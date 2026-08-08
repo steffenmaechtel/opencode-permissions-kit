@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
-    sudo curl git acl python3 ca-certificates \
+    sudo curl git acl python3 ca-certificates nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash -G sudo dev \

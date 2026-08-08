@@ -9,8 +9,9 @@ Once installed, a developer opens a terminal in a project directory and runs `op
 ## Quick Start
 
 ```bash
-opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+npm install -g @steffenmaechtel/opencode-permissions-kit
 sudo opencode-permissions-kit-setup
+opencode plugin @steffenmaechtel/opencode-permissions-kit -g
 ```
 
 Follow the prompts to select project directories. After setup, `cd` into a project and run:
@@ -223,7 +224,7 @@ cp src/index.ts ~/.config/opencode/plugins/
 Type `/permission-status` in opencode to see:
 
 ```
-Permission-Control v0.0.6 (hardened)
+Permission-Control v0.0.7 (hardened)
   User: opencode exists
   Wrapper: /usr/local/bin/opencode
   Config: /home/opencode/.config/opencode/opencode.jsonc

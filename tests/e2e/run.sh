@@ -69,7 +69,7 @@ echo "normal source code"    > "$TMP_PROJECT/test-project/index.php"
 echo ""
 echo "--- Running E2E container ---"
 docker run -d --name "$CONTAINER" \
-    -v "$REPO_DIR:/home/dev/repo:ro" \
+    -v "$REPO_DIR:/home/dev/repo" \
     -v "$TMP_PROJECT/test-project:/var/www/vhosts/test-project" \
     --privileged \
     "$IMAGE" sleep infinity
@@ -80,7 +80,6 @@ echo ""
 echo "--- 1. Install opencode ---"
 E 'curl -fsSL https://opencode.ai/install | bash' || {
     echo "  ${RED}FAIL${NC}  opencode installer failed (network issue?)"
-    # Fallback: check if any opencode binary already exists
     if E 'test -x /home/dev/.opencode/bin/opencode'; then
         echo "  ${GREEN}OK${NC}  opencode binary already present"
     else
@@ -93,12 +92,17 @@ E 'curl -fsSL https://opencode.ai/install | bash' || {
 }
 
 echo ""
-echo "--- 2. Run setup.sh ---"
-E 'sudo /home/dev/repo/files/setup.sh --yes --projects /var/www/vhosts'
+echo "--- 2. npm install -g (from local repo) ---"
+E 'sudo npm install -g /home/dev/repo'
+echo "  npm install complete."
+
+echo ""
+echo "--- 3. Run setup ---"
+E 'sudo opencode-permissions-kit-setup --yes --projects /var/www/vhosts'
 echo "  Setup complete."
 
 echo ""
-echo "--- 3. Wrapper & binary ---"
+echo "--- 4. Wrapper & binary ---"
 check "Wrapper at /usr/local/bin/opencode" \
     E 'test -x /usr/local/bin/opencode'
 check "Binary at /usr/local/lib/opencode/bin/opencode" \
@@ -107,7 +111,7 @@ check "Wrapper is first in PATH" \
     E 'test "$(which opencode)" = "/usr/local/bin/opencode"'
 
 echo ""
-echo "--- 4. User & group ---"
+echo "--- 5. User & group ---"
 check "User opencode exists" \
     E 'id opencode'
 check "opencode is in www-data" \
@@ -116,7 +120,7 @@ check "www-data group exists" \
     E 'getent group www-data'
 
 echo ""
-echo "--- 5. File protection (ACL deny for opencode) ---"
+echo "--- 6. File protection (ACL deny for opencode) ---"
 check_fail ".env blocked" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 check_fail "settings.php blocked" \
@@ -129,31 +133,31 @@ check "index.php readable" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/index.php'
 
 echo ""
-echo "--- 6. Config & agents ---"
+echo "--- 7. Config & agents ---"
 check "Config deployed" \
     E 'sudo test -f /home/opencode/.config/opencode/opencode.jsonc'
 check "Agents dir exists" \
     E 'sudo test -d /home/opencode/.agents/'
 
 echo ""
-echo "--- 7. Git hooks ---"
+echo "--- 8. Git hooks ---"
 check "core.hooksPath set" \
     E 'git config --global core.hooksPath | grep -q /usr/local/lib/opencode/hooks'
 check "Hooks directory exists" \
     E 'test -d /usr/local/lib/opencode/hooks'
 
 echo ""
-echo "--- 8. Umask ---"
+echo "--- 9. Umask ---"
 check "umask script deployed" \
     E 'test -f /etc/profile.d/opencode-umask.sh'
 
 echo ""
-echo "--- 9. protect-projects idempotent ---"
+echo "--- 10. protect-projects idempotent ---"
 E 'sudo /usr/local/lib/opencode/protect-projects.sh --force' && \
     echo "  ${GREEN}OK${NC}  protect-projects.sh runs without error"
 
 echo ""
-echo "--- 10. Sensitive file created after setup ---"
+echo "--- 11. Sensitive file created after setup ---"
 E 'echo "new-secret" | sudo tee /var/www/vhosts/test-project/.env.local > /dev/null'
 E 'sudo /usr/local/lib/opencode/protect-projects.sh --force'
 check_fail ".env.local blocked after protect run" \

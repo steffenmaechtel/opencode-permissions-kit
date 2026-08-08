@@ -2,7 +2,7 @@
 
 Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, settings, and more at the filesystem level.
 
-**One command:** `sudo opencode-permissions-kit-setup` — then `opencode` runs as a dedicated user with hard filesystem denies.
+**Two steps:** `npm install -g` + `sudo opencode-permissions-kit-setup` — then `opencode` runs as a dedicated user with hard filesystem denies.
 
 ## How It Works
 
@@ -17,11 +17,17 @@ Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_
 ## Quick Start
 
 ```bash
-opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+npm install -g @steffenmaechtel/opencode-permissions-kit
 sudo opencode-permissions-kit-setup
 ```
 
-Follow the prompts. Then navigate to a project and run:
+Then install the opencode plugin:
+
+```bash
+opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+```
+
+Navigate to a project and run:
 
 ```bash
 opencode
@@ -53,7 +59,7 @@ Example output:
 └  Done
 ```
 
-The plugin detects whether hardening is active and provides the `/permission-status` command.
+The plugin is included in the npm package. If you only need the binaries, opencode's built-in permission rules also work without the plugin.
 
 ## Uninstall
 
