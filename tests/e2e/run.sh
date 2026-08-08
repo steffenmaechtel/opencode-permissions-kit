@@ -131,9 +131,9 @@ check "index.php readable" \
 echo ""
 echo "--- 6. Config & agents ---"
 check "Config deployed" \
-    E 'test -f /home/opencode/.config/opencode/opencode.jsonc'
+    E 'sudo test -f /home/opencode/.config/opencode/opencode.jsonc'
 check "Agents dir exists" \
-    E 'test -d /home/opencode/.agents/'
+    E 'sudo test -d /home/opencode/.agents/'
 
 echo ""
 echo "--- 7. Git hooks ---"
@@ -149,15 +149,15 @@ check "umask script deployed" \
 
 echo ""
 echo "--- 9. protect-projects idempotent ---"
-E 'sudo /usr/local/lib/opencode/protect-projects.sh' && \
+E 'sudo /usr/local/lib/opencode/protect-projects.sh --force' && \
     echo "  ${GREEN}OK${NC}  protect-projects.sh runs without error"
 
 echo ""
 echo "--- 10. Sensitive file created after setup ---"
-E 'echo "new-secret" | sudo tee /var/www/vhosts/test-project/new.env > /dev/null'
-E 'sudo /usr/local/lib/opencode/protect-projects.sh'
-check_fail "new.env blocked after protect run" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/new.env'
+E 'echo "new-secret" | sudo tee /var/www/vhosts/test-project/.env.local > /dev/null'
+E 'sudo /usr/local/lib/opencode/protect-projects.sh --force'
+check_fail ".env.local blocked after protect run" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env.local'
 
 echo ""
 echo "=============================================="
