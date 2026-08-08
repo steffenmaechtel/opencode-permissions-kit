@@ -1,5 +1,5 @@
 #!/bin/sh
-# opencode Permission-Control Setup-Kit -- setup.sh
+# opencode permissions kit -- setup.sh
 # Idempotent one-shot setup for WSL2 + DDEV environments.
 # Run as your default (non-root) user with sudo privileges:
 #   ./setup.sh
@@ -80,7 +80,7 @@ prompt() {
 
 banner() {
     echo ""
-    echo "  ${GREEN}openCode Permission-Control Setup-Kit${NC}  v$VERSION"
+    echo "  ${GREEN}opencode permissions kit${NC}  v$VERSION"
     echo "  ${CYAN}=============================================${NC}"
     echo ""
 }

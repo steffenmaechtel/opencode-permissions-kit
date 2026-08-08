@@ -1,5 +1,5 @@
 #!/bin/sh
-# opencode Permission-Control Setup-Kit — Verification suite
+# opencode permissions kit — Verification suite
 # Run after setup.sh to confirm everything works.
 set -e
 
@@ -23,7 +23,7 @@ check() {
 }
 
 echo ""
-echo "openCode Permission-Control Setup-Kit — Verification"
+echo "opencode permissions kit — Verification"
 echo "======================================================"
 echo ""
 

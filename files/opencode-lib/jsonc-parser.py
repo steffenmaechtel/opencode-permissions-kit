@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-opencode Permission-Control Setup-Kit — JSONC Pattern Extractor
+opencode permissions kit — JSONC Pattern Extractor
 
 Parses opencode.json[c] and extracts deny or allow patterns from
 permission.read and permission.edit sections.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# opencode Permission-Control Setup-Kit — Wrapper
+# opencode permissions kit — Wrapper
 # This file is deployed to /usr/local/bin/opencode by setup.sh.
 # It ensures opencode always runs as the dedicated 'opencode' user.
 set -e

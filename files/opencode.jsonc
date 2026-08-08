@@ -1,6 +1,6 @@
 {
     "$schema": "https://opencode.ai/config.json",
-    // opencode Permission-Control Setup-Kit — default permission template
+    // opencode permissions kit — default permission template
     // Customize this file to add project-specific rules or allowed commands.
 
     "share": "disabled",

@@ -1,5 +1,5 @@
 #!/bin/sh
-# opencode Permission-Control Setup-Kit -- uninstall.sh
+# opencode permissions kit -- uninstall.sh
 # Removes ALL changes made by setup.sh. Must be run as your default user with sudo.
 #
 # Options:
@@ -37,7 +37,7 @@ OPENCODE_USER="opencode"
 WWW_GROUP="www-data"
 
 echo ""
-echo "  ${RED}openCode Permission-Control Setup-Kit -- UNINSTALL${NC}"
+echo "  ${RED}opencode permissions kit -- UNINSTALL${NC}"
 echo "  This will remove ALL changes made by setup.sh."
 echo ""
 

@@ -1,5 +1,5 @@
 /**
- * opencode Permission-Control Setup-Kit — Plugin
+ * opencode permissions kit — Plugin
  *
  * Two modes:
  *   Setup mode  — hardening not active, guides user through first-time setup
@@ -94,7 +94,7 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
 
         console.log(`
 ╔══════════════════════════════════════════════╗
-║  openCode Permission-Control Setup-Kit      ║
+║  opencode permissions kit      ║
 ║                                              ║
 ║  openCode is running with full filesystem    ║
 ║  access. Harden it via:                      ║

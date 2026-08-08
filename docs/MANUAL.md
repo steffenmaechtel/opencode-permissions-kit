@@ -1,4 +1,4 @@
-# opencode Permission-Control Setup-Kit — Manual
+# opencode permissions kit — Manual
 
 ## What It Does
 

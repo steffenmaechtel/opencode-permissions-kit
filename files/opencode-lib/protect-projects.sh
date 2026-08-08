@@ -1,5 +1,5 @@
 #!/bin/sh
-# opencode Permission-Control Setup-Kit — protect-projects.sh
+# opencode permissions kit — protect-projects.sh
 # Applies hard Linux ACL denies (u:opencode:---) to sensitive files
 # defined in /home/opencode/.config/opencode/opencode.json[c].
 # Also scans each project root for <root>/opencode.json[c] and applies
