@@ -10,7 +10,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-VERSION="0.0.4"
+VERSION="0.0.5"
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -89,16 +89,7 @@ banner() {
 
 banner
 
-if ! sudo -n true 2>/dev/null; then
-    echo "This setup requires sudo. Run as your normal user with sudo privileges."
-    exit 1
-fi
-
-DEFAULT_USER=$(whoami)
-if [ "$DEFAULT_USER" = "root" ]; then
-    echo "${RED}Do not run setup.sh as root. Run as your normal user with sudo.${NC}"
-    exit 1
-fi
+DEFAULT_USER="${SUDO_USER:-$(whoami)}"
 
 if ! grep -qi microsoft /proc/version 2>/dev/null; then
     ans=$(prompt "This does not appear to be WSL2. Continue anyway?" "Y" "N" "")
