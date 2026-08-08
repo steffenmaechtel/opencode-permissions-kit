@@ -323,6 +323,10 @@ fi
 for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
     if [ -f "$cf" ]; then
         sudo sed -i '\|\.opencode/bin|d' "$cf" 2>/dev/null || true
+        if ! sudo grep -q '# opencode permissions kit' "$cf" 2>/dev/null; then
+            echo "" | sudo tee -a "$cf" > /dev/null
+            echo 'export PATH="/usr/local/bin:$PATH"  # opencode permissions kit' | sudo tee -a "$cf" > /dev/null
+        fi
     fi
 done
 

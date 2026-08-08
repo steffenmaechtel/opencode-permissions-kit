@@ -6,7 +6,6 @@
 #   --yes        Skip all prompts, assume Yes
 #   --dry-run    Show what would be removed without changing anything
 #   --debug      Trace execution (set -x)
-set -e
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
