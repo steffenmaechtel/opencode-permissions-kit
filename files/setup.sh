@@ -10,7 +10,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VERSION="0.0.1"
+VERSION="0.0.2"
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'

@@ -94,12 +94,12 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
 
         console.log(`
 ╔══════════════════════════════════════════════╗
-║  opencode permissions kit      ║
+║  opencode permissions kit                    ║
 ║                                              ║
 ║  openCode is running with full filesystem    ║
 ║  access. Harden it via:                      ║
 ║                                              ║
-║    sudo ./files/setup.sh      ║
+║    sudo ./files/setup.sh                     ║
 ║                                              ║
 ║  This will:                                  ║
 ║  • Create a dedicated 'opencode' user        ║
@@ -109,6 +109,7 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
 ║  After setup restart openCode.               ║
 ╚══════════════════════════════════════════════╝
         `.trim())
+        process.exit(0)
     }
 
     return {
@@ -140,7 +141,7 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
                 input.command = null // suppress original
 
                 if (stats.mode === "hardened") {
-                    console.log("Permission-Control v0.0.1 (hardened)")
+                    console.log("Permission-Control v0.0.2 (hardened)")
                     console.log(`  User: opencode ${stats.userExists ? "exists" : "MISSING"}`)
                     console.log(`  Wrapper: ${stats.wrapperExists ? "/usr/local/bin/opencode" : "MISSING"}`)
                     console.log(`  Config: ${stats.configFile || "none"}`)
