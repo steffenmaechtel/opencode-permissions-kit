@@ -223,7 +223,7 @@ cp src/index.ts ~/.config/opencode/plugins/
 Type `/permission-status` in opencode to see:
 
 ```
-Permission-Control v0.0.5 (hardened)
+Permission-Control v0.0.6 (hardened)
   User: opencode exists
   Wrapper: /usr/local/bin/opencode
   Config: /home/opencode/.config/opencode/opencode.jsonc

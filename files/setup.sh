@@ -10,7 +10,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-VERSION="0.0.5"
+VERSION="0.0.6"
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -112,7 +112,6 @@ fi
 BACKUP_DIR="/tmp/opencode-setup-backup-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 echo "Backup directory: $BACKUP_DIR"
-getfacl -R /var/www/vhosts 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
 sudo -u "$DEFAULT_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" || true
 sudo -u "$OPENCODE_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
 [ -f /etc/opencode/sudoers ] && cp /etc/opencode/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
@@ -222,6 +221,12 @@ if [ -n "$PROJECTS_ROOTS" ]; then
 else
     sudo touch /etc/opencode/projects.conf
     echo "No project roots configured."
+fi
+
+# Backup project ACLs now that roots are known
+if [ -n "$PROJECTS_ROOTS" ]; then
+    sudo getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
+    echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
 fi
 
 sudo tee /etc/opencode/setup.conf > /dev/null <<EOF
