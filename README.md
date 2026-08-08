@@ -1,4 +1,4 @@
-# opencode Permission-Control Setup-Kit
+# opencode permissions kit
 
 Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, settings, and more at the filesystem level.
 

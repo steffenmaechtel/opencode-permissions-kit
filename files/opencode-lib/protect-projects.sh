@@ -11,9 +11,14 @@
 set -e
 
 FORCE=false
-case "${1:-}" in
-    --force) FORCE=true ;;
-esac
+CWD=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --force) FORCE=true ;;
+        --cwd)   CWD="$2"; shift ;;
+    esac
+    shift
+done
 
 PROJECTS_CONF="/etc/opencode/projects.conf"
 SETUP_CONF="/etc/opencode/setup.conf"
@@ -73,6 +78,17 @@ while IFS= read -r root; do
     done
 done < "$PROJECTS_CONF"
 
+# CWD project config detection (for cache key, before cache check)
+CWD_CONFIG=""
+if [ -n "$CWD" ]; then
+    if [ -f "$CWD/opencode.jsonc" ]; then CWD_CONFIG="$CWD/opencode.jsonc"
+    elif [ -f "$CWD/opencode.json" ]; then CWD_CONFIG="$CWD/opencode.json"; fi
+fi
+if [ -n "$CWD_CONFIG" ]; then
+    CWD_MTIME=$(stat -c '%Y' "$CWD_CONFIG" 2>/dev/null || echo "0")
+    PROJECT_CONFIGS_MTIME=$((PROJECT_CONFIGS_MTIME + CWD_MTIME))
+fi
+
 # === Cache: skip full scan if nothing changed and not forced ===
 if [ "$FORCE" != true ] && [ -f "$CACHE_FILE" ]; then
     CACHED_CONFIG=$(grep '^config_mtime=' "$CACHE_FILE" 2>/dev/null | cut -d= -f2)
@@ -112,6 +128,20 @@ build_find_args() {
         args="$args \)"
     fi
     echo "$args"
+}
+
+# Check if a given path is under any project root
+is_under_root() {
+    local path="$1"
+    while IFS= read -r root; do
+        [ -z "$root" ] && continue
+        [ ! -d "$root" ] && continue
+        root_clean="${root%/}"
+        if [ "$path" = "$root_clean" ] || [ "${path#$root_clean/}" != "$path" ]; then
+            return 0
+        fi
+    done < "$PROJECTS_CONF"
+    return 1
 }
 
 # Apply ACL denies + close ownership gap for a single project root
@@ -187,6 +217,25 @@ while IFS= read -r root; do
         fi
     fi
 done < "$PROJECTS_CONF"
+
+# === CWD project config (opencode started in this directory) ===
+if [ -n "$CWD_CONFIG" ] && is_under_root "$CWD"; then
+    # Apply CWD-specific denies (additional to global)
+    CWD_PATTERNS=$($PARSER "$CWD_CONFIG" 2>/dev/null || true)
+    if [ -n "$CWD_PATTERNS" ]; then
+        echo "$CWD_PATTERNS" > "$TMP_PATTERNS"
+        CWD_FIND_ARGS=$(build_find_args "$TMP_PATTERNS")
+        apply_acls "$CWD" "$CWD_FIND_ARGS"
+    fi
+
+    # Remove global denies for CWD-level allow patterns
+    CWD_ALLOW=$($PARSER --allow "$CWD_CONFIG" 2>/dev/null || true)
+    if [ -n "$CWD_ALLOW" ]; then
+        echo "$CWD_ALLOW" > "$TMP_PATTERNS"
+        ALLOW_FIND_ARGS=$(build_find_args "$TMP_PATTERNS")
+        remove_acls "$CWD" "$ALLOW_FIND_ARGS"
+    fi
+fi
 
 # Update cache
 printf 'config_mtime=%s\nprojects_mtime=%s\nproject_configs_mtime=%s\n' \

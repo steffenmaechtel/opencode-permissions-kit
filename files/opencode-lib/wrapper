@@ -71,6 +71,6 @@ fi
 printf "  Press Enter to start opencode..."
 read _
 
-/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh
+/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --cwd "$CWD"
 
 exec /usr/bin/sudo -u opencode /usr/local/lib/opencode/bin/opencode "$@"
