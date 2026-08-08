@@ -195,7 +195,7 @@ Add to your `opencode.jsonc`:
 
 ```jsonc
 {
-    "plugin": ["@steffenmaechtel/opencode-permission-kit"]
+    "plugin": ["@steffenmaechtel/opencode-permissions-kit"]
 }
 ```
 

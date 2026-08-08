@@ -10,7 +10,7 @@ Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, s
 - **Wrapper** — every `opencode` invocation validates the directory, refreshes ACLs, then execs as the `opencode` user
 - **Git hooks** — ACLs are re-applied automatically after checkout, merge, and commit
 - **Project-specific configs** — add or override deny rules per project
-- **opencode plugin** — available as npm package `@steffenmaechtel/opencode-permission-kit`
+- **opencode plugin** — available as npm package `@steffenmaechtel/opencode-permissions-kit`
 
 Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_rsa*`, `*id_ed25519*`, `wp-config.php`, `LocalConfiguration.php`, `README.md`, `*.sql.gz`, and more.
 
@@ -34,7 +34,7 @@ Add to your `opencode.jsonc`:
 
 ```jsonc
 {
-    "plugin": ["@steffenmaechtel/opencode-permission-kit"]
+    "plugin": ["@steffenmaechtel/opencode-permissions-kit"]
 }
 ```
 

@@ -52,7 +52,7 @@ fi
 
 echo ""
 echo "  ${GREEN}SECURED BY opencode permissions kit${NC}"
-echo "  ${CYAN}@steffenmaechtel/opencode-permission-kit${NC}"
+echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
 echo ""
 
 # Check for project-level allow overrides
