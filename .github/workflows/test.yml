@@ -7,6 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Make scripts executable
+        run: chmod +x ./tests/test-wrapper-validation.sh ./tests/test-project-config.sh
       - name: Run wrapper validation tests
         run: ./tests/test-wrapper-validation.sh
       - name: Run project config tests

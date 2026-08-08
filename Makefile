@@ -1,4 +1,4 @@
-.PHONY: help test test-wrapper test-config verify setup-dev clean
+.PHONY: help test test-wrapper test-config verify e2e setup-dev clean
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -7,6 +7,7 @@ help:
 	@echo "  make test-wrapper  Run wrapper validation tests"
 	@echo "  make test-config   Run project config tests"
 	@echo "  make verify        Run system verification (requires setup.sh)"
+	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make setup-dev     Quick dev setup (skip prompts)"
 	@echo "  make clean         Uninstall"
 
@@ -24,6 +25,9 @@ test-config:
 
 verify:
 	@./tests/verify.sh
+
+e2e:
+	@./tests/e2e/run.sh
 
 setup-dev:
 	@sudo ./files/setup.sh --yes $(if $(PROJECTS),--projects $(PROJECTS))

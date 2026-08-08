@@ -1,0 +1,17 @@
+name: e2e
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run E2E test
+        run: |
+          chmod +x ./tests/e2e/run.sh
+          ./tests/e2e/run.sh
