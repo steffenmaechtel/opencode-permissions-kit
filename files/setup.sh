@@ -9,7 +9,7 @@
 #   --projects <path...>  Pre-define project roots, skip interactive selection
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 VERSION="0.0.3"
 
 GREEN='\033[0;32m'

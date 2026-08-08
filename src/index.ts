@@ -87,12 +87,12 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
             body: {
                 service: "permission-kit",
                 level: "warn",
-                message: "opencode is NOT hardened. Run setup.sh to enable Linux-ACL protection.",
+                message: "opencode is NOT hardened. Run opencode-permissions-kit-setup to enable Linux-ACL protection.",
                 extra: { directory },
             },
         })
 
-        console.log(`
+        process.stderr.write(`
 ╔══════════════════════════════════════════════╗
 ║  opencode permissions kit                    ║
 ║                                              ║
@@ -108,7 +108,7 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
 ║                                              ║
 ║  After setup restart opencode.               ║
 ╚══════════════════════════════════════════════╝
-        `.trim())
+`)
         process.exit(0)
     }
 
