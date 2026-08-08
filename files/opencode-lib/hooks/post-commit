@@ -1,0 +1,3 @@
+#!/bin/sh
+# Hook: post-commit
+/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force

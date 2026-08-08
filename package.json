@@ -1,0 +1,10 @@
+{
+  "name": "@steffenmaechtel/opencode-permission-kit",
+  "version": "0.0.1",
+  "description": "Hardens opencode via Linux ACLs — deny access to .env, keys, settings",
+  "type": "module",
+  "main": "src/index.ts",
+  "files": ["src/", "files/"],
+  "keywords": ["opencode", "permission", "security", "acl", "hardening"],
+  "license": "MIT"
+}

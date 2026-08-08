@@ -1,0 +1,3 @@
+#!/bin/sh
+# Hook: post-merge
+/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force

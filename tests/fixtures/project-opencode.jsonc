@@ -1,0 +1,43 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "permission": {
+        "read": {
+            "secret-tokens.json": "deny",
+            "**/secret-tokens.json": "deny",
+            "deploy/keys/*.pem": "deny",
+            "dump*.sql": "deny",
+            "**/dump*.sql": "deny",
+            "additional.php": "deny",
+            "**/additional.php": "deny",
+            "settings.php": "deny",
+            "**/settings.php": "deny",
+            "LocalConfiguration.php": "deny",
+            "**/LocalConfiguration.php": "deny",
+            "AdditionalConfiguration.php": "deny",
+            "**/AdditionalConfiguration.php": "deny"
+        },
+        "edit": {
+            "secret-tokens.json": "deny",
+            "**/secret-tokens.json": "deny",
+            "deploy/keys/*.pem": "deny",
+            "dump*.sql": "deny",
+            "**/dump*.sql": "deny",
+            "additional.php": "deny",
+            "**/additional.php": "deny",
+            "settings.php": "deny",
+            "**/settings.php": "deny",
+            "LocalConfiguration.php": "deny",
+            "**/LocalConfiguration.php": "deny",
+            "AdditionalConfiguration.php": "deny",
+            "**/AdditionalConfiguration.php": "deny"
+        },
+        "bash": {
+            "yarn dev": "allow",
+            "yarn build": "allow",
+            "composer install*": "allow",
+            "composer update*": "allow",
+            "ddev composer *": "allow",
+            "ddev typo3 *": "ask"
+        }
+    }
+}

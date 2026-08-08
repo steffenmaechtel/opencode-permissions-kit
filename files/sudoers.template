@@ -1,0 +1,7 @@
+# opencode Permission-Control Setup-Kit — sudoers rule
+# Deployed to /etc/opencode/sudoers, symlinked as /etc/sudoers.d/opencode.
+# DEFAULT_USER is replaced at install time with the actual username.
+
+DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode/bin/opencode *
+DEFAULT_USER ALL=(root)      NOPASSWD: /usr/local/lib/opencode/protect-projects.sh *
+opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode/protect-projects.sh *

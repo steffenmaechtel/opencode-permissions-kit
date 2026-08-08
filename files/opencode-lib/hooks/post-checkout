@@ -1,0 +1,3 @@
+#!/bin/sh
+# Hook: post-checkout
+/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force

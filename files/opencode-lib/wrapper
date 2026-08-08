@@ -1,0 +1,76 @@
+#!/bin/sh
+# opencode Permission-Control Setup-Kit — Wrapper
+# This file is deployed to /usr/local/bin/opencode by setup.sh.
+# It ensures opencode always runs as the dedicated 'opencode' user.
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+PROJECTS_CONF="/etc/opencode/projects.conf"
+
+CWD=$(pwd)
+VALID=false
+if [ -f "$PROJECTS_CONF" ]; then
+    while IFS= read -r root; do
+        [ -z "$root" ] && continue
+        [ ! -d "$root" ] && continue
+        root_clean="${root%/}"
+        if [ "$CWD" = "$root_clean" ] || [ "${CWD#$root_clean/}" != "$CWD" ]; then
+            VALID=true
+            break
+        fi
+    done < "$PROJECTS_CONF"
+fi
+
+if [ "$VALID" != true ]; then
+    echo ""
+    echo "  ${RED}ERROR: opencode cannot be started here${NC}"
+    echo "  ${YELLOW}$CWD${NC} is not a valid project directory."
+    echo ""
+    echo "  Valid project directories:"
+    if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+        count=0
+        while IFS= read -r root; do
+            [ -z "$root" ] && continue
+            count=$((count + 1))
+            if [ "$count" -gt 10 ]; then
+                echo "  ... and more"
+                break
+            fi
+            printf "  - %s\n" "$root"
+        done < "$PROJECTS_CONF"
+    else
+        echo "  (none configured — run setup.sh first)"
+    fi
+    echo ""
+    exit 1
+fi
+
+echo ""
+echo "  ${GREEN}SECURED BY opencode permissions kit${NC}"
+echo "  ${CYAN}@steffenmaechtel/opencode-permission-kit${NC}"
+echo ""
+
+# Check for project-level allow overrides
+PROJECT_CONFIG=""
+if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
+elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
+if [ -n "$PROJECT_CONFIG" ]; then
+    PROJECT_ALLOW=$(python3 /usr/local/lib/opencode/jsonc-parser.py --allow "$PROJECT_CONFIG" 2>/dev/null || true)
+    if [ -n "$PROJECT_ALLOW" ]; then
+        echo "  ${YELLOW}WARNING: This project overrides global deny rules:${NC}"
+        echo "$PROJECT_ALLOW" | sed 's/^/    - /'
+        echo ""
+    fi
+fi
+
+printf "  Press Enter to start opencode..."
+read _
+
+/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh
+
+exec /usr/bin/sudo -u opencode /usr/local/lib/opencode/bin/opencode "$@"
