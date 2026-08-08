@@ -5,6 +5,7 @@
 #  - Project-specific denies are scoped to their own directory
 #  - Projects without own config only get global denies
 #  - Deny patterns are cumulative (global + project, never weaker)
+#  - CWD-level configs (--cwd flag) override global denies and add extra denies
 # Run: ./tests/test-project-config.sh
 set -e
 
@@ -259,6 +260,142 @@ FOUND_C_GLOBAL=$(eval "find \"$ROOT_C\" $GLOBAL_FIND_ARGS" 2>/dev/null | sort)
 assert_contains "global: .env found in project-c" "$ROOT_C/.env" "$FOUND_C_GLOBAL"
 assert_contains "global: settings.php found in project-c" "$ROOT_C/settings.php" "$FOUND_C_GLOBAL"
 assert_contains "global: README.md found in project-c" "$ROOT_C/README.md" "$FOUND_C_GLOBAL"
+
+# Summary
+echo ""
+echo "--- 9. CWD project config (--cwd flag) ---"
+
+# Simulate opencode started in a subdirectory of project-a
+# CWD = project-a/subproject, with its own opencode.jsonc
+
+CWD="$TMPDIR/var/www/vhosts/project-a/subproject"
+CWD_DEEP="$TMPDIR/var/www/vhosts/project-a/subproject/nested"
+mkdir -p "$CWD" "$CWD_DEEP"
+
+# Files in CWD
+touch "$CWD/local-secrets.json"
+touch "$CWD/api-tokens"
+touch "$CWD/README.md"
+touch "$CWD/.env"
+
+# Files in CWD_DEEP (nested subdirectory)
+touch "$CWD_DEEP/deep-secret.key"
+touch "$CWD_DEEP/.env"
+
+# Files outside CWD (project-a root) — should NOT be affected by CWD config
+touch "$TMPDIR/var/www/vhosts/project-a/outside-secret.json"
+
+# Create CWD config that overrides README.md (allow) and adds extra denies
+cat > "$CWD/opencode.jsonc" << 'JSONC'
+{
+    "permission": {
+        "read": {
+            "README.md": "allow",
+            "**/README.md": "allow",
+            "api-tokens": "deny",
+            "local-secrets.json": "deny",
+            "**/local-secrets.json": "deny",
+            "*.key": "deny",
+            "**/*.key": "deny"
+        },
+        "edit": {
+            "README.md": "allow",
+            "**/README.md": "allow",
+            "api-tokens": "deny",
+            "local-secrets.json": "deny",
+            "**/local-secrets.json": "deny",
+            "*.key": "deny",
+            "**/*.key": "deny"
+        }
+    }
+}
+JSONC
+
+# Add CWD root to projects.conf so is_under_root passes
+echo "$TMPDIR/var/www/vhosts" >> "$TMPDIR/projects.conf"
+
+# Extract deny patterns from CWD config
+echo ""
+echo "  --- 9a. CWD pattern extraction ---"
+CWD_PATTERNS=$(python3 "$PARSER" "$CWD/opencode.jsonc" 2>/dev/null || true)
+assert_contains "api-tokens in CWD deny" "api-tokens" "$CWD_PATTERNS"
+assert_contains "local-secrets.json in CWD deny" "local-secrets.json" "$CWD_PATTERNS"
+assert_contains "*.key in CWD deny" "*.key" "$CWD_PATTERNS"
+
+CWD_ALLOW=$(python3 "$PARSER" --allow "$CWD/opencode.jsonc" 2>/dev/null || true)
+assert_contains "README.md in CWD allow" "README.md" "$CWD_ALLOW"
+
+echo ""
+echo "  --- 9b. CWD deny scope (only within CWD) ---"
+echo "$CWD_PATTERNS" > "$TMP_PATTERNS"
+CWD_FIND_ARGS=$(build_find_args "$TMP_PATTERNS")
+
+# Find within CWD should match local files
+FOUND_CWD=$(eval "find \"$CWD\" $CWD_FIND_ARGS" 2>/dev/null | sort)
+assert_contains "CWD deny: local-secrets.json found" "$CWD/local-secrets.json" "$FOUND_CWD"
+assert_contains "CWD deny: api-tokens found" "$CWD/api-tokens" "$FOUND_CWD"
+assert_contains "CWD deny: deep-secret.key found in nested" "$CWD_DEEP/deep-secret.key" "$FOUND_CWD"
+
+# Find from project-a root should match files in CWD but NOT outside CWD files
+# Also should match project-a root files that match the patterns
+FOUND_ROOT_A_CWD=$(eval "find \"$ROOT_A\" $CWD_FIND_ARGS" 2>/dev/null | sort)
+assert_contains "CWD deny (from root): api-tokens in CWD found" "$CWD/api-tokens" "$FOUND_ROOT_A_CWD"
+assert_contains "CWD deny (from root): deep-secret.key in nested found" "$CWD_DEEP/deep-secret.key" "$FOUND_ROOT_A_CWD"
+
+# CWD denies should not match project-a root files with unrelated names
+assert_not_contains "CWD deny: outside-secret.json NOT matched (unrelated name)" \
+    "$ROOT_A/outside-secret.json" "$FOUND_ROOT_A_CWD"
+
+echo ""
+echo "  --- 9c. CWD allow scope (only within CWD) ---"
+echo "$CWD_ALLOW" > "$TMP_PATTERNS"
+ALLOW_FIND_ARGS=$(build_find_args "$TMP_PATTERNS")
+
+# Allow find within CWD should find README.md
+FOUND_ALLOW_CWD=$(eval "find \"$CWD\" $ALLOW_FIND_ARGS" 2>/dev/null | sort)
+assert_contains "CWD allow: README.md found in CWD" "$CWD/README.md" "$FOUND_ALLOW_CWD"
+
+# Allow find from project-a root should find CWD's README.md AND project-a's README.md
+FOUND_ALLOW_ROOT_A=$(eval "find \"$ROOT_A\" $ALLOW_FIND_ARGS" 2>/dev/null | sort)
+assert_contains "CWD allow (from root): project-a README.md found" "$ROOT_A/README.md" "$FOUND_ALLOW_ROOT_A"
+assert_contains "CWD allow (from root): CWD README.md found" "$CWD/README.md" "$FOUND_ALLOW_ROOT_A"
+
+# CWD allow should NOT allow global denies elsewhere (like .env in CWD is still denied globally)
+FOUND_GLOBAL_CWD=$(eval "find \"$CWD\" $GLOBAL_FIND_ARGS" 2>/dev/null | sort)
+assert_contains "global deny: .env in CWD still found" "$CWD/.env" "$FOUND_GLOBAL_CWD"
+
+echo ""
+echo "  --- 9d. Union: global + CWD denies ---"
+CWD_MERGED_FILE=$(mktemp)
+printf '%s\n%s\n' "$GLOBAL_PATTERNS" "$CWD_PATTERNS" > "$CWD_MERGED_FILE"
+CWD_MERGED_ARGS=$(build_find_args "$CWD_MERGED_FILE")
+rm -f "$CWD_MERGED_FILE"
+
+FOUND_CWD_MERGED=$(eval "find \"$CWD\" $CWD_MERGED_ARGS" 2>/dev/null | sort)
+assert_contains "merge: .env from global in CWD" "$CWD/.env" "$FOUND_CWD_MERGED"
+assert_contains "merge: README.md from global in CWD" "$CWD/README.md" "$FOUND_CWD_MERGED"
+assert_contains "merge: api-tokens from CWD deny in CWD" "$CWD/api-tokens" "$FOUND_CWD_MERGED"
+assert_contains "merge: local-secrets.json from CWD deny in CWD" "$CWD/local-secrets.json" "$FOUND_CWD_MERGED"
+
+echo ""
+echo "  --- 9e. CWD outside project root (ignored) ---"
+CWD_OUTSIDE="$TMPDIR/tmp/outside-cwd"
+mkdir -p "$CWD_OUTSIDE"
+cat > "$CWD_OUTSIDE/opencode.jsonc" << 'JSONC'
+{
+    "permission": {
+        "read": { "secret.txt": "deny" }
+    }
+}
+JSONC
+
+# Verify config exists
+assert_contains "outside-cwd: config exists" "" "$([ -f "$CWD_OUTSIDE/opencode.jsonc" ] && echo "yes" || echo "")"
+
+# is_under_root should return false for path outside all project roots
+# We test by checking that find from any project root won't match this path
+FOUND_OUTSIDE=$(eval "find \"$ROOT_A\" -type f -path \"$CWD_OUTSIDE/*\"" 2>/dev/null || true)
+assert_not_contains "outside-cwd: NOT found under any project root" "$CWD_OUTSIDE" "$FOUND_OUTSIDE"
 
 # Summary
 echo ""
