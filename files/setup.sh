@@ -10,7 +10,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-VERSION="0.0.3"
+VERSION="0.0.4"
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'

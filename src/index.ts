@@ -109,7 +109,6 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
 ║  After setup restart opencode.               ║
 ╚══════════════════════════════════════════════╝
 `)
-        process.exit(0)
     }
 
     return {
@@ -141,7 +140,7 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
                 input.command = null // suppress original
 
                 if (stats.mode === "hardened") {
-                    console.log("Permission-Control v0.0.3 (hardened)")
+                    console.log("Permission-Control v0.0.4 (hardened)")
                     console.log(`  User: opencode ${stats.userExists ? "exists" : "MISSING"}`)
                     console.log(`  Wrapper: ${stats.wrapperExists ? "/usr/local/bin/opencode" : "MISSING"}`)
                     console.log(`  Config: ${stats.configFile || "none"}`)
