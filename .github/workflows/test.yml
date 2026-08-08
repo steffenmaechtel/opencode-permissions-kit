@@ -1,0 +1,13 @@
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run wrapper validation tests
+        run: ./tests/test-wrapper-validation.sh
+      - name: Run project config tests
+        run: ./tests/test-project-config.sh
