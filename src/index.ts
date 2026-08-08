@@ -87,7 +87,7 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
             body: {
                 service: "permission-kit",
                 level: "warn",
-                message: "openCode is NOT hardened. Run setup.sh to enable Linux-ACL protection.",
+                message: "opencode is NOT hardened. Run setup.sh to enable Linux-ACL protection.",
                 extra: { directory },
             },
         })
@@ -96,17 +96,17 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
 ╔══════════════════════════════════════════════╗
 ║  opencode permissions kit                    ║
 ║                                              ║
-║  openCode is running with full filesystem    ║
+║  opencode is running with full filesystem    ║
 ║  access. Harden it via:                      ║
 ║                                              ║
-║    sudo ./files/setup.sh                     ║
+║    sudo opencode-permissions-kit-setup       ║
 ║                                              ║
 ║  This will:                                  ║
 ║  • Create a dedicated 'opencode' user        ║
 ║  • Deny access to .env, keys, settings       ║
 ║  • Install a secure wrapper + git hooks      ║
 ║                                              ║
-║  After setup restart openCode.               ║
+║  After setup restart opencode.               ║
 ╚══════════════════════════════════════════════╝
         `.trim())
         process.exit(0)
@@ -141,7 +141,7 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
                 input.command = null // suppress original
 
                 if (stats.mode === "hardened") {
-                    console.log("Permission-Control v0.0.2 (hardened)")
+                    console.log("Permission-Control v0.0.3 (hardened)")
                     console.log(`  User: opencode ${stats.userExists ? "exists" : "MISSING"}`)
                     console.log(`  Wrapper: ${stats.wrapperExists ? "/usr/local/bin/opencode" : "MISSING"}`)
                     console.log(`  Config: ${stats.configFile || "none"}`)
@@ -150,7 +150,7 @@ export const PermissionKit: Plugin = async ({ client, $, directory }) => {
                 } else {
                     console.log("Permission-Control (setup mode)")
                     console.log("  Hardening not active.")
-                    console.log("  Run: cd <repo> && sudo ./files/setup.sh")
+                    console.log("  Run: sudo opencode-permissions-kit-setup")
                 }
             }
         },

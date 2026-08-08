@@ -2,7 +2,7 @@
 
 Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, settings, and more at the filesystem level.
 
-**One command:** `sudo ./files/setup.sh` — then `opencode` runs as a dedicated user with hard filesystem denies.
+**One command:** `sudo opencode-permissions-kit-setup` — then `opencode` runs as a dedicated user with hard filesystem denies.
 
 ## How It Works
 
@@ -17,9 +17,8 @@ Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_
 ## Quick Start
 
 ```bash
-git clone https://github.com/steffenmaechtel/opencode-permissions-kit
-cd opencode-permissions-kit
-sudo ./files/setup.sh
+opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+sudo opencode-permissions-kit-setup
 ```
 
 Follow the prompts. Then navigate to a project and run:
@@ -30,12 +29,28 @@ opencode
 
 ## Plugin Installation
 
-Add to your `opencode.jsonc`:
+```bash
+opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+```
 
-```jsonc
-{
-    "plugin": ["@steffenmaechtel/opencode-permissions-kit"]
-}
+Example output:
+
+```
+┌  Install plugin @steffenmaechtel/opencode-permissions-kit
+│
+◇  Plugin package ready
+│
+◇  Detected server target
+│
+◇  Plugin config updated
+│
+●  Added to ~/.config/opencode/opencode.json
+│
+◆  Installed @steffenmaechtel/opencode-permissions-kit
+│
+●  Scope: global (~/.config/opencode)
+│
+└  Done
 ```
 
 The plugin detects whether hardening is active and provides the `/permission-status` command.
@@ -43,7 +58,7 @@ The plugin detects whether hardening is active and provides the `/permission-sta
 ## Uninstall
 
 ```bash
-sudo ./files/uninstall.sh
+sudo opencode-permissions-kit-uninstall
 ```
 
 Removes the `opencode` user, all files, ACLs, hooks, and sudoers rules. Project files are untouched.

@@ -1,11 +1,15 @@
 {
   "name": "@steffenmaechtel/opencode-permissions-kit",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Hardens opencode via Linux ACLs — deny access to .env, keys, settings",
   "type": "module",
   "main": "src/index.ts",
   "files": ["src/", "files/"],
   "keywords": ["opencode", "permission", "security", "acl", "hardening"],
+  "bin": {
+    "opencode-permissions-kit-setup": "./files/setup.sh",
+    "opencode-permissions-kit-uninstall": "./files/uninstall.sh"
+  },
   "author": "Steffen Maechtel <info@steffen-maechtel.de>",
   "repository": {
     "type": "git",

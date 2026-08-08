@@ -9,9 +9,8 @@ Once installed, a developer opens a terminal in a project directory and runs `op
 ## Quick Start
 
 ```bash
-git clone https://github.com/steffenmaechtel/opencode-permissions-kit
-cd opencode-permissions-kit
-sudo ./files/setup.sh
+opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+sudo opencode-permissions-kit-setup
 ```
 
 Follow the prompts to select project directories. After setup, `cd` into a project and run:
@@ -28,12 +27,12 @@ Project roots are stored in `/etc/opencode/projects.conf` (one absolute path per
 
 **Option A — Re-run setup:**
 ```bash
-sudo ./files/setup.sh --projects /var/www/vhosts/new-project
+sudo opencode-permissions-kit-setup --projects /var/www/vhosts/new-project
 ```
 
 You can pass multiple paths:
 ```bash
-sudo ./files/setup.sh --projects /var/www/vhosts/site-a /var/www/vhosts/site-b
+sudo opencode-permissions-kit-setup --projects /var/www/vhosts/site-a /var/www/vhosts/site-b
 ```
 
 **Option B — Edit the config directly:**
@@ -124,7 +123,7 @@ See `tests/fixtures/project-opencode.jsonc` for a full example (TYPO3 project).
 **Enable during setup:**
 
 ```bash
-sudo ./files/setup.sh --secure-git-config
+sudo opencode-permissions-kit-setup --secure-git-config
 ```
 
 Or answer "Yes" when prompted during interactive setup.
@@ -191,12 +190,26 @@ The setup kit is also available as an opencode plugin. The plugin detects whethe
 
 ### Installation
 
-Add to your `opencode.jsonc`:
+```bash
+opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+```
 
-```jsonc
-{
-    "plugin": ["@steffenmaechtel/opencode-permissions-kit"]
-}
+```
+┌  Install plugin @steffenmaechtel/opencode-permissions-kit
+│
+◇  Plugin package ready
+│
+◇  Detected server target
+│
+◇  Plugin config updated
+│
+●  Added to /home/info/.config/opencode/opencode.json
+│
+◆  Installed @steffenmaechtel/opencode-permissions-kit
+│
+●  Scope: global (/home/info/.config/opencode)
+│
+└  Done
 ```
 
 Or locally from the repo:
@@ -210,7 +223,7 @@ cp src/index.ts ~/.config/opencode/plugins/
 Type `/permission-status` in opencode to see:
 
 ```
-Permission-Control v0.0.1 (hardened)
+Permission-Control v0.0.3 (hardened)
   User: opencode exists
   Wrapper: /usr/local/bin/opencode
   Config: /home/opencode/.config/opencode/opencode.jsonc
@@ -221,7 +234,7 @@ Permission-Control v0.0.1 (hardened)
 ## Uninstalling
 
 ```bash
-sudo ./files/uninstall.sh
+sudo opencode-permissions-kit-uninstall
 ```
 
 Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules. Project files are untouched.

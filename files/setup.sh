@@ -10,7 +10,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VERSION="0.0.2"
+VERSION="0.0.3"
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -277,7 +277,7 @@ opencode_found=false
 
 for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
     if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
-        ans=$(prompt "openCode binary found at $loc. Copy to system path and secure with wrapper?" "Y" "N" "B")
+        ans=$(prompt "opencode binary found at $loc. Copy to system path and secure with wrapper?" "Y" "N" "B")
         case "$ans" in
             y)
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
@@ -302,7 +302,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/usr/local/bin/opencode
 done
 
 if [ "$opencode_found" = false ]; then
-    ans=$(prompt "openCode not found. Run official installer (curl -fsSL https://opencode.ai/install | bash)?" "Y" "N" "")
+    ans=$(prompt "opencode not found. Run official installer (curl -fsSL https://opencode.ai/install | bash)?" "Y" "N" "")
     if [ "$ans" = "y" ]; then
         curl -fsSL https://opencode.ai/install | bash
         if [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
