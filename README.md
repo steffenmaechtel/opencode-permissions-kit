@@ -8,7 +8,7 @@ Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, s
 
 - **Linux ACL layer** — `setfacl` blocks the `opencode` user from reading sensitive files
 - **Wrapper** — every `opencode` invocation validates the directory, refreshes ACLs, then execs as the `opencode` user
-- **Git hooks** — ACLs are re-applied automatically after checkout, merge, and commit
+- **Git hooks** — ACLs are re-applied automatically after checkout, merge, and commit, including the project-level `opencode.jsonc` of the current worktree (not just the global denies)
 - **Project-specific configs** — add or override deny rules per project
 - **opencode plugin** — the npm package `@steffenmaechtel/opencode-permissions-kit` is the only thing you install; it bundles the setup/uninstall scripts and exposes them as TUI commands
 
