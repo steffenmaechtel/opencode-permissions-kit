@@ -4,7 +4,13 @@
 
 Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, settings, and more at the filesystem level.
 
-**One step:** install the opencode plugin, then run `/permission-install` — after that, `opencode` runs as a dedicated user with hard filesystem denies.
+**One step:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
+```
+
+After that, `opencode` runs as a dedicated user with hard filesystem denies. No npm package, no plugin, no extra install steps.
 
 ## How It Works
 
@@ -12,19 +18,17 @@ Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, s
 - **Wrapper** — every `opencode` invocation validates the directory, refreshes ACLs, then execs as the `opencode` user
 - **Git hooks** — ACLs are re-applied automatically after checkout, merge, and commit, including the project-level `opencode.jsonc` of the current worktree (not just the global denies)
 - **Project-specific configs** — add or override deny rules per project
-- **opencode plugin** — the npm package `@steffenmaechtel/opencode-permissions-kit` is the only thing you install; it bundles the install/config/update/uninstall scripts and exposes them as TUI commands
+- **No plugin** — the kit is system-level only: one install script, four management scripts in `/usr/local/lib/opencode/`
 
 Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_rsa*`, `*id_ed25519*`, `wp-config.php`, `LocalConfiguration.php`, `README.md`, `*.sql.gz`, and more.
 
 ## Quick Start
 
-Install the plugin:
-
 ```bash
-opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
 ```
 
-Start opencode in a project directory, type `/permission-install`, and copy the printed command into a terminal (it needs `sudo`). The command points at the bundled `install.sh` — no global npm install required.
+The script fetches its sibling files from the same `master` branch, so the one-liner is always a complete, self-consistent install. It asks interactively; add `--yes` and `--projects /var/www/vhosts` to skip prompts.
 
 After the install completes, restart opencode:
 
@@ -32,47 +36,28 @@ After the install completes, restart opencode:
 opencode
 ```
 
-## Plugin Installation
+## Managing the Kit
+
+All management happens in a regular terminal (they need `sudo` anyway — no opencode commands required):
 
 ```bash
-opencode plugin @steffenmaechtel/opencode-permissions-kit -g
+sudo bash /usr/local/lib/opencode/status.sh       # show protection status
+sudo bash /usr/local/lib/opencode/config.sh       # change settings (projects, .git/config, ACL refresh)
+sudo bash /usr/local/lib/opencode/update.sh       # re-deploy the kit after an update
+bash /usr/local/lib/opencode/uninstall.sh         # remove everything (no sudo prefix)
 ```
 
-Example output:
+`status.sh` also works before the kit is installed, so you can check whether hardening is active from any machine.
 
+## Updating
+
+Fetch `update.sh` from `master` and pipe it through sudo — it deploys the matching branch files and leaves `projects.conf`, `install.conf`, `opencode.jsonc`, and the opencode binary untouched:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/update.sh | sudo bash
 ```
-┌  Install plugin @steffenmaechtel/opencode-permissions-kit
-│
-◇  Plugin package ready
-│
-◇  Detected server target
-│
-◇  Plugin config updated
-│
-●  Added to ~/.config/opencode/opencode.json
-│
-◆  Installed @steffenmaechtel/opencode-permissions-kit
-│
-●  Scope: global (~/.config/opencode)
-│
-└  Done
-```
-
-The npm package is installed only as an opencode plugin. The install, config, update, and uninstall scripts are bundled inside it and run via `/permission-install`, `/permission-config`, `/permission-update`, and `/permission-uninstall`.
-
-## Plugin Commands
-
-| Command | Purpose |
-|---|---|
-| `/permission-install` | Prints the `sudo` command to run the bundled `install.sh` (or confirms hardening is active) |
-| `/permission-config` | Change settings post-install: project roots, `.git/config` hardening, ACL refresh |
-| `/permission-update` | Re-deploy the kit after `git pull` without re-asking install questions |
-| `/permission-status` | Shows user, wrapper, config, and protected projects |
-| `/permission-uninstall` | Prints the command to run the bundled `uninstall.sh` |
 
 ## Uninstall
-
-Run `/permission-uninstall` inside opencode, or directly:
 
 ```bash
 bash /usr/local/lib/opencode/uninstall.sh
@@ -93,6 +78,7 @@ See [docs/MANUAL.md](docs/MANUAL.md) for:
 
 - WSL2 (or any Linux with ACL support)
 - `sudo` access
+- `curl`
 
 ## License
 

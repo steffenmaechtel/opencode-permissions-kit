@@ -1,18 +1,20 @@
 #!/bin/sh
 # opencode permissions kit -- update.sh
 # Re-deploys the KIT only (wrapper, hooks, protect-projects.sh, jsonc-parser,
-# sudoers template, umask profile, uninstall.sh, config.sh) onto a system
-# that has already been installed via install.sh. Does NOT touch:
+# sudoers template, umask profile, uninstall.sh, config.sh, status.sh) onto a
+# system that has already been installed via install.sh. Does NOT touch:
 #   - existing /etc/opencode/projects.conf
 #   - existing /etc/opencode/install.conf (DEFAULT_USER / OPENCODE_USER)
 #   - existing /home/opencode/.config/opencode/opencode.json[c]
 #   - the opencode binary at /usr/local/lib/opencode/bin/opencode
 #   - any ACLs or filesystem metadata
 #
-# Run as your default (non-root) user with sudo privileges:
-#   ./update.sh
-#   ./update.sh --yes            # skip prompts
-#   ./update.sh --refresh        # also re-run protect-projects.sh --force at the end
+# One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/update.sh | sudo bash
+#
+# From a checkout (uses the local files):
+#   sudo bash files/update.sh --yes            # skip prompts
+#   sudo bash files/update.sh --refresh        # also re-run protect-projects.sh --force at the end
 #
 # Use install.sh for the very first setup (it asks the questions).
 # Use config.sh to change project roots or git-config hardening.
@@ -24,7 +26,39 @@ YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# Branch the kit ships from (master = always latest). Overridable for
+# testing: KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
+KIT_BRANCH="${KIT_BRANCH:-master}"
+KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
+
+# Downloads every kit file from KIT_BASE_URL into a temp checkout layout
+# (files/ + VERSION) and prints the files/ directory. Used when this script
+# is streamed via `curl | sudo bash` or run from the installed library
+# (which only holds the previously deployed, possibly older, files).
+fetch_kit() {
+    local base dir f
+    base="$(mktemp -d)"
+    dir="$base/files"
+    mkdir -p "$dir/opencode-lib/hooks"
+    for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
+             sudoers.template umask.sh VERSION \
+             opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
+             opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
+        echo "  fetching $f ..." >&2
+        if [ "$f" = "VERSION" ]; then
+            curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
+        else
+            curl -fsSL "$KIT_BASE_URL/files/$f" -o "$dir/$f" || return 1
+        fi
+    done
+    echo "$dir"
+}
+
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
+    echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
+    SCRIPT_DIR="$(fetch_kit)" || { echo "${RED}Failed to fetch kit files from $KIT_BASE_URL${NC}" >&2; exit 1; }
+fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 LIBDIR="/usr/local/lib/opencode"
 
@@ -112,10 +146,11 @@ sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge
 sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
 sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
+sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/uninstall.sh" \
+               "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit"
 echo "Library files updated: $LIBDIR"
 

@@ -1,8 +1,12 @@
 #!/bin/sh
 # opencode permissions kit -- install.sh
 # First-time installer for WSL2 + DDEV environments. Asks interactively.
-# Run as your default (non-root) user with sudo privileges:
-#   ./install.sh
+#
+# One-liner (fetches this script + all kit files from GitHub at $KIT_BRANCH):
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/install.sh | sudo bash
+#
+# From a checkout (same behaviour, uses the local files):
+#   sudo bash files/install.sh
 #
 # To re-deploy the kit without prompts after it is already installed,
 # use update.sh instead. To change settings later, use config.sh.
@@ -12,7 +16,40 @@
 #   --projects <path...>  Pre-define project roots, skip interactive selection
 set -e
 
+# Branch the kit ships from (master = always latest). Overridable for
+# testing: KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
+KIT_BRANCH="${KIT_BRANCH:-master}"
+KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
+
+# Downloads every kit file from KIT_BASE_URL into a temp checkout layout
+# (files/ + VERSION) and prints the files/ directory. Used when this script
+# is streamed via `curl | sudo bash` and has no local siblings.
+fetch_kit() {
+    local base dir f
+    base="$(mktemp -d)"
+    dir="$base/files"
+    mkdir -p "$dir/opencode-lib/hooks"
+    for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
+             sudoers.template umask.sh VERSION \
+             opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
+             opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
+        echo "  fetching $f ..." >&2
+        if [ "$f" = "VERSION" ]; then
+            curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
+        else
+            curl -fsSL "$KIT_BASE_URL/files/$f" -o "$dir/$f" || return 1
+        fi
+    done
+    echo "$dir"
+}
+
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+STREAMED=false
+if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
+    echo "Not a local checkout — fetching kit files from $KIT_BASE_URL ..."
+    SCRIPT_DIR="$(fetch_kit)" || { echo "${RED}Failed to fetch kit files from $KIT_BASE_URL${NC}" >&2; exit 1; }
+    STREAMED=true
+fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 
 GREEN='\033[0;32m'
@@ -264,7 +301,7 @@ echo "--- opencode installation ---"
 SYSTEM_BIN="/usr/local/lib/opencode/bin/opencode"
 opencode_found=false
 
-for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
+for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
     if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
         ans=$(prompt "opencode binary found at $loc. Copy to system path and secure with wrapper?" "Y" "N" "B")
         case "$ans" in
@@ -294,7 +331,14 @@ if [ "$opencode_found" = false ]; then
     ans=$(prompt "opencode not found. Run official installer (curl -fsSL https://opencode.ai/install | bash)?" "Y" "N" "")
     if [ "$ans" = "y" ]; then
         curl -fsSL https://opencode.ai/install | bash
-        if [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
+        # When run via the one-liner (sudo bash), the official installer
+        # installs into /root/.opencode/bin. Locally it lands in the user's home.
+        if [ -x "/root/.opencode/bin/opencode" ]; then
+            sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
+            sudo cp "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
+            sudo chmod 755 "$SYSTEM_BIN"
+            echo "Installed to $SYSTEM_BIN."
+        elif [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/home/$DEFAULT_USER/.opencode/bin/opencode" "$SYSTEM_BIN"
             sudo chmod 755 "$SYSTEM_BIN"
@@ -334,10 +378,11 @@ sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge
 sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
 sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
+sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/uninstall.sh" \
+               "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit"
 
 # Symlink: /usr/local/bin/opencode -> our wrapper
