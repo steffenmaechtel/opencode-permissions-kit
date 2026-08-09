@@ -1,12 +1,15 @@
-.PHONY: help test test-wrapper test-config test-hooks verify e2e install-dev clean version check-version
+.PHONY: help test test-wrapper test-config test-hooks test-parser test-git-config test-plugin verify e2e install-dev clean version check-version
 
 help:
 	@echo "opencode permissions kit — dev makefile"
 	@echo ""
-	@echo "  make test          Run all self-contained tests"
+	@echo "  make test          Run all self-contained tests (shell)"
+	@echo "  make test-plugin   Run plugin TS unit tests (requires npm install)"
 	@echo "  make test-wrapper  Run wrapper validation tests"
 	@echo "  make test-config   Run project config tests"
 	@echo "  make test-hooks    Run git hook regression tests"
+	@echo "  make test-parser   Run JSONC parser edge-case tests"
+	@echo "  make test-git-config  Run git-config toggle tests"
 	@echo "  make verify        Run system verification (requires install.sh)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make install-dev   Quick dev install (skip prompts)"
@@ -14,9 +17,13 @@ help:
 	@echo "  make version VERSION=x.y.z   Bump version in VERSION + package.json"
 	@echo "  make check-version Validate VERSION and package.json match"
 
-test: test-wrapper test-config test-hooks
+test: test-wrapper test-config test-hooks test-parser test-git-config
 	@echo ""
-	@echo "All tests passed."
+	@echo "All shell tests passed."
+
+test-plugin:
+	@echo "=== Plugin TS Unit Tests ==="
+	@npx vitest run tests/plugin/index.test.ts
 
 test-wrapper:
 	@echo "=== Wrapper Validation Tests ==="
@@ -29,6 +36,14 @@ test-config:
 test-hooks:
 	@echo "=== Git Hook Regression Tests ==="
 	@./tests/test-hooks.sh
+
+test-parser:
+	@echo "=== JSONC Parser Edge-Case Tests ==="
+	@./tests/test-jsonc-parser.sh
+
+test-git-config:
+	@echo "=== Git-Config Toggle Tests ==="
+	@./tests/test-git-config.sh
 
 verify:
 	@./tests/verify.sh

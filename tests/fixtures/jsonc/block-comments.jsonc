@@ -1,0 +1,15 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "permission": {
+        "read": {
+            /* block comments
+               spanning multiple lines */
+            ".env*": "deny",
+            "**/*.env": "deny"
+        },
+        "edit": {
+            ".env*": "deny",
+            "**/*.env": "deny"
+        }
+    }
+}

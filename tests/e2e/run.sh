@@ -185,7 +185,42 @@ check_fail ".env.local blocked after protect run" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env.local'
 
 echo ""
-echo "--- 11. update.sh re-deploys kit non-interactively ---"
+echo "--- 10b. protect-projects cache (second run without --force) ---"
+E 'sudo /usr/local/lib/opencode/protect-projects.sh' && \
+    echo "  ${GREEN}OK${NC}  protect-projects.sh (no --force) exits 0"
+
+echo ""
+echo "--- 10c. protect-projects chown step ---"
+E 'sudo touch /var/www/vhosts/test-project/chown-test.txt' && \
+    E 'sudo chown opencode:www-data /var/www/vhosts/test-project/chown-test.txt' && \
+    E 'sudo /usr/local/lib/opencode/protect-projects.sh --force'
+check "chown: file re-owned to dev:www-data" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/chown-test.txt)" = "dev"'
+
+echo ""
+echo "--- 10d. protect-projects remove_acls (project allow override) ---"
+E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
+{
+    "permission": {
+        "read": { "README.md": "allow", "**/README.md": "allow" },
+        "edit": { "README.md": "allow", "**/README.md": "allow" }
+    }
+}
+EOF'
+E 'sudo /usr/local/lib/opencode/protect-projects.sh --force --cwd /var/www/vhosts/test-project'
+check "allow-override: README.md readable for opencode" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.md'
+
+echo ""
+echo "--- 11. update.sh re-deploys kit + preservation contract ---"
+# Snapshot files that update.sh must NOT touch
+E 'sha256sum /home/opencode/.config/opencode/opencode.jsonc > /tmp/sha-opencode-jsonc.before'
+E 'sha256sum /usr/local/lib/opencode/bin/opencode > /tmp/sha-binary.before'
+E 'cat /etc/opencode/projects.conf > /tmp/projects.conf.before'
+E 'stat -c %Y /home/opencode/.config/opencode/opencode.jsonc > /tmp/mtime-jsonc.before'
+E 'stat -c %Y /usr/local/lib/opencode/bin/opencode > /tmp/mtime-binary.before'
+# Write a sentinel VERSION so we can observe the bump
+E 'echo "9.9.9-sentinel" > /home/dev/repo/VERSION'
 E 'sudo bash /home/dev/repo/files/update.sh --yes' && \
     echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
 check "Wrapper still present after update" E 'test -x /usr/local/bin/opencode'
@@ -195,6 +230,29 @@ check "install.conf still present"         E 'test -f /etc/opencode/install.conf
 check "projects.conf untouched"           E 'test -f /etc/opencode/projects.conf'
 check_fail ".env still blocked after update" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
+check "opencode.jsonc byte-identical (sha256 unchanged)" \
+    E 'test "$(sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1)" = "$(cut -d" " -f1 < /tmp/sha-opencode-jsonc.before)"'
+check "binary byte-identical (sha256 unchanged)" \
+    E 'test "$(sha256sum /usr/local/lib/opencode/bin/opencode | cut -d" " -f1)" = "$(cut -d" " -f1 < /tmp/sha-binary.before)"'
+check "projects.conf content unchanged" \
+    E 'test "$(cat /etc/opencode/projects.conf)" = "$(cat /tmp/projects.conf.before)"'
+check "install.conf VERSION bumped to sentinel" \
+    E 'grep -q "VERSION=9.9.9-sentinel" /etc/opencode/install.conf'
+# Restore real VERSION
+E 'echo "0.0.8" > /home/dev/repo/VERSION'
+
+echo ""
+echo "--- 11b. setup.conf -> install.conf legacy migration ---"
+E 'sudo cp /etc/opencode/install.conf /etc/opencode/setup.conf' && \
+    E 'sudo rm -f /etc/opencode/install.conf'
+check "legacy setup.conf created" E 'test -f /etc/opencode/setup.conf'
+check "install.conf removed for migration test" E '! test -f /etc/opencode/install.conf'
+E 'sudo bash /home/dev/repo/files/update.sh --yes' && \
+    echo "  ${GREEN}OK${NC}  update.sh migrated setup.conf -> install.conf"
+check "setup.conf removed after update" E '! test -f /etc/opencode/setup.conf'
+check "install.conf created by update" E 'test -f /etc/opencode/install.conf'
+check "install.conf contains DEFAULT_USER" \
+    E 'grep -q "DEFAULT_USER=" /etc/opencode/install.conf'
 
 echo ""
 echo "--- 12. config.sh adds a project non-interactively ---"
@@ -206,6 +264,63 @@ check "extra-project in projects.conf" \
     E 'grep -q /var/www/vhosts/extra-project /etc/opencode/projects.conf'
 check_fail "extra-project .env blocked after config add" \
     E 'sudo -u opencode test -r /var/www/vhosts/extra-project/.env'
+
+echo ""
+echo "--- 12b. config.sh projects remove ---"
+E 'sudo bash /usr/local/lib/opencode/config.sh --yes projects remove /var/www/vhosts/extra-project' && \
+    echo "  ${GREEN}OK${NC}  config.sh remove completed"
+check "extra-project removed from projects.conf" \
+    E '! grep -q /var/www/vhosts/extra-project /etc/opencode/projects.conf'
+
+echo ""
+echo "--- 12c. config.sh git-config toggle ---"
+E 'sudo bash /usr/local/lib/opencode/config.sh --yes git-config on' && \
+    echo "  ${GREEN}OK${NC}  git-config on completed"
+check "git-config ON: .git/config deny rule active" \
+    E 'grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'
+check "git-config ON: status reports ON" \
+    E 'sudo bash /usr/local/lib/opencode/config.sh git-config status | grep -q "ON"'
+E 'sudo bash /usr/local/lib/opencode/config.sh --yes git-config off' && \
+    echo "  ${GREEN}OK${NC}  git-config off completed"
+check "git-config OFF: no active .git/config rule" \
+    E '! grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'
+check "git-config OFF: status reports OFF" \
+    E 'sudo bash /usr/local/lib/opencode/config.sh git-config status | grep -q "OFF"'
+
+echo ""
+echo "--- 12d. config.sh interactive menu (piped stdin) ---"
+E 'sudo mkdir -p /var/www/vhosts/menu-project' && \
+    E 'sudo touch /var/www/vhosts/menu-project/.env'
+E 'printf "1\n/var/www/vhosts/menu-project\nq\n" | sudo bash /usr/local/lib/opencode/config.sh 2>&1 | tee /tmp/menu-out.txt' && \
+    echo "  ${GREEN}OK${NC}  menu completed"
+check "menu: shows numbered options" \
+    E 'grep -q "\[1\]" /tmp/menu-out.txt'
+check "menu: project added via menu" \
+    E 'grep -q /var/www/vhosts/menu-project /etc/opencode/projects.conf'
+check "menu: q exits cleanly" \
+    E 'grep -q "Bye" /tmp/menu-out.txt'
+
+echo ""
+echo "--- 12e. wrapper actual invocation ---"
+# Valid CWD: wrapper should show SECURED banner
+E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-valid.txt' && \
+    echo "  ${GREEN}OK${NC}  wrapper ran from valid CWD"
+check "wrapper: SECURED banner from valid CWD" \
+    E 'grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-valid.txt'
+# Invalid CWD: wrapper should refuse
+E 'cd /tmp && /usr/local/bin/opencode 2>&1 | tee /tmp/wrapper-invalid.txt; test $? -ne 0' && \
+    echo "  ${GREEN}OK${NC}  wrapper refused from invalid CWD"
+check "wrapper: ERROR banner from invalid CWD" \
+    E 'grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-invalid.txt'
+
+echo ""
+echo "--- 12f. uninstall.sh --dry-run (no-op) ---"
+E 'bash /usr/local/lib/opencode/uninstall.sh --yes --dry-run' && \
+    echo "  ${GREEN}OK${NC}  uninstall --dry-run completed"
+check "dry-run: wrapper still exists"   E 'test -e /usr/local/bin/opencode'
+check "dry-run: library still exists"   E 'test -e /usr/local/lib/opencode'
+check "dry-run: /etc/opencode intact"  E 'test -e /etc/opencode'
+check "dry-run: user still exists"      E 'id opencode'
 
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"

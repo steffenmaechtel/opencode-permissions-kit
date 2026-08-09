@@ -169,10 +169,14 @@ git_config_file() {
 git_config_status() {
     f="$(git_config_file)"
     [ -z "$f" ] && { echo "No opencode config installed for $OPENCODE_USER."; return; }
-    if grep -q '//SECURE_GIT' "$f" 2>/dev/null; then
-        echo "git-config hardening: ${CYAN}OFF${NC}  ($f)"
-    else
+    # ON  = .git/config deny rule is active (uncommented) in the config
+    # OFF = rule absent or still a //SECURE_GIT comment
+    if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
         echo "git-config hardening: ${GREEN}ON${NC}  ($f)"
+    elif grep -q '//SECURE_GIT' "$f" 2>/dev/null; then
+        echo "git-config hardening: ${CYAN}OFF${NC}  ($f — markers present, rules inactive)"
+    else
+        echo "git-config hardening: ${CYAN}OFF${NC}  ($f)"
     fi
 }
 
@@ -240,13 +244,13 @@ menu() {
                 ;;
             3)
                 f="$(git_config_file)"
-                if grep -q '//SECURE_GIT' "$f" 2>/dev/null; then
-                    if confirm "Enable .git/config hardening? opencode will NOT be able to run ANY git command."; then
-                        git_config_apply on
-                    fi
-                else
+                if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
                     if confirm "Disable .git/config hardening? opencode will be able to run git again."; then
                         git_config_apply off
+                    fi
+                else
+                    if confirm "Enable .git/config hardening? opencode will NOT be able to run ANY git command."; then
+                        git_config_apply on
                     fi
                 fi
                 ;;
