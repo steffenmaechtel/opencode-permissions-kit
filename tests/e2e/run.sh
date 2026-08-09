@@ -94,7 +94,7 @@ E 'curl -fsSL https://opencode.ai/install | bash' || {
 echo ""
 echo "--- 1b. status.sh before install (not-installed state) ---"
 check "status.sh (not installed) reports hardening NOT active" \
-    E 'cd /tmp && /home/dev/repo/files/status.sh 2>&1 | grep -q "NOT active"'
+    E 'cd /tmp && sh /home/dev/repo/files/status.sh 2>&1 | grep -q "NOT active"'
 
 echo ""
 echo "--- 2. Run install (from local repo checkout) ---"
