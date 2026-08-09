@@ -222,10 +222,6 @@ E 'cat /etc/opencode/projects.conf > /tmp/projects.conf.before'
 # We can't overwrite the bind-mounted VERSION reliably, so we copy update.sh + a
 # sentinel VERSION into a temp dir and run it from there.
 E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "9.9.9-sentinel" > /tmp/update-test/VERSION'
-# Verify the sentinel is in place before running update
-E 'cat /tmp/update-test/VERSION'
-E 'ls -la /tmp/update-test/VERSION'
-E 'sudo bash -c '\''SCRIPT_DIR=$(cd "$(dirname "$(readlink -f /tmp/update-test/files/update.sh)")" && pwd); echo "DEBUG SCRIPT_DIR=$SCRIPT_DIR"; cat "$SCRIPT_DIR/../VERSION"'\'''
 E 'sudo bash /tmp/update-test/files/update.sh --yes' && \
     echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
 check "Wrapper still present after update" E 'test -x /usr/local/bin/opencode'
@@ -295,12 +291,12 @@ echo ""
 echo "--- 12d. config.sh interactive menu (displays) ---"
 E 'sudo mkdir -p /var/www/vhosts/menu-project' && \
     E 'sudo touch /var/www/vhosts/menu-project/.env'
-# The menu uses /dev/tty for reads, so we redirect stdin from /dev/null.
-# read </dev/tty fails (no tty in docker exec), falls back to stdin (/dev/null = EOF).
-# EOF → empty input → case "" → falls through to default → "Unknown selection"
-# → loops again → prints menu again → EOF again → repeat forever.
-# So we use timeout to kill it after the menu has printed at least once.
-E 'timeout 2 sudo bash /usr/local/lib/opencode/config.sh < /dev/null 2>&1 | tee /tmp/menu-out.txt || true'
+# The menu prints all options then blocks on read from /dev/tty.
+# With stdin from /dev/null, read </dev/tty fails (no tty in docker exec),
+# falls back to read from stdin (/dev/null = EOF) → empty → "Unknown selection"
+# → loops → reprints menu. timeout kills it after 5s, capturing at least
+# one full menu print.
+E 'timeout 5 sudo bash /usr/local/lib/opencode/config.sh < /dev/null 2>&1 | tee /tmp/menu-out.txt || true'
 E 'sudo chown dev /tmp/menu-out.txt'
 check "menu: shows numbered options" \
     E 'grep -q "\[1\]" /tmp/menu-out.txt'

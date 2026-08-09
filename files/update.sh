@@ -35,9 +35,14 @@ INSTALL_CONF="/etc/opencode/install.conf"
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
 WWW_GROUP="www-data"
+# Save the version from the VERSION file (read above) before sourcing
+# install.conf, which also has a VERSION= line (the old stamp). We don't
+# want install.conf to overwrite the freshly-read VERSION from the repo.
+KIT_VERSION="$VERSION"
 if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
+VERSION="$KIT_VERSION"
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
 WWW_GROUP="${WWW_GROUP:-www-data}"
