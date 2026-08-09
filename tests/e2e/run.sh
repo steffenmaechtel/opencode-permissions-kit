@@ -92,7 +92,12 @@ E 'curl -fsSL https://opencode.ai/install | bash' || {
 }
 
 echo ""
-echo "--- 2. Run install (from local repo, plugin-only distribution) ---"
+echo "--- 1b. status.sh before install (not-installed state) ---"
+check "status.sh (not installed) reports hardening NOT active" \
+    E 'cd /tmp && /home/dev/repo/files/status.sh 2>&1 | grep -q "NOT active"'
+
+echo ""
+echo "--- 2. Run install (from local repo checkout) ---"
 E 'sudo bash /home/dev/repo/files/install.sh --yes --projects /var/www/vhosts'
 echo "  Install complete."
 
@@ -110,8 +115,12 @@ check "config.sh deployed" \
     E 'test -x /usr/local/lib/opencode/config.sh'
 check "update.sh deployed" \
     E 'test -x /usr/local/lib/opencode/update.sh'
+check "status.sh deployed" \
+    E 'test -x /usr/local/lib/opencode/status.sh'
 check "install.conf written" \
     E 'test -f /etc/opencode/install.conf'
+check "status.sh reports hardened" \
+    E '/usr/local/lib/opencode/status.sh 2>&1 | grep -q "hardened"'
 
 echo ""
 echo "--- 4. User & group ---"

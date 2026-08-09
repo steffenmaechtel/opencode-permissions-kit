@@ -1,10 +1,9 @@
-.PHONY: help test test-wrapper test-config test-hooks test-parser test-git-config test-plugin verify e2e install-dev clean version check-version
+.PHONY: help test test-wrapper test-config test-hooks test-parser test-git-config verify e2e install-dev clean version check-version
 
 help:
 	@echo "opencode permissions kit — dev makefile"
 	@echo ""
 	@echo "  make test          Run all self-contained tests (shell)"
-	@echo "  make test-plugin   Run plugin TS unit tests (requires npm install)"
 	@echo "  make test-wrapper  Run wrapper validation tests"
 	@echo "  make test-config   Run project config tests"
 	@echo "  make test-hooks    Run git hook regression tests"
@@ -14,16 +13,12 @@ help:
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make install-dev   Quick dev install (skip prompts)"
 	@echo "  make clean         Uninstall"
-	@echo "  make version VERSION=x.y.z   Bump version in VERSION + package.json"
-	@echo "  make check-version Validate VERSION and package.json match"
+	@echo "  make version VERSION=x.y.z   Bump version in VERSION + KIT_TAG in install.sh/update.sh"
+	@echo "  make check-version Validate VERSION and KIT_TAG match"
 
 test: test-wrapper test-config test-hooks test-parser test-git-config
 	@echo ""
 	@echo "All shell tests passed."
-
-test-plugin:
-	@echo "=== Plugin TS Unit Tests ==="
-	@npx vitest run tests/plugin/index.test.ts
 
 test-wrapper:
 	@echo "=== Wrapper Validation Tests ==="
@@ -60,12 +55,14 @@ clean:
 version:
 	@[ -n "$(VERSION)" ] || { echo "Usage: make version VERSION=x.y.z"; exit 1; }
 	@echo "$(VERSION)" > VERSION
-	@sed -i 's|"version": "[^"]*"|"version": "$(VERSION)"|' package.json
-	@echo "Version set to $(VERSION) (VERSION + package.json)"
+	@sed -i "s|KIT_TAG=\"\$${KIT_TAG:-[^\"]*}\"|KIT_TAG=\"\$${KIT_TAG:-$(VERSION)}\"|" files/install.sh files/update.sh
+	@echo "Version set to $(VERSION) (VERSION file + KIT_TAG in install.sh/update.sh)"
 
 check-version:
-	@v="$$(cat VERSION)"; p="$$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' package.json | head -1)"; \
-	if [ "$$v" != "$$p" ]; then \
-		echo "MISMATCH: VERSION=$$v package.json=$$p"; exit 1; \
+	@v="$$(cat VERSION)"; \
+	i="$$(sed -n 's/.*KIT_TAG="\$${KIT_TAG:-\([^"]*\)}".*/\1/p' files/install.sh | head -1)"; \
+	u="$$(sed -n 's/.*KIT_TAG="\$${KIT_TAG:-\([^"]*\)}".*/\1/p' files/update.sh | head -1)"; \
+	if [ "$$v" != "$$i" ] || [ "$$v" != "$$u" ]; then \
+		echo "MISMATCH: VERSION=$$v install.sh KIT_TAG=$$i update.sh KIT_TAG=$$u"; exit 1; \
 	fi; \
 	echo "Version consistent: $$v"
