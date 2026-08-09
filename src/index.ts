@@ -10,11 +10,19 @@
  * plugin's own install path (import.meta.url) — no global npm install, no bin
  * symlinks.
  *
+ * opencode v1 plugin API (v1.18.15+):
+ *   - `config` hook registers the /permission-* slash commands so they are
+ *     typeable + selectable in the TUI and reach the server command pipeline
+ *   - `command.execute.before` replaces the (LLM-driven) command parts with a
+ *     deterministic answer (the exact sudo command to run, status, etc.)
+ *   - `event` hook observes session.created
+ *   - `shell.env` exposes OPENCODE_HARDENED to spawned shells
+ *
  * Install: opencode plugin install @steffenmaechtel/opencode-permissions-kit
  *     or: place plugin.ts in .opencode/plugins/
  */
 
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Config, Hooks, Plugin } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { execSync } from "node:child_process"
@@ -43,6 +51,21 @@ const VERSION = readVersion()
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Mode = "install" | "hardened"
+
+type CommandName =
+    | "permission-status"
+    | "permission-install"
+    | "permission-config"
+    | "permission-update"
+    | "permission-uninstall"
+
+const COMMAND_NAMES: CommandName[] = [
+    "permission-status",
+    "permission-install",
+    "permission-config",
+    "permission-update",
+    "permission-uninstall",
+]
 
 interface ProtectionStats {
     mode: Mode
@@ -103,13 +126,182 @@ function getStats(): ProtectionStats {
     return { mode, userExists, wrapperExists, configFile, projectsConf, version }
 }
 
+// ── Command definitions (registered via the config hook) ─────────────────────
+
+function commandDefinitions(): NonNullable<Config["command"]> {
+    return {
+        "permission-install": {
+            description: "Install the opencode permissions kit",
+            template: [
+                `The user wants to install the opencode permissions kit.`,
+                `Tell them to run this command in a separate terminal (it needs sudo):`,
+                ``,
+                `    sudo bash ${scriptPath("install")}`,
+                ``,
+                `Optional flags: --yes  --projects /path/to/project.`,
+                `After the install completes, the user must restart opencode.`,
+            ].join("\n"),
+        },
+        "permission-config": {
+            description: "Change permissions kit settings (projects, git-config, ACL refresh)",
+            template: [
+                `The user wants to change permissions kit settings.`,
+                `Tell them to run this command in a separate terminal (it needs sudo):`,
+                ``,
+                `    sudo bash ${scriptPath("config")}`,
+                ``,
+                `Or non-interactively:`,
+                `    sudo bash ${scriptPath("config")} projects add /var/www/vhosts/new-project`,
+                `    sudo bash ${scriptPath("config")} projects remove /var/www/vhosts/old-project`,
+                `    sudo bash ${scriptPath("config")} git-config on|off|status`,
+                `    sudo bash ${scriptPath("config")} refresh`,
+            ].join("\n"),
+        },
+        "permission-update": {
+            description: "Re-deploy the permissions kit after a git pull",
+            template: [
+                `The user wants to re-deploy the permissions kit after an update.`,
+                `Tell them to run this command in a separate terminal (it needs sudo):`,
+                ``,
+                `    sudo bash ${scriptPath("update")}`,
+                ``,
+                `Optional flags: --yes  --refresh (re-applies ACLs after deploy).`,
+            ].join("\n"),
+        },
+        "permission-status": {
+            description: "Show permissions kit status and diagnostics",
+            template: `Show the permissions kit status (mode, user, wrapper, config, projects).`,
+        },
+        "permission-uninstall": {
+            description: "Remove the opencode permissions kit",
+            template: [
+                `The user wants to remove the opencode permissions kit.`,
+                `Tell them to run this command in a separate terminal:`,
+                ``,
+                `    bash ${scriptPath("uninstall")}`,
+                ``,
+                `Optional flags: --yes  --dry-run  --debug.`,
+            ].join("\n"),
+        },
+    }
+}
+
+// ── Deterministic command output (injected via command.execute.before) ───────
+
+function isCommandName(name: string): name is CommandName {
+    return (COMMAND_NAMES as readonly string[]).includes(name)
+}
+
+function commandText(name: string): string | null {
+    if (!isCommandName(name)) return null
+    const stats = getStats()
+
+    switch (name) {
+        case "permission-status": {
+            if (stats.mode === "hardened") {
+                return [
+                    `Permission-Control v${VERSION} (hardened)`,
+                    `  User: opencode ${stats.userExists ? "exists" : "MISSING"}`,
+                    `  Wrapper: ${stats.wrapperExists ? "/usr/local/bin/opencode" : "MISSING"}`,
+                    `  Config: ${stats.configFile || "none"}`,
+                    `  Projects: ${stats.projectsConf.length} (${stats.projectsConf.join(", ") || "none"})`,
+                    `  Cache: ${stats.version || "none"}`,
+                ].join("\n")
+            }
+            return [
+                `Permission-Control v${VERSION} (not installed)`,
+                `  Hardening not active.`,
+                `  Run /permission-install for the hardening command.`,
+            ].join("\n")
+        }
+
+        case "permission-install": {
+            if (stats.mode === "hardened") {
+                return [
+                    `Permission-Control v${VERSION} — already hardened`,
+                    `  User: opencode exists, wrapper at /usr/local/bin/opencode`,
+                    `  To change settings (projects, git-config): /permission-config`,
+                    `  To re-deploy the kit after an update:       /permission-update`,
+                    `  To add projects manually: edit /etc/opencode/projects.conf and run`,
+                    `      sudo /usr/local/lib/opencode/protect-projects.sh --force`,
+                ].join("\n")
+            }
+            return [
+                `Permission-Control v${VERSION} — install`,
+                ``,
+                `  Run this command in a terminal (it needs sudo):`,
+                ``,
+                `      sudo bash ${scriptPath("install")}`,
+                ``,
+                `  Optional flags: --yes  --projects /path/to/project`,
+                `  After install completes, restart opencode.`,
+            ].join("\n")
+        }
+
+        case "permission-config": {
+            if (stats.mode !== "hardened") {
+                return [
+                    `Permission-Control v${VERSION} — not installed`,
+                    `  Run /permission-install first.`,
+                ].join("\n")
+            }
+            return [
+                `Permission-Control v${VERSION} — config`,
+                ``,
+                `  Change settings (project roots, .git/config hardening, ACL refresh):`,
+                ``,
+                `      sudo bash ${scriptPath("config")}`,
+                ``,
+                `  Or non-interactive:`,
+                `      sudo bash ${scriptPath("config")} projects add /var/www/vhosts/new-project`,
+                `      sudo bash ${scriptPath("config")} projects remove /var/www/vhosts/old-project`,
+                `      sudo bash ${scriptPath("config")} git-config on|off|status`,
+                `      sudo bash ${scriptPath("config")} refresh`,
+            ].join("\n")
+        }
+
+        case "permission-update": {
+            if (stats.mode !== "hardened") {
+                return [
+                    `Permission-Control v${VERSION} — not installed`,
+                    `  Run /permission-install first.`,
+                ].join("\n")
+            }
+            return [
+                `Permission-Control v${VERSION} — update`,
+                ``,
+                `  Re-deploys the kit (wrapper, hooks, sudoers, umask) without touching`,
+                `  existing projects.conf, install.conf, opencode.jsonc, or the binary.`,
+                ``,
+                `  Run this command in a terminal (it needs sudo):`,
+                ``,
+                `      sudo bash ${scriptPath("update")}`,
+                ``,
+                `  Optional flags: --yes  --refresh  (re-applies ACLs after deploy)`,
+            ].join("\n")
+        }
+
+        case "permission-uninstall": {
+            return [
+                `Permission-Control v${VERSION} — uninstall`,
+                ``,
+                `  Run this command in a terminal (without sudo prefix):`,
+                ``,
+                `      bash ${scriptPath("uninstall")}`,
+                ``,
+                `  Optional flags: --yes  --dry-run  --debug`,
+            ].join("\n")
+        }
+    }
+    return null
+}
+
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 export const PermissionKit: Plugin = async ({ client, directory }) => {
     const mode = detectMode()
 
     if (mode === "install") {
-        // ── Install Mode (not yet hardened) ──────────────────────────────────
         await client.app.log({
             body: {
                 service: "permission-kit",
@@ -138,131 +330,42 @@ export const PermissionKit: Plugin = async ({ client, directory }) => {
 `)
     }
 
-    return {
-        // ── Events ──────────────────────────────────────────────────────────
+    const hooks: Hooks = {
+        // ── Register slash commands so /permission-* are real commands ────
+        config: async (cfg) => {
+            cfg.command = { ...cfg.command, ...commandDefinitions() }
+        },
+
+        // ── Events ────────────────────────────────────────────────────────
+        event: async ({ event }) => {
+            if (event.type !== "session.created") return
+            if (mode !== "hardened") return
+
+            const stats = getStats()
+            await client.app.log({
+                body: {
+                    service: "permission-kit",
+                    level: "info",
+                    message: `Hardened mode active. Projects: ${stats.projectsConf.length}. Config: ${stats.configFile || "none"}`,
+                    extra: stats as unknown as Record<string, unknown>,
+                },
+            })
+        },
+
+        // ── Replace command parts with deterministic output ───────────────
+        "command.execute.before": async (input, output) => {
+            const text = commandText(input.command)
+            if (text === null) return
+            output.parts.length = 0
+            output.parts.push({ type: "text", text } as any)
+        },
 
         "shell.env": async (input, output) => {
             if (mode === "hardened") {
                 output.env.OPENCODE_HARDENED = "1"
             }
         },
-
-        "session.created": async () => {
-            if (mode === "hardened") {
-                const stats = getStats()
-                await client.app.log({
-                    body: {
-                        service: "permission-kit",
-                        level: "info",
-                        message: `Hardened mode active. Projects: ${stats.projectsConf.length}. Config: ${stats.configFile || "none"}`,
-                        extra: stats,
-                    },
-                })
-            }
-        },
-
-        "tui.command.execute": async (input) => {
-            switch (input.command) {
-                case "permission-status": {
-                    input.command = null // suppress original
-                    const stats = getStats()
-                    if (stats.mode === "hardened") {
-                        console.log(`Permission-Control v${VERSION} (hardened)`)
-                        console.log(`  User: opencode ${stats.userExists ? "exists" : "MISSING"}`)
-                        console.log(`  Wrapper: ${stats.wrapperExists ? "/usr/local/bin/opencode" : "MISSING"}`)
-                        console.log(`  Config: ${stats.configFile || "none"}`)
-                        console.log(`  Projects: ${stats.projectsConf.length} (${stats.projectsConf.join(", ") || "none"})`)
-                        console.log(`  Cache: ${stats.version || "none"}`)
-                    } else {
-                        console.log(`Permission-Control v${VERSION} (not installed)`)
-                        console.log("  Hardening not active.")
-                        console.log("  Run /permission-install for the hardening command.")
-                    }
-                    break
-                }
-
-                case "permission-install": {
-                    input.command = null // suppress original
-                    const stats = getStats()
-                    if (stats.mode === "hardened") {
-                        console.log(`Permission-Control v${VERSION} — already hardened`)
-                        console.log("  User: opencode exists, wrapper at /usr/local/bin/opencode")
-                        console.log("  To change settings (projects, git-config): /permission-config")
-                        console.log("  To re-deploy the kit after an update:       /permission-update")
-                        console.log("  To add projects manually: edit /etc/opencode/projects.conf and run")
-                        console.log("      sudo /usr/local/lib/opencode/protect-projects.sh --force")
-                    } else {
-                        const cmd = scriptPath("install")
-                        console.log(`Permission-Control v${VERSION} — install`)
-                        console.log("")
-                        console.log("  Run this command in a terminal (it needs sudo):")
-                        console.log("")
-                        console.log(`      sudo bash ${cmd}`)
-                        console.log("")
-                        console.log("  Optional flags: --yes  --projects /path/to/project")
-                        console.log("  After install completes, restart opencode.")
-                    }
-                    break
-                }
-
-                case "permission-config": {
-                    input.command = null // suppress original
-                    const stats = getStats()
-                    if (stats.mode !== "hardened") {
-                        console.log(`Permission-Control v${VERSION} — not installed`)
-                        console.log("  Run /permission-install first.")
-                        break
-                    }
-                    const cmd = scriptPath("config")
-                    console.log(`Permission-Control v${VERSION} — config`)
-                    console.log("")
-                    console.log("  Change settings (project roots, .git/config hardening, ACL refresh):")
-                    console.log("")
-                    console.log(`      sudo bash ${cmd}`)
-                    console.log("")
-                    console.log("  Or non-interactive:")
-                    console.log(`      sudo bash ${cmd} projects add /var/www/vhosts/new-project`)
-                    console.log(`      sudo bash ${cmd} projects remove /var/www/vhosts/old-project`)
-                    console.log(`      sudo bash ${cmd} git-config on|off|status`)
-                    console.log(`      sudo bash ${cmd} refresh`)
-                    break
-                }
-
-                case "permission-update": {
-                    input.command = null // suppress original
-                    const stats = getStats()
-                    if (stats.mode !== "hardened") {
-                        console.log(`Permission-Control v${VERSION} — not installed`)
-                        console.log("  Run /permission-install first.")
-                        break
-                    }
-                    const cmd = scriptPath("update")
-                    console.log(`Permission-Control v${VERSION} — update`)
-                    console.log("")
-                    console.log("  Re-deploys the kit (wrapper, hooks, sudoers, umask) without touching")
-                    console.log("  existing projects.conf, install.conf, opencode.jsonc, or the binary.")
-                    console.log("")
-                    console.log("  Run this command in a terminal (it needs sudo):")
-                    console.log("")
-                    console.log(`      sudo bash ${cmd}`)
-                    console.log("")
-                    console.log("  Optional flags: --yes  --refresh  (re-applies ACLs after deploy)")
-                    break
-                }
-
-                case "permission-uninstall": {
-                    input.command = null // suppress original
-                    const cmd = scriptPath("uninstall")
-                    console.log(`Permission-Control v${VERSION} — uninstall`)
-                    console.log("")
-                    console.log("  Run this command in a terminal (without sudo prefix):")
-                    console.log("")
-                    console.log(`      bash ${cmd}`)
-                    console.log("")
-                    console.log("  Optional flags: --yes  --dry-run  --debug")
-                    break
-                }
-            }
-        },
     }
+
+    return hooks
 }

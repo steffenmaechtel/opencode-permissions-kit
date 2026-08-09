@@ -228,6 +228,8 @@ The kit is distributed as an opencode plugin — this is the only install step. 
 
 The plugin resolves the bundled `files/install.sh`, `files/config.sh`, `files/update.sh`, and `files/uninstall.sh` from its own install directory, so no global npm install or PATH setup is needed.
 
+The `/permission-*` commands are registered by the plugin's `config` hook (so they are real, typeable slash commands) and answered deterministically by the `command.execute.before` hook — the printed command/status text appears in the chat, and the assistant relays it. No LLM-generated commands are ever proposed.
+
 ### Installation
 
 ```bash
