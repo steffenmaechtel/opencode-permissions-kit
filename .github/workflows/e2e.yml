@@ -10,7 +10,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run E2E test
         run: |
           chmod +x ./tests/e2e/run.sh ./tests/test-wrapper-validation.sh ./tests/test-project-config.sh ./tests/test-hooks.sh \
