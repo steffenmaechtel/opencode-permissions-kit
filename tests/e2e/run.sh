@@ -191,11 +191,12 @@ E 'sudo /usr/local/lib/opencode/protect-projects.sh' && \
 
 echo ""
 echo "--- 10c. protect-projects chown step ---"
-E 'sudo touch /var/www/vhosts/test-project/chown-test.txt' && \
-    E 'sudo chown opencode:www-data /var/www/vhosts/test-project/chown-test.txt' && \
+# .env is on the deny list; protect-projects.sh chowns opencode-owned files
+# back to DEFAULT_USER:www-data
+E 'sudo chown opencode:www-data /var/www/vhosts/test-project/.env' && \
     E 'sudo /usr/local/lib/opencode/protect-projects.sh --force'
-check "chown: file re-owned to dev:www-data" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/chown-test.txt)" = "dev"'
+check "chown: .env re-owned to dev:www-data" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.env)" = "dev"'
 
 echo ""
 echo "--- 10d. protect-projects remove_acls (project allow override) ---"
@@ -213,12 +214,10 @@ check "allow-override: README.md readable for opencode" \
 
 echo ""
 echo "--- 11. update.sh re-deploys kit + preservation contract ---"
-# Snapshot files that update.sh must NOT touch
-E 'sha256sum /home/opencode/.config/opencode/opencode.jsonc > /tmp/sha-opencode-jsonc.before'
-E 'sha256sum /usr/local/lib/opencode/bin/opencode > /tmp/sha-binary.before'
+# Snapshot files that update.sh must NOT touch (need sudo — /home/opencode is 750)
+E 'sudo sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1 > /tmp/sha-opencode-jsonc.before'
+E 'sudo sha256sum /usr/local/lib/opencode/bin/opencode | cut -d" " -f1 > /tmp/sha-binary.before'
 E 'cat /etc/opencode/projects.conf > /tmp/projects.conf.before'
-E 'stat -c %Y /home/opencode/.config/opencode/opencode.jsonc > /tmp/mtime-jsonc.before'
-E 'stat -c %Y /usr/local/lib/opencode/bin/opencode > /tmp/mtime-binary.before'
 # Write a sentinel VERSION so we can observe the bump
 E 'echo "9.9.9-sentinel" > /home/dev/repo/VERSION'
 E 'sudo bash /home/dev/repo/files/update.sh --yes' && \
@@ -231,9 +230,9 @@ check "projects.conf untouched"           E 'test -f /etc/opencode/projects.conf
 check_fail ".env still blocked after update" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 check "opencode.jsonc byte-identical (sha256 unchanged)" \
-    E 'test "$(sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1)" = "$(cut -d" " -f1 < /tmp/sha-opencode-jsonc.before)"'
+    E 'test "$(sudo sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1)" = "$(cat /tmp/sha-opencode-jsonc.before)"'
 check "binary byte-identical (sha256 unchanged)" \
-    E 'test "$(sha256sum /usr/local/lib/opencode/bin/opencode | cut -d" " -f1)" = "$(cut -d" " -f1 < /tmp/sha-binary.before)"'
+    E 'test "$(sudo sha256sum /usr/local/lib/opencode/bin/opencode | cut -d" " -f1)" = "$(cat /tmp/sha-binary.before)"'
 check "projects.conf content unchanged" \
     E 'test "$(cat /etc/opencode/projects.conf)" = "$(cat /tmp/projects.conf.before)"'
 check "install.conf VERSION bumped to sentinel" \
