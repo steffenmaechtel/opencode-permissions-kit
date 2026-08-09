@@ -183,10 +183,17 @@ git_config_status() {
 git_config_apply() {
     # Re-renders the bundled opencode.jsonc template with or without SECURE_GIT
     enable="$1"
-    template="$SCRIPT_DIR/opencode.jsonc"
     target="/home/opencode/.config/opencode/opencode.jsonc"
 
-    [ -f "$template" ] || die "Template missing: $template"
+    # Find the template: bundled alongside this script, or in the repo, or in the lib dir
+    template=""
+    for cand in "$SCRIPT_DIR/opencode.jsonc" "$SCRIPT_DIR/../files/opencode.jsonc" "$LIBDIR/opencode.jsonc"; do
+        if [ -f "$cand" ]; then
+            template="$cand"
+            break
+        fi
+    done
+    [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/opencode.jsonc, $SCRIPT_DIR/../files/opencode.jsonc, $LIBDIR/opencode.jsonc"
 
     sudo cp "$template" "$target"
     sudo chown "$OPENCODE_USER:$WWW_GROUP" "$target"
