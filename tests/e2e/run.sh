@@ -144,6 +144,24 @@ check "Hooks directory exists" \
     E 'test -d /usr/local/lib/opencode/hooks'
 
 echo ""
+echo "--- 7b. Hook applies project-level config (--cwd) ---"
+E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
+{
+    "permission": {
+        "read": { "deploy-key.pem": "deny", "**/deploy-key.pem": "deny" },
+        "edit": { "deploy-key.pem": "deny", "**/deploy-key.pem": "deny" }
+    }
+}
+EOF'
+E 'sudo touch /var/www/vhosts/test-project/deploy-key.pem'
+E 'cd /var/www/vhosts/test-project && sudo /usr/local/lib/opencode/hooks/post-commit' && \
+    echo "  ${GREEN}OK${NC}  post-commit hook completed"
+check_fail "post-commit applied project deny via --cwd" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/deploy-key.pem'
+check "other project files still protected" \
+    E '! sudo -u opencode test -r /var/www/vhosts/test-project/.env'
+
+echo ""
 echo "--- 8. Umask ---"
 check "umask script deployed" \
     E 'test -f /etc/profile.d/opencode-umask.sh'
@@ -159,6 +177,19 @@ E 'echo "new-secret" | sudo tee /var/www/vhosts/test-project/.env.local > /dev/n
 E 'sudo /usr/local/lib/opencode/protect-projects.sh --force'
 check_fail ".env.local blocked after protect run" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env.local'
+
+echo ""
+echo "--- 11. Uninstall & cleanup verification ---"
+E 'bash /usr/local/lib/opencode/uninstall.sh --yes' && \
+    echo "  ${GREEN}OK${NC}  uninstall.sh completed"
+check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'
+check_fail "Library removed"          E 'test -e /usr/local/lib/opencode'
+check_fail "Sudoers removed"          E 'test -e /etc/sudoers.d/opencode'
+check_fail "/etc/opencode removed"    E 'test -e /etc/opencode'
+check_fail "Umask removed"            E 'test -e /etc/profile.d/opencode-umask.sh'
+check_fail "opencode user removed"    E 'id opencode'
+check_fail "core.hooksPath unset"     E 'git config --global --get core.hooksPath'
+check_fail "Project ACLs cleaned"     E 'getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode"'
 
 echo ""
 echo "=============================================="

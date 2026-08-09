@@ -1,3 +1,5 @@
 #!/bin/sh
 # Hook: post-checkout
-/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force
+# Git runs hooks from the worktree root; pass it as --cwd so the project-level
+# opencode.jsonc denies/allows are applied for the checked-out project.
+/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force --cwd "$(pwd)"

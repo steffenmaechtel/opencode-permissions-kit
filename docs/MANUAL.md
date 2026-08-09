@@ -163,6 +163,8 @@ Global git hooks re-apply ACL denies automatically after:
 - `git merge`
 - `git commit`
 
+The hooks run `protect-projects.sh --force --cwd "$(pwd)"` from the worktree root, so the project-level `opencode.jsonc` of the repository you are working in is applied too — not just the global denies.
+
 No per-repo setup required — `core.hooksPath` is set globally for both users.
 
 ## Verification

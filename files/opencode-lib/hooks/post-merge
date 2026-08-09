@@ -1,3 +1,5 @@
 #!/bin/sh
 # Hook: post-merge
-/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force
+# Git runs hooks from the worktree root; pass it as --cwd so the project-level
+# opencode.jsonc denies/allows are applied for the merged project.
+/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force --cwd "$(pwd)"

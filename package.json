@@ -4,7 +4,7 @@
   "description": "Hardens opencode via Linux ACLs — deny access to .env, keys, settings",
   "type": "module",
   "main": "src/index.ts",
-  "files": ["src/", "files/"],
+  "files": ["src/", "files/", "VERSION"],
   "keywords": ["opencode", "permission", "security", "acl", "hardening"],
   "author": "Steffen Maechtel <info@steffen-maechtel.de>",
   "repository": {

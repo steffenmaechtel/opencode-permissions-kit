@@ -10,7 +10,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-VERSION="0.0.8"
+VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -94,18 +94,6 @@ DEFAULT_USER="${SUDO_USER:-$(whoami)}"
 if ! grep -qi microsoft /proc/version 2>/dev/null; then
     ans=$(prompt "This does not appear to be WSL2. Continue anyway?" "Y" "N" "")
     [ "$ans" != "y" ] && exit 0
-fi
-
-# === Version check: compare baked-in version with repo VERSION file ===
-REPO_VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0")
-if [ "$REPO_VERSION" != "$VERSION" ]; then
-    HIGHER=$(printf '%s\n' "$VERSION" "$REPO_VERSION" | sort -V | tail -1)
-    if [ "$HIGHER" = "$REPO_VERSION" ] && [ "$REPO_VERSION" != "$VERSION" ]; then
-        echo ""
-        echo "  ${YELLOW}Repo has newer version ($REPO_VERSION) — you are running v$VERSION.${NC}"
-        echo "  Run ${CYAN}git pull${NC} first, then re-run ./setup.sh."
-        echo ""
-    fi
 fi
 
 # Backup
