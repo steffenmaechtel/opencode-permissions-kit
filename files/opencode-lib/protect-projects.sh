@@ -21,7 +21,9 @@ while [ $# -gt 0 ]; do
 done
 
 PROJECTS_CONF="/etc/opencode/projects.conf"
-SETUP_CONF="/etc/opencode/setup.conf"
+# install.conf (preferred); fall back to pre-v0.0.9 setup.conf for upgrades.
+INSTALL_CONF="/etc/opencode/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 CONFIG_DIR="/home/opencode/.config/opencode"
 PARSER="/usr/local/lib/opencode/jsonc-parser.py"
 CACHE_FILE="/usr/local/lib/opencode/.cache"
@@ -33,13 +35,13 @@ TMP_PATTERNS=""
 cleanup() { rm -f "$TMP_PATTERNS"; }
 trap cleanup EXIT
 
-# Read DEFAULT_USER from setup.conf
+# Read DEFAULT_USER from install.conf (legacy: setup.conf)
 DEFAULT_USER=""
-if [ -f "$SETUP_CONF" ]; then
-    DEFAULT_USER=$(grep '^DEFAULT_USER=' "$SETUP_CONF" 2>/dev/null | cut -d= -f2)
+if [ -f "$INSTALL_CONF" ]; then
+    DEFAULT_USER=$(grep '^DEFAULT_USER=' "$INSTALL_CONF" 2>/dev/null | cut -d= -f2)
 fi
 if [ -z "$DEFAULT_USER" ]; then
-    echo "protect-projects: DEFAULT_USER not found in $SETUP_CONF — skipping chown step" >&2
+    echo "protect-projects: DEFAULT_USER not found in $INSTALL_CONF — skipping chown step" >&2
 fi
 
 # Find active global config file (.jsonc or .json)

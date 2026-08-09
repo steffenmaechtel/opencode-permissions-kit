@@ -1,8 +1,10 @@
 # opencode permissions kit
 
+> ⚠️ **ALPHA — not for production use.** This kit is still in active development and has not been audited. The ACL rules, wrapper, and sudoers configuration may change in breaking ways between releases. Run it on a throwaway WSL2/dev box, not on a production server.
+
 Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, settings, and more at the filesystem level.
 
-**One step:** install the opencode plugin, then run `/permission-setup` — after that, `opencode` runs as a dedicated user with hard filesystem denies.
+**One step:** install the opencode plugin, then run `/permission-install` — after that, `opencode` runs as a dedicated user with hard filesystem denies.
 
 ## How It Works
 
@@ -10,7 +12,7 @@ Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, s
 - **Wrapper** — every `opencode` invocation validates the directory, refreshes ACLs, then execs as the `opencode` user
 - **Git hooks** — ACLs are re-applied automatically after checkout, merge, and commit, including the project-level `opencode.jsonc` of the current worktree (not just the global denies)
 - **Project-specific configs** — add or override deny rules per project
-- **opencode plugin** — the npm package `@steffenmaechtel/opencode-permissions-kit` is the only thing you install; it bundles the setup/uninstall scripts and exposes them as TUI commands
+- **opencode plugin** — the npm package `@steffenmaechtel/opencode-permissions-kit` is the only thing you install; it bundles the install/config/update/uninstall scripts and exposes them as TUI commands
 
 Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_rsa*`, `*id_ed25519*`, `wp-config.php`, `LocalConfiguration.php`, `README.md`, `*.sql.gz`, and more.
 
@@ -22,9 +24,9 @@ Install the plugin:
 opencode plugin @steffenmaechtel/opencode-permissions-kit -g
 ```
 
-Start opencode in a project directory, type `/permission-setup`, and copy the printed command into a terminal (it needs `sudo`). The command points at the bundled `setup.sh` — no global npm install required.
+Start opencode in a project directory, type `/permission-install`, and copy the printed command into a terminal (it needs `sudo`). The command points at the bundled `install.sh` — no global npm install required.
 
-After the setup completes, restart opencode:
+After the install completes, restart opencode:
 
 ```bash
 opencode
@@ -56,13 +58,15 @@ Example output:
 └  Done
 ```
 
-The npm package is installed only as an opencode plugin. The setup and uninstall scripts are bundled inside it and run via `/permission-setup` and `/permission-uninstall`.
+The npm package is installed only as an opencode plugin. The install, config, update, and uninstall scripts are bundled inside it and run via `/permission-install`, `/permission-config`, `/permission-update`, and `/permission-uninstall`.
 
 ## Plugin Commands
 
 | Command | Purpose |
 |---|---|
-| `/permission-setup` | Prints the `sudo` command to run the bundled `setup.sh` (or confirms hardening is active) |
+| `/permission-install` | Prints the `sudo` command to run the bundled `install.sh` (or confirms hardening is active) |
+| `/permission-config` | Change settings post-install: project roots, `.git/config` hardening, ACL refresh |
+| `/permission-update` | Re-deploy the kit after `git pull` without re-asking install questions |
 | `/permission-status` | Shows user, wrapper, config, and protected projects |
 | `/permission-uninstall` | Prints the command to run the bundled `uninstall.sh` |
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 # opencode permissions kit — Verification suite
-# Run after setup.sh to confirm everything works.
+# Run after install.sh to confirm everything works.
 set -e
 
 RED='\033[0;31m'

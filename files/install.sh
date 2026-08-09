@@ -1,8 +1,11 @@
 #!/bin/sh
-# opencode permissions kit -- setup.sh
-# Idempotent one-shot setup for WSL2 + DDEV environments.
+# opencode permissions kit -- install.sh
+# First-time installer for WSL2 + DDEV environments. Asks interactively.
 # Run as your default (non-root) user with sudo privileges:
-#   ./setup.sh
+#   ./install.sh
+#
+# To re-deploy the kit without prompts after it is already installed,
+# use update.sh instead. To change settings later, use config.sh.
 #
 # Options:
 #   --yes        Skip all prompts, assume Yes
@@ -97,7 +100,7 @@ if ! grep -qi microsoft /proc/version 2>/dev/null; then
 fi
 
 # Backup
-BACKUP_DIR="/tmp/opencode-setup-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP_DIR="/tmp/opencode-install-backup-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 echo "Backup directory: $BACKUP_DIR"
 sudo -u "$DEFAULT_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" || true
@@ -217,12 +220,14 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
 fi
 
-sudo tee /etc/opencode/setup.conf > /dev/null <<EOF
+sudo tee /etc/opencode/install.conf > /dev/null <<EOF
 DEFAULT_USER=$DEFAULT_USER
 OPENCODE_USER=$OPENCODE_USER
 WWW_GROUP=$WWW_GROUP
 VERSION=$VERSION
 EOF
+# Migrate legacy setup.conf (pre-v0.0.9) -> install.conf
+[ -f /etc/opencode/setup.conf ] && sudo rm -f /etc/opencode/setup.conf
 
 # === Step 3: Filesystem ===
 
@@ -295,11 +300,11 @@ if [ "$opencode_found" = false ]; then
             sudo chmod 755 "$SYSTEM_BIN"
             echo "Installed to $SYSTEM_BIN."
         else
-            echo "${RED}Installation failed. Install opencode manually and re-run setup.${NC}"
+            echo "${RED}Installation failed. Install opencode manually and re-run.${NC}"
             exit 1
         fi
     else
-        echo "Aborted. Install opencode manually and re-run setup.sh."
+        echo "Aborted. Install opencode manually and re-run install.sh."
         exit 1
     fi
 fi
@@ -416,7 +421,7 @@ fi
 # === Done ===
 
 echo ""
-echo "  ${GREEN}Setup complete.${NC}"
+echo "  ${GREEN}Installation complete.${NC}"
 echo ""
 echo "  Run:    ${CYAN}opencode${NC}"
 echo "  Backup: $BACKUP_DIR"

@@ -14,7 +14,7 @@ Install the plugin:
 opencode plugin @steffenmaechtel/opencode-permissions-kit -g
 ```
 
-Start opencode, type `/permission-setup`, and run the printed command in a terminal (it needs `sudo`). Follow the prompts to select project directories. After setup, `cd` into a project and run:
+Start opencode, type `/permission-install`, and run the printed command in a terminal (it needs `sudo`). Follow the prompts to select project directories. After the install, `cd` into a project and run:
 
 ```bash
 opencode
@@ -26,18 +26,33 @@ Project roots are stored in `/etc/opencode/projects.conf` (one absolute path per
 
 ### Adding More Projects
 
-**Option A — Re-run setup:**
-Run `/permission-setup` in opencode and append the flag to the printed command:
+**Option A — Use `config.sh` (recommended after install):**
+
+Run `/permission-config` in opencode and run the printed command, then append the subcommand:
+
 ```bash
-sudo bash <path-to-setup.sh> --projects /var/www/vhosts/new-project
+sudo bash /usr/local/lib/opencode/config.sh projects add /var/www/vhosts/new-project
 ```
 
 You can pass multiple paths:
+
 ```bash
-sudo bash <path-to-setup.sh> --projects /var/www/vhosts/site-a /var/www/vhosts/site-b
+sudo bash /usr/local/lib/opencode/config.sh projects add /var/www/vhosts/site-a /var/www/vhosts/site-b
 ```
 
-**Option B — Edit the config directly:**
+`config.sh` updates `projects.conf`, applies the base filesystem bits (group `www-data`, setgid, default ACL), and re-runs `protect-projects.sh --force` in one step. It is non-interactive when you pass `--yes`.
+
+**Option B — Re-run `install.sh` (during initial setup):**
+Run `/permission-install` in opencode and append the flag to the printed command:
+```bash
+sudo bash <path-to-install.sh> --projects /var/www/vhosts/new-project
+```
+You can pass multiple paths:
+```bash
+sudo bash <path-to-install.sh> --projects /var/www/vhosts/site-a /var/www/vhosts/site-b
+```
+
+**Option C — Edit the config directly:**
 ```bash
 sudo nano /etc/opencode/projects.conf
 ```
@@ -53,6 +68,16 @@ cat /etc/opencode/projects.conf
 ```
 
 ### Removing a Project Directory
+
+**Option A — Use `config.sh`:**
+
+```bash
+sudo bash /usr/local/lib/opencode/config.sh projects remove /var/www/vhosts/old-project
+```
+
+Removes the line from `/etc/opencode/projects.conf`. ACL denies on that directory remain on disk until you clear them manually.
+
+**Option B — Edit the config directly:**
 
 Remove the line from `/etc/opencode/projects.conf`. ACLs on that directory remain in place but are no longer refreshed — use `getfacl` / `setfacl -x` to clean up manually or run `uninstall.sh`.
 
@@ -122,14 +147,22 @@ See `tests/fixtures/project-opencode.jsonc` for a full example (TYPO3 project).
 
 `.git/config` can contain remote URLs with embedded credentials. When blocked, opencode **cannot execute any git commands** — no commit, push, pull, status, diff, or log. The developer must handle all git operations themselves.
 
-**Enable during setup:**
+**Enable during install:**
 
-Run `/permission-setup` in opencode and append the flag to the printed command:
+Run `/permission-install` in opencode and append the flag to the printed command:
 ```bash
-sudo bash <path-to-setup.sh> --secure-git-config
+sudo bash <path-to-install.sh> --secure-git-config
 ```
 
-Or answer "Yes" when prompted during interactive setup.
+Or answer "Yes" when prompted during interactive install.
+
+**Toggle later (without re-running install):**
+
+```bash
+sudo bash /usr/local/lib/opencode/config.sh git-config on     # block .git/config
+sudo bash /usr/local/lib/opencode/config.sh git-config off    # allow git access again
+sudo bash /usr/local/lib/opencode/config.sh git-config status # show current state
+```
 
 **Enable manually** (add to global or project config):
 
@@ -188,12 +221,12 @@ These tests run without system dependencies and verify logic in isolation:
 
 ## opencode Plugin
 
-The setup kit is distributed as an opencode plugin — this is the only install step. The plugin detects whether hardening is active and provides two modes:
+The kit is distributed as an opencode plugin — this is the only install step. The plugin detects whether hardening is active and provides two modes:
 
-- **Setup mode** (not hardened): Shows a setup banner and exposes the `/permission-setup` command
-- **Hardened mode** (active): Sets `OPENCODE_HARDENED=1`, logs protection stats, provides status + uninstall commands
+- **Install mode** (not hardened): Shows an install banner and exposes the `/permission-install` command
+- **Hardened mode** (active): Sets `OPENCODE_HARDENED=1`, logs protection stats, provides status / config / update / uninstall commands
 
-The plugin resolves the bundled `files/setup.sh` and `files/uninstall.sh` from its own install directory, so no global npm install or PATH setup is needed.
+The plugin resolves the bundled `files/install.sh`, `files/config.sh`, `files/update.sh`, and `files/uninstall.sh` from its own install directory, so no global npm install or PATH setup is needed.
 
 ### Installation
 
@@ -229,11 +262,13 @@ cp src/index.ts ~/.config/opencode/plugins/
 
 | Command | Purpose |
 |---|---|
-| `/permission-setup` | Prints the `sudo bash <setup.sh>` command to run in a terminal; in hardened mode confirms the protection is active |
+| `/permission-install` | Prints the `sudo bash <install.sh>` command to run in a terminal; in hardened mode confirms the protection is active |
+| `/permission-config` | Prints the `sudo bash <config.sh>` command — change project roots, toggle .git/config hardening, refresh ACLs |
+| `/permission-update` | Prints the `sudo bash <update.sh>` command — re-deploys the kit after a `git pull` without re-asking install questions |
 | `/permission-status` | Shows user, wrapper, config, and protected projects |
 | `/permission-uninstall` | Prints the `bash <uninstall.sh>` command to run in a terminal |
 
-The scripts must run in a regular terminal (not inside opencode): the `sudo` password prompt and the interactive project selection need a real TTY. After setup, restart opencode.
+The scripts must run in a regular terminal (not inside opencode): the `sudo` password prompt and the interactive project selection need a real TTY. After install/update, restart opencode.
 
 Type `/permission-status` in opencode to see:
 
@@ -244,6 +279,28 @@ Permission-Control v0.0.8 (hardened)
   Config: /home/opencode/.config/opencode/opencode.jsonc
   Projects: 1 (/var/www/vhosts)
   Cache: active
+```
+
+## Updating the Kit
+
+After `git pull` (or a new plugin install) you can re-deploy the kit **without** re-answering the install-time questions:
+
+```bash
+sudo bash /usr/local/lib/opencode/update.sh
+```
+
+`update.sh` copies the current wrapper, hooks, `protect-projects.sh`, `jsonc-parser.py`, `sudoers` template, `umask` profile, `config.sh`, `uninstall.sh`, and refreshes the `install.conf` version stamp. It does **not** touch:
+
+- `/etc/opencode/projects.conf`
+- `/etc/opencode/install.conf` (except the `VERSION=` line)
+- `/home/opencode/.config/opencode/opencode.jsonc`
+- the opencode binary at `/usr/local/lib/opencode/bin/opencode`
+- any ACLs or filesystem metadata
+
+Add `--refresh` to also re-run `protect-projects.sh --force` after the deploy:
+
+```bash
+sudo bash /usr/local/lib/opencode/update.sh --refresh
 ```
 
 ## Uninstalling
@@ -265,10 +322,12 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 | `/usr/local/bin/opencode` | Wrapper (symlink to `/usr/local/lib/opencode/wrapper`) |
 | `/usr/local/lib/opencode/wrapper` | Validates directory, refreshes ACLs, execs opencode |
 | `/usr/local/lib/opencode/protect-projects.sh` | Applies ACL denies to sensitive files |
-| `/usr/local/lib/opencode/uninstall.sh` | Uninstall script (deployed by setup, also bundled in the plugin) |
+| `/usr/local/lib/opencode/config.sh` | Change settings post-install (projects, git-config, refresh) |
+| `/usr/local/lib/opencode/update.sh` | Re-deploy the kit after an update, no prompts |
+| `/usr/local/lib/opencode/uninstall.sh` | Uninstall script (deployed by install, also bundled in the plugin) |
 | `/usr/local/lib/opencode/bin/opencode` | The actual opencode binary |
 | `/etc/opencode/projects.conf` | Project roots (one per line) |
-| `/etc/opencode/setup.conf` | `DEFAULT_USER` setting |
+| `/etc/opencode/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `VERSION` |
 | `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with deny patterns |
 | `/etc/sudoers.d/opencode` | Sudo rules for wrapper and protect-projects.sh |
 | `/usr/local/lib/opencode/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |

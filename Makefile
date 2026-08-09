@@ -1,4 +1,4 @@
-.PHONY: help test test-wrapper test-config test-hooks verify e2e setup-dev clean version check-version
+.PHONY: help test test-wrapper test-config test-hooks verify e2e install-dev clean version check-version
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -7,9 +7,9 @@ help:
 	@echo "  make test-wrapper  Run wrapper validation tests"
 	@echo "  make test-config   Run project config tests"
 	@echo "  make test-hooks    Run git hook regression tests"
-	@echo "  make verify        Run system verification (requires setup.sh)"
+	@echo "  make verify        Run system verification (requires install.sh)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
-	@echo "  make setup-dev     Quick dev setup (skip prompts)"
+	@echo "  make install-dev   Quick dev install (skip prompts)"
 	@echo "  make clean         Uninstall"
 	@echo "  make version VERSION=x.y.z   Bump version in VERSION + package.json"
 	@echo "  make check-version Validate VERSION and package.json match"
@@ -36,8 +36,8 @@ verify:
 e2e:
 	@./tests/e2e/run.sh
 
-setup-dev:
-	@sudo ./files/setup.sh --yes $(if $(PROJECTS),--projects $(PROJECTS))
+install-dev:
+	@sudo ./files/install.sh --yes $(if $(PROJECTS),--projects $(PROJECTS))
 
 clean:
 	@./files/uninstall.sh --yes

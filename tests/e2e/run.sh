@@ -92,9 +92,9 @@ E 'curl -fsSL https://opencode.ai/install | bash' || {
 }
 
 echo ""
-echo "--- 2. Run setup (from local repo, plugin-only distribution) ---"
-E 'sudo bash /home/dev/repo/files/setup.sh --yes --projects /var/www/vhosts'
-echo "  Setup complete."
+echo "--- 2. Run install (from local repo, plugin-only distribution) ---"
+E 'sudo bash /home/dev/repo/files/install.sh --yes --projects /var/www/vhosts'
+echo "  Install complete."
 
 echo ""
 echo "--- 3. Wrapper & binary ---"
@@ -106,6 +106,12 @@ check "Wrapper is first in PATH" \
     E 'test "$(which opencode)" = "/usr/local/bin/opencode"'
 check "Uninstall script deployed" \
     E 'test -x /usr/local/lib/opencode/uninstall.sh'
+check "config.sh deployed" \
+    E 'test -x /usr/local/lib/opencode/config.sh'
+check "update.sh deployed" \
+    E 'test -x /usr/local/lib/opencode/update.sh'
+check "install.conf written" \
+    E 'test -f /etc/opencode/install.conf'
 
 echo ""
 echo "--- 4. User & group ---"
@@ -172,14 +178,37 @@ E 'sudo /usr/local/lib/opencode/protect-projects.sh --force' && \
     echo "  ${GREEN}OK${NC}  protect-projects.sh runs without error"
 
 echo ""
-echo "--- 10. Sensitive file created after setup ---"
+echo "--- 10. Sensitive file created after install ---"
 E 'echo "new-secret" | sudo tee /var/www/vhosts/test-project/.env.local > /dev/null'
 E 'sudo /usr/local/lib/opencode/protect-projects.sh --force'
 check_fail ".env.local blocked after protect run" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env.local'
 
 echo ""
-echo "--- 11. Uninstall & cleanup verification ---"
+echo "--- 11. update.sh re-deploys kit non-interactively ---"
+E 'sudo bash /home/dev/repo/files/update.sh --yes' && \
+    echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
+check "Wrapper still present after update" E 'test -x /usr/local/bin/opencode'
+check "config.sh still present"            E 'test -x /usr/local/lib/opencode/config.sh'
+check "update.sh still present"            E 'test -x /usr/local/lib/opencode/update.sh'
+check "install.conf still present"         E 'test -f /etc/opencode/install.conf'
+check "projects.conf untouched"           E 'test -f /etc/opencode/projects.conf'
+check_fail ".env still blocked after update" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
+
+echo ""
+echo "--- 12. config.sh adds a project non-interactively ---"
+E 'sudo mkdir -p /var/www/vhosts/extra-project' && \
+    E 'sudo touch /var/www/vhosts/extra-project/.env'
+E 'sudo bash /usr/local/lib/opencode/config.sh --yes projects add /var/www/vhosts/extra-project' && \
+    echo "  ${GREEN}OK${NC}  config.sh add completed"
+check "extra-project in projects.conf" \
+    E 'grep -q /var/www/vhosts/extra-project /etc/opencode/projects.conf'
+check_fail "extra-project .env blocked after config add" \
+    E 'sudo -u opencode test -r /var/www/vhosts/extra-project/.env'
+
+echo ""
+echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
 check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'

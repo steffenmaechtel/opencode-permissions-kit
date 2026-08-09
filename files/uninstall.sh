@@ -1,6 +1,6 @@
 #!/bin/sh
 # opencode permissions kit -- uninstall.sh
-# Removes ALL changes made by setup.sh. Must be run as your default user with sudo.
+# Removes ALL changes made by install.sh. Must be run as your default user with sudo.
 #
 # Options:
 #   --yes        Skip all prompts, assume Yes
@@ -37,7 +37,7 @@ WWW_GROUP="www-data"
 
 echo ""
 echo "  ${RED}opencode permissions kit -- UNINSTALL${NC}"
-echo "  This will remove ALL changes made by setup.sh."
+echo "  This will remove ALL changes made by install.sh."
 echo ""
 
 trace "DEFAULT_USER=$DEFAULT_USER"
@@ -100,9 +100,12 @@ run() {
     fi
 }
 
-# Source setup.conf for variables
-if [ -f /etc/opencode/setup.conf ]; then
-    trace "sourcing /etc/opencode/setup.conf"
+# Source install.conf (with pre-v0.0.9 fallback to setup.conf)
+if [ -f /etc/opencode/install.conf ]; then
+    trace "sourcing /etc/opencode/install.conf"
+    . /etc/opencode/install.conf
+elif [ -f /etc/opencode/setup.conf ]; then
+    trace "sourcing /etc/opencode/setup.conf (legacy)"
     . /etc/opencode/setup.conf
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
@@ -196,5 +199,5 @@ echo "Removed."
 
 echo ""
 echo "  ${GREEN}Uninstall complete.${NC}"
-echo "  Backups (if any) remain in /tmp/opencode-setup-backup-* for manual cleanup."
+echo "  Backups (if any) remain in /tmp/opencode-install-backup-* for manual cleanup."
 echo ""

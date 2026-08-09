@@ -1,6 +1,6 @@
 #!/bin/sh
 # opencode permissions kit — Wrapper
-# This file is deployed to /usr/local/bin/opencode by setup.sh.
+# This file is deployed to /usr/local/bin/opencode by install.sh.
 # It ensures opencode always runs as the dedicated 'opencode' user.
 set -e
 
@@ -44,7 +44,7 @@ if [ "$VALID" != true ]; then
             printf "  - %s\n" "$root"
         done < "$PROJECTS_CONF"
     else
-        echo "  (none configured — run setup.sh first)"
+        echo "  (none configured — run install.sh first)"
     fi
     echo ""
     exit 1
