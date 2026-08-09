@@ -221,7 +221,9 @@ E 'cat /etc/opencode/projects.conf > /tmp/projects.conf.before'
 # Create a copy of the repo files with a sentinel VERSION so we can observe the bump.
 # We can't overwrite the bind-mounted VERSION reliably, so we copy update.sh + a
 # sentinel VERSION into a temp dir and run it from there.
-E 'mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "9.9.9-sentinel" > /tmp/update-test/VERSION'
+E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "9.9.9-sentinel" > /tmp/update-test/VERSION'
+# Verify the sentinel is in place before running update
+E 'cat /tmp/update-test/VERSION'
 E 'sudo bash /tmp/update-test/files/update.sh --yes' && \
     echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
 check "Wrapper still present after update" E 'test -x /usr/local/bin/opencode'
@@ -291,14 +293,13 @@ echo ""
 echo "--- 12d. config.sh interactive menu (displays) ---"
 E 'sudo mkdir -p /var/www/vhosts/menu-project' && \
     E 'sudo touch /var/www/vhosts/menu-project/.env'
-# The menu uses /dev/tty for reads (not stdin), so we can't pipe input via
-# docker exec. Instead we verify the menu displays correctly by sending 'q'
-# via a timeout-based approach: run with < /dev/null which makes /dev/tty
-# read fail, falling back to stdin which is /dev/null (EOF → empty → main
-# loop case '*' → "Unknown selection" → loops again → EOF again → read
-# returns empty → case "" → falls through). Simplest: just verify the
-# script starts and shows the menu text by capturing output briefly.
-E 'echo "q" | timeout 5 sudo bash /usr/local/lib/opencode/config.sh 2>&1 | tee /tmp/menu-out.txt || true'
+# The menu uses /dev/tty for reads, so we redirect stdin from /dev/null.
+# read </dev/tty fails (no tty in docker exec), falls back to stdin (/dev/null = EOF).
+# EOF → empty input → case "" → falls through to default → "Unknown selection"
+# → loops again → prints menu again → EOF again → repeat forever.
+# So we use timeout to kill it after the menu has printed at least once.
+E 'timeout 2 sudo bash /usr/local/lib/opencode/config.sh < /dev/null 2>&1 | tee /tmp/menu-out.txt || true'
+E 'sudo chown dev /tmp/menu-out.txt'
 check "menu: shows numbered options" \
     E 'grep -q "\[1\]" /tmp/menu-out.txt'
 check "menu: shows git-config option" \
