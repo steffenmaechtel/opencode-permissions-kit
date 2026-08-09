@@ -224,6 +224,8 @@ E 'cat /etc/opencode/projects.conf > /tmp/projects.conf.before'
 E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "9.9.9-sentinel" > /tmp/update-test/VERSION'
 # Verify the sentinel is in place before running update
 E 'cat /tmp/update-test/VERSION'
+E 'ls -la /tmp/update-test/VERSION'
+E 'sudo bash -c '\''SCRIPT_DIR=$(cd "$(dirname "$(readlink -f /tmp/update-test/files/update.sh)")" && pwd); echo "DEBUG SCRIPT_DIR=$SCRIPT_DIR"; cat "$SCRIPT_DIR/../VERSION"'\'''
 E 'sudo bash /tmp/update-test/files/update.sh --yes' && \
     echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
 check "Wrapper still present after update" E 'test -x /usr/local/bin/opencode'
