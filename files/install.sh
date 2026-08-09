@@ -2,8 +2,8 @@
 # opencode permissions kit -- install.sh
 # First-time installer for WSL2 + DDEV environments. Asks interactively.
 #
-# One-liner (fetches this script + all kit files from GitHub at $KIT_TAG):
-#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_TAG/files/install.sh | sudo bash
+# One-liner (fetches this script + all kit files from GitHub at $KIT_BRANCH):
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/install.sh | sudo bash
 #
 # From a checkout (same behaviour, uses the local files):
 #   sudo bash files/install.sh
@@ -16,11 +16,10 @@
 #   --projects <path...>  Pre-define project roots, skip interactive selection
 set -e
 
-# Tag/URL this kit version ships from. Kept in sync with VERSION by
-# `make version` and checked by `make check-version`. Overridable for
-# testing: KIT_TAG=x.y.z  KIT_BASE_URL=https://example.invalid/<tag>
-KIT_TAG="${KIT_TAG:-0.0.8}"
-KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_TAG}"
+# Branch the kit ships from (main = always latest). Overridable for
+# testing: KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
+KIT_BRANCH="${KIT_BRANCH:-main}"
+KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script

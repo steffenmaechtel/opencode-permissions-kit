@@ -7,7 +7,7 @@ Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, s
 **One step:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/0.0.8/files/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/install.sh | sudo bash
 ```
 
 After that, `opencode` runs as a dedicated user with hard filesystem denies. No npm package, no plugin, no extra install steps.
@@ -25,10 +25,10 @@ Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/0.0.8/files/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/install.sh | sudo bash
 ```
 
-The script fetches its sibling files from the same release tag, so the one-liner is always a complete, self-consistent install. It asks interactively; add `--yes` and `--projects /var/www/vhosts` to skip prompts.
+The script fetches its sibling files from the same `main` branch, so the one-liner is always a complete, self-consistent install. It asks interactively; add `--yes` and `--projects /var/www/vhosts` to skip prompts.
 
 After the install completes, restart opencode:
 
@@ -51,10 +51,10 @@ bash /usr/local/lib/opencode/uninstall.sh         # remove everything (no sudo p
 
 ## Updating
 
-Fetch the new release's `update.sh` and pipe it through sudo — it deploys the matching release files and leaves `projects.conf`, `install.conf`, `opencode.jsonc`, and the opencode binary untouched:
+Fetch `update.sh` from `main` and pipe it through sudo — it deploys the matching branch files and leaves `projects.conf`, `install.conf`, `opencode.jsonc`, and the opencode binary untouched:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/0.0.8/files/update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/update.sh | sudo bash
 ```
 
 ## Uninstall

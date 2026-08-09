@@ -3,8 +3,8 @@ name: e2e
 on:
   workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 jobs:
   e2e:

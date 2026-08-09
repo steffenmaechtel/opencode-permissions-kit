@@ -13,8 +13,8 @@ help:
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make install-dev   Quick dev install (skip prompts)"
 	@echo "  make clean         Uninstall"
-	@echo "  make version VERSION=x.y.z   Bump version in VERSION + KIT_TAG in install.sh/update.sh"
-	@echo "  make check-version Validate VERSION and KIT_TAG match"
+	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
+	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
 test: test-wrapper test-config test-hooks test-parser test-git-config
 	@echo ""
@@ -55,14 +55,17 @@ clean:
 version:
 	@[ -n "$(VERSION)" ] || { echo "Usage: make version VERSION=x.y.z"; exit 1; }
 	@echo "$(VERSION)" > VERSION
-	@sed -i "s|KIT_TAG=\"\$${KIT_TAG:-[^\"]*}\"|KIT_TAG=\"\$${KIT_TAG:-$(VERSION)}\"|" files/install.sh files/update.sh
-	@echo "Version set to $(VERSION) (VERSION file + KIT_TAG in install.sh/update.sh)"
+	@echo "Version stamp set to $(VERSION) (VERSION file). Install URLs track the main branch, no tag needed."
 
 check-version:
 	@v="$$(cat VERSION)"; \
-	i="$$(sed -n 's/.*KIT_TAG="\$${KIT_TAG:-\([^"]*\)}".*/\1/p' files/install.sh | head -1)"; \
-	u="$$(sed -n 's/.*KIT_TAG="\$${KIT_TAG:-\([^"]*\)}".*/\1/p' files/update.sh | head -1)"; \
-	if [ "$$v" != "$$i" ] || [ "$$v" != "$$u" ]; then \
-		echo "MISMATCH: VERSION=$$v install.sh KIT_TAG=$$i update.sh KIT_TAG=$$u"; exit 1; \
+	case "$$v" in \
+		[0-9]*.[0-9]*.[0-9]*) ;; \
+		*) echo "VERSION file is not a semver stamp: '$$v'"; exit 1; ;; \
+	esac; \
+	i="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/install.sh | head -1)"; \
+	u="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/update.sh | head -1)"; \
+	if [ -z "$$i" ] || [ "$$i" != "$$u" ]; then \
+		echo "MISMATCH: install.sh KIT_BRANCH=$$i update.sh KIT_BRANCH=$$u"; exit 1; \
 	fi; \
-	echo "Version consistent: $$v"
+	echo "Version stamp: $$v  (installs from branch '$$i')"
