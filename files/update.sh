@@ -26,9 +26,9 @@ YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Branch the kit ships from (main = always latest). Overridable for
+# Branch the kit ships from (master = always latest). Overridable for
 # testing: KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
-KIT_BRANCH="${KIT_BRANCH:-main}"
+KIT_BRANCH="${KIT_BRANCH:-master}"
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout

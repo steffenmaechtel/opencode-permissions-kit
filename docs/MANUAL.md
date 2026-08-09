@@ -9,10 +9,10 @@ Once installed, a developer opens a terminal in a project directory and runs `op
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
 ```
 
-The script detects that it is being streamed, fetches its sibling files (config.sh, update.sh, uninstall.sh, status.sh, wrapper, hooks, templates) from the same `main` branch, and walks you through the setup. Follow the prompts to select project directories. After the install, `cd` into a project and run:
+The script detects that it is being streamed, fetches its sibling files (config.sh, update.sh, uninstall.sh, status.sh, wrapper, hooks, templates) from the same `master` branch, and walks you through the setup. Follow the prompts to select project directories. After the install, `cd` into a project and run:
 
 ```bash
 opencode
@@ -42,11 +42,11 @@ sudo bash /usr/local/lib/opencode/config.sh projects add /var/www/vhosts/site-a 
 
 **Option B — Re-run `install.sh` (during initial setup):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/install.sh | sudo bash -s -- --projects /var/www/vhosts/new-project
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash -s -- --projects /var/www/vhosts/new-project
 ```
 You can pass multiple paths:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/install.sh | sudo bash -s -- --projects /var/www/vhosts/site-a /var/www/vhosts/site-b
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash -s -- --projects /var/www/vhosts/site-a /var/www/vhosts/site-b
 ```
 (Or re-run a local checkout with `sudo bash files/install.sh --projects ...`.)
 
@@ -148,7 +148,7 @@ See `tests/fixtures/project-opencode.jsonc` for a full example (TYPO3 project).
 **Enable during install:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/install.sh | sudo bash -s -- --secure-git-config
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash -s -- --secure-git-config
 ```
 
 Or answer "Yes" when prompted during interactive install.
@@ -257,10 +257,10 @@ Before the kit is installed, `status.sh` still works and reports that hardening 
 
 ## Updating the Kit
 
-After `git pull` (or new changes merged to `main`) you can re-deploy the kit **without** re-answering the install-time questions:
+After `git pull` (or new changes merged to `master`) you can re-deploy the kit **without** re-answering the install-time questions:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/update.sh | sudo bash
 ```
 
 Or run the deployed copy directly:

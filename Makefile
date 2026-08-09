@@ -55,7 +55,7 @@ clean:
 version:
 	@[ -n "$(VERSION)" ] || { echo "Usage: make version VERSION=x.y.z"; exit 1; }
 	@echo "$(VERSION)" > VERSION
-	@echo "Version stamp set to $(VERSION) (VERSION file). Install URLs track the main branch, no tag needed."
+	@echo "Version stamp set to $(VERSION) (VERSION file). Install URLs track the master branch, no tag needed."
 
 check-version:
 	@v="$$(cat VERSION)"; \

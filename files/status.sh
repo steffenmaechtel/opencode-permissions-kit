@@ -41,7 +41,7 @@ if [ "$installed" = false ]; then
     echo "  ${YELLOW}Hardening NOT active.${NC}"
     echo ""
     echo "  Install it with:"
-    echo "      curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/main/files/install.sh | sudo bash"
+    echo "      curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash"
     echo ""
     exit 0
 fi
