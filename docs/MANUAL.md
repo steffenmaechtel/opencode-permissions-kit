@@ -297,8 +297,11 @@ What gets logged:
 | Missing configs (skipped runs) | `projects.conf not found — nothing to protect` |
 | Early exits | `no global opencode config found — nothing to protect` |
 
-`uninstall.sh --yes` removes the log directory and all rotation files along
-with the rest of the kit.
+During an interactive `uninstall.sh` run you are asked whether the audit log
+should be deleted too (recommended, default yes). `uninstall.sh --yes` always
+deletes the log directory and all rotation files along with the rest of the
+kit. The final log entry is written before the directory is removed, so no new
+log file is recreated by the uninstall itself.
 
 ## Updating the Kit
 

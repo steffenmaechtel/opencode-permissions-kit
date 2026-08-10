@@ -220,9 +220,14 @@ log "/etc/opencode removed"
 
 echo ""
 echo "--- Removing audit log ---"
-run "sudo rm -rf /var/log/opencode-permissions-kit"
-log "audit log removed: /var/log/opencode-permissions-kit"
-echo "Removed."
+if [ "$(prompt_yn "Delete audit log too? (recommended)" "y")" = "y" ]; then
+    log "audit log removed: /var/log/opencode-permissions-kit"
+    run "sudo rm -rf /var/log/opencode-permissions-kit"
+    echo "Audit log removed."
+else
+    log "audit log kept (requested by user)"
+    echo "Audit log kept at /var/log/opencode-permissions-kit"
+fi
 
 echo ""
 echo "  ${GREEN}Uninstall complete.${NC}"
