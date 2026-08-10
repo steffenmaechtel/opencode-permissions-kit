@@ -6,9 +6,10 @@
 # best-effort and never breaks the calling script.
 #
 # Location:  /var/log/opencode-permissions-kit/opencode-permissions-kit.log
-#   - dir root:root mode 700, file root:root mode 600 (the 'opencode' user
-#     must NOT be able to read it — it documents the very restrictions that
-#     are applied against that user)
+#   - dir root:<default-user-group> mode 750, file root:<default-user-group>
+#     mode 640 (the 'opencode' user must NOT be able to read it — it documents
+#     the very restrictions that are applied against that user; the default
+#     user / kit admin may read it via their primary group)
 #   - size-based self-rotation: 1 MB -> .1 .. .5, no external logrotate
 #   - one line per event:  <ISO-timestamp> [<script-name>] <message>
 #
@@ -28,13 +29,26 @@ log_init() {
     # Guards against the shell's own "Permission denied" noise on failed
     # redirects (e.g. uninstall running as the default user).
     [ -w "$LOG_DIR" ] || return 1
-    chown root:root "$LOG_DIR" 2>/dev/null || true
-    chmod 700 "$LOG_DIR" 2>/dev/null || true
+    # Grant read access to the default user (the kit admin) via its primary
+    # group. The 'opencode' user is never a member of that group, so it stays
+    # locked out while the admin can read the log without sudo. Falls back to
+    # root-only when no config/user is resolvable.
+    LOG_GROUP="root"
+    for conf in /etc/opencode/install.conf /etc/opencode/setup.conf; do
+        [ -f "$conf" ] || continue
+        default_user=$(sed -n 's/^DEFAULT_USER=//p' "$conf" | tail -1)
+        [ -n "$default_user" ] && break
+    done
+    if [ -n "${default_user:-}" ] && id -u "$default_user" >/dev/null 2>&1; then
+        LOG_GROUP=$(id -gn "$default_user")
+    fi
+    chown "root:$LOG_GROUP" "$LOG_DIR" 2>/dev/null || true
+    chmod 750 "$LOG_DIR" 2>/dev/null || true
     if [ ! -f "$LOG_FILE" ]; then
         : > "$LOG_FILE" 2>/dev/null || return 1
     fi
-    chown root:root "$LOG_FILE" 2>/dev/null || true
-    chmod 600 "$LOG_FILE" 2>/dev/null || true
+    chown "root:$LOG_GROUP" "$LOG_FILE" 2>/dev/null || true
+    chmod 640 "$LOG_FILE" 2>/dev/null || true
 }
 
 log_rotate() {

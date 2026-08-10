@@ -278,9 +278,11 @@ Before the kit is installed, `status.sh` still works and reports that hardening 
 Every kit script that changes the system writes a machine-readable audit trail:
 
 - Location: `/var/log/opencode-permissions-kit/opencode-permissions-kit.log`
-- Directory `root:root` mode `700`, file `root:root` mode `600`. The `opencode`
-  user cannot read it — it documents the very restrictions applied against
-  that user, so it must stay out of its reach.
+- Directory `root:<default-user-group>` mode `750`, file `root:<default-user-group>`
+  mode `640`. The `opencode` user cannot read it — it documents the very
+  restrictions applied against that user, so it must stay out of its reach.
+  The default user (the kit admin) can read it without sudo via their primary
+  group.
 - One line per event: `<ISO-timestamp> [<script-name>] <message>`
 - Size-based self-rotation: 1 MB → `.1` … `.5`. No external logrotate needed.
 - Best-effort by design: if the log cannot be written (e.g. non-root preview),
@@ -384,4 +386,4 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 | `/etc/sudoers.d/opencode` | Sudo rules for wrapper and protect-projects.sh |
 | `/usr/local/lib/opencode/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |
 | `/usr/local/lib/opencode/log.sh` | Shared audit-log helper (sourced by the scripts above) |
-| `/var/log/opencode-permissions-kit/` | Audit log (root-only, mode 700/600, self-rotating) |
+| `/var/log/opencode-permissions-kit/` | Audit log (root + default-user group, mode 750/640, self-rotating) |

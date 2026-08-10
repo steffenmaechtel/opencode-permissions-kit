@@ -483,10 +483,12 @@ check "log dir exists" \
     E 'sudo test -d /var/log/opencode-permissions-kit'
 check "log file exists" \
     E 'sudo test -f /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
-check "log is root-owned mode 600" \
-    E 'test "$(sudo stat -c %U:%a /var/log/opencode-permissions-kit/opencode-permissions-kit.log)" = "root:600"'
-check "log dir is root-owned mode 700" \
-    E 'test "$(sudo stat -c %U:%a /var/log/opencode-permissions-kit)" = "root:700"'
+check "log is root-owned mode 640" \
+    E 'test "$(sudo stat -c %U:%a /var/log/opencode-permissions-kit/opencode-permissions-kit.log)" = "root:640"'
+check "log dir is root-owned mode 750" \
+    E 'test "$(sudo stat -c %U:%a /var/log/opencode-permissions-kit)" = "root:750"'
+check "default user can read log file" \
+    E 'test -r /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "install events logged" \
     E 'sudo grep -q "install complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "protect-projects events logged" \
