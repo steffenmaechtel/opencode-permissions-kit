@@ -8,17 +8,8 @@
     // bypassing the wrapper and its ACL refresh (which only happen when the
     // wrapper execs opencode as the 'opencode' user). This config denies
     // everything for the default user so that bypass is locked down.
+    // The "*" key sets the global default for every tool (read, edit, bash,
+    // webfetch, ...); specific tools could be allowed back in on top of it.
     "share": "disabled",
-    "permission": {
-        "read": "deny",
-        "edit": "deny",
-        "glob": "deny",
-        "grep": "deny",
-        "list": "deny",
-        "bash": { "*": "deny" },
-        "task": "deny",
-        "external_directory": "deny",
-        "webfetch": "deny",
-        "websearch": "deny"
-    }
+    "permission": { "*": "deny" }
 }

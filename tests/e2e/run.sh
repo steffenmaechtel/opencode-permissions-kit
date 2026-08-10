@@ -260,10 +260,8 @@ check "pre-existing default-user config backed up" \
     E 'ls /home/dev/.config/opencode/ | grep -q "opencode.jsonc_BAK_"'
 check "deny-all config owned by dev" \
     E 'test "$(stat -c %U /home/dev/.config/opencode/opencode.jsonc)" = "dev"'
-check "deny-all config denies read" \
-    E 'grep -q "\"read\": \"deny\"" /home/dev/.config/opencode/opencode.jsonc'
-check "deny-all config denies bash" \
-    E 'grep -q "\"bash\"" /home/dev/.config/opencode/opencode.jsonc'
+check "deny-all config denies everything" \
+    E 'grep -q '\''"\*"'\'' /home/dev/.config/opencode/opencode.jsonc'
 
 echo ""
 echo "--- 7. Git hooks ---"
