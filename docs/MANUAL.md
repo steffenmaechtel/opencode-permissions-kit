@@ -232,6 +232,8 @@ These tests run without system dependencies and verify logic in isolation:
 ./tests/test-project-config.sh       # 29 tests: project config parsing & matching
 ```
 
+The end-to-end test (`make e2e`) builds an Ubuntu container, installs the kit, and verifies the full protection flow. It requires Docker and must be run manually from a terminal. The opencode binary is downloaded once per opencode version and cached in `tests/e2e/cache/` (gitignored), so repeated runs with the same version are fast and work offline; a new opencode version triggers a fresh download automatically.
+
 ## Management Scripts
 
 The kit is system-level only — no opencode plugin, no npm package. Everything is managed from a regular terminal (the `sudo` password prompt needs a real TTY, not opencode):
