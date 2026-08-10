@@ -72,6 +72,13 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
     SCRIPT_DIR="$(fetch_kit)" || { echo "${RED}Failed to fetch kit files from $KIT_BASE_URL${NC}" >&2; exit 1; }
+    # Do NOT continue executing this (installed, possibly older) copy: the
+    # deploy below overwrites $LIBDIR/update.sh with the freshly fetched one,
+    # which would replace the very file we are still running from. bash reads
+    # a script incrementally, so a self-modifying script corrupts its parser
+    # mid-run ("syntax error near unexpected token '('"). Re-exec the fetched
+    # copy instead — its own overwrite of $LIBDIR/update.sh is then harmless.
+    exec bash "$SCRIPT_DIR/update.sh" "$@"
 fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 LIBDIR="/usr/local/lib/opencode"
