@@ -49,13 +49,24 @@ bash /usr/local/lib/opencode/uninstall.sh         # remove everything (no sudo p
 
 `status.sh` also works before the kit is installed, so you can check whether hardening is active from any machine.
 
+Every kit script writes an audit trail to `/var/log/opencode-permissions-kit/opencode-permissions-kit.log` (self-rotating, readable by the default user — the `opencode` user cannot read it).
+
 ## Updating
 
-Fetch `update.sh` from `master` and pipe it through sudo — it deploys the matching branch files and leaves `projects.conf`, `install.conf`, `opencode.jsonc`, and the opencode binary untouched:
+Fetch `update.sh` from `master` and pipe it through sudo — it deploys the matching branch files and leaves `projects.conf`, `install.conf`, and `opencode.jsonc` untouched:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/update.sh | sudo bash
 ```
+
+`opencode upgrade` and opencode's auto-updater cannot work behind the wrapper (the binary is root-owned, opencode runs as an unprivileged user), so the bundled config sets `autoupdate: false` and `update.sh` is the upgrade entry point:
+
+```bash
+sudo bash /usr/local/lib/opencode/update.sh --binary                  # upgrade opencode to the latest release
+sudo bash /usr/local/lib/opencode/update.sh --binary-path ./opencode  # install a specific binary
+```
+
+Binary upgrades are best-effort: a failure leaves the current binary in place, the previous one is kept in `/tmp/opencode-upgrade-backup-*`.
 
 ## Uninstall
 
