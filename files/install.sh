@@ -30,6 +30,7 @@ fetch_kit() {
     dir="$base/files"
     mkdir -p "$dir/opencode-lib/hooks"
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
+             opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
              opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
@@ -380,6 +381,7 @@ sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
 sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
+sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc"          "$LIBDIR/opencode-deny-all.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -463,6 +465,32 @@ else
     if [ "$SECURE_GIT_CONFIG" = true ]; then
         echo "  ${YELLOW}Heads-up: --secure-git-config was set but config already existed.${NC}" >&2
     fi
+fi
+
+# === Step 6b: Default-user config (self-update bypass protection) ===
+
+# opencode's self-updater / installer can re-add ~/.opencode/bin to PATH, so
+# 'opencode' would run the real binary as $DEFAULT_USER — bypassing the
+# wrapper, its ACL refresh, and the 'opencode' user. Deploy a deny-* config
+# for the default user so that mode is completely locked down.
+DEFAULT_OC_DIR="/home/$DEFAULT_USER/.config/opencode"
+DEFAULT_OC_CONF="$DEFAULT_OC_DIR/opencode.jsonc"
+sudo mkdir -p "$DEFAULT_OC_DIR"
+if [ -f "$DEFAULT_OC_CONF" ]; then
+    ans=$(prompt "Default-user config $DEFAULT_OC_CONF already exists. Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?" "Y" "N" "")
+    if [ "$ans" = "y" ]; then
+        BAK_STAMP=$(date +%Y%m%d-%H%M%S)
+        sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
+        echo "Backed up to $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
+    else
+        echo "${YELLOW}Existing config kept — deny-all protection NOT installed.${NC}"
+    fi
+fi
+if [ ! -f "$DEFAULT_OC_CONF" ]; then
+    sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
+    sudo chown "$DEFAULT_USER:$WWW_GROUP" "$DEFAULT_OC_CONF"
+    sudo chmod 664 "$DEFAULT_OC_CONF"
+    echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
 fi
 
 # === Step 7: Initial protection run ===

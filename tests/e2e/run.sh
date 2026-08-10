@@ -98,6 +98,9 @@ check "status.sh (not installed) reports hardening NOT active" \
 
 echo ""
 echo "--- 2. Run install (from local repo checkout) ---"
+# Pre-create a default-user config so install.sh must back it up and
+# install the deny-all config (--yes auto-answers the backup prompt).
+E 'mkdir -p /home/dev/.config/opencode && printf "%s\n" "{\"model\":\"dummy\"}" > /home/dev/.config/opencode/opencode.jsonc'
 E 'sudo bash /home/dev/repo/files/install.sh --yes --projects /var/www/vhosts'
 echo "  Install complete."
 
@@ -156,6 +159,19 @@ check "default user can read opencode.jsonc" \
     E 'test -r /home/opencode/.config/opencode/opencode.jsonc'
 check "default user can write opencode.jsonc" \
     E 'test -w /home/opencode/.config/opencode/opencode.jsonc'
+
+echo ""
+echo "--- 6b. Default-user deny-all config (self-update bypass protection) ---"
+check "default-user deny-all config deployed" \
+    E 'test -f /home/dev/.config/opencode/opencode.jsonc'
+check "pre-existing default-user config backed up" \
+    E 'ls /home/dev/.config/opencode/ | grep -q "opencode.jsonc_BAK_"'
+check "deny-all config owned by dev" \
+    E 'test "$(stat -c %U /home/dev/.config/opencode/opencode.jsonc)" = "dev"'
+check "deny-all config denies read" \
+    E 'grep -q "\"read\": \"deny\"" /home/dev/.config/opencode/opencode.jsonc'
+check "deny-all config denies bash" \
+    E 'grep -q "\"bash\"" /home/dev/.config/opencode/opencode.jsonc'
 
 echo ""
 echo "--- 7. Git hooks ---"
@@ -248,6 +264,8 @@ check_fail ".env still blocked after update" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 check "opencode.jsonc byte-identical (sha256 unchanged)" \
     E 'test "$(sudo sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1)" = "$(cat /tmp/sha-opencode-jsonc.before)"'
+check "default-user deny-all config survives update" \
+    E 'test -f /home/dev/.config/opencode/opencode.jsonc'
 check "binary byte-identical (sha256 unchanged)" \
     E 'test "$(sudo sha256sum /usr/local/lib/opencode/bin/opencode | cut -d" " -f1)" = "$(cat /tmp/sha-binary.before)"'
 check "projects.conf content unchanged" \

@@ -10,6 +10,8 @@
 #   - any ACLs
 #   (except: normalizes the /home/opencode ownership/mode so the default user
 #   can edit opencode.jsonc — see the "opencode home" step below)
+#   - the DEFAULT user's existing opencode config (a deny-all config is only
+#   deployed when that user has no opencode.jsonc yet)
 #
 # One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
 #   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/update.sh | sudo bash
@@ -43,6 +45,7 @@ fetch_kit() {
     dir="$base/files"
     mkdir -p "$dir/opencode-lib/hooks"
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
+             opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
              opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
@@ -201,6 +204,22 @@ if [ -d "/home/$OPENCODE_USER" ]; then
     sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER"
     sudo chmod 2750 "/home/$OPENCODE_USER"
     echo "/home/$OPENCODE_USER is accessible for group $WWW_GROUP."
+fi
+
+# --- ensure default-user deny-all config (self-update bypass protection) ------
+# Older installs predate this config. Deploy it only if the default user has
+# no config yet — update.sh must not silently clobber an existing one.
+if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
+    DEFAULT_OC_CONF="/home/$DEFAULT_USER/.config/opencode/opencode.jsonc"
+    if [ ! -f "$DEFAULT_OC_CONF" ]; then
+        sudo mkdir -p "$(dirname "$DEFAULT_OC_CONF")"
+        sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
+        sudo chown "$DEFAULT_USER:$WWW_GROUP" "$DEFAULT_OC_CONF"
+        sudo chmod 664 "$DEFAULT_OC_CONF"
+        echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
+    else
+        echo "Default-user config exists — left untouched (re-run install.sh to back it up)."
+    fi
 fi
 
 # --- refresh install.conf version stamp --------------------------------------

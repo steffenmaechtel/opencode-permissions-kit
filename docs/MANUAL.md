@@ -101,6 +101,22 @@ Add deny patterns under `permission.read.deny` and `permission.edit.deny`. Chang
 
 See `files/opencode.jsonc` for the default template.
 
+### Self-Update Bypass Protection (Default-User Config)
+
+`opencode`'s installer and self-updater can re-add `~/.opencode/bin` to your `PATH`. If that happens, typing `opencode` would run the real binary **as your user** instead of our wrapper — bypassing the wrapper's ACL refresh and the dedicated `opencode` user.
+
+As a safety net, the kit installs a lockout config for the default user:
+
+```bash
+nano /home/$USER/.config/opencode/opencode.jsonc
+```
+
+It denies **everything** (`read`, `edit`, `bash`, …), so even if the real binary takes over, it cannot read or modify anything. Template: `files/opencode-deny-all.jsonc`.
+
+- During `install.sh`, if that file already exists you are asked whether it may be renamed to `opencode.jsonc_BAK_<timestamp>` before the deny-all config is installed.
+- `update.sh` only installs the lockout config when no config exists yet — it never clobbers an existing one (re-run `install.sh` to get the backup prompt).
+- To use opencode normally as your own user, delete or rename that config — the wrapper path is unaffected.
+
 ### Project-Specific Config
 
 Each project can have its own `opencode.jsonc` (or `opencode.json`) in its root directory. Project configs **extend** the global config — they add denies cumulatively, never weaken existing rules.
@@ -308,5 +324,6 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 | `/etc/opencode/projects.conf` | Project roots (one per line) |
 | `/etc/opencode/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `VERSION` |
 | `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with deny patterns |
+| `/home/<default-user>/.config/opencode/opencode.jsonc` | Deny-* lockout config against self-update PATH bypass (see "Self-Update Bypass Protection") |
 | `/etc/sudoers.d/opencode` | Sudo rules for wrapper and protect-projects.sh |
 | `/usr/local/lib/opencode/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |

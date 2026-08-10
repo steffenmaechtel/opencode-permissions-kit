@@ -1,0 +1,24 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    // opencode permissions kit — default-user lockout config
+    // Installed to /home/<default-user>/.config/opencode/opencode.jsonc.
+    //
+    // opencode's self-updater / installer can re-add ~/.opencode/bin to PATH.
+    // Then typing "opencode" would run the real binary as the DEFAULT user,
+    // bypassing the wrapper and its ACL refresh (which only happen when the
+    // wrapper execs opencode as the 'opencode' user). This config denies
+    // everything for the default user so that bypass is locked down.
+    "share": "disabled",
+    "permission": {
+        "read": "deny",
+        "edit": "deny",
+        "glob": "deny",
+        "grep": "deny",
+        "list": "deny",
+        "bash": { "*": "deny" },
+        "task": "deny",
+        "external_directory": "deny",
+        "webfetch": "deny",
+        "websearch": "deny"
+    }
+}
