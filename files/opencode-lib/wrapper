@@ -12,6 +12,13 @@ NC='\033[0m'
 
 PROJECTS_CONF="/etc/opencode/projects.conf"
 
+INSTALL_CONF="/etc/opencode/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
+VERSION="0.0.0"
+if [ -f "$INSTALL_CONF" ]; then
+    . "$INSTALL_CONF"
+fi
+
 CWD=$(pwd)
 VALID=false
 if [ -f "$PROJECTS_CONF" ]; then
@@ -51,7 +58,7 @@ if [ "$VALID" != true ]; then
 fi
 
 echo ""
-echo "  ${GREEN}SECURED BY opencode permissions kit${NC}"
+echo "  ${GREEN}SECURED BY opencode permissions kit ($VERSION)${NC}"
 echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
 echo ""
 

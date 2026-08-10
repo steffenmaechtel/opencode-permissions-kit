@@ -50,6 +50,20 @@ validate_dir() {
     fi
 }
 
+# Replicate the wrapper's version banner logic: read VERSION from the
+# install.conf (falling back to the legacy setup.conf), defaulting to 0.0.0.
+# printf '%b' is used (not echo) so the \033 escapes render identically
+# under dash and bash — matching the wrapper's colored banner.
+banner_line() {
+    local conf="$1" fallback="$2"
+    [ -f "$conf" ] || conf="$fallback"
+    VERSION="0.0.0"
+    if [ -f "$conf" ]; then
+        . "$conf"
+    fi
+    printf '%b\n' "  ${GREEN}SECURED BY opencode permissions kit (${VERSION})${NC}"
+}
+
 # --- Setup temp directories ---
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
@@ -137,6 +151,29 @@ assert_valid "blank lines in projects.conf: invalid" "invalid" "$result"
 printf '%s\n%s\n' "$TMPDIR/project-a" "$TMPDIR/project-nonexistent" > "$TMPDIR/projects.conf"
 result=$(validate_dir "$TMPDIR/project-a" "$TMPDIR/projects.conf")
 assert_valid "skips non-existent entry, matches valid one" "valid" "$result"
+
+# --- Version banner ---
+echo ""
+echo "--- Version banner ---"
+
+printf 'DEFAULT_USER=dev\nVERSION=1.2.3\n' > "$TMPDIR/install.conf"
+result=$(banner_line "$TMPDIR/install.conf" "$TMPDIR/no-such-setup.conf")
+assert_valid "banner shows version from install.conf" \
+    "$(printf '%b' "  ${GREEN}SECURED BY opencode permissions kit (1.2.3)${NC}")" "$result"
+
+printf 'VERSION=7.7.7\n' > "$TMPDIR/setup.conf"
+result=$(banner_line "$TMPDIR/no-such-install.conf" "$TMPDIR/setup.conf")
+assert_valid "banner falls back to legacy setup.conf" \
+    "$(printf '%b' "  ${GREEN}SECURED BY opencode permissions kit (7.7.7)${NC}")" "$result"
+
+result=$(banner_line "$TMPDIR/no-such-install.conf" "$TMPDIR/no-such-setup.conf")
+assert_valid "banner defaults to 0.0.0 when no conf exists" \
+    "$(printf '%b' "  ${GREEN}SECURED BY opencode permissions kit (0.0.0)${NC}")" "$result"
+
+printf 'DEFAULT_USER=dev\n' > "$TMPDIR/no-version.conf"
+result=$(banner_line "$TMPDIR/no-version.conf" "$TMPDIR/setup.conf")
+assert_valid "banner defaults to 0.0.0 when conf has no VERSION line" \
+    "$(printf '%b' "  ${GREEN}SECURED BY opencode permissions kit (0.0.0)${NC}")" "$result"
 
 # --- Summary ---
 echo ""
