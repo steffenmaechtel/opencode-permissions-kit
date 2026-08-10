@@ -7,7 +7,9 @@
 #   - existing /etc/opencode/install.conf (DEFAULT_USER / OPENCODE_USER)
 #   - existing /home/opencode/.config/opencode/opencode.json[c]
 #   - the opencode binary at /usr/local/lib/opencode/bin/opencode
-#   - any ACLs or filesystem metadata
+#   - any ACLs
+#   (except: normalizes the /home/opencode ownership/mode so the default user
+#   can edit opencode.jsonc — see the "opencode home" step below)
 #
 # One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
 #   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/update.sh | sudo bash
@@ -190,6 +192,16 @@ fi
 sudo -u "$OPENCODE_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
 sudo -u "$DEFAULT_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
 echo "core.hooksPath confirmed ($LIBDIR/hooks)."
+
+# --- ensure default user can access the opencode home -------------------------
+# useradd -m leaves the home owned by a private group; older installs only
+# chmod'd it to 750, so the default user (member of $WWW_GROUP) could not even
+# cd into it. Apply the same ownership/mode install.sh uses.
+if [ -d "/home/$OPENCODE_USER" ]; then
+    sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER"
+    sudo chmod 2750 "/home/$OPENCODE_USER"
+    echo "/home/$OPENCODE_USER is accessible for group $WWW_GROUP."
+fi
 
 # --- refresh install.conf version stamp --------------------------------------
 

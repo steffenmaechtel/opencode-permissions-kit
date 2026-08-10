@@ -427,8 +427,12 @@ fi
 # === Step 6: opencode Home ===
 
 sudo mkdir -p /home/opencode/.config/opencode /home/opencode/.agents
+# useradd -m leaves the home dir in a private 'opencode' group, which blocks
+# the default user (member of $WWW_GROUP) from entering it. Chgrp to
+# $WWW_GROUP + setgid so the default user can edit opencode.jsonc etc.
+sudo chown "$OPENCODE_USER:$WWW_GROUP" /home/opencode
+sudo chmod 2750 /home/opencode
 sudo chown -R opencode:www-data /home/opencode/.config /home/opencode/.agents
-sudo chmod 750 /home/opencode
 sudo chmod 2775 /home/opencode/.config /home/opencode/.config/opencode /home/opencode/.agents
 
 if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then

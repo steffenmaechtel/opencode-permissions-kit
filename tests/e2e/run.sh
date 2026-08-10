@@ -150,6 +150,12 @@ check "Config deployed" \
     E 'sudo test -f /home/opencode/.config/opencode/opencode.jsonc'
 check "Agents dir exists" \
     E 'sudo test -d /home/opencode/.agents/'
+check "default user can cd into opencode home" \
+    E 'cd /home/opencode'
+check "default user can read opencode.jsonc" \
+    E 'test -r /home/opencode/.config/opencode/opencode.jsonc'
+check "default user can write opencode.jsonc" \
+    E 'test -w /home/opencode/.config/opencode/opencode.jsonc'
 
 echo ""
 echo "--- 7. Git hooks ---"
@@ -223,7 +229,7 @@ check "allow-override: README.md readable for opencode" \
 
 echo ""
 echo "--- 11. update.sh re-deploys kit + preservation contract ---"
-# Snapshot files that update.sh must NOT touch (need sudo — /home/opencode is 750)
+# Snapshot files that update.sh must NOT touch (use sudo to be independent of perms)
 E 'sudo sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1 > /tmp/sha-opencode-jsonc.before'
 E 'sudo sha256sum /usr/local/lib/opencode/bin/opencode | cut -d" " -f1 > /tmp/sha-binary.before'
 E 'cat /etc/opencode/projects.conf > /tmp/projects.conf.before'

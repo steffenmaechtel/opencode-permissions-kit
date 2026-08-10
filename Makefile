@@ -44,7 +44,7 @@ verify:
 	@./tests/verify.sh
 
 e2e:
-	@./tests/e2e/run.sh
+	@sh ./tests/e2e/run.sh
 
 install-dev:
 	@sudo ./files/install.sh --yes $(if $(PROJECTS),--projects $(PROJECTS))
