@@ -4,6 +4,10 @@
     // Customize this file to add project-specific rules or allowed commands.
 
     "share": "disabled",
+    // Auto-update is disabled on purpose: the binary is root-owned and
+    // opencode runs as an unprivileged user, so self-update cannot work
+    // behind the wrapper. Upgrade via: sudo update.sh --binary
+    "autoupdate": false,
     "permission": {
         "read": {
             "*": "allow",

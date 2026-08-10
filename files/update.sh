@@ -1,17 +1,19 @@
 #!/bin/sh
 # opencode permissions kit -- update.sh
-# Re-deploys the KIT only (wrapper, hooks, protect-projects.sh, jsonc-parser,
-# sudoers template, umask profile, uninstall.sh, config.sh, status.sh) onto a
-# system that has already been installed via install.sh. Does NOT touch:
+# Re-deploys the KIT (wrapper, hooks, protect-projects.sh, jsonc-parser,
+# sudoers template, umask profile, uninstall.sh, config.sh, status.sh, log.sh)
+# onto a system that has already been installed via install.sh. Does NOT touch:
 #   - existing /etc/opencode/projects.conf
 #   - existing /etc/opencode/install.conf (DEFAULT_USER / OPENCODE_USER)
 #   - existing /home/opencode/.config/opencode/opencode.json[c]
-#   - the opencode binary at /usr/local/lib/opencode/bin/opencode
 #   - any ACLs
 #   (except: normalizes the /home/opencode ownership/mode so the default user
 #   can edit opencode.jsonc — see the "opencode home" step below)
 #   - the DEFAULT user's existing opencode config (a deny-all config is only
 #   deployed when that user has no opencode.jsonc yet)
+#   - the opencode binary at /usr/local/lib/opencode/bin/opencode — UNLESS
+#   --binary is given (fetch the latest release and install it) or
+#   --binary-path <file> (install the given binary without downloading).
 #
 # One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
 #   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/update.sh | sudo bash
@@ -19,6 +21,12 @@
 # From a checkout (uses the local files):
 #   sudo bash files/update.sh --yes            # skip prompts
 #   sudo bash files/update.sh --refresh        # also re-run protect-projects.sh --force at the end
+#   sudo bash files/update.sh --binary         # also upgrade opencode to the latest release
+#
+# `opencode upgrade` cannot work behind the wrapper (the binary is root-owned
+# and opencode runs as an unprivileged user), so this script is the upgrade
+# entry point. Binary upgrades are best-effort: a download/verify failure warns
+# and leaves the current binary in place — the kit update still completes.
 #
 # Use install.sh for the very first setup (it asks the questions).
 # Use config.sh to change project roots or git-config hardening.
@@ -100,19 +108,34 @@ WWW_GROUP="${WWW_GROUP:-www-data}"
 
 YES=false
 REFRESH=false
-for arg do
-    case "$arg" in
+BINARY_UPDATE=false
+BINARY_PATH=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
         --yes|-y) YES=true ;;
         --refresh) REFRESH=true ;;
+        --binary) BINARY_UPDATE=true ;;
+        --binary-path)
+            [ "$#" -ge 2 ] || { echo "error: --binary-path requires a file path" >&2; exit 1; }
+            BINARY_UPDATE=true
+            BINARY_PATH="$2"
+            shift
+            ;;
         -h|--help)
             cat <<EOF
 opencode permissions kit -- update.sh  v$VERSION
 Re-deploys the kit on an already-installed system. No prompts by default.
-Usage: ./update.sh [--yes] [--refresh]
+Usage: ./update.sh [--yes] [--refresh] [--binary] [--binary-path <file>]
+  --yes            skip the confirmation prompt
+  --refresh        also re-run protect-projects.sh --force at the end
+  --binary         also upgrade the opencode binary to the latest release
+  --binary-path    install the given binary file instead of downloading
 EOF
             exit 0
             ;;
+        *) echo "error: unknown option: $1" >&2; exit 1 ;;
     esac
+    shift
 done
 
 banner() {
@@ -146,7 +169,7 @@ if ! id "$OPENCODE_USER" >/dev/null 2>&1; then
     die "User '$OPENCODE_USER' missing. Run install.sh first."
 fi
 
-if ! confirm "Re-deploy kit files (binary and existing configs will NOT be touched)?"; then
+if ! confirm "Re-deploy kit files (existing configs will NOT be touched)?"; then
     echo "Aborted."; exit 0
 fi
 
@@ -214,6 +237,99 @@ sudo -u "$OPENCODE_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/d
 sudo -u "$DEFAULT_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
 echo "core.hooksPath confirmed ($LIBDIR/hooks)."
 
+# --- opencode binary upgrade (--binary / --binary-path) ----------------------
+
+SYSTEM_BIN="/usr/local/lib/opencode/bin/opencode"
+
+# Detect the release asset name for this host (mirrors the official installer).
+detect_asset() {
+    local os arch target
+    os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    case "$os" in
+        darwin*) os="darwin" ;;
+        linux*) os="linux" ;;
+        *) return 1 ;;
+    esac
+    arch=$(uname -m)
+    if [ "$arch" = "aarch64" ]; then arch="arm64"; fi
+    if [ "$arch" = "x86_64" ]; then arch="x64"; fi
+    target="$os-$arch"
+    if [ "$arch" = "x64" ] && [ "$os" = "linux" ] && ! grep -qwi avx2 /proc/cpuinfo 2>/dev/null; then
+        target="$target-baseline"
+    fi
+    if [ "$os" = "linux" ] && { [ -f /etc/alpine-release ] || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; }; then
+        target="$target-musl"
+    fi
+    echo "opencode-$target.tar.gz"
+}
+
+# Verify a candidate binary actually runs, then install it over $SYSTEM_BIN.
+install_binary() {
+    local src="$1" current new
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 30 "$src" --version >/dev/null 2>&1 || return 1
+    else
+        "$src" --version >/dev/null 2>&1 || return 1
+    fi
+    current=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
+    sudo cp "$src" "$SYSTEM_BIN" || return 1
+    sudo chmod 755 "$SYSTEM_BIN" || return 1
+    new=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
+    echo "  opencode binary upgraded: ${current} -> ${new}"
+    log "opencode binary upgraded: ${current} -> ${new}"
+}
+
+if [ "$BINARY_UPDATE" = true ]; then
+    echo ""
+    echo "--- Upgrading opencode binary ---"
+    SRC=""
+    if [ -n "$BINARY_PATH" ]; then
+        if [ -x "$BINARY_PATH" ]; then
+            SRC="$BINARY_PATH"
+        else
+            echo "  ${YELLOW}Binary path not found or not executable: $BINARY_PATH${NC}"
+            echo "  Binary left untouched."
+            log "opencode binary upgrade skipped: --binary-path not executable"
+        fi
+    else
+        VER=$(curl -fsSL --max-time 10 https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
+            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+        if [ -z "$VER" ]; then
+            echo "  ${YELLOW}Could not resolve latest opencode version (network?). Binary left untouched.${NC}"
+            log "opencode binary upgrade skipped: cannot resolve latest version"
+        else
+            TMP="$(mktemp -d)"
+            asset=$(detect_asset || true)
+            if [ -n "$asset" ] \
+                && curl -fsSL --max-time 120 "https://github.com/anomalyco/opencode/releases/download/v$VER/$asset" \
+                    -o "$TMP/opencode.tar.gz" \
+                && tar -xzf "$TMP/opencode.tar.gz" -C "$TMP" \
+                && [ -x "$TMP/opencode" ]; then
+                SRC="$TMP/opencode"
+            else
+                echo "  ${YELLOW}Download of opencode $VER failed. Binary left untouched.${NC}"
+                log "opencode binary upgrade skipped: download failed (v$VER)"
+            fi
+            rm -rf "$TMP"
+        fi
+    fi
+    if [ -n "$SRC" ]; then
+        BACKUP_DIR="$(mktemp -d /tmp/opencode-upgrade-backup.XXXXXX)"
+        if [ -x "$SYSTEM_BIN" ]; then
+            sudo cp "$SYSTEM_BIN" "$BACKUP_DIR/opencode.current"
+        fi
+        if install_binary "$SRC"; then
+            echo "  Backup kept in $BACKUP_DIR (remove once you are satisfied)."
+        else
+            echo "  ${YELLOW}Candidate binary failed verification/install. Binary left untouched.${NC}"
+            log "opencode binary upgrade skipped: candidate failed verification/install"
+            rm -rf "$BACKUP_DIR"
+        fi
+    fi
+else
+    echo "  opencode binary left untouched (use --binary to upgrade)."
+fi
+
 # --- ensure default user can access the opencode home -------------------------
 # useradd -m leaves the home owned by a private group; older installs only
 # chmod'd it to 750, so the default user (member of $WWW_GROUP) could not even
@@ -274,6 +390,10 @@ fi
 
 echo ""
 echo "  ${GREEN}Update complete.${NC}  v$VERSION"
-echo "  Binary, projects.conf and opencode.jsonc were left untouched."
+if [ "$BINARY_UPDATE" = true ]; then
+    echo "  projects.conf and opencode.jsonc were left untouched."
+else
+    echo "  Binary, projects.conf and opencode.jsonc were left untouched."
+fi
 echo ""
 log "update complete (version $VERSION)"

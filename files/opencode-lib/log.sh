@@ -24,6 +24,10 @@ LOG_KEEP=5
 
 log_init() {
     mkdir -p "$LOG_DIR" 2>/dev/null || return 1
+    # Only attempt the file setup when we can actually write the directory.
+    # Guards against the shell's own "Permission denied" noise on failed
+    # redirects (e.g. uninstall running as the default user).
+    [ -w "$LOG_DIR" ] || return 1
     chown root:root "$LOG_DIR" 2>/dev/null || true
     chmod 700 "$LOG_DIR" 2>/dev/null || true
     if [ ! -f "$LOG_FILE" ]; then

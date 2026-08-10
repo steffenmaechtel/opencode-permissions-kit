@@ -114,6 +114,27 @@ if [ ! -s "$OC_BIN" ]; then
     echo "  ${RED}FAIL${NC}  cached opencode binary is empty"; exit 1
 fi
 
+# Pin an OLD opencode version to test the binary upgrade path (old -> latest)
+# in section 11c. Release assets stay on GitHub permanently, so this is a
+# one-time download per version, cached exactly like the primary binary.
+OLD_VERSION="1.18.15"
+OLD_BIN="$OC_CACHE_DIR/opencode-$OLD_VERSION/opencode"
+if [ ! -x "$OLD_BIN" ]; then
+    echo "  Downloading opencode $OLD_VERSION ($filename) into cache..."
+    mkdir -p "$(dirname "$OLD_BIN")"
+    curl -fsSL --max-time 120 "https://github.com/anomalyco/opencode/releases/download/v$OLD_VERSION/$filename" \
+        -o "$OC_CACHE_DIR/opencode-old.tar.gz" \
+        || { echo "  ${RED}FAIL${NC}  opencode $OLD_VERSION download failed"; exit 1; }
+    tar -xzf "$OC_CACHE_DIR/opencode-old.tar.gz" -C "$(dirname "$OLD_BIN")" \
+        || { echo "  ${RED}FAIL${NC}  cannot extract opencode $OLD_VERSION tarball"; exit 1; }
+    rm -f "$OC_CACHE_DIR/opencode-old.tar.gz"
+    chmod +x "$OLD_BIN"
+fi
+if [ ! -s "$OLD_BIN" ]; then
+    echo "  ${RED}FAIL${NC}  cached opencode $OLD_VERSION binary is empty"; exit 1
+fi
+echo "  Using opencode $OLD_VERSION for the upgrade test (cache: $OLD_BIN)"
+
 # Cache the installer script too, so the container needs no network for it.
 if [ ! -f "$OC_CACHE_DIR/install.sh" ]; then
     curl -fsSL --max-time 30 https://opencode.ai/install -o "$OC_CACHE_DIR/install.sh" \
@@ -359,6 +380,30 @@ check "install.conf contains DEFAULT_USER" \
     E 'grep -q "DEFAULT_USER=" /etc/opencode/install.conf'
 
 echo ""
+echo "--- 11c. opencode binary upgrade (old -> new via update.sh --binary-path) ---"
+# Downgrade the system binary to a pinned OLD version, then upgrade it back to
+# the (cached) latest with update.sh --binary-path. This is the kit's upgrade
+# entry point — `opencode upgrade` cannot work behind the wrapper.
+E 'sudo cp /opencode-cache/opencode-'"$OLD_VERSION"'/opencode /usr/local/lib/opencode/bin/opencode' && \
+    echo "  ${GREEN}OK${NC}  system binary downgraded to $OLD_VERSION"
+check "downgrade: system binary is $OLD_VERSION" \
+    E 'test "$(sudo /usr/local/lib/opencode/bin/opencode --version)" = "'"$OLD_VERSION"'"'
+E 'sudo bash /home/dev/repo/files/update.sh --yes --binary-path /opencode-cache/opencode-'"$OC_VERSION"'/opencode' && \
+    echo "  ${GREEN}OK${NC}  update.sh --binary-path completed"
+check "upgrade: system binary is latest ($OC_VERSION)" \
+    E 'test "$(sudo /usr/local/lib/opencode/bin/opencode --version)" = "'"$OC_VERSION"'"'
+check "upgrade: version actually changed" \
+    E 'test "'"$OLD_VERSION"'" != "'"$OC_VERSION"'"'
+check "wrapper still present after binary upgrade" E 'test -x /usr/local/bin/opencode'
+check "binary still root-owned" \
+    E 'test "$(stat -c %U:%G /usr/local/lib/opencode/bin/opencode)" = "root:root"'
+check "kit scripts still deployed after binary upgrade" E 'test -x /usr/local/lib/opencode/update.sh'
+check_fail ".env still blocked after binary upgrade" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
+check_fail "new binary writable by opencode user" \
+    E 'sudo -u opencode sh -c "test -w /usr/local/lib/opencode/bin/opencode"'
+
+echo ""
 echo "--- 12. config.sh adds a project non-interactively ---"
 E 'sudo mkdir -p /var/www/vhosts/extra-project' && \
     E 'sudo touch /var/www/vhosts/extra-project/.env'
@@ -439,9 +484,9 @@ check "log dir exists" \
 check "log file exists" \
     E 'sudo test -f /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "log is root-owned mode 600" \
-    E 'test "$(stat -c %U:%a /var/log/opencode-permissions-kit/opencode-permissions-kit.log)" = "root:600"'
+    E 'test "$(sudo stat -c %U:%a /var/log/opencode-permissions-kit/opencode-permissions-kit.log)" = "root:600"'
 check "log dir is root-owned mode 700" \
-    E 'test "$(stat -c %U:%a /var/log/opencode-permissions-kit)" = "root:700"'
+    E 'test "$(sudo stat -c %U:%a /var/log/opencode-permissions-kit)" = "root:700"'
 check "install events logged" \
     E 'sudo grep -q "install complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "protect-projects events logged" \
@@ -450,6 +495,8 @@ check "ACL batch events logged" \
     E 'sudo grep -q "setfacl deny" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "update events logged" \
     E 'sudo grep -q "update complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check "binary upgrade events logged" \
+    E 'sudo grep -q "opencode binary upgraded" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check_fail "opencode user cannot read log file" \
     E 'sudo -u opencode test -r /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check_fail "opencode user cannot enter log dir" \

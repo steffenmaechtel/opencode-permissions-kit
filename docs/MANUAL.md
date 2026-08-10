@@ -322,8 +322,32 @@ sudo bash /usr/local/lib/opencode/update.sh
 - `/etc/opencode/projects.conf`
 - `/etc/opencode/install.conf` (except the `VERSION=` line)
 - `/home/opencode/.config/opencode/opencode.jsonc`
-- the opencode binary at `/usr/local/lib/opencode/bin/opencode`
 - any ACLs or filesystem metadata
+
+### Upgrading the opencode binary
+
+`opencode upgrade` and opencode's auto-updater **cannot** work behind the
+wrapper: the binary at `/usr/local/lib/opencode/bin/opencode` is root-owned and
+opencode runs as the unprivileged `opencode` user, so a self-update would fail
+(or land in a location the wrapper never uses). That is why `autoupdate: false`
+is set in the kit config and `update.sh` is the upgrade entry point.
+
+To also upgrade opencode to the **latest release**:
+
+```bash
+sudo bash /usr/local/lib/opencode/update.sh --binary
+```
+
+Or install a specific binary file (e.g. a pinned version) without downloading:
+
+```bash
+sudo bash /usr/local/lib/opencode/update.sh --binary-path /path/to/opencode
+```
+
+Binary upgrades are best-effort: a download or verification failure leaves the
+current binary in place and logs a warning — the kit update still completes.
+The previous binary is kept in `/tmp/opencode-upgrade-backup-*` until you
+confirm the new version works.
 
 Add `--refresh` to also re-run `protect-projects.sh --force` after the deploy:
 
@@ -349,7 +373,7 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 | `/usr/local/lib/opencode/wrapper` | Validates directory, refreshes ACLs, execs opencode |
 | `/usr/local/lib/opencode/protect-projects.sh` | Applies ACL denies to sensitive files |
 | `/usr/local/lib/opencode/config.sh` | Change settings post-install (projects, git-config, refresh) |
-| `/usr/local/lib/opencode/update.sh` | Re-deploy the kit after an update, no prompts |
+| `/usr/local/lib/opencode/update.sh` | Re-deploy the kit after an update, no prompts (`--binary`/`--binary-path` also upgrade opencode) |
 | `/usr/local/lib/opencode/uninstall.sh` | Uninstall script |
 | `/usr/local/lib/opencode/status.sh` | Show protection status (works even before install) |
 | `/usr/local/lib/opencode/bin/opencode` | The actual opencode binary |
