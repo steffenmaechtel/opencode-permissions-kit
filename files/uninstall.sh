@@ -23,6 +23,18 @@ for arg do
     esac
 done
 
+# === Audit log ===
+# Best-effort shared logger (/var/log/opencode-permissions-kit/). Sourced
+# before any removal so the final lines are written before the library and
+# the log directory itself are deleted.
+log() { :; }
+for cand in "$(dirname "$0")/log.sh" "$(dirname "$0")/opencode-lib/log.sh" "/usr/local/lib/opencode/log.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+
 trace() {
     [ "$DEBUG" = true ] && echo "[debug] $*" >&2
 }
@@ -115,33 +127,39 @@ trace "OPENCODE_USER=$OPENCODE_USER WWW_GROUP=$WWW_GROUP"
 trace "first prompt ..."
 ans=$(prompt_yn "Proceed with uninstall?" "n")
 [ "$ans" != "y" ] && { echo "Aborted."; exit 0; }
+log "uninstall started (dry_run=$DRY_RUN)"
 
 echo ""
 echo "--- Removing Git hooks ---"
 run "sudo -u \"$OPENCODE_USER\" git config --global --unset core.hooksPath 2>/dev/null || true"
 run "sudo -u \"$DEFAULT_USER\" git config --global --unset core.hooksPath 2>/dev/null || true"
 echo "Git hooks removed."
+log "git hooks removed (core.hooksPath unset)"
 
 echo ""
 echo "--- Removing sudoers ---"
 run "sudo rm -f /etc/sudoers.d/opencode"
 echo "sudoers removed."
+log "sudoers removed: /etc/sudoers.d/opencode"
 
 echo ""
 echo "--- Removing wrapper ---"
 run "sudo rm -f /usr/local/bin/opencode"
 echo "Wrapper removed."
+log "wrapper removed: /usr/local/bin/opencode"
 
 echo ""
 echo "--- Removing opencode library ---"
 run "sudo rm -f /usr/local/sbin/protect-projects.sh"
 run "sudo rm -rf /usr/local/lib/opencode"
 echo "opencode library removed."
+log "library removed: /usr/local/lib/opencode"
 
 echo ""
 echo "--- Removing umask profile ---"
 run "sudo rm -f /etc/profile.d/opencode-umask.sh"
 echo "Umask profile removed."
+log "umask profile removed: /etc/profile.d/opencode-umask.sh"
 
 echo ""
 echo "--- Removing opencode user ---"
@@ -150,6 +168,7 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
     if [ "$ans" = "y" ]; then
         run "sudo userdel -r \"$OPENCODE_USER\" 2>/dev/null || true"
         echo "User '$OPENCODE_USER' removed."
+        log "user removed: $OPENCODE_USER"
     else
         echo "User '$OPENCODE_USER' kept."
     fi
@@ -164,6 +183,7 @@ if id "$DEFAULT_USER" | grep -q "$WWW_GROUP"; then
     if [ "$ans" = "y" ]; then
         run "sudo gpasswd -d \"$DEFAULT_USER\" \"$WWW_GROUP\" 2>/dev/null || true"
         echo "Removed from $WWW_GROUP."
+        log "removed $DEFAULT_USER from group $WWW_GROUP"
     else
         echo "Group membership kept."
     fi
@@ -195,6 +215,13 @@ fi
 echo ""
 echo "--- Removing /etc/opencode/ ---"
 run "sudo rm -rf /etc/opencode"
+echo "Removed."
+log "/etc/opencode removed"
+
+echo ""
+echo "--- Removing audit log ---"
+run "sudo rm -rf /var/log/opencode-permissions-kit"
+log "audit log removed: /var/log/opencode-permissions-kit"
 echo "Removed."
 
 echo ""

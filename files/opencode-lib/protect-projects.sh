@@ -10,6 +10,14 @@
 # Runs as root via sudo (idempotent, safe to call repeatedly).
 set -e
 
+# === Audit log ===
+# Best-effort shared logger (/var/log/opencode-permissions-kit/). Logs every
+# ACL change (batch + file count) so the protection history is inspectable.
+log() { :; }
+if [ -f "$(dirname "$0")/log.sh" ]; then
+    . "$(dirname "$0")/log.sh"
+fi
+
 FORCE=false
 CWD=""
 while [ $# -gt 0 ]; do
@@ -42,6 +50,7 @@ if [ -f "$INSTALL_CONF" ]; then
 fi
 if [ -z "$DEFAULT_USER" ]; then
     echo "protect-projects: DEFAULT_USER not found in $INSTALL_CONF — skipping chown step" >&2
+    log "DEFAULT_USER missing from $INSTALL_CONF — chown step skipped"
 fi
 
 # Find active global config file (.jsonc or .json)
@@ -52,6 +61,7 @@ elif [ -f "$CONFIG_DIR/opencode.json" ]; then
     CONFIG_FILE="$CONFIG_DIR/opencode.json"
 else
     echo "protect-projects: No global opencode config — nothing to protect" >&2
+    log "no global opencode config found — nothing to protect"
     exit 0
 fi
 
@@ -61,6 +71,7 @@ GLOBAL_PATTERNS=$($PARSER "$CONFIG_FILE" 2>/dev/null || true)
 # Read project roots (needed early for cache + project config scan)
 if [ ! -f "$PROJECTS_CONF" ]; then
     echo "protect-projects: $PROJECTS_CONF not found — nothing to protect" >&2
+    log "$PROJECTS_CONF not found — nothing to protect"
     exit 0
 fi
 
@@ -152,10 +163,16 @@ apply_acls() {
     [ -z "$find_args" ] && return
     [ "$find_args" = "-type f" ] && return
 
-    eval "find \"$root\" $find_args -exec setfacl -m \"u:$OPENCODE_USER:---\" {} +" 2>/dev/null || true
+    count=$(eval "find \"$root\" $find_args -exec setfacl -m \"u:$OPENCODE_USER:---\" {} + -print" 2>/dev/null | wc -l)
+    if [ "${count:-0}" -gt 0 ]; then
+        log "setfacl deny u:$OPENCODE_USER:--- on $count file(s) under $root"
+    fi
 
     if [ -n "$DEFAULT_USER" ]; then
-        eval "find \"$root\" $find_args -user \"$OPENCODE_USER\" -exec chown \"$DEFAULT_USER:$WWW_GROUP\" {} +" 2>/dev/null || true
+        chown_count=$(eval "find \"$root\" $find_args -user \"$OPENCODE_USER\" -exec chown \"$DEFAULT_USER:$WWW_GROUP\" {} + -print" 2>/dev/null | wc -l)
+        if [ "${chown_count:-0}" -gt 0 ]; then
+            log "chown $DEFAULT_USER:$WWW_GROUP on $chown_count file(s) under $root"
+        fi
     fi
 }
 
@@ -165,7 +182,10 @@ remove_acls() {
     local root="$1" find_args="$2"
     [ -z "$find_args" ] && return
     [ "$find_args" = "-type f" ] && return
-    eval "find \"$root\" $find_args -exec setfacl -x \"u:$OPENCODE_USER\" {} +" 2>/dev/null || true
+    count=$(eval "find \"$root\" $find_args -exec setfacl -x \"u:$OPENCODE_USER\" {} + -print" 2>/dev/null | wc -l)
+    if [ "${count:-0}" -gt 0 ]; then
+        log "setfacl -x (allow override) on $count file(s) under $root"
+    fi
 }
 
 # Build global find args
@@ -186,6 +206,7 @@ while IFS= read -r root; do
         /|/etc|/etc/*|/boot|/boot/*|/usr|/usr/*|/bin|/bin/*|/sbin|/sbin/*|/lib|/lib/*|\
         /lib64|/lib64/*|/sys|/sys/*|/proc|/proc/*|/dev|/dev/*|/run|/run/*|/root|/root/*)
             echo "protect-projects: REFUSING to touch system path: $root" >&2
+            log "REFUSED system path: $root"
             continue
             ;;
     esac
@@ -242,3 +263,4 @@ fi
 # Update cache
 printf 'config_mtime=%s\nprojects_mtime=%s\nproject_configs_mtime=%s\n' \
     "$CONFIG_MTIME" "$PROJECTS_MTIME" "$PROJECT_CONFIGS_MTIME" > "$CACHE_FILE"
+log "protect-projects run complete (force=$FORCE, cwd=${CWD:-none})"

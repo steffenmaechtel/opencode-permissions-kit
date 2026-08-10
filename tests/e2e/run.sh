@@ -433,6 +433,29 @@ check "dry-run: /etc/opencode intact"  E 'test -e /etc/opencode'
 check "dry-run: user still exists"      E 'id opencode'
 
 echo ""
+echo "--- 12g. Audit log ---"
+check "log dir exists" \
+    E 'sudo test -d /var/log/opencode-permissions-kit'
+check "log file exists" \
+    E 'sudo test -f /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check "log is root-owned mode 600" \
+    E 'test "$(stat -c %U:%a /var/log/opencode-permissions-kit/opencode-permissions-kit.log)" = "root:600"'
+check "log dir is root-owned mode 700" \
+    E 'test "$(stat -c %U:%a /var/log/opencode-permissions-kit)" = "root:700"'
+check "install events logged" \
+    E 'sudo grep -q "install complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check "protect-projects events logged" \
+    E 'sudo grep -q "protect-projects run complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check "ACL batch events logged" \
+    E 'sudo grep -q "setfacl deny" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check "update events logged" \
+    E 'sudo grep -q "update complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check_fail "opencode user cannot read log file" \
+    E 'sudo -u opencode test -r /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check_fail "opencode user cannot enter log dir" \
+    E 'sudo -u opencode test -x /var/log/opencode-permissions-kit'
+
+echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
@@ -444,6 +467,7 @@ check_fail "Umask removed"            E 'test -e /etc/profile.d/opencode-umask.s
 check_fail "opencode user removed"    E 'id opencode'
 check_fail "core.hooksPath unset"     E 'git config --global --get core.hooksPath'
 check_fail "Project ACLs cleaned"     E 'getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode"'
+check_fail "Audit log removed"        E 'test -e /var/log/opencode-permissions-kit'
 
 echo ""
 echo "=============================================="

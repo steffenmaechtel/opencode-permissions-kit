@@ -273,6 +273,33 @@ Management (run in a terminal):
 
 Before the kit is installed, `status.sh` still works and reports that hardening is **NOT active** — handy for checking any machine.
 
+## Audit Log
+
+Every kit script that changes the system writes a machine-readable audit trail:
+
+- Location: `/var/log/opencode-permissions-kit/opencode-permissions-kit.log`
+- Directory `root:root` mode `700`, file `root:root` mode `600`. The `opencode`
+  user cannot read it — it documents the very restrictions applied against
+  that user, so it must stay out of its reach.
+- One line per event: `<ISO-timestamp> [<script-name>] <message>`
+- Size-based self-rotation: 1 MB → `.1` … `.5`. No external logrotate needed.
+- Best-effort by design: if the log cannot be written (e.g. non-root preview),
+  the kit scripts keep working silently. Logging never breaks the scripts.
+
+What gets logged:
+
+| Event | Example |
+|---|---|
+| Install / update / uninstall completion | `install complete (user=dev)` |
+| ACL batch changes from `protect-projects.sh` | `setfacl deny u:opencode:--- on 42 file(s) under /var/www/vhosts/foo` |
+| Ownership fixes | `chown dev:www-data on 12 file(s) under /var/www/vhosts/foo` |
+| Protected path refusals | `REFUSED system path: /` |
+| Missing configs (skipped runs) | `projects.conf not found — nothing to protect` |
+| Early exits | `no global opencode config found — nothing to protect` |
+
+`uninstall.sh --yes` removes the log directory and all rotation files along
+with the rest of the kit.
+
 ## Updating the Kit
 
 After `git pull` (or new changes merged to `master`) you can re-deploy the kit **without** re-answering the install-time questions:
@@ -329,3 +356,5 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 | `/home/<default-user>/.config/opencode/opencode.jsonc` | Deny-* lockout config against self-update PATH bypass (see "Self-Update Bypass Protection") |
 | `/etc/sudoers.d/opencode` | Sudo rules for wrapper and protect-projects.sh |
 | `/usr/local/lib/opencode/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |
+| `/usr/local/lib/opencode/log.sh` | Shared audit-log helper (sourced by the scripts above) |
+| `/var/log/opencode-permissions-kit/` | Audit log (root-only, mode 700/600, self-rotating) |

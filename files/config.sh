@@ -30,6 +30,17 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 LIBDIR="/usr/local/lib/opencode"
 PROJECTS_CONF="/etc/opencode/projects.conf"
 
+# === Audit log ===
+# Best-effort shared logger (/var/log/opencode-permissions-kit/). Works from
+# both a repo checkout and the installed library.
+log() { :; }
+for cand in "$SCRIPT_DIR/opencode-lib/log.sh" "$LIBDIR/log.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+
 # install.conf with legacy fallback to pre-v0.0.9 setup.conf
 INSTALL_CONF="/etc/opencode/install.conf"
 [ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
@@ -131,6 +142,7 @@ projects_add() {
         sudo chmod g+s "$p"
         sudo setfacl -R -d -m "g:$WWW_GROUP:rwx" "$p" 2>/dev/null || true
         echo "  ${GREEN}added${NC} $p (group=$WWW_GROUP, setgid, default-acl)"
+        log "project added: $p"
     done
     echo ""
     echo "Running protect-projects.sh --force ..."
@@ -153,6 +165,7 @@ projects_remove() {
         sudo grep -vx "$p" "$PROJECTS_CONF" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
         sudo mv "$PROJECTS_CONF.tmp" "$PROJECTS_CONF"
         echo "  ${GREEN}removed${NC} $p"
+        log "project removed: $p"
     done
 }
 
@@ -206,6 +219,7 @@ git_config_apply() {
         sudo sed -i '/\/\/SECURE_GIT:/d' "$target"
         echo "git-config hardening: ${CYAN}OFF${NC}  ($target)"
     fi
+    log "git-config hardening set to $enable ($target)"
     echo "NOTE: existing config was overwritten from template. Restart opencode to pick up changes."
 }
 
@@ -215,6 +229,7 @@ refresh() {
     echo "Re-running protect-projects.sh --force ..."
     sudo "$LIBDIR/protect-projects.sh" --force
     echo "${GREEN}ACL protection refreshed.${NC}"
+    log "ACL refresh requested"
 }
 
 # --- interactive menu --------------------------------------------------------

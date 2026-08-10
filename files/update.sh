@@ -48,6 +48,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
+             opencode-lib/log.sh \
              opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -66,6 +67,17 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
 fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 LIBDIR="/usr/local/lib/opencode"
+
+# === Audit log ===
+# Best-effort shared logger (/var/log/opencode-permissions-kit/). Covers all
+# three run modes: repo checkout, streamed temp dir, installed library.
+log() { :; }
+for cand in "$SCRIPT_DIR/opencode-lib/log.sh" "$SCRIPT_DIR/log.sh" "$LIBDIR/log.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
 
 # install.conf with legacy fallback to pre-v0.0.9 setup.conf
 INSTALL_CONF="/etc/opencode/install.conf"
@@ -124,6 +136,7 @@ confirm() {
 # --- pre-flight ---------------------------------------------------------------
 
 banner
+log "update started (version $VERSION, refresh=$REFRESH)"
 
 if [ ! -f "$INSTALL_CONF" ] && [ ! -f /etc/opencode/setup.conf ]; then
     die "Not installed yet. Run install.sh first."
@@ -146,6 +159,7 @@ sudo mkdir -p "$LIBDIR/hooks"
 sudo cp "$SCRIPT_DIR/opencode-lib/wrapper"            "$LIBDIR/wrapper"
 sudo cp "$SCRIPT_DIR/opencode-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
 sudo cp "$SCRIPT_DIR/opencode-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
+sudo cp "$SCRIPT_DIR/opencode-lib/log.sh"              "$LIBDIR/log.sh"
 sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
 sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
 sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
@@ -155,9 +169,11 @@ sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
+               "$LIBDIR/log.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit"
 echo "Library files updated: $LIBDIR"
+log "library re-deployed: $LIBDIR"
 
 # --- re-link wrapper + protect-projects --------------------------------------
 
@@ -176,6 +192,7 @@ if [ -f "$SCRIPT_DIR/sudoers.template" ]; then
     sudo ln -sf /etc/opencode/sudoers /etc/sudoers.d/opencode
     if sudo /usr/sbin/visudo -c -f /etc/opencode/sudoers >/dev/null 2>&1; then
         echo "sudoers updated (DEFAULT_USER=$DEFAULT_USER)."
+        log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
     else
         echo "${RED}sudoers validation failed. Check /etc/opencode/sudoers.${NC}"
         exit 1
@@ -188,6 +205,7 @@ if [ -f "$SCRIPT_DIR/umask.sh" ]; then
     sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-umask.sh
     sudo chmod 644 /etc/profile.d/opencode-umask.sh
     echo "umask profile updated."
+    log "umask profile re-deployed: /etc/profile.d/opencode-umask.sh"
 fi
 
 # --- re-apply git hooks path (in case user wiped it) ------------------------
@@ -217,6 +235,7 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
         sudo chown "$DEFAULT_USER:$WWW_GROUP" "$DEFAULT_OC_CONF"
         sudo chmod 664 "$DEFAULT_OC_CONF"
         echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
+        log "deny-all config installed for default user: $DEFAULT_OC_CONF"
     else
         echo "Default-user config exists — left untouched (re-run install.sh to back it up)."
     fi
@@ -237,6 +256,7 @@ rm -f "$NEW_INSTALL_CONF"
 # Cleanup pre-v0.0.9 legacy file
 [ -f /etc/opencode/setup.conf ] && sudo rm -f /etc/opencode/setup.conf
 echo "install.conf updated: VERSION=$VERSION"
+log "install.conf version stamp updated: VERSION=$VERSION"
 
 # --- optional ACL refresh ----------------------------------------------------
 
@@ -244,6 +264,7 @@ if [ "$REFRESH" = true ]; then
     echo ""
     echo "--- Refreshing ACL protection ---"
     sudo "$LIBDIR/protect-projects.sh" --force
+    log "ACL refresh requested (--refresh)"
 else
     echo ""
     echo "Skipped ACL refresh (use --refresh to re-apply protects)."
@@ -255,3 +276,4 @@ echo ""
 echo "  ${GREEN}Update complete.${NC}  v$VERSION"
 echo "  Binary, projects.conf and opencode.jsonc were left untouched."
 echo ""
+log "update complete (version $VERSION)"

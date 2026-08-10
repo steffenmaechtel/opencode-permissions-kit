@@ -33,6 +33,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
+             opencode-lib/log.sh \
              opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -52,6 +53,14 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     STREAMED=true
 fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
+
+# === Audit log ===
+# Best-effort shared logger (/var/log/opencode-permissions-kit/). No-op if
+# the helper is missing — logging must never break the install.
+log() { :; }
+if [ -f "$SCRIPT_DIR/opencode-lib/log.sh" ]; then
+    . "$SCRIPT_DIR/opencode-lib/log.sh"
+fi
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -131,6 +140,7 @@ banner() {
 banner
 
 DEFAULT_USER="${SUDO_USER:-$(whoami)}"
+log "install started (version $VERSION, default user=$DEFAULT_USER)"
 
 if ! grep -qi microsoft /proc/version 2>/dev/null; then
     ans=$(prompt "This does not appear to be WSL2. Continue anyway?" "Y" "N" "")
@@ -141,6 +151,7 @@ fi
 BACKUP_DIR="/tmp/opencode-install-backup-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 echo "Backup directory: $BACKUP_DIR"
+log "backup dir created: $BACKUP_DIR"
 sudo -u "$DEFAULT_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" || true
 sudo -u "$OPENCODE_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
 [ -f /etc/opencode/sudoers ] && cp /etc/opencode/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
@@ -173,6 +184,7 @@ if getent group "$WWW_GROUP" >/dev/null 2>&1; then
 else
     sudo groupadd -f "$WWW_GROUP"
     echo "Group '$WWW_GROUP' created."
+    log "group created: $WWW_GROUP"
 fi
 
 if ! command -v ddev >/dev/null 2>&1; then
@@ -187,10 +199,12 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
 else
     sudo useradd -m -s /bin/bash "$OPENCODE_USER"
     echo "User '$OPENCODE_USER' created."
+    log "user created: $OPENCODE_USER"
 fi
 
 sudo usermod -aG "$WWW_GROUP" "$OPENCODE_USER" 2>/dev/null || true
 sudo usermod -aG "$WWW_GROUP" "$DEFAULT_USER" 2>/dev/null || true
+log "users added to group $WWW_GROUP: $OPENCODE_USER, $DEFAULT_USER"
 
 # === Step 2: Project roots ===
 
@@ -247,9 +261,11 @@ sudo mkdir -p /etc/opencode
 if [ -n "$PROJECTS_ROOTS" ]; then
     echo "$PROJECTS_ROOTS" | tr ' ' '\n' | sudo tee /etc/opencode/projects.conf > /dev/null
     echo "Project roots: $PROJECTS_ROOTS"
+    log "projects.conf written: $PROJECTS_ROOTS"
 else
     sudo touch /etc/opencode/projects.conf
     echo "No project roots configured."
+    log "projects.conf written: (empty)"
 fi
 
 # Backup project ACLs now that roots are known
@@ -266,6 +282,7 @@ VERSION=$VERSION
 EOF
 # Migrate legacy setup.conf (pre-v0.0.9) -> install.conf
 [ -f /etc/opencode/setup.conf ] && sudo rm -f /etc/opencode/setup.conf
+log "install.conf written (version $VERSION)"
 
 # === Step 3: Filesystem ===
 
@@ -293,6 +310,7 @@ fi
 
 sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-umask.sh
 sudo chmod 644 /etc/profile.d/opencode-umask.sh
+log "umask profile installed: /etc/profile.d/opencode-umask.sh"
 
 # === Step 4: opencode binary ===
 
@@ -312,6 +330,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
                 sudo chmod 755 "$SYSTEM_BIN"
                 opencode_found=true
                 echo "Copied to $SYSTEM_BIN."
+                log "binary copied: $loc -> $SYSTEM_BIN"
                 break
                 ;;
             b)
@@ -321,6 +340,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
                 sudo chmod 755 "$SYSTEM_BIN"
                 opencode_found=true
                 echo "Backup saved. Copied to $SYSTEM_BIN."
+                log "binary copied: $loc -> $SYSTEM_BIN (backup saved)"
                 break
                 ;;
             n) echo "Aborted."; exit 1 ;;
@@ -339,11 +359,13 @@ if [ "$opencode_found" = false ]; then
             sudo cp "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
             sudo chmod 755 "$SYSTEM_BIN"
             echo "Installed to $SYSTEM_BIN."
+            log "binary installed (official installer): /root/.opencode/bin/opencode -> $SYSTEM_BIN"
         elif [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/home/$DEFAULT_USER/.opencode/bin/opencode" "$SYSTEM_BIN"
             sudo chmod 755 "$SYSTEM_BIN"
             echo "Installed to $SYSTEM_BIN."
+            log "binary installed (official installer): /home/$DEFAULT_USER/.opencode/bin/opencode -> $SYSTEM_BIN"
         else
             echo "${RED}Installation failed. Install opencode manually and re-run.${NC}"
             exit 1
@@ -363,6 +385,7 @@ for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEF
         fi
     fi
 done
+log "shell PATH config cleaned/updated for $DEFAULT_USER"
 
 # === Step 5: opencode library (consolidated deployment in /usr/local/lib/opencode/) ===
 
@@ -374,6 +397,7 @@ sudo mkdir -p "$LIBDIR/hooks"
 sudo cp "$SCRIPT_DIR/opencode-lib/wrapper"            "$LIBDIR/wrapper"
 sudo cp "$SCRIPT_DIR/opencode-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
 sudo cp "$SCRIPT_DIR/opencode-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
+sudo cp "$SCRIPT_DIR/opencode-lib/log.sh"              "$LIBDIR/log.sh"
 sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
 sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
 sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
@@ -384,12 +408,15 @@ sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc"          "$LIBDIR/opencode-deny-all.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
+               "$LIBDIR/log.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit"
+log "library deployed to $LIBDIR"
 
 # Symlink: /usr/local/bin/opencode -> our wrapper
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
 echo "Wrapper installed: /usr/local/bin/opencode -> $LIBDIR/wrapper"
+log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 
 # Symlink: backward-compat path for direct protect-projects calls
 sudo ln -sf "$LIBDIR/protect-projects.sh" /usr/local/sbin/protect-projects.sh
@@ -404,6 +431,7 @@ sudo ln -sf /etc/opencode/sudoers /etc/sudoers.d/opencode
 
 if sudo /usr/sbin/visudo -c -f /etc/opencode/sudoers >/dev/null 2>&1; then
     echo "sudoers installed."
+    log "sudoers installed: /etc/opencode/sudoers -> /etc/sudoers.d/opencode"
 else
     echo "${RED}sudoers validation failed. Check /etc/opencode/sudoers.${NC}"
     exit 1
@@ -413,6 +441,7 @@ fi
 sudo -u "$OPENCODE_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
 sudo -u "$DEFAULT_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
 echo "Git hooks configured (core.hooksPath = $LIBDIR/hooks)."
+log "git hooks configured: core.hooksPath = $LIBDIR/hooks"
 
 # === Step 5b: .git/config hardening (optional) ===
 
@@ -448,6 +477,7 @@ if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/openc
         sudo sed -i '/\/\/SECURE_GIT:/d' /home/opencode/.config/opencode/opencode.jsonc
         echo "Default config installed (opencode.jsonc)."
     fi
+    log "opencode config installed: /home/opencode/.config/opencode/opencode.jsonc (secure_git=$SECURE_GIT_CONFIG)"
 elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
     sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
     sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
@@ -460,6 +490,7 @@ elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permis
         sudo sed -i '/\/\/SECURE_GIT:/d' /home/opencode/.config/opencode/opencode.jsonc
         echo "Default config installed (opencode.jsonc — backup saved)."
     fi
+    log "opencode config replaced (backup: $BACKUP_DIR/opencode.jsonc-existing)"
 else
     echo "Config already exists, not overwriting."
     if [ "$SECURE_GIT_CONFIG" = true ]; then
@@ -482,6 +513,7 @@ if [ -f "$DEFAULT_OC_CONF" ]; then
         BAK_STAMP=$(date +%Y%m%d-%H%M%S)
         sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
         echo "Backed up to $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
+        log "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
     else
         echo "${YELLOW}Existing config kept — deny-all protection NOT installed.${NC}"
     fi
@@ -491,6 +523,7 @@ if [ ! -f "$DEFAULT_OC_CONF" ]; then
     sudo chown "$DEFAULT_USER:$WWW_GROUP" "$DEFAULT_OC_CONF"
     sudo chmod 664 "$DEFAULT_OC_CONF"
     echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
+    log "deny-all config installed for default user: $DEFAULT_OC_CONF"
 fi
 
 # === Step 7: Initial protection run ===
@@ -508,3 +541,4 @@ echo "  Run:    ${CYAN}opencode${NC}"
 echo "  Backup: $BACKUP_DIR"
 echo "  Docs:   ${CYAN}docs/MANUAL.md${NC} (config, skills, verification, uninstall)"
 echo ""
+log "install complete"
