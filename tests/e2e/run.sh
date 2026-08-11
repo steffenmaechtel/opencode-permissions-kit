@@ -374,6 +374,25 @@ check "stale ACL cleared after refresh" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.txt'
 
 echo ""
+echo "--- 10f. protect-projects ddev compat (.ddev group/mask) ---"
+# ddev recreates .ddev subdirs as the launching developer user with chmod 755,
+# which collapses the ACL mask to r-x and blocks the opencode user (www-data).
+# protect-projects must restore group www-data + rwx mask so ddev works.
+E 'sudo mkdir -p /var/www/vhosts/test-project/.ddev/.homeadditions'
+E 'echo "alias ll" > /var/www/vhosts/test-project/.ddev/.homeadditions/bash_aliases.example'
+E 'sudo chown dev:dev /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/.ddev/.homeadditions'
+E 'sudo chmod 755 /var/www/vhosts/test-project/.ddev/.homeadditions /var/www/vhosts/test-project/.ddev/.homeadditions/bash_aliases.example'
+E 'sudo setfacl -m g:www-data:rwx /var/www/vhosts/test-project/.ddev/.homeadditions /var/www/vhosts/test-project/.ddev/.homeadditions/bash_aliases.example'
+E 'sudo setfacl -m mask::r-x /var/www/vhosts/test-project/.ddev/.homeadditions /var/www/vhosts/test-project/.ddev/.homeadditions/bash_aliases.example'
+check_fail "ddev compat: .homeadditions blocked for opencode before fix" \
+    E 'sudo -u opencode test -w /var/www/vhosts/test-project/.ddev/.homeadditions'
+E 'sudo /usr/local/lib/opencode/protect-projects.sh --force'
+check "ddev compat: .homeadditions writable for opencode after fix" \
+    E 'sudo -u opencode test -w /var/www/vhosts/test-project/.ddev/.homeadditions'
+check "ddev compat: .ddev dir in www-data group" \
+    E 'test "$(stat -c %G /var/www/vhosts/test-project/.ddev/.homeadditions)" = "www-data"'
+
+echo ""
 echo "--- 11. update.sh re-deploys kit + preservation contract ---"
 # Snapshot files that update.sh must NOT touch (use sudo to be independent of perms)
 E 'sudo sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1 > /tmp/sha-opencode-jsonc.before'

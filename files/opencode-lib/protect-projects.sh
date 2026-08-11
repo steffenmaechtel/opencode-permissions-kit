@@ -40,7 +40,8 @@ OPENCODE_USER="opencode"
 WWW_GROUP="www-data"
 
 TMP_PATTERNS=""
-cleanup() { rm -f "$TMP_PATTERNS"; }
+TMP_DDEV=""
+cleanup() { rm -f "$TMP_PATTERNS" "$TMP_DDEV"; }
 trap cleanup EXIT
 
 # Read DEFAULT_USER from install.conf (legacy: setup.conf)
@@ -207,8 +208,45 @@ clear_stale_acls() {
     fi
 }
 
+# ddev compat: ddev recreates the project's .ddev content as the launching
+# developer user (chmod 755), which collapses the ACL mask to r-x and strips
+# the www-data group write the opencode user relies on. ddev start then fails
+# with "permission denied" even though the project opted in to docker/ddev.
+# Re-assert the kit base bits (group www-data, rwx mask) on every .ddev tree
+# found under the root — ddev projects are usually subdirectories of the
+# registered root (e.g. /var/www/vhosts/<project>/.ddev).
+fix_ddev_tree() {
+    local root="$1" d
+    find "$root" -type d -name .ddev -print 2>/dev/null > "$TMP_DDEV"
+    while IFS= read -r d; do
+        [ -z "$d" ] && continue
+
+        notgroup=$(find "$d" ! -group "$WWW_GROUP" -print 2>/dev/null)
+        if [ -n "$notgroup" ]; then
+            printf '%s\n' "$notgroup" | xargs -d '\n' chgrp "$WWW_GROUP"
+            count=$(printf '%s\n' "$notgroup" | wc -l)
+            log "ddev compat: chgrp $WWW_GROUP on $count .ddev file(s)/dir(s) under $d"
+        fi
+
+        # Entries carrying the kit's www-data ACL entry but a mask tighter than
+        # rwx (ddev chmod 755). Restore entry + mask so opencode can rewrite.
+        capped=$(getfacl -R -p "$d" 2>/dev/null | awk '
+            /^# file: / { path = substr($0, 9); has = 0; next }
+            /^group:www-data:/ { has = 1; next }
+            /^mask::/ { if (has && $0 != "mask::rwx") { print path; has = 0 } next }
+            /^$/ { path = ""; has = 0 }
+        ')
+        if [ -n "$capped" ]; then
+            printf '%s\n' "$capped" | xargs -d '\n' setfacl -m "g:$WWW_GROUP:rwx" -m mask::rwx 2>/dev/null
+            count=$(printf '%s\n' "$capped" | wc -l)
+            log "ddev compat: www-data rwx + mask rwx on $count .ddev file(s)/dir(s) under $d"
+        fi
+    done < "$TMP_DDEV"
+}
+
 # Build global find args
 TMP_PATTERNS=$(mktemp)
+TMP_DDEV=$(mktemp)
 GLOBAL_FIND_ARGS=""
 if [ -n "$GLOBAL_PATTERNS" ]; then
     echo "$GLOBAL_PATTERNS" > "$TMP_PATTERNS"
@@ -232,6 +270,9 @@ while IFS= read -r root; do
 
     # Clear stale ACLs from removed deny patterns, then re-apply current ones
     clear_stale_acls "$root"
+
+    # ddev compat: keep .ddev group-writable for opted-in docker/ddev projects
+    fix_ddev_tree "$root"
 
     # Apply global ACL denies (all projects)
     apply_acls "$root" "$GLOBAL_FIND_ARGS"

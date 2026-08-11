@@ -123,6 +123,7 @@ Detection mirrors opencode's own rule semantics (last matching rule wins) and on
 - Granting the group does **not** grant the command: the bundle's deny rules keep opencode from running `docker *` itself. The group only matters for the wrapper-started shell.
 - `status.sh` reports whether the docker group exists and whether the docker/ddev deny rules are active.
 - Docker must be usable by the group: if Docker was installed so that members of `docker` can access the daemon (the default), this just works. The `opencode` user is **not** added to the `docker` group — membership is granted per-invocation via sudo.
+- **`.ddev` write access:** `ddev start` rewrites the project's `.ddev/` files (e.g. `.homeadditions`, `README.txt`). ddev recreates them as the launching developer user and `chmod 755` them, which caps the ACL mask to `r-x` and blocks the `opencode` user (group `www-data`). Each `protect-projects.sh` run (wrapper start, `config.sh`, git hook) now re-asserts the kit base bits on every `.ddev` tree under the registered root (ddev projects are usually subdirectories, e.g. `/var/www/vhosts/<project>/.ddev`) — group `www-data` and a `rwx` mask — so opted-in docker/ddev projects keep working. If `ddev start` is run manually as the developer right after, the next wrapper start repairs the tree automatically.
 
 ## Customizing the Deny List
 
