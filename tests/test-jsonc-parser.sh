@@ -1,7 +1,8 @@
 #!/bin/sh
 # Unit tests for jsonc-parser.py edge cases.
 # Verifies: block comments, URLs in strings, escaped quotes, malformed input,
-# missing permission key, bash-only config, mixed allow/deny, trailing comments.
+# missing permission key, bash-only config, mixed allow/deny, trailing comments,
+# --allow mode, --tools mode (container tool detection).
 # Run: ./tests/test-jsonc-parser.sh
 set -e
 
@@ -130,6 +131,70 @@ assert_not_contains "bundled: //SECURE_GIT NOT present (commented)" "//SECURE_GI
 # --- 13. Bundled template allow mode (SECURE_GIT lines are comments → not emitted) ---
 OUT=$(python3 "$PARSER" --allow "$SCRIPT_DIR/../files/opencode.jsonc" 2>/dev/null || true)
 assert_not_contains "bundled-allow: .git/config NOT emitted (commented)" ".git/config" "$OUT"
+
+# --- 14. --tools: no permission.bash → no tools ---
+OUT=$(python3 "$PARSER" --tools "$FIXTURES/block-comments.jsonc" 2>/dev/null || true)
+assert_empty "tools: no bash section → no tools" "$OUT"
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+# --- 15. --tools: catch-all allow → docker AND ddev ---
+printf '%s\n' '{ "permission": { "bash": { "*": "allow" } } }' > "$TMP/catchall.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/catchall.jsonc" 2>/dev/null || true)
+assert_contains "tools: catch-all allow → docker" "docker" "$OUT"
+assert_contains "tools: catch-all allow → ddev" "ddev" "$OUT"
+
+# --- 16. --tools: "docker *": "allow" → docker only ---
+printf '%s\n' '{ "permission": { "bash": { "docker *": "allow" } } }' > "$TMP/docker.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/docker.jsonc" 2>/dev/null || true)
+assert_contains "tools: docker * allow → docker" "docker" "$OUT"
+assert_not_contains "tools: docker * allow → no ddev" "ddev" "$OUT"
+
+# --- 17. --tools: subcommand-only allow does NOT trigger ---
+printf '%s\n' '{ "permission": { "bash": { "ddev composer *": "allow" } } }' > "$TMP/subcmd.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/subcmd.jsonc" 2>/dev/null || true)
+assert_empty "tools: ddev composer * does NOT trigger ddev" "$OUT"
+
+# --- 18. --tools: bare "docker": "allow" counts ---
+printf '%s\n' '{ "permission": { "bash": { "docker": "allow" } } }' > "$TMP/bare.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/bare.jsonc" 2>/dev/null || true)
+assert_contains "tools: bare docker allow → docker" "docker" "$OUT"
+
+# --- 19. --tools: last match wins — "docker ps" allow then "docker *" deny ---
+printf '%s\n' '{ "permission": { "bash": { "docker ps": "allow", "docker *": "deny" } } }' > "$TMP/deny-last.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/deny-last.jsonc" 2>/dev/null || true)
+assert_not_contains "tools: later docker * deny wins over docker ps allow" "docker" "$OUT"
+
+# --- 20. --tools: shorthand "permission.bash": "allow" and "permission": "allow" ---
+printf '%s\n' '{ "permission": { "bash": "allow" } }' > "$TMP/shorthand.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/shorthand.jsonc" 2>/dev/null || true)
+assert_contains "tools: shorthand bash allow → docker" "docker" "$OUT"
+printf '%s\n' '{ "permission": "allow" }' > "$TMP/toplevel.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/toplevel.jsonc" 2>/dev/null || true)
+assert_contains "tools: top-level allow → ddev" "ddev" "$OUT"
+
+# --- 21. --tools: "sudo docker *" and "docker compose *" do NOT trigger ---
+printf '%s\n' '{ "permission": { "bash": { "sudo docker *": "allow" } } }' > "$TMP/sudo.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/sudo.jsonc" 2>/dev/null || true)
+assert_empty "tools: sudo docker * does NOT trigger" "$OUT"
+printf '%s\n' '{ "permission": { "bash": { "docker compose *": "allow" } } }' > "$TMP/compose.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/compose.jsonc" 2>/dev/null || true)
+assert_empty "tools: docker compose * does NOT trigger" "$OUT"
+
+# --- 22. --tools: catch-all allow + "docker *" deny → docker granted via
+#     docker-compose (matches only "*", like opencode itself) ---
+printf '%s\n' '{ "permission": { "bash": { "*": "allow", "docker *": "deny" } } }' > "$TMP/slip.jsonc"
+OUT=$(python3 "$PARSER" --tools "$TMP/slip.jsonc" 2>/dev/null || true)
+assert_contains "tools: catch-all allow + docker * deny → docker (compose slips through)" "docker" "$OUT"
+
+# --- 23. --tools: bundled template → no container tools (all deny) ---
+OUT=$(python3 "$PARSER" --tools "$SCRIPT_DIR/../files/opencode.jsonc" 2>/dev/null || true)
+assert_empty "tools: bundled template → no container tools" "$OUT"
+
+# --- 24. --tools: project fixture (ddev composer only) → no tools ---
+OUT=$(python3 "$PARSER" --tools "$SCRIPT_DIR/fixtures/project-opencode.jsonc" 2>/dev/null || true)
+assert_empty "tools: project fixture → no container tools" "$OUT"
 
 # --- Summary ---
 echo ""

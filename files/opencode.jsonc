@@ -168,7 +168,21 @@
             "ddev stop --remove-data*": "ask",
             "ddev poweroff *": "ask",
             "ddev exec cat *": "ask",
-            "cat *": "ask"
+            "cat *": "ask",
+            // CONTAINER TOOLS — docker/ddev can only be reached through the
+            // wrapper sandbox (sudo opencode -g docker|ddev). opencode itself
+            // must never run them directly, so these override any ask rule
+            // above (last matching rule wins).
+            "docker": "deny",
+            "docker *": "deny",
+            "docker-compose *": "deny",
+            "docker compose *": "deny",
+            "sudo docker *": "deny",
+            "sudo docker-compose *": "deny",
+            "sudo docker compose *": "deny",
+            "ddev": "deny",
+            "ddev *": "deny",
+            "sudo ddev *": "deny"
         },
         "external_directory": "ask"
     }

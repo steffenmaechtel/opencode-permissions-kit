@@ -1,2 +1,4 @@
 /opencode.jsonc
 tests/e2e/cache/
+
+__pycache__/

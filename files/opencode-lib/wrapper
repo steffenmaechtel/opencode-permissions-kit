@@ -2,6 +2,10 @@
 # opencode permissions kit — Wrapper
 # This file is deployed to /usr/local/bin/opencode by install.sh.
 # It ensures opencode always runs as the dedicated 'opencode' user.
+# Pass `-g docker` (or `--gid docker`) to run opencode with the docker group so
+# container commands work inside the sandbox. Projects that explicitly enable
+# docker/ddev in their opencode.jsonc trigger this automatically (confirmed
+# before start).
 set -e
 
 RED='\033[0;31m'
@@ -62,6 +66,33 @@ echo "  ${GREEN}SECURED BY opencode permissions kit ($VERSION)${NC}"
 echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
 echo ""
 
+# Parse -g/--gid: the kit's escalation channel for container groups.
+CONTAINER_GROUP=""
+CONTAINER_AUTO=false
+prev=""
+for arg in "$@"; do
+    case "$prev" in
+        -g|--gid)
+            case "$arg" in
+                docker|0|root)
+                    CONTAINER_GROUP="docker"
+                    ;;
+                *)
+                    echo ""
+                    echo "  ${RED}ERROR: unsupported group '$arg'${NC}"
+                    echo "  ${YELLOW}Supported: -g docker (runs opencode with the docker group).${NC}"
+                    echo ""
+                    exit 1
+                    ;;
+            esac
+            ;;
+    esac
+    case "$arg" in
+        -g|--gid) prev="$arg" ;;
+        *) prev="" ;;
+    esac
+done
+
 # Check for project-level allow overrides
 PROJECT_CONFIG=""
 if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
@@ -75,8 +106,40 @@ if [ -n "$PROJECT_CONFIG" ]; then
     fi
 fi
 
-printf "  Press Enter to start opencode..."
-read _
+# Detect container tools (docker/ddev) explicitly enabled by the project config
+# and run opencode with the docker group so they work inside the sandbox.
+if [ -z "$CONTAINER_GROUP" ] && [ -n "$PROJECT_CONFIG" ]; then
+    PROJECT_TOOLS=$(python3 /usr/local/lib/opencode/jsonc-parser.py --tools "$PROJECT_CONFIG" 2>/dev/null || true)
+    if [ -n "$PROJECT_TOOLS" ]; then
+        echo "  ${CYAN}Container tools enabled by this project:${NC}"
+        echo "$PROJECT_TOOLS" | sed 's/^/    - /'
+        echo ""
+        CONTAINER_GROUP="docker"
+        CONTAINER_AUTO=true
+    fi
+fi
+
+if [ -n "$CONTAINER_GROUP" ] && ! getent group "$CONTAINER_GROUP" >/dev/null 2>&1; then
+    echo "  ${YELLOW}WARNING: group '$CONTAINER_GROUP' does not exist — running without container group.${NC}"
+    echo ""
+    CONTAINER_GROUP=""
+fi
+
+if [ "$CONTAINER_AUTO" = true ]; then
+    printf "  Run opencode with the docker group? [Y/n] "
+    read answer
+    case "$answer" in
+        n|N|no|No|NO) CONTAINER_GROUP="" ;;
+    esac
+    if [ -n "$CONTAINER_GROUP" ]; then
+        echo ""
+        echo "  ${GREEN}opencode will run with the docker group.${NC}"
+        echo ""
+    fi
+else
+    printf "  Press Enter to start opencode..."
+    read _
+fi
 
 /usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --cwd "$CWD"
 
@@ -87,4 +150,8 @@ read _
 # the project opencode.jsonc of the directory opencode was started in — not the
 # git worktree root (which may be a nested repo).
 export OPENCODE_LAUNCH_CWD="$CWD"
-exec /usr/bin/sudo -u opencode /usr/local/lib/opencode/bin/opencode "$@"
+if [ -n "$CONTAINER_GROUP" ]; then
+    exec /usr/bin/sudo -u opencode -g "$CONTAINER_GROUP" /usr/local/lib/opencode/bin/opencode "$@"
+else
+    exec /usr/bin/sudo -u opencode /usr/local/lib/opencode/bin/opencode "$@"
+fi

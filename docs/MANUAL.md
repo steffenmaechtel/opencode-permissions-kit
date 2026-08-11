@@ -84,8 +84,45 @@ Remove the line from `/etc/opencode/projects.conf`. ACLs on that directory remai
 Every `opencode` invocation goes through the wrapper at `/usr/local/bin/opencode`:
 
 1. **Validate working directory** — the current directory must be inside a path listed in `/etc/opencode/projects.conf`. If not, an error is shown with the list of valid directories and opencode does not start.
-2. **Refresh ACL denies** — runs `protect-projects.sh` to ensure sensitive files are blocked.
-3. **Execute** — starts opencode as the `opencode` user.
+2. **Parse `-g` / `--gid`** — an optional container-group argument for the docker sandbox (see [Container Tools](#container-tools-dockerddev)).
+3. **Detect container tools** — if the project's `opencode.jsonc` explicitly enables docker/ddev, the wrapper proposes running opencode with the docker group and asks for confirmation.
+4. **Refresh ACL denies** — runs `protect-projects.sh` to ensure sensitive files are blocked.
+5. **Execute** — starts opencode as the `opencode` user, optionally with the docker group (`sudo -u opencode -g docker`).
+
+## Container Tools (docker/ddev)
+
+opencode runs as a dedicated user, so container commands like `docker ps`, `docker exec`, `ddev start` or `ddev exec` would normally have no access to the Docker daemon. The kit fixes this with a controlled escalation:
+
+- The bundled `opencode.jsonc` **denies** `docker` / `docker-compose` / `ddev` (and their `sudo` forms) as bash commands, so opencode can never reach them directly — even through `sudo`.
+- The sudoers rule grants the wrapper the `opencode:docker` RunAs group: `sudo -u opencode -g docker`. The wrapper is the **only** path to Docker.
+- Inside the sandbox, opencode's shell has the docker group, so `docker` / `docker-compose` / `ddev` work as usual — while file protection stays fully in effect.
+
+### Manual escalation
+
+```bash
+opencode -g docker
+```
+
+Run opencode with the docker group (confirmed only by the fact that you typed the flag). `--gid docker` and `-g 0` are equivalent. An unsupported group (`-g ddev`, `-g foo`, …) aborts with an error — there is no silent fallback.
+
+### Automatic detection
+
+If the project's own `opencode.jsonc` explicitly allows docker or ddev in `permission.bash` (e.g. `"docker *": "allow"`, `"*": "allow"`, or `"permission": "allow"`), the wrapper prints which tools it detected and asks:
+
+```
+  Run opencode with the docker group? [Y/n]
+```
+
+- **Y** (default) → starts opencode with the docker group, so the project's docker/ddev commands work.
+- **n** → starts opencode without the docker group (commands will fail with a permission error, matching the non-granted state).
+
+Detection mirrors opencode's own rule semantics (last matching rule wins) and only counts rules that would let a real `docker`/`ddev` invocation through — subcommand-only allows like `"ddev composer *": "allow"` do **not** trigger the grant. If the `docker` group does not exist on the system, the wrapper warns and runs without the container group.
+
+### Notes
+
+- Granting the group does **not** grant the command: the bundle's deny rules keep opencode from running `docker *` itself. The group only matters for the wrapper-started shell.
+- `status.sh` reports whether the docker group exists and whether the docker/ddev deny rules are active.
+- Docker must be usable by the group: if Docker was installed so that members of `docker` can access the daemon (the default), this just works. The `opencode` user is **not** added to the `docker` group — membership is granted per-invocation via sudo.
 
 ## Customizing the Deny List
 
@@ -265,6 +302,11 @@ Project roots (1):
 
 .git/config hardening: OFF
 
+Container tools (docker/ddev):
+  docker group: present (gid 999)
+  reachable via: opencode -g docker
+  direct access: blocked (docker/ddev denied in opencode.jsonc)
+
 Management (run in a terminal):
     sudo /usr/local/lib/opencode/config.sh                 change settings
     sudo /usr/local/lib/opencode/update.sh                 re-deploy kit after an update
@@ -272,6 +314,8 @@ Management (run in a terminal):
 ```
 
 Before the kit is installed, `status.sh` still works and reports that hardening is **NOT active** — handy for checking any machine.
+
+The **Container tools** block shows whether the `docker` group exists (it is absent when Docker is not installed), how container access is granted, and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template.
 
 ## Audit Log
 
@@ -372,7 +416,7 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 | Path | Purpose |
 |---|---|
 | `/usr/local/bin/opencode` | Wrapper (symlink to `/usr/local/lib/opencode/wrapper`) |
-| `/usr/local/lib/opencode/wrapper` | Validates directory, refreshes ACLs, execs opencode |
+| `/usr/local/lib/opencode/wrapper` | Validates directory, handles `-g docker` / container detection, refreshes ACLs, execs opencode |
 | `/usr/local/lib/opencode/protect-projects.sh` | Applies ACL denies to sensitive files |
 | `/usr/local/lib/opencode/config.sh` | Change settings post-install (projects, git-config, refresh) |
 | `/usr/local/lib/opencode/update.sh` | Re-deploy the kit after an update, no prompts (`--binary`/`--binary-path` also upgrade opencode) |
@@ -383,7 +427,7 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 | `/etc/opencode/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `VERSION` |
 | `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with deny patterns |
 | `/home/<default-user>/.config/opencode/opencode.jsonc` | Deny-* lockout config against self-update PATH bypass (see "Self-Update Bypass Protection") |
-| `/etc/sudoers.d/opencode` | Sudo rules for wrapper and protect-projects.sh |
+| `/etc/sudoers.d/opencode` | Sudo rules for wrapper, protect-projects.sh, and the `opencode:docker` RunAs escalation |
 | `/usr/local/lib/opencode/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |
 | `/usr/local/lib/opencode/log.sh` | Shared audit-log helper (sourced by the scripts above) |
 | `/var/log/opencode-permissions-kit/` | Audit log (root + default-user group, mode 750/640, self-rotating) |

@@ -495,6 +495,49 @@ check "wrapper stamps OPENCODE_LAUNCH_CWD" \
     E 'grep -q OPENCODE_LAUNCH_CWD /usr/local/lib/opencode/wrapper'
 
 echo ""
+echo "--- 12e2. Container tools: docker group escalation ---"
+check "sudoers grants (opencode : docker) RunAs" \
+    E 'sudo -l | grep -q "opencode : docker"'
+check "wrapper uses sudo -u opencode -g for container group" \
+    E 'grep -q "sudo -u opencode -g" /usr/local/lib/opencode/wrapper'
+check "status.sh reports docker group" \
+    E '/usr/local/lib/opencode/status.sh 2>&1 | grep -q "docker group"'
+# The e2e container has no docker group yet → wrapper must warn + fall back.
+E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode -g docker --help 2>&1 | tee /tmp/wrapper-g.txt' && \
+    echo "  ${GREEN}OK${NC}  wrapper -g docker ran without a docker group"
+check "wrapper -g docker: banner shown" \
+    E 'grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-g.txt'
+check "wrapper -g docker: absent-group warning" \
+    E 'grep -q "does not exist — running without container group" /tmp/wrapper-g.txt'
+# Create the docker group so the escalation path is real.
+E 'sudo groupadd docker' && \
+    echo "  ${GREEN}OK${NC}  docker group created"
+check "sudo -u opencode -g docker runs the binary (RunAs granted)" \
+    E 'sudo -u opencode -g docker /usr/local/lib/opencode/bin/opencode --version'
+check "opencode user NOT in docker group directly (escalation only)" \
+    E '! id -nG opencode | grep -q docker'
+# Project explicitly enables docker → wrapper auto-detects and asks.
+E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
+{
+    "permission": {
+        "bash": { "docker *": "allow" }
+    }
+}
+EOF'
+E 'cd /var/www/vhosts/test-project && printf "Y\n" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-auto.txt' && \
+    echo "  ${GREEN}OK${NC}  wrapper auto-detection (accepted) ran"
+check "wrapper auto-detect: container tools advisory" \
+    E 'grep -q "Container tools enabled by this project" /tmp/wrapper-auto.txt'
+check "wrapper auto-detect: docker group prompt" \
+    E 'grep -q "Run opencode with the docker group" /tmp/wrapper-auto.txt'
+check "wrapper auto-detect: accepted → docker group exec" \
+    E 'grep -q "opencode will run with the docker group" /tmp/wrapper-auto.txt'
+E 'cd /var/www/vhosts/test-project && printf "n\n" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-auto-n.txt' && \
+    echo "  ${GREEN}OK${NC}  wrapper auto-detection (declined) ran"
+check_fail "wrapper auto-detect: declined → no docker group exec" \
+    E 'grep -q "opencode will run with the docker group" /tmp/wrapper-auto-n.txt'
+
+echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"
 E 'bash /usr/local/lib/opencode/uninstall.sh --yes --dry-run' && \
     echo "  ${GREEN}OK${NC}  uninstall --dry-run completed"

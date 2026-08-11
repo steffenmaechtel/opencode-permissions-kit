@@ -6,6 +6,11 @@
 # can apply the project opencode.jsonc of the directory opencode was started in.
 Defaults env_keep += "OPENCODE_LAUNCH_CWD"
 
+# The RunAs group grant lets the wrapper hand opencode the docker group
+# (`sudo -u opencode -g docker`) so projects that explicitly allow docker/ddev
+# in their opencode.jsonc work inside the sandbox. The opencode binary itself
+# stays in the deny list, so the wrapper is the only way to reach docker.
 DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode/bin/opencode *
+DEFAULT_USER ALL=(opencode:docker) NOPASSWD: /usr/local/lib/opencode/bin/opencode *
 DEFAULT_USER ALL=(root)      NOPASSWD: /usr/local/lib/opencode/protect-projects.sh *
 opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode/protect-projects.sh *

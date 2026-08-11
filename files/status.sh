@@ -77,6 +77,21 @@ if [ -f "$f" ]; then
 fi
 
 echo ""
+echo "  ${CYAN}Container tools (docker/ddev):${NC}"
+docker_group="$(getent group docker 2>/dev/null | cut -d: -f3)"
+if [ -n "$docker_group" ]; then
+    echo "    docker group: ${GREEN}present (gid $docker_group)${NC}"
+else
+    echo "    docker group: ${YELLOW}absent${NC} (docker not installed)"
+fi
+echo "    reachable via: opencode -g docker"
+if grep -qE '"[^"]*docker[^"]*": "deny"' "$f" 2>/dev/null; then
+    echo "    direct access: ${GREEN}blocked${NC} (docker/ddev denied in opencode.jsonc)"
+else
+    echo "    direct access: ${RED}NOT blocked${NC} — add the kit's docker/ddev deny rules!"
+fi
+
+echo ""
 echo "  Management (run in a terminal):"
 echo "      sudo $LIBDIR/config.sh                 change settings"
 echo "      sudo $LIBDIR/update.sh                 re-deploy kit after an update"
