@@ -136,6 +136,8 @@ nano /home/opencode/.config/opencode/opencode.jsonc
 
 Add deny patterns under `permission.read.deny` and `permission.edit.deny`. Changes take effect on the next `opencode` start.
 
+**Only `deny` patterns become filesystem ACLs.** `ask` and `allow` patterns affect opencode's prompts only — no hard ACL is set, so normal processes (e.g. `ddev` reading its command docs from `.ddev/commands/<svc>/README.txt`) are never blocked. The bundled template therefore ships `*README.md` as `deny` (the kit's documented self-block) but `*README.txt` as `ask` so ddev keeps working. When you remove a deny pattern from the config, `protect-projects.sh` clears the now-stale ACLs automatically on the next run (wrapper start, `config.sh`, or git hook).
+
 See `files/opencode.jsonc` for the default template.
 
 The bundled template runs `permission.bash` as **ask-by-default** (`"*": "ask"`): every bash command prompts the user for approval unless it matches an explicit `allow` or `deny` rule. It ships a small allowlist of provably harmless read-only commands (`ls`, `pwd`, `whoami`, `git status`, `git diff`, `git log`, ...) and hard-denies system-destructive and container commands. To allow additional commands, add `allow` rules before the deny block — opencode applies the last matching rule, so a later `deny` always wins over a broader `allow`.

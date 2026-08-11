@@ -25,7 +25,11 @@
             "*AdditionalConfiguration.php": "deny",
             // Misc
             "*README.md": "deny",
-            "*README.txt": "deny",
+            // README.txt is "ask" (not deny): ddev reads its command docs from
+            // .ddev/commands/<svc>/README.txt at start, and a filesystem ACL
+            // deny breaks ddev. "ask" keeps the soft prompt for the agent
+            // without a hard ACL.
+            "*README.txt": "ask",
             "*.sql.gz": "deny",
             "*auth.json": "deny",
             // ".env*" catches .env, .env.local, .env.example AND foo.env
@@ -54,7 +58,11 @@
             "*AdditionalConfiguration.php": "deny",
             // Misc
             "*README.md": "deny",
-            "*README.txt": "deny",
+            // README.txt is "ask" (not deny): ddev reads its command docs from
+            // .ddev/commands/<svc>/README.txt at start, and a filesystem ACL
+            // deny breaks ddev. "ask" keeps the soft prompt for the agent
+            // without a hard ACL.
+            "*README.txt": "ask",
             "*.sql.gz": "deny",
             "*auth.json": "deny",
             // ".env*" catches .env, .env.local, .env.example AND foo.env

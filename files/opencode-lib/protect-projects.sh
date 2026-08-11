@@ -188,6 +188,25 @@ remove_acls() {
     fi
 }
 
+# Clear ACL denies for files that no longer match any deny pattern.
+# A deny pattern removed from the config leaves a hard u:OPENCODE_USER:---
+# entry behind; this removes every u:OPENCODE_USER entry and the apply_acls
+# calls right after re-add the ones still matching current patterns.
+# (GNU find has no "-acl" predicate, so this walks once with getfacl -R.)
+clear_stale_acls() {
+    local root="$1"
+    stale=$(getfacl -R -p "$root" 2>/dev/null | awk '
+        /^# file: / { path = substr($0, 9); has = 0; next }
+        /^user:opencode:/ { has = 1; next }
+        /^$/ { if (path != "" && has) print path; path = ""; has = 0 }
+    ')
+    if [ -n "$stale" ]; then
+        count=$(printf '%s\n' "$stale" | wc -l)
+        printf '%s\n' "$stale" | xargs -d '\n' setfacl -x "u:$OPENCODE_USER" 2>/dev/null
+        log "cleared u:$OPENCODE_USER ACL on $count stale file(s) under $root"
+    fi
+}
+
 # Build global find args
 TMP_PATTERNS=$(mktemp)
 GLOBAL_FIND_ARGS=""
@@ -210,6 +229,9 @@ while IFS= read -r root; do
             continue
             ;;
     esac
+
+    # Clear stale ACLs from removed deny patterns, then re-apply current ones
+    clear_stale_acls "$root"
 
     # Apply global ACL denies (all projects)
     apply_acls "$root" "$GLOBAL_FIND_ARGS"

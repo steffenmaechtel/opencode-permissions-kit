@@ -155,6 +155,7 @@ echo "DB_PASS=secret123"    > "$TMP_PROJECT/test-project/.env"
 echo "API_KEY=hunter2"       > "$TMP_PROJECT/test-project/settings.php"
 echo '{"token":"abc"}'       > "$TMP_PROJECT/test-project/auth.json"
 echo "# README"               > "$TMP_PROJECT/test-project/README.md"
+echo "# command docs"          > "$TMP_PROJECT/test-project/README.txt"
 echo "normal source code"    > "$TMP_PROJECT/test-project/index.php"
 
 echo ""
@@ -236,6 +237,8 @@ check_fail "auth.json blocked" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/auth.json'
 check_fail "README.md blocked" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.md'
+check "README.txt readable (ddev compat)" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.txt'
 check "index.php readable" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/index.php'
 
@@ -358,6 +361,17 @@ EOF'
 E 'sudo /usr/local/lib/opencode/protect-projects.sh --force --cwd /var/www/vhosts/test-project'
 check "allow-override: README.md readable for opencode" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.md'
+
+echo ""
+echo "--- 10e. protect-projects clears stale ACLs ---"
+# Simulate a deny pattern that was removed from the config (README.txt is
+# "ask" now): a leftover hard ACL deny must be cleared on the next run.
+E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/README.txt'
+check_fail "stale ACL present before refresh" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.txt'
+E 'sudo /usr/local/lib/opencode/protect-projects.sh --force'
+check "stale ACL cleared after refresh" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.txt'
 
 echo ""
 echo "--- 11. update.sh re-deploys kit + preservation contract ---"
