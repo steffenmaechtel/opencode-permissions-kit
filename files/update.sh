@@ -51,12 +51,12 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    mkdir -p "$dir/opencode-lib/hooks"
+    mkdir -p "$dir/opencode-lib/hooks" "$dir/opencode-lib/bin"
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
-             opencode-lib/log.sh \
+             opencode-lib/log.sh opencode-lib/bin/ddev \
              opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -112,6 +112,18 @@ VERSION="$KIT_VERSION"
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
 WWW_GROUP="${WWW_GROUP:-www-data}"
+
+# DDEV_BIN: real ddev path for the delegation shim. Preserve the value
+# recorded in install.conf; only detect (skipping our own shim symlink) when
+# migrating an install that predates the feature.
+if [ -z "$DDEV_BIN" ]; then
+    DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
+    if [ -n "$DDEV_BIN" ] && [ -L "$DDEV_BIN" ] \
+       && readlink "$DDEV_BIN" 2>/dev/null | grep -q 'opencode-lib/bin/ddev'; then
+        DDEV_BIN="/usr/bin/ddev"
+    fi
+    [ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
+fi
 
 YES=false
 REFRESH=false
@@ -198,10 +210,14 @@ sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
 sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
+# ddev delegation shim
+sudo mkdir -p "$LIBDIR/bin"
+sudo cp "$SCRIPT_DIR/opencode-lib/bin/ddev"            "$LIBDIR/bin/ddev"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit"
+               "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit" \
+               "$LIBDIR/bin/ddev"
 echo "Library files updated: $LIBDIR"
 log "library re-deployed: $LIBDIR"
 
@@ -211,11 +227,24 @@ sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
 sudo ln -sf "$LIBDIR/protect-projects.sh" /usr/local/sbin/protect-projects.sh
 echo "Symlinks refreshed: /usr/local/bin/opencode, /usr/local/sbin/protect-projects.sh"
 
+# --- re-link ddev shim -------------------------------------------------------
+# Shadow /usr/local/bin/ddev with our delegating shim, but never clobber a real
+# ddev installed there — in that layout the real binary wins on PATH and
+# delegation is unavailable (documented limitation).
+if [ -e /usr/local/bin/ddev ] && [ ! -L /usr/local/bin/ddev ]; then
+    echo "  ${YELLOW}/usr/local/bin/ddev is a real ddev (not the kit shim) — delegation NOT shadowed.${NC}"
+    log "ddev shim NOT shadowed: /usr/local/bin/ddev occupied"
+else
+    sudo ln -sf "$LIBDIR/bin/ddev" /usr/local/bin/ddev
+    echo "ddev shim refreshed: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (delegates to $DDEV_BIN as $DEFAULT_USER)"
+    log "ddev shim re-linked: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (DDEV_BIN=$DDEV_BIN)"
+fi
+
 # --- re-deploy sudoers -------------------------------------------------------
 
 if [ -f "$SCRIPT_DIR/sudoers.template" ]; then
     SUDO_TMP=$(mktemp)
-    sed "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
     sudo cp "$SUDO_TMP" /etc/opencode/sudoers
     sudo chmod 440 /etc/opencode/sudoers
     rm -f "$SUDO_TMP"
@@ -369,8 +398,9 @@ fi
 NEW_INSTALL_CONF="$(mktemp)"
 {
     if [ -f "$INSTALL_CONF" ]; then
-        grep -v '^VERSION=' "$INSTALL_CONF" 2>/dev/null
+        grep -v -e '^VERSION=' -e '^DDEV_BIN=' "$INSTALL_CONF" 2>/dev/null
     fi
+    echo "DDEV_BIN=$DDEV_BIN"
     echo "VERSION=$VERSION"
 } | sort -u > "$NEW_INSTALL_CONF"
 sudo cp "$NEW_INSTALL_CONF" /etc/opencode/install.conf

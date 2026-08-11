@@ -92,6 +92,18 @@ else
 fi
 
 echo ""
+echo "  ${CYAN}ddev delegation shim:${NC}"
+if [ -L /usr/local/bin/ddev ] && [ "$(readlink /usr/local/bin/ddev)" = "$LIBDIR/bin/ddev" ]; then
+    echo "    shim: ${GREEN}active${NC}  /usr/local/bin/ddev -> $LIBDIR/bin/ddev"
+    echo "    real ddev: ${DDEV_BIN:-/usr/bin/ddev}"
+    echo "    delegates to: $DEFAULT_USER (the developer)"
+elif [ -e /usr/local/bin/ddev ] && [ ! -L /usr/local/bin/ddev ]; then
+    echo "    shim: ${YELLOW}NOT active${NC}  /usr/local/bin/ddev is a real ddev (delegation unavailable)"
+else
+    echo "    shim: ${YELLOW}NOT installed${NC}"
+fi
+
+echo ""
 echo "  Management (run in a terminal):"
 echo "      sudo $LIBDIR/config.sh                 change settings"
 echo "      sudo $LIBDIR/update.sh                 re-deploy kit after an update"

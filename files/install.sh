@@ -28,12 +28,12 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    mkdir -p "$dir/opencode-lib/hooks"
+    mkdir -p "$dir/opencode-lib/hooks" "$dir/opencode-lib/bin"
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
-             opencode-lib/log.sh \
+             opencode-lib/log.sh opencode-lib/bin/ddev \
              opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -191,6 +191,17 @@ if ! command -v ddev >/dev/null 2>&1; then
     echo "${YELLOW}DDEV not found. Continuing anyway.${NC}"
 fi
 
+# Resolve the REAL ddev path (before the kit shim shadows /usr/local/bin/ddev).
+# On re-install over an existing kit, `command -v ddev` would return our own
+# shim symlink — fall back to the recorded DDEV_BIN or the default location.
+DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
+if [ -n "$DDEV_BIN" ] && [ -L "$DDEV_BIN" ] \
+   && readlink "$DDEV_BIN" 2>/dev/null | grep -q 'opencode-lib/bin/ddev'; then
+    DDEV_BIN=$(sed -n 's/^DDEV_BIN=//p' /etc/opencode/install.conf 2>/dev/null || true)
+fi
+[ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
+log "detected DDEV_BIN=$DDEV_BIN"
+
 # === Step 1: User ===
 
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
@@ -278,6 +289,7 @@ sudo tee /etc/opencode/install.conf > /dev/null <<EOF
 DEFAULT_USER=$DEFAULT_USER
 OPENCODE_USER=$OPENCODE_USER
 WWW_GROUP=$WWW_GROUP
+DDEV_BIN=$DDEV_BIN
 VERSION=$VERSION
 EOF
 # Migrate legacy setup.conf (pre-v0.0.9) -> install.conf
@@ -407,10 +419,14 @@ sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc"          "$LIBDIR/opencode-deny-all.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
+# ddev delegation shim
+sudo mkdir -p "$LIBDIR/bin"
+sudo cp "$SCRIPT_DIR/opencode-lib/bin/ddev"            "$LIBDIR/bin/ddev"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit"
+               "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit" \
+               "$LIBDIR/bin/ddev"
 log "library deployed to $LIBDIR"
 
 # Symlink: /usr/local/bin/opencode -> our wrapper
@@ -421,9 +437,25 @@ log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 # Symlink: backward-compat path for direct protect-projects calls
 sudo ln -sf "$LIBDIR/protect-projects.sh" /usr/local/sbin/protect-projects.sh
 
+# Symlink: /usr/local/bin/ddev -> our shim, so the opencode agent's bare
+# `ddev` invocations hit the delegating shim (ahead of the real ddev in PATH).
+# Only shadow when /usr/local/bin/ddev is free or already ours — never clobber
+# a real ddev installed there; in that layout delegation is unavailable (the
+# real ddev wins on PATH) and the user must move it below /usr/local/bin.
+if [ -L /usr/local/bin/ddev ] && [ "$(readlink /usr/local/bin/ddev)" = "$LIBDIR/bin/ddev" ]; then
+    :
+elif [ -e /usr/local/bin/ddev ]; then
+    echo "  ${YELLOW}WARNING: /usr/local/bin/ddev exists (real ddev). ddev delegation shim NOT linked — move ddev below /usr/local/bin (e.g. /usr/bin) to enable delegation.${NC}"
+    log "ddev shim NOT shadowed: /usr/local/bin/ddev already occupied"
+else
+    sudo ln -sf "$LIBDIR/bin/ddev" /usr/local/bin/ddev
+    echo "ddev shim installed: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (delegates to $DDEV_BIN as $DEFAULT_USER)"
+    log "ddev shim symlinked: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (DDEV_BIN=$DDEV_BIN)"
+fi
+
 # sudoers -> /etc/opencode/sudoers, symlinked as /etc/sudoers.d/opencode
 SUDO_TMP=$(mktemp)
-sed "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
 sudo cp "$SUDO_TMP" /etc/opencode/sudoers
 sudo chmod 440 /etc/opencode/sudoers
 rm -f "$SUDO_TMP"

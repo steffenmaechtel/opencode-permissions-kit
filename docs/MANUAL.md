@@ -125,6 +125,72 @@ Detection mirrors opencode's own rule semantics (last matching rule wins) and on
 - Docker must be usable by the group: if Docker was installed so that members of `docker` can access the daemon (the default), this just works. The `opencode` user is **not** added to the `docker` group — membership is granted per-invocation via sudo.
 - **`.ddev` write access:** `ddev start` rewrites the project's `.ddev/` files (e.g. `.homeadditions`, `README.txt`). ddev recreates them as the launching developer user and `chmod 755` them, which caps the ACL mask to `r-x` and blocks the `opencode` user (group `www-data`). Each `protect-projects.sh` run (wrapper start, `config.sh`, git hook) now re-asserts the kit base bits on every `.ddev` tree under the registered root (ddev projects are usually subdirectories, e.g. `/var/www/vhosts/<project>/.ddev`) — group `www-data` and a `rwx` mask — so opted-in docker/ddev projects keep working. If `ddev start` is run manually as the developer right after, the next wrapper start repairs the tree automatically.
 
+### ddev delegation (running ddev as the developer)
+
+`docker` commands only talk to the daemon socket, so running them as the
+`opencode` user (with the docker group) just works. `ddev` is different: it also
+**rewrites project files on the host** — TYPO3 `config/system/settings.php` /
+`additional.php`, `config/system/.gitignore`, and the `.ddev/.webimageBuild` /
+`.dbimageBuild` directories. Those host-side files are owned by the developer
+(`DEFAULT_USER`) and hardened by the kit (hard ACL denies on
+`*settings.php` / `*additional.php`, developer-owned `config/system/` at `755`
+with no `www-data` write, `.ddev` build dirs `chmod`-able only by their owner).
+Running `ddev` as `opencode` therefore collides with the very protections the
+kit applies, and `ddev start` fails host-side even though the docker socket is
+reachable.
+
+The kit solves this with a **delegating shim**. A tiny script is installed at
+`/usr/local/lib/opencode/bin/ddev` and shadowed as `/usr/local/bin/ddev`
+(ahead of the real ddev in `PATH`). For the `opencode` sandbox user it re-execs
+every `ddev` invocation as the developer via a passwordless sudoers rule:
+
+```
+opencode ALL=(<developer>) NOPASSWD: <ddev-binary>
+```
+
+So when the agent runs `ddev start` inside an opt-in project, the shim runs the
+real ddev **as the developer** — exactly as if the developer had typed it in a
+second terminal. Host files are written with the developer's ownership, no ACL
+conflict, and `.ddev` build dirs are `chmod`-able. The developer's own `ddev`
+calls pass through the shim untouched (it only delegates for the `opencode`
+user).
+
+What the kit records and where:
+
+| Artefact | Location | Purpose |
+|---|---|---|
+| shim | `/usr/local/lib/opencode/bin/ddev` | gates on the `opencode` user, delegates to `<developer>` |
+| shadow symlink | `/usr/local/bin/ddev` -> shim | intercepts the agent's bare `ddev` (ahead of the real ddev) |
+| real ddev path | `DDEV_BIN=` in `/etc/opencode/install.conf` | the shim's delegation target |
+| sudoers rule | `/etc/sudoers.d/opencode` | `opencode ALL=(<developer>) NOPASSWD: <DDEV_BIN>` |
+
+Requirements & limitations:
+
+- **`ddev` must resolve to the shim, not the real binary.** The kit shadows
+  `/usr/local/bin/ddev` only when that path is free or already the shim — it
+  never clobbers a real ddev installed there. If your ddev lives at
+  `/usr/local/bin/ddev` (some installers place it there), move it below
+  `/usr/local/bin` (e.g. to `/usr/bin/ddev`) and re-run `update.sh` so the shim
+  can take over. The Debian/Ubuntu apt package already installs to `/usr/bin/ddev`.
+- **The developer must have docker access.** The shim delegates `ddev` to the
+  developer, who in turn needs the docker socket — i.e. the developer is a
+  member of the `docker` group (the normal setup on a dev machine). The kit does
+  not manage the developer's docker membership.
+- **Subcommand gating is soft.** The shim delegates every `ddev` subcommand the
+  agent invokes; it does not itself block `ddev ssh` or any other subcommand.
+  Whether the agent may call a given `ddev` subcommand at all is controlled by
+  the project's `permission.bash` rules (the soft layer), evaluated before the
+  command reaches the shim. Deny `ddev ssh *` in the project config if you do
+  not want the agent to use it.
+- **`ddev exec` ignores host ACLs.** As with raw `docker`, anything the agent
+  runs via `ddev exec` runs as container root over bind-mounts and can read
+  files regardless of `u:opencode:---` ACLs. Enabling `ddev` for a project
+  accepts this gap.
+- `status.sh` reports whether the shim is active, the real ddev path, and the
+  delegation target.
+- Uninstall removes the `/usr/local/bin/ddev` shadow; the real ddev (wherever
+  it lives) is left intact.
+
 ## Customizing the Deny List
 
 ### Global Config
@@ -314,6 +380,11 @@ Container tools (docker/ddev):
   reachable via: opencode -g docker
   direct access: blocked (docker/ddev denied in opencode.jsonc)
 
+ddev delegation shim:
+  shim: active  /usr/local/bin/ddev -> /usr/local/lib/opencode/bin/ddev
+  real ddev: /usr/bin/ddev
+  delegates to: info (the developer)
+
 Management (run in a terminal):
     sudo /usr/local/lib/opencode/config.sh                 change settings
     sudo /usr/local/lib/opencode/update.sh                 re-deploy kit after an update
@@ -322,7 +393,7 @@ Management (run in a terminal):
 
 Before the kit is installed, `status.sh` still works and reports that hardening is **NOT active** — handy for checking any machine.
 
-The **Container tools** block shows whether the `docker` group exists (it is absent when Docker is not installed), how container access is granted, and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template.
+The **Container tools** block shows whether the `docker` group exists (it is absent when Docker is not installed), how container access is granted, and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template. The **ddev delegation shim** block reports whether the shim is active (shadowing `/usr/local/bin/ddev`), the real ddev path it delegates to, and the developer user it runs ddev as — see [ddev delegation](#ddev-delegation-running-ddev-as-the-developer).
 
 ## Audit Log
 
@@ -430,11 +501,13 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 | `/usr/local/lib/opencode/uninstall.sh` | Uninstall script |
 | `/usr/local/lib/opencode/status.sh` | Show protection status (works even before install) |
 | `/usr/local/lib/opencode/bin/opencode` | The actual opencode binary |
+| `/usr/local/lib/opencode/bin/ddev` | ddev delegation shim (re-execs `ddev` as the developer for the opencode sandbox user) |
+| `/usr/local/bin/ddev` | Shadow symlink to the ddev shim (ahead of the real ddev in PATH) |
 | `/etc/opencode/projects.conf` | Project roots (one per line) |
-| `/etc/opencode/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `VERSION` |
+| `/etc/opencode/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `DDEV_BIN`, `VERSION` |
 | `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with deny patterns |
 | `/home/<default-user>/.config/opencode/opencode.jsonc` | Deny-* lockout config against self-update PATH bypass (see "Self-Update Bypass Protection") |
-| `/etc/sudoers.d/opencode` | Sudo rules for wrapper, protect-projects.sh, and the `opencode:docker` RunAs escalation |
+| `/etc/sudoers.d/opencode` | Sudo rules for wrapper, protect-projects.sh, the `opencode:docker` RunAs escalation, and the ddev delegation |
 | `/usr/local/lib/opencode/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |
 | `/usr/local/lib/opencode/log.sh` | Shared audit-log helper (sourced by the scripts above) |
 | `/var/log/opencode-permissions-kit/` | Audit log (root + default-user group, mode 750/640, self-rotating) |

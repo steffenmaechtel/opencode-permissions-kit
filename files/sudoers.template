@@ -14,3 +14,10 @@ DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode/bin/opencode *
 DEFAULT_USER ALL=(opencode:docker) NOPASSWD: /usr/local/lib/opencode/bin/opencode *
 DEFAULT_USER ALL=(root)      NOPASSWD: /usr/local/lib/opencode/protect-projects.sh *
 opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode/protect-projects.sh *
+
+# ddev delegation: the ddev shim (shadowed as /usr/local/bin/ddev) re-execs
+# every `ddev` the opencode agent invokes as the developer via this rule, so
+# ddev rewrites project files with the developer's ownership instead of
+# colliding with the kit's ACL denies. Both placeholders are replaced at
+# install time: the RunAs user (the developer) and the command path (the real ddev).
+opencode     ALL=(DEFAULT_USER) NOPASSWD: DDEV_BIN

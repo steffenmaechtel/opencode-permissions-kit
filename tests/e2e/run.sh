@@ -179,7 +179,7 @@ E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSI
         failures=1; passed=0
         echo ""
         echo "${RED}E2E aborted — cannot install opencode.${NC}"
-        rm -rf "$TMP_PROJECT"
+        sudo rm -rf "$TMP_PROJECT"
         exit 1
     fi
 }
@@ -188,6 +188,20 @@ echo ""
 echo "--- 1b. status.sh before install (not-installed state) ---"
 check "status.sh (not installed) reports hardening NOT active" \
     E 'cd /tmp && sh /home/dev/repo/files/status.sh 2>&1 | grep -q "NOT active"'
+
+echo ""
+echo "--- 1c. ddev stub (fake /usr/bin/ddev for delegation tests) ---"
+# The e2e container has no real ddev. Install a stub that records the invoking
+# user + args, so we can prove the kit shim delegates opencode's `ddev` to the
+# developer (DEFAULT_USER). Must exist BEFORE install.sh detects DDEV_BIN.
+E 'sudo tee /usr/bin/ddev > /dev/null <<'\''EOF'\''
+#!/bin/sh
+id -un > /tmp/ddev-stub.out
+printf "%s " "$@" >> /tmp/ddev-stub.out
+echo "" >> /tmp/ddev-stub.out
+EOF'
+E 'sudo chmod 755 /usr/bin/ddev'
+check "ddev stub installed at /usr/bin/ddev" E 'test -x /usr/bin/ddev'
 
 echo ""
 echo "--- 2. Run install (from local repo checkout) ---"
@@ -215,6 +229,16 @@ check "status.sh deployed" \
     E 'test -x /usr/local/lib/opencode/status.sh'
 check "install.conf written" \
     E 'test -f /etc/opencode/install.conf'
+check "install.conf records DDEV_BIN" \
+    E 'grep -q "^DDEV_BIN=/usr/bin/ddev" /etc/opencode/install.conf'
+check "ddev shim deployed to library" \
+    E 'test -x /usr/local/lib/opencode/bin/ddev'
+check "ddev shim shadowed at /usr/local/bin/ddev" \
+    E 'test -L /usr/local/bin/ddev'
+check "ddev shim symlink points at the kit shim" \
+    E 'test "$(readlink /usr/local/bin/ddev)" = "/usr/local/lib/opencode/bin/ddev"'
+check "sudoers grants opencode -> DEFAULT_USER ddev delegation" \
+    E 'sudo grep -Eq "^opencode[[:space:]]+ALL=\(dev\)[[:space:]]+NOPASSWD: /usr/bin/ddev$" /etc/opencode/sudoers'
 check "status.sh reports hardened" \
     E '/usr/local/lib/opencode/status.sh 2>&1 | grep -q "hardened"'
 
@@ -620,10 +644,59 @@ check_fail "opencode user cannot enter log dir" \
     E 'sudo -u opencode test -x /var/log/opencode-permissions-kit'
 
 echo ""
+echo "--- 12h. ddev delegation shim ---"
+# The kit shim (/usr/local/bin/ddev) re-execs every `ddev` the opencode agent
+# invokes as the DEFAULT_USER (dev) via sudoers. The stub at /usr/bin/ddev
+# records who actually ran it. Contrast:
+#   - opencode runs the REAL ddev directly  -> stub records "opencode"
+#   - opencode runs the SHIM (via /usr/local/bin/ddev) -> stub records "dev"
+#   - dev runs the SHIM (passthrough)        -> stub records "dev"
+# The opencode->dev flip proves delegation; the dev passthrough proves the shim
+# does not loop or error for the developer themselves.
+#
+# The shim gates on `id -un = opencode` (NOT on the docker group), so we run the
+# opencode cases with plain `sudo -u opencode` (no -g) — the kit's sudoers only
+# grants dev the (opencode:docker) RunAs for the opencode binary itself, not for
+# arbitrary commands, and -g docker is irrelevant to the shim logic anyway.
+E 'sudo rm -f /tmp/ddev-stub.out'
+E 'sudo -u opencode /usr/bin/ddev direct-opencode' && \
+    echo "  ${GREEN}OK${NC}  opencode ran the real ddev directly"
+check "direct: stub records opencode as the invoking user" \
+    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "opencode"'
+check "direct: stub received args" \
+    E 'grep -q "direct-opencode" /tmp/ddev-stub.out'
+
+E 'sudo rm -f /tmp/ddev-stub.out'
+E 'sudo -u opencode /usr/local/bin/ddev delegated-start' && \
+    echo "  ${GREEN}OK${NC}  opencode ran the kit shim (delegated)"
+check "delegated: stub records dev (not opencode) as the invoking user" \
+    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "dev"'
+check "delegated: stub received args" \
+    E 'grep -q "delegated-start" /tmp/ddev-stub.out'
+check_fail "delegated: opencode did NOT run ddev directly" \
+    E 'grep -q "^opencode$" /tmp/ddev-stub.out'
+
+# Passthrough: the developer keeps their own ddev — the shim must not loop.
+E 'sudo rm -f /tmp/ddev-stub.out'
+E '/usr/local/bin/ddev passthrough-dev' && \
+    echo "  ${GREEN}OK${NC}  dev ran the shim (passthrough)"
+check "passthrough: stub records dev (no delegation for the developer)" \
+    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "dev"'
+check "passthrough: stub received args" \
+    E 'grep -q "passthrough-dev" /tmp/ddev-stub.out'
+
+# status.sh reports the shim.
+check "status.sh reports ddev shim active" \
+    E '/usr/local/lib/opencode/status.sh 2>&1 | grep -q "ddev delegation shim"'
+check "status.sh reports the real ddev path" \
+    E '/usr/local/lib/opencode/status.sh 2>&1 | grep -q "/usr/bin/ddev"'
+
+echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
 check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'
+check_fail "ddev shim removed"       E 'test -e /usr/local/bin/ddev'
 check_fail "Library removed"          E 'test -e /usr/local/lib/opencode'
 check_fail "Sudoers removed"          E 'test -e /etc/sudoers.d/opencode'
 check_fail "/etc/opencode removed"    E 'test -e /etc/opencode'
@@ -641,6 +714,9 @@ if [ "$failures" -gt 0 ]; then
 fi
 echo ""
 
-rm -rf "$TMP_PROJECT"
+# Section 10g creates a root-owned README.md inside the bind mount, so the
+# cleanup needs root; best-effort, never mask a real test failure.
+rm -rf "$TMP_PROJECT" 2>/dev/null || true
+sudo rm -rf "$TMP_PROJECT" 2>/dev/null || true
 
 [ "$failures" -eq 0 ] || exit 1

@@ -106,22 +106,53 @@ grant. Smaller attack surface, clearer to document.
 
 ### 4.3 ddev mechanics
 
-**Decision (2026-08-11):** ddev runs **directly as the `opencode` user** with
-its own `~/.ddev` (`/home/opencode/.ddev`), backed by the session docker grant
-(§4.2). No sudoers delegation.
+**Decision (2026-08-11, revised 2026-08-11):** ddev runs **as the DEFAULT_USER
+(the developer)** via a delegating shim — not directly as the `opencode` user.
 
-What `~/.ddev` is (for the record): ddev's *per-user home config directory*,
-created on first run. Contains `global_config.yaml`, SSH keys cached by
-`ddev auth ssh`, mutagen state, project registry. It is **not** a project
-copy and not a ddev installation.
+The original "ddev runs directly as `opencode`" decision failed in practice:
+`ddev start` rewrites host-side project files (TYPO3 `config/system/settings.php`
+/ `additional.php`, `config/system/.gitignore`, `.ddev/.webimageBuild` /
+`.dbimageBuild`), and those files are owned by the developer and hardened by the
+kit (hard ACL denies on `*settings.php` / `*additional.php`, developer-owned
+`config/system/` at `755` with no `www-data` write, `.ddev` build dirs
+`chmod`-able only by their owner). Running `ddev` as `opencode` collides with
+the very protections the kit applies, so `ddev start` failed host-side even
+though the docker socket was reachable.
+
+Revised mechanism:
+
+- A shim at `/usr/local/lib/opencode/bin/ddev` is shadowed as
+  `/usr/local/bin/ddev` (ahead of the real ddev in PATH).
+- For the `opencode` sandbox user the shim re-execs every `ddev` invocation as
+  the DEFAULT_USER via `sudo -u <developer> <DDEV_BIN> "$@"`, backed by a
+  passwordless sudoers rule `opencode ALL=(<developer>) NOPASSWD: <DDEV_BIN>`.
+  `DDEV_BIN` (the real ddev path) is recorded in `/etc/opencode/install.conf`.
+- For every other user (the developer themselves, root, …) the shim passes
+  through to the real ddev untouched — no loop, no double-delegation.
+- The developer must have docker access (member of the `docker` group), which
+  is the normal dev-machine setup; the kit does not manage that membership.
+- `docker` (raw) still runs as the `opencode` user with the docker group grant
+  (§4.2) — only `ddev` is delegated, because only ddev rewrites host files.
 
 Implications:
 
-- `ddev start/stop/restart/composer` over HTTP work out of the box.
-- Anything needing private SSH keys (composer from private git repos,
-  `ddev auth ssh`) **fails** unless keys are explicitly copied into
-  `/home/opencode/.ddev/.ssh` — a deliberate security decision, documented in
-  MANUAL.md.
+- `ddev start/stop/restart/composer` work out of the box, writing project files
+  with the developer's ownership — no ACL conflict, no `chmod` EPERM.
+- `ddev` uses the developer's `~/.ddev` (per-user home config: `global_config.yaml`,
+  SSH keys cached by `ddev auth ssh`, mutagen state, project registry), not
+  `/home/opencode/.ddev`. Anything needing private SSH keys (composer from
+  private git repos, `ddev auth ssh`) works exactly as it does for the developer
+  in a second terminal — a deliberate alignment with the developer's workflow.
+- Subcommand gating is soft: the shim delegates every `ddev` subcommand the
+  agent invokes; whether the agent may call a given subcommand at all is
+  controlled by the project's `permission.bash` rules, evaluated before the
+  command reaches the shim. Deny `ddev ssh *` in the project config to block it.
+- The `/usr/local/bin/ddev` shadow is only created when that path is free or
+  already the shim — the kit never clobbers a real ddev installed there. If the
+  real ddev lives at `/usr/local/bin/ddev` (some installers place it there),
+  delegation is unavailable (the real binary wins on PATH); move it below
+  `/usr/local/bin` (e.g. `/usr/bin/ddev`, where the Debian/Ubuntu apt package
+  installs it) and re-run `update.sh`.
 
 ### 4.2 Grant: per-session, not per-command
 
@@ -136,8 +167,8 @@ exec /usr/bin/sudo -u opencode -g docker /usr/local/lib/opencode/bin/opencode "$
 - The `opencode` user is **never** a member of `docker` in `/etc/group`; no
   permanent change to the account.
 - The sudoers rule becomes `DEFAULT_USER ALL=(opencode:docker) NOPASSWD: ...`.
-- `ddev` rides on the same docker access and runs directly as the `opencode`
-  user with its own `~/.ddev` (first run creates it).
+- `docker` (raw) rides on this grant and runs directly as the `opencode` user.
+  `ddev` is delegated to the DEFAULT_USER via a separate shim (see §4.3).
 - The wrapper prints a clear notice at launch when container tools are granted
   for the project.
 
@@ -189,14 +220,18 @@ on being precise at the cost of missing a legitimately allowed project.
 |---|---|
 | `files/opencode-lib/jsonc-parser.py` | new `--tools` mode (bash-rule evaluation) |
 | `files/opencode-lib/wrapper` | detect tools, conditionally add `-g docker`, print notice |
-| `files/sudoers.template` | extend RunAs to `(opencode:docker)` |
-| `files/status.sh` | show which projects have container tools enabled |
+| `files/opencode-lib/bin/ddev` | **new** — ddev delegation shim (re-execs `ddev` as DEFAULT_USER for the opencode sandbox user) |
+| `files/sudoers.template` | extend RunAs to `(opencode:docker)`, add `opencode ALL=(DEFAULT_USER) NOPASSWD: DDEV_BIN` for ddev delegation |
+| `files/install.sh` | detect `DDEV_BIN`, record in `install.conf`, deploy + shadow the shim, render `DDEV_BIN` into sudoers |
+| `files/update.sh` | re-deploy + re-link the shim, preserve `DDEV_BIN` in `install.conf`, re-render sudoers |
+| `files/uninstall.sh` | remove the `/usr/local/bin/ddev` shadow |
+| `files/status.sh` | report ddev shim state (active / real-ddev conflict / not installed) |
 | `files/opencode.jsonc` | docker/ddev (incl. `sudo` forms) denied in the global bash template |
 | `docs/MANUAL.md` | usage documentation |
-| `tests/` | parser + wrapper tests; e2e section |
+| `tests/` | parser + wrapper tests; ddev shim unit tests; e2e delegation section |
 
-No new files, no changes to `protect-projects.sh`, no docker group membership
-for the `opencode` user.
+One new file (`files/opencode-lib/bin/ddev`); `update.sh` fetch list and CI
+`chmod +x` lists now include it.
 
 ## 7. Open Questions
 
@@ -206,14 +241,19 @@ for the `opencode` user.
       `ddev`) with action `allow` trigger the grant; subcommand allows do not.
       `docker-compose *` (legacy hyphen binary) counts as docker; `docker
       compose *` and `sudo docker *` do **not** trigger.
-- [x] ddev mechanics: ddev runs directly as the `opencode` user with its own
-      `~/.ddev` (no sudoers delegation, no `~/.ddev` SSH keys by default).
+- [x] ddev mechanics: ddev runs **as the DEFAULT_USER (developer)** via a
+      delegating shim shadowed at `/usr/local/bin/ddev`, backed by a sudoers
+      rule `opencode ALL=(DEFAULT_USER) NOPASSWD: DDEV_BIN` (revised 2026-08-11
+      from "directly as opencode", which collided with the kit's own file
+      protections on `ddev start`). `docker` (raw) still runs as `opencode`
+      with the docker-group grant.
 - [x] Launch notice: the wrapper requires an **interactive confirm** at launch
       before granting container tools for the project (not just a warning).
 
 **Still open / to verify at implement time:**
 - [ ] Does Docker Desktop on WSL2 reliably create the `docker` group in the
       target distro? Verify `/var/run/docker.sock` ownership.
-- [ ] `ddev ssh` — not granted (interactive shell, too powerful).
-- [ ] No new files, so `update.sh` fetch list and CI `chmod +x` lists stay
-      unchanged.
+- [ ] `ddev ssh` — not blocked by the shim; gated only by the project's soft
+      `permission.bash` rules. Document denying `ddev ssh *` if unwanted.
+- [ ] Real-ddev-at-`/usr/local/bin/ddev` conflict: documented limitation, no
+      auto-resolution (the kit refuses to clobber a real binary there).

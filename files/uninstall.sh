@@ -149,6 +149,12 @@ echo "Wrapper removed."
 log "wrapper removed: /usr/local/bin/opencode"
 
 echo ""
+echo "--- Removing ddev shim ---"
+run "sudo rm -f /usr/local/bin/ddev"
+echo "ddev shim removed."
+log "ddev shim removed: /usr/local/bin/ddev"
+
+echo ""
 echo "--- Removing opencode library ---"
 run "sudo rm -f /usr/local/sbin/protect-projects.sh"
 run "sudo rm -rf /usr/local/lib/opencode"
