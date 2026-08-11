@@ -393,6 +393,19 @@ check "ddev compat: .ddev dir in www-data group" \
     E 'test "$(stat -c %G /var/www/vhosts/test-project/.ddev/.homeadditions)" = "www-data"'
 
 echo ""
+echo "--- 10g. protect-projects CWD config from ancestor (nested git worktree) ---"
+# The governing opencode.jsonc sits at the project root, but git commands run
+# in a nested worktree (repo/). The hook passes the worktree root as --cwd;
+# protect-projects must find the ANCESTOR config, else the global *README.md
+# deny wins and the project allow override is lost. (test-project/opencode.jsonc
+# with the README.md allow was created in 10d.)
+E 'sudo mkdir -p /var/www/vhosts/test-project/nested/repo'
+E 'echo "readme" | sudo tee /var/www/vhosts/test-project/nested/repo/README.md > /dev/null'
+E 'sudo /usr/local/lib/opencode/protect-projects.sh --force --cwd /var/www/vhosts/test-project/nested/repo'
+check "ancestor config: README.md readable for opencode in nested worktree" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/nested/repo/README.md'
+
+echo ""
 echo "--- 11. update.sh re-deploys kit + preservation contract ---"
 # Snapshot files that update.sh must NOT touch (use sudo to be independent of perms)
 E 'sudo sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1 > /tmp/sha-opencode-jsonc.before'

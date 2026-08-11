@@ -45,6 +45,19 @@ assert_not_contains() {
     fi
 }
 
+check_plain() {
+    local dir="$1" expected="$2" desc="$3"
+    local got
+    got=$(find_cwd_config "$dir")
+    if [ "$got" = "$expected" ]; then
+        echo "  ${GREEN}PASS${NC}  $desc"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  $desc (got '$got', expected '$expected')"
+        failures=$((failures + 1))
+    fi
+}
+
 echo ""
 echo "Project Config Integration Tests (PLAN-STEP-2)"
 echo "================================================"
@@ -396,6 +409,30 @@ assert_contains "outside-cwd: config exists" "" "$([ -f "$CWD_OUTSIDE/opencode.j
 # We test by checking that find from any project root won't match this path
 FOUND_OUTSIDE=$(eval "find \"$ROOT_A\" -type f -path \"$CWD_OUTSIDE/*\"" 2>/dev/null || true)
 assert_not_contains "outside-cwd: NOT found under any project root" "$CWD_OUTSIDE" "$FOUND_OUTSIDE"
+
+echo ""
+echo "  --- 9f. CWD config discovered by walking up (nested git worktree) ---"
+# Git worktrees are often nested repos (repo/ inside a project). The git hooks
+# pass the worktree root as --cwd; the governing config sits at an ANCESTOR
+# (where opencode was launched). find_cwd_config() must find it, else the
+# global denies win and project allow overrides are lost.
+FN=$(awk '/^find_cwd_config\(\)/,/^}/' "$PROTECT")
+if [ -z "$FN" ]; then
+    echo "  ${RED}FAIL${NC}  find_cwd_config() not extracted from $PROTECT"
+    failures=$((failures + 1))
+else
+    eval "$FN"
+    NESTED="$TMPDIR/var/www/vhosts/project-a/nested-worktree/deep"
+    mkdir -p "$NESTED"
+    check_plain "$NESTED" "$TMPDIR/var/www/vhosts/project-a/opencode.jsonc" \
+        "ancestor config found from nested worktree"
+    check_plain "$TMPDIR/var/www/vhosts/project-a" "$TMPDIR/var/www/vhosts/project-a/opencode.jsonc" \
+        "direct config found (unchanged)"
+    check_plain "$TMPDIR/var/www/vhosts/project-b" "" \
+        "no config found -> empty"
+    check_plain "$TMPDIR/var/www/vhosts" "" \
+        "walk stops at / without config -> empty"
+fi
 
 # Summary
 echo ""

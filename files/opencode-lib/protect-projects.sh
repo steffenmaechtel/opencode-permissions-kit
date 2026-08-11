@@ -92,11 +92,31 @@ while IFS= read -r root; do
     done
 done < "$PROJECTS_CONF"
 
+# Find the governing opencode.json[c]: the NEAREST config walking UP from a
+# start directory. Git worktrees are often nested repos (repo/ inside a
+# project) and the git hooks pass the worktree root as --cwd; a config at the
+# project root (where opencode was launched) must still be found from the
+# nested worktree. Echoes the config path, or nothing if no ancestor carries
+# a config.
+find_cwd_config() {
+    local walk="${1%/}"
+    while :; do
+        if [ -f "$walk/opencode.jsonc" ]; then
+            echo "$walk/opencode.jsonc"
+            return 0
+        elif [ -f "$walk/opencode.json" ]; then
+            echo "$walk/opencode.json"
+            return 0
+        fi
+        [ "$walk" = "/" ] && return 0
+        walk=$(dirname "$walk")
+    done
+}
+
 # CWD project config detection (for cache key, before cache check)
 CWD_CONFIG=""
 if [ -n "$CWD" ]; then
-    if [ -f "$CWD/opencode.jsonc" ]; then CWD_CONFIG="$CWD/opencode.jsonc"
-    elif [ -f "$CWD/opencode.json" ]; then CWD_CONFIG="$CWD/opencode.json"; fi
+    CWD_CONFIG=$(find_cwd_config "$CWD")
 fi
 if [ -n "$CWD_CONFIG" ]; then
     CWD_MTIME=$(stat -c '%Y' "$CWD_CONFIG" 2>/dev/null || echo "0")
