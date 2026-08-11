@@ -138,6 +138,8 @@ Add deny patterns under `permission.read.deny` and `permission.edit.deny`. Chang
 
 See `files/opencode.jsonc` for the default template.
 
+The bundled template runs `permission.bash` as **ask-by-default** (`"*": "ask"`): every bash command prompts the user for approval unless it matches an explicit `allow` or `deny` rule. It ships a small allowlist of provably harmless read-only commands (`ls`, `pwd`, `whoami`, `git status`, `git diff`, `git log`, ...) and hard-denies system-destructive and container commands. To allow additional commands, add `allow` rules before the deny block — opencode applies the last matching rule, so a later `deny` always wins over a broader `allow`.
+
 ### Self-Update Bypass Protection (Default-User Config)
 
 `opencode`'s installer and self-updater can re-add `~/.opencode/bin` to your `PATH`. If that happens, typing `opencode` would run the real binary **as your user** instead of our wrapper — bypassing the wrapper's ACL refresh and the dedicated `opencode` user.

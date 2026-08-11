@@ -1,7 +1,13 @@
 {
     "$schema": "https://opencode.ai/config.json",
     // opencode permissions kit — default permission template
-    // Customize this file to add project-specific rules or allowed commands.
+    // Bash is ask-by-default ("*": "ask"): every bash command prompts unless
+    // explicitly allowlisted or denied below. The long ask-blacklist of the
+    // early templates is gone — the default IS ask — so only an allowlist and
+    // a hard denylist remain. No broad ask rules means an "always allow"
+    // approval can never override a deny rule either.
+    // NOTE: opencode's "always allow" approvals are only per-session (not
+    // persisted), so extend the allowlist below as you go.
 
     "share": "disabled",
     // Auto-update is disabled on purpose: the binary is root-owned and
@@ -12,105 +18,85 @@
         "read": {
             "*": "allow",
             // TYPO3
-            "additional.php": "deny",
-            "**/additional.php": "deny",
-            "settings.php": "deny",
-            "**/settings.php": "deny",
+            "*additional.php": "deny",
+            "*settings.php": "deny",
             // TYPO3 Legacy
-            "LocalConfiguration.php": "deny",
-            "**/LocalConfiguration.php": "deny",
-            "AdditionalConfiguration.php": "deny",
-            "**/AdditionalConfiguration.php": "deny",
+            "*LocalConfiguration.php": "deny",
+            "*AdditionalConfiguration.php": "deny",
             // Misc
-            "README.md": "deny",
-            "**/README.md": "deny",
-            "README.txt": "deny",
-            "**/README.txt": "deny",
+            "*README.md": "deny",
+            "*README.txt": "deny",
             "*.sql.gz": "deny",
-            "**/*.sql.gz": "deny",
-            "auth.json": "deny",
-            "**/auth.json": "deny",
-            ".env*": "deny",
-            "**/*.env": "deny",
-            "**/*.env.*": "deny",
-            "**/*.env.example": "deny",
+            "*auth.json": "deny",
+            // ".env*" catches .env, .env.local, .env.example AND foo.env
+            "*.env*": "deny",
             // Private Keys
             "*id_rsa*": "deny",
-            "**/*id_rsa*": "deny",
             "*id_ed25519*": "deny",
-            "**/*id_ed25519*": "deny",
             "*.pem": "deny",
-            "**/*.pem": "deny",
             // WordPress
-            "wp-config.php": "deny",
-            "**/wp-config.php": "deny",
+            "*wp-config.php": "deny",
             // Legacy Projects
-            "conf.php": "deny",
-            "**/conf.php": "deny",
-            "config.php": "deny",
-            "**/config.php": "deny",
-            "config/database.php": "deny",
+            // "*config.php" also covers "wp-config.php" and "myconfig.php"
+            "*conf.php": "deny",
+            "*config.php": "deny",
             //SECURE_GIT: ".git/config": "deny",
             //SECURE_GIT: "**/.git/config": "deny",
-            "**/config/database.php": "deny"
+            "*config/database.php": "deny"
         },
         "edit": {
             "*": "allow",
             // TYPO3
-            "additional.php": "deny",
-            "**/additional.php": "deny",
-            "settings.php": "deny",
-            "**/settings.php": "deny",
+            "*additional.php": "deny",
+            "*settings.php": "deny",
             // TYPO3 Legacy
-            "LocalConfiguration.php": "deny",
-            "**/LocalConfiguration.php": "deny",
-            "AdditionalConfiguration.php": "deny",
-            "**/AdditionalConfiguration.php": "deny",
+            "*LocalConfiguration.php": "deny",
+            "*AdditionalConfiguration.php": "deny",
             // Misc
-            "README.md": "deny",
-            "**/README.md": "deny",
-            "README.txt": "deny",
-            "**/README.txt": "deny",
+            "*README.md": "deny",
+            "*README.txt": "deny",
             "*.sql.gz": "deny",
-            "**/*.sql.gz": "deny",
-            "auth.json": "deny",
-            "**/auth.json": "deny",
-            ".env*": "deny",
-            "**/*.env": "deny",
-            "**/*.env.*": "deny",
-            "**/*.env.example": "deny",
+            "*auth.json": "deny",
+            // ".env*" catches .env, .env.local, .env.example AND foo.env
+            "*.env*": "deny",
             // Private Keys
             "*id_rsa*": "deny",
-            "**/*id_rsa*": "deny",
             "*id_ed25519*": "deny",
-            "**/*id_ed25519*": "deny",
             "*.pem": "deny",
-            "**/*.pem": "deny",
             // WordPress
-            "wp-config.php": "deny",
-            "**/wp-config.php": "deny",
+            "*wp-config.php": "deny",
             // Legacy Projects
-            "conf.php": "deny",
-            "**/conf.php": "deny",
-            "config.php": "deny",
-            "**/config.php": "deny",
-            "config/database.php": "deny",
+            // "*config.php" also covers "wp-config.php" and "myconfig.php"
+            "*conf.php": "deny",
+            "*config.php": "deny",
             //SECURE_GIT: ".git/config": "deny",
             //SECURE_GIT: "**/.git/config": "deny",
-            "**/config/database.php": "deny"
+            "*config/database.php": "deny"
         },
         "bash": {
-            // Allow
-            "*": "allow",
-            "curl *": "allow",
-            "wget *": "allow",
-            // SYSTEM PROTECTION — destructive system commands, never allow
+            // DEFAULT-ASK: every bash command prompts unless explicitly
+            // allowlisted or denied below. Last matching rule wins.
+            "*": "ask",
+            // ALLOW — provably harmless, read-only commands. Keep this list
+            // tight: never allow prefixes with destructive subcommands
+            // (git *, find *, chmod *, rm *, ...). cat/git config stay ask —
+            // they read file content via bash and would bypass the read
+            // denies above.
+            "ls *": "allow",
+            "pwd": "allow",
+            "whoami": "allow",
+            "id *": "allow",
+            "uname *": "allow",
+            "date *": "allow",
+            "df *": "allow",
+            "du *": "allow",
+            "git status *": "allow",
+            "git diff *": "allow",
+            "git log *": "allow",
+            // SYSTEM PROTECTION — destructive system commands, never allow.
+            // Must come AFTER the allow rules: opencode applies the LAST
+            // matching rule, so these override any broader allow above.
             "rm -rf /*": "deny",
-            "rm -rf /": "deny",
-            "rm -rf /etc*": "deny",
-            "rm -rf /boot*": "deny",
-            "rm -rf /usr*": "deny",
-            "rm -rf /home*": "deny",
             ">: /dev/sd*": "deny",
             "dd if=/dev/zero*": "deny",
             "dd of=/dev/sd*": "deny",
@@ -126,61 +112,15 @@
             "mount *": "deny",
             "> /etc/*": "deny",
             "shred /*": "deny",
-            // ASK — potentially destructive commands
-            "rm *": "ask",
-            "rmdir *": "ask",
-            "unlink *": "ask",
-            "shred *": "ask",
-            "dd *": "ask",
-            "mv *": "ask",
-            "chmod *": "ask",
-            "chown *": "ask",
-            "chgrp *": "ask",
-            "truncate *": "ask",
-            "find *-delete*": "ask",
-            "find *-exec*rm*": "ask",
-            "sudo *": "ask",
-            "su *": "ask",
-            "scp *": "ask",
-            "rsync *": "ask",
-            "git *": "ask",
-            "mysql *DROP DATABASE*": "ask",
-            "mysql *drop database*": "ask",
-            "mysql *DROP TABLE*": "ask",
-            "mysql *drop table*": "ask",
-            "mysql *TRUNCATE*": "ask",
-            "mysql *truncate*": "ask",
-            "mysql *DELETE FROM*": "ask",
-            "mysql *delete from*": "ask",
-            "mysqladmin *drop*": "ask",
-            "ddev *DROP DATABASE*": "ask",
-            "ddev *drop database*": "ask",
-            "ddev *DROP TABLE*": "ask",
-            "ddev *drop table*": "ask",
-            "ddev *TRUNCATE*": "ask",
-            "ddev *truncate*": "ask",
-            "ddev *DELETE FROM*": "ask",
-            "ddev *delete from*": "ask",
-            "ddev delete *": "ask",
-            "ddev import-db *": "ask",
-            "ddev export-db *": "ask",
-            "ddev snapshot *restore*": "ask",
-            "ddev stop --remove-data*": "ask",
-            "ddev poweroff *": "ask",
-            "ddev exec cat *": "ask",
-            "cat *": "ask",
             // CONTAINER TOOLS — docker/ddev can only be reached through the
             // wrapper sandbox (sudo opencode -g docker|ddev). opencode itself
-            // must never run them directly, so these override any ask rule
-            // above (last matching rule wins).
-            "docker": "deny",
+            // must never run them directly. "docker *" also covers
+            // "docker compose ..." and the bare "docker" command; the
+            // hyphenated "docker-compose *" is a separate binary.
             "docker *": "deny",
             "docker-compose *": "deny",
-            "docker compose *": "deny",
             "sudo docker *": "deny",
             "sudo docker-compose *": "deny",
-            "sudo docker compose *": "deny",
-            "ddev": "deny",
             "ddev *": "deny",
             "sudo ddev *": "deny"
         },

@@ -34,11 +34,12 @@ Any access decision has two layers, and confusing them causes bugs:
 | **Policy (soft)** | May the *agent* invoke the command at all? | `permission.bash` in `opencode.jsonc` (global + project) | Yes — project config overrides global |
 | **Capability (hard)** | Does the OS let the `opencode` user actually run it? | group membership, sudoers, socket ACLs | **No** — the docker socket is system-wide |
 
-**Decision (2026-08-11):** the global template will default docker/ddev to
-**`deny`**. Currently it contains `"bash": { "*": "allow", ... }`, so a command
-like `docker ps` only matches the catch-all and is policy-allowed. After the
-change, projects must explicitly opt in with an allow rule in their own
-`opencode.jsonc` — the hard layer (no docker group) stays the second gate.
+**Decision (2026-08-11):** the global template denies docker/ddev outright —
+`"docker *"`, `"docker-compose *"`, `"ddev *"` (and their `sudo` forms) are hard
+`deny` rules. On top of that, bash is ask-by-default (`"*": "ask"`), so every
+other command prompts instead of being silently allowed. Projects must
+explicitly opt in with an allow rule in their own `opencode.jsonc` — the hard
+layer (no docker group) stays the second gate.
 
 Note: because the global deny and the project allow use the **same pattern key**
 (`"docker *"`), the deep-merge replaces the value instead of ordering two
@@ -54,13 +55,13 @@ project `"docker*"`) hit the fragile ordering.
   (`propertyOrder: "original"` — key order is preserved).
 - A command is matched against **every** rule; the **last matching rule wins**
   (`findLast`).
-- Hence the kit's convention: broad rules first (`"*": "allow"`), specific
-  rules later.
+- Hence the kit's convention: broad rules first, **deny rules last** — a later
+  deny overrides any broader allow above it and the ask-default `"*": "ask"`.
 
-Example for `docker ps` with the current global template:
-`"*": "allow"` matches → action `allow`. The `ddev ...` rules only match
-specific subcommands (`DROP DATABASE`, `delete`, `import-db`, ...), not a
-plain `ddev start`.
+Example for `docker ps` with the current global template: the last matching
+rule is `"docker *": "deny"` → hard denied. The old catch-all `"*": "allow"`
+is gone; bash now defaults to `"*": "ask"`, so the `ddev ...` rules are
+redundant anyway (ddev is denied wholesale below).
 
 ### 3.2 Across config sources (fragile — the "merge" trap)
 
