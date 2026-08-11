@@ -1,5 +1,8 @@
 #!/bin/sh
 # Hook: post-merge
-# Git runs hooks from the worktree root; pass it as --cwd so the project-level
-# opencode.jsonc denies/allows are applied for the merged project.
-/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force --cwd "$(pwd)"
+# The project-level opencode.jsonc that governs is the one where opencode was
+# LAUNCHED, not the git worktree root (which may be a nested repo). The wrapper
+# stamps OPENCODE_LAUNCH_CWD into the environment of git; when git runs outside
+# opencode, fall back to the worktree root (no opencode session governs then).
+CWD="${OPENCODE_LAUNCH_CWD:-$(pwd)}"
+/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force --cwd "$CWD"

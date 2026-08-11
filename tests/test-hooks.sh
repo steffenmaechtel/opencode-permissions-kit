@@ -1,6 +1,7 @@
 #!/bin/sh
-# Regression test: git hooks must pass --cwd "$(pwd)" so the project-level
-# opencode.jsonc denies/allows are applied for the worktree on git operations.
+# Regression test: git hooks must prefer OPENCODE_LAUNCH_CWD (the directory
+# opencode was started in, stamped by the wrapper) and fall back to "$(pwd)"
+# (the git worktree root) when git runs outside opencode.
 set -e
 
 RED='\033[0;31m'
@@ -35,7 +36,8 @@ for hook in post-checkout post-merge post-commit; do
     check "$hook exists and is executable"  [ -x "$f" ]
     check "$hook calls protect-projects.sh" grep -q 'protect-projects.sh' "$f"
     check "$hook passes --force"            grep -q -- '--force' "$f"
-    check "$hook passes --cwd \$(pwd)"      grep -q -- '--cwd "$(pwd)"' "$f"
+    check "$hook reads OPENCODE_LAUNCH_CWD" grep -Fq '${OPENCODE_LAUNCH_CWD:-$(pwd)}' "$f"
+    check "$hook passes --cwd \$CWD"        grep -Fq -- '--cwd "$CWD"' "$f"
 done
 
 echo ""

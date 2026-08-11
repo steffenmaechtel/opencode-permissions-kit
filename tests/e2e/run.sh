@@ -289,6 +289,32 @@ check "other project files still protected" \
     E '! sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 
 echo ""
+echo "--- 7c. Hook prefers OPENCODE_LAUNCH_CWD over the git worktree root ---"
+# subdir (created host-side, so the host cleanup can remove the test files) has
+# its own config with an ALLOW for launch-key.pem. Its allow override only
+# applies when the hook passes the launch dir as --cwd, which it does when the
+# wrapper stamped OPENCODE_LAUNCH_CWD into the env.
+E 'sudo tee /var/www/vhosts/test-project/subdir/opencode.jsonc > /dev/null <<EOF
+{
+    "permission": {
+        "read": { "launch-key.pem": "allow" },
+        "edit": { "launch-key.pem": "allow" }
+    }
+}
+EOF'
+E 'sudo touch /var/www/vhosts/test-project/subdir/launch-key.pem'
+# Without the env var the hook falls back to the worktree root: allow NOT applied.
+E 'cd /var/www/vhosts/test-project && sudo /usr/local/lib/opencode/hooks/post-commit' && \
+    echo "  ${GREEN}OK${NC}  fallback run (no OPENCODE_LAUNCH_CWD) completed"
+check_fail "fallback keeps launch-dir allow inactive" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/subdir/launch-key.pem'
+# With the env var the hook uses the launch dir: allow applied.
+E 'cd /var/www/vhosts/test-project && sudo OPENCODE_LAUNCH_CWD=/var/www/vhosts/test-project/subdir /usr/local/lib/opencode/hooks/post-commit' && \
+    echo "  ${GREEN}OK${NC}  launch-cwd run completed"
+check "OPENCODE_LAUNCH_CWD activated launch-dir allow" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/subdir/launch-key.pem'
+
+echo ""
 echo "--- 8. Umask ---"
 check "umask script deployed" \
     E 'test -f /etc/profile.d/opencode-umask.sh'
@@ -465,6 +491,8 @@ E 'cd /tmp && /usr/local/bin/opencode 2>&1 | tee /tmp/wrapper-invalid.txt; test 
     echo "  ${GREEN}OK${NC}  wrapper refused from invalid CWD"
 check "wrapper: ERROR banner from invalid CWD" \
     E 'grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-invalid.txt'
+check "wrapper stamps OPENCODE_LAUNCH_CWD" \
+    E 'grep -q OPENCODE_LAUNCH_CWD /usr/local/lib/opencode/wrapper'
 
 echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"

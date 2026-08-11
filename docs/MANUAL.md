@@ -209,7 +209,7 @@ Global git hooks re-apply ACL denies automatically after:
 - `git merge`
 - `git commit`
 
-The hooks run `protect-projects.sh --force --cwd "$(pwd)"` from the worktree root, so the project-level `opencode.jsonc` of the repository you are working in is applied too — not just the global denies.
+The hooks run `protect-projects.sh --force --cwd <dir>`, so the project-level `opencode.jsonc` is applied too — not just the global denies. The `--cwd` is the directory **where opencode was launched**, not the git worktree root: the wrapper stamps it into opencode's environment as `OPENCODE_LAUNCH_CWD` (preserved through `sudo -u opencode` via `Defaults env_keep` in the kit's sudoers), which propagates through opencode's shells to git and its hooks. This matters when the git repository lives in a subfolder of the project that opencode was started in. If git runs outside opencode (e.g. in your own terminal), the variable is absent and the hook falls back to the worktree root.
 
 No per-repo setup required — `core.hooksPath` is set globally for both users.
 

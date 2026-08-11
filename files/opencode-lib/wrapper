@@ -80,4 +80,11 @@ read _
 
 /usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --cwd "$CWD"
 
+# Stamp the launch CWD into the opencode process environment. sudo resets the
+# env (and refuses `sudo VAR=value cmd` under the kit's restricted rule), so the
+# var is exported and preserved via `Defaults env_keep` in the kit's sudoers.
+# opencode's shells and any git they spawn inherit it, so git hooks can apply
+# the project opencode.jsonc of the directory opencode was started in — not the
+# git worktree root (which may be a nested repo).
+export OPENCODE_LAUNCH_CWD="$CWD"
 exec /usr/bin/sudo -u opencode /usr/local/lib/opencode/bin/opencode "$@"
