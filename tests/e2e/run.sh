@@ -67,7 +67,8 @@ mkdir -p "$OC_CACHE_DIR"
 # the endpoint is unreachable, fall back to the newest cached version so repeat
 # runs work offline.
 OC_VERSION=""
-OC_VERSION=$(curl -fsSL --max-time 10 https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
+OC_VERSION=$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+    https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
     | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
 if [ -z "$OC_VERSION" ]; then
     OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
@@ -102,7 +103,10 @@ OC_BIN="$OC_CACHE_DIR/opencode-$OC_VERSION/opencode"
 if [ ! -x "$OC_BIN" ]; then
     echo "  Downloading opencode $OC_VERSION ($filename) into cache..."
     mkdir -p "$(dirname "$OC_BIN")"
-    curl -fsSL --max-time 120 "https://github.com/anomalyco/opencode/releases/download/v$OC_VERSION/$filename" \
+    # Retry: GitHub's release-asset CDN occasionally returns transient 503/502
+    # (outage or rate-limit), which must not fail the whole e2e suite.
+    curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
+        "https://github.com/anomalyco/opencode/releases/download/v$OC_VERSION/$filename" \
         -o "$OC_CACHE_DIR/opencode.tar.gz" \
         || { echo "  ${RED}FAIL${NC}  opencode $OC_VERSION download failed"; exit 1; }
     tar -xzf "$OC_CACHE_DIR/opencode.tar.gz" -C "$(dirname "$OC_BIN")" \
@@ -122,7 +126,8 @@ OLD_BIN="$OC_CACHE_DIR/opencode-$OLD_VERSION/opencode"
 if [ ! -x "$OLD_BIN" ]; then
     echo "  Downloading opencode $OLD_VERSION ($filename) into cache..."
     mkdir -p "$(dirname "$OLD_BIN")"
-    curl -fsSL --max-time 120 "https://github.com/anomalyco/opencode/releases/download/v$OLD_VERSION/$filename" \
+    curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
+        "https://github.com/anomalyco/opencode/releases/download/v$OLD_VERSION/$filename" \
         -o "$OC_CACHE_DIR/opencode-old.tar.gz" \
         || { echo "  ${RED}FAIL${NC}  opencode $OLD_VERSION download failed"; exit 1; }
     tar -xzf "$OC_CACHE_DIR/opencode-old.tar.gz" -C "$(dirname "$OLD_BIN")" \
@@ -137,7 +142,8 @@ echo "  Using opencode $OLD_VERSION for the upgrade test (cache: $OLD_BIN)"
 
 # Cache the installer script too, so the container needs no network for it.
 if [ ! -f "$OC_CACHE_DIR/install.sh" ]; then
-    curl -fsSL --max-time 30 https://opencode.ai/install -o "$OC_CACHE_DIR/install.sh" \
+    curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 60 \
+        https://opencode.ai/install -o "$OC_CACHE_DIR/install.sh" \
         || { echo "  ${RED}FAIL${NC}  cannot fetch opencode installer"; exit 1; }
 fi
 
