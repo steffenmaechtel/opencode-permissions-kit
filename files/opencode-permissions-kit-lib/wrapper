@@ -69,6 +69,21 @@ echo "  ${GREEN}SECURED BY opencode permissions kit ($VERSION)${NC}"
 echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
 echo ""
 
+# Self-check: a self-installed opencode binary (official installer re-run or
+# PATH re-add) would shadow the wrapper in new shells, and tools may call the
+# absolute path of the real binary. Warn (but keep running) when one is present.
+SHADOW="$HOME/.opencode/bin/opencode"
+if [ -e "$SHADOW" ] && { [ ! -L "$SHADOW" ] || [ "$(readlink -f "$SHADOW" 2>/dev/null || echo "$SHADOW")" != "/usr/local/lib/opencode-permissions-kit/wrapper" ]; }; then
+    echo "  ${YELLOW}WARNING: self-installed opencode detected at $SHADOW${NC}"
+    echo "  ${YELLOW}New shells would run it instead of this wrapper. Fix: rm -rf $SHADOW${NC}"
+    echo ""
+fi
+RESOLVED=$(command -v opencode 2>/dev/null || true)
+if [ -n "$RESOLVED" ] && [ "$RESOLVED" != "/usr/local/bin/opencode" ]; then
+    echo "  ${YELLOW}WARNING: 'opencode' on this PATH resolves to $RESOLVED, not the kit wrapper.${NC}"
+    echo ""
+fi
+
 # Parse -g/--gid: the kit's escalation channel for container groups.
 CONTAINER_GROUP=""
 CONTAINER_AUTO=false

@@ -33,7 +33,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/bin/ddev \
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/bin/ddev \
              opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -338,6 +338,13 @@ echo ""
 echo "--- opencode installation ---"
 
 SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
+# The binary must be executable only for root and the opencode user, so a tool
+# invoking the absolute path as the default user cannot bypass the wrapper.
+BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
+secure_binary() {
+    sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
+    sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null || true
+}
 opencode_found=false
 
 for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
@@ -347,7 +354,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
             y)
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 sudo cp "$loc" "$SYSTEM_BIN"
-                sudo chmod 755 "$SYSTEM_BIN"
+                secure_binary
                 opencode_found=true
                 echo "Copied to $SYSTEM_BIN."
                 log "binary copied: $loc -> $SYSTEM_BIN"
@@ -357,7 +364,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
                 cp "$loc" "$BACKUP_DIR/opencode-binary" 2>/dev/null || true
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 sudo cp "$loc" "$SYSTEM_BIN"
-                sudo chmod 755 "$SYSTEM_BIN"
+                secure_binary
                 opencode_found=true
                 echo "Backup saved. Copied to $SYSTEM_BIN."
                 log "binary copied: $loc -> $SYSTEM_BIN (backup saved)"
@@ -377,13 +384,13 @@ if [ "$opencode_found" = false ]; then
         if [ -x "/root/.opencode/bin/opencode" ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
-            sudo chmod 755 "$SYSTEM_BIN"
+            secure_binary
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /root/.opencode/bin/opencode -> $SYSTEM_BIN"
         elif [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/home/$DEFAULT_USER/.opencode/bin/opencode" "$SYSTEM_BIN"
-            sudo chmod 755 "$SYSTEM_BIN"
+            secure_binary
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /home/$DEFAULT_USER/.opencode/bin/opencode -> $SYSTEM_BIN"
         else
@@ -399,13 +406,19 @@ fi
 for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
     if [ -f "$cf" ]; then
         sudo sed -i '\|\.opencode/bin|d' "$cf" 2>/dev/null || true
-        if ! sudo grep -q '# opencode permissions kit' "$cf" 2>/dev/null; then
+        if ! sudo grep -q 'export PATH="/usr/local/bin:$PATH"' "$cf" 2>/dev/null; then
             echo "" | sudo tee -a "$cf" > /dev/null
             echo 'export PATH="/usr/local/bin:$PATH"  # opencode permissions kit' | sudo tee -a "$cf" > /dev/null
         fi
+        # Interactive-shell bypass warning: sources shell-warn.sh so a
+        # self-installed opencode binary is reported in non-login shells too.
+        # The [ -f ... ] guard keeps the line harmless after uninstall.
+        if ! sudo grep -q 'opencode-permissions-kit/shell-warn.sh' "$cf" 2>/dev/null; then
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
+        fi
     fi
 done
-log "shell PATH config cleaned/updated for $DEFAULT_USER"
+log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning hooked)"
 
 # === Step 5: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
@@ -418,6 +431,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/w
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
@@ -431,7 +445,7 @@ sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo mkdir -p "$LIBDIR/bin"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev"            "$LIBDIR/bin/ddev"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/log.sh" \
+               "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit" \
                "$LIBDIR/bin/ddev"

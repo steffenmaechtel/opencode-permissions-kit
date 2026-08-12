@@ -231,7 +231,13 @@ echo "--- 3. Wrapper & binary ---"
 check "Wrapper at /usr/local/bin/opencode" \
     E 'test -x /usr/local/bin/opencode'
 check "Binary at /usr/local/lib/opencode-permissions-kit/bin/opencode" \
-    E 'test -x /usr/local/lib/opencode-permissions-kit/bin/opencode'
+    E 'sudo test -x /usr/local/lib/opencode-permissions-kit/bin/opencode'
+check "Binary owned root:opencode (not world-executable)" \
+    E 'test "$(stat -c %U:%G:%a /usr/local/lib/opencode-permissions-kit/bin/opencode)" = "root:opencode:750"'
+check_fail "Default user cannot execute the binary by absolute path" \
+    E '/usr/local/lib/opencode-permissions-kit/bin/opencode --version'
+check "opencode sandbox user can execute the binary" \
+    E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version'
 check "Wrapper is first in PATH" \
     E 'test "$(which opencode)" = "/usr/local/bin/opencode"'
 check "Uninstall script deployed" \
@@ -304,6 +310,27 @@ check "deny-all config owned by dev" \
     E 'test "$(stat -c %U /home/dev/.config/opencode/opencode.jsonc)" = "dev"'
 check "deny-all config denies everything" \
     E 'grep -q '\''"\*"'\'' /home/dev/.config/opencode/opencode.jsonc'
+
+echo ""
+echo "--- 6c. Wrapper bypass guard (self-install + absolute path) ---"
+check "shell-warn.sh deployed to library" \
+    E 'test -f /usr/local/lib/opencode-permissions-kit/shell-warn.sh'
+check "shell-warn.sh sourced by umask profile" \
+    E 'grep -q shell-warn.sh /etc/profile.d/opencode-permissions-kit-umask.sh'
+check "interactive-shell warning hooked into .bashrc" \
+    E 'grep -q "opencode-permissions-kit/shell-warn.sh" /home/dev/.bashrc'
+# Simulate a self-reinstall: the official installer drops a real binary into
+# ~/.opencode/bin. The guard must report it.
+E 'sudo mkdir -p /home/dev/.opencode/bin && sudo cp /usr/local/lib/opencode-permissions-kit/bin/opencode /home/dev/.opencode/bin/opencode'
+E 'sudo chmod 755 /home/dev/.opencode/bin/opencode && sudo chown dev:dev /home/dev/.opencode/bin/opencode'
+check "shell-warn.sh warns about shadow binary" \
+    E 'sh -c '\''HOME=/home/dev . /usr/local/lib/opencode-permissions-kit/shell-warn.sh'\'' 2>&1 | grep -q "wrapper bypass"'
+check "wrapper start warns about shadow binary" \
+    E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode --help 2>&1 | grep -q "self-installed opencode detected"'
+# Cleaning the shadow directory restores the quiet state.
+E 'rm -rf /home/dev/.opencode'
+check "shell-warn.sh quiet after cleanup" \
+    E 'test -z "$(sh -c '\''HOME=/home/dev . /usr/local/lib/opencode-permissions-kit/shell-warn.sh'\'' 2>&1)"'
 
 echo ""
 echo "--- 7. Git hooks ---"
@@ -504,8 +531,8 @@ check "upgrade: system binary is latest ($OC_VERSION)" \
 check "upgrade: version actually changed" \
     E 'test "'"$OLD_VERSION"'" != "'"$OC_VERSION"'"'
 check "wrapper still present after binary upgrade" E 'test -x /usr/local/bin/opencode'
-check "binary still root-owned" \
-    E 'test "$(stat -c %U:%G /usr/local/lib/opencode-permissions-kit/bin/opencode)" = "root:root"'
+check "binary still root:opencode after binary upgrade" \
+    E 'test "$(stat -c %U:%G /usr/local/lib/opencode-permissions-kit/bin/opencode)" = "root:opencode"'
 check "kit scripts still deployed after binary upgrade" E 'test -x /usr/local/lib/opencode-permissions-kit/update.sh'
 check_fail ".env still blocked after binary upgrade" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
@@ -533,7 +560,7 @@ check "migration: projects.conf content preserved" \
     E 'test "$(cat /etc/opencode-permissions-kit/projects.conf)" = "$(cat /tmp/projects.conf.before)"'
 check "migration: old /etc/opencode removed"      E '! test -e /etc/opencode'
 check "migration: old lib removed"                E '! test -e /usr/local/lib/opencode'
-check "migration: binary moved to new path"       E 'test -x /usr/local/lib/opencode-permissions-kit/bin/opencode'
+check "migration: binary moved to new path"       E 'sudo test -x /usr/local/lib/opencode-permissions-kit/bin/opencode'
 check "migration: binary still runs" \
     E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version)" = "'"$OC_VERSION"'"'
 check "migration: wrapper -> new lib" \

@@ -56,7 +56,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/bin/ddev \
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/bin/ddev \
              opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -204,6 +204,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/w
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
@@ -216,7 +217,7 @@ sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo mkdir -p "$LIBDIR/bin"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev"            "$LIBDIR/bin/ddev"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/log.sh" \
+               "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit" \
                "$LIBDIR/bin/ddev"
@@ -229,7 +230,8 @@ log "library re-deployed: $LIBDIR"
 if [ -d /usr/local/lib/opencode ] && [ ! -x "$LIBDIR/bin/opencode" ] && [ -x /usr/local/lib/opencode/bin/opencode ]; then
     sudo mkdir -p "$LIBDIR/bin"
     sudo mv /usr/local/lib/opencode/bin/opencode "$LIBDIR/bin/opencode"
-    sudo chmod 755 "$LIBDIR/bin/opencode"
+    sudo chown "root:$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")" "$LIBDIR/bin/opencode" 2>/dev/null || true
+    sudo chmod 750 "$LIBDIR/bin/opencode"
     echo "Migrated opencode binary -> $LIBDIR/bin/opencode"
     log "migrated opencode binary: /usr/local/lib/opencode/bin/opencode -> $LIBDIR/bin/opencode"
 fi
@@ -294,6 +296,22 @@ if [ -f "$SCRIPT_DIR/umask.sh" ]; then
     log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 fi
 
+# --- ensure shell-startup wrapper-bypass warning -------------------------------
+# Older installs lack the interactive-shell hook. Append it idempotently so a
+# self-installed opencode binary is reported in non-login shells too. The
+# [ -f ... ] guard keeps the line harmless after uninstall. Never removes user
+# lines — the warning tells the user how to clean up a real reinstall.
+if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
+    for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
+        [ -f "$cf" ] || continue
+        if ! sudo grep -q 'opencode-permissions-kit/shell-warn.sh' "$cf" 2>/dev/null; then
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
+            echo "Wrapper-bypass warning hooked into $cf"
+            log "shell-startup warning hook appended: $cf"
+        fi
+    done
+fi
+
 # --- re-apply git hooks path (in case user wiped it) ------------------------
 
 sudo -u "$OPENCODE_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
@@ -303,6 +321,15 @@ echo "core.hooksPath confirmed ($LIBDIR/hooks)."
 # --- opencode binary upgrade (--binary / --binary-path) ----------------------
 
 SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
+
+# --- re-assert opencode binary permissions ------------------------------------
+# The binary must stay executable only for root and the opencode user, so a
+# tool invoking the absolute path as the default user cannot bypass the wrapper.
+BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
+if [ -x "$SYSTEM_BIN" ]; then
+    sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
+    sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null || true
+fi
 
 # Detect the release asset name for this host (mirrors the official installer).
 detect_asset() {
@@ -336,7 +363,8 @@ install_binary() {
     fi
     current=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     sudo cp "$src" "$SYSTEM_BIN" || return 1
-    sudo chmod 755 "$SYSTEM_BIN" || return 1
+    sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
+    sudo chmod 750 "$SYSTEM_BIN" || return 1
     new=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     echo "  opencode binary upgraded: ${current} -> ${new}"
     log "opencode binary upgraded: ${current} -> ${new}"

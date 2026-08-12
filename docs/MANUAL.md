@@ -225,6 +225,27 @@ It denies **everything** (`read`, `edit`, `bash`, …), so even if the real bina
 - `update.sh` only installs the lockout config when no config exists yet — it never clobbers an existing one (re-run `install.sh` to get the backup prompt).
 - To use opencode normally as your own user, delete or rename that config — the wrapper path is unaffected.
 
+### Wrapper-Bypass Guard (detect a bypass, warn loudly)
+
+The deny-all config above protects the data, but silently. The kit therefore adds three layers that make a bypass **visible** and harden the only remaining vectors:
+
+1. **Binary exec restricted to root + the sandbox user.** The real binary at `/usr/local/lib/opencode-permissions-kit/bin/opencode` is owned `root:opencode` with mode `750`. Only `root` and the `opencode` sandbox user can execute it, so **a tool calling the absolute path as your user fails with "permission denied"** — it cannot start the real binary behind the wrapper's back. The wrapper is unaffected (`sudo -u opencode …` runs it as the sandbox user).
+2. **Shell-start warning.** `install.sh` hooks the kit's `shell-warn.sh` into `~/.bashrc`, `~/.zshrc` and `~/.profile` (as a `[ -f … ] && source` line, harmless after uninstall), and `/etc/profile.d/opencode-permissions-kit-umask.sh` sources it for login shells. Whenever a real `~/.opencode/bin/opencode` exists (e.g. after the official installer re-run) — or `command -v opencode` resolves to anything but the kit wrapper — every new shell prints a loud warning with the fix. `update.sh` appends the same hook to existing installs (idempotent).
+3. **Wrapper self-check.** Every wrapper start re-checks both conditions and prints the same warning. This fires even when a reinstall happened but `PATH` still resolves to the wrapper (e.g. you are in a shell that started before the reinstall).
+
+The warning text:
+
+```
+  *** WARNING: opencode permissions kit — wrapper bypass ***
+  'opencode' resolves to /home/<user>/.opencode/bin/opencode — not the kit wrapper.
+  The real binary runs WITHOUT the kit's ACL protection and sandbox user.
+  Fix:
+      rm -rf ~/.opencode/bin
+      sudo bash /usr/local/lib/opencode-permissions-kit/update.sh
+```
+
+The kit never auto-deletes the shadow binary — it warns and lets you decide. (`install.sh` still removes stray `.opencode/bin` lines from your shell rc files; a re-install after that re-adds them, which is exactly what the warning catches.)
+
 ### Project-Specific Config
 
 Each project can have its own `opencode.jsonc` (or `opencode.json`) in its root directory. Project configs **extend** the global config — they add denies cumulatively, never weaken existing rules.
@@ -441,17 +462,20 @@ Or run the deployed copy directly:
 sudo bash /usr/local/lib/opencode-permissions-kit/update.sh
 ```
 
-`update.sh` fetches the matching branch files (wrapper, hooks, `protect-projects.sh`, `jsonc-parser.py`, `sudoers` template, `umask` profile, `config.sh`, `uninstall.sh`, `status.sh`) and refreshes the `install.conf` version stamp. It does **not** touch:
+`update.sh` fetches the matching branch files (wrapper, hooks, `protect-projects.sh`, `jsonc-parser.py`, `sudoers` template, `umask` profile, `shell-warn.sh`, `config.sh`, `uninstall.sh`, `status.sh`) and refreshes the `install.conf` version stamp. It does **not** touch:
 
 - `/etc/opencode-permissions-kit/projects.conf`
 - `/etc/opencode-permissions-kit/install.conf` (except the `VERSION=` line)
 - `/home/opencode/.config/opencode/opencode.jsonc`
 - any ACLs or filesystem metadata
 
+One exception: it **appends** the wrapper-bypass warning hook (a `[ -f … ] && source` line) to your `~/.bashrc`/`~/.zshrc`/`~/.profile` if missing, so existing installs get the [wrapper-bypass warning](#wrapper-bypass-guard-detect-a-bypass-warn-loudly) too. It never removes your lines — the hook is idempotent and harmless after uninstall.
+
 ### Upgrading the opencode binary
 
 `opencode upgrade` and opencode's auto-updater **cannot** work behind the
-wrapper: the binary at `/usr/local/lib/opencode-permissions-kit/bin/opencode` is root-owned and
+wrapper: the binary at `/usr/local/lib/opencode-permissions-kit/bin/opencode` is root-owned
+(executable only for `root` and the `opencode` sandbox user) and
 opencode runs as the unprivileged `opencode` user, so a self-update would fail
 (or land in a location the wrapper never uses). That is why `autoupdate: false`
 is set in the kit config and `update.sh` is the upgrade entry point.
@@ -535,6 +559,7 @@ Grouped by base directory, paths within each group sorted alphabetically.
 | `/usr/local/lib/opencode-permissions-kit/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |
 | `/usr/local/lib/opencode-permissions-kit/log.sh` | Shared audit-log helper (sourced by the scripts above) |
 | `/usr/local/lib/opencode-permissions-kit/protect-projects.sh` | Applies ACL denies to sensitive files |
+| `/usr/local/lib/opencode-permissions-kit/shell-warn.sh` | Wrapper-bypass warning for shell startup (sourced by profile.d + rc files, see "Wrapper-Bypass Guard") |
 | `/usr/local/lib/opencode-permissions-kit/status.sh` | Show protection status (works even before install) |
 | `/usr/local/lib/opencode-permissions-kit/uninstall.sh` | Uninstall script |
 | `/usr/local/lib/opencode-permissions-kit/update.sh` | Re-deploy the kit after an update, no prompts (`--binary`/`--binary-path` also upgrade opencode) |
