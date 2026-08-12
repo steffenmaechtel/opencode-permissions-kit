@@ -26,7 +26,7 @@ jobs:
         run: |
           echo "OLD_VERSION=$(sed -n 's/^OLD_VERSION="\([0-9.]*\)".*/\1/p' tests/e2e/run.sh | head -1)" >> "$GITHUB_OUTPUT"
       - name: Cache opencode binaries + installer (per version)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: tests/e2e/cache
           # Exact key for the (OLD, latest) combo. When the latest opencode
