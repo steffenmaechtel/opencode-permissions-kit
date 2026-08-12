@@ -43,6 +43,17 @@ NC='\033[0m'
 KIT_BRANCH="${KIT_BRANCH:-master}"
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
+# Canonical kit file list. Single source of truth shared by fetch_kit() and
+# the pre-deploy verification (ensure_local_file), so the two can never drift
+# and a stale installed update.sh fetching an incomplete temp dir is healed
+# before the deploy cp's run.
+KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
+opencode-deny-all.jsonc \
+sudoers.template umask.sh VERSION \
+opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
+opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/bin/ddev \
+opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit"
+
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
 # is streamed via `curl | sudo bash` or run from the installed library
@@ -52,12 +63,7 @@ fetch_kit() {
     base="$(mktemp -d)"
     dir="$base/files"
     mkdir -p "$dir/opencode-permissions-kit-lib/hooks" "$dir/opencode-permissions-kit-lib/bin"
-    for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
-             opencode-deny-all.jsonc \
-             sudoers.template umask.sh VERSION \
-             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/bin/ddev \
-             opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit; do
+    for f in $KIT_FILES; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -66,6 +72,20 @@ fetch_kit() {
         fi
     done
     echo "$dir"
+}
+
+# Re-fetch any single kit file that is missing under $SCRIPT_DIR (best-effort).
+# Handles the transition case where an OLDER installed update.sh performed the
+# initial fetch with a smaller file list (e.g. shell-warn.sh was added later),
+# then re-exec'd this freshly fetched copy — the temp dir is incomplete but
+# $SCRIPT_DIR/../VERSION exists, so the VERSION guard above does not re-fetch.
+# For a real local checkout every file is present and this is a no-op.
+ensure_local_file() {
+    local f="$1"
+    [ -f "$SCRIPT_DIR/$f" ] && return 0
+    mkdir -p "$(dirname "$SCRIPT_DIR/$f")"
+    echo "  re-fetching missing $f ..." >&2
+    curl -fsSL "$KIT_BASE_URL/files/$f" -o "$SCRIPT_DIR/$f" 2>/dev/null || true
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -80,6 +100,12 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     # copy instead — its own overwrite of $LIBDIR/update.sh is then harmless.
     exec bash "$SCRIPT_DIR/update.sh" "$@"
 fi
+# Heal an incomplete fetched temp dir (see ensure_local_file above) before we
+# touch any of the files. No-op for a real local checkout.
+for f in $KIT_FILES; do
+    [ "$f" = "VERSION" ] && continue
+    ensure_local_file "$f"
+done
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
