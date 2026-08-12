@@ -10,7 +10,7 @@ jobs:
       - name: Check version consistency
         run: make check-version
       - name: Make scripts executable
-        run: chmod +x ./tests/test-wrapper-validation.sh ./tests/test-project-config.sh ./tests/test-hooks.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-ddev-shim.sh ./files/opencode-lib/hooks/post-checkout ./files/opencode-lib/hooks/post-merge ./files/opencode-lib/hooks/post-commit ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh ./files/opencode-lib/protect-projects.sh ./files/opencode-lib/wrapper ./files/opencode-lib/log.sh ./files/opencode-lib/bin/ddev
+        run: chmod +x ./tests/test-wrapper-validation.sh ./tests/test-project-config.sh ./tests/test-hooks.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-ddev-shim.sh ./files/opencode-permissions-kit-lib/hooks/post-checkout ./files/opencode-permissions-kit-lib/hooks/post-merge ./files/opencode-permissions-kit-lib/hooks/post-commit ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh ./files/opencode-permissions-kit-lib/protect-projects.sh ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/bin/ddev
       - name: Run wrapper validation tests
         run: ./tests/test-wrapper-validation.sh
       - name: Run project config tests

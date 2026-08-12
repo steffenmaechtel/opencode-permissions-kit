@@ -9,7 +9,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(dirname "$0")"
-HOOKS_DIR="$SCRIPT_DIR/../files/opencode-lib/hooks"
+HOOKS_DIR="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/hooks"
 
 failures=0
 passed=0

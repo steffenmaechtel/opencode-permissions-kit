@@ -2,7 +2,7 @@
 # opencode permissions kit -- status.sh
 # Prints the current protection status. Works whether or not the kit is
 # installed, and does not require root. Run directly:
-#   /usr/local/lib/opencode/status.sh
+#   /usr/local/lib/opencode-permissions-kit/status.sh
 # or from a checkout:
 #   files/status.sh
 set -u
@@ -13,9 +13,13 @@ YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-LIBDIR="/usr/local/lib/opencode"
-INSTALL_CONF="/etc/opencode/install.conf"
+LIBDIR="/usr/local/lib/opencode-permissions-kit"
+INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
 [ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
+PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
+[ -f "$PROJECTS_CONF" ] || PROJECTS_CONF="/etc/opencode/projects.conf"
 
 VERSION="0.0.0"
 DEFAULT_USER=""
@@ -54,12 +58,12 @@ echo "  Config:     $(ls /home/$OPENCODE_USER/.config/opencode/opencode.jsonc 2>
 echo "  Default user: $DEFAULT_USER  group: $WWW_GROUP"
 
 echo ""
-echo "  ${CYAN}Project roots ($(grep -c . /etc/opencode/projects.conf 2>/dev/null || echo 0)):${NC}"
-if [ -f /etc/opencode/projects.conf ] && [ -s /etc/opencode/projects.conf ]; then
+echo "  ${CYAN}Project roots ($(grep -c . "$PROJECTS_CONF" 2>/dev/null || echo 0)):${NC}"
+if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         echo "    - $root"
-    done < /etc/opencode/projects.conf
+    done < "$PROJECTS_CONF"
 else
     echo "    (none)"
 fi

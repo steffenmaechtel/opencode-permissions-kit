@@ -2,8 +2,8 @@
 # Unit tests for the ddev delegation shim.
 #
 # Two layers are checked:
-#   (1) Static structure of files/opencode-lib/bin/ddev — the shim must read
-#       DEFAULT_USER + DDEV_BIN from /etc/opencode/install.conf, gate on the
+#   (1) Static structure of files/opencode-permissions-kit-lib/bin/ddev — the shim must read
+#       DEFAULT_USER + DDEV_BIN from /etc/opencode-permissions-kit/install.conf, gate on the
 #       opencode sandbox user, delegate via `sudo -u <DEFAULT_USER>`, and
 #       pass through to the real ddev otherwise.
 #   (2) Installation wiring — install.sh, update.sh, uninstall.sh, sudoers
@@ -18,7 +18,7 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/.."
-SHIM="$REPO/files/opencode-lib/bin/ddev"
+SHIM="$REPO/files/opencode-permissions-kit-lib/bin/ddev"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/update.sh"
 UNINSTALL="$REPO/files/uninstall.sh"
@@ -51,9 +51,13 @@ echo "-- shim file structure --"
 check "shim exists"                [ -f "$SHIM" ]
 check "shim has shebang"           sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SHIM"
 check "shim reads DEFAULT_USER from install.conf" \
-    grep -Fq 'DEFAULT_USER=$(sed -n '"'"'s/^DEFAULT_USER=//p'"'"' /etc/opencode/install.conf)' "$SHIM"
+    grep -Fq 'DEFAULT_USER=$(sed -n '"'"'s/^DEFAULT_USER=//p'"'"' "$_conf")' "$SHIM"
 check "shim reads DDEV_BIN from install.conf" \
-    grep -Fq 'DDEV_BIN=$(sed -n '"'"'s/^DDEV_BIN=//p'"'"' /etc/opencode/install.conf)' "$SHIM"
+    grep -Fq 'DDEV_BIN=$(sed -n '"'"'s/^DDEV_BIN=//p'"'"' "$_conf")' "$SHIM"
+check "shim prefers new install.conf path" \
+    grep -Fq '/etc/opencode-permissions-kit/install.conf' "$SHIM"
+check "shim falls back to legacy install.conf path" \
+    grep -Fq '/etc/opencode/install.conf' "$SHIM"
 check "shim defaults DDEV_BIN to /usr/bin/ddev" \
     grep -Fq 'DDEV_BIN="/usr/bin/ddev"' "$SHIM"
 check "shim gates on opencode sandbox user"   grep -Fq '"$(id -un)" = "opencode"' "$SHIM"
@@ -66,9 +70,9 @@ check "shim passthrough is the final line"   tail -1 "$SHIM" | grep -Eq '^exec "
 echo ""
 echo "-- install.sh wiring --"
 check "install.sh fetches the shim" \
-    grep -Fq 'opencode-lib/bin/ddev' "$INSTALL"
-check "install.sh mkdirs opencode-lib/bin for fetch" \
-    grep -Fq '"$dir/opencode-lib/bin"' "$INSTALL"
+    grep -Fq 'opencode-permissions-kit-lib/bin/ddev' "$INSTALL"
+check "install.sh mkdirs opencode-permissions-kit-lib/bin for fetch" \
+    grep -Fq '"$dir/opencode-permissions-kit-lib/bin"' "$INSTALL"
 check "install.sh deploys the shim to LIBDIR/bin/ddev" \
     grep -Fq '"$LIBDIR/bin/ddev"' "$INSTALL"
 check "install.sh detects DDEV_BIN" \
@@ -85,7 +89,7 @@ check "install.sh renders DDEV_BIN into sudoers" \
 echo ""
 echo "-- update.sh wiring --"
 check "update.sh fetches the shim" \
-    grep -Fq 'opencode-lib/bin/ddev' "$UPDATE"
+    grep -Fq 'opencode-permissions-kit-lib/bin/ddev' "$UPDATE"
 check "update.sh deploys the shim" \
     grep -Fq '"$LIBDIR/bin/ddev"' "$UPDATE"
 check "update.sh re-links the shim" \
@@ -120,8 +124,8 @@ check "sudoers grants opencode RunAs DEFAULT_USER for DDEV_BIN" \
 
 echo ""
 echo "-- CI chmod lists --"
-check "test.yml chmods the shim"  grep -Fq './files/opencode-lib/bin/ddev' "$TEST_YML"
-check "e2e.yml chmods the shim"   grep -Fq './files/opencode-lib/bin/ddev' "$E2E_YML"
+check "test.yml chmods the shim"  grep -Fq './files/opencode-permissions-kit-lib/bin/ddev' "$TEST_YML"
+check "e2e.yml chmods the shim"   grep -Fq './files/opencode-permissions-kit-lib/bin/ddev' "$E2E_YML"
 check "test.yml runs test-ddev-shim.sh" \
     grep -Fq './tests/test-ddev-shim.sh' "$TEST_YML"
 

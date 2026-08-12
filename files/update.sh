@@ -3,15 +3,15 @@
 # Re-deploys the KIT (wrapper, hooks, protect-projects.sh, jsonc-parser,
 # sudoers template, umask profile, uninstall.sh, config.sh, status.sh, log.sh)
 # onto a system that has already been installed via install.sh. Does NOT touch:
-#   - existing /etc/opencode/projects.conf
-#   - existing /etc/opencode/install.conf (DEFAULT_USER / OPENCODE_USER)
+#   - existing /etc/opencode-permissions-kit/projects.conf
+#   - existing /etc/opencode-permissions-kit/install.conf (DEFAULT_USER / OPENCODE_USER)
 #   - existing /home/opencode/.config/opencode/opencode.json[c]
 #   - any ACLs
 #   (except: normalizes the /home/opencode ownership/mode so the default user
 #   can edit opencode.jsonc — see the "opencode home" step below)
 #   - the DEFAULT user's existing opencode config (a deny-all config is only
 #   deployed when that user has no opencode.jsonc yet)
-#   - the opencode binary at /usr/local/lib/opencode/bin/opencode — UNLESS
+#   - the opencode binary at /usr/local/lib/opencode-permissions-kit/bin/opencode — UNLESS
 #   --binary is given (fetch the latest release and install it) or
 #   --binary-path <file> (install the given binary without downloading).
 #
@@ -51,13 +51,13 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    mkdir -p "$dir/opencode-lib/hooks" "$dir/opencode-lib/bin"
+    mkdir -p "$dir/opencode-permissions-kit-lib/hooks" "$dir/opencode-permissions-kit-lib/bin"
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
-             opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
-             opencode-lib/log.sh opencode-lib/bin/ddev \
-             opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
+             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/bin/ddev \
+             opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -81,21 +81,23 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     exec bash "$SCRIPT_DIR/update.sh" "$@"
 fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
-LIBDIR="/usr/local/lib/opencode"
+LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
 # === Audit log ===
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Covers all
 # three run modes: repo checkout, streamed temp dir, installed library.
 log() { :; }
-for cand in "$SCRIPT_DIR/opencode-lib/log.sh" "$SCRIPT_DIR/log.sh" "$LIBDIR/log.sh"; do
+for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" "$SCRIPT_DIR/log.sh" "$LIBDIR/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
     fi
 done
 
-# install.conf with legacy fallback to pre-v0.0.9 setup.conf
-INSTALL_CONF="/etc/opencode/install.conf"
+# install.conf with legacy fallback (pre-0.0.10 /etc/opencode/, pre-0.0.9 setup.conf)
+INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
 [ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 
 DEFAULT_USER=""
@@ -119,7 +121,7 @@ WWW_GROUP="${WWW_GROUP:-www-data}"
 if [ -z "$DDEV_BIN" ]; then
     DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
     if [ -n "$DDEV_BIN" ] && [ -L "$DDEV_BIN" ] \
-       && readlink "$DDEV_BIN" 2>/dev/null | grep -q 'opencode-lib/bin/ddev'; then
+       && readlink "$DDEV_BIN" 2>/dev/null | grep -Eq 'lib/opencode(-permissions-kit)?/bin/ddev'; then
         DDEV_BIN="/usr/bin/ddev"
     fi
     [ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
@@ -180,7 +182,7 @@ confirm() {
 banner
 log "update started (version $VERSION, refresh=$REFRESH)"
 
-if [ ! -f "$INSTALL_CONF" ] && [ ! -f /etc/opencode/setup.conf ]; then
+if [ ! -f "$INSTALL_CONF" ]; then
     die "Not installed yet. Run install.sh first."
 fi
 
@@ -198,13 +200,13 @@ echo ""
 echo "--- Re-deploying library files ---"
 sudo mkdir -p "$LIBDIR/hooks"
 
-sudo cp "$SCRIPT_DIR/opencode-lib/wrapper"            "$LIBDIR/wrapper"
-sudo cp "$SCRIPT_DIR/opencode-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
-sudo cp "$SCRIPT_DIR/opencode-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
-sudo cp "$SCRIPT_DIR/opencode-lib/log.sh"              "$LIBDIR/log.sh"
-sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
-sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
-sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
 sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
 sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
@@ -212,7 +214,7 @@ sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 # ddev delegation shim
 sudo mkdir -p "$LIBDIR/bin"
-sudo cp "$SCRIPT_DIR/opencode-lib/bin/ddev"            "$LIBDIR/bin/ddev"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev"            "$LIBDIR/bin/ddev"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -220,6 +222,17 @@ sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-pa
                "$LIBDIR/bin/ddev"
 echo "Library files updated: $LIBDIR"
 log "library re-deployed: $LIBDIR"
+
+# --- migrate opencode binary from pre-0.0.10 layout --------------------------
+# Pre-0.0.10 installs kept the binary at /usr/local/lib/opencode/bin/opencode.
+# Move it into the new library so a normal update (no --binary) preserves it.
+if [ -d /usr/local/lib/opencode ] && [ ! -x "$LIBDIR/bin/opencode" ] && [ -x /usr/local/lib/opencode/bin/opencode ]; then
+    sudo mkdir -p "$LIBDIR/bin"
+    sudo mv /usr/local/lib/opencode/bin/opencode "$LIBDIR/bin/opencode"
+    sudo chmod 755 "$LIBDIR/bin/opencode"
+    echo "Migrated opencode binary -> $LIBDIR/bin/opencode"
+    log "migrated opencode binary: /usr/local/lib/opencode/bin/opencode -> $LIBDIR/bin/opencode"
+fi
 
 # --- re-link wrapper + protect-projects --------------------------------------
 
@@ -242,18 +255,30 @@ fi
 
 # --- re-deploy sudoers -------------------------------------------------------
 
+# Ensure the new config dir exists (fresh install or migration from pre-0.0.10).
+sudo mkdir -p /etc/opencode-permissions-kit
+# Migrate projects.conf from the pre-0.0.10 /etc/opencode/ layout if the new
+# copy is missing — update.sh must never drop registered project roots.
+if [ ! -f /etc/opencode-permissions-kit/projects.conf ] && [ -f /etc/opencode/projects.conf ]; then
+    sudo cp /etc/opencode/projects.conf /etc/opencode-permissions-kit/projects.conf
+    echo "Migrated projects.conf -> /etc/opencode-permissions-kit/"
+    log "migrated projects.conf: /etc/opencode -> /etc/opencode-permissions-kit"
+fi
+
 if [ -f "$SCRIPT_DIR/sudoers.template" ]; then
     SUDO_TMP=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
-    sudo cp "$SUDO_TMP" /etc/opencode/sudoers
-    sudo chmod 440 /etc/opencode/sudoers
+    sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
+    sudo chmod 440 /etc/opencode-permissions-kit/sudoers
     rm -f "$SUDO_TMP"
-    sudo ln -sf /etc/opencode/sudoers /etc/sudoers.d/opencode
-    if sudo /usr/sbin/visudo -c -f /etc/opencode/sudoers >/dev/null 2>&1; then
+    sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
+    # Remove the pre-0.0.10 sudoers symlink so only the new name is active.
+    sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
+    if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
         echo "sudoers updated (DEFAULT_USER=$DEFAULT_USER)."
         log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
     else
-        echo "${RED}sudoers validation failed. Check /etc/opencode/sudoers.${NC}"
+        echo "${RED}sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers.${NC}"
         exit 1
     fi
 fi
@@ -261,10 +286,12 @@ fi
 # --- re-deploy umask profile -------------------------------------------------
 
 if [ -f "$SCRIPT_DIR/umask.sh" ]; then
-    sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-umask.sh
-    sudo chmod 644 /etc/profile.d/opencode-umask.sh
+    sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
+    sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
+    # Remove the pre-0.0.10 umask profile so only the new name is loaded.
+    sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
     echo "umask profile updated."
-    log "umask profile re-deployed: /etc/profile.d/opencode-umask.sh"
+    log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 fi
 
 # --- re-apply git hooks path (in case user wiped it) ------------------------
@@ -275,7 +302,7 @@ echo "core.hooksPath confirmed ($LIBDIR/hooks)."
 
 # --- opencode binary upgrade (--binary / --binary-path) ----------------------
 
-SYSTEM_BIN="/usr/local/lib/opencode/bin/opencode"
+SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 
 # Detect the release asset name for this host (mirrors the official installer).
 detect_asset() {
@@ -403,13 +430,24 @@ NEW_INSTALL_CONF="$(mktemp)"
     echo "DDEV_BIN=$DDEV_BIN"
     echo "VERSION=$VERSION"
 } | sort -u > "$NEW_INSTALL_CONF"
-sudo cp "$NEW_INSTALL_CONF" /etc/opencode/install.conf
-sudo chmod 644 /etc/opencode/install.conf
+sudo cp "$NEW_INSTALL_CONF" /etc/opencode-permissions-kit/install.conf
+sudo chmod 644 /etc/opencode-permissions-kit/install.conf
 rm -f "$NEW_INSTALL_CONF"
-# Cleanup pre-v0.0.9 legacy file
+# Cleanup legacy setup.conf (pre-v0.0.9) in both new and old config dirs.
+[ -f /etc/opencode-permissions-kit/setup.conf ] && sudo rm -f /etc/opencode-permissions-kit/setup.conf
 [ -f /etc/opencode/setup.conf ] && sudo rm -f /etc/opencode/setup.conf
 echo "install.conf updated: VERSION=$VERSION"
 log "install.conf version stamp updated: VERSION=$VERSION"
+
+# --- remove pre-0.0.10 legacy layout -----------------------------------------
+# The new library / config dir / symlinks are all in place now; tear down the
+# old /usr/local/lib/opencode and /etc/opencode so only the renamed layout
+# remains. Idempotent and safe (no-op on a fresh 0.0.10+ install).
+sudo rm -rf /usr/local/lib/opencode 2>/dev/null || true
+sudo rm -rf /etc/opencode 2>/dev/null || true
+sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
+sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
+log "legacy pre-0.0.10 layout removed (if present)"
 
 # --- optional ACL refresh ----------------------------------------------------
 

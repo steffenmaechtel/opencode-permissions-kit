@@ -1,5 +1,5 @@
 # opencode permissions kit — sudoers rule
-# Deployed to /etc/opencode/sudoers, symlinked as /etc/sudoers.d/opencode.
+# Deployed to /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit.
 # DEFAULT_USER is replaced at install time with the actual username.
 
 # Preserve the opencode launch directory across `sudo -u opencode` so git hooks
@@ -10,10 +10,10 @@ Defaults env_keep += "OPENCODE_LAUNCH_CWD"
 # (`sudo -u opencode -g docker`) so projects that explicitly allow docker/ddev
 # in their opencode.jsonc work inside the sandbox. The opencode binary itself
 # stays in the deny list, so the wrapper is the only way to reach docker.
-DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode/bin/opencode *
-DEFAULT_USER ALL=(opencode:docker) NOPASSWD: /usr/local/lib/opencode/bin/opencode *
-DEFAULT_USER ALL=(root)      NOPASSWD: /usr/local/lib/opencode/protect-projects.sh *
-opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode/protect-projects.sh *
+DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *
+DEFAULT_USER ALL=(opencode:docker) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *
+DEFAULT_USER ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/protect-projects.sh *
+opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/protect-projects.sh *
 
 # ddev delegation: the ddev shim (shadowed as /usr/local/bin/ddev) re-execs
 # every `ddev` the opencode agent invokes as the developer via this rule, so

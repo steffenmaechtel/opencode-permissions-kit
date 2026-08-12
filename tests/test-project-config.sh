@@ -15,8 +15,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(dirname "$0")"
-PARSER="$SCRIPT_DIR/../files/opencode-lib/jsonc-parser.py"
-PROTECT="$SCRIPT_DIR/../files/opencode-lib/protect-projects.sh"
+PARSER="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/jsonc-parser.py"
+PROTECT="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/protect-projects.sh"
 
 failures=0
 passed=0

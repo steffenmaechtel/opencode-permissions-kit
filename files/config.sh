@@ -1,10 +1,10 @@
 #!/bin/sh
 # opencode permissions kit -- config.sh
 # Change settings AFTER install.sh has been run. Re-runs without re-asking
-# the install-time questions. Reads /etc/opencode/install.conf for context.
+# the install-time questions. Reads /etc/opencode-permissions-kit/install.conf for context.
 #
 # What it can do:
-#   - List / add / remove project roots in /etc/opencode/projects.conf
+#   - List / add / remove project roots in /etc/opencode-permissions-kit/projects.conf
 #   - Toggle .git/config hardening for the opencode user
 #   - Refresh ACL protection (re-run protect-projects.sh --force)
 #
@@ -27,22 +27,25 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-LIBDIR="/usr/local/lib/opencode"
-PROJECTS_CONF="/etc/opencode/projects.conf"
+LIBDIR="/usr/local/lib/opencode-permissions-kit"
+PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
+[ -f "$PROJECTS_CONF" ] || PROJECTS_CONF="/etc/opencode/projects.conf"
 
 # === Audit log ===
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Works from
 # both a repo checkout and the installed library.
 log() { :; }
-for cand in "$SCRIPT_DIR/opencode-lib/log.sh" "$LIBDIR/log.sh"; do
+for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" "$LIBDIR/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
     fi
 done
 
-# install.conf with legacy fallback to pre-v0.0.9 setup.conf
-INSTALL_CONF="/etc/opencode/install.conf"
+# install.conf with legacy fallback (pre-0.0.10 /etc/opencode/, pre-0.0.9 setup.conf)
+INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
 [ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 
 DEFAULT_USER=""
@@ -96,7 +99,7 @@ confirm() {
 }
 
 need_install() {
-    if [ ! -f "$INSTALL_CONF" ] && [ ! -f /etc/opencode/setup.conf ]; then
+    if [ ! -f "$INSTALL_CONF" ]; then
         die "Not installed yet. Run install.sh first."
     fi
     [ -d "$LIBDIR" ] || die "Library missing at $LIBDIR. Run install.sh first."

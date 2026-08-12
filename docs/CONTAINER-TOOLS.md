@@ -121,12 +121,12 @@ though the docker socket was reachable.
 
 Revised mechanism:
 
-- A shim at `/usr/local/lib/opencode/bin/ddev` is shadowed as
+- A shim at `/usr/local/lib/opencode-permissions-kit/bin/ddev` is shadowed as
   `/usr/local/bin/ddev` (ahead of the real ddev in PATH).
 - For the `opencode` sandbox user the shim re-execs every `ddev` invocation as
   the DEFAULT_USER via `sudo -u <developer> <DDEV_BIN> "$@"`, backed by a
   passwordless sudoers rule `opencode ALL=(<developer>) NOPASSWD: <DDEV_BIN>`.
-  `DDEV_BIN` (the real ddev path) is recorded in `/etc/opencode/install.conf`.
+  `DDEV_BIN` (the real ddev path) is recorded in `/etc/opencode-permissions-kit/install.conf`.
 - For every other user (the developer themselves, root, …) the shim passes
   through to the real ddev untouched — no loop, no double-delegation.
 - The developer must have docker access (member of the `docker` group), which
@@ -159,7 +159,7 @@ Implications:
 When the wrapper sees `docker` allowed:
 
 ```sh
-exec /usr/bin/sudo -u opencode -g docker /usr/local/lib/opencode/bin/opencode "$@"
+exec /usr/bin/sudo -u opencode -g docker /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
 ```
 
 - `sudo -g docker` runs the process with the `docker` group as an
@@ -218,9 +218,9 @@ on being precise at the cost of missing a legitimately allowed project.
 
 | File | Change |
 |---|---|
-| `files/opencode-lib/jsonc-parser.py` | new `--tools` mode (bash-rule evaluation) |
-| `files/opencode-lib/wrapper` | detect tools, conditionally add `-g docker`, print notice |
-| `files/opencode-lib/bin/ddev` | **new** — ddev delegation shim (re-execs `ddev` as DEFAULT_USER for the opencode sandbox user) |
+| `files/opencode-permissions-kit-lib/jsonc-parser.py` | new `--tools` mode (bash-rule evaluation) |
+| `files/opencode-permissions-kit-lib/wrapper` | detect tools, conditionally add `-g docker`, print notice |
+| `files/opencode-permissions-kit-lib/bin/ddev` | **new** — ddev delegation shim (re-execs `ddev` as DEFAULT_USER for the opencode sandbox user) |
 | `files/sudoers.template` | extend RunAs to `(opencode:docker)`, add `opencode ALL=(DEFAULT_USER) NOPASSWD: DDEV_BIN` for ddev delegation |
 | `files/install.sh` | detect `DDEV_BIN`, record in `install.conf`, deploy + shadow the shim, render `DDEV_BIN` into sudoers |
 | `files/update.sh` | re-deploy + re-link the shim, preserve `DDEV_BIN` in `install.conf`, re-render sudoers |
@@ -230,7 +230,7 @@ on being precise at the cost of missing a legitimately allowed project.
 | `docs/MANUAL.md` | usage documentation |
 | `tests/` | parser + wrapper tests; ddev shim unit tests; e2e delegation section |
 
-One new file (`files/opencode-lib/bin/ddev`); `update.sh` fetch list and CI
+One new file (`files/opencode-permissions-kit-lib/bin/ddev`); `update.sh` fetch list and CI
 `chmod +x` lists now include it.
 
 ## 7. Open Questions

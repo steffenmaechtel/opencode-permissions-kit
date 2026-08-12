@@ -28,7 +28,7 @@ done
 # before any removal so the final lines are written before the library and
 # the log directory itself are deleted.
 log() { :; }
-for cand in "$(dirname "$0")/log.sh" "$(dirname "$0")/opencode-lib/log.sh" "/usr/local/lib/opencode/log.sh"; do
+for cand in "$(dirname "$0")/log.sh" "$(dirname "$0")/opencode-permissions-kit-lib/log.sh" "/usr/local/lib/opencode-permissions-kit/log.sh" "/usr/local/lib/opencode/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
@@ -112,13 +112,19 @@ run() {
     fi
 }
 
-# Source install.conf (with pre-v0.0.9 fallback to setup.conf)
-if [ -f /etc/opencode/install.conf ]; then
-    trace "sourcing /etc/opencode/install.conf"
-    . /etc/opencode/install.conf
-elif [ -f /etc/opencode/setup.conf ]; then
-    trace "sourcing /etc/opencode/setup.conf (legacy)"
-    . /etc/opencode/setup.conf
+# Source install.conf (new path first, then legacy pre-0.0.10 /etc/opencode/
+# and pre-0.0.9 setup.conf).
+INSTALL_CONF=""
+for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode-permissions-kit/setup.conf \
+          /etc/opencode/install.conf /etc/opencode/setup.conf; do
+    if [ -f "$_c" ]; then
+        INSTALL_CONF="$_c"
+        break
+    fi
+done
+if [ -n "$INSTALL_CONF" ]; then
+    trace "sourcing $INSTALL_CONF"
+    . "$INSTALL_CONF"
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
 WWW_GROUP="${WWW_GROUP:-www-data}"
@@ -138,9 +144,10 @@ log "git hooks removed (core.hooksPath unset)"
 
 echo ""
 echo "--- Removing sudoers ---"
+run "sudo rm -f /etc/sudoers.d/opencode-permissions-kit"
 run "sudo rm -f /etc/sudoers.d/opencode"
 echo "sudoers removed."
-log "sudoers removed: /etc/sudoers.d/opencode"
+log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit (+ legacy /etc/sudoers.d/opencode)"
 
 echo ""
 echo "--- Removing wrapper ---"
@@ -157,15 +164,17 @@ log "ddev shim removed: /usr/local/bin/ddev"
 echo ""
 echo "--- Removing opencode library ---"
 run "sudo rm -f /usr/local/sbin/protect-projects.sh"
+run "sudo rm -rf /usr/local/lib/opencode-permissions-kit"
 run "sudo rm -rf /usr/local/lib/opencode"
 echo "opencode library removed."
-log "library removed: /usr/local/lib/opencode"
+log "library removed: /usr/local/lib/opencode-permissions-kit (+ legacy /usr/local/lib/opencode)"
 
 echo ""
 echo "--- Removing umask profile ---"
+run "sudo rm -f /etc/profile.d/opencode-permissions-kit-umask.sh"
 run "sudo rm -f /etc/profile.d/opencode-umask.sh"
 echo "Umask profile removed."
-log "umask profile removed: /etc/profile.d/opencode-umask.sh"
+log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ legacy opencode-umask.sh)"
 
 echo ""
 echo "--- Removing opencode user ---"
@@ -197,7 +206,9 @@ fi
 
 echo ""
 echo "--- Removing project ACLs and setgid ---"
-if [ -f /etc/opencode/projects.conf ]; then
+UNINSTALL_PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
+[ -f "$UNINSTALL_PROJECTS_CONF" ] || UNINSTALL_PROJECTS_CONF="/etc/opencode/projects.conf"
+if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         [ ! -d "$root" ] && continue
@@ -215,14 +226,15 @@ if [ -f /etc/opencode/projects.conf ]; then
         run "sudo setfacl -R -b \"$root\" 2>/dev/null || true"
         run "sudo setfacl -R -k \"$root\" 2>/dev/null || true"
         run "sudo chmod g-s \"$root\" 2>/dev/null || true"
-    done < /etc/opencode/projects.conf
+    done < "$UNINSTALL_PROJECTS_CONF"
 fi
 
 echo ""
-echo "--- Removing /etc/opencode/ ---"
+echo "--- Removing kit config directories ---"
+run "sudo rm -rf /etc/opencode-permissions-kit"
 run "sudo rm -rf /etc/opencode"
 echo "Removed."
-log "/etc/opencode removed"
+log "config dirs removed: /etc/opencode-permissions-kit (+ legacy /etc/opencode)"
 
 echo ""
 echo "--- Removing audit log ---"

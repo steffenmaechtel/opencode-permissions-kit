@@ -1,8 +1,8 @@
 #!/bin/sh
-# Hook: post-checkout
+# Hook: post-merge
 # The project-level opencode.jsonc that governs is the one where opencode was
 # LAUNCHED, not the git worktree root (which may be a nested repo). The wrapper
 # stamps OPENCODE_LAUNCH_CWD into the environment of git; when git runs outside
 # opencode, fall back to the worktree root (no opencode session governs then).
 CWD="${OPENCODE_LAUNCH_CWD:-$(pwd)}"
-/usr/bin/sudo /usr/local/lib/opencode/protect-projects.sh --force --cwd "$CWD"
+/usr/bin/sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force --cwd "$CWD"

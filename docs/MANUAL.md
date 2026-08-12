@@ -22,20 +22,20 @@ No npm package and no opencode plugin are involved — the kit is system-level o
 
 ## Managing Project Directories
 
-Project roots are stored in `/etc/opencode/projects.conf` (one absolute path per line). The wrapper only allows `opencode` to start inside one of these directories or their subdirectories.
+Project roots are stored in `/etc/opencode-permissions-kit/projects.conf` (one absolute path per line). The wrapper only allows `opencode` to start inside one of these directories or their subdirectories.
 
 ### Adding More Projects
 
 **Option A — Use `config.sh` (recommended after install):**
 
 ```bash
-sudo bash /usr/local/lib/opencode/config.sh projects add /var/www/vhosts/new-project
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh projects add /var/www/vhosts/new-project
 ```
 
 You can pass multiple paths:
 
 ```bash
-sudo bash /usr/local/lib/opencode/config.sh projects add /var/www/vhosts/site-a /var/www/vhosts/site-b
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh projects add /var/www/vhosts/site-a /var/www/vhosts/site-b
 ```
 
 `config.sh` updates `projects.conf`, applies the base filesystem bits (group `www-data`, setgid, default ACL), and re-runs `protect-projects.sh --force` in one step. It is non-interactive when you pass `--yes`.
@@ -52,17 +52,17 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 
 **Option C — Edit the config directly:**
 ```bash
-sudo nano /etc/opencode/projects.conf
+sudo nano /etc/opencode-permissions-kit/projects.conf
 ```
 Add one path per line, then apply ACLs to the new directory:
 ```bash
-sudo /usr/local/lib/opencode/protect-projects.sh --force
+sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force
 ```
 
 ### Listing Configured Directories
 
 ```bash
-cat /etc/opencode/projects.conf
+cat /etc/opencode-permissions-kit/projects.conf
 ```
 
 ### Removing a Project Directory
@@ -70,20 +70,20 @@ cat /etc/opencode/projects.conf
 **Option A — Use `config.sh`:**
 
 ```bash
-sudo bash /usr/local/lib/opencode/config.sh projects remove /var/www/vhosts/old-project
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh projects remove /var/www/vhosts/old-project
 ```
 
-Removes the line from `/etc/opencode/projects.conf`. ACL denies on that directory remain on disk until you clear them manually.
+Removes the line from `/etc/opencode-permissions-kit/projects.conf`. ACL denies on that directory remain on disk until you clear them manually.
 
 **Option B — Edit the config directly:**
 
-Remove the line from `/etc/opencode/projects.conf`. ACLs on that directory remain in place but are no longer refreshed — use `getfacl` / `setfacl -x` to clean up manually or run `uninstall.sh`.
+Remove the line from `/etc/opencode-permissions-kit/projects.conf`. ACLs on that directory remain in place but are no longer refreshed — use `getfacl` / `setfacl -x` to clean up manually or run `uninstall.sh`.
 
 ## How the Wrapper Works
 
 Every `opencode` invocation goes through the wrapper at `/usr/local/bin/opencode`:
 
-1. **Validate working directory** — the current directory must be inside a path listed in `/etc/opencode/projects.conf`. If not, an error is shown with the list of valid directories and opencode does not start.
+1. **Validate working directory** — the current directory must be inside a path listed in `/etc/opencode-permissions-kit/projects.conf`. If not, an error is shown with the list of valid directories and opencode does not start.
 2. **Parse `-g` / `--gid`** — an optional container-group argument for the docker sandbox (see [Container Tools](#container-tools-dockerddev)).
 3. **Detect container tools** — if the project's `opencode.jsonc` explicitly enables docker/ddev, the wrapper proposes running opencode with the docker group and asks for confirmation.
 4. **Refresh ACL denies** — runs `protect-projects.sh` to ensure sensitive files are blocked.
@@ -140,7 +140,7 @@ kit applies, and `ddev start` fails host-side even though the docker socket is
 reachable.
 
 The kit solves this with a **delegating shim**. A tiny script is installed at
-`/usr/local/lib/opencode/bin/ddev` and shadowed as `/usr/local/bin/ddev`
+`/usr/local/lib/opencode-permissions-kit/bin/ddev` and shadowed as `/usr/local/bin/ddev`
 (ahead of the real ddev in `PATH`). For the `opencode` sandbox user it re-execs
 every `ddev` invocation as the developer via a passwordless sudoers rule:
 
@@ -159,10 +159,10 @@ What the kit records and where:
 
 | Artefact | Location | Purpose |
 |---|---|---|
-| shim | `/usr/local/lib/opencode/bin/ddev` | gates on the `opencode` user, delegates to `<developer>` |
+| shim | `/usr/local/lib/opencode-permissions-kit/bin/ddev` | gates on the `opencode` user, delegates to `<developer>` |
 | shadow symlink | `/usr/local/bin/ddev` -> shim | intercepts the agent's bare `ddev` (ahead of the real ddev) |
-| real ddev path | `DDEV_BIN=` in `/etc/opencode/install.conf` | the shim's delegation target |
-| sudoers rule | `/etc/sudoers.d/opencode` | `opencode ALL=(<developer>) NOPASSWD: <DDEV_BIN>` |
+| real ddev path | `DDEV_BIN=` in `/etc/opencode-permissions-kit/install.conf` | the shim's delegation target |
+| sudoers rule | `/etc/sudoers.d/opencode-permissions-kit` | `opencode ALL=(<developer>) NOPASSWD: <DDEV_BIN>` |
 
 Requirements & limitations:
 
@@ -280,9 +280,9 @@ Or answer "Yes" when prompted during interactive install.
 **Toggle later (without re-running install):**
 
 ```bash
-sudo bash /usr/local/lib/opencode/config.sh git-config on     # block .git/config
-sudo bash /usr/local/lib/opencode/config.sh git-config off    # allow git access again
-sudo bash /usr/local/lib/opencode/config.sh git-config status # show current state
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config on     # block .git/config
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config off    # allow git access again
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config status # show current state
 ```
 
 **Enable manually** (add to global or project config):
@@ -349,13 +349,13 @@ The end-to-end test (`make e2e`) builds an Ubuntu container, installs the kit, a
 The kit is system-level only — no opencode plugin, no npm package. Everything is managed from a regular terminal (the `sudo` password prompt needs a real TTY, not opencode):
 
 ```bash
-sudo bash /usr/local/lib/opencode/status.sh       # show protection status
-sudo bash /usr/local/lib/opencode/config.sh       # change settings (projects, .git/config, ACL refresh)
-sudo bash /usr/local/lib/opencode/update.sh       # re-deploy the kit after an update
-bash /usr/local/lib/opencode/uninstall.sh         # remove everything (no sudo prefix)
+sudo bash /usr/local/lib/opencode-permissions-kit/status.sh       # show protection status
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh       # change settings (projects, .git/config, ACL refresh)
+sudo bash /usr/local/lib/opencode-permissions-kit/update.sh       # re-deploy the kit after an update
+bash /usr/local/lib/opencode-permissions-kit/uninstall.sh         # remove everything (no sudo prefix)
 ```
 
-All of these scripts are deployed to `/usr/local/lib/opencode/` by the installer, so there is nothing to fetch or configure afterwards.
+All of these scripts are deployed to `/usr/local/lib/opencode-permissions-kit/` by the installer, so there is nothing to fetch or configure afterwards.
 
 `status.sh` shows the current protection state:
 
@@ -365,8 +365,8 @@ opencode permissions kit  v0.0.8
 
 Mode:       hardened (opencode runs as its own user)
 User:       opencode exists
-Wrapper:    /usr/local/bin/opencode -> /usr/local/lib/opencode/wrapper
-Library:    /usr/local/lib/opencode
+Wrapper:    /usr/local/bin/opencode -> /usr/local/lib/opencode-permissions-kit/wrapper
+Library:    /usr/local/lib/opencode-permissions-kit
 Config:     /home/opencode/.config/opencode/opencode.jsonc
 Default user: info  group: www-data
 
@@ -381,14 +381,14 @@ Container tools (docker/ddev):
   direct access: blocked (docker/ddev denied in opencode.jsonc)
 
 ddev delegation shim:
-  shim: active  /usr/local/bin/ddev -> /usr/local/lib/opencode/bin/ddev
+  shim: active  /usr/local/bin/ddev -> /usr/local/lib/opencode-permissions-kit/bin/ddev
   real ddev: /usr/bin/ddev
   delegates to: info (the developer)
 
 Management (run in a terminal):
-    sudo /usr/local/lib/opencode/config.sh                 change settings
-    sudo /usr/local/lib/opencode/update.sh                 re-deploy kit after an update
-    bash /usr/local/lib/opencode/uninstall.sh              remove the kit
+    sudo /usr/local/lib/opencode-permissions-kit/config.sh                 change settings
+    sudo /usr/local/lib/opencode-permissions-kit/update.sh                 re-deploy kit after an update
+    bash /usr/local/lib/opencode-permissions-kit/uninstall.sh              remove the kit
 ```
 
 Before the kit is installed, `status.sh` still works and reports that hardening is **NOT active** — handy for checking any machine.
@@ -438,20 +438,20 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 Or run the deployed copy directly:
 
 ```bash
-sudo bash /usr/local/lib/opencode/update.sh
+sudo bash /usr/local/lib/opencode-permissions-kit/update.sh
 ```
 
 `update.sh` fetches the matching branch files (wrapper, hooks, `protect-projects.sh`, `jsonc-parser.py`, `sudoers` template, `umask` profile, `config.sh`, `uninstall.sh`, `status.sh`) and refreshes the `install.conf` version stamp. It does **not** touch:
 
-- `/etc/opencode/projects.conf`
-- `/etc/opencode/install.conf` (except the `VERSION=` line)
+- `/etc/opencode-permissions-kit/projects.conf`
+- `/etc/opencode-permissions-kit/install.conf` (except the `VERSION=` line)
 - `/home/opencode/.config/opencode/opencode.jsonc`
 - any ACLs or filesystem metadata
 
 ### Upgrading the opencode binary
 
 `opencode upgrade` and opencode's auto-updater **cannot** work behind the
-wrapper: the binary at `/usr/local/lib/opencode/bin/opencode` is root-owned and
+wrapper: the binary at `/usr/local/lib/opencode-permissions-kit/bin/opencode` is root-owned and
 opencode runs as the unprivileged `opencode` user, so a self-update would fail
 (or land in a location the wrapper never uses). That is why `autoupdate: false`
 is set in the kit config and `update.sh` is the upgrade entry point.
@@ -459,13 +459,13 @@ is set in the kit config and `update.sh` is the upgrade entry point.
 To also upgrade opencode to the **latest release**:
 
 ```bash
-sudo bash /usr/local/lib/opencode/update.sh --binary
+sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --binary
 ```
 
 Or install a specific binary file (e.g. a pinned version) without downloading:
 
 ```bash
-sudo bash /usr/local/lib/opencode/update.sh --binary-path /path/to/opencode
+sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --binary-path /path/to/opencode
 ```
 
 Binary upgrades are best-effort: a download or verification failure leaves the
@@ -476,13 +476,13 @@ confirm the new version works.
 Add `--refresh` to also re-run `protect-projects.sh --force` after the deploy:
 
 ```bash
-sudo bash /usr/local/lib/opencode/update.sh --refresh
+sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --refresh
 ```
 
 ## Uninstalling
 
 ```bash
-bash /usr/local/lib/opencode/uninstall.sh
+bash /usr/local/lib/opencode-permissions-kit/uninstall.sh
 ```
 
 Run it as your normal user (no `sudo` prefix — the script handles sudo itself). Options: `--yes`, `--dry-run`, `--debug`.
@@ -493,21 +493,21 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 
 | Path | Purpose |
 |---|---|
-| `/usr/local/bin/opencode` | Wrapper (symlink to `/usr/local/lib/opencode/wrapper`) |
-| `/usr/local/lib/opencode/wrapper` | Validates directory, handles `-g docker` / container detection, refreshes ACLs, execs opencode |
-| `/usr/local/lib/opencode/protect-projects.sh` | Applies ACL denies to sensitive files |
-| `/usr/local/lib/opencode/config.sh` | Change settings post-install (projects, git-config, refresh) |
-| `/usr/local/lib/opencode/update.sh` | Re-deploy the kit after an update, no prompts (`--binary`/`--binary-path` also upgrade opencode) |
-| `/usr/local/lib/opencode/uninstall.sh` | Uninstall script |
-| `/usr/local/lib/opencode/status.sh` | Show protection status (works even before install) |
-| `/usr/local/lib/opencode/bin/opencode` | The actual opencode binary |
-| `/usr/local/lib/opencode/bin/ddev` | ddev delegation shim (re-execs `ddev` as the developer for the opencode sandbox user) |
+| `/usr/local/bin/opencode` | Wrapper (symlink to `/usr/local/lib/opencode-permissions-kit/wrapper`) |
+| `/usr/local/lib/opencode-permissions-kit/wrapper` | Validates directory, handles `-g docker` / container detection, refreshes ACLs, execs opencode |
+| `/usr/local/lib/opencode-permissions-kit/protect-projects.sh` | Applies ACL denies to sensitive files |
+| `/usr/local/lib/opencode-permissions-kit/config.sh` | Change settings post-install (projects, git-config, refresh) |
+| `/usr/local/lib/opencode-permissions-kit/update.sh` | Re-deploy the kit after an update, no prompts (`--binary`/`--binary-path` also upgrade opencode) |
+| `/usr/local/lib/opencode-permissions-kit/uninstall.sh` | Uninstall script |
+| `/usr/local/lib/opencode-permissions-kit/status.sh` | Show protection status (works even before install) |
+| `/usr/local/lib/opencode-permissions-kit/bin/opencode` | The actual opencode binary |
+| `/usr/local/lib/opencode-permissions-kit/bin/ddev` | ddev delegation shim (re-execs `ddev` as the developer for the opencode sandbox user) |
 | `/usr/local/bin/ddev` | Shadow symlink to the ddev shim (ahead of the real ddev in PATH) |
-| `/etc/opencode/projects.conf` | Project roots (one per line) |
-| `/etc/opencode/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `DDEV_BIN`, `VERSION` |
+| `/etc/opencode-permissions-kit/projects.conf` | Project roots (one per line) |
+| `/etc/opencode-permissions-kit/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `DDEV_BIN`, `VERSION` |
 | `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with deny patterns |
 | `/home/<default-user>/.config/opencode/opencode.jsonc` | Deny-* lockout config against self-update PATH bypass (see "Self-Update Bypass Protection") |
-| `/etc/sudoers.d/opencode` | Sudo rules for wrapper, protect-projects.sh, the `opencode:docker` RunAs escalation, and the ddev delegation |
-| `/usr/local/lib/opencode/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |
-| `/usr/local/lib/opencode/log.sh` | Shared audit-log helper (sourced by the scripts above) |
+| `/etc/sudoers.d/opencode-permissions-kit` | Sudo rules for wrapper, protect-projects.sh, the `opencode:docker` RunAs escalation, and the ddev delegation |
+| `/usr/local/lib/opencode-permissions-kit/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |
+| `/usr/local/lib/opencode-permissions-kit/log.sh` | Shared audit-log helper (sourced by the scripts above) |
 | `/var/log/opencode-permissions-kit/` | Audit log (root + default-user group, mode 750/640, self-rotating) |

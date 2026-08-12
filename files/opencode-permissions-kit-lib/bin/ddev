@@ -11,16 +11,20 @@
 # (the developer themselves, root, or any other user) the shim passes through
 # to the real ddev untouched.
 #
-# Lives at /usr/local/lib/opencode/bin/ddev, shadowed as /usr/local/bin/ddev
+# Lives at /usr/local/lib/opencode-permissions-kit/bin/ddev, shadowed as /usr/local/bin/ddev
 # (ahead of the real ddev in PATH). The real ddev path is recorded in
-# /etc/opencode/install.conf as DDEV_BIN at install time.
+# /etc/opencode-permissions-kit/install.conf as DDEV_BIN at install time.
 
 DEFAULT_USER=""
 DDEV_BIN=""
-if [ -f /etc/opencode/install.conf ]; then
-    DEFAULT_USER=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode/install.conf)
-    DDEV_BIN=$(sed -n 's/^DDEV_BIN=//p' /etc/opencode/install.conf)
-fi
+# Read install.conf (new path first, fall back to pre-0.0.10 /etc/opencode/).
+for _conf in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf; do
+    if [ -f "$_conf" ]; then
+        DEFAULT_USER=$(sed -n 's/^DEFAULT_USER=//p' "$_conf")
+        DDEV_BIN=$(sed -n 's/^DDEV_BIN=//p' "$_conf")
+        break
+    fi
+done
 [ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
 
 # Delegate only for the opencode sandbox user. The developer keeps their own

@@ -18,7 +18,7 @@ After that, `opencode` runs as a dedicated user with hard filesystem denies. No 
 - **Wrapper** — every `opencode` invocation validates the directory, refreshes ACLs, then execs as the `opencode` user
 - **Git hooks** — ACLs are re-applied automatically after checkout, merge, and commit, including the project-level `opencode.jsonc` of the current worktree (not just the global denies)
 - **Project-specific configs** — add or override deny rules per project
-- **No plugin** — the kit is system-level only: one install script, four management scripts in `/usr/local/lib/opencode/`
+- **No plugin** — the kit is system-level only: one install script, four management scripts in `/usr/local/lib/opencode-permissions-kit/`
 
 Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_rsa*`, `*id_ed25519*`, `wp-config.php`, `LocalConfiguration.php`, `README.md`, `*.sql.gz`, and more.
 
@@ -41,10 +41,10 @@ opencode
 All management happens in a regular terminal (they need `sudo` anyway — no opencode commands required):
 
 ```bash
-sudo bash /usr/local/lib/opencode/status.sh       # show protection status
-sudo bash /usr/local/lib/opencode/config.sh       # change settings (projects, .git/config, ACL refresh)
-sudo bash /usr/local/lib/opencode/update.sh       # re-deploy the kit after an update
-bash /usr/local/lib/opencode/uninstall.sh         # remove everything (no sudo prefix)
+sudo bash /usr/local/lib/opencode-permissions-kit/status.sh       # show protection status
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh       # change settings (projects, .git/config, ACL refresh)
+sudo bash /usr/local/lib/opencode-permissions-kit/update.sh       # re-deploy the kit after an update
+bash /usr/local/lib/opencode-permissions-kit/uninstall.sh         # remove everything (no sudo prefix)
 ```
 
 `status.sh` also works before the kit is installed, so you can check whether hardening is active from any machine.
@@ -62,8 +62,8 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 `opencode upgrade` and opencode's auto-updater cannot work behind the wrapper (the binary is root-owned, opencode runs as an unprivileged user), so the bundled config sets `autoupdate: false` and `update.sh` is the upgrade entry point:
 
 ```bash
-sudo bash /usr/local/lib/opencode/update.sh --binary                  # upgrade opencode to the latest release
-sudo bash /usr/local/lib/opencode/update.sh --binary-path ./opencode  # install a specific binary
+sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --binary                  # upgrade opencode to the latest release
+sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --binary-path ./opencode  # install a specific binary
 ```
 
 Binary upgrades are best-effort: a failure leaves the current binary in place, the previous one is kept in `/tmp/opencode-upgrade-backup-*`.
@@ -71,7 +71,7 @@ Binary upgrades are best-effort: a failure leaves the current binary in place, t
 ## Uninstall
 
 ```bash
-bash /usr/local/lib/opencode/uninstall.sh
+bash /usr/local/lib/opencode-permissions-kit/uninstall.sh
 ```
 
 Removes the `opencode` user, all files, ACLs, hooks, and sudoers rules. Project files are untouched.

@@ -14,7 +14,7 @@
 #   - one line per event:  <ISO-timestamp> [<script-name>] <message>
 #
 # Usage (from a kit script):
-#   . /usr/local/lib/opencode/log.sh
+#   . /usr/local/lib/opencode-permissions-kit/log.sh
 #   log "created user opencode"
 #   log "setfacl deny on 42 files under /var/www/vhosts/foo"
 
@@ -34,7 +34,8 @@ log_init() {
     # locked out while the admin can read the log without sudo. Falls back to
     # root-only when no config/user is resolvable.
     LOG_GROUP="root"
-    for conf in /etc/opencode/install.conf /etc/opencode/setup.conf; do
+    for conf in /etc/opencode-permissions-kit/install.conf /etc/opencode-permissions-kit/setup.conf \
+                /etc/opencode/install.conf /etc/opencode/setup.conf; do
         [ -f "$conf" ] || continue
         default_user=$(sed -n 's/^DEFAULT_USER=//p' "$conf" | tail -1)
         [ -n "$default_user" ] && break

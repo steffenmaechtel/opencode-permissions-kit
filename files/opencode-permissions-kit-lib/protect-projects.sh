@@ -5,7 +5,7 @@
 # Also scans each project root for <root>/opencode.json[c] and applies
 # additional project-scoped denies (PLAN-STEP-2: cumulative, never weaker).
 #
-# Scope: ONLY within directories listed in /etc/opencode/projects.conf.
+# Scope: ONLY within directories listed in /etc/opencode-permissions-kit/projects.conf.
 #         Never touches system paths (/, /etc, /boot, /usr, /root).
 # Runs as root via sudo (idempotent, safe to call repeatedly).
 set -e
@@ -28,13 +28,17 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-PROJECTS_CONF="/etc/opencode/projects.conf"
-# install.conf (preferred); fall back to pre-v0.0.9 setup.conf for upgrades.
-INSTALL_CONF="/etc/opencode/install.conf"
+PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
+[ -f "$PROJECTS_CONF" ] || PROJECTS_CONF="/etc/opencode/projects.conf"
+# install.conf (preferred); fall back to legacy paths for upgrades
+# (pre-0.0.10 /etc/opencode/, pre-0.0.9 setup.conf).
+INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
 [ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 CONFIG_DIR="/home/opencode/.config/opencode"
-PARSER="/usr/local/lib/opencode/jsonc-parser.py"
-CACHE_FILE="/usr/local/lib/opencode/.cache"
+PARSER="/usr/local/lib/opencode-permissions-kit/jsonc-parser.py"
+CACHE_FILE="/usr/local/lib/opencode-permissions-kit/.cache"
 
 OPENCODE_USER="opencode"
 WWW_GROUP="www-data"

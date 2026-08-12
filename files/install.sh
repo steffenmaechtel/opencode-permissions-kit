@@ -28,13 +28,13 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    mkdir -p "$dir/opencode-lib/hooks" "$dir/opencode-lib/bin"
+    mkdir -p "$dir/opencode-permissions-kit-lib/hooks" "$dir/opencode-permissions-kit-lib/bin"
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
-             opencode-lib/wrapper opencode-lib/protect-projects.sh opencode-lib/jsonc-parser.py \
-             opencode-lib/log.sh opencode-lib/bin/ddev \
-             opencode-lib/hooks/post-checkout opencode-lib/hooks/post-merge opencode-lib/hooks/post-commit; do
+             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/bin/ddev \
+             opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -58,8 +58,8 @@ VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). No-op if
 # the helper is missing — logging must never break the install.
 log() { :; }
-if [ -f "$SCRIPT_DIR/opencode-lib/log.sh" ]; then
-    . "$SCRIPT_DIR/opencode-lib/log.sh"
+if [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" ]; then
+    . "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"
 fi
 
 GREEN='\033[0;32m'
@@ -154,9 +154,11 @@ echo "Backup directory: $BACKUP_DIR"
 log "backup dir created: $BACKUP_DIR"
 sudo -u "$DEFAULT_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" || true
 sudo -u "$OPENCODE_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
-[ -f /etc/opencode/sudoers ] && cp /etc/opencode/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
+[ -f /etc/opencode-permissions-kit/sudoers ] && cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
+[ -f /etc/opencode/sudoers ] && cp /etc/opencode/sudoers "$BACKUP_DIR/sudoers-legacy" 2>/dev/null || true
 [ -f /usr/local/bin/opencode ] && cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null || true
-[ -d /usr/local/lib/opencode ] && cp -r /usr/local/lib/opencode "$BACKUP_DIR/opencode-lib" 2>/dev/null || true
+[ -d /usr/local/lib/opencode-permissions-kit ] && cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null || true
+[ -d /usr/local/lib/opencode ] && cp -r /usr/local/lib/opencode "$BACKUP_DIR/opencode-lib-legacy" 2>/dev/null || true
 
 echo ""
 echo "--- Pre-flight checks ---"
@@ -194,10 +196,16 @@ fi
 # Resolve the REAL ddev path (before the kit shim shadows /usr/local/bin/ddev).
 # On re-install over an existing kit, `command -v ddev` would return our own
 # shim symlink — fall back to the recorded DDEV_BIN or the default location.
+# The readlink target is $LIBDIR/bin/ddev (new or pre-0.0.10 layout).
 DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
 if [ -n "$DDEV_BIN" ] && [ -L "$DDEV_BIN" ] \
-   && readlink "$DDEV_BIN" 2>/dev/null | grep -q 'opencode-lib/bin/ddev'; then
-    DDEV_BIN=$(sed -n 's/^DDEV_BIN=//p' /etc/opencode/install.conf 2>/dev/null || true)
+   && readlink "$DDEV_BIN" 2>/dev/null | grep -Eq 'lib/opencode(-permissions-kit)?/bin/ddev'; then
+    for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf; do
+        if [ -f "$_c" ]; then
+            DDEV_BIN=$(sed -n 's/^DDEV_BIN=//p' "$_c" 2>/dev/null || true)
+            break
+        fi
+    done
 fi
 [ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
 log "detected DDEV_BIN=$DDEV_BIN"
@@ -268,13 +276,13 @@ else
     esac
 fi
 
-sudo mkdir -p /etc/opencode
+sudo mkdir -p /etc/opencode-permissions-kit
 if [ -n "$PROJECTS_ROOTS" ]; then
-    echo "$PROJECTS_ROOTS" | tr ' ' '\n' | sudo tee /etc/opencode/projects.conf > /dev/null
+    echo "$PROJECTS_ROOTS" | tr ' ' '\n' | sudo tee /etc/opencode-permissions-kit/projects.conf > /dev/null
     echo "Project roots: $PROJECTS_ROOTS"
     log "projects.conf written: $PROJECTS_ROOTS"
 else
-    sudo touch /etc/opencode/projects.conf
+    sudo touch /etc/opencode-permissions-kit/projects.conf
     echo "No project roots configured."
     log "projects.conf written: (empty)"
 fi
@@ -285,7 +293,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
 fi
 
-sudo tee /etc/opencode/install.conf > /dev/null <<EOF
+sudo tee /etc/opencode-permissions-kit/install.conf > /dev/null <<EOF
 DEFAULT_USER=$DEFAULT_USER
 OPENCODE_USER=$OPENCODE_USER
 WWW_GROUP=$WWW_GROUP
@@ -293,7 +301,7 @@ DDEV_BIN=$DDEV_BIN
 VERSION=$VERSION
 EOF
 # Migrate legacy setup.conf (pre-v0.0.9) -> install.conf
-[ -f /etc/opencode/setup.conf ] && sudo rm -f /etc/opencode/setup.conf
+[ -f /etc/opencode-permissions-kit/setup.conf ] && sudo rm -f /etc/opencode-permissions-kit/setup.conf
 log "install.conf written (version $VERSION)"
 
 # === Step 3: Filesystem ===
@@ -320,16 +328,16 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     fi
 fi
 
-sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-umask.sh
-sudo chmod 644 /etc/profile.d/opencode-umask.sh
-log "umask profile installed: /etc/profile.d/opencode-umask.sh"
+sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
+sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
+log "umask profile installed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 
 # === Step 4: opencode binary ===
 
 echo ""
 echo "--- opencode installation ---"
 
-SYSTEM_BIN="/usr/local/lib/opencode/bin/opencode"
+SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 opencode_found=false
 
 for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
@@ -399,20 +407,20 @@ for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEF
 done
 log "shell PATH config cleaned/updated for $DEFAULT_USER"
 
-# === Step 5: opencode library (consolidated deployment in /usr/local/lib/opencode/) ===
+# === Step 5: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
-LIBDIR="/usr/local/lib/opencode"
+LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
 sudo mkdir -p "$LIBDIR/hooks"
 
 # Copy all our scripts into the library directory
-sudo cp "$SCRIPT_DIR/opencode-lib/wrapper"            "$LIBDIR/wrapper"
-sudo cp "$SCRIPT_DIR/opencode-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
-sudo cp "$SCRIPT_DIR/opencode-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
-sudo cp "$SCRIPT_DIR/opencode-lib/log.sh"              "$LIBDIR/log.sh"
-sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
-sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
-sudo cp "$SCRIPT_DIR/opencode-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
 sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
 sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
@@ -421,7 +429,7 @@ sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc"          "$LIBDIR/opencode-deny-al
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 # ddev delegation shim
 sudo mkdir -p "$LIBDIR/bin"
-sudo cp "$SCRIPT_DIR/opencode-lib/bin/ddev"            "$LIBDIR/bin/ddev"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev"            "$LIBDIR/bin/ddev"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -453,19 +461,19 @@ else
     log "ddev shim symlinked: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (DDEV_BIN=$DDEV_BIN)"
 fi
 
-# sudoers -> /etc/opencode/sudoers, symlinked as /etc/sudoers.d/opencode
+# sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
 sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
-sudo cp "$SUDO_TMP" /etc/opencode/sudoers
-sudo chmod 440 /etc/opencode/sudoers
+sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
+sudo chmod 440 /etc/opencode-permissions-kit/sudoers
 rm -f "$SUDO_TMP"
-sudo ln -sf /etc/opencode/sudoers /etc/sudoers.d/opencode
+sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
 
-if sudo /usr/sbin/visudo -c -f /etc/opencode/sudoers >/dev/null 2>&1; then
+if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
     echo "sudoers installed."
-    log "sudoers installed: /etc/opencode/sudoers -> /etc/sudoers.d/opencode"
+    log "sudoers installed: /etc/opencode-permissions-kit/sudoers -> /etc/sudoers.d/opencode-permissions-kit"
 else
-    echo "${RED}sudoers validation failed. Check /etc/opencode/sudoers.${NC}"
+    echo "${RED}sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers.${NC}"
     exit 1
 fi
 
@@ -563,6 +571,17 @@ fi
 if [ -n "$PROJECTS_ROOTS" ]; then
     sudo "$LIBDIR/protect-projects.sh" && echo "Initial ACL protection applied to projects."
 fi
+
+# === Step 8: Remove pre-0.0.10 legacy layout ===
+# A re-install over an older kit leaves the old /usr/local/lib/opencode and
+# /etc/opencode behind; tear them down so only the renamed layout remains.
+# The opencode binary (if any) was already (re)deployed to $LIBDIR/bin/opencode
+# in Step 4, and configs were written to /etc/opencode-permissions-kit above.
+sudo rm -rf /usr/local/lib/opencode 2>/dev/null || true
+sudo rm -rf /etc/opencode 2>/dev/null || true
+sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
+sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
+log "legacy pre-0.0.10 layout removed (if present)"
 
 # === Done ===
 

@@ -36,24 +36,24 @@ check "Default user is in www-data"       id "$(whoami)" | grep -q www-data
 echo ""
 echo "--- Wrapper ---"
 check "Wrapper at /usr/local/bin/opencode"  test -x /usr/local/bin/opencode
-check "System binary exists"                test -x /usr/local/lib/opencode/bin/opencode
+check "System binary exists"                test -x /usr/local/lib/opencode-permissions-kit/bin/opencode
 check "Wrapper is in PATH first"            test "$(which opencode)" = "/usr/local/bin/opencode"
 
 echo ""
 echo "--- Git Hooks ---"
-check "Hooks directory exists"              test -d /usr/local/lib/opencode/hooks
-check "post-checkout hook"                  test -x /usr/local/lib/opencode/hooks/post-checkout
-check "post-merge hook"                     test -x /usr/local/lib/opencode/hooks/post-merge
-check "post-commit hook"                    test -x /usr/local/lib/opencode/hooks/post-commit
-check "hooksPath configured"                git config --get core.hooksPath 2>/dev/null | grep -q '/usr/local/lib/opencode/hooks'
+check "Hooks directory exists"              test -d /usr/local/lib/opencode-permissions-kit/hooks
+check "post-checkout hook"                  test -x /usr/local/lib/opencode-permissions-kit/hooks/post-checkout
+check "post-merge hook"                     test -x /usr/local/lib/opencode-permissions-kit/hooks/post-merge
+check "post-commit hook"                    test -x /usr/local/lib/opencode-permissions-kit/hooks/post-commit
+check "hooksPath configured"                git config --get core.hooksPath 2>/dev/null | grep -q '/usr/local/lib/opencode-permissions-kit/hooks'
 
 echo ""
 echo "--- Sudoers ---"
-check "sudoers file valid"  sudo /usr/sbin/visudo -c -f /etc/opencode/sudoers >/dev/null 2>&1
+check "sudoers file valid"  sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1
 
 echo ""
 echo "--- File Protection (read denial for opencode on sensitive files) ---"
-for dir in $(cat /etc/opencode/projects.conf 2>/dev/null); do
+for dir in $(cat /etc/opencode-permissions-kit/projects.conf 2>/dev/null); do
     for f in "$dir"/*/.env "$dir"/*/settings.php "$dir"/*/auth.json; do
         if [ -f "$f" ]; then
             check "$f blocked for opencode"  ! sudo -u opencode test -r "$f" 2>/dev/null
@@ -63,7 +63,7 @@ done
 
 echo ""
 echo "--- Umask ---"
-check "umask script deployed"  test -f /etc/profile.d/opencode-umask.sh
+check "umask script deployed"  test -f /etc/profile.d/opencode-permissions-kit-umask.sh
 
 echo ""
 echo "======================================================"
