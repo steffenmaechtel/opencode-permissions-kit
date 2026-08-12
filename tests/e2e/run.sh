@@ -100,6 +100,7 @@ fi
 filename="opencode-$target.tar.gz"
 
 OC_BIN="$OC_CACHE_DIR/opencode-$OC_VERSION/opencode"
+_OC_FRESH=false
 if [ ! -x "$OC_BIN" ]; then
     echo "  Downloading opencode $OC_VERSION ($filename) into cache..."
     mkdir -p "$(dirname "$OC_BIN")"
@@ -113,6 +114,7 @@ if [ ! -x "$OC_BIN" ]; then
         || { echo "  ${RED}FAIL${NC}  cannot extract opencode tarball"; exit 1; }
     rm -f "$OC_CACHE_DIR/opencode.tar.gz"
     chmod +x "$OC_BIN"
+    _OC_FRESH=true
 fi
 if [ ! -s "$OC_BIN" ]; then
     echo "  ${RED}FAIL${NC}  cached opencode binary is empty"; exit 1
@@ -124,6 +126,13 @@ fi
 OLD_VERSION="1.18.15"
 OLD_BIN="$OC_CACHE_DIR/opencode-$OLD_VERSION/opencode"
 if [ ! -x "$OLD_BIN" ]; then
+    # If the primary binary was just fetched, pause briefly before the second
+    # consecutive release-asset request. GitHub's CDN sometimes rate-limits or
+    # returns a transient 503 when two downloads hit it back-to-back.
+    if [ "$_OC_FRESH" = true ]; then
+        echo "  Pausing 10s before the OLD-version download (back-to-back CDN courtesy)..."
+        sleep 10
+    fi
     echo "  Downloading opencode $OLD_VERSION ($filename) into cache..."
     mkdir -p "$(dirname "$OLD_BIN")"
     curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
