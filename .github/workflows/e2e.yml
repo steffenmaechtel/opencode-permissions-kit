@@ -6,6 +6,12 @@ on:
     branches:
       - master
 
+# Cancel a superseded run when a new commit lands on the same ref; also
+# dedupes if two events somehow fire for the same push.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e:
     runs-on: ubuntu-latest

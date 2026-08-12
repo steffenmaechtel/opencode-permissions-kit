@@ -1,6 +1,19 @@
 name: tests
 
-on: [push, pull_request]
+# Trigger only once on push to master (plus manual). Avoids the classic
+# double-run: a push to a branch with an open PR fires both `push` and
+# `pull_request`, and a tag push fires `push` again.
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+# Cancel a superseded run when a new commit lands on the same ref; also
+# dedupes if two events somehow fire for the same push.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
