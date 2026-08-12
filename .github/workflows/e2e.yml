@@ -20,12 +20,21 @@ jobs:
       - name: Resolve opencode version
         id: version
         run: |
-          echo "OC_VERSION=$(curl -fsSL https://api.github.com/repos/anomalyco/opencode/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')" >> "$GITHUB_OUTPUT"
-      - name: Cache opencode binary (per version)
+          echo "OC_VERSION=$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 https://api.github.com/repos/anomalyco/opencode/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')" >> "$GITHUB_OUTPUT"
+      - name: Read pinned OLD version (for cache key)
+        id: old
+        run: |
+          echo "OLD_VERSION=$(sed -n 's/^OLD_VERSION="\([0-9.]*\)".*/\1/p' tests/e2e/run.sh | head -1)" >> "$GITHUB_OUTPUT"
+      - name: Cache opencode binaries + installer (per version)
         uses: actions/cache@v4
         with:
           path: tests/e2e/cache
-          key: opencode-e2e-${{ steps.version.outputs.OC_VERSION }}
+          # Exact key for the (OLD, latest) combo. When the latest opencode
+          # bumps, restore-keys below reuses the previous cache (same OLD +
+          # installer), so run.sh only re-downloads the one new binary.
+          key: opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-latest${{ steps.version.outputs.OC_VERSION }}
+          restore-keys: |
+            opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
       - name: Run E2E test
         run: |
           chmod +x ./tests/e2e/run.sh ./tests/test-wrapper-validation.sh ./tests/test-project-config.sh ./tests/test-hooks.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-ddev-shim.sh \
