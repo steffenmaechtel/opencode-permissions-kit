@@ -511,7 +511,7 @@ bash /usr/local/lib/opencode-permissions-kit/uninstall.sh
 
 Run it as your normal user (no `sudo` prefix — the script handles sudo itself). Options: `--yes`, `--dry-run`, `--debug`.
 
-Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules. Project files are untouched.
+Removes the `opencode` user, the kit library, ACLs, hooks, and sudoers rules. Project files are untouched. Shell RC hook lines in `~/.bashrc` / `~/.zshrc` / `~/.profile` (tagged `# opencode permissions kit`) and the default-user config `~/.config/opencode/opencode.jsonc` (plus any `opencode.jsonc_BAK_*` backups) are left in place — they are harmless after uninstall (the `shell-warn.sh` hook is guarded by `[ -f … ]` and silently skips when the library is gone). The uninstall output ends with a `Manual cleanup remaining` notice listing exactly these and how to remove them by hand.
 
 ## File Overview
 

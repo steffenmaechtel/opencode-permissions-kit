@@ -74,7 +74,7 @@ Binary upgrades are best-effort: a failure leaves the current binary in place, t
 bash /usr/local/lib/opencode-permissions-kit/uninstall.sh
 ```
 
-Removes the `opencode` user, all files, ACLs, hooks, and sudoers rules. Project files are untouched.
+Removes the `opencode` user, the kit library, ACLs, hooks, and sudoers rules. Project files are untouched. Shell RC hook lines (`~/.bashrc` / `~/.zshrc` / `~/.profile`, tagged `# opencode permissions kit`) and the default-user `~/.config/opencode/opencode.jsonc` are left in place — harmless after uninstall; the script prints a notice with manual cleanup steps. See [docs/MANUAL.md](docs/MANUAL.md#uninstalling) for details.
 
 ## Documentation
 
