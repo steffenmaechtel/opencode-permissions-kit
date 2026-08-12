@@ -491,23 +491,57 @@ Removes the `opencode` user, all installed files, ACLs, hooks, and sudoers rules
 
 ## File Overview
 
+Grouped by base directory, paths within each group sorted alphabetically.
+
+### /etc/opencode-permissions-kit/
+
 | Path | Purpose |
 |---|---|
-| `/usr/local/bin/opencode` | Wrapper (symlink to `/usr/local/lib/opencode-permissions-kit/wrapper`) |
-| `/usr/local/lib/opencode-permissions-kit/wrapper` | Validates directory, handles `-g docker` / container detection, refreshes ACLs, execs opencode |
-| `/usr/local/lib/opencode-permissions-kit/protect-projects.sh` | Applies ACL denies to sensitive files |
-| `/usr/local/lib/opencode-permissions-kit/config.sh` | Change settings post-install (projects, git-config, refresh) |
-| `/usr/local/lib/opencode-permissions-kit/update.sh` | Re-deploy the kit after an update, no prompts (`--binary`/`--binary-path` also upgrade opencode) |
-| `/usr/local/lib/opencode-permissions-kit/uninstall.sh` | Uninstall script |
-| `/usr/local/lib/opencode-permissions-kit/status.sh` | Show protection status (works even before install) |
-| `/usr/local/lib/opencode-permissions-kit/bin/opencode` | The actual opencode binary |
-| `/usr/local/lib/opencode-permissions-kit/bin/ddev` | ddev delegation shim (re-execs `ddev` as the developer for the opencode sandbox user) |
-| `/usr/local/bin/ddev` | Shadow symlink to the ddev shim (ahead of the real ddev in PATH) |
-| `/etc/opencode-permissions-kit/projects.conf` | Project roots (one per line) |
 | `/etc/opencode-permissions-kit/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `DDEV_BIN`, `VERSION` |
-| `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with deny patterns |
-| `/home/<default-user>/.config/opencode/opencode.jsonc` | Deny-* lockout config against self-update PATH bypass (see "Self-Update Bypass Protection") |
+| `/etc/opencode-permissions-kit/projects.conf` | Project roots (one per line) |
+
+### /etc/sudoers.d/
+
+| Path | Purpose |
+|---|---|
 | `/etc/sudoers.d/opencode-permissions-kit` | Sudo rules for wrapper, protect-projects.sh, the `opencode:docker` RunAs escalation, and the ddev delegation |
+
+### /home/<default-user>/.config/opencode/
+
+| Path | Purpose |
+|---|---|
+| `/home/<default-user>/.config/opencode/opencode.jsonc` | Deny-* lockout config against self-update PATH bypass (see "Self-Update Bypass Protection") |
+
+### /home/opencode/.config/opencode/
+
+| Path | Purpose |
+|---|---|
+| `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with deny patterns |
+
+### /usr/local/bin/
+
+| Path | Purpose |
+|---|---|
+| `/usr/local/bin/ddev` | Shadow symlink to the ddev shim (ahead of the real ddev in PATH) |
+| `/usr/local/bin/opencode` | Wrapper (symlink to `/usr/local/lib/opencode-permissions-kit/wrapper`) |
+
+### /usr/local/lib/opencode-permissions-kit/
+
+| Path | Purpose |
+|---|---|
+| `/usr/local/lib/opencode-permissions-kit/bin/ddev` | ddev delegation shim (re-execs `ddev` as the developer for the opencode sandbox user) |
+| `/usr/local/lib/opencode-permissions-kit/bin/opencode` | The actual opencode binary |
+| `/usr/local/lib/opencode-permissions-kit/config.sh` | Change settings post-install (projects, git-config, refresh) |
 | `/usr/local/lib/opencode-permissions-kit/hooks/` | Global git hooks (post-checkout, post-merge, post-commit) |
 | `/usr/local/lib/opencode-permissions-kit/log.sh` | Shared audit-log helper (sourced by the scripts above) |
+| `/usr/local/lib/opencode-permissions-kit/protect-projects.sh` | Applies ACL denies to sensitive files |
+| `/usr/local/lib/opencode-permissions-kit/status.sh` | Show protection status (works even before install) |
+| `/usr/local/lib/opencode-permissions-kit/uninstall.sh` | Uninstall script |
+| `/usr/local/lib/opencode-permissions-kit/update.sh` | Re-deploy the kit after an update, no prompts (`--binary`/`--binary-path` also upgrade opencode) |
+| `/usr/local/lib/opencode-permissions-kit/wrapper` | Validates directory, handles `-g docker` / container detection, refreshes ACLs, execs opencode |
+
+### /var/log/opencode-permissions-kit/
+
+| Path | Purpose |
+|---|---|
 | `/var/log/opencode-permissions-kit/` | Audit log (root + default-user group, mode 750/640, self-rotating) |
