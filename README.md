@@ -22,6 +22,25 @@ After that, `opencode` runs as a dedicated user with hard filesystem denies. No 
 
 Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_rsa*`, `*id_ed25519*`, `wp-config.php`, `LocalConfiguration.php`, `README.md`, `*.sql.gz`, and more.
 
+## The Three Runtime Modes
+
+The kit runs opencode in one of three modes, depending on (a) whether the
+project's `opencode.jsonc` enables docker/ddev and (b) the configured container
+backend (`CONTAINER_BACKEND` in `install.conf`). The mode decides what the
+`opencode` user can reach — and whether the kit's hard ACL denies hold.
+
+| | **Mode 1 — no containers** | **Mode 2 — rootless** | **Mode 3 — classic docker** |
+|---|---|---|---|
+| Enabled by | project config allows no docker/ddev | project allows docker/ddev + backend `docker-rootless` / `podman-rootless` | project allows docker/ddev + backend `docker-group` |
+| opencode runs as | own user `opencode`, no docker group | own user `opencode`, `DOCKER_HOST` → `opencode`'s rootless socket | own user `opencode` **with** the docker group (`sudo -u opencode -g docker`) |
+| Deny-listed files (`.env`, `settings.php`, `README.md`, keys, …) | **hard-denied** (`u:opencode:---`) | **hard-denied — including inside bind-mounted containers** (containers run as the `opencode` host UID) | **bypassable**: container root reads everything, the ACLs do not apply |
+| ddev | not available | delegated to the developer via the shim → **soft protection only** | delegated to the developer via the shim |
+| Root-equivalence | none | **none** (confined to the `opencode` UID) | **yes** — the docker socket is root on the host |
+| Security posture | full | strong | as unsafe as running without the kit |
+
+Example configs for the modes — global (deny default) and the project override
+that opts in — are in [docs/MANUAL.md](docs/MANUAL.md#the-three-runtime-modes).
+
 ## Quick Start
 
 ```bash
@@ -79,6 +98,7 @@ Removes the `opencode` user, the kit library, ACLs, hooks, and sudoers rules. Pr
 ## Documentation
 
 See [docs/MANUAL.md](docs/MANUAL.md) for:
+- The three runtime modes (no containers / rootless / classic docker)
 - Managing project directories
 - Customizing the deny list (global + per-project)
 - Project-level allow/deny overrides

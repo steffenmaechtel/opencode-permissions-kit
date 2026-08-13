@@ -6,6 +6,70 @@ This kit secures [opencode](https://opencode.ai) by running it as a dedicated Li
 
 Once installed, a developer opens a terminal in a project directory and runs `opencode` — the wrapper validates the directory, refreshes ACLs, then starts opencode as the `opencode` user. Denied files are unreadable at the Linux level; not even `cat .env` works.
 
+## The Three Runtime Modes
+
+The kit runs opencode in one of three modes. The mode depends on (a) whether the
+project's `opencode.jsonc` enables docker/ddev and (b) the configured
+`CONTAINER_BACKEND` (see [Container backend](#container-backend)). It decides
+what the `opencode` user can reach — and whether the kit's hard ACL denies hold.
+
+| | **Mode 1 — no containers** | **Mode 2 — rootless** | **Mode 3 — classic docker** |
+|---|---|---|---|
+| Enabled by | project config allows no docker/ddev | project allows docker/ddev + backend `docker-rootless` / `podman-rootless` | project allows docker/ddev + backend `docker-group` |
+| opencode runs as | own user `opencode`, no docker group | own user `opencode`, `DOCKER_HOST` → `opencode`'s rootless socket | own user `opencode` **with** the docker group (`sudo -u opencode -g docker`) |
+| Access to the project + `/home/opencode/` | yes, ACL-controlled | yes, ACL-controlled | yes (but bypassable — see below) |
+| Deny-listed files (`.env`, `settings.php`, `README.md`, keys, …) | **hard-denied** (`u:opencode:---`) | **hard-denied — including inside bind-mounted containers** (containers run as the `opencode` host UID) | **bypassable**: container root reads everything, the ACLs do not apply |
+| ddev | not available | delegated to the developer via the shim → **soft protection only** (`opencode.jsonc` rules) | delegated to the developer via the shim |
+| Root-equivalence | none | **none** (confined to the `opencode` UID) | **yes** — the docker socket is root on the host |
+| Security posture | full | strong | as unsafe as running without the kit |
+
+**Example configs.** The global config (deployed by the kit at
+`/home/opencode/.config/opencode/opencode.jsonc`) denies docker/ddev by default:
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json",
+    "permission": {
+        "bash": {
+            "ddev *": "deny",
+            "docker *": "deny"
+        }
+    }
+}
+```
+
+(The deployed template carries further rules — deny-all + ask-by-default; the
+docker/ddev denies are what matters here.)
+
+A project with **no** `opencode.jsonc`, or one without any docker/ddev `allow`,
+stays in **Mode 1**:
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json"
+}
+```
+
+A project that explicitly opts in (`/{projectFolder}/myproject/opencode.jsonc`)
+enables container tools — the wrapper asks `Y/n` and starts with the configured
+backend, i.e. **Mode 2** when rootless, **Mode 3** when `docker-group`:
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json",
+    "permission": {
+        "bash": {
+            "ddev *": "allow",
+            "docker *": "allow"
+        }
+    }
+}
+```
+
+```bash
+cd /{projectFolder}/myproject/ && opencode
+```
+
 ## Quick Start
 
 ```bash
@@ -127,7 +191,7 @@ Detection mirrors opencode's own rule semantics (last matching rule wins) and on
 
 ### Container backend
 
-The kit records a **container backend** in `install.conf` (`CONTAINER_BACKEND=`). It decides how the wrapper reaches the container runtime when a project enables docker/ddev — it does **not** change the policy layer (docker/ddev stay denied in `opencode.jsonc`; the wrapper stays the only path).
+The kit records a **container backend** in `install.conf` (`CONTAINER_BACKEND=`). It decides how the wrapper reaches the container runtime when a project enables docker/ddev — it does **not** change the policy layer (docker/ddev stay denied in `opencode.jsonc`; the wrapper stays the only path). How the backend plays out in practice is summarised in [The Three Runtime Modes](#the-three-runtime-modes) at the top of this manual.
 
 | Backend | How the wrapper grants container access | Host privilege of containers |
 |---|---|---|
