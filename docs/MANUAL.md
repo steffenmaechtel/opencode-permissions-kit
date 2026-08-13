@@ -233,8 +233,10 @@ a rootless backend is selected (different daemon/user) — that is expected. The
 `config.sh`, runs a container as the `opencode` user, and asserts `.env` is
 denied while a normal file is readable; `tests/e2e/run-docker-rootless.sh`
 (`make e2e-rootless`) does the same against a real **dockerd** rootless daemon
-(its own systemd-based e2e container), additionally asserting the daemon runs as
-the `opencode` UID, not root.
+(its own systemd-based e2e container), additionally asserting the daemon is
+confined to the `opencode` UID, not root — a container's user namespace maps its
+root to `opencode` (verified via the container's `/proc/self/uid_map`), which is
+why the `u:opencode:---` ACL denies hold inside it.
 
 #### `CONTAINER_BACKEND` keys in `install.conf`
 

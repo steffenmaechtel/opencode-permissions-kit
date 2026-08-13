@@ -437,14 +437,18 @@ and `protect-projects.sh` are unchanged.
    is empty it verifies `command -v podman` and runs opencode **without** exporting
    `DOCKER_HOST` (no docker-CLI compat). The optional `OPENCODE_PODMAN_SOCKET`
    re-enables docker-CLI compat (verified like the docker-rootless socket).
-9. **e2e inside the test container.** Running rootless inside the e2e image
-   needs nested user namespaces and subuid ranges configured in the test
-   image; verify feasibility before Phase 3. *Status: **FEASIBLE & DONE** — the
-   `--privileged` ubuntu:24.04 e2e image supports nested user namespaces;
-   `tests/e2e/run.sh` section 12i installs `podman` + `uidmap` + `slirp4netns`,
-   allocates the `opencode` subuid/subgid range, and runs the §9.1 proof. On a
-   runner whose kernel disallows it, the section SKIPs (counts as skipped, not
-   failed) so CI stays green.*
+ 9. **e2e inside the test container.** Running rootless inside the e2e image
+    needs nested user namespaces and subuid ranges configured in the test
+    image; verify feasibility before Phase 3. *Status: **FEASIBLE & DONE** — the
+    `--privileged` ubuntu:24.04 e2e image supports nested user namespaces;
+    `tests/e2e/run.sh` section 12i installs `podman` + `uidmap` + `slirp4netns`,
+    allocates the `opencode` subuid/subgid range, and runs the §9.1 proof. On a
+    runner whose kernel disallows it, the section SKIPs (counts as skipped, not
+    failed) so CI stays green. When the OUTER docker is rootless (dev hosts),
+    the container runs in a nested user namespace and section 12i seeds an
+    in-range subuid range (`opencode:4096:60000`) before provisioning — the
+    kit's default 231072+ range lies outside the container's uid map and would
+    make `newuidmap` EPERM (same adaptation as the docker-rootless suite).*
     *docker-rootless: **FEASIBLE & DONE** — `tests/e2e/run-docker-rootless.sh`
     uses a separate systemd-based e2e container (`Dockerfile.rootless`) so the
     kit's real provisioning path (which hard-requires `systemctl --user`) can run

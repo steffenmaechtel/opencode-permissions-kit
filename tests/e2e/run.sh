@@ -23,6 +23,12 @@ e2e_prepare_project
 
 e2e_start_container
 
+# Detect the OUTER docker layout (rootful vs rootless). Only the podman-rootless
+# section (12i) uses it: on a rootless host the e2e container runs in a nested
+# user namespace and needs an in-range subuid seed; a rootful host (CI) takes
+# the kit's true default path. See lib.sh e2e_detect_host_layout.
+e2e_detect_host_layout
+
 echo ""
 echo "--- 1. Install opencode (from cache) ---"
 E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSION"'/opencode' || {
@@ -626,13 +632,27 @@ echo "--- 12i. Rootless container backend (podman) — Phase 2 provisioning ---"
 
 _rootless_ok=true
 
+# Nested-userns adaptation (only when the OUTER docker is rootless). On such a
+# host this container itself runs in a user namespace (uid_map `0 <uid> 1 /
+# 1 <n> 65536`), so the kit's default subuid allocation (231072+) is OUTSIDE
+# the container's uid map and podman-rootless provisioning's `newuidmap` write
+# fails with EPERM. Seeding an in-range range first works because
+# setup-container-backend.sh's allocate_range() KEEPS an existing entry. No-op
+# on a rootful host, which keeps CI on the kit's true default path.
+if [ "$E2E_HOST_LAYOUT" = "rootless" ]; then
+    echo "  ${CYAN}Nested userns (rootless host docker) — seeding in-range subuid/subgid${NC}"
+    E 'sudo sh -c '\''printf "opencode:4096:60000\n" > /etc/subuid; printf "opencode:4096:60000\n" > /etc/subgid'\'''
+    check "12i: in-range subuid/subgid seeded for opencode (nested layout)" \
+        E 'grep -q "^opencode:4096:60000$" /etc/subuid && grep -q "^opencode:4096:60000$" /etc/subgid'
+fi
+
 # 12i.1 switch to podman-rootless via config.sh (Phase 2 provisioning).
 # This installs podman+uidmap+slirp4netns, allocates subuid/subgid, updates
 # install.conf, and re-renders the sudoers — all via setup-container-backend.sh.
 # Run config.sh from the REPO checkout so we test the local Phase 2 code, not
 # a potentially stale installed copy.
 if ! E 'sudo bash /home/dev/repo/files/config.sh --yes container-backend podman-rootless >/tmp/config-backend.log 2>&1'; then
-    echo "  ${YELLOW}SKIP${NC}  12i: backend provisioning failed ($(sudo tail -1 /tmp/config-backend.log 2>/dev/null || echo unknown))"
+    echo "  ${YELLOW}SKIP${NC}  12i: backend provisioning failed ($(E 'tail -1 /tmp/config-backend.log' 2>/dev/null || echo unknown))"
     _rootless_ok=false
     skipped=$((skipped + 1))
 fi
@@ -666,7 +686,7 @@ if [ "$_rootless_ok" = true ]; then
         check "12i: rootless podman works as the opencode user (nested userns)" \
             E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman info >/dev/null 2>&1"'
     else
-        echo "  ${YELLOW}SKIP${NC}  12i: nested user namespaces not available ($(sudo tail -1 /tmp/podman-info.out 2>/dev/null || echo unknown))"
+        echo "  ${YELLOW}SKIP${NC}  12i: nested user namespaces not available ($(E 'tail -1 /tmp/podman-info.out' 2>/dev/null || echo unknown))"
         _rootless_ok=false
         skipped=$((skipped + 1))
     fi
