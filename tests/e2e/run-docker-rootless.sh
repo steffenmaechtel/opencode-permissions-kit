@@ -29,9 +29,11 @@
 #   - rootless outer docker (dev hosts): the container itself runs in a user
 #     namespace, so it cannot write host-root cgroup paths; cgroupns=private
 #     (no bind) delegates the container's own subtree as its cgroup root, which
-#     systemd and the inner dockerd both accept. Two further nested-userns
-#     adaptations apply (RL2 prep): an in-range subuid/subgid seed and the
-#     fuse-overlayfs storage driver — see the RL2 prep block.
+#     systemd and the inner dockerd both accept. The RL2 prep block then
+#     applies two container-internal adaptations — see there: the fuse-overlayfs
+#     storage-driver pin applies on BOTH outer layouts (nested kernel overlay
+#     can never stack on the container's own overlay rootfs), while the in-range
+#     subuid/subgid seed applies only to the nested-userns (rootless outer) case.
 #
 # Like run.sh section 12i, the whole docker-rootless section SKIPs (not fails)
 # when the host cannot host systemd-in-docker or nested user namespaces.
@@ -141,30 +143,35 @@ SOCKPATH="/run/user/$OC_UID/docker.sock"
 echo "  opencode uid: $OC_UID (socket: $SOCK)"
 echo "  host docker layout: $E2E_HOST_LAYOUT"
 
-# --- nested-userns adaptations (only when the OUTER docker is rootless) -------
-# On a rootless-host layout this container itself runs in a user namespace
-# (uid_map `0 <uid> 1 / 1 <n> 65536`). Two consequences break the kit's
-# provisioning unless adapted:
-#   - subuid/subgid: the kit allocates a range starting at 100000 (practically
-#     231072+), which is OUTSIDE this container's own uid map, so rootlesskit's
-#     `newuidmap` write fails with EPERM. Seeding an in-range range
-#     (opencode:4096:60000) first works because setup-container-backend.sh's
-#     allocate_range() KEEPS an existing entry.
-#   - storage driver: overlay2 cannot stack on the host's overlay2 from inside
-#     a nested userns (`mount ... invalid argument`), so pin the fuse-overlayfs
-#     driver in ~opencode/.config/docker/daemon.json before provisioning.
-# Both are no-ops on a rootful host, which keeps CI exercising the kit's true
-# default path untouched.
+# --- container-internal adaptations ------------------------------------------
+# This suite always runs docker-in-docker, so two things need adapting INSIDE
+# the container regardless of the outer host layout (both are container
+# accommodations only — the kit's real provisioning path runs untouched):
+#   - storage driver: kernel overlay2 cannot stack on the container's own
+#     overlay rootfs (`mount ... invalid argument`), and on a rootless-host
+#     layout it additionally cannot stack in a nested userns; the inner
+#     rootless daemon therefore uses fuse-overlayfs, pinned in
+#     ~opencode/.config/docker/daemon.json BEFORE provisioning (the setup tool
+#     respects an existing daemon.json).
+#   - subuid/subgid (rootless-host layout ONLY): the container itself runs in a
+#     user namespace (uid_map `0 <uid> 1 / 1 <n> 65536`), and the kit allocates
+#     a range starting at 100000 (practically 231072+), which is OUTSIDE that
+#     map, so rootlesskit's `newuidmap` write fails with EPERM. Seeding an
+#     in-range range (opencode:4096:60000) first works because
+#     setup-container-backend.sh's allocate_range() KEEPS an existing entry.
+#     On a rootful host the container has the full uid space, so this is not
+#     needed there.
+echo ""
+echo "  ${CYAN}RL2 prep: pinning fuse-overlayfs storage driver (nested docker-in-docker)${NC}"
+E 'sudo -u opencode sh -c '\''mkdir -p /home/opencode/.config/docker'\'''
+E 'printf '\''{"storage-driver":"fuse-overlayfs"}\n'\'' | sudo -u opencode tee /home/opencode/.config/docker/daemon.json >/dev/null'
+check "RL2-prep: fuse-overlayfs storage driver pinned (nested docker-in-docker)" \
+    E 'test "$(sudo -u opencode cat /home/opencode/.config/docker/daemon.json)" = "{\"storage-driver\":\"fuse-overlayfs\"}"'
 if [ "$E2E_HOST_LAYOUT" = "rootless" ]; then
-    echo ""
-    echo "  ${CYAN}Nested userns (rootless host docker) — seeding in-range subuid + fuse-overlayfs${NC}"
+    echo "  ${CYAN}Nested userns (rootless host docker) — additionally seeding in-range subuid${NC}"
     E 'sudo sh -c '\''printf "opencode:4096:60000\n" > /etc/subuid; printf "opencode:4096:60000\n" > /etc/subgid'\'''
-    E 'sudo -u opencode sh -c '\''mkdir -p /home/opencode/.config/docker'\'''
-    E 'printf '\''{"storage-driver":"fuse-overlayfs"}\n'\'' | sudo -u opencode tee /home/opencode/.config/docker/daemon.json >/dev/null'
-    check "RL2-prep: in-range subuid/subgid seeded for opencode (nested layout)" \
+    check "RL2-prep: in-range subuid/subgid seeded for opencode (nested userns)" \
         E 'grep -q "^opencode:4096:60000$" /etc/subuid && grep -q "^opencode:4096:60000$" /etc/subgid'
-    check "RL2-prep: fuse-overlayfs storage driver pinned (nested layout)" \
-        E 'test "$(sudo -u opencode cat /home/opencode/.config/docker/daemon.json)" = "{\"storage-driver\":\"fuse-overlayfs\"}"'
 fi
 
 # --- the docker-rootless daemon e2e -------------------------------------------
