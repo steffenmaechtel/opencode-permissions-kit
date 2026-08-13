@@ -1,4 +1,4 @@
-.PHONY: help test test-wrapper test-config test-hooks test-parser test-git-config test-ddev-shim test-container-backend test-bypass-guard verify e2e install-dev clean version check-version
+.PHONY: help test test-wrapper test-config test-hooks test-parser test-git-config test-ddev-shim test-container-backend test-bypass-guard verify e2e e2e-rootless e2e-all install-dev clean version check-version
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -14,6 +14,9 @@ help:
 	@echo "  make test-bypass-guard  Run wrapper-bypass guard tests"
 	@echo "  make verify        Run system verification (requires install.sh)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
+	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
+	@echo "  make e2e-rootless ARGS=--debug   Same, keep the container on failure + dump daemon logs"
+	@echo "  make e2e-all        Run both e2e suites"
 	@echo "  make install-dev   Quick dev install (skip prompts)"
 	@echo "  make clean         Uninstall"
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
@@ -60,6 +63,11 @@ verify:
 
 e2e:
 	@sh ./tests/e2e/run.sh
+
+e2e-rootless:
+	@sh ./tests/e2e/run-docker-rootless.sh $(if $(ARGS),$(ARGS))
+
+e2e-all: e2e e2e-rootless
 
 install-dev:
 	@sudo ./files/install.sh --yes $(if $(PROJECTS),--projects $(PROJECTS))

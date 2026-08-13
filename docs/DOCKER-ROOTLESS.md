@@ -1,6 +1,6 @@
 # Docker Rootless — Design & Implementation Plan
 
-> Status: **Phase 1 + 2 implemented; Phase 3 pending.**
+> Status: **Phase 1 + 2 + 3 (docker-rootless e2e) implemented; ddev-shim env pass-through pending.**
 > This document is the design record for removing the root-equivalence of the
 > kit's docker grant. The authoritative usage documentation for the *current*
 > container-tools feature is `docs/CONTAINER-TOOLS.md` (design record) and
@@ -19,10 +19,12 @@
 > `dockerd-rootless-setuptool.sh` + enables linger. `podman-rootless` is
 > daemonless (no socket, no linger).
 >
-> **Phase 3 (pending):** ddev-shim `DOCKER_HOST`/`XDG_RUNTIME_DIR`
-> pass-through and a `docker-rootless` daemon e2e.
+> **Phase 3 (partially done):** the `docker-rootless` daemon e2e is implemented
+> (`tests/e2e/run-docker-rootless.sh`, systemd-in-container suite). Still
+> pending: the ddev-shim `DOCKER_HOST`/`XDG_RUNTIME_DIR` pass-through.
 >
-> The §9.1 ACL-bind-mount proposition is **proven by e2e** (section 12i).
+> The §9.1 ACL-bind-mount proposition is **proven by e2e** for both rootless
+> backends: podman via run.sh section 12i, docker via run-docker-rootless.sh.
 
 ## 1. The Problem (confirmed)
 
@@ -350,11 +352,20 @@ Therefore the check is **detect + record + warn**, not a hard install block:
    `dockerd-rootless-setuptool.sh` + enables linger. `podman-rootless` is
    daemonless. E2E section 12i exercises provisioning + the §9.1 proof
    end-to-end via `config.sh`.
-3. **Phase 3 — ddev shim env pass-through + docker-rootless e2e (PENDING).** The
+3. **Phase 3 — ddev shim env pass-through + docker-rootless e2e.** The
    ddev-shim `--preserve-env=DOCKER_HOST,XDG_RUNTIME_DIR` pass-through for the
    *developer's* rootless socket — only matters once a developer runs rootless
    too; and a `docker-rootless` daemon e2e (heavier setup than podman's
-   daemonless path).
+   daemonless path). **The docker-rootless daemon e2e is DONE** — the kit's
+   real provisioning path (`config.sh container-backend docker-rootless` →
+   `setup-container-backend.sh` → get.docker.com → subuid/subgid →
+   `dockerd-rootless-setuptool.sh` → `systemctl --user` → linger) is exercised
+   end-to-end in `tests/e2e/run-docker-rootless.sh`, a separate systemd-based
+   e2e container (`Dockerfile.rootless`, `make e2e-rootless`). It covers the
+   wrapper's socket-check sudoers fallback (the 0700 `/run/user/<uid>`
+   scenario), proves the rootless daemon runs as the opencode UID (not root),
+   and re-proves §9.1 with real dockerd. **ddev-shim env pass-through remains
+   pending.**
 
 ## 8. Implementation Footprint
 
@@ -388,7 +399,10 @@ and `protect-projects.sh` are unchanged.
    `--privileged` e2e image, `opencode` subuid/subgid 100000–165535) that
    bind-mounts the project and asserts `cat /app/.env` is denied
    (`u:opencode:---` ACL survives the bind mount) while `cat /app/index.php`
-   succeeds. Verified end-to-end.*
+   succeeds. Re-proven with **real dockerd** in `tests/e2e/run-docker-rootless.sh`
+   section RL4, which additionally asserts the daemon runs as the opencode host
+   UID (`docker run alpine id -u` == the opencode UID), i.e. the rootless
+   daemon is not root-equivalent. Verified end-to-end.*
 2. **Running `systemctl --user` / rootless setup as the `opencode` user.** The
    installer runs as root; rootless setup and linger must be executed as
    `opencode` (`sudo -u opencode …`, `loginctl enable-linger opencode`).
@@ -431,6 +445,30 @@ and `protect-projects.sh` are unchanged.
    allocates the `opencode` subuid/subgid range, and runs the §9.1 proof. On a
    runner whose kernel disallows it, the section SKIPs (counts as skipped, not
    failed) so CI stays green.*
+    *docker-rootless: **FEASIBLE & DONE** — `tests/e2e/run-docker-rootless.sh`
+    uses a separate systemd-based e2e container (`Dockerfile.rootless`) so the
+    kit's real provisioning path (which hard-requires `systemctl --user`) can run
+    end-to-end. It SKIPs wholesale when systemd-in-container or nested user
+    namespaces are unavailable.
+    The container layout adapts to the OUTER docker daemon (auto-detected by
+    `tests/e2e/lib.sh` `e2e_detect_host_layout` via a probe container's
+    `/proc/self/uid_map`):
+    - **rootful host docker** (CI, normal hosts): `cgroupns=host` + host
+      `/sys/fs/cgroup` bind — the documented systemd-in-docker recipe; the inner
+      rootless dockerd resolves its cgroups at host-root level exactly like a
+      real rootless install.
+    - **rootless host docker** (dev hosts where docker itself is rootless): the
+      e2e container runs in a nested user namespace, so its "root" is not host
+      root and it can never write host-root cgroup paths. Docker 29+ mounts a
+      correct private cgroupfs, so the container runs with `cgroupns=private`
+      and **no** `/sys/fs/cgroup` bind: systemd boots and the inner dockerd
+      resolves its slice within the container's own delegated cgroup root. Two
+      further nested-userns adaptations apply (RL2 prep): an in-range
+      subuid/subgid seed (`opencode:4096:60000`, because the kit's default
+      100000+ range lies outside the container's uid map and would EPERM in
+      `newuidmap`) and a `fuse-overlayfs` storage-driver override (overlay2
+      cannot stack on the host's overlay2 under a nested userns). Both are no-ops
+      on a rootful host, keeping CI on the kit's true default path.*
 10. **DDEV ≥ 1.25 gate (§6.8) parsing.** **Decision: parse a semver
    `vX.Y.Z` / `X.Y.Z` token from the real binary's `ddev version` output** (first
    semver match), recorded as `DDEV_VERSION` and surfaced by `status.sh`, which

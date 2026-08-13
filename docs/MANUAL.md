@@ -203,7 +203,7 @@ The kit records a **container backend** in `install.conf` (`CONTAINER_BACKEND=`)
 
 Reachability is probed as the **`opencode` user** — the context that actually connects — not as the developer: rootless sockets live in the `opencode` runtime dir (`/run/user/<uid>`, mode `700`), which a developer-running wrapper cannot stat. The wrapper tries the direct check first, then re-runs the kit's `socket-check.sh` helper (nothing but `test -S`, gated to that script in sudoers) via `sudo -u opencode`, so a reachable daemon is detected even though the developer cannot traverse the runtime dir.
 
-> **Phase 1 + 2 (current state):** the kit is *backend-aware* and can
+> **Phase 1 + 2 + 3 (current state):** the kit is *backend-aware* and can
 > **provision** rootless backends. `install.sh` detects the container situation
 > and offers an interactive backend choice (or `--container-backend
 > podman-rootless` for scripts). `config.sh container-backend` switches
@@ -223,14 +223,18 @@ For `docker-rootless` the helper also records the socket
 ranges for the `opencode` user.
 
 The two-daemon reality and the ddev ≥ 1.25 gate (ddev-shim `--preserve-env`
-pass-through) are tracked in `docs/DOCKER-ROOTLESS.md` as Phase 3. `status.sh`
-reflects whichever backend is configured; `docker ps` inside an `opencode`
-session will not list the developer's ddev containers when a rootless backend is
-selected (different daemon/user) — that is expected. The §9.1 value proposition
-(a rootless bind mount respects `u:opencode:---`) is **proven by e2e** —
-`tests/e2e/run.sh` section 12i provisions real rootless podman via `config.sh`,
-runs a container as the `opencode` user, and asserts `.env` is denied while a
-normal file is readable.
+pass-through) are tracked in `docs/DOCKER-ROOTLESS.md` (Phase 3 ddev-shim part
+still pending). `status.sh` reflects whichever backend is configured; `docker ps`
+inside an `opencode` session will not list the developer's ddev containers when
+a rootless backend is selected (different daemon/user) — that is expected. The
+§9.1 value proposition (a rootless bind mount respects `u:opencode:---`) is
+**proven by e2e** for both rootless backends:
+`tests/e2e/run.sh` section 12i provisions real rootless **podman** via
+`config.sh`, runs a container as the `opencode` user, and asserts `.env` is
+denied while a normal file is readable; `tests/e2e/run-docker-rootless.sh`
+(`make e2e-rootless`) does the same against a real **dockerd** rootless daemon
+(its own systemd-based e2e container), additionally asserting the daemon runs as
+the `opencode` UID, not root.
 
 #### `CONTAINER_BACKEND` keys in `install.conf`
 

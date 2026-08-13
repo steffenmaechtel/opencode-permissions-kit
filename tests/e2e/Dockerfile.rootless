@@ -1,0 +1,63 @@
+FROM ubuntu:24.04
+
+# Systemd-based image for the docker-rootless daemon e2e
+# (tests/e2e/run-docker-rootless.sh). The kit's docker-rootless provisioning
+# (setup-container-backend.sh) requires a working systemd --user manager
+# (dockerd-rootless-setuptool.sh + `systemctl --user`), so this image runs
+# systemd as PID 1. The plain e2e suite uses Dockerfile (no systemd).
+#
+# Run requirements (see run-docker-rootless.sh E2E_RUN_ARGS):
+#   --privileged                              (nested user namespaces)
+#   -v /sys/fs/cgroup:/sys/fs/cgroup:rw       (systemd cgroup v2, cgroupns=host)
+#   --tmpfs /run:rw,mode=755 --tmpfs /tmp:rw  (systemd runtime dirs)
+#
+# Two outer-docker layouts are supported; the runner detects which one it is
+# on and passes the matching E2E_RUN_ARGS:
+#   - rootful outer docker (CI, normal hosts): cgroupns=host + the host
+#     /sys/fs/cgroup bind; the container's systemd and the inner rootless
+#     dockerd both resolve /sys/fs/cgroup/user.slice/<uid>.slice at host-root
+#     level exactly like a real rootless install.
+#   - rootless outer docker (dev hosts): the outer daemon already runs in a
+#     user namespace, so the container can never write host-root cgroup
+#     paths. Docker 29+ mounts a correct private cgroupfs for the container
+#     when started with cgroupns=private and WITHOUT a /sys/fs/cgroup bind;
+#     systemd then boots and the inner dockerd resolves its slice within the
+#     container's own (private) cgroup root.
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# systemd + the pieces dockerd-rootless needs that apt does not install as
+# hard dependencies of docker-ce-rootless-extras on Ubuntu. fuse-overlayfs is
+# the rootless storage driver fallback (overlay2 under user namespaces);
+# slirp4netns is rootlesskit's default network driver; uidmap/dbus-user-session
+# are the kit's own prerequisites (installed again by the helper if missing,
+# harmless to pre-install). iproute2 provides the `ip tuntap` call
+# rootlesskit's slirp4netns setup needs (a userns container can never run
+# dockerd-rootless without it).
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    systemd systemd-sysv dbus \
+    sudo curl git acl python3 ca-certificates nodejs npm \
+    uidmap dbus-user-session slirp4netns fuse-overlayfs iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# dockerd-rootless-setuptool.sh refuses to run unless the nf_tables (or
+# ip_tables) kernel module shows up in /proc/modules or in the kernel's
+# modules.builtin list. The host kernel (WSL2 / CI runner) has nf_tables
+# BUILT-IN — iptables and nft demonstrably work here — but a container never
+# ships /lib/modules metadata, so the check fails. Synthesize the metadata a
+# real linux-modules install for the running kernel would provide.
+RUN mkdir -p "/lib/modules/$(uname -r)" \
+    && printf 'kernel/net/netfilter/nf_tables.ko\nkernel/net/ipv4/netfilter/ip_tables.ko\n' > "/lib/modules/$(uname -r)/modules.builtin"
+
+RUN useradd -m -s /bin/bash -G sudo dev \
+    && echo 'dev ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dev \
+    && chmod 440 /etc/sudoers.d/dev
+
+RUN mkdir -p /var/www/vhosts/test-project \
+    && chown dev:dev /var/www/vhosts /var/www/vhosts/test-project
+
+RUN groupadd -f www-data
+
+# systemd as PID 1.
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

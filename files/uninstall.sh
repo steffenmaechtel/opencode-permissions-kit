@@ -181,6 +181,13 @@ echo "--- Removing opencode user ---"
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ans=$(prompt_yn "Remove user '$OPENCODE_USER' and their home directory?" "n")
     if [ "$ans" = "y" ]; then
+        # A rootless container backend (docker-rootless/podman-rootless) enabled
+        # linger and starts the user's systemd manager; userdel refuses while
+        # that manager is running. Tear it down first (best-effort), then remove
+        # the user.
+        OC_UID=$(id -u "$OPENCODE_USER")
+        run "sudo loginctl disable-linger \"$OPENCODE_USER\" 2>/dev/null || true"
+        run "sudo systemctl stop \"user@$OC_UID.service\" 2>/dev/null || true"
         run "sudo userdel -r \"$OPENCODE_USER\" 2>/dev/null || true"
         echo "User '$OPENCODE_USER' removed."
         log "user removed: $OPENCODE_USER"
