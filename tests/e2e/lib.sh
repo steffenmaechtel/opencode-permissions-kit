@@ -204,7 +204,9 @@ e2e_prepare_project() {
 # --- container lifecycle -----------------------------------------------------
 # Detect whether the OUTER docker daemon is rootless. A rootless daemon runs
 # every container in a user namespace, so a container's /proc/self/uid_map
-# shows a restricted map (`0 <uid> 1 ...`) instead of the full `0 0 4294967295`.
+# maps uid 0 to a NON-zero host uid (`0 <uid> 1 ...`); a rootful daemon maps it
+# to host root (`0 0 4294967295`). Note the map is right-aligned in columns
+# (leading whitespace), so never anchor a pattern at the start of the line.
 # This decides the cgroup strategy for the systemd container (E2E_SYSTEMD=1):
 # under a rootful daemon the container can mount and write host-root cgroup
 # paths (cgroupns=host + host /sys/fs/cgroup bind, the documented
@@ -214,8 +216,8 @@ e2e_prepare_project() {
 # container's own delegated subtree IS the cgroup root.
 e2e_detect_host_layout() {
     local umap
-    umap=$(docker run --rm "$E2E_IMAGE" sh -c 'grep -m1 "^0 " /proc/self/uid_map' 2>/dev/null || true)
-    if [ "$umap" = "0 0 4294967295" ]; then
+    umap=$(docker run --rm "$E2E_IMAGE" sh -c 'awk "{print \$1, \$2; exit}" /proc/self/uid_map' 2>/dev/null || true)
+    if [ "$umap" = "0 0" ]; then
         E2E_HOST_LAYOUT="rootful"
     else
         E2E_HOST_LAYOUT="rootless"
