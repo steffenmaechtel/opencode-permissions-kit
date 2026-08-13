@@ -7,6 +7,7 @@
 #   - List / add / remove project roots in /etc/opencode-permissions-kit/projects.conf
 #   - Toggle .git/config hardening for the opencode user
 #   - Refresh ACL protection (re-run protect-projects.sh --force)
+#   - Switch the container backend (docker-group / docker-rootless / podman-rootless)
 #
 # Run as your default (non-root) user with sudo privileges:
 #   ./config.sh                       # interactive menu
@@ -14,6 +15,7 @@
 #   ./config.sh projects add /var/www/vhosts/foo
 #   ./config.sh projects remove /var/www/vhosts/foo
 #   ./config.sh git-config on|off|status
+#   ./config.sh container-backend docker-group|docker-rootless|podman-rootless|status
 #   ./config.sh refresh
 #
 # Options:
@@ -57,6 +59,7 @@ fi
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
 WWW_GROUP="${WWW_GROUP:-www-data}"
+DDEV_BIN="${DDEV_BIN:-/usr/bin/ddev}"
 
 YES=false
 ACTION=""
@@ -66,12 +69,14 @@ TARGETS=""
 for arg do
     case "$arg" in
         --yes|-y) YES=true ;;
-        projects|git-config|refresh|status)
+        projects|git-config|refresh|status|container-backend)
             [ -z "$ACTION" ] && ACTION="$arg" && continue
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             TARGETS="$TARGETS $arg"
             ;;
         on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg" ;;
+        docker-group|docker-rootless|podman-rootless)
+            [ "$ACTION" = "container-backend" ] && SUB="$arg" ;;
         list|add|remove)
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             ;;
@@ -226,6 +231,139 @@ git_config_apply() {
     echo "NOTE: existing config was overwritten from template. Restart opencode to pick up changes."
 }
 
+# --- container backend (Phase 2) ----------------------------------------------
+
+container_backend_status() {
+    local backend="${CONTAINER_BACKEND:-docker-group}"
+    echo "Container backend: ${CYAN}${backend}${NC}"
+    case "$backend" in
+        docker-rootless)
+            if [ -n "${OPENCODE_DOCKER_HOST:-}" ]; then
+                local sock="$OPENCODE_DOCKER_HOST" sp="${OPENCODE_DOCKER_HOST#unix://}"
+                if [ -S "$sp" ]; then
+                    echo "  socket: ${GREEN}reachable${NC}  $sock"
+                else
+                    echo "  socket: ${RED}NOT reachable${NC}  $sock"
+                fi
+            else
+                echo "  socket: ${YELLOW}not configured${NC}"
+            fi
+            ;;
+        podman-rootless)
+            if [ -n "${OPENCODE_PODMAN_SOCKET:-}" ]; then
+                local sp="${OPENCODE_PODMAN_SOCKET#unix://}"
+                if [ -S "$sp" ]; then
+                    echo "  socket: ${GREEN}reachable${NC}  $OPENCODE_PODMAN_SOCKET"
+                else
+                    echo "  socket: ${RED}NOT reachable${NC}  $OPENCODE_PODMAN_SOCKET"
+                fi
+            elif command -v podman >/dev/null 2>&1; then
+                echo "  podman CLI: ${GREEN}installed${NC}"
+            else
+                echo "  podman CLI: ${RED}NOT installed${NC}"
+            fi
+            ;;
+        *)
+            local dg="$(getent group docker 2>/dev/null | cut -d: -f3)"
+            if [ -n "$dg" ]; then
+                echo "  docker group: ${GREEN}present (gid $dg)${NC}"
+            else
+                echo "  docker group: ${YELLOW}absent${NC}"
+            fi
+            ;;
+    esac
+}
+
+# Re-render the sudoers for a given backend. Mirrors install.sh/update.sh: keep
+# the (opencode:docker) grant for docker-group, strip it for rootless.
+render_sudoers() {
+    local backend="$1"
+    local template=""
+    for cand in "$LIBDIR/sudoers.template" "$SCRIPT_DIR/sudoers.template" "$SCRIPT_DIR/../files/sudoers.template"; do
+        if [ -f "$cand" ]; then template="$cand"; break; fi
+    done
+    [ -n "$template" ] || die "sudoers.template not found."
+    local tmp
+    tmp=$(mktemp)
+    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$template" > "$tmp"
+    case "$backend" in
+        docker-rootless|podman-rootless)
+            sed -e '/^#@docker-group-begin$/,/^#@docker-group-end$/d' "$tmp" > "$tmp.2"
+            ;;
+        *)
+            sed -e '/^#@docker-group-begin$/d' -e '/^#@docker-group-end$/d' "$tmp" > "$tmp.2"
+            ;;
+    esac
+    mv -f "$tmp.2" "$tmp"
+    sudo cp "$tmp" /etc/opencode-permissions-kit/sudoers
+    sudo chmod 440 /etc/opencode-permissions-kit/sudoers
+    rm -f "$tmp"
+    sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
+    if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
+        echo "  sudoers re-rendered for $backend."
+        log "sudoers re-rendered (backend=$backend)"
+    else
+        die "sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers."
+    fi
+}
+
+# Update install.conf: rewrite the backend keys while preserving everything else.
+update_install_conf_backend() {
+    local backend="$1" docker_host="$2" podman_socket="$3"
+    local tmp
+    tmp=$(mktemp)
+    {
+        if [ -f "$INSTALL_CONF" ]; then
+            grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null
+        fi
+        echo "CONTAINER_BACKEND=$backend"
+        [ -n "$docker_host" ] && echo "OPENCODE_DOCKER_HOST=$docker_host"
+        [ -n "$podman_socket" ] && echo "OPENCODE_PODMAN_SOCKET=$podman_socket"
+    } | sort -u > "$tmp"
+    sudo cp "$tmp" "$INSTALL_CONF"
+    sudo chmod 644 "$INSTALL_CONF"
+    rm -f "$tmp"
+}
+
+container_backend_apply() {
+    local new_backend="$1"
+    local setup_script="$LIBDIR/setup-container-backend.sh"
+    [ -f "$setup_script" ] || setup_script="$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh"
+    [ -f "$setup_script" ] || die "setup-container-backend.sh not found."
+
+    local prev="${CONTAINER_BACKEND:-docker-group}"
+    echo "Switching container backend: ${CYAN}${prev}${NC} -> ${CYAN}${new_backend}${NC}"
+
+    if ! confirm "Provision '$new_backend' for $OPENCODE_USER?"; then
+        echo "  Aborted."
+        return 1
+    fi
+
+    # Provision the new backend (or teardown for docker-group).
+    local docker_host="" podman_socket=""
+    local setup_out
+    setup_out=$(sudo sh "$setup_script" "$new_backend" --yes 2>&1) || {
+        echo "${RED}Provisioning failed:${NC}"
+        echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/  /'
+        echo "${YELLOW}Backend not changed.${NC}"
+        return 1
+    }
+    echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/  /'
+    # Capture socket key from the helper output.
+    docker_host=$(echo "$setup_out" | sed -n 's/^OPENCODE_DOCKER_HOST=//p' | tail -1)
+
+    # Update install.conf.
+    update_install_conf_backend "$new_backend" "$docker_host" "$podman_socket"
+
+    # Re-render the sudoers for the new backend.
+    render_sudoers "$new_backend"
+
+    echo ""
+    echo "  ${GREEN}Container backend switched to '$new_backend'.${NC}"
+    echo "  Restart any running opencode sessions to pick up the new backend."
+    log "container backend switched: $prev -> $new_backend"
+}
+
 # --- refresh -----------------------------------------------------------------
 
 refresh() {
@@ -242,12 +380,14 @@ menu() {
     while true; do
         echo "Current settings:"
         git_config_status 2>/dev/null || true
+        container_backend_status 2>/dev/null || true
         projects_list
         echo ""
         echo "  [1] Add project root"
         echo "  [2] Remove project root"
         echo "  [3] Toggle .git/config hardening (on/off)"
         echo "  [4] Refresh ACL protection now"
+        echo "  [5] Switch container backend (docker-group / rootless)"
         echo "  [q] Quit"
         printf "  > "
         read -r sel </dev/tty 2>/dev/null || read -r sel
@@ -280,6 +420,23 @@ menu() {
                 fi
                 ;;
             4) refresh ;;
+            5)
+                banner
+                container_backend_status
+                echo ""
+                echo "  [1] docker-group (default — no host change, root-equivalent)"
+                echo "  [2] podman-rootless (daemonless — ACL denies hold)"
+                echo "  [3] docker-rootless (needs systemd --user)"
+                echo "  [q] Cancel"
+                printf "  > "
+                read -r _be_sel </dev/tty 2>/dev/null || read -r _be_sel
+                case "$_be_sel" in
+                    1) container_backend_apply docker-group || true ;;
+                    2) container_backend_apply podman-rootless || true ;;
+                    3) container_backend_apply docker-rootless || true ;;
+                    *) echo "  Cancelled." ;;
+                esac
+                ;;
             q|Q|quit|exit) echo "Bye."; exit 0 ;;
             *) echo "${YELLOW}Unknown selection.${NC}" ;;
         esac
@@ -311,6 +468,14 @@ case "$ACTION" in
             on|off) banner; git_config_apply "$SUB" ;;
             status|"") banner; git_config_status ;;
             *)      die "Usage: config.sh git-config on|off|status" ;;
+        esac
+        ;;
+    container-backend)
+        case "$SUB" in
+            docker-group|docker-rootless|podman-rootless)
+                banner; container_backend_apply "$SUB" ;;
+            status|"") banner; container_backend_status ;;
+            *)      die "Usage: config.sh container-backend docker-group|docker-rootless|podman-rootless|status" ;;
         esac
         ;;
     refresh)    banner; refresh ;;

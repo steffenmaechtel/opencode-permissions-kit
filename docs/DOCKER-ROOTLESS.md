@@ -1,28 +1,28 @@
 # Docker Rootless — Design & Implementation Plan
 
-> Status: **Phase 1 implemented (backend awareness); Phase 2 / Phase 3 pending.**
+> Status: **Phase 1 + 2 implemented; Phase 3 pending.**
 > This document is the design record for removing the root-equivalence of the
 > kit's docker grant. The authoritative usage documentation for the *current*
 > container-tools feature is `docs/CONTAINER-TOOLS.md` (design record) and
 > `docs/MANUAL.md` (usage).
 >
-> **Phase 1 (done):** the kit records `CONTAINER_BACKEND` in `install.conf`
-> (`docker-group` default, `docker-rootless` / `podman-rootless` opt-in) and the
-> wrapper, `status.sh`, and the sudoers render all react to it. No rootless is
-> provisioned yet — an admin who already runs a rootless backend for the
-> `opencode` user can point the kit at it by editing `install.conf` + re-running
-> `update.sh` (see `docs/MANUAL.md` → "Container backend"). `install.sh` also
-> records `DDEV_VERSION` (the §6.8 gate, advisory). Existing installs behave
-> exactly as before.
+> **Phase 1 (done):** backend awareness — `CONTAINER_BACKEND` in `install.conf`,
+> wrapper/status/sudoers react to it, `DDEV_VERSION` recorded.
 >
-> **Phase 2 (pending):** install-time detection + provisioning (subuid/subgid,
-> rootless setup as `opencode`, linger) and `config.sh container-backend`.
+> **Phase 2 (done):** install-time provisioning — `install.sh` detects the
+> container situation and offers an interactive backend choice (or
+> `--container-backend` for scripts). `config.sh container-backend` switches
+> post-install. The shared `setup-container-backend.sh` installs packages
+> (`uidmap`, `dbus-user-session`, `podman`/`docker-ce-rootless-extras`,
+> `slirp4netns`), auto-allocates non-overlapping `/etc/subuid` + `/etc/subgid`
+> ranges for `opencode`, and for `docker-rootless` runs
+> `dockerd-rootless-setuptool.sh` + enables linger. `podman-rootless` is
+> daemonless (no socket, no linger).
+>
 > **Phase 3 (pending):** ddev-shim `DOCKER_HOST`/`XDG_RUNTIME_DIR`
-> pass-through and e2e coverage per backend.
+> pass-through and a `docker-rootless` daemon e2e.
 >
-> The decisions recorded in §9 below (subuid/subgid, privileged ports, ddev-shim
-> env pass-through, podman CLI, ddev version gate) are the agreed direction for
-> Phase 2 / 3; they are not yet in the code.
+> The §9.1 ACL-bind-mount proposition is **proven by e2e** (section 12i).
 
 ## 1. The Problem (confirmed)
 
@@ -333,18 +333,19 @@ Therefore the check is **detect + record + warn**, not a hard install block:
    `DDEV_VERSION`. Nothing changes for existing installs. An admin who already
    runs rootless for the `opencode` user can point the kit at it manually (edit
    `install.conf` + `update.sh`). Tests: `tests/test-container-backend.sh`.
-2. **Phase 2 — setup helpers (PENDING).** `install.sh`/`config.sh` detect and
-   provision docker-rootless / podman for the `opencode` user (and optionally the
-   developer), including subuid/subgid and linger.
-3. **Phase 3 — ddev shim env pass-through + e2e (e2e DONE for podman-rootless).**
-   The e2e suite (`tests/e2e/run.sh` section 12i) builds a real rootless podman
-   environment inside the `--privileged` test image, proves §9.1, switches the
-   kit to `podman-rootless`, re-renders the sudoers, and exercises the wrapper's
-   podman-CLI dispatch. Still pending: the ddev-shim
-   `--preserve-env=DOCKER_HOST,XDG_RUNTIME_DIR` pass-through for the
-   *developer's* rootless socket — only matters once Phase 2 lets a developer
-   run rootless too; and a `docker-rootless` daemon e2e (heavier setup than
-   podman's daemonless path).
+2. **Phase 2 — setup helpers (DONE).** `install.sh` detects the container
+   situation and offers an interactive backend choice (or `--container-backend`
+   flag for scripts). `config.sh container-backend` switches post-install. The
+   shared `setup-container-backend.sh` installs packages, auto-allocates
+   subuid/subgid for `opencode`, and for `docker-rootless` runs
+   `dockerd-rootless-setuptool.sh` + enables linger. `podman-rootless` is
+   daemonless. E2E section 12i exercises provisioning + the §9.1 proof
+   end-to-end via `config.sh`.
+3. **Phase 3 — ddev shim env pass-through + docker-rootless e2e (PENDING).** The
+   ddev-shim `--preserve-env=DOCKER_HOST,XDG_RUNTIME_DIR` pass-through for the
+   *developer's* rootless socket — only matters once a developer runs rootless
+   too; and a `docker-rootless` daemon e2e (heavier setup than podman's
+   daemonless path).
 
 ## 8. Implementation Footprint
 

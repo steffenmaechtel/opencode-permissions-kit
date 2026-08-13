@@ -137,16 +137,34 @@ The kit records a **container backend** in `install.conf` (`CONTAINER_BACKEND=`)
 
 `docker-group` is the default and the status quo: **no behaviour change for existing installs.** If the configured rootless socket is not reachable, the wrapper warns loudly and starts **without** container tools — it never silently falls back to `-g docker` (that would reintroduce root-equivalent host access). `--yes`/scripts keep `docker-group` unless a backend is chosen explicitly.
 
-> **Phase 1 (current state):** the kit is *backend-aware* — it records `CONTAINER_BACKEND` and the wrapper, `status.sh`, and the sudoers render react to it — but `install.sh` does **not** yet provision rootless. An admin who already runs a rootless backend for the `opencode` user can point the kit at it by editing `/etc/opencode-permissions-kit/install.conf`:
+> **Phase 1 + 2 (current state):** the kit is *backend-aware* and can
+> **provision** rootless backends. `install.sh` detects the container situation
+> and offers an interactive backend choice (or `--container-backend
+> podman-rootless` for scripts). `config.sh container-backend` switches
+> post-install. Rootless provisioning (packages, subuid/subgid auto-allocation,
+> linger) is handled by `setup-container-backend.sh`. An admin who already runs
+> a rootless backend can also point the kit at it manually by editing
+> `/etc/opencode-permissions-kit/install.conf`:
 
 ```bash
-sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=podman-rootless/' /etc/opencode-permissions-kit/install.conf
-sudo /usr/local/lib/opencode-permissions-kit/update.sh --yes     # re-renders sudoers for the new backend
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh container-backend podman-rootless
 ```
 
-For `docker-rootless` you also record the socket (`OPENCODE_DOCKER_HOST=unix:///run/user/$(id -u opencode)/docker.sock`). For `podman-rootless` the `podman` CLI path needs no socket — just ensure `podman` + `uidmap` are installed and `/etc/subuid` + `/etc/subgid` carry an `opencode` range (the kit will provision these automatically in Phase 2).
+For `docker-rootless` the helper also records the socket
+(`OPENCODE_DOCKER_HOST=unix:///run/user/$(id -u opencode)/docker.sock`). For
+`podman-rootless` the `podman` CLI path needs no socket — the helper installs
+`podman` + `uidmap` + `slirp4netns` and auto-allocates `/etc/subuid` + `/etc/subgid`
+ranges for the `opencode` user.
 
-The two-daemon reality and the full provisioning flow (subuid/subgid, linger, ddev ≥ 1.25 gate, ddev-shim env pass-through) are tracked in `docs/DOCKER-ROOTLESS.md` as Phase 2 / Phase 3. `status.sh` reflects whichever backend is configured; `docker ps` inside an `opencode` session will not list the developer's ddev containers when a rootless backend is selected (different daemon/user) — that is expected. The §9.1 value proposition (a rootless bind mount respects `u:opencode:---`) is **proven by e2e** — `tests/e2e/run.sh` section 12i runs a real rootless podman container as the `opencode` user and asserts `.env` is denied while a normal file is readable.
+The two-daemon reality and the ddev ≥ 1.25 gate (ddev-shim `--preserve-env`
+pass-through) are tracked in `docs/DOCKER-ROOTLESS.md` as Phase 3. `status.sh`
+reflects whichever backend is configured; `docker ps` inside an `opencode`
+session will not list the developer's ddev containers when a rootless backend is
+selected (different daemon/user) — that is expected. The §9.1 value proposition
+(a rootless bind mount respects `u:opencode:---`) is **proven by e2e** —
+`tests/e2e/run.sh` section 12i provisions real rootless podman via `config.sh`,
+runs a container as the `opencode` user, and asserts `.env` is denied while a
+normal file is readable.
 
 #### `CONTAINER_BACKEND` keys in `install.conf`
 

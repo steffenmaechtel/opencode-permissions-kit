@@ -33,7 +33,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/bin/ddev \
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/ddev \
              opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -74,11 +74,22 @@ WWW_GROUP="www-data"
 SKIP_PROMPTS=false
 PREDEFINED_PROJECTS=""
 SECURE_GIT_CONFIG=false
+CONTAINER_BACKEND_OPT=""
 
+_skip_next=false
 for arg do
+    if [ "$_skip_next" = true ]; then
+        _skip_next=false
+        shift 2>/dev/null || true
+        continue
+    fi
     case "$arg" in
         --yes) SKIP_PROMPTS=true ;;
         --secure-git-config) SECURE_GIT_CONFIG=true ;;
+        --container-backend)
+            CONTAINER_BACKEND_OPT="$2"
+            _skip_next=true
+            ;;
         --projects)
             shift
             while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
@@ -220,11 +231,9 @@ if [ -x "$DDEV_BIN" ]; then
 fi
 log "detected DDEV_VERSION=${DDEV_VERSION:-unknown}"
 
-# Container backend (Phase 1: backend awareness only — no rootless provisioning
-# yet, see docs/DOCKER-ROOTLESS.md §7). The installer defaults to docker-group
-# (legacy behaviour, zero host change) so existing setups are unaffected. On a
-# re-install over an existing kit, preserve a previously configured backend so a
-# manual rootless setup (edit install.conf) is not silently reset.
+# Container backend selection (Phase 2: detection + provisioning, see
+# docs/DOCKER-ROOTLESS.md §6.4, §6.7). On a re-install over an existing kit,
+# preserve a previously configured backend unless --container-backend overrides.
 CONTAINER_BACKEND="docker-group"
 OPENCODE_DOCKER_HOST=""
 OPENCODE_PODMAN_SOCKET=""
@@ -239,6 +248,85 @@ for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf;
         break
     fi
 done
+
+# --container-backend flag overrides (for non-interactive scripting).
+if [ -n "$CONTAINER_BACKEND_OPT" ]; then
+    case "$CONTAINER_BACKEND_OPT" in
+        docker-group|docker-rootless|podman-rootless|none)
+            CONTAINER_BACKEND="$CONTAINER_BACKEND_OPT"
+            ;;
+        *)
+            echo "${RED}Invalid --container-backend: '$CONTAINER_BACKEND_OPT'${NC}"
+            echo "${YELLOW}Supported: docker-group | docker-rootless | podman-rootless | none${NC}"
+            exit 1
+            ;;
+    esac
+fi
+
+# Interactive prompt (only when not --yes and no --container-backend flag).
+# Auto-detect the container situation and present a choice. --yes defaults to
+# docker-group (zero host change); explicit selection is done via the flag.
+if [ "$SKIP_PROMPTS" != true ] && [ -z "$CONTAINER_BACKEND_OPT" ]; then
+    echo ""
+    echo "--- Container backend ---"
+    echo ""
+    echo "  The container backend decides how opencode reaches Docker/Podman."
+    echo "  docker-group (default) gives root-equivalent host access via the docker socket."
+    echo "  docker-rootless / podman-rootless confine containers to the opencode UID so"
+    echo "  the kit's ACL denies hold inside bind-mounted containers (see docs/DOCKER-ROOTLESS.md)."
+    echo ""
+    echo "  [1] docker-group (default — no host change, root-equivalent)"
+    if command -v podman >/dev/null 2>&1 && sudo -u "$OPENCODE_USER" podman info >/dev/null 2>&1; then
+        echo "  [2] podman-rootless (RECOMMENDED — podman already installed, ACL denies hold)"
+        echo "  [3] docker-rootless (needs systemd --user + docker-ce-rootless-extras)"
+    else
+        echo "  [2] podman-rootless (RECOMMENDED — will install podman + uidmap)"
+        echo "  [3] docker-rootless (needs systemd --user + docker-ce-rootless-extras)"
+    fi
+    echo "  [4] none (no container access)"
+    printf "  > "
+    read -r _be_sel </dev/tty 2>/dev/null || read -r _be_sel
+    case "$_be_sel" in
+        2) CONTAINER_BACKEND="podman-rootless" ;;
+        3) CONTAINER_BACKEND="docker-rootless" ;;
+        4) CONTAINER_BACKEND="none" ;;
+        *) CONTAINER_BACKEND="docker-group" ;;
+    esac
+fi
+
+# Provision the chosen backend (only for rootless; docker-group/none = no-op).
+# The helper installs packages, allocates subuid/subgid, and sets up the
+# daemon. It prints OPENCODE_DOCKER_HOST=... on stdout for the caller to record.
+if [ "$CONTAINER_BACKEND" = "docker-rootless" ] || [ "$CONTAINER_BACKEND" = "podman-rootless" ]; then
+    echo ""
+    echo "--- Provisioning container backend: $CONTAINER_BACKEND ---"
+    SETUP_SCRIPT="$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh"
+    [ -f "$SETUP_SCRIPT" ] || SETUP_SCRIPT="$LIBDIR/setup-container-backend.sh"
+    # Capture stdout (socket key) + let stderr flow to the terminal.
+    _setup_out=$(sh "$SETUP_SCRIPT" "$CONTAINER_BACKEND" --yes 2>&1) || {
+        echo "${RED}Container backend provisioning failed.${NC}"
+        echo "$_setup_out"
+        echo "${YELLOW}Falling back to docker-group (root-equivalent). Fix the issue above and re-run.${NC}"
+        CONTAINER_BACKEND="docker-group"
+        OPENCODE_DOCKER_HOST=""
+        OPENCODE_PODMAN_SOCKET=""
+    }
+    # Extract the socket key from the helper output (last line starting OPENCODE_).
+    _sock=$(echo "$_setup_out" | sed -n 's/^\(OPENCODE_DOCKER_HOST=.*\)/\1/p' | tail -1)
+    if [ -n "$_sock" ]; then
+        OPENCODE_DOCKER_HOST="${_sock#OPENCODE_DOCKER_HOST=}"
+    fi
+    echo "$_setup_out" | grep -v '^OPENCODE_' | sed 's/^/  /'
+fi
+
+# Handle 'none' — no container access at all.
+if [ "$CONTAINER_BACKEND" = "none" ]; then
+    CONTAINER_BACKEND="docker-group"
+    # The wrapper will never get a docker-group grant request because no project
+    # will be configured to enable docker tools. Record docker-group but with
+    # no socket — same as the legacy default.
+fi
+
 log "container backend: $CONTAINER_BACKEND"
 
 # === Step 1: User ===
@@ -467,6 +555,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/protect-projects.sh" "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
@@ -480,7 +569,7 @@ sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo mkdir -p "$LIBDIR/bin"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev"            "$LIBDIR/bin/ddev"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" \
+               "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit" \
                "$LIBDIR/bin/ddev"

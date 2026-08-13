@@ -1,10 +1,10 @@
 #!/bin/sh
-# Unit tests for the container-backend awareness (Phase 1).
+# Unit tests for the container-backend awareness (Phase 1 + Phase 2).
 #
 # The kit records a CONTAINER_BACKEND in install.conf (docker-group default,
 # docker-rootless / podman-rootless opt-in) and the wrapper, status.sh, and the
-# sudoers render all react to it. This is Phase 1 (backend awareness only — no
-# rootless provisioning); see docs/DOCKER-ROOTLESS.md §7.
+# sudoers render all react to it. Phase 2 adds install-time provisioning and
+# the config.sh container-backend subcommand; see docs/DOCKER-ROOTLESS.md §7.
 #
 # Three layers are checked:
 #   (1) sudoers.template — the docker-group RunAs grant is sentinel-wrapped so
@@ -247,6 +247,79 @@ echo "-- CI chmod lists --"
 check "test.yml chmods the new test"  grep -Fq './tests/test-container-backend.sh' "$TEST_YML"
 check "e2e.yml chmods the new test"   grep -Fq './tests/test-container-backend.sh' "$E2E_YML"
 check "test.yml runs the new test"   grep -Fq 'Run container backend tests' "$TEST_YML"
+check "test.yml chmods setup-container-backend.sh" \
+    grep -Fq './files/opencode-permissions-kit-lib/setup-container-backend.sh' "$TEST_YML"
+check "e2e.yml chmods setup-container-backend.sh" \
+    grep -Fq './files/opencode-permissions-kit-lib/setup-container-backend.sh' "$E2E_YML"
+
+echo ""
+echo "-- Phase 2: setup-container-backend.sh structure --"
+SETUP="$REPO/files/opencode-permissions-kit-lib/setup-container-backend.sh"
+check "setup-container-backend.sh exists"  [ -f "$SETUP" ]
+check "setup has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SETUP"
+check "setup accepts docker-rootless"        grep -Fq 'docker-rootless|podman-rootless|docker-group' "$SETUP"
+check "setup installs uidmap + dbus"         grep -Fq 'apt_install uidmap' "$SETUP"
+check "setup auto-allocates subuid/subgid"   grep -Fq 'allocate_subuid_subgid' "$SETUP"
+check "setup allocates non-overlapping range" grep -Fq 'allocate_range' "$SETUP"
+check "setup enables linger for docker-rootless" grep -Fq 'enable_linger' "$SETUP"
+check "setup runs dockerd-rootless-setuptool.sh as opencode" grep -Fq 'dockerd-rootless-setuptool.sh' "$SETUP"
+check "setup installs podman for podman-rootless" grep -Fq 'apt_install uidmap dbus-user-session podman' "$SETUP"
+check "setup tears down when switching to docker-group" grep -Fq 'teardown_rootless' "$SETUP"
+check "setup prints OPENCODE_DOCKER_HOST on stdout" grep -Fq 'echo "OPENCODE_DOCKER_HOST=$SOCK"' "$SETUP"
+check "setup reads opencode user from install.conf" grep -Fq 'OPENCODE_USER="opencode"' "$SETUP"
+check "setup checks systemd for docker-rootless" grep -Fq 'systemd_user_available' "$SETUP"
+
+echo ""
+echo "-- Phase 2: install.sh provisioning --"
+check "install.sh has --container-backend flag" \
+    grep -Fq 'CONTAINER_BACKEND_OPT="$2"' "$INSTALL"
+check "install.sh validates --container-backend value" \
+    grep -Fq 'docker-group|docker-rootless|podman-rootless|none' "$INSTALL"
+check "install.sh fetches setup-container-backend.sh" \
+    grep -Fq 'opencode-permissions-kit-lib/setup-container-backend.sh' "$INSTALL"
+check "install.sh deploys setup-container-backend.sh to LIBDIR" \
+    grep -Fq '"$LIBDIR/setup-container-backend.sh"' "$INSTALL"
+check "install.sh chmods setup-container-backend.sh" \
+    grep -Fq '$LIBDIR/setup-container-backend.sh' "$INSTALL"
+check "install.sh has interactive backend prompt" \
+    grep -Fq 'Container backend' "$INSTALL"
+check "install.sh calls setup helper for rootless" \
+    grep -Fq 'setup-container-backend.sh' "$INSTALL"
+check "install.sh falls back to docker-group on provisioning failure" \
+    grep -Fq 'Falling back to docker-group' "$INSTALL"
+
+echo ""
+echo "-- Phase 2: update.sh deploy --"
+check "update.sh KIT_FILES includes setup-container-backend.sh" \
+    grep -Fq 'opencode-permissions-kit-lib/setup-container-backend.sh' "$UPDATE"
+check "update.sh deploys setup-container-backend.sh to LIBDIR" \
+    grep -Fq '"$LIBDIR/setup-container-backend.sh"' "$UPDATE"
+check "update.sh chmods setup-container-backend.sh" \
+    grep -Fq '$LIBDIR/setup-container-backend.sh' "$UPDATE"
+
+echo ""
+echo "-- Phase 2: config.sh container-backend subcommand --"
+CONFIG="$REPO/files/config.sh"
+check "config.sh recognizes container-backend action" \
+    grep -Fq 'container-backend)' "$CONFIG"
+check "config.sh has container_backend_status" \
+    grep -Fq 'container_backend_status()' "$CONFIG"
+check "config.sh has container_backend_apply" \
+    grep -Fq 'container_backend_apply()' "$CONFIG"
+check "config.sh has render_sudoers" \
+    grep -Fq 'render_sudoers()' "$CONFIG"
+check "config.sh has update_install_conf_backend" \
+    grep -Fq 'update_install_conf_backend()' "$CONFIG"
+check "config.sh dispatches container-backend subcommand" \
+    grep -Fq 'container-backend)' "$CONFIG"
+check "config.sh accepts docker-group|docker-rootless|podman-rootless sub" \
+    grep -Fq 'docker-group|docker-rootless|podman-rootless' "$CONFIG"
+check "config.sh menu has [5] container backend entry" \
+    grep -Fq '[5] Switch container backend' "$CONFIG"
+check "config.sh calls setup-container-backend.sh" \
+    grep -Fq 'setup-container-backend.sh' "$CONFIG"
+check "config.sh render_sudoers strips docker-group block for rootless" \
+    grep -Fq 'begin$/' "$CONFIG"
 
 echo ""
 echo "===================================="

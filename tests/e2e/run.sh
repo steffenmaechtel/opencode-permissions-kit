@@ -781,77 +781,77 @@ check "status.sh reports the real ddev path" \
     E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "/usr/bin/ddev"'
 
 echo ""
-echo "--- 12i. Rootless container backend (podman) ---"
+echo "--- 12i. Rootless container backend (podman) — Phase 2 provisioning ---"
 # This is the real-rootless environment test (docs/DOCKER-ROOTLESS.md §9.1).
 # It proves the core value proposition: a rootless container started by the
 # opencode user accesses bind-mounted files as the opencode host UID, so the
-# kit's hard ACL deny (u:opencode:--- on .env) holds INSIDE the container —
-# `podman run -v <project>:/app alpine cat /app/.env` is denied, while a normal
-# file (index.php) is readable. It also exercises the Phase-1 backend awareness
-# end-to-end: switch install.conf to CONTAINER_BACKEND=podman-rootless, let
-# update.sh re-render the sudoers (strips the (opencode:docker) grant), and show
-# that the wrapper auto-detects the podman-CLI path (no -g, no docker group).
+# kit's hard ACL deny (u:opencode:--- on .env) holds INSIDE the container.
+# It also exercises Phase 2: config.sh container-backend podman-rootless
+# provisions the backend (installs packages via setup-container-backend.sh,
+# allocates subuid/subgid, re-renders the sudoers, updates install.conf).
 #
 # Rootless podman needs nested user namespaces + uidmap. The e2e container runs
-# --privileged, which usually suffices, but some runner kernels disallow it. If
-# podman cannot be installed or `podman info` fails as the opencode user, every
+# --privileged, which usually suffices, but some runner kernels disallow it.
+# If provisioning fails or `podman info` fails as the opencode user, every
 # check in this section is SKIPped (not failed) so CI stays green.
 
-# 12i.1 install podman + uidmap (best-effort; skip the section on failure)
 _rootless_ok=true
-if ! E 'sudo apt-get update -qq && sudo apt-get install -y podman uidmap slirp4netns >/tmp/podman-install.log 2>&1'; then
-    echo "  ${YELLOW}SKIP${NC}  12i: podman not installable in this environment ($(tail -1 /tmp/podman-install.log 2>/dev/null || echo unknown))"
+
+# 12i.1 switch to podman-rootless via config.sh (Phase 2 provisioning).
+# This installs podman+uidmap+slirp4netns, allocates subuid/subgid, updates
+# install.conf, and re-renders the sudoers — all via setup-container-backend.sh.
+# Run config.sh from the REPO checkout so we test the local Phase 2 code, not
+# a potentially stale installed copy.
+if ! E 'sudo bash /home/dev/repo/files/config.sh --yes container-backend podman-rootless >/tmp/config-backend.log 2>&1'; then
+    echo "  ${YELLOW}SKIP${NC}  12i: backend provisioning failed ($(sudo tail -1 /tmp/config-backend.log 2>/dev/null || echo unknown))"
     _rootless_ok=false
     skipped=$((skipped + 1))
 fi
 
+# 12i.2 verify install.conf + sudoers were updated by config.sh.
 if [ "$_rootless_ok" = true ]; then
-    check "12i: podman installed" \
+    check "12i: install.conf records CONTAINER_BACKEND=podman-rootless" \
+        E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
+    check "12i: sudoers strips (opencode:docker) for the podman-rootless backend" \
+        E '! sudo grep -q "opencode:docker" /etc/sudoers.d/opencode-permissions-kit'
+    check "12i: sudoers keeps the base (opencode) RunAs" \
+        E 'sudo grep -q "(opencode) NOPASSWD" /etc/sudoers.d/opencode-permissions-kit'
+    check "12i: sudoers still has the ddev delegation rule" \
+        E 'sudo grep -q "NOPASSWD: /usr/bin/ddev" /etc/sudoers.d/opencode-permissions-kit'
+fi
+
+# 12i.3 verify podman + subuid/subgid were provisioned by the setup helper.
+if [ "$_rootless_ok" = true ]; then
+    check "12i: podman installed by setup helper" \
         E 'command -v podman && podman --version'
+    check "12i: subuid range allocated for opencode" \
+        E 'grep -q "^opencode:" /etc/subuid'
+    check "12i: subgid range allocated for opencode" \
+        E 'grep -q "^opencode:" /etc/subgid'
 fi
 
-# 12i.2 configure subuid/subgid for the opencode user (the kit will do this
-# automatically in Phase 2; here we provision manually to prove the claim).
-if [ "$_rootless_ok" = true ]; then
-    E 'echo "opencode:100000:65536" | sudo tee -a /etc/subuid >/dev/null'
-    E 'echo "opencode:100000:65536" | sudo tee -a /etc/subgid >/dev/null'
-    check "12i: subuid/subgid ranges allocated for opencode" \
-        E 'grep -q "^opencode:100000:65536$" /etc/subuid && grep -q "^opencode:100000:65536$" /etc/subgid'
-fi
-
-# 12i.3 rootless podman usable as the opencode user (this is where a kernel
-# without nested userns would bail). Give opencode a runtime dir + XDG.
+# 12i.4 rootless podman usable as the opencode user (nested userns check).
 if [ "$_rootless_ok" = true ]; then
     E 'sudo mkdir -p /run/user/$(id -u opencode) && sudo chown opencode:opencode /run/user/$(id -u opencode) && sudo chmod 700 /run/user/$(id -u opencode)'
-    # Run podman from /tmp: sudo -u opencode keeps the CWD, and opencode cannot
-    # enter /home/dev (the dev user's private home). The warning message is
-    # captured so a failure here can SKIP the section with a real reason.
     if E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman info >/tmp/podman-info.out 2>&1"'; then
         check "12i: rootless podman works as the opencode user (nested userns)" \
             E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman info >/dev/null 2>&1"'
     else
-        echo "  ${YELLOW}SKIP${NC}  12i: nested user namespaces not available in this environment ($(sudo tail -1 /tmp/podman-info.out 2>/dev/null || echo unknown))"
+        echo "  ${YELLOW}SKIP${NC}  12i: nested user namespaces not available ($(sudo tail -1 /tmp/podman-info.out 2>/dev/null || echo unknown))"
         _rootless_ok=false
         skipped=$((skipped + 1))
     fi
 fi
 
-# 12i.4 the §9.1 proof. Re-affirm the ACL on .env is in place, then run a
-# rootless container as opencode that bind-mounts the project. Denied file ->
-# permission denied; normal file -> readable.
+# 12i.5 the §9.1 proof — ACL deny survives a rootless bind mount.
 if [ "$_rootless_ok" = true ]; then
-    # The kit protected .env earlier (section 10); re-confirm the u:opencode:--- ACL.
     check "12i: .env still carries the u:opencode:--- ACL deny" \
         E 'sudo getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode:---"'
-    # Pre-pull alpine (small); best-effort — skip the §9.1 sub-checks if unreachable.
     if E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman pull alpine:latest >/tmp/podman-pull.out 2>&1"'; then
-        # Container root maps to the opencode host UID -> u:opencode:--- applies.
         check_fail "12i §9.1: rootless container CANNOT read ACL-denied .env via bind mount" \
             E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman run --rm -v /var/www/vhosts/test-project:/app alpine:latest cat /app/.env"'
         check "12i §9.1: rootless container CAN read non-denied index.php via bind mount" \
             E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman run --rm -v /var/www/vhosts/test-project:/app alpine:latest cat /app/index.php" | grep -q "normal source code"'
-        # Sanity: confirm the deny is owed to the ACL, not a missing file (cat the
-        # same file on the host as opencode — also denied by the ACL).
         check_fail "12i §9.1: host-side opencode also denied .env (confirms ACL, not missing file)" \
             E 'sudo -u opencode cat /var/www/vhosts/test-project/.env'
     else
@@ -860,36 +860,15 @@ if [ "$_rootless_ok" = true ]; then
     fi
 fi
 
-# 12i.5 switch the kit to the podman-rootless backend end-to-end. Edit
-# install.conf, re-render the sudoers via update.sh (strips the (opencode:docker)
-# grant), and show status.sh reports the backend + the podman CLI path.
+# 12i.6 status.sh reports the provisioned podman-rootless backend.
 if [ "$_rootless_ok" = true ]; then
-    E 'sudo sed -i "s/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=podman-rootless/" /etc/opencode-permissions-kit/install.conf'
-    # Run update.sh from the REPO checkout (like sections 11/11b/11d), not the
-    # installed library — the installed path would fetch master and overwrite
-    # the locally-deployed Phase-1 scripts with the published (pre-Phase-1)
-    # versions, undoing the very logic under test.
-    E 'sudo bash /home/dev/repo/files/update.sh --yes >/tmp/update-rootless.log 2>&1' && \
-        echo "  ${GREEN}OK${NC}  update.sh re-rendered sudoers for podman-rootless"
-    check "12i: sudoers strips (opencode:docker) for the podman-rootless backend" \
-        E '! sudo grep -q "opencode:docker" /etc/sudoers.d/opencode-permissions-kit'
-    check "12i: sudoers keeps the base (opencode) RunAs" \
-        E 'sudo grep -q "(opencode) NOPASSWD" /etc/sudoers.d/opencode-permissions-kit'
-    check "12i: sudoers still has the ddev delegation rule" \
-        E 'sudo grep -q "NOPASSWD: /usr/bin/ddev" /etc/sudoers.d/opencode-permissions-kit'
-    check "12i: install.conf records CONTAINER_BACKEND=podman-rootless" \
-        E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
-    # status.sh: the podman-CLI branch reports "podman CLI: installed".
     check "12i: status.sh reports the podman-rootless backend" \
         E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "backend:    podman-rootless"'
     check "12i: status.sh reports the podman CLI as installed" \
         E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "podman CLI:.*installed"'
 fi
 
-# 12i.6 wrapper auto-detect on the podman-CLI path. The project opencode.jsonc
-# (set in 12e2, re-asserted here) enables docker -> the wrapper resolves
-# CONTAINER_BACKEND=podman-rootless, finds `podman`, prompts, and on Yes runs
-# opencode WITHOUT -g docker (the podman-CLI exec branch).
+# 12i.7 wrapper auto-detect on the podman-CLI path.
 if [ "$_rootless_ok" = true ]; then
     E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
 {
@@ -906,25 +885,27 @@ EOF'
         E 'grep -q "Run opencode with the podman-rootless backend" /tmp/wrapper-podman.txt'
     check "12i: wrapper podman auto-detect: accepted -> podman-rootless exec message" \
         E 'grep -q "opencode will run with the podman-rootless backend" /tmp/wrapper-podman.txt'
-    # Crucially the wrapper must NOT emit the docker-group path here.
     check_fail "12i: wrapper podman path does NOT mention the docker group" \
         E 'grep -q "opencode will run with the docker group" /tmp/wrapper-podman.txt'
     check_fail "12i: wrapper podman path does NOT warn about an absent docker group" \
         E 'grep -q "does not exist — running without container group" /tmp/wrapper-podman.txt'
-fi
-
-# 12i.7 the opencode user is NOT given the docker group under a rootless
-# backend (containers run as the opencode host UID; no group escalation).
-if [ "$_rootless_ok" = true ]; then
     check "12i: opencode user NOT in the docker group (rootless grants no group)" \
         E '! id -nG opencode | tr " " "\n" | grep -qx docker'
 fi
 
-# 12i.8 teardown the rootless runtime so section 13's uninstall can remove the
-# opencode user (userdel -r fails while a podman runtime/storage is live under
-# /home/opencode). Reset storage, kill any lingering opencode processes, and
-# drop the runtime dir + the .local storage tree.
+# 12i.8 config.sh container-backend status subcommand.
 if [ "$_rootless_ok" = true ]; then
+    check "12i: config.sh container-backend status reports podman-rootless" \
+        E 'sudo bash /home/dev/repo/files/config.sh container-backend status 2>&1 | grep -q "podman-rootless"'
+fi
+
+# 12i.9 teardown the rootless runtime so section 13's uninstall can remove
+# the opencode user. Switch back to docker-group + manual podman storage cleanup.
+if [ "$_rootless_ok" = true ]; then
+    E 'sudo bash /home/dev/repo/files/config.sh --yes container-backend docker-group >/tmp/config-teardown.log 2>&1' || true
+    check "12i: config.sh switches back to docker-group" \
+        E 'grep -q "^CONTAINER_BACKEND=docker-group" /etc/opencode-permissions-kit/install.conf'
+    # Manual podman storage cleanup (userdel -r fails while storage is live).
     E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman system reset --force >/dev/null 2>&1" || true'
     E 'sudo pkill -u opencode 2>/dev/null || true'
     E 'sudo rm -rf /run/user/$(id -u opencode) /home/opencode/.local 2>/dev/null || true'
