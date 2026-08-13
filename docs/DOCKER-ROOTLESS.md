@@ -175,6 +175,15 @@ Before starting, the wrapper verifies the socket is reachable and, if not,
 falls back to running without container tools and prints a loud warning
 (never silently downgrade to `-g docker` — that would reintroduce the hole).
 
+The probe runs from the **`opencode` user's own context**, not the developer's:
+rootless sockets live in the `opencode` runtime dir (`/run/user/<uid>`, mode
+`700` `opencode:opencode`), which a developer-running wrapper cannot stat —
+`test -S` from the developer always fails even when the daemon is up. The
+wrapper therefore tries the direct check first (works when it runs as root or
+as `opencode` itself) and otherwise re-runs the kit's `bin/socket-check.sh`
+(nothing but `test -S`) via the NOPASSWD sudoers rule
+`DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh *`.
+
 ### 6.2 Environment hand-off (`sudo` resets env)
 
 The wrapper starts opencode via `sudo -u opencode`, which resets the

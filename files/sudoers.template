@@ -25,6 +25,13 @@ DEFAULT_USER ALL=(opencode:docker) NOPASSWD: /usr/local/lib/opencode-permissions
 DEFAULT_USER ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/protect-projects.sh *
 opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/protect-projects.sh *
 
+# Rootless socket reachability: the wrapper probes the docker-rootless /
+# podman-rootless socket from the opencode user's own context, because the
+# runtime dir (/run/user/<uid>) is mode 700 opencode:opencode and a
+# developer-running wrapper cannot stat it. Gated to the kit's socket-check.sh
+# helper only (it does nothing but `test -S`) — no arbitrary command execution.
+DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh *
+
 # ddev delegation: the ddev shim (shadowed as /usr/local/bin/ddev) re-execs
 # every `ddev` the opencode agent invokes as the developer via this rule, so
 # ddev rewrites project files with the developer's ownership instead of

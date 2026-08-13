@@ -130,6 +130,8 @@ check "base (opencode) RunAs is always present (outside the block)" \
     grep -Eq 'ALL=\(opencode\) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode \*' "$SUDOERS"
 check "base (opencode) RunAs is NOT inside the docker-group block" \
     awk '/^#@docker-group-begin$/{f=1} /^#@docker-group-end$/{f=0; next} f && /ALL=\(opencode\) NOPASSWD/{bad=1} END{exit bad}' "$SUDOERS"
+check "template has the rootless socket-check NOPASSWD rule" \
+    grep -Fq 'ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh *' "$SUDOERS"
 
 echo ""
 echo "-- sudoers render (per backend) --"
@@ -193,6 +195,26 @@ check "wrapper execs without -g on the podman-CLI branch" \
     grep -Fq '[ "$CONTAINER_PODMAN" = true ]; then' "$WRAPPER"
 
 echo ""
+echo "-- wrapper rootless socket probe (socket-check.sh) --"
+SOCKCHECK="$REPO/files/opencode-permissions-kit-lib/bin/socket-check.sh"
+check "socket-check.sh exists"  [ -f "$SOCKCHECK" ]
+check "socket-check.sh has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SOCKCHECK"
+check "socket-check.sh only does test -S (no command execution)" \
+    grep -Fq '[ -n "$sock" ] && [ -S "$sock" ]' "$SOCKCHECK"
+check "socket-check.sh strips a unix:// prefix" \
+    grep -Fq 'sock="${sock#unix://}"' "$SOCKCHECK"
+check "wrapper has a sock_reachable probe function" \
+    grep -Fq 'sock_reachable()' "$WRAPPER"
+check "wrapper probes the socket directly first (root/opencode contexts)" \
+    grep -Fq '[ -S "$sock" ] 2>/dev/null && return 0' "$WRAPPER"
+check "wrapper re-probes as the opencode user via socket-check.sh" \
+    grep -Fq 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh "$sock"' "$WRAPPER"
+check "docker-rootless branch uses sock_reachable" \
+    grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER"
+check "podman-rootless socket branch uses sock_reachable" \
+    grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER"
+
+echo ""
 echo "-- install.sh wiring --"
 check "install.sh records CONTAINER_BACKEND in install.conf" \
     grep -Fq 'CONTAINER_BACKEND=$CONTAINER_BACKEND' "$INSTALL"
@@ -212,6 +234,10 @@ check "install.sh keeps the docker grant for docker-group" \
     grep -Fq 'begin$/d' "$INSTALL"
 check "install.sh strips the docker grant for rootless" \
     grep -Fq 'begin$/,/^#@docker-group-end' "$INSTALL"
+check "install.sh fetches socket-check.sh" \
+    grep -Fq 'opencode-permissions-kit-lib/bin/socket-check.sh' "$INSTALL"
+check "install.sh deploys socket-check.sh to LIBDIR/bin" \
+    grep -Fq '"$LIBDIR/bin/socket-check.sh"' "$INSTALL"
 
 echo ""
 echo "-- update.sh wiring --"
@@ -228,6 +254,10 @@ check "update.sh does NOT strip CONTAINER_BACKEND in the re-stamp" \
     grep_absent -Eq 'grep -v.*CONTAINER_BACKEND' "$UPDATE"
 check "update.sh still re-stamps DDEV_BIN + VERSION" \
     grep -Fq 'echo "DDEV_BIN=$DDEV_BIN"' "$UPDATE"
+check "update.sh KIT_FILES includes socket-check.sh" \
+    grep -Fq 'opencode-permissions-kit-lib/bin/socket-check.sh' "$UPDATE"
+check "update.sh deploys socket-check.sh to LIBDIR/bin" \
+    grep -Fq '"$LIBDIR/bin/socket-check.sh"' "$UPDATE"
 
 echo ""
 echo "-- status.sh wiring --"
@@ -251,6 +281,10 @@ check "test.yml chmods setup-container-backend.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/setup-container-backend.sh' "$TEST_YML"
 check "e2e.yml chmods setup-container-backend.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/setup-container-backend.sh' "$E2E_YML"
+check "test.yml chmods socket-check.sh" \
+    grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check.sh' "$TEST_YML"
+check "e2e.yml chmods socket-check.sh" \
+    grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check.sh' "$E2E_YML"
 
 echo ""
 echo "-- Phase 2: setup-container-backend.sh structure --"

@@ -137,6 +137,8 @@ The kit records a **container backend** in `install.conf` (`CONTAINER_BACKEND=`)
 
 `docker-group` is the default and the status quo: **no behaviour change for existing installs.** If the configured rootless socket is not reachable, the wrapper warns loudly and starts **without** container tools — it never silently falls back to `-g docker` (that would reintroduce root-equivalent host access). `--yes`/scripts keep `docker-group` unless a backend is chosen explicitly.
 
+Reachability is probed as the **`opencode` user** — the context that actually connects — not as the developer: rootless sockets live in the `opencode` runtime dir (`/run/user/<uid>`, mode `700`), which a developer-running wrapper cannot stat. The wrapper tries the direct check first, then re-runs the kit's `socket-check.sh` helper (nothing but `test -S`, gated to that script in sudoers) via `sudo -u opencode`, so a reachable daemon is detected even though the developer cannot traverse the runtime dir.
+
 > **Phase 1 + 2 (current state):** the kit is *backend-aware* and can
 > **provision** rootless backends. `install.sh` detects the container situation
 > and offers an interactive backend choice (or `--container-backend

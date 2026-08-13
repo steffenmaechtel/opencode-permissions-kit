@@ -160,6 +160,21 @@ fi
 #   CONTAINER_PODMAN=true   -> sudo -u opencode, no DOCKER_HOST (podman-CLI path,
 #                              daemonless per §9.8 — podman run needs no socket)
 # all empty                 -> no container tools this session
+# Probe whether a rootless backend socket is reachable. The sockets live in the
+# opencode user's runtime dir (/run/user/<uid>, mode 700 opencode:opencode), so
+# a wrapper running as the developer cannot stat them directly. Try directly
+# first (works when the wrapper runs as root or as the opencode user itself, or
+# the socket sits somewhere traversable); otherwise re-probe as the opencode
+# user — the context that will actually connect — via the kit's NOPASSWD
+# socket-check.sh rule. Accepts "unix://..." or a plain path.
+sock_reachable() {
+    [ -n "$1" ] || return 1
+    sock="$1"
+    case "$sock" in unix://*) sock="${sock#unix://}";; esac
+    [ -S "$sock" ] 2>/dev/null && return 0
+    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh "$sock" 2>/dev/null
+}
+
 CONTAINER_GROUP=""
 CONTAINER_DOCKER_HOST=""
 CONTAINER_XDG=""
@@ -172,9 +187,7 @@ if [ "$CONTAINER_REQUESTED" = true ]; then
             # Requires the per-user dockerd socket. Never silently fall back to
             # -g docker (root-equivalent); warn loudly and run without instead.
             sock_host="${OPENCODE_DOCKER_HOST:-}"
-            sock="$sock_host"
-            case "$sock" in unix://*) sock="${sock#unix://}";; esac
-            if [ -n "$sock" ] && [ -S "$sock" ]; then
+            if sock_reachable "$sock_host"; then
                 CONTAINER_DOCKER_HOST="$sock_host"
                 CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
             else
@@ -194,9 +207,7 @@ if [ "$CONTAINER_REQUESTED" = true ]; then
             # like the docker-rootless path.
             sock_host="${OPENCODE_PODMAN_SOCKET:-}"
             if [ -n "$sock_host" ]; then
-                sock="$sock_host"
-                case "$sock" in unix://*) sock="${sock#unix://}";; esac
-                if [ -S "$sock" ]; then
+                if sock_reachable "$sock_host"; then
                     CONTAINER_DOCKER_HOST="$sock_host"
                     CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
                 else
