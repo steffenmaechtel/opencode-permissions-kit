@@ -279,6 +279,29 @@ consent). `--yes` therefore keeps `docker-group` (status quo, zero host change);
 explicit selection for scripting is done via a flag, e.g.
 `--container-backend docker-rootless|podman-rootless|docker-group`.
 
+### 6.8 ddev version gate (DDEV ≥ 1.25)
+
+Docker Rootless and Podman are only supported by **DDEV ≥ 1.25** (see
+[ddev.com/blog/podman-and-docker-rootless](https://ddev.com/blog/podman-and-docker-rootless/));
+ddev auto-detects the runtime once installed. That gate applies to the
+**developer's ddev** side — the kit's raw-docker rootless backend for `opencode`
+is independent of the ddev version, and the ddev shim is version-agnostic.
+
+Therefore the check is **detect + record + warn**, not a hard install block:
+
+- **Detect at install/update:** query the *real* binary `"$DDEV_BIN" version`
+  (never `command -v ddev` — that resolves to the shim), parse `vX.Y.Z`, and
+  record `DDEV_VERSION=` in `install.conf` (like `DDEV_BIN`).
+- **Warn when rootless is selected but ddev < 1.25:** "ddev delegation keeps
+  using the developer's classic docker; Docker Rootless/Podman for ddev needs
+  ddev ≥ 1.25 — upgrade ddev first". This is advisory because (a) the opencode
+  raw-docker backend works regardless, and (b) the developer's runtime is their
+  own choice.
+- **`status.sh` reports the version** and flags a `< 1.25` ddev next to a
+  rootless backend selection.
+- ddev absent → skip the check and warn about ddev's absence (as install.sh
+  already does).
+
 ## 7. Phased Rollout
 
 1. **Phase 1 — backend awareness (small, self-contained).** Add
@@ -295,10 +318,10 @@ explicit selection for scripting is done via a flag, e.g.
 
 | File | Change |
 |---|---|
-| `files/install.sh` | detect backend, prompt for it, provision rootless for `opencode` (subuid/subgid, rootless setup as `opencode`, linger), record `CONTAINER_BACKEND`/socket in `install.conf` |
+| `files/install.sh` | detect backend, prompt for it, provision rootless for `opencode` (subuid/subgid, rootless setup as `opencode`, linger), record `CONTAINER_BACKEND`/socket in `install.conf`; detect + record `DDEV_VERSION` (warn if < 1.25 when rootless selected) |
 | `files/update.sh` | deploy new files; preserve new `install.conf` keys (like `DDEV_BIN`) |
 | `files/config.sh` | `container-backend` subcommand (on/off/status) |
-| `files/status.sh` | backend-aware container block (backend, socket, reachability, linger) |
+| `files/status.sh` | backend-aware container block (backend, socket, reachability, linger) + ddev version gate |
 | `files/uninstall.sh` | optionally tear down a kit-created opencode rootless backend |
 | `files/sudoers.template` | env_keep for `DOCKER_HOST`/`XDG_RUNTIME_DIR`; drop `(opencode:docker)` when not docker-group |
 | `files/opencode-permissions-kit-lib/wrapper` | map `-g docker`/auto-detect to the configured backend; set `DOCKER_HOST`; verify reachability; loud fallback |
