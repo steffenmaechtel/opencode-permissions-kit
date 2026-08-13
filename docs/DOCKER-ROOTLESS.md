@@ -457,22 +457,25 @@ and `protect-projects.sh` are unchanged.
     The container layout adapts to the OUTER docker daemon (auto-detected by
     `tests/e2e/lib.sh` `e2e_detect_host_layout` via a probe container's
     `/proc/self/uid_map`):
-    - **rootful host docker** (CI, normal hosts): `cgroupns=host` + host
-      `/sys/fs/cgroup` bind — the documented systemd-in-docker recipe; the inner
-      rootless dockerd resolves its cgroups at host-root level exactly like a
-      real rootless install.
-    - **rootless host docker** (dev hosts where docker itself is rootless): the
-      e2e container runs in a nested user namespace, so its "root" is not host
-      root and it can never write host-root cgroup paths. Docker 29+ mounts a
-      correct private cgroupfs, so the container runs with `cgroupns=private`
-      and **no** `/sys/fs/cgroup` bind: systemd boots and the inner dockerd
-      resolves its slice within the container's own delegated cgroup root. Two
-      further nested-userns adaptations apply (RL2 prep): an in-range
-      subuid/subgid seed (`opencode:4096:60000`, because the kit's default
-      100000+ range lies outside the container's uid map and would EPERM in
-      `newuidmap`) and a `fuse-overlayfs` storage-driver override (overlay2
-      cannot stack on the host's overlay2 under a nested userns). Both are no-ops
-      on a rootful host, keeping CI on the kit's true default path.*
+    - **Container cgroup mode is identical on both layouts**: the systemd
+      container always runs with `--cgroupns=private` (Docker's own default) and
+      **no** `/sys/fs/cgroup` bind. This is the only mode where the nested
+      ROOTLESS inner dockerd's `/proc/self/cgroup` paths match its
+      `/sys/fs/cgroup` view (its `user-<uid>.slice` resolves inside its own
+      delegated subtree). The classic `cgroupns=host` + host cgroup bind makes
+      systemd boot, but the inner daemon then looks for
+      `user.slice/user-<uid>.slice` at the visible host-root tree where it does
+      not exist, so every inner `docker run` fails with "no such file or
+      directory".
+    - **What the layout detection gates is the nested user namespace.** On a
+      rootless host the e2e container itself runs in a nested userns, so the RL2
+      prep seeds an in-range subuid/subgid (`opencode:4096:60000`, because the
+      kit's default 100000+ range lies outside the container's uid map and would
+      EPERM in `newuidmap`); on a rootful host the container has the full uid
+      space and the seed is skipped. The `fuse-overlayfs` storage-driver pin
+      applies on BOTH layouts (nested kernel overlay can never stack on the
+      container's own overlay rootfs, `mount ... invalid argument`); on a real
+      (non-nested) install the kit still uses the default native driver.*
 10. **DDEV ≥ 1.25 gate (§6.8) parsing.** **Decision: parse a semver
    `vX.Y.Z` / `X.Y.Z` token from the real binary's `ddev version` output** (first
    semver match), recorded as `DDEV_VERSION` and surfaced by `status.sh`, which

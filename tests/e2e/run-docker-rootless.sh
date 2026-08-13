@@ -22,18 +22,19 @@
 #   RL6  teardown (switch back to docker-group) + uninstall verification
 #
 # The container layout adapts to the OUTER docker daemon (lib.sh auto-detects
-# it after the build and picks the matching cgroup args):
-#   - rootful outer docker (CI, normal hosts): cgroupns=host + host
-#     /sys/fs/cgroup bind — the documented systemd-in-docker recipe, and the
-#     inner rootless dockerd resolves its cgroups exactly like a real install.
+# it after the build). The systemd container always runs with --cgroupns=private
+# (no /sys/fs/cgroup bind): Docker's default, and the only mode where the
+# nested ROOTLESS inner dockerd's /proc/self/cgroup paths match its
+# /sys/fs/cgroup view. The classic cgroupns=host + host cgroup bind makes
+# systemd boot but breaks the inner daemon (its user-<uid>.slice is not at the
+# visible host-root tree). The layout detection therefore only gates one thing:
+# whether the e2e container runs in a NESTED user namespace —
+#   - rootful outer docker (CI, normal hosts): no nested userns; kit defaults
+#     run untouched.
 #   - rootless outer docker (dev hosts): the container itself runs in a user
-#     namespace, so it cannot write host-root cgroup paths; cgroupns=private
-#     (no bind) delegates the container's own subtree as its cgroup root, which
-#     systemd and the inner dockerd both accept. The RL2 prep block then
-#     applies two container-internal adaptations — see there: the fuse-overlayfs
-#     storage-driver pin applies on BOTH outer layouts (nested kernel overlay
-#     can never stack on the container's own overlay rootfs), while the in-range
-#     subuid/subgid seed applies only to the nested-userns (rootless outer) case.
+#     namespace; the RL2 prep seeds an in-range subuid/subgid (the kit's
+#     231072+ range is outside the container's uid map). The fuse-overlayfs
+#     storage-driver pin applies on BOTH layouts (see the RL2 prep block).
 #
 # Like run.sh section 12i, the whole docker-rootless section SKIPs (not fails)
 # when the host cannot host systemd-in-docker or nested user namespaces.

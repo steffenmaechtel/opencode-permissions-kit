@@ -207,13 +207,13 @@ e2e_prepare_project() {
 # maps uid 0 to a NON-zero host uid (`0 <uid> 1 ...`); a rootful daemon maps it
 # to host root (`0 0 4294967295`). Note the map is right-aligned in columns
 # (leading whitespace), so never anchor a pattern at the start of the line.
-# This decides the cgroup strategy for the systemd container (E2E_SYSTEMD=1):
-# under a rootful daemon the container can mount and write host-root cgroup
-# paths (cgroupns=host + host /sys/fs/cgroup bind, the documented
-# systemd-in-docker recipe); under a rootless daemon the container's "root" is
-# not host root, so it can never touch host-root cgroup dirs and must rely on
-# Docker's private cgroup namespace (cgroupns=private, no bind) where the
-# container's own delegated subtree IS the cgroup root.
+# The ONLY behaviour this flags in the suites is whether the e2e container runs
+# in a nested user namespace — if it does, the kit's default subuid range
+# (231072+) is outside the container's uid map, so the suites seed an in-range
+# subuid/subgid before provisioning. The systemd container's cgroup args do NOT
+# depend on the layout: both layouts run --cgroupns=private (see
+# e2e_start_container) so the nested ROOTLESS inner daemon's /proc/self/cgroup
+# paths match its /sys/fs/cgroup view.
 e2e_detect_host_layout() {
     local umap
     umap=$(docker run --rm "$E2E_IMAGE" sh -c 'awk "{print \$1, \$2; exit}" /proc/self/uid_map' 2>/dev/null || true)
@@ -234,11 +234,18 @@ e2e_start_container() {
         e2e_detect_host_layout
         # systemd-as-PID1 needs fresh runtime dirs on tmpfs.
         E2E_RUN_ARGS="$E2E_RUN_ARGS --tmpfs /run:rw,mode=755 --tmpfs /run/lock --tmpfs /tmp:rw"
-        if [ "$E2E_HOST_LAYOUT" = "rootful" ]; then
-            E2E_RUN_ARGS="$E2E_RUN_ARGS --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw"
-        else
-            E2E_RUN_ARGS="$E2E_RUN_ARGS --cgroupns=private"
-        fi
+        # Private cgroup namespace on BOTH host layouts. This is Docker's own
+        # default for containers and the only mode where the nested ROOTLESS
+        # inner daemon's /proc/self/cgroup paths match its /sys/fs/cgroup view
+        # (its user session resolves inside its own delegated subtree). The
+        # classic cgroupns=host + host /sys/fs/cgroup bind makes systemd boot,
+        # but the inner dockerd then looks for user.slice/user-<uid>.slice at
+        # the visible (host-root) tree, where it does not exist, so every inner
+        # `docker run` fails with "no such file or directory". The layout
+        # difference that matters is therefore ONLY the nested userns (subuid
+        # seed), gated on E2E_HOST_LAYOUT in the suites; the cgroup args are
+        # identical everywhere.
+        E2E_RUN_ARGS="$E2E_RUN_ARGS --cgroupns=private"
     fi
 
     echo ""

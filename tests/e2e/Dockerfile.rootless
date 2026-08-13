@@ -7,22 +7,21 @@ FROM ubuntu:24.04
 # systemd as PID 1. The plain e2e suite uses Dockerfile (no systemd).
 #
 # Run requirements (see run-docker-rootless.sh E2E_RUN_ARGS):
-#   --privileged                              (nested user namespaces)
-#   -v /sys/fs/cgroup:/sys/fs/cgroup:rw       (systemd cgroup v2, cgroupns=host)
-#   --tmpfs /run:rw,mode=755 --tmpfs /tmp:rw  (systemd runtime dirs)
+#   --privileged            (nested user namespaces + /dev/fuse for
+#                            fuse-overlayfs)
+#   --cgroupns=private      (Docker default; the nested ROOTLESS inner dockerd
+#                            only works when its /proc/self/cgroup paths match
+#                            its /sys/fs/cgroup view — see below)
+#   --tmpfs /run:rw,mode=755 --tmpfs /run/lock --tmpfs /tmp:rw
+#                           (systemd runtime dirs)
 #
-# Two outer-docker layouts are supported; the runner detects which one it is
-# on and passes the matching E2E_RUN_ARGS:
-#   - rootful outer docker (CI, normal hosts): cgroupns=host + the host
-#     /sys/fs/cgroup bind; the container's systemd and the inner rootless
-#     dockerd both resolve /sys/fs/cgroup/user.slice/<uid>.slice at host-root
-#     level exactly like a real rootless install.
-#   - rootless outer docker (dev hosts): the outer daemon already runs in a
-#     user namespace, so the container can never write host-root cgroup
-#     paths. Docker 29+ mounts a correct private cgroupfs for the container
-#     when started with cgroupns=private and WITHOUT a /sys/fs/cgroup bind;
-#     systemd then boots and the inner dockerd resolves its slice within the
-#     container's own (private) cgroup root.
+# The systemd container runs with --cgroupns=private and WITHOUT any
+# /sys/fs/cgroup bind on BOTH outer-docker layouts. The classic cgroupns=host +
+# host cgroup bind makes systemd boot but breaks the nested ROOTLESS inner
+# dockerd: it looks for user.slice/user-<uid>.slice at the visible host-root
+# tree, where it does not exist, so every inner `docker run` fails with "no
+# such file or directory". Only the nested-userns subuid seed differs between
+# the two layouts (see run-docker-rootless.sh):
 
 ENV DEBIAN_FRONTEND=noninteractive
 
