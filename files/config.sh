@@ -327,9 +327,14 @@ update_install_conf_backend() {
 
 container_backend_apply() {
     local new_backend="$1"
-    local setup_script="$LIBDIR/setup-container-backend.sh"
-    [ -f "$setup_script" ] || setup_script="$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh"
-    [ -f "$setup_script" ] || die "setup-container-backend.sh not found."
+    # Prefer the setup script alongside this config.sh (repo checkout), then
+    # fall back to the installed library. This ensures the repo version is used
+    # when running from a checkout — important during development / testing.
+    local setup_script=""
+    for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"; do
+        if [ -f "$cand" ]; then setup_script="$cand"; break; fi
+    done
+    [ -n "$setup_script" ] || die "setup-container-backend.sh not found."
 
     local prev="${CONTAINER_BACKEND:-docker-group}"
     echo "Switching container backend: ${CYAN}${prev}${NC} -> ${CYAN}${new_backend}${NC}"

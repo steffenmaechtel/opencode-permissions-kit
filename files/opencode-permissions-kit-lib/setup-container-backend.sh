@@ -143,6 +143,20 @@ allocate_subuid_subgid() {
 systemd_user_available() {
     # Check if `systemctl --user` works for the opencode user. Requires systemd
     # (WSL2: enabled via /etc/wsl.conf [boot] systemd=true) + dbus-user-session.
+    # The opencode user has no login session (it was created by useradd and only
+    # ever runs via sudo -u), so user@<uid>.service is not active. Enable linger
+    # first — that starts the systemd --user manager for the user, which is
+    # exactly what docker-rootless needs (the daemon must survive logout).
+    if command -v loginctl >/dev/null 2>&1; then
+        loginctl enable-linger "$OPENCODE_USER" 2>/dev/null || true
+        # loginctl enable-linger starts user@<uid>.service asynchronously;
+        # give it a moment to come up.
+        sleep 1
+    fi
+    # Ensure the runtime dir exists (systemd --user needs XDG_RUNTIME_DIR).
+    mkdir -p "/run/user/$OC_UID" 2>/dev/null || true
+    chown "$OPENCODE_USER:$OPENCODE_USER" "/run/user/$OC_UID" 2>/dev/null || true
+    chmod 700 "/run/user/$OC_UID" 2>/dev/null || true
     sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user is-active dbus >/dev/null 2>&1 || \
     sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user status >/dev/null 2>&1
 }
@@ -169,28 +183,86 @@ setup_docker_rootless() {
     echo ""
     echo "  ${CYAN}Setting up docker-rootless for $OPENCODE_USER ...${NC}"
 
-    # Prerequisite packages. docker-ce-rootless-extras provides
-    # dockerd-rootless-setuptool.sh. We do NOT install docker-ce itself
-    # (the developer already has it) — only the rootless helpers.
+    # Base prerequisite packages — must be installed BEFORE the systemd check
+    # because dbus-user-session is what makes `systemctl --user` work. On a
+    # fresh WSL2 install (even with systemd in /etc/wsl.conf), the opencode
+    # user has no D-Bus session and `systemctl --user` fails until this
+    # package is present. Install uidmap + dbus-user-session first, then
+    # enable-linger (which starts user@<uid>.service), then verify.
     apt_install uidmap dbus-user-session
+
+    # systemd --user is a hard requirement for the rootless daemon. Enable
+    # linger first (the opencode user has no login session — it was created
+    # by useradd and only ever runs via sudo -u — so user@<uid>.service is
+    # not active. enable-linger starts the systemd --user manager for it).
+    if command -v loginctl >/dev/null 2>&1; then
+        loginctl enable-linger "$OPENCODE_USER" 2>/dev/null || true
+        # loginctl enable-linger starts user@<uid>.service asynchronously;
+        # give it a moment to come up.
+        sleep 1
+    fi
+    # Ensure the runtime dir exists (systemd --user needs XDG_RUNTIME_DIR).
+    mkdir -p "/run/user/$OC_UID" 2>/dev/null || true
+    chown "$OPENCODE_USER:$OPENCODE_USER" "/run/user/$OC_UID" 2>/dev/null || true
+    chmod 700 "/run/user/$OC_UID" 2>/dev/null || true
+
+    if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user is-active dbus >/dev/null 2>&1; then
+        if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user status >/dev/null 2>&1; then
+            echo "${RED}systemd --user is not available for $OPENCODE_USER.${NC}" >&2
+            echo "${YELLOW}Docker rootless needs systemd (WSL2: enable via /etc/wsl.conf [boot] systemd=true + reboot).${NC}" >&2
+            echo "${YELLOW}dbus-user-session was just installed — a reboot may be needed for the user session to start.${NC}" >&2
+            echo "${YELLOW}Consider podman-rootless instead (daemonless, no systemd required).${NC}" >&2
+            # Debug: show what failed (helps diagnose WSL2-specific issues).
+            echo "${CYAN}--- diagnostic (stderr) ---${NC}" >&2
+            echo "loginctl show-user $OPENCODE_USER:" >&2
+            loginctl show-user "$OPENCODE_USER" 2>&1 | sed 's/^/  /' >&2
+            echo "/run/user/$OC_UID:" >&2
+            ls -la "/run/user/$OC_UID" 2>&1 | sed 's/^/  /' >&2
+            echo "systemctl --user is-active dbus:" >&2
+            sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user is-active dbus 2>&1 | sed 's/^/  /' >&2
+            echo "systemctl --user status:" >&2
+            sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user status 2>&1 | head -10 | sed 's/^/  /' >&2
+            exit 1
+        fi
+    fi
+
+    # docker-ce-rootless-extras provides dockerd-rootless-setuptool.sh and
+    # dockerd-rootless.sh. It is NOT in Ubuntu's default repos — it lives in
+    # Docker's official apt repo. The helper also needs docker-ce itself (the
+    # dockerd binary), which most fresh WSL2 installations do not have.
+    # get.docker.com installs both docker-ce + docker-ce-rootless-extras.
     if ! command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
-        apt_install docker-ce-rootless-extras 2>/dev/null || true
+        echo "  dockerd-rootless-setuptool.sh not found — adding Docker's apt repo ..."
+        # Try the distro package first (some distros ship it).
+        if apt_install docker-ce-rootless-extras 2>/dev/null && command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
+            : # installed from an existing repo
+        else
+            # Docker's repo is not configured. Add it via the official get.docker.com
+            # installer, which adds the repo + keyring AND installs docker-ce
+            # (the dockerd binary that dockerd-rootless.sh wraps). This is the
+            # canonical way and does NOT conflict with an existing Docker install.
+            echo "  Running get.docker.com (installs docker-ce + docker-ce-rootless-extras) ..."
+            if curl -fsSL https://get.docker.com -o /tmp/get-docker.sh 2>/dev/null; then
+                sh /tmp/get-docker.sh 2>&1 | sed 's/^/    /' || true
+                rm -f /tmp/get-docker.sh
+                apt-get update -qq 2>/dev/null || true
+                apt_install docker-ce-rootless-extras
+            else
+                # Offline / no network: last-ditch attempt.
+                apt_install docker-ce-rootless-extras 2>/dev/null || true
+            fi
+        fi
     fi
     if ! command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
-        echo "${RED}dockerd-rootless-setuptool.sh not found. Install docker-ce-rootless-extras (or the Docker rootless extras for your distro) and re-run.${NC}" >&2
+        echo "${RED}dockerd-rootless-setuptool.sh still not found.${NC}" >&2
+        echo "${YELLOW}Could not install docker-ce-rootless-extras (no network, or Docker's repo unavailable).${NC}" >&2
+        echo "${YELLOW}Install Docker + the rootless extras manually from https://docs.docker.com/engine/security/rootless/ and re-run,${NC}" >&2
+        echo "${YELLOW}or use podman-rootless instead (daemonless, no Docker repo needed).${NC}" >&2
         exit 1
     fi
 
     # subuid/subgid for opencode
     allocate_subuid_subgid "$OPENCODE_USER"
-
-    # systemd --user is required for the rootless daemon.
-    if ! systemd_user_available; then
-        echo "${RED}systemd --user is not available for $OPENCODE_USER.${NC}" >&2
-        echo "${YELLOW}Docker rootless needs systemd (WSL2: enable via /etc/wsl.conf [boot] systemd=true + reboot).${NC}" >&2
-        echo "${YELLOW}Consider podman-rootless instead (daemonless, no systemd required).${NC}" >&2
-        exit 1
-    fi
 
     # Run the rootless setup as the opencode user (never as root).
     echo "  Running dockerd-rootless-setuptool.sh as $OPENCODE_USER ..."
