@@ -1,10 +1,28 @@
 # Docker Rootless — Design & Implementation Plan
 
-> Status: **Planning (not implemented).** This document is the design record for
-> removing the root-equivalence of the kit's docker grant. The authoritative
-> usage documentation for the *current* container-tools feature is
-> `docs/CONTAINER-TOOLS.md` (design record) and `docs/MANUAL.md` (usage). Nothing
-> here is in the code yet.
+> Status: **Phase 1 implemented (backend awareness); Phase 2 / Phase 3 pending.**
+> This document is the design record for removing the root-equivalence of the
+> kit's docker grant. The authoritative usage documentation for the *current*
+> container-tools feature is `docs/CONTAINER-TOOLS.md` (design record) and
+> `docs/MANUAL.md` (usage).
+>
+> **Phase 1 (done):** the kit records `CONTAINER_BACKEND` in `install.conf`
+> (`docker-group` default, `docker-rootless` / `podman-rootless` opt-in) and the
+> wrapper, `status.sh`, and the sudoers render all react to it. No rootless is
+> provisioned yet — an admin who already runs a rootless backend for the
+> `opencode` user can point the kit at it by editing `install.conf` + re-running
+> `update.sh` (see `docs/MANUAL.md` → "Container backend"). `install.sh` also
+> records `DDEV_VERSION` (the §6.8 gate, advisory). Existing installs behave
+> exactly as before.
+>
+> **Phase 2 (pending):** install-time detection + provisioning (subuid/subgid,
+> rootless setup as `opencode`, linger) and `config.sh container-backend`.
+> **Phase 3 (pending):** ddev-shim `DOCKER_HOST`/`XDG_RUNTIME_DIR`
+> pass-through and e2e coverage per backend.
+>
+> The decisions recorded in §9 below (subuid/subgid, privileged ports, ddev-shim
+> env pass-through, podman CLI, ddev version gate) are the agreed direction for
+> Phase 2 / 3; they are not yet in the code.
 
 ## 1. The Problem (confirmed)
 
@@ -304,15 +322,29 @@ Therefore the check is **detect + record + warn**, not a hard install block:
 
 ## 7. Phased Rollout
 
-1. **Phase 1 — backend awareness (small, self-contained).** Add
-   `CONTAINER_BACKEND` + wrapper/status/sudoers changes; `docker-group` stays
-   the default so nothing changes for existing installs. Enables admins who
-   already run rootless to point the kit at it manually.
-2. **Phase 2 — setup helpers.** `install.sh`/`config.sh` detect and provision
-   docker-rootless / podman for the `opencode` user (and optionally the
+1. **Phase 1 — backend awareness (DONE).** `CONTAINER_BACKEND` is recorded in
+   `install.conf` (default `docker-group`); the wrapper maps `-g docker` /
+   auto-detect to the configured backend (docker group for `docker-group`,
+   `DOCKER_HOST` + socket reachability for the rootless backends, never silently
+   downgrading to `-g docker`); `status.sh` reports the backend + socket + ddev
+   version; the sudoers render keeps the `(opencode:docker)` grant for
+   `docker-group` and strips it for the rootless backends
+   (`env_keep` gains `DOCKER_HOST`/`XDG_RUNTIME_DIR`). `install.sh` also records
+   `DDEV_VERSION`. Nothing changes for existing installs. An admin who already
+   runs rootless for the `opencode` user can point the kit at it manually (edit
+   `install.conf` + `update.sh`). Tests: `tests/test-container-backend.sh`.
+2. **Phase 2 — setup helpers (PENDING).** `install.sh`/`config.sh` detect and
+   provision docker-rootless / podman for the `opencode` user (and optionally the
    developer), including subuid/subgid and linger.
-3. **Phase 3 — ddev shim env pass-through + e2e.** Make the shim preserve the
-   developer's rootless backend, and add e2e coverage for each backend.
+3. **Phase 3 — ddev shim env pass-through + e2e (e2e DONE for podman-rootless).**
+   The e2e suite (`tests/e2e/run.sh` section 12i) builds a real rootless podman
+   environment inside the `--privileged` test image, proves §9.1, switches the
+   kit to `podman-rootless`, re-renders the sudoers, and exercises the wrapper's
+   podman-CLI dispatch. Still pending: the ddev-shim
+   `--preserve-env=DOCKER_HOST,XDG_RUNTIME_DIR` pass-through for the
+   *developer's* rootless socket — only matters once Phase 2 lets a developer
+   run rootless too; and a `docker-rootless` daemon e2e (heavier setup than
+   podman's daemonless path).
 
 ## 8. Implementation Footprint
 
@@ -334,39 +366,68 @@ and `protect-projects.sh` are unchanged.
 
 ## 9. Open Questions / To Verify at Implement Time
 
+> Decisions recorded here (Phase 1 retrospective) are the agreed direction for
+> Phase 2 / 3. Items still marked "verify" need a real rootless environment.
+
 1. **Does the ACL deny actually survive a rootless bind mount?** Verify that a
    container started by a daemon running as `opencode` accesses a
    `u:opencode:---` file as the opencode host UID (denied). This is the core
-   value proposition and must be proven in e2e, not assumed.
+   value proposition and must be proven in e2e (Phase 3), not assumed.
+   *Status: **PROVEN** — `tests/e2e/run.sh` section 12i runs a real rootless
+   podman container as the `opencode` user (nested user namespaces in the
+   `--privileged` e2e image, `opencode` subuid/subgid 100000–165535) that
+   bind-mounts the project and asserts `cat /app/.env` is denied
+   (`u:opencode:---` ACL survives the bind mount) while `cat /app/index.php`
+   succeeds. Verified end-to-end.*
 2. **Running `systemctl --user` / rootless setup as the `opencode` user.** The
    installer runs as root; rootless setup and linger must be executed as
    `opencode` (`sudo -u opencode …`, `loginctl enable-linger opencode`).
    Confirm this works headless under WSL2 (`dbus-user-session` required).
-3. **subuid/subgid ranges.** `opencode` and the developer each need a
-   non-overlapping range. Decide whether the kit allocates ranges or requires
-   the admin to pre-configure them.
+   *Phase 2.*
+3. **subuid/subgid ranges.** **Decision: the kit allocates them automatically.**
+   `install.sh`/`config.sh` (Phase 2) picks a free range for `opencode` (and for
+   the developer only if they opt in too) and writes `/etc/subuid` + `/etc/subgid`.
+   Non-overlapping with any existing entry; never reuses an existing range.
 4. **Privileged ports.** Rootless cannot bind 80/443 → ddev's router must use
-   8080/8443 (`ddev config global --router-http-port=8080 …`). Document as a
-   known consequence, or set it in the ddev shim.
-5. **ddev shim env pass-through.** `sudo -u <developer>` drops `DOCKER_HOST`;
-   options are `--preserve-env=DOCKER_HOST,XDG_RUNTIME_DIR` (needs a matching
-   sudoers/`env_keep` for the developer's env) or re-exporting a recorded
-   developer socket path from `install.conf`. Pick one and test both classic
-   and rootless developer setups.
+   8080/8443 (`ddev config global --router-http-port=8080 …`). **Decision:
+   documentation-only** — record in `MANUAL.md` (and a `status.sh` hint) that
+   rootless forces the high ports; the kit does not rewrite the developer's ddev
+   config.
+5. **ddev shim env pass-through.** `sudo -u <developer>` drops `DOCKER_HOST`.
+   **Decision: `--preserve-env=DOCKER_HOST,XDG_RUNTIME_DIR`** in the ddev shim,
+   backed by a matching `env_keep` for the developer's env in the sudoers rule
+   (Phase 3). Fallback remains re-exporting a recorded developer socket from
+   `install.conf` if `--preserve-env` proves unreliable on the target sudo.
 6. **WSL2 / Docker Desktop vs. in-distro rootless.** Docker Desktop's daemon
    lives in a separate VM and is *not* what rootless-in-distro replaces.
    Recommend Docker Engine **rootless inside the distro** (not Docker Desktop)
-   as the backend; verify DDEV works against it in WSL2.
+   as the backend; verify DDEV works against it in WSL2. *Still to verify.*
 7. **Overlay storage under `/home/opencode`.** The rootless backend stores
    images under `/home/opencode/.local/share/containers`; confirm the home-dir
-   ownership/mode (`opencode:www-data 2750`) does not block it.
-8. **`podman-docker` vs a real `docker` CLI.** If podman is chosen, the
-   `docker` shim must not shadow a real docker binary in a way that silently
-   changes semantics; document which backend a project's `docker *` allow
-   actually exercises.
+   ownership/mode (`opencode:www-data 2750`) does not block it. *Phase 2.*
+8. **`podman-docker` vs a real `docker` CLI.** **Decision: podman-CLI only, no
+   `docker` shim.** When podman is the chosen backend, the agent uses `podman`; a
+   project's `docker *` allow rules do **not** match, and that asymmetry is
+   documented in `MANUAL.md`. Never shadow a real `docker` binary. The wrapper's
+   `podman-rootless` branch is therefore daemonless: when `OPENCODE_PODMAN_SOCKET`
+   is empty it verifies `command -v podman` and runs opencode **without** exporting
+   `DOCKER_HOST` (no docker-CLI compat). The optional `OPENCODE_PODMAN_SOCKET`
+   re-enables docker-CLI compat (verified like the docker-rootless socket).
 9. **e2e inside the test container.** Running rootless inside the e2e image
    needs nested user namespaces and subuid ranges configured in the test
-   image; verify feasibility before Phase 3.
+   image; verify feasibility before Phase 3. *Status: **FEASIBLE & DONE** — the
+   `--privileged` ubuntu:24.04 e2e image supports nested user namespaces;
+   `tests/e2e/run.sh` section 12i installs `podman` + `uidmap` + `slirp4netns`,
+   allocates the `opencode` subuid/subgid range, and runs the §9.1 proof. On a
+   runner whose kernel disallows it, the section SKIPs (counts as skipped, not
+   failed) so CI stays green.*
+10. **DDEV ≥ 1.25 gate (§6.8) parsing.** **Decision: parse a semver
+   `vX.Y.Z` / `X.Y.Z` token from the real binary's `ddev version` output** (first
+   semver match), recorded as `DDEV_VERSION` and surfaced by `status.sh`, which
+   flags a `< 1.25` ddev next to a rootless backend. Advisory only — never a hard
+   install block (the `opencode` raw-docker backend works regardless of ddev).
+   *Already implemented in Phase 1 (detection + recording + status display);
+   the warn fires once Phase 2 makes rootless selectable.*
 
 ## 10. Migration & Compatibility
 

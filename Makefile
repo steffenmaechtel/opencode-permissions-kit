@@ -1,4 +1,4 @@
-.PHONY: help test test-wrapper test-config test-hooks test-parser test-git-config test-ddev-shim test-bypass-guard verify e2e install-dev clean version check-version
+.PHONY: help test test-wrapper test-config test-hooks test-parser test-git-config test-ddev-shim test-container-backend test-bypass-guard verify e2e install-dev clean version check-version
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -10,6 +10,7 @@ help:
 	@echo "  make test-parser   Run JSONC parser edge-case tests"
 	@echo "  make test-git-config  Run git-config toggle tests"
 	@echo "  make test-ddev-shim Run ddev shim tests"
+	@echo "  make test-container-backend  Run container-backend tests"
 	@echo "  make test-bypass-guard  Run wrapper-bypass guard tests"
 	@echo "  make verify        Run system verification (requires install.sh)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
@@ -18,7 +19,7 @@ help:
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
-test: test-wrapper test-config test-hooks test-parser test-git-config test-ddev-shim test-bypass-guard
+test: test-wrapper test-config test-hooks test-parser test-git-config test-ddev-shim test-container-backend test-bypass-guard
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -45,6 +46,10 @@ test-git-config:
 test-ddev-shim:
 	@echo "=== ddev Shim Tests ==="
 	@./tests/test-ddev-shim.sh
+
+test-container-backend:
+	@echo "=== Container Backend Tests ==="
+	@./tests/test-container-backend.sh
 
 test-bypass-guard:
 	@echo "=== Wrapper-Bypass Guard Tests ==="

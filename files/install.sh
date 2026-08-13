@@ -210,6 +210,37 @@ fi
 [ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
 log "detected DDEV_BIN=$DDEV_BIN"
 
+# ddev version (advisory). Recorded for the rootless ddev-version gate —
+# DDEV >= 1.25 is required for Docker Rootless / Podman support (see
+# docs/DOCKER-ROOTLESS.md §6.8). Parse the first semver-like token from the
+# real binary's `version` output; empty when ddev is absent or unparseable.
+DDEV_VERSION=""
+if [ -x "$DDEV_BIN" ]; then
+    DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')"
+fi
+log "detected DDEV_VERSION=${DDEV_VERSION:-unknown}"
+
+# Container backend (Phase 1: backend awareness only — no rootless provisioning
+# yet, see docs/DOCKER-ROOTLESS.md §7). The installer defaults to docker-group
+# (legacy behaviour, zero host change) so existing setups are unaffected. On a
+# re-install over an existing kit, preserve a previously configured backend so a
+# manual rootless setup (edit install.conf) is not silently reset.
+CONTAINER_BACKEND="docker-group"
+OPENCODE_DOCKER_HOST=""
+OPENCODE_PODMAN_SOCKET=""
+for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf; do
+    if [ -f "$_c" ]; then
+        _be=$(sed -n 's/^CONTAINER_BACKEND=//p' "$_c" 2>/dev/null)
+        _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' "$_c" 2>/dev/null)
+        _ps=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' "$_c" 2>/dev/null)
+        [ -n "$_be" ] && CONTAINER_BACKEND="$_be"
+        [ -n "$_dh" ] && OPENCODE_DOCKER_HOST="$_dh"
+        [ -n "$_ps" ] && OPENCODE_PODMAN_SOCKET="$_ps"
+        break
+    fi
+done
+log "container backend: $CONTAINER_BACKEND"
+
 # === Step 1: User ===
 
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
@@ -298,6 +329,10 @@ DEFAULT_USER=$DEFAULT_USER
 OPENCODE_USER=$OPENCODE_USER
 WWW_GROUP=$WWW_GROUP
 DDEV_BIN=$DDEV_BIN
+DDEV_VERSION=$DDEV_VERSION
+CONTAINER_BACKEND=$CONTAINER_BACKEND
+OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST
+OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET
 VERSION=$VERSION
 EOF
 # Migrate legacy setup.conf (pre-v0.0.9) -> install.conf
@@ -478,6 +513,20 @@ fi
 # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
 sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+# The (opencode:docker) RunAs grant is only needed for the docker-group backend
+# (the wrapper uses `sudo -u opencode -g docker`). The rootless backends run
+# WITHOUT the docker group, so strip that block. Empty/unknown defaults to
+# docker-group (legacy behaviour, matching the wrapper's normalization) so the
+# grant stays available.
+case "${CONTAINER_BACKEND:-docker-group}" in
+    docker-rootless|podman-rootless)
+        sed -e '/^#@docker-group-begin$/,/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
+        ;;
+    *)
+        sed -e '/^#@docker-group-begin$/d' -e '/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
+        ;;
+esac
+mv -f "$SUDO_TMP.2" "$SUDO_TMP"
 sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
 sudo chmod 440 /etc/opencode-permissions-kit/sudoers
 rm -f "$SUDO_TMP"

@@ -82,13 +82,55 @@ fi
 
 echo ""
 echo "  ${CYAN}Container tools (docker/ddev):${NC}"
-docker_group="$(getent group docker 2>/dev/null | cut -d: -f3)"
-if [ -n "$docker_group" ]; then
-    echo "    docker group: ${GREEN}present (gid $docker_group)${NC}"
-else
-    echo "    docker group: ${YELLOW}absent${NC} (docker not installed)"
-fi
-echo "    reachable via: opencode -g docker"
+case "${CONTAINER_BACKEND:-docker-group}" in
+    docker-rootless)
+        echo "    backend:    docker-rootless"
+        sock="${OPENCODE_DOCKER_HOST:-}"
+        sockpath="$sock"
+        case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
+        if [ -n "$sock" ] && [ -S "$sockpath" ]; then
+            echo "    socket:     ${GREEN}reachable${NC}  $sock"
+        elif [ -n "$sock" ]; then
+            echo "    socket:     ${RED}NOT reachable${NC}  $sock"
+        else
+            echo "    socket:     ${YELLOW}not configured${NC}"
+        fi
+        # linger is best-effort: loginctl may need auth, ignore errors.
+        if command -v loginctl >/dev/null 2>&1; then
+            linger=$(loginctl show-user "$OPENCODE_USER" 2>/dev/null | sed -n 's/^Linger=//p')
+            [ -n "$linger" ] && echo "    linger:     $linger"
+        fi
+        ;;
+    podman-rootless)
+        echo "    backend:    podman-rootless"
+        sock="${OPENCODE_PODMAN_SOCKET:-}"
+        if [ -n "$sock" ]; then
+            # Optional podman docker-CLI-compat socket.
+            sockpath="$sock"
+            case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
+            if [ -S "$sockpath" ]; then
+                echo "    socket:     ${GREEN}reachable${NC}  $sock"
+            else
+                echo "    socket:     ${RED}NOT reachable${NC}  $sock"
+            fi
+        elif command -v podman >/dev/null 2>&1; then
+            # Daemonless podman-CLI path (no socket needed, §9.8).
+            pver=$(podman --version 2>/dev/null | sed -n 's/.*version \([0-9][0-9.]*\).*/\1/p' | head -1)
+            echo "    podman CLI: ${GREEN}installed${NC}${pver:+  ($pver)}"
+        else
+            echo "    podman CLI: ${RED}NOT installed${NC}"
+        fi
+        ;;
+    *)
+        docker_group="$(getent group docker 2>/dev/null | cut -d: -f3)"
+        if [ -n "$docker_group" ]; then
+            echo "    backend:    docker-group  (docker group: ${GREEN}present (gid $docker_group)${NC})"
+        else
+            echo "    backend:    docker-group  (docker group: ${YELLOW}absent${NC})"
+        fi
+        echo "    reachable via: opencode -g docker"
+        ;;
+esac
 if grep -qE '"[^"]*docker[^"]*": "deny"' "$f" 2>/dev/null; then
     echo "    direct access: ${GREEN}blocked${NC} (docker/ddev denied in opencode.jsonc)"
 else
@@ -101,6 +143,21 @@ if [ -L /usr/local/bin/ddev ] && [ "$(readlink /usr/local/bin/ddev)" = "$LIBDIR/
     echo "    shim: ${GREEN}active${NC}  /usr/local/bin/ddev -> $LIBDIR/bin/ddev"
     echo "    real ddev: ${DDEV_BIN:-/usr/bin/ddev}"
     echo "    delegates to: $DEFAULT_USER (the developer)"
+    if [ -n "${DDEV_VERSION:-}" ]; then
+        ddev_low=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
+        case "${CONTAINER_BACKEND:-docker-group}" in
+            docker-rootless|podman-rootless)
+                if [ "$ddev_low" = yes ]; then
+                    echo "    ddev version: $DDEV_VERSION  ${YELLOW}(ddev < 1.25 — rootless for ddev needs ddev >= 1.25)${NC}"
+                else
+                    echo "    ddev version: $DDEV_VERSION"
+                fi
+                ;;
+            *)
+                echo "    ddev version: $DDEV_VERSION"
+                ;;
+        esac
+    fi
 elif [ -e /usr/local/bin/ddev ] && [ ! -L /usr/local/bin/ddev ]; then
     echo "    shim: ${YELLOW}NOT active${NC}  /usr/local/bin/ddev is a real ddev (delegation unavailable)"
 else

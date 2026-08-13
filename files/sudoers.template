@@ -4,14 +4,24 @@
 
 # Preserve the opencode launch directory across `sudo -u opencode` so git hooks
 # can apply the project opencode.jsonc of the directory opencode was started in.
-Defaults env_keep += "OPENCODE_LAUNCH_CWD"
+# DOCKER_HOST + XDG_RUNTIME_DIR are preserved for the rootless container backends
+# (docker-rootless / podman-rootless): the wrapper exports DOCKER_HOST before the
+# `sudo -u opencode` exec, and these keep it alive across sudo's env reset.
+# The opencode binary itself stays in the deny list, so the wrapper is the only
+# path to reach docker — backend or not.
+Defaults env_keep += "OPENCODE_LAUNCH_CWD DOCKER_HOST XDG_RUNTIME_DIR"
 
-# The RunAs group grant lets the wrapper hand opencode the docker group
-# (`sudo -u opencode -g docker`) so projects that explicitly allow docker/ddev
-# in their opencode.jsonc work inside the sandbox. The opencode binary itself
-# stays in the deny list, so the wrapper is the only way to reach docker.
+# Base RunAs: the wrapper always execs opencode as the opencode user (with no
+# supplementary group) for the no-container path AND for the rootless backends.
 DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *
+#@docker-group-begin
+# Docker-group backend only: the supplementary `-g docker` grant. The wrapper
+# uses `sudo -u opencode -g docker` so projects that explicitly allow docker/ddev
+# in their opencode.jsonc work inside the sandbox. For the rootless backends the
+# kit installs WITHOUT the docker group (containers run under the opencode host
+# UID via a per-user socket), so this line is stripped at render time.
 DEFAULT_USER ALL=(opencode:docker) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *
+#@docker-group-end
 DEFAULT_USER ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/protect-projects.sh *
 opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/protect-projects.sh *
 

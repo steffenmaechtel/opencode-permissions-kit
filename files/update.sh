@@ -296,6 +296,20 @@ fi
 if [ -f "$SCRIPT_DIR/sudoers.template" ]; then
     SUDO_TMP=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+    # The (opencode:docker) RunAs grant is only needed for the docker-group
+    # backend. For the rootless backends strip that block; empty/unknown
+    # defaults to docker-group (matching the wrapper's normalization) so the
+    # grant stays available. CONTAINER_BACKEND is read from install.conf above
+    # (preserved across the update — never re-provisioned here).
+    case "${CONTAINER_BACKEND:-docker-group}" in
+        docker-rootless|podman-rootless)
+            sed -e '/^#@docker-group-begin$/,/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
+            ;;
+        *)
+            sed -e '/^#@docker-group-begin$/d' -e '/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
+            ;;
+    esac
+    mv -f "$SUDO_TMP.2" "$SUDO_TMP"
     sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
     sudo chmod 440 /etc/opencode-permissions-kit/sudoers
     rm -f "$SUDO_TMP"

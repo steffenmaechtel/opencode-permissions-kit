@@ -125,6 +125,38 @@ Detection mirrors opencode's own rule semantics (last matching rule wins) and on
 - Docker must be usable by the group: if Docker was installed so that members of `docker` can access the daemon (the default), this just works. The `opencode` user is **not** added to the `docker` group — membership is granted per-invocation via sudo.
 - **`.ddev` write access:** `ddev start` rewrites the project's `.ddev/` files (e.g. `.homeadditions`, `README.txt`). ddev recreates them as the launching developer user and `chmod 755` them, which caps the ACL mask to `r-x` and blocks the `opencode` user (group `www-data`). Each `protect-projects.sh` run (wrapper start, `config.sh`, git hook) now re-asserts the kit base bits on every `.ddev` tree under the registered root (ddev projects are usually subdirectories, e.g. `/var/www/vhosts/<project>/.ddev`) — group `www-data` and a `rwx` mask — so opted-in docker/ddev projects keep working. If `ddev start` is run manually as the developer right after, the next wrapper start repairs the tree automatically.
 
+### Container backend
+
+The kit records a **container backend** in `install.conf` (`CONTAINER_BACKEND=`). It decides how the wrapper reaches the container runtime when a project enables docker/ddev — it does **not** change the policy layer (docker/ddev stay denied in `opencode.jsonc`; the wrapper stays the only path).
+
+| Backend | How the wrapper grants container access | Host privilege of containers |
+|---|---|---|
+| `docker-group` (default) | `sudo -u opencode -g docker` — the supplementary docker group lets the sandbox talk to the root-owned system daemon | **root-equivalent** on the host (the classic docker-socket gap) |
+| `docker-rootless` | `sudo -u opencode` with `DOCKER_HOST` pointing at the `opencode` user's rootless dockerd socket (`OPENCODE_DOCKER_HOST=`), verified reachable before start | confined to the `opencode` host UID → the kit's `u:opencode:---` ACL denies hold inside bind-mounted containers |
+| `podman-rootless` | `sudo -u opencode` (no `DOCKER_HOST`) — podman is daemonless, so the wrapper just verifies `podman` is installed. Optionally `OPENCODE_PODMAN_SOCKET=` enables a podman docker-CLI-compat socket (then verified like `docker-rootless`) | confined to the `opencode` host UID → ACL denies hold |
+
+`docker-group` is the default and the status quo: **no behaviour change for existing installs.** If the configured rootless socket is not reachable, the wrapper warns loudly and starts **without** container tools — it never silently falls back to `-g docker` (that would reintroduce root-equivalent host access). `--yes`/scripts keep `docker-group` unless a backend is chosen explicitly.
+
+> **Phase 1 (current state):** the kit is *backend-aware* — it records `CONTAINER_BACKEND` and the wrapper, `status.sh`, and the sudoers render react to it — but `install.sh` does **not** yet provision rootless. An admin who already runs a rootless backend for the `opencode` user can point the kit at it by editing `/etc/opencode-permissions-kit/install.conf`:
+
+```bash
+sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=podman-rootless/' /etc/opencode-permissions-kit/install.conf
+sudo /usr/local/lib/opencode-permissions-kit/update.sh --yes     # re-renders sudoers for the new backend
+```
+
+For `docker-rootless` you also record the socket (`OPENCODE_DOCKER_HOST=unix:///run/user/$(id -u opencode)/docker.sock`). For `podman-rootless` the `podman` CLI path needs no socket — just ensure `podman` + `uidmap` are installed and `/etc/subuid` + `/etc/subgid` carry an `opencode` range (the kit will provision these automatically in Phase 2).
+
+The two-daemon reality and the full provisioning flow (subuid/subgid, linger, ddev ≥ 1.25 gate, ddev-shim env pass-through) are tracked in `docs/DOCKER-ROOTLESS.md` as Phase 2 / Phase 3. `status.sh` reflects whichever backend is configured; `docker ps` inside an `opencode` session will not list the developer's ddev containers when a rootless backend is selected (different daemon/user) — that is expected. The §9.1 value proposition (a rootless bind mount respects `u:opencode:---`) is **proven by e2e** — `tests/e2e/run.sh` section 12i runs a real rootless podman container as the `opencode` user and asserts `.env` is denied while a normal file is readable.
+
+#### `CONTAINER_BACKEND` keys in `install.conf`
+
+| Key | Meaning |
+|---|---|
+| `CONTAINER_BACKEND` | `docker-group` \| `docker-rootless` \| `podman-rootless` (empty/unknown → `docker-group`) |
+| `OPENCODE_DOCKER_HOST` | `docker-rootless` socket, e.g. `unix:///run/user/<opencode-uid>/docker.sock` |
+| `OPENCODE_PODMAN_SOCKET` | `podman-rootless` socket |
+| `DDEV_VERSION` | recorded ddev version (advisory; `status.sh` flags a `< 1.25` ddev next to a rootless backend) |
+
 ### ddev delegation (running ddev as the developer)
 
 `docker` commands only talk to the daemon socket, so running them as the
@@ -397,7 +429,7 @@ Project roots (1):
 .git/config hardening: OFF
 
 Container tools (docker/ddev):
-  docker group: present (gid 999)
+  backend:    docker-group  (docker group: present (gid 999))
   reachable via: opencode -g docker
   direct access: blocked (docker/ddev denied in opencode.jsonc)
 
@@ -405,6 +437,7 @@ ddev delegation shim:
   shim: active  /usr/local/bin/ddev -> /usr/local/lib/opencode-permissions-kit/bin/ddev
   real ddev: /usr/bin/ddev
   delegates to: info (the developer)
+  ddev version: 1.24.3
 
 Management (run in a terminal):
     sudo /usr/local/lib/opencode-permissions-kit/config.sh                 change settings
@@ -414,7 +447,7 @@ Management (run in a terminal):
 
 Before the kit is installed, `status.sh` still works and reports that hardening is **NOT active** — handy for checking any machine.
 
-The **Container tools** block shows whether the `docker` group exists (it is absent when Docker is not installed), how container access is granted, and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template. The **ddev delegation shim** block reports whether the shim is active (shadowing `/usr/local/bin/ddev`), the real ddev path it delegates to, and the developer user it runs ddev as — see [ddev delegation](#ddev-delegation-running-ddev-as-the-developer).
+The **Container tools** block reports the configured **backend** (`docker-group` by default; `docker-rootless` / `podman-rootless` when an admin has opted in — see [Container backend](#container-backend)), how container access is granted (the docker group for `docker-group`, or the per-user socket reachability for the rootless backends), and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template. The **ddev delegation shim** block reports whether the shim is active (shadowing `/usr/local/bin/ddev`), the real ddev path it delegates to, the developer user it runs ddev as, and the recorded ddev version (with a note when a rootless backend is selected but ddev < 1.25) — see [ddev delegation](#ddev-delegation-running-ddev-as-the-developer).
 
 ## Audit Log
 
@@ -521,7 +554,7 @@ Grouped by base directory, paths within each group sorted alphabetically.
 
 | Path | Purpose |
 |---|---|
-| `/etc/opencode-permissions-kit/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `DDEV_BIN`, `VERSION` |
+| `/etc/opencode-permissions-kit/install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `DDEV_BIN`, `DDEV_VERSION`, `CONTAINER_BACKEND`, `OPENCODE_DOCKER_HOST`, `OPENCODE_PODMAN_SOCKET`, `VERSION` |
 | `/etc/opencode-permissions-kit/projects.conf` | Project roots (one per line) |
 
 ### /etc/sudoers.d/
