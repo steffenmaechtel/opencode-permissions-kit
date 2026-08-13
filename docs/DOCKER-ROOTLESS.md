@@ -1,4 +1,4 @@
-# Docker / DDEV Rootless — Design & Implementation Plan
+# Docker Rootless — Design & Implementation Plan
 
 > Status: **Planning (not implemented).** This document is the design record for
 > removing the root-equivalence of the kit's docker grant. The authoritative
