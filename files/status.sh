@@ -88,10 +88,17 @@ case "${CONTAINER_BACKEND:-docker-group}" in
         sock="${OPENCODE_DOCKER_HOST:-}"
         sockpath="$sock"
         case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
-        if [ -n "$sock" ] && [ -S "$sockpath" ]; then
-            echo "    socket:     ${GREEN}reachable${NC}  $sock"
-        elif [ -n "$sock" ]; then
-            echo "    socket:     ${RED}NOT reachable${NC}  $sock"
+        # The opencode user's runtime dir (/run/user/<uid>) is mode 700
+        # opencode:opencode, so a non-root status.sh caller cannot stat the
+        # socket inside it. Try stat directly; if that fails (perm), use sudo.
+        if [ -n "$sock" ]; then
+            if [ -S "$sockpath" ] 2>/dev/null; then
+                echo "    socket:     ${GREEN}reachable${NC}  $sock"
+            elif sudo test -S "$sockpath" 2>/dev/null; then
+                echo "    socket:     ${GREEN}reachable${NC}  $sock"
+            else
+                echo "    socket:     ${RED}NOT reachable${NC}  $sock"
+            fi
         else
             echo "    socket:     ${YELLOW}not configured${NC}"
         fi
@@ -108,7 +115,9 @@ case "${CONTAINER_BACKEND:-docker-group}" in
             # Optional podman docker-CLI-compat socket.
             sockpath="$sock"
             case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
-            if [ -S "$sockpath" ]; then
+            if [ -S "$sockpath" ] 2>/dev/null; then
+                echo "    socket:     ${GREEN}reachable${NC}  $sock"
+            elif sudo test -S "$sockpath" 2>/dev/null; then
                 echo "    socket:     ${GREEN}reachable${NC}  $sock"
             else
                 echo "    socket:     ${RED}NOT reachable${NC}  $sock"
