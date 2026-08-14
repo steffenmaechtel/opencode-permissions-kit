@@ -130,7 +130,34 @@
             "sudo docker *": "deny",
             "sudo docker-compose *": "deny",
             "ddev *": "deny",
-            "sudo ddev *": "deny"
+            "sudo ddev *": "deny",
+            // SENSITIVE FILE TRIPWIRE — mirrors the read/edit deny patterns
+            // into bash so allowlisted commands (git log *, git diff *, ls *,
+            // ...) cannot touch protected file names prompt-free. "ask" (not
+            // "deny"): the developer decides per case whether a match is a
+            // false positive (cp .env.example .env) or an unwanted access.
+            // Must stay AFTER the allow rules (last match wins). Patterns are
+            // anchored with a TRAILING "*" — unlike read/edit (which match
+            // file paths), bash rules match the whole command string, so a
+            // name mid-command (cat settings.php | grep DB, cp auth.json /tmp)
+            // must still hit. Still LEXICAL ONLY — variables (F=.env; cat $F),
+            // globs (cat .en?) and indirection (find -exec cat {} \;) evade
+            // it. The OS ACL remains the hard boundary.
+            "*additional.php*": "ask",
+            "*settings.php*": "ask",
+            "*LocalConfiguration.php*": "ask",
+            "*AdditionalConfiguration.php*": "ask",
+            "*README.md*": "ask",
+            "*.sql.gz*": "ask",
+            "*auth.json*": "ask",
+            "*.env*": "ask",
+            "*id_rsa*": "ask",
+            "*id_ed25519*": "ask",
+            "*.pem*": "ask",
+            "*wp-config.php*": "ask",
+            "*conf.php*": "ask",
+            "*config.php*": "ask",
+            "*config/database.php*": "ask"
         },
         "external_directory": "ask"
     }

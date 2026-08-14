@@ -168,6 +168,14 @@ would be the clean solution but exceeds POSIX sh.
 flag-only variants), or accept + document that anything git ever tracked is
 agent-readable without a prompt.
 
+**Status: MITIGATED (soft).** The template now mirrors the read/edit deny patterns
+into `permission.bash` as `ask` rules placed after the allowlist (see
+`files/opencode.jsonc`, "SENSITIVE FILE TRIPWIRE"). Literal-name commands like
+`git log -p -- .env` drop from allow to ask — the developer decides false positive
+vs. unwanted access. Residual: the tripwire is lexical (`F=.env; cat $F`, `cat .en?`,
+`find -exec` evade it) and an approved ask still reads the file; the ODB read
+remains possible after approval. Documented in MANUAL.md.
+
 ### H2. Copies/archives escape the protection scope permanently
 
 Protection is scoped to `projects.conf` roots. Anything the agent copies out during
