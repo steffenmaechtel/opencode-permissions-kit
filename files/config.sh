@@ -482,6 +482,50 @@ EOF
         fi
         sudo mkdir -p /run/opencode-permissions-kit/ddev-txn 2>/dev/null || true
         sudo chmod 755 /run/opencode-permissions-kit/ddev-txn 2>/dev/null || true
+
+        # Router ports: rootless ddev-router cannot bind <1024. Lower the
+        # unprivileged port start to 80, persisted via sysctl.d. Host-wide
+        # change: interactive runs are asked (default N); --yes applies.
+        port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)
+        if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
+            if confirm "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443?"; then
+                if echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
+                    if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
+                        echo "  unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
+                        log "ddev sandbox: net.ipv4.ip_unprivileged_port_start=80 applied"
+                    else
+                        echo "${YELLOW}WARNING: sysctl persisted but not activated live (read-only /proc/sys?) — reboot or run:${NC}"
+                        echo "  sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
+                        log "ddev sandbox: sysctl persisted but not activated live"
+                    fi
+                else
+                    echo "${YELLOW}WARNING: could not write /etc/sysctl.d/99-ddev-rootless.conf — apply the sysctl manually or use higher router ports.${NC}"
+                fi
+            else
+                echo "  Skipped — either set the sysctl manually or use higher router ports:"
+                echo "  sudo -u $OPENCODE_USER ddev config global --router-http-port 8080 --router-https-port 8443"
+            fi
+        fi
+
+        # HTTPS first-run: create the sandbox user's mkcert CA (best-effort).
+        # ddev bundles mkcert in ~/.ddev/bin only after the first ddev start;
+        # until then print the manual step. The system-trust part of
+        # 'mkcert -install' cannot succeed unprivileged — harmless, the CA
+        # files are what ddev needs; browser/host trust stays a manual import.
+        caroot="/home/$OPENCODE_USER/.local/share/mkcert"
+        mkcert_bin="/home/$OPENCODE_USER/.ddev/bin/mkcert"
+        if [ ! -f "$caroot/rootCA.pem" ]; then
+            if [ -x "$mkcert_bin" ]; then
+                sudo -u "$OPENCODE_USER" env CAROOT="$caroot" "$mkcert_bin" -install >/dev/null 2>&1 || true
+                if [ -f "$caroot/rootCA.pem" ]; then
+                    echo "  mkcert CA created: $caroot (import rootCA.pem into your browser for HTTPS trust)"
+                    log "ddev sandbox: mkcert CA created for $OPENCODE_USER"
+                fi
+            else
+                echo "  NOTE: mkcert not downloaded yet — after the first ddev start create the CA:"
+                echo "  sudo -u $OPENCODE_USER env CAROOT=$caroot $mkcert_bin -install"
+            fi
+        fi
     fi
 
     update_install_conf_ddev_mode "$new_mode"

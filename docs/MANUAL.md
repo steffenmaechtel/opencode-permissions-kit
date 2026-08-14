@@ -377,8 +377,49 @@ Trade-offs:
 - **No private SSH keys:** sandbox ddev uses `/home/opencode/.ddev` — composer
   from private repos and `ddev auth ssh` stay developer-terminal tasks
   (handing the agent the developer's keys would outweigh the benefit).
-- **Router ports:** rootless containers cannot bind <1024 — use
-  8080/8443 (`ddev config --router_http_port`).
+- **Router ports:** rootless containers cannot bind ports <1024, so
+  `ddev-router` fails with "cannot expose privileged port 80" on the first
+  `ddev start`. `config.sh ddev-mode sandbox` handles this automatically: it
+  lowers `net.ipv4.ip_unprivileged_port_start` to 80 (interactive runs are
+  asked — default N; `--yes` applies) and persists it in
+  `/etc/sysctl.d/99-ddev-rootless.conf`. Trade-off: every unprivileged user
+  on the host may then bind ports 80–1023 (fine on a single-developer WSL2
+  machine). Declined or failed? Manual equivalents:
+
+  ```bash
+  sudo tee /etc/sysctl.d/99-ddev-rootless.conf <<< 'net.ipv4.ip_unprivileged_port_start=80'
+  sudo sysctl --system
+  ```
+
+  or higher ports instead — for the sandbox user's own ddev home:
+
+  ```bash
+  sudo -u opencode ddev config global --router-http-port 8080 --router-https-port 8443
+  ```
+
+  at the cost of `http://<project>.ddev.site:8080` URLs.
+- **HTTPS (mkcert) first-run setup:** the sandbox ddev has no CA yet — the
+  first start warns that the mkcert CA at
+  `/home/opencode/.local/share/mkcert` is not readable. `config.sh ddev-mode
+  sandbox` creates it best-effort when ddev's bundled mkcert is already
+  present (it is downloaded to `~/.ddev/bin` only on the first ddev start —
+  until then the switch prints the manual step):
+
+  ```bash
+  sudo -u opencode env CAROOT=/home/opencode/.local/share/mkcert /home/opencode/.ddev/bin/mkcert -install
+  ```
+
+  The system-trust part of `-install` cannot succeed unprivileged (harmless —
+  the CA files exist afterwards, which is what ddev needs). To make the host
+  and browsers trust the certificates: import the generated
+  `/home/opencode/.local/share/mkcert/rootCA.pem` into the Windows/WSL
+  browser trust store, and optionally into the host CA bundle:
+
+  ```bash
+  sudo cp /home/opencode/.local/share/mkcert/rootCA.pem /usr/local/share/ca-certificates/opencode-dev.crt
+  sudo update-ca-certificates
+  ```
+
 - **One driver at a time:** the developer's terminal ddev and the sandbox
   ddev use different daemons and fight over `.ddev` ownership — do not drive
   the same project from both simultaneously.

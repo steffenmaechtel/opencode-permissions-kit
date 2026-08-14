@@ -170,6 +170,16 @@ check "config.sh render_sudoers takes the ddev mode" \
     grep -Fq 'render_sudoers "$new_backend" "${DDEV_MODE:-delegated}"' "$CONFIG"
 check "backend switch to docker-group falls back to delegated" \
     grep -Fq 'falling back to '"'"'delegated'"'"'' "$CONFIG"
+check "sandbox switch offers the router-port sysctl" \
+    grep -Fq 'net.ipv4.ip_unprivileged_port_start' "$CONFIG"
+check "sysctl persisted via sysctl.d" \
+    grep -Fq '/etc/sysctl.d/99-ddev-rootless.conf' "$CONFIG"
+check "sysctl activation failure is non-fatal (warning + manual cmd)" \
+    grep -Fq 'sysctl persisted but not activated live' "$CONFIG"
+check "sandbox switch creates the mkcert CA best-effort" \
+    grep -Fq 'rootCA.pem' "$CONFIG"
+check "mkcert manual fallback printed when the binary is absent" \
+    grep -Fq 'mkcert not downloaded yet' "$CONFIG"
 
 echo ""
 echo "-- status.sh wiring --"
