@@ -356,6 +356,22 @@ How it works:
   for other layouts. It is root-owned on purpose: its entries are executed as
   root-side file operations.
 
+What gets installed where (nothing is re-installed per project):
+
+| Layer | Location | Created when | Shared across projects? |
+|---|---|---|---|
+| ddev binary | `/usr/bin/ddev` | never re-installed — the same binary for every user | yes |
+| sandbox ddev home | `/home/opencode/.ddev` (global config, project registry, mutagen binaries) | on the **first** ddev run as `opencode` (the mode switch only pre-creates the empty directory) | yes — once, all projects |
+| docker images | image store of the opencode user's rootless daemon | pulled on the first `ddev start` of a project type | yes — a second TYPO3 project does not pull again |
+| project state | `<project>/.ddev` (config.yaml, image-build dirs, snapshots) | per project | no — this is exactly the directory the transaction OPENs (chown to `opencode`) and CLOSEs (chown back to the developer) |
+
+Consequence: the **first** `ddev start` as the sandbox user is slow (mutagen
+download into `~/.ddev/bin`, image pulls into the rootless daemon). Every
+further project — and every further start — reuses that state; nothing is
+installed per project. The sandbox user's daemon and ddev home are fully
+separate from the developer's (own daemon, own registry), which is also why
+the "one driver at a time" rule below exists.
+
 Trade-offs:
 
 - **No private SSH keys:** sandbox ddev uses `/home/opencode/.ddev` — composer
