@@ -59,6 +59,11 @@ E 'sudo tee /usr/bin/ddev > /dev/null <<'\''EOF'\''
 id -un > /tmp/ddev-stub.out
 printf "%s " "$@" >> /tmp/ddev-stub.out
 echo "" >> /tmp/ddev-stub.out
+# During a sandbox transaction the rewrite-list files must be writable for
+# opencode; the stub records whether it could write settings.php. Without
+# the OPEN ACLs opencode gets EPERM (-> "settings-denied") — that is how this
+# suite catches an off-by-root rewrite-list match bug.
+echo "test" > /var/www/vhosts/test-project/config/system/settings.php >/dev/null 2>&1 && echo "settings-writeable" >> /tmp/ddev-stub.out || echo "settings-denied" >> /tmp/ddev-stub.out
 # Record whether the invoking user can read the (deny-protected) project .env.
 # delegated mode -> runs as dev -> readable; sandbox mode -> runs as opencode
 # -> denied (the transaction window never opens the .env pattern).
@@ -846,6 +851,8 @@ check "12k: mutating run received the subcommand + args" \
     E 'grep -q "start txn-test" /tmp/ddev-stub.out'
 check "12k: .env stays UNREADABLE during the transaction (window excludes secrets)" \
     E 'grep -q "env-denied" /tmp/ddev-stub.out'
+check "12k: OPEN granted write access to settings.php during the transaction (rewrite list matched the nested project)" \
+    E 'grep -q "settings-writeable" /tmp/ddev-stub.out'
 check "12k: CLOSE restored the settings.php deny" \
     E 'sudo getfacl -p /var/www/vhosts/test-project/config/system/settings.php 2>/dev/null | grep -q "user:opencode:---"'
 check "12k: CLOSE handed .ddev back to the developer" \

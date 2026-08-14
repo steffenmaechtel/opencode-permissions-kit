@@ -118,7 +118,7 @@ close_transaction() {
     if [ "$rewrites_loaded" = 1 ]; then
         printf '%s' "$rewrites" | while IFS= read -r entry; do
             [ -z "$entry" ] && continue
-            find "$ROOT" -maxdepth 8 -path "$ROOT/$entry" -exec setfacl -x "u:$OPENCODE_USER" {} + 2>/dev/null
+            find "$ROOT" -maxdepth 8 -path "*/$entry" -exec setfacl -x "u:$OPENCODE_USER" {} + 2>/dev/null
         done
     fi
     # 2. Hand the .ddev trees back to the developer (group kept for the kit).
@@ -146,8 +146,8 @@ if [ "$rewrites_loaded" = 1 ]; then
     printf '%s' "$rewrites" | while IFS= read -r entry; do
         [ -z "$entry" ] && continue
         # Directories get rwx (ddev creates/replaces files inside); files rw.
-        find "$ROOT" -maxdepth 8 -path "$ROOT/$entry" -type d -exec setfacl -m "u:$OPENCODE_USER:rwx" {} + 2>/dev/null
-        find "$ROOT" -maxdepth 8 -path "$ROOT/$entry" -type f -exec setfacl -m "u:$OPENCODE_USER:rw-" {} + 2>/dev/null
+        find "$ROOT" -maxdepth 8 -path "*/$entry" -type d -exec setfacl -m "u:$OPENCODE_USER:rwx" {} + 2>/dev/null
+        find "$ROOT" -maxdepth 8 -path "*/$entry" -type f -exec setfacl -m "u:$OPENCODE_USER:rw-" {} + 2>/dev/null
     done
     log "ddev transaction OPEN (rewrite-list ACLs granted) for $ROOT"
 fi
