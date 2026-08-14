@@ -264,6 +264,19 @@ E2E (extend `tests/e2e/run.sh` / the rootless suites with the ddev stub):
   whether the container mounts the project with a UID-mapped root that does
   not share the `opencode` UID. Untested hypothesis (see L4): UID-shared
   rootless daemon + mutagen.
+- **TODO: `ddev describe` reports different container states depending on
+  the caller.** As the developer user in the terminal, `ddev describe` shows
+  `STAT: stopped` for every container; the same command run by the agent
+  inside opencode shows everything green (`STAT: ok`). Since both callers use
+  separate ddev drivers (developer daemon vs. rootless sandbox daemon, see
+  L3), each only sees its own daemon's containers — the developer driver
+  never started the project, so from its point of view everything is
+  "stopped" while the sandbox daemon actually runs the containers. Open
+  question: whether this is only a cosmetic reporting mismatch or whether the
+  developer driver's `docker-compose`/router state interferes (e.g. the
+  developer's router seeing no networks on its port). Documenting as a TODO —
+  confirm the desired UX (e.g. delegate `ddev describe` to the sandbox
+  driver, or accept per-driver visibility).
 
 ## 11. Effort estimate
 
