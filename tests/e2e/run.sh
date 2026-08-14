@@ -64,6 +64,8 @@ echo "" >> /tmp/ddev-stub.out
 # the OPEN ACLs opencode gets EPERM (-> "settings-denied") — that is how this
 # suite catches an off-by-root rewrite-list match bug.
 echo "test" > /var/www/vhosts/test-project/config/system/settings.php >/dev/null 2>&1 && echo "settings-writeable" >> /tmp/ddev-stub.out || echo "settings-denied" >> /tmp/ddev-stub.out
+# ddev also chmod()s config/system; chmod requires ownership, not just ACLs.
+chmod 700 /var/www/vhosts/test-project/config/system >/dev/null 2>&1 && echo "dir-chmod-OK" >> /tmp/ddev-stub.out || echo "dir-chmod-denied" >> /tmp/ddev-stub.out
 # Record whether the invoking user can read the (deny-protected) project .env.
 # delegated mode -> runs as dev -> readable; sandbox mode -> runs as opencode
 # -> denied (the transaction window never opens the .env pattern).
@@ -853,6 +855,8 @@ check "12k: .env stays UNREADABLE during the transaction (window excludes secret
     E 'grep -q "env-denied" /tmp/ddev-stub.out'
 check "12k: OPEN granted write access to settings.php during the transaction (rewrite list matched the nested project)" \
     E 'grep -q "settings-writeable" /tmp/ddev-stub.out'
+check "12k: OPEN granted OWNERSHIP of config/system (ddev chmod() needs it, ACLs alone don't)" \
+    E 'grep -q "dir-chmod-OK" /tmp/ddev-stub.out'
 check "12k: CLOSE restored the settings.php deny" \
     E 'sudo getfacl -p /var/www/vhosts/test-project/config/system/settings.php 2>/dev/null | grep -q "user:opencode:---"'
 check "12k: CLOSE handed .ddev back to the developer" \
@@ -886,6 +890,10 @@ E 'sudo rm -f /run/opencode-permissions-kit/ddev-txn/_var_www_vhosts.open'
 E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
 check "12k: heal restored .ddev ownership after the stamp cleared" \
     E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
+check "12k: heal restored rewrite-list ownership (config/system back to the developer)" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system)" = "dev"'
+check "12k: heal restored rewrite-list ownership (settings.php back to the developer)" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system/settings.php)" = "dev"'
 
 # 12k.7 switch back to delegated + restore the docker-group backend.
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-mode delegated >/tmp/ddev-mode-back.log 2>&1' || true

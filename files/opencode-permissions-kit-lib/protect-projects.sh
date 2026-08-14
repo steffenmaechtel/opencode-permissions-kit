@@ -284,6 +284,29 @@ fix_ddev_tree() {
     done < "$TMP_DDEV"
 }
 
+# ddev sandbox: heal rewrite-list ownership stranded by a killed transaction
+# (OPEN chowns these matches to opencode; CLOSE restores via the EXIT trap,
+# but a SIGKILL'd wrapper skips the trap). Called per-root in the main scan,
+# gated on no open transaction stamp for that root so a running ddev start is
+# never disturbed.
+heal_rewrite_ownership() {
+    local root="$1" stamp_name stranded
+    [ -n "$DEFAULT_USER" ] || return 0
+    [ -f /etc/opencode-permissions-kit/ddev-rewrites.conf ] || return 0
+    stamp_name=$(printf '%s' "$root" | tr -c 'A-Za-z0-9' '_')
+    [ -e "/run/opencode-permissions-kit/ddev-txn/${stamp_name}.open" ] && return 0
+    while IFS= read -r entry; do
+        case "$entry" in ""|\#*) continue ;; esac
+        case "$entry" in /*|*/../*|../*|*/..) continue ;; esac
+        stranded=$(find "$root" -maxdepth 8 -path "*/$entry" -user "$OPENCODE_USER" -print 2>/dev/null)
+        if [ -n "$stranded" ]; then
+            printf '%s\n' "$stranded" | xargs -d '\n' chown "$DEFAULT_USER:$WWW_GROUP" 2>/dev/null
+            local n; n=$(printf '%s\n' "$stranded" | wc -l)
+            log "ddev txn heal: chown $DEFAULT_USER on $n stranded rewrite-list match(es) ($entry) under $root"
+        fi
+    done < /etc/opencode-permissions-kit/ddev-rewrites.conf
+}
+
 # Build global find args
 TMP_PATTERNS=$(mktemp)
 TMP_DDEV=$(mktemp)
@@ -310,6 +333,14 @@ while IFS= read -r root; do
 
     # Clear stale ACLs from removed deny patterns, then re-apply current ones
     clear_stale_acls "$root"
+
+    # ddev sandbox: heal stranded ownership from a KILLED transaction. OPEN
+    # chowns the rewrite-list matches to opencode (ddev chmod()s them); if
+    # the agent SIGKILLs the wrapper the EXIT trap never reaches CLOSE, so
+    # the files stay opencode-owned until the next --force trigger. Mirrors
+    # the helper's CLOSE for any match that is still opencode-owned, gated on
+    # no open transaction stamp for this root.
+    heal_rewrite_ownership "$root"
 
     # ddev compat: keep .ddev group-writable for opted-in docker/ddev projects
     fix_ddev_tree "$root"

@@ -76,6 +76,12 @@ check "runs ddev as the opencode user"         grep -Fq 'runuser -u "$OPENCODE_U
 check "RUN uses a clean environment"           grep -Fq 'HOME="/home/$OPENCODE_USER"' "$TXN"
 check "CLOSE removes u:opencode grants"        grep -Fq 'setfacl -x "u:$OPENCODE_USER"' "$TXN"
 check "CLOSE chowns .ddev back"                grep -Fq 'chown -R "$DEFAULT_USER:$WWW_GROUP"' "$TXN"
+check "OPEN chowns rewrite-list matches (ddev chmod needs ownership)" \
+    grep -Fq '"$OPENCODE_USER:$WWW_GROUP" {} +' "$TXN"
+check "CLOSE chowns rewrite-list matches back to the developer" \
+    grep -Fq '"$DEFAULT_USER:$WWW_GROUP" {} +' "$TXN"
+check "protect-projects heals stranded rewrite-list ownership (kill residual)" \
+    grep -Fq 'heal_rewrite_ownership()' "$PROTECT"
 check "CLOSE re-runs protect-projects --force" grep -Fq -- '--force --cwd "$ROOT"' "$TXN"
 check "stamp is written under /run"            grep -Fq '/run/opencode-permissions-kit/ddev-txn' "$TXN"
 check "EXIT trap closes the transaction"       grep -Fq "trap 'rc=\$?; close_transaction; exit \$rc' EXIT" "$TXN"

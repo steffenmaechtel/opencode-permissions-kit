@@ -112,13 +112,16 @@ fi
 stamp_root_open() { [ -e "$STAMP" ]; }
 
 close_transaction() {
-    # 1. Remove the u:opencode grants from the rewrite-list matches. Deny
-    #    patterns (settings.php etc.) get their u:opencode:--- re-asserted by
+    # 1. Remove the u:opencode grants AND restore ownership on the rewrite-list
+    #    matches (OPEN chowns them to opencode so ddev's chmod() succeeds;
+    #    ACLs alone don't grant chmod — you have to own the inode). Deny
+    #    patterns (settings.php etc.) get u:opencode:--- re-asserted by
     #    protect-projects right after.
     if [ "$rewrites_loaded" = 1 ]; then
         printf '%s' "$rewrites" | while IFS= read -r entry; do
             [ -z "$entry" ] && continue
             find "$ROOT" -maxdepth 8 -path "*/$entry" -exec setfacl -x "u:$OPENCODE_USER" {} + 2>/dev/null
+            find "$ROOT" -maxdepth 8 -path "*/$entry" -exec chown "$DEFAULT_USER:$WWW_GROUP" {} + 2>/dev/null
         done
     fi
     # 2. Hand the .ddev trees back to the developer (group kept for the kit).
@@ -145,11 +148,15 @@ log "ddev transaction OPEN (chown .ddev -> $OPENCODE_USER) for $ROOT"
 if [ "$rewrites_loaded" = 1 ]; then
     printf '%s' "$rewrites" | while IFS= read -r entry; do
         [ -z "$entry" ] && continue
+        # Ownership goes to opencode (not just an ACL grant): ddev chmod()s
+        # the match (e.g. chmod config/system) and chmod requires the caller
+        # to own the inode — ACL rwx alone is not enough.
+        find "$ROOT" -maxdepth 8 -path "*/$entry" -exec chown "$OPENCODE_USER:$WWW_GROUP" {} + 2>/dev/null
         # Directories get rwx (ddev creates/replaces files inside); files rw.
         find "$ROOT" -maxdepth 8 -path "*/$entry" -type d -exec setfacl -m "u:$OPENCODE_USER:rwx" {} + 2>/dev/null
         find "$ROOT" -maxdepth 8 -path "*/$entry" -type f -exec setfacl -m "u:$OPENCODE_USER:rw-" {} + 2>/dev/null
     done
-    log "ddev transaction OPEN (rewrite-list ACLs granted) for $ROOT"
+    log "ddev transaction OPEN (rewrite-list ownership + ACLs granted) for $ROOT"
 fi
 
 printf '%s\n' "$ROOT" > "$STAMP" 2>/dev/null || true
