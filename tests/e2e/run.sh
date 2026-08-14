@@ -792,8 +792,11 @@ E 'rm -rf /tmp/leak-e2e /tmp/leak-e2e-clean'
 
 echo ""
 echo "--- 12k. ddev sandbox mode (transactional, DDEV-SANDBOX design doc / PROOF-3 H3) ---"
+# 12k.0 the installed config.sh needs the sudoers template next to it.
+check "12k: sudoers.template deployed to the library" \
+    E 'sudo test -f /usr/local/lib/opencode-permissions-kit/sudoers.template'
 # 12k.1 switching to sandbox is REFUSED on the docker-group backend (hard gate).
-E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-refuse.log 2>&1' || true
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-refuse.log 2>&1' || true
 check "12k: sandbox refused on docker-group backend" \
     E 'grep -q "requires a rootless container backend" /tmp/ddev-mode-refuse.log'
 check_fail "12k: install.conf has no DDEV_MODE=sandbox after refusal" \
@@ -803,7 +806,7 @@ check "12k: delegated sudoers rule still present after refusal" \
 
 # 12k.2 fake a rootless backend (no daemon needed for the stub) and switch.
 E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-rootless/' /etc/opencode-permissions-kit/install.conf"
-E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-apply.log 2>&1' || true
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-apply.log 2>&1' || true
 check "12k: ddev-mode sandbox applied" \
     E 'grep -q "ddev mode switched to .sandbox." /tmp/ddev-mode-apply.log'
 check "12k: install.conf records DDEV_MODE=sandbox" \
@@ -874,7 +877,7 @@ check "12k: heal restored .ddev ownership after the stamp cleared" \
     E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
 
 # 12k.7 switch back to delegated + restore the docker-group backend.
-E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-mode delegated >/tmp/ddev-mode-back.log 2>&1' || true
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-mode delegated >/tmp/ddev-mode-back.log 2>&1' || true
 check "12k: ddev-mode delegated applied" \
     E 'grep -q "ddev mode switched to .delegated." /tmp/ddev-mode-back.log'
 check "12k: delegated sudoers rule restored" \

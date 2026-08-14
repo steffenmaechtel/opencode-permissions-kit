@@ -588,6 +588,11 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/
 sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
 sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
+# sudoers.template is deployed alongside config.sh: the installed config.sh
+# re-renders /etc/opencode-permissions-kit/sudoers on container-backend /
+# ddev-mode switches and needs the template next to it.
+sudo cp "$SCRIPT_DIR/sudoers.template"                 "$LIBDIR/sudoers.template"
+sudo chmod 440 "$LIBDIR/sudoers.template"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc"          "$LIBDIR/opencode-deny-all.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"

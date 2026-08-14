@@ -134,6 +134,8 @@ check "install.sh renders ddev blocks (sandbox branch)" \
     grep -Fq '/^#@ddev-delegated-begin$/,/^#@ddev-delegated-end$/d' "$INSTALL"
 check "install.sh renders ddev blocks (delegated branch)" \
     grep -Fq '/^#@ddev-sandbox-begin$/,/^#@ddev-sandbox-end$/d' "$INSTALL"
+check "install.sh deploys sudoers.template to the library (installed config.sh needs it)" \
+    grep -Fq '"$SCRIPT_DIR/sudoers.template"                 "$LIBDIR/sudoers.template"' "$INSTALL"
 
 echo ""
 echo "-- update.sh wiring --"
@@ -145,6 +147,8 @@ check "update.sh chmods ddev-transaction.sh" \
     grep -Fq '"$LIBDIR/ddev-transaction.sh"' "$UPDATE"
 check "update.sh renders ddev blocks by DDEV_MODE" \
     grep -Fq '${DDEV_MODE:-delegated}' "$UPDATE"
+check "update.sh deploys sudoers.template to the library" \
+    grep -Fq '"$SCRIPT_DIR/sudoers.template"                 "$LIBDIR/sudoers.template"' "$UPDATE"
 check "update.sh keeps DDEV_MODE in install.conf (not filtered)" \
     sh -c '! grep -Fq -- "grep -v -e '"'"'^VERSION='"'"' -e '"'"'^DDEV_BIN='"'"' -e '"'"'^DDEV_MODE='"'"'" "$1"' _ "$UPDATE"
 

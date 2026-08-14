@@ -239,6 +239,10 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/
 sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
 sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
+# sudoers.template: needed by the installed config.sh for backend/ddev-mode
+# switches (render_sudoers looks in $LIBDIR first).
+sudo cp "$SCRIPT_DIR/sudoers.template"                 "$LIBDIR/sudoers.template"
+sudo chmod 440 "$LIBDIR/sudoers.template"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 # ddev delegation shim
