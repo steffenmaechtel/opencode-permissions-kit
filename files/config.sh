@@ -69,7 +69,7 @@ TARGETS=""
 for arg do
     case "$arg" in
         --yes|-y) YES=true ;;
-        projects|git-config|refresh|status|container-backend)
+        projects|git-config|refresh|status|container-backend|ddev-mode)
             [ -z "$ACTION" ] && ACTION="$arg" && continue
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             TARGETS="$TARGETS $arg"
@@ -77,6 +77,8 @@ for arg do
         on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg" ;;
         docker-group|docker-rootless|podman-rootless)
             [ "$ACTION" = "container-backend" ] && SUB="$arg" ;;
+        delegated|sandbox)
+            [ "$ACTION" = "ddev-mode" ] && SUB="$arg" ;;
         list|add|remove)
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             ;;
@@ -275,9 +277,12 @@ container_backend_status() {
 }
 
 # Re-render the sudoers for a given backend. Mirrors install.sh/update.sh: keep
-# the (opencode:docker) grant for docker-group, strip it for rootless.
+# the (opencode:docker) grant for docker-group, strip it for rootless. Also
+# keeps only the ddev block matching DDEV_MODE (delegated vs sandbox are
+# mutually exclusive).
 render_sudoers() {
     local backend="$1"
+    local ddev_mode="${2:-${DDEV_MODE:-delegated}}"
     local template=""
     for cand in "$LIBDIR/sudoers.template" "$SCRIPT_DIR/sudoers.template" "$SCRIPT_DIR/../files/sudoers.template"; do
         if [ -f "$cand" ]; then template="$cand"; break; fi
@@ -294,6 +299,14 @@ render_sudoers() {
             sed -e '/^#@docker-group-begin$/d' -e '/^#@docker-group-end$/d' "$tmp" > "$tmp.2"
             ;;
     esac
+    mv -f "$tmp.2" "$tmp"
+    if [ "$ddev_mode" = "sandbox" ]; then
+        sed -e '/^#@ddev-delegated-begin$/,/^#@ddev-delegated-end$/d' \
+            -e '/^#@ddev-sandbox-begin$/d' -e '/^#@ddev-sandbox-end$/d' "$tmp" > "$tmp.2"
+    else
+        sed -e '/^#@ddev-sandbox-begin$/,/^#@ddev-sandbox-end$/d' \
+            -e '/^#@ddev-delegated-begin$/d' -e '/^#@ddev-delegated-end$/d' "$tmp" > "$tmp.2"
+    fi
     mv -f "$tmp.2" "$tmp"
     sudo cp "$tmp" /etc/opencode-permissions-kit/sudoers
     sudo chmod 440 /etc/opencode-permissions-kit/sudoers
@@ -360,13 +373,129 @@ container_backend_apply() {
     # Update install.conf.
     update_install_conf_backend "$new_backend" "$docker_host" "$podman_socket"
 
+    # Combo guard: sandbox ddev requires a rootless backend. Switching to
+    # docker-group therefore falls back to delegated ddev mode.
+    if [ "$new_backend" = "docker-group" ] && [ "${DDEV_MODE:-delegated}" = "sandbox" ]; then
+        echo "${YELLOW}Backend docker-group is incompatible with ddev mode 'sandbox' — falling back to 'delegated'.${NC}"
+        update_install_conf_ddev_mode "delegated"
+        DDEV_MODE="delegated"
+    fi
+
     # Re-render the sudoers for the new backend.
-    render_sudoers "$new_backend"
+    render_sudoers "$new_backend" "${DDEV_MODE:-delegated}"
 
     echo ""
     echo "  ${GREEN}Container backend switched to '$new_backend'.${NC}"
     echo "  Restart any running opencode sessions to pick up the new backend."
     log "container backend switched: $prev -> $new_backend"
+}
+
+# --- ddev mode (delegated | sandbox) ------------------------------------------
+
+REWRITES_CONF="/etc/opencode-permissions-kit/ddev-rewrites.conf"
+
+update_install_conf_ddev_mode() {
+    local mode="$1" tmp
+    tmp=$(mktemp)
+    {
+        if [ -f "$INSTALL_CONF" ]; then
+            grep -v '^DDEV_MODE=' "$INSTALL_CONF" 2>/dev/null
+        fi
+        echo "DDEV_MODE=$mode"
+    } | sort -u > "$tmp"
+    sudo cp "$tmp" "$INSTALL_CONF"
+    sudo chmod 644 "$INSTALL_CONF"
+    rm -f "$tmp"
+}
+
+ddev_mode_status() {
+    local mode="${DDEV_MODE:-delegated}"
+    echo "ddev mode: ${CYAN}${mode}${NC}"
+    case "$mode" in
+        sandbox) echo "  ddev (and its host commands) runs as '$OPENCODE_USER' inside a transaction;" ;;
+        *)       echo "  ddev invoked by the agent runs as '$DEFAULT_USER' via the delegation shim;" ;;
+    esac
+    echo "  mutating subcommands: $( [ "$mode" = sandbox ] && echo 'ddev-transaction.sh (OPEN/RUN/CLOSE)' || echo "sudo -u $DEFAULT_USER $DDEV_BIN" )"
+    if [ "$mode" = "sandbox" ]; then
+        if [ -f "$REWRITES_CONF" ]; then
+            echo "  rewrite list: $REWRITES_CONF ($(grep -vc '^\s*#\|^\s*$' "$REWRITES_CONF" 2>/dev/null || echo '?') entries)"
+        else
+            echo "  rewrite list: ${YELLOW}missing ($REWRITES_CONF)${NC}"
+        fi
+    fi
+}
+
+ddev_mode_apply() {
+    local new_mode="$1"
+    local prev="${DDEV_MODE:-delegated}"
+    [ "$new_mode" = "$prev" ] && { echo "ddev mode is already '$new_mode'."; return 0; }
+
+    if [ "$new_mode" = "sandbox" ]; then
+        # Hard gate: sandbox ddev requires a rootless backend (on docker-group
+        # the container root would void every ACL deny — PROOF-3 C3).
+        case "${CONTAINER_BACKEND:-docker-group}" in
+            docker-rootless|podman-rootless) ;;
+            *) die "ddev mode 'sandbox' requires a rootless container backend (current: ${CONTAINER_BACKEND:-docker-group}). Run 'config.sh container-backend docker-rootless|podman-rootless' first." ;;
+        esac
+        # Soft gate: ddev >= 1.25 for rootless operation (--yes skips: the
+        # admin takes responsibility, e.g. for a version the parser can't read).
+        local dver="${DDEV_VERSION:-}"
+        if [ -z "$dver" ] && [ -x "$DDEV_BIN" ]; then
+            dver="$("$DDEV_BIN" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')"
+        fi
+        if [ -n "$dver" ]; then
+            local ok
+            ok=$(awk -v v="$dver" 'BEGIN{split(v,a,"."); if(a[1]+0>1 || (a[1]+0==1 && a[2]+0>=25)) print "yes"; else print "no"}')
+            if [ "$ok" != "yes" ] && [ "$YES" != true ]; then
+                die "ddev mode 'sandbox' needs ddev >= 1.25 (found ${dver}). Use --yes to override."
+            fi
+            [ "$ok" != "yes" ] && echo "${YELLOW}WARNING: overriding the ddev >= 1.25 requirement (found ${dver}).${NC}"
+        else
+            [ "$YES" = true ] || die "cannot determine the ddev version — use --yes to override."
+        fi
+    fi
+
+    echo "Switching ddev mode: ${CYAN}${prev}${NC} -> ${CYAN}${new_mode}${NC}"
+    confirm "Apply ddev mode '$new_mode'?" || { echo "  Aborted."; return 1; }
+
+    if [ "$new_mode" = "sandbox" ]; then
+        # Provision the sandbox-side ddev home + the root-owned rewrite list
+        # (mirrors install.sh; idempotent).
+        sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
+        sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER/.ddev"
+        sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
+        if [ ! -f "$REWRITES_CONF" ]; then
+            sudo tee "$REWRITES_CONF" > /dev/null <<'EOF'
+# opencode permissions kit — ddev sandbox rewrite list.
+# Relative paths/globs under registered project roots that `ddev start` and
+# friends rewrite on the HOST. The transaction helper grants u:opencode
+# access on these for the duration of a mutating ddev run only. ROOT-OWNED:
+# entries here are executed as root-side file operations — keep this file
+# unwritable for everyone but root (mode 644, no group write).
+# Default: TYPO3 layout.
+config/system
+config/system/settings.php
+config/system/additional.php
+config/system/.gitignore
+EOF
+            sudo chmod 644 "$REWRITES_CONF"
+        fi
+        sudo mkdir -p /run/opencode-permissions-kit/ddev-txn 2>/dev/null || true
+        sudo chmod 755 /run/opencode-permissions-kit/ddev-txn 2>/dev/null || true
+    fi
+
+    update_install_conf_ddev_mode "$new_mode"
+    DDEV_MODE="$new_mode"
+    render_sudoers "${CONTAINER_BACKEND:-docker-group}" "$new_mode"
+
+    echo ""
+    echo "  ${GREEN}ddev mode switched to '$new_mode'.${NC}"
+    if [ "$new_mode" = "sandbox" ]; then
+        echo "  ddev now runs as '$OPENCODE_USER' (transactional); restart running opencode sessions."
+    else
+        echo "  ddev invoked by the agent is delegated to '$DEFAULT_USER' again; restart running opencode sessions."
+    fi
+    log "ddev mode switched: $prev -> $new_mode"
 }
 
 # --- refresh -----------------------------------------------------------------
@@ -481,6 +610,14 @@ case "$ACTION" in
                 banner; container_backend_apply "$SUB" ;;
             status|"") banner; container_backend_status ;;
             *)      die "Usage: config.sh container-backend docker-group|docker-rootless|podman-rootless|status" ;;
+        esac
+        ;;
+    ddev-mode)
+        case "$SUB" in
+            delegated|sandbox)
+                banner; ddev_mode_apply "$SUB" ;;
+            status|"") banner; ddev_mode_status ;;
+            *)      die "Usage: config.sh ddev-mode delegated|sandbox|status" ;;
         esac
         ;;
     refresh)    banner; refresh ;;

@@ -151,7 +151,23 @@ echo "  ${CYAN}ddev delegation shim:${NC}"
 if [ -L /usr/local/bin/ddev ] && [ "$(readlink /usr/local/bin/ddev)" = "$LIBDIR/bin/ddev" ]; then
     echo "    shim: ${GREEN}active${NC}  /usr/local/bin/ddev -> $LIBDIR/bin/ddev"
     echo "    real ddev: ${DDEV_BIN:-/usr/bin/ddev}"
-    echo "    delegates to: $DEFAULT_USER (the developer)"
+    case "${DDEV_MODE:-delegated}" in
+        sandbox)
+            echo "    mode: ${GREEN}sandbox${NC}  ddev runs as $OPENCODE_USER (transactional: OPEN/RUN/CLOSE)"
+            if [ -d /run/opencode-permissions-kit/ddev-txn ] && ls /run/opencode-permissions-kit/ddev-txn/*.open >/dev/null 2>&1; then
+                echo "    transactions: ${YELLOW}active${NC}"
+                for st in /run/opencode-permissions-kit/ddev-txn/*.open; do
+                    [ -e "$st" ] || continue
+                    echo "      open: $(cat "$st" 2>/dev/null || echo '?')"
+                done
+            else
+                echo "    transactions: none open"
+            fi
+            ;;
+        *)
+            echo "    mode: delegated  (invocations from the sandbox run as $DEFAULT_USER)"
+            ;;
+    esac
     if [ -n "${DDEV_VERSION:-}" ]; then
         ddev_low=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
         case "${CONTAINER_BACKEND:-docker-group}" in

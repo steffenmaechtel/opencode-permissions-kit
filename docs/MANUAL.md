@@ -313,6 +313,66 @@ Requirements & limitations:
 - Uninstall removes the `/usr/local/bin/ddev` shadow; the real ddev (wherever
   it lives) is left intact.
 
+### ddev sandbox mode (running ddev as the sandbox user)
+
+Delegation has a security cost: everything ddev spawns — including host-side
+custom commands from `.ddev/commands/host/`, a tree the agent can write —
+runs **as the developer**, outside every ACL deny. On a rootless backend the
+kit therefore offers **sandbox mode** (`docs/PLAN-DDEV-SANDBOX.md`): ddev and
+all of its children run as the `opencode` user, under the kit's protections.
+
+Switch it on (or back):
+
+```bash
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh ddev-mode sandbox
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh ddev-mode status
+```
+
+**Prerequisites (validated on switch):** a rootless container backend
+(`docker-rootless` / `podman-rootless` — on `docker-group` the config command
+refuses, because container root would void every ACL deny) and ddev >= 1.25
+(overridable with `--yes` when your ddev version is not parseable).
+
+How it works:
+
+- Mutating subcommands (`start`, `stop`, `restart`, `config`, `pull`, `push`,
+  `snapshot`, `import-db`, …) go through a root-side **transaction**
+  (`/usr/local/lib/opencode-permissions-kit/ddev-transaction.sh`): it
+  temporarily grants ddev the host-file access it needs (`.ddev` ownership +
+  the admin-declared **rewrite list** in
+  `/etc/opencode-permissions-kit/ddev-rewrites.conf`), runs ddev as
+  `opencode` with a clean environment against the rootless socket, and
+  restores the protections on every exit path (`protect-projects.sh --force`).
+  A killed transaction self-heals on the next `--force` trigger (git hook,
+  wrapper start, `config.sh refresh`); `status.sh` shows open transactions.
+- Read-only subcommands (`describe`, `list`, `logs`, `exec`, `ssh`,
+  `composer`, `launch`, `version`, `help`) skip the transaction and run
+  directly as `opencode` — no ACL window for the common long-running usage.
+- The sudoers rule changes with the mode: in sandbox mode the RunAs-developer
+  delegation rule is **removed** and only the transaction helper is grantable —
+  the agent can never spawn a process as the developer.
+- The rewrite list ships TYPO3 defaults
+  (`config/system`, `settings.php`, `additional.php`, `.gitignore`); extend it
+  for other layouts. It is root-owned on purpose: its entries are executed as
+  root-side file operations.
+
+Trade-offs:
+
+- **No private SSH keys:** sandbox ddev uses `/home/opencode/.ddev` — composer
+  from private repos and `ddev auth ssh` stay developer-terminal tasks
+  (handing the agent the developer's keys would outweigh the benefit).
+- **Router ports:** rootless containers cannot bind <1024 — use
+  8080/8443 (`ddev config --router_http_port`).
+- **One driver at a time:** the developer's terminal ddev and the sandbox
+  ddev use different daemons and fight over `.ddev` ownership — do not drive
+  the same project from both simultaneously.
+- **Laravel is out of scope:** ddev manages `.env` there, and the transaction
+  deliberately never opens deny patterns like `.env`; Laravel projects keep
+  the delegated mode.
+- During a mutating run the rewrite-list files (declared, non-secret config)
+  are readable for the `opencode` user — deny patterns such as `.env` never
+  are. See `docs/PLAN-DDEV-SANDBOX.md` §7 for the full residual-risk analysis.
+
 ## Customizing the Deny List
 
 ### Global Config
@@ -530,7 +590,7 @@ Container tools (docker/ddev):
 ddev delegation shim:
   shim: active  /usr/local/bin/ddev -> /usr/local/lib/opencode-permissions-kit/bin/ddev
   real ddev: /usr/bin/ddev
-  delegates to: info (the developer)
+  mode: delegated  (invocations from the sandbox run as info)
   ddev version: 1.24.3
 
 Leak scan (scratch dirs, name-based, report-only):
@@ -544,7 +604,7 @@ Management (run in a terminal):
 
 Before the kit is installed, `status.sh` still works and reports that hardening is **NOT active** — handy for checking any machine.
 
-The **Container tools** block reports the configured **backend** (`docker-group` by default; `docker-rootless` / `podman-rootless` when an admin has opted in — see [Container backend](#container-backend)), how container access is granted (the docker group for `docker-group`, or the per-user socket reachability for the rootless backends), and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template. The **ddev delegation shim** block reports whether the shim is active (shadowing `/usr/local/bin/ddev`), the real ddev path it delegates to, the developer user it runs ddev as, and the recorded ddev version (with a note when a rootless backend is selected but ddev < 1.25) — see [ddev delegation](#ddev-delegation-running-ddev-as-the-developer). The **leak scan** block sweeps the scratch directories for files whose names match the deny patterns (report-only, see the scope boundary above) and is skipped when no global config or parser is available.
+The **Container tools** block reports the configured **backend** (`docker-group` by default; `docker-rootless` / `podman-rootless` when an admin has opted in — see [Container backend](#container-backend)), how container access is granted (the docker group for `docker-group`, or the per-user socket reachability for the rootless backends), and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template. The **ddev delegation shim** block reports whether the shim is active (shadowing `/usr/local/bin/ddev`), the real ddev path, the configured **ddev mode** (`delegated` — invocations from the sandbox run as the developer — or `sandbox` with any currently open transactions listed; see [ddev sandbox mode](#ddev-sandbox-mode-running-ddev-as-the-sandbox-user)), and the recorded ddev version (with a note when a rootless backend is selected but ddev < 1.25). The **leak scan** block sweeps the scratch directories for files whose names match the deny patterns (report-only, see the scope boundary above) and is skipped when no global config or parser is available.
 
 ## Audit Log
 

@@ -33,7 +33,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/ddev opencode-permissions-kit-lib/bin/socket-check.sh \
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/ddev opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-transaction.sh \
              opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -237,17 +237,41 @@ log "detected DDEV_VERSION=${DDEV_VERSION:-unknown}"
 CONTAINER_BACKEND="docker-group"
 OPENCODE_DOCKER_HOST=""
 OPENCODE_PODMAN_SOCKET=""
+DDEV_MODE="delegated"
 for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf; do
     if [ -f "$_c" ]; then
         _be=$(sed -n 's/^CONTAINER_BACKEND=//p' "$_c" 2>/dev/null)
         _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' "$_c" 2>/dev/null)
         _ps=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' "$_c" 2>/dev/null)
+        _dm=$(sed -n 's/^DDEV_MODE=//p' "$_c" 2>/dev/null)
         [ -n "$_be" ] && CONTAINER_BACKEND="$_be"
         [ -n "$_dh" ] && OPENCODE_DOCKER_HOST="$_dh"
         [ -n "$_ps" ] && OPENCODE_PODMAN_SOCKET="$_ps"
+        [ -n "$_dm" ] && DDEV_MODE="$_dm"
         break
     fi
 done
+
+# ddev mode validation (docs/PLAN-DDEV-SANDBOX.md): sandbox requires a
+# rootless backend (containers under the opencode UID — on docker-group the
+# container root would void every ACL deny) and ddev >= 1.25. Fall back to
+# delegated with a warning when the prerequisites are not met.
+if [ "$DDEV_MODE" = "sandbox" ]; then
+    case "$CONTAINER_BACKEND" in
+        docker-rootless|podman-rootless) ;;
+        *)
+            echo "${YELLOW}WARNING: DDEV_MODE=sandbox requires a rootless container backend (is: $CONTAINER_BACKEND). Falling back to ddev mode 'delegated'.${NC}"
+            DDEV_MODE="delegated"
+            ;;
+    esac
+    if [ "$DDEV_MODE" = "sandbox" ] && [ -n "$DDEV_VERSION" ]; then
+        ddev_ok=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0>1 || (a[1]+0==1 && a[2]+0>=25)) print "yes"; else print "no"}')
+        if [ "$ddev_ok" != "yes" ]; then
+            echo "${YELLOW}WARNING: DDEV_MODE=sandbox needs ddev >= 1.25 (found $DDEV_VERSION). Falling back to ddev mode 'delegated'.${NC}"
+            DDEV_MODE="delegated"
+        fi
+    fi
+fi
 
 # --container-backend flag overrides (for non-interactive scripting).
 if [ -n "$CONTAINER_BACKEND_OPT" ]; then
@@ -421,6 +445,7 @@ DDEV_VERSION=$DDEV_VERSION
 CONTAINER_BACKEND=$CONTAINER_BACKEND
 OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST
 OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET
+DDEV_MODE=$DDEV_MODE
 VERSION=$VERSION
 EOF
 # Migrate legacy setup.conf (pre-v0.0.9) -> install.conf
@@ -556,6 +581,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-transaction.sh" "$LIBDIR/ddev-transaction.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
@@ -573,8 +599,37 @@ sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-pa
                "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit" \
+               "$LIBDIR/ddev-transaction.sh" \
                "$LIBDIR/bin/ddev" "$LIBDIR/bin/socket-check.sh"
 log "library deployed to $LIBDIR"
+
+# Sandbox ddev mode provisioning (docs/PLAN-DDEV-SANDBOX.md): home-side
+# registry for ddev as the opencode user + the root-owned rewrite list the
+# transaction helper grants from. Rewrite entries are relative paths/globs
+# under any registered project root.
+if [ "$DDEV_MODE" = "sandbox" ]; then
+    sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
+    sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER/.ddev"
+    sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
+    if [ ! -f /etc/opencode-permissions-kit/ddev-rewrites.conf ]; then
+        sudo tee /etc/opencode-permissions-kit/ddev-rewrites.conf > /dev/null <<'EOF'
+# opencode permissions kit — ddev sandbox rewrite list.
+# Relative paths/globs under registered project roots that `ddev start` and
+# friends rewrite on the HOST. The transaction helper grants u:opencode
+# access on these for the duration of a mutating ddev run only. ROOT-OWNED:
+# entries here are executed as root-side file operations — keep this file
+# unwritable for everyone but root (mode 644, no group write).
+# Default: TYPO3 layout.
+config/system
+config/system/settings.php
+config/system/additional.php
+config/system/.gitignore
+EOF
+        sudo chmod 644 /etc/opencode-permissions-kit/ddev-rewrites.conf
+    fi
+    sudo mkdir -p /run/opencode-permissions-kit/ddev-txn 2>/dev/null || true
+    log "ddev sandbox mode provisioned (/home/$OPENCODE_USER/.ddev + ddev-rewrites.conf)"
+fi
 
 # Symlink: /usr/local/bin/opencode -> our wrapper
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
@@ -616,6 +671,16 @@ case "${CONTAINER_BACKEND:-docker-group}" in
         sed -e '/^#@docker-group-begin$/d' -e '/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
         ;;
 esac
+mv -f "$SUDO_TMP.2" "$SUDO_TMP"
+# ddev mode: keep only the block matching DDEV_MODE (delegated vs sandbox are
+# mutually exclusive — in sandbox mode the agent must never gain RunAs-developer).
+if [ "$DDEV_MODE" = "sandbox" ]; then
+    sed -e '/^#@ddev-delegated-begin$/,/^#@ddev-delegated-end$/d' \
+        -e '/^#@ddev-sandbox-begin$/d' -e '/^#@ddev-sandbox-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
+else
+    sed -e '/^#@ddev-sandbox-begin$/,/^#@ddev-sandbox-end$/d' \
+        -e '/^#@ddev-delegated-begin$/d' -e '/^#@ddev-delegated-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
+fi
 mv -f "$SUDO_TMP.2" "$SUDO_TMP"
 sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
 sudo chmod 440 /etc/opencode-permissions-kit/sudoers

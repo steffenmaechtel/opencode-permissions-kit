@@ -32,9 +32,21 @@ opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/p
 # helper only (it does nothing but `test -S`) — no arbitrary command execution.
 DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh *
 
-# ddev delegation: the ddev shim (shadowed as /usr/local/bin/ddev) re-execs
-# every `ddev` the opencode agent invokes as the developer via this rule, so
-# ddev rewrites project files with the developer's ownership instead of
-# colliding with the kit's ACL denies. Both placeholders are replaced at
-# install time: the RunAs user (the developer) and the command path (the real ddev).
+# ddev delegation (DDEV_MODE=delegated, the default): the ddev shim
+# (shadowed as /usr/local/bin/ddev) re-execs every `ddev` the opencode agent
+# invokes as the developer via this rule, so ddev rewrites project files with
+# the developer's ownership instead of colliding with the kit's ACL denies.
+# Both placeholders are replaced at install time: the RunAs user (the
+# developer) and the command path (the real ddev).
+#@ddev-delegated-begin
 opencode     ALL=(DEFAULT_USER) NOPASSWD: DDEV_BIN
+#@ddev-delegated-end
+
+# ddev sandbox mode (DDEV_MODE=sandbox, rootless backends only): the shim
+# hands mutating ddev invocations to the transaction helper, which opens the
+# minimal ACL window, runs ddev AS the opencode user, and restores the
+# protections afterwards. Mutually exclusive with the delegation rule above —
+# only the block matching DDEV_MODE survives template rendering.
+#@ddev-sandbox-begin
+opencode     ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh *
+#@ddev-sandbox-end

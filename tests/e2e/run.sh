@@ -59,6 +59,10 @@ E 'sudo tee /usr/bin/ddev > /dev/null <<'\''EOF'\''
 id -un > /tmp/ddev-stub.out
 printf "%s " "$@" >> /tmp/ddev-stub.out
 echo "" >> /tmp/ddev-stub.out
+# Record whether the invoking user can read the (deny-protected) project .env.
+# delegated mode -> runs as dev -> readable; sandbox mode -> runs as opencode
+# -> denied (the transaction window never opens the .env pattern).
+cat /var/www/vhosts/test-project/.env >/dev/null 2>&1 && echo "env-readable" >> /tmp/ddev-stub.out || echo "env-denied" >> /tmp/ddev-stub.out
 EOF'
 E 'sudo chmod 755 /usr/bin/ddev'
 check "ddev stub installed at /usr/bin/ddev" E 'test -x /usr/bin/ddev'
@@ -785,6 +789,99 @@ check_fail "12j: LEAK_SCAN_DIRS override — hits outside the override are not r
 check "12j: root run logs the finding to the audit log" \
     E 'sudo /usr/local/lib/opencode-permissions-kit/status.sh >/dev/null 2>&1; sudo grep -q "leak scan" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 E 'rm -rf /tmp/leak-e2e /tmp/leak-e2e-clean'
+
+echo ""
+echo "--- 12k. ddev sandbox mode (transactional, PLAN-DDEV-SANDBOX / PROOF-3 H3) ---"
+# 12k.1 switching to sandbox is REFUSED on the docker-group backend (hard gate).
+E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-refuse.log 2>&1' || true
+check "12k: sandbox refused on docker-group backend" \
+    E 'grep -q "requires a rootless container backend" /tmp/ddev-mode-refuse.log'
+check_fail "12k: install.conf has no DDEV_MODE=sandbox after refusal" \
+    E 'grep -q "^DDEV_MODE=sandbox" /etc/opencode-permissions-kit/install.conf'
+check "12k: delegated sudoers rule still present after refusal" \
+    E 'sudo grep -q "^opencode[[:space:]]*ALL=(dev)" /etc/opencode-permissions-kit/sudoers'
+
+# 12k.2 fake a rootless backend (no daemon needed for the stub) and switch.
+E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-rootless/' /etc/opencode-permissions-kit/install.conf"
+E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-apply.log 2>&1' || true
+check "12k: ddev-mode sandbox applied" \
+    E 'grep -q "ddev mode switched to .sandbox." /tmp/ddev-mode-apply.log'
+check "12k: install.conf records DDEV_MODE=sandbox" \
+    E 'grep -q "^DDEV_MODE=sandbox" /etc/opencode-permissions-kit/install.conf'
+check "12k: sudoers grants the transaction helper" \
+    E 'sudo grep -q "ddev-transaction.sh" /etc/opencode-permissions-kit/sudoers'
+check_fail "12k: sudoers delegation rule (RunAs dev) removed in sandbox mode" \
+    E 'sudo grep -Eq "^opencode[[:space:]]+ALL=\(dev\)" /etc/opencode-permissions-kit/sudoers'
+check "12k: sandbox ddev home provisioned" \
+    E 'sudo test -d /home/opencode/.ddev'
+check "12k: rewrite list deployed" \
+    E 'test -f /etc/opencode-permissions-kit/ddev-rewrites.conf'
+check "12k: status.sh reports sandbox mode" \
+    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "sandbox"'
+
+# 12k.3 TYPO3-layout fixture + deny baseline for the transaction tests.
+E 'mkdir -p /var/www/vhosts/test-project/config/system'
+E 'printf "<?php\n" > /var/www/vhosts/test-project/config/system/settings.php'
+E 'printf "" > /var/www/vhosts/test-project/config/system/additional.php'
+E 'mkdir -p /var/www/vhosts/test-project/.ddev'
+E 'printf "apiVersion: ddev.io/v1alpha1\n" > /var/www/vhosts/test-project/.ddev/config.yaml'
+E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
+check "12k: baseline — settings.php ACL-denied before the transaction" \
+    E 'sudo getfacl -p /var/www/vhosts/test-project/config/system/settings.php 2>/dev/null | grep -q "user:opencode:---"'
+
+# 12k.4 mutating subcommand goes through the transaction and runs as opencode.
+E 'sudo rm -f /tmp/ddev-stub.out'
+E 'sudo -u opencode sh -c "cd /var/www/vhosts/test-project && ddev start txn-test"' && \
+    echo "  ${GREEN}OK${NC}  sandbox ddev start ran"
+check "12k: mutating run executed as opencode (never dev)" \
+    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "opencode"'
+check "12k: mutating run received the subcommand + args" \
+    E 'grep -q "start txn-test" /tmp/ddev-stub.out'
+check "12k: .env stays UNREADABLE during the transaction (window excludes secrets)" \
+    E 'grep -q "env-denied" /tmp/ddev-stub.out'
+check "12k: CLOSE restored the settings.php deny" \
+    E 'sudo getfacl -p /var/www/vhosts/test-project/config/system/settings.php 2>/dev/null | grep -q "user:opencode:---"'
+check "12k: CLOSE handed .ddev back to the developer" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
+check_fail "12k: no transaction stamp left open" \
+    E 'ls /run/opencode-permissions-kit/ddev-txn/*.open 2>/dev/null'
+
+# 12k.5 read-only subcommand bypasses the transaction (direct exec as opencode).
+E 'sudo rm -f /tmp/ddev-stub.out'
+E 'sudo -u opencode /usr/local/bin/ddev describe' && \
+    echo "  ${GREEN}OK${NC}  read-only ddev describe ran"
+check "12k: read-only run executed as opencode" \
+    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "opencode"'
+check "12k: read-only run received the subcommand" \
+    E 'grep -q "describe" /tmp/ddev-stub.out'
+check_fail "12k: read-only run left no stamp (no transaction)" \
+    E 'ls /run/opencode-permissions-kit/ddev-txn/*.open 2>/dev/null'
+
+# 12k.6 self-heal of a killed transaction (stranded ownership + dir ACL).
+E 'sudo chown -R opencode:www-data /var/www/vhosts/test-project/.ddev'
+E 'sudo setfacl -m u:opencode:rwx /var/www/vhosts/test-project/config/system'
+# Stamp name mirrors the helper: printf %s "/var/www/vhosts" | tr -c 'A-Za-z0-9' '_'
+# (the LEADING slash also becomes an underscore).
+E 'sudo touch /run/opencode-permissions-kit/ddev-txn/_var_www_vhosts.open'
+E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
+check_fail "12k: heal gated — .ddev NOT chowned back while a stamp is open" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
+check "12k: stale dir ACL cleared even with stamp open (clear_stale_acls)" \
+    E '! sudo getfacl -p /var/www/vhosts/test-project/config/system 2>/dev/null | grep -q "user:opencode:rwx"'
+E 'sudo rm -f /run/opencode-permissions-kit/ddev-txn/_var_www_vhosts.open'
+E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
+check "12k: heal restored .ddev ownership after the stamp cleared" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
+
+# 12k.7 switch back to delegated + restore the docker-group backend.
+E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-mode delegated >/tmp/ddev-mode-back.log 2>&1' || true
+check "12k: ddev-mode delegated applied" \
+    E 'grep -q "ddev mode switched to .delegated." /tmp/ddev-mode-back.log'
+check "12k: delegated sudoers rule restored" \
+    E 'sudo grep -Eq "^opencode[[:space:]]+ALL=\(dev\)[[:space:]]+NOPASSWD: /usr/bin/ddev$" /etc/opencode-permissions-kit/sudoers'
+check_fail "12k: transaction rule removed in delegated mode" \
+    E 'sudo grep -q "ddev-transaction.sh" /etc/opencode-permissions-kit/sudoers'
+E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-group/' /etc/opencode-permissions-kit/install.conf"
 
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"

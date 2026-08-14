@@ -1,10 +1,14 @@
 # PLAN-DDEV-SANDBOX: Run ddev as the `opencode` sandbox user
 
-> Status: **PLANNING — not implemented.** This document designs a "sandbox ddev
-> mode" that closes PROOF-3 H3 (ddev delegation = arbitrary host command
-> execution as the developer). Nothing here is in the code yet. The delegated
-> mode (`opencode-permissions-kit-lib/bin/ddev` shim → `sudo -u DEFAULT_USER`)
-> remains the shipped behavior until this plan is implemented and flipped on.
+> Status: **IMPLEMENTED (opt-in, default off).** The transaction helper
+> (`files/opencode-permissions-kit-lib/ddev-transaction.sh`), the shim mode
+> switch (`DDEV_MODE=delegated|sandbox` in install.conf), the mutually
+> exclusive sudoers rendering, `config.sh ddev-mode`, `status.sh` reporting,
+> the protect-projects heal, and unit + e2e tests are in the code. Usage
+> documentation lives in `docs/MANUAL.md` ("ddev sandbox mode"). The design
+> rationale and residual-risk analysis below is the historical planning
+> record; where wording differs, the code wins. Rollout §9 is still at step
+> 1 (delegated stays the default; `config.sh ddev-mode sandbox` is the opt-in).
 
 ## 1. Why this plan exists (PROOF-3 H3)
 

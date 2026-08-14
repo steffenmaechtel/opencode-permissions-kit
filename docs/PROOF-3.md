@@ -217,6 +217,14 @@ AGENTS.md already notes subcommand gating is soft. In workspaces that allow ddev
 exec/launch only, reject unknown), or deny-by-default with per-project opt-in;
 document `ddev ssh` and host-commands as the risk anchors either way.
 
+**Status: MITIGATED (opt-in sandbox mode).** `config.sh ddev-mode sandbox`
+(rootless backends only) now runs ddev — including `.ddev/commands/host/*` —
+as the `opencode` user inside a root-side OPEN/RUN/CLOSE transaction, and the
+RunAs-developer sudoers rule is removed in that mode (see
+`docs/PLAN-DDEV-SANDBOX.md`, implemented). Delegated mode remains the default
+and keeps this gap; the residual risks of the sandbox mode (temporary OPEN
+window on the rewrite list, kill-the-transaction) are analyzed in the plan §7.
+
 ---
 
 ## Medium

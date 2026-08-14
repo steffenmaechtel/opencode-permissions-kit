@@ -1,37 +1,95 @@
 #!/bin/sh
 # opencode permissions kit -- ddev shim
 #
-# ddev rewrites project files as the launching developer (TYPO3 settings.php,
-# config/system/*.php, .gitignore, .ddev build dirs). Running it as the
-# 'opencode' user collides with the kit's file protections — hard ACL denies
-# on settings/additional.php, developer-owned config dirs (755, no www-data
-# write), and .ddev build dirs owned by the developer with no opencode write
-# — so every `ddev` the opencode agent invokes is delegated to the DEFAULT_USER
-# (the developer) via the kit's sudoers rule. Outside the opencode sandbox
-# (the developer themselves, root, or any other user) the shim passes through
-# to the real ddev untouched.
+# Two modes (DDEV_MODE in /etc/opencode-permissions-kit/install.conf):
 #
-# Lives at /usr/local/lib/opencode-permissions-kit/bin/ddev, shadowed as /usr/local/bin/ddev
-# (ahead of the real ddev in PATH). The real ddev path is recorded in
-# /etc/opencode-permissions-kit/install.conf as DDEV_BIN at install time.
+#   delegated (default) — ddev rewrites project files as the launching
+#   developer (TYPO3 settings.php, config/system/*.php, .gitignore, .ddev
+#   build dirs). Running it as the 'opencode' user collides with the kit's
+#   file protections, so every `ddev` the opencode agent invokes is delegated
+#   to the DEFAULT_USER (the developer) via the kit's sudoers rule
+#   `opencode ALL=(DEFAULT_USER) NOPASSWD: DDEV_BIN`.
+#
+#   sandbox — ddev (and everything it spawns: host commands from
+#   .ddev/commands/host/, mutagen, containers) runs as the 'opencode' user
+#   under the kit's ACL denies (closes PROOF-3 H3). Mutating subcommands go
+#   through the root transaction helper (ddev-transaction.sh: OPEN grants,
+#   RUN as opencode, CLOSE restores). Read-only subcommands (describe, exec,
+#   ssh, composer, logs, ...) run directly as opencode — the wrapper already
+#   exported the rootless DOCKER_HOST into the session environment.
+#
+# Outside the opencode sandbox (the developer themselves, root, or any other
+# user) the shim passes through to the real ddev untouched.
+#
+# Lives at /usr/local/lib/opencode-permissions-kit/bin/ddev, shadowed as
+# /usr/local/bin/ddev (ahead of the real ddev in PATH). The real ddev path is
+# recorded in /etc/opencode-permissions-kit/install.conf as DDEV_BIN.
 
 DEFAULT_USER=""
 DDEV_BIN=""
-# Read install.conf (new path first, fall back to pre-0.0.10 /etc/opencode/).
+DDEV_MODE=""
+CONTAINER_BACKEND=""
 for _conf in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf; do
     if [ -f "$_conf" ]; then
         DEFAULT_USER=$(sed -n 's/^DEFAULT_USER=//p' "$_conf")
         DDEV_BIN=$(sed -n 's/^DDEV_BIN=//p' "$_conf")
+        DDEV_MODE=$(sed -n 's/^DDEV_MODE=//p' "$_conf")
+        CONTAINER_BACKEND=$(sed -n 's/^CONTAINER_BACKEND=//p' "$_conf")
         break
     fi
 done
 [ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
+DDEV_MODE="${DDEV_MODE:-delegated}"
 
-# Delegate only for the opencode sandbox user. The developer keeps their own
-# ddev; other contexts pass through unchanged. The sudoers rule
-# (opencode ALL=(DEFAULT_USER) NOPASSWD: DDEV_BIN) makes the delegation
-# passwordless.
+# Read-only ddev subcommands: no host-file rewrite, no transaction needed.
+# Everything else (incl. unknown subcommands) is treated as mutating.
+is_readonly_sub() {
+    case "$1" in
+        describe|list|logs|exec|ssh|composer|launch|version|help|share-output|""|-*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 if [ "$(id -un)" = "opencode" ] && [ -n "$DEFAULT_USER" ] && [ -x /usr/bin/sudo ]; then
+    if [ "$DDEV_MODE" = "sandbox" ]; then
+        # First non-flag argument is the ddev subcommand.
+        sub=""
+        for a in "$@"; do
+            case "$a" in
+                -*) ;;
+                *) sub="$a"; break ;;
+            esac
+        done
+        if is_readonly_sub "$sub"; then
+            # No transaction: the opencode session already carries the
+            # rootless DOCKER_HOST / XDG_RUNTIME_DIR from the wrapper.
+            exec "$DDEV_BIN" "$@"
+        fi
+        # Mutating: resolve the projects.conf root by walking up from PWD,
+        # then hand the whole invocation to the transaction helper.
+        PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
+        [ -f "$PROJECTS_CONF" ] || PROJECTS_CONF="/etc/opencode/projects.conf"
+        [ -f "$PROJECTS_CONF" ] || {
+            echo "ddev: sandbox mode requires $PROJECTS_CONF" >&2
+            exit 1
+        }
+        walk="$(pwd -P)"
+        root=""
+        while :; do
+            if grep -qx -- "$walk" "$PROJECTS_CONF" 2>/dev/null; then
+                root="$walk"
+                break
+            fi
+            [ "$walk" = "/" ] && break
+            walk=$(dirname "$walk")
+        done
+        [ -n "$root" ] || {
+            echo "ddev: sandbox mode — current directory is not inside a registered project root" >&2
+            exit 1
+        }
+        exec /usr/bin/sudo /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh "$root" "$@"
+    fi
+    # delegated: re-exec as the developer (passwordless via sudoers).
     exec /usr/bin/sudo -u "$DEFAULT_USER" "$DDEV_BIN" "$@"
 fi
 

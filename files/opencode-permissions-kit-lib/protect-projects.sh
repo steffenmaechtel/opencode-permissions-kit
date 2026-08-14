@@ -239,11 +239,27 @@ clear_stale_acls() {
 # Re-assert the kit base bits (group www-data, rwx mask) on every .ddev tree
 # found under the root — ddev projects are usually subdirectories of the
 # registered root (e.g. /var/www/vhosts/<project>/.ddev).
+#
+# Additionally heals a KILLED sandbox ddev transaction (PLAN-DDEV-SANDBOX
+# R2): if no transaction stamp is open for this root, hand .ddev content
+# stranded in opencode ownership back to the developer.
 fix_ddev_tree() {
     local root="$1" d
     find "$root" -type d -name .ddev -print 2>/dev/null > "$TMP_DDEV"
     while IFS= read -r d; do
         [ -z "$d" ] && continue
+
+        if [ -n "$DEFAULT_USER" ]; then
+            stamp_name=$(printf '%s' "$root" | tr -c 'A-Za-z0-9' '_')
+            if [ ! -e "/run/opencode-permissions-kit/ddev-txn/${stamp_name}.open" ]; then
+                oc_owned=$(find "$d" -user "$OPENCODE_USER" -print 2>/dev/null)
+                if [ -n "$oc_owned" ]; then
+                    printf '%s\n' "$oc_owned" | xargs -d '\n' chown "$DEFAULT_USER:$WWW_GROUP" 2>/dev/null
+                    count=$(printf '%s\n' "$oc_owned" | wc -l)
+                    log "ddev txn heal: chown $DEFAULT_USER:$WWW_GROUP on $count stranded .ddev file(s)/dir(s) under $d"
+                fi
+            fi
+        fi
 
         notgroup=$(find "$d" ! -group "$WWW_GROUP" -print 2>/dev/null)
         if [ -n "$notgroup" ]; then
