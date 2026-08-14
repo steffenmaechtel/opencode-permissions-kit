@@ -245,6 +245,26 @@ E2E (extend `tests/e2e/run.sh` / the rootless suites with the ddev stub):
    at scale; burn-in will tell.
 - Non-goal: sandbox ddev on the `docker-group` backend (see §3.1).
 
+## 10a. Open TODOs (burn-in findings, 2026-08-14)
+
+- **TODO: TYPO3 project does not boot via the sandbox path.** The container
+  reaches the site, but PHP cannot read the settings file it itself
+  generated during the transaction:
+  `Warning: require(/var/www/html/config/system/settings.php): Failed to
+  open stream: Permission denied in
+  /var/www/html/vendor/typo3/cms-core/Classes/Configuration/ConfigurationManager.php
+  on line 121` — reported at https://pc-database-v2.local/
+  The agent-side `ddev start` (open) now completes without the chmod error,
+  but the web container's PHP process is denied read access to
+  `config/system/settings.php`. Working theory: the file is written as
+  `opencode` (the sandbox user) during OPEN but stays opencode-owned/unreadable
+  for the container's `www-data`; or the rewrite-list CLOSE re-asserted
+  `u:opencode:---` / ownership too early. Next steps: inspect the file's
+  owner/mode/ACL right after `ddev start` (open vs. after close), and check
+  whether the container mounts the project with a UID-mapped root that does
+  not share the `opencode` UID. Untested hypothesis (see L4): UID-shared
+  rootless daemon + mutagen.
+
 ## 11. Effort estimate
 
 | Phase | Content | Estimate |
