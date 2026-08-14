@@ -761,6 +761,32 @@ if [ "$_rootless_ok" = true ]; then
 fi
 
 echo ""
+echo "--- 12j. status.sh leak scan (report-only, PROOF-3 H2) ---"
+# Scratch copies matching the deny patterns must be reported; a renamed copy
+# must stay invisible; and the scan must never touch files outside the
+# project roots (no ACL, no delete — report-only).
+E 'mkdir -p /tmp/leak-e2e/sub /tmp/leak-e2e-clean && printf "SECRET=1\n" > /tmp/leak-e2e/.env && printf "key\n" > /tmp/leak-e2e/sub/backup.pem && printf "<?php\n" > /tmp/leak-e2e/settings.php && printf "renamed copy\n" > /tmp/leak-e2e/notes.txt'
+check "12j: leak scan section is printed" \
+    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "Leak scan"'
+check "12j: deny-pattern copy in /tmp is reported" \
+    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "leak-e2e/.env"'
+check "12j: nested deny-pattern copy is reported" \
+    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "leak-e2e/sub/backup.pem"'
+check "12j: hit counter is shown" \
+    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "[0-9]+ match\(es\)"'
+check_fail "12j: renamed copy stays invisible (name tripwire, no DLP)" \
+    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "leak-e2e/notes.txt"'
+check_fail "12j: report-only — no ACL is applied outside the roots" \
+    E 'getfacl -p /tmp/leak-e2e/.env 2>/dev/null | grep -q "user:opencode"'
+check "12j: LEAK_SCAN_DIRS override narrows the scan (clean dir -> no matches)" \
+    E 'LEAK_SCAN_DIRS=/tmp/leak-e2e-clean /usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "no matches"'
+check_fail "12j: LEAK_SCAN_DIRS override — hits outside the override are not reported" \
+    E 'LEAK_SCAN_DIRS=/tmp/leak-e2e-clean /usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "leak-e2e/.env"'
+check "12j: root run logs the finding to the audit log" \
+    E 'sudo /usr/local/lib/opencode-permissions-kit/status.sh >/dev/null 2>&1; sudo grep -q "leak scan" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+E 'rm -rf /tmp/leak-e2e /tmp/leak-e2e-clean'
+
+echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"

@@ -188,6 +188,17 @@ future scan and stays readable forever. Note `*.sql.gz` is denied but a
 default-ask bash gate (tar/cp are ask — the residual risk is user approval), and
 document the boundary. A tmpwarts-style /tmp cleaner is orthogonal.
 
+**Status: PARTIALLY MITIGATED (visibility).** `status.sh` now ends with a
+report-only **leak scan**: a name-based sweep of `/tmp`, `/var/tmp`, `/dev/shm`
+(overridable via `LEAK_SCAN_DIRS`) for files matching the global deny patterns.
+It catches lazy copies (`cp .env /tmp/backup`) for manual inspection, logs a
+finding line to the audit log when run as root, and never modifies files outside
+the project roots. Residual: renamed copies stay invisible (no content DLP),
+unprivileged runs cannot see inside `0700` directories, and false positives are
+expected. The boundary itself ("locations, not information flows") is now
+documented in MANUAL.md, with a pointer to pre-commit secret scanning (gitleaks)
+for the git side.
+
 ### H3. ddev delegation = arbitrary host command execution as the developer
 
 The shim re-execs every `ddev` as `DEFAULT_USER` (`bin/ddev`, sudoers rule
@@ -273,7 +284,7 @@ an event-based (fanotify/systemd-path) re-scan for mid-session hook-less writes.
 | C3 | docker-group backend voids ACLs | Critical* (documented) | Docs/default-change | 4 |
 | C4 | TOCTOU chown/chgrp/setfacl symlink races | Critical | Low (`-h` flags) | 2 |
 | H1 | `git log *` / `git diff *` allow leaks content | High | Low (rule narrowing) | 5 |
-| H2 | Copies/archives escape scope | High | Docs only | 6 |
+| H2 | Copies/archives escape scope | High | Leak scan (status.sh) + docs | 6 |
 | H3 | ddev host-commands exec as developer | High | Medium (shim allowlist) | 7 |
 | M1–M6 | integrity, .git, supply chain, log, env, scan model | Medium | mixed | 8+ |
 

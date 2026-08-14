@@ -173,6 +173,58 @@ else
     echo "    shim: ${YELLOW}NOT installed${NC}"
 fi
 
+# === Sensitive-file leak scan (report-only) =================================
+# Name-based sweep of scratch directories for files matching the global deny
+# patterns. The kit protects storage locations, not information flows: a copy
+# that left the project roots (cp .env /tmp/backup) is outside every future
+# ACL scan. This surfaces such leftovers for manual inspection. REPORT-ONLY —
+# no ACL is ever changed outside the project roots, and false positives (a
+# developer's own /tmp/foo.env.example) are expected. Renamed copies stay
+# invisible: this is a name tripwire, not content DLP. Runs unprivileged;
+# copies hidden in 0700 directories are only visible when run as root.
+# Override the directories via LEAK_SCAN_DIRS="/tmp /some/dir".
+log() { :; }
+[ -f "$LIBDIR/log.sh" ] && . "$LIBDIR/log.sh"
+LEAK_DIRS="${LEAK_SCAN_DIRS:-/tmp /var/tmp /dev/shm}"
+PARSER="$LIBDIR/jsonc-parser.py"
+SCAN_CFG="/home/$OPENCODE_USER/.config/opencode/opencode.jsonc"
+[ -f "$SCAN_CFG" ] || SCAN_CFG="/home/$OPENCODE_USER/.config/opencode/opencode.json"
+
+echo ""
+echo "  ${CYAN}Leak scan (scratch dirs, name-based, report-only):${NC}"
+if [ -f "$SCAN_CFG" ] && [ -x "$PARSER" ] && command -v python3 >/dev/null 2>&1; then
+    scan_patterns=$(python3 "$PARSER" "$SCAN_CFG" 2>/dev/null || true)
+    scan_hits=""
+    if [ -n "$scan_patterns" ]; then
+        scan_hits=$(
+            for scan_dir in $LEAK_DIRS; do
+                [ -d "$scan_dir" ] || continue
+                while IFS= read -r scan_pat; do
+                    [ -z "$scan_pat" ] && continue
+                    case "$scan_pat" in
+                        */*) find "$scan_dir" -maxdepth 4 -type f -path "*/$scan_pat" -print 2>/dev/null ;;
+                        *)   find "$scan_dir" -maxdepth 4 -type f -name "$scan_pat" -print 2>/dev/null ;;
+                    esac
+                done <<EOF
+$scan_patterns
+EOF
+            done | grep -v -e '/systemd-private-' -e '/snap-private-tmp/' | sort -u
+        )
+    fi
+    scan_count=$(printf '%s\n' "$scan_hits" | grep -c . || true)
+    if [ "${scan_count:-0}" -gt 0 ]; then
+        echo "    ${YELLOW}${scan_count} match(es)${NC} — deny-pattern files outside the protected roots:"
+        printf '%s\n' "$scan_hits" | head -20 | sed 's/^/      /'
+        [ "$scan_count" -gt 20 ] && echo "      ... and $((scan_count - 20)) more"
+        echo "    inspect and remove manually (report-only; renamed copies stay invisible)"
+        log "leak scan: $scan_count deny-pattern match(es) in scratch dirs (report-only)"
+    else
+        echo "    ${GREEN}no matches${NC} in: $LEAK_DIRS"
+    fi
+else
+    echo "    ${YELLOW}skipped${NC} (global config or parser not available)"
+fi
+
 echo ""
 echo "  Management (run in a terminal):"
 echo "      sudo $LIBDIR/config.sh                 change settings"

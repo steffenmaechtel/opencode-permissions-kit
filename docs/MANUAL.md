@@ -333,6 +333,8 @@ The bundled template runs `permission.bash` as **ask-by-default** (`"*": "ask"`)
 
 On top of that, the template carries a **sensitive-file tripwire** in `permission.bash`: the read/edit deny patterns are mirrored as `ask` rules placed *after* the allowlist. This closes the loophole where an allowlisted command (`git log -p -- .env`, `git diff -- auth.json`) could read protected file content prompt-free. `ask` (instead of `deny`) is deliberate: when a command merely *mentions* a protected name, the developer decides whether it is a false positive (`cp .env.example .env`) or an unwanted access. Because bash rules match the whole command string (not file paths), the mirrored patterns carry a trailing `*` so a protected name mid-command (`cat settings.php | grep DB`, `cp auth.json /tmp/x`) still triggers. The tripwire is **lexical** — it matches the literal command string only. Constructions like `F=.env; cat $F`, `cat .en?`, or `find . -exec cat {} \;` do not contain the literal name and fall back to the default `ask`. The hard boundary therefore remains the filesystem ACL.
 
+**Scope boundary — the kit protects locations, not information flows.** Protection is bound to the configured project roots: once content leaves them with the agent's (approved) help — `cp .env /tmp/backup`, `tar czf /tmp/project.tgz .` — no future ACL scan recaptures it, and the kit deliberately does not attempt content inspection (DLP). As a visibility aid, `status.sh` ends with a **leak scan**: a name-based, report-only sweep of the scratch directories (`/tmp`, `/var/tmp`, `/dev/shm`, overridable via `LEAK_SCAN_DIRS`) that lists files matching the deny patterns. It surfaces lazy copies for manual inspection; it never modifies files outside the project roots, renamed copies stay invisible, and occasional false positives (a developer's own `/tmp/foo.env.example`) are expected. Files hidden in `0700` directories are only seen when `status.sh` runs as root. On the git side, prevent secrets from entering history in the first place (pre-commit secret scanning, e.g. gitleaks) — anything git ever tracked is readable from the object database regardless of worktree ACLs (see `docs/PROOF-1.md`).
+
 ### Self-Update Bypass Protection (Default-User Config)
 
 `opencode`'s installer and self-updater can re-add `~/.opencode/bin` to your `PATH`. If that happens, typing `opencode` would run the real binary **as your user** instead of our wrapper — bypassing the wrapper's ACL refresh and the dedicated `opencode` user.
@@ -531,6 +533,9 @@ ddev delegation shim:
   delegates to: info (the developer)
   ddev version: 1.24.3
 
+Leak scan (scratch dirs, name-based, report-only):
+  no matches in: /tmp /var/tmp /dev/shm
+
 Management (run in a terminal):
     sudo /usr/local/lib/opencode-permissions-kit/config.sh                 change settings
     sudo /usr/local/lib/opencode-permissions-kit/update.sh                 re-deploy kit after an update
@@ -539,7 +544,7 @@ Management (run in a terminal):
 
 Before the kit is installed, `status.sh` still works and reports that hardening is **NOT active** — handy for checking any machine.
 
-The **Container tools** block reports the configured **backend** (`docker-group` by default; `docker-rootless` / `podman-rootless` when an admin has opted in — see [Container backend](#container-backend)), how container access is granted (the docker group for `docker-group`, or the per-user socket reachability for the rootless backends), and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template. The **ddev delegation shim** block reports whether the shim is active (shadowing `/usr/local/bin/ddev`), the real ddev path it delegates to, the developer user it runs ddev as, and the recorded ddev version (with a note when a rootless backend is selected but ddev < 1.25) — see [ddev delegation](#ddev-delegation-running-ddev-as-the-developer).
+The **Container tools** block reports the configured **backend** (`docker-group` by default; `docker-rootless` / `podman-rootless` when an admin has opted in — see [Container backend](#container-backend)), how container access is granted (the docker group for `docker-group`, or the per-user socket reachability for the rootless backends), and whether the docker/ddev deny rules in `opencode.jsonc` are active. If it reports `direct access: NOT blocked`, the deny rules were removed from the config — re-run `install.sh` or restore the default template. The **ddev delegation shim** block reports whether the shim is active (shadowing `/usr/local/bin/ddev`), the real ddev path it delegates to, the developer user it runs ddev as, and the recorded ddev version (with a note when a rootless backend is selected but ddev < 1.25) — see [ddev delegation](#ddev-delegation-running-ddev-as-the-developer). The **leak scan** block sweeps the scratch directories for files whose names match the deny patterns (report-only, see the scope boundary above) and is skipped when no global config or parser is available.
 
 ## Audit Log
 
