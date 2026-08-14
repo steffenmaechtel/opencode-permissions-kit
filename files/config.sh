@@ -428,8 +428,9 @@ ddev_mode_status() {
 ddev_mode_apply() {
     local new_mode="$1"
     local prev="${DDEV_MODE:-delegated}"
-    [ "$new_mode" = "$prev" ] && { echo "ddev mode is already '$new_mode'."; return 0; }
 
+    # Gates for a sandbox target run regardless of the current mode — they
+    # validate the config even on an idempotent re-apply.
     if [ "$new_mode" = "sandbox" ]; then
         # Hard gate: sandbox ddev requires a rootless backend (on docker-group
         # the container root would void every ACL deny — PROOF-3 C3).
@@ -455,8 +456,16 @@ ddev_mode_apply() {
         fi
     fi
 
-    echo "Switching ddev mode: ${CYAN}${prev}${NC} -> ${CYAN}${new_mode}${NC}"
-    confirm "Apply ddev mode '$new_mode'?" || { echo "  Aborted."; return 1; }
+    # The actual mode-change bookkeeping runs only on a real switch; the
+    # sandbox setup below (provisioning, sysctl, mkcert) is idempotent and
+    # also runs on a re-apply so an existing sandbox install can pick up new
+    # first-run fixes (e.g. the router-port sysctl added after the switch).
+    if [ "$new_mode" = "$prev" ]; then
+        echo "ddev mode is already '$new_mode' — re-applying $new_mode setup (idempotent)."
+    else
+        echo "Switching ddev mode: ${CYAN}${prev}${NC} -> ${CYAN}${new_mode}${NC}"
+        confirm "Apply ddev mode '$new_mode'?" || { echo "  Aborted."; return 1; }
+    fi
 
     if [ "$new_mode" = "sandbox" ]; then
         # Provision the sandbox-side ddev home + the root-owned rewrite list
@@ -493,6 +502,21 @@ EOF
                     if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
                         echo "  unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
                         log "ddev sandbox: net.ipv4.ip_unprivileged_port_start=80 applied"
+                        # docker-rootless: the daemon's network namespace
+                        # inherited the OLD value at start; restart it so it
+                        # re-inherits 80. podman-rootless is daemonless (every
+                        # `podman run` opens a fresh netns) — no restart needed.
+                        if [ "${CONTAINER_BACKEND:-}" = "docker-rootless" ]; then
+                            oc_uid=$(id -u "$OPENCODE_USER" 2>/dev/null)
+                            if [ -n "$oc_uid" ] && sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$oc_uid" systemctl --user restart docker.service 2>/dev/null; then
+                                echo "  restarted the opencode rootless docker daemon (its netns re-inherits port-start 80)"
+                                log "ddev sandbox: opencode rootless docker daemon restarted for port-start 80"
+                            else
+                                echo "${YELLOW}WARNING: could not restart the opencode rootless daemon — run it manually so its netns picks up 80:${NC}"
+                                echo "  sudo -u $OPENCODE_USER XDG_RUNTIME_DIR=/run/user/$oc_uid systemctl --user restart docker.service"
+                                log "ddev sandbox: rootless daemon restart failed (admin must restart manually)"
+                            fi
+                        fi
                     else
                         echo "${YELLOW}WARNING: sysctl persisted but not activated live (read-only /proc/sys?) — reboot or run:${NC}"
                         echo "  sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
@@ -533,13 +557,17 @@ EOF
     render_sudoers "${CONTAINER_BACKEND:-docker-group}" "$new_mode"
 
     echo ""
-    echo "  ${GREEN}ddev mode switched to '$new_mode'.${NC}"
+    if [ "$new_mode" = "$prev" ]; then
+        echo "  ${GREEN}ddev sandbox setup re-applied (mode was already '$new_mode').${NC}"
+    else
+        echo "  ${GREEN}ddev mode switched to '$new_mode'.${NC}"
+        log "ddev mode switched: $prev -> $new_mode"
+    fi
     if [ "$new_mode" = "sandbox" ]; then
         echo "  ddev now runs as '$OPENCODE_USER' (transactional); restart running opencode sessions."
     else
         echo "  ddev invoked by the agent is delegated to '$DEFAULT_USER' again; restart running opencode sessions."
     fi
-    log "ddev mode switched: $prev -> $new_mode"
 }
 
 # --- refresh -----------------------------------------------------------------

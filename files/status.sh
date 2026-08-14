@@ -163,6 +163,18 @@ if [ -L /usr/local/bin/ddev ] && [ "$(readlink /usr/local/bin/ddev)" = "$LIBDIR/
             else
                 echo "    transactions: none open"
             fi
+            # Router-port readiness: rootless ddev-router cannot bind 80/443
+            # unless ip_unprivileged_port_start <= 80. Shows the HOST value
+            # (the daemon netns inherits it at start; if the daemon started
+            # before the sysctl was applied, re-run 'config.sh ddev-mode
+            # sandbox' which restarts it).
+            port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
+            if [ "${port_start:-1024}" -le 80 ] 2>/dev/null; then
+                echo "    router ports: ${GREEN}ready${NC} (ip_unprivileged_port_start=$port_start)"
+            else
+                echo "    router ports: ${RED}NOT ready${NC} (ip_unprivileged_port_start=$port_start > 80 — ddev-router cannot bind 80/443)"
+                echo "                  fix: sudo bash $LIBDIR/config.sh --yes ddev-mode sandbox"
+            fi
             ;;
         *)
             echo "    mode: delegated  (invocations from the sandbox run as $DEFAULT_USER)"

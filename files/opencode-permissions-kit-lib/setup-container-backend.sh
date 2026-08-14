@@ -275,6 +275,16 @@ setup_docker_rootless() {
     # Enable + start the systemd --user service.
     sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
         systemctl --user enable docker.service 2>/dev/null || true
+    # Rootless ddev-router cannot bind 80/443 unless the unprivileged port
+    # start is <=80 BEFORE the daemon starts (its netns inherits the value
+    # at start). Apply it now so a fresh rootless install is ddev-ready out
+    # of the box; 'config.sh ddev-mode sandbox' re-applies + restarts the
+    # daemon if this was added later.
+    if [ "$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)" -gt 80 ] 2>/dev/null; then
+        echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1 || true
+        sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1 || true
+        log "docker-rootless: net.ipv4.ip_unprivileged_port_start=80 applied before daemon start"
+    fi
     sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
         systemctl --user start docker.service 2>/dev/null || true
 

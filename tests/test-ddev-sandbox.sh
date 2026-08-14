@@ -180,6 +180,14 @@ check "sandbox switch creates the mkcert CA best-effort" \
     grep -Fq 'rootCA.pem' "$CONFIG"
 check "mkcert manual fallback printed when the binary is absent" \
     grep -Fq 'mkcert not downloaded yet' "$CONFIG"
+check "sandbox re-apply is idempotent (runs setup even when already sandbox)" \
+    grep -Fq 're-applying $new_mode setup (idempotent)' "$CONFIG"
+check "sandbox switch restarts the rootless docker daemon after the sysctl" \
+    grep -Fq 'restarted the opencode rootless docker daemon' "$CONFIG"
+check "setup-container-backend applies the sysctl before the daemon start" \
+    grep -Fq 'ip_unprivileged_port_start=80 applied before daemon start' "$REPO/files/opencode-permissions-kit-lib/setup-container-backend.sh"
+check "status.sh reports router-port readiness" \
+    grep -Fq 'router ports:' "$STATUS"
 
 echo ""
 echo "-- status.sh wiring --"
