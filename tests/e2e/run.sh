@@ -821,8 +821,8 @@ check "12k: rewrite list deployed" \
     E 'test -f /etc/opencode-permissions-kit/ddev-rewrites.conf'
 check "12k: --yes applied the router-port sysctl (or ports already unprivileged)" \
     E 'test -f /etc/sysctl.d/99-ddev-rootless.conf || [ "$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)" -le 80 ]'
-check "12k: mkcert first-run note shown (binary not yet downloaded)" \
-    E 'grep -q "mkcert not downloaded yet" /tmp/ddev-mode-apply.log'
+check "12k: mkcert provisioning was attempted (reused/new/absent — env-dependent)" \
+    E 'grep -Eq "mkcert CA reused from|no existing CA found|mkcert not installed" /tmp/ddev-mode-apply.log'
 check "12k: status.sh reports sandbox mode" \
     E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "sandbox"'
 

@@ -175,6 +175,13 @@ if [ -L /usr/local/bin/ddev ] && [ "$(readlink /usr/local/bin/ddev)" = "$LIBDIR/
                 echo "    router ports: ${RED}NOT ready${NC} (ip_unprivileged_port_start=$port_start > 80 — ddev-router cannot bind 80/443)"
                 echo "                  fix: sudo bash $LIBDIR/config.sh --yes ddev-mode sandbox"
             fi
+            # mkcert CAROOT readiness for the sandbox user.
+            ca="/home/$OPENCODE_USER/.local/share/mkcert/rootCA.pem"
+            if [ -f "$ca" ]; then
+                echo "    mkcert CA: ${GREEN}present${NC}  $ca"
+            else
+                echo "    mkcert CA: ${YELLOW}missing${NC}  re-run 'config.sh --yes ddev-mode sandbox' to provision it"
+            fi
             ;;
         *)
             echo "    mode: delegated  (invocations from the sandbox run as $DEFAULT_USER)"

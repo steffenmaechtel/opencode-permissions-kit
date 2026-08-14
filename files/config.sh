@@ -531,23 +531,56 @@ EOF
             fi
         fi
 
-        # HTTPS first-run: create the sandbox user's mkcert CA (best-effort).
-        # ddev bundles mkcert in ~/.ddev/bin only after the first ddev start;
-        # until then print the manual step. The system-trust part of
-        # 'mkcert -install' cannot succeed unprivileged — harmless, the CA
-        # files are what ddev needs; browser/host trust stays a manual import.
+        # HTTPS first-run: provision the sandbox user's mkcert CAROOT. ddev (Linux
+        # side) reads the CA from $CAROOT (/home/<oc>/.local/share/mkcert by
+        # default). On WSL2 we want the sandbox user to share the EXISTING CA
+        # (so Windows browsers already trust it) instead of generating a new
+        # one — search order:
+        #   1. an existing Windows CA at /mnt/c/Users/<u>/AppData/Local/mkcert
+        #   2. an existing Linux CA at the developer's CAROOT
+        #   3. fall back to 'mkcert -install' (new, untrusted CA)
         caroot="/home/$OPENCODE_USER/.local/share/mkcert"
-        mkcert_bin="/home/$OPENCODE_USER/.ddev/bin/mkcert"
         if [ ! -f "$caroot/rootCA.pem" ]; then
-            if [ -x "$mkcert_bin" ]; then
-                sudo -u "$OPENCODE_USER" env CAROOT="$caroot" "$mkcert_bin" -install >/dev/null 2>&1 || true
-                if [ -f "$caroot/rootCA.pem" ]; then
-                    echo "  mkcert CA created: $caroot (import rootCA.pem into your browser for HTTPS trust)"
-                    log "ddev sandbox: mkcert CA created for $OPENCODE_USER"
+            sudo mkdir -p "$caroot"
+            src=""
+            src_label=""
+            # 1. Windows CA via the WSL2 /mnt/c mount. Resolve the Windows
+            #    user via powershell.exe (more reliable than cmd %USERNAME%).
+            if [ -d /mnt/c ]; then
+                win_user=""
+                if command -v powershell.exe >/dev/null 2>&1; then
+                    win_user=$(powershell.exe -NoProfile -Command '[Environment]::UserName' 2>/dev/null | tr -d '\r')
                 fi
+                if [ -z "$win_user" ] && command -v cmd.exe >/dev/null 2>&1; then
+                    win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+                fi
+                if [ -n "$win_user" ]; then
+                    wca="/mnt/c/Users/$win_user/AppData/Local/mkcert"
+                    if [ -f "$wca/rootCA.pem" ] && [ -f "$wca/rootCA-key.pem" ]; then
+                        src="$wca"; src_label="Windows user '$win_user'"
+                    fi
+                fi
+            fi
+            # 2. Linux developer CAROOT.
+            if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
+                src="/home/$DEFAULT_USER/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
+            fi
+            if [ -n "$src" ]; then
+                sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null && \
+                sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$caroot" && \
+                sudo chmod 700 "$caroot" && sudo chmod 600 "$caroot/rootCA-key.pem" && \
+                echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)" && \
+                log "ddev sandbox: mkcert CA reused from $src_label for $OPENCODE_USER"
+            elif command -v mkcert >/dev/null 2>&1; then
+                # 3. Last resort: generate a fresh CA. Nothing on Windows/
+                #    host trusts it yet — browsers will need a manual import.
+                sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
+                [ -f "$caroot/rootCA.pem" ] && \
+                    echo "  ${YELLOW}mkcert: no existing CA found — a new one was created at $caroot.${NC}" && \
+                    echo "  ${YELLOW}Import $caroot/rootCA.pem into your browser's trust store for HTTPS.${NC}" && \
+                    log "ddev sandbox: no existing CA — new mkcert CA created for $OPENCODE_USER"
             else
-                echo "  NOTE: mkcert not downloaded yet — after the first ddev start create the CA:"
-                echo "  sudo -u $OPENCODE_USER env CAROOT=$caroot $mkcert_bin -install"
+                echo "  ${YELLOW}NOTE: mkcert not installed and no CA to reuse — install mkcert (apt or curl) or copy your CA to $caroot.${NC}"
             fi
         fi
     fi

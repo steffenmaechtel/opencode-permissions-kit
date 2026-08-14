@@ -176,10 +176,15 @@ check "sysctl persisted via sysctl.d" \
     grep -Fq '/etc/sysctl.d/99-ddev-rootless.conf' "$CONFIG"
 check "sysctl activation failure is non-fatal (warning + manual cmd)" \
     grep -Fq 'sysctl persisted but not activated live' "$CONFIG"
-check "sandbox switch creates the mkcert CA best-effort" \
-    grep -Fq 'rootCA.pem' "$CONFIG"
-check "mkcert manual fallback printed when the binary is absent" \
-    grep -Fq 'mkcert not downloaded yet' "$CONFIG"
+check "sandbox switch provisions the mkcert CAROOT (reuses existing CA)" \
+    grep -Fq 'mkcert CA reused from' "$CONFIG"
+check "sandbox switch reuses the Windows CA via /mnt/c (WSL2)" \
+    grep -Fq '/mnt/c/Users/$win_user/AppData/Local/mkcert' "$CONFIG" || \
+    grep -Fq 'powershell.exe -NoProfile' "$CONFIG"
+check "sandbox switch falls back to mkcert -install (new CA) when no reuse source" \
+    grep -Fq 'no existing CA found' "$CONFIG"
+check "status.sh reports mkcert CA readiness" \
+    grep -Fq 'mkcert CA:' "$STATUS"
 check "sandbox re-apply is idempotent (runs setup even when already sandbox)" \
     grep -Fq 're-applying $new_mode setup (idempotent)' "$CONFIG"
 check "sandbox switch restarts the rootless docker daemon after the sysctl" \

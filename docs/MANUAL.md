@@ -400,25 +400,34 @@ Trade-offs:
   at the cost of `http://<project>.ddev.site:8080` URLs.
 - **HTTPS (mkcert) first-run setup:** the sandbox ddev has no CA yet — the
   first start warns that the mkcert CA at
-  `/home/opencode/.local/share/mkcert` is not readable. `config.sh ddev-mode
-  sandbox` creates it best-effort when ddev's bundled mkcert is already
-  present (it is downloaded to `~/.ddev/bin` only on the first ddev start —
-  until then the switch prints the manual step):
+  `/home/opencode/.local/share/mkcert` is not readable.
+  `config.sh ddev-mode sandbox` provisions it automatically, **reusing an
+  existing CA** so browsers already trust it (on WSL2 a shared Windows CA
+  keeps the browser quiet). Search order:
+
+  1. **Windows CA** at `/mnt/c/Users/<windowsUser>/AppData/Local/mkcert`
+     (`<windowsUser>` resolved via `powershell.exe` / `cmd.exe`) — copied
+     into the sandbox CAROOT so WSL2 + Windows share one root.
+  2. **Developer Linux CA** at `/home/<DEFAULT_USER>/.local/share/mkcert`.
+  3. Last resort: a **new** CA via `mkcert -install` (the system-trust part
+     fails unprivileged — harmless; the CA files are what ddev needs). The
+     printed path then needs a manual browser import.
+
+  Nothing to run manually in the common case. If you ever need to fix it by
+  hand, the equivalent commands are:
 
   ```bash
-  sudo -u opencode env CAROOT=/home/opencode/.local/share/mkcert /home/opencode/.ddev/bin/mkcert -install
+  sudo mkdir -p /home/opencode/.local/share/mkcert
+  sudo cp /home/<DEFAULT_USER>/.local/share/mkcert/rootCA.pem \
+          /home/opencode/.local/share/mkcert/rootCA.pem
+  sudo cp /home/<DEFAULT_USER>/.local/share/mkcert/rootCA-key.pem \
+          /home/opencode/.local/share/mkcert/rootCA-key.pem
+  sudo chown -R opencode:www-data /home/opencode/.local/share/mkcert
+  sudo chmod 700 /home/opencode/.local/share/mkcert
+  sudo chmod 600 /home/opencode/.local/share/mkcert/rootCA-key.pem
   ```
 
-  The system-trust part of `-install` cannot succeed unprivileged (harmless —
-  the CA files exist afterwards, which is what ddev needs). To make the host
-  and browsers trust the certificates: import the generated
-  `/home/opencode/.local/share/mkcert/rootCA.pem` into the Windows/WSL
-  browser trust store, and optionally into the host CA bundle:
-
-  ```bash
-  sudo cp /home/opencode/.local/share/mkcert/rootCA.pem /usr/local/share/ca-certificates/opencode-dev.crt
-  sudo update-ca-certificates
-  ```
+  `status.sh` reports the CA as `mkcert CA: present` / `missing`.
 
 - **One driver at a time:** the developer's terminal ddev and the sandbox
   ddev use different daemons and fight over `.ddev` ownership — do not drive
