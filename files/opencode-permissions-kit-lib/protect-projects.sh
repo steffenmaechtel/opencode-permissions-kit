@@ -240,7 +240,7 @@ clear_stale_acls() {
 # found under the root — ddev projects are usually subdirectories of the
 # registered root (e.g. /var/www/vhosts/<project>/.ddev).
 #
-# Additionally heals a KILLED sandbox ddev transaction (PLAN-DDEV-SANDBOX
+# Additionally heals a KILLED sandbox ddev transaction (docs/design/DDEV-SANDBOX.md (R2)
 # R2): if no transaction stamp is open for this root, hand .ddev content
 # stranded in opencode ownership back to the developer.
 fix_ddev_tree() {

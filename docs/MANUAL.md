@@ -223,7 +223,7 @@ For `docker-rootless` the helper also records the socket
 ranges for the `opencode` user.
 
 The two-daemon reality and the ddev ≥ 1.25 gate (ddev-shim `--preserve-env`
-pass-through) are tracked in `docs/DOCKER-ROOTLESS.md` (Phase 3 ddev-shim part
+pass-through) are tracked in `docs/design/DOCKER-ROOTLESS.md` (Phase 3 ddev-shim part
 still pending). `status.sh` reflects whichever backend is configured; `docker ps`
 inside an `opencode` session will not list the developer's ddev containers when
 a rootless backend is selected (different daemon/user) — that is expected. The
@@ -318,7 +318,7 @@ Requirements & limitations:
 Delegation has a security cost: everything ddev spawns — including host-side
 custom commands from `.ddev/commands/host/`, a tree the agent can write —
 runs **as the developer**, outside every ACL deny. On a rootless backend the
-kit therefore offers **sandbox mode** (`docs/PLAN-DDEV-SANDBOX.md`): ddev and
+kit therefore offers **sandbox mode** (`docs/design/DDEV-SANDBOX.md`): ddev and
 all of its children run as the `opencode` user, under the kit's protections.
 
 Switch it on (or back):
@@ -371,7 +371,7 @@ Trade-offs:
   the delegated mode.
 - During a mutating run the rewrite-list files (declared, non-secret config)
   are readable for the `opencode` user — deny patterns such as `.env` never
-  are. See `docs/PLAN-DDEV-SANDBOX.md` §7 for the full residual-risk analysis.
+  are. See `docs/design/DDEV-SANDBOX.md` §7 for the full residual-risk analysis.
 
 ## Customizing the Deny List
 
@@ -393,7 +393,7 @@ The bundled template runs `permission.bash` as **ask-by-default** (`"*": "ask"`)
 
 On top of that, the template carries a **sensitive-file tripwire** in `permission.bash`: the read/edit deny patterns are mirrored as `ask` rules placed *after* the allowlist. This closes the loophole where an allowlisted command (`git log -p -- .env`, `git diff -- auth.json`) could read protected file content prompt-free. `ask` (instead of `deny`) is deliberate: when a command merely *mentions* a protected name, the developer decides whether it is a false positive (`cp .env.example .env`) or an unwanted access. Because bash rules match the whole command string (not file paths), the mirrored patterns carry a trailing `*` so a protected name mid-command (`cat settings.php | grep DB`, `cp auth.json /tmp/x`) still triggers. The tripwire is **lexical** — it matches the literal command string only. Constructions like `F=.env; cat $F`, `cat .en?`, or `find . -exec cat {} \;` do not contain the literal name and fall back to the default `ask`. The hard boundary therefore remains the filesystem ACL.
 
-**Scope boundary — the kit protects locations, not information flows.** Protection is bound to the configured project roots: once content leaves them with the agent's (approved) help — `cp .env /tmp/backup`, `tar czf /tmp/project.tgz .` — no future ACL scan recaptures it, and the kit deliberately does not attempt content inspection (DLP). As a visibility aid, `status.sh` ends with a **leak scan**: a name-based, report-only sweep of the scratch directories (`/tmp`, `/var/tmp`, `/dev/shm`, overridable via `LEAK_SCAN_DIRS`) that lists files matching the deny patterns. It surfaces lazy copies for manual inspection; it never modifies files outside the project roots, renamed copies stay invisible, and occasional false positives (a developer's own `/tmp/foo.env.example`) are expected. Files hidden in `0700` directories are only seen when `status.sh` runs as root. On the git side, prevent secrets from entering history in the first place (pre-commit secret scanning, e.g. gitleaks) — anything git ever tracked is readable from the object database regardless of worktree ACLs (see `docs/PROOF-1.md`).
+**Scope boundary — the kit protects locations, not information flows.** Protection is bound to the configured project roots: once content leaves them with the agent's (approved) help — `cp .env /tmp/backup`, `tar czf /tmp/project.tgz .` — no future ACL scan recaptures it, and the kit deliberately does not attempt content inspection (DLP). As a visibility aid, `status.sh` ends with a **leak scan**: a name-based, report-only sweep of the scratch directories (`/tmp`, `/var/tmp`, `/dev/shm`, overridable via `LEAK_SCAN_DIRS`) that lists files matching the deny patterns. It surfaces lazy copies for manual inspection; it never modifies files outside the project roots, renamed copies stay invisible, and occasional false positives (a developer's own `/tmp/foo.env.example`) are expected. Files hidden in `0700` directories are only seen when `status.sh` runs as root. On the git side, prevent secrets from entering history in the first place (pre-commit secret scanning, e.g. gitleaks) — anything git ever tracked is readable from the object database regardless of worktree ACLs (see `docs/security/PROOF-1.md`).
 
 ### Self-Update Bypass Protection (Default-User Config)
 

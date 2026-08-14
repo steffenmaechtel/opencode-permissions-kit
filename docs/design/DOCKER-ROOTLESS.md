@@ -3,7 +3,7 @@
 > Status: **Phase 1 + 2 + 3 (docker-rootless e2e) implemented; ddev-shim env pass-through pending.**
 > This document is the design record for removing the root-equivalence of the
 > kit's docker grant. The authoritative usage documentation for the *current*
-> container-tools feature is `docs/CONTAINER-TOOLS.md` (design record) and
+> container-tools feature is `docs/design/CONTAINER-TOOLS.md` (design record) and
 > `docs/MANUAL.md` (usage).
 >
 > **Phase 1 (done):** backend awareness — `CONTAINER_BACKEND` in `install.conf`,

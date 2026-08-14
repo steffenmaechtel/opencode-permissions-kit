@@ -223,7 +223,7 @@ log "detected DDEV_BIN=$DDEV_BIN"
 
 # ddev version (advisory). Recorded for the rootless ddev-version gate —
 # DDEV >= 1.25 is required for Docker Rootless / Podman support (see
-# docs/DOCKER-ROOTLESS.md §6.8). Parse the first semver-like token from the
+# docs/design/DOCKER-ROOTLESS.md §6.8). Parse the first semver-like token from the
 # real binary's `version` output; empty when ddev is absent or unparseable.
 DDEV_VERSION=""
 if [ -x "$DDEV_BIN" ]; then
@@ -232,7 +232,7 @@ fi
 log "detected DDEV_VERSION=${DDEV_VERSION:-unknown}"
 
 # Container backend selection (Phase 2: detection + provisioning, see
-# docs/DOCKER-ROOTLESS.md §6.4, §6.7). On a re-install over an existing kit,
+# docs/design/DOCKER-ROOTLESS.md §6.4, §6.7). On a re-install over an existing kit,
 # preserve a previously configured backend unless --container-backend overrides.
 CONTAINER_BACKEND="docker-group"
 OPENCODE_DOCKER_HOST=""
@@ -252,7 +252,7 @@ for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf;
     fi
 done
 
-# ddev mode validation (docs/PLAN-DDEV-SANDBOX.md): sandbox requires a
+# ddev mode validation (docs/design/DDEV-SANDBOX.md): sandbox requires a
 # rootless backend (containers under the opencode UID — on docker-group the
 # container root would void every ACL deny) and ddev >= 1.25. Fall back to
 # delegated with a warning when the prerequisites are not met.
@@ -297,7 +297,7 @@ if [ "$SKIP_PROMPTS" != true ] && [ -z "$CONTAINER_BACKEND_OPT" ]; then
     echo "  The container backend decides how opencode reaches Docker/Podman."
     echo "  docker-group (default) gives root-equivalent host access via the docker socket."
     echo "  docker-rootless / podman-rootless confine containers to the opencode UID so"
-    echo "  the kit's ACL denies hold inside bind-mounted containers (see docs/DOCKER-ROOTLESS.md)."
+    echo "  the kit's ACL denies hold inside bind-mounted containers (see docs/design/DOCKER-ROOTLESS.md)."
     echo ""
     echo "  [1] docker-group (default — no host change, root-equivalent)"
     if command -v podman >/dev/null 2>&1 && sudo -u "$OPENCODE_USER" podman info >/dev/null 2>&1; then
@@ -603,7 +603,7 @@ sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-pa
                "$LIBDIR/bin/ddev" "$LIBDIR/bin/socket-check.sh"
 log "library deployed to $LIBDIR"
 
-# Sandbox ddev mode provisioning (docs/PLAN-DDEV-SANDBOX.md): home-side
+# Sandbox ddev mode provisioning (docs/design/DDEV-SANDBOX.md): home-side
 # registry for ddev as the opencode user + the root-owned rewrite list the
 # transaction helper grants from. Rewrite entries are relative paths/globs
 # under any registered project root.

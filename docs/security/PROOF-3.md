@@ -116,7 +116,7 @@ assumption that hooks actually run. Against an adversarial agent they don't.
 - install.sh itself labels it correctly (`install.sh:274,278`:
   "docker-group (default) gives root-equivalent host access") and the rootless
   backends preserve the ACL model because containers run under the opencode host UID
-  (`docs/DOCKER-ROOTLESS.md` §9.1, wrapper comment at `:281-285`).
+  (`docs/design/DOCKER-ROOTLESS.md` §9.1, wrapper comment at `:281-285`).
 
 **Gap:** for any project that enables docker tools with the docker-group backend,
 every confidentiality guarantee of the kit is conditional on "the agent chooses not
@@ -221,7 +221,7 @@ document `ddev ssh` and host-commands as the risk anchors either way.
 (rootless backends only) now runs ddev — including `.ddev/commands/host/*` —
 as the `opencode` user inside a root-side OPEN/RUN/CLOSE transaction, and the
 RunAs-developer sudoers rule is removed in that mode (see
-`docs/PLAN-DDEV-SANDBOX.md`, implemented). Delegated mode remains the default
+`docs/design/DDEV-SANDBOX.md`, implemented). Delegated mode remains the default
 and keeps this gap; the residual risks of the sandbox mode (temporary OPEN
 window on the rewrite list, kill-the-transaction) are analyzed in the plan §7.
 

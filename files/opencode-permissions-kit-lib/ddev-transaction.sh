@@ -1,7 +1,7 @@
 #!/bin/sh
 # opencode permissions kit -- ddev-transaction.sh
 #
-# Root helper for SANDBOX ddev mode (docs/PLAN-DDEV-SANDBOX.md, PROOF-3 H3).
+# Root helper for SANDBOX ddev mode (docs/design/DDEV-SANDBOX.md, PROOF-3 H3).
 # Wraps a mutating ddev invocation in an OPEN -> RUN -> CLOSE transaction so
 # ddev runs as the 'opencode' sandbox user (under the kit's ACL denies)
 # instead of being delegated to the developer:

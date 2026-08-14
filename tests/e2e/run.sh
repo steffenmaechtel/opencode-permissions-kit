@@ -621,7 +621,7 @@ check "status.sh reports the real ddev path" \
 
 echo ""
 echo "--- 12i. Rootless container backend (podman) — Phase 2 provisioning ---"
-# This is the real-rootless environment test (docs/DOCKER-ROOTLESS.md §9.1).
+# This is the real-rootless environment test (docs/design/DOCKER-ROOTLESS.md §9.1).
 # It proves the core value proposition: a rootless container started by the
 # opencode user accesses bind-mounted files as the opencode host UID, so the
 # kit's hard ACL deny (u:opencode:--- on .env) holds INSIDE the container.
@@ -791,7 +791,7 @@ check "12j: root run logs the finding to the audit log" \
 E 'rm -rf /tmp/leak-e2e /tmp/leak-e2e-clean'
 
 echo ""
-echo "--- 12k. ddev sandbox mode (transactional, PLAN-DDEV-SANDBOX / PROOF-3 H3) ---"
+echo "--- 12k. ddev sandbox mode (transactional, DDEV-SANDBOX design doc / PROOF-3 H3) ---"
 # 12k.1 switching to sandbox is REFUSED on the docker-group backend (hard gate).
 E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-refuse.log 2>&1' || true
 check "12k: sandbox refused on docker-group backend" \

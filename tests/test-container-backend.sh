@@ -4,7 +4,7 @@
 # The kit records a CONTAINER_BACKEND in install.conf (docker-group default,
 # docker-rootless / podman-rootless opt-in) and the wrapper, status.sh, and the
 # sudoers render all react to it. Phase 2 adds install-time provisioning and
-# the config.sh container-backend subcommand; see docs/DOCKER-ROOTLESS.md §7.
+# the config.sh container-backend subcommand; see docs/design/DOCKER-ROOTLESS.md §7.
 #
 # Three layers are checked:
 #   (1) sudoers.template — the docker-group RunAs grant is sentinel-wrapped so

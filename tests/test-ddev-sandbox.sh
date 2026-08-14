@@ -1,5 +1,5 @@
 #!/bin/sh
-# Unit tests for the sandbox ddev mode (docs/PLAN-DDEV-SANDBOX.md).
+# Unit tests for the sandbox ddev mode (docs/design/DDEV-SANDBOX.md).
 #
 # Static structure + wiring checks (no Docker, no sudo, no npm):
 #   (1) ddev-transaction.sh — validation, no-eval policy, OPEN/RUN/CLOSE

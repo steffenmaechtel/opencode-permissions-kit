@@ -26,7 +26,7 @@
 # (stop/disable the systemd service, disable-linger) and print nothing.
 #
 # Must run as root. The opencode user must already exist.
-# See docs/DOCKER-ROOTLESS.md §6.4, §6.6, §9.3.
+# See docs/design/DOCKER-ROOTLESS.md §6.4, §6.6, §9.3.
 set -e
 
 GREEN='\033[0;32m'
