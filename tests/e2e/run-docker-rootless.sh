@@ -9,17 +9,18 @@
 # This suite therefore uses a SEPARATE systemd-based container
 # (Dockerfile.rootless) and exercises the REAL provisioning path end-to-end:
 #
-#   RL1  install the kit (docker-group baseline), assert systemd is PID 1
+#   RL1  install the kit (podman-rootless baseline), assert systemd is PID 1
 #   RL2  config.sh container-backend docker-rootless -> REAL provisioning
 #        (get.docker.com -> docker-ce-rootless-extras, subuid/subgid,
 #        dockerd-rootless-setuptool.sh as opencode, systemctl --user, linger)
 #   RL3  wrapper dispatch + the socket-check.sh sudoers fallback (the exact
 #        regression fixed in ab19025): /run/user/<uid> is 0700 opencode, so the
 #        developer-running wrapper must probe via `sudo -u opencode`
-#   RL4  §9.1 ACL proof with REAL dockerd: containers run as the opencode host
-#        UID, so u:opencode:--- denies survive bind mounts
+#   RL4  §9.1 proof with REAL dockerd (soft-only model): containers run as the
+#        opencode host UID — not real root — and CAN read the project files
+#        (the ddev-working goal)
 #   RL5  status.sh + config.sh container-backend status report the backend
-#   RL6  teardown (switch back to docker-group) + uninstall verification
+#   RL6  rootless runtime teardown + uninstall verification
 #
 # The container layout adapts to the OUTER docker daemon (lib.sh auto-detects
 # it after the build). The systemd container always runs with --cgroupns=private

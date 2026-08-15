@@ -8,7 +8,9 @@
 > backend was removed. Usage documentation: `docs/MANUAL.md`. Design record
 > for the current model: `docs/design/DDEV-WORKING.md`.
 >
-> **Phase 1 + 2 + 3 (docker-rootless e2e) implemented; ddev-shim env pass-through pending.**
+> **Phase 1 + 2 + 3 (docker-rootless e2e) implemented.** (The ddev-shim env
+> pass-through item became obsolete when the ddev shim was removed in the
+> soft-only model.)
 > This document is the design record for removing the root-equivalence of the
 > kit's docker grant. The authoritative usage documentation for the *current*
 > container-tools feature is `docs/design/CONTAINER-TOOLS.md` (design record) and
@@ -27,12 +29,15 @@
 > `dockerd-rootless-setuptool.sh` + enables linger. `podman-rootless` is
 > daemonless (no socket, no linger).
 >
-> **Phase 3 (partially done):** the `docker-rootless` daemon e2e is implemented
-> (`tests/e2e/run-docker-rootless.sh`, systemd-in-container suite). Still
-> pending: the ddev-shim `DOCKER_HOST`/`XDG_RUNTIME_DIR` pass-through.
+> **Phase 3 (done):** the `docker-rootless` daemon e2e is implemented
+> (`tests/e2e/run-docker-rootless.sh`, systemd-in-container suite). The
+> ddev-shim `DOCKER_HOST`/`XDG_RUNTIME_DIR` pass-through became obsolete when
+> the ddev shim was removed in the soft-only model.
 >
-> The §9.1 ACL-bind-mount proposition is **proven by e2e** for both rootless
-> backends: podman via run.sh section 12i, docker via run-docker-rootless.sh.
+> The §9.1 bind-mount proposition (soft-only: containers run as the opencode
+> host UID and CAN read the project files) is **proven by e2e** for both
+> rootless backends: podman via run.sh section 12i, docker via
+> run-docker-rootless.sh.
 
 ## 1. The Problem (confirmed)
 
@@ -372,8 +377,8 @@ Therefore the check is **detect + record + warn**, not a hard install block:
    e2e container (`Dockerfile.rootless`, `make e2e-rootless`). It covers the
    wrapper's socket-check sudoers fallback (the 0700 `/run/user/<uid>`
    scenario), proves the rootless daemon runs as the opencode UID (not root),
-   and re-proves §9.1 with real dockerd. **ddev-shim env pass-through remains
-   pending.**
+   and re-proves §9.1 with real dockerd. The ddev-shim env pass-through item
+   became obsolete when the ddev shim was removed in the soft-only model.
 
 ## 8. Implementation Footprint
 
@@ -398,19 +403,22 @@ and `protect-projects.sh` are unchanged.
 > Decisions recorded here (Phase 1 retrospective) are the agreed direction for
 > Phase 2 / 3. Items still marked "verify" need a real rootless environment.
 
-1. **Does the ACL deny actually survive a rootless bind mount?** Verify that a
-   container started by a daemon running as `opencode` accesses a
-   `u:opencode:---` file as the opencode host UID (denied). This is the core
-   value proposition and must be proven in e2e (Phase 3), not assumed.
+1. **Does a rootless bind mount run as the opencode host UID, not root?** Verify
+   that a container started by a daemon running as `opencode` maps container
+   root to the unprivileged opencode host UID. In the soft-only model the §9.1
+   proof flips: containers run as the opencode host UID and CAN read the
+   project files — the deliberate ddev-working trade-off, since protection is
+   opencode's own permission layer, not ACLs. Must be proven in e2e (Phase 3),
+   not assumed.
    *Status: **PROVEN** — `tests/e2e/run.sh` section 12i runs a real rootless
    podman container as the `opencode` user (nested user namespaces in the
-   `--privileged` e2e image, `opencode` subuid/subgid 100000–165535) that
-   bind-mounts the project and asserts `cat /app/.env` is denied
-   (`u:opencode:---` ACL survives the bind mount) while `cat /app/index.php`
-   succeeds. Re-proven with **real dockerd** in `tests/e2e/run-docker-rootless.sh`
-   section RL4, which additionally asserts the daemon runs as the opencode host
-   UID (`docker run alpine id -u` == the opencode UID), i.e. the rootless
-   daemon is not root-equivalent. Verified end-to-end.*
+   `--privileged` e2e image, auto-allocated `opencode` subuid/subgid range) that
+   bind-mounts the project and asserts `cat /app/.env`, `settings.php` and
+   `index.php` all succeed (soft-only, ddev-working goal). Re-proven with
+   **real dockerd** in `tests/e2e/run-docker-rootless.sh` section RL4, which
+   additionally asserts the container uid_map maps root to the opencode host
+   UID (`docker run alpine cat /proc/self/uid_map` → `0 <opencode-uid>`), i.e.
+   the rootless daemon is not root-equivalent. Verified end-to-end.*
 2. **Running `systemctl --user` / rootless setup as the `opencode` user.** The
    installer runs as root; rootless setup and linger must be executed as
    `opencode` (`sudo -u opencode …`, `loginctl enable-linger opencode`).
