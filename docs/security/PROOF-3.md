@@ -6,6 +6,8 @@
 > analysis record; see `docs/design/DDEV-WORKING.md` for the current model
 > and `docs/MANUAL.md` ("Security Model (soft-only)") for the authoritative
 > usage documentation. Where wording differs, the code and MANUAL win.
+> A **Status addendum (2026-08-15)** at the bottom of this file maps every
+> finding to its fate in the shipped design.
 
 **Question under test.** Beyond the timing windows analyzed in PROOF-1 (git pull race,
 object database, mtime cache) and PROOF-2 (no listener for developer-created files) —
@@ -320,3 +322,50 @@ much of this list is a bug report vs. a MANUAL.md paragraph.
 - Not yet e2e-verified: the exact hook-firing behavior for `git pull --ff-only` /
   `--rebase` variants (post-merge vs post-checkout coverage) — add a case to
   `tests/e2e` when addressing C2.
+
+---
+
+## Status addendum (2026-08-15, soft-only model)
+
+> Re-assessment of every finding below against the shipped DDEV-WORKING
+> design (ddev always runs as the `opencode` user, rootless-only backends,
+> no hard ACL layer, sharing group = opencode usergroup). The threat-model
+> question from the footnote above was answered in the process: the kit
+> now explicitly claims **"soft-only"** — file denies gate opencode's
+> tools, UID separation carries the hard guarantees. That decision turns
+> most of this document from a bug report into design record.
+
+| ID | Finding | Status in the current design |
+|---|---|---|
+| C1 | eval pattern injection → root RCE | **Closed.** `protect-projects.sh`, the hooks, and the whole root-side parser path were removed; `migrate-denies.sh` sweeps the artifacts from legacy installs. No root code consumes agent-authored config anymore. |
+| C2 | git hooks suppressible | **Closed.** The hook machinery is gone entirely; `update.sh` unsets `core.hooksPath` on legacy installs. |
+| C3 | docker-group backend voids ACLs | **Closed.** Rootless-only: `install.sh` aborts without a rootless backend, `update.sh`/`migrate-denies.sh` refuse legacy docker-group installs with re-install instructions, the wrapper shows a loud warning on a stale conf value. |
+| C4 | TOCTOU chown/chgrp/setfacl symlink races | **Mitigated, residual risk accepted.** Kit tree-walks now use `find -type d -name .ddev` (never follows symlinks) and plain `chown/chgrp/chmod -R`/`setfacl` are physical (non-symlink-following) for the recursive walk. Remaining window: a racing agent renaming/planting paths between the `find` and the per-path operation during install/update/refresh — a root-run batch job over a group-writable tree. Documented, not further hardened. |
+| H1 | `git log *` / `git diff *` allow leaks content | **Mitigated in the template.** The sensitive-file tripwires (`*additional.php*`, `*.env*`, …) are deliberately ordered AFTER the allow rules — last match wins, so `git diff -- .env` becomes `ask`. Residual: the tripwire is lexical only (variables, globs, indirection evade it); documented in MANUAL.md as the last line of defense. |
+| H2 | Copies/archives escape scope | **Accepted + visibility aid.** "The kit protects locations, not information flows" is the documented scope boundary; `status.sh` ends with a report-only name-based leak scan of the scratch dirs. |
+| H3 | ddev host-commands exec as developer | **Closed by redesign.** ddev runs as `opencode` everywhere (terminal `ddev()` function + sudoers helper); the sudoers carry **zero** RunAs-developer rules. |
+| M1 | protected files deletable/renamable | **Accepted** (soft-only: integrity/availability are not OS-enforced). |
+| M2 | `.git` agent-writable | **Closed in practice.** The `.git` dir stays developer-owned mode 700 and is explicitly excluded from the ddev handovers. |
+| M3 | supply chain: `curl \| sudo bash` from master, unsigned | **Open** (roadmap). Install tracks `master` by design during alpha; tagged/signed releases are the known follow-up (see the repo's planning notes). |
+| M4 | audit-log injection | **Closed.** The log is root-owned 640 in the default user's group; the `opencode` user can neither read nor write it; entries are written by root-side kit scripts only. |
+| M5 | `OPENCODE_LAUNCH_CWD` agent-influenceable | **Closed.** The variable no longer exists; the wrapper validates the CWD against `projects.conf` itself. |
+| M6 | scan-model gaps (PROOF-1/2) | **Moot/accepted.** PROOF-1/2 analyzed the removed ACL layer; in the soft-only model their timing questions reduce to the documented tripwire limitations (H1 residual). |
+
+**New known gaps of the current design (not in the original list):**
+
+- `ddev auth ssh` / composer private keys live in `/home/opencode/.ddev` and are
+  agent-readable — the accepted price of "ddev must read settings.php"
+  (MANUAL.md, Security Model).
+- The ddev handover hands `.ddev/` and the app-type settings dirs
+  (`config/system`, `typo3conf`, `sites/default`, `app/etc`) to the agent user
+  as **owner**. ddev requires ownership (unconditional chmod); protection of
+  the contained files rests entirely on opencode's soft deny/ask rules.
+- Bash tripwires are the last line of defense for bash-spawned reads — no
+  OS backstop exists by design (soft-only).
+- WSL2 only: the drvfs `/mnt/c` mount is world-readable by default and
+  exposes the Windows profile to every WSL user incl. the agent — the kit
+  reports it and offers a `wsl.conf` fix, but cannot enforce it (host-level).
+
+**Net result:** of the actionable findings, C1–C3, H3, M4, M5 are closed by
+the redesign; C4/H1 carry documented residuals; H2/M1/M6 are accepted scope
+boundaries. The one open engineering item is M3 (signed/tagged releases).
