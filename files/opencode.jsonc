@@ -134,6 +134,20 @@
             "sudo docker-compose *": "deny",
             "ddev *": "deny",
             "sudo ddev *": "deny",
+            // CREDENTIAL IMPORT — `ddev auth ssh` copies the given private
+            // key into /home/opencode/.ddev/.ssh (this user's home): once
+            // imported, EVERY opencode session can read it from disk. The
+            // read/edit denies (*id_rsa*, *.pem, ...) and the bash
+            // tripwires below still gate the tools, but the file itself is
+            // user-readable — that is the documented trade-off of "ddev
+            // always runs as opencode". Keep the import a developer-
+            // terminal task. NOTE: if a project config allows "ddev *",
+            // project rules merge LAST and override this deny — re-add
+            // "ddev auth ssh*": "deny" AFTER the allow in the project's
+            // opencode.jsonc to keep the gate. Composer private-repo auth
+            // rides the same ssh-agent (ddev auth ssh).
+            "ddev auth ssh*": "deny",
+            "sudo ddev auth ssh*": "deny",
             // SENSITIVE FILE TRIPWIRE — mirrors the read/edit deny patterns
             // into bash so allowlisted commands (git log *, git diff *, ls *,
             // ...) cannot touch protected file names prompt-free. "ask" (not

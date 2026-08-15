@@ -23,6 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILES="$SCRIPT_DIR/../files"
 HELPER="$FILES/opencode-permissions-kit-lib/bin/ddev-as-opencode"
 FUNC="$FILES/opencode-permissions-kit-lib/ddev-as-opencode.sh"
+TEMPLATE="$FILES/opencode.jsonc"
 SUDOERS="$FILES/sudoers.template"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/update.sh"
@@ -150,6 +151,16 @@ check_fail "function never references the removed legacy bin/ddev shim" \
 # --- 4. sudoers rule -----------------------------------------------------------
 check "sudoers.template grants the ddev-as-opencode helper" \
     sh -c "grep -q 'NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$SUDOERS"
+
+# --- 4b. credential-import gate (ddev auth ssh) ---------------------------------
+check "template denies 'ddev auth ssh*' (incl. sudo)" \
+    sh -c "grep -q '\"ddev auth ssh\\*\": \"deny\"' \"\$1\" && grep -q '\"sudo ddev auth ssh\\*\": \"deny\"' \"\$1\"" _ "$TEMPLATE"
+check "template explains the /home/opencode/.ddev key trade-off" \
+    sh -c "grep -q 'home/opencode/.ddev' \"\$1\" && grep -q 'developer-' \"\$1\"" _ "$TEMPLATE"
+check "template warns that project 'ddev *' allows override the gate" \
+    sh -c "grep -q 'merge LAST and override this deny' \"\$1\"" _ "$TEMPLATE"
+check "template still parses cleanly with the new rules" \
+    python3 "$FILES/opencode-permissions-kit-lib/jsonc-parser.py" "$TEMPLATE"
 
 # --- 5. install.sh wiring ------------------------------------------------------
 check "install.sh fetches both new files (fetch_kit list)" \

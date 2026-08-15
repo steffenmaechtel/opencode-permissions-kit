@@ -79,7 +79,10 @@ A project opts in via its own `opencode.jsonc`:
     "permission": {
         "bash": {
             "ddev *": "allow",
-            "docker *": "allow"
+            "docker *": "allow",
+            // keep the credential gate even with ddev allowed (see below)
+            "ddev auth ssh*": "deny",
+            "sudo ddev auth ssh*": "deny"
         }
     }
 }
@@ -91,7 +94,12 @@ cd /var/www/vhosts/myproject/ && opencode
 
 The wrapper prints the detected tools and asks `Y/n` before starting with the
 backend. The bundled global config denies `docker *` / `ddev *` (and their
-`sudo` forms), so nothing is granted implicitly.
+`sudo` forms), so nothing is granted implicitly. Project rules merge **last**
+(last matching rule wins) — a broad `"ddev *": "allow"` therefore overrides
+the global denies, including the credential gate. Keep a specific
+`"ddev auth ssh*": "deny"` **after** your allow rules (as in the example) or
+the agent can import — and then read — private keys (see the trade-off note
+under "ddev as the opencode user").
 
 ## Quick Start
 
@@ -292,8 +300,14 @@ Notes:
 - **`ddev auth ssh` / composer private keys** now live in
   `/home/opencode/.ddev` and are agent-readable. This is a deliberate
   soft-only trade-off: ddev runs as one user, so what ddev may read, the
-  agent may read. Use `.gitignore`d per-machine credentials and rotate keys
-  if the machine is not trusted.
+  agent may read. The template therefore denies the import command
+  (`ddev auth ssh*`, incl. `sudo`) — run it in your terminal, not from an
+  agent session; the read/edit denies (`*id_rsa*`, `*.pem`, …) and the bash
+  tripwires still gate opencode's tools, but the imported file itself sits
+  user-readable on disk. A project that broadly allows `ddev *` must re-add
+  the specific deny after its allow (see "The Two States"). Use
+  `.gitignore`d per-machine credentials and rotate keys if the machine is
+  not trusted.
 - The **first** `ddev start` as `opencode` is slow (mutagen download, image
   pulls into the rootless daemon); everything afterwards reuses that state.
 
