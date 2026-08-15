@@ -429,6 +429,13 @@ verifies the soft-only model (files readable, rootless container reads
 uninstall. `make e2e-rootless` additionally exercises a real docker-rootless
 daemon (needs systemd-in-container; skips when unavailable).
 
+Note for rootless daemons: a daemon that unpacks images through the containerd
+snapshotter (the kit's own rootless docker) can strip setuid bits from
+BuildKit-built images, which breaks sudo inside the e2e container. The suite
+detects this after the build and transparently rebuilds with the classic
+builder (`DOCKER_BUILDKIT=0`), so it runs unchanged on rootless and rootful
+daemons alike.
+
 ## Management Scripts
 
 ```bash
