@@ -272,16 +272,17 @@ stays). `DEFAULT_USER` stays auto-detected (`SUDO_USER`), never asked.
    `*README.txt*` + `*.git/config*`, soft-only wording), adjust
    `test-jsonc-parser.sh`. Parser trim deferred to Phase 6 (green-tests
    constraint, see §3 parser row).
-2. **Phase 2 — wrapper + sudoers.template**: soft-only wrapper, new sudoers
-   shape; update `test-wrapper-validation.sh`.
-3. **Phase 3 — install.sh**: rootless-only flow, absorbed provisioning, new
-   question list.
-4. **Phase 4 — update.sh migration** (§4) + `test-migration.sh`.
-5. **Phase 5 — config.sh / status.sh / uninstall.sh** cleanup.
+2. **Phase 2 — wrapper + sudoers.template** (DONE): soft-only wrapper, new
+   sudoers shape; `test-wrapper-validation.sh` extended.
+3. **Phase 3 — install.sh** (DONE): rootless-only flow, absorbed
+   provisioning, new question list.
+4. **Phase 4 — update.sh migration** (DONE, §4) + `test-migration.sh`.
+5. **Phase 5 — config.sh / status.sh / uninstall.sh** (DONE) cleanup.
 6. **Phase 6 — delete dead files**, Makefile + both CI workflows, e2e
-   updates, `make e2e` run from this workspace (root `make e2e >
-   ../logs/e2e-$(date +%Y%m%d-%H%M%S).log 2>&1`, then read the log).
-7. **Phase 7 — docs + AGENTS.md.**
+   updates (DONE) — `make e2e` green (183 checks) run from this workspace.
+7. **Phase 7 — docs + AGENTS.md** (DONE): MANUAL/README rewritten,
+   superseded banners on DDEV-SANDBOX/PROOF-1/2/3, rationale updated on
+   DOCKER-ROOTLESS, AGENTS.md rewritten.
 
 VERSION bump: per AGENTS.md, only when the developer asks — the backend
 abort in §4.5 effectively requires users to re-run install.sh, so the
