@@ -1,4 +1,4 @@
-.PHONY: help test test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-migration test-ddev-as-opencode test-mkcert-reuse verify e2e e2e-rootless e2e-all install-dev clean version check-version
+.PHONY: help test test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-migration test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure verify e2e e2e-rootless e2e-all install-dev clean version check-version
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -12,6 +12,7 @@ help:
 	@echo "  make test-migration    Run hard-deny migration tests"
 	@echo "  make test-ddev-as-opencode  Run ddev-as-opencode (ddev always runs as opencode) tests"
 	@echo "  make test-mkcert-reuse    Run mkcert CA reuse tests"
+	@echo "  make test-wsl-exposure   Run WSL2 /mnt/c exposure warning tests"
 	@echo "  make verify        Run system verification (requires install.sh)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
@@ -22,7 +23,7 @@ help:
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
-test: test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-migration test-ddev-as-opencode test-mkcert-reuse
+test: test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-migration test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -49,6 +50,10 @@ test-bypass-guard:
 test-migration:
 	@echo "=== Hard-Deny Migration Tests ==="
 	@./tests/test-migration.sh
+
+test-wsl-exposure:
+	@echo "=== WSL2 /mnt/c exposure Tests ==="
+	@./tests/test-wsl-exposure.sh
 
 test-mkcert-reuse:
 	@echo "=== mkcert CA reuse Tests ==="

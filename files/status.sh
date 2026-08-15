@@ -210,7 +210,29 @@ if [ -n "${DDEV_VERSION:-}" ]; then
     if [ "$ddev_low" = yes ]; then
         echo "    ddev version: $DDEV_VERSION  ${RED}(ddev < 1.25 — rootless needs ddev >= 1.25, upgrade ddev)${NC}"
     else
-        echo "    ddev version: $DDEV_VERSION"
+        echo "        ddev version: $DDEV_VERSION"
+    fi
+fi
+
+# === WSL2 /mnt/c exposure (drvfs world-readable by default) ===================
+# The 9p/drvfs server runs with the Windows session token, so NTFS ACLs do
+# NOT distinguish WSL users — the Linux mode bits are the only filter, and
+# the WSL default mounts C: world-readable. Every WSL user (including the
+# agent's) can then read the whole Windows profile (.ssh, NTUSER.DAT, ...).
+# Report-only; the fix is a host-level wsl.conf change.
+if [ -d /mnt/c ]; then
+    echo ""
+    echo "  ${CYAN}WSL2 /mnt/c exposure:${NC}"
+    mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
+        echo "    /mnt/c:     ${RED}world-readable${NC} (mode $mnt_mode — the agent user can read the whole Windows profile)"
+        echo "                fix: restrict the drvfs mount to the developer in /etc/wsl.conf:"
+        echo "                  [automount]"
+        echo "                  enabled = true"
+        echo "                  options = \"uid=1000,gid=1000,dmask=027,fmask=037\""
+        echo "                (replace uid/gid with the default user's) and run 'wsl --shutdown' from Windows."
+    else
+        echo "    /mnt/c:     ${GREEN}restricted${NC} (mode ${mnt_mode:-?})"
     fi
 fi
 

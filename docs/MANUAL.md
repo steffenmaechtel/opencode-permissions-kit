@@ -41,6 +41,21 @@ Known residual gaps, documented rather than hidden:
   **lexical ask-tripwires**, never by the OS.
 - A container with a bind mount reads the mounted tree freely.
 - Renamed copies of secrets are invisible to the name-based leak scan.
+- **WSL2 only:** `C:` is mounted through 9p/drvfs with the Windows session
+  token — NTFS ACLs do not distinguish WSL users, so with the default
+  world-readable mount **every WSL user (including the agent's) can read
+  the whole Windows profile** (`.ssh/`, `NTUSER.DAT`, browser data). The
+  kit's UID separation only covers the Linux side. Fix at the host level
+  via `/etc/wsl.conf` (then `wsl --shutdown` from Windows):
+
+  ```ini
+  [automount]
+  enabled = true
+  options = "uid=1000,gid=1000,dmask=027,fmask=037"
+  ```
+
+  (replace `uid`/`gid` with your default WSL user's — the agent user must
+  end up as "other", with no bits). `status.sh` reports the exposure.
 
 ## The Two States
 
