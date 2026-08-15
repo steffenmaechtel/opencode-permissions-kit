@@ -16,7 +16,7 @@ After that, `opencode` runs as the dedicated `opencode` user. No npm package, no
 
 - **Dedicated user** — the wrapper at `/usr/local/bin/opencode` validates the project directory, then execs opencode as `opencode` (never as you)
 - **Rootless containers only** — docker-rootless or podman-rootless, owned by the `opencode` user; no root-equivalent docker socket is ever granted (mandatory: provisioning failure aborts the install)
-- **ddev as the sandbox user** — `/home/opencode/.ddev`, router ports, and a reused mkcert CA are provisioned; no delegation shim, no transactions
+- **ddev as the opencode user** — `/home/opencode/.ddev`, router ports, and a reused mkcert CA are provisioned; no delegation shim, no transactions
 - **Soft file permissions** — deny rules in `opencode.jsonc` (`.env*`, `settings.php`, keys, ...) gate opencode's tools and trip bash commands with an `ask`; they are not OS-level ACLs (that is the "ddev must read settings.php" trade-off, see [docs/MANUAL.md](docs/MANUAL.md#security-model-soft-only))
 - **Sharing group** — the `opencode` usergroup + setgid + default ACLs + umask 002, so you and the agent can edit the same files
 - **No plugin** — the kit is system-level only: one install script, management scripts in `/usr/local/lib/opencode-permissions-kit/`
@@ -79,7 +79,7 @@ Removes the `opencode` user (and its usergroup), the kit library, ACLs, and sudo
 
 See [docs/MANUAL.md](docs/MANUAL.md) for:
 - The security model (soft-only) and its trade-offs
-- Container backends and ddev as the sandbox user
+- Container backends and ddev as the opencode user
 - Managing project directories
 - Customizing the deny list (global + per-project)
 - `.git/config` hardening
