@@ -30,6 +30,11 @@ if [ -f "$(dirname "$0")/log.sh" ]; then
     . "$(dirname "$0")/log.sh"
 fi
 
+# Shared ddev handover helpers (.ddev + settings dirs -> opencode user),
+# deployed alongside this script.
+[ -f "$(dirname "$0")/ddev-handover.sh" ] && . "$(dirname "$0")/ddev-handover.sh"
+command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
+
 OPENCODE_USER="opencode"
 GROUP=""
 PROJECTS_FILE=""
@@ -104,15 +109,12 @@ if getent group "$GROUP" >/dev/null 2>&1; then
             chgrp -R "$GROUP" "$root" 2>/dev/null || true
             chmod g+s "$root" 2>/dev/null || true
             setfacl -R -d -m "g:$GROUP:rwx" "$root" 2>/dev/null || true
-            # .ddev handover: ddev always runs as the opencode user, so an
-            # existing .ddev must belong to them (otherwise `ddev start` fails
-            # with "chmod .ddev/.webimageBuild: operation not permitted").
-            # Searched at ANY depth under the root: a registered root is often
-            # a parent folder holding several projects (e.g. /var/www/vhosts).
-            find "$root" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r d; do
-                chown -R "$OPENCODE_USER:$GROUP" "$d" 2>/dev/null || true
-                chmod -R g+w "$d" 2>/dev/null || true
-            done
+            # .ddev + settings-dir handover: ddev always runs as the opencode
+            # user and chmods these paths unconditionally — they must belong
+            # to it (otherwise `ddev start` fails with "operation not
+            # permitted"). Searched at ANY depth under the root: a registered
+            # root is often a parent folder holding several projects.
+            ddev_handover_root "$root" "$OPENCODE_USER" "$GROUP"
         done < "$PROJECTS_FILE"
     fi
     echo "  sharing group re-based to '$GROUP' (chgrp + setgid + default ACLs)"

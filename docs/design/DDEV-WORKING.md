@@ -335,13 +335,19 @@ shell function + a sudoers helper:
 - sudoers: `DEFAULT_USER ALL=(opencode) NOPASSWD:
   /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode *`
   (fixed kit path — `DDEV_BIN` stays dead).
-- **`.ddev/` handover** — every project's `.ddev` is handed over to
-  `opencode:opencode` with `g+w`: install.sh Step 5, config.sh
+- **`.ddev/` + settings-dir handover** — every project's `.ddev` and the
+  app-type's settings directories are handed over to `opencode:opencode`
+  with `g+w`: install.sh Step 5, config.sh
   projects-add, migrate-denies.sh step 3, AND an unconditional block in
   update.sh (so already-migrated installs are healed — the migration path
   alone would miss them). Searched at any depth under each registered root
-  (`find <root> -type d -name .ddev`) — a root is usually a parent folder
-  holding several projects. `.git/` stays developer-owned (mode 700).
+  via the shared helper `ddev-handover.sh`. Rationale: ddev chmods these
+  directories **unconditionally** (e.g. `writeTypo3SettingsFile` does
+  `util.Chmod(dir, 0755)` before writing), and chmod is owner-only — group
+  write can never suffice, ownership is required. Covered types: typo3
+  (`config/system`, `<docroot>/typo3conf`), drupal*/backdrop
+  (`<docroot>/sites/default`), magento (`app/etc`); wordpress (root file)
+  is documented as user-managed. `.git/` stays developer-owned (mode 700).
 
 **Trade-off (accepted, documented in MANUAL.md):** `ddev auth ssh` /
 composer private keys now live in `/home/opencode/.ddev` and are

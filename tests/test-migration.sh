@@ -56,11 +56,36 @@ trap 'rm -rf "$TMPDIR"' EXIT
 # --- fixture -----------------------------------------------------------------
 mkdir -p "$TMPDIR/roots/project-a/config"
 mkdir -p "$TMPDIR/roots/project-b"
+mkdir -p "$TMPDIR/roots/project-c"
 touch "$TMPDIR/roots/project-a/.env"
 touch "$TMPDIR/roots/project-a/settings.php"
 touch "$TMPDIR/roots/project-a/index.php"
 touch "$TMPDIR/roots/project-a/config/settings.php"
 touch "$TMPDIR/roots/project-b/.env"
+
+# ddev projects for the handover: a=typo3, b=drupal (settings dirs must be
+# handed over), c=php (unsupported app type -> its config/system stays
+# untouched). chmod -R g+w is observable via the file modes (644 -> 664);
+# chown to DENY_USER is a no-op here (the test user already owns everything).
+mkdir -p "$TMPDIR/roots/project-a/.ddev" "$TMPDIR/roots/project-a/config/system" "$TMPDIR/roots/project-a/typo3conf"
+printf 'type: typo3\n' > "$TMPDIR/roots/project-a/.ddev/config.yaml"
+touch "$TMPDIR/roots/project-a/config/system/settings.php"
+touch "$TMPDIR/roots/project-a/typo3conf/LocalConfiguration.php"
+mkdir -p "$TMPDIR/roots/project-b/.ddev" "$TMPDIR/roots/project-b/sites/default"
+printf 'type: drupal10\n' > "$TMPDIR/roots/project-b/.ddev/config.yaml"
+touch "$TMPDIR/roots/project-b/sites/default/settings.php"
+mkdir -p "$TMPDIR/roots/project-c/.ddev" "$TMPDIR/roots/project-c/config/system"
+printf 'type: php\n' > "$TMPDIR/roots/project-c/.ddev/config.yaml"
+touch "$TMPDIR/roots/project-c/config/system/settings.php"
+# Deterministic start modes: umask 002 environments (the kit's own profile)
+# would create 664 files and make the handover asserts vacuous.
+chmod 644 "$TMPDIR/roots/project-a/.ddev/config.yaml" \
+    "$TMPDIR/roots/project-a/config/system/settings.php" \
+    "$TMPDIR/roots/project-a/typo3conf/LocalConfiguration.php" \
+    "$TMPDIR/roots/project-b/.ddev/config.yaml" \
+    "$TMPDIR/roots/project-b/sites/default/settings.php" \
+    "$TMPDIR/roots/project-c/.ddev/config.yaml" \
+    "$TMPDIR/roots/project-c/config/system/settings.php"
 
 # Plant hard denies for DENY_USER on the sensitive files (ddev-breaking ones).
 for f in "$TMPDIR/roots/project-a/.env" \
@@ -75,7 +100,7 @@ check "fixture: denies planted" \
 # entries for the file OWNER, and in this fixture DENY_USER owns everything.
 # In the real kit the deny user (opencode) is never the owner.
 
-printf '%s\n%s\n' "$TMPDIR/roots/project-a" "$TMPDIR/roots/project-b" > "$TMPDIR/projects.conf"
+printf '%s\n%s\n%s\n' "$TMPDIR/roots/project-a" "$TMPDIR/roots/project-b" "$TMPDIR/roots/project-c" > "$TMPDIR/projects.conf"
 
 # Legacy conf + lib layout.
 mkdir -p "$TMPDIR/conf" "$TMPDIR/lib/hooks" "$TMPDIR/lib/bin"
@@ -143,6 +168,18 @@ check "group re-based: default ACL on nested dir" \
     sh -c "getfacl -p -d '$TMPDIR/roots/project-a/config' | grep -q 'group:$DENY_GROUP:rwx'"
 check "setgid on roots" \
     sh -c "test -g '$TMPDIR/roots/project-a' && test -g '$TMPDIR/roots/project-b'"
+
+# ddev handover (helper): .ddev + the app-type's settings dirs get g+w.
+check "handover: .ddev contents group-writable (typo3 project)" \
+    sh -c "test \"\$(stat -c %a '$TMPDIR/roots/project-a/.ddev/config.yaml')\" = 664"
+check "handover: typo3 config/system/settings.php group-writable" \
+    sh -c "test \"\$(stat -c %a '$TMPDIR/roots/project-a/config/system/settings.php')\" = 664"
+check "handover: typo3 typo3conf/LocalConfiguration.php group-writable" \
+    sh -c "test \"\$(stat -c %a '$TMPDIR/roots/project-a/typo3conf/LocalConfiguration.php')\" = 664"
+check "handover: drupal sites/default/settings.php group-writable" \
+    sh -c "test \"\$(stat -c %a '$TMPDIR/roots/project-b/sites/default/settings.php')\" = 664"
+check "handover: unsupported app type (php) is NOT touched" \
+    sh -c "test \"\$(stat -c %a '$TMPDIR/roots/project-c/config/system/settings.php')\" = 644"
 
 # Artifacts removed.
 check "artifact: lib/hooks removed"          sh -c "! test -e '$TMPDIR/lib/hooks'"

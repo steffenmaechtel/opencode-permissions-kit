@@ -28,6 +28,7 @@ INSTALL="$FILES/install.sh"
 UPDATE="$FILES/update.sh"
 CONFIG="$FILES/config.sh"
 MIGRATE="$FILES/opencode-permissions-kit-lib/migrate-denies.sh"
+HANDOVER="$FILES/opencode-permissions-kit-lib/ddev-handover.sh"
 STATUS="$FILES/status.sh"
 MAKEFILE="$SCRIPT_DIR/../Makefile"
 TEST_CI="$SCRIPT_DIR/../.github/workflows/test.yml"
@@ -161,26 +162,40 @@ check "install.sh hooks the function into the developer rc files" \
     sh -c "grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh hooks use the [ -f ] uninstall-safe guard" \
     sh -c "grep -qF '[ -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh ] && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh' \"\$1\"" _ "$INSTALL"
-check "install.sh hands over .ddev in the filesystem step" \
-    sh -c "grep -q '.ddev handover' \"\$1\"" _ "$INSTALL"
+check "install.sh hands over ddev paths in the filesystem step" \
+    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$INSTALL"
 
 # --- 6. update.sh wiring -------------------------------------------------------
 check "update.sh KIT_FILES includes both new files" \
     sh -c "grep -q 'opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
+check "update.sh KIT_FILES includes the handover helper" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-handover.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys the function file" \
     sh -c "grep -q '\"\$LIBDIR/ddev-as-opencode.sh\"' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys the helper (mode 755)" \
     sh -c "grep -q '\"\$LIBDIR/bin/ddev-as-opencode\"' \"\$1\"" _ "$UPDATE"
 check "update.sh heals the rc-file hook idempotently" \
     sh -c "grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' \"\$1\"" _ "$UPDATE"
-check "update.sh runs the .ddev handover unconditionally" \
-    sh -c "grep -q '.ddev handover' \"\$1\"" _ "$UPDATE"
+check "update.sh runs the ddev handover unconditionally" \
+    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE"
 
-# --- 7. config.sh / migrate-denies.sh handover ---------------------------------
-check "config.sh projects add hands over .ddev (any depth)" \
-    sh -c "grep -qF 'find \"\$p\" -type d -name .ddev' \"\$1\"" _ "$CONFIG"
-check "migrate-denies.sh step 3 hands over .ddev (any depth)" \
-    sh -c "grep -qF 'find \"\$root\" -type d -name .ddev' \"\$1\"" _ "$MIGRATE"
+# --- 7. handover helper + call sites ---------------------------------------------
+check "handover helper searches .ddev at any depth" \
+    sh -c "grep -qF 'find \"\$dhr_root\" -type d -name .ddev' \"\$1\"" _ "$HANDOVER"
+check "handover helper chowns recursively with g+w" \
+    sh -c "grep -q 'chmod -R g+w' \"\$1\"" _ "$HANDOVER"
+check "handover helper maps typo3 settings dirs (config/system, typo3conf)" \
+    sh -c "grep -qF 'dhp_dirs=\"config/system \$dhp_docroot/typo3conf typo3conf\"' \"\$1\"" _ "$HANDOVER"
+check "handover helper maps drupal settings dirs (sites/default)" \
+    sh -c "grep -qF '\$dhp_docroot/sites/default' \"\$1\"" _ "$HANDOVER"
+check "handover helper skips unknown app types" \
+    sh -c "grep -qF 'return 0' \"\$1\"" _ "$HANDOVER"
+check "config.sh projects add uses the handover helper" \
+    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$CONFIG"
+check "migrate-denies.sh step 3 uses the handover helper" \
+    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$MIGRATE"
+check "migrate-denies.sh sources the helper with a no-op fallback" \
+    sh -c "grep -q 'ddev-handover.sh' \"\$1\" && grep -q 'ddev_handover_root() { :; }' \"\$1\"" _ "$MIGRATE"
 
 # --- 8. status.sh reporting ----------------------------------------------------
 check "status.sh reports ddev-as-opencode state" \

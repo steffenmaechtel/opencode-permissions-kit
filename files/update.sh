@@ -57,7 +57,7 @@ KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc 
 opencode-deny-all.jsonc \
 sudoers.template umask.sh VERSION \
 opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
-opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode"
+opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
@@ -241,7 +241,8 @@ sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/bin/socket-check.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/migrate-denies.sh" \
@@ -332,23 +333,25 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     done
 fi
 
-# --- .ddev handover (ddev always runs as the opencode user) --------------------
-# Every project's .ddev belongs to the opencode user; a dev-owned .ddev breaks
-# `ddev start` with "chmod .ddev/.webimageBuild: operation not permitted".
-# Searched at ANY depth under each registered root (a root is often a parent
-# of several projects). Unconditional (not just inside the migration) so
-# installs that already migrated — the common upgrade path — are healed too.
-# The mode-700 .git dir stays dev-owned; only .ddev is handed over.
+# --- .ddev + settings-dir handover (ddev always runs as the opencode user) -----
+# ddev chmods .ddev and the app-type's settings directories unconditionally,
+# and chmod is owner-only — they must belong to the opencode user or
+# `ddev start` fails with "operation not permitted". Searched at ANY depth
+# under each registered root (a root is often a parent of several projects).
+# Unconditional (not just inside the migration) so installs that already
+# migrated — the common upgrade path — are healed too. The mode-700 .git
+# dir stays dev-owned.
 if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_WWW_GROUP" ]; then
+    # Shared helper: prefer the copy next to this script (checkout — same
+    # vintage as the running update.sh), fall back to the deployed library.
+    [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh"
+    [ -f "$LIBDIR/ddev-handover.sh" ] && . "$LIBDIR/ddev-handover.sh"
+    command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         [ -d "$root" ] || continue
-        find "$root" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r d; do
-            sudo chown -R "$OPENCODE_USER:$NEW_WWW_GROUP" "$d" 2>/dev/null || true
-            sudo chmod -R g+w "$d" 2>/dev/null || true
-            echo ".ddev handover: $d -> $OPENCODE_USER"
-            log ".ddev handover: $d -> $OPENCODE_USER"
-        done
+        ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_WWW_GROUP"
+        log "ddev handover applied under $root"
     done < "$PROJECTS_CONF"
 fi
 

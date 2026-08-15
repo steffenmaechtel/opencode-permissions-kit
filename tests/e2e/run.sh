@@ -149,8 +149,9 @@ echo ""
 echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"
 # A pre-existing dev-owned .ddev breaks `ddev start` as opencode with
 # "chmod .ddev/.webimageBuild: operation not permitted". config.sh refresh
-# (migrate-denies.sh step 3) must hand .ddev over to opencode.
-E 'mkdir -p /var/www/vhosts/test-project/.ddev && touch /var/www/vhosts/test-project/.ddev/.webimageBuild && echo "db_default" > /var/www/vhosts/test-project/.ddev/config.yaml'
+# (migrate-denies.sh step 3) must hand .ddev AND the typo3 settings dirs
+# over to opencode (ddev chmods them unconditionally, owner-only).
+E 'mkdir -p /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/config/system && touch /var/www/vhosts/test-project/.ddev/.webimageBuild && printf "type: typo3\n" > /var/www/vhosts/test-project/.ddev/config.yaml && echo "db_default" > /var/www/vhosts/test-project/config/system/settings.php'
 check "4c: planted .ddev is dev-owned before the handover" \
     E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "dev"'
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes refresh' && \
@@ -161,6 +162,10 @@ check "4c: .ddev in the opencode usergroup" \
     E 'test "$(stat -c %G /var/www/vhosts/test-project/.ddev)" = "opencode"'
 check "4c: .ddev contents group-writable (agent-created files)" \
     E 'test "$(stat -c %a /var/www/vhosts/test-project/.ddev/config.yaml)" = "664"'
+check "4c: typo3 settings dir handed over to opencode" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system)" = "opencode"'
+check "4c: typo3 settings.php group-writable" \
+    E 'test "$(stat -c %a /var/www/vhosts/test-project/config/system/settings.php)" = "664"'
 
 echo ""
 echo "--- 5. Soft-only file access (the ddev-working goal) ---"
@@ -347,7 +352,7 @@ echo "--- 11e. hard-deny migration (DDEV-WORKING §4) ---"
 # the denies, remove the artifacts, and stamp HARD_DENY_REMOVED.
 E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/.env'
 E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/settings.php'
-E 'sudo mkdir -p /var/www/vhosts/test-project/.ddev && sudo touch /var/www/vhosts/test-project/.ddev/.webimageBuild && sudo chown -R dev:dev /var/www/vhosts/test-project/.ddev'
+E 'sudo mkdir -p /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/config/system && sudo touch /var/www/vhosts/test-project/.ddev/.webimageBuild && sudo sh -c "printf \"type: typo3\\n\" > /var/www/vhosts/test-project/.ddev/config.yaml" && sudo sh -c "echo db > /var/www/vhosts/test-project/config/system/settings.php" && sudo chown -R dev:dev /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/config/system'
 E 'sudo mkdir -p /usr/local/lib/opencode-permissions-kit/hooks'
 E 'sudo touch /usr/local/lib/opencode-permissions-kit/protect-projects.sh'
 E 'sudo touch /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh'
@@ -396,6 +401,8 @@ check "11e: migration events logged" \
     E 'sudo grep -q "hard-deny migration" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "11e: .ddev handed over to opencode by the migration" \
     E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "opencode"'
+check "11e: typo3 settings dir handed over by the migration" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system)" = "opencode"'
 check "11e: .ddev group-writable after the migration" \
     E 'test "$(stat -c %a /var/www/vhosts/test-project/.ddev/.webimageBuild)" = "664"'
 
@@ -405,7 +412,7 @@ echo "--- 12. config.sh adds a project non-interactively ---"
 # (ddev always runs as the opencode user).
 E 'sudo mkdir -p /var/www/vhosts/extra-project' && \
     E 'sudo touch /var/www/vhosts/extra-project/.env' && \
-    E 'sudo mkdir -p /var/www/vhosts/extra-project/.ddev && sudo touch /var/www/vhosts/extra-project/.ddev/.webimageBuild' && \
+    E 'sudo mkdir -p /var/www/vhosts/extra-project/.ddev /var/www/vhosts/extra-project/config/system && sudo touch /var/www/vhosts/extra-project/.ddev/.webimageBuild && sudo sh -c "printf \"type: typo3\\n\" > /var/www/vhosts/extra-project/.ddev/config.yaml" && sudo sh -c "echo db > /var/www/vhosts/extra-project/config/system/settings.php"' && \
     E 'sudo chown -R dev:dev /var/www/vhosts/extra-project'
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes projects add /var/www/vhosts/extra-project' && \
     echo "  ${GREEN}OK${NC}  config.sh add completed"
@@ -419,6 +426,8 @@ check "extra-project .ddev handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/extra-project/.ddev)" = "opencode"'
 check "extra-project .ddev group-writable" \
     E 'test "$(stat -c %a /var/www/vhosts/extra-project/.ddev/.webimageBuild)" = "664"'
+check "extra-project typo3 settings dir handed over" \
+    E 'test "$(stat -c %U /var/www/vhosts/extra-project/config/system)" = "opencode"'
 
 echo ""
 echo "--- 12b. config.sh projects remove ---"

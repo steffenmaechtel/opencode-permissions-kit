@@ -39,7 +39,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode; do
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -66,6 +66,12 @@ log() { :; }
 if [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" ]; then
     . "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"
 fi
+
+# Shared ddev handover helpers (.ddev + settings dirs -> opencode user).
+# install.sh always runs from a checkout or a fully fetched temp dir, so the
+# helper sits right next to log.sh.
+[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh"
+command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -528,22 +534,17 @@ if [ -n "$PROJECTS_ROOTS" ]; then
             echo "  $root done."
         done
     fi
-    # .ddev handover (ddev always runs as $OPENCODE_USER): a project that
-    # already has a .ddev must belong to the opencode user, or `ddev start`
-    # fails with "chmod .ddev/.webimageBuild: operation not permitted" when
-    # opencode owns the file but the group-shared metadata changes. Applied
-    # even when the baseline above was skipped. Searched at ANY depth under
-    # each root (a root is often a parent of several projects). Idempotent;
-    # chown to the current user is a no-op, and the mode-700 git dir stays
-    # dev-owned.
+    # .ddev + settings-dir handover (ddev always runs as $OPENCODE_USER):
+    # ddev chmods .ddev and the app-type's settings directories
+    # unconditionally, and chmod is owner-only — they must belong to the
+    # opencode user or `ddev start` fails with "operation not permitted"
+    # (e.g. "chmod .../config/system"). Searched at ANY depth under each
+    # root (a root is often a parent of several projects). Idempotent;
+    # the mode-700 .git dir stays dev-owned.
     for root in $PROJECTS_ROOTS; do
         [ -d "$root" ] || continue
-        find "$root" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r d; do
-            sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$d" 2>/dev/null || true
-            sudo chmod -R g+w "$d" 2>/dev/null || true
-            echo "  .ddev handover: $d -> $OPENCODE_USER"
-            log ".ddev handover: $d -> $OPENCODE_USER"
-        done
+        ddev_handover_root "$root" "$OPENCODE_USER" "$WWW_GROUP"
+        log "ddev handover applied under $root"
     done
 fi
 
@@ -677,7 +678,8 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/
 # into the developer's rc files) + the sudoers helper that execs the real ddev.
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/migrate-denies.sh" \

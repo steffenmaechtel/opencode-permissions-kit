@@ -114,6 +114,19 @@ need_install() {
 
 # --- projects ----------------------------------------------------------------
 
+# Shared ddev handover helpers (.ddev + settings dirs -> opencode user).
+# Prefer the copy alongside this config.sh (repo checkout), then the
+# installed library — same lookup order as the migrate script below.
+_handover=""
+for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        _handover="$cand"
+        break
+    fi
+done
+[ -n "$_handover" ] || ddev_handover_root() { :; }
+
 projects_list() {
     echo "Project roots in ${CYAN}$PROJECTS_CONF${NC}:"
     if [ ! -f "$PROJECTS_CONF" ] || [ ! -s "$PROJECTS_CONF" ]; then
@@ -151,14 +164,12 @@ projects_add() {
         sudo chgrp -R "$WWW_GROUP" "$p" 2>/dev/null || true
         sudo chmod g+s "$p"
         sudo setfacl -R -d -m "g:$WWW_GROUP:rwx" "$p" 2>/dev/null || true
-        # .ddev handover: ddev always runs as $OPENCODE_USER, so an existing
-        # .ddev must belong to them (avoids "chmod .ddev/.webimageBuild:
-        # operation not permitted" on the next `ddev start`). Searched at ANY
-        # depth: the registered path may be a parent of several projects.
-        find "$p" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r d; do
-            sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$d" 2>/dev/null || true
-            sudo chmod -R g+w "$d" 2>/dev/null || true
-        done
+        # ddev handover (.ddev + the app-type's settings dirs at any depth):
+        # ddev always runs as $OPENCODE_USER and chmods these paths
+        # unconditionally — they must belong to it or `ddev start` fails
+        # with "operation not permitted". The registered path may be a
+        # parent of several projects.
+        ddev_handover_root "$p" "$OPENCODE_USER" "$WWW_GROUP"
         echo "  ${GREEN}added${NC} $p (group=$WWW_GROUP, setgid, default-acl)"
         log "project added: $p"
     done

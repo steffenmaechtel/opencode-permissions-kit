@@ -225,15 +225,32 @@ no two owners for `.ddev/`. How that works in practice:
   them in a terminal or call the helper directly:
   `sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode <args>`.
 
-- **`.ddev/` ownership (the EPERM fix):** every project's `.ddev` belongs to
-  `opencode:opencode` and is group-writable (`g+w`), so ddev can chmod its
-  build stamps (the old
-  `chmod .ddev/.webimageBuild: operation not permitted` is gone). The
-  handover searches for `.ddev` at **any depth** under each registered root —
-  a root is usually a parent folder (e.g. `/var/www/vhosts`) holding several
-  projects. It happens on install, when a project is added via `config.sh
-  projects add`, on `config.sh refresh`, and unconditionally on every
-  `update.sh`. Your `.git/` stays yours (mode 700, untouched).
+- **ddev-managed paths (the EPERM fixes):** ddev chmods `.ddev/` and the
+  app-type's **settings directories unconditionally**, and `chmod` is
+  owner-only on Linux — so these paths must belong to `opencode:opencode`
+  (with `g+w`). The kit hands over, at **any depth** under each registered
+  root (a root is usually a parent folder like `/var/www/vhosts` holding
+  several projects):
+
+  | App type (`.ddev/config.yaml` `type:`) | Handed-over directories |
+  |---|---|
+  | `typo3` | `config/system`, `<docroot>/typo3conf` (composer v12+, legacy v12 `system/`, v11−) |
+  | `drupal*`, `backdrop` | `<docroot>/sites/default` |
+  | `magento*` | `app/etc` |
+
+  The handover runs on install, on `config.sh projects add`, on
+  `config.sh refresh`, and unconditionally on every `update.sh`. Your
+  `.git/` stays yours (mode 700, untouched).
+
+  Notes:
+  - ddev resets a settings directory's mode to `0755` on each start — the
+    developer keeps editing the **files** (group-writable), and
+    `update.sh`/`refresh` re-applies `g+w` to the directory.
+  - **wordpress** manages `wp-config.php`, a *file* at the project root —
+    the kit does not hand the project root over. Keep the file user-managed
+    (remove the `#ddev-generated` marker) or set
+    `disable_settings_management: true` in `.ddev/config.yaml`.
+  - Unknown app types (e.g. `php`) are skipped.
 
 Install/update provision the rest:
 
