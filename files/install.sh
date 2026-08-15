@@ -477,20 +477,19 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
     sudo mkdir -p "$caroot"
     src=""
     src_label=""
-    if [ -d /mnt/c ]; then
-        win_user=""
-        if command -v powershell.exe >/dev/null 2>&1; then
-            win_user=$(powershell.exe -NoProfile -Command '[Environment]::UserName' 2>/dev/null | tr -d '\r')
-        fi
-        if [ -z "$win_user" ] && command -v cmd.exe >/dev/null 2>&1; then
-            win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
-        fi
-        if [ -n "$win_user" ]; then
-            wca="/mnt/c/Users/$win_user/AppData/Local/mkcert"
+    # 1. Windows CA: scan the user profiles DIRECTLY. powershell.exe /
+    #    cmd.exe are frequently not on a WSL PATH, so %USERNAME% probing is
+    #    unreliable — a failed probe silently skipped the Windows CA and
+    #    fell through to an untrusted one (browsers showed "not secure").
+    if [ -d /mnt/c/Users ]; then
+        for wca in /mnt/c/Users/*/AppData/Local/mkcert; do
             if [ -f "$wca/rootCA.pem" ] && [ -f "$wca/rootCA-key.pem" ]; then
-                src="$wca"; src_label="Windows user '$win_user'"
+                src="$wca"
+                wuser=${wca#/mnt/c/Users/}
+                src_label="Windows user '${wuser%%/*}'"
+                break
             fi
-        fi
+        done
     fi
     if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
         src="/home/$DEFAULT_USER/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"

@@ -263,7 +263,9 @@ Install/update provision the rest:
   sudo -u opencode ddev config global --router-http-port 8080 --router-https-port 8443
   ```
 
-- **mkcert CA** — reused from the Windows user (WSL2) or the developer's
+- **mkcert CA** — reused from the Windows user (WSL2: scanned from
+  `/mnt/c/Users/*/AppData/Local/mkcert`, so browsers keep trusting ddev's
+  HTTPS certs) or the developer's
   CAROOT so browsers keep trusting ddev's HTTPS certs; a new CA is generated
   only as a last resort.
 

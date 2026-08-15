@@ -182,6 +182,26 @@ fi
 ca="/home/$OPENCODE_USER/.local/share/mkcert/rootCA.pem"
 if [ -f "$ca" ]; then
     echo "    mkcert CA: ${GREEN}present${NC}  $ca"
+    # Mismatch check (report-only): if a Windows mkcert CA exists but the
+    # opencode CAROOT holds a DIFFERENT CA, Windows browsers trust the
+    # Windows one and ddev's certs show as "not secure". Happens when the
+    # CA was reused from the wrong source (e.g. a second WSL distro).
+    win_ca=""
+    if [ -d /mnt/c/Users ]; then
+        for wca in /mnt/c/Users/*/AppData/Local/mkcert/rootCA.pem; do
+            [ -f "$wca" ] && { win_ca="$wca"; break; }
+        done
+    fi
+    if [ -n "$win_ca" ]; then
+        oc_fp=$(openssl x509 -in "$ca" -noout -fingerprint -sha256 2>/dev/null || true)
+        win_fp=$(openssl x509 -in "$win_ca" -noout -fingerprint -sha256 2>/dev/null || true)
+        if [ -n "$oc_fp" ] && [ -n "$win_fp" ] && [ "$oc_fp" != "$win_fp" ]; then
+            echo "    mkcert CA: ${RED}MISMATCH${NC}  opencode CA != Windows CA ($win_ca)"
+            echo "               Windows browsers will show ddev sites as not-secure."
+            echo "               fix: copy the Windows CA (rootCA.pem + rootCA-key.pem) to"
+            echo "               $ca's directory, then remove ~/.ddev/traefik/certs/* and 'ddev restart'"
+        fi
+    fi
 else
     echo "    mkcert CA: ${YELLOW}missing${NC}  (optional — ddev HTTPS will need a trusted CA)"
 fi

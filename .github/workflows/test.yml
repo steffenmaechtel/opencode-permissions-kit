@@ -23,7 +23,7 @@ jobs:
       - name: Check version consistency
         run: make check-version
       - name: Make scripts executable
-        run: chmod +x ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-migration.sh ./tests/test-ddev-as-opencode.sh ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/migrate-denies.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+        run: chmod +x ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-migration.sh ./tests/test-ddev-as-opencode.sh ./tests/test-mkcert-reuse.sh ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/migrate-denies.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
       - name: Run wrapper validation tests
         run: ./tests/test-wrapper-validation.sh
       - name: Run JSONC parser edge-case tests
@@ -38,3 +38,5 @@ jobs:
         run: ./tests/test-migration.sh
       - name: Run ddev-as-opencode tests
         run: ./tests/test-ddev-as-opencode.sh
+      - name: Run mkcert CA reuse tests
+        run: ./tests/test-mkcert-reuse.sh

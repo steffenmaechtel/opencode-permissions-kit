@@ -388,19 +388,20 @@ if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
         if [ ! -f "$caroot/rootCA.pem" ]; then
             sudo mkdir -p "$caroot"
             src=""
-            if [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
-                src="/home/$DEFAULT_USER/.local/share/mkcert"
+            # 1. Windows CA: scan the user profiles directly (powershell.exe /
+            #    cmd.exe are often not on a WSL PATH — probing %USERNAME% is
+            #    unreliable; same fix as install.sh).
+            if [ -d /mnt/c/Users ]; then
+                for wca in /mnt/c/Users/*/AppData/Local/mkcert; do
+                    if [ -f "$wca/rootCA.pem" ] && [ -f "$wca/rootCA-key.pem" ]; then
+                        src="$wca"
+                        break
+                    fi
+                done
             fi
-            if [ -z "$src" ] && [ -d /mnt/c ]; then
-                win_user=""
-                command -v powershell.exe >/dev/null 2>&1 && \
-                    win_user=$(powershell.exe -NoProfile -Command '[Environment]::UserName' 2>/dev/null | tr -d '\r')
-                if [ -z "$win_user" ] && command -v cmd.exe >/dev/null 2>&1; then
-                    win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
-                fi
-                if [ -n "$win_user" ] && [ -f "/mnt/c/Users/$win_user/AppData/Local/mkcert/rootCA.pem" ]; then
-                    src="/mnt/c/Users/$win_user/AppData/Local/mkcert"
-                fi
+            # 2. Developer's Linux CAROOT.
+            if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
+                src="/home/$DEFAULT_USER/.local/share/mkcert"
             fi
             if [ -n "$src" ]; then
                 sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null || true
