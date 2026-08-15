@@ -11,9 +11,15 @@
 # To re-deploy the kit without prompts after it is already installed,
 # use update.sh instead. To change settings later, use config.sh.
 #
+# Soft protection model (docs/design/DDEV-WORKING.md): no hard ACL denies.
+# The kit creates the opencode user, provisions a MANDATORY rootless container
+# backend (docker-rootless or podman-rootless), prepares ddev to run as that
+# user, and sets up the opencode usergroup as the sharing group.
+#
 # Options:
 #   --yes        Skip all prompts, assume Yes
-#   --projects <path...>  Pre-define project roots, skip interactive selection
+#   --projects <path...>  Pre-Define project roots, skip interactive selection
+#   --container-backend <docker-rootless|podman-rootless>  Non-interactive backend choice
 set -e
 
 # Branch the kit ships from (master = always latest). Overridable for
@@ -28,13 +34,12 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    mkdir -p "$dir/opencode-permissions-kit-lib/hooks" "$dir/opencode-permissions-kit-lib/bin"
+    mkdir -p "$dir/opencode-permissions-kit-lib/bin"
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
-             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/ddev opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-transaction.sh \
-             opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit; do
+             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -69,7 +74,9 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 OPENCODE_USER="opencode"
-WWW_GROUP="www-data"
+# The sharing group is the opencode user's own primary usergroup (created by
+# useradd -m). Resolved after the user exists; "opencode" is only the default.
+WWW_GROUP="opencode"
 
 SKIP_PROMPTS=false
 PREDEFINED_PROJECTS=""
@@ -186,177 +193,109 @@ if ! command -v setfacl >/dev/null 2>&1; then
         sudo apt-get install -y acl
     fi
     if ! command -v setfacl >/dev/null 2>&1; then
-        echo "${RED}setfacl required for ACL protection. Install the 'acl' package and re-run.${NC}"
+        echo "${RED}setfacl required for the group-collaboration ACLs. Install the 'acl' package and re-run.${NC}"
         exit 1
     fi
 fi
 
-if getent group "$WWW_GROUP" >/dev/null 2>&1; then
-    ans=$(prompt "Group 'www-data' already exists (Apache/Nginx installed?). Use it?" "Y" "N" "")
-    [ "$ans" != "y" ] && { echo "Aborted."; exit 1; }
-else
-    sudo groupadd -f "$WWW_GROUP"
-    echo "Group '$WWW_GROUP' created."
-    log "group created: $WWW_GROUP"
+# ddev version (hard gate): rootless ddev needs ddev >= 1.25. Resolve the
+# real ddev (a legacy kit shim at /usr/local/bin/ddev still delegates and
+# reports its own version) — prefer the recorded DDEV_BIN, then the first
+# real ddev on PATH, then /usr/bin/ddev.
+DDEV_BIN=""
+for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf; do
+    if [ -f "$_c" ]; then
+        DDEV_BIN=$(sed -n 's/^DDEV_BIN=//p' "$_c" 2>/dev/null || true)
+        break
+    fi
+done
+if [ -z "$DDEV_BIN" ]; then
+    DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
+    if [ -n "$DDEV_BIN" ] && [ -L "$DDEV_BIN" ] \
+       && readlink "$DDEV_BIN" 2>/dev/null | grep -Eq 'lib/opencode(-permissions-kit)?/bin/ddev'; then
+        DDEV_BIN="/usr/bin/ddev"
+    fi
 fi
-
-if ! command -v ddev >/dev/null 2>&1; then
-    echo "${YELLOW}DDEV not found. Continuing anyway.${NC}"
-fi
-
-# Resolve the REAL ddev path (before the kit shim shadows /usr/local/bin/ddev).
-# On re-install over an existing kit, `command -v ddev` would return our own
-# shim symlink — fall back to the recorded DDEV_BIN or the default location.
-# The readlink target is $LIBDIR/bin/ddev (new or pre-0.0.10 layout).
-DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
-if [ -n "$DDEV_BIN" ] && [ -L "$DDEV_BIN" ] \
-   && readlink "$DDEV_BIN" 2>/dev/null | grep -Eq 'lib/opencode(-permissions-kit)?/bin/ddev'; then
-    for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf; do
-        if [ -f "$_c" ]; then
-            DDEV_BIN=$(sed -n 's/^DDEV_BIN=//p' "$_c" 2>/dev/null || true)
-            break
-        fi
-    done
-fi
-[ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
-log "detected DDEV_BIN=$DDEV_BIN"
-
-# ddev version (advisory). Recorded for the rootless ddev-version gate —
-# DDEV >= 1.25 is required for Docker Rootless / Podman support (see
-# docs/design/DOCKER-ROOTLESS.md §6.8). Parse the first semver-like token from the
-# real binary's `version` output; empty when ddev is absent or unparseable.
 DDEV_VERSION=""
-if [ -x "$DDEV_BIN" ]; then
+if [ -n "$DDEV_BIN" ] && [ -x "$DDEV_BIN" ]; then
     DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')"
 fi
-log "detected DDEV_VERSION=${DDEV_VERSION:-unknown}"
+log "detected ddev: bin=${DDEV_BIN:-none} version=${DDEV_VERSION:-unknown}"
+if command -v ddev >/dev/null 2>&1 || [ -n "$DDEV_BIN" ]; then
+    if [ -n "$DDEV_VERSION" ]; then
+        ddev_ok=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0>1 || (a[1]+0==1 && a[2]+0>=25)) print "yes"; else print "no"}')
+        if [ "$ddev_ok" != "yes" ]; then
+            echo "${RED}ddev $DDEV_VERSION found — the kit requires ddev >= 1.25 (rootless container support).${NC}"
+            echo "${YELLOW}Upgrade ddev (curl -fsSL https://ddev.com/install.sh | bash) and re-run.${NC}"
+            exit 1
+        fi
+    else
+        echo "${YELLOW}WARNING: could not parse the ddev version — continuing anyway (ddev >= 1.25 required).${NC}"
+    fi
+else
+    echo "${YELLOW}DDEV not found. Continuing anyway (install it later with ddev >= 1.25).${NC}"
+fi
 
-# Container backend selection (Phase 2: detection + provisioning, see
-# docs/design/DOCKER-ROOTLESS.md §6.4, §6.7). On a re-install over an existing kit,
-# preserve a previously configured backend unless --container-backend overrides.
-CONTAINER_BACKEND="docker-group"
+# Container backend selection. Rootless is MANDATORY: docker-rootless
+# (default) or podman-rootless. The legacy docker-group backend is gone
+# (root-equivalent). On a re-install over an existing kit, preserve a
+# previously configured rootless backend unless --container-backend overrides.
+CONTAINER_BACKEND="docker-rootless"
 OPENCODE_DOCKER_HOST=""
 OPENCODE_PODMAN_SOCKET=""
-DDEV_MODE="delegated"
 for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode/install.conf; do
     if [ -f "$_c" ]; then
         _be=$(sed -n 's/^CONTAINER_BACKEND=//p' "$_c" 2>/dev/null)
         _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' "$_c" 2>/dev/null)
         _ps=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' "$_c" 2>/dev/null)
-        _dm=$(sed -n 's/^DDEV_MODE=//p' "$_c" 2>/dev/null)
-        [ -n "$_be" ] && CONTAINER_BACKEND="$_be"
-        [ -n "$_dh" ] && OPENCODE_DOCKER_HOST="$_dh"
-        [ -n "$_ps" ] && OPENCODE_PODMAN_SOCKET="$_ps"
-        [ -n "$_dm" ] && DDEV_MODE="$_dm"
+        case "$_be" in
+            docker-rootless|podman-rootless)
+                CONTAINER_BACKEND="$_be"
+                [ -n "$_dh" ] && OPENCODE_DOCKER_HOST="$_dh"
+                [ -n "$_ps" ] && OPENCODE_PODMAN_SOCKET="$_ps"
+                ;;
+        esac
         break
     fi
 done
 
-# ddev mode validation (docs/design/DDEV-SANDBOX.md): sandbox requires a
-# rootless backend (containers under the opencode UID — on docker-group the
-# container root would void every ACL deny) and ddev >= 1.25. Fall back to
-# delegated with a warning when the prerequisites are not met.
-if [ "$DDEV_MODE" = "sandbox" ]; then
-    case "$CONTAINER_BACKEND" in
-        docker-rootless|podman-rootless) ;;
-        *)
-            echo "${YELLOW}WARNING: DDEV_MODE=sandbox requires a rootless container backend (is: $CONTAINER_BACKEND). Falling back to ddev mode 'delegated'.${NC}"
-            DDEV_MODE="delegated"
-            ;;
-    esac
-    if [ "$DDEV_MODE" = "sandbox" ] && [ -n "$DDEV_VERSION" ]; then
-        ddev_ok=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0>1 || (a[1]+0==1 && a[2]+0>=25)) print "yes"; else print "no"}')
-        if [ "$ddev_ok" != "yes" ]; then
-            echo "${YELLOW}WARNING: DDEV_MODE=sandbox needs ddev >= 1.25 (found $DDEV_VERSION). Falling back to ddev mode 'delegated'.${NC}"
-            DDEV_MODE="delegated"
-        fi
-    fi
-fi
-
 # --container-backend flag overrides (for non-interactive scripting).
 if [ -n "$CONTAINER_BACKEND_OPT" ]; then
     case "$CONTAINER_BACKEND_OPT" in
-        docker-group|docker-rootless|podman-rootless|none)
+        docker-rootless|podman-rootless)
             CONTAINER_BACKEND="$CONTAINER_BACKEND_OPT"
             ;;
         *)
             echo "${RED}Invalid --container-backend: '$CONTAINER_BACKEND_OPT'${NC}"
-            echo "${YELLOW}Supported: docker-group | docker-rootless | podman-rootless | none${NC}"
+            echo "${YELLOW}Supported: docker-rootless | podman-rootless (rootless only — docker-group was removed)${NC}"
             exit 1
             ;;
     esac
 fi
 
 # Interactive prompt (only when not --yes and no --container-backend flag).
-# Auto-detect the container situation and present a choice. --yes defaults to
-# docker-group (zero host change); explicit selection is done via the flag.
 if [ "$SKIP_PROMPTS" != true ] && [ -z "$CONTAINER_BACKEND_OPT" ]; then
     echo ""
-    echo "--- Container backend ---"
+    echo "--- Container backend (rootless, required) ---"
     echo ""
-    echo "  The container backend decides how opencode reaches Docker/Podman."
-    echo "  docker-group (default) gives root-equivalent host access via the docker socket."
-    echo "  docker-rootless / podman-rootless confine containers to the opencode UID so"
-    echo "  the kit's ACL denies hold inside bind-mounted containers (see docs/design/DOCKER-ROOTLESS.md)."
+    echo "  The container backend decides how opencode reaches containers."
+    echo "  Both backends confine containers to the opencode UID — no"
+    echo "  root-equivalent docker socket is ever granted."
     echo ""
-    echo "  [1] docker-group (default — no host change, root-equivalent)"
-    if command -v podman >/dev/null 2>&1 && sudo -u "$OPENCODE_USER" podman info >/dev/null 2>&1; then
-        echo "  [2] podman-rootless (RECOMMENDED — podman already installed, ACL denies hold)"
-        echo "  [3] docker-rootless (needs systemd --user + docker-ce-rootless-extras)"
-    else
-        echo "  [2] podman-rootless (RECOMMENDED — will install podman + uidmap)"
-        echo "  [3] docker-rootless (needs systemd --user + docker-ce-rootless-extras)"
-    fi
-    echo "  [4] none (no container access)"
+    echo "  [1] docker-rootless (default — needs systemd --user + docker-ce-rootless-extras)"
+    echo "  [2] podman-rootless (daemonless, no systemd required)"
     printf "  > "
     read -r _be_sel </dev/tty 2>/dev/null || read -r _be_sel
     case "$_be_sel" in
         2) CONTAINER_BACKEND="podman-rootless" ;;
-        3) CONTAINER_BACKEND="docker-rootless" ;;
-        4) CONTAINER_BACKEND="none" ;;
-        *) CONTAINER_BACKEND="docker-group" ;;
+        *) CONTAINER_BACKEND="docker-rootless" ;;
     esac
 fi
 
-# Provision the chosen backend (only for rootless; docker-group/none = no-op).
-# The helper installs packages, allocates subuid/subgid, and sets up the
-# daemon. It prints OPENCODE_DOCKER_HOST=... on stdout for the caller to record.
-if [ "$CONTAINER_BACKEND" = "docker-rootless" ] || [ "$CONTAINER_BACKEND" = "podman-rootless" ]; then
-    echo ""
-    echo "--- Provisioning container backend: $CONTAINER_BACKEND ---"
-    SETUP_SCRIPT="$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh"
-    [ -f "$SETUP_SCRIPT" ] || SETUP_SCRIPT="$LIBDIR/setup-container-backend.sh"
-    # Capture stdout (socket key) + let stderr flow to the terminal.
-    _setup_out=$(sh "$SETUP_SCRIPT" "$CONTAINER_BACKEND" --yes 2>&1) || {
-        echo "${RED}Container backend provisioning failed.${NC}"
-        echo "$_setup_out"
-        echo "${YELLOW}Falling back to docker-group (root-equivalent). Fix the issue above and re-run.${NC}"
-        CONTAINER_BACKEND="docker-group"
-        OPENCODE_DOCKER_HOST=""
-        OPENCODE_PODMAN_SOCKET=""
-    }
-    # Extract the socket key from the helper output (last line starting OPENCODE_).
-    _sock=$(echo "$_setup_out" | sed -n 's/^\(OPENCODE_DOCKER_HOST=.*\)/\1/p' | tail -1)
-    if [ -n "$_sock" ]; then
-        OPENCODE_DOCKER_HOST="${_sock#OPENCODE_DOCKER_HOST=}"
-    fi
-    echo "$_setup_out" | grep -v '^OPENCODE_' | sed 's/^/  /'
-fi
-
-# Handle 'none' — no container access at all.
-if [ "$CONTAINER_BACKEND" = "none" ]; then
-    CONTAINER_BACKEND="docker-group"
-    # The wrapper will never get a docker-group grant request because no project
-    # will be configured to enable docker tools. Record docker-group but with
-    # no socket — same as the legacy default.
-fi
-
-log "container backend: $CONTAINER_BACKEND"
-
-# === Step 1: User ===
+# === Step 1: User + group ===
 
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
-    ans=$(prompt "User '$OPENCODE_USER' already exists. Add to www-data and continue?" "Y" "N" "")
+    ans=$(prompt "User '$OPENCODE_USER' already exists. Reuse it?" "Y" "N" "")
     [ "$ans" != "y" ] && { echo "Aborted."; exit 1; }
 else
     sudo useradd -m -s /bin/bash "$OPENCODE_USER"
@@ -364,9 +303,12 @@ else
     log "user created: $OPENCODE_USER"
 fi
 
-sudo usermod -aG "$WWW_GROUP" "$OPENCODE_USER" 2>/dev/null || true
+# The sharing group is the opencode user's PRIMARY usergroup (auto-created by
+# useradd -m). No www-data, no extra group to create or remove.
+WWW_GROUP=$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")
 sudo usermod -aG "$WWW_GROUP" "$DEFAULT_USER" 2>/dev/null || true
-log "users added to group $WWW_GROUP: $OPENCODE_USER, $DEFAULT_USER"
+echo "Sharing group: $WWW_GROUP (developer '$DEFAULT_USER' added)"
+log "sharing group: $WWW_GROUP (developer $DEFAULT_USER added)"
 
 # === Step 2: Project roots ===
 
@@ -391,7 +333,7 @@ else
         echo "  ${YELLOW}No standard directories found.${NC}"
     fi
     echo "  [c] Custom path(s)"
-    echo "  [s] Skip (no project ACLs, only user + wrapper + hooks)"
+    echo "  [s] Skip (no project baseline, only user + wrapper)"
     printf "  > "
     read -r selection </dev/tty 2>/dev/null || read -r selection
 
@@ -404,7 +346,7 @@ else
             ;;
         [Ss]*)
             PROJECTS_ROOTS=""
-            echo "Skipping project ACLs."
+            echo "Skipping project baseline."
             ;;
         *)
             PROJECTS_ROOTS=""
@@ -440,24 +382,136 @@ sudo tee /etc/opencode-permissions-kit/install.conf > /dev/null <<EOF
 DEFAULT_USER=$DEFAULT_USER
 OPENCODE_USER=$OPENCODE_USER
 WWW_GROUP=$WWW_GROUP
-DDEV_BIN=$DDEV_BIN
 DDEV_VERSION=$DDEV_VERSION
 CONTAINER_BACKEND=$CONTAINER_BACKEND
 OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST
 OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET
-DDEV_MODE=$DDEV_MODE
 VERSION=$VERSION
 EOF
 # Migrate legacy setup.conf (pre-v0.0.9) -> install.conf
 [ -f /etc/opencode-permissions-kit/setup.conf ] && sudo rm -f /etc/opencode-permissions-kit/setup.conf
 log "install.conf written (version $VERSION)"
 
-# === Step 3: Filesystem ===
+# === Step 3: Provision the rootless container backend (mandatory) ===
+# A failed provisioning ABORTS the install — the kit does not fall back to a
+# root-equivalent docker-group path. The helper installs packages, allocates
+# subuid/subgid, and sets up the daemon; it prints OPENCODE_DOCKER_HOST=... on
+# stdout for the caller to record.
+echo ""
+echo "--- Provisioning container backend: $CONTAINER_BACKEND ---"
+SETUP_SCRIPT="$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh"
+[ -f "$SETUP_SCRIPT" ] || SETUP_SCRIPT="$LIBDIR/setup-container-backend.sh"
+_setup_out=$(sh "$SETUP_SCRIPT" "$CONTAINER_BACKEND" --yes 2>&1) || {
+    echo "${RED}Container backend provisioning failed.${NC}"
+    echo "$_setup_out"
+    echo "${YELLOW}Fix the issue above and re-run. podman-rootless needs no systemd — try it when docker-rootless cannot run.${NC}"
+    log "container backend provisioning FAILED ($CONTAINER_BACKEND) — install aborted"
+    exit 1
+}
+_sock=$(echo "$_setup_out" | sed -n 's/^\(OPENCODE_DOCKER_HOST=.*\)/\1/p' | tail -1)
+if [ -n "$_sock" ]; then
+    OPENCODE_DOCKER_HOST="${_sock#OPENCODE_DOCKER_HOST=}"
+fi
+echo "$_setup_out" | grep -v '^OPENCODE_' | sed 's/^/  /'
+sudo sed -i "s#^OPENCODE_DOCKER_HOST=.*#OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST#" /etc/opencode-permissions-kit/install.conf
+log "container backend provisioned: $CONTAINER_BACKEND"
+
+# === Step 4: ddev as the opencode user ===
+# /home/<oc>/.ddev is the sandbox user's global ddev home (project registry,
+# mutagen state, `ddev auth ssh` key cache). mkcert CA reuse keeps Windows
+# browsers trusting ddev's HTTPS certs. Router ports: rootless ddev-router
+# cannot bind 80/443 unless ip_unprivileged_port_start <= 80.
+echo ""
+echo "--- ddev runtime for user $OPENCODE_USER ---"
+sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
+sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER/.ddev"
+sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
+log "ddev home provisioned: /home/$OPENCODE_USER/.ddev"
+
+port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)
+if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
+    ans=$(prompt "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443? (host-wide sysctl)" "Y" "N" "")
+    if [ "$ans" = "y" ]; then
+        if echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
+            if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
+                echo "  unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
+                log "net.ipv4.ip_unprivileged_port_start=80 applied"
+                # docker-rootless: the daemon's network namespace inherited the
+                # OLD value at start; restart it so it re-inherits 80.
+                # podman-rootless is daemonless (fresh netns per run) — no restart.
+                oc_uid=$(id -u "$OPENCODE_USER" 2>/dev/null)
+                if [ "$CONTAINER_BACKEND" = "docker-rootless" ] && [ -n "$oc_uid" ]; then
+                    if sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$oc_uid" systemctl --user restart docker.service 2>/dev/null; then
+                        echo "  restarted the opencode rootless docker daemon (its netns re-inherits port-start 80)"
+                        log "rootless docker daemon restarted for port-start 80"
+                    else
+                        echo "${YELLOW}WARNING: could not restart the rootless daemon — run it manually:${NC}"
+                        echo "  sudo -u $OPENCODE_USER XDG_RUNTIME_DIR=/run/user/$oc_uid systemctl --user restart docker.service"
+                        log "rootless daemon restart failed (admin must restart manually)"
+                    fi
+                fi
+            else
+                echo "${YELLOW}WARNING: sysctl persisted but not activated live (read-only /proc/sys?) — reboot or run:${NC}"
+                echo "  sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
+                log "sysctl persisted but not activated live"
+            fi
+        else
+            echo "${YELLOW}WARNING: could not write /etc/sysctl.d/99-ddev-rootless.conf — apply the sysctl manually or use higher router ports.${NC}"
+        fi
+    else
+        echo "  Skipped — either set the sysctl manually or use higher router ports:"
+        echo "  sudo -u $OPENCODE_USER ddev config global --router-http-port 8080 --router-https-port 8443"
+    fi
+fi
+
+# mkcert CA reuse: search order 1. Windows CA (WSL2 /mnt/c), 2. developer's
+# Linux CAROOT, 3. 'mkcert -install' (new, untrusted CA).
+caroot="/home/$OPENCODE_USER/.local/share/mkcert"
+if [ ! -f "$caroot/rootCA.pem" ]; then
+    sudo mkdir -p "$caroot"
+    src=""
+    src_label=""
+    if [ -d /mnt/c ]; then
+        win_user=""
+        if command -v powershell.exe >/dev/null 2>&1; then
+            win_user=$(powershell.exe -NoProfile -Command '[Environment]::UserName' 2>/dev/null | tr -d '\r')
+        fi
+        if [ -z "$win_user" ] && command -v cmd.exe >/dev/null 2>&1; then
+            win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+        fi
+        if [ -n "$win_user" ]; then
+            wca="/mnt/c/Users/$win_user/AppData/Local/mkcert"
+            if [ -f "$wca/rootCA.pem" ] && [ -f "$wca/rootCA-key.pem" ]; then
+                src="$wca"; src_label="Windows user '$win_user'"
+            fi
+        fi
+    fi
+    if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
+        src="/home/$DEFAULT_USER/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
+    fi
+    if [ -n "$src" ]; then
+        sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null && \
+        sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$caroot" && \
+        sudo chmod 700 "$caroot" && sudo chmod 600 "$caroot/rootCA-key.pem" && \
+        echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)" && \
+        log "mkcert CA reused from $src_label for $OPENCODE_USER"
+    elif command -v mkcert >/dev/null 2>&1; then
+        sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
+        [ -f "$caroot/rootCA.pem" ] && \
+            echo "  ${YELLOW}mkcert: no existing CA found — a new one was created at $caroot.${NC}" && \
+            echo "  ${YELLOW}Import $caroot/rootCA.pem into your browser's trust store for HTTPS.${NC}" && \
+            log "mkcert: no existing CA — new one created for $OPENCODE_USER"
+    else
+        echo "  ${YELLOW}NOTE: mkcert not installed and no CA to reuse — install mkcert or copy your CA to $caroot.${NC}"
+    fi
+fi
+
+# === Step 5: Filesystem (group baseline) ===
 
 if [ -n "$PROJECTS_ROOTS" ]; then
     echo ""
     echo "--- Filesystem ---"
-    ans=$(prompt "Apply group-www-data, setgid, and default ACLs to project roots? (changes metadata on ALL files)" "Y" "N" "B")
+    ans=$(prompt "Apply group-$WWW_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)" "Y" "N" "B")
     case "$ans" in
         n) echo "Skipping filesystem setup." ;;
         b)
@@ -480,7 +534,7 @@ sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
 sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
 log "umask profile installed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 
-# === Step 4: opencode binary ===
+# === Step 6: opencode binary ===
 
 echo ""
 echo "--- opencode installation ---"
@@ -556,7 +610,7 @@ for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEF
         sudo sed -i '\|\.opencode/bin|d' "$cf" 2>/dev/null || true
         if ! sudo grep -q 'export PATH="/usr/local/bin:$PATH"' "$cf" 2>/dev/null; then
             echo "" | sudo tee -a "$cf" > /dev/null
-            echo 'export PATH="/usr/local/bin:$PATH"  # opencode permissions kit' | sudo tee -a "$cf" > /dev/null
+            echo 'export PATH="/usr/local/bin:$PATH"' | sudo tee -a "$cf" > /dev/null
         fi
         # Interactive-shell bypass warning: sources shell-warn.sh so a
         # self-installed opencode binary is reported in non-login shells too.
@@ -568,125 +622,57 @@ for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEF
 done
 log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning hooked)"
 
-# === Step 5: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
+# === Step 7: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
-sudo mkdir -p "$LIBDIR/hooks"
+sudo mkdir -p "$LIBDIR/bin"
 
 # Copy all our scripts into the library directory
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-transaction.sh" "$LIBDIR/ddev-transaction.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/migrate-denies.sh"   "$LIBDIR/migrate-denies.sh"
 sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
 sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
 # sudoers.template is deployed alongside config.sh: the installed config.sh
-# re-renders /etc/opencode-permissions-kit/sudoers on container-backend /
-# ddev-mode switches and needs the template next to it.
+# re-renders /etc/opencode-permissions-kit/sudoers on container-backend
+# switches and needs the template next to it.
 sudo cp "$SCRIPT_DIR/sudoers.template"                 "$LIBDIR/sudoers.template"
 sudo chmod 440 "$LIBDIR/sudoers.template"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc"          "$LIBDIR/opencode-deny-all.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
-# ddev delegation shim
-sudo mkdir -p "$LIBDIR/bin"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev"            "$LIBDIR/bin/ddev"
+# rootless socket probe helper
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/bin/socket-check.sh"
-sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
+sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
+               "$LIBDIR/migrate-denies.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit" \
-               "$LIBDIR/ddev-transaction.sh" \
-               "$LIBDIR/bin/ddev" "$LIBDIR/bin/socket-check.sh"
+               "$LIBDIR/bin/socket-check.sh"
 log "library deployed to $LIBDIR"
-
-# Sandbox ddev mode provisioning (docs/design/DDEV-SANDBOX.md): home-side
-# registry for ddev as the opencode user + the root-owned rewrite list the
-# transaction helper grants from. Rewrite entries are relative paths/globs
-# under any registered project root.
-if [ "$DDEV_MODE" = "sandbox" ]; then
-    sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
-    sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER/.ddev"
-    sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
-    if [ ! -f /etc/opencode-permissions-kit/ddev-rewrites.conf ]; then
-        sudo tee /etc/opencode-permissions-kit/ddev-rewrites.conf > /dev/null <<'EOF'
-# opencode permissions kit — ddev sandbox rewrite list.
-# Relative paths/globs under registered project roots that `ddev start` and
-# friends rewrite on the HOST. The transaction helper grants u:opencode
-# access on these for the duration of a mutating ddev run only. ROOT-OWNED:
-# entries here are executed as root-side file operations — keep this file
-# unwritable for everyone but root (mode 644, no group write).
-# Default: TYPO3 layout.
-config/system
-config/system/settings.php
-config/system/additional.php
-config/system/.gitignore
-EOF
-        sudo chmod 644 /etc/opencode-permissions-kit/ddev-rewrites.conf
-    fi
-    sudo mkdir -p /run/opencode-permissions-kit/ddev-txn 2>/dev/null || true
-    log "ddev sandbox mode provisioned (/home/$OPENCODE_USER/.ddev + ddev-rewrites.conf)"
-fi
 
 # Symlink: /usr/local/bin/opencode -> our wrapper
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
 echo "Wrapper installed: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 
-# Symlink: backward-compat path for direct protect-projects calls
-sudo ln -sf "$LIBDIR/protect-projects.sh" /usr/local/sbin/protect-projects.sh
-
-# Symlink: /usr/local/bin/ddev -> our shim, so the opencode agent's bare
-# `ddev` invocations hit the delegating shim (ahead of the real ddev in PATH).
-# Only shadow when /usr/local/bin/ddev is free or already ours — never clobber
-# a real ddev installed there; in that layout delegation is unavailable (the
-# real ddev wins on PATH) and the user must move it below /usr/local/bin.
-if [ -L /usr/local/bin/ddev ] && [ "$(readlink /usr/local/bin/ddev)" = "$LIBDIR/bin/ddev" ]; then
-    :
-elif [ -e /usr/local/bin/ddev ]; then
-    echo "  ${YELLOW}WARNING: /usr/local/bin/ddev exists (real ddev). ddev delegation shim NOT linked — move ddev below /usr/local/bin (e.g. /usr/bin) to enable delegation.${NC}"
-    log "ddev shim NOT shadowed: /usr/local/bin/ddev already occupied"
-else
-    sudo ln -sf "$LIBDIR/bin/ddev" /usr/local/bin/ddev
-    echo "ddev shim installed: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (delegates to $DDEV_BIN as $DEFAULT_USER)"
-    log "ddev shim symlinked: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (DDEV_BIN=$DDEV_BIN)"
+# Remove a legacy ddev delegation shim (pre-DDEV-WORKING installs shadowed
+# /usr/local/bin/ddev). Only ever touch a symlink pointing at OUR library —
+# never a real ddev binary.
+if [ -L /usr/local/bin/ddev ] \
+   && readlink /usr/local/bin/ddev 2>/dev/null | grep -Eq 'lib/opencode(-permissions-kit)?/bin/ddev'; then
+    sudo rm -f /usr/local/bin/ddev
+    echo "Legacy ddev delegation shim removed (/usr/local/bin/ddev) — ddev now runs natively as $OPENCODE_USER."
+    log "legacy ddev shim removed: /usr/local/bin/ddev"
 fi
 
 # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
-sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
-# The (opencode:docker) RunAs grant is only needed for the docker-group backend
-# (the wrapper uses `sudo -u opencode -g docker`). The rootless backends run
-# WITHOUT the docker group, so strip that block. Empty/unknown defaults to
-# docker-group (legacy behaviour, matching the wrapper's normalization) so the
-# grant stays available.
-case "${CONTAINER_BACKEND:-docker-group}" in
-    docker-rootless|podman-rootless)
-        sed -e '/^#@docker-group-begin$/,/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
-        ;;
-    *)
-        sed -e '/^#@docker-group-begin$/d' -e '/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
-        ;;
-esac
-mv -f "$SUDO_TMP.2" "$SUDO_TMP"
-# ddev mode: keep only the block matching DDEV_MODE (delegated vs sandbox are
-# mutually exclusive — in sandbox mode the agent must never gain RunAs-developer).
-if [ "$DDEV_MODE" = "sandbox" ]; then
-    sed -e '/^#@ddev-delegated-begin$/,/^#@ddev-delegated-end$/d' \
-        -e '/^#@ddev-sandbox-begin$/d' -e '/^#@ddev-sandbox-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
-else
-    sed -e '/^#@ddev-sandbox-begin$/,/^#@ddev-sandbox-end$/d' \
-        -e '/^#@ddev-delegated-begin$/d' -e '/^#@ddev-delegated-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
-fi
-mv -f "$SUDO_TMP.2" "$SUDO_TMP"
+sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
 sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
 sudo chmod 440 /etc/opencode-permissions-kit/sudoers
 rm -f "$SUDO_TMP"
@@ -700,42 +686,35 @@ else
     exit 1
 fi
 
-# Git hooks — core.hooksPath points directly into our library
-sudo -u "$OPENCODE_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
-sudo -u "$DEFAULT_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
-echo "Git hooks configured (core.hooksPath = $LIBDIR/hooks)."
-log "git hooks configured: core.hooksPath = $LIBDIR/hooks"
-
-# === Step 5b: .git/config hardening (optional) ===
+# === Step 7b: .git/config hardening (optional, SOFT-only) ===
 
 if [ "$SECURE_GIT_CONFIG" = true ]; then
-    echo "Secure git config: enabled via --secure-git-config flag."
+    echo "Secure git config: enabled via --secure-git-config flag (soft-only — enforced by opencode's permission layer, not the OS)."
 else
-    ans=$(prompt "Block .git/config for opencode? WARNING: If enabled, opencode cannot execute ANY git commands (commit, push, pull, status, diff, log, etc.)." "Y" "N" "")
+    ans=$(prompt "Block .git/config for opencode? (SOFT-only: opencode tools respect it, bash-spawned reads are not OS-blocked)" "Y" "N" "")
     case "$ans" in
         y) SECURE_GIT_CONFIG=true ;;
         *) SECURE_GIT_CONFIG=false ;;
     esac
 fi
 
-# === Step 6: opencode Home ===
+# === Step 8: opencode Home ===
 
 sudo mkdir -p /home/opencode/.config/opencode /home/opencode/.agents
-# useradd -m leaves the home dir in a private 'opencode' group, which blocks
-# the default user (member of $WWW_GROUP) from entering it. Chgrp to
-# $WWW_GROUP + setgid so the default user can edit opencode.jsonc etc.
+# The opencode home belongs to the user's own usergroup; the developer (member
+# of $WWW_GROUP) can enter and edit opencode.jsonc etc.
 sudo chown "$OPENCODE_USER:$WWW_GROUP" /home/opencode
 sudo chmod 2750 /home/opencode
-sudo chown -R opencode:www-data /home/opencode/.config /home/opencode/.agents
+sudo chown -R "$OPENCODE_USER:$WWW_GROUP" /home/opencode/.config /home/opencode/.agents
 sudo chmod 2775 /home/opencode/.config /home/opencode/.config/opencode /home/opencode/.agents
 
 if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
     sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
-    sudo chown opencode:www-data /home/opencode/.config/opencode/opencode.jsonc
+    sudo chown "$OPENCODE_USER:$WWW_GROUP" /home/opencode/.config/opencode/opencode.jsonc
     sudo chmod 664 /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
         sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
-        echo "Default config installed (opencode.jsonc) — .git/config blocked."
+        echo "Default config installed (opencode.jsonc) — .git/config blocked (soft)."
     else
         sudo sed -i '/\/\/SECURE_GIT:/d' /home/opencode/.config/opencode/opencode.jsonc
         echo "Default config installed (opencode.jsonc)."
@@ -744,11 +723,11 @@ if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/openc
 elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
     sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
     sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
-    sudo chown opencode:www-data /home/opencode/.config/opencode/opencode.jsonc
+    sudo chown "$OPENCODE_USER:$WWW_GROUP" /home/opencode/.config/opencode/opencode.jsonc
     sudo chmod 664 /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
         sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
-        echo "Default config installed (opencode.jsonc) — .git/config blocked. Backup saved."
+        echo "Default config installed (opencode.jsonc) — .git/config blocked (soft). Backup saved."
     else
         sudo sed -i '/\/\/SECURE_GIT:/d' /home/opencode/.config/opencode/opencode.jsonc
         echo "Default config installed (opencode.jsonc — backup saved)."
@@ -761,12 +740,12 @@ else
     fi
 fi
 
-# === Step 6b: Default-user config (self-update bypass protection) ===
+# === Step 8b: Default-user config (self-update bypass protection) ===
 
 # opencode's self-updater / installer can re-add ~/.opencode/bin to PATH, so
 # 'opencode' would run the real binary as $DEFAULT_USER — bypassing the
-# wrapper, its ACL refresh, and the 'opencode' user. Deploy a deny-* config
-# for the default user so that mode is completely locked down.
+# wrapper and the 'opencode' user. Deploy a deny-* config for the default
+# user so that mode is completely locked down.
 DEFAULT_OC_DIR="/home/$DEFAULT_USER/.config/opencode"
 DEFAULT_OC_CONF="$DEFAULT_OC_DIR/opencode.jsonc"
 sudo mkdir -p "$DEFAULT_OC_DIR"
@@ -789,22 +768,28 @@ if [ ! -f "$DEFAULT_OC_CONF" ]; then
     log "deny-all config installed for default user: $DEFAULT_OC_CONF"
 fi
 
-# === Step 7: Initial protection run ===
-
-if [ -n "$PROJECTS_ROOTS" ]; then
-    sudo "$LIBDIR/protect-projects.sh" && echo "Initial ACL protection applied to projects."
-fi
-
-# === Step 8: Remove pre-0.0.10 legacy layout ===
-# A re-install over an older kit leaves the old /usr/local/lib/opencode and
-# /etc/opencode behind; tear them down so only the renamed layout remains.
-# The opencode binary (if any) was already (re)deployed to $LIBDIR/bin/opencode
-# in Step 4, and configs were written to /etc/opencode-permissions-kit above.
+# === Step 9: Remove legacy layouts & artifacts ===
+# Pre-0.0.10 layout (/usr/local/lib/opencode, /etc/opencode) plus the
+# pre-DDEV-WORKING artifacts (hooks dir, ddev shim, transaction helper,
+# rewrite list, sbin symlink). Fresh installs are a no-op.
 sudo rm -rf /usr/local/lib/opencode 2>/dev/null || true
 sudo rm -rf /etc/opencode 2>/dev/null || true
 sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
 sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
-log "legacy pre-0.0.10 layout removed (if present)"
+sudo rm -rf "$LIBDIR/hooks" 2>/dev/null || true
+sudo rm -f "$LIBDIR/ddev-transaction.sh" "$LIBDIR/protect-projects.sh" "$LIBDIR/bin/ddev" 2>/dev/null || true
+sudo rm -f /usr/local/sbin/protect-projects.sh 2>/dev/null || true
+sudo rm -f /etc/opencode-permissions-kit/ddev-rewrites.conf 2>/dev/null || true
+sudo rm -rf /run/opencode-permissions-kit 2>/dev/null || true
+# Legacy installs pointed core.hooksPath at our (now removed) hooks dir —
+# unset it for both users so git stops warning.
+sudo -u "$OPENCODE_USER" git config --global --unset core.hooksPath 2>/dev/null || true
+sudo -u "$DEFAULT_USER" git config --global --unset core.hooksPath 2>/dev/null || true
+# A legacy www-data-based install left files in the old sharing group; the
+# group baseline step already re-applied $WWW_GROUP. Record the model switch.
+sudo grep -q '^HARD_DENY_REMOVED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null || \
+    echo "HARD_DENY_REMOVED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
+log "legacy layouts/artifacts removed (if present); soft-only model active"
 
 # === Done ===
 
@@ -813,6 +798,6 @@ echo "  ${GREEN}Installation complete.${NC}"
 echo ""
 echo "  Run:    ${CYAN}opencode${NC}"
 echo "  Backup: $BACKUP_DIR"
-echo "  Docs:   ${CYAN}docs/MANUAL.md${NC} (config, skills, verification, uninstall)"
+echo "  Docs:   ${CYAN}docs/MANUAL.md${NC} (config, security model, verification, uninstall)"
 echo ""
 log "install complete"

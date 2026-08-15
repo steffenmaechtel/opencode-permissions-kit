@@ -24,11 +24,16 @@ PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 VERSION="0.0.0"
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
-WWW_GROUP="www-data"
+WWW_GROUP="opencode"
+HARD_DENY_REMOVED=""
 if [ -f "$INSTALL_CONF" ]; then
     # shellcheck disable=SC1090
     . "$INSTALL_CONF"
 fi
+[ -n "$WWW_GROUP" ] || WWW_GROUP="opencode"
+# Prefer the live primary usergroup over a stale conf value.
+LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
+[ -n "$LIVE_GROUP" ] && WWW_GROUP="$LIVE_GROUP"
 
 # installed = the wrapper is active (user + wrapper + library present)
 installed=false
@@ -50,12 +55,12 @@ if [ "$installed" = false ]; then
     exit 0
 fi
 
-echo "  Mode:       ${GREEN}hardened${NC} (opencode runs as its own user)"
+echo "  Mode:       ${GREEN}user sandbox${NC} (opencode runs as its own user, soft permissions only)"
 echo "  User:       $OPENCODE_USER $(id "$OPENCODE_USER" >/dev/null 2>&1 && echo "exists" || echo "${RED}MISSING${NC}")"
 echo "  Wrapper:    /usr/local/bin/opencode -> $(readlink /usr/local/bin/opencode 2>/dev/null || echo missing)"
 echo "  Library:    $LIBDIR"
 echo "  Config:     $(ls /home/$OPENCODE_USER/.config/opencode/opencode.jsonc 2>/dev/null || ls /home/$OPENCODE_USER/.config/opencode/opencode.json 2>/dev/null || echo "${YELLOW}none${NC}")"
-echo "  Default user: $DEFAULT_USER  group: $WWW_GROUP"
+echo "  Default user: $DEFAULT_USER  sharing group: $WWW_GROUP"
 
 echo ""
 echo "  ${CYAN}Project roots ($(grep -c . "$PROJECTS_CONF" 2>/dev/null || echo 0)):${NC}"
@@ -73,7 +78,7 @@ f="/home/$OPENCODE_USER/.config/opencode/opencode.jsonc"
 if [ -f "$f" ]; then
     if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
         echo ""
-        echo "  .git/config hardening: ${GREEN}ON${NC} (opencode cannot run git)"
+        echo "  .git/config hardening: ${GREEN}ON${NC} (soft-only — opencode tools)"
     else
         echo ""
         echo "  .git/config hardening: ${CYAN}OFF${NC}"
@@ -81,8 +86,8 @@ if [ -f "$f" ]; then
 fi
 
 echo ""
-echo "  ${CYAN}Container tools (docker/ddev):${NC}"
-case "${CONTAINER_BACKEND:-docker-group}" in
+echo "  ${CYAN}Container backend:${NC}"
+case "${CONTAINER_BACKEND:-}" in
     docker-rootless)
         echo "    backend:    docker-rootless"
         sock="${OPENCODE_DOCKER_HOST:-}"
@@ -131,88 +136,80 @@ case "${CONTAINER_BACKEND:-docker-group}" in
         fi
         ;;
     *)
-        docker_group="$(getent group docker 2>/dev/null | cut -d: -f3)"
-        if [ -n "$docker_group" ]; then
-            echo "    backend:    docker-group  (docker group: ${GREEN}present (gid $docker_group)${NC})"
-        else
-            echo "    backend:    docker-group  (docker group: ${YELLOW}absent${NC})"
-        fi
-        echo "    reachable via: opencode -g docker"
+        echo "    backend:    ${RED}none / legacy docker-group${NC}"
+        echo "    re-run install.sh with a rootless backend:"
+        echo "      sudo bash files/install.sh --container-backend docker-rootless|podman-rootless"
         ;;
 esac
-if grep -qE '"[^"]*docker[^"]*": "deny"' "$f" 2>/dev/null; then
-    echo "    direct access: ${GREEN}blocked${NC} (docker/ddev denied in opencode.jsonc)"
-else
-    echo "    direct access: ${RED}NOT blocked${NC} — add the kit's docker/ddev deny rules!"
-fi
 
 echo ""
-echo "  ${CYAN}ddev delegation shim:${NC}"
-if [ -L /usr/local/bin/ddev ] && [ "$(readlink /usr/local/bin/ddev)" = "$LIBDIR/bin/ddev" ]; then
-    echo "    shim: ${GREEN}active${NC}  /usr/local/bin/ddev -> $LIBDIR/bin/ddev"
-    echo "    real ddev: ${DDEV_BIN:-/usr/bin/ddev}"
-    case "${DDEV_MODE:-delegated}" in
-        sandbox)
-            echo "    mode: ${GREEN}sandbox${NC}  ddev runs as $OPENCODE_USER (transactional: OPEN/RUN/CLOSE)"
-            if [ -d /run/opencode-permissions-kit/ddev-txn ] && ls /run/opencode-permissions-kit/ddev-txn/*.open >/dev/null 2>&1; then
-                echo "    transactions: ${YELLOW}active${NC}"
-                for st in /run/opencode-permissions-kit/ddev-txn/*.open; do
-                    [ -e "$st" ] || continue
-                    echo "      open: $(cat "$st" 2>/dev/null || echo '?')"
-                done
-            else
-                echo "    transactions: none open"
-            fi
-            # Router-port readiness: rootless ddev-router cannot bind 80/443
-            # unless ip_unprivileged_port_start <= 80. Shows the HOST value
-            # (the daemon netns inherits it at start; if the daemon started
-            # before the sysctl was applied, re-run 'config.sh ddev-mode
-            # sandbox' which restarts it).
-            port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
-            if [ "${port_start:-1024}" -le 80 ] 2>/dev/null; then
-                echo "    router ports: ${GREEN}ready${NC} (ip_unprivileged_port_start=$port_start)"
-            else
-                echo "    router ports: ${RED}NOT ready${NC} (ip_unprivileged_port_start=$port_start > 80 — ddev-router cannot bind 80/443)"
-                echo "                  fix: sudo bash $LIBDIR/config.sh --yes ddev-mode sandbox"
-            fi
-            # mkcert CAROOT readiness for the sandbox user.
-            ca="/home/$OPENCODE_USER/.local/share/mkcert/rootCA.pem"
-            if [ -f "$ca" ]; then
-                echo "    mkcert CA: ${GREEN}present${NC}  $ca"
-            else
-                echo "    mkcert CA: ${YELLOW}missing${NC}  re-run 'config.sh --yes ddev-mode sandbox' to provision it"
-            fi
-            ;;
-        *)
-            echo "    mode: delegated  (invocations from the sandbox run as $DEFAULT_USER)"
-            ;;
-    esac
-    if [ -n "${DDEV_VERSION:-}" ]; then
-        ddev_low=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
-        case "${CONTAINER_BACKEND:-docker-group}" in
-            docker-rootless|podman-rootless)
-                if [ "$ddev_low" = yes ]; then
-                    echo "    ddev version: $DDEV_VERSION  ${YELLOW}(ddev < 1.25 — rootless for ddev needs ddev >= 1.25)${NC}"
-                else
-                    echo "    ddev version: $DDEV_VERSION"
-                fi
-                ;;
-            *)
-                echo "    ddev version: $DDEV_VERSION"
-                ;;
-        esac
-    fi
-elif [ -e /usr/local/bin/ddev ] && [ ! -L /usr/local/bin/ddev ]; then
-    echo "    shim: ${YELLOW}NOT active${NC}  /usr/local/bin/ddev is a real ddev (delegation unavailable)"
+echo "  ${CYAN}ddev runtime (as user $OPENCODE_USER):${NC}"
+if [ -d "/home/$OPENCODE_USER/.ddev" ]; then
+    echo "    ddev home:  ${GREEN}present${NC}  /home/$OPENCODE_USER/.ddev"
 else
-    echo "    shim: ${YELLOW}NOT installed${NC}"
+    echo "    ddev home:  ${YELLOW}missing${NC}  /home/$OPENCODE_USER/.ddev (created by install.sh / update.sh)"
+fi
+# Router-port readiness: rootless ddev-router cannot bind 80/443 unless
+# ip_unprivileged_port_start <= 80. Shows the HOST value (the docker-rootless
+# daemon netns inherits it at start; the daemon may need a restart if it
+# started before the sysctl was applied).
+port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
+if [ "${port_start:-1024}" -le 80 ] 2>/dev/null; then
+    echo "    router ports: ${GREEN}ready${NC} (ip_unprivileged_port_start=$port_start)"
+else
+    echo "    router ports: ${RED}NOT ready${NC} (ip_unprivileged_port_start=$port_start > 80 — ddev-router cannot bind 80/443)"
+    echo "                  fix: sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
+fi
+# mkcert CAROOT readiness for the opencode user (ddev HTTPS).
+ca="/home/$OPENCODE_USER/.local/share/mkcert/rootCA.pem"
+if [ -f "$ca" ]; then
+    echo "    mkcert CA: ${GREEN}present${NC}  $ca"
+else
+    echo "    mkcert CA: ${YELLOW}missing${NC}  (optional — ddev HTTPS will need a trusted CA)"
+fi
+if [ -n "${DDEV_VERSION:-}" ]; then
+    ddev_low=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
+    if [ "$ddev_low" = yes ]; then
+        echo "    ddev version: $DDEV_VERSION  ${RED}(ddev < 1.25 — rootless needs ddev >= 1.25, upgrade ddev)${NC}"
+    else
+        echo "    ddev version: $DDEV_VERSION"
+    fi
 fi
 
-# === Sensitive-file leak scan (report-only) =================================
+# === Migration state (DDEV-WORKING §4) ========================================
+echo ""
+echo "  ${CYAN}Hard-deny migration:${NC}"
+if [ "${HARD_DENY_REMOVED:-}" = "1" ]; then
+    echo "    stamp:      ${GREEN}done${NC} (soft-only model active)"
+else
+    echo "    stamp:      ${YELLOW}missing${NC} — run update.sh to remove legacy u:$OPENCODE_USER ACL denies"
+fi
+# Report-only scan for leftover hard denies from a pre-migration install.
+if command -v getfacl >/dev/null 2>&1 && [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+    leftover=0
+    while IFS= read -r root; do
+        [ -z "$root" ] && continue
+        [ -d "$root" ] || continue
+        n=$(getfacl -R -p "$root" 2>/dev/null | awk -v u="$OPENCODE_USER" '
+            /^# file: / { path = substr($0, 9); has = 0; next }
+            index($0, "user:" u ":") == 1 { has = 1; next }
+            /^$/ { if (path != "" && has) { print path; has = 0 } path = "" }
+        ' | grep -c . || true)
+        leftover=$((leftover + ${n:-0}))
+    done < "$PROJECTS_CONF"
+    if [ "${leftover:-0}" -gt 0 ]; then
+        echo "    leftover denies: ${RED}$leftover file(s) with u:$OPENCODE_USER ACL entries${NC}"
+        echo "    remove them with: sudo bash $LIBDIR/update.sh"
+    else
+        echo "    leftover denies: ${GREEN}none${NC}"
+    fi
+fi
+
+# === Sensitive-file leak scan (report-only) ===================================
 # Name-based sweep of scratch directories for files matching the global deny
 # patterns. The kit protects storage locations, not information flows: a copy
 # that left the project roots (cp .env /tmp/backup) is outside every future
-# ACL scan. This surfaces such leftovers for manual inspection. REPORT-ONLY —
+# scan. This surfaces such leftovers for manual inspection. REPORT-ONLY —
 # no ACL is ever changed outside the project roots, and false positives (a
 # developer's own /tmp/foo.env.example) are expected. Renamed copies stay
 # invisible: this is a name tripwire, not content DLP. Runs unprivileged;

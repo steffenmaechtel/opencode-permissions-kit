@@ -5,9 +5,9 @@
 #
 # What it can do:
 #   - List / add / remove project roots in /etc/opencode-permissions-kit/projects.conf
-#   - Toggle .git/config hardening for the opencode user
-#   - Refresh ACL protection (re-run protect-projects.sh --force)
-#   - Switch the container backend (docker-group / docker-rootless / podman-rootless)
+#   - Toggle .git/config hardening for the opencode user (SOFT-only)
+#   - Refresh the group baseline (re-run migrate-denies.sh group re-base)
+#   - Switch the container backend (docker-rootless / podman-rootless)
 #
 # Run as your default (non-root) user with sudo privileges:
 #   ./config.sh                       # interactive menu
@@ -15,7 +15,7 @@
 #   ./config.sh projects add /var/www/vhosts/foo
 #   ./config.sh projects remove /var/www/vhosts/foo
 #   ./config.sh git-config on|off|status
-#   ./config.sh container-backend docker-group|docker-rootless|podman-rootless|status
+#   ./config.sh container-backend docker-rootless|podman-rootless|status
 #   ./config.sh refresh
 #
 # Options:
@@ -52,14 +52,16 @@ INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
 
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
-WWW_GROUP="www-data"
+WWW_GROUP="opencode"
 if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
-WWW_GROUP="${WWW_GROUP:-www-data}"
-DDEV_BIN="${DDEV_BIN:-/usr/bin/ddev}"
+# The sharing group is the opencode user's own usergroup; prefer the live
+# value over any stale conf entry (e.g. www-data from a pre-migration install).
+LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
+[ -n "$LIVE_GROUP" ] && WWW_GROUP="$LIVE_GROUP"
 
 YES=false
 ACTION=""
@@ -69,16 +71,14 @@ TARGETS=""
 for arg do
     case "$arg" in
         --yes|-y) YES=true ;;
-        projects|git-config|refresh|status|container-backend|ddev-mode)
+        projects|git-config|refresh|status|container-backend)
             [ -z "$ACTION" ] && ACTION="$arg" && continue
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             TARGETS="$TARGETS $arg"
             ;;
         on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg" ;;
-        docker-group|docker-rootless|podman-rootless)
+        docker-rootless|podman-rootless)
             [ "$ACTION" = "container-backend" ] && SUB="$arg" ;;
-        delegated|sandbox)
-            [ "$ACTION" = "ddev-mode" ] && SUB="$arg" ;;
         list|add|remove)
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             ;;
@@ -147,16 +147,13 @@ projects_add() {
             continue
         fi
         echo "$p" | sudo tee -a "$PROJECTS_CONF" > /dev/null
-        # Apply filesystem basics so ACLs function immediately
+        # Apply the group baseline so the developer/agent share files immediately
         sudo chgrp -R "$WWW_GROUP" "$p" 2>/dev/null || true
         sudo chmod g+s "$p"
         sudo setfacl -R -d -m "g:$WWW_GROUP:rwx" "$p" 2>/dev/null || true
         echo "  ${GREEN}added${NC} $p (group=$WWW_GROUP, setgid, default-acl)"
         log "project added: $p"
     done
-    echo ""
-    echo "Running protect-projects.sh --force ..."
-    sudo "$LIBDIR/protect-projects.sh" --force
 }
 
 projects_remove() {
@@ -168,7 +165,7 @@ projects_remove() {
             echo "  ${YELLOW}not found${NC} $p"
             continue
         fi
-        if ! confirm "Remove '$p' from projects.conf? (ACL denies remain on disk until manually cleared)"; then
+        if ! confirm "Remove '$p' from projects.conf?"; then
             echo "  skip $p"
             continue
         fi
@@ -179,7 +176,7 @@ projects_remove() {
     done
 }
 
-# --- git-config toggle -------------------------------------------------------
+# --- git-config toggle (SOFT-only) ---------------------------------------------
 
 git_config_file() {
     for f in /home/opencode/.config/opencode/opencode.jsonc \
@@ -195,7 +192,7 @@ git_config_status() {
     # ON  = .git/config deny rule is active (uncommented) in the config
     # OFF = rule absent or still a //SECURE_GIT comment
     if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
-        echo "git-config hardening: ${GREEN}ON${NC}  ($f)"
+        echo "git-config hardening: ${GREEN}ON${NC}  ($f, soft-only)"
     elif grep -q '//SECURE_GIT' "$f" 2>/dev/null; then
         echo "git-config hardening: ${CYAN}OFF${NC}  ($f — markers present, rules inactive)"
     else
@@ -224,7 +221,7 @@ git_config_apply() {
 
     if [ "$enable" = "on" ]; then
         sudo sed -i 's|//SECURE_GIT: ||' "$target"
-        echo "git-config hardening: ${GREEN}ON${NC}  ($target)"
+        echo "git-config hardening: ${GREEN}ON${NC}  ($target, soft-only)"
     else
         sudo sed -i '/\/\/SECURE_GIT:/d' "$target"
         echo "git-config hardening: ${CYAN}OFF${NC}  ($target)"
@@ -233,11 +230,17 @@ git_config_apply() {
     echo "NOTE: existing config was overwritten from template. Restart opencode to pick up changes."
 }
 
-# --- container backend (Phase 2) ----------------------------------------------
+# --- container backend ----------------------------------------------------------
 
 container_backend_status() {
-    local backend="${CONTAINER_BACKEND:-docker-group}"
-    echo "Container backend: ${CYAN}${backend}${NC}"
+    local backend="${CONTAINER_BACKEND:-}"
+    if [ -z "$backend" ]; then
+        echo "Container backend: ${RED}none configured${NC}"
+        echo "  A legacy install (docker-group) must be re-installed:"
+        echo "    sudo bash files/install.sh --container-backend docker-rootless"
+        return
+    fi
+    echo "Container backend: ${CYAN}$backend${NC}"
     case "$backend" in
         docker-rootless)
             if [ -n "${OPENCODE_DOCKER_HOST:-}" ]; then
@@ -266,23 +269,14 @@ container_backend_status() {
             fi
             ;;
         *)
-            local dg="$(getent group docker 2>/dev/null | cut -d: -f3)"
-            if [ -n "$dg" ]; then
-                echo "  docker group: ${GREEN}present (gid $dg)${NC}"
-            else
-                echo "  docker group: ${YELLOW}absent${NC}"
-            fi
+            echo "  ${YELLOW}legacy backend '$backend' — re-run install.sh with a rootless backend${NC}"
             ;;
     esac
 }
 
-# Re-render the sudoers for a given backend. Mirrors install.sh/update.sh: keep
-# the (opencode:docker) grant for docker-group, strip it for rootless. Also
-# keeps only the ddev block matching DDEV_MODE (delegated vs sandbox are
-# mutually exclusive).
+# Re-render the sudoers. The soft-only template needs only the DEFAULT_USER
+# substitution (no backend/ddev-mode conditionals anymore).
 render_sudoers() {
-    local backend="$1"
-    local ddev_mode="${2:-${DDEV_MODE:-delegated}}"
     local template=""
     for cand in "$LIBDIR/sudoers.template" "$SCRIPT_DIR/sudoers.template" "$SCRIPT_DIR/../files/sudoers.template"; do
         if [ -f "$cand" ]; then template="$cand"; break; fi
@@ -290,31 +284,14 @@ render_sudoers() {
     [ -n "$template" ] || die "sudoers.template not found."
     local tmp
     tmp=$(mktemp)
-    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$template" > "$tmp"
-    case "$backend" in
-        docker-rootless|podman-rootless)
-            sed -e '/^#@docker-group-begin$/,/^#@docker-group-end$/d' "$tmp" > "$tmp.2"
-            ;;
-        *)
-            sed -e '/^#@docker-group-begin$/d' -e '/^#@docker-group-end$/d' "$tmp" > "$tmp.2"
-            ;;
-    esac
-    mv -f "$tmp.2" "$tmp"
-    if [ "$ddev_mode" = "sandbox" ]; then
-        sed -e '/^#@ddev-delegated-begin$/,/^#@ddev-delegated-end$/d' \
-            -e '/^#@ddev-sandbox-begin$/d' -e '/^#@ddev-sandbox-end$/d' "$tmp" > "$tmp.2"
-    else
-        sed -e '/^#@ddev-sandbox-begin$/,/^#@ddev-sandbox-end$/d' \
-            -e '/^#@ddev-delegated-begin$/d' -e '/^#@ddev-delegated-end$/d' "$tmp" > "$tmp.2"
-    fi
-    mv -f "$tmp.2" "$tmp"
+    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$template" > "$tmp"
     sudo cp "$tmp" /etc/opencode-permissions-kit/sudoers
     sudo chmod 440 /etc/opencode-permissions-kit/sudoers
     rm -f "$tmp"
     sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
     if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
-        echo "  sudoers re-rendered for $backend."
-        log "sudoers re-rendered (backend=$backend)"
+        echo "  sudoers re-rendered."
+        log "sudoers re-rendered"
     else
         die "sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers."
     fi
@@ -349,7 +326,7 @@ container_backend_apply() {
     done
     [ -n "$setup_script" ] || die "setup-container-backend.sh not found."
 
-    local prev="${CONTAINER_BACKEND:-docker-group}"
+    local prev="${CONTAINER_BACKEND:-none}"
     echo "Switching container backend: ${CYAN}${prev}${NC} -> ${CYAN}${new_backend}${NC}"
 
     if ! confirm "Provision '$new_backend' for $OPENCODE_USER?"; then
@@ -357,7 +334,7 @@ container_backend_apply() {
         return 1
     fi
 
-    # Provision the new backend (or teardown for docker-group).
+    # Provision the new backend.
     local docker_host="" podman_socket=""
     local setup_out
     setup_out=$(sudo sh "$setup_script" "$new_backend" --yes 2>&1) || {
@@ -373,16 +350,8 @@ container_backend_apply() {
     # Update install.conf.
     update_install_conf_backend "$new_backend" "$docker_host" "$podman_socket"
 
-    # Combo guard: sandbox ddev requires a rootless backend. Switching to
-    # docker-group therefore falls back to delegated ddev mode.
-    if [ "$new_backend" = "docker-group" ] && [ "${DDEV_MODE:-delegated}" = "sandbox" ]; then
-        echo "${YELLOW}Backend docker-group is incompatible with ddev mode 'sandbox' — falling back to 'delegated'.${NC}"
-        update_install_conf_ddev_mode "delegated"
-        DDEV_MODE="delegated"
-    fi
-
-    # Re-render the sudoers for the new backend.
-    render_sudoers "$new_backend" "${DDEV_MODE:-delegated}"
+    # Re-render the sudoers.
+    render_sudoers
 
     echo ""
     echo "  ${GREEN}Container backend switched to '$new_backend'.${NC}"
@@ -390,226 +359,23 @@ container_backend_apply() {
     log "container backend switched: $prev -> $new_backend"
 }
 
-# --- ddev mode (delegated | sandbox) ------------------------------------------
-
-REWRITES_CONF="/etc/opencode-permissions-kit/ddev-rewrites.conf"
-
-update_install_conf_ddev_mode() {
-    local mode="$1" tmp
-    tmp=$(mktemp)
-    {
-        if [ -f "$INSTALL_CONF" ]; then
-            grep -v '^DDEV_MODE=' "$INSTALL_CONF" 2>/dev/null
-        fi
-        echo "DDEV_MODE=$mode"
-    } | sort -u > "$tmp"
-    sudo cp "$tmp" "$INSTALL_CONF"
-    sudo chmod 644 "$INSTALL_CONF"
-    rm -f "$tmp"
-}
-
-ddev_mode_status() {
-    local mode="${DDEV_MODE:-delegated}"
-    echo "ddev mode: ${CYAN}${mode}${NC}"
-    case "$mode" in
-        sandbox) echo "  ddev (and its host commands) runs as '$OPENCODE_USER' inside a transaction;" ;;
-        *)       echo "  ddev invoked by the agent runs as '$DEFAULT_USER' via the delegation shim;" ;;
-    esac
-    echo "  mutating subcommands: $( [ "$mode" = sandbox ] && echo 'ddev-transaction.sh (OPEN/RUN/CLOSE)' || echo "sudo -u $DEFAULT_USER $DDEV_BIN" )"
-    if [ "$mode" = "sandbox" ]; then
-        if [ -f "$REWRITES_CONF" ]; then
-            echo "  rewrite list: $REWRITES_CONF ($(grep -vc '^\s*#\|^\s*$' "$REWRITES_CONF" 2>/dev/null || echo '?') entries)"
-        else
-            echo "  rewrite list: ${YELLOW}missing ($REWRITES_CONF)${NC}"
-        fi
-    fi
-}
-
-ddev_mode_apply() {
-    local new_mode="$1"
-    local prev="${DDEV_MODE:-delegated}"
-
-    # Gates for a sandbox target run regardless of the current mode — they
-    # validate the config even on an idempotent re-apply.
-    if [ "$new_mode" = "sandbox" ]; then
-        # Hard gate: sandbox ddev requires a rootless backend (on docker-group
-        # the container root would void every ACL deny — PROOF-3 C3).
-        case "${CONTAINER_BACKEND:-docker-group}" in
-            docker-rootless|podman-rootless) ;;
-            *) die "ddev mode 'sandbox' requires a rootless container backend (current: ${CONTAINER_BACKEND:-docker-group}). Run 'config.sh container-backend docker-rootless|podman-rootless' first." ;;
-        esac
-        # Soft gate: ddev >= 1.25 for rootless operation (--yes skips: the
-        # admin takes responsibility, e.g. for a version the parser can't read).
-        local dver="${DDEV_VERSION:-}"
-        if [ -z "$dver" ] && [ -x "$DDEV_BIN" ]; then
-            dver="$("$DDEV_BIN" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')"
-        fi
-        if [ -n "$dver" ]; then
-            local ok
-            ok=$(awk -v v="$dver" 'BEGIN{split(v,a,"."); if(a[1]+0>1 || (a[1]+0==1 && a[2]+0>=25)) print "yes"; else print "no"}')
-            if [ "$ok" != "yes" ] && [ "$YES" != true ]; then
-                die "ddev mode 'sandbox' needs ddev >= 1.25 (found ${dver}). Use --yes to override."
-            fi
-            [ "$ok" != "yes" ] && echo "${YELLOW}WARNING: overriding the ddev >= 1.25 requirement (found ${dver}).${NC}"
-        else
-            [ "$YES" = true ] || die "cannot determine the ddev version — use --yes to override."
-        fi
-    fi
-
-    # The actual mode-change bookkeeping runs only on a real switch; the
-    # sandbox setup below (provisioning, sysctl, mkcert) is idempotent and
-    # also runs on a re-apply so an existing sandbox install can pick up new
-    # first-run fixes (e.g. the router-port sysctl added after the switch).
-    if [ "$new_mode" = "$prev" ]; then
-        echo "ddev mode is already '$new_mode' — re-applying $new_mode setup (idempotent)."
-    else
-        echo "Switching ddev mode: ${CYAN}${prev}${NC} -> ${CYAN}${new_mode}${NC}"
-        confirm "Apply ddev mode '$new_mode'?" || { echo "  Aborted."; return 1; }
-    fi
-
-    if [ "$new_mode" = "sandbox" ]; then
-        # Provision the sandbox-side ddev home + the root-owned rewrite list
-        # (mirrors install.sh; idempotent).
-        sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
-        sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER/.ddev"
-        sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
-        if [ ! -f "$REWRITES_CONF" ]; then
-            sudo tee "$REWRITES_CONF" > /dev/null <<'EOF'
-# opencode permissions kit — ddev sandbox rewrite list.
-# Relative paths/globs under registered project roots that `ddev start` and
-# friends rewrite on the HOST. The transaction helper grants u:opencode
-# access on these for the duration of a mutating ddev run only. ROOT-OWNED:
-# entries here are executed as root-side file operations — keep this file
-# unwritable for everyone but root (mode 644, no group write).
-# Default: TYPO3 layout.
-config/system
-config/system/settings.php
-config/system/additional.php
-config/system/.gitignore
-EOF
-            sudo chmod 644 "$REWRITES_CONF"
-        fi
-        sudo mkdir -p /run/opencode-permissions-kit/ddev-txn 2>/dev/null || true
-        sudo chmod 755 /run/opencode-permissions-kit/ddev-txn 2>/dev/null || true
-
-        # Router ports: rootless ddev-router cannot bind <1024. Lower the
-        # unprivileged port start to 80, persisted via sysctl.d. Host-wide
-        # change: interactive runs are asked (default N); --yes applies.
-        port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)
-        if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
-            if confirm "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443?"; then
-                if echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
-                    if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
-                        echo "  unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
-                        log "ddev sandbox: net.ipv4.ip_unprivileged_port_start=80 applied"
-                        # docker-rootless: the daemon's network namespace
-                        # inherited the OLD value at start; restart it so it
-                        # re-inherits 80. podman-rootless is daemonless (every
-                        # `podman run` opens a fresh netns) — no restart needed.
-                        if [ "${CONTAINER_BACKEND:-}" = "docker-rootless" ]; then
-                            oc_uid=$(id -u "$OPENCODE_USER" 2>/dev/null)
-                            if [ -n "$oc_uid" ] && sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$oc_uid" systemctl --user restart docker.service 2>/dev/null; then
-                                echo "  restarted the opencode rootless docker daemon (its netns re-inherits port-start 80)"
-                                log "ddev sandbox: opencode rootless docker daemon restarted for port-start 80"
-                            else
-                                echo "${YELLOW}WARNING: could not restart the opencode rootless daemon — run it manually so its netns picks up 80:${NC}"
-                                echo "  sudo -u $OPENCODE_USER XDG_RUNTIME_DIR=/run/user/$oc_uid systemctl --user restart docker.service"
-                                log "ddev sandbox: rootless daemon restart failed (admin must restart manually)"
-                            fi
-                        fi
-                    else
-                        echo "${YELLOW}WARNING: sysctl persisted but not activated live (read-only /proc/sys?) — reboot or run:${NC}"
-                        echo "  sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
-                        log "ddev sandbox: sysctl persisted but not activated live"
-                    fi
-                else
-                    echo "${YELLOW}WARNING: could not write /etc/sysctl.d/99-ddev-rootless.conf — apply the sysctl manually or use higher router ports.${NC}"
-                fi
-            else
-                echo "  Skipped — either set the sysctl manually or use higher router ports:"
-                echo "  sudo -u $OPENCODE_USER ddev config global --router-http-port 8080 --router-https-port 8443"
-            fi
-        fi
-
-        # HTTPS first-run: provision the sandbox user's mkcert CAROOT. ddev (Linux
-        # side) reads the CA from $CAROOT (/home/<oc>/.local/share/mkcert by
-        # default). On WSL2 we want the sandbox user to share the EXISTING CA
-        # (so Windows browsers already trust it) instead of generating a new
-        # one — search order:
-        #   1. an existing Windows CA at /mnt/c/Users/<u>/AppData/Local/mkcert
-        #   2. an existing Linux CA at the developer's CAROOT
-        #   3. fall back to 'mkcert -install' (new, untrusted CA)
-        caroot="/home/$OPENCODE_USER/.local/share/mkcert"
-        if [ ! -f "$caroot/rootCA.pem" ]; then
-            sudo mkdir -p "$caroot"
-            src=""
-            src_label=""
-            # 1. Windows CA via the WSL2 /mnt/c mount. Resolve the Windows
-            #    user via powershell.exe (more reliable than cmd %USERNAME%).
-            if [ -d /mnt/c ]; then
-                win_user=""
-                if command -v powershell.exe >/dev/null 2>&1; then
-                    win_user=$(powershell.exe -NoProfile -Command '[Environment]::UserName' 2>/dev/null | tr -d '\r')
-                fi
-                if [ -z "$win_user" ] && command -v cmd.exe >/dev/null 2>&1; then
-                    win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
-                fi
-                if [ -n "$win_user" ]; then
-                    wca="/mnt/c/Users/$win_user/AppData/Local/mkcert"
-                    if [ -f "$wca/rootCA.pem" ] && [ -f "$wca/rootCA-key.pem" ]; then
-                        src="$wca"; src_label="Windows user '$win_user'"
-                    fi
-                fi
-            fi
-            # 2. Linux developer CAROOT.
-            if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
-                src="/home/$DEFAULT_USER/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
-            fi
-            if [ -n "$src" ]; then
-                sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null && \
-                sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$caroot" && \
-                sudo chmod 700 "$caroot" && sudo chmod 600 "$caroot/rootCA-key.pem" && \
-                echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)" && \
-                log "ddev sandbox: mkcert CA reused from $src_label for $OPENCODE_USER"
-            elif command -v mkcert >/dev/null 2>&1; then
-                # 3. Last resort: generate a fresh CA. Nothing on Windows/
-                #    host trusts it yet — browsers will need a manual import.
-                sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
-                [ -f "$caroot/rootCA.pem" ] && \
-                    echo "  ${YELLOW}mkcert: no existing CA found — a new one was created at $caroot.${NC}" && \
-                    echo "  ${YELLOW}Import $caroot/rootCA.pem into your browser's trust store for HTTPS.${NC}" && \
-                    log "ddev sandbox: no existing CA — new mkcert CA created for $OPENCODE_USER"
-            else
-                echo "  ${YELLOW}NOTE: mkcert not installed and no CA to reuse — install mkcert (apt or curl) or copy your CA to $caroot.${NC}"
-            fi
-        fi
-    fi
-
-    update_install_conf_ddev_mode "$new_mode"
-    DDEV_MODE="$new_mode"
-    render_sudoers "${CONTAINER_BACKEND:-docker-group}" "$new_mode"
-
-    echo ""
-    if [ "$new_mode" = "$prev" ]; then
-        echo "  ${GREEN}ddev sandbox setup re-applied (mode was already '$new_mode').${NC}"
-    else
-        echo "  ${GREEN}ddev mode switched to '$new_mode'.${NC}"
-        log "ddev mode switched: $prev -> $new_mode"
-    fi
-    if [ "$new_mode" = "sandbox" ]; then
-        echo "  ddev now runs as '$OPENCODE_USER' (transactional); restart running opencode sessions."
-    else
-        echo "  ddev invoked by the agent is delegated to '$DEFAULT_USER' again; restart running opencode sessions."
-    fi
-}
-
-# --- refresh -----------------------------------------------------------------
+# --- refresh (group baseline) ---------------------------------------------------
 
 refresh() {
-    echo "Re-running protect-projects.sh --force ..."
-    sudo "$LIBDIR/protect-projects.sh" --force
-    echo "${GREEN}ACL protection refreshed.${NC}"
-    log "ACL refresh requested"
+    local migrate=""
+    for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/migrate-denies.sh" "$LIBDIR/migrate-denies.sh"; do
+        if [ -f "$cand" ]; then migrate="$cand"; break; fi
+    done
+    [ -n "$migrate" ] || die "migrate-denies.sh not found."
+    echo "Re-applying the group baseline (chgrp $WWW_GROUP + setgid + default ACLs) ..."
+    sudo sh "$migrate" \
+        --projects "$PROJECTS_CONF" \
+        --conf-dir /etc/opencode-permissions-kit \
+        --lib-dir "$LIBDIR" \
+        --opencode-user "$OPENCODE_USER" \
+        --group "$WWW_GROUP"
+    echo "${GREEN}Group baseline refreshed.${NC}"
+    log "group baseline refresh requested"
 }
 
 # --- interactive menu --------------------------------------------------------
@@ -624,9 +390,9 @@ menu() {
         echo ""
         echo "  [1] Add project root"
         echo "  [2] Remove project root"
-        echo "  [3] Toggle .git/config hardening (on/off)"
-        echo "  [4] Refresh ACL protection now"
-        echo "  [5] Switch container backend (docker-group / rootless)"
+        echo "  [3] Toggle .git/config hardening (on/off, soft-only)"
+        echo "  [4] Refresh group baseline now"
+        echo "  [5] Switch container backend (docker-rootless / podman-rootless)"
         echo "  [q] Quit"
         printf "  > "
         read -r sel </dev/tty 2>/dev/null || read -r sel
@@ -653,7 +419,7 @@ menu() {
                         git_config_apply off
                     fi
                 else
-                    if confirm "Enable .git/config hardening? opencode will NOT be able to run ANY git command."; then
+                    if confirm "Enable .git/config hardening (soft-only)? opencode tools will not touch .git/config."; then
                         git_config_apply on
                     fi
                 fi
@@ -663,16 +429,14 @@ menu() {
                 banner
                 container_backend_status
                 echo ""
-                echo "  [1] docker-group (default — no host change, root-equivalent)"
-                echo "  [2] podman-rootless (daemonless — ACL denies hold)"
-                echo "  [3] docker-rootless (needs systemd --user)"
+                echo "  [1] docker-rootless (needs systemd --user)"
+                echo "  [2] podman-rootless (daemonless)"
                 echo "  [q] Cancel"
                 printf "  > "
                 read -r _be_sel </dev/tty 2>/dev/null || read -r _be_sel
                 case "$_be_sel" in
-                    1) container_backend_apply docker-group || true ;;
+                    1) container_backend_apply docker-rootless || true ;;
                     2) container_backend_apply podman-rootless || true ;;
-                    3) container_backend_apply docker-rootless || true ;;
                     *) echo "  Cancelled." ;;
                 esac
                 ;;
@@ -711,18 +475,10 @@ case "$ACTION" in
         ;;
     container-backend)
         case "$SUB" in
-            docker-group|docker-rootless|podman-rootless)
+            docker-rootless|podman-rootless)
                 banner; container_backend_apply "$SUB" ;;
             status|"") banner; container_backend_status ;;
-            *)      die "Usage: config.sh container-backend docker-group|docker-rootless|podman-rootless|status" ;;
-        esac
-        ;;
-    ddev-mode)
-        case "$SUB" in
-            delegated|sandbox)
-                banner; ddev_mode_apply "$SUB" ;;
-            status|"") banner; ddev_mode_status ;;
-            *)      die "Usage: config.sh ddev-mode delegated|sandbox|status" ;;
+            *)      die "Usage: config.sh container-backend docker-rootless|podman-rootless|status" ;;
         esac
         ;;
     refresh)    banner; refresh ;;

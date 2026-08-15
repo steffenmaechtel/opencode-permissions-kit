@@ -1,10 +1,13 @@
 # PLAN-DDEV-WORKING: Drop the hard ACL deny layer, keep ddev working
 
-> Status: **PLANNED — not implemented.** This is the implementation and
-> migration plan for the "epic change" sketched in the (internal)
-> `local/MAJOR_CHANGE.md`. Nothing in here is in the code yet. Where this
-> plan conflicts with shipped code, the code wins until a section below is
-> marked done.
+> Status: **IMPLEMENTED (all phases done).** Soft-only model shipped:
+> wrapper/sudoers/install/update/config/status/uninstall rewritten, hard-deny
+> migration (`migrate-denies.sh` + `HARD_DENY_REMOVED` stamp) in place,
+> parser `--allow` removed (default deny mode kept — status.sh's leak scan
+> consumes it), dead files deleted, CI/Makefile/e2e updated (`make e2e`
+> green: 183 checks), docs rewritten. Where this plan conflicts with the
+> code, the code wins. This is the design record for the epic change
+> sketched in the (internal) `local/MAJOR_CHANGE.md`.
 
 ## 1. Problem
 

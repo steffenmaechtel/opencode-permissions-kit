@@ -8,6 +8,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 failures=0
 passed=0
 
@@ -174,6 +176,89 @@ printf 'DEFAULT_USER=dev\n' > "$TMPDIR/no-version.conf"
 result=$(banner_line "$TMPDIR/no-version.conf" "$TMPDIR/setup.conf")
 assert_valid "banner defaults to 0.0.0 when conf has no VERSION line" \
     "$(printf '%b' "  ${GREEN}SECURED BY opencode permissions kit (0.0.0)${NC}")" "$result"
+
+# --- Soft-only model (DDEV-WORKING phase 2) ---
+echo ""
+echo "--- Soft-only wrapper/sudoers shape ---"
+
+WRAPPER_FILE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/wrapper"
+SUDOERS_FILE="$SCRIPT_DIR/../files/sudoers.template"
+
+if ! grep -q 'protect-projects' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper no longer calls protect-projects"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper still references protect-projects"
+    failures=$((failures + 1))
+fi
+
+if ! grep -qE '\-g\|--gid' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper has no -g/--gid docker parsing"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper still parses -g/--gid"
+    failures=$((failures + 1))
+fi
+
+if ! grep -q 'OPENCODE_LAUNCH_CWD' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper does not stamp OPENCODE_LAUNCH_CWD"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper still stamps OPENCODE_LAUNCH_CWD"
+    failures=$((failures + 1))
+fi
+
+if ! grep -q 'CONTAINER_GROUP=' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper has no docker-group escalation variable"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper still escalates via CONTAINER_GROUP"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'jsonc-parser.py --tools' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper keeps --tools project detection"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost --tools detection"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'DOCKER_HOST' "$WRAPPER_FILE" && grep -q 'XDG_RUNTIME_DIR' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper exports DOCKER_HOST/XDG_RUNTIME_DIR for rootless"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the rootless env exports"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'sudo -u opencode' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper still execs via sudo -u opencode"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the sudo -u opencode exec"
+    failures=$((failures + 1))
+fi
+
+for marker in '#@docker-group-begin' '#@ddev-delegated-begin' '#@ddev-sandbox-begin' 'DDEV_BIN' 'OPENCODE_LAUNCH_CWD' 'protect-projects'; do
+    if ! grep -q "$marker" "$SUDOERS_FILE"; then
+        echo "  ${GREEN}PASS${NC}  sudoers.template free of '$marker'"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  sudoers.template still contains '$marker'"
+        failures=$((failures + 1))
+    fi
+done
+
+if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR"' "$SUDOERS_FILE" \
+   && grep -q '(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode' "$SUDOERS_FILE" \
+   && grep -q 'socket-check.sh' "$SUDOERS_FILE"; then
+    echo "  ${GREEN}PASS${NC}  sudoers.template keeps base RunAs + socket-check + env_keep"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  sudoers.template lost a required rule"
+    failures=$((failures + 1))
+fi
 
 # --- Summary ---
 echo ""

@@ -1,5 +1,12 @@
 # PROOF-1: Timing of ACL Protection vs. `git pull && cat .env`
 
+> **SUPERSEDED (DDEV-WORKING):** the hard ACL deny layer this document
+> analyzes/proposes was **removed** — file permissions are now opencode's
+> soft permission layer only. This document is kept as the historical
+> analysis record; see `docs/design/DDEV-WORKING.md` for the current model
+> and `docs/MANUAL.md` ("Security Model (soft-only)") for the authoritative
+> usage documentation. Where wording differs, the code and MANUAL win.
+
 **Question under test.** A project repo initially contains no `.env` file. `.env` is a
 deny pattern in the kit's `opencode.jsonc` read/edit rules. A second developer commits
 a `.env` to the repo. If the AI then runs `git pull && cat .env` inside opencode on the

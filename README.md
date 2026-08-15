@@ -1,8 +1,8 @@
 # opencode permissions kit
 
-> ⚠️ **ALPHA — not for production use.** This kit is still in active development and has not been audited. The ACL rules, wrapper, and sudoers configuration may change in breaking ways between releases. Run it on a throwaway WSL2/dev box, not on a production server.
+> ⚠️ **ALPHA — not for production use.** This kit is still in active development and has not been audited. The scripts and sudoers configuration may change in breaking ways between releases. Run it on a throwaway WSL2/dev box, not on a production server.
 
-Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, settings, and more at the filesystem level.
+Runs [opencode](https://opencode.ai) as its own Linux user against a **rootless container backend**, so the agent is UID-separated and ddev keeps working. File permissions are opencode's own **soft** permission layer (`opencode.jsonc`).
 
 **One step:**
 
@@ -10,36 +10,16 @@ Hardens [opencode](https://opencode.ai) via Linux ACLs — block `.env`, keys, s
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
 ```
 
-After that, `opencode` runs as a dedicated user with hard filesystem denies. No npm package, no plugin, no extra install steps.
+After that, `opencode` runs as the dedicated `opencode` user. No npm package, no plugin, no extra install steps.
 
 ## How It Works
 
-- **Linux ACL layer** — `setfacl` blocks the `opencode` user from reading sensitive files
-- **Wrapper** — every `opencode` invocation validates the directory, refreshes ACLs, then execs as the `opencode` user
-- **Git hooks** — ACLs are re-applied automatically after checkout, merge, and commit, including the project-level `opencode.jsonc` of the current worktree (not just the global denies)
-- **Project-specific configs** — add or override deny rules per project
-- **No plugin** — the kit is system-level only: one install script, four management scripts in `/usr/local/lib/opencode-permissions-kit/`
-
-Files protected by default: `.env*`, `settings.php`, `auth.json`, `*.pem`, `*id_rsa*`, `*id_ed25519*`, `wp-config.php`, `LocalConfiguration.php`, `README.md`, `*.sql.gz`, and more.
-
-## The Three Runtime Modes
-
-The kit runs opencode in one of three modes, depending on (a) whether the
-project's `opencode.jsonc` enables docker/ddev and (b) the configured container
-backend (`CONTAINER_BACKEND` in `install.conf`). The mode decides what the
-`opencode` user can reach — and whether the kit's hard ACL denies hold.
-
-| | **Mode 1 — no containers** | **Mode 2 — rootless** | **Mode 3 — classic docker** |
-|---|---|---|---|
-| Enabled by | project config allows no docker/ddev | project allows docker/ddev + backend `docker-rootless` / `podman-rootless` | project allows docker/ddev + backend `docker-group` |
-| opencode runs as | own user `opencode`, no docker group | own user `opencode`, `DOCKER_HOST` → `opencode`'s rootless socket | own user `opencode` **with** the docker group (`sudo -u opencode -g docker`) |
-| Deny-listed files (`.env`, `settings.php`, `README.md`, keys, …) | **hard-denied** (`u:opencode:---`) | **hard-denied — including inside bind-mounted containers** (containers run as the `opencode` host UID) | **bypassable**: container root reads everything, the ACLs do not apply |
-| ddev | not available | delegated to the developer via the shim → **soft protection only** | delegated to the developer via the shim |
-| Root-equivalence | none | **none** (confined to the `opencode` UID) | **yes** — the docker socket is root on the host |
-| Security posture | full | strong | as unsafe as running without the kit |
-
-Example configs for the modes — global (deny default) and the project override
-that opts in — are in [docs/MANUAL.md](docs/MANUAL.md#the-three-runtime-modes).
+- **Dedicated user** — the wrapper at `/usr/local/bin/opencode` validates the project directory, then execs opencode as `opencode` (never as you)
+- **Rootless containers only** — docker-rootless or podman-rootless, owned by the `opencode` user; no root-equivalent docker socket is ever granted (mandatory: provisioning failure aborts the install)
+- **ddev as the sandbox user** — `/home/opencode/.ddev`, router ports, and a reused mkcert CA are provisioned; no delegation shim, no transactions
+- **Soft file permissions** — deny rules in `opencode.jsonc` (`.env*`, `settings.php`, keys, ...) gate opencode's tools and trip bash commands with an `ask`; they are not OS-level ACLs (that is the "ddev must read settings.php" trade-off, see [docs/MANUAL.md](docs/MANUAL.md#security-model-soft-only))
+- **Sharing group** — the `opencode` usergroup + setgid + default ACLs + umask 002, so you and the agent can edit the same files
+- **No plugin** — the kit is system-level only: one install script, management scripts in `/usr/local/lib/opencode-permissions-kit/`
 
 ## Quick Start
 
@@ -61,7 +41,7 @@ All management happens in a regular terminal (they need `sudo` anyway — no ope
 
 ```bash
 sudo bash /usr/local/lib/opencode-permissions-kit/status.sh       # show protection status
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh       # change settings (projects, .git/config, ACL refresh)
+sudo bash /usr/local/lib/opencode-permissions-kit/config.sh       # change settings (projects, .git/config, backend)
 sudo bash /usr/local/lib/opencode-permissions-kit/update.sh       # re-deploy the kit after an update
 bash /usr/local/lib/opencode-permissions-kit/uninstall.sh         # remove everything (no sudo prefix)
 ```
@@ -72,7 +52,7 @@ Every kit script writes an audit trail to `/var/log/opencode-permissions-kit/ope
 
 ## Updating
 
-Fetch `update.sh` from `master` and pipe it through sudo — it deploys the matching branch files and leaves `projects.conf`, `install.conf`, and `opencode.jsonc` untouched:
+Fetch `update.sh` from `master` and pipe it through sudo — it deploys the matching branch files and leaves `projects.conf` and `opencode.jsonc` untouched:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/update.sh | sudo bash
@@ -93,23 +73,25 @@ Binary upgrades are best-effort: a failure leaves the current binary in place, t
 bash /usr/local/lib/opencode-permissions-kit/uninstall.sh
 ```
 
-Removes the `opencode` user, the kit library, ACLs, hooks, and sudoers rules. Project files are untouched. Shell RC hook lines (`~/.bashrc` / `~/.zshrc` / `~/.profile`, tagged `# opencode permissions kit`) and the default-user `~/.config/opencode/opencode.jsonc` are left in place — harmless after uninstall; the script prints a notice with manual cleanup steps. See [docs/MANUAL.md](docs/MANUAL.md#uninstalling) for details.
+Removes the `opencode` user (and its usergroup), the kit library, ACLs, and sudoers rules. Project files are untouched. Shell RC hook lines (`~/.bashrc` / `~/.zshrc` / `~/.profile`, tagged `# opencode permissions kit`) and the default-user `~/.config/opencode/opencode.jsonc` are left in place — harmless after uninstall; the script prints a notice with manual cleanup steps. See [docs/MANUAL.md](docs/MANUAL.md#uninstalling) for details.
 
 ## Documentation
 
 See [docs/MANUAL.md](docs/MANUAL.md) for:
-- The three runtime modes (no containers / rootless / classic docker)
+- The security model (soft-only) and its trade-offs
+- Container backends and ddev as the sandbox user
 - Managing project directories
 - Customizing the deny list (global + per-project)
-- Project-level allow/deny overrides
 - `.git/config` hardening
+- Migration from a hard-ACL install
 - Wrapper behavior
 
 ## Requirements
 
-- WSL2 (or any Linux with ACL support)
+- WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
 - `sudo` access
 - `curl`
+- ddev ≥ 1.25 (when ddev is installed)
 
 ## License
 

@@ -1,5 +1,12 @@
 # PROOF-3: Remaining Gaps in the opencode permissions kit
 
+> **SUPERSEDED (DDEV-WORKING):** the hard ACL deny layer this document
+> analyzes/proposes was **removed** — file permissions are now opencode's
+> soft permission layer only. This document is kept as the historical
+> analysis record; see `docs/design/DDEV-WORKING.md` for the current model
+> and `docs/MANUAL.md` ("Security Model (soft-only)") for the authoritative
+> usage documentation. Where wording differs, the code and MANUAL win.
+
 **Question under test.** Beyond the timing windows analyzed in PROOF-1 (git pull race,
 object database, mtime cache) and PROOF-2 (no listener for developer-created files) —
 what other gaps exist in the kit?

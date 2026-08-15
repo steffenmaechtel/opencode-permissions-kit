@@ -1,6 +1,8 @@
 #!/bin/sh
 # e2e/run.sh — End-to-end test in Docker container
-# Builds an Ubuntu image, installs opencode + our kit, verifies protection.
+# Builds an Ubuntu image, installs opencode + our kit, verifies the soft-only
+# protection model (DDEV-WORKING): opencode runs as its own user against a
+# rootless container backend, no hard ACL denies, ddev can read its files.
 # Run from repo root: ./tests/e2e/run.sh
 # Shares its build/cache/check scaffolding with run-docker-rootless.sh (lib.sh).
 set -e
@@ -50,36 +52,13 @@ check "status.sh (not installed) reports hardening NOT active" \
     E 'cd /tmp && sh /home/dev/repo/files/status.sh 2>&1 | grep -q "NOT active"'
 
 echo ""
-echo "--- 1c. ddev stub (fake /usr/bin/ddev for delegation tests) ---"
-# The e2e container has no real ddev. Install a stub that records the invoking
-# user + args, so we can prove the kit shim delegates opencode's `ddev` to the
-# developer (DEFAULT_USER). Must exist BEFORE install.sh detects DDEV_BIN.
-E 'sudo tee /usr/bin/ddev > /dev/null <<'\''EOF'\''
-#!/bin/sh
-id -un > /tmp/ddev-stub.out
-printf "%s " "$@" >> /tmp/ddev-stub.out
-echo "" >> /tmp/ddev-stub.out
-# During a sandbox transaction the rewrite-list files must be writable for
-# opencode; the stub records whether it could write settings.php. Without
-# the OPEN ACLs opencode gets EPERM (-> "settings-denied") — that is how this
-# suite catches an off-by-root rewrite-list match bug.
-echo "test" > /var/www/vhosts/test-project/config/system/settings.php >/dev/null 2>&1 && echo "settings-writeable" >> /tmp/ddev-stub.out || echo "settings-denied" >> /tmp/ddev-stub.out
-# ddev also chmod()s config/system; chmod requires ownership, not just ACLs.
-chmod 700 /var/www/vhosts/test-project/config/system >/dev/null 2>&1 && echo "dir-chmod-OK" >> /tmp/ddev-stub.out || echo "dir-chmod-denied" >> /tmp/ddev-stub.out
-# Record whether the invoking user can read the (deny-protected) project .env.
-# delegated mode -> runs as dev -> readable; sandbox mode -> runs as opencode
-# -> denied (the transaction window never opens the .env pattern).
-cat /var/www/vhosts/test-project/.env >/dev/null 2>&1 && echo "env-readable" >> /tmp/ddev-stub.out || echo "env-denied" >> /tmp/ddev-stub.out
-EOF'
-E 'sudo chmod 755 /usr/bin/ddev'
-check "ddev stub installed at /usr/bin/ddev" E 'test -x /usr/bin/ddev'
-
-echo ""
-echo "--- 2. Run install (from local repo checkout) ---"
+echo "--- 2. Run install (from local repo checkout, podman-rootless backend) ---"
 # Pre-create a default-user config so install.sh must back it up and
 # install the deny-all config (--yes auto-answers the backup prompt).
+# podman-rootless because the e2e container has no systemd (docker-rootless
+# provisioning would abort — rootless is mandatory now).
 E 'mkdir -p /home/dev/.config/opencode && printf "%s\n" "{\"model\":\"dummy\"}" > /home/dev/.config/opencode/opencode.jsonc'
-E 'sudo bash /home/dev/repo/files/install.sh --yes --projects /var/www/vhosts'
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts'
 echo "  Install complete."
 
 echo ""
@@ -90,7 +69,11 @@ check "Binary at /usr/local/lib/opencode-permissions-kit/bin/opencode" \
     E 'sudo test -x /usr/local/lib/opencode-permissions-kit/bin/opencode'
 check "Binary owned root:opencode (not world-executable)" \
     E 'test "$(stat -c %U:%G:%a /usr/local/lib/opencode-permissions-kit/bin/opencode)" = "root:opencode:750"'
-check_fail "Default user cannot execute the binary by absolute path" \
+# NOTE: with the opencode usergroup as the sharing group, dev is a member and
+# CAN execute the binary by absolute path (group bit r-x). That bypass is
+# mitigated by the default-user deny-all config (section 6b) — documented
+# behavior of the soft-only model, not a regression.
+check "default user can execute the binary by absolute path (group member; deny-all config mitigates)" \
     E '/usr/local/lib/opencode-permissions-kit/bin/opencode --version'
 check "opencode sandbox user can execute the binary" \
     E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version'
@@ -104,44 +87,58 @@ check "update.sh deployed" \
     E 'test -x /usr/local/lib/opencode-permissions-kit/update.sh'
 check "status.sh deployed" \
     E 'test -x /usr/local/lib/opencode-permissions-kit/status.sh'
+check "migrate-denies.sh deployed" \
+    E 'test -x /usr/local/lib/opencode-permissions-kit/migrate-denies.sh'
 check "install.conf written" \
     E 'test -f /etc/opencode-permissions-kit/install.conf'
-check "install.conf records DDEV_BIN" \
-    E 'grep -q "^DDEV_BIN=/usr/bin/ddev" /etc/opencode-permissions-kit/install.conf'
-check "ddev shim deployed to library" \
-    E 'test -x /usr/local/lib/opencode-permissions-kit/bin/ddev'
-check "ddev shim shadowed at /usr/local/bin/ddev" \
-    E 'test -L /usr/local/bin/ddev'
-check "ddev shim symlink points at the kit shim" \
-    E 'test "$(readlink /usr/local/bin/ddev)" = "/usr/local/lib/opencode-permissions-kit/bin/ddev"'
-check "sudoers grants opencode -> DEFAULT_USER ddev delegation" \
-    E 'sudo grep -Eq "^opencode[[:space:]]+ALL=\(dev\)[[:space:]]+NOPASSWD: /usr/bin/ddev$" /etc/opencode-permissions-kit/sudoers'
-check "status.sh reports hardened" \
-    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "hardened"'
+check "install.conf records CONTAINER_BACKEND=podman-rootless" \
+    E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
+check "install.conf records WWW_GROUP=opencode" \
+    E 'grep -q "^WWW_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
+check_fail "no ddev shim in the library (soft-only kit)" \
+    E 'test -e /usr/local/lib/opencode-permissions-kit/bin/ddev'
+check_fail "no hooks directory in the library" \
+    E 'test -d /usr/local/lib/opencode-permissions-kit/hooks'
+check_fail "no protect-projects.sh in the library" \
+    E 'test -e /usr/local/lib/opencode-permissions-kit/protect-projects.sh'
+check_fail "no ddev shim shadowed at /usr/local/bin/ddev" \
+    E 'test -e /usr/local/bin/ddev'
+check_fail "no (opencode:docker) RunAs grant in sudoers" \
+    E 'sudo grep -q "opencode:docker" /etc/sudoers.d/opencode-permissions-kit'
+check "sudoers keeps the base (opencode) RunAs" \
+    E 'sudo grep -q "(opencode) NOPASSWD" /etc/sudoers.d/opencode-permissions-kit'
+check "sudoers has the socket-check.sh rule" \
+    E 'sudo grep -q "socket-check.sh" /etc/sudoers.d/opencode-permissions-kit'
+check "status.sh reports the user-sandbox mode" \
+    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "user sandbox"'
 
 echo ""
 echo "--- 4. User & group ---"
 check "User opencode exists" \
     E 'id opencode'
-check "opencode is in www-data" \
-    E 'id opencode | grep -q www-data'
-check "www-data group exists" \
-    E 'getent group www-data'
+check "opencode primary group is the opencode usergroup" \
+    E 'test "$(id -gn opencode)" = "opencode"'
+check "developer dev is in the opencode group" \
+    E 'id dev | grep -q opencode'
+check "opencode ddev home provisioned" \
+    E 'sudo test -d /home/opencode/.ddev'
 
 echo ""
-echo "--- 5. File protection (ACL deny for opencode) ---"
-check_fail ".env blocked" \
+echo "--- 5. Soft-only file access (the ddev-working goal) ---"
+# No hard ACL denies: the opencode user (and ddev, and its containers) can
+# READ every project file. Protection is opencode's own soft permission layer.
+check ".env readable by opencode (soft-only model)" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
-check_fail "settings.php blocked" \
+check "settings.php readable (ddev boots)" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/settings.php'
-check_fail "auth.json blocked" \
+check "auth.json readable" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/auth.json'
-check_fail "README.md blocked" \
+check "README.md readable" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.md'
-check "README.txt readable (ddev compat)" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.txt'
 check "index.php readable" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/index.php'
+check_fail "no u:opencode ACL deny on .env" \
+    E 'sudo getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode:---"'
 
 echo ""
 echo "--- 6. Config & agents ---"
@@ -189,143 +186,18 @@ check "shell-warn.sh quiet after cleanup" \
     E 'test -z "$(sh -c '\''HOME=/home/dev . /usr/local/lib/opencode-permissions-kit/shell-warn.sh'\'' 2>&1)"'
 
 echo ""
-echo "--- 7. Git hooks ---"
-check "core.hooksPath set" \
-    E 'git config --global core.hooksPath | grep -q /usr/local/lib/opencode-permissions-kit/hooks'
-check "Hooks directory exists" \
-    E 'test -d /usr/local/lib/opencode-permissions-kit/hooks'
-
-echo ""
-echo "--- 7b. Hook applies project-level config (--cwd) ---"
-E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
-{
-    "permission": {
-        "read": { "deploy-key.pem": "deny", "**/deploy-key.pem": "deny" },
-        "edit": { "deploy-key.pem": "deny", "**/deploy-key.pem": "deny" }
-    }
-}
-EOF'
-E 'sudo touch /var/www/vhosts/test-project/deploy-key.pem'
-E 'cd /var/www/vhosts/test-project && sudo /usr/local/lib/opencode-permissions-kit/hooks/post-commit' && \
-    echo "  ${GREEN}OK${NC}  post-commit hook completed"
-check_fail "post-commit applied project deny via --cwd" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/deploy-key.pem'
-check "other project files still protected" \
-    E '! sudo -u opencode test -r /var/www/vhosts/test-project/.env'
-
-echo ""
-echo "--- 7c. Hook prefers OPENCODE_LAUNCH_CWD over the git worktree root ---"
-# subdir (created host-side, so the host cleanup can remove the test files) has
-# its own config with an ALLOW for launch-key.pem. Its allow override only
-# applies when the hook passes the launch dir as --cwd, which it does when the
-# wrapper stamped OPENCODE_LAUNCH_CWD into the env.
-E 'sudo tee /var/www/vhosts/test-project/subdir/opencode.jsonc > /dev/null <<EOF
-{
-    "permission": {
-        "read": { "launch-key.pem": "allow" },
-        "edit": { "launch-key.pem": "allow" }
-    }
-}
-EOF'
-E 'sudo touch /var/www/vhosts/test-project/subdir/launch-key.pem'
-# Without the env var the hook falls back to the worktree root: allow NOT applied.
-E 'cd /var/www/vhosts/test-project && sudo /usr/local/lib/opencode-permissions-kit/hooks/post-commit' && \
-    echo "  ${GREEN}OK${NC}  fallback run (no OPENCODE_LAUNCH_CWD) completed"
-check_fail "fallback keeps launch-dir allow inactive" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/subdir/launch-key.pem'
-# With the env var the hook uses the launch dir: allow applied.
-E 'cd /var/www/vhosts/test-project && sudo OPENCODE_LAUNCH_CWD=/var/www/vhosts/test-project/subdir /usr/local/lib/opencode-permissions-kit/hooks/post-commit' && \
-    echo "  ${GREEN}OK${NC}  launch-cwd run completed"
-check "OPENCODE_LAUNCH_CWD activated launch-dir allow" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/subdir/launch-key.pem'
-
-echo ""
 echo "--- 8. Umask ---"
 check "umask script deployed" \
     E 'test -f /etc/profile.d/opencode-permissions-kit-umask.sh'
 
 echo ""
-echo "--- 9. protect-projects idempotent ---"
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force' && \
-    echo "  ${GREEN}OK${NC}  protect-projects.sh runs without error"
-
-echo ""
-echo "--- 10. Sensitive file created after install ---"
-E 'echo "new-secret" | sudo tee /var/www/vhosts/test-project/.env.local > /dev/null'
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
-check_fail ".env.local blocked after protect run" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env.local'
-
-echo ""
-echo "--- 10b. protect-projects cache (second run without --force) ---"
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh' && \
-    echo "  ${GREEN}OK${NC}  protect-projects.sh (no --force) exits 0"
-
-echo ""
-echo "--- 10c. protect-projects chown step ---"
-# .env is on the deny list; protect-projects.sh chowns opencode-owned files
-# back to DEFAULT_USER:www-data
-E 'sudo chown opencode:www-data /var/www/vhosts/test-project/.env' && \
-    E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
-check "chown: .env re-owned to dev:www-data" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/.env)" = "dev"'
-
-echo ""
-echo "--- 10d. protect-projects remove_acls (project allow override) ---"
-E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
-{
-    "permission": {
-        "read": { "README.md": "allow", "**/README.md": "allow" },
-        "edit": { "README.md": "allow", "**/README.md": "allow" }
-    }
-}
-EOF'
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force --cwd /var/www/vhosts/test-project'
-check "allow-override: README.md readable for opencode" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.md'
-
-echo ""
-echo "--- 10e. protect-projects clears stale ACLs ---"
-# Simulate a deny pattern that was removed from the config (README.txt is
-# "ask" now): a leftover hard ACL deny must be cleared on the next run.
-E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/README.txt'
-check_fail "stale ACL present before refresh" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.txt'
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
-check "stale ACL cleared after refresh" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/README.txt'
-
-echo ""
-echo "--- 10f. protect-projects ddev compat (.ddev group/mask) ---"
-# ddev recreates .ddev subdirs as the launching developer user with chmod 755,
-# which collapses the ACL mask to r-x and blocks the opencode user (www-data).
-# protect-projects must restore group www-data + rwx mask so ddev works.
-E 'sudo mkdir -p /var/www/vhosts/test-project/.ddev/.homeadditions'
-E 'echo "alias ll" > /var/www/vhosts/test-project/.ddev/.homeadditions/bash_aliases.example'
-E 'sudo chown dev:dev /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/.ddev/.homeadditions'
-E 'sudo chmod 755 /var/www/vhosts/test-project/.ddev/.homeadditions /var/www/vhosts/test-project/.ddev/.homeadditions/bash_aliases.example'
-E 'sudo setfacl -m g:www-data:rwx /var/www/vhosts/test-project/.ddev/.homeadditions /var/www/vhosts/test-project/.ddev/.homeadditions/bash_aliases.example'
-E 'sudo setfacl -m mask::r-x /var/www/vhosts/test-project/.ddev/.homeadditions /var/www/vhosts/test-project/.ddev/.homeadditions/bash_aliases.example'
-check_fail "ddev compat: .homeadditions blocked for opencode before fix" \
-    E 'sudo -u opencode test -w /var/www/vhosts/test-project/.ddev/.homeadditions'
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
-check "ddev compat: .homeadditions writable for opencode after fix" \
-    E 'sudo -u opencode test -w /var/www/vhosts/test-project/.ddev/.homeadditions'
-check "ddev compat: .ddev dir in www-data group" \
-    E 'test "$(stat -c %G /var/www/vhosts/test-project/.ddev/.homeadditions)" = "www-data"'
-
-echo ""
-echo "--- 10g. protect-projects CWD config from ancestor (nested git worktree) ---"
-# The governing opencode.jsonc sits at the project root, but git commands run
-# in a nested worktree (repo/). The hook passes the worktree root as --cwd;
-# protect-projects must find the ANCESTOR config, else the global *README.md
-# deny wins and the project allow override is lost. (test-project/opencode.jsonc
-# with the README.md allow was created in 10d.)
-E 'sudo mkdir -p /var/www/vhosts/test-project/nested/repo'
-E 'echo "readme" | sudo tee /var/www/vhosts/test-project/nested/repo/README.md > /dev/null'
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force --cwd /var/www/vhosts/test-project/nested/repo'
-check "ancestor config: README.md readable for opencode in nested worktree" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/nested/repo/README.md'
+echo "--- 9. Group baseline (sharing group = opencode usergroup) ---"
+check "project files in the opencode group" \
+    E 'test "$(stat -c %G /var/www/vhosts/test-project)" = "opencode"'
+check "default ACL g:opencode:rwx on the project root" \
+    E 'sudo getfacl -p -d /var/www/vhosts/test-project | grep -q "group:opencode:rwx"'
+check "setgid on the registered project root" \
+    E 'test -g /var/www/vhosts'
 
 echo ""
 echo "--- 11. update.sh re-deploys kit + preservation contract ---"
@@ -344,7 +216,7 @@ check "config.sh still present"            E 'test -x /usr/local/lib/opencode-pe
 check "update.sh still present"            E 'test -x /usr/local/lib/opencode-permissions-kit/update.sh'
 check "install.conf still present"         E 'test -f /etc/opencode-permissions-kit/install.conf'
 check "projects.conf untouched"           E 'test -f /etc/opencode-permissions-kit/projects.conf'
-check_fail ".env still blocked after update" \
+check ".env still readable after update (soft-only)" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 check "opencode.jsonc byte-identical (sha256 unchanged)" \
     E 'test "$(sudo sha256sum /home/opencode/.config/opencode/opencode.jsonc | cut -d" " -f1)" = "$(cat /tmp/sha-opencode-jsonc.before)"'
@@ -390,7 +262,7 @@ check "wrapper still present after binary upgrade" E 'test -x /usr/local/bin/ope
 check "binary still root:opencode after binary upgrade" \
     E 'test "$(stat -c %U:%G /usr/local/lib/opencode-permissions-kit/bin/opencode)" = "root:opencode"'
 check "kit scripts still deployed after binary upgrade" E 'test -x /usr/local/lib/opencode-permissions-kit/update.sh'
-check_fail ".env still blocked after binary upgrade" \
+check ".env still readable after binary upgrade (soft-only)" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 check_fail "new binary writable by opencode user" \
     E 'sudo -u opencode sh -c "test -w /usr/local/lib/opencode-permissions-kit/bin/opencode"'
@@ -421,16 +293,67 @@ check "migration: binary still runs" \
     E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version)" = "'"$OC_VERSION"'"'
 check "migration: wrapper -> new lib" \
     E 'test "$(readlink /usr/local/bin/opencode)" = "/usr/local/lib/opencode-permissions-kit/wrapper"'
-check "migration: ddev shim -> new lib" \
-    E 'test "$(readlink /usr/local/bin/ddev)" = "/usr/local/lib/opencode-permissions-kit/bin/ddev"'
 check "migration: old sudoers symlink removed"    E '! test -e /etc/sudoers.d/opencode'
 check "migration: new sudoers symlink present"     E 'test -L /etc/sudoers.d/opencode-permissions-kit'
 check "migration: old umask profile removed"      E '! test -e /etc/profile.d/opencode-umask.sh'
 check "migration: new umask profile present"      E 'test -f /etc/profile.d/opencode-permissions-kit-umask.sh'
-check "migration: hooksPath -> new lib" \
-    E 'git config --global core.hooksPath | grep -q /usr/local/lib/opencode-permissions-kit/hooks'
-check_fail ".env still blocked after migration" \
+check ".env still readable after migration (soft-only)" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
+
+echo ""
+echo "--- 11e. hard-deny migration (DDEV-WORKING §4) ---"
+# Simulate a pre-soft-only install: planted u:opencode:--- denies, hooks dir,
+# protect-projects.sh, ddev transaction helper, delegation shim, docker-group
+# backend. The update must REFUSE on docker-group, then (backend fixed) sweep
+# the denies, remove the artifacts, and stamp HARD_DENY_REMOVED.
+E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/.env'
+E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/settings.php'
+E 'sudo mkdir -p /usr/local/lib/opencode-permissions-kit/hooks'
+E 'sudo touch /usr/local/lib/opencode-permissions-kit/protect-projects.sh'
+E 'sudo touch /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh'
+E 'sudo touch /usr/local/lib/opencode-permissions-kit/bin/ddev'
+E 'sudo ln -sf /usr/local/lib/opencode-permissions-kit/bin/ddev /usr/local/bin/ddev'
+E 'git config --global core.hooksPath /usr/local/lib/opencode-permissions-kit/hooks'
+check "11e: planted deny present" \
+    E 'sudo getfacl -p /var/www/vhosts/test-project/.env | grep -q "user:opencode:---"'
+# 11e.1 docker-group backend -> update must abort with instructions.
+E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-group/' /etc/opencode-permissions-kit/install.conf"
+E 'sudo sed -i "/^HARD_DENY_REMOVED=/d" /etc/opencode-permissions-kit/install.conf'
+E 'sudo bash /home/dev/repo/files/update.sh --yes >/tmp/mig-abort.log 2>&1' || true
+check "11e: docker-group update aborts with re-install instructions" \
+    E 'grep -q "install.sh --container-backend" /tmp/mig-abort.log'
+check "11e: refuses to touch denies on docker-group" \
+    E 'sudo getfacl -p /var/www/vhosts/test-project/.env | grep -q "user:opencode:---"'
+# 11e.2 rootless backend -> migration runs.
+E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=podman-rootless/' /etc/opencode-permissions-kit/install.conf"
+E 'sudo bash /home/dev/repo/files/update.sh --yes >/tmp/mig.log 2>&1' && \
+    echo "  ${GREEN}OK${NC}  migration update completed"
+check "11e: deny swept from .env" \
+    E '! sudo getfacl -p /var/www/vhosts/test-project/.env | grep -q "user:opencode:"'
+check "11e: deny swept from settings.php" \
+    E '! sudo getfacl -p /var/www/vhosts/test-project/settings.php | grep -q "user:opencode:"'
+check "11e: settings.php readable again (ddev boots)" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/settings.php'
+check "11e: hooks dir removed" \
+    E '! test -e /usr/local/lib/opencode-permissions-kit/hooks'
+check "11e: protect-projects.sh removed" \
+    E '! test -e /usr/local/lib/opencode-permissions-kit/protect-projects.sh'
+check "11e: ddev-transaction.sh removed" \
+    E '! test -e /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh'
+check "11e: library bin/ddev removed" \
+    E '! test -e /usr/local/lib/opencode-permissions-kit/bin/ddev'
+check "11e: legacy shim unlinked from /usr/local/bin/ddev" \
+    E '! test -e /usr/local/bin/ddev'
+check "11e: core.hooksPath unset for the developer" \
+    E '! git config --global --get core.hooksPath'
+check "11e: install.conf stamped HARD_DENY_REMOVED=1" \
+    E 'grep -q "^HARD_DENY_REMOVED=1" /etc/opencode-permissions-kit/install.conf'
+check "11e: install.conf re-based WWW_GROUP=opencode" \
+    E 'grep -q "^WWW_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
+check "11e: developer (re-)added to the opencode group" \
+    E 'id dev | grep -q opencode'
+check "11e: migration events logged" \
+    E 'sudo grep -q "hard-deny migration" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 
 echo ""
 echo "--- 12. config.sh adds a project non-interactively ---"
@@ -440,7 +363,9 @@ E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes projects ad
     echo "  ${GREEN}OK${NC}  config.sh add completed"
 check "extra-project in projects.conf" \
     E 'grep -q /var/www/vhosts/extra-project /etc/opencode-permissions-kit/projects.conf'
-check_fail "extra-project .env blocked after config add" \
+check "extra-project group baseline applied (default ACL)" \
+    E 'sudo getfacl -p -d /var/www/vhosts/extra-project | grep -q "group:opencode:rwx"'
+check "extra-project .env readable (soft-only)" \
     E 'sudo -u opencode test -r /var/www/vhosts/extra-project/.env'
 
 echo ""
@@ -451,7 +376,7 @@ check "extra-project removed from projects.conf" \
     E '! grep -q /var/www/vhosts/extra-project /etc/opencode-permissions-kit/projects.conf'
 
 echo ""
-echo "--- 12c. config.sh git-config toggle ---"
+echo "--- 12c. config.sh git-config toggle (soft-only) ---"
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes git-config on' && \
     echo "  ${GREEN}OK${NC}  git-config on completed"
 check "git-config ON: .git/config deny rule active" \
@@ -482,11 +407,11 @@ check "menu: banner shown" \
 check "menu: shows current settings" \
     E 'grep -q "Current settings" /tmp/menu-out.txt'
 check "menu: project list shown" \
-    E 'grep -q "\[1\]" /tmp/menu-out.txt'
+    E 'grep -q "Project roots" /tmp/menu-out.txt'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes projects remove /var/www/vhosts/menu-project'
 
 echo ""
-echo "--- 12e. wrapper actual invocation ---"
-# Valid CWD: wrapper should show SECURED banner
+echo "--- 12e. wrapper directory validation ---"
 E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-valid.txt' && \
     echo "  ${GREEN}OK${NC}  wrapper ran from valid CWD"
 check "wrapper: SECURED banner from valid CWD" \
@@ -496,32 +421,15 @@ E 'cd /tmp && /usr/local/bin/opencode 2>&1 | tee /tmp/wrapper-invalid.txt; test 
     echo "  ${GREEN}OK${NC}  wrapper refused from invalid CWD"
 check "wrapper: ERROR banner from invalid CWD" \
     E 'grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-invalid.txt'
-check "wrapper stamps OPENCODE_LAUNCH_CWD" \
+check_fail "wrapper does NOT stamp OPENCODE_LAUNCH_CWD (soft-only)" \
     E 'grep -q OPENCODE_LAUNCH_CWD /usr/local/lib/opencode-permissions-kit/wrapper'
 
 echo ""
-echo "--- 12e2. Container tools: docker group escalation ---"
-check "sudoers grants (opencode : docker) RunAs" \
-    E 'sudo -l | grep -q "opencode : docker"'
-check "wrapper uses sudo -u opencode -g for container group" \
-    E 'grep -q "sudo -u opencode -g" /usr/local/lib/opencode-permissions-kit/wrapper'
-check "status.sh reports docker group" \
-    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "docker group"'
-# The e2e container has no docker group yet → wrapper must warn + fall back.
-E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode -g docker --help 2>&1 | tee /tmp/wrapper-g.txt' && \
-    echo "  ${GREEN}OK${NC}  wrapper -g docker ran without a docker group"
-check "wrapper -g docker: banner shown" \
-    E 'grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-g.txt'
-check "wrapper -g docker: absent-group warning" \
-    E 'grep -q "does not exist — running without container group" /tmp/wrapper-g.txt'
-# Create the docker group so the escalation path is real.
-E 'sudo groupadd docker' && \
-    echo "  ${GREEN}OK${NC}  docker group created"
-check "sudo -u opencode -g docker runs the binary (RunAs granted)" \
-    E 'sudo -u opencode -g docker /usr/local/lib/opencode-permissions-kit/bin/opencode --version'
-check "opencode user NOT in docker group directly (escalation only)" \
-    E '! id -nG opencode | grep -q docker'
-# Project explicitly enables docker → wrapper auto-detects and asks.
+echo "--- 12e2. Legacy docker-group backend warning ---"
+# A stale docker-group value in install.conf must produce a loud warning and
+# NO container tools — never a silent fallback to a root-equivalent path.
+# The warning fires only when a project actually requests container tools,
+# so plant an opting-in project config first.
 E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
 {
     "permission": {
@@ -529,18 +437,12 @@ E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
     }
 }
 EOF'
-E 'cd /var/www/vhosts/test-project && printf "Y\n" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-auto.txt' && \
-    echo "  ${GREEN}OK${NC}  wrapper auto-detection (accepted) ran"
-check "wrapper auto-detect: container tools advisory" \
-    E 'grep -q "Container tools enabled by this project" /tmp/wrapper-auto.txt'
-check "wrapper auto-detect: docker group prompt" \
-    E 'grep -q "Run opencode with the docker group" /tmp/wrapper-auto.txt'
-check "wrapper auto-detect: accepted → docker group exec" \
-    E 'grep -q "opencode will run with the docker group" /tmp/wrapper-auto.txt'
-E 'cd /var/www/vhosts/test-project && printf "n\n" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-auto-n.txt' && \
-    echo "  ${GREEN}OK${NC}  wrapper auto-detection (declined) ran"
-check_fail "wrapper auto-detect: declined → no docker group exec" \
-    E 'grep -q "opencode will run with the docker group" /tmp/wrapper-auto-n.txt'
+E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-group/' /etc/opencode-permissions-kit/install.conf"
+E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-legacy.txt' && \
+    echo "  ${GREEN}OK${NC}  wrapper ran with the legacy backend value"
+check "wrapper legacy backend: removal warning shown" \
+    E 'grep -q "legacy docker-group was removed" /tmp/wrapper-legacy.txt'
+E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=podman-rootless/' /etc/opencode-permissions-kit/install.conf"
 
 echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"
@@ -565,10 +467,8 @@ check "default user can read log file" \
     E 'test -r /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "install events logged" \
     E 'sudo grep -q "install complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
-check "protect-projects events logged" \
-    E 'sudo grep -q "protect-projects run complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
-check "ACL batch events logged" \
-    E 'sudo grep -q "setfacl deny" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check "migration events logged" \
+    E 'sudo grep -q "hard-deny migration complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "update events logged" \
     E 'sudo grep -q "update complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "binary upgrade events logged" \
@@ -579,67 +479,16 @@ check_fail "opencode user cannot enter log dir" \
     E 'sudo -u opencode test -x /var/log/opencode-permissions-kit'
 
 echo ""
-echo "--- 12h. ddev delegation shim ---"
-# The kit shim (/usr/local/bin/ddev) re-execs every `ddev` the opencode agent
-# invokes as the DEFAULT_USER (dev) via sudoers. The stub at /usr/bin/ddev
-# records who actually ran it. Contrast:
-#   - opencode runs the REAL ddev directly  -> stub records "opencode"
-#   - opencode runs the SHIM (via /usr/local/bin/ddev) -> stub records "dev"
-#   - dev runs the SHIM (passthrough)        -> stub records "dev"
-# The opencode->dev flip proves delegation; the dev passthrough proves the shim
-# does not loop or error for the developer themselves.
-#
-# The shim gates on `id -un = opencode` (NOT on the docker group), so we run the
-# opencode cases with plain `sudo -u opencode` (no -g) — the kit's sudoers only
-# grants dev the (opencode:docker) RunAs for the opencode binary itself, not for
-# arbitrary commands, and -g docker is irrelevant to the shim logic anyway.
-E 'sudo rm -f /tmp/ddev-stub.out'
-E 'sudo -u opencode /usr/bin/ddev direct-opencode' && \
-    echo "  ${GREEN}OK${NC}  opencode ran the real ddev directly"
-check "direct: stub records opencode as the invoking user" \
-    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "opencode"'
-check "direct: stub received args" \
-    E 'grep -q "direct-opencode" /tmp/ddev-stub.out'
-
-E 'sudo rm -f /tmp/ddev-stub.out'
-E 'sudo -u opencode /usr/local/bin/ddev delegated-start' && \
-    echo "  ${GREEN}OK${NC}  opencode ran the kit shim (delegated)"
-check "delegated: stub records dev (not opencode) as the invoking user" \
-    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "dev"'
-check "delegated: stub received args" \
-    E 'grep -q "delegated-start" /tmp/ddev-stub.out'
-check_fail "delegated: opencode did NOT run ddev directly" \
-    E 'grep -q "^opencode$" /tmp/ddev-stub.out'
-
-# Passthrough: the developer keeps their own ddev — the shim must not loop.
-E 'sudo rm -f /tmp/ddev-stub.out'
-E '/usr/local/bin/ddev passthrough-dev' && \
-    echo "  ${GREEN}OK${NC}  dev ran the shim (passthrough)"
-check "passthrough: stub records dev (no delegation for the developer)" \
-    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "dev"'
-check "passthrough: stub received args" \
-    E 'grep -q "passthrough-dev" /tmp/ddev-stub.out'
-
-# status.sh reports the shim.
-check "status.sh reports ddev shim active" \
-    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "ddev delegation shim"'
-check "status.sh reports the real ddev path" \
-    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "/usr/bin/ddev"'
-
-echo ""
-echo "--- 12i. Rootless container backend (podman) — Phase 2 provisioning ---"
-# This is the real-rootless environment test (docs/design/DOCKER-ROOTLESS.md §9.1).
-# It proves the core value proposition: a rootless container started by the
-# opencode user accesses bind-mounted files as the opencode host UID, so the
-# kit's hard ACL deny (u:opencode:--- on .env) holds INSIDE the container.
-# It also exercises Phase 2: config.sh container-backend podman-rootless
-# provisions the backend (installs packages via setup-container-backend.sh,
-# allocates subuid/subgid, re-renders the sudoers, updates install.conf).
+echo "--- 12i. Rootless container backend (podman) ---"
+# Real-rootless environment test (docs/design/DOCKER-ROOTLESS.md). In the
+# soft-only model the §9.1 proof flips: containers run as the opencode host
+# UID and CAN read the project files (the ddev-working goal) — but the uid_map
+# still proves they are NOT real root.
 #
 # Rootless podman needs nested user namespaces + uidmap. The e2e container runs
 # --privileged, which usually suffices, but some runner kernels disallow it.
-# If provisioning fails or `podman info` fails as the opencode user, every
-# check in this section is SKIPped (not failed) so CI stays green.
+# If `podman info` fails as the opencode user, every check in this section is
+# SKIPped (not failed) so CI stays green.
 
 _rootless_ok=true
 
@@ -657,27 +506,22 @@ if [ "$E2E_HOST_LAYOUT" = "rootless" ]; then
         E 'grep -q "^opencode:4096:60000$" /etc/subuid && grep -q "^opencode:4096:60000$" /etc/subgid'
 fi
 
-# 12i.1 switch to podman-rootless via config.sh (Phase 2 provisioning).
-# This installs podman+uidmap+slirp4netns, allocates subuid/subgid, updates
-# install.conf, and re-renders the sudoers — all via setup-container-backend.sh.
-# Run config.sh from the REPO checkout so we test the local Phase 2 code, not
-# a potentially stale installed copy.
+# 12i.1 re-apply podman-rootless via config.sh (idempotent re-provision of the
+# install-time backend; exercises the config.sh switch path).
 if ! E 'sudo bash /home/dev/repo/files/config.sh --yes container-backend podman-rootless >/tmp/config-backend.log 2>&1'; then
     echo "  ${YELLOW}SKIP${NC}  12i: backend provisioning failed ($(E 'tail -1 /tmp/config-backend.log' 2>/dev/null || echo unknown))"
     _rootless_ok=false
     skipped=$((skipped + 1))
 fi
 
-# 12i.2 verify install.conf + sudoers were updated by config.sh.
+# 12i.2 verify install.conf + sudoers state.
 if [ "$_rootless_ok" = true ]; then
     check "12i: install.conf records CONTAINER_BACKEND=podman-rootless" \
         E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
-    check "12i: sudoers strips (opencode:docker) for the podman-rootless backend" \
+    check "12i: sudoers has no (opencode:docker) grant" \
         E '! sudo grep -q "opencode:docker" /etc/sudoers.d/opencode-permissions-kit'
     check "12i: sudoers keeps the base (opencode) RunAs" \
         E 'sudo grep -q "(opencode) NOPASSWD" /etc/sudoers.d/opencode-permissions-kit'
-    check "12i: sudoers still has the ddev delegation rule" \
-        E 'sudo grep -q "NOPASSWD: /usr/bin/ddev" /etc/sudoers.d/opencode-permissions-kit'
 fi
 
 # 12i.3 verify podman + subuid/subgid were provisioned by the setup helper.
@@ -703,19 +547,24 @@ if [ "$_rootless_ok" = true ]; then
     fi
 fi
 
-# 12i.5 the §9.1 proof — ACL deny survives a rootless bind mount.
+# 12i.5 the flipped §9.1 proof — soft-only model: a rootless container CAN
+# read the project files (ddev goal), running as the opencode host UID.
 if [ "$_rootless_ok" = true ]; then
-    check "12i: .env still carries the u:opencode:--- ACL deny" \
-        E 'sudo getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode:---"'
+    # Runs `podman run --rm alpine cat /app/<file>` as the opencode user and
+    # greps the container output for <pattern>. Used as the check command so
+    # the PASS/FAIL lines are not swallowed by the output pipe.
+    container_cat_check() {
+        E "cd /tmp && sudo -u opencode sh -c 'XDG_RUNTIME_DIR=/run/user/\$(id -u opencode) podman run --rm -v /var/www/vhosts/test-project:/app alpine:latest cat /app/$2'" | grep -q "$1"
+    }
     if E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman pull alpine:latest >/tmp/podman-pull.out 2>&1"'; then
-        check_fail "12i §9.1: rootless container CANNOT read ACL-denied .env via bind mount" \
-            E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman run --rm -v /var/www/vhosts/test-project:/app alpine:latest cat /app/.env"'
-        check "12i §9.1: rootless container CAN read non-denied index.php via bind mount" \
-            E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman run --rm -v /var/www/vhosts/test-project:/app alpine:latest cat /app/index.php" | grep -q "normal source code"'
-        check_fail "12i §9.1: host-side opencode also denied .env (confirms ACL, not missing file)" \
-            E 'sudo -u opencode cat /var/www/vhosts/test-project/.env'
+        check "12i: rootless container CAN read .env via bind mount (soft-only, ddev-working goal)" \
+            container_cat_check secret123 .env
+        check "12i: rootless container CAN read settings.php via bind mount (ddev boots)" \
+            container_cat_check hunter2 settings.php
+        check "12i: rootless container CAN read index.php via bind mount" \
+            container_cat_check "normal source code" index.php
     else
-        echo "  ${YELLOW}SKIP${NC}  12i §9.1: could not pull alpine (no network?) — $(sudo tail -1 /tmp/podman-pull.out 2>/dev/null || echo unknown)"
+        echo "  ${YELLOW}SKIP${NC}  12i: could not pull alpine (no network?) — $(sudo tail -1 /tmp/podman-pull.out 2>/dev/null || echo unknown)"
         skipped=$((skipped + 2))
     fi
 fi
@@ -726,6 +575,8 @@ if [ "$_rootless_ok" = true ]; then
         E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "backend:    podman-rootless"'
     check "12i: status.sh reports the podman CLI as installed" \
         E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "podman CLI:.*installed"'
+    check "12i: status.sh reports the migration stamp" \
+        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "soft-only model active"'
 fi
 
 # 12i.7 wrapper auto-detect on the podman-CLI path.
@@ -747,8 +598,6 @@ EOF'
         E 'grep -q "opencode will run with the podman-rootless backend" /tmp/wrapper-podman.txt'
     check_fail "12i: wrapper podman path does NOT mention the docker group" \
         E 'grep -q "opencode will run with the docker group" /tmp/wrapper-podman.txt'
-    check_fail "12i: wrapper podman path does NOT warn about an absent docker group" \
-        E 'grep -q "does not exist — running without container group" /tmp/wrapper-podman.txt'
     check "12i: opencode user NOT in the docker group (rootless grants no group)" \
         E '! id -nG opencode | tr " " "\n" | grep -qx docker'
 fi
@@ -760,12 +609,8 @@ if [ "$_rootless_ok" = true ]; then
 fi
 
 # 12i.9 teardown the rootless runtime so section 13's uninstall can remove
-# the opencode user. Switch back to docker-group + manual podman storage cleanup.
+# the opencode user (userdel -r fails while storage is live).
 if [ "$_rootless_ok" = true ]; then
-    E 'sudo bash /home/dev/repo/files/config.sh --yes container-backend docker-group >/tmp/config-teardown.log 2>&1' || true
-    check "12i: config.sh switches back to docker-group" \
-        E 'grep -q "^CONTAINER_BACKEND=docker-group" /etc/opencode-permissions-kit/install.conf'
-    # Manual podman storage cleanup (userdel -r fails while storage is live).
     E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/$(id -u opencode) podman system reset --force >/dev/null 2>&1" || true'
     E 'sudo pkill -u opencode 2>/dev/null || true'
     E 'sudo rm -rf /run/user/$(id -u opencode) /home/opencode/.local 2>/dev/null || true'
@@ -798,119 +643,10 @@ check "12j: root run logs the finding to the audit log" \
 E 'rm -rf /tmp/leak-e2e /tmp/leak-e2e-clean'
 
 echo ""
-echo "--- 12k. ddev sandbox mode (transactional, DDEV-SANDBOX design doc / PROOF-3 H3) ---"
-# 12k.0 the installed config.sh needs the sudoers template next to it.
-check "12k: sudoers.template deployed to the library" \
-    E 'sudo test -f /usr/local/lib/opencode-permissions-kit/sudoers.template'
-# 12k.1 switching to sandbox is REFUSED on the docker-group backend (hard gate).
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-refuse.log 2>&1' || true
-check "12k: sandbox refused on docker-group backend" \
-    E 'grep -q "requires a rootless container backend" /tmp/ddev-mode-refuse.log'
-check_fail "12k: install.conf has no DDEV_MODE=sandbox after refusal" \
-    E 'grep -q "^DDEV_MODE=sandbox" /etc/opencode-permissions-kit/install.conf'
-check "12k: delegated sudoers rule still present after refusal" \
-    E 'sudo grep -q "^opencode[[:space:]]*ALL=(dev)" /etc/opencode-permissions-kit/sudoers'
-
-# 12k.2 fake a rootless backend (no daemon needed for the stub) and switch.
-E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-rootless/' /etc/opencode-permissions-kit/install.conf"
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-mode sandbox >/tmp/ddev-mode-apply.log 2>&1' || true
-check "12k: ddev-mode sandbox applied" \
-    E 'grep -q "ddev mode switched to .sandbox." /tmp/ddev-mode-apply.log'
-check "12k: install.conf records DDEV_MODE=sandbox" \
-    E 'grep -q "^DDEV_MODE=sandbox" /etc/opencode-permissions-kit/install.conf'
-check "12k: sudoers grants the transaction helper" \
-    E 'sudo grep -q "ddev-transaction.sh" /etc/opencode-permissions-kit/sudoers'
-check_fail "12k: sudoers delegation rule (RunAs dev) removed in sandbox mode" \
-    E 'sudo grep -Eq "^opencode[[:space:]]+ALL=\(dev\)" /etc/opencode-permissions-kit/sudoers'
-check "12k: sandbox ddev home provisioned" \
-    E 'sudo test -d /home/opencode/.ddev'
-check "12k: rewrite list deployed" \
-    E 'test -f /etc/opencode-permissions-kit/ddev-rewrites.conf'
-check "12k: --yes applied the router-port sysctl (or ports already unprivileged)" \
-    E 'test -f /etc/sysctl.d/99-ddev-rootless.conf || [ "$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)" -le 80 ]'
-check "12k: mkcert provisioning was attempted (reused/new/absent — env-dependent)" \
-    E 'grep -Eq "mkcert CA reused from|no existing CA found|mkcert not installed" /tmp/ddev-mode-apply.log'
-check "12k: status.sh reports sandbox mode" \
-    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "sandbox"'
-
-# 12k.3 TYPO3-layout fixture + deny baseline for the transaction tests.
-E 'mkdir -p /var/www/vhosts/test-project/config/system'
-E 'printf "<?php\n" > /var/www/vhosts/test-project/config/system/settings.php'
-E 'printf "" > /var/www/vhosts/test-project/config/system/additional.php'
-E 'mkdir -p /var/www/vhosts/test-project/.ddev'
-E 'printf "apiVersion: ddev.io/v1alpha1\n" > /var/www/vhosts/test-project/.ddev/config.yaml'
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
-check "12k: baseline — settings.php ACL-denied before the transaction" \
-    E 'sudo getfacl -p /var/www/vhosts/test-project/config/system/settings.php 2>/dev/null | grep -q "user:opencode:---"'
-
-# 12k.4 mutating subcommand goes through the transaction and runs as opencode.
-E 'sudo rm -f /tmp/ddev-stub.out'
-E 'sudo -u opencode sh -c "cd /var/www/vhosts/test-project && ddev start txn-test"' && \
-    echo "  ${GREEN}OK${NC}  sandbox ddev start ran"
-check "12k: mutating run executed as opencode (never dev)" \
-    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "opencode"'
-check "12k: mutating run received the subcommand + args" \
-    E 'grep -q "start txn-test" /tmp/ddev-stub.out'
-check "12k: .env stays UNREADABLE during the transaction (window excludes secrets)" \
-    E 'grep -q "env-denied" /tmp/ddev-stub.out'
-check "12k: OPEN granted write access to settings.php during the transaction (rewrite list matched the nested project)" \
-    E 'grep -q "settings-writeable" /tmp/ddev-stub.out'
-check "12k: OPEN granted OWNERSHIP of config/system (ddev chmod() needs it, ACLs alone don't)" \
-    E 'grep -q "dir-chmod-OK" /tmp/ddev-stub.out'
-check "12k: CLOSE restored the settings.php deny" \
-    E 'sudo getfacl -p /var/www/vhosts/test-project/config/system/settings.php 2>/dev/null | grep -q "user:opencode:---"'
-check "12k: CLOSE handed .ddev back to the developer" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
-check_fail "12k: no transaction stamp left open" \
-    E 'ls /run/opencode-permissions-kit/ddev-txn/*.open 2>/dev/null'
-
-# 12k.5 read-only subcommand bypasses the transaction (direct exec as opencode).
-E 'sudo rm -f /tmp/ddev-stub.out'
-E 'sudo -u opencode /usr/local/bin/ddev describe' && \
-    echo "  ${GREEN}OK${NC}  read-only ddev describe ran"
-check "12k: read-only run executed as opencode" \
-    E 'test "$(cat /tmp/ddev-stub.out | head -1)" = "opencode"'
-check "12k: read-only run received the subcommand" \
-    E 'grep -q "describe" /tmp/ddev-stub.out'
-check_fail "12k: read-only run left no stamp (no transaction)" \
-    E 'ls /run/opencode-permissions-kit/ddev-txn/*.open 2>/dev/null'
-
-# 12k.6 self-heal of a killed transaction (stranded ownership + dir ACL).
-E 'sudo chown -R opencode:www-data /var/www/vhosts/test-project/.ddev'
-E 'sudo setfacl -m u:opencode:rwx /var/www/vhosts/test-project/config/system'
-# Stamp name mirrors the helper: printf %s "/var/www/vhosts" | tr -c 'A-Za-z0-9' '_'
-# (the LEADING slash also becomes an underscore).
-E 'sudo touch /run/opencode-permissions-kit/ddev-txn/_var_www_vhosts.open'
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
-check_fail "12k: heal gated — .ddev NOT chowned back while a stamp is open" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
-check "12k: stale dir ACL cleared even with stamp open (clear_stale_acls)" \
-    E '! sudo getfacl -p /var/www/vhosts/test-project/config/system 2>/dev/null | grep -q "user:opencode:rwx"'
-E 'sudo rm -f /run/opencode-permissions-kit/ddev-txn/_var_www_vhosts.open'
-E 'sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --force'
-check "12k: heal restored .ddev ownership after the stamp cleared" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
-check "12k: heal restored rewrite-list ownership (config/system back to the developer)" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system)" = "dev"'
-check "12k: heal restored rewrite-list ownership (settings.php back to the developer)" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system/settings.php)" = "dev"'
-
-# 12k.7 switch back to delegated + restore the docker-group backend.
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-mode delegated >/tmp/ddev-mode-back.log 2>&1' || true
-check "12k: ddev-mode delegated applied" \
-    E 'grep -q "ddev mode switched to .delegated." /tmp/ddev-mode-back.log'
-check "12k: delegated sudoers rule restored" \
-    E 'sudo grep -Eq "^opencode[[:space:]]+ALL=\(dev\)[[:space:]]+NOPASSWD: /usr/bin/ddev$" /etc/opencode-permissions-kit/sudoers'
-check_fail "12k: transaction rule removed in delegated mode" \
-    E 'sudo grep -q "ddev-transaction.sh" /etc/opencode-permissions-kit/sudoers'
-E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-group/' /etc/opencode-permissions-kit/install.conf"
-
-echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
 check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'
-check_fail "ddev shim removed"       E 'test -e /usr/local/bin/ddev'
 check_fail "Library removed"          E 'test -e /usr/local/lib/opencode-permissions-kit'
 check_fail "legacy lib removed"       E 'test -e /usr/local/lib/opencode'
 check_fail "Sudoers removed"          E 'test -e /etc/sudoers.d/opencode-permissions-kit'
@@ -920,6 +656,10 @@ check_fail "legacy /etc/opencode removed"             E 'test -e /etc/opencode'
 check_fail "Umask removed"            E 'test -e /etc/profile.d/opencode-permissions-kit-umask.sh'
 check_fail "legacy umask removed"     E 'test -e /etc/profile.d/opencode-umask.sh'
 check_fail "opencode user removed"    E 'id opencode'
+check_fail "opencode usergroup removed (died with the user)" E 'getent group opencode'
+check_fail "developer no longer in the opencode group" E 'id dev | grep -q opencode'
+check_fail "/run/opencode-permissions-kit removed"    E 'test -e /run/opencode-permissions-kit'
+check_fail "router-port sysctl file removed"          E 'test -e /etc/sysctl.d/99-ddev-rootless.conf'
 check_fail "core.hooksPath unset"     E 'git config --global --get core.hooksPath'
 check_fail "Project ACLs cleaned"     E 'getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode"'
 check_fail "Audit log removed"        E 'test -e /var/log/opencode-permissions-kit'

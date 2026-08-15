@@ -1,26 +1,32 @@
 #!/bin/sh
 # opencode permissions kit -- update.sh
-# Re-deploys the KIT (wrapper, hooks, protect-projects.sh, jsonc-parser,
-# sudoers template, umask profile, uninstall.sh, config.sh, status.sh, log.sh)
-# onto a system that has already been installed via install.sh. Does NOT touch:
+# Re-deploys the KIT (wrapper, jsonc-parser, sudoers template, umask profile,
+# uninstall.sh, config.sh, status.sh, log.sh, migrate-denies.sh) onto a system
+# that has already been installed via install.sh. Does NOT touch:
 #   - existing /etc/opencode-permissions-kit/projects.conf
-#   - existing /etc/opencode-permissions-kit/install.conf (DEFAULT_USER / OPENCODE_USER)
+#   - existing /etc/opencode-permissions-kit/install.conf (except the
+#     VERSION stamp, the WWW_GROUP re-base to the opencode usergroup, and
+#     removal of the dead DDEV_BIN/DDEV_MODE keys)
 #   - existing /home/opencode/.config/opencode/opencode.json[c]
-#   - any ACLs
-#   (except: normalizes the /home/opencode ownership/mode so the default user
-#   can edit opencode.jsonc — see the "opencode home" step below)
 #   - the DEFAULT user's existing opencode config (a deny-all config is only
-#   deployed when that user has no opencode.jsonc yet)
+#     deployed when that user has no opencode.jsonc yet)
 #   - the opencode binary at /usr/local/lib/opencode-permissions-kit/bin/opencode — UNLESS
-#   --binary is given (fetch the latest release and install it) or
-#   --binary-path <file> (install the given binary without downloading).
+#     --binary is given (fetch the latest release and install it) or
+#     --binary-path <file> (install the given binary without downloading).
+#
+# One-time hard-deny migration (DDEV-WORKING §4): on the first update from a
+# pre-soft-only install this removes every u:opencode:--- ACL deny from the
+# project roots, re-bases the sharing group to the opencode usergroup, and
+# removes the legacy hooks/shim/transaction artifacts. Gated by the
+# HARD_DENY_REMOVED stamp in install.conf. A legacy docker-group install
+# ABORTS with instructions (rootless is mandatory now).
 #
 # One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
 #   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/update.sh | sudo bash
 #
 # From a checkout (uses the local files):
 #   sudo bash files/update.sh --yes            # skip prompts
-#   sudo bash files/update.sh --refresh        # also re-run protect-projects.sh --force at the end
+#   sudo bash files/update.sh --refresh        # also re-apply the group baseline at the end
 #   sudo bash files/update.sh --binary         # also upgrade opencode to the latest release
 #
 # `opencode upgrade` cannot work behind the wrapper (the binary is root-owned
@@ -50,9 +56,8 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
 opencode-deny-all.jsonc \
 sudoers.template umask.sh VERSION \
-opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/protect-projects.sh opencode-permissions-kit-lib/jsonc-parser.py \
-opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/ddev opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-transaction.sh \
-opencode-permissions-kit-lib/hooks/post-checkout opencode-permissions-kit-lib/hooks/post-merge opencode-permissions-kit-lib/hooks/post-commit"
+opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
+opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
@@ -62,7 +67,7 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    mkdir -p "$dir/opencode-permissions-kit-lib/hooks" "$dir/opencode-permissions-kit-lib/bin"
+    mkdir -p "$dir/opencode-permissions-kit-lib/bin"
     for f in $KIT_FILES; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -76,10 +81,10 @@ fetch_kit() {
 
 # Re-fetch any single kit file that is missing under $SCRIPT_DIR (best-effort).
 # Handles the transition case where an OLDER installed update.sh performed the
-# initial fetch with a smaller file list (e.g. shell-warn.sh was added later),
-# then re-exec'd this freshly fetched copy — the temp dir is incomplete but
-# $SCRIPT_DIR/../VERSION exists, so the VERSION guard above does not re-fetch.
-# For a real local checkout every file is present and this is a no-op.
+# initial fetch with a smaller file list (e.g. migrate-denies.sh was added
+# later), then re-exec'd this freshly fetched copy — the temp dir is incomplete
+# but $SCRIPT_DIR/../VERSION exists, so the VERSION guard above does not
+# re-fetch. For a real local checkout every file is present and this is a no-op.
 ensure_local_file() {
     local f="$1"
     [ -f "$SCRIPT_DIR/$f" ] && return 0
@@ -108,6 +113,8 @@ for f in $KIT_FILES; do
 done
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
+CONFDIR="/etc/opencode-permissions-kit"
+PROJECTS_CONF="$CONFDIR/projects.conf"
 
 # === Audit log ===
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Covers all
@@ -121,14 +128,14 @@ for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" "$SCRIPT_DIR/log.s
 done
 
 # install.conf with legacy fallback (pre-0.0.10 /etc/opencode/, pre-0.0.9 setup.conf)
-INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
+INSTALL_CONF="$CONFDIR/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="$CONFDIR/setup.conf"
 [ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
 [ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
-WWW_GROUP="www-data"
+WWW_GROUP="opencode"
 # Save the version from the VERSION file (read above) before sourcing
 # install.conf, which also has a VERSION= line (the old stamp). We don't
 # want install.conf to overwrite the freshly-read VERSION from the repo.
@@ -139,19 +146,6 @@ fi
 VERSION="$KIT_VERSION"
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
-WWW_GROUP="${WWW_GROUP:-www-data}"
-
-# DDEV_BIN: real ddev path for the delegation shim. Preserve the value
-# recorded in install.conf; only detect (skipping our own shim symlink) when
-# migrating an install that predates the feature.
-if [ -z "$DDEV_BIN" ]; then
-    DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
-    if [ -n "$DDEV_BIN" ] && [ -L "$DDEV_BIN" ] \
-       && readlink "$DDEV_BIN" 2>/dev/null | grep -Eq 'lib/opencode(-permissions-kit)?/bin/ddev'; then
-        DDEV_BIN="/usr/bin/ddev"
-    fi
-    [ -n "$DDEV_BIN" ] || DDEV_BIN="/usr/bin/ddev"
-fi
 
 YES=false
 REFRESH=false
@@ -174,7 +168,7 @@ opencode permissions kit -- update.sh  v$VERSION
 Re-deploys the kit on an already-installed system. No prompts by default.
 Usage: ./update.sh [--yes] [--refresh] [--binary] [--binary-path <file>]
   --yes            skip the confirmation prompt
-  --refresh        also re-run protect-projects.sh --force at the end
+  --refresh        also re-apply the group baseline (chgrp/setgid/default ACLs)
   --binary         also upgrade the opencode binary to the latest release
   --binary-path    install the given binary file instead of downloading
 EOF
@@ -216,6 +210,9 @@ if ! id "$OPENCODE_USER" >/dev/null 2>&1; then
     die "User '$OPENCODE_USER' missing. Run install.sh first."
 fi
 
+# The new sharing group: the opencode user's primary usergroup.
+NEW_WWW_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
+
 if ! confirm "Re-deploy kit files (existing configs will NOT be touched)?"; then
     echo "Aborted."; exit 0
 fi
@@ -224,37 +221,29 @@ fi
 
 echo ""
 echo "--- Re-deploying library files ---"
-sudo mkdir -p "$LIBDIR/hooks"
+sudo mkdir -p "$LIBDIR/bin"
 
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/protect-projects.sh" "$LIBDIR/protect-projects.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-transaction.sh" "$LIBDIR/ddev-transaction.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-checkout" "$LIBDIR/hooks/post-checkout"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-merge"    "$LIBDIR/hooks/post-merge"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/hooks/post-commit"   "$LIBDIR/hooks/post-commit"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/migrate-denies.sh"   "$LIBDIR/migrate-denies.sh"
 sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
 sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
 sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
-# sudoers.template: needed by the installed config.sh for backend/ddev-mode
-# switches (render_sudoers looks in $LIBDIR first).
+# sudoers.template: needed by the installed config.sh for backend switches
+# (render_sudoers looks in $LIBDIR first).
 sudo cp "$SCRIPT_DIR/sudoers.template"                 "$LIBDIR/sudoers.template"
 sudo chmod 440 "$LIBDIR/sudoers.template"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
-# ddev delegation shim
-sudo mkdir -p "$LIBDIR/bin"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev"            "$LIBDIR/bin/ddev"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/bin/socket-check.sh"
-sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/protect-projects.sh" "$LIBDIR/jsonc-parser.py" \
+sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
+               "$LIBDIR/migrate-denies.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/hooks/post-checkout" "$LIBDIR/hooks/post-merge" "$LIBDIR/hooks/post-commit" \
-               "$LIBDIR/ddev-transaction.sh" \
-               "$LIBDIR/bin/ddev" "$LIBDIR/bin/socket-check.sh"
+               "$LIBDIR/bin/socket-check.sh"
 echo "Library files updated: $LIBDIR"
 log "library re-deployed: $LIBDIR"
 
@@ -270,75 +259,37 @@ if [ -d /usr/local/lib/opencode ] && [ ! -x "$LIBDIR/bin/opencode" ] && [ -x /us
     log "migrated opencode binary: /usr/local/lib/opencode/bin/opencode -> $LIBDIR/bin/opencode"
 fi
 
-# --- re-link wrapper + protect-projects --------------------------------------
+# --- re-link wrapper ----------------------------------------------------------
 
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
-sudo ln -sf "$LIBDIR/protect-projects.sh" /usr/local/sbin/protect-projects.sh
-echo "Symlinks refreshed: /usr/local/bin/opencode, /usr/local/sbin/protect-projects.sh"
-
-# --- re-link ddev shim -------------------------------------------------------
-# Shadow /usr/local/bin/ddev with our delegating shim, but never clobber a real
-# ddev installed there — in that layout the real binary wins on PATH and
-# delegation is unavailable (documented limitation).
-if [ -e /usr/local/bin/ddev ] && [ ! -L /usr/local/bin/ddev ]; then
-    echo "  ${YELLOW}/usr/local/bin/ddev is a real ddev (not the kit shim) — delegation NOT shadowed.${NC}"
-    log "ddev shim NOT shadowed: /usr/local/bin/ddev occupied"
-else
-    sudo ln -sf "$LIBDIR/bin/ddev" /usr/local/bin/ddev
-    echo "ddev shim refreshed: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (delegates to $DDEV_BIN as $DEFAULT_USER)"
-    log "ddev shim re-linked: /usr/local/bin/ddev -> $LIBDIR/bin/ddev (DDEV_BIN=$DDEV_BIN)"
-fi
+echo "Symlink refreshed: /usr/local/bin/opencode"
 
 # --- re-deploy sudoers -------------------------------------------------------
 
 # Ensure the new config dir exists (fresh install or migration from pre-0.0.10).
-sudo mkdir -p /etc/opencode-permissions-kit
+sudo mkdir -p "$CONFDIR"
 # Migrate projects.conf from the pre-0.0.10 /etc/opencode/ layout if the new
 # copy is missing — update.sh must never drop registered project roots.
-if [ ! -f /etc/opencode-permissions-kit/projects.conf ] && [ -f /etc/opencode/projects.conf ]; then
-    sudo cp /etc/opencode/projects.conf /etc/opencode-permissions-kit/projects.conf
-    echo "Migrated projects.conf -> /etc/opencode-permissions-kit/"
+if [ ! -f "$PROJECTS_CONF" ] && [ -f /etc/opencode/projects.conf ]; then
+    sudo cp /etc/opencode/projects.conf "$PROJECTS_CONF"
+    echo "Migrated projects.conf -> $CONFDIR/"
     log "migrated projects.conf: /etc/opencode -> /etc/opencode-permissions-kit"
 fi
 
 if [ -f "$SCRIPT_DIR/sudoers.template" ]; then
     SUDO_TMP=$(mktemp)
-    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" -e "s#DDEV_BIN#$DDEV_BIN#g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
-    # The (opencode:docker) RunAs grant is only needed for the docker-group
-    # backend. For the rootless backends strip that block; empty/unknown
-    # defaults to docker-group (matching the wrapper's normalization) so the
-    # grant stays available. CONTAINER_BACKEND is read from install.conf above
-    # (preserved across the update — never re-provisioned here).
-    case "${CONTAINER_BACKEND:-docker-group}" in
-        docker-rootless|podman-rootless)
-            sed -e '/^#@docker-group-begin$/,/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
-            ;;
-        *)
-            sed -e '/^#@docker-group-begin$/d' -e '/^#@docker-group-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
-            ;;
-    esac
-    mv -f "$SUDO_TMP.2" "$SUDO_TMP"
-    # ddev mode: delegated vs sandbox are mutually exclusive in sudoers.
-    # DDEV_MODE is read from install.conf above (preserved across the update).
-    if [ "${DDEV_MODE:-delegated}" = "sandbox" ]; then
-        sed -e '/^#@ddev-delegated-begin$/,/^#@ddev-delegated-end$/d' \
-            -e '/^#@ddev-sandbox-begin$/d' -e '/^#@ddev-sandbox-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
-    else
-        sed -e '/^#@ddev-sandbox-begin$/,/^#@ddev-sandbox-end$/d' \
-            -e '/^#@ddev-delegated-begin$/d' -e '/^#@ddev-delegated-end$/d' "$SUDO_TMP" > "$SUDO_TMP.2"
-    fi
-    mv -f "$SUDO_TMP.2" "$SUDO_TMP"
-    sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
-    sudo chmod 440 /etc/opencode-permissions-kit/sudoers
+    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+    sudo cp "$SUDO_TMP" "$CONFDIR/sudoers"
+    sudo chmod 440 "$CONFDIR/sudoers"
     rm -f "$SUDO_TMP"
-    sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
+    sudo ln -sf "$CONFDIR/sudoers" /etc/sudoers.d/opencode-permissions-kit
     # Remove the pre-0.0.10 sudoers symlink so only the new name is active.
     sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
-    if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
+    if sudo /usr/sbin/visudo -c -f "$CONFDIR/sudoers" >/dev/null 2>&1; then
         echo "sudoers updated (DEFAULT_USER=$DEFAULT_USER)."
         log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
     else
-        echo "${RED}sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers.${NC}"
+        echo "${RED}sudoers validation failed. Check $CONFDIR/sudoers.${NC}"
         exit 1
     fi
 fi
@@ -370,11 +321,83 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     done
 fi
 
-# --- re-apply git hooks path (in case user wiped it) ------------------------
+# --- one-time hard-deny migration (DDEV-WORKING §4) ---------------------------
 
-sudo -u "$OPENCODE_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
-sudo -u "$DEFAULT_USER" git config --global core.hooksPath "$LIBDIR/hooks" 2>/dev/null || true
-echo "core.hooksPath confirmed ($LIBDIR/hooks)."
+if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
+    echo ""
+    echo "--- One-time migration: remove hard ACL denies + legacy artifacts ---"
+    if sudo sh "$LIBDIR/migrate-denies.sh" \
+            --projects "$PROJECTS_CONF" \
+            --conf-dir "$CONFDIR" \
+            --lib-dir "$LIBDIR" \
+            --opencode-user "$OPENCODE_USER" \
+            --group "$NEW_WWW_GROUP"; then
+        # Legacy git hooks pointed at the (now removed) hooks dir.
+        sudo -u "$OPENCODE_USER" git config --global --unset core.hooksPath 2>/dev/null || true
+        sudo -u "$DEFAULT_USER" git config --global --unset core.hooksPath 2>/dev/null || true
+        # Legacy ddev delegation shim: only ever remove OUR symlink.
+        if [ -L /usr/local/bin/ddev ] \
+           && readlink /usr/local/bin/ddev 2>/dev/null | grep -Eq 'lib/opencode(-permissions-kit)?/bin/ddev'; then
+            sudo rm -f /usr/local/bin/ddev
+            echo "Legacy ddev delegation shim removed (/usr/local/bin/ddev) — ddev now runs natively as $OPENCODE_USER."
+            log "legacy ddev shim removed: /usr/local/bin/ddev"
+        fi
+        # Group membership for the developer (fresh login needed to pick it up).
+        sudo usermod -aG "$NEW_WWW_GROUP" "$DEFAULT_USER" 2>/dev/null || true
+        echo "  developer '$DEFAULT_USER' added to group '$NEW_WWW_GROUP' (start a new login shell to pick it up)"
+
+        # ddev runtime for the opencode user (idempotent, prompt-free).
+        sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
+        sudo chown "$OPENCODE_USER:$NEW_WWW_GROUP" "/home/$OPENCODE_USER/.ddev"
+        sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
+        caroot="/home/$OPENCODE_USER/.local/share/mkcert"
+        if [ ! -f "$caroot/rootCA.pem" ]; then
+            sudo mkdir -p "$caroot"
+            src=""
+            if [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
+                src="/home/$DEFAULT_USER/.local/share/mkcert"
+            fi
+            if [ -z "$src" ] && [ -d /mnt/c ]; then
+                win_user=""
+                command -v powershell.exe >/dev/null 2>&1 && \
+                    win_user=$(powershell.exe -NoProfile -Command '[Environment]::UserName' 2>/dev/null | tr -d '\r')
+                if [ -z "$win_user" ] && command -v cmd.exe >/dev/null 2>&1; then
+                    win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+                fi
+                if [ -n "$win_user" ] && [ -f "/mnt/c/Users/$win_user/AppData/Local/mkcert/rootCA.pem" ]; then
+                    src="/mnt/c/Users/$win_user/AppData/Local/mkcert"
+                fi
+            fi
+            if [ -n "$src" ]; then
+                sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null || true
+                sudo chown -R "$OPENCODE_USER:$NEW_WWW_GROUP" "$caroot" 2>/dev/null || true
+                sudo chmod 700 "$caroot" 2>/dev/null || true
+                sudo chmod 600 "$caroot/rootCA-key.pem" 2>/dev/null || true
+                echo "  mkcert CA reused from $src -> $caroot"
+                log "migration: mkcert CA reused for $OPENCODE_USER"
+            fi
+        fi
+        # Router ports: apply live only when the kit's sysctl file already
+        # exists (update.sh must stay prompt-free); otherwise hint.
+        if [ -f /etc/sysctl.d/99-ddev-rootless.conf ]; then
+            sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1 || true
+        else
+            echo "  NOTE: rootless ddev-router needs low ports — either run:"
+            echo "    sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
+            echo "    echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf"
+            echo "  or use higher router ports (ddev config global --router-http-port 8080)."
+        fi
+        log "hard-deny migration complete (DDEV-WORKING)"
+    else
+        rc=$?
+        if [ "$rc" = 3 ]; then
+            die "This install still uses the removed docker-group backend. Re-run install.sh with a rootless backend:
+  sudo bash files/install.sh --container-backend docker-rootless
+  sudo bash files/install.sh --container-backend podman-rootless"
+        fi
+        die "Migration failed (exit $rc). Fix the issue above and re-run."
+    fi
+fi
 
 # --- opencode binary upgrade (--binary / --binary-path) ----------------------
 
@@ -480,13 +503,12 @@ else
 fi
 
 # --- ensure default user can access the opencode home -------------------------
-# useradd -m leaves the home owned by a private group; older installs only
-# chmod'd it to 750, so the default user (member of $WWW_GROUP) could not even
-# cd into it. Apply the same ownership/mode install.sh uses.
+# The home belongs to the opencode user's own usergroup; older installs had it
+# in www-data with mode 750. Apply the current ownership/mode.
 if [ -d "/home/$OPENCODE_USER" ]; then
-    sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER"
+    sudo chown "$OPENCODE_USER:$NEW_WWW_GROUP" "/home/$OPENCODE_USER"
     sudo chmod 2750 "/home/$OPENCODE_USER"
-    echo "/home/$OPENCODE_USER is accessible for group $WWW_GROUP."
+    echo "/home/$OPENCODE_USER is accessible for group $NEW_WWW_GROUP."
 fi
 
 # --- ensure default-user deny-all config (self-update bypass protection) ------
@@ -497,7 +519,7 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     if [ ! -f "$DEFAULT_OC_CONF" ]; then
         sudo mkdir -p "$(dirname "$DEFAULT_OC_CONF")"
         sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
-        sudo chown "$DEFAULT_USER:$WWW_GROUP" "$DEFAULT_OC_CONF"
+        sudo chown "$DEFAULT_USER:$NEW_WWW_GROUP" "$DEFAULT_OC_CONF"
         sudo chmod 664 "$DEFAULT_OC_CONF"
         echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
         log "deny-all config installed for default user: $DEFAULT_OC_CONF"
@@ -506,24 +528,28 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     fi
 fi
 
-# --- refresh install.conf version stamp --------------------------------------
+# --- refresh install.conf (version stamp + model keys) ------------------------
 
 NEW_INSTALL_CONF="$(mktemp)"
 {
     if [ -f "$INSTALL_CONF" ]; then
-        grep -v -e '^VERSION=' -e '^DDEV_BIN=' "$INSTALL_CONF" 2>/dev/null
+        # Strip keys this update owns: VERSION (re-stamped), the dead
+        # DDEV_BIN/DDEV_MODE keys (shim + modes are gone), and WWW_GROUP
+        # (re-based to the opencode usergroup).
+        grep -v -e '^VERSION=' -e '^DDEV_BIN=' -e '^DDEV_MODE=' -e '^WWW_GROUP=' -e '^HARD_DENY_REMOVED=' "$INSTALL_CONF" 2>/dev/null
     fi
-    echo "DDEV_BIN=$DDEV_BIN"
+    echo "WWW_GROUP=$NEW_WWW_GROUP"
+    echo "HARD_DENY_REMOVED=1"
     echo "VERSION=$VERSION"
 } | sort -u > "$NEW_INSTALL_CONF"
-sudo cp "$NEW_INSTALL_CONF" /etc/opencode-permissions-kit/install.conf
-sudo chmod 644 /etc/opencode-permissions-kit/install.conf
+sudo cp "$NEW_INSTALL_CONF" "$CONFDIR/install.conf"
+sudo chmod 644 "$CONFDIR/install.conf"
 rm -f "$NEW_INSTALL_CONF"
 # Cleanup legacy setup.conf (pre-v0.0.9) in both new and old config dirs.
-[ -f /etc/opencode-permissions-kit/setup.conf ] && sudo rm -f /etc/opencode-permissions-kit/setup.conf
+[ -f "$CONFDIR/setup.conf" ] && sudo rm -f "$CONFDIR/setup.conf"
 [ -f /etc/opencode/setup.conf ] && sudo rm -f /etc/opencode/setup.conf
-echo "install.conf updated: VERSION=$VERSION"
-log "install.conf version stamp updated: VERSION=$VERSION"
+echo "install.conf updated: VERSION=$VERSION WWW_GROUP=$NEW_WWW_GROUP"
+log "install.conf updated: VERSION=$VERSION WWW_GROUP=$NEW_WWW_GROUP HARD_DENY_REMOVED=1"
 
 # --- remove pre-0.0.10 legacy layout -----------------------------------------
 # The new library / config dir / symlinks are all in place now; tear down the
@@ -535,16 +561,21 @@ sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
 sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
 log "legacy pre-0.0.10 layout removed (if present)"
 
-# --- optional ACL refresh ----------------------------------------------------
+# --- optional group-baseline refresh ------------------------------------------
 
 if [ "$REFRESH" = true ]; then
     echo ""
-    echo "--- Refreshing ACL protection ---"
-    sudo "$LIBDIR/protect-projects.sh" --force
-    log "ACL refresh requested (--refresh)"
+    echo "--- Refreshing group baseline ---"
+    sudo sh "$LIBDIR/migrate-denies.sh" \
+        --projects "$PROJECTS_CONF" \
+        --conf-dir "$CONFDIR" \
+        --lib-dir "$LIBDIR" \
+        --opencode-user "$OPENCODE_USER" \
+        --group "$NEW_WWW_GROUP"
+    log "group baseline refresh requested (--refresh)"
 else
     echo ""
-    echo "Skipped ACL refresh (use --refresh to re-apply protects)."
+    echo "Skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)."
 fi
 
 # --- done --------------------------------------------------------------------

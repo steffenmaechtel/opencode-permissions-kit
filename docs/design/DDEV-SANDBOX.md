@@ -1,6 +1,14 @@
 # PLAN-DDEV-SANDBOX: Run ddev as the `opencode` sandbox user
 
-> Status: **IMPLEMENTED (opt-in, default off).** The transaction helper
+> Status: **SUPERSEeded by DDEV-WORKING (implemented).** The transaction
+> helper, the ddev-mode switch, and the entire OPEN/RUN/CLOSE machinery were
+> **removed**: with the hard ACL deny layer gone there is nothing to
+> transact — ddev simply runs as the `opencode` user. This document is kept
+> as the historical design record; see `docs/design/DDEV-WORKING.md` for
+> the current model and `docs/MANUAL.md` for usage. Where wording differs,
+> the code wins.
+>
+> Historical note (pre-removal state): the transaction helper
 > (`files/opencode-permissions-kit-lib/ddev-transaction.sh`), the shim mode
 > switch (`DDEV_MODE=delegated|sandbox` in install.conf), the mutually
 > exclusive sudoers rendering, `config.sh ddev-mode`, `status.sh` reporting,

@@ -1,5 +1,12 @@
 # PROOF-2: Developer-Created `.env` in the IDE — Protection Timing
 
+> **SUPERSEDED (DDEV-WORKING):** the hard ACL deny layer this document
+> analyzes/proposes was **removed** — file permissions are now opencode's
+> soft permission layer only. This document is kept as the historical
+> analysis record; see `docs/design/DDEV-WORKING.md` for the current model
+> and `docs/MANUAL.md` ("Security Model (soft-only)") for the authoritative
+> usage documentation. Where wording differs, the code and MANUAL win.
+
 **Question under test.** A developer using the kit creates a `.env` file himself in his
 IDE (no git involved yet). Is that file readable for the opencode user until the kit
 reacts? There is no hook or listener watching developer-created files — would the file

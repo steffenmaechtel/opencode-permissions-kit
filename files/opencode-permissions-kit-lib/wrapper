@@ -2,10 +2,12 @@
 # opencode permissions kit — Wrapper
 # This file is deployed to /usr/local/bin/opencode by install.sh.
 # It ensures opencode always runs as the dedicated 'opencode' user.
-# Pass `-g docker` (or `--gid docker`) to run opencode with the docker group so
-# container commands work inside the sandbox. Projects that explicitly enable
-# docker/ddev in their opencode.jsonc trigger this automatically (confirmed
-# before start).
+#
+# Soft protection model (docs/design/DDEV-WORKING.md): the kit does NOT
+# mirror opencode.jsonc deny rules into Linux ACLs. File permissions are
+# enforced by opencode's own permission layer only. The wrapper's job is
+# UID separation: validate the project dir, detect container-tool opt-in,
+# and exec the binary as 'opencode' against its rootless backend.
 set -e
 
 RED='\033[0;31m'
@@ -26,16 +28,14 @@ if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 
-# Container backend (see docs/DOCKER-ROOTLESS.md). Recorded in install.conf by
-# install.sh. Empty/unknown defaults to docker-group (the legacy behaviour) so
-# existing installs keep working unchanged: the wrapper hands opencode the
-# docker group via `-g docker`. docker-rootless / podman-rootless instead talk
-# to a per-user socket owned by the opencode user, so the kit's hard ACL denies
-# hold inside containers too — those run WITHOUT `-g` and set DOCKER_HOST.
-CONTAINER_BACKEND="${CONTAINER_BACKEND:-docker-group}"
+# Container backend: docker-rootless or podman-rootless only (the legacy
+# docker-group backend is gone — it was root-equivalent). Unknown/missing
+# values disable container tools for the session; the wrapper never falls
+# back to a root-equivalent path.
+CONTAINER_BACKEND="${CONTAINER_BACKEND:-}"
 case "$CONTAINER_BACKEND" in
-    docker-group|docker-rootless|podman-rootless) ;;
-    *) CONTAINER_BACKEND="docker-group" ;;
+    docker-rootless|podman-rootless) ;;
+    *) CONTAINER_BACKEND="" ;;
 esac
 
 CWD=$(pwd)
@@ -96,52 +96,15 @@ if [ -n "$RESOLVED" ] && [ "$RESOLVED" != "/usr/local/bin/opencode" ]; then
     echo ""
 fi
 
-# Parse -g/--gid: the kit's escalation channel for container groups. The flag
-# means "enable container tools for this session"; the configured backend decides
-# HOW (docker group for docker-group, DOCKER_HOST for the rootless backends).
+# Detect container tools (docker/ddev) explicitly enabled by the project
+# config. Any enabled tool means "enable container tools for this session"
+# — the rootless backend decides the actual mechanism.
 CONTAINER_REQUESTED=false
 CONTAINER_AUTO=false
-prev=""
-for arg in "$@"; do
-    case "$prev" in
-        -g|--gid)
-            case "$arg" in
-                docker|0|root)
-                    CONTAINER_REQUESTED=true
-                    ;;
-                *)
-                    echo ""
-                    echo "  ${RED}ERROR: unsupported group '$arg'${NC}"
-                    echo "  ${YELLOW}Supported: -g docker (enables container tools via the configured backend).${NC}"
-                    echo ""
-                    exit 1
-                    ;;
-            esac
-            ;;
-    esac
-    case "$arg" in
-        -g|--gid) prev="$arg" ;;
-        *) prev="" ;;
-    esac
-done
-
-# Check for project-level allow overrides
 PROJECT_CONFIG=""
 if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
 elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
 if [ -n "$PROJECT_CONFIG" ]; then
-    PROJECT_ALLOW=$(python3 /usr/local/lib/opencode-permissions-kit/jsonc-parser.py --allow "$PROJECT_CONFIG" 2>/dev/null || true)
-    if [ -n "$PROJECT_ALLOW" ]; then
-        echo "  ${YELLOW}WARNING: This project overrides global deny rules:${NC}"
-        echo "$PROJECT_ALLOW" | sed 's/^/    - /'
-        echo ""
-    fi
-fi
-
-# Detect container tools (docker/ddev) explicitly enabled by the project config.
-# Any enabled tool means "enable container tools for this session" — the backend
-# (resolved below) decides the actual mechanism.
-if [ "$CONTAINER_REQUESTED" = false ] && [ -n "$PROJECT_CONFIG" ]; then
     PROJECT_TOOLS=$(python3 /usr/local/lib/opencode-permissions-kit/jsonc-parser.py --tools "$PROJECT_CONFIG" 2>/dev/null || true)
     if [ -n "$PROJECT_TOOLS" ]; then
         echo "  ${CYAN}Container tools enabled by this project:${NC}"
@@ -153,13 +116,12 @@ if [ "$CONTAINER_REQUESTED" = false ] && [ -n "$PROJECT_CONFIG" ]; then
 fi
 
 # Resolve the container mechanism for the configured backend. Produces one of:
-#   CONTAINER_GROUP set     -> sudo -u opencode -g docker  (docker-group backend)
 #   CONTAINER_DOCKER_HOST   -> sudo -u opencode with DOCKER_HOST exported
 #                              (docker-rootless socket, or podman-rootless when
 #                               OPENCODE_PODMAN_SOCKET is set for docker-CLI compat)
 #   CONTAINER_PODMAN=true   -> sudo -u opencode, no DOCKER_HOST (podman-CLI path,
 #                              daemonless per §9.8 — podman run needs no socket)
-# all empty                 -> no container tools this session
+#   all empty               -> no container tools this session
 # Probe whether a rootless backend socket is reachable. The sockets live in the
 # opencode user's runtime dir (/run/user/<uid>, mode 700 opencode:opencode), so
 # a wrapper running as the developer cannot stat them directly. Try directly
@@ -175,70 +137,65 @@ sock_reachable() {
     /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh "$sock" 2>/dev/null
 }
 
-CONTAINER_GROUP=""
 CONTAINER_DOCKER_HOST=""
 CONTAINER_XDG=""
 CONTAINER_PODMAN=""
 CONTAINER_LABEL=""
 if [ "$CONTAINER_REQUESTED" = true ]; then
-    case "$CONTAINER_BACKEND" in
-        docker-rootless)
-            CONTAINER_LABEL="the docker-rootless backend"
-            # Requires the per-user dockerd socket. Never silently fall back to
-            # -g docker (root-equivalent); warn loudly and run without instead.
-            sock_host="${OPENCODE_DOCKER_HOST:-}"
-            if sock_reachable "$sock_host"; then
-                CONTAINER_DOCKER_HOST="$sock_host"
-                CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
-            else
-                echo "  ${RED}WARNING: docker-rootless socket not reachable (${sock_host:-unset}).${NC}"
-                echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to -g docker (root-equivalent).${NC}"
-                echo ""
-                CONTAINER_REQUESTED=false
-                CONTAINER_AUTO=false
-            fi
-            ;;
-        podman-rootless)
-            CONTAINER_LABEL="the podman-rootless backend"
-            # Default: podman is daemonless — `podman run` needs no socket and no
-            # DOCKER_HOST (§9.8 podman-CLI path). Verify podman is installed.
-            # Optional: OPENCODE_PODMAN_SOCKET enables docker-CLI compat (point a
-            # `docker` CLI at the podman socket); when set, verify reachability
-            # like the docker-rootless path.
-            sock_host="${OPENCODE_PODMAN_SOCKET:-}"
-            if [ -n "$sock_host" ]; then
+    if [ -z "$CONTAINER_BACKEND" ]; then
+        echo "  ${RED}WARNING: no rootless container backend configured (legacy docker-group was removed).${NC}"
+        echo "  ${YELLOW}Running WITHOUT container tools. Re-run install.sh to provision one.${NC}"
+        echo ""
+        CONTAINER_REQUESTED=false
+        CONTAINER_AUTO=false
+    else
+        CONTAINER_LABEL="the $CONTAINER_BACKEND backend"
+        case "$CONTAINER_BACKEND" in
+            docker-rootless)
+                # Requires the per-user dockerd socket. Never fall back to a
+                # root-equivalent docker group — warn loudly and run without.
+                sock_host="${OPENCODE_DOCKER_HOST:-}"
                 if sock_reachable "$sock_host"; then
                     CONTAINER_DOCKER_HOST="$sock_host"
                     CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
                 else
-                    echo "  ${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
-                    echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to -g docker (root-equivalent).${NC}"
+                    echo "  ${RED}WARNING: docker-rootless socket not reachable (${sock_host:-unset}).${NC}"
+                    echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
                     echo ""
                     CONTAINER_REQUESTED=false
                     CONTAINER_AUTO=false
                 fi
-            elif command -v podman >/dev/null 2>&1; then
-                CONTAINER_PODMAN=true
-            else
-                echo "  ${RED}WARNING: podman-rootless backend selected but 'podman' is not installed.${NC}"
-                echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to -g docker (root-equivalent).${NC}"
-                echo ""
-                CONTAINER_REQUESTED=false
-                CONTAINER_AUTO=false
-            fi
-            ;;
-        docker-group|*)
-            CONTAINER_LABEL="the docker group"
-            if ! getent group docker >/dev/null 2>&1; then
-                echo "  ${YELLOW}WARNING: group 'docker' does not exist — running without container group.${NC}"
-                echo ""
-                CONTAINER_REQUESTED=false
-                CONTAINER_AUTO=false
-            else
-                CONTAINER_GROUP="docker"
-            fi
-            ;;
-    esac
+                ;;
+            podman-rootless)
+                # Default: podman is daemonless — `podman run` needs no socket
+                # and no DOCKER_HOST (§9.8 podman-CLI path). Optional:
+                # OPENCODE_PODMAN_SOCKET enables docker-CLI compat (point a
+                # `docker` CLI at the podman socket); when set, verify
+                # reachability like the docker-rootless path.
+                sock_host="${OPENCODE_PODMAN_SOCKET:-}"
+                if [ -n "$sock_host" ]; then
+                    if sock_reachable "$sock_host"; then
+                        CONTAINER_DOCKER_HOST="$sock_host"
+                        CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
+                    else
+                        echo "  ${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
+                        echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                        echo ""
+                        CONTAINER_REQUESTED=false
+                        CONTAINER_AUTO=false
+                    fi
+                elif command -v podman >/dev/null 2>&1; then
+                    CONTAINER_PODMAN=true
+                else
+                    echo "  ${RED}WARNING: podman-rootless backend selected but 'podman' is not installed.${NC}"
+                    echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                    echo ""
+                    CONTAINER_REQUESTED=false
+                    CONTAINER_AUTO=false
+                fi
+                ;;
+        esac
+    fi
 fi
 
 if [ "$CONTAINER_AUTO" = true ]; then
@@ -246,13 +203,12 @@ if [ "$CONTAINER_AUTO" = true ]; then
     read answer
     case "$answer" in
         n|N|no|No|NO)
-            CONTAINER_GROUP=""
             CONTAINER_DOCKER_HOST=""
             CONTAINER_XDG=""
             CONTAINER_PODMAN=""
             ;;
     esac
-    if [ -n "$CONTAINER_GROUP" ] || [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
+    if [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
         echo ""
         printf "  ${GREEN}opencode will run with %s.${NC}\n" "$CONTAINER_LABEL"
         echo ""
@@ -262,27 +218,12 @@ else
     read _
 fi
 
-/usr/bin/sudo /usr/local/lib/opencode-permissions-kit/protect-projects.sh --cwd "$CWD"
-
-# Stamp the launch CWD into the opencode process environment. sudo resets the
-# env (and refuses `sudo VAR=value cmd` under the kit's restricted rule), so the
-# var is exported and preserved via `Defaults env_keep` in the kit's sudoers.
-# opencode's shells and any git they spawn inherit it, so git hooks can apply
-# the project opencode.jsonc of the directory opencode was started in — not the
-# git worktree root (which may be a nested repo).
-export OPENCODE_LAUNCH_CWD="$CWD"
-if [ -n "$CONTAINER_GROUP" ]; then
-    exec /usr/bin/sudo -u opencode -g "$CONTAINER_GROUP" /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
-elif [ -n "$CONTAINER_DOCKER_HOST" ]; then
-    # Rootless: pass the per-user socket through sudo's env reset via env_keep.
+# Rootless: pass the per-user socket through sudo's env reset via env_keep.
+# podman-CLI path (daemonless): no DOCKER_HOST, no supplementary group.
+# Containers run as the opencode host UID either way.
+if [ -n "$CONTAINER_DOCKER_HOST" ]; then
     export DOCKER_HOST="$CONTAINER_DOCKER_HOST"
     [ -n "$CONTAINER_XDG" ] && export XDG_RUNTIME_DIR="$CONTAINER_XDG"
     exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
-elif [ "$CONTAINER_PODMAN" = true ]; then
-    # podman-CLI path (daemonless): no DOCKER_HOST, no -g. Containers run as the
-    # opencode host UID, so the kit's u:opencode:--- ACL denies hold inside
-    # bind-mounted containers too (see docs/DOCKER-ROOTLESS.md §9.1).
-    exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
-else
-    exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
 fi
+exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"

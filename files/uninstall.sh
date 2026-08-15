@@ -127,7 +127,14 @@ if [ -n "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
-WWW_GROUP="${WWW_GROUP:-www-data}"
+# Sharing group: the opencode user's primary usergroup (soft-only model).
+# Prefer the live value; stale confs may still say www-data.
+LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
+if [ -n "$LIVE_GROUP" ]; then
+    WWW_GROUP="$LIVE_GROUP"
+else
+    WWW_GROUP="${WWW_GROUP:-opencode}"
+fi
 trace "OPENCODE_USER=$OPENCODE_USER WWW_GROUP=$WWW_GROUP"
 
 trace "first prompt ..."
@@ -136,11 +143,14 @@ ans=$(prompt_yn "Proceed with uninstall?" "n")
 log "uninstall started (dry_run=$DRY_RUN)"
 
 echo ""
-echo "--- Removing Git hooks ---"
+echo "--- Removing Git hooks (legacy cleanup) ---"
+# The soft-only kit no longer installs hooks, but a pre-migration install left
+# core.hooksPath pointing at the (deleted) kit hooks dir — git would warn on
+# every command. Unset for both users (best-effort).
 run "sudo -u \"$OPENCODE_USER\" git config --global --unset core.hooksPath 2>/dev/null || true"
 run "sudo -u \"$DEFAULT_USER\" git config --global --unset core.hooksPath 2>/dev/null || true"
-echo "Git hooks removed."
-log "git hooks removed (core.hooksPath unset)"
+echo "Git hooks config removed."
+log "git hooks config removed (core.hooksPath unset, legacy)"
 
 echo ""
 echo "--- Removing sudoers ---"
@@ -156,10 +166,12 @@ echo "Wrapper removed."
 log "wrapper removed: /usr/local/bin/opencode"
 
 echo ""
-echo "--- Removing ddev shim ---"
-run "sudo rm -f /usr/local/bin/ddev"
-echo "ddev shim removed."
-log "ddev shim removed: /usr/local/bin/ddev"
+echo "--- Removing ddev shim (legacy) ---"
+# The soft-only kit installs no shim; a pre-migration install did. Removing
+# /usr/local/bin/ddev only ever hits OUR symlink — guard against a real ddev.
+run "[ -L /usr/local/bin/ddev ] && sudo rm -f /usr/local/bin/ddev || true"
+echo "ddev shim removed (if it was ours)."
+log "ddev shim removed (legacy)"
 
 echo ""
 echo "--- Removing opencode library ---"
@@ -178,6 +190,13 @@ log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ 
 
 echo ""
 echo "--- Removing opencode user ---"
+# Remove the developer from the sharing group FIRST so userdel can clean up
+# the opencode usergroup (its primary group) automatically.
+if id "$DEFAULT_USER" >/dev/null 2>&1 && id "$DEFAULT_USER" | grep -q "$WWW_GROUP"; then
+    run "sudo gpasswd -d \"$DEFAULT_USER\" \"$WWW_GROUP\" 2>/dev/null || true"
+    echo "Removed $DEFAULT_USER from group $WWW_GROUP."
+    log "removed $DEFAULT_USER from group $WWW_GROUP"
+fi
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ans=$(prompt_yn "Remove user '$OPENCODE_USER' and their home directory?" "n")
     if [ "$ans" = "y" ]; then
@@ -188,6 +207,8 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
         OC_UID=$(id -u "$OPENCODE_USER")
         run "sudo loginctl disable-linger \"$OPENCODE_USER\" 2>/dev/null || true"
         run "sudo systemctl stop \"user@$OC_UID.service\" 2>/dev/null || true"
+        # Rootless podman storage keeps the home busy — reset it (best-effort).
+        run "sudo -u \"$OPENCODE_USER\" XDG_RUNTIME_DIR=/run/user/$OC_UID podman system reset --force >/dev/null 2>&1 || true"
         run "sudo userdel -r \"$OPENCODE_USER\" 2>/dev/null || true"
         echo "User '$OPENCODE_USER' removed."
         log "user removed: $OPENCODE_USER"
@@ -196,19 +217,6 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
     fi
 else
     echo "User '$OPENCODE_USER' does not exist."
-fi
-
-echo ""
-echo "--- Removing default user from www-data ---"
-if id "$DEFAULT_USER" | grep -q "$WWW_GROUP"; then
-    ans=$(prompt_yn "Remove '$DEFAULT_USER' from group '$WWW_GROUP'?" "n")
-    if [ "$ans" = "y" ]; then
-        run "sudo gpasswd -d \"$DEFAULT_USER\" \"$WWW_GROUP\" 2>/dev/null || true"
-        echo "Removed from $WWW_GROUP."
-        log "removed $DEFAULT_USER from group $WWW_GROUP"
-    else
-        echo "Group membership kept."
-    fi
 fi
 
 echo ""
@@ -237,11 +245,13 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
 fi
 
 echo ""
-echo "--- Removing kit config directories ---"
+echo "--- Removing kit config directories + runtime artifacts ---"
+run "sudo rm -rf /run/opencode-permissions-kit"
+run "sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf"
 run "sudo rm -rf /etc/opencode-permissions-kit"
 run "sudo rm -rf /etc/opencode"
 echo "Removed."
-log "config dirs removed: /etc/opencode-permissions-kit (+ legacy /etc/opencode)"
+log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
 
 echo ""
 echo "--- Removing audit log ---"

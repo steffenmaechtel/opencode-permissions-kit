@@ -2,7 +2,7 @@
 # Unit tests for jsonc-parser.py edge cases.
 # Verifies: block comments, URLs in strings, escaped quotes, malformed input,
 # missing permission key, bash-only config, mixed allow/deny, trailing comments,
-# --allow mode, --tools mode (container tool detection).
+# --tools mode (container tool detection).
 # Run: ./tests/test-jsonc-parser.sh
 set -e
 
@@ -105,12 +105,6 @@ assert_contains "mixed-deny: .env* in deny list" ".env*" "$OUT"
 assert_contains "mixed-deny: **/*.env in deny list" "**/*.env" "$OUT"
 assert_not_contains "mixed-deny: README.md NOT in deny list" "README.md" "$OUT"
 
-# --- 8. Mixed allow/deny: allow mode returns only allows ---
-OUT=$(python3 "$PARSER" --allow "$FIXTURES/mixed-allow-deny.jsonc" 2>/dev/null || true)
-assert_contains "mixed-allow: README.md in allow list" "README.md" "$OUT"
-assert_contains "mixed-allow: **/README.md in allow list" "**/README.md" "$OUT"
-assert_not_contains "mixed-allow: .env* NOT in allow list" ".env*" "$OUT"
-
 # --- 9. Trailing comment after value ---
 OUT=$(python3 "$PARSER" "$FIXTURES/trailing-comment.jsonc" 2>/dev/null || true)
 assert_contains "trailing-comment: .env* extracted" ".env*" "$OUT"
@@ -129,9 +123,11 @@ assert_contains "bundled: README.md present" "README.md" "$OUT"
 assert_contains "bundled: README.txt present (deny again — soft-only, ddev-safe)" "README.txt" "$OUT"
 assert_not_contains "bundled: //SECURE_GIT NOT present (commented)" "//SECURE_GIT" "$OUT"
 
-# --- 13. Bundled template allow mode (SECURE_GIT lines are comments → not emitted) ---
-OUT=$(python3 "$PARSER" --allow "$SCRIPT_DIR/../files/opencode.jsonc" 2>/dev/null || true)
-assert_not_contains "bundled-allow: .git/config NOT emitted (commented)" ".git/config" "$OUT"
+# --- 13. Bundled template: deny mode only (SECURE_GIT lines are comments) ---
+OUT=$(python3 "$PARSER" "$SCRIPT_DIR/../files/opencode.jsonc" 2>/dev/null || true)
+assert_not_contains "bundled: .git/config NOT emitted (commented)" ".git/config" "$OUT"
+# The removed --allow mode must fail loudly if anything still calls it.
+assert_exitcode "no --allow mode: exits non-zero" 1 python3 "$PARSER" --allow "$SCRIPT_DIR/../files/opencode.jsonc"
 
 # --- 14. --tools: no permission.bash → no tools ---
 OUT=$(python3 "$PARSER" --tools "$FIXTURES/block-comments.jsonc" 2>/dev/null || true)

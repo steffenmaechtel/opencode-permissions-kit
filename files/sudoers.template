@@ -1,29 +1,21 @@
 # opencode permissions kit — sudoers rule
-# Deployed to /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit.
-# DEFAULT_USER is replaced at install time with the actual username.
+# Deployed to /etc/opencode-permissions-kit/sudoers, symlinked as
+# /etc/sudoers.d/opencode-permissions-kit. DEFAULT_USER is replaced at
+# install time with the actual username.
+#
+# Soft protection model (docs/design/DDEV-WORKING.md): the wrapper execs
+# opencode as the 'opencode' user against a rootless container backend —
+# no supplementary docker group, no RunAs-developer ddev delegation, no
+# root-side ACL helper. The opencode binary itself stays in the deny list,
+# so this wrapper rule is the only path to run it.
 
-# Preserve the opencode launch directory across `sudo -u opencode` so git hooks
-# can apply the project opencode.jsonc of the directory opencode was started in.
-# DOCKER_HOST + XDG_RUNTIME_DIR are preserved for the rootless container backends
-# (docker-rootless / podman-rootless): the wrapper exports DOCKER_HOST before the
-# `sudo -u opencode` exec, and these keep it alive across sudo's env reset.
-# The opencode binary itself stays in the deny list, so the wrapper is the only
-# path to reach docker — backend or not.
-Defaults env_keep += "OPENCODE_LAUNCH_CWD DOCKER_HOST XDG_RUNTIME_DIR"
+# Preserve the rootless socket env across `sudo -u opencode`: the wrapper
+# exports DOCKER_HOST (+XDG_RUNTIME_DIR) before the exec and sudo's env
+# reset would drop them otherwise.
+Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR"
 
-# Base RunAs: the wrapper always execs opencode as the opencode user (with no
-# supplementary group) for the no-container path AND for the rootless backends.
+# Base RunAs: the wrapper always execs opencode as the opencode user.
 DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *
-#@docker-group-begin
-# Docker-group backend only: the supplementary `-g docker` grant. The wrapper
-# uses `sudo -u opencode -g docker` so projects that explicitly allow docker/ddev
-# in their opencode.jsonc work inside the sandbox. For the rootless backends the
-# kit installs WITHOUT the docker group (containers run under the opencode host
-# UID via a per-user socket), so this line is stripped at render time.
-DEFAULT_USER ALL=(opencode:docker) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *
-#@docker-group-end
-DEFAULT_USER ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/protect-projects.sh *
-opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/protect-projects.sh *
 
 # Rootless socket reachability: the wrapper probes the docker-rootless /
 # podman-rootless socket from the opencode user's own context, because the
@@ -31,22 +23,3 @@ opencode     ALL=(root)      NOPASSWD: /usr/local/lib/opencode-permissions-kit/p
 # developer-running wrapper cannot stat it. Gated to the kit's socket-check.sh
 # helper only (it does nothing but `test -S`) — no arbitrary command execution.
 DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh *
-
-# ddev delegation (DDEV_MODE=delegated, the default): the ddev shim
-# (shadowed as /usr/local/bin/ddev) re-execs every `ddev` the opencode agent
-# invokes as the developer via this rule, so ddev rewrites project files with
-# the developer's ownership instead of colliding with the kit's ACL denies.
-# Both placeholders are replaced at install time: the RunAs user (the
-# developer) and the command path (the real ddev).
-#@ddev-delegated-begin
-opencode     ALL=(DEFAULT_USER) NOPASSWD: DDEV_BIN
-#@ddev-delegated-end
-
-# ddev sandbox mode (DDEV_MODE=sandbox, rootless backends only): the shim
-# hands mutating ddev invocations to the transaction helper, which opens the
-# minimal ACL window, runs ddev AS the opencode user, and restores the
-# protections afterwards. Mutually exclusive with the delegation rule above —
-# only the block matching DDEV_MODE survives template rendering.
-#@ddev-sandbox-begin
-opencode     ALL=(root) NOPASSWD: /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh *
-#@ddev-sandbox-end

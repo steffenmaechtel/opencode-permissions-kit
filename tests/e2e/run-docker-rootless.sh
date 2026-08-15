@@ -103,20 +103,12 @@ else
 fi
 
 echo ""
-echo "--- RL1. Install the kit (docker-group baseline) ---"
-# ddev stub (records the invoking user + args) must exist BEFORE install.sh
-# detects DDEV_BIN — same as run.sh section 1c.
-E 'sudo tee /usr/bin/ddev > /dev/null <<'\''EOF'\''
-#!/bin/sh
-id -un > /tmp/ddev-stub.out
-printf "%s " "$@" >> /tmp/ddev-stub.out
-echo "" >> /tmp/ddev-stub.out
-EOF'
-E 'sudo chmod 755 /usr/bin/ddev'
-check "ddev stub installed at /usr/bin/ddev" E 'test -x /usr/bin/ddev'
-
-# Install opencode itself (cached binary), then the kit with the default
-# docker-group backend. Never rely on repo mode bits: use `bash script`.
+echo "--- RL1. Install the kit (podman-rootless baseline) ---"
+# Install opencode itself (cached binary), then the kit. The baseline backend
+# is podman-rootless (works without systemd); RL2 below switches to a REAL
+# docker-rootless daemon via config.sh AFTER the container-internal prep
+# (fuse-overlayfs pin + nested-userns subuid seed) is in place. Never rely on
+# repo mode bits: use `bash script`.
 E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSION"'/opencode' || {
     echo "  ${RED}FAIL${NC}  opencode installer failed (network issue?)"
     if E 'test -x /home/dev/.opencode/bin/opencode'; then
@@ -126,17 +118,17 @@ E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSI
         exit 1
     fi
 }
-E 'sudo bash /home/dev/repo/files/install.sh --yes --projects /var/www/vhosts --container-backend docker-group'
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts'
 echo "  Install complete."
 
-check "install.conf records CONTAINER_BACKEND=docker-group" \
-    E 'grep -q "^CONTAINER_BACKEND=docker-group" /etc/opencode-permissions-kit/install.conf'
+check "install.conf records CONTAINER_BACKEND=podman-rootless" \
+    E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
 check "wrapper at /usr/local/bin/opencode" \
     E 'test -x /usr/local/bin/opencode'
 check "opencode sandbox user exists" \
     E 'id opencode'
-check ".env ACL-denied for opencode" \
-    E 'sudo getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode:---"'
+check ".env readable by opencode (soft-only model)" \
+    E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 
 OC_UID=$(E 'id -u opencode')
 SOCK="unix:///run/user/$OC_UID/docker.sock"
@@ -285,7 +277,7 @@ EOF'
 fi
 
 echo ""
-echo "--- RL4. §9.1 proof with REAL dockerd (ACL denies hold in containers) ---"
+echo "--- RL4. §9.1 proof with REAL dockerd (soft-only: containers read as opencode UID) ---"
 if [ "$_rootless_ok" = true ]; then
     check "RL4: docker CLI works against the rootless socket as opencode" \
         E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' DOCKER_HOST='"$SOCK"' docker ps"'
@@ -299,12 +291,16 @@ if [ "$_rootless_ok" = true ]; then
         # never anchor the pattern at the start of the line.
         check "RL4: container userns maps root to the opencode host UID ($OC_UID), not real root" \
             E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' DOCKER_HOST='"$SOCK"' docker run --rm alpine:latest cat /proc/self/uid_map" | grep -qE "0[[:space:]]+'"$OC_UID"'[[:space:]]+"'
-        check_fail "RL4 §9.1: container CANNOT read ACL-denied .env via bind mount" \
-            E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' DOCKER_HOST='"$SOCK"' docker run --rm -v /var/www/vhosts/test-project:/app alpine:latest cat /app/.env"'
-        check "RL4 §9.1: container CAN read non-denied index.php via bind mount" \
-            E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' DOCKER_HOST='"$SOCK"' docker run --rm -v /var/www/vhosts/test-project:/app alpine:latest cat /app/index.php" | grep -q "normal source code"'
-        check_fail "RL4 §9.1: host-side opencode also denied .env (ACL, not missing file)" \
-            E 'sudo -u opencode cat /var/www/vhosts/test-project/.env'
+        # Bind-mount read checks (soft-only model): the container output must
+        # contain the file content. Wrapped in a function so the PASS/FAIL
+        # lines are not swallowed by the output pipe.
+        _rl_cat_check() {
+            E "sudo -u opencode sh -c 'XDG_RUNTIME_DIR=/run/user/$OC_UID DOCKER_HOST=$SOCK docker run --rm -v /var/www/vhosts/test-project:/app alpine:latest cat /app/$2'" | grep -q "$1"
+        }
+        check "RL4 §9.1 (soft-only): container CAN read .env via bind mount (ddev-working goal)" \
+            _rl_cat_check secret123 .env
+        check "RL4 §9.1 (soft-only): container CAN read settings.php via bind mount (ddev boots)" \
+            _rl_cat_check hunter2 settings.php
     else
         echo "  ${YELLOW}SKIP${NC}  RL4 §9.1: could not pull alpine (no network?) — $(E 'tail -1 /tmp/docker-pull.out' 2>/dev/null || echo unknown)"
         skipped=$((skipped + 3))
@@ -325,17 +321,12 @@ if [ "$_rootless_ok" = true ]; then
 fi
 
 echo ""
-echo "--- RL6. Teardown (docker-group) + uninstall ---"
-if [ "$_rootless_ok" = true ]; then
-    E 'sudo bash /home/dev/repo/files/config.sh --yes container-backend docker-group >/tmp/config-teardown.log 2>&1' || true
-    check "RL6: install.conf switched back to docker-group" \
-        E 'grep -q "^CONTAINER_BACKEND=docker-group" /etc/opencode-permissions-kit/install.conf'
-    check_fail "RL6: rootless docker.service stopped after teardown" \
-        E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' systemctl --user is-active docker"'
-    check "RL6: sudoers restored (opencode:docker) for docker-group" \
-        E 'sudo grep -q "opencode:docker" /etc/sudoers.d/opencode-permissions-kit'
-fi
-
+echo "--- RL6. Uninstall (rootless runtime teardown built in) ---"
+# The soft-only kit has no docker-group switch-back — uninstall.sh itself
+# disables linger, stops user@<uid> and resets rootless podman storage so
+# userdel -r can remove the opencode user.
+OC_UID2=$(E 'id -u opencode')
+E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID2"' docker system prune -af >/dev/null 2>&1" || true'
 E 'bash /usr/local/lib/opencode-permissions-kit/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
 check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'

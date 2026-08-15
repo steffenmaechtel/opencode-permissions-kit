@@ -2,14 +2,14 @@
 """
 opencode permissions kit — JSONC Pattern Extractor
 
-Parses opencode.json[c] and extracts deny or allow patterns from
-permission.read and permission.edit sections, or reports which container
-tools (docker/ddev) a project explicitly enables via permission.bash.
+Parses opencode.json[c] and extracts deny patterns from permission.read and
+permission.edit sections (used by status.sh's report-only leak scan), or
+reports which container tools (docker/ddev) a project explicitly enables via
+permission.bash (used by the wrapper's container opt-in).
 
-Output: one glob pattern per line to stdout.
+Output: one entry per line to stdout.
 Usage:
-  python3 jsonc-parser.py /path/to/opencode.json[c]          # deny patterns (default)
-  python3 jsonc-parser.py --allow /path/to/opencode.json[c]  # allow patterns
+  python3 jsonc-parser.py /path/to/opencode.json[c]          # deny patterns
   python3 jsonc-parser.py --tools /path/to/opencode.json[c]  # enabled container tools
 """
 import fnmatch
@@ -78,7 +78,7 @@ def strip_jsonc_comments(text):
     return ''.join(out)
 
 
-def extract_patterns(config_path, action='deny'):
+def extract_patterns(config_path):
     with open(config_path, 'r') as f:
         raw = f.read()
 
@@ -97,7 +97,7 @@ def extract_patterns(config_path, action='deny'):
         rules = permission.get(tool, {})
         if isinstance(rules, dict):
             for pattern, act in rules.items():
-                if act == action and pattern != '*':
+                if act == 'deny' and pattern != '*':
                     patterns.add(pattern)
 
     for p in sorted(patterns):
@@ -158,16 +158,13 @@ def extract_tools(config_path):
 if __name__ == '__main__':
     mode = 'deny'
     args = sys.argv[1:]
-    if args and args[0] == '--allow':
-        mode = 'allow'
-        args = args[1:]
-    elif args and args[0] == '--tools':
+    if args and args[0] == '--tools':
         mode = 'tools'
         args = args[1:]
     if len(args) < 1:
-        print(f"Usage: {sys.argv[0]} [--allow|--tools] <path/to/opencode.json[c]>", file=sys.stderr)
+        print(f"Usage: {sys.argv[0]} [--tools] <path/to/opencode.json[c]>", file=sys.stderr)
         sys.exit(1)
     if mode == 'tools':
         extract_tools(args[0])
     else:
-        extract_patterns(args[0], action=mode)
+        extract_patterns(args[0])
