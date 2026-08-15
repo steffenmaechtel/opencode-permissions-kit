@@ -470,6 +470,44 @@ if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
     fi
 fi
 
+# WSL2 /mnt/c restriction: the drvfs mount runs with the Windows session
+# token, so NTFS ACLs do NOT distinguish WSL users — the world-readable
+# default (mode 777) exposes the whole Windows profile (.ssh, NTUSER.DAT,
+# browser data) to every WSL user, including the agent's. Offer to restrict
+# the mount to the default user. Takes effect only after 'wsl --shutdown'
+# from Windows (the kit cannot reboot the distro).
+if [ -d /mnt/c ]; then
+    mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -z "$mnt_mode" ] || [ $((0$mnt_mode & 0004)) -eq 0 ]; then
+        echo "  /mnt/c already restricted (mode ${mnt_mode:-?}) — Windows profile not exposed."
+    elif grep -q '^\[automount\]' /etc/wsl.conf 2>/dev/null; then
+        echo "  ${YELLOW}NOTE: /etc/wsl.conf already has an [automount] section — left untouched.${NC}"
+        echo "  /mnt/c is world-readable (mode $mnt_mode); every WSL user incl. the agent"
+        echo "  can read the Windows profile. Restrict it manually if unintended."
+        log "wsl.conf has a pre-existing [automount] section — /mnt/c restriction skipped"
+    else
+        ans=$(prompt "Restrict /mnt/c to your user? (WSL2 drvfs is world-readable by default; recommended)" "Y" "N" "")
+        if [ "$ans" = "y" ]; then
+            d_uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo "")
+            d_gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo "")
+            if [ -n "$d_uid" ] && [ -n "$d_gid" ]; then
+                printf '\n[automount]\nenabled = true\noptions = "uid=%s,gid=%s,dmask=027,fmask=037"\n' "$d_uid" "$d_gid" | sudo tee -a /etc/wsl.conf >/dev/null
+                echo "  /etc/wsl.conf: [automount] restricted to uid=$d_uid/gid=$d_gid (dmask=027,fmask=037)"
+                echo "  ${YELLOW}Takes effect after 'wsl --shutdown' (Windows PowerShell) and reopening the distro.${NC}"
+                log "wsl.conf automount restricted to uid=$d_uid gid=$d_gid"
+            else
+                echo "  ${YELLOW}Could not resolve uid/gid for '$DEFAULT_USER' — add manually to /etc/wsl.conf:${NC}"
+                echo "    [automount]"
+                echo "    enabled = true"
+                echo '    options = "uid=<your-uid>,gid=<your-gid>,dmask=027,fmask=037"'
+            fi
+        else
+            echo "  Skipped — /mnt/c stays world-readable; status.sh will keep reporting the exposure."
+            log "wsl.conf /mnt/c restriction declined"
+        fi
+    fi
+fi
+
 # mkcert CA reuse: search order 1. Windows CA (WSL2 /mnt/c), 2. developer's
 # Linux CAROOT, 3. 'mkcert -install' (new, untrusted CA).
 caroot="/home/$OPENCODE_USER/.local/share/mkcert"

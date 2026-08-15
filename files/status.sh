@@ -225,12 +225,16 @@ if [ -d /mnt/c ]; then
     echo "  ${CYAN}WSL2 /mnt/c exposure:${NC}"
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
-        echo "    /mnt/c:     ${RED}world-readable${NC} (mode $mnt_mode — the agent user can read the whole Windows profile)"
-        echo "                fix: restrict the drvfs mount to the developer in /etc/wsl.conf:"
-        echo "                  [automount]"
-        echo "                  enabled = true"
-        echo "                  options = \"uid=1000,gid=1000,dmask=027,fmask=037\""
-        echo "                (replace uid/gid with the default user's) and run 'wsl --shutdown' from Windows."
+        if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
+            echo "    /mnt/c:     ${YELLOW}fix configured, pending${NC}  (wsl.conf carries the restriction — run 'wsl --shutdown' from Windows to apply)"
+        else
+            echo "    /mnt/c:     ${RED}world-readable${NC} (mode $mnt_mode — the agent user can read the whole Windows profile)"
+            echo "                fix: restrict the drvfs mount to the developer in /etc/wsl.conf:"
+            echo "                  [automount]"
+            echo "                  enabled = true"
+            echo "                  options = \"uid=1000,gid=1000,dmask=027,fmask=037\""
+            echo "                (replace uid/gid with the default user's; install.sh asks) and run 'wsl --shutdown' from Windows."
+        fi
     else
         echo "    /mnt/c:     ${GREEN}restricted${NC} (mode ${mnt_mode:-?})"
     fi

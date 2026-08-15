@@ -355,6 +355,28 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_WWW_GROUP" ]; then
     done < "$PROJECTS_CONF"
 fi
 
+# --- WSL2 /mnt/c restriction (report-only — update.sh stays prompt-free) -------
+# The drvfs mount runs with the Windows session token; NTFS ACLs do not
+# distinguish WSL users, so a world-readable /mnt/c exposes the whole
+# Windows profile to every WSL user incl. the agent's. Hint when open,
+# remind about the pending 'wsl --shutdown' when the restriction is
+# configured but not applied yet.
+if [ -d /mnt/c ]; then
+    mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
+        if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
+            echo "  NOTE: /mnt/c restriction configured in /etc/wsl.conf — pending 'wsl --shutdown' (Windows)."
+        else
+            echo "  NOTE: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent"
+            echo "        can read the Windows profile. Recommended fix in /etc/wsl.conf:"
+            echo "          [automount]"
+            echo "          enabled = true"
+            echo "          options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
+            echo "        then 'wsl --shutdown' from Windows. install.sh can apply this for you (interactive)."
+        fi
+    fi
+fi
+
 # --- one-time hard-deny migration (DDEV-WORKING §4) ---------------------------
 
 if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then

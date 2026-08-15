@@ -45,8 +45,11 @@ Known residual gaps, documented rather than hidden:
   token — NTFS ACLs do not distinguish WSL users, so with the default
   world-readable mount **every WSL user (including the agent's) can read
   the whole Windows profile** (`.ssh/`, `NTUSER.DAT`, browser data). The
-  kit's UID separation only covers the Linux side. Fix at the host level
-  via `/etc/wsl.conf` (then `wsl --shutdown` from Windows):
+  kit's UID separation only covers the Linux side. `install.sh` therefore
+  offers to restrict the mount to your user (recommended; applies after
+  `wsl --shutdown` from Windows), `update.sh` prints the recommendation,
+  and `status.sh` reports the exposure plus a configured-but-pending
+  state. Manual fix via `/etc/wsl.conf`:
 
   ```ini
   [automount]
@@ -55,7 +58,7 @@ Known residual gaps, documented rather than hidden:
   ```
 
   (replace `uid`/`gid` with your default WSL user's — the agent user must
-  end up as "other", with no bits). `status.sh` reports the exposure.
+  end up as "other", with no bits).
 
 ## The Two States
 
