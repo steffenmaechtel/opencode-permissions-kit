@@ -118,7 +118,7 @@ The old justification for rootless was "ACL denies hold inside containers"
 | `files/opencode-permissions-kit-lib/shell-warn.sh` | bypass warning stays |
 | `files/opencode-permissions-kit-lib/setup-container-backend.sh` | rootless provisioning; docker-group teardown path removed |
 | `files/opencode-permissions-kit-lib/bin/socket-check.sh` | wrapper socket probe stays |
-| `tests/test-jsonc-parser.sh`, `test-git-config.sh`, `test-bypass-guard.sh` | unaffected (parser `--tools` mode still used) |
+| `tests/test-jsonc-parser.sh`, `test-git-config.sh`, `test-bypass-guard.sh` | parser `--tools` mode still used; `test-git-config.sh` moves off the parser's default mode in Phase 6 (grep-based) |
 | `tests/test-container-backend.sh` | rootless cases only |
 
 ### Rewritten
@@ -127,13 +127,13 @@ The old justification for rootless was "ACL denies hold inside containers"
 |---|---|
 | `files/opencode-permissions-kit-lib/wrapper` | drop the `protect-projects.sh --cwd` call; drop `-g/--gid docker` parsing and the docker-group backend case; drop the `--allow` override warning; keep project-dir validation, `--tools` opt-in, sock probe, DOCKER_HOST/XDG export, `sudo -u opencode` exec; stop exporting `OPENCODE_LAUNCH_CWD` |
 | `files/sudoers.template` | keep: base `(opencode)` RunAs for the binary, socket-check rule, `env_keep += "DOCKER_HOST XDG_RUNTIME_DIR"`; drop: `OPENCODE_LAUNCH_CWD` env_keep, both protect-projects rules, docker-group block, ddev-delegated block, ddev-sandbox block |
-| `files/opencode.jsonc` | comments rewritten ("OS ACL remains the hard boundary" is now false); read/edit denies stay as SOFT rules; add `*.git/config*": "ask"` bash tripwire; keep `docker *`/`ddev *` denies + SECURE_GIT markers |
+| `files/opencode.jsonc` | comments rewritten ("OS ACL remains the hard boundary" is now false); read/edit denies stay as SOFT rules; `*README.txt` goes back to `deny` (the old `ask` existed only because the hard ACL broke ddev's start-time read of `.ddev/commands/<svc>/README.txt` — a soft deny never touches the ddev process); add `*.git/config*": "ask"` and `*README.txt*": "ask"` bash tripwires; keep `docker *`/`ddev *` denies + SECURE_GIT markers |
 | `files/install.sh` | backend prompt becomes docker-rootless (default) \| podman-rootless, **mandatory** — abort when provisioning fails (no docker-group fallback); ddev >= 1.25 becomes a **hard** requirement; absorb sandbox provisioning: `/home/opencode/.ddev`, router-port sysctl question, mkcert CA reuse (moved here from `config.sh ddev-mode sandbox`); drop Step 7 (initial protection run), git hooks setup, hooks deploy; drop `--container-backend docker-group`; **group switch (§2.2)**: drop the `www-data` groupadd/existence prompt, `usermod -aG opencode $DEFAULT_USER` instead, all `:$WWW_GROUP` chowns become `:opencode`, default ACLs `g:opencode:rwx` |
 | `files/update.sh` | shrink `KIT_FILES`; drop hooks/protect-projects/transaction/shim deploy + `core.hooksPath` re-assert + ddev shim re-link; add the **one-time deny-removal + group migration** (§4); keep `--binary`/`--binary-path`; `--refresh` becomes the migration trigger alias (or is removed) |
 | `files/config.sh` | drop `ddev-mode` subcommand + all sandbox provisioning code (moved to install); `container-backend` accepts only rootless values + `status`; `git-config on/off` stays (soft-only, message updated); `refresh` subcommand removed or re-purposed to re-apply the group baseline (now `g:opencode:rwx`) |
 | `files/status.sh` | drop ACL-protection and ddev-mode sections; add: leftover `u:opencode` deny scan (warns "run update.sh"), rootless socket state, `/home/opencode/.ddev` presence, migration stamp state; group display switches to the `opencode` usergroup |
 | `files/uninstall.sh` | drop hooksPath unset, shim/sudoers remnants already handled; keep `setfacl -R -b/-k` sweep (now the only ACL cleanup) + removal of migration artifacts (`ddev-rewrites.conf`, `/run/opencode-permissions-kit/`); **group note**: `gpasswd -d $DEFAULT_USER opencode` (best-effort) before `userdel -r` so the private group is cleaned up automatically |
-| `files/opencode-permissions-kit-lib/jsonc-parser.py` | keep `--tools`; remove `--allow`/default deny-extraction modes (dead code) — or keep the script untouched if removal breaks test-jsonc-parser.sh more than it helps; decision: remove modes, trim test |
+| `files/opencode-permissions-kit-lib/jsonc-parser.py` | keep `--tools`; remove `--allow`/default deny-extraction modes (dead code). **Timing: Phase 6** — until then `test-project-config.sh` (default + `--allow`), `test-git-config.sh` (default mode) and the not-yet-rewritten wrapper (`--allow`) still consume them; trimming earlier would break the green-tests-per-phase rule. Phase 6 also rewrites `test-git-config.sh` to assert SECURE_GIT on/off via grep instead of the parser |
 
 ## 4. Migration of existing installs (update.sh)
 
@@ -234,11 +234,15 @@ stays). `DEFAULT_USER` stays auto-detected (`SUDO_USER`), never asked.
   `.github/workflows/test.yml` and `.github/workflows/e2e.yml` (AGENTS.md
   rule).
 - **e2e** (`tests/e2e/run.sh`): drop hook/ACL/deny assertions and the ddev
-  shim + delegated/sandbox sections; keep/extend 12g log assertions minus
+  shim + delegated/sandbox sections; the "README.txt readable (ddev
+  compat)" OS check and the stale-ACL heal check around it go too
+  (soft-only world); keep/extend 12g log assertions minus
   the ACL event lines; new section: install old-shape kit fixture → run
   update.sh → assert `getfacl` shows no `u:opencode` deny and ddev start
   succeeds reading `settings.php`. Section 12i (rootless runtime teardown)
-  stays.
+  stays. NOTE: e2e is only expected green again **after Phase 6** —
+  intermediate phases change repo files that the e2e container installs,
+  so the unit suite is the per-phase gate.
 
 ## 8. Documentation
 
@@ -260,8 +264,11 @@ stays). `DEFAULT_USER` stays auto-detected (`SUDO_USER`), never asked.
 
 ## 9. Rollout order (each phase leaves `sh tests/test-*.sh` green)
 
-1. **Phase 1 — template + parser**: rewrite `opencode.jsonc` comments/rules,
-   trim `jsonc-parser.py` modes, adjust tests.
+1. **Phase 1 — template + tests** (DONE): rewrite `opencode.jsonc`
+   comments/rules (README.txt → deny, new bash tripwires
+   `*README.txt*` + `*.git/config*`, soft-only wording), adjust
+   `test-jsonc-parser.sh`. Parser trim deferred to Phase 6 (green-tests
+   constraint, see §3 parser row).
 2. **Phase 2 — wrapper + sudoers.template**: soft-only wrapper, new sudoers
    shape; update `test-wrapper-validation.sh`.
 3. **Phase 3 — install.sh**: rootless-only flow, absorbed provisioning, new

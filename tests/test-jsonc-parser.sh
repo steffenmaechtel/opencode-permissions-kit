@@ -126,6 +126,7 @@ OUT=$(python3 "$PARSER" "$SCRIPT_DIR/../files/opencode.jsonc" 2>/dev/null || tru
 assert_contains "bundled: .env* present" ".env*" "$OUT"
 assert_contains "bundled: auth.json present" "auth.json" "$OUT"
 assert_contains "bundled: README.md present" "README.md" "$OUT"
+assert_contains "bundled: README.txt present (deny again — soft-only, ddev-safe)" "README.txt" "$OUT"
 assert_not_contains "bundled: //SECURE_GIT NOT present (commented)" "//SECURE_GIT" "$OUT"
 
 # --- 13. Bundled template allow mode (SECURE_GIT lines are comments → not emitted) ---

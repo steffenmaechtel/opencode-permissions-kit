@@ -1,6 +1,10 @@
 {
     "$schema": "https://opencode.ai/config.json",
     // opencode permissions kit — default permission template
+    // SOFT PROTECTION ONLY: these rules are enforced by opencode's own
+    // permission layer. The kit no longer mirrors them into Linux ACLs —
+    // see docs/design/DDEV-WORKING.md. Processes spawned outside opencode
+    // (ddev, its containers) are NOT restricted by them.
     // Bash is ask-by-default ("*": "ask"): every bash command prompts unless
     // explicitly allowlisted or denied below. The long ask-blacklist of the
     // early templates is gone — the default IS ask — so only an allowlist and
@@ -25,11 +29,10 @@
             "*AdditionalConfiguration.php": "deny",
             // Misc
             "*README.md": "deny",
-            // README.txt is "ask" (not deny): ddev reads its command docs from
-            // .ddev/commands/<svc>/README.txt at start, and a filesystem ACL
-            // deny breaks ddev. "ask" keeps the soft prompt for the agent
-            // without a hard ACL.
-            "*README.txt": "ask",
+            // Soft deny is ddev-safe: ddev reads .ddev/commands/<svc>/README.txt
+            // as a separate process outside opencode's permission layer, so this
+            // rule never affects `ddev start`.
+            "*README.txt": "deny",
             "*.sql.gz": "deny",
             "*auth.json": "deny",
             // ".env*" catches .env, .env.local, .env.example AND foo.env
@@ -58,11 +61,10 @@
             "*AdditionalConfiguration.php": "deny",
             // Misc
             "*README.md": "deny",
-            // README.txt is "ask" (not deny): ddev reads its command docs from
-            // .ddev/commands/<svc>/README.txt at start, and a filesystem ACL
-            // deny breaks ddev. "ask" keeps the soft prompt for the agent
-            // without a hard ACL.
-            "*README.txt": "ask",
+            // Soft deny is ddev-safe: ddev reads .ddev/commands/<svc>/README.txt
+            // as a separate process outside opencode's permission layer, so this
+            // rule never affects `ddev start`.
+            "*README.txt": "deny",
             "*.sql.gz": "deny",
             "*auth.json": "deny",
             // ".env*" catches .env, .env.local, .env.example AND foo.env
@@ -142,12 +144,14 @@
             // name mid-command (cat settings.php | grep DB, cp auth.json /tmp)
             // must still hit. Still LEXICAL ONLY — variables (F=.env; cat $F),
             // globs (cat .en?) and indirection (find -exec cat {} \;) evade
-            // it. The OS ACL remains the hard boundary.
+            // it. With the hard ACL layer gone this is the LAST line of
+            // defense for bash-spawned reads — treat matches seriously.
             "*additional.php*": "ask",
             "*settings.php*": "ask",
             "*LocalConfiguration.php*": "ask",
             "*AdditionalConfiguration.php*": "ask",
             "*README.md*": "ask",
+            "*README.txt*": "ask",
             "*.sql.gz*": "ask",
             "*auth.json*": "ask",
             "*.env*": "ask",
@@ -157,7 +161,11 @@
             "*wp-config.php*": "ask",
             "*conf.php*": "ask",
             "*config.php*": "ask",
-            "*config/database.php*": "ask"
+            "*config/database.php*": "ask",
+            // Pairs with the git-config toggle: even with the read/edit deny
+            // inactive, bash commands naming .git/config (cat .git/config)
+            // trip an ask.
+            "*.git/config*": "ask"
         },
         "external_directory": "ask"
     }
