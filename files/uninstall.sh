@@ -209,6 +209,12 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
         run "sudo systemctl stop \"user@$OC_UID.service\" 2>/dev/null || true"
         # Rootless podman storage keeps the home busy — reset it (best-effort).
         run "sudo -u \"$OPENCODE_USER\" XDG_RUNTIME_DIR=/run/user/$OC_UID podman system reset --force >/dev/null 2>&1 || true"
+        # Stopping the user manager can leave a rootless container's init
+        # (e.g. docker-rootless `catatonit`) orphaned and re-parented to
+        # init.scope; userdel refuses while ANY process of the user runs.
+        # Kill stragglers (best-effort), then remove the user.
+        run "sudo pkill -9 -u \"$OPENCODE_USER\" 2>/dev/null || true"
+        sleep 1
         run "sudo userdel -r \"$OPENCODE_USER\" 2>/dev/null || true"
         echo "User '$OPENCODE_USER' removed."
         log "user removed: $OPENCODE_USER"
