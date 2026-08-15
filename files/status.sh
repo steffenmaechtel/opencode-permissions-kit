@@ -24,16 +24,17 @@ PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 VERSION="0.0.0"
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
-WWW_GROUP="opencode"
+OPENCODE_GROUP=""
 HARD_DENY_REMOVED=""
 if [ -f "$INSTALL_CONF" ]; then
     # shellcheck disable=SC1090
     . "$INSTALL_CONF"
 fi
-[ -n "$WWW_GROUP" ] || WWW_GROUP="opencode"
-# Prefer the live primary usergroup over a stale conf value.
+# Prefer OPENCODE_GROUP, fall back to the legacy WWW_GROUP key a pre-rename
+# install.conf still carries; then the live primary usergroup.
+OPENCODE_GROUP="${OPENCODE_GROUP:-${WWW_GROUP:-opencode}}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
-[ -n "$LIVE_GROUP" ] && WWW_GROUP="$LIVE_GROUP"
+[ -n "$LIVE_GROUP" ] && OPENCODE_GROUP="$LIVE_GROUP"
 
 # installed = the wrapper is active (user + wrapper + library present)
 installed=false
@@ -60,7 +61,7 @@ echo "  User:       $OPENCODE_USER $(id "$OPENCODE_USER" >/dev/null 2>&1 && echo
 echo "  Wrapper:    /usr/local/bin/opencode -> $(readlink /usr/local/bin/opencode 2>/dev/null || echo missing)"
 echo "  Library:    $LIBDIR"
 echo "  Config:     $(ls /home/$OPENCODE_USER/.config/opencode/opencode.jsonc 2>/dev/null || ls /home/$OPENCODE_USER/.config/opencode/opencode.json 2>/dev/null || echo "${YELLOW}none${NC}")"
-echo "  Default user: $DEFAULT_USER  sharing group: $WWW_GROUP"
+echo "  Default user: $DEFAULT_USER  sharing group: $OPENCODE_GROUP"
 
 echo ""
 echo "  ${CYAN}Project roots ($(grep -c . "$PROJECTS_CONF" 2>/dev/null || echo 0)):${NC}"

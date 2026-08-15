@@ -52,16 +52,19 @@ INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
 
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
-WWW_GROUP="opencode"
+OPENCODE_GROUP="opencode"
 if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
-# The sharing group is the opencode user's own usergroup; prefer the live
-# value over any stale conf entry (e.g. www-data from a pre-migration install).
+# Sharing group: prefer the OPENCODE_GROUP key, fall back to the legacy
+# WWW_GROUP key a pre-rename install.conf still carries. The sharing group
+# is the opencode user's own usergroup; prefer the live value over any
+# stale conf entry (e.g. www-data from a pre-migration install).
+OPENCODE_GROUP="${OPENCODE_GROUP:-${WWW_GROUP:-opencode}}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
-[ -n "$LIVE_GROUP" ] && WWW_GROUP="$LIVE_GROUP"
+[ -n "$LIVE_GROUP" ] && OPENCODE_GROUP="$LIVE_GROUP"
 
 YES=false
 ACTION=""
@@ -161,16 +164,16 @@ projects_add() {
         fi
         echo "$p" | sudo tee -a "$PROJECTS_CONF" > /dev/null
         # Apply the group baseline so the developer/agent share files immediately
-        sudo chgrp -R "$WWW_GROUP" "$p" 2>/dev/null || true
+        sudo chgrp -R "$OPENCODE_GROUP" "$p" 2>/dev/null || true
         sudo chmod g+s "$p"
-        sudo setfacl -R -d -m "g:$WWW_GROUP:rwx" "$p" 2>/dev/null || true
+        sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$p" 2>/dev/null || true
         # ddev handover (.ddev + the app-type's settings dirs at any depth):
         # ddev always runs as $OPENCODE_USER and chmods these paths
         # unconditionally — they must belong to it or `ddev start` fails
         # with "operation not permitted". The registered path may be a
         # parent of several projects.
-        ddev_handover_root "$p" "$OPENCODE_USER" "$WWW_GROUP"
-        echo "  ${GREEN}added${NC} $p (group=$WWW_GROUP, setgid, default-acl)"
+        ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
+        echo "  ${GREEN}added${NC} $p (group=$OPENCODE_GROUP, setgid, default-acl)"
         log "project added: $p"
     done
 }
@@ -235,7 +238,7 @@ git_config_apply() {
     [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/opencode.jsonc, $SCRIPT_DIR/../files/opencode.jsonc, $LIBDIR/opencode.jsonc"
 
     sudo cp "$template" "$target"
-    sudo chown "$OPENCODE_USER:$WWW_GROUP" "$target"
+    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$target"
     sudo chmod 664 "$target"
 
     if [ "$enable" = "on" ]; then
@@ -386,13 +389,13 @@ refresh() {
         if [ -f "$cand" ]; then migrate="$cand"; break; fi
     done
     [ -n "$migrate" ] || die "migrate-denies.sh not found."
-    echo "Re-applying the group baseline (chgrp $WWW_GROUP + setgid + default ACLs) ..."
+    echo "Re-applying the group baseline (chgrp $OPENCODE_GROUP + setgid + default ACLs) ..."
     sudo sh "$migrate" \
         --projects "$PROJECTS_CONF" \
         --conf-dir /etc/opencode-permissions-kit \
         --lib-dir "$LIBDIR" \
         --opencode-user "$OPENCODE_USER" \
-        --group "$WWW_GROUP"
+        --group "$OPENCODE_GROUP"
     echo "${GREEN}Group baseline refreshed.${NC}"
     log "group baseline refresh requested"
 }

@@ -194,7 +194,7 @@ No chown sweep (ddev needs to chmod its own files as opencode anyway).
 |---|---|---|
 | `CONTAINER_BACKEND` | docker-group \| docker-rootless \| podman-rootless \| (none) | docker-rootless \| podman-rootless only |
 | `DDEV_MODE` | delegated \| sandbox | **removed** |
-| `WWW_GROUP` | www-data (or custom) | fixed `opencode` (the user's private group, §2.2) — key kept for group-agnostic readers, value no longer asked |
+| `WWW_GROUP` | www-data (or custom) | fixed `opencode` (the user's private group, §2.2) — later renamed to `OPENCODE_GROUP` (readers keep a `WWW_GROUP` fallback for pre-rename confs, `update.sh` renames the key away) |
 | `OPENCODE_DOCKER_HOST` / `OPENCODE_PODMAN_SOCKET` | kept | kept |
 | `HARD_DENY_REMOVED` | — | new migration stamp |
 | `DDEV_BIN` | needed by the shim | **removed** (shim gone; ddev resolved via PATH inside the opencode session) |

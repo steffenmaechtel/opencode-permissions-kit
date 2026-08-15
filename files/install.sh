@@ -82,7 +82,7 @@ NC='\033[0m'
 OPENCODE_USER="opencode"
 # The sharing group is the opencode user's own primary usergroup (created by
 # useradd -m). Resolved after the user exists; "opencode" is only the default.
-WWW_GROUP="opencode"
+OPENCODE_GROUP="opencode"
 
 SKIP_PROMPTS=false
 PREDEFINED_PROJECTS=""
@@ -311,10 +311,10 @@ fi
 
 # The sharing group is the opencode user's PRIMARY usergroup (auto-created by
 # useradd -m). No www-data, no extra group to create or remove.
-WWW_GROUP=$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")
-sudo usermod -aG "$WWW_GROUP" "$DEFAULT_USER" 2>/dev/null || true
-echo "Sharing group: $WWW_GROUP (developer '$DEFAULT_USER' added)"
-log "sharing group: $WWW_GROUP (developer $DEFAULT_USER added)"
+OPENCODE_GROUP=$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")
+sudo usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER" 2>/dev/null || true
+echo "Sharing group: $OPENCODE_GROUP (developer '$DEFAULT_USER' added)"
+log "sharing group: $OPENCODE_GROUP (developer $DEFAULT_USER added)"
 
 # === Step 2: Project roots ===
 
@@ -387,7 +387,7 @@ fi
 sudo tee /etc/opencode-permissions-kit/install.conf > /dev/null <<EOF
 DEFAULT_USER=$DEFAULT_USER
 OPENCODE_USER=$OPENCODE_USER
-WWW_GROUP=$WWW_GROUP
+OPENCODE_GROUP=$OPENCODE_GROUP
 DDEV_VERSION=$DDEV_VERSION
 CONTAINER_BACKEND=$CONTAINER_BACKEND
 OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST
@@ -430,7 +430,7 @@ log "container backend provisioned: $CONTAINER_BACKEND"
 echo ""
 echo "--- ddev runtime for user $OPENCODE_USER ---"
 sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
-sudo chown "$OPENCODE_USER:$WWW_GROUP" "/home/$OPENCODE_USER/.ddev"
+sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "/home/$OPENCODE_USER/.ddev"
 sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
 log "ddev home provisioned: /home/$OPENCODE_USER/.ddev"
 
@@ -534,7 +534,7 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
     fi
     if [ -n "$src" ]; then
         sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null && \
-        sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$caroot" && \
+        sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" && \
         sudo chmod 700 "$caroot" && sudo chmod 600 "$caroot/rootCA-key.pem" && \
         echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)" && \
         log "mkcert CA reused from $src_label for $OPENCODE_USER"
@@ -554,7 +554,7 @@ fi
 if [ -n "$PROJECTS_ROOTS" ]; then
     echo ""
     echo "--- Filesystem ---"
-    ans=$(prompt "Apply group-$WWW_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)" "Y" "N" "B")
+    ans=$(prompt "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)" "Y" "N" "B")
     case "$ans" in
         n) echo "Skipping filesystem setup." ;;
         b)
@@ -565,9 +565,9 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     if [ "$ans" != "n" ]; then
         for root in $PROJECTS_ROOTS; do
             [ -d "$root" ] || continue
-            sudo chgrp -R "$WWW_GROUP" "$root" 2>/dev/null || true
+            sudo chgrp -R "$OPENCODE_GROUP" "$root" 2>/dev/null || true
             sudo chmod g+s "$root"
-            sudo setfacl -R -d -m "g:$WWW_GROUP:rwx" "$root" 2>/dev/null || true
+            sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
             echo "  $root done."
         done
     fi
@@ -580,7 +580,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     # the mode-700 .git dir stays dev-owned.
     for root in $PROJECTS_ROOTS; do
         [ -d "$root" ] || continue
-        ddev_handover_root "$root" "$OPENCODE_USER" "$WWW_GROUP"
+        ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP"
         log "ddev handover applied under $root"
     done
 fi
@@ -771,15 +771,15 @@ fi
 
 sudo mkdir -p /home/opencode/.config/opencode /home/opencode/.agents
 # The opencode home belongs to the user's own usergroup; the developer (member
-# of $WWW_GROUP) can enter and edit opencode.jsonc etc.
-sudo chown "$OPENCODE_USER:$WWW_GROUP" /home/opencode
+# of $OPENCODE_GROUP) can enter and edit opencode.jsonc etc.
+sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode
 sudo chmod 2750 /home/opencode
-sudo chown -R "$OPENCODE_USER:$WWW_GROUP" /home/opencode/.config /home/opencode/.agents
+sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config /home/opencode/.agents
 sudo chmod 2775 /home/opencode/.config /home/opencode/.config/opencode /home/opencode/.agents
 
 if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
     sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
-    sudo chown "$OPENCODE_USER:$WWW_GROUP" /home/opencode/.config/opencode/opencode.jsonc
+    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode/opencode.jsonc
     sudo chmod 664 /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
         sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
@@ -792,7 +792,7 @@ if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/openc
 elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
     sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
     sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
-    sudo chown "$OPENCODE_USER:$WWW_GROUP" /home/opencode/.config/opencode/opencode.jsonc
+    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode/opencode.jsonc
     sudo chmod 664 /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
         sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
@@ -831,7 +831,7 @@ if [ -f "$DEFAULT_OC_CONF" ]; then
 fi
 if [ ! -f "$DEFAULT_OC_CONF" ]; then
     sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
-    sudo chown "$DEFAULT_USER:$WWW_GROUP" "$DEFAULT_OC_CONF"
+    sudo chown "$DEFAULT_USER:$OPENCODE_GROUP" "$DEFAULT_OC_CONF"
     sudo chmod 664 "$DEFAULT_OC_CONF"
     echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
     log "deny-all config installed for default user: $DEFAULT_OC_CONF"
@@ -855,7 +855,7 @@ sudo rm -rf /run/opencode-permissions-kit 2>/dev/null || true
 sudo -u "$OPENCODE_USER" git config --global --unset core.hooksPath 2>/dev/null || true
 sudo -u "$DEFAULT_USER" git config --global --unset core.hooksPath 2>/dev/null || true
 # A legacy www-data-based install left files in the old sharing group; the
-# group baseline step already re-applied $WWW_GROUP. Record the model switch.
+# group baseline step already re-applied $OPENCODE_GROUP. Record the model switch.
 sudo grep -q '^HARD_DENY_REMOVED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null || \
     echo "HARD_DENY_REMOVED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
 log "legacy layouts/artifacts removed (if present); soft-only model active"

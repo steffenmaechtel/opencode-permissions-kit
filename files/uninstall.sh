@@ -45,10 +45,9 @@ fi
 
 DEFAULT_USER=$(whoami)
 OPENCODE_USER="opencode"
-# Sharing group default: the opencode user's own usergroup. A sourced
-# install.conf (below) or the live value (see the LIVE_GROUP override)
-# takes precedence; the pre-soft-only default www-data is long gone.
-WWW_GROUP="opencode"
+# Sharing group: filled from install.conf / the live value below (with a
+# legacy WWW_GROUP fallback); the pre-soft-only default www-data is gone.
+OPENCODE_GROUP=""
 
 echo ""
 echo "  ${RED}opencode permissions kit -- UNINSTALL${NC}"
@@ -130,15 +129,15 @@ if [ -n "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
-# Sharing group: the opencode user's primary usergroup (soft-only model).
-# Prefer the live value; stale confs may still say www-data.
+# Sharing group: prefer OPENCODE_GROUP, fall back to the legacy WWW_GROUP
+# key a pre-rename install.conf still carries; then the live value (stale
+# confs may still say www-data).
+OPENCODE_GROUP="${OPENCODE_GROUP:-${WWW_GROUP:-opencode}}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
 if [ -n "$LIVE_GROUP" ]; then
-    WWW_GROUP="$LIVE_GROUP"
-else
-    WWW_GROUP="${WWW_GROUP:-opencode}"
+    OPENCODE_GROUP="$LIVE_GROUP"
 fi
-trace "OPENCODE_USER=$OPENCODE_USER WWW_GROUP=$WWW_GROUP"
+trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP"
 
 trace "first prompt ..."
 ans=$(prompt_yn "Proceed with uninstall?" "n")
@@ -195,10 +194,10 @@ echo ""
 echo "--- Removing opencode user ---"
 # Remove the developer from the sharing group FIRST so userdel can clean up
 # the opencode usergroup (its primary group) automatically.
-if id "$DEFAULT_USER" >/dev/null 2>&1 && id "$DEFAULT_USER" | grep -q "$WWW_GROUP"; then
-    run "sudo gpasswd -d \"$DEFAULT_USER\" \"$WWW_GROUP\" 2>/dev/null || true"
-    echo "Removed $DEFAULT_USER from group $WWW_GROUP."
-    log "removed $DEFAULT_USER from group $WWW_GROUP"
+if id "$DEFAULT_USER" >/dev/null 2>&1 && id "$DEFAULT_USER" | grep -q "$OPENCODE_GROUP"; then
+    run "sudo gpasswd -d \"$DEFAULT_USER\" \"$OPENCODE_GROUP\" 2>/dev/null || true"
+    echo "Removed $DEFAULT_USER from group $OPENCODE_GROUP."
+    log "removed $DEFAULT_USER from group $OPENCODE_GROUP"
 fi
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ans=$(prompt_yn "Remove user '$OPENCODE_USER' and their home directory?" "n")

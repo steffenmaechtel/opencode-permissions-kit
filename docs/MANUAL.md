@@ -305,7 +305,7 @@ Notes:
 | `OPENCODE_DOCKER_HOST` | `docker-rootless` socket, e.g. `unix:///run/user/<opencode-uid>/docker.sock` |
 | `OPENCODE_PODMAN_SOCKET` | optional podman docker-CLI-compat socket |
 | `DDEV_VERSION` | recorded ddev version (advisory; `status.sh` flags < 1.25) |
-| `WWW_GROUP` | always the `opencode` usergroup (informational) |
+| `OPENCODE_GROUP` | always the `opencode` usergroup (informational; legacy installs may still carry the old `WWW_GROUP` key — readers fall back to it, `update.sh` renames it away) |
 | `HARD_DENY_REMOVED` | migration stamp — `1` once the soft-only migration ran |
 
 ## Customizing the Deny List
@@ -502,7 +502,7 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 ```
 
 `update.sh` re-deploys the kit files and refreshes the `install.conf` version
-stamp (+ `WWW_GROUP` re-base and the migration stamp). It does **not** touch
+stamp (+ `OPENCODE_GROUP` re-base — renaming away a legacy `WWW_GROUP` key — and the migration stamp). It does **not** touch
 `projects.conf` or `/home/opencode/.config/opencode/opencode.jsonc`.
 `--refresh` re-applies the group baseline.
 
@@ -538,7 +538,7 @@ config remain (harmless); the script prints manual cleanup steps.
 
 | Path | Purpose |
 |---|---|
-| `install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `WWW_GROUP`, `DDEV_VERSION`, `CONTAINER_BACKEND`, `OPENCODE_DOCKER_HOST`, `OPENCODE_PODMAN_SOCKET`, `HARD_DENY_REMOVED`, `VERSION` |
+| `install.conf` | `DEFAULT_USER`, `OPENCODE_USER`, `OPENCODE_GROUP`, `DDEV_VERSION`, `CONTAINER_BACKEND`, `OPENCODE_DOCKER_HOST`, `OPENCODE_PODMAN_SOCKET`, `HARD_DENY_REMOVED`, `VERSION` |
 | `projects.conf` | Project roots (one per line) |
 
 ### /etc/sudoers.d/

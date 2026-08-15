@@ -24,6 +24,7 @@ INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/update.sh"
 STATUS="$REPO/files/status.sh"
 CONFIG="$REPO/files/config.sh"
+UNINSTALL="$REPO/files/uninstall.sh"
 SUDOERS="$REPO/files/sudoers.template"
 TEST_YML="$REPO/.github/workflows/test.yml"
 E2E_YML="$REPO/.github/workflows/e2e.yml"
@@ -198,10 +199,10 @@ check "install.sh fetches setup-container-backend.sh" \
     grep -Fq 'opencode-permissions-kit-lib/setup-container-backend.sh' "$INSTALL"
 check "install.sh deploys setup-container-backend.sh to LIBDIR" \
     grep -Fq '"$LIBDIR/setup-container-backend.sh"' "$INSTALL"
-check "install.sh records WWW_GROUP=opencode usergroup" \
-    grep -Fq 'WWW_GROUP=$(id -gn "$OPENCODE_USER"' "$INSTALL"
+check "install.sh records OPENCODE_GROUP=opencode usergroup" \
+    grep -Fq 'OPENCODE_GROUP=$(id -gn "$OPENCODE_USER"' "$INSTALL"
 check "install.sh adds the developer to the opencode usergroup" \
-    grep -Fq 'usermod -aG "$WWW_GROUP" "$DEFAULT_USER"' "$INSTALL"
+    grep -Fq 'usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER"' "$INSTALL"
 
 echo ""
 echo "-- update.sh wiring --"
@@ -225,8 +226,23 @@ check "update.sh KIT_FILES has NO ddev shim" \
     grep_absent -Eq 'opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)' "$UPDATE"
 check "update.sh KIT_FILES has NO git hooks" \
     grep_absent -Fq 'hooks/post-' "$UPDATE"
-check "update.sh re-stamps WWW_GROUP to the opencode usergroup" \
-    grep -Fq 'echo "WWW_GROUP=$NEW_WWW_GROUP"' "$UPDATE"
+check "update.sh re-stamps OPENCODE_GROUP to the opencode usergroup" \
+    grep -Fq 'echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"' "$UPDATE"
+check "update.sh drops the legacy WWW_GROUP key on re-stamp" \
+    grep -Fq "e '^WWW_GROUP='" "$UPDATE"
+check "update.sh comment documents the rename" \
+    grep -Fq 'OPENCODE_GROUP re-base' "$UPDATE"
+
+echo ""
+echo "-- OPENCODE_GROUP rename (legacy WWW_GROUP fallback) --"
+check "config.sh falls back to the legacy WWW_GROUP conf key" \
+    grep -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$CONFIG"
+check "status.sh falls back to the legacy WWW_GROUP conf key" \
+    grep -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$STATUS"
+check "uninstall.sh falls back to the legacy WWW_GROUP conf key" \
+    grep -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$UNINSTALL"
+check "no remaining WWW_GROUP variable use in install.sh" \
+    grep_absent -Fq '$WWW_GROUP' "$INSTALL"
 
 echo ""
 echo "-- config.sh wiring --"

@@ -5,8 +5,9 @@
 # that has already been installed via install.sh. Does NOT touch:
 #   - existing /etc/opencode-permissions-kit/projects.conf
 #   - existing /etc/opencode-permissions-kit/install.conf (except the
-#     VERSION stamp, the WWW_GROUP re-base to the opencode usergroup, and
-#     removal of the dead DDEV_BIN/DDEV_MODE keys)
+#     VERSION stamp, the OPENCODE_GROUP re-base to the opencode usergroup,
+#     the rename WWW_GROUP -> OPENCODE_GROUP, and removal of the dead
+#     DDEV_BIN/DDEV_MODE keys)
 #   - existing /home/opencode/.config/opencode/opencode.json[c]
 #   - the DEFAULT user's existing opencode config (a deny-all config is only
 #     deployed when that user has no opencode.jsonc yet)
@@ -135,7 +136,7 @@ INSTALL_CONF="$CONFDIR/install.conf"
 
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
-WWW_GROUP="opencode"
+OPENCODE_GROUP=""
 # Save the version from the VERSION file (read above) before sourcing
 # install.conf, which also has a VERSION= line (the old stamp). We don't
 # want install.conf to overwrite the freshly-read VERSION from the repo.
@@ -211,7 +212,7 @@ if ! id "$OPENCODE_USER" >/dev/null 2>&1; then
 fi
 
 # The new sharing group: the opencode user's primary usergroup.
-NEW_WWW_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
+NEW_OPENCODE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 
 if ! confirm "Re-deploy kit files (existing configs will NOT be touched)?"; then
     echo "Aborted."; exit 0
@@ -341,7 +342,7 @@ fi
 # Unconditional (not just inside the migration) so installs that already
 # migrated — the common upgrade path — are healed too. The mode-700 .git
 # dir stays dev-owned.
-if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_WWW_GROUP" ]; then
+if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     # Shared helper: prefer the copy next to this script (checkout — same
     # vintage as the running update.sh), fall back to the deployed library.
     [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh"
@@ -350,7 +351,7 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_WWW_GROUP" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         [ -d "$root" ] || continue
-        ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_WWW_GROUP"
+        ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"
         log "ddev handover applied under $root"
     done < "$PROJECTS_CONF"
 fi
@@ -387,7 +388,7 @@ if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
             --conf-dir "$CONFDIR" \
             --lib-dir "$LIBDIR" \
             --opencode-user "$OPENCODE_USER" \
-            --group "$NEW_WWW_GROUP"; then
+            --group "$NEW_OPENCODE_GROUP"; then
         # Legacy git hooks pointed at the (now removed) hooks dir.
         sudo -u "$OPENCODE_USER" git config --global --unset core.hooksPath 2>/dev/null || true
         sudo -u "$DEFAULT_USER" git config --global --unset core.hooksPath 2>/dev/null || true
@@ -399,12 +400,12 @@ if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
             log "legacy ddev shim removed: /usr/local/bin/ddev"
         fi
         # Group membership for the developer (fresh login needed to pick it up).
-        sudo usermod -aG "$NEW_WWW_GROUP" "$DEFAULT_USER" 2>/dev/null || true
-        echo "  developer '$DEFAULT_USER' added to group '$NEW_WWW_GROUP' (start a new login shell to pick it up)"
+        sudo usermod -aG "$NEW_OPENCODE_GROUP" "$DEFAULT_USER" 2>/dev/null || true
+        echo "  developer '$DEFAULT_USER' added to group '$NEW_OPENCODE_GROUP' (start a new login shell to pick it up)"
 
         # ddev runtime for the opencode user (idempotent, prompt-free).
         sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
-        sudo chown "$OPENCODE_USER:$NEW_WWW_GROUP" "/home/$OPENCODE_USER/.ddev"
+        sudo chown "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "/home/$OPENCODE_USER/.ddev"
         sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
         caroot="/home/$OPENCODE_USER/.local/share/mkcert"
         if [ ! -f "$caroot/rootCA.pem" ]; then
@@ -427,7 +428,7 @@ if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
             fi
             if [ -n "$src" ]; then
                 sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null || true
-                sudo chown -R "$OPENCODE_USER:$NEW_WWW_GROUP" "$caroot" 2>/dev/null || true
+                sudo chown -R "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$caroot" 2>/dev/null || true
                 sudo chmod 700 "$caroot" 2>/dev/null || true
                 sudo chmod 600 "$caroot/rootCA-key.pem" 2>/dev/null || true
                 echo "  mkcert CA reused from $src -> $caroot"
@@ -563,9 +564,9 @@ fi
 # The home belongs to the opencode user's own usergroup; older installs had it
 # in www-data with mode 750. Apply the current ownership/mode.
 if [ -d "/home/$OPENCODE_USER" ]; then
-    sudo chown "$OPENCODE_USER:$NEW_WWW_GROUP" "/home/$OPENCODE_USER"
+    sudo chown "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "/home/$OPENCODE_USER"
     sudo chmod 2750 "/home/$OPENCODE_USER"
-    echo "/home/$OPENCODE_USER is accessible for group $NEW_WWW_GROUP."
+    echo "/home/$OPENCODE_USER is accessible for group $NEW_OPENCODE_GROUP."
 fi
 
 # --- ensure default-user deny-all config (self-update bypass protection) ------
@@ -576,7 +577,7 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     if [ ! -f "$DEFAULT_OC_CONF" ]; then
         sudo mkdir -p "$(dirname "$DEFAULT_OC_CONF")"
         sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
-        sudo chown "$DEFAULT_USER:$NEW_WWW_GROUP" "$DEFAULT_OC_CONF"
+        sudo chown "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_OC_CONF"
         sudo chmod 664 "$DEFAULT_OC_CONF"
         echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
         log "deny-all config installed for default user: $DEFAULT_OC_CONF"
@@ -591,11 +592,11 @@ NEW_INSTALL_CONF="$(mktemp)"
 {
     if [ -f "$INSTALL_CONF" ]; then
         # Strip keys this update owns: VERSION (re-stamped), the dead
-        # DDEV_BIN/DDEV_MODE keys (shim + modes are gone), and WWW_GROUP
+        # DDEV_BIN/DDEV_MODE keys (shim + modes are gone), and OPENCODE_GROUP
         # (re-based to the opencode usergroup).
-        grep -v -e '^VERSION=' -e '^DDEV_BIN=' -e '^DDEV_MODE=' -e '^WWW_GROUP=' -e '^HARD_DENY_REMOVED=' "$INSTALL_CONF" 2>/dev/null
+        grep -v -e '^VERSION=' -e '^DDEV_BIN=' -e '^DDEV_MODE=' -e '^OPENCODE_GROUP=' -e '^WWW_GROUP=' -e '^HARD_DENY_REMOVED=' "$INSTALL_CONF" 2>/dev/null
     fi
-    echo "WWW_GROUP=$NEW_WWW_GROUP"
+    echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
     echo "HARD_DENY_REMOVED=1"
     echo "VERSION=$VERSION"
 } | sort -u > "$NEW_INSTALL_CONF"
@@ -605,8 +606,8 @@ rm -f "$NEW_INSTALL_CONF"
 # Cleanup legacy setup.conf (pre-v0.0.9) in both new and old config dirs.
 [ -f "$CONFDIR/setup.conf" ] && sudo rm -f "$CONFDIR/setup.conf"
 [ -f /etc/opencode/setup.conf ] && sudo rm -f /etc/opencode/setup.conf
-echo "install.conf updated: VERSION=$VERSION WWW_GROUP=$NEW_WWW_GROUP"
-log "install.conf updated: VERSION=$VERSION WWW_GROUP=$NEW_WWW_GROUP HARD_DENY_REMOVED=1"
+echo "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
+log "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP HARD_DENY_REMOVED=1"
 
 # --- remove pre-0.0.10 legacy layout -----------------------------------------
 # The new library / config dir / symlinks are all in place now; tear down the
@@ -628,7 +629,7 @@ if [ "$REFRESH" = true ]; then
         --conf-dir "$CONFDIR" \
         --lib-dir "$LIBDIR" \
         --opencode-user "$OPENCODE_USER" \
-        --group "$NEW_WWW_GROUP"
+        --group "$NEW_OPENCODE_GROUP"
     log "group baseline refresh requested (--refresh)"
 else
     echo ""

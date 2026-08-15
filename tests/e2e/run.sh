@@ -93,8 +93,10 @@ check "install.conf written" \
     E 'test -f /etc/opencode-permissions-kit/install.conf'
 check "install.conf records CONTAINER_BACKEND=podman-rootless" \
     E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
-check "install.conf records WWW_GROUP=opencode" \
-    E 'grep -q "^WWW_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
+check "install.conf records OPENCODE_GROUP=opencode" \
+    E 'grep -q "^OPENCODE_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
+check_fail "install.conf carries no legacy WWW_GROUP key" \
+    E 'grep -q "^WWW_GROUP=" /etc/opencode-permissions-kit/install.conf'
 check_fail "no ddev shim in the library (soft-only kit)" \
     E 'test -e /usr/local/lib/opencode-permissions-kit/bin/ddev'
 check_fail "no hooks directory in the library" \
@@ -393,8 +395,8 @@ check "11e: core.hooksPath unset for the developer" \
     E '! git config --global --get core.hooksPath'
 check "11e: install.conf stamped HARD_DENY_REMOVED=1" \
     E 'grep -q "^HARD_DENY_REMOVED=1" /etc/opencode-permissions-kit/install.conf'
-check "11e: install.conf re-based WWW_GROUP=opencode" \
-    E 'grep -q "^WWW_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
+check "11e: install.conf re-based OPENCODE_GROUP=opencode" \
+    E 'grep -q "^OPENCODE_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
 check "11e: developer (re-)added to the opencode group" \
     E 'id dev | grep -q opencode'
 check "11e: migration events logged" \
