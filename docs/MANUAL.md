@@ -297,17 +297,18 @@ Install/update provision the rest:
 
 Notes:
 
-- **`ddev auth ssh` / composer private keys** now live in
-  `/home/opencode/.ddev` and are agent-readable. This is a deliberate
-  soft-only trade-off: ddev runs as one user, so what ddev may read, the
-  agent may read. The template therefore denies the import command
-  (`ddev auth ssh*`, incl. `sudo`) — run it in your terminal, not from an
-  agent session; the read/edit denies (`*id_rsa*`, `*.pem`, …) and the bash
-  tripwires still gate opencode's tools, but the imported file itself sits
-  user-readable on disk. A project that broadly allows `ddev *` must re-add
-  the specific deny after its allow (see "The Two States"). Use
-  `.gitignore`d per-machine credentials and rotate keys if the machine is
-  not trusted.
+- **`ddev auth ssh` / composer private keys** live in
+  `/home/opencode/.ddev` and are agent-readable — ddev runs as one user,
+  including in your terminal, so there is **no safer place the import
+  could put them**: once a key is imported (by you or by an approved
+  agent command), every opencode session can read it from disk. The
+  template denies the import command (`ddev auth ssh*`, incl. `sudo`) so
+  the decision stays with you — run it in your terminal if you accept
+  the trade-off. The read/edit denies (`*id_rsa*`, `*.pem`, …) and the
+  bash tripwires keep gating opencode's tools. A project that broadly
+  allows `ddev *` must re-add the specific deny after its allow (see
+  "The Two States"). Prefer dedicated, rotatable deploy keys and rotate
+  them if the machine is not trusted.
 - The **first** `ddev start` as `opencode` is slow (mutagen download, image
   pulls into the rootless daemon); everything afterwards reuses that state.
 

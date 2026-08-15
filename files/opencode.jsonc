@@ -135,17 +135,20 @@
             "ddev *": "deny",
             "sudo ddev *": "deny",
             // CREDENTIAL IMPORT — `ddev auth ssh` copies the given private
-            // key into /home/opencode/.ddev/.ssh (this user's home): once
-            // imported, EVERY opencode session can read it from disk. The
-            // read/edit denies (*id_rsa*, *.pem, ...) and the bash
-            // tripwires below still gate the tools, but the file itself is
-            // user-readable — that is the documented trade-off of "ddev
-            // always runs as opencode". Keep the import a developer-
-            // terminal task. NOTE: if a project config allows "ddev *",
-            // project rules merge LAST and override this deny — re-add
-            // "ddev auth ssh*": "deny" AFTER the allow in the project's
-            // opencode.jsonc to keep the gate. Composer private-repo auth
-            // rides the same ssh-agent (ddev auth ssh).
+            // key into /home/opencode/.ddev/.ssh (this user's home). ddev
+            // ALWAYS runs as this user — including from the developer's
+            // terminal — so the destination is the SAME no matter who runs
+            // the import: once a key is imported, EVERY opencode session
+            // can read it from disk. The deny below only controls WHO
+            // initiates it (you, in your terminal, instead of an agent
+            // command); it cannot make imported keys unreadable. Prefer
+            // dedicated, rotatable deploy keys — or do not import at all.
+            // The read/edit denies (*id_rsa*, *.pem, ...) and the bash
+            // tripwires below still gate the TOOLS. NOTE: if a project
+            // config allows "ddev *", project rules merge LAST and override
+            // this deny — re-add "ddev auth ssh*": "deny" AFTER the allow
+            // in the project's opencode.jsonc to keep the gate. Composer
+            // private-repo auth rides the same ssh-agent (ddev auth ssh).
             "ddev auth ssh*": "deny",
             "sudo ddev auth ssh*": "deny",
             // SENSITIVE FILE TRIPWIRE — mirrors the read/edit deny patterns

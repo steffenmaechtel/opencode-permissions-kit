@@ -156,9 +156,11 @@ check "sudoers.template grants the ddev-as-opencode helper" \
 check "template denies 'ddev auth ssh*' (incl. sudo)" \
     sh -c "grep -q '\"ddev auth ssh\\*\": \"deny\"' \"\$1\" && grep -q '\"sudo ddev auth ssh\\*\": \"deny\"' \"\$1\"" _ "$TEMPLATE"
 check "template explains the /home/opencode/.ddev key trade-off" \
-    sh -c "grep -q 'home/opencode/.ddev' \"\$1\" && grep -q 'developer-' \"\$1\"" _ "$TEMPLATE"
+    sh -c "grep -q 'home/opencode/.ddev' \"\$1\" && grep -q 'EVERY opencode session' \"\$1\"" _ "$TEMPLATE"
+check "template states the import destination is user-independent" \
+    sh -c "grep -q 'SAME no matter who runs' \"\$1\"" _ "$TEMPLATE"
 check "template warns that project 'ddev *' allows override the gate" \
-    sh -c "grep -q 'merge LAST and override this deny' \"\$1\"" _ "$TEMPLATE"
+    sh -c "grep -q 'merge LAST and override' \"\$1\"" _ "$TEMPLATE"
 check "template still parses cleanly with the new rules" \
     python3 "$FILES/opencode-permissions-kit-lib/jsonc-parser.py" "$TEMPLATE"
 
