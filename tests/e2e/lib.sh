@@ -270,10 +270,14 @@ e2e_cleanup() {
         return
     fi
     docker rm -f "$E2E_CONTAINER" 2>/dev/null || true
-    # Section 10g creates a root-owned README.md inside the bind mount, so a
-    # plain rm can fail; best-effort, never mask a real test failure.
-    rm -rf "${TMP_PROJECT:-/nonexistent-e2e-project}" 2>/dev/null || true
-    sudo rm -rf "${TMP_PROJECT:-/nonexistent-e2e-project}" 2>/dev/null || true
+    # The e2e container runs as root, so the bind mount can hold root-owned
+    # files (e.g. `sudo tee opencode.jsonc`, the chgrp/chmod group baseline).
+    # Try the plain rm first — it normally succeeds — and only fall back to
+    # sudo when it really cannot delete those files, so the sudo password
+    # prompt is not shown on every run. Best-effort, never mask a test failure.
+    if ! rm -rf "${TMP_PROJECT:-/nonexistent-e2e-project}" 2>/dev/null; then
+        sudo rm -rf "${TMP_PROJECT:-/nonexistent-e2e-project}" 2>/dev/null || true
+    fi
 }
 trap e2e_cleanup EXIT
 
