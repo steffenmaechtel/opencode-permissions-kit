@@ -1,0 +1,19 @@
+{
+    // Trailing commas everywhere — legal JSONC, must parse cleanly.
+    "$schema": "https://opencode.ai/config.json",
+    "permission": {
+        "read": {
+            "*": "allow",
+            "*README.md": "deny",
+            "*README.txt": "deny",
+            "**/.env*": "deny",
+        },
+        "edit": {
+            "*README.md": "deny",
+        },
+        "bash": {
+            "ddev *": "allow",
+            "docker *": "allow",
+        },
+    },
+}

@@ -109,6 +109,17 @@ assert_not_contains "mixed-deny: README.md NOT in deny list" "README.md" "$OUT"
 OUT=$(python3 "$PARSER" "$FIXTURES/trailing-comment.jsonc" 2>/dev/null || true)
 assert_contains "trailing-comment: .env* extracted" ".env*" "$OUT"
 
+# --- 9b. Trailing commas (legal JSONC, strict json would reject) ---
+OUT=$(python3 "$PARSER" "$FIXTURES/trailing-comma.jsonc" 2>/dev/null || true)
+RC=$?
+assert_exitcode "trailing-comma: exits zero" 0 sh -c "exit $RC"
+assert_contains "trailing-comma: **/.env* extracted" "**/.env*" "$OUT"
+assert_contains "trailing-comma: README.md extracted" "*README.md" "$OUT"
+assert_contains "trailing-comma: README.txt extracted" "*README.txt" "$OUT"
+OUT=$(python3 "$PARSER" --tools "$FIXTURES/trailing-comma.jsonc" 2>/dev/null || true)
+assert_contains "trailing-comma --tools: ddev detected" "ddev" "$OUT"
+assert_contains "trailing-comma --tools: docker detected" "docker" "$OUT"
+
 # --- 10. Missing file → non-zero exit ---
 assert_exitcode "missing-file: exits non-zero" 1 python3 "$PARSER" "$FIXTURES/nonexistent.jsonc"
 

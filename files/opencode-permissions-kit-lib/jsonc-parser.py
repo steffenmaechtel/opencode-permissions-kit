@@ -40,8 +40,12 @@ def _last_match(command, rules):
     return match
 
 def strip_jsonc_comments(text):
-    """Remove // and /* */ comments, ignoring comment markers inside
-    double-quoted strings (e.g. URLs like "https://opencode.ai/...")."""
+    """Normalize JSONC to plain JSON: remove // and /* */ comments and
+    trailing commas, ignoring markers inside double-quoted strings (e.g.
+    URLs like "https://opencode.ai/..."). Trailing commas (",}") are legal
+    JSONC — editors and users rely on them — but strict json.loads rejects
+    them, so a comma whose next non-whitespace character closes the object
+    or array is dropped."""
     out = []
     i = 0
     n = len(text)
@@ -73,6 +77,26 @@ def strip_jsonc_comments(text):
                 i += 1
             i += 2
             continue
+        if ch == ',':
+            # Trailing comma: peek past whitespace AND comments for the
+            # closing bracket; drop the comma if one follows.
+            j = i + 1
+            while j < n:
+                if text[j] in ' \t\r\n':
+                    j += 1
+                elif text[j] == '/' and j + 1 < n and text[j + 1] == '/':
+                    while j < n and text[j] != '\n':
+                        j += 1
+                elif text[j] == '/' and j + 1 < n and text[j + 1] == '*':
+                    j += 2
+                    while j + 1 < n and not (text[j] == '*' and text[j + 1] == '/'):
+                        j += 1
+                    j += 2
+                else:
+                    break
+            if j < n and text[j] in '}]':
+                i += 1
+                continue
         out.append(ch)
         i += 1
     return ''.join(out)
