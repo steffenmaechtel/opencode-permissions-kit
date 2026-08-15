@@ -3,8 +3,8 @@
 #
 # Provisioning helper for the rootless container backends. Called by install.sh
 # and config.sh to set up docker-rootless or podman-rootless for the opencode
-# sandbox user, or to tear down a previously provisioned backend when switching
-# back to docker-group.
+# user, or to tear down the previously provisioned backend when switching
+# between the two.
 #
 # Usage:
 #   setup-container-backend.sh <backend> [--yes]

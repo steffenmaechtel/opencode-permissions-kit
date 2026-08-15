@@ -322,7 +322,7 @@ the real binary takes over, it cannot read or modify anything. Template:
 
 ### Wrapper-Bypass Guard (detect a bypass, warn loudly)
 
-1. **Binary exec restricted to root + the sandbox group.** The real binary
+1. **Binary exec restricted to root + the opencode usergroup.** The real binary
    at `/usr/local/lib/opencode-permissions-kit/bin/opencode` is owned
    `root:opencode` with mode `750`. Note: the developer is a member of the
    `opencode` group (file sharing), so the group bit grants them execution
@@ -515,7 +515,7 @@ config remain (harmless); the script prints manual cleanup steps.
 | Path | Purpose |
 |---|---|
 | `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with the soft deny list |
-| `/home/opencode/.ddev/` | sandbox user's global ddev home |
+| `/home/opencode/.ddev/` | opencode user's global ddev home |
 | `/home/<dev>/.config/opencode/opencode.jsonc` | deny-* lockout config (self-update bypass) |
 
 ### /usr/local/

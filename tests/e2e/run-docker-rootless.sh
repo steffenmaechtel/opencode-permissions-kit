@@ -126,7 +126,7 @@ check "install.conf records CONTAINER_BACKEND=podman-rootless" \
     E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
 check "wrapper at /usr/local/bin/opencode" \
     E 'test -x /usr/local/bin/opencode'
-check "opencode sandbox user exists" \
+check "opencode user exists" \
     E 'id opencode'
 check ".env readable by opencode (soft-only model)" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'

@@ -75,7 +75,7 @@ check "Binary owned root:opencode (not world-executable)" \
 # behavior of the soft-only model, not a regression.
 check "default user can execute the binary by absolute path (group member; deny-all config mitigates)" \
     E '/usr/local/lib/opencode-permissions-kit/bin/opencode --version'
-check "opencode sandbox user can execute the binary" \
+check "opencode user can execute the binary" \
     E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version'
 check "Wrapper is first in PATH" \
     E 'test "$(which opencode)" = "/usr/local/bin/opencode"'
@@ -109,8 +109,8 @@ check "sudoers keeps the base (opencode) RunAs" \
     E 'sudo grep -q "(opencode) NOPASSWD" /etc/sudoers.d/opencode-permissions-kit'
 check "sudoers has the socket-check.sh rule" \
     E 'sudo grep -q "socket-check.sh" /etc/sudoers.d/opencode-permissions-kit'
-check "status.sh reports the user-sandbox mode" \
-    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "user sandbox"'
+check "status.sh reports the dedicated-user mode" \
+    E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "dedicated user"'
 
 echo ""
 echo "--- 4. User & group ---"

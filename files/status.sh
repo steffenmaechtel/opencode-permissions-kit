@@ -55,7 +55,7 @@ if [ "$installed" = false ]; then
     exit 0
 fi
 
-echo "  Mode:       ${GREEN}user sandbox${NC} (opencode runs as its own user, soft permissions only)"
+echo "  Mode:       ${GREEN}dedicated user${NC} (opencode runs as its own user, soft permissions only)"
 echo "  User:       $OPENCODE_USER $(id "$OPENCODE_USER" >/dev/null 2>&1 && echo "exists" || echo "${RED}MISSING${NC}")"
 echo "  Wrapper:    /usr/local/bin/opencode -> $(readlink /usr/local/bin/opencode 2>/dev/null || echo missing)"
 echo "  Library:    $LIBDIR"

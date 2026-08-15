@@ -38,7 +38,8 @@ cat >&2 <<EOF
 
   *** WARNING: opencode permissions kit — wrapper bypass ***
   'opencode' resolves to $warn_path — not the kit wrapper ($KIT_BIN).
-  The real binary runs WITHOUT the kit's ACL protection and sandbox user.
+  The real binary runs as YOUR user — not the dedicated opencode user the
+  kit's wrapper enforces.
   Fix:
       rm -rf "$HOME/.opencode/bin"
       sudo bash /usr/local/lib/opencode-permissions-kit/update.sh

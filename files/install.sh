@@ -417,7 +417,7 @@ sudo sed -i "s#^OPENCODE_DOCKER_HOST=.*#OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HO
 log "container backend provisioned: $CONTAINER_BACKEND"
 
 # === Step 4: ddev as the opencode user ===
-# /home/<oc>/.ddev is the sandbox user's global ddev home (project registry,
+# /home/<oc>/.ddev is the opencode user's global ddev home (project registry,
 # mutagen state, `ddev auth ssh` key cache). mkcert CA reuse keeps Windows
 # browsers trusting ddev's HTTPS certs. Router ports: rootless ddev-router
 # cannot bind 80/443 unless ip_unprivileged_port_start <= 80.
