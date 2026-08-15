@@ -45,7 +45,10 @@ fi
 
 DEFAULT_USER=$(whoami)
 OPENCODE_USER="opencode"
-WWW_GROUP="www-data"
+# Sharing group default: the opencode user's own usergroup. A sourced
+# install.conf (below) or the live value (see the LIVE_GROUP override)
+# takes precedence; the pre-soft-only default www-data is long gone.
+WWW_GROUP="opencode"
 
 echo ""
 echo "  ${RED}opencode permissions kit -- UNINSTALL${NC}"
