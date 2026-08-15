@@ -225,11 +225,13 @@ no two owners for `.ddev/`. How that works in practice:
   them in a terminal or call the helper directly:
   `sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode <args>`.
 
-- **`.ddev/` ownership (the EPERM fix):** every registered project's `.ddev`
-  belongs to `opencode:opencode` and is group-writable (`g+w`), so ddev can
-  chmod its build stamps (the old
+- **`.ddev/` ownership (the EPERM fix):** every project's `.ddev` belongs to
+  `opencode:opencode` and is group-writable (`g+w`), so ddev can chmod its
+  build stamps (the old
   `chmod .ddev/.webimageBuild: operation not permitted` is gone). The
-  handover happens on install, when a project is added via `config.sh
+  handover searches for `.ddev` at **any depth** under each registered root —
+  a root is usually a parent folder (e.g. `/var/www/vhosts`) holding several
+  projects. It happens on install, when a project is added via `config.sh
   projects add`, on `config.sh refresh`, and unconditionally on every
   `update.sh`. Your `.git/` stays yours (mode 700, untouched).
 

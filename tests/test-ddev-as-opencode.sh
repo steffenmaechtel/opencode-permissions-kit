@@ -177,10 +177,10 @@ check "update.sh runs the .ddev handover unconditionally" \
     sh -c "grep -q '.ddev handover' \"\$1\"" _ "$UPDATE"
 
 # --- 7. config.sh / migrate-denies.sh handover ---------------------------------
-check "config.sh projects add hands over .ddev" \
-    sh -c "grep -q '\"\$p/.ddev\"' \"\$1\"" _ "$CONFIG"
-check "migrate-denies.sh step 3 hands over .ddev" \
-    sh -c "grep -q '\"\$root/.ddev\"' \"\$1\"" _ "$MIGRATE"
+check "config.sh projects add hands over .ddev (any depth)" \
+    sh -c "grep -qF 'find \"\$p\" -type d -name .ddev' \"\$1\"" _ "$CONFIG"
+check "migrate-denies.sh step 3 hands over .ddev (any depth)" \
+    sh -c "grep -qF 'find \"\$root\" -type d -name .ddev' \"\$1\"" _ "$MIGRATE"
 
 # --- 8. status.sh reporting ----------------------------------------------------
 check "status.sh reports ddev-as-opencode state" \

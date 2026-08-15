@@ -153,11 +153,12 @@ projects_add() {
         sudo setfacl -R -d -m "g:$WWW_GROUP:rwx" "$p" 2>/dev/null || true
         # .ddev handover: ddev always runs as $OPENCODE_USER, so an existing
         # .ddev must belong to them (avoids "chmod .ddev/.webimageBuild:
-        # operation not permitted" on the next `ddev start`).
-        if [ -d "$p/.ddev" ]; then
-            sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$p/.ddev" 2>/dev/null || true
-            sudo chmod -R g+w "$p/.ddev" 2>/dev/null || true
-        fi
+        # operation not permitted" on the next `ddev start`). Searched at ANY
+        # depth: the registered path may be a parent of several projects.
+        find "$p" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r d; do
+            sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$d" 2>/dev/null || true
+            sudo chmod -R g+w "$d" 2>/dev/null || true
+        done
         echo "  ${GREEN}added${NC} $p (group=$WWW_GROUP, setgid, default-acl)"
         log "project added: $p"
     done

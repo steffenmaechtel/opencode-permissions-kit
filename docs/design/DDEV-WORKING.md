@@ -335,11 +335,13 @@ shell function + a sudoers helper:
 - sudoers: `DEFAULT_USER ALL=(opencode) NOPASSWD:
   /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode *`
   (fixed kit path — `DDEV_BIN` stays dead).
-- **`.ddev/` handover** — every registered project's `.ddev` is handed over
-  to `opencode:opencode` with `g+w`: install.sh Step 5, config.sh
+- **`.ddev/` handover** — every project's `.ddev` is handed over to
+  `opencode:opencode` with `g+w`: install.sh Step 5, config.sh
   projects-add, migrate-denies.sh step 3, AND an unconditional block in
   update.sh (so already-migrated installs are healed — the migration path
-  alone would miss them). `.git/` stays developer-owned (mode 700).
+  alone would miss them). Searched at any depth under each registered root
+  (`find <root> -type d -name .ddev`) — a root is usually a parent folder
+  holding several projects. `.git/` stays developer-owned (mode 700).
 
 **Trade-off (accepted, documented in MANUAL.md):** `ddev auth ssh` /
 composer private keys now live in `/home/opencode/.ddev` and are

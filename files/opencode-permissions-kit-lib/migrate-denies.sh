@@ -107,10 +107,12 @@ if getent group "$GROUP" >/dev/null 2>&1; then
             # .ddev handover: ddev always runs as the opencode user, so an
             # existing .ddev must belong to them (otherwise `ddev start` fails
             # with "chmod .ddev/.webimageBuild: operation not permitted").
-            if [ -d "$root/.ddev" ]; then
-                chown -R "$OPENCODE_USER:$GROUP" "$root/.ddev" 2>/dev/null || true
-                chmod -R g+w "$root/.ddev" 2>/dev/null || true
-            fi
+            # Searched at ANY depth under the root: a registered root is often
+            # a parent folder holding several projects (e.g. /var/www/vhosts).
+            find "$root" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r d; do
+                chown -R "$OPENCODE_USER:$GROUP" "$d" 2>/dev/null || true
+                chmod -R g+w "$d" 2>/dev/null || true
+            done
         done < "$PROJECTS_FILE"
     fi
     echo "  sharing group re-based to '$GROUP' (chgrp + setgid + default ACLs)"

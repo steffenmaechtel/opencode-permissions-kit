@@ -333,19 +333,22 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
 fi
 
 # --- .ddev handover (ddev always runs as the opencode user) --------------------
-# Every registered project's .ddev belongs to the opencode user; a dev-owned
-# .ddev breaks `ddev start` with "chmod .ddev/.webimageBuild: operation not
-# permitted". Unconditional (not just inside the migration) so installs that
-# already migrated — the common upgrade path — are healed too. The mode-700
-# .git dir stays dev-owned; only .ddev is handed over.
+# Every project's .ddev belongs to the opencode user; a dev-owned .ddev breaks
+# `ddev start` with "chmod .ddev/.webimageBuild: operation not permitted".
+# Searched at ANY depth under each registered root (a root is often a parent
+# of several projects). Unconditional (not just inside the migration) so
+# installs that already migrated — the common upgrade path — are healed too.
+# The mode-700 .git dir stays dev-owned; only .ddev is handed over.
 if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_WWW_GROUP" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
-        [ -d "$root/.ddev" ] || continue
-        sudo chown -R "$OPENCODE_USER:$NEW_WWW_GROUP" "$root/.ddev" 2>/dev/null || true
-        sudo chmod -R g+w "$root/.ddev" 2>/dev/null || true
-        echo ".ddev handover: $root/.ddev -> $OPENCODE_USER"
-        log ".ddev handover: $root/.ddev -> $OPENCODE_USER"
+        [ -d "$root" ] || continue
+        find "$root" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r d; do
+            sudo chown -R "$OPENCODE_USER:$NEW_WWW_GROUP" "$d" 2>/dev/null || true
+            sudo chmod -R g+w "$d" 2>/dev/null || true
+            echo ".ddev handover: $d -> $OPENCODE_USER"
+            log ".ddev handover: $d -> $OPENCODE_USER"
+        done
     done < "$PROJECTS_CONF"
 fi
 

@@ -7,15 +7,17 @@
 # .ddev/ (the "chmod .ddev/.webimageBuild: operation not permitted" bug).
 #
 # Already the opencode user? Run the real ddev directly (no recursion — the
-# agent/opencode session is never wrapped). Otherwise exec the kit's
-# NOPASSWD sudoers helper at its fixed path (never a PATH-lookalike). Must
-# stay POSIX-sh, cheap, and never exit the parent shell.
+# agent/opencode session is never wrapped). Otherwise run the kit's NOPASSWD
+# sudoers helper at its fixed path (never a PATH-lookalike). No `exec`: this
+# runs inside the developer's interactive shell — exec would REPLACE the
+# shell, closing the terminal after ddev exits. Must stay POSIX-sh, cheap,
+# and never exit the parent shell.
 #
 # Deployed to /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh.
 ddev() {
     if [ "$(id -u)" = "$(id -u opencode 2>/dev/null || echo 0)" ]; then
         command ddev "$@"
     else
-        exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"
+        /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"
     fi
 }
