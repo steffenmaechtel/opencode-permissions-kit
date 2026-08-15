@@ -39,7 +39,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh; do
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -528,6 +528,19 @@ if [ -n "$PROJECTS_ROOTS" ]; then
             echo "  $root done."
         done
     fi
+    # .ddev handover (ddev always runs as $OPENCODE_USER): a project that
+    # already has a .ddev must belong to the opencode user, or `ddev start`
+    # fails with "chmod .ddev/.webimageBuild: operation not permitted" when
+    # opencode owns the file but the group-shared metadata changes. Applied
+    # even when the baseline above was skipped. Idempotent; chown to the
+    # current user is a no-op, and the mode-700 git dir stays dev-owned.
+    for root in $PROJECTS_ROOTS; do
+        [ -d "$root/.ddev" ] || continue
+        sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$root/.ddev" 2>/dev/null || true
+        sudo chmod -R g+w "$root/.ddev" 2>/dev/null || true
+        echo "  .ddev handover: $root/.ddev -> $OPENCODE_USER"
+        log ".ddev handover: $root/.ddev -> $OPENCODE_USER"
+    done
 fi
 
 sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
@@ -618,9 +631,17 @@ for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEF
         if ! sudo grep -q 'opencode-permissions-kit/shell-warn.sh' "$cf" 2>/dev/null; then
             echo '[ -f /usr/local/lib/opencode-permissions-kit/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
         fi
+        # Interactive-shell ddev function: `ddev` always runs as the opencode
+        # user (sudoers helper), so the developer terminal and the agent share
+        # one ddev home. The [ -f ... ] guard keeps the line harmless after
+        # uninstall. Only the DEFAULT user gets it — the opencode session must
+        # never be wrapped (the function's id check would be recursive).
+        if ! sudo grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null; then
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh ] && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
+        fi
     fi
 done
-log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning hooked)"
+log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning + ddev-as-opencode hooked)"
 
 # === Step 7: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
@@ -648,11 +669,16 @@ sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc"          "$LIBDIR/opencode-deny-al
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 # rootless socket probe helper
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/bin/socket-check.sh"
+# ddev always runs as the opencode user: the sourced shell function (hooked
+# into the developer's rc files) + the sudoers helper that execs the real ddev.
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/migrate-denies.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/bin/socket-check.sh"
+               "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/ddev-as-opencode"
 log "library deployed to $LIBDIR"
 
 # Symlink: /usr/local/bin/opencode -> our wrapper

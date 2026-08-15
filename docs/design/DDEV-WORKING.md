@@ -300,3 +300,53 @@ version jump is the natural marker.
 - e2e depth for the migration path (full old→new container dance vs.
   fixture-level only). Current plan: fixture-level in e2e, real
   old-install container only if cheap.
+
+## 11. Addendum — ddev always runs as the opencode user
+
+**Burn-in finding (2026-08):** the soft-only model still breaks `ddev start`
+in a real two-owner project:
+
+```
+Failed to start pc-database-v2: chmod /var/www/vhosts/pc-database-v2/.ddev/.webimageBuild: operation not permitted
+```
+
+`.ddev/` is owned by the developer, but the agent's ddev runs as `opencode`;
+Linux `chmod` requires ownership (or root), so the group-shared `.ddev`
+metadata cannot be written. The wrapper's `sudo -u opencode` has no
+passwordless root path. This was the collision inventory in
+DDEV-SANDBOX.md:56, now realized in the soft-only world.
+
+**Decision: one owner for ddev, everywhere.** ddev runs as `opencode` in
+EVERY context — the agent natively, and the developer's terminal through a
+shell function + a sudoers helper:
+
+- `files/opencode-permissions-kit-lib/bin/ddev-as-opencode` — sudoers
+  target, deployed 755. Reads `install.conf` (legacy fallback chain),
+  refuses any non-opencode caller (exit 1), resolves the REAL ddev
+  (`command -v ddev` → `/usr/local/bin/ddev` → `/usr/bin/ddev`; exit 127
+  with a hint when missing), re-sets `HOME`/`XDG_RUNTIME_DIR`/`DOCKER_HOST`
+  (sudo env_reset drops them), `umask 002`, `exec`s the real ddev. Never
+  references the removed shim.
+- `files/opencode-permissions-kit-lib/ddev-as-opencode.sh` — sourced
+  `ddev()` function, appended to the DEFAULT user's rc files (idempotent
+  grep, `[ -f ]` guard like shell-warn.sh). Already opencode → `command
+  ddev` (no recursion); otherwise `exec sudo -u opencode <helper> "$@"`.
+  Never installed for the opencode user.
+- sudoers: `DEFAULT_USER ALL=(opencode) NOPASSWD:
+  /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode *`
+  (fixed kit path — `DDEV_BIN` stays dead).
+- **`.ddev/` handover** — every registered project's `.ddev` is handed over
+  to `opencode:opencode` with `g+w`: install.sh Step 5, config.sh
+  projects-add, migrate-denies.sh step 3, AND an unconditional block in
+  update.sh (so already-migrated installs are healed — the migration path
+  alone would miss them). `.git/` stays developer-owned (mode 700).
+
+**Trade-off (accepted, documented in MANUAL.md):** `ddev auth ssh` /
+composer private keys now live in `/home/opencode/.ddev` and are
+agent-readable. No OS backstop — the price of "ddev must read settings.php"
+extended to "ddev must run as one user".
+
+**Tests:** `tests/test-ddev-as-opencode.sh` (functional guard + function
+branches + wiring incl. CI chmod lists); e2e §4b (helper/hook/sudoers,
+127-without-ddev), §4c (`.ddev` handover via `config.sh refresh`), §11e
+(migration handover), §12 (projects-add handover).

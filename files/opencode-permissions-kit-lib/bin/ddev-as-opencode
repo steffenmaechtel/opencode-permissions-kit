@@ -1,0 +1,82 @@
+#!/bin/sh
+# opencode permissions kit -- bin/ddev-as-opencode
+#
+# Runs the REAL ddev binary as the 'opencode' user. This is the sudoers
+# target for the developer's `ddev` shell function (ddev-as-opencode.sh):
+# the developer's terminal calls `sudo -u opencode <this helper> ...`, the
+# helper sanitizes the environment and execs the real ddev. Because ddev
+# ALWAYS runs as the opencode user, `.ddev/` has exactly one owner — no more
+# "chmod .ddev/.webimageBuild: operation not permitted" (the old collision
+# where the developer owned .ddev but the agent's ddev ran as opencode).
+#
+# Security notes:
+#   - The helper only ever execs the real ddev (resolved via PATH, then the
+#     two standard locations). It is gated to this exact path in sudoers and
+#     must never gain extra power.
+#   - It refuses to run when the current user is NOT the opencode user — the
+#     sudoers rule only grants DEFAULT_USER, but defense-in-depth.
+#   - It re-derives HOME/XDG_RUNTIME_DIR/DOCKER_HOST because sudo's
+#     env_reset drops them; without HOME a developer-invoked ddev would
+#     write into /root instead of the opencode user's /home/<opencode>/.ddev.
+#
+# Deployed to /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode.
+set -u
+
+INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
+[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
+
+OPENCODE_USER="opencode"
+CONTAINER_BACKEND=""
+OPENCODE_DOCKER_HOST=""
+OPENCODE_PODMAN_SOCKET=""
+if [ -f "$INSTALL_CONF" ]; then
+    . "$INSTALL_CONF"
+fi
+OPENCODE_USER="${OPENCODE_USER:-opencode}"
+
+# Guard: only the opencode user may run ddev through this helper. The shell
+# function (ddev-as-opencode.sh) is only installed for the DEFAULT user, but
+# this check makes direct execution the only other entry point.
+OC_UID="$(id -u "$OPENCODE_USER" 2>/dev/null || echo 0)"
+if [ "$(id -u)" != "$OC_UID" ]; then
+    echo "ddev-as-opencode: must run as user '$OPENCODE_USER' (use: sudo -u $OPENCODE_USER ...)" >&2
+    exit 1
+fi
+
+# Resolve the real ddev binary: first on PATH (sudo's env_reset keeps a
+# sane default PATH), then the two standard locations. Never a kit shim.
+DDEV=""
+for cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
+    [ -n "$cand" ] || continue
+    if [ -x "$cand" ]; then
+        DDEV="$cand"
+        break
+    fi
+done
+if [ -z "$DDEV" ]; then
+    echo "ddev-as-opencode: ddev is not installed. Install ddev >= 1.25 and re-run." >&2
+    exit 127
+fi
+
+# Environment: sudo's env_reset dropped the opencode user's values; the
+# developer's would point at the wrong user.
+export HOME="/home/$OPENCODE_USER"
+if [ -n "$OC_UID" ] && [ "$OC_UID" != "0" ]; then
+    export XDG_RUNTIME_DIR="/run/user/$OC_UID"
+fi
+
+case "${CONTAINER_BACKEND:-}" in
+    docker-rootless)
+        [ -n "${OPENCODE_DOCKER_HOST:-}" ] && export DOCKER_HOST="$OPENCODE_DOCKER_HOST"
+        ;;
+    podman-rootless)
+        # Optional docker-CLI compat socket; without it ddev talks to the
+        # podman socket directly via XDG_RUNTIME_DIR (daemonless path).
+        [ -n "${OPENCODE_PODMAN_SOCKET:-}" ] && export DOCKER_HOST="$OPENCODE_PODMAN_SOCKET"
+        ;;
+esac
+
+umask 002
+exec "$DDEV" "$@"

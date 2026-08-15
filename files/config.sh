@@ -151,6 +151,13 @@ projects_add() {
         sudo chgrp -R "$WWW_GROUP" "$p" 2>/dev/null || true
         sudo chmod g+s "$p"
         sudo setfacl -R -d -m "g:$WWW_GROUP:rwx" "$p" 2>/dev/null || true
+        # .ddev handover: ddev always runs as $OPENCODE_USER, so an existing
+        # .ddev must belong to them (avoids "chmod .ddev/.webimageBuild:
+        # operation not permitted" on the next `ddev start`).
+        if [ -d "$p/.ddev" ]; then
+            sudo chown -R "$OPENCODE_USER:$WWW_GROUP" "$p/.ddev" 2>/dev/null || true
+            sudo chmod -R g+w "$p/.ddev" 2>/dev/null || true
+        fi
         echo "  ${GREEN}added${NC} $p (group=$WWW_GROUP, setgid, default-acl)"
         log "project added: $p"
     done

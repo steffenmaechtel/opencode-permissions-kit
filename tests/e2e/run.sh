@@ -124,6 +124,45 @@ check "opencode ddev home provisioned" \
     E 'sudo test -d /home/opencode/.ddev'
 
 echo ""
+echo "--- 4b. ddev always runs as the opencode user (helper + function) ---"
+# The developer's `ddev` is a shell function that execs the kit's sudoers
+# helper, which re-sets the opencode environment and runs the REAL ddev —
+# so the terminal and the agent share one ddev home / one rootless daemon.
+check "4b: ddev-as-opencode helper deployed (mode 755)" \
+    E 'sudo test -x /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode'
+check "4b: ddev() function file deployed" \
+    E 'sudo test -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh'
+check "4b: ddev() function hooked into the developer .bashrc" \
+    E 'grep -q "opencode-permissions-kit/ddev-as-opencode.sh" /home/dev/.bashrc'
+check "4b: sudoers grants the ddev-as-opencode helper" \
+    E 'sudo grep -q "bin/ddev-as-opencode" /etc/sudoers.d/opencode-permissions-kit'
+check_fail "4b: helper refuses a NON-opencode caller (exit 1)" \
+    E 'sudo -u dev /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --version >/dev/null 2>&1'
+check "4b: helper prints 'must run as' for a non-opencode caller" \
+    E 'sudo -u dev /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --version 2>&1 | grep -q "must run as"'
+# The e2e container has no real ddev installed: as the opencode user the
+# helper must exit 127 with a clean hint (never a traceback, never a shim).
+check "4b: helper as opencode without ddev exits 127 with a hint" \
+    E 'sudo -u opencode sh -c "/usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --version >/dev/null 2>/tmp/ddo.out; rc=\$?; test \$rc -eq 127 && grep -q \"ddev is not installed\" /tmp/ddo.out"'
+
+echo ""
+echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"
+# A pre-existing dev-owned .ddev breaks `ddev start` as opencode with
+# "chmod .ddev/.webimageBuild: operation not permitted". config.sh refresh
+# (migrate-denies.sh step 3) must hand .ddev over to opencode.
+E 'mkdir -p /var/www/vhosts/test-project/.ddev && touch /var/www/vhosts/test-project/.ddev/.webimageBuild && echo "db_default" > /var/www/vhosts/test-project/.ddev/config.yaml'
+check "4c: planted .ddev is dev-owned before the handover" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "dev"'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes refresh' && \
+    echo "  ${GREEN}OK${NC}  config.sh refresh completed"
+check "4c: .ddev handed over to opencode" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "opencode"'
+check "4c: .ddev in the opencode usergroup" \
+    E 'test "$(stat -c %G /var/www/vhosts/test-project/.ddev)" = "opencode"'
+check "4c: .ddev contents group-writable (agent-created files)" \
+    E 'test "$(stat -c %a /var/www/vhosts/test-project/.ddev/config.yaml)" = "664"'
+
+echo ""
 echo "--- 5. Soft-only file access (the ddev-working goal) ---"
 # No hard ACL denies: the opencode user (and ddev, and its containers) can
 # READ every project file. Protection is opencode's own soft permission layer.
@@ -308,6 +347,7 @@ echo "--- 11e. hard-deny migration (DDEV-WORKING §4) ---"
 # the denies, remove the artifacts, and stamp HARD_DENY_REMOVED.
 E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/.env'
 E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/settings.php'
+E 'sudo mkdir -p /var/www/vhosts/test-project/.ddev && sudo touch /var/www/vhosts/test-project/.ddev/.webimageBuild && sudo chown -R dev:dev /var/www/vhosts/test-project/.ddev'
 E 'sudo mkdir -p /usr/local/lib/opencode-permissions-kit/hooks'
 E 'sudo touch /usr/local/lib/opencode-permissions-kit/protect-projects.sh'
 E 'sudo touch /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh'
@@ -354,11 +394,19 @@ check "11e: developer (re-)added to the opencode group" \
     E 'id dev | grep -q opencode'
 check "11e: migration events logged" \
     E 'sudo grep -q "hard-deny migration" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
+check "11e: .ddev handed over to opencode by the migration" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "opencode"'
+check "11e: .ddev group-writable after the migration" \
+    E 'test "$(stat -c %a /var/www/vhosts/test-project/.ddev/.webimageBuild)" = "664"'
 
 echo ""
 echo "--- 12. config.sh adds a project non-interactively ---"
+# extra-project carries a dev-owned .ddev to prove the projects-add handover
+# (ddev always runs as the opencode user).
 E 'sudo mkdir -p /var/www/vhosts/extra-project' && \
-    E 'sudo touch /var/www/vhosts/extra-project/.env'
+    E 'sudo touch /var/www/vhosts/extra-project/.env' && \
+    E 'sudo mkdir -p /var/www/vhosts/extra-project/.ddev && sudo touch /var/www/vhosts/extra-project/.ddev/.webimageBuild' && \
+    E 'sudo chown -R dev:dev /var/www/vhosts/extra-project'
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes projects add /var/www/vhosts/extra-project' && \
     echo "  ${GREEN}OK${NC}  config.sh add completed"
 check "extra-project in projects.conf" \
@@ -367,6 +415,10 @@ check "extra-project group baseline applied (default ACL)" \
     E 'sudo getfacl -p -d /var/www/vhosts/extra-project | grep -q "group:opencode:rwx"'
 check "extra-project .env readable (soft-only)" \
     E 'sudo -u opencode test -r /var/www/vhosts/extra-project/.env'
+check "extra-project .ddev handed over to opencode" \
+    E 'test "$(stat -c %U /var/www/vhosts/extra-project/.ddev)" = "opencode"'
+check "extra-project .ddev group-writable" \
+    E 'test "$(stat -c %a /var/www/vhosts/extra-project/.ddev/.webimageBuild)" = "664"'
 
 echo ""
 echo "--- 12b. config.sh projects remove ---"

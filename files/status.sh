@@ -149,6 +149,24 @@ if [ -d "/home/$OPENCODE_USER/.ddev" ]; then
 else
     echo "    ddev home:  ${YELLOW}missing${NC}  /home/$OPENCODE_USER/.ddev (created by install.sh / update.sh)"
 fi
+# ddev always runs as the opencode user: the sudoers helper + the shell
+# function hooked into the default user's rc files.
+if [ -x "$LIBDIR/bin/ddev-as-opencode" ]; then
+    echo "    ddev-as-opencode: ${GREEN}deployed${NC}  $LIBDIR/bin/ddev-as-opencode"
+else
+    echo "    ddev-as-opencode: ${YELLOW}missing${NC}  (run $LIBDIR/update.sh to deploy)"
+fi
+if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/ddev-as-opencode.sh" ]; then
+    hooked=""
+    for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
+        [ -f "$cf" ] && grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null && hooked="$cf" && break
+    done
+    if [ -n "$hooked" ]; then
+        echo "    ddev() hook: ${GREEN}active${NC}  $hooked"
+    else
+        echo "    ddev() hook: ${YELLOW}not hooked${NC}  (run $LIBDIR/update.sh to install into $DEFAULT_USER's rc files)"
+    fi
+fi
 # Router-port readiness: rootless ddev-router cannot bind 80/443 unless
 # ip_unprivileged_port_start <= 80. Shows the HOST value (the docker-rootless
 # daemon netns inherits it at start; the daemon may need a restart if it

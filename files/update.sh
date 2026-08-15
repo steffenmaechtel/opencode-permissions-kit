@@ -57,7 +57,7 @@ KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc 
 opencode-deny-all.jsonc \
 sudoers.template umask.sh VERSION \
 opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
-opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh"
+opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
@@ -239,11 +239,14 @@ sudo chmod 440 "$LIBDIR/sudoers.template"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/bin/socket-check.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/migrate-denies.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/bin/socket-check.sh"
+               "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/ddev-as-opencode"
 echo "Library files updated: $LIBDIR"
 log "library re-deployed: $LIBDIR"
 
@@ -318,7 +321,32 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
             echo "Wrapper-bypass warning hooked into $cf"
             log "shell-startup warning hook appended: $cf"
         fi
+        # ddev always runs as the opencode user: hook the `ddev()` shell
+        # function (sudoers helper). Only the DEFAULT user — the opencode
+        # session must never be wrapped (the function's id check is the guard).
+        if ! sudo grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null; then
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh ] && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
+            echo "ddev-as-opencode function hooked into $cf"
+            log "ddev-as-opencode hook appended: $cf"
+        fi
     done
+fi
+
+# --- .ddev handover (ddev always runs as the opencode user) --------------------
+# Every registered project's .ddev belongs to the opencode user; a dev-owned
+# .ddev breaks `ddev start` with "chmod .ddev/.webimageBuild: operation not
+# permitted". Unconditional (not just inside the migration) so installs that
+# already migrated — the common upgrade path — are healed too. The mode-700
+# .git dir stays dev-owned; only .ddev is handed over.
+if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_WWW_GROUP" ]; then
+    while IFS= read -r root; do
+        [ -z "$root" ] && continue
+        [ -d "$root/.ddev" ] || continue
+        sudo chown -R "$OPENCODE_USER:$NEW_WWW_GROUP" "$root/.ddev" 2>/dev/null || true
+        sudo chmod -R g+w "$root/.ddev" 2>/dev/null || true
+        echo ".ddev handover: $root/.ddev -> $OPENCODE_USER"
+        log ".ddev handover: $root/.ddev -> $OPENCODE_USER"
+    done < "$PROJECTS_CONF"
 fi
 
 # --- one-time hard-deny migration (DDEV-WORKING §4) ---------------------------

@@ -222,7 +222,7 @@ check "update.sh KIT_FILES has NO protect-projects.sh" \
 check "update.sh KIT_FILES has NO ddev-transaction.sh" \
     grep_absent -Fq 'ddev-transaction.sh' "$UPDATE"
 check "update.sh KIT_FILES has NO ddev shim" \
-    grep_absent -Fq 'opencode-permissions-kit-lib/bin/ddev' "$UPDATE"
+    grep_absent -Eq 'opencode-permissions-kit-lib/bin/ddev([[:space:]]|$)' "$UPDATE"
 check "update.sh KIT_FILES has NO git hooks" \
     grep_absent -Fq 'hooks/post-' "$UPDATE"
 check "update.sh re-stamps WWW_GROUP to the opencode usergroup" \

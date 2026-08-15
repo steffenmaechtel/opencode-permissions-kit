@@ -104,6 +104,13 @@ if getent group "$GROUP" >/dev/null 2>&1; then
             chgrp -R "$GROUP" "$root" 2>/dev/null || true
             chmod g+s "$root" 2>/dev/null || true
             setfacl -R -d -m "g:$GROUP:rwx" "$root" 2>/dev/null || true
+            # .ddev handover: ddev always runs as the opencode user, so an
+            # existing .ddev must belong to them (otherwise `ddev start` fails
+            # with "chmod .ddev/.webimageBuild: operation not permitted").
+            if [ -d "$root/.ddev" ]; then
+                chown -R "$OPENCODE_USER:$GROUP" "$root/.ddev" 2>/dev/null || true
+                chmod -R g+w "$root/.ddev" 2>/dev/null || true
+            fi
         done < "$PROJECTS_FILE"
     fi
     echo "  sharing group re-based to '$GROUP' (chgrp + setgid + default ACLs)"

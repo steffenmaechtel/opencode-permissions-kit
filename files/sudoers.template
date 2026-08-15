@@ -23,3 +23,11 @@ DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bi
 # developer-running wrapper cannot stat it. Gated to the kit's socket-check.sh
 # helper only (it does nothing but `test -S`) — no arbitrary command execution.
 DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh *
+
+# ddev always runs as the opencode user (docs/design/DDEV-WORKING.md §7):
+# the developer's `ddev` shell function (ddev-as-opencode.sh, hooked into
+# .bashrc/.zshrc/.profile) execs this helper via sudo, so the terminal and
+# the agent share one ddev home + one rootless daemon. The helper is gated
+# to this exact path, re-sets HOME/XDG_RUNTIME_DIR/DOCKER_HOST for the
+# opencode user, and only ever execs the real ddev binary.
+DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode *

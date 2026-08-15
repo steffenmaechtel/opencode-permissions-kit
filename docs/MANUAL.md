@@ -30,9 +30,10 @@ gates opencode's own read/edit tools only. Processes spawned outside opencode
 |---|---|
 | Agent ≠ developer | wrapper execs `sudo -u opencode`; the developer's home is `750` and not group-shared |
 | Containers ≠ root | rootless backend owned by `opencode` (per-user socket / daemonless podman) |
-| No developer-RunAs | the sudoers carry only `(opencode)` rules for the kit binary + socket probe |
+| No developer-RunAs | the sudoers carry only `(opencode)` rules for the kit binary, the socket probe, and the ddev-as-opencode helper |
 | File denies (`.env`, keys, …) | `opencode.jsonc` soft rules — enforced by opencode's tools, prompted via bash tripwires |
 | Developer ↔ agent file sharing | the `opencode` usergroup: setgid + default group ACLs + umask 002 |
+| ddev runs as one user | the `ddev()` terminal function + the sudoers helper exec the real ddev as `opencode`; project `.ddev/` is handed over (one owner, one daemon) |
 
 Known residual gaps, documented rather than hidden:
 
@@ -50,7 +51,7 @@ the session gets — there is exactly one backend mode (rootless) either way:
 |---|---|---|
 | Enabled by | project has no docker/ddev allow | project `permission.bash` allows `docker *` / `ddev *` (broadly, not subcommand-only) |
 | opencode runs as | `opencode` user | `opencode` user, `DOCKER_HOST` → the user's rootless socket (docker-rootless), or the daemonless podman CLI |
-| ddev | denied | runs natively as `opencode` — no delegation, no transaction |
+| ddev | denied | runs as `opencode` — always (terminal and agent) |
 
 A project opts in via its own `opencode.jsonc`:
 
@@ -208,10 +209,33 @@ Every `opencode` invocation goes through the wrapper at
 
 ### ddev as the opencode user
 
-ddev runs **natively as `opencode`** — no delegation shim, no transaction.
-Install/update provision what it needs:
+ddev runs **always as `opencode`** — no delegation shim, no transaction, and
+no two owners for `.ddev/`. How that works in practice:
 
-- `/home/opencode/.ddev` — the sandbox user's global ddev home (project
+- **Agent (opencode session):** ddev runs natively as `opencode`.
+- **Your terminal (default user):** the kit hooks a `ddev()` shell function
+  into your `~/.bashrc` / `~/.zshrc` / `~/.profile`. It execs
+  `/usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode` via a
+  passwordless sudoers rule, which re-sets the opencode environment
+  (`HOME`, `XDG_RUNTIME_DIR`, `DOCKER_HOST` per backend) and runs the **real**
+  ddev. So the terminal and the agent share one ddev home and one rootless
+  daemon.
+
+  Non-interactive scripts calling `ddev` are not intercepted — either run
+  them in a terminal or call the helper directly:
+  `sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode <args>`.
+
+- **`.ddev/` ownership (the EPERM fix):** every registered project's `.ddev`
+  belongs to `opencode:opencode` and is group-writable (`g+w`), so ddev can
+  chmod its build stamps (the old
+  `chmod .ddev/.webimageBuild: operation not permitted` is gone). The
+  handover happens on install, when a project is added via `config.sh
+  projects add`, on `config.sh refresh`, and unconditionally on every
+  `update.sh`. Your `.git/` stays yours (mode 700, untouched).
+
+Install/update provision the rest:
+
+- `/home/opencode/.ddev` — the opencode user's global ddev home (project
   registry, mutagen binaries, `ddev auth ssh` key cache).
 - **Router ports** — rootless containers cannot bind <1024; either the
   sysctl (`ip_unprivileged_port_start=80`, asked at install) or higher ports:
@@ -226,11 +250,11 @@ Install/update provision what it needs:
 
 Notes:
 
-- **No private SSH keys:** the sandbox ddev home has none — composer from
-  private repos and `ddev auth ssh` stay developer-terminal tasks.
-- **One driver at a time:** the developer's terminal ddev and the sandbox
-  ddev use different daemons — do not drive the same project from both
-  simultaneously.
+- **`ddev auth ssh` / composer private keys** now live in
+  `/home/opencode/.ddev` and are agent-readable. This is a deliberate
+  soft-only trade-off: ddev runs as one user, so what ddev may read, the
+  agent may read. Use `.gitignore`d per-machine credentials and rotate keys
+  if the machine is not trusted.
 - The **first** `ddev start` as `opencode` is slow (mutagen download, image
   pulls into the rootless daemon); everything afterwards reuses that state.
 
@@ -365,11 +389,14 @@ helpers, or you want opencode to commit/push on your behalf.
 1. Removes every `u:opencode:---` ACL deny from the registered project
    roots (via `migrate-denies.sh`).
 2. Re-bases the sharing group to the `opencode` usergroup (chgrp + setgid +
-   default ACLs) and adds the developer to the group.
+   default ACLs), hands over every project's `.ddev` to `opencode`, and adds
+   the developer to the group.
 3. Removes the legacy artifacts: git hooks, `protect-projects.sh`,
    `ddev-transaction.sh`, the ddev delegation shim, the rewrite list.
 4. Unsets `core.hooksPath`, provisions `/home/opencode/.ddev` + mkcert,
-   re-renders the sudoers, stamps `HARD_DENY_REMOVED=1`.
+   re-renders the sudoers (now incl. the ddev-as-opencode rule), hooks the
+   `ddev()` terminal function into your rc files, stamps
+   `HARD_DENY_REMOVED=1`.
 
 A legacy `docker-group` install **aborts with instructions** — re-run
 `install.sh --container-backend docker-rootless|podman-rootless` (rootless is
@@ -472,7 +499,7 @@ config remain (harmless); the script prints manual cleanup steps.
 
 | Path | Purpose |
 |---|---|
-| `opencode-permissions-kit` | `(opencode)` RunAs for the kit binary + the socket-check probe; `DOCKER_HOST`/`XDG_RUNTIME_DIR` env_keep |
+| `opencode-permissions-kit` | `(opencode)` RunAs for the kit binary, the socket-check probe, and the ddev-as-opencode helper; `DOCKER_HOST`/`XDG_RUNTIME_DIR` env_keep |
 
 ### /home/
 
@@ -489,8 +516,10 @@ config remain (harmless); the script prints manual cleanup steps.
 | `/usr/local/bin/opencode` | Wrapper symlink |
 | `.../opencode-permissions-kit/bin/opencode` | The actual opencode binary (`root:opencode` 750) |
 | `.../opencode-permissions-kit/bin/socket-check.sh` | Rootless socket probe (`test -S` only) |
+| `.../opencode-permissions-kit/bin/ddev-as-opencode` | Sudoers helper that runs the real ddev as `opencode` (re-sets `HOME`/`XDG_RUNTIME_DIR`/`DOCKER_HOST`) |
+| `.../opencode-permissions-kit/ddev-as-opencode.sh` | Sourced `ddev()` terminal function (hooked into the default user's rc files) |
 | `.../opencode-permissions-kit/wrapper` | Directory validation, container opt-in, rootless exec |
-| `.../opencode-permissions-kit/migrate-denies.sh` | One-time hard-deny → soft-only migration |
+| `.../opencode-permissions-kit/migrate-denies.sh` | One-time hard-deny → soft-only migration (+ `.ddev` handover) |
 | `.../opencode-permissions-kit/setup-container-backend.sh` | Rootless backend provisioning |
 | `.../opencode-permissions-kit/{config,update,status,uninstall}.sh` | Management |
 | `.../opencode-permissions-kit/{jsonc-parser.py,log.sh,shell-warn.sh,sudoers.template,opencode.jsonc,opencode-deny-all.jsonc}` | Shared helpers/templates |
