@@ -53,6 +53,17 @@ if [ -f "$PROJECTS_CONF" ]; then
 fi
 
 if [ "$VALID" != true ]; then
+    # Version/help queries carry no project context — answer them from the
+    # real binary instead of refusing. The official opencode installer
+    # probes `opencode --version` from $HOME while the kit installs; the
+    # refusal mid-install confused users ("ERROR: opencode cannot be
+    # started here"). From a VALID directory the normal bannered path
+    # below still applies.
+    case "${1:-}" in
+        --version|-V|-h|--help)
+            exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
+            ;;
+    esac
     echo ""
     echo "  ${RED}ERROR: opencode cannot be started here${NC}"
     echo "  ${YELLOW}$CWD${NC} is not a valid project directory."

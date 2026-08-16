@@ -100,7 +100,10 @@ OPENCODE_GROUP="opencode"
 
 SKIP_PROMPTS=false
 PREDEFINED_PROJECTS=""
-SECURE_GIT_CONFIG=false
+# Default true = .git/config deny rules active = git blocked for the agent
+# (the recommended, pre-Phase-4 --yes behavior). The questions below and
+# the --secure-git-config flag set it explicitly.
+SECURE_GIT_CONFIG=true
 CONTAINER_BACKEND_OPT=""
 
 _skip_next=false
@@ -418,9 +421,9 @@ if [ "$MODE" = "standard" ] && [ "$INTERACTIVE" = true ]; then
     fi
     if [ "$GIT_FLAG_GIVEN" != true ]; then
         _g=$(ui_menu "Allow opencode access to git commands?" "no" \
-            "no|block git for the agent (recommended)" \
-            "yes|allow (soft-only .git/config deny)")
-        [ "$_g" = "yes" ] && SECURE_GIT_CONFIG=true
+            "no|block .git/config for the agent (recommended)" \
+            "yes|allow git commands")
+        if [ "$_g" = "yes" ]; then SECURE_GIT_CONFIG=false; else SECURE_GIT_CONFIG=true; fi
     fi
 fi
 
@@ -430,31 +433,29 @@ fi
 # without asking.
 ui_section "Plan"
 
-ui_plan 1 "create user 'opencode' + sharing group" "(developer '$DEFAULT_USER' added)"
-ui_plan 2 "provision $CONTAINER_BACKEND for 'opencode'" "(mandatory — aborts on failure)"
+# Numbered dynamically: optional steps (mnt/c, port sysctl) are omitted
+# when not applicable — no gaps in the list the user confirms.
+_plan_n=0
+_plan() { _plan_n=$((_plan_n + 1)); ui_plan "$_plan_n" "$1" "$2"; }
+
+_plan "create user 'opencode' + sharing group" "(developer '$DEFAULT_USER' added)"
+_plan "provision $CONTAINER_BACKEND for 'opencode'" "(mandatory — aborts on failure)"
 if [ -n "$PREDEFINED_PROJECTS" ]; then
-    ui_plan 3 "group + setgid + default ACLs" "on $PREDEFINED_PROJECTS"
+    _plan "group + setgid + default ACLs" "on $PREDEFINED_PROJECTS"
 else
-    ui_plan 3 "group + setgid + default ACLs" "(project roots selected next)"
+    _plan "group + setgid + default ACLs" "(project roots selected next)"
 fi
-ui_plan 4 "secure the opencode binary + wrapper" "root:opencode 750"
+_plan "secure the opencode binary + wrapper" "root:opencode 750"
 if [ -d /mnt/c ]; then
     _pm=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$_pm" ] && [ $((0$_pm & 0004)) -ne 0 ]; then
-        ui_plan 5 "restrict /mnt/c via /etc/wsl.conf" "(takes effect after wsl --shutdown)"
-    else
-        ui_plan 5 "/mnt/c" "already restricted"
+        _plan "restrict /mnt/c via /etc/wsl.conf" "(takes effect after wsl --shutdown)"
     fi
 fi
 _pps=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
-[ "${_pps:-1024}" -gt 80 ] 2>/dev/null && ui_plan 6 "lower ip_unprivileged_port_start to 80" "(ddev-router 80/443)"
-if [ "$MODE" = "standard" ]; then
-    ui_plan 7 "deny-all config for your user" "(self-update bypass guard)"
-    ui_plan 8 "deploy library, sudoers, audit log" "/usr/local/lib/opencode-permissions-kit"
-else
-    ui_plan 7 "ports /mnt/c / git / deny-all" "(asked individually — Advanced)"
-    ui_plan 8 "deploy library, sudoers, audit log" "/usr/local/lib/opencode-permissions-kit"
-fi
+[ "${_pps:-1024}" -gt 80 ] 2>/dev/null && _plan "lower ip_unprivileged_port_start to 80" "(ddev-router 80/443)"
+_plan "deny-all config for your user" "(self-update bypass guard)"
+_plan "deploy library, sudoers, audit log" "/usr/local/lib/opencode-permissions-kit"
 
 if [ "$INTERACTIVE" = true ]; then
     echo ""
@@ -790,6 +791,17 @@ remove_shadow_binary() {
 }
 opencode_found=false
 
+# Re-install over an existing kit: the secured binary is already in place.
+# Reuse it — do NOT re-run the official installer (its `opencode --version`
+# probe reaches the real binary through the wrapper now and reports
+# "already installed", skipping the download, which would abort here).
+if [ -x "$SYSTEM_BIN" ]; then
+    secure_binary
+    opencode_found=true
+    ui_detail "binary already secured under the kit — reusing $SYSTEM_BIN"
+    log "binary reused on re-install: $SYSTEM_BIN"
+fi
+
 for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
     if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
         ans=$(prompt "opencode binary found at $loc. Copy to system path and secure with wrapper?" "Y" "N" "B")
@@ -950,14 +962,19 @@ fi
 
 # === Step 7b: .git/config hardening (optional, SOFT-only) ===
 
-if [ "$SECURE_GIT_CONFIG" = true ]; then
-    ui_info "git access: allowed (soft-only — enforced by opencode's permission layer, not the OS)"
-else
+# Advanced mode asks here (Standard already asked in its question section;
+# --secure-git-config decided via flag). --yes runs skip everything.
+GIT_ASKED=false
+if [ "$GIT_FLAG_GIVEN" != true ] && [ "$INTERACTIVE" = true ] && [ "$MODE" = "advanced" ]; then
     ans=$(prompt "Block .git/config for opencode? (SOFT-only: opencode tools respect it, bash-spawned reads are not OS-blocked)" "Y" "N" "")
     case "$ans" in
         y) SECURE_GIT_CONFIG=true ;;
         *) SECURE_GIT_CONFIG=false ;;
     esac
+    GIT_ASKED=true
+fi
+if [ "$SECURE_GIT_CONFIG" = true ]; then
+    ui_info "git for the agent: BLOCKED (.git/config deny active, soft-only — enforced by opencode's permission layer, not the OS)"
 fi
 
 # === Step 8: opencode Home ===
@@ -995,11 +1012,26 @@ elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permis
         echo "Default config installed (opencode.jsonc — backup saved)."
     fi
     log "opencode config replaced (backup: $BACKUP_DIR/opencode.jsonc-existing)"
+elif [ -f /home/opencode/.config/opencode/opencode.json ] && [ ! -f /home/opencode/.config/opencode/opencode.jsonc ]; then
+    ui_detail "opencode.json exists — left untouched (custom user config)"
+    log "opencode config kept: custom opencode.json (not overwritten)"
 else
-    echo "Config already exists, not overwriting."
+    # Kit-managed opencode.jsonc already exists (re-install). The git choice
+    # above must not be silently ignored: re-render from the template with
+    # the chosen SECURE_GIT state — same semantics as `config.sh git-config
+    # on|off` — with a backup of the previous file.
+    sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
+    sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
+    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode/opencode.jsonc
+    sudo chmod 664 /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
-        echo "  ${UI_YELLOW}Heads-up: --secure-git-config was set but config already existed.${UI_NC}" >&2
+        sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
+        ui_success "agent config re-applied — .git/config blocked (soft, backup saved)"
+    else
+        sudo sed -i '/\/\/SECURE_GIT:/d' /home/opencode/.config/opencode/opencode.jsonc
+        ui_success "agent config re-applied — git allowed (backup saved)"
     fi
+    log "opencode config re-rendered with the chosen git setting (secure_git=$SECURE_GIT_CONFIG, backup: $BACKUP_DIR/opencode.jsonc-existing)"
 fi
 
 # === Step 8b: Default-user config (self-update bypass protection) ===
@@ -1016,17 +1048,17 @@ if [ -f "$DEFAULT_OC_CONF" ]; then
     if [ "$ans" = "y" ]; then
         BAK_STAMP=$(date +%Y%m%d-%H%M%S)
         sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
-        echo "Backed up to $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
+        ui_success "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
         log "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
     else
-        echo "${UI_YELLOW}Existing config kept — deny-all protection NOT installed.${UI_NC}"
+        ui_warn "existing default-user config kept — deny-all protection NOT installed"
     fi
 fi
 if [ ! -f "$DEFAULT_OC_CONF" ]; then
     sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
     sudo chown "$DEFAULT_USER:$OPENCODE_GROUP" "$DEFAULT_OC_CONF"
     sudo chmod 664 "$DEFAULT_OC_CONF"
-    echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
+    ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
     log "deny-all config installed for default user: $DEFAULT_OC_CONF"
 fi
 
@@ -1060,9 +1092,9 @@ ui_kv "Kit"      "v$VERSION"
 ui_kv "Backend"  "$CONTAINER_BACKEND (owned by 'opencode')"
 [ -n "$PROJECTS_ROOTS" ] && ui_kv "Projects" "$PROJECTS_ROOTS"
 if [ "$SECURE_GIT_CONFIG" = true ]; then
-    ui_kv "Git"   "allowed (soft-only .git/config deny)"
+    ui_kv "Git"   "blocked for the agent (.git/config deny active)"
 else
-    ui_kv "Git"   "blocked for the agent"
+    ui_kv "Git"   "allowed"
 fi
 ui_kv "Backup"   "$BACKUP_DIR"
 echo ""
@@ -1095,7 +1127,8 @@ fi
 echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"
-ui_detail "status.sh                      verify the protection"
-ui_detail "config.sh                      change settings later"
-ui_detail "docs/MANUAL.md                 config, security model, verification, uninstall"
+ui_detail "cd $LIBDIR"
+ui_detail "sh status.sh                   verify the protection"
+ui_detail "sudo sh config.sh              change settings later"
+ui_detail "MANUAL: https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/MANUAL.md"
 log "install complete"

@@ -240,6 +240,37 @@ else
     failures=$((failures + 1))
 fi
 
+# --- Version/help passthrough from an invalid CWD ---
+# The official opencode installer probes `opencode --version` from $HOME
+# (an invalid directory) while the kit installs; the wrapper must answer
+# from the real binary instead of refusing (regression: the mid-install
+# "ERROR: opencode cannot be started here" confused users).
+if grep -A14 'if \[ "\$VALID" != true \]; then' "$WRAPPER_FILE" | grep -q -- '--version'; then
+    echo "  ${GREEN}PASS${NC}  wrapper answers --version from an invalid CWD (installer probe)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper refuses --version outside a project directory"
+    failures=$((failures + 1))
+fi
+
+if grep -A14 'if \[ "\$VALID" != true \]; then' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
+    echo "  ${GREEN}PASS${NC}  invalid-CWD version passthrough execs the secured binary"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  invalid-CWD version passthrough lost the binary exec"
+    failures=$((failures + 1))
+fi
+
+# The passthrough must precede the refusal (exec replaces the process, the
+# ERROR banner must stay unreachable for version/help args).
+if [ "$(grep -n -- '--version' "$WRAPPER_FILE" | head -1 | cut -d: -f1)" -lt "$(grep -n 'ERROR: opencode cannot be started here' "$WRAPPER_FILE" | head -1 | cut -d: -f1)" ]; then
+    echo "  ${GREEN}PASS${NC}  passthrough is checked before the refusal"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  refusal runs before the version passthrough"
+    failures=$((failures + 1))
+fi
+
 for marker in '#@docker-group-begin' '#@ddev-delegated-begin' '#@ddev-sandbox-begin' 'DDEV_BIN' 'OPENCODE_LAUNCH_CWD' 'protect-projects'; do
     if ! grep -q "$marker" "$SUDOERS_FILE"; then
         echo "  ${GREEN}PASS${NC}  sudoers.template free of '$marker'"
