@@ -110,29 +110,32 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 
 The script detects that it is being streamed, fetches its sibling files
 (config.sh, update.sh, uninstall.sh, status.sh, wrapper, templates) from the
-same `master` branch, and walks you through the setup:
+same `master` branch, and walks you through the setup.
 
-1. **Project folders** — e.g. `/var/www/vhosts` (multi-select or custom).
-2. **Rootless container tool** — docker-rootless (default) or podman-rootless.
-   Provisioning is mandatory: if it fails, the install aborts (podman needs
-   no systemd — try it when docker-rootless cannot run).
-3. **Router ports** — lower `net.ipv4.ip_unprivileged_port_start` to 80 so
-   ddev-router can bind 80/443? (host-wide sysctl; declined → use higher
-   router ports).
-4. **Allow git commands** — no (default) or yes (soft-only `.git/config`
-   deny via `--secure-git-config`).
+**Standard mode (default):** a pre-flight inventory lists what is already on
+the system (WSL2, curl/acl, ddev, docker/podman, an existing kit
+installation, the opencode binary, `/mnt/c` exposure, router ports), then
+asks only:
 
-Non-interactive:
+1. **Project directory** — e.g. `/var/www/vhosts` (default when present).
+2. **Git access** — block for the agent (default) or allow (soft-only).
+3. *Exception:* when podman is detected — stay with podman-rootless
+   (default) or use docker-rootless. Otherwise docker-rootless is used
+   silently.
 
-```bash
-sudo bash files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts
-```
+After the two questions a numbered **plan** is shown (user + sharing group,
+backend provisioning, ACLs, binary + wrapper, `/mnt/c` restriction, port
+sysctl, deny-all config, library deploy) with `Confirm` / `Switch to
+Advanced` / `Abort`. Everything not asked runs with the recommended value —
+identical to `--yes`.
 
-(`--container-backend` must come **before** `--projects` — the projects flag
-consumes the rest of the command line.)
+**Advanced mode:** keeps the granular prompts for every step (backend
+choice, project multi-select, port sysctl, `/mnt/c` restriction, ACL
+baseline, binary handling, deny-all config handling).
 
 ddev ≥ 1.25 is a hard requirement when ddev is installed; the installer
-aborts on older versions.
+aborts on older versions. Rootless backend provisioning is mandatory — a
+failure aborts the install (there is no docker-group fallback).
 
 After the install, `cd` into a project and run:
 
@@ -147,6 +150,15 @@ directory first in `$PATH` — the installer cleans the rc files, but only for
 new shells. Until you open a fresh terminal, `opencode` would resolve to the
 old binary and bypass the wrapper. (Same-shell fix: `hash -r` and
 `export PATH="/usr/local/bin:$PATH"`.)
+
+Non-interactive (Standard mode with defaults, no questions):
+
+```bash
+sudo bash files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts
+```
+
+(`--container-backend` must come **before** `--projects` — the projects flag
+consumes the rest of the command line.)
 
 No npm package and no opencode plugin are involved — the kit is system-level
 only.
