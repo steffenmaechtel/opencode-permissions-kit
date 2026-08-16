@@ -183,16 +183,26 @@ confirmation) — implemented only for this discussion.
 
 ## 7. Rollout (each phase ships independently)
 
-1. Extract `files/opencode-permissions-kit-lib/ui.sh` from the demo lib +
-   unit tests (`tests/test-ui.sh`: NO_COLOR, non-tty, ASCII fallback).
-2. `status.sh` (read-only, lowest risk — first visible win).
-3. `update.sh` + `config.sh`.
-4. `install.sh` Standard/Advanced + pre-flight inventory; e2e asserts the
-   new flow; `--yes` path verified non-interactive.
-5. Wrapper touch-ups last.
+1. **DONE** — `files/opencode-permissions-kit-lib/ui.sh` extracted + unit
+   tests (`tests/test-ui.sh`: NO_COLOR, non-tty, ASCII fallback, alignment,
+   question defaults) + deploy/fetch wiring in install.sh & update.sh + CI
+   chmod lists.
+2. **DONE** — `status.sh` restyled (read-only; sections Core / Projects /
+   backend / ddev / WSL2 / migration / leak scan; setgid check per project
+   root added).
+3. **DONE** — `update.sh` + `config.sh` restyled (ui_banner/sections/kv,
+   plain-function fallback when ui.sh is missing; menu on ui_menu).
+4. **DONE** — `install.sh` Standard/Advanced: mode question, pre-flight
+   inventory (incl. existing-kit detection with an update.sh hint), podman
+   exception question in Standard, plan + Confirm/Advanced/Abort, styled
+   execution + completion panel. `--yes` = Standard with defaults,
+   non-interactive verified by e2e.
+5. **DONE (deliberate no-op)** — wrapper stays minimal: its banner is
+   byte-locked by tests/test-wrapper-validation.sh and it already follows
+   "one header + warnings only".
 
-Constraints: file names, flags, `install.conf`/`projects.conf`/
-`opencode.jsonc` semantics unchanged. Update MANUAL.md per phase.
+Constraints kept: file names, flags, `install.conf`/`projects.conf`/
+`opencode.jsonc` semantics unchanged; MANUAL.md updated per phase.
 
 ## 8. Demo playground: `tests/ux/`
 
