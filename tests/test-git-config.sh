@@ -110,6 +110,51 @@ else
     fail "round-trip: ON->OFF sed is no-op (rules already active)"
 fi
 
+# --- 6. install.sh git semantics (regression: 2026-08-16 live-test bugs) ---
+# SECURE_GIT_CONFIG=true means the deny rules are ACTIVE = git BLOCKED.
+# A live install run revealed three inversions/gaps that must never return:
+#   a) the Standard question mapped "allow" to true (= block),
+#   b) the completion panel showed the mapping backwards,
+#   c) a re-install silently ignored the choice (config never re-rendered).
+INSTALL="$SCRIPT_DIR/../files/install.sh"
+
+if grep -q '^SECURE_GIT_CONFIG=true' "$INSTALL"; then
+    pass "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
+else
+    fail "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
+fi
+
+if grep -q 'yes" \]; then SECURE_GIT_CONFIG=false' "$INSTALL" \
+   || grep -Eq '=\s*"yes"\s*\]\s*&&\s*SECURE_GIT_CONFIG=false' "$INSTALL"; then
+    pass "install.sh: Standard 'allow git' maps to SECURE_GIT_CONFIG=false"
+else
+    fail "install.sh: Standard 'allow git' maps to SECURE_GIT_CONFIG=false"
+fi
+
+if grep -q 'ui_kv "Git".*blocked for the agent' "$INSTALL" \
+   && ! grep -q 'ui_kv "Git".*allowed (soft-only' "$INSTALL"; then
+    pass "install.sh: completion panel maps true=blocked / false=allowed"
+else
+    fail "install.sh: completion panel maps true=blocked / false=allowed"
+fi
+
+# The re-install path must back up + re-render the agent config with the
+# chosen git setting (never silently keep a stale one).
+if grep -q 'opencode.jsonc-existing' "$INSTALL" \
+   && grep -q 'config re-applied' "$INSTALL"; then
+    pass "install.sh: re-install re-renders the agent config (backup kept)"
+else
+    fail "install.sh: re-install re-renders the agent config (backup kept)"
+fi
+
+# Plan numbering must be dynamic (_plan helper) — a skipped optional step
+# must not leave a gap in the numbered plan the user confirms.
+if grep -q '_plan()' "$INSTALL" && ! grep -Eq 'ui_plan [0-9]' "$INSTALL"; then
+    pass "install.sh: plan numbering is dynamic (no gaps when steps are skipped)"
+else
+    fail "install.sh: plan numbering is dynamic (no gaps when steps are skipped)"
+fi
+
 # --- Summary ---
 echo ""
 echo "===================================="

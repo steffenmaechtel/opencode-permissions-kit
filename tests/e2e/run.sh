@@ -454,6 +454,21 @@ check "git-config OFF: status reports OFF" \
     E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config status 2>&1 | grep -q "OFF"'
 
 echo ""
+echo "--- 12c-2. install.sh re-run re-applies the git choice (re-install) ---"
+# 12c left git-config OFF. A re-install without flags must NOT silently keep
+# that stale agent config: the default (git blocked) is re-rendered from the
+# template with the previous file backed up. Regression for the 2026-08-16
+# live-test bug where the choice was ignored on re-install.
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts' && \
+    echo "  ${GREEN}OK${NC}  re-install completed"
+check "re-install: default git-block re-applied to the existing agent config" \
+    E 'sudo grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'
+check "re-install: previous agent config was backed up" \
+    E 'sudo ls /tmp/opencode-install-backup-*/opencode.jsonc-existing >/dev/null 2>&1'
+check "re-install: config.sh status reports ON again" \
+    E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config status 2>&1 | grep -q "ON"'
+
+echo ""
 echo "--- 12d. config.sh interactive menu (displays) ---"
 E 'sudo mkdir -p /var/www/vhosts/menu-project' && \
     E 'sudo touch /var/www/vhosts/menu-project/.env'

@@ -118,7 +118,10 @@ installation, the opencode binary, `/mnt/c` exposure, router ports), then
 asks only:
 
 1. **Project directory** — e.g. `/var/www/vhosts` (default when present).
-2. **Git access** — block for the agent (default) or allow (soft-only).
+2. **Git access** — block `.git/config` for the agent (default) or allow
+   git commands. Re-running install.sh over an existing kit re-applies this
+   choice to the agent's `opencode.jsonc` (previous file backed up) — the
+   same operation as `config.sh git-config on|off`.
 3. *Exception:* when podman is detected — stay with podman-rootless
    (default) or use docker-rootless. Otherwise docker-rootless is used
    silently.
