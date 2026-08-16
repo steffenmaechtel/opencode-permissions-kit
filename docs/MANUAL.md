@@ -380,6 +380,12 @@ the real binary takes over, it cannot read or modify anything. Template:
 - `update.sh` only installs the lockout config when no config exists yet.
 - To use opencode normally as your own user, delete or rename that config.
 
+`install.sh` also removes a self-installed binary from `~/.opencode/bin`
+(after securing its copy under the kit, with a backup in the install backup
+directory), so the wrapper starts without the bypass warning. If the file
+reappears later (official installer re-run, self-update), the wrapper and
+shell warnings flag it — apply the suggested `rm -rf ~/.opencode/bin`.
+
 ### Wrapper-Bypass Guard (detect a bypass, warn loudly)
 
 1. **Binary exec restricted to root + the opencode usergroup.** The real binary

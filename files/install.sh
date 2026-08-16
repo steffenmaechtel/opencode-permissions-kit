@@ -602,6 +602,20 @@ secure_binary() {
     sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
     sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null || true
 }
+# The wrapper warns about a self-installed binary shadowing it from
+# ~/.opencode/bin. Once our secured copy exists, remove the user-local
+# original (backed up first) so the first wrapper run is warning-free.
+remove_shadow_binary() {
+    case "$1" in
+        */.opencode/bin/opencode) ;;
+        *) return 0 ;;   # never touch /usr/bin, /usr/local/bin, ...
+    esac
+    [ -e "$1" ] || return 0
+    cp "$1" "$BACKUP_DIR/opencode-binary" 2>/dev/null || true
+    sudo rm -f "$1"
+    echo "Removed user-local copy: $1 (backup: $BACKUP_DIR/opencode-binary)"
+    log "user-local opencode binary removed: $1 (backed up to $BACKUP_DIR/opencode-binary)"
+}
 opencode_found=false
 
 for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
@@ -612,6 +626,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 sudo cp "$loc" "$SYSTEM_BIN"
                 secure_binary
+                remove_shadow_binary "$loc"
                 opencode_found=true
                 echo "Copied to $SYSTEM_BIN."
                 log "binary copied: $loc -> $SYSTEM_BIN"
@@ -622,6 +637,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 sudo cp "$loc" "$SYSTEM_BIN"
                 secure_binary
+                remove_shadow_binary "$loc"
                 opencode_found=true
                 echo "Backup saved. Copied to $SYSTEM_BIN."
                 log "binary copied: $loc -> $SYSTEM_BIN (backup saved)"
@@ -642,12 +658,14 @@ if [ "$opencode_found" = false ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
             secure_binary
+            remove_shadow_binary "/root/.opencode/bin/opencode"
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /root/.opencode/bin/opencode -> $SYSTEM_BIN"
         elif [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/home/$DEFAULT_USER/.opencode/bin/opencode" "$SYSTEM_BIN"
             secure_binary
+            remove_shadow_binary "/home/$DEFAULT_USER/.opencode/bin/opencode"
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /home/$DEFAULT_USER/.opencode/bin/opencode -> $SYSTEM_BIN"
         else
