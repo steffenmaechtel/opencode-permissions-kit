@@ -39,7 +39,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh; do
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -54,7 +54,7 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 STREAMED=false
 if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     echo "Not a local checkout — fetching kit files from $KIT_BASE_URL ..."
-    SCRIPT_DIR="$(fetch_kit)" || { echo "${RED}Failed to fetch kit files from $KIT_BASE_URL${NC}" >&2; exit 1; }
+    SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
     STREAMED=true
 fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
@@ -73,11 +73,25 @@ fi
 [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh"
 command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
 
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+# === Shared UI helpers ===
+# The kit files sit next to this script (checkout or fully fetched temp dir);
+# a plain fallback keeps install.sh working if ui.sh is somehow missing.
+UI_LIB="$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh"
+if [ -f "$UI_LIB" ]; then
+    . "$UI_LIB"
+else
+    ui_info()    { echo "  info     $1"; }
+    ui_success() { echo "  success  $1"; }
+    ui_warn()    { echo "  warn     $1"; }
+    ui_error()   { echo "  error    $1" >&2; }
+    ui_detail()  { echo "     $1"; }
+    ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
+    ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
+    ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
+    ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
+    ui_plan()    { printf '    %s  %s\n' "$1" "$2"; }
+    UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
+fi
 
 OPENCODE_USER="opencode"
 # The sharing group is the opencode user's own primary usergroup (created by
@@ -98,7 +112,7 @@ for arg do
     fi
     case "$arg" in
         --yes) SKIP_PROMPTS=true ;;
-        --secure-git-config) SECURE_GIT_CONFIG=true ;;
+        --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
         --container-backend)
             CONTAINER_BACKEND_OPT="$2"
             _skip_next=true
@@ -153,10 +167,7 @@ prompt() {
 }
 
 banner() {
-    echo ""
-    echo "  ${GREEN}opencode permissions kit${NC}  v$VERSION"
-    echo "  ${CYAN}=============================================${NC}"
-    echo ""
+    ui_banner "$VERSION" "installs opencode as its own user behind rootless containers"
 }
 
 # === Start ===
@@ -166,7 +177,28 @@ banner
 DEFAULT_USER="${SUDO_USER:-$(whoami)}"
 log "install started (version $VERSION, default user=$DEFAULT_USER)"
 
-if ! grep -qi microsoft /proc/version 2>/dev/null; then
+# === Install mode ===
+# Standard asks only the essential questions and takes recommended defaults
+# for everything else (same answers as --yes); Advanced keeps every granular
+# prompt of the install steps below.
+INTERACTIVE=true
+[ "$SKIP_PROMPTS" = true ] && INTERACTIVE=false
+MODE="standard"
+if [ "$INTERACTIVE" = true ]; then
+    _mode=$(ui_menu "How do you want to install?" "1" \
+        "1|Standard (recommended — few questions, safe defaults)" \
+        "2|Advanced (control every step)" \
+        "x|Abort")
+    case "$_mode" in
+        x) ui_info "Aborted."; exit 0 ;;
+        2) MODE="advanced" ;;
+    esac
+fi
+log "install mode: $MODE (interactive=$INTERACTIVE)"
+
+IS_WSL2=false
+grep -qi microsoft /proc/version 2>/dev/null && IS_WSL2=true
+if [ "$IS_WSL2" != true ]; then
     ans=$(prompt "This does not appear to be WSL2. Continue anyway?" "Y" "N" "")
     [ "$ans" != "y" ] && exit 0
 fi
@@ -184,11 +216,10 @@ sudo -u "$OPENCODE_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/g
 [ -d /usr/local/lib/opencode-permissions-kit ] && cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null || true
 [ -d /usr/local/lib/opencode ] && cp -r /usr/local/lib/opencode "$BACKUP_DIR/opencode-lib-legacy" 2>/dev/null || true
 
-echo ""
-echo "--- Pre-flight checks ---"
+ui_section "Pre-flight"
 
 if ! command -v curl >/dev/null 2>&1; then
-    echo "${RED}curl is required but not installed.${NC}"
+    ui_error "curl is required but not installed."
     exit 1
 fi
 
@@ -199,7 +230,7 @@ if ! command -v setfacl >/dev/null 2>&1; then
         sudo apt-get install -y acl
     fi
     if ! command -v setfacl >/dev/null 2>&1; then
-        echo "${RED}setfacl required for the group-collaboration ACLs. Install the 'acl' package and re-run.${NC}"
+        ui_error "setfacl required for the group-collaboration ACLs. Install the 'acl' package and re-run."
         exit 1
     fi
 fi
@@ -231,15 +262,15 @@ if command -v ddev >/dev/null 2>&1 || [ -n "$DDEV_BIN" ]; then
     if [ -n "$DDEV_VERSION" ]; then
         ddev_ok=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0>1 || (a[1]+0==1 && a[2]+0>=25)) print "yes"; else print "no"}')
         if [ "$ddev_ok" != "yes" ]; then
-            echo "${RED}ddev $DDEV_VERSION found — the kit requires ddev >= 1.25 (rootless container support).${NC}"
-            echo "${YELLOW}Upgrade ddev (curl -fsSL https://ddev.com/install.sh | bash) and re-run.${NC}"
+            ui_error "ddev $DDEV_VERSION found — the kit requires ddev >= 1.25 (rootless container support)."
+            ui_warn "upgrade ddev (curl -fsSL https://ddev.com/install.sh | bash) and re-run."
             exit 1
         fi
     else
-        echo "${YELLOW}WARNING: could not parse the ddev version — continuing anyway (ddev >= 1.25 required).${NC}"
+        ui_warn "could not parse the ddev version — continuing anyway (ddev >= 1.25 required)."
     fi
 else
-    echo "${YELLOW}DDEV not found. Continuing anyway (install it later with ddev >= 1.25).${NC}"
+    ui_warn "ddev not found — continuing anyway (install it later with ddev >= 1.25)."
 fi
 
 # Container backend selection. Rootless is MANDATORY: docker-rootless
@@ -272,40 +303,183 @@ if [ -n "$CONTAINER_BACKEND_OPT" ]; then
             CONTAINER_BACKEND="$CONTAINER_BACKEND_OPT"
             ;;
         *)
-            echo "${RED}Invalid --container-backend: '$CONTAINER_BACKEND_OPT'${NC}"
-            echo "${YELLOW}Supported: docker-rootless | podman-rootless (rootless only — docker-group was removed)${NC}"
+            echo "${UI_RED}Invalid --container-backend: '$CONTAINER_BACKEND_OPT'${UI_NC}"
+            echo "${UI_YELLOW}Supported: docker-rootless | podman-rootless (rootless only — docker-group was removed)${UI_NC}"
             exit 1
             ;;
     esac
 fi
 
-# Interactive prompt (only when not --yes and no --container-backend flag).
-if [ "$SKIP_PROMPTS" != true ] && [ -z "$CONTAINER_BACKEND_OPT" ]; then
+# Interactive backend choice (only when not --yes and no flag override).
+# Both backends confine containers to the opencode UID — no root-equivalent
+# docker socket is ever granted. Standard asks ONLY when podman is present
+# ("stay with podman?"); docker-rootless is the silent default otherwise.
+if [ "$INTERACTIVE" = true ] && [ -z "$CONTAINER_BACKEND_OPT" ]; then
+    if [ "$MODE" = "advanced" ]; then
+        _be_sel=$(ui_menu "Container backend for the agent user? (rootless, required)" \
+            "$([ "$CONTAINER_BACKEND" = "podman-rootless" ] && echo 2 || echo 1)" \
+            "1|docker-rootless (default — needs systemd --user + docker-ce-rootless-extras)" \
+            "2|podman-rootless (daemonless, no systemd required)")
+        case "$_be_sel" in
+            2) CONTAINER_BACKEND="podman-rootless" ;;
+            *) CONTAINER_BACKEND="docker-rootless" ;;
+        esac
+    elif command -v podman >/dev/null 2>&1; then
+        _be_def="podman"
+        [ "$CONTAINER_BACKEND" = "docker-rootless" ] && _be_def="docker"
+        _be_sel=$(ui_menu "Podman is installed. Which rootless backend should the agent use?" \
+            "$_be_def" \
+            "podman|podman-rootless (daemonless — no systemd needed)" \
+            "docker|docker-rootless (provisioned for the opencode user)")
+        case "$_be_sel" in
+            podman) CONTAINER_BACKEND="podman-rootless" ;;
+            *)      CONTAINER_BACKEND="docker-rootless" ;;
+        esac
+    fi
+fi
+
+# === Pre-flight inventory =====================================================
+# Read-only summary of what the checks found and what the installer will do
+# about it — the user confirms the plan before anything is modified.
+ui_section "Inventory"
+
+[ "$IS_WSL2" = true ] && ui_have "WSL2" "detected" || ui_atten "WSL2" "not detected — continuing anyway"
+ui_have "curl" "present"
+command -v setfacl >/dev/null 2>&1 && ui_have "acl tools" "present" || ui_add "acl tools" "installing now"
+if [ -n "$DDEV_VERSION" ]; then
+    ui_have "ddev" "v$DDEV_VERSION (>= 1.25)"
+else
+    ui_atten "ddev" "not installed (optional — needs >= 1.25)"
+fi
+HAVE_DOCKER=false; HAVE_PODMAN=false
+command -v docker  >/dev/null 2>&1 && HAVE_DOCKER=true
+command -v podman  >/dev/null 2>&1 && HAVE_PODMAN=true
+if [ "$HAVE_DOCKER" = true ]; then
+    ui_have "docker CLI" "present — rootless backend will be provisioned for 'opencode'"
+elif [ "$HAVE_PODMAN" = true ]; then
+    ui_have "podman" "present — used rootless for 'opencode'"
+else
+    ui_add "$CONTAINER_BACKEND" "will be installed + provisioned for 'opencode'"
+fi
+
+# Existing kit detection: user 'opencode', install.conf, or a wrapper symlink.
+EXISTING_KIT=false
+if id "$OPENCODE_USER" >/dev/null 2>&1 || [ -f /etc/opencode-permissions-kit/install.conf ] || [ -L /usr/local/bin/opencode ]; then
+    EXISTING_KIT=true
+    _ekv="unknown"
+    [ -f /etc/opencode-permissions-kit/install.conf ] && _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
+    ui_atten "existing kit" "detected (v${_ekv:-?}) — update.sh is the usual upgrade path"
+    if [ "$INTERACTIVE" = true ]; then
+        _ek=$(ui_ask "Re-configure the existing installation with install.sh?" "y")
+        [ "$_ek" != "y" ] && { ui_info "Aborted — run: sudo bash /usr/local/lib/opencode-permissions-kit/update.sh"; exit 0; }
+    fi
+fi
+
+# opencode binary candidates (the copy+secure step runs later).
+OC_BINARY_FOUND=""
+for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
+    if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
+        OC_BINARY_FOUND="$loc"
+        ui_have "opencode binary" "$loc — will be secured under the kit"
+        break
+    fi
+done
+[ -n "$OC_BINARY_FOUND" ] || ui_add "opencode binary" "official installer will fetch it"
+
+# WSL2 /mnt/c exposure preview (question + fix come later in step 4).
+if [ -d /mnt/c ]; then
+    _pm=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -n "$_pm" ] && [ $((0$_pm & 0004)) -ne 0 ]; then
+        ui_atten "/mnt/c" "world-readable (mode $_pm) — restriction offered in step 4"
+    else
+        ui_have "/mnt/c" "restricted (mode ${_pm:-?})"
+    fi
+fi
+
+# Router-port readiness preview.
+_pps=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
+if [ "${_pps:-1024}" -le 80 ] 2>/dev/null; then
+    ui_have "router ports" "ready (ip_unprivileged_port_start=$_pps)"
+else
+    ui_add "router ports" "sysctl to 80 offered (ddev-router 80/443)"
+fi
+
+# === Standard questions ========================================================
+# Standard asks exactly: project directory + git access. The podman exception
+# was already asked during backend selection. --yes takes the defaults.
+if [ "$MODE" = "standard" ] && [ "$INTERACTIVE" = true ]; then
+    ui_section "Standard setup"
+
+    if [ -z "$PREDEFINED_PROJECTS" ]; then
+        _pdef="/var/www/vhosts"
+        [ -d "$_pdef" ] || _pdef=""
+        _p=$(ui_ask "Project directory (agent workspaces)" "$_pdef")
+        [ -n "$_p" ] && PREDEFINED_PROJECTS="$_p"
+    fi
+    if [ "$GIT_FLAG_GIVEN" != true ]; then
+        _g=$(ui_menu "Allow opencode access to git commands?" "no" \
+            "no|block git for the agent (recommended)" \
+            "yes|allow (soft-only .git/config deny)")
+        [ "$_g" = "yes" ] && SECURE_GIT_CONFIG=true
+    fi
+fi
+
+# === Plan + confirmation ========================================================
+# The full plan with the effective values; C proceeds, A switches to the
+# granular prompts (Advanced), X aborts. Non-interactive runs print the plan
+# without asking.
+ui_section "Plan"
+
+ui_plan 1 "create user 'opencode' + sharing group" "(developer '$DEFAULT_USER' added)"
+ui_plan 2 "provision $CONTAINER_BACKEND for 'opencode'" "(mandatory — aborts on failure)"
+if [ -n "$PREDEFINED_PROJECTS" ]; then
+    ui_plan 3 "group + setgid + default ACLs" "on $PREDEFINED_PROJECTS"
+else
+    ui_plan 3 "group + setgid + default ACLs" "(project roots selected next)"
+fi
+ui_plan 4 "secure the opencode binary + wrapper" "root:opencode 750"
+if [ -d /mnt/c ]; then
+    _pm=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -n "$_pm" ] && [ $((0$_pm & 0004)) -ne 0 ]; then
+        ui_plan 5 "restrict /mnt/c via /etc/wsl.conf" "(takes effect after wsl --shutdown)"
+    else
+        ui_plan 5 "/mnt/c" "already restricted"
+    fi
+fi
+_pps=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
+[ "${_pps:-1024}" -gt 80 ] 2>/dev/null && ui_plan 6 "lower ip_unprivileged_port_start to 80" "(ddev-router 80/443)"
+if [ "$MODE" = "standard" ]; then
+    ui_plan 7 "deny-all config for your user" "(self-update bypass guard)"
+    ui_plan 8 "deploy library, sudoers, audit log" "/usr/local/lib/opencode-permissions-kit"
+else
+    ui_plan 7 "ports /mnt/c / git / deny-all" "(asked individually — Advanced)"
+    ui_plan 8 "deploy library, sudoers, audit log" "/usr/local/lib/opencode-permissions-kit"
+fi
+
+if [ "$INTERACTIVE" = true ]; then
     echo ""
-    echo "--- Container backend (rootless, required) ---"
-    echo ""
-    echo "  The container backend decides how opencode reaches containers."
-    echo "  Both backends confine containers to the opencode UID — no"
-    echo "  root-equivalent docker socket is ever granted."
-    echo ""
-    echo "  [1] docker-rootless (default — needs systemd --user + docker-ce-rootless-extras)"
-    echo "  [2] podman-rootless (daemonless, no systemd required)"
-    printf "  > "
-    read -r _be_sel </dev/tty 2>/dev/null || read -r _be_sel
-    case "$_be_sel" in
-        2) CONTAINER_BACKEND="podman-rootless" ;;
-        *) CONTAINER_BACKEND="docker-rootless" ;;
+    _go=$(ui_menu "Proceed?" "C" "C|Confirm" "A|Switch to Advanced" "X|Abort")
+    case "$_go" in
+        X)  ui_info "Aborted — nothing was changed."; exit 0 ;;
+        A)  MODE="advanced"
+            ui_info "Advanced mode — the remaining steps ask for your decisions." ;;
     esac
 fi
 
+# Standard answers every remaining decision with the recommended value
+# (identical to --yes); Advanced keeps the granular prompts below.
+[ "$MODE" = "standard" ] && SKIP_PROMPTS=true
+log "plan confirmed (mode=$MODE)"
+
 # === Step 1: User + group ===
 
+ui_info "Creating user + sharing group ..."
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ans=$(prompt "User '$OPENCODE_USER' already exists. Reuse it?" "Y" "N" "")
-    [ "$ans" != "y" ] && { echo "Aborted."; exit 1; }
+    [ "$ans" != "y" ] && { ui_info "Aborted."; exit 1; }
 else
     sudo useradd -m -s /bin/bash "$OPENCODE_USER"
-    echo "User '$OPENCODE_USER' created."
+    ui_success "user '$OPENCODE_USER' created"
     log "user created: $OPENCODE_USER"
 fi
 
@@ -313,7 +487,7 @@ fi
 # useradd -m). No www-data, no extra group to create or remove.
 OPENCODE_GROUP=$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")
 sudo usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER" 2>/dev/null || true
-echo "Sharing group: $OPENCODE_GROUP (developer '$DEFAULT_USER' added)"
+ui_success "sharing group '$OPENCODE_GROUP' (developer '$DEFAULT_USER' added)"
 log "sharing group: $OPENCODE_GROUP (developer $DEFAULT_USER added)"
 
 # === Step 2: Project roots ===
@@ -321,9 +495,7 @@ log "sharing group: $OPENCODE_GROUP (developer $DEFAULT_USER added)"
 if [ -n "$PREDEFINED_PROJECTS" ]; then
     PROJECTS_ROOTS="$PREDEFINED_PROJECTS"
 else
-    echo ""
-    echo "--- Project roots ---"
-    echo ""
+    ui_section "Project roots"
     echo "Select project directories (space-separated numbers), or 'c' for custom, 's' to skip."
 
     num=1
@@ -336,7 +508,7 @@ else
         fi
     done
     if [ -z "$options" ]; then
-        echo "  ${YELLOW}No standard directories found.${NC}"
+        ui_warn "no standard directories found."
     fi
     echo "  [c] Custom path(s)"
     echo "  [s] Skip (no project baseline, only user + wrapper)"
@@ -384,6 +556,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
 fi
 
+ui_info "Writing /etc/opencode-permissions-kit/install.conf ..."
 sudo tee /etc/opencode-permissions-kit/install.conf > /dev/null <<EOF
 DEFAULT_USER=$DEFAULT_USER
 OPENCODE_USER=$OPENCODE_USER
@@ -403,14 +576,13 @@ log "install.conf written (version $VERSION)"
 # root-equivalent docker-group path. The helper installs packages, allocates
 # subuid/subgid, and sets up the daemon; it prints OPENCODE_DOCKER_HOST=... on
 # stdout for the caller to record.
-echo ""
-echo "--- Provisioning container backend: $CONTAINER_BACKEND ---"
+ui_section "Provisioning container backend: $CONTAINER_BACKEND"
 SETUP_SCRIPT="$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh"
 [ -f "$SETUP_SCRIPT" ] || SETUP_SCRIPT="$LIBDIR/setup-container-backend.sh"
 _setup_out=$(sh "$SETUP_SCRIPT" "$CONTAINER_BACKEND" --yes 2>&1) || {
-    echo "${RED}Container backend provisioning failed.${NC}"
+    ui_error "Container backend provisioning failed."
     echo "$_setup_out"
-    echo "${YELLOW}Fix the issue above and re-run. podman-rootless needs no systemd — try it when docker-rootless cannot run.${NC}"
+    ui_warn "fix the issue above and re-run. podman-rootless needs no systemd — try it when docker-rootless cannot run."
     log "container backend provisioning FAILED ($CONTAINER_BACKEND) — install aborted"
     exit 1
 }
@@ -418,7 +590,8 @@ _sock=$(echo "$_setup_out" | sed -n 's/^\(OPENCODE_DOCKER_HOST=.*\)/\1/p' | tail
 if [ -n "$_sock" ]; then
     OPENCODE_DOCKER_HOST="${_sock#OPENCODE_DOCKER_HOST=}"
 fi
-echo "$_setup_out" | grep -v '^OPENCODE_' | sed 's/^/  /'
+echo "$_setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
+ui_success "container backend provisioned: $CONTAINER_BACKEND"
 sudo sed -i "s#^OPENCODE_DOCKER_HOST=.*#OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST#" /etc/opencode-permissions-kit/install.conf
 log "container backend provisioned: $CONTAINER_BACKEND"
 
@@ -427,8 +600,7 @@ log "container backend provisioned: $CONTAINER_BACKEND"
 # mutagen state, `ddev auth ssh` key cache). mkcert CA reuse keeps Windows
 # browsers trusting ddev's HTTPS certs. Router ports: rootless ddev-router
 # cannot bind 80/443 unless ip_unprivileged_port_start <= 80.
-echo ""
-echo "--- ddev runtime for user $OPENCODE_USER ---"
+ui_section "ddev runtime for user $OPENCODE_USER"
 sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
 sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "/home/$OPENCODE_USER/.ddev"
 sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
@@ -440,7 +612,7 @@ if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
     if [ "$ans" = "y" ]; then
         if echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
             if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
-                echo "  unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
+                ui_success "unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
                 log "net.ipv4.ip_unprivileged_port_start=80 applied"
                 # docker-rootless: the daemon's network namespace inherited the
                 # OLD value at start; restart it so it re-inherits 80.
@@ -448,24 +620,24 @@ if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
                 oc_uid=$(id -u "$OPENCODE_USER" 2>/dev/null)
                 if [ "$CONTAINER_BACKEND" = "docker-rootless" ] && [ -n "$oc_uid" ]; then
                     if sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$oc_uid" systemctl --user restart docker.service 2>/dev/null; then
-                        echo "  restarted the opencode rootless docker daemon (its netns re-inherits port-start 80)"
+                        ui_success "restarted the opencode rootless docker daemon (its netns re-inherits port-start 80)"
                         log "rootless docker daemon restarted for port-start 80"
                     else
-                        echo "${YELLOW}WARNING: could not restart the rootless daemon — run it manually:${NC}"
+                        ui_warn "could not restart the rootless daemon — run it manually:"
                         echo "  sudo -u $OPENCODE_USER XDG_RUNTIME_DIR=/run/user/$oc_uid systemctl --user restart docker.service"
                         log "rootless daemon restart failed (admin must restart manually)"
                     fi
                 fi
             else
-                echo "${YELLOW}WARNING: sysctl persisted but not activated live (read-only /proc/sys?) — reboot or run:${NC}"
+                ui_warn "sysctl persisted but not activated live (read-only /proc/sys?) — reboot or run:"
                 echo "  sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
                 log "sysctl persisted but not activated live"
             fi
         else
-            echo "${YELLOW}WARNING: could not write /etc/sysctl.d/99-ddev-rootless.conf — apply the sysctl manually or use higher router ports.${NC}"
+            ui_warn "could not write /etc/sysctl.d/99-ddev-rootless.conf — apply the sysctl manually or use higher router ports."
         fi
     else
-        echo "  Skipped — either set the sysctl manually or use higher router ports:"
+        ui_detail "skipped — either set the sysctl manually or use higher router ports:"
         echo "  sudo -u $OPENCODE_USER ddev config global --router-http-port 8080 --router-https-port 8443"
     fi
 fi
@@ -481,11 +653,13 @@ if [ -d /mnt/c ]; then
     if [ -z "$mnt_mode" ] || [ $((0$mnt_mode & 0004)) -eq 0 ]; then
         echo "  /mnt/c already restricted (mode ${mnt_mode:-?}) — Windows profile not exposed."
     elif grep -q '^\[automount\]' /etc/wsl.conf 2>/dev/null; then
-        echo "  ${YELLOW}NOTE: /etc/wsl.conf already has an [automount] section — left untouched.${NC}"
+        echo "  ${UI_YELLOW}NOTE: /etc/wsl.conf already has an [automount] section — left untouched.${UI_NC}"
         echo "  /mnt/c is world-readable (mode $mnt_mode); every WSL user incl. the agent"
         echo "  can read the Windows profile. Restrict it manually if unintended."
         log "wsl.conf has a pre-existing [automount] section — /mnt/c restriction skipped"
     else
+        echo "  ${UI_YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the${UI_NC}"
+        echo "  ${UI_YELLOW}agent can read the Windows profile (.ssh, NTUSER.DAT, browser data).${UI_NC}"
         ans=$(prompt "Restrict /mnt/c to your user? (WSL2 drvfs is world-readable by default; recommended)" "Y" "N" "")
         if [ "$ans" = "y" ]; then
             d_uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo "")
@@ -493,10 +667,10 @@ if [ -d /mnt/c ]; then
             if [ -n "$d_uid" ] && [ -n "$d_gid" ]; then
                 printf '\n[automount]\nenabled = true\noptions = "uid=%s,gid=%s,dmask=027,fmask=037"\n' "$d_uid" "$d_gid" | sudo tee -a /etc/wsl.conf >/dev/null
                 echo "  /etc/wsl.conf: [automount] restricted to uid=$d_uid/gid=$d_gid (dmask=027,fmask=037)"
-                echo "  ${YELLOW}Takes effect after 'wsl --shutdown' (Windows PowerShell) and reopening the distro.${NC}"
+                echo "  ${UI_YELLOW}Takes effect after 'wsl --shutdown' (Windows PowerShell) and reopening the distro.${UI_NC}"
                 log "wsl.conf automount restricted to uid=$d_uid gid=$d_gid"
             else
-                echo "  ${YELLOW}Could not resolve uid/gid for '$DEFAULT_USER' — add manually to /etc/wsl.conf:${NC}"
+                echo "  ${UI_YELLOW}Could not resolve uid/gid for '$DEFAULT_USER' — add manually to /etc/wsl.conf:${UI_NC}"
                 echo "    [automount]"
                 echo "    enabled = true"
                 echo '    options = "uid=<your-uid>,gid=<your-gid>,dmask=027,fmask=037"'
@@ -541,22 +715,21 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
     elif command -v mkcert >/dev/null 2>&1; then
         sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
         [ -f "$caroot/rootCA.pem" ] && \
-            echo "  ${YELLOW}mkcert: no existing CA found — a new one was created at $caroot.${NC}" && \
-            echo "  ${YELLOW}Import $caroot/rootCA.pem into your browser's trust store for HTTPS.${NC}" && \
+            echo "  ${UI_YELLOW}mkcert: no existing CA found — a new one was created at $caroot.${UI_NC}" && \
+            echo "  ${UI_YELLOW}Import $caroot/rootCA.pem into your browser's trust store for HTTPS.${UI_NC}" && \
             log "mkcert: no existing CA — new one created for $OPENCODE_USER"
     else
-        echo "  ${YELLOW}NOTE: mkcert not installed and no CA to reuse — install mkcert or copy your CA to $caroot.${NC}"
+        echo "  ${UI_YELLOW}NOTE: mkcert not installed and no CA to reuse — install mkcert or copy your CA to $caroot.${UI_NC}"
     fi
 fi
 
 # === Step 5: Filesystem (group baseline) ===
 
 if [ -n "$PROJECTS_ROOTS" ]; then
-    echo ""
-    echo "--- Filesystem ---"
+    ui_section "Filesystem (group baseline)"
     ans=$(prompt "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)" "Y" "N" "B")
     case "$ans" in
-        n) echo "Skipping filesystem setup." ;;
+        n) ui_detail "skipping filesystem setup." ;;
         b)
             getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
             echo "Backup saved." ;;
@@ -568,7 +741,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
             sudo chgrp -R "$OPENCODE_GROUP" "$root" 2>/dev/null || true
             sudo chmod g+s "$root"
             sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
-            echo "  $root done."
+            ui_success "$root — group + setgid + default ACLs applied"
         done
     fi
     # .ddev + settings-dir handover (ddev always runs as $OPENCODE_USER):
@@ -591,8 +764,7 @@ log "umask profile installed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 
 # === Step 6: opencode binary ===
 
-echo ""
-echo "--- opencode installation ---"
+ui_section "opencode binary + wrapper"
 
 SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 # The binary must be executable only for root and the opencode user, so a tool
@@ -601,6 +773,20 @@ BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 secure_binary() {
     sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
     sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null || true
+}
+# The wrapper warns about a self-installed binary shadowing it from
+# ~/.opencode/bin. Once our secured copy exists, remove the user-local
+# original (backed up first) so the first wrapper run is warning-free.
+remove_shadow_binary() {
+    case "$1" in
+        */.opencode/bin/opencode) ;;
+        *) return 0 ;;   # never touch /usr/bin, /usr/local/bin, ...
+    esac
+    [ -e "$1" ] || return 0
+    cp "$1" "$BACKUP_DIR/opencode-binary" 2>/dev/null || true
+    sudo rm -f "$1"
+    echo "Removed user-local copy: $1 (backup: $BACKUP_DIR/opencode-binary)"
+    log "user-local opencode binary removed: $1 (backed up to $BACKUP_DIR/opencode-binary)"
 }
 opencode_found=false
 
@@ -612,6 +798,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 sudo cp "$loc" "$SYSTEM_BIN"
                 secure_binary
+                remove_shadow_binary "$loc"
                 opencode_found=true
                 echo "Copied to $SYSTEM_BIN."
                 log "binary copied: $loc -> $SYSTEM_BIN"
@@ -622,6 +809,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 sudo cp "$loc" "$SYSTEM_BIN"
                 secure_binary
+                remove_shadow_binary "$loc"
                 opencode_found=true
                 echo "Backup saved. Copied to $SYSTEM_BIN."
                 log "binary copied: $loc -> $SYSTEM_BIN (backup saved)"
@@ -642,16 +830,18 @@ if [ "$opencode_found" = false ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
             secure_binary
+            remove_shadow_binary "/root/.opencode/bin/opencode"
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /root/.opencode/bin/opencode -> $SYSTEM_BIN"
         elif [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/home/$DEFAULT_USER/.opencode/bin/opencode" "$SYSTEM_BIN"
             secure_binary
+            remove_shadow_binary "/home/$DEFAULT_USER/.opencode/bin/opencode"
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /home/$DEFAULT_USER/.opencode/bin/opencode -> $SYSTEM_BIN"
         else
-            echo "${RED}Installation failed. Install opencode manually and re-run.${NC}"
+            echo "${UI_RED}Installation failed. Install opencode manually and re-run.${UI_NC}"
             exit 1
         fi
     else
@@ -687,6 +877,7 @@ log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning
 
 # === Step 7: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
+ui_section "Deploying the kit library"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
 sudo mkdir -p "$LIBDIR/bin"
@@ -695,6 +886,7 @@ sudo mkdir -p "$LIBDIR/bin"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh"               "$LIBDIR/ui.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/migrate-denies.sh"   "$LIBDIR/migrate-denies.sh"
@@ -718,15 +910,16 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
 sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
+               "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/migrate-denies.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/ddev-as-opencode"
 log "library deployed to $LIBDIR"
+ui_success "kit library deployed: $LIBDIR"
 
 # Symlink: /usr/local/bin/opencode -> our wrapper
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
-echo "Wrapper installed: /usr/local/bin/opencode -> $LIBDIR/wrapper"
+ui_success "wrapper installed: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 
 # Remove a legacy ddev delegation shim (pre-DDEV-WORKING installs shadowed
@@ -748,17 +941,17 @@ rm -f "$SUDO_TMP"
 sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
 
 if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
-    echo "sudoers installed."
+    ui_success "sudoers installed + validated (/etc/sudoers.d/opencode-permissions-kit)"
     log "sudoers installed: /etc/opencode-permissions-kit/sudoers -> /etc/sudoers.d/opencode-permissions-kit"
 else
-    echo "${RED}sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers.${NC}"
+    ui_error "sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers."
     exit 1
 fi
 
 # === Step 7b: .git/config hardening (optional, SOFT-only) ===
 
 if [ "$SECURE_GIT_CONFIG" = true ]; then
-    echo "Secure git config: enabled via --secure-git-config flag (soft-only — enforced by opencode's permission layer, not the OS)."
+    ui_info "git access: allowed (soft-only — enforced by opencode's permission layer, not the OS)"
 else
     ans=$(prompt "Block .git/config for opencode? (SOFT-only: opencode tools respect it, bash-spawned reads are not OS-blocked)" "Y" "N" "")
     case "$ans" in
@@ -805,7 +998,7 @@ elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permis
 else
     echo "Config already exists, not overwriting."
     if [ "$SECURE_GIT_CONFIG" = true ]; then
-        echo "  ${YELLOW}Heads-up: --secure-git-config was set but config already existed.${NC}" >&2
+        echo "  ${UI_YELLOW}Heads-up: --secure-git-config was set but config already existed.${UI_NC}" >&2
     fi
 fi
 
@@ -826,7 +1019,7 @@ if [ -f "$DEFAULT_OC_CONF" ]; then
         echo "Backed up to $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
         log "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
     else
-        echo "${YELLOW}Existing config kept — deny-all protection NOT installed.${NC}"
+        echo "${UI_YELLOW}Existing config kept — deny-all protection NOT installed.${UI_NC}"
     fi
 fi
 if [ ! -f "$DEFAULT_OC_CONF" ]; then
@@ -862,11 +1055,47 @@ log "legacy layouts/artifacts removed (if present); soft-only model active"
 
 # === Done ===
 
+ui_section "Installation complete"
+ui_kv "Kit"      "v$VERSION"
+ui_kv "Backend"  "$CONTAINER_BACKEND (owned by 'opencode')"
+[ -n "$PROJECTS_ROOTS" ] && ui_kv "Projects" "$PROJECTS_ROOTS"
+if [ "$SECURE_GIT_CONFIG" = true ]; then
+    ui_kv "Git"   "allowed (soft-only .git/config deny)"
+else
+    ui_kv "Git"   "blocked for the agent"
+fi
+ui_kv "Backup"   "$BACKUP_DIR"
 echo ""
-echo "  ${GREEN}Installation complete.${NC}"
+# WSL2 final exposure warning: the wsl.conf restriction only takes effect
+# after 'wsl --shutdown' — until then /mnt/c stays world-readable and the
+# wrapper warns on every opencode start. Covers both "declined" and
+# "configured but pending".
+if [ -d /mnt/c ]; then
+    mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
+        echo "  ${UI_YELLOW}WARNING: /mnt/c is still world-readable (mode $mnt_mode) — the agent${UI_NC}"
+        echo "  ${UI_YELLOW}can read your Windows profile. If the wsl.conf restriction was just${UI_NC}"
+        echo "  ${UI_YELLOW}configured, it needs 'wsl --shutdown' from Windows + reopening the distro${UI_NC}"
+        echo "  ${UI_YELLOW}to take effect. opencode will warn on every start until then.${UI_NC}"
+        echo ""
+    fi
+fi
+# A shell that already ran 'opencode' has the old user-local binary hashed
+# (and ~/.opencode/bin still first in its $PATH — the rc cleanup above only
+# affects NEW shells). A child process cannot fix the parent shell, so tell
+# the user to restart the terminal.
+if [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
+    echo "  ${UI_YELLOW}IMPORTANT:${UI_NC} open a NEW terminal before running 'opencode'."
+    echo "  Your current shell still resolves the old, unwrapped binary from"
+    echo "  ~/.opencode/bin (bash caches the path, and it is still first in \$PATH"
+    echo "  of this shell). Until you restart, 'opencode' would bypass the wrapper"
+    echo "  and the 'opencode' user."
+    echo ""
+fi
 echo ""
-echo "  Run:    ${CYAN}opencode${NC}"
-echo "  Backup: $BACKUP_DIR"
-echo "  Docs:   ${CYAN}docs/MANUAL.md${NC} (config, security model, verification, uninstall)"
-echo ""
+ui_info "Next:"
+ui_detail "opencode                       start the agent (new terminal!)"
+ui_detail "status.sh                      verify the protection"
+ui_detail "config.sh                      change settings later"
+ui_detail "docs/MANUAL.md                 config, security model, verification, uninstall"
 log "install complete"

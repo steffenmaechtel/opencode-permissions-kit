@@ -1,8 +1,15 @@
 name: e2e
 
+# Runs on manual dispatch, push to master, and pull requests targeting
+# master. PRs get the e2e verdict before merge. A branch push with an open
+# PR fires only `pull_request` (no `push` filter for other branches) — no
+# double-run.
 on:
   workflow_dispatch:
   push:
+    branches:
+      - master
+  pull_request:
     branches:
       - master
 
@@ -37,9 +44,9 @@ jobs:
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
       - name: Run E2E test
         run: |
-          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-migration.sh ./tests/test-ddev-as-opencode.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh \
+          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-migration.sh ./tests/test-ddev-as-opencode.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh ./tests/test-ui.sh \
             ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh \
-            ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/migrate-denies.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+            ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/ui.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/migrate-denies.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
           ./tests/e2e/run.sh
 
   # docker-rootless daemon e2e (Phase 3). Same triggers + shared binary cache;
@@ -67,7 +74,7 @@ jobs:
       - name: Run docker-rootless E2E test
         run: |
           chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh \
-            ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-migration.sh ./tests/test-ddev-as-opencode.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh \
+            ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-migration.sh ./tests/test-ddev-as-opencode.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh ./tests/test-ui.sh \
             ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh \
-            ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/migrate-denies.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+            ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/ui.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/migrate-denies.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
           ./tests/e2e/run-docker-rootless.sh

@@ -312,13 +312,13 @@ echo ""
 echo "--- RL5. status.sh + config.sh report the docker-rootless backend ---"
 if [ "$_rootless_ok" = true ]; then
     check "RL5: status.sh reports the docker-rootless backend" \
-        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "backend:    docker-rootless"'
+        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "backend +docker-rootless"'
     check "RL5: status.sh reports the socket as reachable" \
-        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "socket:.*reachable"'
+        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "socket +reachable"'
     check "RL5: config.sh container-backend status reports docker-rootless" \
         E 'sudo bash /home/dev/repo/files/config.sh container-backend status 2>&1 | grep -q "docker-rootless"'
     check "RL5: config.sh container-backend status reports the socket reachable" \
-        E 'sudo bash /home/dev/repo/files/config.sh container-backend status 2>&1 | grep -q "socket:.*reachable"'
+        E 'sudo bash /home/dev/repo/files/config.sh container-backend status 2>&1 | grep -Eq "socket +reachable"'
 fi
 
 echo ""

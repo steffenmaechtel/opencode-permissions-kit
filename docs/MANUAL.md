@@ -46,10 +46,11 @@ Known residual gaps, documented rather than hidden:
   world-readable mount **every WSL user (including the agent's) can read
   the whole Windows profile** (`.ssh/`, `NTUSER.DAT`, browser data). The
   kit's UID separation only covers the Linux side. `install.sh` therefore
-  offers to restrict the mount to your user (recommended; applies after
-  `wsl --shutdown` from Windows), `update.sh` prints the recommendation,
-  and `status.sh` reports the exposure plus a configured-but-pending
-  state. Manual fix via `/etc/wsl.conf`:
+  warns and offers to restrict the mount to your user (recommended; applies
+  after `wsl --shutdown` from Windows), `update.sh` prints a warning,
+  `status.sh` reports the exposure plus a configured-but-pending state, and
+  the **wrapper warns on every `opencode` start** until the restriction is
+  actually applied. Manual fix via `/etc/wsl.conf`:
 
   ```ini
   [automount]
@@ -109,19 +110,48 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 
 The script detects that it is being streamed, fetches its sibling files
 (config.sh, update.sh, uninstall.sh, status.sh, wrapper, templates) from the
-same `master` branch, and walks you through the setup:
+same `master` branch, and walks you through the setup.
 
-1. **Project folders** — e.g. `/var/www/vhosts` (multi-select or custom).
-2. **Rootless container tool** — docker-rootless (default) or podman-rootless.
-   Provisioning is mandatory: if it fails, the install aborts (podman needs
-   no systemd — try it when docker-rootless cannot run).
-3. **Router ports** — lower `net.ipv4.ip_unprivileged_port_start` to 80 so
-   ddev-router can bind 80/443? (host-wide sysctl; declined → use higher
-   router ports).
-4. **Allow git commands** — no (default) or yes (soft-only `.git/config`
-   deny via `--secure-git-config`).
+**Standard mode (default):** a pre-flight inventory lists what is already on
+the system (WSL2, curl/acl, ddev, docker/podman, an existing kit
+installation, the opencode binary, `/mnt/c` exposure, router ports), then
+asks only:
 
-Non-interactive:
+1. **Project directory** — e.g. `/var/www/vhosts` (default when present).
+2. **Git access** — block for the agent (default) or allow (soft-only).
+3. *Exception:* when podman is detected — stay with podman-rootless
+   (default) or use docker-rootless. Otherwise docker-rootless is used
+   silently.
+
+After the two questions a numbered **plan** is shown (user + sharing group,
+backend provisioning, ACLs, binary + wrapper, `/mnt/c` restriction, port
+sysctl, deny-all config, library deploy) with `Confirm` / `Switch to
+Advanced` / `Abort`. Everything not asked runs with the recommended value —
+identical to `--yes`.
+
+**Advanced mode:** keeps the granular prompts for every step (backend
+choice, project multi-select, port sysctl, `/mnt/c` restriction, ACL
+baseline, binary handling, deny-all config handling).
+
+ddev ≥ 1.25 is a hard requirement when ddev is installed; the installer
+aborts on older versions. Rootless backend provisioning is mandatory — a
+failure aborts the install (there is no docker-group fallback).
+
+After the install, `cd` into a project and run:
+
+```bash
+opencode
+```
+
+**Restart your terminal first** if opencode was already installed via the
+official installer: a shell that has run `opencode` before has the old
+`~/.opencode/bin` binary cached (bash's command hash) and still lists that
+directory first in `$PATH` — the installer cleans the rc files, but only for
+new shells. Until you open a fresh terminal, `opencode` would resolve to the
+old binary and bypass the wrapper. (Same-shell fix: `hash -r` and
+`export PATH="/usr/local/bin:$PATH"`.)
+
+Non-interactive (Standard mode with defaults, no questions):
 
 ```bash
 sudo bash files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts
@@ -129,15 +159,6 @@ sudo bash files/install.sh --yes --container-backend podman-rootless --projects 
 
 (`--container-backend` must come **before** `--projects` — the projects flag
 consumes the rest of the command line.)
-
-ddev ≥ 1.25 is a hard requirement when ddev is installed; the installer
-aborts on older versions.
-
-After the install, `cd` into a project and run:
-
-```bash
-opencode
-```
 
 No npm package and no opencode plugin are involved — the kit is system-level
 only.
@@ -371,6 +392,12 @@ the real binary takes over, it cannot read or modify anything. Template:
   `opencode.jsonc_BAK_<timestamp>` before the deny-all config is installed.
 - `update.sh` only installs the lockout config when no config exists yet.
 - To use opencode normally as your own user, delete or rename that config.
+
+`install.sh` also removes a self-installed binary from `~/.opencode/bin`
+(after securing its copy under the kit, with a backup in the install backup
+directory), so the wrapper starts without the bypass warning. If the file
+reappears later (official installer re-run, self-update), the wrapper and
+shell warnings flag it — apply the suggested `rm -rf ~/.opencode/bin`.
 
 ### Wrapper-Bypass Guard (detect a bypass, warn loudly)
 

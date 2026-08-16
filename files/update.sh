@@ -39,12 +39,6 @@
 # Use config.sh to change project roots or git-config hardening.
 set -e
 
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'
-NC='\033[0m'
-
 # Branch the kit ships from (master = always latest). Overridable for
 # testing: KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
 KIT_BRANCH="${KIT_BRANCH:-master}"
@@ -58,7 +52,7 @@ KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc 
 opencode-deny-all.jsonc \
 sudoers.template umask.sh VERSION \
 opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
-opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh"
+opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
@@ -97,7 +91,7 @@ ensure_local_file() {
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
-    SCRIPT_DIR="$(fetch_kit)" || { echo "${RED}Failed to fetch kit files from $KIT_BASE_URL${NC}" >&2; exit 1; }
+    SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
     # Do NOT continue executing this (installed, possibly older) copy: the
     # deploy below overwrites $LIBDIR/update.sh with the freshly fetched one,
     # which would replace the very file we are still running from. bash reads
@@ -116,6 +110,29 @@ VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 CONFDIR="/etc/opencode-permissions-kit"
 PROJECTS_CONF="$CONFDIR/projects.conf"
+
+# === Shared UI helpers ===
+# Checkout copy first, then the deployed library; a plain fallback keeps
+# update.sh working on an install whose library predates ui.sh.
+UI_LIB=""
+for _cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh" "$LIBDIR/ui.sh"; do
+    if [ -f "$_cand" ]; then UI_LIB="$_cand"; break; fi
+done
+if [ -n "$UI_LIB" ]; then
+    . "$UI_LIB"
+else
+    ui_info()    { echo "  info     $1"; }
+    ui_success() { echo "  success  $1"; }
+    ui_warn()    { echo "  warn     $1"; }
+    ui_error()   { echo "  error    $1" >&2; }
+    ui_detail()  { echo "     $1"; }
+    ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
+    ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
+    ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
+    ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
+    ui_plan()    { printf '    %s  %s\n' "$1" "$2"; }
+    UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
+fi
 
 # === Audit log ===
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Covers all
@@ -181,21 +198,15 @@ EOF
 done
 
 banner() {
-    echo ""
-    echo "  ${GREEN}opencode permissions kit${NC}  update  v$VERSION"
-    echo "  ${CYAN}=============================================${NC}"
-    echo ""
+    ui_banner "$VERSION" "update — re-deploys the kit, keeps your configuration"
 }
 
-die() { echo "${RED}$*${NC}" >&2; exit 1; }
+die() { ui_error "$*"; exit 1; }
 
 confirm() {
     [ "$YES" = true ] && return 0
-    printf "[?] %s (Y/n) " "$1" >&2
-    read -r ans </dev/tty 2>/dev/null || read -r ans
-    case "$(echo "$ans" | tr '[:upper:]' '[:lower:]')" in
-        n|no) return 1 ;; *) return 0 ;;
-    esac
+    ans=$(ui_ask "$1" "y")
+    [ "$ans" = "y" ]
 }
 
 # --- pre-flight ---------------------------------------------------------------
@@ -220,13 +231,13 @@ fi
 
 # --- re-deploy library files --------------------------------------------------
 
-echo ""
-echo "--- Re-deploying library files ---"
+ui_section "Re-deploying library files"
 sudo mkdir -p "$LIBDIR/bin"
 
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh"               "$LIBDIR/ui.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/migrate-denies.sh"   "$LIBDIR/migrate-denies.sh"
@@ -245,11 +256,11 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
 sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/log.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
+               "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/migrate-denies.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
                "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/ddev-as-opencode"
-echo "Library files updated: $LIBDIR"
+ui_success "library re-deployed: $LIBDIR"
 log "library re-deployed: $LIBDIR"
 
 # --- migrate opencode binary from pre-0.0.10 layout --------------------------
@@ -260,14 +271,14 @@ if [ -d /usr/local/lib/opencode ] && [ ! -x "$LIBDIR/bin/opencode" ] && [ -x /us
     sudo mv /usr/local/lib/opencode/bin/opencode "$LIBDIR/bin/opencode"
     sudo chown "root:$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")" "$LIBDIR/bin/opencode" 2>/dev/null || true
     sudo chmod 750 "$LIBDIR/bin/opencode"
-    echo "Migrated opencode binary -> $LIBDIR/bin/opencode"
+    ui_success "migrated opencode binary -> $LIBDIR/bin/opencode"
     log "migrated opencode binary: /usr/local/lib/opencode/bin/opencode -> $LIBDIR/bin/opencode"
 fi
 
 # --- re-link wrapper ----------------------------------------------------------
 
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
-echo "Symlink refreshed: /usr/local/bin/opencode"
+ui_success "wrapper symlink refreshed: /usr/local/bin/opencode"
 
 # --- re-deploy sudoers -------------------------------------------------------
 
@@ -277,7 +288,7 @@ sudo mkdir -p "$CONFDIR"
 # copy is missing — update.sh must never drop registered project roots.
 if [ ! -f "$PROJECTS_CONF" ] && [ -f /etc/opencode/projects.conf ]; then
     sudo cp /etc/opencode/projects.conf "$PROJECTS_CONF"
-    echo "Migrated projects.conf -> $CONFDIR/"
+    ui_success "migrated projects.conf -> $CONFDIR/"
     log "migrated projects.conf: /etc/opencode -> /etc/opencode-permissions-kit"
 fi
 
@@ -291,11 +302,10 @@ if [ -f "$SCRIPT_DIR/sudoers.template" ]; then
     # Remove the pre-0.0.10 sudoers symlink so only the new name is active.
     sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
     if sudo /usr/sbin/visudo -c -f "$CONFDIR/sudoers" >/dev/null 2>&1; then
-        echo "sudoers updated (DEFAULT_USER=$DEFAULT_USER)."
+        ui_success "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
         log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
     else
-        echo "${RED}sudoers validation failed. Check $CONFDIR/sudoers.${NC}"
-        exit 1
+        die "sudoers validation failed. Check $CONFDIR/sudoers."
     fi
 fi
 
@@ -306,7 +316,7 @@ if [ -f "$SCRIPT_DIR/umask.sh" ]; then
     sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
     # Remove the pre-0.0.10 umask profile so only the new name is loaded.
     sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
-    echo "umask profile updated."
+    ui_success "umask profile re-deployed"
     log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 fi
 
@@ -320,7 +330,7 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
         [ -f "$cf" ] || continue
         if ! sudo grep -q 'opencode-permissions-kit/shell-warn.sh' "$cf" 2>/dev/null; then
             echo '[ -f /usr/local/lib/opencode-permissions-kit/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
-            echo "Wrapper-bypass warning hooked into $cf"
+            ui_success "wrapper-bypass warning hooked into $cf"
             log "shell-startup warning hook appended: $cf"
         fi
         # ddev always runs as the opencode user: hook the `ddev()` shell
@@ -328,7 +338,7 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
         # session must never be wrapped (the function's id check is the guard).
         if ! sudo grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null; then
             echo '[ -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh ] && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
-            echo "ddev-as-opencode function hooked into $cf"
+            ui_success "ddev-as-opencode function hooked into $cf"
             log "ddev-as-opencode hook appended: $cf"
         fi
     done
@@ -366,14 +376,17 @@ if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
         if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
-            echo "  NOTE: /mnt/c restriction configured in /etc/wsl.conf — pending 'wsl --shutdown' (Windows)."
+            echo "  ${UI_YELLOW}WARNING: /mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)${UI_NC}"
+            echo "  ${UI_YELLOW}— the mount stays world-readable (mode $mnt_mode) and opencode warns on${UI_NC}"
+            echo "  ${UI_YELLOW}every start until the distro is reopened.${UI_NC}"
         else
-            echo "  NOTE: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent"
-            echo "        can read the Windows profile. Recommended fix in /etc/wsl.conf:"
-            echo "          [automount]"
-            echo "          enabled = true"
-            echo "          options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
-            echo "        then 'wsl --shutdown' from Windows. install.sh can apply this for you (interactive)."
+            echo "  ${UI_YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent${UI_NC}"
+            echo "  ${UI_YELLOW}can read the Windows profile. opencode warns on every start until fixed.${UI_NC}"
+            echo "  ${UI_YELLOW}Recommended fix in /etc/wsl.conf:${UI_NC}"
+            echo "    [automount]"
+            echo "    enabled = true"
+            echo "    options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
+            echo "  ${UI_YELLOW}then 'wsl --shutdown' from Windows. install.sh can apply this for you (interactive).${UI_NC}"
         fi
     fi
 fi
@@ -381,8 +394,7 @@ fi
 # --- one-time hard-deny migration (DDEV-WORKING §4) ---------------------------
 
 if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
-    echo ""
-    echo "--- One-time migration: remove hard ACL denies + legacy artifacts ---"
+    ui_section "One-time migration (remove hard ACL denies + legacy artifacts)"
     if sudo sh "$LIBDIR/migrate-denies.sh" \
             --projects "$PROJECTS_CONF" \
             --conf-dir "$CONFDIR" \
@@ -396,12 +408,12 @@ if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
         if [ -L /usr/local/bin/ddev ] \
            && readlink /usr/local/bin/ddev 2>/dev/null | grep -Eq 'lib/opencode(-permissions-kit)?/bin/ddev'; then
             sudo rm -f /usr/local/bin/ddev
-            echo "Legacy ddev delegation shim removed (/usr/local/bin/ddev) — ddev now runs natively as $OPENCODE_USER."
+            ui_success "legacy ddev delegation shim removed (/usr/local/bin/ddev) — ddev now runs natively as $OPENCODE_USER"
             log "legacy ddev shim removed: /usr/local/bin/ddev"
         fi
         # Group membership for the developer (fresh login needed to pick it up).
         sudo usermod -aG "$NEW_OPENCODE_GROUP" "$DEFAULT_USER" 2>/dev/null || true
-        echo "  developer '$DEFAULT_USER' added to group '$NEW_OPENCODE_GROUP' (start a new login shell to pick it up)"
+        ui_success "developer '$DEFAULT_USER' added to group '$NEW_OPENCODE_GROUP' (start a new login shell to pick it up)"
 
         # ddev runtime for the opencode user (idempotent, prompt-free).
         sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
@@ -431,7 +443,7 @@ if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
                 sudo chown -R "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$caroot" 2>/dev/null || true
                 sudo chmod 700 "$caroot" 2>/dev/null || true
                 sudo chmod 600 "$caroot/rootCA-key.pem" 2>/dev/null || true
-                echo "  mkcert CA reused from $src -> $caroot"
+                ui_success "mkcert CA reused: $src -> $caroot"
                 log "migration: mkcert CA reused for $OPENCODE_USER"
             fi
         fi
@@ -440,7 +452,7 @@ if ! grep -q '^HARD_DENY_REMOVED=1' "$INSTALL_CONF" 2>/dev/null; then
         if [ -f /etc/sysctl.d/99-ddev-rootless.conf ]; then
             sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1 || true
         else
-            echo "  NOTE: rootless ddev-router needs low ports — either run:"
+            ui_warn "rootless ddev-router needs low ports — either run:"
             echo "    sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
             echo "    echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf"
             echo "  or use higher router ports (ddev config global --router-http-port 8080)."
@@ -510,22 +522,20 @@ install_binary() {
 }
 
 if [ "$BINARY_UPDATE" = true ]; then
-    echo ""
-    echo "--- Upgrading opencode binary ---"
+    ui_section "Upgrading opencode binary"
     SRC=""
     if [ -n "$BINARY_PATH" ]; then
         if [ -x "$BINARY_PATH" ]; then
             SRC="$BINARY_PATH"
         else
-            echo "  ${YELLOW}Binary path not found or not executable: $BINARY_PATH${NC}"
-            echo "  Binary left untouched."
+            ui_warn "binary path not found or not executable: $BINARY_PATH — left untouched"
             log "opencode binary upgrade skipped: --binary-path not executable"
         fi
     else
         VER=$(curl -fsSL --max-time 10 https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
             | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
         if [ -z "$VER" ]; then
-            echo "  ${YELLOW}Could not resolve latest opencode version (network?). Binary left untouched.${NC}"
+            ui_warn "could not resolve latest opencode version (network?) — binary left untouched"
             log "opencode binary upgrade skipped: cannot resolve latest version"
         else
             TMP="$(mktemp -d)"
@@ -537,7 +547,7 @@ if [ "$BINARY_UPDATE" = true ]; then
                 && [ -x "$TMP/opencode" ]; then
                 SRC="$TMP/opencode"
             else
-                echo "  ${YELLOW}Download of opencode $VER failed. Binary left untouched.${NC}"
+                ui_warn "download of opencode $VER failed — binary left untouched"
                 log "opencode binary upgrade skipped: download failed (v$VER)"
             fi
             rm -rf "$TMP"
@@ -549,15 +559,15 @@ if [ "$BINARY_UPDATE" = true ]; then
             sudo cp "$SYSTEM_BIN" "$BACKUP_DIR/opencode.current"
         fi
         if install_binary "$SRC"; then
-            echo "  Backup kept in $BACKUP_DIR (remove once you are satisfied)."
+            ui_detail "backup kept in $BACKUP_DIR (remove once you are satisfied)"
         else
-            echo "  ${YELLOW}Candidate binary failed verification/install. Binary left untouched.${NC}"
+            ui_warn "candidate binary failed verification/install — binary left untouched"
             log "opencode binary upgrade skipped: candidate failed verification/install"
             rm -rf "$BACKUP_DIR"
         fi
     fi
 else
-    echo "  opencode binary left untouched (use --binary to upgrade)."
+    ui_detail "opencode binary left untouched (use --binary to upgrade)"
 fi
 
 # --- ensure default user can access the opencode home -------------------------
@@ -566,7 +576,7 @@ fi
 if [ -d "/home/$OPENCODE_USER" ]; then
     sudo chown "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "/home/$OPENCODE_USER"
     sudo chmod 2750 "/home/$OPENCODE_USER"
-    echo "/home/$OPENCODE_USER is accessible for group $NEW_OPENCODE_GROUP."
+    ui_success "/home/$OPENCODE_USER re-based to group $NEW_OPENCODE_GROUP (mode 2750)"
 fi
 
 # --- ensure default-user deny-all config (self-update bypass protection) ------
@@ -579,10 +589,10 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
         sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
         sudo chown "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_OC_CONF"
         sudo chmod 664 "$DEFAULT_OC_CONF"
-        echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
+        ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
         log "deny-all config installed for default user: $DEFAULT_OC_CONF"
     else
-        echo "Default-user config exists — left untouched (re-run install.sh to back it up)."
+        ui_detail "default-user config exists — left untouched (re-run install.sh to back it up)"
     fi
 fi
 
@@ -606,7 +616,7 @@ rm -f "$NEW_INSTALL_CONF"
 # Cleanup legacy setup.conf (pre-v0.0.9) in both new and old config dirs.
 [ -f "$CONFDIR/setup.conf" ] && sudo rm -f "$CONFDIR/setup.conf"
 [ -f /etc/opencode/setup.conf ] && sudo rm -f /etc/opencode/setup.conf
-echo "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
+ui_success "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
 log "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP HARD_DENY_REMOVED=1"
 
 # --- remove pre-0.0.10 legacy layout -----------------------------------------
@@ -622,8 +632,7 @@ log "legacy pre-0.0.10 layout removed (if present)"
 # --- optional group-baseline refresh ------------------------------------------
 
 if [ "$REFRESH" = true ]; then
-    echo ""
-    echo "--- Refreshing group baseline ---"
+    ui_section "Refreshing group baseline"
     sudo sh "$LIBDIR/migrate-denies.sh" \
         --projects "$PROJECTS_CONF" \
         --conf-dir "$CONFDIR" \
@@ -632,18 +641,16 @@ if [ "$REFRESH" = true ]; then
         --group "$NEW_OPENCODE_GROUP"
     log "group baseline refresh requested (--refresh)"
 else
-    echo ""
-    echo "Skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)."
+    ui_detail "skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)"
 fi
 
 # --- done --------------------------------------------------------------------
 
-echo ""
-echo "  ${GREEN}Update complete.${NC}  v$VERSION"
-if [ "$BINARY_UPDATE" = true ]; then
-    echo "  projects.conf and opencode.jsonc were left untouched."
-else
-    echo "  Binary, projects.conf and opencode.jsonc were left untouched."
-fi
-echo ""
+ui_section "Update complete"
+
+ui_kv "Kit"      "v$VERSION"
+ui_kv "Configs"  "projects.conf and opencode.jsonc untouched"
+[ "$BINARY_UPDATE" = true ] || ui_kv "Binary"   "untouched (use --binary to upgrade)"
+ui_info "Next:"
+ui_detail "status.sh               verify the protection"
 log "update complete (version $VERSION)"

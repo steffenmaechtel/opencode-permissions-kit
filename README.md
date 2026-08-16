@@ -96,3 +96,8 @@ See [docs/MANUAL.md](docs/MANUAL.md) for:
 ## License
 
 MIT
+
+## Disclaimer
+
+Community project — not affiliated with, endorsed by, or officially supported by OpenCode or Anomaly Innovations, Inc.
+This project is an independent community tool for configuring permissions for OpenCode.
