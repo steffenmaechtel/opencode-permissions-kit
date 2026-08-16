@@ -1,7 +1,17 @@
 # UX Improvement Plan — install / update / status / config / wrapper
 
-Status: **DRAFT for discussion** — interactive style demos live in `tests/ux/`
-(run them, pick what you like, then we implement phase by phase).
+Status: **DECIDED (2026-08-16)** — interactive style demos live in
+`tests/ux/` (run them, pick what you like, then we implement phase by phase).
+
+Decisions:
+- Log style: **A — labeled lines** (`info` / `success` / `warn` / `error`).
+- Banner: **slim line** (boxed variant dropped).
+- Symbols: Unicode default (✔ + ⚠ ✖), `UI_ASCII=1` fallback — kept.
+- Docker classic: **stays removed**, also in Advanced (§5).
+- Non-WSL2 host: keep the "Continue anyway?" prompt.
+- Standard + world-readable `/mnt/c`: **keep asking** — the question makes
+  the pending manual step visible.
+- Standard question count (project dir, git, podman exception) confirmed.
 
 ## 1. Goals
 
@@ -199,14 +209,14 @@ Nothing there executes anything — pure simulated output with short sleeps.
 Run: `sh tests/ux/example-install-standard.sh` (questions accept Enter for
 the default; piped/EOF input falls back to defaults).
 
-## 9. Open questions (need your call)
+## 9. Decisions (resolved 2026-08-16)
 
-1. Docker classic: follow §5 recommendation (keep removed)?
-2. Non-WSL2 host: keep "continue anyway?" prompt, or hard-abort in Standard?
-3. Standard + `/mnt/c` world-readable: auto-restrict without asking (it only
-   takes effect after `wsl --shutdown` anyway)?
-4. Symbols default: Unicode (✔ ⚠ ✖) with `UI_ASCII=1` fallback — OK?
-5. Banner: slim line (default) or boxed variant B?
+1. Docker classic: **stays removed** (§5 recommendation accepted).
+2. Non-WSL2 host: keep "Continue anyway?" prompt.
+3. Standard + `/mnt/c` world-readable: keep asking (visibility of the
+   pending `wsl --shutdown` step).
+4. Symbols: Unicode default with `UI_ASCII=1` fallback — confirmed.
+5. Banner: slim line — confirmed.
 
 ## 10. References
 
