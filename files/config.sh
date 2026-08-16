@@ -22,14 +22,30 @@
 #   --yes   Skip confirmations, assume Yes
 set -e
 
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
+
+# === Shared UI helpers ===
+# Checkout copy first, then the deployed library; a plain fallback keeps
+# config.sh working on an install whose library predates ui.sh.
+UI_LIB=""
+for _cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh" "$LIBDIR/ui.sh"; do
+    if [ -f "$_cand" ]; then UI_LIB="$_cand"; break; fi
+done
+if [ -n "$UI_LIB" ]; then
+    . "$UI_LIB"
+else
+    ui_info()    { echo "  info     $1"; }
+    ui_success() { echo "  success  $1"; }
+    ui_warn()    { echo "  warn     $1"; }
+    ui_error()   { echo "  error    $1" >&2; }
+    ui_detail()  { echo "     $1"; }
+    ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
+    ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
+    ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
+    ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
+    UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
+fi
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 [ -f "$PROJECTS_CONF" ] || PROJECTS_CONF="/etc/opencode/projects.conf"
 
@@ -91,13 +107,10 @@ done
 TARGETS="${TARGETS# }"
 
 banner() {
-    echo ""
-    echo "  ${GREEN}opencode permissions kit${NC}  config"
-    echo "  ${CYAN}=============================================${NC}"
-    echo ""
+    ui_banner "${VERSION:-}" "config — change settings"
 }
 
-die() { echo "${RED}$*${NC}" >&2; exit 1; }
+die() { ui_error "$*"; exit 1; }
 
 confirm() {
     [ "$YES" = true ] && return 0
@@ -131,9 +144,9 @@ done
 [ -n "$_handover" ] || ddev_handover_root() { :; }
 
 projects_list() {
-    echo "Project roots in ${CYAN}$PROJECTS_CONF${NC}:"
+    ui_info "Project roots ($PROJECTS_CONF):"
     if [ ! -f "$PROJECTS_CONF" ] || [ ! -s "$PROJECTS_CONF" ]; then
-        echo "  (none configured)"
+        ui_detail "(none configured)"
         return
     fi
     num=0
@@ -141,12 +154,12 @@ projects_list() {
         [ -z "$line" ] && continue
         num=$((num + 1))
         if [ -d "$line" ]; then
-            echo "  [$num] $line"
+            ui_have "[$num] $line" ""
         else
-            echo "  [$num] $line ${YELLOW}(missing)${NC}"
+            ui_atten "[$num] $line" "missing"
         fi
     done < "$PROJECTS_CONF"
-    [ "$num" -eq 0 ] && echo "  (none configured)"
+    [ "$num" -eq 0 ] && ui_detail "(none configured)"
 }
 
 projects_add() {
@@ -155,11 +168,11 @@ projects_add() {
     for p in $TARGETS; do
         p="$(cd "$p" 2>/dev/null && pwd)" || p="$p"
         if ! [ -d "$p" ]; then
-            echo "  ${YELLOW}skip${NC} $p (not a directory)"
+            ui_warn "skip $p (not a directory)"
             continue
         fi
         if [ -f "$PROJECTS_CONF" ] && grep -qxF "$p" "$PROJECTS_CONF"; then
-            echo "  ${CYAN}exists${NC} $p"
+            ui_detail "exists: $p"
             continue
         fi
         echo "$p" | sudo tee -a "$PROJECTS_CONF" > /dev/null
@@ -173,7 +186,7 @@ projects_add() {
         # with "operation not permitted". The registered path may be a
         # parent of several projects.
         ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
-        echo "  ${GREEN}added${NC} $p (group=$OPENCODE_GROUP, setgid, default-acl)"
+        ui_success "added $p (group=$OPENCODE_GROUP, setgid, default-acl)"
         log "project added: $p"
     done
 }
@@ -184,16 +197,16 @@ projects_remove() {
     for p in $TARGETS; do
         p="$(cd "$p" 2>/dev/null && pwd)" || p="$p"
         if ! grep -qxF "$p" "$PROJECTS_CONF"; then
-            echo "  ${YELLOW}not found${NC} $p"
+            ui_warn "not found: $p"
             continue
         fi
         if ! confirm "Remove '$p' from projects.conf?"; then
-            echo "  skip $p"
+            ui_detail "skip $p"
             continue
         fi
         sudo grep -vx "$p" "$PROJECTS_CONF" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
         sudo mv "$PROJECTS_CONF.tmp" "$PROJECTS_CONF"
-        echo "  ${GREEN}removed${NC} $p"
+        ui_success "removed $p"
         log "project removed: $p"
     done
 }
@@ -214,11 +227,11 @@ git_config_status() {
     # ON  = .git/config deny rule is active (uncommented) in the config
     # OFF = rule absent or still a //SECURE_GIT comment
     if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
-        echo "git-config hardening: ${GREEN}ON${NC}  ($f, soft-only)"
+        ui_kv "git-config" "ON  ($f, soft-only)" "$UI_GREEN"
     elif grep -q '//SECURE_GIT' "$f" 2>/dev/null; then
-        echo "git-config hardening: ${CYAN}OFF${NC}  ($f — markers present, rules inactive)"
+        ui_kv "git-config" "OFF  ($f — markers present, rules inactive)"
     else
-        echo "git-config hardening: ${CYAN}OFF${NC}  ($f)"
+        ui_kv "git-config" "OFF  ($f)"
     fi
 }
 
@@ -243,13 +256,13 @@ git_config_apply() {
 
     if [ "$enable" = "on" ]; then
         sudo sed -i 's|//SECURE_GIT: ||' "$target"
-        echo "git-config hardening: ${GREEN}ON${NC}  ($target, soft-only)"
+        ui_kv "git-config" "ON  ($target, soft-only)" "$UI_GREEN"
     else
         sudo sed -i '/\/\/SECURE_GIT:/d' "$target"
-        echo "git-config hardening: ${CYAN}OFF${NC}  ($target)"
+        ui_kv "git-config" "OFF  ($target)"
     fi
     log "git-config hardening set to $enable ($target)"
-    echo "NOTE: existing config was overwritten from template. Restart opencode to pick up changes."
+    ui_warn "existing config was overwritten from template. Restart opencode to pick up changes."
 }
 
 # --- container backend ----------------------------------------------------------
@@ -257,41 +270,41 @@ git_config_apply() {
 container_backend_status() {
     local backend="${CONTAINER_BACKEND:-}"
     if [ -z "$backend" ]; then
-        echo "Container backend: ${RED}none configured${NC}"
-        echo "  A legacy install (docker-group) must be re-installed:"
-        echo "    sudo bash files/install.sh --container-backend docker-rootless"
+        ui_kv "backend" "none configured" "$UI_RED"
+        ui_detail "a legacy install (docker-group) must be re-installed:"
+        ui_detail "sudo bash files/install.sh --container-backend docker-rootless"
         return
     fi
-    echo "Container backend: ${CYAN}$backend${NC}"
+    ui_kv "backend" "$backend"
     case "$backend" in
         docker-rootless)
             if [ -n "${OPENCODE_DOCKER_HOST:-}" ]; then
                 local sock="$OPENCODE_DOCKER_HOST" sp="${OPENCODE_DOCKER_HOST#unix://}"
                 if [ -S "$sp" ]; then
-                    echo "  socket: ${GREEN}reachable${NC}  $sock"
+                    ui_kv "socket" "reachable — $sock" "$UI_GREEN"
                 else
-                    echo "  socket: ${RED}NOT reachable${NC}  $sock"
+                    ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
                 fi
             else
-                echo "  socket: ${YELLOW}not configured${NC}"
+                ui_kv "socket" "not configured" "$UI_YELLOW"
             fi
             ;;
         podman-rootless)
             if [ -n "${OPENCODE_PODMAN_SOCKET:-}" ]; then
                 local sp="${OPENCODE_PODMAN_SOCKET#unix://}"
                 if [ -S "$sp" ]; then
-                    echo "  socket: ${GREEN}reachable${NC}  $OPENCODE_PODMAN_SOCKET"
+                    ui_kv "socket" "reachable — $OPENCODE_PODMAN_SOCKET" "$UI_GREEN"
                 else
-                    echo "  socket: ${RED}NOT reachable${NC}  $OPENCODE_PODMAN_SOCKET"
+                    ui_kv "socket" "NOT reachable — $OPENCODE_PODMAN_SOCKET" "$UI_RED"
                 fi
             elif command -v podman >/dev/null 2>&1; then
-                echo "  podman CLI: ${GREEN}installed${NC}"
+                ui_kv "podman CLI" "installed" "$UI_GREEN"
             else
-                echo "  podman CLI: ${RED}NOT installed${NC}"
+                ui_kv "podman CLI" "NOT installed" "$UI_RED"
             fi
             ;;
         *)
-            echo "  ${YELLOW}legacy backend '$backend' — re-run install.sh with a rootless backend${NC}"
+            ui_kv "backend" "legacy '$backend' — re-run install.sh with a rootless backend" "$UI_YELLOW"
             ;;
     esac
 }
@@ -312,7 +325,7 @@ render_sudoers() {
     rm -f "$tmp"
     sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
     if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
-        echo "  sudoers re-rendered."
+        ui_success "sudoers re-rendered"
         log "sudoers re-rendered"
     else
         die "sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers."
@@ -349,10 +362,10 @@ container_backend_apply() {
     [ -n "$setup_script" ] || die "setup-container-backend.sh not found."
 
     local prev="${CONTAINER_BACKEND:-none}"
-    echo "Switching container backend: ${CYAN}${prev}${NC} -> ${CYAN}${new_backend}${NC}"
+    ui_info "switching container backend: $prev -> $new_backend"
 
     if ! confirm "Provision '$new_backend' for $OPENCODE_USER?"; then
-        echo "  Aborted."
+        ui_detail "aborted."
         return 1
     fi
 
@@ -360,12 +373,12 @@ container_backend_apply() {
     local docker_host="" podman_socket=""
     local setup_out
     setup_out=$(sudo sh "$setup_script" "$new_backend" --yes 2>&1) || {
-        echo "${RED}Provisioning failed:${NC}"
-        echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/  /'
-        echo "${YELLOW}Backend not changed.${NC}"
+        ui_error "provisioning failed:"
+        echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
+        ui_warn "backend not changed."
         return 1
     }
-    echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/  /'
+    echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
     # Capture socket key from the helper output.
     docker_host=$(echo "$setup_out" | sed -n 's/^OPENCODE_DOCKER_HOST=//p' | tail -1)
 
@@ -376,8 +389,8 @@ container_backend_apply() {
     render_sudoers
 
     echo ""
-    echo "  ${GREEN}Container backend switched to '$new_backend'.${NC}"
-    echo "  Restart any running opencode sessions to pick up the new backend."
+    ui_success "container backend switched to '$new_backend'."
+    ui_detail "restart any running opencode sessions to pick up the new backend"
     log "container backend switched: $prev -> $new_backend"
 }
 
@@ -389,14 +402,14 @@ refresh() {
         if [ -f "$cand" ]; then migrate="$cand"; break; fi
     done
     [ -n "$migrate" ] || die "migrate-denies.sh not found."
-    echo "Re-applying the group baseline (chgrp $OPENCODE_GROUP + setgid + default ACLs) ..."
+    ui_info "re-applying the group baseline (chgrp $OPENCODE_GROUP + setgid + default ACLs) ..."
     sudo sh "$migrate" \
         --projects "$PROJECTS_CONF" \
         --conf-dir /etc/opencode-permissions-kit \
         --lib-dir "$LIBDIR" \
         --opencode-user "$OPENCODE_USER" \
         --group "$OPENCODE_GROUP"
-    echo "${GREEN}Group baseline refreshed.${NC}"
+    ui_success "group baseline refreshed."
     log "group baseline refresh requested"
 }
 
@@ -405,34 +418,28 @@ refresh() {
 menu() {
     banner
     while true; do
-        echo "Current settings:"
+        ui_section "Current settings"
         git_config_status 2>/dev/null || true
         container_backend_status 2>/dev/null || true
         projects_list
         echo ""
-        echo "  [1] Add project root"
-        echo "  [2] Remove project root"
-        echo "  [3] Toggle .git/config hardening (on/off, soft-only)"
-        echo "  [4] Refresh group baseline now"
-        echo "  [5] Switch container backend (docker-rootless / podman-rootless)"
-        echo "  [q] Quit"
-        printf "  > "
-        read -r sel </dev/tty 2>/dev/null || read -r sel
+        sel=$(ui_menu "What do you want to do?" "1" \
+            "1|Add project root" \
+            "2|Remove project root" \
+            "3|Toggle .git/config hardening (on/off, soft-only)" \
+            "4|Refresh group baseline now" \
+            "5|Switch container backend (docker-rootless / podman-rootless)" \
+            "q|Quit")
         case "$sel" in
             1)
-                echo "Enter paths (space-separated):"
-                printf "  > "
-                read -r paths </dev/tty 2>/dev/null || read -r paths
+                paths=$(ui_ask "Paths to add (space-separated)" "")
                 [ -z "$paths" ] && continue
                 ACTION=projects; SUB=add; TARGETS="$paths"; projects_add
                 ;;
             2)
-                ACTION=projects; SUB=remove; TARGETS=""
-                echo "Enter path to remove:"
-                printf "  > "
-                read -r paths </dev/tty 2>/dev/null || read -r paths
+                paths=$(ui_ask "Path to remove" "")
                 [ -z "$paths" ] && continue
-                TARGETS="$paths"; projects_remove
+                ACTION=projects; SUB=remove; TARGETS="$paths"; projects_remove
                 ;;
             3)
                 f="$(git_config_file)"
@@ -451,19 +458,18 @@ menu() {
                 banner
                 container_backend_status
                 echo ""
-                echo "  [1] docker-rootless (needs systemd --user)"
-                echo "  [2] podman-rootless (daemonless)"
-                echo "  [q] Cancel"
-                printf "  > "
-                read -r _be_sel </dev/tty 2>/dev/null || read -r _be_sel
+                _be_sel=$(ui_menu "Switch to which backend?" "1" \
+                    "1|docker-rootless (needs systemd --user)" \
+                    "2|podman-rootless (daemonless)" \
+                    "q|Cancel")
                 case "$_be_sel" in
                     1) container_backend_apply docker-rootless || true ;;
                     2) container_backend_apply podman-rootless || true ;;
-                    *) echo "  Cancelled." ;;
+                    *) ui_detail "cancelled." ;;
                 esac
                 ;;
-            q|Q|quit|exit) echo "Bye."; exit 0 ;;
-            *) echo "${YELLOW}Unknown selection.${NC}" ;;
+            q) ui_info "Bye."; exit 0 ;;
+            *) ui_warn "Unknown selection." ;;
         esac
         echo ""
     done
@@ -507,5 +513,4 @@ case "$ACTION" in
     *)          die "Unknown action: $ACTION" ;;
 esac
 
-echo ""
-echo "  ${GREEN}Done.${NC}"
+ui_success "Done."
