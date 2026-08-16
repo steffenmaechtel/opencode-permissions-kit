@@ -1,10 +1,14 @@
 name: tests
 
-# Trigger only once on push to master (plus manual). Avoids the classic
-# double-run: a push to a branch with an open PR fires both `push` and
-# `pull_request`, and a tag push fires `push` again.
+# Trigger on push to master, pull requests targeting master, and manual
+# runs. PRs run the suite before merge; pushes to master run it after. A
+# branch push with an open PR fires only `pull_request` (no `push` filter
+# for other branches), avoiding the classic double-run.
 on:
   push:
+    branches:
+      - master
+  pull_request:
     branches:
       - master
   workflow_dispatch:
