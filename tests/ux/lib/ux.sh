@@ -97,6 +97,13 @@ ui_kv() {
     printf '  %-14s %s%s%s\n' "$1" "${3:-$UI_NC}" "$2" "$UI_NC"
 }
 
+ui_kv_warn() {
+    # Like ui_kv, but with a warn symbol — value column aligns with ui_kv
+    # (2 + 1 sym + 2 + 11 label + 1 space = same offset as 2 + 14 + 1).
+    printf '  %s%s%s  %-11s %s%s%s\n' \
+        "$UI_YELLOW" "$UI_SYM_WARN" "$UI_NC" "$1" "$UI_YELLOW" "$2" "$UI_NC"
+}
+
 # --- plan list (numbered) --------------------------------------------------------
 
 ui_plan() {
