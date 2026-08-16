@@ -60,7 +60,7 @@ if [ "$VALID" != true ]; then
     # started here"). From a VALID directory the normal bannered path
     # below still applies.
     case "${1:-}" in
-        --version|-V|-h|--help)
+        --version|-v|-h|--help)
             exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
             ;;
     esac
