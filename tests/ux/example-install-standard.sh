@@ -1,6 +1,6 @@
 #!/bin/sh
 # DEMO — proposed STANDARD install flow (docs/design/UX-IMPROVEMENT.md §4.3).
-# Simulated output only; nothing is executed. Run: sh test/ux/example-install-standard.sh
+# Simulated output only; nothing is executed. Run: sh tests/ux/example-install-standard.sh
 set -u
 . "$(dirname "$0")/lib/ux.sh"
 
@@ -16,7 +16,7 @@ ans=$(ui_menu "How do you want to install?" "1" \
     "x|Abort")
 case "$ans" in
     x*) ui_info "Aborted."; exit 0 ;;
-    2*) ui_info "Switching to Advanced — see test/ux/example-install-advanced.sh for that flow."; exit 0 ;;
+    2*) ui_info "Switching to Advanced — see tests/ux/example-install-advanced.sh for that flow."; exit 0 ;;
 esac
 
 # --- pre-flight inventory --------------------------------------------------------
@@ -79,7 +79,7 @@ echo ""
 ans=$(ui_menu "Proceed?" "C" "C|Confirm" "A|Switch to Advanced" "X|Abort")
 case "$ans" in
     X*) ui_info "Aborted — nothing was changed."; exit 0 ;;
-    A*) ui_info "Switching to Advanced — see test/ux/example-install-advanced.sh"; exit 0 ;;
+    A*) ui_info "Switching to Advanced — see tests/ux/example-install-advanced.sh"; exit 0 ;;
 esac
 
 # --- simulated run --------------------------------------------------------------------

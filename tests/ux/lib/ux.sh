@@ -1,4 +1,4 @@
-# opencode permissions kit — DEMO UI helpers (test/ux/ playground)
+# opencode permissions kit — DEMO UI helpers (tests/ux/ playground)
 #
 # Candidate for files/opencode-permissions-kit-lib/ui.sh (see
 # docs/design/UX-IMPROVEMENT.md). POSIX sh, zero dependencies.
@@ -11,13 +11,17 @@
 # Usage: . "$(dirname "$0")/lib/ux.sh"
 
 # --- colors & symbols ---------------------------------------------------------
+# The escape sequences must be resolved to REAL bytes once at load time
+# (printf only interprets \033 in the format string, never in %s arguments),
+# otherwise terminals print a literal "\033[0;33m".
 if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
     UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''
     UI_DIM=''; UI_BOLD=''; UI_NC=''
 else
-    UI_GREEN='\033[0;32m'; UI_RED='\033[0;31m'; UI_YELLOW='\033[0;33m'
-    UI_CYAN='\033[0;36m';  UI_BLUE='\033[0;34m'
-    UI_DIM='\033[2m'; UI_BOLD='\033[1m'; UI_NC='\033[0m'
+    UI_GREEN=$(printf '\033[0;32m'); UI_RED=$(printf '\033[0;31m')
+    UI_YELLOW=$(printf '\033[0;33m'); UI_CYAN=$(printf '\033[0;36m')
+    UI_BLUE=$(printf '\033[0;34m')
+    UI_DIM=$(printf '\033[2m'); UI_BOLD=$(printf '\033[1m'); UI_NC=$(printf '\033[0m')
 fi
 
 if [ -n "${UI_ASCII:-}" ]; then

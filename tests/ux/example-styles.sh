@@ -1,6 +1,6 @@
 #!/bin/sh
 # DEMO — style variants side by side (docs/design/UX-IMPROVEMENT.md §3).
-# Pick what you like; nothing is executed. Run: sh test/ux/example-styles.sh
+# Pick what you like; nothing is executed. Run: sh tests/ux/example-styles.sh
 set -u
 . "$(dirname "$0")/lib/ux.sh"
 

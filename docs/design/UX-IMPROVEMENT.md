@@ -1,6 +1,6 @@
 # UX Improvement Plan — install / update / status / config / wrapper
 
-Status: **DRAFT for discussion** — interactive style demos live in `test/ux/`
+Status: **DRAFT for discussion** — interactive style demos live in `tests/ux/`
 (run them, pick what you like, then we implement phase by phase).
 
 ## 1. Goals
@@ -61,7 +61,7 @@ Plus:
 - Every script ends with a **summary block**: what changed, where the backup
   is, pending manual steps (`wsl --shutdown`, terminal restart), next command.
 
-Implementation: the demo lib `test/ux/lib/ux.sh` is the candidate for the
+Implementation: the demo lib `tests/ux/lib/ux.sh` is the candidate for the
 real `files/opencode-permissions-kit-lib/ui.sh`. POSIX sh, zero deps.
 
 ## 4. Install flow redesign
@@ -154,7 +154,7 @@ terminal, `wsl --shutdown`), and the next commands (`opencode`, `status.sh`,
   "rootful docker only" and prints how to add rootless (doc link), offering
   podman-rootless as the alternative. Never a silent fallback.
 
-For the feeling of the alternative, `test/ux/example-install-advanced.sh`
+For the feeling of the alternative, `tests/ux/example-install-advanced.sh`
 demonstrates the warning-flow variant (selectable behind a typed
 confirmation) — implemented only for this discussion.
 
@@ -184,7 +184,7 @@ confirmation) — implemented only for this discussion.
 Constraints: file names, flags, `install.conf`/`projects.conf`/
 `opencode.jsonc` semantics unchanged. Update MANUAL.md per phase.
 
-## 8. Demo playground: `test/ux/`
+## 8. Demo playground: `tests/ux/`
 
 Nothing there executes anything — pure simulated output with short sleeps.
 
@@ -196,7 +196,7 @@ Nothing there executes anything — pure simulated output with short sleeps.
 | `example-status.sh` | Proposed status.sh panel |
 | `example-styles.sh` | Side-by-side style variants (labels vs symbols vs brackets, banner variants, density) |
 
-Run: `sh test/ux/example-install-standard.sh` (questions accept Enter for
+Run: `sh tests/ux/example-install-standard.sh` (questions accept Enter for
 the default; piped/EOF input falls back to defaults).
 
 ## 9. Open questions (need your call)

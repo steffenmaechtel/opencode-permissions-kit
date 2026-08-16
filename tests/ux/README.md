@@ -1,4 +1,4 @@
-# test/ux/ — UX playground (DEMO ONLY)
+# tests/ux/ — UX playground (DEMO ONLY)
 
 Experimental preview of the proposed output styles and flows from
 [docs/design/UX-IMPROVEMENT.md](../docs/design/UX-IMPROVEMENT.md).
@@ -8,11 +8,11 @@ prints simulated output (with short sleeps for realism).
 ## Run
 
 ```sh
-sh test/ux/example-install-standard.sh    # proposed Standard install flow
-sh test/ux/example-install-advanced.sh    # proposed Advanced flow (+ docker-classic warning variant)
-sh test/ux/example-update.sh              # proposed update.sh output
-sh test/ux/example-status.sh              # proposed status.sh output
-sh test/ux/example-styles.sh              # style variants side by side
+sh tests/ux/example-install-standard.sh    # proposed Standard install flow
+sh tests/ux/example-install-advanced.sh    # proposed Advanced flow (+ docker-classic warning variant)
+sh tests/ux/example-update.sh              # proposed update.sh output
+sh tests/ux/example-status.sh              # proposed status.sh output
+sh tests/ux/example-styles.sh              # style variants side by side
 ```
 
 Questions accept Enter for the default; piped/EOF input falls back to the
