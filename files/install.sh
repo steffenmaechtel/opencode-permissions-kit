@@ -791,6 +791,17 @@ remove_shadow_binary() {
 }
 opencode_found=false
 
+# Re-install over an existing kit: the secured binary is already in place.
+# Reuse it — do NOT re-run the official installer (its `opencode --version`
+# probe reaches the real binary through the wrapper now and reports
+# "already installed", skipping the download, which would abort here).
+if [ -x "$SYSTEM_BIN" ]; then
+    secure_binary
+    opencode_found=true
+    ui_detail "binary already secured under the kit — reusing $SYSTEM_BIN"
+    log "binary reused on re-install: $SYSTEM_BIN"
+fi
+
 for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
     if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
         ans=$(prompt "opencode binary found at $loc. Copy to system path and secure with wrapper?" "Y" "N" "B")
@@ -1037,17 +1048,17 @@ if [ -f "$DEFAULT_OC_CONF" ]; then
     if [ "$ans" = "y" ]; then
         BAK_STAMP=$(date +%Y%m%d-%H%M%S)
         sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
-        echo "Backed up to $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
+        ui_success "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
         log "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
     else
-        echo "${UI_YELLOW}Existing config kept — deny-all protection NOT installed.${UI_NC}"
+        ui_warn "existing default-user config kept — deny-all protection NOT installed"
     fi
 fi
 if [ ! -f "$DEFAULT_OC_CONF" ]; then
     sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
     sudo chown "$DEFAULT_USER:$OPENCODE_GROUP" "$DEFAULT_OC_CONF"
     sudo chmod 664 "$DEFAULT_OC_CONF"
-    echo "Deny-all config installed for default user: $DEFAULT_OC_CONF"
+    ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
     log "deny-all config installed for default user: $DEFAULT_OC_CONF"
 fi
 
@@ -1116,7 +1127,8 @@ fi
 echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"
-ui_detail "status.sh                      verify the protection"
-ui_detail "config.sh                      change settings later"
-ui_detail "docs/MANUAL.md                 config, security model, verification, uninstall"
+ui_detail "cd $LIBDIR"
+ui_detail "sh status.sh                   verify the protection"
+ui_detail "sudo sh config.sh              change settings later"
+ui_detail "MANUAL: https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/MANUAL.md"
 log "install complete"
