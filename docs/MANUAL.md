@@ -46,10 +46,11 @@ Known residual gaps, documented rather than hidden:
   world-readable mount **every WSL user (including the agent's) can read
   the whole Windows profile** (`.ssh/`, `NTUSER.DAT`, browser data). The
   kit's UID separation only covers the Linux side. `install.sh` therefore
-  offers to restrict the mount to your user (recommended; applies after
-  `wsl --shutdown` from Windows), `update.sh` prints the recommendation,
-  and `status.sh` reports the exposure plus a configured-but-pending
-  state. Manual fix via `/etc/wsl.conf`:
+  warns and offers to restrict the mount to your user (recommended; applies
+  after `wsl --shutdown` from Windows), `update.sh` prints a warning,
+  `status.sh` reports the exposure plus a configured-but-pending state, and
+  the **wrapper warns on every `opencode` start** until the restriction is
+  actually applied. Manual fix via `/etc/wsl.conf`:
 
   ```ini
   [automount]

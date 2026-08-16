@@ -96,6 +96,29 @@ if [ -n "$RESOLVED" ] && [ "$RESOLVED" != "/usr/local/bin/opencode" ]; then
     echo ""
 fi
 
+# WSL2 exposure check: the drvfs /mnt/c mount runs with the Windows session
+# token — NTFS ACLs do not distinguish WSL users, so a world-readable mount
+# lets the agent read the whole Windows profile (.ssh, NTUSER.DAT, browser
+# data). Warn on EVERY start until the restriction is applied.
+if [ -d /mnt/c ]; then
+    mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
+        if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
+            echo "  ${YELLOW}WARNING: /mnt/c restriction configured but PENDING (mode $mnt_mode).${NC}"
+            echo "  ${YELLOW}Run 'wsl --shutdown' from Windows and reopen the distro — until then${NC}"
+            echo "  ${YELLOW}the agent can read your Windows profile via /mnt/c.${NC}"
+        else
+            echo "  ${YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — the agent can read${NC}"
+            echo "  ${YELLOW}your whole Windows profile (.ssh, browser data). Fix in /etc/wsl.conf:${NC}"
+            echo "  ${YELLOW}  [automount]${NC}"
+            echo "  ${YELLOW}  enabled = true${NC}"
+            echo "  ${YELLOW}  options = \"uid=<uid>,gid=<gid>,dmask=027,fmask=037\"${NC}"
+            echo "  ${YELLOW}then 'wsl --shutdown' from Windows (install.sh can apply this for you).${NC}"
+        fi
+        echo ""
+    fi
+fi
+
 # Detect container tools (docker/ddev) explicitly enabled by the project
 # config. Any enabled tool means "enable container tools for this session"
 # — the rootless backend decides the actual mechanism.

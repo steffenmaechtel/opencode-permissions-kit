@@ -366,14 +366,17 @@ if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
         if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
-            echo "  NOTE: /mnt/c restriction configured in /etc/wsl.conf — pending 'wsl --shutdown' (Windows)."
+            echo "  ${YELLOW}WARNING: /mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)${NC}"
+            echo "  ${YELLOW}— the mount stays world-readable (mode $mnt_mode) and opencode warns on${NC}"
+            echo "  ${YELLOW}every start until the distro is reopened.${NC}"
         else
-            echo "  NOTE: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent"
-            echo "        can read the Windows profile. Recommended fix in /etc/wsl.conf:"
-            echo "          [automount]"
-            echo "          enabled = true"
-            echo "          options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
-            echo "        then 'wsl --shutdown' from Windows. install.sh can apply this for you (interactive)."
+            echo "  ${YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent${NC}"
+            echo "  ${YELLOW}can read the Windows profile. opencode warns on every start until fixed.${NC}"
+            echo "  ${YELLOW}Recommended fix in /etc/wsl.conf:${NC}"
+            echo "    [automount]"
+            echo "    enabled = true"
+            echo "    options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
+            echo "  ${YELLOW}then 'wsl --shutdown' from Windows. install.sh can apply this for you (interactive).${NC}"
         fi
     fi
 fi

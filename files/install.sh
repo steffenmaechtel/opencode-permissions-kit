@@ -486,6 +486,8 @@ if [ -d /mnt/c ]; then
         echo "  can read the Windows profile. Restrict it manually if unintended."
         log "wsl.conf has a pre-existing [automount] section — /mnt/c restriction skipped"
     else
+        echo "  ${YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the${NC}"
+        echo "  ${YELLOW}agent can read the Windows profile (.ssh, NTUSER.DAT, browser data).${NC}"
         ans=$(prompt "Restrict /mnt/c to your user? (WSL2 drvfs is world-readable by default; recommended)" "Y" "N" "")
         if [ "$ans" = "y" ]; then
             d_uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo "")
@@ -883,6 +885,20 @@ log "legacy layouts/artifacts removed (if present); soft-only model active"
 echo ""
 echo "  ${GREEN}Installation complete.${NC}"
 echo ""
+# WSL2 final exposure warning: the wsl.conf restriction only takes effect
+# after 'wsl --shutdown' — until then /mnt/c stays world-readable and the
+# wrapper warns on every opencode start. Covers both "declined" and
+# "configured but pending".
+if [ -d /mnt/c ]; then
+    mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
+        echo "  ${YELLOW}WARNING: /mnt/c is still world-readable (mode $mnt_mode) — the agent${NC}"
+        echo "  ${YELLOW}can read your Windows profile. If the wsl.conf restriction was just${NC}"
+        echo "  ${YELLOW}configured, it needs 'wsl --shutdown' from Windows + reopening the distro${NC}"
+        echo "  ${YELLOW}to take effect. opencode will warn on every start until then.${NC}"
+        echo ""
+    fi
+fi
 # A shell that already ran 'opencode' has the old user-local binary hashed
 # (and ~/.opencode/bin still first in its $PATH — the rc cleanup above only
 # affects NEW shells). A child process cannot fix the parent shell, so tell
