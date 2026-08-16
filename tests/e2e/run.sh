@@ -635,9 +635,9 @@ fi
 # 12i.6 status.sh reports the provisioned podman-rootless backend.
 if [ "$_rootless_ok" = true ]; then
     check "12i: status.sh reports the podman-rootless backend" \
-        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "backend:    podman-rootless"'
+        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "backend +podman-rootless"'
     check "12i: status.sh reports the podman CLI as installed" \
-        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "podman CLI:.*installed"'
+        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "podman CLI +installed"'
     check "12i: status.sh reports the migration stamp" \
         E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "soft-only model active"'
 fi
