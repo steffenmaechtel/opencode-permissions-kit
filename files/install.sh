@@ -865,6 +865,18 @@ log "legacy layouts/artifacts removed (if present); soft-only model active"
 echo ""
 echo "  ${GREEN}Installation complete.${NC}"
 echo ""
+# A shell that already ran 'opencode' has the old user-local binary hashed
+# (and ~/.opencode/bin still first in its $PATH — the rc cleanup above only
+# affects NEW shells). A child process cannot fix the parent shell, so tell
+# the user to restart the terminal.
+if [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
+    echo "  ${YELLOW}IMPORTANT:${NC} open a NEW terminal before running 'opencode'."
+    echo "  Your current shell still resolves the old, unwrapped binary from"
+    echo "  ~/.opencode/bin (bash caches the path, and it is still first in \$PATH"
+    echo "  of this shell). Until you restart, 'opencode' would bypass the wrapper"
+    echo "  and the 'opencode' user."
+    echo ""
+fi
 echo "  Run:    ${CYAN}opencode${NC}"
 echo "  Backup: $BACKUP_DIR"
 echo "  Docs:   ${CYAN}docs/MANUAL.md${NC} (config, security model, verification, uninstall)"

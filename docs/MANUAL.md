@@ -139,6 +139,14 @@ After the install, `cd` into a project and run:
 opencode
 ```
 
+**Restart your terminal first** if opencode was already installed via the
+official installer: a shell that has run `opencode` before has the old
+`~/.opencode/bin` binary cached (bash's command hash) and still lists that
+directory first in `$PATH` — the installer cleans the rc files, but only for
+new shells. Until you open a fresh terminal, `opencode` would resolve to the
+old binary and bypass the wrapper. (Same-shell fix: `hash -r` and
+`export PATH="/usr/local/bin:$PATH"`.)
+
 No npm package and no opencode plugin are involved — the kit is system-level
 only.
 
