@@ -48,6 +48,17 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
   | sudo env KIT_BRANCH=feature/simplify-script-calls bash
 ```
 
+An installed kit updates from a branch the same way (stream `update.sh`
+instead of re-installing — your `projects.conf` and deny list survive):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/feature/simplify-script-calls/files/update.sh \
+  | sudo env KIT_BRANCH=feature/simplify-script-calls bash
+```
+
+Switching back to `master` later is the same call without `KIT_BRANCH`
+(see the [update guide](docs/how-to/update.md)).
+
 (`make check-version` ensures `KIT_BRANCH` stays consistent for `master`.)
 Use a throwaway WSL2/dev box — the kit is alpha software.
 
