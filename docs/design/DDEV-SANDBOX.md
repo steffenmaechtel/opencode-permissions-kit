@@ -5,7 +5,7 @@
 > **removed**: with the hard ACL deny layer gone there is nothing to
 > transact — ddev simply runs as the `opencode` user. This document is kept
 > as the historical design record; see `docs/design/DDEV-WORKING.md` for
-> the current model and `docs/MANUAL.md` for usage. Where wording differs,
+> the current model and `docs/README.md` for usage. Where wording differs,
 > the code wins.
 >
 > Historical note (pre-removal state): the transaction helper
@@ -13,7 +13,7 @@
 > switch (`DDEV_MODE=delegated|sandbox` in install.conf), the mutually
 > exclusive sudoers rendering, `config.sh ddev-mode`, `status.sh` reporting,
 > the protect-projects heal, and unit + e2e tests are in the code. Usage
-> documentation lives in `docs/MANUAL.md` ("ddev sandbox mode"). The design
+> documentation lives in `docs/README.md`. The design
 > rationale and residual-risk analysis below is the historical planning
 > record; where wording differs, the code wins. Rollout §9 is still at step
 > 1 (delegated stays the default; `config.sh ddev-mode sandbox` is the opt-in).

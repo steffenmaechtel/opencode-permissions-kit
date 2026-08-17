@@ -5,7 +5,7 @@
 > DDEV-WORKING); the *rationale* changed: rootless is no longer justified by
 > "ACL denies hold inside containers" (the ACL layer is gone) but by **UID
 > separation without a root-equivalent socket**. The legacy `docker-group`
-> backend was removed. Usage documentation: `docs/MANUAL.md`. Design record
+> backend was removed. Usage documentation: `docs/README.md` (index). Design record
 > for the current model: `docs/design/DDEV-WORKING.md`.
 >
 > **Phase 1 + 2 + 3 (docker-rootless e2e) implemented.** (The ddev-shim env
@@ -14,7 +14,7 @@
 > This document is the design record for removing the root-equivalence of the
 > kit's docker grant. The authoritative usage documentation for the *current*
 > container-tools feature is `docs/design/CONTAINER-TOOLS.md` (design record) and
-> `docs/MANUAL.md` (usage).
+> `docs/README.md` (usage index).
 >
 > **Phase 1 (done):** backend awareness — `CONTAINER_BACKEND` in `install.conf`,
 > wrapper/status/sudoers react to it, `DDEV_VERSION` recorded.

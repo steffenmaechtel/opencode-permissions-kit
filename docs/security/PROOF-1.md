@@ -4,8 +4,8 @@
 > analyzes/proposes was **removed** — file permissions are now opencode's
 > soft permission layer only. This document is kept as the historical
 > analysis record; see `docs/design/DDEV-WORKING.md` for the current model
-> and `docs/MANUAL.md` ("Security Model (soft-only)") for the authoritative
-> usage documentation. Where wording differs, the code and MANUAL win.
+> and `docs/concepts/security-model.md` for the authoritative
+> usage documentation. Where wording differs, the code and the docs win.
 
 **Question under test.** A project repo initially contains no `.env` file. `.env` is a
 deny pattern in the kit's `opencode.jsonc` read/edit rules. A second developer commits

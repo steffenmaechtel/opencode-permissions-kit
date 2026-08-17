@@ -4,8 +4,8 @@
 > analyzes/proposes was **removed** — file permissions are now opencode's
 > soft permission layer only. This document is kept as the historical
 > analysis record; see `docs/design/DDEV-WORKING.md` for the current model
-> and `docs/MANUAL.md` ("Security Model (soft-only)") for the authoritative
-> usage documentation. Where wording differs, the code and MANUAL win.
+> and `docs/concepts/security-model.md` for the authoritative
+> usage documentation. Where wording differs, the code and the docs win.
 > A **Status addendum (2026-08-15)** at the bottom of this file maps every
 > finding to its fate in the shipped design.
 
