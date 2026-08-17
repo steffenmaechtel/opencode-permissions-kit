@@ -37,10 +37,12 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 During an interactive run you are asked whether the
 [audit log](../reference/audit-log.md) should be deleted too (recommended).
 
-## Status after uninstall
+## Verify the removal
+
+Check from a fresh checkout instead of the deleted library — `status.sh`
+also runs straight from the repository (it works without an install; it
+reports "NOT active" then):
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/status.sh
+sudo bash files/status.sh
 ```
-
-reports "NOT active" — the script works before and after an install.

@@ -68,8 +68,9 @@ state, and the leak scan.
 sudo bash /usr/local/lib/opencode-permissions-kit/status.sh
 ```
 
-Works **before** an install too (reports "NOT active") — use it to check
-whether hardening is active from any machine.
+Runs from a checkout too (`sudo bash files/status.sh`) and works **before**
+an install or after an uninstall — it reports "NOT active" when the kit is
+not installed. Use it to check whether hardening is active from any machine.
 
 ## uninstall.sh
 
