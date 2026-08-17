@@ -113,12 +113,11 @@ banner() {
 die() { ui_error "$*"; exit 1; }
 
 confirm() {
+    # Convention: docs/design/conventions.md — default capital in the hint,
+    # Enter accepts it, y/yes/n/no case-insensitive. ui_confirm handles all
+    # of that; this wrapper only adds the --yes shortcut.
     [ "$YES" = true ] && return 0
-    printf "[?] %s (y/N) " "$1" >&2
-    read -r ans </dev/tty 2>/dev/null || read -r ans
-    case "$(echo "$ans" | tr '[:upper:]' '[:lower:]')" in
-        y|yes) return 0 ;; *) return 1 ;;
-    esac
+    ui_confirm "$1" "n"
 }
 
 need_install() {

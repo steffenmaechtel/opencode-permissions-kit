@@ -32,6 +32,8 @@ self-fetches its siblings from the same branch, and everything is deployed to
 - **Never commit on `master`.** Work on `feature/<name>` branches, merged via
   pull request with green CI. Pushing and PRs are the maintainer's job.
 - **All shipped content is English** — scripts, docs, prompts, messages.
+- **Follow `docs/design/conventions.md`** for interactive prompts, output
+  style, and other shipped-code conventions.
 - **Docs change with the code:** a PR that changes user-facing behavior
   updates the affected page under `docs/` in the same PR. One page = one
   topic type; see `docs/README.md` for the structure.
