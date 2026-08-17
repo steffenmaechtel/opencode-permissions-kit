@@ -1,4 +1,4 @@
-.PHONY: help test test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-migration test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths verify e2e e2e-rootless e2e-all install-dev clean version check-version
+.PHONY: help test test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths verify e2e e2e-rootless e2e-all install-dev clean version check-version
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -9,7 +9,6 @@ help:
 	@echo "  make test-git-config  Run git-config toggle tests"
 	@echo "  make test-container-backend  Run container-backend tests"
 	@echo "  make test-bypass-guard  Run wrapper-bypass guard tests"
-	@echo "  make test-migration    Run hard-deny migration tests"
 	@echo "  make test-ddev-as-opencode  Run ddev-as-opencode (ddev always runs as opencode) tests"
 	@echo "  make test-mkcert-reuse    Run mkcert CA reuse tests"
 	@echo "  make test-wsl-exposure   Run WSL2 /mnt/c exposure warning tests"
@@ -26,7 +25,7 @@ help:
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
-test: test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-migration test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths
+test: test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -49,10 +48,6 @@ test-container-backend:
 test-bypass-guard:
 	@echo "=== Wrapper-Bypass Guard Tests ==="
 	@./tests/test-bypass-guard.sh
-
-test-migration:
-	@echo "=== Hard-Deny Migration Tests ==="
-	@./tests/test-migration.sh
 
 test-wsl-exposure:
 	@echo "=== WSL2 /mnt/c exposure Tests ==="

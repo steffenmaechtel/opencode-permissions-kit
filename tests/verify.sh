@@ -64,8 +64,6 @@ echo "--- Backend & ddev runtime ---"
 check "install.conf records a rootless backend" \
     grep -qE '^CONTAINER_BACKEND=(docker-rootless|podman-rootless)' /etc/opencode-permissions-kit/install.conf 2>/dev/null
 check "ddev home ~opencode/.ddev exists"       sudo test -d /home/opencode/.ddev
-check "install.conf stamped HARD_DENY_REMOVED" \
-    grep -q '^HARD_DENY_REMOVED=1' /etc/opencode-permissions-kit/install.conf 2>/dev/null
 
 echo ""
 echo "--- Group baseline ---"

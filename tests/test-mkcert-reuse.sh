@@ -72,16 +72,10 @@ check "install.sh: Windows scan comes before the Linux fallback" \
     test -n "$inst_win" -a -n "$inst_linux" -a "$inst_win" -lt "$inst_linux"
 
 # --- update.sh detection -----------------------------------------------------
-check "update.sh scans /mnt/c/Users profiles directly (glob)" \
-    sh -c "grep -qF '/mnt/c/Users/*/AppData/Local/mkcert' \"\$1\"" _ "$UPDATE"
-check "update.sh no longer invokes powershell.exe" \
-    sh -c "! grep -q 'powershell.exe -NoProfile' \"\$1\"" _ "$UPDATE"
-check "update.sh no longer invokes cmd.exe" \
-    sh -c "! grep -q 'cmd.exe /c' \"\$1\"" _ "$UPDATE"
-check "update.sh keeps the developer-Linux CAROOT fallback" \
-    sh -c "grep -qF '/home/\$DEFAULT_USER/.local/share/mkcert/rootCA.pem' \"\$1\"" _ "$UPDATE"
-check "update.sh: Windows scan comes before the Linux fallback" \
-    test -n "$upd_win" -a -n "$upd_linux" -a "$upd_win" -lt "$upd_linux"
+# (update.sh no longer provisions the CA — that ran with the legacy
+# migration; a 0.0.14+ install already has the CA. install.sh owns reuse.)
+check "update.sh has no CA provisioning left (legacy cleanup)" \
+    sh -c "! grep -qF '/mnt/c/Users/*/AppData/Local/mkcert' \"\$1\"" _ "$UPDATE"
 
 # --- status.sh mismatch warning ----------------------------------------------
 check "status.sh compares CA fingerprints" \

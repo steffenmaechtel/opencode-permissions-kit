@@ -110,8 +110,6 @@ check "update.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/shell-warn.sh' "$UPDATE"
 check "update.sh re-asserts binary 750" \
     grep -Fq 'chmod 750 "$SYSTEM_BIN"' "$UPDATE"
-check "update.sh restricts migrated binary to 750" \
-    grep -Fq 'chmod 750 "$LIBDIR/bin/opencode"' "$UPDATE"
 check "update.sh never uses world-executable binary mode" \
     sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1"' _ "$UPDATE"
 

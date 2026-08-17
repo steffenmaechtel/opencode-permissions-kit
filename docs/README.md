@@ -28,7 +28,6 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 - [Customize the deny list](how-to/customize-deny-list.md)
 - [Harden `.git/config`](how-to/secure-git-config.md)
 - [Update the kit and the binary](how-to/update.md)
-- [Migrate from a hard-ACL install](how-to/migrate-from-hard-acl.md)
 - [Uninstall](how-to/uninstall.md)
 
 ## Reference (look it up)

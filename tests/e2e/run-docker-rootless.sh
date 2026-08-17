@@ -323,8 +323,7 @@ fi
 
 echo ""
 echo "--- RL6. Uninstall (rootless runtime teardown built in) ---"
-# The soft-only kit has no docker-group switch-back — uninstall.sh itself
-# disables linger, stops user@<uid> and resets rootless podman storage so
+# uninstall.sh itself disables linger, stops user@<uid> and resets rootless podman storage so
 # userdel -r can remove the opencode user.
 OC_UID2=$(E 'id -u opencode')
 E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID2"' docker system prune -af >/dev/null 2>&1" || true'

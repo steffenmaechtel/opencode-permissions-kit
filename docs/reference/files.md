@@ -16,12 +16,12 @@ This page lists every file and directory the kit manages, and every key in
 |---|---|
 | `DEFAULT_USER` | The developer's user (kit admin) |
 | `OPENCODE_USER` | The agent user (always `opencode`) |
-| `CONTAINER_BACKEND` | `docker-rootless` \| `podman-rootless` (legacy `docker-group` → warning, no tools) |
+| `CONTAINER_BACKEND` | `docker-rootless` \| `podman-rootless` |
 | `OPENCODE_DOCKER_HOST` | `docker-rootless` socket, e.g. `unix:///run/user/<opencode-uid>/docker.sock` |
 | `OPENCODE_PODMAN_SOCKET` | Optional podman docker-CLI-compat socket |
 | `DDEV_VERSION` | Recorded ddev version (advisory; `status.sh` flags < 1.25) |
-| `OPENCODE_GROUP` | Always the `opencode` usergroup (informational; legacy installs may still carry the old `WWW_GROUP` key — readers fall back to it, `update.sh` renames it away) |
-| `HARD_DENY_REMOVED` | Migration stamp — `1` once the soft-only migration ran |
+| `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
+| `HARD_DENY_REMOVED` | unused (historical migration stamp; updates from < 0.0.14 are refused — see [update](../how-to/update.md)) |
 | `VERSION` | Deployed kit version |
 
 ## /etc/sudoers.d/
@@ -50,7 +50,6 @@ This page lists every file and directory the kit manages, and every key in
 | `/usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode` | Sudoers helper that runs the real ddev as `opencode` (re-sets `HOME`/`XDG_RUNTIME_DIR`/`DOCKER_HOST`) |
 | `/usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh` | Sourced `ddev()` terminal function (hooked into the default user's rc files) |
 | `/usr/local/lib/opencode-permissions-kit/wrapper` | Directory validation, container opt-in, rootless exec |
-| `/usr/local/lib/opencode-permissions-kit/migrate-denies.sh` | One-time hard-deny → soft-only migration (+ `.ddev` handover) |
 | `/usr/local/lib/opencode-permissions-kit/setup-container-backend.sh` | Rootless backend provisioning |
 | `/usr/local/lib/opencode-permissions-kit/config.sh` | Management: projects, git-config, backend, refresh |
 | `/usr/local/lib/opencode-permissions-kit/update.sh` | Management: re-deploy, binary upgrades |

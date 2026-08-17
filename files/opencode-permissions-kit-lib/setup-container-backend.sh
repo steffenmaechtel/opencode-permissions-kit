@@ -8,7 +8,7 @@
 #
 # Usage:
 #   setup-container-backend.sh <backend> [--yes]
-#     backend: docker-rootless | podman-rootless | docker-group
+#     backend: docker-rootless | podman-rootless
 #     --yes:   skip confirmations
 #
 # What it does (for rootless backends):
@@ -21,9 +21,6 @@
 #      no linger unless a podman.socket is desired for docker-CLI compat).
 #   4. Print the socket path (if any) on stdout so the caller can record it in
 #      install.conf. For podman-rootless daemonless, nothing is printed.
-#
-# For docker-group: tear down a previously kit-provisioned rootless backend
-# (stop/disable the systemd service, disable-linger) and print nothing.
 #
 # Must run as root. The opencode user must already exist.
 # See docs/design/docker-rootless.md §6.4, §6.6, §9.3.
@@ -39,7 +36,7 @@ BACKEND=""
 YES=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        docker-rootless|podman-rootless|docker-group) BACKEND="$1" ;;
+        docker-rootless|podman-rootless) BACKEND="$1" ;;
         --yes|-y) YES=true ;;
         *) echo "${RED}setup-container-backend.sh: unknown arg '$1'${NC}" >&2; exit 1 ;;
     esac
@@ -67,9 +64,6 @@ done
 # Read install.conf for OPENCODE_USER.
 OPENCODE_USER="opencode"
 INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
@@ -171,14 +165,6 @@ enable_linger() {
         loginctl enable-linger "$OPENCODE_USER" 2>/dev/null || true
         echo "  Linger enabled for $OPENCODE_USER (daemon survives logout)."
         log "linger enabled for $OPENCODE_USER"
-    fi
-}
-
-disable_linger() {
-    if command -v loginctl >/dev/null 2>&1; then
-        loginctl disable-linger "$OPENCODE_USER" 2>/dev/null || true
-        echo "  Linger disabled for $OPENCODE_USER."
-        log "linger disabled for $OPENCODE_USER"
     fi
 }
 
@@ -339,36 +325,10 @@ setup_podman_rootless() {
     # No socket to print (daemonless podman-CLI path).
 }
 
-# --- teardown (switch to docker-group) -----------------------------------------
-
-teardown_rootless() {
-    echo ""
-    echo "  ${CYAN}Tearing down rootless backend for $OPENCODE_USER ...${NC}"
-
-    # Stop + disable the docker-rootless systemd --user service (if active).
-    if command -v systemctl >/dev/null 2>&1 && systemd_user_available 2>/dev/null; then
-        sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
-            systemctl --user stop docker.service 2>/dev/null || true
-        sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
-            systemctl --user disable docker.service 2>/dev/null || true
-    fi
-
-    disable_linger
-
-    # Note: subuid/subgid entries and installed packages are left in place
-    # (removing them is too invasive and would break a re-switch). The kit
-    # records nothing about having created them, so a manual cleanup is the
-    # admin's choice via /etc/subuid + /etc/subgid.
-    echo "  ${GREEN}Rootless backend torn down.${NC}"
-    echo "  ${YELLOW}Packages (podman/uidmap/...) and /etc/subuid entries left in place.${NC}"
-    log "rootless backend torn down for $OPENCODE_USER"
-}
-
 # --- dispatch -----------------------------------------------------------------
 
 case "$BACKEND" in
     docker-rootless)  setup_docker_rootless ;;
     podman-rootless)  setup_podman_rootless ;;
-    docker-group)     teardown_rootless ;;
-    *) echo "${RED}Unknown backend: $BACKEND${NC}" >&2; exit 1 ;;
+    *) echo "${RED}Unknown backend: $BACKEND (supported: docker-rootless, podman-rootless)${NC}" >&2; exit 1 ;;
 esac

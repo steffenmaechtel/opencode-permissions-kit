@@ -25,29 +25,12 @@ ui_atten "existing kit v0.0.9"           "detected — will be migrated"
 
 ui_section "Choices"
 
-# Backend — including the (deliberately scary) docker classic variant.
+# Backend — rootless only.
 BACKEND=$(ui_menu "Container backend for the agent user?" "1" \
     "1|docker-rootless (recommended)" \
-    "2|podman-rootless (daemonless, no systemd)" \
-    "3|docker classic — root docker (INSECURE)")
+    "2|podman-rootless (daemonless, no systemd)")
 
-if [ "$BACKEND" = "3" ]; then
-    echo ""
-    ui_error "docker classic grants the agent a ROOT-EQUIVALENT socket."
-    ui_error "The agent user could escape every restriction the kit sets up:"
-    ui_detail "mount the host filesystem, read /etc/shadow, install software,"
-    ui_detail "patch the kit away. UID separation — the kit's only hard"
-    ui_detail "guarantee — would be void."
-    echo ""
-    CONFIRM=$(ui_ask "Type 'root-docker' to accept the risk (anything else aborts)" "")
-    if [ "$CONFIRM" = "root-docker" ]; then
-        ui_warn "docker classic selected — AGAINST the kit's recommendation"
-        BACKEND="docker-group (root-equivalent)"
-    else
-        ui_info "Falling back to docker-rootless."
-        BACKEND="docker-rootless"
-    fi
-elif [ "$BACKEND" = "2" ]; then
+if [ "$BACKEND" = "2" ]; then
     BACKEND="podman-rootless"
     ui_detail "podman detected earlier — staying with podman"
 else
@@ -86,10 +69,6 @@ ui_success "done"
 ui_info "Provisioning $BACKEND..."
 sim 0.5
 ui_success "backend ready"
-ui_info "Migrating the existing v0.0.9 install..."
-sim 0.4
-ui_success "legacy hard-deny ACLs removed (12 entries)"
-ui_success "files re-based to group 'opencode'"
 ui_info "Applying ACL baseline, wrapper, configs..."
 sim 0.5
 ui_success "done"

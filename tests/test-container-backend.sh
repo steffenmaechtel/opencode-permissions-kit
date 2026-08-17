@@ -146,8 +146,8 @@ check "wrapper accepts docker-rootless/podman-rootless backends" \
     grep -Fq 'docker-rootless|podman-rootless' "$WRAPPER"
 check "wrapper exports DOCKER_HOST for rootless" \
     grep -Fq 'export DOCKER_HOST="$CONTAINER_DOCKER_HOST"' "$WRAPPER"
-check "wrapper warns about the removed legacy backend instead of downgrading" \
-    grep -Fq 'legacy docker-group was removed' "$WRAPPER"
+check "wrapper warns about unknown/missing backend instead of downgrading" \
+    grep -Fq 'no rootless container backend configured' "$WRAPPER"
 check "wrapper has podman-CLI path (daemonless, no DOCKER_HOST)" \
     grep -Fq 'CONTAINER_PODMAN=true' "$WRAPPER"
 check "wrapper verifies 'command -v podman' for the podman-CLI path" \
@@ -186,7 +186,7 @@ check "install.sh records OPENCODE_PODMAN_SOCKET in install.conf" \
 check "install.sh records DDEV_VERSION in install.conf" \
     grep -Fq 'DDEV_VERSION=$DDEV_VERSION' "$INSTALL"
 check "install.sh preserves an existing backend on re-install" \
-    grep -Eq 'sed -n '"'"'s/\^CONTAINER_BACKEND=//p'"'"' "\$_c"' "$INSTALL"
+    grep -Eq 'sed -n '"'"'s/\^CONTAINER_BACKEND=//p'"'"' /etc/opencode-permissions-kit/install.conf' "$INSTALL"
 check "install.sh validates --container-backend (rootless only)" \
     grep -Fq 'docker-rootless|podman-rootless' "$INSTALL"
 check "install.sh aborts on provisioning failure (no docker-group fallback)" \
@@ -214,10 +214,10 @@ check "update.sh KIT_FILES includes setup-container-backend.sh" \
     grep -Fq 'opencode-permissions-kit-lib/setup-container-backend.sh' "$UPDATE"
 check "update.sh deploys setup-container-backend.sh to LIBDIR" \
     grep -Fq '"$LIBDIR/setup-container-backend.sh"' "$UPDATE"
-check "update.sh KIT_FILES includes migrate-denies.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/migrate-denies.sh' "$UPDATE"
-check "update.sh writes the HARD_DENY_REMOVED stamp" \
-    grep -Fq 'HARD_DENY_REMOVED=1' "$UPDATE"
+check "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)" \
+    grep_absent -Fq 'opencode-permissions-kit-lib/migrate-denies.sh' "$UPDATE"
+check "update.sh stamps no HARD_DENY_REMOVED key anymore" \
+    grep_absent -Fq 'HARD_DENY_REMOVED=1' "$UPDATE"
 check "update.sh KIT_FILES has NO protect-projects.sh" \
     grep_absent -Fq 'protect-projects.sh' "$UPDATE"
 check "update.sh KIT_FILES has NO ddev-transaction.sh" \
@@ -228,19 +228,19 @@ check "update.sh KIT_FILES has NO git hooks" \
     grep_absent -Fq 'hooks/post-' "$UPDATE"
 check "update.sh re-stamps OPENCODE_GROUP to the opencode usergroup" \
     grep -Fq 'echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"' "$UPDATE"
-check "update.sh drops the legacy WWW_GROUP key on re-stamp" \
-    grep -Fq "e '^WWW_GROUP='" "$UPDATE"
-check "update.sh comment documents the rename" \
+check "update.sh strips no legacy keys on re-stamp (cleanup done)" \
+    grep_absent -Fq "e '^WWW_GROUP='" "$UPDATE"
+check "update.sh comment documents the re-base" \
     grep -Fq 'OPENCODE_GROUP re-base' "$UPDATE"
 
 echo ""
-echo "-- OPENCODE_GROUP rename (legacy WWW_GROUP fallback) --"
-check "config.sh falls back to the legacy WWW_GROUP conf key" \
-    grep -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$CONFIG"
-check "status.sh falls back to the legacy WWW_GROUP conf key" \
-    grep -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$STATUS"
-check "uninstall.sh falls back to the legacy WWW_GROUP conf key" \
-    grep -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$UNINSTALL"
+echo "-- OPENCODE_GROUP (legacy WWW_GROUP removed) --"
+check "config.sh has no WWW_GROUP fallback" \
+    grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$CONFIG"
+check "status.sh has no WWW_GROUP fallback" \
+    grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$STATUS"
+check "uninstall.sh has no WWW_GROUP fallback" \
+    grep_absent -Fq 'OPENCODE_GROUP:-${WWW_GROUP:-opencode}' "$UNINSTALL"
 check "no remaining WWW_GROUP variable use in install.sh" \
     grep_absent -Fq '$WWW_GROUP' "$INSTALL"
 
@@ -269,10 +269,8 @@ check "status.sh handles rootless backends" \
     grep -Fq 'docker-rootless|podman-rootless' "$STATUS"
 check "status.sh reports socket reachability" \
     grep -Fq 'NOT reachable' "$STATUS"
-check "status.sh reports the migration stamp" \
-    grep -Fq 'HARD_DENY_REMOVED' "$STATUS"
-check "status.sh warns about leftover u:opencode denies" \
-    grep -Fq 'update.sh' "$STATUS"
+check "status.sh has no migration-stamp section (legacy cleanup)" \
+    grep_absent -Fq 'HARD_DENY_REMOVED' "$STATUS"
 
 echo ""
 echo "-- CI chmod lists --"
@@ -287,10 +285,10 @@ check "test.yml chmods socket-check.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check.sh' "$TEST_YML"
 check "e2e.yml chmods socket-check.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check.sh' "$E2E_YML"
-check "test.yml chmods migrate-denies.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/migrate-denies.sh' "$TEST_YML"
-check "test.yml chmods test-migration.sh" \
-    grep -Fq './tests/test-migration.sh' "$TEST_YML"
+check "test.yml has no migrate-denies.sh chmod (removed)" \
+    grep_absent -Fq './files/opencode-permissions-kit-lib/migrate-denies.sh' "$TEST_YML"
+check "test.yml has no test-migration.sh (removed)" \
+    grep_absent -Fq './tests/test-migration.sh' "$TEST_YML"
 
 echo ""
 echo "-- setup-container-backend.sh structure --"

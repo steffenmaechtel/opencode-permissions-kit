@@ -34,7 +34,9 @@ trap 'rm -rf "$WORK"' EXIT
 # Fake library with stub scripts recording how they were invoked.
 LIB="$WORK/lib"
 mkdir -p "$LIB"
-echo "9.9.9" > "$LIB/VERSION"
+# install.conf carries the deployed VERSION stamp (a standalone VERSION file
+# is NOT deployed to the library — regression guard for the v0.0.0 display).
+printf 'DEFAULT_USER=dev\nVERSION=9.9.9\n' > "$WORK/install.conf"
 for s in status config update uninstall; do
     cat > "$LIB/$s.sh" <<EOF
 #!/bin/sh
@@ -64,7 +66,7 @@ cp "$KIT" "$LIB/kit"
 chmod +x "$LIB/kit"
 
 run_kit() {
-    "$BIN/opencode-permissions-kit" "$@" 2>/dev/null
+    OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" "$@" 2>/dev/null
 }
 
 echo "=== CLI dispatcher tests ==="
@@ -83,8 +85,8 @@ assert "help == --help" "$(run_kit --help)" "$out_help"
 
 # version comes from the library VERSION file
 case "$out" in
-    *"v9.9.9"*) echo "  ${GREEN}PASS${NC}  version from LIBDIR/VERSION"; passed=$((passed + 1)) ;;
-    *) echo "  ${RED}FAIL${NC}  version from LIBDIR/VERSION (got: $out)"; failures=$((failures + 1)) ;;
+    *"v9.9.9"*) echo "  ${GREEN}PASS${NC}  version from install.conf stamp"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  version from install.conf stamp (got: $out)"; failures=$((failures + 1)) ;;
 esac
 
 # status dispatches without sudo (root test envs: euid matches current)

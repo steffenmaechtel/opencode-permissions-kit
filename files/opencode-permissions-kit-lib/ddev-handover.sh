@@ -17,10 +17,10 @@
 #                     magento*  -> app/etc
 #
 # Everything is best-effort (|| true) and idempotent. POSIX sh, SOURCED
-# (never executed) by install.sh, update.sh, config.sh (projects add) and
-# migrate-denies.sh (refresh/migration). Callers run as root (or via
-# sudo) — plain chown is fine. No logging here: the functions echo their
-# actions, callers wrap them with their own log calls as needed.
+# (never executed) by install.sh, update.sh and config.sh (projects add,
+# refresh). Callers run as root (or via sudo) — plain chown is fine. No
+# logging here: the functions echo their actions, callers wrap them with
+# their own log calls as needed.
 #
 # Deployed to /usr/local/lib/opencode-permissions-kit/ddev-handover.sh.
 

@@ -45,8 +45,7 @@ fi
 
 DEFAULT_USER=$(whoami)
 OPENCODE_USER="opencode"
-# Sharing group: filled from install.conf / the live value below (with a
-# legacy WWW_GROUP fallback); the pre-soft-only default www-data is gone.
+# Sharing group: filled from install.conf / the live value below.
 OPENCODE_GROUP=""
 
 echo ""
@@ -116,25 +115,15 @@ run() {
     fi
 }
 
-# Source install.conf (new path first, then legacy pre-0.0.10 /etc/opencode/
-# and pre-0.0.9 setup.conf).
-INSTALL_CONF=""
-for _c in /etc/opencode-permissions-kit/install.conf /etc/opencode-permissions-kit/setup.conf \
-          /etc/opencode/install.conf /etc/opencode/setup.conf; do
-    if [ -f "$_c" ]; then
-        INSTALL_CONF="$_c"
-        break
-    fi
-done
-if [ -n "$INSTALL_CONF" ]; then
+# Source install.conf (canonical path since 0.0.10).
+INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
+if [ -f "$INSTALL_CONF" ]; then
     trace "sourcing $INSTALL_CONF"
     . "$INSTALL_CONF"
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
-# Sharing group: prefer OPENCODE_GROUP, fall back to the legacy WWW_GROUP
-# key a pre-rename install.conf still carries; then the live value (stale
-# confs may still say www-data).
-OPENCODE_GROUP="${OPENCODE_GROUP:-${WWW_GROUP:-opencode}}"
+# Sharing group: the opencode user's own usergroup; prefer the live value.
+OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
 if [ -n "$LIVE_GROUP" ]; then
     OPENCODE_GROUP="$LIVE_GROUP"
@@ -147,21 +136,10 @@ ans=$(prompt_yn "Proceed with uninstall?" "n")
 log "uninstall started (dry_run=$DRY_RUN)"
 
 echo ""
-echo "--- Removing Git hooks (legacy cleanup) ---"
-# The soft-only kit no longer installs hooks, but a pre-migration install left
-# core.hooksPath pointing at the (deleted) kit hooks dir — git would warn on
-# every command. Unset for both users (best-effort).
-run "sudo -u \"$OPENCODE_USER\" git config --global --unset core.hooksPath 2>/dev/null || true"
-run "sudo -u \"$DEFAULT_USER\" git config --global --unset core.hooksPath 2>/dev/null || true"
-echo "Git hooks config removed."
-log "git hooks config removed (core.hooksPath unset, legacy)"
-
-echo ""
 echo "--- Removing sudoers ---"
 run "sudo rm -f /etc/sudoers.d/opencode-permissions-kit"
-run "sudo rm -f /etc/sudoers.d/opencode"
 echo "sudoers removed."
-log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit (+ legacy /etc/sudoers.d/opencode)"
+log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit"
 
 echo ""
 echo "--- Removing wrapper ---"
@@ -176,27 +154,16 @@ echo "CLI dispatcher removed."
 log "cli removed: /usr/local/bin/opencode-permissions-kit"
 
 echo ""
-echo "--- Removing ddev shim (legacy) ---"
-# The soft-only kit installs no shim; a pre-migration install did. Removing
-# /usr/local/bin/ddev only ever hits OUR symlink — guard against a real ddev.
-run "[ -L /usr/local/bin/ddev ] && sudo rm -f /usr/local/bin/ddev || true"
-echo "ddev shim removed (if it was ours)."
-log "ddev shim removed (legacy)"
-
-echo ""
 echo "--- Removing opencode library ---"
-run "sudo rm -f /usr/local/sbin/protect-projects.sh"
 run "sudo rm -rf /usr/local/lib/opencode-permissions-kit"
-run "sudo rm -rf /usr/local/lib/opencode"
 echo "opencode library removed."
-log "library removed: /usr/local/lib/opencode-permissions-kit (+ legacy /usr/local/lib/opencode)"
+log "library removed: /usr/local/lib/opencode-permissions-kit"
 
 echo ""
 echo "--- Removing umask profile ---"
 run "sudo rm -f /etc/profile.d/opencode-permissions-kit-umask.sh"
-run "sudo rm -f /etc/profile.d/opencode-umask.sh"
 echo "Umask profile removed."
-log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ legacy opencode-umask.sh)"
+log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 
 echo ""
 echo "--- Removing opencode user ---"
@@ -238,7 +205,6 @@ fi
 echo ""
 echo "--- Removing project ACLs and setgid ---"
 UNINSTALL_PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
-[ -f "$UNINSTALL_PROJECTS_CONF" ] || UNINSTALL_PROJECTS_CONF="/etc/opencode/projects.conf"
 if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
@@ -265,7 +231,6 @@ echo "--- Removing kit config directories + runtime artifacts ---"
 run "sudo rm -rf /run/opencode-permissions-kit"
 run "sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf"
 run "sudo rm -rf /etc/opencode-permissions-kit"
-run "sudo rm -rf /etc/opencode"
 echo "Removed."
 log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
 

@@ -9,11 +9,7 @@ set -u
 
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
-[ -f "$PROJECTS_CONF" ] || PROJECTS_CONF="/etc/opencode/projects.conf"
 
 # Shared UI helpers: installed library first, then the checkout layout.
 UI_LIB="$LIBDIR/ui.sh"
@@ -33,14 +29,12 @@ VERSION="0.0.0"
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
 OPENCODE_GROUP=""
-HARD_DENY_REMOVED=""
 if [ -f "$INSTALL_CONF" ]; then
     # shellcheck disable=SC1090
     . "$INSTALL_CONF"
 fi
-# Prefer OPENCODE_GROUP, fall back to the legacy WWW_GROUP key a pre-rename
-# install.conf still carries; then the live primary usergroup.
-OPENCODE_GROUP="${OPENCODE_GROUP:-${WWW_GROUP:-opencode}}"
+# Sharing group: the opencode user's own usergroup; prefer the live value.
+OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
 [ -n "$LIVE_GROUP" ] && OPENCODE_GROUP="$LIVE_GROUP"
 
@@ -160,7 +154,7 @@ case "${CONTAINER_BACKEND:-}" in
         fi
         ;;
     *)
-        ui_kv "backend" "none / legacy docker-group" "$UI_RED"
+        ui_kv "backend" "unknown ('$backend')" "$UI_RED"
         ui_detail "re-run install.sh with a rootless backend:"
         ui_detail "sudo bash files/install.sh --container-backend docker-rootless|podman-rootless"
         ;;
@@ -271,36 +265,6 @@ if [ -d /mnt/c ]; then
         fi
     else
         ui_kv "/mnt/c" "restricted (mode ${mnt_mode:-?})" "$UI_GREEN"
-    fi
-fi
-
-# === Migration state (DDEV-WORKING §4) ==========================================
-
-ui_section "Hard-deny migration"
-
-if [ "${HARD_DENY_REMOVED:-}" = "1" ]; then
-    ui_kv "stamp" "done (soft-only model active)" "$UI_GREEN"
-else
-    ui_kv "stamp" "missing — run update.sh to remove legacy u:$OPENCODE_USER ACL denies" "$UI_YELLOW"
-fi
-# Report-only scan for leftover hard denies from a pre-migration install.
-if command -v getfacl >/dev/null 2>&1 && [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
-    leftover=0
-    while IFS= read -r root; do
-        [ -z "$root" ] && continue
-        [ -d "$root" ] || continue
-        n=$(getfacl -R -p "$root" 2>/dev/null | awk -v u="$OPENCODE_USER" '
-            /^# file: / { path = substr($0, 9); has = 0; next }
-            index($0, "user:" u ":") == 1 { has = 1; next }
-            /^$/ { if (path != "" && has) { print path; has = 0 } path = "" }
-        ' | grep -c . || true)
-        leftover=$((leftover + ${n:-0}))
-    done < "$PROJECTS_CONF"
-    if [ "${leftover:-0}" -gt 0 ]; then
-        ui_kv "leftover denies" "$leftover file(s) with u:$OPENCODE_USER ACL entries" "$UI_RED"
-        ui_detail "remove them with: sudo bash $LIBDIR/update.sh"
-    else
-        ui_kv "leftover denies" "none" "$UI_GREEN"
     fi
 fi
 
