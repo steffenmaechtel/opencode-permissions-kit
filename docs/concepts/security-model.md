@@ -83,3 +83,6 @@ options = "uid=1000,gid=1000,dmask=027,fmask=037"
 from that default (created additional users, changed the default user)
 adjust `uid`/`gid` to your default WSL user's values — the goal is always
 the same: the agent user must end up as "other", with no bits.
+
+Not sure what your values are? Check them with `id -u` / `id -g` in a fresh
+WSL terminal (logged in as the default user).
