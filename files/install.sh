@@ -373,8 +373,11 @@ if id "$OPENCODE_USER" >/dev/null 2>&1 || [ -f /etc/opencode-permissions-kit/ins
     [ -f /etc/opencode-permissions-kit/install.conf ] && _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
     ui_atten "existing kit" "detected (v${_ekv:-?}) — update.sh is the usual upgrade path"
     if [ "$INTERACTIVE" = true ]; then
-        _ek=$(ui_ask "Re-configure the existing installation with install.sh?" "y")
-        [ "$_ek" != "y" ] && { ui_info "Aborted — run: sudo bash /usr/local/lib/opencode-permissions-kit/update.sh"; exit 0; }
+        # Convention: docs/design/conventions.md — [Y/n] via ui_confirm.
+        if ! ui_confirm "Re-configure the existing installation with install.sh?" "y"; then
+            ui_info "Aborted — run: opencode-permissions-kit update"
+            exit 0
+        fi
     fi
 fi
 

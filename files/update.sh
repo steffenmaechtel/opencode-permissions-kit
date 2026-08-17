@@ -204,9 +204,10 @@ banner() {
 die() { ui_error "$*"; exit 1; }
 
 confirm() {
+    # Convention: docs/design/conventions.md — [Y/n] default capital,
+    # Enter accepts it, y/yes/n/no case-insensitive.
     [ "$YES" = true ] && return 0
-    ans=$(ui_ask "$1" "y")
-    [ "$ans" = "y" ]
+    ui_confirm "$1" "y"
 }
 
 # --- pre-flight ---------------------------------------------------------------
