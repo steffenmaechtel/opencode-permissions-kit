@@ -159,6 +159,26 @@ else
     failures=$((failures + 1))
 fi
 
+# Compat-stub guard: while the upgrade floor is 0.0.14, the pre-0.0.15
+# update.sh file lists still fetch migrate-denies.sh — a 404 would abort
+# their update before the new update.sh takes over. The stub is never
+# deployed (not in the current KIT_FILES).
+floor_line="$(grep -o 'floor_check "0\.[0-9]*\.[0-9]*"' "$SCRIPT_DIR/../files/update.sh" | head -1)"
+case "$floor_line" in
+    *0.0.14*)
+        if [ -f "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/migrate-denies.sh" ]; then
+            echo "  ${GREEN}PASS${NC}  compat stub present while floor is 0.0.14"; passed=$((passed + 1))
+        else
+            echo "  ${RED}FAIL${NC}  compat stub present while floor is 0.014 (0.0.14 update.sh fetches it — 404 aborts the update)"; failures=$((failures + 1))
+        fi
+        ;;
+esac
+if sed -n 's/^KIT_FILES="\(.*\)"$/\1/p' "$SCRIPT_DIR/../files/update.sh" | grep -q 'opencode-permissions-kit-lib/migrate-denies.sh'; then
+    echo "  ${RED}FAIL${NC}  stub must NOT be in KIT_FILES (never deployed)"; failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  stub not in KIT_FILES (never deployed)"; passed=$((passed + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

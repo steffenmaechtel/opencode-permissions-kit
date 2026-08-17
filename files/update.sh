@@ -42,6 +42,10 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 # the pre-deploy verification (ensure_local_file), so the two can never drift
 # and a stale installed update.sh fetching an incomplete temp dir is healed
 # before the deploy cp's run.
+# REMOVED kit files must keep a compatibility stub under files/ while any
+# update.sh within the upgrade floor still lists them (a 404 aborts the old
+# fetch before the new update.sh takes over) — see
+# opencode-permissions-kit-lib/migrate-denies.sh.
 KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
 opencode-deny-all.jsonc \
 sudoers.template umask.sh VERSION \

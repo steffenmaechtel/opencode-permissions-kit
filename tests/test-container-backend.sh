@@ -215,7 +215,7 @@ check "update.sh KIT_FILES includes setup-container-backend.sh" \
 check "update.sh deploys setup-container-backend.sh to LIBDIR" \
     grep -Fq '"$LIBDIR/setup-container-backend.sh"' "$UPDATE"
 check "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)" \
-    grep_absent -Fq 'opencode-permissions-kit-lib/migrate-denies.sh' "$UPDATE"
+    sh -c "! sed -n 's/^KIT_FILES=\"\\(.*\\)\"$/\\1/p' \"\$1\" | grep -q migrate-denies" _ "$UPDATE"
 check "update.sh stamps no HARD_DENY_REMOVED key anymore" \
     grep_absent -Fq 'HARD_DENY_REMOVED=1' "$UPDATE"
 check "update.sh KIT_FILES has NO protect-projects.sh" \
