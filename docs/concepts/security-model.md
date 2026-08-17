@@ -76,4 +76,5 @@ options = "uid=1000,gid=1000,dmask=027,fmask=037"
 ```
 
 (Replace `uid`/`gid` with your default WSL user's — the agent user must end
-up as "other", with no bits.)
+up as "other", with no bits.) The change takes effect only after a full WSL
+restart: run `wsl --shutdown` from Windows, then reopen your WSL terminal.
