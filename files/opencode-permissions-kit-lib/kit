@@ -25,6 +25,14 @@ if [ -L "$SELF" ]; then
 fi
 LIBDIR="$(cd "$(dirname "$SELF")" && pwd -P)"
 
+# Shared UI helpers — same visual language as every kit script (labeled
+# error lines, colors off when piped). $LIBDIR is resolved above.
+if [ -f "$LIBDIR/ui.sh" ]; then
+    . "$LIBDIR/ui.sh"
+else
+    ui_error() { echo "  error    $1" >&2; }
+fi
+
 # Version from install.conf (the deployed stamp — same source as status.sh;
 # a standalone VERSION file is not deployed to the library). OPK_INSTALL_CONF
 # overrides the path for tests only.
@@ -68,7 +76,7 @@ case "$cmd" in
         ;;
     config|update)
         if [ ! -f "$LIBDIR/$cmd.sh" ]; then
-            echo "error: $LIBDIR/$cmd.sh not found — is the kit installed?" >&2
+            ui_error "$LIBDIR/$cmd.sh not found — is the kit installed?"
             exit 1
         fi
         if [ "$(id -u)" -eq 0 ]; then
@@ -78,7 +86,7 @@ case "$cmd" in
         ;;
     uninstall)
         if [ ! -f "$LIBDIR/uninstall.sh" ]; then
-            echo "error: $LIBDIR/uninstall.sh not found — is the kit installed?" >&2
+            ui_error "$LIBDIR/uninstall.sh not found — is the kit installed?"
             exit 1
         fi
         # uninstall.sh expects the default user (no sudo prefix); it asks
@@ -93,7 +101,7 @@ case "$cmd" in
         exit 1
         ;;
     *)
-        echo "error: unknown command '$cmd'" >&2
+        ui_error "unknown command '$cmd'"
         echo "" >&2
         usage >&2
         exit 1
