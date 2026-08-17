@@ -45,7 +45,7 @@ ddev_handover_root() {
 # Hands the settings directories ddev chmods for the detected app type
 # over to <user>:<group> with g+w. Projects without .ddev/config.yaml or
 # with an unknown/unsupported type are skipped (wordpress manages a file
-# at the project root — see docs/MANUAL.md, "ddev-managed paths").
+# at the project root — see docs/concepts/ddev-integration.md).
 ddev_handover_project() {
     dhp_proj="${1:-}"
     dhp_user="${2:-}"

@@ -2,7 +2,7 @@
 # e2e/run-docker-rootless.sh — docker-rootless daemon end-to-end test
 # Run from repo root: ./tests/e2e/run-docker-rootless.sh
 #
-# Phase 3 of docs/design/DOCKER-ROOTLESS.md. Unlike the podman-rootless suite
+# Phase 3 of docs/design/docker-rootless.md. Unlike the podman-rootless suite
 # (run.sh section 12i), docker-rootless cannot run in the plain e2e container:
 # the kit's provisioning (setup-container-backend.sh) hard-requires a working
 # systemd --user manager (dockerd-rootless-setuptool.sh + `systemctl --user`).

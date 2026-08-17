@@ -11,7 +11,7 @@
 # To re-deploy the kit without prompts after it is already installed,
 # use update.sh instead. To change settings later, use config.sh.
 #
-# Soft protection model (docs/design/DDEV-WORKING.md): no hard ACL denies.
+# Soft protection model (docs/design/ddev-working.md): no hard ACL denies.
 # The kit creates the opencode user, provisions a MANDATORY rootless container
 # backend (docker-rootless or podman-rootless), prepares ddev to run as that
 # user, and sets up the opencode usergroup as the sharing group.
@@ -1130,5 +1130,5 @@ ui_detail "opencode                       start the agent (new terminal!)"
 ui_detail "cd $LIBDIR"
 ui_detail "sh status.sh                   verify the protection"
 ui_detail "sudo sh config.sh              change settings later"
-ui_detail "MANUAL: https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/MANUAL.md"
+ui_detail "Docs:  https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/README.md"
 log "install complete"

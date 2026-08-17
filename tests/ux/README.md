@@ -1,7 +1,7 @@
 # tests/ux/ — UX playground (DEMO ONLY)
 
 Experimental preview of the proposed output styles and flows from
-[docs/design/UX-IMPROVEMENT.md](../docs/design/UX-IMPROVEMENT.md).
+[docs/design/ux-improvement.md](../docs/design/ux-improvement.md).
 **Nothing here changes anything on your system** — every script only
 prints simulated output (with short sleeps for realism).
 

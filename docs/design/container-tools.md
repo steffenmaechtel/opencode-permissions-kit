@@ -2,8 +2,8 @@
 
 > Status: **Implemented (2026-08-11).** This document is the historical design
 > record behind the container-tools feature. The decisions below are in the
-> code; the authoritative usage documentation lives in `docs/MANUAL.md` under
-> "Container Tools (docker/ddev)". The unchecked "Still open" items in §7 have
+> code; the authoritative usage documentation lives in
+> `docs/how-to/container-tools.md`. The unchecked "Still open" items in §7 have
 > not been revisited since implementation.
 
 ## 1. The Problem
