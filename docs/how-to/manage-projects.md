@@ -13,7 +13,10 @@ inside one of these directories or their subdirectories.
 opencode-permissions-kit config projects add /var/www/vhosts/new-project
 ```
 
-Multiple paths at once are fine. `config.sh` appends the path to
+Multiple paths at once are fine, and `~` works. System paths (`/`, `/usr`,
+`/home`, `/tmp`, …) are rejected — the group baseline (`chgrp -R`,
+`setfacl -R`) must never run over them; use a dedicated folder like
+`/var/www/vhosts` or `~/dev`. `config.sh` appends the path to
 `projects.conf` and applies the **group baseline** (group `opencode`, setgid,
 default ACLs `g:opencode:rwx`) in one step — no extra step needed.
 

@@ -410,6 +410,51 @@ else
     ui_add "router ports" "sysctl to 80 offered (ddev-router 80/443)"
 fi
 
+# A project root must never be (or live directly under) a system path:
+# the group baseline runs chgrp -R + setfacl -R over it. Allowed below
+# /home/ and /var/www...; everything else system-ish is rejected. Also
+# rejects relative paths and ../. traversal games. "~" is expanded to
+# $HOME; the normalized path is returned in _PP_NORM for the caller.
+project_path_sane() {
+    _pp="${1%/}"
+    [ -n "$_pp" ] || return 1
+    # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
+    # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
+        "~/"*) _pp="$HOME${_pp#\~}" ;;
+        "~"*) return 1 ;;
+    esac; fi
+    _PP_NORM="$_pp"
+    case "$_pp" in
+        /*) ;;
+        *)  return 1 ;;   # relative paths are error-prone in projects.conf
+    esac
+    case "$_pp" in
+        *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
+    esac
+    case "$_pp" in
+        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|/lib*/*|\
+/media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
+/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
+/usr|/usr/*|/var|/var/tmp)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+# Validate --projects values against the same policy (fail fast, before
+# anything is touched).
+if [ -n "$PREDEFINED_PROJECTS" ]; then
+    for _fp in $PREDEFINED_PROJECTS; do
+        if ! project_path_sane "$_fp"; then
+            ui_error "'$_fp' is a system path — refusing to use it as a project root."
+            ui_info "Use a dedicated folder like /var/www/vhosts or /home/<you>/projects."
+            exit 1
+        fi
+    done
+fi
+
 # === Standard questions ========================================================
 # Standard asks exactly: project directory + git access. The podman exception
 # was already asked during backend selection. --yes takes the defaults.
@@ -419,7 +464,21 @@ if [ "$MODE" = "standard" ] && [ "$INTERACTIVE" = true ]; then
     if [ -z "$PREDEFINED_PROJECTS" ]; then
         _pdef="/var/www/vhosts"
         [ -d "$_pdef" ] || _pdef=""
-        _p=$(ui_ask "Project directory (agent workspaces)" "$_pdef")
+        ui_detail "a parent folder holding your projects, e.g. /var/www/vhosts, ~/dev or ~/projects"
+        while true; do
+            _p=$(ui_ask "Project directory (agent workspaces)" "$_pdef")
+            # Empty (no default existed) falls through to the numbered
+            # selection later; only validate what was actually entered.
+            if [ -n "$_p" ]; then
+                if ! project_path_sane "$_p"; then
+                    ui_error "'$_p' is a system path — the kit would chgrp -R/setfacl -R over it."
+                    ui_info "Use a dedicated folder like /var/www/vhosts, ~/dev or ~/projects."
+                    continue
+                fi
+                _p="$_PP_NORM"   # ~ expanded to $HOME
+            fi
+            break
+        done
         [ -n "$_p" ] && PREDEFINED_PROJECTS="$_p"
     fi
     if [ "$GIT_FLAG_GIVEN" != true ]; then
@@ -522,9 +581,23 @@ else
     case "$selection" in
         [Cc]*)
             echo "Enter paths (space-separated):"
-            printf "  > "
-            read -r custom </dev/tty 2>/dev/null || read -r custom
-            PROJECTS_ROOTS="$custom"
+            _custom=""
+            while [ -z "$_custom" ]; do
+                printf "  > "
+                read -r custom </dev/tty 2>/dev/null || read -r custom
+                _custom=""
+                _bad=""
+                for p in $custom; do
+                    if project_path_sane "$p"; then
+                        _custom="$_custom $p"
+                    else
+                        ui_error "'$p' is a system path — rejected."
+                        _bad=1
+                    fi
+                done
+                [ -n "$_bad" ] && _custom=""
+            done
+            PROJECTS_ROOTS="$_custom"
             ;;
         [Ss]*)
             PROJECTS_ROOTS=""
