@@ -10,7 +10,7 @@ inside one of these directories or their subdirectories.
 ## Add a project directory
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh projects add /var/www/vhosts/new-project
+opencode-permissions-kit config projects add /var/www/vhosts/new-project
 ```
 
 Multiple paths at once are fine. `config.sh` appends the path to
@@ -29,13 +29,13 @@ sudo setfacl -R -d -m g:opencode:rwx /var/www/vhosts/new-project
 ## List configured directories
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh projects list
+opencode-permissions-kit config projects list
 ```
 
 ## Remove a project directory
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh projects remove /var/www/vhosts/old-project
+opencode-permissions-kit config projects remove /var/www/vhosts/old-project
 ```
 
 Only the `projects.conf` line is removed; files and their group bits stay as

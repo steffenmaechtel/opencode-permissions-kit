@@ -168,6 +168,12 @@ echo "Wrapper removed."
 log "wrapper removed: /usr/local/bin/opencode"
 
 echo ""
+echo "--- Removing cli dispatcher ---"
+run "sudo rm -f /usr/local/bin/opencode-permissions-kit"
+echo "CLI dispatcher removed."
+log "cli removed: /usr/local/bin/opencode-permissions-kit"
+
+echo ""
 echo "--- Removing ddev shim (legacy) ---"
 # The soft-only kit installs no shim; a pre-migration install did. Removing
 # /usr/local/bin/ddev only ever hits OUR symlink — guard against a real ddev.

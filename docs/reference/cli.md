@@ -1,7 +1,29 @@
 # CLI reference
 
-This page lists every kit script with its flags. Management scripts live in
-`/usr/local/lib/opencode-permissions-kit/` after installation.
+This page lists the kit's commands and flags.
+
+## The `opencode-permissions-kit` command
+
+After installation, one command manages everything (works from anywhere in
+your WSL/Linux system):
+
+```bash
+opencode-permissions-kit status
+opencode-permissions-kit config projects add /var/www/vhosts/new-project
+opencode-permissions-kit update --binary
+opencode-permissions-kit uninstall
+opencode-permissions-kit help        # commands + arguments overview
+```
+
+Everything after the subcommand goes to the underlying script unchanged,
+so all flags below work with both forms. `config` and `update` elevate via
+sudo automatically; `status` needs no sudo; `uninstall` runs as your user
+and asks for sudo itself.
+
+The command is a symlink (`/usr/local/bin/opencode-permissions-kit`) into
+the kit library — deployed since kit 0.0.14. On older installs, run
+[update](../how-to/update.md) once to get it. The direct script calls below
+keep working everywhere.
 
 ## install.sh
 

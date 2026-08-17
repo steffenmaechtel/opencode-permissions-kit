@@ -19,9 +19,9 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 Later, at any time:
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config on
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config off
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config status
+opencode-permissions-kit config git-config on
+opencode-permissions-kit config git-config off
+opencode-permissions-kit config git-config status
 ```
 
 `on` re-renders the agent's `opencode.jsonc` with the deny rules (the

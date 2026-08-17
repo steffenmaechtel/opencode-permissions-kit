@@ -896,6 +896,7 @@ sudo mkdir -p "$LIBDIR/bin"
 
 # Copy all our scripts into the library directory
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/kit"                "$LIBDIR/kit"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh"               "$LIBDIR/ui.sh"
@@ -921,7 +922,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
 sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh"
-sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
+sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/migrate-denies.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -933,6 +934,11 @@ ui_success "kit library deployed: $LIBDIR"
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
 ui_success "wrapper installed: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/wrapper"
+
+# CLI dispatcher: /usr/local/bin/opencode-permissions-kit -> kit
+sudo ln -sf "$LIBDIR/kit" /usr/local/bin/opencode-permissions-kit
+ui_success "cli installed: opencode-permissions-kit -> $LIBDIR/kit"
+log "cli symlink: /usr/local/bin/opencode-permissions-kit -> $LIBDIR/kit"
 
 # Remove a legacy ddev delegation shim (pre-DDEV-WORKING installs shadowed
 # /usr/local/bin/ddev). Only ever touch a symlink pointing at OUR library —
@@ -1127,8 +1133,7 @@ fi
 echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"
-ui_detail "cd $LIBDIR"
-ui_detail "sh status.sh                   verify the protection"
-ui_detail "sudo sh config.sh              change settings later"
+ui_detail "opencode-permissions-kit status   verify the protection"
+ui_detail "opencode-permissions-kit config   change settings later (or update/uninstall)"
 ui_detail "Docs:  https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/README.md"
 log "install complete"

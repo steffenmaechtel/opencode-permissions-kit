@@ -65,7 +65,7 @@ wrapper. Same-shell fix: `hash -r` and
 Run the status script:
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/status.sh
+opencode-permissions-kit status
 ```
 
 It reports the protection mode, backend + socket reachability, ddev runtime

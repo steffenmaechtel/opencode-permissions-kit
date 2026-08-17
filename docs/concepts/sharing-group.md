@@ -34,5 +34,5 @@ you create are readable/writable for the agent — no chgrp chores.
 If group bits drift (e.g. after unpacking an archive as root), re-apply:
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --refresh
+opencode-permissions-kit update --refresh
 ```

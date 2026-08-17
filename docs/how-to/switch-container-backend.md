@@ -7,13 +7,13 @@ The backend is configured at install time (`--container-backend
 docker-rootless|podman-rootless`) and can be switched at any time:
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh container-backend podman-rootless
+opencode-permissions-kit config container-backend podman-rootless
 ```
 
 Check the current backend and socket state:
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh container-backend status
+opencode-permissions-kit config container-backend status
 ```
 
 ## What the switch does

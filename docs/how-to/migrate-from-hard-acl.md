@@ -45,7 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 - Check the migration state and leftover denies:
 
   ```bash
-  sudo bash /usr/local/lib/opencode-permissions-kit/status.sh
+  opencode-permissions-kit status
   ```
 
 - Design background: `docs/design/ddev-working.md` (the migration's design

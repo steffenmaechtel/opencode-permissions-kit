@@ -1,0 +1,96 @@
+#!/bin/sh
+# opencode permissions kit — CLI dispatcher
+# Deployed to /usr/local/bin/opencode-permissions-kit by install.sh
+# (symlink -> /usr/local/lib/opencode-permissions-kit/kit).
+#
+# One command for all management scripts, usable from anywhere in WSL:
+#   opencode-permissions-kit status     -> status.sh   (no sudo needed)
+#   opencode-permissions-kit config ... -> config.sh   (auto sudo)
+#   opencode-permissions-kit update ... -> update.sh   (auto sudo)
+#   opencode-permissions-kit uninstall  -> uninstall.sh (runs as your user,
+#                                            asks for sudo itself)
+#
+# Everything after the subcommand is passed through to the script, so all
+# script flags work unchanged (see docs/reference/cli.md).
+set -u
+
+# Resolve the library directory through the /usr/local/bin symlink.
+SELF="$0"
+if [ -L "$SELF" ]; then
+    target=$(readlink "$SELF" 2>/dev/null || true)
+    case "$target" in
+        /*) SELF="$target" ;;
+        *)  SELF="$(dirname "$SELF")/$target" ;;
+    esac
+fi
+LIBDIR="$(cd "$(dirname "$SELF")" && pwd -P)"
+
+VERSION="0.0.0"
+if [ -f "$LIBDIR/VERSION" ]; then
+    VERSION=$(cat "$LIBDIR/VERSION" 2>/dev/null || echo "0.0.0")
+fi
+
+usage() {
+    cat <<EOF
+opencode permissions kit  v$VERSION
+
+Usage: opencode-permissions-kit <command> [args...]
+
+Commands:
+  status                          Show the protection status (no sudo needed)
+  config <args...>                Change settings: projects list|add|remove,
+                                  git-config on|off|status,
+                                  container-backend <backend>|status, refresh
+  update [--yes] [--refresh]      Re-deploy the kit; --binary / --binary-path
+                                  upgrade the opencode binary
+  uninstall [--yes] [--dry-run]   Remove the kit (runs as your user)
+  help                            Show this help
+
+Everything after <command> is passed to the underlying script, so all
+flags from the scripts work unchanged. Direct calls still work too:
+  /usr/local/lib/opencode-permissions-kit/<script>.sh
+
+Docs: https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/reference/cli.md
+EOF
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+    status)
+        exec sh "$LIBDIR/status.sh" "$@"
+        ;;
+    config|update)
+        if [ ! -f "$LIBDIR/$cmd.sh" ]; then
+            echo "error: $LIBDIR/$cmd.sh not found — is the kit installed?" >&2
+            exit 1
+        fi
+        if [ "$(id -u)" -eq 0 ]; then
+            exec sh "$LIBDIR/$cmd.sh" "$@"
+        fi
+        exec sudo sh "$LIBDIR/$cmd.sh" "$@"
+        ;;
+    uninstall)
+        if [ ! -f "$LIBDIR/uninstall.sh" ]; then
+            echo "error: $LIBDIR/uninstall.sh not found — is the kit installed?" >&2
+            exit 1
+        fi
+        # uninstall.sh expects the default user (no sudo prefix); it asks
+        # for sudo itself via sudo -v.
+        exec sh "$LIBDIR/uninstall.sh" "$@"
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    "")
+        usage
+        exit 1
+        ;;
+    *)
+        echo "error: unknown command '$cmd'" >&2
+        echo "" >&2
+        usage >&2
+        exit 1
+        ;;
+esac
