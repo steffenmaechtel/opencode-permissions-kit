@@ -464,7 +464,11 @@ if [ "$MODE" = "standard" ] && [ "$INTERACTIVE" = true ]; then
     if [ -z "$PREDEFINED_PROJECTS" ]; then
         _pdef="/var/www/vhosts"
         [ -d "$_pdef" ] || _pdef=""
-        ui_detail "a parent folder holding your projects, e.g. /var/www/vhosts, ~/dev or ~/projects"
+        ui_detail "a parent folder holding your projects — the agent may only"
+        ui_detail "start inside it. Example paths:"
+        ui_detail "  /var/www/vhosts"
+        ui_detail "  ~/dev"
+        ui_detail "  ~/projects"
         while true; do
             _p=$(ui_ask "Project directory (agent workspaces)" "$_pdef")
             # Empty (no default existed) falls through to the numbered
