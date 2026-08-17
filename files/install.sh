@@ -38,7 +38,7 @@ fetch_kit() {
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
-             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
+             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
              opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then

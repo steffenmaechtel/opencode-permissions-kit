@@ -140,6 +140,23 @@ case "$errout" in
     *) echo "  ${RED}FAIL${NC}  missing script names the problem (got: $errout)"; failures=$((failures + 1)) ;;
 esac
 
+# List drift guard: install.sh's fetch_kit() list and update.sh's KIT_FILES
+# must carry the same file set — a missing entry means streamed installs
+# fetch an incomplete kit and crash at deploy time (set -e).
+install_list="$(sed -n '/^fetch_kit() {/,/^}/p' "$SCRIPT_DIR/../files/install.sh" \
+    | grep -v 'mkdir' \
+    | grep -oE '(install|config|update|uninstall|status)\.sh|opencode(-deny-all)?\.jsonc|sudoers\.template|umask\.sh|VERSION|opencode-permissions-kit-lib/[a-zA-Z0-9./_-]+' | sort -u)"
+update_list="$(awk '/^KIT_FILES=/{flag=1} flag{printf "%s ", $0} flag && /"[[:space:]]*$/{exit}' "$SCRIPT_DIR/../files/update.sh" \
+    | sed -e 's/^KIT_FILES="//' -e 's/"[[:space:]]*$//' -e 's/\\//g' | tr ' ' '\n' | grep -v '^$' | sort -u)"
+if [ "$install_list" = "$update_list" ]; then
+    echo "  ${GREEN}PASS${NC}  install.sh fetch list == update.sh KIT_FILES"; passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  install.sh fetch list == update.sh KIT_FILES"
+    echo "        only in install.sh: $(printf '%s\n' "$install_list" | grep -vxF "$(printf '%s\n' "$update_list")" | tr '\n' ' ')"
+    echo "        only in update.sh: $(printf '%s\n' "$update_list" | grep -vxF "$(printf '%s\n' "$install_list")" | tr '\n' ' ')"
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"
