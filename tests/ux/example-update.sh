@@ -30,10 +30,6 @@ ui_info "Re-applying the ddev handover (.ddev + settings dirs)..."
 sim 0.4
 ui_success "3 projects handed over to 'opencode'"
 
-ui_info "Checking pending migrations..."
-sim 0.2
-ui_success "none — already on the soft-only model"
-
 ui_warn "/mnt/c restriction configured but still pending 'wsl --shutdown'"
 
 ui_section "Update complete"

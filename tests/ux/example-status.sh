@@ -31,7 +31,7 @@ ui_section "Projects (3)"
 
 ui_have "/var/www/vhosts/shop"       "group 'opencode', setgid + ACLs"
 ui_have "/var/www/vhosts/blog"       "group 'opencode', setgid + ACLs"
-ui_atten "/var/www/vhosts/legacy"    "missing setgid bit — run config.sh refresh"
+ui_atten "/var/www/vhosts/old-shop"  "missing setgid bit — run config.sh refresh"
 
 ui_section "Warnings"
 

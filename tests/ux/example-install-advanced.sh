@@ -69,10 +69,6 @@ ui_success "done"
 ui_info "Provisioning $BACKEND..."
 sim 0.5
 ui_success "backend ready"
-ui_info "Migrating the existing v0.0.9 install..."
-sim 0.4
-ui_success "legacy hard-deny ACLs removed (12 entries)"
-ui_success "files re-based to group 'opencode'"
 ui_info "Applying ACL baseline, wrapper, configs..."
 sim 0.5
 ui_success "done"

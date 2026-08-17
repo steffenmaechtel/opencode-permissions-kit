@@ -168,14 +168,6 @@ enable_linger() {
     fi
 }
 
-disable_linger() {
-    if command -v loginctl >/dev/null 2>&1; then
-        loginctl disable-linger "$OPENCODE_USER" 2>/dev/null || true
-        echo "  Linger disabled for $OPENCODE_USER."
-        log "linger disabled for $OPENCODE_USER"
-    fi
-}
-
 # --- docker-rootless setup ----------------------------------------------------
 
 setup_docker_rootless() {

@@ -117,7 +117,7 @@ run() {
 
 # Source install.conf (canonical path since 0.0.10).
 INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
-if [ -n "$INSTALL_CONF" ] && [ -f "$INSTALL_CONF" ]; then
+if [ -f "$INSTALL_CONF" ]; then
     trace "sourcing $INSTALL_CONF"
     . "$INSTALL_CONF"
 fi

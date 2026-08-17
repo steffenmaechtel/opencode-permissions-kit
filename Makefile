@@ -9,7 +9,6 @@ help:
 	@echo "  make test-git-config  Run git-config toggle tests"
 	@echo "  make test-container-backend  Run container-backend tests"
 	@echo "  make test-bypass-guard  Run wrapper-bypass guard tests"
-	@echo "  make    Run hard-deny migration tests"
 	@echo "  make test-ddev-as-opencode  Run ddev-as-opencode (ddev always runs as opencode) tests"
 	@echo "  make test-mkcert-reuse    Run mkcert CA reuse tests"
 	@echo "  make test-wsl-exposure   Run WSL2 /mnt/c exposure warning tests"
@@ -49,8 +48,6 @@ test-container-backend:
 test-bypass-guard:
 	@echo "=== Wrapper-Bypass Guard Tests ==="
 	@./tests/test-bypass-guard.sh
-
-	@echo "=== Hard-Deny Migration Tests ==="
 
 test-wsl-exposure:
 	@echo "=== WSL2 /mnt/c exposure Tests ==="
