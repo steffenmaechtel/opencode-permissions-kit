@@ -27,10 +27,10 @@ handled by `setup-container-backend.sh`:
 - **podman-rootless** — daemonless (no socket, no linger); an optional
   `OPENCODE_PODMAN_SOCKET` enables docker-CLI compatibility.
 
-A legacy `docker-group` value produces a loud warning and **no** container
+An unknown backend value produces a loud warning and **no** container
 tools — there is no silent fallback to a root-equivalent path. Re-run
-`install.sh --container-backend docker-rootless|podman-rootless` to leave
-legacy state behind.
+`install.sh --container-backend docker-rootless|podman-rootless` to fix
+the configuration.
 
 ## After the switch
 

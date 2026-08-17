@@ -6,7 +6,7 @@
 # What it can do:
 #   - List / add / remove project roots in /etc/opencode-permissions-kit/projects.conf
 #   - Toggle .git/config hardening for the opencode user (SOFT-only)
-#   - Refresh the group baseline (re-run migrate-denies.sh group re-base)
+#   - Refresh the group baseline (re-apply chgrp/setgid/default ACLs)
 #   - Switch the container backend (docker-rootless / podman-rootless)
 #
 # Run as your default (non-root) user with sudo privileges:
@@ -47,7 +47,6 @@ else
     UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
 fi
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
-[ -f "$PROJECTS_CONF" ] || PROJECTS_CONF="/etc/opencode/projects.conf"
 
 # === Audit log ===
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Works from
@@ -60,11 +59,8 @@ for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" "$LIBDIR/log.sh"; 
     fi
 done
 
-# install.conf with legacy fallback (pre-0.0.10 /etc/opencode/, pre-0.0.9 setup.conf)
+# install.conf (canonical path since 0.0.10)
 INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
@@ -74,11 +70,9 @@ if [ -f "$INSTALL_CONF" ]; then
 fi
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
-# Sharing group: prefer the OPENCODE_GROUP key, fall back to the legacy
-# WWW_GROUP key a pre-rename install.conf still carries. The sharing group
-# is the opencode user's own usergroup; prefer the live value over any
-# stale conf entry (e.g. www-data from a pre-migration install).
-OPENCODE_GROUP="${OPENCODE_GROUP:-${WWW_GROUP:-opencode}}"
+# Sharing group: the opencode user's own usergroup; prefer the live value
+# over any stale conf entry.
+OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
 [ -n "$LIVE_GROUP" ] && OPENCODE_GROUP="$LIVE_GROUP"
 
@@ -131,7 +125,7 @@ need_install() {
 
 # Shared ddev handover helpers (.ddev + settings dirs -> opencode user).
 # Prefer the copy alongside this config.sh (repo checkout), then the
-# installed library — same lookup order as the migrate script below.
+# installed library — same lookup order as everywhere else.
 _handover=""
 for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"; do
     if [ -f "$cand" ]; then
@@ -307,7 +301,7 @@ container_backend_status() {
     local backend="${CONTAINER_BACKEND:-}"
     if [ -z "$backend" ]; then
         ui_kv "backend" "none configured" "$UI_RED"
-        ui_detail "a legacy install (docker-group) must be re-installed:"
+        ui_detail "re-run install.sh to configure a rootless backend:"
         ui_detail "sudo bash files/install.sh --container-backend docker-rootless"
         return
     fi
@@ -340,7 +334,7 @@ container_backend_status() {
             fi
             ;;
         *)
-            ui_kv "backend" "legacy '$backend' — re-run install.sh with a rootless backend" "$UI_YELLOW"
+            ui_kv "backend" "unknown '$backend' — re-run install.sh with a rootless backend" "$UI_YELLOW"
             ;;
     esac
 }
@@ -433,18 +427,17 @@ container_backend_apply() {
 # --- refresh (group baseline) ---------------------------------------------------
 
 refresh() {
-    local migrate=""
-    for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/migrate-denies.sh" "$LIBDIR/migrate-denies.sh"; do
-        if [ -f "$cand" ]; then migrate="$cand"; break; fi
-    done
-    [ -n "$migrate" ] || die "migrate-denies.sh not found."
     ui_info "re-applying the group baseline (chgrp $OPENCODE_GROUP + setgid + default ACLs) ..."
-    sudo sh "$migrate" \
-        --projects "$PROJECTS_CONF" \
-        --conf-dir /etc/opencode-permissions-kit \
-        --lib-dir "$LIBDIR" \
-        --opencode-user "$OPENCODE_USER" \
-        --group "$OPENCODE_GROUP"
+    if [ -f "$PROJECTS_CONF" ]; then
+        while IFS= read -r p; do
+            [ -z "$p" ] && continue
+            [ -d "$p" ] || continue
+            sudo chgrp -R "$OPENCODE_GROUP" "$p" 2>/dev/null || true
+            sudo chmod g+s "$p" 2>/dev/null || true
+            sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$p" 2>/dev/null || true
+            ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
+        done < "$PROJECTS_CONF"
+    fi
     ui_success "group baseline refreshed."
     log "group baseline refresh requested"
 }

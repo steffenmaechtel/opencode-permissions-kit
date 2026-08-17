@@ -28,7 +28,6 @@ SUDOERS="$FILES/sudoers.template"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/update.sh"
 CONFIG="$FILES/config.sh"
-MIGRATE="$FILES/opencode-permissions-kit-lib/migrate-denies.sh"
 HANDOVER="$FILES/opencode-permissions-kit-lib/ddev-handover.sh"
 STATUS="$FILES/status.sh"
 MAKEFILE="$SCRIPT_DIR/../Makefile"
@@ -205,10 +204,8 @@ check "handover helper skips unknown app types" \
     sh -c "grep -qF 'return 0' \"\$1\"" _ "$HANDOVER"
 check "config.sh projects add uses the handover helper" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$CONFIG"
-check "migrate-denies.sh step 3 uses the handover helper" \
-    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$MIGRATE"
-check "migrate-denies.sh sources the helper with a no-op fallback" \
-    sh -c "grep -q 'ddev-handover.sh' \"\$1\" && grep -q 'ddev_handover_root() { :; }' \"\$1\"" _ "$MIGRATE"
+check "update.sh refresh uses the handover helper" \
+    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE"
 
 # --- 8. status.sh reporting ----------------------------------------------------
 check "status.sh reports ddev-as-opencode state" \

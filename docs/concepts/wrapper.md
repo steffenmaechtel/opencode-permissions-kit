@@ -16,8 +16,8 @@ Every `opencode` invocation goes through the wrapper at
 3. **Probe the backend** — docker-rootless: the per-user socket is verified
    reachable (as the `opencode` user, via the kit's `socket-check.sh`
    sudoers rule); podman-rootless: the `podman` CLI must be installed (an
-   optional `OPENCODE_PODMAN_SOCKET` enables docker-CLI compat). A stale
-   legacy `docker-group` value produces a loud warning and **no** container
+   optional `OPENCODE_PODMAN_SOCKET` enables docker-CLI compat). An unknown
+   backend value produces a loud warning and **no** container
    tools — never a silent fallback to a root-equivalent path.
 4. **Execute** — `sudo -u opencode` with `DOCKER_HOST`/`XDG_RUNTIME_DIR`
    exported for the rootless socket (preserved across sudo via the kit's

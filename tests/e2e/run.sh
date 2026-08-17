@@ -87,16 +87,12 @@ check "update.sh deployed" \
     E 'test -x /usr/local/lib/opencode-permissions-kit/update.sh'
 check "status.sh deployed" \
     E 'test -x /usr/local/lib/opencode-permissions-kit/status.sh'
-check "migrate-denies.sh deployed" \
-    E 'test -x /usr/local/lib/opencode-permissions-kit/migrate-denies.sh'
 check "install.conf written" \
     E 'test -f /etc/opencode-permissions-kit/install.conf'
 check "install.conf records CONTAINER_BACKEND=podman-rootless" \
     E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
 check "install.conf records OPENCODE_GROUP=opencode" \
     E 'grep -q "^OPENCODE_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
-check_fail "install.conf carries no legacy WWW_GROUP key" \
-    E 'grep -q "^WWW_GROUP=" /etc/opencode-permissions-kit/install.conf'
 check_fail "no ddev shim in the library (soft-only kit)" \
     E 'test -e /usr/local/lib/opencode-permissions-kit/bin/ddev'
 check_fail "no hooks directory in the library" \
@@ -151,7 +147,7 @@ echo ""
 echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"
 # A pre-existing dev-owned .ddev breaks `ddev start` as opencode with
 # "chmod .ddev/.webimageBuild: operation not permitted". config.sh refresh
-# (migrate-denies.sh step 3) must hand .ddev AND the typo3 settings dirs
+# (the group-baseline refresh) must hand .ddev AND the typo3 settings dirs
 # over to opencode (ddev chmods them unconditionally, owner-only).
 E 'mkdir -p /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/config/system && touch /var/www/vhosts/test-project/.ddev/.webimageBuild && printf "type: typo3\n" > /var/www/vhosts/test-project/.ddev/config.yaml && echo "db_default" > /var/www/vhosts/test-project/config/system/settings.php'
 check "4c: planted .ddev is dev-owned before the handover" \
@@ -277,17 +273,21 @@ check "install.conf VERSION bumped to sentinel" \
 E 'rm -rf /tmp/update-test'
 
 echo ""
-echo "--- 11b. setup.conf -> install.conf legacy migration ---"
-E 'sudo cp /etc/opencode-permissions-kit/install.conf /etc/opencode-permissions-kit/setup.conf' && \
-    E 'sudo rm -f /etc/opencode-permissions-kit/install.conf'
-check "legacy setup.conf created" E 'test -f /etc/opencode-permissions-kit/setup.conf'
-check "install.conf removed for migration test" E '! test -f /etc/opencode-permissions-kit/install.conf'
-E 'sudo bash /home/dev/repo/files/update.sh --yes' && \
-    echo "  ${GREEN}OK${NC}  update.sh migrated setup.conf -> install.conf"
-check "setup.conf removed after update" E '! test -f /etc/opencode-permissions-kit/setup.conf'
-check "install.conf created by update" E 'test -f /etc/opencode-permissions-kit/install.conf'
-check "install.conf contains DEFAULT_USER" \
-    E 'grep -q "DEFAULT_USER=" /etc/opencode-permissions-kit/install.conf'
+echo "--- 11b. update floor check (installs < 0.0.14 abort) ---"
+# Updates are only supported from 0.0.14 onwards; an older VERSION stamp must
+# abort with re-install instructions instead of running an undefined path.
+E 'sudo cp /etc/opencode-permissions-kit/install.conf /tmp/install.conf.floor-bak'
+E "sudo sed -i 's/^VERSION=.*/VERSION=0.0.13/' /etc/opencode-permissions-kit/install.conf"
+E 'sudo bash /home/dev/repo/files/update.sh --yes >/tmp/floor-abort.log 2>&1' || true
+check "floor: update aborts on VERSION=0.0.13" \
+    E 'grep -q "Unsupported upgrade path" /tmp/floor-abort.log'
+check "floor: abort names the re-install way out" \
+    E 'grep -q "install.sh" /tmp/floor-abort.log'
+check "floor: library not re-deployed by the aborted run" \
+    E 'test -x /usr/local/lib/opencode-permissions-kit/config.sh'
+E 'sudo mv /tmp/install.conf.floor-bak /etc/opencode-permissions-kit/install.conf'
+E 'sudo bash /home/dev/repo/files/update.sh --yes >/dev/null 2>&1' && \
+    echo "  ${GREEN}OK${NC}  update succeeds again with a supported version"
 
 echo ""
 echo "--- 11c. opencode binary upgrade (old -> new via update.sh --binary-path) ---"
@@ -312,101 +312,6 @@ check ".env still readable after binary upgrade (soft-only)" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 check_fail "new binary writable by opencode user" \
     E 'sudo -u opencode sh -c "test -w /usr/local/lib/opencode-permissions-kit/bin/opencode"'
-
-echo ""
-echo "--- 11d. pre-0.0.10 layout -> renamed layout migration ---"
-# Simulate a 0.0.9-style install: move the new library + config dir to the
-# old names, re-create the old sudoers symlink, then run update.sh from the
-# repo checkout and assert it migrates everything back to the renamed layout
-# (binary moved, configs preserved, old dirs removed, symlinks re-pointed).
-E 'sudo cp -r /etc/opencode-permissions-kit /etc/opencode' && \
-    E 'sudo cp -r /usr/local/lib/opencode-permissions-kit /usr/local/lib/opencode' && \
-    E 'sudo rm -rf /etc/opencode-permissions-kit /usr/local/lib/opencode-permissions-kit' && \
-    E 'sudo ln -sf /etc/opencode/sudoers /etc/sudoers.d/opencode' && \
-    E 'sudo cp /etc/profile.d/opencode-permissions-kit-umask.sh /etc/profile.d/opencode-umask.sh'
-check "migration: old /etc/opencode present"      E 'test -d /etc/opencode'
-check "migration: old lib present"                E 'test -d /usr/local/lib/opencode'
-E 'sudo bash /home/dev/repo/files/update.sh --yes' && \
-    echo "  ${GREEN}OK${NC}  update.sh migrated old layout -> renamed layout"
-check "migration: install.conf at new path"       E 'test -f /etc/opencode-permissions-kit/install.conf'
-check "migration: projects.conf at new path"      E 'test -f /etc/opencode-permissions-kit/projects.conf'
-check "migration: projects.conf content preserved" \
-    E 'test "$(cat /etc/opencode-permissions-kit/projects.conf)" = "$(cat /tmp/projects.conf.before)"'
-check "migration: old /etc/opencode removed"      E '! test -e /etc/opencode'
-check "migration: old lib removed"                E '! test -e /usr/local/lib/opencode'
-check "migration: binary moved to new path"       E 'sudo test -x /usr/local/lib/opencode-permissions-kit/bin/opencode'
-check "migration: binary still runs" \
-    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version)" = "'"$OC_VERSION"'"'
-check "migration: wrapper -> new lib" \
-    E 'test "$(readlink /usr/local/bin/opencode)" = "/usr/local/lib/opencode-permissions-kit/wrapper"'
-check "migration: old sudoers symlink removed"    E '! test -e /etc/sudoers.d/opencode'
-check "migration: new sudoers symlink present"     E 'test -L /etc/sudoers.d/opencode-permissions-kit'
-check "migration: old umask profile removed"      E '! test -e /etc/profile.d/opencode-umask.sh'
-check "migration: new umask profile present"      E 'test -f /etc/profile.d/opencode-permissions-kit-umask.sh'
-check ".env still readable after migration (soft-only)" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
-
-echo ""
-echo "--- 11e. hard-deny migration (DDEV-WORKING §4) ---"
-# Simulate a pre-soft-only install: planted u:opencode:--- denies, hooks dir,
-# protect-projects.sh, ddev transaction helper, delegation shim, docker-group
-# backend. The update must REFUSE on docker-group, then (backend fixed) sweep
-# the denies, remove the artifacts, and stamp HARD_DENY_REMOVED.
-E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/.env'
-E 'sudo setfacl -m u:opencode:--- /var/www/vhosts/test-project/settings.php'
-E 'sudo mkdir -p /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/config/system && sudo touch /var/www/vhosts/test-project/.ddev/.webimageBuild && sudo sh -c "printf \"type: typo3\\n\" > /var/www/vhosts/test-project/.ddev/config.yaml" && sudo sh -c "echo db > /var/www/vhosts/test-project/config/system/settings.php" && sudo chown -R dev:dev /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/config/system'
-E 'sudo mkdir -p /usr/local/lib/opencode-permissions-kit/hooks'
-E 'sudo touch /usr/local/lib/opencode-permissions-kit/protect-projects.sh'
-E 'sudo touch /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh'
-E 'sudo touch /usr/local/lib/opencode-permissions-kit/bin/ddev'
-E 'sudo ln -sf /usr/local/lib/opencode-permissions-kit/bin/ddev /usr/local/bin/ddev'
-E 'git config --global core.hooksPath /usr/local/lib/opencode-permissions-kit/hooks'
-check "11e: planted deny present" \
-    E 'sudo getfacl -p /var/www/vhosts/test-project/.env | grep -q "user:opencode:---"'
-# 11e.1 docker-group backend -> update must abort with instructions.
-E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-group/' /etc/opencode-permissions-kit/install.conf"
-E 'sudo sed -i "/^HARD_DENY_REMOVED=/d" /etc/opencode-permissions-kit/install.conf'
-E 'sudo bash /home/dev/repo/files/update.sh --yes >/tmp/mig-abort.log 2>&1' || true
-check "11e: docker-group update aborts with re-install instructions" \
-    E 'grep -q "install.sh --container-backend" /tmp/mig-abort.log'
-check "11e: refuses to touch denies on docker-group" \
-    E 'sudo getfacl -p /var/www/vhosts/test-project/.env | grep -q "user:opencode:---"'
-# 11e.2 rootless backend -> migration runs.
-E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=podman-rootless/' /etc/opencode-permissions-kit/install.conf"
-E 'sudo bash /home/dev/repo/files/update.sh --yes >/tmp/mig.log 2>&1' && \
-    echo "  ${GREEN}OK${NC}  migration update completed"
-check "11e: deny swept from .env" \
-    E '! sudo getfacl -p /var/www/vhosts/test-project/.env | grep -q "user:opencode:"'
-check "11e: deny swept from settings.php" \
-    E '! sudo getfacl -p /var/www/vhosts/test-project/settings.php | grep -q "user:opencode:"'
-check "11e: settings.php readable again (ddev boots)" \
-    E 'sudo -u opencode test -r /var/www/vhosts/test-project/settings.php'
-check "11e: hooks dir removed" \
-    E '! test -e /usr/local/lib/opencode-permissions-kit/hooks'
-check "11e: protect-projects.sh removed" \
-    E '! test -e /usr/local/lib/opencode-permissions-kit/protect-projects.sh'
-check "11e: ddev-transaction.sh removed" \
-    E '! test -e /usr/local/lib/opencode-permissions-kit/ddev-transaction.sh'
-check "11e: library bin/ddev removed" \
-    E '! test -e /usr/local/lib/opencode-permissions-kit/bin/ddev'
-check "11e: legacy shim unlinked from /usr/local/bin/ddev" \
-    E '! test -e /usr/local/bin/ddev'
-check "11e: core.hooksPath unset for the developer" \
-    E '! git config --global --get core.hooksPath'
-check "11e: install.conf stamped HARD_DENY_REMOVED=1" \
-    E 'grep -q "^HARD_DENY_REMOVED=1" /etc/opencode-permissions-kit/install.conf'
-check "11e: install.conf re-based OPENCODE_GROUP=opencode" \
-    E 'grep -q "^OPENCODE_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
-check "11e: developer (re-)added to the opencode group" \
-    E 'id dev | grep -q opencode'
-check "11e: migration events logged" \
-    E 'sudo grep -q "hard-deny migration" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
-check "11e: .ddev handed over to opencode by the migration" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "opencode"'
-check "11e: typo3 settings dir handed over by the migration" \
-    E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system)" = "opencode"'
-check "11e: .ddev group-writable after the migration" \
-    E 'test "$(stat -c %a /var/www/vhosts/test-project/.ddev/.webimageBuild)" = "664"'
 
 echo ""
 echo "--- 12. config.sh adds a project non-interactively ---"
@@ -503,26 +408,6 @@ check_fail "wrapper does NOT stamp OPENCODE_LAUNCH_CWD (soft-only)" \
     E 'grep -q OPENCODE_LAUNCH_CWD /usr/local/lib/opencode-permissions-kit/wrapper'
 
 echo ""
-echo "--- 12e2. Legacy docker-group backend warning ---"
-# A stale docker-group value in install.conf must produce a loud warning and
-# NO container tools — never a silent fallback to a root-equivalent path.
-# The warning fires only when a project actually requests container tools,
-# so plant an opting-in project config first.
-E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
-{
-    "permission": {
-        "bash": { "docker *": "allow" }
-    }
-}
-EOF'
-E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=docker-group/' /etc/opencode-permissions-kit/install.conf"
-E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-legacy.txt' && \
-    echo "  ${GREEN}OK${NC}  wrapper ran with the legacy backend value"
-check "wrapper legacy backend: removal warning shown" \
-    E 'grep -q "legacy docker-group was removed" /tmp/wrapper-legacy.txt'
-E "sudo sed -i 's/^CONTAINER_BACKEND=.*/CONTAINER_BACKEND=podman-rootless/' /etc/opencode-permissions-kit/install.conf"
-
-echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/uninstall.sh --yes --dry-run' && \
     echo "  ${GREEN}OK${NC}  uninstall --dry-run completed"
@@ -545,8 +430,6 @@ check "default user can read log file" \
     E 'test -r /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "install events logged" \
     E 'sudo grep -q "install complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
-check "migration events logged" \
-    E 'sudo grep -q "hard-deny migration complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "update events logged" \
     E 'sudo grep -q "update complete" /var/log/opencode-permissions-kit/opencode-permissions-kit.log'
 check "binary upgrade events logged" \
@@ -653,8 +536,6 @@ if [ "$_rootless_ok" = true ]; then
         E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "backend +podman-rootless"'
     check "12i: status.sh reports the podman CLI as installed" \
         E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "podman CLI +installed"'
-    check "12i: status.sh reports the migration stamp" \
-        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -q "soft-only model active"'
 fi
 
 # 12i.7 wrapper auto-detect on the podman-CLI path.
@@ -726,19 +607,14 @@ E 'bash /usr/local/lib/opencode-permissions-kit/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
 check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'
 check_fail "Library removed"          E 'test -e /usr/local/lib/opencode-permissions-kit'
-check_fail "legacy lib removed"       E 'test -e /usr/local/lib/opencode'
 check_fail "Sudoers removed"          E 'test -e /etc/sudoers.d/opencode-permissions-kit'
-check_fail "legacy sudoers removed"   E 'test -e /etc/sudoers.d/opencode'
 check_fail "/etc/opencode-permissions-kit removed"    E 'test -e /etc/opencode-permissions-kit'
-check_fail "legacy /etc/opencode removed"             E 'test -e /etc/opencode'
 check_fail "Umask removed"            E 'test -e /etc/profile.d/opencode-permissions-kit-umask.sh'
-check_fail "legacy umask removed"     E 'test -e /etc/profile.d/opencode-umask.sh'
 check_fail "opencode user removed"    E 'id opencode'
 check_fail "opencode usergroup removed (died with the user)" E 'getent group opencode'
 check_fail "developer no longer in the opencode group" E 'id dev | grep -q opencode'
 check_fail "/run/opencode-permissions-kit removed"    E 'test -e /run/opencode-permissions-kit'
 check_fail "router-port sysctl file removed"          E 'test -e /etc/sysctl.d/99-ddev-rootless.conf'
-check_fail "core.hooksPath unset"     E 'git config --global --get core.hooksPath'
 check_fail "Project ACLs cleaned"     E 'getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode"'
 check_fail "Audit log removed"        E 'test -e /var/log/opencode-permissions-kit'
 

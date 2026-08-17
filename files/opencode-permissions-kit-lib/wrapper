@@ -17,19 +17,14 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
-[ -f "$PROJECTS_CONF" ] || PROJECTS_CONF="/etc/opencode/projects.conf"
 
 INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode-permissions-kit/setup.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/install.conf"
-[ -f "$INSTALL_CONF" ] || INSTALL_CONF="/etc/opencode/setup.conf"
 VERSION="0.0.0"
 if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 
-# Container backend: docker-rootless or podman-rootless only (the legacy
-# docker-group backend is gone — it was root-equivalent). Unknown/missing
+# Container backend: docker-rootless or podman-rootless only. Unknown/missing
 # values disable container tools for the session; the wrapper never falls
 # back to a root-equivalent path.
 CONTAINER_BACKEND="${CONTAINER_BACKEND:-}"
@@ -177,7 +172,7 @@ CONTAINER_PODMAN=""
 CONTAINER_LABEL=""
 if [ "$CONTAINER_REQUESTED" = true ]; then
     if [ -z "$CONTAINER_BACKEND" ]; then
-        echo "  ${RED}WARNING: no rootless container backend configured (legacy docker-group was removed).${NC}"
+        echo "  ${RED}WARNING: no rootless container backend configured.${NC}"
         echo "  ${YELLOW}Running WITHOUT container tools. Re-run install.sh to provision one.${NC}"
         echo ""
         CONTAINER_REQUESTED=false

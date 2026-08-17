@@ -2,6 +2,16 @@
 
 This guide shows how to update the kit's scripts and the opencode binary.
 
+## Supported upgrade paths
+
+Updates are supported from kit **0.0.14 onwards**. On older installs
+`update.sh` aborts with instructions — re-run the installer instead; it
+keeps your projects and deny list where possible:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
+```
+
 ## Update the kit
 
 ```bash
