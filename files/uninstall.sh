@@ -80,9 +80,11 @@ trace "sudo OK"
 prompt_yn() {
     # prompt_yn "message" default
     # Returns "y" or "n"
+    # Prompt convention: docs/design/conventions.md — [Y/n] / [y/N],
+    # default as capital letter, Enter accepts it.
     local msg="$1" default="$2"
-    local hint="(y/N)"
-    [ "$default" = "y" ] && hint="(Y/n)"
+    local hint="[y/N]"
+    [ "$default" = "y" ] && hint="[Y/n]"
     if [ "$YES" = true ]; then
         trace "prompt '$msg' -> yes (--yes)"
         echo "y"
@@ -166,6 +168,12 @@ echo "--- Removing wrapper ---"
 run "sudo rm -f /usr/local/bin/opencode"
 echo "Wrapper removed."
 log "wrapper removed: /usr/local/bin/opencode"
+
+echo ""
+echo "--- Removing cli dispatcher ---"
+run "sudo rm -f /usr/local/bin/opencode-permissions-kit"
+echo "CLI dispatcher removed."
+log "cli removed: /usr/local/bin/opencode-permissions-kit"
 
 echo ""
 echo "--- Removing ddev shim (legacy) ---"

@@ -30,8 +30,10 @@ installation, `/mnt/c` exposure, router ports).
 It then asks only two questions:
 
 1. **Project directory** — the folder that holds your projects, e.g.
-   `/var/www/vhosts` (the default when present). The agent may only start
-   inside this tree.
+   `/var/www/vhosts`, `~/dev` or `~/projects` (default `/var/www/vhosts`
+   when it exists). The agent may only start inside this tree. System
+   paths (`/`, `/usr`, `/home`, …) are rejected — the installer would
+   otherwise run its group baseline over them.
 2. **Git access** — block `.git/config` for the agent (default) or allow git
    commands. You can change this later with
    [git-config](how-to/secure-git-config.md).
@@ -65,7 +67,7 @@ wrapper. Same-shell fix: `hash -r` and
 Run the status script:
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/status.sh
+opencode-permissions-kit status
 ```
 
 It reports the protection mode, backend + socket reachability, ddev runtime

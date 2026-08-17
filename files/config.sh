@@ -113,12 +113,11 @@ banner() {
 die() { ui_error "$*"; exit 1; }
 
 confirm() {
+    # Convention: docs/design/conventions.md — default capital in the hint,
+    # Enter accepts it, y/yes/n/no case-insensitive. ui_confirm handles all
+    # of that; this wrapper only adds the --yes shortcut.
     [ "$YES" = true ] && return 0
-    printf "[?] %s (y/N) " "$1" >&2
-    read -r ans </dev/tty 2>/dev/null || read -r ans
-    case "$(echo "$ans" | tr '[:upper:]' '[:lower:]')" in
-        y|yes) return 0 ;; *) return 1 ;;
-    esac
+    ui_confirm "$1" "n"
 }
 
 need_install() {
@@ -162,10 +161,47 @@ projects_list() {
     [ "$num" -eq 0 ] && ui_detail "(none configured)"
 }
 
+# Same policy as install.sh: never run the group baseline (chgrp -R +
+# setfacl -R) over a system path. Allowed: dedicated project folders
+# (/var/www/..., /home/<user>/..., ~/...). "~" is expanded; the normalized
+# path is returned in _PP_NORM for the caller.
+project_path_sane() {
+    _pp="${1%/}"
+    [ -n "$_pp" ] || return 1
+    # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
+    # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
+        "~/"*) _pp="$HOME${_pp#\~}" ;;
+        "~"*) return 1 ;;
+    esac; fi
+    _PP_NORM="$_pp"
+    case "$_pp" in
+        /*) ;;
+        *)  return 1 ;;   # relative paths are error-prone in projects.conf
+    esac
+    case "$_pp" in
+        *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
+    esac
+    case "$_pp" in
+        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|/lib*/*|\
+/media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
+/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
+/usr|/usr/*|/var|/var/tmp)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
 projects_add() {
     [ -z "$TARGETS" ] && die "Usage: config.sh projects add <path...>"
     sudo mkdir -p "$(dirname "$PROJECTS_CONF")"
     for p in $TARGETS; do
+        if ! project_path_sane "$p"; then
+            ui_error "'$p' is a system path — refusing to add it (chgrp -R/setfacl -R would run over it)."
+            continue
+        fi
+        p="${_PP_NORM:-$p}"
         p="$(cd "$p" 2>/dev/null && pwd)" || p="$p"
         if ! [ -d "$p" ]; then
             ui_warn "skip $p (not a directory)"

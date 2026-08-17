@@ -11,12 +11,18 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 `update.sh` re-deploys the kit files and refreshes the `install.conf` version
 stamp. It does **not** touch `projects.conf` or
 `/home/opencode/.config/opencode/opencode.jsonc` — your project list and
-deny-list customizations survive.
+deny-list customizations survive. Since this update (kit 0.0.14) the
+`opencode-permissions-kit` command (see [CLI](../reference/cli.md)) exists —
+future updates work without the curl one-liner:
+
+```bash
+opencode-permissions-kit update
+```
 
 To re-apply the group baseline (chgrp/setgid/default ACLs) as well:
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --refresh
+opencode-permissions-kit update --refresh
 ```
 
 ## Upgrade the opencode binary
@@ -27,8 +33,8 @@ the bundled config sets `autoupdate: false`, and `update.sh` is the upgrade
 entry point:
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --binary                  # latest release
-sudo bash /usr/local/lib/opencode-permissions-kit/update.sh --binary-path ./opencode  # a specific file
+opencode-permissions-kit update --binary                  # latest release
+opencode-permissions-kit update --binary-path ./opencode  # a specific file
 ```
 
 Binary upgrades are best-effort: a failure leaves the current binary in
@@ -37,7 +43,7 @@ place, the previous one is kept in `/tmp/opencode-upgrade-backup-*`.
 ## Verify
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/status.sh
+opencode-permissions-kit status
 ```
 
 `status.sh` shows the deployed version and the backend state after the

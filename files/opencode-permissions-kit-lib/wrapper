@@ -233,10 +233,13 @@ if [ "$CONTAINER_REQUESTED" = true ]; then
 fi
 
 if [ "$CONTAINER_AUTO" = true ]; then
+    # Prompt convention: docs/design/conventions.md — [Y/n] default capital,
+    # Enter accepts, y/yes/n/no case-insensitive.
     printf "  Run opencode with %s? [Y/n] " "$CONTAINER_LABEL"
     read answer
-    case "$answer" in
-        n|N|no|No|NO)
+    _ans=$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')
+    case "$_ans" in
+        n|no)
             CONTAINER_DOCKER_HOST=""
             CONTAINER_XDG=""
             CONTAINER_PODMAN=""

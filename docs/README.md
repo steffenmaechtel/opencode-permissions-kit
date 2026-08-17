@@ -46,4 +46,6 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 `design/` and `security/` hold the historical planning and analysis records.
 They are not user documentation — where wording differs from the code, the
-code wins.
+code wins. One exception is living, not historical:
+[conventions.md](design/conventions.md) — the binding style guide for
+shipped code (prompts, output, language).

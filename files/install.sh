@@ -38,7 +38,7 @@ fetch_kit() {
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
-             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/jsonc-parser.py \
+             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
              opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/migrate-denies.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -373,8 +373,11 @@ if id "$OPENCODE_USER" >/dev/null 2>&1 || [ -f /etc/opencode-permissions-kit/ins
     [ -f /etc/opencode-permissions-kit/install.conf ] && _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
     ui_atten "existing kit" "detected (v${_ekv:-?}) — update.sh is the usual upgrade path"
     if [ "$INTERACTIVE" = true ]; then
-        _ek=$(ui_ask "Re-configure the existing installation with install.sh?" "y")
-        [ "$_ek" != "y" ] && { ui_info "Aborted — run: sudo bash /usr/local/lib/opencode-permissions-kit/update.sh"; exit 0; }
+        # Convention: docs/design/conventions.md — [Y/n] via ui_confirm.
+        if ! ui_confirm "Re-configure the existing installation with install.sh?" "y"; then
+            ui_info "Aborted — run: opencode-permissions-kit update"
+            exit 0
+        fi
     fi
 fi
 
@@ -407,6 +410,51 @@ else
     ui_add "router ports" "sysctl to 80 offered (ddev-router 80/443)"
 fi
 
+# A project root must never be (or live directly under) a system path:
+# the group baseline runs chgrp -R + setfacl -R over it. Allowed below
+# /home/ and /var/www...; everything else system-ish is rejected. Also
+# rejects relative paths and ../. traversal games. "~" is expanded to
+# $HOME; the normalized path is returned in _PP_NORM for the caller.
+project_path_sane() {
+    _pp="${1%/}"
+    [ -n "$_pp" ] || return 1
+    # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
+    # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
+        "~/"*) _pp="$HOME${_pp#\~}" ;;
+        "~"*) return 1 ;;
+    esac; fi
+    _PP_NORM="$_pp"
+    case "$_pp" in
+        /*) ;;
+        *)  return 1 ;;   # relative paths are error-prone in projects.conf
+    esac
+    case "$_pp" in
+        *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
+    esac
+    case "$_pp" in
+        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|/lib*/*|\
+/media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
+/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
+/usr|/usr/*|/var|/var/tmp)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+# Validate --projects values against the same policy (fail fast, before
+# anything is touched).
+if [ -n "$PREDEFINED_PROJECTS" ]; then
+    for _fp in $PREDEFINED_PROJECTS; do
+        if ! project_path_sane "$_fp"; then
+            ui_error "'$_fp' is a system path — refusing to use it as a project root."
+            ui_info "Use a dedicated folder like /var/www/vhosts or /home/<you>/projects."
+            exit 1
+        fi
+    done
+fi
+
 # === Standard questions ========================================================
 # Standard asks exactly: project directory + git access. The podman exception
 # was already asked during backend selection. --yes takes the defaults.
@@ -416,7 +464,25 @@ if [ "$MODE" = "standard" ] && [ "$INTERACTIVE" = true ]; then
     if [ -z "$PREDEFINED_PROJECTS" ]; then
         _pdef="/var/www/vhosts"
         [ -d "$_pdef" ] || _pdef=""
-        _p=$(ui_ask "Project directory (agent workspaces)" "$_pdef")
+        ui_detail "a parent folder holding your projects — the agent may only"
+        ui_detail "start inside it. Example paths:"
+        ui_detail "  /var/www/vhosts"
+        ui_detail "  ~/dev"
+        ui_detail "  ~/projects"
+        while true; do
+            _p=$(ui_ask "Project directory (agent workspaces)" "$_pdef")
+            # Empty (no default existed) falls through to the numbered
+            # selection later; only validate what was actually entered.
+            if [ -n "$_p" ]; then
+                if ! project_path_sane "$_p"; then
+                    ui_error "'$_p' is a system path — the kit would chgrp -R/setfacl -R over it."
+                    ui_info "Use a dedicated folder like /var/www/vhosts, ~/dev or ~/projects."
+                    continue
+                fi
+                _p="$_PP_NORM"   # ~ expanded to $HOME
+            fi
+            break
+        done
         [ -n "$_p" ] && PREDEFINED_PROJECTS="$_p"
     fi
     if [ "$GIT_FLAG_GIVEN" != true ]; then
@@ -519,9 +585,23 @@ else
     case "$selection" in
         [Cc]*)
             echo "Enter paths (space-separated):"
-            printf "  > "
-            read -r custom </dev/tty 2>/dev/null || read -r custom
-            PROJECTS_ROOTS="$custom"
+            _custom=""
+            while [ -z "$_custom" ]; do
+                printf "  > "
+                read -r custom </dev/tty 2>/dev/null || read -r custom
+                _custom=""
+                _bad=""
+                for p in $custom; do
+                    if project_path_sane "$p"; then
+                        _custom="$_custom $p"
+                    else
+                        ui_error "'$p' is a system path — rejected."
+                        _bad=1
+                    fi
+                done
+                [ -n "$_bad" ] && _custom=""
+            done
+            PROJECTS_ROOTS="$_custom"
             ;;
         [Ss]*)
             PROJECTS_ROOTS=""
@@ -896,6 +976,7 @@ sudo mkdir -p "$LIBDIR/bin"
 
 # Copy all our scripts into the library directory
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/kit"                "$LIBDIR/kit"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh"               "$LIBDIR/ui.sh"
@@ -921,7 +1002,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
 sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh"
-sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/jsonc-parser.py" \
+sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/migrate-denies.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -933,6 +1014,11 @@ ui_success "kit library deployed: $LIBDIR"
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
 ui_success "wrapper installed: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/wrapper"
+
+# CLI dispatcher: /usr/local/bin/opencode-permissions-kit -> kit
+sudo ln -sf "$LIBDIR/kit" /usr/local/bin/opencode-permissions-kit
+ui_success "cli installed: opencode-permissions-kit -> $LIBDIR/kit"
+log "cli symlink: /usr/local/bin/opencode-permissions-kit -> $LIBDIR/kit"
 
 # Remove a legacy ddev delegation shim (pre-DDEV-WORKING installs shadowed
 # /usr/local/bin/ddev). Only ever touch a symlink pointing at OUR library —
@@ -1127,8 +1213,7 @@ fi
 echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"
-ui_detail "cd $LIBDIR"
-ui_detail "sh status.sh                   verify the protection"
-ui_detail "sudo sh config.sh              change settings later"
+ui_detail "opencode-permissions-kit status   verify the protection"
+ui_detail "opencode-permissions-kit config   change settings later (or update/uninstall)"
 ui_detail "Docs:  https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/README.md"
 log "install complete"

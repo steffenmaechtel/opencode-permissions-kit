@@ -47,9 +47,16 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$BACKEND" ] || { echo "${RED}Usage: setup-container-backend.sh <backend> [--yes]${NC}" >&2; exit 1; }
 
-# === Audit log ===
-log() { :; }
+# === Shared helpers (ui.sh, log.sh) ===
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
+log() { :; }
+for cand in "$LIBDIR/ui.sh" "$(dirname "$0")/ui.sh" "$(dirname "$0")/opencode-permissions-kit-lib/ui.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+log() { :; }
 for cand in "$LIBDIR/log.sh" "$(dirname "$0")/log.sh" "$(dirname "$0")/opencode-permissions-kit-lib/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
@@ -74,12 +81,10 @@ OC_UID=$(id -u "$OPENCODE_USER" 2>/dev/null || echo "")
 [ -n "$OC_UID" ] || { echo "${RED}Cannot resolve UID for $OPENCODE_USER.${NC}" >&2; exit 1; }
 
 confirm() {
+    # Convention: docs/design/conventions.md — default capital in the hint,
+    # Enter accepts it, y/yes/n/no case-insensitive.
     [ "$YES" = true ] && return 0
-    printf "[?] %s (y/N) " "$1" >&2
-    read -r ans </dev/tty 2>/dev/null || read -r ans
-    case "$(echo "$ans" | tr '[:upper:]' '[:lower:]')" in
-        y|yes) return 0 ;; *) return 1 ;;
-    esac
+    ui_confirm "$1" "n"
 }
 
 # --- package installation -----------------------------------------------------

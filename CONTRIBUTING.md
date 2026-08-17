@@ -30,6 +30,38 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   `tests/`, add it to the `chmod +x` list in **both**
   `.github/workflows/test.yml` and `.github/workflows/e2e.yml`.
 
+## Testing a branch on a real machine
+
+CI covers the unit and e2e suites, but some changes deserve a real install.
+Stream `install.sh` from any branch — `KIT_BRANCH` makes the installer
+self-fetch its sibling files from the same branch:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/<branch>/files/install.sh \
+  | sudo env KIT_BRANCH=<branch> bash
+```
+
+Example for this branch:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/feature/simplify-script-calls/files/install.sh \
+  | sudo env KIT_BRANCH=feature/simplify-script-calls bash
+```
+
+An installed kit updates from a branch the same way (stream `update.sh`
+instead of re-installing — your `projects.conf` and deny list survive):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/feature/simplify-script-calls/files/update.sh \
+  | sudo env KIT_BRANCH=feature/simplify-script-calls bash
+```
+
+Switching back to `master` later is the same call without `KIT_BRANCH`
+(see the [update guide](docs/how-to/update.md)).
+
+(`make check-version` ensures `KIT_BRANCH` stays consistent for `master`.)
+Use a throwaway WSL2/dev box — the kit is alpha software.
+
 ## Documentation
 
 User-facing documentation lives in `docs/` and is organized by topic type

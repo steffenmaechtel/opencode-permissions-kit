@@ -229,7 +229,14 @@ if [ -f "$ca" ]; then
         fi
     fi
 else
-    ui_kv "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)" "$UI_YELLOW"
+    # The CA lives under opencode-only dirs (typically 700) — a non-root
+    # caller cannot stat the file, so "missing" may just mean "unchecked".
+    # Only root can genuinely confirm absence.
+    if [ "$(id -u)" -ne 0 ] && [ -d "/home/$OPENCODE_USER" ]; then
+        ui_kv "mkcert CA" "unknown — needs root to check (run: sudo opencode-permissions-kit status)" "$UI_YELLOW"
+    else
+        ui_kv "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)" "$UI_YELLOW"
+    fi
 fi
 if [ -n "${DDEV_VERSION:-}" ]; then
     ddev_low=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)

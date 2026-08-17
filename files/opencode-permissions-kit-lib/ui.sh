@@ -122,6 +122,23 @@ ui_ask() {
     printf '%s\n' "$_ans"
 }
 
+ui_confirm() {
+    # ui_confirm "Question?" <default y|n>  -> exit status 0 = yes, 1 = no.
+    # Convention (docs/design/conventions.md): prompt shows [Y/n] / [y/N]
+    # with the DEFAULT as the capital letter; Enter accepts the default;
+    # y/yes/n/no accepted (case-insensitive); EOF/unknown -> default.
+    _q="$1"; _d="${2:-n}"
+    [ "$_d" = "y" ] && _hint="[Y/n]" || _hint="[y/N]"
+    printf '  %s %s ' "$_q" "$_hint" >&2
+    IFS= read -r _ans </dev/tty 2>/dev/null || IFS= read -r _ans || _ans=''
+    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]')"
+    [ -z "$_ans" ] && _ans="$_d"
+    case "$_ans" in
+        y|yes) return 0 ;;
+        *)     return 1 ;;
+    esac
+}
+
 ui_menu() {
     # ui_menu "Question?" <default-key> <"key|description"...> -> prints the chosen KEY.
     # Menu on stderr (clean $(...) capture). Reads /dev/tty when possible;
