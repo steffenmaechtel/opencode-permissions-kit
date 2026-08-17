@@ -75,6 +75,11 @@ enabled = true
 options = "uid=1000,gid=1000,dmask=027,fmask=037"
 ```
 
-(Replace `uid`/`gid` with your default WSL user's — the agent user must end
-up as "other", with no bits.) The change takes effect only after a full WSL
-restart: run `wsl --shutdown` from Windows, then reopen your WSL terminal.
+> **After editing, restart WSL completely:** run `wsl --shutdown` from
+> Windows, then reopen your WSL terminal — the mount options only take
+> effect on a fresh WSL start.
+
+`1000` is the default UID/GID of the first WSL user. Only if you deviate
+from that default (created additional users, changed the default user)
+adjust `uid`/`gid` to your default WSL user's values — the goal is always
+the same: the agent user must end up as "other", with no bits.
