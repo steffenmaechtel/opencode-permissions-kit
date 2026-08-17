@@ -45,9 +45,9 @@ The full walkthrough (including verification) lives in
 The docs are structured by need — start at the [documentation index](docs/README.md):
 
 - [Getting started](docs/getting-started.md) — install, configure, verify
-- [Concepts](docs/concepts/) — how and why the kit works
-- [How-to guides](docs/how-to/) — manage projects, allow ddev, update, uninstall
-- [Reference](docs/reference/) — CLI, files, audit log, glossary
+- [Security model](docs/concepts/security-model.md) and the other [concepts](docs/README.md#concepts-why-it-works-this-way)
+- [How-to guides](docs/README.md#how-to-guides-solve-a-task) — manage projects, allow ddev, update, uninstall
+- [Reference](docs/README.md#reference-look-it-up) — CLI, files, audit log, glossary
 - [Troubleshooting](docs/troubleshooting.md) — symptom → cause → fix
 
 ## License

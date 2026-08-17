@@ -1,10 +1,10 @@
 # IMPROVE-DOCS: Rebuild the documentation (README + split handbook)
 
-> Status: **DECIDED (2026-08-17)** — the §9 open questions are answered (see
-> §9 "Decisions"); implementation not started yet. This is the design/plan
-> record for the documentation epic. Implementation happens phase by phase
-> (see §8), ideally as one GitHub issue per phase so PRs can close them
-> (`Closes #N`, see `local/INFO-INTERN.md` workflow).
+> Status: **IMPLEMENTED (2026-08-17).** All four phases landed on branch
+> `feature/improve-docs` (issues #5–#8). The §10 quality gates are ticked;
+> the read-aloud pass on getting-started + security-model was done in
+> review by the author — re-run it after larger edits. This document is the
+> design record for the new documentation structure.
 
 ## 1. Problem
 
@@ -272,16 +272,16 @@ phase 3 = #7, phase 4 = #8. PR bodies use `Closes #N`.
 
 ## 10. Quality gates (definition of done for the epic)
 
-- [ ] Every page has exactly one topic type + a first-line purpose statement.
-- [ ] Each persona's primary question (§3) is answerable in ≤ 3 clicks from
+- [x] Every page has exactly one topic type + a first-line purpose statement.
+- [x] Each persona's primary question (§3) is answerable in ≤ 3 clicks from
       the repo root.
-- [ ] No duplicated install/update/uninstall command blocks across pages
+- [x] No duplicated install/update/uninstall command blocks across pages
       (single source, linked).
-- [ ] All internal links + anchors valid (`tests/test-docs.sh` in CI).
-- [ ] Reverse outlining pass done per page (headings alone must read as a
+- [x] All internal links + anchors valid (`tests/test-docs.sh` in CI).
+- [x] Reverse outlining pass done per page (headings alone must read as a
       sensible table of contents).
-- [ ] Read-aloud pass done on getting-started + security-model.
-- [ ] README contains no content that belongs to how-to/reference pages.
-- [ ] AGENTS.md split done: `repo/AGENTS.md` in git with the new docs
+- [x] Read-aloud pass done on getting-started + security-model.
+- [x] README contains no content that belongs to how-to/reference pages.
+- [x] AGENTS.md split done: `repo/AGENTS.md` in git with the new docs
       paths, workspace root file is a thin pointer + internal notes.
-- [ ] MANUAL.md deleted; no page links to it anymore (link check proves it).
+- [x] MANUAL.md deleted; no page links to it anymore (link check proves it).

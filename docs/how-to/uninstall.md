@@ -3,7 +3,7 @@
 This guide shows how to remove the kit completely — and what deliberately
 stays behind.
 
-## Uninstall
+## Run the uninstall
 
 ```bash
 bash /usr/local/lib/opencode-permissions-kit/uninstall.sh
