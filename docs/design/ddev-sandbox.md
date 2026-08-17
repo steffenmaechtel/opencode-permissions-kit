@@ -4,7 +4,7 @@
 > helper, the ddev-mode switch, and the entire OPEN/RUN/CLOSE machinery were
 > **removed**: with the hard ACL deny layer gone there is nothing to
 > transact — ddev simply runs as the `opencode` user. This document is kept
-> as the historical design record; see `docs/design/DDEV-WORKING.md` for
+> as the historical design record; see `docs/design/ddev-working.md` for
 > the current model and `docs/README.md` for usage. Where wording differs,
 > the code wins.
 >
@@ -33,7 +33,7 @@ umask `002`). Consequences:
   and with the docker-group backend container root reads everything
   (PROOF-3 C3).
 - "ddev enabled" currently equals "the agent inherits the developer's host
-  identity" (see `DOCKER-ROOTLESS.md` §4.1: "ddev is not securable on the
+  identity" (see `docker-rootless.md` §4.1: "ddev is not securable on the
   ACL layer").
 
 **Goal of sandbox mode:** ddev (and everything it spawns — host commands,
@@ -45,7 +45,7 @@ agent itself can read — nothing more.
 ## 2. Why delegation exists (the collision inventory)
 
 The original "ddev runs directly as opencode" approach failed in practice
-(CONTAINER-TOOLS.md §4.3). `ddev start` rewrites host-side files, and every
+(container-tools.md §4.3). `ddev start` rewrites host-side files, and every
 write collided with the kit's own protections:
 
 | Path ddev touches | Owner / protection today | Collision when ddev runs as `opencode` |
@@ -66,7 +66,7 @@ what the transaction wrapper (§4) does.
    `podman-rootless` (kit-implemented, incl. linger + socket reachability).
    Rationale: containers must run under the `opencode` host UID so
    `u:opencode:---` holds **inside** bind-mounted containers
-   (`DOCKER-ROOTLESS.md` §9.1, e2e-proven). On `docker-group`, container root
+   (`docker-rootless.md` §9.1, e2e-proven). On `docker-group`, container root
    (CAP_DAC_OVERRIDE) voids every ACL (PROOF-3 C3) — sandbox ddev on
    docker-group would be security theater. **Sandbox mode is only offered when
    the backend is rootless; on `docker-group` the shim keeps delegating.**

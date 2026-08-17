@@ -48,5 +48,5 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
   sudo bash /usr/local/lib/opencode-permissions-kit/status.sh
   ```
 
-- Design background: `docs/design/DDEV-WORKING.md` (the migration's design
+- Design background: `docs/design/ddev-working.md` (the migration's design
   record).

@@ -1,5 +1,5 @@
 #!/bin/sh
-# DEMO — proposed ADVANCED install flow (docs/design/UX-IMPROVEMENT.md §4.4).
+# DEMO — proposed ADVANCED install flow (docs/design/ux-improvement.md §4.4).
 # Includes the docker-classic warning variant for the §5 discussion.
 # Simulated output only; nothing is executed. Run: sh tests/ux/example-install-advanced.sh
 set -u

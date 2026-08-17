@@ -2,7 +2,7 @@
 #
 # One visual language for every kit script (install/update/config/status).
 # POSIX sh, zero dependencies. Style decisions are recorded in
-# docs/design/UX-IMPROVEMENT.md: labeled log lines (info/success/warn/error),
+# docs/design/ux-improvement.md: labeled log lines (info/success/warn/error),
 # slim banner, Unicode symbols with ASCII fallback.
 #
 # Rules:

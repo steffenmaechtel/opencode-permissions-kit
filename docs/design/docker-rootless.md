@@ -6,14 +6,14 @@
 > "ACL denies hold inside containers" (the ACL layer is gone) but by **UID
 > separation without a root-equivalent socket**. The legacy `docker-group`
 > backend was removed. Usage documentation: `docs/README.md` (index). Design record
-> for the current model: `docs/design/DDEV-WORKING.md`.
+> for the current model: `docs/design/ddev-working.md`.
 >
 > **Phase 1 + 2 + 3 (docker-rootless e2e) implemented.** (The ddev-shim env
 > pass-through item became obsolete when the ddev shim was removed in the
 > soft-only model.)
 > This document is the design record for removing the root-equivalence of the
 > kit's docker grant. The authoritative usage documentation for the *current*
-> container-tools feature is `docs/design/CONTAINER-TOOLS.md` (design record) and
+> container-tools feature is `docs/design/container-tools.md` (design record) and
 > `docs/README.md` (usage index).
 >
 > **Phase 1 (done):** backend awareness — `CONTAINER_BACKEND` in `install.conf`,
@@ -116,7 +116,7 @@ The kit's ACL denies only ever target the `opencode` user (`u:opencode:---`).
 read the project's own secrets — the application itself reads `.env` /
 `settings.php` at runtime. The only way to force ddev under those ACLs would be
 to run ddev (and therefore its containers) as `opencode`, which is exactly what
-failed during the original implementation (`CONTAINER-TOOLS.md` §4.3): `ddev
+failed during the original implementation (`container-tools.md` §4.3): `ddev
 start` then rewrites host files as `opencode`, collides with the kit's
 protections, and the app can no longer read its own secrets.
 

@@ -3,7 +3,7 @@
 > **SUPERSEDED (DDEV-WORKING):** the hard ACL deny layer this document
 > analyzes/proposes was **removed** — file permissions are now opencode's
 > soft permission layer only. This document is kept as the historical
-> analysis record; see `docs/design/DDEV-WORKING.md` for the current model
+> analysis record; see `docs/design/ddev-working.md` for the current model
 > and `docs/concepts/security-model.md` for the authoritative
 > usage documentation. Where wording differs, the code and the docs win.
 

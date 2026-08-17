@@ -253,10 +253,10 @@ stays). `DEFAULT_USER` stays auto-detected (`SUDO_USER`), never asked.
   model (soft-only)" section with the trade-offs from §2.1; updated install
   question walkthrough; migration instructions.
 - `README.md`: trim feature list to the four goals in §2.
-- `docs/design/DOCKER-ROOTLESS.md`: rationale section rewritten (UID
+- `docs/design/docker-rootless.md`: rationale section rewritten (UID
   separation, not ACL-holding).
-- `docs/design/DDEV-SANDBOX.md` + `docs/security/PROOF-1/2/3.md`: add a
-  status banner "superseded by DDEV-WORKING.md (hard deny layer removed)";
+- `docs/design/ddev-sandbox.md` + `docs/security/PROOF-1/2/3.md`: add a
+  status banner "superseded by ddev-working.md (hard deny layer removed)";
   keep as historical records.
 - `AGENTS.md`: ddev-shim section, self-block section, and audit-log wording
   ("documents the restrictions applied against it") all become obsolete —
@@ -314,7 +314,7 @@ Failed to start pc-database-v2: chmod /var/www/vhosts/pc-database-v2/.ddev/.webi
 Linux `chmod` requires ownership (or root), so the group-shared `.ddev`
 metadata cannot be written. The wrapper's `sudo -u opencode` has no
 passwordless root path. This was the collision inventory in
-DDEV-SANDBOX.md:56, now realized in the soft-only world.
+ddev-sandbox.md:56, now realized in the soft-only world.
 
 **Decision: one owner for ddev, everywhere.** ddev runs as `opencode` in
 EVERY context — the agent natively, and the developer's terminal through a

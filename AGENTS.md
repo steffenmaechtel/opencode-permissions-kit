@@ -39,7 +39,7 @@ self-fetches its siblings from the same branch, and everything is deployed to
   install/update deploy lists (`KIT_FILES`) reference them everywhere.
 - **Don't bump `VERSION`** unless the maintainer asks.
 - The security model is deliberately **soft-only** — never re-introduce
-  OS-level deny ACLs. Background: `docs/design/DDEV-WORKING.md`,
+  OS-level deny ACLs. Background: `docs/design/ddev-working.md`,
   current model: `docs/concepts/security-model.md`.
 
 ## Testing

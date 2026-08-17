@@ -11,7 +11,7 @@
 # To re-deploy the kit without prompts after it is already installed,
 # use update.sh instead. To change settings later, use config.sh.
 #
-# Soft protection model (docs/design/DDEV-WORKING.md): no hard ACL denies.
+# Soft protection model (docs/design/ddev-working.md): no hard ACL denies.
 # The kit creates the opencode user, provisions a MANDATORY rootless container
 # backend (docker-rootless or podman-rootless), prepares ddev to run as that
 # user, and sets up the opencode usergroup as the sharing group.

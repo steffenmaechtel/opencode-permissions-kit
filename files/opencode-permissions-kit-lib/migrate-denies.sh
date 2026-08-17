@@ -1,7 +1,7 @@
 #!/bin/sh
 # opencode permissions kit — migrate-denies.sh
 # One-time migration from the hard-ACL model to the soft-only model
-# (docs/design/DDEV-WORKING.md §4). Called by update.sh (as root); usable
+# (docs/design/ddev-working.md §4). Called by update.sh (as root); usable
 # standalone against fixture trees — every path is parameterized.
 #
 # What it does:

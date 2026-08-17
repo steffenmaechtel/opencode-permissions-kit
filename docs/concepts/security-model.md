@@ -32,7 +32,7 @@ are the "ddev must work" decision:
 > bash) can read every project file — including `settings.php`, which ddev's
 > web container needs to boot.
 
-The design record is `docs/design/DDEV-WORKING.md`.
+The design record is `docs/design/ddev-working.md`.
 
 | Guarantee | Mechanism |
 |---|---|

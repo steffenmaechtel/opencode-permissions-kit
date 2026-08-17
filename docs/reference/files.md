@@ -43,15 +43,23 @@ This page lists every file and directory the kit manages, and every key in
 | Path | Purpose |
 |---|---|
 | `/usr/local/bin/opencode` | Wrapper symlink |
-| `.../opencode-permissions-kit/bin/opencode` | The actual opencode binary (`root:opencode` 750) |
-| `.../opencode-permissions-kit/bin/socket-check.sh` | Rootless socket probe (`test -S` only) |
-| `.../opencode-permissions-kit/bin/ddev-as-opencode` | Sudoers helper that runs the real ddev as `opencode` (re-sets `HOME`/`XDG_RUNTIME_DIR`/`DOCKER_HOST`) |
-| `.../opencode-permissions-kit/ddev-as-opencode.sh` | Sourced `ddev()` terminal function (hooked into the default user's rc files) |
-| `.../opencode-permissions-kit/wrapper` | Directory validation, container opt-in, rootless exec |
-| `.../opencode-permissions-kit/migrate-denies.sh` | One-time hard-deny → soft-only migration (+ `.ddev` handover) |
-| `.../opencode-permissions-kit/setup-container-backend.sh` | Rootless backend provisioning |
-| `.../opencode-permissions-kit/{config,update,status,uninstall}.sh` | Management |
-| `.../opencode-permissions-kit/{jsonc-parser.py,log.sh,shell-warn.sh,sudoers.template,opencode.jsonc,opencode-deny-all.jsonc}` | Shared helpers/templates |
+| `/usr/local/lib/opencode-permissions-kit/bin/opencode` | The actual opencode binary (`root:opencode` 750) |
+| `/usr/local/lib/opencode-permissions-kit/bin/socket-check.sh` | Rootless socket probe (`test -S` only) |
+| `/usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode` | Sudoers helper that runs the real ddev as `opencode` (re-sets `HOME`/`XDG_RUNTIME_DIR`/`DOCKER_HOST`) |
+| `/usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh` | Sourced `ddev()` terminal function (hooked into the default user's rc files) |
+| `/usr/local/lib/opencode-permissions-kit/wrapper` | Directory validation, container opt-in, rootless exec |
+| `/usr/local/lib/opencode-permissions-kit/migrate-denies.sh` | One-time hard-deny → soft-only migration (+ `.ddev` handover) |
+| `/usr/local/lib/opencode-permissions-kit/setup-container-backend.sh` | Rootless backend provisioning |
+| `/usr/local/lib/opencode-permissions-kit/config.sh` | Management: projects, git-config, backend, refresh |
+| `/usr/local/lib/opencode-permissions-kit/update.sh` | Management: re-deploy, binary upgrades |
+| `/usr/local/lib/opencode-permissions-kit/status.sh` | Management: status + leak scan |
+| `/usr/local/lib/opencode-permissions-kit/uninstall.sh` | Management: uninstall |
+| `/usr/local/lib/opencode-permissions-kit/jsonc-parser.py` | Shared helper: config parsing |
+| `/usr/local/lib/opencode-permissions-kit/log.sh` | Shared helper: audit logging |
+| `/usr/local/lib/opencode-permissions-kit/shell-warn.sh` | Shared helper: bypass warnings |
+| `/usr/local/lib/opencode-permissions-kit/sudoers.template` | Template: sudoers rendering |
+| `/usr/local/lib/opencode-permissions-kit/opencode.jsonc` | Template: the agent's soft deny config |
+| `/usr/local/lib/opencode-permissions-kit/opencode-deny-all.jsonc` | Template: default-user lockout config |
 
 ## /var/log/opencode-permissions-kit/
 
