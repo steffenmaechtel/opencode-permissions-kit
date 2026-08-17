@@ -22,9 +22,28 @@ daemon. Consequence: `docker ps` in your own terminal and in an agent
 session list the same containers — but a colleague's rootful docker daemon
 is a different world entirely.
 
-Non-interactive scripts calling `ddev` are not intercepted — either run
-them in a terminal or call the helper directly:
-`sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode <args>`.
+### Why scripts must take the detour
+
+The `ddev()` function lives in your shell RC files — and shell functions
+exist only in shells that loaded those files, i.e. your interactive
+terminal sessions:
+
+| Who calls `ddev`? | What happens |
+|---|---|
+| You, in a terminal | The function intercepts the call → runs via the sudoers helper as `opencode` ✔ |
+| A script (cronjob, Makefile, deploy script) | Calls the **real ddev binary** as your user — the function never applies ✘ |
+
+In the second case ddev runs as your user instead of `opencode` — two
+owners for `.ddev/`, a different daemon: exactly the state the kit
+prevents. Two ways out for scripts:
+
+1. Run the script from a normal terminal (it inherits the function).
+2. Call the helper explicitly — this is exactly what the `ddev()` function
+   does internally, minus the shell function in between:
+
+   ```bash
+   sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode start
+   ```
 
 ## ddev-managed paths (the EPERM fixes)
 
