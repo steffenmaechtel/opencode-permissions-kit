@@ -9,8 +9,8 @@ how to work on the code. For what the kit does, see the
 1. Create a feature branch off `master`: `feature/<name>`.
 2. Work there until stable.
 3. Open a pull request against `master`. CI must be green before merge.
-4. Never push directly to `master` (it is branch-protected — it is also the
-   live install source: the one-liner streams from `master`).
+4. Never push directly to `master`: it is the live install source — the
+   one-liner streams `files/install.sh` from `master`.
 
 ## Tests
 
