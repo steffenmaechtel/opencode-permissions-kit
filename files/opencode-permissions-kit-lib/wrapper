@@ -8,6 +8,8 @@
 # enforced by opencode's own permission layer only. The wrapper's job is
 # UID separation: validate the project dir, detect container-tool opt-in,
 # and exec the binary as 'opencode' against its rootless backend.
+# `opencode serve` takes a headless path (see SERVE_MODE below): third-party
+# UIs like OpenChamber spawn the server non-interactively.
 set -e
 
 RED='\033[0;31m'
@@ -33,6 +35,33 @@ case "$CONTAINER_BACKEND" in
     *) CONTAINER_BACKEND="" ;;
 esac
 
+# Headless serve mode. Third-party UIs (OpenChamber, ...) spawn
+# `opencode serve --hostname <h> --port <p>` non-interactively: stdin is
+# /dev/null and stdout is parsed for the "opencode server listening on
+# <url>" line. Banner and prompts break that twice over — extra stdout
+# noise for the parser, and `read` hitting EOF would make set -e kill
+# the wrapper before the exec. Serve mode therefore prints nothing on
+# stdout, reports diagnostics on stderr, skips the project-dir check
+# (the server accepts sessions per client request; the soft layer —
+# global + per-project opencode.jsonc — still applies to every session),
+# and resolves container tools silently.
+SERVE_MODE=false
+if [ "${1:-}" = "serve" ]; then SERVE_MODE=true; fi
+
+# Wrapper diagnostics: interactive starts print to the terminal, serve
+# mode redirects to stderr so stdout carries only opencode's own output.
+# printf '%b' (not echo) so the \033 color escapes render identically
+# under dash and bash. An empty argument prints a blank separator line.
+note() {
+    _fd=1
+    [ "$SERVE_MODE" = true ] && _fd=2
+    if [ -n "$1" ]; then
+        printf '  %b\n' "$1" >&"$_fd"
+    else
+        printf '\n' >&"$_fd"
+    fi
+}
+
 CWD=$(pwd)
 VALID=false
 if [ -f "$PROJECTS_CONF" ]; then
@@ -47,7 +76,7 @@ if [ -f "$PROJECTS_CONF" ]; then
     done < "$PROJECTS_CONF"
 fi
 
-if [ "$VALID" != true ]; then
+if [ "$VALID" != true ] && [ "$SERVE_MODE" != true ]; then
     # Version/help queries carry no project context — answer them from the
     # real binary instead of refusing. The official opencode installer
     # probes `opencode --version` from $HOME while the kit installs; the
@@ -82,24 +111,26 @@ if [ "$VALID" != true ]; then
     exit 1
 fi
 
-echo ""
-echo "  ${GREEN}SECURED BY opencode permissions kit ($VERSION)${NC}"
-echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
-echo ""
+if [ "$SERVE_MODE" != true ]; then
+    echo ""
+    echo "  ${GREEN}SECURED BY opencode permissions kit ($VERSION)${NC}"
+    echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
+    echo ""
+fi
 
 # Self-check: a self-installed opencode binary (official installer re-run or
 # PATH re-add) would shadow the wrapper in new shells, and tools may call the
 # absolute path of the real binary. Warn (but keep running) when one is present.
 SHADOW="$HOME/.opencode/bin/opencode"
 if [ -e "$SHADOW" ] && { [ ! -L "$SHADOW" ] || [ "$(readlink -f "$SHADOW" 2>/dev/null || echo "$SHADOW")" != "/usr/local/lib/opencode-permissions-kit/wrapper" ]; }; then
-    echo "  ${YELLOW}WARNING: self-installed opencode detected at $SHADOW${NC}"
-    echo "  ${YELLOW}New shells would run it instead of this wrapper. Fix: rm -rf $SHADOW${NC}"
-    echo ""
+    note "${YELLOW}WARNING: self-installed opencode detected at $SHADOW${NC}"
+    note "${YELLOW}New shells would run it instead of this wrapper. Fix: rm -rf $SHADOW${NC}"
+    note ""
 fi
 RESOLVED=$(command -v opencode 2>/dev/null || true)
 if [ -n "$RESOLVED" ] && [ "$RESOLVED" != "/usr/local/bin/opencode" ]; then
-    echo "  ${YELLOW}WARNING: 'opencode' on this PATH resolves to $RESOLVED, not the kit wrapper.${NC}"
-    echo ""
+    note "${YELLOW}WARNING: 'opencode' on this PATH resolves to $RESOLVED, not the kit wrapper.${NC}"
+    note ""
 fi
 
 # WSL2 exposure check: the drvfs /mnt/c mount runs with the Windows session
@@ -110,18 +141,18 @@ if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
         if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
-            echo "  ${YELLOW}WARNING: /mnt/c restriction configured but PENDING (mode $mnt_mode).${NC}"
-            echo "  ${YELLOW}Run 'wsl --shutdown' from Windows and reopen the distro — until then${NC}"
-            echo "  ${YELLOW}the agent can read your Windows profile via /mnt/c.${NC}"
+            note "${YELLOW}WARNING: /mnt/c restriction configured but PENDING (mode $mnt_mode).${NC}"
+            note "${YELLOW}Run 'wsl --shutdown' from Windows and reopen the distro — until then${NC}"
+            note "${YELLOW}the agent can read your Windows profile via /mnt/c.${NC}"
         else
-            echo "  ${YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — the agent can read${NC}"
-            echo "  ${YELLOW}your whole Windows profile (.ssh, browser data). Fix in /etc/wsl.conf:${NC}"
-            echo "  ${YELLOW}  [automount]${NC}"
-            echo "  ${YELLOW}  enabled = true${NC}"
-            echo "  ${YELLOW}  options = \"uid=<uid>,gid=<gid>,dmask=027,fmask=037\"${NC}"
-            echo "  ${YELLOW}then 'wsl --shutdown' from Windows (install.sh can apply this for you).${NC}"
+            note "${YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — the agent can read${NC}"
+            note "${YELLOW}your whole Windows profile (.ssh, browser data). Fix in /etc/wsl.conf:${NC}"
+            note "${YELLOW}  [automount]${NC}"
+            note "${YELLOW}  enabled = true${NC}"
+            note "${YELLOW}  options = \"uid=<uid>,gid=<gid>,dmask=027,fmask=037\"${NC}"
+            note "${YELLOW}then 'wsl --shutdown' from Windows (install.sh can apply this for you).${NC}"
         fi
-        echo ""
+        note ""
     fi
 fi
 
@@ -136,12 +167,26 @@ elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
 if [ -n "$PROJECT_CONFIG" ]; then
     PROJECT_TOOLS=$(python3 /usr/local/lib/opencode-permissions-kit/jsonc-parser.py --tools "$PROJECT_CONFIG" 2>/dev/null || true)
     if [ -n "$PROJECT_TOOLS" ]; then
-        echo "  ${CYAN}Container tools enabled by this project:${NC}"
-        echo "$PROJECT_TOOLS" | sed 's/^/    - /'
-        echo ""
+        note "${CYAN}Container tools enabled by this project:${NC}"
+        if [ "$SERVE_MODE" = true ]; then
+            printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&2
+        else
+            printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /'
+        fi
+        note ""
         CONTAINER_REQUESTED=true
         CONTAINER_AUTO=true
     fi
+fi
+
+# Serve mode requests container tools silently: a server process serves
+# many projects, so there is no single project opt-in to confirm and no
+# terminal to confirm on. This stays inside the soft model — whether a
+# session may use docker/ddev is still decided per session by the
+# global and per-project opencode.jsonc permission rules.
+if [ "$SERVE_MODE" = true ]; then
+    CONTAINER_REQUESTED=true
+    CONTAINER_AUTO=false
 fi
 
 # Resolve the container mechanism for the configured backend. Produces one of:
@@ -172,9 +217,9 @@ CONTAINER_PODMAN=""
 CONTAINER_LABEL=""
 if [ "$CONTAINER_REQUESTED" = true ]; then
     if [ -z "$CONTAINER_BACKEND" ]; then
-        echo "  ${RED}WARNING: no rootless container backend configured.${NC}"
-        echo "  ${YELLOW}Running WITHOUT container tools. Re-run install.sh to provision one.${NC}"
-        echo ""
+        note "${RED}WARNING: no rootless container backend configured.${NC}"
+        note "${YELLOW}Running WITHOUT container tools. Re-run install.sh to provision one.${NC}"
+        note ""
         CONTAINER_REQUESTED=false
         CONTAINER_AUTO=false
     else
@@ -188,9 +233,9 @@ if [ "$CONTAINER_REQUESTED" = true ]; then
                     CONTAINER_DOCKER_HOST="$sock_host"
                     CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
                 else
-                    echo "  ${RED}WARNING: docker-rootless socket not reachable (${sock_host:-unset}).${NC}"
-                    echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
-                    echo ""
+                    note "${RED}WARNING: docker-rootless socket not reachable (${sock_host:-unset}).${NC}"
+                    note "${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                    note ""
                     CONTAINER_REQUESTED=false
                     CONTAINER_AUTO=false
                 fi
@@ -207,18 +252,18 @@ if [ "$CONTAINER_REQUESTED" = true ]; then
                         CONTAINER_DOCKER_HOST="$sock_host"
                         CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
                     else
-                        echo "  ${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
-                        echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
-                        echo ""
+                        note "${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
+                        note "${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                        note ""
                         CONTAINER_REQUESTED=false
                         CONTAINER_AUTO=false
                     fi
                 elif command -v podman >/dev/null 2>&1; then
                     CONTAINER_PODMAN=true
                 else
-                    echo "  ${RED}WARNING: podman-rootless backend selected but 'podman' is not installed.${NC}"
-                    echo "  ${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
-                    echo ""
+                    note "${RED}WARNING: podman-rootless backend selected but 'podman' is not installed.${NC}"
+                    note "${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                    note ""
                     CONTAINER_REQUESTED=false
                     CONTAINER_AUTO=false
                 fi
@@ -246,8 +291,12 @@ if [ "$CONTAINER_AUTO" = true ]; then
         echo ""
     fi
 else
-    printf "  Press Enter to start opencode..."
-    read _
+    if [ "$SERVE_MODE" != true ]; then
+        printf "  Press Enter to start opencode..."
+        read _
+    elif [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
+        printf '  %b\n' "${GREEN}opencode serve: container tools attached via $CONTAINER_LABEL.${NC}" >&2
+    fi
 fi
 
 # Rootless: pass the per-user socket through sudo's env reset via env_keep.

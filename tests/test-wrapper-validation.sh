@@ -239,7 +239,7 @@ fi
 # (an invalid directory) while the kit installs; the wrapper must answer
 # from the real binary instead of refusing (regression: the mid-install
 # "ERROR: opencode cannot be started here" confused users).
-if grep -A14 'if \[ "\$VALID" != true \]; then' "$WRAPPER_FILE" | grep -q -- '--version'; then
+if grep -A14 'if \[ "\$VALID" != true \]' "$WRAPPER_FILE" | grep -q -- '--version'; then
     echo "  ${GREEN}PASS${NC}  wrapper answers --version from an invalid CWD (installer probe)"
     passed=$((passed + 1))
 else
@@ -247,7 +247,7 @@ else
     failures=$((failures + 1))
 fi
 
-if grep -A14 'if \[ "\$VALID" != true \]; then' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
+if grep -A14 'if \[ "\$VALID" != true \]' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
     echo "  ${GREEN}PASS${NC}  invalid-CWD version passthrough execs the secured binary"
     passed=$((passed + 1))
 else
@@ -265,6 +265,62 @@ else
     failures=$((failures + 1))
 fi
 
+# --- Headless serve mode (third-party UIs like OpenChamber) ---
+# OpenChamber et al. spawn `opencode serve` with stdin ignored and parse
+# stdout for the "opencode server listening on <url>" line. The wrapper
+# must not banner/prompt there (read-on-EOF + set -e would kill it before
+# the exec) and must keep stdout clean.
+echo ""
+echo "--- Serve mode (headless, third-party UIs) ---"
+
+if grep -q 'if \[ "${1:-}" = "serve" \]; then SERVE_MODE=true; fi' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper detects the serve subcommand"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost serve detection"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'if \[ "\$VALID" != true \] && \[ "\$SERVE_MODE" != true \]; then' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  serve mode skips the project-dir refusal"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve mode still bound to project-dir validation"
+    failures=$((failures + 1))
+fi
+
+if [ "$(grep -n 'SERVE_MODE" != true \]; then' "$WRAPPER_FILE" | tail -1 | cut -d: -f1)" -lt "$(grep -n 'Press Enter to start opencode' "$WRAPPER_FILE" | head -1 | cut -d: -f1)" ]; then
+    echo "  ${GREEN}PASS${NC}  serve mode suppresses the Press-Enter prompt"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve mode would still block on Press Enter"
+    failures=$((failures + 1))
+fi
+
+if grep -A8 '^note()' "$WRAPPER_FILE" | grep -q '>&"\$_fd"\|>&\$_fd' && grep -A8 '^note()' "$WRAPPER_FILE" | grep -q '_fd=2'; then
+    echo "  ${GREEN}PASS${NC}  serve-mode diagnostics go to stderr (note helper)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve-mode diagnostics would pollute stdout"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'if \[ "\$SERVE_MODE" = true \]; then' "$WRAPPER_FILE" && grep -q 'CONTAINER_AUTO=false' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  serve mode requests container tools without prompting"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve mode lost the silent container-tool request"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'OPENCODE_SERVER_PASSWORD' "$SUDOERS_FILE"; then
+    echo "  ${GREEN}PASS${NC}  sudoers.template keeps OPENCODE_SERVER_PASSWORD across sudo"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  sudoers.template drops OPENCODE_SERVER_PASSWORD (headless serve loses auth)"
+    failures=$((failures + 1))
+fi
+
 for marker in '#@docker-group-begin' '#@ddev-delegated-begin' '#@ddev-sandbox-begin' 'DDEV_BIN' 'OPENCODE_LAUNCH_CWD' 'protect-projects'; do
     if ! grep -q "$marker" "$SUDOERS_FILE"; then
         echo "  ${GREEN}PASS${NC}  sudoers.template free of '$marker'"
@@ -275,7 +331,7 @@ for marker in '#@docker-group-begin' '#@ddev-delegated-begin' '#@ddev-sandbox-be
     fi
 done
 
-if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR"' "$SUDOERS_FILE" \
+if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD"' "$SUDOERS_FILE" \
    && grep -q '(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode' "$SUDOERS_FILE" \
    && grep -q 'socket-check.sh' "$SUDOERS_FILE"; then
     echo "  ${GREEN}PASS${NC}  sudoers.template keeps base RunAs + socket-check + env_keep"

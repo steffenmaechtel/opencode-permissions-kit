@@ -15,6 +15,9 @@ the linked design docs and commit history.
 | 0.0.11 | — (release of the above) | Rootless-only, opencode usergroup as sharing group, ddev-as-opencode, wrapper bypass guards, audit log, WSL2 `/mnt/c` exposure warnings |
 | 0.0.12 | CLI output was plain/unprofessional; install asked too many questions in the wrong order | **UX overhaul**: shared UI library (`ui.sh`), Standard/Advanced install mode with pre-flight inventory + plan + confirm, restyled status/update/config |
 | 0.0.13 | Live-testing 0.0.12 revealed: git choice ignored on re-install, inverted SECURE_GIT mapping, plan numbering gaps, installer probe broke on the wrapper, binary re-download on re-install | Re-install correctness fixes + wrapper `--version` passthrough + binary reuse, all with regression tests |
+| 0.0.14 | Docs were one big MANUAL.md; no structured entry point for new users | **Docs overhaul**: docs skeleton (getting-started / concepts / how-to / reference / troubleshooting), lowercase-kebab file naming, docs link check in CI |
+| 0.0.15 | Five scripts with individual call conventions; prompt styles had drifted; installer asked for project paths with no guidance | `opencode-permissions-kit` CLI dispatcher, unified `[Y/n]`/`[y/N]` prompt convention (binding `conventions.md`), project-path policy + example hint, legacy migration removal (0.0.14 upgrade floor) |
+| 0.0.16 | Third-party UIs (OpenChamber) spawn `opencode serve` non-interactively — banner + `Press Enter` + `[Y/n]` broke the managed startup, and sudo's env reset silently dropped `OPENCODE_SERVER_PASSWORD` | **Headless serve mode** in the wrapper (`serve` subcommand: no banner/prompts, diagnostics on stderr, no project-dir check, silent container attach); sudoers `env_keep` adds `OPENCODE_SERVER_PASSWORD` |
 
 ## Retired / backup branches
 
