@@ -173,8 +173,6 @@ project_path_sane() {
     [ -n "$_pp" ] || return 1
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
-    # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
-    # the pattern must be escaped (\~) or it tilde-expands and never matches.
     # ~ resolves against PROJECT_TILDE_HOME (the DEFAULT user's home when
     # running under sudo — $HOME would be /root).
     # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input

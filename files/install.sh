@@ -18,7 +18,7 @@
 #
 # Options:
 #   --yes        Skip all prompts, assume Yes
-#   --projects <path...>  Pre-Define project roots, skip interactive selection
+#   --projects <path...>  Pre-define project roots, skip interactive selection
 #   --container-backend <docker-rootless|podman-rootless>  Non-interactive backend choice
 #   --secure-git-config   Enable .git/config hardening up front
 #
@@ -420,8 +420,6 @@ fi
 project_path_sane() {
     _pp="${1%/}"
     [ -n "$_pp" ] || return 1
-    # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
-    # the pattern must be escaped (\~) or it tilde-expands and never matches.
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
     # ~ resolves against PROJECT_TILDE_HOME (the DEFAULT user's home when
