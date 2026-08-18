@@ -39,7 +39,10 @@ self-fetches its siblings from the same branch, and everything is deployed to
   topic type; see `docs/README.md` for the structure.
 - **Don't rename scripts** in `files/` — the Makefile, tests, docs, and the
   install/update deploy lists (`KIT_FILES`) reference them everywhere.
-- **Don't bump `VERSION`** unless the maintainer asks.
+- **Don't bump `VERSION`** unless the maintainer asks. Release tags (when
+  set at all) are the bare version stamp **without a `v` prefix** —
+  `0.0.17`, not `v0.0.17` (matches the `VERSION` file; installs stream
+  from `master`, the tag is purely informational).
 - The security model is deliberately **soft-only** — never re-introduce
   OS-level deny ACLs. Background: `docs/design/ddev-working.md`,
   current model: `docs/concepts/security-model.md`.
