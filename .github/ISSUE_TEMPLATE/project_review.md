@@ -48,6 +48,25 @@ Scope: branch / commit range since last review: `<e.g. v0.0.16..master>`
       refactor vs. guard vs. accept
 - [ ] Error messages actionable (say what failed AND how to fix it)
 
+## 3b. Test completeness
+
+Re-assess the pyramid itself, not just its green state — ask "if a
+contributor introduced bug X in area Y tomorrow, which suite would
+catch it?" for each area below:
+
+- [ ] **Coverage gaps:** scripts under `files/` without a dedicated unit
+      suite, or with one that only covers the happy path (compare the
+      `test-*.sh` list against the shipped scripts)
+- [ ] **Unprotected changes:** recent behavior changes whose regression
+      is NOT pinned by a unit or e2e check yet
+- [ ] **Guard canaries:** consistency guards (drift, workflows, chmod
+      lists) can still fail — their canary sections trip on mutation
+- [ ] **e2e / e2e-rootless:** new user-facing flows covered end-to-end?
+      Skips visible (`GITHUB_STEP_SUMMARY`) and strict mode exercised
+      occasionally?
+- [ ] **Verdict:** write down 1–3 concrete test improvements; bigger
+      ones become issues labeled `tech-debt`
+
 ## 4. Docs
 
 - [ ] Behavior changes since the last review have matching docs changes
