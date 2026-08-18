@@ -164,6 +164,9 @@ project_path_sane() {
     [ -n "$_pp" ] || return 1
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
+    # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input
     if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
         "~/"*) _pp="$HOME${_pp#\~}" ;;
         "~"*) return 1 ;;
@@ -177,10 +180,11 @@ project_path_sane() {
         *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
     esac
     case "$_pp" in
-        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|/lib*/*|\
+        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
 /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
 /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
-/usr|/usr/*|/var|/var/tmp)
+/usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
+/var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
             return 1
             ;;
     esac
@@ -196,7 +200,7 @@ projects_add() {
             continue
         fi
         p="${_PP_NORM:-$p}"
-        p="$(cd "$p" 2>/dev/null && pwd)" || p="$p"
+        if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
         if ! [ -d "$p" ]; then
             ui_warn "skip $p (not a directory)"
             continue
@@ -225,7 +229,7 @@ projects_remove() {
     [ -z "$TARGETS" ] && die "Usage: config.sh projects remove <path...>"
     [ -f "$PROJECTS_CONF" ] || { echo "No projects.conf — nothing to remove."; return; }
     for p in $TARGETS; do
-        p="$(cd "$p" 2>/dev/null && pwd)" || p="$p"
+        if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
         if ! grep -qxF "$p" "$PROJECTS_CONF"; then
             ui_warn "not found: $p"
             continue
@@ -234,7 +238,7 @@ projects_remove() {
             ui_detail "skip $p"
             continue
         fi
-        sudo grep -vx "$p" "$PROJECTS_CONF" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
+        sudo grep -vxF "$p" "$PROJECTS_CONF" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
         sudo mv "$PROJECTS_CONF.tmp" "$PROJECTS_CONF"
         ui_success "removed $p"
         log "project removed: $p"

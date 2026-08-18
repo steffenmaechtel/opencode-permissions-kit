@@ -206,13 +206,16 @@ if [ "$IS_WSL2" != true ]; then
     [ "$ans" != "y" ] && exit 0
 fi
 
-# Backup
-BACKUP_DIR="/tmp/opencode-install-backup-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$BACKUP_DIR"
+# Backup. mktemp (not a timestamped name): root copies sudoers, gitconfigs
+# and the opencode binary into this directory inside world-writable /tmp —
+# the path must not be predictable or pre-creatable by another user.
+BACKUP_DIR="$(mktemp -d /tmp/opencode-install-backup.XXXXXX)" || exit 1
 echo "Backup directory: $BACKUP_DIR"
 log "backup dir created: $BACKUP_DIR"
-sudo -u "$DEFAULT_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" || true
-sudo -u "$OPENCODE_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
+# shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
+sudo -u "$DEFAULT_USER" git config --global --list > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || true
+# shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
+sudo -u "$OPENCODE_USER" git config --global --list > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
 [ -f /etc/opencode-permissions-kit/sudoers ] && cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
 [ -f /usr/local/bin/opencode ] && cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null || true
 [ -d /usr/local/lib/opencode-permissions-kit ] && cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null || true
@@ -399,6 +402,7 @@ project_path_sane() {
     [ -n "$_pp" ] || return 1
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input
     if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
         "~/"*) _pp="$HOME${_pp#\~}" ;;
         "~"*) return 1 ;;
@@ -412,10 +416,11 @@ project_path_sane() {
         *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
     esac
     case "$_pp" in
-        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|/lib*/*|\
+        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
 /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
 /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
-/usr|/usr/*|/var|/var/tmp)
+/usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
+/var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
             return 1
             ;;
     esac
@@ -612,6 +617,7 @@ fi
 
 # Backup project ACLs now that roots are known
 if [ -n "$PROJECTS_ROOTS" ]; then
+    # shellcheck disable=SC2086,SC2024  # word splitting intended (root list); root redirects
     sudo getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
     echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
 fi
@@ -789,6 +795,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     case "$ans" in
         n) ui_detail "skipping filesystem setup." ;;
         b)
+            # shellcheck disable=SC2086  # word splitting intended (root list)
             getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
             echo "Backup saved." ;;
         y) ;;

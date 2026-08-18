@@ -117,9 +117,12 @@ case "${CONTAINER_BACKEND:-}" in
         case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
         # The opencode user's runtime dir (/run/user/<uid>) is mode 700
         # opencode:opencode, so a non-root status.sh caller cannot stat the
-        # socket inside it. Try stat directly; if that fails (perm), use sudo.
+        # socket inside it. Try stat directly; if that fails (perm), use
+        # sudo -n (non-interactive — status.sh must never prompt for a
+        # password; without cached credentials the socket reads as
+        # "NOT reachable" until run via sudo).
         if [ -n "$sock" ]; then
-            if [ -S "$sockpath" ] 2>/dev/null || sudo test -S "$sockpath" 2>/dev/null; then
+            if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv "socket" "reachable — $sock" "$UI_GREEN"
             else
                 ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
@@ -140,7 +143,7 @@ case "${CONTAINER_BACKEND:-}" in
             # Optional podman docker-CLI-compat socket.
             sockpath="$sock"
             case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
-            if [ -S "$sockpath" ] 2>/dev/null || sudo test -S "$sockpath" 2>/dev/null; then
+            if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv "socket" "reachable — $sock" "$UI_GREEN"
             else
                 ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
@@ -154,7 +157,7 @@ case "${CONTAINER_BACKEND:-}" in
         fi
         ;;
     *)
-        ui_kv "backend" "unknown ('$backend')" "$UI_RED"
+        ui_kv "backend" "unknown ('${CONTAINER_BACKEND:-none}')" "$UI_RED"
         ui_detail "re-run install.sh with a rootless backend:"
         ui_detail "sudo bash files/install.sh --container-backend docker-rootless|podman-rootless"
         ;;
