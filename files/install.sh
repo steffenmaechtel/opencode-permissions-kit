@@ -20,6 +20,11 @@
 #   --yes        Skip all prompts, assume Yes
 #   --projects <path...>  Pre-Define project roots, skip interactive selection
 #   --container-backend <docker-rootless|podman-rootless>  Non-interactive backend choice
+#   --secure-git-config   Enable .git/config hardening up front
+#
+# Flags may appear in any order. --projects consumes every following
+# non-flag argument as a project root; parsing continues after them.
+# Unknown options abort the install (fail fast, no silently ignored typos).
 set -e
 
 # Branch the kit ships from (master = always latest). Overridable for
@@ -106,31 +111,36 @@ PREDEFINED_PROJECTS=""
 SECURE_GIT_CONFIG=true
 CONTAINER_BACKEND_OPT=""
 
-_skip_next=false
-for arg do
-    if [ "$_skip_next" = true ]; then
-        _skip_next=false
-        shift 2>/dev/null || true
-        continue
-    fi
-    case "$arg" in
-        --yes) SKIP_PROMPTS=true ;;
-        --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
-        --container-backend)
-            CONTAINER_BACKEND_OPT="$2"
-            _skip_next=true
-            ;;
-        --projects)
-            shift
-            while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
-                PREDEFINED_PROJECTS="$PREDEFINED_PROJECTS $1"
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --yes) SKIP_PROMPTS=true ;;
+            --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
+            --container-backend)
+                if [ $# -lt 2 ]; then
+                    echo "error: --container-backend requires a value (docker-rootless|podman-rootless)" >&2
+                    exit 1
+                fi
+                CONTAINER_BACKEND_OPT="$2"
                 shift
-            done
-            break
-            ;;
-    esac
-    shift 2>/dev/null || true
-done
+                ;;
+            --projects)
+                shift
+                while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
+                    PREDEFINED_PROJECTS="$PREDEFINED_PROJECTS $1"
+                    shift
+                done
+                continue
+                ;;
+            *)
+                echo "error: unknown option: $1 (see the script header for usage)" >&2
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
+parse_args "$@"
 
 # === Helpers ===
 
@@ -178,6 +188,16 @@ banner() {
 banner
 
 DEFAULT_USER="${SUDO_USER:-$(whoami)}"
+
+# ~ in project paths must expand to the DEFAULT user's home, not $HOME:
+# under `curl | sudo bash` / `sudo bash install.sh`, $HOME is /root and
+# "~/dev" would be rejected as a "/root system path" with a confusing
+# error. project_path_sane reads PROJECT_TILDE_HOME.
+PROJECT_TILDE_HOME="$HOME"
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+    if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
+fi
 log "install started (version $VERSION, default user=$DEFAULT_USER)"
 
 # === Install mode ===
@@ -402,9 +422,13 @@ project_path_sane() {
     [ -n "$_pp" ] || return 1
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
+    # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    # ~ resolves against PROJECT_TILDE_HOME (the DEFAULT user's home when
+    # running under sudo — $HOME would be /root).
     # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input
-    if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
-        "~/"*) _pp="$HOME${_pp#\~}" ;;
+    if [ "$_pp" = "~" ]; then _pp="${PROJECT_TILDE_HOME:-$HOME}"; else case "$_pp" in
+        "~/"*) _pp="${PROJECT_TILDE_HOME:-$HOME}${_pp#\~}" ;;
         "~"*) return 1 ;;
     esac; fi
     _PP_NORM="$_pp"

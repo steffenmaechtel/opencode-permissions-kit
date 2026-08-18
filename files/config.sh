@@ -70,6 +70,15 @@ if [ -f "$INSTALL_CONF" ]; then
 fi
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# ~ in project paths must expand to the DEFAULT user's home, not $HOME:
+# config.sh usually runs via sudo, where $HOME is /root and "~/dev" would
+# be rejected as a "/root system path" with a confusing error.
+# project_path_sane reads PROJECT_TILDE_HOME.
+PROJECT_TILDE_HOME="$HOME"
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+    if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
+fi
 # Sharing group: the opencode user's own usergroup; prefer the live value
 # over any stale conf entry.
 OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
@@ -166,9 +175,11 @@ project_path_sane() {
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
+    # ~ resolves against PROJECT_TILDE_HOME (the DEFAULT user's home when
+    # running under sudo — $HOME would be /root).
     # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input
-    if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
-        "~/"*) _pp="$HOME${_pp#\~}" ;;
+    if [ "$_pp" = "~" ]; then _pp="${PROJECT_TILDE_HOME:-$HOME}"; else case "$_pp" in
+        "~/"*) _pp="${PROJECT_TILDE_HOME:-$HOME}${_pp#\~}" ;;
         "~"*) return 1 ;;
     esac; fi
     _PP_NORM="$_pp"

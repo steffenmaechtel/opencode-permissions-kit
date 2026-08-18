@@ -37,9 +37,11 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | Flag | Meaning |
 |---|---|
 | `--yes` | Skip all prompts, assume Yes (Standard mode with defaults) |
-| `--projects <path...>` | Pre-define project roots, skip interactive selection |
-| `--container-backend <docker-rootless\|podman-rootless>` | Non-interactive backend choice — must come **before** `--projects` (the projects flag consumes the rest of the command line) |
+| `--projects <path...>` | Pre-define project roots, skip interactive selection (consumes every following non-flag argument) |
+| `--container-backend <docker-rootless\|podman-rootless>` | Non-interactive backend choice |
 | `--secure-git-config` | Enable `.git/config` hardening up front |
+
+Flags may appear in any order; unknown options abort the install.
 
 Environment: `KIT_BRANCH` (default `master`) selects the branch to fetch
 siblings from — used for testing feature branches.
