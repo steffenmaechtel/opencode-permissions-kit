@@ -18,8 +18,13 @@
 #
 # Options:
 #   --yes        Skip all prompts, assume Yes
-#   --projects <path...>  Pre-Define project roots, skip interactive selection
+#   --projects <path...>  Pre-define project roots, skip interactive selection
 #   --container-backend <docker-rootless|podman-rootless>  Non-interactive backend choice
+#   --secure-git-config   Enable .git/config hardening up front
+#
+# Flags may appear in any order. --projects consumes every following
+# non-flag argument as a project root; parsing continues after them.
+# Unknown options abort the install (fail fast, no silently ignored typos).
 set -e
 
 # Branch the kit ships from (master = always latest). Overridable for
@@ -106,31 +111,36 @@ PREDEFINED_PROJECTS=""
 SECURE_GIT_CONFIG=true
 CONTAINER_BACKEND_OPT=""
 
-_skip_next=false
-for arg do
-    if [ "$_skip_next" = true ]; then
-        _skip_next=false
-        shift 2>/dev/null || true
-        continue
-    fi
-    case "$arg" in
-        --yes) SKIP_PROMPTS=true ;;
-        --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
-        --container-backend)
-            CONTAINER_BACKEND_OPT="$2"
-            _skip_next=true
-            ;;
-        --projects)
-            shift
-            while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
-                PREDEFINED_PROJECTS="$PREDEFINED_PROJECTS $1"
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --yes) SKIP_PROMPTS=true ;;
+            --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
+            --container-backend)
+                if [ $# -lt 2 ]; then
+                    echo "error: --container-backend requires a value (docker-rootless|podman-rootless)" >&2
+                    exit 1
+                fi
+                CONTAINER_BACKEND_OPT="$2"
                 shift
-            done
-            break
-            ;;
-    esac
-    shift 2>/dev/null || true
-done
+                ;;
+            --projects)
+                shift
+                while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
+                    PREDEFINED_PROJECTS="$PREDEFINED_PROJECTS $1"
+                    shift
+                done
+                continue
+                ;;
+            *)
+                echo "error: unknown option: $1 (see the script header for usage)" >&2
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
+parse_args "$@"
 
 # === Helpers ===
 
@@ -178,6 +188,16 @@ banner() {
 banner
 
 DEFAULT_USER="${SUDO_USER:-$(whoami)}"
+
+# ~ in project paths must expand to the DEFAULT user's home, not $HOME:
+# under `curl | sudo bash` / `sudo bash install.sh`, $HOME is /root and
+# "~/dev" would be rejected as a "/root system path" with a confusing
+# error. project_path_sane reads PROJECT_TILDE_HOME.
+PROJECT_TILDE_HOME="$HOME"
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+    if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
+fi
 log "install started (version $VERSION, default user=$DEFAULT_USER)"
 
 # === Install mode ===
@@ -206,13 +226,16 @@ if [ "$IS_WSL2" != true ]; then
     [ "$ans" != "y" ] && exit 0
 fi
 
-# Backup
-BACKUP_DIR="/tmp/opencode-install-backup-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$BACKUP_DIR"
+# Backup. mktemp (not a timestamped name): root copies sudoers, gitconfigs
+# and the opencode binary into this directory inside world-writable /tmp —
+# the path must not be predictable or pre-creatable by another user.
+BACKUP_DIR="$(mktemp -d /tmp/opencode-install-backup.XXXXXX)" || exit 1
 echo "Backup directory: $BACKUP_DIR"
 log "backup dir created: $BACKUP_DIR"
-sudo -u "$DEFAULT_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" || true
-sudo -u "$OPENCODE_USER" git config --global --list 2>/dev/null > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
+# shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
+sudo -u "$DEFAULT_USER" git config --global --list > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || true
+# shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
+sudo -u "$OPENCODE_USER" git config --global --list > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
 [ -f /etc/opencode-permissions-kit/sudoers ] && cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
 [ -f /usr/local/bin/opencode ] && cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null || true
 [ -d /usr/local/lib/opencode-permissions-kit ] && cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null || true
@@ -399,8 +422,11 @@ project_path_sane() {
     [ -n "$_pp" ] || return 1
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
-    if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
-        "~/"*) _pp="$HOME${_pp#\~}" ;;
+    # ~ resolves against PROJECT_TILDE_HOME (the DEFAULT user's home when
+    # running under sudo — $HOME would be /root).
+    # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input
+    if [ "$_pp" = "~" ]; then _pp="${PROJECT_TILDE_HOME:-$HOME}"; else case "$_pp" in
+        "~/"*) _pp="${PROJECT_TILDE_HOME:-$HOME}${_pp#\~}" ;;
         "~"*) return 1 ;;
     esac; fi
     _PP_NORM="$_pp"
@@ -412,10 +438,11 @@ project_path_sane() {
         *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
     esac
     case "$_pp" in
-        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|/lib*/*|\
+        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
 /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
 /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
-/usr|/usr/*|/var|/var/tmp)
+/usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
+/var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
             return 1
             ;;
     esac
@@ -612,6 +639,7 @@ fi
 
 # Backup project ACLs now that roots are known
 if [ -n "$PROJECTS_ROOTS" ]; then
+    # shellcheck disable=SC2086,SC2024  # word splitting intended (root list); root redirects
     sudo getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
     echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
 fi
@@ -789,6 +817,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     case "$ans" in
         n) ui_detail "skipping filesystem setup." ;;
         b)
+            # shellcheck disable=SC2086  # word splitting intended (root list)
             getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
             echo "Backup saved." ;;
         y) ;;

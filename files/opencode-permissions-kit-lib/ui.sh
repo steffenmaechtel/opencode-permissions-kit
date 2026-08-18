@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # opencode permissions kit — shared UI helpers (ui.sh)
 #
 # One visual language for every kit script (install/update/config/status).

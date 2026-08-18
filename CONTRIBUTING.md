@@ -14,6 +14,13 @@ how to work on the code. For what the kit does, see the
 
 ## Tests
 
+First make sure your host has everything installed (shellcheck is part of
+`make test` via `make lint`):
+
+```bash
+sh tests/check-host.sh  # prints install commands for anything missing
+```
+
 ```bash
 sh tests/test-*.sh     # unit suite — always invoke via sh, never rely on exec bits
 make check-version     # VERSION stamp + KIT_BRANCH consistency
@@ -21,8 +28,13 @@ make e2e               # Docker-based end-to-end suite (podman-rootless install)
 make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-container, skips otherwise)
 ```
 
-- **Never rely on repository mode bits.** Call test and helper scripts with
-  `sh <script>` — checkouts lose the executable bit.
+- **Call test and helper scripts with `sh <script>`.** Executable bits are
+  tracked in git, so a fresh Linux/macOS clone runs `make test` directly —
+  but the bits are lost on Windows filesystems, WSL trees on `/mnt/c`, and
+  by mode-stripping transfer channels (ZIP downloads, shared folders,
+  `cp`/`scp` without `-p`). `sh <script>` works everywhere; the CI
+  `chmod +x` lists are the second safety net (kept complete by
+  `tests/test-workflows.sh`).
 - After changes to `install.sh`, `update.sh`, the wrapper, or backend
   provisioning, **both** e2e suites are part of the definition of done — a
   green `make e2e` alone is not sufficient.
@@ -75,6 +87,28 @@ User-facing documentation lives in `docs/` and is organized by topic type
 Design records for larger decisions live in `docs/design/`, security analyses
 in `docs/security/` — both are historical records; where wording differs from
 the code, the code wins.
+
+## Project reviews
+
+Full reviews (security, bugs, quality, docs, CI) are **trigger-based**, not
+on a calendar. Open a review issue from the `project_review` template when
+any of these fires:
+
+- a **version bump** is planned (before the release),
+- roughly **500+ changed lines or 10+ merged PRs** have accumulated on
+  `master` since the last review, or
+- a PR touched a **high blast-radius area** (`sudoers.template`, the
+  wrapper, backend provisioning, the security model).
+
+Findings from a review become issues labeled `review` (actionable soon) or
+`tech-debt` (deliberately deferred, with a reason). A review starts by
+working the backlog, not by re-inventing itself: the checklist lives in
+`.github/ISSUE_TEMPLATE/project_review.md` and doubles as the working
+instructions for a coding agent doing the review locally.
+
+After each review, try to shrink the next one: every finding that could be
+turned into a lint rule, unit test, or consistency guard should be — the
+remaining manual surface is what the checklist cannot automate.
 
 ## Version
 

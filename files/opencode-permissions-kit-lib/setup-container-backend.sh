@@ -46,7 +46,6 @@ done
 
 # === Shared helpers (ui.sh, log.sh) ===
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
-log() { :; }
 for cand in "$LIBDIR/ui.sh" "$(dirname "$0")/ui.sh" "$(dirname "$0")/opencode-permissions-kit-lib/ui.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
@@ -93,6 +92,7 @@ apt_install() {
     [ -z "$pkgs" ] && return 0
     echo "  Installing:$pkgs ..."
     apt-get update -qq 2>/dev/null || true
+    # shellcheck disable=SC2086  # word splitting intended (package list)
     apt-get install -y $pkgs
 }
 
@@ -233,15 +233,18 @@ setup_docker_rootless() {
             # (the dockerd binary that dockerd-rootless.sh wraps). This is the
             # canonical way and does NOT conflict with an existing Docker install.
             echo "  Running get.docker.com (installs docker-ce + docker-ce-rootless-extras) ..."
-            if curl -fsSL https://get.docker.com -o /tmp/get-docker.sh 2>/dev/null; then
-                sh /tmp/get-docker.sh 2>&1 | sed 's/^/    /' || true
-                rm -f /tmp/get-docker.sh
+            # mktemp, never a fixed /tmp path: this script runs as root, and a
+            # pre-planted file at a predictable path would be executed as root.
+            GET_DOCKER_TMP="$(mktemp)" || exit 1
+            if curl -fsSL https://get.docker.com -o "$GET_DOCKER_TMP" 2>/dev/null; then
+                sh "$GET_DOCKER_TMP" 2>&1 | sed 's/^/    /' || true
                 apt-get update -qq 2>/dev/null || true
                 apt_install docker-ce-rootless-extras
             else
                 # Offline / no network: last-ditch attempt.
                 apt_install docker-ce-rootless-extras 2>/dev/null || true
             fi
+            rm -f "$GET_DOCKER_TMP"
         fi
     fi
     if ! command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then

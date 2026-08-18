@@ -70,6 +70,15 @@ if [ -f "$INSTALL_CONF" ]; then
 fi
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# ~ in project paths must expand to the DEFAULT user's home, not $HOME:
+# config.sh usually runs via sudo, where $HOME is /root and "~/dev" would
+# be rejected as a "/root system path" with a confusing error.
+# project_path_sane reads PROJECT_TILDE_HOME.
+PROJECT_TILDE_HOME="$HOME"
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+    if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
+fi
 # Sharing group: the opencode user's own usergroup; prefer the live value
 # over any stale conf entry.
 OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
@@ -164,8 +173,11 @@ project_path_sane() {
     [ -n "$_pp" ] || return 1
     # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
     # the pattern must be escaped (\~) or it tilde-expands and never matches.
-    if [ "$_pp" = "~" ]; then _pp="$HOME"; else case "$_pp" in
-        "~/"*) _pp="$HOME${_pp#\~}" ;;
+    # ~ resolves against PROJECT_TILDE_HOME (the DEFAULT user's home when
+    # running under sudo — $HOME would be /root).
+    # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input
+    if [ "$_pp" = "~" ]; then _pp="${PROJECT_TILDE_HOME:-$HOME}"; else case "$_pp" in
+        "~/"*) _pp="${PROJECT_TILDE_HOME:-$HOME}${_pp#\~}" ;;
         "~"*) return 1 ;;
     esac; fi
     _PP_NORM="$_pp"
@@ -177,10 +189,11 @@ project_path_sane() {
         *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
     esac
     case "$_pp" in
-        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|/lib*/*|\
+        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
 /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
 /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
-/usr|/usr/*|/var|/var/tmp)
+/usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
+/var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
             return 1
             ;;
     esac
@@ -196,7 +209,7 @@ projects_add() {
             continue
         fi
         p="${_PP_NORM:-$p}"
-        p="$(cd "$p" 2>/dev/null && pwd)" || p="$p"
+        if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
         if ! [ -d "$p" ]; then
             ui_warn "skip $p (not a directory)"
             continue
@@ -225,7 +238,7 @@ projects_remove() {
     [ -z "$TARGETS" ] && die "Usage: config.sh projects remove <path...>"
     [ -f "$PROJECTS_CONF" ] || { echo "No projects.conf — nothing to remove."; return; }
     for p in $TARGETS; do
-        p="$(cd "$p" 2>/dev/null && pwd)" || p="$p"
+        if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
         if ! grep -qxF "$p" "$PROJECTS_CONF"; then
             ui_warn "not found: $p"
             continue
@@ -234,7 +247,7 @@ projects_remove() {
             ui_detail "skip $p"
             continue
         fi
-        sudo grep -vx "$p" "$PROJECTS_CONF" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
+        sudo grep -vxF "$p" "$PROJECTS_CONF" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
         sudo mv "$PROJECTS_CONF.tmp" "$PROJECTS_CONF"
         ui_success "removed $p"
         log "project removed: $p"

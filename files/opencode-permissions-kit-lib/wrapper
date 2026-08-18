@@ -69,7 +69,7 @@ if [ -f "$PROJECTS_CONF" ]; then
         [ -z "$root" ] && continue
         [ ! -d "$root" ] && continue
         root_clean="${root%/}"
-        if [ "$CWD" = "$root_clean" ] || [ "${CWD#$root_clean/}" != "$CWD" ]; then
+        if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
             VALID=true
             break
         fi
@@ -276,7 +276,9 @@ if [ "$CONTAINER_AUTO" = true ]; then
     # Prompt convention: docs/design/conventions.md — [Y/n] default capital,
     # Enter accepts, y/yes/n/no case-insensitive.
     printf "  Run opencode with %s? [Y/n] " "$CONTAINER_LABEL"
-    read answer
+    # EOF-safe: read fails on closed stdin and would kill the wrapper under
+    # set -e; an empty answer falls through to the default (yes).
+    IFS= read -r answer || answer=''
     _ans=$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')
     case "$_ans" in
         n|no)
@@ -293,7 +295,7 @@ if [ "$CONTAINER_AUTO" = true ]; then
 else
     if [ "$SERVE_MODE" != true ]; then
         printf "  Press Enter to start opencode..."
-        read _
+        IFS= read -r _ || :
     elif [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
         printf '  %b\n' "${GREEN}opencode serve: container tools attached via $CONTAINER_LABEL.${NC}" >&2
     fi

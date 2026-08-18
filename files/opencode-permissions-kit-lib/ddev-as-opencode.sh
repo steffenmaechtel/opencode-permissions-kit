@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # opencode permissions kit -- ddev-as-opencode.sh
 # Sourced in the DEFAULT user's interactive shells (a guarded source line is
 # appended to .bashrc/.zshrc/.profile at install/update). Defines a `ddev`

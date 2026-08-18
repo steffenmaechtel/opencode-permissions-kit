@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # opencode permissions kit -- ddev-handover.sh
 #
 # Shared handover for everything ddev must OWN while running as the
