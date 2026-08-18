@@ -57,6 +57,19 @@ UI_LIB="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/ui.sh"
 
 run_case() {
     (
+        # Everything inside: PATH (with the shims below), set -u (the B1
+        # regression needs it), and the install.conf variables status.sh
+        # would have sourced by now.
+        PATH="$WORK:$PATH"
+        export PATH
+        # Mirror status.sh's own shell flags: set -u yes (that is the B1
+        # regression), but NOT set -e — the subshell inherits errexit from
+        # this test script, and the extracted block legitimately ends in
+        # `[ -n "$linger" ] && ui_kv ...` whose false status would abort
+        # the subshell on linger-less hosts (CI runners) — the exact
+        # false failure this guard prevents.
+        set -u
+        set +e
         . "$UI_LIB"
         CONTAINER_BACKEND="$1"
         OPENCODE_DOCKER_HOST="${2:-}"
@@ -65,30 +78,43 @@ run_case() {
         # is always set there (the linger probe uses it). Mirror that.
         OPENCODE_USER="${OPENCODE_USER:-opencode}"
         eval "$(extract_backend_case)"
+        # Do NOT rely on the case block's trailing status: it legitimately
+        # ends in `[ -n "$linger" ] && ui_kv ...`, whose status depends on
+        # the host's loginctl (dev host with linger: 0 / CI runner: 1) — and
+        # the caller runs under set -e. exit 0 only normalizes that benign
+        # trailing status; a set -u crash aborts the subshell EARLY, long
+        # before this line, and stays non-zero.
+        exit 0
     ) 2>&1
 }
 
 # a) unknown backend value: must print unknown('...') and NOT crash
-#    (set -u is active in the parent suite but the eval runs without it —
-#    so ALSO run under set -u to prove the fix)
-out=$(set -u; run_case "kubernetes" "" "") && rc=0 || rc=$?
-if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q "unknown ('kubernetes')"; then
+# || true on every capture: when the extracted block aborts (the B1 bug —
+# unset var under set -u), the subshell exits non-zero and this script's
+# own set -e would kill the TEST instead of reporting FAIL. The output is
+# what the assertions judge; the status is discarded by design.
+out=$(run_case "kubernetes" "" "" || true)
+if printf '%s' "$out" | grep -q "unknown ('kubernetes')" \
+   && ! printf '%s' "$out" | grep -q "parameter not set"; then
     pass "unknown backend reports unknown('kubernetes') without crashing (set -u)"
 else
-    fail "unknown backend reports unknown('kubernetes') without crashing (rc=$rc out=$out)"
+    fail "unknown backend reports unknown('kubernetes') without crashing (out=$out)"
 fi
 
 # b) empty backend: reports unknown('none')
-out=$(set -u; run_case "" "" "") && rc=0 || rc=$?
-if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q "unknown ('none')"; then
+out=$(run_case "" "" "" || true)
+if printf '%s' "$out" | grep -q "unknown ('none')" \
+   && ! printf '%s' "$out" | grep -q "parameter not set"; then
     pass "empty backend reports unknown('none') without crashing (set -u)"
 else
-    fail "empty backend reports unknown('none') without crashing (rc=$rc out=$out)"
+    fail "empty backend reports unknown('none') without crashing (out=$out)"
 fi
 
 # c) docker-rootless with a configured socket that does not exist: NOT
 #    reachable, and the probe must not prompt (sudo -n). A prompting sudo
-#    shim fails the test.
+#    shim fails the test. NOTE: the shim must actually be IN the PATH of
+#    run_case's subshell (see run_case) — a `PATH=... cmd; f` prefix would
+#    apply the assignment only to `cmd`, never to f.
 cat > "$WORK/sudo" <<'EOF'
 #!/bin/sh
 # fail on any interactive sudo attempt: -n must already be in the args
@@ -98,13 +124,12 @@ case " $* " in
 esac
 EOF
 chmod +x "$WORK/sudo"
-out=$(PATH="$WORK:$PATH" set -u; run_case "docker-rootless" "unix:///run/user/99999/docker.sock" "") && rc=0 || rc=$?
-if [ "$rc" = "0" ] \
-   && ! printf '%s' "$out" | grep -q PROMPT-ATTEMPT \
-   && printf '%s' "$out" | grep -q "NOT reachable"; then
+out=$(run_case "docker-rootless" "unix:///run/user/99999/docker.sock" "" || true)
+if printf '%s' "$out" | grep -q "NOT reachable" \
+   && ! printf '%s' "$out" | grep -qE 'PROMPT-ATTEMPT|parameter not set'; then
     pass "docker-rootless: unreachable socket reported without sudo prompt"
 else
-    fail "docker-rootless: unreachable socket reported without sudo prompt (rc=$rc out=$out)"
+    fail "docker-rootless: unreachable socket reported without sudo prompt (out=$out)"
 fi
 
 # --- 2. not-installed state: exit 0 + install hint ------------------------------
