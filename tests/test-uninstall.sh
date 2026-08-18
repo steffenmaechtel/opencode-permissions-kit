@@ -36,6 +36,19 @@ exit 0
 EOF
 chmod +x "$WORK/sudo"
 
+# Fake id: the userdel branch is only entered when the opencode user
+# exists — true on a dev host with the kit installed, false on a CI
+# runner. Pretend it always exists so the removal plan is complete (and
+# the test hermetic) on every host.
+cat > "$WORK/id" <<'EOF'
+#!/bin/sh
+case "$1" in
+    -u) echo 60000 ;;
+    *)  exit 0 ;;
+esac
+EOF
+chmod +x "$WORK/id"
+
 # --- 1. guards: refuses root / opencode --------------------------------------
 
 run_uninstall_as() {
