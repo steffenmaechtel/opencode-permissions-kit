@@ -11,8 +11,11 @@
 
 # Preserve the rootless socket env across `sudo -u opencode`: the wrapper
 # exports DOCKER_HOST (+XDG_RUNTIME_DIR) before the exec and sudo's env
-# reset would drop them otherwise.
-Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR"
+# reset would drop them otherwise. OPENCODE_SERVER_PASSWORD stays too, so
+# headless `opencode serve` (third-party UIs like OpenChamber, which pass
+# the password they generate from --ui-password) does not silently lose
+# its authentication.
+Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD"
 
 # Base RunAs: the wrapper always execs opencode as the opencode user.
 DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *

@@ -23,6 +23,29 @@ Every `opencode` invocation goes through the wrapper at
    exported for the rootless socket (preserved across sudo via the kit's
    `env_keep`).
 
+## The serve exception (headless start)
+
+`opencode serve` does not go through these steps. Third-party UIs like
+OpenChamber spawn the server non-interactively — stdin is `/dev/null` and
+stdout is parsed for the `opencode server listening on <url>` line — so
+banner, `Press Enter`, and the `[Y/n]` container question would break the
+startup (and `read` on a closed stdin kills the wrapper before it execs).
+
+In serve mode the wrapper therefore:
+
+- skips the project-directory check — the server accepts sessions per
+  client request, and the soft permission layer (global + per-project
+  `opencode.jsonc`) still applies to every session,
+- prints nothing on stdout; diagnostics (shadow binary, backend
+  warnings) go to stderr,
+- resolves container tools silently — a server serves many projects, so
+  there is no single opt-in to confirm; whether a session may actually
+  use docker/ddev stays decided by the `opencode.jsonc` rules.
+
+`OPENCODE_SERVER_PASSWORD` is preserved across the `sudo -u opencode`
+exec, so a password a UI passes to the server survives (see the
+[OpenChamber how-to](../how-to/openchamber.md)).
+
 ## Self-update bypass protection (default-user deny-all)
 
 opencode's installer and self-updater can re-add `~/.opencode/bin` to your

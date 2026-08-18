@@ -408,6 +408,28 @@ check_fail "wrapper does NOT stamp OPENCODE_LAUNCH_CWD (soft-only)" \
     E 'grep -q OPENCODE_LAUNCH_CWD /usr/local/lib/opencode-permissions-kit/wrapper'
 
 echo ""
+echo "--- 12e.2 wrapper serve mode (headless, third-party UIs like OpenChamber) ---"
+# Third-party UIs spawn `opencode serve` with stdin ignored and parse stdout
+# for the "opencode server listening" line — no banner, no prompts, and the
+# project-dir refusal must not fire (OpenChamber often launches from $HOME).
+# timeout(1) kills the server after it came up; exit 124 = it ran headless
+# until then.
+E 'cd /tmp && timeout 20 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4199 > /tmp/wrapper-serve.out 2> /tmp/wrapper-serve.err; test $? -eq 124' && \
+    echo "  ${GREEN}OK${NC}  wrapper serve ran headless from a non-project dir"
+check "wrapper serve: opencode server listening line on stdout" \
+    E 'grep -q "opencode server listening" /tmp/wrapper-serve.out'
+check_fail "wrapper serve: no SECURED banner on stdout" \
+    E 'grep -q "SECURED BY" /tmp/wrapper-serve.out'
+check_fail "wrapper serve: no Press-Enter prompt on stdout" \
+    E 'grep -q "Press Enter" /tmp/wrapper-serve.out'
+E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4198 > /tmp/wrapper-serve2.out 2>/dev/null; test $? -eq 124' && \
+    echo "  ${GREEN}OK${NC}  wrapper serve ran headless from a project dir"
+check "wrapper serve: listening line also from project dir" \
+    E 'grep -q "opencode server listening" /tmp/wrapper-serve2.out'
+check "wrapper serve: sudoers keep OPENCODE_SERVER_PASSWORD across sudo" \
+    E 'sudo grep -q "OPENCODE_SERVER_PASSWORD" /etc/sudoers.d/opencode-permissions-kit'
+
+echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/uninstall.sh --yes --dry-run' && \
     echo "  ${GREEN}OK${NC}  uninstall --dry-run completed"

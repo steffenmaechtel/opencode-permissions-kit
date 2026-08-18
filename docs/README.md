@@ -24,6 +24,7 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 - [Manage project directories](how-to/manage-projects.md)
 - [Allow docker/ddev in a project](how-to/container-tools.md)
+- [Use OpenChamber with the kit](how-to/openchamber.md)
 - [Switch the container backend](how-to/switch-container-backend.md)
 - [Customize the deny list](how-to/customize-deny-list.md)
 - [Harden `.git/config`](how-to/secure-git-config.md)

@@ -99,8 +99,8 @@ echo "======================================"
 echo ""
 
 echo "-- sudoers.template structure --"
-check "template keeps DOCKER_HOST + XDG_RUNTIME_DIR env_keep" \
-    grep -Fq 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR"' "$SUDOERS"
+check "template keeps DOCKER_HOST + XDG_RUNTIME_DIR + OPENCODE_SERVER_PASSWORD env_keep" \
+    grep -Fq 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD"' "$SUDOERS"
 check "template has NO OPENCODE_LAUNCH_CWD env_keep" \
     grep_absent -Fq 'OPENCODE_LAUNCH_CWD' "$SUDOERS"
 check "template has NO docker-group block sentinels" \
