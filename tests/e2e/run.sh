@@ -375,6 +375,16 @@ check "re-install: previous agent config was backed up" \
 check "re-install: config.sh status reports ON again" \
     E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config status 2>&1 | grep -q "ON"'
 
+echo "--- 12c-3. install.sh argument validation (fail fast) ---"
+check_fail "install.sh aborts on unknown flags" \
+    E 'sudo bash /home/dev/repo/files/install.sh --bogus-flag >/dev/null 2>&1'
+check "install.sh names the unknown flag in its error" \
+    E 'sudo bash /home/dev/repo/files/install.sh --bogus-flag 2>&1 | grep -q "unknown option: --bogus-flag"'
+check_fail "install.sh aborts on --container-backend without a value" \
+    E 'sudo bash /home/dev/repo/files/install.sh --container-backend >/dev/null 2>&1'
+check "kit still operational after rejected installs" \
+    E 'test -x /usr/local/bin/opencode && id opencode'
+
 echo ""
 echo "--- 12d. config.sh interactive menu (displays) ---"
 E 'sudo mkdir -p /var/www/vhosts/menu-project' && \

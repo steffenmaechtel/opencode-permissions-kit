@@ -84,6 +84,13 @@ check_fail() {
 skip() {
     echo "  ${YELLOW}SKIP${NC}  $1"
     skipped=$((skipped + 1))
+    # E2E_STRICT=1 turns skips into failures: a wholesale-skip run is
+    # green otherwise, and nobody notices the core sections never ran
+    # (wire this via the workflow's strict dispatch input).
+    if [ "${E2E_STRICT:-0}" = "1" ]; then
+        echo "  ${RED}FAIL${NC}  (strict mode) $1"
+        failures=$((failures + 1))
+    fi
 }
 
 # --- opencode binary cache (version-keyed) -----------------------------------
@@ -319,5 +326,16 @@ e2e_finish() {
         echo "  ${RED}Failed: $failures${NC}"
     fi
     echo ""
+    # CI visibility: a green run with many skips is a hollow verdict —
+    # surface the skip count on the GitHub summary page too.
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        {
+            echo "### e2e: $(basename "$0")"
+            echo "- Passed: $passed"
+            [ "$skipped" -gt 0 ] && echo "- **Skipped: $skipped**"
+            [ "$skipped" -eq 0 ] && echo "- Skipped: 0"
+            [ "$failures" -gt 0 ] && echo "- **Failed: $failures**"
+        } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+    fi
     [ "$failures" -eq 0 ]
 }

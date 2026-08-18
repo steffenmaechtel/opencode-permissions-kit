@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files verify e2e e2e-rootless e2e-all install-dev clean version check-version
+.PHONY: help test lint check-host test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status e2e e2e-rootless e2e-all install-dev clean version check-version
 
 # Scripts checked by `make lint` (everything shipped in files/).
 SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status.sh files/uninstall.sh files/umask.sh \
@@ -38,6 +38,8 @@ help:
 	@echo "  make test-docs     Run docs link check"
 	@echo "  make test-install-args  Run install.sh arg-parsing tests"
 	@echo "  make test-kit-files     Run kit file list consistency tests"
+	@echo "  make test-uninstall     Run uninstall.sh tests"
+	@echo "  make test-status        Run status.sh tests"
 	@echo "  make verify        Run system verification (requires install.sh)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
@@ -48,7 +50,7 @@ help:
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
-test: lint test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files
+test: lint test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -109,9 +111,6 @@ test-ddev-as-opencode:
 	@echo "=== ddev-as-opencode Tests ==="
 	@./tests/test-ddev-as-opencode.sh
 
-verify:
-	@./tests/verify.sh
-
 e2e:
 	@sh ./tests/e2e/run.sh
 
@@ -163,3 +162,11 @@ test-install-args:
 test-kit-files:
 	@echo "=== Kit File List Consistency Tests ==="
 	@./tests/test-kit-files.sh
+
+test-uninstall:
+	@echo "=== Uninstall Tests ==="
+	@./tests/test-uninstall.sh
+
+test-status:
+	@echo "=== Status Tests ==="
+	@./tests/test-status.sh
