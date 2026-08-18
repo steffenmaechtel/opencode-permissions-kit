@@ -28,8 +28,13 @@ make e2e               # Docker-based end-to-end suite (podman-rootless install)
 make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-container, skips otherwise)
 ```
 
-- **Never rely on repository mode bits.** Call test and helper scripts with
-  `sh <script>` — checkouts lose the executable bit.
+- **Call test and helper scripts with `sh <script>`.** Executable bits are
+  tracked in git, so a fresh Linux/macOS clone runs `make test` directly —
+  but the bits are lost on Windows filesystems, WSL trees on `/mnt/c`, and
+  by mode-stripping transfer channels (ZIP downloads, shared folders,
+  `cp`/`scp` without `-p`). `sh <script>` works everywhere; the CI
+  `chmod +x` lists are the second safety net (kept complete by
+  `tests/test-workflows.sh`).
 - After changes to `install.sh`, `update.sh`, the wrapper, or backend
   provisioning, **both** e2e suites are part of the definition of done — a
   green `make e2e` alone is not sufficient.
