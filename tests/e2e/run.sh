@@ -368,8 +368,10 @@ E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-ro
     echo "  ${GREEN}OK${NC}  re-install completed"
 check "re-install: default git-block re-applied to the existing agent config" \
     E 'sudo grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'
+# The backup dir is root:root 0700 (mktemp — it holds sudoers + gitconfigs),
+# so the glob must be expanded by root's shell, not the dev shell running E.
 check "re-install: previous agent config was backed up" \
-    E 'sudo ls /tmp/opencode-install-backup-*/opencode.jsonc-existing >/dev/null 2>&1'
+    E "sudo sh -c 'ls /tmp/opencode-install-backup*/opencode.jsonc-existing >/dev/null 2>&1'"
 check "re-install: config.sh status reports ON again" \
     E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh git-config status 2>&1 | grep -q "ON"'
 
