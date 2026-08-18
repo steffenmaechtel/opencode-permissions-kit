@@ -10,6 +10,12 @@
     // everything for the default user so that bypass is locked down.
     // The "*" key sets the global default for every tool (read, edit, bash,
     // webfetch, ...); specific tools could be allowed back in on top of it.
+    //
+    // LOOKING FOR THE AGENT'S PERMISSIONS? This file is NOT them — it only
+    // locks out the bypass mode. The agent runs as its own user and reads:
+    //   /home/opencode/.config/opencode/opencode.jsonc
+    // Edit that file (you are in its sharing group) or run
+    // `opencode-permissions-kit config` to change settings.
     "share": "disabled",
     "permission": { "*": "deny" }
 }

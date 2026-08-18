@@ -205,6 +205,8 @@ check "deny-all config owned by dev" \
     E 'test "$(stat -c %U /home/dev/.config/opencode/opencode.jsonc)" = "dev"'
 check "deny-all config denies everything" \
     E 'grep -q '\''"\*"'\'' /home/dev/.config/opencode/opencode.jsonc'
+check "deny-all config points to the agent config (discoverability hint)" \
+    E 'grep -q "/home/opencode/.config/opencode/opencode.jsonc" /home/dev/.config/opencode/opencode.jsonc'
 
 echo ""
 echo "--- 6c. Wrapper bypass guard (self-install + absolute path) ---"
