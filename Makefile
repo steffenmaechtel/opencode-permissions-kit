@@ -1,9 +1,28 @@
-.PHONY: help test test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths verify e2e e2e-rootless e2e-all install-dev clean version check-version
+.PHONY: help test lint check-host test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows verify e2e e2e-rootless e2e-all install-dev clean version check-version
+
+# Scripts checked by `make lint` (everything shipped in files/).
+SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status.sh files/uninstall.sh files/umask.sh \
+	files/opencode-permissions-kit-lib/wrapper files/opencode-permissions-kit-lib/kit \
+	files/opencode-permissions-kit-lib/log.sh files/opencode-permissions-kit-lib/ui.sh \
+	files/opencode-permissions-kit-lib/shell-warn.sh files/opencode-permissions-kit-lib/setup-container-backend.sh \
+	files/opencode-permissions-kit-lib/ddev-as-opencode.sh files/opencode-permissions-kit-lib/ddev-handover.sh \
+	files/opencode-permissions-kit-lib/migrate-denies.sh \
+	files/opencode-permissions-kit-lib/bin/socket-check.sh files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+
+# Intentional deviations, excluded repo-wide:
+#   SC1090/SC1091 — kit scripts source helpers/configs via variables
+#                  (checkout -> temp fetch -> installed library lookups)
+#   SC2034        — sourced libs / fallback blocks define vars used by callers
+#   SC3043        — 'local' is not POSIX but dash AND bash support it; the
+#                  kit targets exactly those two shells
+SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043
 
 help:
 	@echo "opencode permissions kit — dev makefile"
 	@echo ""
-	@echo "  make test          Run all self-contained tests (shell)"
+	@echo "  make test          Run all self-contained tests (shell) + lint"
+	@echo "  make check-host    Verify the host has all tools needed to contribute"
+	@echo "  make lint          ShellCheck over the shipped scripts (needs shellcheck)"
 	@echo "  make test-wrapper  Run wrapper validation tests"
 	@echo "  make test-parser   Run JSONC parser edge-case tests"
 	@echo "  make test-git-config  Run git-config toggle tests"
@@ -15,6 +34,8 @@ help:
 	@echo "  make test-ui         Run shared UI helper tests"
 	@echo "  make test-kit-cli   Run CLI dispatcher tests"
 	@echo "  make test-project-paths  Run project path policy tests"
+	@echo "  make test-workflows Run CI workflow consistency tests"
+	@echo "  make test-docs     Run docs link check"
 	@echo "  make verify        Run system verification (requires install.sh)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
@@ -25,9 +46,26 @@ help:
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
-test: test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths
+test: lint test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs
 	@echo ""
 	@echo "All shell tests passed."
+
+lint:
+	@echo "=== ShellCheck (shipped scripts) ==="
+	@if ! command -v shellcheck >/dev/null 2>&1; then \
+		echo "error:  shellcheck is required for 'make lint' (part of 'make test')."; \
+		echo "        Debian/Ubuntu:  sudo apt install shellcheck"; \
+		echo "        macOS:          brew install shellcheck"; \
+		echo "        other:          https://github.com/koalaman/shellcheck#installing"; \
+		echo "        or run:         sh tests/check-host.sh  (checks all contributor tools)"; \
+		exit 1; \
+	fi
+	@shellcheck --severity=warning --exclude=$(SHELLCHECK_EXCLUDES) $(SHELLCHECK_FILES)
+	@echo "ShellCheck passed."
+
+check-host:
+	@echo "=== Contributor host check ==="
+	@sh tests/check-host.sh
 
 test-wrapper:
 	@echo "=== Wrapper Validation Tests ==="
@@ -107,3 +145,11 @@ check-version:
 test-project-paths:
 	@echo "=== Project Path Policy Tests ==="
 	@./tests/test-project-paths.sh
+
+test-workflows:
+	@echo "=== CI Workflow Consistency Tests ==="
+	@./tests/test-workflows.sh
+
+test-docs:
+	@echo "=== Docs Link Check ==="
+	@./tests/test-docs.sh

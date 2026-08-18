@@ -14,6 +14,13 @@ how to work on the code. For what the kit does, see the
 
 ## Tests
 
+First make sure your host has everything installed (shellcheck is part of
+`make test` via `make lint`):
+
+```bash
+sh tests/check-host.sh  # prints install commands for anything missing
+```
+
 ```bash
 sh tests/test-*.sh     # unit suite — always invoke via sh, never rely on exec bits
 make check-version     # VERSION stamp + KIT_BRANCH consistency

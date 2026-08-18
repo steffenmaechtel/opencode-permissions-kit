@@ -52,6 +52,12 @@ Documented rather than hidden:
   [leak scan](../how-to/customize-deny-list.md).
 - The kit protects **locations, not information flows** — once content
   leaves the project roots, no scan recaptures it.
+- **Supply chain (trust assumption):** the one-liner streams `install.sh`
+  from `master` over HTTPS, and `update.sh --binary` downloads the opencode
+  release tarball without a checksum or signature — the "verification" is a
+  liveness check (`opencode --version` runs). Installing means trusting
+  GitHub, the opencode releases, and (for docker-rootless provisioning)
+  get.docker.com at install time.
 
 ## WSL2: the /mnt/c exposure
 

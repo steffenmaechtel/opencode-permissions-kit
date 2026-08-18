@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # opencode permissions kit — wrapper-bypass warning for shell startup
 # Sourced at login (via /etc/profile.d/opencode-permissions-kit-umask.sh) and
 # in interactive shells (via a line appended to .bashrc/.zshrc/.profile).

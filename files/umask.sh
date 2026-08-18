@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # opencode permissions kit
 # Set umask 002 so new files get group-write (the opencode usergroup).
 # Prepend /usr/local/bin to ensure the wrapper takes priority.
