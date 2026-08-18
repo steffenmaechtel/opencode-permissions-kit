@@ -83,6 +83,28 @@ Design records for larger decisions live in `docs/design/`, security analyses
 in `docs/security/` — both are historical records; where wording differs from
 the code, the code wins.
 
+## Project reviews
+
+Full reviews (security, bugs, quality, docs, CI) are **trigger-based**, not
+on a calendar. Open a review issue from the `project_review` template when
+any of these fires:
+
+- a **version bump** is planned (before the release),
+- roughly **500+ changed lines or 10+ merged PRs** have accumulated on
+  `master` since the last review, or
+- a PR touched a **high blast-radius area** (`sudoers.template`, the
+  wrapper, backend provisioning, the security model).
+
+Findings from a review become issues labeled `review` (actionable soon) or
+`tech-debt` (deliberately deferred, with a reason). A review starts by
+working the backlog, not by re-inventing itself: the checklist lives in
+`.github/ISSUE_TEMPLATE/project_review.md` and doubles as the working
+instructions for a coding agent doing the review locally.
+
+After each review, try to shrink the next one: every finding that could be
+turned into a lint rule, unit test, or consistency guard should be — the
+remaining manual surface is what the checklist cannot automate.
+
 ## Version
 
 Do not bump `VERSION` unless the maintainer asks for a release.
