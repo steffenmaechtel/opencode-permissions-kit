@@ -275,6 +275,27 @@ if [ -n "${DDEV_VERSION:-}" ]; then
         ui_kv "ddev version" "$DDEV_VERSION"
     fi
 fi
+# Windows hosts readiness (WSL2): custom-tld projects need their hostnames
+# in the Windows hosts file for the browser; ddev (running as opencode)
+# cannot manage that file. Report-only, per project root.
+if [ -d /mnt/c ] && [ -f "$LIBDIR/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/System32/drivers/etc/hosts ] \
+   && [ -n "${DEFAULT_USER:-}" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
+    # shellcheck disable=SC1091  # deployed lib, checked above
+    . "$LIBDIR/ddev-hosts.sh"
+    _st_miss_total=0
+    if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+        while IFS= read -r _st_root; do
+            [ -z "$_st_root" ] && continue
+            [ -d "$_st_root" ] || continue
+            find "$_st_root" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r _st_d; do
+                _st_m=$(ddev_hosts_missing "$(dirname "$_st_d")")
+                [ -n "$_st_m" ] || continue
+                ui_kv_warn "hosts (win)" "$(dirname "$_st_d"): missing $(printf '%s' "$_st_m" | tr '\n' ' ')"
+                echo "     add: opencode-permissions-kit ddev-hosts-add"
+            done
+        done < "$PROJECTS_CONF"
+    fi
+fi
 
 # === WSL2 /mnt/c exposure (drvfs world-readable by default) =====================
 # The 9p/drvfs server runs with the Windows session token, so NTFS ACLs do

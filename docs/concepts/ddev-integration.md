@@ -105,6 +105,38 @@ Notes:
   browsers keep trusting ddev's HTTPS certs; a new CA is generated only as
   a last resort.
 
+## Hostnames and the Windows hosts file
+
+On WSL2, stock ddev manages the **Windows** hosts file (running
+`ddev-hostname.exe` via WSL interop). For the kit's ddev user that path
+is closed — `/mnt/c` is restricted to the developer, and interop is
+additionally broken on many WSL2+systemd hosts. ddev then only **warns**
+and continues (`ddev start` succeeds), but your Windows **browser**
+cannot resolve custom-`project_tld` domains until the hostnames are in
+the Windows hosts file.
+
+The kit deliberately gives the agent **no** hosts-file access. Instead
+the developer gets a one-command bridge that uses **ddev's own
+elevation path** (`ddev hostname <name> 127.0.0.1` as your user →
+`ddev-hostname.exe` → the Windows permission dialog):
+
+```bash
+opencode-permissions-kit ddev-hosts-add          # in the project dir
+```
+
+It adds every hostname missing from
+`C:\Windows\System32\drivers\etc\hosts` — the project name + TLD,
+`additional_hostnames`, and non-wildcard `additional_fqdns`. After
+`ddev start`/`restart` the kit's `ddev()` shell function prints the
+missing hostnames plus that command as a hint; `ddev-hosts-check`
+lists them on demand, and `opencode-permissions-kit status` reports
+them per project root.
+
+Projects on the default `ddev.site` TLD with internet access need no
+hosts entry at all (DNS wildcard). `ddev launch` cannot open a browser
+from the opencode context — open the URL in your Windows browser
+directly.
+
 ## The SSH-key trade-off
 
 `ddev auth ssh` / composer private keys live in `/home/opencode/.ddev` and

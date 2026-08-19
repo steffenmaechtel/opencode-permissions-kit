@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status e2e e2e-rootless e2e-all install-dev clean version check-version
+.PHONY: help test lint check-host test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status e2e e2e-rootless e2e-all install-dev clean version check-version
 
 # Scripts checked by `make lint` (everything shipped in files/).
 SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status.sh files/uninstall.sh files/umask.sh \
@@ -7,6 +7,7 @@ SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status
 	files/opencode-permissions-kit-lib/shell-warn.sh files/opencode-permissions-kit-lib/setup-container-backend.sh \
 	files/opencode-permissions-kit-lib/ddev-as-opencode.sh files/opencode-permissions-kit-lib/ddev-handover.sh \
 	files/opencode-permissions-kit-lib/ddev-migrate.sh \
+	files/opencode-permissions-kit-lib/ddev-hosts.sh \
 	files/opencode-permissions-kit-lib/migrate-denies.sh \
 	files/opencode-permissions-kit-lib/bin/socket-check.sh files/opencode-permissions-kit-lib/bin/ddev-as-opencode
 
@@ -31,6 +32,7 @@ help:
 	@echo "  make test-bypass-guard  Run wrapper-bypass guard tests"
 	@echo "  make test-ddev-as-opencode  Run ddev-as-opencode (ddev always runs as opencode) tests"
 	@echo "  make test-ddev-migrate    Run ddev database migration tests"
+	@echo "  make test-ddev-hosts      Run Windows hosts bridge tests"
 	@echo "  make test-mkcert-reuse    Run mkcert CA reuse tests"
 	@echo "  make test-wsl-exposure   Run WSL2 /mnt/c exposure warning tests"
 	@echo "  make test-ui         Run shared UI helper tests"
@@ -52,7 +54,7 @@ help:
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
-test: lint test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status
+test: lint test-wrapper test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -116,6 +118,10 @@ test-ddev-as-opencode:
 test-ddev-migrate:
 	@echo "=== ddev database migration Tests ==="
 	@./tests/test-ddev-migrate.sh
+
+test-ddev-hosts:
+	@echo "=== Windows hosts bridge Tests ==="
+	@./tests/test-ddev-hosts.sh
 
 e2e:
 	@sh ./tests/e2e/run.sh

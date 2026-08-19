@@ -109,6 +109,42 @@ covers this bootstrap case (root inode → `opencode`, mode `2755`) and
 hands the root back to you once TYPO3 is detected; see the bootstrap
 paragraph in [ddev integration](concepts/ddev-integration.md).
 
+## ddev warns "Unable to open hosts file ... permission denied"
+
+**Cause:** two layers, and the second one is deliberate:
+
+1. The kit's `/mnt/c` restriction: ddev runs as `opencode` and can
+   neither read the Windows hosts file nor run Windows binaries — the
+   agent must not reach the Windows profile. ddev only **warns**;
+   `ddev start` succeeds, but your Windows browser cannot resolve
+   custom-`project_tld` domains yet.
+2. (Only for the fix below) WSL interop must work as your user. On many
+   WSL2+systemd hosts the `WSLInterop` binfmt entry disappears — even
+   `cmd.exe` fails ("WSL Interoperability is disabled"). Re-register:
+
+   ```bash
+   sudo sh -c 'echo ":WSLInterop:M::MZ::/init:PF" > /proc/sys/fs/binfmt_misc/register'
+   ```
+
+   (verify with `cmd.exe /c echo hi`; persists until the next
+   `wsl --shutdown` — and check `/etc/wsl.conf` has no
+   `[interop] enabled=false`).
+
+**Fix (developer side):** add the missing hostnames via the kit's
+bridge — it runs ddev's own `ddev hostname` as your user and Windows
+shows its permission dialog:
+
+```bash
+cd /var/www/vhosts/<project>
+opencode-permissions-kit ddev-hosts-add
+```
+
+`ddev-hosts-check` lists what is missing; `opencode-permissions-kit
+status` reports it per project root. Manual fallback: edit
+`C:\Windows\System32\drivers\etc\hosts` in an elevated editor and add
+`127.0.0.1 <project>.<tld>`. Projects on the default `ddev.site` TLD
+with internet access need no hosts entry at all.
+
 ## `docker ps` in the agent session lists "wrong" containers
 
 **Cause:** expected behavior — the session talks to the **opencode user's**
