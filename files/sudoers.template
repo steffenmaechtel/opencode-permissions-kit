@@ -34,3 +34,17 @@ DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/b
 # to this exact path, re-sets HOME/XDG_RUNTIME_DIR/DOCKER_HOST for the
 # opencode user, and only ever execs the real ddev binary.
 DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode *
+
+# ddev-hostname (WSL2): ddev start aborts when a project hostname (custom
+# project_tld, additional_hostnames/fqdns) is not resolvable and cannot
+# be added to the hosts file. With wsl2_no_windows_hosts_mgt=true (set by
+# the kit) ddev targets the WSL /etc/hosts via ddev-hostname, which
+# re-execs itself under sudo — and the opencode user has no sudo rights,
+# so the rule below closes that gap. Trade-off (accepted): the opencode
+# user — including agent sessions — can write ARBITRARY hostname->IP
+# entries into the WSL /etc/hosts (WSL-internal DNS spoofing); Windows
+# browsers/HTTPS are unaffected (they resolve via the Windows hosts file
+# + certificate validation). Lines whose binary does not exist are
+# stripped by install.sh/update.sh (DDEV_HOSTNAME_RULE marker).
+opencode ALL=(root) NOPASSWD: /usr/local/bin/ddev-hostname # DDEV_HOSTNAME_RULE
+opencode ALL=(root) NOPASSWD: /usr/bin/ddev-hostname # DDEV_HOSTNAME_RULE

@@ -105,6 +105,38 @@ Notes:
   browsers keep trusting ddev's HTTPS certs; a new CA is generated only as
   a last resort.
 
+## Hostnames and the Windows hosts file
+
+On WSL2, stock ddev manages the **Windows** hosts file (running
+`ddev-hostname.exe` via WSL interop). That path is closed for the kit's
+ddev user — `/mnt/c` is restricted to the developer, and interop is
+additionally broken on many WSL2+systemd hosts. Since a failed hosts
+update **aborts `ddev start`**, the kit:
+
+- sets `wsl2_no_windows_hosts_mgt=true` in ddev's global config — ddev
+  then manages the **WSL `/etc/hosts`** via the Linux `ddev-hostname`
+  binary instead, and
+- grants the `opencode` user passwordless sudo for exactly that binary
+  (sudoers; rules are stripped automatically where the binary is
+  absent).
+
+That makes ddev **self-healing across the whole project lifecycle**:
+`ddev start` adds a missing hostname, `ddev delete` removes it, renamed
+domains follow — with no kit involvement. The trade-off (accepted): the
+opencode user, including agent sessions, can write arbitrary
+hostname→IP entries into the WSL `/etc/hosts` (WSL-internal DNS
+spoofing); Windows browsers and HTTPS are unaffected — they resolve via
+the **Windows** hosts file, which stays yours entirely.
+
+Consequences for the browser: a project with a custom `project_tld`
+needs its entry in the *Windows* hosts file for your Windows browser
+(`127.0.0.1 your-project.local` in
+`C:\Windows\System32\drivers\etc\hosts`) — or use the default
+`ddev.site` TLD with internet, where DNS resolves everything and no
+hosts entry is needed at all. `ddev launch` cannot open a browser from
+the opencode context; open the URL in your Windows browser directly.
+See [troubleshooting](../troubleshooting.md).
+
 ## The SSH-key trade-off
 
 `ddev auth ssh` / composer private keys live in `/home/opencode/.ddev` and

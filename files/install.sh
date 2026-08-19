@@ -812,6 +812,25 @@ if [ -d /mnt/c ]; then
     fi
 fi
 
+# WSL2 hosts deadlock (ddev start aborts on custom domains): ddev would
+# manage the WINDOWS hosts file via ddev-hostname.exe + WSL interop —
+# impossible for the opencode user (/mnt/c is restricted to the developer
+# by design; interop is additionally broken on many WSL2+systemd hosts)
+# and the error is FATAL in ddev's Start(). Switch ddev to the WSL
+# /etc/hosts instead; the kit maintains the entries itself (ddev_hosts_sync
+# runs with the handover). The Windows hosts entry for the browser stays
+# the developer's step — see docs/troubleshooting.md. Best-effort.
+if [ -d /mnt/c ] && [ -n "$DDEV_BIN" ] && [ -x "$DDEV_BIN" ]; then
+    if sudo -u "$OPENCODE_USER" env HOME="/home/$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$OPENCODE_USER")" \
+        "$DDEV_BIN" config global --wsl2-no-windows-hosts-mgt true >/dev/null 2>&1; then
+        ui_detail "ddev hosts: wsl2_no_windows_hosts_mgt=true (kit maintains /etc/hosts; Windows hosts stays yours)"
+        log "ddev global config: wsl2_no_windows_hosts_mgt=true"
+    else
+        ui_warn "could not set ddev's wsl2_no_windows_hosts_mgt — ddev start may abort on unresolvable hostnames"
+        log "ddev global config wsl2_no_windows_hosts_mgt FAILED (best-effort)"
+    fi
+fi
+
 # mkcert CA reuse: search order 1. Windows CA (WSL2 /mnt/c), 2. developer's
 # Linux CAROOT, 3. 'mkcert -install' (new, untrusted CA).
 caroot="/home/$OPENCODE_USER/.local/share/mkcert"
@@ -1179,6 +1198,16 @@ log "cli symlink: /usr/local/bin/opencode-permissions-kit -> $LIBDIR/kit"
 # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
 sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+# ddev-hostname rules: keep only lines whose binary exists (marker-
+# filtered; ddev-hostname may be absent or in a nonstandard place).
+DHN_TMP=$(mktemp)
+while IFS= read -r dhnr; do
+    dhnp=$(printf '%s\n' "$dhnr" | sed -n 's/^opencode ALL=(root) NOPASSWD: \([^ ]*\) .*DDEV_HOSTNAME_RULE.*/\1/p')
+    if [ -z "$dhnp" ] || { [ -n "$dhnp" ] && [ -x "$dhnp" ]; }; then
+        printf '%s\n' "$dhnr" | sed 's/ # DDEV_HOSTNAME_RULE//'
+    fi
+done < "$SUDO_TMP" > "$DHN_TMP"
+mv "$DHN_TMP" "$SUDO_TMP"
 sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
 sudo chmod 440 /etc/opencode-permissions-kit/sudoers
 rm -f "$SUDO_TMP"

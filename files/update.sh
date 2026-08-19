@@ -296,6 +296,16 @@ sudo mkdir -p "$CONFDIR"
 if [ -f "$SCRIPT_DIR/sudoers.template" ]; then
     SUDO_TMP=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+    # ddev-hostname rules: keep only lines whose binary exists (same
+    # marker filter as install.sh and config.sh — keep the three in sync).
+    DHN_TMP=$(mktemp)
+    while IFS= read -r dhnr; do
+        dhnp=$(printf '%s\n' "$dhnr" | sed -n 's/^opencode ALL=(root) NOPASSWD: \([^ ]*\) .*DDEV_HOSTNAME_RULE.*/\1/p')
+        if [ -z "$dhnp" ] || { [ -n "$dhnp" ] && [ -x "$dhnp" ]; }; then
+            printf '%s\n' "$dhnr" | sed 's/ # DDEV_HOSTNAME_RULE//'
+        fi
+    done < "$SUDO_TMP" > "$DHN_TMP"
+    mv "$DHN_TMP" "$SUDO_TMP"
     sudo cp "$SUDO_TMP" "$CONFDIR/sudoers"
     sudo chmod 440 "$CONFDIR/sudoers"
     rm -f "$SUDO_TMP"
@@ -365,6 +375,21 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
         ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         log "ddev handover applied under $root"
     done < "$PROJECTS_CONF"
+fi
+
+# WSL2 hosts deadlock heal (see install.sh Step 4 for the full story):
+# keep ddev on the WSL /etc/hosts so `ddev start` cannot abort on the
+# Windows-hosts/interop path the opencode user can never take. Best-effort,
+# prompt-free.
+if [ -d /mnt/c ]; then
+    _uh_bin="$(command -v ddev 2>/dev/null || true)"
+    [ -n "$_uh_bin" ] || { [ -x /usr/local/bin/ddev ] && _uh_bin=/usr/local/bin/ddev; }
+    [ -n "$_uh_bin" ] || { [ -x /usr/bin/ddev ] && _uh_bin=/usr/bin/ddev; }
+    if [ -n "$_uh_bin" ] && sudo -u "$OPENCODE_USER" env HOME="/home/$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$OPENCODE_USER")" \
+        "$_uh_bin" config global --wsl2-no-windows-hosts-mgt true >/dev/null 2>&1; then
+        ui_detail "ddev hosts: wsl2_no_windows_hosts_mgt=true (kit maintains /etc/hosts)"
+        log "ddev global config: wsl2_no_windows_hosts_mgt=true"
+    fi
 fi
 
 # --- WSL2 /mnt/c restriction (report-only — update.sh stays prompt-free) -------

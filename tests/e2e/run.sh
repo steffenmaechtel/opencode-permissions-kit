@@ -72,7 +72,7 @@ FAKE_DDEV_B64="$(base64 "$(dirname "$(readlink -f "$0")")/fake-ddev" | tr -d '\n
 E "echo $FAKE_DDEV_B64 | base64 -d | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev"
 E 'mkdir -p /home/dev/.ddev /var/www/vhosts/ddev-mig/.ddev /var/www/vhosts/ddev-broken/.ddev'
 E 'printf "%s\n" "project_info:" "  ddev-mig:" "    approot: /var/www/vhosts/ddev-mig" "  ddev-broken:" "    approot: /var/www/vhosts/ddev-broken" > /home/dev/.ddev/global_config.yaml'
-E 'printf "type: typo3\n" > /var/www/vhosts/ddev-mig/.ddev/config.yaml && printf "type: typo3\n" > /var/www/vhosts/ddev-broken/.ddev/config.yaml'
+E 'printf "type: typo3\nname: ddev-mig\nproject_tld: local\nadditional_hostnames:\n  - shop\n" > /var/www/vhosts/ddev-mig/.ddev/config.yaml && printf "type: typo3\nname: ddev-broken\n" > /var/www/vhosts/ddev-broken/.ddev/config.yaml'
 E 'touch /var/www/vhosts/ddev-mig/.ddev/.webimageBuild'
 # Group-baseline fixtures: a pre-install tree (dir + file, dev-owned 644)
 # plus a .git that must stay developer-private.
@@ -245,6 +245,13 @@ check "4c: detected typo3 project root handed BACK to dev (2775)" \
     E 'test "$(stat -c %U /var/www/vhosts/detected-project)" = "dev" && test "$(stat -c %a /var/www/vhosts/detected-project)" = "2775"'
 check "4c: detected typo3 settings dir still handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/detected-project/config/system)" = "opencode"'
+# ddev-hostname self-healing (WSL2 hosts deadlock): the sudoers render
+# must keep only rules whose binary exists — the e2e container has NO
+# ddev-hostname, so BOTH marker rules must be stripped (comments stay).
+check "4c: sudoers grants ddev-hostname only when the binary exists (stripped here)" \
+    E '! sudo grep -q "^opencode ALL=(root) NOPASSWD: .*ddev-hostname" /etc/sudoers.d/opencode-permissions-kit'
+check_fail "4c: no kit-written /etc/hosts block (ddev owns the hosts lifecycle)" \
+    E 'grep -q "BEGIN opencode-permissions-kit" /etc/hosts'
 
 echo ""
 echo "--- 5. Soft-only file access (the ddev-working goal) ---"

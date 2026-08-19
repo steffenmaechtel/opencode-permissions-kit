@@ -367,6 +367,17 @@ render_sudoers() {
     local tmp
     tmp=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$template" > "$tmp"
+    # ddev-hostname rules: keep only lines whose binary exists (same
+    # marker filter as install.sh and update.sh — keep the three in sync).
+    local dhnt dhnr dhnp
+    dhnt=$(mktemp)
+    while IFS= read -r dhnr; do
+        dhnp=$(printf '%s\n' "$dhnr" | sed -n 's/^opencode ALL=(root) NOPASSWD: \([^ ]*\) .*DDEV_HOSTNAME_RULE.*/\1/p')
+        if [ -z "$dhnp" ] || { [ -n "$dhnp" ] && [ -x "$dhnp" ]; }; then
+            printf '%s\n' "$dhnr" | sed 's/ # DDEV_HOSTNAME_RULE//'
+        fi
+    done < "$tmp" > "$dhnt"
+    mv "$dhnt" "$tmp"
     sudo cp "$tmp" /etc/opencode-permissions-kit/sudoers
     sudo chmod 440 /etc/opencode-permissions-kit/sudoers
     rm -f "$tmp"
