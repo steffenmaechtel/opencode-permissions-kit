@@ -109,42 +109,6 @@ covers this bootstrap case (root inode → `opencode`, mode `2755`) and
 hands the root back to you once TYPO3 is detected; see the bootstrap
 paragraph in [ddev integration](concepts/ddev-integration.md).
 
-## ddev launch / hostnames fail with "WSL Interoperability is disabled"
-
-**Cause:** two layers, and the second one is deliberate:
-
-1. WSL interop is broken distro-wide on many WSL2+systemd hosts (the
-   `WSLInterop` binfmt entry disappears — even `cmd.exe` fails as your
-   user). Re-register it with:
-
-   ```bash
-   sudo sh -c 'echo ":WSLInterop:M::MZ::/init:PF" > /proc/sys/fs/binfmt_misc/register'
-   ```
-
-   (verify with `cmd.exe /c echo hi`; persists until the next
-   `wsl --shutdown` — make sure `/etc/wsl.conf` has no `[interop]
-   enabled=false`).
-2. The kit's `/mnt/c` restriction: the agent user (and therefore ddev,
-   which always runs as `opencode`) cannot execute Windows binaries at
-   all — by design, the agent must not read the Windows profile.
-
-**What the kit already does:** ddev is switched to the **WSL**
-`/etc/hosts` (`wsl2_no_windows_hosts_mgt=true`) and may elevate the
-Linux `ddev-hostname` binary via a passwordless sudoers rule — so
-`ddev start`/`delete` manage hostnames themselves, with custom domains
-working, despite layer 2. `ddev launch` (browser) and the **Windows**
-hosts entry remain developer-side actions; open the site in your
-Windows browser after adding the hostname to the Windows hosts file:
-
-```
-127.0.0.1 your-project.local
-```
-
-(`notepad.exe C:\Windows\System32\drivers\etc\hosts` from your terminal
-— works once layer 1 is fixed, since your user owns `/mnt/c` access).
-Projects on the default `ddev.site` TLD with internet access need no
-hosts entry at all (DNS wildcard).
-
 ## `docker ps` in the agent session lists "wrong" containers
 
 **Cause:** expected behavior — the session talks to the **opencode user's**

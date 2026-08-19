@@ -252,32 +252,6 @@ check "config.sh passes DEFAULT_USER to the handover" \
     sh -c "grep -qF 'ddev_handover_root \"\$p\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$CONFIG"
 rm -rf "$HWORK"
 
-# --- 7c. ddev-hostname self-healing (WSL2 hosts deadlock) ------------------------
-# ddev start ABORTS when a hostname is unresolvable and cannot be added:
-# with wsl2_no_windows_hosts_mgt=true (set by install/update) ddev calls
-# the LINUX ddev-hostname, which re-execs under sudo — the opencode user
-# needs a sudoers rule for it. ddev then covers the WHOLE lifecycle
-# (start adds, delete removes, renames follow) — no kit-side hosts sync
-# (removed: two writers would fight over the same file).
-check "sudoers.template grants opencode the ddev-hostname elevation (WSL2)" \
-    sh -c "grep -q 'opencode ALL=(root) NOPASSWD: /usr/bin/ddev-hostname' \"\$1\"" _ "$SUDOERS"
-check "sudoers.template covers the alternate ddev-hostname location" \
-    sh -c "grep -q 'opencode ALL=(root) NOPASSWD: /usr/local/bin/ddev-hostname' \"\$1\"" _ "$SUDOERS"
-check "sudoers.template documents the WSL DNS-spoofing trade-off" \
-    sh -c "grep -q 'DNS spoofing' \"\$1\"" _ "$SUDOERS"
-check "install.sh filters ddev-hostname rules by binary existence" \
-    sh -c "grep -q 'DDEV_HOSTNAME_RULE' \"\$1\"" _ "$INSTALL"
-check "update.sh filters ddev-hostname rules by binary existence" \
-    sh -c "grep -q 'DDEV_HOSTNAME_RULE' \"\$1\"" _ "$UPDATE"
-check "config.sh filters ddev-hostname rules by binary existence" \
-    sh -c "grep -q 'DDEV_HOSTNAME_RULE' \"\$1\"" _ "$CONFIG"
-check "install.sh sets ddev's wsl2_no_windows_hosts_mgt for the opencode user" \
-    sh -c "grep -q -- '--wsl2-no-windows-hosts-mgt true' \"\$1\"" _ "$INSTALL"
-check "update.sh heals wsl2_no_windows_hosts_mgt" \
-    sh -c "grep -q -- '--wsl2-no-windows-hosts-mgt true' \"\$1\"" _ "$UPDATE"
-check_fail "no kit-side /etc/hosts writer left (ddev owns the file now)" \
-    sh -c "grep -q 'ddev_hosts_sync\|BEGIN opencode-permissions-kit' \"\$1\"" _ "$HANDOVER"
-
 # --- 8. status.sh reporting ----------------------------------------------------
 check "status.sh reports ddev-as-opencode state" \
     sh -c "grep -q 'ddev-as-opencode' \"\$1\"" _ "$STATUS"
