@@ -91,6 +91,15 @@ directories themselves stay in place and are shared via the group baseline.
   Non-interactive installs (`--yes`) print the list + warning and
   continue. The `DDEV_EXPORTED` stamp is only written when **zero**
   exports failed, so a re-run retries.
+- **Resume on re-run:** an interrupted install (Ctrl-C mid-export, or the
+  failed-projects abort) leaves no stamp — but re-running does NOT start a
+  second dump wave. The export reuses the newest existing
+  `ddev-migration-*` directory: projects with an intact dump + OK
+  manifest entry are skipped, only missing/failed ones are retried, and
+  stale FAIL/SKIP lines for a retried project are replaced (so a fixed
+  project counts as OK and the installer does not re-ask the abort
+  question). One self-contained directory per migration wave — `import`
+  always reads the newest.
 
 ## 4. Tests / CI
 

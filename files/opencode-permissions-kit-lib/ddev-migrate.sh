@@ -200,7 +200,18 @@ ddev_migrate_export() {
     [ -n "$dm_list" ] || { echo "  no ddev projects under the registered roots."; return 1; }
 
     dm_stamp=$(date +%Y%m%d-%H%M%S)
-    DD_MIG_DUMP_DIR="$DDEV_MIG_BACKUP_ROOT/ddev-migration-$dm_stamp"
+    # Resume: an interrupted install (Ctrl-C mid-export, or the
+    # failed-projects abort question) may have left a dump directory
+    # behind. Re-use the newest one instead of starting a fresh wave:
+    # already-exported projects are skipped, only missing/failed ones are
+    # retried — and there is exactly ONE self-contained directory per
+    # migration wave (import always reads the newest).
+    DD_MIG_DUMP_DIR=$(ddev_migrate_latest_dir)
+    if [ -n "$DD_MIG_DUMP_DIR" ] && [ -f "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+        echo "  resuming dump directory: $DD_MIG_DUMP_DIR"
+    else
+        DD_MIG_DUMP_DIR="$DDEV_MIG_BACKUP_ROOT/ddev-migration-$dm_stamp"
+    fi
     mkdir -p "$DD_MIG_DUMP_DIR" || return 1
     # dev writes the dumps, the opencode group (dev is a member) keeps
     # them group-readable; finalized below.
@@ -209,6 +220,19 @@ ddev_migrate_export() {
 
     printf '%s\n' "$dm_list" | while IFS='|' read -r dm_n dm_ar; do
         echo "  exporting $dm_n ($dm_ar) ..."
+        # Resume: intact dump + OK entry in THIS directory — skip the
+        # start/export/stop cycle and keep the existing dump.
+        if [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] && grep -q "^OK|$dm_n|" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null; then
+            echo "    already exported — skipping (resume)"
+            continue
+        fi
+        # Drop stale entries for this project (a FAILED or SKIPped run is
+        # being retried; the old line must not linger — the installer
+        # counts FAIL entries and would re-ask the abort question).
+        if [ -f "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+            grep -vE "^(OK|FAIL|SKIP)\|$dm_n\|" "$DD_MIG_DUMP_DIR/manifest.conf" > "$DD_MIG_DUMP_DIR/manifest.conf.tmp" || true
+            mv "$DD_MIG_DUMP_DIR/manifest.conf.tmp" "$DD_MIG_DUMP_DIR/manifest.conf"
+        fi
         # Already handed over? dev-side ddev cannot start it anymore.
         if [ -d "$dm_ar/.ddev" ] && [ "$(stat -c %U "$dm_ar/.ddev" 2>/dev/null)" = "$dm_oc" ]; then
             echo "    SKIP: .ddev already owned by '$dm_oc' (handover done) — dev-side export"

@@ -163,8 +163,10 @@ if [ "$1" = "export-db" ]; then
         esac
     done
 fi
-# "broken" simulates an old production project that no longer starts.
-if [ "$1" = "start" ] && [ "$2" = "broken" ]; then
+# "broken" simulates an old production project that no longer starts —
+# but only while the DDEV_FAKE_BROKEN marker exists (so a second run can
+# simulate "user fixed the project and re-ran install.sh").
+if [ "$1" = "start" ] && [ "$2" = "broken" ] && [ -n "${DDEV_FAKE_BROKEN:-}" ]; then
     echo "Failed to start broken: fixture failure" >&2
     exit 1
 fi
@@ -209,7 +211,7 @@ ddev_migrate_export "$2" "$3" "$4" "$5"
 WRAP
 
 OUT=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
-    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" DDEV_FAKE_BROKEN=1 \
     PATH="$WORK/bin:$PATH" \
     sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts)
 DUMP_DIR=$(ls -1d "$WORK/backups"/ddev-migration-* 2>/dev/null | tail -1)
@@ -240,6 +242,35 @@ check "a failed start does not abort the remaining exports" \
     sh -c "grep -q 'export-db gamma' \"\$1\"" _ "$WORK/ddev.log"
 check_fail "no stop is issued for the failed project (it never started)" \
     sh -c "grep -q 'ddev:stop broken' \"\$1\"" _ "$WORK/ddev.log"
+
+# --- 4b. resume: an aborted install re-runs the export --------------------------------
+# Run 1 above left FAIL|broken (the failed-projects abort path: stamp NOT
+# set). Run 2 = user fixed the project and re-ran install.sh: the SAME dump
+# directory must be reused, already-exported projects skipped, broken
+# retried, stale FAIL entries replaced.
+mv "$WORK/ddev.log" "$WORK/ddev-run1.log"
+OUT2=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts)
+
+assert_eq "resume reuses the SAME dump directory (no second wave)" \
+    "1" "$(ls -1d "$WORK/backups"/ddev-migration-* 2>/dev/null | wc -l | tr -d ' ')"
+check_fail "already-exported project alpha is NOT started again" \
+    sh -c "grep -q 'ddev:start alpha' \"\$1\"" _ "$WORK/ddev.log"
+check_fail "already-exported project gamma is NOT started again" \
+    sh -c "grep -q 'ddev:start gamma' \"\$1\"" _ "$WORK/ddev.log"
+check "fixed project broken IS retried" \
+    sh -c "grep -q 'ddev:start broken' \"\$1\"" _ "$WORK/ddev.log"
+check "retried project now has a dump" test -s "$DUMP_DIR/broken.sql.gz"
+check "manifest records OK for the retried project" \
+    sh -c "grep -q '^OK|broken|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check_fail "stale FAIL entry is gone after the successful retry" \
+    sh -c "grep -q '^FAIL|broken|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+assert_eq "no FAIL entries remain (installer would not re-ask the abort question)" \
+    "0" "$(grep -c '^FAIL|' "$DUMP_DIR/manifest.conf" || true)"
+assert_eq "manifest has exactly one OK line per project (no duplicates)" \
+    "3" "$(grep -c '^OK|' "$DUMP_DIR/manifest.conf")"
 
 # --- 5. import loop (static wiring) ---------------------------------------------
 

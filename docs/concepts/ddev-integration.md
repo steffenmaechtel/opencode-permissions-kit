@@ -147,3 +147,7 @@ would become unreachable) or abort so you can fix them first — the
 `.ddev` handover has not happened yet at that point, so your side still
 works and a re-run retries cleanly. `--yes` installs print the list and
 continue.
+
+Re-running the installer after an abort **resumes** instead of repeating:
+projects whose dumps already exist are skipped, only missing or
+previously-failed ones are exported (into the same dump directory).
