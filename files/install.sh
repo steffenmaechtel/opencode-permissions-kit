@@ -21,6 +21,7 @@
 #   --projects <path...>  Pre-define project roots, skip interactive selection
 #   --container-backend <docker-rootless|podman-rootless>  Non-interactive backend choice
 #   --secure-git-config   Enable .git/config hardening up front
+#   --skip-ddev-migration  Do not export the dev user's ddev databases
 #
 # Flags may appear in any order. --projects consumes every following
 # non-flag argument as a project root; parsing continues after them.
@@ -44,7 +45,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh; do
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -78,6 +79,11 @@ fi
 [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh"
 command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
 
+# Shared ddev database-migration helpers (dev-user registry -> SQL dumps,
+# issue #15). Same sourcing rules as ddev-handover.sh.
+[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh"
+command -v ddev_migrate_registry >/dev/null 2>&1 || { ddev_migrate_registry() { :; }; ddev_migrate_projects() { :; }; ddev_migrate_done() { return 1; }; }
+
 # === Shared UI helpers ===
 # The kit files sit next to this script (checkout or fully fetched temp dir);
 # a plain fallback keeps install.sh working if ui.sh is somehow missing.
@@ -110,12 +116,16 @@ PREDEFINED_PROJECTS=""
 # the --secure-git-config flag set it explicitly.
 SECURE_GIT_CONFIG=true
 CONTAINER_BACKEND_OPT=""
+# ddev database export (issue #15): default on — the dumps are the only
+# portable copy once ddev switches to the opencode user's daemon.
+SKIP_DDEV_MIGRATION=false
 
 parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --yes) SKIP_PROMPTS=true ;;
             --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
+            --skip-ddev-migration) SKIP_DDEV_MIGRATION=true ;;
             --container-backend)
                 if [ $# -lt 2 ]; then
                     echo "error: --container-backend requires a value (docker-rootless|podman-rootless)" >&2
@@ -288,6 +298,9 @@ fi
 CONTAINER_BACKEND="docker-rootless"
 OPENCODE_DOCKER_HOST=""
 OPENCODE_PODMAN_SOCKET=""
+# Pre-set migration stamp: install.conf is REWRITTEN in Step 2, so the
+# "already exported" state must be captured here (Step 4b checks it).
+DDEV_EXPORTED_PRE=$(sed -n 's/^DDEV_EXPORTED=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
 if [ -f /etc/opencode-permissions-kit/install.conf ]; then
     _be=$(sed -n 's/^CONTAINER_BACKEND=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
     _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
@@ -355,6 +368,18 @@ if [ -n "$DDEV_VERSION" ]; then
     ui_have "ddev" "v$DDEV_VERSION (>= 1.25)"
 else
     ui_atten "ddev" "not installed (optional — needs >= 1.25)"
+fi
+# ddev migration detection (issue #15): projects in the DEFAULT user's
+# registry lose their daemon after the switch — the export is offered.
+DD_MIG_ALL=""
+if [ -n "$DDEV_BIN" ] && [ -d "/home/$DEFAULT_USER/.ddev" ]; then
+    DD_MIG_ALL=$(ddev_migrate_registry "/home/$DEFAULT_USER/.ddev")
+fi
+DD_MIG_COUNT=$(printf '%s\n' "$DD_MIG_ALL" | grep -c . || true)
+if [ "$DD_MIG_COUNT" -gt 0 ]; then
+    ui_atten "ddev projects" "$DD_MIG_COUNT registered for '$DEFAULT_USER' — database export offered"
+else
+    ui_have "ddev projects" "none registered (nothing to migrate)"
 fi
 HAVE_DOCKER=false; HAVE_PODMAN=false
 command -v docker  >/dev/null 2>&1 && HAVE_DOCKER=true
@@ -512,6 +537,9 @@ _plan() { _plan_n=$((_plan_n + 1)); ui_plan "$_plan_n" "$1" "$2"; }
 
 _plan "create user 'opencode' + sharing group" "(developer '$DEFAULT_USER' added)"
 _plan "provision $CONTAINER_BACKEND for 'opencode'" "(mandatory — aborts on failure)"
+if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
+    _plan "export ddev databases to SQL dumps" "($DD_MIG_COUNT project(s), before the .ddev handover)"
+fi
 if [ -n "$PREDEFINED_PROJECTS" ]; then
     _plan "group + setgid + default ACLs" "on $PREDEFINED_PROJECTS"
 else
@@ -809,6 +837,74 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
     fi
 fi
 
+# === Step 4b: ddev database export (dev user -> SQL dumps) ===================
+# Issue #15: pre-kit ddev projects live in the DEFAULT user's registry and
+# daemon. After the kit takes over, ddev runs as $OPENCODE_USER against the
+# new rootless daemon — the dev-side containers/volumes become unreachable
+# and containers cannot move between daemons. SQL dumps are the only
+# portable copy, so they are exported NOW, while dev-side ddev still works:
+# the .ddev handover at the end of Step 5 chowns .ddev to $OPENCODE_USER
+# and would break dev-side `ddev start` (the chmod-is-owner-only rule).
+# The IMPORT is deliberately NOT part of the install: it is a separate,
+# user-driven step (first opencode-side start pulls images) — see the
+# summary below and docs/concepts/ddev-integration.md.
+DD_MIG_DUMP_DIR=""
+if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
+    ui_section "ddev databases (user $DEFAULT_USER)"
+    if [ "$SKIP_DDEV_MIGRATION" = true ]; then
+        ui_detail "skipped (--skip-ddev-migration) — the databases become unreachable"
+        ui_detail "with the old daemon; export manually BEFORE using ddev again:"
+        ui_detail "  sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export $DEFAULT_USER ${PROJECTS_ROOTS:-<roots>}"
+        log "ddev database export skipped (--skip-ddev-migration)"
+    elif [ "$DDEV_EXPORTED_PRE" = "1" ]; then
+        ui_detail "already exported on a previous run (DDEV_EXPORTED=1) — skipping"
+        log "ddev database export skipped (DDEV_EXPORTED stamp present)"
+    elif ddev_migrate_done "$OPENCODE_USER"; then
+        ui_detail "$OPENCODE_USER already has ddev projects registered — skipping the export"
+        log "ddev database export skipped (opencode registry already populated)"
+    elif [ -z "$PROJECTS_ROOTS" ]; then
+        ui_detail "no project roots configured — export skipped (only projects under"
+        ui_detail "the registered roots are migrated; see docs/troubleshooting.md)"
+        log "ddev database export skipped (no project roots)"
+    else
+        if [ "$MODE" = "advanced" ] && [ "$INTERACTIVE" = true ]; then
+            ans=$(prompt "Export the dev user's ddev databases before the handover? (recommended — dumps under /var/backups/opencode-permissions-kit)" "Y" "N" "")
+            [ "$ans" != "y" ] && SKIP_DDEV_MIGRATION=true
+        fi
+        if [ "$SKIP_DDEV_MIGRATION" != true ]; then
+            # shellcheck disable=SC2086  # word splitting intended (root list)
+            ddev_migrate_export "$DEFAULT_USER" "$OPENCODE_USER" "$OPENCODE_GROUP" $PROJECTS_ROOTS || true
+            DD_MIG_DUMP_DIR="${DD_MIG_DUMP_DIR:-}"
+            if [ -n "$DD_MIG_DUMP_DIR" ] && [ "${DD_MIG_OK:-0}" -gt 0 ]; then
+                ui_success "ddev databases exported: $DD_MIG_OK ok, ${DD_MIG_FAIL:-0} failed — $DD_MIG_DUMP_DIR"
+                if ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+                    echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
+                fi
+                log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL dir=$DD_MIG_DUMP_DIR"
+            else
+                ui_warn "ddev database export produced no dumps — import manually later if needed"
+                ui_detail "retry after install: sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export $DEFAULT_USER $PROJECTS_ROOTS"
+                log "ddev database export produced no dumps"
+            fi
+        else
+            ui_detail "declined — the dev databases become unreachable with the old daemon"
+            ui_detail "export manually BEFORE using ddev again:"
+            ui_detail "  sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export $DEFAULT_USER $PROJECTS_ROOTS"
+            log "ddev database export declined (advanced prompt)"
+        fi
+    fi
+fi
+# Carry a pre-existing stamp over the install.conf rewrite in Step 2 —
+# without this, every second re-install would re-attempt (and fail) the
+# dev-side export.
+if [ "$DDEV_EXPORTED_PRE" = "1" ] && ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+    echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
+fi
+# Carry a pre-existing stamp over the install.conf rewrite in Step 2.
+if [ "$DDEV_EXPORTED_PRE" = "1" ] && ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+    echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
+fi
+
 # === Step 5: Filesystem (group baseline) ===
 
 if [ -n "$PROJECTS_ROOTS" ]; then
@@ -1006,7 +1102,8 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -1151,6 +1248,9 @@ ui_section "Installation complete"
 ui_kv "Kit"      "v$VERSION"
 ui_kv "Backend"  "$CONTAINER_BACKEND (owned by 'opencode')"
 [ -n "$PROJECTS_ROOTS" ] && ui_kv "Projects" "$PROJECTS_ROOTS"
+if [ -n "$DD_MIG_DUMP_DIR" ]; then
+    ui_kv_warn "Ddev dumps" "$DD_MIG_DUMP_DIR — import: sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import"
+fi
 if [ "$SECURE_GIT_CONFIG" = true ]; then
     ui_kv "Git"   "blocked for the agent (.git/config deny active)"
 else
@@ -1187,6 +1287,7 @@ fi
 echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"
+[ -n "$DD_MIG_DUMP_DIR" ] && ui_detail "ddev-migrate.sh import          re-import your ddev databases (first start pulls images)"
 ui_detail "opencode-permissions-kit status   verify the protection"
 ui_detail "opencode-permissions-kit config   change settings later (or update/uninstall)"
 ui_detail "Docs:  https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/README.md"

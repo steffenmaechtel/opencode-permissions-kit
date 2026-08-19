@@ -111,3 +111,31 @@ rotatable deploy keys and rotate them if the machine is not trusted.
 
 The **first** `ddev start` as `opencode` downloads mutagen and pulls images
 into the rootless daemon; everything afterwards reuses that state.
+
+## Database migration from your old daemon
+
+Before the kit, ddev ran as **you** against your daemon. At install time
+the kit exports every registered project's database while your side still
+works — one project at a time (`ddev start` → `ddev export-db` →
+`ddev stop`, so dozens of projects never run simultaneously), then powers
+the old daemon off (volumes are kept). The dumps land in
+`/var/backups/opencode-permissions-kit/ddev-migration-<timestamp>/`;
+the kit never deletes them. Projects without a database
+(`omit_containers: [db]`) are skipped automatically.
+
+The **import is deliberately your call**, not part of the install (the
+first opencode-side start pulls images and takes a while). After the
+install:
+
+```bash
+# all at once:
+sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import
+# or per project (the ddev() function already runs as opencode):
+ddev start <project> && ddev import-db <project> --file=<dump>.sql.gz
+```
+
+`opencode-permissions-kit status` lists dumps still waiting for import.
+Only each project's **default** database is exported; extra named
+databases need a manual `ddev export-db --database=<name>` on the old
+side — do that **before** the `.ddev` handover made your side
+inoperable (see [troubleshooting](../troubleshooting.md)).

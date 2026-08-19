@@ -105,6 +105,18 @@ The **first** `ddev start` is slow (mutagen download, image pulls into the
 rootless daemon); every later start reuses that state. Details:
 [ddev integration](concepts/ddev-integration.md).
 
+If you had ddev projects before the kit, the installer exported their
+databases to `/var/backups/opencode-permissions-kit/ddev-migration-*/`
+(asked before the switch; `--skip-ddev-migration` opts out). Re-import
+them when ready:
+
+```bash
+sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import
+```
+
+or per project with `ddev import-db <project> --file=<dump>.sql.gz` —
+see [ddev integration](concepts/ddev-integration.md).
+
 ## Next steps
 
 - Give a project access to docker/ddev: [Allow docker/ddev](how-to/container-tools.md)

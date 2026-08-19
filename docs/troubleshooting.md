@@ -38,6 +38,37 @@ export PATH="/usr/local/bin:$PATH"
 **Fix:** none needed — wait once; every later start reuses the state. See
 [ddev integration](concepts/ddev-integration.md).
 
+## My databases are gone after the install
+
+**Cause:** your old containers/volumes lived in your daemon; ddev now runs
+as `opencode` against the kit's rootless daemon. Containers cannot move
+between daemons — SQL dumps are the only portable copy (the installer
+offers to create them before the `.ddev` handover).
+
+**Fix:** check what the install already exported:
+
+```bash
+ls /var/backups/opencode-permissions-kit/ddev-migration-*/
+```
+
+- Dumps there? Import them:
+  `sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import`
+  (or per project: `ddev start <name> && ddev import-db <name> --file=<dump>.sql.gz`).
+- No dumps (export skipped/declined) and `.ddev` is **still yours**?
+  Export now, before using ddev again:
+  `sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export <your-user> <project-roots>`
+- `.ddev` already handed over to `opencode`? Temporarily give it back,
+  export, hand it over again (replace `$USER` with your username):
+
+  ```bash
+  sudo find /var/www/vhosts -type d -name .ddev -prune -print0 \
+    | xargs -0 -n1 -I{} sudo chown -R "$USER" {}
+  sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export "$USER" /var/www/vhosts
+  sudo /usr/local/lib/opencode-permissions-kit/config.sh refresh
+  ```
+
+Details: [ddev integration](concepts/ddev-integration.md).
+
 ## ddev complains it cannot bind port 80/443
 
 **Cause:** rootless containers cannot bind ports < 1024.

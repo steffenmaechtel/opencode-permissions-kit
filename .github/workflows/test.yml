@@ -27,7 +27,7 @@ jobs:
       - name: Check version consistency
         run: make check-version
       - name: Make scripts executable
-        run: chmod +x ./tests/test-ui.sh ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-ddev-as-opencode.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh ./tests/test-docs.sh ./tests/test-kit-cli.sh ./tests/test-project-paths.sh ./tests/test-workflows.sh ./tests/test-install-args.sh ./tests/test-kit-files.sh ./tests/test-uninstall.sh ./tests/test-status.sh ./tests/check-host.sh ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/kit ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/ui.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+        run: chmod +x ./tests/test-ui.sh ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-ddev-as-opencode.sh ./tests/test-ddev-migrate.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh ./tests/test-docs.sh ./tests/test-kit-cli.sh ./tests/test-project-paths.sh ./tests/test-workflows.sh ./tests/test-install-args.sh ./tests/test-kit-files.sh ./tests/test-uninstall.sh ./tests/test-status.sh ./tests/check-host.sh ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/kit ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/ui.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/ddev-migrate.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
       - name: Install shellcheck
         run: sudo apt-get update -qq && sudo apt-get install -y shellcheck
       - name: Check contributor host tools
@@ -46,6 +46,8 @@ jobs:
         run: ./tests/test-bypass-guard.sh
       - name: Run ddev-as-opencode tests
         run: ./tests/test-ddev-as-opencode.sh
+      - name: Run ddev database migration tests
+        run: ./tests/test-ddev-migrate.sh
       - name: Run mkcert CA reuse tests
         run: ./tests/test-mkcert-reuse.sh
       - name: Run WSL2 /mnt/c exposure tests

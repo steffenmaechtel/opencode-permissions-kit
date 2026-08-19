@@ -44,6 +44,7 @@ reset_globals() {
     SECURE_GIT_CONFIG=true
     GIT_FLAG_GIVEN=""
     CONTAINER_BACKEND_OPT=""
+    SKIP_DDEV_MIGRATION=false
 }
 
 # expect_rc <want-rc> <description> <args...>
@@ -84,6 +85,18 @@ parse_args --container-backend podman-rootless
 [ "$CONTAINER_BACKEND_OPT" = "podman-rootless" ] \
     && pass "--container-backend captures its value" \
     || fail "--container-backend captures its value"
+
+reset_globals
+parse_args --skip-ddev-migration
+[ "$SKIP_DDEV_MIGRATION" = true ] \
+    && pass "--skip-ddev-migration sets the flag" \
+    || fail "--skip-ddev-migration sets the flag"
+
+reset_globals
+parse_args --yes
+[ "$SKIP_DDEV_MIGRATION" = false ] \
+    && pass "ddev migration stays ON by default" \
+    || fail "ddev migration stays ON by default"
 
 # The regression this file exists for: flags AFTER --projects used to be
 # silently dropped (the old loop `break`ed out of the parser).

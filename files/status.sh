@@ -235,6 +235,31 @@ else
         ui_kv "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)" "$UI_YELLOW"
     fi
 fi
+# Migration dumps (issue #15): databases exported from the developer's
+# daemon at install time wait here until they are imported into the
+# opencode daemon. Read-only listing — importing is the user's call.
+_mig_root="/var/backups/opencode-permissions-kit"
+_mig_dir=$(ls -1d "$_mig_root"/ddev-migration-* 2>/dev/null | sort | tail -1 || true)
+if [ -n "$_mig_dir" ] && [ -f "$_mig_dir/manifest.conf" ]; then
+    _mig_ok=$(grep -c '^OK|' "$_mig_dir/manifest.conf" 2>/dev/null || true)
+    _mig_ok=${_mig_ok:-0}
+    if [ "$_mig_ok" -gt 0 ]; then
+        _mig_imported=0
+        if [ -d "/home/$OPENCODE_USER/.ddev" ]; then
+            _mig_imported=$(grep -c '^project_info:' "/home/$OPENCODE_USER/.ddev/global_config.yaml" 2>/dev/null || true)
+            _mig_imported=${_mig_imported:-0}
+        fi
+        if [ "$_mig_imported" -gt 0 ]; then
+            ui_kv "db dumps" "$_mig_ok dump(s) — ${_mig_dir##*/}" "$UI_GREEN"
+            ui_detail "if some databases are missing in the opencode projects, import manually:"
+            ui_detail "  sudo sh $LIBDIR/ddev-migrate.sh import"
+        else
+            ui_kv_warn "db dumps" "$_mig_ok dump(s) waiting for import — ${_mig_dir##*/}"
+            ui_detail "import all: sudo sh $LIBDIR/ddev-migrate.sh import  (first start pulls images)"
+            ui_detail "or per project: ddev start <name> && ddev import-db <name> --file=<dump>.sql.gz"
+        fi
+    fi
+fi
 if [ -n "${DDEV_VERSION:-}" ]; then
     ddev_low=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
     if [ "$ddev_low" = yes ]; then
