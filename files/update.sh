@@ -362,7 +362,7 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         [ -d "$root" ] || continue
-        ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"
+        ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         log "ddev handover applied under $root"
     done < "$PROJECTS_CONF"
 fi
@@ -551,7 +551,7 @@ if [ "$REFRESH" = true ]; then
             sudo find "$root" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
             sudo find "$root" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo setfacl -R -d -m "g:$NEW_OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
-            ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"
+            ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi
     ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"

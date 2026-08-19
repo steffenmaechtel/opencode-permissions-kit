@@ -101,6 +101,14 @@ sudo bash /usr/local/lib/opencode-permissions-kit/update.sh
 (or `config.sh refresh`). The handover table lives in
 [ddev integration](concepts/ddev-integration.md).
 
+**EPERM on the project root itself** (`chmod /var/www/vhosts/<project>:
+operation not permitted` during `ddev start` on a fresh clone): same
+mechanism, different target — without `vendor/` ddev writes its settings
+file at the project root and chmods the root directory. The handover
+covers this bootstrap case (root inode → `opencode`, mode `2755`) and
+hands the root back to you once TYPO3 is detected; see the bootstrap
+paragraph in [ddev integration](concepts/ddev-integration.md).
+
 ## `docker ps` in the agent session lists "wrong" containers
 
 **Cause:** expected behavior — the session talks to the **opencode user's**

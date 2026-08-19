@@ -227,6 +227,24 @@ check "4c: typo3 settings dir handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system)" = "opencode"'
 check "4c: typo3 settings.php group-writable" \
     E 'test "$(stat -c %a /var/www/vhosts/test-project/config/system/settings.php)" = "664"'
+# Project-root handover (TYPO3 bootstrap): no vendor marker => ddev's
+# settings-path fallback targets the APP ROOT and its chmod needs
+# ownership. Root inode (not contents) => opencode, mode 2755: Perm==0755
+# makes ddev's util.Chmod a structural no-op.
+check "4c: undetected typo3 project root owned by opencode (bootstrap)" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project)" = "opencode"'
+check "4c: undetected typo3 project root is 2755 (Perm==0755, ddev chmod no-op)" \
+    E 'test "$(stat -c %a /var/www/vhosts/test-project)" = "2755"'
+check "4c: project-root handover is inode-only (contents not chowned to opencode)" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/index.php)" != "opencode"'
+# Detected project (vendor marker present): ddev targets config/system,
+# never the root — it must stay dev-owned with g+w (2775).
+E 'sudo mkdir -p /var/www/vhosts/detected-project/.ddev /var/www/vhosts/detected-project/vendor/typo3/cms-core/Classes/Information /var/www/vhosts/detected-project/config/system && sudo chown -R dev:dev /var/www/vhosts/detected-project && printf "type: typo3\n" | sudo tee /var/www/vhosts/detected-project/.ddev/config.yaml >/dev/null && sudo touch /var/www/vhosts/detected-project/vendor/typo3/cms-core/Classes/Information/Typo3Version.php'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes refresh'
+check "4c: detected typo3 project root handed BACK to dev (2775)" \
+    E 'test "$(stat -c %U /var/www/vhosts/detected-project)" = "dev" && test "$(stat -c %a /var/www/vhosts/detected-project)" = "2775"'
+check "4c: detected typo3 settings dir still handed over to opencode" \
+    E 'test "$(stat -c %U /var/www/vhosts/detected-project/config/system)" = "opencode"'
 
 echo ""
 echo "--- 5. Soft-only file access (the ddev-working goal) ---"

@@ -59,6 +59,20 @@ like `/var/www/vhosts` holding several projects):
 | `drupal*`, `backdrop` | `<docroot>/sites/default` |
 | `magento*` | `app/etc` |
 
+**The project root during bootstrap.** A freshly cloned `typo3` project
+has no `vendor/` yet — ddev cannot detect the installation and falls back
+to writing its settings file at the **project root**, chmod-ing the root
+directory to `0755` on every start. Since `chmod` is owner-only, the kit
+hands the root *directory inode* (never its contents) to `opencode` with
+mode `2755`: the exact `0755` base bits make ddev's chmod a no-op, so
+`ddev start` and `ddev composer install` work from the first run. While
+the root is handed over, creating new top-level files is limited (editing
+existing files is not — they stay group-writable). Once TYPO3 is
+installed (`vendor/` or `<docroot>/typo3` present, the same markers
+ddev's detection uses), ddev targets `config/system` instead and the kit
+hands the root **back to you** (`2775`, group-writable) on the next
+install/`projects add`/`refresh`/`update --refresh`.
+
 The handover runs on install, on `config.sh projects add`, on
 `config.sh refresh`, and unconditionally on every `update.sh`. Your
 `.git/` stays yours (mode 700, untouched).

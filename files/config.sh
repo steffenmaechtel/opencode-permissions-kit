@@ -232,7 +232,7 @@ projects_add() {
         # unconditionally — they must belong to it or `ddev start` fails
         # with "operation not permitted". The registered path may be a
         # parent of several projects.
-        ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
+        ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         ui_success "added $p (group=$OPENCODE_GROUP, setgid, default-acl)"
         log "project added: $p"
     done
@@ -456,7 +456,7 @@ refresh() {
             sudo find "$p" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
             sudo find "$p" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$p" 2>/dev/null || true
-            ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
+            ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi
     ui_success "group baseline refreshed."
