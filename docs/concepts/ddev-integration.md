@@ -139,3 +139,11 @@ Only each project's **default** database is exported; extra named
 databases need a manual `ddev export-db --database=<name>` on the old
 side — do that **before** the `.ddev` handover made your side
 inoperable (see [troubleshooting](../troubleshooting.md)).
+
+A project that no longer **starts** (old production leftovers) does not
+block the others: the export continues, then the installer lists the
+failed projects and asks whether to continue anyway (their databases
+would become unreachable) or abort so you can fix them first — the
+`.ddev` handover has not happened yet at that point, so your side still
+works and a re-run retries cleanly. `--yes` installs print the list and
+continue.

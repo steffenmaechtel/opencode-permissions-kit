@@ -163,13 +163,19 @@ if [ "$1" = "export-db" ]; then
         esac
     done
 fi
+# "broken" simulates an old production project that no longer starts.
+if [ "$1" = "start" ] && [ "$2" = "broken" ]; then
+    echo "Failed to start broken: fixture failure" >&2
+    exit 1
+fi
 exit 0
 FAKE
 chmod +x "$WORK/bin/ddev"
 
-# Two exportable projects + one db-less project under the root.
+# Two exportable projects + one db-less project + one BROKEN project
+# (start fails — the loop must continue with the others) under the root.
 rm -rf /var/tmp/opencode-ddev-mig-roots
-mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/alpha/.ddev /var/tmp/opencode-ddev-mig-roots/vhosts/gamma/.ddev /var/tmp/opencode-ddev-mig-roots/vhosts/nodb/.ddev "$WORK/devhome/.ddev"
+mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/alpha/.ddev /var/tmp/opencode-ddev-mig-roots/vhosts/gamma/.ddev /var/tmp/opencode-ddev-mig-roots/vhosts/nodb/.ddev /var/tmp/opencode-ddev-mig-roots/vhosts/broken/.ddev "$WORK/devhome/.ddev"
 cat > "$WORK/devhome/.ddev/global_config.yaml" <<'YML'
 project_info:
   alpha:
@@ -178,10 +184,13 @@ project_info:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/gamma
   nodb:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/nodb
+  broken:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/broken
 YML
 printf 'name: alpha\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/alpha/.ddev/config.yaml
 printf 'name: gamma\ntype: php\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/gamma/.ddev/config.yaml
 printf 'omit_containers: [db]\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/nodb/.ddev/config.yaml
+printf 'name: broken\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/broken/.ddev/config.yaml
 
 # Run the library export directly with a controlled backup root; the sudo
 # detour is shimmed (CI runs unprivileged) by overriding the run-as helper
@@ -226,8 +235,11 @@ check_fail "ddev is never called with a project PATH" \
 check "manifest records OK for alpha" sh -c "grep -q '^OK|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
 check "manifest records OK for gamma" sh -c "grep -q '^OK|gamma|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
 check "manifest records SKIP for the db-less project" sh -c "grep -q '^SKIP|nodb|.*no-db-container' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
-check "no FAIL entries in the manifest (both exports succeeded)" \
-    sh -c "! grep -q '^FAIL|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check "manifest records FAIL for the unstartable project" sh -c "grep -q '^FAIL|broken|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check "a failed start does not abort the remaining exports" \
+    sh -c "grep -q 'export-db gamma' \"\$1\"" _ "$WORK/ddev.log"
+check_fail "no stop is issued for the failed project (it never started)" \
+    sh -c "grep -q 'ddev:stop broken' \"\$1\"" _ "$WORK/ddev.log"
 
 # --- 5. import loop (static wiring) ---------------------------------------------
 
@@ -256,6 +268,18 @@ check "install.sh runs the export in Step 4b (before the Step 5 handover)" \
     sh -c 'export_ln=$(grep -n "ddev_migrate_export \"" "$1" | head -1 | cut -d: -f1); hand_ln=$(grep -n "ddev_handover_root \"" "$1" | head -1 | cut -d: -f1); [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$INSTALL"
 check "install.sh stamps DDEV_EXPORTED=1 after a successful export" \
     sh -c "grep -q 'DDEV_EXPORTED=1' \"\$1\"" _ "$INSTALL"
+check "install.sh gates the DDEV_EXPORTED stamp on zero failures" \
+    sh -c "grep -qF '[ \"\$DD_MIG_FAIL\" -eq 0 ]' \"\$1\"" _ "$INSTALL"
+check "install.sh re-reads ok/fail counts from the manifest (subshell-safe)" \
+    sh -c "grep -q 'grep -c .\\^OK|.' \"\$1\" || grep -qF 'grep -c \"^OK|\"' \"\$1\"" _ "$INSTALL"
+check "install.sh lists failed projects before continuing" \
+    sh -c "grep -q 'could NOT be exported' \"\$1\"" _ "$INSTALL"
+check "install.sh asks before continuing with failed exports (default: abort)" \
+    sh -c "grep -q 'ui_confirm \"Continue the install anyway?' \"\$1\" && grep -q '\"n\"' \"\$1\"" _ "$INSTALL"
+check "install.sh aborts BEFORE the handover when the user declines" \
+    sh -c "grep -q 'the .ddev handover did NOT run' \"\$1\"" _ "$INSTALL"
+check "install.sh keeps exporting the remaining projects on failure (non-fatal loop)" \
+    sh -c "grep -qF 'continue' \"\$1\"" _ "$MIG"
 check "install.sh skips the export when already stamped" \
     sh -c "grep -q 'DDEV_EXPORTED_PRE' \"\$1\"" _ "$INSTALL"
 check "install.sh shows the dumps + import hint in the summary" \

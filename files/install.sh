@@ -875,12 +875,47 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
             # shellcheck disable=SC2086  # word splitting intended (root list)
             ddev_migrate_export "$DEFAULT_USER" "$OPENCODE_USER" "$OPENCODE_GROUP" $PROJECTS_ROOTS || true
             DD_MIG_DUMP_DIR="${DD_MIG_DUMP_DIR:-}"
-            if [ -n "$DD_MIG_DUMP_DIR" ] && [ "${DD_MIG_OK:-0}" -gt 0 ]; then
-                ui_success "ddev databases exported: $DD_MIG_OK ok, ${DD_MIG_FAIL:-0} failed — $DD_MIG_DUMP_DIR"
-                if ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
-                    echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
+            if [ -n "$DD_MIG_DUMP_DIR" ] && [ -s "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+                # The manifest is authoritative (the export loop runs in a
+                # subshell — its variable state does not propagate).
+                DD_MIG_OK=$(grep -c '^OK|' "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
+                DD_MIG_FAIL=$(grep -c '^FAIL|' "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
+                DD_MIG_OK=${DD_MIG_OK:-0}; DD_MIG_FAIL=${DD_MIG_FAIL:-0}
+                if [ "$DD_MIG_OK" -gt 0 ]; then
+                    ui_success "ddev databases exported: $DD_MIG_OK ok, $DD_MIG_FAIL failed — $DD_MIG_DUMP_DIR"
+                else
+                    ui_warn "ddev database export produced NO dumps ($DD_MIG_FAIL failed)"
                 fi
-                log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL dir=$DD_MIG_DUMP_DIR"
+                if [ "$DD_MIG_FAIL" -eq 0 ]; then
+                    if ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+                        echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
+                    fi
+                    log "ddev databases exported: ok=$DD_MIG_OK fail=0 dir=$DD_MIG_DUMP_DIR"
+                else
+                    # Old production projects sometimes no longer start — their
+                    # DBs would be unreachable after the handover. All OTHER
+                    # projects were still exported (the loop continues on
+                    # failure); now the user decides: fix first (abort — the
+                    # handover has not run, the dev side still works) or accept.
+                    ui_warn "these projects could NOT be exported (no database dump):"
+                    grep '^FAIL|' "$DD_MIG_DUMP_DIR/manifest.conf" | cut -d'|' -f2 | sed 's/^/     /'
+                    ui_detail "once the install continues, their databases are only reachable via"
+                    ui_detail "the old daemon — a later dev-side export is impossible (handover)."
+                    if [ "$INTERACTIVE" = true ]; then
+                        # Convention: docs/design/conventions.md — default "n":
+                        # continuing is the destructive choice here.
+                        if ! ui_confirm "Continue the install anyway? (the listed databases become unreachable)" "n"; then
+                            ui_info "Aborted — the .ddev handover did NOT run, your dev-side ddev still works."
+                            ui_detail "fix the failed projects (ddev start <name> as $DEFAULT_USER), then re-run install.sh"
+                            ui_detail "dumps already written stay in $DD_MIG_DUMP_DIR"
+                            log "install aborted: $DD_MIG_FAIL ddev export(s) failed (user decision) — no handover ran"
+                            exit 1
+                        fi
+                    else
+                        ui_warn "continuing (--yes): the listed databases become unreachable"
+                    fi
+                    log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL dir=$DD_MIG_DUMP_DIR (failures accepted)"
+                fi
             else
                 ui_warn "ddev database export produced no dumps — import manually later if needed"
                 ui_detail "retry after install: sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export $DEFAULT_USER $PROJECTS_ROOTS"
@@ -897,10 +932,6 @@ fi
 # Carry a pre-existing stamp over the install.conf rewrite in Step 2 —
 # without this, every second re-install would re-attempt (and fail) the
 # dev-side export.
-if [ "$DDEV_EXPORTED_PRE" = "1" ] && ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
-    echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
-fi
-# Carry a pre-existing stamp over the install.conf rewrite in Step 2.
 if [ "$DDEV_EXPORTED_PRE" = "1" ] && ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
     echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
 fi

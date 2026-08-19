@@ -58,8 +58,58 @@ echo "--- 2. Run install (from local repo checkout, podman-rootless backend) ---
 # podman-rootless because the e2e container has no systemd (docker-rootless
 # provisioning would abort — rootless is mandatory now).
 E 'mkdir -p /home/dev/.config/opencode && printf "%s\n" "{\"model\":\"dummy\"}" > /home/dev/.config/opencode/opencode.jsonc'
-E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts'
+
+echo ""
+echo "--- 1c. ddev migration fixtures (fake ddev + dev registry, issue #15) ---"
+# The fake ddev (tests/e2e/fake-ddev) answers the version gate, records
+# every call + the .ddev owner at call time, exports dump files, and fails
+# `start ddev-broken`. The dev registry lists two projects under the
+# registered root /var/www/vhosts. Base64 transport (portable GNU+BSD form,
+# no -w0): the E helper takes a single sh -c string (heredocs get
+# unreadable), and the fixture never needs the exec bit on the host —
+# only inside the container.
+FAKE_DDEV_B64="$(base64 "$(dirname "$(readlink -f "$0")")/fake-ddev" | tr -d '\n')"
+E "echo $FAKE_DDEV_B64 | base64 -d | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev"
+E 'mkdir -p /home/dev/.ddev /var/www/vhosts/ddev-mig/.ddev /var/www/vhosts/ddev-broken/.ddev'
+E 'printf "%s\n" "project_info:" "  ddev-mig:" "    approot: /var/www/vhosts/ddev-mig" "  ddev-broken:" "    approot: /var/www/vhosts/ddev-broken" > /home/dev/.ddev/global_config.yaml'
+E 'printf "type: typo3\n" > /var/www/vhosts/ddev-mig/.ddev/config.yaml && printf "type: typo3\n" > /var/www/vhosts/ddev-broken/.ddev/config.yaml'
+E 'touch /var/www/vhosts/ddev-mig/.ddev/.webimageBuild'
+# The log is written by root (version gate) AND dev (export loop): dev owns
+# it, world-writable so both may append.
+E 'touch /tmp/fake-ddev.log && chmod 666 /tmp/fake-ddev.log'
+
+E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts 2>&1 | tee /tmp/install-out.log'"
 echo "  Install complete."
+
+echo ""
+echo "--- 2c. ddev database migration (issue #15) ---"
+check "2c: dump directory created under /var/backups" \
+    E 'ls -d /var/backups/opencode-permissions-kit/ddev-migration-* >/dev/null 2>&1'
+check "2c: dump exported for the healthy project" \
+    E 'sudo sh -c "test -s /var/backups/opencode-permissions-kit/ddev-migration-*/ddev-mig.sql.gz"'
+check "2c: manifest records OK for the healthy project" \
+    E 'sudo sh -c "grep -q \"^OK|ddev-mig|\" /var/backups/opencode-permissions-kit/ddev-migration-*/manifest.conf"'
+check "2c: manifest records FAIL for the unstartable project" \
+    E 'sudo sh -c "grep -q \"^FAIL|ddev-broken|\" /var/backups/opencode-permissions-kit/ddev-migration-*/manifest.conf"'
+check "2c: export ran while .ddev was still dev-owned (before the handover)" \
+    E 'grep -q "^export-db ddev-mig .*|dev$" /tmp/fake-ddev.log'
+check "2c: per-project stop recorded (one project at a time)" \
+    E 'grep -q "^stop ddev-mig|" /tmp/fake-ddev.log'
+check "2c: exactly one final poweroff" \
+    E 'test "$(grep -c "^poweroff|" /tmp/fake-ddev.log)" = "1"'
+check "2c: .ddev handed over to opencode AFTER the export" \
+    E 'test "$(stat -c %U /var/www/vhosts/ddev-mig/.ddev)" = "opencode"'
+check "2c: install warned about the failed project (list + consequence)" \
+    E 'grep -q "ddev-broken" /tmp/install-out.log && grep -q "could NOT be exported" /tmp/install-out.log'
+check "2c: --yes continued past the failed export (non-interactive)" \
+    E 'test -x /usr/local/bin/opencode'
+check_fail "2c: DDEV_EXPORTED stamp NOT set while exports failed" \
+    E 'sudo grep -q "^DDEV_EXPORTED=" /etc/opencode-permissions-kit/install.conf'
+check "2c: install summary shows the dumps + import hint" \
+    E 'grep -q "ddev-migrate.sh import" /tmp/install-out.log'
+# Remove the fake binary: section 3 asserts no ddev shadow exists at
+# /usr/local/bin/ddev (the soft-only kit ships no shim).
+E 'sudo rm -f /usr/local/bin/ddev'
 
 echo ""
 echo "--- 3. Wrapper & binary ---"

@@ -80,9 +80,17 @@ directories themselves stay in place and are shared via the group baseline.
   - summary: dumps + import hint.
 - `status.sh`: "db dumps … waiting for import" (warn) until the opencode
   registry is populated, informational afterwards.
-- Failures are **never fatal**: per-project export failures become FAIL
-  manifest entries; "no dumps at all" leaves the stamp unset so a re-run
-  retries.
+- Failures are **never fatal to the export**: a project whose `ddev start`
+  fails (old production projects that no longer boot) is recorded as a
+  FAIL manifest entry and the loop continues — the other projects still
+  get their dumps. Afterwards the installer lists the failed projects and
+  asks **interactively**: continue anyway (their databases become
+  unreachable after the handover) or abort — default **abort**, because
+  aborting is the safe side: the `.ddev` handover has not run yet, the
+  dev side still works, the user can fix the broken project and re-run.
+  Non-interactive installs (`--yes`) print the list + warning and
+  continue. The `DDEV_EXPORTED` stamp is only written when **zero**
+  exports failed, so a re-run retries.
 
 ## 4. Tests / CI
 
