@@ -59,6 +59,20 @@ like `/var/www/vhosts` holding several projects):
 | `drupal*`, `backdrop` | `<docroot>/sites/default` |
 | `magento*` | `app/etc` |
 
+**The project root during bootstrap.** A freshly cloned `typo3` project
+has no `vendor/` yet — ddev cannot detect the installation and falls back
+to writing its settings file at the **project root**, chmod-ing the root
+directory to `0755` on every start. Since `chmod` is owner-only, the kit
+hands the root *directory inode* (never its contents) to `opencode` with
+mode `2755`: the exact `0755` base bits make ddev's chmod a no-op, so
+`ddev start` and `ddev composer install` work from the first run. While
+the root is handed over, creating new top-level files is limited (editing
+existing files is not — they stay group-writable). Once TYPO3 is
+installed (`vendor/` or `<docroot>/typo3` present, the same markers
+ddev's detection uses), ddev targets `config/system` instead and the kit
+hands the root **back to you** (`2775`, group-writable) on the next
+install/`projects add`/`refresh`/`update --refresh`.
+
 The handover runs on install, on `config.sh projects add`, on
 `config.sh refresh`, and unconditionally on every `update.sh`. Your
 `.git/` stays yours (mode 700, untouched).
@@ -91,6 +105,38 @@ Notes:
   browsers keep trusting ddev's HTTPS certs; a new CA is generated only as
   a last resort.
 
+## Hostnames and the Windows hosts file
+
+On WSL2, stock ddev manages the **Windows** hosts file (running
+`ddev-hostname.exe` via WSL interop). For the kit's ddev user that path
+is closed — `/mnt/c` is restricted to the developer, and interop is
+additionally broken on many WSL2+systemd hosts. ddev then only **warns**
+and continues (`ddev start` succeeds), but your Windows **browser**
+cannot resolve custom-`project_tld` domains until the hostnames are in
+the Windows hosts file.
+
+The kit deliberately gives the agent **no** hosts-file access. Instead
+the developer gets a one-command bridge that uses **ddev's own
+elevation path** (`ddev hostname <name> 127.0.0.1` as your user →
+`ddev-hostname.exe` → the Windows permission dialog):
+
+```bash
+opencode-permissions-kit ddev-hosts-add          # in the project dir
+```
+
+It adds every hostname missing from
+`C:\Windows\System32\drivers\etc\hosts` — the project name + TLD,
+`additional_hostnames`, and non-wildcard `additional_fqdns`. After
+`ddev start`/`restart` the kit's `ddev()` shell function prints the
+missing hostnames plus that command as a hint; `ddev-hosts-check`
+lists them on demand, and `opencode-permissions-kit status` reports
+them per project root.
+
+Projects on the default `ddev.site` TLD with internet access need no
+hosts entry at all (DNS wildcard). `ddev launch` cannot open a browser
+from the opencode context — open the URL in your Windows browser
+directly.
+
 ## The SSH-key trade-off
 
 `ddev auth ssh` / composer private keys live in `/home/opencode/.ddev` and
@@ -111,3 +157,43 @@ rotatable deploy keys and rotate them if the machine is not trusted.
 
 The **first** `ddev start` as `opencode` downloads mutagen and pulls images
 into the rootless daemon; everything afterwards reuses that state.
+
+## Database migration from your old daemon
+
+Before the kit, ddev ran as **you** against your daemon. At install time
+the kit exports every registered project's database while your side still
+works — one project at a time (`ddev start` → `ddev export-db` →
+`ddev stop`, so dozens of projects never run simultaneously), then powers
+the old daemon off (volumes are kept). The dumps land in
+`/var/backups/opencode-permissions-kit/ddev-migration-<timestamp>/`;
+the kit never deletes them. Projects without a database
+(`omit_containers: [db]`) are skipped automatically.
+
+The **import is deliberately your call**, not part of the install (the
+first opencode-side start pulls images and takes a while). After the
+install:
+
+```bash
+# all at once:
+sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import
+# or per project (the ddev() function already runs as opencode):
+ddev start <project> && ddev import-db <project> --file=<dump>.sql.gz
+```
+
+`opencode-permissions-kit status` lists dumps still waiting for import.
+Only each project's **default** database is exported; extra named
+databases need a manual `ddev export-db --database=<name>` on the old
+side — do that **before** the `.ddev` handover made your side
+inoperable (see [troubleshooting](../troubleshooting.md)).
+
+A project that no longer **starts** (old production leftovers) does not
+block the others: the export continues, then the installer lists the
+failed projects and asks whether to continue anyway (their databases
+would become unreachable) or abort so you can fix them first — the
+`.ddev` handover has not happened yet at that point, so your side still
+works and a re-run retries cleanly. `--yes` installs print the list and
+continue.
+
+Re-running the installer after an abort **resumes** instead of repeating:
+projects whose dumps already exist are skipped, only missing or
+previously-failed ones are exported (into the same dump directory).

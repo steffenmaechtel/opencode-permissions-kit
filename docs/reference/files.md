@@ -49,6 +49,7 @@ This page lists every file and directory the kit manages, and every key in
 | `/usr/local/lib/opencode-permissions-kit/bin/socket-check.sh` | Rootless socket probe (`test -S` only) |
 | `/usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode` | Sudoers helper that runs the real ddev as `opencode` (re-sets `HOME`/`XDG_RUNTIME_DIR`/`DOCKER_HOST`) |
 | `/usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh` | Sourced `ddev()` terminal function (hooked into the default user's rc files) |
+| `/usr/local/lib/opencode-permissions-kit/ddev-migrate.sh` | Database bridge for the daemon switch: export (dev user, install time) + import/list (post-install) |
 | `/usr/local/lib/opencode-permissions-kit/wrapper` | Directory validation, container opt-in, rootless exec |
 | `/usr/local/lib/opencode-permissions-kit/setup-container-backend.sh` | Rootless backend provisioning |
 | `/usr/local/lib/opencode-permissions-kit/config.sh` | Management: projects, git-config, backend, refresh |

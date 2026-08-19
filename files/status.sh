@@ -117,13 +117,17 @@ case "${CONTAINER_BACKEND:-}" in
         case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
         # The opencode user's runtime dir (/run/user/<uid>) is mode 700
         # opencode:opencode, so a non-root status.sh caller cannot stat the
-        # socket inside it. Try stat directly; if that fails (perm), use
-        # sudo -n (non-interactive — status.sh must never prompt for a
-        # password; without cached credentials the socket reads as
-        # "NOT reachable" until run via sudo).
+        # socket inside it. Direct stat first; then sudo -n (non-interactive
+        # — status.sh must never prompt for a password); when both fail but
+        # the runtime dir exists and is NOT traversable by the caller, the
+        # state is UNKNOWN, not broken (same wording pattern as the mkcert
+        # CA check below — a red "NOT reachable" made users think the
+        # daemon was down). A traversable dir without a socket stays red.
         if [ -n "$sock" ]; then
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv "socket" "reachable — $sock" "$UI_GREEN"
+            elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
+                ui_kv "socket" "unknown — needs root to check (run: sudo opencode-permissions-kit status)" "$UI_YELLOW"
             else
                 ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
             fi
@@ -140,11 +144,14 @@ case "${CONTAINER_BACKEND:-}" in
         ui_kv "backend" "podman-rootless" "$UI_GREEN"
         sock="${OPENCODE_PODMAN_SOCKET:-}"
         if [ -n "$sock" ]; then
-            # Optional podman docker-CLI-compat socket.
+            # Optional podman docker-CLI-compat socket (see docker-rootless
+            # branch for the probe rationale).
             sockpath="$sock"
             case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv "socket" "reachable — $sock" "$UI_GREEN"
+            elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
+                ui_kv "socket" "unknown — needs root to check (run: sudo opencode-permissions-kit status)" "$UI_YELLOW"
             else
                 ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
             fi
@@ -235,12 +242,58 @@ else
         ui_kv "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)" "$UI_YELLOW"
     fi
 fi
+# Migration dumps (issue #15): databases exported from the developer's
+# daemon at install time wait here until they are imported into the
+# opencode daemon. Read-only listing — importing is the user's call.
+_mig_root="/var/backups/opencode-permissions-kit"
+_mig_dir=$(ls -1d "$_mig_root"/ddev-migration-* 2>/dev/null | sort | tail -1 || true)
+if [ -n "$_mig_dir" ] && [ -f "$_mig_dir/manifest.conf" ]; then
+    _mig_ok=$(grep -c '^OK|' "$_mig_dir/manifest.conf" 2>/dev/null || true)
+    _mig_ok=${_mig_ok:-0}
+    if [ "$_mig_ok" -gt 0 ]; then
+        _mig_imported=0
+        if [ -d "/home/$OPENCODE_USER/.ddev" ]; then
+            _mig_imported=$(grep -c '^project_info:' "/home/$OPENCODE_USER/.ddev/global_config.yaml" 2>/dev/null || true)
+            _mig_imported=${_mig_imported:-0}
+        fi
+        if [ "$_mig_imported" -gt 0 ]; then
+            ui_kv "db dumps" "$_mig_ok dump(s) — ${_mig_dir##*/}" "$UI_GREEN"
+            ui_detail "if some databases are missing in the opencode projects, import manually:"
+            ui_detail "  sudo sh $LIBDIR/ddev-migrate.sh import"
+        else
+            ui_kv_warn "db dumps" "$_mig_ok dump(s) waiting for import — ${_mig_dir##*/}"
+            ui_detail "import all: sudo sh $LIBDIR/ddev-migrate.sh import  (first start pulls images)"
+            ui_detail "or per project: ddev start <name> && ddev import-db <name> --file=<dump>.sql.gz"
+        fi
+    fi
+fi
 if [ -n "${DDEV_VERSION:-}" ]; then
     ddev_low=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
     if [ "$ddev_low" = yes ]; then
         ui_kv "ddev version" "$DDEV_VERSION (ddev < 1.25 — rootless needs ddev >= 1.25, upgrade ddev)" "$UI_RED"
     else
         ui_kv "ddev version" "$DDEV_VERSION"
+    fi
+fi
+# Windows hosts readiness (WSL2): custom-tld projects need their hostnames
+# in the Windows hosts file for the browser; ddev (running as opencode)
+# cannot manage that file. Report-only, per project root.
+if [ -d /mnt/c ] && [ -f "$LIBDIR/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/System32/drivers/etc/hosts ] \
+   && [ -n "${DEFAULT_USER:-}" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
+    # shellcheck disable=SC1091  # deployed lib, checked above
+    . "$LIBDIR/ddev-hosts.sh"
+    _st_miss_total=0
+    if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+        while IFS= read -r _st_root; do
+            [ -z "$_st_root" ] && continue
+            [ -d "$_st_root" ] || continue
+            find "$_st_root" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r _st_d; do
+                _st_m=$(ddev_hosts_missing "$(dirname "$_st_d")")
+                [ -n "$_st_m" ] || continue
+                ui_kv_warn "hosts (win)" "$(dirname "$_st_d"): missing $(printf '%s' "$_st_m" | tr '\n' ' ')"
+                echo "     add: opencode-permissions-kit ddev-hosts-add"
+            done
+        done < "$PROJECTS_CONF"
     fi
 fi
 

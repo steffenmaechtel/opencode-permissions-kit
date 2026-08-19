@@ -1,0 +1,35 @@
+#!/bin/sh
+# tests/e2e/fake-ddev — host-side fixture, NOT executed on the host.
+# Planted into the e2e container at /usr/local/bin/ddev BEFORE install.sh
+# runs (run.sh section 1c) so the installer's ddev migration path executes
+# end-to-end against a controllable stand-in:
+#   - answers `version` for the >= 1.25 gate
+#   - start/export-db/stop/poweroff are recorded to $DDEV_FAKE_LOG
+#     TOGETHER with the current owner of the fixture project's .ddev —
+#     the ordering proof: the export must run while .ddev still belongs
+#     to dev (before install.sh's handover chowns it to opencode)
+#   - `export-db <name> --file=<path>` writes a dump file (like real ddev)
+#   - project "ddev-broken" FAILS to start (old production project that
+#     no longer boots) — the export loop must continue with the others
+#     and install.sh must surface the failure.
+case "$1" in
+    version)
+        echo "ddev version v1.25.0"
+        ;;
+    start)
+        if [ "$2" = "ddev-broken" ]; then
+            echo "Failed to start ddev-broken: fixture failure (old project)" >&2
+            exit 1
+        fi
+        ;;
+    export-db)
+        for a in "$@"; do
+            case "$a" in
+                --file=*) printf 'FAKEDUMP-%s\n' "$2" > "${a#--file=}" ;;
+            esac
+        done
+        ;;
+esac
+echo "$*|$(stat -c %U /var/www/vhosts/ddev-mig/.ddev 2>/dev/null || echo no-fixture)" \
+    >> "${DDEV_FAKE_LOG:-/tmp/fake-ddev.log}"
+exit 0

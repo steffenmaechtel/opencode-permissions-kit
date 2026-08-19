@@ -207,6 +207,51 @@ check "config.sh projects add uses the handover helper" \
 check "update.sh refresh uses the handover helper" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE"
 
+# --- 7b. project-root handover (TYPO3 bootstrap, EPERM on fresh clones) ---------
+# ddev's settings-path fallback targets the APP ROOT while TYPO3 is not
+# yet installed and chmods it to 0755 — owner-only, so the root must
+# belong to the ddev user during bootstrap and go back to the developer
+# once detection kicks in. Functional test as the CURRENT user (chown to
+# self is permitted, so the ownership branches are exercised as no-ops;
+# the MODE changes are real).
+HWORK=$(mktemp -d)
+mkdir -p "$HWORK/proj/.ddev"
+printf 'type: typo3\n' > "$HWORK/proj/.ddev/config.yaml"
+chmod 2775 "$HWORK/proj"
+
+check "typo3 detection: no vendor, no typo3 dir => undetected" \
+    sh -c ". \"\$1\" && if ddev_typo3_detected \"\$2\" .; then exit 1; fi" _ "$HANDOVER" "$HWORK/proj"
+
+mkdir -p "$HWORK/proj/vendor/typo3/cms-core/Classes/Information"
+touch "$HWORK/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
+check "typo3 detection: vendor Typo3Version.php => detected (composer mode)" \
+    sh -c ". \"\$1\" && ddev_typo3_detected \"\$2\" ." _ "$HANDOVER" "$HWORK/proj"
+rm -rf "$HWORK/proj/vendor"
+check "typo3 detection: docroot typo3 dir => detected (legacy)" \
+    sh -c "mkdir -p \"\$2/public/typo3\" && . \"\$1\" && ddev_typo3_detected \"\$2\" public" _ "$HANDOVER" "$HWORK/proj"
+rm -rf "$HWORK/proj/public"
+
+check "undetected typo3: root becomes 2755 (Perm==0755, ddev chmod is a no-op)" \
+    sh -c ". \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2755" _ "$HANDOVER" "$HWORK/proj"
+
+mkdir -p "$HWORK/proj/vendor/typo3/cms-core/Classes/Information"
+touch "$HWORK/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
+check "detected typo3: root handed back with 2775 (g+w restored)" \
+    sh -c ". \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2775" _ "$HANDOVER" "$HWORK/proj"
+
+check "non-typo3 type: root untouched by the project-root handover" \
+    sh -c "printf 'type: php\n' > \"\$2/.ddev/config.yaml\" && chmod 2770 \"\$2\" && . \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2770" _ "$HANDOVER" "$HWORK/proj"
+
+check "handover_root signature carries the dev user (handback target)" \
+    sh -c "grep -qF 'dhr_dev=\"\${4:-}\"' \"\$1\"" _ "$HANDOVER"
+check "install.sh passes DEFAULT_USER to the handover" \
+    sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
+check "update.sh passes DEFAULT_USER to the handover" \
+    sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$UPDATE"
+check "config.sh passes DEFAULT_USER to the handover" \
+    sh -c "grep -qF 'ddev_handover_root \"\$p\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$CONFIG"
+rm -rf "$HWORK"
+
 # --- 8. status.sh reporting ----------------------------------------------------
 check "status.sh reports ddev-as-opencode state" \
     sh -c "grep -q 'ddev-as-opencode' \"\$1\"" _ "$STATUS"

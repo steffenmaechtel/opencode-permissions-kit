@@ -11,6 +11,7 @@ your WSL/Linux system):
 opencode-permissions-kit status
 opencode-permissions-kit config projects add /var/www/vhosts/new-project
 opencode-permissions-kit update --binary
+opencode-permissions-kit ddev-hosts-add     # in a ddev project dir
 opencode-permissions-kit uninstall
 opencode-permissions-kit help        # commands + arguments overview
 ```
@@ -18,12 +19,33 @@ opencode-permissions-kit help        # commands + arguments overview
 Everything after the subcommand goes to the underlying script unchanged,
 so all flags below work with both forms. `config` and `update` elevate via
 sudo automatically; `status` needs no sudo; `uninstall` runs as your user
-and asks for sudo itself.
+and asks for sudo itself; `ddev-hosts-*` run as your user (they drive
+Windows-side elevation through ddev itself).
 
 The command is a symlink (`/usr/local/bin/opencode-permissions-kit`) into
 the kit library — deployed since kit 0.0.14. On older installs, run
 [update](../how-to/update.md) once to get it. The direct script calls below
 keep working everywhere.
+
+## ddev-hosts-add / ddev-hosts-check
+
+Windows hosts bridge (WSL2): ddev runs as `opencode` and cannot manage
+the Windows hosts file — your Windows browser cannot resolve custom-
+`project_tld` domains. These commands stay on the developer side; the
+agent never gets hosts-file access.
+
+```bash
+opencode-permissions-kit ddev-hosts-check   # what is missing?
+opencode-permissions-kit ddev-hosts-add     # add it (Windows asks permission)
+```
+
+`ddev-hosts-add` runs `ddev hostname <name> 127.0.0.1` as your user for
+every hostname missing from `C:\Windows\System32\drivers\etc\hosts`
+(project name + TLD, `additional_hostnames`, non-wildcard
+`additional_fqdns`); ddev elevates via `ddev-hostname.exe` and Windows
+shows its confirmation dialog (needs working WSL interop). Both take an
+optional project directory argument (default: the current directory).
+The `ddev()` shell hook prints the hint after `ddev start`/`restart`.
 
 ## install.sh
 

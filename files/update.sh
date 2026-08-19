@@ -50,7 +50,7 @@ KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc 
 opencode-deny-all.jsonc \
 sudoers.template umask.sh VERSION \
 opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh"
+opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
@@ -273,7 +273,9 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -361,7 +363,7 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         [ -d "$root" ] || continue
-        ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"
+        ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         log "ddev handover applied under $root"
     done < "$PROJECTS_CONF"
 fi
@@ -545,12 +547,15 @@ if [ "$REFRESH" = true ]; then
             [ -z "$root" ] && continue
             [ -d "$root" ] || continue
             sudo chgrp -R "$NEW_OPENCODE_GROUP" "$root" 2>/dev/null || true
-            sudo chmod g+s "$root" 2>/dev/null || true
+            # Recursive baseline like install.sh Step 5: setgid on every
+            # directory, group-write on files — .git stays developer-private.
+            sudo find "$root" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
+            sudo find "$root" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo setfacl -R -d -m "g:$NEW_OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
-            ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"
+            ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi
-    ui_success "group baseline refreshed (chgrp + setgid + default ACLs)"
+    ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"
     log "group baseline refresh requested (--refresh)"
 else
     ui_detail "skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)"

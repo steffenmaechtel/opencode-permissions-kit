@@ -132,6 +132,24 @@ else
     fail "docker-rootless: unreachable socket reported without sudo prompt (out=$out)"
 fi
 
+# d) docker-rootless with the socket inside a NON-TRAVERSABLE runtime dir
+#    (production finding: /run/user/<uid> is 700 opencode:opencode — a
+#    non-root caller cannot stat inside, sudo -n has no cached credentials;
+#    the old output said red "NOT reachable" and users thought the daemon
+#    was down). Must report "unknown — needs root", never red.
+mkdir -p "$WORK/locked-runtime"
+chmod 700 "$WORK/locked-runtime"   # 700 of a nonexistent other user is untestable; 000 works for everyone
+chmod 000 "$WORK/locked-runtime"
+out=$(run_case "docker-rootless" "unix://$WORK/locked-runtime/docker.sock" "" || true)
+if printf '%s' "$out" | grep -q "unknown — needs root to check" \
+   && ! printf '%s' "$out" | grep -q "NOT reachable" \
+   && ! printf '%s' "$out" | grep -qE 'PROMPT-ATTEMPT|parameter not set'; then
+    pass "docker-rootless: socket in inaccessible runtime dir reports unknown (needs root)"
+else
+    fail "docker-rootless: socket in inaccessible runtime dir reports unknown (needs root) (out=$out)"
+fi
+chmod 755 "$WORK/locked-runtime" 2>/dev/null || true
+
 # --- 2. not-installed state: exit 0 + install hint ------------------------------
 
 if ! id opencode >/dev/null 2>&1; then

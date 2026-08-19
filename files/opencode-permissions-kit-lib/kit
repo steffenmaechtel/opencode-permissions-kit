@@ -56,6 +56,11 @@ Commands:
                                   container-backend <backend>|status, refresh
   update [--yes] [--refresh]      Re-deploy the kit; --binary / --binary-path
                                   upgrade the opencode binary
+  ddev-hosts-add [dir]            Add this project's ddev hostnames to the
+                                  Windows hosts file (ddev's own UAC flow;
+                                  run as your user, Windows asks permission)
+  ddev-hosts-check [dir]          List this project's ddev hostnames missing
+                                  from the Windows hosts file
   uninstall [--yes] [--dry-run]   Remove the kit (runs as your user)
   help                            Show this help
 
@@ -92,6 +97,39 @@ case "$cmd" in
         # uninstall.sh expects the default user (no sudo prefix); it asks
         # for sudo itself via sudo -v.
         exec sh "$LIBDIR/uninstall.sh" "$@"
+        ;;
+    ddev-hosts-add|ddev-hosts-check)
+        # Windows hosts bridge: must run AS THE DEVELOPER (interop + the
+        # Windows user's drvfs access), never as root/opencode. Sourced
+        # lib, functions called inline — argument passing stays simple.
+        [ -f "$LIBDIR/ddev-hosts.sh" ] || { ui_error "$LIBDIR/ddev-hosts.sh not found — is the kit installed?"; exit 1; }
+        # shellcheck disable=SC1090
+        . "$LIBDIR/ddev-hosts.sh"
+        if [ "$(id -u)" -eq 0 ]; then
+            _kitsu=""
+            [ -f /etc/opencode-permissions-kit/install.conf ] && _kitsu=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode-permissions-kit/install.conf | tail -1)
+            [ -n "$_kitsu" ] || _kitsu="${SUDO_USER:-}"
+            if [ -z "$_kitsu" ] || [ "$(id -u "$_kitsu" 2>/dev/null || echo 0)" = "0" ]; then
+                ui_error "cannot resolve the developer user — run as your user, not as root"
+                exit 1
+            fi
+            exec sudo -u "$_kitsu" env HOME="/home/$_kitsu" sh -c ". '$LIBDIR/ddev-hosts.sh' && $cmd \"\$1\"" _ "${1:-$PWD}"
+        fi
+        case "$cmd" in
+            ddev-hosts-check)
+                _khm=$(ddev_hosts_missing "${1:-$PWD}")
+                if [ -z "$_khm" ]; then
+                    echo "all ddev hostnames already in $DDEV_WIN_HOSTS"
+                else
+                    echo "missing from $DDEV_WIN_HOSTS:"
+                    printf '%s\n' "$_khm" | sed 's/^/  /'
+                    echo "add them: opencode-permissions-kit ddev-hosts-add"
+                fi
+                ;;
+            ddev-hosts-add)
+                ddev_hosts_add "${1:-$PWD}"
+                ;;
+        esac
         ;;
     help|--help|-h)
         usage

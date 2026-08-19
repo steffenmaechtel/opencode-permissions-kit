@@ -38,6 +38,37 @@ export PATH="/usr/local/bin:$PATH"
 **Fix:** none needed — wait once; every later start reuses the state. See
 [ddev integration](concepts/ddev-integration.md).
 
+## My databases are gone after the install
+
+**Cause:** your old containers/volumes lived in your daemon; ddev now runs
+as `opencode` against the kit's rootless daemon. Containers cannot move
+between daemons — SQL dumps are the only portable copy (the installer
+offers to create them before the `.ddev` handover).
+
+**Fix:** check what the install already exported:
+
+```bash
+ls /var/backups/opencode-permissions-kit/ddev-migration-*/
+```
+
+- Dumps there? Import them:
+  `sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import`
+  (or per project: `ddev start <name> && ddev import-db <name> --file=<dump>.sql.gz`).
+- No dumps (export skipped/declined) and `.ddev` is **still yours**?
+  Export now, before using ddev again:
+  `sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export <your-user> <project-roots>`
+- `.ddev` already handed over to `opencode`? Temporarily give it back,
+  export, hand it over again (replace `$USER` with your username):
+
+  ```bash
+  sudo find /var/www/vhosts -type d -name .ddev -prune -print0 \
+    | xargs -0 -n1 -I{} sudo chown -R "$USER" {}
+  sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export "$USER" /var/www/vhosts
+  sudo /usr/local/lib/opencode-permissions-kit/config.sh refresh
+  ```
+
+Details: [ddev integration](concepts/ddev-integration.md).
+
 ## ddev complains it cannot bind port 80/443
 
 **Cause:** rootless containers cannot bind ports < 1024.
@@ -69,6 +100,50 @@ sudo bash /usr/local/lib/opencode-permissions-kit/update.sh
 
 (or `config.sh refresh`). The handover table lives in
 [ddev integration](concepts/ddev-integration.md).
+
+**EPERM on the project root itself** (`chmod /var/www/vhosts/<project>:
+operation not permitted` during `ddev start` on a fresh clone): same
+mechanism, different target — without `vendor/` ddev writes its settings
+file at the project root and chmods the root directory. The handover
+covers this bootstrap case (root inode → `opencode`, mode `2755`) and
+hands the root back to you once TYPO3 is detected; see the bootstrap
+paragraph in [ddev integration](concepts/ddev-integration.md).
+
+## ddev warns "Unable to open hosts file ... permission denied"
+
+**Cause:** two layers, and the second one is deliberate:
+
+1. The kit's `/mnt/c` restriction: ddev runs as `opencode` and can
+   neither read the Windows hosts file nor run Windows binaries — the
+   agent must not reach the Windows profile. ddev only **warns**;
+   `ddev start` succeeds, but your Windows browser cannot resolve
+   custom-`project_tld` domains yet.
+2. (Only for the fix below) WSL interop must work as your user. On many
+   WSL2+systemd hosts the `WSLInterop` binfmt entry disappears — even
+   `cmd.exe` fails ("WSL Interoperability is disabled"). Re-register:
+
+   ```bash
+   sudo sh -c 'echo ":WSLInterop:M::MZ::/init:PF" > /proc/sys/fs/binfmt_misc/register'
+   ```
+
+   (verify with `cmd.exe /c echo hi`; persists until the next
+   `wsl --shutdown` — and check `/etc/wsl.conf` has no
+   `[interop] enabled=false`).
+
+**Fix (developer side):** add the missing hostnames via the kit's
+bridge — it runs ddev's own `ddev hostname` as your user and Windows
+shows its permission dialog:
+
+```bash
+cd /var/www/vhosts/<project>
+opencode-permissions-kit ddev-hosts-add
+```
+
+`ddev-hosts-check` lists what is missing; `opencode-permissions-kit
+status` reports it per project root. Manual fallback: edit
+`C:\Windows\System32\drivers\etc\hosts` in an elevated editor and add
+`127.0.0.1 <project>.<tld>`. Projects on the default `ddev.site` TLD
+with internet access need no hosts entry at all.
 
 ## `docker ps` in the agent session lists "wrong" containers
 
