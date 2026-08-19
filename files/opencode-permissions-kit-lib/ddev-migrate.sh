@@ -119,8 +119,18 @@ _ddev_migrate_run_as() {
     sudo -u "$dm_u" env $dm_env "$@"
 }
 
+# _ddev_migrate_bin [user]
+# Resolves the real ddev binary: root's PATH, the standard locations,
+# then (when <user> is given) that user's private install paths — ddev's
+# installer offers a per-user install, and `sudo -u` does not inherit it.
 _ddev_migrate_bin() {
-    for dm_c in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
+    dmb_u="${1:-}"
+    dmb_extra=""
+    if [ -n "$dmb_u" ]; then
+        dmb_h=$(getent passwd "$dmb_u" 2>/dev/null | cut -d: -f6)
+        [ -n "$dmb_h" ] && dmb_extra="$dmb_h/.local/bin/ddev $dmb_h/bin/ddev $dmb_h/.ddev/bin/ddev"
+    fi
+    for dm_c in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev $dmb_extra; do
         [ -n "$dm_c" ] && [ -x "$dm_c" ] && { echo "$dm_c"; return 0; }
     done
     return 1
@@ -186,7 +196,7 @@ ddev_migrate_has_db() {
 ddev_migrate_export() {
     dm_dev="$1"; dm_oc="$2"; dm_ocg="$3"; shift 3
     DD_MIG_DUMP_DIR=""; DD_MIG_OK=0; DD_MIG_FAIL=0
-    dm_bin=$(_ddev_migrate_bin) || {
+    dm_bin=$(_ddev_migrate_bin "$dm_dev") || {
         echo "  ddev not found — cannot export databases."
         return 1
     }
@@ -252,15 +262,23 @@ ddev_migrate_export() {
             echo "FAIL|$dm_n|$dm_ar|" >> "$DD_MIG_DUMP_DIR/manifest.conf"
             continue
         fi
-        if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" >/dev/null 2>&1 \
+        dm_err="$DD_MIG_DUMP_DIR/.export-$dm_n.err"
+        if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" >"$dm_err" 2>&1 \
            && [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
             echo "    dump: $DD_MIG_DUMP_DIR/$dm_n.sql.gz"
             echo "OK|$dm_n|$dm_ar|$dm_n.sql.gz" >> "$DD_MIG_DUMP_DIR/manifest.conf"
+        elif grep -q "service db does not exist" "$dm_err" 2>/dev/null; then
+            # Runtime twin of omit_containers: the db service never came up
+            # (state=doesnotexist) — nothing to export, not a failure.
+            rm -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" 2>/dev/null || true
+            echo "    SKIP: no running db service in this project"
+            echo "SKIP|$dm_n|$dm_ar|no-db-service" >> "$DD_MIG_DUMP_DIR/manifest.conf"
         else
             rm -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" 2>/dev/null || true
             echo "    FAILED: ddev export-db — no dump for $dm_n"
             echo "FAIL|$dm_n|$dm_ar|" >> "$DD_MIG_DUMP_DIR/manifest.conf"
         fi
+        rm -f "$dm_err" 2>/dev/null || true
         # Stop this project before the next one starts: a production
         # machine may hold dozens of ddev projects — running them all at
         # once would exhaust RAM. Volumes are kept by plain `ddev stop`.
@@ -318,7 +336,7 @@ ddev_migrate_import() {
     dm_dh="${OPENCODE_DOCKER_HOST:-$dm_dh}"
     dm_ps="${OPENCODE_PODMAN_SOCKET:-$dm_ps}"
     id "$dm_oc" >/dev/null 2>&1 || { echo "ddev-migrate: user '$dm_oc' does not exist"; return 1; }
-    dm_bin=$(_ddev_migrate_bin) || { echo "ddev-migrate: ddev is not installed"; return 1; }
+    dm_bin=$(_ddev_migrate_bin "$dm_oc") || { echo "ddev-migrate: ddev is not installed"; return 1; }
 
     dm_env="HOME=/home/$dm_oc XDG_RUNTIME_DIR=/run/user/$(id -u "$dm_oc")"
     case "$dm_be" in

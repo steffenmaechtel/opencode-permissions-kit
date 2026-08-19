@@ -546,12 +546,15 @@ if [ "$REFRESH" = true ]; then
             [ -z "$root" ] && continue
             [ -d "$root" ] || continue
             sudo chgrp -R "$NEW_OPENCODE_GROUP" "$root" 2>/dev/null || true
-            sudo chmod g+s "$root" 2>/dev/null || true
+            # Recursive baseline like install.sh Step 5: setgid on every
+            # directory, group-write on files — .git stays developer-private.
+            sudo find "$root" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
+            sudo find "$root" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo setfacl -R -d -m "g:$NEW_OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
             ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"
         done < "$PROJECTS_CONF"
     fi
-    ui_success "group baseline refreshed (chgrp + setgid + default ACLs)"
+    ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"
     log "group baseline refresh requested (--refresh)"
 else
     ui_detail "skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)"

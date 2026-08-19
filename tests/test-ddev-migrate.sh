@@ -165,9 +165,15 @@ if [ "$1" = "export-db" ]; then
 fi
 # "broken" simulates an old production project that no longer starts —
 # but only while the DDEV_FAKE_BROKEN marker exists (so a second run can
-# simulate "user fixed the project and re-ran install.sh").
+# simulate "user fixed the project and re-ran install.sh).
 if [ "$1" = "start" ] && [ "$2" = "broken" ] && [ -n "${DDEV_FAKE_BROKEN:-}" ]; then
     echo "Failed to start broken: fixture failure" >&2
+    exit 1
+fi
+# "nodbrt" has a db-less runtime (no omit_containers entry, but the db
+# service never existed — ddev fails export-db with a classifiable error).
+if [ "$1" = "export-db" ] && [ "$2" = "nodbrt" ]; then
+    echo "Error: failed to export database for nodbrt: unable to export db: service db does not exist in project nodbrt (state=doesnotexist)" >&2
     exit 1
 fi
 exit 0
@@ -175,9 +181,14 @@ FAKE
 chmod +x "$WORK/bin/ddev"
 
 # Two exportable projects + one db-less project + one BROKEN project
-# (start fails — the loop must continue with the others) under the root.
+# (start fails — the loop must continue with the others) + one project
+# whose db service does not exist at runtime (export-db fails with
+# ddev's "service db does not exist" — classified SKIP, not FAIL).
 rm -rf /var/tmp/opencode-ddev-mig-roots
-mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/alpha/.ddev /var/tmp/opencode-ddev-mig-roots/vhosts/gamma/.ddev /var/tmp/opencode-ddev-mig-roots/vhosts/nodb/.ddev /var/tmp/opencode-ddev-mig-roots/vhosts/broken/.ddev "$WORK/devhome/.ddev"
+for _p in alpha gamma nodb broken nodbrt; do
+    mkdir -p "/var/tmp/opencode-ddev-mig-roots/vhosts/$_p/.ddev"
+done
+mkdir -p "$WORK/devhome/.ddev"
 cat > "$WORK/devhome/.ddev/global_config.yaml" <<'YML'
 project_info:
   alpha:
@@ -188,11 +199,14 @@ project_info:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/nodb
   broken:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/broken
+  nodbrt:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/nodbrt
 YML
 printf 'name: alpha\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/alpha/.ddev/config.yaml
 printf 'name: gamma\ntype: php\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/gamma/.ddev/config.yaml
 printf 'omit_containers: [db]\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/nodb/.ddev/config.yaml
 printf 'name: broken\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/broken/.ddev/config.yaml
+printf 'name: nodbrt\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/nodbrt/.ddev/config.yaml
 
 # Run the library export directly with a controlled backup root; the sudo
 # detour is shimmed (CI runs unprivileged) by overriding the run-as helper
@@ -238,6 +252,8 @@ check "manifest records OK for alpha" sh -c "grep -q '^OK|alpha|' \"\$1\"" _ "$D
 check "manifest records OK for gamma" sh -c "grep -q '^OK|gamma|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
 check "manifest records SKIP for the db-less project" sh -c "grep -q '^SKIP|nodb|.*no-db-container' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
 check "manifest records FAIL for the unstartable project" sh -c "grep -q '^FAIL|broken|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check "runtime-db-less project is classified SKIP (not FAIL)" \
+    sh -c "grep -q '^SKIP|nodbrt|.*no-db-service' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
 check "a failed start does not abort the remaining exports" \
     sh -c "grep -q 'export-db gamma' \"\$1\"" _ "$WORK/ddev.log"
 check_fail "no stop is issued for the failed project (it never started)" \
@@ -268,9 +284,13 @@ check "manifest records OK for the retried project" \
 check_fail "stale FAIL entry is gone after the successful retry" \
     sh -c "grep -q '^FAIL|broken|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
 assert_eq "no FAIL entries remain (installer would not re-ask the abort question)" \
-    "0" "$(grep -c '^FAIL|' "$DUMP_DIR/manifest.conf" || true)"
+    "0" "$(grep -c '^FAIL|' "$DUMP_DIR/manifest.conf")"
 assert_eq "manifest has exactly one OK line per project (no duplicates)" \
     "3" "$(grep -c '^OK|' "$DUMP_DIR/manifest.conf")"
+assert_eq "SKIP lines stay single too (nodb + nodbrt)" \
+    "2" "$(grep -c '^SKIP|' "$DUMP_DIR/manifest.conf")"
+check_fail "no leftover .export-*.err capture files in the dump directory" \
+    sh -c "ls \"\$1\"/.export-*.err >/dev/null 2>&1" _ "$DUMP_DIR"
 
 # --- 5. import loop (static wiring) ---------------------------------------------
 
@@ -313,6 +333,25 @@ check "install.sh keeps exporting the remaining projects on failure (non-fatal l
     sh -c "grep -qF 'continue' \"\$1\"" _ "$MIG"
 check "install.sh skips the export when already stamped" \
     sh -c "grep -q 'DDEV_EXPORTED_PRE' \"\$1\"" _ "$INSTALL"
+
+# --- 6b. production-WSL findings (local/nb-laptop-output) -----------------------
+
+# ddev detection: version probe falls back to the DEFAULT user — `ddev
+# version` can come up empty as root while working as the actual user.
+check "install.sh probes the ddev version as the DEFAULT user too" \
+    sh -c "grep -q 'DDEV_BIN_DEV' \"\$1\" && grep -q 'sudo -u \"\$DEFAULT_USER\" env HOME=\"/home/\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
+check "install.sh inventory distinguishes found-but-unreadable from missing" \
+    sh -c "grep -q 'version could not be read' \"\$1\" && grep -q 'not installed (optional' \"\$1\"" _ "$INSTALL"
+check "migration detection is gated on the registry, not the binary" \
+    sh -c "grep -qF 'if [ -d \"/home/\$DEFAULT_USER/.ddev\" ]; then' \"\$1\"" _ "$INSTALL"
+# _ddev_migrate_bin must consider per-user install paths (sudo -u does not
+# inherit the dev user's PATH).
+check "ddev resolution includes the user's private install paths" \
+    sh -c "grep -q '.local/bin/ddev' \"\$1\" && grep -q '.ddev/bin/ddev' \"\$1\"" _ "$MIG"
+# Runtime db-less projects are SKIP, not FAIL (hotfix log: "service db
+# does not exist (state=doesnotexist)").
+check "runtime db-less export failure is classified no-db-service" \
+    sh -c "grep -q 'no-db-service' \"\$1\"" _ "$MIG"
 check "install.sh shows the dumps + import hint in the summary" \
     sh -c "grep -q 'Ddev dumps' \"\$1\" && grep -q 'ddev-migrate.sh import' \"\$1\"" _ "$INSTALL"
 check "install.sh inventory counts the dev user's ddev projects" \

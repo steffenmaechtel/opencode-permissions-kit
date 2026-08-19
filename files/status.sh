@@ -117,13 +117,17 @@ case "${CONTAINER_BACKEND:-}" in
         case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
         # The opencode user's runtime dir (/run/user/<uid>) is mode 700
         # opencode:opencode, so a non-root status.sh caller cannot stat the
-        # socket inside it. Try stat directly; if that fails (perm), use
-        # sudo -n (non-interactive — status.sh must never prompt for a
-        # password; without cached credentials the socket reads as
-        # "NOT reachable" until run via sudo).
+        # socket inside it. Direct stat first; then sudo -n (non-interactive
+        # — status.sh must never prompt for a password); when both fail but
+        # the runtime dir exists and is NOT traversable by the caller, the
+        # state is UNKNOWN, not broken (same wording pattern as the mkcert
+        # CA check below — a red "NOT reachable" made users think the
+        # daemon was down). A traversable dir without a socket stays red.
         if [ -n "$sock" ]; then
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv "socket" "reachable — $sock" "$UI_GREEN"
+            elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
+                ui_kv "socket" "unknown — needs root to check (run: sudo opencode-permissions-kit status)" "$UI_YELLOW"
             else
                 ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
             fi
@@ -140,11 +144,14 @@ case "${CONTAINER_BACKEND:-}" in
         ui_kv "backend" "podman-rootless" "$UI_GREEN"
         sock="${OPENCODE_PODMAN_SOCKET:-}"
         if [ -n "$sock" ]; then
-            # Optional podman docker-CLI-compat socket.
+            # Optional podman docker-CLI-compat socket (see docker-rootless
+            # branch for the probe rationale).
             sockpath="$sock"
             case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv "socket" "reachable — $sock" "$UI_GREEN"
+            elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
+                ui_kv "socket" "unknown — needs root to check (run: sudo opencode-permissions-kit status)" "$UI_YELLOW"
             else
                 ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
             fi

@@ -270,10 +270,22 @@ if ! command -v setfacl >/dev/null 2>&1; then
 fi
 
 # ddev version (hard gate): rootless ddev needs ddev >= 1.25.
+# Probed twice: as root first, then as the DEFAULT user — `ddev version`
+# can come up empty under root (HOME=/root, no docker context) while the
+# very same binary answers fine as the user who actually uses ddev. The
+# second probe only runs when the first could not parse a version.
 DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
 DDEV_VERSION=""
 if [ -n "$DDEV_BIN" ] && [ -x "$DDEV_BIN" ]; then
     DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')"
+fi
+DDEV_BIN_DEV=""
+if [ -z "$DDEV_VERSION" ] && id "$DEFAULT_USER" >/dev/null 2>&1; then
+    DDEV_BIN_DEV="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" sh -c 'command -v ddev 2>/dev/null || true')"
+    if [ -n "$DDEV_BIN_DEV" ] && [ -x "$DDEV_BIN_DEV" ]; then
+        DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" "$DDEV_BIN_DEV" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')"
+        [ -z "$DDEV_BIN" ] && DDEV_BIN="$DDEV_BIN_DEV"
+    fi
 fi
 log "detected ddev: bin=${DDEV_BIN:-none} version=${DDEV_VERSION:-unknown}"
 if command -v ddev >/dev/null 2>&1 || [ -n "$DDEV_BIN" ]; then
@@ -285,7 +297,7 @@ if command -v ddev >/dev/null 2>&1 || [ -n "$DDEV_BIN" ]; then
             exit 1
         fi
     else
-        ui_warn "could not parse the ddev version — continuing anyway (ddev >= 1.25 required)."
+        ui_warn "ddev found but the version could not be read (as root nor as '$DEFAULT_USER') — continuing anyway (ddev >= 1.25 required)."
     fi
 else
     ui_warn "ddev not found — continuing anyway (install it later with ddev >= 1.25)."
@@ -366,13 +378,17 @@ ui_have "curl" "present"
 command -v setfacl >/dev/null 2>&1 && ui_have "acl tools" "present" || ui_add "acl tools" "installing now"
 if [ -n "$DDEV_VERSION" ]; then
     ui_have "ddev" "v$DDEV_VERSION (>= 1.25)"
+elif [ -n "$DDEV_BIN" ]; then
+    ui_atten "ddev" "found (${DDEV_BIN}) but the version could not be read — treated as >= 1.25"
 else
     ui_atten "ddev" "not installed (optional — needs >= 1.25)"
 fi
 # ddev migration detection (issue #15): projects in the DEFAULT user's
 # registry lose their daemon after the switch — the export is offered.
+# Gated on the registry file alone: ddev may live off root's PATH (the
+# binary is resolved again at export time with per-user fallbacks).
 DD_MIG_ALL=""
-if [ -n "$DDEV_BIN" ] && [ -d "/home/$DEFAULT_USER/.ddev" ]; then
+if [ -d "/home/$DEFAULT_USER/.ddev" ]; then
     DD_MIG_ALL=$(ddev_migrate_registry "/home/$DEFAULT_USER/.ddev")
 fi
 DD_MIG_COUNT=$(printf '%s\n' "$DD_MIG_ALL" | grep -c . || true)
@@ -954,6 +970,14 @@ if [ -n "$PROJECTS_ROOTS" ]; then
             [ -d "$root" ] || continue
             sudo chgrp -R "$OPENCODE_GROUP" "$root" 2>/dev/null || true
             sudo chmod g+s "$root"
+            # Recursive baseline (matches what a production tree needs):
+            # setgid on EVERY directory — new files anywhere in the tree get
+            # the sharing group, not just directly under the root — and
+            # group-write on existing files, so developer and agent can edit
+            # each other's pre-install files. .git stays out: it is
+            # developer-private (mode 700) by design.
+            sudo find "$root" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
+            sudo find "$root" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
             ui_success "$root — group + setgid + default ACLs applied"
         done

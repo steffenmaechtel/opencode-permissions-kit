@@ -74,6 +74,9 @@ E 'mkdir -p /home/dev/.ddev /var/www/vhosts/ddev-mig/.ddev /var/www/vhosts/ddev-
 E 'printf "%s\n" "project_info:" "  ddev-mig:" "    approot: /var/www/vhosts/ddev-mig" "  ddev-broken:" "    approot: /var/www/vhosts/ddev-broken" > /home/dev/.ddev/global_config.yaml'
 E 'printf "type: typo3\n" > /var/www/vhosts/ddev-mig/.ddev/config.yaml && printf "type: typo3\n" > /var/www/vhosts/ddev-broken/.ddev/config.yaml'
 E 'touch /var/www/vhosts/ddev-mig/.ddev/.webimageBuild'
+# Group-baseline fixtures: a pre-install tree (dir + file, dev-owned 644)
+# plus a .git that must stay developer-private.
+E 'sudo mkdir -p /var/www/vhosts/perm-check/sub /var/www/vhosts/perm-check/.git && sudo chown -R dev:dev /var/www/vhosts/perm-check && printf "old\n" | sudo tee /var/www/vhosts/perm-check/existing-file.txt >/dev/null && printf "gitconf\n" | sudo tee /var/www/vhosts/perm-check/.git/config >/dev/null && sudo chmod 700 /var/www/vhosts/perm-check/.git && sudo chmod 600 /var/www/vhosts/perm-check/.git/config'
 # The log is written by root (version gate) AND dev (export loop): dev owns
 # it, world-writable so both may append.
 E 'touch /tmp/fake-ddev.log && chmod 666 /tmp/fake-ddev.log'
@@ -107,6 +110,16 @@ check_fail "2c: DDEV_EXPORTED stamp NOT set while exports failed" \
     E 'sudo grep -q "^DDEV_EXPORTED=" /etc/opencode-permissions-kit/install.conf'
 check "2c: install summary shows the dumps + import hint" \
     E 'grep -q "ddev-migrate.sh import" /tmp/install-out.log'
+check "2c: recursive group baseline — subdir carries setgid" \
+    E 'test -g /var/www/vhosts/perm-check/sub'
+check "2c: recursive group baseline — pre-existing file is group-writable" \
+    E 'test "$(stat -c %A /var/www/vhosts/perm-check/existing-file.txt | cut -c6)" = "w"'
+check "2c: recursive group baseline — group is opencode everywhere" \
+    E 'test "$(stat -c %G /var/www/vhosts/perm-check/existing-file.txt)" = "opencode"'
+check "2c: .git stays developer-private (mode 600, not group-writable)" \
+    E 'test "$(stat -c %a /var/www/vhosts/perm-check/.git/config)" = "600"'
+check "2c: .git dir keeps mode 700" \
+    E 'test "$(stat -c %a /var/www/vhosts/perm-check/.git)" = "700"'
 # Remove the fake binary: section 3 asserts no ddev shadow exists at
 # /usr/local/bin/ddev (the soft-only kit ships no shim).
 E 'sudo rm -f /usr/local/bin/ddev'

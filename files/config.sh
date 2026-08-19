@@ -220,9 +220,13 @@ projects_add() {
         fi
         echo "$p" | sudo tee -a "$PROJECTS_CONF" > /dev/null
         # Apply the group baseline so the developer/agent share files immediately
-        sudo chgrp -R "$OPENCODE_GROUP" "$p" 2>/dev/null || true
-        sudo chmod g+s "$p"
-        sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$p" 2>/dev/null || true
+            sudo chgrp -R "$OPENCODE_GROUP" "$p" 2>/dev/null || true
+            sudo chmod g+s "$p"
+            # Recursive baseline like install.sh Step 5: setgid on every
+            # directory, group-write on files — .git stays developer-private.
+            sudo find "$p" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
+            sudo find "$p" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
+            sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$p" 2>/dev/null || true
         # ddev handover (.ddev + the app-type's settings dirs at any depth):
         # ddev always runs as $OPENCODE_USER and chmods these paths
         # unconditionally — they must belong to it or `ddev start` fails
@@ -440,13 +444,17 @@ container_backend_apply() {
 # --- refresh (group baseline) ---------------------------------------------------
 
 refresh() {
-    ui_info "re-applying the group baseline (chgrp $OPENCODE_GROUP + setgid + default ACLs) ..."
+    ui_info "re-applying the group baseline (chgrp $OPENCODE_GROUP + setgid + g+rw + default ACLs) ..."
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r p; do
             [ -z "$p" ] && continue
             [ -d "$p" ] || continue
             sudo chgrp -R "$OPENCODE_GROUP" "$p" 2>/dev/null || true
             sudo chmod g+s "$p" 2>/dev/null || true
+            # Recursive baseline like install.sh Step 5: setgid on every
+            # directory, group-write on files — .git stays developer-private.
+            sudo find "$p" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
+            sudo find "$p" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$p" 2>/dev/null || true
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
         done < "$PROJECTS_CONF"

@@ -16,6 +16,24 @@ The kit uses the `opencode` user's own primary usergroup (created by
 Net effect: files the agent creates are group-writable for you, and files
 you create are readable/writable for the agent — no chgrp chores.
 
+## What the baseline covers
+
+The group baseline is applied **recursively** over every project root
+(install, `config.sh projects add`, `config.sh refresh`,
+`update.sh --refresh`):
+
+| Operation | Scope |
+|---|---|
+| `chgrp -R opencode` | every file and directory |
+| `chmod g+s` (setgid) | every directory — new files anywhere in the tree inherit the sharing group, not just directly under the root |
+| `chmod g+rw` | every existing file, so you and the agent can edit each other's pre-install files |
+| default ACLs `g:opencode:rwx` | every directory (governs new files' access) |
+
+**`.git/` directories are excluded** on purpose: they stay
+developer-owned and mode 700 (the agent's git access is governed by the
+soft `.git/config` deny instead — see
+[the security model](security-model.md)).
+
 ## Consequences
 
 - **Group changes need a fresh login shell.** After install (or after
