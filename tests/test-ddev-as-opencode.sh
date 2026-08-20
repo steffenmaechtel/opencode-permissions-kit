@@ -157,6 +157,8 @@ check "launch arm computes the URL as opencode via the helper (issue #20)" \
     sh -c "grep -qF 'DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
 check "launch arm extracts the FULLURL line (ddev debug contract)" \
     sh -c "grep -qF \"s/^FULLURL //p\" \"\$1\"" _ "$FUNC"
+check "FULLURL transport lines are filtered from the visible output" \
+    sh -c "grep -qF \"grep -v '^FULLURL ' >&2\" \"\$1\"" _ "$FUNC"
 check "launch arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
     sh -c "grep -q 'explorer.exe' \"\$1\" && grep -q 'xdg-open' \"\$1\"" _ "$FUNC"
 check "sudoers env_keep includes DDEV_DEBUG (launch URL transport)" \

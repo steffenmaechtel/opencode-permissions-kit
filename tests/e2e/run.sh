@@ -249,6 +249,10 @@ check "4b: ddev phpmyadmin routes through the browser arm (issue #20 follow-up)"
     E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev phpmyadmin" | grep -qx "https://fake-project.ddev.site as opencode"'
 check "4b: launch does not run ddev as the developer (no spurious internal start)" \
     E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" | grep -qv "as dev"'
+check_fail "4b: FULLURL transport lines stay off the visible output (stdout AND stderr)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" 2>&1 | grep -q "^FULLURL"'
+check "4b: stdout carries exactly the clean URL line" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" 2>/dev/null | grep -qx "https://fake-project.ddev.site as opencode"'
 E 'sudo rm -f /usr/local/bin/ddev'
 
 echo ""

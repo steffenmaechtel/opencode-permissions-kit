@@ -38,14 +38,19 @@ _opk_browser_open() {
 # The command runs AS OPENCODE with DDEV_DEBUG=true: whatever internal
 # `ddev launch` child it spawns (bash host command or Go exec) inherits
 # the flag, prints "FULLURL <url>" and exits instead of opening a browser
-# (as opencode it could not — no interop). Output is teed to stderr so it
-# (and prompts) stays live; the extracted URL is printed and opened AS
-# THE DEVELOPER via _opk_browser_open. DDEV_DEBUG survives sudo via the
-# kit's sudoers env_keep. ddev without the FULLURL debug contract simply
-# shows its output; the browser then stays closed (upgrade ddev).
+# (as opencode it could not — no interop). Output streams to stderr live
+# (prompts like the phpmyadmin install question stay interactive) but
+# WITHOUT the FULLURL transport lines — they go to the capture file only,
+# the clean URL is printed on stdout by this function. DDEV_DEBUG
+# survives sudo via the kit's sudoers env_keep. ddev without the FULLURL
+# debug contract simply shows its output; the browser then stays closed
+# (upgrade ddev).
 _opk_ddev_browser() {
-    _opk_out="$(DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@" 2>&1 | tee /dev/stderr)"
-    _opk_url="$(printf '%s\n' "$_opk_out" | sed -n 's/^FULLURL //p' | tail -1)"
+    _opk_tmp="${TMPDIR:-/tmp}/opk-ddev-browser.$$"
+    DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@" 2>&1 \
+        | tee "$_opk_tmp" | grep -v '^FULLURL ' >&2
+    _opk_url="$(sed -n 's/^FULLURL //p' "$_opk_tmp" 2>/dev/null | tail -1)"
+    rm -f "$_opk_tmp"
     if [ -n "$_opk_url" ]; then
         printf '%s\n' "$_opk_url"
         _opk_browser_open "$_opk_url"
