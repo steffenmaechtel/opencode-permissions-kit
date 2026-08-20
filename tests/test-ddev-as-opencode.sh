@@ -144,6 +144,32 @@ check "function execs the kit's sudoers helper for the developer" \
     sh -c "grep -q 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
 check "function uses 'command ddev' in the opencode branch" \
     sh -c "grep -q 'command ddev' \"\$1\"" _ "$FUNC"
+
+# --- 3a. launch special case (issue #20) ---------------------------------------
+# `ddev launch` must run as the DEVELOPER (browser opening needs WSL interop,
+# which the opencode user must not have). Functional: fake id reports a
+# non-opencode uid, fake ddev on PATH prints; the launch call must reach the
+# fake ddev directly (no sudo — the helper would fail here). All other
+# commands keep routing through the sudoers helper (static: absolute path).
+mkdir -p "$TMPDIR/bin2"
+cat > "$TMPDIR/bin2/id" <<'FAKEID'
+#!/bin/sh
+case "$*" in
+    "-u") echo 4242 ;;
+    "-u opencode") echo 9999 ;;
+    *) echo 0 ;;
+esac
+FAKEID
+chmod +x "$TMPDIR/bin2/id"
+LRESULT=$(
+    PATH="$TMPDIR/bin2:$TMPDIR/bin:$PATH"
+    . "$FUNC"
+    ddev launch https://example.ddev.site 2>&1
+)
+assert_eq "launch runs the real ddev as the developer (no sudo, issue #20)" \
+    "REAL_DDEV_RAN:launch https://example.ddev.site" "$LRESULT"
+check "non-launch commands still route through the sudoers helper (case arm)" \
+    sh -c "grep -qF 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode \"\$@\"' \"\$1\"" _ "$FUNC"
 check_fail "function never references the removed legacy bin/ddev shim" \
     sh -c "grep -qE 'opencode-permissions-kit/bin/ddev(\$|[^-])' \"\$1\"" _ "$FUNC"
 

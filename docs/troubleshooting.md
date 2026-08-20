@@ -3,6 +3,29 @@
 This page lists known failure modes — each entry follows
 symptom → cause → fix. If your case is missing, open an issue.
 
+## ddev launch fails with "WSL Interoperability is disabled" / "Permission denied"
+
+**Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`)
+spews `grep: /proc/sys/fs/binfmt_misc/WSLInterop: No such file or
+directory`, `wslview ... Permission denied` and exits non-zero.
+
+**Cause:** the command ran as the `opencode` user (the `ddev()` function
+routes everything there). Opening a browser on WSL2 needs Windows
+interop (`explorer.exe` / `xdg-open` → `wslview`), which the `opencode`
+user deliberately has not — `/mnt/c` is restricted to you, so every
+`.exe` is unreadable for the agent. The `grep ... WSLInterop` line is a
+cosmetic wslu quirk (with `systemd=true` the binfmt entry is named
+`WSLInterop-late`); the real blocker is the permission denied.
+
+**Fix:**
+
+- in your terminal: update the kit and open a new terminal — the
+  `ddev()` function special-cases `launch` to run as you (issue #20),
+  and the browser opens;
+- in an agent session this stays blocked **by design**: the agent should
+  not open windows on your Windows desktop. Ask it for the URL instead
+  (`ddev describe`) and open it yourself.
+
 ## vendor script (runTests.sh) fails with "chmod .ddev/...: operation not permitted"
 
 **Symptom:** `vendor/bin/runTests.sh -s phpstan` (or similar vendor

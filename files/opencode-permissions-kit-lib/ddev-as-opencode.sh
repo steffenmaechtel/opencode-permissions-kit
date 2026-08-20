@@ -24,7 +24,26 @@ ddev() {
     if [ "$(id -u)" = "$(id -u opencode 2>/dev/null || echo 0)" ]; then
         command ddev "$@"
     else
-        /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"
+        case "${1:-}" in
+            launch)
+                # issue #20: `ddev launch` must run as the DEVELOPER. Opening
+                # the browser needs WSL interop (explorer.exe / xdg-open ->
+                # wslview), which the opencode user deliberately has not
+                # (/mnt/c restricted) — as opencode launch dies with
+                # "Permission denied" on reg.exe/chcp.com. As the developer
+                # ddev cannot see the rootless daemon, so the launch script
+                # sees "not running", runs its internal `ddev start` — which
+                # goes through THIS function again (exported + BASH_ENV,
+                # issue #18) and runs as opencode — then recurses
+                # (no_recursion=true) and opens the URL with the developer's
+                # interop. The agent side keeps the real binary and stays
+                # interop-blocked by design.
+                command ddev "$@"
+                ;;
+            *)
+                /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"
+                ;;
+        esac
     fi
     _opk_rc=$?
     # ${1:-}: the exported function may land in child scripts running

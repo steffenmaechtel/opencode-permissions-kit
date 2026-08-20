@@ -223,6 +223,17 @@ check "4b: ddev() exported to child bash scripts (issue #18)" \
     E 'sudo -u dev -H bash -c "source /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; bash -c \"type -t ddev\"" 2>/dev/null | grep -q function'
 check "4b: ddev() survives the vendor #!/bin/sh wrapper chain into the bash target (issue #18)" \
     E 'sudo -u dev -H bash -c "source /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; /tmp/rt-wrap.sh -s phpstan" 2>/dev/null | grep -qx ddev'
+# Issue #20: `ddev launch` must run as the DEVELOPER — opening the browser
+# needs WSL interop (explorer.exe / xdg-open -> wslview), which the opencode
+# user deliberately has not. Fake id reports a non-opencode uid; the fake
+# ddev proves launch runs it directly as the developer, while `start` still
+# routes through the sudoers helper (as opencode — no ddev in the container,
+# so the helper exits 127 with its hint).
+E 'mkdir -p /tmp/opk-fakebin && printf "#!/bin/sh\ncase \"\$*\" in \"-u\") echo 4242;; \"-u opencode\") echo 9999;; *) echo 0;; esac\n" > /tmp/opk-fakebin/id && printf "#!/bin/sh\necho \"REAL_DDEV_RAN:\$*\"\n" > /tmp/opk-fakebin/ddev && chmod 755 /tmp/opk-fakebin/id /tmp/opk-fakebin/ddev'
+check "4b: ddev launch runs the real ddev as the developer (issue #20)" \
+    E 'sudo -u dev -H env PATH=/tmp/opk-fakebin:/usr/bin:/bin sh -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch https://x.ddev.site" 2>/dev/null | grep -qx "REAL_DDEV_RAN:launch https://x.ddev.site"'
+check "4b: ddev start still routes through the sudoers helper as opencode" \
+    E 'sudo -u dev -H env PATH=/tmp/opk-fakebin:/usr/bin:/bin sh -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "ddev is not installed"'
 
 echo ""
 echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"

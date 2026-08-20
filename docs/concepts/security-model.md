@@ -38,7 +38,7 @@ The design record is `docs/design/ddev-working.md`.
 |---|---|
 | File denies (`.env`, keys, …) | `opencode.jsonc` soft rules — enforced by opencode's tools, prompted via bash tripwires |
 | Developer ↔ agent file sharing | the `opencode` usergroup: setgid + default group ACLs + umask 002 |
-| ddev runs as one user | the `ddev()` terminal function + the sudoers helper exec the real ddev as `opencode` |
+| ddev runs as one user | the `ddev()` terminal function + the sudoers helper exec the real ddev as `opencode` (sole exception: `ddev launch` runs as the developer — it needs the Windows interop the agent must not have, see [ddev integration](ddev-integration.md#exception-ddev-launch-runs-as-you-issue-20)) |
 
 ## Known residual gaps
 
