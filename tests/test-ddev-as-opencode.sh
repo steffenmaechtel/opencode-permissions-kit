@@ -157,12 +157,31 @@ check "launch arm computes the URL as opencode via the helper (issue #20)" \
     sh -c "grep -qF 'DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
 check "launch arm extracts the FULLURL line (ddev debug contract)" \
     sh -c "grep -qF \"s/^FULLURL //p\" \"\$1\"" _ "$FUNC"
-check "launch arm falls back to the real ddev for old ddev versions" \
-    sh -c "grep -A2 'FULLURL //p' \"\$1\" | grep -q 'command ddev' || grep -qF 'command ddev \"\$@\"' \"\$1\"" _ "$FUNC"
 check "launch arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
     sh -c "grep -q 'explorer.exe' \"\$1\" && grep -q 'xdg-open' \"\$1\"" _ "$FUNC"
 check "sudoers env_keep includes DDEV_DEBUG (launch URL transport)" \
     sh -c "grep -q 'env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD DDEV_DEBUG\"' \"\$1\"" _ "$SUDOERS"
+
+# --- 3a-2. browser-command routing (issue #20 follow-up: mailpit/phpmyadmin) ---
+# Functional against _opk_is_browser_cmd: the default list, the xhgui
+# arg-awareness, and the extensible conf file (OPK_BROWSER_CMDS_CONF).
+BC() { env OPK_BROWSER_CMDS_CONF="${3:-/nonexistent}" sh -c '. "$1" && if _opk_is_browser_cmd "$2" "${4:-}"; then echo yes; else echo no; fi' _ "$FUNC" "$1" "" "$2"; }
+assert_eq "routing: launch is a browser command"        "yes" "$(BC launch)"
+assert_eq "routing: mailpit is a browser command"       "yes" "$(BC mailpit)"
+assert_eq "routing: phpmyadmin is a browser command"    "yes" "$(BC phpmyadmin)"
+assert_eq "routing: adminer is a browser command"       "yes" "$(BC adminer)"
+assert_eq "routing: bare xhgui is a browser command"    "yes" "$(BC xhgui)"
+assert_eq "routing: xhgui launch is a browser command"  "yes" "$(BC xhgui launch)"
+assert_eq "routing: xhgui status is NOT"                "no"  "$(BC xhgui status)"
+assert_eq "routing: start is NOT"                       "no"  "$(BC start)"
+assert_eq "routing: exec is NOT"                        "no"  "$(BC exec)"
+CONF=$(mktemp)
+printf '# custom browser commands\nmy-custom-tool\n\n# another\n  spaced-tool  \n' > "$CONF"
+assert_eq "routing: conf file adds custom browser commands (issue #20 follow-up)" "yes" \
+    "$(env OPK_BROWSER_CMDS_CONF="$CONF" sh -c '. "$1" && if _opk_is_browser_cmd my-custom-tool; then echo yes; else echo no; fi' _ "$FUNC")"
+assert_eq "routing: conf entries are whitespace/comment tolerant" "yes" \
+    "$(env OPK_BROWSER_CMDS_CONF="$CONF" sh -c '. "$1" && if _opk_is_browser_cmd spaced-tool; then echo yes; else echo no; fi' _ "$FUNC")"
+rm -f "$CONF"
 check "non-launch commands still route through the sudoers helper (case arm)" \
     sh -c "grep -qF 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode \"\$@\"' \"\$1\"" _ "$FUNC"
 check_fail "function never references the removed legacy bin/ddev shim" \

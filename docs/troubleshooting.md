@@ -3,9 +3,10 @@
 This page lists known failure modes — each entry follows
 symptom → cause → fix. If your case is missing, open an issue.
 
-## ddev launch fails with "WSL Interoperability is disabled" / "Permission denied"
+## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
 
-**Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`)
+**Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`,
+`ddev mailpit`, `ddev phpmyadmin`, `ddev adminer`, `ddev xhgui`)
 spews `grep: /proc/sys/fs/binfmt_misc/WSLInterop: No such file or
 directory`, `wslview ... Permission denied` and exits non-zero.
 
@@ -20,9 +21,13 @@ cosmetic wslu quirk (with `systemd=true` the binfmt entry is named
 **Fix:**
 
 - in your terminal: update the kit and open a new terminal — the
-  `ddev()` function routes the URL computation to `opencode` (no
-  "not running" restart detour) and opens the URL with your interop
-  (issue #20);
+  `ddev()` function routes the whole browser-command class
+  (`launch`, `mailpit`, `phpmyadmin`, `adminer`, `xhgui`) through the
+  split URL-computation-as-opencode + browser-open-as-developer, without
+  a "not running" restart detour (issue #20). A project-specific
+  browser command (a custom ddev host command that internally calls
+  `ddev launch`) joins the class via one line in
+  `/etc/opencode-permissions-kit/ddev-browser-cmds.conf`;
 - in an agent session this stays blocked **by design**: the agent should
   not open windows on your Windows desktop. Ask it for the URL instead
   (`ddev describe`) and open it yourself.

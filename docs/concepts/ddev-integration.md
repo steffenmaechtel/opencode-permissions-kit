@@ -22,29 +22,37 @@ daemon. Consequence: `docker ps` in your own terminal and in an agent
 session list the same containers — but a colleague's rootful docker daemon
 is a different world entirely.
 
-### Exception: `ddev launch` (issue #20)
+### Browser-opening commands (issue #20)
 
-`ddev launch` computes the project URL and opens it in a browser — on
-WSL2 via `explorer.exe` / `xdg-open` → `wslview`, i.e. **Windows
-interop**. That is exactly what the `opencode` user must not have (an
-`.exe` would run as your Windows user, outside every soft rule), so the
-`ddev()` function splits the job:
+Commands that open a browser — `ddev launch` itself and every wrapper
+whose internals spawn `ddev launch ...` (`mailpit` → `launch -m`, the
+phpmyadmin/adminer add-ons and custom project host commands →
+`launch :<port>`, `xhgui` bare) — cannot run as `opencode`: opening the
+browser on WSL2 needs `explorer.exe` / `xdg-open` → `wslview`, i.e.
+**Windows interop**, exactly what the `opencode` user must not have (an
+`.exe` would run as your Windows user, outside every soft rule). The
+`ddev()` function routes the whole class through a split:
 
-1. The URL is computed **as `opencode`**: the function calls the sudoers
-   helper with `DDEV_DEBUG=true`, which makes ddev's launch script print
-   `FULLURL <url>` instead of opening anything. Running as `opencode` is
-   what makes this correct — as *you*, ddev cannot see the rootless
-   daemon, would decide "not running" and run its internal `ddev start`
-   on **every** launch; and the https/mkcert detection needs the
-   `opencode`-owned CAROOT. A stopped project is started by that same
-   run (as `opencode`, with output passed through).
+1. The command runs **as `opencode`** with `DDEV_DEBUG=true`: whatever
+   internal `ddev launch` child it spawns (bash host command or Go exec)
+   inherits the flag, prints `FULLURL <url>` and exits instead of opening
+   anything. Running as `opencode` is what makes this correct — as
+   *you*, ddev cannot see the rootless daemon, would decide "not
+   running" and run its internal `ddev start` on **every** call; the
+   https/mkcert detection needs the `opencode`-owned CAROOT. A stopped
+   project is started by that same run.
 2. The URL is opened **as you** (`explorer.exe`, falling back to
    `xdg-open`) — your interop, your browser.
 
-Net effect: `ddev launch` in your terminal opens the browser without a
-restart detour; agent-side `ddev launch` still fails interop-blocked (by
-design — the agent should not pop windows on your Windows desktop; it
-can hand you the URL from `ddev describe` instead).
+Project-specific browser commands can be added to
+`/etc/opencode-permissions-kit/ddev-browser-cmds.conf` (one command name
+per line, `#` comments) — any ddev host command that internally calls
+`ddev launch` fits the same mechanism.
+
+Net effect: browser commands in your terminal open the browser without a
+restart detour; agent-side they still fail interop-blocked (by design —
+the agent should not pop windows on your Windows desktop; it can hand
+you the URL from `ddev describe` instead).
 
 ### Scripts: bash children inherit the function
 

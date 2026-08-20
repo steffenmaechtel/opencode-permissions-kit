@@ -20,44 +20,80 @@
 # command plus the missing domains; the agent never touches the hosts file.
 #
 # Deployed to /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh.
+# _opk_browser_open <url>: open a URL AS THE DEVELOPER — the browser open
+# needs WSL interop (explorer.exe / xdg-open -> wslview), which the
+# opencode user deliberately has not (/mnt/c restricted).
+_opk_browser_open() {
+    if command -v explorer.exe >/dev/null 2>&1; then
+        explorer.exe "$1"
+    elif command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "$1"
+    fi
+}
+
+# _opk_ddev_browser <ddev-args...>: issue #20 + follow-up. Covers every
+# ddev command that opens a browser — `launch` itself and the wrappers
+# whose internals spawn `ddev launch ...` (mailpit: "launch -m", the
+# phpmyadmin/adminer add-ons: "launch :<port>", xhgui: "launch <url>").
+# The command runs AS OPENCODE with DDEV_DEBUG=true: whatever internal
+# `ddev launch` child it spawns (bash host command or Go exec) inherits
+# the flag, prints "FULLURL <url>" and exits instead of opening a browser
+# (as opencode it could not — no interop). Output is teed to stderr so it
+# (and prompts) stays live; the extracted URL is printed and opened AS
+# THE DEVELOPER via _opk_browser_open. DDEV_DEBUG survives sudo via the
+# kit's sudoers env_keep. ddev without the FULLURL debug contract simply
+# shows its output; the browser then stays closed (upgrade ddev).
+_opk_ddev_browser() {
+    _opk_out="$(DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@" 2>&1 | tee /dev/stderr)"
+    _opk_url="$(printf '%s\n' "$_opk_out" | sed -n 's/^FULLURL //p' | tail -1)"
+    if [ -n "$_opk_url" ]; then
+        printf '%s\n' "$_opk_url"
+        _opk_browser_open "$_opk_url"
+    fi
+    return 0
+}
+
+# _opk_browser_cmds: command names whose ddev run opens a browser —
+# `launch` itself plus the wrappers whose internals spawn
+# `ddev launch ...` (mailpit: "launch -m", phpmyadmin/adminer add-ons:
+# "launch :<port>" — also matches CUSTOM project host commands of the
+# same name, e.g. a phpmyadmin with own ports). Extendable via
+# /etc/opencode-permissions-kit/ddev-browser-cmds.conf (one name per
+# line, '#' comments allowed) for project-specific browser commands.
+_opk_browser_cmds() {
+    printf '%s\n' launch mailpit phpmyadmin adminer
+    _opk_bcc="${OPK_BROWSER_CMDS_CONF:-/etc/opencode-permissions-kit/ddev-browser-cmds.conf}"
+    [ -f "$_opk_bcc" ] && grep -v '^[[:space:]]*#' "$_opk_bcc" 2>/dev/null | grep -v '^[[:space:]]*$'
+    return 0
+}
+
+# _opk_is_browser_cmd <cmd> [subcmd]: true when this ddev invocation
+# opens a browser. xhgui only does so bare or as "xhgui launch" — its
+# on/off/status are plain daemon commands.
+_opk_is_browser_cmd() {
+    if [ "$1" = "xhgui" ]; then
+        case "${2:-}" in
+            ""|launch) return 0 ;;
+            *) return 1 ;;
+        esac
+    fi
+    for _opk_bc in $(_opk_browser_cmds); do
+        [ "$_opk_bc" = "$1" ] && return 0
+    done
+    return 1
+}
+
 ddev() {
     if [ "$(id -u)" = "$(id -u opencode 2>/dev/null || echo 0)" ]; then
         command ddev "$@"
     else
-        case "${1:-}" in
-            launch)
-                # issue #20: the URL must be COMPUTED as opencode (docker +
-                # mkcert visibility — as the developer ddev cannot see the
-                # rootless daemon, decides "not running" and would run its
-                # internal `ddev start` on EVERY launch), but the browser
-                # must be OPENED as the developer (WSL interop — the
-                # opencode user must not have it). DDEV_DEBUG=true makes
-                # ddev's launch script print "FULLURL <url>" instead of
-                # opening anything; the variable survives sudo via the
-                # kit's sudoers env_keep. Stopped projects are started by
-                # that same opencode-side run (the script's internal
-                # `ddev start`), the start output is passed through. Old
-                # ddev without the FULLURL contract falls back to running
-                # launch as the developer (may re-trigger the start).
-                _opk_out="$(DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@" 2>&1)"
-                _opk_url="$(printf '%s\n' "$_opk_out" | sed -n 's/^FULLURL //p' | tail -1)"
-                if [ -n "$_opk_url" ]; then
-                    printf '%s\n' "$_opk_out" | grep -q "starting it" && printf '%s\n' "$_opk_out"
-                    printf '%s\n' "$_opk_url"
-                    if command -v explorer.exe >/dev/null 2>&1; then
-                        explorer.exe "$_opk_url"
-                    elif command -v xdg-open >/dev/null 2>&1; then
-                        xdg-open "$_opk_url"
-                    fi
-                else
-                    [ -n "$_opk_out" ] && printf '%s\n' "$_opk_out" >&2
-                    command ddev "$@"
-                fi
-                ;;
-            *)
-                /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"
-                ;;
-        esac
+        if _opk_is_browser_cmd "${1:-}" "${2:-}"; then
+            # Browser commands (issue #20): URL computed as opencode —
+            # see _opk_ddev_browser above.
+            _opk_ddev_browser "$@"
+        else
+            /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"
+        fi
     fi
     _opk_rc=$?
     # ${1:-}: the exported function may land in child scripts running

@@ -232,17 +232,21 @@ check "4b: ddev() survives the vendor #!/bin/sh wrapper chain into the bash targ
 E 'mkdir -p /tmp/opk-fakebin && printf "#!/bin/sh\ncase \"\$*\" in \"-u\") echo 4242;; \"-u opencode\") echo 9999;; *) echo 0;; esac\n" > /tmp/opk-fakebin/id && printf "#!/bin/sh\necho \"REAL_DDEV_RAN:\$*\"\n" > /tmp/opk-fakebin/ddev && chmod 755 /tmp/opk-fakebin/id /tmp/opk-fakebin/ddev'
 check "4b: ddev start still routes through the sudoers helper as opencode" \
     E 'sudo -u dev -H env PATH=/tmp/opk-fakebin:/usr/bin:/bin sh -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "ddev is not installed"'
-# Issue #20, full chain: the launch arm computes the URL AS OPENCODE via
-# the sudoers helper with DDEV_DEBUG=true (ddev's launch script prints
-# "FULLURL <url>" instead of opening a browser) and only the browser open
-# runs as the developer — a dev-side ddev run would see "not running"
-# (no rootless daemon access) and trigger its internal `ddev start` on
-# every launch. Fake ddev honors the FULLURL contract and records the
-# caller; no explorer.exe/xdg-open in the container, so the function
-# prints the URL.
-E 'printf "#!/bin/sh\ncase \"\$1\" in launch) echo \"FULLURL https://fake-project.ddev.site as \$(id -un)\";; *) exit 0;; esac\n" | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev'
+# Issue #20 full chain: the browser-command arm computes the URL AS
+# OPENCODE via the sudoers helper with DDEV_DEBUG=true (ddev's launch
+# prints "FULLURL <url>" instead of opening a browser — inherited by
+# INTERNAL `ddev launch` children of wrapper commands like mailpit or
+# the phpmyadmin/adminer add-ons) and only the browser open runs as the
+# developer. Fake ddev honors the FULLURL contract for the whole class
+# and records the caller; no explorer.exe/xdg-open in the container, so
+# the function prints the URL.
+E 'printf "#!/bin/sh\ncase \"\$1\" in launch|mailpit|phpmyadmin|adminer) echo \"FULLURL https://fake-project.ddev.site as \$(id -un)\";; *) exit 0;; esac\n" | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev'
 check "4b: ddev launch computes the URL as opencode and hands it to the developer (issue #20)" \
     E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch /typo3" | grep -qx "https://fake-project.ddev.site as opencode"'
+check "4b: ddev mailpit routes through the browser arm (issue #20 follow-up)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev mailpit" | grep -qx "https://fake-project.ddev.site as opencode"'
+check "4b: ddev phpmyadmin routes through the browser arm (issue #20 follow-up)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev phpmyadmin" | grep -qx "https://fake-project.ddev.site as opencode"'
 check "4b: launch does not run ddev as the developer (no spurious internal start)" \
     E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" | grep -qv "as dev"'
 E 'sudo rm -f /usr/local/bin/ddev'
