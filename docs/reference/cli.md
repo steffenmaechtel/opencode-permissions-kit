@@ -74,6 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | `--projects <path...>` | Pre-define project roots, skip interactive selection (consumes every following non-flag argument) |
 | `--container-backend <docker-rootless\|podman-rootless>` | Non-interactive backend choice |
 | `--secure-git-config` | Enable `.git/config` hardening up front |
+| `--migrate-agents <move\|copy\|skip>` | Bring the developer's `~/.agents` + `~/.claude` (skills) into `/home/opencode` — move (recommended), copy, or skip; default: ask (`--yes` = move) |
 
 Flags may appear in any order; unknown options abort the install.
 

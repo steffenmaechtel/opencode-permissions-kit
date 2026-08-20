@@ -119,6 +119,9 @@ CONTAINER_BACKEND_OPT=""
 # ddev database export (issue #15): default on — the dumps are the only
 # portable copy once ddev switches to the opencode user's daemon.
 SKIP_DDEV_MIGRATION=false
+# ~/.agents migration (issue #19): empty = decide via prompt (--yes takes
+# the recommended "move"); --migrate-agents forces move|copy|skip.
+MIGRATE_AGENTS_OPT=""
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -126,6 +129,20 @@ parse_args() {
             --yes) SKIP_PROMPTS=true ;;
             --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
             --skip-ddev-migration) SKIP_DDEV_MIGRATION=true ;;
+            --migrate-agents)
+                if [ $# -lt 2 ]; then
+                    echo "error: --migrate-agents requires a value (move|copy|skip)" >&2
+                    exit 1
+                fi
+                case "$2" in
+                    move|copy|skip) MIGRATE_AGENTS_OPT="$2" ;;
+                    *)
+                        echo "error: --migrate-agents must be move, copy or skip (got: $2)" >&2
+                        exit 1
+                        ;;
+                esac
+                shift
+                ;;
             --container-backend)
                 if [ $# -lt 2 ]; then
                     echo "error: --container-backend requires a value (docker-rootless|podman-rootless)" >&2
@@ -1235,6 +1252,80 @@ sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode
 sudo chmod 2750 /home/opencode
 sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config /home/opencode/.agents
 sudo chmod 2775 /home/opencode/.config /home/opencode/.config/opencode /home/opencode/.agents
+
+# === Step 8a: migrate the developer's agent resources (issue #19) ==============
+# opencode auto-loads skills from ~/.agents/skills/ and ~/.claude/skills/
+# (plus the same-named dirs up the project tree) — collected in the
+# DEVELOPER's home they are invisible to the agent, which reads
+# /home/opencode. Offer move (recommended — one canonical copy, the
+# developer keeps rw via the sharing group), copy (both sides keep their
+# own, may drift) or skip. Applies to both folders; the choice is made
+# once and applies to whichever exist.
+MIGRATE_AGENT_DIRS=".agents .claude"
+_opk_migrate_one() {
+    _opk_src="/home/$DEFAULT_USER/$1"
+    _opk_dst="/home/$OPENCODE_USER/$1"
+    [ -d "$_opk_src" ] || return 0
+    [ -n "$(ls -A "$_opk_src" 2>/dev/null)" ] || return 0
+    sudo mkdir -p "$_opk_dst"
+    # cp -a (not mv): merges into the existing target and works when src
+    # and dst would collide on a re-install.
+    if sudo cp -a "$_opk_src/." "$_opk_dst/" 2>/dev/null; then
+        [ "$_opk_ag" = m ] && sudo rm -rf "$_opk_src"
+        # Sharing baseline: opencode owns, the developer keeps rw
+        # through the group (dirs setgid so new files inherit it). The
+        # top dir gets the explicit 2775 — mkdir's mode depends on the
+        # process umask.
+        sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"
+        sudo chmod 2775 "$_opk_dst"
+        sudo find "$_opk_dst" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
+        sudo find "$_opk_dst" -type f -exec chmod g+rw {} + 2>/dev/null || true
+        if [ "$_opk_ag" = m ]; then
+            ui_success "agent resources MOVED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
+            log "agents migration: moved $_opk_src -> $_opk_dst"
+        else
+            ui_success "agent resources COPIED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
+            log "agents migration: copied $_opk_src -> $_opk_dst"
+        fi
+    else
+        ui_warn "could not ${_opk_ag} $_opk_src — left untouched"
+        log "agents migration failed: $_opk_src"
+    fi
+}
+_opk_have_agent_dirs=false
+for _opk_d in $MIGRATE_AGENT_DIRS; do
+    [ -d "/home/$DEFAULT_USER/$_opk_d" ] && [ -n "$(ls -A "/home/$DEFAULT_USER/$_opk_d" 2>/dev/null)" ] && _opk_have_agent_dirs=true
+done
+if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]; then
+    _opk_ag="${MIGRATE_AGENTS_OPT:-}"
+    if [ -z "$_opk_ag" ]; then
+        if [ "$INTERACTIVE" = true ]; then
+            while true; do
+                echo "" >&2
+                printf "[?] Existing agent resources (~/.agents, ~/.claude — skills etc.) — bring them into /home/%s?\n" "$OPENCODE_USER" >&2
+                echo "    (m) Move   — recommended: one canonical copy; you keep read/write via the $OPENCODE_GROUP group" >&2
+                echo "    (c) Copy   — duplicate; both sides keep their own copy (may drift)" >&2
+                echo "    (s) Skip   — leave them in your home (the agent cannot use them)" >&2
+                printf "    > " >&2
+                read -r _opk_ans </dev/tty 2>/dev/null || read -r _opk_ans
+                case "$(printf '%s' "$_opk_ans" | tr '[:upper:]' '[:lower:]')" in
+                    m|move|"") _opk_ag=m; break ;;
+                    c|copy)    _opk_ag=c; break ;;
+                    s|skip)    _opk_ag=s; break ;;
+                esac
+            done
+        else
+            _opk_ag=m
+        fi
+    fi
+    case "$_opk_ag" in
+        m|c) for _opk_d in $MIGRATE_AGENT_DIRS; do _opk_migrate_one "$_opk_d"; done ;;
+        s)
+            ui_detail "skipped: ~/.agents and ~/.claude stay in your home — the agent cannot use these skills"
+            log "agents migration: skipped by choice"
+            ;;
+    esac
+fi
 
 if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
     sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc

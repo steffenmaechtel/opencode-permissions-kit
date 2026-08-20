@@ -45,6 +45,7 @@ reset_globals() {
     GIT_FLAG_GIVEN=""
     CONTAINER_BACKEND_OPT=""
     SKIP_DDEV_MIGRATION=false
+    MIGRATE_AGENTS_OPT=""
 }
 
 # expect_rc <want-rc> <description> <args...>
@@ -98,6 +99,25 @@ parse_args --yes
     && pass "ddev migration stays ON by default" \
     || fail "ddev migration stays ON by default"
 
+# --migrate-agents (issue #19): valid values captured, invalid abort.
+for _ma_v in move copy skip; do
+    reset_globals
+    parse_args --migrate-agents "$_ma_v"
+    [ "$MIGRATE_AGENTS_OPT" = "$_ma_v" ] \
+        && pass "--migrate-agents $_ma_v is captured" \
+        || fail "--migrate-agents $_ma_v is captured"
+done
+reset_globals
+parse_args --yes
+[ "$MIGRATE_AGENTS_OPT" = "" ] \
+    && pass "agents migration undecided by default (prompt/--yes recommended)" \
+    || fail "agents migration undecided by default"
+reset_globals
+parse_args --projects /var/www/vhosts --migrate-agents copy
+[ "$MIGRATE_AGENTS_OPT" = "copy" ] \
+    && pass "--migrate-agents works after --projects" \
+    || fail "--migrate-agents works after --projects"
+
 # The regression this file exists for: flags AFTER --projects used to be
 # silently dropped (the old loop `break`ed out of the parser).
 reset_globals
@@ -130,6 +150,8 @@ parse_args --yes --projects --container-backend docker-rootless
 expect_rc 1 "unknown option aborts" --yes --bogus
 expect_rc 1 "--container-backend without a value aborts" --yes --container-backend
 expect_rc 1 "typo'd flag aborts (--ye)" --ye
+expect_rc 1 "--migrate-agents without a value aborts" --yes --migrate-agents
+expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agents steal
 
 echo ""
 if [ "$failures" -gt 0 ]; then

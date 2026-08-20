@@ -177,6 +177,28 @@ fi
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ans=$(prompt_yn "Remove user '$OPENCODE_USER' and their home directory?" "n")
     if [ "$ans" = "y" ]; then
+        # userdel -r deletes /home/<opencode> INCLUDING migrated agent
+        # resources (issue #19 move mode: ~/.agents and ~/.claude with
+        # the developer's skills). Back them up to the developer's
+        # ownership before the home goes away. (ls without sudo: the
+        # developer is in the sharing group and can list the dirs.)
+        for _un_ag_dirname in .agents .claude; do
+            _un_ag_src="/home/$OPENCODE_USER/$_un_ag_dirname"
+            if [ -d "$_un_ag_src" ] && [ -n "$(ls -A "$_un_ag_src" 2>/dev/null)" ]; then
+                _un_ag_stamp="$(date +%Y%m%d-%H%M%S)"
+                _un_ag_dir="/var/backups/opencode-permissions-kit/$_un_ag_dirname-backup-$_un_ag_stamp"
+                if [ "$DRY_RUN" = true ]; then
+                    echo "  [DRY] sudo mkdir -p '$_un_ag_dir' && sudo cp -a '$_un_ag_src/.' '$_un_ag_dir/'"
+                elif sudo mkdir -p "$_un_ag_dir" && sudo cp -a "$_un_ag_src/." "$_un_ag_dir/" 2>/dev/null; then
+                    id "$DEFAULT_USER" >/dev/null 2>&1 && sudo chown -R "$DEFAULT_USER" "$_un_ag_dir"
+                    echo "Agent resources backed up: $_un_ag_dir (restore with: cp -a $_un_ag_dir/. ~/$_un_ag_dirname/)"
+                    log "agents backup before userdel: $_un_ag_dir"
+                else
+                    echo "WARNING: could not back up $_un_ag_src — its content will be deleted with the user."
+                    log "agents backup FAILED before userdel: $_un_ag_dirname"
+                fi
+            fi
+        done
         # A rootless container backend (docker-rootless/podman-rootless) enabled
         # linger and starts the user's systemd manager; userdel refuses while
         # that manager is running. Tear it down first (best-effort), then remove
