@@ -85,8 +85,11 @@ _opk_hosts_hint() {
     echo "  (your Windows browser cannot resolve them until added):"
     printf '%s\n' "$_opk_miss" | sed 's/^/    /'
     echo ""
-    echo "  add them (Windows asks for permission):"
-    echo "    opencode-permissions-kit ddev-hosts-add"
+    echo "  add them (Windows asks for permission, one command each —"
+    echo "  you see exactly what gets added):"
+    for _opk_h in $_opk_miss; do
+        echo "    opencode-permissions-kit ddev-hosts-add $_opk_h"
+    done
     return 0
 }
 

@@ -96,12 +96,17 @@ printf '127.0.0.1 localhost\n127.0.0.1 base-typo3-modulset.local other.local\n' 
 
 assert_eq "missing: present hostname not reported" "" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/proj1")"
-assert_eq "missing: absent hostnames reported" \
-    "api.ddev.site
-full.example.com
-proj2.ddev.site
-shop.ddev.site" \
+# issue #21: hostnames under the DEFAULT tld (*.ddev.site) are never
+# reported — ddev's public wildcard DNS already resolves them, no hosts
+# entry is needed. additional_fqdns with a real domain still count.
+assert_eq "missing: *.ddev.site skipped (wildcard DNS), custom fqdns reported" \
+    "full.example.com" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts" sh -c '. "$1" && ddev_hosts_missing "$2" | sort' _ "$HOSTS" "$WORK/proj2")"
+assert_eq "missing: custom project_tld hostnames reported (need hosts entries)" \
+    "base-typo3-modulset.local" \
+    "$(DDEV_WIN_HOSTS="$WORK/nonexistent" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/proj1")"
+assert_eq "missing: default-tld project fully silent (wildcard DNS)" "" \
+    "$(DDEV_WIN_HOSTS="$WORK/nonexistent" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/proj3")"
 
 # Word-boundary safety: a longer hostname containing the checked one must
 # NOT count as present.
@@ -141,12 +146,20 @@ ADD_OUT=$(DDEV_WIN_HOSTS="$WORK/winhosts" DDEV_FAKE_LOG="$WORK/ddev-calls.log" \
     DDEV_HOSTS_DEV_USER="$(id -un)" SUDO_USER="" \
     PATH="$WORK/bin:$PATH" \
     sh -c '. "$1" && ddev_hosts_add "$2" >/dev/null 2>&1 || true' _ "$HOSTS" "$WORK/proj2")
-assert_eq "add calls ddev hostname once per missing hostname, 127.0.0.1" \
-    "ddev:hostname api.ddev.site 127.0.0.1
-ddev:hostname full.example.com 127.0.0.1
-ddev:hostname proj2.ddev.site 127.0.0.1
-ddev:hostname shop.ddev.site 127.0.0.1" \
+assert_eq "add calls ddev hostname once per missing hostname, 127.0.0.1 (*.ddev.site never)" \
+    "ddev:hostname full.example.com 127.0.0.1" \
     "$(grep '^ddev:hostname' "$WORK/ddev-calls.log" | sort)"
+
+# Hostname mode (issue #21): a non-directory argument adds exactly that
+# one hostname — the per-hostname commands status/hints print.
+rm -f "$WORK/ddev-calls2.log"
+DDEV_WIN_HOSTS="$WORK/winhosts" DDEV_FAKE_LOG="$WORK/ddev-calls2.log" \
+    DDEV_HOSTS_DEV_USER="$(id -un)" SUDO_USER="" \
+    PATH="$WORK/bin:$PATH" \
+    sh -c '. "$1" && ddev_hosts_add my-fancy-project.local >/dev/null 2>&1 || true' _ "$HOSTS"
+assert_eq "add: hostname mode adds exactly the given name (issue #21)" \
+    "ddev:hostname my-fancy-project.local 127.0.0.1" \
+    "$(grep '^ddev:hostname' "$WORK/ddev-calls2.log")"
 
 # --- 4. kit CLI wiring ----------------------------------------------------------
 
@@ -182,6 +195,18 @@ check "update.sh deploys ddev-hosts.sh" \
     sh -c "grep -q '\"\$LIBDIR/ddev-hosts.sh\"' \"\$1\"" _ "$UPDATE"
 check "status.sh reports missing Windows hostnames" \
     sh -c "grep -q 'hosts (win)' \"\$1\"" _ "$STATUS"
+check "status.sh scan prunes vendor dirs (issue #21)" \
+    sh -c "grep -qF -e '-name vendor' \"\$1\"" _ "$STATUS"
+check "status.sh scan prunes node_modules dirs (issue #21)" \
+    sh -c "grep -qF -e '-name node_modules' \"\$1\"" _ "$STATUS"
+check "status.sh prints one add command per hostname (issue #21)" \
+    sh -c "grep -qF 'ddev-hosts-add \$_st_h' \"\$1\"" _ "$STATUS"
+check "hook hint prints one add command per hostname (issue #21)" \
+    sh -c "grep -qF 'ddev-hosts-add \$_opk_h' \"\$1\"" _ "$FUNC"
+check "kit CLI usage documents the hostname mode (issue #21)" \
+    sh -c "grep -qF 'ddev-hosts-add [dir|hostname]' \"\$1\"" _ "$KIT"
+check "kit CLI check output shows per-hostname add commands" \
+    sh -c "grep -qF 'ddev-hosts-add /' \"\$1\"" _ "$KIT"
 check "Makefile lint list includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/ddev-hosts.sh' \"\$1\"" _ "$MAKEFILE"
 check "test.yml chmod list includes ddev-hosts.sh" \

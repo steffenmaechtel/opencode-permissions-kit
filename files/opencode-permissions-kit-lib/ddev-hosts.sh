@@ -103,8 +103,12 @@ ddev_hosts_list() {
 
 # ddev_hosts_missing <project-dir> [hosts-file]
 # Prints the project's hostnames that are NOT in the Windows hosts file
-# (default $DDEV_WIN_HOSTS). An unreadable hosts file counts as "all
-# missing" — the hint then still shows, ddev-host-add re-checks.
+# (default $DDEV_WIN_HOSTS) — EXCEPT hostnames under the default tld
+# (*.ddev.site): ddev's public wildcard DNS already resolves them to
+# 127.0.0.1, no hosts entry is ever needed (issue #21; ddev itself stopped
+# managing hosts entries for the default tld). An unreadable hosts file
+# counts as "all missing" — the hint then still shows, ddev-host-add
+# re-checks.
 ddev_hosts_missing() {
     dhmi_proj="${1:-}"
     dhmi_hosts="${2:-$DDEV_WIN_HOSTS}"
@@ -113,6 +117,9 @@ ddev_hosts_missing() {
     dhmi_list=$(ddev_hosts_list "$dhmi_proj")
     [ -n "$dhmi_list" ] || return 0
     for dhmi_h in $dhmi_list; do
+        case "$dhmi_h" in
+            *.ddev.site) continue ;;
+        esac
         if [ -f "$dhmi_hosts" ] && grep -Eq "[[:space:]]$dhmi_h([[:space:]]|\$)" "$dhmi_hosts" 2>/dev/null; then
             continue
         fi
@@ -121,16 +128,19 @@ ddev_hosts_missing() {
     return 0
 }
 
-# ddev_hosts_add <project-dir>
-# Adds every missing hostname via ddev's own elevation path, run AS THE
-# DEVELOPER (ddev must not run as the agent user here — the Windows
-# hosts file and interop belong to the developer). One ddev call per
-# hostname (ddev hostname takes a single name); Windows may show one UAC
-# dialog per call. Prints a manual fallback when ddev or interop fails.
+# ddev_hosts_add <project-dir|hostname>
+# Adds hostnames via ddev's own elevation path, run AS THE DEVELOPER
+# (ddev must not run as the agent user here — the Windows hosts file and
+# interop belong to the developer). One ddev call per hostname (ddev
+# hostname takes a single name); Windows may show one UAC dialog per call.
+# Prints a manual fallback when ddev or interop fails.
+# Two modes (issue #21): an existing DIRECTORY adds that project's missing
+# hostnames; a HOSTNAME adds exactly that one name — the per-hostname
+# commands the status/hints print, so the user sees and adds exactly what
+# was reported.
 ddev_hosts_add() {
-    dha_proj="${1:-}"
-    [ -n "$dha_proj" ] || dha_proj="$PWD"
-    [ -f "$dha_proj/.ddev/config.yaml" ] || { echo "ddev-hosts: no ddev project in $dha_proj"; return 1; }
+    dha_arg="${1:-}"
+    [ -n "$dha_arg" ] || dha_arg="$PWD"
 
     dha_conf="/etc/opencode-permissions-kit/install.conf"
     dha_dev="${DDEV_HOSTS_DEV_USER:-}"
@@ -146,16 +156,37 @@ ddev_hosts_add() {
         dha_dev=""
     fi
 
+    dha_bin="$(command -v ddev 2>/dev/null || true)"
+    [ -n "$dha_bin" ] || { [ -x /usr/local/bin/ddev ] && dha_bin=/usr/local/bin/ddev; }
+    [ -n "$dha_bin" ] || { [ -x /usr/bin/ddev ] && dha_bin=/usr/bin/ddev; }
+    [ -n "$dha_bin" ] || { echo "ddev-hosts: ddev is not installed"; return 1; }
+
+    # Hostname mode: not an existing directory and no path separator.
+    if [ ! -d "$dha_arg" ]; then
+        case "$dha_arg" in
+            */*) echo "ddev-hosts: no ddev project in $dha_arg"; return 1 ;;
+        esac
+        echo "adding $dha_arg (Windows may ask for permission) ..."
+        if [ -n "$dha_dev" ]; then
+            sudo -u "$dha_dev" env HOME="/home/$dha_dev" "$dha_bin" hostname "$dha_arg" 127.0.0.1
+        else
+            "$dha_bin" hostname "$dha_arg" 127.0.0.1
+        fi || { echo "  FAILED: $dha_arg — add it manually (see below)"; return 1; }
+        echo ""
+        echo "  Windows hosts file: $DDEV_WIN_HOSTS"
+        echo "  manual fallback (Windows PowerShell as admin):"
+        echo "    Add-Content -Path 'C:\Windows\System32\drivers\etc\hosts' -Value '127.0.0.1 $dha_arg'"
+        return 0
+    fi
+
+    dha_proj="$dha_arg"
+    [ -f "$dha_proj/.ddev/config.yaml" ] || { echo "ddev-hosts: no ddev project in $dha_proj"; return 1; }
+
     dha_missing=$(ddev_hosts_missing "$dha_proj")
     if [ -z "$dha_missing" ]; then
         echo "all hostnames already in $DDEV_WIN_HOSTS — nothing to do"
         return 0
     fi
-
-    dha_bin="$(command -v ddev 2>/dev/null || true)"
-    [ -n "$dha_bin" ] || { [ -x /usr/local/bin/ddev ] && dha_bin=/usr/local/bin/ddev; }
-    [ -n "$dha_bin" ] || { [ -x /usr/bin/ddev ] && dha_bin=/usr/bin/ddev; }
-    [ -n "$dha_bin" ] || { echo "ddev-hosts: ddev is not installed"; return 1; }
 
     dha_failed=""
     dha_rc=0

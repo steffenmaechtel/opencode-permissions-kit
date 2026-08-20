@@ -208,11 +208,15 @@ cd /var/www/vhosts/<project>
 opencode-permissions-kit ddev-hosts-add
 ```
 
-`ddev-hosts-check` lists what is missing; `opencode-permissions-kit
-status` reports it per project root. Manual fallback: edit
+`ddev-hosts-check` lists what is missing (one ready-made
+`ddev-hosts-add <hostname>` command each — that form works from
+anywhere); `opencode-permissions-kit status` reports it per project
+root. Manual fallback: edit
 `C:\Windows\System32\drivers\etc\hosts` in an elevated editor and add
-`127.0.0.1 <project>.<tld>`. Projects on the default `ddev.site` TLD
-with internet access need no hosts entry at all.
+`127.0.0.1 <project>.<tld>`. Hostnames under the default `*.ddev.site`
+TLD never need an entry (ddev's wildcard DNS) — and entries inside
+`vendor/`/`node_modules/` `.ddev` dirs are never your projects: the
+status scan skips them.
 
 ## `docker ps` in the agent session lists "wrong" containers
 

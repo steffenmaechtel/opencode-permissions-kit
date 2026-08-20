@@ -56,11 +56,13 @@ Commands:
                                   container-backend <backend>|status, refresh
   update [--yes] [--refresh]      Re-deploy the kit; --binary / --binary-path
                                   upgrade the opencode binary
-  ddev-hosts-add [dir]            Add this project's ddev hostnames to the
-                                  Windows hosts file (ddev's own UAC flow;
-                                  run as your user, Windows asks permission)
-  ddev-hosts-check [dir]          List this project's ddev hostnames missing
-                                  from the Windows hosts file
+  ddev-hosts-add [dir|hostname]     Add ddev hostnames to the Windows hosts
+                                   file (ddev's own UAC flow; run as your
+                                   user, Windows asks permission). A dir adds
+                                   that project's missing hostnames, a
+                                   hostname adds exactly that one
+  ddev-hosts-check [dir]            List this project's ddev hostnames missing
+                                   from the Windows hosts file
   uninstall [--yes] [--dry-run]   Remove the kit (runs as your user)
   help                            Show this help
 
@@ -123,7 +125,8 @@ case "$cmd" in
                 else
                     echo "missing from $DDEV_WIN_HOSTS:"
                     printf '%s\n' "$_khm" | sed 's/^/  /'
-                    echo "add them: opencode-permissions-kit ddev-hosts-add"
+                    echo "add them (one command each):"
+                    printf '%s\n' "$_khm" | sed 's/^/  opencode-permissions-kit ddev-hosts-add /'
                 fi
                 ;;
             ddev-hosts-add)

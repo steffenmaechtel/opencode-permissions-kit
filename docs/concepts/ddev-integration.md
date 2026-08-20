@@ -158,16 +158,17 @@ opencode-permissions-kit ddev-hosts-add          # in the project dir
 
 It adds every hostname missing from
 `C:\Windows\System32\drivers\etc\hosts` — the project name + TLD,
-`additional_hostnames`, and non-wildcard `additional_fqdns`. After
+`additional_hostnames`, and non-wildcard `additional_fqdns`. Hostnames
+under the default `*.ddev.site` TLD are never touched: ddev's public
+wildcard DNS already resolves them, no hosts entry is needed. After
 `ddev start`/`restart` the kit's `ddev()` shell function prints the
-missing hostnames plus that command as a hint; `ddev-hosts-check`
-lists them on demand, and `opencode-permissions-kit status` reports
-them per project root.
-
-Projects on the default `ddev.site` TLD with internet access need no
-hosts entry at all (DNS wildcard). `ddev launch` cannot open a browser
-from the opencode context — open the URL in your Windows browser
-directly.
+missing hostnames with one ready-made command each —
+`opencode-permissions-kit ddev-hosts-add <hostname>` also works
+standalone from anywhere, so you add exactly what was reported;
+`ddev-hosts-check` lists them on demand, and
+`opencode-permissions-kit status` reports them per project root (its
+scan skips `vendor/` and `node_modules/` — composer/npm packages ship
+their own `.ddev` dirs that are not your projects).
 
 ## The SSH-key trade-off
 
