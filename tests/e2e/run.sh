@@ -210,6 +210,16 @@ check "4b: helper prints 'must run as' for a non-opencode caller" \
 # helper must exit 127 with a clean hint (never a traceback, never a shim).
 check "4b: helper as opencode without ddev exits 127 with a hint" \
     E 'sudo -u opencode sh -c "/usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --version >/dev/null 2>/tmp/ddo.out; rc=\$?; test \$rc -eq 127 && grep -q \"ddev is not installed\" /tmp/ddo.out"'
+# Issue #18: vendor scripts (e.g. TYPO3 vendor/bin/runTests.sh) call ddev
+# in a CHILD bash shell. The hook must export the function, so a child
+# bash script resolves ddev to the function (runs as opencode) instead of
+# a real binary (would run as the developer). The hook file is sourced
+# directly (Ubuntu's .bashrc returns early for non-interactive shells;
+# the .bashrc wiring itself is asserted by the static check above).
+check "4b: ddev() exported to child bash scripts (issue #18)" \
+    E 'sudo -u dev -H bash -c "source /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; bash -c \"type -t ddev\"" 2>/dev/null | grep -q function'
+check "4b: vendor-style child script resolves ddev to the function (issue #18)" \
+    E 'sudo -u dev -H bash -c "source /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; printf \"#!/bin/bash\\ncommand -v ddev\\n\" > /tmp/vendor-style.sh; bash /tmp/vendor-style.sh" 2>/dev/null | grep -qx ddev'
 
 echo ""
 echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"

@@ -147,6 +147,23 @@ check "function uses 'command ddev' in the opencode branch" \
 check_fail "function never references the removed legacy bin/ddev shim" \
     sh -c "grep -qE 'opencode-permissions-kit/bin/ddev(\$|[^-])' \"\$1\"" _ "$FUNC"
 
+# --- 3b. exported function reaches child bash scripts (issue #18) -----------
+# Vendor scripts (TYPO3 vendor/bin/runTests.sh) run ddev in a CHILD bash
+# shell. The function file must export the function there (bash-only,
+# guarded on BASH_VERSION), so `type -t ddev` in the child reports
+# "function" and `command -v ddev` resolves to it. Nested bash chain:
+# sh -> bash (source + export -f) -> bash (import via environment).
+check "function file exports ddev for bash children" \
+    sh -c "grep -qF 'export -f ddev' \"\$1\"" _ "$FUNC"
+check "export block is guarded (never runs in dash/zsh)" \
+    sh -c "grep -qF '[ -n \"\${BASH_VERSION:-}\" ]' \"\$1\"" _ "$FUNC"
+check "function body is set -u safe (\${1:-} in the hosts-hint case)" \
+    sh -c "grep -qF 'case \"\${1:-}\" in' \"\$1\"" _ "$FUNC"
+check "exported ddev() reaches a child bash script (type -t)" \
+    env OPK_FUNC="$FUNC" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; bash -c \"type -t ddev\"" | grep -q function'
+check "exported ddev() is what command -v resolves to in a child bash script" \
+    env OPK_FUNC="$FUNC" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; bash -c \"command -v ddev\"" | grep -qx ddev'
+
 # --- 4. sudoers rule -----------------------------------------------------------
 check "sudoers.template grants the ddev-as-opencode helper" \
     sh -c "grep -q 'NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$SUDOERS"

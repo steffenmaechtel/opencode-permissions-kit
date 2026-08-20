@@ -3,6 +3,33 @@
 This page lists known failure modes — each entry follows
 symptom → cause → fix. If your case is missing, open an issue.
 
+## vendor script (runTests.sh) fails with "chmod .ddev/...: operation not permitted"
+
+**Symptom:** `vendor/bin/runTests.sh -s phpstan` (or similar vendor
+tooling) reports port conflicts, then ddev dies with
+`chmod .ddev/.webimageBuild: operation not permitted` — while the same
+ddev command typed directly in the terminal works.
+
+**Cause:** the script ran ddev as **you** (the developer), not as the
+`opencode` user the kit uses. The kit's `ddev()` shell function is
+exported to bash child scripts, but that does not reach
+`#!/bin/sh` scripts, cronjobs, IDE tasks, or zsh-launched children —
+there the real ddev binary runs as your user and collides with the
+opencode-owned `.ddev/`.
+
+**Fix:**
+
+- update the kit and open a **new terminal** (the export ships with the
+  hook), then run the script again — bash scripts like
+  `vendor/bin/runTests.sh` are covered;
+- force bash for `#!/bin/sh` vendor scripts:
+  `bash vendor/bin/runTests.sh -s phpstan`;
+- or run the inner ddev command directly (it works in your terminal):
+
+  ```bash
+  ddev exec vendor/bin/phpstan analyse -c vendor/somepath/phpstan/phpstan.neon --verbose --no-progress --no-interaction --memory-limit 4G
+  ```
+
 ## git: "detected dubious ownership in repository at ..."
 
 **Cause:** git refuses repositories owned by another user. The kit sets

@@ -27,7 +27,9 @@ ddev() {
         /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"
     fi
     _opk_rc=$?
-    case "$1" in
+    # ${1:-}: the exported function may land in child scripts running
+    # `set -u` that call ddev without arguments (issue #18).
+    case "${1:-}" in
         start|restart) _opk_hosts_hint 2>/dev/null || true ;;
     esac
     return "$_opk_rc"
@@ -54,3 +56,19 @@ _opk_hosts_hint() {
     echo "    opencode-permissions-kit ddev-hosts-add"
     return 0
 }
+
+# Export for bash child processes (issue #18): vendor scripts like TYPO3's
+# vendor/bin/runTests.sh call `ddev` in a CHILD bash shell, where this file
+# was never sourced — the script resolved the real binary and ran ddev as
+# the developer, colliding with the opencode-owned .ddev/ ("chmod
+# .ddev/.webimageBuild: operation not permitted"). Exported bash functions
+# travel via the environment (BASH_FUNC_*), so a child bash script —
+# whether it calls `ddev ...` bare or resolves it via `command -v ddev` —
+# gets this function and ddev runs as opencode there too.
+# Bash-only by nature: dash (`#!/bin/sh`) scripts do not import bash
+# functions, and zsh cannot export functions to bash children — see
+# docs/troubleshooting.md for the workarounds.
+# shellcheck disable=SC3045  # bash-only block, guarded above
+if [ -n "${BASH_VERSION:-}" ]; then
+    export -f ddev _opk_hosts_hint 2>/dev/null || true
+fi
