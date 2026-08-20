@@ -45,7 +45,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh; do
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -83,6 +83,11 @@ command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
 # issue #15). Same sourcing rules as ddev-handover.sh.
 [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh"
 command -v ddev_migrate_registry >/dev/null 2>&1 || { ddev_migrate_registry() { :; }; ddev_migrate_projects() { :; }; ddev_migrate_done() { return 1; }; }
+
+# Shared group-baseline helper with live progress (issue #14). Same
+# sourcing rules as ddev-handover.sh.
+[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh"
+command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 
 # === Shared UI helpers ===
 # The kit files sit next to this script (checkout or fully fetched temp dir);
@@ -978,6 +983,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
         n) ui_detail "skipping filesystem setup." ;;
         b)
             # shellcheck disable=SC2086  # word splitting intended (root list)
+            ui_detail "reading current ACLs with getfacl -R (large trees: this can take minutes) ..."
             getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
             echo "Backup saved." ;;
         y) ;;
@@ -985,20 +991,11 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     if [ "$ans" != "n" ]; then
         for root in $PROJECTS_ROOTS; do
             [ -d "$root" ] || continue
-            sudo chgrp -R "$OPENCODE_GROUP" "$root" 2>/dev/null || true
-            sudo chmod g+s "$root"
-            # Recursive baseline (matches what a production tree needs):
-            # setgid + group rwx on EVERY directory — new files anywhere in
-            # the tree get the sharing group, and both sides can create
-            # entries in pre-existing directories — and group rw on existing
-            # files, so developer and agent can edit each other's pre-install
-            # files. .git is INCLUDED (issue #17): it stays developer-owned
-            # but group-accessible so the agent's git can read the
-            # repository; .git/config stays guarded by the soft deny (see
-            # docs/concepts/security-model.md).
-            sudo find "$root" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
-            sudo find "$root" -type f -exec chmod g+rw {} + 2>/dev/null || true
-            sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
+            # Group baseline via the shared helper: chgrp + setgid +
+            # group rw + default ACLs, .git included (issue #17), with a
+            # live per-pass progress counter (issue #14 — large trees
+            # used to run minutes in silence).
+            fs_baseline_root "$root" "$OPENCODE_GROUP"
             ui_success "$root — group + setgid + default ACLs applied"
         done
     fi
@@ -1191,8 +1188,9 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \

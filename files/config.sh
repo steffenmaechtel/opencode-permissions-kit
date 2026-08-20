@@ -145,6 +145,16 @@ for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR
 done
 [ -n "$_handover" ] || ddev_handover_root() { :; }
 
+# Shared group-baseline helper with live progress (issue #14). Same
+# lookup order as ddev-handover.sh above.
+for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
+
 projects_list() {
     ui_info "Project roots ($PROJECTS_CONF):"
     if [ ! -f "$PROJECTS_CONF" ] || [ ! -s "$PROJECTS_CONF" ]; then
@@ -219,15 +229,10 @@ projects_add() {
             continue
         fi
         echo "$p" | sudo tee -a "$PROJECTS_CONF" > /dev/null
-        # Apply the group baseline so the developer/agent share files immediately
-            sudo chgrp -R "$OPENCODE_GROUP" "$p" 2>/dev/null || true
-            sudo chmod g+s "$p"
-            # Recursive baseline like install.sh Step 5: setgid + group rwx
-            # on every directory, group rw on files — .git included (issue
-            # #17), developer-owned but group-accessible.
-            sudo find "$p" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
-            sudo find "$p" -type f -exec chmod g+rw {} + 2>/dev/null || true
-            sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$p" 2>/dev/null || true
+        # Apply the group baseline so the developer/agent share files
+        # immediately — shared helper with live per-pass progress
+        # (issue #14), .git included (issue #17).
+            fs_baseline_root "$p" "$OPENCODE_GROUP"
         # ddev handover (.ddev + the app-type's settings dirs at any depth):
         # ddev always runs as $OPENCODE_USER and chmods these paths
         # unconditionally — they must belong to it or `ddev start` fails
@@ -450,14 +455,8 @@ refresh() {
         while IFS= read -r p; do
             [ -z "$p" ] && continue
             [ -d "$p" ] || continue
-            sudo chgrp -R "$OPENCODE_GROUP" "$p" 2>/dev/null || true
-            sudo chmod g+s "$p" 2>/dev/null || true
-            # Recursive baseline like install.sh Step 5: setgid + group rwx
-            # on every directory, group rw on files — .git included (issue
-            # #17), developer-owned but group-accessible.
-            sudo find "$p" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
-            sudo find "$p" -type f -exec chmod g+rw {} + 2>/dev/null || true
-            sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$p" 2>/dev/null || true
+            # Shared helper with live per-pass progress (issue #14).
+            fs_baseline_root "$p" "$OPENCODE_GROUP"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi

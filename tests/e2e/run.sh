@@ -122,6 +122,8 @@ check "2c: recursive group baseline — pre-existing file is group-writable" \
     E 'test "$(stat -c %A /var/www/vhosts/perm-check/existing-file.txt | cut -c6)" = "w"'
 check "2c: recursive group baseline — group is opencode everywhere" \
     E 'test "$(stat -c %G /var/www/vhosts/perm-check/existing-file.txt)" = "opencode"'
+check "2c: baseline runs with live per-pass progress (issue #14)" \
+    E 'grep -q "group baseline on /var/www/vhosts" /tmp/install-out.log && grep -q "entries — done" /tmp/install-out.log'
 check "2c: .git dir gets the group baseline (dev-owned, setgid + group-writable)" \
     E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git)" = "dev:opencode:2770"'
 check "2c: .git/config group-writable, stays dev-owned (issue #17)" \

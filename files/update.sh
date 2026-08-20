@@ -50,7 +50,7 @@ KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc 
 opencode-deny-all.jsonc \
 sudoers.template umask.sh VERSION \
 opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh"
+opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
@@ -274,8 +274,9 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -361,6 +362,7 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh"
     [ -f "$LIBDIR/ddev-handover.sh" ] && . "$LIBDIR/ddev-handover.sh"
     command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
+    ui_detail "scanning project roots for ddev directories (large trees: this can take a while) ..."
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         [ -d "$root" ] || continue
@@ -555,17 +557,18 @@ log "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
 
 if [ "$REFRESH" = true ]; then
     ui_section "Refreshing group baseline"
+    # Shared helper with live per-pass progress (issue #14 — large trees
+    # used to run minutes in silence during --refresh).
+    _fsbl=""
+    for _fsbl_cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"; do
+        if [ -f "$_fsbl_cand" ]; then . "$_fsbl_cand"; _fsbl="$_fsbl_cand"; break; fi
+    done
+    [ -n "$_fsbl" ] || fs_baseline_root() { :; }
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r root; do
             [ -z "$root" ] && continue
             [ -d "$root" ] || continue
-            sudo chgrp -R "$NEW_OPENCODE_GROUP" "$root" 2>/dev/null || true
-            # Recursive baseline like install.sh Step 5: setgid + group rwx
-            # on every directory, group rw on files — .git included (issue
-            # #17), developer-owned but group-accessible.
-            sudo find "$root" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
-            sudo find "$root" -type f -exec chmod g+rw {} + 2>/dev/null || true
-            sudo setfacl -R -d -m "g:$NEW_OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
+            fs_baseline_root "$root" "$NEW_OPENCODE_GROUP"
             ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi

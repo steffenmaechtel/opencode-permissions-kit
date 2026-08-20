@@ -20,7 +20,9 @@ you create are readable/writable for the agent — no chgrp chores.
 
 The group baseline is applied **recursively** over every project root
 (install, `config.sh projects add`, `config.sh refresh`,
-`update.sh --refresh`):
+`update.sh --refresh`) — by a shared helper that prints a live per-pass
+entry counter, because first runs over large trees (hundreds of repos)
+take minutes per pass:
 
 | Operation | Scope |
 |---|---|
