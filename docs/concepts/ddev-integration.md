@@ -27,22 +27,24 @@ is a different world entirely.
 The `ddev()` function lives in your shell RC files — and shell functions
 exist only in shells that loaded those files. To cover **vendor scripts**
 like TYPO3's `vendor/bin/runTests.sh`, which call `ddev` in a child bash
-process (issue #18), the hook **exports** the function: every child bash
-script you start from your terminal — bare `ddev ...` calls and
-`command -v ddev` resolutions alike — gets the function and runs ddev as
-`opencode`.
+process (issue #18), the hook uses two transports: it **exports** the
+function (bash children import it directly), and it sets **`BASH_ENV`**
+pointing at itself (non-interactive bash startups source that file — a
+plain variable, so it even survives `#!/bin/sh` wrapper scripts and
+Makefile/zsh spawn paths in between). A user-set `BASH_ENV` is never
+overridden.
 
 | Who calls `ddev`? | What happens |
 |---|---|
 | You, in a terminal | The function intercepts the call → runs via the sudoers helper as `opencode` ✔ |
-| A **bash** script started from your terminal (e.g. `vendor/bin/runTests.sh`) | Inherits the exported function → runs as `opencode` ✔ |
-| A `#!/bin/sh` script, cronjob, or anything outside your shell (Makefile recipes, IDE tasks, zsh children) | Calls the **real ddev binary** as your user — the function never applies ✘ |
+| A bash script started from your terminal (e.g. `vendor/bin/runTests.sh`, also behind its `#!/bin/sh` wrapper) | Gets the function via `export -f` / `BASH_ENV` → runs as `opencode` ✔ |
+| A pure `#!/bin/sh` (dash) target script, cronjob, IDE task — anything outside your shell environment | Calls the **real ddev binary** as your user — the function never applies ✘ |
 
 In the last case ddev runs as your user instead of `opencode` — two
 owners for `.ddev/`, a different daemon: exactly the state the kit
 prevents. Ways out for those scripts:
 
-1. Force bash for a `#!/bin/sh` script: `bash vendor/bin/runTests.sh -s phpstan`.
+1. Force bash for a dash script: `bash vendor/bin/runTests.sh -s phpstan`.
 2. Call the helper explicitly — this is exactly what the `ddev()` function
    does internally, minus the shell function in between:
 

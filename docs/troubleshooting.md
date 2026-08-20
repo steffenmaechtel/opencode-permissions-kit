@@ -11,18 +11,18 @@ tooling) reports port conflicts, then ddev dies with
 ddev command typed directly in the terminal works.
 
 **Cause:** the script ran ddev as **you** (the developer), not as the
-`opencode` user the kit uses. The kit's `ddev()` shell function is
-exported to bash child scripts, but that does not reach
-`#!/bin/sh` scripts, cronjobs, IDE tasks, or zsh-launched children —
-there the real ddev binary runs as your user and collides with the
-opencode-owned `.ddev/`.
+`opencode` user the kit uses. The kit's `ddev()` shell function reaches
+bash child scripts (exported function + `BASH_ENV`, covering
+`vendor/bin/runTests.sh` including its `#!/bin/sh` wrapper), but not
+pure dash targets, cronjobs, IDE tasks, or shells that never loaded your
+RC files — there the real ddev binary runs as your user and collides
+with the opencode-owned `.ddev/`.
 
 **Fix:**
 
-- update the kit and open a **new terminal** (the export ships with the
-  hook), then run the script again — bash scripts like
-  `vendor/bin/runTests.sh` are covered;
-- force bash for `#!/bin/sh` vendor scripts:
+- update the kit and open a **new terminal** (both transports ship with
+  the hook), then run the script again;
+- force bash for pure `#!/bin/sh` vendor scripts:
   `bash vendor/bin/runTests.sh -s phpstan`;
 - or run the inner ddev command directly (it works in your terminal):
 

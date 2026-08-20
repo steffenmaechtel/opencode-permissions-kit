@@ -149,9 +149,9 @@ check_fail "function never references the removed legacy bin/ddev shim" \
 
 # --- 3b. exported function reaches child bash scripts (issue #18) -----------
 # Vendor scripts (TYPO3 vendor/bin/runTests.sh) run ddev in a CHILD bash
-# shell. The function file must export the function there (bash-only,
-# guarded on BASH_VERSION), so `type -t ddev` in the child reports
-# "function" and `command -v ddev` resolves to it. Nested bash chain:
+# shell. The hook must export the function there (bash-only, guarded on
+# BASH_VERSION), so `type -t ddev` in the child reports "function" and
+# `command -v ddev` resolves to it. Nested bash chain:
 # sh -> bash (source + export -f) -> bash (import via environment).
 check "function file exports ddev for bash children" \
     sh -c "grep -qF 'export -f ddev' \"\$1\"" _ "$FUNC"
@@ -163,6 +163,24 @@ check "exported ddev() reaches a child bash script (type -t)" \
     env OPK_FUNC="$FUNC" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; bash -c \"type -t ddev\"" | grep -q function'
 check "exported ddev() is what command -v resolves to in a child bash script" \
     env OPK_FUNC="$FUNC" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; bash -c \"command -v ddev\"" | grep -qx ddev'
+
+# --- 3c. BASH_ENV second transport: survives #!/bin/sh wrappers (issue #18) --
+# The real vendor/bin/runTests.sh is a dash wrapper that execs a bash
+# target; dash strips BASH_FUNC_* env entries, so only the BASH_ENV
+# transport (plain variable, self-referential via BASH_SOURCE, never
+# clobbering a user-set value) gets the function through the chain:
+# sh -> bash (source hook) -> sh wrapper (exec) -> bash target.
+VCHAIN=$(mktemp -d)
+printf '#!/usr/bin/env sh\nexec "%s/target.sh" "$@"\n' "$VCHAIN" > "$VCHAIN/wrapper.sh"
+printf '#!/usr/bin/env bash\ntype -t ddev\n' > "$VCHAIN/target.sh"
+chmod +x "$VCHAIN/wrapper.sh" "$VCHAIN/target.sh"
+check "hook sets BASH_ENV (self-referential, empty-guarded)" \
+    sh -c "grep -qF '[ -z \"\${BASH_ENV:-}\" ]' \"\$1\" && grep -q 'export BASH_ENV=' \"\$1\"" _ "$FUNC"
+check "ddev() survives a #!/bin/sh wrapper into the bash target (issue #18)" \
+    env OPK_FUNC="$FUNC" OPK_CHAIN="$VCHAIN" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; \"\$OPK_CHAIN/wrapper.sh\" -s phpstan" | grep -q function'
+check "hook does not clobber a user-set BASH_ENV" \
+    env OPK_FUNC="$FUNC" sh -c 'bash -c "export BASH_ENV=/nonexistent-user-file; . \"\$OPK_FUNC\" 2>/dev/null; test \"\$BASH_ENV\" = /nonexistent-user-file"'
+rm -rf "$VCHAIN"
 
 # --- 4. sudoers rule -----------------------------------------------------------
 check "sudoers.template grants the ddev-as-opencode helper" \

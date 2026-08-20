@@ -61,14 +61,29 @@ _opk_hosts_hint() {
 # vendor/bin/runTests.sh call `ddev` in a CHILD bash shell, where this file
 # was never sourced — the script resolved the real binary and ran ddev as
 # the developer, colliding with the opencode-owned .ddev/ ("chmod
-# .ddev/.webimageBuild: operation not permitted"). Exported bash functions
-# travel via the environment (BASH_FUNC_*), so a child bash script —
-# whether it calls `ddev ...` bare or resolves it via `command -v ddev` —
-# gets this function and ddev runs as opencode there too.
-# Bash-only by nature: dash (`#!/bin/sh`) scripts do not import bash
-# functions, and zsh cannot export functions to bash children — see
-# docs/troubleshooting.md for the workarounds.
+# .ddev/.webimageBuild: operation not permitted"). Two transports:
+#   1. export -f: bash children inherit the function directly via the
+#      environment (BASH_FUNC_*). Does NOT survive a #!/bin/sh (dash)
+#      wrapper in between — dash drops BASH_FUNC_* entries (invalid
+#      identifier names) before exec.
+#   2. BASH_ENV: non-interactive bash startups source the file it names
+#      before running the script. A plainly-named variable, so dash
+#      wrappers (vendor/bin/runTests.sh -> exec the bash target) and
+#      Makefile/zsh spawn paths pass it through untouched. Self-
+#      referential via BASH_SOURCE (works for repo checkouts and
+#      deployed kits alike); never clobbers a user-set BASH_ENV.
+# Either way a child bash script — whether it calls `ddev ...` bare or
+# resolves it via `command -v ddev` — gets this function and ddev runs as
+# opencode there too. sudo's env_reset keeps both out of the opencode
+# session (no recursion). Pure dash targets still need the documented
+# workarounds — see docs/troubleshooting.md.
 # shellcheck disable=SC3045  # bash-only block, guarded above
 if [ -n "${BASH_VERSION:-}" ]; then
     export -f ddev _opk_hosts_hint 2>/dev/null || true
+    if [ -z "${BASH_ENV:-}" ]; then
+        # shellcheck disable=SC3028  # bash-only variable in a guarded block
+        _opk_hook="${BASH_SOURCE:-}"
+        _opk_hook=$(readlink -f "$_opk_hook" 2>/dev/null || printf '%s' "$_opk_hook")
+        [ -n "$_opk_hook" ] && export BASH_ENV="$_opk_hook"
+    fi
 fi
