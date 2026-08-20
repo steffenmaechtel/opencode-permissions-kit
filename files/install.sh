@@ -45,7 +45,7 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh; do
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -84,6 +84,11 @@ command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
 [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh"
 command -v ddev_migrate_registry >/dev/null 2>&1 || { ddev_migrate_registry() { :; }; ddev_migrate_projects() { :; }; ddev_migrate_done() { return 1; }; }
 
+# Shared group-baseline helper with live progress (issue #14). Same
+# sourcing rules as ddev-handover.sh.
+[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh"
+command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
+
 # === Shared UI helpers ===
 # The kit files sit next to this script (checkout or fully fetched temp dir);
 # a plain fallback keeps install.sh working if ui.sh is somehow missing.
@@ -119,6 +124,9 @@ CONTAINER_BACKEND_OPT=""
 # ddev database export (issue #15): default on — the dumps are the only
 # portable copy once ddev switches to the opencode user's daemon.
 SKIP_DDEV_MIGRATION=false
+# ~/.agents migration (issue #19): empty = decide via prompt (--yes takes
+# the recommended "move"); --migrate-agents forces move|copy|skip.
+MIGRATE_AGENTS_OPT=""
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -126,6 +134,20 @@ parse_args() {
             --yes) SKIP_PROMPTS=true ;;
             --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
             --skip-ddev-migration) SKIP_DDEV_MIGRATION=true ;;
+            --migrate-agents)
+                if [ $# -lt 2 ]; then
+                    echo "error: --migrate-agents requires a value (move|copy|skip)" >&2
+                    exit 1
+                fi
+                case "$2" in
+                    move|copy|skip) MIGRATE_AGENTS_OPT="$2" ;;
+                    *)
+                        echo "error: --migrate-agents must be move, copy or skip (got: $2)" >&2
+                        exit 1
+                        ;;
+                esac
+                shift
+                ;;
             --container-backend)
                 if [ $# -lt 2 ]; then
                     echo "error: --container-backend requires a value (docker-rootless|podman-rootless)" >&2
@@ -961,6 +983,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
         n) ui_detail "skipping filesystem setup." ;;
         b)
             # shellcheck disable=SC2086  # word splitting intended (root list)
+            ui_detail "reading current ACLs with getfacl -R (large trees: this can take minutes) ..."
             getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
             echo "Backup saved." ;;
         y) ;;
@@ -968,17 +991,11 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     if [ "$ans" != "n" ]; then
         for root in $PROJECTS_ROOTS; do
             [ -d "$root" ] || continue
-            sudo chgrp -R "$OPENCODE_GROUP" "$root" 2>/dev/null || true
-            sudo chmod g+s "$root"
-            # Recursive baseline (matches what a production tree needs):
-            # setgid on EVERY directory — new files anywhere in the tree get
-            # the sharing group, not just directly under the root — and
-            # group-write on existing files, so developer and agent can edit
-            # each other's pre-install files. .git stays out: it is
-            # developer-private (mode 700) by design.
-            sudo find "$root" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
-            sudo find "$root" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
-            sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
+            # Group baseline via the shared helper: chgrp + setgid +
+            # group rw + default ACLs, .git included (issue #17), with a
+            # live per-pass progress counter (issue #14 — large trees
+            # used to run minutes in silence).
+            fs_baseline_root "$root" "$OPENCODE_GROUP"
             ui_success "$root — group + setgid + default ACLs applied"
         done
     fi
@@ -988,12 +1005,25 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     # opencode user or `ddev start` fails with "operation not permitted"
     # (e.g. "chmod .../config/system"). Searched at ANY depth under each
     # root (a root is often a parent of several projects). Idempotent;
-    # the mode-700 .git dir stays dev-owned.
+    # .git dirs are never chowned — they stay developer-owned (the group
+    # baseline above makes them group-accessible).
     for root in $PROJECTS_ROOTS; do
         [ -d "$root" ] || continue
         ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         log "ddev handover applied under $root"
     done
+fi
+
+# git refuses to work in repositories owned by someone else ("detected
+# dubious ownership") — every project root here IS developer-owned, so the
+# agent's git needs the global exception (issue #17). Idempotent: the get
+# guard prevents duplicate entries on re-install.
+if command -v git >/dev/null 2>&1; then
+    if ! sudo -u "$OPENCODE_USER" -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx '*'; then
+        sudo -u "$OPENCODE_USER" -H git config --global --add safe.directory '*' \
+            && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+    fi
+    log "git safe.directory ensured for $OPENCODE_USER"
 fi
 
 sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
@@ -1158,8 +1188,9 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh"
+sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
@@ -1219,6 +1250,80 @@ sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode
 sudo chmod 2750 /home/opencode
 sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config /home/opencode/.agents
 sudo chmod 2775 /home/opencode/.config /home/opencode/.config/opencode /home/opencode/.agents
+
+# === Step 8a: migrate the developer's agent resources (issue #19) ==============
+# opencode auto-loads skills from ~/.agents/skills/ and ~/.claude/skills/
+# (plus the same-named dirs up the project tree) — collected in the
+# DEVELOPER's home they are invisible to the agent, which reads
+# /home/opencode. Offer move (recommended — one canonical copy, the
+# developer keeps rw via the sharing group), copy (both sides keep their
+# own, may drift) or skip. Applies to both folders; the choice is made
+# once and applies to whichever exist.
+MIGRATE_AGENT_DIRS=".agents .claude"
+_opk_migrate_one() {
+    _opk_src="/home/$DEFAULT_USER/$1"
+    _opk_dst="/home/$OPENCODE_USER/$1"
+    [ -d "$_opk_src" ] || return 0
+    [ -n "$(ls -A "$_opk_src" 2>/dev/null)" ] || return 0
+    sudo mkdir -p "$_opk_dst"
+    # cp -a (not mv): merges into the existing target and works when src
+    # and dst would collide on a re-install.
+    if sudo cp -a "$_opk_src/." "$_opk_dst/" 2>/dev/null; then
+        [ "$_opk_ag" = m ] && sudo rm -rf "$_opk_src"
+        # Sharing baseline: opencode owns, the developer keeps rw
+        # through the group (dirs setgid so new files inherit it). The
+        # top dir gets the explicit 2775 — mkdir's mode depends on the
+        # process umask.
+        sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"
+        sudo chmod 2775 "$_opk_dst"
+        sudo find "$_opk_dst" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
+        sudo find "$_opk_dst" -type f -exec chmod g+rw {} + 2>/dev/null || true
+        if [ "$_opk_ag" = m ]; then
+            ui_success "agent resources MOVED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
+            log "agents migration: moved $_opk_src -> $_opk_dst"
+        else
+            ui_success "agent resources COPIED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
+            log "agents migration: copied $_opk_src -> $_opk_dst"
+        fi
+    else
+        ui_warn "could not ${_opk_ag} $_opk_src — left untouched"
+        log "agents migration failed: $_opk_src"
+    fi
+}
+_opk_have_agent_dirs=false
+for _opk_d in $MIGRATE_AGENT_DIRS; do
+    [ -d "/home/$DEFAULT_USER/$_opk_d" ] && [ -n "$(ls -A "/home/$DEFAULT_USER/$_opk_d" 2>/dev/null)" ] && _opk_have_agent_dirs=true
+done
+if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]; then
+    _opk_ag="${MIGRATE_AGENTS_OPT:-}"
+    if [ -z "$_opk_ag" ]; then
+        if [ "$INTERACTIVE" = true ]; then
+            while true; do
+                echo "" >&2
+                printf "[?] Existing agent resources (~/.agents, ~/.claude — skills etc.) — bring them into /home/%s?\n" "$OPENCODE_USER" >&2
+                echo "    (m) Move   — recommended: one canonical copy; you keep read/write via the $OPENCODE_GROUP group" >&2
+                echo "    (c) Copy   — duplicate; both sides keep their own copy (may drift)" >&2
+                echo "    (s) Skip   — leave them in your home (the agent cannot use them)" >&2
+                printf "    > " >&2
+                read -r _opk_ans </dev/tty 2>/dev/null || read -r _opk_ans
+                case "$(printf '%s' "$_opk_ans" | tr '[:upper:]' '[:lower:]')" in
+                    m|move|"") _opk_ag=m; break ;;
+                    c|copy)    _opk_ag=c; break ;;
+                    s|skip)    _opk_ag=s; break ;;
+                esac
+            done
+        else
+            _opk_ag=m
+        fi
+    fi
+    case "$_opk_ag" in
+        m|c) for _opk_d in $MIGRATE_AGENT_DIRS; do _opk_migrate_one "$_opk_d"; done ;;
+        s)
+            ui_detail "skipped: ~/.agents and ~/.claude stay in your home — the agent cannot use these skills"
+            log "agents migration: skipped by choice"
+            ;;
+    esac
+fi
 
 if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
     sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc

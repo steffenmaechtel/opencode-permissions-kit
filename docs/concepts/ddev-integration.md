@@ -22,22 +22,61 @@ daemon. Consequence: `docker ps` in your own terminal and in an agent
 session list the same containers — but a colleague's rootful docker daemon
 is a different world entirely.
 
-### Why scripts must take the detour
+### Browser-opening commands (issue #20)
+
+Commands that open a browser — `ddev launch` itself and every wrapper
+whose internals spawn `ddev launch ...` (`mailpit` → `launch -m`, the
+phpmyadmin/adminer add-ons and custom project host commands →
+`launch :<port>`, `xhgui` bare) — cannot run as `opencode`: opening the
+browser on WSL2 needs `explorer.exe` / `xdg-open` → `wslview`, i.e.
+**Windows interop**, exactly what the `opencode` user must not have (an
+`.exe` would run as your Windows user, outside every soft rule). The
+`ddev()` function routes the whole class through a split:
+
+1. The command runs **as `opencode`** with `DDEV_DEBUG=true`: whatever
+   internal `ddev launch` child it spawns (bash host command or Go exec)
+   inherits the flag, prints `FULLURL <url>` and exits instead of opening
+   anything. Running as `opencode` is what makes this correct — as
+   *you*, ddev cannot see the rootless daemon, would decide "not
+   running" and run its internal `ddev start` on **every** call; the
+   https/mkcert detection needs the `opencode`-owned CAROOT. A stopped
+   project is started by that same run.
+2. The URL is opened **as you** (`explorer.exe`, falling back to
+   `xdg-open`) — your interop, your browser.
+
+Project-specific browser commands can be added to
+`/etc/opencode-permissions-kit/ddev-browser-cmds.conf` (one command name
+per line, `#` comments) — any ddev host command that internally calls
+`ddev launch` fits the same mechanism.
+
+Net effect: browser commands in your terminal open the browser without a
+restart detour; agent-side they still fail interop-blocked (by design —
+the agent should not pop windows on your Windows desktop; it can hand
+you the URL from `ddev describe` instead).
+
+### Scripts: bash children inherit the function
 
 The `ddev()` function lives in your shell RC files — and shell functions
-exist only in shells that loaded those files, i.e. your interactive
-terminal sessions:
+exist only in shells that loaded those files. To cover **vendor scripts**
+like TYPO3's `vendor/bin/runTests.sh`, which call `ddev` in a child bash
+process (issue #18), the hook uses two transports: it **exports** the
+function (bash children import it directly), and it sets **`BASH_ENV`**
+pointing at itself (non-interactive bash startups source that file — a
+plain variable, so it even survives `#!/bin/sh` wrapper scripts and
+Makefile/zsh spawn paths in between). A user-set `BASH_ENV` is never
+overridden.
 
 | Who calls `ddev`? | What happens |
 |---|---|
 | You, in a terminal | The function intercepts the call → runs via the sudoers helper as `opencode` ✔ |
-| A script (cronjob, Makefile, deploy script) | Calls the **real ddev binary** as your user — the function never applies ✘ |
+| A bash script started from your terminal (e.g. `vendor/bin/runTests.sh`, also behind its `#!/bin/sh` wrapper) | Gets the function via `export -f` / `BASH_ENV` → runs as `opencode` ✔ |
+| A pure `#!/bin/sh` (dash) target script, cronjob, IDE task — anything outside your shell environment | Calls the **real ddev binary** as your user — the function never applies ✘ |
 
-In the second case ddev runs as your user instead of `opencode` — two
+In the last case ddev runs as your user instead of `opencode` — two
 owners for `.ddev/`, a different daemon: exactly the state the kit
-prevents. Two ways out for scripts:
+prevents. Ways out for those scripts:
 
-1. Run the script from a normal terminal (it inherits the function).
+1. Force bash for a dash script: `bash vendor/bin/runTests.sh -s phpstan`.
 2. Call the helper explicitly — this is exactly what the `ddev()` function
    does internally, minus the shell function in between:
 
@@ -75,7 +114,8 @@ install/`projects add`/`refresh`/`update --refresh`.
 
 The handover runs on install, on `config.sh projects add`, on
 `config.sh refresh`, and unconditionally on every `update.sh`. Your
-`.git/` stays yours (mode 700, untouched).
+`.git/` stays yours (ownership untouched; the group baseline makes it
+group-accessible — see [the sharing group](sharing-group.md)).
 
 Notes:
 
@@ -126,16 +166,17 @@ opencode-permissions-kit ddev-hosts-add          # in the project dir
 
 It adds every hostname missing from
 `C:\Windows\System32\drivers\etc\hosts` — the project name + TLD,
-`additional_hostnames`, and non-wildcard `additional_fqdns`. After
+`additional_hostnames`, and non-wildcard `additional_fqdns`. Hostnames
+under the default `*.ddev.site` TLD are never touched: ddev's public
+wildcard DNS already resolves them, no hosts entry is needed. After
 `ddev start`/`restart` the kit's `ddev()` shell function prints the
-missing hostnames plus that command as a hint; `ddev-hosts-check`
-lists them on demand, and `opencode-permissions-kit status` reports
-them per project root.
-
-Projects on the default `ddev.site` TLD with internet access need no
-hosts entry at all (DNS wildcard). `ddev launch` cannot open a browser
-from the opencode context — open the URL in your Windows browser
-directly.
+missing hostnames with one ready-made command each —
+`opencode-permissions-kit ddev-hosts-add <hostname>` also works
+standalone from anywhere, so you add exactly what was reported;
+`ddev-hosts-check` lists them on demand, and
+`opencode-permissions-kit status` reports them per project root (its
+scan skips `vendor/` and `node_modules/` — composer/npm packages ship
+their own `.ddev` dirs that are not your projects).
 
 ## The SSH-key trade-off
 

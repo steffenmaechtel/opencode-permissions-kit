@@ -144,8 +144,85 @@ check "function execs the kit's sudoers helper for the developer" \
     sh -c "grep -q 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
 check "function uses 'command ddev' in the opencode branch" \
     sh -c "grep -q 'command ddev' \"\$1\"" _ "$FUNC"
+
+# --- 3a. launch special case (issue #20) ---------------------------------------
+# `ddev launch` computes the URL AS OPENCODE via the sudoers helper with
+# DDEV_DEBUG=true (ddev's launch script then prints "FULLURL <url>" instead
+# of opening a browser) and only the browser open runs as the developer —
+# as the developer ddev cannot see the rootless daemon and would run its
+# internal `ddev start` on every launch. Static checks (the arm calls the
+# absolute /usr/bin/sudo — not interceptable in unit tests; the e2e suite
+# covers the full chain).
+check "launch arm computes the URL as opencode via the helper (issue #20)" \
+    sh -c "grep -qF 'DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
+check "launch arm extracts the FULLURL line (ddev debug contract)" \
+    sh -c "grep -qF \"s/^FULLURL //p\" \"\$1\"" _ "$FUNC"
+check "FULLURL transport lines are filtered from the visible output" \
+    sh -c "grep -qF \"grep -v '^FULLURL ' >&2\" \"\$1\"" _ "$FUNC"
+check "launch arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
+    sh -c "grep -q 'explorer.exe' \"\$1\" && grep -q 'xdg-open' \"\$1\"" _ "$FUNC"
+check "sudoers env_keep includes DDEV_DEBUG (launch URL transport)" \
+    sh -c "grep -q 'env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD DDEV_DEBUG\"' \"\$1\"" _ "$SUDOERS"
+
+# --- 3a-2. browser-command routing (issue #20 follow-up: mailpit/phpmyadmin) ---
+# Functional against _opk_is_browser_cmd: the default list, the xhgui
+# arg-awareness, and the extensible conf file (OPK_BROWSER_CMDS_CONF).
+BC() { env OPK_BROWSER_CMDS_CONF="${3:-/nonexistent}" sh -c '. "$1" && if _opk_is_browser_cmd "$2" "${4:-}"; then echo yes; else echo no; fi' _ "$FUNC" "$1" "" "$2"; }
+assert_eq "routing: launch is a browser command"        "yes" "$(BC launch)"
+assert_eq "routing: mailpit is a browser command"       "yes" "$(BC mailpit)"
+assert_eq "routing: phpmyadmin is a browser command"    "yes" "$(BC phpmyadmin)"
+assert_eq "routing: adminer is a browser command"       "yes" "$(BC adminer)"
+assert_eq "routing: bare xhgui is a browser command"    "yes" "$(BC xhgui)"
+assert_eq "routing: xhgui launch is a browser command"  "yes" "$(BC xhgui launch)"
+assert_eq "routing: xhgui status is NOT"                "no"  "$(BC xhgui status)"
+assert_eq "routing: start is NOT"                       "no"  "$(BC start)"
+assert_eq "routing: exec is NOT"                        "no"  "$(BC exec)"
+CONF=$(mktemp)
+printf '# custom browser commands\nmy-custom-tool\n\n# another\n  spaced-tool  \n' > "$CONF"
+assert_eq "routing: conf file adds custom browser commands (issue #20 follow-up)" "yes" \
+    "$(env OPK_BROWSER_CMDS_CONF="$CONF" sh -c '. "$1" && if _opk_is_browser_cmd my-custom-tool; then echo yes; else echo no; fi' _ "$FUNC")"
+assert_eq "routing: conf entries are whitespace/comment tolerant" "yes" \
+    "$(env OPK_BROWSER_CMDS_CONF="$CONF" sh -c '. "$1" && if _opk_is_browser_cmd spaced-tool; then echo yes; else echo no; fi' _ "$FUNC")"
+rm -f "$CONF"
+check "non-launch commands still route through the sudoers helper (case arm)" \
+    sh -c "grep -qF 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode \"\$@\"' \"\$1\"" _ "$FUNC"
 check_fail "function never references the removed legacy bin/ddev shim" \
     sh -c "grep -qE 'opencode-permissions-kit/bin/ddev(\$|[^-])' \"\$1\"" _ "$FUNC"
+
+# --- 3b. exported function reaches child bash scripts (issue #18) -----------
+# Vendor scripts (TYPO3 vendor/bin/runTests.sh) run ddev in a CHILD bash
+# shell. The hook must export the function there (bash-only, guarded on
+# BASH_VERSION), so `type -t ddev` in the child reports "function" and
+# `command -v ddev` resolves to it. Nested bash chain:
+# sh -> bash (source + export -f) -> bash (import via environment).
+check "function file exports ddev for bash children" \
+    sh -c "grep -qF 'export -f ddev' \"\$1\"" _ "$FUNC"
+check "export block is guarded (never runs in dash/zsh)" \
+    sh -c "grep -qF '[ -n \"\${BASH_VERSION:-}\" ]' \"\$1\"" _ "$FUNC"
+check "function body is set -u safe (\${1:-} in the hosts-hint case)" \
+    sh -c "grep -qF 'case \"\${1:-}\" in' \"\$1\"" _ "$FUNC"
+check "exported ddev() reaches a child bash script (type -t)" \
+    env OPK_FUNC="$FUNC" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; bash -c \"type -t ddev\"" | grep -q function'
+check "exported ddev() is what command -v resolves to in a child bash script" \
+    env OPK_FUNC="$FUNC" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; bash -c \"command -v ddev\"" | grep -qx ddev'
+
+# --- 3c. BASH_ENV second transport: survives #!/bin/sh wrappers (issue #18) --
+# The real vendor/bin/runTests.sh is a dash wrapper that execs a bash
+# target; dash strips BASH_FUNC_* env entries, so only the BASH_ENV
+# transport (plain variable, self-referential via BASH_SOURCE, never
+# clobbering a user-set value) gets the function through the chain:
+# sh -> bash (source hook) -> sh wrapper (exec) -> bash target.
+VCHAIN=$(mktemp -d)
+printf '#!/usr/bin/env sh\nexec "%s/target.sh" "$@"\n' "$VCHAIN" > "$VCHAIN/wrapper.sh"
+printf '#!/usr/bin/env bash\ntype -t ddev\n' > "$VCHAIN/target.sh"
+chmod +x "$VCHAIN/wrapper.sh" "$VCHAIN/target.sh"
+check "hook sets BASH_ENV (self-referential, empty-guarded)" \
+    sh -c "grep -qF '[ -z \"\${BASH_ENV:-}\" ]' \"\$1\" && grep -q 'export BASH_ENV=' \"\$1\"" _ "$FUNC"
+check "ddev() survives a #!/bin/sh wrapper into the bash target (issue #18)" \
+    env OPK_FUNC="$FUNC" OPK_CHAIN="$VCHAIN" sh -c 'bash -c ". \"\$OPK_FUNC\" 2>/dev/null; \"\$OPK_CHAIN/wrapper.sh\" -s phpstan" | grep -q function'
+check "hook does not clobber a user-set BASH_ENV" \
+    env OPK_FUNC="$FUNC" sh -c 'bash -c "export BASH_ENV=/nonexistent-user-file; . \"\$OPK_FUNC\" 2>/dev/null; test \"\$BASH_ENV\" = /nonexistent-user-file"'
+rm -rf "$VCHAIN"
 
 # --- 4. sudoers rule -----------------------------------------------------------
 check "sudoers.template grants the ddev-as-opencode helper" \

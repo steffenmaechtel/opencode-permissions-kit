@@ -3,6 +3,80 @@
 This page lists known failure modes — each entry follows
 symptom → cause → fix. If your case is missing, open an issue.
 
+## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
+
+**Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`,
+`ddev mailpit`, `ddev phpmyadmin`, `ddev adminer`, `ddev xhgui`)
+spews `grep: /proc/sys/fs/binfmt_misc/WSLInterop: No such file or
+directory`, `wslview ... Permission denied` and exits non-zero.
+
+**Cause:** the command ran as the `opencode` user (the `ddev()` function
+routes everything there). Opening a browser on WSL2 needs Windows
+interop (`explorer.exe` / `xdg-open` → `wslview`), which the `opencode`
+user deliberately has not — `/mnt/c` is restricted to you, so every
+`.exe` is unreadable for the agent. The `grep ... WSLInterop` line is a
+cosmetic wslu quirk (with `systemd=true` the binfmt entry is named
+`WSLInterop-late`); the real blocker is the permission denied.
+
+**Fix:**
+
+- in your terminal: update the kit and open a new terminal — the
+  `ddev()` function routes the whole browser-command class
+  (`launch`, `mailpit`, `phpmyadmin`, `adminer`, `xhgui`) through the
+  split URL-computation-as-opencode + browser-open-as-developer, without
+  a "not running" restart detour (issue #20). A project-specific
+  browser command (a custom ddev host command that internally calls
+  `ddev launch`) joins the class via one line in
+  `/etc/opencode-permissions-kit/ddev-browser-cmds.conf`;
+- in an agent session this stays blocked **by design**: the agent should
+  not open windows on your Windows desktop. Ask it for the URL instead
+  (`ddev describe`) and open it yourself.
+
+## vendor script (runTests.sh) fails with "chmod .ddev/...: operation not permitted"
+
+**Symptom:** `vendor/bin/runTests.sh -s phpstan` (or similar vendor
+tooling) reports port conflicts, then ddev dies with
+`chmod .ddev/.webimageBuild: operation not permitted` — while the same
+ddev command typed directly in the terminal works.
+
+**Cause:** the script ran ddev as **you** (the developer), not as the
+`opencode` user the kit uses. The kit's `ddev()` shell function reaches
+bash child scripts (exported function + `BASH_ENV`, covering
+`vendor/bin/runTests.sh` including its `#!/bin/sh` wrapper), but not
+pure dash targets, cronjobs, IDE tasks, or shells that never loaded your
+RC files — there the real ddev binary runs as your user and collides
+with the opencode-owned `.ddev/`.
+
+**Fix:**
+
+- update the kit and open a **new terminal** (both transports ship with
+  the hook), then run the script again;
+- force bash for pure `#!/bin/sh` vendor scripts:
+  `bash vendor/bin/runTests.sh -s phpstan`;
+- or run the inner ddev command directly (it works in your terminal):
+
+  ```bash
+  ddev exec vendor/bin/phpstan analyse -c vendor/somepath/phpstan/phpstan.neon --verbose --no-progress --no-interaction --memory-limit 4G
+  ```
+
+## git: "detected dubious ownership in repository at ..."
+
+**Cause:** git refuses repositories owned by another user. The kit sets
+`safe.directory '*'` in the **opencode user's** global git config (install
+and update), so the agent side is covered. You only hit this as the
+**developer** when you run git in a repository the agent created (cloned
+as `opencode`, so it is `opencode`-owned).
+
+**Fix:** trust the agent's checkouts (developer side):
+
+```bash
+git config --global --add safe.directory '*'
+```
+
+or add single paths instead of the wildcard. If the agent side ever
+regresses (e.g. a deleted `~opencode/.gitconfig`), re-run the kit's
+updater — it re-applies the setting.
+
 ## Wrapper prints a loud bypass warning on start
 
 **Cause:** a real `~/.opencode/bin/opencode` exists — the official installer
@@ -139,11 +213,15 @@ cd /var/www/vhosts/<project>
 opencode-permissions-kit ddev-hosts-add
 ```
 
-`ddev-hosts-check` lists what is missing; `opencode-permissions-kit
-status` reports it per project root. Manual fallback: edit
+`ddev-hosts-check` lists what is missing (one ready-made
+`ddev-hosts-add <hostname>` command each — that form works from
+anywhere); `opencode-permissions-kit status` reports it per project
+root. Manual fallback: edit
 `C:\Windows\System32\drivers\etc\hosts` in an elevated editor and add
-`127.0.0.1 <project>.<tld>`. Projects on the default `ddev.site` TLD
-with internet access need no hosts entry at all.
+`127.0.0.1 <project>.<tld>`. Hostnames under the default `*.ddev.site`
+TLD never need an entry (ddev's wildcard DNS) — and entries inside
+`vendor/`/`node_modules/` `.ddev` dirs are never your projects: the
+status scan skips them.
 
 ## `docker ps` in the agent session lists "wrong" containers
 

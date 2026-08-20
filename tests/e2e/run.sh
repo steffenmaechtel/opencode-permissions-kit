@@ -58,6 +58,11 @@ echo "--- 2. Run install (from local repo checkout, podman-rootless backend) ---
 # podman-rootless because the e2e container has no systemd (docker-rootless
 # provisioning would abort — rootless is mandatory now).
 E 'mkdir -p /home/dev/.config/opencode && printf "%s\n" "{\"model\":\"dummy\"}" > /home/dev/.config/opencode/opencode.jsonc'
+# Agent-resource fixtures (issue #19): skills in the developer's ~/.agents
+# and ~/.claude (the two dirs opencode auto-scans for
+# <dir>/skills/**/SKILL.md) — the install must MOVE both into
+# /home/opencode (--yes default) with the sharing-group baseline.
+E 'mkdir -p /home/dev/.agents/skills/my-skill /home/dev/.claude/skills/claude-skill && printf "name: my-skill\n---\nbody\n" > /home/dev/.agents/skills/my-skill/SKILL.md && printf "name: claude-skill\n---\nbody\n" > /home/dev/.claude/skills/claude-skill/SKILL.md && chmod 700 /home/dev/.agents /home/dev/.claude && chmod 600 /home/dev/.agents/skills/my-skill/SKILL.md /home/dev/.claude/skills/claude-skill/SKILL.md'
 
 echo ""
 echo "--- 1c. ddev migration fixtures (fake ddev + dev registry, issue #15) ---"
@@ -75,8 +80,9 @@ E 'printf "%s\n" "project_info:" "  ddev-mig:" "    approot: /var/www/vhosts/dde
 E 'printf "type: typo3\n" > /var/www/vhosts/ddev-mig/.ddev/config.yaml && printf "type: typo3\n" > /var/www/vhosts/ddev-broken/.ddev/config.yaml'
 E 'touch /var/www/vhosts/ddev-mig/.ddev/.webimageBuild'
 # Group-baseline fixtures: a pre-install tree (dir + file, dev-owned 644)
-# plus a .git that must stay developer-private.
-E 'sudo mkdir -p /var/www/vhosts/perm-check/sub /var/www/vhosts/perm-check/.git && sudo chown -R dev:dev /var/www/vhosts/perm-check && printf "old\n" | sudo tee /var/www/vhosts/perm-check/existing-file.txt >/dev/null && printf "gitconf\n" | sudo tee /var/www/vhosts/perm-check/.git/config >/dev/null && sudo chmod 700 /var/www/vhosts/perm-check/.git && sudo chmod 600 /var/www/vhosts/perm-check/.git/config'
+# plus a real dev-owned git repo (.git 700, config 600) that must become
+# group-accessible so the agent-git check below is meaningful.
+E 'sudo git init -q /var/www/vhosts/perm-check && sudo sh -c "cd /var/www/vhosts/perm-check && git -c user.email=dev@example.com -c user.name=dev commit -q --allow-empty -m init" && sudo mkdir -p /var/www/vhosts/perm-check/sub && sudo chown -R dev:dev /var/www/vhosts/perm-check && printf "old\n" | sudo tee /var/www/vhosts/perm-check/existing-file.txt >/dev/null && sudo chmod 700 /var/www/vhosts/perm-check/.git && sudo chmod 600 /var/www/vhosts/perm-check/.git/config'
 # The log is written by root (version gate) AND dev (export loop): dev owns
 # it, world-writable so both may append.
 E 'touch /tmp/fake-ddev.log && chmod 666 /tmp/fake-ddev.log'
@@ -116,10 +122,16 @@ check "2c: recursive group baseline — pre-existing file is group-writable" \
     E 'test "$(stat -c %A /var/www/vhosts/perm-check/existing-file.txt | cut -c6)" = "w"'
 check "2c: recursive group baseline — group is opencode everywhere" \
     E 'test "$(stat -c %G /var/www/vhosts/perm-check/existing-file.txt)" = "opencode"'
-check "2c: .git stays developer-private (mode 600, not group-writable)" \
-    E 'test "$(stat -c %a /var/www/vhosts/perm-check/.git/config)" = "600"'
-check "2c: .git dir keeps mode 700" \
-    E 'test "$(stat -c %a /var/www/vhosts/perm-check/.git)" = "700"'
+check "2c: baseline runs with live per-pass progress (issue #14)" \
+    E 'grep -q "group baseline on /var/www/vhosts" /tmp/install-out.log && grep -q "entries — done" /tmp/install-out.log'
+check "2c: .git dir gets the group baseline (dev-owned, setgid + group-writable)" \
+    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git)" = "dev:opencode:2770"'
+check "2c: .git/config group-writable, stays dev-owned (issue #17)" \
+    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/config)" = "dev:opencode:660"'
+check "2c: git safe.directory '*' set for the opencode user (issue #17)" \
+    E 'sudo -u opencode -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx "*"'
+check "2c: agent git can read the dev-owned repository (no dubious ownership)" \
+    E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check log --oneline -1 >/dev/null 2>&1'
 # Remove the fake binary: section 3 asserts no ddev shadow exists at
 # /usr/local/bin/ddev (the soft-only kit ships no shim).
 E 'sudo rm -f /usr/local/bin/ddev'
@@ -205,6 +217,50 @@ check "4b: helper prints 'must run as' for a non-opencode caller" \
 # helper must exit 127 with a clean hint (never a traceback, never a shim).
 check "4b: helper as opencode without ddev exits 127 with a hint" \
     E 'sudo -u opencode sh -c "/usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --version >/dev/null 2>/tmp/ddo.out; rc=\$?; test \$rc -eq 127 && grep -q \"ddev is not installed\" /tmp/ddo.out"'
+# Issue #18: vendor scripts (e.g. TYPO3 vendor/bin/runTests.sh) call ddev
+# in a CHILD bash shell — behind a #!/bin/sh (dash) wrapper that execs the
+# bash target. The hook must export the function AND set BASH_ENV (dash
+# strips BASH_FUNC_* entries, only the BASH_ENV variable survives), so the
+# target resolves ddev to the function (runs as opencode) instead of the
+# real binary (would run as the developer). The hook file is sourced
+# directly (Ubuntu's .bashrc returns early for non-interactive shells; the
+# .bashrc wiring itself is asserted by the static check above).
+E 'printf "#!/usr/bin/env sh\nexec /tmp/rt-target.sh \"\$@\"\n" > /tmp/rt-wrap.sh && printf "#!/usr/bin/env bash\ncommand -v ddev\n" > /tmp/rt-target.sh && chmod 755 /tmp/rt-wrap.sh /tmp/rt-target.sh'
+check "4b: ddev() exported to child bash scripts (issue #18)" \
+    E 'sudo -u dev -H bash -c "source /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; bash -c \"type -t ddev\"" 2>/dev/null | grep -q function'
+check "4b: ddev() survives the vendor #!/bin/sh wrapper chain into the bash target (issue #18)" \
+    E 'sudo -u dev -H bash -c "source /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; /tmp/rt-wrap.sh -s phpstan" 2>/dev/null | grep -qx ddev'
+# Issue #20: `ddev launch` must run as the DEVELOPER — opening the browser
+# needs WSL interop (explorer.exe / xdg-open -> wslview), which the opencode
+# user deliberately has not. Fake id reports a non-opencode uid; the fake
+# ddev proves launch runs it directly as the developer, while `start` still
+# routes through the sudoers helper (as opencode — no ddev in the container,
+# so the helper exits 127 with its hint).
+E 'mkdir -p /tmp/opk-fakebin && printf "#!/bin/sh\ncase \"\$*\" in \"-u\") echo 4242;; \"-u opencode\") echo 9999;; *) echo 0;; esac\n" > /tmp/opk-fakebin/id && printf "#!/bin/sh\necho \"REAL_DDEV_RAN:\$*\"\n" > /tmp/opk-fakebin/ddev && chmod 755 /tmp/opk-fakebin/id /tmp/opk-fakebin/ddev'
+check "4b: ddev start still routes through the sudoers helper as opencode" \
+    E 'sudo -u dev -H env PATH=/tmp/opk-fakebin:/usr/bin:/bin sh -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "ddev is not installed"'
+# Issue #20 full chain: the browser-command arm computes the URL AS
+# OPENCODE via the sudoers helper with DDEV_DEBUG=true (ddev's launch
+# prints "FULLURL <url>" instead of opening a browser — inherited by
+# INTERNAL `ddev launch` children of wrapper commands like mailpit or
+# the phpmyadmin/adminer add-ons) and only the browser open runs as the
+# developer. Fake ddev honors the FULLURL contract for the whole class
+# and records the caller; no explorer.exe/xdg-open in the container, so
+# the function prints the URL.
+E 'printf "#!/bin/sh\ncase \"\$1\" in launch|mailpit|phpmyadmin|adminer) echo \"FULLURL https://fake-project.ddev.site as \$(id -un)\";; *) exit 0;; esac\n" | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev'
+check "4b: ddev launch computes the URL as opencode and hands it to the developer (issue #20)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch /typo3" | grep -qx "https://fake-project.ddev.site as opencode"'
+check "4b: ddev mailpit routes through the browser arm (issue #20 follow-up)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev mailpit" | grep -qx "https://fake-project.ddev.site as opencode"'
+check "4b: ddev phpmyadmin routes through the browser arm (issue #20 follow-up)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev phpmyadmin" | grep -qx "https://fake-project.ddev.site as opencode"'
+check "4b: launch does not run ddev as the developer (no spurious internal start)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" | grep -qv "as dev"'
+check_fail "4b: FULLURL transport lines stay off the visible output (stdout AND stderr)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" 2>&1 | grep -q "^FULLURL"'
+check "4b: stdout carries exactly the clean URL line" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" 2>/dev/null | grep -qx "https://fake-project.ddev.site as opencode"'
+E 'sudo rm -f /usr/local/bin/ddev'
 
 echo ""
 echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"
@@ -269,6 +325,18 @@ check "Config deployed" \
     E 'sudo test -f /home/opencode/.config/opencode/opencode.jsonc'
 check "Agents dir exists" \
     E 'sudo test -d /home/opencode/.agents/'
+check "issue #19: ~/.agents MOVED into the opencode home (--yes default)" \
+    E 'test "$(cat /home/opencode/.agents/skills/my-skill/SKILL.md)" = "name: my-skill
+---
+body"'
+check "issue #19: ~/.claude MOVED into the opencode home too" \
+    E 'test -f /home/opencode/.claude/skills/claude-skill/SKILL.md'
+check "issue #19: developer's source dirs are gone after the move" \
+    E 'test ! -e /home/dev/.agents && test ! -e /home/dev/.claude'
+check "issue #19: migrated dirs carry the sharing baseline (setgid + group)" \
+    E 'test "$(stat -c %U:%G:%a /home/opencode/.agents)" = "opencode:opencode:2775" && test "$(stat -c %U:%G:%a /home/opencode/.claude)" = "opencode:opencode:2775"'
+check "issue #19: migrated files are group-writable for the developer" \
+    E 'test "$(stat -c %U:%G:%a /home/opencode/.agents/skills/my-skill/SKILL.md)" = "opencode:opencode:660" && test -w /home/opencode/.agents/skills/my-skill/SKILL.md'
 check "default user can cd into opencode home" \
     E 'cd /home/opencode'
 check "default user can read opencode.jsonc" \

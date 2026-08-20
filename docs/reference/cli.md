@@ -45,7 +45,19 @@ every hostname missing from `C:\Windows\System32\drivers\etc\hosts`
 `additional_fqdns`); ddev elevates via `ddev-hostname.exe` and Windows
 shows its confirmation dialog (needs working WSL interop). Both take an
 optional project directory argument (default: the current directory).
-The `ddev()` shell hook prints the hint after `ddev start`/`restart`.
+
+Hostnames under the default `*.ddev.site` TLD are never reported or
+added — ddev's public wildcard DNS already resolves them, no hosts
+entry is needed (the per-hostname commands the status and the `ddev()`
+hook print include the name, so you add exactly what was reported:
+
+```bash
+opencode-permissions-kit ddev-hosts-add my-fancy-project.local
+```
+
+works from anywhere). The status scan also skips `vendor/` and
+`node_modules/`: composer/npm packages ship their own `.ddev` dirs
+(package development checkouts) which are not your projects.
 
 ## install.sh
 
@@ -62,6 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | `--projects <path...>` | Pre-define project roots, skip interactive selection (consumes every following non-flag argument) |
 | `--container-backend <docker-rootless\|podman-rootless>` | Non-interactive backend choice |
 | `--secure-git-config` | Enable `.git/config` hardening up front |
+| `--migrate-agents <move\|copy\|skip>` | Bring the developer's `~/.agents` + `~/.claude` (skills) into `/home/opencode` — move (recommended), copy, or skip; default: ask (`--yes` = move) |
 
 Flags may appear in any order; unknown options abort the install.
 

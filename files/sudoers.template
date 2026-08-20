@@ -14,8 +14,10 @@
 # reset would drop them otherwise. OPENCODE_SERVER_PASSWORD stays too, so
 # headless `opencode serve` (third-party UIs like OpenChamber, which pass
 # the password they generate from --ui-password) does not silently lose
-# its authentication.
-Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD"
+# its authentication. DDEV_DEBUG rides along for the `ddev launch` URL
+# transport (ddev's launch script prints "FULLURL <url>" instead of
+# opening a browser — the developer side opens it, see issue #20).
+Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD DDEV_DEBUG"
 
 # Base RunAs: the wrapper always execs opencode as the opencode user.
 DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *

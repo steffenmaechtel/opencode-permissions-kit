@@ -27,7 +27,7 @@ same `master` branch, and first prints a **pre-flight inventory** of what it
 found on your system (WSL2, curl/acl, ddev, docker/podman, an existing kit
 installation, `/mnt/c` exposure, router ports).
 
-It then asks only two questions:
+It then asks only the essential questions:
 
 1. **Project directory** — the folder that holds your projects, e.g.
    `/var/www/vhosts`, `~/dev` or `~/projects` (default `/var/www/vhosts`
@@ -36,7 +36,17 @@ It then asks only two questions:
    otherwise run its group baseline over them.
 2. **Git access** — block `.git/config` for the agent (default) or allow git
    commands. You can change this later with
-   [git-config](how-to/secure-git-config.md).
+   [git-config](how-to/secure-git-config.md). Either way the agent's git can
+   read your repositories: the group baseline covers `.git/`, and the kit
+   sets `safe.directory` for the `opencode` user (no "dubious ownership"
+   errors).
+3. **Agent resources** — when you already have `~/.agents` or `~/.claude`
+   (skills; opencode auto-loads both from `<dir>/skills/**/SKILL.md`),
+   bring them into `/home/opencode` so the agent can use them:
+   **move** (recommended — one canonical copy; you keep read/write via the
+   sharing group), **copy** (both sides keep their own, may drift) or
+   **skip**. Non-interactive installs move;
+   `--migrate-agents move|copy|skip` forces a choice.
 
 One exception: when podman is detected, you choose between podman-rootless
 (default) and docker-rootless. Otherwise docker-rootless is used silently.
