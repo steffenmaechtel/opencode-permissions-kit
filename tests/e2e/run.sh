@@ -75,8 +75,9 @@ E 'printf "%s\n" "project_info:" "  ddev-mig:" "    approot: /var/www/vhosts/dde
 E 'printf "type: typo3\n" > /var/www/vhosts/ddev-mig/.ddev/config.yaml && printf "type: typo3\n" > /var/www/vhosts/ddev-broken/.ddev/config.yaml'
 E 'touch /var/www/vhosts/ddev-mig/.ddev/.webimageBuild'
 # Group-baseline fixtures: a pre-install tree (dir + file, dev-owned 644)
-# plus a .git that must stay developer-private.
-E 'sudo mkdir -p /var/www/vhosts/perm-check/sub /var/www/vhosts/perm-check/.git && sudo chown -R dev:dev /var/www/vhosts/perm-check && printf "old\n" | sudo tee /var/www/vhosts/perm-check/existing-file.txt >/dev/null && printf "gitconf\n" | sudo tee /var/www/vhosts/perm-check/.git/config >/dev/null && sudo chmod 700 /var/www/vhosts/perm-check/.git && sudo chmod 600 /var/www/vhosts/perm-check/.git/config'
+# plus a real dev-owned git repo (.git 700, config 600) that must become
+# group-accessible so the agent-git check below is meaningful.
+E 'sudo git init -q /var/www/vhosts/perm-check && sudo sh -c "cd /var/www/vhosts/perm-check && git -c user.email=dev@example.com -c user.name=dev commit -q --allow-empty -m init" && sudo mkdir -p /var/www/vhosts/perm-check/sub && sudo chown -R dev:dev /var/www/vhosts/perm-check && printf "old\n" | sudo tee /var/www/vhosts/perm-check/existing-file.txt >/dev/null && sudo chmod 700 /var/www/vhosts/perm-check/.git && sudo chmod 600 /var/www/vhosts/perm-check/.git/config'
 # The log is written by root (version gate) AND dev (export loop): dev owns
 # it, world-writable so both may append.
 E 'touch /tmp/fake-ddev.log && chmod 666 /tmp/fake-ddev.log'
@@ -116,10 +117,14 @@ check "2c: recursive group baseline — pre-existing file is group-writable" \
     E 'test "$(stat -c %A /var/www/vhosts/perm-check/existing-file.txt | cut -c6)" = "w"'
 check "2c: recursive group baseline — group is opencode everywhere" \
     E 'test "$(stat -c %G /var/www/vhosts/perm-check/existing-file.txt)" = "opencode"'
-check "2c: .git stays developer-private (mode 600, not group-writable)" \
-    E 'test "$(stat -c %a /var/www/vhosts/perm-check/.git/config)" = "600"'
-check "2c: .git dir keeps mode 700" \
-    E 'test "$(stat -c %a /var/www/vhosts/perm-check/.git)" = "700"'
+check "2c: .git dir gets the group baseline (dev-owned, setgid + group-writable)" \
+    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git)" = "dev:opencode:2770"'
+check "2c: .git/config group-writable, stays dev-owned (issue #17)" \
+    E 'test "$(stat -c %U:%G:%a /var/www/vhosts/perm-check/.git/config)" = "dev:opencode:660"'
+check "2c: git safe.directory '*' set for the opencode user (issue #17)" \
+    E 'sudo -u opencode -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx "*"'
+check "2c: agent git can read the dev-owned repository (no dubious ownership)" \
+    E 'sudo -u opencode -H git -C /var/www/vhosts/perm-check log --oneline -1 >/dev/null 2>&1'
 # Remove the fake binary: section 3 asserts no ddev shadow exists at
 # /usr/local/bin/ddev (the soft-only kit ships no shim).
 E 'sudo rm -f /usr/local/bin/ddev'

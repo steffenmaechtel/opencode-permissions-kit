@@ -75,7 +75,8 @@ install/`projects add`/`refresh`/`update --refresh`.
 
 The handover runs on install, on `config.sh projects add`, on
 `config.sh refresh`, and unconditionally on every `update.sh`. Your
-`.git/` stays yours (mode 700, untouched).
+`.git/` stays yours (ownership untouched; the group baseline makes it
+group-accessible — see [the sharing group](sharing-group.md)).
 
 Notes:
 

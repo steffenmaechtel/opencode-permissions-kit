@@ -352,8 +352,9 @@ fi
 # `ddev start` fails with "operation not permitted". Searched at ANY depth
 # under each registered root (a root is often a parent of several projects).
 # Unconditional (not just inside the migration) so installs that already
-# migrated — the common upgrade path — are healed too. The mode-700 .git
-# dir stays dev-owned.
+# migrated — the common upgrade path — are healed too. .git dirs are
+# never chowned — they stay developer-owned (the group baseline makes
+# them group-accessible).
 if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     # Shared helper: prefer the copy next to this script (checkout — same
     # vintage as the running update.sh), fall back to the deployed library.
@@ -366,6 +367,18 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
         ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         log "ddev handover applied under $root"
     done < "$PROJECTS_CONF"
+fi
+
+# git "dubious ownership" exception for the opencode user (issue #17) —
+# every registered project root is developer-owned, the agent's git needs
+# safe.directory to run there. Unconditional so existing installs get it
+# on the first update; the get guard keeps it idempotent.
+if command -v git >/dev/null 2>&1; then
+    if ! sudo -u "$OPENCODE_USER" -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx '*'; then
+        sudo -u "$OPENCODE_USER" -H git config --global --add safe.directory '*' \
+            && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+    fi
+    log "git safe.directory ensured for $OPENCODE_USER"
 fi
 
 # --- WSL2 /mnt/c restriction (report-only — update.sh stays prompt-free) -------
@@ -547,10 +560,11 @@ if [ "$REFRESH" = true ]; then
             [ -z "$root" ] && continue
             [ -d "$root" ] || continue
             sudo chgrp -R "$NEW_OPENCODE_GROUP" "$root" 2>/dev/null || true
-            # Recursive baseline like install.sh Step 5: setgid on every
-            # directory, group-write on files — .git stays developer-private.
-            sudo find "$root" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
-            sudo find "$root" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
+            # Recursive baseline like install.sh Step 5: setgid + group rwx
+            # on every directory, group rw on files — .git included (issue
+            # #17), developer-owned but group-accessible.
+            sudo find "$root" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
+            sudo find "$root" -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo setfacl -R -d -m "g:$NEW_OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
             ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"

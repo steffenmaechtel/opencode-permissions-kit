@@ -971,13 +971,16 @@ if [ -n "$PROJECTS_ROOTS" ]; then
             sudo chgrp -R "$OPENCODE_GROUP" "$root" 2>/dev/null || true
             sudo chmod g+s "$root"
             # Recursive baseline (matches what a production tree needs):
-            # setgid on EVERY directory — new files anywhere in the tree get
-            # the sharing group, not just directly under the root — and
-            # group-write on existing files, so developer and agent can edit
-            # each other's pre-install files. .git stays out: it is
-            # developer-private (mode 700) by design.
-            sudo find "$root" -name .git -prune -o -type d -exec chmod g+s {} + 2>/dev/null || true
-            sudo find "$root" -name .git -prune -o -type f -exec chmod g+rw {} + 2>/dev/null || true
+            # setgid + group rwx on EVERY directory — new files anywhere in
+            # the tree get the sharing group, and both sides can create
+            # entries in pre-existing directories — and group rw on existing
+            # files, so developer and agent can edit each other's pre-install
+            # files. .git is INCLUDED (issue #17): it stays developer-owned
+            # but group-accessible so the agent's git can read the
+            # repository; .git/config stays guarded by the soft deny (see
+            # docs/concepts/security-model.md).
+            sudo find "$root" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
+            sudo find "$root" -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo setfacl -R -d -m "g:$OPENCODE_GROUP:rwx" "$root" 2>/dev/null || true
             ui_success "$root — group + setgid + default ACLs applied"
         done
@@ -988,12 +991,25 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     # opencode user or `ddev start` fails with "operation not permitted"
     # (e.g. "chmod .../config/system"). Searched at ANY depth under each
     # root (a root is often a parent of several projects). Idempotent;
-    # the mode-700 .git dir stays dev-owned.
+    # .git dirs are never chowned — they stay developer-owned (the group
+    # baseline above makes them group-accessible).
     for root in $PROJECTS_ROOTS; do
         [ -d "$root" ] || continue
         ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         log "ddev handover applied under $root"
     done
+fi
+
+# git refuses to work in repositories owned by someone else ("detected
+# dubious ownership") — every project root here IS developer-owned, so the
+# agent's git needs the global exception (issue #17). Idempotent: the get
+# guard prevents duplicate entries on re-install.
+if command -v git >/dev/null 2>&1; then
+    if ! sudo -u "$OPENCODE_USER" -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx '*'; then
+        sudo -u "$OPENCODE_USER" -H git config --global --add safe.directory '*' \
+            && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+    fi
+    log "git safe.directory ensured for $OPENCODE_USER"
 fi
 
 sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh

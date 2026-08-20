@@ -36,7 +36,10 @@ It then asks only two questions:
    otherwise run its group baseline over them.
 2. **Git access** — block `.git/config` for the agent (default) or allow git
    commands. You can change this later with
-   [git-config](how-to/secure-git-config.md).
+   [git-config](how-to/secure-git-config.md). Either way the agent's git can
+   read your repositories: the group baseline covers `.git/`, and the kit
+   sets `safe.directory` for the `opencode` user (no "dubious ownership"
+   errors).
 
 One exception: when podman is detected, you choose between podman-rootless
 (default) and docker-rootless. Otherwise docker-rootless is used silently.

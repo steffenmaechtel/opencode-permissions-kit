@@ -25,14 +25,20 @@ The group baseline is applied **recursively** over every project root
 | Operation | Scope |
 |---|---|
 | `chgrp -R opencode` | every file and directory |
-| `chmod g+s` (setgid) | every directory — new files anywhere in the tree inherit the sharing group, not just directly under the root |
+| `chmod g+rwxs` (setgid + group rwx) | every directory — the group can create entries in pre-existing directories, and new files anywhere in the tree inherit the sharing group, not just directly under the root |
 | `chmod g+rw` | every existing file, so you and the agent can edit each other's pre-install files |
 | default ACLs `g:opencode:rwx` | every directory (governs new files' access) |
 
-**`.git/` directories are excluded** on purpose: they stay
-developer-owned and mode 700 (the agent's git access is governed by the
-soft `.git/config` deny instead — see
-[the security model](security-model.md)).
+**`.git/` directories are included** in the baseline (issue #17): they
+stay developer-owned but get the same group access, so the agent's git
+can read the repository at the filesystem level. Because git also
+refuses to run in repositories owned by someone else ("detected dubious
+ownership"), the kit sets `safe.directory '*'` in the opencode user's
+global git config on install and update — the agent's `git log`, `git
+diff` & co. work in your projects out of the box. `.git/config` (which
+can hold remote URLs with embedded credentials) remains guarded by the
+soft `.git/config` deny — see
+[the security model](security-model.md).
 
 ## Consequences
 

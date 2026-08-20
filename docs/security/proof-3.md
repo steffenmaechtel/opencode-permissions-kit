@@ -254,6 +254,11 @@ Beyond C2: `.git/config` (credentials, insteadOf URLs), `.git/objects` (PROOF-1 
 or at least surface it in install.sh's summary; it costs little (agent rarely needs
 to read .git/config via tools).
 
+*Status update (issue #17):* the group baseline now covers `.git` (group-writable
+for the agent, still developer-owned). That makes this mitigation-relevant again —
+the soft `.git/config` deny/tripwire is the only guard, see the M2 row in the
+summary table.
+
 ### M3. Supply chain: `curl | sudo bash` from `master`, unsigned
 
 install.sh/update.sh self-fetch siblings from `KIT_BRANCH` (default `master`) via
@@ -345,7 +350,7 @@ much of this list is a bug report vs. a MANUAL.md paragraph.
 | H2 | Copies/archives escape scope | **Accepted + visibility aid.** "The kit protects locations, not information flows" is the documented scope boundary; `status.sh` ends with a report-only name-based leak scan of the scratch dirs. |
 | H3 | ddev host-commands exec as developer | **Closed by redesign.** ddev runs as `opencode` everywhere (terminal `ddev()` function + sudoers helper); the sudoers carry **zero** RunAs-developer rules. |
 | M1 | protected files deletable/renamable | **Accepted** (soft-only: integrity/availability are not OS-enforced). |
-| M2 | `.git` agent-writable | **Closed in practice.** The `.git` dir stays developer-owned mode 700 and is explicitly excluded from the ddev handovers. |
+| M2 | `.git` agent-writable | **Accepted, soft-mitigated.** Since the issue-#17 baseline change the `.git` tree is group-writable for the agent (deliberate: the agent's git must read the repository). `.git` stays excluded from the ddev handovers (never chowned to `opencode`), and `.git/config` remains guarded by the soft deny + bash tripwire — integrity of `.git` is not OS-enforced, consistent with the soft-only model. |
 | M3 | supply chain: `curl \| sudo bash` from master, unsigned | **Open** (roadmap). Install tracks `master` by design during alpha; tagged/signed releases are the known follow-up (see the repo's planning notes). |
 | M4 | audit-log injection | **Closed.** The log is root-owned 640 in the default user's group; the `opencode` user can neither read nor write it; entries are written by root-side kit scripts only. |
 | M5 | `OPENCODE_LAUNCH_CWD` agent-influenceable | **Closed.** The variable no longer exists; the wrapper validates the CWD against `projects.conf` itself. |

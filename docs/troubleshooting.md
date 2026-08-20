@@ -3,6 +3,24 @@
 This page lists known failure modes — each entry follows
 symptom → cause → fix. If your case is missing, open an issue.
 
+## git: "detected dubious ownership in repository at ..."
+
+**Cause:** git refuses repositories owned by another user. The kit sets
+`safe.directory '*'` in the **opencode user's** global git config (install
+and update), so the agent side is covered. You only hit this as the
+**developer** when you run git in a repository the agent created (cloned
+as `opencode`, so it is `opencode`-owned).
+
+**Fix:** trust the agent's checkouts (developer side):
+
+```bash
+git config --global --add safe.directory '*'
+```
+
+or add single paths instead of the wildcard. If the agent side ever
+regresses (e.g. a deleted `~opencode/.gitconfig`), re-run the kit's
+updater — it re-applies the setting.
+
 ## Wrapper prints a loud bypass warning on start
 
 **Cause:** a real `~/.opencode/bin/opencode` exists — the official installer
