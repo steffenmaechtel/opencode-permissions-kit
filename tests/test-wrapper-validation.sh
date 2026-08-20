@@ -331,7 +331,7 @@ for marker in '#@docker-group-begin' '#@ddev-delegated-begin' '#@ddev-sandbox-be
     fi
 done
 
-if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD"' "$SUDOERS_FILE" \
+if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD DDEV_DEBUG"' "$SUDOERS_FILE" \
    && grep -q '(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode' "$SUDOERS_FILE" \
    && grep -q 'socket-check.sh' "$SUDOERS_FILE"; then
     echo "  ${GREEN}PASS${NC}  sudoers.template keeps base RunAs + socket-check + env_keep"

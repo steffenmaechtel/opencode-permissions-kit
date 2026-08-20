@@ -26,19 +26,33 @@ ddev() {
     else
         case "${1:-}" in
             launch)
-                # issue #20: `ddev launch` must run as the DEVELOPER. Opening
-                # the browser needs WSL interop (explorer.exe / xdg-open ->
-                # wslview), which the opencode user deliberately has not
-                # (/mnt/c restricted) — as opencode launch dies with
-                # "Permission denied" on reg.exe/chcp.com. As the developer
-                # ddev cannot see the rootless daemon, so the launch script
-                # sees "not running", runs its internal `ddev start` — which
-                # goes through THIS function again (exported + BASH_ENV,
-                # issue #18) and runs as opencode — then recurses
-                # (no_recursion=true) and opens the URL with the developer's
-                # interop. The agent side keeps the real binary and stays
-                # interop-blocked by design.
-                command ddev "$@"
+                # issue #20: the URL must be COMPUTED as opencode (docker +
+                # mkcert visibility — as the developer ddev cannot see the
+                # rootless daemon, decides "not running" and would run its
+                # internal `ddev start` on EVERY launch), but the browser
+                # must be OPENED as the developer (WSL interop — the
+                # opencode user must not have it). DDEV_DEBUG=true makes
+                # ddev's launch script print "FULLURL <url>" instead of
+                # opening anything; the variable survives sudo via the
+                # kit's sudoers env_keep. Stopped projects are started by
+                # that same opencode-side run (the script's internal
+                # `ddev start`), the start output is passed through. Old
+                # ddev without the FULLURL contract falls back to running
+                # launch as the developer (may re-trigger the start).
+                _opk_out="$(DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@" 2>&1)"
+                _opk_url="$(printf '%s\n' "$_opk_out" | sed -n 's/^FULLURL //p' | tail -1)"
+                if [ -n "$_opk_url" ]; then
+                    printf '%s\n' "$_opk_out" | grep -q "starting it" && printf '%s\n' "$_opk_out"
+                    printf '%s\n' "$_opk_url"
+                    if command -v explorer.exe >/dev/null 2>&1; then
+                        explorer.exe "$_opk_url"
+                    elif command -v xdg-open >/dev/null 2>&1; then
+                        xdg-open "$_opk_url"
+                    fi
+                else
+                    [ -n "$_opk_out" ] && printf '%s\n' "$_opk_out" >&2
+                    command ddev "$@"
+                fi
                 ;;
             *)
                 /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"

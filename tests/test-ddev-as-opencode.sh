@@ -146,28 +146,23 @@ check "function uses 'command ddev' in the opencode branch" \
     sh -c "grep -q 'command ddev' \"\$1\"" _ "$FUNC"
 
 # --- 3a. launch special case (issue #20) ---------------------------------------
-# `ddev launch` must run as the DEVELOPER (browser opening needs WSL interop,
-# which the opencode user must not have). Functional: fake id reports a
-# non-opencode uid, fake ddev on PATH prints; the launch call must reach the
-# fake ddev directly (no sudo — the helper would fail here). All other
-# commands keep routing through the sudoers helper (static: absolute path).
-mkdir -p "$TMPDIR/bin2"
-cat > "$TMPDIR/bin2/id" <<'FAKEID'
-#!/bin/sh
-case "$*" in
-    "-u") echo 4242 ;;
-    "-u opencode") echo 9999 ;;
-    *) echo 0 ;;
-esac
-FAKEID
-chmod +x "$TMPDIR/bin2/id"
-LRESULT=$(
-    PATH="$TMPDIR/bin2:$TMPDIR/bin:$PATH"
-    . "$FUNC"
-    ddev launch https://example.ddev.site 2>&1
-)
-assert_eq "launch runs the real ddev as the developer (no sudo, issue #20)" \
-    "REAL_DDEV_RAN:launch https://example.ddev.site" "$LRESULT"
+# `ddev launch` computes the URL AS OPENCODE via the sudoers helper with
+# DDEV_DEBUG=true (ddev's launch script then prints "FULLURL <url>" instead
+# of opening a browser) and only the browser open runs as the developer —
+# as the developer ddev cannot see the rootless daemon and would run its
+# internal `ddev start` on every launch. Static checks (the arm calls the
+# absolute /usr/bin/sudo — not interceptable in unit tests; the e2e suite
+# covers the full chain).
+check "launch arm computes the URL as opencode via the helper (issue #20)" \
+    sh -c "grep -qF 'DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
+check "launch arm extracts the FULLURL line (ddev debug contract)" \
+    sh -c "grep -qF \"s/^FULLURL //p\" \"\$1\"" _ "$FUNC"
+check "launch arm falls back to the real ddev for old ddev versions" \
+    sh -c "grep -A2 'FULLURL //p' \"\$1\" | grep -q 'command ddev' || grep -qF 'command ddev \"\$@\"' \"\$1\"" _ "$FUNC"
+check "launch arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
+    sh -c "grep -q 'explorer.exe' \"\$1\" && grep -q 'xdg-open' \"\$1\"" _ "$FUNC"
+check "sudoers env_keep includes DDEV_DEBUG (launch URL transport)" \
+    sh -c "grep -q 'env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD DDEV_DEBUG\"' \"\$1\"" _ "$SUDOERS"
 check "non-launch commands still route through the sudoers helper (case arm)" \
     sh -c "grep -qF 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode \"\$@\"' \"\$1\"" _ "$FUNC"
 check_fail "function never references the removed legacy bin/ddev shim" \

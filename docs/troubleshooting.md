@@ -20,8 +20,9 @@ cosmetic wslu quirk (with `systemd=true` the binfmt entry is named
 **Fix:**
 
 - in your terminal: update the kit and open a new terminal — the
-  `ddev()` function special-cases `launch` to run as you (issue #20),
-  and the browser opens;
+  `ddev()` function routes the URL computation to `opencode` (no
+  "not running" restart detour) and opens the URL with your interop
+  (issue #20);
 - in an agent session this stays blocked **by design**: the agent should
   not open windows on your Windows desktop. Ask it for the URL instead
   (`ddev describe`) and open it yourself.

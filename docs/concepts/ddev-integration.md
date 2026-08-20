@@ -22,20 +22,29 @@ daemon. Consequence: `docker ps` in your own terminal and in an agent
 session list the same containers — but a colleague's rootful docker daemon
 is a different world entirely.
 
-### Exception: `ddev launch` runs as you (issue #20)
+### Exception: `ddev launch` (issue #20)
 
-`ddev launch` only computes the project URL and opens it in a browser —
-on WSL2 via `explorer.exe` / `xdg-open` → `wslview`, i.e. **Windows
+`ddev launch` computes the project URL and opens it in a browser — on
+WSL2 via `explorer.exe` / `xdg-open` → `wslview`, i.e. **Windows
 interop**. That is exactly what the `opencode` user must not have (an
 `.exe` would run as your Windows user, outside every soft rule), so the
-`ddev()` function special-cases `launch`: it runs the real ddev as **the
-developer**. ddev then cannot see the rootless daemon, the launch script
-thinks the project is not running and runs its internal `ddev start` —
-which goes through the exported function again and runs as `opencode` —
-and finally opens the URL with your interop. Net effect: `ddev launch`
-in your terminal opens the browser; agent-side `ddev launch` still fails
-interop-blocked (by design — the agent should not pop windows on your
-Windows desktop; it can hand you the URL from `ddev describe` instead).
+`ddev()` function splits the job:
+
+1. The URL is computed **as `opencode`**: the function calls the sudoers
+   helper with `DDEV_DEBUG=true`, which makes ddev's launch script print
+   `FULLURL <url>` instead of opening anything. Running as `opencode` is
+   what makes this correct — as *you*, ddev cannot see the rootless
+   daemon, would decide "not running" and run its internal `ddev start`
+   on **every** launch; and the https/mkcert detection needs the
+   `opencode`-owned CAROOT. A stopped project is started by that same
+   run (as `opencode`, with output passed through).
+2. The URL is opened **as you** (`explorer.exe`, falling back to
+   `xdg-open`) — your interop, your browser.
+
+Net effect: `ddev launch` in your terminal opens the browser without a
+restart detour; agent-side `ddev launch` still fails interop-blocked (by
+design — the agent should not pop windows on your Windows desktop; it
+can hand you the URL from `ddev describe` instead).
 
 ### Scripts: bash children inherit the function
 
