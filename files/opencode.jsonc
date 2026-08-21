@@ -46,6 +46,10 @@
             // Legacy Projects
             // "*config.php" also covers "wp-config.php" and "myconfig.php"
             "*conf.php": "deny",
+            // TYPO3 carve-out (issue #23): "*conf.php" above also matches
+            // ext_localconf.php — extension bootstrap code, not a secrets
+            // file. Last matching rule wins, so this allow re-enables it.
+            "*ext_localconf.php": "allow",
             "*config.php": "deny",
             //SECURE_GIT: ".git/config": "deny",
             //SECURE_GIT: "**/.git/config": "deny",
@@ -78,6 +82,8 @@
             // Legacy Projects
             // "*config.php" also covers "wp-config.php" and "myconfig.php"
             "*conf.php": "deny",
+            // TYPO3 carve-out — mirrors the read section (issue #23)
+            "*ext_localconf.php": "allow",
             "*config.php": "deny",
             //SECURE_GIT: ".git/config": "deny",
             //SECURE_GIT: "**/.git/config": "deny",

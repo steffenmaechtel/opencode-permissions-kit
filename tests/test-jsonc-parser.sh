@@ -140,6 +140,19 @@ assert_not_contains "bundled: .git/config NOT emitted (commented)" ".git/config"
 # The removed --allow mode must fail loudly if anything still calls it.
 assert_exitcode "no --allow mode: exits non-zero" 1 python3 "$PARSER" --allow "$SCRIPT_DIR/../files/opencode.jsonc"
 
+# --- 13b. Bundled template: TYPO3 ext_localconf.php carve-out (issue #23) ---
+# opencode applies the LAST matching rule, so each "*ext_localconf.php":
+# "allow" must sit after a "*conf.php": "deny" (read AND edit section).
+TPL="$SCRIPT_DIR/../files/opencode.jsonc"
+D1=$(grep -n '"\*conf\.php": "deny"' "$TPL" | sed -n 1p | cut -d: -f1)
+D2=$(grep -n '"\*conf\.php": "deny"' "$TPL" | sed -n 2p | cut -d: -f1)
+A1=$(grep -n '"\*ext_localconf\.php": "allow"' "$TPL" | sed -n 1p | cut -d: -f1)
+A2=$(grep -n '"\*ext_localconf\.php": "allow"' "$TPL" | sed -n 2p | cut -d: -f1)
+assert_exitcode "carve-out: read allow after deny (issue #23)" 0 \
+    sh -c "[ \"${A1:-0}\" -gt \"${D1:-999999}\" ]"
+assert_exitcode "carve-out: edit allow after deny (issue #23)" 0 \
+    sh -c "[ \"${A2:-0}\" -gt \"${D2:-999999}\" ]"
+
 # --- 14. --tools: no permission.bash → no tools ---
 OUT=$(python3 "$PARSER" --tools "$FIXTURES/block-comments.jsonc" 2>/dev/null || true)
 assert_empty "tools: no bash section → no tools" "$OUT"
