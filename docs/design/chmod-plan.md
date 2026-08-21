@@ -178,11 +178,10 @@ settings management.
 
 - **Q1 (resolved):** status.sh surfaces the mode + per-project flag state
   — yes, one line per project (explains both EPERM symptoms at a glance).
-- **Q2:** The how-to's settings-file template: TYPO3-only first? (Drupal's
-  `settings.ddev.php` include chain is more intrusive to hand-write;
-  leaning TYPO3-only + documented limitation.)
+- **Q2 (resolved):** settings-file template is TYPO3-only for now —
+  Drupal's `settings.ddev.php` include chain is more intrusive to
+  hand-write; documented as a limitation, extendable later.
 - **Q3 (resolved):** leak-scan deny list unchanged — committed settings
   files are the repo's choice, the scan stays name-based either way.
-- **Q4:** Mode naming shown to users: leaning "dev-owned projects" in
-  docs, `ddev-settings` as the config.sh action (ddev-adjacent, no third
-  kit-specific permission vocabulary).
+- **Q4 (resolved):** naming: "dev-owned projects" in docs,
+  `ddev-settings` as the config.sh action.
