@@ -1,4 +1,4 @@
-# PLAN-CHMOD: Permanent group-writable projects via disable_settings_management
+# PLAN-DDEV-DEV-OWNED-PROJECTS: Permanent group-writable projects via disable_settings_management
 
 > Status: **DRAFT — planned, not implemented.** This plan replaces the
 > per-path ownership juggling (`.ddev` / settings dirs / typo3 bootstrap
