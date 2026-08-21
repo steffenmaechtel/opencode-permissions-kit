@@ -197,6 +197,19 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/ddev-as-opencode.sh" ]; then
         ui_kv "ddev() hook" "not hooked — run $LIBDIR/update.sh" "$UI_YELLOW"
     fi
 fi
+# Dev-owned mode (docs/design/ddev-dev-owned-projects.md): on = the kit
+# writes disable_settings_management: true into projects' .ddev/config.yaml
+# and keeps settings dirs + project root developer-owned; off = ddev
+# manages settings (handover model). install.conf is world-readable.
+_dv_stamp=$(sed -n 's/^DDEV_DEV_OWNED=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
+case "${_dv_stamp:-}" in
+    true|TRUE|1|yes)
+        ui_kv "ddev settings" "dev-owned — kit writes disable_settings_management (permanent 2775/664)" "$UI_GREEN"
+        ;;
+    false|FALSE|0|no|"")
+        ui_kv "ddev settings" "ddev-managed — handover model (config.sh ddev-settings on to switch)"
+        ;;
+esac
 # Router-port readiness: rootless ddev-router cannot bind 80/443 unless
 # ip_unprivileged_port_start <= 80. Shows the HOST value (the docker-rootless
 # daemon netns inherits it at start; the daemon may need a restart if it

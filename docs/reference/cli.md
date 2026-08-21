@@ -99,6 +99,7 @@ sudo bash /usr/local/lib/opencode-permissions-kit/config.sh <command>
 | `container-backend status` | Show the configured backend + socket state |
 | `refresh` | Re-apply the group baseline (chgrp/setgid/default ACLs) |
 | `handover <path...>` | Re-run the ddev handover for one project — the fresh-clone EPERM repair (see [ddev integration](../concepts/ddev-integration.md)) |
+| `ddev-settings on\|off\|status` | Dev-owned projects: kit writes `disable_settings_management: true` (see [dev-owned projects](../how-to/dev-owned-projects.md)) |
 
 ## update.sh
 

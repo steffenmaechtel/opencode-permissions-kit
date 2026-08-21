@@ -187,6 +187,13 @@ once TYPO3 is detected; see the bootstrap paragraph in
 prints this exact command when it detects the case before a
 `ddev start`.
 
+**Tired of the ownership back-and-forth?** Switch the project to
+[dev-owned](how-to/dev-owned-projects.md): `config ddev-settings on`
+makes the kit write `disable_settings_management: true` into the
+project's `.ddev/config.yaml` — ddev then never touches paths outside
+`.ddev/`, everything stays permanently yours, and `git checkout` /
+`mv` / `rm` cannot hit ownership errors anymore.
+
 ## ddev warns "Unable to open hosts file ... permission denied"
 
 **Cause:** two layers, and the second one is deliberate:

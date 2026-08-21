@@ -6,7 +6,7 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 ## Getting started
 
-- [Getting started](getting-started.md) — install the kit, answer the two
+- [Getting started](getting-started.md) — install the kit, answer the
   installer questions, and verify your first agent session
 
 ## Concepts (why it works this way)
@@ -27,6 +27,7 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 - [Use OpenChamber with the kit](how-to/openchamber.md)
 - [Switch the container backend](how-to/switch-container-backend.md)
 - [Customize the deny list](how-to/customize-deny-list.md)
+- [Use dev-owned projects](how-to/dev-owned-projects.md)
 - [Harden `.git/config`](how-to/secure-git-config.md)
 - [Update the kit and the binary](how-to/update.md)
 - [Uninstall](how-to/uninstall.md)

@@ -55,7 +55,9 @@ Commands:
                                   git-config on|off|status,
                                   container-backend <backend>|status, refresh,
                                   handover <path...> (ddev ownership repair
-                                  for a freshly cloned project)
+                                  for a freshly cloned project),
+                                  ddev-settings on|off|status (dev-owned
+                                  projects)
   update [--yes] [--refresh]      Re-deploy the kit; --binary / --binary-path
                                   upgrade the opencode binary
   ddev-hosts-add [dir|hostname]     Add ddev hostnames to the Windows hosts

@@ -29,7 +29,7 @@ are opencode's soft layer only (see [Security Model](docs/concepts/security-mode
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
 ```
 
-The installer asks two questions and shows a plan before touching anything.
+The installer asks a few questions and shows a plan before touching anything.
 The full walkthrough (including verification) lives in
 [Getting Started](docs/getting-started.md).
 

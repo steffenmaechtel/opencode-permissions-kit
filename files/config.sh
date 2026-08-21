@@ -19,6 +19,7 @@
 #   ./config.sh container-backend docker-rootless|podman-rootless|status
 #   ./config.sh refresh
 #   ./config.sh handover /var/www/vhosts/foo
+#   ./config.sh ddev-settings on|off|status
 #
 # Options:
 #   --yes   Skip confirmations, assume Yes
@@ -95,12 +96,13 @@ TARGETS=""
 for arg do
     case "$arg" in
         --yes|-y) YES=true ;;
-        projects|git-config|refresh|status|container-backend|handover)
+        projects|git-config|refresh|status|container-backend|handover|ddev-settings)
             [ -z "$ACTION" ] && ACTION="$arg" && continue
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             TARGETS="$TARGETS $arg"
             ;;
-        on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg" ;;
+        on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg"
+                 [ "$ACTION" = "ddev-settings" ] && SUB="$arg" ;;
         docker-rootless|podman-rootless)
             [ "$ACTION" = "container-backend" ] && SUB="$arg" ;;
         list|add|remove)
@@ -494,6 +496,60 @@ handover() {
     done
 }
 
+# --- ddev-settings (dev-owned mode) ----------------------------------------------
+
+# Dev-owned mode (docs/design/ddev-dev-owned-projects.md): while ON, the
+# handover scans write disable_settings_management: true into each
+# project's committed .ddev/config.yaml; flagged projects keep their
+# settings dirs + project root (ddev never chmods outside .ddev/ then).
+ddev_settings_status() {
+    if ddev_devowned_enabled; then
+        ui_kv "ddev-settings" "on — dev-owned projects (kit writes disable_settings_management)" "$UI_GREEN"
+        ui_detail "handover scans flag every project and keep settings dirs +"
+        ui_detail "project root yours (2775). See docs/how-to/dev-owned-projects.md"
+    else
+        ui_kv "ddev-settings" "off — ddev manages settings (handover model)"
+        ui_detail "settings dirs + typo3 bootstrap root are handed to $OPENCODE_USER"
+        ui_detail "while ddev needs them. Enable with: config.sh ddev-settings on"
+    fi
+}
+
+update_install_conf_ddev_owned() {
+    local value="$1"
+    local tmp
+    tmp=$(mktemp)
+    {
+        if [ -f "$INSTALL_CONF" ]; then
+            grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null
+        fi
+        echo "DDEV_DEV_OWNED=$value"
+    } | sort -u > "$tmp"
+    sudo cp "$tmp" "$INSTALL_CONF"
+    sudo chmod 644 "$INSTALL_CONF"
+    rm -f "$tmp"
+}
+
+ddev_settings_apply() {
+    local new="$1"
+    if [ "$new" = "on" ]; then
+        update_install_conf_ddev_owned true
+        DDEV_DEV_OWNED=true
+        ui_success "ddev-settings on — dev-owned projects (recommended)"
+        ui_info "existing projects get the flag + handback on the next scan. Run:"
+        ui_detail "sudo opencode-permissions-kit config refresh"
+        ui_detail "(or per project: sudo opencode-permissions-kit config handover <path>)"
+        ui_detail "commit the added disable_settings_management line in each repo."
+    else
+        update_install_conf_ddev_owned false
+        DDEV_DEV_OWNED=false
+        ui_success "ddev-settings off — ddev manages settings (handover model)"
+        ui_info "already-committed flags stay (repo content) — those projects remain"
+        ui_info "dev-owned. Remove the disable_settings_management key from a repo's"
+        ui_info ".ddev/config.yaml to give settings back to ddev, then run refresh."
+    fi
+    log "ddev-settings set to $new"
+}
+
 # --- interactive menu --------------------------------------------------------
 
 menu() {
@@ -510,6 +566,7 @@ menu() {
             "3|Toggle .git/config hardening (on/off, soft-only)" \
             "4|Refresh group baseline now" \
             "5|Switch container backend (docker-rootless / podman-rootless)" \
+            "6|ddev-settings: dev-owned projects on/off" \
             "q|Quit")
         case "$sel" in
             1)
@@ -535,6 +592,20 @@ menu() {
                 fi
                 ;;
             4) refresh ;;
+            6)
+                banner
+                ddev_settings_status
+                echo ""
+                _ds_sel=$(ui_menu "ddev-settings: dev-owned projects?" "1" \
+                    "1|on — kit writes disable_settings_management: true (recommended)" \
+                    "2|off — ddev manages settings (handover model)" \
+                    "q|Cancel")
+                case "$_ds_sel" in
+                    1) ddev_settings_apply on || true ;;
+                    2) ddev_settings_apply off || true ;;
+                    *) ui_detail "cancelled." ;;
+                esac
+                ;;
             5)
                 banner
                 container_backend_status
@@ -592,6 +663,13 @@ case "$ACTION" in
         ;;
     refresh)    banner; refresh ;;
     handover)   banner; handover ;;
+    ddev-settings)
+        case "$SUB" in
+            on|off) banner; ddev_settings_apply "$SUB" ;;
+            status|"") banner; ddev_settings_status ;;
+            *)      die "Usage: config.sh ddev-settings on|off|status" ;;
+        esac
+        ;;
     *)          die "Unknown action: $ACTION" ;;
 esac
 

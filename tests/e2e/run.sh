@@ -87,7 +87,7 @@ E 'sudo git init -q /var/www/vhosts/perm-check && sudo sh -c "cd /var/www/vhosts
 # it, world-writable so both may append.
 E 'touch /tmp/fake-ddev.log && chmod 666 /tmp/fake-ddev.log'
 
-E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts 2>&1 | tee /tmp/install-out.log'"
+E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev 2>&1 | tee /tmp/install-out.log'"
 echo "  Install complete."
 
 echo ""
@@ -330,6 +330,45 @@ check "4d: .ddev inside vendor/ is NOT handed over (issue #21 pattern)" \
     E 'test "$(stat -c %U /var/www/vhosts/fresh-clone/vendor/some/pkg/.ddev)" = "dev"'
 
 echo ""
+echo "--- 4e. dev-owned mode (disable_settings_management, design plan) ---"
+# Installed with --ddev-settings ddev (handover model) so far. Toggle the
+# dev-owned mode on: the scan must write disable_settings_management:
+# true into a project's .ddev/config.yaml and keep settings dirs + root
+# developer-owned — ddev then never chmods outside .ddev/ (early return
+# in its CreateSettingsFile), git checkout stays free even on a fresh
+# typo3 clone.
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-settings on'
+check "4e: install.conf carries the mode stamp" \
+    E 'grep -q "^DDEV_DEV_OWNED=true$" /etc/opencode-permissions-kit/install.conf'
+E 'sudo mkdir -p /var/www/vhosts/devowned-proj/.ddev /var/www/vhosts/devowned-proj/config/system && sudo chown -R dev:dev /var/www/vhosts/devowned-proj && printf "type: typo3\n" > /var/www/vhosts/devowned-proj/.ddev/config.yaml && chmod 2775 /var/www/vhosts/devowned-proj'
+check "4e: fresh clone root is dev-owned before the scan" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-proj)" = "dev"'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/devowned-proj' && \
+    echo "  ${GREEN}OK${NC}  config.sh handover (dev-owned) completed"
+check "4e: scan wrote disable_settings_management into .ddev/config.yaml" \
+    E 'grep -qx "disable_settings_management: true" /var/www/vhosts/devowned-proj/.ddev/config.yaml'
+check "4e: undetected typo3 root STAYS dev-owned (no bootstrap handover)" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-proj)" = "dev" && test "$(stat -c %a /var/www/vhosts/devowned-proj)" = "2775"'
+check "4e: settings dir stays dev-owned" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-proj/config/system)" = "dev"'
+check "4e: .ddev still handed over to opencode" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-proj/.ddev)" = "opencode"'
+check "4e: developer can replace top-level files (git checkout simulation)" \
+    E 'sudo -u dev touch /var/www/vhosts/devowned-proj/AGENTS.md && sudo -u dev rm /var/www/vhosts/devowned-proj/AGENTS.md'
+# migration: a project that went through the handover model (opencode-owned
+# root 2755) gets everything back once flagged
+E 'sudo mkdir -p /var/www/vhosts/devowned-mig/.ddev && sudo chown -R dev:dev /var/www/vhosts/devowned-mig && printf "type: typo3\n" > /var/www/vhosts/devowned-mig/.ddev/config.yaml && sudo chown opencode:opencode /var/www/vhosts/devowned-mig && sudo chmod 2755 /var/www/vhosts/devowned-mig'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/devowned-mig'
+check "4e: previously handed-over root migrates back to dev (2775)" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-mig)" = "dev" && test "$(stat -c %a /var/www/vhosts/devowned-mig)" = "2775"'
+# hook hint on an unflagged fresh clone mentions the dev-owned effect
+E 'sudo mkdir -p /var/www/vhosts/devowned-hint/.ddev && sudo chown -R dev:dev /var/www/vhosts/devowned-hint && printf "type: typo3\n" > /var/www/vhosts/devowned-hint/.ddev/config.yaml && chmod 2775 /var/www/vhosts/devowned-hint'
+check "4e: hook hint mentions disable_settings_management (dev-owned note)" \
+    E 'sudo -u dev -H sh -c "cd /var/www/vhosts/devowned-hint && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "disable_settings_management:"'
+# back to the handover model for the remaining sections
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-settings off'
+
+echo ""
 echo "--- 5. Soft-only file access (the ddev-working goal) ---"
 # No hard ACL denies: the opencode user (and ddev, and its containers) can
 # READ every project file. Protection is opencode's own soft permission layer.
@@ -542,7 +581,7 @@ echo "--- 12c-2. install.sh re-run re-applies the git choice (re-install) ---"
 # that stale agent config: the default (git blocked) is re-rendered from the
 # template with the previous file backed up. Regression for the 2026-08-16
 # live-test bug where the choice was ignored on re-install.
-E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts' && \
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev' && \
     echo "  ${GREEN}OK${NC}  re-install completed"
 check "re-install: default git-block re-applied to the existing agent config" \
     E 'sudo grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'

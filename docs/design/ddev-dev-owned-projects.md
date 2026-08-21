@@ -1,11 +1,11 @@
 # PLAN-DDEV-DEV-OWNED-PROJECTS: Permanent group-writable projects via disable_settings_management
 
-> Status: **DRAFT — planned, not implemented.** This plan replaces the
-> per-path ownership juggling (`.ddev` / settings dirs / typo3 bootstrap
-> root handovers) with a static, ddev-conflict-free permission model,
-> managed by a kit-level mode. Evidence: ddev source (github/ddev,
-> v1.25.x) and the productive-WSL reports behind the handover fixes
-> (local `Lokaler-Test.txt` and the `git checkout` EPERM follow-up).
+> Status: **IMPLEMENTED (all sections).** Installer question + stamp
+> (`DDEV_DEV_OWNED`), flag writer + scan branching in ddev-handover.sh,
+> `config.sh ddev-settings on|off|status`, status.sh mode line, hook
+> note, how-to + concept/troubleshooting/cli docs, unit + e2e coverage
+> (`make e2e` green: 224 checks incl. section 4e). Where this plan
+> conflicts with the code, the code wins.
 
 ## 1. Problem
 

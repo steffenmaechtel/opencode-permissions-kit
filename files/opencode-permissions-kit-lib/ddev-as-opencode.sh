@@ -168,6 +168,13 @@ _opk_bootstrap_hint() {
     echo "  (the kit hands it back after install):"
     echo ""
     echo "    sudo opencode-permissions-kit config handover $PWD"
+    # Dev-owned mode: the same command also writes
+    # disable_settings_management: true (the durable fix — ddev then never
+    # touches paths outside .ddev/, the root stays yours permanently).
+    if ddev_devowned_enabled; then
+        echo "    (dev-owned mode on: this also writes disable_settings_management:"
+        echo "     true into .ddev/config.yaml — commit that line)"
+    fi
     echo ""
     return 0
 }

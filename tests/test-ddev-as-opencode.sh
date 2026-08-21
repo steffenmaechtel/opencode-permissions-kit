@@ -30,6 +30,10 @@ UPDATE="$FILES/update.sh"
 CONFIG="$FILES/config.sh"
 KIT="$FILES/opencode-permissions-kit-lib/kit"
 HANDOVER="$FILES/opencode-permissions-kit-lib/ddev-handover.sh"
+# Hermetic dev-owned checks: never read this machine's real install.conf
+# (ddev_devowned_enabled falls back to the stamp) — point it at nothing.
+OPK_INSTALL_CONF="/nonexistent-opk-test-install.conf"
+export OPK_INSTALL_CONF
 STATUS="$FILES/status.sh"
 MAKEFILE="$SCRIPT_DIR/../Makefile"
 TEST_CI="$SCRIPT_DIR/../.github/workflows/test.yml"
@@ -277,9 +281,9 @@ check "handover scan prunes vendor/node_modules (issue #21 pattern)" \
 check "handover helper chowns recursively with g+w" \
     sh -c "grep -q 'chmod -R g+w' \"\$1\"" _ "$HANDOVER"
 check "handover helper maps typo3 settings dirs (config/system, typo3conf)" \
-    sh -c "grep -qF 'dhp_dirs=\"config/system \$dhp_docroot/typo3conf typo3conf\"' \"\$1\"" _ "$HANDOVER"
+    sh -c "grep -qF 'echo \"config/system \$dts_docroot/typo3conf typo3conf\"' \"\$1\"" _ "$HANDOVER"
 check "handover helper maps drupal settings dirs (sites/default)" \
-    sh -c "grep -qF '\$dhp_docroot/sites/default' \"\$1\"" _ "$HANDOVER"
+    sh -c "grep -qF '\$dts_docroot/sites/default' \"\$1\"" _ "$HANDOVER"
 check "handover helper skips unknown app types" \
     sh -c "grep -qF 'return 0' \"\$1\"" _ "$HANDOVER"
 check "config.sh projects add uses the handover helper" \
@@ -366,6 +370,102 @@ check "hook bootstrap hint stays silent when the root is already handed over" \
     sh -c "grep -qF '[ \"\$(stat -c %U \"\$PWD\" 2>/dev/null)\" = \"opencode\" ]' \"\$1\"" _ "$FUNC"
 check "hook exports the bootstrap hint for bash children" \
     sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
+
+# --- 7e. dev-owned mode (docs/design/ddev-dev-owned-projects.md) ------------------
+# Mode on: the scan writes disable_settings_management: true; a FLAGGED
+# project (mode-written or repo-committed) keeps settings dirs + root as
+# the developer's (handback), unflagged projects keep the handover.
+# Functional as the CURRENT user (oc-user == dev-user == tester), so the
+# observable differences are the MODE (2755 handover vs 2775 handback),
+# the flag line in .ddev/config.yaml, and the echo output.
+DWORK=$(mktemp -d)
+
+# flag writer: appends iff absent, idempotent, comment on its own lines
+mkdir -p "$DWORK/fw/.ddev"
+printf 'name: fw\ntype: typo3\n' > "$DWORK/fw/.ddev/config.yaml"
+check "flag writer: appends the key when absent" \
+    sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null && grep -qx 'disable_settings_management: true' \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw"
+check "flag writer: idempotent (no duplicate key)" \
+    sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; [ \"\$(grep -c '^disable_settings_management:' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw"
+# pre-existing explicit false stays untouched (repo decided otherwise)
+mkdir -p "$DWORK/fw2/.ddev"
+printf 'name: fw2\ndisable_settings_management: false\n' > "$DWORK/fw2/.ddev/config.yaml"
+check "flag writer: pre-existing key (false) left untouched" \
+    sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; grep -qx 'disable_settings_management: false' \"\$2/.ddev/config.yaml\" && [ \"\$(grep -c '^disable_settings_management:' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw2"
+# missing config.yaml: silent no-op
+mkdir -p "$DWORK/fw3/.ddev"
+check "flag writer: missing config.yaml is a no-op" \
+    sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" && test ! -f \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw3"
+# no trailing newline: the appended key must still land on its own line
+mkdir -p "$DWORK/fw4/.ddev"
+printf 'name: fw4' > "$DWORK/fw4/.ddev/config.yaml"
+check "flag writer: survives a file without trailing newline" \
+    sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null && grep -qx 'disable_settings_management: true' \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw4"
+
+# flagged detection
+check "flagged detection: true" \
+    sh -c ". \"\$1\" && ddev_devowned_flagged \"\$2\"" _ "$HANDOVER" "$DWORK/fw"
+check "flagged detection: false" \
+    sh -c ". \"\$1\" && if ddev_devowned_flagged \"\$2\"; then exit 1; fi" _ "$HANDOVER" "$DWORK/fw2"
+
+# scan: mode ON + unflagged typo3 -> flag written + handback (2775)
+mkdir -p "$DWORK/on/proj/.ddev" "$DWORK/on/proj/config/system"
+printf 'type: typo3\n' > "$DWORK/on/proj/.ddev/config.yaml"
+echo "db" > "$DWORK/on/proj/config/system/settings.php"
+chmod 2770 "$DWORK/on/proj"
+DON_OUT=$(DDEV_DEV_OWNED=true sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/on" 2>/dev/null || true)
+check "scan mode on: writes the dev-owned flag" \
+    sh -c "grep -qx 'disable_settings_management: true' \"\$1/.ddev/config.yaml\"" _ "$DWORK/on/proj"
+check "scan mode on: undetected typo3 root stays dev-owned 2775 (no bootstrap handover)" \
+    sh -c "test \"\$(stat -c %a \"\$1\")\" = 2775" _ "$DWORK/on/proj"
+check "scan mode on: settings dir stays with the developer" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'dev-owned handback: .*config/system'" _ "$DON_OUT"
+check "scan mode on: .ddev still handed over" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q '.ddev handover:'" _ "$DON_OUT"
+
+# scan: mode OFF + repo-committed flag -> handback anyway, no flag write
+mkdir -p "$DWORK/off/proj/.ddev" "$DWORK/off/proj/config/system"
+printf 'type: typo3\ndisable_settings_management: true\n' > "$DWORK/off/proj/.ddev/config.yaml"
+chmod 2755 "$DWORK/off/proj"
+DOFF_OUT=$(DDEV_DEV_OWNED=false sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/off" 2>/dev/null || true)
+check "scan mode off: committed flag honored (handback, not handover)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'dev-owned handback:' && ! printf '%s\n' \"\$1\" | grep -q 'dev-owned flag written'" _ "$DOFF_OUT"
+check "scan mode off: flagged root handed back to 2775" \
+    sh -c "test \"\$(stat -c %a \"\$1\")\" = 2775" _ "$DWORK/off/proj"
+
+# scan: mode OFF + unflagged -> today's handover (root 2755)
+mkdir -p "$DWORK/old/proj/.ddev"
+printf 'type: typo3\n' > "$DWORK/old/proj/.ddev/config.yaml"
+chmod 2775 "$DWORK/old/proj"
+DDEV_DEV_OWNED=false sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/old" >/dev/null 2>&1 || true
+check "scan mode off + unflagged: bootstrap root still handed over (2755)" \
+    sh -c "test \"\$(stat -c %a \"\$1\")\" = 2755" _ "$DWORK/old/proj"
+rm -rf "$DWORK"
+unset DDEV_DEV_OWNED
+
+# wiring: config.sh / install.sh / status.sh / hook / kit CLI
+check "config.sh dispatches ddev-settings" \
+    sh -c "grep -q 'ddev-settings)' \"\$1\"" _ "$CONFIG"
+check "config.sh ddev-settings has status + apply" \
+    sh -c "grep -q 'ddev_settings_status' \"\$1\" && grep -q 'ddev_settings_apply' \"\$1\"" _ "$CONFIG"
+check "config.sh ddev-settings re-stamps install.conf" \
+    sh -c "grep -q 'update_install_conf_ddev_owned' \"\$1\"" _ "$CONFIG"
+check "config.sh menu offers ddev-settings" \
+    sh -c "grep -q 'ddev-settings: dev-owned projects on/off' \"\$1\"" _ "$CONFIG"
+check "install.sh parses --ddev-settings" \
+    sh -c "grep -q -- '--ddev-settings' \"\$1\"" _ "$INSTALL"
+check "install.sh defaults to dev-owned (DDEV_DEV_OWNED=true)" \
+    sh -c "grep -qF 'DDEV_DEV_OWNED=true' \"\$1\"" _ "$INSTALL"
+check "install.sh stamps DDEV_DEV_OWNED into install.conf" \
+    sh -c "grep -qF 'DDEV_DEV_OWNED=\$DDEV_DEV_OWNED' \"\$1\"" _ "$INSTALL"
+check "install.sh asks the ddev-settings question (standard + advanced)" \
+    sh -c "[ \"\$(grep -c 'ddev settings management? (dev-owned projects)' \"\$1\")\" -ge 2 ]" _ "$INSTALL"
+check "status.sh reports the ddev settings mode" \
+    sh -c "grep -q 'ddev settings' \"\$1\"" _ "$STATUS"
+check "hook hint mentions the dev-owned effect" \
+    sh -c "grep -q 'disable_settings_management:' \"\$1\"" _ "$FUNC"
+check "kit CLI usage documents ddev-settings" \
+    sh -c "grep -q 'ddev-settings on|off|status' \"\$1\"" _ "$KIT"
 check "install.sh passes DEFAULT_USER to the handover" \
     sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
 check "update.sh passes DEFAULT_USER to the handover" \
