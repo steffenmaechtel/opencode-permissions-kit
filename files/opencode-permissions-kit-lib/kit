@@ -53,7 +53,9 @@ Commands:
   status                          Show the protection status (no sudo needed)
   config <args...>                Change settings: projects list|add|remove,
                                   git-config on|off|status,
-                                  container-backend <backend>|status, refresh
+                                  container-backend <backend>|status, refresh,
+                                  handover <path...> (ddev ownership repair
+                                  for a freshly cloned project)
   update [--yes] [--refresh]      Re-deploy the kit; --binary / --binary-path
                                   upgrade the opencode binary
   ddev-hosts-add [dir|hostname]     Add ddev hostnames to the Windows hosts

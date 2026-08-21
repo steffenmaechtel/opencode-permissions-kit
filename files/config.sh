@@ -7,6 +7,7 @@
 #   - List / add / remove project roots in /etc/opencode-permissions-kit/projects.conf
 #   - Toggle .git/config hardening for the opencode user (SOFT-only)
 #   - Refresh the group baseline (re-apply chgrp/setgid/default ACLs)
+#   - Re-run the ddev handover for one project (fresh-clone EPERM repair)
 #   - Switch the container backend (docker-rootless / podman-rootless)
 #
 # Run as your default (non-root) user with sudo privileges:
@@ -17,6 +18,7 @@
 #   ./config.sh git-config on|off|status
 #   ./config.sh container-backend docker-rootless|podman-rootless|status
 #   ./config.sh refresh
+#   ./config.sh handover /var/www/vhosts/foo
 #
 # Options:
 #   --yes   Skip confirmations, assume Yes
@@ -93,7 +95,7 @@ TARGETS=""
 for arg do
     case "$arg" in
         --yes|-y) YES=true ;;
-        projects|git-config|refresh|status|container-backend)
+        projects|git-config|refresh|status|container-backend|handover)
             [ -z "$ACTION" ] && ACTION="$arg" && continue
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             TARGETS="$TARGETS $arg"
@@ -464,6 +466,34 @@ refresh() {
     log "group baseline refresh requested"
 }
 
+# --- handover (ddev ownership, one project) --------------------------------------
+
+# Light variant of `refresh`: re-runs ONLY the ddev handover (.ddev dirs
+# at any depth, settings dirs, typo3 bootstrap root) on the given paths —
+# no group baseline. The ready-made fix for `ddev start` failing with
+# "operation not permitted" on a freshly cloned project; the ddev()
+# shell hook (ddev-as-opencode.sh) prints this exact command when it
+# detects the bootstrap case.
+handover() {
+    [ -z "$TARGETS" ] && die "Usage: config.sh handover <path...>"
+    for p in $TARGETS; do
+        if ! project_path_sane "$p"; then
+            ui_error "'$p' is a system path — refusing to touch it (the handover chowns below it)."
+            continue
+        fi
+        p="${_PP_NORM:-$p}"
+        if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
+        if ! [ -d "$p" ]; then
+            ui_warn "skip $p (not a directory)"
+            continue
+        fi
+        ui_info "ddev handover on $p (.ddev + settings dirs + typo3 bootstrap root) ..."
+        ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
+        ui_success "handover applied to $p"
+        log "ddev handover: $p"
+    done
+}
+
 # --- interactive menu --------------------------------------------------------
 
 menu() {
@@ -561,6 +591,7 @@ case "$ACTION" in
         esac
         ;;
     refresh)    banner; refresh ;;
+    handover)   banner; handover ;;
     *)          die "Unknown action: $ACTION" ;;
 esac
 

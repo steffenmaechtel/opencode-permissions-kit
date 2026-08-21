@@ -113,7 +113,16 @@ hands the root **back to you** (`2775`, group-writable) on the next
 install/`projects add`/`refresh`/`update --refresh`.
 
 The handover runs on install, on `config.sh projects add`, on
-`config.sh refresh`, and unconditionally on every `update.sh`. Your
+`config.sh refresh`, on `config.sh handover <path>` (one project, no
+group baseline — the fast repair after cloning a new project), and
+unconditionally on every `update.sh`. The `ddev` shell hook covers the
+gap between cloning and the next handover run: before `ddev start` /
+`ddev restart` it detects the bootstrap case (fresh `typo3` clone whose
+root still belongs to you) and prints the ready-made
+`config handover` command instead of leaving you with ddev's cryptic
+`operation not permitted`. The scan never descends into `vendor/` or
+`node_modules/` — a `.ddev` directory found there is a shipped test
+fixture, not a project. Your
 `.git/` stays yours (ownership untouched; the group baseline makes it
 group-accessible — see [the sharing group](sharing-group.md)).
 

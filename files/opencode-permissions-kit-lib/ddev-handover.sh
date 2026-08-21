@@ -9,7 +9,10 @@
 # app-type's settings directories must belong to the ddev user too:
 #
 #   .ddev/          at any depth under a registered root (a root is
-#                   usually a parent folder of several projects)
+#                   usually a parent folder of several projects), but
+#                   NEVER inside vendor/ or node_modules/ (packages
+#                   shipping a .ddev test fixture are not projects —
+#                   mirrors the hosts-scan pruning, issue #21)
 #   settings dirs   derived from the project's .ddev/config.yaml `type:`:
 #                     typo3     -> config/system, <docroot>/typo3conf,
 #                                  typo3conf (covers composer v12+,
@@ -112,7 +115,11 @@ ddev_handover_root() {
     dhr_group="${3:-}"
     dhr_dev="${4:-}"
     [ -n "$dhr_root" ] && [ -d "$dhr_root" ] || return 0
-    find "$dhr_root" -type d -name .ddev -prune 2>/dev/null | while IFS= read -r dhr_d; do
+    # Prune vendor/node_modules (issue #21 pattern): a .ddev found there
+    # belongs to a shipped test fixture, not to a project — handing it
+    # over would chown third-party package files for no benefit.
+    find "$dhr_root" -type d \( -name vendor -o -name node_modules \) -prune -o \
+        -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r dhr_d; do
         chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || true
         chmod -R g+w "$dhr_d" 2>/dev/null || true
         echo "  .ddev handover: $dhr_d -> $dhr_user"

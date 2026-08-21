@@ -303,6 +303,33 @@ check "4c: detected typo3 settings dir still handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/detected-project/config/system)" = "opencode"'
 
 echo ""
+echo "--- 4d. fresh clone: hook hint + config.sh handover (local-test issue) ---"
+# Scenario from the productive WSL test: git clone a typo3 project AFTER
+# the last handover scan -> `ddev start` fails with EPERM (ddev chmods the
+# undetected project root; owner-only). The ddev() hook must print the
+# ready-made fix BEFORE the run, and `config.sh handover <project>` (light,
+# no group baseline) must repair ownership without a full refresh.
+E 'sudo mkdir -p /var/www/vhosts/fresh-clone/.ddev && sudo chown -R dev:dev /var/www/vhosts/fresh-clone && printf "type: typo3\n" > /var/www/vhosts/fresh-clone/.ddev/config.yaml && chmod 2775 /var/www/vhosts/fresh-clone'
+check "4d: fresh clone root is dev-owned before the handover" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone)" = "dev"'
+check "4d: ddev() hook prints the bootstrap hint naming the handover command" \
+    E 'sudo -u dev -H sh -c "cd /var/www/vhosts/fresh-clone && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "config handover /var/www/vhosts/fresh-clone"'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/fresh-clone' && \
+    echo "  ${GREEN}OK${NC}  config.sh handover completed"
+check "4d: handover gives the bootstrap root to opencode (2755, chmod no-op)" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone)" = "opencode" && test "$(stat -c %a /var/www/vhosts/fresh-clone)" = "2755"'
+check "4d: .ddev handed over too" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone/.ddev)" = "opencode"'
+check_fail "4d: hook stays silent once the root is handed over" \
+    E 'sudo -u dev -H sh -c "cd /var/www/vhosts/fresh-clone && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "hint: fresh typo3 clone"'
+# vendor pruning (issue #21 pattern): a .ddev shipped inside a vendor
+# package is a test fixture, not a project — never handed over.
+E 'sudo mkdir -p /var/www/vhosts/fresh-clone/vendor/some/pkg/.ddev && sudo chown -R dev:dev /var/www/vhosts/fresh-clone/vendor'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/fresh-clone'
+check "4d: .ddev inside vendor/ is NOT handed over (issue #21 pattern)" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone/vendor/some/pkg/.ddev)" = "dev"'
+
+echo ""
 echo "--- 5. Soft-only file access (the ddev-working goal) ---"
 # No hard ACL denies: the opencode user (and ddev, and its containers) can
 # READ every project file. Protection is opencode's own soft permission layer.

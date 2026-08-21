@@ -28,6 +28,7 @@ SUDOERS="$FILES/sudoers.template"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/update.sh"
 CONFIG="$FILES/config.sh"
+KIT="$FILES/opencode-permissions-kit-lib/kit"
 HANDOVER="$FILES/opencode-permissions-kit-lib/ddev-handover.sh"
 STATUS="$FILES/status.sh"
 MAKEFILE="$SCRIPT_DIR/../Makefile"
@@ -270,7 +271,9 @@ check "update.sh runs the ddev handover unconditionally" \
 
 # --- 7. handover helper + call sites ---------------------------------------------
 check "handover helper searches .ddev at any depth" \
-    sh -c "grep -qF 'find \"\$dhr_root\" -type d -name .ddev' \"\$1\"" _ "$HANDOVER"
+    sh -c "grep -qF 'find \"\$dhr_root\"' \"\$1\" && grep -qF -- '-type d -name .ddev -prune -print' \"\$1\"" _ "$HANDOVER"
+check "handover scan prunes vendor/node_modules (issue #21 pattern)" \
+    sh -c "grep -qF -- '-name vendor -o -name node_modules' \"\$1\"" _ "$HANDOVER"
 check "handover helper chowns recursively with g+w" \
     sh -c "grep -q 'chmod -R g+w' \"\$1\"" _ "$HANDOVER"
 check "handover helper maps typo3 settings dirs (config/system, typo3conf)" \
@@ -321,6 +324,48 @@ check "non-typo3 type: root untouched by the project-root handover" \
 
 check "handover_root signature carries the dev user (handback target)" \
     sh -c "grep -qF 'dhr_dev=\"\${4:-}\"' \"\$1\"" _ "$HANDOVER"
+
+# Functional prune check: a .ddev inside vendor/ is NOT handed over (a
+# shipped test fixture, not a project — issue #21 pattern), the real
+# project .ddev still is.
+rm -rf "$HWORK/scan"
+mkdir -p "$HWORK/scan/proj/.ddev" "$HWORK/scan/proj/vendor/some/pkg/.ddev"
+SCAN_OUT=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$HWORK/scan" 2>/dev/null || true)
+check "handover scan skips .ddev inside vendor/" \
+    sh -c "! printf '%s\n' \"\$1\" | grep -q 'vendor/some/pkg/.ddev'" _ "$SCAN_OUT"
+check "handover scan still hands over the project .ddev" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'proj/.ddev'" _ "$SCAN_OUT"
+rm -rf "$HWORK/scan"
+
+# --- 7c. config.sh handover subcommand (fresh-clone EPERM repair) -----------------
+check "config.sh dispatches the handover action" \
+    sh -c "grep -q 'handover)' \"\$1\"" _ "$CONFIG"
+check "config.sh handover uses the handover helper (no baseline)" \
+    sh -c "awk '/^handover\(\)/,/^}/' \"\$1\" | grep -q 'ddev_handover_root'" _ "$CONFIG"
+check "config.sh handover screens system paths" \
+    sh -c "awk '/^handover\(\)/,/^}/' \"\$1\" | grep -q 'project_path_sane'" _ "$CONFIG"
+check "config.sh header documents the handover usage" \
+    sh -c "grep -q 'config.sh handover' \"\$1\"" _ "$CONFIG"
+check "kit CLI usage documents the handover command" \
+    sh -c "grep -q 'handover <path...>' \"\$1\"" _ "$KIT"
+
+# --- 7d. ddev() hook: typo3 bootstrap hint ----------------------------------------
+# Fresh clone + type typo3 + undetected + root not opencode-owned => ddev
+# start fails with EPERM. The hook must name the one-command fix BEFORE
+# the run; silent in every other case (grep-based, mirrors the hosts-hint
+# tests — the fixed /usr/local lib path prevents a functional test).
+check "hook prints the typo3-bootstrap hint before start/restart" \
+    sh -c "grep -qE 'start\\\|restart\\) _opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
+check "hook bootstrap hint shows the ready-made handover command" \
+    sh -c "grep -q 'config handover' \"\$1\"" _ "$FUNC"
+check "hook bootstrap hint is gated on a project in the cwd" \
+    sh -c "grep -qF '[ -f \"\$PWD/.ddev/config.yaml\" ]' \"\$1\"" _ "$FUNC"
+check "hook bootstrap hint reuses the kit typo3 detection" \
+    sh -c "grep -q 'ddev_typo3_detected' \"\$1\"" _ "$FUNC"
+check "hook bootstrap hint stays silent when the root is already handed over" \
+    sh -c "grep -qF '[ \"\$(stat -c %U \"\$PWD\" 2>/dev/null)\" = \"opencode\" ]' \"\$1\"" _ "$FUNC"
+check "hook exports the bootstrap hint for bash children" \
+    sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
 check "install.sh passes DEFAULT_USER to the handover" \
     sh -c "grep -qF 'ddev_handover_root \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
 check "update.sh passes DEFAULT_USER to the handover" \

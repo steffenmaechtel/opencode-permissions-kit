@@ -98,6 +98,7 @@ sudo bash /usr/local/lib/opencode-permissions-kit/config.sh <command>
 | `container-backend docker-rootless\|podman-rootless` | Switch the backend (see [switch the backend](../how-to/switch-container-backend.md)) |
 | `container-backend status` | Show the configured backend + socket state |
 | `refresh` | Re-apply the group baseline (chgrp/setgid/default ACLs) |
+| `handover <path...>` | Re-run the ddev handover for one project — the fresh-clone EPERM repair (see [ddev integration](../concepts/ddev-integration.md)) |
 
 ## update.sh
 
