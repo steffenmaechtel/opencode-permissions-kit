@@ -509,10 +509,17 @@ check "11b: kit re-deploy skipped (marker survived)" \
     E 'test "$(sudo cat /usr/local/lib/opencode-permissions-kit/.only-binary-marker)" = "marker"'
 check "11b: install.conf version NOT re-stamped (still section 11's sentinel)" \
     E 'grep -q "VERSION=9.9.9-sentinel" /etc/opencode-permissions-kit/install.conf && ! grep -q "VERSION=8.8.8-onlybinary" /etc/opencode-permissions-kit/install.conf'
+# top-level shorthand (issue #24): kit CLI maps upgrade-opencode onto
+# update.sh --yes --only-binary, flags pass through
+E 'printf "#!/bin/sh\necho \"opencode version 7.7.7-shorthand\"\n" > /tmp/stub-opencode2 && chmod +x /tmp/stub-opencode2'
+E 'opencode-permissions-kit upgrade-opencode --binary-path /tmp/stub-opencode2' && \
+    echo "  ${GREEN}OK${NC}  kit CLI upgrade-opencode completed"
+check "11b: upgrade-opencode replaced the binary (shorthand works)" \
+    E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 7.7.7-shorthand"'
 E 'sudo rm -f /usr/local/lib/opencode-permissions-kit/.only-binary-marker'
 # restore the real binary for the remaining sections
 E 'sudo cp /opencode-cache/opencode-'"$OC_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chown root:opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chmod 750 /usr/local/lib/opencode-permissions-kit/bin/opencode'
-E 'rm -rf /tmp/update-test /tmp/stub-opencode'
+E 'rm -rf /tmp/update-test /tmp/stub-opencode /tmp/stub-opencode2'
 
 echo ""
 echo "--- 11b. update floor check (installs < 0.0.14 abort) ---"

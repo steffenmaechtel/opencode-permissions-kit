@@ -645,5 +645,5 @@ fi
 [ "$BINARY_UPDATE" = true ] || ui_kv "Binary"   "untouched (use --binary to upgrade)"
 ui_info "Next:"
 ui_detail "opencode-permissions-kit status   verify the protection"
-ui_detail "opencode-permissions-kit update --binary    upgrade the opencode binary"
+ui_detail "opencode-permissions-kit upgrade-opencode    upgrade the opencode binary"
 log "update complete (version $VERSION)"

@@ -11,6 +11,7 @@ your WSL/Linux system):
 opencode-permissions-kit status
 opencode-permissions-kit config projects add /var/www/vhosts/new-project
 opencode-permissions-kit update --binary
+opencode-permissions-kit upgrade-opencode   # just the opencode binary
 opencode-permissions-kit ddev-hosts-add     # in a ddev project dir
 opencode-permissions-kit uninstall
 opencode-permissions-kit help        # commands + arguments overview
@@ -116,6 +117,10 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | `--binary` | Also upgrade the opencode binary to the latest release |
 | `--only-binary` | Skip every kit step, only upgrade the opencode binary |
 | `--binary-path <file>` | Install a specific binary file instead |
+
+`opencode-permissions-kit upgrade-opencode` is the shorthand for
+`update --yes --only-binary` — extra flags (e.g. `--binary-path`) pass
+through.
 
 Never touches `projects.conf` or the agent's `opencode.jsonc`. See
 [update](../how-to/update.md).

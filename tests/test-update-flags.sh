@@ -104,6 +104,8 @@ check "summary: binary-only mode reports Mode instead of Kit/Configs" \
     sh -c "grep -q 'binary-only (kit files untouched)' \"\$1\"" _ "$UPDATE"
 check "kit CLI usage documents --only-binary" \
     sh -c "grep -q -- '--only-binary' \"\$1\"" _ "$KIT"
+check "kit CLI has the upgrade-opencode shorthand (injects --yes --only-binary)" \
+    sh -c "grep -q 'upgrade-opencode)' \"\$1\" && grep -q -- '--yes --only-binary' \"\$1\"" _ "$KIT"
 check "docs: cli.md update flag table lists --only-binary" \
     sh -c "grep -q -- '--only-binary' \"\$1\"" _ "$CLI_MD"
 

@@ -61,6 +61,9 @@ Commands:
   update [--yes] [--refresh]      Re-deploy the kit; --binary / --binary-path
                                   upgrade the opencode binary; --only-binary
                                   skips every kit step and only upgrades it
+  upgrade-opencode [flags...]     Just upgrade the opencode binary — shorthand
+                                  for 'update --yes --only-binary' (extra
+                                  flags pass through, e.g. --binary-path)
   ddev-hosts-add [dir|hostname]     Add ddev hostnames to the Windows hosts
                                    file (ddev's own UAC flow; run as your
                                    user, Windows asks permission). A dir adds
@@ -95,6 +98,18 @@ case "$cmd" in
             exec sh "$LIBDIR/$cmd.sh" "$@"
         fi
         exec sudo sh "$LIBDIR/$cmd.sh" "$@"
+        ;;
+    upgrade-opencode)
+        # Binary-only shorthand (issue #24): update.sh --yes --only-binary,
+        # extra flags pass through (--binary-path for offline installs).
+        if [ ! -f "$LIBDIR/update.sh" ]; then
+            ui_error "$LIBDIR/update.sh not found — is the kit installed?"
+            exit 1
+        fi
+        if [ "$(id -u)" -eq 0 ]; then
+            exec sh "$LIBDIR/update.sh" --yes --only-binary "$@"
+        fi
+        exec sudo sh "$LIBDIR/update.sh" --yes --only-binary "$@"
         ;;
     uninstall)
         if [ ! -f "$LIBDIR/uninstall.sh" ]; then
