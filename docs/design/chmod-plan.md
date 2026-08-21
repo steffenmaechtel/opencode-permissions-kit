@@ -2,10 +2,10 @@
 
 > Status: **DRAFT — planned, not implemented.** This plan replaces the
 > per-path ownership juggling (`.ddev` / settings dirs / typo3 bootstrap
-> root handovers) with a static, ddev-conflict-free permission model.
-> Evidence: ddev source (github/ddev, v1.25.x) and the productive-WSL
-> reports behind the handover fixes (local `Lokaler-Test.txt` and the
-> `git checkout` EPERM follow-up).
+> root handovers) with a static, ddev-conflict-free permission model,
+> managed by a kit-level mode. Evidence: ddev source (github/ddev,
+> v1.25.x) and the productive-WSL reports behind the handover fixes
+> (local `Lokaler-Test.txt` and the `git checkout` EPERM follow-up).
 
 ## 1. Problem
 
@@ -20,7 +20,7 @@ working tree:
 | project root (typo3 bootstrap: no `vendor/` yet) | `opencode` | ddev's settings-path fallback writes `AdditionalConfiguration.php` AT the root and chmods the root to 0755 |
 
 Each handover needs a trigger (install / `projects add` / `refresh` /
-`update` / the new `config handover`), and the typo3 bootstrap root must be
+`update` / `config handover`), and the typo3 bootstrap root must be
 handed **back** once `composer install` makes TYPO3 detectable — a moment
 the kit cannot observe. Real-world consequences (both reported from a
 productive WSL install):
@@ -49,11 +49,13 @@ Root cause (ddev source, verified):
 
 ## 2. Decision
 
-**Offer a per-project opt-in "dev-owned project" mode built on ddev's own
-`disable_settings_management: true`.** With settings management off,
+**Ship a kit-level "dev-owned projects" mode. While on, the kit itself
+writes `disable_settings_management: true` into every discovered
+project's `.ddev/config.yaml` and hands settings dirs + typo3 bootstrap
+root back to the developer.** With settings management off,
 `CreateSettingsFile` returns **before** the chmod loop
-(`pkg/ddevapp/apptypes.go:329`), ddev never touches settings paths or the
-bootstrap root, and the kit's static baseline becomes the permanent state:
+(`pkg/ddevapp/apptypes.go:329`), ddev never touches paths outside
+`.ddev/`, and the kit's static baseline becomes the permanent state:
 
 | Zone | Owner | Mode (permanent) |
 |---|---|---|
@@ -63,17 +65,32 @@ bootstrap root, and the kit's static baseline becomes the permanent state:
 Consequences:
 
 - **No settings-dir handover, no bootstrap-root handover, no handback.**
-  `git checkout` / `mv` / `rm` always work for the developer.
-- The group baseline (chgrp + setgid + g+rw + default ACLs, umask 002)
-  remains the only recurring repair — it is idempotent and conflict-free
-  (nothing fights it anymore).
+  `git checkout` / `mv` / `rm` always work for the developer — including
+  on a fresh clone, from the very first `ddev start`.
+- The flag lives in the **committed** `.ddev/config.yaml`: teammates get
+  it via the repo, with or without the kit. Their ddev also stops
+  managing settings — for repos that ship their own settings file (the
+  maintainer's standard) that is the intended end state, nothing changes
+  for them.
 - `.ddev/` stays opencode-owned: ddev's internal chmods are git-irrelevant
   (`.ddev` is committed only partially — `config.yaml`, commands — and
   those stay group-writable through the baseline).
+- The group baseline (chgrp + setgid + g+rw + default ACLs, umask 002)
+  remains the only recurring repair — it is idempotent and conflict-free
+  (nothing fights it anymore).
 
-The current handover model stays the **default** (zero-setup ddev
-experience); dev-owned is the mode for developers who prefer permanent
-permissions and are willing to own their settings file.
+**Separation of policy and behavior (important):**
+
+- The **flag** in `.ddev/config.yaml` is the per-project source of truth:
+  flagged projects are dev-owned, unflagged projects get today's
+  handover treatment — regardless of the mode.
+- The **mode** only decides whether the kit *writes* the flag into
+  projects that lack it. Mode off = the kit never edits `.ddev/config.yaml`
+  (today's behavior, for public users who want ddev's auto-settings).
+
+Mode default: **on** (installer question, recommended; `--yes` takes the
+default). Declining at install — or `config.sh ddev-settings off` later —
+keeps the handover model.
 
 ## 3. What ddev does NOT do anymore in this mode (the trade-off)
 
@@ -85,10 +102,12 @@ there is no global switch) disables:
 - the per-start chmod of those paths,
 - the typo3 bootstrap fallback that writes settings at the project root.
 
-The developer writes the CMS settings file **once, themselves** (or keeps
-a committed one). For TYPO3 (the kit's main audience) that is a small,
-commit-safe `config/system/AdditionalConfiguration.php` with ddev's fixed
-credentials — the kit ships a documented template (§5).
+The settings file becomes the **repo's responsibility** — committed, owned
+by the team, not by ddev. For the maintainer's TYPO3 repos that is already
+the norm; the how-to ships a commit-safe template (`config/system/AdditionalConfiguration.php`
+with ddev's fixed credentials or, better, env-var driven) for repos that
+still rely on ddev's generated file. The kit deliberately does NOT
+generate or modify CMS settings files — only the ddev flag.
 
 Things that keep working unchanged: `ddev start`, mutagen sync, router,
 `ddev composer`, `ddev import-db`, exec, logs — none of them depend on
@@ -97,60 +116,73 @@ settings management.
 ## 4. Rule of thumb for support/troubleshooting
 
 - ddev writes/chmods it and it is **inside `.ddev/`** → fine, opencode owns it.
-- ddev would write/chmod it **outside `.ddev/`** → only with settings
-  management enabled → handover model (default mode).
-- dev-owned mode: ddev never writes outside `.ddev/` → static baseline.
+- Flagged project (dev-owned): ddev never writes outside `.ddev/` → static
+  baseline, no handover questions.
+- Unflagged project: ddev chmods outside `.ddev/` → handover model
+  (default mode for unflagged projects).
 
 ## 5. Implementation sketch (for the implementing PR)
 
-1. **Detection** — `ddev-handover.sh` grows
-   `ddev_settings_management_disabled <project-dir>`:
-   `yq`-free parse of `.ddev/config.yaml` for
-   `disable_settings_management: true` (sed, like the `type:` parse).
-2. **Handover functions gate on it** — `ddev_handover_project` and
-   `ddev_handover_project_root` return early (no chown) when disabled;
-   `ddev_handover_root` keeps handing over `.ddev/` only. A dev-owned
-   project that was previously in handover mode needs a one-time
-   **migration back**: new `config.sh handback <path...>` subcommand
-   (root inode + settings dirs → developer, 2775; guarded by
-   `project_path_sane`; refuses while typo3 is undetected AND settings
-   management is still on — that would recreate the EPERM bootstrap).
-3. **Installer/`projects add`** — when a project has the flag set, skip
-   the settings/root handover from the start (same gate as 2).
-4. **Docs** — new how-to `docs/how-to/dev-owned-projects.md`:
-   - enable: `disable_settings_management: true` in `.ddev/config.yaml`
-     (committed — affects teammates without the kit: safe, it is a
-     standard ddev flag),
-   - the TYPO3 `AdditionalConfiguration.php` template (db/db/db, host
-     `db`, driver from `.ddev/config.yaml` `database:`; marker comment
-     `# ddev-managed-by: developer`),
-   - when to choose which mode (table §2),
-   - migration instructions (flag + `config handback`).
-   - update `docs/concepts/ddev-integration.md` (mode table + the
-     rule-of-thumb §4) and `docs/troubleshooting.md` (EPERM entries get
-     the dev-owned alternative).
-5. **Tests** — unit: gate behavior (fixture trees with/without the flag),
-   `handback` wiring + guards; e2e (`tests/e2e/run.sh`): plant a
-   flagged project, verify `config.sh refresh` leaves settings dirs
-   dev-owned, `git checkout` file replacement succeeds, `.ddev` still
-   opencode-owned; extend the fake ddev if a start-path assertion needs
-   it (the flag itself is ddev-side, the kit only stops chowning).
-6. **Explicitly out of scope** — the kit never writes the flag into
-   `.ddev/config.yaml` itself (team-shared file, deliberate developer
-   decision), and there is no auto-handback of bootstrap roots in the
-   default mode (superseded by this plan instead of the previously
-   sketched hook-based handback).
+1. **Installer + config.sh**
+   - install.sh asks (recommended default yes; `--yes` takes it; a flag
+     like `--ddev-settings=auto|ddev` for scripts) and stamps
+     `DDEV_DEV_OWNED=true|false` into install.conf.
+   - `config.sh ddev-settings on|off|status` toggles; `off` also stops
+     future flag writes (committed flags stay — repo content).
+   - status.sh reports the mode and, per project, whether it is flagged.
+2. **Flag writer** — `ddev-handover.sh` grows
+   `ddev_devowned_flag <project-dir>`: appends the top-level key
+   `disable_settings_management: true` to `.ddev/config.yaml` **iff**
+   the file exists and the key is not already present (sed check, then
+   append; no other edit, no backup churn — one line, idempotent).
+   Never runs inside pruned trees (vendor/node_modules `.ddev` fixtures).
+3. **Scan behavior** — `ddev_handover_root` and its callers
+   (install, `projects add`, `refresh`, `update`, `handover`):
+   - `.ddev/` handover: unchanged (always opencode).
+   - per project: if mode on → `ddev_devowned_flag` first; then, if the
+     project is flagged (mode-written or repo-committed), hand settings
+     dirs + project root **back** to the developer (2775, g+w) instead of
+     handing them over; unflagged projects keep today's handover logic
+     verbatim (incl. the typo3 bootstrap root rules).
+4. **Fresh clone flow**
+   - Repo with the committed flag (their norm): nothing to do — clone is
+     dev-owned 2775 from the umask/setgid parent, `ddev start` just works.
+   - External repo without the flag: the existing `ddev()` hook bootstrap
+     hint fires; with the mode on, the hint's fix (`config handover
+     <path>`) also writes the flag — one command, once per repo, then
+     commit it.
+5. **Docs** — new how-to `docs/how-to/dev-owned-projects.md`: mode
+   on/off, what the kit writes into `.ddev/config.yaml` (team-visible!),
+   the committed-settings-file pattern for TYPO3 (credentials + env-var
+   variant), team implications (colleagues without the kit), migration
+   (= enable mode, run `refresh` once, commit). Update
+   `docs/concepts/ddev-integration.md` (mode table + §4 rule of thumb)
+   and `docs/troubleshooting.md` (EPERM entries get the dev-owned
+   alternative).
+6. **Tests**
+   - Unit: flag writer (appends iff absent, no-op when present, skips
+     missing config.yaml), scan hands back flagged projects / hands over
+     unflagged ones, mode off → no writes, config.sh toggle wiring,
+     install.sh question + stamp, status reporting.
+   - e2e (`tests/e2e/run.sh`): extend section 4 — a mode-on run flags a
+     planted project, settings dirs + root stay dev-owned 2775,
+     `git checkout` file replacement succeeds, `.ddev` still
+     opencode-owned; existing 4c/4d checks keep a mode-off run (or get
+     mode-specific expectations).
+7. **Explicitly out of scope** — the kit never writes or edits CMS
+   settings files (`AdditionalConfiguration.php` etc.); it only manages
+   the ddev flag. Auto-handback in the unflagged (handover) model stays
+   unsolved by design — that model is superseded by this mode.
 
 ## 6. Open questions (to resolve before implementing)
 
-- **Q1:** Should `status.sh` surface the mode per project
-  (handover vs dev-owned) in its projects list? (Leaning: yes, one
-  line per project — it explains both EPERM symptoms at a glance.)
-- **Q2:** Template support beyond TYPO3 first? Drupal's
+- **Q1 (resolved):** status.sh surfaces the mode + per-project flag state
+  — yes, one line per project (explains both EPERM symptoms at a glance).
+- **Q2:** The how-to's settings-file template: TYPO3-only first? (Drupal's
   `settings.ddev.php` include chain is more intrusive to hand-write;
-  start TYPO3-only and document the limitation?
-- **Q3:** Does the leak-scan deny list need a dev-owned exception
-  (settings file now contains DB creds but is committed anyway)?
-- **Q4:** Naming: `dev-owned` vs `static-permissions` vs
-  `no-handover` for docs/UI? (Leaning: keep it ddev-adjacent —
-  "settings management disabled" — to avoid a third kit-specific term.)
+  leaning TYPO3-only + documented limitation.)
+- **Q3 (resolved):** leak-scan deny list unchanged — committed settings
+  files are the repo's choice, the scan stays name-based either way.
+- **Q4:** Mode naming shown to users: leaning "dev-owned projects" in
+  docs, `ddev-settings` as the config.sh action (ddev-adjacent, no third
+  kit-specific permission vocabulary).
