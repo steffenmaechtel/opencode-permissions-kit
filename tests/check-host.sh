@@ -71,6 +71,7 @@ check git      "branching, git-config tests"                 "$APT git / $BREW g
 check make     "make test / make lint / make e2e"            "$APT make / $BREW make"
 check python3  "jsonc parser + kit CLI + git-config tests"   "$APT python3 / $BREW python"
 check shellcheck "static analysis of the shipped scripts (make lint)" "$APT shellcheck / $BREW shellcheck"
+check setsid   "hermetic ui tests (detach the controlling tty)"  "$APT util-linux"
 
 ui_section "Optional (e2e suites only — make e2e / e2e-rootless)"
 check_opt docker "runs the containerized e2e suites"         "$APT docker-ce"
