@@ -1,13 +1,11 @@
 name: tests
 
-# Trigger on push to master, pull requests targeting master, and manual
-# runs. PRs run the suite before merge; pushes to master run it after. A
-# branch push with an open PR fires only `pull_request` (no `push` filter
-# for other branches), avoiding the classic double-run.
+# Trigger on pull requests targeting master and manual runs. The PR run
+# is the merge gate — master only ever receives merged PR commits, so no
+# post-merge push run is needed (deliberately removed to avoid the
+# double-run after merging). A branch push with an open PR fires only
+# `pull_request`, avoiding the classic double-run.
 on:
-  push:
-    branches:
-      - master
   pull_request:
     branches:
       - master

@@ -1,9 +1,10 @@
 name: e2e
 
-# Runs on manual dispatch, push to master, and pull requests targeting
-# master. PRs get the e2e verdict before merge. A branch push with an open
-# PR fires only `pull_request` (no `push` filter for other branches) — no
-# double-run.
+# Runs on manual dispatch and pull requests targeting master. PRs get
+# the e2e verdict before merge — master only ever receives merged PR
+# commits, so no post-merge push run is needed (deliberately removed to
+# avoid the double-run after merging). A branch push with an open PR
+# fires only `pull_request` — no double-run.
 on:
   workflow_dispatch:
     inputs:
@@ -12,9 +13,6 @@ on:
         required: false
         default: false
         type: boolean
-  push:
-    branches:
-      - master
   pull_request:
     branches:
       - master
