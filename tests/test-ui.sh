@@ -28,10 +28,20 @@ check() {
     fi
 }
 
-# Runs a snippet with the lib sourced; stdout captured, stdin /dev/null
-# (no tty in a test runner -> colors off, reads hit EOF).
+# ui_ask/ui_menu/ui_confirm read /dev/tty FIRST (design: prompts survive
+# `curl | bash` installs with redirected stdin). On an interactive terminal
+# that makes these tests read the developer's keyboard instead of the piped
+# input (invisible hangs, wrong results). setsid detaches the controlling
+# tty, so the helpers fall back to stdin exactly as in CI.
+command -v setsid >/dev/null 2>&1 || {
+    echo "test-ui: setsid (util-linux) is required for hermetic runs" >&2
+    exit 1
+}
+
+# Runs a snippet with the lib sourced; stdout captured, stdin /dev/null,
+# no controlling tty (colors off, reads hit EOF).
 run_ui() {
-    sh -c '. "$1"; eval "$2"' x "$UI" "$1" </dev/null 2>/dev/null
+    setsid sh -c '. "$1"; eval "$2"' x "$UI" "$1" </dev/null 2>/dev/null
 }
 
 echo ""
@@ -117,19 +127,19 @@ check "section rule contains the title" \
 ans=$(run_ui 'ui_ask "Proceed?" "yes"')
 check "ui_ask returns the default on EOF" [ "$ans" = "yes" ]
 
-ans=$(printf 'no\n' | sh -c ". \"\$1\"; ui_ask \"Proceed?\" \"yes\"" _ "$UI" 2>/dev/null)
+ans=$(printf 'no\n' | setsid sh -c ". \"\$1\"; ui_ask \"Proceed?\" \"yes\"" _ "$UI" 2>/dev/null)
 check "ui_ask returns typed input" [ "$ans" = "no" ]
 
 ans=$(run_ui 'ui_menu "Mode?" "1" "1|Standard" "2|Advanced"')
 check "ui_menu returns the default key on EOF" [ "$ans" = "1" ]
 
-ans=$(printf '2\n' | sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
+ans=$(printf '2\n' | setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
 check "ui_menu returns the chosen key" [ "$ans" = "2" ]
 
-ans=$(printf 'zzz\n' | sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
+ans=$(printf 'zzz\n' | setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
 check "ui_menu falls back to default on unknown input" [ "$ans" = "1" ]
 
-menu_err=$(sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\"" _ "$UI" 2>&1 >/dev/null </dev/null)
+menu_err=$(setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\"" _ "$UI" 2>&1 >/dev/null </dev/null)
 check "ui_menu prints the menu to stderr" \
     sh -c "printf %s \"\$1\" | grep -q 'Mode?'" _ "$menu_err"
 
