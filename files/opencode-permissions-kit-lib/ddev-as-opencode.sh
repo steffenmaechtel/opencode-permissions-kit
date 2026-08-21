@@ -159,6 +159,9 @@ _opk_bootstrap_hint() {
     [ -n "$_opk_docroot" ] || _opk_docroot="."
     # shellcheck disable=SC1091  # deployed kit path, checked above
     . /usr/local/lib/opencode-permissions-kit/ddev-handover.sh
+    # Dev-owned (flagged) project: ddev never touches paths outside
+    # .ddev/ — the bootstrap EPERM cannot occur, stay silent.
+    ddev_devowned_flagged "$PWD" && return 0
     ddev_typo3_detected "$PWD" "$_opk_docroot" && return 0
     [ "$(stat -c %U "$PWD" 2>/dev/null)" = "opencode" ] && return 0
     echo ""

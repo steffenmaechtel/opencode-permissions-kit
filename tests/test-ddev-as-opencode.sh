@@ -366,6 +366,8 @@ check "hook bootstrap hint is gated on a project in the cwd" \
     sh -c "grep -qF '[ -f \"\$PWD/.ddev/config.yaml\" ]' \"\$1\"" _ "$FUNC"
 check "hook bootstrap hint reuses the kit typo3 detection" \
     sh -c "grep -q 'ddev_typo3_detected' \"\$1\"" _ "$FUNC"
+check "hook bootstrap hint stays silent for dev-owned flagged projects" \
+    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'ddev_devowned_flagged \"\$PWD\" && return 0'" _ "$FUNC"
 check "hook bootstrap hint stays silent when the root is already handed over" \
     sh -c "grep -qF '[ \"\$(stat -c %U \"\$PWD\" 2>/dev/null)\" = \"opencode\" ]' \"\$1\"" _ "$FUNC"
 check "hook exports the bootstrap hint for bash children" \

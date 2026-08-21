@@ -365,6 +365,10 @@ check "4e: previously handed-over root migrates back to dev (2775)" \
 E 'sudo mkdir -p /var/www/vhosts/devowned-hint/.ddev && sudo chown -R dev:dev /var/www/vhosts/devowned-hint && printf "type: typo3\n" > /var/www/vhosts/devowned-hint/.ddev/config.yaml && chmod 2775 /var/www/vhosts/devowned-hint'
 check "4e: hook hint mentions disable_settings_management (dev-owned note)" \
     E 'sudo -u dev -H sh -c "cd /var/www/vhosts/devowned-hint && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "disable_settings_management:"'
+# once flagged, the hook must stay silent (the EPERM can no longer occur)
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/devowned-hint'
+check "4e: hook hint silent once the project is flagged (dev-owned)" \
+    E '! sudo -u dev -H sh -c "cd /var/www/vhosts/devowned-hint && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "hint: fresh typo3 clone"'
 # back to the handover model for the remaining sections
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-settings off'
 
