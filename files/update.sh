@@ -85,7 +85,19 @@ ensure_local_file() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
+# Binary-only modes (--only-binary / --binary-path) need NO kit files at
+# all — when running from the installed library, skip the self-fetch
+# (and the per-file heal loop below, which would re-fetch the whole kit
+# for the flat LIBDIR layout). The flags must work while the installed
+# update.sh IS the current one; an older installed copy rejects them as
+# unknown options (run one regular update first).
+_opk_binonly=false
+for _opk_a in "$@"; do
+    case "$_opk_a" in
+        --only-binary|--binary-path) _opk_binonly=true; break ;;
+    esac
+done
+if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
     SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
     # Do NOT continue executing this (installed, possibly older) copy: the
@@ -97,12 +109,19 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     exec bash "$SCRIPT_DIR/update.sh" "$@"
 fi
 # Heal an incomplete fetched temp dir (see ensure_local_file above) before we
-# touch any of the files. No-op for a real local checkout.
-for f in $KIT_FILES; do
-    [ "$f" = "VERSION" ] && continue
-    ensure_local_file "$f"
-done
-VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
+# touch any of the files. No-op for a real local checkout; skipped entirely
+# for binary-only runs from the installed library.
+if [ "$_opk_binonly" != true ]; then
+    for f in $KIT_FILES; do
+        [ "$f" = "VERSION" ] && continue
+        ensure_local_file "$f"
+    done
+fi
+# Library runs have no ../VERSION — fall back to the installed stamp so the
+# banner/summary show the real version (binary-only runs never re-stamp it).
+VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null \
+    || sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 \
+    || echo "0.0.0")
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 CONFDIR="/etc/opencode-permissions-kit"
 PROJECTS_CONF="$CONFDIR/projects.conf"
