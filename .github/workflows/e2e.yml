@@ -1,9 +1,10 @@
 name: e2e
 
-# Runs on manual dispatch, push to master, and pull requests targeting
-# master. PRs get the e2e verdict before merge. A branch push with an open
-# PR fires only `pull_request` (no `push` filter for other branches) — no
-# double-run.
+# Runs on manual dispatch and pull requests targeting master. PRs get
+# the e2e verdict before merge — master only ever receives merged PR
+# commits, so no post-merge push run is needed (deliberately removed to
+# avoid the double-run after merging). A branch push with an open PR
+# fires only `pull_request` — no double-run.
 on:
   workflow_dispatch:
     inputs:
@@ -12,12 +13,15 @@ on:
         required: false
         default: false
         type: boolean
-  push:
-    branches:
-      - master
   pull_request:
     branches:
       - master
+
+# Least-privilege token (CodeQL actions/missing-workflow-permissions):
+# read-only access is enough (checkout + cache only — no artifacts,
+# no PR comments).
+permissions:
+  contents: read
 
 # Cancel a superseded run when a new commit lands on the same ref; also
 # dedupes if two events somehow fire for the same push.
@@ -50,7 +54,7 @@ jobs:
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
       - name: Run E2E test
         run: |
-          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./tests/check-host.sh ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-ddev-as-opencode.sh ./tests/test-ddev-migrate.sh ./tests/test-ddev-hosts.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh ./tests/test-ui.sh ./tests/test-docs.sh ./tests/test-kit-cli.sh ./tests/test-project-paths.sh ./tests/test-workflows.sh ./tests/test-install-args.sh ./tests/test-kit-files.sh ./tests/test-uninstall.sh ./tests/test-status.sh ./tests/test-fs-baseline.sh \
+          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./tests/check-host.sh ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-ddev-as-opencode.sh ./tests/test-ddev-migrate.sh ./tests/test-ddev-hosts.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh ./tests/test-ui.sh ./tests/test-docs.sh ./tests/test-kit-cli.sh ./tests/test-project-paths.sh ./tests/test-workflows.sh ./tests/test-install-args.sh ./tests/test-kit-files.sh ./tests/test-uninstall.sh ./tests/test-status.sh ./tests/test-update-flags.sh ./tests/test-fs-baseline.sh \
             ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh \
             ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/kit ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/ui.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/ddev-migrate.sh ./files/opencode-permissions-kit-lib/ddev-hosts.sh ./files/opencode-permissions-kit-lib/fs-baseline.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
           ./tests/e2e/run.sh
@@ -79,7 +83,7 @@ jobs:
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
       - name: Run docker-rootless E2E test
         run: |
-          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./tests/check-host.sh \
+          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/lib.sh ./tests/check-host.sh ./tests/test-update-flags.sh \
             ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-ddev-as-opencode.sh ./tests/test-ddev-migrate.sh ./tests/test-ddev-hosts.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh ./tests/test-ui.sh ./tests/test-docs.sh ./tests/test-kit-cli.sh ./tests/test-project-paths.sh ./tests/test-workflows.sh ./tests/test-install-args.sh ./tests/test-kit-files.sh ./tests/test-uninstall.sh ./tests/test-status.sh ./tests/test-fs-baseline.sh \
             ./files/config.sh ./files/update.sh ./files/install.sh ./files/uninstall.sh ./files/status.sh \
             ./files/opencode-permissions-kit-lib/wrapper ./files/opencode-permissions-kit-lib/kit ./files/opencode-permissions-kit-lib/log.sh ./files/opencode-permissions-kit-lib/ui.sh ./files/opencode-permissions-kit-lib/shell-warn.sh ./files/opencode-permissions-kit-lib/setup-container-backend.sh ./files/opencode-permissions-kit-lib/bin/socket-check.sh ./files/opencode-permissions-kit-lib/ddev-as-opencode.sh ./files/opencode-permissions-kit-lib/ddev-handover.sh ./files/opencode-permissions-kit-lib/ddev-migrate.sh ./files/opencode-permissions-kit-lib/ddev-hosts.sh ./files/opencode-permissions-kit-lib/fs-baseline.sh ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode

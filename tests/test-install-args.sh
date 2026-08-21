@@ -46,6 +46,8 @@ reset_globals() {
     CONTAINER_BACKEND_OPT=""
     SKIP_DDEV_MIGRATION=false
     MIGRATE_AGENTS_OPT=""
+    DDEV_DEV_OWNED=true
+    DDEV_SETTINGS_GIVEN=false
 }
 
 # expect_rc <want-rc> <description> <args...>
@@ -92,6 +94,25 @@ parse_args --skip-ddev-migration
 [ "$SKIP_DDEV_MIGRATION" = true ] \
     && pass "--skip-ddev-migration sets the flag" \
     || fail "--skip-ddev-migration sets the flag"
+
+# --ddev-settings (dev-owned mode): valid values captured, default on.
+reset_globals
+parse_args --ddev-settings dev-owned
+[ "$DDEV_DEV_OWNED" = true ] && [ "$DDEV_SETTINGS_GIVEN" = true ] \
+    && pass "--ddev-settings dev-owned is captured" \
+    || fail "--ddev-settings dev-owned is captured"
+reset_globals
+parse_args --ddev-settings ddev
+[ "$DDEV_DEV_OWNED" = false ] && [ "$DDEV_SETTINGS_GIVEN" = true ] \
+    && pass "--ddev-settings ddev is captured (handover model)" \
+    || fail "--ddev-settings ddev is captured (handover model)"
+reset_globals
+parse_args --yes
+[ "$DDEV_DEV_OWNED" = true ] && [ "$DDEV_SETTINGS_GIVEN" = false ] \
+    && pass "dev-owned mode ON by default (recommended)" \
+    || fail "dev-owned mode ON by default (recommended)"
+expect_rc 1 "--ddev-settings with an invalid value aborts" --ddev-settings maybe
+expect_rc 1 "--ddev-settings without a value aborts" --ddev-settings
 
 reset_globals
 parse_args --yes

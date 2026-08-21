@@ -92,6 +92,13 @@ ddev() {
     if [ "$(id -u)" = "$(id -u opencode 2>/dev/null || echo 0)" ]; then
         command ddev "$@"
     else
+        # Bootstrap hint BEFORE the run: on a fresh typo3 clone `ddev
+        # start` fails with a cryptic EPERM (ddev chmods the project
+        # root while TYPO3 is undetected — owner-only operation). The
+        # hint names the one-command fix while the error is still ahead.
+        case "${1:-}" in
+            start|restart) _opk_bootstrap_hint 2>/dev/null || true ;;
+        esac
         if _opk_is_browser_cmd "${1:-}" "${2:-}"; then
             # Browser commands (issue #20): URL computed as opencode —
             # see _opk_ddev_browser above.
@@ -134,6 +141,47 @@ _opk_hosts_hint() {
     return 0
 }
 
+# _opk_bootstrap_hint: before start/restart, detect the TYPO3 bootstrap
+# case (fresh clone) that makes `ddev start` fail with EPERM: without
+# vendor/ ddev cannot detect the installation, writes its settings file
+# at the PROJECT ROOT and chmods the root directory — an owner-only
+# operation, and the root belongs to the developer, not to opencode.
+# Prints the one-command fix (config.sh handover — root-run, hands the
+# root back once TYPO3 is installed). Silent whenever anything is off:
+# no project in the cwd, not typo3, TYPO3 detected, root already handed
+# over, or the kit lib missing.
+_opk_bootstrap_hint() {
+    [ -f /usr/local/lib/opencode-permissions-kit/ddev-handover.sh ] || return 0
+    [ -f "$PWD/.ddev/config.yaml" ] || return 0
+    _opk_type=$(sed -n 's/^type:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
+    [ "$_opk_type" = "typo3" ] || return 0
+    _opk_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
+    [ -n "$_opk_docroot" ] || _opk_docroot="."
+    # shellcheck disable=SC1091  # deployed kit path, checked above
+    . /usr/local/lib/opencode-permissions-kit/ddev-handover.sh
+    # Dev-owned (flagged) project: ddev never touches paths outside
+    # .ddev/ — the bootstrap EPERM cannot occur, stay silent.
+    ddev_devowned_flagged "$PWD" && return 0
+    ddev_typo3_detected "$PWD" "$_opk_docroot" && return 0
+    [ "$(stat -c %U "$PWD" 2>/dev/null)" = "opencode" ] && return 0
+    echo ""
+    echo "  hint: fresh typo3 clone — until composer install, ddev writes its"
+    echo "  settings file at the project root and must chmod it (owner-only;"
+    echo "  the root belongs to you, ddev runs as opencode). Hand it over once"
+    echo "  (the kit hands it back after install):"
+    echo ""
+    echo "    sudo opencode-permissions-kit config handover $PWD"
+    # Dev-owned mode: the same command also writes
+    # disable_settings_management: true (the durable fix — ddev then never
+    # touches paths outside .ddev/, the root stays yours permanently).
+    if ddev_devowned_enabled; then
+        echo "    (dev-owned mode on: this also writes disable_settings_management:"
+        echo "     true into .ddev/config.yaml — commit that line)"
+    fi
+    echo ""
+    return 0
+}
+
 # Export for bash child processes (issue #18): vendor scripts like TYPO3's
 # vendor/bin/runTests.sh call `ddev` in a CHILD bash shell, where this file
 # was never sourced — the script resolved the real binary and ran ddev as
@@ -156,7 +204,7 @@ _opk_hosts_hint() {
 # workarounds — see docs/troubleshooting.md.
 # shellcheck disable=SC3045  # bash-only block, guarded above
 if [ -n "${BASH_VERSION:-}" ]; then
-    export -f ddev _opk_hosts_hint 2>/dev/null || true
+    export -f ddev _opk_hosts_hint _opk_bootstrap_hint 2>/dev/null || true
     if [ -z "${BASH_ENV:-}" ]; then
         # shellcheck disable=SC3028  # bash-only variable in a guarded block
         _opk_hook="${BASH_SOURCE:-}"

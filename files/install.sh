@@ -22,6 +22,9 @@
 #   --container-backend <docker-rootless|podman-rootless>  Non-interactive backend choice
 #   --secure-git-config   Enable .git/config hardening up front
 #   --skip-ddev-migration  Do not export the dev user's ddev databases
+#   --ddev-settings <dev-owned|ddev>  Dev-owned mode: kit writes
+#                          disable_settings_management: true into each
+#                          project's .ddev/config.yaml (default: dev-owned)
 #
 # Flags may appear in any order. --projects consumes every following
 # non-flag argument as a project root; parsing continues after them.
@@ -127,6 +130,13 @@ SKIP_DDEV_MIGRATION=false
 # ~/.agents migration (issue #19): empty = decide via prompt (--yes takes
 # the recommended "move"); --migrate-agents forces move|copy|skip.
 MIGRATE_AGENTS_OPT=""
+# Dev-owned mode (docs/design/ddev-dev-owned-projects.md): true = the kit
+# writes disable_settings_management: true into each project's committed
+# .ddev/config.yaml; settings dirs + project root stay developer-owned
+# (recommended default). false = ddev keeps managing settings (handover
+# model). --ddev-settings forces dev-owned|ddev.
+DDEV_DEV_OWNED=true
+DDEV_SETTINGS_GIVEN=false
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -154,6 +164,22 @@ parse_args() {
                     exit 1
                 fi
                 CONTAINER_BACKEND_OPT="$2"
+                shift
+                ;;
+            --ddev-settings)
+                if [ $# -lt 2 ]; then
+                    echo "error: --ddev-settings requires a value (dev-owned|ddev)" >&2
+                    exit 1
+                fi
+                case "$2" in
+                    dev-owned) DDEV_DEV_OWNED=true ;;
+                    ddev)      DDEV_DEV_OWNED=false ;;
+                    *)
+                        echo "error: --ddev-settings must be dev-owned or ddev (got: $2)" >&2
+                        exit 1
+                        ;;
+                esac
+                DDEV_SETTINGS_GIVEN=true
                 shift
                 ;;
             --projects)
@@ -560,6 +586,12 @@ if [ "$MODE" = "standard" ] && [ "$INTERACTIVE" = true ]; then
             "yes|allow git commands")
         if [ "$_g" = "yes" ]; then SECURE_GIT_CONFIG=false; else SECURE_GIT_CONFIG=true; fi
     fi
+    if [ "$DDEV_SETTINGS_GIVEN" != true ]; then
+        _ds=$(ui_menu "ddev settings management? (dev-owned projects)" "dev-owned" \
+            "dev-owned|kit disables it — settings files stay yours, permanent 2775 (recommended)" \
+            "ddev|ddev keeps writing CMS settings (handover model)")
+        [ "$_ds" = "ddev" ] && DDEV_DEV_OWNED=false
+    fi
 fi
 
 # === Plan + confirmation ========================================================
@@ -582,6 +614,9 @@ if [ -n "$PREDEFINED_PROJECTS" ]; then
     _plan "group + setgid + default ACLs" "on $PREDEFINED_PROJECTS"
 else
     _plan "group + setgid + default ACLs" "(project roots selected next)"
+fi
+if [ "$DDEV_DEV_OWNED" = true ]; then
+    _plan "ddev dev-owned mode" "(writes disable_settings_management: true into .ddev/config.yaml)"
 fi
 _plan "secure the opencode binary + wrapper" "root:opencode 750"
 if [ -d /mnt/c ]; then
@@ -719,6 +754,7 @@ DDEV_VERSION=$DDEV_VERSION
 CONTAINER_BACKEND=$CONTAINER_BACKEND
 OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST
 OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET
+DDEV_DEV_OWNED=$DDEV_DEV_OWNED
 VERSION=$VERSION
 EOF
 log "install.conf written (version $VERSION)"
@@ -1006,7 +1042,17 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     # (e.g. "chmod .../config/system"). Searched at ANY depth under each
     # root (a root is often a parent of several projects). Idempotent;
     # .git dirs are never chowned — they stay developer-owned (the group
-    # baseline above makes them group-accessible).
+    # baseline above makes them group-accessible). With the dev-owned
+    # mode on (DDEV_DEV_OWNED, see docs/design/ddev-dev-owned-projects.md)
+    # the scan instead flags the project and keeps settings dirs + root
+    # developer-owned. Advanced mode decides here (Standard/--yes already
+    # did, --ddev-settings forces).
+    if [ "$DDEV_SETTINGS_GIVEN" != true ] && [ "$INTERACTIVE" = true ] && [ "$MODE" = "advanced" ]; then
+        _ds=$(ui_menu "ddev settings management? (dev-owned projects)" "dev-owned" \
+            "dev-owned|kit disables it — settings files stay yours, permanent 2775 (recommended)" \
+            "ddev|ddev keeps writing CMS settings (handover model)")
+        [ "$_ds" = "ddev" ] && DDEV_DEV_OWNED=false
+    fi
     for root in $PROJECTS_ROOTS; do
         [ -d "$root" ] || continue
         ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"

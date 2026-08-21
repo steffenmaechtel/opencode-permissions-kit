@@ -166,22 +166,33 @@ sudo -u opencode ddev config global --router-http-port 8080 --router-https-port 
 belongs to the developer — ddev chmods it unconditionally, and `chmod` is
 owner-only on Linux.
 
-**Fix:** run the handover:
+**Fix:** run the handover (fast — one project, no group baseline):
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/update.sh
+sudo opencode-permissions-kit config handover /var/www/vhosts/<project>
 ```
 
-(or `config.sh refresh`). The handover table lives in
+(or `update.sh` / `config.sh refresh` to re-run it over every registered
+root). The handover table lives in
 [ddev integration](concepts/ddev-integration.md).
 
 **EPERM on the project root itself** (`chmod /var/www/vhosts/<project>:
 operation not permitted` during `ddev start` on a fresh clone): same
 mechanism, different target — without `vendor/` ddev writes its settings
-file at the project root and chmods the root directory. The handover
-covers this bootstrap case (root inode → `opencode`, mode `2755`) and
-hands the root back to you once TYPO3 is detected; see the bootstrap
-paragraph in [ddev integration](concepts/ddev-integration.md).
+file at the project root and chmods the root directory. The fix is the
+same `config handover` command above: it covers this bootstrap case
+(root inode → `opencode`, mode `2755`) and hands the root back to you
+once TYPO3 is detected; see the bootstrap paragraph in
+[ddev integration](concepts/ddev-integration.md). The `ddev` shell hook
+prints this exact command when it detects the case before a
+`ddev start`.
+
+**Tired of the ownership back-and-forth?** Switch the project to
+[dev-owned](how-to/dev-owned-projects.md): `config ddev-settings on`
+makes the kit write `disable_settings_management: true` into the
+project's `.ddev/config.yaml` — ddev then never touches paths outside
+`.ddev/`, everything stays permanently yours, and `git checkout` /
+`mv` / `rm` cannot hit ownership errors anymore.
 
 ## ddev warns "Unable to open hosts file ... permission denied"
 

@@ -85,7 +85,19 @@ ensure_local_file() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
+# Binary-only modes (--only-binary / --binary-path) need NO kit files at
+# all — when running from the installed library, skip the self-fetch
+# (and the per-file heal loop below, which would re-fetch the whole kit
+# for the flat LIBDIR layout). The flags must work while the installed
+# update.sh IS the current one; an older installed copy rejects them as
+# unknown options (run one regular update first).
+_opk_binonly=false
+for _opk_a in "$@"; do
+    case "$_opk_a" in
+        --only-binary|--binary-path) _opk_binonly=true; break ;;
+    esac
+done
+if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
     SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
     # Do NOT continue executing this (installed, possibly older) copy: the
@@ -97,12 +109,19 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     exec bash "$SCRIPT_DIR/update.sh" "$@"
 fi
 # Heal an incomplete fetched temp dir (see ensure_local_file above) before we
-# touch any of the files. No-op for a real local checkout.
-for f in $KIT_FILES; do
-    [ "$f" = "VERSION" ] && continue
-    ensure_local_file "$f"
-done
-VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
+# touch any of the files. No-op for a real local checkout; skipped entirely
+# for binary-only runs from the installed library.
+if [ "$_opk_binonly" != true ]; then
+    for f in $KIT_FILES; do
+        [ "$f" = "VERSION" ] && continue
+        ensure_local_file "$f"
+    done
+fi
+# Library runs have no ../VERSION — fall back to the installed stamp so the
+# banner/summary show the real version (binary-only runs never re-stamp it).
+VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null \
+    || sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 \
+    || echo "0.0.0")
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 CONFDIR="/etc/opencode-permissions-kit"
 PROJECTS_CONF="$CONFDIR/projects.conf"
@@ -186,12 +205,18 @@ fi
 YES=false
 REFRESH=false
 BINARY_UPDATE=false
+ONLY_BINARY=false
 BINARY_PATH=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --yes|-y) YES=true ;;
         --refresh) REFRESH=true ;;
         --binary) BINARY_UPDATE=true ;;
+        --only-binary)
+            # issue #24: skip every kit step, only upgrade the binary
+            ONLY_BINARY=true
+            BINARY_UPDATE=true
+            ;;
         --binary-path)
             [ "$#" -ge 2 ] || { echo "error: --binary-path requires a file path" >&2; exit 1; }
             BINARY_UPDATE=true
@@ -202,10 +227,11 @@ while [ "$#" -gt 0 ]; do
             cat <<EOF
 opencode permissions kit -- update.sh  v$VERSION
 Re-deploys the kit on an already-installed system. No prompts by default.
-Usage: ./update.sh [--yes] [--refresh] [--binary] [--binary-path <file>]
+Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path <file>]
   --yes            skip the confirmation prompt
   --refresh        also re-apply the group baseline (chgrp/setgid/default ACLs)
   --binary         also upgrade the opencode binary to the latest release
+  --only-binary    skip every kit step, ONLY upgrade the opencode binary
   --binary-path    install the given binary file instead of downloading
 EOF
             exit 0
@@ -244,11 +270,18 @@ fi
 # The new sharing group: the opencode user's primary usergroup.
 NEW_OPENCODE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 
-if ! confirm "Re-deploy kit files (existing configs will NOT be touched)?"; then
+if [ "$ONLY_BINARY" = true ]; then
+    _uc_msg="Only upgrade the opencode binary (kit files untouched)?"
+else
+    _uc_msg="Re-deploy kit files (existing configs will NOT be touched)?"
+fi
+if ! confirm "$_uc_msg"; then
     echo "Aborted."; exit 0
 fi
 
-# --- re-deploy library files --------------------------------------------------
+if [ "$ONLY_BINARY" != true ]; then
+
+# --- re-deploy library files (skipped by --only-binary) ------------------------
 
 ui_section "Re-deploying library files"
 sudo mkdir -p "$LIBDIR/bin"
@@ -408,6 +441,8 @@ if [ -d /mnt/c ]; then
     fi
 fi
 
+fi   # ONLY_BINARY skip: kit re-deploy ... pre-binary sections
+
 # --- opencode binary upgrade (--binary / --binary-path) ----------------------
 
 SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
@@ -460,9 +495,32 @@ install_binary() {
     log "opencode binary upgraded: ${current} -> ${new}"
 }
 
+# Download + extract the latest opencode release into <dir>. Prints the
+# candidate binary path on success, nothing on failure. The CALLER owns
+# <dir> — cleanup happens only after the install attempt (the old flow
+# deleted the extracted candidate before verification could run: every
+# downloaded upgrade failed with "candidate failed verification",
+# issue #24).
+fetch_latest_opencode() {
+    _flo_dst="${1:-}"
+    [ -n "$_flo_dst" ] && [ -d "$_flo_dst" ] || return 1
+    _flo_ver=$(curl -fsSL --max-time 10 https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
+        | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+    [ -n "$_flo_ver" ] || return 1
+    _flo_asset=$(detect_asset || true)
+    [ -n "$_flo_asset" ] || return 1
+    curl -fsSL --max-time 120 "https://github.com/anomalyco/opencode/releases/download/v$_flo_ver/$_flo_asset" \
+        -o "$_flo_dst/opencode.tar.gz" || return 1
+    tar -xzf "$_flo_dst/opencode.tar.gz" -C "$_flo_dst" || return 1
+    [ -x "$_flo_dst/opencode" ] || return 1
+    echo "$_flo_dst/opencode"
+    return 0
+}
+
 if [ "$BINARY_UPDATE" = true ]; then
     ui_section "Upgrading opencode binary"
     SRC=""
+    TMP=""
     if [ -n "$BINARY_PATH" ]; then
         if [ -x "$BINARY_PATH" ]; then
             SRC="$BINARY_PATH"
@@ -471,25 +529,14 @@ if [ "$BINARY_UPDATE" = true ]; then
             log "opencode binary upgrade skipped: --binary-path not executable"
         fi
     else
-        VER=$(curl -fsSL --max-time 10 https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
-            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
-        if [ -z "$VER" ]; then
-            ui_warn "could not resolve latest opencode version (network?) — binary left untouched"
-            log "opencode binary upgrade skipped: cannot resolve latest version"
+        TMP="$(mktemp -d)"
+        if SRC=$(fetch_latest_opencode "$TMP"); then
+            :   # candidate extracted; TMP stays alive until after the install
         else
-            TMP="$(mktemp -d)"
-            asset=$(detect_asset || true)
-            if [ -n "$asset" ] \
-                && curl -fsSL --max-time 120 "https://github.com/anomalyco/opencode/releases/download/v$VER/$asset" \
-                    -o "$TMP/opencode.tar.gz" \
-                && tar -xzf "$TMP/opencode.tar.gz" -C "$TMP" \
-                && [ -x "$TMP/opencode" ]; then
-                SRC="$TMP/opencode"
-            else
-                ui_warn "download of opencode $VER failed — binary left untouched"
-                log "opencode binary upgrade skipped: download failed (v$VER)"
-            fi
+            ui_warn "download of the latest opencode release failed — binary left untouched"
+            log "opencode binary upgrade skipped: download failed"
             rm -rf "$TMP"
+            TMP=""
         fi
     fi
     if [ -n "$SRC" ]; then
@@ -504,10 +551,15 @@ if [ "$BINARY_UPDATE" = true ]; then
             log "opencode binary upgrade skipped: candidate failed verification/install"
             rm -rf "$BACKUP_DIR"
         fi
+        # Candidate dir cleanup AFTER the install attempt — never before
+        # verification (issue #24).
+        [ -n "$TMP" ] && rm -rf "$TMP"
     fi
 else
     ui_detail "opencode binary left untouched (use --binary to upgrade)"
 fi
+
+if [ "$ONLY_BINARY" != true ]; then
 
 # --- ensure default user can access the opencode home -------------------------
 # The home belongs to the opencode user's own usergroup; older installs had it
@@ -578,14 +630,20 @@ else
     ui_detail "skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)"
 fi
 
+fi   # ONLY_BINARY skip: post-binary sections
+
 # --- done --------------------------------------------------------------------
 
 ui_section "Update complete"
 
-ui_kv "Kit"      "v$VERSION"
-ui_kv "Configs"  "projects.conf and opencode.jsonc untouched"
+if [ "$ONLY_BINARY" = true ]; then
+    ui_kv "Mode"     "binary-only (kit files untouched)"
+else
+    ui_kv "Kit"      "v$VERSION"
+    ui_kv "Configs"  "projects.conf and opencode.jsonc untouched"
+fi
 [ "$BINARY_UPDATE" = true ] || ui_kv "Binary"   "untouched (use --binary to upgrade)"
 ui_info "Next:"
 ui_detail "opencode-permissions-kit status   verify the protection"
-ui_detail "opencode-permissions-kit update --binary    upgrade the opencode binary"
+ui_detail "opencode-permissions-kit upgrade-opencode    upgrade the opencode binary"
 log "update complete (version $VERSION)"

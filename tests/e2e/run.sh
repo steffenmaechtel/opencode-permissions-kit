@@ -87,7 +87,7 @@ E 'sudo git init -q /var/www/vhosts/perm-check && sudo sh -c "cd /var/www/vhosts
 # it, world-writable so both may append.
 E 'touch /tmp/fake-ddev.log && chmod 666 /tmp/fake-ddev.log'
 
-E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts 2>&1 | tee /tmp/install-out.log'"
+E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev 2>&1 | tee /tmp/install-out.log'"
 echo "  Install complete."
 
 echo ""
@@ -303,6 +303,76 @@ check "4c: detected typo3 settings dir still handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/detected-project/config/system)" = "opencode"'
 
 echo ""
+echo "--- 4d. fresh clone: hook hint + config.sh handover (local-test issue) ---"
+# Scenario from the productive WSL test: git clone a typo3 project AFTER
+# the last handover scan -> `ddev start` fails with EPERM (ddev chmods the
+# undetected project root; owner-only). The ddev() hook must print the
+# ready-made fix BEFORE the run, and `config.sh handover <project>` (light,
+# no group baseline) must repair ownership without a full refresh.
+E 'sudo mkdir -p /var/www/vhosts/fresh-clone/.ddev && sudo chown -R dev:dev /var/www/vhosts/fresh-clone && printf "type: typo3\n" > /var/www/vhosts/fresh-clone/.ddev/config.yaml && chmod 2775 /var/www/vhosts/fresh-clone'
+check "4d: fresh clone root is dev-owned before the handover" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone)" = "dev"'
+check "4d: ddev() hook prints the bootstrap hint naming the handover command" \
+    E 'sudo -u dev -H sh -c "cd /var/www/vhosts/fresh-clone && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "config handover /var/www/vhosts/fresh-clone"'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/fresh-clone' && \
+    echo "  ${GREEN}OK${NC}  config.sh handover completed"
+check "4d: handover gives the bootstrap root to opencode (2755, chmod no-op)" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone)" = "opencode" && test "$(stat -c %a /var/www/vhosts/fresh-clone)" = "2755"'
+check "4d: .ddev handed over too" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone/.ddev)" = "opencode"'
+check_fail "4d: hook stays silent once the root is handed over" \
+    E 'sudo -u dev -H sh -c "cd /var/www/vhosts/fresh-clone && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "hint: fresh typo3 clone"'
+# vendor pruning (issue #21 pattern): a .ddev shipped inside a vendor
+# package is a test fixture, not a project — never handed over.
+E 'sudo mkdir -p /var/www/vhosts/fresh-clone/vendor/some/pkg/.ddev && sudo chown -R dev:dev /var/www/vhosts/fresh-clone/vendor'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/fresh-clone'
+check "4d: .ddev inside vendor/ is NOT handed over (issue #21 pattern)" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone/vendor/some/pkg/.ddev)" = "dev"'
+
+echo ""
+echo "--- 4e. dev-owned mode (disable_settings_management, design plan) ---"
+# Installed with --ddev-settings ddev (handover model) so far. Toggle the
+# dev-owned mode on: the scan must write disable_settings_management:
+# true into a project's .ddev/config.yaml and keep settings dirs + root
+# developer-owned — ddev then never chmods outside .ddev/ (early return
+# in its CreateSettingsFile), git checkout stays free even on a fresh
+# typo3 clone.
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-settings on'
+check "4e: install.conf carries the mode stamp" \
+    E 'grep -q "^DDEV_DEV_OWNED=true$" /etc/opencode-permissions-kit/install.conf'
+E 'sudo mkdir -p /var/www/vhosts/devowned-proj/.ddev /var/www/vhosts/devowned-proj/config/system && sudo chown -R dev:dev /var/www/vhosts/devowned-proj && printf "type: typo3\n" > /var/www/vhosts/devowned-proj/.ddev/config.yaml && chmod 2775 /var/www/vhosts/devowned-proj'
+check "4e: fresh clone root is dev-owned before the scan" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-proj)" = "dev"'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/devowned-proj' && \
+    echo "  ${GREEN}OK${NC}  config.sh handover (dev-owned) completed"
+check "4e: scan wrote disable_settings_management into .ddev/config.yaml" \
+    E 'grep -qx "disable_settings_management: true" /var/www/vhosts/devowned-proj/.ddev/config.yaml'
+check "4e: undetected typo3 root STAYS dev-owned (no bootstrap handover)" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-proj)" = "dev" && test "$(stat -c %a /var/www/vhosts/devowned-proj)" = "2775"'
+check "4e: settings dir stays dev-owned" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-proj/config/system)" = "dev"'
+check "4e: .ddev still handed over to opencode" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-proj/.ddev)" = "opencode"'
+check "4e: developer can replace top-level files (git checkout simulation)" \
+    E 'sudo -u dev touch /var/www/vhosts/devowned-proj/AGENTS.md && sudo -u dev rm /var/www/vhosts/devowned-proj/AGENTS.md'
+# migration: a project that went through the handover model (opencode-owned
+# root 2755) gets everything back once flagged
+E 'sudo mkdir -p /var/www/vhosts/devowned-mig/.ddev && sudo chown -R dev:dev /var/www/vhosts/devowned-mig && printf "type: typo3\n" > /var/www/vhosts/devowned-mig/.ddev/config.yaml && sudo chown opencode:opencode /var/www/vhosts/devowned-mig && sudo chmod 2755 /var/www/vhosts/devowned-mig'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/devowned-mig'
+check "4e: previously handed-over root migrates back to dev (2775)" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-mig)" = "dev" && test "$(stat -c %a /var/www/vhosts/devowned-mig)" = "2775"'
+# hook hint on an unflagged fresh clone mentions the dev-owned effect
+E 'sudo mkdir -p /var/www/vhosts/devowned-hint/.ddev && sudo chown -R dev:dev /var/www/vhosts/devowned-hint && printf "type: typo3\n" > /var/www/vhosts/devowned-hint/.ddev/config.yaml && chmod 2775 /var/www/vhosts/devowned-hint'
+check "4e: hook hint mentions disable_settings_management (dev-owned note)" \
+    E 'sudo -u dev -H sh -c "cd /var/www/vhosts/devowned-hint && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "disable_settings_management:"'
+# once flagged, the hook must stay silent (the EPERM can no longer occur)
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/devowned-hint'
+check "4e: hook hint silent once the project is flagged (dev-owned)" \
+    E '! sudo -u dev -H sh -c "cd /var/www/vhosts/devowned-hint && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "hint: fresh typo3 clone"'
+# back to the handover model for the remaining sections
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-settings off'
+
+echo ""
 echo "--- 5. Soft-only file access (the ddev-working goal) ---"
 # No hard ACL denies: the opencode user (and ddev, and its containers) can
 # READ every project file. Protection is opencode's own soft permission layer.
@@ -424,6 +494,34 @@ check "install.conf VERSION bumped to sentinel" \
 E 'rm -rf /tmp/update-test'
 
 echo ""
+echo "--- 11b. update.sh --only-binary (issue #24) ---"
+# Binary-only mode: kit steps skipped (marker in LIBDIR survives, the
+# install.conf version stays at section 11's sentinel), the binary is
+# actually replaced by the given stub.
+E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "8.8.8-onlybinary" > /tmp/update-test/VERSION'
+E 'sudo sh -c "echo marker > /usr/local/lib/opencode-permissions-kit/.only-binary-marker"'
+E 'printf "#!/bin/sh\necho \"opencode version 9.9.9-onlybinary\"\n" > /tmp/stub-opencode && chmod +x /tmp/stub-opencode'
+E 'sudo bash /tmp/update-test/files/update.sh --yes --only-binary --binary-path /tmp/stub-opencode' && \
+    echo "  ${GREEN}OK${NC}  update.sh --only-binary completed"
+check "11b: binary replaced by the stub (--only-binary)" \
+    E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 9.9.9-onlybinary"'
+check "11b: kit re-deploy skipped (marker survived)" \
+    E 'test "$(sudo cat /usr/local/lib/opencode-permissions-kit/.only-binary-marker)" = "marker"'
+check "11b: install.conf version NOT re-stamped (still section 11's sentinel)" \
+    E 'grep -q "VERSION=9.9.9-sentinel" /etc/opencode-permissions-kit/install.conf && ! grep -q "VERSION=8.8.8-onlybinary" /etc/opencode-permissions-kit/install.conf'
+# top-level shorthand (issue #24): kit CLI maps upgrade-opencode onto
+# update.sh --yes --only-binary, flags pass through
+E 'printf "#!/bin/sh\necho \"opencode version 7.7.7-shorthand\"\n" > /tmp/stub-opencode2 && chmod +x /tmp/stub-opencode2'
+E 'opencode-permissions-kit upgrade-opencode --binary-path /tmp/stub-opencode2' && \
+    echo "  ${GREEN}OK${NC}  kit CLI upgrade-opencode completed"
+check "11b: upgrade-opencode replaced the binary (shorthand works)" \
+    E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 7.7.7-shorthand"'
+E 'sudo rm -f /usr/local/lib/opencode-permissions-kit/.only-binary-marker'
+# restore the real binary for the remaining sections
+E 'sudo cp /opencode-cache/opencode-'"$OC_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chown root:opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chmod 750 /usr/local/lib/opencode-permissions-kit/bin/opencode'
+E 'rm -rf /tmp/update-test /tmp/stub-opencode /tmp/stub-opencode2'
+
+echo ""
 echo "--- 11b. update floor check (installs < 0.0.14 abort) ---"
 # Updates are only supported from 0.0.14 onwards; an older VERSION stamp must
 # abort with re-install instructions instead of running an undefined path.
@@ -515,7 +613,7 @@ echo "--- 12c-2. install.sh re-run re-applies the git choice (re-install) ---"
 # that stale agent config: the default (git blocked) is re-rendered from the
 # template with the previous file backed up. Regression for the 2026-08-16
 # live-test bug where the choice was ignored on re-install.
-E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts' && \
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev' && \
     echo "  ${GREEN}OK${NC}  re-install completed"
 check "re-install: default git-block re-applied to the existing agent config" \
     E 'sudo grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'

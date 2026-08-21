@@ -47,6 +47,12 @@ It then asks only the essential questions:
    sharing group), **copy** (both sides keep their own, may drift) or
    **skip**. Non-interactive installs move;
    `--migrate-agents move|copy|skip` forces a choice.
+4. **ddev settings** — dev-owned projects (default): the kit writes
+   `disable_settings_management: true` into each project's
+   `.ddev/config.yaml`, so everything outside `.ddev/` stays permanently
+   yours and `git checkout` never hits ownership errors. Choose `ddev` to
+   keep ddev's settings management (handover model) instead. See
+   [dev-owned projects](how-to/dev-owned-projects.md).
 
 One exception: when podman is detected, you choose between podman-rootless
 (default) and docker-rootless. Otherwise docker-rootless is used silently.

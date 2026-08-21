@@ -100,6 +100,12 @@ assert "config passes args" "config:euid=$(id -u):args=projects list" "$out"
 out="$(run_kit update --yes --refresh)"
 assert "update passes flags" "update:euid=$(id -u):args=--yes --refresh" "$out"
 
+# upgrade-opencode: binary-only shorthand — injects --yes --only-binary,
+# extra flags pass through (issue #24)
+out="$(run_kit upgrade-opencode --binary-path /tmp/x)"
+assert "upgrade-opencode injects --yes --only-binary (flags pass through)" \
+    "update:euid=$(id -u):args=--yes --only-binary --binary-path /tmp/x" "$out"
+
 # non-root invocations of config/update go through sudo
 if [ "$(id -u)" -ne 0 ]; then
     if [ -f "$WORK/sudo-marker" ]; then

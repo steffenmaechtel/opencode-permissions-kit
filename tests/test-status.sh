@@ -26,6 +26,15 @@ fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
+# --- 0. dev-owned mode line (docs/design/ddev-dev-owned-projects.md) -------------
+if grep -q 'ui_kv "ddev settings"' "$STATUS" && \
+   grep -q 'dev-owned — kit writes disable_settings_management' "$STATUS" && \
+   grep -qF 'DDEV_DEV_OWNED=' "$STATUS"; then
+    pass "status.sh reports the ddev settings mode (stamp-driven)"
+else
+    fail "status.sh reports the ddev settings mode (stamp-driven)"
+fi
+
 # status.sh reads absolute paths (LIBDIR, /etc/...). The only seam we can
 # redirect without root is the opencode home it inspects — the interesting
 # branches here (backend case, install.conf sourcing) are exercised by

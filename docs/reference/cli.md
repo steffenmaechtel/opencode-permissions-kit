@@ -11,6 +11,7 @@ your WSL/Linux system):
 opencode-permissions-kit status
 opencode-permissions-kit config projects add /var/www/vhosts/new-project
 opencode-permissions-kit update --binary
+opencode-permissions-kit upgrade-opencode   # just the opencode binary
 opencode-permissions-kit ddev-hosts-add     # in a ddev project dir
 opencode-permissions-kit uninstall
 opencode-permissions-kit help        # commands + arguments overview
@@ -98,6 +99,8 @@ sudo bash /usr/local/lib/opencode-permissions-kit/config.sh <command>
 | `container-backend docker-rootless\|podman-rootless` | Switch the backend (see [switch the backend](../how-to/switch-container-backend.md)) |
 | `container-backend status` | Show the configured backend + socket state |
 | `refresh` | Re-apply the group baseline (chgrp/setgid/default ACLs) |
+| `handover <path...>` | Re-run the ddev handover for one project — the fresh-clone EPERM repair (see [ddev integration](../concepts/ddev-integration.md)) |
+| `ddev-settings on\|off\|status` | Dev-owned projects: kit writes `disable_settings_management: true` (see [dev-owned projects](../how-to/dev-owned-projects.md)) |
 
 ## update.sh
 
@@ -112,7 +115,12 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | `--yes` | Skip the confirmation prompt |
 | `--refresh` | Also re-apply the group baseline |
 | `--binary` | Also upgrade the opencode binary to the latest release |
+| `--only-binary` | Skip every kit step, only upgrade the opencode binary |
 | `--binary-path <file>` | Install a specific binary file instead |
+
+`opencode-permissions-kit upgrade-opencode` is the shorthand for
+`update --yes --only-binary` — extra flags (e.g. `--binary-path`) pass
+through.
 
 Never touches `projects.conf` or the agent's `opencode.jsonc`. See
 [update](../how-to/update.md).

@@ -43,8 +43,10 @@ the bundled config sets `autoupdate: false`, and `update.sh` is the upgrade
 entry point:
 
 ```bash
-opencode-permissions-kit update --binary                  # latest release
-opencode-permissions-kit update --binary-path ./opencode  # a specific file
+opencode-permissions-kit upgrade-opencode                 # latest release
+opencode-permissions-kit upgrade-opencode --binary-path ./opencode  # specific file
+# equivalent long form:
+opencode-permissions-kit update --only-binary
 ```
 
 Binary upgrades are best-effort: a failure leaves the current binary in

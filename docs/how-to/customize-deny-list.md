@@ -27,6 +27,13 @@ The bundled template additionally:
   in bash — so `cat settings.php | grep DB` still prompts. The tripwire is
   lexical: variables (`F=.env; cat $F`), globs, and indirection evade it.
 
+The template itself uses a carve-out: TYPO3's `ext_localconf.php` is
+re-allowed **after** the broad `*conf.php` deny (legacy projects) in both
+`read` and `edit` — the pattern would otherwise block that extension
+bootstrap file, which is code, not secrets. opencode applies the **last**
+matching rule, so a narrow `allow` placed after a broad `deny` is also how
+you exempt a file from an overmatching rule in your own config.
+
 ## Add a per-project config
 
 Each project can have its own `opencode.jsonc` in its root. Project configs
