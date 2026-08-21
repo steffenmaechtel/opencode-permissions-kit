@@ -11,6 +11,11 @@ on:
       - master
   workflow_dispatch:
 
+# Least-privilege token (CodeQL actions/missing-workflow-permissions):
+# read-only access to the repository is all this workflow needs.
+permissions:
+  contents: read
+
 # Cancel a superseded run when a new commit lands on the same ref; also
 # dedupes if two events somehow fire for the same push.
 concurrency:

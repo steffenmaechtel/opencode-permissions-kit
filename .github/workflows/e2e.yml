@@ -17,6 +17,12 @@ on:
     branches:
       - master
 
+# Least-privilege token (CodeQL actions/missing-workflow-permissions):
+# read-only access is enough (checkout + cache only — no artifacts,
+# no PR comments).
+permissions:
+  contents: read
+
 # Cancel a superseded run when a new commit lands on the same ref; also
 # dedupes if two events somehow fire for the same push.
 concurrency:
