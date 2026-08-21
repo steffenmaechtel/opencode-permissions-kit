@@ -114,6 +114,7 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | `--yes` | Skip the confirmation prompt |
 | `--refresh` | Also re-apply the group baseline |
 | `--binary` | Also upgrade the opencode binary to the latest release |
+| `--only-binary` | Skip every kit step, only upgrade the opencode binary |
 | `--binary-path <file>` | Install a specific binary file instead |
 
 Never touches `projects.conf` or the agent's `opencode.jsonc`. See

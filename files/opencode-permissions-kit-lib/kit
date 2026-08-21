@@ -59,7 +59,8 @@ Commands:
                                   ddev-settings on|off|status (dev-owned
                                   projects)
   update [--yes] [--refresh]      Re-deploy the kit; --binary / --binary-path
-                                  upgrade the opencode binary
+                                  upgrade the opencode binary; --only-binary
+                                  skips every kit step and only upgrades it
   ddev-hosts-add [dir|hostname]     Add ddev hostnames to the Windows hosts
                                    file (ddev's own UAC flow; run as your
                                    user, Windows asks permission). A dir adds

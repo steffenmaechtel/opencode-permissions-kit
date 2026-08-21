@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status e2e e2e-rootless e2e-all install-dev clean version check-version
+.PHONY: help test lint check-host test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status test-update-flags e2e e2e-rootless e2e-all install-dev clean version check-version
 
 # Scripts checked by `make lint` (everything shipped in files/).
 SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status.sh files/uninstall.sh files/umask.sh \
@@ -55,7 +55,7 @@ help:
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
-test: lint test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status
+test: lint test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status test-update-flags
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -183,3 +183,7 @@ test-uninstall:
 test-status:
 	@echo "=== Status Tests ==="
 	@./tests/test-status.sh
+
+test-update-flags:
+	@echo "=== update.sh Flags Tests ==="
+	@./tests/test-update-flags.sh

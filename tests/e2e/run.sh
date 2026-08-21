@@ -494,6 +494,27 @@ check "install.conf VERSION bumped to sentinel" \
 E 'rm -rf /tmp/update-test'
 
 echo ""
+echo "--- 11b. update.sh --only-binary (issue #24) ---"
+# Binary-only mode: kit steps skipped (marker in LIBDIR survives, the
+# install.conf version stays at section 11's sentinel), the binary is
+# actually replaced by the given stub.
+E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "8.8.8-onlybinary" > /tmp/update-test/VERSION'
+E 'sudo sh -c "echo marker > /usr/local/lib/opencode-permissions-kit/.only-binary-marker"'
+E 'printf "#!/bin/sh\necho \"opencode version 9.9.9-onlybinary\"\n" > /tmp/stub-opencode && chmod +x /tmp/stub-opencode'
+E 'sudo bash /tmp/update-test/files/update.sh --yes --only-binary --binary-path /tmp/stub-opencode' && \
+    echo "  ${GREEN}OK${NC}  update.sh --only-binary completed"
+check "11b: binary replaced by the stub (--only-binary)" \
+    E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 9.9.9-onlybinary"'
+check "11b: kit re-deploy skipped (marker survived)" \
+    E 'test "$(sudo cat /usr/local/lib/opencode-permissions-kit/.only-binary-marker)" = "marker"'
+check "11b: install.conf version NOT re-stamped (still section 11's sentinel)" \
+    E 'grep -q "VERSION=9.9.9-sentinel" /etc/opencode-permissions-kit/install.conf && ! grep -q "VERSION=8.8.8-onlybinary" /etc/opencode-permissions-kit/install.conf'
+E 'sudo rm -f /usr/local/lib/opencode-permissions-kit/.only-binary-marker'
+# restore the real binary for the remaining sections
+E 'sudo cp /opencode-cache/opencode-'"$OC_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chown root:opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chmod 750 /usr/local/lib/opencode-permissions-kit/bin/opencode'
+E 'rm -rf /tmp/update-test /tmp/stub-opencode'
+
+echo ""
 echo "--- 11b. update floor check (installs < 0.0.14 abort) ---"
 # Updates are only supported from 0.0.14 onwards; an older VERSION stamp must
 # abort with re-install instructions instead of running an undefined path.
