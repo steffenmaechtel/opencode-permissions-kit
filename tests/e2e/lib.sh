@@ -18,6 +18,9 @@
 #                    run-ddev.sh suite; the image was setuid-guarded at
 #                    build time — DD0 re-asserts it on every boot).
 #   E2E_DEBUG        1 = keep the container on failure for inspection
+#   E2E_KEEP         1 = keep the container after ANY run (fast iteration:
+#                    exec manual retries inside it; the next run removes the
+#                    leftover itself, see e2e_start_container)
 #   E2E_OLD_VERSION  pinned old opencode for the upgrade test
 #                    (default: 1.18.15; only fetched if e2e_fetch_old is called)
 #
@@ -51,6 +54,7 @@ E2E_CMD="${E2E_CMD:-sleep infinity}"
 E2E_SYSTEMD="${E2E_SYSTEMD:-0}"
 E2E_SKIP_BUILD="${E2E_SKIP_BUILD:-0}"
 E2E_DEBUG="${E2E_DEBUG:-0}"
+E2E_KEEP="${E2E_KEEP:-0}"
 E2E_OLD_VERSION="${E2E_OLD_VERSION:-1.18.15}"
 E2E_HOST_LAYOUT="unknown"
 
@@ -305,6 +309,12 @@ e2e_start_container() {
 E() { docker exec -u dev "$E2E_CONTAINER" sh -c "$@"; }
 
 e2e_cleanup() {
+    if [ "${E2E_KEEP:-0}" = "1" ]; then
+        echo ""
+        echo "  ${YELLOW}E2E_KEEP=1: keeping container '$E2E_CONTAINER' (fast iteration)${NC}"
+        echo "    docker exec -it $E2E_CONTAINER bash   (removed automatically by the next run)"
+        return
+    fi
     if [ "$E2E_DEBUG" = "1" ] && [ "$failures" -gt 0 ]; then
         echo ""
         echo "  ${YELLOW}--debug: keeping container '$E2E_CONTAINER' for inspection${NC}"
