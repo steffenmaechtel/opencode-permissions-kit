@@ -291,6 +291,8 @@ e2e_start_container() {
 
     echo ""
     echo "--- Running E2E container ---"
+    # A leftover container from an aborted/debug run must not block the name.
+    docker rm -f "$E2E_CONTAINER" >/dev/null 2>&1 || true
     # shellcheck disable=SC2086  # E2E_RUN_ARGS / E2E_CMD are intentional word splits
     docker run -d --name "$E2E_CONTAINER" \
         -v "$REPO_DIR:/home/dev/repo" \
