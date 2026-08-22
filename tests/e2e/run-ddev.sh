@@ -28,7 +28,7 @@
 #   --fresh   rebuild the golden image (new ddev version, recipe bump, TTL)
 set -e
 
-E2E_DEBUG=0
+E2E_DEBUG="${E2E_DEBUG:-0}"
 FRESH=0
 for _arg in "$@"; do
     case "$_arg" in
