@@ -374,7 +374,9 @@ Consequence: **dev-owned mode × `create-project` are incompatible until
 a fix** (kit-side: document the temporary `config handover` workaround
 or special-case it; upstream: ddev could drop `-o/-g` when running as
 non-root on a foreign-owned root). DD14 asserts both sides as the
-regression pair.
+regression pair. Reference checkouts for follow-up analysis:
+`github/ddev` (tag v1.25.3), `github/composer` (tag 2.10.2) in this
+workspace.
 
 **DD14 checks:** dev-owned root → create-project must FAIL with exit 23
 (tripwire, Finding 2); after switching to handover mode (root
