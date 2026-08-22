@@ -13,7 +13,14 @@
 #   E2E_SYSTEMD      1 = systemd-as-PID1 container (rootless suite). e2e_start_container
 #                    then auto-detects the OUTER docker layout (rootful vs
 #                    rootless) and builds the cgroup args accordingly.
+#   E2E_SKIP_BUILD   1 = e2e_start_container runs the EXISTING E2E_IMAGE
+#                    without building (golden-image cache path of the
+#                    run-ddev.sh suite; the image was setuid-guarded at
+#                    build time — DD0 re-asserts it on every boot).
 #   E2E_DEBUG        1 = keep the container on failure for inspection
+#   E2E_KEEP         1 = keep the container after ANY run (fast iteration:
+#                    exec manual retries inside it; the next run removes the
+#                    leftover itself, see e2e_start_container)
 #   E2E_OLD_VERSION  pinned old opencode for the upgrade test
 #                    (default: 1.18.15; only fetched if e2e_fetch_old is called)
 #
@@ -45,7 +52,9 @@ E2E_DOCKERFILE="${E2E_DOCKERFILE:-Dockerfile}"
 E2E_RUN_ARGS="${E2E_RUN_ARGS:-}"
 E2E_CMD="${E2E_CMD:-sleep infinity}"
 E2E_SYSTEMD="${E2E_SYSTEMD:-0}"
+E2E_SKIP_BUILD="${E2E_SKIP_BUILD:-0}"
 E2E_DEBUG="${E2E_DEBUG:-0}"
+E2E_KEEP="${E2E_KEEP:-0}"
 E2E_OLD_VERSION="${E2E_OLD_VERSION:-1.18.15}"
 E2E_HOST_LAYOUT="unknown"
 
@@ -240,27 +249,29 @@ e2e_detect_host_layout() {
 }
 
 e2e_start_container() {
-    echo ""
-    echo "--- Building Docker image ($E2E_DOCKERFILE) ---"
-    docker build -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"
+    if [ "$E2E_SKIP_BUILD" != "1" ]; then
+        echo ""
+        echo "--- Building Docker image ($E2E_DOCKERFILE) ---"
+        docker build -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"
 
-    # Setuid guard: daemons that unpack images through the containerd
-    # snapshotter (the rootless docker the kit provisions does this by
-    # default) can strip setuid bits from image layers. sudo inside the
-    # e2e container then dies with "must be owned by uid 0 and have the
-    # setuid bit set" and EVERY sudo-based check fails with a misleading
-    # error. Detect it (sudo must keep its setuid bit) and rebuild with
-    # the classic builder, which preserves file modes — that is also why
-    # an agent session on the kit's own rootless daemon CAN run these
-    # suites: `DOCKER_BUILDKIT=0 make e2e` works, and this guard makes
-    # even a plain `make e2e` self-heal.
-    if ! docker run --rm --entrypoint sh "$E2E_IMAGE" -c 'test -u /usr/bin/sudo' >/dev/null 2>&1; then
-        echo "  ${YELLOW}NOTE${NC} this daemon's BuildKit unpack strips setuid bits (containerd snapshotter) —"
-        echo "  rebuilding with the classic builder (DOCKER_BUILDKIT=0) so sudo works in the container..."
-        if ! DOCKER_BUILDKIT=0 docker build -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"; then
-            echo "  ${RED}FAIL${NC} classic-builder rebuild failed (removed in this Docker version?)."
-            echo "  Run the suite on a daemon whose images keep setuid bits (e.g. the rootful system docker)."
-            exit 1
+        # Setuid guard: daemons that unpack images through the containerd
+        # snapshotter (the rootless docker the kit provisions does this by
+        # default) can strip setuid bits from image layers. sudo inside
+        # the e2e container then dies with "must be owned by uid 0 and have
+        # the setuid bit set" and EVERY sudo-based check fails with a
+        # misleading error. Detect it (sudo must keep its setuid bit) and
+        # rebuild with the classic builder, which preserves file modes —
+        # that is also why an agent session on the kit's own rootless
+        # daemon CAN run these suites: `DOCKER_BUILDKIT=0 make e2e` works,
+        # and this guard makes even a plain `make e2e` self-heal.
+        if ! docker run --rm --entrypoint sh "$E2E_IMAGE" -c 'test -u /usr/bin/sudo' >/dev/null 2>&1; then
+            echo "  ${YELLOW}NOTE${NC} this daemon's BuildKit unpack strips setuid bits (containerd snapshotter) —"
+            echo "  rebuilding with the classic builder (DOCKER_BUILDKIT=0) so sudo works in the container..."
+            if ! DOCKER_BUILDKIT=0 docker build -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"; then
+                echo "  ${RED}FAIL${NC} classic-builder rebuild failed (removed in this Docker version?)."
+                echo "  Run the suite on a daemon whose images keep setuid bits (e.g. the rootful system docker)."
+                exit 1
+            fi
         fi
     fi
 
@@ -284,6 +295,8 @@ e2e_start_container() {
 
     echo ""
     echo "--- Running E2E container ---"
+    # A leftover container from an aborted/debug run must not block the name.
+    docker rm -f "$E2E_CONTAINER" >/dev/null 2>&1 || true
     # shellcheck disable=SC2086  # E2E_RUN_ARGS / E2E_CMD are intentional word splits
     docker run -d --name "$E2E_CONTAINER" \
         -v "$REPO_DIR:/home/dev/repo" \
@@ -296,6 +309,12 @@ e2e_start_container() {
 E() { docker exec -u dev "$E2E_CONTAINER" sh -c "$@"; }
 
 e2e_cleanup() {
+    if [ "${E2E_KEEP:-0}" = "1" ]; then
+        echo ""
+        echo "  ${YELLOW}E2E_KEEP=1: keeping container '$E2E_CONTAINER' (fast iteration)${NC}"
+        echo "    docker exec -it $E2E_CONTAINER bash   (removed automatically by the next run)"
+        return
+    fi
     if [ "$E2E_DEBUG" = "1" ] && [ "$failures" -gt 0 ]; then
         echo ""
         echo "  ${YELLOW}--debug: keeping container '$E2E_CONTAINER' for inspection${NC}"
