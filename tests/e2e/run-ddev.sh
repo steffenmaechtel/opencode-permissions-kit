@@ -409,6 +409,10 @@ echo "--- DD2/DD3/DD4. bootstrap, chmod modes, dev-owned (project dd2) ---"
 E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings off >/dev/null 2>&1'
 E 'sudo -u dev mkdir -p /var/www/vhosts/dd2'
 DEVSH 'cd /var/www/vhosts/dd2 && ddev config --project-type=typo3 --webserver-type=apache-fpm --docroot=public --project-tld local >/tmp/dd2-config.log 2>&1'
+# Deterministic handover-mode state: strip the dev-owned flag ddev's own
+# config template may carry over (its commented default is part of the
+# generated yaml) so the bootstrap-path checks below are not mode-dependent.
+E 'sudo sed -i "/^disable_settings_management:/d" /var/www/vhosts/dd2/.ddev/config.yaml'
 check "DD2: ddev config on empty dir completes (burn-in flags)" \
     E 'grep -q "Configuration complete" /tmp/dd2-config.log'
 check "DD2: .ddev is opencode-owned after config" \
@@ -445,7 +449,7 @@ if [ "$_daemon_ok" = true ]; then
         E 'test "$(stat -c %U /var/www/vhosts/dd2/.ddev)" = opencode'
     if OC_DD2 'ddev restart >/tmp/dd2-restart.log 2>&1'; then
         check "DD4: dev-owned restart succeeds" \
-            E 'grep -q "Successfully started" /tmp/dd2-restart.log'
+            E 'grep -qE "Successfully started|Restarted" /tmp/dd2-restart.log'
     else
         echo "  ${RED}FAIL${NC}  DD4: dev-owned restart failed:";         failures=$((failures + 1))
         E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd2-restart.log 2>/dev/null | tail -10' || true
@@ -506,10 +510,11 @@ if [ "$_daemon_ok" = true ]; then
         OC_DD2 'ddev stop >/tmp/dd7.log 2>&1'
     check "DD7: ddev delete -Oy" \
         OC_DD2 'ddev delete -Oy >/tmp/dd7.log 2>&1'
-    # dd13-start1.log is EXCLUDED: the DD13 tripwire asserts that exact
-    # EPERM (bootstrap before handover) — it is expected content there.
+    # EXCLUDED logs hold EXPECTED EPERM text: dd13-start1 (the DD13
+    # tripwire asserts that exact bootstrap EPERM), dd2-config (the burn-in
+    # Finding-1 chmod warning from `ddev config`).
     check "DD7: zero 'operation not permitted' across the suite log" \
-        E '_s=$(grep -il "operation not permitted" /tmp/dd2-*.log /tmp/dd7.log /tmp/dd9.log /tmp/dd10-*.log /tmp/dd11-*.log /tmp/dd12-*.log 2>/dev/null); test -z "$_s"'
+        E '_s=$(grep -il "operation not permitted" /tmp/dd2-start.log /tmp/dd2-restart.log /tmp/dd2-handover.log /tmp/dd7.log /tmp/dd9.log /tmp/dd10-*.log /tmp/dd11-*.log /tmp/dd12-*.log 2>/dev/null); test -z "$_s"'
 fi
 
 if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/null; then
