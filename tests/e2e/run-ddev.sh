@@ -175,7 +175,7 @@ else
     E 'printf "{\"storage-driver\":\"fuse-overlayfs\"}\n" | sudo -u opencode tee /home/opencode/.config/docker/daemon.json >/dev/null'
 
     if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/setup-container-backend.sh docker-rootless --yes >/tmp/dd-setup.log 2>&1'; then
-        echo "  ${RED}FAIL${NC}  backend provisioning failed — /tmp/dd-setup.log:"
+        echo "  ${RED}FAIL${NC}  backend provisioning failed — /tmp/dd-setup.log:";         failures=$((failures + 1))
         E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-setup.log | tail -30' || true
         exit 1
     fi
@@ -184,14 +184,14 @@ else
         E "sudo test -S /run/user/$(dd_oc_uid)/docker.sock" 2>/dev/null && { _sock_ok=true; break; }
         sleep 1
     done
-    [ "$_sock_ok" = true ] || { echo "  ${RED}FAIL${NC}  inner rootless daemon socket never appeared"; exit 1; }
+    [ "$_sock_ok" = true ] || { echo "  ${RED}FAIL${NC}  inner rootless daemon socket never appeared"; failures=$((failures + 1)); exit 1; }
 
     # Real ddev from the host-side cache (bind-mounted read-only), then the
     # rootless router ports (§6 R7 — the documented rootless answer instead
     # of the host-wide sysctl). ddev instrumentation is opt-in: stays off.
     E 'sudo install -m 755 /opencode-cache/ddev-'"$DD_VER"'/ddev /usr/local/bin/ddev'
     dd_build_oc /tmp 'ddev config global --router-http-port 8080 --router-https-port 8443' \
-        || { echo "  ${RED}FAIL${NC}  ddev global config failed"; exit 1; }
+        || { echo "  ${RED}FAIL${NC}  ddev global config failed"; failures=$((failures + 1)); exit 1; }
 
     # Warm-up (§4.2.6): pull images + mutagen (+ camino master, §7.1).
     if [ "$SITE_TIER" = "camino" ] && [ -f "$SCRIPT_DIR/fixtures/camino/site/composer.json" ]; then
@@ -203,15 +203,15 @@ else
         # both run unimpeded.
         E 'sudo chown -R opencode:opencode /var/www/vhosts/dd-warmup'
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev start >/tmp/dd-warm.log 2>&1' \
-            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up ddev start failed"; exit 1; }
+            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up ddev start failed"; failures=$((failures + 1)); exit 1; }
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev composer install >/tmp/dd-warm.log 2>&1' \
-            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up composer install failed"; exit 1; }
+            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up composer install failed"; failures=$((failures + 1)); exit 1; }
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev import-db --src=/home/dev/repo/tests/e2e/fixtures/camino/db.sql.gz >/tmp/dd-warm.log 2>&1' \
-            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up db import failed"; exit 1; }
+            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up db import failed"; failures=$((failures + 1)); exit 1; }
         E 'curl --resolve dd-warmup.local:8080:127.0.0.1 -fsS http://dd-warmup.local:8080/camino/ -o /tmp/dd-warm-front.html' \
-            || { echo "  ${RED}FAIL${NC}  warm-up frontend not reachable"; E 'head -5 /tmp/dd-warm-front.html 2>/dev/null' || true; exit 1; }
+            || { echo "  ${RED}FAIL${NC}  warm-up frontend not reachable"; failures=$((failures + 1)); E 'head -5 /tmp/dd-warm-front.html 2>/dev/null' || true; exit 1; }
         E 'grep -qiE "camino|typo3|permission kit" /tmp/dd-warm-front.html' \
-            || { echo "  ${RED}FAIL${NC}  warm-up frontend has no marker content"; exit 1; }
+            || { echo "  ${RED}FAIL${NC}  warm-up frontend has no marker content"; failures=$((failures + 1)); exit 1; }
         # Pristine master WITH vendor/ (§7.1): per-run copies are page-cached
         # cp -a, no per-run composer install needed.
         E 'sudo mkdir -p /opt/e2e/fixtures && sudo cp -a /var/www/vhosts/dd-warmup /opt/e2e/fixtures/camino'
@@ -221,7 +221,7 @@ else
         echo "  warm-up: skeleton php project (image pulls + mutagen) ..."
         E 'sudo mkdir -p /var/www/vhosts/dd-warmup && sudo chown opencode:opencode /var/www/vhosts/dd-warmup'
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev config --project-type=php --docroot=public --auto >/dev/null 2>&1 && ddev start >/tmp/dd-warm.log 2>&1' \
-            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up ddev start failed"; exit 1; }
+            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up ddev start failed"; failures=$((failures + 1)); exit 1; }
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev delete -Oy >/dev/null 2>&1 || true'
     fi
 
@@ -307,10 +307,10 @@ check "DD0: sudo setuid bit intact" \
 echo ""
 echo "--- DD1. kit install on the warm image (upgrade-style) ---"
 E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSION"'/opencode' || {
-    E 'test -x /home/dev/.opencode/bin/opencode' || { echo "  ${RED}E2E aborted — cannot install opencode.${NC}"; exit 1; }
+    E 'test -x /home/dev/.opencode/bin/opencode' || { echo "  ${RED}E2E aborted — cannot install opencode.${NC}"; failures=$((failures + 1)); exit 1; }
 }
 if ! E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend docker-rootless --projects /var/www/vhosts --skip-ddev-migration >/tmp/dd-install.log 2>&1'; then
-    echo "  ${RED}FAIL${NC}  kit install failed:"
+    echo "  ${RED}FAIL${NC}  kit install failed:"; failures=$((failures + 1));     failures=$((failures + 1))
     E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-install.log | tail -30' || true
     exit 1
 fi
@@ -375,7 +375,7 @@ if [ "$_daemon_ok" = true ]; then
         check "DD4: dev-owned restart succeeds" \
             E 'grep -q "Successfully started" /tmp/dd2-restart.log'
     else
-        echo "  ${RED}FAIL${NC}  DD4: dev-owned restart failed:"
+        echo "  ${RED}FAIL${NC}  DD4: dev-owned restart failed:";         failures=$((failures + 1))
         E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd2-restart.log 2>/dev/null | tail -10' || true
         failures=$((failures + 1))
     fi
@@ -470,7 +470,7 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
                 check "DD11: developer-side restart through ddev() works while running" \
                     E 'grep -q "Successfully started" /tmp/dd11-restart.log'
             else
-                echo "  ${RED}FAIL${NC}  DD11: developer-side restart failed:"
+                echo "  ${RED}FAIL${NC}  DD11: developer-side restart failed:";                 failures=$((failures + 1))
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd11-restart.log 2>/dev/null | tail -10' || true
                 failures=$((failures + 1))
             fi
@@ -544,7 +544,7 @@ if [ "$SITE_TIER" = "camino" ]; then
                 check "DD12: ddev survives git's .ddev file replacement (restart)" \
                     E 'grep -q "Successfully started" /tmp/dd12-restart.log'
             else
-                echo "  ${RED}FAIL${NC}  DD12: restart after .ddev checkout failed:"
+                echo "  ${RED}FAIL${NC}  DD12: restart after .ddev checkout failed:";                 failures=$((failures + 1))
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd12-restart.log 2>/dev/null | tail -10' || true
                 failures=$((failures + 1))
             fi
@@ -597,7 +597,7 @@ if OC_CWD=/var/www/vhosts/dd13-proj OC 'ddev start >/tmp/dd13-start2.log 2>&1'; 
             check "DD14: composer.lock + vendor + public/index.php landed completely" \
                 E 'test -f /var/www/vhosts/dd13-proj/composer.lock && test -d /var/www/vhosts/dd13-proj/vendor && test -f /var/www/vhosts/dd13-proj/public/index.php'
         else
-            echo "  ${RED}FAIL${NC}  DD14: create-project failed (exit-23 investigation) — full tail:"
+            echo "  ${RED}FAIL${NC}  DD14: create-project failed (exit-23 investigation) — full tail:";             failures=$((failures + 1))
             E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd14.log | tail -25' || true
             failures=$((failures + 1))
         fi
