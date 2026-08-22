@@ -127,10 +127,13 @@ e2e_prepare_project
 
 # Helpers used by the cold-build path below (the kit is not installed yet,
 # so there is no ddev() hook — env is set explicitly, like the wrapper does).
+# Note: $1/$2 are expanded at construction time on purpose — the dev shell
+# must receive the FULL inner command (a literal $2 would expand empty there
+# and break the inner sh -c).
 dd_oc_uid() { E 'id -u opencode'; }
 dd_build_oc() {
     _ocu=$(dd_oc_uid)
-    E 'sudo -u opencode env HOME=/home/opencode XDG_RUNTIME_DIR=/run/user/'"$_ocu"' DOCKER_HOST=unix:///run/user/'"$_ocu"'/docker.sock DDEV_NO_INSTRUMENTATION=true sh -c "cd '"$1"' && $2"'
+    E 'sudo -u opencode env HOME=/home/opencode XDG_RUNTIME_DIR=/run/user/'"$_ocu"' DOCKER_HOST=unix:///run/user/'"$_ocu"'/docker.sock DDEV_NO_INSTRUMENTATION=true sh -c "cd '"$1"' && '"$2"'"'
 }
 
 if dd_golden_current; then
