@@ -240,10 +240,10 @@ else
     echo "  committing golden image $GOLDEN_IMAGE (ddev $DD_VER, format $GOLDEN_FORMAT, site: ${SITE_TIER:-none}) ..."
     docker stop -t 30 "$E2E_CONTAINER" >/dev/null
     docker commit \
-        --label "kit.e2e.ddev.version=$DD_VER" \
-        --label "kit.e2e.format=$GOLDEN_FORMAT" \
-        --label "kit.e2e.built=$(date +%s)" \
-        --label "kit.e2e.site=${SITE_TIER:-none}" \
+        --change 'LABEL kit.e2e.ddev.version='"$DD_VER" \
+        --change 'LABEL kit.e2e.format='"$GOLDEN_FORMAT" \
+        --change 'LABEL kit.e2e.built='"$(date +%s)" \
+        --change 'LABEL kit.e2e.site='"${SITE_TIER:-none}" \
         "$E2E_CONTAINER" "$GOLDEN_IMAGE" >/dev/null
     docker rm "$E2E_CONTAINER" >/dev/null
     echo "  golden size: $(docker image inspect -f '{{ .Size }}' "$GOLDEN_IMAGE" | awk '{printf "%.1f GB", $1/1024/1024/1024}')"
