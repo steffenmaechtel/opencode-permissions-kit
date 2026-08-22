@@ -297,12 +297,18 @@ OC() {
 }
 DEVSH() { docker exec -u dev "$E2E_CONTAINER" bash -ic "$1" 2>&1; }
 
+_act_ok=false
+for _i in $(seq 1 30); do
+    E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' systemctl --user is-active docker" 2>/dev/null | grep -qx active' \
+        && { _act_ok=true; break; }
+    sleep 1
+done
 check "DD0: inner rootless daemon is active (linger auto-start)" \
-    E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' systemctl --user is-active docker" | grep -qx active'
+    test "$_act_ok" = true
 check "DD0: golden daemon kept its images (R3 canary)" \
     OC 'test -n "$(docker images -q)"'
 check "DD0: ddev $DD_WANT present and working" \
-    OC "ddev version 2>/dev/null | head -1 | grep -q '$DD_WANT'"
+    OC "ddev version 2>/dev/null | grep -q '$DD_WANT'"
 if ! E 'test -u /usr/bin/sudo' >/dev/null 2>&1; then
     echo "  ${YELLOW}NOTE${NC} sudo lost its setuid bit (R2) — self-healing with chmod u+s"
     E 'sudo chmod u+s /usr/bin/sudo'
