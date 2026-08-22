@@ -226,7 +226,7 @@ else
             || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up ddev start failed"; failures=$((failures + 1)); exit 1; }
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev composer install >/tmp/dd-warm.log 2>&1' \
             || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up composer install failed"; failures=$((failures + 1)); exit 1; }
-        dd_build_oc /var/www/vhosts/dd-warmup 'ddev import-db --src=/home/dev/repo/tests/e2e/fixtures/camino/db.sql.gz >/tmp/dd-warm.log 2>&1' \
+        dd_build_oc /var/www/vhosts/dd-warmup 'ddev import-db --file=/home/dev/repo/tests/e2e/fixtures/camino/db.sql.gz >/tmp/dd-warm.log 2>&1' \
             || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up db import failed"; failures=$((failures + 1)); exit 1; }
         E 'curl --resolve dd-warmup.local:8080:127.0.0.1 -fsS http://dd-warmup.local:8080/camino/ -o /tmp/dd-warm-front.html' \
             || { echo "  ${RED}FAIL${NC}  warm-up frontend not reachable"; failures=$((failures + 1)); E 'head -5 /tmp/dd-warm-front.html 2>/dev/null' || true; exit 1; }
@@ -500,7 +500,7 @@ if [ "$_daemon_ok" = true ]; then
     echo ""
     echo "--- DD9. db round-trip (import/export) ---"
     E 'printf "CREATE TABLE dd9_mark (id INT);\n" | gzip > /tmp/dd9.sql.gz'
-    if OC_DD2 'ddev import-db --src=/tmp/dd9.sql.gz >/tmp/dd9.log 2>&1'; then
+    if OC_DD2 'ddev import-db --file=/tmp/dd9.sql.gz >/tmp/dd9.log 2>&1'; then
         check "DD9: export-db returns the imported mark" \
             OC_DD2 'ddev export-db -f=/tmp/dd9-out.sql.gz >/dev/null 2>&1 && zcat /tmp/dd9-out.sql.gz | grep -q dd9_mark'
     else
@@ -539,7 +539,7 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
                 E 'grep -q "Successfully started" /tmp/dd10-start.log'
             check "DD10: settings dir keeps g+w through start (dev-owned mode, #25)" \
                 E 'test "$(stat -c %a /var/www/vhosts/camino-e2e/config/system)" = "2775"'
-            OC_CAM 'ddev import-db --src=/home/dev/repo/tests/e2e/fixtures/camino/db.sql.gz >/tmp/dd10-imp.log 2>&1' \
+            OC_CAM 'ddev import-db --file=/home/dev/repo/tests/e2e/fixtures/camino/db.sql.gz >/tmp/dd10-imp.log 2>&1' \
                 || echo "  ${YELLOW}NOTE${NC}  DD10: db import failed — site may show the install tool"
             E 'curl --resolve camino-e2e.local:8080:127.0.0.1 -fsS http://camino-e2e.local:8080/camino/ -o /tmp/dd10-front.html'
             check "DD10: frontend answers 200 (first real 'site works' assert)" \
