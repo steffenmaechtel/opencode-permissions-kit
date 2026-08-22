@@ -57,6 +57,16 @@ GOLDEN_FORMAT=1
 GOLDEN_TTL_DAYS="${E2E_DDEV_TTL:-14}"
 SITE_TIER="${E2E_DDEV_SITE:-}"           # camino | (empty)
 
+# Inner-daemon storage lives on a named OUTER-daemon volume, NOT in the
+# container filesystem: `docker commit` drops character-device nodes, and an
+# overlayfs/fuse store is full of them (the whiteouts representing file
+# deletions in image layers). Committing the store corrupted every cached
+# image ("deleted" files like /etc/mysql/mariadb.cnf reappeared, mysqld died
+# on an inaccessible socket) — verified 2026-08-22. Volumes are excluded
+# from commit but persist across runs: warm boots reuse the intact store.
+DD_VOLUME="opencode-e2e-ddev-dockerdata"
+E2E_RUN_ARGS="--mount source=$DD_VOLUME,target=/home/opencode/.local/share/docker"
+
 echo ""
 echo "${CYAN}========================================================${NC}"
 echo "${CYAN}   opencode permissions kit — real-ddev E2E (golden)${NC}"
@@ -144,6 +154,8 @@ else
     [ "$FRESH" = "1" ] && _why="--fresh"
     echo ""
     echo "  ${YELLOW}golden image rebuild${NC} ($_why): provisioning daemon + ddev + images once (§4.2)..."
+    # Fresh store: the dockerdata volume holds the old daemon's images.
+    docker volume rm -f "$DD_VOLUME" >/dev/null 2>&1 || true
     E2E_IMAGE="$BASE_IMAGE"
     E2E_SKIP_BUILD=0
     e2e_start_container
@@ -165,6 +177,9 @@ else
     # is NOT installed into the golden image (§4.1) — only its provisioning
     # helper runs, so every cached run installs the kit fresh (DD1).
     E 'id opencode >/dev/null 2>&1 || sudo useradd -m -s /bin/bash opencode'
+    # The dockerdata volume mountpoint is root-owned when fresh — the inner
+    # rootless daemon (running as opencode) must own its data-root.
+    E 'sudo mkdir -p /home/opencode/.local/share/docker && sudo chown opencode:opencode /home/opencode/.local/share/docker'
     # Deterministic subuid seed (nested-userns constraint): the e2e
     # container's own uid_map covers only uids 1..65536, so the kit default
     # (100000+) would be unmappable when the OUTER daemon is rootless; the
@@ -307,6 +322,11 @@ check "DD0: inner rootless daemon is active (linger auto-start)" \
     test "$_act_ok" = true
 check "DD0: golden daemon kept its images (R3 canary)" \
     OC 'test -n "$(docker images -q)"'
+# Whiteout canary (2026-08-22 corruption): a healthy overlay store contains
+# thousands of character devices; zero means layer deletions are void and
+# every cached image is damaged (see DD_VOLUME rationale above).
+check "DD0: inner image store intact (whiteouts present)" \
+    E 'test "$(sudo find /home/opencode/.local/share/docker -type c 2>/dev/null | wc -l)" -gt 0'
 check "DD0: ddev $DD_WANT present and working" \
     OC "ddev version 2>/dev/null | grep -q '$DD_WANT'"
 if ! E 'test -u /usr/bin/sudo' >/dev/null 2>&1; then
