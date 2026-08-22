@@ -246,12 +246,11 @@ else
     fi
 
     # Quiesce + export + commit (§4.2.8-9): prune leftover containers
-    # (images stay), stop the inner daemon, export its images to the
-    # host-side tarball cache, DELETE the store from the container
-    # filesystem (golden-image v2: committing the store corrupts it — see
-    # DD_IMG_TAR rationale), then snapshot the stopped container.
+    # (images stay), export the images to the host-side tarball cache WHILE
+    # THE DAEMON STILL RUNS, stop the daemon, DELETE the store from the
+    # container filesystem (golden-image v2: committing the store corrupts
+    # it — see DD_IMG_TAR rationale), then snapshot the stopped container.
     dd_build_oc /tmp 'docker system prune -f >/dev/null 2>&1 || true'
-    dd_build_oc /tmp 'systemctl --user stop docker.service' || true
     echo ""
     echo "  exporting inner images to $DD_IMG_TAR ..."
     _ocu=$(dd_oc_uid)
@@ -263,6 +262,7 @@ else
         DOCKER_HOST="unix:///run/user/$_ocu/docker.sock" \
         docker save $_imgs > "$DD_IMG_TAR" \
         || { echo "  ${RED}FAIL${NC}  docker save failed"; failures=$((failures + 1)); exit 1; }
+    dd_build_oc /tmp 'systemctl --user stop docker.service' || true
     E 'sudo rm -rf /home/opencode/.local/share/docker'
     echo "  committing golden image $GOLDEN_IMAGE (ddev $DD_VER, format $GOLDEN_FORMAT, site: ${SITE_TIER:-none}) ..."
     docker stop -t 30 "$E2E_CONTAINER" >/dev/null
