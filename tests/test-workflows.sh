@@ -1,6 +1,6 @@
 #!/bin/sh
 # Unit tests for CI workflow consistency (AGENTS.md rule: every executable
-# goes into the chmod +x list of BOTH workflow files):
+# goes into the chmod +x list of ALL workflow files that run it):
 #   1. every ./path a workflow chmods must exist in the repo (renames and
 #      typos otherwise fail silently — CI chmods a ghost and loses the bit)
 #   2. every executable CI needs (unit tests, e2e scripts, check-host,
@@ -19,6 +19,7 @@ NC='\033[0m'
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 WF_TEST="$REPO/.github/workflows/test.yml"
 WF_E2E="$REPO/.github/workflows/e2e.yml"
+WF_DDEV_E2E="$REPO/.github/workflows/e2e-ddev.yml"
 
 failures=0
 passed=0
@@ -41,7 +42,7 @@ trap 'rm -f "$TMP_TOKENS"' EXIT INT TERM
 
 # --- 1. every chmodded path exists ------------------------------------------
 
-for wf in "$WF_TEST" "$WF_E2E"; do
+for wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
     name="${wf##*/}"
     chmod_tokens "$wf" > "$TMP_TOKENS"
     ghosts=""
@@ -82,7 +83,7 @@ for f in $(find "$REPO/files" -type f | sort); do
     required="$required ./${f#"$REPO"/}"
 done
 
-for wf in "$WF_TEST" "$WF_E2E"; do
+for wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
     name="${wf##*/}"
     chmod_tokens "$wf" > "$TMP_TOKENS"
     missing=""

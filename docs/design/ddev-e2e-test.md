@@ -395,11 +395,13 @@ bare-origin flow (DD12).
   `e2e-ddev-fresh` (`--fresh`), help entries. NOT added to `e2e-all` —
   `e2e-all` stays the merge gate; e2e-ddev downloads GBs and must not gate
   every PR.
-- **CI (phase 3, after local burn-in):** new `.github/workflows/ddev-e2e.yml`
-  — weekly `schedule` + `workflow_dispatch` (+ optional `DDEV_VERSION`
-  input); no image caching between runs (R6). AGENTS.md rule applies: the
-  new executable goes into the chmod lists of BOTH workflow files, and
-  `tests/test-workflows.sh` must learn the new workflow file.
+- **CI (phase 3):** `.github/workflows/e2e-ddev.yml` — live since
+  2026-08-22 as **manual-only** (`workflow_dispatch` with `site_tier` and
+  `ddev_version` inputs; the maintainer validates runner runtime first).
+  Weekly `schedule` is the planned follow-up once duration is known; no
+  image caching between runs (R6). The chmod-list rule now covers all
+  THREE workflow files (`tests/test-workflows.sh` enforces it, including
+  the runner `tests/e2e/run-ddev.sh`).
 - **Docs:** this record + a MANUAL.md "troubleshooting with e2e-ddev" note +
   README testing mention in the same PR as the runner (repo rule: docs move
   with code).
