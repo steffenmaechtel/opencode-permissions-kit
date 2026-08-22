@@ -57,16 +57,6 @@ GOLDEN_FORMAT=1
 GOLDEN_TTL_DAYS="${E2E_DDEV_TTL:-14}"
 SITE_TIER="${E2E_DDEV_SITE:-}"           # camino | (empty)
 
-# Inner-daemon storage lives on a named OUTER-daemon volume, NOT in the
-# container filesystem: `docker commit` drops character-device nodes, and an
-# overlayfs/fuse store is full of them (the whiteouts representing file
-# deletions in image layers). Committing the store corrupted every cached
-# image ("deleted" files like /etc/mysql/mariadb.cnf reappeared, mysqld died
-# on an inaccessible socket) — verified 2026-08-22. Volumes are excluded
-# from commit but persist across runs: warm boots reuse the intact store.
-DD_VOLUME="opencode-e2e-ddev-dockerdata"
-E2E_RUN_ARGS="--mount source=$DD_VOLUME,target=/home/opencode/.local/share/docker"
-
 echo ""
 echo "${CYAN}========================================================${NC}"
 echo "${CYAN}   opencode permissions kit — real-ddev E2E (golden)${NC}"
@@ -113,6 +103,19 @@ fi
 [ -s "$DD_BIN" ] || { echo "  ${RED}FAIL${NC}  cached ddev binary is empty"; exit 1; }
 echo "  Using ddev $DD_WANT (cache: $DD_BIN)"
 
+# Golden-image v2 (2026-08-22 pivot): the golden image contains NO inner
+# docker store. Baking the store into a `docker commit` corrupted every
+# cached image — commit is not a faithful copy for overlay whiteouts
+# ("deleted" files like /etc/mysql/mariadb.cnf reappeared; every project db
+# died on an inaccessible unix socket), and a named-volume store corrupted
+# the same way through the nested storage stack. Instead the IMAGES are
+# cached host-side as a docker-save tarball (ext4, gitignored, next to the
+# opencode binaries) and `docker load`-ed into a FRESH inner store on every
+# warm start — the exact write path that produced working images in the
+# cold build. System state (packages, ddev, composer/fixture data,
+# /home/opencode/.ddev) stays in the golden commit (regular files only).
+DD_IMG_TAR="$SCRIPT_DIR/cache/ddev-images-$DD_VER-f$GOLDEN_FORMAT.tar"
+
 dd_label() {
     docker image inspect -f "{{ index .Config.Labels \"$1\" }}" "$GOLDEN_IMAGE" 2>/dev/null || true
 }
@@ -120,6 +123,7 @@ dd_label() {
 dd_golden_current() {
     [ "$FRESH" = "0" ] || return 1
     docker image inspect "$GOLDEN_IMAGE" >/dev/null 2>&1 || return 1
+    [ -f "$DD_IMG_TAR" ] || return 1
     [ "$(dd_label kit.e2e.ddev.version)" = "$DD_VER" ] || return 1
     [ "$(dd_label kit.e2e.format)" = "$GOLDEN_FORMAT" ] || return 1
     [ "$(dd_label kit.e2e.site)" = "${SITE_TIER:-none}" ] || return 1
@@ -154,8 +158,6 @@ else
     [ "$FRESH" = "1" ] && _why="--fresh"
     echo ""
     echo "  ${YELLOW}golden image rebuild${NC} ($_why): provisioning daemon + ddev + images once (§4.2)..."
-    # Fresh store: the dockerdata volume holds the old daemon's images.
-    docker volume rm -f "$DD_VOLUME" >/dev/null 2>&1 || true
     E2E_IMAGE="$BASE_IMAGE"
     E2E_SKIP_BUILD=0
     e2e_start_container
@@ -177,9 +179,6 @@ else
     # is NOT installed into the golden image (§4.1) — only its provisioning
     # helper runs, so every cached run installs the kit fresh (DD1).
     E 'id opencode >/dev/null 2>&1 || sudo useradd -m -s /bin/bash opencode'
-    # The dockerdata volume mountpoint is root-owned when fresh — the inner
-    # rootless daemon (running as opencode) must own its data-root.
-    E 'sudo mkdir -p /home/opencode/.local/share/docker && sudo chown opencode:opencode /home/opencode/.local/share/docker'
     # Deterministic subuid seed (nested-userns constraint): the e2e
     # container's own uid_map covers only uids 1..65536, so the kit default
     # (100000+) would be unmappable when the OUTER daemon is rootless; the
@@ -246,12 +245,25 @@ else
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev delete -Oy >/dev/null 2>&1 || true'
     fi
 
-    # Quiesce + commit (§4.2.8-9): stop the inner daemon so the committed
-    # storage is consistent, prune leftover containers (images stay), then
-    # snapshot the stopped container.
+    # Quiesce + export + commit (§4.2.8-9): prune leftover containers
+    # (images stay), stop the inner daemon, export its images to the
+    # host-side tarball cache, DELETE the store from the container
+    # filesystem (golden-image v2: committing the store corrupts it — see
+    # DD_IMG_TAR rationale), then snapshot the stopped container.
     dd_build_oc /tmp 'docker system prune -f >/dev/null 2>&1 || true'
     dd_build_oc /tmp 'systemctl --user stop docker.service' || true
     echo ""
+    echo "  exporting inner images to $DD_IMG_TAR ..."
+    _ocu=$(dd_oc_uid)
+    _imgs=$(E 'sudo -u opencode env HOME=/home/opencode XDG_RUNTIME_DIR=/run/user/'"$_ocu"' DOCKER_HOST=unix:///run/user/'"$_ocu"'/docker.sock docker images --format "{{.Repository}}:{{.Tag}}" | grep -v "<none>"')
+    [ -n "$_imgs" ] || { echo "  ${RED}FAIL${NC}  no inner images to export"; failures=$((failures + 1)); exit 1; }
+    # shellcheck disable=SC2086  # word splitting is the image list
+    docker exec -u dev "$E2E_CONTAINER" \
+        sudo -u opencode env HOME=/home/opencode XDG_RUNTIME_DIR="/run/user/$_ocu" \
+        DOCKER_HOST="unix:///run/user/$_ocu/docker.sock" \
+        docker save $_imgs > "$DD_IMG_TAR" \
+        || { echo "  ${RED}FAIL${NC}  docker save failed"; failures=$((failures + 1)); exit 1; }
+    E 'sudo rm -rf /home/opencode/.local/share/docker'
     echo "  committing golden image $GOLDEN_IMAGE (ddev $DD_VER, format $GOLDEN_FORMAT, site: ${SITE_TIER:-none}) ..."
     docker stop -t 30 "$E2E_CONTAINER" >/dev/null
     docker commit \
@@ -320,13 +332,33 @@ for _i in $(seq 1 30); do
 done
 check "DD0: inner rootless daemon is active (linger auto-start)" \
     test "$_act_ok" = true
-check "DD0: golden daemon kept its images (R3 canary)" \
+
+# Warm start (§4.3): the golden image ships NO image store — restore the
+# cached images from the host-side docker-save tarball into the fresh inner
+# store (same unpack path the cold build used; ~1-3 min from local disk).
+if [ ! -f "$DD_IMG_TAR" ]; then
+    echo "  ${RED}FAIL${NC}  image tarball missing: $DD_IMG_TAR (rebuild with --fresh)"
+    failures=$((failures + 1))
+    e2e_finish
+    exit $?
+fi
+echo "  loading cached ddev images ($(du -h "$DD_IMG_TAR" | cut -f1)) ..."
+if ! docker exec -i -u dev "$E2E_CONTAINER" \
+        sudo -u opencode env HOME=/home/opencode \
+        XDG_RUNTIME_DIR="/run/user/$OC_UID" DOCKER_HOST="$SOCK" \
+        docker load < "$DD_IMG_TAR" >/tmp/dd-load.log 2>&1; then
+    echo "  ${RED}FAIL${NC}  docker load failed:"; failures=$((failures + 1))
+    docker exec -u dev "$E2E_CONTAINER" sh -c 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-load.log | tail -10' || true
+    exit 1
+fi
+check "DD0: cached images restored (R3 canary)" \
     OC 'test -n "$(docker images -q)"'
-# Whiteout canary (2026-08-22 corruption): a healthy overlay store contains
-# thousands of character devices; zero means layer deletions are void and
-# every cached image is damaged (see DD_VOLUME rationale above).
-check "DD0: inner image store intact (whiteouts present)" \
-    E 'test "$(sudo find /home/opencode/.local/share/docker -type c 2>/dev/null | wc -l)" -gt 0'
+# Image-integrity canary (2026-08-22 corruption class): the ddev db image
+# DELETES /etc/mysql/mariadb.cnf in an upper layer; if that deletion is
+# void, mariadbd reads the Debian socket config (/run/mysqld, mysql:999)
+# and every project db dies with "Bind on unix socket: Permission denied".
+check "DD0: db base image intact (mariadb.cnf ghost absent)" \
+    OC 'docker run --rm --entrypoint sh ddev/ddev-dbserver-mariadb-11.8:v'"$DD_VER"' -c "test ! -e /etc/mysql/mariadb.cnf"'
 check "DD0: ddev $DD_WANT present and working" \
     OC "ddev version 2>/dev/null | grep -q '$DD_WANT'"
 if ! E 'test -u /usr/bin/sudo' >/dev/null 2>&1; then
@@ -342,7 +374,7 @@ E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSI
     E 'test -x /home/dev/.opencode/bin/opencode' || { echo "  ${RED}E2E aborted — cannot install opencode.${NC}"; failures=$((failures + 1)); exit 1; }
 }
 if ! E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend docker-rootless --projects /var/www/vhosts --skip-ddev-migration >/tmp/dd-install.log 2>&1'; then
-    echo "  ${RED}FAIL${NC}  kit install failed:"; failures=$((failures + 1));     failures=$((failures + 1))
+    echo "  ${RED}FAIL${NC}  kit install failed:"; failures=$((failures + 1))
     E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-install.log | tail -30' || true
     exit 1
 fi
