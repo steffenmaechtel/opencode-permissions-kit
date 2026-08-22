@@ -362,18 +362,24 @@ lands, then flipped):
 **Finding 2 — `ddev composer create-project` exits 23 ("Moving install
 to Composer root", partial result):** files landed (composer.json,
 packages/, …) but the move was incomplete and the command errored;
-recovery via `ddev composer req`/`install` worked. Cause not yet
-diagnosed (suspect: the move into the handed-over bootstrap root with
-pre-existing opencode-owned `public/` / `.vscode`). Exactly the class
-only a real-ddev suite can catch.
+recovery via `ddev composer req`/`install` worked. **Root cause
+diagnosed (2026-08-22, in-suite):** the move is an `rsync -rltgopD`
+inside the web container (`cmd/ddev/cmd/composer-create-project.go`);
+`-o/-g` chowns the composer root, which only succeeds when the ddev user
+OWNS it. In dev-owned mode (kit default) the root belongs to the
+developer, so as opencode rsync dies with `chown "/var/www/html/."
+failed: Operation not permitted` → exit 23 — the exact burn-in symptom.
+With an opencode-owned (handover-mode) root create-project succeeds.
+Consequence: **dev-owned mode × `create-project` are incompatible until
+a fix** (kit-side: document the temporary `config handover` workaround
+or special-case it; upstream: ddev could drop `-o/-g` when running as
+non-root on a foreign-owned root). DD14 asserts both sides as the
+regression pair.
 
-**DD14 checks:** on the DD13 project after handover, `ddev composer
-create-project typo3/cms-base-distribution:^14` exits 0, moves ALL
-expected files (composer.lock, public/ contents), and the tree stays
-handover-consistent. Failure output is dumped verbatim (exit-23
-diagnosis needs the real ddev log). The burn-in's unrelated GitHub-dist
-504s (`api.github.com … zipball … 504`) justify the §4.1 warm composer
-cache + a suite-level retry: never let a CDN blip fail a ddev-flow run.
+**DD14 checks:** dev-owned root → create-project must FAIL with exit 23
+(tripwire, Finding 2); after switching to handover mode (root
+opencode-owned) create-project must exit 0 and land composer.lock +
+public/index.php completely.
 
 **Validated as working (no new checks needed beyond existing DD rows):**
 the pre-start hint + handover + green start flow (DD2/DD4), hosts-hint +
@@ -448,3 +454,8 @@ copy/import/boot), `--fresh` = first-build cost again.
 - DD14's exit-23 cause is undiagnosed — investigate during phase 1
   burn-in (may be a ddev bug worth reporting upstream, in which case the
   check pins ddev's behavior with a version note instead of ours).
+  **Resolved (2026-08-22):** rsync `-o/-g` chown on the dev-owned
+  composer root — dev-owned × create-project incompatible until fixed;
+  DD14 asserts the pair (fail in dev-owned, succeed in handover).
+  Remaining decision: kit-side workaround (hint/`config handover`
+  detour) vs. upstream report — tracked as the Finding-2 issue.

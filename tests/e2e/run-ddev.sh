@@ -671,12 +671,26 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
     echo ""
     echo "--- DD14. ddev composer create-project (exit-23 burn-in finding) ---"
     if [ "${E2E_DDEV_SKIP_CREATE:-0}" != "1" ]; then
+        # Root cause (diagnosed 2026-08-22): create-project moves the created
+        # project with `rsync -rltgopD` — `-o/-g` chowns the composer root,
+        # which only works when the ddev user OWNS it. In dev-owned mode the
+        # root belongs to dev, so as opencode rsync dies with
+        # "chown \"/var/www/html/.\" failed: Operation not permitted" (23).
+        # Handover mode (root opencode-owned) works. Both sides asserted.
+        check_fail "DD14: TRIPWIRE create-project fails in dev-owned mode (rsync chown EPERM — Finding 2)" \
+            OC_DD13 'ddev composer create-project "typo3/cms-base-distribution:^14" >/tmp/dd14-devowned.log 2>&1'
+        OC_DD13 'ddev exec rm -rf /tmp/cp-* >/dev/null 2>&1' || true
+        E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings off >/dev/null 2>&1'
+        E 'sudo sed -i "/^disable_settings_management:/d" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
+        E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd13-proj >/dev/null 2>&1'
+        check "DD14: handover mode: root handed to opencode (create-project precondition)" \
+            E 'test "$(stat -c %U /var/www/vhosts/dd13-proj)" = opencode'
         if OC_DD13 'ddev composer create-project "typo3/cms-base-distribution:^14" >/tmp/dd14.log 2>&1'; then
-            check "DD14: create-project exits 0" true
+            check "DD14: handover mode: create-project exits 0" true
             check "DD14: composer.lock + vendor + public/index.php landed completely" \
-                E 'test -f /var/www/vhosts/dd13-proj/composer.lock && test -d /var/www/vhosts/dd13-proj/vendor && test -f /var/www/vhosts/dd13-proj/public/index.php'
+                E 'test -f /var/www/vhosts/dd13-proj/composer.lock && test -f /var/www/vhosts/dd13-proj/public/index.php'
         else
-            echo "  ${RED}FAIL${NC}  DD14: create-project failed (exit-23 investigation) — full tail:";             failures=$((failures + 1))
+            echo "  ${RED}FAIL${NC}  DD14: create-project failed even with opencode-owned root — full tail:"
             E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd14.log | tail -25' || true
             failures=$((failures + 1))
         fi
