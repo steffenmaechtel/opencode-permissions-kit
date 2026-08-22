@@ -165,8 +165,14 @@ else
     # is NOT installed into the golden image (§4.1) — only its provisioning
     # helper runs, so every cached run installs the kit fresh (DD1).
     E 'id opencode >/dev/null 2>&1 || sudo useradd -m -s /bin/bash opencode'
-    # Deterministic subuid seed: in-range for a nested-userns (rootless
-    # outer daemon) container, harmless on rootful. The provisioning helper
+    # Deterministic subuid seed (nested-userns constraint): the e2e
+    # container's own uid_map covers only uids 1..65536, so the kit default
+    # (100000+) would be unmappable when the OUTER daemon is rootless; the
+    # seeded window fits. It cannot be enlarged to cover uid 65534 (nobody):
+    # 65535 consecutive slots under 65536 inevitably collide with the daemon
+    # user's own uid in the map. nginx-fpm chowns to exactly that uid, so
+    # EVERY project in this suite must use apache-fpm (www-data = 33, well
+    # inside the window) — like the camino fixture. The provisioning helper
     # KEEPS an existing entry, so this pins the range on every layout.
     E 'sudo sh -c "printf \"opencode:4096:60000\n\" > /etc/subuid; printf \"opencode:4096:60000\n\" > /etc/subgid"'
     # fuse-overlayfs pin — kernel overlay2 cannot stack on the container's
@@ -220,7 +226,7 @@ else
         echo ""
         echo "  warm-up: skeleton php project (image pulls + mutagen) ..."
         E 'sudo mkdir -p /var/www/vhosts/dd-warmup && sudo chown opencode:opencode /var/www/vhosts/dd-warmup'
-        dd_build_oc /var/www/vhosts/dd-warmup 'ddev config --project-type=php --docroot=public --auto >/dev/null 2>&1 && ddev start >/tmp/dd-warm.log 2>&1' \
+        dd_build_oc /var/www/vhosts/dd-warmup 'ddev config --project-type=php --webserver-type=apache-fpm --docroot=public --auto >/dev/null 2>&1 && ddev start >/tmp/dd-warm.log 2>&1' \
             || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up ddev start failed"; failures=$((failures + 1)); exit 1; }
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev delete -Oy >/dev/null 2>&1 || true'
     fi
@@ -336,7 +342,7 @@ echo "--- DD2/DD3/DD4. bootstrap, chmod modes, dev-owned (project dd2) ---"
 # dev-owned default — both against one fresh typo3 bootstrap project.
 E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings off >/dev/null 2>&1'
 E 'sudo -u dev mkdir -p /var/www/vhosts/dd2'
-DEVSH 'cd /var/www/vhosts/dd2 && ddev config --project-type=typo3 --docroot=public --project-tld local >/tmp/dd2-config.log 2>&1'
+DEVSH 'cd /var/www/vhosts/dd2 && ddev config --project-type=typo3 --webserver-type=apache-fpm --docroot=public --project-tld local >/tmp/dd2-config.log 2>&1'
 check "DD2: ddev config on empty dir completes (burn-in flags)" \
     E 'grep -q "Configuration complete" /tmp/dd2-config.log'
 check "DD2: .ddev is opencode-owned after config" \
