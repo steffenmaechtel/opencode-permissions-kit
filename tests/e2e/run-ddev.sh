@@ -558,7 +558,7 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
             echo "--- DD11. two-owner reality on the live site ---"
             if DEVSH 'cd /var/www/vhosts/camino-e2e && ddev restart >/tmp/dd11-restart.log 2>&1'; then
                 check "DD11: developer-side restart through ddev() works while running" \
-                    E 'grep -q "Successfully started" /tmp/dd11-restart.log'
+                    E 'grep -qE "Successfully started|Restarted" /tmp/dd11-restart.log'
             else
                 echo "  ${RED}FAIL${NC}  DD11: developer-side restart failed:";                 failures=$((failures + 1))
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd11-restart.log 2>/dev/null | tail -10' || true
@@ -613,9 +613,15 @@ if [ "$SITE_TIER" = "camino" ]; then
         # Recover the possibly half-switched tree before the next section.
         DEVSH 'cd /var/www/vhosts/dd12-proj && git checkout -q -f main && git clean -qfd' || true
 
-        # (c) back to dev-owned: the same switch now succeeds.
+        # (c) back to dev-owned: the same switch now succeeds. The tripwire's
+        # sed-delete + the handover's re-append leave the TRACKED
+        # .ddev/config.yaml dirty (position differs from the committed flag
+        # line) — restore the committed state (the fixture commits the flag,
+        # i.e. exactly what dev-owned mode wants) so switch assertions and
+        # config.yaml-touching branches stay clean.
         E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings on >/dev/null 2>&1'
         E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd12-proj >/dev/null 2>&1'
+        E 'git -C /var/www/vhosts/dd12-proj checkout -q -- .'
         check "DD12: after dev-owned handover the same switch succeeds" \
             DEVSH 'cd /var/www/vhosts/dd12-proj && git checkout -q feature/top-level && test ! -f LICENSE && git checkout -q main && test -z "$(git status --porcelain)"'
 
@@ -632,7 +638,7 @@ if [ "$SITE_TIER" = "camino" ]; then
                 test "$_dd12_sw" = 0
             if DEVSH 'cd /var/www/vhosts/dd12-proj && ddev restart >/tmp/dd12-restart.log 2>&1'; then
                 check "DD12: ddev survives git's .ddev file replacement (restart)" \
-                    E 'grep -q "Successfully started" /tmp/dd12-restart.log'
+                    E 'grep -qE "Successfully started|Restarted" /tmp/dd12-restart.log'
             else
                 echo "  ${RED}FAIL${NC}  DD12: restart after .ddev checkout failed:";                 failures=$((failures + 1))
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd12-restart.log 2>/dev/null | tail -10' || true
