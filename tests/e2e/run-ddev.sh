@@ -322,6 +322,14 @@ OC() {
         env HOME=/home/opencode XDG_RUNTIME_DIR="/run/user/$OC_UID" \
         DOCKER_HOST="$SOCK" DDEV_NO_INSTRUMENTATION=true sh -c "cd ${OC_CWD:-/tmp} && $1"
 }
+# Project-scoped wrappers: `OC_CWD=x OC ...` is only parsed as an env
+# assignment when written LITERALLY — passed through check()'s "$@" the
+# word becomes a command ("OC_CWD=...: not found" in dash). The wrappers
+# put the assignment in their own body, safe everywhere.
+OC_DD2()   { OC_CWD=/var/www/vhosts/dd2        OC "$1"; }
+OC_DD13()  { OC_CWD=/var/www/vhosts/dd13-proj  OC "$1"; }
+OC_CAM()   { OC_CWD=/var/www/vhosts/camino-e2e OC "$1"; }
+OC_DD12()  { OC_CWD=/var/www/vhosts/dd12-proj  OC "$1"; }
 DEVSH() { docker exec -u dev "$E2E_CONTAINER" bash -ic "$1" 2>&1; }
 
 _act_ok=false
@@ -408,7 +416,7 @@ check "DD2: .ddev is opencode-owned after config" \
 E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd2 >/tmp/dd2-handover.log 2>&1'
 check "DD2: handover mode: bootstrap root inode handed to opencode 2755" \
     E 'test "$(stat -c %U:%a /var/www/vhosts/dd2)" = "opencode:2755"'
-if OC_CWD=/var/www/vhosts/dd2 OC 'ddev start >/tmp/dd2-start.log 2>&1'; then
+if OC_DD2 'ddev start >/tmp/dd2-start.log 2>&1'; then
     check "DD2: agent-side start completes (real ddev, no EPERM)" \
         E 'grep -q "Successfully started" /tmp/dd2-start.log'
     check "DD3: ddev chmod'd the bootstrap root to 0755 (issue #25 mechanics)" \
@@ -435,7 +443,7 @@ if [ "$_daemon_ok" = true ]; then
         E 'test "$(stat -c %U:%a /var/www/vhosts/dd2)" = "dev:2775"'
     check "DD4: .ddev stays opencode-owned" \
         E 'test "$(stat -c %U /var/www/vhosts/dd2/.ddev)" = opencode'
-    if OC_CWD=/var/www/vhosts/dd2 OC 'ddev restart >/tmp/dd2-restart.log 2>&1'; then
+    if OC_DD2 'ddev restart >/tmp/dd2-restart.log 2>&1'; then
         check "DD4: dev-owned restart succeeds" \
             E 'grep -q "Successfully started" /tmp/dd2-restart.log'
     else
@@ -453,26 +461,26 @@ if [ "$_daemon_ok" = true ]; then
     check "DD5: export -f lands the function in nested bash -c (issue #18)" \
         DEVSH 'bash -c "type ddev | grep -q function"'
     check "DD5: ddev via dev function runs the REAL ddev (version)" \
-        DEVSH 'cd /var/www/vhosts/dd2 && ddev version 2>/dev/null | head -1 | grep -q ddev'
+        DEVSH 'cd /var/www/vhosts/dd2 && ddev version 2>/dev/null | grep -q ddev'
     check "DD5: ddev processes run as opencode (pgrep uid — issue #18 root cause)" \
         DEVSH 'cd /var/www/vhosts/dd2 && (ddev exec sleep 6 >/dev/null 2>&1 &) && sleep 2 && pgrep -x ddev -u opencode >/dev/null'
 
     echo ""
     echo "--- DD6. container identity with real ddev containers ---"
     check "DD6: ddev exec works (agent side)" \
-        OC_CWD=/var/www/vhosts/dd2 OC 'ddev exec true'
+        OC_DD2 'ddev exec true'
     _dd6_uidmap() {
-        OC_CWD=/var/www/vhosts/dd2 OC 'ddev exec cat /proc/self/uid_map' 2>/dev/null \
+        OC_DD2 'ddev exec cat /proc/self/uid_map' 2>/dev/null \
             | grep -qE "0[[:space:]]+${OC_UID}[[:space:]]"
     }
     check "DD6: web container userns maps root to the opencode host UID (§9.1)" \
         _dd6_uidmap
     check "DD6: container reads the settings file via bind mount (soft-only goal)" \
-        OC_CWD=/var/www/vhosts/dd2 OC 'ddev exec cat /var/www/html/AdditionalConfiguration.php 2>/dev/null | grep -q ddev'
+        OC_DD2 'ddev exec cat /var/www/html/AdditionalConfiguration.php 2>/dev/null | grep -q ddev'
 
     echo ""
     echo "--- DD8. describe parity: agent vs developer context (§10a) ---"
-    OC_CWD=/var/www/vhosts/dd2 OC 'ddev describe --json-output >/tmp/dd8-oc.json 2>/dev/null' || true
+    OC_DD2 'ddev describe --json-output >/tmp/dd8-oc.json 2>/dev/null' || true
     DEVSH 'cd /var/www/vhosts/dd2 && ddev describe --json-output >/tmp/dd8-dev.json 2>/dev/null' || true
     check "DD8: agent-side describe reports the project running" \
         E 'grep -Eq "\"status\": ?\"running\"" /tmp/dd8-oc.json'
@@ -482,9 +490,9 @@ if [ "$_daemon_ok" = true ]; then
     echo ""
     echo "--- DD9. db round-trip (import/export) ---"
     E 'printf "CREATE TABLE dd9_mark (id INT);\n" | gzip > /tmp/dd9.sql.gz'
-    if OC_CWD=/var/www/vhosts/dd2 OC 'ddev import-db --src=/tmp/dd9.sql.gz >/tmp/dd9.log 2>&1'; then
+    if OC_DD2 'ddev import-db --src=/tmp/dd9.sql.gz >/tmp/dd9.log 2>&1'; then
         check "DD9: export-db returns the imported mark" \
-            OC_CWD=/var/www/vhosts/dd2 OC 'ddev export-db -f=/tmp/dd9-out.sql.gz >/dev/null 2>&1 && zcat /tmp/dd9-out.sql.gz | grep -q dd9_mark'
+            OC_DD2 'ddev export-db -f=/tmp/dd9-out.sql.gz >/dev/null 2>&1 && zcat /tmp/dd9-out.sql.gz | grep -q dd9_mark'
     else
         echo "  ${YELLOW}SKIP${NC}  DD9: import-db failed"
         skip "dd9 import failed"
@@ -493,13 +501,15 @@ if [ "$_daemon_ok" = true ]; then
     echo ""
     echo "--- DD7. lifecycle + suite-wide EPERM sweep ---"
     check "DD7: ddev restart" \
-        OC_CWD=/var/www/vhosts/dd2 OC 'ddev restart >/tmp/dd7.log 2>&1'
+        OC_DD2 'ddev restart >/tmp/dd7.log 2>&1'
     check "DD7: ddev stop" \
-        OC_CWD=/var/www/vhosts/dd2 OC 'ddev stop >/tmp/dd7.log 2>&1'
+        OC_DD2 'ddev stop >/tmp/dd7.log 2>&1'
     check "DD7: ddev delete -Oy" \
-        OC_CWD=/var/www/vhosts/dd2 OC 'ddev delete -Oy >/tmp/dd7.log 2>&1'
+        OC_DD2 'ddev delete -Oy >/tmp/dd7.log 2>&1'
+    # dd13-start1.log is EXCLUDED: the DD13 tripwire asserts that exact
+    # EPERM (bootstrap before handover) — it is expected content there.
     check "DD7: zero 'operation not permitted' across the suite log" \
-        E '_s=$(grep -il "operation not permitted" /tmp/dd2-*.log /tmp/dd7.log /tmp/dd10-*.log /tmp/dd11-*.log 2>/dev/null); test -z "$_s"'
+        E '_s=$(grep -il "operation not permitted" /tmp/dd2-*.log /tmp/dd7.log /tmp/dd9.log /tmp/dd10-*.log /tmp/dd11-*.log /tmp/dd12-*.log 2>/dev/null); test -z "$_s"'
 fi
 
 if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/null; then
@@ -513,12 +523,12 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
             E 'test "$(stat -c %U /var/www/vhosts/camino-e2e/config/system)" = dev'
         check "DD10: .ddev opencode-owned after handover" \
             E 'test "$(stat -c %U /var/www/vhosts/camino-e2e/.ddev)" = opencode'
-        if OC_CWD=/var/www/vhosts/camino-e2e OC 'ddev start >/tmp/dd10-start.log 2>&1'; then
+        if OC_CAM 'ddev start >/tmp/dd10-start.log 2>&1'; then
             check "DD10: real site starts" \
                 E 'grep -q "Successfully started" /tmp/dd10-start.log'
             check "DD10: settings dir keeps g+w through start (dev-owned mode, #25)" \
                 E 'test "$(stat -c %a /var/www/vhosts/camino-e2e/config/system)" = "2775"'
-            OC_CWD=/var/www/vhosts/camino-e2e OC 'ddev import-db --src=/home/dev/repo/tests/e2e/fixtures/camino/db.sql.gz >/tmp/dd10-imp.log 2>&1' \
+            OC_CAM 'ddev import-db --src=/home/dev/repo/tests/e2e/fixtures/camino/db.sql.gz >/tmp/dd10-imp.log 2>&1' \
                 || echo "  ${YELLOW}NOTE${NC}  DD10: db import failed — site may show the install tool"
             E 'curl --resolve camino-e2e.local:8080:127.0.0.1 -fsS http://camino-e2e.local:8080/camino/ -o /tmp/dd10-front.html'
             check "DD10: frontend answers 200 (first real 'site works' assert)" \
@@ -543,7 +553,7 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
                 E 'test -s /tmp/dd11-front.html'
             check "DD11: dev can edit the settings file (#25 regression)" \
                 DEVSH 'cd /var/www/vhosts/camino-e2e && printf "\n// dd11 edit\n" >> config/system/settings.php'
-            OC_CWD=/var/www/vhosts/camino-e2e OC 'ddev delete -Oy >/dev/null 2>&1' || true
+            OC_CAM 'ddev delete -Oy >/dev/null 2>&1' || true
         else
             echo "  ${YELLOW}SKIP${NC}  DD10: site start failed — output:"
             E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd10-start.log 2>/dev/null | tail -15' || true
@@ -599,7 +609,7 @@ if [ "$SITE_TIER" = "camino" ]; then
 
         # (e) pull-while-running: git replaces tracked .ddev content, ddev
         #     must survive it (restart, not a broken tree).
-        if OC_CWD=/var/www/vhosts/dd12-proj OC 'ddev start >/tmp/dd12-start.log 2>&1'; then
+        if OC_DD12 'ddev start >/tmp/dd12-start.log 2>&1'; then
             DEVSH 'cd /var/www/vhosts/dd12-proj && git checkout -q feature/ddev-tree && git checkout -q main' \
                 && _dd12_sw=0 || _dd12_sw=1
             check "DD12: checkout inside the running project's .ddev works" \
@@ -612,7 +622,7 @@ if [ "$SITE_TIER" = "camino" ]; then
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd12-restart.log 2>/dev/null | tail -10' || true
                 failures=$((failures + 1))
             fi
-            OC_CWD=/var/www/vhosts/dd12-proj OC 'ddev delete -Oy >/dev/null 2>&1' || true
+            OC_DD12 'ddev delete -Oy >/dev/null 2>&1' || true
         else
             echo "  ${YELLOW}SKIP${NC}  DD12: project start failed"
             E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd12-start.log 2>/dev/null | tail -10' || true
@@ -649,14 +659,14 @@ check "DD13: dev can edit .ddev/config.yaml after handover" \
     DEVSH 'cd /var/www/vhosts/dd13-proj && printf "# dd13 edit\n" >> .ddev/config.yaml'
 check "DD13: root stays dev-owned (dev-owned mode)" \
     E 'test "$(stat -c %U /var/www/vhosts/dd13-proj)" = dev'
-if OC_CWD=/var/www/vhosts/dd13-proj OC 'ddev start >/tmp/dd13-start2.log 2>&1'; then
+if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
     check "DD13: start succeeds after handover (burn-in end state)" \
         E 'grep -q "Successfully started" /tmp/dd13-start2.log'
 
     echo ""
     echo "--- DD14. ddev composer create-project (exit-23 burn-in finding) ---"
     if [ "${E2E_DDEV_SKIP_CREATE:-0}" != "1" ]; then
-        if OC_CWD=/var/www/vhosts/dd13-proj OC 'ddev composer create-project "typo3/cms-base-distribution:^14" >/tmp/dd14.log 2>&1'; then
+        if OC_DD13 'ddev composer create-project "typo3/cms-base-distribution:^14" >/tmp/dd14.log 2>&1'; then
             check "DD14: create-project exits 0" true
             check "DD14: composer.lock + vendor + public/index.php landed completely" \
                 E 'test -f /var/www/vhosts/dd13-proj/composer.lock && test -d /var/www/vhosts/dd13-proj/vendor && test -f /var/www/vhosts/dd13-proj/public/index.php'
@@ -668,7 +678,7 @@ if OC_CWD=/var/www/vhosts/dd13-proj OC 'ddev start >/tmp/dd13-start2.log 2>&1'; 
     else
         skip "DD14 skipped (E2E_DDEV_SKIP_CREATE=1)"
     fi
-    OC_CWD=/var/www/vhosts/dd13-proj OC 'ddev delete -Oy >/dev/null 2>&1' || true
+    OC_DD13 'ddev delete -Oy >/dev/null 2>&1' || true
 else
     echo "  ${YELLOW}SKIP${NC}  DD13: second start failed — output:"
     E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd13-start2.log 2>/dev/null | tail -15' || true
