@@ -685,6 +685,11 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
         E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd13-proj >/dev/null 2>&1'
         check "DD14: handover mode: root handed to opencode (create-project precondition)" \
             E 'test "$(stat -c %U /var/www/vhosts/dd13-proj)" = opencode'
+        # The failed dev-owned attempt left partial files behind; ddev only
+        # allows [AdditionalConfiguration.php LocalConfiguration.php public]
+        # beside .ddev for create-project (checkForComposerCreateAllowedPaths)
+        # — the exact recovery situation from the burn-in. Clean up.
+        E 'sudo sh -c "cd /var/www/vhosts/dd13-proj && find . -mindepth 1 -maxdepth 1 ! -name .ddev -exec rm -rf {} +"'
         if OC_DD13 'ddev composer create-project "typo3/cms-base-distribution:^14" >/tmp/dd14.log 2>&1'; then
             check "DD14: handover mode: create-project exits 0" true
             check "DD14: composer.lock + vendor + public/index.php landed completely" \
