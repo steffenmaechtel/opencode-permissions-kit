@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status test-update-flags e2e e2e-rootless e2e-all install-dev clean version check-version
+.PHONY: help test lint check-host test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-uninstall test-status test-update-flags e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version
 
 # Scripts checked by `make lint` (everything shipped in files/).
 SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status.sh files/uninstall.sh files/umask.sh \
@@ -49,6 +49,9 @@ help:
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
 	@echo "  make e2e-rootless ARGS=--debug   Same, keep the container on failure + dump daemon logs"
+	@echo "  make e2e-ddev       Run the real-ddev e2e suite (golden-image cache; first run builds it, see docs/design/ddev-e2e-test.md)"
+	@echo "  make e2e-ddev ARGS='--fresh'     Force a golden-image rebuild (new ddev version, recipe bump)"
+	@echo "  make e2e-ddev-fresh Same as e2e-ddev ARGS=--fresh"
 	@echo "  make e2e-all        Run both e2e suites"
 	@echo "  make install-dev   Quick dev install (skip prompts)"
 	@echo "  make clean         Uninstall"
@@ -129,6 +132,12 @@ e2e:
 
 e2e-rootless:
 	@sh ./tests/e2e/run-docker-rootless.sh $(if $(ARGS),$(ARGS))
+
+e2e-ddev:
+	@sh ./tests/e2e/run-ddev.sh $(if $(ARGS),$(ARGS))
+
+e2e-ddev-fresh:
+	@sh ./tests/e2e/run-ddev.sh --fresh
 
 e2e-all: e2e e2e-rootless
 

@@ -70,6 +70,7 @@ for f in "$REPO"/tests/test-*.sh \
          "$REPO"/tests/check-host.sh \
          "$REPO"/tests/e2e/run.sh \
          "$REPO"/tests/e2e/run-docker-rootless.sh \
+         "$REPO"/tests/e2e/run-ddev.sh \
          "$REPO"/tests/e2e/lib.sh; do
     required="$required ./${f#"$REPO"/}"
 done
