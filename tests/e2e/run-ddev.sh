@@ -423,10 +423,16 @@ check "DD2: handover mode: bootstrap root inode handed to opencode 2755" \
 if OC_DD2 'ddev start >/tmp/dd2-start.log 2>&1'; then
     check "DD2: agent-side start completes (real ddev, no EPERM)" \
         E 'grep -q "Successfully started" /tmp/dd2-start.log'
-    check "DD3: ddev chmod'd the bootstrap root to 0755 (issue #25 mechanics)" \
-        E 'test "$(stat -c %a /var/www/vhosts/dd2)" = "755"'
-    check "DD3: bootstrap settings file at project root is opencode-owned" \
-        E 'test "$(stat -c %U /var/www/vhosts/dd2/AdditionalConfiguration.php 2>/dev/null || echo missing)" = opencode'
+    # ddev v1.25.3 pinned behavior (typo3.go:24-27): with undetected TYPO3
+    # the settings writer EARLY-RETURNS (paths "skipable") — the start
+    # neither chmods the bootstrap root to 0755 nor writes a root
+    # AdditionalConfiguration.php. Tripwire: if ddev changes this bootstrap
+    # behavior again, these checks flip and tell us (issue #25 mechanics
+    # are still covered by DD13 + the camino tier).
+    check "DD3: v1.25.3: start leaves undetected bootstrap root at 2755 (typo3.go early-return)" \
+        E 'test "$(stat -c %a /var/www/vhosts/dd2)" = "2755"'
+    check "DD3: v1.25.3: no root AdditionalConfiguration.php while TYPO3 undetected" \
+        E 'test ! -e /var/www/vhosts/dd2/AdditionalConfiguration.php'
     E 'sudo bash /home/dev/repo/files/config.sh --yes refresh >/dev/null 2>&1'
     check "DD3: config.sh refresh restores g+w on the root (2755)" \
         E 'test "$(stat -c %a /var/www/vhosts/dd2)" = "2755"'
@@ -479,8 +485,8 @@ if [ "$_daemon_ok" = true ]; then
     }
     check "DD6: web container userns maps root to the opencode host UID (§9.1)" \
         _dd6_uidmap
-    check "DD6: container reads the settings file via bind mount (soft-only goal)" \
-        OC_DD2 'ddev exec cat /var/www/html/AdditionalConfiguration.php 2>/dev/null | grep -q ddev'
+    check "DD6: container reads project files via bind mount (soft-only goal)" \
+        OC_DD2 'ddev exec cat /mnt/ddev_config/config.yaml | grep -q ddev'
 
     echo ""
     echo "--- DD8. describe parity: agent vs developer context (§10a) ---"
