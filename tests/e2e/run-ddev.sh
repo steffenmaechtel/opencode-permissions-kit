@@ -555,6 +555,16 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
     if E 'test -f /opt/e2e/fixtures/camino/vendor/bin/typo3'; then
         E 'sudo cp -a /opt/e2e/fixtures/camino /var/www/vhosts/camino-e2e'
         E 'sudo chown -R dev:dev /var/www/vhosts/camino-e2e'
+        # Model the kit's group baseline (fs-baseline.sh: g+w everywhere +
+        # setgid on dirs): a fresh git checkout — what actions/checkout AND
+        # any fresh clone produce — carries neither (git cannot store
+        # them), so `cp -a` from the golden fixture reproduces the bare
+        # checkout modes. The handover's dev-owned handback only re-asserts
+        # g+w on the settings dirs, never setgid — but on a real machine
+        # every registered project root HAS the baseline (dirs 2775), which
+        # is what the DD10 mode check asserts. First GitHub run failed
+        # exactly here (config/system came out 0775/0755, not 2775).
+        E 'sudo chmod -R g+w /var/www/vhosts/camino-e2e && sudo find /var/www/vhosts/camino-e2e -type d -exec chmod g+s {} +'
         E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/camino-e2e >/tmp/dd10-handover.log 2>&1'
         check "DD10: handover leaves settings dev-owned (flag committed)" \
             E 'test "$(stat -c %U /var/www/vhosts/camino-e2e/config/system)" = dev'
