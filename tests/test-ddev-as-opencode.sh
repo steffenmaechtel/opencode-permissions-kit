@@ -167,7 +167,7 @@ check "FULLURL transport lines are filtered from the visible output" \
 check "launch arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
     sh -c "grep -q 'explorer.exe' \"\$1\" && grep -q 'xdg-open' \"\$1\"" _ "$FUNC"
 check "sudoers env_keep includes DDEV_DEBUG (launch URL transport)" \
-    sh -c "grep -q 'env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD DDEV_DEBUG\"' \"\$1\"" _ "$SUDOERS"
+    sh -c "grep -q 'env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME DDEV_DEBUG\"' \"\$1\"" _ "$SUDOERS"
 
 # --- 3a-2. browser-command routing (issue #20 follow-up: mailpit/phpmyadmin) ---
 # Functional against _opk_is_browser_cmd: the default list, the xhgui

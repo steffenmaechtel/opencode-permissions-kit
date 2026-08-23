@@ -38,8 +38,9 @@ openchamber --ui-password be-creative-here
 
 OpenChamber derives the server password from `--ui-password` and passes
 it to the server as `OPENCODE_SERVER_PASSWORD`. The kit's sudoers rule
-preserves that variable across the `sudo -u opencode` exec, so the server
-actually comes up with the password applied.
+preserves that variable (and `OPENCODE_SERVER_USERNAME`, its Basic-auth
+counterpart) across the `sudo -u opencode` exec, so the server actually
+comes up with the password applied.
 
 ## Container tools in OpenChamber sessions
 
