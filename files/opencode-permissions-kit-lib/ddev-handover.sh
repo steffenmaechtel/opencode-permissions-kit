@@ -10,9 +10,9 @@
 #
 #   .ddev/          at any depth under a registered root (a root is
 #                   usually a parent folder of several projects), but
-#                   NEVER inside vendor/ or node_modules/ (packages
-#                   shipping a .ddev test fixture are not projects —
-#                   mirrors the hosts-scan pruning, issue #21)
+#                   NEVER inside vendor/, node_modules/ or testdata/
+#                   trees (shipped test fixtures are not projects —
+#                   mirrors the hosts-scan pruning, issues #21/#29)
 #   settings dirs   derived from the project's .ddev/config.yaml `type:`:
 #                     typo3     -> config/system, <docroot>/typo3conf,
 #                                  typo3conf (covers composer v12+,
@@ -66,25 +66,66 @@ ddev_devowned_flagged() {
         | head -1 | tr -d ' \t"'"'" | grep -qx true
 }
 
-# ddev_devowned_flag <project-dir>: append the top-level key to
+# ddev_devowned_flag <project-dir>: insert the top-level key into
 # .ddev/config.yaml IFF the file exists and the key is absent (one line,
 # idempotent — the file is committed team content, the kit adds exactly
-# this key and nothing else). Caller echoes/prints; run as root.
+# this key and nothing else). Insertion point (issue #28): directly below
+# the head section — after corepack_enable, after type: as fallback, at
+# the top of the file as last resort — never appended to the end, where
+# ddev's default template carries a wall of commented examples that
+# hides the change. A blank line before and after the block, never
+# doubled. Caller echoes/prints; run as root.
 ddev_devowned_flag() {
     [ -f "${1:-}/.ddev/config.yaml" ] || return 0
-    if grep -q '^disable_settings_management:' "$1/.ddev/config.yaml"; then
+    ddf_cfg="${1:-}/.ddev/config.yaml"
+    if grep -q '^disable_settings_management:' "$ddf_cfg"; then
         return 0
     fi
-    # Guarantee a trailing newline: without it the appended comment would
-    # join the file's last line.
-    [ -n "$(tail -c1 "$1/.ddev/config.yaml" 2>/dev/null)" ] && printf '\n' >> "$1/.ddev/config.yaml"
-    {
-        printf '# opencode permissions kit: dev-owned mode — ddev must not\n'
-        printf '# chmod/write settings files outside .ddev/ (permanent 2775/664).\n'
-        printf 'disable_settings_management: true\n'
-    } >> "$1/.ddev/config.yaml"
-    chmod g+w "$1/.ddev/config.yaml" 2>/dev/null || true
-    echo "  dev-owned flag written: $1/.ddev/config.yaml (disable_settings_management: true — commit it)"
+    ddf_anchor=''
+    if grep -q '^corepack_enable:' "$ddf_cfg"; then
+        ddf_anchor='^corepack_enable:'
+    elif grep -q '^type:' "$ddf_cfg"; then
+        ddf_anchor='^type:'
+    fi
+    # Rewrite via temp + `cat >` (same inode: owner and mode of the
+    # committed config.yaml survive, unlike an mv).
+    ddf_tmp=$(mktemp "${ddf_cfg}.opk.XXXXXX") || return 0
+    if awk -v opk_anchor="$ddf_anchor" '
+        BEGIN {
+            c1 = "# opencode permissions kit: dev-owned mode — ddev must not"
+            c2 = "# chmod/write settings files outside .ddev/ (permanent 2775/664)."
+        }
+        # No anchor key at all: the block opens the file (issue #28).
+        opk_anchor == "" && !done {
+            done = 1
+            print c1; print c2
+            print "disable_settings_management: true"
+            if ($0 !~ /^[ \t]*$/) print ""
+        }
+        {
+            if (pending) {          # line after the anchor: block first,
+                pending = 0         # then this line (blank kept single)
+                print ""
+                print c1; print c2
+                print "disable_settings_management: true"
+                if ($0 !~ /^[ \t]*$/) print ""
+            } else if (!done && $0 ~ opk_anchor) {
+                done = 1
+                pending = 1
+            }
+            print
+        }
+        END {                       # anchor was the last line
+            if (pending) {
+                print ""; print c1; print c2
+                print "disable_settings_management: true"
+            }
+        }
+    ' "$ddf_cfg" > "$ddf_tmp" && cat "$ddf_tmp" > "$ddf_cfg"; then
+        chmod g+w "$ddf_cfg" 2>/dev/null || true
+        echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
+    fi
+    rm -f "$ddf_tmp"
     return 0
 }
 
@@ -192,10 +233,12 @@ ddev_handover_root() {
     dhr_group="${3:-}"
     dhr_dev="${4:-}"
     [ -n "$dhr_root" ] && [ -d "$dhr_root" ] || return 0
-    # Prune vendor/node_modules (issue #21 pattern): a .ddev found there
-    # belongs to a shipped test fixture, not to a project — handing it
-    # over would chown third-party package files for no benefit.
-    find "$dhr_root" -type d \( -name vendor -o -name node_modules \) -prune -o \
+    # Prune vendor/node_modules/testdata (issue #21/#29 pattern): a .ddev
+    # found there belongs to a shipped test fixture, not to a project —
+    # e.g. a checkout of ddev's own repository carries dozens under
+    # cmd/pkg testdata; handing them over would chown third-party files
+    # and write dev-owned flags into fixture configs.
+    find "$dhr_root" -type d \( -name vendor -o -name node_modules -o -name testdata \) -prune -o \
         -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r dhr_d; do
         chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || true
         chmod -R g+w "$dhr_d" 2>/dev/null || true

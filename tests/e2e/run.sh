@@ -328,6 +328,12 @@ E 'sudo mkdir -p /var/www/vhosts/fresh-clone/vendor/some/pkg/.ddev && sudo chown
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/fresh-clone'
 check "4d: .ddev inside vendor/ is NOT handed over (issue #21 pattern)" \
     E 'test "$(stat -c %U /var/www/vhosts/fresh-clone/vendor/some/pkg/.ddev)" = "dev"'
+# testdata pruning (issue #29): a checkout of ddev's own repository ships
+# .ddev dirs under cmd/pkg testdata — fixtures, not projects.
+E 'sudo mkdir -p /var/www/vhosts/fresh-clone/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev && sudo chown -R dev:dev /var/www/vhosts/fresh-clone/pkg'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/fresh-clone'
+check "4d: .ddev inside testdata/ is NOT handed over (issue #29)" \
+    E 'test "$(stat -c %U /var/www/vhosts/fresh-clone/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev)" = "dev"'
 
 echo ""
 echo "--- 4e. dev-owned mode (disable_settings_management, design plan) ---"
@@ -347,6 +353,8 @@ E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /v
     echo "  ${GREEN}OK${NC}  config.sh handover (dev-owned) completed"
 check "4e: scan wrote disable_settings_management into .ddev/config.yaml" \
     E 'grep -qx "disable_settings_management: true" /var/www/vhosts/devowned-proj/.ddev/config.yaml'
+check "4e: flag inserted below type: with blank separation (issue #28)" \
+    E 'test -z "$(sed -n 2p /var/www/vhosts/devowned-proj/.ddev/config.yaml)" && test "$(sed -n 5p /var/www/vhosts/devowned-proj/.ddev/config.yaml)" = "disable_settings_management: true"'
 check "4e: undetected typo3 root STAYS dev-owned (no bootstrap handover)" \
     E 'test "$(stat -c %U /var/www/vhosts/devowned-proj)" = "dev" && test "$(stat -c %a /var/www/vhosts/devowned-proj)" = "2775"'
 check "4e: settings dir stays dev-owned" \
@@ -369,6 +377,15 @@ check "4e: hook hint mentions disable_settings_management (dev-owned note)" \
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/devowned-hint'
 check "4e: hook hint silent once the project is flagged (dev-owned)" \
     E '! sudo -u dev -H sh -c "cd /var/www/vhosts/devowned-hint && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "hint: fresh typo3 clone"'
+# testdata pruning in dev-owned mode (issue #29): fixture .ddev configs
+# (e.g. a checkout of ddev's own repository) must stay untouched — no
+# flag write, no chown, no git-status pollution in the checkout.
+E 'sudo mkdir -p /var/www/vhosts/devowned-skip/pkg/ddevapp/testdata/TestWriteConfig/proj/.ddev && sudo chown -R dev:dev /var/www/vhosts/devowned-skip && printf "name: p\ntype: php\n" > /var/www/vhosts/devowned-skip/pkg/ddevapp/testdata/TestWriteConfig/proj/.ddev/config.yaml'
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes handover /var/www/vhosts/devowned-skip'
+check "4e: scan skips .ddev inside testdata/ (issue #29, no flag write)" \
+    E '! grep -q "^disable_settings_management:" /var/www/vhosts/devowned-skip/pkg/ddevapp/testdata/TestWriteConfig/proj/.ddev/config.yaml'
+check "4e: scan skips .ddev inside testdata/ (issue #29, no chown)" \
+    E 'test "$(stat -c %U /var/www/vhosts/devowned-skip/pkg/ddevapp/testdata/TestWriteConfig/proj/.ddev)" = "dev"'
 # back to the handover model for the remaining sections
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/config.sh --yes ddev-settings off'
 

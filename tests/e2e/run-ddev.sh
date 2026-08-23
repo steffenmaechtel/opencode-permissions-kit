@@ -155,6 +155,23 @@ dd_build_oc() {
     E 'sudo -u opencode env HOME=/home/opencode XDG_RUNTIME_DIR=/run/user/'"$_ocu"' DOCKER_HOST=unix:///run/user/'"$_ocu"'/docker.sock DDEV_NO_INSTRUMENTATION=true sh -c "cd '"$1"' && '"$2"'"'
 }
 
+# Plain-Linux runners (GitHub CI): ddev adds unresolvable project hostnames
+# (.local TLDs) to /etc/hosts via ddev-hostname — a binary the suite never
+# installs (only the ddev binary goes to /usr/local/bin), so `ddev start`
+# dies with "Binary not found: ddev-hostname is not installed" (first
+# GitHub e2e-ddev run). On WSL2 hosts the suite passed by accident: ddev
+# reads the WINDOWS hosts file there, which does not exist inside the
+# container ("Unable to open hosts file" is only a warning + skip,
+# pkg/ddevapp/hostname_mgt.go). Pre-seeding the suite's fixed .local
+# hostnames makes ddev find them already managed (Has() -> continue) on
+# every platform. The skeleton warm-up needs nothing: its default
+# *.ddev.site TLD resolves via public wildcard DNS. Run once per container
+# boot (both the cold-build and the warm-start container; /etc/hosts is a
+# docker bind-mount and does not survive the golden-image commit).
+dd_seed_hosts() {
+    E 'sudo sh -c "printf \"127.0.0.1 dd-warmup.local dd2.local camino-e2e.local dd12-proj.local dd13-proj.local\\n\" >> /etc/hosts"'
+}
+
 if dd_golden_current; then
     echo ""
     echo "  ${GREEN}golden image current${NC} (ddev $DD_VER, format $GOLDEN_FORMAT, site: ${SITE_TIER:-none}) — warm start"
@@ -179,6 +196,8 @@ else
         e2e_finish
         exit $?
     fi
+    # .local hostnames for the warm-up starts (see dd_seed_hosts).
+    dd_seed_hosts
 
     # Provision the inner environment (kit code path, §4.2). The kit itself
     # is NOT installed into the golden image (§4.1) — only its provisioning
@@ -318,6 +337,8 @@ if [ "$_sock_ok" != true ]; then
     e2e_finish
     exit $?
 fi
+# .local hostnames for the DD2/DD10-DD13 starts (see dd_seed_hosts).
+dd_seed_hosts
 
 # Agent-context runner: ddev as the opencode user with the session env the
 # wrapper exports. Dev-context runs go through DEVSH (interactive bash

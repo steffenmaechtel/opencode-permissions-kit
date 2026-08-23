@@ -300,11 +300,12 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/System
         while IFS= read -r _st_root; do
             [ -z "$_st_root" ] && continue
             [ -d "$_st_root" ] || continue
-            # vendor/ and node_modules/ pruned (issue #21): composer/npm
-            # packages ship their own .ddev dirs (development checkouts of
-            # the package) — they are not the user's projects and their
+            # vendor/, node_modules/ and testdata/ pruned (issues #21,
+            # #29): composer/npm packages and test fixtures (e.g. a
+            # checkout of ddev's own repository) ship their own .ddev
+            # dirs — they are not the user's projects and their
             # hostnames must never hit the Windows hosts file.
-            find "$_st_root" \( -type d \( -name vendor -o -name node_modules \) \) -prune -o -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r _st_d; do
+            find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \) \) -prune -o -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r _st_d; do
                 _st_m=$(ddev_hosts_missing "$(dirname "$_st_d")")
                 [ -n "$_st_m" ] || continue
                 ui_kv_warn "hosts (win)" "$(dirname "$_st_d"): missing $(printf '%s' "$_st_m" | tr '\n' ' ')"
