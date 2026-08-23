@@ -11,11 +11,12 @@ OpenChamber can manage the opencode server itself: it spawns
 connects to it. That spawn is non-interactive — stdin is closed and
 OpenChamber waits for the `opencode server listening on …` line on stdout.
 
-The kit's wrapper is interactive by design (banner, `Press Enter`, the
-`[Y/n]` container-tools question). To make both worlds work together, the
-wrapper has a **headless serve mode**: when the first argument is `serve`,
-it prints nothing on stdout, asks nothing, and starts the server as the
-`opencode` user directly. Project-directory checks do not apply to
+The kit's wrapper has a **headless serve mode** for exactly this spawn
+style: when the first argument is `serve`, it prints nothing on stdout,
+asks nothing, and starts the server as the `opencode` user directly.
+(Since 0.0.21 the wrapper is prompt-free in general — no `Press Enter`,
+no `[Y/n]` — but serve mode additionally keeps stdout clean for
+parsers.) Project-directory checks do not apply to
 `serve` — sessions still get the global and per-project `opencode.jsonc`
 permission rules (see [the wrapper](../concepts/wrapper.md)).
 
@@ -45,8 +46,9 @@ comes up with the password applied.
 ## Container tools in OpenChamber sessions
 
 In serve mode the wrapper attaches the configured rootless backend
-silently — there is no `[Y/n]` because a server process serves many
-projects. Whether a session may run `docker`/`ddev` is still decided per
+silently — a server process serves many projects, so there is no
+per-project question at spawn time. Whether a session may run
+`docker`/`ddev` is still decided per
 project by the `opencode.jsonc` permission rules (see
 [allow docker and ddev](container-tools.md)): projects without the allow
 rules keep the deny. If no backend is configured or its socket is not

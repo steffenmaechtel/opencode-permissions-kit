@@ -253,7 +253,8 @@ if [ "$_rootless_ok" = true ]; then
     check "RL3: installed wrapper exports DOCKER_HOST for the rootless backend" \
         E 'grep -q "export DOCKER_HOST" /usr/local/lib/opencode-permissions-kit/wrapper'
 
-    # Project explicitly enables docker -> wrapper auto-detects and asks.
+    # Project explicitly enables docker -> wrapper auto-detects (no prompt
+    # since 0.0.21 — the TUI mode row carries the state).
     E 'sudo tee /var/www/vhosts/test-project/opencode.jsonc > /dev/null <<EOF
 {
     "permission": {
@@ -261,13 +262,13 @@ if [ "$_rootless_ok" = true ]; then
     }
 }
 EOF'
-    E 'cd /var/www/vhosts/test-project && printf "Y\n" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-drl.txt' && \
-        echo "  ${GREEN}OK${NC}  wrapper docker-rootless auto-detection (accepted) ran"
+    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-drl.txt' && \
+        echo "  ${GREEN}OK${NC}  wrapper docker-rootless auto-detection ran"
     check "RL3: wrapper auto-detect: container tools advisory" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-drl.txt'
-    check "RL3: wrapper auto-detect: docker-rootless prompt" \
-        E 'grep -q "Run opencode with the docker-rootless backend" /tmp/wrapper-drl.txt'
-    check "RL3: wrapper auto-detect: accepted -> docker-rootless exec message" \
+    check "RL3: wrapper auto-detect: no [Y/n] question (removed 0.0.21)" \
+        E '! grep -q "? \[Y/n\]" /tmp/wrapper-drl.txt'
+    check "RL3: wrapper auto-detect: docker-rootless exec message" \
         E 'grep -q "opencode will run with the docker-rootless backend" /tmp/wrapper-drl.txt'
     check_fail "RL3: wrapper does NOT mention the docker group" \
         E 'grep -q "opencode will run with the docker group" /tmp/wrapper-drl.txt'

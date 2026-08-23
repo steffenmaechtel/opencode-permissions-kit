@@ -1,0 +1,8 @@
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "_opencode_permissions_kit": true,
+  "theme": "opencode-danger",
+  "plugin": [
+    ["/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx", {}]
+  ]
+}

@@ -847,12 +847,12 @@ if [ "$_rootless_ok" = true ]; then
     }
 }
 EOF'
-    E 'cd /var/www/vhosts/test-project && printf "Y\n" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-podman.txt' && \
-        echo "  ${GREEN}OK${NC}  wrapper podman auto-detection (accepted) ran"
+    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-podman.txt' && \
+        echo "  ${GREEN}OK${NC}  wrapper podman auto-detection ran"
     check "12i: wrapper podman auto-detect: container tools advisory" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-podman.txt'
-    check "12i: wrapper podman auto-detect: podman-rootless prompt" \
-        E 'grep -q "Run opencode with the podman-rootless backend" /tmp/wrapper-podman.txt'
+    check "12i: wrapper podman auto-detect: no [Y/n] question (removed 0.0.21)" \
+        E '! grep -q "? \[Y/n\]" /tmp/wrapper-podman.txt'
     check "12i: wrapper podman auto-detect: accepted -> podman-rootless exec message" \
         E 'grep -q "opencode will run with the podman-rootless backend" /tmp/wrapper-podman.txt'
     check_fail "12i: wrapper podman path does NOT mention the docker group" \

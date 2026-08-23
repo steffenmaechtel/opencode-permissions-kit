@@ -114,8 +114,9 @@ If you use ddev, verify that it runs as the `opencode` user from both sides:
 
 1. In your terminal: `ddev start` (the kit's `ddev()` shell function routes
    it through the opencode user — open a fresh terminal first).
-2. In an opencode session in the same project, if it opted into container
-   tools: `ddev list`.
+2. In an opencode session in the same project, if it is in the
+   **with ddev/docker** state (see
+   [allow docker and ddev](how-to/container-tools.md)): `ddev list`.
 
 The **first** `ddev start` is slow (mutagen download, image pulls into the
 rootless daemon); every later start reuses that state. Details:

@@ -48,7 +48,8 @@ fetch_kit() {
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \
              opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh; do
+             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh \
+             opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -1236,6 +1237,13 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/dde
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
+# TUI mode display (docs/design/plan-ui-tui-opencode.md): plugin + templates
+sudo mkdir -p "$LIBDIR/tui"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
+sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh"
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
@@ -1444,6 +1452,49 @@ if [ ! -f "$DEFAULT_OC_CONF" ]; then
     sudo chmod 664 "$DEFAULT_OC_CONF"
     ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
     log "deny-all config installed for default user: $DEFAULT_OC_CONF"
+fi
+
+# === Step 8c: TUI mode display (docs/design/plan-ui-tui-opencode.md) ============
+# Two HOME-keyed effects, no env transport (sudo's env_reset rewrites
+# HOME, the TUI loads its global config from $HOME):
+#   opencode user  -> kit tui.json registers the mode plugin (text row
+#                     in app_bottom: "opencode-permissions-kit Mode:
+#                     with ddev/docker" / "no ddev/docker", live from
+#                     install.conf). The user's own theme choice is
+#                     NEVER touched (no theme key anywhere).
+#   default user   -> red opencode-danger theme (the bypass warning:
+#                     running the ORIGINAL opencode binary as yourself
+#                     defeats the kit's UID separation; deny-all still
+#                     guards, the red is the visible amplifier).
+# Both files carry the _opencode_permissions_kit marker: the kit only
+# writes them if absent or previously kit-written — user edits survive
+# re-installs and updates (same policy as the deny-all config above).
+OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"
+OC_TUI_CONF="$OC_TUI_DIR/tui.json"
+sudo mkdir -p "$OC_TUI_DIR"
+if [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
+    sudo cp "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
+    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$OC_TUI_CONF"
+    sudo chmod 664 "$OC_TUI_CONF"
+    ui_success "TUI mode display installed for $OPENCODE_USER: $OC_TUI_CONF (plugin row in the TUI footer)"
+    log "tui mode display installed: $OC_TUI_CONF"
+else
+    ui_detail "existing $OC_TUI_CONF kept — TUI mode display NOT installed (user-managed file)"
+fi
+
+DEFAULT_TUI_CONF="$DEFAULT_OC_DIR/tui.json"
+DEFAULT_THEME_DIR="$DEFAULT_OC_DIR/themes"
+if [ ! -f "$DEFAULT_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$DEFAULT_TUI_CONF" 2>/dev/null; then
+    sudo mkdir -p "$DEFAULT_THEME_DIR"
+    sudo cp "$LIBDIR/tui/opencode-danger.theme.json" "$DEFAULT_THEME_DIR/opencode-danger.json"
+    sudo cp "$LIBDIR/tui/tui-danger.json" "$DEFAULT_TUI_CONF"
+    sudo chown -R "$DEFAULT_USER:$OPENCODE_GROUP" "$DEFAULT_THEME_DIR"
+    sudo chown "$DEFAULT_USER:$OPENCODE_GROUP" "$DEFAULT_TUI_CONF"
+    sudo chmod 664 "$DEFAULT_TUI_CONF" "$DEFAULT_THEME_DIR/opencode-danger.json"
+    ui_success "danger theme installed for $DEFAULT_USER: red warning look when the original binary runs as you"
+    log "tui danger theme installed: $DEFAULT_TUI_CONF"
+else
+    ui_detail "existing $DEFAULT_TUI_CONF kept — danger theme NOT installed (user-managed file)"
 fi
 
 # === Step 9: Clean stale runtime state ===

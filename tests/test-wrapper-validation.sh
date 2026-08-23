@@ -289,12 +289,28 @@ else
     failures=$((failures + 1))
 fi
 
-if [ "$(grep -n 'SERVE_MODE" != true \]; then' "$WRAPPER_FILE" | tail -1 | cut -d: -f1)" -lt "$(grep -n 'Press Enter to start opencode' "$WRAPPER_FILE" | head -1 | cut -d: -f1)" ]; then
-    echo "  ${GREEN}PASS${NC}  serve mode suppresses the Press-Enter prompt"
-    passed=$((passed + 1))
-else
-    echo "  ${RED}FAIL${NC}  serve mode would still block on Press Enter"
+if grep -q 'Press Enter to start opencode' "$WRAPPER_FILE"; then
+    echo "  ${RED}FAIL${NC}  wrapper still pauses on Press Enter (removed 0.0.21)"
     failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  no Press-Enter pause (removed 0.0.21 — the TUI shows the kit mode)"
+    passed=$((passed + 1))
+fi
+
+if grep -q 'Run opencode with .*?\[Y/n\]\|Run opencode with %s? \[Y/n\]' "$WRAPPER_FILE" || grep -qF '"[Y/n]"' "$WRAPPER_FILE"; then
+    echo "  ${RED}FAIL${NC}  wrapper still asks the [Y/n] container question (removed 0.0.21)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  no [Y/n] container question (removed 0.0.21 — state is visible in the TUI)"
+    passed=$((passed + 1))
+fi
+
+if grep -q 'read -r answer' "$WRAPPER_FILE"; then
+    echo "  ${RED}FAIL${NC}  wrapper still reads an interactive answer"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  wrapper is prompt-free (no interactive reads left)"
+    passed=$((passed + 1))
 fi
 
 if grep -A8 '^note()' "$WRAPPER_FILE" | grep -q '>&"\$_fd"\|>&\$_fd' && grep -A8 '^note()' "$WRAPPER_FILE" | grep -q '_fd=2'; then
