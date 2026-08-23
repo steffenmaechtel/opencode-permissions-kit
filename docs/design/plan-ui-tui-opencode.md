@@ -1,10 +1,16 @@
 # PLAN-UI-TUI-OPENCODE: Surface the kit mode inside the opencode TUI
 
-**Status: brainstorm** — nothing implemented, all source claims verified
-against the pinned opencode checkout at v1.18.15
-(`github/opencode`, `git log -1` → `release: v1.18.15`) and the opentui
-checkout at **v0.4.5** (`github/opentui`, tag `Release v0.4.5` — the
-exact version opencode v1.18.15 pins via its package.json catalog).
+**Status: implemented 2026-08-23** (A' + B v1 as specced below; commit
+history on `feature/improve-ui-tui-opencode`). Payload:
+`files/opencode-permissions-kit-lib/tui/` (plugin `kit-mode.tsx`,
+`opencode-danger.theme.json`, both tui.json templates), deployed by
+install.sh Step 8c + update.sh, guarded by
+`tests/test-tui-mode.sh`. Everything below is kept as the design
+record; claims were verified against the pinned opencode checkout at
+v1.18.15 (`github/opencode`, `git log -1` → `release: v1.18.15`) and
+the opentui checkout at **v0.4.5** (`github/opentui`, tag
+`Release v0.4.5` — the exact version opencode v1.18.15 pins via its
+package.json catalog).
 
 ## 1. Motivation
 

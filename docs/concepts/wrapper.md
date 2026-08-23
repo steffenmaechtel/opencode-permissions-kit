@@ -71,6 +71,34 @@ the real binary takes over, it cannot read or modify anything. Template:
 (after securing its copy under the kit), so the wrapper starts without the
 bypass warning.
 
+The same HOME-keyed mechanism carries a visible marker for this case: the
+kit installs a **red `opencode-danger` theme** for the default user
+(`~/.config/opencode/tui.json` + `~/.config/opencode/themes/`). If the
+original binary ever runs as your user, its TUI is red — the deny-all
+config still does the actual guarding, the color is the amplifier.
+
+## Mode display in the TUI
+
+The kit registers a small TUI plugin for the `opencode` user
+(`/home/opencode/.config/opencode/tui.json` →
+`/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx`). It renders
+one thin row at the very bottom of the TUI, on the home screen and
+inside sessions:
+
+```
+opencode-permissions-kit Mode: with ddev/docker
+```
+
+`with ddev/docker` when a rootless container backend is provisioned,
+`no ddev/docker` otherwise — derived live from the kit's install.conf,
+so backend switches show up without a restart. The text color follows
+**your** opencode theme; the plugin never sets or changes the theme. If
+you manage your own `~/.config/opencode/tui.json` (for the opencode
+user), the kit leaves it alone — the file is only written when absent
+or previously kit-written (marker key `_opencode_permissions_kit`).
+
+Design background: [plan-ui-tui-opencode](../design/plan-ui-tui-opencode.md).
+
 ## Wrapper-bypass guard (detect, then warn loudly)
 
 1. **Binary exec restricted to root + the opencode usergroup.** The real
