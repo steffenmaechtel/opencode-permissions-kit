@@ -17,6 +17,16 @@ writes one line into each project's `.ddev/config.yaml`:
 disable_settings_management: true
 ```
 
+The line is **inserted below the head of the file** — after
+`corepack_enable:`, after `type:` as fallback, at the top as last
+resort — with a blank line before and after, so it never disappears
+below the huge comment block ddev's default template carries (issue
+#28). Already-flagged configs (including flags appended at the end by
+older kit versions) are left untouched. Only real projects are flagged:
+`.ddev` dirs inside `vendor/`, `node_modules/` and `testdata/` trees
+are test fixtures — e.g. a checkout of ddev's own repository ships
+dozens — and are skipped (issue #29).
+
 With that flag ddev stops managing CMS settings files completely — it
 never writes or chmods anything outside `.ddev/` (verified against the
 ddev source: settings creation returns early). Consequences:

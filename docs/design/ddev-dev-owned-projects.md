@@ -131,11 +131,15 @@ settings management.
      future flag writes (committed flags stay — repo content).
    - status.sh reports the mode and, per project, whether it is flagged.
 2. **Flag writer** — `ddev-handover.sh` grows
-   `ddev_devowned_flag <project-dir>`: appends the top-level key
+   `ddev_devowned_flag <project-dir>`: adds the top-level key
    `disable_settings_management: true` to `.ddev/config.yaml` **iff**
-   the file exists and the key is not already present (sed check, then
-   append; no other edit, no backup churn — one line, idempotent).
-   Never runs inside pruned trees (vendor/node_modules `.ddev` fixtures).
+   the file exists and the key is not already present (grep check, then
+   a single insert; no other edit, no backup churn — one line,
+   idempotent). Inserted below the head of the file (after
+   `corepack_enable:`, `type:` as fallback, top as last resort), not
+   appended — ddev's default template would hide an appended flag
+   behind its comment block (issue #28). Never runs inside pruned trees
+   (vendor/node_modules/testdata `.ddev` fixtures, issues #21/#29).
 3. **Scan behavior** — `ddev_handover_root` and its callers
    (install, `projects add`, `refresh`, `update`, `handover`):
    - `.ddev/` handover: unchanged (always opencode).
@@ -160,7 +164,7 @@ settings management.
    and `docs/troubleshooting.md` (EPERM entries get the dev-owned
    alternative).
 6. **Tests**
-   - Unit: flag writer (appends iff absent, no-op when present, skips
+   - Unit: flag writer (inserts iff absent, no-op when present, skips
      missing config.yaml), scan hands back flagged projects / hands over
      unflagged ones, mode off → no writes, config.sh toggle wiring,
      install.sh question + stamp, status reporting.

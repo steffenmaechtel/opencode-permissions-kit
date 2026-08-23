@@ -382,10 +382,10 @@ check "hook exports the bootstrap hint for bash children" \
 # the flag line in .ddev/config.yaml, and the echo output.
 DWORK=$(mktemp -d)
 
-# flag writer: appends iff absent, idempotent, comment on its own lines
+# flag writer: inserts iff absent, idempotent, comment on its own lines
 mkdir -p "$DWORK/fw/.ddev"
 printf 'name: fw\ntype: typo3\n' > "$DWORK/fw/.ddev/config.yaml"
-check "flag writer: appends the key when absent" \
+check "flag writer: writes the key when absent" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null && grep -qx 'disable_settings_management: true' \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw"
 check "flag writer: idempotent (no duplicate key)" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; [ \"\$(grep -c '^disable_settings_management:' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw"
@@ -398,11 +398,29 @@ check "flag writer: pre-existing key (false) left untouched" \
 mkdir -p "$DWORK/fw3/.ddev"
 check "flag writer: missing config.yaml is a no-op" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" && test ! -f \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw3"
-# no trailing newline: the appended key must still land on its own line
+# no trailing newline: the inserted key must still land on its own line
 mkdir -p "$DWORK/fw4/.ddev"
 printf 'name: fw4' > "$DWORK/fw4/.ddev/config.yaml"
 check "flag writer: survives a file without trailing newline" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null && grep -qx 'disable_settings_management: true' \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw4"
+
+# insertion point (issue #28): below corepack_enable, below type: as
+# fallback, at the top as last resort — never appended after ddev's
+# trailing comment block. Blank line before and after, never doubled.
+mkdir -p "$DWORK/fw5/.ddev"
+printf 'name: fw5\ntype: typo3\ncorepack_enable: false\n\n# Key features of DDEV config.yaml:\n# name: <projectname>\n' > "$DWORK/fw5/.ddev/config.yaml"
+check "flag writer: inserts after corepack_enable (issue #28)" \
+    sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; _a=\$(grep -n '^corepack_enable:' \"\$2/.ddev/config.yaml\" | cut -d: -f1); _b=\$(grep -n '^disable_settings_management: true' \"\$2/.ddev/config.yaml\" | cut -d: -f1); [ \"\$((_b - _a))\" = 4 ]" _ "$HANDOVER" "$DWORK/fw5"
+check "flag writer: blank line after the inserted block (no doubling)" \
+    sh -c "[ \"\$(grep -c '^\$' \"\$1/.ddev/config.yaml\")\" = 2 ]" _ "$DWORK/fw5"
+mkdir -p "$DWORK/fw6/.ddev"
+printf 'name: fw6\ntype: typo3\ndocroot: public\n' > "$DWORK/fw6/.ddev/config.yaml"
+check "flag writer: type fallback when corepack_enable is absent (issue #28)" \
+    sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; _a=\$(grep -n '^type:' \"\$2/.ddev/config.yaml\" | cut -d: -f1); _b=\$(grep -n '^disable_settings_management: true' \"\$2/.ddev/config.yaml\" | cut -d: -f1); [ \"\$((_b - _a))\" = 4 ]" _ "$HANDOVER" "$DWORK/fw6"
+mkdir -p "$DWORK/fw7/.ddev"
+printf 'webimage: config.yaml\nhooks:\n  post-start:\n    - exec: \"ls\"\n' > "$DWORK/fw7/.ddev/config.yaml"
+check "flag writer: no anchor key at all -> top of the file (issue #28)" \
+    sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; [ \"\$(grep -n '^disable_settings_management: true' \"\$2/.ddev/config.yaml\" | cut -d: -f1)\" = 3 ] && [ \"\$(grep -c '^\$' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw7"
 
 # flagged detection
 check "flagged detection: true" \
@@ -415,9 +433,16 @@ mkdir -p "$DWORK/on/proj/.ddev" "$DWORK/on/proj/config/system"
 printf 'type: typo3\n' > "$DWORK/on/proj/.ddev/config.yaml"
 echo "db" > "$DWORK/on/proj/config/system/settings.php"
 chmod 2770 "$DWORK/on/proj"
+# testdata pruning (issue #29): a checkout of ddev's own repository ships
+# .ddev dirs under cmd/pkg testdata — fixtures, not projects. The scan
+# must neither chown them nor write dev-owned flags into their configs.
+mkdir -p "$DWORK/on/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev"
+printf 'name: p\ntype: php\n' > "$DWORK/on/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev/config.yaml"
 DON_OUT=$(DDEV_DEV_OWNED=true sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/on" 2>/dev/null || true)
 check "scan mode on: writes the dev-owned flag" \
     sh -c "grep -qx 'disable_settings_management: true' \"\$1/.ddev/config.yaml\"" _ "$DWORK/on/proj"
+check "scan mode on: .ddev inside testdata/ is skipped entirely (issue #29)" \
+    sh -c "! grep -q 'disable_settings_management:' \"\$1/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev/config.yaml\" && ! printf '%s\n' \"\$2\" | grep -q 'testdata'" _ "$DWORK/on" "$DON_OUT"
 check "scan mode on: undetected typo3 root stays dev-owned 2775 (no bootstrap handover)" \
     sh -c "test \"\$(stat -c %a \"\$1\")\" = 2775" _ "$DWORK/on/proj"
 check "scan mode on: settings dir stays with the developer" \

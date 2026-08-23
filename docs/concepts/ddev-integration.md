@@ -120,9 +120,10 @@ gap between cloning and the next handover run: before `ddev start` /
 `ddev restart` it detects the bootstrap case (fresh `typo3` clone whose
 root still belongs to you) and prints the ready-made
 `config handover` command instead of leaving you with ddev's cryptic
-`operation not permitted`. The scan never descends into `vendor/` or
-`node_modules/` — a `.ddev` directory found there is a shipped test
-fixture, not a project. Your
+`operation not permitted`. The scan never descends into `vendor/`,
+`node_modules/` or `testdata/` trees — a `.ddev` directory found there
+is a shipped test fixture, not a project (a checkout of ddev's own
+repository carries dozens, issue #29). Your
 `.git/` stays yours (ownership untouched; the group baseline makes it
 group-accessible — see [the sharing group](sharing-group.md)).
 
@@ -132,7 +133,12 @@ The handover model exists because ddev chmods settings paths outside
 `.ddev/` on every start. **Dev-owned mode removes that cause**: the kit
 writes `disable_settings_management: true` into each project's committed
 `.ddev/config.yaml` (installer default; `config.sh ddev-settings
-on|off|status`), and ddev then never writes or chmods anything outside
+on|off|status`) — inserted directly below the head of the file (after
+`corepack_enable:`, `type:` as fallback), never appended at the end
+where ddev's default template hides it behind a wall of commented
+examples (issue #28). Fixture `.ddev` dirs under `vendor/`,
+`node_modules/` and `testdata/` are never flagged. ddev then never
+writes or chmods anything outside
 `.ddev/`. Settings dirs and project roots stay developer-owned
 permanently (2775/664 via the group baseline) — no handover, no
 handback, `git checkout` always free, fresh clones work from the first
@@ -200,8 +206,8 @@ missing hostnames with one ready-made command each —
 standalone from anywhere, so you add exactly what was reported;
 `ddev-hosts-check` lists them on demand, and
 `opencode-permissions-kit status` reports them per project root (its
-scan skips `vendor/` and `node_modules/` — composer/npm packages ship
-their own `.ddev` dirs that are not your projects).
+scan skips `vendor/`, `node_modules/` and `testdata/` — packages and
+test fixtures ship their own `.ddev` dirs that are not your projects).
 
 ## The SSH-key trade-off
 
