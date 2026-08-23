@@ -169,6 +169,7 @@ Same idioms as `e2e_resolve_cache` (lib.sh): resolve, compare, fall back.
 | R7 | router ports <1024 under rootless | suite pins the documented rootless answer — `ddev config global --router-http-port 8080 --router-https-port 8443` — instead of the host-wide sysctl; the sysctl question stays covered by unit tests |
 | R8 | ddev update checks / instrumentation phone home and add flakiness | warm-up sets `DDEV_NO_INSTRUMENTATION=true` + update-check off in `~opencode/.ddev/global_config.yaml`; offline repeat runs stay green |
 | R9 | plain-Linux runners: ddev adds unresolvable `.local` hostnames to `/etc/hosts` via `ddev-hostname`, which the suite never installs → `ddev start` dies with "Binary not found" (first GitHub run; WSL2 passed by accident — ddev reads the *Windows* hosts file there, missing in the container ⇒ warn+skip) | `dd_seed_hosts` pre-seeds the suite's fixed `.local` hostnames into the container's `/etc/hosts` on every boot (cold-build + warm-start), so ddev finds them already managed and never calls `ddev-hostname`; removal attempts on `ddev delete` only warn |
+| R10 | fresh checkouts (actions/checkout or any clone) carry neither setgid nor group-write on the camino fixture — git cannot store mode bits beyond the executable flag. The dev-owned handback re-asserts only `g+w`, never setgid, so `config/system` ended at 0775/0755 and DD10's `2775` assert failed on the second GitHub run (the workspace's ext4 copy ships 2775 — locally invisible) | the camino-e2e copy step now applies the kit's group baseline explicitly (`chmod -R g+w` + setgid on dirs), modeling what `fs-baseline.sh` does to every registered project root on a real machine |
 
 ## 7. Test catalog (DD sections)
 
@@ -403,6 +404,10 @@ bare-origin flow (DD12).
   image caching between runs (R6). The chmod-list rule now covers all
   THREE workflow files (`tests/test-workflows.sh` enforces it, including
   the runner `tests/e2e/run-ddev.sh`).
+  **First green GitHub run (full camino tier): 2026-08-23** — after two
+  plain-Linux fixes the workspace could not catch (R9 hosts seeding, R10
+  fixture group baseline). Both prior failing runs are pinned in the
+  issue tracker. Weekly `schedule` is now unblocked.
 - **Docs:** this record + a MANUAL.md "troubleshooting with e2e-ddev" note +
   README testing mention in the same PR as the runner (repo rule: docs move
   with code).

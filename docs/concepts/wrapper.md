@@ -42,9 +42,14 @@ In serve mode the wrapper therefore:
   there is no single opt-in to confirm; whether a session may actually
   use docker/ddev stays decided by the `opencode.jsonc` rules.
 
-`OPENCODE_SERVER_PASSWORD` is preserved across the `sudo -u opencode`
-exec, so a password a UI passes to the server survives (see the
-[OpenChamber how-to](../how-to/openchamber.md)).
+`OPENCODE_SERVER_PASSWORD` and `OPENCODE_SERVER_USERNAME` are preserved
+across the `sudo -u opencode` exec, so the Basic-auth credentials a UI
+passes to the server survive (see the
+[OpenChamber how-to](../how-to/openchamber.md)). No other `OPENCODE_*`
+variable crosses the sudo boundary: agent-side configuration
+(`OPENCODE_CONFIG*`, `OPENCODE_AUTH_CONTENT`, `OPENCODE_PERMISSION`,
+…) lives in the opencode user's own environment, and sudo's env reset
+is what keeps the calling shell from overriding it per invocation.
 
 ## Self-update bypass protection (default-user deny-all)
 
