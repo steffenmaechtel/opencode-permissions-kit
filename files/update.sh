@@ -61,7 +61,10 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    mkdir -p "$dir/opencode-permissions-kit-lib/bin"
+    # Pre-create every subdirectory referenced by KIT_FILES (bin/, tui/):
+    # curl -o cannot write into a missing directory and aborts the fetch
+    # with error 23 ("Failure writing output to destination").
+    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/tui"
     for f in $KIT_FILES; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
