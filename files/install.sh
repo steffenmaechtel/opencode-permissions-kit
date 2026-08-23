@@ -43,7 +43,10 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    mkdir -p "$dir/opencode-permissions-kit-lib/bin"
+    # Pre-create every subdirectory referenced by the file list (bin/, tui/):
+    # curl -o cannot write into a missing directory and aborts the fetch
+    # with error 23 ("Failure writing output to destination").
+    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/tui"
     for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
              opencode-deny-all.jsonc \
              sudoers.template umask.sh VERSION \

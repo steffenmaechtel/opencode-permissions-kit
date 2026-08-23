@@ -163,6 +163,88 @@ case "$_deploy_missing" in
         ;;
 esac
 
+# --- 5. fetch_kit pre-creates every subdirectory in the list ----------------------
+# curl -o cannot write into a missing directory: the streamed fetch aborts
+# with curl error 23 at the first nested file (the tui/ regression — every
+# `opencode-permissions-kit update` from the library failed mid-fetch).
+fetch_body() {
+    sed -n '/^fetch_kit() {/,/^}/p' "$1"
+}
+
+# unique subdirectory prefixes referenced by the (verified-identical) lists
+subdirs=$(for f in $update_list; do case "$f" in */*) echo "${f%/*}" ;; esac; done | sort -u)
+
+mkdir_missing=""
+for script in "$INSTALL" "$UPDATE"; do
+    name="${script##*/}"
+    body="$(fetch_body "$script")"
+    for d in $subdirs; do
+        # a literal "$dir/$d" or any deeper "$dir/$d/..." mkdir covers $d
+        # (mkdir -p creates the parents)
+        echo "$body" | grep -qF "\"\$dir/$d\"" \
+            || echo "$body" | grep -qF "\"\$dir/$d/" \
+            || mkdir_missing="$mkdir_missing $name:$d"
+    done
+done
+if [ -z "$mkdir_missing" ]; then
+    pass "fetch_kit pre-creates every listed subdirectory ($(echo "$subdirs" | tr '\n' ' '))"
+else
+    fail "fetch_kit does not pre-create listed subdirectories (curl error 23):$mkdir_missing"
+fi
+
+# 5a. canary: without the tui/ mkdir the guard above must trip. Mutate a
+#     COPY of update.sh exactly like the original regression.
+sed 's| "\$dir/opencode-permissions-kit-lib/tui"||' "$UPDATE" > "$WORK/update-notui.sh"
+_canary=""
+_body="$(fetch_body "$WORK/update-notui.sh")"
+for d in $subdirs; do
+    echo "$_body" | grep -qF "\"\$dir/$d\"" \
+        || echo "$_body" | grep -qF "\"\$dir/$d/" \
+        || _canary="$_canary $d"
+done
+case "$_canary" in
+    *opencode-permissions-kit-lib/tui*)
+        pass "canary: missing tui/ mkdir is detected"
+        ;;
+    *)
+        fail "canary: missing tui/ mkdir is detected (guard is blind!)"
+        ;;
+esac
+
+# 5b. functional: run update.sh's fetch_kit with a fake curl that writes the
+#     -o target directly (NO directory creation, like real curl — a missing
+#     parent dir must fail, reproducing curl error 23).
+mkdir -p "$WORK/fakebin"
+cat > "$WORK/fakebin/curl" <<'FAKE'
+#!/bin/sh
+_out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "-o" ] && _out="$2" && break
+    shift
+done
+printf 'stub\n' > "$_out"
+FAKE
+chmod +x "$WORK/fakebin/curl"
+
+sed -n '/^KIT_FILES="/,/"$/p' "$UPDATE" > "$WORK/kitfiles.env"
+sed -n '/^fetch_kit() {/,/^}/p' "$UPDATE" > "$WORK/fetchkit.fn"
+_fk_dir="$(PATH="$WORK/fakebin:$PATH" sh -c '
+    . "$1"
+    eval "$(cat "$2")"
+    fetch_kit
+' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" 2>/dev/null || true)"
+_fk_base="$(dirname "$_fk_dir")"
+_fk_missing=""
+for f in $update_list; do
+    if [ "$f" = "VERSION" ]; then p="$_fk_base/VERSION"; else p="$_fk_dir/$f"; fi
+    [ -f "$p" ] || _fk_missing="$_fk_missing $f"
+done
+if [ -z "$_fk_missing" ] && [ -n "$_fk_dir" ]; then
+    pass "functional: fake-curl fetch_kit writes every listed file incl. nested dirs"
+else
+    fail "functional: fake-curl fetch_kit writes every listed file (missing:$_fk_missing)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
