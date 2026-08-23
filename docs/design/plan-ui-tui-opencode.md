@@ -310,10 +310,14 @@ check (B1, §5).
      to win single_winner and re-render the stock footer plus a mode
      chip after the path — behind a per-opencode-version compatibility
      check (the stock footer's internals drift, e.g. 1.18.21).
-   - the plugin tui.json lives on the opencode user only (the bypass
-     TUI deliberately gets NO kit plugin — it is the thing being
-     warned about, and the plugin could not trust its environment
-     anyway).
+   - the plugin tui.json lives on BOTH users: the opencode user gets
+     the mode row; the default user's template registers the SAME
+     plugin, which detects the bypass (process user ≠ install.conf's
+     OPENCODE_USER, real uid via os.userInfo) and renders
+     `WARNING UNSECURE (bypass of opencode-permissions-kit detected)`
+     in theme.error instead of the mode row — red theme + warning row
+     together (revised 2026-08-23: the earlier "no plugin on the bypass
+     TUI" stance was dropped in favor of the explicit in-TUI warning).
  5. **Update flow:** `update.sh` re-deploys the theme/plugin and
    re-renders the tui.json files (same KIT_FILES pattern as the other
    payloads); backend toggles (`config.sh container-backend`) need no

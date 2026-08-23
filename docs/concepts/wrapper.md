@@ -79,8 +79,17 @@ bypass warning.
 The same HOME-keyed mechanism carries a visible marker for this case: the
 kit installs a **red `opencode-danger` theme** for the default user
 (`~/.config/opencode/tui.json` + `~/.config/opencode/themes/`). If the
-original binary ever runs as your user, its TUI is red — the deny-all
-config still does the actual guarding, the color is the amplifier.
+original binary ever runs as your user, its TUI is red **and** shows a
+warning row at the very bottom:
+
+```
+WARNING UNSECURE (bypass of opencode-permissions-kit detected)
+```
+
+The plugin detects the case by comparing the process user against the
+kit's `OPENCODE_USER` stamp (the real uid — immune to environment
+spoofing). The deny-all config still does the actual guarding; the red
+look and the warning row are the visible amplifiers.
 
 ## Mode display in the TUI
 

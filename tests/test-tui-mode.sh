@@ -65,6 +65,8 @@ check_no "opencode-user template sets NO theme (user theme freedom)" \
     grep -q '"theme":' "$TUIJSON"
 check "default-user template sets the danger theme" \
     grep -q '"theme": "opencode-danger"' "$TUIDANGER"
+check "default-user template registers the plugin (bypass warning row)" \
+    grep -q '"/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"' "$TUIDANGER"
 check "danger theme is valid JSON with a theme object" \
     python3 -c "import json,sys; d=json.load(open('$THEME')); sys.exit(0 if 'theme' in d and 'defs' in d else 1)"
 
@@ -86,6 +88,14 @@ check "plugin renders the kit-prefixed mode string" \
     grep -qF '{prefix} Mode: {mode}' "$PLUGIN"
 check "plugin reads the kit VERSION stamp from install.conf" \
     grep -q 'VERSION=' "$PLUGIN"
+check "plugin renders the bypass warning string (exact wording)" \
+    grep -qF 'WARNING UNSECURE (bypass of opencode-permissions-kit detected)' "$PLUGIN"
+check "plugin detects the bypass via the real process user" \
+    grep -q 'os.userInfo()' "$PLUGIN"
+check "plugin reads OPENCODE_USER from install.conf for bypass detection" \
+    grep -q 'OPENCODE_USER' "$PLUGIN"
+check "bypass warning renders in the theme error color" \
+    grep -q 'theme.error' "$PLUGIN"
 check "plugin wording: with ddev/docker" \
     grep -q '"with ddev/docker"' "$PLUGIN"
 check "plugin wording: no ddev/docker" \
