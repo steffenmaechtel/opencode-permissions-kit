@@ -11,28 +11,42 @@ exact version opencode v1.18.15 pins via its package.json catalog).
 The kit installs opencode in one of several security postures, but once
 the TUI is running **nothing on screen says which one you are in**:
 
-| Kit mode (working title) | Meaning | Theme (decided 2026-08-23) |
+| Kit mode (working title) | Meaning | Display (decided 2026-08-23, revised same day) |
 |---|---|---|
-| `[full]` hardened | no container backend at all — docker/ddev denied everywhere | built-in **`matrix`** (green) |
-| `[strong]` rootless | rootless container backend, soft permission layer (today's default install) | built-in **`github`** (blue primary, purple/cyan accents) |
-| `[danger]` bypassed | the agent is NOT running under the kit's separation — e.g. the developer launches the original opencode binary as **their own user** (self-update bypass, the case the deny-all lockout exists for) | custom **`opencode-danger`** (red) — draft in appendix A |
+| `[no ddev/docker]` hardened | no container backend at all — docker/ddev denied everywhere | footer text `Mode: no ddev/docker` — theme stays the USER's choice |
+| `[with ddev/docker]` rootless | rootless container backend, soft permission layer (today's default install) | footer text `Mode: with ddev/docker` — theme stays the USER's choice |
+| `[danger]` bypassed | the agent is NOT running under the kit's separation — e.g. the developer launches the original opencode binary as **their own user** (self-update bypass, the case the deny-all lockout exists for) | custom **`opencode-danger`** (red) theme — draft in appendix A |
+
+Wording note: the user-facing strings deliberately avoid the internal
+`[full]`/`[strong]` working titles and the docs' older "no container
+tools / container tools opted in" — `Mode: no ddev/docker` and
+`Mode: with ddev/docker` are what a user can read at a glance (the
+docs' state names were aligned to this wording on 2026-08-23).
 
 Two ideas from the maintainer (2026-08-23):
 
 1. **Status display** — while the TUI is open, show something like
-   `Mode: [strong] rootless containers`.
+   `Mode: with ddev/docker`.
 2. **Theme-by-mode** — start opencode with a theme that encodes the mode
    (`opencode --theme=green|red`), so a glance at the window is enough.
 
-Refinement (maintainer, same day): the theme does not need a CLI flag
-at all — it can follow **which user's HOME the TUI runs under**:
+Revision (maintainer, same day): **no kit themes for the opencode user**
+— users like picking their own theme via `/theme`, and there is a hard
+technical reason: `config.theme` from tui.json **shadows the KV the
+`/theme` picker writes** (`context/theme.tsx:121` —
+`config.theme ?? kv.get("theme")`). A kit-set theme would silently
+disable the user's own theme selection. The red warning theme stays —
+but ONLY for the default user (the bypass case), where "theme freedom"
+is not the point:
 
 - wrapper path (`opencode` → `sudo -u opencode`) → HOME is
-  `/home/opencode` → the opencode user's global `tui.json` applies →
-  green (`[full]`, no backend) or cyan/blue (`[strong]`, backend on).
+  `/home/opencode` → **no tui.json from the kit at all**; the mode is
+  shown as text in the TUI (option B).
 - original binary as the developer (`~/.opencode/bin/opencode` or
   wherever the self-updater put it) → HOME is `/home/$DEFAULT_USER` →
-  the developer's global `tui.json` applies → **red**.
+  the developer's global `tui.json` applies → **red**
+  `opencode-danger` (appendix A) — deliberate warning styling on the
+  path that bypasses the kit's UID separation.
 
 This works without any env transport: sudo's env_reset rewrites HOME to
 the target user (HOME is not in the kit's env_keep — verified against
@@ -151,7 +165,7 @@ v0.4.5 tag:
   (opentui `renderer.ts:3838`, native zig fn). opencode's own TUI uses
   it (`app.tsx:457-474`, title `"OpenCode"` / `"OC | <session>"`) — so
   it exists and works in the pinned 0.4.5. A mode suffix like
-  `OC | <session> — [strong] rootless` would show in tab bars / tmux
+  `OC | <session> — with ddev/docker` would show in tab bars / tmux
   pane titles **even when the TUI is not focused**. Caveat: the app
   re-sets the title on route changes — a plugin must re-assert after
   `event.on(...)` route/session events or the suffix disappears (no
@@ -160,7 +174,7 @@ v0.4.5 tag:
   notifications (opentui `renderer.ts:1823`). opencode's attention
   system uses it (`attention.ts:185`). A kit plugin could notify when
   the rootless socket dies mid-session ("backend gone — mode downgraded
-  to [full]").
+  to no ddev/docker").
 - **Mouse events, keyboard events** via the renderer (`enableMouse`,
   kitty keyboard protocol flags, RawMouseEvent/KeyEvent parsing) —
   enough to build a hoverable status widget later; not needed for v1.
@@ -185,113 +199,172 @@ API-stability caveat: everything the kit uses must be re-verified
 against the pinned @opentui/* version whenever opencode bumps it (the
 opencode catalog is the source of truth; today 0.4.5).
 
+### 3.8 Slot mechanics — where a plugin's UI can actually land
+
+Verified at opencode v1.18.15 + opentui v0.4.5 (registry sorting:
+ascending by `order`; slot `mode` is chosen by the HOST when mounting):
+
+- **What the stock footer is:** the home-screen footer (path left,
+  MCP indicator, version right) is itself a TUI plugin —
+  `feature-plugins/home/footer.tsx`, id `internal:home-footer`,
+  registered in slot **`home_footer` with `order: 100`**.
+- **`home_footer` is mounted `mode="single_winner"`** (routes/home.tsx):
+  only the FIRST registration (lowest order) renders. A kit plugin
+  cannot append "Mode: …" after the path — it would have to register
+  with `order < 100` and re-render the whole footer itself (directory,
+  MCP, version) = forking upstream footer code, drift on every update
+  (1.18.21 already reshuffles it: version replaced by cost/context on
+  narrow widths).
+- **The session footer is not a slot at all** (routes/session/footer.tsx
+  is hardcoded app UI: directory left, permissions/LSP/MCP right) — no
+  plugin can append after the path during a session.
+- **`app_bottom` is mounted without a mode → default append**
+  (app.tsx:1125): every registered plugin renders, stacked — a thin
+  full-width row at the very bottom, present on BOTH home and session
+  screens. This is the only universal, non-forking in-canvas slot for
+  the mode text; the TUI is responsive, an own row never competes with
+  the footer's shrinkable columns.
+
+Consequence for the design: "Mode: no ddev/docker / with ddev/docker after the path"
+is only achievable by replacing the home footer (fork) — the robust
+v1 is `app_bottom` (own thin row) + the terminal-title suffix (F),
+with footer replacement as an optional variant behind a compatibility
+check (B1, §5).
+
 ## 4. Options, weighed
 
 | # | Mechanism | Shows mode? | Sets theme? | Pros | Cons |
 |---|---|---|---|---|---|
-| A | Kit-written `~/.config/opencode/tui.json` (`theme` key) + kit theme files in `~/.config/opencode/themes/` | no (static) | at start | no code in opencode, no plugin runtime, survives updates, mode changes only via `config.sh` anyway (rare) → re-render then | static per start; a user's own tui.json edits could drift (kit owns the file — needs merge policy) |
-| B | Kit TUI plugin (absolute path spec from the kit dir) in that tui.json | **yes, live** | **yes, live** (`theme.set`) | real status line (`Mode: [strong] rootless`), can probe socket/install.conf itself, reacts to mode changes without restart | TUI plugin API is young/undocumented upstream — pin + smoke-test per opencode version; JS surface to maintain; plugin runs with TUI privileges |
+| A' | Kit-written `tui.json` + `opencode-danger` theme — **default user ONLY** | no (static) | at start (danger only) | no code in opencode, no plugin runtime, red warning exactly on the bypass path | none relevant — the bypass user is being warned, not styled; if they change the theme, the warning styling is gone (acceptable: deny-all still guards) |
+| A | ~~Kit themes for the opencode user (`matrix`/`github`)~~ | — | — | **rejected in revision**: `config.theme` shadows the `/theme` picker's KV (theme.tsx:121) — a kit theme would lock users out of their own theme selection | — |
+| B | Kit TUI plugin (absolute path spec from the kit dir) in the opencode user's tui.json | **yes, live** | n/a now (dropped by revision) | real status text (`Mode: with ddev/docker`), can probe socket/install.conf itself, reacts to mode changes without restart | TUI plugin API is young/undocumented upstream — pin + smoke-test per opencode version; JS surface to maintain; plugin runs with TUI privileges |
 | C | `OPENCODE_TUI_CONFIG` env from the wrapper + env_keep | no | at start | per-launch choice without writing files | **rejected**: env_keeping it = JS injection path into the TUI process from any calling shell (3.2) |
-| D | Upstream `--theme` CLI flag | no | at start | nicest UX (`opencode --theme=green`) | does not exist in v1.18.15; upstream PR + release lag; still only start-time |
+| D | Upstream `--theme` CLI flag | no | at start | nicest UX (`opencode --theme=green`) | does not exist in v1.18.15; upstream PR + release lag; still only start-time; theme-for-opencode-user dropped anyway |
 | E | Terminal-level tricks (title bar via OSC, wrapper-set env in PS1) | outside TUI | no | zero opencode coupling | fragile, invisible inside tmux/pane titles, not "in the TUI" |
 | F | Plugin-driven terminal title (`renderer.setTerminalTitle`, 3.7) | **yes — in tab/tmux title, even unfocused** | no | exists + battle-tested in pinned 0.4.5 (opencode sets `"OC | <session>"` itself); zero layout risk; visible across tmux panes | not inside the TUI canvas; app re-sets the title on route changes — plugin must re-assert after route/session events; users who disable the title (`terminal_title_enabled`) must be respected |
 
-**Recommendation: A + B combined, delivered in kit terms (F as a B bonus):**
+**Recommendation (revised): A' + B, F as a B bonus:**
 
-- **A (theme-by-identity, cheap, do first):** two global `tui.json`
-  files, following HOME (see §1 refinement):
-  - `/home/opencode/.config/opencode/tui.json` — rendered by the kit
-    with `"theme": "<green|cyan/blue built-in>"` depending on the
-    backend stamps in install.conf (`[full]` vs `[strong]`).
-  - `/home/$DEFAULT_USER/.config/opencode/tui.json` — `"theme":
-    "<red>"`; deployed only-if-absent exactly like the deny-all
-    lockout next door (install.sh:1442 pattern).
-  **Built-ins first, custom files only where needed** (decided
-  2026-08-23):
-  - `[full]` green: built-in `matrix` (primary `rainGreen`)
-  - `[strong]`: built-in `github` — blue primary (`#58a6ff`) with
-    purple secondary / cyan accent (reads blue-purple; maintainer's
-    pick — docker/ddev tier)
-  - `[danger]` red: **no built-in has a red primary** → ship exactly
-    ONE custom theme `opencode-danger.json` (appendix A), a fork of
-    the built-in `lucent-orng` with the orange system remapped to red
-    (same structure: transparent backgrounds, small defs table).
-    Deployed to `~/.config/opencode/themes/` of BOTH users — custom
-    themes are discovered from `themes/*.json` in either config dir,
-    no upstream code involved.
-  Trade-off built-ins vs customs: built-ins = zero shipped files but
-  their look can drift with opencode updates (a renamed/removed
-  built-in would fall back to `opencode` default — acceptable, the
-  mode still exists); customs = stable look but files to maintain
-  (here: one).
-  Precedence note: `config.theme` from tui.json **outranks the KV**
-  the `/theme` picker writes (`context/theme.tsx:121` —
-  `config.theme ?? kv.get("theme")`) — a kit-set theme is
-  authoritative; the escape hatch is editing/removing tui.json
-  (document it).
-- **B (status line, second step):** `files/tui-plugin/` ships a tiny
-  plugin registered by the same tui.json (`plugin:
-  ["/usr/local/lib/opencode-permissions-kit/tui-plugin/index.js"]`),
-  rendering `Mode: [strong] rootless containers` in `home_footer`/
-  `app_bottom`, reading install.conf + probing the socket; may also
-  call `theme.set()` so the theme tracks reality (e.g. socket gone →
-  visually downgraded) and send itself `SIGUSR2` after theme installs.
+- **A' (danger theme, default user only):** `/home/$DEFAULT_USER/.config/
+  opencode/tui.json` with `"theme": "opencode-danger"` + the theme file
+  in `~/.config/opencode/themes/` — deployed only-if-absent exactly
+  like the deny-all lockout next door (install.sh:1442 pattern). No
+  tui.json for the opencode user at all (theme freedom preserved —
+  nothing shadows `/theme`).
+- **B (status text — now the primary mode display):** `files/tui-plugin/`
+  ships a tiny plugin rendering `Mode: no ddev/docker` / `Mode: with ddev/docker`,
+  reading install.conf + probing the socket. Placement constraints
+  (verified, see §3.8): "right after the path" is NOT available as an
+  append — the only universal, non-forking slot is `app_bottom`
+  (append mode, one thin row, home + session screens). Rendering in
+  `home_footer` itself is possible but single_winner means replacing
+  the built-in footer wholesale (fork risk on every upstream update,
+  e.g. 1.18.21's cost/context column) — B1 below.
 - **F (cheap extra inside B):** the same plugin suffixes the terminal
-  title (e.g. `OC | session — [strong]`), re-asserted on route/session
-  events, gated on the user's `terminal_title_enabled` KV state; and
-  may call `triggerNotification` when the backend socket dies
-  mid-session.
+  title (e.g. `OC | session — docker/ddev`), re-asserted on route/
+  session events, gated on the user's `terminal_title_enabled` KV
+  state; and may call `triggerNotification` when the backend socket
+  dies mid-session.
 
 ## 5. Design sketch (for the implementing PR)
 
 1. **Mode derivation helper** (`opencode-permissions-kit-lib/`):
-   `kit_mode()` → `full|strong|danger` from install.conf + optional
-   socket probe. Shared by config.sh render + the plugin (which reads
-   install.conf itself — a shell-out or a duplicated tiny parser).
-   `danger` is not an install.conf state — it is the identity signal
-   (TUI running under the developer's HOME), so the helper only picks
-   `full|strong` for the opencode user's render; the dev-side file is
-   static red.
-2. **Theme choice (decided):** built-in `matrix` for `[full]`,
-   built-in `github` for `[strong]`, and one shipped custom theme
-   `files/tui-themes/opencode-danger.json` (appendix A draft) for
-   `[danger]`, deployed to both users' `~/.config/opencode/themes/`.
-   Anti-drift test: unit check that `matrix`/`github` still exist in
-   the installed opencode's theme list is not possible from the kit —
-   instead the docs note the fallback (unknown theme name → default
-   `opencode` theme, mode display unaffected).
-3. **tui.json ownership:** kit writes each file only if absent or
-   previously kit-written (marker key `_opencode_permissions_kit: true`,
-   ignored by opencode's schema). Never clobber user edits — identical
-   to the deny-all policy at install.sh:1441; document the escape hatch
-   (`config.sh tui-reset`?). Project-level `tui.json` (closer to cwd)
-   still outranks the global file — acceptable and worth a docs note.
-4. **Plugin (phase 2)** in `files/tui-plugin/`: no npm deps, plain JS,
-   defensive `try/catch` everywhere (a broken plugin must never take the
-   TUI down), unit-testable mode parser, version-pinned CI smoke test
-   (start TUI headless, assert the slot renders).
-5. **Update flow:** `update.sh` re-deploys themes/plugin and re-renders
-   both tui.json files (same KIT_FILES pattern as the other payloads);
-   backend toggles (`config.sh container-backend`) re-render the
-   opencode user's file so `[full]`↔`[strong]` recolors.
+   `kit_mode()` → `no-ddev-docker|with-ddev-docker` from install.conf
+   (backend stamps) + optional socket probe. Used by the plugin (which
+   reads install.conf itself — a shell-out or a duplicated tiny
+   parser). `danger` is not an install.conf state — it is the identity
+   signal (TUI running under the developer's HOME) and needs no
+   derivation: the red theme
+   file is static.
+2. **Theme choice (revised):** exactly ONE shipped custom theme —
+   `files/tui-themes/opencode-danger.json` (appendix A draft), deployed
+   to `/home/$DEFAULT_USER/.config/opencode/themes/` only. The opencode
+   user gets NO theme/tui.json (theme freedom preserved). The
+   default-user tui.json references the theme by name; if a future
+   opencode renames the schema, the theme silently stops loading
+   (fallback: default theme) — the deny-all lockout still guards, the
+   red was always only a visual amplifier.
+3. **tui.json ownership (default user only):** kit writes the file
+   only if absent or previously kit-written (marker key
+   `_opencode_permissions_kit: true`, ignored by opencode's schema).
+   Never clobber user edits — identical to the deny-all policy at
+   install.sh:1441; document the escape hatch (`config.sh tui-reset`?).
+   Project-level `tui.json` (closer to cwd) still outranks the global
+   file — acceptable and worth a docs note. The opencode user's
+   tui.json (plugin registration, see 4) follows the same ownership
+   rules.
+4. **Plugin (primary mode display)** in `files/tui-plugin/`: no npm
+   deps, plain JS, defensive `try/catch` everywhere (a broken plugin
+   must never take the TUI down), unit-testable mode parser,
+   version-pinned CI smoke test (start TUI headless, assert the slot
+   renders). Renders `Mode: no ddev/docker` / `Mode: with ddev/docker`:
+   - v1: slot **`app_bottom`** (append, own thin row, all screens) —
+     zero fork risk.
+   - optional variant **B1**: register `home_footer` with `order < 100`
+     to win single_winner and re-render the stock footer plus a mode
+     chip after the path — behind a per-opencode-version compatibility
+     check (the stock footer's internals drift, e.g. 1.18.21).
+   - the plugin tui.json lives on the opencode user only (the bypass
+     TUI deliberately gets NO kit plugin — it is the thing being
+     warned about, and the plugin could not trust its environment
+     anyway).
+ 5. **Update flow:** `update.sh` re-deploys the theme/plugin and
+   re-renders the tui.json files (same KIT_FILES pattern as the other
+   payloads); backend toggles (`config.sh container-backend`) need no
+   re-render anymore (the plugin derives the mode live).
+
+## 5a. Spike validation (2026-08-23, WSL2, opencode 1.18.21)
+
+Option B proved on the maintainer's machine with a minimal spike
+(project `.opencode/tui.json` + bare `.tsx` plugin registering
+`app_bottom`):
+
+- **The bare plugin loads with ZERO npm installs** in the project or
+  config dir — JSX (`@opentui/solid` runtime) and the
+  `@opencode-ai/plugin/tui` type-only import resolve against
+  opencode's own transpile/bundle. The feared dependency-resolution
+  blocker does not exist; the shipped kit plugin needs no node_modules.
+- **`app_bottom` renders** as a thin own row at the very bottom, on the
+  home screen and inside sessions.
+- **`api.theme.current` colors work** — the text followed the user's
+  own theme (osaka-jade: cyan-ish `info`), i.e. the status text adapts
+  to any user theme instead of fighting it.
+- **Mode derivation live from install.conf** (`CONTAINER_BACKEND=`
+  regex) worked; the displayed string was the pre-revision wording
+  (`Mode: docker/ddev` — before the wording change to
+  `with ddev/docker`).
+- Side observation: the wrapper correctly refused to start in an
+  unregistered directory (`/tmp/...`) until
+  `config projects add` registered it — the plugin path needs no
+  change, but an install-time note "the TUI shows Mode: ..." should
+  mention nothing here; behavior is orthogonal.
+
+Remaining unknowns after the spike: long-term API stability across
+opencode releases (pin + smoke test per version stays in the plan) and
+whether `theme.install()`/`theme.set()` behave the same for the danger
+theme (A' ships the theme as a FILE instead — no plugin needed there,
+so this is moot for v1).
 
 ## 6. Open questions
 
 - ~~Is `danger` a real kit state?~~ Resolved by the HOME refinement:
   danger = TUI under the developer's own HOME (original binary,
   self-update bypass) — the state the deny-all lockout already guards.
-- ~~Theme picks?~~ Decided 2026-08-23: `matrix` / `github` /
-  custom `opencode-danger` (lucent-orng fork, appendix A). Open: final
-  red tuning after seeing it in a real terminal (values in appendix A
-  are a first draft).
+- ~~Theme picks?~~ Decided 2026-08-23 (`matrix`/`github`/custom red),
+  then REVISED same day: no kit themes for the opencode user (theme
+  freedom + `/theme` shadowing), red `opencode-danger` for the default
+  user only. Open: final red tuning after seeing it in a real terminal
+  (values in appendix A are a first draft).
 - Does a project-local `tui.json` (precedence 3.3-3) override the kit
   theme too easily? Do we care (docs vs code)?
 - TUI plugin API stability across opencode releases — do we gate the
   plugin on the installed opencode version (kit knows it) and fall back
   to A-only? Includes the opentui pin (0.4.5 today) — recheck the
   `CliRenderer` surface we use whenever opencode bumps @opentui/*.
-- `home_footer` vs `app_bottom` — which slot survives upstream UI
-  reshuffles better?
+- ~~`home_footer` vs `app_bottom`~~ Resolved by §3.8: `home_footer` is
+  single_winner (replace-only, fork risk) and the session footer is not
+  slotted at all → v1 uses `app_bottom`; footer replacement (B1) is an
+  opt-in variant behind a version check.
 - Title suffix (F): respect the KV key `terminal_title_enabled` —
   read it via the plugin KV api or leave title handling entirely alone
   when disabled?

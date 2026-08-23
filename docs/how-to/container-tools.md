@@ -8,7 +8,7 @@ against the kit's rootless backend — and which rule order matters.
 Whether the project's `opencode.jsonc` enables container tools decides what
 the session gets — there is exactly one backend mode (rootless) either way:
 
-| | **no container tools** | **container tools opted in** |
+| | **no ddev/docker** | **with ddev/docker** |
 |---|---|---|
 | Enabled by | project has no docker/ddev allow | project `permission.bash` allows `docker *` / `ddev *` (broadly, not subcommand-only) |
 | opencode runs as | `opencode` user | `opencode` user, `DOCKER_HOST` → the user's rootless socket (docker-rootless), or the daemonless podman CLI |
