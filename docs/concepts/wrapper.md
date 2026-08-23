@@ -11,8 +11,9 @@ Every `opencode` invocation goes through the wrapper at
 1. **Validate working directory** — the current directory must be inside a
    path listed in `projects.conf`. Otherwise opencode does not start.
 2. **Detect container tools** — if the project's `opencode.jsonc` broadly
-   allows docker/ddev, the wrapper proposes running with the configured
-   rootless backend and asks for confirmation.
+   allows docker/ddev, the wrapper attaches the configured rootless
+   backend (no confirmation dialog — the state is visible in the TUI,
+   see [mode display](#mode-display-in-the-tui)).
 3. **Probe the backend** — docker-rootless: the per-user socket is verified
    reachable (as the `opencode` user, via the kit's `socket-check.sh`
    sudoers rule); podman-rootless: the `podman` CLI must be installed (an
@@ -23,15 +24,19 @@ Every `opencode` invocation goes through the wrapper at
    exported for the rootless socket (preserved across sudo via the kit's
    `env_keep`).
 
+The wrapper prints its banner and starts opencode **immediately** — no
+`Press Enter` pause and no `[Y/n]` container question (both removed in
+0.0.21: the question was effectively always answered with yes, and the
+kit's state is now visible inside the TUI at all times).
+
 ## The serve exception (headless start)
 
 `opencode serve` does not go through these steps. Third-party UIs like
 OpenChamber spawn the server non-interactively — stdin is `/dev/null` and
 stdout is parsed for the `opencode server listening on <url>` line — so
-banner, `Press Enter`, and the `[Y/n]` container question would break the
-startup (and `read` on a closed stdin kills the wrapper before it execs).
-
-In serve mode the wrapper therefore:
+any interactive prompt would break the startup (and `read` on a closed
+stdin kills the wrapper before it execs). Since 0.0.21 the wrapper is
+prompt-free everywhere; serve mode additionally:
 
 - skips the project-directory check — the server accepts sessions per
   client request, and the soft permission layer (global + per-project

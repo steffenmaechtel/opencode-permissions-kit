@@ -272,31 +272,19 @@ if [ "$CONTAINER_REQUESTED" = true ]; then
     fi
 fi
 
+# No prompts, no pause (since 0.0.21): the banner prints, opencode
+# starts immediately. The [Y/n] container question was always answered
+# with yes in practice, and the kit's state is now visible INSIDE the
+# TUI (mode row in app_bottom, docs/design/plan-ui-tui-opencode.md) —
+# a pause before the TUI would only delay that information. Serve mode
+# was never allowed to prompt (headless contract, 0.0.16); it keeps its
+# stderr advisory for attached container tools.
 if [ "$CONTAINER_AUTO" = true ]; then
-    # Prompt convention: docs/design/conventions.md — [Y/n] default capital,
-    # Enter accepts, y/yes/n/no case-insensitive.
-    printf "  Run opencode with %s? [Y/n] " "$CONTAINER_LABEL"
-    # EOF-safe: read fails on closed stdin and would kill the wrapper under
-    # set -e; an empty answer falls through to the default (yes).
-    IFS= read -r answer || answer=''
-    _ans=$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')
-    case "$_ans" in
-        n|no)
-            CONTAINER_DOCKER_HOST=""
-            CONTAINER_XDG=""
-            CONTAINER_PODMAN=""
-            ;;
-    esac
     if [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
-        echo ""
         printf "  ${GREEN}opencode will run with %s.${NC}\n" "$CONTAINER_LABEL"
-        echo ""
     fi
-else
-    if [ "$SERVE_MODE" != true ]; then
-        printf "  Press Enter to start opencode..."
-        IFS= read -r _ || :
-    elif [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
+elif [ "$SERVE_MODE" = true ]; then
+    if [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
         printf '  %b\n' "${GREEN}opencode serve: container tools attached via $CONTAINER_LABEL.${NC}" >&2
     fi
 fi
