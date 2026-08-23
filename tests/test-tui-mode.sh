@@ -83,7 +83,9 @@ sys.exit(0)"
 
 # --- plugin content -----------------------------------------------------------
 check "plugin renders the kit-prefixed mode string" \
-    grep -q 'opencode-permissions-kit Mode: {mode}' "$PLUGIN"
+    grep -qF '{prefix} Mode: {mode}' "$PLUGIN"
+check "plugin reads the kit VERSION stamp from install.conf" \
+    grep -q 'VERSION=' "$PLUGIN"
 check "plugin wording: with ddev/docker" \
     grep -q '"with ddev/docker"' "$PLUGIN"
 check "plugin wording: no ddev/docker" \
