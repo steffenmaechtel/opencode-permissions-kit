@@ -13,20 +13,20 @@ the TUI is running **nothing on screen says which one you are in**:
 
 | Kit mode (working title) | Meaning | Display (decided 2026-08-23, revised same day) |
 |---|---|---|
-| `[no ddev/docker]` hardened | no container backend at all — docker/ddev denied everywhere | footer text `Mode: no ddev/docker` — theme stays the USER's choice |
-| `[with ddev/docker]` rootless | rootless container backend, soft permission layer (today's default install) | footer text `Mode: with ddev/docker` — theme stays the USER's choice |
+| `[no ddev/docker]` hardened | no container backend at all — docker/ddev denied everywhere | footer text `opencode-permissions-kit Mode: no ddev/docker` — theme stays the USER's choice |
+| `[with ddev/docker]` rootless | rootless container backend, soft permission layer (today's default install) | footer text `opencode-permissions-kit Mode: with ddev/docker` — theme stays the USER's choice |
 | `[danger]` bypassed | the agent is NOT running under the kit's separation — e.g. the developer launches the original opencode binary as **their own user** (self-update bypass, the case the deny-all lockout exists for) | custom **`opencode-danger`** (red) theme — draft in appendix A |
 
 Wording note: the user-facing strings deliberately avoid the internal
 `[full]`/`[strong]` working titles and the docs' older "no container
-tools / container tools opted in" — `Mode: no ddev/docker` and
-`Mode: with ddev/docker` are what a user can read at a glance (the
+tools / container tools opted in" — `opencode-permissions-kit Mode: no ddev/docker` and
+`opencode-permissions-kit Mode: with ddev/docker` are what a user can read at a glance (the
 docs' state names were aligned to this wording on 2026-08-23).
 
 Two ideas from the maintainer (2026-08-23):
 
 1. **Status display** — while the TUI is open, show something like
-   `Mode: with ddev/docker`.
+   `opencode-permissions-kit Mode: with ddev/docker`.
 2. **Theme-by-mode** — start opencode with a theme that encodes the mode
    (`opencode --theme=green|red`), so a glance at the window is enough.
 
@@ -210,7 +210,7 @@ ascending by `order`; slot `mode` is chosen by the HOST when mounting):
   registered in slot **`home_footer` with `order: 100`**.
 - **`home_footer` is mounted `mode="single_winner"`** (routes/home.tsx):
   only the FIRST registration (lowest order) renders. A kit plugin
-  cannot append "Mode: …" after the path — it would have to register
+  cannot append "opencode-permissions-kit Mode: …" after the path — it would have to register
   with `order < 100` and re-render the whole footer itself (directory,
   MCP, version) = forking upstream footer code, drift on every update
   (1.18.21 already reshuffles it: version replaced by cost/context on
@@ -225,7 +225,7 @@ ascending by `order`; slot `mode` is chosen by the HOST when mounting):
   the mode text; the TUI is responsive, an own row never competes with
   the footer's shrinkable columns.
 
-Consequence for the design: "Mode: no ddev/docker / with ddev/docker after the path"
+Consequence for the design: "opencode-permissions-kit Mode: … after the path"
 is only achievable by replacing the home footer (fork) — the robust
 v1 is `app_bottom` (own thin row) + the terminal-title suffix (F),
 with footer replacement as an optional variant behind a compatibility
@@ -237,7 +237,7 @@ check (B1, §5).
 |---|---|---|---|---|---|
 | A' | Kit-written `tui.json` + `opencode-danger` theme — **default user ONLY** | no (static) | at start (danger only) | no code in opencode, no plugin runtime, red warning exactly on the bypass path | none relevant — the bypass user is being warned, not styled; if they change the theme, the warning styling is gone (acceptable: deny-all still guards) |
 | A | ~~Kit themes for the opencode user (`matrix`/`github`)~~ | — | — | **rejected in revision**: `config.theme` shadows the `/theme` picker's KV (theme.tsx:121) — a kit theme would lock users out of their own theme selection | — |
-| B | Kit TUI plugin (absolute path spec from the kit dir) in the opencode user's tui.json | **yes, live** | n/a now (dropped by revision) | real status text (`Mode: with ddev/docker`), can probe socket/install.conf itself, reacts to mode changes without restart | TUI plugin API is young/undocumented upstream — pin + smoke-test per opencode version; JS surface to maintain; plugin runs with TUI privileges |
+| B | Kit TUI plugin (absolute path spec from the kit dir) in the opencode user's tui.json | **yes, live** | n/a now (dropped by revision) | real status text (`opencode-permissions-kit Mode: with ddev/docker`), can probe socket/install.conf itself, reacts to mode changes without restart | TUI plugin API is young/undocumented upstream — pin + smoke-test per opencode version; JS surface to maintain; plugin runs with TUI privileges |
 | C | `OPENCODE_TUI_CONFIG` env from the wrapper + env_keep | no | at start | per-launch choice without writing files | **rejected**: env_keeping it = JS injection path into the TUI process from any calling shell (3.2) |
 | D | Upstream `--theme` CLI flag | no | at start | nicest UX (`opencode --theme=green`) | does not exist in v1.18.15; upstream PR + release lag; still only start-time; theme-for-opencode-user dropped anyway |
 | E | Terminal-level tricks (title bar via OSC, wrapper-set env in PS1) | outside TUI | no | zero opencode coupling | fragile, invisible inside tmux/pane titles, not "in the TUI" |
@@ -252,7 +252,7 @@ check (B1, §5).
   tui.json for the opencode user at all (theme freedom preserved —
   nothing shadows `/theme`).
 - **B (status text — now the primary mode display):** `files/tui-plugin/`
-  ships a tiny plugin rendering `Mode: no ddev/docker` / `Mode: with ddev/docker`,
+  ships a tiny plugin rendering `opencode-permissions-kit Mode: no ddev/docker` / `opencode-permissions-kit Mode: with ddev/docker`,
   reading install.conf + probing the socket. Placement constraints
   (verified, see §3.8): "right after the path" is NOT available as an
   append — the only universal, non-forking slot is `app_bottom`
@@ -297,7 +297,7 @@ check (B1, §5).
    deps, plain JS, defensive `try/catch` everywhere (a broken plugin
    must never take the TUI down), unit-testable mode parser,
    version-pinned CI smoke test (start TUI headless, assert the slot
-   renders). Renders `Mode: no ddev/docker` / `Mode: with ddev/docker`:
+   renders). Renders `opencode-permissions-kit Mode: no ddev/docker` / `opencode-permissions-kit Mode: with ddev/docker`:
    - v1: slot **`app_bottom`** (append, own thin row, all screens) —
      zero fork risk.
    - optional variant **B1**: register `home_footer` with `order < 100`
@@ -331,8 +331,8 @@ Option B proved on the maintainer's machine with a minimal spike
   to any user theme instead of fighting it.
 - **Mode derivation live from install.conf** (`CONTAINER_BACKEND=`
   regex) worked; the displayed string was the pre-revision wording
-  (`Mode: docker/ddev` — before the wording change to
-  `with ddev/docker`).
+  (`Mode: docker/ddev`) — later revised to
+  `opencode-permissions-kit Mode: with ddev/docker`.
 - Side observation: the wrapper correctly refused to start in an
   unregistered directory (`/tmp/...`) until
   `config projects add` registered it — the plugin path needs no
