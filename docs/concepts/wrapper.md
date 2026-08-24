@@ -9,7 +9,9 @@ Every `opencode` invocation goes through the wrapper at
 `/usr/local/bin/opencode`:
 
 1. **Validate working directory** — the current directory must be inside a
-   path listed in `projects.conf`. Otherwise opencode does not start.
+   path listed in `projects.conf`. Otherwise the interactive start is
+   refused (headless invocations skip this — see
+   [below](#headless-invocations-serve-run-queries)).
 2. **Detect container tools** — if the project's `opencode.jsonc` broadly
    allows docker/ddev, the wrapper attaches the configured rootless
    backend (no confirmation dialog — the state is visible in the TUI,
@@ -29,23 +31,46 @@ The wrapper prints its banner and starts opencode **immediately** — no
 0.0.21: the question was effectively always answered with yes, and the
 kit's state is now visible inside the TUI at all times).
 
-## The serve exception (headless start)
+## Headless invocations (serve, run, queries)
 
-`opencode serve` does not go through these steps. Third-party UIs like
-OpenChamber spawn the server non-interactively — stdin is `/dev/null` and
-stdout is parsed for the `opencode server listening on <url>` line — so
-any interactive prompt would break the startup (and `read` on a closed
-stdin kills the wrapper before it execs). Since 0.0.21 the wrapper is
-prompt-free everywhere; serve mode additionally:
+`opencode serve` and the other non-interactive subcommands do not go
+through the interactive path. Third-party tools spawn opencode
+non-interactively and parse its stdout:
 
-- skips the project-directory check — the server accepts sessions per
-  client request, and the soft permission layer (global + per-project
-  `opencode.jsonc`) still applies to every session,
-- prints nothing on stdout; diagnostics (shadow binary, backend
-  warnings) go to stderr,
-- resolves container tools silently — a server serves many projects, so
-  there is no single opt-in to confirm; whether a session may actually
-  use docker/ddev stays decided by the `opencode.jsonc` rules.
+| Invocation | Who uses it | What is parsed |
+|---|---|---|
+| `opencode serve` | OpenChamber, cezar, CodeWalk, the VS Code extension | `opencode server listening on <url>` |
+| `opencode run` | CI runners, kanban orchestrators, eval harnesses | `--format json` / stream-json events |
+| `opencode acp` | IDE agents (Agent Client Protocol) | JSON-RPC over stdio |
+| `opencode models`, `agent`, `providers`, `export`, … | cezar (model discovery), scripts | JSON/plain listings |
+
+A banner or prompt on stdout would break those parsers (and `read` on a
+closed stdin would kill the wrapper under `set -e`), and the
+project-directory check would refuse tools running from git worktrees or
+temporary checkouts. Headless invocations therefore:
+
+- skip the project-directory check — the soft permission layer (global +
+  per-project `opencode.jsonc`) still applies to every session,
+- print nothing on stdout; diagnostics (shadow binary, backend warnings)
+  go to stderr,
+- resolve container tools silently — `serve` always attaches them (a
+  server serves many projects); `run`/queries attach them when the CWD's
+  project config opts in. Whether a session may actually use docker/ddev
+  stays decided by the `opencode.jsonc` rules.
+
+What counts as headless: `serve`, `acp`, the query subcommands (`models`,
+`agent`, `providers`, `session`, `export`, `import`, `stats`, `account`,
+`github`, `pr`, `mcp`, `plug`, `db`, `generate`, `web`, `debug`,
+`uninstall`, `upgrade`), and `run` when a message argument is given or
+stdin is piped. Interactive TUI starts (no subcommand, flags-only
+starts, `tui`, `attach`, or `opencode run` on a terminal without a
+message) keep the banner and the project-directory check.
+
+Which ecosystem tools use which invocation — and the verified status of
+each — is tracked in the [compatibility
+matrix](../reference/compatibility.md) (issue #42 research). Tools that
+are opencode *plugins* (awesome-opencode) load inside the agent process
+and never touch the wrapper.
 
 `OPENCODE_SERVER_PASSWORD` and `OPENCODE_SERVER_USERNAME` are preserved
 across the `sudo -u opencode` exec, so the Basic-auth credentials a UI

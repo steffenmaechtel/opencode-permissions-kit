@@ -11,14 +11,17 @@ OpenChamber can manage the opencode server itself: it spawns
 connects to it. That spawn is non-interactive — stdin is closed and
 OpenChamber waits for the `opencode server listening on …` line on stdout.
 
-The kit's wrapper has a **headless serve mode** for exactly this spawn
+The kit's wrapper has a **headless mode** for exactly this spawn
 style: when the first argument is `serve`, it prints nothing on stdout,
 asks nothing, and starts the server as the `opencode` user directly.
 (Since 0.0.21 the wrapper is prompt-free in general — no `Press Enter`,
-no `[Y/n]` — but serve mode additionally keeps stdout clean for
+no `[Y/n]` — but headless mode additionally keeps stdout clean for
 parsers.) Project-directory checks do not apply to
 `serve` — sessions still get the global and per-project `opencode.jsonc`
-permission rules (see [the wrapper](../concepts/wrapper.md)).
+permission rules (see [the wrapper](../concepts/wrapper.md)). The same
+headless contract covers other ecosystem tools — `opencode run`
+orchestrators (cezar, CI runners) and `opencode acp` IDE agents — see
+[headless invocations](../concepts/wrapper.md#headless-invocations-serve-run-queries).
 
 ## Just run it
 

@@ -344,6 +344,113 @@ if [ -d /mnt/c ]; then
     fi
 fi
 
+# === Root-equivalent access audit (issue #37) ====================================
+# Root-equivalent surfaces BEYOND the kit's own backends: a rootful docker
+# daemon or containerd, LXD/libvirt — and, very common on WSL2, the Docker
+# Desktop / Rancher Desktop integration sockets under /mnt/wsl, which the
+# distro mounts world-usable. Any of these reachable by the agent user
+# breaks the "containers ≠ root" guarantee as thoroughly as a root docker
+# group membership. All checks are report-only stat math — no privileged
+# probe, no prompt, no fix (removing access is the admin's decision).
+
+# status_groups_hits <groups-list> <danger-list>: prints every group from
+# <danger-list> that appears in <groups-list> (word match).
+# shellcheck disable=SC2086  # word splitting intended: both are group lists
+status_groups_hits() {
+    for sgh_g in $2; do
+        case " $1 " in *" $sgh_g "*) printf '%s\n' "$sgh_g" ;; esac
+    done
+    return 0
+}
+
+# status_sock_agent_reachable <socket-path> <agent-groups>: exit 0 when the
+# agent user can plausibly connect — socket world-writable, or group-writable
+# with its group among <agent-groups>. Pure stat math, works unprivileged.
+status_sock_agent_reachable() {
+    ssr_mode=$(stat -c %a "$1" 2>/dev/null) || return 1
+    [ $((0$ssr_mode & 0002)) -ne 0 ] && return 0
+    if [ $((0$ssr_mode & 0020)) -ne 0 ]; then
+        ssr_grp=$(stat -c %G "$1" 2>/dev/null)
+        case " $2 " in *" $ssr_grp "*) return 0 ;; esac
+    fi
+    return 1
+}
+
+ui_section "Root-equivalent access (audit)"
+
+# Groups that are root-equivalent (or credential-equivalent) if the AGENT
+# user is a member. The kit never adds them — this catches later manual
+# grants (usermod -aG docker opencode "to make something work").
+sra_groups=$(id -nG "$OPENCODE_USER" 2>/dev/null || true)
+sra_finding=false
+# shellcheck disable=SC2086  # word splitting intended: group lists
+sra_red=$(status_groups_hits "$sra_groups" "docker containerd lxd libvirt libvirt-qemu snap disk sudo admin wheel" | tr '\n' ' ')
+# shellcheck disable=SC2086  # word splitting intended: group lists
+sra_yellow=$(status_groups_hits "$sra_groups" "wireshark adm systemd-journal" | tr '\n' ' ')
+sra_red=${sra_red% } ; sra_yellow=${sra_yellow% }
+if [ -n "$sra_red" ]; then
+    ui_kv "groups (root-equiv)" "$OPENCODE_USER in: $sra_red — full root, remove with: sudo gpasswd -d $OPENCODE_USER <group>" "$UI_RED"
+    sra_finding=true
+fi
+if [ -n "$sra_yellow" ]; then
+    ui_kv "groups (sensitive)" "$OPENCODE_USER in: $sra_yellow — log/packet access can leak credentials" "$UI_YELLOW"
+    sra_finding=true
+fi
+
+# Root-equivalent daemon sockets: system-wide paths plus everything the
+# WSL2 desktop integrations mount under /mnt/wsl (Docker Desktop exposes
+# its daemon socket world-usable to every WSL distro user by default).
+# Override the list via ROOT_EQUIV_SOCKS (same pattern as LEAK_SCAN_DIRS).
+sra_sock_list="/var/run/docker.sock /run/containerd/containerd.sock /var/lib/lxd/unix.socket /run/libvirt/libvirt-sock"
+sra_sock_list="${ROOT_EQUIV_SOCKS:-$sra_sock_list}"
+if [ -d /mnt/wsl ]; then
+    sra_sock_list="$sra_sock_list $(find /mnt/wsl -maxdepth 4 \( -type s -o -type l \) \( -name docker.sock -o -name podman.sock -o -name containerd.sock -o -name crio.sock \) 2>/dev/null)"
+fi
+sra_seen=""
+for sra_s in $sra_sock_list; do
+    [ -S "$sra_s" ] || continue
+    # dedup (symlinked paths resolve to the same socket)
+    sra_r=$(readlink -f "$sra_s" 2>/dev/null || echo "$sra_s")
+    case " $sra_seen " in *" $sra_r "*) continue ;; esac
+    sra_seen="$sra_seen $sra_r"
+    if status_sock_agent_reachable "$sra_s" "$sra_groups"; then
+        ui_kv "socket" "$sra_s — AGENT-REACHABLE (root-equivalent daemon)" "$UI_RED"
+        sra_finding=true
+    else
+        ui_kv "socket" "$sra_s — present, not agent-reachable" "$UI_GREEN"
+    fi
+done
+
+# Windows interop: with a world-executable /mnt/c the agent can run Windows
+# binaries as the Windows session user (no Linux root, but full Windows
+# profile access). The /mnt/c restriction above (fmask) also blocks this
+# exec path — this probe makes the interop outcome explicit.
+if [ -e /mnt/c/Windows/System32 ]; then
+    sra_mode=$(stat -c %a /mnt/c/Windows/System32/cmd.exe 2>/dev/null || true)
+    if [ -n "$sra_mode" ] && [ $((0$sra_mode & 0001)) -ne 0 ]; then
+        ui_kv "win interop" "agent can execute Windows binaries (/mnt/c world-executable)" "$UI_RED"
+        sra_finding=true
+    else
+        ui_kv "win interop" "blocked for the agent (/mnt/c restricted)" "$UI_GREEN"
+    fi
+fi
+
+# The agent user itself must have NO sudo rules (the kit grants rules only
+# to the developer, RunAs opencode). Only checkable when status.sh runs as
+# root; otherwise silent.
+if [ "$(id -u)" -eq 0 ] && command -v sudo >/dev/null 2>&1; then
+    if sudo -n -l -U "$OPENCODE_USER" 2>/dev/null | grep -Eq '\((ALL|opencode)[^)]*\)' ; then
+        ui_kv "sudo rules" "$OPENCODE_USER may run sudo — the kit grants it none (investigate)" "$UI_RED"
+        sra_finding=true
+    else
+        ui_kv "sudo rules" "none for $OPENCODE_USER" "$UI_GREEN"
+    fi
+fi
+
+if [ "$sra_finding" = false ]; then
+    ui_kv "result" "no root-equivalent access found for $OPENCODE_USER" "$UI_GREEN"
+fi
+
 # === Sensitive-file leak scan (report-only) =====================================
 # Name-based sweep of scratch directories for files matching the global deny
 # patterns. The kit protects storage locations, not information flows: a copy

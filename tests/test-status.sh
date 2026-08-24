@@ -159,6 +159,109 @@ else
 fi
 chmod 755 "$WORK/locked-runtime" 2>/dev/null || true
 
+# --- 1b. root-equivalent access audit (issue #37) --------------------------------
+# The audit ships two pure helpers (stat math only); they are extracted and
+# unit-tested directly, plus static assertions on the section wiring.
+if grep -q 'ui_section "Root-equivalent access' "$STATUS" \
+   && grep -q 'ROOT_EQUIV_SOCKS' "$STATUS" \
+   && grep -q '/mnt/wsl' "$STATUS"; then
+    pass "status.sh carries the root-equivalent access section (issue #37)"
+else
+    fail "status.sh carries the root-equivalent access section (issue #37)"
+fi
+
+(
+    . "$UI_LIB"
+    eval "$(sed -n '/^status_groups_hits()/,/^}/p' "$STATUS")"
+    eval "$(sed -n '/^status_sock_agent_reachable()/,/^}/p' "$STATUS")"
+
+    # groups: word match, no substring false positives (adm vs admin)
+    _out=$(status_groups_hits "opencode www-data" "docker sudo admin adm wheel")
+    [ "$_out" = "" ] && echo GROUPS-CLEAN-OK
+    _out=$(status_groups_hits "opencode docker adm" "docker sudo admin adm wheel" | tr '\n' ' ')
+    [ "$_out" = "docker adm " ] && echo GROUPS-HIT-OK
+
+    # socket reachability: real unix socket, perm math without root
+    _sock="$WORK/fake-daemon.sock"
+    python3 - "$_sock" <<'PYEOF'
+import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.bind(sys.argv[1])
+s.listen(1)
+PYEOF
+    _grp=$(id -gn)
+    chmod 666 "$_sock"
+    status_sock_agent_reachable "$_sock" ""          && echo SOCK-WORLDW-OK
+    chmod 660 "$_sock"; chgrp "$_grp" "$_sock"
+    status_sock_agent_reachable "$_sock" "$_grp"     && echo SOCK-GROUPW-OK
+    status_sock_agent_reachable "$_sock" "othergrp"  || echo SOCK-GROUPW-DENY-OK
+    chmod 660 "$_sock"; chgrp "$_grp" "$_sock"
+    status_sock_agent_reachable "$_sock" ""          || echo SOCK-NOOTHER-OK
+    status_sock_agent_reachable "$WORK/absent.sock" "" || echo SOCK-ABSENT-OK
+) > "$WORK/audit.out" 2>&1
+_audit_ok=0
+for _want in GROUPS-CLEAN-OK GROUPS-HIT-OK SOCK-WORLDW-OK SOCK-GROUPW-OK SOCK-GROUPW-DENY-OK SOCK-NOOTHER-OK SOCK-ABSENT-OK; do
+    if grep -q "$_want" "$WORK/audit.out"; then
+        _audit_ok=$((_audit_ok + 1))
+    else
+        fail "audit helper: missing $_want ($(cat "$WORK/audit.out"))"
+    fi
+done
+[ "$_audit_ok" -eq 7 ] && pass "root-equivalent audit helpers (groups + socket math)"
+
+# --- 1c. audit section body executes without crashing (review 0.0.22) -----------
+# The helper units above cover the math; this runs the WHOLE section body
+# (extraction like the backend case) against a fake agent user + a real
+# fake socket, under set -u — a crash here would otherwise only surface on
+# an installed host (the e2e grep hits an earlier line and passes anyway).
+# || true on the captures: the subshell deliberately runs under set -u and
+# its exit status must not kill this script (same pattern as run_case).
+AUDIT_SECTION="$(sed -n '/^# === Root-equivalent access audit/,/^# === Sensitive-file leak scan/p' "$STATUS" | sed '$d')"
+[ -n "$AUDIT_SECTION" ] || { echo "  ${RED}audit section not extractable${NC}"; exit 1; }
+_sock2="$WORK/fake-agent-sock"
+python3 - "$_sock2" <<'PYEOF'
+import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.bind(sys.argv[1])
+s.listen(1)
+PYEOF
+audit_out=$(
+    (
+        set -u; set +e
+        . "$UI_LIB"
+        OPENCODE_USER="root"                 # exists everywhere; id -nG works
+        ROOT_EQUIV_SOCKS="$_sock2"           # the fake socket, world-writable
+        chmod 666 "$_sock2" 2>/dev/null      # bind honors umask: force 666
+        eval "$AUDIT_SECTION"
+        exit 0
+    ) 2>&1
+) || true
+if printf '%s' "$audit_out" | grep -q "Root-equivalent access" \
+   && printf '%s' "$audit_out" | grep -q "AGENT-REACHABLE" \
+   && ! printf '%s' "$audit_out" | grep -q "parameter not set"; then
+    pass "audit section body runs (fake world-writable socket flagged red)"
+else
+    fail "audit section body runs (out=$(printf '%s' "$audit_out" | head -3))"
+fi
+# The same socket at 660 with a group the agent user is NOT in must NOT be
+# flagged reachable (perm-math negative inside the section body).
+audit_out2=$(
+    (
+        set -u; set +e
+        . "$UI_LIB"
+        OPENCODE_USER="root"
+        ROOT_EQUIV_SOCKS="$_sock2"
+        chmod 660 "$_sock2" 2>/dev/null
+        eval "$AUDIT_SECTION"
+        exit 0
+    ) 2>&1
+) || true
+if printf '%s' "$audit_out2" | grep -q "not agent-reachable"; then
+    pass "audit section body: group-w socket with foreign group stays green"
+else
+    fail "audit section body: foreign-group socket flagged or crashed (out=$(printf '%s' "$audit_out2" | head -3))"
+fi
+
 # --- 2. not-installed state: exit 0 + install hint ------------------------------
 
 if ! id opencode >/dev/null 2>&1; then

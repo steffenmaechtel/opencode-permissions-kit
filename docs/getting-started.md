@@ -40,12 +40,14 @@ It then asks only the essential questions:
    read your repositories: the group baseline covers `.git/`, and the kit
    sets `safe.directory` for the `opencode` user (no "dubious ownership"
    errors).
-3. **Agent resources** — when you already have `~/.agents` or `~/.claude`
-   (skills; opencode auto-loads both from `<dir>/skills/**/SKILL.md`),
-   bring them into `/home/opencode` so the agent can use them:
-   **move** (recommended — one canonical copy; you keep read/write via the
-   sharing group), **copy** (both sides keep their own, may drift) or
-   **skip**. Non-interactive installs move;
+3. **Agent resources** — bring the resources opencode auto-loads into
+   `/home/opencode` so the agent can use them: `~/.agents`
+   (**whole directory** — it is opencode's own namespace) and
+   `~/.claude/skills` (**skills/ only** — the rest of `~/.claude` is
+   Claude Code's home, so credentials like `.credentials.json` stay in
+   your home). Choose **move** (recommended — one canonical copy; you
+   keep read/write via the sharing group), **copy** (both sides keep
+   their own, may drift) or **skip**. Non-interactive installs move;
    `--migrate-agents move|copy|skip` forces a choice.
 4. **ddev settings** — dev-owned projects (default): the kit writes
    `disable_settings_management: true` into each project's

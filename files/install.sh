@@ -1314,9 +1314,16 @@ sudo chmod 2775 /home/opencode/.config /home/opencode/.config/opencode /home/ope
 # DEVELOPER's home they are invisible to the agent, which reads
 # /home/opencode. Offer move (recommended — one canonical copy, the
 # developer keeps rw via the sharing group), copy (both sides keep their
-# own, may drift) or skip. Applies to both folders; the choice is made
-# once and applies to whichever exist.
-MIGRATE_AGENT_DIRS=".agents .claude"
+# own, may drift) or skip. The choice is made once and applies to
+# whichever exist.
+#
+# Scope (review 0.0.22): ~/.agents is opencode's OWN directory and
+# migrates WHOLE — everything in it belongs to the agent namespace
+# anyway. ~/.claude is Claude Code's home and carries OAuth tokens
+# (.credentials.json) and account state at its top level — only
+# skills/ crosses (the only part opencode loads), so credentials
+# never reach the agent's group-readable home.
+MIGRATE_AGENT_DIRS=".agents .claude/skills"
 _opk_migrate_one() {
     _opk_src="/home/$DEFAULT_USER/$1"
     _opk_dst="/home/$OPENCODE_USER/$1"
@@ -1330,9 +1337,19 @@ _opk_migrate_one() {
         # Sharing baseline: opencode owns, the developer keeps rw
         # through the group (dirs setgid so new files inherit it). The
         # top dir gets the explicit 2775 — mkdir's mode depends on the
-        # process umask.
+        # process umask. Sub-path migrations (.claude/skills) also
+        # normalize the parent the kit just created (mkdir -p leaves it
+        # root-owned otherwise) — never /home/opencode itself, whose
+        # mode 2750 (no world bit) is by design.
         sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"
         sudo chmod 2775 "$_opk_dst"
+        case "$1" in
+            */*)
+                _opk_parent="$(dirname "$_opk_dst")"
+                sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_parent" 2>/dev/null || true
+                sudo chmod 2775 "$_opk_parent" 2>/dev/null || true
+                ;;
+        esac
         sudo find "$_opk_dst" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
         sudo find "$_opk_dst" -type f -exec chmod g+rw {} + 2>/dev/null || true
         if [ "$_opk_ag" = m ]; then
@@ -1357,7 +1374,8 @@ if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]
         if [ "$INTERACTIVE" = true ]; then
             while true; do
                 echo "" >&2
-                printf "[?] Existing agent resources (~/.agents, ~/.claude — skills etc.) — bring them into /home/%s?\n" "$OPENCODE_USER" >&2
+                printf "[?] Existing agent resources (~/.agents, ~/.claude/skills) — bring them into /home/%s?\n" "$OPENCODE_USER" >&2
+                echo "    (~/.agents moves whole; from ~/.claude only skills/ — credentials like .credentials.json stay in your home)" >&2
                 echo "    (m) Move   — recommended: one canonical copy; you keep read/write via the $OPENCODE_GROUP group" >&2
                 echo "    (c) Copy   — duplicate; both sides keep their own copy (may drift)" >&2
                 echo "    (s) Skip   — leave them in your home (the agent cannot use them)" >&2
@@ -1376,7 +1394,7 @@ if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]
     case "$_opk_ag" in
         m|c) for _opk_d in $MIGRATE_AGENT_DIRS; do _opk_migrate_one "$_opk_d"; done ;;
         s)
-            ui_detail "skipped: ~/.agents and ~/.claude stay in your home — the agent cannot use these skills"
+            ui_detail "skipped: ~/.agents and ~/.claude/skills stay in your home — the agent cannot use them"
             log "agents migration: skipped by choice"
             ;;
     esac
