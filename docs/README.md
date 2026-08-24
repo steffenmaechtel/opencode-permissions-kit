@@ -36,6 +36,8 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 - [CLI — scripts and flags](reference/cli.md)
 - [Files and paths](reference/files.md)
+- [Ecosystem compatibility](reference/compatibility.md) — which tools that
+  spawn opencode work with the kit, and how
 - [Audit log](reference/audit-log.md)
 - [Glossary](reference/glossary.md)
 

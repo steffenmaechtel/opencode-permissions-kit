@@ -66,14 +66,11 @@ stdin is piped. Interactive TUI starts (no subcommand, flags-only
 starts, `tui`, `attach`, or `opencode run` on a terminal without a
 message) keep the banner and the project-directory check.
 
-Verified against the opencode ecosystem (issue #42): OpenChamber (web +
-VS Code), cezar (drives OpenCode via `opencode serve` + `opencode
-models`), CodeWalk, OpenCode Mobile / P4OC (remote `serve` clients), and
-`opencode run`-based orchestrators (Vibe Kanban, eval-harness, GitHub
-Actions). Tools that are opencode *plugins* (awesome-opencode) load
-inside the agent process and never touch the wrapper. Tools that are
-not opencode clients at all (e.g. OpenHarness runs its own harness with
-its own auth) have no interaction with the kit.
+Which ecosystem tools use which invocation — and the verified status of
+each — is tracked in the [compatibility
+matrix](../reference/compatibility.md) (issue #42 research). Tools that
+are opencode *plugins* (awesome-opencode) load inside the agent process
+and never touch the wrapper.
 
 `OPENCODE_SERVER_PASSWORD` and `OPENCODE_SERVER_USERNAME` are preserved
 across the `sudo -u opencode` exec, so the Basic-auth credentials a UI
