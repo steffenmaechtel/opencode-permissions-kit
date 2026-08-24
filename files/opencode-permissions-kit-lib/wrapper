@@ -8,8 +8,9 @@
 # enforced by opencode's own permission layer only. The wrapper's job is
 # UID separation: validate the project dir, detect container-tool opt-in,
 # and exec the binary as 'opencode' against its rootless backend.
-# `opencode serve` takes a headless path (see SERVE_MODE below): third-party
-# UIs like OpenChamber spawn the server non-interactively.
+# `opencode serve` and friends take a headless path (see HEADLESS below):
+# third-party UIs like OpenChamber spawn the server non-interactively, and
+# orchestrators parse `opencode run --format json` output.
 set -e
 
 RED='\033[0;31m'
@@ -35,26 +36,58 @@ case "$CONTAINER_BACKEND" in
     *) CONTAINER_BACKEND="" ;;
 esac
 
-# Headless serve mode. Third-party UIs (OpenChamber, ...) spawn
-# `opencode serve --hostname <h> --port <p>` non-interactively: stdin is
-# /dev/null and stdout is parsed for the "opencode server listening on
-# <url>" line. Banner and prompts break that twice over — extra stdout
-# noise for the parser, and `read` hitting EOF would make set -e kill
-# the wrapper before the exec. Serve mode therefore prints nothing on
-# stdout, reports diagnostics on stderr, skips the project-dir check
-# (the server accepts sessions per client request; the soft layer —
-# global + per-project opencode.jsonc — still applies to every session),
-# and resolves container tools silently.
-SERVE_MODE=false
-if [ "${1:-}" = "serve" ]; then SERVE_MODE=true; fi
+# Headless mode (issue #42; generalizes the 0.0.16 serve fix). Ecosystem
+# tools spawn opencode non-interactively and parse its stdout:
+#   `opencode serve`   OpenChamber, cezar, CodeWalk, the VS Code extension
+#                      (parse the "listening on <url>" line)
+#   `opencode run`     CI runners, kanban orchestrators, eval harnesses
+#                      (`--format json` / stream-json on stdout)
+#   `opencode acp`     JSON-RPC over stdio (IDE agents) — stdout must stay
+#                      protocol-clean
+#   query subcommands  `models`, `agent`, `providers`, ... (e.g. cezar
+#                      caches `opencode models` output)
+# A banner on stdout breaks those parsers twice over — extra noise and a
+# `read` hitting EOF under set -e killing the wrapper before the exec —
+# and the project-dir refusal would block tools running from git
+# worktrees or temp checkouts. Headless therefore prints NOTHING on
+# stdout (diagnostics go to stderr), skips the project-dir check (the
+# soft layer — global + per-project opencode.jsonc — still applies to
+# every session), and resolves container tools silently. Interactive TUI
+# starts (no subcommand, flags-only start, `tui`, `attach`, or `run` with
+# a tty and no message argument) keep banner and check.
+HEADLESS=false
+_hr_first=true
+_hr_msg=false
+for _hr_a in "$@"; do
+    if [ "$_hr_first" = true ]; then
+        _hr_first=false
+        continue
+    fi
+    case "$_hr_a" in
+        -*) ;;
+        *) _hr_msg=true; break ;;
+    esac
+done
+case "${1:-}" in
+    serve|acp|models|agent|providers|session|export|import|stats|account|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade)
+        HEADLESS=true
+        ;;
+    run)
+        # Non-interactive when a message argument exists (any arg after the
+        # subcommand that is not a flag) or stdin is piped (prompt on stdin).
+        if [ "$_hr_msg" = true ] || ! [ -t 0 ]; then
+            HEADLESS=true
+        fi
+        ;;
+esac
 
-# Wrapper diagnostics: interactive starts print to the terminal, serve
+# Wrapper diagnostics: interactive starts print to the terminal, headless
 # mode redirects to stderr so stdout carries only opencode's own output.
 # printf '%b' (not echo) so the \033 color escapes render identically
 # under dash and bash. An empty argument prints a blank separator line.
 note() {
     _fd=1
-    [ "$SERVE_MODE" = true ] && _fd=2
+    [ "$HEADLESS" = true ] && _fd=2
     if [ -n "$1" ]; then
         printf '  %b\n' "$1" >&"$_fd"
     else
@@ -76,7 +109,7 @@ if [ -f "$PROJECTS_CONF" ]; then
     done < "$PROJECTS_CONF"
 fi
 
-if [ "$VALID" != true ] && [ "$SERVE_MODE" != true ]; then
+if [ "$VALID" != true ] && [ "$HEADLESS" != true ]; then
     # Version/help queries carry no project context — answer them from the
     # real binary instead of refusing. The official opencode installer
     # probes `opencode --version` from $HOME while the kit installs; the
@@ -111,7 +144,7 @@ if [ "$VALID" != true ] && [ "$SERVE_MODE" != true ]; then
     exit 1
 fi
 
-if [ "$SERVE_MODE" != true ]; then
+if [ "$HEADLESS" != true ]; then
     echo ""
     echo "  ${GREEN}SECURED BY opencode permissions kit ($VERSION)${NC}"
     echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
@@ -168,23 +201,21 @@ if [ -n "$PROJECT_CONFIG" ]; then
     PROJECT_TOOLS=$(python3 /usr/local/lib/opencode-permissions-kit/jsonc-parser.py --tools "$PROJECT_CONFIG" 2>/dev/null || true)
     if [ -n "$PROJECT_TOOLS" ]; then
         note "${CYAN}Container tools enabled by this project:${NC}"
-        if [ "$SERVE_MODE" = true ]; then
-            printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&2
-        else
-            printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /'
-        fi
+        printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_fd"
         note ""
         CONTAINER_REQUESTED=true
         CONTAINER_AUTO=true
     fi
 fi
 
-# Serve mode requests container tools silently: a server process serves
-# many projects, so there is no single project opt-in to confirm and no
-# terminal to confirm on. This stays inside the soft model — whether a
-# session may use docker/ddev is still decided per session by the
-# global and per-project opencode.jsonc permission rules.
-if [ "$SERVE_MODE" = true ]; then
+# `serve` always resolves container tools silently (a server process
+# serves many projects — no single opt-in, no terminal). Other headless
+# invocations get them through the project opt-in above (notes are
+# stderr-only in headless mode, stdout stays machine-clean). This stays
+# inside the soft model — whether a session may use docker/ddev is still
+# decided per session by the global and per-project opencode.jsonc
+# permission rules.
+if [ "${1:-}" = "serve" ]; then
     CONTAINER_REQUESTED=true
     CONTAINER_AUTO=false
 fi
@@ -276,16 +307,12 @@ fi
 # starts immediately. The [Y/n] container question was always answered
 # with yes in practice, and the kit's state is now visible INSIDE the
 # TUI (mode row in app_bottom, docs/design/plan-ui-tui-opencode.md) —
-# a pause before the TUI would only delay that information. Serve mode
-# was never allowed to prompt (headless contract, 0.0.16); it keeps its
-# stderr advisory for attached container tools.
-if [ "$CONTAINER_AUTO" = true ]; then
+# a pause before the TUI would only delay that information. Headless
+# mode was never allowed to prompt (0.0.16 contract); its advisory goes
+# to stderr only.
+if [ "$CONTAINER_AUTO" = true ] || [ "$HEADLESS" = true ]; then
     if [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
-        printf "  ${GREEN}opencode will run with %s.${NC}\n" "$CONTAINER_LABEL"
-    fi
-elif [ "$SERVE_MODE" = true ]; then
-    if [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
-        printf '  %b\n' "${GREEN}opencode serve: container tools attached via $CONTAINER_LABEL.${NC}" >&2
+        note "${GREEN}opencode will run with $CONTAINER_LABEL.${NC}"
     fi
 fi
 

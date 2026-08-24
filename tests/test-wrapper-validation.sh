@@ -265,27 +265,74 @@ else
     failures=$((failures + 1))
 fi
 
-# --- Headless serve mode (third-party UIs like OpenChamber) ---
-# OpenChamber et al. spawn `opencode serve` with stdin ignored and parse
-# stdout for the "opencode server listening on <url>" line. The wrapper
-# must not banner/prompt there (read-on-EOF + set -e would kill it before
-# the exec) and must keep stdout clean.
+# --- Headless mode (third-party UIs + orchestrators, issue #42) ---
+# Ecosystem tools spawn opencode non-interactively: `opencode serve`
+# (OpenChamber, cezar, CodeWalk — stdout parsed for the "listening on"
+# line), `opencode run` (CI/eval harnesses, `--format json` stdout),
+# `opencode acp` (JSON-RPC over stdio) and query subcommands. The wrapper
+# must keep stdout machine-clean and must not refuse non-project CWDs
+# there (worktrees, temp checkouts).
 echo ""
-echo "--- Serve mode (headless, third-party UIs) ---"
+echo "--- Headless mode (third-party tools) ---"
 
-if grep -q 'if \[ "${1:-}" = "serve" \]; then SERVE_MODE=true; fi' "$WRAPPER_FILE"; then
-    echo "  ${GREEN}PASS${NC}  wrapper detects the serve subcommand"
+if grep -q '^HEADLESS=false' "$WRAPPER_FILE" && grep -q 'serve|acp|models|agent|providers' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper classifies headless subcommands (serve/acp/queries)"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  wrapper lost serve detection"
+    echo "  ${RED}FAIL${NC}  wrapper lost headless subcommand classification"
     failures=$((failures + 1))
 fi
 
-if grep -q 'if \[ "\$VALID" != true \] && \[ "\$SERVE_MODE" != true \]; then' "$WRAPPER_FILE"; then
-    echo "  ${GREEN}PASS${NC}  serve mode skips the project-dir refusal"
+if grep -q 'if \[ "\$VALID" != true \] && \[ "\$HEADLESS" != true \]; then' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  headless mode skips the project-dir refusal"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  serve mode still bound to project-dir validation"
+    echo "  ${RED}FAIL${NC}  headless mode still bound to project-dir validation"
+    failures=$((failures + 1))
+fi
+
+# Classification is executable: extract the block and run it against
+# representative argument vectors (same static-extraction technique as
+# test-status.sh). tty-less CI makes `run` (no message) headless via the
+# stdin check — an interactive terminal would keep it bannered; that
+# branch is covered by the `-t 0` grep below.
+HL_BLOCK="$(sed -n '/^HEADLESS=false/,/^esac/p' "$WRAPPER_FILE")"
+[ -n "$HL_BLOCK" ] || { echo "  ${RED}FAIL${NC}  headless block not extractable"; failures=$((failures + 1)); }
+hl_case() { # <desc> <expected> <args...>
+    _desc="$1"; _want="$2"; shift 2
+    _got=$(set -- "$@"; eval "$HL_BLOCK"; echo "$HEADLESS")
+    if [ "$_got" = "$_want" ]; then
+        echo "  ${GREEN}PASS${NC}  headless: $_desc"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  headless: $_desc (want=$_want got=$_got)"
+        failures=$((failures + 1))
+    fi
+}
+hl_case "serve is headless"             true  serve
+hl_case "run with message is headless"  true  run "fix the bug"
+hl_case "run --format json is headless" true  run --format json "hi"
+hl_case "acp is headless"               true  acp
+hl_case "models is headless"            true  models
+hl_case "export is headless"            true  export sess-123
+hl_case "tui stays interactive"         false  tui
+hl_case "attach stays interactive"      false  attach
+hl_case "no args stays interactive"     false
+hl_case "flags-only start stays interactive" false --debug
+
+if grep -q '\-t 0' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  run without message checks stdin tty (piped = headless)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  run lost the interactive-tty distinction"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'if \[ "${1:-}" = "serve" \]; then' "$WRAPPER_FILE" && grep -q 'CONTAINER_AUTO=false' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  serve requests container tools without prompting"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve lost the silent container-tool request"
     failures=$((failures + 1))
 fi
 
@@ -314,18 +361,20 @@ else
 fi
 
 if grep -A8 '^note()' "$WRAPPER_FILE" | grep -q '>&"\$_fd"\|>&\$_fd' && grep -A8 '^note()' "$WRAPPER_FILE" | grep -q '_fd=2'; then
-    echo "  ${GREEN}PASS${NC}  serve-mode diagnostics go to stderr (note helper)"
+    echo "  ${GREEN}PASS${NC}  headless diagnostics go to stderr (note helper)"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  serve-mode diagnostics would pollute stdout"
+    echo "  ${RED}FAIL${NC}  headless diagnostics would pollute stdout"
     failures=$((failures + 1))
 fi
 
-if grep -q 'if \[ "\$SERVE_MODE" = true \]; then' "$WRAPPER_FILE" && grep -q 'CONTAINER_AUTO=false' "$WRAPPER_FILE"; then
-    echo "  ${GREEN}PASS${NC}  serve mode requests container tools without prompting"
+# The container-tools advisory must also route through note() — a raw
+# printf to stdout would pollute `opencode run --format json` output.
+if ! grep -q 'printf "  ${GREEN}opencode will run with' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  container advisory uses note() (stdout-safe for orchestrators)"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  serve mode lost the silent container-tool request"
+    echo "  ${RED}FAIL${NC}  container advisory prints raw to stdout"
     failures=$((failures + 1))
 fi
 

@@ -707,6 +707,18 @@ check "wrapper serve: listening line also from project dir" \
 check "wrapper serve: sudoers keep OPENCODE_SERVER_PASSWORD across sudo" \
     E 'sudo grep -q "OPENCODE_SERVER_PASSWORD" /etc/sudoers.d/opencode-permissions-kit'
 
+echo "--- 12e.3 wrapper headless run (orchestrators: cezar, CI, eval harnesses — issue #42) ---"
+# Orchestrators spawn `opencode run` from git worktrees / temp checkouts
+# and parse stdout (`--format json`). The wrapper must neither refuse the
+# non-project CWD nor print the banner on stdout. Without auth the binary
+# errors quickly on stderr — the wrapper contract is about stdout staying
+# machine-clean, which holds either way.
+E 'cd /tmp && timeout 30 /usr/local/bin/opencode run --format json "say ok" > /tmp/wrapper-run.out 2> /tmp/wrapper-run.err; true'
+check_fail "wrapper run from non-project dir: no project-dir refusal" \
+    E 'grep -q "cannot be started here" /tmp/wrapper-run.out /tmp/wrapper-run.err'
+check_fail "wrapper run: no SECURED banner on stdout" \
+    E 'grep -q "SECURED BY" /tmp/wrapper-run.out'
+
 echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/uninstall.sh --yes --dry-run' && \
