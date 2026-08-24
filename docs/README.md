@@ -45,10 +45,19 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 - [Troubleshooting](troubleshooting.md) — symptom → cause → fix
 
+## Evaluations (internal)
+
+- [Evaluations](evaluate/README.md) — third-party tools and addons
+  assessed against the kit's model, with verdicts (issues #40, #41)
+
 ## Design records (internal)
 
-`design/` and `security/` hold the historical planning and analysis records.
-They are not user documentation — where wording differs from the code, the
-code wins. One exception is living, not historical:
-[conventions.md](design/conventions.md) — the binding style guide for
-shipped code (prompts, output, language).
+`design/` holds planning and analysis records for CURRENT behavior —
+where wording differs from the code, the code wins. Notable living
+references: [conventions.md](design/conventions.md) — the binding style
+guide for shipped code (prompts, output, language) — and
+[rootless-backend.md](design/rootless-backend.md) — the provisioning and
+selection reference for the rootless container backends. Superseded or
+purely historical records live in [`_archive/`](_archive/) (same
+subfolder structure: `_archive/design/`, `_archive/security/`) — they
+document how the kit got here, not how it works today.

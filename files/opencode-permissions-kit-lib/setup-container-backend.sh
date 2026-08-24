@@ -23,7 +23,7 @@
 #      install.conf. For podman-rootless daemonless, nothing is printed.
 #
 # Must run as root. The opencode user must already exist.
-# See docs/design/docker-rootless.md §6.4, §6.6, §9.3.
+# See docs/design/rootless-backend.md (provisioning reference).
 set -e
 
 GREEN='\033[0;32m'

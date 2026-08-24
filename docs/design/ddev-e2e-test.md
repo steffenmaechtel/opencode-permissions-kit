@@ -1,15 +1,27 @@
 # PLAN-DDEV-E2E: real-ddev e2e suite with a cached golden container
 
-> Status: **PLANNED — not implemented.** Design record for a third e2e suite
-> (`make e2e-ddev`) that runs the REAL ddev against the REAL docker-rootless
-> daemon inside the systemd test container, answering the recurring burn-in
-> problem: most ddev issues (#18, #20, #21, #25, the §10a TODOs in
-> ddev-sandbox.md) only surfaced on productive WSL installs because both
-> existing suites exercise ddev through the `fake-ddev` stub — kit plumbing
-> only, never ddev itself. The core enabler is a **golden-image cache**: the
-> provisioned rootless daemon + ddev + pulled images are snapshotted once via
-> `docker commit`, so repeat runs skip the 3–4+ minute download/install phase.
-> Where wording differs from the code, the code wins.
+> Status: **IMPLEMENTED — shipped with 0.0.21.** `make e2e-ddev` /
+> `make e2e-ddev-fresh` run `tests/e2e/run-ddev.sh` (68 checks, full
+> DD0–DD14 catalog incl. the camino real-site tier and the bare-origin
+> git tier; manual CI workflow since 2026-08-22, first green GitHub run
+> 2026-08-23 — §8). The text below is the original design record; where
+> wording differs from the code, the code wins. Two deltas since the
+> plan: the golden image moved from the §4.2 `docker commit` flow to a
+> **save/load tar** flow (the inner docker store on the container
+> filesystem produced whiteouts that `docker commit` dropped — golden
+> image v2 keeps no inner store and loads images from a tar on boot),
+> and the weekly CI `schedule` (§8) is still pending — the workflow is
+> `workflow_dispatch`-only.
+>
+> Original framing, kept for context: a third e2e suite answering the
+> recurring burn-in problem — most ddev issues (#18, #20, #21, #25, the
+> §10a TODOs in ddev-sandbox.md, archived under
+> `docs/_archive/design/`) only surfaced on productive WSL
+> installs because both existing suites exercise ddev through the
+> `fake-ddev` stub — kit plumbing only, never ddev itself. The core
+> enabler is a **golden-image cache**: the provisioned rootless daemon +
+> ddev + pulled images are snapshotted once, so repeat runs skip the
+> 3–4+ minute download/install phase.
 
 ## 1. Problem & goal
 
@@ -18,7 +30,7 @@
 | `make e2e` (run.sh, 250 checks) | ddev is `tests/e2e/fake-ddev` — a logging stub. Nothing of ddev itself runs: no containers, no mutagen, no chmod behavior, no router. |
 | `make e2e-rootless` (run-docker-rootless.sh, 54 checks) | REAL inner docker-rootless daemon (systemd container), but ddev is never installed — only raw `docker` probes (alpine). |
 
-Every issue class from `ddev-as-user-issues.md` §1.1 — settings-dir chmod
+Every issue class from `ddev-as-user-issues.md` §1.1 (archived: `docs/_archive/design/`) — settings-dir chmod
 (`#25`), the `ddev()` function transports (`#18`), describe-state mismatches,
 mutagen, first-start behavior — needs real ddev to reproduce. Goal:
 
@@ -173,7 +185,7 @@ Same idioms as `e2e_resolve_cache` (lib.sh): resolve, compare, fall back.
 
 ## 7. Test catalog (DD sections)
 
-Mapped to the documented issue classes (ddev-as-user-issues.md §1.1) — each
+Mapped to the documented issue classes (ddev-as-user-issues.md §1.1, archived: docs/_archive/design/) — each
 row is the regression net for a real burn-in finding:
 
 | Section | Checks | Issue class |
@@ -248,8 +260,8 @@ re-done per run: `trustedHostsPattern` in `config/system/settings.php`,
 to the burn-in commits except three documented deviations: `name:` line
 dropped from `.ddev/config.yaml`, `!/public/index.php` gitignore
 exception so clones boot, dump as sidecar `db.sql.gz`) plus the fixture
-README with the regeneration recipe. Phase 2b fixture intake is done;
-the golden-image warm-up integration remains.
+README with the regeneration recipe. Phase 2b complete — DD10/DD11 ship
+in the runner (shipped 0.0.21).
 
 Location: `tests/e2e/fixtures/camino/` in the repo (shipped — installs
 stream from the same repo, and CI needs the files). If the dump ever
@@ -283,7 +295,8 @@ another baked artifact and keeps branch content in reviewable script form —
 the maintainer's real project bare repo is the template for what the
 branches must contain). **Status: generator implemented and verified**
 (2026-08-22; ShellCheck-clean, clone + all branch switches tested against
-the harvested camino fixture) — reconciled with the real burn-in bare repo:
+the harvested camino fixture; DD12 shipped 0.0.21) — reconciled with the
+real burn-in bare repo:
 the tracked set there is `.ddev/config.yaml` + the composer/TYPO3 tree
 (11 files, no AGENTS.md), so `feature/top-level` works on README.md/LICENSE
 instead. Branch layout:
@@ -414,15 +427,17 @@ bare-origin flow (DD12).
 
 ## 9. Rollout & effort
 
+All phases shipped with 0.0.21; estimates below are the original plan.
+
 | Phase | Content | Estimate |
 |---|---|---|
-| 1 | runner skeleton + golden-image build/quiesce/commit/boot (§4) + DD0–DD2 | 1–2 d |
-| 2 | full catalog DD3–DD9 + `--fresh`/TTL knobs | 1 d |
-| 2b | real-site tier: fixture intake (**done 2026-08-22** — `tests/e2e/fixtures/camino/` harvested), remaining: warm-up integration + DD10–DD11 | 1 d |
-| 2c | git-flow tier: `make-bare-origin.sh` generator (**done 2026-08-22**, verified) + DD12 | 0.5 d |
-| 2d | burn-in findings §7.3: DD13 (config-on-empty-dir tripwires) + DD14 (create-project) — DD13/DD14 need no site fixture, only ddev + composer | 0.5 d |
-| 3 | Makefile/CI workflow + test-workflows + docs | 0.5–1 d |
-| 4 | burn-in on this workspace (rootful + rootless outer layouts), matrix knob `DDEV_VERSION` for new ddev releases | 0.5 d |
+| 1 ✅ | runner skeleton + golden-image build/quiesce/commit/boot (§4) + DD0–DD2 | 1–2 d |
+| 2 ✅ | full catalog DD3–DD9 + `--fresh`/TTL knobs | 1 d |
+| 2b ✅ | real-site tier: fixture intake (`tests/e2e/fixtures/camino/`, harvested 2026-08-22), warm-up integration + DD10–DD11 | 1 d |
+| 2c ✅ | git-flow tier: `make-bare-origin.sh` generator + DD12 | 0.5 d |
+| 2d ✅ | burn-in findings §7.3: DD13 + DD14 (tripwire pairs) | 0.5 d |
+| 3 ✅ | Makefile/CI workflow + test-workflows + docs | 0.5–1 d |
+| 4 ✅ | burn-in on this workspace (rootful + rootless outer layouts), matrix knob `DDEV_VERSION` | 0.5 d |
 
 Expected wall times (workspace, rootless outer daemon): first build 5–12 min
 (image pulls dominate; real-site warm-up adds `composer install` + import,

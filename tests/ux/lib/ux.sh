@@ -1,7 +1,7 @@
 # opencode permissions kit — DEMO UI helpers (tests/ux/ playground)
 #
 # Candidate for files/opencode-permissions-kit-lib/ui.sh (see
-# docs/design/ux-improvement.md). POSIX sh, zero dependencies.
+# docs/_archive/design/ux-improvement.md). POSIX sh, zero dependencies.
 #
 # Rules:
 #   - Colors off when NO_COLOR is set or stdout is not a tty.

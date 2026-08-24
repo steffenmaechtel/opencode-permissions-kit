@@ -1,5 +1,5 @@
 #!/bin/sh
-# DEMO — proposed update.sh output (docs/design/ux-improvement.md §6).
+# DEMO — proposed update.sh output (docs/_archive/design/ux-improvement.md §6).
 # Simulated output only; nothing is executed. Run: sh tests/ux/example-update.sh
 set -u
 . "$(dirname "$0")/lib/ux.sh"

@@ -1,5 +1,5 @@
 #!/bin/sh
-# DEMO — proposed STANDARD install flow (docs/design/ux-improvement.md §4.3).
+# DEMO — proposed STANDARD install flow (docs/_archive/design/ux-improvement.md §4.3).
 # Simulated output only; nothing is executed. Run: sh tests/ux/example-install-standard.sh
 set -u
 . "$(dirname "$0")/lib/ux.sh"
