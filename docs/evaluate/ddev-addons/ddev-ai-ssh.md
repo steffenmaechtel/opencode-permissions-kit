@@ -4,8 +4,9 @@
 > [#41](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/41)
 > · Verdict: **Not applicable (complement only for foreign-agent
 > sidecar setups the kit does not have)**
-> · Source: <https://github.com/trebormc/ddev-ai-ssh> (README; last
-> commit 2026-07-09, active)
+> · Source: <https://github.com/trebormc/ddev-ai-ssh> — verified
+> against a local clone @ `cf26f3e` (`docker-compose.ai-ssh.yaml`,
+> `web-build/Dockerfile.ai-ssh`, `install.yaml`)
 
 ## What it does
 

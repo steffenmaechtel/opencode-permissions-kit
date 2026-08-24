@@ -4,26 +4,34 @@
 > [#41](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/41)
 > · Verdict: **Conflicting (collapses the agent into the app container
 > — the opposite of the kit's separation goal)**
-> · Source: <https://github.com/e0ipso/ddev-assistant-opencode>
-> (README; last commit 2026-05-18, minimal docs)
+> · Source: <https://github.com/e0ipso/ddev-assistant-opencode> —
+> verified against a local clone @ `5cb552b`
+> (`docker-compose.assistant-opencode.yaml`,
+> `web-build/Dockerfile.assistant-opencode`, `install.yaml`)
 
 ## What it does
 
 Installs opencode **into the web container image**
-(`curl opencode.ai/install | bash` → `/usr/local/bin/opencode`); usage
-is plain `ddev exec opencode` — agent and project stack share one
-container. Bind-mounts the host `~/.config/opencode`,
-`~/.cache/opencode`, `~/.local/share/opencode` into the web container
-at identical paths; pre/post-start hooks chown them to the web user.
+(`curl -fsSL https://opencode.ai/install | bash` →
+`/usr/local/bin/opencode`); usage is plain `ddev exec opencode` — agent
+and project stack share one container. The compose file bind-mounts
+the host `${HOME}/.config/opencode`, `~/.cache/opencode`, **and the
+full `~/.local/share/opencode`** into the web container at identical
+paths; a pre-start hook pre-creates the paths with the right type and
+post-start hooks chown them to the web user (the README's own comment
+notes Docker would otherwise create directories at missing file
+paths).
 
 ## Identity / secrets
 
 - Runs as the web container's default user (ddev's host-uid mapping;
   under the kit's rootless backend = the `opencode` UID).
-- **Weakest secret posture of the three addons:** the host user's
-  entire opencode auth/config/cache is mounted inside the **application
-  container** — arbitrary project code (vendor scripts, CMS plugins)
-  can read the API keys and poison config.
+- **Weakest secret posture of the three addons (source-verified):** the
+  host user's **entire** opencode home is mounted inside the
+  **application container** — config, cache, *and* the full
+  `~/.local/share/opencode` including `auth.json` — so arbitrary
+  project code (vendor scripts, CMS plugins) can read the API keys and
+  poison config.
 
 ## Lifecycle
 

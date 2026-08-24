@@ -3,7 +3,8 @@
 > Evaluated: 2026-08-24 · Issue
 > [#40](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/40)
 > · Verdict: **Conflicting with the model**
-> · Source: <https://github.com/containers/bubblewrap> (README/docs; v0.11.x era)
+> · Source: <https://github.com/containers/bubblewrap> — verified
+> against a local clone @ `2f55bae` (README, docs)
 
 ## What it is
 
@@ -23,6 +24,11 @@ determined by the arguments": the policy is your argv.
 - Ubuntu 24.04+ needs the AppArmor `bwrap-userns-restrict` fix or
   `kernel.apparmor_restrict_unprivileged_userns=0`. WSL2: unprivileged
   userns generally works; AppArmor typically not enforced.
+- Notable upstream signal (verified @ `2f55bae`): a
+  `--not-a-security-boundary` flag was added for callers that use bwrap
+  purely for filesystem layout and want **fail-open** behavior — the
+  project itself is explicit that the boundary is only as strong as the
+  caller's argv.
 
 ## Maturity
 

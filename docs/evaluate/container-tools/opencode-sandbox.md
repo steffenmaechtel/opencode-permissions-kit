@@ -4,8 +4,10 @@
 > [#40](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/40)
 > · Verdict: **Conflicting as a default; complementary only as a
 > per-project opt-in network fence**
-> · Source: <https://www.npmjs.com/package/opencode-sandbox> (v0.5.1;
-> engine: Anthropic `@anthropic-ai/sandbox-runtime`)
+> · Source: <https://www.npmjs.com/package/opencode-sandbox> — verified
+> against a local clone of the plugin repo @ `328c963`
+> (`src/index.ts`, `src/config.ts`; engine: Anthropic
+> `@anthropic-ai/sandbox-runtime` 0.0.73)
 
 ## What it is
 
@@ -21,6 +23,14 @@ Default policy: writes only to project + `/tmp`; deny-read `~/.ssh`,
 pypi, github, api.anthropic.com, …) — everything else blocked.
 Configurable via `~/.config/opencode-sandbox/` (env / per-project /
 global).
+
+Source-verified details (@ `328c963`): the hooks are
+`tool.execute.before`/`tool.execute.after` wrapping only `bash` calls;
+the config surface is exactly `denyRead/allowRead/allowWrite/denyWrite`
++ `allowedDomains/allowUnixSockets/allowAllUnixSockets/
+allowLocalBinding`; **fail-open is explicit in the code** — Windows
+logs "commands will run without sandbox" and every setup error is
+caught and swallowed.
 
 ## Requirements
 
