@@ -45,6 +45,11 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 - [Troubleshooting](troubleshooting.md) — symptom → cause → fix
 
+## Evaluations (internal)
+
+- [Evaluations](evaluate/README.md) — third-party tools and addons
+  assessed against the kit's model, with verdicts (issues #40, #41)
+
 ## Design records (internal)
 
 `design/` holds planning and analysis records for CURRENT behavior —
