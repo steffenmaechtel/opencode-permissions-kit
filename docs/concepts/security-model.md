@@ -18,6 +18,9 @@ Concretely:
 
 - the agent's processes run as `opencode`, never as the developer — no
   credentials, SSH keys, or dotfiles in `/home/<developer>` are reachable,
+- the agent-resources migration (`--migrate-agents`) moves `~/.agents`
+  whole but only `~/.claude/skills` — credentials such as
+  `~/.claude/.credentials.json` never cross into the agent's home,
 - containers run under the `opencode` host UID via a rootless backend — the
   agent can never reach a root-equivalent docker socket,
 - no code path executes as the developer (no RunAs-developer sudoers rule).

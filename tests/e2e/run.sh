@@ -62,7 +62,7 @@ E 'mkdir -p /home/dev/.config/opencode && printf "%s\n" "{\"model\":\"dummy\"}" 
 # and ~/.claude (the two dirs opencode auto-scans for
 # <dir>/skills/**/SKILL.md) — the install must MOVE both into
 # /home/opencode (--yes default) with the sharing-group baseline.
-E 'mkdir -p /home/dev/.agents/skills/my-skill /home/dev/.claude/skills/claude-skill && printf "name: my-skill\n---\nbody\n" > /home/dev/.agents/skills/my-skill/SKILL.md && printf "name: claude-skill\n---\nbody\n" > /home/dev/.claude/skills/claude-skill/SKILL.md && chmod 700 /home/dev/.agents /home/dev/.claude && chmod 600 /home/dev/.agents/skills/my-skill/SKILL.md /home/dev/.claude/skills/claude-skill/SKILL.md'
+E 'mkdir -p /home/dev/.agents/skills/my-skill /home/dev/.claude/skills/claude-skill && printf "name: my-skill\n---\nbody\n" > /home/dev/.agents/skills/my-skill/SKILL.md && printf "name: claude-skill\n---\nbody\n" > /home/dev/.claude/skills/claude-skill/SKILL.md && printf "agent-notes\n" > /home/dev/.agents/notes.md && printf "oauth-credentials" > /home/dev/.claude/.credentials.json && chmod 700 /home/dev/.agents /home/dev/.claude && chmod 600 /home/dev/.agents/skills/my-skill/SKILL.md /home/dev/.claude/skills/claude-skill/SKILL.md'
 
 echo ""
 echo "--- 1c. ddev migration fixtures (fake ddev + dev registry, issue #15) ---"
@@ -412,14 +412,16 @@ check "Config deployed" \
     E 'sudo test -f /home/opencode/.config/opencode/opencode.jsonc'
 check "Agents dir exists" \
     E 'sudo test -d /home/opencode/.agents/'
-check "issue #19: ~/.agents MOVED into the opencode home (--yes default)" \
+check "issue #19: ~/.agents moved WHOLE into the opencode home (--yes default)" \
     E 'test "$(cat /home/opencode/.agents/skills/my-skill/SKILL.md)" = "name: my-skill
 ---
-body"'
-check "issue #19: ~/.claude MOVED into the opencode home too" \
+body" && test -f /home/opencode/.agents/notes.md'
+check "issue #19: ~/.claude/skills moved into the opencode home" \
     E 'test -f /home/opencode/.claude/skills/claude-skill/SKILL.md'
-check "issue #19: developer's source dirs are gone after the move" \
-    E 'test ! -e /home/dev/.agents && test ! -e /home/dev/.claude'
+check "review 0.0.22: ~/.claude/.credentials.json STAYS with the developer (skills-only from .claude)" \
+    E 'test -f /home/dev/.claude/.credentials.json && test ! -e /home/opencode/.claude/.credentials.json'
+check "issue #19: whole .agents gone after the move, .claude parent stays (skills-only)" \
+    E 'test ! -e /home/dev/.agents && test -d /home/dev/.claude && test ! -e /home/dev/.claude/skills'
 check "issue #19: migrated dirs carry the sharing baseline (setgid + group)" \
     E 'test "$(stat -c %U:%G:%a /home/opencode/.agents)" = "opencode:opencode:2775" && test "$(stat -c %U:%G:%a /home/opencode/.claude)" = "opencode:opencode:2775"'
 check "issue #19: migrated files are group-writable for the developer" \
