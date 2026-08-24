@@ -92,3 +92,31 @@ the same: the agent user must end up as "other", with no bits.
 
 Not sure what your values are? Check them with `id -u` / `id -g` in a fresh
 WSL terminal (logged in as the default user).
+
+## Other root-equivalent surfaces (audit)
+
+Docker is not the only tool whose daemon socket means root. `status.sh`
+ships a **report-only audit** ("Root-equivalent access" section) that
+checks the surfaces below for agent reachability — the kit never changes
+them, because removing access is an admin decision:
+
+| Surface | Why it matters | Default on WSL2 |
+|---|---|---|
+| Rootful docker socket (`/var/run/docker.sock`) / `docker` group | full root, classic escape | installed by many devs — fine while the agent user stays out of the group |
+| Docker Desktop / Rancher Desktop integration sockets under `/mnt/wsl` | root-equivalent daemon in the Windows VM, exposed **world-usable** to every WSL distro user | present whenever Docker Desktop's WSL integration is enabled — remove the agent's distro from it or restrict the socket |
+| `containerd` socket | full root | root-only by default |
+| LXD/LXC, libvirt (`lxd`, `libvirt` groups + sockets) | full root (host VMs/mounts) | not installed by default |
+| `sudo`/`admin`/`wheel`/`disk`/`snap` groups for the agent user | full root | never granted by the kit — the audit catches later manual grants |
+| `wireshark`/`adm`/`systemd-journal` groups | not root, but packet/log access can leak credentials | not granted by the kit |
+| Windows interop (executing `.exe` via `/mnt/c`) | runs code as the Windows session user | blocked by the `/mnt/c` restriction above; the audit probes the exec bit explicitly |
+
+Deliberately **not** flagged:
+
+- `snapd`'s socket is mode 666 by design, but snapd gates write requests
+  by peer credentials (root only) — not root-equivalent for the agent.
+- `newuidmap`/`newgidmap` are setuid, but required by the rootless
+  backends and bounded to the ranges in `/etc/subuid`.
+
+The audit is stat math only — no privileged probes, no prompts. Override
+the socket list with `ROOT_EQUIV_SOCKS="…"` (same pattern as
+`LEAK_SCAN_DIRS`).
