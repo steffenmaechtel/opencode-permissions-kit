@@ -25,7 +25,7 @@ self-fetches its siblings from the same branch, and everything is deployed to
 - `tests/` — shell unit tests (`test-*.sh`), Docker e2e suites (`e2e/`),
   UX demos (`ux/`)
 - `docs/` — user documentation (concepts / how-to / reference), design
-  records (`design/`), security analyses (`security/`)
+  records (`design/`), superseded records (`_archive/`)
 
 ## Rules
 

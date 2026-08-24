@@ -15,7 +15,8 @@
 >
 > Original framing, kept for context: a third e2e suite answering the
 > recurring burn-in problem — most ddev issues (#18, #20, #21, #25, the
-> §10a TODOs in ddev-sandbox.md) only surfaced on productive WSL
+> §10a TODOs in ddev-sandbox.md, archived under
+> `docs/_archive/design/`) only surfaced on productive WSL
 > installs because both existing suites exercise ddev through the
 > `fake-ddev` stub — kit plumbing only, never ddev itself. The core
 > enabler is a **golden-image cache**: the provisioned rootless daemon +
@@ -29,7 +30,7 @@
 | `make e2e` (run.sh, 250 checks) | ddev is `tests/e2e/fake-ddev` — a logging stub. Nothing of ddev itself runs: no containers, no mutagen, no chmod behavior, no router. |
 | `make e2e-rootless` (run-docker-rootless.sh, 54 checks) | REAL inner docker-rootless daemon (systemd container), but ddev is never installed — only raw `docker` probes (alpine). |
 
-Every issue class from `ddev-as-user-issues.md` §1.1 — settings-dir chmod
+Every issue class from `ddev-as-user-issues.md` §1.1 (archived: `docs/_archive/design/`) — settings-dir chmod
 (`#25`), the `ddev()` function transports (`#18`), describe-state mismatches,
 mutagen, first-start behavior — needs real ddev to reproduce. Goal:
 
@@ -184,7 +185,7 @@ Same idioms as `e2e_resolve_cache` (lib.sh): resolve, compare, fall back.
 
 ## 7. Test catalog (DD sections)
 
-Mapped to the documented issue classes (ddev-as-user-issues.md §1.1) — each
+Mapped to the documented issue classes (ddev-as-user-issues.md §1.1, archived: docs/_archive/design/) — each
 row is the regression net for a real burn-in finding:
 
 | Section | Checks | Issue class |

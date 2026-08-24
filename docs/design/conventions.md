@@ -39,9 +39,10 @@ purpose, they are not confirmations.
 
 ## Script output style
 
-See `docs/design/ux-improvement.md` (decisions): labeled lines
-`info`/`success`/`warn`/`error` via `ui.sh`, slim banner, Unicode symbols
-with `UI_ASCII=1` fallback, `NO_COLOR` and non-tty honored.
+See `docs/_archive/design/ux-improvement.md` (decisions, archived):
+labeled lines `info`/`success`/`warn`/`error` via `ui.sh`, slim banner,
+Unicode symbols with `UI_ASCII=1` fallback, `NO_COLOR` and non-tty
+honored.
 
 ## Language
 

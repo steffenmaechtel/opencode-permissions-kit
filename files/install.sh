@@ -1240,7 +1240,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/dde
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
-# TUI mode display (docs/design/plan-ui-tui-opencode.md): plugin + templates
+# TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates
 sudo mkdir -p "$LIBDIR/tui"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
@@ -1475,7 +1475,7 @@ if [ ! -f "$DEFAULT_OC_CONF" ]; then
     log "deny-all config installed for default user: $DEFAULT_OC_CONF"
 fi
 
-# === Step 8c: TUI mode display (docs/design/plan-ui-tui-opencode.md) ============
+# === Step 8c: TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md) ============
 # Two HOME-keyed effects, no env transport (sudo's env_reset rewrites
 # HOME, the TUI loads its global config from $HOME):
 #   opencode user  -> kit tui.json registers the mode plugin (text row

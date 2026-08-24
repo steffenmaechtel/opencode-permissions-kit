@@ -755,7 +755,7 @@ check_fail "opencode user cannot enter log dir" \
 
 echo ""
 echo "--- 12i. Rootless container backend (podman) ---"
-# Real-rootless environment test (docs/design/docker-rootless.md). In the
+# Real-rootless environment test (docs/_archive/design/docker-rootless.md). In the
 # soft-only model the §9.1 proof flips: containers run as the opencode host
 # UID and CAN read the project files (the ddev-working goal) — but the uid_map
 # still proves they are NOT real root.

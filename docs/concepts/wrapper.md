@@ -137,7 +137,9 @@ you manage your own `~/.config/opencode/tui.json` (for the opencode
 user), the kit leaves it alone — the file is only written when absent
 or previously kit-written (marker key `_opencode_permissions_kit`).
 
-Design background: [plan-ui-tui-opencode](../design/plan-ui-tui-opencode.md).
+Design background:
+[plan-ui-tui-opencode](../_archive/design/plan-ui-tui-opencode.md)
+(archived).
 
 ## Wrapper-bypass guard (detect, then warn loudly)
 

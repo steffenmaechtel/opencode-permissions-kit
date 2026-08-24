@@ -306,7 +306,7 @@ fi
 # No prompts, no pause (since 0.0.21): the banner prints, opencode
 # starts immediately. The [Y/n] container question was always answered
 # with yes in practice, and the kit's state is now visible INSIDE the
-# TUI (mode row in app_bottom, docs/design/plan-ui-tui-opencode.md) —
+# TUI (mode row in app_bottom, docs/_archive/design/plan-ui-tui-opencode.md) —
 # a pause before the TUI would only delay that information. Headless
 # mode was never allowed to prompt (0.0.16 contract); its advisory goes
 # to stderr only.

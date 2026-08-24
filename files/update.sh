@@ -313,7 +313,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/dde
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
-# TUI mode display (docs/design/plan-ui-tui-opencode.md): plugin + templates.
+# TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates.
 sudo mkdir -p "$LIBDIR/tui"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
@@ -616,7 +616,7 @@ rm -f "$NEW_INSTALL_CONF"
 ui_success "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
 log "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
 
-# --- TUI mode display user files (docs/design/plan-ui-tui-opencode.md) ---------
+# --- TUI mode display user files (docs/_archive/design/plan-ui-tui-opencode.md) ---------
 # Same only-if-absent-or-kit-written policy as install.sh (marker key
 # _opencode_permissions_kit): user edits survive updates.
 OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"

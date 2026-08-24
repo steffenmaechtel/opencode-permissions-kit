@@ -47,8 +47,10 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 ## Design records (internal)
 
-`design/` and `security/` hold the historical planning and analysis records.
-They are not user documentation — where wording differs from the code, the
-code wins. One exception is living, not historical:
-[conventions.md](design/conventions.md) — the binding style guide for
-shipped code (prompts, output, language).
+`design/` holds planning and analysis records for CURRENT behavior —
+where wording differs from the code, the code wins. Superseded or purely
+historical records live in [`_archive/`](_archive/) (same subfolder
+structure: `_archive/design/`, `_archive/security/`) — they document how
+the kit got here, not how it works today. One exception is living, not
+historical: [conventions.md](design/conventions.md) — the binding style
+guide for shipped code (prompts, output, language).

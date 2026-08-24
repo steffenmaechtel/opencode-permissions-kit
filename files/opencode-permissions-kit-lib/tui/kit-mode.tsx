@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-// opencode permissions kit -- TUI mode display (docs/design/plan-ui-tui-opencode.md)
+// opencode permissions kit -- TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md)
 //
 // Renders the kit's container-tools state in the app_bottom slot
 // (append mode: own thin row, visible on home + session screens):

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Unit tests for the TUI mode display payload
-# (docs/design/plan-ui-tui-opencode.md — option A' + B, spike-validated
+# (docs/_archive/design/plan-ui-tui-opencode.md — option A' + B, spike-validated
 # 2026-08-23):
 #   - files/opencode-permissions-kit-lib/tui/ contains the plugin
 #     (kit-mode.tsx), the danger theme, and both tui.json templates
