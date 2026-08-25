@@ -111,8 +111,10 @@ and silences the warning.
   configuration moves them) and re-chmods its config root to `0700` on
   every settings write, revoking any granted group access. Under the
   kit's UID separation the `opencode` user therefore cannot work in
-  them. This is an upstream limitation — work in project directories
-  until OpenChamber ships a relocatable chats root.
+  them. This is an upstream limitation
+  ([openchamber#3130](https://github.com/openchamber/openchamber/issues/3130)) —
+  work in project directories until OpenChamber ships a relocatable
+  chats root.
 
 - **"OpenCode process exited before serving"** — usually a self-installed
   opencode shadowing the wrapper: check for `~/.opencode/bin/opencode`
