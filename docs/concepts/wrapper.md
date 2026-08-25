@@ -66,6 +66,16 @@ stdin is piped. Interactive TUI starts (no subcommand, flags-only
 starts, `tui`, `attach`, or `opencode run` on a terminal without a
 message) keep the banner and the project-directory check.
 
+`serve` additionally sanity-checks its working directory: UIs like
+OpenChamber default it to the developer's `$HOME`, which the `opencode`
+user cannot read (UID separation) — the server would boot but answer
+HTTP 500 on every config load for that directory. The wrapper probes
+readability from the `opencode` user's context (`cwd-check.sh`, gated
+by its own sudoers rule), warns on stderr and starts the server from a
+readable fallback (the matching projects root, else the first readable
+configured root, else the `opencode` home) — see the
+[OpenChamber how-to](../how-to/openchamber.md#server-working-directory).
+
 Which ecosystem tools use which invocation — and the verified status of
 each — is tracked in the [compatibility
 matrix](../reference/compatibility.md) (issue #42 research). Tools that

@@ -38,6 +38,15 @@ DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bi
 # helper only (it does nothing but `test -S`) — no arbitrary command execution.
 DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh *
 
+# Headless serve working-directory probe: third-party UIs (OpenChamber) spawn
+# `opencode serve` with the developer's $HOME as cwd — unreadable for the
+# opencode user by design (UID separation), which turns every config load for
+# that directory into HTTP 500. The wrapper probes readability from the
+# opencode user's own context and falls back to a readable projects root.
+# Gated to the kit's cwd-check.sh helper only (it does nothing but stat the
+# directory and print readable/unreadable) — no arbitrary command execution.
+DEFAULT_USER ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/cwd-check.sh *
+
 # ddev always runs as the opencode user (docs/design/DDEV-WORKING.md §7):
 # the developer's `ddev` shell function (ddev-as-opencode.sh, hooked into
 # .bashrc/.zshrc/.profile) execs this helper via sudo, so the terminal and

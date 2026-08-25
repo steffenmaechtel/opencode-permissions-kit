@@ -50,7 +50,7 @@ KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc 
 opencode-deny-all.jsonc \
 sudoers.template umask.sh VERSION \
 opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh \
+opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/bin/cwd-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh \
 opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
@@ -307,6 +307,7 @@ sudo chmod 440 "$LIBDIR/sudoers.template"
 sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
 sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/bin/socket-check.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/cwd-check.sh" "$LIBDIR/bin/cwd-check.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
@@ -324,7 +325,7 @@ sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/opencode-danger.theme.jso
 sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
                "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
                "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/ddev-as-opencode"
+               "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/cwd-check.sh" "$LIBDIR/bin/ddev-as-opencode"
 ui_success "library re-deployed: $LIBDIR"
 log "library re-deployed: $LIBDIR"
 

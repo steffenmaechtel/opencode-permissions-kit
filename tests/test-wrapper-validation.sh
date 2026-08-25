@@ -406,6 +406,140 @@ else
     failures=$((failures + 1))
 fi
 
+# --- Headless serve cwd probe (OpenChamber HTTP 500 fix) ---
+# OpenChamber spawns `opencode serve` with the developer's $HOME as cwd;
+# the opencode user cannot read it (UID separation), so config load for
+# that directory turns into HTTP 500. The wrapper probes readability via
+# cwd-check.sh (as the opencode user) and falls back to a readable
+# projects root, warning on stderr.
+echo ""
+echo "--- Headless serve cwd probe ---"
+
+CWD_CHECK="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/cwd-check.sh"
+
+# functional: the helper itself (it only stats — runs as the test user)
+result=$(sh "$CWD_CHECK" "$TMPDIR/project-a")
+assert_valid "cwd-check: existing readable dir reports readable" "readable" "$result"
+
+result=$(sh "$CWD_CHECK" "$TMPDIR/no-such-dir")
+assert_valid "cwd-check: missing dir reports unreadable" "unreadable" "$result"
+
+result=$(sh "$CWD_CHECK" "")
+assert_valid "cwd-check: empty argument reports unreadable" "unreadable" "$result"
+
+sh "$CWD_CHECK" "$TMPDIR/no-such-dir" >/dev/null 2>&1
+assert_valid "cwd-check: always exits 0 (empty output = probe unavailable)" "0" "$?"
+
+# functional: the wrapper's fallback selection (block extracted and run
+# with a stubbed cwd_probe — same static-extraction technique as HL_BLOCK)
+SC_BLOCK="$(sed -n '/^if \[ "\${1:-}" = "serve" \] &&/,/^# Rootless: pass the per-user socket/p' "$WRAPPER_FILE" | sed '$d')"
+if [ -n "$SC_BLOCK" ]; then
+    echo "  ${GREEN}PASS${NC}  serve cwd block extractable"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve cwd block not extractable"
+    failures=$((failures + 1))
+fi
+
+# sc_serve <cwd> <readable-dirs, space-separated> — runs the extracted
+# block with $1=serve, a stubbed cwd_probe and a silent note(); prints
+# "fallback=<dir|none> pwd=<dir> warn=<0|1>"
+sc_serve() {
+    _cwd="$1"; _readable="$2"
+    (
+        set -- serve
+        CWD="$_cwd"
+        PROJECTS_CONF="$TMPDIR/sc-projects.conf"
+        SERVE_FALLBACK=""
+        _warned=0
+        RED='' GREEN='' CYAN='' YELLOW='' NC=''
+        note() { if [ -n "$1" ]; then _warned=1; fi; }
+        cwd_probe() {
+            case " $_readable " in *" $1 "*) echo readable ;; *) echo unreadable ;; esac
+        }
+        eval "$SC_BLOCK"
+        printf 'fallback=%s pwd=%s warn=%s\n' "${SERVE_FALLBACK:-none}" "$(pwd)" "$_warned"
+    )
+}
+
+mkdir -p "$TMPDIR/sc-root-a" "$TMPDIR/sc-root-b" "$TMPDIR/sc-root-b/sub"
+printf '%s\n' "$TMPDIR/sc-root-a" "$TMPDIR/sc-root-b" > "$TMPDIR/sc-projects.conf"
+
+# OpenChamber case: cwd unrelated to any root (like $HOME), both roots
+# readable -> first configured readable root wins, warning printed, cd done
+result=$(sc_serve "$TMPDIR/other" "$TMPDIR/sc-root-a $TMPDIR/sc-root-b")
+assert_valid "serve fallback: unrelated cwd -> first readable root" \
+    "fallback=$TMPDIR/sc-root-a pwd=$TMPDIR/sc-root-a warn=1" "$result"
+
+# cwd inside a root's subdir -> that root wins even though it is listed second
+result=$(sc_serve "$TMPDIR/sc-root-b/sub" "$TMPDIR/sc-root-a $TMPDIR/sc-root-b")
+assert_valid "serve fallback: cwd under a root -> that root (ancestor preferred)" \
+    "fallback=$TMPDIR/sc-root-b pwd=$TMPDIR/sc-root-b warn=1" "$result"
+
+# first root unreadable -> pass 2 picks the next readable one
+result=$(sc_serve "$TMPDIR/other" "$TMPDIR/sc-root-b")
+assert_valid "serve fallback: skips unreadable configured roots" \
+    "fallback=$TMPDIR/sc-root-b pwd=$TMPDIR/sc-root-b warn=1" "$result"
+
+# readable cwd -> no probe complaint, no fallback, no cd, no warning
+result=$(sc_serve "$TMPDIR/sc-root-a" "$TMPDIR/sc-root-a")
+assert_valid "serve cwd: readable cwd is left alone" \
+    "fallback=none pwd=$(pwd) warn=0" "$result"
+
+# probe unavailable (sudoers rule missing / sudo denied -> empty output)
+# must NOT trigger the fallback path
+sc_serve_noprobe() {
+    (
+        set -- serve
+        CWD="$TMPDIR/other"
+        PROJECTS_CONF="$TMPDIR/sc-projects.conf"
+        SERVE_FALLBACK=""
+        _warned=0
+        RED='' GREEN='' CYAN='' YELLOW='' NC=''
+        note() { if [ -n "$1" ]; then _warned=1; fi; }
+        cwd_probe() { :; }
+        eval "$SC_BLOCK"
+        printf 'fallback=%s warn=%s\n' "${SERVE_FALLBACK:-none}" "$_warned"
+    )
+}
+result=$(sc_serve_noprobe)
+assert_valid "serve cwd: unavailable probe (empty output) changes nothing" \
+    "fallback=none warn=0" "$result"
+
+# static: wrapper wiring + sudoers rule
+if grep -q 'cwd-check.sh "\$1" 2>/dev/null || true' "$WRAPPER_FILE" \
+   && grep -q 'sudo -n -u opencode.*cwd-check.sh' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper probes the serve cwd via cwd-check.sh (sudo -n, fault-tolerant)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the fault-tolerant cwd-check.sh probe"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'OPENCHAMBER_OPENCODE_CWD' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  serve warning names OPENCHAMBER_OPENCODE_CWD as the fix"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve warning lost the OPENCHAMBER_OPENCODE_CWD hint"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'getent passwd opencode' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  serve fallback ends at the opencode user's home"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve fallback lost the opencode-home last resort"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'bin/cwd-check.sh \*' "$SUDOERS_FILE"; then
+    echo "  ${GREEN}PASS${NC}  sudoers.template gates cwd-check.sh (NOPASSWD, opencode RunAs)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  sudoers.template lost the cwd-check.sh rule"
+    failures=$((failures + 1))
+fi
+
 # --- Summary ---
 echo ""
 echo "===================================="

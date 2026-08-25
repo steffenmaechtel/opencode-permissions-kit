@@ -316,6 +316,71 @@ if [ "$CONTAINER_AUTO" = true ] || [ "$HEADLESS" = true ]; then
     fi
 fi
 
+# Headless serve working-directory sanity (OpenChamber & co): a server
+# whose working directory the opencode user cannot read still boots, but
+# every request that loads config for that directory answers HTTP 500 —
+# opencode treats EACCES on <dir>/opencode.jsonc as a hard error, not as
+# "no config file". OpenChamber defaults the server cwd to the
+# developer's $HOME, exactly the unreadable case. Probe from the opencode
+# user's own context (cwd-check.sh, same sudoers pattern as
+# socket-check.sh); on "unreadable" fall back to a readable directory so
+# the server comes up working: the configured projects root containing
+# the cwd, else the first readable configured root, else the opencode
+# user's home. Empty probe output (sudoers rule missing, sudo denied)
+# means "unknown" — proceed without touching the directory. The warning
+# goes to stderr via note() — headless stdout stays machine-clean.
+cwd_probe() {
+    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/cwd-check.sh "$1" 2>/dev/null || true
+}
+if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
+    SERVE_FALLBACK=""
+    if [ -f "$PROJECTS_CONF" ]; then
+        # pass 1: the configured root containing the cwd (project subdir
+        # with restrictive bits falls back to its own projects root)
+        while IFS= read -r root; do
+            [ -z "$root" ] && continue
+            [ ! -d "$root" ] && continue
+            root_clean="${root%/}"
+            if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
+                if [ "$(cwd_probe "$root_clean")" = "readable" ]; then
+                    SERVE_FALLBACK="$root_clean"
+                    break
+                fi
+            fi
+        done < "$PROJECTS_CONF"
+        # pass 2: first readable configured root (the OpenChamber case:
+        # cwd is $HOME, no root contains it)
+        if [ -z "$SERVE_FALLBACK" ]; then
+            while IFS= read -r root; do
+                [ -z "$root" ] && continue
+                [ ! -d "$root" ] && continue
+                root_clean="${root%/}"
+                if [ "$(cwd_probe "$root_clean")" = "readable" ]; then
+                    SERVE_FALLBACK="$root_clean"
+                    break
+                fi
+            done < "$PROJECTS_CONF"
+        fi
+    fi
+    if [ -z "$SERVE_FALLBACK" ]; then
+        SERVE_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6)
+        [ -n "$SERVE_FALLBACK" ] && [ "$(cwd_probe "$SERVE_FALLBACK")" = "readable" ] || SERVE_FALLBACK=""
+    fi
+    note "${RED}WARNING: the server working directory is not readable by the opencode user:${NC}"
+    note "${YELLOW}$CWD${NC}"
+    note "${YELLOW}Config load fails there — /session, /config and /project would answer HTTP 500.${NC}"
+    if [ -n "$SERVE_FALLBACK" ]; then
+        note "${YELLOW}Falling back to: $SERVE_FALLBACK${NC}"
+        note "${YELLOW}OpenChamber: 'export OPENCHAMBER_OPENCODE_CWD=$SERVE_FALLBACK' picks the server directory.${NC}"
+        note ""
+        cd "$SERVE_FALLBACK"
+    else
+        note "${YELLOW}No readable fallback found (no projects.conf entry, no opencode home).${NC}"
+        note "${YELLOW}Set OPENCHAMBER_OPENCODE_CWD (OpenChamber) to a readable directory.${NC}"
+        note ""
+    fi
+fi
+
 # Rootless: pass the per-user socket through sudo's env reset via env_keep.
 # podman-CLI path (daemonless): no DOCKER_HOST, no supplementary group.
 # Containers run as the opencode host UID either way.

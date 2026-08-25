@@ -9,7 +9,7 @@ SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status
 	files/opencode-permissions-kit-lib/ddev-migrate.sh \
 	files/opencode-permissions-kit-lib/ddev-hosts.sh \
 	files/opencode-permissions-kit-lib/migrate-denies.sh \
-	files/opencode-permissions-kit-lib/bin/socket-check.sh files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+	files/opencode-permissions-kit-lib/bin/socket-check.sh files/opencode-permissions-kit-lib/bin/cwd-check.sh files/opencode-permissions-kit-lib/bin/ddev-as-opencode
 
 # Intentional deviations, excluded repo-wide:
 #   SC1090/SC1091 — kit scripts source helpers/configs via variables
