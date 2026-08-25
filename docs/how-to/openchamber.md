@@ -105,6 +105,15 @@ and silences the warning.
   sudoers rule is present — run `update.sh` if the warning stays away
   but the 500s don't.)
 
+- **Projectless chats fail (HTTP 500 on `/api/session` with a
+  `…/.config/openchamber/chats/…` directory)** — OpenChamber hard-pins
+  these chat worktrees to `$HOME/.config/openchamber/chats` (no
+  configuration moves them) and re-chmods its config root to `0700` on
+  every settings write, revoking any granted group access. Under the
+  kit's UID separation the `opencode` user therefore cannot work in
+  them. This is an upstream limitation — work in project directories
+  until OpenChamber ships a relocatable chats root.
+
 - **"OpenCode process exited before serving"** — usually a self-installed
   opencode shadowing the wrapper: check for `~/.opencode/bin/opencode`
   (remove it, see [the wrapper](../concepts/wrapper.md)) or point
