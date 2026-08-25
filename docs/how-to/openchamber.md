@@ -58,7 +58,52 @@ rules keep the deny. If no backend is configured or its socket is not
 reachable, the server starts without container tools and says so on
 stderr.
 
+## Server working directory
+
+OpenChamber starts the managed server with a working directory of its
+own choosing — by default **your home directory**. Under the kit the
+server runs as the `opencode` user, which usually cannot read your
+`$HOME` (that is the UID separation doing its job). The server still
+boots, but every request that loads config for its working directory —
+`/session`, `/config`, `/project` — answers HTTP 500
+(`Unexpected server error`): accessing `$HOME/opencode.jsonc` fails with
+`EACCES`, and opencode treats that as a hard error instead of "no config
+file".
+
+Point OpenChamber at a directory the `opencode` user can read — your
+projects root (the parent of the paths in `projects.conf`) — and persist
+it in your shell:
+
+```bash
+echo 'export OPENCHAMBER_OPENCODE_CWD=/var/www/vhosts' >> ~/.bashrc
+```
+
+OpenChamber reads the variable at startup only; restart it after
+changing it. Note that directory-scoped requests follow the directory
+selected in the UI — pick your actual project there, otherwise they
+fall back to the home directory and hit the same wall.
+
+If you don't set the variable, the wrapper still catches the case at
+`serve` start: it probes the server working directory from the
+`opencode` user's context (`cwd-check.sh`) and, when unreadable, warns
+on **stderr** and starts the server from a readable fallback — the
+projects root containing the directory, else the first readable
+configured root, else the `opencode` user's home. The 500s disappear,
+but the warning only reaches the terminal OpenChamber was started
+from (its web UI swallows server stderr) — setting
+`OPENCHAMBER_OPENCODE_CWD` keeps the server directory deterministic
+and silences the warning.
+
 ## Troubleshooting
+
+- **HTTP 500 on `/api/*` requests (Unexpected server error)** — the
+  managed server's working directory (your `$HOME`) is not readable by
+  the `opencode` user. Set `OPENCHAMBER_OPENCODE_CWD` to a readable
+  projects root — see
+  [Server working directory](#server-working-directory). (The wrapper's
+  automatic fallback covers this only when the kit's `cwd-check.sh`
+  sudoers rule is present — run `update.sh` if the warning stays away
+  but the 500s don't.)
 
 - **"OpenCode process exited before serving"** — usually a self-installed
   opencode shadowing the wrapper: check for `~/.opencode/bin/opencode`
