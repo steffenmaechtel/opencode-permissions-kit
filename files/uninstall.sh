@@ -149,9 +149,9 @@ log "wrapper removed: /usr/local/bin/opencode"
 
 echo ""
 echo "--- Removing cli dispatcher ---"
-run "sudo rm -f /usr/local/bin/opencode-permissions-kit"
+run "sudo rm -f /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit"
 echo "CLI dispatcher removed."
-log "cli removed: /usr/local/bin/opencode-permissions-kit"
+log "cli removed: /usr/local/bin/opk"
 
 echo ""
 echo "--- Removing opencode library ---"

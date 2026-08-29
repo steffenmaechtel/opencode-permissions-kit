@@ -43,7 +43,7 @@ This page lists every file and directory the kit manages, and every key in
 | Path | Purpose |
 |---|---|
 | `/usr/local/bin/opencode` | Wrapper symlink |
-| `/usr/local/bin/opencode-permissions-kit` | CLI dispatcher symlink (see [CLI](cli.md)) |
+| `/usr/local/bin/opk` | CLI dispatcher symlink (see [CLI](cli.md)) |
 | `/usr/local/lib/opencode-permissions-kit/kit` | CLI dispatcher (status/config/update/uninstall routing) |
 | `/usr/local/lib/opencode-permissions-kit/bin/opencode` | The actual opencode binary (`root:opencode` 750) |
 | `/usr/local/lib/opencode-permissions-kit/bin/socket-check.sh` | Rootless socket probe (`test -S` only) |

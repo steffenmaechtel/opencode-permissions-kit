@@ -140,6 +140,10 @@ echo ""
 echo "--- 3. Wrapper & binary ---"
 check "Wrapper at /usr/local/bin/opencode" \
     E 'test -x /usr/local/bin/opencode'
+check "CLI dispatcher at /usr/local/bin/opk" \
+    E 'test -x /usr/local/bin/opk'
+check "legacy CLI name /usr/local/bin/opencode-permissions-kit not present" \
+    E '! test -e /usr/local/bin/opencode-permissions-kit'
 check "Binary at /usr/local/lib/opencode-permissions-kit/bin/opencode" \
     E 'sudo test -x /usr/local/lib/opencode-permissions-kit/bin/opencode'
 check "Binary owned root:opencode (not world-executable)" \
@@ -531,7 +535,7 @@ check "11b: install.conf version NOT re-stamped (still section 11's sentinel)" \
 # top-level shorthand (issue #24): kit CLI maps upgrade-opencode onto
 # update.sh --yes --only-binary, flags pass through
 E 'printf "#!/bin/sh\necho \"opencode version 7.7.7-shorthand\"\n" > /tmp/stub-opencode2 && chmod +x /tmp/stub-opencode2'
-E 'opencode-permissions-kit upgrade-opencode --binary-path /tmp/stub-opencode2' && \
+E 'opk upgrade-opencode --binary-path /tmp/stub-opencode2' && \
     echo "  ${GREEN}OK${NC}  kit CLI upgrade-opencode completed"
 check "11b: upgrade-opencode replaced the binary (shorthand works)" \
     E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 7.7.7-shorthand"'

@@ -6,7 +6,7 @@ stays behind.
 ## Run the uninstall
 
 ```bash
-opencode-permissions-kit uninstall
+opk uninstall
 ```
 
 Run it as your default user (it asks for `sudo` where needed). Options:

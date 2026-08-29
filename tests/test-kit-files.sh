@@ -166,7 +166,7 @@ esac
 # --- 5. fetch_kit pre-creates every subdirectory in the list ----------------------
 # curl -o cannot write into a missing directory: the streamed fetch aborts
 # with curl error 23 at the first nested file (the tui/ regression — every
-# `opencode-permissions-kit update` from the library failed mid-fetch).
+# `opk update` from the library failed mid-fetch).
 fetch_body() {
     sed -n '/^fetch_kit() {/,/^}/p' "$1"
 }

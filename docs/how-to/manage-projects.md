@@ -10,7 +10,7 @@ inside one of these directories or their subdirectories.
 ## Add a project directory
 
 ```bash
-opencode-permissions-kit config projects add /var/www/vhosts/new-project
+opk config projects add /var/www/vhosts/new-project
 ```
 
 Multiple paths at once are fine, and `~` works. System paths (`/`, `/usr`,
@@ -32,13 +32,13 @@ sudo setfacl -R -d -m g:opencode:rwx /var/www/vhosts/new-project
 ## List configured directories
 
 ```bash
-opencode-permissions-kit config projects list
+opk config projects list
 ```
 
 ## Remove a project directory
 
 ```bash
-opencode-permissions-kit config projects remove /var/www/vhosts/old-project
+opk config projects remove /var/www/vhosts/old-project
 ```
 
 Only the `projects.conf` line is removed; files and their group bits stay as

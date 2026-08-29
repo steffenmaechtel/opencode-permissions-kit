@@ -1,13 +1,13 @@
 #!/bin/sh
 # opencode permissions kit — CLI dispatcher
-# Deployed to /usr/local/bin/opencode-permissions-kit by install.sh
+# Deployed to /usr/local/bin/opk by install.sh
 # (symlink -> /usr/local/lib/opencode-permissions-kit/kit).
 #
 # One command for all management scripts, usable from anywhere in WSL:
-#   opencode-permissions-kit status     -> status.sh   (no sudo needed)
-#   opencode-permissions-kit config ... -> config.sh   (auto sudo)
-#   opencode-permissions-kit update ... -> update.sh   (auto sudo)
-#   opencode-permissions-kit uninstall  -> uninstall.sh (runs as your user,
+#   opk status     -> status.sh   (no sudo needed)
+#   opk config ... -> config.sh   (auto sudo)
+#   opk update ... -> update.sh   (auto sudo)
+#   opk uninstall  -> uninstall.sh (runs as your user,
 #                                            asks for sudo itself)
 #
 # Everything after the subcommand is passed through to the script, so all
@@ -47,7 +47,7 @@ usage() {
     cat <<EOF
 opencode permissions kit  v$VERSION
 
-Usage: opencode-permissions-kit <command> [args...]
+Usage: opk <command> [args...]
 
 Commands:
   status                          Show the protection status (no sudo needed)
@@ -151,7 +151,7 @@ case "$cmd" in
                     echo "missing from $DDEV_WIN_HOSTS:"
                     printf '%s\n' "$_khm" | sed 's/^/  /'
                     echo "add them (one command each):"
-                    printf '%s\n' "$_khm" | sed 's/^/  opencode-permissions-kit ddev-hosts-add /'
+                    printf '%s\n' "$_khm" | sed 's/^/  opk ddev-hosts-add /'
                 fi
                 ;;
             ddev-hosts-add)
@@ -175,7 +175,7 @@ case "$cmd" in
         # argument errors and --dry-run work unprivileged.
         _ho_err() {
             ui_error "$1"
-            echo "  usage: opencode-permissions-kit handover <me|opencode> <path>... [--dry-run]" >&2
+            echo "  usage: opk handover <me|opencode> <path>... [--dry-run]" >&2
             exit 1
         }
         [ "$#" -ge 2 ] || _ho_err "handover: need a target (me or opencode) and at least one path"

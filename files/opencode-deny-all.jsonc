@@ -15,7 +15,7 @@
     // locks out the bypass mode. The agent runs as its own user and reads:
     //   /home/opencode/.config/opencode/opencode.jsonc
     // Edit that file (you are in its sharing group) or run
-    // `opencode-permissions-kit config` to change settings.
+    // `opk config` to change settings.
     "share": "disabled",
     "permission": { "*": "deny" }
 }

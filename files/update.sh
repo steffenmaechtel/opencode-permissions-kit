@@ -333,8 +333,9 @@ log "library re-deployed: $LIBDIR"
 
 sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
 ui_success "wrapper symlink refreshed: /usr/local/bin/opencode"
-sudo ln -sf "$LIBDIR/kit" /usr/local/bin/opencode-permissions-kit
-ui_success "cli symlink refreshed: /usr/local/bin/opencode-permissions-kit"
+sudo rm -f /usr/local/bin/opencode-permissions-kit
+sudo ln -sf "$LIBDIR/kit" /usr/local/bin/opk
+ui_success "cli symlink refreshed: /usr/local/bin/opk (legacy name removed)"
 
 # --- re-deploy sudoers -------------------------------------------------------
 
@@ -680,6 +681,6 @@ else
 fi
 [ "$BINARY_UPDATE" = true ] || ui_kv "Binary"   "untouched (use --binary to upgrade)"
 ui_info "Next:"
-ui_detail "opencode-permissions-kit status   verify the protection"
-ui_detail "opencode-permissions-kit upgrade-opencode    upgrade the opencode binary"
+ui_detail "opk status   verify the protection"
+ui_detail "opk upgrade-opencode    upgrade the opencode binary"
 log "update complete (version $VERSION)"

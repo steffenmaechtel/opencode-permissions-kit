@@ -14,8 +14,8 @@
 #   - DELETE this file when the upgrade floor moves past 0.0.14.
 #
 # Replacement for the only still-needed function (group baseline refresh):
-#   opencode-permissions-kit update --refresh   (inline in update.sh)
-#   opencode-permissions-kit config refresh     (inline in config.sh)
+#   opk update --refresh   (inline in update.sh)
+#   opk config refresh     (inline in config.sh)
 echo "migrate-denies.sh was removed in kit 0.0.15 — the group baseline" >&2
 echo "refresh now lives in update.sh --refresh / config.sh refresh." >&2
 exit 0
