@@ -13,20 +13,45 @@ opencode-permissions-kit config projects add /var/www/vhosts/new-project
 opencode-permissions-kit update --binary
 opencode-permissions-kit upgrade-opencode   # just the opencode binary
 opencode-permissions-kit ddev-hosts-add     # in a ddev project dir
+opencode-permissions-kit handover me .gotmp # mixed-owner tree -> yours
 opencode-permissions-kit uninstall
 opencode-permissions-kit help        # commands + arguments overview
 ```
 
 Everything after the subcommand goes to the underlying script unchanged,
-so all flags below work with both forms. `config` and `update` elevate via
-sudo automatically; `status` needs no sudo; `uninstall` runs as your user
-and asks for sudo itself; `ddev-hosts-*` run as your user (they drive
-Windows-side elevation through ddev itself).
+so all flags below work with both forms. `config`, `update` and `handover`
+elevate via sudo automatically; `status` needs no sudo; `uninstall` runs as
+your user and asks for sudo itself; `ddev-hosts-*` run as your user (they
+drive Windows-side elevation through ddev itself).
 
 The command is a symlink (`/usr/local/bin/opencode-permissions-kit`) into
 the kit library — deployed since kit 0.0.14. On older installs, run
 [update](../how-to/update.md) once to get it. The direct script calls below
 keep working everywhere.
+
+## handover
+
+Switch file ownership between the two kit users — you and the agent:
+
+```bash
+opencode-permissions-kit handover me <path>...        # -> your user
+opencode-permissions-kit handover opencode <path>...  # -> the agent user
+opencode-permissions-kit handover me .gotmp --dry-run # show the plan only
+```
+
+For mixed-owner trees: when both you and the agent built or worked in the
+same checkout (for example ddev's `.gotmp` build cache after tests ran as
+both users), plain `chown` needs root and the exact usernames. `handover`
+does the recursive `chown` for you — `me` resolves to your default user,
+`opencode` to the agent user, both from the kit's install configuration.
+
+The change is recursive and only flips the **owner** — the group stays the
+kit's sharing group and group-write access is re-applied, so both sides
+keep their group access to the tree (the same semantics as the ddev
+handovers, see [ddev integration](../concepts/ddev-integration.md)).
+System roots (`/`, `/usr`, `/var`, ...) and whole home directories are
+refused — hand over trees, not systems. The command elevates via sudo
+itself; `--dry-run` validates and prints the plan without sudo.
 
 ## ddev-hosts-add / ddev-hosts-check
 
