@@ -185,6 +185,12 @@ case "$cmd" in
         for _ho_a in "$@"; do
             [ "$_ho_a" = "--dry-run" ] && _ho_dry=1
         done
+        # Usage errors first: a wrong target must not be masked by a
+        # missing install.conf (e.g. dev checkouts without an install).
+        case "$_ho_target" in
+            me|opencode) ;;
+            *)        _ho_err "handover: unknown target '$_ho_target' (me or opencode)" ;;
+        esac
         [ -f "$INSTALL_CONF" ] || _ho_err "handover: $INSTALL_CONF not found — is the kit installed?"
         _ho_getconf() { sed -n "s/^$1=//p" "$INSTALL_CONF" 2>/dev/null | tail -1; }
         _ho_group=$(_ho_getconf OPENCODE_GROUP)
@@ -192,7 +198,6 @@ case "$cmd" in
         case "$_ho_target" in
             me)       _ho_user=$(_ho_getconf DEFAULT_USER) ;;
             opencode) _ho_user=$(_ho_getconf OPENCODE_USER) ;;
-            *)        _ho_err "handover: unknown target '$_ho_target' (me or opencode)" ;;
         esac
         [ -n "$_ho_user" ] || _ho_err "handover: install.conf has no user for '$_ho_target'"
         id -u "$_ho_user" >/dev/null 2>&1 || _ho_err "handover: user '$_ho_user' does not exist"

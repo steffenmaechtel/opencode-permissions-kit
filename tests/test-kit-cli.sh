@@ -168,8 +168,9 @@ else
     echo "  ${GREEN}PASS${NC}  handover without a path exits non-zero"; passed=$((passed + 1))
 fi
 
-# unknown target -> usage error naming the choices
-errout="$("$BIN/opencode-permissions-kit" handover nobody "$WORK/ho-tree" 2>&1 >/dev/null || true)"
+# unknown target -> usage error naming the choices (hermetic: explicit
+# install.conf — CI runners have no /etc/opencode-permissions-kit)
+errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" handover nobody "$WORK/ho-tree" 2>&1 >/dev/null || true)"
 case "$errout" in
     *"me or opencode"*) echo "  ${GREEN}PASS${NC}  handover rejects unknown target"; passed=$((passed + 1)) ;;
     *) echo "  ${RED}FAIL${NC}  handover rejects unknown target (got: $errout)"; failures=$((failures + 1)) ;;
