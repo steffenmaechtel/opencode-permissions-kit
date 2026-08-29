@@ -13,7 +13,7 @@ opencode-permissions-kit config projects add /var/www/vhosts/new-project
 opencode-permissions-kit update --binary
 opencode-permissions-kit upgrade-opencode   # just the opencode binary
 opencode-permissions-kit ddev-hosts-add     # in a ddev project dir
-opencode-permissions-kit handover me .gotmp # mixed-owner tree -> yours
+opencode-permissions-kit handover me .gotmp # mixed-owner tree -> yours again
 opencode-permissions-kit uninstall
 opencode-permissions-kit help        # commands + arguments overview
 ```
@@ -34,16 +34,22 @@ keep working everywhere.
 Switch file ownership between the two kit users — you and the agent:
 
 ```bash
-opencode-permissions-kit handover me <path>...        # -> your user
-opencode-permissions-kit handover opencode <path>...  # -> the agent user
-opencode-permissions-kit handover me .gotmp --dry-run # show the plan only
+# You and the agent both ran builds in the same checkout; ddev's .gotmp
+# cache now contains files of both users and every build complains
+# ("chmod ... Operation not permitted"). Make the whole tree yours again:
+cd /var/www/vhosts/ddev
+opencode-permissions-kit handover me .gotmp
+
+# Same idea the other way — give a folder to the agent user:
+opencode-permissions-kit handover opencode /var/www/vhosts/some-project/
+
+# Not sure yet? Show what would happen, without sudo:
+opencode-permissions-kit handover me .gotmp --dry-run
 ```
 
-For mixed-owner trees: when both you and the agent built or worked in the
-same checkout (for example ddev's `.gotmp` build cache after tests ran as
-both users), plain `chown` needs root and the exact usernames. `handover`
-does the recursive `chown` for you — `me` resolves to your default user,
-`opencode` to the agent user, both from the kit's install configuration.
+`me` and `opencode` resolve to your default user and the agent user from
+the kit's install configuration — no usernames to remember, no root shell.
+Plain `chown -R` would need both.
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides
