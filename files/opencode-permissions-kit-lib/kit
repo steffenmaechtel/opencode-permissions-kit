@@ -70,7 +70,12 @@ Commands:
                                    that project's missing hostnames, a
                                    hostname adds exactly that one
   ddev-hosts-check [dir]            List this project's ddev hostnames missing
-                                   from the Windows hosts file
+                                    from the Windows hosts file
+  handover <me|opencode> <path>...  Recursively hand file ownership to you (me)
+                                    or the agent user (opencode) — the sharing
+                                    group stays, so both sides keep access. For
+                                    mixed-owner trees, e.g. after builds by
+                                    both users. --dry-run shows the plan
   uninstall [--yes] [--dry-run]   Remove the kit (runs as your user)
   help                            Show this help
 
@@ -153,6 +158,88 @@ case "$cmd" in
                 ddev_hosts_add "${1:-$PWD}"
                 ;;
         esac
+        ;;
+    handover)
+        # Generic ownership switch between the two kit users, for
+        # mixed-owner trees (e.g. a checkout where BOTH the developer and
+        # the agent ran builds, like ddev's .gotmp cache): recursive chown
+        # to <user> + the kit's SHARING group, then g+w — the same
+        # semantics as the ddev handovers (ddev-handover.sh), applied to
+        # any path. The group never changes, so both sides keep group
+        # access; only the owner flips.
+        #   handover me <path>...        -> DEFAULT_USER:OPENCODE_GROUP
+        #   handover opencode <path>...  -> OPENCODE_USER:OPENCODE_GROUP
+        # --dry-run prints the plan and changes nothing (no sudo needed).
+        # System roots and whole home directories are refused: hand over
+        # trees, not systems. Validation runs BEFORE the sudo hop, so
+        # argument errors and --dry-run work unprivileged.
+        _ho_err() {
+            ui_error "$1"
+            echo "  usage: opencode-permissions-kit handover <me|opencode> <path>... [--dry-run]" >&2
+            exit 1
+        }
+        [ "$#" -ge 2 ] || _ho_err "handover: need a target (me or opencode) and at least one path"
+        _ho_target="$1"
+        shift
+        _ho_dry=0
+        for _ho_a in "$@"; do
+            [ "$_ho_a" = "--dry-run" ] && _ho_dry=1
+        done
+        # Usage errors first: a wrong target must not be masked by a
+        # missing install.conf (e.g. dev checkouts without an install).
+        case "$_ho_target" in
+            me|opencode) ;;
+            *)        _ho_err "handover: unknown target '$_ho_target' (me or opencode)" ;;
+        esac
+        [ -f "$INSTALL_CONF" ] || _ho_err "handover: $INSTALL_CONF not found — is the kit installed?"
+        _ho_getconf() { sed -n "s/^$1=//p" "$INSTALL_CONF" 2>/dev/null | tail -1; }
+        _ho_group=$(_ho_getconf OPENCODE_GROUP)
+        [ -n "$_ho_group" ] || _ho_err "handover: install.conf has no OPENCODE_GROUP"
+        case "$_ho_target" in
+            me)       _ho_user=$(_ho_getconf DEFAULT_USER) ;;
+            opencode) _ho_user=$(_ho_getconf OPENCODE_USER) ;;
+        esac
+        [ -n "$_ho_user" ] || _ho_err "handover: install.conf has no user for '$_ho_target'"
+        id -u "$_ho_user" >/dev/null 2>&1 || _ho_err "handover: user '$_ho_user' does not exist"
+        for _ho_a in "$@"; do
+            [ "$_ho_a" = "--dry-run" ] && continue
+            _ho_np=$(realpath -m "$_ho_a" 2>/dev/null || printf '%s' "$_ho_a")
+            case "$_ho_np" in
+                /|/bin|/boot|/dev|/etc|/home|/lib|/lib32|/lib64|/libx32|/media|/mnt|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var)
+                    _ho_err "handover: refusing system path '$_ho_np' — hand over subpaths, not system roots" ;;
+            esac
+            case "$_ho_np" in
+                /home/*) [ "$(dirname "$_ho_np")" = "/home" ] && _ho_err "handover: refusing whole home directory '$_ho_np' — hand over subpaths" ;;
+            esac
+            [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
+        done
+        if [ "$_ho_dry" = 1 ]; then
+            for _ho_a in "$@"; do
+                [ "$_ho_a" = "--dry-run" ] && continue
+                echo "  would hand over: $_ho_a -> $_ho_user:$_ho_group (recursive, g+w)"
+            done
+            exit 0
+        fi
+        if [ "$(id -u)" -ne 0 ]; then
+            # Loop guard: sudo must actually elevate (fake/broken sudo
+            # would re-enter this branch forever).
+            [ "${OPK_HANDOVER_ROOT:-}" = "1" ] && _ho_err "handover: sudo did not elevate — giving up"
+            exec sudo env OPK_INSTALL_CONF="$INSTALL_CONF" OPK_HANDOVER_ROOT=1 \
+                sh "$LIBDIR/kit" handover "$_ho_target" "$@"
+        fi
+        _ho_rc=0
+        ui_info "handing over to $_ho_user:$_ho_group (recursive, g+w) ..."
+        for _ho_a in "$@"; do
+            [ "$_ho_a" = "--dry-run" ] && continue
+            if chown -R "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null && chmod -R g+w "$_ho_a" 2>/dev/null; then
+                echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
+            else
+                ui_error "handover failed: $_ho_a"
+                _ho_rc=1
+            fi
+        done
+        [ "$_ho_rc" = 0 ] && ui_success "handover complete"
+        exit "$_ho_rc"
         ;;
     help|--help|-h)
         usage

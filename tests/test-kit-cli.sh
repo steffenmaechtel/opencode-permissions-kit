@@ -36,7 +36,10 @@ LIB="$WORK/lib"
 mkdir -p "$LIB"
 # install.conf carries the deployed VERSION stamp (a standalone VERSION file
 # is NOT deployed to the library — regression guard for the v0.0.0 display).
-printf 'DEFAULT_USER=dev\nVERSION=9.9.9\n' > "$WORK/install.conf"
+# Users must EXIST for the handover tests (the command validates with id);
+# the current user/group double as the fake developer and opencode user.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nVERSION=9.9.9\n' \
+    "$(id -un)" "$(id -un)" "$(id -gn)" > "$WORK/install.conf"
 for s in status config update uninstall; do
     cat > "$LIB/$s.sh" <<EOF
 #!/bin/sh
@@ -74,7 +77,7 @@ echo "=== CLI dispatcher tests ==="
 # help lists every subcommand
 out="$(run_kit --help)"
 assert "--help exits 0" "0" "$?"
-for c in status config update uninstall help; do
+for c in status config update uninstall handover help; do
     case "$out" in
         *"$c"*) echo "  ${GREEN}PASS${NC}  --help mentions '$c'"; passed=$((passed + 1)) ;;
         *) echo "  ${RED}FAIL${NC}  --help mentions '$c'"; failures=$((failures + 1)) ;;
@@ -147,6 +150,88 @@ case "$errout" in
     *"not found"*) echo "  ${GREEN}PASS${NC}  missing script names the problem"; passed=$((passed + 1)) ;;
     *) echo "  ${RED}FAIL${NC}  missing script names the problem (got: $errout)"; failures=$((failures + 1)) ;;
 esac
+
+# --- handover: generic ownership switch ------------------------------------
+# Validation and --dry-run must work unprivileged and BEFORE any sudo hop.
+mkdir -p "$WORK/ho-tree/sub"
+: > "$WORK/ho-tree/sub/file"
+
+# no / too few arguments -> usage error
+if run_kit handover >/dev/null 2>&1; then
+    echo "  ${RED}FAIL${NC}  handover without args exits non-zero"; failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  handover without args exits non-zero"; passed=$((passed + 1))
+fi
+if run_kit handover me >/dev/null 2>&1; then
+    echo "  ${RED}FAIL${NC}  handover without a path exits non-zero"; failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  handover without a path exits non-zero"; passed=$((passed + 1))
+fi
+
+# unknown target -> usage error naming the choices (hermetic: explicit
+# install.conf — CI runners have no /etc/opencode-permissions-kit)
+errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" handover nobody "$WORK/ho-tree" 2>&1 >/dev/null || true)"
+case "$errout" in
+    *"me or opencode"*) echo "  ${GREEN}PASS${NC}  handover rejects unknown target"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  handover rejects unknown target (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+
+# nonexistent path -> error
+if run_kit handover me "$WORK/does-not-exist" >/dev/null 2>&1; then
+    echo "  ${RED}FAIL${NC}  handover rejects nonexistent paths"; failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  handover rejects nonexistent paths"; passed=$((passed + 1))
+fi
+
+# system roots and whole home directories are refused
+for _bad in / /usr /etc /var "/home/$(id -un)"; do
+    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" handover me "$_bad" 2>&1 >/dev/null || true)"
+    case "$errout" in
+        *"refusing"*) echo "  ${GREEN}PASS${NC}  handover refuses $_bad"; passed=$((passed + 1)) ;;
+        *) echo "  ${RED}FAIL${NC}  handover refuses $_bad (got: $errout)"; failures=$((failures + 1)) ;;
+    esac
+done
+
+# --dry-run: plan only, no changes, no sudo, exit 0
+rm -f "$WORK/sudo-marker"
+out="$(run_kit handover me "$WORK/ho-tree" --dry-run)"
+assert "handover --dry-run exits 0" "0" "$?"
+case "$out" in
+    *"would hand over: $WORK/ho-tree -> $(id -un):$(id -gn)"*)
+        echo "  ${GREEN}PASS${NC}  handover --dry-run prints the plan (user:group)"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  handover --dry-run prints the plan (got: $out)"; failures=$((failures + 1)) ;;
+esac
+if [ -f "$WORK/sudo-marker" ]; then
+    echo "  ${RED}FAIL${NC}  handover --dry-run needs no sudo"; failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  handover --dry-run needs no sudo"; passed=$((passed + 1))
+fi
+
+# real run (no --dry-run): elevates via sudo. With the FAKE sudo it cannot
+# elevate — the loop guard must stop the re-entry instead of recursing.
+rm -f "$WORK/sudo-marker"
+if [ "$(id -u)" -ne 0 ]; then
+    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" handover me "$WORK/ho-tree" 2>&1 >/dev/null || true)"
+    if [ -f "$WORK/sudo-marker" ]; then
+        echo "  ${GREEN}PASS${NC}  handover elevates via sudo"; passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  handover elevates via sudo"; failures=$((failures + 1))
+    fi
+    case "$errout" in
+        *"did not elevate"*) echo "  ${GREEN}PASS${NC}  handover loop guard stops non-elevating sudo"; passed=$((passed + 1)) ;;
+        *) echo "  ${RED}FAIL${NC}  handover loop guard stops non-elevating sudo (got: $errout)"; failures=$((failures + 1)) ;;
+    esac
+else
+    # test env is root: the real chown runs; the tree must end up owned by
+    # the conf user with group write access.
+    out="$(run_kit handover opencode "$WORK/ho-tree")"
+    _own=$(stat -c '%U:%G' "$WORK/ho-tree/sub/file")
+    assert "handover chowns recursively (root env)" "$(id -un):$(id -gn)" "$_own"
+    case "$out" in
+        *"handover: $WORK/ho-tree"*) echo "  ${GREEN}PASS${NC}  handover reports each path (root env)"; passed=$((passed + 1)) ;;
+        *) echo "  ${RED}FAIL${NC}  handover reports each path (root env, got: $out)"; failures=$((failures + 1)) ;;
+    esac
+fi
 
 # List drift guard: install.sh's fetch_kit() list and update.sh's KIT_FILES
 # must carry the same file set — a missing entry means streamed installs
