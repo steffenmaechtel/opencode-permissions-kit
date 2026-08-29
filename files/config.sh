@@ -536,8 +536,8 @@ ddev_settings_apply() {
         DDEV_DEV_OWNED=true
         ui_success "ddev-settings on — dev-owned projects (recommended)"
         ui_info "existing projects get the flag + handback on the next scan. Run:"
-        ui_detail "sudo opencode-permissions-kit config refresh"
-        ui_detail "(or per project: sudo opencode-permissions-kit config handover <path>)"
+        ui_detail "sudo opk config refresh"
+        ui_detail "(or per project: sudo opk config handover <path>)"
         ui_detail "commit the added disable_settings_management line in each repo."
     else
         update_install_conf_ddev_owned false

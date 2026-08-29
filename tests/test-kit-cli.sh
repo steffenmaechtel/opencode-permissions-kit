@@ -64,12 +64,12 @@ export PATH
 # Dispatch through a symlink like /usr/local/bin does.
 BIN="$WORK/bin"
 mkdir -p "$BIN"
-ln -s "$LIB/kit" "$BIN/opencode-permissions-kit"
+ln -s "$LIB/kit" "$BIN/opk"
 cp "$KIT" "$LIB/kit"
 chmod +x "$LIB/kit"
 
 run_kit() {
-    OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" "$@" 2>/dev/null
+    OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" "$@" 2>/dev/null
 }
 
 echo "=== CLI dispatcher tests ==="
@@ -145,7 +145,7 @@ if run_kit update >/dev/null 2>&1; then
 else
     echo "  ${GREEN}PASS${NC}  missing script exits non-zero"; passed=$((passed + 1))
 fi
-errout="$("$BIN/opencode-permissions-kit" update 2>&1 >/dev/null || true)"
+errout="$("$BIN/opk" update 2>&1 >/dev/null || true)"
 case "$errout" in
     *"not found"*) echo "  ${GREEN}PASS${NC}  missing script names the problem"; passed=$((passed + 1)) ;;
     *) echo "  ${RED}FAIL${NC}  missing script names the problem (got: $errout)"; failures=$((failures + 1)) ;;
@@ -170,7 +170,7 @@ fi
 
 # unknown target -> usage error naming the choices (hermetic: explicit
 # install.conf — CI runners have no /etc/opencode-permissions-kit)
-errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" handover nobody "$WORK/ho-tree" 2>&1 >/dev/null || true)"
+errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover nobody "$WORK/ho-tree" 2>&1 >/dev/null || true)"
 case "$errout" in
     *"me or opencode"*) echo "  ${GREEN}PASS${NC}  handover rejects unknown target"; passed=$((passed + 1)) ;;
     *) echo "  ${RED}FAIL${NC}  handover rejects unknown target (got: $errout)"; failures=$((failures + 1)) ;;
@@ -185,7 +185,7 @@ fi
 
 # system roots and whole home directories are refused
 for _bad in / /usr /etc /var "/home/$(id -un)"; do
-    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" handover me "$_bad" 2>&1 >/dev/null || true)"
+    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$_bad" 2>&1 >/dev/null || true)"
     case "$errout" in
         *"refusing"*) echo "  ${GREEN}PASS${NC}  handover refuses $_bad"; passed=$((passed + 1)) ;;
         *) echo "  ${RED}FAIL${NC}  handover refuses $_bad (got: $errout)"; failures=$((failures + 1)) ;;
@@ -211,7 +211,7 @@ fi
 # elevate — the loop guard must stop the re-entry instead of recursing.
 rm -f "$WORK/sudo-marker"
 if [ "$(id -u)" -ne 0 ]; then
-    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opencode-permissions-kit" handover me "$WORK/ho-tree" 2>&1 >/dev/null || true)"
+    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$WORK/ho-tree" 2>&1 >/dev/null || true)"
     if [ -f "$WORK/sudo-marker" ]; then
         echo "  ${GREEN}PASS${NC}  handover elevates via sudo"; passed=$((passed + 1))
     else

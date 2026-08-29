@@ -48,14 +48,14 @@ Fresh installs already have it on (recommended default). On an existing
 install:
 
 ```bash
-sudo opencode-permissions-kit config ddev-settings on
-sudo opencode-permissions-kit config refresh   # flags existing projects + hands back
+sudo opk config ddev-settings on
+sudo opk config refresh   # flags existing projects + hands back
 ```
 
 Per project (faster, no full baseline):
 
 ```bash
-sudo opencode-permissions-kit config handover /var/www/vhosts/<project>
+sudo opk config handover /var/www/vhosts/<project>
 ```
 
 **Commit the added `disable_settings_management: true` line** — it is
@@ -92,7 +92,7 @@ hand-write the include (design plan, open extension).
 ## Disable it
 
 ```bash
-sudo opencode-permissions-kit config ddev-settings off
+sudo opk config ddev-settings off
 ```
 
 Stops future flag writes. Already-committed flags stay (repo content) —

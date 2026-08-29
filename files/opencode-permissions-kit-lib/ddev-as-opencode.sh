@@ -136,7 +136,7 @@ _opk_hosts_hint() {
     echo "  add them (Windows asks for permission, one command each —"
     echo "  you see exactly what gets added):"
     for _opk_h in $_opk_miss; do
-        echo "    opencode-permissions-kit ddev-hosts-add $_opk_h"
+        echo "    opk ddev-hosts-add $_opk_h"
     done
     return 0
 }
@@ -170,7 +170,7 @@ _opk_bootstrap_hint() {
     echo "  the root belongs to you, ddev runs as opencode). Hand it over once"
     echo "  (the kit hands it back after install):"
     echo ""
-    echo "    sudo opencode-permissions-kit config handover $PWD"
+    echo "    sudo opk config handover $PWD"
     # Dev-owned mode: the same command also writes
     # disable_settings_management: true (the durable fix — ddev then never
     # touches paths outside .ddev/, the root stays yours permanently).

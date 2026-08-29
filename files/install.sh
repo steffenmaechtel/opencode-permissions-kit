@@ -470,7 +470,7 @@ if id "$OPENCODE_USER" >/dev/null 2>&1 || [ -f /etc/opencode-permissions-kit/ins
     if [ "$INTERACTIVE" = true ]; then
         # Convention: docs/design/conventions.md — [Y/n] via ui_confirm.
         if ! ui_confirm "Re-configure the existing installation with install.sh?" "y"; then
-            ui_info "Aborted — run: opencode-permissions-kit update"
+            ui_info "Aborted — run: opk update"
             exit 0
         fi
     fi
@@ -1262,10 +1262,11 @@ sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
 ui_success "wrapper installed: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/wrapper"
 
-# CLI dispatcher: /usr/local/bin/opencode-permissions-kit -> kit
-sudo ln -sf "$LIBDIR/kit" /usr/local/bin/opencode-permissions-kit
-ui_success "cli installed: opencode-permissions-kit -> $LIBDIR/kit"
-log "cli symlink: /usr/local/bin/opencode-permissions-kit -> $LIBDIR/kit"
+# CLI dispatcher: /usr/local/bin/opk -> kit
+sudo rm -f /usr/local/bin/opencode-permissions-kit
+sudo ln -sf "$LIBDIR/kit" /usr/local/bin/opk
+ui_success "cli installed: opk -> $LIBDIR/kit"
+log "cli symlink: /usr/local/bin/opk -> $LIBDIR/kit"
 
 # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
@@ -1569,7 +1570,7 @@ echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"
 [ -n "$DD_MIG_DUMP_DIR" ] && ui_detail "ddev-migrate.sh import          re-import your ddev databases (first start pulls images)"
-ui_detail "opencode-permissions-kit status   verify the protection"
-ui_detail "opencode-permissions-kit config   change settings later (or update/uninstall)"
+ui_detail "opk status   verify the protection"
+ui_detail "opk config   change settings later (or update/uninstall)"
 ui_detail "Docs:  https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/README.md"
 log "install complete"

@@ -95,6 +95,7 @@ PLAN="$(PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry
 for want in \
     "/etc/sudoers.d/opencode-permissions-kit" \
     "/usr/local/bin/opencode" \
+    "/usr/local/bin/opk" \
     "/usr/local/lib/opencode-permissions-kit" \
     "/etc/profile.d/opencode-permissions-kit-umask.sh" \
     "/etc/opencode-permissions-kit"; do

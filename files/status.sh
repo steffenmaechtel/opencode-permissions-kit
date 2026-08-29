@@ -127,7 +127,7 @@ case "${CONTAINER_BACKEND:-}" in
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv "socket" "reachable — $sock" "$UI_GREEN"
             elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
-                ui_kv "socket" "unknown — needs root to check (run: sudo opencode-permissions-kit status)" "$UI_YELLOW"
+                ui_kv "socket" "unknown — needs root to check (run: sudo opk status)" "$UI_YELLOW"
             else
                 ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
             fi
@@ -151,7 +151,7 @@ case "${CONTAINER_BACKEND:-}" in
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv "socket" "reachable — $sock" "$UI_GREEN"
             elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
-                ui_kv "socket" "unknown — needs root to check (run: sudo opencode-permissions-kit status)" "$UI_YELLOW"
+                ui_kv "socket" "unknown — needs root to check (run: sudo opk status)" "$UI_YELLOW"
             else
                 ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
             fi
@@ -250,7 +250,7 @@ else
     # caller cannot stat the file, so "missing" may just mean "unchecked".
     # Only root can genuinely confirm absence.
     if [ "$(id -u)" -ne 0 ] && [ -d "/home/$OPENCODE_USER" ]; then
-        ui_kv "mkcert CA" "unknown — needs root to check (run: sudo opencode-permissions-kit status)" "$UI_YELLOW"
+        ui_kv "mkcert CA" "unknown — needs root to check (run: sudo opk status)" "$UI_YELLOW"
     else
         ui_kv "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)" "$UI_YELLOW"
     fi
@@ -310,7 +310,7 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/System
                 [ -n "$_st_m" ] || continue
                 ui_kv_warn "hosts (win)" "$(dirname "$_st_d"): missing $(printf '%s' "$_st_m" | tr '\n' ' ')"
                 for _st_h in $_st_m; do
-                    echo "     add: opencode-permissions-kit ddev-hosts-add $_st_h"
+                    echo "     add: opk ddev-hosts-add $_st_h"
                 done
             done
         done < "$PROJECTS_CONF"

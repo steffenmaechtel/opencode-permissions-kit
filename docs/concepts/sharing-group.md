@@ -60,5 +60,5 @@ soft `.git/config` deny — see
 If group bits drift (e.g. after unpacking an archive as root), re-apply:
 
 ```bash
-opencode-permissions-kit update --refresh
+opk update --refresh
 ```

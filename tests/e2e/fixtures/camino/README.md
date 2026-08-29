@@ -54,7 +54,7 @@ db/db credentials) and the site config with its relative `base: /camino/`
 ddev config --php-version 8.3 --project-type=typo3 --docroot=public \
   --webserver-type=apache-fpm --project-tld local \
   --web-environment-add="TYPO3_CONTEXT=Development/ddev" --nodejs-version=14.18.1
-sudo opencode-permissions-kit config handover "$PWD"
+sudo opk config handover "$PWD"
 ddev start
 ddev composer create-project "typo3/cms-base-distribution:^14"
 ddev composer req typo3/theme-camino

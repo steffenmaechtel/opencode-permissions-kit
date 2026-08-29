@@ -169,7 +169,7 @@ owner-only on Linux.
 **Fix:** run the handover (fast — one project, no group baseline):
 
 ```bash
-sudo opencode-permissions-kit config handover /var/www/vhosts/<project>
+sudo opk config handover /var/www/vhosts/<project>
 ```
 
 (or `update.sh` / `config.sh refresh` to re-run it over every registered
@@ -221,12 +221,12 @@ shows its permission dialog:
 
 ```bash
 cd /var/www/vhosts/<project>
-opencode-permissions-kit ddev-hosts-add
+opk ddev-hosts-add
 ```
 
 `ddev-hosts-check` lists what is missing (one ready-made
 `ddev-hosts-add <hostname>` command each — that form works from
-anywhere); `opencode-permissions-kit status` reports it per project
+anywhere); `opk status` reports it per project
 root. Manual fallback: edit
 `C:\Windows\System32\drivers\etc\hosts` in an elevated editor and add
 `127.0.0.1 <project>.<tld>`. Hostnames under the default `*.ddev.site`

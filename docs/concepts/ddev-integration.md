@@ -192,7 +192,7 @@ elevation path** (`ddev hostname <name> 127.0.0.1` as your user →
 `ddev-hostname.exe` → the Windows permission dialog):
 
 ```bash
-opencode-permissions-kit ddev-hosts-add          # in the project dir
+opk ddev-hosts-add          # in the project dir
 ```
 
 It adds every hostname missing from
@@ -202,10 +202,10 @@ under the default `*.ddev.site` TLD are never touched: ddev's public
 wildcard DNS already resolves them, no hosts entry is needed. After
 `ddev start`/`restart` the kit's `ddev()` shell function prints the
 missing hostnames with one ready-made command each —
-`opencode-permissions-kit ddev-hosts-add <hostname>` also works
+`opk ddev-hosts-add <hostname>` also works
 standalone from anywhere, so you add exactly what was reported;
 `ddev-hosts-check` lists them on demand, and
-`opencode-permissions-kit status` reports them per project root (its
+`opk status` reports them per project root (its
 scan skips `vendor/`, `node_modules/` and `testdata/` — packages and
 test fixtures ship their own `.ddev` dirs that are not your projects).
 
@@ -252,7 +252,7 @@ sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import
 ddev start <project> && ddev import-db <project> --file=<dump>.sql.gz
 ```
 
-`opencode-permissions-kit status` lists dumps still waiting for import.
+`opk status` lists dumps still waiting for import.
 Only each project's **default** database is exported; extra named
 databases need a manual `ddev export-db --database=<name>` on the old
 side — do that **before** the `.ddev` handover made your side

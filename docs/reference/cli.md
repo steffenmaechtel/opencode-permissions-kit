@@ -2,20 +2,20 @@
 
 This page lists the kit's commands and flags.
 
-## The `opencode-permissions-kit` command
+## The `opk` command
 
 After installation, one command manages everything (works from anywhere in
 your WSL/Linux system):
 
 ```bash
-opencode-permissions-kit status
-opencode-permissions-kit config projects add /var/www/vhosts/new-project
-opencode-permissions-kit update --binary
-opencode-permissions-kit upgrade-opencode   # just the opencode binary
-opencode-permissions-kit ddev-hosts-add     # in a ddev project dir
-opencode-permissions-kit handover me .gotmp # mixed-owner tree -> yours again
-opencode-permissions-kit uninstall
-opencode-permissions-kit help        # commands + arguments overview
+opk status
+opk config projects add /var/www/vhosts/new-project
+opk update --binary
+opk upgrade-opencode   # just the opencode binary
+opk ddev-hosts-add     # in a ddev project dir
+opk handover me .gotmp # mixed-owner tree -> yours again
+opk uninstall
+opk help        # commands + arguments overview
 ```
 
 Everything after the subcommand goes to the underlying script unchanged,
@@ -24,9 +24,11 @@ elevate via sudo automatically; `status` needs no sudo; `uninstall` runs as
 your user and asks for sudo itself; `ddev-hosts-*` run as your user (they
 drive Windows-side elevation through ddev itself).
 
-The command is a symlink (`/usr/local/bin/opencode-permissions-kit`) into
-the kit library — deployed since kit 0.0.14. On older installs, run
-[update](../how-to/update.md) once to get it. The direct script calls below
+The command is a symlink (`/usr/local/bin/opk`) into
+the kit library — deployed since kit 0.0.14 as `opencode-permissions-kit`
+and renamed to `opk` (issue #48). On older installs, run
+[update](../how-to/update.md) once to switch to the new name — it creates
+`opk` and removes the old long-name symlink. The direct script calls below
 keep working everywhere.
 
 ## handover
@@ -38,13 +40,13 @@ Switch file ownership between the two kit users — you and the agent:
 # cache now contains files of both users and every build complains
 # ("chmod ... Operation not permitted"). Make the whole tree yours again:
 cd /var/www/vhosts/ddev
-opencode-permissions-kit handover me .gotmp
+opk handover me .gotmp
 
 # Same idea the other way — give a folder to the agent user:
-opencode-permissions-kit handover opencode /var/www/vhosts/some-project/
+opk handover opencode /var/www/vhosts/some-project/
 
 # Not sure yet? Show what would happen, without sudo:
-opencode-permissions-kit handover me .gotmp --dry-run
+opk handover me .gotmp --dry-run
 ```
 
 `me` and `opencode` resolve to your default user and the agent user from
@@ -67,8 +69,8 @@ the Windows hosts file — your Windows browser cannot resolve custom-
 agent never gets hosts-file access.
 
 ```bash
-opencode-permissions-kit ddev-hosts-check   # what is missing?
-opencode-permissions-kit ddev-hosts-add     # add it (Windows asks permission)
+opk ddev-hosts-check   # what is missing?
+opk ddev-hosts-add     # add it (Windows asks permission)
 ```
 
 `ddev-hosts-add` runs `ddev hostname <name> 127.0.0.1` as your user for
@@ -84,7 +86,7 @@ entry is needed (the per-hostname commands the status and the `ddev()`
 hook print include the name, so you add exactly what was reported:
 
 ```bash
-opencode-permissions-kit ddev-hosts-add my-fancy-project.local
+opk ddev-hosts-add my-fancy-project.local
 ```
 
 works from anywhere). The status scan also skips `vendor/` and
@@ -149,7 +151,7 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | `--only-binary` | Skip every kit step, only upgrade the opencode binary |
 | `--binary-path <file>` | Install a specific binary file instead |
 
-`opencode-permissions-kit upgrade-opencode` is the shorthand for
+`opk upgrade-opencode` is the shorthand for
 `update --yes --only-binary` — extra flags (e.g. `--binary-path`) pass
 through.
 
