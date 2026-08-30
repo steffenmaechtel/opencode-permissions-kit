@@ -260,6 +260,17 @@ check "4b: describe/start invocations ran as opencode" \
     E 'grep -qx opencode /tmp/fake-ddev-calls'
 check_fail "4b: no ddev invocation ran as the developer" \
     E 'grep -qx dev /tmp/fake-ddev-calls'
+# Direct-start parity: the arm's internal `ddev start` must print the
+# same hosts-file hint a direct `ddev start` prints. A planted (empty)
+# /mnt/c Windows hosts file + a custom-tld project fixture make
+# _opk_hosts_hint fire; the stopped state file forces the internal start.
+E 'sudo mkdir -p /mnt/c/Windows/System32/drivers/etc && sudo touch /mnt/c/Windows/System32/drivers/etc/hosts && mkdir -p /tmp/opk-hint-proj/.ddev && printf "name: hint-proj\nproject_tld: local\n" > /tmp/opk-hint-proj/.ddev/config.yaml && sudo rm -f /tmp/fake-ddev-running'
+E 'sudo -u dev -H bash -c "cd /tmp/opk-hint-proj && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" > /tmp/opk-hint-out 2>&1'
+check "4b: the internal start prints the hosts-file hint (direct-start parity)" \
+    E 'grep -q "hint: these hostnames are missing" /tmp/opk-hint-out'
+check "4b: the hint offers the ready-made opk ddev-hosts-add command" \
+    E 'grep -q "opk ddev-hosts-add hint-proj.local" /tmp/opk-hint-out'
+E 'sudo rm -rf /mnt/c /tmp/opk-hint-proj /tmp/opk-hint-out'
 check "4b: ddev mailpit routes through the browser arm (issue #20 follow-up)" \
     E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev mailpit" 2>/dev/null | grep -qx "https://fake-project.ddev.site:8026"'
 check "4b: ddev phpmyadmin opens the describe service URL (issue #20 follow-up)" \

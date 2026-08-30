@@ -155,8 +155,17 @@ _opk_ddev_browser() {
         return $?
     fi
     if [ "$(_opk_json_get "$_opk_desc" status)" != "running" ]; then
-        # Launch-script parity: a stopped project is started first
-        /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode start || return $?
+        # Launch-script parity: a stopped project is started first — with
+        # the same hints a direct `ddev start` prints (bootstrap hint
+        # before, hosts-file hint after): the developer must not lose the
+        # "opk ddev-hosts-add" bridge just because OUR arm ran the start.
+        _opk_bootstrap_hint 2>/dev/null || true
+        /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode start
+        _opk_brc=$?
+        _opk_hosts_hint 2>/dev/null || true
+        if [ "$_opk_brc" -ne 0 ]; then
+            return "$_opk_brc"
+        fi
         _opk_desc="$(_opk_ddev_describe)"
         _opk_url2="$(_opk_browser_url "$_opk_desc" "$@")"
         if [ -n "$_opk_url2" ]; then

@@ -164,6 +164,10 @@ check "browser arm describes the project as opencode via the helper (issue #20)"
     sh -c "grep -qF 'ddev-as-opencode describe -j' \"\$1\"" _ "$FUNC"
 check "browser arm starts a stopped project first (launch-script parity)" \
     sh -c "grep -qF 'ddev-as-opencode start' \"\$1\"" _ "$FUNC"
+check "browser arm prints the bootstrap hint before its internal start" \
+    sh -c "grep -qF '_opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
+check "browser arm prints the hosts-file hint after its internal start (direct-start parity)" \
+    sh -c "grep -qF '_opk_hosts_hint' \"\$1\"" _ "$FUNC"
 check "browser arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
     sh -c "grep -q 'explorer.exe' \"\$1\" && grep -q 'xdg-open' \"\$1\"" _ "$FUNC"
 check "browser arm plain-runs commands without a describe URL (prompts stay interactive)" \
