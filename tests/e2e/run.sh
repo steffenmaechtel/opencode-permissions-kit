@@ -243,28 +243,45 @@ check "4b: ddev() survives the vendor #!/bin/sh wrapper chain into the bash targ
 E 'mkdir -p /tmp/opk-fakebin && printf "#!/bin/sh\ncase \"\$*\" in \"-u\") echo 4242;; \"-u opencode\") echo 9999;; *) echo 0;; esac\n" > /tmp/opk-fakebin/id && printf "#!/bin/sh\necho \"REAL_DDEV_RAN:\$*\"\n" > /tmp/opk-fakebin/ddev && chmod 755 /tmp/opk-fakebin/id /tmp/opk-fakebin/ddev'
 check "4b: ddev start still routes through the sudoers helper as opencode" \
     E 'sudo -u dev -H env PATH=/tmp/opk-fakebin:/usr/bin:/bin sh -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev start" 2>&1 | grep -q "ddev is not installed"'
-# Issue #20 full chain: the browser-command arm computes the URL AS
-# OPENCODE via the sudoers helper with DDEV_DEBUG=true (ddev's launch
-# prints "FULLURL <url>" instead of opening a browser — inherited by
-# INTERNAL `ddev launch` children of wrapper commands like mailpit or
-# the phpmyadmin/adminer add-ons) and only the browser open runs as the
-# developer. Fake ddev honors the FULLURL contract for the whole class
-# and records the caller; no explorer.exe/xdg-open in the container, so
-# the function prints the URL.
-E 'printf "#!/bin/sh\ncase \"\$1\" in launch|mailpit|phpmyadmin|adminer) echo \"FULLURL https://fake-project.ddev.site as \$(id -un)\";; *) exit 0;; esac\n" | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev'
+# Issue #20 full chain: the browser-command arm reads the URL from
+# `ddev describe -j` AS OPENCODE via the sudoers helper (upstream
+# guidance, ddev/ddev#8771 — describe carries the URLs even for a
+# stopped project) and only the browser open runs as the developer.
+# The fake ddev implements the describe contract, records every caller
+# into /tmp/fake-ddev-calls, and models the launch-script behavior of
+# starting a stopped project (state file flips stopped -> running).
+# No explorer.exe/xdg-open in the container, so the arm prints the URL.
+E 'printf "#!/bin/sh\nid -un >> /tmp/fake-ddev-calls\ncase \"\$1\" in\n    start)\n        touch /tmp/fake-ddev-running\n        echo FAKE_DDEV_START_RAN\n        ;;\n    describe)\n        if [ -f /tmp/fake-ddev-running ]; then s=running; else s=stopped; fi\n        printf \"{\\\"raw\\\":{\\\"status\\\":\\\"%%s\\\",\\\"primary_url\\\":\\\"https://fake-project.ddev.site\\\",\\\"mailpit_https_url\\\":\\\"https://fake-project.ddev.site:8026\\\",\\\"xhgui_status\\\":\\\"disabled\\\",\\\"services\\\":{\\\"phpmyadmin\\\":{\\\"https_url\\\":\\\"https://pma-fake-project.ddev.site\\\"}}},\\\"level\\\":\\\"info\\\",\\\"msg\\\":\\\"fake\\\"}\n\" \"\$s\"\n        ;;\n    *)\n        echo \"FAKE_DDEV_RAN:\$*\"\n        ;;\nesac\nexit 0\n" | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev && rm -f /tmp/fake-ddev-running /tmp/fake-ddev-calls'
+check "4b: ddev launch starts a stopped project first (launch-script parity)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch /typo3" 2>&1 | grep -q FAKE_DDEV_START_RAN'
 check "4b: ddev launch computes the URL as opencode and hands it to the developer (issue #20)" \
-    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch /typo3" | grep -qx "https://fake-project.ddev.site as opencode"'
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch /typo3" 2>/dev/null | grep -qx "https://fake-project.ddev.site/typo3"'
+check "4b: describe/start invocations ran as opencode" \
+    E 'grep -qx opencode /tmp/fake-ddev-calls'
+check_fail "4b: no ddev invocation ran as the developer" \
+    E 'grep -qx dev /tmp/fake-ddev-calls'
+# Direct-start parity: the arm's internal `ddev start` must print the
+# same hosts-file hint a direct `ddev start` prints. A planted (empty)
+# /mnt/c Windows hosts file + a custom-tld project fixture make
+# _opk_hosts_hint fire; the stopped state file forces the internal start.
+E 'sudo mkdir -p /mnt/c/Windows/System32/drivers/etc && sudo touch /mnt/c/Windows/System32/drivers/etc/hosts && mkdir -p /tmp/opk-hint-proj/.ddev && printf "name: hint-proj\nproject_tld: local\n" > /tmp/opk-hint-proj/.ddev/config.yaml && sudo rm -f /tmp/fake-ddev-running'
+E 'sudo -u dev -H bash -c "cd /tmp/opk-hint-proj && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" > /tmp/opk-hint-out 2>&1'
+check "4b: the internal start prints the hosts-file hint (direct-start parity)" \
+    E 'grep -q "hint: these hostnames are missing" /tmp/opk-hint-out'
+check "4b: the hint offers the ready-made opk ddev-hosts-add command" \
+    E 'grep -q "opk ddev-hosts-add hint-proj.local" /tmp/opk-hint-out'
+E 'sudo rm -rf /mnt/c /tmp/opk-hint-proj /tmp/opk-hint-out'
 check "4b: ddev mailpit routes through the browser arm (issue #20 follow-up)" \
-    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev mailpit" | grep -qx "https://fake-project.ddev.site as opencode"'
-check "4b: ddev phpmyadmin routes through the browser arm (issue #20 follow-up)" \
-    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev phpmyadmin" | grep -qx "https://fake-project.ddev.site as opencode"'
-check "4b: launch does not run ddev as the developer (no spurious internal start)" \
-    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" | grep -qv "as dev"'
-check_fail "4b: FULLURL transport lines stay off the visible output (stdout AND stderr)" \
-    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" 2>&1 | grep -q "^FULLURL"'
-check "4b: stdout carries exactly the clean URL line" \
-    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" 2>/dev/null | grep -qx "https://fake-project.ddev.site as opencode"'
-E 'sudo rm -f /usr/local/bin/ddev'
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev mailpit" 2>/dev/null | grep -qx "https://fake-project.ddev.site:8026"'
+check "4b: ddev phpmyadmin opens the describe service URL (issue #20 follow-up)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev phpmyadmin" 2>/dev/null | grep -qx "https://pma-fake-project.ddev.site"'
+check "4b: xhgui without a describe URL plain-runs as opencode (own output)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev xhgui" 2>/dev/null | grep -qx "FAKE_DDEV_RAN:xhgui"'
+check_fail "4b: the launch arm never executes ddev launch itself (URL from describe)" \
+    E 'sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" 2>&1 | grep -q FAKE_DDEV_RAN'
+check "4b: stdout carries exactly the clean URL line (running project, no start output)" \
+    E 'test "$(sudo -u dev -H bash -c ". /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh; ddev launch" 2>/dev/null | wc -l)" = 1'
+E 'sudo rm -f /usr/local/bin/ddev /tmp/fake-ddev-running /tmp/fake-ddev-calls'
 
 echo ""
 echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"

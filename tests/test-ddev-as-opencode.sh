@@ -150,24 +150,79 @@ check "function execs the kit's sudoers helper for the developer" \
 check "function uses 'command ddev' in the opencode branch" \
     sh -c "grep -q 'command ddev' \"\$1\"" _ "$FUNC"
 
-# --- 3a. launch special case (issue #20) ---------------------------------------
-# `ddev launch` computes the URL AS OPENCODE via the sudoers helper with
-# DDEV_DEBUG=true (ddev's launch script then prints "FULLURL <url>" instead
-# of opening a browser) and only the browser open runs as the developer —
-# as the developer ddev cannot see the rootless daemon and would run its
-# internal `ddev start` on every launch. Static checks (the arm calls the
-# absolute /usr/bin/sudo — not interceptable in unit tests; the e2e suite
-# covers the full chain).
-check "launch arm computes the URL as opencode via the helper (issue #20)" \
-    sh -c "grep -qF 'DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
-check "launch arm extracts the FULLURL line (ddev debug contract)" \
-    sh -c "grep -qF \"s/^FULLURL //p\" \"\$1\"" _ "$FUNC"
-check "FULLURL transport lines are filtered from the visible output" \
-    sh -c "grep -qF \"grep -v '^FULLURL ' >&2\" \"\$1\"" _ "$FUNC"
-check "launch arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
+# --- 3a. browser commands (issue #20) ------------------------------------------
+# `ddev launch` & co read their URL from `ddev describe -j` AS OPENCODE
+# via the sudoers helper (upstream guidance, ddev/ddev#8771 — describe
+# carries the URLs even for a stopped project) and only the browser open
+# runs as the developer — as the developer ddev cannot see the rootless
+# daemon and would run its internal `ddev start` on every launch. The
+# describe→URL mapping is pure shell (tested functionally below); the
+# sudo arms are static checks (the arm calls the absolute /usr/bin/sudo
+# — not interceptable in unit tests; the e2e suite covers the full
+# chain).
+check "browser arm describes the project as opencode via the helper (issue #20)" \
+    sh -c "grep -qF 'ddev-as-opencode describe -j' \"\$1\"" _ "$FUNC"
+check "browser arm starts a stopped project first (launch-script parity)" \
+    sh -c "grep -qF 'ddev-as-opencode start' \"\$1\"" _ "$FUNC"
+check "browser arm prints the bootstrap hint before its internal start" \
+    sh -c "grep -qF '_opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
+check "browser arm prints the hosts-file hint after its internal start (direct-start parity)" \
+    sh -c "grep -qF '_opk_hosts_hint' \"\$1\"" _ "$FUNC"
+check "browser arm opens the URL with the developer's interop (explorer.exe/xdg-open)" \
     sh -c "grep -q 'explorer.exe' \"\$1\" && grep -q 'xdg-open' \"\$1\"" _ "$FUNC"
-check "sudoers env_keep includes DDEV_DEBUG (launch URL transport)" \
-    sh -c "grep -q 'env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME DDEV_DEBUG\"' \"\$1\"" _ "$SUDOERS"
+check "browser arm plain-runs commands without a describe URL (prompts stay interactive)" \
+    sh -c "grep -qF 'browser open is skipped' \"\$1\"" _ "$FUNC"
+check "browser arm parses the describe JSON with python3 (kit prerequisite)" \
+    sh -c "grep -q 'python3' \"\$1\"" _ "$FUNC"
+check "sudoers env_keep keeps the transport vars" \
+    sh -c "grep -q 'env_keep += \"DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME\"' \"\$1\"" _ "$SUDOERS"
+check_fail "sudoers no longer keep DDEV_DEBUG (describe transport needs none)" \
+    sh -c "grep -q 'DDEV_DEBUG' \"\$1\"" _ "$SUDOERS"
+check_fail "function file no longer uses the FULLURL debug contract" \
+    sh -c "grep -q 'FULLURL' \"\$1\"" _ "$FUNC"
+
+# describe→URL mapping, functional: the fixture mirrors the fields ddev
+# emits for a running project (config-derived fields exist even when
+# stopped). BU <json> <cmd> [arg] runs _opk_browser_url on the fixture.
+DJ='{"raw":{"status":"running","primary_url":"https://fake-project.ddev.site","mailpit_https_url":"https://fake-project.ddev.site:8026","mailpit_url":"http://fake-project.ddev.site:8025","xhgui_status":"enabled","xhgui_https_url":"https://fake-project.ddev.site:8443","xhgui_url":"http://fake-project.ddev.site:8442","services":{"phpmyadmin":{"https_url":"https://fake-project.ddev.site:8036"}}},"level":"info","msg":"fake"}'
+DJ_HTTP='{"raw":{"status":"running","primary_url":"http://fake-project.ddev.site:8080","mailpit_https_url":"https://fake-project.ddev.site:8026","mailpit_url":"http://fake-project.ddev.site:8025"},"level":"info","msg":"fake"}'
+DJ_NOX='{"raw":{"status":"running","primary_url":"https://fake-project.ddev.site","xhgui_status":"disabled"},"level":"info","msg":"fake"}'
+BU() { sh -c '. "$1" && _opk_browser_url "$2" "$3" "$4"' _ "$FUNC" "$1" "$2" "${3:-}"; }
+assert_eq "url: bare launch is the primary URL" \
+    "https://fake-project.ddev.site" "$(BU "$DJ" launch)"
+assert_eq "url: launch <path> appends the path" \
+    "https://fake-project.ddev.site/typo3" "$(BU "$DJ" launch /typo3)"
+assert_eq "url: launch <rel-path> inserts the slash" \
+    "https://fake-project.ddev.site/phpinfo.php" "$(BU "$DJ" launch phpinfo.php)"
+assert_eq "url: launch <full-url> passes it through" \
+    "https://elsewhere.example/sub" "$(BU "$DJ" launch https://elsewhere.example/sub)"
+assert_eq "url: launch :<port> replaces the primary port" \
+    "https://fake-project.ddev.site:8031" "$(BU "$DJ" launch :8031)"
+assert_eq "url: launch :<port> on a ported primary strips the old port" \
+    "http://fake-project.ddev.site:3000" "$(BU "$DJ_HTTP" launch :3000)"
+assert_eq "url: launch -m is the Mailpit URL" \
+    "https://fake-project.ddev.site:8026" "$(BU "$DJ" launch -m)"
+assert_eq "url: launch --mailpit works too" \
+    "https://fake-project.ddev.site:8026" "$(BU "$DJ" launch --mailpit)"
+assert_eq "url: launch -m falls back to plain run for -p (ddev prints its hint)" \
+    "" "$(BU "$DJ" launch -p)"
+assert_eq "url: mailpit is the https variant (https primary)" \
+    "https://fake-project.ddev.site:8026" "$(BU "$DJ" mailpit)"
+assert_eq "url: mailpit is the http variant (http primary)" \
+    "http://fake-project.ddev.site:8025" "$(BU "$DJ_HTTP" mailpit)"
+assert_eq "url: xhgui is the xhgui URL when enabled" \
+    "https://fake-project.ddev.site:8443" "$(BU "$DJ" xhgui)"
+assert_eq "url: xhgui disabled falls back to plain run" \
+    "" "$(BU "$DJ_NOX" xhgui)"
+assert_eq "url: phpmyadmin comes from the describe service" \
+    "https://fake-project.ddev.site:8036" "$(BU "$DJ" phpmyadmin)"
+assert_eq "url: adminer without a describe service falls back to plain run" \
+    "" "$(BU "$DJ" adminer)"
+assert_eq "url: json field extraction of a nested path" \
+    "https://fake-project.ddev.site:8036" \
+    "$(sh -c '. "$1" && _opk_json_get "$2" services phpmyadmin https_url' _ "$FUNC" "$DJ")"
+assert_eq "url: json field extraction of a missing path is empty" \
+    "" "$(sh -c '. "$1" && _opk_json_get "$2" services adminer https_url' _ "$FUNC" "$DJ")"
 
 # --- 3a-2. browser-command routing (issue #20 follow-up: mailpit/phpmyadmin) ---
 # Functional against _opk_is_browser_cmd: the default list, the xhgui

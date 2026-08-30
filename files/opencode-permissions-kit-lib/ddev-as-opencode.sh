@@ -33,36 +33,158 @@ _opk_browser_open() {
 
 # _opk_ddev_browser <ddev-args...>: issue #20 + follow-up. Covers every
 # ddev command that opens a browser — `launch` itself and the wrappers
-# whose internals spawn `ddev launch ...` (mailpit: "launch -m", the
-# phpmyadmin/adminer add-ons: "launch :<port>", xhgui: "launch <url>").
-# The command runs AS OPENCODE with DDEV_DEBUG=true: whatever internal
-# `ddev launch` child it spawns (bash host command or Go exec) inherits
-# the flag, prints "FULLURL <url>" and exits instead of opening a browser
-# (as opencode it could not — no interop). Output streams to stderr live
-# (prompts like the phpmyadmin install question stay interactive) but
-# WITHOUT the FULLURL transport lines — they go to the capture file only,
-# the clean URL is printed on stdout by this function. DDEV_DEBUG
-# survives sudo via the kit's sudoers env_keep. ddev without the FULLURL
-# debug contract simply shows its output; the browser then stays closed
-# (upgrade ddev).
+# that would spawn it (mailpit, the phpmyadmin/adminer add-ons, xhgui).
+# The URL is read from `ddev describe -j` run AS OPENCODE (via the
+# sudoers helper): running as opencode is what makes it correct — as
+# *you*, ddev cannot see the rootless daemon and would decide "not
+# running" and run its internal `ddev start` on EVERY call. ddev
+# maintains every URL in the describe document from the project config,
+# even while the project is stopped (upstream-recommended scripting
+# interface, ddev/ddev#8771) — no DDEV_DEBUG log flooding needed
+# anymore. A stopped project is started first, exactly like ddev's own
+# launch script (whose `ddev start` used to arrive wrapped in debug
+# logging). Commands whose URL describe does not carry — the built-in
+# phpmyadmin installer prompt (add-on not installed yet), custom
+# project commands without a matching service — fall back to a plain
+# run AS OPENCODE: output and prompts stay interactive, only the
+# browser open is skipped (as opencode there is no interop anyway).
+# The URL is printed on stdout and opened AS THE DEVELOPER
+# (_opk_browser_open — WSL interop, which the opencode user must not
+# have).
+_opk_ddev_describe() {
+    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode describe -j 2>/dev/null || true
+}
+
+# _opk_json_get <json> <key>...: the string value at .raw.<key1>.<key2>...
+# of a `ddev describe -j` document (single line); empty when the path is
+# absent or not a string. Keys may be passed as separate arguments or
+# dot-joined. python3 is a kit prerequisite (the installer already
+# depends on it for its jsonc parsing).
+_opk_json_get() {
+    _opk_gj="$1"
+    shift
+    printf '%s' "$_opk_gj" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)["raw"]
+    for k in ".".join(sys.argv[1:]).split("."):
+        d = d[k]
+    if isinstance(d, str):
+        print(d)
+except Exception:
+    pass' "$@" 2>/dev/null
+}
+
+# _opk_scheme_url <json> <https-key> <http-key>: the URL variant matching
+# the primary URL's scheme (ddev's launch script picks the mailpit port
+# the same way), the other variant as fallback — empty when describe
+# carries neither.
+_opk_scheme_url() {
+    case "$(_opk_json_get "$1" primary_url)" in
+        https*) _opk_su="$(_opk_json_get "$1" "$2")" ;;
+        *) _opk_su="$(_opk_json_get "$1" "$3")" ;;
+    esac
+    [ -n "$_opk_su" ] || _opk_su="$(_opk_json_get "$1" "$2")"
+    [ -n "$_opk_su" ] || _opk_su="$(_opk_json_get "$1" "$3")"
+    printf '%s\n' "$_opk_su"
+}
+
+# _opk_browser_url <json> <argv...>: the URL this browser command would
+# open, computed from the describe document — empty when the command
+# must fall back to a plain run. The `launch` argument handling mirrors
+# ddev's launch script: -m switches to the Mailpit URL, -p must run ddev
+# itself (ddev prints its phpMyAdmin add-on hint there), `--` ends the
+# flags, then one positional — a full URL as-is, :<port> replaces the
+# primary URL's port (keeping its scheme), anything else is appended as
+# a path.
+_opk_browser_url() {
+    _opk_bj="$1"
+    shift
+    _opk_bc="$1"
+    case "$_opk_bc" in
+        launch)
+            shift
+            _opk_bl_base="$(_opk_json_get "$_opk_bj" primary_url)"
+            while :; do
+                case "${1:-}" in
+                    -m|--mailpit|--mailhog)
+                        _opk_bl_base="$(_opk_scheme_url "$_opk_bj" mailpit_https_url mailpit_url)"
+                        ;;
+                    -p|--phpmyadmin) return 0 ;;
+                    --) shift; break ;;
+                    -*) ;;
+                    *) break ;;
+                esac
+                shift
+            done
+            case "${1:-}" in
+                "") printf '%s\n' "$_opk_bl_base" ;;
+                http://*|https://*) printf '%s\n' "$1" ;;
+                :*) printf '%s\n' "${_opk_bl_base%:[0-9]*}$1" ;;
+                *) printf '%s\n' "${_opk_bl_base%/}/${1#/}" ;;
+            esac
+            return 0
+            ;;
+        mailpit)
+            _opk_scheme_url "$_opk_bj" mailpit_https_url mailpit_url
+            return 0
+            ;;
+        xhgui)
+            if [ "$(_opk_json_get "$_opk_bj" xhgui_status)" = "enabled" ]; then
+                _opk_scheme_url "$_opk_bj" xhgui_https_url xhgui_url
+            fi
+            return 0
+            ;;
+    esac
+    # phpmyadmin/adminer (+ conf-registered commands): a ddev service of
+    # the same name carries the URL in describe
+    _opk_scheme_url "$_opk_bj" "services.$_opk_bc.https_url" "services.$_opk_bc.http_url"
+}
+
 _opk_ddev_browser() {
-    _opk_tmp="${TMPDIR:-/tmp}/opk-ddev-browser.$$"
-    DDEV_DEBUG=true /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@" 2>&1 \
-        | tee "$_opk_tmp" | grep -v '^FULLURL ' >&2
-    _opk_url="$(sed -n 's/^FULLURL //p' "$_opk_tmp" 2>/dev/null | tail -1)"
-    rm -f "$_opk_tmp"
-    if [ -n "$_opk_url" ]; then
-        printf '%s\n' "$_opk_url"
-        _opk_browser_open "$_opk_url"
+    _opk_desc="$(_opk_ddev_describe)"
+    _opk_url=""
+    if [ -n "$_opk_desc" ]; then
+        _opk_url="$(_opk_browser_url "$_opk_desc" "$@")"
     fi
+    if [ -z "$_opk_url" ]; then
+        # No URL from describe (not a project dir, unknown command,
+        # add-on not installed): plain run — ddev's own output, prompts
+        # and exit code pass through.
+        /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode "$@"
+        return $?
+    fi
+    if [ "$(_opk_json_get "$_opk_desc" status)" != "running" ]; then
+        # Launch-script parity: a stopped project is started first — with
+        # the same hints a direct `ddev start` prints (bootstrap hint
+        # before, hosts-file hint after): the developer must not lose the
+        # "opk ddev-hosts-add" bridge just because OUR arm ran the start.
+        _opk_bootstrap_hint 2>/dev/null || true
+        /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode start
+        _opk_brc=$?
+        _opk_hosts_hint 2>/dev/null || true
+        if [ "$_opk_brc" -ne 0 ]; then
+            return "$_opk_brc"
+        fi
+        _opk_desc="$(_opk_ddev_describe)"
+        _opk_url2="$(_opk_browser_url "$_opk_desc" "$@")"
+        if [ -n "$_opk_url2" ]; then
+            _opk_url="$_opk_url2"
+        fi
+    fi
+    printf '%s\n' "$_opk_url"
+    _opk_browser_open "$_opk_url"
     return 0
 }
 
 # _opk_browser_cmds: command names whose ddev run opens a browser —
-# `launch` itself plus the wrappers whose internals spawn
-# `ddev launch ...` (mailpit: "launch -m", phpmyadmin/adminer add-ons:
-# "launch :<port>" — also matches CUSTOM project host commands of the
-# same name, e.g. a phpmyadmin with own ports). Extendable via
+# `launch` itself plus the wrappers (mailpit, the phpmyadmin/adminer
+# add-ons, xhgui). Their URL comes from `ddev describe -j`: the
+# built-ins carry theirs in dedicated fields, add-on commands appear as
+# raw.services.<name> — CUSTOM project host commands of the same name
+# only open their browser when describe carries a service of that name
+# too (otherwise they plain-run as opencode and the browser stays
+# closed). Extendable via
 # /etc/opencode-permissions-kit/ddev-browser-cmds.conf (one name per
 # line, '#' comments allowed) for project-specific browser commands.
 _opk_browser_cmds() {
