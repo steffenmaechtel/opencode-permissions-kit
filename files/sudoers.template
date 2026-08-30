@@ -16,9 +16,9 @@
 # (third-party UIs like OpenChamber, which pass the password they generate
 # from --ui-password) does not silently lose its authentication — the
 # username is the Basic-auth counterpart (server/auth.ts, default
-# "opencode"). DDEV_DEBUG rides along for the `ddev launch` URL transport
-# (ddev's launch script prints "FULLURL <url>" instead of opening a
-# browser — the developer side opens it, see issue #20).
+# "opencode"). Browser commands (`ddev launch` & co.) need no extra
+# variable anymore: their URLs are read from `ddev describe -j`
+# (ddev/ddev#8771).
 #
 # Deliberately NOT kept: every other OPENCODE_* variable. Agent-side
 # config (OPENCODE_CONFIG*, OPENCODE_AUTH_CONTENT, OPENCODE_API_KEY,
@@ -26,7 +26,7 @@
 # belongs to the opencode user's own environment — env_reset is the
 # protection here, keeping any of them would let the calling shell
 # override agent config/permissions per invocation.
-Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME DDEV_DEBUG"
+Defaults env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"
 
 # Base RunAs: the wrapper always execs opencode as the opencode user.
 DEFAULT_USER ALL=(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode *

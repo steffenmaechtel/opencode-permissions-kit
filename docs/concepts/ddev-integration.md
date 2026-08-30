@@ -24,30 +24,43 @@ is a different world entirely.
 
 ### Browser-opening commands (issue #20)
 
-Commands that open a browser — `ddev launch` itself and every wrapper
-whose internals spawn `ddev launch ...` (`mailpit` → `launch -m`, the
-phpmyadmin/adminer add-ons and custom project host commands →
-`launch :<port>`, `xhgui` bare) — cannot run as `opencode`: opening the
-browser on WSL2 needs `explorer.exe` / `xdg-open` → `wslview`, i.e.
-**Windows interop**, exactly what the `opencode` user must not have (an
-`.exe` would run as your Windows user, outside every soft rule). The
-`ddev()` function routes the whole class through a split:
+Commands that open a browser — `ddev launch` itself and its wrappers
+(`mailpit`, the phpmyadmin/adminer add-ons, `xhgui`) — cannot run as
+`opencode`: opening the browser on WSL2 needs `explorer.exe` /
+`xdg-open` → `wslview`, i.e. **Windows interop**, exactly what the
+`opencode` user must not have (an `.exe` would run as your Windows
+user, outside every soft rule). The `ddev()` function routes the whole
+class through a split:
 
-1. The command runs **as `opencode`** with `DDEV_DEBUG=true`: whatever
-   internal `ddev launch` child it spawns (bash host command or Go exec)
-   inherits the flag, prints `FULLURL <url>` and exits instead of opening
-   anything. Running as `opencode` is what makes this correct — as
-   *you*, ddev cannot see the rootless daemon, would decide "not
-   running" and run its internal `ddev start` on **every** call; the
-   https/mkcert detection needs the `opencode`-owned CAROOT. A stopped
-   project is started by that same run.
-2. The URL is opened **as you** (`explorer.exe`, falling back to
-   `xdg-open`) — your interop, your browser.
+1. The URL is read from **`ddev describe -j`** run **as `opencode`**
+   via the sudoers helper — ddev maintains every URL in that document
+   from the project config, even while the project is stopped (the
+   upstream-recommended scripting interface,
+   [ddev/ddev#8771](https://github.com/ddev/ddev/issues/8771)).
+   `launch` maps to `raw.primary_url` (with `launch`'s argument forms:
+   path, `:<port>`, full URL), `mailpit` to `raw.mailpit_https_url`,
+   `xhgui` to `raw.xhgui_https_url` (when enabled), and add-on
+   commands like `phpmyadmin` to `raw.services.<name>.https_url`.
+   Running as `opencode` is what makes this correct — as *you*, ddev
+   cannot see the rootless daemon and would run its internal
+   `ddev start` on **every** call. The JSON is parsed with python3 (a
+   kit prerequisite). A stopped project is started first, exactly like
+   ddev's own launch script — but plainly, without the `DDEV_DEBUG`
+   log flooding the old URL transport needed.
+2. Commands whose URL describe does not carry — the built-in
+   `phpmyadmin` installer prompt (add-on not yet installed), custom
+   project commands without a matching service — **plain-run as
+   `opencode`**: output, prompts and exit code pass through
+   unchanged; only the browser open is skipped.
+3. The URL is printed and opened **as you** (`explorer.exe`, falling
+   back to `xdg-open`) — your interop, your browser.
 
 Project-specific browser commands can be added to
-`/etc/opencode-permissions-kit/ddev-browser-cmds.conf` (one command name
-per line, `#` comments) — any ddev host command that internally calls
-`ddev launch` fits the same mechanism.
+`/etc/opencode-permissions-kit/ddev-browser-cmds.conf` (one command
+name per line, `#` comments) — they open their browser when
+`ddev describe` carries a service of the same name
+(`raw.services.<name>.https_url`); otherwise they plain-run as
+`opencode`.
 
 Net effect: browser commands in your terminal open the browser without a
 restart detour; agent-side they still fail interop-blocked (by design —
