@@ -123,6 +123,53 @@ check "helper execs the resolved ddev binary" \
 check_fail "helper never references the removed legacy bin/ddev shim" \
     sh -c "grep -qE 'opencode-permissions-kit/bin/ddev(\$|[^-])' \"\$1\"" _ "$HELPER"
 
+# --- 2b. working-directory fallback (issue #51) ---------------------------------
+# sudo keeps the caller's cwd, so the opencode process can inherit a
+# directory it cannot search (the developer's $HOME is 0750 on Ubuntu
+# 24.04). ddev's compose loader resolves its embedded schema against the
+# process cwd (os.Getwd -> stat "."), which dies with 'error in parsing
+# "compose-spec.json": stat .: permission denied' there — the issue #51
+# warning on cwd-independent runs like `ddev poweroff`. The helper must
+# probe the inherited cwd and fall back to the opencode home, noting it
+# on stderr and never aborting the run. Functional with stubs: a fake id
+# (constant uid — the guard passes for any user) and a fake ddev (args +
+# cwd marker). The unreadable cwd is built with the owner-bit trick: a
+# process can SIT in a directory it cannot search (exactly what sudo's
+# cwd inheritance produces) but [ -x . ] is false there — the condition
+# behind Go's stat(".") EACCES.
+check "helper probes the inherited cwd for search permission (issue #51)" \
+    sh -c "grep -qF 'if ! [ -x . ]; then' \"\$1\"" _ "$HELPER"
+check "helper falls back to the opencode home on an unreadable cwd" \
+    sh -c "grep -qF 'cd \"\$HOME\" 2>/dev/null || true' \"\$1\"" _ "$HELPER"
+check "helper notes the fallback on stderr and never aborts the run" \
+    sh -c "grep -q 'not accessible to the opencode user - continuing in ' \"\$1\" && grep -qF '>&2' \"\$1\"" _ "$HELPER"
+
+WF=$(mktemp -d)
+mkdir -p "$WF/stub"
+printf '#!/bin/sh\necho 4242\n' > "$WF/stub/id"
+printf '#!/bin/sh\necho "FAKE_DDEV_ARGS:$*"\necho "FAKE_DDEV_CWD:$(pwd)"\n' > "$WF/stub/ddev"
+chmod +x "$WF/stub/id" "$WF/stub/ddev"
+mkdir "$WF/locked"
+
+WF_OUT=$(cd "$WF" && PATH="$WF/stub:$PATH" sh "$HELPER" poweroff 2>&1)
+check "fallback: readable cwd keeps the directory (ddev runs right there)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'FAKE_DDEV_CWD:$WF'" _ "$WF_OUT"
+check "fallback: readable cwd stays silent (no note)" \
+    sh -c "if printf '%s\n' \"\$1\" | grep -q 'not accessible'; then exit 1; fi" _ "$WF_OUT"
+check "fallback: arguments pass through to ddev untouched" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'FAKE_DDEV_ARGS:poweroff'" _ "$WF_OUT"
+
+set +e
+WF_OUT2=$(cd "$WF/locked" && chmod 007 "$WF/locked" && PATH="$WF/stub:$PATH" sh "$HELPER" stop myproject 2>&1)
+WF_RC=$?
+set -e
+chmod 700 "$WF/locked"
+check "fallback: unreadable cwd prints the explanatory note (issue #51)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'not accessible to the opencode user'" _ "$WF_OUT2"
+check "fallback: unreadable cwd still execs ddev (exit code passes through)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'FAKE_DDEV_ARGS:stop myproject'" _ "$WF_OUT2" && [ "$WF_RC" = 0 ]
+rm -rf "$WF"
+
 # --- 3. function file: sourcing + both branches -------------------------------
 # Fixture: a fake ddev on PATH so the already-opencode branch runs something
 # observable instead of the (absent) real ddev.

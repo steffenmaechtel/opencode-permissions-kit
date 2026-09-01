@@ -97,6 +97,37 @@ prevents. Ways out for those scripts:
    sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode start
    ```
 
+### Unreadable working directories (issue #51)
+
+`sudo` keeps your working directory, so ddev — running as `opencode` —
+inherits whatever directory you invoked it from, including ones the
+opencode user cannot read, like your `$HOME` (mode 0750 on Ubuntu 24.04).
+ddev resolves its embedded compose schema against the process working
+directory, so registry-driven runs from such a directory
+(`ddev poweroff`, `ddev stop <project>`) used to print one warning per
+project:
+
+```
+Failed to load compose project for down: validating …: error in parsing "compose-spec.json": stat .: permission denied
+```
+
+The stop itself still worked — noise, not breakage.
+
+The helper now probes the inherited working directory, prints a one-line
+note when the opencode user cannot read it, and runs ddev from the
+opencode home instead:
+
+```
+ddev-as-opencode: current directory is not accessible to the opencode user - continuing in /home/opencode
+```
+
+Commands that address a project by name or walk the registry
+(`ddev poweroff`, `ddev stop <project>`, `ddev list`) are unaffected by
+the working directory. Commands without a project name (`ddev start`,
+`ddev describe`) need the project directory as their working directory —
+run them from inside the project (the [sharing group](sharing-group.md)
+keeps it readable for opencode) or pass the project name.
+
 ## ddev-managed paths (the EPERM fixes)
 
 ddev chmods `.ddev/` and the app-type's **settings directories

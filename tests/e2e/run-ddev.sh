@@ -538,15 +538,28 @@ if [ "$_daemon_ok" = true ]; then
     echo "--- DD7. lifecycle + suite-wide EPERM sweep ---"
     check "DD7: ddev restart" \
         OC_DD2 'ddev restart >/tmp/dd7.log 2>&1'
-    check "DD7: ddev stop" \
-        OC_DD2 'ddev stop >/tmp/dd7.log 2>&1'
+    # Issue #51: registry-driven ddev runs from a directory the opencode
+    # user cannot search — the developer's $HOME (0750 dev-owned) being the
+    # natural one for `ddev poweroff` — made ddev's compose loader die on
+    # os.Getwd() -> stat(".") with 'error in parsing "compose-spec.json":
+    # stat .: permission denied' (warning per project, stop still worked).
+    # The ddev() function inherits that cwd via sudo; bin/ddev-as-opencode
+    # now probes it and falls back to the opencode home with a stderr
+    # note. This is the real transport: dev shell -> ddev() -> sudoers
+    # helper -> real ddev, against the live dd2 project.
+    check "DD7: ddev stop by name from the dev's unreadable home (#51)" \
+        DEVSH 'cd ~ && ddev stop dd2 >/tmp/dd7-stop.log 2>&1'
+    check "DD7: no compose-spec warning from the unreadable cwd (#51)" \
+        E 'test -z "$(grep -s "compose-spec.json" /tmp/dd7-stop.log)"'
+    check "DD7: the fallback note names the run directory (#51)" \
+        E 'grep -q "not accessible to the opencode user" /tmp/dd7-stop.log'
     check "DD7: ddev delete -Oy" \
         OC_DD2 'ddev delete -Oy >/tmp/dd7.log 2>&1'
     # EXCLUDED logs hold EXPECTED EPERM text: dd13-start1 (the DD13
     # tripwire asserts that exact bootstrap EPERM), dd2-config (the burn-in
     # Finding-1 chmod warning from `ddev config`).
     check "DD7: zero 'operation not permitted' across the suite log" \
-        E '_s=$(grep -il "operation not permitted" /tmp/dd2-start.log /tmp/dd2-restart.log /tmp/dd2-handover.log /tmp/dd7.log /tmp/dd9.log /tmp/dd10-*.log /tmp/dd11-*.log /tmp/dd12-*.log 2>/dev/null); test -z "$_s"'
+        E '_s=$(grep -il "operation not permitted" /tmp/dd2-start.log /tmp/dd2-restart.log /tmp/dd2-handover.log /tmp/dd7.log /tmp/dd7-stop.log /tmp/dd9.log /tmp/dd10-*.log /tmp/dd11-*.log /tmp/dd12-*.log 2>/dev/null); test -z "$_s"'
 fi
 
 if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/null; then

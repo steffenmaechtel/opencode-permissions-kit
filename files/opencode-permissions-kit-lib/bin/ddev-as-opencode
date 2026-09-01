@@ -75,5 +75,25 @@ case "${CONTAINER_BACKEND:-}" in
         ;;
 esac
 
+# Working-directory fallback (issue #51): sudo keeps the caller's cwd, so
+# the opencode process can inherit a directory it cannot search — the
+# developer's $HOME is 0750 on Ubuntu 24.04, and `ddev poweroff` is a
+# command you naturally run from there. ddev's embedded compose schema is
+# registered under a RELATIVE resource name, so every compose load
+# resolves it against the process cwd (os.Getwd -> stat "."), which fails
+# with 'error in parsing "compose-spec.json": stat .: permission denied'
+# there — a warning per project on cwd-independent runs (`ddev poweroff`,
+# `ddev stop <project>`), while the stop itself still succeeds. Probe the
+# inherited cwd from the process itself (not $PWD) and fall back to the
+# opencode home: registry-driven commands then run clean, and commands
+# that need the cwd (bare `ddev start`) would fail in such a directory
+# anyway — the stderr note keeps that failure explainable. Never aborts:
+# when even the fallback cd fails, ddev runs with the inherited cwd as
+# before.
+if ! [ -x . ]; then
+    echo "ddev-as-opencode: current directory is not accessible to the opencode user - continuing in $HOME" >&2
+    cd "$HOME" 2>/dev/null || true
+fi
+
 umask 002
 exec "$DDEV" "$@"
