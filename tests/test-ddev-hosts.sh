@@ -90,6 +90,23 @@ assert_eq "list: name lowercased (ddev uses ToLower)" \
     "with_upper_case.ddev.site" \
     "$(sh -c '. "$1" && ddev_hosts_list "$2"' _ "$HOSTS" "$WORK/proj3")"
 
+# issue #46: config.yaml with Windows CRLF line endings — block-list items
+# kept their \r and it ended up mid-hostname ("name\r.tld"): the terminal
+# renders the tail at column 0 (".localosts (win)", ".localdd:") and the
+# hosts-file grep never matches, so an added hostname stays "missing".
+mkdir -p "$WORK/projcrlf/.ddev"
+printf 'name: crlf-proj\r\nproject_tld: local\r\nadditional_hostnames:\r\n  - extra\r\nadditional_fqdns:\r\n  - full.example.com\r\n' > "$WORK/projcrlf/.ddev/config.yaml"
+assert_eq "list: CRLF config.yaml yields clean hostnames (issue #46)" \
+    "crlf-proj.local
+extra.local
+full.example.com" \
+    "$(sh -c '. "$1" && ddev_hosts_list "$2" | sort' _ "$HOSTS" "$WORK/projcrlf")"
+if sh -c '. "$1" && ddev_hosts_list "$2"' _ "$HOSTS" "$WORK/projcrlf" | grep -q "$(printf '\r')"; then
+    fail "list: CR byte leaked into hostname output (issue #46)"
+else
+    pass "list: no CR byte in hostname output (issue #46)"
+fi
+
 # --- 2. missing check against the Windows hosts file --------------------------
 
 printf '127.0.0.1 localhost\n127.0.0.1 base-typo3-modulset.local other.local\n' > "$WORK/winhosts"
@@ -114,6 +131,16 @@ printf '127.0.0.1 localhost\n127.0.0.1 xbase-typo3-modulset.localy\n' > "$WORK/w
 assert_eq "missing: substring hosts do not satisfy the check" \
     "base-typo3-modulset.local" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts2" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/proj1")"
+
+# issue #46 follow-up: a hostname parsed from a CRLF config.yaml must
+# match a cleanly added hosts entry (and a CRLF hosts file) — otherwise
+# status reports it missing forever no matter how often the user adds it.
+printf '127.0.0.1 crlf-proj.local extra.local full.example.com\n' > "$WORK/winhostscrlf"
+assert_eq "missing: CRLF-parsed hostnames match clean hosts entries (issue #46)" "" \
+    "$(DDEV_WIN_HOSTS="$WORK/winhostscrlf" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/projcrlf")"
+printf '127.0.0.1 crlf-proj.local extra.local full.example.com\r\n' > "$WORK/winhostscrlf"
+assert_eq "missing: CRLF hosts entries still count as present (issue #46)" "" \
+    "$(DDEV_WIN_HOSTS="$WORK/winhostscrlf" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/projcrlf")"
 
 # Unreadable/absent hosts file: everything counts as missing (hint shows).
 assert_eq "missing: absent hosts file => all hostnames reported" \

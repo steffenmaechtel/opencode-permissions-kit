@@ -38,6 +38,12 @@ DDEV_WIN_HOSTS="${DDEV_WIN_HOSTS:-/mnt/c/Windows/System32/drivers/etc/hosts}"
 _ddev_hosts_yaml_list() {
     [ -f "$1" ] || return 0
     awk -v key="$2" '
+        # CRLF guard (issue #46): a Windows-edited config.yaml carries \r
+        # line endings; block-list items would keep theirs and the \r
+        # would end up mid-hostname ("name\r.tld") — it garbles terminal
+        # output (the tail overwrites the line start) and defeats the
+        # hosts-file grep, so an added hostname stays "missing" forever.
+        { gsub(/\r/, "") }
         $0 ~ "^[[:space:]]*" key ":" {
             line = $0
             sub(/^[^:]*:[[:space:]]*/, "", line)
