@@ -221,8 +221,8 @@ if [ "$_rootless_ok" = true ]; then
         E '! sudo grep -q "opencode:docker" /etc/sudoers.d/opencode-permissions-kit'
     check "RL2: sudoers keeps the base (opencode) RunAs" \
         E 'sudo grep -q "(opencode) NOPASSWD" /etc/sudoers.d/opencode-permissions-kit'
-    check "RL2: sudoers keeps the socket-check.sh NOPASSWD rule" \
-        E 'sudo grep -q "socket-check.sh" /etc/sudoers.d/opencode-permissions-kit'
+    check "RL2: sudoers keeps the socket-check NOPASSWD rule" \
+        E 'sudo grep -q "bin/socket-check \*" /etc/sudoers.d/opencode-permissions-kit'
     check "RL2: opencode user NOT in the docker group (no root-equivalent grant)" \
         E '! id -nG opencode | tr " " "\n" | grep -qx docker'
     check "RL2: runtime dir is 0700 opencode (as on the real target)" \

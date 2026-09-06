@@ -184,8 +184,8 @@ check_fail "no (opencode:docker) RunAs grant in sudoers" \
     E 'sudo grep -q "opencode:docker" /etc/sudoers.d/opencode-permissions-kit'
 check "sudoers keeps the base (opencode) RunAs" \
     E 'sudo grep -q "(opencode) NOPASSWD" /etc/sudoers.d/opencode-permissions-kit'
-check "sudoers has the socket-check.sh rule" \
-    E 'sudo grep -q "socket-check.sh" /etc/sudoers.d/opencode-permissions-kit'
+check "sudoers has the socket-check rule" \
+    E 'sudo grep -q "bin/socket-check \\*" /etc/sudoers.d/opencode-permissions-kit'
 check "status.sh reports the dedicated-user mode" \
     E '/usr/local/lib/opencode-permissions-kit/management/status.sh 2>&1 | grep -q "dedicated user"'
 
