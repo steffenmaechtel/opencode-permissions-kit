@@ -12,10 +12,30 @@ keeps your projects and deny list where possible:
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
 ```
 
+## Migrating to ≥ 0.0.29 (one-time, layout change)
+
+0.0.29 reorganized the deployed library (`bin/`, `sh/`, `py/`,
+`management/`, `templates/`) and renamed several files. The installed
+`update.sh` of an older kit still fetches the old file list and aborts
+with a curl 404 — **`opk update` cannot perform this particular hop**.
+Migrate once with the streamed one-liner (it deploys the new layout,
+removes the old files, and rewrites the kit-owned shell-hook lines in
+your `.bashrc`/`.zshrc`/`.profile` in place):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/opencode-permissions-kit-lib/management/update.sh | sudo bash
+```
+
+Then open a new terminal (so the rewritten `ddev()` hook loads) and
+verify with `opk status`. From 0.0.29 onwards, `opk update` works again
+as usual. A fresh install via the `install.sh` one-liner works too —
+your `projects.conf` and opencode configs are preserved either way.
+Background: [streamline design record](../design/streamline.md).
+
 ## Update the kit
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/opencode-permissions-kit-lib/management/update.sh | sudo bash
 ```
 
 `update.sh` re-deploys the kit files and refreshes the `install.conf` version

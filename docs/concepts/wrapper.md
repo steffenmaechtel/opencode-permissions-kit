@@ -17,7 +17,7 @@ Every `opencode` invocation goes through the wrapper at
    backend (no confirmation dialog — the state is visible in the TUI,
    see [mode display](#mode-display-in-the-tui)).
 3. **Probe the backend** — docker-rootless: the per-user socket is verified
-   reachable (as the `opencode` user, via the kit's `socket-check.sh`
+   reachable (as the `opencode` user, via the kit's `socket-check`
    sudoers rule); podman-rootless: the `podman` CLI must be installed (an
    optional `OPENCODE_PODMAN_SOCKET` enables docker-CLI compat). An unknown
    backend value produces a loud warning and **no** container

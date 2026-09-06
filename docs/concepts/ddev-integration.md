@@ -291,7 +291,7 @@ install:
 
 ```bash
 # all at once:
-sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import
+sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import
 # or per project (the ddev() function already runs as opencode):
 ddev start <project> && ddev import-db <project> --file=<dump>.sql.gz
 ```

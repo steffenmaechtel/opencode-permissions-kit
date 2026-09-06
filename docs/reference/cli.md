@@ -120,7 +120,7 @@ siblings from — used for testing feature branches.
 Change settings on an installed kit.
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/config.sh <command>
+sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh <command>
 ```
 
 | Command | Meaning |
@@ -140,7 +140,7 @@ sudo bash /usr/local/lib/opencode-permissions-kit/config.sh <command>
 Re-deploy the kit after an update; upgrades the opencode binary.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/opencode-permissions-kit-lib/management/update.sh | sudo bash
 ```
 
 | Flag | Meaning |
@@ -165,7 +165,7 @@ runtime readiness (`~opencode/.ddev`, router ports, mkcert CA), migration
 state, and the leak scan.
 
 ```bash
-sudo bash /usr/local/lib/opencode-permissions-kit/status.sh
+sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh
 ```
 
 Runs from a checkout too (`sudo bash files/status.sh`) and works **before**
@@ -177,7 +177,7 @@ not installed. Use it to check whether hardening is active from any machine.
 Remove everything the kit installed (see [uninstall](../how-to/uninstall.md)).
 
 ```bash
-bash /usr/local/lib/opencode-permissions-kit/uninstall.sh
+bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh
 ```
 
 | Flag | Meaning |
