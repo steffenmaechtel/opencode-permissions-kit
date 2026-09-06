@@ -234,7 +234,7 @@ stays). `DEFAULT_USER` stays auto-detected (`SUDO_USER`), never asked.
   aborts with instructions.
 - **Makefile**: update the test list; `make check-version` unchanged.
 - **CI**: update the `chmod +x` lists and test script lists in **both**
-  `.github/workflows/test.yml` and `.github/workflows/e2e.yml` (AGENTS.md
+  `.github/workflows/test-unit.yml` and `.github/workflows/test-e2e.yml` (AGENTS.md
   rule).
 - **e2e** (`tests/e2e/run.sh`): drop hook/ACL/deny assertions and the ddev
   shim + delegated/sandbox sections; the "README.txt readable (ddev

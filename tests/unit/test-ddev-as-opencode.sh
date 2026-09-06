@@ -36,8 +36,8 @@ OPK_INSTALL_CONF="/nonexistent-opk-test-install.conf"
 export OPK_INSTALL_CONF
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
-TEST_CI="$SCRIPT_DIR/../../.github/workflows/test.yml"
-E2E_CI="$SCRIPT_DIR/../../.github/workflows/e2e.yml"
+TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
+E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -610,11 +610,11 @@ check "status.sh reports ddev-as-opencode state" \
 # --- 9. Makefile + CI wiring ---------------------------------------------------
 check "Makefile has a test-ddev-as-opencode target in the test: list" \
     sh -c "grep -q 'test-ddev-as-opencode' \"\$1\"" _ "$MAKEFILE"
-check "test.yml chmod list + run step mention the new test" \
+check "test-unit.yml chmod list + run step mention the new test" \
     sh -c "grep -q 'test-ddev-as-opencode.sh' \"\$1\"" _ "$TEST_CI"
-check "test.yml chmod list includes the new lib files" \
+check "test-unit.yml chmod list includes the new lib files" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$TEST_CI"
-check "e2e.yml chmod list includes the new lib files" \
+check "test-e2e.yml chmod list includes the new lib files" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$E2E_CI"
 
 # --- Summary -------------------------------------------------------------------

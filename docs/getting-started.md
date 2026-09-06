@@ -19,11 +19,11 @@ subuid/subgid ranges, linger) itself.
 Run the one-liner in a terminal on the target machine:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
 ```
 
 The script detects that it is streamed, fetches its sibling files from the
-same `master` branch, and first prints a **pre-flight inventory** of what it
+same `stable` release mirror, and first prints a **pre-flight inventory** of what it
 found on your system (WSL2, curl/acl, ddev, docker/podman, an existing kit
 installation, `/mnt/c` exposure, router ports).
 

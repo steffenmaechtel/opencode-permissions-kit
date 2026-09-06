@@ -3,7 +3,7 @@
 # First-time installer for WSL2 + DDEV environments. Asks interactively.
 #
 # One-liner (fetches this script + all kit files from GitHub at $KIT_BRANCH):
-#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
 #
 # From a checkout (same behaviour, uses the local files):
 #   sudo bash files/install.sh
@@ -31,8 +31,13 @@
 # Unknown options abort the install (fail fast, no silently ignored typos).
 set -e
 
-# Branch the kit ships from (master = always latest). Overridable for
-# testing: KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
+# Ref the kit ships from. 'stable' = the release mirror (byte-identical to
+# master at release points, docs one-liners use it); 'master' = development
+# channel (the in-code default — the copy streamed from a ref must default
+# to that ref's own channel so master and stable copies stay identical).
+# The actually-used value is stamped as KIT_CHANNEL into install.conf, so
+# `opk update` keeps tracking it. Overridable for testing:
+#   KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
 KIT_BRANCH="${KIT_BRANCH:-master}"
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
@@ -761,9 +766,10 @@ CONTAINER_BACKEND=$CONTAINER_BACKEND
 OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST
 OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET
 DDEV_DEV_OWNED=$DDEV_DEV_OWNED
+KIT_CHANNEL=$KIT_BRANCH
 VERSION=$VERSION
 EOF
-log "install.conf written (version $VERSION)"
+log "install.conf written (version $VERSION, channel $KIT_BRANCH)"
 
 # === Step 3: Provision the rootless container backend (mandatory) ===
 # A failed provisioning ABORTS the install — the kit never falls back to a
@@ -1532,6 +1538,7 @@ sudo rm -rf /run/opencode-permissions-kit 2>/dev/null || true
 
 ui_section "Installation complete"
 ui_kv "Kit"      "v$VERSION"
+ui_kv "Channel"  "$KIT_BRANCH (updates track it: opk update)"
 ui_kv "Backend"  "$CONTAINER_BACKEND (owned by 'opencode')"
 [ -n "$PROJECTS_ROOTS" ] && ui_kv "Projects" "$PROJECTS_ROOTS"
 if [ -n "$DD_MIG_DUMP_DIR" ]; then

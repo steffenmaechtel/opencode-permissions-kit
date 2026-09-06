@@ -1,7 +1,9 @@
-.PHONY: help test lint check-host test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version
+.PHONY: help test lint check-host test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
-# Scripts checked by `make lint` (everything shipped in files/).
+# Scripts checked by `make lint` (everything shipped in files/, plus the
+# maintainer release helper in scripts/).
 SHELLCHECK_FILES = files/install.sh \
+	scripts/release.sh \
 	files/opencode-permissions-kit-lib/management/config.sh files/opencode-permissions-kit-lib/management/update.sh \
 	files/opencode-permissions-kit-lib/management/status.sh files/opencode-permissions-kit-lib/management/uninstall.sh \
 	files/etc/umask.sh \
@@ -61,8 +63,9 @@ help:
 	@echo "  make clean         Uninstall"
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
+	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags
+test: lint test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -154,7 +157,7 @@ clean:
 version:
 	@[ -n "$(VERSION)" ] || { echo "Usage: make version VERSION=x.y.z"; exit 1; }
 	@echo "$(VERSION)" > VERSION
-	@echo "Version stamp set to $(VERSION) (VERSION file). Install URLs track the master branch, no tag needed."
+	@echo "Version stamp set to $(VERSION) (VERSION file). Release: tag it, then fast-forward 'stable' to master (docs/design/release-handling.md)."
 
 check-version:
 	@v="$$(cat VERSION)"; \
@@ -164,10 +167,19 @@ check-version:
 	esac; \
 	i="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/install.sh | head -1)"; \
 	u="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/opencode-permissions-kit-lib/management/update.sh | head -1)"; \
+	normalize() { printf '%s' "$$1" | sed 's/^\$${[^:]*:-//; s/}$$//'; }; \
+	i="$$(normalize "$$i")"; u="$$(normalize "$$u")"; \
 	if [ -z "$$i" ] || [ "$$i" != "$$u" ]; then \
 		echo "MISMATCH: install.sh KIT_BRANCH=$$i update.sh KIT_BRANCH=$$u"; exit 1; \
 	fi; \
-	echo "Version stamp: $$v  (installs from branch '$$i')"
+	if [ "$$i" != "master" ]; then \
+		echo "UNEXPECTED DEFAULT: in-code KIT_BRANCH default must stay 'master' (stable is docs-only + stamp), got '$$i'"; exit 1; \
+	fi; \
+	echo "Version stamp: $$v  (in-code channel default '$$i'; docs one-liners use the stable mirror)"
+
+release:
+	@[ -n "$(VERSION)" ] || { echo "Usage: make release VERSION=x.y.z"; exit 1; }
+	@./scripts/release.sh $(VERSION) $(if $(ARGS),$(ARGS))
 
 test-project-paths:
 	@echo "=== Project Path Policy Tests ==="
@@ -202,5 +214,9 @@ test-status:
 	@./tests/unit/test-status.sh
 
 test-update-flags:
-	@echo "=== update.sh Flags Tests ==="
+	@echo "=== update.sh Flag Tests ==="
 	@./tests/unit/test-update-flags.sh
+
+test-release:
+	@echo "=== Release Helper Tests ==="
+	@./tests/unit/test-release.sh

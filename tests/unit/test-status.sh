@@ -326,6 +326,40 @@ else
     fail "ddev version: stamp fallback annotated when no binary answers"
 fi
 
+# --- 1e. channel stamp display (issue #38) ----------------------------------------
+# status.sh shows the KIT_CHANNEL stamp from install.conf; unstamped
+# (pre-beta) installs must say so instead of crashing under set -u.
+channel_out=$(
+    (
+        set -u; set +e
+        . "$UI_LIB"
+        KIT_CHANNEL="stable"
+        eval "$(sed -n '/^# Channel stamp (issue #38)/,/^fi$/p' "$STATUS")"
+        exit 0
+    ) 2>&1
+) || true
+if printf '%s' "$channel_out" | grep -q "stable" \
+   && ! printf '%s' "$channel_out" | grep -q "unstamped"; then
+    pass "channel: stamped value shown"
+else
+    fail "channel: stamped value shown (out=$channel_out)"
+fi
+channel_out=$(
+    (
+        set -u; set +e
+        . "$UI_LIB"
+        unset KIT_CHANNEL
+        eval "$(sed -n '/^# Channel stamp (issue #38)/,/^fi$/p' "$STATUS")"
+        exit 0
+    ) 2>&1
+) || true
+if printf '%s' "$channel_out" | grep -q "unstamped" \
+   && ! printf '%s' "$channel_out" | grep -q "parameter not set"; then
+    pass "channel: unstamped install reports master (unstamped) without crashing"
+else
+    fail "channel: unstamped install reports master (unstamped) without crashing (out=$channel_out)"
+fi
+
 # --- 2. not-installed state: exit 0 + install hint ------------------------------
 
 if ! id opencode >/dev/null 2>&1; then

@@ -96,10 +96,11 @@ works from anywhere). The status scan also skips `vendor/` and
 ## install.sh
 
 Installs the kit. Stream it from GitHub or run it from a checkout; when
-streamed, it self-fetches its sibling files from the same branch.
+streamed, it self-fetches its sibling files from the same ref. The docs
+one-liner uses the `stable` release mirror:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
 ```
 
 | Flag | Meaning |
@@ -112,8 +113,11 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 
 Flags may appear in any order; unknown options abort the install.
 
-Environment: `KIT_BRANCH` (default `master`) selects the branch to fetch
-siblings from — used for testing feature branches.
+Environment: `KIT_BRANCH` (default `master`) selects the ref to fetch
+siblings from — any branch or version tag works (`stable` release mirror,
+`master` dev channel, `feature/...`, `0.0.29`; see
+[update channels](../how-to/update.md#channels)). The value is stamped as
+`KIT_CHANNEL` in `install.conf`, which later `opk update` runs follow.
 
 ## config.sh
 
@@ -140,8 +144,11 @@ sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh <command>
 Re-deploy the kit after an update; upgrades the opencode binary.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/opencode-permissions-kit-lib/management/update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=stable bash
 ```
+
+Without `KIT_BRANCH` set, the deployed `update.sh` follows the channel
+stamped in `install.conf` (`KIT_CHANNEL`, shown by `opk status`).
 
 | Flag | Meaning |
 |---|---|

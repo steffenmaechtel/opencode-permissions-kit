@@ -21,8 +21,8 @@ INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
-TEST_CI="$SCRIPT_DIR/../../.github/workflows/test.yml"
-E2E_CI="$SCRIPT_DIR/../../.github/workflows/e2e.yml"
+TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
+E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -236,9 +236,9 @@ check "kit CLI check output shows per-hostname add commands" \
     sh -c "grep -qF 'ddev-hosts-add /' \"\$1\"" _ "$KIT"
 check "Makefile lint list includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$MAKEFILE"
-check "test.yml chmod list includes ddev-hosts.sh" \
+check "test-unit.yml chmod list includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$TEST_CI"
-check "e2e.yml chmod lists include ddev-hosts.sh" \
+check "test-e2e.yml chmod lists include ddev-hosts.sh" \
     sh -c "grep -c 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\" | grep -q \"^2\$\"" _ "$E2E_CI"
 
 # --- Summary -----------------------------------------------------------------------

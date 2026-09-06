@@ -1,14 +1,18 @@
-name: e2e-ddev
+name: test-e2e-ddev
 
 # Real-ddev e2e suite (tests/e2e/run-ddev.sh, docs/design/ddev-e2e-test.md).
-# MANUAL-ONLY for now: the maintainer validates runtime + duration on a real
-# runner first; a weekly schedule is the planned phase-3 follow-up (the
-# golden-image cache is a local-workspace concept — CI rebuilds warm every
-# run, see design doc §6 R6).
-#
-# Not part of the PR merge gate (e2e.yml keeps that job): this suite
-# downloads GBs of images and runs a real ddev project lifecycle.
+# Runs on master pushes and manual dispatch. NOT on pull requests (test-e2e.yml
+# keeps the PR gate): this suite downloads GBs of images and runs a real
+# ddev project lifecycle — too heavy per PR, but master is the staging
+# area for the 'stable' release mirror and must be fully green before a
+# release is cut (scripts/release.sh includes these runs in its CI gate).
+# Push runs use the defaults (no camino site tier, latest ddev); the
+# inputs only apply to manual dispatch. CI rebuilds the golden image warm
+# every run (the cache is a local-workspace concept, design doc §6 R6).
 on:
+  push:
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       site_tier:
@@ -51,7 +55,7 @@ jobs:
           E2E_DDEV_SITE: ${{ inputs.site_tier == true && 'camino' || '' }}
           DDEV_VERSION: ${{ inputs.ddev_version }}
         run: |
-          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/run-ddev.sh ./tests/e2e/lib.sh ./tests/check-host.sh ./tests/unit/test-opencode-as-opencode.sh ./tests/unit/test-jsonc-parser.sh ./tests/unit/test-git-config.sh ./tests/unit/test-container-backend.sh ./tests/unit/test-bypass-guard.sh ./tests/unit/test-ddev-as-opencode.sh ./tests/unit/test-ddev-migrate.sh ./tests/unit/test-ddev-hosts.sh ./tests/unit/test-mkcert-reuse.sh ./tests/unit/test-wsl-exposure.sh ./tests/unit/test-ui.sh ./tests/unit/test-docs.sh ./tests/unit/test-kit-cli.sh ./tests/unit/test-project-paths.sh ./tests/unit/test-workflows.sh ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-update-flags.sh ./tests/unit/test-fs-baseline.sh \
+          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/run-ddev.sh ./tests/e2e/lib.sh ./tests/check-host.sh ./tests/unit/test-opencode-as-opencode.sh ./tests/unit/test-jsonc-parser.sh ./tests/unit/test-git-config.sh ./tests/unit/test-container-backend.sh ./tests/unit/test-bypass-guard.sh ./tests/unit/test-ddev-as-opencode.sh ./tests/unit/test-ddev-migrate.sh ./tests/unit/test-ddev-hosts.sh ./tests/unit/test-mkcert-reuse.sh ./tests/unit/test-wsl-exposure.sh ./tests/unit/test-ui.sh ./tests/unit/test-docs.sh ./tests/unit/test-kit-cli.sh ./tests/unit/test-project-paths.sh ./tests/unit/test-workflows.sh ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-update-flags.sh ./tests/unit/test-release.sh ./tests/unit/test-fs-baseline.sh \
             ./files/install.sh ./files/etc/umask.sh ./files/opencode-permissions-kit-lib/management/config.sh ./files/opencode-permissions-kit-lib/management/update.sh ./files/opencode-permissions-kit-lib/management/uninstall.sh ./files/opencode-permissions-kit-lib/management/status.sh ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh ./files/opencode-permissions-kit-lib/sh/ui.sh ./files/opencode-permissions-kit-lib/sh/shell-warn.sh ./files/opencode-permissions-kit-lib/bin/setup-container-backend ./files/opencode-permissions-kit-lib/bin/socket-check ./files/opencode-permissions-kit-lib/bin/cwd-check ./files/opencode-permissions-kit-lib/sh/ddev-terminal.sh ./files/opencode-permissions-kit-lib/sh/ddev-handover.sh ./files/opencode-permissions-kit-lib/sh/ddev-migrate.sh ./files/opencode-permissions-kit-lib/bin/ddev-migrate ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx ./files/opencode-permissions-kit-lib/tui/opencode-danger.theme.json ./files/opencode-permissions-kit-lib/tui/tui.json ./files/opencode-permissions-kit-lib/tui/tui-danger.json ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
           ./tests/e2e/run-ddev.sh
       - name: Summary

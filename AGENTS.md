@@ -11,10 +11,13 @@ own Linux user (`opencode`) against a **rootless container backend**
 (docker-rootless or podman-rootless), so the agent is UID-separated from the
 developer while ddev keeps working. File permissions are opencode's **soft**
 permission layer (`opencode.jsonc`) — there are no OS-level ACL denies. There
-is no plugin, no npm package, no release tags: developers stream
-`files/install.sh` from `master` (`curl ... | sudo bash`), the script
-self-fetches its siblings from the same branch, and everything is deployed to
-`/usr/local/lib/opencode-permissions-kit/`.
+is no plugin, no npm package: developers stream `files/install.sh` from the
+`stable` release mirror (`curl ... | sudo env KIT_BRANCH=stable bash`; the
+docs' default), the script self-fetches its siblings from the same ref, and
+everything is deployed to `/usr/local/lib/opencode-permissions-kit/`. The
+used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
+`opk update`; `master` stays the development channel. Channels and the
+`stable` mirror discipline: `docs/design/release-handling.md`.
 
 ## Layout
 
@@ -42,8 +45,12 @@ self-fetches its siblings from the same branch, and everything is deployed to
   install/update deploy lists (`KIT_FILES`) reference them everywhere.
 - **Don't bump `VERSION`** unless the maintainer asks. Release tags (when
   set at all) are the bare version stamp **without a `v` prefix** —
-  `0.0.17`, not `v0.0.17` (matches the `VERSION` file; installs stream
-  from `master`, the tag is purely informational).
+  `0.0.17`, not `v0.0.17` (matches the `VERSION` file). Tags are also
+  installable pins (`KIT_BRANCH=0.0.17`); the stable channel is the
+  `stable` mirror branch, fast-forwarded to `master` on release.
+  Releases are cut with `make release VERSION=x.y.z`
+  (`scripts/release.sh` — bump lands via PR first, the script tags and
+  mirrors).
 - The security model is deliberately **soft-only** — never re-introduce
   OS-level deny ACLs. Background: `docs/design/ddev-working.md`,
   current model: `docs/concepts/security-model.md`.

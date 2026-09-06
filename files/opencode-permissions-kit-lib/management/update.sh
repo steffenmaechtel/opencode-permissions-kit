@@ -17,7 +17,7 @@
 # installs abort with instructions (re-run install.sh).
 #
 # One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
-#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/opencode-permissions-kit-lib/management/update.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=stable bash
 #
 # From a checkout (uses the local files):
 #   sudo bash files/update.sh --yes            # skip prompts
@@ -33,9 +33,14 @@
 # Use config.sh to change project roots or git-config hardening.
 set -e
 
-# Branch the kit ships from (master = always latest). Overridable for
-# testing: KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
-KIT_BRANCH="${KIT_BRANCH:-master}"
+# Ref the kit updates from. Resolution (issue #38, docs/design/
+# release-handling.md): explicit KIT_BRANCH env > KIT_CHANNEL stamp in
+# install.conf (the channel this machine installed/last updated from) >
+# master (development channel; 'stable' is the release mirror the docs
+# one-liners use). Must run BEFORE the self-fetch below. Overridable for
+# testing: KIT_BASE_URL=https://example.invalid/<branch>
+_kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)"
+KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
 # Canonical kit file list. Single source of truth shared by fetch_kit() and
@@ -212,7 +217,7 @@ if [ -f "$INSTALL_CONF" ]; then
         echo ""
         echo "  Updates are only supported from kit 0.0.14 onwards (older"
         echo "  migrations have been removed). Re-run install.sh instead:"
-        echo "    curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash"
+        echo "    curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
         echo ""
         exit 1
     fi
@@ -258,7 +263,7 @@ EOF
 done
 
 banner() {
-    ui_banner "$VERSION" "update — re-deploys the kit, keeps your configuration"
+    ui_banner "$VERSION" "update — channel '$KIT_BRANCH' — re-deploys the kit, keeps your configuration"
 }
 
 die() { ui_error "$*"; exit 1; }
@@ -641,18 +646,20 @@ fi
 NEW_INSTALL_CONF="$(mktemp)"
 {
     if [ -f "$INSTALL_CONF" ]; then
-        # Strip keys this update owns: VERSION (re-stamped) and
-        # OPENCODE_GROUP (re-based to the opencode usergroup).
-        grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' "$INSTALL_CONF" 2>/dev/null
+        # Strip keys this update owns: VERSION (re-stamped),
+        # OPENCODE_GROUP (re-based to the opencode usergroup), and
+        # KIT_CHANNEL (re-stamped to the ref just updated from).
+        grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' "$INSTALL_CONF" 2>/dev/null
     fi
     echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
+    echo "KIT_CHANNEL=$KIT_BRANCH"
     echo "VERSION=$VERSION"
 } | sort -u > "$NEW_INSTALL_CONF"
 sudo cp "$NEW_INSTALL_CONF" "$CONFDIR/install.conf"
 sudo chmod 644 "$CONFDIR/install.conf"
 rm -f "$NEW_INSTALL_CONF"
-ui_success "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
-log "install.conf updated: VERSION=$VERSION OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
+ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
+log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
 
 # --- TUI mode display user files (docs/_archive/design/plan-ui-tui-opencode.md) ---------
 # Same only-if-absent-or-kit-written policy as install.sh (marker key

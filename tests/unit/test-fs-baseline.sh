@@ -20,8 +20,8 @@ INSTALL="$SCRIPT_DIR/../../files/install.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
-TEST_CI="$SCRIPT_DIR/../../.github/workflows/test.yml"
-E2E_CI="$SCRIPT_DIR/../../.github/workflows/e2e.yml"
+TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
+E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -132,14 +132,14 @@ grep -q 'test-fs-baseline' "$MAKEFILE" \
     && pass "Makefile test target includes test-fs-baseline" \
     || fail "Makefile test target includes test-fs-baseline"
 grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" \
-    && pass "test.yml chmod list includes the new test" \
-    || fail "test.yml chmod list includes the new test"
+    && pass "test-unit.yml chmod list includes the new test" \
+    || fail "test-unit.yml chmod list includes the new test"
 grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$TEST_CI" \
-    && pass "test.yml chmod list includes the new lib" \
-    || fail "test.yml chmod list includes the new lib"
+    && pass "test-unit.yml chmod list includes the new lib" \
+    || fail "test-unit.yml chmod list includes the new lib"
 [ "$(grep -c 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$E2E_CI")" = "2" ] \
-    && pass "e2e.yml chmod lists include the new lib (both jobs)" \
-    || fail "e2e.yml chmod lists include the new lib (both jobs)"
+    && pass "test-e2e.yml chmod lists include the new lib (both jobs)" \
+    || fail "test-e2e.yml chmod lists include the new lib (both jobs)"
 
 # --- Summary ---------------------------------------------------------------------------
 echo ""

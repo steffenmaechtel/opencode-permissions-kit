@@ -111,6 +111,50 @@ check "kit CLI has the upgrade-opencode shorthand (injects --yes --only-binary)"
 check "docs: cli.md update flag table lists --only-binary" \
     sh -c "grep -q -- '--only-binary' \"\$1\"" _ "$CLI_MD"
 
+# --- 5. channel resolution (issue #38: env KIT_BRANCH > KIT_CHANNEL stamp > master)
+# The stamp read + fallback chain is extracted verbatim and executed with
+# a fake sed on PATH (the stamp comes from install.conf via sed); the fake
+# answers whatever stamp the case needs, independent of the host's /etc.
+CHAN_BLOCK="$(grep -F '_kit_stamped_channel=' "$UPDATE" | head -1)
+$(grep -F 'KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"' "$UPDATE" | head -1)"
+if [ -n "$(printf '%s' "$CHAN_BLOCK" | grep -F '_kit_stamped_channel=')" ]; then
+    pass "channel resolution block extractable from update.sh"
+else
+    fail "channel resolution block extractable from update.sh"
+    echo "  ${RED}$failures test(s) failed.${NC}"
+    exit 1
+fi
+mkdir -p "$WORK/chanbin"
+chan_case() {
+    # $1 = what the fake sed answers (the stamp), $2 = KIT_BRANCH env (or "")
+    printf '#!/bin/sh\n[ -n "%s" ] && echo "%s"\nexit 0\n' "$1" "$1" > "$WORK/chanbin/sed"
+    chmod +x "$WORK/chanbin/sed"
+    (
+        PATH="$WORK/chanbin:$PATH"
+        export PATH
+        [ -n "$2" ] && export KIT_BRANCH="$2"
+        [ -z "$2" ] && unset KIT_BRANCH
+        eval "$CHAN_BLOCK"
+        printf '%s' "$KIT_BRANCH"
+    )
+}
+out=$(chan_case "stable" "")
+[ "$out" = "stable" ] && pass "channel: stamp wins when no env is set" \
+    || fail "channel: stamp wins when no env is set (out=$out)"
+out=$(chan_case "stable" "master")
+[ "$out" = "master" ] && pass "channel: explicit env overrides the stamp" \
+    || fail "channel: explicit env overrides the stamp (out=$out)"
+out=$(chan_case "" "")
+[ "$out" = "master" ] && pass "channel: master fallback when nothing is stamped" \
+    || fail "channel: master fallback when nothing is stamped (out=$out)"
+out=$(chan_case "" "feature/x")
+[ "$out" = "feature/x" ] && pass "channel: any branch env passes through" \
+    || fail "channel: any branch env passes through (out=$out)"
+check "channel: KIT_BASE_URL builds from the resolved ref" \
+    sh -c "grep -F 'KIT_BASE_URL=\"\${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/\$KIT_BRANCH}\"' \"\$1\"" _ "$UPDATE"
+check "channel: install.conf refresh strips and re-stamps KIT_CHANNEL" \
+    sh -c "grep -qF -- \"-e '^KIT_CHANNEL='\" \"\$1\" && grep -qF 'echo \"KIT_CHANNEL=\$KIT_BRANCH\"' \"\$1\"" _ "$UPDATE"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

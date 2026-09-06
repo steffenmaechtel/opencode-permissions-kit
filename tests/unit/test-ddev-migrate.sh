@@ -28,8 +28,8 @@ INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
-TEST_CI="$SCRIPT_DIR/../../.github/workflows/test.yml"
-E2E_CI="$SCRIPT_DIR/../../.github/workflows/e2e.yml"
+TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
+E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -377,11 +377,11 @@ check "Makefile lint list includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$MAKEFILE"
 check "Makefile has a test-ddev-migrate target in the test: list" \
     sh -c "grep -q 'test: .*test-ddev-migrate' \"\$1\"" _ "$MAKEFILE"
-check "test.yml chmod list + run step mention the new test" \
+check "test-unit.yml chmod list + run step mention the new test" \
     sh -c "grep -q 'test-ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
-check "test.yml chmod list includes ddev-migrate.sh" \
+check "test-unit.yml chmod list includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
-check "e2e.yml chmod lists include ddev-migrate.sh" \
+check "test-e2e.yml chmod lists include ddev-migrate.sh" \
     sh -c "grep -c 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\" | grep -q '^2\$'" _ "$E2E_CI"
 
 # --- Summary ------------------------------------------------------------------------

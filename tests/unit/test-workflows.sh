@@ -5,7 +5,7 @@
 #      typos otherwise fail silently — CI chmods a ghost and loses the bit)
 #   2. every executable CI needs (unit tests, e2e scripts, check-host,
 #      shipped scripts under files/) must be chmodded in BOTH
-#      .github/workflows/test.yml and .github/workflows/e2e.yml
+#      .github/workflows/test-unit.yml and .github/workflows/test-e2e.yml
 #
 # Git checkouts lose the exec bit, so a missing entry means the affected
 # suite breaks only in CI — exactly the drift this test trips on.
@@ -17,9 +17,9 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-WF_TEST="$REPO/.github/workflows/test.yml"
-WF_E2E="$REPO/.github/workflows/e2e.yml"
-WF_DDEV_E2E="$REPO/.github/workflows/e2e-ddev.yml"
+WF_TEST="$REPO/.github/workflows/test-unit.yml"
+WF_E2E="$REPO/.github/workflows/test-e2e.yml"
+WF_DDEV_E2E="$REPO/.github/workflows/test-e2e-ddev.yml"
 
 failures=0
 passed=0
