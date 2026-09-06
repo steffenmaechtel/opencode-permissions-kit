@@ -474,7 +474,7 @@ refresh() {
 # at any depth, settings dirs, typo3 bootstrap root) on the given paths —
 # no group baseline. The ready-made fix for `ddev start` failing with
 # "operation not permitted" on a freshly cloned project; the ddev()
-# shell hook (ddev-as-opencode.sh) prints this exact command when it
+# shell hook (ddev-terminal.sh) prints this exact command when it
 # detects the bootstrap case.
 handover() {
     [ -z "$TARGETS" ] && die "Usage: config.sh handover <path...>"

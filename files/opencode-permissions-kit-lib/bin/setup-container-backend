@@ -44,16 +44,16 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$BACKEND" ] || { echo "${RED}Usage: setup-container-backend <backend> [--yes]${NC}" >&2; exit 1; }
 
-# === Shared helpers (ui.sh, log.sh) ===
+# === Shared helpers (sh/ui.sh, sh/log.sh — bin/ sits next to sh/) ===
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
-for cand in "$LIBDIR/ui.sh" "$(dirname "$0")/ui.sh" "$(dirname "$0")/opencode-permissions-kit-lib/ui.sh"; do
+for cand in "$LIBDIR/sh/ui.sh" "$(dirname "$0")/../sh/ui.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
     fi
 done
 log() { :; }
-for cand in "$LIBDIR/log.sh" "$(dirname "$0")/log.sh" "$(dirname "$0")/opencode-permissions-kit-lib/log.sh"; do
+for cand in "$LIBDIR/sh/log.sh" "$(dirname "$0")/../sh/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break

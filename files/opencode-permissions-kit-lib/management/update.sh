@@ -96,27 +96,27 @@ ensure_local_file() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-# Binary-only modes (--only-binary / --binary-path) need NO kit files at
-# all — when running from the installed library, skip the self-fetch
-# (and the per-file heal loop below, which would re-fetch the whole kit
-# for the flat LIBDIR layout). The flags must work while the installed
-# update.sh IS the current one; an older installed copy rejects them as
-# unknown options (run one regular update first).
+# Binary-only mode (--only-binary) needs NO kit files at all — when running
+# from the installed library, skip the self-fetch (and the per-file heal loop
+# below, which would re-fetch the whole kit for the deployed layout).
+# --binary-path ALONE does a full update PLUS the binary swap, so it must NOT
+# skip the fetch (review 0.0.29: from the installed library it would have
+# crashed the deploy section with FILES_ROOT=/usr/local/lib).
 _opk_binonly=false
 for _opk_a in "$@"; do
     case "$_opk_a" in
-        --only-binary|--binary-path) _opk_binonly=true; break ;;
+        --only-binary) _opk_binonly=true; break ;;
     esac
 done
 if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
     SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
     # Do NOT continue executing this (installed, possibly older) copy: the
-    # deploy below overwrites $LIBDIR/update.sh with the freshly fetched one,
+    # deploy below overwrites $LIBDIR/management/update.sh with the freshly fetched one,
     # which would replace the very file we are still running from. bash reads
     # a script incrementally, so a self-modifying script corrupts its parser
     # mid-run ("syntax error near unexpected token '('"). Re-exec the fetched
-    # copy instead — its own overwrite of $LIBDIR/update.sh is then harmless.
+    # copy instead — its own overwrite of $LIBDIR/management/update.sh is then harmless.
     exec bash "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh" "$@"
 fi
 # The files/ root this update deploys from: after the fetch+re-exec above

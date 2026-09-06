@@ -1,7 +1,7 @@
 #!/bin/sh
 # Unit tests for the "ddev always runs as the opencode user" feature
 # (DDEV-WORKING §7): bin/ddev-as-opencode (sudoers helper) +
-# ddev-as-opencode.sh (sourced `ddev()` shell function).
+# ddev-terminal.sh (sourced `ddev()` shell function) + bin/ddev-as-opencode.
 # Runs against the repo files as the CURRENT user — no root, no real
 # opencode user required. Verifies:
 #   - the helper refuses any non-opencode caller (exit 1)
@@ -12,7 +12,7 @@
 #   - wiring: sudoers rule, install.sh/update.sh fetch+deploy+hook,
 #     config.sh / migrate-denies.sh .ddev handover, status.sh reporting,
 #     Makefile target, CI workflow chmod lists + test step
-# Run: sh tests/test-ddev-as-opencode.sh
+# Run: sh tests/unit/test-ddev-as-opencode.sh
 set -e
 
 RED='\033[0;31m'
