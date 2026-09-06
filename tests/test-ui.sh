@@ -1,5 +1,5 @@
 #!/bin/sh
-# Unit tests for the shared UI helpers (files/opencode-permissions-kit-lib/ui.sh).
+# Unit tests for the shared UI helpers (files/opencode-permissions-kit-lib/sh/ui.sh).
 # Covers: syntax, NO_COLOR / non-tty color suppression, UI_ASCII fallback,
 # symbol defaults, output formats, alignment, and the ui_ask/ui_menu defaults.
 # No root required. Run: sh tests/test-ui.sh
@@ -10,7 +10,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-UI="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/ui.sh"
+UI="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/sh/ui.sh"
 
 failures=0
 passed=0

@@ -218,7 +218,7 @@ else
     E 'sudo -u opencode sh -c "mkdir -p /home/opencode/.config/docker"'
     E 'printf "{\"storage-driver\":\"fuse-overlayfs\"}\n" | sudo -u opencode tee /home/opencode/.config/docker/daemon.json >/dev/null'
 
-    if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/setup-container-backend.sh docker-rootless --yes >/tmp/dd-setup.log 2>&1'; then
+    if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/bin/setup-container-backend docker-rootless --yes >/tmp/dd-setup.log 2>&1'; then
         echo "  ${RED}FAIL${NC}  backend provisioning failed — /tmp/dd-setup.log:";         failures=$((failures + 1))
         E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-setup.log | tail -30' || true
         exit 1
@@ -422,7 +422,7 @@ check "DD1: wrapper at /usr/local/bin/opencode" \
 check "DD1: sudoers carries the ddev-as-opencode helper rule" \
     E 'sudo grep -q "bin/ddev-as-opencode" /etc/sudoers.d/opencode-permissions-kit'
 check "DD1: ddev() hook wired into dev's bashrc" \
-    E 'grep -q "ddev-as-opencode.sh" /home/dev/.bashrc'
+    E 'grep -q "sh/ddev-terminal.sh" /home/dev/.bashrc'
 check "DD1: global ddev home provisioned for opencode" \
     E 'sudo test -d /home/opencode/.ddev'
 
@@ -432,7 +432,7 @@ echo ""
 echo "--- DD2/DD3/DD4. bootstrap, chmod modes, dev-owned (project dd2) ---"
 # Handover-mode section first (ddev-settings off = the old model), then the
 # dev-owned default — both against one fresh typo3 bootstrap project.
-E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings off >/dev/null 2>&1'
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings off >/dev/null 2>&1'
 E 'sudo -u dev mkdir -p /var/www/vhosts/dd2'
 DEVSH 'cd /var/www/vhosts/dd2 && ddev config --project-type=typo3 --webserver-type=apache-fpm --docroot=public --project-tld local >/tmp/dd2-config.log 2>&1'
 # Deterministic handover-mode state: strip the dev-owned flag ddev's own
@@ -443,7 +443,7 @@ check "DD2: ddev config on empty dir completes (burn-in flags)" \
     E 'grep -q "Configuration complete" /tmp/dd2-config.log'
 check "DD2: .ddev is opencode-owned after config" \
     E 'test "$(stat -c %U /var/www/vhosts/dd2/.ddev)" = opencode'
-E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd2 >/tmp/dd2-handover.log 2>&1'
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd2 >/tmp/dd2-handover.log 2>&1'
 check "DD2: handover mode: bootstrap root inode handed to opencode 2755" \
     E 'test "$(stat -c %U:%a /var/www/vhosts/dd2)" = "opencode:2755"'
 if OC_DD2 'ddev start >/tmp/dd2-start.log 2>&1'; then
@@ -459,7 +459,7 @@ if OC_DD2 'ddev start >/tmp/dd2-start.log 2>&1'; then
         E 'test "$(stat -c %a /var/www/vhosts/dd2)" = "2755"'
     check "DD3: v1.25.3: no root AdditionalConfiguration.php while TYPO3 undetected" \
         E 'test ! -e /var/www/vhosts/dd2/AdditionalConfiguration.php'
-    E 'sudo bash /home/dev/repo/files/config.sh --yes refresh >/dev/null 2>&1'
+    E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes refresh >/dev/null 2>&1'
     check "DD3: config.sh refresh restores g+w on the root (2755)" \
         E 'test "$(stat -c %a /var/www/vhosts/dd2)" = "2755"'
 else
@@ -471,8 +471,8 @@ fi
 
 if [ "$_daemon_ok" = true ]; then
     # Dev-owned mode: the committed-flag model (ddev-dev-owned-projects.md).
-    E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings on >/dev/null 2>&1'
-    E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd2 >/tmp/dd2-handback.log 2>&1'
+    E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings on >/dev/null 2>&1'
+    E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd2 >/tmp/dd2-handback.log 2>&1'
     check "DD4: dev-owned handover: flag written into .ddev/config.yaml" \
         E 'grep -q "^disable_settings_management: true" /var/www/vhosts/dd2/.ddev/config.yaml'
     check "DD4: dev-owned handover: bootstrap root handed back to dev (2775)" \
@@ -578,7 +578,7 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
         # is what the DD10 mode check asserts. First GitHub run failed
         # exactly here (config/system came out 0775/0755, not 2775).
         E 'sudo chmod -R g+w /var/www/vhosts/camino-e2e && sudo find /var/www/vhosts/camino-e2e -type d -exec chmod g+s {} +'
-        E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/camino-e2e >/tmp/dd10-handover.log 2>&1'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/camino-e2e >/tmp/dd10-handover.log 2>&1'
         check "DD10: handover leaves settings dev-owned (flag committed)" \
             E 'test "$(stat -c %U /var/www/vhosts/camino-e2e/config/system)" = dev'
         check "DD10: .ddev opencode-owned after handover" \
@@ -636,7 +636,7 @@ if [ "$SITE_TIER" = "camino" ]; then
     if E 'test -f /tmp/dd12-origin/HEAD'; then
         # (a) dev-owned default: clone as dev, handover, all branch switches free.
         E 'git clone -q /tmp/dd12-origin /var/www/vhosts/dd12-proj'
-        E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd12-proj >/dev/null 2>&1'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd12-proj >/dev/null 2>&1'
         check "DD12: dev-owned: top-level branch switch is free (the promise)" \
             DEVSH 'cd /var/www/vhosts/dd12-proj && git checkout -q feature/top-level && test ! -f LICENSE && grep -q feature/top-level README.md'
         check "DD12: dev-owned: settings-tree switch is free" \
@@ -647,9 +647,9 @@ if [ "$SITE_TIER" = "camino" ]; then
         # (b) handover-mode tripwire (§7.2 12.2): bootstrap root opencode-owned
         #     -> a top-level switch must hit the documented unlink EPERM.
         #     sed runs as root: dev cannot edit .ddev/config.yaml yet (Finding 1).
-        E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings off >/dev/null 2>&1'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings off >/dev/null 2>&1'
         E 'sudo sed -i "/^disable_settings_management:/d" /var/www/vhosts/dd12-proj/.ddev/config.yaml'
-        E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd12-proj >/dev/null 2>&1'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd12-proj >/dev/null 2>&1'
         check "DD12: handover mode: bootstrap root is opencode-owned (tripwire setup)" \
             E 'test "$(stat -c %U /var/www/vhosts/dd12-proj)" = opencode'
         check_fail "DD12: handover mode: top-level switch hits unlink EPERM (documented pain)" \
@@ -663,8 +663,8 @@ if [ "$SITE_TIER" = "camino" ]; then
         # line) — restore the committed state (the fixture commits the flag,
         # i.e. exactly what dev-owned mode wants) so switch assertions and
         # config.yaml-touching branches stay clean.
-        E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings on >/dev/null 2>&1'
-        E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd12-proj >/dev/null 2>&1'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings on >/dev/null 2>&1'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd12-proj >/dev/null 2>&1'
         E 'git -C /var/www/vhosts/dd12-proj checkout -q -- .'
         check "DD12: after dev-owned handover the same switch succeeds" \
             DEVSH 'cd /var/www/vhosts/dd12-proj && git checkout -q feature/top-level && test ! -f LICENSE && git checkout -q main && test -z "$(git status --porcelain)"'
@@ -718,7 +718,7 @@ check "DD13: first start prints the bootstrap hint (hook promise)" \
     E 'grep -q "hint: fresh typo3 clone" /tmp/dd13-start1.log'
 check "DD13: TRIPWIRE first start fails EPERM until handover (burn-in flow)" \
     test "$_dd13_first" = 1
-E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd13-proj >/tmp/dd13-handover.log 2>&1'
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd13-proj >/tmp/dd13-handover.log 2>&1'
 check "DD13: handover writes the dev-owned flag (durable fix)" \
     E 'grep -q "^disable_settings_management: true" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
 check "DD13: dev can edit .ddev/config.yaml after handover" \
@@ -741,9 +741,9 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
         check_fail "DD14: TRIPWIRE create-project fails in dev-owned mode (rsync chown EPERM — Finding 2)" \
             OC_DD13 'ddev composer create-project "typo3/cms-base-distribution:^14" >/tmp/dd14-devowned.log 2>&1'
         OC_DD13 'ddev exec rm -rf /tmp/cp-* >/dev/null 2>&1' || true
-        E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings off >/dev/null 2>&1'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings off >/dev/null 2>&1'
         E 'sudo sed -i "/^disable_settings_management:/d" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
-        E 'sudo bash /home/dev/repo/files/config.sh --yes handover /var/www/vhosts/dd13-proj >/dev/null 2>&1'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd13-proj >/dev/null 2>&1'
         check "DD14: handover mode: root handed to opencode (create-project precondition)" \
             E 'test "$(stat -c %U /var/www/vhosts/dd13-proj)" = opencode'
         # The failed dev-owned attempt left partial files behind; ddev only
@@ -771,6 +771,6 @@ else
 fi
 
 # Leave the kit in its default state for subsequent runs.
-E 'sudo bash /home/dev/repo/files/config.sh --yes ddev-settings on >/dev/null 2>&1' || true
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings on >/dev/null 2>&1' || true
 
 e2e_finish

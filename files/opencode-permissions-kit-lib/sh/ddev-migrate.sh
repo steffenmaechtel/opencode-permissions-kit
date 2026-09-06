@@ -35,11 +35,11 @@
 # database of each project is exported; extra named databases need a
 # manual `ddev export-db --database=<name>`.
 #
-# Sourced (install.sh calls the ddev_migrate_* functions) AND executable
-# standalone via `sh ddev-migrate.sh <mode>`. No ui.sh dependency —
-# plain output, callers wrap with their own UI/log calls as needed.
+# Sourced (install.sh calls the ddev_migrate_* functions) — the CLI
+# dispatch lives in bin/ddev-migrate. No ui.sh dependency — plain output,
+# callers wrap with their own UI/log calls as needed.
 #
-# Deployed to /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh.
+# Deployed to /usr/local/lib/opencode-permissions-kit/sh/ddev-migrate.sh.
 
 DDEV_MIG_BACKUP_ROOT="${DDEV_MIG_BACKUP_ROOT:-/var/backups/opencode-permissions-kit}"
 
@@ -368,44 +368,11 @@ ddev_migrate_import() {
     [ -z "$dm_failed" ]
 }
 
-# --- standalone entry (sourced callers never trigger this) ----------------------
+# --- usage (printed by bin/ddev-migrate, the CLI dispatcher) ---------------------
 
 _ddev_migrate_usage() {
-    echo "Usage: sh ddev-migrate.sh <command> [args]"
+    echo "Usage: ddev-migrate <command> [args]"
     echo "  export <dev-user> <project-root> [root ...]   export ddev databases as <dev-user> (root)"
     echo "  import [dump-dir]                              import dumps as the opencode user (root)"
     echo "  list                                           show dump directories + contents"
 }
-
-case "${0##*/}" in
-    ddev-migrate.sh)
-        case "${1:-}" in
-            list)
-                dm_found=0
-                for dm_d in "$DDEV_MIG_BACKUP_ROOT"/ddev-migration-*; do
-                    [ -d "$dm_d" ] || continue
-                    dm_found=1
-                    echo "$dm_d:"
-                    ls -1 "$dm_d" 2>/dev/null | sed 's/^/    /'
-                done
-                [ "$dm_found" = 0 ] && echo "no dump directories under $DDEV_MIG_BACKUP_ROOT"
-                ;;
-            export)
-                [ "$(id -u)" = 0 ] || { echo "ddev-migrate: export must run as root"; exit 1; }
-                [ $# -ge 3 ] || { _ddev_migrate_usage; exit 1; }
-                dm_ocg=$(id -gn opencode 2>/dev/null || echo opencode)
-                dm_dev="$2"; shift 2
-                ddev_migrate_export "$dm_dev" opencode "$dm_ocg" "$@"
-                exit $?
-                ;;
-            import)
-                ddev_migrate_import "${2:-}"
-                exit $?
-                ;;
-            *)
-                _ddev_migrate_usage
-                [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || exit 1
-                ;;
-        esac
-        ;;
-esac

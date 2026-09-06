@@ -14,7 +14,7 @@
 #   - one line per event:  <ISO-timestamp> [<script-name>] <message>
 #
 # Usage (from a kit script):
-#   . /usr/local/lib/opencode-permissions-kit/log.sh
+#   . /usr/local/lib/opencode-permissions-kit/sh/log.sh
 #   log "created user opencode"
 #   log "setfacl deny on 42 files under /var/www/vhosts/foo"
 

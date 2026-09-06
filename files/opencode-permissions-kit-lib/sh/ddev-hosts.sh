@@ -27,8 +27,8 @@
 #                                      confirmation dialog. Requires working
 #                                      interop (see docs/troubleshooting.md).
 #
-# POSIX sh, SOURCED (kit CLI, ddev-as-opencode.sh hook) and never executed.
-# Deployed to /usr/local/lib/opencode-permissions-kit/ddev-hosts.sh.
+# POSIX sh, SOURCED (kit CLI, ddev-terminal.sh hook) and never executed.
+# Deployed to /usr/local/lib/opencode-permissions-kit/sh/ddev-hosts.sh.
 
 DDEV_WIN_HOSTS="${DDEV_WIN_HOSTS:-/mnt/c/Windows/System32/drivers/etc/hosts}"
 

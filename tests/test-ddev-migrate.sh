@@ -1,6 +1,6 @@
 #!/bin/sh
 # Unit tests for the ddev database migration (issue #15):
-# opencode-permissions-kit-lib/ddev-migrate.sh + its install.sh wiring.
+# opencode-permissions-kit-lib/sh/ddev-migrate.sh + its install.sh wiring.
 # Runs against the repo files as the CURRENT user — no root, no real ddev
 # required (a fake ddev on PATH records the command sequence). Verifies:
 #   - the registry parser (global_config.yaml project_info/approot)
@@ -22,10 +22,11 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILES="$SCRIPT_DIR/../files"
-MIG="$FILES/opencode-permissions-kit-lib/ddev-migrate.sh"
+MIG="$FILES/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
+BIN_MIG="$FILES/opencode-permissions-kit-lib/bin/ddev-migrate"
 INSTALL="$FILES/install.sh"
-UPDATE="$FILES/update.sh"
-STATUS="$FILES/status.sh"
+UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
+STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../Makefile"
 TEST_CI="$SCRIPT_DIR/../.github/workflows/test.yml"
 E2E_CI="$SCRIPT_DIR/../.github/workflows/e2e.yml"
@@ -302,8 +303,8 @@ check "import builds DOCKER_HOST from the configured backend" \
     sh -c "grep -q 'OPENCODE_DOCKER_HOST' \"\$1\" && grep -q 'OPENCODE_PODMAN_SOCKET' \"\$1\"" _ "$MIG"
 check "import never deletes dumps on failure" \
     sh -c "! grep -q 'rm -rf.*DDEV_MIG_BACKUP_ROOT' \"\$1\"" _ "$MIG"
-check "standalone list mode exists" \
-    sh -c "grep -q 'ddev-migrate.sh' \"\$1\" && grep -q 'list)' \"\$1\"" _ "$MIG"
+check "standalone list mode exists (bin dispatcher)" \
+    sh -c "grep -q 'list)' \"\$1\"" _ "$BIN_MIG"
 
 # --- 6. install.sh wiring ----------------------------------------------------------
 
@@ -312,9 +313,9 @@ check "install.sh documents --skip-ddev-migration in the header" \
 check "install.sh parses --skip-ddev-migration" \
     sh -c "grep -q -- '--skip-ddev-migration) SKIP_DDEV_MIGRATION=true' \"\$1\"" _ "$INSTALL"
 check "install.sh sources ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh fetch list includes ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh runs the export in Step 4b (before the Step 5 handover)" \
     sh -c 'export_ln=$(grep -n "ddev_migrate_export \"" "$1" | head -1 | cut -d: -f1); hand_ln=$(grep -n "ddev_handover_root \"" "$1" | head -1 | cut -d: -f1); [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$INSTALL"
 check "install.sh stamps DDEV_EXPORTED=1 after a successful export" \
@@ -353,35 +354,35 @@ check "ddev resolution includes the user's private install paths" \
 check "runtime db-less export failure is classified no-db-service" \
     sh -c "grep -q 'no-db-service' \"\$1\"" _ "$MIG"
 check "install.sh shows the dumps + import hint in the summary" \
-    sh -c "grep -q 'Ddev dumps' \"\$1\" && grep -q 'ddev-migrate.sh import' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'Ddev dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$INSTALL"
 check "install.sh inventory counts the dev user's ddev projects" \
     sh -c "grep -q 'ddev projects' \"\$1\" && grep -q 'ddev_migrate_registry' \"\$1\"" _ "$INSTALL"
 check "install.sh plan mentions the database export when projects exist" \
     sh -c "grep -q 'export ddev databases' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys ddev-migrate.sh to the library" \
-    sh -c "grep -q '\"\$LIBDIR/ddev-migrate.sh\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q '\"\$LIBDIR/sh/ddev-migrate.sh\"' \"\$1\" && grep -q '\"\$LIBDIR/bin/ddev-migrate\"' \"\$1\"" _ "$INSTALL"
 
 # --- 7. update.sh / status.sh wiring ------------------------------------------------
 
 check "update.sh KIT_FILES includes ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-migrate.sh' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys ddev-migrate.sh" \
-    sh -c "grep -q '\"\$LIBDIR/ddev-migrate.sh\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q '\"\$LIBDIR/sh/ddev-migrate.sh\"' \"\$1\" && grep -q '\"\$LIBDIR/bin/ddev-migrate\"' \"\$1\"" _ "$UPDATE"
 check "status.sh reports dumps waiting for import" \
-    sh -c "grep -q 'db dumps' \"\$1\" && grep -q 'ddev-migrate.sh import' \"\$1\"" _ "$STATUS"
+    sh -c "grep -q 'db dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$STATUS"
 
 # --- 8. Makefile + CI wiring --------------------------------------------------------
 
 check "Makefile lint list includes ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-migrate.sh' \"\$1\"" _ "$MAKEFILE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$MAKEFILE"
 check "Makefile has a test-ddev-migrate target in the test: list" \
     sh -c "grep -q 'test: .*test-ddev-migrate' \"\$1\"" _ "$MAKEFILE"
 check "test.yml chmod list + run step mention the new test" \
     sh -c "grep -q 'test-ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
 check "test.yml chmod list includes ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
 check "e2e.yml chmod lists include ddev-migrate.sh" \
-    sh -c "grep -c 'opencode-permissions-kit-lib/ddev-migrate.sh' \"\$1\" | grep -q '^2\$'" _ "$E2E_CI"
+    sh -c "grep -c 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\" | grep -q '^2\$'" _ "$E2E_CI"
 
 # --- Summary ------------------------------------------------------------------------
 

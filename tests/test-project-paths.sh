@@ -16,7 +16,7 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL="$SCRIPT_DIR/../files/install.sh"
-CONFIG="$SCRIPT_DIR/../files/config.sh"
+CONFIG="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/config.sh"
 
 failures=0
 passed=0

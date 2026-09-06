@@ -10,4 +10,4 @@ case ":$PATH:" in
     *:/usr/local/bin:*) ;;
     *) export PATH="/usr/local/bin:$PATH" ;;
 esac
-[ -r /usr/local/lib/opencode-permissions-kit/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/shell-warn.sh
+[ -r /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh

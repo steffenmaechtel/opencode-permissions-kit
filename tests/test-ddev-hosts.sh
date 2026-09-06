@@ -14,12 +14,12 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILES="$SCRIPT_DIR/../files"
-HOSTS="$FILES/opencode-permissions-kit-lib/ddev-hosts.sh"
-FUNC="$FILES/opencode-permissions-kit-lib/ddev-as-opencode.sh"
-KIT="$FILES/opencode-permissions-kit-lib/kit"
+HOSTS="$FILES/opencode-permissions-kit-lib/sh/ddev-hosts.sh"
+FUNC="$FILES/opencode-permissions-kit-lib/sh/ddev-terminal.sh"
+KIT="$FILES/opencode-permissions-kit-lib/bin/opk"
 INSTALL="$FILES/install.sh"
-UPDATE="$FILES/update.sh"
-STATUS="$FILES/status.sh"
+UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
+STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../Makefile"
 TEST_CI="$SCRIPT_DIR/../.github/workflows/test.yml"
 E2E_CI="$SCRIPT_DIR/../.github/workflows/e2e.yml"
@@ -213,13 +213,13 @@ check "hook preserves ddev's exit code" \
 # --- 6. deploy wiring -------------------------------------------------------------
 
 check "install.sh fetch list includes ddev-hosts.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-hosts.sh' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys ddev-hosts.sh" \
-    sh -c "grep -q '\"\$LIBDIR/ddev-hosts.sh\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q '\"\$LIBDIR/sh/ddev-hosts.sh\"' \"\$1\"" _ "$INSTALL"
 check "update.sh KIT_FILES includes ddev-hosts.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-hosts.sh' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys ddev-hosts.sh" \
-    sh -c "grep -q '\"\$LIBDIR/ddev-hosts.sh\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q '\"\$LIBDIR/sh/ddev-hosts.sh\"' \"\$1\"" _ "$UPDATE"
 check "status.sh reports missing Windows hostnames" \
     sh -c "grep -q 'hosts (win)' \"\$1\"" _ "$STATUS"
 check "status.sh scan prunes vendor dirs (issue #21)" \
@@ -235,11 +235,11 @@ check "kit CLI usage documents the hostname mode (issue #21)" \
 check "kit CLI check output shows per-hostname add commands" \
     sh -c "grep -qF 'ddev-hosts-add /' \"\$1\"" _ "$KIT"
 check "Makefile lint list includes ddev-hosts.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-hosts.sh' \"\$1\"" _ "$MAKEFILE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$MAKEFILE"
 check "test.yml chmod list includes ddev-hosts.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-hosts.sh' \"\$1\"" _ "$TEST_CI"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$TEST_CI"
 check "e2e.yml chmod lists include ddev-hosts.sh" \
-    sh -c "grep -c 'opencode-permissions-kit-lib/ddev-hosts.sh' \"\$1\" | grep -q \"^2\$\"" _ "$E2E_CI"
+    sh -c "grep -c 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\" | grep -q \"^2\$\"" _ "$E2E_CI"
 
 # --- Summary -----------------------------------------------------------------------
 

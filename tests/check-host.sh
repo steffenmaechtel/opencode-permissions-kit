@@ -20,7 +20,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Shared UI helpers — same visual language as every kit script.
-UI_LIB="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/ui.sh"
+UI_LIB="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     . "$UI_LIB"
 else

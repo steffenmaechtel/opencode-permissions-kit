@@ -62,9 +62,8 @@ done
 # Canonical set: everything CI executes by path. Derived from disk so a new
 # test-*.sh automatically enforces its own workflow entries. Exceptions are
 # files never executed directly:
-#   files/umask.sh                     sourced by /etc/profile.d
+#   files/etc/umask.sh                     sourced via /etc/profile.d
 #   jsonc-parser.py                    invoked via python3
-#   migrate-denies.sh                  fetch-only compat stub
 #   *.jsonc, sudoers.template          data, not code
 required=""
 for f in "$REPO"/tests/test-*.sh \
@@ -78,7 +77,7 @@ done
 for f in $(find "$REPO/files" -type f | sort); do
     base="${f##*/}"
     case "$base" in
-        umask.sh|jsonc-parser.py|migrate-denies.sh|*.jsonc|sudoers.template) continue ;;
+        umask.sh|jsonc-parser.py|*.jsonc|sudoers.template) continue ;;
     esac
     required="$required ./${f#"$REPO"/}"
 done

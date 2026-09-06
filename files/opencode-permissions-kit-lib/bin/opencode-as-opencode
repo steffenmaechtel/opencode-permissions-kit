@@ -1,7 +1,10 @@
 #!/bin/sh
-# opencode permissions kit — Wrapper
-# This file is deployed to /usr/local/bin/opencode by install.sh.
-# It ensures opencode always runs as the dedicated 'opencode' user.
+# opencode permissions kit -- bin/opencode-as-opencode
+# This file is deployed to /usr/local/bin/opencode by install.sh (symlink
+# to /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode).
+# It ensures opencode always runs as the dedicated 'opencode' user —
+# the wrapper's name follows the bin/ddev-as-opencode pattern ("run X as
+# the opencode user").
 #
 # Soft protection model (docs/design/DDEV-WORKING.md): the kit does NOT
 # mirror opencode.jsonc deny rules into Linux ACLs. File permissions are
@@ -155,7 +158,7 @@ fi
 # PATH re-add) would shadow the wrapper in new shells, and tools may call the
 # absolute path of the real binary. Warn (but keep running) when one is present.
 SHADOW="$HOME/.opencode/bin/opencode"
-if [ -e "$SHADOW" ] && { [ ! -L "$SHADOW" ] || [ "$(readlink -f "$SHADOW" 2>/dev/null || echo "$SHADOW")" != "/usr/local/lib/opencode-permissions-kit/wrapper" ]; }; then
+if [ -e "$SHADOW" ] && { [ ! -L "$SHADOW" ] || [ "$(readlink -f "$SHADOW" 2>/dev/null || echo "$SHADOW")" != "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; }; then
     note "${YELLOW}WARNING: self-installed opencode detected at $SHADOW${NC}"
     note "${YELLOW}New shells would run it instead of this wrapper. Fix: rm -rf $SHADOW${NC}"
     note ""
@@ -198,7 +201,7 @@ PROJECT_CONFIG=""
 if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
 elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
 if [ -n "$PROJECT_CONFIG" ]; then
-    PROJECT_TOOLS=$(python3 /usr/local/lib/opencode-permissions-kit/jsonc-parser.py --tools "$PROJECT_CONFIG" 2>/dev/null || true)
+    PROJECT_TOOLS=$(python3 /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$PROJECT_CONFIG" 2>/dev/null || true)
     if [ -n "$PROJECT_TOOLS" ]; then
         note "${CYAN}Container tools enabled by this project:${NC}"
         printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_fd"
@@ -233,13 +236,13 @@ fi
 # first (works when the wrapper runs as root or as the opencode user itself, or
 # the socket sits somewhere traversable); otherwise re-probe as the opencode
 # user — the context that will actually connect — via the kit's NOPASSWD
-# socket-check.sh rule. Accepts "unix://..." or a plain path.
+# socket-check rule. Accepts "unix://..." or a plain path.
 sock_reachable() {
     [ -n "$1" ] || return 1
     sock="$1"
     case "$sock" in unix://*) sock="${sock#unix://}";; esac
     [ -S "$sock" ] 2>/dev/null && return 0
-    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh "$sock" 2>/dev/null
+    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock" 2>/dev/null
 }
 
 CONTAINER_DOCKER_HOST=""
@@ -322,15 +325,15 @@ fi
 # opencode treats EACCES on <dir>/opencode.jsonc as a hard error, not as
 # "no config file". OpenChamber defaults the server cwd to the
 # developer's $HOME, exactly the unreadable case. Probe from the opencode
-# user's own context (cwd-check.sh, same sudoers pattern as
-# socket-check.sh); on "unreadable" fall back to a readable directory so
+# user's own context (cwd-check, same sudoers pattern as
+# socket-check); on "unreadable" fall back to a readable directory so
 # the server comes up working: the configured projects root containing
 # the cwd, else the first readable configured root, else the opencode
 # user's home. Empty probe output (sudoers rule missing, sudo denied)
 # means "unknown" — proceed without touching the directory. The warning
 # goes to stderr via note() — headless stdout stays machine-clean.
 cwd_probe() {
-    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/cwd-check.sh "$1" 2>/dev/null || true
+    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/cwd-check "$1" 2>/dev/null || true
 }
 if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
     SERVE_FALLBACK=""

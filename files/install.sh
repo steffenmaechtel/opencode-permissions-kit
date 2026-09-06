@@ -43,15 +43,17 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    # Pre-create every subdirectory referenced by the file list (bin/, tui/):
-    # curl -o cannot write into a missing directory and aborts the fetch
-    # with error 23 ("Failure writing output to destination").
-    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/tui"
-    for f in install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
-             opencode-deny-all.jsonc \
-             sudoers.template umask.sh VERSION \
-             opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-             opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/bin/cwd-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh \
+    # Pre-create every subdirectory referenced by the file list (bin/, sh/,
+    # py/, tui/): curl -o cannot write into a missing directory and aborts
+    # the fetch with error 23 ("Failure writing output to destination").
+    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" "$dir/etc"
+    for f in install.sh VERSION \
+             opencode-permissions-kit-lib/management/config.sh opencode-permissions-kit-lib/management/update.sh opencode-permissions-kit-lib/management/status.sh opencode-permissions-kit-lib/management/uninstall.sh \
+             opencode-permissions-kit-lib/templates/opencode.jsonc \
+             opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
+             opencode-permissions-kit-lib/templates/sudoers.template etc/umask.sh \
+             opencode-permissions-kit-lib/bin/opencode-as-opencode opencode-permissions-kit-lib/bin/opk opencode-permissions-kit-lib/py/jsonc-parser.py \
+             opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh \
              opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -76,30 +78,30 @@ VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). No-op if
 # the helper is missing — logging must never break the install.
 log() { :; }
-if [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" ]; then
-    . "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"
+if [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/log.sh" ]; then
+    . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/log.sh"
 fi
 
 # Shared ddev handover helpers (.ddev + settings dirs -> opencode user).
 # install.sh always runs from a checkout or a fully fetched temp dir, so the
 # helper sits right next to log.sh.
-[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh"
+[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
 
 # Shared ddev database-migration helpers (dev-user registry -> SQL dumps,
 # issue #15). Same sourcing rules as ddev-handover.sh.
-[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh"
+[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
 command -v ddev_migrate_registry >/dev/null 2>&1 || { ddev_migrate_registry() { :; }; ddev_migrate_projects() { :; }; ddev_migrate_done() { return 1; }; }
 
 # Shared group-baseline helper with live progress (issue #14). Same
 # sourcing rules as ddev-handover.sh.
-[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh"
+[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 
 # === Shared UI helpers ===
 # The kit files sit next to this script (checkout or fully fetched temp dir);
 # a plain fallback keeps install.sh working if ui.sh is somehow missing.
-UI_LIB="$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh"
+UI_LIB="$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     . "$UI_LIB"
 else
@@ -769,8 +771,8 @@ log "install.conf written (version $VERSION)"
 # subuid/subgid, and sets up the daemon; it prints OPENCODE_DOCKER_HOST=... on
 # stdout for the caller to record.
 ui_section "Provisioning container backend: $CONTAINER_BACKEND"
-SETUP_SCRIPT="$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh"
-[ -f "$SETUP_SCRIPT" ] || SETUP_SCRIPT="$LIBDIR/setup-container-backend.sh"
+SETUP_SCRIPT="$SCRIPT_DIR/opencode-permissions-kit-lib/bin/setup-container-backend"
+[ -f "$SETUP_SCRIPT" ] || SETUP_SCRIPT="$LIBDIR/bin/setup-container-backend"
 _setup_out=$(sh "$SETUP_SCRIPT" "$CONTAINER_BACKEND" --yes 2>&1) || {
     ui_error "Container backend provisioning failed."
     echo "$_setup_out"
@@ -932,7 +934,7 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
     if [ "$SKIP_DDEV_MIGRATION" = true ]; then
         ui_detail "skipped (--skip-ddev-migration) — the databases become unreachable"
         ui_detail "with the old daemon; export manually BEFORE using ddev again:"
-        ui_detail "  sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export $DEFAULT_USER ${PROJECTS_ROOTS:-<roots>}"
+        ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export $DEFAULT_USER ${PROJECTS_ROOTS:-<roots>}"
         log "ddev database export skipped (--skip-ddev-migration)"
     elif [ "$DDEV_EXPORTED_PRE" = "1" ]; then
         ui_detail "already exported on a previous run (DDEV_EXPORTED=1) — skipping"
@@ -996,13 +998,13 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
                 fi
             else
                 ui_warn "ddev database export produced no dumps — import manually later if needed"
-                ui_detail "retry after install: sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export $DEFAULT_USER $PROJECTS_ROOTS"
+                ui_detail "retry after install: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export $DEFAULT_USER $PROJECTS_ROOTS"
                 log "ddev database export produced no dumps"
             fi
         else
             ui_detail "declined — the dev databases become unreachable with the old daemon"
             ui_detail "export manually BEFORE using ddev again:"
-            ui_detail "  sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh export $DEFAULT_USER $PROJECTS_ROOTS"
+            ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export $DEFAULT_USER $PROJECTS_ROOTS"
             log "ddev database export declined (advanced prompt)"
         fi
     fi
@@ -1076,7 +1078,7 @@ if command -v git >/dev/null 2>&1; then
     log "git safe.directory ensured for $OPENCODE_USER"
 fi
 
-sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
+sudo cp "$SCRIPT_DIR/etc/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
 sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
 log "umask profile installed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 
@@ -1189,88 +1191,90 @@ for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEF
         # Interactive-shell bypass warning: sources shell-warn.sh so a
         # self-installed opencode binary is reported in non-login shells too.
         # The [ -f ... ] guard keeps the line harmless after uninstall.
-        if ! sudo grep -q 'opencode-permissions-kit/shell-warn.sh' "$cf" 2>/dev/null; then
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
+        if ! sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh' "$cf" 2>/dev/null; then
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
         fi
         # Interactive-shell ddev function: `ddev` always runs as the opencode
         # user (sudoers helper), so the developer terminal and the agent share
         # one ddev home. The [ -f ... ] guard keeps the line harmless after
         # uninstall. Only the DEFAULT user gets it — the opencode session must
         # never be wrapped (the function's id check would be recursive).
-        if ! sudo grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null; then
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh ] && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
+        if ! sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null; then
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
         fi
     fi
 done
-log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning + ddev-as-opencode hooked)"
+log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning + ddev terminal hook installed)"
 
 # === Step 7: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
 ui_section "Deploying the kit library"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
-sudo mkdir -p "$LIBDIR/bin"
+sudo mkdir -p "$LIBDIR/bin" "$LIBDIR/sh" "$LIBDIR/py" "$LIBDIR/tui" "$LIBDIR/management" "$LIBDIR/templates"
 
-# Copy all our scripts into the library directory
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/kit"                "$LIBDIR/kit"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh"               "$LIBDIR/ui.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"
-sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
-sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
-sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
+# Copy all our scripts into the library directory. Layout (docs/design/streamline.md):
+# bin/ = commands (no extension), sh/ = sourced shell libraries, py/ = python,
+# management/ = the management entry scripts, templates/ = rendered/deployed templates.
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/opencode-as-opencode" "$LIBDIR/bin/opencode-as-opencode"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/opk"                "$LIBDIR/bin/opk"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/py/jsonc-parser.py"    "$LIBDIR/py/jsonc-parser.py"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/log.sh"             "$LIBDIR/sh/log.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"              "$LIBDIR/sh/ui.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/shell-warn.sh"      "$LIBDIR/sh/shell-warn.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/config.sh"                        "$LIBDIR/management/config.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh"                        "$LIBDIR/management/update.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/status.sh"                        "$LIBDIR/management/status.sh"
 # sudoers.template is deployed alongside config.sh: the installed config.sh
 # re-renders /etc/opencode-permissions-kit/sudoers on container-backend
 # switches and needs the template next to it.
-sudo cp "$SCRIPT_DIR/sudoers.template"                 "$LIBDIR/sudoers.template"
-sudo chmod 440 "$LIBDIR/sudoers.template"
-sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
-sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc"          "$LIBDIR/opencode-deny-all.jsonc"
-sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template"                 "$LIBDIR/templates/sudoers.template"
+sudo chmod 440 "$LIBDIR/templates/sudoers.template"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc"                   "$LIBDIR/templates/opencode.jsonc"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc"          "$LIBDIR/templates/opencode-deny-all.jsonc"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/uninstall.sh"                     "$LIBDIR/management/uninstall.sh"
 # rootless socket probe helper
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/bin/socket-check.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check" "$LIBDIR/bin/socket-check"
 # headless serve cwd probe helper (readable-for-opencode check + fallback)
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/cwd-check.sh" "$LIBDIR/bin/cwd-check.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/cwd-check" "$LIBDIR/bin/cwd-check"
 # ddev always runs as the opencode user: the sourced shell function (hooked
 # into the developer's rc files) + the sudoers helper that execs the real ddev.
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-terminal.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/sh/ddev-migrate.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates
-sudo mkdir -p "$LIBDIR/tui"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh"
-sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
-               "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/cwd-check.sh" "$LIBDIR/bin/ddev-as-opencode"
+sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh"
+sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
+               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
+               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
+               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-migrate"
 log "library deployed to $LIBDIR"
 ui_success "kit library deployed: $LIBDIR"
 
-# Symlink: /usr/local/bin/opencode -> our wrapper
-sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
-ui_success "wrapper installed: /usr/local/bin/opencode -> $LIBDIR/wrapper"
-log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/wrapper"
+# Symlink: /usr/local/bin/opencode -> the wrapper (bin/opencode-as-opencode)
+sudo ln -sf "$LIBDIR/bin/opencode-as-opencode" /usr/local/bin/opencode
+ui_success "wrapper installed: /usr/local/bin/opencode -> $LIBDIR/bin/opencode-as-opencode"
+log "wrapper symlink: /usr/local/bin/opencode -> $LIBDIR/bin/opencode-as-opencode"
 
-# CLI dispatcher: /usr/local/bin/opk -> kit
+# CLI dispatcher: /usr/local/bin/opk -> bin/opk
 sudo rm -f /usr/local/bin/opencode-permissions-kit
-sudo ln -sf "$LIBDIR/kit" /usr/local/bin/opk
-ui_success "cli installed: opk -> $LIBDIR/kit"
-log "cli symlink: /usr/local/bin/opk -> $LIBDIR/kit"
+sudo ln -sf "$LIBDIR/bin/opk" /usr/local/bin/opk
+ui_success "cli installed: opk -> $LIBDIR/bin/opk"
+log "cli symlink: /usr/local/bin/opk -> $LIBDIR/bin/opk"
 
 # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
-sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
 sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
 sudo chmod 440 /etc/opencode-permissions-kit/sudoers
 rm -f "$SUDO_TMP"
@@ -1404,7 +1408,7 @@ if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]
 fi
 
 if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
-    sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
+    sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
     sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode/opencode.jsonc
     sudo chmod 664 /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
@@ -1417,7 +1421,7 @@ if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/openc
     log "opencode config installed: /home/opencode/.config/opencode/opencode.jsonc (secure_git=$SECURE_GIT_CONFIG)"
 elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
     sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
-    sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
+    sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
     sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode/opencode.jsonc
     sudo chmod 664 /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
@@ -1437,7 +1441,7 @@ else
     # the chosen SECURE_GIT state — same semantics as `config.sh git-config
     # on|off` — with a backup of the previous file.
     sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
-    sudo cp "$SCRIPT_DIR/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
+    sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
     sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode/opencode.jsonc
     sudo chmod 664 /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
@@ -1471,7 +1475,7 @@ if [ -f "$DEFAULT_OC_CONF" ]; then
     fi
 fi
 if [ ! -f "$DEFAULT_OC_CONF" ]; then
-    sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
+    sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
     sudo chown "$DEFAULT_USER:$OPENCODE_GROUP" "$DEFAULT_OC_CONF"
     sudo chmod 664 "$DEFAULT_OC_CONF"
     ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
@@ -1531,7 +1535,7 @@ ui_kv "Kit"      "v$VERSION"
 ui_kv "Backend"  "$CONTAINER_BACKEND (owned by 'opencode')"
 [ -n "$PROJECTS_ROOTS" ] && ui_kv "Projects" "$PROJECTS_ROOTS"
 if [ -n "$DD_MIG_DUMP_DIR" ]; then
-    ui_kv_warn "Ddev dumps" "$DD_MIG_DUMP_DIR — import: sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import"
+    ui_kv_warn "Ddev dumps" "$DD_MIG_DUMP_DIR — import: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import"
 fi
 if [ "$SECURE_GIT_CONFIG" = true ]; then
     ui_kv "Git"   "blocked for the agent (.git/config deny active)"

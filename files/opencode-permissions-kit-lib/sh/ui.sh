@@ -17,7 +17,7 @@
 #     (stdin may be the curl|bash script stream).
 #
 # Sourced (never executed):
-#   . /usr/local/lib/opencode-permissions-kit/ui.sh
+#   . /usr/local/lib/opencode-permissions-kit/sh/ui.sh
 
 # --- colors ---------------------------------------------------------------------
 if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then

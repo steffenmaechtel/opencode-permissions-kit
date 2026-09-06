@@ -175,8 +175,8 @@ assert_valid "banner defaults to 0.0.0 when conf has no VERSION line" \
 echo ""
 echo "--- Soft-only wrapper/sudoers shape ---"
 
-WRAPPER_FILE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/wrapper"
-SUDOERS_FILE="$SCRIPT_DIR/../files/sudoers.template"
+WRAPPER_FILE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+SUDOERS_FILE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/sudoers.template"
 
 if ! grep -q 'protect-projects' "$WRAPPER_FILE"; then
     echo "  ${GREEN}PASS${NC}  wrapper no longer calls protect-projects"
@@ -399,7 +399,7 @@ done
 if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' "$SUDOERS_FILE" \
    && ! grep -q 'DDEV_DEBUG' "$SUDOERS_FILE" \
    && grep -q '(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode' "$SUDOERS_FILE" \
-   && grep -q 'socket-check.sh' "$SUDOERS_FILE"; then
+   && grep -q 'socket-check \*' "$SUDOERS_FILE"; then
     echo "  ${GREEN}PASS${NC}  sudoers.template keeps base RunAs + socket-check + env_keep (no DDEV_DEBUG)"
     passed=$((passed + 1))
 else
@@ -416,7 +416,7 @@ fi
 echo ""
 echo "--- Headless serve cwd probe ---"
 
-CWD_CHECK="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/cwd-check.sh"
+CWD_CHECK="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/cwd-check"
 
 # functional: the helper itself (it only stats — runs as the test user)
 result=$(sh "$CWD_CHECK" "$TMPDIR/project-a")
@@ -508,8 +508,8 @@ assert_valid "serve cwd: unavailable probe (empty output) changes nothing" \
     "fallback=none warn=0" "$result"
 
 # static: wrapper wiring + sudoers rule
-if grep -q 'cwd-check.sh "\$1" 2>/dev/null || true' "$WRAPPER_FILE" \
-   && grep -q 'sudo -n -u opencode.*cwd-check.sh' "$WRAPPER_FILE"; then
+if grep -q 'cwd-check "\$1" 2>/dev/null || true' "$WRAPPER_FILE" \
+   && grep -q 'sudo -n -u opencode.*cwd-check' "$WRAPPER_FILE"; then
     echo "  ${GREEN}PASS${NC}  wrapper probes the serve cwd via cwd-check.sh (sudo -n, fault-tolerant)"
     passed=$((passed + 1))
 else
@@ -533,7 +533,7 @@ else
     failures=$((failures + 1))
 fi
 
-if grep -q 'bin/cwd-check.sh \*' "$SUDOERS_FILE"; then
+if grep -q 'bin/cwd-check \*' "$SUDOERS_FILE"; then
     echo "  ${GREEN}PASS${NC}  sudoers.template gates cwd-check.sh (NOPASSWD, opencode RunAs)"
     passed=$((passed + 1))
 else

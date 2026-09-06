@@ -17,7 +17,7 @@
 # installs abort with instructions (re-run install.sh).
 #
 # One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
-#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/update.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH/files/opencode-permissions-kit-lib/management/update.sh | sudo bash
 #
 # From a checkout (uses the local files):
 #   sudo bash files/update.sh --yes            # skip prompts
@@ -42,15 +42,22 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 # the pre-deploy verification (ensure_local_file), so the two can never drift
 # and a stale installed update.sh fetching an incomplete temp dir is healed
 # before the deploy cp's run.
-# REMOVED kit files must keep a compatibility stub under files/ while any
-# update.sh within the upgrade floor still lists them (a 404 aborts the old
-# fetch before the new update.sh takes over) — see
-# opencode-permissions-kit-lib/migrate-denies.sh.
-KIT_FILES="install.sh config.sh update.sh uninstall.sh status.sh opencode.jsonc \
-opencode-deny-all.jsonc \
-sudoers.template umask.sh VERSION \
-opencode-permissions-kit-lib/wrapper opencode-permissions-kit-lib/kit opencode-permissions-kit-lib/jsonc-parser.py \
-opencode-permissions-kit-lib/log.sh opencode-permissions-kit-lib/ui.sh opencode-permissions-kit-lib/shell-warn.sh opencode-permissions-kit-lib/setup-container-backend.sh opencode-permissions-kit-lib/bin/socket-check.sh opencode-permissions-kit-lib/bin/cwd-check.sh opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/ddev-handover.sh opencode-permissions-kit-lib/ddev-migrate.sh opencode-permissions-kit-lib/ddev-hosts.sh opencode-permissions-kit-lib/fs-baseline.sh \
+# Layout (docs/design/streamline.md): bin/ = commands, sh/ = sourced libs,
+# py/ = python, tui/ = assets; the management scripts and templates keep
+# their files/ root paths (streamed entry points) and deploy into
+# management/ and templates/.
+# BREAKING (0.0.29): the pre-0.0.29 flat layout moved — `opk update` from
+# an older install aborts on the old fetch list (404); migrate once via
+#   curl -fsSL .../files/opencode-permissions-kit-lib/management/update.sh | sudo bash
+# which deploys the new layout and removes the old files (see the cleanup
+# section below). No compatibility stubs are kept for the old paths.
+KIT_FILES="install.sh VERSION \
+             opencode-permissions-kit-lib/management/config.sh opencode-permissions-kit-lib/management/update.sh opencode-permissions-kit-lib/management/status.sh opencode-permissions-kit-lib/management/uninstall.sh \
+             opencode-permissions-kit-lib/templates/opencode.jsonc \
+             opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
+             opencode-permissions-kit-lib/templates/sudoers.template etc/umask.sh \
+opencode-permissions-kit-lib/bin/opencode-as-opencode opencode-permissions-kit-lib/bin/opk opencode-permissions-kit-lib/py/jsonc-parser.py \
+opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh \
 opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
@@ -61,10 +68,10 @@ fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
     dir="$base/files"
-    # Pre-create every subdirectory referenced by KIT_FILES (bin/, tui/):
-    # curl -o cannot write into a missing directory and aborts the fetch
-    # with error 23 ("Failure writing output to destination").
-    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/tui"
+    # Pre-create every subdirectory referenced by KIT_FILES (bin/, sh/,
+    # py/, tui/): curl -o cannot write into a missing directory and aborts
+    # the fetch with error 23 ("Failure writing output to destination").
+    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" "$dir/etc"
     for f in $KIT_FILES; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
@@ -134,7 +141,7 @@ PROJECTS_CONF="$CONFDIR/projects.conf"
 # Checkout copy first, then the deployed library; a plain fallback keeps
 # update.sh working on an install whose library predates ui.sh.
 UI_LIB=""
-for _cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh" "$LIBDIR/ui.sh"; do
+for _cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh" "$LIBDIR/sh/ui.sh"; do
     if [ -f "$_cand" ]; then UI_LIB="$_cand"; break; fi
 done
 if [ -n "$UI_LIB" ]; then
@@ -157,7 +164,7 @@ fi
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Covers all
 # three run modes: repo checkout, streamed temp dir, installed library.
 log() { :; }
-for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" "$SCRIPT_DIR/log.sh" "$LIBDIR/log.sh"; do
+for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/log.sh" "$LIBDIR/sh/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
@@ -288,62 +295,78 @@ if [ "$ONLY_BINARY" != true ]; then
 # --- re-deploy library files (skipped by --only-binary) ------------------------
 
 ui_section "Re-deploying library files"
-sudo mkdir -p "$LIBDIR/bin"
+sudo mkdir -p "$LIBDIR/bin" "$LIBDIR/sh" "$LIBDIR/py" "$LIBDIR/tui" "$LIBDIR/management" "$LIBDIR/templates"
 
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/wrapper"            "$LIBDIR/wrapper"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/kit"                "$LIBDIR/kit"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/jsonc-parser.py"     "$LIBDIR/jsonc-parser.py"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh"              "$LIBDIR/log.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh"               "$LIBDIR/ui.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/shell-warn.sh"       "$LIBDIR/shell-warn.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"
-sudo cp "$SCRIPT_DIR/config.sh"                        "$LIBDIR/config.sh"
-sudo cp "$SCRIPT_DIR/update.sh"                        "$LIBDIR/update.sh"
-sudo cp "$SCRIPT_DIR/status.sh"                        "$LIBDIR/status.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/opencode-as-opencode" "$LIBDIR/bin/opencode-as-opencode"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/opk"                "$LIBDIR/bin/opk"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/py/jsonc-parser.py"    "$LIBDIR/py/jsonc-parser.py"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/log.sh"             "$LIBDIR/sh/log.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"              "$LIBDIR/sh/ui.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/shell-warn.sh"      "$LIBDIR/sh/shell-warn.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/config.sh"                        "$LIBDIR/management/config.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh"                        "$LIBDIR/management/update.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/status.sh"                        "$LIBDIR/management/status.sh"
 # sudoers.template: needed by the installed config.sh for backend switches
-# (render_sudoers looks in $LIBDIR first).
-sudo cp "$SCRIPT_DIR/sudoers.template"                 "$LIBDIR/sudoers.template"
-sudo chmod 440 "$LIBDIR/sudoers.template"
-sudo cp "$SCRIPT_DIR/opencode.jsonc"                   "$LIBDIR/opencode.jsonc"
-sudo cp "$SCRIPT_DIR/uninstall.sh"                     "$LIBDIR/uninstall.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check.sh" "$LIBDIR/bin/socket-check.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/cwd-check.sh" "$LIBDIR/bin/cwd-check.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-as-opencode.sh" "$LIBDIR/ddev-as-opencode.sh"
+# (render_sudoers looks in $LIBDIR/templates first).
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template"                 "$LIBDIR/templates/sudoers.template"
+sudo chmod 440 "$LIBDIR/templates/sudoers.template"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc"                   "$LIBDIR/templates/opencode.jsonc"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/uninstall.sh"                     "$LIBDIR/management/uninstall.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check" "$LIBDIR/bin/socket-check"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/cwd-check" "$LIBDIR/bin/cwd-check"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-terminal.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-migrate.sh" "$LIBDIR/ddev-migrate.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-hosts.sh" "$LIBDIR/ddev-hosts.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/sh/ddev-migrate.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates.
-sudo mkdir -p "$LIBDIR/tui"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/ddev-as-opencode.sh" "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh"
+sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh"
 sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 755 "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
-               "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" "$LIBDIR/setup-container-backend.sh" \
-               "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-               "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/cwd-check.sh" "$LIBDIR/bin/ddev-as-opencode"
+sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
+               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
+               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
+               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-migrate"
+
+# --- old-layout cleanup (0.0.29 streamline, docs/design/streamline.md §5) --------
+# Remove the union of pre-0.0.29 deployed paths after the new layout is in
+# place. Idempotent rm -f — covers every historical location since 0.0.14.
+for _opk_old in \
+    "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
+    "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/cwd-check.sh" \
+    "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" \
+    "$LIBDIR/setup-container-backend.sh" "$LIBDIR/ddev-as-opencode.sh" \
+    "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" \
+    "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh" \
+    "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
+    "$LIBDIR/sudoers.template" "$LIBDIR/opencode.jsonc" "$LIBDIR/opencode-deny-all.jsonc" \
+    "$LIBDIR/migrate-denies.sh"; do
+    [ -e "$_opk_old" ] && sudo rm -f "$_opk_old" && ui_detail "removed old file: $_opk_old"
+done
 ui_success "library re-deployed: $LIBDIR"
-log "library re-deployed: $LIBDIR"
+log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
 
 # --- re-link wrapper + cli dispatcher ------------------------------------------
 
-sudo ln -sf "$LIBDIR/wrapper" /usr/local/bin/opencode
-ui_success "wrapper symlink refreshed: /usr/local/bin/opencode"
+sudo ln -sf "$LIBDIR/bin/opencode-as-opencode" /usr/local/bin/opencode
+ui_success "wrapper symlink refreshed: /usr/local/bin/opencode -> $LIBDIR/bin/opencode-as-opencode"
 sudo rm -f /usr/local/bin/opencode-permissions-kit
-sudo ln -sf "$LIBDIR/kit" /usr/local/bin/opk
-ui_success "cli symlink refreshed: /usr/local/bin/opk (legacy name removed)"
+sudo ln -sf "$LIBDIR/bin/opk" /usr/local/bin/opk
+ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy name removed)"
 
 # --- re-deploy sudoers -------------------------------------------------------
 
 sudo mkdir -p "$CONFDIR"
 
-if [ -f "$SCRIPT_DIR/sudoers.template" ]; then
+if [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" ]; then
     SUDO_TMP=$(mktemp)
-    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/sudoers.template" > "$SUDO_TMP"
+    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
     sudo cp "$SUDO_TMP" "$CONFDIR/sudoers"
     sudo chmod 440 "$CONFDIR/sudoers"
     rm -f "$SUDO_TMP"
@@ -361,7 +384,7 @@ fi
 # --- re-deploy umask profile -------------------------------------------------
 
 if [ -f "$SCRIPT_DIR/umask.sh" ]; then
-    sudo cp "$SCRIPT_DIR/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
+    sudo cp "$SCRIPT_DIR/etc/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
     sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
     # Remove the pre-0.0.10 umask profile so only the new name is loaded.
     sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
@@ -369,26 +392,34 @@ if [ -f "$SCRIPT_DIR/umask.sh" ]; then
     log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 fi
 
-# --- ensure shell-startup wrapper-bypass warning -------------------------------
-# Older installs lack the interactive-shell hook. Append it idempotently so a
-# self-installed opencode binary is reported in non-login shells too. The
-# [ -f ... ] guard keeps the line harmless after uninstall. Never removes user
-# lines — the warning tells the user how to clean up a real reinstall.
+# --- shell-startup hooks (rewrite old paths, append when missing) ---------------
+# Older installs lack the interactive-shell hooks — append them idempotently
+# so a self-installed opencode binary is reported and `ddev()` stays wrapped.
+# 0.0.29 moved the hooked files (shell-warn.sh, ddev-as-opencode.sh ->
+# sh/ddev-terminal.sh): the rc lines reference them by absolute path, and
+# their [ -f ... ] guard would silently disable the hook after the move.
+# The kit-owned line is therefore REWRITTEN in place (exact path match —
+# user lines are never touched, the guard keeps the line harmless after
+# uninstall); the hook is only appended when no kit hook line exists at all.
 if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
         [ -f "$cf" ] || continue
-        if ! sudo grep -q 'opencode-permissions-kit/shell-warn.sh' "$cf" 2>/dev/null; then
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
+        if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' "$cf" 2>/dev/null; then
+            sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh|/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh|g' "$cf"
+        else
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
             ui_success "wrapper-bypass warning hooked into $cf"
             log "shell-startup warning hook appended: $cf"
         fi
         # ddev always runs as the opencode user: hook the `ddev()` shell
         # function (sudoers helper). Only the DEFAULT user — the opencode
         # session must never be wrapped (the function's id check is the guard).
-        if ! sudo grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null; then
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh ] && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
-            ui_success "ddev-as-opencode function hooked into $cf"
-            log "ddev-as-opencode hook appended: $cf"
+        if sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh\|opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null; then
+            sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh|/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh|g' "$cf"
+        else
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
+            ui_success "ddev terminal hook installed into $cf"
+            log "ddev-terminal hook appended: $cf"
         fi
     done
 fi
@@ -405,8 +436,8 @@ fi
 if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     # Shared helper: prefer the copy next to this script (checkout — same
     # vintage as the running update.sh), fall back to the deployed library.
-    [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh"
-    [ -f "$LIBDIR/ddev-handover.sh" ] && . "$LIBDIR/ddev-handover.sh"
+    [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+    [ -f "$LIBDIR/sh/ddev-handover.sh" ] && . "$LIBDIR/sh/ddev-handover.sh"
     command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
     ui_detail "scanning project roots for ddev directories (large trees: this can take a while) ..."
     while IFS= read -r root; do
@@ -590,7 +621,7 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     DEFAULT_OC_CONF="/home/$DEFAULT_USER/.config/opencode/opencode.jsonc"
     if [ ! -f "$DEFAULT_OC_CONF" ]; then
         sudo mkdir -p "$(dirname "$DEFAULT_OC_CONF")"
-        sudo cp "$SCRIPT_DIR/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
+        sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
         sudo chown "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_OC_CONF"
         sudo chmod 664 "$DEFAULT_OC_CONF"
         ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
@@ -649,7 +680,7 @@ if [ "$REFRESH" = true ]; then
     # Shared helper with live per-pass progress (issue #14 — large trees
     # used to run minutes in silence during --refresh).
     _fsbl=""
-    for _fsbl_cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"; do
+    for _fsbl_cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
         if [ -f "$_fsbl_cand" ]; then . "$_fsbl_cand"; _fsbl="$_fsbl_cand"; break; fi
     done
     [ -n "$_fsbl" ] || fs_baseline_root() { :; }

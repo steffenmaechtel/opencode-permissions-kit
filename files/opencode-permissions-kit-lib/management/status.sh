@@ -2,7 +2,7 @@
 # opencode permissions kit -- status.sh
 # Prints the current protection status. Works whether or not the kit is
 # installed, and does not require root. Run directly:
-#   /usr/local/lib/opencode-permissions-kit/status.sh
+#   /usr/local/lib/opencode-permissions-kit/management/status.sh
 # or from a checkout:
 #   files/status.sh
 set -u
@@ -12,16 +12,16 @@ INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 
 # Shared UI helpers: installed library first, then the checkout layout.
-UI_LIB="$LIBDIR/ui.sh"
+UI_LIB="$LIBDIR/sh/ui.sh"
 if [ ! -f "$UI_LIB" ]; then
     _self="$(cd "$(dirname "$0")" && pwd)"
-    [ -f "$_self/opencode-permissions-kit-lib/ui.sh" ] && UI_LIB="$_self/opencode-permissions-kit-lib/ui.sh"
+    [ -f "$_self/../sh/ui.sh" ] && UI_LIB="$_self/../sh/ui.sh"
 fi
 if [ -f "$UI_LIB" ]; then
     # shellcheck disable=SC1090
     . "$UI_LIB"
 else
-    echo "error  ui.sh not found (expected $LIBDIR/ui.sh or next to status.sh in a checkout)" >&2
+    echo "error  ui.sh not found (expected $LIBDIR/sh/ui.sh or next to status.sh in a checkout)" >&2
     exit 1
 fi
 
@@ -40,7 +40,7 @@ LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
 
 # installed = the wrapper is active (user + wrapper + library present)
 installed=false
-if id "$OPENCODE_USER" >/dev/null 2>&1 && [ -x "$LIBDIR/wrapper" ] && [ -L /usr/local/bin/opencode ]; then
+if id "$OPENCODE_USER" >/dev/null 2>&1 && [ -x "$LIBDIR/bin/opencode-as-opencode" ] && [ -L /usr/local/bin/opencode ]; then
     installed=true
 fi
 
@@ -184,17 +184,17 @@ fi
 if [ -x "$LIBDIR/bin/ddev-as-opencode" ]; then
     ui_kv "helper" "deployed — $LIBDIR/bin/ddev-as-opencode" "$UI_GREEN"
 else
-    ui_kv "helper" "missing — run $LIBDIR/update.sh to deploy" "$UI_YELLOW"
+    ui_kv "helper" "missing — run opk update to deploy" "$UI_YELLOW"
 fi
-if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/ddev-as-opencode.sh" ]; then
+if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-terminal.sh" ]; then
     hooked=""
     for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
-        [ -f "$cf" ] && grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null && hooked="$cf" && break
+        [ -f "$cf" ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null && hooked="$cf" && break
     done
     if [ -n "$hooked" ]; then
         ui_kv "ddev() hook" "active — $hooked" "$UI_GREEN"
     else
-        ui_kv "ddev() hook" "not hooked — run $LIBDIR/update.sh" "$UI_YELLOW"
+        ui_kv "ddev() hook" "not hooked — run opk update" "$UI_YELLOW"
     fi
 fi
 # Dev-owned mode (docs/design/ddev-dev-owned-projects.md): on = the kit
@@ -272,10 +272,10 @@ if [ -n "$_mig_dir" ] && [ -f "$_mig_dir/manifest.conf" ]; then
         if [ "$_mig_imported" -gt 0 ]; then
             ui_kv "db dumps" "$_mig_ok dump(s) — ${_mig_dir##*/}" "$UI_GREEN"
             ui_detail "if some databases are missing in the opencode projects, import manually:"
-            ui_detail "  sudo sh $LIBDIR/ddev-migrate.sh import"
+            ui_detail "  sudo $LIBDIR/bin/ddev-migrate import"
         else
             ui_kv_warn "db dumps" "$_mig_ok dump(s) waiting for import — ${_mig_dir##*/}"
-            ui_detail "import all: sudo sh $LIBDIR/ddev-migrate.sh import  (first start pulls images)"
+            ui_detail "import all: sudo $LIBDIR/bin/ddev-migrate import  (first start pulls images)"
             ui_detail "or per project: ddev start <name> && ddev import-db <name> --file=<dump>.sql.gz"
         fi
     fi
@@ -291,10 +291,10 @@ fi
 # Windows hosts readiness (WSL2): custom-tld projects need their hostnames
 # in the Windows hosts file for the browser; ddev (running as opencode)
 # cannot manage that file. Report-only, per project root.
-if [ -d /mnt/c ] && [ -f "$LIBDIR/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/System32/drivers/etc/hosts ] \
+if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/System32/drivers/etc/hosts ] \
    && [ -n "${DEFAULT_USER:-}" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
     # shellcheck disable=SC1091  # deployed lib, checked above
-    . "$LIBDIR/ddev-hosts.sh"
+    . "$LIBDIR/sh/ddev-hosts.sh"
     _st_miss_total=0
     if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
         while IFS= read -r _st_root; do
@@ -462,9 +462,9 @@ fi
 # copies hidden in 0700 directories are only visible when run as root.
 # Override the directories via LEAK_SCAN_DIRS="/tmp /some/dir".
 log() { :; }
-[ -f "$LIBDIR/log.sh" ] && . "$LIBDIR/log.sh"
+[ -f "$LIBDIR/sh/log.sh" ] && . "$LIBDIR/sh/log.sh"
 LEAK_DIRS="${LEAK_SCAN_DIRS:-/tmp /var/tmp /dev/shm}"
-PARSER="$LIBDIR/jsonc-parser.py"
+PARSER="$LIBDIR/py/jsonc-parser.py"
 SCAN_CFG="/home/$OPENCODE_USER/.config/opencode/opencode.jsonc"
 [ -f "$SCAN_CFG" ] || SCAN_CFG="/home/$OPENCODE_USER/.config/opencode/opencode.json"
 
@@ -507,7 +507,7 @@ fi
 
 echo ""
 ui_info "Management (run in a terminal):"
-ui_detail "sudo $LIBDIR/config.sh                 change settings"
-ui_detail "sudo $LIBDIR/update.sh                 re-deploy kit after an update"
-ui_detail "bash $LIBDIR/uninstall.sh              remove the kit"
+ui_detail "sudo $LIBDIR/management/config.sh                 change settings"
+ui_detail "sudo $LIBDIR/management/update.sh                 re-deploy kit after an update"
+ui_detail "bash $LIBDIR/management/uninstall.sh              remove the kit"
 echo ""

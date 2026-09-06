@@ -15,8 +15,8 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-UPDATE="$SCRIPT_DIR/../files/update.sh"
-KIT="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/kit"
+UPDATE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/update.sh"
+KIT="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/opk"
 CLI_MD="$SCRIPT_DIR/../docs/reference/cli.md"
 
 failures=0

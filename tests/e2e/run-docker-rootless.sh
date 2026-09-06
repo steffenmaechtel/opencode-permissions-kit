@@ -177,7 +177,7 @@ echo "--- RL2. Switch to docker-rootless via config.sh (real provisioning) ---"
 # subuid/subgid, dockerd-rootless-setuptool.sh as opencode, systemctl --user
 # enable+start docker.service, linger. Run the REPO checkout so we test the
 # local code, not a potentially stale installed copy.
-if ! E 'sudo bash /home/dev/repo/files/config.sh --yes container-backend docker-rootless >/tmp/config-drl.log 2>&1'; then
+if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes container-backend docker-rootless >/tmp/config-drl.log 2>&1'; then
     echo "  ${YELLOW}SKIP${NC}  RL2: docker-rootless provisioning failed"
     echo "  --- /tmp/config-drl.log (full) ---"
     E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/config-drl.log 2>/dev/null' || true
@@ -243,15 +243,15 @@ if [ "$_rootless_ok" = true ]; then
     check_fail "RL3: developer cannot probe the socket directly (0700 dir)" \
         E "test -S $SOCKPATH"
     check "RL3: socket-check.sh reachable as developer via sudoers (unix:// form)" \
-        E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh '"$SOCK"
+        E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check '"$SOCK"
     check "RL3: socket-check.sh reachable as developer via sudoers (path form)" \
-        E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh '"$SOCKPATH"
+        E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check '"$SOCKPATH"
     check "RL3: socket-check.sh also works as the opencode user itself" \
-        E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh '"$SOCK"'"'
+        E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' /usr/local/lib/opencode-permissions-kit/bin/socket-check '"$SOCK"'"'
     check "RL3: sudoers preserves DOCKER_HOST/XDG_RUNTIME_DIR/OPENCODE_SERVER_PASSWORD across sudo" \
         E 'sudo grep -q "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD" /etc/sudoers.d/opencode-permissions-kit'
     check "RL3: installed wrapper exports DOCKER_HOST for the rootless backend" \
-        E 'grep -q "export DOCKER_HOST" /usr/local/lib/opencode-permissions-kit/wrapper'
+        E 'grep -q "export DOCKER_HOST" /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode'
 
     # Project explicitly enables docker -> wrapper auto-detects (no prompt
     # since 0.0.21 — the TUI mode row carries the state).
@@ -313,13 +313,13 @@ echo ""
 echo "--- RL5. status.sh + config.sh report the docker-rootless backend ---"
 if [ "$_rootless_ok" = true ]; then
     check "RL5: status.sh reports the docker-rootless backend" \
-        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "backend +docker-rootless"'
+        E '/usr/local/lib/opencode-permissions-kit/management/status.sh 2>&1 | grep -Eq "backend +docker-rootless"'
     check "RL5: status.sh reports the socket as reachable" \
-        E '/usr/local/lib/opencode-permissions-kit/status.sh 2>&1 | grep -Eq "socket +reachable"'
+        E '/usr/local/lib/opencode-permissions-kit/management/status.sh 2>&1 | grep -Eq "socket +reachable"'
     check "RL5: config.sh container-backend status reports docker-rootless" \
-        E 'sudo bash /home/dev/repo/files/config.sh container-backend status 2>&1 | grep -q "docker-rootless"'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh container-backend status 2>&1 | grep -q "docker-rootless"'
     check "RL5: config.sh container-backend status reports the socket reachable" \
-        E 'sudo bash /home/dev/repo/files/config.sh container-backend status 2>&1 | grep -Eq "socket +reachable"'
+        E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh container-backend status 2>&1 | grep -Eq "socket +reachable"'
 fi
 
 echo ""
@@ -328,7 +328,7 @@ echo "--- RL6. Uninstall (rootless runtime teardown built in) ---"
 # userdel -r can remove the opencode user.
 OC_UID2=$(E 'id -u opencode')
 E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID2"' docker system prune -af >/dev/null 2>&1" || true'
-E 'bash /usr/local/lib/opencode-permissions-kit/uninstall.sh --yes' && \
+E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
 check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'
 check_fail "Library removed"          E 'test -e /usr/local/lib/opencode-permissions-kit'

@@ -19,7 +19,7 @@ NC='\033[0m'
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 INSTALL="$REPO/files/install.sh"
-UPDATE="$REPO/files/update.sh"
+UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 
 failures=0
 passed=0

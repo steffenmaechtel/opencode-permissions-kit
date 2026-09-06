@@ -32,7 +32,7 @@ LIBDIR="/usr/local/lib/opencode-permissions-kit"
 # Checkout copy first, then the deployed library; a plain fallback keeps
 # config.sh working on an install whose library predates ui.sh.
 UI_LIB=""
-for _cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/ui.sh" "$LIBDIR/ui.sh"; do
+for _cand in "$SCRIPT_DIR/../sh/ui.sh" "$LIBDIR/sh/ui.sh"; do
     if [ -f "$_cand" ]; then UI_LIB="$_cand"; break; fi
 done
 if [ -n "$UI_LIB" ]; then
@@ -55,7 +55,7 @@ PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). Works from
 # both a repo checkout and the installed library.
 log() { :; }
-for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/log.sh" "$LIBDIR/log.sh"; do
+for cand in "$SCRIPT_DIR/../sh/log.sh" "$LIBDIR/sh/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
@@ -140,7 +140,7 @@ need_install() {
 # Prefer the copy alongside this config.sh (repo checkout), then the
 # installed library — same lookup order as everywhere else.
 _handover=""
-for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/ddev-handover.sh" "$LIBDIR/ddev-handover.sh"; do
+for cand in "$SCRIPT_DIR/../sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         _handover="$cand"
@@ -151,7 +151,7 @@ done
 
 # Shared group-baseline helper with live progress (issue #14). Same
 # lookup order as ddev-handover.sh above.
-for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/fs-baseline.sh" "$LIBDIR/fs-baseline.sh"; do
+for cand in "$SCRIPT_DIR/../sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
@@ -299,13 +299,13 @@ git_config_apply() {
 
     # Find the template: bundled alongside this script, or in the repo, or in the lib dir
     template=""
-    for cand in "$SCRIPT_DIR/opencode.jsonc" "$SCRIPT_DIR/../files/opencode.jsonc" "$LIBDIR/opencode.jsonc"; do
+    for cand in "$SCRIPT_DIR/../templates/opencode.jsonc" "$LIBDIR/templates/opencode.jsonc"; do
         if [ -f "$cand" ]; then
             template="$cand"
             break
         fi
     done
-    [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/opencode.jsonc, $SCRIPT_DIR/../files/opencode.jsonc, $LIBDIR/opencode.jsonc"
+    [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/../templates/opencode.jsonc, $LIBDIR/templates/opencode.jsonc"
 
     sudo cp "$template" "$target"
     sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$target"
@@ -370,7 +370,7 @@ container_backend_status() {
 # substitution (no backend/ddev-mode conditionals anymore).
 render_sudoers() {
     local template=""
-    for cand in "$LIBDIR/sudoers.template" "$SCRIPT_DIR/sudoers.template" "$SCRIPT_DIR/../files/sudoers.template"; do
+    for cand in "$LIBDIR/templates/sudoers.template" "$SCRIPT_DIR/../templates/sudoers.template"; do
         if [ -f "$cand" ]; then template="$cand"; break; fi
     done
     [ -n "$template" ] || die "sudoers.template not found."
@@ -413,10 +413,10 @@ container_backend_apply() {
     # fall back to the installed library. This ensures the repo version is used
     # when running from a checkout — important during development / testing.
     local setup_script=""
-    for cand in "$SCRIPT_DIR/opencode-permissions-kit-lib/setup-container-backend.sh" "$LIBDIR/setup-container-backend.sh"; do
+    for cand in "$SCRIPT_DIR/../bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"; do
         if [ -f "$cand" ]; then setup_script="$cand"; break; fi
     done
-    [ -n "$setup_script" ] || die "setup-container-backend.sh not found."
+    [ -n "$setup_script" ] || die "setup-container-backend not found."
 
     local prev="${CONTAINER_BACKEND:-none}"
     ui_info "switching container backend: $prev -> $new_backend"

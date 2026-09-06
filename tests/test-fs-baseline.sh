@@ -15,10 +15,10 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/fs-baseline.sh"
+LIB="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 INSTALL="$SCRIPT_DIR/../files/install.sh"
-UPDATE="$SCRIPT_DIR/../files/update.sh"
-CONFIG="$SCRIPT_DIR/../files/config.sh"
+UPDATE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/update.sh"
+CONFIG="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/config.sh"
 MAKEFILE="$SCRIPT_DIR/../Makefile"
 TEST_CI="$SCRIPT_DIR/../.github/workflows/test.yml"
 E2E_CI="$SCRIPT_DIR/../.github/workflows/e2e.yml"
@@ -114,10 +114,10 @@ for f in "$INSTALL" "$UPDATE" "$CONFIG"; do
         fail "$(basename "$f") runs the baseline through fs_baseline_root"
     fi
 done
-grep -q 'opencode-permissions-kit-lib/fs-baseline.sh' "$INSTALL" \
+grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$INSTALL" \
     && pass "install.sh fetch list includes fs-baseline.sh" \
     || fail "install.sh fetch list includes fs-baseline.sh"
-grep -q 'opencode-permissions-kit-lib/fs-baseline.sh' "$UPDATE" \
+grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$UPDATE" \
     && pass "update.sh KIT_FILES includes fs-baseline.sh" \
     || fail "update.sh KIT_FILES includes fs-baseline.sh"
 grep -q 'large trees: this can take a while' "$UPDATE" \
@@ -134,10 +134,10 @@ grep -q 'test-fs-baseline' "$MAKEFILE" \
 grep -q 'tests/test-fs-baseline.sh' "$TEST_CI" \
     && pass "test.yml chmod list includes the new test" \
     || fail "test.yml chmod list includes the new test"
-grep -q 'opencode-permissions-kit-lib/fs-baseline.sh' "$TEST_CI" \
+grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$TEST_CI" \
     && pass "test.yml chmod list includes the new lib" \
     || fail "test.yml chmod list includes the new lib"
-[ "$(grep -c 'opencode-permissions-kit-lib/fs-baseline.sh' "$E2E_CI")" = "2" ] \
+[ "$(grep -c 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$E2E_CI")" = "2" ] \
     && pass "e2e.yml chmod lists include the new lib (both jobs)" \
     || fail "e2e.yml chmod lists include the new lib (both jobs)"
 

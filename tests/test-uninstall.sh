@@ -17,7 +17,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-UNINSTALL="$SCRIPT_DIR/../files/uninstall.sh"
+UNINSTALL="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/uninstall.sh"
 
 failures=0
 passed=0

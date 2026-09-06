@@ -32,7 +32,7 @@
 # fine. No logging here: the functions echo their actions, callers wrap
 # them with their own log calls as needed.
 #
-# Deployed to /usr/local/lib/opencode-permissions-kit/ddev-handover.sh.
+# Deployed to /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh.
 #
 # DEV-OWNED MODE (docs/design/ddev-dev-owned-projects.md): when enabled
 # (DDEV_DEV_OWNED=true or the install.conf stamp, see

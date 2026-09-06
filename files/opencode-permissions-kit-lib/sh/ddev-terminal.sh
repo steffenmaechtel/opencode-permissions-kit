@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# opencode permissions kit -- ddev-as-opencode.sh
+# opencode permissions kit -- ddev-terminal.sh
 # Sourced in the DEFAULT user's interactive shells (a guarded source line is
 # appended to .bashrc/.zshrc/.profile at install/update). Defines a `ddev`
 # shell function that ALWAYS runs ddev as the 'opencode' user, so the
@@ -19,7 +19,8 @@
 # domains until the developer adds them. The hook prints the ready-made
 # command plus the missing domains; the agent never touches the hosts file.
 #
-# Deployed to /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh.
+# Deployed to /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh (was
+# ddev-as-opencode.sh — renamed to decouple it from bin/ddev-as-opencode).
 # _opk_browser_open <url>: open a URL AS THE DEVELOPER — the browser open
 # needs WSL interop (explorer.exe / xdg-open -> wslview), which the
 # opencode user deliberately has not (/mnt/c restricted).
@@ -244,10 +245,10 @@ ddev() {
 # current directory, lib missing, or nothing missing.
 _opk_hosts_hint() {
     [ -f /mnt/c/Windows/System32/drivers/etc/hosts ] || return 0
-    [ -f /usr/local/lib/opencode-permissions-kit/ddev-hosts.sh ] || return 0
+    [ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-hosts.sh ] || return 0
     [ -f "$PWD/.ddev/config.yaml" ] || return 0
     # shellcheck disable=SC1091  # deployed kit path, checked above
-    . /usr/local/lib/opencode-permissions-kit/ddev-hosts.sh
+    . /usr/local/lib/opencode-permissions-kit/sh/ddev-hosts.sh
     _opk_miss=$(ddev_hosts_missing "$PWD")
     [ -n "$_opk_miss" ] || return 0
     echo ""
@@ -273,14 +274,14 @@ _opk_hosts_hint() {
 # no project in the cwd, not typo3, TYPO3 detected, root already handed
 # over, or the kit lib missing.
 _opk_bootstrap_hint() {
-    [ -f /usr/local/lib/opencode-permissions-kit/ddev-handover.sh ] || return 0
+    [ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh ] || return 0
     [ -f "$PWD/.ddev/config.yaml" ] || return 0
     _opk_type=$(sed -n 's/^type:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
     [ "$_opk_type" = "typo3" ] || return 0
     _opk_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
     [ -n "$_opk_docroot" ] || _opk_docroot="."
     # shellcheck disable=SC1091  # deployed kit path, checked above
-    . /usr/local/lib/opencode-permissions-kit/ddev-handover.sh
+    . /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh
     # Dev-owned (flagged) project: ddev never touches paths outside
     # .ddev/ — the bootstrap EPERM cannot occur, stay silent.
     ddev_devowned_flagged "$PWD" && return 0

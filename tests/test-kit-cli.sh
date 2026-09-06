@@ -1,5 +1,5 @@
 #!/bin/sh
-# Test the CLI dispatcher (files/opencode-permissions-kit-lib/kit).
+# Test the CLI dispatcher (files/opencode-permissions-kit-lib/bin/opk).
 # Builds a fake library dir with stub scripts, symlinks the dispatcher,
 # and checks dispatch, help, error handling, and flag pass-through.
 # Run: sh tests/test-kit-cli.sh
@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-KIT="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/kit"
+KIT="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/opk"
 
 failures=0
 passed=0
@@ -40,8 +40,9 @@ mkdir -p "$LIB"
 # the current user/group double as the fake developer and opencode user.
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nVERSION=9.9.9\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" > "$WORK/install.conf"
+mkdir -p "$LIB/management"
 for s in status config update uninstall; do
-    cat > "$LIB/$s.sh" <<EOF
+    cat > "$LIB/management/$s.sh" <<EOF
 #!/bin/sh
 echo "$s:euid=\$(id -u):args=\$*"
 EOF
@@ -61,12 +62,15 @@ chmod +x "$FAKEBIN/sudo"
 PATH="$FAKEBIN:$PATH"
 export PATH
 
-# Dispatch through a symlink like /usr/local/bin does.
+# Dispatch through a symlink like /usr/local/bin does. The dispatcher
+# resolves LIBDIR as the parent of its own bin/ location. No sh/ui.sh in
+# the fake lib: the dispatcher must fall back to its built-in ui_error
+# (stderr) when the library is incomplete.
 BIN="$WORK/bin"
-mkdir -p "$BIN"
-ln -s "$LIB/kit" "$BIN/opk"
-cp "$KIT" "$LIB/kit"
-chmod +x "$LIB/kit"
+mkdir -p "$BIN" "$LIB/bin"
+ln -s "$LIB/bin/opk" "$BIN/opk"
+cp "$KIT" "$LIB/bin/opk"
+chmod +x "$LIB/bin/opk"
 
 run_kit() {
     OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" "$@" 2>/dev/null
@@ -139,7 +143,7 @@ else
 fi
 
 # missing script -> clear error, non-zero
-rm "$LIB/update.sh"
+rm "$LIB/management/update.sh"
 if run_kit update >/dev/null 2>&1; then
     echo "  ${RED}FAIL${NC}  missing script exits non-zero"; failures=$((failures + 1))
 else
@@ -238,8 +242,8 @@ fi
 # fetch an incomplete kit and crash at deploy time (set -e).
 install_list="$(sed -n '/^fetch_kit() {/,/^}/p' "$SCRIPT_DIR/../files/install.sh" \
     | grep -v 'mkdir' \
-    | grep -oE '(install|config|update|uninstall|status)\.sh|opencode(-deny-all)?\.jsonc|sudoers\.template|umask\.sh|VERSION|opencode-permissions-kit-lib/[a-zA-Z0-9./_-]+' | sort -u)"
-update_list="$(awk '/^KIT_FILES=/{flag=1} flag{printf "%s ", $0} flag && /"[[:space:]]*$/{exit}' "$SCRIPT_DIR/../files/update.sh" \
+    | grep -oE '(install|config|update|uninstall|status)\.sh|opencode(-deny-all)?\.jsonc|sudoers\.template|umask\.sh|VERSION|etc/[a-zA-Z0-9./_-]+|opencode-permissions-kit-lib/[a-zA-Z0-9./_-]+' | sort -u)"
+update_list="$(awk '/^KIT_FILES=/{flag=1} flag{printf "%s ", $0} flag && /"[[:space:]]*$/{exit}' "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/update.sh" \
     | sed -e 's/^KIT_FILES="//' -e 's/"[[:space:]]*$//' -e 's/\\//g' | tr ' ' '\n' | grep -v '^$' | sort -u)"
 if [ "$install_list" = "$update_list" ]; then
     echo "  ${GREEN}PASS${NC}  install.sh fetch list == update.sh KIT_FILES"; passed=$((passed + 1))
@@ -250,21 +254,17 @@ else
     failures=$((failures + 1))
 fi
 
-# Compat-stub guard: while the upgrade floor is 0.0.14, the pre-0.0.15
-# update.sh file lists still fetch migrate-denies.sh — a 404 would abort
-# their update before the new update.sh takes over. The stub is never
-# deployed (not in the current KIT_FILES).
-floor_line="$(grep -o 'floor_check "0\.[0-9]*\.[0-9]*"' "$SCRIPT_DIR/../files/update.sh" | head -1)"
-case "$floor_line" in
-    *0.0.14*)
-        if [ -f "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/migrate-denies.sh" ]; then
-            echo "  ${GREEN}PASS${NC}  compat stub present while floor is 0.0.14"; passed=$((passed + 1))
-        else
-            echo "  ${RED}FAIL${NC}  compat stub present while floor is 0.014 (0.0.14 update.sh fetches it — 404 aborts the update)"; failures=$((failures + 1))
-        fi
-        ;;
-esac
-if sed -n 's/^KIT_FILES="\(.*\)"$/\1/p' "$SCRIPT_DIR/../files/update.sh" | grep -q 'opencode-permissions-kit-lib/migrate-denies.sh'; then
+# Compat-stub guard retired with 0.0.29 (docs/design/streamline.md): no
+# compatibility stubs are kept for pre-0.0.29 fetch lists — old update.sh
+# copies 404 on the moved paths and users migrate via the streamed
+# one-liner instead. The stub file and its KIT_FILES entry must both be
+# gone.
+if [ -e "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/migrate-denies.sh" ]; then
+    echo "  ${RED}FAIL${NC}  migrate-denies.sh stub must not exist (stub era ended with 0.0.29)"; failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  no migrate-denies.sh stub (stub era ended with 0.0.29)"; passed=$((passed + 1))
+fi
+if sed -n 's/^KIT_FILES="\(.*\)"$/\1/p' "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/update.sh" | grep -q 'opencode-permissions-kit-lib/migrate-denies.sh'; then
     echo "  ${RED}FAIL${NC}  stub must NOT be in KIT_FILES (never deployed)"; failures=$((failures + 1))
 else
     echo "  ${GREEN}PASS${NC}  stub not in KIT_FILES (never deployed)"; passed=$((passed + 1))

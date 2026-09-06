@@ -28,7 +28,7 @@ done
 # before any removal so the final lines are written before the library and
 # the log directory itself are deleted.
 log() { :; }
-for cand in "$(dirname "$0")/log.sh" "$(dirname "$0")/opencode-permissions-kit-lib/log.sh" "/usr/local/lib/opencode-permissions-kit/log.sh" "/usr/local/lib/opencode/log.sh"; do
+for cand in "$(dirname "$0")/../sh/log.sh" "/usr/local/lib/opencode-permissions-kit/sh/log.sh" "/usr/local/lib/opencode/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break

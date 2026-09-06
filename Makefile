@@ -1,15 +1,19 @@
 .PHONY: help test lint check-host test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version
 
 # Scripts checked by `make lint` (everything shipped in files/).
-SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status.sh files/uninstall.sh files/umask.sh \
-	files/opencode-permissions-kit-lib/wrapper files/opencode-permissions-kit-lib/kit \
-	files/opencode-permissions-kit-lib/log.sh files/opencode-permissions-kit-lib/ui.sh \
-	files/opencode-permissions-kit-lib/shell-warn.sh files/opencode-permissions-kit-lib/setup-container-backend.sh \
-	files/opencode-permissions-kit-lib/ddev-as-opencode.sh files/opencode-permissions-kit-lib/ddev-handover.sh \
-	files/opencode-permissions-kit-lib/ddev-migrate.sh \
-	files/opencode-permissions-kit-lib/ddev-hosts.sh \
-	files/opencode-permissions-kit-lib/migrate-denies.sh \
-	files/opencode-permissions-kit-lib/bin/socket-check.sh files/opencode-permissions-kit-lib/bin/cwd-check.sh files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+SHELLCHECK_FILES = files/install.sh \
+	files/opencode-permissions-kit-lib/management/config.sh files/opencode-permissions-kit-lib/management/update.sh \
+	files/opencode-permissions-kit-lib/management/status.sh files/opencode-permissions-kit-lib/management/uninstall.sh \
+	files/etc/umask.sh \
+	files/opencode-permissions-kit-lib/bin/opencode-as-opencode files/opencode-permissions-kit-lib/bin/opk \
+	files/opencode-permissions-kit-lib/sh/log.sh files/opencode-permissions-kit-lib/sh/ui.sh \
+	files/opencode-permissions-kit-lib/sh/shell-warn.sh files/opencode-permissions-kit-lib/bin/setup-container-backend \
+	files/opencode-permissions-kit-lib/sh/ddev-terminal.sh files/opencode-permissions-kit-lib/sh/ddev-handover.sh \
+	files/opencode-permissions-kit-lib/sh/ddev-migrate.sh files/opencode-permissions-kit-lib/bin/ddev-migrate \
+	files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
+	files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+	files/opencode-permissions-kit-lib/bin/socket-check files/opencode-permissions-kit-lib/bin/cwd-check \
+	files/opencode-permissions-kit-lib/bin/ddev-as-opencode
 
 # Intentional deviations, excluded repo-wide:
 #   SC1090/SC1091 — kit scripts source helpers/configs via variables
@@ -159,7 +163,7 @@ check-version:
 		*) echo "VERSION file is not a semver stamp: '$$v'"; exit 1; ;; \
 	esac; \
 	i="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/install.sh | head -1)"; \
-	u="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/update.sh | head -1)"; \
+	u="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/opencode-permissions-kit-lib/management/update.sh | head -1)"; \
 	if [ -z "$$i" ] || [ "$$i" != "$$u" ]; then \
 		echo "MISMATCH: install.sh KIT_BRANCH=$$i update.sh KIT_BRANCH=$$u"; exit 1; \
 	fi; \

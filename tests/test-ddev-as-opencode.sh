@@ -22,19 +22,19 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILES="$SCRIPT_DIR/../files"
 HELPER="$FILES/opencode-permissions-kit-lib/bin/ddev-as-opencode"
-FUNC="$FILES/opencode-permissions-kit-lib/ddev-as-opencode.sh"
-TEMPLATE="$FILES/opencode.jsonc"
-SUDOERS="$FILES/sudoers.template"
+FUNC="$FILES/opencode-permissions-kit-lib/sh/ddev-terminal.sh"
+TEMPLATE="$FILES/opencode-permissions-kit-lib/templates/opencode.jsonc"
+SUDOERS="$FILES/opencode-permissions-kit-lib/templates/sudoers.template"
 INSTALL="$FILES/install.sh"
-UPDATE="$FILES/update.sh"
-CONFIG="$FILES/config.sh"
-KIT="$FILES/opencode-permissions-kit-lib/kit"
-HANDOVER="$FILES/opencode-permissions-kit-lib/ddev-handover.sh"
+UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
+CONFIG="$FILES/opencode-permissions-kit-lib/management/config.sh"
+KIT="$FILES/opencode-permissions-kit-lib/bin/opk"
+HANDOVER="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 # Hermetic dev-owned checks: never read this machine's real install.conf
 # (ddev_devowned_enabled falls back to the stamp) — point it at nothing.
 OPK_INSTALL_CONF="/nonexistent-opk-test-install.conf"
 export OPK_INSTALL_CONF
-STATUS="$FILES/status.sh"
+STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../Makefile"
 TEST_CI="$SCRIPT_DIR/../.github/workflows/test.yml"
 E2E_CI="$SCRIPT_DIR/../.github/workflows/e2e.yml"
@@ -345,33 +345,33 @@ check "template states the import destination is user-independent" \
 check "template warns that project 'ddev *' allows override the gate" \
     sh -c "grep -q 'merge LAST and override' \"\$1\"" _ "$TEMPLATE"
 check "template still parses cleanly with the new rules" \
-    python3 "$FILES/opencode-permissions-kit-lib/jsonc-parser.py" "$TEMPLATE"
+    python3 "$FILES/opencode-permissions-kit-lib/py/jsonc-parser.py" "$TEMPLATE"
 
 # --- 5. install.sh wiring ------------------------------------------------------
 check "install.sh fetches both new files (fetch_kit list)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys the function file" \
-    sh -c "grep -q '\"\$LIBDIR/ddev-as-opencode.sh\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q '\"\$LIBDIR/sh/ddev-terminal.sh\"' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys the helper (mode 755)" \
     sh -c "grep -q '\"\$LIBDIR/bin/ddev-as-opencode\"' \"\$1\"" _ "$INSTALL"
 check "install.sh hooks the function into the developer rc files" \
-    sh -c "grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh hooks use the [ -f ] uninstall-safe guard" \
-    sh -c "grep -qF '[ -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh ] && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh hands over ddev paths in the filesystem step" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$INSTALL"
 
 # --- 6. update.sh wiring -------------------------------------------------------
 check "update.sh KIT_FILES includes both new files" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-as-opencode.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
 check "update.sh KIT_FILES includes the handover helper" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/ddev-handover.sh' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-handover.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys the function file" \
-    sh -c "grep -q '\"\$LIBDIR/ddev-as-opencode.sh\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q '\"\$LIBDIR/sh/ddev-terminal.sh\"' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys the helper (mode 755)" \
     sh -c "grep -q '\"\$LIBDIR/bin/ddev-as-opencode\"' \"\$1\"" _ "$UPDATE"
 check "update.sh heals the rc-file hook idempotently" \
-    sh -c "grep -q 'opencode-permissions-kit/ddev-as-opencode.sh' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh runs the ddev handover unconditionally" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE"
 

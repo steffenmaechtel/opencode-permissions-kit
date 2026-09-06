@@ -18,7 +18,7 @@
 # Never executed directly. FS_SUDO overrides the sudo prefix ("" in
 # tests; plain find/chgrp/chmod/setfacl for a same-user run). Note the
 # plain "-": FS_SUDO="" must stay empty, a ":-" would re-substitute sudo.
-# Deployed to /usr/local/lib/opencode-permissions-kit/fs-baseline.sh.
+# Deployed to /usr/local/lib/opencode-permissions-kit/sh/fs-baseline.sh.
 
 _fsb_sudo() { ${FS_SUDO-sudo} "$@"; }
 

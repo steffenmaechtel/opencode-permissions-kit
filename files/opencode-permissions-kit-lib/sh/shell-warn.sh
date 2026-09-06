@@ -6,11 +6,11 @@
 # opencode binary could shadow it in the next shell (official installer re-run,
 # PATH re-add). Must stay POSIX-sh, cheap, and never exit the parent shell.
 #
-# Deployed to /usr/local/lib/opencode-permissions-kit/shell-warn.sh.
+# Deployed to /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh.
 
 [ -n "${HOME:-}" ] || return 0
 
-KIT_WRAPPER="/usr/local/lib/opencode-permissions-kit/wrapper"
+KIT_WRAPPER="/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode"
 KIT_BIN="/usr/local/bin/opencode"
 
 warn_path=""
@@ -43,7 +43,7 @@ cat >&2 <<EOF
   kit's wrapper enforces.
   Fix:
       rm -rf "$HOME/.opencode/bin"
-      sudo bash /usr/local/lib/opencode-permissions-kit/update.sh
+      sudo bash /usr/local/lib/opencode-permissions-kit/management/update.sh
   New shells keep warning until this is resolved.
 
 EOF

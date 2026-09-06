@@ -28,8 +28,8 @@ THEME="$TUIDIR/opencode-danger.theme.json"
 TUIJSON="$TUIDIR/tui.json"
 TUIDANGER="$TUIDIR/tui-danger.json"
 INSTALL="$REPO/files/install.sh"
-UPDATE="$REPO/files/update.sh"
-UNINSTALL="$REPO/files/uninstall.sh"
+UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 
 failures=0
 passed=0

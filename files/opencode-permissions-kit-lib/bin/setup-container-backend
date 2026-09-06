@@ -1,5 +1,5 @@
 #!/bin/sh
-# opencode permissions kit -- setup-container-backend.sh
+# opencode permissions kit -- setup-container-backend
 #
 # Provisioning helper for the rootless container backends. Called by install.sh
 # and config.sh to set up docker-rootless or podman-rootless for the opencode
@@ -7,7 +7,7 @@
 # between the two.
 #
 # Usage:
-#   setup-container-backend.sh <backend> [--yes]
+#   setup-container-backend <backend> [--yes]
 #     backend: docker-rootless | podman-rootless
 #     --yes:   skip confirmations
 #
@@ -38,11 +38,11 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         docker-rootless|podman-rootless) BACKEND="$1" ;;
         --yes|-y) YES=true ;;
-        *) echo "${RED}setup-container-backend.sh: unknown arg '$1'${NC}" >&2; exit 1 ;;
+        *) echo "${RED}setup-container-backend: unknown arg '$1'${NC}" >&2; exit 1 ;;
     esac
     shift
 done
-[ -n "$BACKEND" ] || { echo "${RED}Usage: setup-container-backend.sh <backend> [--yes]${NC}" >&2; exit 1; }
+[ -n "$BACKEND" ] || { echo "${RED}Usage: setup-container-backend <backend> [--yes]${NC}" >&2; exit 1; }
 
 # === Shared helpers (ui.sh, log.sh) ===
 LIBDIR="/usr/local/lib/opencode-permissions-kit"

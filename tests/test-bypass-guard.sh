@@ -1,7 +1,7 @@
 #!/bin/sh
 # Unit tests for the wrapper-bypass guard (self-install / absolute-path
 # protection). Two layers are checked:
-#   (1) Functional: files/opencode-permissions-kit-lib/shell-warn.sh warns
+#   (1) Functional: files/opencode-permissions-kit-lib/sh/shell-warn.sh warns
 #       when a self-installed opencode binary shadows the wrapper, and stays
 #       quiet when the wrapper is in charge.
 #   (2) Static wiring: install.sh, update.sh, the wrapper, umask.sh and the
@@ -15,11 +15,11 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/.."
-WARN="$REPO/files/opencode-permissions-kit-lib/shell-warn.sh"
-WRAPPER="$REPO/files/opencode-permissions-kit-lib/wrapper"
+WARN="$REPO/files/opencode-permissions-kit-lib/sh/shell-warn.sh"
+WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
-UPDATE="$REPO/files/update.sh"
-UMASK="$REPO/files/umask.sh"
+UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+UMASK="$REPO/files/etc/umask.sh"
 TEST_YML="$REPO/.github/workflows/test.yml"
 E2E_YML="$REPO/.github/workflows/e2e.yml"
 
@@ -68,7 +68,7 @@ check "shadow real binary: warns" sh -c 'echo "$1" | grep -q "wrapper bypass"' _
 check "shadow real binary: suggests fix" sh -c 'echo "$1" | grep -q "rm -rf"' _ "$out"
 
 mkdir -p "$TMP/home-link/.opencode/bin"
-ln -s /usr/local/lib/opencode-permissions-kit/wrapper "$TMP/home-link/.opencode/bin/opencode"
+ln -s /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode "$TMP/home-link/.opencode/bin/opencode"
 out=$(run_warn "$TMP/home-link" "/usr/bin:/bin")
 check "shadow symlink to kit wrapper: quiet" [ -z "$out" ]
 
@@ -90,11 +90,11 @@ check "wrapper self-checks PATH resolution" \
 echo ""
 echo "-- install.sh wiring --"
 check "install.sh fetches shell-warn.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/shell-warn.sh' "$INSTALL"
+    grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$INSTALL"
 check "install.sh deploys shell-warn.sh to LIBDIR" \
-    grep -Fq '"$LIBDIR/shell-warn.sh"' "$INSTALL"
+    grep -Fq '"$LIBDIR/sh/shell-warn.sh"' "$INSTALL"
 check "install.sh hooks shell-warn.sh into rc files" \
-    grep -Fq 'opencode-permissions-kit/shell-warn.sh' "$INSTALL"
+    grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$INSTALL"
 check "install.sh restricts binary to root:group 750" \
     grep -Fq 'chmod 750 "$SYSTEM_BIN"' "$INSTALL"
 check "install.sh never uses world-executable binary mode" \
@@ -103,11 +103,11 @@ check "install.sh never uses world-executable binary mode" \
 echo ""
 echo "-- update.sh wiring --"
 check "update.sh fetches shell-warn.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/shell-warn.sh' "$UPDATE"
+    grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$UPDATE"
 check "update.sh deploys shell-warn.sh to LIBDIR" \
-    grep -Fq '"$LIBDIR/shell-warn.sh"' "$UPDATE"
+    grep -Fq '"$LIBDIR/sh/shell-warn.sh"' "$UPDATE"
 check "update.sh hooks shell-warn.sh into rc files" \
-    grep -Fq 'opencode-permissions-kit/shell-warn.sh' "$UPDATE"
+    grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE"
 check "update.sh re-asserts binary 750" \
     grep -Fq 'chmod 750 "$SYSTEM_BIN"' "$UPDATE"
 check "update.sh never uses world-executable binary mode" \
@@ -116,9 +116,9 @@ check "update.sh never uses world-executable binary mode" \
 echo ""
 echo "-- CI chmod lists --"
 check "test.yml chmods shell-warn.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/shell-warn.sh' "$TEST_YML"
+    grep -Fq './files/opencode-permissions-kit-lib/sh/shell-warn.sh' "$TEST_YML"
 check "e2e.yml chmods shell-warn.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/shell-warn.sh' "$E2E_YML"
+    grep -Fq './files/opencode-permissions-kit-lib/sh/shell-warn.sh' "$E2E_YML"
 check "test.yml runs test-bypass-guard.sh" \
     grep -Fq './tests/test-bypass-guard.sh' "$TEST_YML"
 

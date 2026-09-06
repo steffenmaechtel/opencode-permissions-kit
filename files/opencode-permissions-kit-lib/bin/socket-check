@@ -1,5 +1,5 @@
 #!/bin/sh
-# opencode permissions kit -- socket-check.sh
+# opencode permissions kit -- socket-check
 #
 # Verifies that a unix socket path exists and is actually a socket. The wrapper
 # uses this as the reachability probe for the rootless container backends

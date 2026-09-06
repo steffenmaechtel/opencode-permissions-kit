@@ -11,8 +11,8 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TEMPLATE="$SCRIPT_DIR/../files/opencode.jsonc"
-PARSER="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/jsonc-parser.py"
+TEMPLATE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
+PARSER="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
 
 failures=0
 passed=0

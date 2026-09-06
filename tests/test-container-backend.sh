@@ -19,13 +19,13 @@ NC='\033[m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/.."
-WRAPPER="$REPO/files/opencode-permissions-kit-lib/wrapper"
+WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
-UPDATE="$REPO/files/update.sh"
-STATUS="$REPO/files/status.sh"
-CONFIG="$REPO/files/config.sh"
-UNINSTALL="$REPO/files/uninstall.sh"
-SUDOERS="$REPO/files/sudoers.template"
+UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
+CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
+UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
+SUDOERS="$REPO/files/opencode-permissions-kit-lib/templates/sudoers.template"
 TEST_YML="$REPO/.github/workflows/test.yml"
 E2E_YML="$REPO/.github/workflows/e2e.yml"
 
@@ -116,7 +116,7 @@ check "template has NO ddev-transaction grant" \
 check "base (opencode) RunAs for the binary is present" \
     grep -Eq 'ALL=\(opencode\) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode \*' "$SUDOERS"
 check "template has the rootless socket-check NOPASSWD rule" \
-    grep -Fq 'ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh *' "$SUDOERS"
+    grep -Fq 'ALL=(opencode)  NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/socket-check *' "$SUDOERS"
 
 echo ""
 echo "-- sudoers render --"
@@ -124,7 +124,7 @@ OUT="$TMPDIR/sudoers"
 render_sudoers "$SUDOERS" dev "$OUT"
 check "render: substitutes DEFAULT_USER"       grep -Fq 'dev ALL=(opencode) NOPASSWD' "$OUT"
 check "render: no placeholder remains"         grep_absent -Fq 'DEFAULT_USER' "$OUT"
-check "render: keeps socket-check rule"        grep -Fq 'socket-check.sh' "$OUT"
+check "render: keeps socket-check rule"        grep -Fq "socket-check *" "$OUT"
 
 echo ""
 echo "-- wrapper dispatch (mirrored logic) --"
@@ -159,7 +159,7 @@ check "wrapper warns when podman-rootless but podman not installed" \
 
 echo ""
 echo "-- wrapper rootless socket probe (socket-check.sh) --"
-SOCKCHECK="$REPO/files/opencode-permissions-kit-lib/bin/socket-check.sh"
+SOCKCHECK="$REPO/files/opencode-permissions-kit-lib/bin/socket-check"
 check "socket-check.sh exists"  [ -f "$SOCKCHECK" ]
 check "socket-check.sh has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SOCKCHECK"
 check "socket-check.sh only does test -S (no command execution)" \
@@ -171,7 +171,7 @@ check "wrapper has a sock_reachable probe function" \
 check "wrapper probes the socket directly first (root/opencode contexts)" \
     grep -Fq '[ -S "$sock" ] 2>/dev/null && return 0' "$WRAPPER"
 check "wrapper re-probes as the opencode user via socket-check.sh" \
-    grep -Fq 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check.sh "$sock"' "$WRAPPER"
+    grep -Fq 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock"' "$WRAPPER"
 check "docker-rootless branch uses sock_reachable" \
     grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER"
 check "podman-rootless socket branch uses sock_reachable" \
@@ -194,13 +194,13 @@ check "install.sh validates --container-backend (rootless only)" \
 check "install.sh aborts on provisioning failure (no docker-group fallback)" \
     grep -Fq 'Container backend provisioning failed' "$INSTALL"
 check "install.sh fetches socket-check.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/bin/socket-check.sh' "$INSTALL"
+    grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$INSTALL"
 check "install.sh deploys socket-check.sh to LIBDIR/bin" \
-    grep -Fq '"$LIBDIR/bin/socket-check.sh"' "$INSTALL"
+    grep -Fq '"$LIBDIR/bin/socket-check"' "$INSTALL"
 check "install.sh fetches setup-container-backend.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/setup-container-backend.sh' "$INSTALL"
+    grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$INSTALL"
 check "install.sh deploys setup-container-backend.sh to LIBDIR" \
-    grep -Fq '"$LIBDIR/setup-container-backend.sh"' "$INSTALL"
+    grep -Fq '"$LIBDIR/bin/setup-container-backend"' "$INSTALL"
 check "install.sh records OPENCODE_GROUP=opencode usergroup" \
     grep -Fq 'OPENCODE_GROUP=$(id -gn "$OPENCODE_USER"' "$INSTALL"
 check "install.sh adds the developer to the opencode usergroup" \
@@ -209,13 +209,13 @@ check "install.sh adds the developer to the opencode usergroup" \
 echo ""
 echo "-- update.sh wiring --"
 check "update.sh KIT_FILES includes socket-check.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/bin/socket-check.sh' "$UPDATE"
+    grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$UPDATE"
 check "update.sh deploys socket-check.sh to LIBDIR/bin" \
-    grep -Fq '"$LIBDIR/bin/socket-check.sh"' "$UPDATE"
+    grep -Fq '"$LIBDIR/bin/socket-check"' "$UPDATE"
 check "update.sh KIT_FILES includes setup-container-backend.sh" \
-    grep -Fq 'opencode-permissions-kit-lib/setup-container-backend.sh' "$UPDATE"
+    grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$UPDATE"
 check "update.sh deploys setup-container-backend.sh to LIBDIR" \
-    grep -Fq '"$LIBDIR/setup-container-backend.sh"' "$UPDATE"
+    grep -Fq '"$LIBDIR/bin/setup-container-backend"' "$UPDATE"
 check "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)" \
     sh -c "! sed -n 's/^KIT_FILES=\"\\(.*\\)\"$/\\1/p' \"\$1\" | grep -q migrate-denies" _ "$UPDATE"
 check "update.sh stamps no HARD_DENY_REMOVED key anymore" \
@@ -280,13 +280,13 @@ check "test.yml chmods this test"  grep -Fq './tests/test-container-backend.sh' 
 check "e2e.yml chmods this test"   grep -Fq './tests/test-container-backend.sh' "$E2E_YML"
 check "test.yml runs this test"   grep -Fq 'Run container backend tests' "$TEST_YML"
 check "test.yml chmods setup-container-backend.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/setup-container-backend.sh' "$TEST_YML"
+    grep -Fq './files/opencode-permissions-kit-lib/bin/setup-container-backend' "$TEST_YML"
 check "e2e.yml chmods setup-container-backend.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/setup-container-backend.sh' "$E2E_YML"
+    grep -Fq './files/opencode-permissions-kit-lib/bin/setup-container-backend' "$E2E_YML"
 check "test.yml chmods socket-check.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check.sh' "$TEST_YML"
+    grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check' "$TEST_YML"
 check "e2e.yml chmods socket-check.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check.sh' "$E2E_YML"
+    grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check' "$E2E_YML"
 check "test.yml has no migrate-denies.sh chmod (removed)" \
     grep_absent -Fq './files/opencode-permissions-kit-lib/migrate-denies.sh' "$TEST_YML"
 check "test.yml has no test-migration.sh (removed)" \
@@ -294,7 +294,7 @@ check "test.yml has no test-migration.sh (removed)" \
 
 echo ""
 echo "-- setup-container-backend.sh structure --"
-SETUP="$REPO/files/opencode-permissions-kit-lib/setup-container-backend.sh"
+SETUP="$REPO/files/opencode-permissions-kit-lib/bin/setup-container-backend"
 check "setup-container-backend.sh exists"  [ -f "$SETUP" ]
 check "setup has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SETUP"
 check "setup accepts rootless backends"        grep -Fq 'docker-rootless|podman-rootless' "$SETUP"

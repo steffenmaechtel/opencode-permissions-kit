@@ -1,20 +1,21 @@
 #!/bin/sh
-# opencode permissions kit — CLI dispatcher
+# opencode permissions kit -- bin/opk (CLI dispatcher)
 # Deployed to /usr/local/bin/opk by install.sh
-# (symlink -> /usr/local/lib/opencode-permissions-kit/kit).
+# (symlink -> /usr/local/lib/opencode-permissions-kit/bin/opk).
 #
 # One command for all management scripts, usable from anywhere in WSL:
-#   opk status     -> status.sh   (no sudo needed)
-#   opk config ... -> config.sh   (auto sudo)
-#   opk update ... -> update.sh   (auto sudo)
-#   opk uninstall  -> uninstall.sh (runs as your user,
+#   opk status     -> management/status.sh   (no sudo needed)
+#   opk config ... -> management/config.sh   (auto sudo)
+#   opk update ... -> management/update.sh   (auto sudo)
+#   opk uninstall  -> management/uninstall.sh (runs as your user,
 #                                            asks for sudo itself)
 #
 # Everything after the subcommand is passed through to the script, so all
 # script flags work unchanged (see docs/reference/cli.md).
 set -u
 
-# Resolve the library directory through the /usr/local/bin symlink.
+# Resolve the library root through the /usr/local/bin/opk symlink. The
+# dispatcher lives in bin/, so the root is one directory up.
 SELF="$0"
 if [ -L "$SELF" ]; then
     target=$(readlink "$SELF" 2>/dev/null || true)
@@ -23,12 +24,12 @@ if [ -L "$SELF" ]; then
         *)  SELF="$(dirname "$SELF")/$target" ;;
     esac
 fi
-LIBDIR="$(cd "$(dirname "$SELF")" && pwd -P)"
+LIBDIR="$(cd "$(dirname "$SELF")/.." && pwd -P)"
 
 # Shared UI helpers — same visual language as every kit script (labeled
 # error lines, colors off when piped). $LIBDIR is resolved above.
-if [ -f "$LIBDIR/ui.sh" ]; then
-    . "$LIBDIR/ui.sh"
+if [ -f "$LIBDIR/sh/ui.sh" ]; then
+    . "$LIBDIR/sh/ui.sh"
 else
     ui_error() { echo "  error    $1" >&2; }
 fi
@@ -81,7 +82,7 @@ Commands:
 
 Everything after <command> is passed to the underlying script, so all
 flags from the scripts work unchanged. Direct calls still work too:
-  /usr/local/lib/opencode-permissions-kit/<script>.sh
+  /usr/local/lib/opencode-permissions-kit/management/<script>.sh
 
 Docs: https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/reference/cli.md
 EOF
@@ -92,46 +93,46 @@ cmd="${1:-}"
 
 case "$cmd" in
     status)
-        exec sh "$LIBDIR/status.sh" "$@"
+        exec sh "$LIBDIR/management/status.sh" "$@"
         ;;
     config|update)
-        if [ ! -f "$LIBDIR/$cmd.sh" ]; then
-            ui_error "$LIBDIR/$cmd.sh not found — is the kit installed?"
+        if [ ! -f "$LIBDIR/management/$cmd.sh" ]; then
+            ui_error "$LIBDIR/management/$cmd.sh not found — is the kit installed?"
             exit 1
         fi
         if [ "$(id -u)" -eq 0 ]; then
-            exec sh "$LIBDIR/$cmd.sh" "$@"
+            exec sh "$LIBDIR/management/$cmd.sh" "$@"
         fi
-        exec sudo sh "$LIBDIR/$cmd.sh" "$@"
+        exec sudo sh "$LIBDIR/management/$cmd.sh" "$@"
         ;;
     upgrade-opencode)
         # Binary-only shorthand (issue #24): update.sh --yes --only-binary,
         # extra flags pass through (--binary-path for offline installs).
-        if [ ! -f "$LIBDIR/update.sh" ]; then
-            ui_error "$LIBDIR/update.sh not found — is the kit installed?"
+        if [ ! -f "$LIBDIR/management/update.sh" ]; then
+            ui_error "$LIBDIR/management/update.sh not found — is the kit installed?"
             exit 1
         fi
         if [ "$(id -u)" -eq 0 ]; then
-            exec sh "$LIBDIR/update.sh" --yes --only-binary "$@"
+            exec sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
         fi
-        exec sudo sh "$LIBDIR/update.sh" --yes --only-binary "$@"
+        exec sudo sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
         ;;
     uninstall)
-        if [ ! -f "$LIBDIR/uninstall.sh" ]; then
-            ui_error "$LIBDIR/uninstall.sh not found — is the kit installed?"
+        if [ ! -f "$LIBDIR/management/uninstall.sh" ]; then
+            ui_error "$LIBDIR/management/uninstall.sh not found — is the kit installed?"
             exit 1
         fi
         # uninstall.sh expects the default user (no sudo prefix); it asks
         # for sudo itself via sudo -v.
-        exec sh "$LIBDIR/uninstall.sh" "$@"
+        exec sh "$LIBDIR/management/uninstall.sh" "$@"
         ;;
     ddev-hosts-add|ddev-hosts-check)
         # Windows hosts bridge: must run AS THE DEVELOPER (interop + the
         # Windows user's drvfs access), never as root/opencode. Sourced
         # lib, functions called inline — argument passing stays simple.
-        [ -f "$LIBDIR/ddev-hosts.sh" ] || { ui_error "$LIBDIR/ddev-hosts.sh not found — is the kit installed?"; exit 1; }
+        [ -f "$LIBDIR/sh/ddev-hosts.sh" ] || { ui_error "$LIBDIR/sh/ddev-hosts.sh not found — is the kit installed?"; exit 1; }
         # shellcheck disable=SC1090
-        . "$LIBDIR/ddev-hosts.sh"
+        . "$LIBDIR/sh/ddev-hosts.sh"
         if [ "$(id -u)" -eq 0 ]; then
             _kitsu=""
             [ -f /etc/opencode-permissions-kit/install.conf ] && _kitsu=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode-permissions-kit/install.conf | tail -1)
@@ -140,7 +141,7 @@ case "$cmd" in
                 ui_error "cannot resolve the developer user — run as your user, not as root"
                 exit 1
             fi
-            exec sudo -u "$_kitsu" env HOME="/home/$_kitsu" sh -c ". '$LIBDIR/ddev-hosts.sh' && $cmd \"\$1\"" _ "${1:-$PWD}"
+            exec sudo -u "$_kitsu" env HOME="/home/$_kitsu" sh -c ". '$LIBDIR/sh/ddev-hosts.sh' && $cmd \"\$1\"" _ "${1:-$PWD}"
         fi
         case "$cmd" in
             ddev-hosts-check)
@@ -225,7 +226,7 @@ case "$cmd" in
             # would re-enter this branch forever).
             [ "${OPK_HANDOVER_ROOT:-}" = "1" ] && _ho_err "handover: sudo did not elevate — giving up"
             exec sudo env OPK_INSTALL_CONF="$INSTALL_CONF" OPK_HANDOVER_ROOT=1 \
-                sh "$LIBDIR/kit" handover "$_ho_target" "$@"
+                sh "$LIBDIR/bin/opk" handover "$_ho_target" "$@"
         fi
         _ho_rc=0
         ui_info "handing over to $_ho_user:$_ho_group (recursive, g+w) ..."
