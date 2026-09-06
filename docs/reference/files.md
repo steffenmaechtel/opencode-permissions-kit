@@ -19,7 +19,7 @@ This page lists every file and directory the kit manages, and every key in
 | `CONTAINER_BACKEND` | `docker-rootless` \| `podman-rootless` |
 | `OPENCODE_DOCKER_HOST` | `docker-rootless` socket, e.g. `unix:///run/user/<opencode-uid>/docker.sock` |
 | `OPENCODE_PODMAN_SOCKET` | Optional podman docker-CLI-compat socket |
-| `DDEV_VERSION` | Recorded ddev version (advisory; `status.sh` flags < 1.25) |
+| `DDEV_VERSION` | ddev version recorded at install time (fallback — `status.sh` reports the live `ddev --version` of the installed binary and flags < 1.25) |
 | `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
 | `HARD_DENY_REMOVED` | unused (historical migration stamp; updates from < 0.0.14 are refused — see [update](../how-to/update.md)) |
 | `VERSION` | Deployed kit version |

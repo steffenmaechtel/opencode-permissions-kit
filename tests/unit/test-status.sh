@@ -262,6 +262,70 @@ else
     fail "audit section body: foreign-group socket flagged or crashed (out=$(printf '%s' "$audit_out2" | head -3))"
 fi
 
+# --- 1d. live ddev version probe (issue #56) -------------------------------------
+# DDEV_VERSION in install.conf is an install-time stamp; status.sh must
+# report the LIVE binary version instead (the stale stamp showed 1.25.3
+# while the terminal's `ddev --version` answered 1.25.4). Extract the
+# probe block and run it with a fake ddev shim ahead on PATH — command -v
+# resolves the shim first, so the host's own ddev cannot interfere.
+DDEV_PROBE="$(sed -n '/^# Live ddev version/,/^# Windows hosts readiness/p' "$STATUS" | sed '$d')"
+if [ -n "$DDEV_PROBE" ]; then
+    pass "ddev version probe block extractable from status.sh"
+else
+    fail "ddev version probe block extractable from status.sh"
+    echo "  ${RED}$failures test(s) failed.${NC}"
+    exit 1
+fi
+printf '#!/bin/sh\necho "ddev version v1.25.4"\n' > "$WORK/ddev"
+chmod +x "$WORK/ddev"
+probe_out=$(
+    (
+        PATH="$WORK:$PATH"
+        export PATH
+        set -u
+        set +e
+        . "$UI_LIB"
+        DDEV_VERSION="1.25.3"
+        eval "$DDEV_PROBE"
+        exit 0
+    ) 2>&1
+) || true
+if printf '%s' "$probe_out" | grep -q "1.25.4" \
+   && ! printf '%s' "$probe_out" | grep -q "1.25.3"; then
+    pass "ddev version: live probe wins over the install-time stamp (issue #56)"
+else
+    fail "ddev version: live probe wins over the stamp (out=$probe_out)"
+fi
+
+# the < 1.25 gate must judge the LIVE version too
+printf '#!/bin/sh\necho "ddev version v1.24.2"\n' > "$WORK/ddev"
+probe_low=$(
+    (
+        PATH="$WORK:$PATH"
+        export PATH
+        set -u
+        set +e
+        . "$UI_LIB"
+        DDEV_VERSION="1.24.2"
+        eval "$DDEV_PROBE"
+        exit 0
+    ) 2>&1
+) || true
+if printf '%s' "$probe_low" | grep -q "rootless needs ddev >= 1.25"; then
+    pass "ddev version: live version < 1.25 keeps the red gate"
+else
+    fail "ddev version: live version < 1.25 keeps the red gate (out=$probe_low)"
+fi
+
+# fallback: no binary answers -> the stamp, annotated (static assert: the
+# standard locations /usr/local/bin/ddev and /usr/bin/ddev exist on real
+# hosts and cannot be shadowed in-process)
+if grep -q 'recorded at install time' "$STATUS"; then
+    pass "ddev version: stamp fallback annotated when no binary answers"
+else
+    fail "ddev version: stamp fallback annotated when no binary answers"
+fi
+
 # --- 2. not-installed state: exit 0 + install hint ------------------------------
 
 if ! id opencode >/dev/null 2>&1; then
