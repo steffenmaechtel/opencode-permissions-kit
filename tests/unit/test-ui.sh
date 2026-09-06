@@ -10,7 +10,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-UI="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/sh/ui.sh"
+UI="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
 
 failures=0
 passed=0

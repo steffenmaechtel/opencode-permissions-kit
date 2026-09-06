@@ -16,7 +16,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INSTALL="$SCRIPT_DIR/../files/install.sh"
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
 
 failures=0
 passed=0

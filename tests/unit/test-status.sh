@@ -16,7 +16,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-STATUS="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/status.sh"
+STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
 
 failures=0
 passed=0
@@ -62,7 +62,7 @@ else
 fi
 
 # ui_kv is defined by ui.sh — source the real one
-UI_LIB="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/sh/ui.sh"
+UI_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
 
 run_case() {
     (

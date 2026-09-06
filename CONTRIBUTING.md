@@ -22,7 +22,7 @@ sh tests/check-host.sh  # prints install commands for anything missing
 ```
 
 ```bash
-sh tests/test-*.sh     # unit suite — always invoke via sh, never rely on exec bits
+sh tests/unit/test-*.sh   # unit suite — always invoke via sh, never rely on exec bits
 make check-version     # VERSION stamp + KIT_BRANCH consistency
 make e2e               # Docker-based end-to-end suite (podman-rootless install)
 make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-container, skips otherwise)
@@ -34,7 +34,7 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   by mode-stripping transfer channels (ZIP downloads, shared folders,
   `cp`/`scp` without `-p`). `sh <script>` works everywhere; the CI
   `chmod +x` lists are the second safety net (kept complete by
-  `tests/test-workflows.sh`).
+  `tests/unit/test-workflows.sh`).
 - After changes to `install.sh`, `update.sh`, the wrapper, or backend
   provisioning, **both** e2e suites are part of the definition of done — a
   green `make e2e` alone is not sufficient.

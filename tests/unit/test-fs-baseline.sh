@@ -7,7 +7,7 @@
 #     tree keep their group — xargs chgrp would follow them)
 #   - .git is included (issue #17 semantics carried over)
 # Runs against the repo lib as the CURRENT user (FS_SUDO="") — no root.
-# Run: sh tests/test-fs-baseline.sh
+# Run: sh tests/unit/test-fs-baseline.sh
 set -e
 
 RED='\033[0;31m'
@@ -15,13 +15,13 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/sh/fs-baseline.sh"
-INSTALL="$SCRIPT_DIR/../files/install.sh"
-UPDATE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/update.sh"
-CONFIG="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/config.sh"
-MAKEFILE="$SCRIPT_DIR/../Makefile"
-TEST_CI="$SCRIPT_DIR/../.github/workflows/test.yml"
-E2E_CI="$SCRIPT_DIR/../.github/workflows/e2e.yml"
+LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/fs-baseline.sh"
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
+UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
+MAKEFILE="$SCRIPT_DIR/../../Makefile"
+TEST_CI="$SCRIPT_DIR/../../.github/workflows/test.yml"
+E2E_CI="$SCRIPT_DIR/../../.github/workflows/e2e.yml"
 
 failures=0
 passed=0
@@ -131,7 +131,7 @@ grep -q 'large trees: this can take minutes' "$INSTALL" \
 grep -q 'test-fs-baseline' "$MAKEFILE" \
     && pass "Makefile test target includes test-fs-baseline" \
     || fail "Makefile test target includes test-fs-baseline"
-grep -q 'tests/test-fs-baseline.sh' "$TEST_CI" \
+grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" \
     && pass "test.yml chmod list includes the new test" \
     || fail "test.yml chmod list includes the new test"
 grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$TEST_CI" \

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test wrapper directory validation logic.
 # Creates temp directories and projects.conf, then tests various CWD scenarios.
-# Run: ./tests/test-wrapper-validation.sh
+# Run: ./tests/unit/test-wrapper-validation.sh
 set -e
 
 RED='\033[0;31m'
@@ -175,8 +175,8 @@ assert_valid "banner defaults to 0.0.0 when conf has no VERSION line" \
 echo ""
 echo "--- Soft-only wrapper/sudoers shape ---"
 
-WRAPPER_FILE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
-SUDOERS_FILE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/sudoers.template"
+WRAPPER_FILE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+SUDOERS_FILE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/sudoers.template"
 
 if ! grep -q 'protect-projects' "$WRAPPER_FILE"; then
     echo "  ${GREEN}PASS${NC}  wrapper no longer calls protect-projects"
@@ -416,7 +416,7 @@ fi
 echo ""
 echo "--- Headless serve cwd probe ---"
 
-CWD_CHECK="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/cwd-check"
+CWD_CHECK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/cwd-check"
 
 # functional: the helper itself (it only stats — runs as the test user)
 result=$(sh "$CWD_CHECK" "$TMPDIR/project-a")

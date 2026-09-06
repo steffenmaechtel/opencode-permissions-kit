@@ -3,7 +3,7 @@
 # Verifies the //SECURE_GIT: sed manipulation in the bundled opencode.jsonc
 # template produces a valid, parseable JSONC with .git/config denies
 # present (on) or absent (off), and that status detection works.
-# Run: ./tests/test-git-config.sh
+# Run: ./tests/unit/test-git-config.sh
 set -e
 
 RED='\033[0;31m'
@@ -11,8 +11,8 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TEMPLATE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
-PARSER="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
+TEMPLATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
+PARSER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
 
 failures=0
 passed=0
@@ -116,7 +116,7 @@ fi
 #   a) the Standard question mapped "allow" to true (= block),
 #   b) the completion panel showed the mapping backwards,
 #   c) a re-install silently ignored the choice (config never re-rendered).
-INSTALL="$SCRIPT_DIR/../files/install.sh"
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
 
 if grep -q '^SECURE_GIT_CONFIG=true' "$INSTALL"; then
     pass "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"

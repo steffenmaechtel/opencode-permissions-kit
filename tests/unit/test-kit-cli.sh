@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-KIT="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/opk"
+KIT="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 
 failures=0
 passed=0
@@ -240,10 +240,10 @@ fi
 # List drift guard: install.sh's fetch_kit() list and update.sh's KIT_FILES
 # must carry the same file set — a missing entry means streamed installs
 # fetch an incomplete kit and crash at deploy time (set -e).
-install_list="$(sed -n '/^fetch_kit() {/,/^}/p' "$SCRIPT_DIR/../files/install.sh" \
+install_list="$(sed -n '/^fetch_kit() {/,/^}/p' "$SCRIPT_DIR/../../files/install.sh" \
     | grep -v 'mkdir' \
     | grep -oE '(install|config|update|uninstall|status)\.sh|opencode(-deny-all)?\.jsonc|sudoers\.template|umask\.sh|VERSION|etc/[a-zA-Z0-9./_-]+|opencode-permissions-kit-lib/[a-zA-Z0-9./_-]+' | sort -u)"
-update_list="$(awk '/^KIT_FILES=/{flag=1} flag{printf "%s ", $0} flag && /"[[:space:]]*$/{exit}' "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/update.sh" \
+update_list="$(awk '/^KIT_FILES=/{flag=1} flag{printf "%s ", $0} flag && /"[[:space:]]*$/{exit}' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh" \
     | sed -e 's/^KIT_FILES="//' -e 's/"[[:space:]]*$//' -e 's/\\//g' | tr ' ' '\n' | grep -v '^$' | sort -u)"
 if [ "$install_list" = "$update_list" ]; then
     echo "  ${GREEN}PASS${NC}  install.sh fetch list == update.sh KIT_FILES"; passed=$((passed + 1))
@@ -259,12 +259,12 @@ fi
 # copies 404 on the moved paths and users migrate via the streamed
 # one-liner instead. The stub file and its KIT_FILES entry must both be
 # gone.
-if [ -e "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/migrate-denies.sh" ]; then
+if [ -e "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/migrate-denies.sh" ]; then
     echo "  ${RED}FAIL${NC}  migrate-denies.sh stub must not exist (stub era ended with 0.0.29)"; failures=$((failures + 1))
 else
     echo "  ${GREEN}PASS${NC}  no migrate-denies.sh stub (stub era ended with 0.0.29)"; passed=$((passed + 1))
 fi
-if sed -n 's/^KIT_FILES="\(.*\)"$/\1/p' "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/update.sh" | grep -q 'opencode-permissions-kit-lib/migrate-denies.sh'; then
+if sed -n 's/^KIT_FILES="\(.*\)"$/\1/p' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh" | grep -q 'opencode-permissions-kit-lib/migrate-denies.sh'; then
     echo "  ${RED}FAIL${NC}  stub must NOT be in KIT_FILES (never deployed)"; failures=$((failures + 1))
 else
     echo "  ${GREEN}PASS${NC}  stub not in KIT_FILES (never deployed)"; passed=$((passed + 1))

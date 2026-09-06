@@ -17,7 +17,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-REPO="$(cd "$(dirname "$0")/.." && pwd)"
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 

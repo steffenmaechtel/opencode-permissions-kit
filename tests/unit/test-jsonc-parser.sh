@@ -3,7 +3,7 @@
 # Verifies: block comments, URLs in strings, escaped quotes, malformed input,
 # missing permission key, bash-only config, mixed allow/deny, trailing comments,
 # --tools mode (container tool detection).
-# Run: ./tests/test-jsonc-parser.sh
+# Run: ./tests/unit/test-jsonc-parser.sh
 set -e
 
 RED='\033[0;31m'
@@ -11,8 +11,8 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PARSER="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
-FIXTURES="$SCRIPT_DIR/fixtures/jsonc"
+PARSER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
+FIXTURES="$SCRIPT_DIR/../fixtures/jsonc"
 
 failures=0
 passed=0
@@ -127,7 +127,7 @@ assert_exitcode "missing-file: exits non-zero" 1 python3 "$PARSER" "$FIXTURES/no
 assert_exitcode "no-args: exits non-zero" 1 python3 "$PARSER"
 
 # --- 12. Bundled template parses cleanly ---
-OUT=$(python3 "$PARSER" "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/opencode.jsonc" 2>/dev/null || true)
+OUT=$(python3 "$PARSER" "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc" 2>/dev/null || true)
 assert_contains "bundled: .env* present" ".env*" "$OUT"
 assert_contains "bundled: auth.json present" "auth.json" "$OUT"
 assert_contains "bundled: README.md present" "README.md" "$OUT"
@@ -135,15 +135,15 @@ assert_contains "bundled: README.txt present (deny again — soft-only, ddev-saf
 assert_not_contains "bundled: //SECURE_GIT NOT present (commented)" "//SECURE_GIT" "$OUT"
 
 # --- 13. Bundled template: deny mode only (SECURE_GIT lines are comments) ---
-OUT=$(python3 "$PARSER" "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/opencode.jsonc" 2>/dev/null || true)
+OUT=$(python3 "$PARSER" "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc" 2>/dev/null || true)
 assert_not_contains "bundled: .git/config NOT emitted (commented)" ".git/config" "$OUT"
 # The removed --allow mode must fail loudly if anything still calls it.
-assert_exitcode "no --allow mode: exits non-zero" 1 python3 "$PARSER" --allow "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
+assert_exitcode "no --allow mode: exits non-zero" 1 python3 "$PARSER" --allow "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
 
 # --- 13b. Bundled template: TYPO3 ext_localconf.php carve-out (issue #23) ---
 # opencode applies the LAST matching rule, so each "*ext_localconf.php":
 # "allow" must sit after a "*conf.php": "deny" (read AND edit section).
-TPL="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
+TPL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
 D1=$(grep -n '"\*conf\.php": "deny"' "$TPL" | sed -n 1p | cut -d: -f1)
 D2=$(grep -n '"\*conf\.php": "deny"' "$TPL" | sed -n 2p | cut -d: -f1)
 A1=$(grep -n '"\*ext_localconf\.php": "allow"' "$TPL" | sed -n 1p | cut -d: -f1)
@@ -210,11 +210,11 @@ OUT=$(python3 "$PARSER" --tools "$TMP/slip.jsonc" 2>/dev/null || true)
 assert_contains "tools: catch-all allow + docker * deny → docker (compose slips through)" "docker" "$OUT"
 
 # --- 23. --tools: bundled template → no container tools (all deny) ---
-OUT=$(python3 "$PARSER" --tools "$SCRIPT_DIR/../files/opencode-permissions-kit-lib/templates/opencode.jsonc" 2>/dev/null || true)
+OUT=$(python3 "$PARSER" --tools "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc" 2>/dev/null || true)
 assert_empty "tools: bundled template → no container tools" "$OUT"
 
 # --- 24. --tools: project fixture (ddev composer only) → no tools ---
-OUT=$(python3 "$PARSER" --tools "$SCRIPT_DIR/fixtures/project-opencode.jsonc" 2>/dev/null || true)
+OUT=$(python3 "$PARSER" --tools "$SCRIPT_DIR/../fixtures/project-opencode.jsonc" 2>/dev/null || true)
 assert_empty "tools: project fixture → no container tools" "$OUT"
 
 # --- Summary ---

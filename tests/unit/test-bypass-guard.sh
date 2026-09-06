@@ -14,7 +14,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO="$SCRIPT_DIR/.."
+REPO="$SCRIPT_DIR/../.."
 WARN="$REPO/files/opencode-permissions-kit-lib/sh/shell-warn.sh"
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
@@ -120,7 +120,7 @@ check "test.yml chmods shell-warn.sh" \
 check "e2e.yml chmods shell-warn.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/sh/shell-warn.sh' "$E2E_YML"
 check "test.yml runs test-bypass-guard.sh" \
-    grep -Fq './tests/test-bypass-guard.sh' "$TEST_YML"
+    grep -Fq './tests/unit/test-bypass-guard.sh' "$TEST_YML"
 
 echo ""
 echo "===================================="

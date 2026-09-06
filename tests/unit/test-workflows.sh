@@ -16,7 +16,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-REPO="$(cd "$(dirname "$0")/.." && pwd)"
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 WF_TEST="$REPO/.github/workflows/test.yml"
 WF_E2E="$REPO/.github/workflows/e2e.yml"
 WF_DDEV_E2E="$REPO/.github/workflows/e2e-ddev.yml"
@@ -66,7 +66,7 @@ done
 #   jsonc-parser.py                    invoked via python3
 #   *.jsonc, sudoers.template          data, not code
 required=""
-for f in "$REPO"/tests/test-*.sh \
+for f in "$REPO"/tests/unit/test-*.sh \
          "$REPO"/tests/check-host.sh \
          "$REPO"/tests/e2e/run.sh \
          "$REPO"/tests/e2e/run-docker-rootless.sh \

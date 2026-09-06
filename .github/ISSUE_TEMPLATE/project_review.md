@@ -71,7 +71,7 @@ catch it?" for each area below:
 
 - [ ] Behavior changes since the last review have matching docs changes
       (same-PR rule was followed)
-- [ ] `sh tests/test-docs.sh` green; one page = one topic type
+- [ ] `sh tests/unit/test-docs.sh` green; one page = one topic type
 
 ## 5. CI
 

@@ -18,10 +18,10 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-STATUS="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/status.sh"
-INSTALL="$SCRIPT_DIR/../files/install.sh"
-UPDATE="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/management/update.sh"
-WRAPPER="$SCRIPT_DIR/../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
+UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+WRAPPER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 
 failures=0
 passed=0

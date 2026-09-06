@@ -21,15 +21,15 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-FILES="$SCRIPT_DIR/../files"
+FILES="$SCRIPT_DIR/../../files"
 MIG="$FILES/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
 BIN_MIG="$FILES/opencode-permissions-kit-lib/bin/ddev-migrate"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
-MAKEFILE="$SCRIPT_DIR/../Makefile"
-TEST_CI="$SCRIPT_DIR/../.github/workflows/test.yml"
-E2E_CI="$SCRIPT_DIR/../.github/workflows/e2e.yml"
+MAKEFILE="$SCRIPT_DIR/../../Makefile"
+TEST_CI="$SCRIPT_DIR/../../.github/workflows/test.yml"
+E2E_CI="$SCRIPT_DIR/../../.github/workflows/e2e.yml"
 
 failures=0
 passed=0

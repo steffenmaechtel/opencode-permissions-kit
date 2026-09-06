@@ -18,7 +18,7 @@ GREEN='\033[0;32m'
 NC='\033[m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO="$SCRIPT_DIR/.."
+REPO="$SCRIPT_DIR/../.."
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
@@ -276,8 +276,8 @@ check "status.sh has no migration-stamp section (legacy cleanup)" \
 
 echo ""
 echo "-- CI chmod lists --"
-check "test.yml chmods this test"  grep -Fq './tests/test-container-backend.sh' "$TEST_YML"
-check "e2e.yml chmods this test"   grep -Fq './tests/test-container-backend.sh' "$E2E_YML"
+check "test.yml chmods this test"  grep -Fq './tests/unit/test-container-backend.sh' "$TEST_YML"
+check "e2e.yml chmods this test"   grep -Fq './tests/unit/test-container-backend.sh' "$E2E_YML"
 check "test.yml runs this test"   grep -Fq 'Run container backend tests' "$TEST_YML"
 check "test.yml chmods setup-container-backend.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/setup-container-backend' "$TEST_YML"
@@ -290,7 +290,7 @@ check "e2e.yml chmods socket-check.sh" \
 check "test.yml has no migrate-denies.sh chmod (removed)" \
     grep_absent -Fq './files/opencode-permissions-kit-lib/migrate-denies.sh' "$TEST_YML"
 check "test.yml has no test-migration.sh (removed)" \
-    grep_absent -Fq './tests/test-migration.sh' "$TEST_YML"
+    grep_absent -Fq './tests/unit/test-migration.sh' "$TEST_YML"
 
 echo ""
 echo "-- setup-container-backend.sh structure --"

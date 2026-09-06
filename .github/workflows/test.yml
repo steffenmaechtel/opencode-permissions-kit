@@ -30,7 +30,7 @@ jobs:
       - name: Check version consistency
         run: make check-version
       - name: Make scripts executable
-        run: chmod +x ./tests/test-ui.sh ./tests/test-wrapper-validation.sh ./tests/test-jsonc-parser.sh ./tests/test-git-config.sh ./tests/test-container-backend.sh ./tests/test-bypass-guard.sh ./tests/test-ddev-as-opencode.sh ./tests/test-ddev-migrate.sh ./tests/test-ddev-hosts.sh ./tests/test-mkcert-reuse.sh ./tests/test-wsl-exposure.sh ./tests/test-docs.sh ./tests/test-kit-cli.sh ./tests/test-project-paths.sh ./tests/test-workflows.sh ./tests/test-install-args.sh ./tests/test-kit-files.sh ./tests/test-tui-mode.sh ./tests/test-uninstall.sh ./tests/test-status.sh ./tests/test-update-flags.sh ./tests/test-fs-baseline.sh ./tests/check-host.sh ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/run-ddev.sh ./tests/e2e/lib.sh ./files/install.sh ./files/etc/umask.sh ./files/opencode-permissions-kit-lib/management/config.sh ./files/opencode-permissions-kit-lib/management/update.sh ./files/opencode-permissions-kit-lib/management/uninstall.sh ./files/opencode-permissions-kit-lib/management/status.sh ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh ./files/opencode-permissions-kit-lib/sh/ui.sh ./files/opencode-permissions-kit-lib/sh/shell-warn.sh ./files/opencode-permissions-kit-lib/bin/setup-container-backend ./files/opencode-permissions-kit-lib/bin/socket-check ./files/opencode-permissions-kit-lib/bin/cwd-check ./files/opencode-permissions-kit-lib/sh/ddev-terminal.sh ./files/opencode-permissions-kit-lib/sh/ddev-handover.sh ./files/opencode-permissions-kit-lib/sh/ddev-migrate.sh ./files/opencode-permissions-kit-lib/bin/ddev-migrate ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx ./files/opencode-permissions-kit-lib/tui/opencode-danger.theme.json ./files/opencode-permissions-kit-lib/tui/tui.json ./files/opencode-permissions-kit-lib/tui/tui-danger.json ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+        run: chmod +x ./tests/unit/test-ui.sh ./tests/unit/test-opencode-as-opencode.sh ./tests/unit/test-jsonc-parser.sh ./tests/unit/test-git-config.sh ./tests/unit/test-container-backend.sh ./tests/unit/test-bypass-guard.sh ./tests/unit/test-ddev-as-opencode.sh ./tests/unit/test-ddev-migrate.sh ./tests/unit/test-ddev-hosts.sh ./tests/unit/test-mkcert-reuse.sh ./tests/unit/test-wsl-exposure.sh ./tests/unit/test-docs.sh ./tests/unit/test-kit-cli.sh ./tests/unit/test-project-paths.sh ./tests/unit/test-workflows.sh ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-update-flags.sh ./tests/unit/test-fs-baseline.sh ./tests/check-host.sh ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/run-ddev.sh ./tests/e2e/lib.sh ./files/install.sh ./files/etc/umask.sh ./files/opencode-permissions-kit-lib/management/config.sh ./files/opencode-permissions-kit-lib/management/update.sh ./files/opencode-permissions-kit-lib/management/uninstall.sh ./files/opencode-permissions-kit-lib/management/status.sh ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh ./files/opencode-permissions-kit-lib/sh/ui.sh ./files/opencode-permissions-kit-lib/sh/shell-warn.sh ./files/opencode-permissions-kit-lib/bin/setup-container-backend ./files/opencode-permissions-kit-lib/bin/socket-check ./files/opencode-permissions-kit-lib/bin/cwd-check ./files/opencode-permissions-kit-lib/sh/ddev-terminal.sh ./files/opencode-permissions-kit-lib/sh/ddev-handover.sh ./files/opencode-permissions-kit-lib/sh/ddev-migrate.sh ./files/opencode-permissions-kit-lib/bin/ddev-migrate ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx ./files/opencode-permissions-kit-lib/tui/opencode-danger.theme.json ./files/opencode-permissions-kit-lib/tui/tui.json ./files/opencode-permissions-kit-lib/tui/tui-danger.json ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
       - name: Install shellcheck
         run: sudo apt-get update -qq && sudo apt-get install -y shellcheck
       - name: Check contributor host tools
@@ -38,42 +38,42 @@ jobs:
       - name: Run ShellCheck lint
         run: make lint
       - name: Run wrapper validation tests
-        run: ./tests/test-wrapper-validation.sh
+        run: ./tests/unit/test-opencode-as-opencode.sh
       - name: Run JSONC parser edge-case tests
-        run: ./tests/test-jsonc-parser.sh
+        run: ./tests/unit/test-jsonc-parser.sh
       - name: Run git-config toggle tests
-        run: ./tests/test-git-config.sh
+        run: ./tests/unit/test-git-config.sh
       - name: Run container backend tests
-        run: ./tests/test-container-backend.sh
+        run: ./tests/unit/test-container-backend.sh
       - name: Run wrapper-bypass guard tests
-        run: ./tests/test-bypass-guard.sh
+        run: ./tests/unit/test-bypass-guard.sh
       - name: Run ddev-as-opencode tests
-        run: ./tests/test-ddev-as-opencode.sh
+        run: ./tests/unit/test-ddev-as-opencode.sh
       - name: Run ddev database migration tests
-        run: ./tests/test-ddev-migrate.sh
+        run: ./tests/unit/test-ddev-migrate.sh
       - name: Run Windows hosts bridge tests
-        run: ./tests/test-ddev-hosts.sh
+        run: ./tests/unit/test-ddev-hosts.sh
       - name: Run mkcert CA reuse tests
-        run: ./tests/test-mkcert-reuse.sh
+        run: ./tests/unit/test-mkcert-reuse.sh
       - name: Run WSL2 /mnt/c exposure tests
-        run: ./tests/test-wsl-exposure.sh
+        run: ./tests/unit/test-wsl-exposure.sh
       - name: Run UI helper tests
-        run: ./tests/test-ui.sh
+        run: ./tests/unit/test-ui.sh
       - name: Run docs link check
-        run: ./tests/test-docs.sh
+        run: ./tests/unit/test-docs.sh
       - name: Run CLI dispatcher tests
-        run: ./tests/test-kit-cli.sh
+        run: ./tests/unit/test-kit-cli.sh
       - name: Run project path policy tests
-        run: ./tests/test-project-paths.sh
+        run: ./tests/unit/test-project-paths.sh
       - name: Run workflow consistency tests
-        run: ./tests/test-workflows.sh
+        run: ./tests/unit/test-workflows.sh
       - name: Run install.sh arg-parsing tests
-        run: ./tests/test-install-args.sh
+        run: ./tests/unit/test-install-args.sh
       - name: Run kit file list tests
-        run: ./tests/test-kit-files.sh ./tests/test-tui-mode.sh
+        run: ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh
       - name: Run uninstall tests
-        run: ./tests/test-uninstall.sh
+        run: ./tests/unit/test-uninstall.sh
       - name: Run status tests
-        run: ./tests/test-status.sh
+        run: ./tests/unit/test-status.sh
       - name: Run fs-baseline progress tests
-        run: ./tests/test-fs-baseline.sh
+        run: ./tests/unit/test-fs-baseline.sh
