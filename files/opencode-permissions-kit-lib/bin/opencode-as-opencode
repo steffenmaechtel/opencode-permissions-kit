@@ -1,0 +1,395 @@
+#!/bin/sh
+# opencode permissions kit -- bin/opencode-as-opencode
+# This file is deployed to /usr/local/bin/opencode by install.sh (symlink
+# to /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode).
+# It ensures opencode always runs as the dedicated 'opencode' user —
+# the wrapper's name follows the bin/ddev-as-opencode pattern ("run X as
+# the opencode user").
+#
+# Soft protection model (docs/design/DDEV-WORKING.md): the kit does NOT
+# mirror opencode.jsonc deny rules into Linux ACLs. File permissions are
+# enforced by opencode's own permission layer only. The wrapper's job is
+# UID separation: validate the project dir, detect container-tool opt-in,
+# and exec the binary as 'opencode' against its rootless backend.
+# `opencode serve` and friends take a headless path (see HEADLESS below):
+# third-party UIs like OpenChamber spawn the server non-interactively, and
+# orchestrators parse `opencode run --format json` output.
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
+
+INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
+VERSION="0.0.0"
+if [ -f "$INSTALL_CONF" ]; then
+    . "$INSTALL_CONF"
+fi
+
+# Container backend: docker-rootless or podman-rootless only. Unknown/missing
+# values disable container tools for the session; the wrapper never falls
+# back to a root-equivalent path.
+CONTAINER_BACKEND="${CONTAINER_BACKEND:-}"
+case "$CONTAINER_BACKEND" in
+    docker-rootless|podman-rootless) ;;
+    *) CONTAINER_BACKEND="" ;;
+esac
+
+# Headless mode (issue #42; generalizes the 0.0.16 serve fix). Ecosystem
+# tools spawn opencode non-interactively and parse its stdout:
+#   `opencode serve`   OpenChamber, cezar, CodeWalk, the VS Code extension
+#                      (parse the "listening on <url>" line)
+#   `opencode run`     CI runners, kanban orchestrators, eval harnesses
+#                      (`--format json` / stream-json on stdout)
+#   `opencode acp`     JSON-RPC over stdio (IDE agents) — stdout must stay
+#                      protocol-clean
+#   query subcommands  `models`, `agent`, `providers`, ... (e.g. cezar
+#                      caches `opencode models` output)
+# A banner on stdout breaks those parsers twice over — extra noise and a
+# `read` hitting EOF under set -e killing the wrapper before the exec —
+# and the project-dir refusal would block tools running from git
+# worktrees or temp checkouts. Headless therefore prints NOTHING on
+# stdout (diagnostics go to stderr), skips the project-dir check (the
+# soft layer — global + per-project opencode.jsonc — still applies to
+# every session), and resolves container tools silently. Interactive TUI
+# starts (no subcommand, flags-only start, `tui`, `attach`, or `run` with
+# a tty and no message argument) keep banner and check.
+HEADLESS=false
+_hr_first=true
+_hr_msg=false
+for _hr_a in "$@"; do
+    if [ "$_hr_first" = true ]; then
+        _hr_first=false
+        continue
+    fi
+    case "$_hr_a" in
+        -*) ;;
+        *) _hr_msg=true; break ;;
+    esac
+done
+case "${1:-}" in
+    serve|acp|models|agent|providers|session|export|import|stats|account|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade)
+        HEADLESS=true
+        ;;
+    run)
+        # Non-interactive when a message argument exists (any arg after the
+        # subcommand that is not a flag) or stdin is piped (prompt on stdin).
+        if [ "$_hr_msg" = true ] || ! [ -t 0 ]; then
+            HEADLESS=true
+        fi
+        ;;
+esac
+
+# Wrapper diagnostics: interactive starts print to the terminal, headless
+# mode redirects to stderr so stdout carries only opencode's own output.
+# printf '%b' (not echo) so the \033 color escapes render identically
+# under dash and bash. An empty argument prints a blank separator line.
+note() {
+    _fd=1
+    [ "$HEADLESS" = true ] && _fd=2
+    if [ -n "$1" ]; then
+        printf '  %b\n' "$1" >&"$_fd"
+    else
+        printf '\n' >&"$_fd"
+    fi
+}
+
+CWD=$(pwd)
+VALID=false
+if [ -f "$PROJECTS_CONF" ]; then
+    while IFS= read -r root; do
+        [ -z "$root" ] && continue
+        [ ! -d "$root" ] && continue
+        root_clean="${root%/}"
+        if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
+            VALID=true
+            break
+        fi
+    done < "$PROJECTS_CONF"
+fi
+
+if [ "$VALID" != true ] && [ "$HEADLESS" != true ]; then
+    # Version/help queries carry no project context — answer them from the
+    # real binary instead of refusing. The official opencode installer
+    # probes `opencode --version` from $HOME while the kit installs; the
+    # refusal mid-install confused users ("ERROR: opencode cannot be
+    # started here"). From a VALID directory the normal bannered path
+    # below still applies.
+    case "${1:-}" in
+        --version|-v|-h|--help)
+            exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
+            ;;
+    esac
+    echo ""
+    echo "  ${RED}ERROR: opencode cannot be started here${NC}"
+    echo "  ${YELLOW}$CWD${NC} is not a valid project directory."
+    echo ""
+    echo "  Valid project directories:"
+    if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
+        count=0
+        while IFS= read -r root; do
+            [ -z "$root" ] && continue
+            count=$((count + 1))
+            if [ "$count" -gt 10 ]; then
+                echo "  ... and more"
+                break
+            fi
+            printf "  - %s\n" "$root"
+        done < "$PROJECTS_CONF"
+    else
+        echo "  (none configured — run install.sh first)"
+    fi
+    echo ""
+    exit 1
+fi
+
+if [ "$HEADLESS" != true ]; then
+    echo ""
+    echo "  ${GREEN}SECURED BY opencode permissions kit ($VERSION)${NC}"
+    echo "  ${CYAN}@steffenmaechtel/opencode-permissions-kit${NC}"
+    echo ""
+fi
+
+# Self-check: a self-installed opencode binary (official installer re-run or
+# PATH re-add) would shadow the wrapper in new shells, and tools may call the
+# absolute path of the real binary. Warn (but keep running) when one is present.
+SHADOW="$HOME/.opencode/bin/opencode"
+if [ -e "$SHADOW" ] && { [ ! -L "$SHADOW" ] || [ "$(readlink -f "$SHADOW" 2>/dev/null || echo "$SHADOW")" != "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; }; then
+    note "${YELLOW}WARNING: self-installed opencode detected at $SHADOW${NC}"
+    note "${YELLOW}New shells would run it instead of this wrapper. Fix: rm -rf $SHADOW${NC}"
+    note ""
+fi
+RESOLVED=$(command -v opencode 2>/dev/null || true)
+if [ -n "$RESOLVED" ] && [ "$RESOLVED" != "/usr/local/bin/opencode" ]; then
+    note "${YELLOW}WARNING: 'opencode' on this PATH resolves to $RESOLVED, not the kit wrapper.${NC}"
+    note ""
+fi
+
+# WSL2 exposure check: the drvfs /mnt/c mount runs with the Windows session
+# token — NTFS ACLs do not distinguish WSL users, so a world-readable mount
+# lets the agent read the whole Windows profile (.ssh, NTUSER.DAT, browser
+# data). Warn on EVERY start until the restriction is applied.
+if [ -d /mnt/c ]; then
+    mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
+        if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
+            note "${YELLOW}WARNING: /mnt/c restriction configured but PENDING (mode $mnt_mode).${NC}"
+            note "${YELLOW}Run 'wsl --shutdown' from Windows and reopen the distro — until then${NC}"
+            note "${YELLOW}the agent can read your Windows profile via /mnt/c.${NC}"
+        else
+            note "${YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — the agent can read${NC}"
+            note "${YELLOW}your whole Windows profile (.ssh, browser data). Fix in /etc/wsl.conf:${NC}"
+            note "${YELLOW}  [automount]${NC}"
+            note "${YELLOW}  enabled = true${NC}"
+            note "${YELLOW}  options = \"uid=<uid>,gid=<gid>,dmask=027,fmask=037\"${NC}"
+            note "${YELLOW}then 'wsl --shutdown' from Windows (install.sh can apply this for you).${NC}"
+        fi
+        note ""
+    fi
+fi
+
+# Detect container tools (docker/ddev) explicitly enabled by the project
+# config. Any enabled tool means "enable container tools for this session"
+# — the rootless backend decides the actual mechanism.
+CONTAINER_REQUESTED=false
+CONTAINER_AUTO=false
+PROJECT_CONFIG=""
+if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
+elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
+if [ -n "$PROJECT_CONFIG" ]; then
+    PROJECT_TOOLS=$(python3 /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$PROJECT_CONFIG" 2>/dev/null || true)
+    if [ -n "$PROJECT_TOOLS" ]; then
+        note "${CYAN}Container tools enabled by this project:${NC}"
+        printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_fd"
+        note ""
+        CONTAINER_REQUESTED=true
+        CONTAINER_AUTO=true
+    fi
+fi
+
+# `serve` always resolves container tools silently (a server process
+# serves many projects — no single opt-in, no terminal). Other headless
+# invocations get them through the project opt-in above (notes are
+# stderr-only in headless mode, stdout stays machine-clean). This stays
+# inside the soft model — whether a session may use docker/ddev is still
+# decided per session by the global and per-project opencode.jsonc
+# permission rules.
+if [ "${1:-}" = "serve" ]; then
+    CONTAINER_REQUESTED=true
+    CONTAINER_AUTO=false
+fi
+
+# Resolve the container mechanism for the configured backend. Produces one of:
+#   CONTAINER_DOCKER_HOST   -> sudo -u opencode with DOCKER_HOST exported
+#                              (docker-rootless socket, or podman-rootless when
+#                               OPENCODE_PODMAN_SOCKET is set for docker-CLI compat)
+#   CONTAINER_PODMAN=true   -> sudo -u opencode, no DOCKER_HOST (podman-CLI path,
+#                              daemonless per §9.8 — podman run needs no socket)
+#   all empty               -> no container tools this session
+# Probe whether a rootless backend socket is reachable. The sockets live in the
+# opencode user's runtime dir (/run/user/<uid>, mode 700 opencode:opencode), so
+# a wrapper running as the developer cannot stat them directly. Try directly
+# first (works when the wrapper runs as root or as the opencode user itself, or
+# the socket sits somewhere traversable); otherwise re-probe as the opencode
+# user — the context that will actually connect — via the kit's NOPASSWD
+# socket-check rule. Accepts "unix://..." or a plain path.
+sock_reachable() {
+    [ -n "$1" ] || return 1
+    sock="$1"
+    case "$sock" in unix://*) sock="${sock#unix://}";; esac
+    [ -S "$sock" ] 2>/dev/null && return 0
+    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock" 2>/dev/null
+}
+
+CONTAINER_DOCKER_HOST=""
+CONTAINER_XDG=""
+CONTAINER_PODMAN=""
+CONTAINER_LABEL=""
+if [ "$CONTAINER_REQUESTED" = true ]; then
+    if [ -z "$CONTAINER_BACKEND" ]; then
+        note "${RED}WARNING: no rootless container backend configured.${NC}"
+        note "${YELLOW}Running WITHOUT container tools. Re-run install.sh to provision one.${NC}"
+        note ""
+        CONTAINER_REQUESTED=false
+        CONTAINER_AUTO=false
+    else
+        CONTAINER_LABEL="the $CONTAINER_BACKEND backend"
+        case "$CONTAINER_BACKEND" in
+            docker-rootless)
+                # Requires the per-user dockerd socket. Never fall back to a
+                # root-equivalent docker group — warn loudly and run without.
+                sock_host="${OPENCODE_DOCKER_HOST:-}"
+                if sock_reachable "$sock_host"; then
+                    CONTAINER_DOCKER_HOST="$sock_host"
+                    CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
+                else
+                    note "${RED}WARNING: docker-rootless socket not reachable (${sock_host:-unset}).${NC}"
+                    note "${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                    note ""
+                    CONTAINER_REQUESTED=false
+                    CONTAINER_AUTO=false
+                fi
+                ;;
+            podman-rootless)
+                # Default: podman is daemonless — `podman run` needs no socket
+                # and no DOCKER_HOST (§9.8 podman-CLI path). Optional:
+                # OPENCODE_PODMAN_SOCKET enables docker-CLI compat (point a
+                # `docker` CLI at the podman socket); when set, verify
+                # reachability like the docker-rootless path.
+                sock_host="${OPENCODE_PODMAN_SOCKET:-}"
+                if [ -n "$sock_host" ]; then
+                    if sock_reachable "$sock_host"; then
+                        CONTAINER_DOCKER_HOST="$sock_host"
+                        CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
+                    else
+                        note "${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
+                        note "${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                        note ""
+                        CONTAINER_REQUESTED=false
+                        CONTAINER_AUTO=false
+                    fi
+                elif command -v podman >/dev/null 2>&1; then
+                    CONTAINER_PODMAN=true
+                else
+                    note "${RED}WARNING: podman-rootless backend selected but 'podman' is not installed.${NC}"
+                    note "${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                    note ""
+                    CONTAINER_REQUESTED=false
+                    CONTAINER_AUTO=false
+                fi
+                ;;
+        esac
+    fi
+fi
+
+# No prompts, no pause (since 0.0.21): the banner prints, opencode
+# starts immediately. The [Y/n] container question was always answered
+# with yes in practice, and the kit's state is now visible INSIDE the
+# TUI (mode row in app_bottom, docs/_archive/design/plan-ui-tui-opencode.md) —
+# a pause before the TUI would only delay that information. Headless
+# mode was never allowed to prompt (0.0.16 contract); its advisory goes
+# to stderr only.
+if [ "$CONTAINER_AUTO" = true ] || [ "$HEADLESS" = true ]; then
+    if [ -n "$CONTAINER_DOCKER_HOST" ] || [ "$CONTAINER_PODMAN" = true ]; then
+        note "${GREEN}opencode will run with $CONTAINER_LABEL.${NC}"
+    fi
+fi
+
+# Headless serve working-directory sanity (OpenChamber & co): a server
+# whose working directory the opencode user cannot read still boots, but
+# every request that loads config for that directory answers HTTP 500 —
+# opencode treats EACCES on <dir>/opencode.jsonc as a hard error, not as
+# "no config file". OpenChamber defaults the server cwd to the
+# developer's $HOME, exactly the unreadable case. Probe from the opencode
+# user's own context (cwd-check, same sudoers pattern as
+# socket-check); on "unreadable" fall back to a readable directory so
+# the server comes up working: the configured projects root containing
+# the cwd, else the first readable configured root, else the opencode
+# user's home. Empty probe output (sudoers rule missing, sudo denied)
+# means "unknown" — proceed without touching the directory. The warning
+# goes to stderr via note() — headless stdout stays machine-clean.
+cwd_probe() {
+    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/cwd-check "$1" 2>/dev/null || true
+}
+if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
+    SERVE_FALLBACK=""
+    if [ -f "$PROJECTS_CONF" ]; then
+        # pass 1: the configured root containing the cwd (project subdir
+        # with restrictive bits falls back to its own projects root)
+        while IFS= read -r root; do
+            [ -z "$root" ] && continue
+            [ ! -d "$root" ] && continue
+            root_clean="${root%/}"
+            if [ "$CWD" = "$root_clean" ] || [ "${CWD#"$root_clean"/}" != "$CWD" ]; then
+                if [ "$(cwd_probe "$root_clean")" = "readable" ]; then
+                    SERVE_FALLBACK="$root_clean"
+                    break
+                fi
+            fi
+        done < "$PROJECTS_CONF"
+        # pass 2: first readable configured root (the OpenChamber case:
+        # cwd is $HOME, no root contains it)
+        if [ -z "$SERVE_FALLBACK" ]; then
+            while IFS= read -r root; do
+                [ -z "$root" ] && continue
+                [ ! -d "$root" ] && continue
+                root_clean="${root%/}"
+                if [ "$(cwd_probe "$root_clean")" = "readable" ]; then
+                    SERVE_FALLBACK="$root_clean"
+                    break
+                fi
+            done < "$PROJECTS_CONF"
+        fi
+    fi
+    if [ -z "$SERVE_FALLBACK" ]; then
+        SERVE_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6)
+        [ -n "$SERVE_FALLBACK" ] && [ "$(cwd_probe "$SERVE_FALLBACK")" = "readable" ] || SERVE_FALLBACK=""
+    fi
+    note "${RED}WARNING: the server working directory is not readable by the opencode user:${NC}"
+    note "${YELLOW}$CWD${NC}"
+    note "${YELLOW}Config load fails there — /session, /config and /project would answer HTTP 500.${NC}"
+    if [ -n "$SERVE_FALLBACK" ]; then
+        note "${YELLOW}Falling back to: $SERVE_FALLBACK${NC}"
+        note "${YELLOW}OpenChamber: 'export OPENCHAMBER_OPENCODE_CWD=$SERVE_FALLBACK' picks the server directory.${NC}"
+        note ""
+        cd "$SERVE_FALLBACK"
+    else
+        note "${YELLOW}No readable fallback found (no projects.conf entry, no opencode home).${NC}"
+        note "${YELLOW}Set OPENCHAMBER_OPENCODE_CWD (OpenChamber) to a readable directory.${NC}"
+        note ""
+    fi
+fi
+
+# Rootless: pass the per-user socket through sudo's env reset via env_keep.
+# podman-CLI path (daemonless): no DOCKER_HOST, no supplementary group.
+# Containers run as the opencode host UID either way.
+if [ -n "$CONTAINER_DOCKER_HOST" ]; then
+    export DOCKER_HOST="$CONTAINER_DOCKER_HOST"
+    [ -n "$CONTAINER_XDG" ] && export XDG_RUNTIME_DIR="$CONTAINER_XDG"
+    exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
+fi
+exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"

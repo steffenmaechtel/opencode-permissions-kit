@@ -130,7 +130,7 @@ databases to `/var/backups/opencode-permissions-kit/ddev-migration-*/`
 them when ready:
 
 ```bash
-sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import
+sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import
 ```
 
 or per project with `ddev import-db <project> --file=<dump>.sql.gz` —

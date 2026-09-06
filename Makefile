@@ -1,15 +1,19 @@
-.PHONY: help test lint check-host test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version
+.PHONY: help test lint check-host test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version
 
 # Scripts checked by `make lint` (everything shipped in files/).
-SHELLCHECK_FILES = files/install.sh files/config.sh files/update.sh files/status.sh files/uninstall.sh files/umask.sh \
-	files/opencode-permissions-kit-lib/wrapper files/opencode-permissions-kit-lib/kit \
-	files/opencode-permissions-kit-lib/log.sh files/opencode-permissions-kit-lib/ui.sh \
-	files/opencode-permissions-kit-lib/shell-warn.sh files/opencode-permissions-kit-lib/setup-container-backend.sh \
-	files/opencode-permissions-kit-lib/ddev-as-opencode.sh files/opencode-permissions-kit-lib/ddev-handover.sh \
-	files/opencode-permissions-kit-lib/ddev-migrate.sh \
-	files/opencode-permissions-kit-lib/ddev-hosts.sh \
-	files/opencode-permissions-kit-lib/migrate-denies.sh \
-	files/opencode-permissions-kit-lib/bin/socket-check.sh files/opencode-permissions-kit-lib/bin/cwd-check.sh files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+SHELLCHECK_FILES = files/install.sh \
+	files/opencode-permissions-kit-lib/management/config.sh files/opencode-permissions-kit-lib/management/update.sh \
+	files/opencode-permissions-kit-lib/management/status.sh files/opencode-permissions-kit-lib/management/uninstall.sh \
+	files/etc/umask.sh \
+	files/opencode-permissions-kit-lib/bin/opencode-as-opencode files/opencode-permissions-kit-lib/bin/opk \
+	files/opencode-permissions-kit-lib/sh/log.sh files/opencode-permissions-kit-lib/sh/ui.sh \
+	files/opencode-permissions-kit-lib/sh/shell-warn.sh files/opencode-permissions-kit-lib/bin/setup-container-backend \
+	files/opencode-permissions-kit-lib/sh/ddev-terminal.sh files/opencode-permissions-kit-lib/sh/ddev-handover.sh \
+	files/opencode-permissions-kit-lib/sh/ddev-migrate.sh files/opencode-permissions-kit-lib/bin/ddev-migrate \
+	files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
+	files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+	files/opencode-permissions-kit-lib/bin/socket-check files/opencode-permissions-kit-lib/bin/cwd-check \
+	files/opencode-permissions-kit-lib/bin/ddev-as-opencode
 
 # Intentional deviations, excluded repo-wide:
 #   SC1090/SC1091 — kit scripts source helpers/configs via variables
@@ -25,7 +29,7 @@ help:
 	@echo "  make test          Run all self-contained tests (shell) + lint"
 	@echo "  make check-host    Verify the host has all tools needed to contribute"
 	@echo "  make lint          ShellCheck over the shipped scripts (needs shellcheck)"
-	@echo "  make test-wrapper  Run wrapper validation tests"
+	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
 	@echo "  make test-parser   Run JSONC parser edge-case tests"
 	@echo "  make test-git-config  Run git-config toggle tests"
@@ -58,7 +62,7 @@ help:
 	@echo "  make version VERSION=x.y.z   Set display version stamp (VERSION file only)"
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 
-test: lint test-wrapper test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags
+test: lint test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -79,53 +83,53 @@ check-host:
 	@echo "=== Contributor host check ==="
 	@sh tests/check-host.sh
 
-test-wrapper:
+test-opencode-as-opencode:
 	@echo "=== Wrapper Validation Tests ==="
-	@./tests/test-wrapper-validation.sh
+	@./tests/unit/test-opencode-as-opencode.sh
 
 test-parser:
 	@echo "=== JSONC Parser Edge-Case Tests ==="
-	@./tests/test-jsonc-parser.sh
+	@./tests/unit/test-jsonc-parser.sh
 
 test-git-config:
 	@echo "=== Git-Config Toggle Tests ==="
-	@./tests/test-git-config.sh
+	@./tests/unit/test-git-config.sh
 
 test-container-backend:
 	@echo "=== Container Backend Tests ==="
-	@./tests/test-container-backend.sh
+	@./tests/unit/test-container-backend.sh
 
 test-bypass-guard:
 	@echo "=== Wrapper-Bypass Guard Tests ==="
-	@./tests/test-bypass-guard.sh
+	@./tests/unit/test-bypass-guard.sh
 
 test-wsl-exposure:
 	@echo "=== WSL2 /mnt/c exposure Tests ==="
-	@./tests/test-wsl-exposure.sh
+	@./tests/unit/test-wsl-exposure.sh
 
 test-ui:
 	@echo "=== UI Helper Tests ==="
-	@./tests/test-ui.sh
+	@./tests/unit/test-ui.sh
 
 test-kit-cli:
 	@echo "=== CLI Dispatcher Tests ==="
-	@./tests/test-kit-cli.sh
+	@./tests/unit/test-kit-cli.sh
 
 test-mkcert-reuse:
 	@echo "=== mkcert CA reuse Tests ==="
-	@./tests/test-mkcert-reuse.sh
+	@./tests/unit/test-mkcert-reuse.sh
 
 test-ddev-as-opencode:
 	@echo "=== ddev-as-opencode Tests ==="
-	@./tests/test-ddev-as-opencode.sh
+	@./tests/unit/test-ddev-as-opencode.sh
 
 test-ddev-migrate:
 	@echo "=== ddev database migration Tests ==="
-	@./tests/test-ddev-migrate.sh
+	@./tests/unit/test-ddev-migrate.sh
 
 test-ddev-hosts:
 	@echo "=== Windows hosts bridge Tests ==="
-	@./tests/test-ddev-hosts.sh
+	@./tests/unit/test-ddev-hosts.sh
 
 e2e:
 	@sh ./tests/e2e/run.sh
@@ -159,7 +163,7 @@ check-version:
 		*) echo "VERSION file is not a semver stamp: '$$v'"; exit 1; ;; \
 	esac; \
 	i="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/install.sh | head -1)"; \
-	u="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/update.sh | head -1)"; \
+	u="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/opencode-permissions-kit-lib/management/update.sh | head -1)"; \
 	if [ -z "$$i" ] || [ "$$i" != "$$u" ]; then \
 		echo "MISMATCH: install.sh KIT_BRANCH=$$i update.sh KIT_BRANCH=$$u"; exit 1; \
 	fi; \
@@ -167,36 +171,36 @@ check-version:
 
 test-project-paths:
 	@echo "=== Project Path Policy Tests ==="
-	@./tests/test-project-paths.sh
+	@./tests/unit/test-project-paths.sh
 
 test-workflows:
 	@echo "=== CI Workflow Consistency Tests ==="
-	@./tests/test-workflows.sh
+	@./tests/unit/test-workflows.sh
 
 test-docs:
 	@echo "=== Docs Link Check ==="
-	@./tests/test-docs.sh
+	@./tests/unit/test-docs.sh
 
 test-install-args:
 	@echo "=== install.sh Arg-Parsing Tests ==="
-	@./tests/test-install-args.sh
+	@./tests/unit/test-install-args.sh
 
 test-kit-files:
 	@echo "=== Kit File List Consistency Tests ==="
-	@./tests/test-kit-files.sh
+	@./tests/unit/test-kit-files.sh
 
 test-tui-mode:
 	@echo "=== TUI Mode Display Tests ==="
-	@./tests/test-tui-mode.sh
+	@./tests/unit/test-tui-mode.sh
 
 test-uninstall:
 	@echo "=== Uninstall Tests ==="
-	@./tests/test-uninstall.sh
+	@./tests/unit/test-uninstall.sh
 
 test-status:
 	@echo "=== Status Tests ==="
-	@./tests/test-status.sh
+	@./tests/unit/test-status.sh
 
 test-update-flags:
 	@echo "=== update.sh Flags Tests ==="
-	@./tests/test-update-flags.sh
+	@./tests/unit/test-update-flags.sh

@@ -2,7 +2,7 @@
 # opencode permissions kit -- bin/ddev-as-opencode
 #
 # Runs the REAL ddev binary as the 'opencode' user. This is the sudoers
-# target for the developer's `ddev` shell function (ddev-as-opencode.sh):
+# target for the developer's `ddev` shell function (ddev-terminal.sh):
 # the developer's terminal calls `sudo -u opencode <this helper> ...`, the
 # helper sanitizes the environment and execs the real ddev. Because ddev
 # ALWAYS runs as the opencode user, `.ddev/` has exactly one owner — no more
@@ -34,7 +34,7 @@ fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
 
 # Guard: only the opencode user may run ddev through this helper. The shell
-# function (ddev-as-opencode.sh) is only installed for the DEFAULT user, but
+# function (ddev-terminal.sh) is only installed for the DEFAULT user, but
 # this check makes direct execution the only other entry point.
 OC_UID="$(id -u "$OPENCODE_USER" 2>/dev/null || echo 0)"
 if [ "$(id -u)" != "$OC_UID" ]; then

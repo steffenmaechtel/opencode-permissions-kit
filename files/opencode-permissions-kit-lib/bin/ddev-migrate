@@ -1,0 +1,47 @@
+#!/bin/sh
+# opencode permissions kit -- bin/ddev-migrate
+# CLI dispatcher for the ddev database migration bridge (issue #15).
+# The functions live in sh/ddev-migrate.sh (sourced by install.sh);
+# this entry point makes them a command (docs/design/streamline.md):
+#   sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export <dev-user> <root> [root ...]
+#   sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import [dump-dir]
+#   /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate list
+set -u
+
+# Resolve the library root through this script's real path (checkout and
+# deployed kit alike): bin/ddev-migrate -> <libdir>/sh/ddev-migrate.sh.
+SELF="$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")"
+OPK_MIG_LIB="$(cd "$(dirname "$SELF")/../sh" 2>/dev/null && pwd -P)"
+if [ -z "$OPK_MIG_LIB" ] || [ ! -f "$OPK_MIG_LIB/ddev-migrate.sh" ]; then
+    echo "ddev-migrate: ddev-migrate.sh not found next to bin/ — is the kit installed?" >&2
+    exit 1
+fi
+# shellcheck disable=SC1090
+. "$OPK_MIG_LIB/ddev-migrate.sh"
+
+case "${1:-}" in
+    list)
+        dm_found=0
+        for dm_d in "$DDEV_MIG_BACKUP_ROOT"/ddev-migration-*; do
+            [ -d "$dm_d" ] || continue
+            dm_found=1
+            echo "$dm_d:"
+            ls -1 "$dm_d" 2>/dev/null | sed 's/^/    /'
+        done
+        [ "$dm_found" = 0 ] && echo "no dump directories under $DDEV_MIG_BACKUP_ROOT"
+        ;;
+    export)
+        [ "$(id -u)" = 0 ] || { echo "ddev-migrate: export must run as root"; exit 1; }
+        [ $# -ge 3 ] || { _ddev_migrate_usage; exit 1; }
+        dm_ocg=$(id -gn opencode 2>/dev/null || echo opencode)
+        dm_dev="$2"; shift 2
+        ddev_migrate_export "$dm_dev" opencode "$dm_ocg" "$@"
+        ;;
+    import)
+        ddev_migrate_import "${2:-}"
+        ;;
+    *)
+        _ddev_migrate_usage
+        [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || exit 1
+        ;;
+esac

@@ -22,7 +22,8 @@ self-fetches its siblings from the same branch, and everything is deployed to
   `status.sh`, `uninstall.sh`) and templates
 - `files/opencode-permissions-kit-lib/` — shared helpers (wrapper, ui/log,
   jsonc parser, ddev handover, backend setup, sudoers helpers)
-- `tests/` — shell unit tests (`test-*.sh`), Docker e2e suites (`e2e/`),
+- `tests/` — shell unit tests (`unit/`), host pre-flight (`check-host.sh`),
+  fixtures (`fixtures/`), Docker e2e suites (`e2e/`),
   UX demos (`ux/`)
 - `docs/` — user documentation (concepts / how-to / reference), design
   records (`design/`), superseded records (`_archive/`)
@@ -56,7 +57,7 @@ working around a missing tool.
 
 ```bash
 sh tests/check-host.sh   # host pre-flight (required tools + install hints)
-sh tests/test-*.sh       # unit suite — always via sh, never rely on exec bits
+sh tests/unit/test-*.sh # unit suite — always via sh, never rely on exec bits
 make lint                # ShellCheck over the shipped scripts
 make check-version       # VERSION + KIT_BRANCH consistency
 make e2e                 # e2e (Docker needed)
