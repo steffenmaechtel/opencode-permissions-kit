@@ -1,10 +1,12 @@
-name: e2e
+name: test-e2e
 
-# Runs on manual dispatch and pull requests targeting master. PRs get
-# the e2e verdict before merge — master only ever receives merged PR
-# commits, so no post-merge push run is needed (deliberately removed to
-# avoid the double-run after merging). A branch push with an open PR
-# fires only `pull_request` — no double-run.
+# Runs on manual dispatch, pull requests targeting master, and master
+# pushes. PRs get the e2e verdict before merge; the push run re-verifies
+# the exact master commit that lands (squash merges and back-to-back
+# merges can produce a master state no PR ever tested). Master is the
+# staging area for the 'stable' release mirror — it must be green before
+# a release is cut (scripts/release.sh checks exactly this run). A
+# branch push with an open PR fires only `pull_request` — no double-run.
 on:
   workflow_dispatch:
     inputs:
@@ -14,6 +16,9 @@ on:
         default: false
         type: boolean
   pull_request:
+    branches:
+      - master
+  push:
     branches:
       - master
 

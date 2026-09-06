@@ -1,14 +1,18 @@
-name: e2e-ddev
+name: test-e2e-ddev
 
 # Real-ddev e2e suite (tests/e2e/run-ddev.sh, docs/design/ddev-e2e-test.md).
-# MANUAL-ONLY for now: the maintainer validates runtime + duration on a real
-# runner first; a weekly schedule is the planned phase-3 follow-up (the
-# golden-image cache is a local-workspace concept — CI rebuilds warm every
-# run, see design doc §6 R6).
-#
-# Not part of the PR merge gate (e2e.yml keeps that job): this suite
-# downloads GBs of images and runs a real ddev project lifecycle.
+# Runs on master pushes and manual dispatch. NOT on pull requests (test-e2e.yml
+# keeps the PR gate): this suite downloads GBs of images and runs a real
+# ddev project lifecycle — too heavy per PR, but master is the staging
+# area for the 'stable' release mirror and must be fully green before a
+# release is cut (scripts/release.sh includes these runs in its CI gate).
+# Push runs use the defaults (no camino site tier, latest ddev); the
+# inputs only apply to manual dispatch. CI rebuilds the golden image warm
+# every run (the cache is a local-workspace concept, design doc §6 R6).
 on:
+  push:
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       site_tier:

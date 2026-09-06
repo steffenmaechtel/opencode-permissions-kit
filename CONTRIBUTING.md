@@ -40,7 +40,7 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   green `make e2e` alone is not sufficient.
 - When adding a new executable under `files/` or a new test script under
   `tests/`, add it to the `chmod +x` list in **both**
-  `.github/workflows/test.yml` and `.github/workflows/e2e.yml`.
+  `.github/workflows/test-unit.yml` and `.github/workflows/test-e2e.yml`.
 
 ## Testing a branch on a real machine
 

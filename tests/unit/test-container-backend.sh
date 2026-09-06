@@ -26,8 +26,8 @@ STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 SUDOERS="$REPO/files/opencode-permissions-kit-lib/templates/sudoers.template"
-TEST_YML="$REPO/.github/workflows/test.yml"
-E2E_YML="$REPO/.github/workflows/e2e.yml"
+TEST_YML="$REPO/.github/workflows/test-unit.yml"
+E2E_YML="$REPO/.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -276,20 +276,20 @@ check "status.sh has no migration-stamp section (legacy cleanup)" \
 
 echo ""
 echo "-- CI chmod lists --"
-check "test.yml chmods this test"  grep -Fq './tests/unit/test-container-backend.sh' "$TEST_YML"
-check "e2e.yml chmods this test"   grep -Fq './tests/unit/test-container-backend.sh' "$E2E_YML"
-check "test.yml runs this test"   grep -Fq 'Run container backend tests' "$TEST_YML"
-check "test.yml chmods setup-container-backend.sh" \
+check "test-unit.yml chmods this test"  grep -Fq './tests/unit/test-container-backend.sh' "$TEST_YML"
+check "test-e2e.yml chmods this test"   grep -Fq './tests/unit/test-container-backend.sh' "$E2E_YML"
+check "test-unit.yml runs this test"   grep -Fq 'Run container backend tests' "$TEST_YML"
+check "test-unit.yml chmods setup-container-backend.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/setup-container-backend' "$TEST_YML"
-check "e2e.yml chmods setup-container-backend.sh" \
+check "test-e2e.yml chmods setup-container-backend.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/setup-container-backend' "$E2E_YML"
-check "test.yml chmods socket-check.sh" \
+check "test-unit.yml chmods socket-check.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check' "$TEST_YML"
-check "e2e.yml chmods socket-check.sh" \
+check "test-e2e.yml chmods socket-check.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check' "$E2E_YML"
-check "test.yml has no migrate-denies.sh chmod (removed)" \
+check "test-unit.yml has no migrate-denies.sh chmod (removed)" \
     grep_absent -Fq './files/opencode-permissions-kit-lib/migrate-denies.sh' "$TEST_YML"
-check "test.yml has no test-migration.sh (removed)" \
+check "test-unit.yml has no test-migration.sh (removed)" \
     grep_absent -Fq './tests/unit/test-migration.sh' "$TEST_YML"
 
 echo ""

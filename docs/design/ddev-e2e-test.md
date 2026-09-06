@@ -3,15 +3,18 @@
 > Status: **IMPLEMENTED — shipped with 0.0.21.** `make e2e-ddev` /
 > `make e2e-ddev-fresh` run `tests/e2e/run-ddev.sh` (68 checks, full
 > DD0–DD14 catalog incl. the camino real-site tier and the bare-origin
-> git tier; manual CI workflow since 2026-08-22, first green GitHub run
+> git tier; CI workflow since 2026-08-22, first green GitHub run
 > 2026-08-23 — §8). The text below is the original design record; where
 > wording differs from the code, the code wins. Two deltas since the
 > plan: the golden image moved from the §4.2 `docker commit` flow to a
 > **save/load tar** flow (the inner docker store on the container
 > filesystem produced whiteouts that `docker commit` dropped — golden
 > image v2 keeps no inner store and loads images from a tar on boot),
-> and the weekly CI `schedule` (§8) is still pending — the workflow is
-> `workflow_dispatch`-only.
+> and the CI trigger grew beyond the planned weekly `schedule` (§8):
+> since the beta channel split (issue #38) the workflow runs on every
+> **master push** (plus `workflow_dispatch` on demand) — master is the
+> staging area for the `stable` mirror and must be fully green before a
+> release is cut; PRs stay excluded (test-e2e.yml keeps the PR gate).
 >
 > Original framing, kept for context: a third e2e suite answering the
 > recurring burn-in problem — most ddev issues (#18, #20, #21, #25, the
@@ -410,7 +413,7 @@ bare-origin flow (DD12).
   `e2e-ddev-fresh` (`--fresh`), help entries. NOT added to `e2e-all` —
   `e2e-all` stays the merge gate; e2e-ddev downloads GBs and must not gate
   every PR.
-- **CI (phase 3):** `.github/workflows/e2e-ddev.yml` — live since
+- **CI (phase 3):** `.github/workflows/test-e2e-ddev.yml` — live since
   2026-08-22 as **manual-only** (`workflow_dispatch` with `site_tier` and
   `ddev_version` inputs; the maintainer validates runner runtime first).
   Weekly `schedule` is the planned follow-up once duration is known; no

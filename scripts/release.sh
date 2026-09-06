@@ -18,6 +18,8 @@
 #   - 'stable' (if it exists on origin) is an ancestor of master, so the
 #     mirror is a pure fast-forward — a diverged 'stable' aborts, this
 #     script never force-pushes
+#   - CI on the master commit is green (tests + e2e run on every master
+#     push; checked via gh or curl+python3 — --skip-ci overrides)
 #   - unit suite + lint + check-version green (unless --skip-tests)
 #
 # Then: create the annotated tag, move local 'stable' to master, push
@@ -30,14 +32,16 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION=""
 DRY_RUN=false
 SKIP_TESTS=false
+SKIP_CI=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -h|--help)
-            sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         --dry-run)     DRY_RUN=true ;;
         --skip-tests)  SKIP_TESTS=true ;;
+        --skip-ci)     SKIP_CI=true ;;
         -*)            echo "error:  unknown option: $1" >&2; exit 1 ;;
         *)             [ -z "$VERSION" ] || { echo "error:  only one version argument allowed" >&2; exit 1; }
                        VERSION="$1" ;;
@@ -136,6 +140,75 @@ else
         say "origin/stable already at master (mirror up to date)"
     else
         say "origin/stable fast-forwards to master"
+    fi
+fi
+
+if [ "$SKIP_CI" = true ]; then
+    say "CI check skipped (--skip-ci)"
+else
+    # Master pushes run the full CI suite (tests + e2e) — the 'stable'
+    # mirror must never be cut from an untested master. Ask whichever
+    # tool is available: gh first (embedded jq), then the plain GitHub
+    # API via curl+python3 (both are kit host requirements — the gate
+    # works on hosts without gh). A definitive red/absent answer aborts;
+    # tools that cannot answer (missing, offline, rate-limited) only
+    # warn. Both paths yield "<status>\t<conclusion>" lines for THIS
+    # master commit only.
+    _ci_answered=false
+    _ci_tsv=""
+    if command -v gh >/dev/null 2>&1; then
+        if _ci_tsv="$(gh run list --branch master -L 10 \
+                --json headSha,status,conclusion \
+                --jq ".[] | select(.headSha == \"$HEAD_REV\") | [.status, .conclusion] | @tsv" \
+                2>/dev/null)"; then
+            _ci_answered=true
+        fi
+    fi
+    if [ "$_ci_answered" != true ] && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+        _repo_slug="$(git -C "$REPO" remote get-url origin 2>/dev/null \
+            | sed -n 's#.*github\.com[:/]##p' | sed 's#\.git$##')"
+        if [ -n "$_repo_slug" ]; then
+            if _ci_tsv="$(curl -fsSL --max-time 20 \
+                    "https://api.github.com/repos/$_repo_slug/actions/runs?branch=master&per_page=20" 2>/dev/null \
+                    | HEAD_SHA="$HEAD_REV" python3 -c '
+import json, os, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+sha = os.environ.get("HEAD_SHA")
+for r in data.get("workflow_runs", []):
+    if r.get("head_sha") == sha:
+        print("%s\t%s" % (r.get("status", ""), r.get("conclusion") or ""))
+' 2>/dev/null)"; then
+                _ci_answered=true
+            fi
+        fi
+    fi
+    if [ "$_ci_answered" != true ]; then
+        say "cannot verify CI status (no gh, no curl+python3 API access) — check Actions manually before releasing"
+    elif [ -z "$_ci_tsv" ]; then
+        err "no CI runs found for this master commit ($HEAD_REV)."
+        say "Push master first and wait for the workflows (tests + e2e run on"
+        say "master pushes). First release before any master CI exists?"
+        say "Re-run with --skip-ci to override deliberately."
+        exit 1
+    elif printf '%s' "$_ci_tsv" | grep -qiE '^(in_progress|queued|waiting|pending|action_required)'; then
+        err "CI is still running on this master commit — wait for it to finish."
+        printf '%s\n' "$_ci_tsv" | sed 's/^/  say  /'
+        exit 1
+    else
+        # Every run for this sha must be completed + green (success,
+        # skipped, neutral). Any other conclusion (failure, cancelled,
+        # timed_out, ...) blocks the release.
+        _ci_red=$(printf '%s\n' "$_ci_tsv" | grep -cvE '^completed[[:space:]]+(success|skipped|neutral)$' || true)
+        if [ "${_ci_red:-0}" -gt 0 ]; then
+            err "CI on this master commit is not green — the stable mirror must not be cut from it."
+            printf '%s\n' "$_ci_tsv" | sed 's/^/  say  /'
+            say "Check: gh run list --branch master  (or the Actions page)"
+            exit 1
+        fi
+        say "CI on this master commit is green"
     fi
 fi
 

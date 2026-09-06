@@ -45,6 +45,26 @@ mkrepo() {
     git -C "$WORK/r" push -q origin master
 }
 
+# Fake gh on PATH for EVERY sandbox run (the CI pre-flight must not
+# depend on the host: a real gh would fail on the file:// sandbox origin
+# and abort the script with "no CI runs"). Defaults to green; section 6b
+# steers scenarios via FAKE_GH_* env vars.
+mkdir -p "$WORK/ghbin"
+cat > "$WORK/ghbin/gh" <<'FAKEGH'
+#!/bin/sh
+case " $* " in
+    *" run list "*)
+        [ -n "${FAKE_GH_EMPTY:-}" ] && exit 0
+        [ -n "${FAKE_GH_RAW:-}" ] && { printf '%s\n' "$FAKE_GH_RAW"; exit 0; }
+        printf '%s\t%s\n' "${FAKE_GH_STATUS:-completed}" "${FAKE_GH_CONCLUSION:-success}"
+        ;;
+    *) exit 0 ;;
+esac
+FAKEGH
+chmod +x "$WORK/ghbin/gh"
+PATH="$WORK/ghbin:$PATH"
+export PATH
+
 expect_rc() {
     _want="$1"; _desc="$2"; shift 2
     set +e
@@ -152,6 +172,45 @@ expect_rc 0 "second run exits 0 (resume)" \
 printf '%s' "$LAST_OUT" | grep -q "nothing to push" \
     && pass "second run recognizes nothing to push" \
     || fail "second run recognizes nothing to push (out=$LAST_OUT)"
+
+# --- 6b. CI pre-flight (master must be green before the mirror is cut) ------------
+# The fake gh (set up next to mkrepo, green by default, already on PATH)
+# answers `run list` with the post--jq TSV the script expects. FAKE_GH_*
+# are exported/unset around each run — env(1) prefixes cannot reach the
+# expect_rc shell function (rc 127).
+mkrepo
+
+FAKE_GH_CONCLUSION=failure; export FAKE_GH_CONCLUSION
+expect_rc 1 "red CI on master blocks the release" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run 2>/dev/null
+unset FAKE_GH_CONCLUSION
+
+FAKE_GH_STATUS=in_progress; export FAKE_GH_STATUS
+expect_rc 1 "still-running CI blocks the release" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run 2>/dev/null
+unset FAKE_GH_STATUS
+
+FAKE_GH_EMPTY=1; export FAKE_GH_EMPTY
+expect_rc 1 "no CI runs for the commit blocks the release" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run 2>/dev/null
+unset FAKE_GH_EMPTY
+
+FAKE_GH_RAW="$(printf 'completed\tsuccess\ncompleted\tfailure')"; export FAKE_GH_RAW
+expect_rc 1 "one red run among green ones still blocks" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run 2>/dev/null
+unset FAKE_GH_RAW
+
+expect_rc 0 "green CI passes the pre-flight" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run
+
+FAKE_GH_CONCLUSION=failure; export FAKE_GH_CONCLUSION
+expect_rc 0 "--skip-ci overrides the CI gate" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests --dry-run --skip-ci
+unset FAKE_GH_CONCLUSION
+
+grep -q 'actions/runs?branch=master' "$RELEASE" \
+    && pass "CI gate has the curl+python3 fallback (no gh needed on the host)" \
+    || fail "CI gate has the curl+python3 fallback (no gh needed on the host)"
 
 # --- 7. static: test gate + suite wiring -------------------------------------------
 grep -q 'make -C "$REPO" test check-version' "$RELEASE" \

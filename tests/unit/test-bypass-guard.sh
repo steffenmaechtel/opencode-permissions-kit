@@ -20,8 +20,8 @@ WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 UMASK="$REPO/files/etc/umask.sh"
-TEST_YML="$REPO/.github/workflows/test.yml"
-E2E_YML="$REPO/.github/workflows/e2e.yml"
+TEST_YML="$REPO/.github/workflows/test-unit.yml"
+E2E_YML="$REPO/.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -115,11 +115,11 @@ check "update.sh never uses world-executable binary mode" \
 
 echo ""
 echo "-- CI chmod lists --"
-check "test.yml chmods shell-warn.sh" \
+check "test-unit.yml chmods shell-warn.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/sh/shell-warn.sh' "$TEST_YML"
-check "e2e.yml chmods shell-warn.sh" \
+check "test-e2e.yml chmods shell-warn.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/sh/shell-warn.sh' "$E2E_YML"
-check "test.yml runs test-bypass-guard.sh" \
+check "test-unit.yml runs test-bypass-guard.sh" \
     grep -Fq './tests/unit/test-bypass-guard.sh' "$TEST_YML"
 
 echo ""
