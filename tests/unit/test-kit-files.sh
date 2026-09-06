@@ -88,15 +88,36 @@ fi
 
 # --- 3. deploy targets are covered by the fetch list -----------------------------
 
+# Path normalization for the cross-check: install.sh cp sources are rooted
+# at files/ directly; update.sh lives in opencode-permissions-kit-lib/
+# management/, so its "$SCRIPT_DIR/<rel>" sources resolve against that
+# directory. Normalize both to files/-rooted paths.
+norm_files_path() {
+    printf '%s\n' "$1" | awk -F/ '{
+        n = 0
+        for (i = 1; i <= NF; i++) {
+            if ($i == "" || $i == ".") continue
+            if ($i == "..") { if (n > 0) n--; continue }
+            stack[++n] = $i
+        }
+        out = ""
+        for (i = 1; i <= n; i++) out = out (i > 1 ? "/" : "") stack[i]
+        print out
+    }'
+}
+
 deploy_missing=""
 for script in "$INSTALL" "$UPDATE"; do
     name="${script##*/}"
+    base=""
+    [ "$name" = "update.sh" ] && base="opencode-permissions-kit-lib/management"
     # collect `cp "$SCRIPT_DIR/<target>"` sources
     targets=$(grep -oE 'cp "\$SCRIPT_DIR/[^"]+"' "$script" | sed -e 's|cp "\$SCRIPT_DIR/||' -e 's|"||')
     for t in $targets; do
+        ft="$(norm_files_path "$base/$t")"
         case " $update_list " in
-            *" $t "*) ;;
-            *) deploy_missing="$deploy_missing $name:$t" ;;
+            *" $ft "*) ;;
+            *) deploy_missing="$deploy_missing $name:$ft" ;;
         esac
     done
 done

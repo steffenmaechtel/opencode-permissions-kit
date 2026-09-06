@@ -95,7 +95,7 @@ check "flag: help text documents --only-binary" \
 check "gating: kit re-deploy sections are wrapped (2 skip zones)" \
     sh -c "[ \"\$(grep -c 'if \[ \"\$ONLY_BINARY\" != true \]; then' \"\$1\")\" -ge 2 ]" _ "$UPDATE"
 check "no kit self-fetch in binary-only mode (library runs stay offline for kit files)" \
-    sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" && grep -qF '[ \"\$_opk_binonly\" != true ] && [ ! -f \"\$SCRIPT_DIR/../VERSION\" ]' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" && grep -qF '[ \"\$_opk_binonly\" != true ] && [ ! -f \"\$SCRIPT_DIR/../../../VERSION\" ]' \"\$1\"" _ "$UPDATE"
 check "library runs fall back to the installed version stamp" \
     sh -c "grep -q 's/^VERSION=//p' \"\$1\"" _ "$UPDATE"
 check "gating: confirm prompt reflects binary-only mode" \
