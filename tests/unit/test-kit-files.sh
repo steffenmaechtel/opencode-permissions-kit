@@ -110,9 +110,9 @@ deploy_missing=""
 for script in "$INSTALL" "$UPDATE"; do
     name="${script##*/}"
     base=""
-    [ "$name" = "update.sh" ] && base="opencode-permissions-kit-lib/management"
-    # collect `cp "$SCRIPT_DIR/<target>"` sources
-    targets=$(grep -oE 'cp "\$SCRIPT_DIR/[^"]+"' "$script" | sed -e 's|cp "\$SCRIPT_DIR/||' -e 's|"||')
+    [ "$name" = "update.sh" ] && base=""
+    # collect `cp "$SCRIPT_DIR/<target>"` / `cp "$FILES_ROOT/<target>"` sources
+    targets=$(grep -oE 'cp "\$(SCRIPT_DIR|FILES_ROOT)/[^"]+"' "$script" | cut -d'"' -f3)
     for t in $targets; do
         ft="$(norm_files_path "$base/$t")"
         case " $update_list " in

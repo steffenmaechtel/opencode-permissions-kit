@@ -127,7 +127,7 @@ check "install.sh keeps user-managed tui.json (skip branch)" \
 check "update.sh KIT_FILES includes the tui payload" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$UPDATE"
 check "update.sh re-deploys the plugin to LIBDIR/tui" \
-    grep -q 'cp "$SCRIPT_DIR/../tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"' "$UPDATE"
+    grep -q 'cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"' "$UPDATE"
 check "update.sh refreshes the opencode-user tui.json (marker policy)" \
     grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$UPDATE"
 check "update.sh refreshes the default-user danger theme" \
