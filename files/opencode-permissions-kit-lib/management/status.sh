@@ -280,13 +280,30 @@ if [ -n "$_mig_dir" ] && [ -f "$_mig_dir/manifest.conf" ]; then
         fi
     fi
 fi
-if [ -n "${DDEV_VERSION:-}" ]; then
-    ddev_low=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
+# Live ddev version (issue #56): DDEV_VERSION from install.conf is an
+# install-time stamp and goes stale the moment the developer upgrades
+# ddev — `sudo opk status` kept showing the old version while the
+# terminal's `ddev --version` already answered with the new one. Probe
+# the real binary instead, with the SAME resolution order as
+# bin/ddev-as-opencode (PATH, then the two standard locations).
+# `--version` is a local-only flag (no daemon, no HOME writes), so it is
+# safe here even as root. The stamp stays the fallback for hosts where
+# no binary answers at all.
+_st_bin=""
+for _st_cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
+    [ -n "$_st_cand" ] && [ -x "$_st_cand" ] && { _st_bin="$_st_cand"; break; }
+done
+_st_ver=""
+[ -n "$_st_bin" ] && _st_ver=$("$_st_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+if [ -n "$_st_ver" ]; then
+    ddev_low=$(awk -v v="$_st_ver" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
     if [ "$ddev_low" = yes ]; then
-        ui_kv "ddev version" "$DDEV_VERSION (ddev < 1.25 — rootless needs ddev >= 1.25, upgrade ddev)" "$UI_RED"
+        ui_kv "ddev version" "$_st_ver (ddev < 1.25 — rootless needs ddev >= 1.25, upgrade ddev)" "$UI_RED"
     else
-        ui_kv "ddev version" "$DDEV_VERSION"
+        ui_kv "ddev version" "$_st_ver"
     fi
+elif [ -n "${DDEV_VERSION:-}" ]; then
+    ui_kv "ddev version" "$DDEV_VERSION (recorded at install time — ddev binary not found now)" "$UI_YELLOW"
 fi
 # Windows hosts readiness (WSL2): custom-tld projects need their hostnames
 # in the Windows hosts file for the browser; ddev (running as opencode)
