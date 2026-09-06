@@ -1,8 +1,9 @@
 # PLAN-STREAMLINE: file/folder taxonomy and clean names
 
-> Status: **IMPLEMENTED on `feature/streamline`** (issue #54) — unit suite
-> + lint green; e2e verification pending. Where wording differs from the
-> code, the code wins.
+> Status: **IMPLEMENTED on `feature/streamline`** (issue #54) — unit suite,
+> lint and all three e2e suites green (`make e2e` 243 checks,
+> `make e2e-rootless` 42, `make e2e-ddev` 54). Where wording differs from
+> the code, the code wins.
 
 ## 1. Problem & goal
 
@@ -182,10 +183,17 @@ Security model untouched: pure file-layout change, no permission semantics.
 make lint                 # shellcheck over the shipped scripts  ✓ green
 sh tests/unit/test-*.sh   # full unit suite (make test)           ✓ green
 make check-version        # VERSION + KIT_BRANCH consistency      ✓ green
-make e2e                  # Docker needed                         pending
-make e2e-rootless
-make e2e-ddev
+make e2e                  # 243 checks                            ✓ green
+make e2e-rootless         # 42 checks                             ✓ green
+make e2e-ddev             # 54 checks (golden-image cache)        ✓ green
 ```
+
+One real bug the e2e caught (and fixed): `update.sh` initially kept its
+old `$SCRIPT_DIR` assumptions after moving into `management/ — streamed
+sentinel updates silently fetched master instead of the local tree, and
+`--binary-path` runs crashed in the deploy section. The fix computes a
+`FILES_ROOT` (fetched temp dir or checkout `files/`) once and resolves
+every kit source, the heal loop and the `VERSION` read through it.
 
 Both e2e suites (plus e2e-ddev) are part of the definition of done for
 install.sh/update.sh/wrapper changes (AGENTS.md).
