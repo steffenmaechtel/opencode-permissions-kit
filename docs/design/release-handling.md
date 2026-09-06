@@ -1,9 +1,9 @@
 # Release handling after alpha — channels, tags, stability
 
-> Status: **PROPOSAL (planning).** Options and a recommendation for how
-> the kit ships stable versions once it leaves the alpha stage. Nothing
-> is implemented yet — this record exists so the decision is made before
-> the first post-alpha release. Tracked in
+> Status: **CURRENT (Phase 1 implemented).** Options and the decided
+> model for how the kit ships stable versions after alpha. Phase 1
+> (stable mirror branch + `KIT_CHANNEL` stamp + channel-aware updates)
+> is implemented; Phases 2–3 are on-demand follow-ups. Tracked in
 > [issue #38](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/38).
 
 ## 1. Problem
@@ -91,9 +91,13 @@ never in the code:
   `KIT_BRANCH=master` opts into dev, `KIT_BRANCH=feature/...` tests any
   branch, `KIT_BRANCH=0.0.30` pins an exact tag — one mechanism for all
   three.
-- **Release procedure:** bump `VERSION` (maintainer asks, per repo
-  rules) → merge → tag `x.y.z` on `master` → fast-forward `stable` to
-  `master` → push. Optional later: a GitHub Action mirrors on tag push.
+- **Release procedure:** bump `VERSION` via PR on `master` (repo rule:
+  never commit on master directly), then
+  `make release VERSION=x.y.z` — the scripted release helper
+  ([`scripts/release.sh`](../../scripts/release.sh)) verifies the
+  preconditions, tags `x.y.z`, fast-forwards `stable` (aborting instead
+  of force-pushing on divergence), and pushes. Optional later: a GitHub
+  Action mirrors on tag push.
 - **Hotfix policy:** fix on `master`, cut `x.y.(z+1)` normally. Never
   commit to `stable` directly (branch protection: merges only) — direct
   patches would break the byte-identical invariant.
@@ -337,7 +341,7 @@ Homebrew (D1), npm (D2), and AUR (D4) stay rejected at every phase —
 they fail the kit's root-and-system-mutation model or its
 no-runtime philosophy regardless of scale.
 
-## 7. Implementation outline (for the PR that leaves alpha — not now)
+## 7. Implementation outline (Phase 1 — implemented)
 
 1. Create `stable` at current `master`; branch protection: merges from
    `master` only, no direct commits.

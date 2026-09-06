@@ -57,9 +57,9 @@ where wording differs from the code, the code wins. Notable living
 references: [conventions.md](design/conventions.md) — the binding style
 guide for shipped code (prompts, output, language) — and
 [rootless-backend.md](design/rootless-backend.md) — the provisioning and
-selection reference for the rootless container backends. A proposal not
-yet implemented: [release-handling.md](design/release-handling.md) —
-release channels and stability after alpha (issue #38). Superseded or
+selection reference for the rootless container backends. Release model:
+[release-handling.md](design/release-handling.md) — channels, the
+`stable` mirror, and the phased adoption roadmap (issue #38). Superseded or
 purely historical records live in [`_archive/`](_archive/) (same
 subfolder structure: `_archive/design/`, `_archive/security/`) — they
 document how the kit got here, not how it works today.

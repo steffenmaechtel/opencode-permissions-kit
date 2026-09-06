@@ -174,6 +174,18 @@ expect_rc 1 "typo'd flag aborts (--ye)" --ye
 expect_rc 1 "--migrate-agents without a value aborts" --yes --migrate-agents
 expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agents steal
 
+# --- channel stamp (issue #38) -----------------------------------------------
+
+# install.sh stamps the actually-used ref as KIT_CHANNEL into install.conf
+# (the heredoc tee block) and reports it in the final summary.
+if grep -qF "KIT_CHANNEL=\$KIT_BRANCH" "$INSTALL" \
+   && grep -qF "tee /etc/opencode-permissions-kit/install.conf" "$INSTALL" \
+   && grep -qF 'ui_kv "Channel"' "$INSTALL"; then
+    pass "install.sh stamps KIT_CHANNEL and reports the channel"
+else
+    fail "install.sh stamps KIT_CHANNEL and reports the channel"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

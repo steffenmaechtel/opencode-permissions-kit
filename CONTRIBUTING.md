@@ -64,15 +64,42 @@ An installed kit updates from a branch the same way (stream `update.sh`
 instead of re-installing — your `projects.conf` and deny list survive):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/feature/simplify-script-calls/files/update.sh \
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/feature/simplify-script-calls/files/opencode-permissions-kit-lib/management/update.sh \
   | sudo env KIT_BRANCH=feature/simplify-script-calls bash
 ```
 
-Switching back to `master` later is the same call without `KIT_BRANCH`
-(see the [update guide](docs/how-to/update.md)).
+Switching back to a channel later is the same call with `stable` (or
+`master`) as `KIT_BRANCH` — the switch re-stamps `KIT_CHANNEL` in
+`install.conf`, so subsequent plain `opk update` runs stay there (see the
+[update guide](docs/how-to/update.md#channels)).
 
 (`make check-version` ensures `KIT_BRANCH` stays consistent for `master`.)
 Use a throwaway WSL2/dev box — the kit is alpha software.
+
+## Making a release
+
+Releases are maintainer-only and fully scripted
+([`scripts/release.sh`](scripts/release.sh), issue #38; model:
+[release-handling](docs/design/release-handling.md) — a release is the
+tag `x.y.z` on `master` plus a fast-forward of the `stable` mirror, which
+must stay **byte-identical** to `master`). Per release:
+
+1. VERSION bump lands on `master` **via PR** (never commit on master
+   directly): `git checkout -b release/x.y.z && make version VERSION=x.y.z`,
+   commit, push, merge.
+2. Cut the release — the script verifies clean tree, sync with origin,
+   VERSION stamp, free tag, fast-forwardability of `stable`, runs the
+   suite, then tags, mirrors, and pushes (never force-pushes):
+
+   ```bash
+   make release VERSION=x.y.z            # or: scripts/release.sh x.y.z
+   make release VERSION=x.y.z ARGS=--dry-run   # print the steps, change nothing
+   ```
+
+3. Optional: `gh release create x.y.z --generate-notes` for notes.
+
+Everything else (branch protection on `stable`, announcements) is set up
+once, not per release.
 
 ## Documentation
 

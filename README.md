@@ -26,8 +26,11 @@ are opencode's soft layer only (see [Security Model](docs/concepts/security-mode
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
 ```
+
+The `stable` ref is the release mirror (recommended); `master` is the
+development channel — see [Update channels](docs/how-to/update.md#channels).
 
 The installer asks a few questions and shows a plan before touching anything.
 The full walkthrough (including verification) lives in

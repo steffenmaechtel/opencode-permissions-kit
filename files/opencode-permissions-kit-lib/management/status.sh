@@ -50,7 +50,7 @@ if [ "$installed" = false ]; then
     ui_warn "Hardening NOT active."
     echo ""
     ui_info "Install it with:"
-    ui_detail "curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh | sudo bash"
+    ui_detail "curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
     echo ""
     exit 0
 fi
@@ -60,6 +60,14 @@ fi
 ui_section "Core"
 
 ui_kv "Mode"     "dedicated user (soft permissions only)" "$UI_GREEN"
+# Channel stamp (issue #38): the ref installs/updates track. Unstamped =
+# installed before the beta channel split — such installs update from
+# 'master' until their next opk update re-stamps it.
+if [ -n "${KIT_CHANNEL:-}" ]; then
+    ui_kv "Channel"  "$KIT_CHANNEL"
+else
+    ui_kv "Channel"  "master (unstamped — pre-beta install, opk update re-stamps it)"
+fi
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ui_kv "User"  "$OPENCODE_USER — exists"
 else
