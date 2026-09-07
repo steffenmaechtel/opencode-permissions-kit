@@ -138,7 +138,7 @@ ls /var/backups/opencode-permissions-kit/ddev-migration-*/
   sudo find /var/www/vhosts -type d -name .ddev -prune -print0 \
     | xargs -0 -n1 -I{} sudo chown -R "$USER" {}
   sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export "$USER" /var/www/vhosts
-  sudo /usr/local/lib/opencode-permissions-kit/management/config.sh refresh
+  sudo opk config refresh
   ```
 
 Details: [ddev integration](concepts/ddev-integration.md).

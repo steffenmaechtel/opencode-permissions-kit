@@ -43,7 +43,7 @@ cat >&2 <<EOF
   kit's wrapper enforces.
   Fix:
       rm -rf "$HOME/.opencode/bin"
-      sudo bash /usr/local/lib/opencode-permissions-kit/management/update.sh
+      sudo opk update
   New shells keep warning until this is resolved.
 
 EOF

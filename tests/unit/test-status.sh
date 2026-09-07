@@ -360,6 +360,20 @@ else
     fail "channel: unstamped install reports master (unstamped) without crashing (out=$channel_out)"
 fi
 
+# --- 1f. management footer uses the opk shorthand (issue #62) ---------------------
+# The footer is the hint users copy-paste; it must print the short CLI
+# commands, not the library paths behind them.
+if grep -qF 'ui_detail "sudo opk config' "$STATUS" && \
+   grep -qF 'ui_detail "sudo opk update' "$STATUS" && \
+   grep -qF 'ui_detail "opk uninstall' "$STATUS" && \
+   ! grep -q 'management/config\.sh.*change settings' "$STATUS" && \
+   ! grep -q 'management/update\.sh.*re-deploy' "$STATUS" && \
+   ! grep -q 'management/uninstall\.sh.*remove the kit' "$STATUS"; then
+    pass "management footer prints opk shorthand, not library paths (issue #62)"
+else
+    fail "management footer prints opk shorthand, not library paths (issue #62)"
+fi
+
 # --- 2. not-installed state: exit 0 + install hint ------------------------------
 
 if ! id opencode >/dev/null 2>&1; then
