@@ -94,6 +94,36 @@ from (its web UI swallows server stderr) — setting
 `OPENCHAMBER_OPENCODE_CWD` keeps the server directory deterministic
 and silences the warning.
 
+## Projectless chats
+
+A chat that is not tied to a project directory still needs a worktree —
+OpenChamber creates one directory per chat and the opencode server
+works inside it. By default those worktrees live under
+`~/.config/openchamber/chats` in **your** home, which the `opencode`
+user cannot reach under the kit's UID separation — every projectless
+chat answered HTTP 500
+([openchamber#3130](https://github.com/openchamber/openchamber/issues/3130)).
+
+Since **OpenChamber 1.22.2** the chats root is relocatable: set
+`OPENCHAMBER_CHATS_DIR` to a directory both users can work in. Prepare
+it like a project root — sharing group, setgid, and default ACLs, so
+directories created by OpenChamber (running as you) stay writable by
+the `opencode` server user:
+
+```bash
+sudo install -d -o "$USER" -g opencode -m 2775 /var/www/vhosts/openchamber-chats
+sudo setfacl -d -m g:opencode:rwx /var/www/vhosts/openchamber-chats
+echo 'export OPENCHAMBER_CHATS_DIR=/var/www/vhosts/openchamber-chats' >> ~/.bashrc
+```
+
+(`opencode` here is the kit's sharing group; adjust if yours differs —
+`opk status` shows it under *Sharing*.) OpenChamber reads the variable
+at startup only; restart it after changing it. Existing chats are not
+moved — new chats go to the new root, legacy chats under the old root
+stay listed and deletable; unsetting the variable returns new chats to
+the default root. Managed chats are a web/desktop feature — the VS Code
+mode has no projectless chats.
+
 ## Troubleshooting
 
 - **HTTP 500 on `/api/*` requests (Unexpected server error)** — the
@@ -106,15 +136,13 @@ and silences the warning.
   but the 500s don't.)
 
 - **Projectless chats fail (HTTP 500 on `/api/session` with a
-  `…/.config/openchamber/chats/…` directory)** — OpenChamber hard-pins
-  these chat worktrees to `$HOME/.config/openchamber/chats` (no
-  configuration moves them) and re-chmods its config root to `0700` on
-  every settings write, revoking any granted group access. Under the
-  kit's UID separation the `opencode` user therefore cannot work in
-  them. This is an upstream limitation
-  ([openchamber#3130](https://github.com/openchamber/openchamber/issues/3130)) —
-  work in project directories until OpenChamber ships a relocatable
-  chats root.
+  `…/.config/openchamber/chats/…` directory)** — the chats root under
+  your `$HOME` is unreachable for the `opencode` user (UID separation).
+  OpenChamber 1.22.2 fixed this upstream: relocate the root with
+  `OPENCHAMBER_CHATS_DIR` — see
+  [Projectless chats](#projectless-chats). On older OpenChamber, work
+  in project directories
+  ([openchamber#3130](https://github.com/openchamber/openchamber/issues/3130)).
 
 - **"OpenCode process exited before serving"** — usually a self-installed
   opencode shadowing the wrapper: check for `~/.opencode/bin/opencode`
