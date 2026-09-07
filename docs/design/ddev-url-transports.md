@@ -3,7 +3,7 @@
 > Status: **IMPLEMENTED (since 0.0.26, PR #50).** The kit reads browser-command
 > URLs from `ddev describe -j`. This record documents that transport, the
 > removed one it replaced, the upstream alternatives considered, and where
-> each fact lives in the ddev source (pinned v1.25.3) so it can be
+> each fact lives in the ddev source (pinned v1.25.4) so it can be
 > re-verified on ddev updates. Where this record conflicts with the code,
 > the code wins.
 
@@ -80,17 +80,42 @@ complaint in ddev/ddev#8771). Also dropped: `DDEV_DEBUG` from the sudoers
 
 ## 4. Alternatives considered (deferred / upstream)
 
-### `ddev launch --print-url` + `DDEV_LAUNCH_PRINT_URL` — our upstream PR
+### `ddev launch --print-url` + `DDEV_LAUNCH_PRINT_URL` — merged, released, not adopted
 
-[ddev/ddev#8772](https://github.com/ddev/ddev/pull/8772) adds a
-`--print-url` flag (and env var, so nested launch children of wrapper
-commands inherit it) that prints the composed URL and exits 0. **Kept
-open** after maintainer feedback: rfay would prefer this usage over the
-`DDEV_DEBUG=true ddev launch` trick ddev uses in its own tests. If it
-merges, it is attractive wherever the **composed** URL matters — ddev
-itself would apply the `launch` argument handling we currently replicate
-in shell. The kit does not depend on it (describe works on released
-ddev); a later transport switch or combination is an open follow-up.
+[ddev/ddev#8772](https://github.com/ddev/ddev/pull/8772) added a
+`--print-url` flag (and the `DDEV_LAUNCH_PRINT_URL` env var, so nested
+launch children of wrapper commands inherit it) that prints the composed
+URL — no prefix, exit 0 — instead of opening a browser. **Merged and
+released in ddev v1.25.4** (issue #61). It is attractive wherever the
+**composed** URL matters: ddev itself would apply the `launch` argument
+handling the kit currently replicates in shell.
+
+**Decision: the kit stays on `ddev describe -j`** (issue #61):
+
+- **Version floor.** The flag exists only in ddev ≥ 1.25.4; the kit
+  supports ≥ 1.25.0. On older ddev the launch script's unknown-option
+  branch *ignores* `--print-url` and falls through to the browser open —
+  as opencode, without interop, the exact failure this arm exists to
+  prevent. A switch would need a version probe plus a second code path;
+  "one interface, one code path" was the deciding principle in 0.0.26.
+- **Service URLs.** `--print-url` composes only the primary/Mailpit URL
+  (plus argument forms). The phpMyAdmin/adminer/xhgui URLs come from
+  describe's `raw.services.*` (with the add-ons' custom ports) —
+  describe stays the uniform source either way.
+- **Stopped-project output.** The v1.25.4 launch script still
+  auto-starts a stopped project (`ddev start` output first, URL as the
+  last stdout line). The kit's arm runs that start itself so the
+  bootstrap/hosts hints keep their place around it; delegating would
+  bury them and require last-line scraping.
+- **Side-effect-free probe.** Describe fields are config-derived: the
+  URL is known before anything starts; starting stays the arm's own
+  explicit decision.
+
+Revisit when the kit raises its minimum ddev to ≥ 1.25.4 **and** ddev
+can print service URLs (or the add-on wrappers compose them) — then
+`DDEV_LAUNCH_PRINT_URL=true` could replace both the shell argument
+replication and the describe mapping for launch/mailpit in one code
+path again.
 
 ### Global host-command env — rfay's suggestion
 
@@ -116,29 +141,36 @@ python3 dependency). Deferred because:
 Combining both (env for the built-ins, describe for services) was
 considered and rejected for now: one interface, one code path.
 
-## 5. Upstream source map (pinned v1.25.3)
+## 5. Upstream source map (pinned v1.25.4)
 
 For re-verification when a new ddev release lands — paths refer to the
-read-only checkout in the dev workspace (`github/ddev`, tag v1.25.3; not
-shipped with the kit):
+read-only checkout in the dev workspace (`github/ddev`, tag v1.25.4; not
+shipped with the kit). Re-verified for v1.25.4 at issue #61; unchanged
+in substance from the v1.25.3 map.
 
-- `pkg/ddevapp/ddevapp.go` — `Describe()` (~line 223): the `raw` map.
-  `primary_url`, `mailpit_https_url`/`mailpit_url`,
-  `xhgui_https_url`/`xhgui_url` are config-derived (present when
-  stopped); `services` is filled from running containers **and** from
-  compose-defined stopped services (URLs built from their
+- `pkg/ddevapp/ddevapp.go` — `Describe()` (line 232): the `raw` map.
+  `primary_url` (line 258), `mailpit_https_url`/`mailpit_url`
+  (lines 253–254), `xhgui_https_url`/`xhgui_url` are config-derived
+  (present when stopped); `services` is filled from running containers
+  **and** from compose-defined stopped services (URLs built from their
   `HTTP(S)_EXPOSE` env; mailpit ports excluded).
-- `pkg/ddevapp/ddevapp.go` (~line 2910) — the env block injected into
+- `pkg/ddevapp/ddevapp.go` (~line 3006) — the env block injected into
   host-command dispatch (`DDEV_PRIMARY_URL`, `DDEV_SCHEME`, mailpit and
   xhgui ports, …; no per-service variables).
 - `pkg/ddevapp/global_dotddev_assets/commands/host/launch` — the launch
-  script: auto-start when not running, the argument forms above, and the
-  `FULLURL`-under-debug contract at the end.
+  script: auto-start when not running, the argument forms above, the
+  `FULLURL`-under-debug contract, and since v1.25.4 the
+  `--print-url`/`DDEV_LAUNCH_PRINT_URL` branch (print the bare URL,
+  exit 0) *before* the debug and browser branches. Unknown options are
+  warned about and ignored — older ddev silently degrades
+  `--print-url` into a browser open (see §4). The `:port` argument
+  handling shells out to `docker run ddev/ddev-utilities` helpers and
+  re-consults `ddev describe -j` for the scheme.
 - Same directory: built-in `mailpit` (just `ddev launch -m`) and built-in
   `phpmyadmin` (interactive add-on installer — the launcher is the
   add-on's own project-level command, which calls `ddev launch :<port>`;
   its Gitpod branch even uses the `DDEV_DEBUG`/`FULLURL` grep trick).
-- `cmd/ddev/cmd/describe.go` — JSON emission:
+- `cmd/ddev/cmd/describe.go` — JSON emission (line 72):
   `output.UserOut.WithField("raw", desc)` through logrus' JSONFormatter:
   one line, `raw` nested at the top level.
 
