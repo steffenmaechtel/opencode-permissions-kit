@@ -23,7 +23,7 @@ to every session regardless of which tool started it.
 
 | Tool | Kind | Invocation | Status |
 |---|---|---|---|
-| [OpenChamber](https://openchamber.dev) (web/desktop/VS Code) | UI | `opencode serve` | works (headless serve since 0.0.16) |
+| [OpenChamber](https://openchamber.dev) (web/desktop/VS Code) | UI | `opencode serve` | works (headless serve since 0.0.16; projectless chats need OpenChamber ≥ 1.22.2, see [the how-to](../how-to/openchamber.md#projectless-chats)) |
 | CodeWalk | remote UI | user-run `opencode serve` | works |
 | OpenCode Mobile, P4OC | mobile clients | user-run `opencode serve` | works |
 | [cezar](https://github.com/lukaszuznanski/cezar) | orchestrator | `opencode serve` + `opencode models` | works (headless queries since 0.0.22) |
@@ -42,6 +42,11 @@ enforced. It does not mean the kit audits or endorses the tool itself.
 
 ## Caveats
 
+- **OpenChamber projectless chats.** The managed chats root defaults to
+  a path under the developer's `$HOME` that the `opencode` user cannot
+  reach. OpenChamber ≥ 1.22.2 relocates it via `OPENCHAMBER_CHATS_DIR`;
+  on older versions projectless chats fail with HTTP 500 — see
+  [Projectless chats](../how-to/openchamber.md#projectless-chats).
 - **Absolute-path spawns.** A tool hardcoding `~/.opencode/bin/opencode`
   bypasses the wrapper — the kit's [bypass
   guards](../concepts/wrapper.md) detect and warn about that binary.

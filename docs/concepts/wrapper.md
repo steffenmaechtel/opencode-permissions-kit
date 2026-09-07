@@ -75,6 +75,9 @@ by its own sudoers rule), warns on stderr and starts the server from a
 readable fallback (the matching projects root, else the first readable
 configured root, else the `opencode` home) — see the
 [OpenChamber how-to](../how-to/openchamber.md#server-working-directory).
+Projectless chats have a separate directory quirk of their own, solved
+upstream with `OPENCHAMBER_CHATS_DIR` (OpenChamber ≥ 1.22.2) — see
+[Projectless chats](../how-to/openchamber.md#projectless-chats).
 
 Which ecosystem tools use which invocation — and the verified status of
 each — is tracked in the [compatibility
