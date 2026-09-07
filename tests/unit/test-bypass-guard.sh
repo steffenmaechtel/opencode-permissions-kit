@@ -66,6 +66,8 @@ echo "not-the-wrapper" > "$TMP/home-shadow/.opencode/bin/opencode"
 out=$(run_warn "$TMP/home-shadow" "/usr/bin:/bin")
 check "shadow real binary: warns" sh -c 'echo "$1" | grep -q "wrapper bypass"' _ "$out"
 check "shadow real binary: suggests fix" sh -c 'echo "$1" | grep -q "rm -rf"' _ "$out"
+check "shadow real binary: suggests opk shorthand, not the library path (issue #62)" \
+    sh -c 'echo "$1" | grep -q "sudo opk update" && ! echo "$1" | grep -q "management/update.sh"' _ "$out"
 
 mkdir -p "$TMP/home-link/.opencode/bin"
 ln -s /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode "$TMP/home-link/.opencode/bin/opencode"

@@ -531,8 +531,10 @@ fi
 # === Management ==================================================================
 
 echo ""
+# Management hints use the opk shorthand (issue #62): shorter than the
+# library paths, and the dispatcher elevates itself where needed.
 ui_info "Management (run in a terminal):"
-ui_detail "sudo $LIBDIR/management/config.sh                 change settings"
-ui_detail "sudo $LIBDIR/management/update.sh                 re-deploy kit after an update"
-ui_detail "bash $LIBDIR/management/uninstall.sh              remove the kit"
+ui_detail "sudo opk config      change settings"
+ui_detail "sudo opk update      re-deploy kit after an update"
+ui_detail "opk uninstall        remove the kit"
 echo ""
