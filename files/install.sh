@@ -806,6 +806,24 @@ sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "/home/$OPENCODE_USER/.ddev"
 sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
 log "ddev home provisioned: /home/$OPENCODE_USER/.ddev"
 
+# docker-rootless + ddev 1.25.0-1.25.2: the global no-bind-mounts switch
+# is required or the first `ddev start` hard-errors (upstream fixed
+# rootless bind mounts in v1.25.3 — newer ddevs keep bind mounts). The
+# if/else keeps set -e out of the picture: "not needed" is rc=1.
+if [ "$CONTAINER_BACKEND" = "docker-rootless" ] && [ -n "$DDEV_BIN" ] && [ -n "$DDEV_VERSION" ]; then
+    if ddev_rootless_bindmounts "$OPENCODE_USER" "$CONTAINER_BACKEND" "$DDEV_VERSION" "$DDEV_BIN"; then
+        ui_success "ddev no-bind-mounts global set (required for ddev $DDEV_VERSION on docker-rootless)"
+        log "ddev no-bind-mounts set (backend=docker-rootless, ddev=$DDEV_VERSION)"
+    else
+        case $? in
+            2) ui_warn "could not set ddev's no-bind-mounts global — ddev $DDEV_VERSION on docker-rootless"
+               ui_warn "may fail with 'bind mounts can't be used with Docker Rootless'. Fix manually:"
+               ui_detail "sudo -u $OPENCODE_USER env HOME=/home/$OPENCODE_USER ddev config global --no-bind-mounts"
+               log "ddev no-bind-mounts setup failed (backend=docker-rootless, ddev=$DDEV_VERSION)" ;;
+        esac
+    fi
+fi
+
 port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)
 if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
     ans=$(prompt "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443? (host-wide sysctl)" "Y" "N" "")
@@ -1042,8 +1060,10 @@ if [ -n "$PROJECTS_ROOTS" ]; then
             # Group baseline via the shared helper: chgrp + setgid +
             # group rw + default ACLs, .git included (issue #17), with a
             # live per-pass progress counter (issue #14 — large trees
-            # used to run minutes in silence).
-            fs_baseline_root "$root" "$OPENCODE_GROUP"
+            # used to run minutes in silence). The agent user enables
+            # the exact per-ancestor traversal probe (roots under a
+            # 0750 developer home — see fs_ensure_traversable).
+            fs_baseline_root "$root" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ui_success "$root — group + setgid + default ACLs applied"
         done
     fi

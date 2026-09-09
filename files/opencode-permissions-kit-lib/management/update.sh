@@ -700,7 +700,7 @@ if [ "$REFRESH" = true ]; then
         while IFS= read -r root; do
             [ -z "$root" ] && continue
             [ -d "$root" ] || continue
-            fs_baseline_root "$root" "$NEW_OPENCODE_GROUP"
+            fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi

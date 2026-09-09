@@ -20,6 +20,13 @@ Multiple paths at once are fine, and `~` works. System paths (`/`, `/usr`,
 `projects.conf` and applies the **group baseline** (group `opencode`, setgid,
 default ACLs `g:opencode:rwx`) in one step — no extra step needed.
 
+Roots below your home directory (like `~/dev`) work too: adding or
+refreshing a root also grants **traverse-only** ACLs (`g:opencode:--x`,
+no listing/reading) on ancestors that would otherwise block the agent —
+a home directory is `0750` on Ubuntu 24.04, and without `+x` on every
+component above the root, opencode cannot reach it at all. See
+[troubleshooting](../troubleshooting.md) for the failure picture.
+
 ### Manual equivalent
 
 ```bash

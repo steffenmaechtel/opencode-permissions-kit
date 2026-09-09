@@ -235,8 +235,9 @@ projects_add() {
         echo "$p" | sudo tee -a "$PROJECTS_CONF" > /dev/null
         # Apply the group baseline so the developer/agent share files
         # immediately — shared helper with live per-pass progress
-        # (issue #14), .git included (issue #17).
-            fs_baseline_root "$p" "$OPENCODE_GROUP"
+        # (issue #14), .git included (issue #17). The agent user enables
+        # the exact per-ancestor traversal probe (0750 developer homes).
+            fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
         # ddev handover (.ddev + the app-type's settings dirs at any depth):
         # ddev always runs as $OPENCODE_USER and chmods these paths
         # unconditionally — they must belong to it or `ddev start` fails
@@ -445,6 +446,32 @@ container_backend_apply() {
     # Re-render the sudoers.
     render_sudoers
 
+    # docker-rootless + ddev 1.25.0-1.25.2 needs the global
+    # no-bind-mounts switch (first `ddev start` would hard-error; fixed
+    # upstream in v1.25.3 — see ddev_rootless_bindmounts).
+    if [ "$new_backend" = "docker-rootless" ]; then
+        _cand_bin=""
+        for _cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
+            [ -n "$_cand" ] && [ -x "$_cand" ] && { _cand_bin="$_cand"; break; }
+        done
+        if [ -n "$_cand_bin" ]; then
+            _cand_ver=$("$_cand_bin" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+            # if/else, not `case $?` after a bare call — config.sh runs
+            # under set -e and "not needed" is rc=1.
+            if ddev_rootless_bindmounts "$OPENCODE_USER" "$new_backend" "$_cand_ver" "$_cand_bin"; then
+                ui_success "ddev no-bind-mounts global set (required for ddev $_cand_ver on docker-rootless)"
+                log "ddev no-bind-mounts set (backend switch, ddev=$_cand_ver)"
+            else
+                case $? in
+                    2) ui_warn "could not set ddev's no-bind-mounts global — an old ddev (1.25.0-1.25.2) on"
+                       ui_warn "docker-rootless fails with 'bind mounts can't be used with Docker Rootless'. Fix:"
+                       ui_detail "sudo -u $OPENCODE_USER env HOME=/home/$OPENCODE_USER ddev config global --no-bind-mounts"
+                       log "ddev no-bind-mounts setup failed (backend switch)" ;;
+                esac
+            fi
+        fi
+    fi
+
     echo ""
     ui_success "container backend switched to '$new_backend'."
     ui_detail "restart any running opencode sessions to pick up the new backend"
@@ -460,7 +487,7 @@ refresh() {
             [ -z "$p" ] && continue
             [ -d "$p" ] || continue
             # Shared helper with live per-pass progress (issue #14).
-            fs_baseline_root "$p" "$OPENCODE_GROUP"
+            fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi

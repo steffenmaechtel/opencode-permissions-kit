@@ -455,6 +455,54 @@ check "test-unit.yml chmod list includes ddev-migrate.sh" \
 check "test-e2e.yml chmod lists include ddev-migrate.sh" \
     sh -c "grep -c 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\" | grep -q '^2\$'" _ "$E2E_CI"
 
+# --- 9. rootless bind-mounts switch (ddev 1.25.0-1.25.2) ---------------------------
+# ddev_rootless_bindmounts lives in ddev-handover.sh (sourced by the
+# same three callers): docker-rootless + old ddev -> set the global
+# no-bind-mounts switch; modern ddev (>= 1.25.3) and podman keep bind
+# mounts. Uses the fake ddev from section 4 (logs every call).
+HAND="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+bm_run() {
+    sh -c '. "$1"
+        _ddev_handover_run_as() { shift 1; "$@"; }
+        ddev_rootless_bindmounts oc "$2" "$3" "$4"
+        echo "rc=$?"' _ "$HAND" "$1" "$2" "$3"
+}
+: > "$WORK/ddev-bm.log"
+OUT=$(DDEV_LOG="$WORK/ddev-bm.log" PATH="$WORK/bin:$PATH" bm_run docker-rootless 1.25.2 "$WORK/bin/ddev")
+check "ddev 1.25.2 on docker-rootless sets the switch" \
+    sh -c "printf '%s' \"\$2\" | grep -q 'rc=0' && grep -q 'ddev:config global --no-bind-mounts' \"\$1\"" _ "$WORK/ddev-bm.log" "$OUT"
+OUT=$(DDEV_LOG="$WORK/ddev-bm.log" PATH="$WORK/bin:$PATH" bm_run docker-rootless 1.25.0 "$WORK/bin/ddev")
+check "ddev 1.25.0 on docker-rootless sets the switch" \
+    sh -c "printf '%s' \"\$2\" | grep -q 'rc=0'" _ "$WORK/ddev-bm.log" "$OUT"
+_n=$(wc -l < "$WORK/ddev-bm.log" | tr -d ' ')
+assert_eq "modern ddev (1.25.3+) keeps bind mounts (no third call)" "2" "$_n"
+OUT=$(DDEV_LOG="$WORK/ddev-bm.log" PATH="$WORK/bin:$PATH" bm_run docker-rootless 1.25.3 "$WORK/bin/ddev")
+check "ddev 1.25.3 on docker-rootless is a no-op (rc=1)" \
+    sh -c "printf '%s' \"\$1\" | grep -q 'rc=1$'" _ "$OUT"
+OUT=$(DDEV_LOG="$WORK/ddev-bm.log" PATH="$WORK/bin:$PATH" bm_run podman-rootless 1.25.2 "$WORK/bin/ddev")
+check "podman-rootless never touches the switch (rc=1)" \
+    sh -c "printf '%s' \"\$1\" | grep -q 'rc=1$'" _ "$OUT"
+OUT=$(bm_run docker-rootless 1.25.2 "/does/not/exist")
+check "unknown ddev binary reports rc=2 (wanted, not possible)" \
+    sh -c "printf '%s' \"\$1\" | grep -q 'rc=2$'" _ "$OUT"
+# install.sh/config.sh run under set -e: the "not needed" rc=1 must be
+# consumable by the if/else caller pattern without aborting (regression:
+# a bare call + `case $?` killed install.sh at Step 4 on modern ddev).
+OUT=$(sh -c 'set -e
+    . "$1"
+    _ddev_handover_run_as() { shift 1; "$@"; }
+    if ddev_rootless_bindmounts oc docker-rootless 1.25.4 /bin/true; then :
+    else case $? in 2) exit 9 ;; esac
+    fi
+    echo survived' _ "$HAND")
+assert_eq "rc=1 (not needed) never trips set -e in the caller pattern" "survived" "$OUT"
+
+CONFIG_SH="$FILES/opencode-permissions-kit-lib/management/config.sh"
+check "install.sh wires the bind-mounts switch (backend + version gated)" \
+    sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\" && grep -qF '[ -n \"\$DDEV_BIN\" ] && [ -n \"\$DDEV_VERSION\" ]' \"\$1\"" _ "$INSTALL"
+check "config.sh wires the bind-mounts switch on backend changes" \
+    sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\"" _ "$CONFIG_SH"
+
 # --- Summary ------------------------------------------------------------------------
 
 # Cleanup fixture roots outside WORK.

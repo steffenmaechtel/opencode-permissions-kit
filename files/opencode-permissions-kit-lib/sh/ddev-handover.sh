@@ -152,6 +152,45 @@ ddev_type_settings_dirs() {
     return 0
 }
 
+# _ddev_handover_run_as <user> <cmd...>
+# Runs cmd as <user> with HOME re-set (sudo's env_reset drops it; ddev
+# needs HOME for its global config). Callers are root; tests override
+# this after sourcing (same pattern as ddev-migrate's
+# _ddev_migrate_run_as).
+_ddev_handover_run_as() {
+    _dhr_u="$1"; shift
+    _dhr_h=$(getent passwd "$_dhr_u" 2>/dev/null | cut -d: -f6)
+    [ -n "$_dhr_h" ] || return 1
+    sudo -u "$_dhr_u" env HOME="$_dhr_h" "$@"
+}
+
+# ddev_rootless_bindmounts <oc-user> <backend> <ddev-version> <ddev-bin>
+# ddev 1.25.0-1.25.2 hard-errors on the FIRST `ddev start` against a
+# rootless docker daemon without the global no-bind-mounts switch
+# ("bind mounts can't be used with Docker Rootless"). Upstream fixed
+# rootless bind mounts in v1.25.3, where the switch would needlessly
+# force Mutagen file sync — so it is set ONLY for docker-rootless with
+# an old ddev. Idempotent, best-effort. Returns 0 = switch set,
+# 1 = not needed (modern ddev or non-docker backend), 2 = wanted but
+# not possible (binary/version unknown or the call failed).
+ddev_rootless_bindmounts() {
+    drb_user="$1"; drb_backend="$2"; drb_ver="$3"; drb_bin="$4"
+    [ "$drb_backend" = "docker-rootless" ] || return 1
+    [ -n "$drb_bin" ] && [ -x "$drb_bin" ] || return 2
+    [ -n "$drb_ver" ] || return 2
+    drb_old=$(awk -v v="$drb_ver" 'BEGIN{
+        split(v, a, "."); split("1.25.3", b, ".")
+        for (i = 1; i <= 3; i++) {
+            if ((a[i] + 0) < (b[i] + 0)) { print "yes"; exit }
+            if ((a[i] + 0) > (b[i] + 0)) { print "no"; exit }
+        }
+        print "no" }')
+    [ "$drb_old" = "yes" ] || return 1
+    _ddev_handover_run_as "$drb_user" "$drb_bin" config global --no-bind-mounts >/dev/null 2>&1 || return 2
+    echo "  ddev global no-bind-mounts set (ddev $drb_ver on docker-rootless requires it)"
+    return 0
+}
+
 # ddev_handover_project_root <project-dir> <oc-user> <group> [dev-user]
 # Manages the project's ROOT DIRECTORY (the inode only, never its
 # contents) for the TYPO3 bootstrap case.

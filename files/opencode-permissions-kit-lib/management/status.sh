@@ -95,6 +95,41 @@ fi
 
 # === Projects ==================================================================
 
+# _st_ancestor_grants_x <dir>: does <dir> let the agent side traverse it?
+# Looser than the grant-side check in fs-baseline.sh on purpose
+# (report-only): other-x, group-x when the dir's group is the sharing
+# group, or ANY named user/group ACL entry with x (the kit only ever
+# writes group:<group> entries; a foreign named entry is almost
+# certainly a manual traversal fix). Mask reduction is ignored — the
+# warning would only be a false negative then.
+_st_ancestor_grants_x() {
+    _stx_mode=$(stat -c %A "$1" 2>/dev/null) || return 1
+    # other x: literal x or the sticky form t (/tmp); group x: literal x
+    # or the setgid form s (the kit's own 2775 dirs).
+    case "$_stx_mode" in
+        ?????????x|?????????t) return 0 ;;
+    esac
+    getfacl -p "$1" 2>/dev/null | grep -qE '^(user|group):[^:]+:..x' && return 0
+    if [ "$(stat -c %G "$1" 2>/dev/null)" = "$OPENCODE_GROUP" ]; then
+        case "$_stx_mode" in ??????x???|??????s???) return 0 ;; esac
+    fi
+    return 1
+}
+
+# _st_root_blocker <root>: echoes the first ancestor that blocks
+# traversal to <root> (empty when the whole chain is passable).
+_st_root_blocker() {
+    _str_d=$(dirname "$1")
+    while [ -n "$_str_d" ] && [ "$_str_d" != "/" ]; do
+        if ! _st_ancestor_grants_x "$_str_d"; then
+            echo "$_str_d"
+            return 0
+        fi
+        _str_d=$(dirname "$_str_d")
+    done
+    return 0
+}
+
 ui_section "Projects ($(grep -c . "$PROJECTS_CONF" 2>/dev/null || echo 0))"
 
 if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
@@ -107,6 +142,14 @@ if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
             ui_have "$root" "setgid ($root_mode) + ACLs"
         else
             ui_atten "$root" "missing setgid bit — run config.sh refresh"
+        fi
+        # Ancestor traversal: the baseline fixes the root DOWN, but a
+        # blocked ancestor (0750 developer home) keeps the agent from
+        # reaching the root at all (EACCES; ddev then claims "a project
+        # cannot be created in the DDEV source code").
+        _st_block=$(_st_root_blocker "$root")
+        if [ -n "$_st_block" ]; then
+            ui_atten "$root" "unreachable for $OPENCODE_USER — $_st_block blocks traversal (fix: sudo opk config refresh)"
         fi
     done < "$PROJECTS_CONF"
 else

@@ -127,7 +127,44 @@ grep -q 'large trees: this can take minutes' "$INSTALL" \
     && pass "install.sh hints before the getfacl backup (issue #14)" \
     || fail "install.sh hints before the getfacl backup (issue #14)"
 
-# --- 7. Makefile + CI wiring -----------------------------------------------------------
+# --- 7. ancestor traversal (fs_ensure_traversable) ------------------------------------
+# Fresh chain outside $WORK (which already carries the traverse entry
+# from the runs above): $TR (700, group GRP) -> pub (755) -> proj.
+# Ancestors of $TR/pub/proj: pub has other-x (untouched), $TR is 700
+# with the sharing group (grant), /tmp and / are world-x (untouched).
+TR=$(mktemp -d)
+mkdir -p "$TR/pub/proj" "$TR/gx/proj"
+chmod 700 "$TR"
+chmod 755 "$TR/pub"
+chmod 750 "$TR/gx"
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$TR/pub/proj" "$GRP" >/dev/null 2>&1
+if getfacl -p "$TR" 2>/dev/null | grep -q "^group:$GRP:--x"; then
+    pass "blocking ancestor gets a traverse-only ACL (x, no read/list)"
+else
+    fail "blocking ancestor gets a traverse-only ACL (got: $(getfacl -p "$TR" 2>/dev/null | grep "^group:$GRP" | tr '\n' ' '))"
+fi
+if getfacl -p "$TR" 2>/dev/null | grep -q "^group:$GRP:r"; then
+    fail "traverse grant must not add read (dir stays non-listable)"
+else
+    pass "traverse grant must not add read (dir stays non-listable)"
+fi
+if getfacl -p "$TR/pub" 2>/dev/null | grep -q "^group:$GRP:"; then
+    fail "other-x ancestor stays untouched (no ACL entry)"
+else
+    pass "other-x ancestor stays untouched (no ACL entry)"
+fi
+# 750 dir owned by the sharing group already grants group-x: no entry.
+if getfacl -p "$TR/gx" 2>/dev/null | grep -q "^group:$GRP:"; then
+    fail "group-x ancestor (dir group == sharing group) stays untouched"
+else
+    pass "group-x ancestor (dir group == sharing group) stays untouched"
+fi
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$TR/gx/proj" "$GRP" >/dev/null 2>&1
+_n=$(getfacl -p "$TR" 2>/dev/null | grep -c "^group:$GRP:--x")
+assert_eq "traverse grant is idempotent (single ACL entry)" "1" "$_n"
+rm -rf "$TR"
+
+# --- 8. Makefile + CI wiring -----------------------------------------------------------
 grep -q 'test-fs-baseline' "$MAKEFILE" \
     && pass "Makefile test target includes test-fs-baseline" \
     || fail "Makefile test target includes test-fs-baseline"
