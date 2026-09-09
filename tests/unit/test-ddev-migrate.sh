@@ -225,6 +225,11 @@ assert_eq "missing global config keeps the db" "yes" "$(has_db "$WORK/p1")"
 mkdir -p "$WORK/bin"
 cat > "$WORK/bin/ddev" <<'FAKE'
 #!/bin/sh
+# Stdin eater (regression: real ddev reads stdin — prompt/TUI probing —
+# and silently consumed the export loop's project list: ONE dump per
+# run, resume picked the next each time). Enabled explicitly so local
+# runs with a terminal don't hang on it.
+[ -n "${DDEV_EAT_STDIN:-}" ] && cat > /dev/null
 echo "ddev:$*" >> "$DDEV_LOG"
 if [ "$1" = "export-db" ]; then
     for a in "$@"; do
@@ -295,9 +300,9 @@ ddev_migrate_export "$2" "$3" "$4" "$5"
 WRAP
 
 OUT=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
-    DDEV_MIG_DEV_HOME="$WORK/devhome" DDEV_FAKE_BROKEN=1 \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" DDEV_FAKE_BROKEN=1 DDEV_EAT_STDIN=1 \
     PATH="$WORK/bin:$PATH" \
-    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts)
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null)
 DUMP_DIR=$(ls -1d "$WORK/backups"/ddev-migration-* 2>/dev/null | tail -1)
 
 check "export produced a dump directory" test -n "$DUMP_DIR"
@@ -566,6 +571,18 @@ if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/uraabe2" \
     fail "gap: complete manifest reports NO gap"
 else
     pass "gap: complete manifest reports NO gap"
+fi
+# A FAIL entry counts as ATTEMPTED (production: a project whose database
+# was never pulled must not nag the gap warning forever) — 11 OK + 1 FAIL
+# = 12 attempted vs 12 registered: no gap (OK-only counting would warn).
+sed -i '/^OK|teamshub|/d' "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
+printf 'FAIL|teamshub|%s/uraabe-vhosts/x|teamshub.sql.gz\n' "$WORK" \
+    >> "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
+if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/uraabe2" \
+    sh -c '. "$1" && ddev_migrate_gap uraabe "$2" >/dev/null' _ "$MIG" "$WORK/uraabe-vhosts"; then
+    fail "gap: FAIL entries count as attempted (no gap)"
+else
+    pass "gap: FAIL entries count as attempted (no gap)"
 fi
 
 # registry subcommand (read-only, no root gate): export/outside view

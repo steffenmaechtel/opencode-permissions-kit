@@ -142,8 +142,10 @@ ddev_migrate_outside() {
 # ddev_migrate_gap <dev-user> <root> [root ...]
 # Partial-export detector: prints "<recorded> <registered> <dump-dir>"
 # when the CURRENT registry under the roots lists MORE projects than
-# the newest manifest recorded (OK+SKIP entries), exit 0; exit 1 when
-# there is no manifest, no registry, or no gap. Production finding: a
+# the newest manifest ever ATTEMPTED (OK, SKIP and FAIL entries count —
+# a project that failed export-db for real, e.g. it never had a
+# database, must not nag forever), exit 0; exit 1 when there is no
+# manifest, no registry, or no gap. Production finding: a
 # legacy-registry install exported 1 of 12 databases, stamped
 # DDEV_EXPORTED=1, and every retry silently skipped while eleven
 # databases stayed behind in the old daemon.
@@ -151,7 +153,7 @@ ddev_migrate_gap() {
     dmg_dev="$1"; shift
     dmg_dir=$(ddev_migrate_latest_dir)
     [ -n "$dmg_dir" ] && [ -f "$dmg_dir/manifest.conf" ] || return 1
-    dmg_have=$(grep -cE '^(OK|SKIP)\|' "$dmg_dir/manifest.conf" 2>/dev/null || true)
+    dmg_have=$(grep -cE '^(OK|SKIP|FAIL)\|' "$dmg_dir/manifest.conf" 2>/dev/null || true)
     dmg_have=${dmg_have:-0}
     dmg_now=$(ddev_migrate_projects "$(ddev_migrate_home "$dmg_dev")/.ddev" "$@" 2>/dev/null | grep -c . || true)
     dmg_now=${dmg_now:-0}
@@ -302,6 +304,12 @@ ddev_migrate_export() {
     chown "$dm_dev:$dm_ocg" "$DD_MIG_DUMP_DIR" 2>/dev/null || true
     chmod 2770 "$DD_MIG_DUMP_DIR" 2>/dev/null || true
 
+    # NOTE on loop hygiene: this loop's stdin IS the project list (the
+    # printf pipe), and ddev reads stdin (prompt/TUI probing) — without
+    # the explicit </dev/null on every ddev invocation below, the first
+    # ddev call consumed the remaining list and the loop silently ended
+    # after ONE project per run (production finding: 12 databases, one
+    # dump per export invocation, resume picked up the next each time).
     printf '%s\n' "$dm_list" | while IFS='|' read -r dm_n dm_ar; do
         echo "  exporting $dm_n ($dm_ar) ..."
         # Resume: intact dump + OK entry in THIS directory — skip the
@@ -331,13 +339,13 @@ ddev_migrate_export() {
             echo "SKIP|$dm_n|$dm_ar|no-db-container" >> "$DD_MIG_DUMP_DIR/manifest.conf"
             continue
         fi
-        if ! _ddev_migrate_run_as "$dm_dev" "$dm_bin" start "$dm_n" >/dev/null 2>&1; then
+        if ! _ddev_migrate_run_as "$dm_dev" "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1; then
             echo "    FAILED: ddev start — project left untouched, import this one manually"
             echo "FAIL|$dm_n|$dm_ar|" >> "$DD_MIG_DUMP_DIR/manifest.conf"
             continue
         fi
         dm_err="$DD_MIG_DUMP_DIR/.export-$dm_n.err"
-        if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" >"$dm_err" 2>&1 \
+        if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" </dev/null >"$dm_err" 2>&1 \
            && [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
             echo "    dump: $DD_MIG_DUMP_DIR/$dm_n.sql.gz"
             echo "OK|$dm_n|$dm_ar|$dm_n.sql.gz" >> "$DD_MIG_DUMP_DIR/manifest.conf"
@@ -356,14 +364,14 @@ ddev_migrate_export() {
         # Stop this project before the next one starts: a production
         # machine may hold dozens of ddev projects — running them all at
         # once would exhaust RAM. Volumes are kept by plain `ddev stop`.
-        _ddev_migrate_run_as "$dm_dev" "$dm_bin" stop "$dm_n" >/dev/null 2>&1 \
+        _ddev_migrate_run_as "$dm_dev" "$dm_bin" stop "$dm_n" </dev/null >/dev/null 2>&1 \
             || echo "    NOTE: ddev stop failed — stop $dm_n manually to free its resources"
     done
 
     # One poweroff stops every project AND the old ddev-router: the ports
     # are free for the opencode-side router later. Containers are removed
     # but database volumes stay — nothing is destroyed.
-    _ddev_migrate_run_as "$dm_dev" "$dm_bin" poweroff >/dev/null 2>&1 \
+    _ddev_migrate_run_as "$dm_dev" "$dm_bin" poweroff </dev/null >/dev/null 2>&1 \
         && echo "  old ddev powered off (database volumes kept)" \
         || echo "  NOTE: ddev poweroff failed — stop the old projects manually before the first opencode-side start"
 
@@ -423,9 +431,12 @@ ddev_migrate_import() {
         [ "$dm_st" = "OK" ] && [ -n "$dm_n" ] && [ -n "$dm_ar" ] && [ -n "$dm_f" ] || continue
         [ -f "$dm_dir/$dm_f" ] || { echo "  $dm_n: dump missing ($dm_dir/$dm_f)"; dm_failed="$dm_failed $dm_n"; continue; }
         echo "  importing $dm_n ($dm_ar) ..."
+        # </dev/null: this loop's stdin IS manifest.conf — ddev reads
+        # stdin and would consume the manifest mid-iteration (same class
+        # as the export-loop finding).
         # shellcheck disable=SC2086  # word splitting intended (env assignments)
-        if sudo -u "$dm_oc" env $dm_env "$dm_bin" start "$dm_n" >/dev/null 2>&1 \
-           && sudo -u "$dm_oc" env $dm_env "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" >/dev/null 2>&1; then
+        if sudo -u "$dm_oc" env $dm_env "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 \
+           && sudo -u "$dm_oc" env $dm_env "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" </dev/null >/dev/null 2>&1; then
             echo "    imported: $dm_f"
             dm_ok=$((dm_ok + 1))
         else
