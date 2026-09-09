@@ -274,8 +274,16 @@ if [ -n "$_mig_dir" ] && [ -f "$_mig_dir/manifest.conf" ]; then
     if [ "$_mig_ok" -gt 0 ]; then
         _mig_imported=0
         if [ -d "/home/$OPENCODE_USER/.ddev" ]; then
-            _mig_imported=$(grep -c '^project_info:' "/home/$OPENCODE_USER/.ddev/global_config.yaml" 2>/dev/null || true)
-            _mig_imported=${_mig_imported:-0}
+            # ddev >= 1.23 registers into project_list.yaml, older into
+            # the project_info: block of global_config.yaml — either
+            # means the opencode side already has projects.
+            if [ -f "/home/$OPENCODE_USER/.ddev/project_list.yaml" ] \
+                && grep -q 'approot:' "/home/$OPENCODE_USER/.ddev/project_list.yaml" 2>/dev/null; then
+                _mig_imported=1
+            else
+                _mig_imported=$(grep -c '^project_info:' "/home/$OPENCODE_USER/.ddev/global_config.yaml" 2>/dev/null || true)
+                _mig_imported=${_mig_imported:-0}
+            fi
         fi
         if [ "$_mig_imported" -gt 0 ]; then
             ui_kv "db dumps" "$_mig_ok dump(s) — ${_mig_dir##*/}" "$UI_GREEN"

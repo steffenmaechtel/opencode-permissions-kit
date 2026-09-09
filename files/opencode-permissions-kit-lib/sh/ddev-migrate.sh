@@ -43,20 +43,18 @@
 
 DDEV_MIG_BACKUP_ROOT="${DDEV_MIG_BACKUP_ROOT:-/var/backups/opencode-permissions-kit}"
 
-# ddev_migrate_registry <ddev-home>
-# Prints "name|approot" for every project in ddev's global registry
-# (global_config.yaml). No ddev binary, no jq — pure awk over the YAML
-# subset ddev actually writes:
-#   project_info:
-#     <name>:
-#       approot: /path/to/project
-ddev_migrate_registry() {
-    dm_gc="${1:-}/global_config.yaml"
-    [ -f "$dm_gc" ] || return 0
+# _ddev_migrate_scan_registry <yaml-file>
+# Prints "name|approot" pairs from a ddev project-list YAML. No ddev
+# binary, no jq — pure awk over the YAML subset ddev actually writes
+# (name -> approot map; leading indentation is stripped, so one scanner
+# covers both the standalone top-level map and the project_info:-nested
+# variant):
+#   <name>:
+#     approot: /path/to/project
+_ddev_migrate_scan_registry() {
+    [ -f "${1:-}" ] || return 0
     awk '
-        /^project_info:/ { inb = 1; next }
-        inb && /^[^ \t#]/ { inb = 0 }
-        inb {
+        {
             line = $0
             sub(/^[ \t]+/, "", line)
             if (line ~ /^#/) next
@@ -68,7 +66,24 @@ ddev_migrate_registry() {
                 if (name != "" && line != "") printf "%s|%s\n", name, line
             }
         }
-    ' "$dm_gc"
+    ' "$1"
+    return 0
+}
+
+# ddev_migrate_registry <ddev-home>
+# Prints "name|approot" for every project in ddev's global registry —
+# from BOTH registry layouts ddev has used: project_list.yaml (ddev >=
+# 1.23.0 moved the list into its own file, commit 94d77509a) and the
+# legacy project_info: block inside global_config.yaml (ddev < 1.23 and
+# not-yet-migrated homes — ddev clears it on first run of a newer
+# version). A name present in both (mid-migration) is printed twice —
+# harmless: callers filter by approot and the export resume logic skips
+# projects whose dump is already in the manifest.
+ddev_migrate_registry() {
+    dm_rh="${1:-}"
+    [ -n "$dm_rh" ] || return 0
+    _ddev_migrate_scan_registry "$dm_rh/project_list.yaml"
+    _ddev_migrate_scan_registry "$dm_rh/global_config.yaml"
     return 0
 }
 
@@ -99,9 +114,14 @@ ddev_migrate_projects() {
 # ddev_migrate_done <opencode-user>
 # True (0) when the opencode user already has registered ddev projects —
 # the switch already happened, an export would find a broken dev side.
+# Both registry layouts count (see ddev_migrate_registry): modern
+# project_list.yaml and the legacy project_info: block. DDEV_MIG_OC_HOME
+# overrides the home base (keeps unit tests hermetic — the real path is
+# always /home/<opencode-user>).
 ddev_migrate_done() {
-    dm_ocgc="/home/${1:-opencode}/.ddev/global_config.yaml"
-    [ -f "$dm_ocgc" ] && grep -q '^project_info:' "$dm_ocgc" 2>/dev/null
+    dm_ocd="${DDEV_MIG_OC_HOME:-/home/${1:-opencode}}/.ddev"
+    { [ -f "$dm_ocd/project_list.yaml" ] && grep -q 'approot:' "$dm_ocd/project_list.yaml" 2>/dev/null; } && return 0
+    [ -f "$dm_ocd/global_config.yaml" ] && grep -q '^project_info:' "$dm_ocd/global_config.yaml" 2>/dev/null
 }
 
 # _ddev_migrate_run_as <user> <cmd...>
