@@ -3,7 +3,8 @@
 # opencode-permissions-kit-lib/sh/ddev-migrate.sh + its install.sh wiring.
 # Runs against the repo files as the CURRENT user — no root, no real ddev
 # required (a fake ddev on PATH records the command sequence). Verifies:
-#   - the registry parser (global_config.yaml project_info/approot)
+#   - the registry parser (project_list.yaml for ddev >= 1.23 AND the
+#     legacy global_config.yaml project_info/approot block)
 #   - the root filter (only projects under registered roots)
 #   - the omit_containers detection (inline + block YAML, project + global)
 #   - the export loop: project NAME arguments (never paths), start ->
@@ -109,6 +110,74 @@ beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
 # Nonexistent approots are dropped (stale registry entries).
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/does/not/exist")
 assert_eq "root filter with no matching dirs yields nothing" "" "$RESULT"
+
+# --- 2b. ddev >= 1.23 registry: standalone project_list.yaml -----------------------
+# ddev >= 1.23.0 (commit 94d77509a) keeps the project list in its own
+# project_list.yaml — top-level name map, 4-space indent as written by
+# ddev's yaml.Marshal — and clears the legacy project_info: block in
+# global_config.yaml on first run. The parser must read BOTH layouts.
+mkdir -p "$WORK/devhome123/.ddev"
+cat > "$WORK/devhome123/.ddev/project_list.yaml" <<'YML'
+shopware-test-260605:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+    used_host_ports: []
+beta:
+    approot: "/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta"
+outside:
+    approot: /var/tmp/opencode-ddev-mig-roots/srv/other/outside
+YML
+printf 'last_started_version: v1.25.2\nwebimage: ddev/ddev-webserver\n' > "$WORK/devhome123/.ddev/global_config.yaml"
+
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev")
+assert_eq "registry parser reads the ddev >= 1.23 project_list.yaml (quoted + unquoted)" \
+    "shopware-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
+outside|/var/tmp/opencode-ddev-mig-roots/srv/other/outside" "$RESULT"
+
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome123/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
+assert_eq "root filter applies to project_list.yaml projects too" \
+    "shopware-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
+
+# Both layouts side by side (mid-migration home): entries from both
+# files are emitted — duplicates are tolerated downstream (the export
+# resume logic skips projects already in the manifest).
+mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/gamma
+cat > "$WORK/devhome123/.ddev/global_config.yaml" <<'YML'
+project_info:
+  legacy-only:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/gamma
+YML
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome123/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
+assert_eq "legacy and modern registry files are BOTH scanned" \
+    "shopware-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
+legacy-only|/var/tmp/opencode-ddev-mig-roots/vhosts/gamma" "$RESULT"
+
+# ddev creates an EMPTY project_list.yaml on fresh homes — no projects.
+printf 'last_started_version: v1.25.2\n' > "$WORK/devhome123/.ddev/global_config.yaml"
+: > "$WORK/devhome123/.ddev/project_list.yaml"
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev")
+assert_eq "empty project_list.yaml + bare global config yields nothing" "" "$RESULT"
+
+# --- 2c. ddev_migrate_done: both registry layouts count ----------------------------
+# DDEV_MIG_OC_HOME pins the check to the fixture (real path is always
+# /home/<opencode-user>).
+done_check() { sh -c ". \"\$1\" && if DDEV_MIG_OC_HOME=\"\$2\" ddev_migrate_done oc; then echo yes; else echo no; fi" _ "$MIG" "$1"; }
+mkdir -p "$WORK/ochome/.ddev"
+
+printf 'last_started_version: v1.25.2\n' > "$WORK/ochome/.ddev/global_config.yaml"
+: > "$WORK/ochome/.ddev/project_list.yaml"
+assert_eq "done: bare modern home (empty list) is NOT done" "no" "$(done_check "$WORK/ochome")"
+
+printf 'shopware:\n    approot: /tmp/shopware\n' > "$WORK/ochome/.ddev/project_list.yaml"
+assert_eq "done: project_list.yaml entries count" "yes" "$(done_check "$WORK/ochome")"
+
+rm -f "$WORK/ochome/.ddev/project_list.yaml"
+printf 'project_info:\n  p:\n    approot: /tmp/p\n' > "$WORK/ochome/.ddev/global_config.yaml"
+assert_eq "done: legacy project_info block counts" "yes" "$(done_check "$WORK/ochome")"
+
+rm -rf "$WORK/devhome123" "$WORK/ochome"
 
 # --- 3. omit_containers detection -------------------------------------------------
 
@@ -370,6 +439,8 @@ check "update.sh deploys ddev-migrate.sh" \
     sh -c "grep -q '\"\$LIBDIR/sh/ddev-migrate.sh\"' \"\$1\" && grep -q '\"\$LIBDIR/bin/ddev-migrate\"' \"\$1\"" _ "$UPDATE"
 check "status.sh reports dumps waiting for import" \
     sh -c "grep -q 'db dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$STATUS"
+check "status.sh import detection knows the ddev >= 1.23 project_list.yaml" \
+    sh -c "grep -q 'project_list.yaml' \"\$1\" && grep -q 'approot:' \"\$1\"" _ "$STATUS"
 
 # --- 8. Makefile + CI wiring --------------------------------------------------------
 

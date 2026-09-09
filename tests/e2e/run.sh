@@ -76,7 +76,12 @@ echo "--- 1c. ddev migration fixtures (fake ddev + dev registry, issue #15) ---"
 FAKE_DDEV_B64="$(base64 "$(dirname "$(readlink -f "$0")")/fake-ddev" | tr -d '\n')"
 E "echo $FAKE_DDEV_B64 | base64 -d | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev"
 E 'mkdir -p /home/dev/.ddev /var/www/vhosts/ddev-mig/.ddev /var/www/vhosts/ddev-broken/.ddev'
-E 'printf "%s\n" "project_info:" "  ddev-mig:" "    approot: /var/www/vhosts/ddev-mig" "  ddev-broken:" "    approot: /var/www/vhosts/ddev-broken" > /home/dev/.ddev/global_config.yaml'
+# Registry layouts as a real ddev home has them (>= 1.23): projects in
+# the standalone project_list.yaml (4-space indent, yaml.Marshal form),
+# the legacy project_info: block left over in global_config.yaml for a
+# not-yet-migrated project — the install must export from BOTH.
+E 'printf "%s\n" "ddev-mig:" "    approot: /var/www/vhosts/ddev-mig" > /home/dev/.ddev/project_list.yaml'
+E 'printf "%s\n" "project_info:" "  ddev-broken:" "    approot: /var/www/vhosts/ddev-broken" > /home/dev/.ddev/global_config.yaml'
 E 'printf "type: typo3\n" > /var/www/vhosts/ddev-mig/.ddev/config.yaml && printf "type: typo3\n" > /var/www/vhosts/ddev-broken/.ddev/config.yaml'
 E 'touch /var/www/vhosts/ddev-mig/.ddev/.webimageBuild'
 # Group-baseline fixtures: a pre-install tree (dir + file, dev-owned 644)

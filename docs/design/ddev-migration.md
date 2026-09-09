@@ -54,9 +54,14 @@ directories themselves stay in place and are shared via the group baseline.
 
 ### Details that came out of the ddev source (github.com/ddev/ddev)
 
-- ddev commands address projects by **NAME** (the registry key in
-  `global_config.yaml` → `project_info.<name>.approot`), never by path —
-  `getRequestedProjects()` looks names up in the docker/registry maps.
+- ddev commands address projects by **NAME** (the registry key), never
+  by path — `getRequestedProjects()` looks names up in the
+  docker/registry maps. The registry itself lives in
+  `project_list.yaml` (`<name>.approot`) since ddev v1.23.0 (commit
+  `94d77509a`); older ddev (and not-yet-migrated homes) carries the same
+  pairs in the `project_info:` block of `global_config.yaml`. The kit
+  parses BOTH — a ddev ≥ 1.23 machine has already migrated away from
+  the legacy block.
 - `omit_containers` (project config) and `omit_containers_global` (global
   config) accept only `db` and `ddev-ssh-agent`
   (pkg/nodeps/values.go `ValidOmitContainers`). Projects omitting `db`
