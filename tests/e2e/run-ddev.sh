@@ -555,12 +555,24 @@ if [ "$_daemon_ok" = true ]; then
     # now probes it and falls back to the opencode home with a stderr
     # note. This is the real transport: dev shell -> ddev() -> sudoers
     # helper -> real ddev, against the live dd2 project.
-    check "DD7: ddev stop by name from the dev's unreadable home (#51)" \
+    # NB: since the ancestor-traversal fix the kit grants g:opencode:--x
+    # on /home/dev whenever a registered root lives under it (DD1 does
+    # exactly that), so $HOME itself is now SEARCHABLE for the agent:
+    # stopping from there runs clean WITHOUT the fallback note (strictly
+    # better — that is the fix working). The note itself is
+    # regression-tested from ~/locked: a 700 dir the kit never grants on
+    # (sibling branch, not an ancestor of any root).
+    E 'mkdir -p /home/dev/locked && chmod 700 /home/dev/locked'
+    check "DD7: ddev stop by name from the dev's home (#51 + traversal fix)" \
         DEVSH 'cd ~ && ddev stop dd2 >/tmp/dd7-stop.log 2>&1'
-    check "DD7: no compose-spec warning from the unreadable cwd (#51)" \
+    check "DD7: no compose-spec warning from the x-only home cwd (#51)" \
         E 'test -z "$(grep -s "compose-spec.json" /tmp/dd7-stop.log)"'
+    check "DD7: no fallback note from the now-traversable home (traversal fix)" \
+        E 'test -z "$(grep -s "not accessible to the opencode user" /tmp/dd7-stop.log)"'
+    check "DD7: ddev stop works from an ungranted dir too (#51)" \
+        DEVSH 'cd ~/locked && ddev stop dd2 >/tmp/dd7-locked.log 2>&1'
     check "DD7: the fallback note names the run directory (#51)" \
-        E 'grep -q "not accessible to the opencode user" /tmp/dd7-stop.log'
+        E 'grep -q "not accessible to the opencode user" /tmp/dd7-locked.log'
     check "DD7: ddev delete -Oy" \
         OC_DD2 'ddev delete -Oy >/tmp/dd7.log 2>&1'
     # EXCLUDED logs hold EXPECTED EPERM text: dd13-start1 (the DD13
