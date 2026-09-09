@@ -143,6 +143,21 @@ ls /var/backups/opencode-permissions-kit/ddev-migration-*/
 
 Details: [ddev integration](concepts/ddev-integration.md).
 
+**Only some of my databases were exported** — the install said
+`N ok, 0 failed` with N smaller than your project count and continued:
+
+- See what the export would take today (read-only, as your user):
+  `/usr/local/lib/opencode-permissions-kit/bin/ddev-migrate registry <your-user> <project-roots>`
+  — projects listed as `outside:` fall outside the registered roots and
+  are never exported.
+- Registry entries can also have grown AFTER a (partial) export — for
+  example a pre-1.23-format install exported from a stale legacy block.
+  `opk status` reports `db dumps INCOMPLETE` in that case, and later
+  installs warn about it. Fix: follow the `.ddev already handed over`
+  runbook above once — `ddev-migrate export` skips projects that already
+  have a dump in the newest manifest (resume), so only the missing ones
+  run.
+
 ## The agent gets "Permission denied" on my project / ddev claims "a project cannot be created in the DDEV source code"
 
 **Cause:** a project root under your home directory (for example

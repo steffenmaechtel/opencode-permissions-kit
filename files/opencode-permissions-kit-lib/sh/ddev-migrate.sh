@@ -87,6 +87,26 @@ ddev_migrate_registry() {
     return 0
 }
 
+# ddev_migrate_under_roots <approot> <root> [root ...]
+# True (0) when <approot> lies under one of the roots (or equals one).
+ddev_migrate_under_roots() {
+    dmur_p="${1%/}"
+    shift
+    for dmur_r in "$@"; do
+        case "$dmur_p" in "${dmur_r%/}"|"${dmur_r%/}"/*) return 0 ;; esac
+    done
+    return 1
+}
+
+# ddev_migrate_home <user>
+# The user's home via getent, DDEV_MIG_DEV_HOME as override (keeps the
+# unit tests hermetic — never read a real user's registry there).
+ddev_migrate_home() {
+    dmh_h=$(getent passwd "$1" 2>/dev/null | cut -d: -f6)
+    [ -n "$dmh_h" ] || dmh_h="/home/$1"
+    printf '%s\n' "${DDEV_MIG_DEV_HOME:-$dmh_h}"
+}
+
 # ddev_migrate_projects <ddev-home> <root> [root ...]
 # Like ddev_migrate_registry, but only projects whose approot lies under
 # one of the registered roots (those are the projects the kit takes over)
@@ -97,17 +117,46 @@ ddev_migrate_projects() {
     ddev_migrate_registry "$dm_ph" | while IFS='|' read -r dm_n dm_ar; do
         [ -n "$dm_ar" ] || continue
         [ -d "$dm_ar" ] || continue
-        dm_ar="${dm_ar%/}"
-        for dm_r in "$@"; do
-            dm_r="${dm_r%/}"
-            case "$dm_ar" in
-                "$dm_r"|"$dm_r"/*)
-                    printf '%s|%s\n' "$dm_n" "$dm_ar"
-                    break
-                    ;;
-            esac
-        done
+        if ddev_migrate_under_roots "$dm_ar" "$@"; then
+            printf '%s|%s\n' "$dm_n" "${dm_ar%/}"
+        fi
     done
+    return 0
+}
+
+# ddev_migrate_outside <ddev-home> <root> [root ...]
+# Names of registry projects whose approot is NOT under any of the given
+# roots — BEFORE the dir-existence filter: the point is to expose what
+# the root filter silently drops (production finding: one of twelve
+# projects exported, no hint why).
+ddev_migrate_outside() {
+    dmo_ph="${1:-}"; shift
+    [ -n "$dmo_ph" ] || return 0
+    ddev_migrate_registry "$dmo_ph" | while IFS='|' read -r dmo_n dmo_ar; do
+        [ -n "$dmo_ar" ] || continue
+        ddev_migrate_under_roots "$dmo_ar" "$@" || printf '%s\n' "$dmo_n"
+    done
+    return 0
+}
+
+# ddev_migrate_gap <dev-user> <root> [root ...]
+# Partial-export detector: prints "<recorded> <registered> <dump-dir>"
+# when the CURRENT registry under the roots lists MORE projects than
+# the newest manifest recorded (OK+SKIP entries), exit 0; exit 1 when
+# there is no manifest, no registry, or no gap. Production finding: a
+# legacy-registry install exported 1 of 12 databases, stamped
+# DDEV_EXPORTED=1, and every retry silently skipped while eleven
+# databases stayed behind in the old daemon.
+ddev_migrate_gap() {
+    dmg_dev="$1"; shift
+    dmg_dir=$(ddev_migrate_latest_dir)
+    [ -n "$dmg_dir" ] && [ -f "$dmg_dir/manifest.conf" ] || return 1
+    dmg_have=$(grep -cE '^(OK|SKIP)\|' "$dmg_dir/manifest.conf" 2>/dev/null || true)
+    dmg_have=${dmg_have:-0}
+    dmg_now=$(ddev_migrate_projects "$(ddev_migrate_home "$dmg_dev")/.ddev" "$@" 2>/dev/null | grep -c . || true)
+    dmg_now=${dmg_now:-0}
+    [ "$dmg_now" -gt "$dmg_have" ] || return 1
+    printf '%s %s %s\n' "$dmg_have" "$dmg_now" "$dmg_dir"
     return 0
 }
 
@@ -220,14 +269,19 @@ ddev_migrate_export() {
         echo "  ddev not found — cannot export databases."
         return 1
     }
-    # The dev user's ddev home: real passwd entry (homes do not have to be
-    # under /home), DDEV_MIG_DEV_HOME as an override (keeps the unit
-    # tests hermetic — never read a real user's registry there).
-    dm_home=$(getent passwd "$dm_dev" 2>/dev/null | cut -d: -f6)
-    [ -n "$dm_home" ] || dm_home="/home/$dm_dev"
-    dm_home="${DDEV_MIG_DEV_HOME:-$dm_home}"
+    # The dev user's ddev home (DDEV_MIG_DEV_HOME override keeps the
+    # unit tests hermetic — never read a real user's registry there).
+    dm_home=$(ddev_migrate_home "$dm_dev")
     dm_list=$(ddev_migrate_projects "$dm_home/.ddev" "$@")
     [ -n "$dm_list" ] || { echo "  no ddev projects under the registered roots."; return 1; }
+    # Registry entries outside the given roots are legal by design (the
+    # kit only takes over registered roots) — but a silently shrinking
+    # dump set is the #1 migration surprise. Say it loudly, with names.
+    dm_outside=$(ddev_migrate_outside "$dm_home/.ddev" "$@")
+    if [ -n "$dm_outside" ]; then
+        echo "  WARNING: $(printf '%s\n' "$dm_outside" | grep -c .) registered ddev project(s) are OUTSIDE the given roots — NOT exported:"
+        printf '%s\n' "$dm_outside" | sed 's/^/    /'
+    fi
 
     dm_stamp=$(date +%Y%m%d-%H%M%S)
     # Resume: an interrupted install (Ctrl-C mid-export, or the
@@ -395,4 +449,7 @@ _ddev_migrate_usage() {
     echo "  export <dev-user> <project-root> [root ...]   export ddev databases as <dev-user> (root)"
     echo "  import [dump-dir]                              import dumps as the opencode user (root)"
     echo "  list                                           show dump directories + contents"
+    echo "  registry <dev-user> [root ...]                 print the dev user's ddev registry; with"
+    echo "                                                 roots: which projects an export would"
+    echo "                                                 take and which fall outside (read-only)"
 }

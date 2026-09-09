@@ -503,6 +503,91 @@ check "install.sh wires the bind-mounts switch (backend + version gated)" \
 check "config.sh wires the bind-mounts switch on backend changes" \
     sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\"" _ "$CONFIG_SH"
 
+# --- 10. partial-export hardening (production finding: 1 of 12) --------------------
+# Real-world registry, verbatim from the report: mixed-case and dotted
+# project names, all approots under one root. The parser must yield all
+# twelve and nothing may fall outside the root.
+mkdir -p "$WORK/uraabe/.ddev"
+cat > "$WORK/uraabe/.ddev/project_list.yaml" <<'YML'
+adk:
+    approot: /home/uraabe/www/vhosts/academy-dk
+blackforest24-SW6:
+    approot: /home/uraabe/www/vhosts/blackforest24-SW6
+bruder-shopware-sw6:
+    approot: /home/uraabe/www/vhosts/bruder-shopware-sw6
+brudertoys-sap:
+    approot: /home/uraabe/www/vhosts/brudertoys-sap
+od-multi-store:
+    approot: /home/uraabe/www/vhosts/od-multi-store
+sascha-advent-calendar:
+    approot: /home/uraabe/www/vhosts/sascha-advent-calendar
+shopware-test-260605:
+    approot: /home/uraabe/www/vhosts/shopware-test-260605
+swdemo-6-7-0-1:
+    approot: /home/uraabe/www/vhosts/swdemo_6_7_0_1
+teamshub:
+    approot: /home/uraabe/www/vhosts/teamshub
+weindepot-vinum:
+    approot: /home/uraabe/www/vhosts/weindepot-vinum
+wf-xmas:
+    approot: /home/uraabe/www/vhosts/wf-xmas
+www.innova-vital.de:
+    approot: /home/uraabe/www/vhosts/www.innova-vital.de
+YML
+assert_eq "real-world registry: all 12 projects parsed (case + dots)" "12" \
+    "$(sh -c '. "$1" && ddev_migrate_registry "$2"' _ "$MIG" "$WORK/uraabe/.ddev" | grep -c .)"
+assert_eq "real-world registry: nothing outside the root" "" \
+    "$(sh -c '. "$1" && ddev_migrate_outside "$2" /home/uraabe/www/vhosts' _ "$MIG" "$WORK/uraabe/.ddev")"
+assert_eq "narrow root: the other 11 are reported outside" "11" \
+    "$(sh -c '. "$1" && ddev_migrate_outside "$2" /home/uraabe/www/vhosts/academy-dk' _ "$MIG" "$WORK/uraabe/.ddev" | grep -c .)"
+
+# The gap detector needs the approots to EXIST (ddev_migrate_projects
+# drops stale entries) — mirror the registry into the fixture tree.
+mkdir -p "$WORK/uraabe2/.ddev"
+sed "s|/home/uraabe/www/vhosts|$WORK/uraabe-vhosts|g" "$WORK/uraabe/.ddev/project_list.yaml" \
+    > "$WORK/uraabe2/.ddev/project_list.yaml"
+sh -c '. "$1" && ddev_migrate_registry "$2"' _ "$MIG" "$WORK/uraabe2/.ddev" \
+    | while IFS='|' read -r _gn _ga; do mkdir -p "$_ga"; done
+mkdir -p "$WORK/gapbackups/ddev-migration-20260909-232704"
+printf 'OK|adk|%s/uraabe-vhosts/academy-dk|adk.sql.gz\n' "$WORK" \
+    > "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
+GAP=$(DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/uraabe2" \
+    sh -c '. "$1" && ddev_migrate_gap uraabe "$2"' _ "$MIG" "$WORK/uraabe-vhosts")
+assert_eq "gap: 1 dump recorded vs 12 registered -> have/now reported" \
+    "1 12 $WORK/gapbackups/ddev-migration-20260909-232704" "$GAP"
+for _gn in blackforest24-SW6 bruder-shopware-sw6 brudertoys-sap od-multi-store \
+           sascha-advent-calendar shopware-test-260605 swdemo-6-7-0-1 teamshub \
+           weindepot-vinum wf-xmas www.innova-vital.de; do
+    printf 'OK|%s|%s/uraabe-vhosts/x|%s.sql.gz\n' "$_gn" "$WORK" "$_gn" \
+        >> "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
+done
+if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/uraabe2" \
+    sh -c '. "$1" && ddev_migrate_gap uraabe "$2" >/dev/null' _ "$MIG" "$WORK/uraabe-vhosts"; then
+    fail "gap: complete manifest reports NO gap"
+else
+    pass "gap: complete manifest reports NO gap"
+fi
+
+# registry subcommand (read-only, no root gate): export/outside view
+OUT=$(DDEV_MIG_DEV_HOME="$WORK/uraabe2" sh "$BIN_MIG" registry uraabe "$WORK/uraabe-vhosts")
+assert_eq "registry cmd: all 12 under the root classified export" "12" \
+    "$(printf '%s\n' "$OUT" | grep -c '^  export:')"
+assert_eq "registry cmd: none outside" "0" \
+    "$(printf '%s\n' "$OUT" | grep -c '^  outside:')"
+OUT=$(DDEV_MIG_DEV_HOME="$WORK/uraabe2" sh "$BIN_MIG" registry uraabe "$WORK/uraabe-vhosts/academy-dk" 2>/dev/null || true)
+assert_eq "registry cmd: narrow root -> 1 export, 11 outside" "1 11" \
+    "$(printf '%s\n' "$OUT" | grep -c '^  export:') $(printf '%s\n' "$OUT" | grep -c '^  outside:')"
+
+# wiring: the outside warning + the install/status gap detectors exist
+check "export warns about registry projects outside the roots" \
+    sh -c "grep -q 'OUTSIDE the given roots' \"\$1\"" _ "$MIG"
+check "install.sh warns on skip branches when the registry outgrew the manifest" \
+    sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$(grep -c '_ddev_mig_gap_warn' \"\$1\")\" -ge 3 ]" _ "$INSTALL"
+check "status.sh reports INCOMPLETE dumps vs the dev registry" \
+    sh -c "grep -q 'INCOMPLETE — registry lists' \"\$1\" && grep -q 'ddev-migrate registry' \"\$1\"" _ "$STATUS"
+check "bin dispatcher has the registry subcommand" \
+    sh -c "grep -q 'registry)' \"\$1\"" _ "$BIN_MIG"
+
 # --- Summary ------------------------------------------------------------------------
 
 # Cleanup fixture roots outside WORK.
