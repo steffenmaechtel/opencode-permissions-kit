@@ -143,6 +143,44 @@ ls /var/backups/opencode-permissions-kit/ddev-migration-*/
 
 Details: [ddev integration](concepts/ddev-integration.md).
 
+## The agent gets "Permission denied" on my project / ddev claims "a project cannot be created in the DDEV source code"
+
+**Cause:** a project root under your home directory (for example
+`/home/<you>/www/vhosts`) needs `+x` on EVERY path component above it —
+and Ubuntu 24.04 ships home directories as `0750 <you>:<you>`. The group
+baseline fixes the root itself, but with a non-traversable home the
+`opencode` user cannot resolve the path at all: `opencode` fails with
+`EACCES: permission denied, lstat '<project>'`, and ddev misreports the
+same EACCES as `a project cannot be created in the DDEV source code`
+(its file-exists check treats "permission denied" as "exists").
+
+**Fix:** the installer and `opk config refresh` grant traverse-only ACLs
+(`g:<sharing-group>:--x` — no listing, no reading) on the blocking
+ancestors automatically. To repair an older install:
+
+```bash
+sudo opk config refresh
+# or manually (traverse-only, no read):
+sudo setfacl -m g:opencode:X /home/<you> /home/<you>/www
+```
+
+`opk status` shows a warning per affected root.
+
+## ddev start fails with "bind mounts can't be used with Docker Rootless"
+
+**Cause:** ddev 1.25.0–1.25.2 cannot use bind mounts against a rootless
+Docker daemon; upstream fixed that in v1.25.3.
+
+**Fix:** the installer and the `opk config container-backend
+docker-rootless` switch set ddev's global `no-bind-mounts` flag
+automatically when they detect one of those versions — nothing to do.
+On an affected existing install, run it once yourself (or upgrade ddev
+to >= 1.25.3):
+
+```bash
+sudo -u opencode env HOME=/home/opencode ddev config global --no-bind-mounts
+```
+
 ## ddev complains it cannot bind port 80/443
 
 **Cause:** rootless containers cannot bind ports < 1024.

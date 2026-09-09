@@ -407,7 +407,9 @@ echo "--- DD1. kit install on the warm image (upgrade-style) ---"
 E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSION"'/opencode' || {
     E 'test -x /home/dev/.opencode/bin/opencode' || { echo "  ${RED}E2E aborted — cannot install opencode.${NC}"; failures=$((failures + 1)); exit 1; }
 }
-if ! E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend docker-rootless --projects /var/www/vhosts --skip-ddev-migration >/tmp/dd-install.log 2>&1'; then
+# Ancestor-traversal fixture: second root UNDER the 0750 dev home.
+E 'mkdir -p /home/dev/vhosts/hometest && chmod 750 /home/dev'
+if ! E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend docker-rootless --projects "/var/www/vhosts /home/dev/vhosts" --skip-ddev-migration >/tmp/dd-install.log 2>&1'; then
     echo "  ${RED}FAIL${NC}  kit install failed:"; failures=$((failures + 1))
     E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-install.log | tail -30' || true
     exit 1
@@ -415,6 +417,12 @@ fi
 echo "  ${GREEN}OK${NC}  kit install completed"
 check "DD1: install.conf records docker-rootless" \
     E 'grep -q "^CONTAINER_BACKEND=docker-rootless" /etc/opencode-permissions-kit/install.conf'
+check "DD1: traverse-only ACL granted on the 0750 dev home" \
+    E 'getfacl -p /home/dev 2>/dev/null | grep -q "^group:opencode:--x"'
+check "DD1: opencode can stat the root under the dev home" \
+    E 'sudo -u opencode stat /home/dev/vhosts/hometest >/dev/null'
+check "DD1: modern ddev keeps bind mounts (switch not forced)" \
+    E '! grep -q "^no_bind_mounts: true" /home/opencode/.ddev/global_config.yaml 2>/dev/null'
 check "DD1: dev-owned mode is the installer default" \
     E 'grep -q "^DDEV_DEV_OWNED=true" /etc/opencode-permissions-kit/install.conf'
 check "DD1: wrapper at /usr/local/bin/opencode" \

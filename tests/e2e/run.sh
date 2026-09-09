@@ -92,8 +92,24 @@ E 'sudo git init -q /var/www/vhosts/perm-check && sudo sh -c "cd /var/www/vhosts
 # it, world-writable so both may append.
 E 'touch /tmp/fake-ddev.log && chmod 666 /tmp/fake-ddev.log'
 
-E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev 2>&1 | tee /tmp/install-out.log'"
+# Ancestor-traversal fixture: a second root UNDER the dev home, which is
+# 0750 like an Ubuntu 24.04 $HOME — the install must grant traverse-only
+# ACLs on /home/dev or the agent cannot reach the root at all.
+E 'mkdir -p /home/dev/vhosts/hometest && chmod 750 /home/dev'
+
+E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects \"/var/www/vhosts /home/dev/vhosts\" --ddev-settings ddev 2>&1 | tee /tmp/install-out.log'"
 echo "  Install complete."
+
+echo ""
+echo "--- 2b. ancestor traversal (root under the 0750 dev home) ---"
+check "2b: traverse-only ACL granted on the dev home" \
+    E 'getfacl -p /home/dev 2>/dev/null | grep -q "^group:opencode:--x"'
+check "2b: opencode can stat the root under the dev home" \
+    E 'sudo -u opencode stat /home/dev/vhosts/hometest >/dev/null'
+check "2b: traverse grant stays read-less (home not listable)" \
+    E '! getfacl -p /home/dev 2>/dev/null | grep -q "^group:opencode:r"'
+check "2b: podman-rootless never sets the ddev bind-mounts switch" \
+    E '! grep -q "config global --no-bind-mounts" /tmp/fake-ddev.log'
 
 echo ""
 echo "--- 2c. ddev database migration (issue #15) ---"

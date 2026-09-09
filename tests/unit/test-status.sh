@@ -387,6 +387,32 @@ else
     echo "  info   opencode user exists on this host — skipping not-installed check"
 fi
 
+# --- 3. traversal warning helpers (ancestor chain of a root) --------------------
+
+# Extract the two helpers verbatim from status.sh and exercise them on a
+# fixture chain: W (700) / t (700) / w (755) / proj — walking up from
+# proj, t is the first blocker; after a traverse-only ACL on t and W the
+# chain is clean.
+eval "$(sed -n '/^_st_ancestor_grants_x()/,/^}/p' "$STATUS")"
+eval "$(sed -n '/^_st_root_blocker()/,/^}/p' "$STATUS")"
+OPENCODE_GROUP="$(id -gn)"
+W3=$(mktemp -d)
+mkdir -p "$W3/t/w/proj"
+chmod 700 "$W3" "$W3/t"
+chmod 755 "$W3/t/w"
+if [ "$(_st_root_blocker "$W3/t/w/proj")" = "$W3/t" ]; then
+    pass "blocker check names the first blocking ancestor"
+else
+    fail "blocker check names the first blocking ancestor (got '$(_st_root_blocker "$W3/t/w/proj"))')"
+fi
+setfacl -m "g:$OPENCODE_GROUP:X" "$W3" "$W3/t"
+if [ -z "$(_st_root_blocker "$W3/t/w/proj")" ]; then
+    pass "blocker check accepts traverse-only ACL entries"
+else
+    fail "blocker check accepts traverse-only ACL entries (got '$(_st_root_blocker "$W3/t/w/proj"))')"
+fi
+rm -rf "$W3"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
