@@ -143,6 +143,34 @@ ls /var/backups/opencode-permissions-kit/ddev-migration-*/
 
 Details: [ddev integration](concepts/ddev-integration.md).
 
+**Only some of my databases were exported** — the install said
+`N ok, 0 failed` with N smaller than your project count and continued:
+
+- Older kit versions had a loop bug where each `ddev-migrate export`
+  run dumped exactly ONE project (ddev reads stdin and consumed the
+  loop's project list, so the loop ended after the first entry; the
+  resume logic then took the next project on every re-run). Update the
+  kit, then simply re-run the export — already-dumped projects are
+  skipped, only the missing ones run:
+  `sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export "$USER" <project-roots>`
+- See what the export would take today (read-only, as your user):
+  `/usr/local/lib/opencode-permissions-kit/bin/ddev-migrate registry <your-user> <project-roots>`
+  — projects listed as `outside:` fall outside the registered roots and
+  are never exported.
+- A project whose export **fails on every run** (for example its
+  database was never pulled from staging, so there is nothing to dump)
+  does not block the remaining projects — it is recorded as `FAIL`, the
+  loop continues, and the summary lists it. To mark a project as
+  intentionally database-less, add `omit_containers: [db]` to its
+  `.ddev/config.yaml`: the export then records a clean SKIP.
+- Registry entries can also have grown AFTER a (partial) export — for
+  example a pre-1.23-format install exported from a stale legacy block.
+  `opk status` reports `db dumps INCOMPLETE` in that case, and later
+  installs warn about it. Fix: follow the `.ddev already handed over`
+  runbook above once — `ddev-migrate export` skips projects that already
+  have a dump in the newest manifest (resume), so only the missing ones
+  run.
+
 ## The agent gets "Permission denied" on my project / ddev claims "a project cannot be created in the DDEV source code"
 
 **Cause:** a project root under your home directory (for example

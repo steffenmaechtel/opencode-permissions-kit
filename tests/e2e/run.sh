@@ -79,8 +79,10 @@ E 'mkdir -p /home/dev/.ddev /var/www/vhosts/ddev-mig/.ddev /var/www/vhosts/ddev-
 # Registry layouts as a real ddev home has them (>= 1.23): projects in
 # the standalone project_list.yaml (4-space indent, yaml.Marshal form),
 # the legacy project_info: block left over in global_config.yaml for a
-# not-yet-migrated project — the install must export from BOTH.
-E 'printf "%s\n" "ddev-mig:" "    approot: /var/www/vhosts/ddev-mig" > /home/dev/.ddev/project_list.yaml'
+# not-yet-migrated project — the install must export from BOTH. The
+# third entry lives OUTSIDE the roots: the export must warn about it
+# (partial-export hardening).
+E 'printf "%s\n" "ddev-mig:" "    approot: /var/www/vhosts/ddev-mig" "outside-proj:" "    approot: /srv/other/outside-proj" > /home/dev/.ddev/project_list.yaml'
 E 'printf "%s\n" "project_info:" "  ddev-broken:" "    approot: /var/www/vhosts/ddev-broken" > /home/dev/.ddev/global_config.yaml'
 E 'printf "type: typo3\n" > /var/www/vhosts/ddev-mig/.ddev/config.yaml && printf "type: typo3\n" > /var/www/vhosts/ddev-broken/.ddev/config.yaml'
 E 'touch /var/www/vhosts/ddev-mig/.ddev/.webimageBuild'
@@ -127,6 +129,8 @@ check "2c: per-project stop recorded (one project at a time)" \
     E 'grep -q "^stop ddev-mig|" /tmp/fake-ddev.log'
 check "2c: exactly one final poweroff" \
     E 'test "$(grep -c "^poweroff|" /tmp/fake-ddev.log)" = "1"'
+check "2c: registry entries outside the roots trigger the export warning" \
+    E 'grep -q "OUTSIDE the given roots" /tmp/install-out.log && grep -q "outside-proj" /tmp/install-out.log'
 check "2c: .ddev handed over to opencode AFTER the export" \
     E 'test "$(stat -c %U /var/www/vhosts/ddev-mig/.ddev)" = "opencode"'
 check "2c: install warned about the failed project (list + consequence)" \

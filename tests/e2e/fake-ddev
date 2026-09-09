@@ -12,6 +12,11 @@
 #   - project "ddev-broken" FAILS to start (old production project that
 #     no longer boots) — the export loop must continue with the others
 #     and install.sh must surface the failure.
+#   - reads stdin like real ddev does (prompt/TUI probing) — safe here
+#     (docker exec without -i gives EOF) and it is the regression for
+#     the production finding where ddev consumed the export loop's
+#     project list: ONE dump per run, resume picked the next each time.
+cat > /dev/null
 case "$1" in
     version)
         echo "ddev version v1.25.0"

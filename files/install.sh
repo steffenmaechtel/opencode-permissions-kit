@@ -953,6 +953,23 @@ fi
 # user-driven step (first opencode-side start pulls images) — see the
 # summary below and docs/concepts/ddev-integration.md.
 DD_MIG_DUMP_DIR=""
+# Partial-export detector (production finding: a pre-registry-fix run
+# exported 1 of 12 databases, stamped DDEV_EXPORTED=1, and every later
+# install silently skipped the export while eleven databases stayed in
+# the old daemon). Loud warning whenever the CURRENT dev registry lists
+# more projects than the newest manifest recorded — no-op without a
+# manifest or without growth.
+_ddev_mig_gap_warn() {
+    # shellcheck disable=SC2086  # word splitting intended (root list)
+    _g=$(ddev_migrate_gap "$DEFAULT_USER" $PROJECTS_ROOTS) || return 0
+    _g_have=${_g%% *}
+    _g_rest=${_g#* }
+    _g_now=${_g_rest%% *}
+    ui_warn "partial ddev export detected: the registry lists $_g_now project(s) under the roots, only $_g_have dump(s) recorded"
+    ui_warn "the missing databases stay in the old daemon — bridge them (docs/troubleshooting.md, 'My databases are gone after the install')"
+    ui_detail "see what is missing: /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate registry $DEFAULT_USER $PROJECTS_ROOTS"
+    log "ddev migration gap detected: registry=$_g_now dumps=$_g_have"
+}
 if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
     ui_section "ddev databases (user $DEFAULT_USER)"
     if [ "$SKIP_DDEV_MIGRATION" = true ]; then
@@ -961,9 +978,11 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
         ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export $DEFAULT_USER ${PROJECTS_ROOTS:-<roots>}"
         log "ddev database export skipped (--skip-ddev-migration)"
     elif [ "$DDEV_EXPORTED_PRE" = "1" ]; then
+        _ddev_mig_gap_warn
         ui_detail "already exported on a previous run (DDEV_EXPORTED=1) — skipping"
         log "ddev database export skipped (DDEV_EXPORTED stamp present)"
     elif ddev_migrate_done "$OPENCODE_USER"; then
+        _ddev_mig_gap_warn
         ui_detail "$OPENCODE_USER already has ddev projects registered — skipping the export"
         log "ddev database export skipped (opencode registry already populated)"
     elif [ -z "$PROJECTS_ROOTS" ]; then

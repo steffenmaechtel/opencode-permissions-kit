@@ -339,6 +339,39 @@ if [ -n "$_mig_dir" ] && [ -f "$_mig_dir/manifest.conf" ]; then
         fi
     fi
 fi
+# Partial-export detector (production finding: 1 of 12 databases
+# exported, every retry silently skipped). Compares the dev user's
+# CURRENT registry under the configured roots against the newest
+# manifest — warns when databases are still missing, with or without a
+# manifest. Needs the deployed lib's parser; silently skipped when the
+# registry is unreadable for the caller.
+if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-migrate.sh" ]; then
+    # shellcheck disable=SC1090
+    . "$LIBDIR/sh/ddev-migrate.sh"
+    _mig_roots=""
+    [ -f "$PROJECTS_CONF" ] && _mig_roots=$(grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null | tr '\n' ' ')
+    if [ -n "$_mig_roots" ]; then
+        # shellcheck disable=SC2086  # word splitting intended (root list)
+        if _mig_gap=$(DDEV_MIG_BACKUP_ROOT="$_mig_root" ddev_migrate_gap "$DEFAULT_USER" $_mig_roots); then
+            _mig_have=${_mig_gap%% *}
+            _mig_rest=${_mig_gap#* }
+            _mig_now=${_mig_rest%% *}
+            ui_kv_warn "db dumps" "INCOMPLETE — registry lists $_mig_now project(s), only $_mig_have dump(s) recorded"
+            ui_detail "missing databases stay in the old daemon — bridge them (docs/troubleshooting.md,"
+            ui_detail "'My databases are gone after the install'); check: $LIBDIR/bin/ddev-migrate registry $DEFAULT_USER $_mig_roots"
+        elif [ -z "$_mig_dir" ] || [ ! -f "$_mig_dir/manifest.conf" ]; then
+            # no manifest at all: warn only when the registry HAS projects
+            # shellcheck disable=SC2086  # word splitting intended (root list)
+            _mig_reg=$(ddev_migrate_projects "$(ddev_migrate_home "$DEFAULT_USER")/.ddev" $_mig_roots 2>/dev/null | grep -c . || true)
+            _mig_reg=${_mig_reg:-0}
+            if [ "$_mig_reg" -gt 0 ]; then
+                ui_kv_warn "db dumps" "NONE — but the ddev registry lists $_mig_reg project(s)"
+                ui_detail "the install-time export did not run or found nothing; bridge manually:"
+                ui_detail "  sudo $LIBDIR/bin/ddev-migrate export $DEFAULT_USER $_mig_roots"
+            fi
+        fi
+    fi
+fi
 # Live ddev version (issue #56): DDEV_VERSION from install.conf is an
 # install-time stamp and goes stale the moment the developer upgrades
 # ddev — `sudo opk status` kept showing the old version while the

@@ -40,6 +40,33 @@ case "${1:-}" in
     import)
         ddev_migrate_import "${2:-}"
         ;;
+    registry)
+        # Read-only diagnostics (runs as any user who can read the
+        # registry): what an export WOULD take under the given roots —
+        # and what silently falls outside (partial-export finding).
+        [ $# -ge 2 ] || { _ddev_migrate_usage; exit 1; }
+        dm_user="$2"; shift 2
+        dm_home=$(ddev_migrate_home "$dm_user")
+        if [ $# -gt 0 ]; then
+            echo "ddev registry of $dm_user — roots: $*"
+            ddev_migrate_registry "$dm_home/.ddev" | while IFS='|' read -r dm_n dm_ar; do
+                [ -n "$dm_ar" ] || continue
+                dm_ar="${dm_ar%/}"
+                if ddev_migrate_under_roots "$dm_ar" "$@"; then
+                    if [ -d "$dm_ar" ]; then
+                        echo "  export:  $dm_n  ($dm_ar)"
+                    else
+                        echo "  export:  $dm_n  ($dm_ar — DIRECTORY MISSING)"
+                    fi
+                else
+                    echo "  outside: $dm_n  ($dm_ar)"
+                fi
+            done
+        else
+            echo "ddev registry of $dm_user:"
+            ddev_migrate_registry "$dm_home/.ddev" | sed 's/^/  /'
+        fi
+        ;;
     *)
         _ddev_migrate_usage
         [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || exit 1
