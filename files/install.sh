@@ -1616,6 +1616,16 @@ if [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
     echo "  and the 'opencode' user."
     echo ""
 fi
+# Session hint (issue #73): everything below only reaches sessions started
+# AFTER this install — the sharing-group membership (usermod -aG above)
+# takes effect on the next login and without it the current session has no
+# file access via the group, the ddev() hook is not sourced yet (ddev in
+# an old terminal would run as the developer, unable to see the rootless
+# daemon), and the PATH/umask profile additions are not applied.
+echo "  ${UI_YELLOW}Restart your terminal (or log in again) — the current session${UI_NC}"
+echo "  ${UI_YELLOW}has no sharing-group membership yet, no ddev shell function and no${UI_NC}"
+echo "  ${UI_YELLOW}PATH/umask additions; a fresh session starts with all of them.${UI_NC}"
+echo ""
 echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"

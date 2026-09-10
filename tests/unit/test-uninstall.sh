@@ -39,12 +39,15 @@ chmod +x "$WORK/sudo"
 # Fake id: the userdel branch is only entered when the opencode user
 # exists — true on a dev host with the kit installed, false on a CI
 # runner. Pretend it always exists so the removal plan is complete (and
-# the test hermetic) on every host.
+# the test hermetic) on every host. -u/-g also feed the ownership-revert
+# capture (issue #74): uid 60000 / gid 60001 must flow into the find.
 cat > "$WORK/id" <<'EOF'
 #!/bin/sh
 case "$1" in
-    -u) echo 60000 ;;
-    *)  exit 0 ;;
+    -u)  echo 60000 ;;
+    -g)  echo 60001 ;;
+    -gn) echo devgroup ;;
+    *)   exit 0 ;;
 esac
 EOF
 chmod +x "$WORK/id"
@@ -157,6 +160,61 @@ for projpath in /var/www/vhosts /var/www /home/dev/x; do
     fi
 done
 
+# --- 4b. ownership revert (issue #74) ---------------------------------------------
+# The kit hands .ddev/ trees, settings dirs and typo3 bootstrap roots to
+# the opencode user; the agent/ddev create opencode-owned files on top.
+# Uninstall must give ALL of it back to the developer — matched by
+# uid/gid, because the user removal above may already have orphaned the
+# ids. Functional: the project loop is extracted verbatim (it hardcodes
+# the conf path, so it is fed a fake root via stdin) and run with a
+# logging run() stub; the captured uid/gid (fake id: 60000/60001) must
+# land inside the find, with chown to DEFAULT_USER:<dev-group>. The loop
+# is extracted verbatim except for its stdin redirect (the conf path is
+# hardcoded) — the fake roots are piped in instead.
+PROJECT_LOOP="$(sed -n '/while IFS= read -r root; do/,/done < /p' "$UNINSTALL" | sed 's|done < "$UNINSTALL_PROJECTS_CONF"|done|')"
+if [ -n "$PROJECT_LOOP" ] && printf '%s' "$PROJECT_LOOP" | grep -q 'find'; then
+    pass "project loop with ownership revert extractable from uninstall.sh"
+else
+    fail "project loop with ownership revert extractable from uninstall.sh"
+fi
+LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && printf '%s\n/etc\n' "$WORK/fakeproj" | (
+    run() { echo "RUN: $*"; }
+    log() { :; }
+    UN_OC_UID=60000
+    UN_OC_GID=60001
+    UN_DEV_GROUP=devgroup
+    DEFAULT_USER=devuser
+    eval "$PROJECT_LOOP"
+) 2>&1 || true)
+if printf '%s' "$LOOP_OUT" | grep -qF "find \"$WORK/fakeproj\"" \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-uid "60000"' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid "60001"' \
+   && printf '%s' "$LOOP_OUT" | grep -qF 'chown "devuser:devgroup"'; then
+    pass "ownership revert: uid/gid-matched chown to the developer per root (issue #74)"
+else
+    fail "ownership revert loop (out=$(printf '%s' "$LOOP_OUT" | head -5))"
+fi
+# -xdev would stop at mount boundaries — project roots are regularly
+# separate mounts (bind mounts, NFS): the revert must follow, like the
+# setfacl -R calls in the same loop (checked above via the -xdev grep).
+if printf '%s' "$LOOP_OUT" | grep -qF "find \"/etc\""; then
+    fail "ownership revert: system paths are never chowned (screened)"
+else
+    pass "ownership revert: system paths are never chowned (screened)"
+fi
+
+# The uid/gid capture must happen BEFORE the user removal: after userdel
+# the name no longer resolves and only the numeric ids can still match
+# the orphaned files.
+CAPTURE_LINE=$(grep -n 'UN_OC_UID=' "$UNINSTALL" | head -1 | cut -d: -f1)
+USERDEL_LINE=$(grep -n 'sudo userdel -r' "$UNINSTALL" | head -1 | cut -d: -f1)
+if [ -n "$CAPTURE_LINE" ] && [ -n "$USERDEL_LINE" ] && [ "$CAPTURE_LINE" -lt "$USERDEL_LINE" ]; then
+    pass "ownership revert: ids captured before userdel (orphan-proof)"
+else
+    fail "ownership revert: ids must be captured before userdel (capture=$CAPTURE_LINE userdel=$USERDEL_LINE)"
+fi
+
 # --- 5. cleanup hints match what install.sh leaves behind ----------------------
 
 if grep -qF "still contain" "$UNINSTALL" && grep -qF 'opencode permissions kit' "$UNINSTALL"; then
@@ -175,6 +233,14 @@ if grep -qF '/tmp/opencode-install-backup' "$UNINSTALL" \
     pass "backup hint matches the mktemp path shape"
 else
     fail "backup hint matches the mktemp path shape"
+fi
+# Session hint (issue #73): the running shell keeps the ddev function
+# (helper deleted), PATH/umask and group membership — the uninstall must
+# tell the user to restart the terminal.
+if grep -q 'Restart your terminal' "$UNINSTALL"; then
+    pass "final output tells the user to restart the terminal (issue #73)"
+else
+    fail "final output tells the user to restart the terminal (issue #73)"
 fi
 
 echo ""

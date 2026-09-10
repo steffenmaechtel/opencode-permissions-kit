@@ -372,21 +372,34 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-migrate.sh" ]; then
         fi
     fi
 fi
-# Live ddev version (issue #56): DDEV_VERSION from install.conf is an
-# install-time stamp and goes stale the moment the developer upgrades
+# Live ddev version (issues #56, #72): DDEV_VERSION from install.conf is
+# an install-time stamp and goes stale the moment the developer upgrades
 # ddev — `sudo opk status` kept showing the old version while the
 # terminal's `ddev --version` already answered with the new one. Probe
-# the real binary instead, with the SAME resolution order as
-# bin/ddev-as-opencode (PATH, then the two standard locations).
-# `--version` is a local-only flag (no daemon, no HOME writes), so it is
-# safe here even as root. The stamp stays the fallback for hosts where
-# no binary answers at all.
+# the real binary instead, in two tiers:
+#   1. the binary resolved the SAME way bin/ddev-as-opencode does (PATH,
+#      then the two standard locations), run as the current user —
+#      `--version` is a local-only flag (no daemon, no HOME writes), so
+#      this is safe and covers plain `opk status` and checkout runs.
+#   2. ddev >= 1.25.4 refuses root outright ("DDEV is not designed to be
+#      run with root privileges", exit 1 before printing anything), so
+#      under `sudo opk status` tier 1 is silent even though the binary
+#      exists. Ask the kit's own helper instead: it runs ddev exactly
+#      the way the kit does (as the opencode user, HOME/DOCKER_HOST
+#      re-set) — the most truthful version there is. sudo -n never
+#      prompts: root needs no password, the developer hits the kit's
+#      NOPASSWD sudoers rule, anyone else fails fast into the fallback.
+# The stamp stays the fallback for hosts where no binary answers at all.
 _st_bin=""
 for _st_cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
     [ -n "$_st_cand" ] && [ -x "$_st_cand" ] && { _st_bin="$_st_cand"; break; }
 done
 _st_ver=""
 [ -n "$_st_bin" ] && _st_ver=$("$_st_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+_st_helper="${LIBDIR:-/usr/local/lib/opencode-permissions-kit}/bin/ddev-as-opencode"
+if [ -z "$_st_ver" ] && [ -x "$_st_helper" ] && command -v sudo >/dev/null 2>&1; then
+    _st_ver=$(sudo -n -u "${OPENCODE_USER:-opencode}" "$_st_helper" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+fi
 if [ -n "$_st_ver" ]; then
     ddev_low=$(awk -v v="$_st_ver" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
     if [ "$ddev_low" = yes ]; then

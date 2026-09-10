@@ -192,6 +192,13 @@ TYPO3 a small committed `AdditionalConfiguration.php` — see the
 committed flag is dev-owned regardless of the kit mode; the mode only
 decides whether the kit writes the flag.
 
+One handover remains in dev-owned mode: `.ddev/` itself stays with
+`opencode` — the flag only silences ddev outside `.ddev/`; inside it,
+ddev keeps writing and chmod-ing on every run (`config.yaml`,
+`.webimageBuild`, snapshots — `chmod` is owner-only and ddev runs as
+`opencode`), so handing `.ddev/` to the developer would break every
+`ddev start`.
+
 Notes:
 
 - ddev resets a settings directory's mode to `0755` on each start — you

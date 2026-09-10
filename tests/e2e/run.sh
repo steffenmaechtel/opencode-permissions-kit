@@ -978,4 +978,19 @@ check_fail "router-port sysctl file removed"          E 'test -e /etc/sysctl.d/9
 check_fail "Project ACLs cleaned"     E 'getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode"'
 check_fail "Audit log removed"        E 'test -e /var/log/opencode-permissions-kit'
 
+# Issue #74: the kit handed .ddev/, the typo3 settings dir (and for
+# bootstrap projects the root) to the opencode user, and agent/ddev runs
+# created opencode-owned files on top. After uninstall (and userdel!)
+# everything kit-owned under the registered roots must belong to the
+# developer again — userdel already orphaned the uid, so this proves the
+# numeric-id revert works on orphaned files.
+check "13a: project .ddev ownership reverted to the developer" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "dev"'
+check "13a: ownership revert recurses into the .ddev tree" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev/config.yaml)" = "dev"'
+check "13a: typo3 settings dir ownership reverted to the developer" \
+    E 'test "$(stat -c %U /var/www/vhosts/test-project/config/system)" = "dev"'
+check "13a: project group reverted to the developer's login group" \
+    E 'test "$(stat -c %G /var/www/vhosts/test-project/.ddev)" = "dev"'
+
 e2e_finish

@@ -19,9 +19,15 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 - the kit library under `/usr/local/lib/opencode-permissions-kit/` and the
   `/usr/local/bin/opencode` wrapper
 - sudoers rules, profile scripts, project ACLs/setgid
+- kit ownership inside the registered project roots: everything the kit
+  handed to the `opencode` user (`.ddev/` trees, ddev settings
+  directories, bootstrap project roots) and every file the agent/ddev
+  created while running as `opencode` is chowned back to you — matched by
+  uid/gid, so it also catches files whose owner became an orphaned id
+  after the user removal
 - `/run/opencode-permissions-kit` and the router-port sysctl file
 
-**Project files are untouched.**
+**Project file contents are untouched** — only owner and group revert.
 
 ## What stays behind (harmless)
 
@@ -36,6 +42,11 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 
 During an interactive run you are asked whether the
 [audit log](../reference/audit-log.md) should be deleted too (recommended).
+
+After the uninstall, **restart your terminal (or log in again)**: the
+running session still carries the kit's `ddev` shell function (its sudoers
+helper is gone), the PATH/umask additions and your old membership in the
+sharing group — a fresh session starts clean.
 
 ## Verify the removal
 

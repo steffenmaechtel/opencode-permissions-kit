@@ -641,25 +641,54 @@ if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     fi
 fi
 
+# --- live ddev version for the install.conf refresh (issue #72) ------------------
+# DDEV_VERSION is an install-time stamp; a ddev upgrade leaves it behind.
+# Re-probe on every update so the stamp fallback stays honest. Ask the
+# kit's own helper first: ddev >= 1.25.4 refuses to run as root ("DDEV is
+# not designed to be run with root privileges", exit 1 before any output)
+# and updates run as root — the helper runs ddev exactly the way the kit
+# does (as the opencode user, HOME/DOCKER_HOST re-set). The direct binary
+# (PATH, then the two standard locations) is the fallback; when neither
+# answers, the old stamp survives.
+NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1)"
+_ddev_probe=""
+if [ -x "$LIBDIR/bin/ddev-as-opencode" ] && id "$OPENCODE_USER" >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+    _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+fi
+if [ -z "$_ddev_probe" ]; then
+    _ddev_bin=""
+    for _ddev_cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
+        [ -n "$_ddev_cand" ] && [ -x "$_ddev_cand" ] && { _ddev_bin="$_ddev_cand"; break; }
+    done
+    if [ -n "$_ddev_bin" ]; then
+        _ddev_probe=$("$_ddev_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+    fi
+fi
+if [ -n "$_ddev_probe" ]; then
+    NEW_DDEV_VERSION="$_ddev_probe"
+fi
+
 # --- refresh install.conf (version stamp + group key) --------------------------
 
 NEW_INSTALL_CONF="$(mktemp)"
 {
     if [ -f "$INSTALL_CONF" ]; then
         # Strip keys this update owns: VERSION (re-stamped),
-        # OPENCODE_GROUP (re-based to the opencode usergroup), and
-        # KIT_CHANNEL (re-stamped to the ref just updated from).
-        grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' "$INSTALL_CONF" 2>/dev/null
+        # OPENCODE_GROUP (re-based to the opencode usergroup),
+        # KIT_CHANNEL (re-stamped to the ref just updated from), and
+        # DDEV_VERSION (re-probed above — the fallback stays fresh).
+        grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null
     fi
     echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
     echo "KIT_CHANNEL=$KIT_BRANCH"
     echo "VERSION=$VERSION"
+    echo "DDEV_VERSION=$NEW_DDEV_VERSION"
 } | sort -u > "$NEW_INSTALL_CONF"
 sudo cp "$NEW_INSTALL_CONF" "$CONFDIR/install.conf"
 sudo chmod 644 "$CONFDIR/install.conf"
 rm -f "$NEW_INSTALL_CONF"
-ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
-log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
+ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
+log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
 
 # --- TUI mode display user files (docs/_archive/design/plan-ui-tui-opencode.md) ---------
 # Same only-if-absent-or-kit-written policy as install.sh (marker key

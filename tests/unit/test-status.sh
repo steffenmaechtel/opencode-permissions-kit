@@ -326,6 +326,52 @@ else
     fail "ddev version: stamp fallback annotated when no binary answers"
 fi
 
+# --- 1d-2. helper probe tier (issue #72) -------------------------------------------
+# ddev >= 1.25.4 refuses root ("DDEV is not designed to be run with root
+# privileges", exit 1 before printing anything): a root-run `sudo opk
+# status` got an EMPTY `ddev --version` and fell back to the stale
+# install-time stamp. When the direct probe stays silent, the block must
+# ask the kit's ddev-as-opencode helper AS THE OPENCODE USER — it runs
+# ddev exactly the way the kit does (root needs no password for sudo -u,
+# the developer hits the kit's NOPASSWD sudoers rule). Functional with
+# stubs: a "present but silent" ddev mirrors the root failure exactly
+# (binary found, no version), the fake sudo answers the helper call, and
+# LIBDIR points at a stub kit with an executable helper.
+mkdir -p "$WORK/fakekit/bin" "$WORK/quiet"
+printf '#!/bin/sh\nexit 1\n' > "$WORK/fakekit/bin/ddev-as-opencode"
+chmod +x "$WORK/fakekit/bin/ddev-as-opencode"
+printf '#!/bin/sh\necho "ddev version v1.26.0"\n' > "$WORK/sudo"
+chmod +x "$WORK/sudo"
+printf '#!/bin/sh\nexit 1\n' > "$WORK/quiet/ddev"
+chmod +x "$WORK/quiet/ddev"
+probe_helper=$(
+    (
+        PATH="$WORK/quiet:$WORK:$PATH"
+        export PATH
+        set -u
+        set +e
+        . "$UI_LIB"
+        LIBDIR="$WORK/fakekit"
+        OPENCODE_USER="opencode"
+        DDEV_VERSION="1.25.3"
+        eval "$DDEV_PROBE"
+        exit 0
+    ) 2>&1
+) || true
+if printf '%s' "$probe_helper" | grep -q "1.26.0" \
+   && ! printf '%s' "$probe_helper" | grep -q "1.25.3"; then
+    pass "ddev version: helper probe answers when root-run ddev stays silent (issue #72)"
+else
+    fail "ddev version: helper probe tier (out=$(printf '%s' "$probe_helper" | head -3))"
+fi
+
+# the helper tier must never prompt for a password inside a status output
+if grep -q 'sudo -n -u' "$STATUS"; then
+    pass "ddev version: helper probe uses sudo -n (no password prompt)"
+else
+    fail "ddev version: helper probe uses sudo -n (no password prompt)"
+fi
+
 # --- 1e. channel stamp display (issue #38) ----------------------------------------
 # status.sh shows the KIT_CHANNEL stamp from install.conf; unstamped
 # (pre-beta) installs must say so instead of crashing under set -u.
