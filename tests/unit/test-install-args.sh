@@ -186,6 +186,18 @@ else
     fail "install.sh stamps KIT_CHANNEL and reports the channel"
 fi
 
+# --- session hint (issue #73) -------------------------------------------------
+
+# The install's rc hook, profile PATH/umask and above all the sharing-group
+# membership (usermod -aG) only reach sessions started AFTER the install —
+# the final output must say so (mirrors the uninstall hint).
+if grep -qF 'Restart your terminal (or log in again)' "$INSTALL" \
+   && grep -qF 'sharing-group membership' "$INSTALL"; then
+    pass "install final output tells the user to restart the terminal (issue #73)"
+else
+    fail "install final output tells the user to restart the terminal (issue #73)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

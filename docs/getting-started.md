@@ -73,12 +73,23 @@ handling, deny-all handling). Non-interactive installs work too:
 
 ## Restart your terminal
 
-Open a **fresh terminal** before running opencode. A shell that has run
-opencode before still has the old `~/.opencode/bin` binary cached (bash's
-command hash) and lists that directory first in `$PATH` — until you open a
-new terminal, `opencode` would resolve to the old binary and bypass the
-wrapper. Same-shell fix: `hash -r` and
-`export PATH="/usr/local/bin:$PATH"`.
+Open a **fresh terminal** (or log in again) before continuing — for every
+install, not only the special case below:
+
+- **Sharing-group membership** is granted at install time
+  (`usermod -aG`) but only takes effect on your next login — until then
+  the current session cannot access your projects through the group.
+- The **`ddev` shell function** is hooked into your rc files; an old
+  terminal does not have it, and a `ddev` there would run as you, unable
+  to see the rootless daemon.
+- The **PATH and umask** additions from the profile script only load in
+  new sessions.
+
+Special case — a shell that has run opencode before also has the old
+`~/.opencode/bin` binary cached (bash's command hash) and lists that
+directory first in `$PATH`: until you open a new terminal, `opencode`
+would resolve to the old binary and bypass the wrapper. Same-shell fix:
+`hash -r` and `export PATH="/usr/local/bin:$PATH"`.
 
 ## Verify the installation
 
