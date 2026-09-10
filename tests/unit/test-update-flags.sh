@@ -155,6 +155,20 @@ check "channel: KIT_BASE_URL builds from the resolved ref" \
 check "channel: install.conf refresh strips and re-stamps KIT_CHANNEL" \
     sh -c "grep -qF -- \"-e '^KIT_CHANNEL='\" \"\$1\" && grep -qF 'echo \"KIT_CHANNEL=\$KIT_BRANCH\"' \"\$1\"" _ "$UPDATE"
 
+# --- 6. ddev version stamp refresh (issue #72) -------------------------------------
+# DDEV_VERSION in install.conf is an install-time stamp; ddev upgrades leave
+# it behind, and ddev >= 1.25.4 even refuses root-run probes (update.sh runs
+# as root). The refresh must re-probe via the kit's helper (ddev exactly as
+# the kit runs it) and keep the old stamp when nothing answers.
+check "ddev stamp: refresh strips and re-stamps DDEV_VERSION" \
+    sh -c "grep -qF -- \"-e '^DDEV_VERSION='\" \"\$1\" && grep -qF 'echo \"DDEV_VERSION=\$NEW_DDEV_VERSION\"' \"\$1\"" _ "$UPDATE"
+check "ddev stamp: probe asks the ddev-as-opencode helper (ddev >= 1.25.4 refuses root)" \
+    sh -c "grep -q 'sudo -n -u \"\$OPENCODE_USER\" \"\$LIBDIR/bin/ddev-as-opencode\" --version' \"\$1\"" _ "$UPDATE"
+check "ddev stamp: old stamp survives when no binary answers" \
+    sh -c "grep -q 's/^DDEV_VERSION=//p' \"\$1\"" _ "$UPDATE"
+check "ddev stamp: summary line reports the refreshed value" \
+    sh -c "grep -q 'DDEV_VERSION=\$NEW_DDEV_VERSION' \"\$1\"" _ "$UPDATE"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

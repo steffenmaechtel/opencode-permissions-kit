@@ -78,7 +78,8 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 ```
 
 `update.sh` re-deploys the kit files and refreshes the `install.conf` version
-stamp. It does **not** touch `projects.conf` or
+stamp (plus the `DDEV_VERSION` stamp — re-probed live, so a ddev upgrade
+does not leave a stale fallback behind). It does **not** touch `projects.conf` or
 `/home/opencode/.config/opencode/opencode.jsonc` — your project list and
 deny-list customizations survive. Since kit 0.0.14 the
 `opk` command (see [CLI](../reference/cli.md)) exists —
