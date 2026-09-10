@@ -318,3 +318,13 @@ echo "      plugin; opencode skips it when the plugin file is gone),"
 echo "      ~/.config/opencode/tui.json + ~/.config/opencode/themes/"
 echo "      opencode-danger.json (red bypass theme for your user)."
 echo ""
+# Session hint (issue #73): the running shell still carries kit leftovers
+# a fresh session drops by itself — the ddev() function from the rc hook
+# (its sudoers helper is gone now, every call would error), the PATH/umask
+# additions from the removed profile script, and the sharing-group
+# membership (gpasswd -d above only takes effect on the next login).
+echo "  ${YELLOW}Restart your terminal (or log in again) — the current session${NC}"
+echo "  ${YELLOW}still carries the kit's ddev shell function (now pointing at a${NC}"
+echo "  ${YELLOW}deleted helper), its PATH/umask additions and the old group${NC}"
+echo "  ${YELLOW}membership; a fresh session starts clean.${NC}"
+echo ""

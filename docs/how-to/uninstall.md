@@ -43,6 +43,11 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 During an interactive run you are asked whether the
 [audit log](../reference/audit-log.md) should be deleted too (recommended).
 
+After the uninstall, **restart your terminal (or log in again)**: the
+running session still carries the kit's `ddev` shell function (its sudoers
+helper is gone), the PATH/umask additions and your old membership in the
+sharing group — a fresh session starts clean.
+
 ## Verify the removal
 
 Check from a fresh checkout instead of the deleted library — `status.sh`

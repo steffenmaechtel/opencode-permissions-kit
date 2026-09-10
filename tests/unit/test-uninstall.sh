@@ -234,6 +234,14 @@ if grep -qF '/tmp/opencode-install-backup' "$UNINSTALL" \
 else
     fail "backup hint matches the mktemp path shape"
 fi
+# Session hint (issue #73): the running shell keeps the ddev function
+# (helper deleted), PATH/umask and group membership — the uninstall must
+# tell the user to restart the terminal.
+if grep -q 'Restart your terminal' "$UNINSTALL"; then
+    pass "final output tells the user to restart the terminal (issue #73)"
+else
+    fail "final output tells the user to restart the terminal (issue #73)"
+fi
 
 echo ""
 if [ "$failures" -gt 0 ]; then
