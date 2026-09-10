@@ -128,7 +128,16 @@ LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
 if [ -n "$LIVE_GROUP" ]; then
     OPENCODE_GROUP="$LIVE_GROUP"
 fi
-trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP"
+# Kit-user ids, captured BEFORE the user removal below: once userdel ran,
+# project files still owned by opencode carry an ORPHANED uid — the
+# ownership revert in the project section below can only match those
+# numerically (issue #74). UN_DEV_GROUP is the revert target group (the
+# developer's own login group — the kit's sharing group dies with the
+# opencode user).
+UN_OC_UID=$(id -u "$OPENCODE_USER" 2>/dev/null || true)
+UN_OC_GID=$(id -g "$OPENCODE_USER" 2>/dev/null || true)
+UN_DEV_GROUP=$(id -gn "$DEFAULT_USER" 2>/dev/null || true)
+trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP uid=$UN_OC_UID gid=$UN_OC_GID devgroup=$UN_DEV_GROUP"
 
 trace "first prompt ..."
 ans=$(prompt_yn "Proceed with uninstall?" "n")
@@ -225,7 +234,17 @@ else
 fi
 
 echo ""
-echo "--- Removing project ACLs and setgid ---"
+echo "--- Reverting project ownership + ACLs ---"
+# Issue #74: the kit hands .ddev/ trees, app-type settings dirs and (typo3
+# bootstrap) project roots over to the opencode user, and everything the
+# agent/ddev created while running as opencode is opencode-owned too. Left
+# as-is after an uninstall, those files belong to a user (or an orphaned
+# uid, after userdel) the developer cannot follow — the project becomes
+# inaccessible without sudo. Revert EVERYTHING the kit user owns back to
+# the developer: matched by uid/gid so it also catches orphaned ids after
+# the user removal above, and restricted to the registered project roots
+# (same source of truth as the ACL cleanup). File CONTENTS are never
+# touched — only owner and group.
 UNINSTALL_PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
     while IFS= read -r root; do
@@ -241,10 +260,20 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
                 ;;
         esac
 
+        echo "  Reverting kit ownership in: $root"
+        if [ -n "$UN_OC_UID" ] && [ -n "$UN_OC_GID" ]; then
+            # No -xdev on purpose: project roots are often separate mounts
+            # (the e2e bind-mounts them; NFS/overlay in the wild) — the
+            # revert must follow, exactly like the setfacl -R below.
+            run "sudo find \"$root\" \( -uid \"$UN_OC_UID\" -o -gid \"$UN_OC_GID\" \) -exec chown \"$DEFAULT_USER:$UN_DEV_GROUP\" {} + 2>/dev/null || true"
+        else
+            echo "    opencode user unknown — skipped (chown manually if files are locked)"
+        fi
         echo "  Cleaning ACLs from: $root"
         run "sudo setfacl -R -b \"$root\" 2>/dev/null || true"
         run "sudo setfacl -R -k \"$root\" 2>/dev/null || true"
         run "sudo chmod g-s \"$root\" 2>/dev/null || true"
+        log "project ownership reverted + ACLs cleaned: $root"
     done < "$UNINSTALL_PROJECTS_CONF"
 fi
 

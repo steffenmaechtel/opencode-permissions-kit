@@ -19,9 +19,15 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 - the kit library under `/usr/local/lib/opencode-permissions-kit/` and the
   `/usr/local/bin/opencode` wrapper
 - sudoers rules, profile scripts, project ACLs/setgid
+- kit ownership inside the registered project roots: everything the kit
+  handed to the `opencode` user (`.ddev/` trees, ddev settings
+  directories, bootstrap project roots) and every file the agent/ddev
+  created while running as `opencode` is chowned back to you — matched by
+  uid/gid, so it also catches files whose owner became an orphaned id
+  after the user removal
 - `/run/opencode-permissions-kit` and the router-port sysctl file
 
-**Project files are untouched.**
+**Project file contents are untouched** — only owner and group revert.
 
 ## What stays behind (harmless)
 
