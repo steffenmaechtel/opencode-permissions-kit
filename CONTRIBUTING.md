@@ -41,6 +41,12 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
 - When adding a new executable under `files/` or a new test script under
   `tests/`, add it to the `chmod +x` list in **both**
   `.github/workflows/test-unit.yml` and `.github/workflows/test-e2e.yml`.
+- Besides PRs and `master` pushes, CI runs a **weekly scheduled** burn-in
+  on `master` (Mondays ~03:00 UTC, issue #78): the e2e suites install the
+  *latest* opencode/ddev releases at runtime, so the schedule catches
+  environment drift on a "green" master even when nothing was pushed.
+  Scheduled runs use their own concurrency group — they never cancel
+  push/PR runs, and a red weekly run blocks the next release by design.
 
 ## Testing a branch on a real machine
 

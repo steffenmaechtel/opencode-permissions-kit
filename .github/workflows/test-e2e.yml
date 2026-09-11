@@ -7,6 +7,12 @@ name: test-e2e
 # staging area for the 'stable' release mirror — it must be green before
 # a release is cut (scripts/release.sh checks exactly this run). A
 # branch push with an open PR fires only `pull_request` — no double-run.
+# A weekly schedule (Mon 03:17 UTC, issue #78) re-runs both suites on
+# master even when nothing was pushed: the suites resolve the LATEST
+# opencode release at runtime, so a new opencode version can break a
+# "green" master between pushes — the cron catches that drift before a
+# release is cut. Scheduled runs use the defaults (E2E_STRICT=0, like
+# push runs; the strict input only applies to manual dispatch).
 on:
   workflow_dispatch:
     inputs:
@@ -21,6 +27,8 @@ on:
   push:
     branches:
       - master
+  schedule:
+    - cron: '17 3 * * 1'  # Mondays 03:17 UTC (after test-unit's verdict)
 
 # Least-privilege token (CodeQL actions/missing-workflow-permissions):
 # read-only access is enough (checkout + cache only — no artifacts,
@@ -29,9 +37,13 @@ permissions:
   contents: read
 
 # Cancel a superseded run when a new commit lands on the same ref; also
-# dedupes if two events somehow fire for the same push.
+# dedupes if two events somehow fire for the same push. Scheduled runs
+# get their own group: a weekly run must never cancel an in-flight
+# push/PR run of the same ref (a cancelled run on a master sha reads as
+# red to scripts/release.sh's CI gate) — and conversely stays alive to
+# deliver its drift verdict even when master moves under it.
 concurrency:
-  group: e2e-${{ github.ref }}
+  group: e2e-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
   cancel-in-progress: true
 
 jobs:
