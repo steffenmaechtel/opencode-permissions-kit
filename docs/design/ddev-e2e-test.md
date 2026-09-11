@@ -15,6 +15,8 @@
 > **master push** (plus `workflow_dispatch` on demand) — master is the
 > staging area for the `stable` mirror and must be fully green before a
 > release is cut; PRs stay excluded (test-e2e.yml keeps the PR gate).
+> The planned weekly `schedule` itself landed 2026-09-11 (issue #78)
+> on all three workflows, including this one.
 >
 > Original framing, kept for context: a third e2e suite answering the
 > recurring burn-in problem — most ddev issues (#18, #20, #21, #25, the
@@ -423,7 +425,10 @@ bare-origin flow (DD12).
   **First green GitHub run (full camino tier): 2026-08-23** — after two
   plain-Linux fixes the workspace could not catch (R9 hosts seeding, R10
   fixture group baseline). Both prior failing runs are pinned in the
-  issue tracker. Weekly `schedule` is now unblocked.
+  issue tracker. Weekly `schedule` shipped 2026-09-11 (issue #78):
+  Mondays 03:27 UTC, defaults only (no camino tier, latest ddev), in a
+  dedicated concurrency group so a scheduled run can never cancel an
+  in-flight push run (release.sh reads a cancelled run as red).
 - **Docs:** this record + a MANUAL.md "troubleshooting with e2e-ddev" note +
   README testing mention in the same PR as the runner (repo rule: docs move
   with code).

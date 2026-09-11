@@ -6,9 +6,14 @@ name: test-e2e-ddev
 # ddev project lifecycle — too heavy per PR, but master is the staging
 # area for the 'stable' release mirror and must be fully green before a
 # release is cut (scripts/release.sh includes these runs in its CI gate).
-# Push runs use the defaults (no camino site tier, latest ddev); the
-# inputs only apply to manual dispatch. CI rebuilds the golden image warm
-# every run (the cache is a local-workspace concept, design doc §6 R6).
+# A weekly schedule (Mon 03:27 UTC, issue #78) re-runs the suite on
+# master even when nothing was pushed — the design doc's planned
+# burn-in (§8/R6): the suite installs the LATEST ddev and rebuilds the
+# golden image warm from scratch, catching ddev/opencode release drift
+# between pushes. Push and scheduled runs use the defaults (no camino
+# site tier, latest ddev); the inputs only apply to manual dispatch.
+# CI rebuilds the golden image warm every run (the cache is a
+# local-workspace concept, design doc §6 R6).
 on:
   push:
     branches:
@@ -25,12 +30,20 @@ on:
         required: false
         default: ''
         type: string
+  schedule:
+    - cron: '27 3 * * 1'  # Mondays 03:27 UTC (after test-e2e's verdict)
 
 permissions:
   contents: read
 
+# Cancel a superseded run when a new commit lands on the same ref; also
+# dedupes if two events somehow fire for the same push. Scheduled runs
+# get their own group: a weekly run must never cancel an in-flight
+# push run of the same ref (a cancelled run on a master sha reads as
+# red to scripts/release.sh's CI gate) — and conversely stays alive to
+# deliver its drift verdict even when master moves under it.
 concurrency:
-  group: e2e-ddev-${{ github.ref }}
+  group: e2e-ddev-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
   cancel-in-progress: true
 
 jobs:
