@@ -196,6 +196,20 @@ def extract_tools(config_path):
     if isinstance(config, list):
         rules = _debug_entry_rules(config)
         whole = None
+    elif not isinstance(config, dict) or (config_path == '-' and 'permission' not in config and 'permissions' not in config):
+        # A piped `opencode debug config` output that is not a dict WITH
+        # permission data is not a config at all — most likely an error
+        # object from a failed/cold service (1.x merged output and 2.x
+        # Entry[] always carry permissions). Exit 3 so the caller can fall
+        # back instead of trusting "no tools" (wrapper, issue #80). Plain
+        # config FILES may legitimately omit permission — they keep the
+        # permissive empty result.
+        if config_path == '-':
+            print(f"Unrecognized debug-config shape: {config_path}", file=sys.stderr)
+            sys.exit(3)
+        permission = {}
+        whole = None
+        rules = []
     else:
         permission = config.get('permission', {})
 

@@ -277,6 +277,13 @@ assert_empty "tools-2x: empty entry list -> no tools" "$OUT"
 OUT=$(printf '%s\n' '[{ "type": "directory", "path": "/x" }, { "type": "document", "info": { "share": "disabled" } }]' | python3 "$PARSER" --tools - 2>/dev/null || true)
 assert_empty "tools-2x: documents without permissions -> no tools" "$OUT"
 
+# stdin error-object shape (e.g. a failed/cold 2.x service answering the
+# debug-config probe) must exit 3 = "not trustworthy, fall back" (issue #80)
+assert_exitcode "tools-stdin: error object shape exits 3 (fall back)" 3 sh -c 'printf "%s\n" "{ \"error\": \"cold start\" }" | python3 "$0" --tools - >/dev/null 2>&1' "$PARSER"
+assert_exitcode "tools-stdin: garbage top-level exits 3 (fall back)" 3 sh -c 'printf "%s\n" "\"garbage\"" | python3 "$0" --tools - >/dev/null 2>&1' "$PARSER"
+OUT=$(printf '%s\n' '{ "permission": {} }' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_empty "tools-stdin: dict WITH permission key stays valid (empty tools)" "$OUT"
+
 # --- Summary ---
 echo ""
 echo "===================================="

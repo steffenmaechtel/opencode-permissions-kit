@@ -608,7 +608,8 @@ dt_run() {
             if [ "$_merged" = "EMPTY" ]; then return 0; fi
             printf '%s\n' "$_merged"
         }
-        tools_from_config() { command python3 "$REAL_PARSER" --tools "$@" 2>/dev/null || true; }
+        tools_from_config() { command python3 "$REAL_PARSER" --tools "$@" 2>/dev/null; }
+        stop_merged_config_service() { :; }
         eval "$DT_BLOCK" >/dev/null
         printf 'tools=[%s] requested=%s auto=%s banner=%s\n' \
             "$(printf '%s' "$PROJECT_TOOLS" | tr '\n' ' ')" "$CONTAINER_REQUESTED" "$CONTAINER_AUTO" "$_banner"
@@ -641,6 +642,21 @@ assert_valid "fallback: opencode.json variant scanned" \
 result=$(dt_run '{ "permission": { "bash": { "docker *": "deny" } } }' opencode.jsonc '{ "permission": { "bash": { "docker *": "allow" } } }')
 assert_valid "merged: successful probe is authoritative (no project fallback)" \
     "tools=[] requested=false auto=false banner=0" "$result"
+
+# probe answered an ERROR OBJECT (cold-start failure, parser exit 3) → not
+# trustworthy → the project fallback fires despite non-empty probe output
+result=$(dt_run '{ "error": "service starting" }' opencode.jsonc '{ "permission": { "bash": { "docker *": "allow" } } }')
+assert_valid "merged: error-object probe falls back to the project scan" \
+    "tools=[docker] requested=true auto=true banner=1" "$result"
+
+# 2.x: the probe's background service is stopped again (stale-config guard)
+if grep -q 'stop_merged_config_service()' "$WRAPPER_FILE" && grep -q 'service stop' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper stops the 2.x probe service (stale-config guard)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the probe service stop"
+    failures=$((failures + 1))
+fi
 
 # probe failed + no project config → nothing
 result=$(dt_run EMPTY - '')
