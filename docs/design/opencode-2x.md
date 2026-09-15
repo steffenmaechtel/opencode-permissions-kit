@@ -135,3 +135,32 @@ assets (the cache is not reproducible in CI from tags alone).
   guard (e.g. mtime probe of the config files).
 - **`OPENCODE_PASSWORD` env_keep**: 2.x's primary name; add to sudoers
   env_keep when third-party UIs adopt it (legacy name still works).
+
+## 10. Adoption plan (working notes)
+
+How the compatibility work rolls out — decided 2026-09-16, session over
+issues #80/#81:
+
+1. **Now — branch stays open.** `feature/opencode-2x-compat` waits while
+   the real-WSL install (kit from the branch, 2.0.3 built from source)
+   gets manual observation. Holding is risk-free: every 2.x behavior is
+   gated on `OPENCODE_MAJOR`, and both e2e suites are green against
+   1.x latest (unchanged behavior) and 2.0.3.
+2. **CI cannot run 2.x yet — deliberately.** No release assets exist for
+   the v2 tags, so the e2e download path 404s. Building from source in
+   CI (bun, ~8 min) or pulling upstream workflow-run artifacts (auth,
+   90-day expiry, fragile) was considered and rejected as premature.
+   The proof stays local: version-keyed cache in `tests/e2e/cache/`
+   makes repeat runs cheap. The moment upstream ships release assets,
+   `E2E_OC_VERSION` works in CI unchanged — add the job then.
+3. **Merge as a normal PR** once manual validation satisfies. Everything
+   is already in production shape; nothing in the PR depends on 2.x
+   being released.
+4. **Follow-ups, in order**: `kit-mode-2x` (plugin port + `cli.json`
+   management + `OPENCODE_MAJOR`-keyed deployment of both variants;
+   verification loop: real-WSL TUI render + e2e deployment checks), then
+   the CI job, then the §9 ergonomics items.
+5. **Urgency trigger**: when upstream flips `releases/latest` to 2.x,
+   every fresh kit install pulls a 2.x binary — the merge becomes
+   time-critical on that day. Monitor cheaply with
+   `git ls-remote` / the releases API at session starts.
