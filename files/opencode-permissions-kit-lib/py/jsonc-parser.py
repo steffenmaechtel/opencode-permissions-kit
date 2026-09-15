@@ -4,13 +4,17 @@ opencode permissions kit — JSONC Pattern Extractor
 
 Parses opencode.json[c] and extracts deny patterns from permission.read and
 permission.edit sections (used by status.sh's report-only leak scan), or
-reports which container tools (docker/ddev) a project explicitly enables via
-permission.bash (used by the wrapper's container opt-in).
+reports which container tools (docker/ddev) a config explicitly enables via
+permission.bash (used by the wrapper's container opt-in). Both modes accept
+"-" to read JSON from stdin instead of a file — the wrapper pipes
+`opencode debug config` output there (the session's final merged config,
+global + project; issue #81).
 
 Output: one entry per line to stdout.
 Usage:
   python3 jsonc-parser.py /path/to/opencode.json[c]          # deny patterns
   python3 jsonc-parser.py --tools /path/to/opencode.json[c]  # enabled container tools
+  (either mode: "-" as the path reads JSON from stdin)
 """
 import fnmatch
 import json
@@ -102,9 +106,19 @@ def strip_jsonc_comments(text):
     return ''.join(out)
 
 
-def extract_patterns(config_path):
+def read_config(config_path):
+    """Read the raw config text. "-" means stdin, so callers can pipe in
+    `opencode debug config` output — plain JSON whose object key order
+    (json.loads preserves insertion order) carries the merged global +
+    project rule order that last-match-wins evaluation needs."""
+    if config_path == '-':
+        return sys.stdin.read()
     with open(config_path, 'r') as f:
-        raw = f.read()
+        return f.read()
+
+
+def extract_patterns(config_path):
+    raw = read_config(config_path)
 
     clean = strip_jsonc_comments(raw)
 
@@ -129,15 +143,15 @@ def extract_patterns(config_path):
 
 
 def extract_tools(config_path):
-    """Report which container tools (docker, ddev) the project explicitly
-    enables. Evaluates ONLY the project config's own permission.bash rules in
-    file order (last matching rule wins, same as opencode). A rule only counts
-    if it matches a representative docker/ddev command — subcommand-only allows
-    like "ddev composer *" never match "ddev start" and therefore do not
-    trigger. Top-level "permission": "allow" and "permission.bash": "allow"
+    """Report which container tools (docker, ddev) the config explicitly
+    enables. Evaluates the permission.bash rules of the given file (or the
+    piped merged config when config_path is "-") in key order (last matching
+    rule wins, same as opencode). A rule only counts if it matches a
+    representative docker/ddev command — subcommand-only allows like
+    "ddev composer *" never match "ddev start" and therefore do not trigger.
+    Top-level "permission": "allow" and "permission.bash": "allow"
     shorthands count as allowing everything. Prints one tool per line."""
-    with open(config_path, 'r') as f:
-        raw = f.read()
+    raw = read_config(config_path)
 
     clean = strip_jsonc_comments(raw)
 
@@ -186,7 +200,7 @@ if __name__ == '__main__':
         mode = 'tools'
         args = args[1:]
     if len(args) < 1:
-        print(f"Usage: {sys.argv[0]} [--tools] <path/to/opencode.json[c]>", file=sys.stderr)
+        print(f"Usage: {sys.argv[0]} [--tools] <path/to/opencode.json[c]|->", file=sys.stderr)
         sys.exit(1)
     if mode == 'tools':
         extract_tools(args[0])

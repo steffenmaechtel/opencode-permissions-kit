@@ -217,6 +217,25 @@ assert_empty "tools: bundled template → no container tools" "$OUT"
 OUT=$(python3 "$PARSER" --tools "$SCRIPT_DIR/../fixtures/project-opencode.jsonc" 2>/dev/null || true)
 assert_empty "tools: project fixture → no container tools" "$OUT"
 
+# --- 25. stdin mode: piped `opencode debug config` JSON (issue #81) ---
+# The wrapper pipes the session's final merged config (global + project)
+# into the parser; "-" must read it from stdin with key order intact.
+OUT=$(printf '%s\n' '{ "$schema": "https://opencode.ai/config.json", "permission": { "read": { "*.env*": "deny" }, "bash": { "*": "allow", "docker *": "allow", "docker-compose *": "deny", "sudo docker *": "deny", "ddev *": "allow", "sudo ddev *": "deny", "ddev auth ssh*": "deny" } } }' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_contains "tools-stdin: merged debug-config JSON → docker" "docker" "$OUT"
+assert_contains "tools-stdin: merged debug-config JSON → ddev" "ddev" "$OUT"
+
+OUT=$(printf '%s\n' '{ "share": "disabled", "permission": { "bash": { "ls *": "allow" } } }' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_empty "tools-stdin: merged config without broad allows → no tools" "$OUT"
+
+# last match wins on the MERGED key order: a later broader deny kills the
+# broad allow (both TOOL_COMMANDS probes match "docker*")
+OUT=$(printf '%s\n' '{ "permission": { "bash": { "docker *": "allow", "docker*": "deny" } } }' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_not_contains "tools-stdin: later docker* deny wins over docker * allow" "docker" "$OUT"
+
+# deny mode also reads stdin (generic "-")
+OUT=$(printf '%s\n' '{ "permission": { "read": { "*.env*": "deny" } } }' | python3 "$PARSER" - 2>/dev/null || true)
+assert_contains "deny-stdin: .env* extracted from stdin" ".env*" "$OUT"
+
 # --- Summary ---
 echo ""
 echo "===================================="
