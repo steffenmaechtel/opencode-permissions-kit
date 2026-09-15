@@ -222,7 +222,18 @@ fi
 # tool means "enable container tools for this session" — the rootless
 # backend decides the actual mechanism.
 merged_config() {
-    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+    # timeout(1) bounds the probe: a 2.x service that cannot bind its port
+    # makes `debug config` retry forever — 2.x assigns the service port per
+    # CHANNEL, not per user (127.0.0.1:0xc0de), so a bare 2.x opencode run
+    # by the default user blocks the opencode user's service, and without
+    # the bound even `opencode --version` hangs after the banner (observed
+    # on a real WSL, issue #80). On timeout the wrapper falls back to the
+    # project-only scan. 10s covers a cold service boot (~2-4s) generously.
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 10 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+    else
+        /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+    fi
 }
 tools_from_config() {
     # "-" reads stdin (the piped merged config); a path reads that file.
@@ -240,7 +251,11 @@ tools_from_config() {
 # the service. 1.x: unknown subcommand, error ignored.
 stop_merged_config_service() {
     [ "${OPENCODE_MAJOR:-}" = 2 ] || return 0
-    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 5 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+    else
+        /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+    fi
 }
 CONTAINER_REQUESTED=false
 CONTAINER_AUTO=false

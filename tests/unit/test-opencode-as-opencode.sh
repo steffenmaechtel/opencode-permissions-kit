@@ -658,6 +658,17 @@ else
     failures=$((failures + 1))
 fi
 
+# the probe is time-bounded: a 2.x service blocked from its port makes
+# `debug config` retry forever (port is per channel, not per user) — the
+# wrapper must fall through instead of hanging even --version
+if grep -q 'timeout 10' "$WRAPPER_FILE" && grep -q 'timeout 5' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  probe + service stop are time-bounded (port-collision hang)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the probe/stop timeouts"
+    failures=$((failures + 1))
+fi
+
 # probe failed + no project config → nothing
 result=$(dt_run EMPTY - '')
 assert_valid "fallback: no project config → no tools" \

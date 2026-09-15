@@ -65,6 +65,14 @@ edits reload only after seconds). Both were observed in the e2e as
   list nor a dict carrying `permission`/`permissions` makes the parser
   exit 3 = "not trustworthy" → the wrapper falls back to the project-only
   scan instead of trusting "no tools".
+- **Time bound**: the probe runs under `timeout 10` (best-effort, no
+  timeout(1) → unbounded). 2.x assigns the background-service port per
+  CHANNEL, not per user (`127.0.0.1:0xc0de`): a bare 2.x opencode run by
+  the default user (the known bypass scenario — deny-all config
+  mitigates permissions, not ports) blocks the opencode user's service,
+  and `debug config` then retries forever. Without the bound even
+  `opencode --version` hangs after the banner (observed on a real WSL).
+  The service stop after the probe is time-bounded the same way.
 - **Service stop**: after a probe on 2.x the wrapper stops the background
   service again (graceful `service stop`). Every probe then reads fresh
   files, and no stale registration survives a wrapper crash. This matches
@@ -109,6 +117,11 @@ assets (the cache is not reproducible in CI from tags alone).
 
 ## 9. Open items
 
+- **Service port collision**: 2.x binds the background service per channel
+  (`0xc0de`), not per user — the default user running bare 2.x opencode
+  blocks the opencode user's service (probe time-bounded, see §4, but the
+  session itself would also suffer). Watch for an upstream fix or a kit
+  side service-port config once 2.x ships release assets.
 - **kit-mode.tsx port**: v1 TUI plugins do not run on 2.x (new plugin
   API). The mode row is 1.x-only until ported; the plugin registration in
   the opencode user's `tui.json` is inert under 2.x (loads without
