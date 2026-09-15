@@ -213,8 +213,10 @@ if [ "$_rootless_ok" = true ]; then
 fi
 
 if [ "$_rootless_ok" = true ]; then
-    check "RL2: install.conf records CONTAINER_BACKEND=docker-rootless" \
-        E 'grep -q "^CONTAINER_BACKEND=docker-rootless" /etc/opencode-permissions-kit/install.conf'
+check "RL2: install.conf records CONTAINER_BACKEND=docker-rootless" \
+    E 'grep -q "^CONTAINER_BACKEND=docker-rootless" /etc/opencode-permissions-kit/install.conf'
+check "RL2: install.conf stamps the opencode major (issue #80)" \
+    E 'grep -qE "^OPENCODE_MAJOR=[12]$" /etc/opencode-permissions-kit/install.conf'
     check "RL2: install.conf records the rootless socket" \
         E 'grep -q "^OPENCODE_DOCKER_HOST=unix:///run/user/'"$OC_UID"'/docker.sock" /etc/opencode-permissions-kit/install.conf'
     check "RL2: sudoers strips (opencode:docker) for docker-rootless" \

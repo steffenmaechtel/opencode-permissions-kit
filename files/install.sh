@@ -1229,13 +1229,17 @@ fi
 # Stamp the installed binary's major into install.conf (issue #80): the
 # wrapper gates opencode 2.x-only flags (session `--standalone`) on it.
 # "opencode v2..." -> 2, 1.x bare versions and anything else -> 1. Best
-# effort — a missing stamp makes the wrapper detect at runtime.
+# effort — a missing stamp makes the wrapper detect at runtime. NOTE:
+# sed exits 0 even without a match, so the append must be grep-gated.
 OPENCODE_MAJOR=1
 case $("$SYSTEM_BIN" --version 2>/dev/null | head -1) in
     "opencode v2"*) OPENCODE_MAJOR=2 ;;
 esac
-sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$OPENCODE_MAJOR/" /etc/opencode-permissions-kit/install.conf 2>/dev/null \
-    || echo "OPENCODE_MAJOR=$OPENCODE_MAJOR" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
+if grep -q '^OPENCODE_MAJOR=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+    sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$OPENCODE_MAJOR/" /etc/opencode-permissions-kit/install.conf
+else
+    echo "OPENCODE_MAJOR=$OPENCODE_MAJOR" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
+fi
 log "install.conf stamped: OPENCODE_MAJOR=$OPENCODE_MAJOR"
 
 for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do

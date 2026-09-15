@@ -197,6 +197,8 @@ check "install.conf records CONTAINER_BACKEND=podman-rootless" \
     E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
 check "install.conf records OPENCODE_GROUP=opencode" \
     E 'grep -q "^OPENCODE_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
+check "install.conf stamps the opencode major (issue #80)" \
+    E 'grep -qE "^OPENCODE_MAJOR=[12]$" /etc/opencode-permissions-kit/install.conf'
 check_fail "no ddev shim in the library (soft-only kit)" \
     E 'test -e /usr/local/lib/opencode-permissions-kit/bin/ddev'
 check_fail "no hooks directory in the library" \
