@@ -279,6 +279,31 @@ EOF'
 fi
 
 echo ""
+echo "--- RL3b. Global-config container detection (issue #81) ---"
+# Broad allows in the opencode user's GLOBAL config must be detected: the
+# wrapper evaluates the session's final merged config (`opencode debug
+# config`, as the opencode user from the cwd), not just the project file.
+# Flip the global template's denies in place (positions kept, credential
+# gates stay after the allows), drop the project opt-in.
+if [ "$_rootless_ok" = true ]; then
+    E 'sudo cp /home/opencode/.config/opencode/opencode.jsonc /tmp/global-jsonc.bak'
+    E 'sudo sed -i "s/\"docker \*\": \"deny\"/\"docker *\": \"allow\"/; s/\"ddev \*\": \"deny\"/\"ddev *\": \"allow\"/" /home/opencode/.config/opencode/opencode.jsonc'
+    E 'sudo rm -f /var/www/vhosts/test-project/opencode.jsonc'
+    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-drl-global.txt' && \
+        echo "  ${GREEN}OK${NC}  wrapper global-config detection ran"
+    check "RL3b: global-config allow detected (banner)" \
+        E 'grep -q "Container tools enabled by this project" /tmp/wrapper-drl-global.txt'
+    check "RL3b: global-config allow lists docker" \
+        E 'grep -q "^    - docker$" /tmp/wrapper-drl-global.txt'
+    check "RL3b: global-config allow lists ddev" \
+        E 'grep -q "^    - ddev$" /tmp/wrapper-drl-global.txt'
+    check "RL3b: global-config allow -> docker-rootless exec message" \
+        E 'grep -q "opencode will run with the docker-rootless backend" /tmp/wrapper-drl-global.txt'
+    # restore the stock global config
+    E 'sudo cp /tmp/global-jsonc.bak /home/opencode/.config/opencode/opencode.jsonc'
+fi
+
+echo ""
 echo "--- RL4. §9.1 proof with REAL dockerd (soft-only: containers read as opencode UID) ---"
 if [ "$_rootless_ok" = true ]; then
     check "RL4: docker CLI works against the rootless socket as opencode" \

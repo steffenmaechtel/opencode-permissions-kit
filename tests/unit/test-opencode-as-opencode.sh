@@ -541,6 +541,105 @@ else
     failures=$((failures + 1))
 fi
 
+# --- Container-tool detection from the final merged config (issue #81) ---
+# The wrapper asks opencode itself (`opencode debug config`, run as the
+# opencode user from the cwd) for the session's FINAL permission config and
+# applies the broad-allow detection to that — a broad allow in the opencode
+# user's global config counts too. Only when the probe returns nothing does
+# it fall back to the pre-#81 project-only scan.
+echo ""
+echo "--- Merged-config container detection (issue #81) ---"
+
+# static: the probe is wired as designed (fault-tolerant, no prompt)
+if grep -q 'sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper probes the merged config via opencode debug config (sudo -n)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the opencode debug config probe"
+    failures=$((failures + 1))
+fi
+
+if grep -q 'tools_from_config -' "$WRAPPER_FILE" && grep -q 'tools_from_config "\$PROJECT_CONFIG"' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper evaluates the merged config first, project file as fallback"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the merged/project detection order"
+    failures=$((failures + 1))
+fi
+
+# functional: extract the detection logic, stub the probe + note, run the
+# REAL parser (same static-extraction technique as HL_BLOCK / SC_BLOCK)
+DT_BLOCK="$(sed -n '/^CONTAINER_REQUESTED=false$/,/^# .serve. always resolves container tools/p' "$WRAPPER_FILE" | sed '$d')"
+if [ -n "$DT_BLOCK" ]; then
+    echo "  ${GREEN}PASS${NC}  detection block extractable"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  detection block not extractable"
+    failures=$((failures + 1))
+fi
+
+mkdir -p "$TMPDIR/dt-project"
+REAL_PARSER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
+
+# dt_run <merged-json|EMPTY> <project-file|-> <project-content>
+# Prints "tools=[...] requested=.. auto=.. banner=.." (banner counts the
+# non-empty note() calls the block makes).
+dt_run() {
+    _merged="$1"; _proj="$2"; _content="$3"
+    (
+        cd "$TMPDIR/dt-project" || exit 1
+        rm -f opencode.jsonc opencode.json
+        if [ "$_proj" != "-" ]; then printf '%s\n' "$_content" > "$_proj"; fi
+        CONTAINER_REQUESTED=false
+        CONTAINER_AUTO=false
+        PROJECT_TOOLS=""
+        MERGED_CONFIG=""
+        _fd=1
+        _banner=0
+        note() { if [ -n "$1" ]; then _banner=$((_banner + 1)); fi; }
+        merged_config() {
+            if [ "$_merged" = "EMPTY" ]; then return 0; fi
+            printf '%s\n' "$_merged"
+        }
+        tools_from_config() { command python3 "$REAL_PARSER" --tools "$@" 2>/dev/null || true; }
+        eval "$DT_BLOCK" >/dev/null
+        printf 'tools=[%s] requested=%s auto=%s banner=%s\n' \
+            "$(printf '%s' "$PROJECT_TOOLS" | tr '\n' ' ')" "$CONTAINER_REQUESTED" "$CONTAINER_AUTO" "$_banner"
+    )
+}
+
+# issue #81 core: broad allows live in the GLOBAL config only (no project
+# file) — the merged debug-config output carries them
+result=$(dt_run '{ "permission": { "bash": { "*": "allow", "docker *": "allow", "docker-compose *": "deny", "sudo docker *": "deny", "ddev *": "allow", "sudo ddev *": "deny", "ddev auth ssh*": "deny" } } }' - '')
+assert_valid "merged: global-config allows → docker+ddev, session requested" \
+    "tools=[docker ddev] requested=true auto=true banner=1" "$result"
+
+# merged config without broad allows → nothing enabled, no banner
+result=$(dt_run '{ "permission": { "bash": { "ls *": "allow" } } }' - '')
+assert_valid "merged: no broad allows → no tools" \
+    "tools=[] requested=false auto=false banner=0" "$result"
+
+# probe failed (EMPTY output) + project opencode.jsonc → fallback finds it
+result=$(dt_run EMPTY opencode.jsonc '{ "permission": { "bash": { "docker *": "allow" } } }')
+assert_valid "fallback: project opencode.jsonc scanned when probe is empty" \
+    "tools=[docker] requested=true auto=true banner=1" "$result"
+
+# probe failed + only opencode.json → the .json variant is picked
+result=$(dt_run EMPTY opencode.json '{ "permission": { "bash": { "ddev *": "allow" } } }')
+assert_valid "fallback: opencode.json variant scanned" \
+    "tools=[ddev] requested=true auto=true banner=1" "$result"
+
+# probe SUCCEEDED and says no tools → authoritative; the project file's
+# allow must NOT re-enable them through the fallback
+result=$(dt_run '{ "permission": { "bash": { "docker *": "deny" } } }' opencode.jsonc '{ "permission": { "bash": { "docker *": "allow" } } }')
+assert_valid "merged: successful probe is authoritative (no project fallback)" \
+    "tools=[] requested=false auto=false banner=0" "$result"
+
+# probe failed + no project config → nothing
+result=$(dt_run EMPTY - '')
+assert_valid "fallback: no project config → no tools" \
+    "tools=[] requested=false auto=false banner=0" "$result"
+
 # --- Summary ---
 echo ""
 echo "===================================="

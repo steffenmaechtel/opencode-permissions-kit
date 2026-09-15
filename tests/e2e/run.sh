@@ -921,6 +921,29 @@ EOF'
         E '! id -nG opencode | tr " " "\n" | grep -qx docker'
 fi
 
+# 12i.7b issue #81: broad allows in the opencode user's GLOBAL config must
+# be detected too — the wrapper evaluates the session's final merged config
+# (via `opencode debug config`, as the opencode user from the cwd), not just
+# the project file. Flip the global template's denies in place (positions
+# kept, credential gates stay after the allows), drop the project opt-in.
+if [ "$_rootless_ok" = true ]; then
+    E 'sudo cp /home/opencode/.config/opencode/opencode.jsonc /tmp/global-jsonc.bak'
+    E 'sudo sed -i "s/\"docker \*\": \"deny\"/\"docker *\": \"allow\"/; s/\"ddev \*\": \"deny\"/\"ddev *\": \"allow\"/" /home/opencode/.config/opencode/opencode.jsonc'
+    E 'sudo rm -f /var/www/vhosts/test-project/opencode.jsonc'
+    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-global.txt' && \
+        echo "  ${GREEN}OK${NC}  wrapper global-config detection ran"
+    check "12i: global-config allow detected (banner)" \
+        E 'grep -q "Container tools enabled by this project" /tmp/wrapper-global.txt'
+    check "12i: global-config allow lists docker" \
+        E 'grep -q "^    - docker$" /tmp/wrapper-global.txt'
+    check "12i: global-config allow lists ddev" \
+        E 'grep -q "^    - ddev$" /tmp/wrapper-global.txt'
+    check "12i: global-config allow -> podman-rootless exec message" \
+        E 'grep -q "opencode will run with the podman-rootless backend" /tmp/wrapper-global.txt'
+    # restore the stock global config — later sections (12j leak scan) read it
+    E 'sudo cp /tmp/global-jsonc.bak /home/opencode/.config/opencode/opencode.jsonc'
+fi
+
 # 12i.8 config.sh container-backend status subcommand.
 if [ "$_rootless_ok" = true ]; then
     check "12i: config.sh container-backend status reports podman-rootless" \

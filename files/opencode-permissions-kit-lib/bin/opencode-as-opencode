@@ -192,23 +192,46 @@ if [ -d /mnt/c ]; then
     fi
 fi
 
-# Detect container tools (docker/ddev) explicitly enabled by the project
-# config. Any enabled tool means "enable container tools for this session"
-# — the rootless backend decides the actual mechanism.
+# Detect container tools (docker/ddev) enabled by the session's FINAL
+# permission config (issue #81): a broad allow counts no matter which file
+# declares it — the project's opencode.json[c] OR the opencode user's global
+# ~/.config/opencode/opencode.json[c]. The final result comes from opencode
+# itself: `opencode debug config`, run here as the opencode user from the
+# current directory, resolves exactly the merge the real session will see
+# (that user's global config, this cwd's project config, last matching rule
+# wins). The call rides the kit's base sudoers rule (bin/opencode with any
+# args) and never prompts (-n). When the probe returns nothing (opencode too
+# old for `debug config`, unreadable cwd, sudo denied), fall back to scanning
+# only the project config — the pre-#81 behavior. Any enabled tool means
+# "enable container tools for this session" — the rootless backend decides
+# the actual mechanism.
+merged_config() {
+    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+}
+tools_from_config() {
+    # "-" reads stdin (the piped merged config); a path reads that file.
+    python3 /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$1" 2>/dev/null || true
+}
 CONTAINER_REQUESTED=false
 CONTAINER_AUTO=false
-PROJECT_CONFIG=""
-if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
-elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
-if [ -n "$PROJECT_CONFIG" ]; then
-    PROJECT_TOOLS=$(python3 /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$PROJECT_CONFIG" 2>/dev/null || true)
-    if [ -n "$PROJECT_TOOLS" ]; then
-        note "${CYAN}Container tools enabled by this project:${NC}"
-        printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_fd"
-        note ""
-        CONTAINER_REQUESTED=true
-        CONTAINER_AUTO=true
+PROJECT_TOOLS=""
+MERGED_CONFIG=$(merged_config)
+if [ -n "$MERGED_CONFIG" ]; then
+    PROJECT_TOOLS=$(printf '%s' "$MERGED_CONFIG" | tools_from_config -)
+else
+    PROJECT_CONFIG=""
+    if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
+    elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
+    if [ -n "$PROJECT_CONFIG" ]; then
+        PROJECT_TOOLS=$(tools_from_config "$PROJECT_CONFIG")
     fi
+fi
+if [ -n "$PROJECT_TOOLS" ]; then
+    note "${CYAN}Container tools enabled by this project:${NC}"
+    printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_fd"
+    note ""
+    CONTAINER_REQUESTED=true
+    CONTAINER_AUTO=true
 fi
 
 # `serve` always resolves container tools silently (a server process
