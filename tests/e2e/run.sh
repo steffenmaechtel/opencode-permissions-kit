@@ -582,7 +582,10 @@ E 'opk upgrade-opencode --binary-path /tmp/stub-opencode2' && \
 check "11b: upgrade-opencode replaced the binary (shorthand works)" \
     E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 7.7.7-shorthand"'
 E 'sudo rm -f /usr/local/lib/opencode-permissions-kit/.only-binary-marker'
-# restore the real binary for the remaining sections
+# restore the real binary for the remaining sections. opencode 2.x keeps a
+# background service daemon running the binary (issue #80) — stop it first
+# or the replace fails with "Text file busy" (1.x: unknown command, ignored).
+E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true; sudo pkill -u opencode -f "serve --servic[e]" >/dev/null 2>&1 || true'
 E 'sudo cp /opencode-cache/opencode-'"$OC_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chown root:opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chmod 750 /usr/local/lib/opencode-permissions-kit/bin/opencode'
 E 'rm -rf /tmp/update-test /tmp/stub-opencode /tmp/stub-opencode2'
 
@@ -608,14 +611,15 @@ echo "--- 11c. opencode binary upgrade (old -> new via update.sh --binary-path) 
 # Downgrade the system binary to a pinned OLD version, then upgrade it back to
 # the (cached) latest with update.sh --binary-path. This is the kit's upgrade
 # entry point — `opencode upgrade` cannot work behind the wrapper.
+E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true; sudo pkill -u opencode -f "serve --servic[e]" >/dev/null 2>&1 || true'
 E 'sudo cp /opencode-cache/opencode-'"$OLD_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode' && \
     echo "  ${GREEN}OK${NC}  system binary downgraded to $OLD_VERSION"
 check "downgrade: system binary is $OLD_VERSION" \
-    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version)" = "'"$OLD_VERSION"'"'
+    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version | sed "s/^opencode v//")" = "'"$OLD_VERSION"'"'
 E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/update.sh --yes --binary-path /opencode-cache/opencode-'"$OC_VERSION"'/opencode' && \
     echo "  ${GREEN}OK${NC}  update.sh --binary-path completed"
 check "upgrade: system binary is latest ($OC_VERSION)" \
-    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version)" = "'"$OC_VERSION"'"'
+    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version | sed "s/^opencode v//")" = "'"$OC_VERSION"'"'
 check "upgrade: version actually changed" \
     E 'test "'"$OLD_VERSION"'" != "'"$OC_VERSION"'"'
 check "wrapper still present after binary upgrade" E 'test -x /usr/local/bin/opencode'

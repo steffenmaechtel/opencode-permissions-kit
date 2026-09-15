@@ -71,8 +71,13 @@ for _hr_a in "$@"; do
         *) _hr_msg=true; break ;;
     esac
 done
+# Subcommand union for headless classification: opencode 1.x names (agent,
+# plug, providers, account, github, pr, db, generate, web — kept; unknown to
+# 2.x, which errors on them anyway) plus 2.x additions (api, auth, plugin,
+# service, pair, update — issue #80). 2.x `mini` is an interactive UI and
+# stays bannered like `tui`/`attach`.
 case "${1:-}" in
-    serve|acp|models|agent|providers|session|export|import|stats|account|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade)
+    serve|acp|models|agent|providers|session|export|import|stats|account|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade|api|auth|plugin|service|pair|update)
         HEADLESS=true
         ;;
     run)
@@ -406,6 +411,45 @@ if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
         note ""
     fi
 fi
+
+# opencode 2.x session servers (issue #80): 2.x commands prefer the shared
+# background service (`opencode serve --service`, auto-spawned, env from its
+# own registration) — tools then run in a daemon that never saw this
+# wrapper's exported DOCKER_HOST/XDG_RUNTIME_DIR, and the per-project
+# container opt-in breaks. `--standalone` forces a private server as a child
+# of the exec'd process (full env inheritance, dies with the session). The
+# flag exists only in 2.x, so it is gated on the OPENCODE_MAJOR stamp from
+# install.conf (fallback: runtime detection for installs older than the
+# stamp). Session commands only — the TUI default start (no args or
+# flags-only), `run`, and `mini`; an explicit --server or --standalone in
+# the user's args always wins.
+if [ -z "${OPENCODE_MAJOR:-}" ]; then
+    case $(/usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null) in
+        "opencode v2"*) OPENCODE_MAJOR=2 ;;
+        *) OPENCODE_MAJOR=1 ;;
+    esac
+fi
+standalone_mode() {
+    [ "${OPENCODE_MAJOR:-}" = 2 ] || { echo none; return 0; }
+    for _sa in "$@"; do
+        case "$_sa" in --server|--server=*|--standalone) echo none; return 0 ;; esac
+    done
+    case "${1:-}" in
+        run|mini) echo after-first ;;
+        ""|-*) echo append ;;
+        *) echo none ;;
+    esac
+}
+case $(standalone_mode "$@") in
+    append)
+        set -- "$@" --standalone
+        ;;
+    after-first)
+        _sub="$1"
+        shift
+        set -- "$_sub" --standalone "$@"
+        ;;
+esac
 
 # Rootless: pass the per-user socket through sudo's env reset via env_keep.
 # podman-CLI path (daemonless): no DOCKER_HOST, no supplementary group.

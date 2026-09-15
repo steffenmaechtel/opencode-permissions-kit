@@ -142,15 +142,47 @@ def extract_patterns(config_path):
         print(p)
 
 
+def _debug_entry_rules(config):
+    """Extract ordered (pattern, action) rules from `opencode debug config`
+    output (opencode 2.x, issue #80): a LIST of entries, lowest priority
+    first. Documents carry the normalized `permissions` rule array where the
+    v1 permission.bash map was migrated to {action, resource, effect} records
+    (action "bash" became "shell"; the config files themselves may still use
+    the v1 shape — opencode normalizes on load). Rules from later documents
+    win (appended last), matching the session's last-match-wins evaluation."""
+    rules = []
+    if not isinstance(config, list):
+        return rules
+    for entry in config:
+        if not isinstance(entry, dict) or entry.get('type') != 'document':
+            continue
+        info = entry.get('info')
+        if not isinstance(info, dict):
+            continue
+        for rule in info.get('permissions', []):
+            if not isinstance(rule, dict):
+                continue
+            if rule.get('action') not in ('shell', 'bash', '*'):
+                continue
+            resource = rule.get('resource')
+            effect = rule.get('effect')
+            if isinstance(resource, str) and isinstance(effect, str):
+                rules.append((resource, effect))
+    return rules
+
+
 def extract_tools(config_path):
     """Report which container tools (docker, ddev) the config explicitly
-    enables. Evaluates the permission.bash rules of the given file (or the
-    piped merged config when config_path is "-") in key order (last matching
-    rule wins, same as opencode). A rule only counts if it matches a
-    representative docker/ddev command — subcommand-only allows like
-    "ddev composer *" never match "ddev start" and therefore do not trigger.
-    Top-level "permission": "allow" and "permission.bash": "allow"
-    shorthands count as allowing everything. Prints one tool per line."""
+    enables. Accepts a config FILE in the v1 shape (permission.bash map,
+    evaluated in key order, last matching rule wins — same as opencode) or,
+    when config_path is "-", the piped output of `opencode debug config`:
+    the 1.x merged config object or the 2.x list of document entries, both
+    evaluated with the same last-match-wins semantics. A rule only counts
+    if it matches a representative docker/ddev command — subcommand-only
+    allows like "ddev composer *" never match "ddev start" and therefore do
+    not trigger. Top-level "permission": "allow" and "permission.bash":
+    "allow" shorthands count as allowing everything. Prints one tool per
+    line."""
     raw = read_config(config_path)
 
     clean = strip_jsonc_comments(raw)
@@ -161,18 +193,22 @@ def extract_tools(config_path):
         print(f"Error parsing {config_path}: {e}", file=sys.stderr)
         sys.exit(1)
 
-    permission = config.get('permission', {})
+    if isinstance(config, list):
+        rules = _debug_entry_rules(config)
+        whole = None
+    else:
+        permission = config.get('permission', {})
 
-    # Top-level shorthand: "permission": "allow" -> everything allowed.
-    whole = permission if isinstance(permission, str) else None
+        # Top-level shorthand: "permission": "allow" -> everything allowed.
+        whole = permission if isinstance(permission, str) else None
 
-    rules = []
-    if isinstance(permission, dict):
-        bash = permission.get('bash')
-        if isinstance(bash, str):
-            rules = [('*', bash)]
-        elif isinstance(bash, dict):
-            rules = [(p, a) for p, a in bash.items()]
+        rules = []
+        if isinstance(permission, dict):
+            bash = permission.get('bash')
+            if isinstance(bash, str):
+                rules = [('*', bash)]
+            elif isinstance(bash, dict):
+                rules = [(p, a) for p, a in bash.items()]
 
     for tool in ('docker', 'ddev'):
         granted = (whole == 'allow')

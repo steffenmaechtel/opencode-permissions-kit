@@ -56,6 +56,11 @@ E2E_SKIP_BUILD="${E2E_SKIP_BUILD:-0}"
 E2E_DEBUG="${E2E_DEBUG:-0}"
 E2E_KEEP="${E2E_KEEP:-0}"
 E2E_OLD_VERSION="${E2E_OLD_VERSION:-1.18.15}"
+# Pin the opencode version under test (e.g. E2E_OC_VERSION=2.0.3 for the
+# opencode 2.x proof, issue #80 — 2.x has no GitHub release assets yet, so
+# the binary must already sit in tests/e2e/cache/opencode-<version>/).
+# Default (empty): resolve the current latest release.
+E2E_OC_VERSION="${E2E_OC_VERSION:-}"
 E2E_HOST_LAYOUT="unknown"
 
 failures=0
@@ -112,13 +117,20 @@ e2e_resolve_cache() {
     OC_CACHE_DIR="$SCRIPT_DIR/cache"
     mkdir -p "$OC_CACHE_DIR"
 
-    # Resolve the current opencode version from GitHub releases (tiny request).
-    # If the endpoint is unreachable, fall back to the newest cached version so
-    # repeat runs work offline.
-    OC_VERSION=""
-    OC_VERSION=$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-        https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
-        | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+    # Resolve the opencode version under test. E2E_OC_VERSION pins it
+    # (cache required when upstream has no release assets for it); the
+    # default resolves the current latest from GitHub releases (tiny
+    # request). If the endpoint is unreachable, fall back to the newest
+    # cached version so repeat runs work offline.
+    OC_VERSION="$E2E_OC_VERSION"
+    if [ -z "$OC_VERSION" ]; then
+        OC_VERSION=$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+            https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
+            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+    elif [ ! -x "$OC_CACHE_DIR/opencode-$OC_VERSION/opencode" ]; then
+        echo "  ${RED}FAIL${NC}  E2E_OC_VERSION=$OC_VERSION pinned but no cached binary at $OC_CACHE_DIR/opencode-$OC_VERSION/opencode."
+        exit 1
+    fi
     if [ -z "$OC_VERSION" ]; then
         OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
         if [ -n "$OC_VERSION" ]; then

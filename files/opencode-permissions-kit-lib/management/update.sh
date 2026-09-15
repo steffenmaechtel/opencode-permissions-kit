@@ -540,11 +540,28 @@ install_binary() {
     else
         "$src" --version >/dev/null 2>&1 || return 1
     fi
+    # opencode 2.x keeps a background service daemon running the binary
+    # (issue #80): replacing it while the daemon lives fails with "Text
+    # file busy". Stop the service best-effort first — 2.x answers the
+    # graceful stop, 1.x reports an unknown command and both errors are
+    # ignored; the pkill is the belt to that braces (also catches a
+    # wedged daemon). The next 2.x command re-ensures the service.
+    sudo -u "$OPENCODE_USER" "$SYSTEM_BIN" service stop >/dev/null 2>&1 || true
+    sudo pkill -u "$OPENCODE_USER" -f "serve --servic[e]" >/dev/null 2>&1 || true
     current=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     sudo cp "$src" "$SYSTEM_BIN" || return 1
     sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
     sudo chmod 750 "$SYSTEM_BIN" || return 1
     new=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
+    # Re-stamp the major so the wrapper's 2.x --standalone gating follows
+    # the binary ("opencode v2..." -> 2, anything else -> 1).
+    _new_major=$(printf '%s' "$new" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
+    [ -n "$_new_major" ] || _new_major=1
+    if [ -f "$CONFDIR/install.conf" ] && grep -q '^OPENCODE_MAJOR=' "$CONFDIR/install.conf" 2>/dev/null; then
+        sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf"
+    elif [ -f "$CONFDIR/install.conf" ]; then
+        echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null
+    fi
     echo "  opencode binary upgraded: ${current} -> ${new}"
     log "opencode binary upgraded: ${current} -> ${new}"
 }
