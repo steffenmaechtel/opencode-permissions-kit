@@ -87,17 +87,24 @@ export default Plugin.define({
       }
     }
     // One full-width own row per screen (v1 parity, wraps gracefully on
-    // narrow terminals): appending to the footer ITSELF (not the .status
-    // column) gives the kit its own line — status-slot contributions share
-    // the row with health indicators and the version and wrap into orphan
-    // fragments at small widths (observed: "opencode-" / "permissions-kit ("
-    // across four lines). The home screen carries both footers, so the
-    // prompt slot renders only inside a session (its input has a
-    // sessionID there) and the home slot covers the home screen.
+    // narrow terminals). Home: appending to the home footer adds a line to
+    // the footer area. Sessions: the prompt footer is a ROW container —
+    // append/after siblings stay in its horizontal flow (squeezed into a
+    // wrapping right segment at narrow widths) — so the session row comes
+    // from the app slot instead, gated on the reactive route; it renders
+    // below the whole prompt area as its own line. Plugin routes show no
+    // kit row (v1 showed home + session screens only).
     context.ui.slot({ append: "home.footer", render })
     context.ui.slot({
-      after: "prompt.footer",
-      render: (input) => (input?.sessionID ? render() : <text></text>),
+      append: "app",
+      render: () => {
+        try {
+          const route = context.ui.router.current()
+          return route?.type === "session" ? render() : <text></text>
+        } catch {
+          return <text></text>
+        }
+      },
     })
   },
 })

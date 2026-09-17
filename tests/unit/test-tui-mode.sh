@@ -158,10 +158,10 @@ check "2x plugin detects the bypass via the real process user" \
     grep -q 'os.userInfo()' "$PLUGIN2X"
 check "2x plugin derives the mode live from install.conf" \
     grep -q 'CONTAINER_BACKEND' "$PLUGIN2X"
-check "2x plugin renders its own footer rows (home + prompt)" \
-    grep -q '"home.footer"' "$PLUGIN2X" && grep -q '"prompt.footer"' "$PLUGIN2X"
-check "2x plugin keeps one row per screen (prompt slot renders in sessions only)" \
-    grep -q 'input?.sessionID ? render()' "$PLUGIN2X"
+check "2x plugin renders its own footer rows (home + app slot)" \
+    grep -q '"home.footer"' "$PLUGIN2X" && grep -q '"app"' "$PLUGIN2X"
+check "2x plugin keeps one row per screen (app slot renders in sessions only)" \
+    grep -q 'route?.type === "session" ? render()' "$PLUGIN2X"
 check "2x plugin colors follow theme tokens (subdued/info/error)" \
     grep -q 'text.subdued' "$PLUGIN2X" && grep -q 'feedback.info.default' "$PLUGIN2X" && grep -q 'feedback.error.default' "$PLUGIN2X"
 check "2x plugin render is defensive (try/catch)" \
