@@ -734,24 +734,23 @@ if [ ! -f "$DEFAULT_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$DEFAU
     log "tui danger theme refreshed: $DEFAULT_TUI_CONF"
 fi
 
-# opencode 2.x (issue #80): re-register the kit-mode-2x.tsx port in both
-# users' cli.json (additive; drops the auto-migrated v1 kit-mode.tsx entry
-# 2.x may have carried over from tui.json). Idempotent — tui-register only
-# rewrites on change. The major comes from the install.conf stamp; binary
-# upgrades re-stamp it via install_binary().
+# opencode 2.x (issue #80): re-register the kit-mode-2x.tsx port for both
+# users — the TUI discovers local plugins as DIRECTORIES under
+# ~/.config/opencode/plugins/<name>/ with a tui entrypoint; file paths in
+# cli.json are skipped (entries from pre-0.0.35 kits are unregistered,
+# best-effort). Symlink into LIBDIR keeps one source of truth. The major
+# comes from the install.conf stamp; binary upgrades re-stamp it.
 _oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1)
 if [ "$_oc_major" = "2" ]; then
     for _oc_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
         _oc_user_dir="${_oc_dir_user%%:*}"
         _oc_dir_owner="${_oc_dir_user#*:}"
-        sudo mkdir -p "$_oc_user_dir"
-        if sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" register "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx"; then
-            sudo chown "$_oc_dir_owner:$NEW_OPENCODE_GROUP" "$_oc_user_dir/cli.json" 2>/dev/null || true
-            sudo chmod 664 "$_oc_user_dir/cli.json" 2>/dev/null || true
-            log "tui mode registered for 2.x: $_oc_user_dir/cli.json (kit-mode-2x.tsx)"
-        else
-            log "tui-register skipped (unmanaged cli.json): $_oc_user_dir/cli.json"
-        fi
+        sudo mkdir -p "$_oc_user_dir/plugins/opencode-permissions-kit"
+        sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"
+        sudo chown "$_oc_dir_owner:$NEW_OPENCODE_GROUP" "$_oc_user_dir/plugins" "$_oc_user_dir/plugins/opencode-permissions-kit" 2>/dev/null || true
+        sudo chown -h "$_oc_dir_owner:$NEW_OPENCODE_GROUP" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
+        sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" unregister "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
+        log "tui mode registered for 2.x: $_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"
     done
 fi
 

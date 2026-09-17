@@ -162,17 +162,14 @@ run "sudo rm -f /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit"
 echo "CLI dispatcher removed."
 log "cli removed: /usr/local/bin/opk"
 
-# opencode 2.x (issue #80): drop the kit's plugin entry from both users'
-# cli.json BEFORE the library goes — the plugin file is about to vanish and
-# a dangling entry would surface as a load error in the TUI plugin dialog.
-# Additive manager, unmanaged/broken files are left untouched.
+# opencode 2.x (issue #80): drop the kit's plugin registration before the
+# library goes — the discovered plugin dir (symlinked into LIBDIR) and any
+# inert file-path entries older kits may have written into cli.json. The
+# additive manager leaves unmanaged/broken files untouched.
 if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
     for _un_dir in "/home/opencode/.config/opencode" "/home/$DEFAULT_USER/.config/opencode"; do
-        if sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" \
-            unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
-            --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx; then
-            log "cli.json plugin entry removed: $_un_dir/cli.json"
-        fi
+        run "sudo rm -rf '$_un_dir/plugins/opencode-permissions-kit'"
+        run "sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py '$_un_dir/cli.json' unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"
     done
 fi
 

@@ -1589,29 +1589,29 @@ else
     ui_detail "existing $DEFAULT_TUI_CONF kept — TUI mode display NOT installed (user-managed file)"
 fi
 
-# opencode 2.x (issue #80): the terminal client reads ONE global cli.json
-# (layered tui.json is auto-migrated on first start, v1 plugins do not run
-# there). Register the kit-mode-2x.tsx port additively for both users and
-# drop the auto-migrated v1 kit-mode.tsx entry 2.x may have carried over.
-# Creating cli.json at install time also pre-empts the migration — the v1
-# entry then never lands in it on fresh installs. The tui.json deployment
-# above stays: it is inert under 2.x and makes a later 1.x binary swap
-# work instantly.
+# opencode 2.x (issue #80): the TUI discovers local CLI plugins as
+# DIRECTORIES under ~/.config/opencode/plugins/<name>/ whose tui entrypoint
+# (tui.tsx) is resolved by the host — file paths in cli.json `plugins` are
+# deliberately skipped by the reconciliation, so registering there does
+# nothing. Register the kit-mode-2x.tsx port as a symlinked plugin dir for
+# both users: LIBDIR stays the single source of truth (opk update swaps
+# the file, the TUI's file watcher reloads it). Any file-path kit entries
+# an earlier kit version may have written into cli.json are inert and get
+# unregistered. The tui.json deployment above stays: it is inert under
+# 2.x and makes a later 1.x binary swap work instantly.
 if [ "$OPENCODE_MAJOR" = 2 ]; then
     for _oc_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "$DEFAULT_OC_DIR:$DEFAULT_USER"; do
         _oc_user_dir="${_oc_dir_user%%:*}"
         _oc_dir_owner="${_oc_dir_user#*:}"
-        sudo mkdir -p "$_oc_user_dir"
-        if sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" register "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx"; then
-            sudo chown "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/cli.json"
-            sudo chmod 664 "$_oc_user_dir/cli.json"
-        else
-            ui_detail "cli.json at $_oc_user_dir/cli.json not kit-managed — registration skipped (parse or shape error)"
-            log "tui-register skipped (unmanaged cli.json): $_oc_user_dir/cli.json"
-        fi
+        sudo mkdir -p "$_oc_user_dir/plugins/opencode-permissions-kit"
+        sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"
+        sudo chown "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/plugins" "$_oc_user_dir/plugins/opencode-permissions-kit"
+        sudo chown -h "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
+        # best-effort cleanup of inert file-path entries (pre-0.0.35 kits)
+        sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" unregister "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
     done
-    ui_success "TUI mode display registered for opencode 2.x: kit-mode-2x.tsx in cli.json (both users)"
-    log "tui mode registered for 2.x: cli.json plugins entry (kit-mode-2x.tsx)"
+    ui_success "TUI mode display registered for opencode 2.x: plugins/opencode-permissions-kit/tui.tsx (both users)"
+    log "tui mode registered for 2.x: plugin dir + symlink (kit-mode-2x.tsx)"
 fi
 
 # === Step 9: Clean stale runtime state ===

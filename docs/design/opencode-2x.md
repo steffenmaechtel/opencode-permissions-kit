@@ -124,12 +124,17 @@ assets (the cache is not reproducible in CI from tags alone).
   side service-port config once 2.x ships release assets.
 - **kit-mode.tsx port — DONE** (kept for context): `kit-mode-2x.tsx` is
   the v2 CLI-plugin port (same strings/contract, footer.status slots,
-  theme tokens, `Plugin.define` entrypoint). Registered additively in
-  both users' `~/.config/opencode/cli.json` via `py/tui-register.py`
-  (OPENCODE_MAJOR-gated in install.sh/update.sh, unregistered by
-  uninstall.sh; the auto-migrated v1 entry is dropped). Deployment and
-  registration are e2e-verified; the actual TUI render needs a real
-  terminal (manual verification on a real WSL).
+  theme tokens, `Plugin.define` entrypoint). Registered as a **discovered
+  plugin directory** — `~/.config/opencode/plugins/opencode-permissions-
+  kit/tui.tsx`, symlinked into LIBDIR (single source of truth, watcher
+  reloads on kit updates) — for both users, OPENCODE_MAJOR-gated in
+  install.sh/update.sh. File paths in cli.json `plugins` are deliberately
+  skipped by the TUI reconciliation (verified in a live 2.0.6 TUI:
+  registered-but-not-loaded); `py/tui-register.py` stays as the cleanup
+  tool that unregisters such inert entries from earlier kit versions.
+  uninstall.sh removes the plugin dir and the entries. Verified in a live
+  tmux-driven 2.0.6 TUI: the mode row renders in home + prompt footers
+  and the plugin dialog lists `opencode-permissions-kit-mode` as local.
 - **cli.json management — DONE** (kept for context): see above — additive
   entry management only, user keys and entries survive, unparseable or
   wrong-shaped files are left untouched.

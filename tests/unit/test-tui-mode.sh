@@ -168,14 +168,16 @@ check "install.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$INSTALL"
 check "install.sh deploys the 2x plugin to LIBDIR/tui" \
     grep -q 'cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"' "$INSTALL"
-check "install.sh registers the 2x plugin in cli.json (major-gated)" \
-    grep -q 'tui-register.py.*cli.json.*kit-mode-2x.tsx' "$INSTALL"
+check "install.sh registers the 2x plugin as a discovered plugin dir (major-gated)" \
+    grep -q 'ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"' "$INSTALL"
+check "install.sh unregisters inert cli.json path entries (2x cleanup)" \
+    grep -q 'tui-register.py" "$_oc_user_dir/cli.json" unregister' "$INSTALL"
 check "update.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$UPDATE"
-check "update.sh re-registers the 2x plugin in cli.json (major-gated)" \
-    grep -q 'tui-register.py.*cli.json.*kit-mode-2x.tsx' "$UPDATE"
-check "uninstall.sh removes the cli.json plugin entries" \
-    grep -q 'kit-mode-2x.tsx' "$UNINSTALL"
+check "update.sh re-registers the 2x plugin dir (major-gated)" \
+    grep -q 'ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"' "$UPDATE"
+check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
+    grep -q 'plugins/opencode-permissions-kit' "$UNINSTALL" && grep -q 'kit-mode-2x.tsx' "$UNINSTALL"
 
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"

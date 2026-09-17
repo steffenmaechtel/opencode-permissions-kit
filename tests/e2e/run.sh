@@ -201,21 +201,24 @@ check "install.conf stamps the opencode major (issue #80)" \
     E 'grep -qE "^OPENCODE_MAJOR=[12]$" /etc/opencode-permissions-kit/install.conf'
 
 # TUI mode display registration is major-keyed (issue #80): 2.x registers
-# the kit-mode-2x.tsx port additively in both users' cli.json (and drops
-# the auto-migrated v1 entry), 1.x keeps the tui.json flow and must NOT
-# create a kit cli.json.
+# the kit-mode-2x.tsx port as a discovered plugin dir
+# (~/.config/opencode/plugins/<name>/tui.tsx symlinked into LIBDIR — file
+# paths in cli.json are skipped by the TUI), 1.x keeps the tui.json flow
+# and must NOT create kit plugin dirs.
 case "$OC_VERSION" in
     2.*)
-        check "2x: opencode user cli.json registers kit-mode-2x.tsx" \
-            E 'sudo grep -q "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx" /home/opencode/.config/opencode/cli.json'
-        check "2x: default user cli.json registers kit-mode-2x.tsx" \
-            E 'grep -q "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx" /home/dev/.config/opencode/cli.json'
-        check "2x: no (migrated) v1 plugin entry left in cli.json" \
-            E '! sudo grep -q "tui/kit-mode.tsx" /home/opencode/.config/opencode/cli.json'
+        check "2x: opencode user plugin dir symlinks kit-mode-2x.tsx" \
+            E 'test "$(sudo readlink /home/opencode/.config/opencode/plugins/opencode-permissions-kit/tui.tsx)" = "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"'
+        check "2x: default user plugin dir symlinks kit-mode-2x.tsx" \
+            E 'test "$(readlink /home/dev/.config/opencode/plugins/opencode-permissions-kit/tui.tsx)" = "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"'
+        check "2x: plugin symlink target readable (loads)" \
+            E 'sudo test -r /home/opencode/.config/opencode/plugins/opencode-permissions-kit/tui.tsx'
+        check "2x: no inert kit path entries in cli.json" \
+            E '! sudo grep -q "opencode-permissions-kit/tui/kit-mode" /home/opencode/.config/opencode/cli.json 2>/dev/null'
         ;;
     *)
-        check "1x: no kit cli.json on 1.x (tui.json flow only)" \
-            E '! test -f /home/opencode/.config/opencode/cli.json'
+        check "1x: no kit plugin dir on 1.x (tui.json flow only)" \
+            E '! test -e /home/opencode/.config/opencode/plugins/opencode-permissions-kit'
         ;;
 esac
 check_fail "no ddev shim in the library (soft-only kit)" \
