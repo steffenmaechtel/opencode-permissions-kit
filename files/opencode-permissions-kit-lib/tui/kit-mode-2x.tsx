@@ -86,7 +86,14 @@ export default Plugin.define({
         return <text></text>
       }
     }
+    // One row per screen (v1 parity): the home screen carries BOTH footers —
+    // the prompt composer's status hint (which wraps narrow) and the home
+    // footer — so the prompt slot renders only inside a session (its input
+    // has a sessionID there) and the home slot covers the home screen.
     context.ui.slot({ append: "home.footer.status", render })
-    context.ui.slot({ append: "prompt.footer.status", render })
+    context.ui.slot({
+      append: "prompt.footer.status",
+      render: (input) => (input?.sessionID ? render() : <text></text>),
+    })
   },
 })

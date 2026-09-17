@@ -160,6 +160,8 @@ check "2x plugin derives the mode live from install.conf" \
     grep -q 'CONTAINER_BACKEND' "$PLUGIN2X"
 check "2x plugin renders in the footer status slots (home + prompt)" \
     grep -q '"home.footer.status"' "$PLUGIN2X" && grep -q '"prompt.footer.status"' "$PLUGIN2X"
+check "2x plugin keeps one row per screen (prompt slot renders in sessions only)" \
+    grep -q 'input?.sessionID ? render()' "$PLUGIN2X"
 check "2x plugin colors follow theme tokens (subdued/info/error)" \
     grep -q 'text.subdued' "$PLUGIN2X" && grep -q 'feedback.info.default' "$PLUGIN2X" && grep -q 'feedback.error.default' "$PLUGIN2X"
 check "2x plugin render is defensive (try/catch)" \
