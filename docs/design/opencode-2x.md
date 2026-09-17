@@ -122,14 +122,17 @@ assets (the cache is not reproducible in CI from tags alone).
   blocks the opencode user's service (probe time-bounded, see §4, but the
   session itself would also suffer). Watch for an upstream fix or a kit
   side service-port config once 2.x ships release assets.
-- **kit-mode.tsx port**: v1 TUI plugins do not run on 2.x (new plugin
-  API). The mode row is 1.x-only until ported; the plugin registration in
-  the opencode user's `tui.json` is inert under 2.x (loads without
-  crashing — verified — but renders nothing).
-- **cli.json management**: 2.x terminal-client config moves to one global
-  `~/.config/opencode/cli.json` (auto-migrated from `tui.json` on first
-  start). The kit's marker-based management ("write only if absent or
-  kit-written") must learn `cli.json` when the plugin is ported.
+- **kit-mode.tsx port — DONE** (kept for context): `kit-mode-2x.tsx` is
+  the v2 CLI-plugin port (same strings/contract, footer.status slots,
+  theme tokens, `Plugin.define` entrypoint). Registered additively in
+  both users' `~/.config/opencode/cli.json` via `py/tui-register.py`
+  (OPENCODE_MAJOR-gated in install.sh/update.sh, unregistered by
+  uninstall.sh; the auto-migrated v1 entry is dropped). Deployment and
+  registration are e2e-verified; the actual TUI render needs a real
+  terminal (manual verification on a real WSL).
+- **cli.json management — DONE** (kept for context): see above — additive
+  entry management only, user keys and entries survive, unparseable or
+  wrong-shaped files are left untouched.
 - **Service-mode ergonomics**: once 2.x is `releases/latest`, reconsider
   per-start service boots vs. keeping the service warm with a staleness
   guard (e.g. mtime probe of the config files).
@@ -156,10 +159,8 @@ issues #80/#81:
 3. **Merge as a normal PR** once manual validation satisfies. Everything
    is already in production shape; nothing in the PR depends on 2.x
    being released.
-4. **Follow-ups, in order**: `kit-mode-2x` (plugin port + `cli.json`
-   management + `OPENCODE_MAJOR`-keyed deployment of both variants;
-   verification loop: real-WSL TUI render + e2e deployment checks), then
-   the CI job, then the §9 ergonomics items.
+4. **Follow-ups, in order**: ~~`kit-mode-2x`~~ (done — see §9, ported on
+   this branch), then the CI job, then the §9 ergonomics items.
 5. **Urgency trigger**: when upstream flips `releases/latest` to 2.x,
    every fresh kit install pulls a 2.x binary — the merge becomes
    time-critical on that day. Monitor cheaply with

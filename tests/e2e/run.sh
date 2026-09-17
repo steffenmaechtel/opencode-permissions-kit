@@ -199,6 +199,25 @@ check "install.conf records OPENCODE_GROUP=opencode" \
     E 'grep -q "^OPENCODE_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
 check "install.conf stamps the opencode major (issue #80)" \
     E 'grep -qE "^OPENCODE_MAJOR=[12]$" /etc/opencode-permissions-kit/install.conf'
+
+# TUI mode display registration is major-keyed (issue #80): 2.x registers
+# the kit-mode-2x.tsx port additively in both users' cli.json (and drops
+# the auto-migrated v1 entry), 1.x keeps the tui.json flow and must NOT
+# create a kit cli.json.
+case "$OC_VERSION" in
+    2.*)
+        check "2x: opencode user cli.json registers kit-mode-2x.tsx" \
+            E 'sudo grep -q "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx" /home/opencode/.config/opencode/cli.json'
+        check "2x: default user cli.json registers kit-mode-2x.tsx" \
+            E 'grep -q "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx" /home/dev/.config/opencode/cli.json'
+        check "2x: no (migrated) v1 plugin entry left in cli.json" \
+            E '! sudo grep -q "tui/kit-mode.tsx" /home/opencode/.config/opencode/cli.json'
+        ;;
+    *)
+        check "1x: no kit cli.json on 1.x (tui.json flow only)" \
+            E '! test -f /home/opencode/.config/opencode/cli.json'
+        ;;
+esac
 check_fail "no ddev shim in the library (soft-only kit)" \
     E 'test -e /usr/local/lib/opencode-permissions-kit/bin/ddev'
 check_fail "no hooks directory in the library" \

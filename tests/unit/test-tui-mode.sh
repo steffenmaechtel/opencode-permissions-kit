@@ -137,6 +137,71 @@ check "update.sh refreshes the default-user danger theme" \
 check "uninstall.sh documents the tui.json leftovers" \
     grep -q 'tui.json' "$UNINSTALL"
 
+# --- opencode 2.x port (issue #80) ---------------------------------------------
+PLUGIN2X="$TUIDIR/kit-mode-2x.tsx"
+REGISTER="$REPO/files/opencode-permissions-kit-lib/py/tui-register.py"
+
+check "2x plugin exists (kit-mode-2x.tsx)" test -f "$PLUGIN2X"
+check "2x plugin uses the v2 Plugin.define entrypoint" \
+    grep -q 'Plugin.define' "$PLUGIN2X"
+check "2x plugin has a stable id" \
+    grep -q "id: \"opencode-permissions-kit-mode\"" "$PLUGIN2X"
+check "2x plugin renders the kit-prefixed mode string" \
+    grep -qF '{prefix} Mode: {mode}' "$PLUGIN2X"
+check "2x plugin renders the bypass warning string (exact wording)" \
+    grep -qF 'WARNING UNSECURE (bypass of opencode-permissions-kit detected)' "$PLUGIN2X"
+check "2x plugin wording: with ddev/docker" \
+    grep -q '"with ddev/docker"' "$PLUGIN2X"
+check "2x plugin wording: no ddev/docker" \
+    grep -q '"no ddev/docker"' "$PLUGIN2X"
+check "2x plugin detects the bypass via the real process user" \
+    grep -q 'os.userInfo()' "$PLUGIN2X"
+check "2x plugin derives the mode live from install.conf" \
+    grep -q 'CONTAINER_BACKEND' "$PLUGIN2X"
+check "2x plugin renders in the footer status slots (home + prompt)" \
+    grep -q '"home.footer.status"' "$PLUGIN2X" && grep -q '"prompt.footer.status"' "$PLUGIN2X"
+check "2x plugin colors follow theme tokens (subdued/info/error)" \
+    grep -q 'text.subdued' "$PLUGIN2X" && grep -q 'feedback.info.default' "$PLUGIN2X" && grep -q 'feedback.error.default' "$PLUGIN2X"
+check "2x plugin render is defensive (try/catch)" \
+    grep -q 'catch' "$PLUGIN2X"
+check "install.sh fetch list includes the 2x plugin" \
+    grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$INSTALL"
+check "install.sh deploys the 2x plugin to LIBDIR/tui" \
+    grep -q 'cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"' "$INSTALL"
+check "install.sh registers the 2x plugin in cli.json (major-gated)" \
+    grep -q 'tui-register.py.*cli.json.*kit-mode-2x.tsx' "$INSTALL"
+check "update.sh fetch list includes the 2x plugin" \
+    grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$UPDATE"
+check "update.sh re-registers the 2x plugin in cli.json (major-gated)" \
+    grep -q 'tui-register.py.*cli.json.*kit-mode-2x.tsx' "$UPDATE"
+check "uninstall.sh removes the cli.json plugin entries" \
+    grep -q 'kit-mode-2x.tsx' "$UNINSTALL"
+
+# tui-register.py functional behavior (cli.json is user-owned state)
+check "tui-register.py exists" test -f "$REGISTER"
+T2X=$(mktemp -d)
+trap 'rm -rf "$T2X"' EXIT INT TERM
+check "register: creates minimal cli.json" \
+    python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
+    && grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"' "$T2X/cli.json"
+check "register: idempotent (second run, still exactly one entry)" \
+    python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
+    && [ "$(grep -c kit-mode-2x.tsx "$T2X/cli.json")" = "1" ]
+printf '{\n  // user comment survives\n  "theme": {"name": "gruvbox"},\n  "plugins": ["user-pkg", {"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"}]\n}\n' > "$T2X/cli2.json"
+check "register: JSONC input, user keys survive, legacy v1 entry dropped" \
+    python3 "$REGISTER" "$T2X/cli2.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx \
+    && grep -q '"user-pkg"' "$T2X/cli2.json" && grep -q 'gruvbox' "$T2X/cli2.json" \
+    && grep -q kit-mode-2x.tsx "$T2X/cli2.json" && ! grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"' "$T2X/cli2.json"
+check "unregister: removes the kit entry, keeps the rest" \
+    python3 "$REGISTER" "$T2X/cli2.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
+    && ! grep -q kit-mode-2x.tsx "$T2X/cli2.json" && grep -q '"user-pkg"' "$T2X/cli2.json"
+echo "garbage" > "$T2X/bad.json"
+check_no "register: refuses to touch unparseable cli.json" \
+    python3 "$REGISTER" "$T2X/bad.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+printf '{"plugins": "not-a-list"}' > "$T2X/bad2.json"
+check_no "register: refuses non-list plugins key" \
+    python3 "$REGISTER" "$T2X/bad2.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+
 # --- summary ------------------------------------------------------------------
 echo ""
 if [ "$failures" -gt 0 ]; then
