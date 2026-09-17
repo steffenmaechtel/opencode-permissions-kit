@@ -57,9 +57,9 @@ fetch_kit() {
              opencode-permissions-kit-lib/templates/opencode.jsonc \
              opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
              opencode-permissions-kit-lib/templates/sudoers.template etc/umask.sh \
-             opencode-permissions-kit-lib/bin/opencode-as-opencode opencode-permissions-kit-lib/bin/opk opencode-permissions-kit-lib/py/jsonc-parser.py \
+             opencode-permissions-kit-lib/bin/opencode-as-opencode opencode-permissions-kit-lib/bin/opk opencode-permissions-kit-lib/py/jsonc-parser.py opencode-permissions-kit-lib/py/tui-register.py \
              opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh \
-             opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json; do
+             opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/kit-mode-2x.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json; do
         echo "  fetching $f ..." >&2
         if [ "$f" = "VERSION" ]; then
             curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
@@ -1226,6 +1226,22 @@ if [ "$opencode_found" = false ]; then
     fi
 fi
 
+# Stamp the installed binary's major into install.conf (issue #80): the
+# wrapper gates opencode 2.x-only flags (session `--standalone`) on it.
+# "opencode v2..." -> 2, 1.x bare versions and anything else -> 1. Best
+# effort — a missing stamp makes the wrapper detect at runtime. NOTE:
+# sed exits 0 even without a match, so the append must be grep-gated.
+OPENCODE_MAJOR=1
+case $("$SYSTEM_BIN" --version 2>/dev/null | head -1) in
+    "opencode v2"*) OPENCODE_MAJOR=2 ;;
+esac
+if grep -q '^OPENCODE_MAJOR=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+    sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$OPENCODE_MAJOR/" /etc/opencode-permissions-kit/install.conf
+else
+    echo "OPENCODE_MAJOR=$OPENCODE_MAJOR" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
+fi
+log "install.conf stamped: OPENCODE_MAJOR=$OPENCODE_MAJOR"
+
 for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
     if [ -f "$cf" ]; then
         sudo sed -i '\|\.opencode/bin|d' "$cf" 2>/dev/null || true
@@ -1294,10 +1310,13 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/s
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/py/tui-register.py" "$LIBDIR/py/tui-register.py"
+sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
+sudo chmod 755 "$LIBDIR/py/tui-register.py"
 sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh"
 sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
                "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
@@ -1567,7 +1586,32 @@ if [ ! -f "$DEFAULT_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$DEFAU
     ui_success "danger theme installed for $DEFAULT_USER: red warning look when the original binary runs as you"
     log "tui danger theme installed: $DEFAULT_TUI_CONF"
 else
-    ui_detail "existing $DEFAULT_TUI_CONF kept — danger theme NOT installed (user-managed file)"
+    ui_detail "existing $DEFAULT_TUI_CONF kept — TUI mode display NOT installed (user-managed file)"
+fi
+
+# opencode 2.x (issue #80): the TUI discovers local CLI plugins as
+# DIRECTORIES under ~/.config/opencode/plugins/<name>/ whose tui entrypoint
+# (tui.tsx) is resolved by the host — file paths in cli.json `plugins` are
+# deliberately skipped by the reconciliation, so registering there does
+# nothing. Register the kit-mode-2x.tsx port as a symlinked plugin dir for
+# both users: LIBDIR stays the single source of truth (opk update swaps
+# the file, the TUI's file watcher reloads it). Any file-path kit entries
+# an earlier kit version may have written into cli.json are inert and get
+# unregistered. The tui.json deployment above stays: it is inert under
+# 2.x and makes a later 1.x binary swap work instantly.
+if [ "$OPENCODE_MAJOR" = 2 ]; then
+    for _oc_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "$DEFAULT_OC_DIR:$DEFAULT_USER"; do
+        _oc_user_dir="${_oc_dir_user%%:*}"
+        _oc_dir_owner="${_oc_dir_user#*:}"
+        sudo mkdir -p "$_oc_user_dir/plugins/opencode-permissions-kit"
+        sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"
+        sudo chown "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/plugins" "$_oc_user_dir/plugins/opencode-permissions-kit"
+        sudo chown -h "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
+        # best-effort cleanup of inert file-path entries (pre-0.0.35 kits)
+        sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" unregister "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
+    done
+    ui_success "TUI mode display registered for opencode 2.x: plugins/opencode-permissions-kit/tui.tsx (both users)"
+    log "tui mode registered for 2.x: plugin dir + symlink (kit-mode-2x.tsx)"
 fi
 
 # === Step 9: Clean stale runtime state ===

@@ -71,8 +71,13 @@ for _hr_a in "$@"; do
         *) _hr_msg=true; break ;;
     esac
 done
+# Subcommand union for headless classification: opencode 1.x names (agent,
+# plug, providers, account, github, pr, db, generate, web — kept; unknown to
+# 2.x, which errors on them anyway) plus 2.x additions (api, auth, plugin,
+# service, pair, update — issue #80). 2.x `mini` is an interactive UI and
+# stays bannered like `tui`/`attach`.
 case "${1:-}" in
-    serve|acp|models|agent|providers|session|export|import|stats|account|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade)
+    serve|acp|models|agent|providers|session|export|import|stats|account|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade|api|auth|plugin|service|pair|update)
         HEADLESS=true
         ;;
     run)
@@ -192,6 +197,16 @@ if [ -d /mnt/c ]; then
     fi
 fi
 
+# opencode major version (2.x changes the session-server model, issue #80):
+# normally stamped into install.conf at install/update time; the runtime
+# fallback covers stamps from older kit versions ("opencode v2..." -> 2).
+if [ -z "${OPENCODE_MAJOR:-}" ]; then
+    case $(/usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null) in
+        "opencode v2"*) OPENCODE_MAJOR=2 ;;
+        *) OPENCODE_MAJOR=1 ;;
+    esac
+fi
+
 # Detect container tools (docker/ddev) enabled by the session's FINAL
 # permission config (issue #81): a broad allow counts no matter which file
 # declares it — the project's opencode.json[c] OR the opencode user's global
@@ -200,32 +215,64 @@ fi
 # current directory, resolves exactly the merge the real session will see
 # (that user's global config, this cwd's project config, last matching rule
 # wins). The call rides the kit's base sudoers rule (bin/opencode with any
-# args) and never prompts (-n). When the probe returns nothing (opencode too
-# old for `debug config`, unreadable cwd, sudo denied), fall back to scanning
-# only the project config — the pre-#81 behavior. Any enabled tool means
-# "enable container tools for this session" — the rootless backend decides
-# the actual mechanism.
+# args) and never prompts (-n). When the probe returns nothing or an
+# untrustworthy answer (opencode too old for `debug config`, unreadable
+# cwd, sudo denied, a cold-start error object — parser exit 3), fall back
+# to scanning only the project config — the pre-#81 behavior. Any enabled
+# tool means "enable container tools for this session" — the rootless
+# backend decides the actual mechanism.
 merged_config() {
-    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+    # timeout(1) bounds the probe: a 2.x service that cannot bind its port
+    # makes `debug config` retry forever — 2.x assigns the service port per
+    # CHANNEL, not per user (127.0.0.1:0xc0de), so a bare 2.x opencode run
+    # by the default user blocks the opencode user's service, and without
+    # the bound even `opencode --version` hangs after the banner (observed
+    # on a real WSL, issue #80). On timeout the wrapper falls back to the
+    # project-only scan. 10s covers a cold service boot (~2-4s) generously.
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 10 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+    else
+        /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+    fi
 }
 tools_from_config() {
     # "-" reads stdin (the piped merged config); a path reads that file.
-    python3 /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$1" 2>/dev/null || true
+    # Non-zero exit = output not trustworthy (JSON error, or exit 3 for an
+    # unusable shape) — the caller falls back to the project-only scan.
+    python3 /usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py --tools "$1" 2>/dev/null
+}
+# opencode 2.x: the probe may have cold-started the background service —
+# stop it again (graceful). A long-lived service answers later probes with
+# its BOOT-TIME config snapshot: root-owned config edits (sudo tee, sed -i)
+# need seconds to reload, so a reused daemon reports stale permissions
+# right after an edit (observed in the e2e: a fresh global allow invisible
+# to the immediate next start). Stopping keeps every probe on fresh files,
+# matching the kit's per-invocation model; the next 2.x command re-ensures
+# the service. 1.x: unknown subcommand, error ignored.
+stop_merged_config_service() {
+    [ "${OPENCODE_MAJOR:-}" = 2 ] || return 0
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 5 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+    else
+        /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+    fi
 }
 CONTAINER_REQUESTED=false
 CONTAINER_AUTO=false
 PROJECT_TOOLS=""
 MERGED_CONFIG=$(merged_config)
-if [ -n "$MERGED_CONFIG" ]; then
-    PROJECT_TOOLS=$(printf '%s' "$MERGED_CONFIG" | tools_from_config -)
+if [ -n "$MERGED_CONFIG" ] && PROJECT_TOOLS=$(printf '%s' "$MERGED_CONFIG" | tools_from_config -); then
+    : # probe output is authoritative (may legitimately list no tools)
 else
+    PROJECT_TOOLS=""
     PROJECT_CONFIG=""
     if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
     elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
     if [ -n "$PROJECT_CONFIG" ]; then
-        PROJECT_TOOLS=$(tools_from_config "$PROJECT_CONFIG")
+        PROJECT_TOOLS=$(tools_from_config "$PROJECT_CONFIG") || PROJECT_TOOLS=""
     fi
 fi
+stop_merged_config_service
 if [ -n "$PROJECT_TOOLS" ]; then
     note "${CYAN}Container tools enabled by this project:${NC}"
     printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_fd"
@@ -406,6 +453,39 @@ if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
         note ""
     fi
 fi
+
+# opencode 2.x session servers (issue #80): 2.x commands prefer the shared
+# background service (`opencode serve --service`, auto-spawned, env from its
+# own registration) — tools then run in a daemon that never saw this
+# wrapper's exported DOCKER_HOST/XDG_RUNTIME_DIR, and the per-project
+# container opt-in breaks. `--standalone` forces a private server as a child
+# of the exec'd process (full env inheritance, dies with the session). The
+# flag exists only in 2.x, gated on OPENCODE_MAJOR (resolved above; the
+# install.conf stamp wins, runtime detection is the fallback). Session
+# commands only — the TUI default start (no args or flags-only), `run`, and
+# `mini`; an explicit --server or --standalone in the user's args always
+# wins.
+standalone_mode() {
+    [ "${OPENCODE_MAJOR:-}" = 2 ] || { echo none; return 0; }
+    for _sa in "$@"; do
+        case "$_sa" in --server|--server=*|--standalone) echo none; return 0 ;; esac
+    done
+    case "${1:-}" in
+        run|mini) echo after-first ;;
+        ""|-*) echo append ;;
+        *) echo none ;;
+    esac
+}
+case $(standalone_mode "$@") in
+    append)
+        set -- "$@" --standalone
+        ;;
+    after-first)
+        _sub="$1"
+        shift
+        set -- "$_sub" --standalone "$@"
+        ;;
+esac
 
 # Rootless: pass the per-user socket through sudo's env reset via env_keep.
 # podman-CLI path (daemonless): no DOCKER_HOST, no supplementary group.

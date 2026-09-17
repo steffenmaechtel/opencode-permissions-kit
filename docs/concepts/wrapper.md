@@ -131,9 +131,7 @@ look and the warning row are the visible amplifiers.
 
 ## Mode display in the TUI
 
-The kit registers a small TUI plugin for the `opencode` user
-(`/home/opencode/.config/opencode/tui.json` →
-`/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx`). It renders
+The kit registers a small TUI plugin for the `opencode` user. It renders
 one thin row at the very bottom of the TUI, on the home screen and
 inside sessions:
 
@@ -145,14 +143,25 @@ opencode-permissions-kit (0.0.20) Mode: with ddev/docker
 `no ddev/docker` otherwise — derived live from the kit's install.conf
 (backend state **and** the installed kit version), so backend switches
 show up without a restart. The text color follows
-**your** opencode theme; the plugin never sets or changes the theme. If
-you manage your own `~/.config/opencode/tui.json` (for the opencode
-user), the kit leaves it alone — the file is only written when absent
-or previously kit-written (marker key `_opencode_permissions_kit`).
+**your** opencode theme; the plugin never sets or changes the theme.
+
+The registration differs by opencode major (detected at install/update
+time and stamped as `OPENCODE_MAJOR` in install.conf):
+
+- **opencode 1.x**: `~/.config/opencode/tui.json` (marker key
+  `_opencode_permissions_kit`) loads
+  `/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx`. If you
+  manage your own `tui.json` for the `opencode` user, the kit leaves it
+  alone — the file is only written when absent or previously
+  kit-written.
+- **opencode 2.x**: v1 plugins do not run there; the kit deploys the
+  port `kit-mode-2x.tsx` and registers it as a discovered plugin dir —
+  `~/.config/opencode/plugins/opencode-permissions-kit/tui.tsx`,
+  symlinked into the kit's library. Remove that directory to opt out.
 
 Design background:
 [plan-ui-tui-opencode](../_archive/design/plan-ui-tui-opencode.md)
-(archived).
+(archived) and [opencode-2x](../design/opencode-2x.md) (current).
 
 ## Wrapper-bypass guard (detect, then warn loudly)
 

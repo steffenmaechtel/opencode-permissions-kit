@@ -236,6 +236,54 @@ assert_not_contains "tools-stdin: later docker* deny wins over docker * allow" "
 OUT=$(printf '%s\n' '{ "permission": { "read": { "*.env*": "deny" } } }' | python3 "$PARSER" - 2>/dev/null || true)
 assert_contains "deny-stdin: .env* extracted from stdin" ".env*" "$OUT"
 
+# --- 26. --tools stdin: opencode 2.x `debug config` Entry[] shape (issue #80) ---
+# 2.x prints a LIST of documents (lowest priority first) whose normalized
+# `permissions` arrays carry {action, resource, effect} records; the v1
+# permission.bash map was migrated ("bash" action became "shell").
+OUT=$(printf '%s\n' '[
+  { "type": "directory", "path": "/smoke/proj" },
+  { "type": "document", "path": "/root/.config/opencode/opencode.jsonc", "info": {
+      "$schema": "https://opencode.ai/config.json", "share": "disabled",
+      "permissions": [
+        { "action": "shell", "resource": "*", "effect": "allow" },
+        { "action": "shell", "resource": "docker *", "effect": "deny" },
+        { "action": "shell", "resource": "docker-compose *", "effect": "deny" },
+        { "action": "shell", "resource": "sudo docker *", "effect": "deny" },
+        { "action": "shell", "resource": "ddev *", "effect": "deny" },
+        { "action": "shell", "resource": "sudo ddev *", "effect": "deny" },
+        { "action": "edit", "resource": "*.env*", "effect": "deny" }
+      ] } },
+  { "type": "document", "path": "/smoke/proj/opencode.jsonc", "info": {
+      "permissions": [
+        { "action": "shell", "resource": "docker *", "effect": "allow" }
+      ] } }
+]' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_contains "tools-2x: project doc overrides global docker deny" "docker" "$OUT"
+assert_not_contains "tools-2x: global ddev deny stands (no project allow)" "ddev" "$OUT"
+
+# global document grants both (the issue #81 scenario on 2.x)
+OUT=$(printf '%s\n' '[
+  { "type": "document", "info": { "permissions": [
+      { "action": "shell", "resource": "docker *", "effect": "allow" },
+      { "action": "shell", "resource": "ddev *", "effect": "allow" }
+  ] } }
+]' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_contains "tools-2x: global allows detected (docker)" "docker" "$OUT"
+assert_contains "tools-2x: global allows detected (ddev)" "ddev" "$OUT"
+
+# empty list / documents without permissions -> no tools, no crash
+OUT=$(printf '%s\n' '[]' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_empty "tools-2x: empty entry list -> no tools" "$OUT"
+OUT=$(printf '%s\n' '[{ "type": "directory", "path": "/x" }, { "type": "document", "info": { "share": "disabled" } }]' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_empty "tools-2x: documents without permissions -> no tools" "$OUT"
+
+# stdin error-object shape (e.g. a failed/cold 2.x service answering the
+# debug-config probe) must exit 3 = "not trustworthy, fall back" (issue #80)
+assert_exitcode "tools-stdin: error object shape exits 3 (fall back)" 3 sh -c 'printf "%s\n" "{ \"error\": \"cold start\" }" | python3 "$0" --tools - >/dev/null 2>&1' "$PARSER"
+assert_exitcode "tools-stdin: garbage top-level exits 3 (fall back)" 3 sh -c 'printf "%s\n" "\"garbage\"" | python3 "$0" --tools - >/dev/null 2>&1' "$PARSER"
+OUT=$(printf '%s\n' '{ "permission": {} }' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_empty "tools-stdin: dict WITH permission key stays valid (empty tools)" "$OUT"
+
 # --- Summary ---
 echo ""
 echo "===================================="

@@ -77,7 +77,7 @@ done
 for f in $(find "$REPO/files" -type f | sort); do
     base="${f##*/}"
     case "$base" in
-        umask.sh|jsonc-parser.py|*.jsonc|sudoers.template) continue ;;
+        umask.sh|jsonc-parser.py|tui-register.py|*.jsonc|sudoers.template) continue ;;
     esac
     required="$required ./${f#"$REPO"/}"
 done

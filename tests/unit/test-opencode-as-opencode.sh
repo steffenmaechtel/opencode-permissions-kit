@@ -315,8 +315,15 @@ hl_case "run --format json is headless" true  run --format json "hi"
 hl_case "acp is headless"               true  acp
 hl_case "models is headless"            true  models
 hl_case "export is headless"            true  export sess-123
+hl_case "2x api is headless"            true  api GET /config
+hl_case "2x auth is headless"           true  auth login
+hl_case "2x plugin is headless"         true  plugin list
+hl_case "2x service is headless"        true  service status
+hl_case "2x pair is headless"           true  pair
+hl_case "2x update is headless"         true  update
 hl_case "tui stays interactive"         false  tui
 hl_case "attach stays interactive"      false  attach
+hl_case "2x mini stays interactive"     false  mini
 hl_case "no args stays interactive"     false
 hl_case "flags-only start stays interactive" false --debug
 
@@ -601,7 +608,8 @@ dt_run() {
             if [ "$_merged" = "EMPTY" ]; then return 0; fi
             printf '%s\n' "$_merged"
         }
-        tools_from_config() { command python3 "$REAL_PARSER" --tools "$@" 2>/dev/null || true; }
+        tools_from_config() { command python3 "$REAL_PARSER" --tools "$@" 2>/dev/null; }
+        stop_merged_config_service() { :; }
         eval "$DT_BLOCK" >/dev/null
         printf 'tools=[%s] requested=%s auto=%s banner=%s\n' \
             "$(printf '%s' "$PROJECT_TOOLS" | tr '\n' ' ')" "$CONTAINER_REQUESTED" "$CONTAINER_AUTO" "$_banner"
@@ -635,10 +643,97 @@ result=$(dt_run '{ "permission": { "bash": { "docker *": "deny" } } }' opencode.
 assert_valid "merged: successful probe is authoritative (no project fallback)" \
     "tools=[] requested=false auto=false banner=0" "$result"
 
+# probe answered an ERROR OBJECT (cold-start failure, parser exit 3) → not
+# trustworthy → the project fallback fires despite non-empty probe output
+result=$(dt_run '{ "error": "service starting" }' opencode.jsonc '{ "permission": { "bash": { "docker *": "allow" } } }')
+assert_valid "merged: error-object probe falls back to the project scan" \
+    "tools=[docker] requested=true auto=true banner=1" "$result"
+
+# 2.x: the probe's background service is stopped again (stale-config guard)
+if grep -q 'stop_merged_config_service()' "$WRAPPER_FILE" && grep -q 'service stop' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper stops the 2.x probe service (stale-config guard)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the probe service stop"
+    failures=$((failures + 1))
+fi
+
+# the probe is time-bounded: a 2.x service blocked from its port makes
+# `debug config` retry forever (port is per channel, not per user) — the
+# wrapper must fall through instead of hanging even --version
+if grep -q 'timeout 10' "$WRAPPER_FILE" && grep -q 'timeout 5' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  probe + service stop are time-bounded (port-collision hang)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the probe/stop timeouts"
+    failures=$((failures + 1))
+fi
+
 # probe failed + no project config → nothing
 result=$(dt_run EMPTY - '')
 assert_valid "fallback: no project config → no tools" \
     "tools=[] requested=false auto=false banner=0" "$result"
+
+# --- opencode 2.x session servers: --standalone gating (issue #80) ---
+# 2.x runs tools in a shared background service whose env never saw the
+# wrapper's DOCKER_HOST — session commands (TUI default, run, mini) get
+# --standalone (private server child, full env). 1.x never gets the flag
+# (unknown there); an explicit --server/--standalone wins.
+echo ""
+echo "--- 2.x standalone gating (issue #80) ---"
+
+SM_BLOCK="$(sed -n '/^standalone_mode()/,/^}/p' "$WRAPPER_FILE")"
+if [ -n "$SM_BLOCK" ]; then
+    echo "  ${GREEN}PASS${NC}  standalone_mode function extractable"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  standalone_mode function not extractable"
+    failures=$((failures + 1))
+fi
+
+sm_case() { # <expected: none|append|after-first> <OPENCODE_MAJOR> <args...>
+    _want="$1"; OPENCODE_MAJOR="$2"; shift 2
+    _got=$(eval "$SM_BLOCK"; standalone_mode "$@")
+    if [ "$_got" = "$_want" ]; then
+        echo "  ${GREEN}PASS${NC}  standalone: $3${*:+ }-> $_want"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  standalone: args=[$*] want=$_want got=$_got"
+        failures=$((failures + 1))
+    fi
+}
+sm_case none 1
+sm_case none 1 run "fix"
+sm_case none ""
+sm_case append 2
+sm_case append 2 --debug
+sm_case append 2 --port 57222
+sm_case after-first 2 run "fix the bug"
+sm_case after-first 2 mini
+sm_case none 2 serve --port 4199
+sm_case none 2 models
+sm_case none 2 debug config
+sm_case none 2 run --server http://127.0.0.1:1 "hi"
+sm_case none 2 --standalone
+sm_case none 2 run --standalone "hi"
+
+# arg rewriting: the wrapper's case block inserts/appends correctly
+if grep -q 'case \$(standalone_mode "\$@")' "$WRAPPER_FILE" && grep -q 'set -- "\$_sub" --standalone "\$@"' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper rewrites args via standalone_mode"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the standalone arg rewriting"
+    failures=$((failures + 1))
+fi
+
+# runtime fallback detects 2.x from --version output
+if grep -q '"opencode v2"\*) OPENCODE_MAJOR=2' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper runtime-detects 2.x (fallback without stamp)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the 2.x runtime detection"
+    failures=$((failures + 1))
+fi
 
 # --- Summary ---
 echo ""

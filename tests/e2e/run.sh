@@ -197,6 +197,30 @@ check "install.conf records CONTAINER_BACKEND=podman-rootless" \
     E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
 check "install.conf records OPENCODE_GROUP=opencode" \
     E 'grep -q "^OPENCODE_GROUP=opencode" /etc/opencode-permissions-kit/install.conf'
+check "install.conf stamps the opencode major (issue #80)" \
+    E 'grep -qE "^OPENCODE_MAJOR=[12]$" /etc/opencode-permissions-kit/install.conf'
+
+# TUI mode display registration is major-keyed (issue #80): 2.x registers
+# the kit-mode-2x.tsx port as a discovered plugin dir
+# (~/.config/opencode/plugins/<name>/tui.tsx symlinked into LIBDIR — file
+# paths in cli.json are skipped by the TUI), 1.x keeps the tui.json flow
+# and must NOT create kit plugin dirs.
+case "$OC_VERSION" in
+    2.*)
+        check "2x: opencode user plugin dir symlinks kit-mode-2x.tsx" \
+            E 'test "$(sudo readlink /home/opencode/.config/opencode/plugins/opencode-permissions-kit/tui.tsx)" = "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"'
+        check "2x: default user plugin dir symlinks kit-mode-2x.tsx" \
+            E 'test "$(readlink /home/dev/.config/opencode/plugins/opencode-permissions-kit/tui.tsx)" = "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"'
+        check "2x: plugin symlink target readable (loads)" \
+            E 'sudo test -r /home/opencode/.config/opencode/plugins/opencode-permissions-kit/tui.tsx'
+        check "2x: no inert kit path entries in cli.json" \
+            E '! sudo grep -q "opencode-permissions-kit/tui/kit-mode" /home/opencode/.config/opencode/cli.json 2>/dev/null'
+        ;;
+    *)
+        check "1x: no kit plugin dir on 1.x (tui.json flow only)" \
+            E '! test -e /home/opencode/.config/opencode/plugins/opencode-permissions-kit'
+        ;;
+esac
 check_fail "no ddev shim in the library (soft-only kit)" \
     E 'test -e /usr/local/lib/opencode-permissions-kit/bin/ddev'
 check_fail "no hooks directory in the library" \
@@ -582,7 +606,10 @@ E 'opk upgrade-opencode --binary-path /tmp/stub-opencode2' && \
 check "11b: upgrade-opencode replaced the binary (shorthand works)" \
     E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 7.7.7-shorthand"'
 E 'sudo rm -f /usr/local/lib/opencode-permissions-kit/.only-binary-marker'
-# restore the real binary for the remaining sections
+# restore the real binary for the remaining sections. opencode 2.x keeps a
+# background service daemon running the binary (issue #80) — stop it first
+# or the replace fails with "Text file busy" (1.x: unknown command, ignored).
+E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true; sudo pkill -u opencode -f "serve --servic[e]" >/dev/null 2>&1 || true'
 E 'sudo cp /opencode-cache/opencode-'"$OC_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chown root:opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chmod 750 /usr/local/lib/opencode-permissions-kit/bin/opencode'
 E 'rm -rf /tmp/update-test /tmp/stub-opencode /tmp/stub-opencode2'
 
@@ -608,14 +635,15 @@ echo "--- 11c. opencode binary upgrade (old -> new via update.sh --binary-path) 
 # Downgrade the system binary to a pinned OLD version, then upgrade it back to
 # the (cached) latest with update.sh --binary-path. This is the kit's upgrade
 # entry point — `opencode upgrade` cannot work behind the wrapper.
+E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true; sudo pkill -u opencode -f "serve --servic[e]" >/dev/null 2>&1 || true'
 E 'sudo cp /opencode-cache/opencode-'"$OLD_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode' && \
     echo "  ${GREEN}OK${NC}  system binary downgraded to $OLD_VERSION"
 check "downgrade: system binary is $OLD_VERSION" \
-    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version)" = "'"$OLD_VERSION"'"'
+    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version | sed "s/^opencode v//")" = "'"$OLD_VERSION"'"'
 E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/update.sh --yes --binary-path /opencode-cache/opencode-'"$OC_VERSION"'/opencode' && \
     echo "  ${GREEN}OK${NC}  update.sh --binary-path completed"
 check "upgrade: system binary is latest ($OC_VERSION)" \
-    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version)" = "'"$OC_VERSION"'"'
+    E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version | sed "s/^opencode v//")" = "'"$OC_VERSION"'"'
 check "upgrade: version actually changed" \
     E 'test "'"$OLD_VERSION"'" != "'"$OC_VERSION"'"'
 check "wrapper still present after binary upgrade" E 'test -x /usr/local/bin/opencode'
@@ -736,14 +764,14 @@ check_fail "wrapper does NOT stamp OPENCODE_LAUNCH_CWD (soft-only)" \
 echo ""
 echo "--- 12e.2 wrapper serve mode (headless, third-party UIs like OpenChamber) ---"
 # Third-party UIs spawn `opencode serve` with stdin ignored and parse stdout
-# for the "opencode server listening" line — no banner, no prompts, and the
+# for the "server listening" line (1.x: "opencode server listening", 2.x: "server listening") — no banner, no prompts, and the
 # project-dir refusal must not fire (OpenChamber often launches from $HOME).
 # timeout(1) kills the server after it came up; exit 124 = it ran headless
 # until then.
 E 'cd /tmp && timeout 20 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4199 > /tmp/wrapper-serve.out 2> /tmp/wrapper-serve.err; test $? -eq 124' && \
     echo "  ${GREEN}OK${NC}  wrapper serve ran headless from a non-project dir"
 check "wrapper serve: opencode server listening line on stdout" \
-    E 'grep -q "opencode server listening" /tmp/wrapper-serve.out'
+    E 'grep -q "server listening" /tmp/wrapper-serve.out'
 check_fail "wrapper serve: no SECURED banner on stdout" \
     E 'grep -q "SECURED BY" /tmp/wrapper-serve.out'
 check_fail "wrapper serve: no Press-Enter prompt on stdout" \
@@ -751,7 +779,7 @@ check_fail "wrapper serve: no Press-Enter prompt on stdout" \
 E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4198 > /tmp/wrapper-serve2.out 2>/dev/null; test $? -eq 124' && \
     echo "  ${GREEN}OK${NC}  wrapper serve ran headless from a project dir"
 check "wrapper serve: listening line also from project dir" \
-    E 'grep -q "opencode server listening" /tmp/wrapper-serve2.out'
+    E 'grep -q "server listening" /tmp/wrapper-serve2.out'
 check "wrapper serve: sudoers keep OPENCODE_SERVER_PASSWORD across sudo" \
     E 'sudo grep -q "OPENCODE_SERVER_PASSWORD" /etc/sudoers.d/opencode-permissions-kit'
 

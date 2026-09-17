@@ -135,13 +135,13 @@ test-ddev-hosts:
 	@./tests/unit/test-ddev-hosts.sh
 
 e2e:
-	@sh ./tests/e2e/run.sh
+	@E2E_OC_VERSION='$(E2E_OC_VERSION)' sh ./tests/e2e/run.sh
 
 e2e-rootless:
-	@sh ./tests/e2e/run-docker-rootless.sh $(if $(ARGS),$(ARGS))
+	@E2E_OC_VERSION='$(E2E_OC_VERSION)' sh ./tests/e2e/run-docker-rootless.sh $(if $(ARGS),$(ARGS))
 
 e2e-ddev:
-	@sh ./tests/e2e/run-ddev.sh $(if $(ARGS),$(ARGS))
+	@E2E_OC_VERSION='$(E2E_OC_VERSION)' sh ./tests/e2e/run-ddev.sh $(if $(ARGS),$(ARGS))
 
 e2e-ddev-fresh:
 	@sh ./tests/e2e/run-ddev.sh --fresh
