@@ -78,6 +78,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/management/status.sh` | Management: status + leak scan |
 | `/usr/local/lib/opencode-permissions-kit/management/uninstall.sh` | Management: uninstall |
 | `/usr/local/lib/opencode-permissions-kit/py/jsonc-parser.py` | Shared helper: config parsing |
+| `/usr/local/lib/opencode-permissions-kit/py/tui-register.py` | Shared helper: cli.json plugin-entry cleanup (opencode 2.x) |
 | `/usr/local/lib/opencode-permissions-kit/templates/sudoers.template` | Template: sudoers rendering |
 | `/usr/local/lib/opencode-permissions-kit/templates/opencode.jsonc` | Template: the agent's soft deny config |
 | `/usr/local/lib/opencode-permissions-kit/templates/opencode-deny-all.jsonc` | Template: default-user lockout config |

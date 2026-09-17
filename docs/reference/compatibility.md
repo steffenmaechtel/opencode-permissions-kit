@@ -2,7 +2,9 @@
 
 This page lists third-party tools that spawn or front opencode, how they
 invoke it, and whether they work on a machine where the kit owns the
-`opencode` command. Last verified: Aug 2026 (opencode v1.18.15).
+`opencode` command. Last verified: Sep 2026 (opencode 1.18.31 and the
+2.0.6 pre-release tag — the kit supports both majors; internals:
+[design/opencode-2x.md](../design/opencode-2x.md)).
 
 ## How the kit intercepts tools
 
@@ -54,6 +56,12 @@ enforced. It does not mean the kit audits or endorses the tool itself.
 - **sudo-spawning tools.** Tools that spawn opencode under `sudo` run it
   as root — outside the kit's model. Report such a tool and we will take
   a look; the kit deliberately grants no root path.
+- **opencode 2.x background service port.** opencode 2.x (pre-release)
+  binds its background service per *channel*, not per user: running a
+  bare 2.x opencode as the developer occupies the port the `opencode`
+  user's service needs. Kit starts stay functional (their config probe
+  is time-bounded), but bare runs print a load/wait notice. Avoid
+  running 2.x opencode outside the kit on the same machine.
 
 ## Keeping this page current
 
