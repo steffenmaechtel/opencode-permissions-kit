@@ -73,14 +73,20 @@ export default Plugin.define({
         const { mode, version, bypass } = kitState(confPath)
         const theme = context.theme
         if (bypass) {
-          return <text fg={theme.text.feedback.error.default}>{WARNING}</text>
+          return (
+            <box paddingLeft={2}>
+              <text fg={theme.text.feedback.error.default}>{WARNING}</text>
+            </box>
+          )
         }
         const color = mode === "with ddev/docker" ? theme.text.feedback.info.default : theme.text.subdued
         const prefix = version ? `opencode-permissions-kit (${version})` : "opencode-permissions-kit"
         return (
-          <text fg={color}>
-            {prefix} Mode: {mode}
-          </text>
+          <box paddingLeft={2}>
+            <text fg={color}>
+              {prefix} Mode: {mode}
+            </text>
+          </box>
         )
       } catch {
         return <text></text>
@@ -100,7 +106,10 @@ export default Plugin.define({
       render: () => {
         try {
           const route = context.ui.router.current()
-          return route?.type === "session" ? render() : <text></text>
+          // paddingBottom: the app slot hugs the terminal's bottom edge —
+          // one blank line below matches the air the home footer row has
+          // (v1 carried paddingBottom={1} for the same reason).
+          return route?.type === "session" ? <box paddingBottom={1}>{render()}</box> : <text></text>
         } catch {
           return <text></text>
         }

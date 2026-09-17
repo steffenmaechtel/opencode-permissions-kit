@@ -162,6 +162,10 @@ check "2x plugin renders its own footer rows (home + app slot)" \
     grep -q '"home.footer"' "$PLUGIN2X" && grep -q '"app"' "$PLUGIN2X"
 check "2x plugin keeps one row per screen (app slot renders in sessions only)" \
     grep -q 'route?.type === "session" ? render()' "$PLUGIN2X"
+check "2x plugin session row has bottom padding (does not hug the terminal edge)" \
+    grep -q 'paddingBottom={1}' "$PLUGIN2X"
+check "2x plugin rows have left padding (aligned with the TUI content)" \
+    grep -q 'paddingLeft={2}' "$PLUGIN2X"
 check "2x plugin colors follow theme tokens (subdued/info/error)" \
     grep -q 'text.subdued' "$PLUGIN2X" && grep -q 'feedback.info.default' "$PLUGIN2X" && grep -q 'feedback.error.default' "$PLUGIN2X"
 check "2x plugin render is defensive (try/catch)" \
