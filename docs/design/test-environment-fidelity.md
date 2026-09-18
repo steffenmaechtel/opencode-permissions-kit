@@ -111,7 +111,13 @@ production code path touched (draining stdin). Rule for this repo:
    (ddev's chmod/mutagen/router behavior), run the real thing; cache the
    provisioned environment so repeat runs stay cheap. Keep coverage of
    each loop/plumbing path there too, not only happy-path lifecycles —
-   the stdin bug was in a loop the real-binary suite did not drive.
+   the stdin bug was in a loop the real-binary suite did not drive
+   (shipped since 2026-09-18: suite section DD15 drives both
+   ddev-migrate loops with real ddev; the import-loop check is
+   mutation-verified — removing its `</dev/null` makes only the first
+   project import. Caveat learned there: a FAILING real ddev never
+   reaches its stdin probing, so a fail-path scenario proves loop
+   survival only — the drain itself needs the success path).
 3. **Environment matrix as a test dimension.** For flows that read any
    fd, run the scenario against stdin variants: closed (`<&-`), EOF
    (`</dev/null`), pipe-with-data (`< <(printf ...)`), and PTY (§4.4).
