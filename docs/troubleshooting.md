@@ -59,6 +59,57 @@ with the opencode-owned `.ddev/`.
   ddev exec vendor/bin/phpstan analyse -c vendor/somepath/phpstan/phpstan.neon --verbose --no-progress --no-interaction --memory-limit 4G
   ```
 
+## ddev fails with "all predefined address pools have been fully subnetted"
+
+**Symptom:** `ddev start` (or vendor tooling like `runTests.sh` wrapping it)
+aborts with `Error response from daemon: all predefined address pools
+have been fully subnetted` once enough projects exist.
+
+**Cause:** a stock Docker limit, not a kit one — and identical for rootless
+and rootful daemons. Docker carves one subnet per user-defined bridge
+network out of its two default address pools: 16 × `/16` from
+`172.17.0.0/12` plus 16 × `/20` from `192.168.0.0/16` — roughly 30
+networks, one of which the default bridge already occupies. ddev creates
+one network per project, and `ddev stop` keeps it (only `ddev delete`
+removes it), so stopped-but-not-deleted projects keep consuming subnets.
+
+**Fix:** reclaim abandoned networks — this prunes every network no
+container uses anymore (`docker network ls` works the same way):
+
+```bash
+sudo -u opencode env HOME=/home/opencode \
+  DOCKER_HOST=unix:///run/user/$(id -u opencode)/docker.sock \
+  docker network prune -f
+```
+
+If you legitimately run that many projects in parallel, raise the pools.
+Rootless Docker reads the daemon config of the user running the daemon —
+`opencode` — and the kit never touches this file (it survives installs
+and updates):
+
+```bash
+sudo mkdir -p /home/opencode/.config/docker
+sudo tee /home/opencode/.config/docker/daemon.json >/dev/null <<'EOF'
+{
+  "default-address-pools": [
+    { "base": "172.17.0.0/12", "size": 24 },
+    { "base": "192.168.0.0/16", "size": 24 }
+  ]
+}
+EOF
+sudo chown -R opencode:opencode /home/opencode/.config/docker
+sudo -u opencode XDG_RUNTIME_DIR=/run/user/$(id -u opencode) \
+  systemctl --user restart docker.service
+```
+
+- `size: 24` carves `/24` subnets instead: 4,000+ networks, each still
+  offering 254 container addresses (a ddev project needs a handful).
+- A `daemon.json` that already exists (for example pinning a storage
+  driver)? Merge the `default-address-pools` key in — do not overwrite
+  the file.
+- Existing networks keep their subnets; only networks created after the
+  restart come from the enlarged pools.
+
 ## git: "detected dubious ownership in repository at ..."
 
 **Cause:** git refuses repositories owned by another user. The kit sets
