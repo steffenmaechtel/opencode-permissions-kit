@@ -582,6 +582,84 @@ if [ "$_daemon_ok" = true ]; then
         E '_s=$(grep -il "operation not permitted" /tmp/dd2-start.log /tmp/dd2-restart.log /tmp/dd2-handover.log /tmp/dd7.log /tmp/dd7-stop.log /tmp/dd9.log /tmp/dd10-*.log /tmp/dd11-*.log /tmp/dd12-*.log 2>/dev/null); test -z "$_s"'
 fi
 
+if [ "$_daemon_ok" = true ]; then
+    echo ""
+    echo "--- DD15. ddev-migrate loops with REAL ddev (b14a198 regression) ---"
+    # test-environment-fidelity.md §4.2: the stdin-drain production bug lived
+    # in the ddev-migrate loops — loops the real-binary suite never drove
+    # (the fake-ddev tier covers them via run.sh §2c). Both loops run here
+    # against the REAL ddev. Two projects per loop: with the bug only the
+    # FIRST project was processed per run — one project cannot distinguish.
+
+    # (a) export loop, dev side: two projects with DEV-owned .ddev, created
+    #     by real `ddev config` AS the dev user (registers into the dev
+    #     registry; config needs no daemon). The container's dev user has
+    #     NO docker daemon, so every `ddev start` inside the loop fails —
+    #     expected: the assertion is that the loop REACHES both projects
+    #     (announcement + FAIL manifest entry each) instead of breaking on
+    #     the first failing child. MUST run before (b): the export picks
+    #     up the NEWEST dump directory on resume. NB: this scenario cannot
+    #     catch the stdin-drain itself — real ddev only probes stdin once
+    #     a command PROGRESSES (prompt/TUI machinery), and start dies on
+    #     the missing daemon long before that. The drain regression is
+    #     proven by (b) with real successful starts (mutation-verified:
+    #     stripping the </dev/null makes only project 1 import) plus the
+    #     unit fake's DDEV_EAT_STDIN contract (test-ddev-migrate.sh).
+    E 'sudo -u dev mkdir -p /var/www/vhosts/dd-mig-1 /var/www/vhosts/dd-mig-2'
+    E 'sudo -u dev env HOME=/home/dev DDEV_NO_INSTRUMENTATION=true sh -c "cd /var/www/vhosts/dd-mig-1 && ddev config --project-type=php --webserver-type=apache-fpm --docroot=public --auto >/tmp/ddm-devcfg1.log 2>&1"'
+    E 'sudo -u dev env HOME=/home/dev DDEV_NO_INSTRUMENTATION=true sh -c "cd /var/www/vhosts/dd-mig-2 && ddev config --project-type=php --webserver-type=apache-fpm --docroot=public --auto >/tmp/ddm-devcfg2.log 2>&1"'
+    check "DD15: dev-side ddev config completes for both projects (no daemon needed)" \
+        E 'grep -q "Configuration complete" /tmp/ddm-devcfg1.log && grep -q "Configuration complete" /tmp/ddm-devcfg2.log'
+    check "DD15: both projects registered in the DEV registry" \
+        E 'grep -q "approot: /var/www/vhosts/dd-mig-1" /home/dev/.ddev/project_list.yaml && grep -q "approot: /var/www/vhosts/dd-mig-2" /home/dev/.ddev/project_list.yaml'
+    check "DD15: .ddev dev-owned (export reaches real ddev, not the handover SKIP)" \
+        E 'test "$(stat -c %U /var/www/vhosts/dd-mig-1/.ddev)" = dev && test "$(stat -c %U /var/www/vhosts/dd-mig-2/.ddev)" = dev'
+    # Exit code 1 is EXPECTED here (nothing exports: every start fails).
+    E 'sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export dev /var/www/vhosts >/tmp/ddm-exp.log 2>&1 || true'
+    check "DD15: export loop announces BOTH projects (loop survival)" \
+        E 'grep -q "exporting dd-mig-1" /tmp/ddm-exp.log && grep -q "exporting dd-mig-2" /tmp/ddm-exp.log'
+    check "DD15: real ddev start invoked per project (fails: dev owns no daemon here)" \
+        E 'test "$(grep -c "FAILED: ddev start" /tmp/ddm-exp.log)" = 2'
+    check "DD15: manifest records FAIL for BOTH projects (loop survived)" \
+        E 'd=$(ls -1d /var/backups/opencode-permissions-kit/ddev-migration-2*/manifest.conf | sort | tail -1) && grep -q "^FAIL|dd-mig-1|" "$d" && grep -q "^FAIL|dd-mig-2|" "$d"'
+
+    # (b) import loop, opencode side (green path): two projects registered
+    #     for opencode via the ddev() transport, plus a fabricated dump
+    #     directory in the exact layout a real export finalizes (OK entries
+    #     + dumps, opencode-owned 750/640) — then the REAL ddev-migrate
+    #     import, whose loop stdin IS manifest.conf (the b14a198 twin).
+    #     The starts SUCCEED here, so real ddev reaches its stdin probing:
+    #     mutation-verified that stripping </dev/null from the loop's
+    #     ddev start flips 'reached project 2' to FAIL (first-only import).
+    OC_DDI1() { OC_CWD=/var/www/vhosts/dd-imp-1 OC "$1"; }
+    OC_DDI2() { OC_CWD=/var/www/vhosts/dd-imp-2 OC "$1"; }
+    E 'sudo -u dev mkdir -p /var/www/vhosts/dd-imp-1 /var/www/vhosts/dd-imp-2'
+    DEVSH 'cd /var/www/vhosts/dd-imp-1 && ddev config --project-type=php --webserver-type=apache-fpm --docroot=public --auto >/tmp/ddm-occfg1.log 2>&1'
+    DEVSH 'cd /var/www/vhosts/dd-imp-2 && ddev config --project-type=php --webserver-type=apache-fpm --docroot=public --auto >/tmp/ddm-occfg2.log 2>&1'
+    check "DD15: import-loop projects configured via the ddev() transport (opencode-owned .ddev)" \
+        E 'test "$(stat -c %U /var/www/vhosts/dd-imp-1/.ddev)" = opencode && test "$(stat -c %U /var/www/vhosts/dd-imp-2/.ddev)" = opencode'
+    E 'sudo mkdir -p /var/backups/opencode-permissions-kit/ddev-migration-ddimp'
+    E 'sudo sh -c "printf \"CREATE TABLE ddimp_mark_1 (id INT);\n\" | gzip > /var/backups/opencode-permissions-kit/ddev-migration-ddimp/dd-imp-1.sql.gz"'
+    E 'sudo sh -c "printf \"CREATE TABLE ddimp_mark_2 (id INT);\n\" | gzip > /var/backups/opencode-permissions-kit/ddev-migration-ddimp/dd-imp-2.sql.gz"'
+    E 'sudo sh -c "printf \"OK|dd-imp-1|/var/www/vhosts/dd-imp-1|dd-imp-1.sql.gz\nOK|dd-imp-2|/var/www/vhosts/dd-imp-2|dd-imp-2.sql.gz\n\" > /var/backups/opencode-permissions-kit/ddev-migration-ddimp/manifest.conf"'
+    E 'sudo chown -R opencode:opencode /var/backups/opencode-permissions-kit/ddev-migration-ddimp && sudo chmod 750 /var/backups/opencode-permissions-kit/ddev-migration-ddimp && sudo chmod 640 /var/backups/opencode-permissions-kit/ddev-migration-ddimp/*'
+    check "DD15: ddev-migrate import exits 0 (real ddev start + import-db per project)" \
+        E 'sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import /var/backups/opencode-permissions-kit/ddev-migration-ddimp >/tmp/ddm-imp.log 2>&1'
+    check "DD15: import reports both databases" \
+        E 'grep -q "imported 2 database(s)" /tmp/ddm-imp.log'
+    check "DD15: import loop reached project 1 (mark table present)" \
+        OC_DDI1 'ddev export-db -f=/tmp/ddm-out1.sql.gz >/dev/null 2>&1 && zcat /tmp/ddm-out1.sql.gz | grep -q ddimp_mark_1'
+    check "DD15: import loop reached project 2 (b14a198 regression)" \
+        OC_DDI2 'ddev export-db -f=/tmp/ddm-out2.sql.gz >/dev/null 2>&1 && zcat /tmp/ddm-out2.sql.gz | grep -q ddimp_mark_2'
+
+    # Cleanup: dd-imp projects (containers + volumes), fixture dirs, dump
+    # dirs. The dev-side registry entries stay — ddev delete would need a
+    # daemon the dev user does not have; the container is per-run anyway.
+    OC 'ddev delete -Oy dd-imp-1 >/dev/null 2>&1 || true'
+    OC 'ddev delete -Oy dd-imp-2 >/dev/null 2>&1 || true'
+    E 'sudo rm -rf /var/www/vhosts/dd-mig-1 /var/www/vhosts/dd-mig-2 /var/www/vhosts/dd-imp-1 /var/www/vhosts/dd-imp-2 /var/backups/opencode-permissions-kit/ddev-migration-ddimp /var/backups/opencode-permissions-kit/ddev-migration-2* || true'
+fi
+
 if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/null; then
     echo ""
     echo "--- DD10/DD11. real-site tier (camino) ---"

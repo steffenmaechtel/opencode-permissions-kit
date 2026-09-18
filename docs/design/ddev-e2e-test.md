@@ -1,8 +1,8 @@
 # PLAN-DDEV-E2E: real-ddev e2e suite with a cached golden container
 
 > Status: **IMPLEMENTED — shipped with 0.0.21.** `make e2e-ddev` /
-> `make e2e-ddev-fresh` run `tests/e2e/run-ddev.sh` (68 checks, full
-> DD0–DD14 catalog incl. the camino real-site tier and the bare-origin
+> `make e2e-ddev-fresh` run `tests/e2e/run-ddev.sh` (70 checks, full
+> DD0–DD15 catalog incl. the camino real-site tier and the bare-origin
 > git tier; CI workflow since 2026-08-22, first green GitHub run
 > 2026-08-23 — §8). The text below is the original design record; where
 > wording differs from the code, the code wins. Two deltas since the
@@ -16,7 +16,12 @@
 > staging area for the `stable` mirror and must be fully green before a
 > release is cut; PRs stay excluded (test-e2e.yml keeps the PR gate).
 > The planned weekly `schedule` itself landed 2026-09-11 (issue #78)
-> on all three workflows, including this one.
+> on all three workflows, including this one. Latest addition: **DD15**
+> (2026-09-18) drives both `ddev-migrate` loops (export + import) with
+> REAL ddev — the b14a198 stdin-drain class locked at the real-binary
+> tier (see [test-environment-fidelity.md](test-environment-fidelity.md)
+> §4.2); mutation-verified: stripping the loop's `</dev/null` flips the
+> import checks to first-only.
 >
 > Original framing, kept for context: a third e2e suite answering the
 > recurring burn-in problem — most ddev issues (#18, #20, #21, #25, the
