@@ -15,8 +15,13 @@
 > **master push** (plus `workflow_dispatch` on demand) — master is the
 > staging area for the `stable` mirror and must be fully green before a
 > release is cut; PRs stay excluded (test-e2e.yml keeps the PR gate).
-> The planned weekly `schedule` itself landed 2026-09-11 (issue #78)
-> on all three workflows, including this one. Latest addition: **DD15**
+> weekly `schedule` itself landed 2026-09-11 (issue #78)
+> on all three workflows, including this one. Since 2026-09-19 push and
+> scheduled runs include the **camino tier** (`E2E_DDEV_SITE=camino`;
+> manual dispatch can deselect it) — master is the pre-release gate and
+> the real-site tier is the burn-in class this suite exists for (proven
+> CI-green 2026-08-23); runtime fit was validated against the 60 min
+> job timeout by that full-tier run. Latest addition: **DD15**
 > (2026-09-18) drives both `ddev-migrate` loops (export + import) with
 > REAL ddev — the b14a198 stdin-drain class locked at the real-binary
 > tier (see [test-environment-fidelity.md](test-environment-fidelity.md)
@@ -434,6 +439,10 @@ bare-origin flow (DD12).
   Mondays 03:27 UTC, defaults only (no camino tier, latest ddev), in a
   dedicated concurrency group so a scheduled run can never cancel an
   in-flight push run (release.sh reads a cancelled run as red).
+  Delta 2026-09-19: push AND scheduled runs now include the camino tier
+  — the "defaults only" phase ended once the full-tier runtime was
+  proven inside the 60 min timeout; manual dispatch keeps a deselect
+  for lean skeleton runs.
 - **Docs:** this record + a MANUAL.md "troubleshooting with e2e-ddev" note +
   README testing mention in the same PR as the runner (repo rule: docs move
   with code).
