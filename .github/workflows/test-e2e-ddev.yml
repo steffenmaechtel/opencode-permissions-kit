@@ -17,6 +17,17 @@ name: test-e2e-ddev
 # site tier for a lean skeleton run.
 # CI rebuilds the golden image warm every run (the cache is a
 # local-workspace concept, design doc §6 R6).
+#
+# Path filtering (docs-only changes skip): push runs first detect what
+# changed (dorny/paths-filter) — when NOTHING outside docs/**, *.md,
+# LICENSE and .gitignore changed, the suite job skips with a green
+# 'skipped' conclusion (job-level on purpose: the run still EXISTS for
+# its sha, so scripts/release.sh's gate — which accepts skipped but not
+# absent runs — stays satisfied even on a docs-only master push; and a
+# docs-only push never cuts a release anyway). Schedule and manual
+# dispatch always run (drift checks / explicit human intent — the GB
+# downloads are the point there). test-unit.yml is NOT filtered:
+# test-docs.sh validates links across docs/ + root Markdown.
 on:
   push:
     branches:
@@ -50,7 +61,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Changed-path detection for the skip logic (header comment above).
+  # 'code' is true when anything outside the docs-only set changed.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'files/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - '.github/**'
+              - 'Makefile'
+              - 'VERSION'
+
   e2e-ddev:
+    needs: changes
+    # docs-only changes skip; schedule/dispatch always run (see header)
+    if: ${{ github.event_name != 'push' && github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

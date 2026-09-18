@@ -443,6 +443,14 @@ bare-origin flow (DD12).
   — the "defaults only" phase ended once the full-tier runtime was
   proven inside the 60 min timeout; manual dispatch keeps a deselect
   for lean skeleton runs.
+  Delta 2026-09-19 (2): docs-only changes skip the e2e suites — both
+  e2e workflows detect changed paths via `dorny/paths-filter` and their
+  jobs skip green when nothing outside `docs/**`, `*.md`, `LICENSE`,
+  `.gitignore` changed. Job-level skip on purpose (not workflow-level
+  `paths:`): the run still exists for its sha, keeping
+  scripts/release.sh's gate satisfied (it accepts `skipped`, aborts on
+  absent runs). Schedule and manual dispatch always run.
+  `test-unit.yml` stays unfiltered — test-docs.sh validates docs links.
 - **Docs:** this record + a MANUAL.md "troubleshooting with e2e-ddev" note +
   README testing mention in the same PR as the runner (repo rule: docs move
   with code).

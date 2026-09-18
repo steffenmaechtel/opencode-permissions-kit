@@ -13,6 +13,17 @@ name: test-e2e
 # "green" master between pushes — the cron catches that drift before a
 # release is cut. Scheduled runs use the defaults (E2E_STRICT=0, like
 # push runs; the strict input only applies to manual dispatch).
+#
+# Path filtering (docs-only changes skip): push and PR runs first detect
+# what changed (dorny/paths-filter) — when NOTHING outside docs/**,
+# *.md, LICENSE and .gitignore changed, both jobs skip with a green
+# 'skipped' conclusion (job-level on purpose: the run still EXISTS for
+# its sha, so scripts/release.sh's gate — which accepts skipped but not
+# absent runs — stays satisfied even on a docs-only master push).
+# Schedule and manual dispatch always run (drift checks / explicit
+# human intent). test-unit.yml is NOT filtered: test-docs.sh validates
+# links across docs/ + the root Markdown files, so docs changes are
+# unit-test-relevant.
 on:
   workflow_dispatch:
     inputs:
@@ -47,7 +58,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Changed-path detection for the skip logic (header comment above).
+  # 'code' is true when anything outside the docs-only set changed.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'files/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - '.github/**'
+              - 'Makefile'
+              - 'VERSION'
+
   e2e:
+    needs: changes
+    # docs-only changes skip; schedule/dispatch always run (see header)
+    if: ${{ github.event_name != 'push' && github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -79,6 +115,9 @@ jobs:
   # needs systemd-in-container + nested user namespaces, and SKIPs wholesale
   # when the runner cannot provide them (see run-docker-rootless.sh).
   e2e-rootless:
+    needs: changes
+    # docs-only changes skip; schedule/dispatch always run (see header)
+    if: ${{ github.event_name != 'push' && github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
