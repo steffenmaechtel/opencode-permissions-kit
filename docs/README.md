@@ -61,7 +61,9 @@ selection reference for the rootless container backends. Release model:
 [release-handling.md](design/release-handling.md) — channels, the
 `stable` mirror, and the phased adoption roadmap (issue #38). opencode
 2.x compatibility (service model, detection, open items):
-[opencode-2x.md](design/opencode-2x.md). Superseded or
+[opencode-2x.md](design/opencode-2x.md). Test fidelity — why bugs pass
+unit and e2e but hit real terminals, and the patterns that close the
+gap: [test-environment-fidelity.md](design/test-environment-fidelity.md). Superseded or
 purely historical records live in [`_archive/`](_archive/) (same
 subfolder structure: `_archive/design/`, `_archive/security/`) — they
 document how the kit got here, not how it works today.
