@@ -106,14 +106,60 @@ older kit versions. All 2.x-only behavior hangs off this one variable.
 ## 8. Proving it: version-pinned e2e
 
 2.x has no GitHub release assets yet (tags only), so the binary is built
-from source (bun 1.4.2, `packages/cli/script/build.ts
---target=opencode-linux-x64`, `OPENCODE_VERSION` env pins the stamp) and
-seeded into `tests/e2e/cache/opencode-<version>/` (gitignored).
-`make e2e E2E_OC_VERSION=2.0.3` pins the whole suite to it — the default
-(empty) still resolves `releases/latest`. Verified green: `e2e` +
-`e2e-rootless` against 2.0.3 (256 + 46 checks) and against 1.x latest
-(256 + 46). A CI job for the 2.x pin follows once upstream ships release
-assets (the cache is not reproducible in CI from tags alone).
+from source and seeded into `tests/e2e/cache/opencode-<version>/`
+(gitignored). `make e2e E2E_OC_VERSION=2.0.3` pins the whole suite to it
+— the default (empty) still resolves `releases/latest`. Verified green
+against **2.0.11** (2026-09-20, binary built from the tag with the recipe
+below): `e2e` + `e2e-rootless` + `e2e-ddev` (261 + 47 + 70 checks, zero
+failures) — no breaking changes against the kit's 2.x handling; the
+upgrade path (1.18.15 → 2.0.11 via `opk upgrade-opencode`) is covered by
+the `e2e` run. Earlier pins: 2.0.6 (`e2e` + `e2e-rootless`, 261 + 47)
+and 1.x latest (258 + 47). A CI job for the 2.x pin follows once upstream
+ships release assets (the cache is not reproducible in CI from tags
+alone).
+
+### Build recipe (local, containerized)
+
+Prereq: a read-only checkout of the opencode source at the wanted tag
+(`git checkout v2.0.11`); the bun container tag must match the checkout's
+`packageManager` field in `package.json` (2.0.x pins `bun@1.4.2`).
+
+```bash
+VER=2.0.11
+docker run --rm \
+  -v /path/to/opencode-checkout:/src:ro \
+  -v "$(pwd)":/out \
+  oven/bun:1.4.2 bash -c '
+    set -e
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq >/dev/null && apt-get install -y -qq git unzip curl >/dev/null
+    cp -a /src /work && cd /work
+    bun install
+    OPENCODE_VERSION='"$VER"' BUN_COMPILE_RELEASE=bun-v1.4.2 \
+      bun packages/cli/script/build.ts --target=opencode-linux-x64 --skip-web-ui
+    cp packages/cli/dist/cli-linux-x64/bin/opencode /out/opencode-'"$VER"'
+    /out/opencode-'"$VER"' --version'
+```
+
+Notes:
+
+- `OPENCODE_VERSION` pins the `--version` stamp; without it the build
+  derives the next version from the npm registry.
+- `--skip-web-ui` omits the embedded web app (not needed for kit
+  purposes); drop it to build the full artifact.
+- Takes ~8 minutes (dominated by `bun install`); the binary is
+  ~175–190 MB (2.0.11: 175 MB, 2.0.6: 187 MB).
+- Two quirks observed: store and invoke the binary **inside a
+  directory** (e.g. `…/bin/opencode` — the kit's layout); a binary
+  placed at a bare path like `/tmp/opencode` collides with 2.x's runtime
+  extraction dir and fails with `EEXIST`. And `--target` wants the full
+  name `opencode-linux-x64`, not `linux-x64`.
+
+Seeding the e2e cache (`repo/tests/e2e/cache/opencode-$VER/opencode`,
+executable) makes every local suite run offline against the pin:
+`make e2e E2E_OC_VERSION=$VER`. To install such a binary on a real
+machine: `sudo opk upgrade-opencode --binary-path …` (re-stamps
+`OPENCODE_MAJOR`).
 
 ## 9. Open items
 
