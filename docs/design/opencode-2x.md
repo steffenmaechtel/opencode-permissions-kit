@@ -105,18 +105,25 @@ older kit versions. All 2.x-only behavior hangs off this one variable.
 
 ## 8. Proving it: version-pinned e2e
 
-2.x has no GitHub release assets yet (tags only), so the binary is built
-from source and seeded into `tests/e2e/cache/opencode-<version>/`
-(gitignored). `make e2e E2E_OC_VERSION=2.0.3` pins the whole suite to it
-— the default (empty) still resolves `releases/latest`. Verified green
-against **2.0.11** (2026-09-20, binary built from the tag with the recipe
-below): `e2e` + `e2e-rootless` + `e2e-ddev` (261 + 47 + 70 checks, zero
-failures) — no breaking changes against the kit's 2.x handling; the
-upgrade path (1.18.15 → 2.0.11 via `opk upgrade-opencode`) is covered by
-the `e2e` run. Earlier pins: 2.0.6 (`e2e` + `e2e-rootless`, 261 + 47)
-and 1.x latest (258 + 47). A CI job for the 2.x pin follows once upstream
-ships release assets (the cache is not reproducible in CI from tags
-alone).
+2.x ships no GitHub release assets — it distributes through the **npm
+registry** (`@opencode/cli-<target>` packages, resolved by the official v2
+installer `https://opencode.ai/v2/install` via
+`opencode.ai/update/api/latest/cli/npm`; GitHub `releases/latest` stays
+1.x). The e2e cache therefore picks the download source by major
+(`tests/e2e/lib.sh`, `e2e_fetch_opencode`): 1.x from GitHub release
+assets, 2.x from npm (legacy `@opencode-ai` scope as fallback for
+pre-migration versions) — `make e2e E2E_OC_VERSION=2.0.11` works on any
+online machine without pre-seeding. Building from source via the recipe
+below remains the option for unreleased tags. The default (empty) still
+resolves `releases/latest`. Verified green against **2.0.11** (2026-09-20,
+binary built from the tag with the recipe below, suite re-run against the
+npm-downloaded binary): `e2e` + `e2e-rootless` + `e2e-ddev` (261 + 47 + 70
+checks, zero failures) — no breaking changes against the kit's 2.x
+handling; the upgrade path (1.18.15 → 2.0.11 via `opk upgrade-opencode`)
+is covered by the `e2e` run. Earlier pins: 2.0.6 (`e2e` + `e2e-rootless`,
+261 + 47) and 1.x latest (258 + 47). A CI job pinning `E2E_OC_VERSION`
+to the current 2.x release is now feasible (the npm tarball is a stable,
+CI-reproducible source) — adding it is a follow-up decision (runner cost).
 
 ### Build recipe (local, containerized)
 
@@ -155,8 +162,9 @@ Notes:
   extraction dir and fails with `EEXIST`. And `--target` wants the full
   name `opencode-linux-x64`, not `linux-x64`.
 
-Seeding the e2e cache (`repo/tests/e2e/cache/opencode-$VER/opencode`,
-executable) makes every local suite run offline against the pin:
+The suite fetches pinned 2.x versions from npm on demand (see above);
+manual cache seeding (`repo/tests/e2e/cache/opencode-$VER/opencode`,
+executable) is only needed for offline runs or source-built binaries:
 `make e2e E2E_OC_VERSION=$VER`. To install such a binary on a real
 machine: `sudo opk upgrade-opencode --binary-path …` (re-stamps
 `OPENCODE_MAJOR`).
@@ -207,6 +215,10 @@ issues #80/#81:
    The proof stays local: version-keyed cache in `tests/e2e/cache/`
    makes repeat runs cheap. The moment upstream ships release assets,
    `E2E_OC_VERSION` works in CI unchanged — add the job then.
+   *Update 2026-09-20:* the technical blocker is gone — v2 publishes
+   npm tarballs (`@opencode/cli-<target>`, dist-tag `latest` = 2.0.11)
+   and the e2e fetches 2.x pins from there (§8). Adding the CI job is
+   now a cost decision, not a feasibility one.
 3. **Merge as a normal PR** once manual validation satisfies. Everything
    is already in production shape; nothing in the PR depends on 2.x
    being released.
@@ -216,3 +228,10 @@ issues #80/#81:
    every fresh kit install pulls a 2.x binary — the merge becomes
    time-critical on that day. Monitor cheaply with
    `git ls-remote` / the releases API at session starts.
+   *Update 2026-09-20:* GitHub `releases/latest` is no longer the only
+   flip signal — the v2 channel is already `latest` on npm and in
+   opencode.ai's update API, while `releases/latest` stays 1.x. What
+   actually gates fresh kit installs is the **old** installer URL the
+   kit reuses (`https://opencode.ai/install`, still GitHub/v1
+   resolution); watch that it does not switch to the npm/update-API
+   resolution of `/v2/install`.
