@@ -174,9 +174,12 @@ grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" \
 grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$TEST_CI" \
     && pass "test-unit.yml chmod list includes the new lib" \
     || fail "test-unit.yml chmod list includes the new lib"
-[ "$(grep -c 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$E2E_CI")" = "2" ] \
-    && pass "test-e2e.yml chmod lists include the new lib (both jobs)" \
-    || fail "test-e2e.yml chmod lists include the new lib (both jobs)"
+# Every chmod block in test-e2e.yml must list fs-baseline.sh (one
+# occurrence per block; the block count grows with pin/matrix jobs).
+blocks=$(grep -c 'chmod +x' "$E2E_CI")
+[ "$(grep -c 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$E2E_CI")" = "$blocks" ] \
+    && pass "test-e2e.yml chmod lists include the new lib (every job)" \
+    || fail "test-e2e.yml chmod lists include the new lib (every job)"
 
 # --- Summary ---------------------------------------------------------------------------
 echo ""

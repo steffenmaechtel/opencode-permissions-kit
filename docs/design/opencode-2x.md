@@ -121,9 +121,12 @@ npm-downloaded binary): `e2e` + `e2e-rootless` + `e2e-ddev` (261 + 47 + 70
 checks, zero failures) — no breaking changes against the kit's 2.x
 handling; the upgrade path (1.18.15 → 2.0.11 via `opk upgrade-opencode`)
 is covered by the `e2e` run. Earlier pins: 2.0.6 (`e2e` + `e2e-rootless`,
-261 + 47) and 1.x latest (258 + 47). A CI job pinning `E2E_OC_VERSION`
-to the current 2.x release is now feasible (the npm tarball is a stable,
-CI-reproducible source) — adding it is a follow-up decision (runner cost).
+261 + 47) and 1.x latest (258 + 47). CI runs the suites against the
+current 2.x release too (shipped 2026-09-23): `e2e-2x` + `e2e-rootless-2x`
+(PRs, master pushes, weekly) and `e2e-ddev-2x` (master pushes, weekly)
+resolve the npm dist-tag `latest` at run time and pin `E2E_OC_VERSION`
+to it — the npm tarball is a stable, CI-reproducible source — and a
+resolution outside `2.*` fails the jobs loudly (the flip signal, §10.5).
 
 ### Build recipe (local, containerized)
 
@@ -215,15 +218,19 @@ issues #80/#81:
    The proof stays local: version-keyed cache in `tests/e2e/cache/`
    makes repeat runs cheap. The moment upstream ships release assets,
    `E2E_OC_VERSION` works in CI unchanged — add the job then.
-   *Update 2026-09-20:* the technical blocker is gone — v2 publishes
-   npm tarballs (`@opencode/cli-<target>`, dist-tag `latest` = 2.0.11)
-   and the e2e fetches 2.x pins from there (§8). Adding the CI job is
-   now a cost decision, not a feasibility one.
+    *Update 2026-09-20:* the technical blocker is gone — v2 publishes
+    npm tarballs (`@opencode/cli-<target>`, dist-tag `latest` = 2.0.11)
+    and the e2e fetches 2.x pins from there (§8). Adding the CI job is
+    now a cost decision, not a feasibility one.
+    *Update 2026-09-23:* decided and shipped — the e2e workflows run the
+    suites a second time pinned to the npm dist-tag `latest` (§8); runner
+    cost accepted for PRs, master pushes, and the weekly drift runs.
 3. **Merge as a normal PR** once manual validation satisfies. Everything
    is already in production shape; nothing in the PR depends on 2.x
    being released.
 4. **Follow-ups, in order**: ~~`kit-mode-2x`~~ (done — see §9, ported on
-   this branch), then the CI job, then the §9 ergonomics items.
+   this branch), ~~the CI job~~ (done — shipped 2026-09-23, see §8),
+   then the §9 ergonomics items.
 5. **Urgency trigger**: when upstream flips `releases/latest` to 2.x,
    every fresh kit install pulls a 2.x binary — the merge becomes
    time-critical on that day. Monitor cheaply with
