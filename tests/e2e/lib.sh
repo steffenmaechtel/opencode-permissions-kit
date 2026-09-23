@@ -56,9 +56,11 @@ E2E_SKIP_BUILD="${E2E_SKIP_BUILD:-0}"
 E2E_DEBUG="${E2E_DEBUG:-0}"
 E2E_KEEP="${E2E_KEEP:-0}"
 E2E_OLD_VERSION="${E2E_OLD_VERSION:-1.18.15}"
-# Pin the opencode version under test (e.g. E2E_OC_VERSION=2.0.3 for the
-# opencode 2.x proof, issue #80 — 2.x has no GitHub release assets yet, so
-# the binary must already sit in tests/e2e/cache/opencode-<version>/).
+# Pin the opencode version under test (e.g. E2E_OC_VERSION=2.0.11 for the
+# opencode 2.x proof, issue #80). Pinned versions are fetched on demand:
+# 1.x from GitHub release assets, 2.x from the npm registry (2.x ships no
+# GitHub assets — the channel the official v2 installer,
+# https://opencode.ai/v2/install, resolves through).
 # Default (empty): resolve the current latest release.
 E2E_OC_VERSION="${E2E_OC_VERSION:-}"
 E2E_HOST_LAYOUT="unknown"
@@ -113,23 +115,69 @@ skip() {
 # per opencode version on the HOST and mount it into the container read-only
 # (the installer supports --binary <path>, which skips the download but keeps
 # the PATH-modification behavior the kit's install.sh depends on).
+
+# Download one opencode binary into the cache; the source is picked by major:
+#   1.x — GitHub release asset (tarball root holds `opencode`), the same URL
+#         the official v1 installer uses;
+#   2.x — the npm registry (`@opencode/cli-<target>`, tarball layout
+#         `package/bin/opencode`) — 2.x ships no GitHub release assets; this
+#         is the channel the official v2 installer resolves through. The
+#         legacy `@opencode-ai` scope is the fallback for versions published
+#         before the scope migration.
+# $1 = version, $2 = destination binary path, $3 = temp tarball path.
+e2e_fetch_opencode() {
+    local ver="$1" dest="$2" tmp="$3" xdir
+    mkdir -p "$(dirname "$dest")"
+    case "$ver" in
+        2.*)
+            echo "  Downloading opencode $ver (npm @opencode/cli-$target) into cache..."
+            if ! curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
+                "https://registry.npmjs.org/@opencode/cli-$target/-/cli-$target-$ver.tgz" \
+                -o "$tmp" 2>/dev/null; then
+                curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
+                    "https://registry.npmjs.org/@opencode-ai/cli-$target/-/cli-$target-$ver.tgz" \
+                    -o "$tmp" \
+                    || { echo "  ${RED}FAIL${NC}  opencode $ver download failed (npm: @opencode/cli-$target, @opencode-ai/cli-$target)"; exit 1; }
+            fi
+            xdir="$tmp.x"
+            rm -rf "$xdir"
+            mkdir -p "$xdir"
+            tar -xzf "$tmp" -C "$xdir" \
+                || { echo "  ${RED}FAIL${NC}  cannot extract opencode $ver npm tarball"; exit 1; }
+            mv "$xdir/package/bin/opencode" "$dest" \
+                || { echo "  ${RED}FAIL${NC}  opencode $ver npm tarball has no package/bin/opencode"; exit 1; }
+            rm -rf "$xdir" "$tmp"
+            ;;
+        *)
+            echo "  Downloading opencode $ver (GitHub opencode-$target.tar.gz) into cache..."
+            # Retry: GitHub's release-asset CDN occasionally returns transient 503/502
+            # (outage or rate-limit), which must not fail the whole e2e suite.
+            curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
+                "https://github.com/anomalyco/opencode/releases/download/v$ver/opencode-$target.tar.gz" \
+                -o "$tmp" \
+                || { echo "  ${RED}FAIL${NC}  opencode $ver download failed (GitHub)"; exit 1; }
+            tar -xzf "$tmp" -C "$(dirname "$dest")" \
+                || { echo "  ${RED}FAIL${NC}  cannot extract opencode $ver tarball"; exit 1; }
+            rm -f "$tmp"
+            ;;
+    esac
+    chmod +x "$dest"
+}
+
 e2e_resolve_cache() {
     OC_CACHE_DIR="$SCRIPT_DIR/cache"
     mkdir -p "$OC_CACHE_DIR"
 
-    # Resolve the opencode version under test. E2E_OC_VERSION pins it
-    # (cache required when upstream has no release assets for it); the
+    # Resolve the opencode version under test. E2E_OC_VERSION pins it; the
     # default resolves the current latest from GitHub releases (tiny
     # request). If the endpoint is unreachable, fall back to the newest
-    # cached version so repeat runs work offline.
+    # cached version so repeat runs work offline. A pinned version that is
+    # not cached yet is downloaded on demand (see e2e_fetch_opencode).
     OC_VERSION="$E2E_OC_VERSION"
     if [ -z "$OC_VERSION" ]; then
         OC_VERSION=$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
             https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
             | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
-    elif [ ! -x "$OC_CACHE_DIR/opencode-$OC_VERSION/opencode" ]; then
-        echo "  ${RED}FAIL${NC}  E2E_OC_VERSION=$OC_VERSION pinned but no cached binary at $OC_CACHE_DIR/opencode-$OC_VERSION/opencode."
-        exit 1
     fi
     if [ -z "$OC_VERSION" ]; then
         OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
@@ -141,7 +189,9 @@ e2e_resolve_cache() {
         fi
     fi
 
-    # Detect the release asset name for this host (mirrors the official installer).
+    # Detect the platform target for this host (mirrors the official
+    # installers — both the v1 GitHub assets and the v2 npm packages key
+    # on it, including the -baseline and -musl suffixes).
     os=$(uname -s | tr '[:upper:]' '[:lower:]')
     case "$os" in
         darwin*) os="darwin" ;;
@@ -158,23 +208,11 @@ e2e_resolve_cache() {
     if [ "$os" = "linux" ] && { [ -f /etc/alpine-release ] || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; }; then
         target="$target-musl"
     fi
-    filename="opencode-$target.tar.gz"
 
     OC_BIN="$OC_CACHE_DIR/opencode-$OC_VERSION/opencode"
     _OC_FRESH=false
     if [ ! -x "$OC_BIN" ]; then
-        echo "  Downloading opencode $OC_VERSION ($filename) into cache..."
-        mkdir -p "$(dirname "$OC_BIN")"
-        # Retry: GitHub's release-asset CDN occasionally returns transient 503/502
-        # (outage or rate-limit), which must not fail the whole e2e suite.
-        curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
-            "https://github.com/anomalyco/opencode/releases/download/v$OC_VERSION/$filename" \
-            -o "$OC_CACHE_DIR/opencode.tar.gz" \
-            || { echo "  ${RED}FAIL${NC}  opencode $OC_VERSION download failed"; exit 1; }
-        tar -xzf "$OC_CACHE_DIR/opencode.tar.gz" -C "$(dirname "$OC_BIN")" \
-            || { echo "  ${RED}FAIL${NC}  cannot extract opencode tarball"; exit 1; }
-        rm -f "$OC_CACHE_DIR/opencode.tar.gz"
-        chmod +x "$OC_BIN"
+        e2e_fetch_opencode "$OC_VERSION" "$OC_BIN" "$OC_CACHE_DIR/opencode.tar.gz"
         _OC_FRESH=true
     fi
     if [ ! -s "$OC_BIN" ]; then
@@ -193,9 +231,9 @@ e2e_resolve_cache() {
 }
 
 # Pin an OLD opencode version to test the binary upgrade path (old -> latest).
-# Release assets stay on GitHub permanently, so this is a one-time download per
-# version, cached exactly like the primary binary. Only the run.sh suite needs
-# this (its update/binary-upgrade sections); the rootless runner skips it.
+# Fetched on demand exactly like the primary binary (GitHub for 1.x, npm for
+# 2.x) and cached the same way. Only the run.sh suite needs this (its update/
+# binary-upgrade sections); the rootless runner skips it.
 e2e_fetch_old() {
     OLD_VERSION="$E2E_OLD_VERSION"
     OLD_BIN="$OC_CACHE_DIR/opencode-$OLD_VERSION/opencode"
@@ -207,16 +245,7 @@ e2e_fetch_old() {
             echo "  Pausing 10s before the OLD-version download (back-to-back CDN courtesy)..."
             sleep 10
         fi
-        echo "  Downloading opencode $OLD_VERSION ($filename) into cache..."
-        mkdir -p "$(dirname "$OLD_BIN")"
-        curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
-            "https://github.com/anomalyco/opencode/releases/download/v$OLD_VERSION/$filename" \
-            -o "$OC_CACHE_DIR/opencode-old.tar.gz" \
-            || { echo "  ${RED}FAIL${NC}  opencode $OLD_VERSION download failed"; exit 1; }
-        tar -xzf "$OC_CACHE_DIR/opencode-old.tar.gz" -C "$(dirname "$OLD_BIN")" \
-            || { echo "  ${RED}FAIL${NC}  cannot extract opencode $OLD_VERSION tarball"; exit 1; }
-        rm -f "$OC_CACHE_DIR/opencode-old.tar.gz"
-        chmod +x "$OLD_BIN"
+        e2e_fetch_opencode "$OLD_VERSION" "$OLD_BIN" "$OC_CACHE_DIR/opencode-old.tar.gz"
     fi
     if [ ! -s "$OLD_BIN" ]; then
         echo "  ${RED}FAIL${NC}  cached opencode $OLD_VERSION binary is empty"; exit 1
