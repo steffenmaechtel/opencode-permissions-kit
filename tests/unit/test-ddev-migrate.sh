@@ -457,8 +457,10 @@ check "test-unit.yml chmod list + run step mention the new test" \
     sh -c "grep -q 'test-ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
 check "test-unit.yml chmod list includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
+# Every chmod block in test-e2e.yml must list ddev-migrate.sh (one
+# occurrence per block; the block count grows with pin/matrix jobs).
 check "test-e2e.yml chmod lists include ddev-migrate.sh" \
-    sh -c "grep -c 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\" | grep -q '^2\$'" _ "$E2E_CI"
+    sh -c 'blocks=$(grep -c "chmod +x" "$1"); grep -c "opencode-permissions-kit-lib/sh/ddev-migrate.sh" "$1" | grep -q "^${blocks}$"' _ "$E2E_CI"
 
 # --- 9. rootless bind-mounts switch (ddev 1.25.0-1.25.2) ---------------------------
 # ddev_rootless_bindmounts lives in ddev-handover.sh (sourced by the

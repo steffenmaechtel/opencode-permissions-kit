@@ -6,6 +6,7 @@
 #   2. every executable CI needs (unit tests, e2e scripts, check-host,
 #      shipped scripts under files/) must be chmodded in BOTH
 #      .github/workflows/test-unit.yml and .github/workflows/test-e2e.yml
+#   3. the e2e workflows must keep their opencode 2.x pin jobs (issue #80)
 #
 # Git checkouts lose the exec bit, so a missing entry means the affected
 # suite breaks only in CI — exactly the drift this test trips on.
@@ -95,6 +96,47 @@ for wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
         fail "$name: missing chmod entries:$missing"
     fi
 done
+
+# --- 3. opencode 2.x pin jobs (issue #80) --------------------------------------
+
+# The e2e workflows run the suites a second time against the CURRENT 2.x
+# release (npm dist-tag latest — 2.x ships no GitHub release assets).
+# Silent removal would weaken 2.x coverage with no local signal; these
+# checks trip on it. Patterns per file:
+#   job id           — one 2x job per suite the workflow runs
+#   npm resolution   — the version comes from the npm registry, the
+#                      source tests/e2e/lib.sh downloads 2.x pins from
+#   E2E_OC_VERSION   — the runner receives the resolved version as a pin
+#   2.* guard        — a resolution outside 2.* fails the job loudly
+#                      (the upstream flip signal, docs/design/opencode-2x.md)
+
+check_2x() {
+    _wf="$1"; _name="${_wf##*/}"; shift
+    _missing=""
+    for _pat in "$@"; do
+        grep -q -- "$_pat" "$_wf" || _missing="$_missing [$_pat]"
+    done
+    if [ -z "$_missing" ]; then
+        pass "$_name: 2.x pin jobs present (npm resolution + pin + 2.* guard)"
+    else
+        fail "$_name: 2.x pin wiring incomplete:$_missing"
+    fi
+}
+
+check_2x "$WF_E2E" \
+    '^  e2e-2x:' \
+    '^  e2e-rootless-2x:' \
+    'registry.npmjs.org/@opencode/cli-linux-x64/latest' \
+    'E2E_OC_VERSION=' \
+    '2\.\*) echo "OC2_VERSION=' \
+    '::error::npm dist-tag latest'
+
+check_2x "$WF_DDEV_E2E" \
+    '^  e2e-ddev-2x:' \
+    'registry.npmjs.org/@opencode/cli-linux-x64/latest' \
+    'E2E_OC_VERSION=' \
+    '2\.\*) echo "OC2_VERSION=' \
+    '::error::npm dist-tag latest'
 
 echo ""
 if [ "$failures" -gt 0 ]; then

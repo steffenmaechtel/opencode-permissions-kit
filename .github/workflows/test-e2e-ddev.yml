@@ -18,6 +18,14 @@ name: test-e2e-ddev
 # CI rebuilds the golden image warm every run (the cache is a
 # local-workspace concept, design doc §6 R6).
 #
+# The e2e-ddev-2x job runs the same suite pinned to the CURRENT opencode
+# 2.x release (issue #80): 2.x ships via the npm registry, not GitHub
+# releases (releases/latest stays 1.x), so the job resolves the npm
+# dist-tag 'latest' at run time and fails loudly when that tag ever
+# leaves 2.* — the upstream flip the kit must react to
+# (docs/design/opencode-2x.md). Same (heavy) triggers as the v1 job:
+# master pushes, weekly schedule, manual dispatch — not PRs.
+#
 # Path filtering (docs-only changes skip): push runs first detect what
 # changed (dorny/paths-filter) — when NOTHING outside docs/**, *.md,
 # LICENSE and .gitignore changed, the suite job skips with a green
@@ -100,8 +108,11 @@ jobs:
         with:
           path: tests/e2e/cache
           key: opencode-e2e-latest${{ steps.version.outputs.OC_VERSION }}
+          # No trailing dash: the prefix must match the primary keys of
+          # previous runs (opencode-e2e-latest<ver>) to warm-start the
+          # binary when the latest version bumps.
           restore-keys: |
-            opencode-e2e-latest-
+            opencode-e2e-latest
       - name: Run real-ddev E2E test
         env:
           E2E_DDEV_SITE: ${{ (github.event_name != 'workflow_dispatch' || inputs.site_tier == true) && 'camino' || 'none' }}
@@ -117,5 +128,63 @@ jobs:
           DDEV_VERSION: ${{ inputs.ddev_version }}
         run: |
           echo "### ddev-e2e (run-ddev.sh)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- site tier: ${E2E_DDEV_SITE:-none}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ddev: ${DDEV_VERSION:-latest}" >> "$GITHUB_STEP_SUMMARY"
+
+  # opencode 2.x pin (issue #80): the same suite against the CURRENT 2.x
+  # release, resolved from the npm registry at run time — 2.x ships no
+  # GitHub release assets (releases/latest stays 1.x). A resolution
+  # outside 2.* fails the job loudly: that is the upstream flip the kit
+  # must react to (docs/design/opencode-2x.md). Same triggers + docs-only
+  # skip as the v1 job (no PRs — the GB downloads are the point).
+  e2e-ddev-2x:
+    needs: changes
+    # docs-only changes skip; schedule/dispatch always run (see header)
+    if: ${{ github.event_name != 'push' && github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve current opencode 2.x (npm dist-tag latest)
+        id: version2x
+        # linux-x64: runners and the e2e container are amd64 Linux. This is
+        # the same npm source tests/e2e/lib.sh downloads the pinned 2.x
+        # binary from — the channel the official v2 installer resolves.
+        run: |
+          OC2="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+              https://registry.npmjs.org/@opencode/cli-linux-x64/latest \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' \
+              2>/dev/null || true)"
+          case "$OC2" in
+            2.*) echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.* version (upstream flip? docs/design/opencode-2x.md)" && exit 1 ;;
+          esac
+      - name: Cache opencode binaries (per 2.x version, warm-start from the other e2e caches)
+        uses: actions/cache@v6
+        with:
+          path: tests/e2e/cache
+          # No trailing dash on the restore prefixes: they must prefix-match
+          # the primary keys of previous runs (opencode-e2e-2x-... from the
+          # e2e workflow's 2x jobs, opencode-e2e-latest<ver> from the v1
+          # ddev job) to warm-start the binary on version bumps.
+          key: opencode-e2e-2x-npm${{ steps.version2x.outputs.OC2_VERSION }}
+          restore-keys: |
+            opencode-e2e-2x-
+            opencode-e2e-latest
+      - name: Run real-ddev E2E test (opencode 2.x pin)
+        env:
+          E2E_DDEV_SITE: ${{ (github.event_name != 'workflow_dispatch' || inputs.site_tier == true) && 'camino' || 'none' }}
+          DDEV_VERSION: ${{ inputs.ddev_version }}
+        run: |
+          chmod +x ./tests/e2e/run.sh ./tests/e2e/run-docker-rootless.sh ./tests/e2e/run-ddev.sh ./tests/e2e/lib.sh ./tests/check-host.sh ./tests/unit/test-opencode-as-opencode.sh ./tests/unit/test-jsonc-parser.sh ./tests/unit/test-git-config.sh ./tests/unit/test-container-backend.sh ./tests/unit/test-bypass-guard.sh ./tests/unit/test-ddev-as-opencode.sh ./tests/unit/test-ddev-migrate.sh ./tests/unit/test-ddev-hosts.sh ./tests/unit/test-mkcert-reuse.sh ./tests/unit/test-wsl-exposure.sh ./tests/unit/test-ui.sh ./tests/unit/test-docs.sh ./tests/unit/test-kit-cli.sh ./tests/unit/test-project-paths.sh ./tests/unit/test-workflows.sh ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-update-flags.sh ./tests/unit/test-release.sh ./tests/unit/test-fs-baseline.sh ./tests/unit/test-e2e-sources.sh \
+            ./files/install.sh ./files/etc/umask.sh ./files/opencode-permissions-kit-lib/management/config.sh ./files/opencode-permissions-kit-lib/management/update.sh ./files/opencode-permissions-kit-lib/management/uninstall.sh ./files/opencode-permissions-kit-lib/management/status.sh ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh ./files/opencode-permissions-kit-lib/sh/ui.sh ./files/opencode-permissions-kit-lib/sh/shell-warn.sh ./files/opencode-permissions-kit-lib/bin/setup-container-backend ./files/opencode-permissions-kit-lib/bin/socket-check ./files/opencode-permissions-kit-lib/bin/cwd-check ./files/opencode-permissions-kit-lib/sh/ddev-terminal.sh ./files/opencode-permissions-kit-lib/sh/ddev-handover.sh ./files/opencode-permissions-kit-lib/sh/ddev-migrate.sh ./files/opencode-permissions-kit-lib/bin/ddev-migrate ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx ./files/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx ./files/opencode-permissions-kit-lib/tui/opencode-danger.theme.json ./files/opencode-permissions-kit-lib/tui/tui.json ./files/opencode-permissions-kit-lib/tui/tui-danger.json ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+          E2E_OC_VERSION=${{ steps.version2x.outputs.OC2_VERSION }} ./tests/e2e/run-ddev.sh
+      - name: Summary
+        if: always()
+        env:
+          E2E_DDEV_SITE: ${{ (github.event_name != 'workflow_dispatch' || inputs.site_tier == true) && 'camino' || 'none' }}
+          DDEV_VERSION: ${{ inputs.ddev_version }}
+        run: |
+          echo "### ddev-e2e-2x (run-ddev.sh, opencode ${{ steps.version2x.outputs.OC2_VERSION }})" >> "$GITHUB_STEP_SUMMARY"
           echo "- site tier: ${E2E_DDEV_SITE:-none}" >> "$GITHUB_STEP_SUMMARY"
           echo "- ddev: ${DDEV_VERSION:-latest}" >> "$GITHUB_STEP_SUMMARY"

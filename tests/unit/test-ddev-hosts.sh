@@ -238,8 +238,10 @@ check "Makefile lint list includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$MAKEFILE"
 check "test-unit.yml chmod list includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$TEST_CI"
+# Every chmod block in test-e2e.yml must list ddev-hosts.sh (one
+# occurrence per block; the block count grows with pin/matrix jobs).
 check "test-e2e.yml chmod lists include ddev-hosts.sh" \
-    sh -c "grep -c 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\" | grep -q \"^2\$\"" _ "$E2E_CI"
+    sh -c 'blocks=$(grep -c "chmod +x" "$1"); grep -c "opencode-permissions-kit-lib/sh/ddev-hosts.sh" "$1" | grep -q "^${blocks}$"' _ "$E2E_CI"
 
 # --- Summary -----------------------------------------------------------------------
 
