@@ -526,17 +526,18 @@ check "interactive-shell warning hooked into .bashrc" \
     E 'grep -q "opencode-permissions-kit/sh/shell-warn.sh" /home/dev/.bashrc'
 # Simulate a self-reinstall: the official installer drops a real binary into
 # ~/.opencode/bin. The guard must report it.
-# Probe note: `__opk-e2e-probe` (a bare word, not a headless/version arg)
-# drives the INTERACTIVE wrapper path — banner + warnings — while the real
-# binary exits promptly (1.x: not a directory, 2.x: unknown command).
-# --version/--help are useless as probes since issue #91: they exec straight
-# to the binary, banner-free.
+# Probe note: the banner checks drive the REAL interactive start (no args,
+# stdin closed) under `timeout 3` — exactly what a user runs in a project
+# directory, same pattern as the config.sh menu probe below. --version/--help
+# are useless as probes since issue #91: they exec straight to the binary,
+# banner-free. A fake argument is no alternative either: it only exits fast
+# because the binary errors on it.
 E 'sudo mkdir -p /home/dev/.opencode/bin && sudo cp /usr/local/lib/opencode-permissions-kit/bin/opencode /home/dev/.opencode/bin/opencode'
 E 'sudo chmod 755 /home/dev/.opencode/bin/opencode && sudo chown dev:dev /home/dev/.opencode/bin/opencode'
 check "shell-warn.sh warns about shadow binary" \
     E 'sh -c '\''HOME=/home/dev . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh'\'' 2>&1 | grep -q "wrapper bypass"'
 check "wrapper start warns about shadow binary" \
-    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode __opk-e2e-probe 2>&1 | grep -q "self-installed opencode detected"'
+    E 'cd /var/www/vhosts/test-project && timeout 3 /usr/local/bin/opencode </dev/null 2>&1 | grep -q "self-installed opencode detected"'
 # Cleaning the shadow directory restores the quiet state.
 E 'rm -rf /home/dev/.opencode'
 check "shell-warn.sh quiet after cleanup" \
@@ -754,10 +755,9 @@ E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes 
 
 echo ""
 echo "--- 12e. wrapper directory validation ---"
-# Valid CWD: the interactive path prints the banner (issue #91 note:
-# --version/--help exec banner-free, so the probe is a bare word the real
-# binary rejects promptly — see the 6c probe note).
-E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode __opk-e2e-probe </dev/null 2>&1 | tee /tmp/wrapper-valid.txt' && \
+# Valid CWD: the real interactive start prints the banner (issue #91 note:
+# --version/--help exec banner-free — see the 6c probe note).
+E 'cd /var/www/vhosts/test-project && timeout 3 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-valid.txt || true' && \
     echo "  ${GREEN}OK${NC}  wrapper ran from valid CWD"
 check "wrapper: SECURED banner from valid CWD" \
     E 'grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-valid.txt'
@@ -958,7 +958,7 @@ if [ "$_rootless_ok" = true ]; then
     }
 }
 EOF'
-    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode __opk-e2e-probe </dev/null 2>&1 | tee /tmp/wrapper-podman.txt' && \
+    E 'cd /var/www/vhosts/test-project && timeout 3 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-podman.txt || true' && \
         echo "  ${GREEN}OK${NC}  wrapper podman auto-detection ran"
     check "12i: wrapper podman auto-detect: container tools advisory" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-podman.txt'
@@ -981,7 +981,7 @@ if [ "$_rootless_ok" = true ]; then
     E 'sudo cp /home/opencode/.config/opencode/opencode.jsonc /tmp/global-jsonc.bak'
     E 'sudo sed -i "s/\"docker \*\": \"deny\"/\"docker *\": \"allow\"/; s/\"ddev \*\": \"deny\"/\"ddev *\": \"allow\"/" /home/opencode/.config/opencode/opencode.jsonc'
     E 'sudo rm -f /var/www/vhosts/test-project/opencode.jsonc'
-    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode __opk-e2e-probe </dev/null 2>&1 | tee /tmp/wrapper-global.txt' && \
+    E 'cd /var/www/vhosts/test-project && timeout 3 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-global.txt || true' && \
         echo "  ${GREEN}OK${NC}  wrapper global-config detection ran"
     check "12i: global-config allow detected (banner)" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-global.txt'
