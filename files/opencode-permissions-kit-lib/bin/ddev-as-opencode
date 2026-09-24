@@ -42,6 +42,31 @@ if [ "$(id -u)" != "$OC_UID" ]; then
     exit 1
 fi
 
+# --opk-ensure-shared <dir> (issue #94): re-assert group-write on a .ddev
+# tree that ddev just created or regenerated. ddev hardcodes explicit
+# 0755/0644 modes (os.MkdirAll / WriteFile), which neither the umask nor
+# the inherited default ACL can widen — the ACL mask gets capped to r-x
+# and the developer (sharing-group member) cannot write into the tree:
+# `git pull` delivering .ddev/ files then fails with "permission denied".
+# Running as the opencode user, this heal only ever touches
+# opencode-owned entries (chmod is owner-only); git-created entries are
+# already group-writable. Heavy generated subtrees are pruned
+# (db_snapshots is chmod 0777 by ddev itself; import dumps are transient
+# and gitignored). No new privilege: the opencode user could chmod its
+# own files without this helper too — the sudoers gate on this exact
+# path just makes the heal reachable from the ddev() shell function.
+# Idempotent, best-effort, never fails.
+if [ "${1:-}" = "--opk-ensure-shared" ]; then
+    _opk_dir="${2:-}"
+    if [ -n "$_opk_dir" ] && [ -d "$_opk_dir" ]; then
+        find "$_opk_dir" \
+            -type d \( -name db_snapshots -o -name import-db -o -name import-files \) -prune -o \
+            -print0 2>/dev/null \
+            | xargs -0 -r chmod g+w 2>/dev/null || true
+    fi
+    exit 0
+fi
+
 # Resolve the real ddev binary: first on PATH (sudo's env_reset keeps a
 # sane default PATH), then the two standard locations. Never a kit shim.
 DDEV=""

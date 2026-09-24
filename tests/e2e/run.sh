@@ -373,6 +373,36 @@ check "4c: detected typo3 settings dir still handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/detected-project/config/system)" = "opencode"'
 
 echo ""
+echo "--- 4c-2. ddev() reshare: .ddev stays dev-writable (issue #94) ---"
+# ddev hardcodes explicit 0755/0644 modes, which cap the inherited ACL mask
+# to r-x: content ddev creates as opencode keeps the developer (sharing
+# group) out — `git pull` delivering teammate .ddev/ files fails with
+# "permission denied" (reproduced live on a kit machine). The ddev()
+# function must heal group-write after the tree-creating commands.
+# Fixture: a project whose .ddev was created by "ddev" (= opencode) with
+# restrictive modes; a planted fake ddev answers the config call.
+E 'sudo mkdir -p /var/www/vhosts/git94/.ddev/commands/web /var/www/vhosts/git94/.ddev/db_snapshots && sudo chown dev:dev /var/www/vhosts/git94 && sudo chown -R opencode:opencode /var/www/vhosts/git94/.ddev'
+E 'sudo -u opencode sh -c "chmod 755 /var/www/vhosts/git94/.ddev /var/www/vhosts/git94/.ddev/commands /var/www/vhosts/git94/.ddev/commands/web /var/www/vhosts/git94/.ddev/db_snapshots"'
+E 'printf "name: git94\ntype: php\n" | sudo -u opencode tee /var/www/vhosts/git94/.ddev/config.yaml >/dev/null && sudo -u opencode chmod 644 /var/www/vhosts/git94/.ddev/config.yaml'
+E 'printf "#!/bin/sh\ncase \"\$1\" in config) echo FAKE_DDEV_CONFIG;; *) echo \"FAKE_DDEV_RAN:\$*\";; esac\n" | sudo tee /usr/local/bin/ddev >/dev/null && sudo chmod 755 /usr/local/bin/ddev'
+check "4c-2: fixture reproduces the bug — ddev-created tree is NOT dev-writable" \
+    E '! sudo -u dev test -w /var/www/vhosts/git94/.ddev/commands/web'
+E 'sudo -u dev -H bash -c "cd /var/www/vhosts/git94 && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev config --project-name=git94" >/dev/null 2>&1 || true'
+check "4c-2: ddev() heals .ddev group-write after config (issue #94)" \
+    E 'sudo -u dev test -w /var/www/vhosts/git94/.ddev/commands/web'
+check "4c-2: heal lifts files too — git can rewrite .ddev/config.yaml" \
+    E 'sudo -u dev test -w /var/www/vhosts/git94/.ddev/config.yaml'
+check "4c-2: db_snapshots stays pruned from the heal" \
+    E '! sudo -u dev test -w /var/www/vhosts/git94/.ddev/db_snapshots'
+check "4c-2: the teammate-file git pull delivers lands for the developer" \
+    E 'sudo -u dev sh -c "printf \"#!/bin/sh\\n\" > /var/www/vhosts/git94/.ddev/commands/web/arrived-command" && test -f /var/www/vhosts/git94/.ddev/commands/web/arrived-command'
+# No project in the cwd (ddev config global from $HOME): the heal must be
+# a silent no-op, not an error.
+E 'sudo -u dev -H bash -c "cd /home/dev && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev config global --no-bind-mounts" >/dev/null 2>&1' && \
+    echo "  ${GREEN}OK${NC}  heal is a silent no-op without a project in the cwd"
+E 'sudo rm -rf /var/www/vhosts/git94 /usr/local/bin/ddev'
+
+echo ""
 echo "--- 4d. fresh clone: hook hint + config.sh handover (local-test issue) ---"
 # Scenario from the productive WSL test: git clone a typo3 project AFTER
 # the last handover scan -> `ddev start` fails with EPERM (ddev chmods the
