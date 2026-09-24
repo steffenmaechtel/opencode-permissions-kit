@@ -88,21 +88,29 @@ Releases are maintainer-only and fully scripted
 ([`scripts/release.sh`](scripts/release.sh), issue #38; model:
 [release-handling](docs/design/release-handling.md) — a release is the
 tag `x.y.z` on `master` plus a fast-forward of the `stable` mirror, which
-must stay **byte-identical** to `master`). Per release:
+must stay **byte-identical** to `master`).
 
-1. VERSION bump lands on `master` **via PR** (never commit on master
-   directly): `git checkout -b release/x.y.z && make version VERSION=x.y.z`,
-   commit, push, merge.
-2. Cut the release — the script verifies clean tree, sync with origin,
-   VERSION stamp, free tag, fast-forwardability of `stable`, runs the
-   suite, then tags, mirrors, and pushes (never force-pushes):
+Cheat sheet — copy the block, search & replace `0.0.36` with the new
+version, run the lines one by one. The VERSION bump lands on `master`
+**via PR** (never commit on master directly); `make release` then verifies
+a clean tree, sync with origin, the VERSION stamp, a free tag and
+`stable` fast-forwardability, runs the suite, and tags, mirrors and
+pushes (never force-pushes):
 
-   ```bash
-   make release VERSION=x.y.z            # or: scripts/release.sh x.y.z
-   make release VERSION=x.y.z ARGS=--dry-run   # print the steps, change nothing
-   ```
+```bash
+git checkout -b release/0.0.36
+make version VERSION=0.0.36
+git commit -am "chore: bump VERSION to 0.0.36"
+git push origin release/0.0.36
 
-3. Optional: `gh release create x.y.z --generate-notes` for notes.
+# On GitHub: open the PR for release/0.0.36 => merge => wait for green CI
+
+make release VERSION=0.0.36
+gh release create 0.0.36 --title "0.0.36" --generate-notes --latest
+```
+
+`make release VERSION=0.0.36 ARGS=--dry-run` prints the steps without
+changing anything.
 
 Everything else (branch protection on `stable`, announcements) is set up
 once, not per release.
