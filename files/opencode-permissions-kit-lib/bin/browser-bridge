@@ -73,6 +73,6 @@ fi
 # failing opencode's spawn. Styled like the wrapper's note() output —
 # yellow, framed by blank lines — so it reads as kit output, not as part
 # of opencode's login dialog.
-printf '\n\033[0;33m⚠ auto-open unavailable for the agent — open the printed URL manually\033[0m\n\n' 2>/dev/null >/dev/tty || true
+printf '\n\033[0;33m⚠  auto-open unavailable for the agent — open the printed URL manually\033[0m\n\n' 2>/dev/null >/dev/tty || true
 _bb_dbg "no real powershell reachable for this caller -> exit 0"
 exit 0
