@@ -744,7 +744,8 @@ if [ "$SITE_TIER" = "camino" ]; then
 
         # (b) handover-mode tripwire (§7.2 12.2): bootstrap root opencode-owned
         #     -> a top-level switch must hit the documented unlink EPERM.
-        #     sed runs as root: dev cannot edit .ddev/config.yaml yet (Finding 1).
+        #     sed runs as root for determinism (the issue #94 heal makes
+        #     .ddev/config.yaml dev-editable too).
         E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings off >/dev/null 2>&1'
         E 'sudo sed -i "/^disable_settings_management:/d" /var/www/vhosts/dd12-proj/.ddev/config.yaml'
         E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd12-proj >/dev/null 2>&1'
@@ -807,9 +808,9 @@ check "DD13: config completes despite the settings chmod warning" \
     E 'grep -q "Configuration complete" /tmp/dd13-config.log'
 check "DD13: .ddev opencode-owned (ddev-created)" \
     E 'test "$(stat -c %U /var/www/vhosts/dd13-proj/.ddev)" = opencode'
-check "DD13: TRIPWIRE .ddev/config.yaml NOT group-writable (Finding 1 — flips when fixed)" \
-    E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/config.yaml) & 0020 )) -eq 0'
-check_fail "DD13: TRIPWIRE dev cannot edit .ddev/config.yaml (Finding 1 — flips when fixed)" \
+check "DD13: .ddev/config.yaml group-writable right after config (Finding 1 fixed — issue #94 heal)" \
+    E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/config.yaml) & 0020 )) -ne 0'
+check "DD13: dev can edit .ddev/config.yaml right after config (Finding 1 fixed — issue #94 heal)" \
     DEVSH 'cd /var/www/vhosts/dd13-proj && printf "\n" >> .ddev/config.yaml'
 DEVSH 'cd /var/www/vhosts/dd13-proj && ddev start >/tmp/dd13-start1.log 2>&1' && _dd13_first=0 || _dd13_first=1
 check "DD13: first start prints the bootstrap hint (hook promise)" \
