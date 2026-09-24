@@ -474,6 +474,29 @@ if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
     fi
 fi
 
+# Device logins (console/auth, issue #91): the browser-open spawn inside
+# opencode (`open` package → the kit's powershell.exe stand-in on WSL) goes
+# through Bun's posix_spawn, which fails with EACCES when the process cwd
+# is not readable by the opencode user — the developer's home (mode 750)
+# is exactly that case, and the login died on the spawn error right after
+# printing URL + device code. Direct execve from such a cwd works (the
+# kernel never touches it for absolute paths); only Bun's spawn chokes.
+# Device logins carry no project context — run them from a readable
+# directory (the opencode home, same last-resort fallback as serve above)
+# instead of the inherited one. Empty probe output means "unknown" —
+# proceed without touching the directory (same contract as serve).
+if [ "${1:-}" = "console" ] || [ "${1:-}" = "auth" ]; then
+    if [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
+        LOGIN_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6)
+        if [ -n "$LOGIN_FALLBACK" ] && [ "$(cwd_probe "$LOGIN_FALLBACK")" = "readable" ]; then
+            note "${YELLOW}Login runs from $LOGIN_FALLBACK (the current directory is not readable${NC}"
+            note "${YELLOW}by the opencode user; device logins carry no project context).${NC}"
+            note ""
+            cd "$LOGIN_FALLBACK" 2>/dev/null || true
+        fi
+    fi
+fi
+
 # opencode 2.x session servers (issue #80): 2.x commands prefer the shared
 # background service (`opencode serve --service`, auto-spawned, env from its
 # own registration) — tools then run in a daemon that never saw this

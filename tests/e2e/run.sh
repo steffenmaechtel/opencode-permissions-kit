@@ -781,6 +781,18 @@ check "wrapper: --version works from invalid CWD without refusal (issue #91)" \
     E '! grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-version-invalid.txt'
 check "wrapper: --version banner-free from invalid CWD (issue #91)" \
     E '! grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-version-invalid.txt'
+# Device login from an UNREADABLE cwd (issue #91): Bun's posix_spawn for the
+# browser-open fails with EACCES when the opencode process cwd is not
+# readable for the opencode user (developer home, mode 750). The wrapper
+# must move the login to a readable directory (opencode home) before the
+# exec — same cwd_probe machinery as the serve fallback.
+E 'sudo chmod 750 /home/dev'
+E 'cd /home/dev && timeout 8 /usr/local/bin/opencode console login </dev/null 2>&1 | tee /tmp/wrapper-login-home.txt || true'
+E 'sudo chmod 755 /home/dev'
+check "wrapper: device login moves off an unreadable cwd (issue #91)" \
+    E 'grep -q "Login runs from" /tmp/wrapper-login-home.txt'
+check "wrapper: device login gets no project-dir refusal" \
+    E '! grep -q "cannot be started here" /tmp/wrapper-login-home.txt'
 check_fail "wrapper does NOT stamp OPENCODE_LAUNCH_CWD (soft-only)" \
     E 'grep -q OPENCODE_LAUNCH_CWD /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode'
 

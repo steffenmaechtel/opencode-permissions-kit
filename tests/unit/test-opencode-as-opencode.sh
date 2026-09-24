@@ -293,6 +293,37 @@ else
     failures=$((failures + 1))
 fi
 
+# --- Device-login cwd fallback (issue #91, Bun posix_spawn EACCES) ----------
+# console/auth logins open the browser through Bun's posix_spawn, which
+# fails with EACCES when the opencode process cwd is unreadable for the
+# opencode user (developer home, mode 750) — the login died right after
+# printing URL + code. The wrapper must move device logins to a readable
+# directory (opencode home) before the exec, using the same cwd_probe as
+# the serve fallback.
+if grep -q '\[ "\${1:-}" = "console" \] || \[ "\${1:-}" = "auth" \]' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  device logins (console/auth) have a cwd fallback branch"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  device logins lack the cwd fallback branch (Bun EACCES crash)"
+    failures=$((failures + 1))
+fi
+
+if sed -n '/= "console" \] || \[ "\${1:-}" = "auth" \]/,/^fi$/p' "$WRAPPER_FILE" | grep -q 'cwd_probe'; then
+    echo "  ${GREEN}PASS${NC}  device-login fallback probes readability (cwd_probe reuse)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  device-login fallback does not probe readability"
+    failures=$((failures + 1))
+fi
+
+if sed -n '/= "console" \] || \[ "\${1:-}" = "auth" \]/,/^fi$/p' "$WRAPPER_FILE" | grep -q 'cd "\$LOGIN_FALLBACK"'; then
+    echo "  ${GREEN}PASS${NC}  device-login fallback cds before the exec"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  device-login fallback never changes directory"
+    failures=$((failures + 1))
+fi
+
 # Classification is executable: extract the block and run it against
 # representative argument vectors (same static-extraction technique as
 # test-status.sh). tty-less CI makes `run` (no message) headless via the

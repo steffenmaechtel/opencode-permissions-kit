@@ -76,6 +76,13 @@ Interactive TUI starts (no subcommand, flags-only
 starts, `tui`, `attach`, or `opencode run` on a terminal without a
 message) keep the banner and the project-directory check.
 
+Device logins get the same working-directory treatment as `serve`: when the
+current directory is not readable by the `opencode` user (typically your
+`$HOME`, mode 750), Bun's `posix_spawn` for the browser-open fails with
+`EACCES` even though the spawned file is executable — so the wrapper moves
+`console`/`auth` to a readable directory (the opencode home) before
+starting the binary (issue #91).
+
 `serve` additionally sanity-checks its working directory: UIs like
 OpenChamber default it to the developer's `$HOME`, which the `opencode`
 user cannot read (UID separation) — the server would boot but answer
