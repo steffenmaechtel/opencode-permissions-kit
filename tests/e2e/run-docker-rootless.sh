@@ -265,9 +265,12 @@ if [ "$_rootless_ok" = true ]; then
 }
 EOF'
 # Probe note: the banner checks drive the REAL interactive start (no args,
-# stdin closed) under `timeout 3` — what a user runs in a project directory.
-# --version/--help exec banner-free since issue #91 and are no probes.
-    E 'cd /var/www/vhosts/test-project && timeout 3 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-drl.txt || true' && \
+# stdin closed) under `timeout 20` — what a user runs in a project directory.
+# --version/--help exec banner-free since issue #91 and are no probes. The
+# trailing grep -q ends the probe when the expected line has flushed
+# (SIGPIPE) — opencode 2.x may cold-start its background session service
+# inside the wrapper's container probe, which the early exit absorbs.
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-drl.txt | { grep -q "will run with" || true; }' && \
         echo "  ${GREEN}OK${NC}  wrapper docker-rootless auto-detection ran"
     check "RL3: wrapper auto-detect: container tools advisory" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-drl.txt'
@@ -294,7 +297,7 @@ if [ "$_rootless_ok" = true ]; then
     E 'sudo cp /home/opencode/.config/opencode/opencode.jsonc /tmp/global-jsonc.bak'
     E 'sudo sed -i "s/\"docker \*\": \"deny\"/\"docker *\": \"allow\"/; s/\"ddev \*\": \"deny\"/\"ddev *\": \"allow\"/" /home/opencode/.config/opencode/opencode.jsonc'
     E 'sudo rm -f /var/www/vhosts/test-project/opencode.jsonc'
-    E 'cd /var/www/vhosts/test-project && timeout 3 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-drl-global.txt || true' && \
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-drl-global.txt | { grep -q "will run with" || true; }' && \
         echo "  ${GREEN}OK${NC}  wrapper global-config detection ran"
     check "RL3b: global-config allow detected (banner)" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-drl-global.txt'
