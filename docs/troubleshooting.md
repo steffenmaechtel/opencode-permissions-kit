@@ -404,6 +404,24 @@ login still works when you open the printed URL yourself: the crash
 happens *after* URL and device code are displayed. Details: [security
 model](concepts/security-model.md).
 
+**Diagnose — expected vs. broken:** when the login runs with the agent
+identity on a hardened mount, the stand-in prints
+`auto-open unavailable for the agent — open the printed URL manually`
+straight to your terminal and the login keeps polling. That line is the
+*designed* state (the agent must not gain Windows interop), not an error.
+`OPK_BROWSER_BRIDGE_DEBUG=1` before a direct invocation traces the full
+decision (caller identity, powershell scan, forward/no-op). Self-test as
+your own user — the browser must open `https://opencode.ai`:
+
+```bash
+OPK_BROWSER_BRIDGE_DEBUG=1 /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe \
+    -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand UwB0AGEAcgB0ACAAIgBoAHQAdABwAHMAOgAvAC8AbwBwAGUAbgBjAG8AZABlAC4AYQBpACIA
+```
+
+Run as yourself the trace ends in `forwarding to /mnt/c/...` and the
+browser opens; if it does not, check the mount options (`stat -c %a
+/mnt/c`) — your user must be the mount owner.
+
 ## Group membership (opencode group) not applied
 
 **Cause:** group changes apply only to new login sessions.

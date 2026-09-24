@@ -123,7 +123,11 @@ The kit solves this **without granting the agent anything**:
 
 The stand-in parses nothing and holds no privileges — the agent can run it
 with arbitrary arguments to no effect beyond a possible browser open *as
-the caller* (which it cannot reach on a hardened mount anyway).
+the caller* (which it cannot reach on a hardened mount anyway). When the
+no-op path triggers, it prints a one-line hint to the terminal
+(`auto-open unavailable for the agent — open the printed URL manually`);
+`OPK_BROWSER_BRIDGE_DEBUG=1` traces the decision for direct invocations
+(self-test: [troubleshooting](../troubleshooting.md)).
 `opk status` reports the bridge state; the wrapper warns when the mount is
 restricted but the bridge is missing (hand-edited `wsl.conf`, partial
 deploy). Uninstall removes the section and the stand-in tree.

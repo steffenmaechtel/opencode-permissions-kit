@@ -28,10 +28,27 @@
 # parses nothing and must never grow privileged behavior (the agent can
 # execute it with arbitrary arguments).
 #
+# Diagnostics: the no-op path writes a one-line hint straight to the
+# controlling terminal (/dev/tty) so the human at the screen sees why no
+# browser opened — opencode's spawn discards the stand-in's stdio, and a
+# pipe would never reach the user. Silent without a tty (headless runs).
+# OPK_BROWSER_BRIDGE_DEBUG=1 additionally prints the decision trace to
+# stderr (caller identity, powershell scan, forward/no-op) — meant for
+# direct invocations; opencode's spawn strips the env and discards the
+# stream anyway.
+#
 # OPK_WSL_C_ROOT overrides the Windows drive root for tests; production
 # resolution is the drvfs/9p mount of C: from /proc/mounts, /mnt/c as
 # fallback.
 set -e
+
+_bb_dbg() {
+    if [ "${OPK_BROWSER_BRIDGE_DEBUG:-}" = "1" ]; then
+        echo "browser-bridge[debug]: $*" >&2
+    fi
+}
+
+_bb_dbg "invoked as $(id -un 2>/dev/null || echo '?') uid=$(id -u 2>/dev/null || echo '?') args: $*"
 
 _opk_real=""
 for _opk_root in ${OPK_WSL_C_ROOT:-} $(awk '
@@ -43,9 +60,17 @@ for _opk_root in ${OPK_WSL_C_ROOT:-} $(awk '
         _opk_real="$_opk_candidate"
         break
     fi
+    _bb_dbg "not executable by this caller: $_opk_candidate"
 done
 
 if [ -n "$_opk_real" ]; then
+    _bb_dbg "forwarding to $_opk_real"
     exec "$_opk_real" "$@"
 fi
+
+# No forwarding for this caller (the agent on a hardened mount, or a host
+# without a reachable C:): tell the human at the terminal instead of
+# failing opencode's spawn.
+echo "auto-open unavailable for the agent — open the printed URL manually" 2>/dev/null >/dev/tty || true
+_bb_dbg "no real powershell reachable for this caller -> exit 0"
 exit 0

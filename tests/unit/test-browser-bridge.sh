@@ -240,6 +240,48 @@ else
 fi
 
 echo ""
+echo "--- diagnostics (debug trace + tty hint) ---"
+
+# 18. without the debug env the no-op path is completely silent (opencode's
+#     spawn would show any stdout/stderr noise in the login dialog)
+_out="$(OPK_WSL_C_ROOT="$WORK/nowhere" "$BRIDGE_BIN" -EncodedCommand X 2>&1)"
+if [ -z "$_out" ]; then
+    pass "no-op path is silent without OPK_BROWSER_BRIDGE_DEBUG"
+else
+    fail "no-op path leaks output without the debug env (got: '$_out')"
+fi
+
+# 19. with the debug env the no-op path traces the decision
+if OPK_BROWSER_BRIDGE_DEBUG=1 OPK_WSL_C_ROOT="$WORK/nowhere" "$BRIDGE_BIN" -EncodedCommand X 2>&1 \
+   | grep -q "browser-bridge\[debug\]: no real powershell reachable"; then
+    pass "debug env traces the no-op decision"
+else
+    fail "debug env does not trace the no-op decision"
+fi
+
+# 20. with the debug env the forwarding path traces target + decision
+if OPK_BROWSER_BRIDGE_DEBUG=1 OPK_WSL_C_ROOT="$WORK/fakec" "$BRIDGE_BIN" 2>&1 \
+   | grep -q "browser-bridge\[debug\]: forwarding to $WORK/fakec"; then
+    pass "debug env traces the forwarding decision"
+else
+    fail "debug env does not trace the forwarding decision"
+fi
+
+# 21. the no-op hint goes to the controlling terminal, not stdout/stderr:
+#     under a pty (script -e) it must appear, detached it must not.
+if command -v script >/dev/null 2>&1; then
+    _pty_out="$(script -qec "OPK_WSL_C_ROOT='$WORK/nowhere' '$BRIDGE_BIN'" /dev/null 2>&1 | tr -d '\r')"
+    case "$_pty_out" in
+        *"auto-open unavailable for the agent"*)
+            pass "tty hint appears on a controlling terminal (pty)" ;;
+        *)
+            fail "tty hint missing under a pty (got: '$_pty_out')" ;;
+    esac
+else
+    echo "  SKIP  tty hint under a pty (script(1) not available)"
+fi
+
+echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1
