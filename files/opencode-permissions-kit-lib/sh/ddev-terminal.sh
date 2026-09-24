@@ -163,6 +163,9 @@ _opk_ddev_browser() {
         _opk_bootstrap_hint 2>/dev/null || true
         /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode start
         _opk_brc=$?
+        # issue #94: this internal start regenerates .ddev content too —
+        # same group-write heal as the plain path below.
+        _opk_ddev_reshare
         _opk_hosts_hint 2>/dev/null || true
         if [ "$_opk_brc" -ne 0 ]; then
             return "$_opk_brc"
@@ -233,10 +236,29 @@ ddev() {
     _opk_rc=$?
     # ${1:-}: the exported function may land in child scripts running
     # `set -u` that call ddev without arguments (issue #18).
+    # issue #94: tree-creating commands leave ddev-written content without
+    # group-write (ddev's explicit 0755/0644 cap the inherited ACL mask) —
+    # heal before git ever needs to write there.
+    case "${1:-}" in
+        config|get|start|restart) _opk_ddev_reshare ;;
+    esac
     case "${1:-}" in
         start|restart) _opk_hosts_hint 2>/dev/null || true ;;
     esac
     return "$_opk_rc"
+}
+
+# _opk_ddev_reshare (issue #94): after tree-creating ddev commands, re-run
+# the group-write heal on the project's .ddev through the sudoers helper
+# (bin/ddev-as-opencode --opk-ensure-shared — runs as opencode, owner-only
+# chmod on its own files, zero new privilege). Without it, ddev's explicit
+# 0755/0644 modes keep the developer out of the tree: `git pull` on
+# teammate-delivered .ddev/ files fails with "permission denied". Cheap,
+# silent, never changes the ddev command's own exit code.
+_opk_ddev_reshare() {
+    [ -d "$PWD/.ddev" ] || return 0
+    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-ensure-shared "$PWD/.ddev" >/dev/null 2>&1 || true
+    return 0
 }
 
 # _opk_hosts_hint: after start/restart, list the hostnames missing from the
@@ -327,7 +349,7 @@ _opk_bootstrap_hint() {
 # workarounds — see docs/troubleshooting.md.
 # shellcheck disable=SC3045  # bash-only block, guarded above
 if [ -n "${BASH_VERSION:-}" ]; then
-    export -f ddev _opk_hosts_hint _opk_bootstrap_hint 2>/dev/null || true
+    export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare 2>/dev/null || true
     if [ -z "${BASH_ENV:-}" ]; then
         # shellcheck disable=SC3028  # bash-only variable in a guarded block
         _opk_hook="${BASH_SOURCE:-}"

@@ -170,6 +170,49 @@ check "fallback: unreadable cwd still execs ddev (exit code passes through)" \
     sh -c "printf '%s\n' \"\$1\" | grep -qF 'FAKE_DDEV_ARGS:stop myproject'" _ "$WF_OUT2" && [ "$WF_RC" = 0 ]
 rm -rf "$WF"
 
+# --- 2b. --opk-ensure-shared heal (issue #94) -----------------------------------
+# ddev hardcodes explicit 0755/0644 modes which neither the umask nor the
+# inherited default ACL can widen — the developer (sharing group) cannot
+# write into ddev-created .ddev trees and `git pull` fails. The heal
+# re-asserts g+w (owner-only chmod, runs as opencode via the sudoers gate)
+# with the heavy generated subtrees pruned. The uid guard is satisfied the
+# same way as above: a stubbed id(1) on PATH.
+SH_STUB=$(mktemp -d)
+printf '#!/bin/sh\necho 4242\n' > "$SH_STUB/id"
+chmod 755 "$SH_STUB/id"
+
+SH=$(mktemp -d)
+mkdir -p "$SH/.ddev/commands/web" "$SH/.ddev/db_snapshots" "$SH/.ddev/import-db"
+printf '#!/bin/sh\n' > "$SH/.ddev/config.yaml"
+printf '#!/bin/sh\n' > "$SH/.ddev/commands/web/hostcmd"
+printf 'SNAP\n'      > "$SH/.ddev/db_snapshots/db.sql.gz"
+printf 'DUMP\n'      > "$SH/.ddev/import-db/dump.sql.gz"
+chmod 755 "$SH/.ddev" "$SH/.ddev/commands" "$SH/.ddev/commands/web" "$SH/.ddev/db_snapshots" "$SH/.ddev/import-db"
+chmod 644 "$SH/.ddev/config.yaml" "$SH/.ddev/commands/web/hostcmd" "$SH/.ddev/db_snapshots/db.sql.gz" "$SH/.ddev/import-db/dump.sql.gz"
+
+HEAL_OUT=$(PATH="$SH_STUB:$PATH" sh "$HELPER" --opk-ensure-shared "$SH/.ddev" 2>&1)
+HEAL_RC=$?
+
+check "heal: exits 0 and stays silent" [ "$HEAL_RC" = 0 ] && [ -z "$HEAL_OUT" ]
+check "heal: directories get group-write (git can deliver files there)" \
+    [ "$(stat -c %a "$SH/.ddev/commands/web")" = "775" ]
+check "heal: files get group-write (git can rewrite them)" \
+    [ "$(stat -c %a "$SH/.ddev/config.yaml")" = "664" ]
+check "heal: db_snapshots stays pruned (ddev chmods it 0777 itself)" \
+    [ "$(stat -c %a "$SH/.ddev/db_snapshots")" = "755" ]
+check "heal: import-db stays pruned (transient, gitignored)" \
+    [ "$(stat -c %a "$SH/.ddev/import-db")" = "755" ]
+
+PATH="$SH_STUB:$PATH" sh "$HELPER" --opk-ensure-shared "$SH/does-not-exist" >/dev/null 2>&1
+check "heal: missing target is a clean no-op (exit 0)" [ "$?" = 0 ]
+
+# The heal must sit BEFORE the ddev resolution/exec: it never needs ddev,
+# and the resolve block must not run for it.
+check "heal: handled before the ddev binary resolution" \
+    sh -c "awk '/--opk-ensure-shared/{h=NR} /DDEV=\"\"/{d=NR} END{exit !(h>0 && d>0 && h<d)}' \"\$1\"" _ "$HELPER"
+
+rm -rf "$SH" "$SH_STUB"
+
 # --- 3. function file: sourcing + both branches -------------------------------
 # Fixture: a fake ddev on PATH so the already-opencode branch runs something
 # observable instead of the (absent) real ddev.
@@ -474,6 +517,23 @@ check "hook bootstrap hint stays silent when the root is already handed over" \
     sh -c "grep -qF '[ \"\$(stat -c %U \"\$PWD\" 2>/dev/null)\" = \"opencode\" ]' \"\$1\"" _ "$FUNC"
 check "hook exports the bootstrap hint for bash children" \
     sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
+
+# --- 7d. reshare wiring (issue #94) ----------------------------------------------
+# The ddev() function must re-assert group-write after the tree-creating
+# commands (ddev's explicit 0755/0644 modes otherwise keep the developer
+# out of .ddev/ — git pulls fail), through the sudoers helper's heal mode.
+check "reshare: _opk_ddev_reshare calls the helper's heal mode" \
+    sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-ensure-shared' " _ "$FUNC"
+check "reshare: heal runs after config/get/start/restart" \
+    sh -c "grep -q 'config|get|start|restart) _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
+check "reshare: heal is silent and never changes the ddev exit code" \
+    sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '|| true' && awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF 'return 0'" _ "$FUNC"
+check "reshare: no heal without a project in the cwd" \
+    sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '[ -d \"\$PWD/.ddev\" ]'" _ "$FUNC"
+check "reshare: exported for bash children (issue #18)" \
+    sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
+check "reshare: browser-command path heals after its internal start too" \
+    sh -c "awk '/_opk_ddev_browser\(\)/,/^}/' \"\$1\" | grep -A5 'ddev-as-opencode start' | grep -q _opk_ddev_reshare" _ "$FUNC"
 
 # --- 7e. dev-owned mode (docs/design/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED

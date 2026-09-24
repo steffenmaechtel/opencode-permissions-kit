@@ -171,6 +171,32 @@ repository carries dozens, issue #29). Your
 `.git/` stays yours (ownership untouched; the group baseline makes it
 group-accessible — see [the sharing group](sharing-group.md)).
 
+### Team git workflows: group-write on ddev-created content (issue #94)
+
+ddev hardcodes **explicit `0755`/`0644` modes** for everything it
+creates. Explicit modes bypass the umask, and they cap the inherited
+default ACL down to `r-x` for the group — so content ddev writes as
+`opencode` (a `ddev config` in a freshly cloned project, regenerated
+webserver configs on `ddev start`) starts out **without group write**.
+Without a countermeasure, `git pull` fails with *permission denied* the
+moment a teammate delivers a new or modified file under `.ddev/`
+(commands, `homeadditions`, …) — you, the sharing-group member, cannot
+write into those trees.
+
+The kit heals this at the source: after the tree-creating commands
+(`ddev config` / `get` / `start` / `restart`), your `ddev` shell function
+re-asserts group-write on the project's `.ddev` through the sudoers
+helper (`--opk-ensure-shared`, running as `opencode`: owner-only chmod on
+its own files, no new privilege). Heavy generated subtrees are pruned
+(`db_snapshots` is chmod `0777` by ddev itself, import dumps are
+transient). Trees that arrived via git itself never need the heal — git
+writes them as you, with your umask and the inherited ACLs.
+
+Edge case: content written by the *agent's* ddev session (running as
+`opencode` directly, not through your shell function) lacks the automatic
+heal — run any `ddev` command yourself or `opk update` /
+`opk handover opencode <project>` to re-normalize.
+
 ## Dev-owned projects (the alternative to handovers)
 
 The handover model exists because ddev chmods settings paths outside
