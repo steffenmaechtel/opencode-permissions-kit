@@ -234,24 +234,26 @@ else
     failures=$((failures + 1))
 fi
 
-# --- Version/help passthrough from an invalid CWD ---
+# --- Version/help passthrough from ANY directory (issue #91) ---
 # The official opencode installer probes `opencode --version` from $HOME
 # (an invalid directory) while the kit installs; the wrapper must answer
 # from the real binary instead of refusing (regression: the mid-install
-# "ERROR: opencode cannot be started here" confused users).
-if grep -A14 'if \[ "\$VALID" != true \]' "$WRAPPER_FILE" | grep -q -- '--version'; then
-    echo "  ${GREEN}PASS${NC}  wrapper answers --version from an invalid CWD (installer probe)"
+# "ERROR: opencode cannot be started here" confused users). Since issue
+# #91 the passthrough is its own case BEFORE the project-dir check —
+# version/help must stay banner-free from valid directories too.
+if sed -n '/--version|-v|-h|--help)/,/^esac/p' "$WRAPPER_FILE" | grep -q -- '--version'; then
+    echo "  ${GREEN}PASS${NC}  wrapper answers --version from any directory (installer probe)"
     passed=$((passed + 1))
 else
     echo "  ${RED}FAIL${NC}  wrapper refuses --version outside a project directory"
     failures=$((failures + 1))
 fi
 
-if grep -A14 'if \[ "\$VALID" != true \]' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
-    echo "  ${GREEN}PASS${NC}  invalid-CWD version passthrough execs the secured binary"
+if sed -n '/--version|-v|-h|--help)/,/^esac/p' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
+    echo "  ${GREEN}PASS${NC}  version passthrough execs the secured binary"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  invalid-CWD version passthrough lost the binary exec"
+    echo "  ${RED}FAIL${NC}  version passthrough lost the binary exec"
     failures=$((failures + 1))
 fi
 
@@ -291,6 +293,37 @@ else
     failures=$((failures + 1))
 fi
 
+# --- Device-login cwd fallback (issue #91, Bun posix_spawn EACCES) ----------
+# console/auth logins open the browser through Bun's posix_spawn, which
+# fails with EACCES when the opencode process cwd is unreadable for the
+# opencode user (developer home, mode 750) — the login died right after
+# printing URL + code. The wrapper must move device logins to a readable
+# directory (opencode home) before the exec, using the same cwd_probe as
+# the serve fallback.
+if grep -q '\[ "\${1:-}" = "console" \] || \[ "\${1:-}" = "auth" \]' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  device logins (console/auth) have a cwd fallback branch"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  device logins lack the cwd fallback branch (Bun EACCES crash)"
+    failures=$((failures + 1))
+fi
+
+if sed -n '/= "console" \] || \[ "\${1:-}" = "auth" \]/,/^fi$/p' "$WRAPPER_FILE" | grep -q 'cwd_probe'; then
+    echo "  ${GREEN}PASS${NC}  device-login fallback probes readability (cwd_probe reuse)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  device-login fallback does not probe readability"
+    failures=$((failures + 1))
+fi
+
+if sed -n '/= "console" \] || \[ "\${1:-}" = "auth" \]/,/^fi$/p' "$WRAPPER_FILE" | grep -q 'cd "\$LOGIN_FALLBACK"'; then
+    echo "  ${GREEN}PASS${NC}  device-login fallback cds before the exec"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  device-login fallback never changes directory"
+    failures=$((failures + 1))
+fi
+
 # Classification is executable: extract the block and run it against
 # representative argument vectors (same static-extraction technique as
 # test-status.sh). tty-less CI makes `run` (no message) headless via the
@@ -317,6 +350,7 @@ hl_case "models is headless"            true  models
 hl_case "export is headless"            true  export sess-123
 hl_case "2x api is headless"            true  api GET /config
 hl_case "2x auth is headless"           true  auth login
+hl_case "1x console login is headless"  true  console login
 hl_case "2x plugin is headless"         true  plugin list
 hl_case "2x service is headless"        true  service status
 hl_case "2x pair is headless"           true  pair

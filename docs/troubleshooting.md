@@ -378,6 +378,50 @@ options = "uid=1000,gid=1000,dmask=027,fmask=037"
 (replace `uid`/`gid` with your default WSL user's), then from Windows run
 `wsl --shutdown` and restart WSL. Details: [security model](concepts/security-model.md).
 
+## `opencode console login` / `opencode auth login` crashes with EACCES on powershell.exe
+
+**Cause 1:** the device login opens its verification URL through the `open`
+package bundled with opencode, which spawns the Windows powershell.exe. On
+a restricted `/mnt/c` the `opencode` user may not execute it, and the login
+dies on that spawn error (issue #91). The kit's browser bridge redirects
+that lookup to a harmless stand-in — the crash means the bridge is not in
+place (broken deploy, hand-edited `/etc/wsl.conf`).
+
+**Cause 2:** the login ran from a directory the `opencode` user cannot read
+(typically your `$HOME`, mode 750). Bun's `posix_spawn` — used for the
+browser-open — fails with `EACCES` in that case even though the spawned
+file itself is executable; plain `execve` is unaffected. The wrapper moves
+`console`/`auth` logins to a readable directory (the opencode home) before
+starting the binary, so this is handled automatically; a crash means an
+old wrapper is deployed.
+
+**Fix:** re-run the install or `opk update` — both (re)apply the
+`[opencode-permissions-kit]` section in `/etc/wsl.conf`, the stand-in
+under `/usr/local/lib/opencode-permissions-kit/wsl/`, and the current
+wrapper. The wsl.conf section takes effect immediately (only `open` reads
+it; WSL ignores it — no `wsl --shutdown` needed). Without a bridge, the
+login still works when you open the printed URL yourself: the crash
+happens *after* URL and device code are displayed. Details: [security
+model](concepts/security-model.md).
+
+**Diagnose — expected vs. broken:** when the login runs with the agent
+identity on a hardened mount, the stand-in prints
+`auto-open unavailable for the agent — open the printed URL manually`
+straight to your terminal and the login keeps polling. That line is the
+*designed* state (the agent must not gain Windows interop), not an error.
+`OPK_BROWSER_BRIDGE_DEBUG=1` before a direct invocation traces the full
+decision (caller identity, powershell scan, forward/no-op). Self-test as
+your own user — the browser must open `https://opencode.ai`:
+
+```bash
+OPK_BROWSER_BRIDGE_DEBUG=1 /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe \
+    -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand UwB0AGEAcgB0ACAAIgBoAHQAdABwAHMAOgAvAC8AbwBwAGUAbgBjAG8AZABlAC4AYQBpACIA
+```
+
+Run as yourself the trace ends in `forwarding to /mnt/c/...` and the
+browser opens; if it does not, check the mount options (`stat -c %a
+/mnt/c`) — your user must be the mount owner.
+
 ## Group membership (opencode group) not applied
 
 **Cause:** group changes apply only to new login sessions.

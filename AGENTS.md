@@ -34,7 +34,8 @@ used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
 ## Rules
 
 - **Never commit on `master`.** Work on `feature/<name>` branches, merged via
-  pull request with green CI. Pushing and PRs are the maintainer's job.
+  pull request with green CI. The agent commits its finished work on the
+  feature branch; push/pull and PRs are the maintainer's job.
 - **All shipped content is English** — scripts, docs, prompts, messages.
 - **Follow `docs/design/conventions.md`** for interactive prompts, output
   style, and other shipped-code conventions.

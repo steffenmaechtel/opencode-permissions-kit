@@ -35,6 +35,17 @@ for cand in "$(dirname "$0")/../sh/log.sh" "/usr/local/lib/opencode-permissions-
     fi
 done
 
+# WSL browser bridge helper (issue #91): needed below to strip the kit
+# section from /etc/wsl.conf before the library goes. Stub keeps older
+# installs (no deployed helper yet) uninstallable.
+browser_bridge_remove() { :; }
+for cand in "$(dirname "$0")/../sh/wsl-browser-bridge.sh" "/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+
 trace() {
     [ "$DEBUG" = true ] && echo "[debug] $*" >&2
 }
@@ -171,6 +182,20 @@ if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
         run "sudo rm -rf '$_un_dir/plugins/opencode-permissions-kit'"
         run "sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py '$_un_dir/cli.json' unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"
     done
+fi
+
+echo ""
+echo "--- Removing WSL browser bridge ---"
+# (issue #91) Strip the kit-managed section from /etc/wsl.conf (every other
+# line is preserved) and drop the stand-in tree under the library before it
+# goes. Safe no-op when neither exists (non-WSL / pre-bridge installs).
+if [ "$DRY_RUN" = true ]; then
+    echo "  [DRY] remove [opencode-permissions-kit] section from /etc/wsl.conf (sed rewrite)"
+    echo "  [DRY] sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl"
+else
+    browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
+    echo "WSL browser bridge removed."
+    log "wsl browser bridge removed (/etc/wsl.conf section + library wsl/ tree)"
 fi
 
 echo ""

@@ -526,12 +526,23 @@ check "interactive-shell warning hooked into .bashrc" \
     E 'grep -q "opencode-permissions-kit/sh/shell-warn.sh" /home/dev/.bashrc'
 # Simulate a self-reinstall: the official installer drops a real binary into
 # ~/.opencode/bin. The guard must report it.
+# Probe note: the banner checks drive the REAL interactive start (no args,
+# stdin closed) under `timeout 20` — exactly what a user runs in a project
+# directory, same pattern as the config.sh menu probe below. --version/--help
+# are useless as probes since issue #91: they exec straight to the binary,
+# banner-free. A fake argument is no alternative either: it only exits fast
+# because the binary errors on it. The trailing grep -q ends the probe as
+# soon as the expected line has flushed (SIGPIPE stops the pipeline) —
+# on opencode 1.x the banner is instant, on 2.x the wrapper's `debug
+# config` container probe may cold-start the background session service
+# (several seconds), which the early exit absorbs without a fixed sleep.
+# `timeout 20` is only the safety net.
 E 'sudo mkdir -p /home/dev/.opencode/bin && sudo cp /usr/local/lib/opencode-permissions-kit/bin/opencode /home/dev/.opencode/bin/opencode'
 E 'sudo chmod 755 /home/dev/.opencode/bin/opencode && sudo chown dev:dev /home/dev/.opencode/bin/opencode'
 check "shell-warn.sh warns about shadow binary" \
     E 'sh -c '\''HOME=/home/dev . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh'\'' 2>&1 | grep -q "wrapper bypass"'
 check "wrapper start warns about shadow binary" \
-    E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode --help 2>&1 | grep -q "self-installed opencode detected"'
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | grep -q "self-installed opencode detected"'
 # Cleaning the shadow directory restores the quiet state.
 E 'rm -rf /home/dev/.opencode'
 check "shell-warn.sh quiet after cleanup" \
@@ -584,6 +595,12 @@ E 'rm -rf /tmp/update-test'
 
 echo ""
 echo "--- 11b. update.sh --only-binary (issue #24) ---"
+# opencode 2.x keeps a background service daemon running the binary (same
+# ETXTBSY hazard as the restore below, issue #80) — spawned by the wrapper
+# probes' `debug config` in the sections above. Stop it first or the
+# --only-binary replace fails with "Text file busy" (1.x: unknown
+# command / no daemon, ignored).
+E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true; sudo pkill -u opencode -f "serve --servic[e]" >/dev/null 2>&1 || true'
 # Binary-only mode: kit steps skipped (marker in LIBDIR survives, the
 # install.conf version stays at section 11's sentinel), the binary is
 # actually replaced by the given stub.
@@ -749,7 +766,9 @@ E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes 
 
 echo ""
 echo "--- 12e. wrapper directory validation ---"
-E 'cd /var/www/vhosts/test-project && echo "" | /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-valid.txt' && \
+# Valid CWD: the real interactive start prints the banner (issue #91 note:
+# --version/--help exec banner-free — see the 6c probe note).
+E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-valid.txt | { grep -q "SECURED BY opencode permissions kit" || true; }' && \
     echo "  ${GREEN}OK${NC}  wrapper ran from valid CWD"
 check "wrapper: SECURED banner from valid CWD" \
     E 'grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-valid.txt'
@@ -758,6 +777,33 @@ E 'cd /tmp && /usr/local/bin/opencode 2>&1 | tee /tmp/wrapper-invalid.txt; test 
     echo "  ${GREEN}OK${NC}  wrapper refused from invalid CWD"
 check "wrapper: ERROR banner from invalid CWD" \
     E 'grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-invalid.txt'
+# issue #91: version/help answer from the real binary, banner-free, from ANY
+# directory (the official installer parses `opencode --version` verbatim and
+# probes it from $HOME mid-install).
+E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --version 2>&1 | tee /tmp/wrapper-version.txt' && \
+    echo "  ${GREEN}OK${NC}  wrapper answered --version from valid CWD"
+check "wrapper: --version banner-free from valid CWD (issue #91)" \
+    E '! grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-version.txt'
+check "wrapper: --version output is non-empty" \
+    E 'test -s /tmp/wrapper-version.txt'
+E 'cd /tmp && /usr/local/bin/opencode --version 2>&1 | tee /tmp/wrapper-version-invalid.txt' && \
+    echo "  ${GREEN}OK${NC}  wrapper answered --version from invalid CWD"
+check "wrapper: --version works from invalid CWD without refusal (issue #91)" \
+    E '! grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-version-invalid.txt'
+check "wrapper: --version banner-free from invalid CWD (issue #91)" \
+    E '! grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-version-invalid.txt'
+# Device login from an UNREADABLE cwd (issue #91): Bun's posix_spawn for the
+# browser-open fails with EACCES when the opencode process cwd is not
+# readable for the opencode user (developer home, mode 750). The wrapper
+# must move the login to a readable directory (opencode home) before the
+# exec — same cwd_probe machinery as the serve fallback.
+E 'sudo chmod 750 /home/dev'
+E 'cd /home/dev && timeout 8 /usr/local/bin/opencode console login </dev/null 2>&1 | tee /tmp/wrapper-login-home.txt || true'
+E 'sudo chmod 755 /home/dev'
+check "wrapper: device login moves off an unreadable cwd (issue #91)" \
+    E 'grep -q "Login runs from" /tmp/wrapper-login-home.txt'
+check "wrapper: device login gets no project-dir refusal" \
+    E '! grep -q "cannot be started here" /tmp/wrapper-login-home.txt'
 check_fail "wrapper does NOT stamp OPENCODE_LAUNCH_CWD (soft-only)" \
     E 'grep -q OPENCODE_LAUNCH_CWD /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode'
 
@@ -935,7 +981,7 @@ if [ "$_rootless_ok" = true ]; then
     }
 }
 EOF'
-    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-podman.txt' && \
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-podman.txt | { grep -q "will run with" || true; }' && \
         echo "  ${GREEN}OK${NC}  wrapper podman auto-detection ran"
     check "12i: wrapper podman auto-detect: container tools advisory" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-podman.txt'
@@ -958,7 +1004,7 @@ if [ "$_rootless_ok" = true ]; then
     E 'sudo cp /home/opencode/.config/opencode/opencode.jsonc /tmp/global-jsonc.bak'
     E 'sudo sed -i "s/\"docker \*\": \"deny\"/\"docker *\": \"allow\"/; s/\"ddev \*\": \"deny\"/\"ddev *\": \"allow\"/" /home/opencode/.config/opencode/opencode.jsonc'
     E 'sudo rm -f /var/www/vhosts/test-project/opencode.jsonc'
-    E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --help 2>&1 | tee /tmp/wrapper-global.txt' && \
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-global.txt | { grep -q "will run with" || true; }' && \
         echo "  ${GREEN}OK${NC}  wrapper global-config detection ran"
     check "12i: global-config allow detected (banner)" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-global.txt'

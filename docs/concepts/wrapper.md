@@ -31,6 +31,13 @@ The wrapper prints its banner and starts opencode **immediately** — no
 0.0.21: the question was effectively always answered with yes, and the
 kit's state is now visible inside the TUI at all times).
 
+An exception runs before everything else: `opencode --version`, `-v`, `-h`
+and `--help` exec straight to the real binary from **any** directory — no
+banner, no project-directory check, no container resolution. Scripts and
+the official opencode installer parse that output verbatim, and the
+installer probes it from `$HOME` mid-install (a refusal there broke
+installs).
+
 ## Headless invocations (serve, run, queries)
 
 `opencode serve` and the other non-interactive subcommands do not go
@@ -60,11 +67,21 @@ temporary checkouts. Headless invocations therefore:
 
 What counts as headless: `serve`, `acp`, the query subcommands (`models`,
 `agent`, `providers`, `session`, `export`, `import`, `stats`, `account`,
-`github`, `pr`, `mcp`, `plug`, `db`, `generate`, `web`, `debug`,
-`uninstall`, `upgrade`), and `run` when a message argument is given or
-stdin is piped. Interactive TUI starts (no subcommand, flags-only
+`console`, `github`, `pr`, `mcp`, `plug`, `db`, `generate`, `web`, `debug`,
+`uninstall`, `upgrade`, plus the 2.x additions `api`, `auth`, `plugin`,
+`service`, `pair`, `update`), and `run` when a message argument is given or
+stdin is piped. `console login` (1.x) and `auth login` (2.x) are device
+logins — they carry no project context and must work from any directory.
+Interactive TUI starts (no subcommand, flags-only
 starts, `tui`, `attach`, or `opencode run` on a terminal without a
 message) keep the banner and the project-directory check.
+
+Device logins get the same working-directory treatment as `serve`: when the
+current directory is not readable by the `opencode` user (typically your
+`$HOME`, mode 750), Bun's `posix_spawn` for the browser-open fails with
+`EACCES` even though the spawned file is executable — so the wrapper moves
+`console`/`auth` to a readable directory (the opencode home) before
+starting the binary (issue #91).
 
 `serve` additionally sanity-checks its working directory: UIs like
 OpenChamber default it to the developer's `$HOME`, which the `opencode`
