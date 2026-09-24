@@ -96,6 +96,38 @@ the same: the agent user must end up as "other", with no bits.
 Not sure what your values are? Check them with `id -u` / `id -g` in a fresh
 WSL terminal (logged in as the default user).
 
+## WSL2: the browser bridge (login survival on a hardened /mnt/c)
+
+The restriction above has a side effect on opencode's device logins
+(`opencode console login` on 1.x, `opencode auth login` on 2.x): opening
+the verification URL goes through the `open` package bundled with opencode,
+which spawns
+`<first "root =" in /etc/wsl.conf>c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`.
+On the restricted mount the `opencode` user may not execute that binary —
+and opencode dies on the resulting spawn error (issue #91), right after
+printing URL and device code.
+
+The kit solves this **without granting the agent anything**:
+
+- install.sh/update.sh keep a kit-managed `[opencode-permissions-kit]`
+  section at the **top** of `/etc/wsl.conf` whose `root =` line points at
+  the kit library. WSL itself ignores the unknown section (no restart
+  needed, no mount change); only `open`'s whole-file first-match scan sees
+  it — the computed powershell path now lands inside the library.
+- there, `wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` is
+  a harmless stand-in (`bin/browser-bridge`): it forwards to the **real**
+  powershell.exe whenever the calling user may execute it (you, the
+  developer — the browser opens exactly as before) and exits 0 otherwise
+  (the agent): the login flow keeps polling, and you open the printed URL
+  from any browser.
+
+The stand-in parses nothing and holds no privileges — the agent can run it
+with arbitrary arguments to no effect beyond a possible browser open *as
+the caller* (which it cannot reach on a hardened mount anyway).
+`opk status` reports the bridge state; the wrapper warns when the mount is
+restricted but the bridge is missing (hand-edited `wsl.conf`, partial
+deploy). Uninstall removes the section and the stand-in tree.
+
 ## Other root-equivalent surfaces (audit)
 
 Docker is not the only tool whose daemon socket means root. `status.sh`

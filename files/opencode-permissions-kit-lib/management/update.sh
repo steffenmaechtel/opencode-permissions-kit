@@ -62,7 +62,7 @@ KIT_FILES="install.sh VERSION \
              opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
              opencode-permissions-kit-lib/templates/sudoers.template etc/umask.sh \
 opencode-permissions-kit-lib/bin/opencode-as-opencode opencode-permissions-kit-lib/bin/opk opencode-permissions-kit-lib/py/jsonc-parser.py opencode-permissions-kit-lib/py/tui-register.py \
-opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh \
+opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh opencode-permissions-kit-lib/bin/browser-bridge \
 opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/kit-mode-2x.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
@@ -333,13 +333,17 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
+# WSL browser bridge (issue #91): the deploy helper joins the library; the
+# stand-in tree + /etc/wsl.conf section are (re)applied below after the
+# library is in place.
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
 # TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates.
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh"
+sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
 sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
 sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
@@ -364,6 +368,20 @@ for _opk_old in \
 done
 ui_success "library re-deployed: $LIBDIR"
 log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
+
+# --- WSL browser bridge (issue #91) ------------------------------------------
+# (Re)apply the stand-in tree + /etc/wsl.conf kit section so existing WSL
+# installs pick the fix up on `opk update` (write_conf also heals a stale
+# root = value). No-op on non-WSL hosts; inert on unhardened /mnt/c.
+[ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+[ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] && . "$LIBDIR/sh/wsl-browser-bridge.sh"
+command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
+command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
+if browser_bridge_is_wsl; then
+    browser_bridge_install "$FILES_ROOT" "$LIBDIR"
+    ui_success "WSL browser bridge re-applied (opencode console/auth login fix)"
+    log "wsl browser bridge re-applied: $LIBDIR/wsl + [opencode-permissions-kit] section in /etc/wsl.conf"
+fi
 
 # --- re-link wrapper + cli dispatcher ------------------------------------------
 

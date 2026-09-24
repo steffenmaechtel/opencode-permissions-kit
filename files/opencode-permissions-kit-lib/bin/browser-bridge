@@ -1,0 +1,51 @@
+#!/bin/sh
+# opencode permissions kit -- bin/browser-bridge
+# Deployed to /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/
+# WindowsPowerShell/v1.0/powershell.exe and registered through the
+# [opencode-permissions-kit] section in /etc/wsl.conf (see
+# sh/wsl-browser-bridge.sh for the deployment logic).
+#
+# Why: the `open` npm package bundled in opencode locates WSL's
+# powershell.exe by appending c/Windows/System32/.../powershell.exe to the
+# FIRST `root =` line it finds in /etc/wsl.conf — regardless of section —
+# and spawns the result with -EncodedCommand to open a URL (device logins
+# like `opencode console login` / `opencode auth login`). On a hardened
+# /mnt/c (dmask/fmask restriction, docs/concepts/security-model.md) the
+# opencode user cannot execute the real powershell.exe, and opencode's
+# login flow dies on that synchronous spawn error (issue #91) — Bun's
+# child_process.spawn throws on EACCES before opencode's own error
+# handling can catch it.
+#
+# The stand-in keeps the flow alive without granting anything:
+#   - caller may execute the real powershell.exe (the mount owner, i.e.
+#     the developer on a hardened mount; any user on a default 777 mount):
+#     forward transparently — the browser opens exactly as before.
+#   - caller may not (the opencode user on a hardened mount): exit 0.
+#     opencode has already printed the verification URL and device code;
+#     the login continues polling and the user opens the URL from any
+#     browser (terminal emulators linkify it).
+# Arguments are passed through only on the forwarding path — this script
+# parses nothing and must never grow privileged behavior (the agent can
+# execute it with arbitrary arguments).
+#
+# OPK_WSL_C_ROOT overrides the Windows drive root for tests; production
+# resolution is the drvfs/9p mount of C: from /proc/mounts, /mnt/c as
+# fallback.
+set -e
+
+_opk_real=""
+for _opk_root in ${OPK_WSL_C_ROOT:-} $(awk '
+    ($3 == "drvfs" || $3 == "9p") && $1 ~ /^[Cc]:/ { print $2 }
+' /proc/mounts 2>/dev/null) /mnt/c; do
+    [ -n "$_opk_root" ] || continue
+    _opk_candidate="$_opk_root/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+    if [ -x "$_opk_candidate" ]; then
+        _opk_real="$_opk_candidate"
+        break
+    fi
+done
+
+if [ -n "$_opk_real" ]; then
+    exec "$_opk_real" "$@"
+fi
+exit 0

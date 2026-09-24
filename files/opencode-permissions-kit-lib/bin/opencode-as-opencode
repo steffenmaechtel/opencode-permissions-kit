@@ -74,10 +74,12 @@ done
 # Subcommand union for headless classification: opencode 1.x names (agent,
 # plug, providers, account, github, pr, db, generate, web — kept; unknown to
 # 2.x, which errors on them anyway) plus 2.x additions (api, auth, plugin,
-# service, pair, update — issue #80). 2.x `mini` is an interactive UI and
-# stays bannered like `tui`/`attach`.
+# service, pair, update — issue #80). `console` joins for its `login`
+# subcommand (issue #91): device auth carries no project context and must
+# work from any directory. 2.x `mini` is an interactive UI and stays
+# bannered like `tui`/`attach`.
 case "${1:-}" in
-    serve|acp|models|agent|providers|session|export|import|stats|account|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade|api|auth|plugin|service|pair|update)
+    serve|acp|models|agent|providers|session|export|import|stats|account|console|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade|api|auth|plugin|service|pair|update)
         HEADLESS=true
         ;;
     run)
@@ -117,18 +119,21 @@ if [ -f "$PROJECTS_CONF" ]; then
     done < "$PROJECTS_CONF"
 fi
 
+# Version/help queries carry no project context and no kit state — answer
+# them straight from the real binary, from ANY directory (issue #91): the
+# banner and the wrapper diagnostics must not pollute `opencode --version`
+# output, which scripts and the official installer parse. The official
+# opencode installer probes `opencode --version` from $HOME while the kit
+# installs; the refusal mid-install confused users ("ERROR: opencode cannot
+# be started here"). Same exec path as below — no banner, no project-dir
+# check, no container resolution.
+case "${1:-}" in
+    --version|-v|-h|--help)
+        exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
+        ;;
+esac
+
 if [ "$VALID" != true ] && [ "$HEADLESS" != true ]; then
-    # Version/help queries carry no project context — answer them from the
-    # real binary instead of refusing. The official opencode installer
-    # probes `opencode --version` from $HOME while the kit installs; the
-    # refusal mid-install confused users ("ERROR: opencode cannot be
-    # started here"). From a VALID directory the normal bannered path
-    # below still applies.
-    case "${1:-}" in
-        --version|-v|-h|--help)
-            exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
-            ;;
-    esac
     echo ""
     echo "  ${RED}ERROR: opencode cannot be started here${NC}"
     echo "  ${YELLOW}$CWD${NC} is not a valid project directory."
@@ -194,6 +199,21 @@ if [ -d /mnt/c ]; then
             note "${YELLOW}then 'wsl --shutdown' from Windows (install.sh can apply this for you).${NC}"
         fi
         note ""
+    fi
+    # Browser bridge sanity (issue #91): on a hardened /mnt/c the opencode
+    # user cannot execute powershell.exe, and opencode's device-login flows
+    # (`console login`, `auth login`) die on that spawn error. The kit's
+    # browser bridge redirects the bundled `open` package's powershell
+    # lookup to a harmless stand-in via the [opencode-permissions-kit]
+    # section in /etc/wsl.conf. Warn when the mount is restricted but the
+    # bridge is not in place (broken deploy, hand-edited wsl.conf).
+    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
+        if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ] \
+           || ! grep -q '^\[opencode-permissions-kit\]' /etc/wsl.conf 2>/dev/null; then
+            note "${YELLOW}WARNING: browser bridge missing — 'console login'/'auth login' would fail${NC}"
+            note "${YELLOW}on this restricted /mnt/c. Re-run install.sh (or 'opk update') to set it up.${NC}"
+            note ""
+        fi
     fi
 fi
 

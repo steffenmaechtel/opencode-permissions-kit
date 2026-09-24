@@ -234,24 +234,26 @@ else
     failures=$((failures + 1))
 fi
 
-# --- Version/help passthrough from an invalid CWD ---
+# --- Version/help passthrough from ANY directory (issue #91) ---
 # The official opencode installer probes `opencode --version` from $HOME
 # (an invalid directory) while the kit installs; the wrapper must answer
 # from the real binary instead of refusing (regression: the mid-install
-# "ERROR: opencode cannot be started here" confused users).
-if grep -A14 'if \[ "\$VALID" != true \]' "$WRAPPER_FILE" | grep -q -- '--version'; then
-    echo "  ${GREEN}PASS${NC}  wrapper answers --version from an invalid CWD (installer probe)"
+# "ERROR: opencode cannot be started here" confused users). Since issue
+# #91 the passthrough is its own case BEFORE the project-dir check —
+# version/help must stay banner-free from valid directories too.
+if sed -n '/--version|-v|-h|--help)/,/^esac/p' "$WRAPPER_FILE" | grep -q -- '--version'; then
+    echo "  ${GREEN}PASS${NC}  wrapper answers --version from any directory (installer probe)"
     passed=$((passed + 1))
 else
     echo "  ${RED}FAIL${NC}  wrapper refuses --version outside a project directory"
     failures=$((failures + 1))
 fi
 
-if grep -A14 'if \[ "\$VALID" != true \]' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
-    echo "  ${GREEN}PASS${NC}  invalid-CWD version passthrough execs the secured binary"
+if sed -n '/--version|-v|-h|--help)/,/^esac/p' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
+    echo "  ${GREEN}PASS${NC}  version passthrough execs the secured binary"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  invalid-CWD version passthrough lost the binary exec"
+    echo "  ${RED}FAIL${NC}  version passthrough lost the binary exec"
     failures=$((failures + 1))
 fi
 
@@ -317,6 +319,7 @@ hl_case "models is headless"            true  models
 hl_case "export is headless"            true  export sess-123
 hl_case "2x api is headless"            true  api GET /config
 hl_case "2x auth is headless"           true  auth login
+hl_case "1x console login is headless"  true  console login
 hl_case "2x plugin is headless"         true  plugin list
 hl_case "2x service is headless"        true  service status
 hl_case "2x pair is headless"           true  pair

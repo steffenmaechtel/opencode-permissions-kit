@@ -3,6 +3,15 @@
 This page lists every file and directory the kit manages, and every key in
 `install.conf`.
 
+## /etc/wsl.conf
+
+Not kit-owned — your WSL configuration. The kit appends the `[automount]`
+hardening (on your confirmation, applies after `wsl --shutdown`) and keeps
+a kit-managed `[opencode-permissions-kit]` section at the top (WSL only:
+redirects opencode's powershell lookup to the browser bridge stand-in;
+WSL itself ignores the unknown section — no restart needed). Uninstall
+removes exactly that section and leaves your own entries untouched.
+
 ## /etc/opencode-permissions-kit/
 
 | Path | Purpose |
@@ -65,11 +74,14 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/bin/setup-container-backend` | Rootless backend provisioning |
 | `/usr/local/lib/opencode-permissions-kit/bin/socket-check` | Rootless socket probe (`test -S` only) |
 | `/usr/local/lib/opencode-permissions-kit/bin/cwd-check` | Headless serve cwd probe (readable-for-opencode check) |
+| `/usr/local/lib/opencode-permissions-kit/bin/browser-bridge` | WSL browser bridge stand-in (deployed into the `wsl/` tree, see below) |
+| `/usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` | WSL browser bridge: stand-in the bundled `open` package spawns for device logins — forwards to the real powershell.exe when the caller may execute it, `exit 0` otherwise (WSL only; see [security model](../concepts/security-model.md#wsl2-the-browser-bridge-login-survival-on-a-hardened-mntc)) |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh` | Sourced `ddev()` terminal function (hooked into the default user's rc files) |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh` | Shared helper: `.ddev` + settings-dir chown |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-hosts.sh` | Shared helper: Windows hosts bridge |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-migrate.sh` | Shared helper: migration functions (sourced by install.sh and `bin/ddev-migrate`) |
 | `/usr/local/lib/opencode-permissions-kit/sh/fs-baseline.sh` | Shared helper: group baseline recursion |
+| `/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh` | Shared helper: WSL browser bridge deploy (wsl.conf section + stand-in) |
 | `/usr/local/lib/opencode-permissions-kit/sh/log.sh` | Shared helper: audit logging |
 | `/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh` | Shared helper: bypass warnings |
 | `/usr/local/lib/opencode-permissions-kit/sh/ui.sh` | Shared helper: labeled output |
