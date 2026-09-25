@@ -370,18 +370,26 @@ ui_success "library re-deployed: $LIBDIR"
 log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
 
 # --- WSL browser bridge (issues #91, #100) -------------------------------------
-# (Re)apply the stand-in tree + /etc/wsl.conf comment block so existing WSL
-# installs pick the fix up on `opk update` (write_conf also heals a stale
-# root = value and migrates the broken 0.0.36 section away). No-op on
-# non-WSL hosts; inert on unhardened /mnt/c.
+# (Re)apply the stand-in tree and strip the legacy 0.0.36 section (kit-owned
+# regression cleanup). The /etc/wsl.conf carrier is NEVER written here —
+# the kit does not edit wsl.conf implicitly (docs/design/wsl-conf-consent.md);
+# the user opts in via 'sudo opk wsl-add-opencode-1-fix'. An existing
+# carrier stays untouched and keeps working.
 [ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
 [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] && . "$LIBDIR/sh/wsl-browser-bridge.sh"
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
 if browser_bridge_is_wsl; then
     browser_bridge_install "$FILES_ROOT" "$LIBDIR"
-    ui_success "WSL browser bridge re-applied (opencode console/auth login fix)"
-    log "wsl browser bridge re-applied: $LIBDIR/wsl + comment block in /etc/wsl.conf"
+    if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
+        ui_success "WSL browser bridge re-applied (carrier present — fully active)"
+        log "wsl browser bridge re-applied: $LIBDIR/wsl (carrier present)"
+    else
+        ui_success "WSL browser bridge stand-in re-applied (no wsl.conf carrier)"
+        ui_detail "enable the opencode 1.x login fix yourself (the kit does not edit /etc/wsl.conf):"
+        ui_detail "  sudo opk wsl-add-opencode-1-fix"
+        log "wsl browser bridge stand-in re-applied: $LIBDIR/wsl (carrier left to 'opk wsl-add-opencode-1-fix')"
+    fi
 fi
 
 # --- re-link wrapper + cli dispatcher ------------------------------------------
@@ -512,7 +520,8 @@ if [ -d /mnt/c ]; then
             echo "    [automount]"
             echo "    enabled = true"
             echo "    options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
-            echo "  ${UI_YELLOW}then 'wsl --shutdown' from Windows. install.sh can apply this for you (interactive).${UI_NC}"
+            echo "  ${UI_YELLOW}then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf —${UI_NC}"
+            echo "  ${UI_YELLOW}apply the snippet yourself.${UI_NC}"
         fi
     fi
 fi

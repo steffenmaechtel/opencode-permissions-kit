@@ -22,6 +22,7 @@ STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.s
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 WRAPPER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 
 failures=0
 passed=0
@@ -67,16 +68,20 @@ check "status.sh stays silent when the mount is restricted" \
 check "status.sh detects a configured-but-pending fix (wsl --shutdown)" \
     sh -c "grep -q 'pending' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$STATUS"
 
-# --- install.sh interactive restriction ----------------------------------------
-check "install.sh gates the restriction on /mnt/c existing" \
+# --- install.sh report-only restriction (consent policy) ------------------------
+# The kit never writes /etc/wsl.conf (docs/design/wsl-conf-consent.md):
+# install prints the snippet, the user applies it.
+check "install.sh gates the exposure info on /mnt/c existing" \
     sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$INSTALL"
-check "install.sh warns about the exposure before prompting" \
+check "install.sh warns about the exposure" \
     sh -c "grep -q 'WARNING: /mnt/c is world-readable' \"\$1\"" _ "$INSTALL"
-check "install.sh prompts before touching wsl.conf" \
-    sh -c "grep -q 'Restrict /mnt/c to your user' \"\$1\"" _ "$INSTALL"
-check "install.sh writes the [automount] section with dmask/fmask" \
+check "install.sh never writes /etc/wsl.conf (no tee/append)" \
+    sh -c "! grep -q 'tee -a /etc/wsl.conf' \"\$1\"" _ "$INSTALL"
+check "install.sh no longer prompts for the restriction (explicit consent)" \
+    sh -c "! grep -q 'Restrict /mnt/c to your user' \"\$1\"" _ "$INSTALL"
+check "install.sh prints the [automount] snippet with dmask/fmask" \
     sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027,fmask=037' \"\$1\"" _ "$INSTALL"
-check "install.sh derives uid/gid from the default user (not hardcoded)" \
+check "install.sh resolves uid/gid for the snippet from the default user" \
     sh -c "grep -qF 'id -u \"\$DEFAULT_USER\"' \"\$1\" && grep -qF 'id -g \"\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
 check "install.sh leaves a pre-existing [automount] section untouched" \
     sh -c "grep -q 'already has an \[automount\]' \"\$1\"" _ "$INSTALL"
@@ -86,6 +91,8 @@ check "install.sh skips silently when the mount is already restricted" \
     sh -c "grep -qF '/mnt/c already restricted' \"\$1\"" _ "$INSTALL"
 check "install.sh warns again in the final summary while /mnt/c is exposed" \
     sh -c "grep -q 'still world-readable' \"\$1\" && grep -q 'warn on every start' \"\$1\"" _ "$INSTALL"
+check "install.sh points WSL users at the opt-in bridge command" \
+    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$INSTALL"
 
 # --- wrapper startup warning ------------------------------------------------------
 check "wrapper passes sh -n" sh -n "$WRAPPER"
@@ -99,6 +106,8 @@ check "wrapper shows the wsl.conf automount fix" \
     sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027,fmask=037' \"\$1\"" _ "$WRAPPER"
 check "wrapper names the activation step (wsl --shutdown)" \
     sh -c "grep -q 'wsl --shutdown' \"\$1\"" _ "$WRAPPER"
+check "wrapper points at the opt-in bridge command" \
+    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$WRAPPER"
 check "wrapper detects a configured-but-pending restriction" \
     sh -c "grep -q 'PENDING' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$WRAPPER"
 check "wrapper stays silent when the mount is restricted (other bit off)" \
@@ -111,6 +120,26 @@ check "update.sh prints the recommended wsl.conf options" \
     sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027' \"\$1\"" _ "$UPDATE"
 check "update.sh reminds about a configured-but-pending restriction" \
     sh -c "grep -q \"pending 'wsl --shutdown'\" \"\$1\"" _ "$UPDATE"
+check "update.sh never writes /etc/wsl.conf (carrier left to the user)" \
+    sh -c "! grep -q 'browser_bridge_write_conf' \"\$1\" && grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$UPDATE"
+
+# --- the explicit-consent command (opk wsl-add-opencode-1-fix) -------------------
+check "opk implements the wsl-add-opencode-1-fix subcommand" \
+    sh -c "grep -q 'wsl-add-opencode-1-fix)' \"\$1\"" _ "$OPK"
+check "opk wsl-add-opencode-1-fix elevates via sudo and runs write_conf" \
+    sh -c "awk '/wsl-add-opencode-1-fix\)/,/;;/' \"\$1\" | grep -q 'sudo' && awk '/wsl-add-opencode-1-fix\)/,/;;/' \"\$1\" | grep -q 'browser_bridge_write_conf'" _ "$OPK"
+check "opk wsl-add-opencode-1-fix is the ONLY shipped entry point calling write_conf" \
+    sh -c "! grep -rl 'browser_bridge_write_conf' \"\$1\" 2>/dev/null | grep -v 'sh/wsl-browser-bridge.sh$' | grep -v 'bin/opk$' | grep -q ." _ "$SCRIPT_DIR/../../files"
+check "status.sh points at the opt-in bridge command" \
+    sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$STATUS"
+
+# --- uninstall consent (docs/design/wsl-conf-consent.md) --------------------------
+UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
+check "uninstall.sh passes sh -n" sh -n "$UNINSTALL"
+check "uninstall.sh asks before removing kit-owned wsl.conf content" \
+    sh -c "grep -q \"Remove the kit's wsl.conf bridge block?\" \"\$1\" && grep -q 'prompt_yn' \"\$1\"" _ "$UNINSTALL"
+check "uninstall.sh prints the manual line range when declined" \
+    sh -c "grep -q 'browser bridge -- begin\\\$' \"\$1\" && grep -q 'left untouched' \"\$1\"" _ "$UNINSTALL"
 
 # --- mode-mask arithmetic (the exact check status.sh performs) -----------------
 mode_allows_other() {

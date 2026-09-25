@@ -5,14 +5,18 @@ This page lists every file and directory the kit manages, and every key in
 
 ## /etc/wsl.conf
 
-Not kit-owned — your WSL configuration. The kit appends the `[automount]`
-hardening (on your confirmation, applies after `wsl --shutdown`) and keeps
-a kit-managed **comment block** at the top (WSL only: its carrier line —
-a `#` comment containing a raw carriage return before `root = …` — wins
-the `open` package's scan and redirects opencode's powershell lookup to
-the browser bridge stand-in; WSL itself only ever sees comments, so no
-warning, no restart needed). Uninstall removes exactly that block and
-leaves your own entries untouched.
+Never written by the kit — your WSL configuration stays yours: install
+and update only *print* snippets for you to apply yourself
+([why](../design/wsl-conf-consent.md)). One optional kit artifact can
+live in it, written by a single explicit command:
+`sudo opk wsl-add-opencode-1-fix` places the browser-bridge **comment
+block** at the top (WSL only; its carrier line — a `#` comment containing
+a raw carriage return before `root = …` — wins the `open` package's scan
+and redirects opencode's powershell lookup to the browser bridge
+stand-in; WSL itself only ever sees comments, so no warning, no restart
+needed). The `[automount]` hardening is yours to add manually.
+Uninstall asks before removing the kit block (or assumes yes with
+`--yes`); your own entries always stay.
 
 ## /etc/opencode-permissions-kit/
 

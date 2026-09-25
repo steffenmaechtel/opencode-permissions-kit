@@ -17,6 +17,14 @@
 # forwards to the real powershell.exe whenever the calling user may
 # execute it and exits 0 otherwise — see bin/browser-bridge.
 #
+# Consent policy (docs/design/wsl-conf-consent.md): the kit NEVER writes
+# /etc/wsl.conf implicitly. install.sh/update.sh deploy only the stand-in
+# tree and strip kit-owned legacy content (the broken 0.0.36 section);
+# writing the carrier block is reserved for the explicit user command
+# `sudo opk wsl-add-opencode-1-fix` (bin/opk), which calls
+# browser_bridge_write_conf. Existing carriers are never touched by
+# updates — removal happens only through `opk uninstall`.
+#
 # Why a comment block and not an INI section (issue #100): WSL's wsl.conf
 # parser (src/shared/configfile/configfile.cpp) only accepts section names
 # matching [A-Za-z][A-Za-z0-9]* and keys matching the same charset — the
@@ -95,15 +103,14 @@ browser_bridge_write_conf() {
     rm -f "$_bb_tmp"
 }
 
-# Deploy the stand-in at the path open() computes and register it in
-# /etc/wsl.conf. <files_root> is the kit files/ tree holding
-# opencode-permissions-kit-lib/bin/browser-bridge; <libdir> is the deployed
-# library root (/usr/local/lib/opencode-permissions-kit).
-browser_bridge_install() {
-    _bb_files_root="$1"
+# Deploy the stand-in tree at the path open() computes. <src> is the
+# browser-bridge script (files/ tree or deployed library); <libdir> is the
+# deployed library root (/usr/local/lib/opencode-permissions-kit).
+# Conf-free by design — this touches only kit-owned paths.
+browser_bridge_deploy_tree() {
+    _bb_src="$1"
     _bb_libdir="$2"
     browser_bridge_is_wsl || return 0
-    _bb_src="$_bb_files_root/opencode-permissions-kit-lib/bin/browser-bridge"
     [ -f "$_bb_src" ] || return 0
     ${OPK_WSL_SUDO-sudo} mkdir -p "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell/v1.0"
     # shellcheck disable=SC2174
@@ -111,7 +118,41 @@ browser_bridge_install() {
         "$_bb_libdir/wsl/c/Windows/System32" "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell" \
         "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell/v1.0"
     ${OPK_WSL_SUDO-sudo} install -m 755 "$_bb_src" "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
-    browser_bridge_write_conf "$_bb_libdir"
+}
+
+# Strip ONLY the legacy 0.0.36 hyphen section (kit-owned regression
+# cleanup, issue #100 — restores WSL's ability to parse the file). Never
+# writes anything new; a valid carrier block is left untouched.
+browser_bridge_strip_legacy() {
+    _bb_conf="${OPK_WSL_CONF-/etc/wsl.conf}"
+    [ -f "$_bb_conf" ] || return 0
+    grep -q '^\[opencode-permissions-kit\]$' "$_bb_conf" || return 0
+    _bb_tmp="$(mktemp)"
+    awk '
+        in_legacy {
+            if ($0 ~ /^\[/) { in_legacy = 0; print; next }
+            next
+        }
+        /^\[opencode-permissions-kit\]$/ { in_legacy = 1; next }
+        { print }
+    ' "$_bb_conf" > "$_bb_tmp"
+    ${OPK_WSL_SUDO-sudo} cp "$_bb_tmp" "$_bb_conf"
+    rm -f "$_bb_tmp"
+}
+
+# Deploy the stand-in tree and clean up kit-owned legacy wsl.conf content
+# (install.sh/update.sh entry point). Deliberately does NOT write the
+# carrier block — that is the user's explicit call (`sudo opk
+# wsl-add-opencode-1-fix`, see the consent policy above).
+# <files_root> is the kit files/ tree holding
+# opencode-permissions-kit-lib/bin/browser-bridge; <libdir> is the deployed
+# library root.
+browser_bridge_install() {
+    _bb_files_root="$1"
+    _bb_libdir="$2"
+    browser_bridge_is_wsl || return 0
+    browser_bridge_deploy_tree "$_bb_files_root/opencode-permissions-kit-lib/bin/browser-bridge" "$_bb_libdir"
+    browser_bridge_strip_legacy
 }
 
 # Remove the kit block (and any legacy 0.0.36 section) from /etc/wsl.conf

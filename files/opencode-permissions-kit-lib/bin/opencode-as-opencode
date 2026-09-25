@@ -196,22 +196,22 @@ if [ -d /mnt/c ]; then
             note "${YELLOW}  [automount]${NC}"
             note "${YELLOW}  enabled = true${NC}"
             note "${YELLOW}  options = \"uid=<uid>,gid=<gid>,dmask=027,fmask=037\"${NC}"
-            note "${YELLOW}then 'wsl --shutdown' from Windows (install.sh can apply this for you).${NC}"
+            note "${YELLOW}then 'wsl --shutdown' from Windows (apply it yourself — the kit never edits wsl.conf).${NC}"
         fi
         note ""
     fi
-    # Browser bridge sanity (issue #91): on a hardened /mnt/c the opencode
-    # user cannot execute powershell.exe, and opencode's device-login flows
-    # (`console login`, `auth login`) die on that spawn error. The kit's
-    # browser bridge redirects the bundled `open` package's powershell
-    # lookup to a harmless stand-in via the kit comment block in
-    # /etc/wsl.conf. Warn when the mount is restricted but the bridge is
-    # not in place (broken deploy, hand-edited wsl.conf).
+    # Browser bridge sanity (issues #91, #100): on a hardened /mnt/c the
+    # opencode user cannot execute powershell.exe, and opencode's device-login
+    # flows (`console login`, `auth login`) die on that spawn error. The kit's
+    # browser bridge redirects the bundled `open` package's powershell lookup
+    # to a harmless stand-in via the kit comment block in /etc/wsl.conf
+    # (explicit opt-in — the kit never edits wsl.conf implicitly). Warn when
+    # the mount is restricted but the bridge is not in place.
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
         if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ] \
            || ! grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             note "${YELLOW}WARNING: browser bridge missing — 'console login'/'auth login' would fail${NC}"
-            note "${YELLOW}on this restricted /mnt/c. Re-run install.sh (or 'opk update') to set it up.${NC}"
+            note "${YELLOW}on this restricted /mnt/c. Enable it: sudo opk wsl-add-opencode-1-fix${NC}"
             note ""
         fi
     fi

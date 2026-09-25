@@ -55,6 +55,12 @@ used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
 - The security model is deliberately **soft-only** — never re-introduce
   OS-level deny ACLs. Background: `docs/design/ddev-working.md`,
   current model: `docs/concepts/security-model.md`.
+- **The kit never edits user-owned system config on its own — above all
+  `/etc/wsl.conf`.** Install/update only *show* snippets or name opt-in
+  commands the user runs themselves; `opk wsl-add-opencode-1-fix` is the
+  only command that writes wsl.conf, and only on explicit invocation.
+  `opk uninstall` asks (or `--yes`) before removing kit-owned wsl.conf
+  content. Rationale: `docs/design/wsl-conf-consent.md`.
 
 ## Testing
 

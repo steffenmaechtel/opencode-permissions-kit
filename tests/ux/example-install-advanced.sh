@@ -39,7 +39,6 @@ fi
 
 PROJECT=$(ui_ask "Project directory?" "/var/www/vhosts")
 PORTS=$(ui_menu "Lower unprivileged port start to 80 (ddev-router 80/443)?" "yes" "yes|host-wide sysctl, recommended" "no|use higher router ports")
-WSLC=$(ui_menu "Restrict /mnt/c to your user (needs wsl --shutdown)?" "yes" "yes|recommended" "no|leave world-readable")
 GIT=$(ui_menu "Allow opencode git access?" "no" "no|block git for the agent (recommended)" "yes|allow (soft-only .git/config deny)")
 DENY=$(ui_menu "Existing default-user opencode config found — replace with deny-all?" "backup" "backup|back up as opencode.jsonc_BAK_<ts> (recommended)" "keep|keep my config" "overwrite|overwrite without backup")
 
@@ -50,7 +49,7 @@ ui_section "Plan"
 ui_kv "Backend"    "$BACKEND"
 ui_kv "Projects"   "$PROJECT"
 ui_kv "Router"     "$([ "$PORTS" = "yes" ] && echo "ports 80/443 (sysctl)" || echo "higher ports (8080/8443)")"
-ui_kv "/mnt/c"     "$([ "$WSLC" = "yes" ] && echo "restrict via wsl.conf" || echo "leave world-readable (not recommended)")"
+ui_kv "/mnt/c"     "hardening snippet printed (manual — the kit never writes wsl.conf)"
 ui_kv "Git"        "$([ "$GIT" = "yes" ] && echo "allowed (soft deny only)" || echo "blocked")"
 ui_kv "Old config" "$DENY"
 ui_kv "Migration"  "v0.0.9 kit detected — legacy ACLs will be removed"

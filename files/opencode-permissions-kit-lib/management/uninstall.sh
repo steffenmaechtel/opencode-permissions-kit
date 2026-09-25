@@ -186,18 +186,36 @@ fi
 
 echo ""
 echo "--- Removing WSL browser bridge ---"
-# (issues #91, #100) Strip the kit-managed comment block — and the legacy
-# 0.0.36 [opencode-permissions-kit] section — from /etc/wsl.conf (every
-# other line is preserved) and drop the stand-in tree under the library
-# before it goes. Safe no-op when neither exists (non-WSL / pre-bridge
-# installs).
+# (issues #91, #100) Consent policy (docs/design/wsl-conf-consent.md): the
+# kit never edits /etc/wsl.conf on its own — not even here. When kit-owned
+# content is present (the bridge comment block, or the legacy 0.0.36
+# section), ASK before removing it; --yes assumes yes, declining leaves
+# the file untouched and prints exactly what to delete by hand (after this
+# uninstall 'opk' is gone — there is no cleanup command anymore). The
+# stand-in tree under the library always goes (it dies with the library).
 if [ "$DRY_RUN" = true ]; then
-    echo "  [DRY] remove kit comment block from /etc/wsl.conf (rewrite)"
+    echo "  [DRY] ask: remove the kit-owned wsl.conf bridge block? (default: yes)"
     echo "  [DRY] sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl"
 else
-    browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
-    echo "WSL browser bridge removed."
-    log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree)"
+    if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null \
+       || grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null; then
+        if [ "$(prompt_yn "Remove the kit's wsl.conf bridge block? (kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
+            browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
+            echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
+            log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
+        else
+            sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl
+            echo "wsl.conf left untouched — remove the kit block yourself (WSL never"
+            echo "warns about it; no 'wsl --shutdown' needed). It spans these lines:"
+            grep -n '^# opencode permissions kit browser bridge -- begin$\|^# opencode permissions kit browser bridge -- end$' /etc/wsl.conf 2>/dev/null | sed 's/^/    /'
+            grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null \
+                && echo "    plus the legacy [opencode-permissions-kit] section (through its root = line)"
+            log "wsl browser bridge: wsl.conf block left in place (user declined)"
+        fi
+    else
+        browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
+        log "wsl browser bridge removed (no wsl.conf content found; library wsl/ tree dropped)"
+    fi
 fi
 
 echo ""

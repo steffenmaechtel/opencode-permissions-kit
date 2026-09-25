@@ -466,13 +466,17 @@ if [ -d /mnt/c ]; then
         # Browser bridge (issues #91, #100): on the restricted mount the
         # opencode user cannot execute powershell.exe — without the bridge,
         # device logins (`console login` / `auth login`) die on the spawn
-        # error.
+        # error. The wsl.conf carrier is an explicit opt-in (the kit never
+        # edits wsl.conf implicitly).
         if [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ] \
            && grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             ui_kv "browser bridge" "deployed (opencode logins survive the hardened mount)" "$UI_GREEN"
+        elif [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+            ui_kv "browser bridge" "stand-in only — no wsl.conf carrier ('console login' fails on this mount)" "$UI_RED"
+            ui_detail "fix: sudo opk wsl-add-opencode-1-fix (explicit consent — the kit never edits wsl.conf itself)"
         else
             ui_kv "browser bridge" "missing — 'console login'/'auth login' fails on this mount" "$UI_RED"
-            ui_detail "fix: re-run install.sh or 'opk update' (deploys the wsl.conf bridge block + stand-in)"
+            ui_detail "fix: sudo opk update (deploys the stand-in), then sudo opk wsl-add-opencode-1-fix (wsl.conf carrier)"
         fi
     fi
 fi

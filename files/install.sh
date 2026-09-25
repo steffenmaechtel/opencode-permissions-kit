@@ -502,11 +502,11 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
 done
 [ -n "$OC_BINARY_FOUND" ] || ui_add "opencode binary" "official installer will fetch it"
 
-# WSL2 /mnt/c exposure preview (question + fix come later in step 4).
+# WSL2 /mnt/c exposure preview (hardening snippet comes later in step 4).
 if [ -d /mnt/c ]; then
     _pm=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$_pm" ] && [ $((0$_pm & 0004)) -ne 0 ]; then
-        ui_atten "/mnt/c" "world-readable (mode $_pm) — restriction offered in step 4"
+        ui_atten "/mnt/c" "world-readable (mode $_pm) — hardening snippet shown in step 4"
     else
         ui_have "/mnt/c" "restricted (mode ${_pm:-?})"
     fi
@@ -641,7 +641,7 @@ _plan "secure the opencode binary + wrapper" "root:opencode 750"
 if [ -d /mnt/c ]; then
     _pm=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$_pm" ] && [ $((0$_pm & 0004)) -ne 0 ]; then
-        _plan "restrict /mnt/c via /etc/wsl.conf" "(takes effect after wsl --shutdown)"
+        _plan "print /mnt/c hardening snippet" "(manual — the kit never writes /etc/wsl.conf)"
     fi
 fi
 _pps=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
@@ -649,7 +649,7 @@ _pps=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?"
 _plan "deny-all config for your user" "(self-update bypass guard)"
 _plan "deploy library, sudoers, audit log" "/usr/local/lib/opencode-permissions-kit"
 if browser_bridge_is_wsl; then
-    _plan "deploy WSL browser bridge" "(opencode login fix: /etc/wsl.conf bridge block)"
+    _plan "deploy WSL browser bridge stand-in" "(login fix; wsl.conf carrier via 'opk wsl-add-opencode-1-fix')"
 fi
 
 if [ "$INTERACTIVE" = true ]; then
@@ -871,12 +871,13 @@ if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
     fi
 fi
 
-# WSL2 /mnt/c restriction: the drvfs mount runs with the Windows session
-# token, so NTFS ACLs do NOT distinguish WSL users — the world-readable
-# default (mode 777) exposes the whole Windows profile (.ssh, NTUSER.DAT,
-# browser data) to every WSL user, including the agent's. Offer to restrict
-# the mount to the default user. Takes effect only after 'wsl --shutdown'
-# from Windows (the kit cannot reboot the distro).
+# WSL2 /mnt/c restriction (report-only — the kit NEVER writes /etc/wsl.conf,
+# docs/design/wsl-conf-consent.md): the drvfs mount runs with the Windows
+# session token, so NTFS ACLs do NOT distinguish WSL users — the
+# world-readable default (mode 777) exposes the whole Windows profile
+# (.ssh, NTUSER.DAT, browser data) to every WSL user, including the
+# agent's. Print the ready-to-run snippet; applying it is the user's
+# explicit call and takes effect only after 'wsl --shutdown' from Windows.
 if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -z "$mnt_mode" ] || [ $((0$mnt_mode & 0004)) -eq 0 ]; then
@@ -885,29 +886,22 @@ if [ -d /mnt/c ]; then
         echo "  ${UI_YELLOW}NOTE: /etc/wsl.conf already has an [automount] section — left untouched.${UI_NC}"
         echo "  /mnt/c is world-readable (mode $mnt_mode); every WSL user incl. the agent"
         echo "  can read the Windows profile. Restrict it manually if unintended."
-        log "wsl.conf has a pre-existing [automount] section — /mnt/c restriction skipped"
+        log "wsl.conf has a pre-existing [automount] section — no hardening snippet printed"
     else
+        d_uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo "")
+        d_gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo "")
         echo "  ${UI_YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the${UI_NC}"
         echo "  ${UI_YELLOW}agent can read the Windows profile (.ssh, NTUSER.DAT, browser data).${UI_NC}"
-        ans=$(prompt "Restrict /mnt/c to your user? (WSL2 drvfs is world-readable by default; recommended)" "Y" "N" "")
-        if [ "$ans" = "y" ]; then
-            d_uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo "")
-            d_gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo "")
-            if [ -n "$d_uid" ] && [ -n "$d_gid" ]; then
-                printf '\n[automount]\nenabled = true\noptions = "uid=%s,gid=%s,dmask=027,fmask=037"\n' "$d_uid" "$d_gid" | sudo tee -a /etc/wsl.conf >/dev/null
-                echo "  /etc/wsl.conf: [automount] restricted to uid=$d_uid/gid=$d_gid (dmask=027,fmask=037)"
-                echo "  ${UI_YELLOW}Takes effect after 'wsl --shutdown' (Windows PowerShell) and reopening the distro.${UI_NC}"
-                log "wsl.conf automount restricted to uid=$d_uid gid=$d_gid"
-            else
-                echo "  ${UI_YELLOW}Could not resolve uid/gid for '$DEFAULT_USER' — add manually to /etc/wsl.conf:${UI_NC}"
-                echo "    [automount]"
-                echo "    enabled = true"
-                echo '    options = "uid=<your-uid>,gid=<your-gid>,dmask=027,fmask=037"'
-            fi
+        echo "  ${UI_YELLOW}The kit does not edit /etc/wsl.conf — apply the restriction yourself:${UI_NC}"
+        echo "    [automount]"
+        echo "    enabled = true"
+        if [ -n "$d_uid" ] && [ -n "$d_gid" ]; then
+            echo "    options = \"uid=$d_uid,gid=$d_gid,dmask=027,fmask=037\""
         else
-            echo "  Skipped — /mnt/c stays world-readable; status.sh will keep reporting the exposure."
-            log "wsl.conf /mnt/c restriction declined"
+            echo '    options = "uid=<your-uid>,gid=<your-gid>,dmask=027,fmask=037"'
         fi
+        echo "  ${UI_YELLOW}(append to /etc/wsl.conf, then 'wsl --shutdown' from Windows + reopen the distro).${UI_NC}"
+        log "/mnt/c hardening snippet printed (kit never writes wsl.conf)"
     fi
 fi
 
@@ -1364,18 +1358,26 @@ else
 fi
 
 # WSL browser bridge (issues #91, #100): the helper library is always
-# deployed; the stand-in tree + /etc/wsl.conf comment block only materialize
-# on WSL (the helper no-ops elsewhere). Installed on hardened AND unhardened
-# /mnt/c alike — the developer who hardens later (status.sh hint) is already
-# covered.
+# deployed; the stand-in tree only materializes on WSL (the helper no-ops
+# elsewhere). The /etc/wsl.conf carrier is NOT written here — the kit
+# never edits wsl.conf implicitly (docs/design/wsl-conf-consent.md); the
+# user opts in explicitly via 'sudo opk wsl-add-opencode-1-fix'. A legacy
+# 0.0.36 section is stripped (kit-owned regression cleanup).
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
 sudo chmod 644 "$LIBDIR/sh/wsl-browser-bridge.sh"
 if browser_bridge_is_wsl; then
     browser_bridge_install "$SCRIPT_DIR" "$LIBDIR"
-    ui_success "WSL browser bridge deployed (opencode console/auth login fix)"
+    ui_success "WSL browser bridge stand-in deployed"
+    if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
+        ui_detail "wsl.conf carrier already present — bridge fully active"
+        log "wsl browser bridge stand-in deployed: $LIBDIR/wsl (carrier present)"
+    else
+        ui_detail "enable the login fix yourself (the kit does not edit /etc/wsl.conf):"
+        ui_detail "  sudo opk wsl-add-opencode-1-fix"
+        log "wsl browser bridge stand-in deployed: $LIBDIR/wsl (carrier left to 'opk wsl-add-opencode-1-fix')"
+    fi
     ui_detail "on a hardened /mnt/c the browser cannot auto-open for the agent;"
     ui_detail "opencode prints URL + code — open them from your own browser"
-    log "wsl browser bridge deployed: $LIBDIR/wsl + comment block in /etc/wsl.conf"
 else
     log "wsl browser bridge skipped (not WSL)"
 fi
@@ -1662,17 +1664,17 @@ else
 fi
 ui_kv "Backup"   "$BACKUP_DIR"
 echo ""
-# WSL2 final exposure warning: the wsl.conf restriction only takes effect
-# after 'wsl --shutdown' — until then /mnt/c stays world-readable and the
-# wrapper warns on every opencode start. Covers both "declined" and
-# "configured but pending".
+# WSL2 final exposure warning: a manually-applied wsl.conf restriction only
+# takes effect after 'wsl --shutdown' — until then /mnt/c stays
+# world-readable and the wrapper warns on every opencode start.
 if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
         echo "  ${UI_YELLOW}WARNING: /mnt/c is still world-readable (mode $mnt_mode) — the agent${UI_NC}"
-        echo "  ${UI_YELLOW}can read your Windows profile. If the wsl.conf restriction was just${UI_NC}"
-        echo "  ${UI_YELLOW}configured, it needs 'wsl --shutdown' from Windows + reopening the distro${UI_NC}"
-        echo "  ${UI_YELLOW}to take effect. opencode will warn on every start until then.${UI_NC}"
+        echo "  ${UI_YELLOW}can read your Windows profile. If you just applied the [automount]${UI_NC}"
+        echo "  ${UI_YELLOW}snippet to /etc/wsl.conf, it needs 'wsl --shutdown' from Windows${UI_NC}"
+        echo "  ${UI_YELLOW}+ reopening the distro to take effect.${UI_NC}"
+        echo "  ${UI_YELLOW}opencode will warn on every start until then.${UI_NC}"
         echo ""
     fi
 fi
