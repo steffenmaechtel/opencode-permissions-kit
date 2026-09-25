@@ -102,24 +102,38 @@ The restriction above has a side effect on opencode's device logins
 (`opencode console login` on 1.x, `opencode auth login` on 2.x): opening
 the verification URL goes through the `open` package bundled with opencode,
 which spawns
-`<first "root =" in /etc/wsl.conf>c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`.
+`<first "root =" match in /etc/wsl.conf>c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`.
 On the restricted mount the `opencode` user may not execute that binary —
 and opencode dies on the resulting spawn error (issue #91), right after
 printing URL and device code.
 
 The kit solves this **without granting the agent anything**:
 
-- install.sh/update.sh keep a kit-managed `[opencode-permissions-kit]`
-  section at the **top** of `/etc/wsl.conf` whose `root =` line points at
-  the kit library. WSL itself ignores the unknown section (no restart
-  needed, no mount change); only `open`'s whole-file first-match scan sees
-  it — the computed powershell path now lands inside the library.
+- install.sh/update.sh keep a kit-managed **comment block** at the **top**
+  of `/etc/wsl.conf`. Its last line is a carrier for `open`'s scan: the
+  line starts with `#` (so WSL treats it as a comment) and contains a raw
+  carriage return before `root = <kit library>` — `open`'s regex cannot
+  see the `#` across that CR, so its first-match scan resolves into the
+  kit library and the computed powershell path lands there.
 - there, `wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` is
   a harmless stand-in (`bin/browser-bridge`): it forwards to the **real**
   powershell.exe whenever the calling user may execute it (you, the
   developer — the browser opens exactly as before) and exits 0 otherwise
   (the agent): the login flow keeps polling, and you open the printed URL
   from any browser.
+
+Why not a normal INI section: WSL's `wsl.conf` parser only accepts section
+and key names made of letters and digits — the hyphenated section the kit
+shipped in 0.0.36 made WSL complain (`wsl: Expected ']' in
+/etc/wsl.conf:1`) and, on WSL ≤ 2.9.12, silently dropped **every** setting
+in the file, including the `[automount]` restriction and `[boot]`
+`systemd=true` (issue #100). A parser-valid section name would not help
+either: every unknown key makes WSL print
+`wsl: Unknown key '<section>.root'` on each start. Comments are the only
+carrier WSL never complains about. Newer `open` versions (wsl-utils based)
+parse line-based, ignore the carrier, and check powershell access
+themselves before spawning — they fall back to `xdg-open` and need no
+bridge.
 
 The stand-in parses nothing and holds no privileges — the agent can run it
 with arbitrary arguments to no effect beyond a possible browser open *as
@@ -130,7 +144,7 @@ no-op path triggers, it prints a one-line hint to the terminal
 (self-test: [troubleshooting](../troubleshooting.md)).
 `opk status` reports the bridge state; the wrapper warns when the mount is
 restricted but the bridge is missing (hand-edited `wsl.conf`, partial
-deploy). Uninstall removes the section and the stand-in tree.
+deploy). Uninstall removes the block and the stand-in tree.
 
 ## Other root-equivalent surfaces (audit)
 

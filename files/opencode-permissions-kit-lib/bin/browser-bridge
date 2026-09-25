@@ -1,16 +1,16 @@
 #!/bin/sh
 # opencode permissions kit -- bin/browser-bridge
 # Deployed to /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/
-# WindowsPowerShell/v1.0/powershell.exe and registered through the
-# [opencode-permissions-kit] section in /etc/wsl.conf (see
-# sh/wsl-browser-bridge.sh for the deployment logic).
+# WindowsPowerShell/v1.0/powershell.exe and registered through the kit
+# comment block in /etc/wsl.conf (see sh/wsl-browser-bridge.sh for the
+# deployment logic).
 #
 # Why: the `open` npm package bundled in opencode locates WSL's
 # powershell.exe by appending c/Windows/System32/.../powershell.exe to the
-# FIRST `root =` line it finds in /etc/wsl.conf — regardless of section —
-# and spawns the result with -EncodedCommand to open a URL (device logins
-# like `opencode console login` / `opencode auth login`). On a hardened
-# /mnt/c (dmask/fmask restriction, docs/concepts/security-model.md) the
+# FIRST `root =` match in /etc/wsl.conf and spawns the result with
+# -EncodedCommand to open a URL (device logins like `opencode console
+# login` / `opencode auth login`). On a hardened /mnt/c (dmask/fmask
+# restriction, docs/concepts/security-model.md) the
 # opencode user cannot execute the real powershell.exe, and opencode's
 # login flow dies on that synchronous spawn error (issue #91) — Bun's
 # child_process.spawn throws on EACCES before opencode's own error

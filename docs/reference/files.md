@@ -7,10 +7,12 @@ This page lists every file and directory the kit manages, and every key in
 
 Not kit-owned — your WSL configuration. The kit appends the `[automount]`
 hardening (on your confirmation, applies after `wsl --shutdown`) and keeps
-a kit-managed `[opencode-permissions-kit]` section at the top (WSL only:
-redirects opencode's powershell lookup to the browser bridge stand-in;
-WSL itself ignores the unknown section — no restart needed). Uninstall
-removes exactly that section and leaves your own entries untouched.
+a kit-managed **comment block** at the top (WSL only: its carrier line —
+a `#` comment containing a raw carriage return before `root = …` — wins
+the `open` package's scan and redirects opencode's powershell lookup to
+the browser bridge stand-in; WSL itself only ever sees comments, so no
+warning, no restart needed). Uninstall removes exactly that block and
+leaves your own entries untouched.
 
 ## /etc/opencode-permissions-kit/
 
@@ -81,7 +83,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-hosts.sh` | Shared helper: Windows hosts bridge |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-migrate.sh` | Shared helper: migration functions (sourced by install.sh and `bin/ddev-migrate`) |
 | `/usr/local/lib/opencode-permissions-kit/sh/fs-baseline.sh` | Shared helper: group baseline recursion |
-| `/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh` | Shared helper: WSL browser bridge deploy (wsl.conf section + stand-in) |
+| `/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh` | Shared helper: WSL browser bridge deploy (wsl.conf comment block + stand-in) |
 | `/usr/local/lib/opencode-permissions-kit/sh/log.sh` | Shared helper: audit logging |
 | `/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh` | Shared helper: bypass warnings |
 | `/usr/local/lib/opencode-permissions-kit/sh/ui.sh` | Shared helper: labeled output |
