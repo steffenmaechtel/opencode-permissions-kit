@@ -148,7 +148,12 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 ```
 
 Without `KIT_BRANCH` set, the deployed `update.sh` follows the channel
-stamped in `install.conf` (`KIT_CHANNEL`, shown by `opk status`).
+stamped in `install.conf` (`KIT_CHANNEL`, shown by `opk status`). Switch
+channels without editing `install.conf`:
+
+```bash
+sudo opk update --channel stable   # or master, a feature branch, or a tag
+```
 
 | Flag | Meaning |
 |---|---|
@@ -157,6 +162,7 @@ stamped in `install.conf` (`KIT_CHANNEL`, shown by `opk status`).
 | `--binary` | Also upgrade the opencode binary to the latest release |
 | `--only-binary` | Skip every kit step, only upgrade the opencode binary |
 | `--binary-path <file>` | Install a specific binary file instead |
+| `--channel <ref>` | Switch the tracking ref for this and every future update (re-stamps `KIT_CHANNEL`) |
 
 `opk upgrade-opencode` is the shorthand for
 `update --yes --only-binary` — extra flags (e.g. `--binary-path`) pass

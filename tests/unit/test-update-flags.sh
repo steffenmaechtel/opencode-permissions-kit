@@ -169,6 +169,25 @@ check "ddev stamp: old stamp survives when no binary answers" \
 check "ddev stamp: summary line reports the refreshed value" \
     sh -c "grep -q 'DDEV_VERSION=\$NEW_DDEV_VERSION' \"\$1\"" _ "$UPDATE"
 
+# --- 7. --channel (switch the tracking ref without editing install.conf) --------
+_prescan_ln=$(grep -n '_prev_arg' "$UPDATE" | head -1 | cut -d: -f1)
+_resolv_ln=$(grep -n '_kit_stamped_channel=' "$UPDATE" | head -1 | cut -d: -f1)
+if [ -n "$_prescan_ln" ] && [ -n "$_resolv_ln" ] && [ "$_prescan_ln" -lt "$_resolv_ln" ]; then
+    pass "channel: pre-scan runs before the stamp resolution (fetch uses the new ref)"
+else
+    fail "channel: pre-scan runs before the stamp resolution (fetch uses the new ref)"
+fi
+check "channel: arg loop accepts --channel with a value (not 'unknown option')" \
+    sh -c "grep -q -- '--channel)' \"\$1\" && grep -qF -- '--channel requires a ref' \"\$1\"" _ "$UPDATE"
+check "channel: help text documents --channel" \
+    sh -c "grep -q -- '--channel <ref>' \"\$1\"" _ "$UPDATE"
+check "channel: switch persists via the KIT_CHANNEL re-stamp" \
+    sh -c "grep -qF 'KIT_CHANNEL=\$KIT_BRANCH' \"\$1\"" _ "$UPDATE"
+check "channel: missing ref is rejected (arg loop, from a checkout)" \
+    sh -c "! sh \"\$1\" --channel >/dev/null 2>&1" _ "$UPDATE"
+check "channel: --help with --channel still works (pre-scan is silent)" \
+    sh -c "sh \"\$1\" --channel testref --help >/dev/null 2>&1" _ "$UPDATE"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

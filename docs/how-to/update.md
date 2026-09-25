@@ -13,9 +13,20 @@ The kit ships from two refs; which one you use is stamped into
 | `master` | Development channel — moves with every merged PR | Testing the newest changes |
 | `<branch>` / `x.y.z` | Any feature branch, or an exact version tag (e.g. `0.0.29`) | Testing a PR, pinning a version |
 
-`opk update` follows the stamped channel automatically. Switch explicitly
-with the `KIT_BRANCH` environment variable — install or update, same
-mechanism:
+`opk update` follows the stamped channel automatically. The easy switch is
+the `--channel` flag — updates from the given ref and re-stamps
+`KIT_CHANNEL` in one go, so subsequent plain `opk update` runs stay on the
+new channel:
+
+```bash
+sudo opk update --channel stable    # release mirror (recommended default)
+sudo opk update --channel master    # development channel
+sudo opk update --channel feature/wsl-conf-user-consent   # test a branch
+sudo opk update --channel 0.0.29    # pin an exact version
+```
+
+The `KIT_BRANCH` environment variable does the same for every entry point
+(curl-streamed install or update, `opk update`):
 
 ```bash
 # update from the stable release mirror (recommended default)
