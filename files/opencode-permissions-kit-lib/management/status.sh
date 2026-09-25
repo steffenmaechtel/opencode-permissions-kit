@@ -463,15 +463,16 @@ if [ -d /mnt/c ]; then
         fi
     else
         ui_kv "/mnt/c" "restricted (mode ${mnt_mode:-?})" "$UI_GREEN"
-        # Browser bridge (issue #91): on the restricted mount the opencode
-        # user cannot execute powershell.exe — without the bridge, device
-        # logins (`console login` / `auth login`) die on the spawn error.
+        # Browser bridge (issues #91, #100): on the restricted mount the
+        # opencode user cannot execute powershell.exe — without the bridge,
+        # device logins (`console login` / `auth login`) die on the spawn
+        # error.
         if [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ] \
-           && grep -q '^\[opencode-permissions-kit\]' /etc/wsl.conf 2>/dev/null; then
+           && grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             ui_kv "browser bridge" "deployed (opencode logins survive the hardened mount)" "$UI_GREEN"
         else
             ui_kv "browser bridge" "missing — 'console login'/'auth login' fails on this mount" "$UI_RED"
-            ui_detail "fix: re-run install.sh or 'opk update' (deploys the wsl.conf kit section + stand-in)"
+            ui_detail "fix: re-run install.sh or 'opk update' (deploys the wsl.conf bridge block + stand-in)"
         fi
     fi
 fi

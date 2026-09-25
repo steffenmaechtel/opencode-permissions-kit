@@ -395,13 +395,13 @@ file itself is executable; plain `execve` is unaffected. The wrapper moves
 starting the binary, so this is handled automatically; a crash means an
 old wrapper is deployed.
 
-**Fix:** re-run the install or `opk update` — both (re)apply the
-`[opencode-permissions-kit]` section in `/etc/wsl.conf`, the stand-in
-under `/usr/local/lib/opencode-permissions-kit/wsl/`, and the current
-wrapper. The wsl.conf section takes effect immediately (only `open` reads
-it; WSL ignores it — no `wsl --shutdown` needed). Without a bridge, the
-login still works when you open the printed URL yourself: the crash
-happens *after* URL and device code are displayed. Details: [security
+**Fix:** re-run the install or `opk update` — both (re)apply the kit
+comment block in `/etc/wsl.conf`, the stand-in under
+`/usr/local/lib/opencode-permissions-kit/wsl/`, and the current wrapper.
+The wsl.conf block takes effect immediately (only `open` reads it; WSL
+sees comments — no `wsl --shutdown` needed). Without a bridge, the login
+still works when you open the printed URL yourself: the crash happens
+*after* URL and device code are displayed. Details: [security
 model](concepts/security-model.md).
 
 **Diagnose — expected vs. broken:** when the login runs with the agent
@@ -421,6 +421,23 @@ OPK_BROWSER_BRIDGE_DEBUG=1 /usr/local/lib/opencode-permissions-kit/wsl/c/Windows
 Run as yourself the trace ends in `forwarding to /mnt/c/...` and the
 browser opens; if it does not, check the mount options (`stat -c %a
 /mnt/c`) — your user must be the mount owner.
+
+## WSL prints `wsl: Expected ']' in /etc/wsl.conf` after updating to kit 0.0.36
+
+**Cause:** kit 0.0.36 registered its browser bridge through an INI section
+whose name contains hyphens. WSL's `wsl.conf` parser only accepts section
+names made of letters and digits, complains about the line — and on WSL
+≤ 2.9.12 aborts parsing right there, so every setting below silently
+stops applying: the `[automount]` restriction stays pending, `[boot]`
+`systemd=true` (and with it the docker-rootless backend) disappears after
+the next `wsl --shutdown` (issue #100).
+
+**Fix:** update the kit (`sudo opk update`, ≥ 0.0.37) — the rewrite
+replaces the broken section with a pure comment block that WSL never
+complains about — then run `wsl --shutdown` from Windows and reopen your
+distro so the dropped settings apply again. `opk status` should show the
+backend socket reachable, `/mnt/c` restricted, and the browser bridge
+deployed. Details: [security model](concepts/security-model.md).
 
 ## Group membership (opencode group) not applied
 

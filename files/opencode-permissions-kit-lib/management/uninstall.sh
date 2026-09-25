@@ -186,16 +186,18 @@ fi
 
 echo ""
 echo "--- Removing WSL browser bridge ---"
-# (issue #91) Strip the kit-managed section from /etc/wsl.conf (every other
-# line is preserved) and drop the stand-in tree under the library before it
-# goes. Safe no-op when neither exists (non-WSL / pre-bridge installs).
+# (issues #91, #100) Strip the kit-managed comment block — and the legacy
+# 0.0.36 [opencode-permissions-kit] section — from /etc/wsl.conf (every
+# other line is preserved) and drop the stand-in tree under the library
+# before it goes. Safe no-op when neither exists (non-WSL / pre-bridge
+# installs).
 if [ "$DRY_RUN" = true ]; then
-    echo "  [DRY] remove [opencode-permissions-kit] section from /etc/wsl.conf (sed rewrite)"
+    echo "  [DRY] remove kit comment block from /etc/wsl.conf (rewrite)"
     echo "  [DRY] sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl"
 else
     browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
     echo "WSL browser bridge removed."
-    log "wsl browser bridge removed (/etc/wsl.conf section + library wsl/ tree)"
+    log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree)"
 fi
 
 echo ""

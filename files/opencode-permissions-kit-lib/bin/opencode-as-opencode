@@ -204,12 +204,12 @@ if [ -d /mnt/c ]; then
     # user cannot execute powershell.exe, and opencode's device-login flows
     # (`console login`, `auth login`) die on that spawn error. The kit's
     # browser bridge redirects the bundled `open` package's powershell
-    # lookup to a harmless stand-in via the [opencode-permissions-kit]
-    # section in /etc/wsl.conf. Warn when the mount is restricted but the
-    # bridge is not in place (broken deploy, hand-edited wsl.conf).
+    # lookup to a harmless stand-in via the kit comment block in
+    # /etc/wsl.conf. Warn when the mount is restricted but the bridge is
+    # not in place (broken deploy, hand-edited wsl.conf).
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
         if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ] \
-           || ! grep -q '^\[opencode-permissions-kit\]' /etc/wsl.conf 2>/dev/null; then
+           || ! grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             note "${YELLOW}WARNING: browser bridge missing — 'console login'/'auth login' would fail${NC}"
             note "${YELLOW}on this restricted /mnt/c. Re-run install.sh (or 'opk update') to set it up.${NC}"
             note ""

@@ -105,6 +105,8 @@ git push origin release/0.0.36
 
 # On GitHub: open the PR for release/0.0.36 => merge => wait for green CI
 
+git checkout master
+git pull origin master
 make release VERSION=0.0.36
 gh release create 0.0.36 --title "0.0.36" --generate-notes --latest
 ```

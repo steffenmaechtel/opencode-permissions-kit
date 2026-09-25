@@ -103,9 +103,10 @@ command -v ddev_migrate_registry >/dev/null 2>&1 || { ddev_migrate_registry() { 
 [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 
-# Shared WSL browser bridge helper (issue #91): deploys the powershell.exe
-# stand-in + /etc/wsl.conf section that keep opencode's device logins alive
-# on a hardened /mnt/c. Same sourcing rules as ddev-handover.sh.
+# Shared WSL browser bridge helper (issues #91, #100): deploys the
+# powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
+# device logins alive on a hardened /mnt/c. Same sourcing rules as
+# ddev-handover.sh.
 [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
@@ -648,7 +649,7 @@ _pps=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?"
 _plan "deny-all config for your user" "(self-update bypass guard)"
 _plan "deploy library, sudoers, audit log" "/usr/local/lib/opencode-permissions-kit"
 if browser_bridge_is_wsl; then
-    _plan "deploy WSL browser bridge" "(opencode login fix: /etc/wsl.conf kit section)"
+    _plan "deploy WSL browser bridge" "(opencode login fix: /etc/wsl.conf bridge block)"
 fi
 
 if [ "$INTERACTIVE" = true ]; then
@@ -1362,10 +1363,11 @@ else
     exit 1
 fi
 
-# WSL browser bridge (issue #91): the helper library is always deployed; the
-# stand-in tree + /etc/wsl.conf section only materialize on WSL (the helper
-# no-ops elsewhere). Installed on hardened AND unhardened /mnt/c alike —
-# the developer who hardens later (status.sh hint) is already covered.
+# WSL browser bridge (issues #91, #100): the helper library is always
+# deployed; the stand-in tree + /etc/wsl.conf comment block only materialize
+# on WSL (the helper no-ops elsewhere). Installed on hardened AND unhardened
+# /mnt/c alike — the developer who hardens later (status.sh hint) is already
+# covered.
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
 sudo chmod 644 "$LIBDIR/sh/wsl-browser-bridge.sh"
 if browser_bridge_is_wsl; then
@@ -1373,7 +1375,7 @@ if browser_bridge_is_wsl; then
     ui_success "WSL browser bridge deployed (opencode console/auth login fix)"
     ui_detail "on a hardened /mnt/c the browser cannot auto-open for the agent;"
     ui_detail "opencode prints URL + code — open them from your own browser"
-    log "wsl browser bridge deployed: $LIBDIR/wsl + [opencode-permissions-kit] section in /etc/wsl.conf"
+    log "wsl browser bridge deployed: $LIBDIR/wsl + comment block in /etc/wsl.conf"
 else
     log "wsl browser bridge skipped (not WSL)"
 fi
