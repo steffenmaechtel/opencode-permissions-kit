@@ -178,7 +178,6 @@ case "$cmd" in
         # section is cleaned up on the way, and only kit content is ever
         # removed or added. Auto-sudo like config/update.
         [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] || { ui_error "$LIBDIR/sh/wsl-browser-bridge.sh not found — is the kit installed?"; exit 1; }
-        [ -f "$LIBDIR/bin/browser-bridge" ] || { ui_error "$LIBDIR/bin/browser-bridge not found — run 'sudo opk update' first"; exit 1; }
         if [ "$(id -u)" -ne 0 ]; then
             exec sudo sh "$LIBDIR/bin/opk" "$cmd"
         fi
@@ -188,7 +187,15 @@ case "$cmd" in
         # shellcheck disable=SC1090
         . "$LIBDIR/sh/wsl-browser-bridge.sh"
         browser_bridge_is_wsl || { ui_error "not WSL — the browser bridge is WSL-only"; exit 1; }
-        browser_bridge_deploy_tree "$LIBDIR/bin/browser-bridge" "$LIBDIR"
+        # Redeploy the stand-in when the source is in the library; older
+        # deploys (update before browser-bridge joined the library) may only
+        # have the tree — fine, the carrier is the missing piece then.
+        if [ -f "$LIBDIR/bin/browser-bridge" ]; then
+            browser_bridge_deploy_tree "$LIBDIR/bin/browser-bridge" "$LIBDIR"
+        elif [ ! -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+            ui_error "stand-in missing and no $LIBDIR/bin/browser-bridge — run 'sudo opk update' first"
+            exit 1
+        fi
         browser_bridge_write_conf "$LIBDIR"
         ui_success "WSL browser bridge active — opencode 1.x device logins survive a hardened /mnt/c"
         ui_detail "carrier written to /etc/wsl.conf as a comment block (WSL ignores it;"

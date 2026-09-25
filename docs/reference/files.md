@@ -80,7 +80,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/bin/setup-container-backend` | Rootless backend provisioning |
 | `/usr/local/lib/opencode-permissions-kit/bin/socket-check` | Rootless socket probe (`test -S` only) |
 | `/usr/local/lib/opencode-permissions-kit/bin/cwd-check` | Headless serve cwd probe (readable-for-opencode check) |
-| `/usr/local/lib/opencode-permissions-kit/bin/browser-bridge` | WSL browser bridge stand-in (deployed into the `wsl/` tree, see below) |
+| `/usr/local/lib/opencode-permissions-kit/bin/browser-bridge` | WSL browser bridge stand-in source — deployed into the `wsl/` tree (see below); re-deployed by `opk wsl-add-opencode-1-fix` |
 | `/usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` | WSL browser bridge: stand-in the bundled `open` package spawns for device logins — forwards to the real powershell.exe when the caller may execute it, `exit 0` otherwise (WSL only; see [security model](../concepts/security-model.md#wsl2-the-browser-bridge-login-survival-on-a-hardened-mntc)) |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh` | Sourced `ddev()` terminal function (hooked into the default user's rc files) |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh` | Shared helper: `.ddev` + settings-dir chown |

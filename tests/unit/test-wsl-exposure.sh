@@ -140,6 +140,8 @@ check "uninstall.sh asks before removing kit-owned wsl.conf content" \
     sh -c "grep -q \"Remove the kit's wsl.conf bridge block?\" \"\$1\" && grep -q 'prompt_yn' \"\$1\"" _ "$UNINSTALL"
 check "uninstall.sh prints the manual line range when declined" \
     sh -c "grep -q 'browser bridge -- begin\\\$' \"\$1\" && grep -q 'left untouched' \"\$1\"" _ "$UNINSTALL"
+check "install.sh and update.sh deploy bin/browser-bridge into the library" \
+    sh -c "grep -q 'bin/browser-bridge\" \"\$LIBDIR/bin/browser-bridge' \"\$1\" && grep -q 'bin/browser-bridge\" \"\$LIBDIR/bin/browser-bridge' \"\$2\"" _ "$INSTALL" "$UPDATE"
 
 # --- mode-mask arithmetic (the exact check status.sh performs) -----------------
 mode_allows_other() {
