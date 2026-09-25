@@ -56,6 +56,23 @@ check "e2e_resolve_cache uses e2e_fetch_opencode" \
 check "e2e_fetch_old uses e2e_fetch_opencode" \
     grep_q 'e2e_fetch_opencode "\$OLD_VERSION"'
 
+# --- rate-limit resilience (CI crash 2026-09-25: api.github.com 60 req/h
+# per IP on shared runners killed the ddev-2x job at version resolution) ---
+RUN_DDEV="$(cd "$(dirname "$0")/../e2e" && pwd)/run-ddev.sh"
+WF_E2E="$(cd "$(dirname "$0")/../../.github/workflows" && pwd)/test-e2e.yml"
+WF_DDEV="$(cd "$(dirname "$0")/../../.github/workflows" && pwd)/test-e2e-ddev.yml"
+
+check "gh_latest_tag helper exists in lib.sh" \
+    grep -q '^gh_latest_tag() {' "$LIB"
+check "version resolution authorizes the API when a token is present" \
+    sh -c "grep -q 'OPK_GH_TOKEN' \"\$1\" && grep -q 'Authorization: Bearer' \"\$1\"" _ "$LIB"
+check "version resolution falls back to the releases/latest redirect" \
+    sh -c "grep -q 'url_effective' \"\$1\" && grep -q '/tag/v' \"\$1\"" _ "$LIB"
+check "run-ddev.sh resolves ddev through gh_latest_tag (no bare API call)" \
+    sh -c "grep -q 'gh_latest_tag ddev/ddev' \"\$1\" && ! grep -q 'https://api.github.com/repos/ddev' \"\$1\"" _ "$RUN_DDEV"
+check "workflows export the workflow token to the e2e steps" \
+    sh -c "grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$1\" && grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

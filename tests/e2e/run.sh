@@ -702,6 +702,30 @@ check ".env still readable after binary upgrade (soft-only)" \
 check_fail "new binary writable by opencode user" \
     E 'sudo -u opencode sh -c "test -w /usr/local/lib/opencode-permissions-kit/bin/opencode"'
 
+# opencode 2.x runs only (issue #99): a plain upgrade must stay on the
+# 2.x major — the npm dist-tag resolution replaces the old GitHub
+# releases/latest lookup, which downgraded 2.x installs to 1.x latest.
+case "$OC_VERSION" in
+    2.*)
+        echo ""
+        echo "--- 11d. upgrade-opencode stays on the 2.x major (issue #99) ---"
+        # --only-binary skips the kit self-fetch; the only download is the
+        # binary itself (npm @opencode/cli-<target>, dist-tag latest).
+        E 'opk upgrade-opencode' && \
+            echo "  ${GREEN}OK${NC}  opk upgrade-opencode (live npm resolution) completed"
+        check "11d: binary is still opencode 2.x after the upgrade" \
+            E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 | sed "s/^opencode v//; s/\..*//")" = 2'
+        check "11d: OPENCODE_MAJOR stamp still 2" \
+            E 'grep -q "^OPENCODE_MAJOR=2$" /etc/opencode-permissions-kit/install.conf'
+        check "11d: 2.x TUI plugin still registered for the agent user" \
+            E 'test -L /home/opencode/.config/opencode/plugins/opencode-permissions-kit/tui.tsx'
+        # restore the pinned binary so later sections stay deterministic
+        E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true; sudo pkill -u opencode -f "serve --servic[e]" >/dev/null 2>&1 || true'
+        E 'sudo cp /opencode-cache/opencode-'"$OC_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chown root:opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chmod 750 /usr/local/lib/opencode-permissions-kit/bin/opencode' && \
+            echo "  ${GREEN}OK${NC}  pinned binary $OC_VERSION restored"
+        ;;
+esac
+
 echo ""
 echo "--- 12. config.sh adds a project non-interactively ---"
 # extra-project carries a dev-owned .ddev to prove the projects-add handover

@@ -64,14 +64,16 @@ echo "${CYAN}========================================================${NC}"
 echo ""
 
 # --- resolve the ddev version + fetch the binary (host-side cache) -----------
-# Mirrors e2e_resolve_cache: pin via DDEV_VERSION, else latest release, else
-# the golden image's label (offline fallback). The tarball lands in
-# tests/e2e/cache/ddev-<v>/ (gitignored, mounted read-only into the container).
+# Mirrors e2e_resolve_cache: pin via DDEV_VERSION, else latest release
+# (rate-limit resilient, see lib.sh gh_latest_tag — the CI crash of
+# 2026-09-25 died here on api.github.com rate limits), else the golden
+# image's label (offline fallback). The tarball lands in
+# tests/e2e/cache/ddev-<v>/ (gitignored, mounted read-only into the
+# container).
 DD_WANT="${DDEV_VERSION:-}"
 if [ -z "$DD_WANT" ]; then
-    DD_WANT=$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-        https://api.github.com/repos/ddev/ddev/releases/latest 2>/dev/null \
-        | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+    _dd_tag=$(gh_latest_tag ddev/ddev)
+    [ -n "$_dd_tag" ] && DD_WANT="v$_dd_tag"
 fi
 if [ -z "$DD_WANT" ]; then
     DD_WANT=$(docker image inspect -f '{{ index .Config.Labels "kit.e2e.ddev.version" }}' "$GOLDEN_IMAGE" 2>/dev/null || true)

@@ -184,14 +184,26 @@ sudo opk update --channel stable   # or master, a feature branch, or a tag
 |---|---|
 | `--yes` | Skip the confirmation prompt |
 | `--refresh` | Also re-apply the group baseline |
-| `--binary` | Also upgrade the opencode binary to the latest release |
+| `--binary` | Also upgrade the opencode binary to the latest release **of the current major** |
 | `--only-binary` | Skip every kit step, only upgrade the opencode binary |
 | `--binary-path <file>` | Install a specific binary file instead |
 | `--channel <ref>` | Switch the tracking ref for this and every future update (re-stamps `KIT_CHANNEL`) |
+| `--major 1\|2` | Switch the opencode major (TUI registration flips with it) |
+| `--version <ver>` | Upgrade to exactly this opencode version (channel by prefix: `2.*` from npm, `1.x` from GitHub) |
 
-`opk upgrade-opencode` is the shorthand for
-`update --yes --only-binary` — extra flags (e.g. `--binary-path`) pass
-through.
+Upgrades never cross majors silently (issue #99): without `--major` /
+`--version` the latest release **of the installed major** is used — 1.x
+resolves through GitHub releases, 2.x through the npm dist-tag `latest`
+(the channel the official v2 installer uses). `opk upgrade-opencode` is
+the shorthand for `update --yes --only-binary` — extra flags (e.g.
+`--binary-path`, `--major 2`, `--version 2.0.11`) pass through:
+
+```bash
+sudo opk upgrade-opencode                 # latest of the current major
+sudo opk upgrade-opencode --major 2       # switch 1.x -> 2.x (latest 2.x)
+sudo opk upgrade-opencode --major 1       # switch back to latest 1.x
+sudo opk upgrade-opencode --version 2.0.11
+```
 
 Never touches `projects.conf` or the agent's `opencode.jsonc`. See
 [update](../how-to/update.md).

@@ -88,6 +88,17 @@ edits reload only after seconds). Both were observed in the e2e as
 then a pkill fallback that catches a wedged daemon; both best-effort,
 1.x ignores the unknown subcommand) and re-stamps `OPENCODE_MAJOR`.
 
+*Issue #99:* version upgrades never cross majors silently. Without flags
+the latest release **of the installed major** resolves — 1.x through
+GitHub `releases/latest`, 2.x through the npm dist-tag `latest` of
+`@opencode/cli-<target>` (§8's channel split, now in `update.sh` itself;
+a resolution off the requested major fails loudly instead). `--major 1|2`
+switches majors explicitly, `--version <ver>` pins an exact release. A
+major flip re-anchors the TUI registration immediately
+(`sync_tui_registration`: plugin dir on 2.x, removed on 1.x — the 1.x
+tui.json/danger theme are major-agnostic and stay), even in
+`--only-binary` runs.
+
 ## 6. Headless classification: subcommand union
 
 The wrapper's HEADLESS list keeps every 1.x name (unknown to 2.x, which

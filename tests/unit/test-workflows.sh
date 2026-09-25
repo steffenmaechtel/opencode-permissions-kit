@@ -138,6 +138,22 @@ check_2x "$WF_DDEV_E2E" \
     '2\.\*) echo "OC2_VERSION=' \
     '::error::npm dist-tag latest'
 
+# Structural YAML guard (workflow-upload breakage 2026-09-25: a second
+# env: block on a step that already had one made GitHub reject the whole
+# file): every step may carry at most ONE env: block.
+_dups=0
+for _wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
+    _out=$(awk '/^      - /{ if (c>1) { print FILENAME ": " prev " (" c " env blocks)" }; c=0; prev=$0 }
+                /^        env:/{c++}
+                END{ if (c>1) { print FILENAME ": " prev " (" c " env blocks)" } }' "$_wf")
+    [ -n "$_out" ] && { echo "$_out"; _dups=1; }
+done
+if [ "$_dups" = 0 ]; then
+    pass "no workflow step carries more than one env block"
+else
+    fail "no workflow step carries more than one env block"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

@@ -180,8 +180,10 @@ check "install.sh unregisters inert cli.json path entries (2x cleanup)" \
     grep -q 'tui-register.py" "$_oc_user_dir/cli.json" unregister' "$INSTALL"
 check "update.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$UPDATE"
-check "update.sh re-registers the 2x plugin dir (major-gated)" \
-    grep -q 'ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"' "$UPDATE"
+check "update.sh re-registers the 2x plugin dir (major-gated, sync function)" \
+    grep -q 'ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"' "$UPDATE" \
+    && grep -q 'sync_tui_registration "$_oc_major"' "$UPDATE" \
+    && grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE"
 check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
     grep -q 'plugins/opencode-permissions-kit' "$UNINSTALL" && grep -q 'kit-mode-2x.tsx' "$UNINSTALL"
 

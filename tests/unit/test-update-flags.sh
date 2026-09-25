@@ -44,41 +44,112 @@ else
     exit 1
 fi
 
-# --- 2. functional: candidate survives until the caller installs it -------------
-# Fake curl on PATH: without -o it answers the GitHub API call, with -o it
-# "downloads" a fixture tarball containing an executable opencode stub.
-mkdir -p "$WORK/bin" "$WORK/fixture"
+# --- 2. functional: major-aware resolution + candidate survives (issue #99) ------
+# Fake curl on PATH: registry.npmjs.org answers the dist-tags doc (no -o)
+# or "downloads" an npm-layout tarball (-o); api.github.com answers the
+# releases/latest tag (no -o) or a GitHub-layout tarball (-o).
+mkdir -p "$WORK/bin" "$WORK/fixture" "$WORK/fixture-npm/package/bin"
 printf '#!/bin/sh\necho "opencode version 9.9.9"\n' > "$WORK/fixture/opencode"
 chmod +x "$WORK/fixture/opencode"
 tar -czf "$WORK/fixture/release.tar.gz" -C "$WORK/fixture" opencode
+printf '#!/bin/sh\necho "opencode v2.1.99"\n' > "$WORK/fixture-npm/package/bin/opencode"
+chmod +x "$WORK/fixture-npm/package/bin/opencode"
+tar -czf "$WORK/fixture/release-npm.tgz" -C "$WORK/fixture-npm" package
 cat > "$WORK/bin/curl" <<FAKE
 #!/bin/sh
-case " \$* " in
+_args="\$*"
+case " \$_args " in
     *" -o "*)
         _out=""
         while [ \$# -gt 0 ]; do
             [ "\$1" = "-o" ] && _out="\$2" && break
             shift
         done
-        cp "$WORK/fixture/release.tar.gz" "\$_out"
+        if printf '%s' "\$_args" | grep -q 'registry.npmjs.org'; then
+            cp "$WORK/fixture/release-npm.tgz" "\$_out"
+        else
+            cp "$WORK/fixture/release.tar.gz" "\$_out"
+        fi
+        ;;
+    *registry.npmjs.org*)
+        printf '{"_id":"cli","dist-tags":{"latest":"2.1.99","next":"2.2.0-beta.1"},"versions":{}}\n'
+        ;;
+    *api.github.com*)
+        printf '{"tag_name":"v1.18.99"}\n'
         ;;
     *)
-        printf '{"tag_name":"v9.9.9"}\n'
+        printf '{"tag_name":"v1.18.99"}\n'
         ;;
 esac
 FAKE
 chmod +x "$WORK/bin/curl"
 
+# Extract every version-resolution function into one sourceable file.
+FUNCS="$WORK/funcs.sh"
+{
+    sed -n '/^detect_target() {/,/^}/p' "$UPDATE"
+    sed -n '/^detect_asset() {/,/^}/p' "$UPDATE"
+    sed -n '/^version_major() {/,/^}/p' "$UPDATE"
+    sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE"
+    sed -n '/^resolve_latest_opencode_version() {/,/^}/p' "$UPDATE"
+    sed -n '/^fetch_opencode_version() {/,/^}/p' "$UPDATE"
+    sed -n '/^fetch_latest_opencode() {/,/^}/p' "$UPDATE"
+} > "$FUNCS"
+
+# Stubs for current_opencode_major (2.x and 1.x --version shapes).
+printf '#!/bin/sh\necho "opencode v2.0.11"\n' > "$WORK/stub-v2"; chmod +x "$WORK/stub-v2"
+printf '#!/bin/sh\necho "1.18.31"\n'        > "$WORK/stub-v1"; chmod +x "$WORK/stub-v1"
+mkdir -p "$WORK/conf"
+
+# 2a. major detection from the binary's --version shape
+run_resolver() {
+    # run_resolver <curl-bin-dir> <stub> <expr>
+    env PATH="$1:$PATH" SYSTEM_BIN="$2" CONFDIR="$WORK/conf" \
+        sh -c ". '$FUNCS' && $3" 2>/dev/null
+}
+_re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'current_opencode_major')
+[ "$_re" = "2" ] && pass "resolve: 2.x --version line maps to major 2" || fail "resolve: 2.x --version line maps to major 2 (got: '$_re')"
+_re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'current_opencode_major')
+[ "$_re" = "1" ] && pass "resolve: bare 1.x --version line maps to major 1" || fail "resolve: bare 1.x --version line maps to major 1 (got: '$_re')"
+
+# 2b. latest resolution per major (npm dist-tag vs GitHub releases/latest)
+_re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'resolve_latest_opencode_version 2')
+[ "$_re" = "2.1.99" ] && pass "resolve: major 2 resolves through the npm dist-tag" || fail "resolve: major 2 resolves through the npm dist-tag (got: '$_re')"
+_re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'resolve_latest_opencode_version 1')
+[ "$_re" = "1.18.99" ] && pass "resolve: major 1 resolves through GitHub releases/latest" || fail "resolve: major 1 resolves through GitHub releases/latest (got: '$_re')"
+
+# 2c. a dist-tag outside the wanted major fails loudly (no silent crossing)
+mkdir -p "$WORK/bin3"
+sed 's/"latest":"2.1.99"/"latest":"3.0.0"/' "$WORK/bin/curl" > "$WORK/bin3/curl"
+chmod +x "$WORK/bin3/curl"
+_re=$(run_resolver "$WORK/bin3" "$WORK/stub-v2" 'resolve_latest_opencode_version 2' >/dev/null && echo resolved || echo refused)
+[ "$_re" = "refused" ] && pass "resolve: dist-tag off the wanted major is refused (issue #99)" || fail "resolve: dist-tag off the wanted major is refused (got: '$_re')"
+
+# 2d. exact-version download: npm layout (2.*) and GitHub layout (1.x)
 DL="$(mktemp -d)"
-OUT=$(PATH="$WORK/bin:$PATH" sh -c "
-    eval \"\$(sed -n '/^detect_asset() {/,/^}/p' \"\$1\")\"
-    eval \"\$(sed -n '/^fetch_latest_opencode() {/,/^}/p' \"\$1\")\"
-    fetch_latest_opencode \"\$2\"
-" _ "$UPDATE" "$DL" 2>/dev/null || true)
-check "fetch: prints the candidate path" [ "$OUT" = "$DL/opencode" ]
-check "fetch: candidate binary exists and is executable" test -x "$DL/opencode"
-check "fetch: candidate runs (--version works for install_binary)" \
+OUT=$(PATH="$WORK/bin:$PATH" sh -c ". '$FUNCS' && fetch_opencode_version '$DL' '2.1.99'" 2>/dev/null || true)
+check "fetch: 2.* downloads through npm (package/bin/opencode)" [ "$OUT" = "$DL/opencode" ]
+check "fetch: 2.* candidate runs and reports the 2.x version" \
+    sh -c "\"\$1\" --version 2>/dev/null | grep -q '^opencode v2\.1\.99\$'" _ "$DL/opencode"
+rm -rf "$DL"; DL="$(mktemp -d)"
+OUT=$(PATH="$WORK/bin:$PATH" sh -c ". '$FUNCS' && fetch_opencode_version '$DL' '1.18.99'" 2>/dev/null || true)
+check "fetch: 1.x downloads through GitHub (tarball-root opencode)" [ "$OUT" = "$DL/opencode" ]
+check "fetch: 1.x candidate runs (--version works for install_binary)" \
     sh -c "\"\$1\" --version >/dev/null 2>&1" _ "$DL/opencode"
+rm -rf "$DL"
+
+# 2e. fetch_latest_opencode: default stays on the CURRENT major (no 2.x ->
+# 1.x downgrade); explicit major picks the channel
+DL="$(mktemp -d)"
+OUT=$(PATH="$WORK/bin:$PATH" SYSTEM_BIN="$WORK/stub-v2" CONFDIR="$WORK/conf" \
+    sh -c ". '$FUNCS' && fetch_latest_opencode '$DL'" 2>/dev/null || true)
+check "fetch: current major 2 -> npm candidate (issue #99: no downgrade)" \
+    sh -c "[ \"\$1\" = \"\$2/opencode\" ] && \"\$1\" --version 2>/dev/null | grep -q '^opencode v2'" _ "$OUT" "$DL"
+rm -rf "$DL"; DL="$(mktemp -d)"
+OUT=$(PATH="$WORK/bin:$PATH" SYSTEM_BIN="$WORK/stub-v1" CONFDIR="$WORK/conf" \
+    sh -c ". '$FUNCS' && fetch_latest_opencode '$DL'" 2>/dev/null || true)
+check "fetch: current major 1 -> GitHub candidate" \
+    sh -c "[ \"\$1\" = \"\$2/opencode\" ] && \"\$1\" --version >/dev/null 2>&1" _ "$OUT" "$DL"
 rm -rf "$DL"
 
 # --- 3. TMP cleanup order: never before the install attempt ----------------------
@@ -187,6 +258,26 @@ check "channel: missing ref is rejected (arg loop, from a checkout)" \
     sh -c "! sh \"\$1\" --channel >/dev/null 2>&1" _ "$UPDATE"
 check "channel: --help with --channel still works (pre-scan is silent)" \
     sh -c "sh \"\$1\" --channel testref --help >/dev/null 2>&1" _ "$UPDATE"
+
+# --- 8. --major / --version (issue #99: upgrades never cross majors) ------------
+check "flag: --major parsed, only 1 or 2 accepted" \
+    sh -c "grep -q -- '--major)' \"\$1\" && grep -q -- '--major must be 1 or 2' \"\$1\"" _ "$UPDATE"
+check "flag: --version parsed with a value" \
+    sh -c "grep -q -- '--version)' \"\$1\" && grep -q -- '--version requires an opencode version' \"\$1\"" _ "$UPDATE"
+check "flag: --major 3 is rejected" \
+    sh -c "! sh \"\$1\" --binary --major 3 >/dev/null 2>&1" _ "$UPDATE"
+check "flag: --version without a value is rejected" \
+    sh -c "! sh \"\$1\" --binary --version >/dev/null 2>&1" _ "$UPDATE"
+check "flag: help text documents --major and --version" \
+    sh -c "grep -q -- '--major 1|2' \"\$1\" && grep -q -- '--version <ver>' \"\$1\"" _ "$UPDATE"
+check "resolve: latest-version resolution guards the requested major" \
+    sh -c "grep -q '2\.\*) echo \"\$_rlov_ver\"' \"\$1\" && grep -q '1\.\*) echo \"\$_rlov_ver\"' \"\$1\"" _ "$UPDATE"
+check "resolve: 2.x channel is the npm registry (with scope fallback)" \
+    sh -c "grep -q 'registry.npmjs.org/@opencode/cli-' \"\$1\" && grep -q 'registry.npmjs.org/@opencode-ai/cli-' \"\$1\"" _ "$UPDATE"
+check "tui: registration flips with the major (sync function, both directions)" \
+    sh -c "grep -q '^sync_tui_registration() {' \"\$1\" && grep -q 'if \[ \"\$_str_major\" = 2 \]' \"\$1\" && grep -q 'rm -rf \"\$_str_user_dir/plugins/opencode-permissions-kit\"' \"\$1\"" _ "$UPDATE"
+check "tui: a major flip re-anchors the registration even in --only-binary runs" \
+    sh -c "grep -n 'sync_tui_registration \"\$_maj_after\"' \"\$1\" | head -1 | cut -d: -f1 | grep -q ." _ "$UPDATE"
 
 # --- Summary ----------------------------------------------------------------------
 echo ""
