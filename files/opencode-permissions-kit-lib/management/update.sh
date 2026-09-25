@@ -34,11 +34,26 @@
 set -e
 
 # Ref the kit updates from. Resolution (issue #38, docs/design/
-# release-handling.md): explicit KIT_BRANCH env > KIT_CHANNEL stamp in
-# install.conf (the channel this machine installed/last updated from) >
-# master (development channel; 'stable' is the release mirror the docs
-# one-liners use). Must run BEFORE the self-fetch below. Overridable for
-# testing: KIT_BASE_URL=https://example.invalid/<branch>
+# release-handling.md): --channel flag (pre-scanned below) > explicit
+# KIT_BRANCH env > KIT_CHANNEL stamp in install.conf (the channel this
+# machine installed/last updated from) > master (development channel;
+# 'stable' is the release mirror the docs one-liners use). Must run BEFORE
+# the self-fetch below. Overridable for testing:
+# KIT_BASE_URL=https://example.invalid/<branch>
+#
+# --channel <ref> pre-scan: 'opk update --channel <ref>' switches the
+# tracking ref for THIS update and every future one — update.sh re-stamps
+# KIT_CHANNEL at the end, so the switch persists. The scan must happen
+# before the resolution below and before the fetch; the regular arg loop
+# below consumes and validates the flag again.
+_prev_arg=""
+for _arg in "$@"; do
+    if [ "$_prev_arg" = "--channel" ]; then
+        [ -n "$_arg" ] || { echo "error: --channel requires a ref (stable, master, a branch, or a tag)" >&2; exit 1; }
+        KIT_BRANCH="$_arg"
+    fi
+    _prev_arg="$_arg"
+done
 _kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)"
 KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
@@ -244,16 +259,24 @@ while [ "$#" -gt 0 ]; do
             BINARY_PATH="$2"
             shift
             ;;
+        --channel)
+            # consumed by the pre-scan above (before the self-fetch);
+            # accepted here so it never reaches the unknown-option trap
+            [ "$#" -ge 2 ] || { echo "error: --channel requires a ref (stable, master, a branch, or a tag)" >&2; exit 1; }
+            shift
+            ;;
         -h|--help)
             cat <<EOF
 opencode permissions kit -- update.sh  v$VERSION
 Re-deploys the kit on an already-installed system. No prompts by default.
-Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path <file>]
+Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path <file>] [--channel <ref>]
   --yes            skip the confirmation prompt
   --refresh        also re-apply the group baseline (chgrp/setgid/default ACLs)
   --binary         also upgrade the opencode binary to the latest release
   --only-binary    skip every kit step, ONLY upgrade the opencode binary
   --binary-path    install the given binary file instead of downloading
+  --channel        switch the tracking ref for this and every future update
+                   (stable, master, a feature branch, or a pinned tag)
 EOF
             exit 0
             ;;

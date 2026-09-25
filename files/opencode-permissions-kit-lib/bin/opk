@@ -63,8 +63,11 @@ Commands:
                                   ddev-settings on|off|status (dev-owned
                                   projects)
   update [--yes] [--refresh]      Re-deploy the kit; --binary / --binary-path
-                                  upgrade the opencode binary; --only-binary
-                                  skips every kit step and only upgrades it
+                                   upgrade the opencode binary; --only-binary
+                                   skips every kit step and only upgrades it;
+                                   --channel <ref> switches the tracking ref
+                                   (stable, master, a branch, a tag) for this
+                                   and every future update
   upgrade-opencode [flags...]     Just upgrade the opencode binary — shorthand
                                   for 'update --yes --only-binary' (extra
                                   flags pass through, e.g. --binary-path)
