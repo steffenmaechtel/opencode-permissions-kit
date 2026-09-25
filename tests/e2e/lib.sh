@@ -164,20 +164,54 @@ e2e_fetch_opencode() {
     chmod +x "$dest"
 }
 
+# Resolve the latest release tag of a GitHub repo, rate-limit resilient
+# (CI crash 2026-09-25: unauthenticated api.github.com is 60 req/h per IP
+# and shared GitHub-runner IPs routinely exhaust it — the ddev-2x job died
+# in "cannot resolve a ddev version" while every npm-based job stayed
+# green). Chain: REST API (authorized when OPK_GH_TOKEN/GITHUB_TOKEN is
+# exported by the workflows — 1000+ req/h), then the releases/latest HTML
+# redirect (no API, no rate limit). Prints the bare tag (no leading v),
+# or nothing when both endpoints refuse.
+# $1 = owner/repo.
+gh_latest_tag() {
+    local repo="$1" tag _auth
+    repo="${repo#https://github.com/}"
+    _auth=""
+    if [ -n "${OPK_GH_TOKEN:-}" ]; then _auth="Authorization: Bearer $OPK_GH_TOKEN"
+    elif [ -n "${GITHUB_TOKEN:-}" ]; then _auth="Authorization: Bearer $GITHUB_TOKEN"
+    fi
+    if [ -n "$_auth" ]; then
+        tag=$(curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 \
+            -H "$_auth" "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null \
+            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+    else
+        tag=$(curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 \
+            "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null \
+            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+    fi
+    if [ -z "$tag" ]; then
+        # No API fallback: releases/latest 302s to releases/tag/v<ver> —
+        # plain HTML endpoints carry no per-IP API rate limit.
+        tag=$(curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 \
+            -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest" 2>/dev/null \
+            | sed -n 's|.*/tag/v\([^/?#]*\).*|\1|p' || true)
+    fi
+    printf '%s\n' "$tag"
+}
+
 e2e_resolve_cache() {
     OC_CACHE_DIR="$SCRIPT_DIR/cache"
     mkdir -p "$OC_CACHE_DIR"
 
     # Resolve the opencode version under test. E2E_OC_VERSION pins it; the
-    # default resolves the current latest from GitHub releases (tiny
-    # request). If the endpoint is unreachable, fall back to the newest
-    # cached version so repeat runs work offline. A pinned version that is
-    # not cached yet is downloaded on demand (see e2e_fetch_opencode).
+    # default resolves the current latest from GitHub releases (rate-limit
+    # resilient, see gh_latest_tag). If the endpoint is unreachable, fall
+    # back to the newest cached version so repeat runs work offline. A
+    # pinned version that is not cached yet is downloaded on demand (see
+    # e2e_fetch_opencode).
     OC_VERSION="$E2E_OC_VERSION"
     if [ -z "$OC_VERSION" ]; then
-        OC_VERSION=$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-            https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
-            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+        OC_VERSION=$(gh_latest_tag anomalyco/opencode)
     fi
     if [ -z "$OC_VERSION" ]; then
         OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
