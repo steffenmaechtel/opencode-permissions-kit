@@ -3,14 +3,15 @@
 #   1. bin/browser-bridge stand-in: forwards to the real powershell.exe
 #      when the caller may execute it, exit 0 otherwise (the opencode user
 #      on a hardened /mnt/c — the login flow must survive the spawn).
-#   2. sh/wsl-browser-bridge.sh: the /etc/wsl.conf rewrite (driven through
-#      the REAL functions via the OPK_WSL_CONF/OPK_WSL_SUDO/OPK_WSL_FORCE
-#      overrides, same convention as DDEV_WIN_HOSTS/FS_SUDO) prepends a
+#   2. sh/wsl-browser-bridge.sh: install deploys ONLY the stand-in tree and
+#      never writes /etc/wsl.conf (consent policy,
+#      docs/design/wsl-conf-consent.md) — it merely strips the broken
+#      legacy 0.0.36 section. The carrier write (the opk
+#      wsl-add-opencode-1-fix path, browser_bridge_write_conf) prepends a
 #      pure-comment kit block (WSL-silent by construction, issue #100)
 #      whose raw-CR carrier line wins open@<=10's `root =` scan, preserves
-#      every foreign line, is idempotent, migrates the broken 0.0.36
-#      section away, and the remove path restores the original file
-#      byte-for-byte.
+#      every foreign line, is idempotent, and the remove path restores the
+#      original file byte-for-byte.
 # Run: sh tests/unit/test-browser-bridge.sh
 set -u
 
@@ -143,9 +144,9 @@ fi
 chmod 755 "$WORK/fakec/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 
 echo ""
-echo "--- wsl.conf bridge block rewrite (real functions, overridden paths) ---"
+echo "--- wsl-browser-bridge.sh: install/update path (never touches wsl.conf) ---"
 
-# Pre-existing user conf the bridge must preserve byte-for-byte:
+# Pre-existing user conf install must leave alone, byte-for-byte:
 cat > "$CONF" <<'CONF'
 [boot]
 systemd=true
@@ -159,7 +160,7 @@ options = "uid=1000,gid=1000,dmask=027,fmask=037"
 CONF
 cp "$CONF" "$WORK/orig.conf"
 
-# 4. full install: stand-in tree + conf block
+# 4. full install: stand-in tree deployed
 BB_CALL='browser_bridge_install "$1" "$2"' bb "$FILES_ROOT" "$LIBDIR"
 _SHIM="$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 if [ -f "$_SHIM" ] && [ -x "$_SHIM" ]; then
@@ -175,82 +176,97 @@ else
     fail "deployed stand-in differs from bin/browser-bridge"
 fi
 
-# 6. the kit block lands at the TOP (open's scan is first-match)
+# 6. consent policy: install NEVER writes /etc/wsl.conf
+if diff -q "$CONF" "$WORK/orig.conf" >/dev/null 2>&1; then
+    pass "install leaves wsl.conf byte-for-byte untouched (consent policy)"
+else
+    fail "install wrote to wsl.conf — only 'opk wsl-add-opencode-1-fix' may"
+fi
+
+# 7. install still strips the broken legacy 0.0.36 section (kit-owned
+#    regression cleanup, issue #100) without adding the carrier block
+printf '[opencode-permissions-kit]\n# Managed by the opencode permissions kit. WSL ignores this section; it\n# redirects the powershell.exe lookup (issue #91).\nroot = /usr/local/lib/opencode-permissions-kit/wsl\n\n[boot]\nsystemd=true\n' > "$CONF"
+BB_CALL='browser_bridge_install "$1" "$2"' bb "$FILES_ROOT" "$LIBDIR"
+printf '[boot]\nsystemd=true\n' > "$WORK/strip.expect"
+if ! grep -q 'opencode-permissions-kit\]' "$CONF" \
+   && ! grep -q '^# opencode permissions kit browser bridge -- begin$' "$CONF" \
+   && diff -q "$CONF" "$WORK/strip.expect" >/dev/null 2>&1; then
+    pass "install strips the legacy 0.0.36 section, adds nothing (issue #100)"
+else
+    fail "legacy-section cleanup on install broken"
+fi
+
+echo ""
+echo "--- wsl.conf carrier write (opk wsl-add-opencode-1-fix path) ---"
+
+# Fresh user conf; the carrier write (write_conf) runs it through the REAL
+# functions via the OPK_WSL_CONF/OPK_WSL_SUDO/OPK_WSL_FORCE overrides.
+cat > "$CONF" <<'CONF'
+[boot]
+systemd=true
+
+[user]
+default=infotest
+
+[automount]
+enabled = true
+options = "uid=1000,gid=1000,dmask=027,fmask=037"
+CONF
+cp "$CONF" "$WORK/orig.conf"
+BB_CALL='browser_bridge_write_conf "$1"' bb "$LIBDIR"
+
+# 8. the kit block lands at the TOP (open's scan is first-match)
 if head -1 "$CONF" | grep -q '^# opencode permissions kit browser bridge -- begin$'; then
     pass "kit block is the first thing in wsl.conf (wins open's first-match scan)"
 else
     fail "kit block is not at the top of wsl.conf"
 fi
 
-# 7. the carrier line is a raw-CR comment: '# ---...\rroot = <libdir>/wsl'
+# 9. the carrier line is a raw-CR comment: '# ---...\rroot = <libdir>/wsl'
 if printf '%s\n' "$(sed -n '9p' "$CONF" | cat -v)" | grep -q '\^Mroot = '"$LIBDIR"'/wsl$'; then
     pass "carrier line is comment + raw CR + root = <libdir>/wsl"
 else
     fail "carrier line malformed (must be # ---...<CR>root = <libdir>/wsl)"
 fi
 
-# 8. open@10.1.2 scan resolves to the stand-in path
+# 10. open@10.1.2 scan resolves to the stand-in path
 if opk_scan_ok "$CONF" "$LIBDIR"; then
     pass "open@10.1.2 scan resolves powershell.exe to the kit stand-in"
 else
     fail "open@10.1.2 scan does not resolve to the kit stand-in"
 fi
 
-# 9. newer open (wsl-utils, line-based) skips the whole block
+# 11. newer open (wsl-utils, line-based) skips the whole block
 if wslutils_ignores_block "$CONF"; then
     pass "wsl-utils line parser ignores the kit block (access-check fallback)"
 else
     fail "wsl-utils parser picks up the kit carrier (would break its fallback)"
 fi
 
-# 10. WSL itself sees no section and no key from the kit
+# 12. WSL itself sees no section and no key from the kit
 if wsl_sees_nothing "$CONF"; then
     pass "WSL sees only comments from the kit (no section, no key, no warning)"
 else
     fail "kit content would be parsed by WSL (warning/abort risk, issue #100)"
 fi
 
-# 11. every foreign line survives below the block (10 block lines + blank)
+# 13. every foreign line survives below the block (10 block lines + blank)
 if tail -n +12 "$CONF" | diff -q - "$WORK/orig.conf" >/dev/null 2>&1; then
     pass "foreign wsl.conf content preserved byte-for-byte below the block"
 else
     fail "foreign wsl.conf content altered by the rewrite"
 fi
 
-# 12. idempotent: a second install run changes nothing
-cp "$CONF" "$WORK/before-second.conf"
-BB_CALL='browser_bridge_install "$1" "$2"' bb "$FILES_ROOT" "$LIBDIR"
-if diff -q "$CONF" "$WORK/before-second.conf" >/dev/null 2>&1; then
-    pass "rewrite is idempotent (second run is a no-op)"
-else
-    fail "rewrite is not idempotent (block duplicated or content changed)"
-fi
-
-# 13. migration from the broken 0.0.36 section (issue #100): the hyphenated
-#     section is replaced by the comment block; user content stays intact
-cat > "$CONF" <<'CONF'
-[opencode-permissions-kit]
-# Managed by the opencode permissions kit. WSL ignores this section; it
-# redirects the powershell.exe lookup of the `open` npm package (bundled in
-# opencode) to the kit stand-in so device logins survive a hardened /mnt/c
-# (issue #91). Do not add other keys here — uninstall removes the section.
-root = /usr/local/lib/opencode-permissions-kit/wsl
-
-[boot]
-systemd=true
-CONF
+# 14. idempotent: a second carrier write changes nothing
+cp "$CONF" "$WORK/after-first.conf"
 BB_CALL='browser_bridge_write_conf "$1"' bb "$LIBDIR"
-printf '[boot]\nsystemd=true\n' > "$WORK/migrate.expect"
-if ! grep -q 'opencode-permissions-kit\]' "$CONF" \
-   && grep -q '^# opencode permissions kit browser bridge -- begin$' "$CONF" \
-   && opk_scan_ok "$CONF" "$LIBDIR" \
-   && tail -n +12 "$CONF" | diff -q - "$WORK/migrate.expect" >/dev/null 2>&1; then
-    pass "0.0.36 hyphen section migrated to the comment block (issue #100)"
+if diff -q "$CONF" "$WORK/after-first.conf" >/dev/null 2>&1; then
+    pass "carrier write is idempotent (second run is a no-op)"
 else
-    fail "0.0.36 section migration broken"
+    fail "carrier write is not idempotent (block duplicated or content changed)"
 fi
 
-# 14. a stale root = value heals (old kit block replaced, not appended)
+# 15. a stale root = value heals (old kit block replaced, not appended)
 printf '# opencode permissions kit browser bridge -- begin\n# stale deploy\n# ----\rroot = /old/lib/wsl\n# opencode permissions kit browser bridge -- end\n\n[boot]\nsystemd=true\n' > "$CONF"
 BB_CALL='browser_bridge_write_conf "$1"' bb "$LIBDIR"
 if ! grep -q '/old/lib' "$CONF" && opk_scan_ok "$CONF" "$LIBDIR"; then
@@ -259,7 +275,7 @@ else
     fail "stale kit block survives the rewrite"
 fi
 
-# 15. the user's own [automount] root = (if they ever set one) stays intact
+# 16. the user's own [automount] root = (if they ever set one) stays intact
 #     BELOW the kit block — open's first-match still resolves to the kit
 printf '[automount]\nroot = /mnt/\nenabled = true\n' > "$WORK/orig-automount.conf"
 cp "$WORK/orig-automount.conf" "$CONF"
@@ -271,7 +287,21 @@ else
     fail "rewrite damages a foreign automount root = line"
 fi
 
-# 16. fresh install without any pre-existing wsl.conf works (no read crash)
+# 17. carrier write on a legacy 0.0.36 conf (opk wsl-add-opencode-1-fix on a
+#     broken install): hyphen section migrated away, user content intact
+printf '[opencode-permissions-kit]\n# Managed by the opencode permissions kit. WSL ignores this section; it\n# redirects the powershell.exe lookup of the `open` npm package (bundled in\n# opencode) to the kit stand-in so device logins survive a hardened /mnt/c\n# (issue #91). Do not add other keys here — uninstall removes the section.\nroot = /usr/local/lib/opencode-permissions-kit/wsl\n\n[boot]\nsystemd=true\n' > "$CONF"
+BB_CALL='browser_bridge_write_conf "$1"' bb "$LIBDIR"
+printf '[boot]\nsystemd=true\n' > "$WORK/migrate.expect"
+if ! grep -q 'opencode-permissions-kit\]' "$CONF" \
+   && grep -q '^# opencode permissions kit browser bridge -- begin$' "$CONF" \
+   && opk_scan_ok "$CONF" "$LIBDIR" \
+   && tail -n +12 "$CONF" | diff -q - "$WORK/migrate.expect" >/dev/null 2>&1; then
+    pass "0.0.36 hyphen section migrated to the comment block (issue #100)"
+else
+    fail "0.0.36 section migration broken"
+fi
+
+# 18. fresh install without any pre-existing wsl.conf works (no read crash)
 rm -f "$CONF"
 BB_CALL='browser_bridge_write_conf "$1"' bb "$LIBDIR"
 if [ -f "$CONF" ] && opk_scan_ok "$CONF" "$LIBDIR"; then
@@ -280,7 +310,7 @@ else
     fail "fresh-install path broken"
 fi
 
-# 17. remove restores the original conf byte-for-byte and drops the tree
+# 19. remove restores the original conf byte-for-byte and drops the tree
 cat > "$CONF" <<'CONF'
 [boot]
 systemd=true
@@ -304,7 +334,7 @@ else
     fail "stand-in tree survives browser_bridge_remove"
 fi
 
-# 18. remove also strips a legacy 0.0.36 section (uninstall migration)
+# 20. remove also strips a legacy 0.0.36 section (uninstall migration)
 printf '[opencode-permissions-kit]\n# Managed by the opencode permissions kit. WSL ignores this section; it\n# redirects the powershell.exe lookup (issue #91). Do not add other keys\n# here — uninstall removes the section.\nroot = /usr/local/lib/opencode-permissions-kit/wsl\n\n[boot]\nsystemd=true\n' > "$CONF"
 BB_CALL='browser_bridge_remove "$1"' bb "$LIBDIR"
 if printf '[boot]\nsystemd=true\n' | diff -q - "$CONF" >/dev/null 2>&1; then
@@ -313,7 +343,7 @@ else
     fail "remove leaves legacy section residue"
 fi
 
-# 19. remove is safe on a bridge-free conf (no kit block, no tree)
+# 21. remove is safe on a bridge-free conf (no kit block, no tree)
 BB_CALL='browser_bridge_remove "$1"' bb "$LIBDIR"
 if printf '[boot]\nsystemd=true\n' | diff -q - "$CONF" >/dev/null 2>&1; then
     pass "remove is a no-op when no kit block exists"
@@ -324,21 +354,23 @@ fi
 echo ""
 echo "--- helper contract ---"
 
-# 20. sourcing defines the API and executes nothing (deploy is caller-side)
+# 22. sourcing defines the API and executes nothing (deploy is caller-side)
 _api=$(OPK_WSL_CONF="$CONF" OPK_WSL_SUDO="" sh -c '
     . "$1"
     command -v browser_bridge_is_wsl >/dev/null 2>&1 \
+    && command -v browser_bridge_deploy_tree >/dev/null 2>&1 \
+    && command -v browser_bridge_strip_legacy >/dev/null 2>&1 \
     && command -v browser_bridge_write_conf >/dev/null 2>&1 \
     && command -v browser_bridge_install >/dev/null 2>&1 \
     && command -v browser_bridge_remove >/dev/null 2>&1 \
     && echo ok' _ "$BRIDGE_SH")
 if [ "$_api" = "ok" ]; then
-    pass "helper exports the four bridge functions (sourced, not executed)"
+    pass "helper exports the six bridge functions (sourced, not executed)"
 else
     fail "helper API incomplete"
 fi
 
-# 21. without OPK_WSL_FORCE the is_wsl probe delegates to /proc/version
+# 23. without OPK_WSL_FORCE the is_wsl probe delegates to /proc/version
 #     (whatever that says on the host — WSL dev boxes included)
 _raw=no
 grep -qi microsoft /proc/version 2>/dev/null && _raw=yes
@@ -353,7 +385,7 @@ else
     fail "is_wsl ignores /proc/version without FORCE (probe=$_probe raw=$_raw)"
 fi
 
-# 22. install no-ops (gracefully) when the stand-in source is absent —
+# 24. install no-ops (gracefully) when the stand-in source is absent —
 #     e.g. a partial files/ tree
 if OPK_WSL_CONF="$CONF" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
     sh -c '. "$1" && browser_bridge_install "$2" "$3"' _ "$BRIDGE_SH" "$WORK/no-such-files-root" "$LIBDIR" >/dev/null 2>&1; then
@@ -365,7 +397,7 @@ fi
 echo ""
 echo "--- diagnostics (debug trace + tty hint) ---"
 
-# 23. without the debug env the no-op path is completely silent (opencode's
+# 25. without the debug env the no-op path is completely silent (opencode's
 #     spawn would show any stdout/stderr noise in the login dialog)
 _out="$(OPK_WSL_C_ROOT="$WORK/nowhere" "$BRIDGE_BIN" -EncodedCommand X 2>&1)"
 if [ -z "$_out" ]; then
@@ -374,7 +406,7 @@ else
     fail "no-op path leaks output without the debug env (got: '$_out')"
 fi
 
-# 24. with the debug env the no-op path traces the decision
+# 26. with the debug env the no-op path traces the decision
 if OPK_BROWSER_BRIDGE_DEBUG=1 OPK_WSL_C_ROOT="$WORK/nowhere" "$BRIDGE_BIN" -EncodedCommand X 2>&1 \
    | grep -q "browser-bridge\[debug\]: no real powershell reachable"; then
     pass "debug env traces the no-op decision"
@@ -382,7 +414,7 @@ else
     fail "debug env does not trace the no-op decision"
 fi
 
-# 25. with the debug env the forwarding path traces target + decision
+# 27. with the debug env the forwarding path traces target + decision
 if OPK_BROWSER_BRIDGE_DEBUG=1 OPK_WSL_C_ROOT="$WORK/fakec" "$BRIDGE_BIN" 2>&1 \
    | grep -q "browser-bridge\[debug\]: forwarding to $WORK/fakec"; then
     pass "debug env traces the forwarding decision"
@@ -390,7 +422,7 @@ else
     fail "debug env does not trace the forwarding decision"
 fi
 
-# 26. the no-op hint goes to the controlling terminal, not stdout/stderr:
+# 28. the no-op hint goes to the controlling terminal, not stdout/stderr:
 #     under a pty (script -e) it must appear, detached it must not.
 if command -v script >/dev/null 2>&1; then
     _pty_out="$(script -qec "OPK_WSL_C_ROOT='$WORK/nowhere' '$BRIDGE_BIN'" /dev/null 2>&1 | tr -d '\r')"

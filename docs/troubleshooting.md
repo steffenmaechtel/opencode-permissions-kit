@@ -376,7 +376,9 @@ options = "uid=1000,gid=1000,dmask=027,fmask=037"
 ```
 
 (replace `uid`/`gid` with your default WSL user's), then from Windows run
-`wsl --shutdown` and restart WSL. Details: [security model](concepts/security-model.md).
+`wsl --shutdown` and restart WSL. The kit never edits `/etc/wsl.conf`
+itself — applying the snippet is yours ([why](design/wsl-conf-consent.md)).
+Details: [security model](concepts/security-model.md).
 
 ## `opencode console login` / `opencode auth login` crashes with EACCES on powershell.exe
 
@@ -395,13 +397,21 @@ file itself is executable; plain `execve` is unaffected. The wrapper moves
 starting the binary, so this is handled automatically; a crash means an
 old wrapper is deployed.
 
-**Fix:** re-run the install or `opk update` — both (re)apply the kit
-comment block in `/etc/wsl.conf`, the stand-in under
-`/usr/local/lib/opencode-permissions-kit/wsl/`, and the current wrapper.
-The wsl.conf block takes effect immediately (only `open` reads it; WSL
-sees comments — no `wsl --shutdown` needed). Without a bridge, the login
-still works when you open the printed URL yourself: the crash happens
-*after* URL and device code are displayed. Details: [security
+**Fix:** run
+
+```bash
+sudo opk wsl-add-opencode-1-fix
+```
+
+It (re)deploys the stand-in under
+`/usr/local/lib/opencode-permissions-kit/wsl/` and writes the kit comment
+block into `/etc/wsl.conf` — the one kit command that touches the file,
+and only because you ran it ([why](design/wsl-conf-consent.md)). The
+block takes effect immediately (only `open` reads it; WSL sees comments
+— no `wsl --shutdown` needed). If the stand-in itself is missing, run
+`sudo opk update` first. Without a bridge, the login still works when you
+open the printed URL yourself: the crash happens *after* URL and device
+code are displayed. Details: [security
 model](concepts/security-model.md).
 
 **Diagnose — expected vs. broken:** when the login runs with the agent
@@ -432,12 +442,18 @@ stops applying: the `[automount]` restriction stays pending, `[boot]`
 `systemd=true` (and with it the docker-rootless backend) disappears after
 the next `wsl --shutdown` (issue #100).
 
-**Fix:** update the kit (`sudo opk update`, ≥ 0.0.37) — the rewrite
-replaces the broken section with a pure comment block that WSL never
-complains about — then run `wsl --shutdown` from Windows and reopen your
-distro so the dropped settings apply again. `opk status` should show the
-backend socket reachable, `/mnt/c` restricted, and the browser bridge
-deployed. Details: [security model](concepts/security-model.md).
+**Fix:** update the kit (`sudo opk update`, ≥ 0.0.38) — it strips the
+broken section (restoring WSL's ability to parse the file) — then opt in
+to the login-fix carrier yourself:
+
+```bash
+sudo opk wsl-add-opencode-1-fix
+```
+
+Finally run `wsl --shutdown` from Windows and reopen your distro so the
+dropped settings apply again. `opk status` should show the backend socket
+reachable, `/mnt/c` restricted, and the browser bridge deployed. Details:
+[security model](concepts/security-model.md).
 
 ## Group membership (opencode group) not applied
 

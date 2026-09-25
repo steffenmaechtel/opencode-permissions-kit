@@ -29,6 +29,12 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 
 **Project file contents are untouched** — only owner and group revert.
 
+On WSL, the uninstaller also **asks** whether to remove the kit's
+browser-bridge block from `/etc/wsl.conf` (kit-owned comment lines only;
+default: yes). Decline and it prints the exact line range to delete by
+hand — the kit never edits `wsl.conf` without your say-so
+([why](../design/wsl-conf-consent.md)).
+
 ## What stays behind (harmless)
 
 - Shell RC hook lines (`~/.bashrc` / `~/.zshrc` / `~/.profile`, tagged

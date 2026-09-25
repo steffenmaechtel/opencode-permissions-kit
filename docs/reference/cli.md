@@ -2,6 +2,30 @@
 
 This page lists the kit's commands and flags.
 
+## wsl-add-opencode-1-fix
+
+Write the WSL browser-bridge carrier into `/etc/wsl.conf` (sudo — the
+command elevates itself):
+
+```bash
+sudo opk wsl-add-opencode-1-fix
+```
+
+Keeps opencode 1.x device logins (`console login`) alive on a hardened
+`/mnt/c`: the carrier is a comment block at the top of your `wsl.conf`
+whose `root =` line wins the bundled `open` package's scan, redirecting
+its powershell.exe lookup to the kit stand-in (forwards for you, exits 0
+for the agent). Takes effect immediately — no `wsl --shutdown` needed,
+WSL only ever sees comments. opencode 2.x needs no bridge (its `open`
+access-checks powershell and falls back to xdg-open).
+
+This is the **only** kit command that writes `/etc/wsl.conf` — install
+and update never touch the file; they only deploy the stand-in tree and
+tell you about this command ([why](../design/wsl-conf-consent.md)). The
+command is idempotent and also cleans up the broken kit-0.0.36 section if
+one is present. `opk uninstall` asks before removing the block again
+(`--yes` assumes yes).
+
 ## The `opk` command
 
 After installation, one command manages everything (works from anywhere in
@@ -14,6 +38,7 @@ opk update --binary
 opk upgrade-opencode   # just the opencode binary
 opk ddev-hosts-add     # in a ddev project dir
 opk handover me .gotmp # mixed-owner tree -> yours again
+opk wsl-add-opencode-1-fix   # opt in to the WSL browser-bridge carrier
 opk uninstall
 opk help        # commands + arguments overview
 ```

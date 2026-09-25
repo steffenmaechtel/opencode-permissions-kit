@@ -10,6 +10,9 @@
 #   opk uninstall  -> management/uninstall.sh (runs as your user,
 #                                            asks for sudo itself)
 #
+# wsl-add-opencode-1-fix is implemented inline (explicit-consent wsl.conf
+# write, docs/design/wsl-conf-consent.md).
+#
 # Everything after the subcommand is passed through to the script, so all
 # script flags work unchanged (see docs/reference/cli.md).
 set -u
@@ -73,10 +76,16 @@ Commands:
   ddev-hosts-check [dir]            List this project's ddev hostnames missing
                                     from the Windows hosts file
   handover <me|opencode> <path>...  Recursively hand file ownership to you (me)
-                                    or the agent user (opencode) — the sharing
-                                    group stays, so both sides keep access. For
-                                    mixed-owner trees, e.g. after builds by
-                                    both users. --dry-run shows the plan
+                                     or the agent user (opencode) — the sharing
+                                     group stays, so both sides keep access. For
+                                     mixed-owner trees, e.g. after builds by
+                                     both users. --dry-run shows the plan
+  wsl-add-opencode-1-fix            Write the WSL browser-bridge carrier into
+                                    /etc/wsl.conf (sudo). The only kit command
+                                    that touches wsl.conf — explicit consent:
+                                    install/update never do. Keeps opencode
+                                    1.x device logins alive on a hardened
+                                    /mnt/c (opencode 2.x needs no bridge)
   uninstall [--yes] [--dry-run]   Remove the kit (runs as your user)
   help                            Show this help
 
@@ -159,6 +168,39 @@ case "$cmd" in
                 ddev_hosts_add "${1:-$PWD}"
                 ;;
         esac
+        ;;
+    wsl-add-opencode-1-fix)
+        # Explicit consent for the /etc/wsl.conf browser-bridge carrier
+        # (docs/design/wsl-conf-consent.md): install/update never write
+        # wsl.conf — only THIS command, run by the user, does. It (re)deploys
+        # the stand-in tree from the library and writes the kit comment
+        # block (pure comments for WSL, issue #100); a legacy 0.0.36
+        # section is cleaned up on the way, and only kit content is ever
+        # removed or added. Auto-sudo like config/update.
+        [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] || { ui_error "$LIBDIR/sh/wsl-browser-bridge.sh not found — is the kit installed?"; exit 1; }
+        if [ "$(id -u)" -ne 0 ]; then
+            exec sudo sh "$LIBDIR/bin/opk" "$cmd"
+        fi
+        # Running as root: the bridge helper's writes need no sudo prefix.
+        OPK_WSL_SUDO=""
+        export OPK_WSL_SUDO
+        # shellcheck disable=SC1090
+        . "$LIBDIR/sh/wsl-browser-bridge.sh"
+        browser_bridge_is_wsl || { ui_error "not WSL — the browser bridge is WSL-only"; exit 1; }
+        # Redeploy the stand-in when the source is in the library; older
+        # deploys (update before browser-bridge joined the library) may only
+        # have the tree — fine, the carrier is the missing piece then.
+        if [ -f "$LIBDIR/bin/browser-bridge" ]; then
+            browser_bridge_deploy_tree "$LIBDIR/bin/browser-bridge" "$LIBDIR"
+        elif [ ! -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+            ui_error "stand-in missing and no $LIBDIR/bin/browser-bridge — run 'sudo opk update' first"
+            exit 1
+        fi
+        browser_bridge_write_conf "$LIBDIR"
+        ui_success "WSL browser bridge active — opencode 1.x device logins survive a hardened /mnt/c"
+        ui_detail "carrier written to /etc/wsl.conf as a comment block (WSL ignores it;"
+        ui_detail "takes effect immediately, no 'wsl --shutdown' needed)"
+        ui_detail "'opk uninstall' removes the block again"
         ;;
     handover)
         # Generic ownership switch between the two kit users, for

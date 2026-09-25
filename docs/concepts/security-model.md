@@ -70,11 +70,13 @@ do not distinguish WSL users, so with the default world-readable mount
 (`.ssh/`, `NTUSER.DAT`, browser data). The kit's UID separation only covers
 the Linux side.
 
-The kit surfaces this everywhere: `install.sh` warns and offers to restrict
-the mount to your user (recommended; applies after `wsl --shutdown` from
-Windows), `update.sh` prints a warning, `status.sh` reports the exposure,
-and the **wrapper warns on every `opencode` start** until the restriction is
-applied.
+The kit surfaces this everywhere: `install.sh` prints the ready-to-run
+restriction snippet (the kit never edits `/etc/wsl.conf` itself — you
+apply it; takes effect after `wsl --shutdown` from Windows),
+`update.sh` prints a warning with the same snippet, `status.sh` reports
+the exposure, and the **wrapper warns on every `opencode` start** until
+the restriction is applied. Rationale for the no-write rule:
+[design: wsl.conf consent](../design/wsl-conf-consent.md).
 
 Manual fix via `/etc/wsl.conf`:
 
@@ -109,12 +111,15 @@ printing URL and device code.
 
 The kit solves this **without granting the agent anything**:
 
-- install.sh/update.sh keep a kit-managed **comment block** at the **top**
-  of `/etc/wsl.conf`. Its last line is a carrier for `open`'s scan: the
-  line starts with `#` (so WSL treats it as a comment) and contains a raw
-  carriage return before `root = <kit library>` — `open`'s regex cannot
-  see the `#` across that CR, so its first-match scan resolves into the
-  kit library and the computed powershell path lands there.
+- `sudo opk wsl-add-opencode-1-fix` — run by you, the only kit command
+  that ever writes `/etc/wsl.conf` (install/update deploy just the
+  stand-in tree; the kit never edits the file implicitly) — writes a
+  kit-managed **comment block** at the **top** of `/etc/wsl.conf`. Its
+  last line is a carrier for `open`'s scan: the line starts with `#`
+  (so WSL treats it as a comment) and contains a raw carriage return
+  before `root = <kit library>` — `open`'s regex cannot see the `#`
+  across that CR, so its first-match scan resolves into the kit library
+  and the computed powershell path lands there.
 - there, `wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` is
   a harmless stand-in (`bin/browser-bridge`): it forwards to the **real**
   powershell.exe whenever the calling user may execute it (you, the
@@ -142,9 +147,10 @@ no-op path triggers, it prints a one-line hint to the terminal
 (`auto-open unavailable for the agent — open the printed URL manually`);
 `OPK_BROWSER_BRIDGE_DEBUG=1` traces the decision for direct invocations
 (self-test: [troubleshooting](../troubleshooting.md)).
-`opk status` reports the bridge state; the wrapper warns when the mount is
-restricted but the bridge is missing (hand-edited `wsl.conf`, partial
-deploy). Uninstall removes the block and the stand-in tree.
+`opk status` reports the bridge state and names
+`opk wsl-add-opencode-1-fix` when the carrier is missing; the wrapper
+warns the same way on every start. Uninstall asks before removing the
+block (or assumes yes with `--yes`) and always removes the stand-in tree.
 
 ## Other root-equivalent surfaces (audit)
 
