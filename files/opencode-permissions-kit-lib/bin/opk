@@ -67,10 +67,14 @@ Commands:
                                    skips every kit step and only upgrades it;
                                    --channel <ref> switches the tracking ref
                                    (stable, master, a branch, a tag) for this
-                                   and every future update
+                                   and every future update; --major 1|2
+                                   switches the opencode major, --version <ver>
+                                   pins an exact version (default: latest of
+                                   the current major — never crosses majors)
   upgrade-opencode [flags...]     Just upgrade the opencode binary — shorthand
-                                  for 'update --yes --only-binary' (extra
-                                  flags pass through, e.g. --binary-path)
+                                   for 'update --yes --only-binary' (extra
+                                   flags pass through, e.g. --binary-path,
+                                   --major 1|2, --version <ver>)
   ddev-hosts-add [dir|hostname]     Add ddev hostnames to the Windows hosts
                                    file (ddev's own UAC flow; run as your
                                    user, Windows asks permission). A dir adds

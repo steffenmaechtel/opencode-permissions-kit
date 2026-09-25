@@ -114,7 +114,9 @@ the bundled config sets `autoupdate: false`, and `update.sh` is the upgrade
 entry point:
 
 ```bash
-opk upgrade-opencode                 # latest release
+opk upgrade-opencode                 # latest release of the current major
+opk upgrade-opencode --major 2       # switch to the latest opencode 2.x
+opk upgrade-opencode --version 2.0.11  # pin an exact version
 opk upgrade-opencode --binary-path ./opencode  # specific file
 # equivalent long form:
 opk update --only-binary

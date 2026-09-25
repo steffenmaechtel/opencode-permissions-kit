@@ -243,6 +243,8 @@ REFRESH=false
 BINARY_UPDATE=false
 ONLY_BINARY=false
 BINARY_PATH=""
+UPGRADE_MAJOR=""
+UPGRADE_VERSION=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --yes|-y) YES=true ;;
@@ -262,21 +264,43 @@ while [ "$#" -gt 0 ]; do
         --channel)
             # consumed by the pre-scan above (before the self-fetch);
             # accepted here so it never reaches the unknown-option trap
-            [ "$#" -ge 2 ] || { echo "error: --channel requires a ref (stable, master, a branch, or a tag)" >&2; exit 1; }
+            [ "$#" -ge 2 ] || { echo "error: --channel requires a ref (stable, master, a feature branch, or a tag)" >&2; exit 1; }
+            shift
+            ;;
+        --major)
+            # issue #99: switch the opencode major (1 <-> 2); without it
+            # upgrades stay within the current major
+            [ "$#" -ge 2 ] || { echo "error: --major requires a number (1 or 2)" >&2; exit 1; }
+            case "$2" in
+                1|2) UPGRADE_MAJOR="$2" ;;
+                *) echo "error: --major must be 1 or 2" >&2; exit 1 ;;
+            esac
+            shift
+            ;;
+        --version)
+            # issue #99: pin an exact opencode version; the download
+            # channel follows the version prefix (2.* npm, 1.x GitHub)
+            [ "$#" -ge 2 ] || { echo "error: --version requires an opencode version (e.g. 2.0.11)" >&2; exit 1; }
+            UPGRADE_VERSION="$2"
             shift
             ;;
         -h|--help)
             cat <<EOF
 opencode permissions kit -- update.sh  v$VERSION
 Re-deploys the kit on an already-installed system. No prompts by default.
-Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path <file>] [--channel <ref>]
+Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path <file>] [--channel <ref>] [--major 1|2] [--version <ver>]
   --yes            skip the confirmation prompt
   --refresh        also re-apply the group baseline (chgrp/setgid/default ACLs)
   --binary         also upgrade the opencode binary to the latest release
+                   of the CURRENT major (issue #99: never crosses majors)
   --only-binary    skip every kit step, ONLY upgrade the opencode binary
   --binary-path    install the given binary file instead of downloading
   --channel        switch the tracking ref for this and every future update
                    (stable, master, a feature branch, or a pinned tag)
+  --major          switch the opencode major: 1 or 2 (default: stay on the
+                   current major; the TUI registration flips with it)
+  --version        upgrade to exactly this opencode version (channel by
+                   prefix: 2.* from npm, 1.x from GitHub)
 EOF
             exit 0
             ;;
@@ -568,8 +592,10 @@ if [ -x "$SYSTEM_BIN" ]; then
     sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null || true
 fi
 
-# Detect the release asset name for this host (mirrors the official installer).
-detect_asset() {
+# Detect the opencode release target for this host (mirrors the official
+# installer; the same string is the npm package suffix, see
+# tests/e2e/lib.sh).
+detect_target() {
     local os arch target
     os=$(uname -s | tr '[:upper:]' '[:lower:]')
     case "$os" in
@@ -587,7 +613,12 @@ detect_asset() {
     if [ "$os" = "linux" ] && { [ -f /etc/alpine-release ] || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; }; then
         target="$target-musl"
     fi
-    echo "opencode-$target.tar.gz"
+    echo "$target"
+}
+
+# Release asset name for this host (1.x GitHub assets).
+detect_asset() {
+    echo "opencode-$(detect_target).tar.gz"
 }
 
 # Verify a candidate binary actually runs, then install it over $SYSTEM_BIN.
@@ -624,26 +655,119 @@ install_binary() {
     log "opencode binary upgraded: ${current} -> ${new}"
 }
 
-# Download + extract the latest opencode release into <dir>. Prints the
-# candidate binary path on success, nothing on failure. The CALLER owns
-# <dir> — cleanup happens only after the install attempt (the old flow
-# deleted the extracted candidate before verification could run: every
-# downloaded upgrade failed with "candidate failed verification",
-# issue #24).
-fetch_latest_opencode() {
-    _flo_dst="${1:-}"
-    [ -n "$_flo_dst" ] && [ -d "$_flo_dst" ] || return 1
-    _flo_ver=$(curl -fsSL --max-time 10 https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
-        | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
-    [ -n "$_flo_ver" ] || return 1
-    _flo_asset=$(detect_asset || true)
-    [ -n "$_flo_asset" ] || return 1
-    curl -fsSL --max-time 120 "https://github.com/anomalyco/opencode/releases/download/v$_flo_ver/$_flo_asset" \
-        -o "$_flo_dst/opencode.tar.gz" || return 1
-    tar -xzf "$_flo_dst/opencode.tar.gz" -C "$_flo_dst" || return 1
-    [ -x "$_flo_dst/opencode" ] || return 1
-    echo "$_flo_dst/opencode"
+# Major of an opencode --version line (issue #99): 2.x prints
+# "opencode v2.0.11" -> 2; 1.x prints the bare version ("1.18.31") -> 1.
+version_major() {
+    printf '%s' "$1" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p'
+}
+
+# Major of the currently installed binary — the source of truth; the
+# install.conf stamp is the fallback (older kits), 1 the last resort.
+current_opencode_major() {
+    _com_ver=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || true)
+    if [ -n "$_com_ver" ]; then
+        _com_maj=$(version_major "$_com_ver")
+        [ -n "$_com_maj" ] || _com_maj=1
+        echo "$_com_maj"
+        return 0
+    fi
+    _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1)
+    echo "${_com_maj:-1}"
+}
+
+# Latest version for a major (issue #99): upgrades never hop majors
+# silently. 1.x resolves through GitHub releases/latest (still the 1.x
+# channel), 2.x through the npm dist-tag `latest` of @opencode/cli-<target>
+# — the channel the official v2 installer resolves through; 2.x ships no
+# GitHub release assets (docs/design/opencode-2x.md §8). A resolution
+# outside the requested major fails loudly instead of crossing majors.
+resolve_latest_opencode_version() {
+    _rlov_major="$1"
+    _rlov_target=$(detect_target) || return 1
+    if [ "$_rlov_major" = 2 ]; then
+        _rlov_ver=$(curl -fsSL --max-time 10 "https://registry.npmjs.org/@opencode/cli-$_rlov_target" 2>/dev/null \
+            | tr ',' '\n' | sed -n 's/.*"latest": *"\([^"]*\)".*/\1/p' | head -1 || true)
+        case "$_rlov_ver" in
+            2.*) echo "$_rlov_ver"; return 0 ;;
+            *)  return 1 ;;
+        esac
+    else
+        _rlov_ver=$(curl -fsSL --max-time 10 https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
+            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+        case "$_rlov_ver" in
+            1.*) echo "$_rlov_ver"; return 0 ;;
+            *)  return 1 ;;
+        esac
+    fi
+}
+
+# Download + extract one exact opencode version into <dir> (channel by
+# version prefix, same split as tests/e2e/lib.sh): 2.* from the npm
+# registry (legacy @opencode-ai scope as fallback for pre-migration
+# versions, tarball layout package/bin/opencode), 1.x from GitHub release
+# assets. Prints the candidate binary path on success, nothing on failure.
+# The CALLER owns <dir> — cleanup happens only after the install attempt
+# (issue #24).
+fetch_opencode_version() {
+    _fov_dst="$1" _fov_ver="$2"
+    [ -n "$_fov_dst" ] && [ -d "$_fov_dst" ] || return 1
+    _fov_target=$(detect_target) || return 1
+    case "$_fov_ver" in
+        2.*)
+            if ! curl -fsSL --max-time 240 "https://registry.npmjs.org/@opencode/cli-$_fov_target/-/cli-$_fov_target-$_fov_ver.tgz" \
+                    -o "$_fov_dst/opencode.tar.gz" 2>/dev/null; then
+                curl -fsSL --max-time 240 "https://registry.npmjs.org/@opencode-ai/cli-$_fov_target/-/cli-$_fov_target-$_fov_ver.tgz" \
+                    -o "$_fov_dst/opencode.tar.gz" || return 1
+            fi
+            mkdir -p "$_fov_dst/npmx" || return 1
+            tar -xzf "$_fov_dst/opencode.tar.gz" -C "$_fov_dst/npmx" || return 1
+            [ -x "$_fov_dst/npmx/package/bin/opencode" ] || return 1
+            mv "$_fov_dst/npmx/package/bin/opencode" "$_fov_dst/opencode" || return 1
+            rm -rf "$_fov_dst/npmx" "$_fov_dst/opencode.tar.gz"
+            ;;
+        *)
+            curl -fsSL --max-time 240 "https://github.com/anomalyco/opencode/releases/download/v$_fov_ver/opencode-$_fov_target.tar.gz" \
+                -o "$_fov_dst/opencode.tar.gz" || return 1
+            tar -xzf "$_fov_dst/opencode.tar.gz" -C "$_fov_dst" || return 1
+            rm -f "$_fov_dst/opencode.tar.gz"
+            ;;
+    esac
+    [ -x "$_fov_dst/opencode" ] || return 1
+    echo "$_fov_dst/opencode"
     return 0
+}
+
+# Latest release for a major, downloaded into <dir> (issue #99 wrapper).
+fetch_latest_opencode() {
+    _fll_dst="$1" _fll_major="$2"
+    [ -n "$_fll_major" ] || _fll_major=$(current_opencode_major)
+    _fll_ver=$(resolve_latest_opencode_version "$_fll_major") || return 1
+    fetch_opencode_version "$_fll_dst" "$_fll_ver" || return 1
+}
+
+# TUI mode display per major (issue #80): the 1.x artifacts (tui.json +
+# danger theme) are major-agnostic — 2.x ignores them and they make a 1.x
+# swap work instantly. Only the 2.x CLI-plugin dir flips: present on 2.x
+# (symlink to kit-mode-2x.tsx, LIBDIR stays the source of truth), removed
+# on 1.x. Inert file-path entries from pre-0.0.35 kits are unregistered
+# best-effort on both paths.
+sync_tui_registration() {
+    _str_major="$1"
+    for _str_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
+        _str_user_dir="${_str_dir_user%%:*}"
+        _str_dir_owner="${_str_dir_user#*:}"
+        if [ "$_str_major" = 2 ]; then
+            sudo mkdir -p "$_str_user_dir/plugins/opencode-permissions-kit"
+            sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
+            sudo chown "$_str_dir_owner:$NEW_OPENCODE_GROUP" "$_str_user_dir/plugins" "$_str_user_dir/plugins/opencode-permissions-kit" 2>/dev/null || true
+            sudo chown -h "$_str_dir_owner:$NEW_OPENCODE_GROUP" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
+            log "tui mode registered for 2.x: $_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
+        else
+            sudo rm -rf "$_str_user_dir/plugins/opencode-permissions-kit"
+            log "tui mode 2.x registration removed: $_str_user_dir/plugins/opencode-permissions-kit"
+        fi
+        sudo python3 "$LIBDIR/py/tui-register.py" "$_str_user_dir/cli.json" unregister "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
+    done
 }
 
 if [ "$BINARY_UPDATE" = true ]; then
@@ -658,14 +782,32 @@ if [ "$BINARY_UPDATE" = true ]; then
             log "opencode binary upgrade skipped: --binary-path not executable"
         fi
     else
-        TMP="$(mktemp -d)"
-        if SRC=$(fetch_latest_opencode "$TMP"); then
-            :   # candidate extracted; TMP stays alive until after the install
+        # Version resolution (issue #99): --version pin > --major switch >
+        # stay on the current major. Never crosses majors silently.
+        _up_ver=""
+        if [ -n "$UPGRADE_VERSION" ]; then
+            _up_ver="$UPGRADE_VERSION"
+            ui_detail "target version pinned: $_up_ver"
         else
-            ui_warn "download of the latest opencode release failed — binary left untouched"
-            log "opencode binary upgrade skipped: download failed"
-            rm -rf "$TMP"
-            TMP=""
+            _up_major="${UPGRADE_MAJOR:-$(current_opencode_major)}"
+            ui_detail "resolving the latest opencode $_up_major.x release"
+            if ! _up_ver=$(resolve_latest_opencode_version "$_up_major"); then
+                ui_warn "could not resolve the latest opencode $_up_major.x release — binary left untouched"
+                if [ -z "$UPGRADE_MAJOR" ]; then
+                    ui_detail "to switch the opencode major run: opk upgrade-opencode --major 1|2"
+                fi
+                log "opencode binary upgrade skipped: no $_up_major.x release resolved"
+            fi
+        fi
+        if [ -n "$_up_ver" ]; then
+            TMP="$(mktemp -d)"
+            if ! SRC=$(fetch_opencode_version "$TMP" "$_up_ver"); then
+                ui_warn "download of opencode $_up_ver failed — binary left untouched"
+                log "opencode binary upgrade skipped: download of $_up_ver failed"
+                rm -rf "$TMP"
+                TMP=""
+                SRC=""
+            fi
         fi
     fi
     if [ -n "$SRC" ]; then
@@ -673,8 +815,18 @@ if [ "$BINARY_UPDATE" = true ]; then
         if [ -x "$SYSTEM_BIN" ]; then
             sudo cp "$SYSTEM_BIN" "$BACKUP_DIR/opencode.current"
         fi
+        _maj_before=$(current_opencode_major)
         if install_binary "$SRC"; then
             ui_detail "backup kept in $BACKUP_DIR (remove once you are satisfied)"
+            # A major flip (v1 <-> v2, issue #99) must re-anchor the TUI
+            # registration even in --only-binary runs — the plugin dir is
+            # binary-coupled, not kit-coupled.
+            _maj_after=$(current_opencode_major)
+            if [ "$_maj_before" != "$_maj_after" ]; then
+                sync_tui_registration "$_maj_after"
+                ui_detail "opencode major changed ($_maj_before -> $_maj_after): TUI registration flipped"
+                log "opencode major flipped: $_maj_before -> $_maj_after (tui registration synced)"
+            fi
         else
             ui_warn "candidate binary failed verification/install — binary left untouched"
             log "opencode binary upgrade skipped: candidate failed verification/install"
@@ -789,25 +941,14 @@ if [ ! -f "$DEFAULT_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$DEFAU
     log "tui danger theme refreshed: $DEFAULT_TUI_CONF"
 fi
 
-# opencode 2.x (issue #80): re-register the kit-mode-2x.tsx port for both
-# users — the TUI discovers local plugins as DIRECTORIES under
-# ~/.config/opencode/plugins/<name>/ with a tui entrypoint; file paths in
-# cli.json are skipped (entries from pre-0.0.35 kits are unregistered,
-# best-effort). Symlink into LIBDIR keeps one source of truth. The major
-# comes from the install.conf stamp; binary upgrades re-stamp it.
+# opencode 2.x (issue #80, #99): keep the TUI mode registration anchored
+# to the installed major — register the kit-mode-2x.tsx plugin dir on 2.x,
+# remove it on 1.x (the 1.x tui.json/danger theme are major-agnostic and
+# stay). The major comes from the install.conf stamp, freshly re-stamped
+# by any binary upgrade above.
 _oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1)
-if [ "$_oc_major" = "2" ]; then
-    for _oc_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
-        _oc_user_dir="${_oc_dir_user%%:*}"
-        _oc_dir_owner="${_oc_dir_user#*:}"
-        sudo mkdir -p "$_oc_user_dir/plugins/opencode-permissions-kit"
-        sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"
-        sudo chown "$_oc_dir_owner:$NEW_OPENCODE_GROUP" "$_oc_user_dir/plugins" "$_oc_user_dir/plugins/opencode-permissions-kit" 2>/dev/null || true
-        sudo chown -h "$_oc_dir_owner:$NEW_OPENCODE_GROUP" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
-        sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" unregister "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
-        log "tui mode registered for 2.x: $_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"
-    done
-fi
+[ -n "$_oc_major" ] || _oc_major=1
+sync_tui_registration "$_oc_major"
 
 # --- optional group-baseline refresh ------------------------------------------
 
