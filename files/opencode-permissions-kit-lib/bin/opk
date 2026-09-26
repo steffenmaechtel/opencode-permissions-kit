@@ -34,7 +34,12 @@ LIBDIR="$(cd "$(dirname "$SELF")/.." && pwd -P)"
 if [ -f "$LIBDIR/sh/ui.sh" ]; then
     . "$LIBDIR/sh/ui.sh"
 else
-    ui_error() { echo "  error    $1" >&2; }
+    # Minimal fallbacks: plain, colorless, same argument shapes — every
+    # ui_* helper opk uses must exist even when the library is damaged.
+    ui_error()   { echo "  error    $1" >&2; }
+    ui_info()    { echo "  info     $1"; }
+    ui_success() { echo "  ok       $1"; }
+    ui_detail()  { echo "           $1"; }
 fi
 
 # Version from install.conf (the deployed stamp — same source as status.sh;
