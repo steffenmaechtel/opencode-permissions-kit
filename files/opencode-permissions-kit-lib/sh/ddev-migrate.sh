@@ -216,6 +216,9 @@ _ddev_migrate_list_has_db() {
     [ -f "$1" ] || { echo no; return 0; }
     # NOTE: awk `exit` still runs the END block — decide there, once.
     awk -v key="$2" '
+        # CRLF guard (issue #46): Windows-edited config.yaml — block-list
+        # items would keep their \r and "- db\r" would miss the comparison.
+        { gsub(/\r/, "") }
         $0 ~ "^[[:space:]]*" key ":" {
             line = $0
             sub(/^[^:]*:[[:space:]]*/, "", line)
