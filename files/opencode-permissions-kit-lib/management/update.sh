@@ -695,8 +695,16 @@ resolve_latest_opencode_version() {
     _rlov_major="$1"
     _rlov_target=$(detect_target) || return 1
     if [ "$_rlov_major" = 2 ]; then
+        # python3 is the kit's canonical JSON parser (grep/sed on a
+        # packument can match an earlier "latest": occurrence elsewhere).
         _rlov_ver=$(curl -fsSL --max-time 10 "https://registry.npmjs.org/@opencode/cli-$_rlov_target" 2>/dev/null \
-            | tr ',' '\n' | sed -n 's/.*"latest": *"\([^"]*\)".*/\1/p' | head -1 || true)
+            | python3 -c 'import json,sys
+try:
+    dist = json.load(sys.stdin)["dist-tags"]
+    print(dist["latest"])
+except Exception:
+    sys.exit(1)
+' 2>/dev/null || true)
         case "$_rlov_ver" in
             2.*) echo "$_rlov_ver"; return 0 ;;
             *)  return 1 ;;
