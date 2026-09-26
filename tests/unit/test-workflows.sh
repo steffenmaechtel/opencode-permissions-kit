@@ -107,8 +107,10 @@ done
 #   npm resolution   — the version comes from the npm registry, the
 #                      source tests/e2e/lib.sh downloads 2.x pins from
 #   E2E_OC_VERSION   — the runner receives the resolved version as a pin
-#   2.* guard        — a resolution outside 2.* fails the job loudly
-#                      (the upstream flip signal, docs/design/opencode-2x.md)
+#   anchored guard   — the version is validated against an anchored
+#                      2.x semver regex (grep -qE '^2\.[0-9]+(\.[0-9]+)*$')
+#                      before it reaches GITHUB_OUTPUT; the BRE pattern below
+#                      matches the literal "^2\.[0" head of that regex
 
 check_2x() {
     _wf="$1"; _name="${_wf##*/}"; shift
@@ -127,15 +129,15 @@ check_2x "$WF_E2E" \
     '^  e2e-2x:' \
     '^  e2e-rootless-2x:' \
     'registry.npmjs.org/@opencode/cli-linux-x64/latest' \
-    'E2E_OC_VERSION=' \
-    '2\.\*) echo "OC2_VERSION=' \
+    'E2E_OC_VERSION' \
+    '\^2\\\.\[0' \
     '::error::npm dist-tag latest'
 
 check_2x "$WF_DDEV_E2E" \
     '^  e2e-ddev-2x:' \
     'registry.npmjs.org/@opencode/cli-linux-x64/latest' \
-    'E2E_OC_VERSION=' \
-    '2\.\*) echo "OC2_VERSION=' \
+    'E2E_OC_VERSION' \
+    '\^2\\\.\[0' \
     '::error::npm dist-tag latest'
 
 # Structural YAML guard (workflow-upload breakage 2026-09-25: a second
