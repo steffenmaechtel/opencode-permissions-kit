@@ -210,7 +210,11 @@ _st_root_blocker() {
             echo "$_str_d"
             return 0
         fi
-        _str_d=$(dirname "$_str_d")
+        # Fixed-point guard: a relative root would spin dirname on "."
+        # forever (C13) — stop when dirname stops making progress.
+        _str_next=$(dirname "$_str_d")
+        [ "$_str_next" = "$_str_d" ] && break
+        _str_d=$_str_next
     done
     return 0
 }
