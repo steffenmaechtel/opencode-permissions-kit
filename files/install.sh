@@ -733,45 +733,57 @@ else
     fi
     echo "  [c] Custom path(s)"
     echo "  [s] Skip (no project baseline, only user + wrapper)"
-    printf "  > "
-    read -r selection </dev/tty 2>/dev/null || read -r selection
+    # Re-ask until the selection resolves: an out-of-range number or stray
+    # input used to yield an empty root list and silently continue (C11).
+    _sel_done=""
+    while [ -z "$_sel_done" ]; do
+        printf "  > "
+        read -r selection </dev/tty 2>/dev/null || read -r selection
 
-    case "$selection" in
-        [Cc]*)
-            echo "Enter paths (space-separated):"
-            _custom=""
-            while [ -z "$_custom" ]; do
-                printf "  > "
-                read -r custom </dev/tty 2>/dev/null || read -r custom
+        case "$selection" in
+            [Cc]*)
+                echo "Enter paths (space-separated):"
                 _custom=""
-                _bad=""
-                for p in $custom; do
-                    if project_path_sane "$p"; then
-                        _custom="$_custom $p"
-                    else
-                        ui_error "'$p' is a system path — rejected."
-                        _bad=1
-                    fi
+                while [ -z "$_custom" ]; do
+                    printf "  > "
+                    read -r custom </dev/tty 2>/dev/null || read -r custom
+                    _custom=""
+                    _bad=""
+                    for p in $custom; do
+                        if project_path_sane "$p"; then
+                            _custom="$_custom $p"
+                        else
+                            ui_error "'$p' is a system path — rejected."
+                            _bad=1
+                        fi
+                    done
+                    [ -n "$_bad" ] && _custom=""
                 done
-                [ -n "$_bad" ] && _custom=""
-            done
-            PROJECTS_ROOTS="$_custom"
-            ;;
-        [Ss]*)
-            PROJECTS_ROOTS=""
-            echo "Skipping project baseline."
-            ;;
-        *)
-            PROJECTS_ROOTS=""
-            idx=1
-            for dir in $options; do
-                for s in $selection; do
-                    [ "$s" = "$idx" ] && PROJECTS_ROOTS="$PROJECTS_ROOTS $dir"
+                PROJECTS_ROOTS="$_custom"
+                _sel_done=1
+                ;;
+            [Ss]*)
+                PROJECTS_ROOTS=""
+                echo "Skipping project baseline."
+                _sel_done=1
+                ;;
+            *)
+                PROJECTS_ROOTS=""
+                idx=1
+                for dir in $options; do
+                    for s in $selection; do
+                        [ "$s" = "$idx" ] && PROJECTS_ROOTS="$PROJECTS_ROOTS $dir"
+                    done
+                    idx=$((idx + 1))
                 done
-                idx=$((idx + 1))
-            done
-            ;;
-    esac
+                if [ -n "$PROJECTS_ROOTS" ]; then
+                    _sel_done=1
+                else
+                    ui_error "invalid selection '$selection' — pick numbers from the list, 'c' for custom, or 's' to skip."
+                fi
+                ;;
+        esac
+    done
 fi
 
 sudo mkdir -p /etc/opencode-permissions-kit
