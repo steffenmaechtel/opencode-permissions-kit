@@ -224,6 +224,23 @@ def extract_tools(config_path):
             elif isinstance(bash, dict):
                 rules = [(p, a) for p, a in bash.items()]
 
+        # 2.x-shape project FILES: a top-level "permissions" rule array
+        # (the records `opencode debug config` normalizes to). The live
+        # probe covers them; the file fallback must too, not silently
+        # report no tools (C14). Appended after the v1 map so last-match-
+        # wins gives the 2.x records precedence, like later documents.
+        permissions = config.get('permissions')
+        if isinstance(permissions, list):
+            for rule in permissions:
+                if not isinstance(rule, dict):
+                    continue
+                if rule.get('action') not in ('shell', 'bash', '*'):
+                    continue
+                resource = rule.get('resource')
+                effect = rule.get('effect')
+                if isinstance(resource, str) and isinstance(effect, str):
+                    rules.append((resource, effect))
+
     for tool in ('docker', 'ddev'):
         granted = (whole == 'allow')
         if not granted:
