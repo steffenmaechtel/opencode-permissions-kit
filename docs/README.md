@@ -55,13 +55,15 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 `design/` holds planning and analysis records for CURRENT behavior —
 where wording differs from the code, the code wins. Notable living
 references: [conventions.md](design/conventions.md) — the binding style
-guide for shipped code (prompts, output, language) — and
+guide for shipped code (prompts, output, language, shell security) — and
 [rootless-backend.md](design/rootless-backend.md) — the provisioning and
 selection reference for the rootless container backends. Release model:
 [release-handling.md](design/release-handling.md) — channels, the
 `stable` mirror, and the phased adoption roadmap (issue #38). opencode
 2.x compatibility (service model, detection, open items):
-[opencode-2x.md](design/opencode-2x.md). Test fidelity — why bugs pass
+[opencode-2x.md](design/opencode-2x.md). Known-security-advisory
+warnings (shipped database, upstream watch, curation loop):
+[security-advisories.md](design/security-advisories.md). Test fidelity — why bugs pass
 unit and e2e but hit real terminals, and the patterns that close the
 gap: [test-environment-fidelity.md](design/test-environment-fidelity.md). Superseded or
 purely historical records live in [`_archive/`](_archive/) (same

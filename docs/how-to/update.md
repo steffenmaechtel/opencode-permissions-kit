@@ -125,6 +125,43 @@ opk update --only-binary
 Binary upgrades are best-effort: a failure leaves the current binary in
 place, the previous one is kept in `/tmp/opencode-upgrade-backup-*`.
 
+## Security advisories
+
+The kit ships a curated database of known opencode security advisories
+(`sh/advisories.sh` in the deployed library). On every start the wrapper
+checks your installed version against it — **locally, offline**; when
+your install is affected, the banner shows a red warning with the
+advisory and the fix:
+
+```text
+  WARNING: the installed opencode 1.0.100 is affected by a known security advisory:
+  GHSA-vxw4-wv6m-9hhh (high): Unauthenticated HTTP server allows arbitrary command execution
+  patched in opencode 1.0.216
+  Please upgrade opencode with 'opk upgrade-opencode'.
+```
+
+Fix it with:
+
+```bash
+opk upgrade-opencode
+```
+
+Two things to know:
+
+- **Only advisories that can affect your install warn.** The kit deploys
+  the opencode binary itself (never through a package manager), so
+  npm-only advisories — like GHSA-632h-h47v-g4x4 — do not match kit
+  installs.
+- **Fresh entries travel with kit releases.** New advisories upstream are
+  picked up by a scheduled scan in the kit repo and shipped through the
+  normal release channel — run `sudo opk update` to get them. `opk
+  status` shows the section **Security advisories**: your install's
+  verdict from the shipped database, plus a live upstream check that
+  flags advisories newer than your kit release.
+
+Background and design decisions:
+[security-advisories design record](../design/security-advisories.md).
+
 ## Verify
 
 ```bash

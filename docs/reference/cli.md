@@ -212,7 +212,9 @@ Never touches `projects.conf` or the agent's `opencode.jsonc`. See
 
 Show the protection status: mode, backend + socket reachability, ddev
 runtime readiness (`~opencode/.ddev`, router ports, mkcert CA), migration
-state, and the leak scan.
+state, the security-advisory check (see
+[security advisories](../how-to/update.md#security-advisories)), and the
+leak scan.
 
 ```bash
 sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh
