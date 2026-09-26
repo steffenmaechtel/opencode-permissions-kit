@@ -156,10 +156,17 @@ ui_menu() {
     done
     printf '  > ' >&2
     IFS= read -r _ans </dev/tty 2>/dev/null || IFS= read -r _ans || _ans=''
+    # Keys match case-insensitively (a lowercase "x" must still hit "X|Abort",
+    # never fall through to the default — which could be "Confirm"). The
+    # canonical key as defined by the caller is printed, not the raw input.
+    _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]')"
     _found=''
     for _opt in "$@"; do
-        _k=${_opt%%|*}
-        [ "$_ans" = "$_k" ] && _found=1
+        _k=$(printf '%s' "${_opt%%|*}" | tr '[:upper:]' '[:lower:]')
+        if [ "$_ans" = "$_k" ]; then
+            _found=1
+            _ans="${_opt%%|*}"
+        fi
     done
     [ -z "$_found" ] && _ans="$_d"
     printf '%s\n' "$_ans"
