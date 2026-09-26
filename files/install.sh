@@ -561,7 +561,7 @@ project_path_sane() {
     case "$_pp" in
         /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
 /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
-/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
+/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/tmp/*|/var/tmp/*|\
 /usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
 /var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
             return 1
