@@ -55,7 +55,7 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 `design/` holds planning and analysis records for CURRENT behavior —
 where wording differs from the code, the code wins. Notable living
 references: [conventions.md](design/conventions.md) — the binding style
-guide for shipped code (prompts, output, language) — and
+guide for shipped code (prompts, output, language, shell security) — and
 [rootless-backend.md](design/rootless-backend.md) — the provisioning and
 selection reference for the rootless container backends. Release model:
 [release-handling.md](design/release-handling.md) — channels, the

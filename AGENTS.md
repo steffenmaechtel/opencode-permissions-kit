@@ -38,7 +38,8 @@ used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
   feature branch; push/pull and PRs are the maintainer's job.
 - **All shipped content is English** — scripts, docs, prompts, messages.
 - **Follow `docs/design/conventions.md`** for interactive prompts, output
-  style, and other shipped-code conventions.
+  style, shell security (untrusted input), and other shipped-code
+  conventions.
 - **Docs change with the code:** a PR that changes user-facing behavior
   updates the affected page under `docs/` in the same PR. One page = one
   topic type; see `docs/README.md` for the structure.
