@@ -9,6 +9,7 @@ SHELLCHECK_FILES = files/install.sh \
 	files/etc/umask.sh \
 	files/opencode-permissions-kit-lib/bin/opencode-as-opencode files/opencode-permissions-kit-lib/bin/opk \
 	files/opencode-permissions-kit-lib/sh/log.sh files/opencode-permissions-kit-lib/sh/ui.sh \
+	files/opencode-permissions-kit-lib/sh/advisories.sh \
 	files/opencode-permissions-kit-lib/sh/shell-warn.sh files/opencode-permissions-kit-lib/bin/setup-container-backend \
 	files/opencode-permissions-kit-lib/sh/ddev-terminal.sh files/opencode-permissions-kit-lib/sh/ddev-handover.sh \
 	files/opencode-permissions-kit-lib/sh/ddev-migrate.sh files/opencode-permissions-kit-lib/bin/ddev-migrate \

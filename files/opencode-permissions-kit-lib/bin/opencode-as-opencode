@@ -164,6 +164,49 @@ if [ "$HEADLESS" != true ]; then
     echo ""
 fi
 
+# Known security advisories for the installed binary (issue #107): the
+# curated database ships with the kit (sh/advisories.sh) and is checked
+# LOCALLY — no network on the hot path, fresh entries arrive through the
+# normal release channel (opk update). The version is probed fresh on
+# every start (never a stale install.conf stamp) via the same sudo path
+# the exec below uses. timeout(1) bounds the probe: a 2.x service that
+# cannot bind its port makes even `--version` hang (observed on a real
+# WSL, issue #80). Fail-open — a failed, hung, or unparseable probe skips
+# the check; a security warning must never keep a session from starting.
+# The kit installs the binary itself (never through a package manager),
+# so its install channel is always 'standalone' — advisories qualified
+# 'npm' (GHSA-632h-h47v-g4x4) do not match kit installs.
+ADV_HITS=""
+if [ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
+    # shellcheck disable=SC1091  # deployed lib, guarded above
+    . /usr/local/lib/opencode-permissions-kit/sh/advisories.sh
+    ADV_LINE=""
+    if command -v timeout >/dev/null 2>&1; then
+        ADV_LINE=$(timeout 5 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+    else
+        ADV_LINE=$(/usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+    fi
+    ADV_VERSION=$(advisories_version_of "$ADV_LINE")
+    # An unparseable version (empty) matches nothing — the lib fails safe.
+    ADV_HITS=$(advisories_matching opencode "$ADV_VERSION" standalone || true)
+fi
+if [ -n "$ADV_HITS" ]; then
+    note "${RED}WARNING: the installed opencode $ADV_VERSION is affected by a known security advisory:${NC}"
+    while IFS= read -r ADV_HIT; do
+        IFS='|' read -r ADV_PKG ADV_RANGES ADV_PATCHED ADV_CHANNEL ADV_SEV ADV_ID ADV_SUMMARY <<EOF
+$ADV_HIT
+EOF
+        note "${YELLOW}$ADV_ID ($ADV_SEV): $ADV_SUMMARY${NC}"
+        if [ -n "$ADV_PATCHED" ]; then
+            note "${YELLOW}patched in opencode $ADV_PATCHED${NC}"
+        fi
+    done <<EOF
+$ADV_HITS
+EOF
+    note "${YELLOW}Please upgrade opencode with 'opk upgrade-opencode'.${NC}"
+    note ""
+fi
+
 # Self-check: a self-installed opencode binary (official installer re-run or
 # PATH re-add) would shadow the wrapper in new shells, and tools may call the
 # absolute path of the real binary. Warn (but keep running) when one is present.

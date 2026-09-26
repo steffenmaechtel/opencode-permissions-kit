@@ -1,0 +1,32 @@
+name: security-scan
+
+# Security advisory watch (issue #107, docs/design/security-advisories.md):
+# daily diff of the upstream opencode advisories (GitHub) against the ids the
+# shipped database (files/opencode-permissions-kit-lib/sh/advisories.sh)
+# knows. Every unknown upstream id opens one maintainer issue with the
+# upstream data and a curation checklist — curation and the release stay
+# human decisions. Runs scripts/security-scan.sh (dry-run locally:
+# OPK_SCAN_DRY_RUN=1 GITHUB_REPOSITORY=owner/repo scripts/security-scan.sh).
+
+on:
+  schedule:
+    - cron: "23 5 * * *" # daily 05:23 UTC (odd minute — off the top-of-hour load)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: security-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check upstream advisories against the shipped database
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/security-scan.sh

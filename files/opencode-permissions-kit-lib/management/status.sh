@@ -93,6 +93,91 @@ if [ -f "$f" ]; then
     fi
 fi
 
+# === Security advisories (issue #107) ============================================
+# Two sources, two jobs: the SHIPPED database (sh/advisories.sh) is the
+# curated truth — channel-qualified, ranges refined to the patched
+# version — and the only source that claims "affected". The UPSTREAM feed
+# (GitHub, live) is the freshness signal: an advisory upstream that the
+# shipped database lacks means the kit release lags, not that this
+# install is affected (upstream ranges are channel-blind — a npm-only
+# advisory ranges over standalone versions too). The kit installs the
+# binary itself, so its install channel is always 'standalone'.
+if [ -f "$LIBDIR/sh/advisories.sh" ]; then
+    # shellcheck disable=SC1090
+    . "$LIBDIR/sh/advisories.sh"
+    ui_section "Security advisories"
+    # Installed version: probed fresh through the kit's sudo path (same
+    # pattern as the wrapper's check; the install.conf stamp would go
+    # stale the moment a binary is swapped outside opk). sudo -n never
+    # prompts: root needs no password, the developer rides the kit's
+    # NOPASSWD rule, anyone else just sees "unknown".
+    ADV_VER=""
+    if [ -x "$LIBDIR/bin/opencode" ] && command -v sudo >/dev/null 2>&1; then
+        ADV_VER=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+    fi
+    if [ -n "$ADV_VER" ]; then
+        ADV_HITS=$(advisories_matching opencode "$ADV_VER" standalone || true)
+        if [ -n "$ADV_HITS" ]; then
+            ui_kv "opencode $ADV_VER" "AFFECTED by a known advisory — upgrade now" "$UI_RED"
+            while IFS= read -r ADV_LINE; do
+                IFS='|' read -r ADV_PKG ADV_RANGES ADV_PATCHED ADV_CHANNEL ADV_SEV ADV_ID ADV_SUMMARY <<EOF
+$ADV_LINE
+EOF
+                ui_detail "$ADV_ID ($ADV_SEV): $ADV_SUMMARY"
+                [ -n "$ADV_PATCHED" ] && ui_detail "patched in: opencode $ADV_PATCHED"
+            done <<EOF
+$ADV_HITS
+EOF
+            ui_detail "fix: opk upgrade-opencode"
+        else
+            ui_kv "opencode $ADV_VER" "no known advisory affects this install (kit $VERSION database)" "$UI_GREEN"
+        fi
+    else
+        ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)" "$UI_YELLOW"
+    fi
+    # Upstream freshness (live, best-effort): GitHub's advisory feed vs
+    # the ids the shipped database knows. Never decides affectedness.
+    # python3 is required to parse the feed — without it (or offline)
+    # the live check reports "unavailable", never a false "ok".
+    if command -v curl >/dev/null 2>&1; then
+        ADV_FEED=""
+        ADV_FEED=$(curl -fsSL --max-time 10 "https://api.github.com/repos/anomalyco/opencode/security-advisories" 2>/dev/null || true)
+        ADV_PARSE_OK=false
+        ADV_NEW=""
+        if [ -n "$ADV_FEED" ] && command -v python3 >/dev/null 2>&1; then
+            # advisory ids from the feed (ghsa_id per entry); exit 1 on
+            # anything that is not JSON — an unparseable feed is
+            # "unavailable", not "no advisories".
+            if ADV_IDS=$(printf '%s' "$ADV_FEED" | python3 -c 'import json,sys
+try:
+    feed = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+for entry in feed or []:
+    print(entry.get("ghsa_id", ""))' 2>/dev/null); then
+                ADV_PARSE_OK=true
+                ADV_KNOWN=$(advisories_ids opencode || true)
+                while IFS= read -r ADV_ID; do
+                    [ -n "$ADV_ID" ] || continue
+                    printf '%s\n' "$ADV_KNOWN" | grep -qxF "$ADV_ID" && continue
+                    ADV_NEW="$ADV_NEW $ADV_ID"
+                done <<EOF
+$ADV_IDS
+EOF
+            fi
+        fi
+        if [ -n "$ADV_NEW" ]; then
+            ui_kv_warn "upstream" "new advisory(ies) upstream, not yet in this kit:$ADV_NEW"
+            ui_detail "the database travels with kit releases — run: sudo opk update"
+            ui_detail "(already current? the entry is being curated — see the upstream advisory page)"
+        elif [ "$ADV_PARSE_OK" = true ]; then
+            ui_kv "upstream" "live check ok — nothing beyond the shipped database" "$UI_GREEN"
+        else
+            ui_kv "upstream" "live check unavailable (offline, blocked, or python3 missing)" "$UI_YELLOW"
+        fi
+    fi
+fi
+
 # === Projects ==================================================================
 
 # _st_ancestor_grants_x <dir>: does <dir> let the agent side traverse it?
