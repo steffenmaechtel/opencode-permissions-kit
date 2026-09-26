@@ -224,39 +224,25 @@ parse_args "$@"
 
 # === Helpers ===
 
-prompt() {
-    # prompt "Question?" "Y" "N" "B"
-    # Returns: y, n, or b
-    local msg="$1"
-    local opt_y="$2"
-    local opt_n="$3"
-    local opt_b="$4"
-
+# confirm "Question?" — conventions.md prompt shape ([y/N], Enter = no;
+# y/yes case-insensitive). Exit status 0 = yes. --yes/SKIP_PROMPTS
+# answers yes (same as the old prompt() helper).
+confirm() {
     if [ "$SKIP_PROMPTS" = true ]; then
-        echo "y"
+        return 0
+    fi
+    ui_confirm "$1" n
+}
+
+# _yes_no_backup_menu "Question?" — a choice beyond yes/no becomes a keyed
+# menu (conventions.md); prints y, n or b (backup first, then yes).
+# Enter/EOF = No; --yes/SKIP_PROMPTS = yes.
+_yes_no_backup_menu() {
+    if [ "$SKIP_PROMPTS" = true ]; then
+        echo y
         return
     fi
-
-    echo "" >&2
-    printf "[?] %s" "$msg" >&2
-    [ -n "$opt_y" ] && printf "  (%s) Yes" "$opt_y" >&2
-    [ -n "$opt_n" ] && printf "  (%s) No" "$opt_n" >&2
-    [ -n "$opt_b" ] && printf "  (%s) Backup + Yes" "$opt_b" >&2
-    echo "" >&2
-
-    while true; do
-        printf "    > " >&2
-        read -r answer </dev/tty 2>/dev/null || read -r answer
-        answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]')
-        case "$answer" in
-            y|yes) echo "y"; return ;;
-            n|no)  echo "n"; return ;;
-            b|backup)
-                if [ -n "$opt_b" ]; then echo "b"; return; fi
-                ;;
-            "") echo "n"; return ;;
-        esac
-    done
+    ui_menu "$1" "n" "y|Yes" "n|No" "b|Backup first, then yes"
 }
 
 banner() {
@@ -312,8 +298,7 @@ log "install mode: $MODE (interactive=$INTERACTIVE)"
 IS_WSL2=false
 grep -qi microsoft /proc/version 2>/dev/null && IS_WSL2=true
 if [ "$IS_WSL2" != true ]; then
-    ans=$(prompt "This does not appear to be WSL2. Continue anyway?" "Y" "N" "")
-    [ "$ans" != "y" ] && exit 0
+    confirm "This does not appear to be WSL2. Continue anyway?" || exit 0
 fi
 
 # Backup. mktemp (not a timestamped name): root copies sudoers, gitconfigs
@@ -338,8 +323,7 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 if ! command -v setfacl >/dev/null 2>&1; then
-    ans=$(prompt "'acl' package not installed (setfacl/getfacl missing). Install it now?" "Y" "N" "")
-    if [ "$ans" = "y" ]; then
+    if confirm "'acl' package not installed (setfacl/getfacl missing). Install it now?"; then
         sudo apt-get update -qq 2>/dev/null || true
         sudo apt-get install -y acl
     fi
@@ -684,8 +668,7 @@ log "plan confirmed (mode=$MODE)"
 
 ui_info "Creating user + sharing group ..."
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
-    ans=$(prompt "User '$OPENCODE_USER' already exists. Reuse it?" "Y" "N" "")
-    [ "$ans" != "y" ] && { ui_info "Aborted."; exit 1; }
+    confirm "User '$OPENCODE_USER' already exists. Reuse it?" || { ui_info "Aborted."; exit 1; }
 else
     sudo useradd -m -s /bin/bash "$OPENCODE_USER"
     ui_success "user '$OPENCODE_USER' created"
@@ -874,8 +857,7 @@ fi
 
 port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)
 if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
-    ans=$(prompt "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443? (host-wide sysctl)" "Y" "N" "")
-    if [ "$ans" = "y" ]; then
+    if confirm "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443? (host-wide sysctl)"; then
         if echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
             if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
                 ui_success "unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
@@ -1033,8 +1015,7 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
         log "ddev database export skipped (no project roots)"
     else
         if [ "$MODE" = "advanced" ] && [ "$INTERACTIVE" = true ]; then
-            ans=$(prompt "Export the dev user's ddev databases before the handover? (recommended — dumps under /var/backups/opencode-permissions-kit)" "Y" "N" "")
-            [ "$ans" != "y" ] && SKIP_DDEV_MIGRATION=true
+            confirm "Export the dev user's ddev databases before the handover? (recommended — dumps under /var/backups/opencode-permissions-kit)" || SKIP_DDEV_MIGRATION=true
         fi
         if [ "$SKIP_DDEV_MIGRATION" != true ]; then
             # shellcheck disable=SC2086  # word splitting intended (root list)
@@ -1105,7 +1086,7 @@ fi
 
 if [ -n "$PROJECTS_ROOTS" ]; then
     ui_section "Filesystem (group baseline)"
-    ans=$(prompt "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)" "Y" "N" "B")
+    ans=$(_yes_no_backup_menu "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)")
     case "$ans" in
         n) ui_detail "skipping filesystem setup." ;;
         b)
@@ -1210,7 +1191,7 @@ fi
 
 for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
     if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
-        ans=$(prompt "opencode binary found at $loc. Copy to system path and secure with wrapper?" "Y" "N" "B")
+        ans=$(_yes_no_backup_menu "opencode binary found at $loc. Copy to system path and secure with wrapper?")
         case "$ans" in
             y)
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
@@ -1239,8 +1220,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
 done
 
 if [ "$opencode_found" = false ]; then
-    ans=$(prompt "opencode not found. Run official installer (curl -fsSL https://opencode.ai/install | bash)?" "Y" "N" "")
-    if [ "$ans" = "y" ]; then
+    if confirm "opencode not found. Run official installer (curl -fsSL https://opencode.ai/install | bash)?"; then
         curl -fsSL https://opencode.ai/install | bash
         # When run via the one-liner (sudo bash), the official installer
         # installs into /root/.opencode/bin. Locally it lands in the user's home.
@@ -1434,11 +1414,11 @@ fi
 # --secure-git-config decided via flag). --yes runs skip everything.
 GIT_ASKED=false
 if [ "$GIT_FLAG_GIVEN" != true ] && [ "$INTERACTIVE" = true ] && [ "$MODE" = "advanced" ]; then
-    ans=$(prompt "Block .git/config for opencode? (SOFT-only: opencode tools respect it, bash-spawned reads are not OS-blocked)" "Y" "N" "")
-    case "$ans" in
-        y) SECURE_GIT_CONFIG=true ;;
-        *) SECURE_GIT_CONFIG=false ;;
-    esac
+    if confirm "Block .git/config for opencode? (SOFT-only: opencode tools respect it, bash-spawned reads are not OS-blocked)"; then
+        SECURE_GIT_CONFIG=true
+    else
+        SECURE_GIT_CONFIG=false
+    fi
     GIT_ASKED=true
 fi
 if [ "$SECURE_GIT_CONFIG" = true ]; then
@@ -1604,8 +1584,7 @@ DEFAULT_OC_DIR="/home/$DEFAULT_USER/.config/opencode"
 DEFAULT_OC_CONF="$DEFAULT_OC_DIR/opencode.jsonc"
 sudo mkdir -p "$DEFAULT_OC_DIR"
 if [ -f "$DEFAULT_OC_CONF" ]; then
-    ans=$(prompt "Default-user config $DEFAULT_OC_CONF already exists. Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?" "Y" "N" "")
-    if [ "$ans" = "y" ]; then
+    if confirm "Default-user config $DEFAULT_OC_CONF already exists. Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?"; then
         BAK_STAMP=$(date +%Y%m%d-%H%M%S)
         sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
         ui_success "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
