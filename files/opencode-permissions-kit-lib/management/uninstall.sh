@@ -118,11 +118,23 @@ if [ "$DRY_RUN" = true ]; then
     echo ""
 fi
 
+# Direct invocation only — no eval, no `sh -c` (docs/design/conventions.md).
+# Failures print their error and the uninstall continues (no set -e here).
 run() {
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] $*"
     else
-        eval "$*"
+        "$@"
+    fi
+}
+
+# Like run, but output and failures are silenced (the former
+# "cmd 2>/dev/null || true" call sites — best-effort cleanup).
+run_q() {
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] $*"
+    else
+        "$@" >/dev/null 2>&1 || true
     fi
 }
 
@@ -157,19 +169,19 @@ log "uninstall started (dry_run=$DRY_RUN)"
 
 echo ""
 echo "--- Removing sudoers ---"
-run "sudo rm -f /etc/sudoers.d/opencode-permissions-kit"
+run sudo rm -f /etc/sudoers.d/opencode-permissions-kit
 echo "sudoers removed."
 log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit"
 
 echo ""
 echo "--- Removing wrapper ---"
-run "sudo rm -f /usr/local/bin/opencode"
+run sudo rm -f /usr/local/bin/opencode
 echo "Wrapper removed."
 log "wrapper removed: /usr/local/bin/opencode"
 
 echo ""
 echo "--- Removing cli dispatcher ---"
-run "sudo rm -f /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit"
+run sudo rm -f /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit
 echo "CLI dispatcher removed."
 log "cli removed: /usr/local/bin/opk"
 
@@ -179,8 +191,8 @@ log "cli removed: /usr/local/bin/opk"
 # additive manager leaves unmanaged/broken files untouched.
 if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
     for _un_dir in "/home/opencode/.config/opencode" "/home/$DEFAULT_USER/.config/opencode"; do
-        run "sudo rm -rf '$_un_dir/plugins/opencode-permissions-kit'"
-        run "sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py '$_un_dir/cli.json' unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"
+        run sudo rm -rf "$_un_dir/plugins/opencode-permissions-kit"
+        run sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
     done
 fi
 
@@ -220,13 +232,13 @@ fi
 
 echo ""
 echo "--- Removing opencode library ---"
-run "sudo rm -rf /usr/local/lib/opencode-permissions-kit"
+run sudo rm -rf /usr/local/lib/opencode-permissions-kit
 echo "opencode library removed."
 log "library removed: /usr/local/lib/opencode-permissions-kit"
 
 echo ""
 echo "--- Removing umask profile ---"
-run "sudo rm -f /etc/profile.d/opencode-permissions-kit-umask.sh"
+run sudo rm -f /etc/profile.d/opencode-permissions-kit-umask.sh
 echo "Umask profile removed."
 log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 
@@ -235,7 +247,7 @@ echo "--- Removing opencode user ---"
 # Remove the developer from the sharing group FIRST so userdel can clean up
 # the opencode usergroup (its primary group) automatically.
 if id "$DEFAULT_USER" >/dev/null 2>&1 && id "$DEFAULT_USER" | grep -q "$OPENCODE_GROUP"; then
-    run "sudo gpasswd -d \"$DEFAULT_USER\" \"$OPENCODE_GROUP\" 2>/dev/null || true"
+    run_q sudo gpasswd -d "$DEFAULT_USER" "$OPENCODE_GROUP"
     echo "Removed $DEFAULT_USER from group $OPENCODE_GROUP."
     log "removed $DEFAULT_USER from group $OPENCODE_GROUP"
 fi
@@ -269,17 +281,17 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
         # that manager is running. Tear it down first (best-effort), then remove
         # the user.
         OC_UID=$(id -u "$OPENCODE_USER")
-        run "sudo loginctl disable-linger \"$OPENCODE_USER\" 2>/dev/null || true"
-        run "sudo systemctl stop \"user@$OC_UID.service\" 2>/dev/null || true"
+        run_q sudo loginctl disable-linger "$OPENCODE_USER"
+        run_q sudo systemctl stop "user@$OC_UID.service"
         # Rootless podman storage keeps the home busy — reset it (best-effort).
-        run "sudo -u \"$OPENCODE_USER\" XDG_RUNTIME_DIR=/run/user/$OC_UID podman system reset --force >/dev/null 2>&1 || true"
+        run_q sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR=/run/user/"$OC_UID" podman system reset --force
         # Stopping the user manager can leave a rootless container's init
         # (e.g. docker-rootless `catatonit`) orphaned and re-parented to
         # init.scope; userdel refuses while ANY process of the user runs.
         # Kill stragglers (best-effort), then remove the user.
-        run "sudo pkill -9 -u \"$OPENCODE_USER\" 2>/dev/null || true"
+        run_q sudo pkill -9 -u "$OPENCODE_USER"
         sleep 1
-        run "sudo userdel -r \"$OPENCODE_USER\" 2>/dev/null || true"
+        run_q sudo userdel -r "$OPENCODE_USER"
         echo "User '$OPENCODE_USER' removed."
         log "user removed: $OPENCODE_USER"
     else
@@ -321,23 +333,23 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             # No -xdev on purpose: project roots are often separate mounts
             # (the e2e bind-mounts them; NFS/overlay in the wild) — the
             # revert must follow, exactly like the setfacl -R below.
-            run "sudo find \"$root\" \( -uid \"$UN_OC_UID\" -o -gid \"$UN_OC_GID\" \) -exec chown \"$DEFAULT_USER:$UN_DEV_GROUP\" {} + 2>/dev/null || true"
+            run_q sudo find "$root" \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
         else
             echo "    opencode user unknown — skipped (chown manually if files are locked)"
         fi
         echo "  Cleaning ACLs from: $root"
-        run "sudo setfacl -R -b \"$root\" 2>/dev/null || true"
-        run "sudo setfacl -R -k \"$root\" 2>/dev/null || true"
-        run "sudo chmod g-s \"$root\" 2>/dev/null || true"
+        run_q sudo setfacl -R -b "$root"
+        run_q sudo setfacl -R -k "$root"
+        run_q sudo chmod g-s "$root"
         log "project ownership reverted + ACLs cleaned: $root"
     done < "$UNINSTALL_PROJECTS_CONF"
 fi
 
 echo ""
 echo "--- Removing kit config directories + runtime artifacts ---"
-run "sudo rm -rf /run/opencode-permissions-kit"
-run "sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf"
-run "sudo rm -rf /etc/opencode-permissions-kit"
+run sudo rm -rf /run/opencode-permissions-kit
+run sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
+run sudo rm -rf /etc/opencode-permissions-kit
 echo "Removed."
 log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
 
@@ -345,7 +357,7 @@ echo ""
 echo "--- Removing audit log ---"
 if [ "$(prompt_yn "Delete audit log too? (recommended)" "y")" = "y" ]; then
     log "audit log removed: /var/log/opencode-permissions-kit"
-    run "sudo rm -rf /var/log/opencode-permissions-kit"
+    run_q sudo rm -rf /var/log/opencode-permissions-kit
     echo "Audit log removed."
 else
     log "audit log kept (requested by user)"
