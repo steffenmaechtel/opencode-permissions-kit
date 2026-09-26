@@ -338,7 +338,11 @@ fi
 stop_merged_config_service
 if [ -n "$PROJECT_TOOLS" ]; then
     note "${CYAN}Container tools enabled by this project:${NC}"
-    printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_fd"
+    # Same stream note() uses — recomputed here instead of relying on the
+    # _fd global leaking out of the preceding note() call (C12).
+    _tools_fd=1
+    [ "$HEADLESS" = true ] && _tools_fd=2
+    printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_tools_fd"
     note ""
     CONTAINER_REQUESTED=true
     CONTAINER_AUTO=true
