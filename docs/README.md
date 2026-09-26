@@ -65,7 +65,10 @@ selection reference for the rootless container backends. Release model:
 warnings (shipped database, upstream watch, curation loop):
 [security-advisories.md](design/security-advisories.md). Test fidelity — why bugs pass
 unit and e2e but hit real terminals, and the patterns that close the
-gap: [test-environment-fidelity.md](design/test-environment-fidelity.md). Superseded or
+gap: [test-environment-fidelity.md](design/test-environment-fidelity.md).
+Model-generated code reviews — immutable snapshots plus per-finding
+resolutions — live in [`design/review/`](design/review/README.md).
+Superseded or
 purely historical records live in [`_archive/`](_archive/) (same
 subfolder structure: `_archive/design/`, `_archive/security/`) — they
 document how the kit got here, not how it works today.
