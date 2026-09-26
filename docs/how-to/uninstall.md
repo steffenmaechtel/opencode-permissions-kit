@@ -61,5 +61,5 @@ also runs straight from the repository (it works without an install; it
 reports "NOT active" then):
 
 ```bash
-sudo bash files/status.sh
+sudo bash files/opencode-permissions-kit-lib/management/status.sh
 ```

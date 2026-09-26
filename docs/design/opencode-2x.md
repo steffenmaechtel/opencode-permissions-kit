@@ -1,8 +1,9 @@
 # opencode 2.x compatibility — design record
 
 > Status: **CURRENT (work in progress).** What the kit does today to stay
-> compatible with opencode 1.x **and** the upcoming 2.x line (tags
-> `v2.0.x`, not yet on `releases/latest`), what was verified, and what is
+> compatible with opencode 1.x **and** 2.x (2.x ships through the npm
+> registry — `@opencode/cli-<target>`, dist-tag `latest`; GitHub
+> `releases/latest` stays on 1.x), what was verified, and what is
 > still open. Issue #80. The 2.x migration guide
 > (<https://opencode.ai/v2/docs/migrate-v1/>) is the upstream reference;
 > where wording differs from the code, the code wins.
@@ -222,20 +223,22 @@ issues #80/#81:
    gets manual observation. Holding is risk-free: every 2.x behavior is
    gated on `OPENCODE_MAJOR`, and both e2e suites are green against
    1.x latest (unchanged behavior) and 2.0.3.
-2. **CI cannot run 2.x yet — deliberately.** No release assets exist for
+2. **CI runs 2.x alongside 1.x — shipped 2026-09-23.** (History: CI
+   originally could not run 2.x at all. No release assets existed for
    the v2 tags, so the e2e download path 404s. Building from source in
    CI (bun, ~8 min) or pulling upstream workflow-run artifacts (auth,
    90-day expiry, fragile) was considered and rejected as premature.
-   The proof stays local: version-keyed cache in `tests/e2e/cache/`
+   The proof stayed local: version-keyed cache in `tests/e2e/cache/`
    makes repeat runs cheap. The moment upstream ships release assets,
-   `E2E_OC_VERSION` works in CI unchanged — add the job then.
+   `E2E_OC_VERSION` works in CI unchanged — add the job then.)
     *Update 2026-09-20:* the technical blocker is gone — v2 publishes
     npm tarballs (`@opencode/cli-<target>`, dist-tag `latest` = 2.0.11)
     and the e2e fetches 2.x pins from there (§8). Adding the CI job is
     now a cost decision, not a feasibility one.
     *Update 2026-09-23:* decided and shipped — the e2e workflows run the
-    suites a second time pinned to the npm dist-tag `latest` (§8); runner
-    cost accepted for PRs, master pushes, and the weekly drift runs.
+    suites a second time pinned to the npm dist-tag `latest`, resolved
+    at run time (§8); runner cost accepted for PRs, master pushes, and
+    the weekly drift runs.
 3. **Merge as a normal PR** once manual validation satisfies. Everything
    is already in production shape; nothing in the PR depends on 2.x
    being released.

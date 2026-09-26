@@ -39,8 +39,10 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   provisioning, **both** e2e suites are part of the definition of done — a
   green `make e2e` alone is not sufficient.
 - When adding a new executable under `files/` or a new test script under
-  `tests/`, add it to the `chmod +x` list in **both**
-  `.github/workflows/test-unit.yml` and `.github/workflows/test-e2e.yml`.
+  `tests/`, add it to the `chmod +x` list in **every workflow that runs
+  it** — `tests/unit/test-workflows.sh` enforces the complete set
+  (`test-unit.yml`, `test-e2e.yml`, `test-e2e-ddev.yml`; the ddev suite
+  shares the chmod lists).
 - Besides PRs and `master` pushes, CI runs a **weekly scheduled** burn-in
   on `master` (Mondays ~03:00 UTC, issue #78): the e2e suites install the
   *latest* opencode/ddev releases at runtime, so the schedule catches

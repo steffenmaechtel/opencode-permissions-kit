@@ -4,8 +4,8 @@
 #   1. every ./path a workflow chmods must exist in the repo (renames and
 #      typos otherwise fail silently — CI chmods a ghost and loses the bit)
 #   2. every executable CI needs (unit tests, e2e scripts, check-host,
-#      shipped scripts under files/) must be chmodded in BOTH
-#      .github/workflows/test-unit.yml and .github/workflows/test-e2e.yml
+#      shipped scripts under files/) must be chmodded in ALL workflow
+#      files that run it: test-unit.yml, test-e2e.yml, test-e2e-ddev.yml
 #   3. the e2e workflows must keep their opencode 2.x pin jobs (issue #80)
 #
 # Git checkouts lose the exec bit, so a missing entry means the affected
@@ -58,7 +58,7 @@ for wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
     fi
 done
 
-# --- 2. required executables in BOTH workflow files --------------------------
+# --- 2. required executables in ALL workflow files -----------------------------
 
 # Canonical set: everything CI executes by path. Derived from disk so a new
 # test-*.sh automatically enforces its own workflow entries. Exceptions are
