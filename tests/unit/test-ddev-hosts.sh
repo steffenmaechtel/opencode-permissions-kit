@@ -137,7 +137,7 @@ assert_eq "missing: substring hosts do not satisfy the check" \
 # hostname was re-added forever) and let "+" false-match other names.
 mkdir -p "$WORK/projmeta/.ddev"
 printf 'type: php\nname: meta-proj\nproject_tld: test\nadditional_fqdns:\n  - weird[y]name.test\n  - plus+name.test\n' > "$WORK/projmeta/.ddev/config.yaml"
-printf '127.0.0.1 localhost\n127.0.0.1 weird[y]name.test plus+name.test\n' > "$WORK/winhosts3"
+printf '127.0.0.1 localhost meta-proj.test weird[y]name.test plus+name.test\n' > "$WORK/winhosts3"
 assert_eq "missing: metacharacter hostnames match literally (C22)" "" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts3" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/projmeta")"
 
