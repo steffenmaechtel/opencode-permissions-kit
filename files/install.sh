@@ -78,6 +78,9 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     STREAMED=true
 fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
+# Install target (deployed in Step 7). Defined early: steps before Step 7
+# (e.g. the container-backend fallback path) already need it.
+LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
 # === Audit log ===
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). No-op if
@@ -1275,7 +1278,6 @@ log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning
 # === Step 7: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
 ui_section "Deploying the kit library"
-LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
 sudo mkdir -p "$LIBDIR/bin" "$LIBDIR/sh" "$LIBDIR/py" "$LIBDIR/tui" "$LIBDIR/management" "$LIBDIR/templates"
 
