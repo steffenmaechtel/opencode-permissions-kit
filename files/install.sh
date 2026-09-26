@@ -269,6 +269,16 @@ banner
 
 DEFAULT_USER="${SUDO_USER:-$(whoami)}"
 
+# The username is interpolated into sudoers (sed) and sourced from
+# install.conf — reject anything outside the conservative Unix name
+# charset (letters, digits, _, ., -) before it can corrupt either.
+case "$DEFAULT_USER" in
+    ''|*[!A-Za-z0-9_.-]*)
+        echo "error  Invalid user name '$DEFAULT_USER' (allowed: letters, digits, '_', '.', '-')" >&2
+        exit 1
+        ;;
+esac
+
 # ~ in project paths must expand to the DEFAULT user's home, not $HOME:
 # under `curl | sudo bash` / `sudo bash install.sh`, $HOME is /root and
 # "~/dev" would be rejected as a "/root system path" with a confusing
@@ -1353,18 +1363,21 @@ log "cli symlink: /usr/local/bin/opk -> $LIBDIR/bin/opk"
 # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
 sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
+# Validate the RENDERED file before anything is deployed: a broken file in
+# /etc/sudoers.d makes sudo itself refuse to run, and recovering would
+# require non-sudo access. Nothing is deployed unless visudo approves.
+if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
+    rm -f "$SUDO_TMP"
+    ui_error "sudoers template failed validation — nothing was deployed (user '$DEFAULT_USER')."
+    log "sudoers validation FAILED (rendered template, user $DEFAULT_USER) — install aborted"
+    exit 1
+fi
 sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
 sudo chmod 440 /etc/opencode-permissions-kit/sudoers
 rm -f "$SUDO_TMP"
 sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
-
-if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
-    ui_success "sudoers installed + validated (/etc/sudoers.d/opencode-permissions-kit)"
-    log "sudoers installed: /etc/opencode-permissions-kit/sudoers -> /etc/sudoers.d/opencode-permissions-kit"
-else
-    ui_error "sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers."
-    exit 1
-fi
+ui_success "sudoers installed + validated (/etc/sudoers.d/opencode-permissions-kit)"
+log "sudoers installed: /etc/opencode-permissions-kit/sudoers -> /etc/sudoers.d/opencode-permissions-kit"
 
 # WSL browser bridge (issues #91, #100): the helper library is always
 # deployed; the stand-in tree only materializes on WSL (the helper no-ops

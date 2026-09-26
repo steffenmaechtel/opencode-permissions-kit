@@ -459,20 +459,27 @@ ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy
 sudo mkdir -p "$CONFDIR"
 
 if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ]; then
+    # The username is sed-interpolated into sudoers — reject exotic names
+    # (e.g. a manually edited install.conf) before they corrupt the syntax.
+    case "$DEFAULT_USER" in
+        *[!A-Za-z0-9_.-]*|'') die "invalid DEFAULT_USER '$DEFAULT_USER' in install.conf" ;;
+    esac
     SUDO_TMP=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
+    # Validate the RENDERED file before deploying anything: a broken file
+    # in /etc/sudoers.d makes sudo itself refuse to run (S1).
+    if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
+        rm -f "$SUDO_TMP"
+        die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."
+    fi
     sudo cp "$SUDO_TMP" "$CONFDIR/sudoers"
     sudo chmod 440 "$CONFDIR/sudoers"
     rm -f "$SUDO_TMP"
     sudo ln -sf "$CONFDIR/sudoers" /etc/sudoers.d/opencode-permissions-kit
     # Remove the pre-0.0.10 sudoers symlink so only the new name is active.
     sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
-    if sudo /usr/sbin/visudo -c -f "$CONFDIR/sudoers" >/dev/null 2>&1; then
-        ui_success "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
-        log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
-    else
-        die "sudoers validation failed. Check $CONFDIR/sudoers."
-    fi
+    ui_success "sudoers re-deployed + validated (DEFAULT_USER=$DEFAULT_USER)"
+    log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
 fi
 
 # --- re-deploy umask profile -------------------------------------------------

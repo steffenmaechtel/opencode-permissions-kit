@@ -375,19 +375,29 @@ render_sudoers() {
         if [ -f "$cand" ]; then template="$cand"; break; fi
     done
     [ -n "$template" ] || die "sudoers.template not found."
+    # The username is sed-interpolated into sudoers — reject exotic names
+    # (e.g. a manually edited install.conf) before they corrupt the syntax.
+    case "$DEFAULT_USER" in
+        *[!A-Za-z0-9_.-]*|'') die "invalid DEFAULT_USER '$DEFAULT_USER' in install.conf" ;;
+    esac
     local tmp
     tmp=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$template" > "$tmp"
+    # Validate the RENDERED file before deploying anything: a broken file
+    # in /etc/sudoers.d makes sudo itself refuse to run (S1).
+    if ! sudo /usr/sbin/visudo -c -f "$tmp" >/dev/null 2>&1; then
+        rm -f "$tmp"
+        die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."
+    fi
     sudo cp "$tmp" /etc/opencode-permissions-kit/sudoers
     sudo chmod 440 /etc/opencode-permissions-kit/sudoers
     rm -f "$tmp"
     sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
-    if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
-        ui_success "sudoers re-rendered"
-        log "sudoers re-rendered"
-    else
-        die "sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers."
-    fi
+    # Remove the pre-0.0.10 sudoers symlink so only the new name is active
+    # (same cleanup update.sh performs — C16).
+    sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
+    ui_success "sudoers re-rendered + validated"
+    log "sudoers re-rendered"
 }
 
 # Update install.conf: rewrite the backend keys while preserving everything else.
