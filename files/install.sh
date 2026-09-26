@@ -695,7 +695,19 @@ fi
 # The sharing group is the opencode user's PRIMARY usergroup (auto-created by
 # useradd -m). No www-data, no extra group to create or remove.
 OPENCODE_GROUP=$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")
-sudo usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER" 2>/dev/null || true
+# The developer's membership is the kit's core sharing mechanism — a silent
+# failure here would leave the whole model without its foundation, so this
+# fails loud (and verifies membership instead of trusting the exit code).
+if ! sudo usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER"; then
+    ui_error "failed to add '$DEFAULT_USER' to the sharing group '$OPENCODE_GROUP'."
+    log "sharing group: usermod FAILED for $DEFAULT_USER — install aborted"
+    exit 1
+fi
+if ! id -nG "$DEFAULT_USER" | tr ' ' '\n' | grep -qx "$OPENCODE_GROUP"; then
+    # usermod returned success but the group database disagrees — surface it
+    # instead of reporting unqualified success.
+    ui_warn "membership not yet visible via id(1) — verify with 'id -nG $DEFAULT_USER' after the install"
+fi
 ui_success "sharing group '$OPENCODE_GROUP' (developer '$DEFAULT_USER' added)"
 log "sharing group: $OPENCODE_GROUP (developer $DEFAULT_USER added)"
 
