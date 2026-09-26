@@ -55,12 +55,61 @@ fi
 . "$DB"
 KNOWN=$(advisories_ids opencode || true)
 
+# scan_advisory_valid <id> <severity> <ranges> <patched> — shape-validate one
+# parsed advisory line BEFORE any field reaches argv (title) or a query
+# string (--search). Untrusted-input guard, CWE-74 discipline:
+#   - no shell re-parsing risk exists — every expansion stays
+#     double-quoted, printf takes fields as %s arguments, free text
+#     (summary/url) flows only into the body FILE, nothing is ever eval'd
+#   - what CAN be attacked is SEMANTICS: a crafted id ("GHSA-x is:closed",
+#     a tab smuggled into a field shifting the TSV columns) would steer the
+#     dedup search or garble the issue — so every field that leaves the
+#     script as argv/query is charset-allowlisted first, and anything else
+#     is SKIPPED loudly instead of interpolated
+# Returns 0 = usable, 1 = skip.
+scan_advisory_valid() {
+    case "$1" in
+        GHSA-*) ;;
+        *) return 1 ;;
+    esac
+    # charset allowlist, NOT a prefix glob: a `*` tail would swallow
+    # payloads ("GHSA-632h$(...)") — the negated class rejects any char
+    # outside [A-Za-z0-9-] (spaces steer --search, quotes/parens smuggle
+    # shell syntax into argv text)
+    case "$1" in
+        *[!A-Za-z0-9-]*) return 1 ;;
+    esac
+    case "$2" in
+        low|moderate|high|critical) ;;
+        *) return 1 ;;
+    esac
+    _sav_patched=$(printf '%s' "$4" | tr -d ' ')
+    case "$_sav_patched" in
+        *[!0-9.]*) return 1 ;;
+    esac
+    _sav_rest="$3,"
+    while [ -n "$_sav_rest" ]; do
+        _sav_cmp="${_sav_rest%%,*}"
+        _sav_rest="${_sav_rest#*,}"
+        _sav_cmp=$(printf '%s' "$_sav_cmp" | tr -d ' ')
+        [ -n "$_sav_cmp" ] || continue
+        printf '%s' "$_sav_cmp" | grep -qE '^(>=|<=|<|>|=)?[0-9]+(\.[0-9]+)*$' || return 1
+    done
+    return 0
+}
+
 # --- diff + one issue per unknown advisory --------------------------------------
 BODY=$(mktemp)
 trap 'rm -f "$BODY"' EXIT INT TERM
 NEW=0
+SKIPPED=0
 while IFS='	' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
     [ -n "$ID" ] || continue
+    if ! scan_advisory_valid "$ID" "$SEVERITY" "$RANGES" "$PATCHED"; then
+        SKIPPED=$((SKIPPED + 1))
+        say "WARN: skipping '$ID' — malformed feed fields (id/severity/ranges/patched shape; feed corruption?)"
+        continue
+    fi
     if printf '%s\n' "$KNOWN" | grep -qxF "$ID"; then
         say "$ID known (shipped database) — ok"
         continue
@@ -107,4 +156,7 @@ done <<EOF
 $UPSTREAM
 EOF
 
+if [ "$SKIPPED" -gt 0 ]; then
+    die "$SKIPPED malformed advisory(ies) skipped — inspect the upstream feed (see the WARN lines above)"
+fi
 say "scan done — $NEW new advisory(ies)"

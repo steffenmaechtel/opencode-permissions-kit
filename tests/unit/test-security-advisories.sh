@@ -235,6 +235,91 @@ else
     fail "status.sh: advisory section, upstream live check, upgrade hint"
 fi
 
+# --- 8. scan script: untrusted-input guard --------------------------------------------
+
+# scripts/security-scan.sh feeds EXTERNAL data (the GitHub advisory feed)
+# into gh argv and a --search query. No shell re-parsing exists (all
+# expansions double-quoted, printf %s, free text only in the body file),
+# but semantics can be attacked — the guard function shape-validates
+# every field that leaves the script as argv/query. Static extraction,
+# same technique as test-status.sh's backend case.
+SCAN="$SCRIPT_DIR/../../scripts/security-scan.sh"
+extract_scan_guard() {
+    sed -n '/^scan_advisory_valid() {/,/^}/p' "$SCAN"
+}
+if [ -n "$(extract_scan_guard)" ]; then
+    pass "security-scan.sh: guard function extractable"
+else
+    fail "security-scan.sh: guard function extractable"
+fi
+eval "$(extract_scan_guard)"
+
+# the real feed shape stays usable (spaces in comparators tolerated)
+if scan_advisory_valid "GHSA-632h-h47v-g4x4" "high" ">=1.14.30, < 1.18.22" "1.18.22"; then
+    pass "scan guard: well-formed advisory passes"
+else
+    fail "scan guard: well-formed advisory passes"
+fi
+# no patched version yet (real advisories can lack one) stays usable
+if scan_advisory_valid "GHSA-632h-h47v-g4x4" "critical" "<1.0.216" ""; then
+    pass "scan guard: empty patched (no fix yet) passes"
+else
+    fail "scan guard: empty patched (no fix yet) passes"
+fi
+# semantic injection into the dedup search query: space + GitHub qualifier
+if scan_advisory_valid "GHSA-x is:closed in:title" "high" "<1.0.216" "1.0.216"; then
+    fail "scan guard: search-qualifier smuggling rejected"
+else
+    pass "scan guard: search-qualifier smuggling rejected"
+fi
+# shell metacharacters must stay literal data — and be rejected outright;
+# single quotes hand the payload to the guard as TEXT, the marker file
+# proves nothing anywhere ever executed it
+PWNED_DIR="$(mktemp -d)"
+PWNED="$PWNED_DIR/pwned"
+if scan_advisory_valid 'GHSA-632h$(touch '"$PWNED"')' "high" "<1.0.216" "1.0.216"; then
+    fail "scan guard: command-substitution payload rejected"
+else
+    pass "scan guard: command-substitution payload rejected"
+fi
+if [ -e "$PWNED" ]; then
+    fail "scan guard: payload never executed (marker file must not exist)"
+else
+    pass "scan guard: payload never executed (marker file must not exist)"
+fi
+rm -rf "$PWNED_DIR"
+if scan_advisory_valid "GHSA-x; gh repo delete" "high" "<1.0.216" "1.0.216"; then
+    fail "scan guard: semicolon payload rejected"
+else
+    pass "scan guard: semicolon payload rejected"
+fi
+# a tab smuggled into a field shifts the TSV columns — the shape checks
+# catch the resulting garbage severity
+if scan_advisory_valid "GHSA-x" "high	extra" "<1.0.216" "1.0.216"; then
+    fail "scan guard: TSV column shift (garbage severity) rejected"
+else
+    pass "scan guard: TSV column shift (garbage severity) rejected"
+fi
+if scan_advisory_valid "GHSA-x" "high" ">=1.0.0 || rm -rf /" "1.0.216"; then
+    fail "scan guard: shell-syntax in ranges rejected"
+else
+    pass "scan guard: shell-syntax in ranges rejected"
+fi
+if scan_advisory_valid "GHSA-x" "high" ">=1.0.0" "1.0.216 && evil"; then
+    fail "scan guard: shell-syntax in patched rejected"
+else
+    pass "scan guard: shell-syntax in patched rejected"
+fi
+# quoting discipline stays in place: the id only ever reaches argv inside
+# double quotes, free text only the body file
+if grep -q -- '--search "\$ID in:title"' "$SCAN" \
+   && grep -q -- '--title "New upstream advisory \$ID affects opencode"' "$SCAN" \
+   && ! grep -q 'eval ' "$SCAN"; then
+    pass "security-scan.sh: quoted argv only, no eval"
+else
+    fail "security-scan.sh: quoted argv only, no eval"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

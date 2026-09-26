@@ -98,6 +98,20 @@ new issue → curate the record (channel, refined range) → cover it in
 Freshness therefore rides the normal release cadence (~1 advisory per
 month upstream — the daily scan + release channel comfortably keep up).
 
+**Untrusted input** (the feed is external data, the token has
+`issues:write`): no shell re-parsing path exists — every expansion is
+double-quoted, `printf '%s'`-style takes fields as arguments, free text
+(summary/url) flows only into the body FILE, nothing is ever `eval`'d.
+What can still be attacked is *semantics*: a crafted id could steer the
+`--search` query, a smuggled tab could shift the TSV columns. So every
+field that leaves the script as argv or query passes
+`scan_advisory_valid` first — charset allowlists (the id pattern is a
+negated-class match, never a prefix glob — a `*` tail would swallow
+payloads), anchored regexes for ranges/patched, vocabulary for severity.
+A malformed advisory is skipped loudly and fails the run. Payload
+attempts (command substitution, qualifier smuggling, column shifts) are
+unit-tested in `tests/unit/test-security-advisories.sh` (§8).
+
 ## Initial database (2026-09)
 
 All three upstream advisories shipped as records:
