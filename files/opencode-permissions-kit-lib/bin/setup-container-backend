@@ -139,27 +139,6 @@ allocate_subuid_subgid() {
 
 # --- systemd --user helpers ----------------------------------------------------
 
-systemd_user_available() {
-    # Check if `systemctl --user` works for the opencode user. Requires systemd
-    # (WSL2: enabled via /etc/wsl.conf [boot] systemd=true) + dbus-user-session.
-    # The opencode user has no login session (it was created by useradd and only
-    # ever runs via sudo -u), so user@<uid>.service is not active. Enable linger
-    # first — that starts the systemd --user manager for the user, which is
-    # exactly what docker-rootless needs (the daemon must survive logout).
-    if command -v loginctl >/dev/null 2>&1; then
-        loginctl enable-linger "$OPENCODE_USER" 2>/dev/null || true
-        # loginctl enable-linger starts user@<uid>.service asynchronously;
-        # give it a moment to come up.
-        sleep 1
-    fi
-    # Ensure the runtime dir exists (systemd --user needs XDG_RUNTIME_DIR).
-    mkdir -p "/run/user/$OC_UID" 2>/dev/null || true
-    chown "$OPENCODE_USER:$OPENCODE_USER" "/run/user/$OC_UID" 2>/dev/null || true
-    chmod 700 "/run/user/$OC_UID" 2>/dev/null || true
-    sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user is-active dbus >/dev/null 2>&1 || \
-    sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user status >/dev/null 2>&1
-}
-
 enable_linger() {
     if command -v loginctl >/dev/null 2>&1; then
         loginctl enable-linger "$OPENCODE_USER" 2>/dev/null || true

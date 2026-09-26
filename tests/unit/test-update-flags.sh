@@ -1,6 +1,7 @@
 #!/bin/sh
 # Unit tests for update.sh's binary-upgrade flow + --only-binary (issue #24):
-#   - fetch_latest_opencode: functional test with a fake curl on PATH —
+#   - latest-fetch composition (resolve_latest_opencode_version +
+#     fetch_opencode_version): functional test with a fake curl on PATH —
 #     the extracted candidate must SURVIVE until the caller installs it
 #     (the old flow `rm -rf $TMP`'d it before verification, so every
 #     downloaded upgrade failed with "candidate failed verification")
@@ -36,10 +37,10 @@ extract_fn() {
     sed -n "/^$1() {/,/^}/p" "$UPDATE"
 }
 
-if [ -n "$(extract_fn fetch_latest_opencode)" ]; then
-    pass "fetch_latest_opencode defined in update.sh"
+if [ -n "$(extract_fn resolve_latest_opencode_version)" ]; then
+    pass "resolve_latest_opencode_version defined in update.sh"
 else
-    fail "fetch_latest_opencode defined in update.sh"
+    fail "resolve_latest_opencode_version defined in update.sh"
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1
 fi
@@ -88,12 +89,10 @@ chmod +x "$WORK/bin/curl"
 FUNCS="$WORK/funcs.sh"
 {
     sed -n '/^detect_target() {/,/^}/p' "$UPDATE"
-    sed -n '/^detect_asset() {/,/^}/p' "$UPDATE"
     sed -n '/^version_major() {/,/^}/p' "$UPDATE"
     sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE"
     sed -n '/^resolve_latest_opencode_version() {/,/^}/p' "$UPDATE"
     sed -n '/^fetch_opencode_version() {/,/^}/p' "$UPDATE"
-    sed -n '/^fetch_latest_opencode() {/,/^}/p' "$UPDATE"
 } > "$FUNCS"
 
 # Stubs for current_opencode_major (2.x and 1.x --version shapes).
@@ -138,16 +137,18 @@ check "fetch: 1.x candidate runs (--version works for install_binary)" \
     sh -c "\"\$1\" --version >/dev/null 2>&1" _ "$DL/opencode"
 rm -rf "$DL"
 
-# 2e. fetch_latest_opencode: default stays on the CURRENT major (no 2.x ->
-# 1.x downgrade); explicit major picks the channel
+# 2e. latest-fetch composition (formerly fetch_latest_opencode, C20): the
+# default stays on the CURRENT major (no 2.x -> 1.x downgrade); explicit
+# major picks the channel. Composed from the two shipped functions exactly
+# like the upgrade-opencode flow does.
 DL="$(mktemp -d)"
 OUT=$(PATH="$WORK/bin:$PATH" SYSTEM_BIN="$WORK/stub-v2" CONFDIR="$WORK/conf" \
-    sh -c ". '$FUNCS' && fetch_latest_opencode '$DL'" 2>/dev/null || true)
+    sh -c ". '$FUNCS' && _fl_ver=\$(resolve_latest_opencode_version \"\$(current_opencode_major)\") && fetch_opencode_version '$DL' \"\$_fl_ver\"" 2>/dev/null || true)
 check "fetch: current major 2 -> npm candidate (issue #99: no downgrade)" \
     sh -c "[ \"\$1\" = \"\$2/opencode\" ] && \"\$1\" --version 2>/dev/null | grep -q '^opencode v2'" _ "$OUT" "$DL"
 rm -rf "$DL"; DL="$(mktemp -d)"
 OUT=$(PATH="$WORK/bin:$PATH" SYSTEM_BIN="$WORK/stub-v1" CONFDIR="$WORK/conf" \
-    sh -c ". '$FUNCS' && fetch_latest_opencode '$DL'" 2>/dev/null || true)
+    sh -c ". '$FUNCS' && _fl_ver=\$(resolve_latest_opencode_version \"\$(current_opencode_major)\") && fetch_opencode_version '$DL' \"\$_fl_ver\"" 2>/dev/null || true)
 check "fetch: current major 1 -> GitHub candidate" \
     sh -c "[ \"\$1\" = \"\$2/opencode\" ] && \"\$1\" --version >/dev/null 2>&1" _ "$OUT" "$DL"
 rm -rf "$DL"

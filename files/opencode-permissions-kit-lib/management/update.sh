@@ -629,11 +629,6 @@ detect_target() {
     echo "$target"
 }
 
-# Release asset name for this host (1.x GitHub assets).
-detect_asset() {
-    echo "opencode-$(detect_target).tar.gz"
-}
-
 # Verify a candidate binary actually runs, then install it over $SYSTEM_BIN.
 install_binary() {
     local src="$1" current new
@@ -756,14 +751,6 @@ fetch_opencode_version() {
     [ -x "$_fov_dst/opencode" ] || return 1
     echo "$_fov_dst/opencode"
     return 0
-}
-
-# Latest release for a major, downloaded into <dir> (issue #99 wrapper).
-fetch_latest_opencode() {
-    _fll_dst="$1" _fll_major="$2"
-    [ -n "$_fll_major" ] || _fll_major=$(current_opencode_major)
-    _fll_ver=$(resolve_latest_opencode_version "$_fll_major") || return 1
-    fetch_opencode_version "$_fll_dst" "$_fll_ver" || return 1
 }
 
 # TUI mode display per major (issue #80): the 1.x artifacts (tui.json +
