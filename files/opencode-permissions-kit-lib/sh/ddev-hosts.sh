@@ -126,7 +126,14 @@ ddev_hosts_missing() {
         case "$dhmi_h" in
             *.ddev.site) continue ;;
         esac
-        if [ -f "$dhmi_hosts" ] && grep -Eq "[[:space:]]$dhmi_h([[:space:]]|\$)" "$dhmi_hosts" 2>/dev/null; then
+        # Exact field comparison (C22): interpolating the hostname into a
+        # grep -E pattern mis-matches on regex metacharacters — a name
+        # with "[y]" never matched (re-added forever), "+" false-matched
+        # other names. Fields 2+ are the names; field 1 is the IP.
+        if [ -f "$dhmi_hosts" ] && awk -v h="$dhmi_h" '
+            { for (i = 2; i <= NF; i++) if ($i == h) found = 1 }
+            END { exit !found }
+        ' "$dhmi_hosts" 2>/dev/null; then
             continue
         fi
         printf '%s\n' "$dhmi_h"

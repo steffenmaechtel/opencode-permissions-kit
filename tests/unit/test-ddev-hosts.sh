@@ -132,6 +132,15 @@ assert_eq "missing: substring hosts do not satisfy the check" \
     "base-typo3-modulset.local" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts2" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/proj1")"
 
+# C22: regex metacharacters in a hostname (brackets, plus) must compare as
+# LITERAL fields — the old grep -E interpolation never matched "[y]" (the
+# hostname was re-added forever) and let "+" false-match other names.
+mkdir -p "$WORK/projmeta/.ddev"
+printf 'type: php\nname: meta-proj\nproject_tld: test\nadditional_fqdns:\n  - weird[y]name.test\n  - plus+name.test\n' > "$WORK/projmeta/.ddev/config.yaml"
+printf '127.0.0.1 localhost\n127.0.0.1 weird[y]name.test plus+name.test\n' > "$WORK/winhosts3"
+assert_eq "missing: metacharacter hostnames match literally (C22)" "" \
+    "$(DDEV_WIN_HOSTS="$WORK/winhosts3" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/projmeta")"
+
 # issue #46 follow-up: a hostname parsed from a CRLF config.yaml must
 # match a cleanly added hosts entry (and a CRLF hosts file) — otherwise
 # status reports it missing forever no matter how often the user adds it.
