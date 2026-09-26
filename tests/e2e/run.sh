@@ -413,7 +413,7 @@ E 'sudo mkdir -p /var/www/vhosts/fresh-clone/.ddev && sudo chown -R dev:dev /var
 check "4d: fresh clone root is dev-owned before the handover" \
     E 'test "$(stat -c %U /var/www/vhosts/fresh-clone)" = "dev"'
 check "4d: ddev() hook prints the bootstrap hint naming the handover command" \
-    E 'sudo -u dev -H sh -c "cd /var/www/vhosts/fresh-clone && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev start" 2>&1 | grep -q "config handover /var/www/vhosts/fresh-clone"'
+    E 'sudo -u dev -H sh -c "cd /var/www/vhosts/fresh-clone && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev start" 2>&1 | grep -q "config handover \"/var/www/vhosts/fresh-clone\""'
 E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes handover /var/www/vhosts/fresh-clone' && \
     echo "  ${GREEN}OK${NC}  config.sh handover completed"
 check "4d: handover gives the bootstrap root to opencode (2755, chmod no-op)" \
