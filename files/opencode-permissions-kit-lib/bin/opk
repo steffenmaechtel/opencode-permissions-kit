@@ -34,7 +34,12 @@ LIBDIR="$(cd "$(dirname "$SELF")/.." && pwd -P)"
 if [ -f "$LIBDIR/sh/ui.sh" ]; then
     . "$LIBDIR/sh/ui.sh"
 else
-    ui_error() { echo "  error    $1" >&2; }
+    # Minimal fallbacks: plain, colorless, same argument shapes — every
+    # ui_* helper opk uses must exist even when the library is damaged.
+    ui_error()   { echo "  error    $1" >&2; }
+    ui_info()    { echo "  info     $1"; }
+    ui_success() { echo "  ok       $1"; }
+    ui_detail()  { echo "           $1"; }
 fi
 
 # Version from install.conf (the deployed stamp — same source as status.sh;
@@ -157,7 +162,16 @@ case "$cmd" in
                 ui_error "cannot resolve the developer user — run as your user, not as root"
                 exit 1
             fi
-            exec sudo -u "$_kitsu" env HOME="/home/$_kitsu" sh -c ". '$LIBDIR/sh/ddev-hosts.sh' && $cmd \"\$1\"" _ "${1:-$PWD}"
+            # Nothing user-controlled in the sh -c body (C23): the function
+            # name comes from the fixed cmd dispatch above, the lib path is
+            # kit-owned, and the project path travels as an argument.
+            case "$cmd" in
+                ddev-hosts-check) _kitfn=ddev_hosts_missing ;;
+                ddev-hosts-add)   _kitfn=ddev_hosts_add ;;
+                *)                ui_error "unknown command: $cmd"; exit 1 ;;
+            esac
+            exec sudo -u "$_kitsu" env HOME="/home/$_kitsu" \
+                sh -c '. "$1" && "$2" "$3"' _ "$LIBDIR/sh/ddev-hosts.sh" "$_kitfn" "${1:-$PWD}"
         fi
         case "$cmd" in
             ddev-hosts-check)

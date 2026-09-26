@@ -179,6 +179,7 @@ else
 fi
 LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && printf '%s\n/etc\n' "$WORK/fakeproj" | (
     run() { echo "RUN: $*"; }
+    run_q() { echo "RUN: $*"; }
     log() { :; }
     UN_OC_UID=60000
     UN_OC_GID=60001
@@ -186,11 +187,11 @@ LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && printf '%s\n/etc\n' "$WORK/fakeproj" | (
     DEFAULT_USER=devuser
     eval "$PROJECT_LOOP"
 ) 2>&1 || true)
-if printf '%s' "$LOOP_OUT" | grep -qF "find \"$WORK/fakeproj\"" \
+if printf '%s' "$LOOP_OUT" | grep -qF "find $WORK/fakeproj" \
    && ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-uid "60000"' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid "60001"' \
-   && printf '%s' "$LOOP_OUT" | grep -qF 'chown "devuser:devgroup"'; then
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-uid 60000' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60001' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +'; then
     pass "ownership revert: uid/gid-matched chown to the developer per root (issue #74)"
 else
     fail "ownership revert loop (out=$(printf '%s' "$LOOP_OUT" | head -5))"

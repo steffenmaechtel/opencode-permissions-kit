@@ -307,7 +307,7 @@ check "setup installs podman for podman-rootless" grep -Fq 'apt_install uidmap d
 check "setup adds Docker apt repo when docker-ce-rootless-extras missing" grep -Fq 'get.docker.com' "$SETUP"
 check "setup prints OPENCODE_DOCKER_HOST on stdout" grep -Fq 'echo "OPENCODE_DOCKER_HOST=$SOCK"' "$SETUP"
 check "setup reads opencode user from install.conf" grep -Fq 'OPENCODE_USER="opencode"' "$SETUP"
-check "setup checks systemd for docker-rootless" grep -Fq 'systemd_user_available' "$SETUP"
+check "setup checks systemd for docker-rootless" grep -Fq 'systemctl --user is-active dbus' "$SETUP"
 
 echo ""
 echo "===================================="

@@ -51,7 +51,7 @@ fi
 eval "$(extract_fn "$INSTALL")"
 
 # must REJECT (system paths and direct children of them)
-REJECT="/ /usr /etc /home /root /var /tmp /bin /sbin /lib /lib64 /libx32 /opt /srv \
+REJECT="/ /usr /etc /home /root /var /tmp /tmp/build-dir /bin /sbin /lib /lib64 /libx32 /opt /srv \
 /mnt /mnt/c /media /media/usb /proc /sys /dev /run /boot /var/tmp \
 /var/log /var/log/nginx /var/lib /var/lib/docker /var/spool /var/spool/cron \
 /var/cache /var/mail /var/mail/root \

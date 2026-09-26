@@ -77,7 +77,13 @@ fs_ensure_traversable() {
                 printf '%s\n' "  WARNING: could not grant traversal on $fsb_d (setfacl failed — ACL support?) — the agent may not reach $fsb_root" >&2
             fi
         fi
-        fsb_d=$(dirname "$fsb_d")
+        # Fixed-point guard: a relative root would make dirname spin on
+        # "." forever (unreachable via project_path_sane, but a manually
+        # edited projects.conf could carry one) — stop when dirname stops
+        # making progress (C13).
+        _fsb_next=$(dirname "$fsb_d")
+        [ "$_fsb_next" = "$fsb_d" ] && break
+        fsb_d=$_fsb_next
     done
     return 0
 }

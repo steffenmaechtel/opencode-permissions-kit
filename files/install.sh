@@ -78,6 +78,9 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     STREAMED=true
 fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
+# Install target (deployed in Step 7). Defined early: steps before Step 7
+# (e.g. the container-backend fallback path) already need it.
+LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
 # === Audit log ===
 # Best-effort shared logger (/var/log/opencode-permissions-kit/). No-op if
@@ -221,39 +224,25 @@ parse_args "$@"
 
 # === Helpers ===
 
-prompt() {
-    # prompt "Question?" "Y" "N" "B"
-    # Returns: y, n, or b
-    local msg="$1"
-    local opt_y="$2"
-    local opt_n="$3"
-    local opt_b="$4"
-
+# confirm "Question?" — conventions.md prompt shape ([y/N], Enter = no;
+# y/yes case-insensitive). Exit status 0 = yes. --yes/SKIP_PROMPTS
+# answers yes (same as the old prompt() helper).
+confirm() {
     if [ "$SKIP_PROMPTS" = true ]; then
-        echo "y"
+        return 0
+    fi
+    ui_confirm "$1" n
+}
+
+# _yes_no_backup_menu "Question?" — a choice beyond yes/no becomes a keyed
+# menu (conventions.md); prints y, n or b (backup first, then yes).
+# Enter/EOF = No; --yes/SKIP_PROMPTS = yes.
+_yes_no_backup_menu() {
+    if [ "$SKIP_PROMPTS" = true ]; then
+        echo y
         return
     fi
-
-    echo "" >&2
-    printf "[?] %s" "$msg" >&2
-    [ -n "$opt_y" ] && printf "  (%s) Yes" "$opt_y" >&2
-    [ -n "$opt_n" ] && printf "  (%s) No" "$opt_n" >&2
-    [ -n "$opt_b" ] && printf "  (%s) Backup + Yes" "$opt_b" >&2
-    echo "" >&2
-
-    while true; do
-        printf "    > " >&2
-        read -r answer </dev/tty 2>/dev/null || read -r answer
-        answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]')
-        case "$answer" in
-            y|yes) echo "y"; return ;;
-            n|no)  echo "n"; return ;;
-            b|backup)
-                if [ -n "$opt_b" ]; then echo "b"; return; fi
-                ;;
-            "") echo "n"; return ;;
-        esac
-    done
+    ui_menu "$1" "n" "y|Yes" "n|No" "b|Backup first, then yes"
 }
 
 banner() {
@@ -265,6 +254,16 @@ banner() {
 banner
 
 DEFAULT_USER="${SUDO_USER:-$(whoami)}"
+
+# The username is interpolated into sudoers (sed) and sourced from
+# install.conf — reject anything outside the conservative Unix name
+# charset (letters, digits, _, ., -) before it can corrupt either.
+case "$DEFAULT_USER" in
+    ''|*[!A-Za-z0-9_.-]*)
+        echo "error  Invalid user name '$DEFAULT_USER' (allowed: letters, digits, '_', '.', '-')" >&2
+        exit 1
+        ;;
+esac
 
 # ~ in project paths must expand to the DEFAULT user's home, not $HOME:
 # under `curl | sudo bash` / `sudo bash install.sh`, $HOME is /root and
@@ -299,8 +298,7 @@ log "install mode: $MODE (interactive=$INTERACTIVE)"
 IS_WSL2=false
 grep -qi microsoft /proc/version 2>/dev/null && IS_WSL2=true
 if [ "$IS_WSL2" != true ]; then
-    ans=$(prompt "This does not appear to be WSL2. Continue anyway?" "Y" "N" "")
-    [ "$ans" != "y" ] && exit 0
+    confirm "This does not appear to be WSL2. Continue anyway?" || exit 0
 fi
 
 # Backup. mktemp (not a timestamped name): root copies sudoers, gitconfigs
@@ -325,8 +323,7 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 if ! command -v setfacl >/dev/null 2>&1; then
-    ans=$(prompt "'acl' package not installed (setfacl/getfacl missing). Install it now?" "Y" "N" "")
-    if [ "$ans" = "y" ]; then
+    if confirm "'acl' package not installed (setfacl/getfacl missing). Install it now?"; then
         sudo apt-get update -qq 2>/dev/null || true
         sudo apt-get install -y acl
     fi
@@ -548,7 +545,7 @@ project_path_sane() {
     case "$_pp" in
         /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
 /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
-/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
+/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/tmp/*|/var/tmp/*|\
 /usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
 /var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
             return 1
@@ -671,8 +668,7 @@ log "plan confirmed (mode=$MODE)"
 
 ui_info "Creating user + sharing group ..."
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
-    ans=$(prompt "User '$OPENCODE_USER' already exists. Reuse it?" "Y" "N" "")
-    [ "$ans" != "y" ] && { ui_info "Aborted."; exit 1; }
+    confirm "User '$OPENCODE_USER' already exists. Reuse it?" || { ui_info "Aborted."; exit 1; }
 else
     sudo useradd -m -s /bin/bash "$OPENCODE_USER"
     ui_success "user '$OPENCODE_USER' created"
@@ -682,7 +678,19 @@ fi
 # The sharing group is the opencode user's PRIMARY usergroup (auto-created by
 # useradd -m). No www-data, no extra group to create or remove.
 OPENCODE_GROUP=$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")
-sudo usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER" 2>/dev/null || true
+# The developer's membership is the kit's core sharing mechanism — a silent
+# failure here would leave the whole model without its foundation, so this
+# fails loud (and verifies membership instead of trusting the exit code).
+if ! sudo usermod -aG "$OPENCODE_GROUP" "$DEFAULT_USER"; then
+    ui_error "failed to add '$DEFAULT_USER' to the sharing group '$OPENCODE_GROUP'."
+    log "sharing group: usermod FAILED for $DEFAULT_USER — install aborted"
+    exit 1
+fi
+if ! id -nG "$DEFAULT_USER" | tr ' ' '\n' | grep -qx "$OPENCODE_GROUP"; then
+    # usermod returned success but the group database disagrees — surface it
+    # instead of reporting unqualified success.
+    ui_warn "membership not yet visible via id(1) — verify with 'id -nG $DEFAULT_USER' after the install"
+fi
 ui_success "sharing group '$OPENCODE_GROUP' (developer '$DEFAULT_USER' added)"
 log "sharing group: $OPENCODE_GROUP (developer $DEFAULT_USER added)"
 
@@ -708,45 +716,57 @@ else
     fi
     echo "  [c] Custom path(s)"
     echo "  [s] Skip (no project baseline, only user + wrapper)"
-    printf "  > "
-    read -r selection </dev/tty 2>/dev/null || read -r selection
+    # Re-ask until the selection resolves: an out-of-range number or stray
+    # input used to yield an empty root list and silently continue (C11).
+    _sel_done=""
+    while [ -z "$_sel_done" ]; do
+        printf "  > "
+        read -r selection </dev/tty 2>/dev/null || read -r selection
 
-    case "$selection" in
-        [Cc]*)
-            echo "Enter paths (space-separated):"
-            _custom=""
-            while [ -z "$_custom" ]; do
-                printf "  > "
-                read -r custom </dev/tty 2>/dev/null || read -r custom
+        case "$selection" in
+            [Cc]*)
+                echo "Enter paths (space-separated):"
                 _custom=""
-                _bad=""
-                for p in $custom; do
-                    if project_path_sane "$p"; then
-                        _custom="$_custom $p"
-                    else
-                        ui_error "'$p' is a system path — rejected."
-                        _bad=1
-                    fi
+                while [ -z "$_custom" ]; do
+                    printf "  > "
+                    read -r custom </dev/tty 2>/dev/null || read -r custom
+                    _custom=""
+                    _bad=""
+                    for p in $custom; do
+                        if project_path_sane "$p"; then
+                            _custom="$_custom $p"
+                        else
+                            ui_error "'$p' is a system path — rejected."
+                            _bad=1
+                        fi
+                    done
+                    [ -n "$_bad" ] && _custom=""
                 done
-                [ -n "$_bad" ] && _custom=""
-            done
-            PROJECTS_ROOTS="$_custom"
-            ;;
-        [Ss]*)
-            PROJECTS_ROOTS=""
-            echo "Skipping project baseline."
-            ;;
-        *)
-            PROJECTS_ROOTS=""
-            idx=1
-            for dir in $options; do
-                for s in $selection; do
-                    [ "$s" = "$idx" ] && PROJECTS_ROOTS="$PROJECTS_ROOTS $dir"
+                PROJECTS_ROOTS="$_custom"
+                _sel_done=1
+                ;;
+            [Ss]*)
+                PROJECTS_ROOTS=""
+                echo "Skipping project baseline."
+                _sel_done=1
+                ;;
+            *)
+                PROJECTS_ROOTS=""
+                idx=1
+                for dir in $options; do
+                    for s in $selection; do
+                        [ "$s" = "$idx" ] && PROJECTS_ROOTS="$PROJECTS_ROOTS $dir"
+                    done
+                    idx=$((idx + 1))
                 done
-                idx=$((idx + 1))
-            done
-            ;;
-    esac
+                if [ -n "$PROJECTS_ROOTS" ]; then
+                    _sel_done=1
+                else
+                    ui_error "invalid selection '$selection' — pick numbers from the list, 'c' for custom, or 's' to skip."
+                fi
+                ;;
+        esac
+    done
 fi
 
 sudo mkdir -p /etc/opencode-permissions-kit
@@ -837,8 +857,7 @@ fi
 
 port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)
 if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
-    ans=$(prompt "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443? (host-wide sysctl)" "Y" "N" "")
-    if [ "$ans" = "y" ]; then
+    if confirm "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443? (host-wide sysctl)"; then
         if echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
             if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
                 ui_success "unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
@@ -996,8 +1015,7 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
         log "ddev database export skipped (no project roots)"
     else
         if [ "$MODE" = "advanced" ] && [ "$INTERACTIVE" = true ]; then
-            ans=$(prompt "Export the dev user's ddev databases before the handover? (recommended — dumps under /var/backups/opencode-permissions-kit)" "Y" "N" "")
-            [ "$ans" != "y" ] && SKIP_DDEV_MIGRATION=true
+            confirm "Export the dev user's ddev databases before the handover? (recommended — dumps under /var/backups/opencode-permissions-kit)" || SKIP_DDEV_MIGRATION=true
         fi
         if [ "$SKIP_DDEV_MIGRATION" != true ]; then
             # shellcheck disable=SC2086  # word splitting intended (root list)
@@ -1068,7 +1086,7 @@ fi
 
 if [ -n "$PROJECTS_ROOTS" ]; then
     ui_section "Filesystem (group baseline)"
-    ans=$(prompt "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)" "Y" "N" "B")
+    ans=$(_yes_no_backup_menu "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)")
     case "$ans" in
         n) ui_detail "skipping filesystem setup." ;;
         b)
@@ -1173,7 +1191,7 @@ fi
 
 for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
     if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
-        ans=$(prompt "opencode binary found at $loc. Copy to system path and secure with wrapper?" "Y" "N" "B")
+        ans=$(_yes_no_backup_menu "opencode binary found at $loc. Copy to system path and secure with wrapper?")
         case "$ans" in
             y)
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
@@ -1202,8 +1220,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
 done
 
 if [ "$opencode_found" = false ]; then
-    ans=$(prompt "opencode not found. Run official installer (curl -fsSL https://opencode.ai/install | bash)?" "Y" "N" "")
-    if [ "$ans" = "y" ]; then
+    if confirm "opencode not found. Run official installer (curl -fsSL https://opencode.ai/install | bash)?"; then
         curl -fsSL https://opencode.ai/install | bash
         # When run via the one-liner (sudo bash), the official installer
         # installs into /root/.opencode/bin. Locally it lands in the user's home.
@@ -1275,7 +1292,6 @@ log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning
 # === Step 7: opencode library (consolidated deployment in /usr/local/lib/opencode-permissions-kit/) ===
 
 ui_section "Deploying the kit library"
-LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
 sudo mkdir -p "$LIBDIR/bin" "$LIBDIR/sh" "$LIBDIR/py" "$LIBDIR/tui" "$LIBDIR/management" "$LIBDIR/templates"
 
@@ -1351,18 +1367,21 @@ log "cli symlink: /usr/local/bin/opk -> $LIBDIR/bin/opk"
 # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
 sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
+# Validate the RENDERED file before anything is deployed: a broken file in
+# /etc/sudoers.d makes sudo itself refuse to run, and recovering would
+# require non-sudo access. Nothing is deployed unless visudo approves.
+if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
+    rm -f "$SUDO_TMP"
+    ui_error "sudoers template failed validation — nothing was deployed (user '$DEFAULT_USER')."
+    log "sudoers validation FAILED (rendered template, user $DEFAULT_USER) — install aborted"
+    exit 1
+fi
 sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
 sudo chmod 440 /etc/opencode-permissions-kit/sudoers
 rm -f "$SUDO_TMP"
 sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
-
-if sudo /usr/sbin/visudo -c -f /etc/opencode-permissions-kit/sudoers >/dev/null 2>&1; then
-    ui_success "sudoers installed + validated (/etc/sudoers.d/opencode-permissions-kit)"
-    log "sudoers installed: /etc/opencode-permissions-kit/sudoers -> /etc/sudoers.d/opencode-permissions-kit"
-else
-    ui_error "sudoers validation failed. Check /etc/opencode-permissions-kit/sudoers."
-    exit 1
-fi
+ui_success "sudoers installed + validated (/etc/sudoers.d/opencode-permissions-kit)"
+log "sudoers installed: /etc/opencode-permissions-kit/sudoers -> /etc/sudoers.d/opencode-permissions-kit"
 
 # WSL browser bridge (issues #91, #100): the helper library is always
 # deployed; the stand-in tree only materializes on WSL (the helper no-ops
@@ -1395,11 +1414,11 @@ fi
 # --secure-git-config decided via flag). --yes runs skip everything.
 GIT_ASKED=false
 if [ "$GIT_FLAG_GIVEN" != true ] && [ "$INTERACTIVE" = true ] && [ "$MODE" = "advanced" ]; then
-    ans=$(prompt "Block .git/config for opencode? (SOFT-only: opencode tools respect it, bash-spawned reads are not OS-blocked)" "Y" "N" "")
-    case "$ans" in
-        y) SECURE_GIT_CONFIG=true ;;
-        *) SECURE_GIT_CONFIG=false ;;
-    esac
+    if confirm "Block .git/config for opencode? (SOFT-only: opencode tools respect it, bash-spawned reads are not OS-blocked)"; then
+        SECURE_GIT_CONFIG=true
+    else
+        SECURE_GIT_CONFIG=false
+    fi
     GIT_ASKED=true
 fi
 if [ "$SECURE_GIT_CONFIG" = true ]; then
@@ -1565,8 +1584,7 @@ DEFAULT_OC_DIR="/home/$DEFAULT_USER/.config/opencode"
 DEFAULT_OC_CONF="$DEFAULT_OC_DIR/opencode.jsonc"
 sudo mkdir -p "$DEFAULT_OC_DIR"
 if [ -f "$DEFAULT_OC_CONF" ]; then
-    ans=$(prompt "Default-user config $DEFAULT_OC_CONF already exists. Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?" "Y" "N" "")
-    if [ "$ans" = "y" ]; then
+    if confirm "Default-user config $DEFAULT_OC_CONF already exists. Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?"; then
         BAK_STAMP=$(date +%Y%m%d-%H%M%S)
         sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
         ui_success "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"

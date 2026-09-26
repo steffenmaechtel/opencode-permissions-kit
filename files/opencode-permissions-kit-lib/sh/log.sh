@@ -44,7 +44,9 @@ log_init() {
     chown "root:$LOG_GROUP" "$LOG_DIR" 2>/dev/null || true
     chmod 750 "$LOG_DIR" 2>/dev/null || true
     if [ ! -f "$LOG_FILE" ]; then
-        : > "$LOG_FILE" 2>/dev/null || return 1
+        # Create with the final mode right away — `: >` would create the
+        # file with the process umask first (world-readable for a beat).
+        install -m 640 /dev/null "$LOG_FILE" 2>/dev/null || return 1
     fi
     chown "root:$LOG_GROUP" "$LOG_FILE" 2>/dev/null || true
     chmod 640 "$LOG_FILE" 2>/dev/null || true

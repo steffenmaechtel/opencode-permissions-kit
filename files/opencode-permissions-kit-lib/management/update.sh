@@ -373,6 +373,9 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/status.sh"         
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template"                 "$LIBDIR/templates/sudoers.template"
 sudo chmod 440 "$LIBDIR/templates/sudoers.template"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode.jsonc"                   "$LIBDIR/templates/opencode.jsonc"
+# Same deploy set as install.sh (C19): without this line the deny-all
+# template in $LIBDIR/templates/ went stale on every opk update.
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc"          "$LIBDIR/templates/opencode-deny-all.jsonc"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/uninstall.sh"                     "$LIBDIR/management/uninstall.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/socket-check" "$LIBDIR/bin/socket-check"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/cwd-check" "$LIBDIR/bin/cwd-check"
@@ -459,20 +462,27 @@ ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy
 sudo mkdir -p "$CONFDIR"
 
 if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ]; then
+    # The username is sed-interpolated into sudoers — reject exotic names
+    # (e.g. a manually edited install.conf) before they corrupt the syntax.
+    case "$DEFAULT_USER" in
+        *[!A-Za-z0-9_.-]*|'') die "invalid DEFAULT_USER '$DEFAULT_USER' in install.conf" ;;
+    esac
     SUDO_TMP=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
+    # Validate the RENDERED file before deploying anything: a broken file
+    # in /etc/sudoers.d makes sudo itself refuse to run (S1).
+    if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
+        rm -f "$SUDO_TMP"
+        die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."
+    fi
     sudo cp "$SUDO_TMP" "$CONFDIR/sudoers"
     sudo chmod 440 "$CONFDIR/sudoers"
     rm -f "$SUDO_TMP"
     sudo ln -sf "$CONFDIR/sudoers" /etc/sudoers.d/opencode-permissions-kit
     # Remove the pre-0.0.10 sudoers symlink so only the new name is active.
     sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
-    if sudo /usr/sbin/visudo -c -f "$CONFDIR/sudoers" >/dev/null 2>&1; then
-        ui_success "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
-        log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
-    else
-        die "sudoers validation failed. Check $CONFDIR/sudoers."
-    fi
+    ui_success "sudoers re-deployed + validated (DEFAULT_USER=$DEFAULT_USER)"
+    log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
 fi
 
 # --- re-deploy umask profile -------------------------------------------------
@@ -619,11 +629,6 @@ detect_target() {
     echo "$target"
 }
 
-# Release asset name for this host (1.x GitHub assets).
-detect_asset() {
-    echo "opencode-$(detect_target).tar.gz"
-}
-
 # Verify a candidate binary actually runs, then install it over $SYSTEM_BIN.
 install_binary() {
     local src="$1" current new
@@ -688,8 +693,16 @@ resolve_latest_opencode_version() {
     _rlov_major="$1"
     _rlov_target=$(detect_target) || return 1
     if [ "$_rlov_major" = 2 ]; then
+        # python3 is the kit's canonical JSON parser (grep/sed on a
+        # packument can match an earlier "latest": occurrence elsewhere).
         _rlov_ver=$(curl -fsSL --max-time 10 "https://registry.npmjs.org/@opencode/cli-$_rlov_target" 2>/dev/null \
-            | tr ',' '\n' | sed -n 's/.*"latest": *"\([^"]*\)".*/\1/p' | head -1 || true)
+            | python3 -c 'import json,sys
+try:
+    dist = json.load(sys.stdin)["dist-tags"]
+    print(dist["latest"])
+except Exception:
+    sys.exit(1)
+' 2>/dev/null || true)
         case "$_rlov_ver" in
             2.*) echo "$_rlov_ver"; return 0 ;;
             *)  return 1 ;;
@@ -738,14 +751,6 @@ fetch_opencode_version() {
     [ -x "$_fov_dst/opencode" ] || return 1
     echo "$_fov_dst/opencode"
     return 0
-}
-
-# Latest release for a major, downloaded into <dir> (issue #99 wrapper).
-fetch_latest_opencode() {
-    _fll_dst="$1" _fll_major="$2"
-    [ -n "$_fll_major" ] || _fll_major=$(current_opencode_major)
-    _fll_ver=$(resolve_latest_opencode_version "$_fll_major") || return 1
-    fetch_opencode_version "$_fll_dst" "$_fll_ver" || return 1
 }
 
 # TUI mode display per major (issue #80): the 1.x artifacts (tui.json +

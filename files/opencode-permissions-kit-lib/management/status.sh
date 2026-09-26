@@ -210,7 +210,11 @@ _st_root_blocker() {
             echo "$_str_d"
             return 0
         fi
-        _str_d=$(dirname "$_str_d")
+        # Fixed-point guard: a relative root would spin dirname on "."
+        # forever (C13) — stop when dirname stops making progress.
+        _str_next=$(dirname "$_str_d")
+        [ "$_str_next" = "$_str_d" ] && break
+        _str_d=$_str_next
     done
     return 0
 }
@@ -223,7 +227,9 @@ if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
         [ -d "$root" ] || { ui_miss "$root" "directory missing"; continue; }
         # setgid on the root is what keeps new files in the sharing group
         root_mode=$(stat -c %a "$root" 2>/dev/null || echo "?")
-        if [ $((0${root_mode:-0} & 02000)) -ne 0 ]; then
+        if [ "$root_mode" = "?" ]; then
+            ui_atten "$root" "mode unreadable (stat failed) — run config.sh refresh"
+        elif [ $((0${root_mode} & 02000)) -ne 0 ]; then
             ui_have "$root" "setgid ($root_mode) + ACLs"
         else
             ui_atten "$root" "missing setgid bit — run config.sh refresh"
@@ -683,6 +689,8 @@ fi
 # invisible: this is a name tripwire, not content DLP. Runs unprivileged;
 # copies hidden in 0700 directories are only visible when run as root.
 # Override the directories via LEAK_SCAN_DIRS="/tmp /some/dir".
+# Noop stub first: log() must exist even when the library (and log.sh with
+# it) is already gone — the scan itself never depends on it.
 log() { :; }
 [ -f "$LIBDIR/sh/log.sh" ] && . "$LIBDIR/sh/log.sh"
 LEAK_DIRS="${LEAK_SCAN_DIRS:-/tmp /var/tmp /dev/shm}"
@@ -702,7 +710,19 @@ if [ -f "$SCAN_CFG" ] && [ -x "$PARSER" ] && command -v python3 >/dev/null 2>&1;
                 while IFS= read -r scan_pat; do
                     [ -z "$scan_pat" ] && continue
                     case "$scan_pat" in
-                        */*) find "$scan_dir" -maxdepth 4 -type f -path "*/$scan_pat" -print 2>/dev/null ;;
+                        */*)
+                            find "$scan_dir" -maxdepth 4 -type f -path "*/$scan_pat" -print 2>/dev/null
+                            # "*/<pat>" needs a deeper hierarchy — a leading
+                            # "**/" pattern must ALSO hit files directly in
+                            # the scan dir (same coverage as the -name branch).
+                            scan_tail=${scan_pat#\*\*/}
+                            if [ "$scan_tail" != "$scan_pat" ] && [ -n "$scan_tail" ]; then
+                                case "$scan_tail" in
+                                    */*) find "$scan_dir" -maxdepth 4 -type f -path "$scan_dir/$scan_tail" -print 2>/dev/null ;;
+                                    *)   find "$scan_dir" -maxdepth 4 -type f -name "$scan_tail" -print 2>/dev/null ;;
+                                esac
+                            fi
+                            ;;
                         *)   find "$scan_dir" -maxdepth 4 -type f -name "$scan_pat" -print 2>/dev/null ;;
                     esac
                 done <<EOF

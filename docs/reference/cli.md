@@ -131,8 +131,10 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | Flag | Meaning |
 |---|---|
 | `--yes` | Skip all prompts, assume Yes (Standard mode with defaults) |
-| `--projects <path...>` | Pre-define project roots, skip interactive selection (consumes every following non-flag argument) |
+| `--projects <path...>` | Pre-Define project roots, skip interactive selection (consumes every following non-flag argument) |
 | `--container-backend <docker-rootless\|podman-rootless>` | Non-interactive backend choice |
+| `--skip-ddev-migration` | Do not export the dev user's ddev databases (no `Step 4b` dumps) |
+| `--ddev-settings <dev-owned\|ddev>` | Pre-decide the settings mode: `dev-owned` writes `disable_settings_management: true` (recommended), `ddev` keeps ddev managing settings |
 | `--secure-git-config` | Enable `.git/config` hardening up front |
 | `--migrate-agents <move\|copy\|skip>` | Bring the developer's agent resources into `/home/opencode`: `~/.agents` **whole** (opencode's own namespace) + `~/.claude/skills` **skills/ only** (credentials like `~/.claude/.credentials.json` stay in your home) — move (recommended), copy, or skip; default: ask (`--yes` = move) |
 
@@ -220,7 +222,7 @@ leak scan.
 sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh
 ```
 
-Runs from a checkout too (`sudo bash files/status.sh`) and works **before**
+Runs from a checkout too (`sudo bash files/opencode-permissions-kit-lib/management/status.sh`) and works **before**
 an install or after an uninstall — it reports "NOT active" when the kit is
 not installed. Use it to check whether hardening is active from any machine.
 

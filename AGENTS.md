@@ -81,4 +81,5 @@ make e2e-rootless        # docker-rootless e2e (skips without systemd-in-contain
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning. New
-executable scripts go into the `chmod +x` lists of BOTH CI workflow files.
+executable scripts go into the `chmod +x` lists of EVERY CI workflow that runs them
+(enforced by `tests/unit/test-workflows.sh`).

@@ -62,8 +62,10 @@ ddev_devowned_enabled() {
 # — the per-project source of truth, regardless of the kit mode.
 ddev_devowned_flagged() {
     [ -f "${1:-}/.ddev/config.yaml" ] || return 1
+    # tr also strips \r: a Windows-edited config.yaml carries CRLF line
+    # endings and "true\r" would miss the grep (issue #46 class of bugs).
     sed -n 's/^disable_settings_management:[[:space:]]*//p' "$1/.ddev/config.yaml" \
-        | head -1 | tr -d ' \t"'"'" | grep -qx true
+        | head -1 | tr -d ' \t\r"'"'" | grep -qx true
 }
 
 # ddev_devowned_flag <project-dir>: insert the top-level key into
@@ -135,8 +137,8 @@ ddev_type_settings_dirs() {
     dts_proj="${1:-}"
     [ -n "$dts_proj" ] && [ -d "$dts_proj/.ddev" ] || return 0
     [ -f "$dts_proj/.ddev/config.yaml" ] || return 0
-    dts_type=$(sed -n 's/^type:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
-    dts_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
+    dts_type=$(sed -n 's/^type:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
+    dts_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ -n "$dts_docroot" ] || dts_docroot="."
     case "$dts_type" in
         typo3)
@@ -228,9 +230,9 @@ ddev_handover_project_root() {
     dhq_dev="${4:-}"
     [ -n "$dhq_proj" ] && [ -d "$dhq_proj" ] || return 0
     [ -f "$dhq_proj/.ddev/config.yaml" ] || return 0
-    dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
+    dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ "$dhq_type" = "typo3" ] || return 0
-    dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
+    dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ -n "$dhq_docroot" ] || dhq_docroot="."
     if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then
         if [ -n "$dhq_dev" ] && [ "$(stat -c %U "$dhq_proj" 2>/dev/null)" = "$dhq_user" ]; then

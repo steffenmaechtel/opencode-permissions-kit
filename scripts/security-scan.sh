@@ -32,8 +32,8 @@ command -v curl >/dev/null 2>&1 || die "curl is required"
 # join every vulnerabilities[] entry with ", " (an advisory can carry more
 # than one package/range pair); newlines in summaries become spaces so the
 # TSV stays one line per advisory.
-FEED=$(curl -fsSL --max-time 30 "$UPSTREAM_API" || true)
-[ -n "$FEED" ] || { say "upstream feed unreachable (offline or blocked) — nothing to do"; exit 0; }
+FEED=$(curl -fsSL --max-time 30 "$UPSTREAM_API" 2>/dev/null) \
+    || die "upstream feed unreachable (offline, blocked, or rate-limited): $UPSTREAM_API"
 if ! UPSTREAM=$(printf '%s' "$FEED" | python3 -c 'import json,sys
 try:
     feed = json.load(sys.stdin)
