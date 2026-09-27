@@ -19,6 +19,10 @@ the maintainers did about it** (the resolution).
    the reviewer found versus what was fixed. Corrections happen in the
    resolution, not by rewriting history. (The review's own "Retracted/ghost
    findings" section is part of the snapshot: retractions stay visible.)
+   Outside the snapshot, IDs always carry the review stem — `0.0.38 S1`,
+   never a bare `S1` — because every review restarts at S1/C1; the mapping
+   lives in [INDEX.md](INDEX.md) and
+   [conventions.md](../conventions.md#referencing-review-findings).
 2. **The snapshot carries one pointer line** at the top — `> Resolution:
    <file>` — once a resolution exists. That is the only edit allowed.
 3. **The resolution dispositiones every finding**, one of:

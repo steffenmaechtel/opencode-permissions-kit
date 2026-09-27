@@ -24,6 +24,10 @@ inclusion. Aborted runs: what was recovered and how.>
      resolution — never renumber): S# = security, C# = correctness/bugs,
      D# = docs/consistency, Q# = quality (minor). Sections that have no
      findings are dropped.
+     Reference rule (conventions.md): outside this snapshot, IDs always
+     carry the review stem — `(0.0.39b C1)`, never bare `(C1)` — because
+     every review restarts at S1/C1. In-code comments, commit messages,
+     and the resolution use the qualified form.
      Table discipline: escape every literal `|` inside a cell as `\|`;
      cite file:line for every finding; severity in bold only for
      MEDIUM and above. -->

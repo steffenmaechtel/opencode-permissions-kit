@@ -88,6 +88,21 @@ Patterns already in this repo:
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
 
+## Referencing review findings
+
+Every review restarts its finding IDs at S1/C1, so a bare ID is ambiguous
+across reviews (v0.0.38 and 0.0.39a both have an `S1`). In-code comments,
+commit messages, and resolutions therefore always qualify the ID with the
+review stem (the snapshot's file-name stem without the date):
+
+- `(0.0.38 S1)` — v0.0.38 review, security finding 1
+- `(0.0.39a C1)` / `(0.0.39b S1)` — same-day variant snapshots
+
+Grep-able by design: `grep -rn "0.0.38 S1"`. The
+[review index](review/INDEX.md) maps stems to snapshots, ID ranges, and
+resolutions; the snapshot's own
+[template](review/template.md) carries the rule.
+
 ## Language
 
 All shipped content (scripts, docs, prompts, messages) is English — see
