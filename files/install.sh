@@ -717,7 +717,7 @@ else
     echo "  [c] Custom path(s)"
     echo "  [s] Skip (no project baseline, only user + wrapper)"
     # Re-ask until the selection resolves: an out-of-range number or stray
-    # input used to yield an empty root list and silently continue (C11).
+    # input used to yield an empty root list and silently continue (0.0.38 C11).
     _sel_done=""
     while [ -z "$_sel_done" ]; do
         printf "  > "

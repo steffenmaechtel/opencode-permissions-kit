@@ -384,7 +384,7 @@ render_sudoers() {
     tmp=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$template" > "$tmp"
     # Validate the RENDERED file before deploying anything: a broken file
-    # in /etc/sudoers.d makes sudo itself refuse to run (S1).
+    # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
     if ! sudo /usr/sbin/visudo -c -f "$tmp" >/dev/null 2>&1; then
         rm -f "$tmp"
         die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."

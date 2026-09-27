@@ -162,7 +162,7 @@ case "$cmd" in
                 ui_error "cannot resolve the developer user — run as your user, not as root"
                 exit 1
             fi
-            # Nothing user-controlled in the sh -c body (C23): the function
+            # Nothing user-controlled in the sh -c body (0.0.38 C23): the function
             # name comes from the fixed cmd dispatch above, the lib path is
             # kit-owned, and the project path travels as an argument.
             case "$cmd" in

@@ -138,7 +138,7 @@ assert_eq "missing: substring hosts do not satisfy the check" \
 mkdir -p "$WORK/projmeta/.ddev"
 printf 'type: php\nname: meta-proj\nproject_tld: test\nadditional_fqdns:\n  - weird[y]name.test\n  - plus+name.test\n' > "$WORK/projmeta/.ddev/config.yaml"
 printf '127.0.0.1 localhost meta-proj.test weird[y]name.test plus+name.test\n' > "$WORK/winhosts3"
-assert_eq "missing: metacharacter hostnames match literally (C22)" "" \
+assert_eq "missing: metacharacter hostnames match literally (0.0.38 C22)" "" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts3" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/projmeta")"
 
 # issue #46 follow-up: a hostname parsed from a CRLF config.yaml must

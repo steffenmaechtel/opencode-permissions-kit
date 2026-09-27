@@ -373,7 +373,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/status.sh"         
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template"                 "$LIBDIR/templates/sudoers.template"
 sudo chmod 440 "$LIBDIR/templates/sudoers.template"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode.jsonc"                   "$LIBDIR/templates/opencode.jsonc"
-# Same deploy set as install.sh (C19): without this line the deny-all
+# Same deploy set as install.sh (0.0.38 C19): without this line the deny-all
 # template in $LIBDIR/templates/ went stale on every opk update.
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc"          "$LIBDIR/templates/opencode-deny-all.jsonc"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/uninstall.sh"                     "$LIBDIR/management/uninstall.sh"
@@ -470,7 +470,7 @@ if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ];
     SUDO_TMP=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
     # Validate the RENDERED file before deploying anything: a broken file
-    # in /etc/sudoers.d makes sudo itself refuse to run (S1).
+    # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
     if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
         rm -f "$SUDO_TMP"
         die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."

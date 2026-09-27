@@ -126,7 +126,7 @@ ddev_hosts_missing() {
         case "$dhmi_h" in
             *.ddev.site) continue ;;
         esac
-        # Exact field comparison (C22): interpolating the hostname into a
+        # Exact field comparison (0.0.38 C22): interpolating the hostname into a
         # grep -E pattern mis-matches on regex metacharacters — a name
         # with "[y]" never matched (re-added forever), "+" false-matched
         # other names. Fields 2+ are the names; field 1 is the IP. CR is

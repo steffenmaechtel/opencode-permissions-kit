@@ -227,7 +227,7 @@ def extract_tools(config_path):
         # 2.x-shape project FILES: a top-level "permissions" rule array
         # (the records `opencode debug config` normalizes to). The live
         # probe covers them; the file fallback must too, not silently
-        # report no tools (C14). Appended after the v1 map so last-match-
+        # report no tools (0.0.38 C14). Appended after the v1 map so last-match-
         # wins gives the 2.x records precedence, like later documents.
         permissions = config.get('permissions')
         if isinstance(permissions, list):
