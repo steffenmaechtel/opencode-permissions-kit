@@ -8,7 +8,8 @@ the maintainers did about it** (the resolution).
 
 | File | Meaning |
 |---|---|
-| `YYYY-MM-DD-v<VERSION>.md` | The review snapshot — findings as reported, never edited after the fact |
+| `template.md` | The skeleton a new review snapshot starts from (header fields, table shapes, finding-ID scheme) |
+| `YYYY-MM-DD-v<VERSION>.md` | The review snapshot — findings as reported, never edited after the fact. Several snapshots of the same date-version get variant suffixes `-a`, `-b`, … in review order |
 | `YYYY-MM-DD-v<VERSION>-resolution.md` | The disposition of every finding (same date-version stem) |
 
 ## Rules
