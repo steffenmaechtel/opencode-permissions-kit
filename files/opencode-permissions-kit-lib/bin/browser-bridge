@@ -37,9 +37,12 @@
 # direct invocations; opencode's spawn strips the env and discards the
 # stream anyway.
 #
-# OPK_WSL_C_ROOT overrides the Windows drive root for tests; production
-# resolution is the drvfs/9p mount of C: from /proc/mounts, /mnt/c as
-# fallback.
+# OPK_WSL_C_ROOT overrides the Windows drive root for tests — EXCLUSIVE:
+# when set, only that root is scanned, never the host's real C:. A mere
+# prepend would make the unit tests exec the actual powershell.exe on a
+# WSL host whenever the caller may execute /mnt/c (interactive spawn,
+# hanging suite). Production resolution is the drvfs/9p mount of C: from
+# /proc/mounts, /mnt/c as fallback; production never sets the override.
 set -e
 
 _bb_dbg() {
@@ -51,9 +54,14 @@ _bb_dbg() {
 _bb_dbg "invoked as $(id -un 2>/dev/null || echo '?') uid=$(id -u 2>/dev/null || echo '?') args: $*"
 
 _opk_real=""
-for _opk_root in ${OPK_WSL_C_ROOT:-} $(awk '
-    ($3 == "drvfs" || $3 == "9p") && $1 ~ /^[Cc]:/ { print $2 }
-' /proc/mounts 2>/dev/null) /mnt/c; do
+if [ -n "${OPK_WSL_C_ROOT:-}" ]; then
+    _opk_roots=${OPK_WSL_C_ROOT}
+else
+    _opk_roots="$(awk '
+        ($3 == "drvfs" || $3 == "9p") && $1 ~ /^[Cc]:/ { print $2 }
+    ' /proc/mounts 2>/dev/null || true) /mnt/c"
+fi
+for _opk_root in $_opk_roots; do
     [ -n "$_opk_root" ] || continue
     _opk_candidate="$_opk_root/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
     if [ -x "$_opk_candidate" ]; then
