@@ -99,8 +99,8 @@ review stem (the snapshot's file-name stem without the date):
 - `(0.0.39a C1)` / `(0.0.39b S1)` — same-day variant snapshots
 
 Grep-able by design: `grep -rn "0.0.38 S1"`. The
-[review index](review/INDEX.md) maps stems to snapshots, ID ranges, and
-resolutions; the snapshot's own
+[review index](review/README.md#index) maps stems to snapshots, ID ranges,
+and resolutions; the snapshot's own
 [template](review/template.md) carries the rule.
 
 ## Language
