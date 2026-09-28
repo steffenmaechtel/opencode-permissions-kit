@@ -108,6 +108,23 @@ ui_plan() {
 
 # --- questions ------------------------------------------------------------------------------
 
+# Read one answer line into the variable named by $1. The controlling tty
+# is preferred (prompts survive `curl | bash` installs with redirected
+# stdin); the stdin fallback stays for pipe-fed runs (tests, CI). But a
+# caller whose stdin IS the script stream (install.sh in streamed mode)
+# sets UI_NO_STDIN_FALLBACK=1 and gets a hard error instead of script
+# bytes being consumed as the answer (review 0.0.39b C6).
+_ui_read() {
+    if IFS= read -r "$1" </dev/tty 2>/dev/null; then
+        return 0
+    fi
+    if [ "${UI_NO_STDIN_FALLBACK:-}" = "1" ]; then
+        printf '  error     no terminal available for this prompt — rerun with --yes or from a checkout\n' >&2
+        exit 1
+    fi
+    IFS= read -r "$1" || :
+}
+
 ui_ask() {
     # ui_ask "Question?" "default"  -> prints the answer on stdout.
     # Prompt on stderr (clean $(...) capture). Reads /dev/tty when possible;
@@ -118,7 +135,7 @@ ui_ask() {
     else
         printf '  %s > ' "$_q" >&2
     fi
-    IFS= read -r _ans </dev/tty 2>/dev/null || IFS= read -r _ans || _ans=''
+    _ui_read _ans
     [ -z "$_ans" ] && _ans="$_d"
     printf '%s\n' "$_ans"
 }
@@ -131,7 +148,7 @@ ui_confirm() {
     _q="$1"; _d="${2:-n}"
     [ "$_d" = "y" ] && _hint="[Y/n]" || _hint="[y/N]"
     printf '  %s %s ' "$_q" "$_hint" >&2
-    IFS= read -r _ans </dev/tty 2>/dev/null || IFS= read -r _ans || _ans=''
+    _ui_read _ans
     _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]')"
     [ -z "$_ans" ] && _ans="$_d"
     case "$_ans" in
@@ -155,7 +172,7 @@ ui_menu() {
         fi
     done
     printf '  > ' >&2
-    IFS= read -r _ans </dev/tty 2>/dev/null || IFS= read -r _ans || _ans=''
+    _ui_read _ans
     # Keys match case-insensitively (a lowercase "x" must still hit "X|Abort",
     # never fall through to the default — which could be "Confirm"). The
     # canonical key as defined by the caller is printed, not the raw input.

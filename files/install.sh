@@ -106,6 +106,10 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
     STREAMED=true
 fi
+# A streamed install's stdin IS the script body (curl | sudo bash): the
+# prompt helpers must never fall back to reading it — they would consume
+# script bytes as the answer (review 0.0.39b C6). See _ui_read in ui.sh.
+if [ "$STREAMED" = true ]; then UI_NO_STDIN_FALLBACK=1; fi
 VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "0.0.0")
 # Install target (deployed in Step 7). Defined early: steps before Step 7
 # (e.g. the container-backend fallback path) already need it.
@@ -173,6 +177,14 @@ else
     ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
     ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
     ui_plan()    { printf '    %s  %s\n' "$1" "$2"; }
+    _ui_read() {
+        if IFS= read -r "$1" </dev/tty 2>/dev/null; then return 0; fi
+        if [ "${UI_NO_STDIN_FALLBACK:-}" = "1" ]; then
+            echo "  error     no terminal available for this prompt — rerun with --yes or from a checkout" >&2
+            exit 1
+        fi
+        IFS= read -r "$1" || :
+    }
     UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
 fi
 
@@ -777,17 +789,19 @@ else
     # Re-ask until the selection resolves: an out-of-range number or stray
     # input used to yield an empty root list and silently continue (0.0.38 C11).
     _sel_done=""
+    selection=""
     while [ -z "$_sel_done" ]; do
         printf "  > "
-        read -r selection </dev/tty 2>/dev/null || read -r selection
+        _ui_read selection
 
         case "$selection" in
             [Cc]*)
                 echo "Enter paths (space-separated):"
                 _custom=""
+                custom=""
                 while [ -z "$_custom" ]; do
                     printf "  > "
-                    read -r custom </dev/tty 2>/dev/null || read -r custom
+                    _ui_read custom
                     _custom=""
                     _bad=""
                     for p in $custom; do
@@ -881,7 +895,12 @@ if [ -n "$_sock" ]; then
 fi
 echo "$_setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
 ui_success "container backend provisioned: $CONTAINER_BACKEND"
-sudo sed -i "s#^OPENCODE_DOCKER_HOST=.*#OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST#" /etc/opencode-permissions-kit/install.conf
+# Re-stamp the socket into install.conf. The value is kit-controlled
+# (setup-container-backend output) but is still escaped for the sed
+# replacement — '#', '&' or '\' in a socket path must not corrupt the
+# rewrite (review 0.0.39b C4).
+_odh_esc=$(printf '%s' "$OPENCODE_DOCKER_HOST" | sed 's/[&\\#]/\\&/g')
+sudo sed -i "s#^OPENCODE_DOCKER_HOST=.*#OPENCODE_DOCKER_HOST=$_odh_esc#" /etc/opencode-permissions-kit/install.conf
 log "container backend provisioned: $CONTAINER_BACKEND"
 
 # === Step 4: ddev as the opencode user ===
@@ -1316,7 +1335,10 @@ fi
 # effort — a missing stamp makes the wrapper detect at runtime. NOTE:
 # sed exits 0 even without a match, so the append must be grep-gated.
 OPENCODE_MAJOR=1
-case $("$SYSTEM_BIN" --version 2>/dev/null | head -1) in
+# Bounded probe: every other probe of this binary carries a timeout
+# (wrapper issue #80) — a wedged binary must not hang the installer at
+# the very last step (review 0.0.39b C5).
+case $(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1) in
     "opencode v2"*) OPENCODE_MAJOR=2 ;;
 esac
 if grep -q '^OPENCODE_MAJOR=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
@@ -1569,7 +1591,9 @@ if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]
                 echo "    (c) Copy   — duplicate; both sides keep their own copy (may drift)" >&2
                 echo "    (s) Skip   — leave them in your home (the agent cannot use them)" >&2
                 printf "    > " >&2
-                read -r _opk_ans </dev/tty 2>/dev/null || read -r _opk_ans
+                printf "  > "
+                _opk_ans=""
+                _ui_read _opk_ans
                 case "$(printf '%s' "$_opk_ans" | tr '[:upper:]' '[:lower:]')" in
                     m|move|"") _opk_ag=m; break ;;
                     c|copy)    _opk_ag=c; break ;;

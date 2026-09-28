@@ -201,9 +201,13 @@ if [ "$_opk_binonly" != true ]; then
 fi
 # Library runs have no ../VERSION — fall back to the installed stamp so the
 # banner/summary show the real version (binary-only runs never re-stamp it).
+# The empty-output case is closed explicitly: sed "succeeding" with no
+# match would otherwise leave VERSION empty instead of "0.0.0"
+# (review 0.0.39b Q3).
 VERSION=$(cat "$FILES_ROOT/../VERSION" 2>/dev/null \
     || sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 \
     || echo "0.0.0")
+[ -n "$VERSION" ] || VERSION="0.0.0"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 CONFDIR="/etc/opencode-permissions-kit"
 PROJECTS_CONF="$CONFDIR/projects.conf"
