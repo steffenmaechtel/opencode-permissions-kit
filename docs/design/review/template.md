@@ -7,11 +7,11 @@
 > resolution file exists — the snapshot itself is never edited afterwards
 > (see README.md rules).
 
-**Date:** YYYY-MM-DD
-**Version reviewed:** `X.Y.Z` (branch `<branch>`, working tree clean, commit `<sha>`)
-**Model used:** <model name and the agent/CLI that ran it>
-**Scope:** shipped code (`files/` incl. lib `sh/`, `management/`, `bin/`, `py/`, `tui/`, `templates/`), `scripts/`, `Makefile`, `.github/workflows/`; state explicitly what was read fully vs. targeted, and what was excluded.
-**Verification at review time:** <the suites that ran and their result, e.g. `make test`, `make lint`, `make check-version` — plus, explicitly, what did NOT run (e.g. the e2e suites).>
+- **Date:** YYYY-MM-DD
+- **Version reviewed:** `X.Y.Z` (branch `<branch>`, working tree clean, commit `<sha>`)
+- **Model used:** <model name and the agent/CLI that ran it>
+- **Scope:** shipped code (`files/` incl. lib `sh/`, `management/`, `bin/`, `py/`, `tui/`, `templates/`), `scripts/`, `Makefile`, `.github/workflows/`; state explicitly what was read fully vs. targeted, and what was excluded.
+- **Verification at review time:** <the suites that ran and their result, e.g. `make test`, `make lint`, `make check-version` — plus, explicitly, what did NOT run (e.g. the e2e suites).>
 
 Method note: <how the review was produced — single-agent or parallel
 subagents, independent of / compared against other snapshots of the same
