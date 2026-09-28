@@ -145,6 +145,8 @@ siblings from — any branch or version tag works (`stable` release mirror,
 `master` dev channel, `feature/...`, `0.0.29`; see
 [update channels](../how-to/update.md#channels)). The value is stamped as
 `KIT_CHANNEL` in `install.conf`, which later `opk update` runs follow.
+Refs are limited to `A-Z a-z 0-9 . _ / -` (a git-ref charset) — anything
+else is refused before anything runs.
 
 ## config.sh
 

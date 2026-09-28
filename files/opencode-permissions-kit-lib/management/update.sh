@@ -56,6 +56,16 @@ for _arg in "$@"; do
 done
 _kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)"
 KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
+# The resolved ref is re-stamped as KIT_CHANNEL into install.conf, which
+# privileged scripts source wholesale — refuse anything outside a git-ref
+# charset, whatever its source (--channel flag, env, or a stale stamp)
+# (review 0.0.39b S1).
+case "$KIT_BRANCH" in
+    *[!A-Za-z0-9._/-]*)
+        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-'" >&2
+        exit 1
+        ;;
+esac
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
 # Canonical kit file list. Single source of truth shared by fetch_kit() and

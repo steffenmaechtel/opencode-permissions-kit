@@ -39,6 +39,15 @@ set -e
 # `opk update` keeps tracking it. Overridable for testing:
 #   KIT_BRANCH=my-branch  KIT_BASE_URL=https://example.invalid/<branch>
 KIT_BRANCH="${KIT_BRANCH:-master}"
+# The ref is stamped as KIT_CHANNEL into install.conf, which privileged
+# scripts source wholesale — refuse anything outside a git-ref charset
+# instead of persisting shell metacharacters as root (review 0.0.39b S1).
+case "$KIT_BRANCH" in
+    *[!A-Za-z0-9._/-]*)
+        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-'" >&2
+        exit 1
+        ;;
+esac
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout

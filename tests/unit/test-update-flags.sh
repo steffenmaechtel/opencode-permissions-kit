@@ -259,6 +259,12 @@ check "channel: missing ref is rejected (arg loop, from a checkout)" \
     sh -c "! sh \"\$1\" --channel >/dev/null 2>&1" _ "$UPDATE"
 check "channel: --help with --channel still works (pre-scan is silent)" \
     sh -c "sh \"\$1\" --channel testref --help >/dev/null 2>&1" _ "$UPDATE"
+check "channel: ref charset is enforced — metacharacters rejected (0.0.39b S1)" \
+    sh -c "! sh \"\$1\" --channel 'foo;rm' >/dev/null 2>&1" _ "$UPDATE"
+check "channel: ref charset is enforced — newline rejected, also via env" \
+    sh -c "! env KIT_BRANCH=\$(printf 'a\\nb') sh \"\$1\" --help >/dev/null 2>&1" _ "$UPDATE"
+check "channel: a real ref shape passes the gate (stable)" \
+    sh -c "sh \"\$1\" --channel stable --help >/dev/null 2>&1" _ "$UPDATE"
 
 # --- 8. --major / --version (issue #99: upgrades never cross majors) ------------
 check "flag: --major parsed, only 1 or 2 accepted" \
