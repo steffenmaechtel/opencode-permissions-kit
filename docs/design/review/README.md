@@ -2,7 +2,9 @@
 
 Model-generated code reviews of the kit live in this folder. The convention
 keeps two things separate: **what the review found** (immutable) and **what
-the maintainers did about it** (the resolution).
+the maintainers did about it** (the resolution). When to review at all,
+which scope (full vs diff) and the loop's stop rule:
+[review-concept.md](../review-concept.md).
 
 ## File naming
 

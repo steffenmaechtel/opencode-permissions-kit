@@ -155,6 +155,12 @@ After each review, try to shrink the next one: every finding that could be
 turned into a lint rule, unit test, or consistency guard should be — the
 remaining manual surface is what the checklist cannot automate.
 
+Scope and cadence follow the [review concept](docs/design/review-concept.md):
+full reviews are this trigger-based gate; the fixes themselves get a
+**wave review** (diff scope) before their PR — mandatory when a wave
+changes the semantics of root-running scripts — and the review → fix →
+review loop stops only when a full pass returns no new MED/HIGH findings.
+
 ## Version
 
 Do not bump `VERSION` unless the maintainer asks for a release.
