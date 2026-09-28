@@ -23,7 +23,9 @@
 #
 # Options:
 #   --yes   Skip confirmations, assume Yes
-set -e
+# -u/pipefail rationale: see install.sh (review 0.0.39a C2).
+set -eu
+(set -o pipefail) 2>/dev/null && set -o pipefail || true
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"

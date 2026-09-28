@@ -76,8 +76,8 @@ ui_banner() {
 # --- inventory / checklist -----------------------------------------------------------
 
 _ui_item() {
-    # _ui_item <color> <symbol> <label> <note>
-    printf '  %s%s%s  %-30s %s\n' "$1" "$2" "$UI_NC" "$3" "$4"
+    # _ui_item <color> <symbol> <label> <note>  (note optional)
+    printf '  %s%s%s  %-30s %s\n' "$1" "$2" "$UI_NC" "$3" "${4:-}"
 }
 
 ui_have()  { _ui_item "$UI_GREEN"  "$UI_SYM_OK"   "$1" "$2"; }  # present/ready

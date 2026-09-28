@@ -31,7 +31,9 @@
 #
 # Use install.sh for the very first setup (it asks the questions).
 # Use config.sh to change project roots or git-config hardening.
-set -e
+# -u/pipefail rationale: see install.sh (review 0.0.39a C2).
+set -eu
+(set -o pipefail) 2>/dev/null && set -o pipefail || true
 
 # Scratch-file cleanup (review 0.0.39a C1): temp artifacts are removed on
 # ANY exit path — failure, Ctrl-C, TERM, and success. The upgrade backup

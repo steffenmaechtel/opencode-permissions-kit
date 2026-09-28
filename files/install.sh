@@ -29,7 +29,11 @@
 # Flags may appear in any order. --projects consumes every following
 # non-flag argument as a project root; parsing continues after them.
 # Unknown options abort the install (fail fast, no silently ignored typos).
-set -e
+# -u: a typo'd variable expands empty in ROOT context — refuse to run on
+# unset references (review 0.0.39a C2). pipefail only where the shell has
+# it: bash runs the kit (curl | sudo bash), dash would abort on the option.
+set -eu
+(set -o pipefail) 2>/dev/null && set -o pipefail || true
 
 # Scratch-file cleanup (review 0.0.39a C1): every temp artifact this script
 # creates is removed on ANY exit path — failure, Ctrl-C, TERM, and success.
@@ -184,6 +188,7 @@ MIGRATE_AGENTS_OPT=""
 # model). --ddev-settings forces dev-owned|ddev.
 DDEV_DEV_OWNED=true
 DDEV_SETTINGS_GIVEN=false
+GIT_FLAG_GIVEN=false
 
 parse_args() {
     while [ $# -gt 0 ]; do

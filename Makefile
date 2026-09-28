@@ -25,7 +25,9 @@ SHELLCHECK_FILES = files/install.sh \
 #   SC2034        — sourced libs / fallback blocks define vars used by callers
 #   SC3043        — 'local' is not POSIX but dash AND bash support it; the
 #                  kit targets exactly those two shells
-SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043
+#   SC3040        — guarded `(set -o pipefail)` probe: bash enables it, dash
+#                  skips it (the 2>/dev/null subshell test) — deliberate
+SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040
 
 help:
 	@echo "opencode permissions kit — dev makefile"
