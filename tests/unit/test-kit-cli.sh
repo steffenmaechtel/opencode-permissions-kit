@@ -187,8 +187,9 @@ else
     echo "  ${GREEN}PASS${NC}  handover rejects nonexistent paths"; passed=$((passed + 1))
 fi
 
-# system roots and whole home directories are refused
-for _bad in / /usr /etc /var "/home/$(id -un)"; do
+# system roots, their SUBPATHS, and whole home directories are refused
+# (0.0.39b S2: /etc/apache2 used to pass the exact-match blocklist)
+for _bad in / /usr /etc /var "/home/$(id -un)" /etc/apache2 /usr/local/foo /var/log /var/lib/docker; do
     errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$_bad" 2>&1 >/dev/null || true)"
     case "$errout" in
         *"refusing"*) echo "  ${GREEN}PASS${NC}  handover refuses $_bad"; passed=$((passed + 1)) ;;

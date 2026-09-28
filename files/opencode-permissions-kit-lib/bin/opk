@@ -234,9 +234,9 @@ case "$cmd" in
         #   handover me <path>...        -> DEFAULT_USER:OPENCODE_GROUP
         #   handover opencode <path>...  -> OPENCODE_USER:OPENCODE_GROUP
         # --dry-run prints the plan and changes nothing (no sudo needed).
-        # System roots and whole home directories are refused: hand over
-        # trees, not systems. Validation runs BEFORE the sudo hop, so
-        # argument errors and --dry-run work unprivileged.
+        # System roots AND their subpaths, and whole home directories, are
+        # refused: hand over trees, not systems. Validation runs BEFORE
+        # the sudo hop, so argument errors and --dry-run work unprivileged.
         _ho_err() {
             ui_error "$1"
             echo "  usage: opk handover <me|opencode> <path>... [--dry-run]" >&2
@@ -268,9 +268,20 @@ case "$cmd" in
         for _ho_a in "$@"; do
             [ "$_ho_a" = "--dry-run" ] && continue
             _ho_np=$(realpath -m "$_ho_a" 2>/dev/null || printf '%s' "$_ho_a")
+            # Same policy shape as project_path_sane: system roots AND
+            # their subpaths are refused — /etc/apache2 or /usr/local/foo
+            # must not pass just because they are not the exact root
+            # (review 0.0.39b S2). One deliberate difference: /tmp
+            # subpaths stay allowed — handing over a temp build tree is
+            # a legitimate ops action, and the baseline's reason to
+            # refuse /tmp/* (project roots) does not apply here.
             case "$_ho_np" in
-                /|/bin|/boot|/dev|/etc|/home|/lib|/lib32|/lib64|/libx32|/media|/mnt|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var)
-                    _ho_err "handover: refusing system path '$_ho_np' — hand over subpaths, not system roots" ;;
+                /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
+/media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
+/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
+/usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
+/var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
+                    _ho_err "handover: refusing system path '$_ho_np' — hand over project trees, not system (sub)paths" ;;
             esac
             case "$_ho_np" in
                 /home/*) [ "$(dirname "$_ho_np")" = "/home" ] && _ho_err "handover: refusing whole home directory '$_ho_np' — hand over subpaths" ;;

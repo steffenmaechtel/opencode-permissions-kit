@@ -78,6 +78,11 @@ opk handover me .gotmp --dry-run
 the kit's install configuration — no usernames to remember, no root shell.
 Plain `chown -R` would need both.
 
+System roots and their subpaths (`/etc`, `/etc/apache2`, `/usr/local/...`)
+and whole home directories are refused — hand over project trees, not
+systems. `/tmp` subpaths are allowed (temp build trees are legitimate
+handover targets).
+
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides
 keep their group access to the tree (the same semantics as the ddev
