@@ -85,7 +85,7 @@ fall back to the home directory and hit the same wall.
 
 If you don't set the variable, the wrapper still catches the case at
 `serve` start: it probes the server working directory from the
-`opencode` user's context (`cwd-check.sh`) and, when unreadable, warns
+`opencode` user's context (`cwd-check`) and, when unreadable, warns
 on **stderr** and starts the server from a readable fallback — the
 projects root containing the directory, else the first readable
 configured root, else the `opencode` user's home. The 500s disappear,
@@ -131,7 +131,7 @@ mode has no projectless chats.
   the `opencode` user. Set `OPENCHAMBER_OPENCODE_CWD` to a readable
   projects root — see
   [Server working directory](#server-working-directory). (The wrapper's
-  automatic fallback covers this only when the kit's `cwd-check.sh`
+  automatic fallback covers this only when the kit's `cwd-check`
   sudoers rule is present — run `update.sh` if the warning stays away
   but the 500s don't.)
 

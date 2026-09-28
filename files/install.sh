@@ -377,6 +377,14 @@ if ! command -v curl >/dev/null 2>&1; then
     exit 1
 fi
 
+# python3 is a hard runtime dependency (fs-baseline progress pipe, ddev
+# describe JSON parsing, 2.x version resolution, status checks) — probe
+# it up front instead of failing mid-install (review 0.0.39a D8).
+if ! command -v python3 >/dev/null 2>&1; then
+    ui_error "python3 is required but not installed (apt install python3)."
+    exit 1
+fi
+
 if ! command -v setfacl >/dev/null 2>&1; then
     if confirm "'acl' package not installed (setfacl/getfacl missing). Install it now?"; then
         sudo apt-get update -qq 2>/dev/null || true

@@ -60,7 +60,9 @@ Usage: opk <command> [args...]
 
 Commands:
   status                          Show the protection status (no sudo needed)
-  config <args...>                Change settings: projects list|add|remove,
+  config <args...>                Change settings: status (git-config +
+                                  projects overview), projects
+                                  list|add|remove,
                                   git-config on|off|status,
                                   container-backend <backend>|status, refresh,
                                   handover <path...> (ddev ownership repair

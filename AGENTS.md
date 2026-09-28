@@ -21,10 +21,10 @@ used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
 
 ## Layout
 
-- `files/` — the shipped scripts (`install.sh`, `config.sh`, `update.sh`,
-  `status.sh`, `uninstall.sh`) and templates
-- `files/opencode-permissions-kit-lib/` — shared helpers (wrapper, ui/log,
-  jsonc parser, ddev handover, backend setup, sudoers helpers)
+- `files/` — the streamed entry point (`install.sh`) and templates
+- `files/opencode-permissions-kit-lib/` — the shipped library: management
+  scripts (`config.sh`, `update.sh`, `status.sh`, `uninstall.sh` under
+  `management/`), wrapper + helpers (`bin/`, `sh/`), `py/`, `tui/`
 - `tests/` — shell unit tests (`unit/`), host pre-flight (`check-host.sh`),
   fixtures (`fixtures/`), Docker e2e suites (`e2e/`),
   UX demos (`ux/`)
@@ -66,7 +66,8 @@ used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
 ## Testing
 
 **At session start, run `sh tests/check-host.sh`.** It verifies the host has
-every tool the suite needs (git, make, python3, shellcheck) and prints
+every tool the suite needs (git, make, python3, shellcheck, setsid —
+see the script for the current list) and prints
 install commands for anything missing — ask the user to install rather than
 working around a missing tool.
 

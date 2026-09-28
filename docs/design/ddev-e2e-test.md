@@ -219,6 +219,7 @@ row is the regression net for a real burn-in finding:
 | DD12 (opt-in) | git flow against a local bare origin, §7.2 below | checkout EPERM class |
 | DD13 | `ddev config` on a fresh empty dir (new-project creation), §7.3 below | new-project gap (2026-08-22 burn-in) |
 | DD14 | `ddev composer create-project` on the handed-over bootstrap project, §7.3 below | create-project exit 23 (2026-08-22 burn-in) |
+| DD15 | drives both `ddev-migrate` loops (export + import) with REAL ddev — the b14a198 stdin-drain class locked at the real-binary tier (`tests/e2e/run-ddev.sh`) | stdin-drain (2026-09-18) |
 
 Out of scope per §2: launch/hosts/mkcert Windows halves — asserted only as
 "prints URL / reports missing hostnames / interop-blocked as designed".

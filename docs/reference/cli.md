@@ -119,9 +119,9 @@ hook print include the name, so you add exactly what was reported:
 opk ddev-hosts-add my-fancy-project.local
 ```
 
-works from anywhere). The status scan also skips `vendor/` and
-`node_modules/`: composer/npm packages ship their own `.ddev` dirs
-(package development checkouts) which are not your projects.
+works from anywhere). The status scan also skips `vendor/`,
+`node_modules/`, and `testdata/`: composer/npm packages ship their own
+`.ddev` dirs (package development checkouts) which are not your projects.
 
 ## install.sh
 
@@ -136,7 +136,7 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | Flag | Meaning |
 |---|---|
 | `--yes` | Skip all prompts, assume Yes (Standard mode with defaults) |
-| `--projects <path...>` | Pre-Define project roots, skip interactive selection (consumes every following non-flag argument) |
+| `--projects <path...>` | Pre-define project roots, skip interactive selection (consumes every following non-flag argument) |
 | `--container-backend <docker-rootless\|podman-rootless>` | Non-interactive backend choice |
 | `--skip-ddev-migration` | Do not export the dev user's ddev databases (no `Step 4b` dumps) |
 | `--ddev-settings <dev-owned\|ddev>` | Pre-decide the settings mode: `dev-owned` writes `disable_settings_management: true` (recommended), `ddev` keeps ddev managing settings |
@@ -163,6 +163,7 @@ sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh <command>
 
 | Command | Meaning |
 |---|---|
+| `status` | Quick overview: git-config state + configured project roots |
 | `projects list` | Show configured project roots |
 | `projects add <path...>` | Register roots + apply group baseline + ddev handover |
 | `projects remove <path...>` | Remove the `projects.conf` lines (files untouched) |
@@ -219,11 +220,13 @@ Never touches `projects.conf` or the agent's `opencode.jsonc`. See
 
 ## status.sh
 
-Show the protection status: mode, backend + socket reachability, ddev
-runtime readiness (`~opencode/.ddev`, router ports, mkcert CA), migration
-state, the security-advisory check (see
-[security advisories](../how-to/update.md#security-advisories)), and the
-leak scan.
+Show the protection status: mode, backend + socket reachability, project
+roots, ddev runtime readiness (`~opencode/.ddev`, router ports, mkcert CA),
+migration state, the security-advisory check (see
+[security advisories](../how-to/update.md#security-advisories)), the WSL2
+`/mnt/c` exposure (including the browser-bridge state), the
+root-equivalent-access audit, and the leak scan — followed by management
+hints (`opk update`, `opk config`, ...).
 
 ```bash
 sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh

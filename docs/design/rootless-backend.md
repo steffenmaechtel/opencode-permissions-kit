@@ -69,7 +69,7 @@ edits `/etc/subuid` — never silently. `--yes` without an explicit
 Post-install switch: `opencode-permissions-kit config container-backend
 <backend>` (reversible, re-provisions via §3).
 
-## 3. Provisioning reference (`setup-container-backend.sh`)
+## 3. Provisioning reference (`setup-container-backend`)
 
 Runs as root, as the `opencode` user where noted. Idempotent — every
 step is a no-op when already in place.

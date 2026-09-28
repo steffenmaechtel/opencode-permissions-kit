@@ -16,8 +16,13 @@ Every kit script that changes the system writes to
 ## Notable events
 
 - install/update/uninstall completion
-- backend switches
-- the hard-deny migration (`hard-deny migration ...`)
+- backend switches (`container backend switched: ...`)
+- project roots added/removed (`project added: ...`, `project removed: ...`)
+- the git-config toggle (`git-config hardening set to ...`)
+- ddev handovers (`ddev handover: ...`, `ddev handover applied under ...`)
+- ddev-settings changes (`ddev-settings set to ...`)
+- the agents migration (`agents migration: moved|copied|skipped ...`)
+- ddev database exports (started/skipped/result lines)
 - binary upgrades
 - leak-scan findings
 

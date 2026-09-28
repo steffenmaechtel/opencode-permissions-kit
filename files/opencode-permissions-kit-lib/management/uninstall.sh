@@ -385,6 +385,11 @@ echo "      /home/opencode/.config/opencode/tui.json (registers the kit"
 echo "      plugin; opencode skips it when the plugin file is gone),"
 echo "      ~/.config/opencode/tui.json + ~/.config/opencode/themes/"
 echo "      opencode-danger.json (red bypass theme for your user)."
+echo "    - Windows hosts file: entries added by 'opk ddev-hosts-add'"
+echo "      (C:\\Windows\\System32\\drivers\\etc\\hosts) keep resolving"
+echo "      project domains to 127.0.0.1 — remove them manually if you"
+echo "      no longer need them (project domains under *.ddev.site were"
+echo "      never added)."
 echo ""
 # Session hint (issue #73): the running shell still carries kit leftovers
 # a fresh session drops by itself — the ddev() function from the rc hook

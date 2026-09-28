@@ -138,7 +138,7 @@ like `/var/www/vhosts` holding several projects):
 
 | App type (`.ddev/config.yaml` `type:`) | Handed-over directories |
 |---|---|
-| `typo3` | `config/system`, `<docroot>/typo3conf` (composer v12+, legacy v12 `system/`, v11−) |
+| `typo3` | `config/system`, `<docroot>/typo3conf`, and bare `typo3conf` (repo-root fallback for legacy installs; composer v12+, legacy v12 `system/`, v11−) |
 | `drupal*`, `backdrop` | `<docroot>/sites/default` |
 | `magento*` | `app/etc` |
 

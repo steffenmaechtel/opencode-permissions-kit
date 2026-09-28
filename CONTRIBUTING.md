@@ -110,7 +110,7 @@ git push origin release/0.0.36
 git checkout master
 git pull origin master
 make release VERSION=0.0.36
-gh release create 0.0.36 --title "0.0.36" --generate-notes --latest
+gh release create 0.0.36 --generate-notes
 ```
 
 `make release VERSION=0.0.36 ARGS=--dry-run` prints the steps without
@@ -129,9 +129,9 @@ User-facing documentation lives in `docs/` and is organized by topic type
 - One page = one topic type, with a first-line purpose statement.
 - All shipped content (scripts, docs, messages) is in English.
 
-Design records for larger decisions live in `docs/design/`, security analyses
-in `docs/security/` — both are historical records; where wording differs from
-the code, the code wins.
+Design records for larger decisions live in `docs/design/`, historical
+security analyses in `docs/_archive/security/` — both are historical
+records; where wording differs from the code, the code wins.
 
 ## Project reviews
 

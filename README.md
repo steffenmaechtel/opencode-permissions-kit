@@ -41,6 +41,7 @@ The full walkthrough (including verification) lives in
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
 - `sudo` access
 - `curl`
+- `python3` (shipped with default WSL2 images)
 - ddev ≥ 1.25 (when ddev is installed)
 
 ## Documentation

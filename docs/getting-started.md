@@ -9,6 +9,8 @@ background are linked at the end.
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
 - `sudo` access on that machine
 - `curl`
+- `python3` (used for JSON parsing, the baseline progress pipe and version
+  resolution — default WSL2 images ship it; the installer probes for it)
 - ddev ≥ 1.25, if ddev is installed (the installer aborts on older versions)
 
 Nothing else — the kit installs the rootless container backend (packages,
@@ -27,7 +29,8 @@ same `stable` release mirror, and first prints a **pre-flight inventory** of wha
 found on your system (WSL2, curl/acl, ddev, docker/podman, an existing kit
 installation, `/mnt/c` exposure, router ports).
 
-It then asks only the essential questions:
+It then asks only the essential questions (in this order — the agent
+resources question comes much later in the run, right before the finish):
 
 1. **Project directory** — the folder that holds your projects, e.g.
    `/var/www/vhosts`, `~/dev` or `~/projects` (default `/var/www/vhosts`
@@ -40,8 +43,15 @@ It then asks only the essential questions:
    read your repositories: the group baseline covers `.git/`, and the kit
    sets `safe.directory` for the `opencode` user (no "dubious ownership"
    errors).
-3. **Agent resources** — bring the resources opencode auto-loads into
-   `/home/opencode` so the agent can use them: `~/.agents`
+3. **ddev settings** — dev-owned projects (default): the kit writes
+   `disable_settings_management: true` into each project's
+   `.ddev/config.yaml`, so everything outside `.ddev/` stays permanently
+   yours and `git checkout` never hits ownership errors. Choose `ddev` to
+   keep ddev's settings management (handover model) instead. See
+   [dev-owned projects](how-to/dev-owned-projects.md).
+4. **Agent resources** (asked near the end, and only when `~/.agents` or
+   `~/.claude/skills` actually exist) — bring the resources opencode
+   auto-loads into `/home/opencode` so the agent can use them: `~/.agents`
    (**whole directory** — it is opencode's own namespace) and
    `~/.claude/skills` (**skills/ only** — the rest of `~/.claude` is
    Claude Code's home, so credentials like `.credentials.json` stay in
@@ -49,25 +59,23 @@ It then asks only the essential questions:
    keep read/write via the sharing group), **copy** (both sides keep
    their own, may drift) or **skip**. Non-interactive installs move;
    `--migrate-agents move|copy|skip` forces a choice.
-4. **ddev settings** — dev-owned projects (default): the kit writes
-   `disable_settings_management: true` into each project's
-   `.ddev/config.yaml`, so everything outside `.ddev/` stays permanently
-   yours and `git checkout` never hits ownership errors. Choose `ddev` to
-   keep ddev's settings management (handover model) instead. See
-   [dev-owned projects](how-to/dev-owned-projects.md).
 
 One exception: when podman is detected, you choose between podman-rootless
 (default) and docker-rootless. Otherwise docker-rootless is used silently.
 
 After the questions the installer shows a numbered **plan** (user + sharing
-group, backend provisioning, ACLs, binary + wrapper, `/mnt/c` restriction,
-port sysctl, deny-all config, library deploy) with `Confirm` / `Switch to
-Advanced` / `Abort`. Confirm with Enter — everything not asked runs with the
-recommended value.
+group, backend provisioning, ACLs, binary + wrapper, `/mnt/c` hardening
+snippet, port sysctl, deny-all config, library deploy) with `Confirm` /
+`Switch to Advanced` / `Abort`. Confirm with Enter — everything not asked
+runs with the recommended value.
 
-**Advanced mode** exposes granular prompts for every step (backend choice,
-project multi-select, port sysctl, `/mnt/c` restriction, ACL baseline, binary
-handling, deny-all handling). Non-interactive installs work too:
+**Advanced mode** exposes granular prompts for the steps Standard decides
+silently (backend choice, project multi-select, port sysctl, ACL baseline,
+binary handling, deny-all handling). The `/mnt/c` exposure is never a
+prompt in either mode — the kit only *prints* the ready-to-run
+restriction snippet (it never edits `/etc/wsl.conf` itself; see the
+[security model](concepts/security-model.md)). Non-interactive installs
+work too:
 `install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts`
 — see the [CLI reference](reference/cli.md).
 
@@ -100,7 +108,8 @@ opk status
 ```
 
 It reports the protection mode, backend + socket reachability, ddev runtime
-readiness, and ends with a leak scan. Everything green means the kit is
+readiness, the `/mnt/c` exposure, the root-equivalent-access audit, and a
+leak scan, followed by management hints. Everything green means the kit is
 active.
 
 ## Start your first session
@@ -137,7 +146,8 @@ rootless daemon); every later start reuses that state. Details:
 
 If you had ddev projects before the kit, the installer exported their
 databases to `/var/backups/opencode-permissions-kit/ddev-migration-*/`
-(asked before the switch; `--skip-ddev-migration` opts out). Re-import
+(Standard mode exports automatically after you confirm the plan; Advanced
+mode asks first; `--skip-ddev-migration` opts out). Re-import
 them when ready:
 
 ```bash

@@ -35,6 +35,9 @@ Uninstall asks before removing the kit block (or assumes yes with
 | `OPENCODE_DOCKER_HOST` | `docker-rootless` socket, e.g. `unix:///run/user/<opencode-uid>/docker.sock` |
 | `OPENCODE_PODMAN_SOCKET` | Optional podman docker-CLI-compat socket |
 | `DDEV_VERSION` | ddev version recorded at install time and re-probed by every `opk update` (fallback — `status.sh` reports the live `ddev --version`: directly, or through the ddev-as-opencode helper when run as root, since ddev ≥ 1.25.4 refuses root; flags < 1.25) |
+| `DDEV_DEV_OWNED` | `true` = dev-owned settings mode (kit writes `disable_settings_management: true`), `false` = ddev-managed (handover model); toggled by `opk config ddev-settings` |
+| `DDEV_EXPORTED` | `1` once a ddev database export wave completed — later installs/updates skip the export |
+| `OPENCODE_MAJOR` | installed opencode binary's major (1 or 2); gates the wrapper's 2.x-only flags. Best effort — the wrapper detects at runtime when missing |
 | `KIT_CHANNEL` | Ref installs/updates track (`stable`, `master`, a feature branch, or a pinned tag) — set by `install.sh`, re-stamped by `update.sh`, shown by `opk status` |
 | `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
 | `HARD_DENY_REMOVED` | unused (historical migration stamp; updates from < 0.0.14 are refused — see [update](../how-to/update.md)) |

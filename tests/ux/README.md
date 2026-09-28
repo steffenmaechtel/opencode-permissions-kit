@@ -19,7 +19,7 @@ Questions accept Enter for the default; piped/EOF input falls back to the
 defaults, so the scripts are safe to pipe into `less` etc.
 
 `lib/ux.sh` is the candidate for the real shared helper
-(`files/opencode-permissions-kit-lib/ui.sh`): POSIX sh, zero dependencies,
+(`files/opencode-permissions-kit-lib/sh/ui.sh`): POSIX sh, zero dependencies,
 honors `NO_COLOR` / non-tty, `UI_ASCII=1` forces ASCII fallbacks.
 
 ## Feedback wanted
