@@ -97,6 +97,49 @@ for wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
     fi
 done
 
+# --- 2b. every chmodded unit suite is actually RUN (0.0.39a D20) ----------------
+
+# test-update-flags.sh and test-release.sh sat on the chmod line of
+# test-unit.yml with no run: step — the chmod list only proves the path
+# exists, so the orphaned suites were invisible to every check. Every
+# unit suite chmodded in test-unit.yml must appear in one of its run:
+# lines (local `make test` runs them all; CI must not silently skip any).
+run_tokens() {
+    grep -E '^[[:space:]]+run: ' "$1" | grep -oE '\./[A-Za-z0-9_./-]+\.sh' | sort -u
+}
+
+TMP_RUNS="$(mktemp)"
+trap 'rm -f "$TMP_TOKENS" "$TMP_RUNS"' EXIT INT TERM
+run_tokens "$WF_TEST" > "$TMP_RUNS"
+orphans=""
+# word splitting is safe: repo paths never contain whitespace
+# shellcheck disable=SC2046
+for tok in $(chmod_tokens "$WF_TEST" | grep -E '^\./tests/unit/test-'); do
+    grep -qxF "$tok" "$TMP_RUNS" || orphans="$orphans $tok"
+done
+if [ -z "$orphans" ]; then
+    pass "test-unit.yml: every chmodded unit suite has a run step"
+else
+    fail "test-unit.yml: chmodded but never run:$orphans"
+fi
+
+# --- 2b. scripts/ executables in test-unit.yml (0.0.39a D21) --------------------
+
+# The required set above derives from tests/ + files/ only, so
+# scripts/release.sh and scripts/security-scan.sh were never enforced.
+# Only test-unit.yml chmods both (the e2e workflows never execute them);
+# the bit matters there because test-release.sh and the advisory suite
+# run them by path.
+_smissing=""
+for _s in ./scripts/release.sh ./scripts/security-scan.sh; do
+    chmod_tokens "$WF_TEST" | grep -qxF "$_s" || _smissing="$_smissing $_s"
+done
+if [ -z "$_smissing" ]; then
+    pass "test-unit.yml: scripts/release.sh + scripts/security-scan.sh chmodded"
+else
+    fail "test-unit.yml: scripts chmod entries missing:$_smissing"
+fi
+
 # --- 3. opencode 2.x pin jobs (issue #80) --------------------------------------
 
 # The e2e workflows run the suites a second time against the CURRENT 2.x

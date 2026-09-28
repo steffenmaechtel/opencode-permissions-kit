@@ -90,6 +90,10 @@ jobs:
         run: ./tests/unit/test-uninstall.sh
       - name: Run status tests
         run: ./tests/unit/test-status.sh
+      - name: Run update flags tests
+        run: ./tests/unit/test-update-flags.sh
+      - name: Run release script tests
+        run: ./tests/unit/test-release.sh
       - name: Run fs-baseline progress tests
         run: ./tests/unit/test-fs-baseline.sh
       - name: Run e2e binary source tests
