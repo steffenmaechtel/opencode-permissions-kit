@@ -581,6 +581,16 @@ project_path_sane() {
             return 1
             ;;
     esac
+    # The agent user's own home is never a valid project root: the group
+    # baseline (chgrp/setfacl -R) would run over the very directory that
+    # carries the agent's config and state (review 0.0.39a S4).
+    [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] && return 1
+    # The developer's whole home as a root is allowed but deserves a
+    # warning: the baseline gives the agent group-write over every file
+    # in it.
+    if [ -n "${PROJECT_TILDE_HOME:-}" ] && [ "$_pp" = "$PROJECT_TILDE_HOME" ]; then
+        echo "  warn     '$PROJECT_TILDE_HOME' is your whole home — the agent gains group-write over it" >&2
+    fi
     return 0
 }
 

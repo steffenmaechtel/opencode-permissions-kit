@@ -143,7 +143,18 @@ ensure_local_file() {
     [ -f "$FILES_ROOT/$f" ] && return 0
     mkdir -p "$(dirname "$FILES_ROOT/$f")"
     echo "  re-fetching missing $f ..." >&2
-    curl -fsSL "$KIT_BASE_URL/files/$f" -o "$FILES_ROOT/$f" 2>/dev/null || true
+    # A failed fetch must never leave a partial (empty or HTML-error-body)
+    # file in place — it would be deployed with sudo cp further down
+    # (review 0.0.39a S3). Fetch to a temp file, move in only when sound.
+    local _elf_tmp
+    _elf_tmp="$(mktemp)"
+    if ! curl -fsSL "$KIT_BASE_URL/files/$f" -o "$_elf_tmp" 2>/dev/null || [ ! -s "$_elf_tmp" ]; then
+        rm -f "$_elf_tmp"
+        echo "error: could not fetch $f from $KIT_BASE_URL — aborting (partial files are never deployed)" >&2
+        return 1
+    fi
+    chmod 644 "$_elf_tmp"
+    mv "$_elf_tmp" "$FILES_ROOT/$f"
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"

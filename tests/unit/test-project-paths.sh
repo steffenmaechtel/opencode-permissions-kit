@@ -56,7 +56,8 @@ REJECT="/ /usr /etc /home /root /var /tmp /tmp/build-dir /bin /sbin /lib /lib64 
 /var/log /var/log/nginx /var/lib /var/lib/docker /var/spool /var/spool/cron \
 /var/cache /var/mail /var/mail/root \
 /usr/share /etc/nginx /root/projects /home/../etc /./etc /etc/ /usr/ \
-relative/path ../etc ./here subdir"
+relative/path ../etc ./here subdir \
+/home/opencode"
 
 # must ACCEPT (dedicated project folders)
 ACCEPT="/var/www/vhosts /var/www /var/www/vhosts/client1 /home/dev/projects \

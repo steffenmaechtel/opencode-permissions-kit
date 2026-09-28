@@ -166,6 +166,10 @@ check "add is a no-op when nothing is missing" \
     sh -c "grep -q 'nothing to do' \"\$1\"" _ "$HOSTS"
 check "add prints a manual PowerShell fallback on failure" \
     sh -c "grep -q 'Add-Content' \"\$1\"" _ "$HOSTS"
+check "PowerShell hint uses a placeholder, never the interpolated hostname (0.0.39a S5)" \
+    sh -c "! grep -qF -- \"-Value '127.0.0.1 \$dha_arg'\" \"\$1\" && grep -qF -- \"-Value '127.0.0.1 <hostname>'\" \"\$1\"" _ "$HOSTS"
+check "hostname charset gate: non [A-Za-z0-9.-] names are dropped (0.0.39a S5)" \
+    sh -c "grep -qF '*[!A-Za-z0-9.-]*) continue ;;' \"\$1\"" _ "$HOSTS"
 check_fail "add never writes the hosts file itself (no shell redirection)" \
     sh -c "grep -qE '(>>?|tee).*(winhosts|WIN_HOSTS|drivers/etc/hosts)' \"\$1\"" _ "$HOSTS"
 
