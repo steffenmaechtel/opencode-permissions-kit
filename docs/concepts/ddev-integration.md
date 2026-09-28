@@ -251,7 +251,10 @@ Notes:
 - **mkcert CA** — reused from the Windows user (WSL2: scanned from
   `/mnt/c/Users/*/AppData/Local/mkcert`) or the developer's CAROOT so
   browsers keep trusting ddev's HTTPS certs; a new CA is generated only as
-  a last resort.
+  a last resort. The copy includes the CA **private key** — ddev signs
+  certificates host-side as the `opencode` user, which has no `/mnt/c`
+  access to the original; the accepted residual risk is documented in the
+  [security model](security-model.md#known-residual-gaps).
 
 ## Hostnames and the Windows hosts file
 
