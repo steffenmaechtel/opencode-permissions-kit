@@ -404,13 +404,13 @@ fi
 DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
 DDEV_VERSION=""
 if [ -n "$DDEV_BIN" ] && [ -x "$DDEV_BIN" ]; then
-    DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')"
+    DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
 fi
 DDEV_BIN_DEV=""
 if [ -z "$DDEV_VERSION" ] && id "$DEFAULT_USER" >/dev/null 2>&1; then
     DDEV_BIN_DEV="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" sh -c 'command -v ddev 2>/dev/null || true')"
     if [ -n "$DDEV_BIN_DEV" ] && [ -x "$DDEV_BIN_DEV" ]; then
-        DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" "$DDEV_BIN_DEV" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')"
+        DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" "$DDEV_BIN_DEV" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
         [ -z "$DDEV_BIN" ] && DDEV_BIN="$DDEV_BIN_DEV"
     fi
 fi
@@ -439,7 +439,9 @@ OPENCODE_DOCKER_HOST=""
 OPENCODE_PODMAN_SOCKET=""
 # Pre-set migration stamp: install.conf is REWRITTEN in Step 2, so the
 # "already exported" state must be captured here (Step 4b checks it).
-DDEV_EXPORTED_PRE=$(sed -n 's/^DDEV_EXPORTED=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
+# || true: the file is optional (fresh install) — with pipefail the sed
+# failure must not abort (the old tail-masking hid it).
+DDEV_EXPORTED_PRE=$(sed -n 's/^DDEV_EXPORTED=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true)
 if [ -f /etc/opencode-permissions-kit/install.conf ]; then
     _be=$(sed -n 's/^CONTAINER_BACKEND=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
     _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)

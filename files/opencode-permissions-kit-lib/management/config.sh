@@ -436,11 +436,14 @@ update_install_conf_backend() {
     tmp=$(mktemp)
     {
         if [ -f "$INSTALL_CONF" ]; then
-            grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null
+            grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null || true
         fi
         echo "CONTAINER_BACKEND=$backend"
-        [ -n "$docker_host" ] && echo "OPENCODE_DOCKER_HOST=$docker_host"
-        [ -n "$podman_socket" ] && echo "OPENCODE_PODMAN_SOCKET=$podman_socket"
+        # if (not [ ] &&): a false short-circuit inside the braced group
+        # would fail the group's pipeline under set -e/pipefail and kill
+        # the script mid-rewrite (docker_host is empty on podman backends)
+        if [ -n "$docker_host" ]; then echo "OPENCODE_DOCKER_HOST=$docker_host"; fi
+        if [ -n "$podman_socket" ]; then echo "OPENCODE_PODMAN_SOCKET=$podman_socket"; fi
     } | sort -u > "$tmp"
     sudo cp "$tmp" "$INSTALL_CONF"
     sudo chmod 644 "$INSTALL_CONF"
@@ -494,7 +497,7 @@ container_backend_apply() {
             [ -n "$_cand" ] && [ -x "$_cand" ] && { _cand_bin="$_cand"; break; }
         done
         if [ -n "$_cand_bin" ]; then
-            _cand_ver=$("$_cand_bin" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+            _cand_ver=$("$_cand_bin" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)
             # if/else, not `case $?` after a bare call — config.sh runs
             # under set -e and "not needed" is rc=1.
             if ddev_rootless_bindmounts "$OPENCODE_USER" "$new_backend" "$_cand_ver" "$_cand_bin"; then
@@ -586,7 +589,7 @@ update_install_conf_ddev_owned() {
     tmp=$(mktemp)
     {
         if [ -f "$INSTALL_CONF" ]; then
-            grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null
+            grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null || true
         fi
         echo "DDEV_DEV_OWNED=$value"
     } | sort -u > "$tmp"

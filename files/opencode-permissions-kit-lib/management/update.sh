@@ -72,7 +72,9 @@ for _arg in "$@"; do
     fi
     _prev_arg="$_arg"
 done
-_kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)"
+# || true on the optional-file reads: with pipefail the sed failure on a
+# missing install.conf must not abort (the old tail-masking hid it).
+_kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true)"
 KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 # The resolved ref is re-stamped as KIT_CHANNEL into install.conf, which
 # privileged scripts source wholesale — refuse anything outside a git-ref
@@ -732,7 +734,7 @@ current_opencode_major() {
         echo "$_com_maj"
         return 0
     fi
-    _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1)
+    _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
     echo "${_com_maj:-1}"
 }
 
@@ -940,10 +942,10 @@ fi
 # does (as the opencode user, HOME/DOCKER_HOST re-set). The direct binary
 # (PATH, then the two standard locations) is the fallback; when neither
 # answers, the old stamp survives.
-NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1)"
+NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)"
 _ddev_probe=""
 if [ -x "$LIBDIR/bin/ddev-as-opencode" ] && id "$OPENCODE_USER" >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-    _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+    _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
 fi
 if [ -z "$_ddev_probe" ]; then
     _ddev_bin=""
@@ -951,7 +953,7 @@ if [ -z "$_ddev_probe" ]; then
         [ -n "$_ddev_cand" ] && [ -x "$_ddev_cand" ] && { _ddev_bin="$_ddev_cand"; break; }
     done
     if [ -n "$_ddev_bin" ]; then
-        _ddev_probe=$("$_ddev_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+        _ddev_probe=$("$_ddev_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
     fi
 fi
 if [ -n "$_ddev_probe" ]; then
@@ -968,7 +970,9 @@ _CONF_TMP="$NEW_INSTALL_CONF"
         # OPENCODE_GROUP (re-based to the opencode usergroup),
         # KIT_CHANNEL (re-stamped to the ref just updated from), and
         # DDEV_VERSION (re-probed above — the fallback stays fresh).
-        grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null
+        # || true: grep -v exits 1 on an empty result, which pipefail
+        # would turn into an abort mid-rewrite.
+        grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null || true
     fi
     echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
     echo "KIT_CHANNEL=$KIT_BRANCH"
@@ -1010,7 +1014,7 @@ fi
 # remove it on 1.x (the 1.x tui.json/danger theme are major-agnostic and
 # stay). The major comes from the install.conf stamp, freshly re-stamped
 # by any binary upgrade above.
-_oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1)
+_oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
 [ -n "$_oc_major" ] || _oc_major=1
 sync_tui_registration "$_oc_major"
 

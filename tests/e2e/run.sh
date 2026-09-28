@@ -852,7 +852,16 @@ check "wrapper: --version banner-free from invalid CWD (issue #91)" \
 # must move the login to a readable directory (opencode home) before the
 # exec — same cwd_probe machinery as the serve fallback.
 E 'sudo chmod 750 /home/dev'
-E 'cd /home/dev && timeout 8 /usr/local/bin/opencode console login </dev/null 2>&1 | tee /tmp/wrapper-login-home.txt || true'
+# opencode >= 1.18.33 survives SIGTERM during the device-login poll (prints
+# "Canceled", then keeps the process — and everything above it — alive), so a
+# plain `timeout 8 ... | tee` hangs the whole suite (reproduced against the
+# raw binary, no kit involved; 1.18.32 still exits cleanly). Structure that
+# cannot hang: file redirect instead of a pipe (nothing waits on the orphan)
+# plus timeout's SIGKILL, and a separate cleanup step whose 'consol[e]'
+# pattern cannot match its own command line (pkill would otherwise kill the
+# exec shell carrying the literal "console login" from the invocation above).
+E 'cd /home/dev && timeout -k 2 8 /usr/local/bin/opencode console login </dev/null >/tmp/wrapper-login-home.txt 2>&1 || true'
+E 'sudo pkill -KILL -f "consol[e] login" 2>/dev/null || true'
 E 'sudo chmod 755 /home/dev'
 check "wrapper: device login moves off an unreadable cwd (issue #91)" \
     E 'grep -q "Login runs from" /tmp/wrapper-login-home.txt'
