@@ -133,6 +133,24 @@ else
     pass "rejects empty path"
 fi
 
+# install.sh must store the NORMALIZED path, not the raw tilde input, in
+# both entry points — a literal ~/dev in projects.conf is silently skipped
+# by every consumer (review 0.0.39b C1). The standard prompt (line ~593)
+# always did; --projects and the custom-path dialog must match it.
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
+_norm_sites=$(grep -c '_PP_NORM' "$INSTALL")
+if [ "$_norm_sites" -ge 4 ]; then
+    pass "install.sh uses _PP_NORM in all project entry points ($_norm_sites sites)"
+else
+    fail "install.sh uses _PP_NORM in all project entry points (only $_norm_sites sites)"
+fi
+if grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' "$INSTALL" \
+   && grep -q '_custom="$_custom \$_PP_NORM"' "$INSTALL"; then
+    pass "install.sh: --projects and custom dialog store the expanded path"
+else
+    fail "install.sh: --projects and custom dialog store the expanded path"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

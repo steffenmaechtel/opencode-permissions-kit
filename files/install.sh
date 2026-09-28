@@ -555,15 +555,20 @@ project_path_sane() {
 }
 
 # Validate --projects values against the same policy (fail fast, before
-# anything is touched).
+# anything is touched). The list is rebuilt from _PP_NORM so a tilde path
+# like ~/dev is stored expanded — the raw value would never match a real
+# directory in any consumer (review 0.0.39b C1).
 if [ -n "$PREDEFINED_PROJECTS" ]; then
+    _fp_norm=""
     for _fp in $PREDEFINED_PROJECTS; do
         if ! project_path_sane "$_fp"; then
             ui_error "'$_fp' is a system path — refusing to use it as a project root."
             ui_info "Use a dedicated folder like /var/www/vhosts or /home/<you>/projects."
             exit 1
         fi
+        _fp_norm="$_fp_norm $_PP_NORM"
     done
+    PREDEFINED_PROJECTS="${_fp_norm# }"
 fi
 
 # === Standard questions ========================================================
@@ -734,7 +739,7 @@ else
                     _bad=""
                     for p in $custom; do
                         if project_path_sane "$p"; then
-                            _custom="$_custom $p"
+                            _custom="$_custom $_PP_NORM"
                         else
                             ui_error "'$p' is a system path — rejected."
                             _bad=1
