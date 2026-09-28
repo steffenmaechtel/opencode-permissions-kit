@@ -266,6 +266,12 @@ check "channel: ref charset is enforced — newline rejected, also via env" \
 check "channel: a real ref shape passes the gate (stable)" \
     sh -c "sh \"\$1\" --channel stable --help >/dev/null 2>&1" _ "$UPDATE"
 
+# --- 7b. scratch cleanup (review 0.0.39a C1) --------------------------------------
+check "cleanup: EXIT/INT/TERM trap removes fetch tree, sudoers + conf temps" \
+    sh -c "grep -qF 'trap cleanup EXIT INT TERM' \"\$1\" && grep -qF '_FETCH_TREE=\"\$base\"' \"\$1\" && grep -qF '_CONF_TMP=' \"\$1\"" _ "$UPDATE"
+check "cleanup: fetched tree survives the self re-exec via the environment" \
+    sh -c "grep -qF 'export _FETCH_TREE' \"\$1\"" _ "$UPDATE"
+
 # --- 8. --major / --version (issue #99: upgrades never cross majors) ------------
 check "flag: --major parsed, only 1 or 2 accepted" \
     sh -c "grep -q -- '--major)' \"\$1\" && grep -q -- '--major must be 1 or 2' \"\$1\"" _ "$UPDATE"

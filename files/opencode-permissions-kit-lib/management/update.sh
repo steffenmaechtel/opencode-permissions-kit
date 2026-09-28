@@ -33,6 +33,22 @@
 # Use config.sh to change project roots or git-config hardening.
 set -e
 
+# Scratch-file cleanup (review 0.0.39a C1): temp artifacts are removed on
+# ANY exit path — failure, Ctrl-C, TERM, and success. The upgrade backup
+# directory is deliberately kept (recovery material, reported to the
+# user). _FETCH_TREE survives the self re-exec below via the environment,
+# so the re-exec'd copy cleans the tree its parent fetched.
+_FETCH_TREE="${_FETCH_TREE:-}"
+_BIN_TMP=""
+_CONF_TMP=""
+cleanup() {
+    if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
+    if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
+    if [ -n "${_BIN_TMP:-}" ]; then rm -rf "$_BIN_TMP"; fi
+    if [ -n "${_CONF_TMP:-}" ]; then rm -f "$_CONF_TMP"; fi
+}
+trap cleanup EXIT INT TERM
+
 # Ref the kit updates from. Resolution (issue #38, docs/design/
 # release-handling.md): --channel flag (pre-scanned below) > explicit
 # KIT_BRANCH env > KIT_CHANNEL stamp in install.conf (the channel this
@@ -97,6 +113,9 @@ opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/k
 fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
+    # Registered for the EXIT/INT/TERM cleanup (survives the re-exec via
+    # the export below): a failed fetch must not leave the partial tree.
+    _FETCH_TREE="$base"
     dir="$base/files"
     # Pre-create every subdirectory referenced by KIT_FILES (bin/, sh/,
     # py/, tui/): curl -o cannot write into a missing directory and aborts
@@ -147,6 +166,10 @@ if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
     # a script incrementally, so a self-modifying script corrupts its parser
     # mid-run ("syntax error near unexpected token '('"). Re-exec the fetched
     # copy instead — its own overwrite of $LIBDIR/management/update.sh is then harmless.
+    # exec replaces this shell, so the EXIT trap cannot fire here — hand the
+    # fetched tree to the new process via the environment; its own cleanup
+    # trap removes it on exit.
+    export _FETCH_TREE
     exec bash "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh" "$@"
 fi
 # The files/ root this update deploys from: after the fetch+re-exec above
@@ -819,11 +842,13 @@ if [ "$BINARY_UPDATE" = true ]; then
         fi
         if [ -n "$_up_ver" ]; then
             TMP="$(mktemp -d)"
+            _BIN_TMP="$TMP"
             if ! SRC=$(fetch_opencode_version "$TMP" "$_up_ver"); then
                 ui_warn "download of opencode $_up_ver failed — binary left untouched"
                 log "opencode binary upgrade skipped: download of $_up_ver failed"
                 rm -rf "$TMP"
                 TMP=""
+                _BIN_TMP=""
                 SRC=""
             fi
         fi
@@ -916,6 +941,7 @@ fi
 # --- refresh install.conf (version stamp + group key) --------------------------
 
 NEW_INSTALL_CONF="$(mktemp)"
+_CONF_TMP="$NEW_INSTALL_CONF"
 {
     if [ -f "$INSTALL_CONF" ]; then
         # Strip keys this update owns: VERSION (re-stamped),

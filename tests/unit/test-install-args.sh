@@ -198,6 +198,18 @@ else
     fail "install final output tells the user to restart the terminal (issue #73)"
 fi
 
+# --- scratch cleanup (review 0.0.39a C1) ---------------------------------------
+
+# Root-running installer must not leak its temp artifacts on failure or
+# Ctrl-C: fetch tree + sudoers render temp are trapped on EXIT/INT/TERM.
+# The backup dir is deliberately NOT in the trap (recovery material).
+if grep -qF 'trap cleanup EXIT INT TERM' "$INSTALL" \
+   && grep -qF '_FETCH_TREE="$base"' "$INSTALL"; then
+    pass "install.sh traps EXIT/INT/TERM and registers the fetch tree for cleanup"
+else
+    fail "install.sh traps EXIT/INT/TERM and registers the fetch tree for cleanup"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

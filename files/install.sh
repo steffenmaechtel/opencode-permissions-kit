@@ -31,6 +31,19 @@
 # Unknown options abort the install (fail fast, no silently ignored typos).
 set -e
 
+# Scratch-file cleanup (review 0.0.39a C1): every temp artifact this script
+# creates is removed on ANY exit path — failure, Ctrl-C, TERM, and success.
+# The backup directory is deliberately NOT touched: it holds pre-install
+# copies (sudoers, configs) that are recovery material after a failed run,
+# and the user is told where it is. Fetch tree + sudoers render temp are
+# pure scratch and must not leak as root-owned 0700 leftovers.
+_FETCH_TREE=""
+cleanup() {
+    if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
+    if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
+}
+trap cleanup EXIT INT TERM
+
 # Ref the kit ships from. 'stable' = the release mirror (byte-identical to
 # master at release points, docs one-liners use it); 'master' = development
 # channel (the in-code default — the copy streamed from a ref must default
@@ -56,6 +69,9 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
+    # Registered for the EXIT/INT/TERM cleanup: a failed fetch (or an
+    # aborted install later on) must not leave the partial tree behind.
+    _FETCH_TREE="$base"
     dir="$base/files"
     # Pre-create every subdirectory referenced by the file list (bin/, sh/,
     # py/, tui/): curl -o cannot write into a missing directory and aborts
