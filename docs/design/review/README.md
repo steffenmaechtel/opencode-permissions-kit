@@ -59,3 +59,4 @@ snapshots (`grep -n "C13" 2026-09-26-v0.0.38.md`).
 | 0.0.39a | [2026-09-27-v0.0.39-a.md](2026-09-27-v0.0.39-a.md) | S1–S9, C1–C9, D1–D25 | [2026-09-28-v0.0.39-resolution.md](2026-09-28-v0.0.39-resolution.md) | same-day variant a |
 | 0.0.39b | [2026-09-27-v0.0.39-b.md](2026-09-27-v0.0.39-b.md) | S1–S4, C1–C6, D1–D3, Q1–Q3 | [2026-09-28-v0.0.39-resolution.md](2026-09-28-v0.0.39-resolution.md) | same-day variant b; independent of -a (overlaps are confirmations) |
 | 0.0.39c | [2026-09-27-v0.0.39-c.md](2026-09-27-v0.0.39-c.md) | — (no new findings) | — | provenance analysis of the -a/-b rows vs. tag `0.0.38`: 57/59 pre-existing, 1 fix-wave regression (0.0.39a D12, cosmetic), 1 post-tag feature nit (0.0.39a S9) |
+| 0.0.39d | [2026-09-28-v0.0.39-d.md](2026-09-28-v0.0.39-d.md) | S1–S8, C1–C8, D1–D5, 1 retraction | [2026-09-28-v0.0.39-resolution.md](2026-09-28-v0.0.39-resolution.md) | review of the 0.0.39 fix wave itself (20 commits, `7692cb1..84a31da`, pre-PR) |
