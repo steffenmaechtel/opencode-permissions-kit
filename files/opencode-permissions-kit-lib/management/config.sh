@@ -249,7 +249,7 @@ projects_add() {
         # immediately — shared helper with live per-pass progress
         # (issue #14), .git included (issue #17). The agent user enables
         # the exact per-ancestor traversal probe (0750 developer homes).
-            fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
+        fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
         # ddev handover (.ddev + the app-type's settings dirs at any depth):
         # ddev always runs as $OPENCODE_USER and chmods these paths
         # unconditionally — they must belong to it or `ddev start` fails

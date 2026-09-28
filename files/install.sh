@@ -119,27 +119,40 @@ if [ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/log.sh" ]; then
     . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/log.sh"
 fi
 
+# Source a shipped library or die loudly: under set -e a missing file in
+# the old `[ -f x ] && . x` pattern aborted the WHOLE install silently
+# (the failed test's exit status trips errexit) — a diagnostic beats a
+# mysterious early exit (review 0.0.39b C2).
+kit_source() {
+    if [ -f "$1" ]; then
+        . "$1"
+    else
+        echo "error: missing kit library: $1 (incomplete checkout or broken fetch)" >&2
+        exit 1
+    fi
+}
+
 # Shared ddev handover helpers (.ddev + settings dirs -> opencode user).
 # install.sh always runs from a checkout or a fully fetched temp dir, so the
 # helper sits right next to log.sh.
-[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
 
 # Shared ddev database-migration helpers (dev-user registry -> SQL dumps,
 # issue #15). Same sourcing rules as ddev-handover.sh.
-[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
 command -v ddev_migrate_registry >/dev/null 2>&1 || { ddev_migrate_registry() { :; }; ddev_migrate_projects() { :; }; ddev_migrate_done() { return 1; }; }
 
 # Shared group-baseline helper with live progress (issue #14). Same
 # sourcing rules as ddev-handover.sh.
-[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 
 # Shared WSL browser bridge helper (issues #91, #100): deploys the
 # powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
 # device logins alive on a hardened /mnt/c. Same sourcing rules as
 # ddev-handover.sh.
-[ -f "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] && . "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
 
@@ -427,8 +440,8 @@ if [ -n "$CONTAINER_BACKEND_OPT" ]; then
             CONTAINER_BACKEND="$CONTAINER_BACKEND_OPT"
             ;;
         *)
-            echo "${UI_RED}Invalid --container-backend: '$CONTAINER_BACKEND_OPT'${UI_NC}"
-            echo "${UI_YELLOW}Supported: docker-rootless | podman-rootless (rootless only)${UI_NC}"
+            ui_error "Invalid --container-backend: '$CONTAINER_BACKEND_OPT'"
+            ui_info "Supported: docker-rootless | podman-rootless (rootless only)"
             exit 1
             ;;
     esac
@@ -1288,7 +1301,7 @@ if [ "$opencode_found" = false ]; then
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /home/$DEFAULT_USER/.opencode/bin/opencode -> $SYSTEM_BIN"
         else
-            echo "${UI_RED}Installation failed. Install opencode manually and re-run.${UI_NC}"
+            ui_error "Installation failed. Install opencode manually and re-run."
             exit 1
         fi
     else

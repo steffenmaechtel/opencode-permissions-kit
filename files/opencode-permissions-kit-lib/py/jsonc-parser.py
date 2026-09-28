@@ -117,16 +117,20 @@ def read_config(config_path):
         return f.read()
 
 
-def extract_patterns(config_path):
-    raw = read_config(config_path)
-
-    clean = strip_jsonc_comments(raw)
-
+def load_config(config_path):
+    """Read, comment-strip and parse the config document. Shared by every
+    extract_* entry point (they used to carry identical copies of this
+    try/except — the kind of twin that diverges silently); exits with a
+    diagnostic on invalid JSON."""
     try:
-        config = json.loads(clean)
+        return json.loads(strip_jsonc_comments(read_config(config_path)))
     except json.JSONDecodeError as e:
         print(f"Error parsing {config_path}: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def extract_patterns(config_path):
+    config = load_config(config_path)
 
     patterns = set()
     permission = config.get('permission', {})
@@ -183,15 +187,7 @@ def extract_tools(config_path):
     not trigger. Top-level "permission": "allow" and "permission.bash":
     "allow" shorthands count as allowing everything. Prints one tool per
     line."""
-    raw = read_config(config_path)
-
-    clean = strip_jsonc_comments(raw)
-
-    try:
-        config = json.loads(clean)
-    except json.JSONDecodeError as e:
-        print(f"Error parsing {config_path}: {e}", file=sys.stderr)
-        sys.exit(1)
+    config = load_config(config_path)
 
     if isinstance(config, list):
         rules = _debug_entry_rules(config)
