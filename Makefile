@@ -3,7 +3,7 @@
 # Scripts checked by `make lint` (everything shipped in files/, plus the
 # maintainer helpers in scripts/).
 SHELLCHECK_FILES = files/install.sh \
-	scripts/release.sh scripts/security-scan.sh \
+	scripts/release.sh scripts/advisory-watch.sh \
 	files/opencode-permissions-kit-lib/management/config.sh files/opencode-permissions-kit-lib/management/update.sh \
 	files/opencode-permissions-kit-lib/management/status.sh files/opencode-permissions-kit-lib/management/uninstall.sh \
 	files/etc/umask.sh \

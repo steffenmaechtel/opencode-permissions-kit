@@ -6,7 +6,7 @@
 # service, no runtime network — the wrapper checks it locally on every start
 # and `opk status` diffs it against the upstream GitHub feed. Fresh entries
 # travel through the normal release channel (make release → stable mirror →
-# opk update); a scheduled CI watch (scripts/security-scan.sh) opens a
+# opk update); a scheduled CI watch (scripts/advisory-watch.sh) opens a
 # maintainer issue when upstream publishes an advisory the database lacks.
 #
 # Sourced (never executed):

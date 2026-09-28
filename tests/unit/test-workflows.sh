@@ -126,16 +126,16 @@ fi
 # --- 2b. scripts/ executables in test-unit.yml (0.0.39a D21) --------------------
 
 # The required set above derives from tests/ + files/ only, so
-# scripts/release.sh and scripts/security-scan.sh were never enforced.
+# scripts/release.sh and scripts/advisory-watch.sh were never enforced.
 # Only test-unit.yml chmods both (the e2e workflows never execute them);
 # the bit matters there because test-release.sh and the advisory suite
 # run them by path.
 _smissing=""
-for _s in ./scripts/release.sh ./scripts/security-scan.sh; do
+for _s in ./scripts/release.sh ./scripts/advisory-watch.sh; do
     chmod_tokens "$WF_TEST" | grep -qxF "$_s" || _smissing="$_smissing $_s"
 done
 if [ -z "$_smissing" ]; then
-    pass "test-unit.yml: scripts/release.sh + scripts/security-scan.sh chmodded"
+    pass "test-unit.yml: scripts/release.sh + scripts/advisory-watch.sh chmodded"
 else
     fail "test-unit.yml: scripts chmod entries missing:$_smissing"
 fi

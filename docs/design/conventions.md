@@ -83,7 +83,7 @@ Patterns already in this repo:
 
 | Context | Pattern | Code |
 |---|---|---|
-| GitHub advisory feed → `gh` argv/query | `scan_advisory_valid` — charset + vocabulary + anchored ranges | `scripts/security-scan.sh` |
+| GitHub advisory feed → `gh` argv/query | `scan_advisory_valid` — charset + vocabulary + anchored ranges | `scripts/advisory-watch.sh` |
 | version resolution (GitHub/npm) | strict `case 1.*`/`2.*`, loud abort outside the shape | `management/update.sh` (`resolve_latest_opencode_version`) |
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
