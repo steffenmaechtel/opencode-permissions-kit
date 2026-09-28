@@ -268,7 +268,7 @@ check "channel: a real ref shape passes the gate (stable)" \
 
 # --- 7b. scratch cleanup (review 0.0.39a C1) --------------------------------------
 check "cleanup: EXIT/INT/TERM trap removes fetch tree, sudoers + conf temps" \
-    sh -c "grep -qF 'trap cleanup EXIT INT TERM' \"\$1\" && grep -qF '_FETCH_TREE=\"\$base\"' \"\$1\" && grep -qF '_CONF_TMP=' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF 'trap cleanup EXIT' \"\$1\" && grep -qF \"trap 'cleanup; exit 1' INT TERM\" \"\$1\" && grep -qF '_FETCH_TREE=\"\$base\"' \"\$1\" && grep -qF '_CONF_TMP=' \"\$1\"" _ "$UPDATE"
 check "cleanup: fetched tree survives the self re-exec via the environment" \
     sh -c "grep -qF 'export _FETCH_TREE' \"\$1\"" _ "$UPDATE"
 

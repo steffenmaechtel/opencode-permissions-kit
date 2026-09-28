@@ -955,7 +955,7 @@ _rootless_ok=true
 # 1 <n> 65536`), so the kit's default subuid allocation (231072+) is OUTSIDE
 # the container's uid map and podman-rootless provisioning's `newuidmap` write
 # fails with EPERM. Seeding an in-range range first works because
-# setup-container-backend.sh's allocate_range() KEEPS an existing entry. No-op
+# setup-container-backend's allocate_range() KEEPS an existing entry. No-op
 # on a rootful host, which keeps CI on the kit's true default path.
 if [ "$E2E_HOST_LAYOUT" = "rootless" ]; then
     echo "  ${CYAN}Nested userns (rootless host docker) — seeding in-range subuid/subgid${NC}"

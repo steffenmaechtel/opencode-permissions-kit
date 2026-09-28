@@ -135,7 +135,7 @@ captures all of it in one artifact.
 1. build Dockerfile.rootless (lib.sh, setuid guard applies)
 2. start systemd container
 3. create opencode user + subuid seed + fuse-overlayfs daemon.json   (RL2 prep)
-4. provision inner daemon: setup-container-backend.sh path
+4. provision inner daemon: setup-container-backend path
    (or dockerd-rootless-setuptool.sh directly — see §6 R5)
 5. install ddev (official install script, pinned version §5)
 6. warm up:  ddev config --project-type=typo3 --auto  +  ddev start

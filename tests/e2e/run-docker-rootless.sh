@@ -4,7 +4,7 @@
 #
 # Phase 3 of docs/design/rootless-backend.md. Unlike the podman-rootless suite
 # (run.sh section 12i), docker-rootless cannot run in the plain e2e container:
-# the kit's provisioning (setup-container-backend.sh) hard-requires a working
+# the kit's provisioning (setup-container-backend) hard-requires a working
 # systemd --user manager (dockerd-rootless-setuptool.sh + `systemctl --user`).
 # This suite therefore uses a SEPARATE systemd-based container
 # (Dockerfile.rootless) and exercises the REAL provisioning path end-to-end:
@@ -152,7 +152,7 @@ echo "  host docker layout: $E2E_HOST_LAYOUT"
 #     a range starting at 100000 (practically 231072+), which is OUTSIDE that
 #     map, so rootlesskit's `newuidmap` write fails with EPERM. Seeding an
 #     in-range range (opencode:4096:60000) first works because
-#     setup-container-backend.sh's allocate_range() KEEPS an existing entry.
+#     setup-container-backend's allocate_range() KEEPS an existing entry.
 #     On a rootful host the container has the full uid space, so this is not
 #     needed there.
 echo ""
@@ -173,7 +173,7 @@ _rootless_ok=true
 
 echo ""
 echo "--- RL2. Switch to docker-rootless via config.sh (real provisioning) ---"
-# Full Phase 3 path: config.sh -> setup-container-backend.sh -> get.docker.com,
+# Full Phase 3 path: config.sh -> setup-container-backend -> get.docker.com,
 # subuid/subgid, dockerd-rootless-setuptool.sh as opencode, systemctl --user
 # enable+start docker.service, linger. Run the REPO checkout so we test the
 # local code, not a potentially stale installed copy.

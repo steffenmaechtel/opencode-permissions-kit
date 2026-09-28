@@ -2,7 +2,7 @@ FROM ubuntu:24.04
 
 # Systemd-based image for the docker-rootless daemon e2e
 # (tests/e2e/run-docker-rootless.sh). The kit's docker-rootless provisioning
-# (setup-container-backend.sh) requires a working systemd --user manager
+# (setup-container-backend) requires a working systemd --user manager
 # (dockerd-rootless-setuptool.sh + `systemctl --user`), so this image runs
 # systemd as PID 1. The plain e2e suite uses Dockerfile (no systemd).
 #

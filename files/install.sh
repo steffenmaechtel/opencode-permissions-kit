@@ -46,7 +46,12 @@ cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
     if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
 }
-trap cleanup EXIT INT TERM
+# A signal handler must EXIT: without it the interrupted script resumes
+# running after cleanup — with its scratch files already deleted
+# (fix-wave review). The EXIT trap re-runs cleanup; the rms are
+# idempotent.
+trap cleanup EXIT
+trap 'cleanup; exit 1' INT TERM
 
 # Ref the kit ships from. 'stable' = the release mirror (byte-identical to
 # master at release points, docs one-liners use it); 'master' = development
@@ -326,7 +331,9 @@ esac
 # error. project_path_sane reads PROJECT_TILDE_HOME.
 PROJECT_TILDE_HOME="$HOME"
 if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
-    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+    # || true: a stale SUDO_USER must not abort under pipefail — the
+    # [ -n "$_th" ] guard below handles the empty case (fix-wave review).
+    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6 || true)"
     if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
 fi
 log "install started (version $VERSION, default user=$DEFAULT_USER)"
@@ -905,7 +912,11 @@ _sock=$(echo "$_setup_out" | sed -n 's/^\(OPENCODE_DOCKER_HOST=.*\)/\1/p' | tail
 if [ -n "$_sock" ]; then
     OPENCODE_DOCKER_HOST="${_sock#OPENCODE_DOCKER_HOST=}"
 fi
-echo "$_setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
+# { grep -v || true }: display-only filter — grep -v exits 1 when the
+# setup output consists solely of OPENCODE_ key lines, which pipefail
+# would turn into an abort right after successful provisioning
+# (fix-wave review).
+echo "$_setup_out" | { grep -v '^OPENCODE_' || true; } | sed 's/^/     /'
 ui_success "container backend provisioned: $CONTAINER_BACKEND"
 # Re-stamp the socket into install.conf. The value is kit-controlled
 # (setup-container-backend output) but is still escaped for the sed

@@ -119,7 +119,7 @@ The old justification for rootless was "ACL denies hold inside containers"
 | `files/opencode-deny-all.jsonc` | default-user bypass guard still valid |
 | `files/opencode-permissions-kit-lib/log.sh` | audit log stays |
 | `files/opencode-permissions-kit-lib/shell-warn.sh` | bypass warning stays |
-| `files/opencode-permissions-kit-lib/setup-container-backend.sh` | rootless provisioning; docker-group teardown path removed |
+| `files/opencode-permissions-kit-lib/setup-container-backend` | rootless provisioning; docker-group teardown path removed |
 | `files/opencode-permissions-kit-lib/bin/socket-check.sh` | wrapper socket probe stays |
 | `tests/test-jsonc-parser.sh`, `test-git-config.sh`, `test-bypass-guard.sh` | parser `--tools` mode still used; `test-git-config.sh` moves off the parser's default mode in Phase 6 (grep-based) |
 | `tests/test-container-backend.sh` | rootless cases only |

@@ -81,7 +81,8 @@ OPENCODE_USER="${OPENCODE_USER:-opencode}"
 # project_path_sane reads PROJECT_TILDE_HOME.
 PROJECT_TILDE_HOME="$HOME"
 if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
-    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+    # || true: see install.sh — a stale SUDO_USER must not abort (fix-wave review)
+    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6 || true)"
     if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
 fi
 # Sharing group: the opencode user's own usergroup; prefer the live value
@@ -177,7 +178,11 @@ projects_list() {
             ui_atten "[$num] $line" "missing"
         fi
     done < "$PROJECTS_CONF"
-    [ "$num" -eq 0 ] && ui_detail "(none configured)"
+    # if (not [ ] &&): a false short-circuit as the function's LAST
+    # statement would make projects_list return 1 and kill the script
+    # under set -e whenever roots ARE configured (fix-wave review).
+    if [ "$num" -eq 0 ]; then ui_detail "(none configured)"; fi
+    return 0
 }
 
 # Same policy as install.sh: never run the group baseline (chgrp -R +
@@ -474,11 +479,11 @@ container_backend_apply() {
     local setup_out
     setup_out=$(sudo sh "$setup_script" "$new_backend" --yes 2>&1) || {
         ui_error "provisioning failed:"
-        echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
+        echo "$setup_out" | { grep -v '^OPENCODE_' || true; } | sed 's/^/     /'
         ui_warn "backend not changed."
         return 1
     }
-    echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
+    echo "$setup_out" | { grep -v '^OPENCODE_' || true; } | sed 's/^/     /'
     # Capture socket key from the helper output.
     docker_host=$(echo "$setup_out" | sed -n 's/^OPENCODE_DOCKER_HOST=//p' | tail -1)
 

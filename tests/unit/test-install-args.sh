@@ -201,13 +201,16 @@ fi
 # --- scratch cleanup (review 0.0.39a C1) ---------------------------------------
 
 # Root-running installer must not leak its temp artifacts on failure or
-# Ctrl-C: fetch tree + sudoers render temp are trapped on EXIT/INT/TERM.
-# The backup dir is deliberately NOT in the trap (recovery material).
-if grep -qF 'trap cleanup EXIT INT TERM' "$INSTALL" \
+# Ctrl-C: fetch tree + sudoers render temp are trapped on EXIT, and the
+# signal handlers EXIT after cleanup (a resuming script would run on with
+# its scratch already deleted). The backup dir is deliberately NOT in the
+# trap (recovery material).
+if grep -qF 'trap cleanup EXIT' "$INSTALL" \
+   && grep -qF "trap 'cleanup; exit 1' INT TERM" "$INSTALL" \
    && grep -qF '_FETCH_TREE="$base"' "$INSTALL"; then
-    pass "install.sh traps EXIT/INT/TERM and registers the fetch tree for cleanup"
+    pass "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
 else
-    fail "install.sh traps EXIT/INT/TERM and registers the fetch tree for cleanup"
+    fail "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
 fi
 
 echo ""

@@ -83,8 +83,8 @@ fi
 # --- 3. rotation: size threshold creates .1, chain capped at LOG_KEEP -----------
 
 run_lib "$WORK" 10 >/dev/null 2>&1 'log "big one"'
-# first log rotates nothing (file below threshold at write time); the
-# SECOND write must see size >= 10 and rotate the old content to .1
+# the FIRST write creates a file already >= the tiny threshold (LOG_MAX_BYTES=10);
+# the SECOND write's log_rotate sees size >= 10 and moves the old content to .1
 run_lib "$WORK" 10 >/dev/null 2>&1 'log "overflow"'
 if [ -f "$WORK/log/kit.log.1" ] && grep -q "big one" "$WORK/log/kit.log.1"; then
     pass "rotation: oversized file moves to .1 with content intact"

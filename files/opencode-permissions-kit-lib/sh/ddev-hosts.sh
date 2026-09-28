@@ -123,12 +123,14 @@ ddev_hosts_missing() {
     dhmi_list=$(ddev_hosts_list "$dhmi_proj")
     [ -n "$dhmi_list" ] || return 0
     for dhmi_h in $dhmi_list; do
-        # Hostnames only ever contain letters, digits, dots and hyphens.
-        # Anything else (whitespace, quotes, metacharacters) is refused
-        # here instead of being trusted to stay whitespace-free on the
-        # way into argv and printed hints (review 0.0.39a S5).
+        # Hostnames only ever contain letters, digits, dots and hyphens,
+        # and must START with a letter or digit — a leading hyphen would
+        # reach `ddev hostname` as an option-looking argv. Anything else
+        # (whitespace, quotes, metacharacters) is refused here instead of
+        # being trusted on the way into argv and printed hints
+        # (review 0.0.39a S5, fix-wave review).
         case "$dhmi_h" in
-            *[!A-Za-z0-9.-]*) continue ;;
+            [!A-Za-z0-9]*|*[!A-Za-z0-9.-]*) continue ;;
         esac
         case "$dhmi_h" in
             *.ddev.site) continue ;;

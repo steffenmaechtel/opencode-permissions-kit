@@ -452,7 +452,7 @@ fi
 # OpenChamber spawns `opencode serve` with the developer's $HOME as cwd;
 # the opencode user cannot read it (UID separation), so config load for
 # that directory turns into HTTP 500. The wrapper probes readability via
-# cwd-check.sh (as the opencode user) and falls back to a readable
+# cwd-check (as the opencode user) and falls back to a readable
 # projects root, warning on stderr.
 echo ""
 echo "--- Headless serve cwd probe ---"
@@ -551,10 +551,10 @@ assert_valid "serve cwd: unavailable probe (empty output) changes nothing" \
 # static: wrapper wiring + sudoers rule
 if grep -q 'cwd-check "\$1" 2>/dev/null || true' "$WRAPPER_FILE" \
    && grep -q 'sudo -n -u opencode.*cwd-check' "$WRAPPER_FILE"; then
-    echo "  ${GREEN}PASS${NC}  wrapper probes the serve cwd via cwd-check.sh (sudo -n, fault-tolerant)"
+    echo "  ${GREEN}PASS${NC}  wrapper probes the serve cwd via cwd-check (sudo -n, fault-tolerant)"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  wrapper lost the fault-tolerant cwd-check.sh probe"
+    echo "  ${RED}FAIL${NC}  wrapper lost the fault-tolerant cwd-check probe"
     failures=$((failures + 1))
 fi
 
@@ -575,10 +575,10 @@ else
 fi
 
 if grep -q 'bin/cwd-check \*' "$SUDOERS_FILE"; then
-    echo "  ${GREEN}PASS${NC}  sudoers.template gates cwd-check.sh (NOPASSWD, opencode RunAs)"
+    echo "  ${GREEN}PASS${NC}  sudoers.template gates cwd-check (NOPASSWD, opencode RunAs)"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  sudoers.template lost the cwd-check.sh rule"
+    echo "  ${RED}FAIL${NC}  sudoers.template lost the cwd-check rule"
     failures=$((failures + 1))
 fi
 

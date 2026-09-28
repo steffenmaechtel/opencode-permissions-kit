@@ -10,7 +10,7 @@
 #       substitution only, visudo-clean shape.
 #   (3) wrapper resolution mirror — rootless backends only, no fallback.
 #   (4) static wiring — install.sh, update.sh, config.sh, status.sh,
-#       setup-container-backend.sh, and the CI chmod lists.
+#       setup-container-backend, and the CI chmod lists.
 set -e
 
 RED='\033[0;31m'
@@ -197,9 +197,9 @@ check "install.sh fetches socket-check.sh" \
     grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$INSTALL"
 check "install.sh deploys socket-check.sh to LIBDIR/bin" \
     grep -Fq '"$LIBDIR/bin/socket-check"' "$INSTALL"
-check "install.sh fetches setup-container-backend.sh" \
+check "install.sh fetches setup-container-backend" \
     grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$INSTALL"
-check "install.sh deploys setup-container-backend.sh to LIBDIR" \
+check "install.sh deploys setup-container-backend to LIBDIR" \
     grep -Fq '"$LIBDIR/bin/setup-container-backend"' "$INSTALL"
 check "install.sh records OPENCODE_GROUP=opencode usergroup" \
     grep -Fq 'OPENCODE_GROUP=$(id -gn "$OPENCODE_USER"' "$INSTALL"
@@ -212,9 +212,9 @@ check "update.sh KIT_FILES includes socket-check.sh" \
     grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$UPDATE"
 check "update.sh deploys socket-check.sh to LIBDIR/bin" \
     grep -Fq '"$LIBDIR/bin/socket-check"' "$UPDATE"
-check "update.sh KIT_FILES includes setup-container-backend.sh" \
+check "update.sh KIT_FILES includes setup-container-backend" \
     grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$UPDATE"
-check "update.sh deploys setup-container-backend.sh to LIBDIR" \
+check "update.sh deploys setup-container-backend to LIBDIR" \
     grep -Fq '"$LIBDIR/bin/setup-container-backend"' "$UPDATE"
 check "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)" \
     sh -c "! sed -n 's/^KIT_FILES=\"\\(.*\\)\"$/\\1/p' \"\$1\" | grep -q migrate-denies" _ "$UPDATE"
@@ -279,9 +279,9 @@ echo "-- CI chmod lists --"
 check "test-unit.yml chmods this test"  grep -Fq './tests/unit/test-container-backend.sh' "$TEST_YML"
 check "test-e2e.yml chmods this test"   grep -Fq './tests/unit/test-container-backend.sh' "$E2E_YML"
 check "test-unit.yml runs this test"   grep -Fq 'Run container backend tests' "$TEST_YML"
-check "test-unit.yml chmods setup-container-backend.sh" \
+check "test-unit.yml chmods setup-container-backend" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/setup-container-backend' "$TEST_YML"
-check "test-e2e.yml chmods setup-container-backend.sh" \
+check "test-e2e.yml chmods setup-container-backend" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/setup-container-backend' "$E2E_YML"
 check "test-unit.yml chmods socket-check.sh" \
     grep -Fq './files/opencode-permissions-kit-lib/bin/socket-check' "$TEST_YML"
@@ -293,9 +293,9 @@ check "test-unit.yml has no test-migration.sh (removed)" \
     grep_absent -Fq './tests/unit/test-migration.sh' "$TEST_YML"
 
 echo ""
-echo "-- setup-container-backend.sh structure --"
+echo "-- setup-container-backend structure --"
 SETUP="$REPO/files/opencode-permissions-kit-lib/bin/setup-container-backend"
-check "setup-container-backend.sh exists"  [ -f "$SETUP" ]
+check "setup-container-backend exists"  [ -f "$SETUP" ]
 check "setup has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SETUP"
 check "setup accepts rootless backends"        grep -Fq 'docker-rootless|podman-rootless' "$SETUP"
 check "setup installs uidmap + dbus"         grep -Fq 'apt_install uidmap' "$SETUP"

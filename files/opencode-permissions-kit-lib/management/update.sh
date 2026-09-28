@@ -49,7 +49,10 @@ cleanup() {
     if [ -n "${_BIN_TMP:-}" ]; then rm -rf "$_BIN_TMP"; fi
     if [ -n "${_CONF_TMP:-}" ]; then rm -f "$_CONF_TMP"; fi
 }
-trap cleanup EXIT INT TERM
+# A signal handler must EXIT (see install.sh); the EXIT trap re-runs the
+# idempotent cleanup.
+trap cleanup EXIT
+trap 'cleanup; exit 1' INT TERM
 
 # Ref the kit updates from. Resolution (issue #38, docs/design/
 # release-handling.md): --channel flag (pre-scanned below) > explicit

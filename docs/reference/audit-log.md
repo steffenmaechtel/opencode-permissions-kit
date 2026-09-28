@@ -22,7 +22,7 @@ Every kit script that changes the system writes to
 - ddev handovers (`ddev handover: ...`, `ddev handover applied under ...`)
 - ddev-settings changes (`ddev-settings set to ...`)
 - the agents migration (`agents migration: moved|copied|skipped ...`)
-- ddev database exports (started/skipped/result lines)
+- ddev database exports (skipped/result lines)
 - binary upgrades
 - leak-scan findings
 
