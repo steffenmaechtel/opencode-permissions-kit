@@ -1200,8 +1200,12 @@ log "umask profile installed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 ui_section "opencode binary + wrapper"
 
 SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
-# The binary must be executable only for root and the opencode user, so a tool
-# invoking the absolute path as the default user cannot bypass the wrapper.
+# root:$BINARY_GROUP mode 750 lets the opencode user (a group member) run
+# the binary and keeps unrelated users out. It is NOT a developer-side
+# bypass guard: the developer is in the sharing group too and CAN exec
+# this path directly — the wrapper-bypass protection for the developer
+# is the soft layer (deny-all config + red theme + warnings), per the
+# kit's declared model.
 BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 secure_binary() {
     sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true

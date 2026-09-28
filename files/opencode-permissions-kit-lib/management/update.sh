@@ -643,8 +643,11 @@ fi   # ONLY_BINARY skip: kit re-deploy ... pre-binary sections
 SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 
 # --- re-assert opencode binary permissions ------------------------------------
-# The binary must stay executable only for root and the opencode user, so a
-# tool invoking the absolute path as the default user cannot bypass the wrapper.
+# root:$BINARY_GROUP mode 750 lets the opencode user run the binary and
+# keeps unrelated users out — but it is NOT a developer-side bypass guard:
+# the developer is in the sharing group and CAN exec this path directly;
+# the soft layer (deny-all config + warnings) is what deters that, per
+# the kit's declared model.
 BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 if [ -x "$SYSTEM_BIN" ]; then
     sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true

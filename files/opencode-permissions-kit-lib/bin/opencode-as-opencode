@@ -6,7 +6,7 @@
 # the wrapper's name follows the bin/ddev-as-opencode pattern ("run X as
 # the opencode user").
 #
-# Soft protection model (docs/design/DDEV-WORKING.md): the kit does NOT
+# Soft protection model (docs/design/ddev-working.md): the kit does NOT
 # mirror opencode.jsonc deny rules into Linux ACLs. File permissions are
 # enforced by opencode's own permission layer only. The wrapper's job is
 # UID separation: validate the project dir, detect container-tool opt-in,

@@ -1,9 +1,9 @@
 #!/bin/sh
 # opencode permissions kit -- log.sh
 # Shared audit log for every kit script that changes the system. Sourced
-# (not executed) by install.sh / update.sh / config.sh / uninstall.sh /
-# protect-projects.sh. Without it the kit still works — logging is
-# best-effort and never breaks the calling script.
+# (not executed) by install.sh / update.sh / config.sh / uninstall.sh.
+# Without it the kit still works — logging is best-effort and never
+# breaks the calling script.
 #
 # Location:  /var/log/opencode-permissions-kit/opencode-permissions-kit.log
 #   - dir root:<default-user-group> mode 750, file root:<default-user-group>
