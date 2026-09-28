@@ -52,6 +52,8 @@ jobs:
         run: sh tests/check-host.sh
       - name: Run ShellCheck lint
         run: make lint
+      - name: Python syntax check
+        run: make check-py
       - name: Run wrapper validation tests
         run: ./tests/unit/test-opencode-as-opencode.sh
       - name: Run JSONC parser edge-case tests

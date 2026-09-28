@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` (everything shipped in files/, plus the
 # maintainer helpers in scripts/).
@@ -71,7 +71,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -91,6 +91,19 @@ lint:
 check-host:
 	@echo "=== Contributor host check ==="
 	@sh tests/check-host.sh
+
+# Python syntax gate (review 0.0.39a C5): a syntax error in the shipped
+# py/ scripts otherwise ships green until an e2e run (or a user) hits it.
+# PYTHONPYCACHEPREFIX keeps the bytecode cache out of the repo tree (the
+# workflow-consistency test derives requirements from files/ on disk).
+# The tui/*.tsx assets stay covered by the e2e suites (a real TS check
+# would need a node + typescript install — not a unit-suite dependency).
+check-py:
+	@echo "=== Python syntax check (shipped scripts) ==="
+	@PYTHONPYCACHEPREFIX="$$(mktemp -d)" python3 -m py_compile \
+		files/opencode-permissions-kit-lib/py/jsonc-parser.py \
+		files/opencode-permissions-kit-lib/py/tui-register.py
+	@echo "Python syntax OK."
 
 test-opencode-as-opencode:
 	@echo "=== Wrapper Validation Tests ==="
