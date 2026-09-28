@@ -308,6 +308,16 @@ git_config_apply() {
     done
     [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/../templates/opencode.jsonc, $LIBDIR/templates/opencode.jsonc"
 
+    # Back up an existing agent config before the template overwrite — same
+    # data-safety as the install path. Without this, a customized
+    # opencode.jsonc would be destroyed by a plain on/off toggle.
+    backup=""
+    if sudo test -f "$target"; then
+        backup="${target}.bak-$(date +%Y%m%d-%H%M%S)"
+        sudo cp "$target" "$backup"
+        sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$backup"
+    fi
+
     sudo cp "$template" "$target"
     sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$target"
     sudo chmod 664 "$target"
@@ -320,7 +330,12 @@ git_config_apply() {
         ui_kv "git-config" "OFF  ($target)"
     fi
     log "git-config hardening set to $enable ($target)"
-    ui_warn "existing config was overwritten from template. Restart opencode to pick up changes."
+    if [ -n "$backup" ]; then
+        ui_detail "previous config backed up: $backup"
+        ui_warn "existing config was overwritten from template. Restart opencode to pick up changes."
+    else
+        ui_warn "config was rendered from template. Restart opencode to pick up changes."
+    fi
 }
 
 # --- container backend ----------------------------------------------------------
