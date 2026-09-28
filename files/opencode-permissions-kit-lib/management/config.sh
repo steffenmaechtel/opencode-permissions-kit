@@ -203,6 +203,8 @@ project_path_sane() {
     esac
     case "$_pp" in
         *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
+        *[[:space:]]*) return 1 ;;        # storage format is line-based and
+                                         # space-free (0.0.39b C3)
     esac
     case "$_pp" in
         /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\

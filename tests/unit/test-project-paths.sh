@@ -134,6 +134,19 @@ else
     pass "rejects empty path"
 fi
 
+# Paths containing whitespace are rejected: projects.conf is line-based
+# and the install-side writer splits on spaces (0.0.39b C3).
+if project_path_sane "/home/dev/my projects"; then
+    fail "rejects paths containing spaces (storage format is space-free)"
+else
+    pass "rejects paths containing spaces (storage format is space-free)"
+fi
+if project_path_sane "/var/www/vhosts/client site"; then
+    fail "rejects paths containing tabs/spaces anywhere"
+else
+    pass "rejects paths containing tabs/spaces anywhere"
+fi
+
 # install.sh must store the NORMALIZED path, not the raw tilde input, in
 # both entry points — a literal ~/dev in projects.conf is silently skipped
 # by every consumer (review 0.0.39b C1). The standard prompt (line ~593)

@@ -23,7 +23,7 @@ Uninstall asks before removing the kit block (or assumes yes with
 | Path | Purpose |
 |---|---|
 | `install.conf` | Install settings (keys below) |
-| `projects.conf` | Project roots (one per line) |
+| `projects.conf` | Project roots (one per line; paths must not contain spaces — the writer splits on them, every consumer reads line-by-line) |
 
 ### `install.conf` keys
 
