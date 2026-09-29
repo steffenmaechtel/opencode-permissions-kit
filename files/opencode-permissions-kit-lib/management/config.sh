@@ -27,6 +27,21 @@
 set -eu
 (set -o pipefail) 2>/dev/null && set -o pipefail || true
 
+# Scratch cleanup (review 0.0.39e C3): same contract as install.sh /
+# update.sh — temp artifacts die on any exit path. The mktemps here live
+# in function locals (sudoers render, conf rewrites), so they register
+# in a registry the trap empties; a Ctrl-C must never leak the rendered
+# sudoers tempfile.
+_TMP_REGISTRY=""
+_tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
+cleanup() {
+    # word splitting intended: registry entries are mktemp paths
+    # shellcheck disable=SC2086
+    if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
+}
+trap cleanup EXIT
+trap 'cleanup; exit 1' INT TERM
+
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 
@@ -416,6 +431,7 @@ render_sudoers() {
     esac
     local tmp
     tmp=$(mktemp)
+    _tmp_track "$tmp"
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$template" > "$tmp"
     # Validate the RENDERED file before deploying anything: a broken file
     # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
@@ -439,6 +455,7 @@ update_install_conf_backend() {
     local backend="$1" docker_host="$2" podman_socket="$3"
     local tmp
     tmp=$(mktemp)
+    _tmp_track "$tmp"
     {
         if [ -f "$INSTALL_CONF" ]; then
             grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null || true
@@ -592,6 +609,7 @@ update_install_conf_ddev_owned() {
     local value="$1"
     local tmp
     tmp=$(mktemp)
+    _tmp_track "$tmp"
     {
         if [ -f "$INSTALL_CONF" ]; then
             grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null || true

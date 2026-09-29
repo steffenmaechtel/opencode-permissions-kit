@@ -58,6 +58,14 @@
 
 # Whether this host is WSL (the bridge is inert anywhere else).
 # OPK_WSL_FORCE=1 claims WSL for tests on any host.
+
+# Scratch-file registration (review 0.0.39e C3): the rewriting functions
+# mktemp their staging files; when sourced by install.sh/update.sh/
+# config.sh they register with the host's EXIT/INT/TERM cleanup via
+# _tmp_track. The no-op fallback covers standalone/test sourcing (no
+# trap there — the normal code paths still remove their own temps).
+command -v _tmp_track >/dev/null 2>&1 || _tmp_track() { :; }
+
 browser_bridge_is_wsl() {
     [ "${OPK_WSL_FORCE:-0}" = "1" ] && return 0
     grep -qi microsoft /proc/version 2>/dev/null
@@ -72,6 +80,7 @@ browser_bridge_write_conf() {
     _bb_libdir="$1"
     _bb_conf="${OPK_WSL_CONF-/etc/wsl.conf}"
     _bb_tmp="$(mktemp)"
+    _tmp_track "$_bb_tmp"
     printf '# opencode permissions kit browser bridge -- begin\n# Managed by the opencode permissions kit (issues #91, #100). Every line\n# in this block is a comment for WSL -- no section, no key, no effect on\n# WSL itself. The `open` npm package bundled in opencode scans\n# /etc/wsl.conf for the first `root =` line to locate powershell.exe; the\n# carrier line at the end of this block wins that scan and redirects it\n# to the kit stand-in, keeping opencode device logins alive on a\n# hardened /mnt/c. Do not edit -- `opk uninstall` removes this block.\n# ----------------------------------------------------------------------\rroot = %s/wsl\n# opencode permissions kit browser bridge -- end\n\n' "$_bb_libdir" > "$_bb_tmp"
     if [ -f "$_bb_conf" ]; then
         # Strip a previous kit block (including its trailing blank line)
@@ -128,6 +137,7 @@ browser_bridge_strip_legacy() {
     [ -f "$_bb_conf" ] || return 0
     grep -q '^\[opencode-permissions-kit\]$' "$_bb_conf" || return 0
     _bb_tmp="$(mktemp)"
+    _tmp_track "$_bb_tmp"
     awk '
         in_legacy {
             if ($0 ~ /^\[/) { in_legacy = 0; print; next }
@@ -163,6 +173,7 @@ browser_bridge_remove() {
     if [ -f "$_bb_conf" ] && { grep -q '^# opencode permissions kit browser bridge -- begin$' "$_bb_conf" \
             || grep -q '^\[opencode-permissions-kit\]$' "$_bb_conf"; }; then
         _bb_tmp="$(mktemp)"
+        _tmp_track "$_bb_tmp"
         awk '
             in_block {
                 if ($0 ~ /^# opencode permissions kit browser bridge -- end$/) { in_block = 0; next }

@@ -231,6 +231,9 @@ esac
 FAKE
 chmod +x "$FKWORK/bin/curl"
 eval "$(sed -n '/^fetch_kit() {/,/^}/p' "$INSTALL")"
+# fetch_kit registers its fetch temps via _tmp_track (the host script's
+# trap empties the registry; the isolated function only needs it defined).
+_tmp_track() { :; }
 FKOUT=""
 FKRC=0
 FKOUT=$(PATH="$FKWORK/bin:$PATH" KIT_BASE_URL="https://example.test" fetch_kit 2>&1) || FKRC=$?

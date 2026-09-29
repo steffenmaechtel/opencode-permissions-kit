@@ -42,9 +42,17 @@ set -eu
 # and the user is told where it is. Fetch tree + sudoers render temp are
 # pure scratch and must not leak as root-owned 0700 leftovers.
 _FETCH_TREE=""
+# Registry for short-lived scratch files created inside functions
+# (fetch temps, wsl-browser-bridge rewrites) — the trap empties it on
+# every exit path (review 0.0.39e C3).
+_TMP_REGISTRY=""
+_tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
 cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
     if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
+    # word splitting intended: registry entries are mktemp paths
+    # shellcheck disable=SC2086
+    if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
 }
 # A signal handler must EXIT: without it the interrupted script resumes
 # running after cleanup — with its scratch files already deleted
@@ -139,6 +147,7 @@ fetch_kit() {
             _fk_url="$KIT_BASE_URL/files/$f"
         fi
         _fk_tmp=$(mktemp)
+        _tmp_track "$_fk_tmp"
         if ! curl -fsSL "$_fk_url" -o "$_fk_tmp" || [ ! -s "$_fk_tmp" ]; then
             rm -f "$_fk_tmp"
             echo "error: could not fetch $f from $_fk_url (failed or empty) — aborting" >&2

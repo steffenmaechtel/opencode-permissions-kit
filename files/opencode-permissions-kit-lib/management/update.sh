@@ -43,11 +43,19 @@ set -eu
 _FETCH_TREE="${_FETCH_TREE:-}"
 _BIN_TMP=""
 _CONF_TMP=""
+# Registry for short-lived scratch files created inside functions
+# (ensure_local_file fetch temps, wsl-browser-bridge rewrites) — the
+# trap empties it on every exit path (review 0.0.39e C3).
+_TMP_REGISTRY=""
+_tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
 cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
     if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
     if [ -n "${_BIN_TMP:-}" ]; then rm -rf "$_BIN_TMP"; fi
     if [ -n "${_CONF_TMP:-}" ]; then rm -f "$_CONF_TMP"; fi
+    # word splitting intended: registry entries are mktemp paths
+    # shellcheck disable=SC2086
+    if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
 }
 # A signal handler must EXIT (see install.sh); the EXIT trap re-runs the
 # idempotent cleanup.
@@ -198,6 +206,7 @@ ensure_local_file() {
     # (review 0.0.39a S3). Fetch to a temp file, move in only when sound.
     local _elf_tmp
     _elf_tmp="$(mktemp)"
+    _tmp_track "$_elf_tmp"
     if ! curl -fsSL "$KIT_BASE_URL/files/$f" -o "$_elf_tmp" 2>/dev/null || [ ! -s "$_elf_tmp" ]; then
         rm -f "$_elf_tmp"
         echo "error: could not fetch $f from $KIT_BASE_URL — aborting (partial files are never deployed)" >&2
