@@ -91,7 +91,7 @@ When a review runs as parallel subagents:
 - model policy (since 2026-09-29): the **main agent** runs the strong
   default model (GLM-5.3) and owns the verification duty; **every reviewer
   subagent runs on GLM-5.3-Flash** via pinned agent definitions
-  (`agent/review.md` mechanical sweep, `agent/review-security.md`,
+  (`agent/review-mechanical.md` sweep, `agent/review-security.md`,
   `agent/review-quality.md`) — cost over single-agent depth. Two
   compensations make that safe: every Flash finding is re-verified by the
   main agent before it enters a snapshot, and independent duplicate agents
