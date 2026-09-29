@@ -7,10 +7,16 @@
 #   --dry-run    Show what would be removed without changing anything
 #   --debug      Trace execution (set -x)
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-NC='\033[0m'
+# Colors resolved to REAL bytes once at load (printf interprets \033 in
+# the format string; a bare echo does not portably — dash yes, bash
+# prints the literal). Off for NO_COLOR / non-tty, same rule as sh/ui.sh
+# (0.0.39e C10/C12).
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
+    RED=''; GREEN=''; YELLOW=''; NC=''
+else
+    RED=$(printf '\033[0;31m'); GREEN=$(printf '\033[0;32m')
+    YELLOW=$(printf '\033[0;33m'); NC=$(printf '\033[0m')
+fi
 
 YES=false
 DRY_RUN=false
