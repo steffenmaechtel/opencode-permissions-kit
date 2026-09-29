@@ -88,8 +88,20 @@ Two hard rules learned the hard way:
 
 When a review runs as parallel subagents:
 
-- launch at the gateway-default model variant (higher reasoning settings
-  were rejected/timeout-prone on 2026-09-27),
+- model policy (since 2026-09-29): the **main agent** runs the strong
+  default model (GLM-5.3) and owns the verification duty; **every reviewer
+  subagent runs on GLM-5.3-Flash** via pinned agent definitions
+  (`agent/review.md` mechanical sweep, `agent/review-security.md`,
+  `agent/review-quality.md`) — cost over single-agent depth. Two
+  compensations make that safe: every Flash finding is re-verified by the
+  main agent before it enters a snapshot, and independent duplicate agents
+  (the 0.0.39 a/b pattern) are cheap enough to run routinely — redundancy
+  replaces depth. Higher-reasoning variants stay rejected (timeout-prone,
+  2026-09-27); a single agent may be pinned up to the strong model for a
+  release-critical pass (maintainer's call, recorded in the snapshot
+  header). History: 0.0.38/a–c ran Flash end-to-end on the crashing
+  opencode-go provider; d–g ran the judgment agents on GLM-5.3 (gateway
+  default) before this policy made all-Flash explicit.
 - enforce **checkpoint discipline**: each agent appends findings to a side
   file after every completed section (empty sections get a `clean` line) —
   end-synthesis turns are the primary failure mode, and checkpoints survive
