@@ -1064,11 +1064,26 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
         src="/home/$DEFAULT_USER/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
     fi
     if [ -n "$src" ]; then
-        sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null && \
-        sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" && \
-        sudo chmod 700 "$caroot" && sudo chmod 600 "$caroot/rootCA-key.pem" && \
-        echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)" && \
-        log "mkcert CA reused from $src_label for $OPENCODE_USER"
+        # No && chain: a mid-chain failure silently skipped the chmod 600
+        # on the copied CA PRIVATE KEY (0.0.39e C2). Each step is explicit;
+        # a failure aborts the reuse loudly and falls through to the
+        # mkcert -install branch below.
+        if sudo cp "$src/rootCA.pem" "$src/rootCA-key.pem" "$caroot/" 2>/dev/null \
+           && sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" \
+           && sudo chmod 700 "$caroot" \
+           && sudo chmod 600 "$caroot/rootCA-key.pem"; then
+            echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)"
+            log "mkcert CA reused from $src_label for $OPENCODE_USER"
+        else
+            echo "  ${UI_YELLOW}mkcert CA reuse from $src_label FAILED — removing the partial copy, falling back to a new CA.${UI_NC}"
+            sudo rm -f "$caroot/rootCA.pem" "$caroot/rootCA-key.pem"
+            log "mkcert CA reuse FAILED (source: $src_label) — partial copy removed"
+            # The elif below no longer applies once this branch ran — do
+            # the new-CA fallback here.
+            if command -v mkcert >/dev/null 2>&1; then
+                sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
+            fi
+        fi
     elif command -v mkcert >/dev/null 2>&1; then
         sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
         [ -f "$caroot/rootCA.pem" ] && \
