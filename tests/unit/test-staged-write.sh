@@ -112,6 +112,27 @@ fi
 assert_eq "failed src: destination untouched" "PRE-EXISTING" "$(cat "$WORK/dst/keep.json" 2>/dev/null)"
 assert_eq "failed src: no staging leftovers" "" "$(ls -A "$WORK/stage" 2>/dev/null)"
 
+# 1e. destination is a DIRECTORY (review 0.0.39h F3): `mv -f` would move
+# the staged file INSIDE it and return 0 — staged_write must refuse, the
+# directory must stay empty. [ -d ] follows a link-to-directory, so that
+# variant is covered by the same gate; a link to a FILE is still replaced
+# (1b).
+mkdir -p "$WORK/dst/asdir"
+if staged_write 664 "$OWNER" "$WORK/src/a" "$WORK/dst/asdir" 2>/dev/null; then
+    fail "dir dst: staged_write refuses"
+else
+    pass "dir dst: staged_write refuses"
+fi
+assert_eq "dir dst: nothing landed inside the directory" "" "$(ls -A "$WORK/dst/asdir" 2>/dev/null)"
+assert_eq "dir dst: no staging leftovers" "" "$(ls -A "$WORK/stage" 2>/dev/null)"
+ln -s "$WORK/dst/asdir" "$WORK/dst/dirlink"
+if staged_write 664 "$OWNER" "$WORK/src/a" "$WORK/dst/dirlink" 2>/dev/null; then
+    fail "dir-link dst: staged_write refuses"
+else
+    pass "dir-link dst: staged_write refuses"
+fi
+assert_eq "dir-link dst: nothing landed inside the link target" "" "$(ls -A "$WORK/dst/asdir" 2>/dev/null)"
+
 # --- 2. ddev-handover gates (S2) -------------------------------------------------
 # PATH-stubbed chown/chmod record their operands; the fixture carries a
 # REAL settings dir (web/typo3conf, config/system) and a PLANTED symlink
@@ -258,6 +279,51 @@ check "wiring: update.sh tui.json write goes through staged_write" \
     grep -qF 'staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json"' "$UPDATE"
 check "wiring: install.sh config writes go through staged_write" \
     sh -c 'grep -c "staged_write 664" "$1" | grep -q "^[3-9]$" ' _ "$INSTALL"
+
+# --- 6. agent_home_sane (0.0.39h F1/F2) ---------------------------------------------
+# The walker asserts every component of a path below the agent home
+# (OPK_AGENT_HOME overrides the base for this unprivileged run).
+AH="$WORK/ah"; mkdir -p "$AH/oc/.config/opencode" "$AH/other"
+ln -s "$AH/other" "$AH/oc/linked"
+check "walker: clean chain passes silently" \
+    sh -c '. "$1" && OPK_AGENT_HOME="$2/oc" agent_home_sane oc "$2/oc/.config/opencode"' _ "$STAGEDWRITE" "$AH"
+if OPK_AGENT_HOME="$AH/oc" sh -c '. "$1" && agent_home_sane oc "$2/oc/linked/x"' _ "$STAGEDWRITE" "$AH" 2>/dev/null; then
+    fail "walker: linked intermediate component trips"
+else
+    pass "walker: linked intermediate component trips"
+fi
+if OPK_AGENT_HOME="$AH/oc" sh -c '. "$1" && agent_home_sane oc "$2/oc/linked"' _ "$STAGEDWRITE" "$AH" 2>/dev/null; then
+    fail "walker: linked leaf trips"
+else
+    pass "walker: linked leaf trips"
+fi
+check "walker: path outside the agent home passes" \
+    sh -c '. "$1" && OPK_AGENT_HOME="$2/oc" agent_home_sane oc "$2/other/x"' _ "$STAGEDWRITE" "$AH"
+check "walker: the home itself passes" \
+    sh -c '. "$1" && OPK_AGENT_HOME="$2/oc" agent_home_sane oc "$2/oc"' _ "$STAGEDWRITE" "$AH"
+
+# --- 7. wiring: the 0.0.39h gates ----------------------------------------------
+UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
+check "gates: install.sh ~/.ddev operand gate" \
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"/home/\$OPENCODE_USER/.ddev\"" "$1"' _ "$INSTALL"
+check "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents)" \
+    sh -c 'grep -c "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/" "$1" | grep -q "^[3-9]$"' _ "$INSTALL"
+check "gates: install.sh agents-migration operand gate" \
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_opk_dst\"" "$1"' _ "$INSTALL"
+check "gates: install.sh mkcert chain gate" \
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$caroot\"" "$1"' _ "$INSTALL"
+check "gates: install.sh agent-config + tui + plugin chain gates" \
+    sh -c 'grep -q "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/.config/opencode" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_oc_user_dir\"" "$1"' _ "$INSTALL"
+check "gates: update.sh sources staged-write.sh early + walker fallback" \
+    sh -c 'grep -q "command -v agent_home_sane >/dev/null 2>&1 \|\| agent_home_sane() { return 0; }" "$1"' _ "$UPDATE"
+check "gates: update.sh sync_tui_registration + tui.json chain gates" \
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_str_user_dir\"" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1"' _ "$UPDATE"
+check "gates: config.sh git_config_apply chain gate" \
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$(dirname \"\$target\")\"" "$1"' _ "$CONFIG"
+check "gates: uninstall.sh plugin-removal chain gate" \
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_un_dir\"" "$1"' _ "$UNINSTALL"
+check "F3: staged-write.sh refuses a directory destination" \
+    grep -qF 'destination '"'"'$_sw_dst'"'"' is a directory' "$STAGEDWRITE"
 
 # --- summary -----------------------------------------------------------------------
 

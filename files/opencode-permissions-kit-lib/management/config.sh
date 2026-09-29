@@ -359,6 +359,16 @@ git_config_apply() {
     done
     [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/../templates/opencode.jsonc, $LIBDIR/templates/opencode.jsonc"
 
+    # Chain gate (review 0.0.39h F2): staged_write secures the destination
+    # NAME only — a replaced PARENT (~/.config or ~/.config/opencode,
+    # agent-replaceable after any completed install) passes `sudo mkdir -p`
+    # silently and would redirect the writes below into the link target.
+    # The requested toggle was NOT applied — die loudly (user-managed link;
+    # the kit never follows links in the agent home).
+    if ! agent_home_sane "$OPENCODE_USER" "$(dirname "$target")"; then
+        die "a parent of $target is a symlink — git-config $enable NOT applied (user-managed link)"
+    fi
+
     # Back up an existing agent config before the template overwrite — same
     # data-safety as the install path. Without this, a customized
     # opencode.jsonc would be destroyed by a plain on/off toggle.

@@ -1009,10 +1009,18 @@ log "container backend provisioned: $CONTAINER_BACKEND"
 # browsers trusting ddev's HTTPS certs. Router ports: rootless ddev-router
 # cannot bind 80/443 unless ip_unprivileged_port_start <= 80.
 ui_section "ddev runtime for user $OPENCODE_USER"
-sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
-sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "/home/$OPENCODE_USER/.ddev"
-sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
-log "ddev home provisioned: /home/$OPENCODE_USER/.ddev"
+# Operand gate (review 0.0.39h F1) BEFORE any chown/chmod: both
+# dereference a symlink OPERAND, and ~/.ddev is agent-replaceable after
+# any completed install — a planted link there must never hand the
+# pointed tree to the agent or chmod it. Skip loudly (user-managed).
+if agent_home_sane "$OPENCODE_USER" "/home/$OPENCODE_USER/.ddev"; then
+    sudo mkdir -p "/home/$OPENCODE_USER/.ddev"
+    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "/home/$OPENCODE_USER/.ddev"
+    sudo chmod 755 "/home/$OPENCODE_USER/.ddev"
+    log "ddev home provisioned: /home/$OPENCODE_USER/.ddev"
+else
+    log "ddev home provisioning skipped: /home/$OPENCODE_USER/.ddev is a symlink (user-managed)"
+fi
 
 # docker-rootless + ddev 1.25.0-1.25.2: the global no-bind-mounts switch
 # is required or the first `ddev start` hard-errors (upstream fixed
@@ -1109,88 +1117,97 @@ fi
 # operand (review 0.0.39g S1).
 caroot="/home/$OPENCODE_USER/.local/share/mkcert"
 if [ ! -f "$caroot/rootCA.pem" ]; then
-    sudo mkdir -p "$caroot"
-    src=""
-    src_label=""
-    # 1. Windows CA: scan the user profiles DIRECTLY. powershell.exe /
-    #    cmd.exe are frequently not on a WSL PATH, so %USERNAME% probing is
-    #    unreliable — a failed probe silently skipped the Windows CA and
-    #    fell through to an untrusted one (browsers showed "not secure").
-    if [ -d /mnt/c/Users ]; then
-        for wca in /mnt/c/Users/*/AppData/Local/mkcert; do
-            if [ -f "$wca/rootCA.pem" ] && [ -f "$wca/rootCA-key.pem" ]; then
-                src="$wca"
-                wuser=${wca#/mnt/c/Users/}
-                src_label="Windows user '${wuser%%/*}'"
-                break
+    # Chain gate (review 0.0.39h F2) BEFORE mkdir -p: every component of
+    # the chain to $caroot (~/.local, ~/.local/share) is
+    # agent-replaceable — a planted link passes `sudo mkdir -p` silently
+    # and would redirect the staged_write mvs + the caroot chown/chmod
+    # below into the link target. Skip loudly (user-managed); no CA will
+    # exist, so warn like the other no-CA ends (0.0.39h F5).
+    if ! agent_home_sane "$OPENCODE_USER" "$caroot"; then
+        echo "  ${UI_YELLOW}mkcert: the chain to $caroot contains a symlink — CA provisioning skipped (the kit never follows links in the agent home).${UI_NC}"
+        ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate. Remove the link or place your CA at $caroot and re-run."
+        log "mkcert CA provisioning skipped: symlink in the chain to $caroot (no CA provisioned)"
+    else
+        sudo mkdir -p "$caroot"
+        src=""
+        src_label=""
+        # 1. Windows CA: scan the user profiles DIRECTLY. powershell.exe /
+        #    cmd.exe are frequently not on a WSL PATH, so %USERNAME% probing is
+        #    unreliable — a failed probe silently skipped the Windows CA and
+        #    fell through to an untrusted one (browsers showed "not secure").
+        if [ -d /mnt/c/Users ]; then
+            for wca in /mnt/c/Users/*/AppData/Local/mkcert; do
+                if [ -f "$wca/rootCA.pem" ] && [ -f "$wca/rootCA-key.pem" ]; then
+                    src="$wca"
+                    wuser=${wca#/mnt/c/Users/}
+                    src_label="Windows user '${wuser%%/*}'"
+                    break
+                fi
+            done
+        fi
+        if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
+            src="/home/$DEFAULT_USER/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
+        fi
+        if [ -n "$src" ]; then
+            # No && chain: a mid-chain failure silently skipped the chmod 600
+            # on the copied CA PRIVATE KEY (0.0.39e C2). Each step is explicit;
+            # a failure aborts the reuse loudly and falls through to the
+            # mkcert -install fallback below. The CA files go through
+            # staged_write (mode + owner applied on the staged file); the
+            # directory inode handover rechecks [ -L ] immediately before
+            # chown/chmod touch it (0.0.39g S1).
+            if staged_write 644 "$OPENCODE_USER:$OPENCODE_GROUP" "$src/rootCA.pem" "$caroot/rootCA.pem" \
+               && staged_write 600 "$OPENCODE_USER:$OPENCODE_GROUP" "$src/rootCA-key.pem" "$caroot/rootCA-key.pem" \
+               && [ ! -L "$caroot" ] \
+               && sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" \
+               && sudo chmod 700 "$caroot"; then
+                echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)"
+                log "mkcert CA reused from $src_label for $OPENCODE_USER"
+            else
+                echo "  ${UI_YELLOW}mkcert CA reuse from $src_label FAILED — removing the partial copy, falling back to a new CA.${UI_NC}"
+                sudo rm -f "$caroot/rootCA.pem" "$caroot/rootCA-key.pem"
+                log "mkcert CA reuse FAILED (source: $src_label) — partial copy removed"
+                # The elif below no longer applies once this branch ran — do
+                # the new-CA fallback here, and VERIFY it: a failed step above
+                # may have left $caroot root-owned (mkcert -install as the
+                # agent would then fail), and "falling back" must not
+                # silently end without any CA (wave-f review).
+                if [ ! -L "$caroot" ]; then
+                    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" 2>/dev/null || true
+                fi
+                if command -v mkcert >/dev/null 2>&1; then
+                    sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
+                fi
+                if [ ! -f "$caroot/rootCA.pem" ]; then
+                    ui_warn "no mkcert CA exists at $caroot after the fallback — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
+                    log "mkcert CA fallback produced no CA at $caroot"
+                fi
             fi
-        done
-    fi
-    if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
-        src="/home/$DEFAULT_USER/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
-    fi
-    if [ -n "$src" ]; then
-        if [ -L "$caroot" ]; then
-            echo "  ${UI_YELLOW}mkcert: $caroot is a symlink — CA reuse skipped (the kit never follows symlinks in the agent home).${UI_NC}"
-            log "mkcert CA reuse skipped: $caroot is a symlink"
-        # No && chain: a mid-chain failure silently skipped the chmod 600
-        # on the copied CA PRIVATE KEY (0.0.39e C2). Each step is explicit;
-        # a failure aborts the reuse loudly and falls through to the
-        # mkcert -install fallback below. The CA files go through
-        # staged_write (mode + owner applied on the staged file); the
-        # directory inode handover rechecks [ -L ] immediately before
-        # chown/chmod touch it (0.0.39g S1).
-        elif staged_write 644 "$OPENCODE_USER:$OPENCODE_GROUP" "$src/rootCA.pem" "$caroot/rootCA.pem" \
-           && staged_write 600 "$OPENCODE_USER:$OPENCODE_GROUP" "$src/rootCA-key.pem" "$caroot/rootCA-key.pem" \
-           && [ ! -L "$caroot" ] \
-           && sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" \
-           && sudo chmod 700 "$caroot"; then
-            echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)"
-            log "mkcert CA reused from $src_label for $OPENCODE_USER"
-        else
-            echo "  ${UI_YELLOW}mkcert CA reuse from $src_label FAILED — removing the partial copy, falling back to a new CA.${UI_NC}"
-            sudo rm -f "$caroot/rootCA.pem" "$caroot/rootCA-key.pem"
-            log "mkcert CA reuse FAILED (source: $src_label) — partial copy removed"
-            # The elif below no longer applies once this branch ran — do
-            # the new-CA fallback here, and VERIFY it: a failed step above
-            # may have left $caroot root-owned (mkcert -install as the
-            # agent would then fail), and "falling back" must not
-            # silently end without any CA (wave-f review).
+        elif command -v mkcert >/dev/null 2>&1; then
+            # Fresh CA. mkcert runs as the agent and can only write $caroot
+            # once the kit user owns it — hand the ([ -L ]-gated, root-created)
+            # directory over FIRST; the old silent-no-CA path ran mkcert
+            # against a root-owned dir (0.0.39g C1). The system/Windows trust
+            # stores are NOT touched: mkcert as the agent cannot reach them
+            # (0.0.39g Q7), and installing an agent-writable CA system-wide
+            # is the developer's call — see the hint below.
             if [ ! -L "$caroot" ]; then
                 sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" 2>/dev/null || true
+                sudo chmod 700 "$caroot" 2>/dev/null || true
             fi
-            if command -v mkcert >/dev/null 2>&1; then
-                sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
+            sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
+            if [ -f "$caroot/rootCA.pem" ]; then
+                echo "  ${UI_YELLOW}mkcert: no existing CA found — a new one was created at $caroot.${UI_NC}"
+                echo "  ${UI_YELLOW}It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER'): browsers will warn.${UI_NC}"
+                echo "  ${UI_YELLOW}Import $caroot/rootCA.pem into your browser, or run 'sudo env CAROOT=$caroot mkcert -install' yourself.${UI_NC}"
+                log "mkcert: no existing CA — new one created for $OPENCODE_USER (system trust store not updated)"
+            else
+                ui_warn "no mkcert CA exists at $caroot after the install attempt — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
+                log "mkcert: fresh-install attempt produced no CA at $caroot"
             fi
-            if [ ! -f "$caroot/rootCA.pem" ]; then
-                ui_warn "no mkcert CA exists at $caroot after the fallback — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
-                log "mkcert CA fallback produced no CA at $caroot"
-            fi
-        fi
-    elif command -v mkcert >/dev/null 2>&1; then
-        # Fresh CA. mkcert runs as the agent and can only write $caroot
-        # once the kit user owns it — hand the ([ -L ]-gated, root-created)
-        # directory over FIRST; the old silent-no-CA path ran mkcert
-        # against a root-owned dir (0.0.39g C1). The system/Windows trust
-        # stores are NOT touched: mkcert as the agent cannot reach them
-        # (0.0.39g Q7), and installing an agent-writable CA system-wide
-        # is the developer's call — see the hint below.
-        if [ ! -L "$caroot" ]; then
-            sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" 2>/dev/null || true
-            sudo chmod 700 "$caroot" 2>/dev/null || true
-        fi
-        sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
-        if [ -f "$caroot/rootCA.pem" ]; then
-            echo "  ${UI_YELLOW}mkcert: no existing CA found — a new one was created at $caroot.${UI_NC}"
-            echo "  ${UI_YELLOW}It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER'): browsers will warn.${UI_NC}"
-            echo "  ${UI_YELLOW}Import $caroot/rootCA.pem into your browser, or run 'sudo env CAROOT=$caroot mkcert -install' yourself.${UI_NC}"
-            log "mkcert: no existing CA — new one created for $OPENCODE_USER (system trust store not updated)"
         else
-            ui_warn "no mkcert CA exists at $caroot after the install attempt — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
-            log "mkcert: fresh-install attempt produced no CA at $caroot"
+            echo "  ${UI_YELLOW}NOTE: mkcert not installed and no CA to reuse — install mkcert or copy your CA to $caroot.${UI_NC}"
         fi
-    else
-        echo "  ${UI_YELLOW}NOTE: mkcert not installed and no CA to reuse — install mkcert or copy your CA to $caroot.${UI_NC}"
     fi
 fi
 
@@ -1672,11 +1689,34 @@ fi
 
 sudo mkdir -p /home/opencode/.config/opencode /home/opencode/.agents
 # The opencode home belongs to the user's own usergroup; the developer (member
-# of $OPENCODE_GROUP) can enter and edit opencode.jsonc etc.
+# of $OPENCODE_GROUP) can enter and edit opencode.jsonc etc. The home inode
+# itself is NOT agent-replaceable (no write on /home) — it stays ungated.
 sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode
 sudo chmod 2750 /home/opencode
-sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config /home/opencode/.agents
-sudo chmod 2775 /home/opencode/.config /home/opencode/.config/opencode /home/opencode/.agents
+# Operand gates (review 0.0.39h F1): chown -R/chmod dereference a symlink
+# OPERAND, and after any completed install every operand below is
+# agent-replaceable — a planted ~/.config -> /etc would recursively hand an
+# arbitrary tree to the agent, chmod 2775 on a linked .config/opencode would
+# make an arbitrary dir world-writable+setgid. Skip each linked operand
+# loudly (user-managed). The walker also covers the PARENT chain of
+# .config/opencode (0.0.39h F2).
+if agent_home_sane "$OPENCODE_USER" /home/opencode/.config; then
+    sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config
+    sudo chmod 2775 /home/opencode/.config
+else
+    log "agent config dir skipped: /home/opencode/.config is (below) a symlink (user-managed)"
+fi
+if agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
+    sudo chmod 2775 /home/opencode/.config/opencode
+else
+    log "agent config dir skipped: /home/opencode/.config/opencode is (below) a symlink (user-managed)"
+fi
+if agent_home_sane "$OPENCODE_USER" /home/opencode/.agents; then
+    sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.agents
+    sudo chmod 2775 /home/opencode/.agents
+else
+    log "agent skills dir skipped: /home/opencode/.agents is (below) a symlink (user-managed)"
+fi
 
 # === Step 8a: migrate the developer's agent resources (issue #19) ==============
 # opencode auto-loads skills from ~/.agents/skills/ and ~/.claude/skills/
@@ -1699,6 +1739,16 @@ _opk_migrate_one() {
     _opk_dst="/home/$OPENCODE_USER/$1"
     [ -d "$_opk_src" ] || return 0
     [ -n "$(ls -A "$_opk_src" 2>/dev/null)" ] || return 0
+    # Operand gate (review 0.0.39h F1), covering the whole chain incl. the
+    # destination leaf and its parent (~/.claude for .claude/skills):
+    # mkdir -p passes through a linked parent silently, cp -a would write
+    # developer content THROUGH a linked destination, chown -R would hand
+    # the pointed tree to the agent. Skip loudly (user-managed).
+    if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
+        ui_warn "agent resources not migrated: the chain to $_opk_dst contains a symlink (user-managed) — $_opk_src left untouched"
+        log "agents migration skipped: symlink in the chain to $_opk_dst"
+        return 0
+    fi
     sudo mkdir -p "$_opk_dst"
     # cp -a (not mv): merges into the existing target and works when src
     # and dst would collide on a re-install.
@@ -1781,7 +1831,15 @@ fi
 # with the kit's regular file (review 0.0.39g S1); the backup cp only
 # READS through an existing config and writes into the root-owned
 # backup dir.
-if [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
+# Parent-chain gate (review 0.0.39h F2): staged_write secures the
+# destination NAME only — a replaced PARENT (~/.config or
+# ~/.config/opencode, agent-replaceable after any completed install)
+# passes `sudo mkdir -p` silently and would redirect the mv below into
+# the link target. Skip loudly (user-managed).
+if ! agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
+    echo "  ${UI_YELLOW}WARNING: the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed (user-managed; the kit never follows links in the agent home).${UI_NC}"
+    log "agent config skipped: symlink in the parent chain of /home/opencode/.config/opencode"
+elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
     staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
     if [ "$SECURE_GIT_CONFIG" = true ]; then
         sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
@@ -1866,19 +1924,30 @@ fi
 # re-installs and updates (same policy as the deny-all config above).
 OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"
 OC_TUI_CONF="$OC_TUI_DIR/tui.json"
-sudo mkdir -p "$OC_TUI_DIR"
-# A symlink at the destination is user structure (dotfile setups): never
-# written through (root cp/chown would follow it — 0.0.39g S1), never
-# silently destroyed — same user-managed policy as an unmarked tui.json.
-if [ -L "$OC_TUI_CONF" ]; then
-    ui_detail "existing $OC_TUI_CONF is a symlink — TUI mode display NOT installed (user-managed link)"
-    log "tui mode display skipped: $OC_TUI_CONF is a symlink (user-managed)"
-elif [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
-    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
-    ui_success "TUI mode display installed for $OPENCODE_USER: $OC_TUI_CONF (plugin row in the TUI footer)"
-    log "tui mode display installed: $OC_TUI_CONF"
+# Chain gate BEFORE mkdir -p (review 0.0.39h F2): the [ -L ] gate below
+# checks the destination NAME only — a linked PARENT (~/.config or
+# ~/.config/opencode, agent-replaceable) passes `sudo mkdir -p` silently
+# and would redirect the staged_write mv into the link target. Skip
+# loudly (user-managed). The gate includes the .config/opencode leaf:
+# mkdir -p through a linked leaf redirects the write the same way.
+if ! agent_home_sane "$OPENCODE_USER" "$OC_TUI_DIR"; then
+    ui_detail "the chain to $OC_TUI_CONF contains a symlink — TUI mode display NOT installed (user-managed)"
+    log "tui mode display skipped: symlink in the chain to $OC_TUI_CONF"
 else
-    ui_detail "existing $OC_TUI_CONF kept — TUI mode display NOT installed (user-managed file)"
+    sudo mkdir -p "$OC_TUI_DIR"
+    # A symlink at the destination is user structure (dotfile setups): never
+    # written through (root cp/chown would follow it — 0.0.39g S1), never
+    # silently destroyed — same user-managed policy as an unmarked tui.json.
+    if [ -L "$OC_TUI_CONF" ]; then
+        ui_detail "existing $OC_TUI_CONF is a symlink — TUI mode display NOT installed (user-managed link)"
+        log "tui mode display skipped: $OC_TUI_CONF is a symlink (user-managed)"
+    elif [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
+        staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
+        ui_success "TUI mode display installed for $OPENCODE_USER: $OC_TUI_CONF (plugin row in the TUI footer)"
+        log "tui mode display installed: $OC_TUI_CONF"
+    else
+        ui_detail "existing $OC_TUI_CONF kept — TUI mode display NOT installed (user-managed file)"
+    fi
 fi
 
 DEFAULT_TUI_CONF="$DEFAULT_OC_DIR/tui.json"
@@ -1910,6 +1979,17 @@ if [ "$OPENCODE_MAJOR" = 2 ]; then
     for _oc_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "$DEFAULT_OC_DIR:$DEFAULT_USER"; do
         _oc_user_dir="${_oc_dir_user%%:*}"
         _oc_dir_owner="${_oc_dir_user#*:}"
+        # Chain gate (review 0.0.39h F2): the gates below check plugins/ and
+        # the plugin dir, but the PARENT chain of the config dir is
+        # agent-replaceable too (the agent side) — a linked parent passes
+        # `sudo mkdir -p` silently and redirects the mkdir/ln/chown AND the
+        # tui-register run below through it. The walker no-ops outside the
+        # agent home (the developer side is trusted).
+        if ! agent_home_sane "$OPENCODE_USER" "$_oc_user_dir"; then
+            ui_detail "the chain to $_oc_user_dir contains a symlink — TUI plugin registration skipped (user-managed)"
+            log "tui plugin registration skipped: symlink in the chain to $_oc_user_dir"
+            continue
+        fi
         # 0.0.39g S1 class: the opencode user's config dir is agent-owned.
         # A planted symlink at plugins/ (or the plugin dir itself) must
         # never be followed — mkdir -p would create through it, chown

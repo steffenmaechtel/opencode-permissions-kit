@@ -52,6 +52,18 @@ for cand in "$(dirname "$0")/../sh/wsl-browser-bridge.sh" "/usr/local/lib/openco
     fi
 done
 
+# Agent-home link gates (review 0.0.39h F2, same class as the install/update
+# gates): the plugin removal below acts THROUGH a linked parent (~/.config,
+# ~/.config/opencode — agent-replaceable). Stub keeps older installs
+# (pre-0.0.39h deployed library, no walker yet) uninstallable.
+agent_home_sane() { return 0; }
+for cand in "$(dirname "$0")/../sh/staged-write.sh" "/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+
 trace() {
     [ "$DEBUG" = true ] && echo "[debug] $*" >&2
 }
@@ -197,6 +209,16 @@ log "cli removed: /usr/local/bin/opk"
 # additive manager leaves unmanaged/broken files untouched.
 if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
     for _un_dir in "/home/opencode/.config/opencode" "/home/$DEFAULT_USER/.config/opencode"; do
+        # Chain gate (review 0.0.39h F2): rm -rf and the tui-register rewrite
+        # below act THROUGH a linked parent (~/.config, ~/.config/opencode —
+        # agent-replaceable): a planted link redirects the removal/rewrite
+        # into the link target. The walker no-ops outside the agent home (the
+        # developer side is trusted). Skip loudly (user-managed).
+        if ! agent_home_sane "$OPENCODE_USER" "$_un_dir"; then
+            echo "  ${YELLOW}WARNING: the chain to $_un_dir contains a symlink — plugin registration left in place (user-managed).${NC}"
+            log "tui plugin removal skipped: symlink in the chain to $_un_dir"
+            continue
+        fi
         run sudo rm -rf "$_un_dir/plugins/opencode-permissions-kit"
         run sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
     done

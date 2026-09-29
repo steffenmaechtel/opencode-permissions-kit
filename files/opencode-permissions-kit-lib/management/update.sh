@@ -320,6 +320,24 @@ done
 # install.conf (upgrade floor 0.0.14: the canonical path always exists)
 INSTALL_CONF="$CONFDIR/install.conf"
 
+# Shared symlink-safe privileged-write helper (review 0.0.39g S1) +
+# agent-home link gates (review 0.0.39h F1/F2): the tui.json refresh and
+# sync_tui_registration below write into the AGENT-owned
+# ~/.config/opencode — root cp/chown must never follow a planted symlink
+# there, and a linked PARENT (~/.config, ~/.config/opencode) must never
+# redirect the writes. Sourced EARLY (moved from the tui.json section,
+# 0.0.39h): sync_tui_registration also runs from the binary-upgrade
+# section above that old point. Same lookup order as ui.sh.
+_swl=""
+for _swl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
+    if [ -f "$_swl_cand" ]; then . "$_swl_cand"; _swl="$_swl_cand"; break; fi
+done
+[ -n "$_swl" ] || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+# Old-library fallback (pre-0.0.39h deployed copy): no walker yet — fail
+# open like the pre-gate behavior, the writes above still refuse via
+# staged_write itself.
+command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
+
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
 INSTALLED_VERSION=""
@@ -888,6 +906,16 @@ sync_tui_registration() {
     for _str_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
         _str_user_dir="${_str_dir_user%%:*}"
         _str_dir_owner="${_str_dir_user#*:}"
+        # Chain gate (review 0.0.39h F2): the gates below check plugins/
+        # and the plugin dir, but the PARENT chain of the config dir is
+        # agent-replaceable too (the agent side) — a linked parent passes
+        # `sudo mkdir -p` silently and redirects the mkdir/ln/chown/rm AND
+        # the tui-register run below through it. The walker no-ops outside
+        # the agent home (the developer side is trusted).
+        if ! agent_home_sane "$OPENCODE_USER" "$_str_user_dir"; then
+            log "tui plugin registration skipped: symlink in the chain to $_str_user_dir (user-managed)"
+            continue
+        fi
         # 0.0.39g S1 class: the opencode user's config dir is agent-owned.
         # A planted symlink at plugins/ (or the plugin dir itself) must
         # never be followed — mkdir -p would create through it, chown
@@ -1066,22 +1094,27 @@ log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$
 # --- TUI mode display user files (docs/_archive/design/plan-ui-tui-opencode.md) ---------
 # Same only-if-absent-or-kit-written policy as install.sh (marker key
 # _opencode_permissions_kit): user edits survive updates. The write goes
-# through the shared staged_write helper (review 0.0.39g S1): the target
-# dir is agent-owned, root cp/chown must never follow a planted symlink —
-# a user-managed symlink is skipped, never written through.
-_swl=""
-for _swl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
-    if [ -f "$_swl_cand" ]; then . "$_swl_cand"; _swl="$_swl_cand"; break; fi
-done
-[ -n "$_swl" ] || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+# through the shared staged_write helper (review 0.0.39g S1 — sourced
+# early, see the top of this script): the target dir is agent-owned, root
+# cp/chown must never follow a planted symlink; a user-managed symlink at
+# the destination is skipped, never written through.
 OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"
 OC_TUI_CONF="$OC_TUI_DIR/tui.json"
-sudo mkdir -p "$OC_TUI_DIR"
-if [ -L "$OC_TUI_CONF" ]; then
-    log "tui mode display skipped: $OC_TUI_CONF is a symlink (user-managed)"
-elif [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
-    staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
-    log "tui mode display refreshed: $OC_TUI_CONF"
+# Chain gate BEFORE mkdir -p (review 0.0.39h F2): a linked PARENT
+# (~/.config, ~/.config/opencode) or a linked .config/opencode leaf
+# passes `sudo mkdir -p` silently and would redirect the staged_write mv
+# into the link target. Skip loudly (user-managed).
+if ! agent_home_sane "$OPENCODE_USER" "$OC_TUI_DIR"; then
+    ui_detail "the chain to $OC_TUI_CONF contains a symlink — TUI mode display NOT refreshed (user-managed)"
+    log "tui mode display skipped: symlink in the chain to $OC_TUI_CONF"
+else
+    sudo mkdir -p "$OC_TUI_DIR"
+    if [ -L "$OC_TUI_CONF" ]; then
+        log "tui mode display skipped: $OC_TUI_CONF is a symlink (user-managed)"
+    elif [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
+        staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
+        log "tui mode display refreshed: $OC_TUI_CONF"
+    fi
 fi
 DEFAULT_TUI_CONF="/home/$DEFAULT_USER/.config/opencode/tui.json"
 DEFAULT_THEME_DIR="/home/$DEFAULT_USER/.config/opencode/themes"
