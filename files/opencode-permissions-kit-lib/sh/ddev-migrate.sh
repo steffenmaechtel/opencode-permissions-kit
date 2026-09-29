@@ -102,7 +102,7 @@ ddev_migrate_under_roots() {
 # The user's home via getent, DDEV_MIG_DEV_HOME as override (keeps the
 # unit tests hermetic — never read a real user's registry there).
 ddev_migrate_home() {
-    dmh_h=$(getent passwd "$1" 2>/dev/null | cut -d: -f6)
+    dmh_h=$(getent passwd "$1" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$dmh_h" ] || dmh_h="/home/$1"
     printf '%s\n' "${DDEV_MIG_DEV_HOME:-$dmh_h}"
 }
@@ -181,7 +181,7 @@ ddev_migrate_done() {
 # a rootless socket). Callers are root (install.sh / sudo standalone).
 _ddev_migrate_run_as() {
     dm_u="$1"; shift
-    dm_h=$(getent passwd "$dm_u" 2>/dev/null | cut -d: -f6)
+    dm_h=$(getent passwd "$dm_u" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$dm_h" ] || return 1
     dm_i=$(id -u "$dm_u" 2>/dev/null)
     dm_env="HOME=$dm_h"
@@ -198,7 +198,7 @@ _ddev_migrate_bin() {
     dmb_u="${1:-}"
     dmb_extra=""
     if [ -n "$dmb_u" ]; then
-        dmb_h=$(getent passwd "$dmb_u" 2>/dev/null | cut -d: -f6)
+        dmb_h=$(getent passwd "$dmb_u" 2>/dev/null | cut -d: -f6 || true)
         [ -n "$dmb_h" ] && dmb_extra="$dmb_h/.local/bin/ddev $dmb_h/bin/ddev $dmb_h/.ddev/bin/ddev"
     fi
     for dm_c in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev $dmb_extra; do

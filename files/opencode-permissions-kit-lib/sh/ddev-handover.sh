@@ -180,7 +180,7 @@ ddev_type_settings_dirs() {
 # _ddev_migrate_run_as).
 _ddev_handover_run_as() {
     _dhr_u="$1"; shift
-    _dhr_h=$(getent passwd "$_dhr_u" 2>/dev/null | cut -d: -f6)
+    _dhr_h=$(getent passwd "$_dhr_u" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$_dhr_h" ] || return 1
     sudo -u "$_dhr_u" env HOME="$_dhr_h" "$@"
 }

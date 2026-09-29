@@ -508,7 +508,6 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/Sys
    && [ -n "${DEFAULT_USER:-}" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
     # shellcheck disable=SC1091  # deployed lib, checked above
     . "$LIBDIR/sh/ddev-hosts.sh"
-    _st_miss_total=0
     if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
         while IFS= read -r _st_root; do
             [ -z "$_st_root" ] && continue

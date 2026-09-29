@@ -73,8 +73,8 @@ KIT_BRANCH="${KIT_BRANCH:-master}"
 # scripts source wholesale — refuse anything outside a git-ref charset
 # instead of persisting shell metacharacters as root (review 0.0.39b S1).
 case "$KIT_BRANCH" in
-    *[!A-Za-z0-9._/-]*)
-        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-'" >&2
+    *[!A-Za-z0-9._/-]*|*..*)
+        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
         exit 1
         ;;
 esac
@@ -1334,7 +1334,15 @@ SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 secure_binary() {
     sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
-    sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null || true
+    # The 750 is load-bearing: it scopes execution to root + the sharing
+    # group. Fail loud like update.sh's install_binary does — a silent
+    # best-effort chmod reported the binary as secured while it was not
+    # (0.0.39e C4).
+    if ! sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null; then
+        ui_error "cannot chmod 750 $SYSTEM_BIN — aborting."
+        log "secure_binary FAILED: chmod 750 on $SYSTEM_BIN"
+        exit 1
+    fi
 }
 # The wrapper warns about a self-installed binary shadowing it from
 # ~/.opencode/bin. Once our secured copy exists, remove the user-local
@@ -1664,7 +1672,11 @@ _opk_migrate_one() {
             log "agents migration: copied $_opk_src -> $_opk_dst"
         fi
     else
-        ui_warn "could not ${_opk_ag} $_opk_src — left untouched"
+        # _opk_ag may be a flag-given word (move|copy) or the interactive
+        # letter (m|c) — the message must name the action, not the letter
+        # (0.0.39e C7).
+        _opk_word=$(printf '%s' "$_opk_ag" | sed 's/^m$/move/; s/^c$/copy/')
+        ui_warn "could not ${_opk_word} $_opk_src — left untouched"
         log "agents migration failed: $_opk_src"
     fi
 }
@@ -1683,8 +1695,7 @@ if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]
                 echo "    (m) Move   — recommended: one canonical copy; you keep read/write via the $OPENCODE_GROUP group" >&2
                 echo "    (c) Copy   — duplicate; both sides keep their own copy (may drift)" >&2
                 echo "    (s) Skip   — leave them in your home (the agent cannot use them)" >&2
-                printf "    > " >&2
-                printf "  > "
+                printf "  > " >&2
                 _opk_ans=""
                 _ui_read _opk_ans
                 case "$(printf '%s' "$_opk_ans" | tr '[:upper:]' '[:lower:]')" in

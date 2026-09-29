@@ -92,8 +92,8 @@ KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 # charset, whatever its source (--channel flag, env, or a stale stamp)
 # (review 0.0.39b S1).
 case "$KIT_BRANCH" in
-    *[!A-Za-z0-9._/-]*)
-        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-'" >&2
+    *[!A-Za-z0-9._/-]*|*..*)
+        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
         exit 1
         ;;
 esac
