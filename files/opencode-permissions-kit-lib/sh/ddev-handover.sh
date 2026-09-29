@@ -131,6 +131,24 @@ ddev_devowned_flag() {
     return 0
 }
 
+# _ddev_docroot_sane <docroot>: containment gate for the docroot value
+# parsed from the group-writable .ddev/config.yaml (0.0.39e S2). The
+# value feeds root-run chown -R/chmod -R paths under the project root —
+# traversal segments or an absolute path must never escape it (the same
+# policy project_path_sane enforces everywhere else). Space-free is part
+# of the contract: the settings-dir list is word-split by every caller.
+# Fails (warns to stderr) on anything not a contained relative path.
+_ddev_docroot_sane() {
+    case "$1" in
+        ""|".") return 0 ;;
+        /*|*..*|*[!A-Za-z0-9._/-]*)
+            printf '%s\n' "  WARNING: ignoring docroot '$1' from .ddev/config.yaml — not a contained relative path" >&2
+            return 1
+            ;;
+    esac
+    return 0
+}
+
 # ddev_type_settings_dirs <project-dir>: echoes the settings dirs ddev
 # chmods for the project's app type (empty for unknown types).
 ddev_type_settings_dirs() {
@@ -140,6 +158,7 @@ ddev_type_settings_dirs() {
     dts_type=$(sed -n 's/^type:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     dts_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ -n "$dts_docroot" ] || dts_docroot="."
+    _ddev_docroot_sane "$dts_docroot" || dts_docroot="."
     case "$dts_type" in
         typo3)
             echo "config/system $dts_docroot/typo3conf typo3conf"
@@ -234,6 +253,7 @@ ddev_handover_project_root() {
     [ "$dhq_type" = "typo3" ] || return 0
     dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ -n "$dhq_docroot" ] || dhq_docroot="."
+    _ddev_docroot_sane "$dhq_docroot" || dhq_docroot="."
     if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then
         if [ -n "$dhq_dev" ] && [ "$(stat -c %U "$dhq_proj" 2>/dev/null)" = "$dhq_user" ]; then
             chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || true

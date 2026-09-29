@@ -468,6 +468,21 @@ touch "$HWORK/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
 check "detected typo3: root handed back with 2775 (g+w restored)" \
     sh -c ". \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2775" _ "$HANDOVER" "$HWORK/proj"
 
+# --- 7c. docroot containment (0.0.39e S2) -----------------------------------------
+# docroot comes from the group-writable .ddev/config.yaml and feeds
+# root-run chown -R paths — traversal or absolute values must fall back
+# to "." (with a warning), never escape the project root.
+printf 'name: d1\ntype: typo3\ndocroot: public\n' > "$HWORK/proj/.ddev/config.yaml"
+check "docroot containment: sane docroot passes through" \
+    sh -c ". \"\$1\" 2>/dev/null && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = 'config/system public/typo3conf typo3conf' ]" _ "$HANDOVER" "$HWORK/proj"
+printf 'name: d2\ntype: typo3\ndocroot: ../../..\n' > "$HWORK/proj/.ddev/config.yaml"
+check "docroot containment: traversal falls back to '.' and warns" \
+    sh -c ". \"\$1\" && out=\$(ddev_type_settings_dirs \"\$2\" 2>&1); case \"\$out\" in *WARNING*) ;; *) exit 1 ;; esac; [ \"\$(printf '%s\n' \"\$out\" | grep -v WARNING)\" = 'config/system ./typo3conf typo3conf' ]" _ "$HANDOVER" "$HWORK/proj"
+printf 'name: d3\ntype: drupal\ndocroot: /etc\n' > "$HWORK/proj/.ddev/config.yaml"
+check "docroot containment: absolute docroot falls back to '.'" \
+    sh -c ". \"\$1\" && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = './sites/default' ]" _ "$HANDOVER" "$HWORK/proj"
+printf 'type: typo3\n' > "$HWORK/proj/.ddev/config.yaml"
+
 check "non-typo3 type: root untouched by the project-root handover" \
     sh -c "printf 'type: php\n' > \"\$2/.ddev/config.yaml\" && chmod 2770 \"\$2\" && . \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2770" _ "$HANDOVER" "$HWORK/proj"
 
