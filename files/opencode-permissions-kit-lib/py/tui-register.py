@@ -26,7 +26,9 @@ Exit 0 on success or no-op, 1 on usage/IO/parse errors (to stderr).
 import importlib.util
 import json
 import os
+import stat
 import sys
+import tempfile
 
 # Never drop __pycache__ beside the kit's scripts when importing the
 # parser (happened on first use; the files tree must stay clean).
@@ -127,12 +129,40 @@ def main(argv):
     try:
         # Atomic rewrite (0.0.39e C16): writing in place truncates first —
         # a crash mid-write would corrupt user state this tool promises to
-        # preserve. Same shape as the kit's shell cp-from-temp pattern.
-        tmp = path + ".opk.tmp"
-        with open(tmp, "w") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-        os.replace(tmp, path)
+        # preserve. mkstemp (O_EXCL, random name), NOT a fixed suffix: this
+        # runs as ROOT against the agent-owned ~/.config/opencode — a
+        # predictable temp name is a planted-symlink primitive (wave-f
+        # review). Owner and mode of an EXISTING file are restored so the
+        # replace stays invisible to the agent user; a first-run creation
+        # gets 0644 (what the old in-place open produced under the root
+        # umask).
+        try:
+            _st = os.stat(path)
+        except FileNotFoundError:
+            _st = None
+        fd, tmp = tempfile.mkstemp(
+            dir=os.path.dirname(path) or ".",
+            prefix=os.path.basename(path) + ".opk.",
+        )
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f, indent=2)
+                f.write("\n")
+            if _st is not None:
+                os.chmod(tmp, stat.S_IMODE(_st.st_mode))
+                try:
+                    os.chown(tmp, _st.st_uid, _st.st_gid)
+                except OSError:
+                    pass  # unprivileged caller keeping its own ownership
+            else:
+                os.chmod(tmp, 0o644)
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
     except OSError as e:
         print(f"tui-register: cannot write {path}: {e}", file=sys.stderr)
         return 1

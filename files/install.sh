@@ -42,6 +42,9 @@ set -eu
 # and the user is told where it is. Fetch tree + sudoers render temp are
 # pure scratch and must not leak as root-owned 0700 leftovers.
 _FETCH_TREE=""
+# Result dir of a streamed fetch_kit run (set by fetch_kit, read by the
+# caller — see the STREAMED block below).
+_FK_DIR=""
 # Registry for short-lived scratch files created inside functions
 # (fetch temps, wsl-browser-bridge rewrites) — the trap empties it on
 # every exit path (review 0.0.39e C3).
@@ -156,14 +159,22 @@ fetch_kit() {
         chmod 644 "$_fk_tmp"
         mv "$_fk_tmp" "$_fk_dst"
     done
-    echo "$dir"
+    # Global, NOT stdout: the caller must not run this function inside a
+    # command substitution — a subshell's variable writes (incl. the
+    # _FETCH_TREE registration for the cleanup trap) never reach the
+    # parent, silently voiding the trap (wave-f review).
+    _FK_DIR="$dir"
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 STREAMED=false
 if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     echo "Not a local checkout — fetching kit files from $KIT_BASE_URL ..."
-    SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    # Direct call, NOT SCRIPT_DIR="$(fetch_kit)": command substitution runs
+    # in a subshell, where _FETCH_TREE/_TMP_REGISTRY registrations would be
+    # lost and the cleanup trap silently void (wave-f review).
+    fetch_kit || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    SCRIPT_DIR="$_FK_DIR"
     STREAMED=true
 fi
 # A streamed install's stdin IS the script body (curl | sudo bash): the
@@ -1119,9 +1130,17 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
             sudo rm -f "$caroot/rootCA.pem" "$caroot/rootCA-key.pem"
             log "mkcert CA reuse FAILED (source: $src_label) — partial copy removed"
             # The elif below no longer applies once this branch ran — do
-            # the new-CA fallback here.
+            # the new-CA fallback here, and VERIFY it: a failed chown -R
+            # above may have left $caroot root-owned (mkcert -install as
+            # the agent would then fail), and "falling back" must not
+            # silently end without any CA (wave-f review).
+            sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" 2>/dev/null || true
             if command -v mkcert >/dev/null 2>&1; then
                 sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
+            fi
+            if [ ! -f "$caroot/rootCA.pem" ]; then
+                ui_warn "no mkcert CA exists at $caroot after the fallback — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
+                log "mkcert CA fallback produced no CA at $caroot"
             fi
         fi
     elif command -v mkcert >/dev/null 2>&1; then

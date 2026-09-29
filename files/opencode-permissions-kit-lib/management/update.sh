@@ -41,6 +41,10 @@ set -eu
 # user). _FETCH_TREE survives the self re-exec below via the environment,
 # so the re-exec'd copy cleans the tree its parent fetched.
 _FETCH_TREE="${_FETCH_TREE:-}"
+# Result dir of a fetched tree — set by fetch_kit, read by the caller
+# below (never stdout: the export + trap registration must happen in THIS
+# shell, and a command substitution would void both; wave-f review).
+_FK_DIR="${_FK_DIR:-}"
 _BIN_TMP=""
 _CONF_TMP=""
 # Registry for short-lived scratch files created inside functions
@@ -181,6 +185,7 @@ fetch_kit() {
             _fk_url="$KIT_BASE_URL/files/$f"
         fi
         _fk_tmp=$(mktemp)
+        _tmp_track "$_fk_tmp"
         if ! curl -fsSL "$_fk_url" -o "$_fk_tmp" || [ ! -s "$_fk_tmp" ]; then
             rm -f "$_fk_tmp"
             echo "error: could not fetch $f from $_fk_url (failed or empty) — aborting" >&2
@@ -189,7 +194,9 @@ fetch_kit() {
         chmod 644 "$_fk_tmp"
         mv "$_fk_tmp" "$_fk_dst"
     done
-    echo "$dir"
+    # Global, NOT stdout — see install.sh's copy (subshell registrations
+    # would void the cleanup trap; wave-f review).
+    _FK_DIR="$dir"
 }
 
 # Re-fetch any single kit file that is missing under $FILES_ROOT (best-effort).
@@ -231,7 +238,11 @@ for _opk_a in "$@"; do
 done
 if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
-    SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    # Direct call, NOT SCRIPT_DIR="$(fetch_kit)" — a subshell's variable
+    # writes (incl. the _FETCH_TREE export below and the trap
+    # registrations) never reach this shell (wave-f review).
+    fetch_kit || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    SCRIPT_DIR="$_FK_DIR"
     # Do NOT continue executing this (installed, possibly older) copy: the
     # deploy below overwrites $LIBDIR/management/update.sh with the freshly fetched one,
     # which would replace the very file we are still running from. bash reads

@@ -248,6 +248,19 @@ if grep -q '\[ ! -s "\$_fk_tmp" \]' "$UPDATE" && grep -q '_fk_url="\$KIT_BASE_UR
 else
     fail "update.sh fetch_kit carries the same empty-body guard"
 fi
+# Direct call, never a command substitution: a subshell's _FETCH_TREE /
+# registry writes never reach the parent and void the cleanup trap
+# (wave-f review). Anchored — the comments reference the old form, the
+# assignment must not exist.
+if ! grep -q '^    SCRIPT_DIR="$(fetch_kit)"' "$INSTALL" \
+   && ! grep -q '^    SCRIPT_DIR="$(fetch_kit)"' "$UPDATE" \
+   && grep -q '_FK_DIR="\$dir"' "$INSTALL" && grep -q '_FK_DIR="\$dir"' "$UPDATE"; then
+    pass "fetch_kit result leaves the shell via _FK_DIR, not a subshell echo"
+else
+    fail "fetch_kit result leaves the shell via _FK_DIR, not a subshell echo"
+fi
+# the test's own fetch run registered the tree — remove it
+rm -rf "${_FETCH_TREE:-}" 2>/dev/null || true
 rm -rf "$FKWORK"
 # remove the fetched VERSION artifact fetch_kit may have written to CWD
 # (it returns a tree path; nothing lands outside $FKWORK on failure)
