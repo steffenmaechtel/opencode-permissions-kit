@@ -308,12 +308,23 @@ projects_remove() {
             ui_detail "skip $p"
             continue
         fi
-        # { grep -v || true } (0.0.39g C3): GNU grep -v exits 1 when the
-        # result is EMPTY — removing the LAST registered project would
-        # fail the pipeline and abort mid-loop (stale .tmp, no ui_success)
-        # under any pipefail-enabled shell. Same guard class as update.sh's
-        # install.conf rewrite.
-        { sudo grep -vxF "$p" "$PROJECTS_CONF" || true; } | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
+        # grep -v rc 1 (empty result — removing the LAST registered
+        # project, 0.0.39g C3) is benign; rc 2 is a REAL read error and
+        # must die BEFORE the .tmp is mv'd over projects.conf: the old
+        # `{ grep -v || true; } | tee` guard masked it into an empty
+        # rewrite that clobbered the file (review 0.0.39h F4). The rc is
+        # captured OUTSIDE the write pipeline — dash has no pipefail, an
+        # `|| rc=$?` on the pipeline would only ever see tee's 0. The
+        # .tmp is registered in the scratch registry.
+        _pr_rc=0
+        _pr_out=$(sudo grep -vxF "$p" "$PROJECTS_CONF" 2>/dev/null) || _pr_rc=$?
+        [ "$_pr_rc" -le 1 ] || die "cannot rewrite $PROJECTS_CONF (grep rc $_pr_rc) — '$p' NOT removed"
+        _tmp_track "$PROJECTS_CONF.tmp"
+        if [ -n "$_pr_out" ]; then
+            printf '%s\n' "$_pr_out" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
+        else
+            sudo tee "$PROJECTS_CONF.tmp" > /dev/null < /dev/null
+        fi
         sudo mv "$PROJECTS_CONF.tmp" "$PROJECTS_CONF"
         ui_success "removed $p"
         log "project removed: $p"
@@ -382,13 +393,24 @@ git_config_apply() {
         staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$target" "$backup"
     fi
 
-    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$template" "$target"
+    # 0.0.39h F8: render the FINAL content (template + the SECURE_GIT
+    # edit) on a scratch copy and deploy with ONE staged_write — the old
+    # sudo sed -i follow-up was a SECOND privileged write on the
+    # agent-owned destination; a link swapped between the two would
+    # disclose a root-readable file into the agent config.
+    _gca_tmp=$(mktemp)
+    _tmp_track "$_gca_tmp"
+    if [ "$enable" = "on" ]; then
+        sed 's|//SECURE_GIT: ||' "$template" > "$_gca_tmp"
+    else
+        sed '/\/\/SECURE_GIT:/d' "$template" > "$_gca_tmp"
+    fi
+    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_gca_tmp" "$target"
+    rm -f "$_gca_tmp"
 
     if [ "$enable" = "on" ]; then
-        sudo sed -i 's|//SECURE_GIT: ||' "$target"
         ui_kv "git-config" "ON  ($target, soft-only)" "$UI_GREEN"
     else
-        sudo sed -i '/\/\/SECURE_GIT:/d' "$target"
         ui_kv "git-config" "OFF  ($target)"
     fi
     log "git-config hardening set to $enable ($target)"
@@ -481,23 +503,28 @@ render_sudoers() {
 # Update install.conf: rewrite the backend keys while preserving everything else.
 update_install_conf_backend() {
     local backend="$1" docker_host="$2" podman_socket="$3"
-    local tmp
-    tmp=$(mktemp)
-    _tmp_track "$tmp"
+    # rc-narrowed guard (review 0.0.39h F4 — the old `|| true` masked a
+    # real read error into a conf keeping only the re-stamped keys) +
+    # atomic deploy (0.0.39h F6): render the sibling temp BESIDE the
+    # target and mv it in — a truncate-in-place `sudo cp` leaves a
+    # partial install.conf on a mid-write crash. rc captured outside the
+    # pipeline (dash has no pipefail).
+    _ucb_rc=0
+    _ucb_keep=$(grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null) || _ucb_rc=$?
+    [ "$_ucb_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ucb_rc) — backend not switched"
+    _ucb_tmp="$INSTALL_CONF.opk-new"
+    _tmp_track "$_ucb_tmp"
     {
-        if [ -f "$INSTALL_CONF" ]; then
-            grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null || true
-        fi
+        if [ -n "$_ucb_keep" ]; then printf '%s\n' "$_ucb_keep"; fi
         echo "CONTAINER_BACKEND=$backend"
         # if (not [ ] &&): a false short-circuit inside the braced group
         # would fail the group's pipeline under set -e/pipefail and kill
         # the script mid-rewrite (docker_host is empty on podman backends)
         if [ -n "$docker_host" ]; then echo "OPENCODE_DOCKER_HOST=$docker_host"; fi
         if [ -n "$podman_socket" ]; then echo "OPENCODE_PODMAN_SOCKET=$podman_socket"; fi
-    } | sort -u > "$tmp"
-    sudo cp "$tmp" "$INSTALL_CONF"
-    sudo chmod 644 "$INSTALL_CONF"
-    rm -f "$tmp"
+    } | sort -u | sudo tee "$_ucb_tmp" > /dev/null
+    sudo chmod 644 "$_ucb_tmp"
+    sudo mv -f "$_ucb_tmp" "$INSTALL_CONF"
 }
 
 container_backend_apply() {
@@ -635,18 +662,19 @@ ddev_settings_status() {
 
 update_install_conf_ddev_owned() {
     local value="$1"
-    local tmp
-    tmp=$(mktemp)
-    _tmp_track "$tmp"
+    # Same rc-narrowed + atomic shape as update_install_conf_backend
+    # (review 0.0.39h F4/F6).
+    _udd_rc=0
+    _udd_keep=$(grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null) || _udd_rc=$?
+    [ "$_udd_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_udd_rc) — ddev-settings not changed"
+    _udd_tmp="$INSTALL_CONF.opk-new"
+    _tmp_track "$_udd_tmp"
     {
-        if [ -f "$INSTALL_CONF" ]; then
-            grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null || true
-        fi
+        if [ -n "$_udd_keep" ]; then printf '%s\n' "$_udd_keep"; fi
         echo "DDEV_DEV_OWNED=$value"
-    } | sort -u > "$tmp"
-    sudo cp "$tmp" "$INSTALL_CONF"
-    sudo chmod 644 "$INSTALL_CONF"
-    rm -f "$tmp"
+    } | sort -u | sudo tee "$_udd_tmp" > /dev/null
+    sudo chmod 644 "$_udd_tmp"
+    sudo mv -f "$_udd_tmp" "$INSTALL_CONF"
 }
 
 ddev_settings_apply() {

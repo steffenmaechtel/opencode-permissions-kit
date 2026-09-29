@@ -81,7 +81,9 @@ Plain `chown -R` would need both.
 System roots and their subpaths (`/etc`, `/etc/apache2`, `/usr/local/...`)
 and whole home directories are refused — hand over project trees, not
 systems. `/tmp` subpaths are allowed (temp build trees are legitimate
-handover targets).
+handover targets). Symlinked paths are refused too: `chown -R`/`chmod -R`
+follow a symlink operand, and the kit never hands a tree over through a
+link.
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides

@@ -1836,27 +1836,40 @@ fi
 # ~/.config/opencode, agent-replaceable after any completed install)
 # passes `sudo mkdir -p` silently and would redirect the mv below into
 # the link target. Skip loudly (user-managed).
+#
+# 0.0.39h F8: the FINAL content is rendered OFFLINE (template + the
+# SECURE_GIT edit on a scratch copy) and deployed with ONE staged_write —
+# the old sudo sed -i follow-up was a SECOND privileged write on the
+# agent-owned destination; a link swapped in the window between the two
+# would disclose a root-readable file into the agent config.
+_oc_install_agent_config() {
+    _oic_tmp=$(mktemp) || return 1
+    _tmp_track "$_oic_tmp"
+    if [ "$SECURE_GIT_CONFIG" = true ]; then
+        sed 's|//SECURE_GIT: ||' "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" > "$_oic_tmp"
+    else
+        sed '/\/\/SECURE_GIT:/d' "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" > "$_oic_tmp"
+    fi
+    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_oic_tmp" /home/opencode/.config/opencode/opencode.jsonc
+    rm -f "$_oic_tmp"
+}
 if ! agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
     echo "  ${UI_YELLOW}WARNING: the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed (user-managed; the kit never follows links in the agent home).${UI_NC}"
     log "agent config skipped: symlink in the parent chain of /home/opencode/.config/opencode"
 elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
-    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
+    _oc_install_agent_config
     if [ "$SECURE_GIT_CONFIG" = true ]; then
-        sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
         echo "Default config installed (opencode.jsonc) — .git/config blocked (soft)."
     else
-        sudo sed -i '/\/\/SECURE_GIT:/d' /home/opencode/.config/opencode/opencode.jsonc
         echo "Default config installed (opencode.jsonc)."
     fi
     log "opencode config installed: /home/opencode/.config/opencode/opencode.jsonc (secure_git=$SECURE_GIT_CONFIG)"
 elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
     sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
-    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
+    _oc_install_agent_config
     if [ "$SECURE_GIT_CONFIG" = true ]; then
-        sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
         echo "Default config installed (opencode.jsonc) — .git/config blocked (soft). Backup saved."
     else
-        sudo sed -i '/\/\/SECURE_GIT:/d' /home/opencode/.config/opencode/opencode.jsonc
         echo "Default config installed (opencode.jsonc — backup saved)."
     fi
     log "opencode config replaced (backup: $BACKUP_DIR/opencode.jsonc-existing)"
@@ -1869,12 +1882,10 @@ else
     # the chosen SECURE_GIT state — same semantics as `config.sh git-config
     # on|off` — with a backup of the previous file.
     sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
-    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" /home/opencode/.config/opencode/opencode.jsonc
+    _oc_install_agent_config
     if [ "$SECURE_GIT_CONFIG" = true ]; then
-        sudo sed -i 's|//SECURE_GIT: ||' /home/opencode/.config/opencode/opencode.jsonc
         ui_success "agent config re-applied — .git/config blocked (soft, backup saved)"
     else
-        sudo sed -i '/\/\/SECURE_GIT:/d' /home/opencode/.config/opencode/opencode.jsonc
         ui_success "agent config re-applied — git allowed (backup saved)"
     fi
     log "opencode config re-rendered with the chosen git setting (secure_git=$SECURE_GIT_CONFIG, backup: $BACKUP_DIR/opencode.jsonc-existing)"

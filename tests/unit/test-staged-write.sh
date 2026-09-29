@@ -191,30 +191,112 @@ printf 'type: typo3\n' > "$WORK/flagproj2/.ddev/config.yaml"
 PATH="$STUB:$PATH" sh -c '. "$1" && ddev_devowned_flag "$2"' _ "$HANDOVER" "$WORK/flagproj2" >/dev/null 2>&1
 check "dev-owned flag: real config.yaml gets the flag" \
     grep -q 'disable_settings_management: true' "$WORK/flagproj2/.ddev/config.yaml"
+# 0.0.39h F13: the exec-time recheck skip is ANNOUNCED (stderr note), not
+# silent like a plain failure.
+check "dev-owned flag: exec-time recheck skip is announced" \
+    grep -q 'changed to a symlink mid-write' "$HANDOVER"
 
-# --- 3. projects_remove pipeline (C3) --------------------------------------------
-# GNU grep -v exits 1 when the result is EMPTY: removing the last project
-# must not abort the rewrite. The guard shape is config.sh's exact
-# pipeline (minus sudo), run under bash pipefail — dash has no pipefail,
-# which is precisely the nothing-documents-it reliance C3 flags.
+# --- 2c/2d. ddev_handover_root scan loop (0.0.39h F9 — S2's core had no
+# behavioral coverage): the .ddev tree reaches chown -R AND chmod -R, and
+# the exec-time [ -L ] recheck BETWEEN them closes the swapped-symlink
+# window. The racing chown stub swaps the real .ddev for a symlink WHEN
+# chown runs — the race, deterministically.
+mkdir -p "$WORK/hr/proj/.ddev" "$WORK/hr/proj/web/typo3conf" "$WORK/hr-victim" "$WORK/stubhr"
+printf 'type: typo3\ndocroot: web\n' > "$WORK/hr/proj/.ddev/config.yaml"
+printf '#!/bin/sh\necho "chown $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr/chown"
+printf '#!/bin/sh\necho "chmod $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr/chmod"
+chmod +x "$WORK/stubhr/chown" "$WORK/stubhr/chmod"
+OPS_HR_LOG="$WORK/ops-hr.log"; export OPS_HR_LOG
+OUT_HR="$(PATH="$WORK/stubhr:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/hr")"
+check "handover_root: .ddev reaches chown -R" \
+    grep -qxF "chown -R ocuser:ocgroup $WORK/hr/proj/.ddev" "$OPS_HR_LOG"
+check "handover_root: .ddev reaches chmod -R" \
+    grep -qxF "chmod -R g+w $WORK/hr/proj/.ddev" "$OPS_HR_LOG"
+check "handover_root: scan-loop settings handover runs (web/typo3conf)" \
+    grep -qxF "chown -R ocuser:ocgroup $WORK/hr/proj/web/typo3conf" "$OPS_HR_LOG"
+check "handover_root: handover echoed" \
+    echo "$OUT_HR" | grep -qF ".ddev handover: $WORK/hr/proj/.ddev -> ocuser"
+# racing variant: the stub swaps .ddev for a symlink at chown time
+mkdir -p "$WORK/hr2/proj/.ddev" "$WORK/hr2/proj/web/typo3conf" "$WORK/hr2-victim" "$WORK/stubhr2"
+printf 'type: typo3\ndocroot: web\n' > "$WORK/hr2/proj/.ddev/config.yaml"
+printf '#!/bin/sh\ncase " $* " in *" $RACE_D "*) rm -rf "$RACE_D"; ln -s "$RACE_V" "$RACE_D";; esac\necho "chown $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr2/chown"
+printf '#!/bin/sh\necho "chmod $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr2/chmod"
+chmod +x "$WORK/stubhr2/chown" "$WORK/stubhr2/chmod"
+RACE_D="$WORK/hr2/proj/.ddev"; RACE_V="$WORK/hr2-victim"; export RACE_D RACE_V
+OUT_HR2="$(PATH="$WORK/stubhr2:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/hr2")"
+check "handover_root recheck: swapped .ddev still hit chown -R (the stub ran first)" \
+    grep -qxF "chown -R ocuser:ocgroup $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"
+if grep -qxF "chmod -R g+w $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"; then
+    fail "handover_root recheck: swapped-symlink .ddev never reaches chmod -R"
+else
+    pass "handover_root recheck: swapped-symlink .ddev never reaches chmod -R"
+fi
+if echo "$OUT_HR2" | grep -qF ".ddev handover: $WORK/hr2/proj/.ddev"; then
+    fail "handover_root recheck: swapped .ddev produces no handover echo"
+else
+    pass "handover_root recheck: swapped .ddev produces no handover echo"
+fi
+
+# --- 2e. ddev_handover_project_back (0.0.39h F9): planted settings-dir
+# links never reach the recursive ops; the root-inode handback fires only
+# for a kit-owned root (stubbed stat).
+mkdir -p "$WORK/bk/proj/.ddev" "$WORK/bk/proj/web/typo3conf" "$WORK/bk/proj/config/system" "$WORK/bk-victim/typo3conf" "$WORK/stubbk"
+printf 'type: typo3\ndocroot: web\n' > "$WORK/bk/proj/.ddev/config.yaml"
+ln -s "$WORK/bk-victim/typo3conf" "$WORK/bk/proj/typo3conf"
+printf '#!/bin/sh\necho "chown $*" >> "$OPS_BK_LOG"\n' > "$WORK/stubbk/chown"
+printf '#!/bin/sh\necho "chmod $*" >> "$OPS_BK_LOG"\n' > "$WORK/stubbk/chmod"
+printf '#!/bin/sh\nprintf "%%s\\n" "$STAT_OWNER"\n' > "$WORK/stubbk/stat"
+chmod +x "$WORK/stubbk/chown" "$WORK/stubbk/chmod" "$WORK/stubbk/stat"
+OPS_BK_LOG="$WORK/ops-bk.log"; export OPS_BK_LOG
+STAT_OWNER=ocuser; export STAT_OWNER
+PATH="$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_project_back "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/bk/proj" >/dev/null 2>&1
+check "project_back: real settings dirs reach chown -R (dev handback)" \
+    sh -c 'grep -qxF "chown -R devuser:ocgroup '"$WORK"'/bk/proj/web/typo3conf" "$1" && grep -qxF "chown -R devuser:ocgroup '"$WORK"'/bk/proj/config/system" "$1"' _ "$OPS_BK_LOG"
+if grep -q " $WORK/bk/proj/typo3conf" "$OPS_BK_LOG"; then
+    fail "project_back: planted settings-dir symlink never reaches chown -R/chmod -R"
+else
+    pass "project_back: planted settings-dir symlink never reaches chown -R/chmod -R"
+fi
+check "project_back: kit-owned root (stat=ocuser) is handed back" \
+    sh -c 'grep -qxF "chown devuser:ocgroup '"$WORK"'/bk/proj" "$1" && grep -qxF "chmod 2775 '"$WORK"'/bk/proj" "$1"' _ "$OPS_BK_LOG"
+: > "$OPS_BK_LOG"
+STAT_OWNER=devuser
+PATH="$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_project_back "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/bk/proj" >/dev/null 2>&1
+if grep -qxF "chown devuser:ocgroup $WORK/bk/proj" "$OPS_BK_LOG"; then
+    fail "project_back: developer-owned root (stat=devuser) is NOT touched"
+else
+    pass "project_back: developer-owned root (stat=devuser) is NOT touched"
+fi
+
+# --- 3. projects_remove rewrite (C3 / 0.0.39h F4) ---------------------------------
+# GNU grep -v exits 1 when the result is EMPTY (removing the last project
+# — benign) and 2 on a real read error. config.sh's shape captures the rc
+# OUTSIDE the write pipeline (dash has no pipefail — an `|| rc=$?` on a
+# pipeline would only ever see tee's 0) and dies on rc >= 2 BEFORE the
+# .tmp is mv'd over projects.conf: the old `{ grep -v || true; } | tee`
+# guard masked rc 2 into an empty rewrite that clobbered the file.
 
 PCONF="$WORK/projects.conf"
 printf '/var/www/only-project\n' > "$PCONF"
-if bash -c 'set -o pipefail; { grep -vxF "$1" "$2" || true; } | cat > "$3"' _ "/var/www/only-project" "$PCONF" "$WORK/projects.out"; then
-    pass "C3 pipeline: last-project removal exits 0 under pipefail"
+if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]' _ "/var/www/only-project" "$PCONF"; then
+    pass "C3/F4: last-project removal (rc 1) stays benign"
 else
-    fail "C3 pipeline: last-project removal exits 0 under pipefail"
+    fail "C3/F4: last-project removal (rc 1) stays benign"
 fi
-assert_eq "C3 pipeline: empty result, no stale copy" "" "$(cat "$WORK/projects.out" 2>/dev/null)"
-# control: WITHOUT the guard the same pipeline fails under pipefail (the
-# test must be able to detect the class it guards against)
-if bash -c 'set -o pipefail; grep -vxF "$1" "$2" | cat > /dev/null' _ "/var/www/only-project" "$PCONF" 2>/dev/null; then
-    fail "C3 control: unguarded pipeline fails under pipefail"
+assert_eq "C3/F4: empty result, no stale copy" "" "$(grep -vxF "/var/www/only-project" "$PCONF" 2>/dev/null)"
+# control: a real read error (grep on a directory) yields rc 2 — the
+# narrowed guard must refuse (the old || true masked this class)
+if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]' _ "x" "$WORK" 2>/dev/null; then
+    fail "C3/F4 control: grep rc 2 (read error) refuses the rewrite"
 else
-    pass "C3 control: unguarded pipeline fails under pipefail"
+    pass "C3/F4 control: grep rc 2 (read error) refuses the rewrite"
 fi
-check "C3: config.sh carries the guarded pipeline" \
-    grep -qF '{ sudo grep -vxF "$p" "$PROJECTS_CONF" || true; }' "$CONFIG"
+check "C3/F4: config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + registers the .tmp" \
+    sh -c 'grep -qF "_pr_out=\$(sudo grep -vxF \"\$p\" \"\$PROJECTS_CONF\" 2>/dev/null) || _pr_rc=\$?" "$1" && grep -qF "[ \"\$_pr_rc\" -le 1 ] || die" "$1" && grep -qF "_tmp_track \"\$PROJECTS_CONF.tmp\"" "$1"' _ "$CONFIG"
+check "F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)" \
+    sh -c 'grep -qF "_ic_keep=\$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"' -e '"'"'^DDEV_VERSION='"'"' \"\$INSTALL_CONF\" 2>/dev/null) || _ic_rc=\$?" "$1" && grep -qF "_tmp_track \"\$_INSTALL_CONF_TMP\"" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\" \"\$CONFDIR/install.conf\"" "$1"' _ "$UPDATE"
+check "F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)" \
+    sh -c 'grep -qF "_ucb_keep=\$(grep -v" "$1" && grep -qF "mv -f \"\$_ucb_tmp\" \"\$INSTALL_CONF\"" "$1" && grep -qF "mv -f \"\$_udd_tmp\" \"\$INSTALL_CONF\"" "$1"' _ "$CONFIG"
 
 # --- 4. ensure_local_file (C4) ----------------------------------------------------
 # Extracted from update.sh (the CLI runs its main on source), with a
@@ -277,8 +359,16 @@ check "wiring: config.sh sources staged-write.sh" \
     grep -qF 'for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"' "$CONFIG"
 check "wiring: update.sh tui.json write goes through staged_write" \
     grep -qF 'staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json"' "$UPDATE"
-check "wiring: install.sh config writes go through staged_write" \
-    sh -c 'grep -c "staged_write 664" "$1" | grep -q "^[3-9]$" ' _ "$INSTALL"
+check "wiring: install.sh config writes go through staged_write (F8: offline-rendered, ONE write per branch)" \
+    sh -c 'grep -c "_oc_install_agent_config" "$1" | grep -q "^[4-9]$" && ! grep -q "sed -i .*opencode\.jsonc" "$1"' _ "$INSTALL"
+check "wiring: config.sh git_config_apply renders offline, ONE staged_write (F8)" \
+    sh -c 'grep -qF "_gca_tmp" "$1" && grep -c "staged_write 664" "$1" | grep -q "^2$" && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG"
+OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
+WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
+check "F10: opk handover refuses symlinked operands + rechecks between the ops" \
+    sh -c 'grep -qF "[ -L \"\$_ho_a\" ]" "$1" && grep -qF "[ ! -L \"\$_ho_a\" ]" "$1"' _ "$OPK"
+check "F12: wrapper YELLOW is 0;33 (no 1;33 left repo-wide)" \
+    sh -c '! grep -q "1;33" "$1"' _ "$WRAPPER"
 
 # --- 6. agent_home_sane (0.0.39h F1/F2) ---------------------------------------------
 # The walker asserts every component of a path below the agent home

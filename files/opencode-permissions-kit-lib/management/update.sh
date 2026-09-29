@@ -46,7 +46,6 @@ _FETCH_TREE="${_FETCH_TREE:-}"
 # shell, and a command substitution would void both; wave-f review).
 _FK_DIR="${_FK_DIR:-}"
 _BIN_TMP=""
-_CONF_TMP=""
 # Registry for short-lived scratch files created inside functions
 # (ensure_local_file fetch temps, wsl-browser-bridge rewrites) — the
 # trap empties it on every exit path (review 0.0.39e C3).
@@ -56,7 +55,6 @@ cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
     if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
     if [ -n "${_BIN_TMP:-}" ]; then rm -rf "$_BIN_TMP"; fi
-    if [ -n "${_CONF_TMP:-}" ]; then rm -f "$_CONF_TMP"; fi
     # word splitting intended: registry entries are mktemp paths
     # shellcheck disable=SC2086
     if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
@@ -1067,27 +1065,33 @@ if [ -n "$_ddev_probe" ]; then
 fi
 
 # --- refresh install.conf (version stamp + group key) --------------------------
-
-NEW_INSTALL_CONF="$(mktemp)"
-_CONF_TMP="$NEW_INSTALL_CONF"
+# Atomic re-stamp (review 0.0.39h F6 — the C5 twin site: install.sh's stamp
+# got temp+mv in 0.0.39g, this rewrite still deployed via truncate-in-place
+# `sudo cp`): render the new content BESIDE the target, then mv it in — a
+# mid-write crash never leaves a partial install.conf. The sibling temp is
+# registered in the scratch registry. The grep guard is narrowed (0.0.39h
+# F4): rc 1 (empty result) stays benign, rc 2 (real read error) now dies
+# BEFORE any write — the old `|| true` masked it into a rewrite keeping
+# only the 4 re-stamped keys. The rc is captured OUTSIDE the write
+# pipeline: dash has no pipefail, `|| rc=$?` on the pipeline would only
+# ever see tee's 0.
+# Keys this update owns: VERSION (re-stamped), OPENCODE_GROUP (re-based to
+# the opencode usergroup), KIT_CHANNEL (re-stamped to the ref just updated
+# from), DDEV_VERSION (re-probed above — the fallback stays fresh).
+_INSTALL_CONF_TMP="$CONFDIR/install.conf.opk-new"
+_tmp_track "$_INSTALL_CONF_TMP"
+_ic_rc=0
+_ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null) || _ic_rc=$?
+[ "$_ic_rc" -le 1 ] || { echo "error: cannot read $INSTALL_CONF (grep rc $_ic_rc) — install.conf left untouched" >&2; exit 1; }
 {
-    if [ -f "$INSTALL_CONF" ]; then
-        # Strip keys this update owns: VERSION (re-stamped),
-        # OPENCODE_GROUP (re-based to the opencode usergroup),
-        # KIT_CHANNEL (re-stamped to the ref just updated from), and
-        # DDEV_VERSION (re-probed above — the fallback stays fresh).
-        # || true: grep -v exits 1 on an empty result, which pipefail
-        # would turn into an abort mid-rewrite.
-        grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null || true
-    fi
+    if [ -n "$_ic_keep" ]; then printf '%s\n' "$_ic_keep"; fi
     echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
     echo "KIT_CHANNEL=$KIT_BRANCH"
     echo "VERSION=$VERSION"
     echo "DDEV_VERSION=$NEW_DDEV_VERSION"
-} | sort -u > "$NEW_INSTALL_CONF"
-sudo cp "$NEW_INSTALL_CONF" "$CONFDIR/install.conf"
-sudo chmod 644 "$CONFDIR/install.conf"
-rm -f "$NEW_INSTALL_CONF"
+} | sort -u | sudo tee "$_INSTALL_CONF_TMP" > /dev/null
+sudo chmod 644 "$_INSTALL_CONF_TMP"
+sudo mv -f "$_INSTALL_CONF_TMP" "$CONFDIR/install.conf"
 ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
 log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
 

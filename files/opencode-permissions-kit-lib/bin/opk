@@ -308,7 +308,18 @@ case "$cmd" in
         ui_info "handing over to $_ho_user:$_ho_group (recursive, g+w) ..."
         for _ho_a in "$@"; do
             [ "$_ho_a" = "--dry-run" ] && continue
-            if chown -R "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null && chmod -R g+w "$_ho_a" 2>/dev/null; then
+            # [ -L ] refuse + exec-time recheck (review 0.0.39h F10, the
+            # deeec30 pattern): chown -R/chmod -R dereference a symlink
+            # OPERAND — a planted link at the handed-over path would hand
+            # the pointed tree to the target user.
+            if [ -L "$_ho_a" ]; then
+                ui_error "handover: '$_ho_a' is a symlink — refusing (chown -R/chmod -R follow it)"
+                _ho_rc=1
+                continue
+            fi
+            if chown -R "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null \
+               && [ ! -L "$_ho_a" ] \
+               && chmod -R g+w "$_ho_a" 2>/dev/null; then
                 echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
             else
                 ui_error "handover failed: $_ho_a"

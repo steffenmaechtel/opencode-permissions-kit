@@ -134,12 +134,19 @@ ddev_devowned_flag() {
                 print "disable_settings_management: true"
             }
         }
-    ' "$ddf_cfg" > "$ddf_tmp" && [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
-        cat "$ddf_tmp" > "$ddf_cfg"
-        if [ ! -L "$ddf_cfg" ]; then
-            chmod g+w "$ddf_cfg" 2>/dev/null || true
+    ' "$ddf_cfg" > "$ddf_tmp"; then
+        if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
+            cat "$ddf_tmp" > "$ddf_cfg"
+            if [ ! -L "$ddf_cfg" ]; then
+                chmod g+w "$ddf_cfg" 2>/dev/null || true
+            fi
+            echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
+        else
+            # 0.0.39h F13: the exec-time recheck tripped (the config or its
+            # temp turned into a symlink mid-write) — announce the skip like
+            # the entry gate above does, instead of ending silently.
+            printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write — dev-owned flag NOT written (links are never followed)" >&2
         fi
-        echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
     fi
     rm -f "$ddf_tmp"
     return 0

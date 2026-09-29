@@ -251,7 +251,10 @@ Notes:
 - **mkcert CA** — reused from the Windows user (WSL2: scanned from
   `/mnt/c/Users/*/AppData/Local/mkcert`) or the developer's CAROOT so
   browsers keep trusting ddev's HTTPS certs; a new CA is generated only as
-  a last resort. A fresh CA is created **as the `opencode` user** and is
+  a last resort. A symlink anywhere in the chain to the agent's CAROOT is
+  never followed — CA reuse/provisioning is skipped with a warning, so no
+  trusted CA exists in that case until you remove the link and re-run the
+  install. A fresh CA is created **as the `opencode` user** and is
   therefore NOT installed into the system or Windows trust stores — the
   install prints the import command (`sudo env CAROOT=… mkcert -install`)
   for you to run yourself. The copy includes the CA **private key** — ddev
