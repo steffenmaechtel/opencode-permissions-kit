@@ -120,6 +120,16 @@ if counted:
 # _fsb_pass <label> <root> <find-expr...> -- <cmd...>: one baseline pass
 # over the NUL stream. The find expression comes through verbatim, the
 # command after "--" receives the paths via xargs -0 (-r: no empty run).
+#
+# The consumer is a recheck loop, NOT a direct xargs exec (0.0.39e S1):
+# find classifies each entry at SCAN time, and the scanned trees are
+# group-writable by the semi-trusted agent — a file swapped for a symlink
+# in the scan->exec window would be dereferenced by chgrp/chmod/setfacl
+# on the operand, reaching outside the tree (the old chgrp -R never did:
+# its traversal skipped symlinks by default). Every path is re-tested
+# with [ -L ] immediately before its command runs; anything that is a
+# symlink NOW is skipped. The command words are kit-fixed and space-free
+# by construction (same contract as the find expression above).
 _fsb_pass() {
     _fsbp_label="$1"; _fsbp_root="$2"; shift 2
     _fsbp_expr=""
@@ -132,7 +142,18 @@ _fsb_pass() {
     # shellcheck disable=SC2086  # find expression built word-wise above
     _fsb_sudo find "$_fsbp_root" $_fsbp_expr -print0 2>/dev/null \
         | _fsb_count_tee "$_fsbp_label" \
-        | _fsb_sudo xargs -0 -r "$@"
+        | _fsb_sudo xargs -0 -r sh -c '
+            # $1 = arity of the fixed command, then the kit-fixed command
+            # words, then the batch of NUL-separated paths xargs appended.
+            _n=$1; shift
+            _c=""
+            while [ "$_n" -gt 0 ]; do _c="$_c $1"; shift; _n=$((_n - 1)); done
+            for _p in "$@"; do
+                [ -L "$_p" ] && continue
+                # shellcheck disable=SC2086  # kit-fixed, space-free words
+                $_c "$_p"
+            done
+          ' xargs-sh "$#" "$@"
     return 0
 }
 
