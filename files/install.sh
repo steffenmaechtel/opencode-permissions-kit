@@ -95,11 +95,26 @@ fetch_kit() {
              opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/advisories.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh opencode-permissions-kit-lib/bin/browser-bridge \
              opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/kit-mode-2x.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json; do
         echo "  fetching $f ..." >&2
+        # Fetch to a temp file and refuse anything unsound (0.0.39e C1):
+        # an empty-but-200 body (captive portal, broken mirror) previously
+        # landed in the deploy tree as root — same guard ensure_local_file
+        # already carries; an empty sourced lib degrades to a silent no-op
+        # stub via the fallback blocks.
         if [ "$f" = "VERSION" ]; then
-            curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
+            _fk_dst="$base/VERSION"
+            _fk_url="$KIT_BASE_URL/VERSION"
         else
-            curl -fsSL "$KIT_BASE_URL/files/$f" -o "$dir/$f" || return 1
+            _fk_dst="$dir/$f"
+            _fk_url="$KIT_BASE_URL/files/$f"
         fi
+        _fk_tmp=$(mktemp)
+        if ! curl -fsSL "$_fk_url" -o "$_fk_tmp" || [ ! -s "$_fk_tmp" ]; then
+            rm -f "$_fk_tmp"
+            echo "error: could not fetch $f from $_fk_url (failed or empty) — aborting" >&2
+            return 1
+        fi
+        chmod 644 "$_fk_tmp"
+        mv "$_fk_tmp" "$_fk_dst"
     done
     echo "$dir"
 }

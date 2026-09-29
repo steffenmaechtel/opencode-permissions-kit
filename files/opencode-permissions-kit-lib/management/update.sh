@@ -130,11 +130,24 @@ fetch_kit() {
     mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" "$dir/etc"
     for f in $KIT_FILES; do
         echo "  fetching $f ..." >&2
+        # Fetch to a temp file and refuse anything unsound (0.0.39e C1):
+        # an empty-but-200 body landed in the deploy tree as root before —
+        # the same guard ensure_local_file already carries.
         if [ "$f" = "VERSION" ]; then
-            curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
+            _fk_dst="$base/VERSION"
+            _fk_url="$KIT_BASE_URL/VERSION"
         else
-            curl -fsSL "$KIT_BASE_URL/files/$f" -o "$dir/$f" || return 1
+            _fk_dst="$dir/$f"
+            _fk_url="$KIT_BASE_URL/files/$f"
         fi
+        _fk_tmp=$(mktemp)
+        if ! curl -fsSL "$_fk_url" -o "$_fk_tmp" || [ ! -s "$_fk_tmp" ]; then
+            rm -f "$_fk_tmp"
+            echo "error: could not fetch $f from $_fk_url (failed or empty) — aborting" >&2
+            return 1
+        fi
+        chmod 644 "$_fk_tmp"
+        mv "$_fk_tmp" "$_fk_dst"
     done
     echo "$dir"
 }

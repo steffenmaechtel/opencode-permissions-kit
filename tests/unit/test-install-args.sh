@@ -213,6 +213,42 @@ else
     fail "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
 fi
 
+# --- scratch cleanup: fetch refuses empty bodies (review 0.0.39e C1) --------------
+# Fake curl: every file gets content EXCEPT etc/umask.sh, which answers
+# HTTP-200-style success with an EMPTY body (captive portal / broken
+# mirror). fetch_kit must abort instead of deploying the empty file.
+FKWORK=$(mktemp -d)
+mkdir -p "$FKWORK/bin"
+cat > "$FKWORK/bin/curl" <<'FAKE'
+#!/bin/sh
+# args: -fsSL <url> -o <tmpfile>
+last=
+for a in "$@"; do last="$a"; done
+case "$2" in
+    */files/etc/umask.sh) : > "$last"; exit 0 ;;   # empty-but-200
+    *) printf 'content\n' > "$last"; exit 0 ;;
+esac
+FAKE
+chmod +x "$FKWORK/bin/curl"
+eval "$(sed -n '/^fetch_kit() {/,/^}/p' "$INSTALL")"
+FKOUT=""
+FKRC=0
+FKOUT=$(PATH="$FKWORK/bin:$PATH" KIT_BASE_URL="https://example.test" fetch_kit 2>&1) || FKRC=$?
+if [ "$FKRC" -ne 0 ] && printf '%s' "$FKOUT" | grep -q "empty"; then
+    pass "fetch_kit aborts on an empty (200) body instead of deploying it"
+else
+    fail "fetch_kit aborts on an empty (200) body (rc=$FKRC out=$FKOUT)"
+fi
+UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+if grep -q '\[ ! -s "\$_fk_tmp" \]' "$UPDATE" && grep -q '_fk_url="\$KIT_BASE_URL/VERSION"' "$UPDATE"; then
+    pass "update.sh fetch_kit carries the same empty-body guard (twin in sync)"
+else
+    fail "update.sh fetch_kit carries the same empty-body guard"
+fi
+rm -rf "$FKWORK"
+# remove the fetched VERSION artifact fetch_kit may have written to CWD
+# (it returns a tree path; nothing lands outside $FKWORK on failure)
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
