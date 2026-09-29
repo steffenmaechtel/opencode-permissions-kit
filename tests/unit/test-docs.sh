@@ -5,7 +5,7 @@
 # and AGENTS.md, contains a broken relative link or a dangling in-page
 # anchor. HTTP(S)/mailto links are skipped (no network access).
 #
-# Run: sh tests/test-docs.sh
+# Run: sh tests/unit/test-docs.sh
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1

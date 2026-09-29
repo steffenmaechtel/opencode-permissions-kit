@@ -5,7 +5,7 @@
 # developer gets a ready-made command that uses ddev's own elevation path
 # (`ddev hostname <name> 127.0.0.1` as the dev user -> ddev-hostname.exe
 # -> Windows UAC dialog).
-# Run: sh tests/test-ddev-hosts.sh
+# Run: sh tests/unit/test-ddev-hosts.sh
 set -e
 
 RED='\033[0;31m'

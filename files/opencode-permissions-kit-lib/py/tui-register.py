@@ -125,9 +125,14 @@ def main(argv):
     else:
         data.pop("plugins", None)
     try:
-        with open(path, "w") as f:
+        # Atomic rewrite (0.0.39e C16): writing in place truncates first —
+        # a crash mid-write would corrupt user state this tool promises to
+        # preserve. Same shape as the kit's shell cp-from-temp pattern.
+        tmp = path + ".opk.tmp"
+        with open(tmp, "w") as f:
             json.dump(data, f, indent=2)
             f.write("\n")
+        os.replace(tmp, path)
     except OSError as e:
         print(f"tui-register: cannot write {path}: {e}", file=sys.stderr)
         return 1

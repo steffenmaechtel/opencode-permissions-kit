@@ -2,7 +2,7 @@
 # Unit tests for the shared UI helpers (files/opencode-permissions-kit-lib/sh/ui.sh).
 # Covers: syntax, NO_COLOR / non-tty color suppression, UI_ASCII fallback,
 # symbol defaults, output formats, alignment, and the ui_ask/ui_menu defaults.
-# No root required. Run: sh tests/test-ui.sh
+# No root required. Run: sh tests/unit/test-ui.sh
 set -u
 
 RED='\033[0;31m'

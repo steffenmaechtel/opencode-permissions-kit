@@ -9,7 +9,7 @@
 #
 # Static extraction where possible; behavioural checks run the script
 # with --dry-run against a fake sudo that only logs.
-# Run: sh tests/test-uninstall.sh
+# Run: sh tests/unit/test-uninstall.sh
 set -e
 
 RED='\033[0;31m'

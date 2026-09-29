@@ -10,7 +10,7 @@
 #      update.sh must be in the list — otherwise the streamed install
 #      aborts mid-deploy (set -e) because the temp fetch never pulled it.
 #
-# Run: sh tests/test-kit-files.sh
+# Run: sh tests/unit/test-kit-files.sh
 set -u
 
 RED='\033[0;31m'

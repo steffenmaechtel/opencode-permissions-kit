@@ -10,7 +10,7 @@
 #
 # Static asserts on the repo files + a POSIX-arithmetic check of the
 # mode-mask logic. No root, no WSL required.
-# Run: sh tests/test-wsl-exposure.sh
+# Run: sh tests/unit/test-wsl-exposure.sh
 set -e
 
 RED='\033[0;31m'

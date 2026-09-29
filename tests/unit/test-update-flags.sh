@@ -8,7 +8,7 @@
 #   - TMP cleanup happens AFTER the install attempt (static order check)
 #   - --only-binary: parsing, gating, confirm text, summary, docs
 # No root required.
-# Run: sh tests/test-update-flags.sh
+# Run: sh tests/unit/test-update-flags.sh
 set -e
 
 RED='\033[0;31m'

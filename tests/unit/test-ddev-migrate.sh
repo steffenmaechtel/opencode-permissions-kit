@@ -14,7 +14,7 @@
 #   - install.sh wiring: flag, plan line, Step 4b BEFORE the .ddev
 #     handover (order is the whole point — see issue #15), stamp
 #   - status.sh / update.sh / Makefile / CI wiring
-# Run: sh tests/test-ddev-migrate.sh
+# Run: sh tests/unit/test-ddev-migrate.sh
 set -e
 
 RED='\033[0;31m'

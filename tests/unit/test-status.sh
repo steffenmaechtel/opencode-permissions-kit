@@ -8,7 +8,7 @@
 #   - not-installed state prints the install hint and exits 0
 #   - sudo probes are non-interactive (sudo -n) — a fake sudo that would
 #     prompt fails the test
-# Run: sh tests/test-status.sh
+# Run: sh tests/unit/test-status.sh
 set -e
 
 RED='\033[0;31m'

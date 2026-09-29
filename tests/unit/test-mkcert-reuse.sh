@@ -12,7 +12,7 @@
 # and a found Windows CA.
 #
 # Static asserts on the repo files (no root, no WSL required).
-# Run: sh tests/test-mkcert-reuse.sh
+# Run: sh tests/unit/test-mkcert-reuse.sh
 set -e
 
 RED='\033[0;31m'

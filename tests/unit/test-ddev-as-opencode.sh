@@ -10,7 +10,7 @@
 #     already-opencode branch execs the REAL ddev (no recursion)
 #   - no reference to the removed legacy bin/ddev shim anywhere
 #   - wiring: sudoers rule, install.sh/update.sh fetch+deploy+hook,
-#     config.sh / migrate-denies.sh .ddev handover, status.sh reporting,
+#     config.sh .ddev handover, status.sh reporting,
 #     Makefile target, CI workflow chmod lists + test step
 # Run: sh tests/unit/test-ddev-as-opencode.sh
 set -e

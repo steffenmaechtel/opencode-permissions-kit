@@ -10,7 +10,7 @@
 #
 # Git checkouts lose the exec bit, so a missing entry means the affected
 # suite breaks only in CI — exactly the drift this test trips on.
-# Run: sh tests/test-workflows.sh
+# Run: sh tests/unit/test-workflows.sh
 set -u
 
 RED='\033[0;31m'

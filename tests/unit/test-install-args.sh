@@ -8,7 +8,7 @@
 #
 # Static extraction of parse_args() from install.sh, then table-driven
 # checks. No root required.
-# Run: sh tests/test-install-args.sh
+# Run: sh tests/unit/test-install-args.sh
 set -e
 
 RED='\033[0;31m'

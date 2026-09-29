@@ -7,7 +7,7 @@
 #
 # Static extraction of project_path_sane() from the shipped scripts, then
 # table-driven checks. No root required.
-# Run: sh tests/test-project-paths.sh
+# Run: sh tests/unit/test-project-paths.sh
 set -e
 
 RED='\033[0;31m'

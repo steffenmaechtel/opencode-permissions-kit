@@ -2,7 +2,7 @@
 # Test the CLI dispatcher (files/opencode-permissions-kit-lib/bin/opk).
 # Builds a fake library dir with stub scripts, symlinks the dispatcher,
 # and checks dispatch, help, error handling, and flag pass-through.
-# Run: sh tests/test-kit-cli.sh
+# Run: sh tests/unit/test-kit-cli.sh
 set -e
 set -u
 

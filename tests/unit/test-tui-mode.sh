@@ -14,7 +14,7 @@
 #     (test-kit-files.sh guards the rest of the list consistency)
 #   - uninstall.sh mentions the leftovers
 #
-# Run: sh tests/test-tui-mode.sh
+# Run: sh tests/unit/test-tui-mode.sh
 set -u
 
 RED='\033[0;31m'
