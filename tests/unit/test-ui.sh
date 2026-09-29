@@ -139,6 +139,16 @@ check "ui_menu returns the chosen key" [ "$ans" = "2" ]
 ans=$(printf 'zzz\n' | setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
 check "ui_menu falls back to default on unknown input" [ "$ans" = "1" ]
 
+# --- no-tty gate (streamed installs, 0.0.39b C6 / 0.0.39e C8) ----------------------
+# UI_NO_STDIN_FALLBACK=1 + no controlling tty: the read must HARD-EXIT
+# with guidance instead of consuming piped stdin (which, in a streamed
+# install, is the script body itself). Without the env var the pipe-fed
+# fallback keeps working (tests above).
+gate_rc=0
+gate_out=$(printf 'yes\n' | UI_NO_STDIN_FALLBACK=1 setsid sh -c ". \"\$1\"; ui_ask \"Proceed?\" \"no\"" _ "$UI" 2>&1) || gate_rc=$?
+check "no-tty gate: UI_NO_STDIN_FALLBACK hard-exits with guidance" \
+    sh -c "[ \"\$1\" -ne 0 ] && printf '%s' \"\$2\" | grep -q 'no terminal available'" _ "$gate_rc" "$gate_out"
+
 menu_err=$(setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\"" _ "$UI" 2>&1 >/dev/null </dev/null)
 check "ui_menu prints the menu to stderr" \
     sh -c "printf %s \"\$1\" | grep -q 'Mode?'" _ "$menu_err"
