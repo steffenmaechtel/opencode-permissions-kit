@@ -44,6 +44,12 @@ labeled lines `info`/`success`/`warn`/`error` via `ui.sh`, slim banner,
 Unicode symbols with `UI_ASCII=1` fallback, `NO_COLOR` and non-tty
 honored.
 
+File lists in code (fetch/deploy/chmod lists such as `KIT_FILES` and
+install.sh's fetch list): **one file per line**, backslash-continued.
+Packed multi-name lines make diffs unreadable; consumers and tests
+compare word-wise, so the layout is pure convention — keep it when
+adding entries.
+
 ## Shell security (untrusted input)
 
 External data — HTTP feeds, files someone else wrote, anything parsed

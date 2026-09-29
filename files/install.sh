@@ -86,14 +86,45 @@ fetch_kit() {
     # py/, tui/): curl -o cannot write into a missing directory and aborts
     # the fetch with error 23 ("Failure writing output to destination").
     mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" "$dir/etc"
-    for f in install.sh VERSION \
-             opencode-permissions-kit-lib/management/config.sh opencode-permissions-kit-lib/management/update.sh opencode-permissions-kit-lib/management/status.sh opencode-permissions-kit-lib/management/uninstall.sh \
+    # Fetch list — FORMAT RULE: one file per line, backslash-continued.
+    # Packed multi-name lines make every diff unreadable (test-kit-files
+    # compares word-wise and does not care about layout; this format is
+    # convention). Keep it when adding files.
+    for f in install.sh \
+             VERSION \
+             opencode-permissions-kit-lib/management/config.sh \
+             opencode-permissions-kit-lib/management/update.sh \
+             opencode-permissions-kit-lib/management/status.sh \
+             opencode-permissions-kit-lib/management/uninstall.sh \
              opencode-permissions-kit-lib/templates/opencode.jsonc \
              opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
-             opencode-permissions-kit-lib/templates/sudoers.template etc/umask.sh \
-             opencode-permissions-kit-lib/bin/opencode-as-opencode opencode-permissions-kit-lib/bin/opk opencode-permissions-kit-lib/py/jsonc-parser.py opencode-permissions-kit-lib/py/tui-register.py \
-             opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/advisories.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh opencode-permissions-kit-lib/bin/browser-bridge \
-             opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/kit-mode-2x.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json; do
+             opencode-permissions-kit-lib/templates/sudoers.template \
+             etc/umask.sh \
+             opencode-permissions-kit-lib/bin/opencode-as-opencode \
+             opencode-permissions-kit-lib/bin/opk \
+             opencode-permissions-kit-lib/py/jsonc-parser.py \
+             opencode-permissions-kit-lib/py/tui-register.py \
+             opencode-permissions-kit-lib/sh/log.sh \
+             opencode-permissions-kit-lib/sh/ui.sh \
+             opencode-permissions-kit-lib/sh/advisories.sh \
+             opencode-permissions-kit-lib/sh/shell-warn.sh \
+             opencode-permissions-kit-lib/bin/setup-container-backend \
+             opencode-permissions-kit-lib/bin/socket-check \
+             opencode-permissions-kit-lib/bin/cwd-check \
+             opencode-permissions-kit-lib/sh/ddev-terminal.sh \
+             opencode-permissions-kit-lib/bin/ddev-as-opencode \
+             opencode-permissions-kit-lib/sh/ddev-handover.sh \
+             opencode-permissions-kit-lib/sh/ddev-migrate.sh \
+             opencode-permissions-kit-lib/bin/ddev-migrate \
+             opencode-permissions-kit-lib/sh/ddev-hosts.sh \
+             opencode-permissions-kit-lib/sh/fs-baseline.sh \
+             opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
+             opencode-permissions-kit-lib/bin/browser-bridge \
+             opencode-permissions-kit-lib/tui/kit-mode.tsx \
+             opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
+             opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
+             opencode-permissions-kit-lib/tui/tui.json \
+             opencode-permissions-kit-lib/tui/tui-danger.json; do
         echo "  fetching $f ..." >&2
         # Fetch to a temp file and refuse anything unsound (0.0.39e C1):
         # an empty-but-200 body (captive portal, broken mirror) previously

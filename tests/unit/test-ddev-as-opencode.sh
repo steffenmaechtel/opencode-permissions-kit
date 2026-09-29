@@ -392,7 +392,7 @@ check "template still parses cleanly with the new rules" \
 
 # --- 5. install.sh wiring ------------------------------------------------------
 check "install.sh fetches both new files (fetch_kit list)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys the function file" \
     sh -c "grep -q '\"\$LIBDIR/sh/ddev-terminal.sh\"' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys the helper (mode 755)" \
@@ -406,7 +406,7 @@ check "install.sh hands over ddev paths in the filesystem step" \
 
 # --- 6. update.sh wiring -------------------------------------------------------
 check "update.sh KIT_FILES includes both new files" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
 check "update.sh KIT_FILES includes the handover helper" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-handover.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys the function file" \

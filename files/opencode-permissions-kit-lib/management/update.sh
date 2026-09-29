@@ -104,14 +104,46 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 #   curl -fsSL .../files/opencode-permissions-kit-lib/management/update.sh | sudo bash
 # which deploys the new layout and removes the old files (see the cleanup
 # section below). No compatibility stubs are kept for the old paths.
-KIT_FILES="install.sh VERSION \
-             opencode-permissions-kit-lib/management/config.sh opencode-permissions-kit-lib/management/update.sh opencode-permissions-kit-lib/management/status.sh opencode-permissions-kit-lib/management/uninstall.sh \
-             opencode-permissions-kit-lib/templates/opencode.jsonc \
-             opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
-             opencode-permissions-kit-lib/templates/sudoers.template etc/umask.sh \
-opencode-permissions-kit-lib/bin/opencode-as-opencode opencode-permissions-kit-lib/bin/opk opencode-permissions-kit-lib/py/jsonc-parser.py opencode-permissions-kit-lib/py/tui-register.py \
-opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/advisories.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh opencode-permissions-kit-lib/bin/browser-bridge \
-opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/kit-mode-2x.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json"
+#
+# FORMAT RULE: one file per line, backslash-continued — packed multi-name
+# lines make every diff unreadable (test-kit-files compares word-wise and
+# does not care about layout; this format is convention). Keep it when
+# adding files. install.sh's fetch_kit list follows the same rule.
+KIT_FILES="install.sh \
+VERSION \
+opencode-permissions-kit-lib/management/config.sh \
+opencode-permissions-kit-lib/management/update.sh \
+opencode-permissions-kit-lib/management/status.sh \
+opencode-permissions-kit-lib/management/uninstall.sh \
+opencode-permissions-kit-lib/templates/opencode.jsonc \
+opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
+opencode-permissions-kit-lib/templates/sudoers.template \
+etc/umask.sh \
+opencode-permissions-kit-lib/bin/opencode-as-opencode \
+opencode-permissions-kit-lib/bin/opk \
+opencode-permissions-kit-lib/py/jsonc-parser.py \
+opencode-permissions-kit-lib/py/tui-register.py \
+opencode-permissions-kit-lib/sh/log.sh \
+opencode-permissions-kit-lib/sh/ui.sh \
+opencode-permissions-kit-lib/sh/advisories.sh \
+opencode-permissions-kit-lib/sh/shell-warn.sh \
+opencode-permissions-kit-lib/bin/setup-container-backend \
+opencode-permissions-kit-lib/bin/socket-check \
+opencode-permissions-kit-lib/bin/cwd-check \
+opencode-permissions-kit-lib/sh/ddev-terminal.sh \
+opencode-permissions-kit-lib/bin/ddev-as-opencode \
+opencode-permissions-kit-lib/sh/ddev-handover.sh \
+opencode-permissions-kit-lib/sh/ddev-migrate.sh \
+opencode-permissions-kit-lib/bin/ddev-migrate \
+opencode-permissions-kit-lib/sh/ddev-hosts.sh \
+opencode-permissions-kit-lib/sh/fs-baseline.sh \
+opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
+opencode-permissions-kit-lib/bin/browser-bridge \
+opencode-permissions-kit-lib/tui/kit-mode.tsx \
+opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
+opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
+opencode-permissions-kit-lib/tui/tui.json \
+opencode-permissions-kit-lib/tui/tui-danger.json"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
