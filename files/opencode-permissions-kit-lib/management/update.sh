@@ -149,6 +149,7 @@ opencode-permissions-kit-lib/sh/ddev-migrate.sh \
 opencode-permissions-kit-lib/bin/ddev-migrate \
 opencode-permissions-kit-lib/sh/ddev-hosts.sh \
 opencode-permissions-kit-lib/sh/fs-baseline.sh \
+opencode-permissions-kit-lib/sh/staged-write.sh \
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
 opencode-permissions-kit-lib/bin/browser-bridge \
 opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -241,7 +242,7 @@ if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
     # Direct call, NOT SCRIPT_DIR="$(fetch_kit)" — a subshell's variable
     # writes (incl. the _FETCH_TREE export below and the trap
     # registrations) never reach this shell (wave-f review).
-    fetch_kit || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    fetch_kit || { echo "error: Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
     SCRIPT_DIR="$_FK_DIR"
     # Do NOT continue executing this (installed, possibly older) copy: the
     # deploy below overwrites $LIBDIR/management/update.sh with the freshly fetched one,
@@ -321,7 +322,6 @@ INSTALL_CONF="$CONFDIR/install.conf"
 
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
-OPENCODE_GROUP=""
 INSTALLED_VERSION=""
 # Save the version from the VERSION file (read above) before sourcing
 # install.conf, which also has a VERSION= line (the old stamp). We don't
@@ -505,6 +505,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/sh/ddev-migrate.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # browser-bridge stand-in source (deploys into the wsl/ tree; source of
 # 'opk wsl-add-opencode-1-fix' re-runs)
@@ -519,7 +520,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
+sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
 sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
 sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
@@ -887,6 +888,15 @@ sync_tui_registration() {
     for _str_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
         _str_user_dir="${_str_dir_user%%:*}"
         _str_dir_owner="${_str_dir_user#*:}"
+        # 0.0.39g S1 class: the opencode user's config dir is agent-owned.
+        # A planted symlink at plugins/ (or the plugin dir itself) must
+        # never be followed — mkdir -p would create through it, chown
+        # dereferences the operand (arbitrary chown to the agent), and
+        # rm -rf would delete through it. Skip loudly instead.
+        if [ -L "$_str_user_dir/plugins" ] || [ -L "$_str_user_dir/plugins/opencode-permissions-kit" ]; then
+            log "tui plugin registration skipped: $_str_user_dir/plugins is a symlink (user-managed)"
+            continue
+        fi
         if [ "$_str_major" = 2 ]; then
             sudo mkdir -p "$_str_user_dir/plugins/opencode-permissions-kit"
             sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
@@ -1055,14 +1065,22 @@ log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$
 
 # --- TUI mode display user files (docs/_archive/design/plan-ui-tui-opencode.md) ---------
 # Same only-if-absent-or-kit-written policy as install.sh (marker key
-# _opencode_permissions_kit): user edits survive updates.
+# _opencode_permissions_kit): user edits survive updates. The write goes
+# through the shared staged_write helper (review 0.0.39g S1): the target
+# dir is agent-owned, root cp/chown must never follow a planted symlink —
+# a user-managed symlink is skipped, never written through.
+_swl=""
+for _swl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
+    if [ -f "$_swl_cand" ]; then . "$_swl_cand"; _swl="$_swl_cand"; break; fi
+done
+[ -n "$_swl" ] || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
 OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"
 OC_TUI_CONF="$OC_TUI_DIR/tui.json"
 sudo mkdir -p "$OC_TUI_DIR"
-if [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
-    sudo cp "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
-    sudo chown "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$OC_TUI_CONF"
-    sudo chmod 664 "$OC_TUI_CONF"
+if [ -L "$OC_TUI_CONF" ]; then
+    log "tui mode display skipped: $OC_TUI_CONF is a symlink (user-managed)"
+elif [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
+    staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
     log "tui mode display refreshed: $OC_TUI_CONF"
 fi
 DEFAULT_TUI_CONF="/home/$DEFAULT_USER/.config/opencode/tui.json"

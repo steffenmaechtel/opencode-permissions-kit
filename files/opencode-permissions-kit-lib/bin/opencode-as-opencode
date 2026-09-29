@@ -503,7 +503,7 @@ if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
         fi
     fi
     if [ -z "$SERVE_FALLBACK" ]; then
-        SERVE_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6)
+        SERVE_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6 || true)
         [ -n "$SERVE_FALLBACK" ] && [ "$(cwd_probe "$SERVE_FALLBACK")" = "readable" ] || SERVE_FALLBACK=""
     fi
     note "${RED}WARNING: the server working directory is not readable by the opencode user:${NC}"
@@ -534,7 +534,7 @@ fi
 # proceed without touching the directory (same contract as serve).
 if [ "${1:-}" = "console" ] || [ "${1:-}" = "auth" ]; then
     if [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
-        LOGIN_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6)
+        LOGIN_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6 || true)
         if [ -n "$LOGIN_FALLBACK" ] && [ "$(cwd_probe "$LOGIN_FALLBACK")" = "readable" ]; then
             note "${YELLOW}Login runs from $LOGIN_FALLBACK (the current directory is not readable${NC}"
             note "${YELLOW}by the opencode user; device logins carry no project context).${NC}"

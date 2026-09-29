@@ -185,10 +185,13 @@ ddev_hosts_add() {
     [ -n "$dha_bin" ] || { [ -x /usr/bin/ddev ] && dha_bin=/usr/bin/ddev; }
     [ -n "$dha_bin" ] || { echo "ddev-hosts: ddev is not installed"; return 1; }
 
-    # Hostname mode: not an existing directory and no path separator.
+    # Hostname mode: not an existing directory and no path separator; a
+    # leading dash would reach `ddev hostname` as a flag (argv-passed and
+    # quoted, runs as the dev user — 0.0.39g Q6, below the action bar).
     if [ ! -d "$dha_arg" ]; then
         case "$dha_arg" in
             */*) echo "ddev-hosts: no ddev project in $dha_arg"; return 1 ;;
+            -*) echo "ddev-hosts: '$dha_arg' is not a hostname (leading dash)"; return 1 ;;
         esac
         echo "adding $dha_arg (Windows may ask for permission) ..."
         if [ -n "$dha_dev" ]; then

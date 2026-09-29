@@ -21,7 +21,7 @@ if [ -f "$UI_LIB" ]; then
     # shellcheck disable=SC1090
     . "$UI_LIB"
 else
-    echo "error  ui.sh not found (expected $LIBDIR/sh/ui.sh or next to status.sh in a checkout)" >&2
+    echo "error: ui.sh not found (expected $LIBDIR/sh/ui.sh or next to status.sh in a checkout)" >&2
     exit 1
 fi
 

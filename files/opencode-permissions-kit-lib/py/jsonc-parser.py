@@ -121,9 +121,14 @@ def load_config(config_path):
     """Read, comment-strip and parse the config document. Shared by every
     extract_* entry point (they used to carry identical copies of this
     try/except — the kind of twin that diverges silently); exits with a
-    diagnostic on invalid JSON."""
+    diagnostic on unreadable files and invalid JSON (a missing/unreadable
+    config used to surface as a raw OSError traceback while parse errors
+    got the polished message — 0.0.39g Q4)."""
     try:
         return json.loads(strip_jsonc_comments(read_config(config_path)))
+    except OSError as e:
+        print(f"Error reading {config_path}: {e}", file=sys.stderr)
+        sys.exit(1)
     except json.JSONDecodeError as e:
         print(f"Error parsing {config_path}: {e}", file=sys.stderr)
         sys.exit(1)

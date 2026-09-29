@@ -177,9 +177,12 @@ expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agen
 # --- channel stamp (issue #38) -----------------------------------------------
 
 # install.sh stamps the actually-used ref as KIT_CHANNEL into install.conf
-# (the heredoc tee block) and reports it in the final summary.
+# and reports it in the final summary. Since 0.0.39g C5 the stamp is
+# written to a temp file beside it and renamed onto the canonical path —
+# assert the full atomic shape (heredoc tee into the temp + mv).
 if grep -qF "KIT_CHANNEL=\$KIT_BRANCH" "$INSTALL" \
-   && grep -qF "tee /etc/opencode-permissions-kit/install.conf" "$INSTALL" \
+   && grep -qF 'tee "$_INSTALL_CONF_TMP"' "$INSTALL" \
+   && grep -qF 'mv -f "$_INSTALL_CONF_TMP" /etc/opencode-permissions-kit/install.conf' "$INSTALL" \
    && grep -qF 'ui_kv "Channel"' "$INSTALL"; then
     pass "install.sh stamps KIT_CHANNEL and reports the channel"
 else

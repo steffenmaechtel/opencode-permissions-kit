@@ -177,6 +177,18 @@ for cand in "$SCRIPT_DIR/../sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
 done
 command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 
+# Shared symlink-safe privileged write helper (review 0.0.39g S1):
+# git_config_apply writes into the AGENT-owned ~/.config/opencode — root
+# cp/chown must never follow a planted symlink there. Same lookup order
+# as ddev-handover.sh above.
+for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+command -v staged_write >/dev/null 2>&1 || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+
 projects_list() {
     ui_info "Project roots ($PROJECTS_CONF):"
     if [ ! -f "$PROJECTS_CONF" ] || [ ! -s "$PROJECTS_CONF" ]; then
@@ -296,7 +308,12 @@ projects_remove() {
             ui_detail "skip $p"
             continue
         fi
-        sudo grep -vxF "$p" "$PROJECTS_CONF" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
+        # { grep -v || true } (0.0.39g C3): GNU grep -v exits 1 when the
+        # result is EMPTY — removing the LAST registered project would
+        # fail the pipeline and abort mid-loop (stale .tmp, no ui_success)
+        # under any pipefail-enabled shell. Same guard class as update.sh's
+        # install.conf rewrite.
+        { sudo grep -vxF "$p" "$PROJECTS_CONF" || true; } | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
         sudo mv "$PROJECTS_CONF.tmp" "$PROJECTS_CONF"
         ui_success "removed $p"
         log "project removed: $p"
@@ -345,16 +362,17 @@ git_config_apply() {
     # Back up an existing agent config before the template overwrite — same
     # data-safety as the install path. Without this, a customized
     # opencode.jsonc would be destroyed by a plain on/off toggle.
+    # Both writes go through staged_write (review 0.0.39g S1): the target
+    # dir is agent-owned, a pre-planted symlink at the config or backup
+    # name must never be followed by root cp/chown — mv replaces the link
+    # itself, the backup content survives (a link is read, not replaced).
     backup=""
     if sudo test -f "$target"; then
         backup="${target}.bak-$(date +%Y%m%d-%H%M%S)"
-        sudo cp "$target" "$backup"
-        sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$backup"
+        staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$target" "$backup"
     fi
 
-    sudo cp "$template" "$target"
-    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$target"
-    sudo chmod 664 "$target"
+    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$template" "$target"
 
     if [ "$enable" = "on" ]; then
         sudo sed -i 's|//SECURE_GIT: ||' "$target"

@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` (everything shipped in files/, plus the
 # maintainer helpers in scripts/).
@@ -15,6 +15,7 @@ SHELLCHECK_FILES = files/install.sh \
 	files/opencode-permissions-kit-lib/sh/ddev-migrate.sh files/opencode-permissions-kit-lib/bin/ddev-migrate \
 	files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
 	files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+	files/opencode-permissions-kit-lib/sh/staged-write.sh \
 	files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh files/opencode-permissions-kit-lib/bin/browser-bridge \
 	files/opencode-permissions-kit-lib/bin/socket-check files/opencode-permissions-kit-lib/bin/cwd-check \
 	files/opencode-permissions-kit-lib/bin/ddev-as-opencode
@@ -37,6 +38,7 @@ help:
 	@echo "  make lint          ShellCheck over the shipped scripts (needs shellcheck)"
 	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
+	@echo "  make test-staged-write  Run symlink-safe write / handover gate tests (0.0.39g)"
 	@echo "  make test-parser   Run JSONC parser edge-case tests"
 	@echo "  make test-git-config  Run git-config toggle tests"
 	@echo "  make test-container-backend  Run container-backend tests"
@@ -71,7 +73,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -243,6 +245,10 @@ test-release:
 test-fs-baseline:
 	@echo "=== Group-Baseline Progress Tests ==="
 	@./tests/unit/test-fs-baseline.sh
+
+test-staged-write:
+	@echo "=== Symlink-Safe Write / Handover Gate Tests (0.0.39g) ==="
+	@./tests/unit/test-staged-write.sh
 
 test-e2e-sources:
 	@echo "=== E2E Source-Consistency Tests ==="

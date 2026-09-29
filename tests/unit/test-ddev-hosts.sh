@@ -256,6 +256,38 @@ check "test-unit.yml chmod list includes ddev-hosts.sh" \
 check "test-e2e.yml chmod lists include ddev-hosts.sh" \
     sh -c 'blocks=$(grep -c "chmod +x" "$1"); grep -c "opencode-permissions-kit-lib/sh/ddev-hosts.sh" "$1" | grep -q "^${blocks}$"' _ "$E2E_CI"
 
+# --- behavioral: hostname-mode arg validation (0.0.39g Q6) -------------------------
+# A leading dash must be rejected BEFORE it reaches `ddev hostname` as a
+# flag; a clean hostname still goes through. ddev is PATH-stubbed with a
+# recorder.
+HOSTS_WORK=$(mktemp -d)
+HOSTS_STUB="$HOSTS_WORK/bin"
+mkdir -p "$HOSTS_STUB"
+printf '#!/bin/sh\necho "ddev $*" >> "$DDEV_CALLS"\n' > "$HOSTS_STUB/ddev"
+chmod +x "$HOSTS_STUB/ddev"
+DDEV_CALLS="$HOSTS_WORK/calls"
+export DDEV_CALLS
+OUT_DASH="$(PATH="$HOSTS_STUB:$PATH" DDEV_HOSTS_DEV_USER="$(id -un)" SUDO_USER="" sh -c '. "$1" >/dev/null 2>&1; ddev_hosts_add --evil-flag' _ "$HOSTS" 2>&1 || true)"
+if [ "$(PATH="$HOSTS_STUB:$PATH" DDEV_HOSTS_DEV_USER="$(id -un)" SUDO_USER="" sh -c '. "$1" >/dev/null 2>&1; ddev_hosts_add --evil-flag >/dev/null 2>&1; echo $?' _ "$HOSTS")" = "0" ]; then
+    fail "hostname mode: leading dash rejected (rc != 0)"
+else
+    pass "hostname mode: leading dash rejected (rc != 0)"
+fi
+if echo "$OUT_DASH" | grep -qF "not a hostname"; then
+    pass "hostname mode: leading dash gets a clear message"
+else
+    fail "hostname mode: leading dash gets a clear message"
+fi
+if [ -e "$DDEV_CALLS" ]; then
+    fail "hostname mode: dash arg never reaches ddev"
+else
+    pass "hostname mode: dash arg never reaches ddev"
+fi
+PATH="$HOSTS_STUB:$PATH" DDEV_HOSTS_DEV_USER="$(id -un)" SUDO_USER="" sh -c '. "$1" >/dev/null 2>&1; ddev_hosts_add myhost.test >/dev/null 2>&1' _ "$HOSTS" || true
+check "hostname mode: clean hostname reaches ddev hostname" \
+    grep -qxF "ddev hostname myhost.test 127.0.0.1" "$DDEV_CALLS"
+rm -rf "$HOSTS_WORK"
+
 # --- Summary -----------------------------------------------------------------------
 
 echo ""
