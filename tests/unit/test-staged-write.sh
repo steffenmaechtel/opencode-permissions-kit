@@ -1,6 +1,6 @@
 #!/bin/sh
-# Unit tests for the 0.0.39g symlink-hardening wave (review S1/S2 + the
-# C3/C4/C5 contract gaps):
+# Unit tests for the 0.0.39g symlink-hardening wave (review 0.0.39g S1/S2 +
+# the C3/C4/C5 contract gaps) and the 0.0.39h–k gate follow-ups:
 #   - staged_write (sh/staged-write.sh): stage in a root-owned dir, apply
 #     owner/mode there, mv onto the destination — a planted symlink at the
 #     destination (dangling or not) is REPLACED, never followed; the
@@ -52,7 +52,7 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
 echo ""
-echo "staged-write + handover symlink gates (0.0.39g S1/S2)"
+echo "staged-write + handover symlink gates (0.0.39g S1/S2 + follow-ups)"
 echo "====================================================="
 echo ""
 
@@ -279,23 +279,23 @@ fi
 PCONF="$WORK/projects.conf"
 printf '/var/www/only-project\n' > "$PCONF"
 if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]' _ "/var/www/only-project" "$PCONF"; then
-    pass "C3/F4: last-project removal (rc 1) stays benign"
+    pass "C3 (0.0.39g) / F4 (0.0.39h): last-project removal (rc 1) stays benign"
 else
-    fail "C3/F4: last-project removal (rc 1) stays benign"
+    fail "C3 (0.0.39g) / F4 (0.0.39h): last-project removal (rc 1) stays benign"
 fi
-assert_eq "C3/F4: empty result, no stale copy" "" "$(grep -vxF "/var/www/only-project" "$PCONF" 2>/dev/null)"
+assert_eq "C3 (0.0.39g) / F4 (0.0.39h): empty result, no stale copy" "" "$(grep -vxF "/var/www/only-project" "$PCONF" 2>/dev/null)"
 # control: a real read error (grep on a directory) yields rc 2 — the
 # narrowed guard must refuse (the old || true masked this class)
 if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]' _ "x" "$WORK" 2>/dev/null; then
-    fail "C3/F4 control: grep rc 2 (read error) refuses the rewrite"
+    fail "C3 (0.0.39g) / F4 (0.0.39h) control: grep rc 2 (read error) refuses the rewrite"
 else
-    pass "C3/F4 control: grep rc 2 (read error) refuses the rewrite"
+    pass "C3 (0.0.39g) / F4 (0.0.39h) control: grep rc 2 (read error) refuses the rewrite"
 fi
-check "C3/F4: config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + registers the .tmp" \
+check "C3 (0.0.39g) / F4 (0.0.39h): config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + registers the .tmp" \
     sh -c 'grep -qF "_pr_out=\$(sudo grep -vxF \"\$p\" \"\$PROJECTS_CONF\" 2>/dev/null) || _pr_rc=\$?" "$1" && grep -qF "[ \"\$_pr_rc\" -le 1 ] || die" "$1" && grep -qF "_tmp_track \"\$PROJECTS_CONF.tmp\"" "$1"' _ "$CONFIG"
-check "F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)" \
+check "0.0.39h F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)" \
     sh -c 'grep -qF "_ic_keep=\$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"' -e '"'"'^DDEV_VERSION='"'"' \"\$INSTALL_CONF\" 2>/dev/null) || _ic_rc=\$?" "$1" && grep -qF "_tmp_track \"\$_INSTALL_CONF_TMP\"" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\" \"\$CONFDIR/install.conf\"" "$1"' _ "$UPDATE"
-check "F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)" \
+check "0.0.39h F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)" \
     sh -c 'grep -qF "_ucb_keep=\$(grep -v" "$1" && grep -qF "mv -f \"\$_ucb_tmp\" \"\$INSTALL_CONF\"" "$1" && grep -qF "mv -f \"\$_udd_tmp\" \"\$INSTALL_CONF\"" "$1"' _ "$CONFIG"
 
 # --- 4. ensure_local_file (C4) ----------------------------------------------------
@@ -359,16 +359,16 @@ check "wiring: config.sh sources staged-write.sh" \
     grep -qF 'for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"' "$CONFIG"
 check "wiring: update.sh tui.json write goes through staged_write" \
     grep -qF 'staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json"' "$UPDATE"
-check "wiring: install.sh config writes go through staged_write (F8: offline-rendered, ONE write per branch)" \
+check "wiring: install.sh config writes go through staged_write (0.0.39h F8: offline-rendered, ONE write per branch)" \
     sh -c 'grep -c "_oc_install_agent_config" "$1" | grep -q "^[4-9]$" && ! grep -q "sed -i .*opencode\.jsonc" "$1"' _ "$INSTALL"
-check "wiring: config.sh git_config_apply renders offline, ONE staged_write (F8)" \
+check "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8)" \
     sh -c 'grep -qF "_gca_tmp" "$1" && grep -c "staged_write 664" "$1" | grep -q "^2$" && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG"
 OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
-check "F10: opk handover refuses symlinked operands + rechecks between the ops" \
+check "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops" \
     sh -c 'grep -qF "[ -L \"\$_ho_a\" ]" "$1" && grep -qF "[ ! -L \"\$_ho_a\" ]" "$1"' _ "$OPK"
-check "F4: opk handover --dry-run previews the symlink refuse" \
+check "0.0.39i F4: opk handover --dry-run previews the symlink refuse" \
     grep -qF "would refuse" "$OPK"
-check "F12: no 1;33 color definition remains repo-wide (files/)" \
+check "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
     sh -c '! grep -rq "1;33" "$1"' _ "$REPO/files"
 
 # --- 6. agent_home_sane (0.0.39h F1/F2) ---------------------------------------------
@@ -423,7 +423,7 @@ check "gates: config.sh git_config_apply chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$(dirname \"\$target\")\"" "$1"' _ "$CONFIG"
 check "gates: uninstall.sh plugin-removal chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_un_dir\"" "$1"' _ "$UNINSTALL"
-check "F3: staged-write.sh refuses a directory destination" \
+check "0.0.39h F3: staged-write.sh refuses a directory destination" \
     grep -qF 'destination '"'"'$_sw_dst'"'"' is a directory' "$STAGEDWRITE"
 
 # --- summary -----------------------------------------------------------------------

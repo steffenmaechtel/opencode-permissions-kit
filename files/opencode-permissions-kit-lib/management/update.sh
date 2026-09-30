@@ -711,18 +711,15 @@ if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
         if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
-            echo "  ${UI_YELLOW}WARNING: /mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)${UI_NC}"
-            echo "  ${UI_YELLOW}— the mount stays world-readable (mode $mnt_mode) and opencode warns on${UI_NC}"
-            echo "  ${UI_YELLOW}every start until the distro is reopened.${UI_NC}"
+            ui_warn "/mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)"
+            ui_warn "the mount stays world-readable (mode $mnt_mode) and opencode warns on every start until the distro is reopened."
         else
-            echo "  ${UI_YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent${UI_NC}"
-            echo "  ${UI_YELLOW}can read the Windows profile. opencode warns on every start until fixed.${UI_NC}"
-            echo "  ${UI_YELLOW}Recommended fix in /etc/wsl.conf:${UI_NC}"
-            echo "    [automount]"
-            echo "    enabled = true"
-            echo "    options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
-            echo "  ${UI_YELLOW}then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf —${UI_NC}"
-            echo "  ${UI_YELLOW}apply the snippet yourself.${UI_NC}"
+            ui_warn "/mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent can read the Windows profile."
+            ui_warn "opencode warns on every start until fixed. Recommended fix in /etc/wsl.conf:"
+            ui_detail "[automount]"
+            ui_detail "enabled = true"
+            ui_detail "options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
+            ui_warn "then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf — apply the snippet yourself."
         fi
     fi
 fi

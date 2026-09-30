@@ -2059,11 +2059,9 @@ echo ""
 if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
-        echo "  ${UI_YELLOW}WARNING: /mnt/c is still world-readable (mode $mnt_mode) — the agent${UI_NC}"
-        echo "  ${UI_YELLOW}can read your Windows profile. If you just applied the [automount]${UI_NC}"
-        echo "  ${UI_YELLOW}snippet to /etc/wsl.conf, it needs 'wsl --shutdown' from Windows${UI_NC}"
-        echo "  ${UI_YELLOW}+ reopening the distro to take effect.${UI_NC}"
-        echo "  ${UI_YELLOW}opencode will warn on every start until then.${UI_NC}"
+        ui_warn "/mnt/c is still world-readable (mode $mnt_mode) — the agent can read your Windows profile."
+        ui_warn "If you just applied the [automount] snippet to /etc/wsl.conf, it needs 'wsl --shutdown' from Windows"
+        ui_warn "+ reopening the distro to take effect — opencode will warn on every start until then."
         echo ""
     fi
 fi
@@ -2072,7 +2070,7 @@ fi
 # affects NEW shells). A child process cannot fix the parent shell, so tell
 # the user to restart the terminal.
 if [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
-    echo "  ${UI_YELLOW}IMPORTANT:${UI_NC} open a NEW terminal before running 'opencode'."
+    ui_warn "IMPORTANT: open a NEW terminal before running 'opencode'."
     echo "  Your current shell still resolves the old, unwrapped binary from"
     echo "  ~/.opencode/bin (bash caches the path, and it is still first in \$PATH"
     echo "  of this shell). Until you restart, 'opencode' would bypass the wrapper"
@@ -2085,9 +2083,9 @@ fi
 # file access via the group, the ddev() hook is not sourced yet (ddev in
 # an old terminal would run as the developer, unable to see the rootless
 # daemon), and the PATH/umask profile additions are not applied.
-echo "  ${UI_YELLOW}Restart your terminal (or log in again) — the current session${UI_NC}"
-echo "  ${UI_YELLOW}has no sharing-group membership yet, no ddev shell function and no${UI_NC}"
-echo "  ${UI_YELLOW}PATH/umask additions; a fresh session starts with all of them.${UI_NC}"
+ui_warn "Restart your terminal (or log in again) — the current session has no sharing-group"
+ui_warn "membership yet, no ddev shell function and no PATH/umask additions; a fresh"
+ui_warn "session starts with all of them."
 echo ""
 echo ""
 ui_info "Next:"
