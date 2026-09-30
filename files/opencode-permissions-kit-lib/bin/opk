@@ -293,7 +293,14 @@ case "$cmd" in
         if [ "$_ho_dry" = 1 ]; then
             for _ho_a in "$@"; do
                 [ "$_ho_a" = "--dry-run" ] && continue
-                echo "  would hand over: $_ho_a -> $_ho_user:$_ho_group (recursive, g+w)"
+                # 0.0.39i F4: the dry run previews the symlink refuse too —
+                # what --dry-run announces must match what the real run does
+                # (cli.md documents the refusal without a dry-run carve-out).
+                if [ -L "$_ho_a" ]; then
+                    echo "  would refuse: '$_ho_a' is a symlink (chown -R/chmod -R follow it)"
+                else
+                    echo "  would hand over: $_ho_a -> $_ho_user:$_ho_group (recursive, g+w)"
+                fi
             done
             exit 0
         fi

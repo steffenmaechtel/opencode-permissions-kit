@@ -364,11 +364,12 @@ check "wiring: install.sh config writes go through staged_write (F8: offline-ren
 check "wiring: config.sh git_config_apply renders offline, ONE staged_write (F8)" \
     sh -c 'grep -qF "_gca_tmp" "$1" && grep -c "staged_write 664" "$1" | grep -q "^2$" && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG"
 OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
-WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 check "F10: opk handover refuses symlinked operands + rechecks between the ops" \
     sh -c 'grep -qF "[ -L \"\$_ho_a\" ]" "$1" && grep -qF "[ ! -L \"\$_ho_a\" ]" "$1"' _ "$OPK"
-check "F12: wrapper YELLOW is 0;33 (no 1;33 left repo-wide)" \
-    sh -c '! grep -q "1;33" "$1"' _ "$WRAPPER"
+check "F4: opk handover --dry-run previews the symlink refuse" \
+    grep -qF "would refuse" "$OPK"
+check "F12: no 1;33 color definition remains repo-wide (files/)" \
+    sh -c '! grep -rq "1;33" "$1"' _ "$REPO/files"
 
 # --- 6. agent_home_sane (0.0.39h F1/F2) ---------------------------------------------
 # The walker asserts every component of a path below the agent home
@@ -398,6 +399,11 @@ check "gates: install.sh ~/.ddev operand gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"/home/\$OPENCODE_USER/.ddev\"" "$1"' _ "$INSTALL"
 check "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents)" \
     sh -c 'grep -c "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/" "$1" | grep -q "^[3-9]$"' _ "$INSTALL"
+# 0.0.39i F1: the combined top-level mkdir is gone — every Step 8 mkdir
+# runs INSIDE its operand gate (three per-operand mkdirs), so no root
+# mkdir passes through a linked parent.
+check "gates: install.sh Step 8 mkdir sits inside the operand gates (0.0.39i F1)" \
+    sh -c '! grep -qF "mkdir -p /home/opencode/.config/opencode /home/opencode/.agents" "$1" && grep -c "sudo mkdir -p /home/opencode/" "$1" | grep -q "^[3-9]$"' _ "$INSTALL"
 check "gates: install.sh agents-migration operand gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_opk_dst\"" "$1"' _ "$INSTALL"
 check "gates: install.sh mkcert chain gate" \

@@ -83,7 +83,7 @@ and whole home directories are refused — hand over project trees, not
 systems. `/tmp` subpaths are allowed (temp build trees are legitimate
 handover targets). Symlinked paths are refused too: `chown -R`/`chmod -R`
 follow a symlink operand, and the kit never hands a tree over through a
-link.
+link (`--dry-run` lists the refusals it would make).
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides

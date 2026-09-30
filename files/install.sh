@@ -1687,7 +1687,6 @@ fi
 
 # === Step 8: opencode Home ===
 
-sudo mkdir -p /home/opencode/.config/opencode /home/opencode/.agents
 # The opencode home belongs to the user's own usergroup; the developer (member
 # of $OPENCODE_GROUP) can enter and edit opencode.jsonc etc. The home inode
 # itself is NOT agent-replaceable (no write on /home) — it stays ungated.
@@ -1699,19 +1698,24 @@ sudo chmod 2750 /home/opencode
 # arbitrary tree to the agent, chmod 2775 on a linked .config/opencode would
 # make an arbitrary dir world-writable+setgid. Skip each linked operand
 # loudly (user-managed). The walker also covers the PARENT chain of
-# .config/opencode (0.0.39h F2).
+# .config/opencode (0.0.39h F2). Each mkdir sits INSIDE its gate too
+# (0.0.39i F1): mkdir -p passes through a linked parent silently — ungated
+# it would plant a root-owned dir in the link target.
 if agent_home_sane "$OPENCODE_USER" /home/opencode/.config; then
+    sudo mkdir -p /home/opencode/.config
     sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config
     sudo chmod 2775 /home/opencode/.config
 else
     log "agent config dir skipped: /home/opencode/.config is (below) a symlink (user-managed)"
 fi
 if agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
+    sudo mkdir -p /home/opencode/.config/opencode
     sudo chmod 2775 /home/opencode/.config/opencode
 else
     log "agent config dir skipped: /home/opencode/.config/opencode is (below) a symlink (user-managed)"
 fi
 if agent_home_sane "$OPENCODE_USER" /home/opencode/.agents; then
+    sudo mkdir -p /home/opencode/.agents
     sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.agents
     sudo chmod 2775 /home/opencode/.agents
 else

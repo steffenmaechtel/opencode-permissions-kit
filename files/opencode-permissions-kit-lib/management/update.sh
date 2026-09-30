@@ -1082,7 +1082,7 @@ _INSTALL_CONF_TMP="$CONFDIR/install.conf.opk-new"
 _tmp_track "$_INSTALL_CONF_TMP"
 _ic_rc=0
 _ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null) || _ic_rc=$?
-[ "$_ic_rc" -le 1 ] || { echo "error: cannot read $INSTALL_CONF (grep rc $_ic_rc) — install.conf left untouched" >&2; exit 1; }
+[ "$_ic_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ic_rc) — install.conf left untouched"
 {
     if [ -n "$_ic_keep" ]; then printf '%s\n' "$_ic_keep"; fi
     echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
