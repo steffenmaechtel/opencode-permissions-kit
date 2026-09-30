@@ -532,6 +532,12 @@ check "default user can read opencode.jsonc" \
     E 'test -r /home/opencode/.config/opencode/opencode.jsonc'
 check "default user can write opencode.jsonc" \
     E 'test -w /home/opencode/.config/opencode/opencode.jsonc'
+check "agent config dir owned by the agent user (0.0.39j F1)" \
+    E 'test "$(stat -c %U /home/opencode/.config/opencode)" = "opencode"'
+check "agent .config owned by the agent user (0.0.39j F1)" \
+    E 'test "$(stat -c %U /home/opencode/.config)" = "opencode"'
+check "agent .agents owned by the agent user (0.0.39j F1)" \
+    E 'test "$(stat -c %U /home/opencode/.agents)" = "opencode"'
 
 echo ""
 echo "--- 6b. Default-user deny-all config (self-update bypass protection) ---"

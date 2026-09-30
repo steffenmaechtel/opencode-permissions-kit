@@ -404,6 +404,11 @@ check "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents)
 # mkdir passes through a linked parent.
 check "gates: install.sh Step 8 mkdir sits inside the operand gates (0.0.39i F1)" \
     sh -c '! grep -qF "mkdir -p /home/opencode/.config/opencode /home/opencode/.agents" "$1" && grep -c "sudo mkdir -p /home/opencode/" "$1" | grep -q "^[3-9]$"' _ "$INSTALL"
+# 0.0.39j F1: every Step 8 operand carries its own chown — gate 2's mkdir
+# runs after gate 1's chown -R, so without its own chown the fresh-install
+# leaf ends root-owned.
+check "gates: install.sh Step 8 chowns every operand it creates (0.0.39j F1)" \
+    sh -c 'grep -qF "sudo chown -R \"\$OPENCODE_USER:\$OPENCODE_GROUP\" /home/opencode/.config/opencode" "$1"' _ "$INSTALL"
 check "gates: install.sh agents-migration operand gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_opk_dst\"" "$1"' _ "$INSTALL"
 check "gates: install.sh mkcert chain gate" \
