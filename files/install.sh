@@ -240,8 +240,10 @@ command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { 
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
 
 # === Shared UI helpers ===
-# The kit files sit next to this script (checkout or fully fetched temp dir);
-# a plain fallback keeps install.sh working if ui.sh is somehow missing.
+# The kit files sit next to this script (checkout or fully fetched temp dir).
+# The fallback covers the OUTPUT helpers only — the interactive prompts
+# (ui_ask/ui_confirm/ui_menu) come solely from ui.sh, so a ui.sh-less run
+# proceeds only up to its first prompt and dies there (set -e).
 UI_LIB="$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     . "$UI_LIB"

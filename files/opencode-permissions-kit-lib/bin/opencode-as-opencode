@@ -16,11 +16,16 @@
 # orchestrators parse `opencode run --format json` output.
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
-NC='\033[0m'
+# Colors resolve to REAL bytes once (printf, not echo -e); off for
+# NO_COLOR / non-tty, same rule as sh/ui.sh and uninstall.sh
+# (0.0.39e C10/C12; guard added per 0.0.39m C1).
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
+    RED=''; GREEN=''; CYAN=''; YELLOW=''; NC=''
+else
+    RED=$(printf '\033[0;31m'); GREEN=$(printf '\033[0;32m')
+    CYAN=$(printf '\033[0;36m'); YELLOW=$(printf '\033[0;33m')
+    NC=$(printf '\033[0m')
+fi
 
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 

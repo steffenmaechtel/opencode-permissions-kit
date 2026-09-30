@@ -5,6 +5,9 @@
 #   /usr/local/lib/opencode-permissions-kit/management/status.sh
 # or from a checkout:
 #   files/status.sh
+# Deliberately set -u ONLY (no -e/pipefail): status is a read-only report —
+# one failing probe must not kill the remaining sections; failures render
+# as "unknown" rows instead (same fail-soft class as uninstall.sh).
 set -u
 
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
