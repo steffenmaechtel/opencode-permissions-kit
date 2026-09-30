@@ -1087,24 +1087,24 @@ if [ -d /mnt/c ]; then
     if [ -z "$mnt_mode" ] || [ $((0$mnt_mode & 0004)) -eq 0 ]; then
         echo "  /mnt/c already restricted (mode ${mnt_mode:-?}) — Windows profile not exposed."
     elif grep -q '^\[automount\]' /etc/wsl.conf 2>/dev/null; then
-        echo "  ${UI_YELLOW}NOTE: /etc/wsl.conf already has an [automount] section — left untouched.${UI_NC}"
+        ui_warn "NOTE: /etc/wsl.conf already has an [automount] section — left untouched."
         echo "  /mnt/c is world-readable (mode $mnt_mode); every WSL user incl. the agent"
         echo "  can read the Windows profile. Restrict it manually if unintended."
         log "wsl.conf has a pre-existing [automount] section — no hardening snippet printed"
     else
         d_uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo "")
         d_gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo "")
-        echo "  ${UI_YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the${UI_NC}"
-        echo "  ${UI_YELLOW}agent can read the Windows profile (.ssh, NTUSER.DAT, browser data).${UI_NC}"
-        echo "  ${UI_YELLOW}The kit does not edit /etc/wsl.conf — apply the restriction yourself:${UI_NC}"
-        echo "    [automount]"
-        echo "    enabled = true"
+        ui_warn "/mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent"
+        ui_warn "can read the Windows profile (.ssh, NTUSER.DAT, browser data)."
+        ui_warn "The kit does not edit /etc/wsl.conf — apply the restriction yourself:"
+        ui_detail "[automount]"
+        ui_detail "enabled = true"
         if [ -n "$d_uid" ] && [ -n "$d_gid" ]; then
-            echo "    options = \"uid=$d_uid,gid=$d_gid,dmask=027,fmask=037\""
+            ui_detail "options = \"uid=$d_uid,gid=$d_gid,dmask=027,fmask=037\""
         else
-            echo '    options = "uid=<your-uid>,gid=<your-gid>,dmask=027,fmask=037"'
+            ui_detail 'options = "uid=<your-uid>,gid=<your-gid>,dmask=027,fmask=037"'
         fi
-        echo "  ${UI_YELLOW}(append to /etc/wsl.conf, then 'wsl --shutdown' from Windows + reopen the distro).${UI_NC}"
+        ui_warn "(append to /etc/wsl.conf, then 'wsl --shutdown' from Windows + reopen the distro)."
         log "/mnt/c hardening snippet printed (kit never writes wsl.conf)"
     fi
 fi
@@ -1124,7 +1124,7 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
     # below into the link target. Skip loudly (user-managed); no CA will
     # exist, so warn like the other no-CA ends (0.0.39h F5).
     if ! agent_home_sane "$OPENCODE_USER" "$caroot"; then
-        echo "  ${UI_YELLOW}mkcert: the chain to $caroot contains a symlink — CA provisioning skipped (the kit never follows links in the agent home).${UI_NC}"
+        ui_warn "mkcert: the chain to $caroot contains a symlink — CA provisioning skipped (the kit never follows links in the agent home)."
         ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate. Remove the link or place your CA at $caroot and re-run."
         log "mkcert CA provisioning skipped: symlink in the chain to $caroot (no CA provisioned)"
     else
@@ -1164,7 +1164,7 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
                 echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)"
                 log "mkcert CA reused from $src_label for $OPENCODE_USER"
             else
-                echo "  ${UI_YELLOW}mkcert CA reuse from $src_label FAILED — removing the partial copy, falling back to a new CA.${UI_NC}"
+                ui_warn "mkcert CA reuse from $src_label FAILED — removing the partial copy, falling back to a new CA."
                 sudo rm -f "$caroot/rootCA.pem" "$caroot/rootCA-key.pem"
                 log "mkcert CA reuse FAILED (source: $src_label) — partial copy removed"
                 # The elif below no longer applies once this branch ran — do
@@ -1197,16 +1197,16 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
             fi
             sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
             if [ -f "$caroot/rootCA.pem" ]; then
-                echo "  ${UI_YELLOW}mkcert: no existing CA found — a new one was created at $caroot.${UI_NC}"
-                echo "  ${UI_YELLOW}It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER'): browsers will warn.${UI_NC}"
-                echo "  ${UI_YELLOW}Import $caroot/rootCA.pem into your browser, or run 'sudo env CAROOT=$caroot mkcert -install' yourself.${UI_NC}"
+                ui_warn "mkcert: no existing CA found — a new one was created at $caroot."
+                ui_warn "It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER'): browsers will warn."
+                ui_detail "Import $caroot/rootCA.pem into your browser, or run 'sudo env CAROOT=$caroot mkcert -install' yourself."
                 log "mkcert: no existing CA — new one created for $OPENCODE_USER (system trust store not updated)"
             else
                 ui_warn "no mkcert CA exists at $caroot after the install attempt — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
                 log "mkcert: fresh-install attempt produced no CA at $caroot"
             fi
         else
-            echo "  ${UI_YELLOW}NOTE: mkcert not installed and no CA to reuse — install mkcert or copy your CA to $caroot.${UI_NC}"
+            ui_warn "NOTE: mkcert not installed and no CA to reuse — install mkcert or copy your CA to $caroot."
         fi
     fi
 fi
@@ -1865,7 +1865,7 @@ _oc_install_agent_config() {
     rm -f "$_oic_tmp"
 }
 if ! agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
-    echo "  ${UI_YELLOW}WARNING: the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed (user-managed; the kit never follows links in the agent home).${UI_NC}"
+    ui_warn "the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed (user-managed; the kit never follows links in the agent home)."
     log "agent config skipped: symlink in the parent chain of /home/opencode/.config/opencode"
 elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
     _oc_install_agent_config

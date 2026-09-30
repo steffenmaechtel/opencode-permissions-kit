@@ -74,7 +74,7 @@ check "status.sh detects a configured-but-pending fix (wsl --shutdown)" \
 check "install.sh gates the exposure info on /mnt/c existing" \
     sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$INSTALL"
 check "install.sh warns about the exposure" \
-    sh -c "grep -q 'WARNING: /mnt/c is world-readable' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\"" _ "$INSTALL"
 check "install.sh never writes /etc/wsl.conf (no tee/append)" \
     sh -c "! grep -q 'tee -a /etc/wsl.conf' \"\$1\"" _ "$INSTALL"
 check "install.sh no longer prompts for the restriction (explicit consent)" \
