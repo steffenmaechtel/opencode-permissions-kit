@@ -1712,8 +1712,10 @@ if agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
     sudo mkdir -p /home/opencode/.config/opencode
     # Own chown -R (0.0.39j F1): gate 1's `chown -R .config` runs BEFORE
     # this leaf exists on a fresh install — without this chown the dir
-    # ends root-owned (live-verified) and neither the agent nor the
-    # sharing group can create entries in the agent's own config dir.
+    # ends root-owned (live-verified). Write access would survive via the
+    # setgid-inherited sharing group (the agent's own primary group,
+    # 0.0.39k wording fix), but the agent's config dir must be OWNED by
+    # the agent user — like .config and .agents.
     sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" /home/opencode/.config/opencode
     sudo chmod 2775 /home/opencode/.config/opencode
 else
