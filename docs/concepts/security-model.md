@@ -55,12 +55,41 @@ Documented rather than hidden:
   [leak scan](../how-to/customize-deny-list.md).
 - The kit protects **locations, not information flows** — once content
   leaves the project roots, no scan recaptures it.
+- **mkcert CA key in the agent's home (deliberate):** ddev signs its
+  `*.ddev.site` certificates **on the host, as the user running ddev** —
+  and that user is `opencode`. The CA normally lives on the Windows side
+  (`/mnt/c/Users/<you>/AppData/Local/mkcert`), which the agent is
+  deliberately kept off of (see the /mnt/c exposure below), so install
+  copies the CA — **including the private key** — once into
+  `/home/opencode/.local/share/mkcert` (dir 0700, key 0600). The key is
+  functionally required: ddev's pre-flight treats a CAROOT without a
+  readable `rootCA-key.pem` as "no CA at all" and silently degrades to
+  HTTP-only URLs, and ddev itself copies both CA files into the shared
+  `ddev-global-cache` volume anyway. Residual risk: the semi-trusted
+  agent user can mint leaf certificates your browsers trust — a
+  TLS-MITM capability against hosts you visit. The keyless alternative
+  is ddev's `.ddev/custom_certs/` flow (you sign per-project certs),
+  at the cost of the `*.ddev.site` wildcard and per-project manual
+  provisioning.
 - **Supply chain (trust assumption):** the one-liner streams `install.sh`
-  from `master` over HTTPS, and `update.sh --binary` downloads the opencode
-  release tarball without a checksum or signature — the "verification" is a
-  liveness check (`opencode --version` runs). Installing means trusting
-  GitHub, the opencode releases, and (for docker-rootless provisioning)
-  get.docker.com at install time.
+  from `master` over HTTPS, `update.sh` re-fetches every kit file from the
+  tracked ref under the same TLS-only model (no checksums, signatures, or
+  commit pinning), and `update.sh --binary` downloads the opencode release
+  tarball — the "verification" is a liveness check (`opencode --version`
+  runs). Rootless backend provisioning runs get.docker.com, and the
+  fallback opencode install streams `https://opencode.ai/install` — both
+  as root. Installing means trusting GitHub, the opencode releases, and
+  get.docker.com at install time. A pinned-release checksum manifest
+  (published as a repo artifact per release) would close the gap without
+  breaking the streaming design. The `KIT_BASE_URL` env override replaces
+  the fetch target entirely — env-controlled fetch-and-execute-as-root,
+  by design a developer escape hatch, so treat the install environment as
+  trusted.
+- **OpenChamber serve password in the agent env:** when the serve feature
+  is configured, `OPENCODE_SERVER_PASSWORD` (and username) survive sudo's
+  `env_reset` into the agent's environment. Any process running as
+  `opencode` can read them — no privilege escalation (it is the same
+  secret the listener itself holds), but pick a strong password.
 
 ## WSL2: the /mnt/c exposure
 

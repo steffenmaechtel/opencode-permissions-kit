@@ -35,8 +35,8 @@ Goals (from the issue):
 
 - `install.sh` / `update.sh` fetch every kit file from
   `KIT_BASE_URL = https://raw.githubusercontent.com/<repo>/$KIT_BRANCH`
-  with `KIT_BRANCH` defaulting to `master` (files/install.sh:36,
-  files/opencode-permissions-kit-lib/management/update.sh:38).
+  with `KIT_BRANCH` defaulting to `master` (files/install.sh:41,
+  files/opencode-permissions-kit-lib/management/update.sh:57-59).
 - `KIT_BRANCH` already accepts **any ref raw.githubusercontent
   understands** — branches, and also tags:
   `KIT_BRANCH=0.0.29` resolves `refs/tags/0.0.29`. Exact-version

@@ -26,7 +26,9 @@ Exit 0 on success or no-op, 1 on usage/IO/parse errors (to stderr).
 import importlib.util
 import json
 import os
+import stat
 import sys
+import tempfile
 
 # Never drop __pycache__ beside the kit's scripts when importing the
 # parser (happened on first use; the files tree must stay clean).
@@ -125,9 +127,64 @@ def main(argv):
     else:
         data.pop("plugins", None)
     try:
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
+        # Atomic rewrite (0.0.39e C16): writing in place truncates first —
+        # a crash mid-write would corrupt user state this tool promises to
+        # preserve. mkstemp (O_EXCL, random name), NOT a fixed suffix: this
+        # runs as ROOT against the agent-owned ~/.config/opencode — a
+        # predictable temp name is a planted-symlink primitive (wave-f
+        # review). 0.0.39g hardening, all on the same write path:
+        #   S3 — fchmod/fchown act on the mkstemp FD, never the temp PATH:
+        #        the agent can watch the temp name (inotify) and swap it
+        #        for a symlink before a path-based chown — an arbitrary
+        #        chown/chmod as root. The fd cannot be swapped.
+        #   C2 — lstat, not stat: a symlinked cli.json is user structure
+        #        (dotfile setups). stat would restore the TARGET's
+        #        owner/mode and os.replace would silently destroy the
+        #        link — refuse instead.
+        #   S4 — first-run creation is owned by the config DIRECTORY's
+        #        owner (the agent) with 0644: a root-owned cli.json used
+        #        to be undeletable state in the agent's home — the TUI
+        #        could never persist its preferences.
+        #   C6 — flush + fsync before replace: the rename can be ordered
+        #        before the data, and a crash would leave a zero-length
+        #        cli.json.
+        try:
+            _st = os.lstat(path)
+        except FileNotFoundError:
+            _st = None
+        if _st is not None and stat.S_ISLNK(_st.st_mode):
+            print(f"tui-register: {path} is a symlink — refusing to replace it (manage the plugin entry in the link target instead)", file=sys.stderr)
+            return 1
+        fd, tmp = tempfile.mkstemp(
+            dir=os.path.dirname(path) or ".",
+            prefix=os.path.basename(path) + ".opk.",
+        )
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f, indent=2)
+                f.write("\n")
+                f.flush()
+                os.fsync(f.fileno())
+                if _st is not None:
+                    os.fchmod(f.fileno(), stat.S_IMODE(_st.st_mode))
+                    try:
+                        os.fchown(f.fileno(), _st.st_uid, _st.st_gid)
+                    except OSError:
+                        pass  # unprivileged caller keeping its own ownership
+                else:
+                    os.fchmod(f.fileno(), 0o644)
+                    _dir = os.stat(os.path.dirname(path) or ".")
+                    try:
+                        os.fchown(f.fileno(), _dir.st_uid, _dir.st_gid)
+                    except OSError:
+                        pass  # unprivileged caller keeping its own ownership
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
     except OSError as e:
         print(f"tui-register: cannot write {path}: {e}", file=sys.stderr)
         return 1

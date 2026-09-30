@@ -5,6 +5,9 @@
 #   /usr/local/lib/opencode-permissions-kit/management/status.sh
 # or from a checkout:
 #   files/status.sh
+# Deliberately set -u ONLY (no -e/pipefail): status is a read-only report —
+# one failing probe must not kill the remaining sections; failures render
+# as "unknown" rows instead (same fail-soft class as uninstall.sh).
 set -u
 
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
@@ -21,7 +24,7 @@ if [ -f "$UI_LIB" ]; then
     # shellcheck disable=SC1090
     . "$UI_LIB"
 else
-    echo "error  ui.sh not found (expected $LIBDIR/sh/ui.sh or next to status.sh in a checkout)" >&2
+    echo "error: ui.sh not found (expected $LIBDIR/sh/ui.sh or next to status.sh in a checkout)" >&2
     exit 1
 fi
 
@@ -211,7 +214,7 @@ _st_root_blocker() {
             return 0
         fi
         # Fixed-point guard: a relative root would spin dirname on "."
-        # forever (C13) — stop when dirname stops making progress.
+        # forever (0.0.38 C13) — stop when dirname stops making progress.
         _str_next=$(dirname "$_str_d")
         [ "$_str_next" = "$_str_d" ] && break
         _str_d=$_str_next
@@ -508,7 +511,6 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/Sys
    && [ -n "${DEFAULT_USER:-}" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
     # shellcheck disable=SC1091  # deployed lib, checked above
     . "$LIBDIR/sh/ddev-hosts.sh"
-    _st_miss_total=0
     if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
         while IFS= read -r _st_root; do
             [ -z "$_st_root" ] && continue

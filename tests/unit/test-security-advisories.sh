@@ -237,20 +237,20 @@ fi
 
 # --- 8. scan script: untrusted-input guard --------------------------------------------
 
-# scripts/security-scan.sh feeds EXTERNAL data (the GitHub advisory feed)
+# scripts/advisory-watch.sh feeds EXTERNAL data (the GitHub advisory feed)
 # into gh argv and a --search query. No shell re-parsing exists (all
 # expansions double-quoted, printf %s, free text only in the body file),
 # but semantics can be attacked — the guard function shape-validates
 # every field that leaves the script as argv/query. Static extraction,
 # same technique as test-status.sh's backend case.
-SCAN="$SCRIPT_DIR/../../scripts/security-scan.sh"
+SCAN="$SCRIPT_DIR/../../scripts/advisory-watch.sh"
 extract_scan_guard() {
     sed -n '/^scan_advisory_valid() {/,/^}/p' "$SCAN"
 }
 if [ -n "$(extract_scan_guard)" ]; then
-    pass "security-scan.sh: guard function extractable"
+    pass "advisory-watch.sh: guard function extractable"
 else
-    fail "security-scan.sh: guard function extractable"
+    fail "advisory-watch.sh: guard function extractable"
 fi
 eval "$(extract_scan_guard)"
 
@@ -315,9 +315,9 @@ fi
 if grep -q -- '--search "\$ID in:title"' "$SCAN" \
    && grep -q -- '--title "New upstream advisory \$ID affects opencode"' "$SCAN" \
    && ! grep -q 'eval ' "$SCAN"; then
-    pass "security-scan.sh: quoted argv only, no eval"
+    pass "advisory-watch.sh: quoted argv only, no eval"
 else
-    fail "security-scan.sh: quoted argv only, no eval"
+    fail "advisory-watch.sh: quoted argv only, no eval"
 fi
 
 echo ""

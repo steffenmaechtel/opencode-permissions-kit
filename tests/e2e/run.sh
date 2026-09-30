@@ -532,6 +532,12 @@ check "default user can read opencode.jsonc" \
     E 'test -r /home/opencode/.config/opencode/opencode.jsonc'
 check "default user can write opencode.jsonc" \
     E 'test -w /home/opencode/.config/opencode/opencode.jsonc'
+check "agent config dir ownership pinned: owner, group, mode (0.0.39j F1 / 0.0.39k F2)" \
+    E 'test "$(stat -c %U:%G:%a /home/opencode/.config/opencode)" = "opencode:opencode:2775"'
+check "agent .config ownership pinned: owner, group, mode (0.0.39j F1 / 0.0.39k F2)" \
+    E 'test "$(stat -c %U:%G:%a /home/opencode/.config)" = "opencode:opencode:2775"'
+check "agent .agents ownership pinned: owner, group, mode (0.0.39j F1 / 0.0.39k F2)" \
+    E 'test "$(stat -c %U:%G:%a /home/opencode/.agents)" = "opencode:opencode:2775"'
 
 echo ""
 echo "--- 6b. Default-user deny-all config (self-update bypass protection) ---"
@@ -852,7 +858,16 @@ check "wrapper: --version banner-free from invalid CWD (issue #91)" \
 # must move the login to a readable directory (opencode home) before the
 # exec — same cwd_probe machinery as the serve fallback.
 E 'sudo chmod 750 /home/dev'
-E 'cd /home/dev && timeout 8 /usr/local/bin/opencode console login </dev/null 2>&1 | tee /tmp/wrapper-login-home.txt || true'
+# opencode >= 1.18.33 survives SIGTERM during the device-login poll (prints
+# "Canceled", then keeps the process — and everything above it — alive), so a
+# plain `timeout 8 ... | tee` hangs the whole suite (reproduced against the
+# raw binary, no kit involved; 1.18.32 still exits cleanly). Structure that
+# cannot hang: file redirect instead of a pipe (nothing waits on the orphan)
+# plus timeout's SIGKILL, and a separate cleanup step whose 'consol[e]'
+# pattern cannot match its own command line (pkill would otherwise kill the
+# exec shell carrying the literal "console login" from the invocation above).
+E 'cd /home/dev && timeout -k 2 8 /usr/local/bin/opencode console login </dev/null >/tmp/wrapper-login-home.txt 2>&1 || true'
+E 'sudo pkill -KILL -f "consol[e] login" 2>/dev/null || true'
 E 'sudo chmod 755 /home/dev'
 check "wrapper: device login moves off an unreadable cwd (issue #91)" \
     E 'grep -q "Login runs from" /tmp/wrapper-login-home.txt'
@@ -946,7 +961,7 @@ _rootless_ok=true
 # 1 <n> 65536`), so the kit's default subuid allocation (231072+) is OUTSIDE
 # the container's uid map and podman-rootless provisioning's `newuidmap` write
 # fails with EPERM. Seeding an in-range range first works because
-# setup-container-backend.sh's allocate_range() KEEPS an existing entry. No-op
+# setup-container-backend's allocate_range() KEEPS an existing entry. No-op
 # on a rootful host, which keeps CI on the kit's true default path.
 if [ "$E2E_HOST_LAYOUT" = "rootless" ]; then
     echo "  ${CYAN}Nested userns (rootless host docker) — seeding in-range subuid/subgid${NC}"

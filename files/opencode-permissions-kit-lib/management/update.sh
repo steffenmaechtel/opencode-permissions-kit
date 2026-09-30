@@ -31,7 +31,38 @@
 #
 # Use install.sh for the very first setup (it asks the questions).
 # Use config.sh to change project roots or git-config hardening.
-set -e
+# -u/pipefail rationale: see install.sh (review 0.0.39a C2).
+set -eu
+(set -o pipefail) 2>/dev/null && set -o pipefail || true
+
+# Scratch-file cleanup (review 0.0.39a C1): temp artifacts are removed on
+# ANY exit path — failure, Ctrl-C, TERM, and success. The upgrade backup
+# directory is deliberately kept (recovery material, reported to the
+# user). _FETCH_TREE survives the self re-exec below via the environment,
+# so the re-exec'd copy cleans the tree its parent fetched.
+_FETCH_TREE="${_FETCH_TREE:-}"
+# Result dir of a fetched tree — set by fetch_kit, read by the caller
+# below (never stdout: the export + trap registration must happen in THIS
+# shell, and a command substitution would void both; wave-f review).
+_FK_DIR="${_FK_DIR:-}"
+_BIN_TMP=""
+# Registry for short-lived scratch files created inside functions
+# (ensure_local_file fetch temps, wsl-browser-bridge rewrites) — the
+# trap empties it on every exit path (review 0.0.39e C3).
+_TMP_REGISTRY=""
+_tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
+cleanup() {
+    if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
+    if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
+    if [ -n "${_BIN_TMP:-}" ]; then rm -rf "$_BIN_TMP"; fi
+    # word splitting intended: registry entries are mktemp paths
+    # shellcheck disable=SC2086
+    if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
+}
+# A signal handler must EXIT (see install.sh); the EXIT trap re-runs the
+# idempotent cleanup.
+trap cleanup EXIT
+trap 'cleanup; exit 1' INT TERM
 
 # Ref the kit updates from. Resolution (issue #38, docs/design/
 # release-handling.md): --channel flag (pre-scanned below) > explicit
@@ -54,8 +85,20 @@ for _arg in "$@"; do
     fi
     _prev_arg="$_arg"
 done
-_kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)"
+# || true on the optional-file reads: with pipefail the sed failure on a
+# missing install.conf must not abort (the old tail-masking hid it).
+_kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true)"
 KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
+# The resolved ref is re-stamped as KIT_CHANNEL into install.conf, which
+# privileged scripts source wholesale — refuse anything outside a git-ref
+# charset, whatever its source (--channel flag, env, or a stale stamp)
+# (review 0.0.39b S1).
+case "$KIT_BRANCH" in
+    *[!A-Za-z0-9._/-]*|*..*)
+        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
+        exit 1
+        ;;
+esac
 KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/$KIT_BRANCH}"
 
 # Canonical kit file list. Single source of truth shared by fetch_kit() and
@@ -71,14 +114,47 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 #   curl -fsSL .../files/opencode-permissions-kit-lib/management/update.sh | sudo bash
 # which deploys the new layout and removes the old files (see the cleanup
 # section below). No compatibility stubs are kept for the old paths.
-KIT_FILES="install.sh VERSION \
-             opencode-permissions-kit-lib/management/config.sh opencode-permissions-kit-lib/management/update.sh opencode-permissions-kit-lib/management/status.sh opencode-permissions-kit-lib/management/uninstall.sh \
-             opencode-permissions-kit-lib/templates/opencode.jsonc \
-             opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
-             opencode-permissions-kit-lib/templates/sudoers.template etc/umask.sh \
-opencode-permissions-kit-lib/bin/opencode-as-opencode opencode-permissions-kit-lib/bin/opk opencode-permissions-kit-lib/py/jsonc-parser.py opencode-permissions-kit-lib/py/tui-register.py \
-opencode-permissions-kit-lib/sh/log.sh opencode-permissions-kit-lib/sh/ui.sh opencode-permissions-kit-lib/sh/advisories.sh opencode-permissions-kit-lib/sh/shell-warn.sh opencode-permissions-kit-lib/bin/setup-container-backend opencode-permissions-kit-lib/bin/socket-check opencode-permissions-kit-lib/bin/cwd-check opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode opencode-permissions-kit-lib/sh/ddev-handover.sh opencode-permissions-kit-lib/sh/ddev-migrate.sh opencode-permissions-kit-lib/bin/ddev-migrate opencode-permissions-kit-lib/sh/ddev-hosts.sh opencode-permissions-kit-lib/sh/fs-baseline.sh opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh opencode-permissions-kit-lib/bin/browser-bridge \
-opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/kit-mode-2x.tsx opencode-permissions-kit-lib/tui/opencode-danger.theme.json opencode-permissions-kit-lib/tui/tui.json opencode-permissions-kit-lib/tui/tui-danger.json"
+#
+# FORMAT RULE: one file per line, backslash-continued — packed multi-name
+# lines make every diff unreadable (test-kit-files compares word-wise and
+# does not care about layout; this format is convention). Keep it when
+# adding files. install.sh's fetch_kit list follows the same rule.
+KIT_FILES="install.sh \
+VERSION \
+opencode-permissions-kit-lib/management/config.sh \
+opencode-permissions-kit-lib/management/update.sh \
+opencode-permissions-kit-lib/management/status.sh \
+opencode-permissions-kit-lib/management/uninstall.sh \
+opencode-permissions-kit-lib/templates/opencode.jsonc \
+opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
+opencode-permissions-kit-lib/templates/sudoers.template \
+etc/umask.sh \
+opencode-permissions-kit-lib/bin/opencode-as-opencode \
+opencode-permissions-kit-lib/bin/opk \
+opencode-permissions-kit-lib/py/jsonc-parser.py \
+opencode-permissions-kit-lib/py/tui-register.py \
+opencode-permissions-kit-lib/sh/log.sh \
+opencode-permissions-kit-lib/sh/ui.sh \
+opencode-permissions-kit-lib/sh/advisories.sh \
+opencode-permissions-kit-lib/sh/shell-warn.sh \
+opencode-permissions-kit-lib/bin/setup-container-backend \
+opencode-permissions-kit-lib/bin/socket-check \
+opencode-permissions-kit-lib/bin/cwd-check \
+opencode-permissions-kit-lib/sh/ddev-terminal.sh \
+opencode-permissions-kit-lib/bin/ddev-as-opencode \
+opencode-permissions-kit-lib/sh/ddev-handover.sh \
+opencode-permissions-kit-lib/sh/ddev-migrate.sh \
+opencode-permissions-kit-lib/bin/ddev-migrate \
+opencode-permissions-kit-lib/sh/ddev-hosts.sh \
+opencode-permissions-kit-lib/sh/fs-baseline.sh \
+opencode-permissions-kit-lib/sh/staged-write.sh \
+opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
+opencode-permissions-kit-lib/bin/browser-bridge \
+opencode-permissions-kit-lib/tui/kit-mode.tsx \
+opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
+opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
+opencode-permissions-kit-lib/tui/tui.json \
+opencode-permissions-kit-lib/tui/tui-danger.json"
 
 # Downloads every kit file from KIT_BASE_URL into a temp checkout layout
 # (files/ + VERSION) and prints the files/ directory. Used when this script
@@ -87,6 +163,9 @@ opencode-permissions-kit-lib/tui/kit-mode.tsx opencode-permissions-kit-lib/tui/k
 fetch_kit() {
     local base dir f
     base="$(mktemp -d)"
+    # Registered for the EXIT/INT/TERM cleanup (survives the re-exec via
+    # the export below): a failed fetch must not leave the partial tree.
+    _FETCH_TREE="$base"
     dir="$base/files"
     # Pre-create every subdirectory referenced by KIT_FILES (bin/, sh/,
     # py/, tui/): curl -o cannot write into a missing directory and aborts
@@ -94,13 +173,29 @@ fetch_kit() {
     mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" "$dir/etc"
     for f in $KIT_FILES; do
         echo "  fetching $f ..." >&2
+        # Fetch to a temp file and refuse anything unsound (0.0.39e C1):
+        # an empty-but-200 body landed in the deploy tree as root before —
+        # the same guard ensure_local_file already carries.
         if [ "$f" = "VERSION" ]; then
-            curl -fsSL "$KIT_BASE_URL/VERSION" -o "$base/VERSION" || return 1
+            _fk_dst="$base/VERSION"
+            _fk_url="$KIT_BASE_URL/VERSION"
         else
-            curl -fsSL "$KIT_BASE_URL/files/$f" -o "$dir/$f" || return 1
+            _fk_dst="$dir/$f"
+            _fk_url="$KIT_BASE_URL/files/$f"
         fi
+        _fk_tmp=$(mktemp)
+        _tmp_track "$_fk_tmp"
+        if ! curl -fsSL "$_fk_url" -o "$_fk_tmp" || [ ! -s "$_fk_tmp" ]; then
+            rm -f "$_fk_tmp"
+            echo "error: could not fetch $f from $_fk_url (failed or empty) — aborting" >&2
+            return 1
+        fi
+        chmod 644 "$_fk_tmp"
+        mv "$_fk_tmp" "$_fk_dst"
     done
-    echo "$dir"
+    # Global, NOT stdout — see install.sh's copy (subshell registrations
+    # would void the cleanup trap; wave-f review).
+    _FK_DIR="$dir"
 }
 
 # Re-fetch any single kit file that is missing under $FILES_ROOT (best-effort).
@@ -112,7 +207,19 @@ ensure_local_file() {
     [ -f "$FILES_ROOT/$f" ] && return 0
     mkdir -p "$(dirname "$FILES_ROOT/$f")"
     echo "  re-fetching missing $f ..." >&2
-    curl -fsSL "$KIT_BASE_URL/files/$f" -o "$FILES_ROOT/$f" 2>/dev/null || true
+    # A failed fetch must never leave a partial (empty or HTML-error-body)
+    # file in place — it would be deployed with sudo cp further down
+    # (review 0.0.39a S3). Fetch to a temp file, move in only when sound.
+    local _elf_tmp
+    _elf_tmp="$(mktemp)"
+    _tmp_track "$_elf_tmp"
+    if ! curl -fsSL "$KIT_BASE_URL/files/$f" -o "$_elf_tmp" 2>/dev/null || [ ! -s "$_elf_tmp" ]; then
+        rm -f "$_elf_tmp"
+        echo "error: could not fetch $f from $KIT_BASE_URL — aborting (partial files are never deployed)" >&2
+        return 1
+    fi
+    chmod 644 "$_elf_tmp"
+    mv "$_elf_tmp" "$FILES_ROOT/$f"
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -130,13 +237,21 @@ for _opk_a in "$@"; do
 done
 if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
     echo "No local checkout — fetching kit files from $KIT_BASE_URL ..."
-    SCRIPT_DIR="$(fetch_kit)" || { echo "error  Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    # Direct call, NOT SCRIPT_DIR="$(fetch_kit)" — a subshell's variable
+    # writes (incl. the _FETCH_TREE export below and the trap
+    # registrations) never reach this shell (wave-f review).
+    fetch_kit || { echo "error: Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    SCRIPT_DIR="$_FK_DIR"
     # Do NOT continue executing this (installed, possibly older) copy: the
     # deploy below overwrites $LIBDIR/management/update.sh with the freshly fetched one,
     # which would replace the very file we are still running from. bash reads
     # a script incrementally, so a self-modifying script corrupts its parser
     # mid-run ("syntax error near unexpected token '('"). Re-exec the fetched
     # copy instead — its own overwrite of $LIBDIR/management/update.sh is then harmless.
+    # exec replaces this shell, so the EXIT trap cannot fire here — hand the
+    # fetched tree to the new process via the environment; its own cleanup
+    # trap removes it on exit.
+    export _FETCH_TREE
     exec bash "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh" "$@"
 fi
 # The files/ root this update deploys from: after the fetch+re-exec above
@@ -155,9 +270,13 @@ if [ "$_opk_binonly" != true ]; then
 fi
 # Library runs have no ../VERSION — fall back to the installed stamp so the
 # banner/summary show the real version (binary-only runs never re-stamp it).
+# The empty-output case is closed explicitly: sed "succeeding" with no
+# match would otherwise leave VERSION empty instead of "0.0.0"
+# (review 0.0.39b Q3).
 VERSION=$(cat "$FILES_ROOT/../VERSION" 2>/dev/null \
     || sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 \
     || echo "0.0.0")
+[ -n "$VERSION" ] || VERSION="0.0.0"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 CONFDIR="/etc/opencode-permissions-kit"
 PROJECTS_CONF="$CONFDIR/projects.conf"
@@ -199,9 +318,26 @@ done
 # install.conf (upgrade floor 0.0.14: the canonical path always exists)
 INSTALL_CONF="$CONFDIR/install.conf"
 
+# Shared symlink-safe privileged-write helper (review 0.0.39g S1) +
+# agent-home link gates (review 0.0.39h F1/F2): the tui.json refresh and
+# sync_tui_registration below write into the AGENT-owned
+# ~/.config/opencode — root cp/chown must never follow a planted symlink
+# there, and a linked PARENT (~/.config, ~/.config/opencode) must never
+# redirect the writes. Sourced EARLY (moved from the tui.json section,
+# 0.0.39h): sync_tui_registration also runs from the binary-upgrade
+# section above that old point. Same lookup order as ui.sh.
+_swl=""
+for _swl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
+    if [ -f "$_swl_cand" ]; then . "$_swl_cand"; _swl="$_swl_cand"; break; fi
+done
+[ -n "$_swl" ] || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+# Old-library fallback (pre-0.0.39h deployed copy): no walker yet — fail
+# open like the pre-gate behavior, the writes above still refuse via
+# staged_write itself.
+command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
+
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
-OPENCODE_GROUP=""
 INSTALLED_VERSION=""
 # Save the version from the VERSION file (read above) before sourcing
 # install.conf, which also has a VERSION= line (the old stamp). We don't
@@ -373,7 +509,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/status.sh"         
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template"                 "$LIBDIR/templates/sudoers.template"
 sudo chmod 440 "$LIBDIR/templates/sudoers.template"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode.jsonc"                   "$LIBDIR/templates/opencode.jsonc"
-# Same deploy set as install.sh (C19): without this line the deny-all
+# Same deploy set as install.sh (0.0.38 C19): without this line the deny-all
 # template in $LIBDIR/templates/ went stale on every opk update.
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc"          "$LIBDIR/templates/opencode-deny-all.jsonc"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/uninstall.sh"                     "$LIBDIR/management/uninstall.sh"
@@ -385,6 +521,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/sh/ddev-migrate.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # browser-bridge stand-in source (deploys into the wsl/ tree; source of
 # 'opk wsl-add-opencode-1-fix' re-runs)
@@ -399,7 +536,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
+sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
 sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
 sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
@@ -470,7 +607,7 @@ if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ];
     SUDO_TMP=$(mktemp)
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
     # Validate the RENDERED file before deploying anything: a broken file
-    # in /etc/sudoers.d makes sudo itself refuse to run (S1).
+    # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
     if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
         rm -f "$SUDO_TMP"
         die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."
@@ -574,18 +711,15 @@ if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
         if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
-            echo "  ${UI_YELLOW}WARNING: /mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)${UI_NC}"
-            echo "  ${UI_YELLOW}— the mount stays world-readable (mode $mnt_mode) and opencode warns on${UI_NC}"
-            echo "  ${UI_YELLOW}every start until the distro is reopened.${UI_NC}"
+            ui_warn "/mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)"
+            ui_warn "the mount stays world-readable (mode $mnt_mode) and opencode warns on every start until the distro is reopened."
         else
-            echo "  ${UI_YELLOW}WARNING: /mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent${UI_NC}"
-            echo "  ${UI_YELLOW}can read the Windows profile. opencode warns on every start until fixed.${UI_NC}"
-            echo "  ${UI_YELLOW}Recommended fix in /etc/wsl.conf:${UI_NC}"
-            echo "    [automount]"
-            echo "    enabled = true"
-            echo "    options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
-            echo "  ${UI_YELLOW}then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf —${UI_NC}"
-            echo "  ${UI_YELLOW}apply the snippet yourself.${UI_NC}"
+            ui_warn "/mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent can read the Windows profile."
+            ui_warn "opencode warns on every start until fixed. Recommended fix in /etc/wsl.conf:"
+            ui_detail "[automount]"
+            ui_detail "enabled = true"
+            ui_detail "options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
+            ui_warn "then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf — apply the snippet yourself."
         fi
     fi
 fi
@@ -597,8 +731,11 @@ fi   # ONLY_BINARY skip: kit re-deploy ... pre-binary sections
 SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 
 # --- re-assert opencode binary permissions ------------------------------------
-# The binary must stay executable only for root and the opencode user, so a
-# tool invoking the absolute path as the default user cannot bypass the wrapper.
+# root:$BINARY_GROUP mode 750 lets the opencode user run the binary and
+# keeps unrelated users out — but it is NOT a developer-side bypass guard:
+# the developer is in the sharing group and CAN exec this path directly;
+# the soft layer (deny-all config + warnings) is what deters that, per
+# the kit's declared model.
 BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 if [ -x "$SYSTEM_BIN" ]; then
     sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
@@ -679,7 +816,7 @@ current_opencode_major() {
         echo "$_com_maj"
         return 0
     fi
-    _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1)
+    _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
     echo "${_com_maj:-1}"
 }
 
@@ -764,6 +901,25 @@ sync_tui_registration() {
     for _str_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
         _str_user_dir="${_str_dir_user%%:*}"
         _str_dir_owner="${_str_dir_user#*:}"
+        # Chain gate (review 0.0.39h F2): the gates below check plugins/
+        # and the plugin dir, but the PARENT chain of the config dir is
+        # agent-replaceable too (the agent side) — a linked parent passes
+        # `sudo mkdir -p` silently and redirects the mkdir/ln/chown/rm AND
+        # the tui-register run below through it. The walker no-ops outside
+        # the agent home (the developer side is trusted).
+        if ! agent_home_sane "$OPENCODE_USER" "$_str_user_dir"; then
+            log "tui plugin registration skipped: symlink in the chain to $_str_user_dir (user-managed)"
+            continue
+        fi
+        # 0.0.39g S1 class: the opencode user's config dir is agent-owned.
+        # A planted symlink at plugins/ (or the plugin dir itself) must
+        # never be followed — mkdir -p would create through it, chown
+        # dereferences the operand (arbitrary chown to the agent), and
+        # rm -rf would delete through it. Skip loudly instead.
+        if [ -L "$_str_user_dir/plugins" ] || [ -L "$_str_user_dir/plugins/opencode-permissions-kit" ]; then
+            log "tui plugin registration skipped: $_str_user_dir/plugins is a symlink (user-managed)"
+            continue
+        fi
         if [ "$_str_major" = 2 ]; then
             sudo mkdir -p "$_str_user_dir/plugins/opencode-permissions-kit"
             sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
@@ -809,11 +965,13 @@ if [ "$BINARY_UPDATE" = true ]; then
         fi
         if [ -n "$_up_ver" ]; then
             TMP="$(mktemp -d)"
+            _BIN_TMP="$TMP"
             if ! SRC=$(fetch_opencode_version "$TMP" "$_up_ver"); then
                 ui_warn "download of opencode $_up_ver failed — binary left untouched"
                 log "opencode binary upgrade skipped: download of $_up_ver failed"
                 rm -rf "$TMP"
                 TMP=""
+                _BIN_TMP=""
                 SRC=""
             fi
         fi
@@ -885,10 +1043,10 @@ fi
 # does (as the opencode user, HOME/DOCKER_HOST re-set). The direct binary
 # (PATH, then the two standard locations) is the fallback; when neither
 # answers, the old stamp survives.
-NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1)"
+NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)"
 _ddev_probe=""
 if [ -x "$LIBDIR/bin/ddev-as-opencode" ] && id "$OPENCODE_USER" >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-    _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+    _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
 fi
 if [ -z "$_ddev_probe" ]; then
     _ddev_bin=""
@@ -896,7 +1054,7 @@ if [ -z "$_ddev_probe" ]; then
         [ -n "$_ddev_cand" ] && [ -x "$_ddev_cand" ] && { _ddev_bin="$_ddev_cand"; break; }
     done
     if [ -n "$_ddev_bin" ]; then
-        _ddev_probe=$("$_ddev_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+        _ddev_probe=$("$_ddev_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
     fi
 fi
 if [ -n "$_ddev_probe" ]; then
@@ -904,38 +1062,60 @@ if [ -n "$_ddev_probe" ]; then
 fi
 
 # --- refresh install.conf (version stamp + group key) --------------------------
-
-NEW_INSTALL_CONF="$(mktemp)"
+# Atomic re-stamp (review 0.0.39h F6 — the C5 twin site: install.sh's stamp
+# got temp+mv in 0.0.39g, this rewrite still deployed via truncate-in-place
+# `sudo cp`): render the new content BESIDE the target, then mv it in — a
+# mid-write crash never leaves a partial install.conf. The sibling temp is
+# registered in the scratch registry. The grep guard is narrowed (0.0.39h
+# F4): rc 1 (empty result) stays benign, rc 2 (real read error) now dies
+# BEFORE any write — the old `|| true` masked it into a rewrite keeping
+# only the 4 re-stamped keys. The rc is captured OUTSIDE the write
+# pipeline: dash has no pipefail, `|| rc=$?` on the pipeline would only
+# ever see tee's 0.
+# Keys this update owns: VERSION (re-stamped), OPENCODE_GROUP (re-based to
+# the opencode usergroup), KIT_CHANNEL (re-stamped to the ref just updated
+# from), DDEV_VERSION (re-probed above — the fallback stays fresh).
+_INSTALL_CONF_TMP="$CONFDIR/install.conf.opk-new"
+_tmp_track "$_INSTALL_CONF_TMP"
+_ic_rc=0
+_ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null) || _ic_rc=$?
+[ "$_ic_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ic_rc) — install.conf left untouched"
 {
-    if [ -f "$INSTALL_CONF" ]; then
-        # Strip keys this update owns: VERSION (re-stamped),
-        # OPENCODE_GROUP (re-based to the opencode usergroup),
-        # KIT_CHANNEL (re-stamped to the ref just updated from), and
-        # DDEV_VERSION (re-probed above — the fallback stays fresh).
-        grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null
-    fi
+    if [ -n "$_ic_keep" ]; then printf '%s\n' "$_ic_keep"; fi
     echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
     echo "KIT_CHANNEL=$KIT_BRANCH"
     echo "VERSION=$VERSION"
     echo "DDEV_VERSION=$NEW_DDEV_VERSION"
-} | sort -u > "$NEW_INSTALL_CONF"
-sudo cp "$NEW_INSTALL_CONF" "$CONFDIR/install.conf"
-sudo chmod 644 "$CONFDIR/install.conf"
-rm -f "$NEW_INSTALL_CONF"
+} | sort -u | sudo tee "$_INSTALL_CONF_TMP" > /dev/null
+sudo chmod 644 "$_INSTALL_CONF_TMP"
+sudo mv -f "$_INSTALL_CONF_TMP" "$CONFDIR/install.conf"
 ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
 log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
 
 # --- TUI mode display user files (docs/_archive/design/plan-ui-tui-opencode.md) ---------
 # Same only-if-absent-or-kit-written policy as install.sh (marker key
-# _opencode_permissions_kit): user edits survive updates.
+# _opencode_permissions_kit): user edits survive updates. The write goes
+# through the shared staged_write helper (review 0.0.39g S1 — sourced
+# early, see the top of this script): the target dir is agent-owned, root
+# cp/chown must never follow a planted symlink; a user-managed symlink at
+# the destination is skipped, never written through.
 OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"
 OC_TUI_CONF="$OC_TUI_DIR/tui.json"
-sudo mkdir -p "$OC_TUI_DIR"
-if [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
-    sudo cp "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
-    sudo chown "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$OC_TUI_CONF"
-    sudo chmod 664 "$OC_TUI_CONF"
-    log "tui mode display refreshed: $OC_TUI_CONF"
+# Chain gate BEFORE mkdir -p (review 0.0.39h F2): a linked PARENT
+# (~/.config, ~/.config/opencode) or a linked .config/opencode leaf
+# passes `sudo mkdir -p` silently and would redirect the staged_write mv
+# into the link target. Skip loudly (user-managed).
+if ! agent_home_sane "$OPENCODE_USER" "$OC_TUI_DIR"; then
+    ui_detail "the chain to $OC_TUI_CONF contains a symlink — TUI mode display NOT refreshed (user-managed)"
+    log "tui mode display skipped: symlink in the chain to $OC_TUI_CONF"
+else
+    sudo mkdir -p "$OC_TUI_DIR"
+    if [ -L "$OC_TUI_CONF" ]; then
+        log "tui mode display skipped: $OC_TUI_CONF is a symlink (user-managed)"
+    elif [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
+        staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
+        log "tui mode display refreshed: $OC_TUI_CONF"
+    fi
 fi
 DEFAULT_TUI_CONF="/home/$DEFAULT_USER/.config/opencode/tui.json"
 DEFAULT_THEME_DIR="/home/$DEFAULT_USER/.config/opencode/themes"
@@ -954,7 +1134,7 @@ fi
 # remove it on 1.x (the 1.x tui.json/danger theme are major-agnostic and
 # stay). The major comes from the install.conf stamp, freshly re-stamped
 # by any binary upgrade above.
-_oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1)
+_oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
 [ -n "$_oc_major" ] || _oc_major=1
 sync_tui_registration "$_oc_major"
 

@@ -138,7 +138,7 @@ like `/var/www/vhosts` holding several projects):
 
 | App type (`.ddev/config.yaml` `type:`) | Handed-over directories |
 |---|---|
-| `typo3` | `config/system`, `<docroot>/typo3conf` (composer v12+, legacy v12 `system/`, v11−) |
+| `typo3` | `config/system`, `<docroot>/typo3conf`, and bare `typo3conf` (repo-root fallback for legacy installs; composer v12+, legacy v12 `system/`, v11−) |
 | `drupal*`, `backdrop` | `<docroot>/sites/default` |
 | `magento*` | `app/etc` |
 
@@ -251,7 +251,16 @@ Notes:
 - **mkcert CA** — reused from the Windows user (WSL2: scanned from
   `/mnt/c/Users/*/AppData/Local/mkcert`) or the developer's CAROOT so
   browsers keep trusting ddev's HTTPS certs; a new CA is generated only as
-  a last resort.
+  a last resort. A symlink anywhere in the chain to the agent's CAROOT is
+  never followed — CA reuse/provisioning is skipped with a warning, so no
+  trusted CA exists in that case until you remove the link and re-run the
+  install. A fresh CA is created **as the `opencode` user** and is
+  therefore NOT installed into the system or Windows trust stores — the
+  install prints the import command (`sudo env CAROOT=… mkcert -install`)
+  for you to run yourself. The copy includes the CA **private key** — ddev
+  signs certificates host-side as the `opencode` user, which has no `/mnt/c`
+  access to the original; the accepted residual risk is documented in the
+  [security model](security-model.md#known-residual-gaps).
 
 ## Hostnames and the Windows hosts file
 

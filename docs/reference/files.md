@@ -23,7 +23,7 @@ Uninstall asks before removing the kit block (or assumes yes with
 | Path | Purpose |
 |---|---|
 | `install.conf` | Install settings (keys below) |
-| `projects.conf` | Project roots (one per line) |
+| `projects.conf` | Project roots (one per line; paths must not contain spaces — the writer splits on them, every consumer reads line-by-line) |
 
 ### `install.conf` keys
 
@@ -35,6 +35,9 @@ Uninstall asks before removing the kit block (or assumes yes with
 | `OPENCODE_DOCKER_HOST` | `docker-rootless` socket, e.g. `unix:///run/user/<opencode-uid>/docker.sock` |
 | `OPENCODE_PODMAN_SOCKET` | Optional podman docker-CLI-compat socket |
 | `DDEV_VERSION` | ddev version recorded at install time and re-probed by every `opk update` (fallback — `status.sh` reports the live `ddev --version`: directly, or through the ddev-as-opencode helper when run as root, since ddev ≥ 1.25.4 refuses root; flags < 1.25) |
+| `DDEV_DEV_OWNED` | `true` = dev-owned settings mode (kit writes `disable_settings_management: true`), `false` = ddev-managed (handover model); toggled by `opk config ddev-settings` |
+| `DDEV_EXPORTED` | `1` once a ddev database export wave completed — later installs/updates skip the export |
+| `OPENCODE_MAJOR` | installed opencode binary's major (1 or 2); gates the wrapper's 2.x-only flags. Best effort — the wrapper detects at runtime when missing |
 | `KIT_CHANNEL` | Ref installs/updates track (`stable`, `master`, a feature branch, or a pinned tag) — set by `install.sh`, re-stamped by `update.sh`, shown by `opk status` |
 | `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
 | `HARD_DENY_REMOVED` | unused (historical migration stamp; updates from < 0.0.14 are refused — see [update](../how-to/update.md)) |
@@ -86,10 +89,12 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh` | Shared helper: `.ddev` + settings-dir chown |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-hosts.sh` | Shared helper: Windows hosts bridge |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-migrate.sh` | Shared helper: migration functions (sourced by install.sh and `bin/ddev-migrate`) |
+| `/usr/local/lib/opencode-permissions-kit/sh/advisories.sh` | Shared helper: the kit's static security-advisory database (checked by the wrapper on every start, diffed against the upstream feed by `opk status`) |
 | `/usr/local/lib/opencode-permissions-kit/sh/fs-baseline.sh` | Shared helper: group baseline recursion |
 | `/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh` | Shared helper: WSL browser bridge deploy (wsl.conf comment block + stand-in) |
 | `/usr/local/lib/opencode-permissions-kit/sh/log.sh` | Shared helper: audit logging |
 | `/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh` | Shared helper: bypass warnings |
+| `/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh` | Shared helper: symlink-safe privileged writes (`staged_write` staging + the `agent_home_sane` walker) |
 | `/usr/local/lib/opencode-permissions-kit/sh/ui.sh` | Shared helper: labeled output |
 | `/usr/local/lib/opencode-permissions-kit/management/config.sh` | Management: projects, git-config, backend, refresh |
 | `/usr/local/lib/opencode-permissions-kit/management/update.sh` | Management: re-deploy, binary upgrades |

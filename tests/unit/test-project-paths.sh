@@ -7,7 +7,7 @@
 #
 # Static extraction of project_path_sane() from the shipped scripts, then
 # table-driven checks. No root required.
-# Run: sh tests/test-project-paths.sh
+# Run: sh tests/unit/test-project-paths.sh
 set -e
 
 RED='\033[0;31m'
@@ -56,7 +56,8 @@ REJECT="/ /usr /etc /home /root /var /tmp /tmp/build-dir /bin /sbin /lib /lib64 
 /var/log /var/log/nginx /var/lib /var/lib/docker /var/spool /var/spool/cron \
 /var/cache /var/mail /var/mail/root \
 /usr/share /etc/nginx /root/projects /home/../etc /./etc /etc/ /usr/ \
-relative/path ../etc ./here subdir"
+relative/path ../etc ./here subdir \
+/home/opencode"
 
 # must ACCEPT (dedicated project folders)
 ACCEPT="/var/www/vhosts /var/www /var/www/vhosts/client1 /home/dev/projects \
@@ -131,6 +132,37 @@ if project_path_sane ""; then
     fail "rejects empty path"
 else
     pass "rejects empty path"
+fi
+
+# Paths containing whitespace are rejected: projects.conf is line-based
+# and the install-side writer splits on spaces (0.0.39b C3).
+if project_path_sane "/home/dev/my projects"; then
+    fail "rejects paths containing spaces (storage format is space-free)"
+else
+    pass "rejects paths containing spaces (storage format is space-free)"
+fi
+if project_path_sane "/var/www/vhosts/client site"; then
+    fail "rejects paths containing tabs/spaces anywhere"
+else
+    pass "rejects paths containing tabs/spaces anywhere"
+fi
+
+# install.sh must store the NORMALIZED path, not the raw tilde input, in
+# both entry points — a literal ~/dev in projects.conf is silently skipped
+# by every consumer (review 0.0.39b C1). The standard prompt (line ~593)
+# always did; --projects and the custom-path dialog must match it.
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
+_norm_sites=$(grep -c '_PP_NORM' "$INSTALL")
+if [ "$_norm_sites" -ge 4 ]; then
+    pass "install.sh uses _PP_NORM in all project entry points ($_norm_sites sites)"
+else
+    fail "install.sh uses _PP_NORM in all project entry points (only $_norm_sites sites)"
+fi
+if grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' "$INSTALL" \
+   && grep -q '_custom="$_custom \$_PP_NORM"' "$INSTALL"; then
+    pass "install.sh: --projects and custom dialog store the expanded path"
+else
+    fail "install.sh: --projects and custom dialog store the expanded path"
 fi
 
 echo ""

@@ -19,7 +19,7 @@ opk config container-backend status
 ## What the switch does
 
 Rootless provisioning (packages, subuid/subgid auto-allocation, linger) is
-handled by `setup-container-backend.sh`:
+handled by `setup-container-backend`:
 
 - **docker-rootless** — per-user daemon, started via
   `dockerd-rootless-setuptool.sh`, linger enabled so the socket exists

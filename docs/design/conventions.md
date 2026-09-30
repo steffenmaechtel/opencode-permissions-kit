@@ -44,6 +44,12 @@ labeled lines `info`/`success`/`warn`/`error` via `ui.sh`, slim banner,
 Unicode symbols with `UI_ASCII=1` fallback, `NO_COLOR` and non-tty
 honored.
 
+File lists in code (fetch/deploy/chmod lists such as `KIT_FILES` and
+install.sh's fetch list): **one file per line**, backslash-continued.
+Packed multi-name lines make diffs unreadable; consumers and tests
+compare word-wise, so the layout is pure convention — keep it when
+adding entries.
+
 ## Shell security (untrusted input)
 
 External data — HTTP feeds, files someone else wrote, anything parsed
@@ -83,10 +89,25 @@ Patterns already in this repo:
 
 | Context | Pattern | Code |
 |---|---|---|
-| GitHub advisory feed → `gh` argv/query | `scan_advisory_valid` — charset + vocabulary + anchored ranges | `scripts/security-scan.sh` |
+| GitHub advisory feed → `gh` argv/query | `scan_advisory_valid` — charset + vocabulary + anchored ranges | `scripts/advisory-watch.sh` |
 | version resolution (GitHub/npm) | strict `case 1.*`/`2.*`, loud abort outside the shape | `management/update.sh` (`resolve_latest_opencode_version`) |
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
+
+## Referencing review findings
+
+Every review restarts its finding IDs at S1/C1, so a bare ID is ambiguous
+across reviews (v0.0.38 and 0.0.39a both have an `S1`). In-code comments,
+commit messages, and resolutions therefore always qualify the ID with the
+review stem (the snapshot's file-name stem without the date):
+
+- `(0.0.38 S1)` — v0.0.38 review, security finding 1
+- `(0.0.39a C1)` / `(0.0.39b S1)` — same-day variant snapshots
+
+Grep-able by design: `grep -rn "0.0.38 S1"`. The
+[review index](review/README.md#index) maps stems to snapshots, ID ranges,
+and resolutions; the snapshot's own
+[template](review/template.md) carries the rule.
 
 ## Language
 

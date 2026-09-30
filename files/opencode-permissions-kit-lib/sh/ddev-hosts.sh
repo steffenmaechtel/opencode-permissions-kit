@@ -123,10 +123,19 @@ ddev_hosts_missing() {
     dhmi_list=$(ddev_hosts_list "$dhmi_proj")
     [ -n "$dhmi_list" ] || return 0
     for dhmi_h in $dhmi_list; do
+        # Hostnames only ever contain letters, digits, dots and hyphens,
+        # and must START with a letter or digit — a leading hyphen would
+        # reach `ddev hostname` as an option-looking argv. Anything else
+        # (whitespace, quotes, metacharacters) is refused here instead of
+        # being trusted on the way into argv and printed hints
+        # (review 0.0.39a S5, fix-wave review).
+        case "$dhmi_h" in
+            [!A-Za-z0-9]*|*[!A-Za-z0-9.-]*) continue ;;
+        esac
         case "$dhmi_h" in
             *.ddev.site) continue ;;
         esac
-        # Exact field comparison (C22): interpolating the hostname into a
+        # Exact field comparison (0.0.38 C22): interpolating the hostname into a
         # grep -E pattern mis-matches on regex metacharacters — a name
         # with "[y]" never matched (re-added forever), "+" false-matched
         # other names. Fields 2+ are the names; field 1 is the IP. CR is
@@ -176,10 +185,13 @@ ddev_hosts_add() {
     [ -n "$dha_bin" ] || { [ -x /usr/bin/ddev ] && dha_bin=/usr/bin/ddev; }
     [ -n "$dha_bin" ] || { echo "ddev-hosts: ddev is not installed"; return 1; }
 
-    # Hostname mode: not an existing directory and no path separator.
+    # Hostname mode: not an existing directory and no path separator; a
+    # leading dash would reach `ddev hostname` as a flag (argv-passed and
+    # quoted, runs as the dev user — 0.0.39g Q6, below the action bar).
     if [ ! -d "$dha_arg" ]; then
         case "$dha_arg" in
             */*) echo "ddev-hosts: no ddev project in $dha_arg"; return 1 ;;
+            -*) echo "ddev-hosts: '$dha_arg' is not a hostname (leading dash)"; return 1 ;;
         esac
         echo "adding $dha_arg (Windows may ask for permission) ..."
         if [ -n "$dha_dev" ]; then
@@ -190,7 +202,11 @@ ddev_hosts_add() {
         echo ""
         echo "  Windows hosts file: $DDEV_WIN_HOSTS"
         echo "  manual fallback (Windows PowerShell as admin):"
-        echo "    Add-Content -Path 'C:\Windows\System32\drivers\etc\hosts' -Value '127.0.0.1 $dha_arg'"
+        # The hint is a placeholder, never the interpolated hostname — a
+        # crafted project name must not land inside a command the user is
+        # invited to paste into an admin shell (review 0.0.39a S5).
+        echo "    Add-Content -Path 'C:\Windows\System32\drivers\etc\hosts' -Value '127.0.0.1 <hostname>'"
+        echo "    (the hostname printed above)"
         return 0
     fi
 
@@ -205,10 +221,13 @@ ddev_hosts_add() {
 
     dha_failed=""
     dha_rc=0
-    # for-loop, not a pipe: the exit code must survive the loop (a while
-    # pipeline would run in a subshell and lose dha_rc). Hostnames never
-    # contain whitespace.
-    for dha_h in $dha_missing; do
+    # Line-wise iteration over the newline-separated list (ddev_hosts_missing
+    # validated every entry's charset) via a heredoc: unlike a while-pipe,
+    # the loop stays in this shell so dha_rc survives, and unlike a for-word
+    # split it does not rely on hostnames being whitespace-free
+    # (review 0.0.39a S5).
+    while IFS= read -r dha_h; do
+        [ -n "$dha_h" ] || continue
         echo "adding $dha_h (Windows may ask for permission) ..."
         if [ -n "$dha_dev" ]; then
             sudo -u "$dha_dev" env HOME="/home/$dha_dev" "$dha_bin" hostname "$dha_h" 127.0.0.1 \
@@ -217,7 +236,9 @@ ddev_hosts_add() {
             "$dha_bin" hostname "$dha_h" 127.0.0.1 \
                 || { echo "  FAILED: $dha_h — add it manually (see below)"; dha_rc=1; }
         fi
-    done
+    done <<DHA_LIST
+$dha_missing
+DHA_LIST
     echo ""
     echo "  Windows hosts file: $DDEV_WIN_HOSTS"
     echo "  manual fallback (Windows PowerShell as admin):"

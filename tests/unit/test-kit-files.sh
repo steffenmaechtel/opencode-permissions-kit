@@ -10,7 +10,7 @@
 #      update.sh must be in the list — otherwise the streamed install
 #      aborts mid-deploy (set -e) because the temp fetch never pulled it.
 #
-# Run: sh tests/test-kit-files.sh
+# Run: sh tests/unit/test-kit-files.sh
 set -u
 
 RED='\033[0;31m'
@@ -249,10 +249,13 @@ chmod +x "$WORK/fakebin/curl"
 
 sed -n '/^KIT_FILES="/,/"$/p' "$UPDATE" > "$WORK/kitfiles.env"
 sed -n '/^fetch_kit() {/,/^}/p' "$UPDATE" > "$WORK/fetchkit.fn"
+# fetch_kit reports the tree via the _FK_DIR global (no stdout — a
+# command-substitution call would void the trap registrations); the inner
+# shell echoes it deliberately for this test.
 _fk_dir="$(PATH="$WORK/fakebin:$PATH" sh -c '
     . "$1"
     eval "$(cat "$2")"
-    fetch_kit
+    fetch_kit && printf "%s\n" "$_FK_DIR"
 ' _ "$WORK/kitfiles.env" "$WORK/fetchkit.fn" 2>/dev/null || true)"
 _fk_base="$(dirname "$_fk_dir")"
 _fk_missing=""

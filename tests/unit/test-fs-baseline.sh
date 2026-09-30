@@ -181,6 +181,34 @@ blocks=$(grep -c 'chmod +x' "$E2E_CI")
     && pass "test-e2e.yml chmod lists include the new lib (every job)" \
     || fail "test-e2e.yml chmod lists include the new lib (every job)"
 
+# --- 8. exec-time symlink recheck (0.0.39e S1) ------------------------------------------
+# The race itself (swap between find's scan and xargs' exec) cannot be
+# scripted deterministically — what CAN be asserted is the guard: the
+# consumer re-tests [ -L ] immediately before running the command, so a
+# path that is a symlink AT EXEC TIME is skipped even when find's
+# expression matched it. Simulate by driving _fsb_pass with an
+# expression (-true) that deliberately includes symlinks: the target
+# OUTSIDE the root must keep its mode, the regular file inside must not.
+SW=$(mktemp -d)
+mkdir -p "$SW/root"
+printf 'inside\n' > "$SW/root/in-file"
+chmod 600 "$SW/root/in-file"
+printf 'target\n' > "$SW/target"       # outside the pass root below
+chmod 600 "$SW/target"
+ln -s "$SW/target" "$SW/root/link"     # symlink INSIDE the pass root
+FS_SUDO="" sh -c '. "$1" && _fsb_pass "test" "$2" -true -- chmod g+rw' _ "$LIB" "$SW/root" >/dev/null 2>&1
+if [ "$(stat -c %a "$SW/target")" = "600" ]; then
+    pass "exec-time recheck: symlink operands are skipped — target outside the root untouched"
+else
+    fail "exec-time recheck: symlink operands are skipped — target outside the root untouched (mode now $(stat -c %a "$SW/target"))"
+fi
+if [ "$(stat -c %a "$SW/root/in-file")" = "660" ]; then
+    pass "exec-time recheck: regular files inside the pass root still processed (chain works)"
+else
+    fail "exec-time recheck: regular files still processed (mode $(stat -c %a "$SW/root/in-file"))"
+fi
+rm -rf "$SW"
+
 # --- Summary ---------------------------------------------------------------------------
 echo ""
 echo "================================================="

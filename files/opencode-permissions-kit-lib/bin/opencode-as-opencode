@@ -6,7 +6,7 @@
 # the wrapper's name follows the bin/ddev-as-opencode pattern ("run X as
 # the opencode user").
 #
-# Soft protection model (docs/design/DDEV-WORKING.md): the kit does NOT
+# Soft protection model (docs/design/ddev-working.md): the kit does NOT
 # mirror opencode.jsonc deny rules into Linux ACLs. File permissions are
 # enforced by opencode's own permission layer only. The wrapper's job is
 # UID separation: validate the project dir, detect container-tool opt-in,
@@ -16,11 +16,16 @@
 # orchestrators parse `opencode run --format json` output.
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+# Colors resolve to REAL bytes once (printf, not echo -e); off for
+# NO_COLOR / non-tty, same rule as sh/ui.sh and uninstall.sh
+# (0.0.39e C10/C12; guard added per 0.0.39m C1).
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
+    RED=''; GREEN=''; CYAN=''; YELLOW=''; NC=''
+else
+    RED=$(printf '\033[0;31m'); GREEN=$(printf '\033[0;32m')
+    CYAN=$(printf '\033[0;36m'); YELLOW=$(printf '\033[0;33m')
+    NC=$(printf '\033[0m')
+fi
 
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 
@@ -339,7 +344,7 @@ stop_merged_config_service
 if [ -n "$PROJECT_TOOLS" ]; then
     note "${CYAN}Container tools enabled by this project:${NC}"
     # Same stream note() uses — recomputed here instead of relying on the
-    # _fd global leaking out of the preceding note() call (C12).
+    # _fd global leaking out of the preceding note() call (0.0.38 C12).
     _tools_fd=1
     [ "$HEADLESS" = true ] && _tools_fd=2
     printf '%s\n' "$PROJECT_TOOLS" | sed 's/^/    - /' >&"$_tools_fd"
@@ -503,7 +508,7 @@ if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
         fi
     fi
     if [ -z "$SERVE_FALLBACK" ]; then
-        SERVE_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6)
+        SERVE_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6 || true)
         [ -n "$SERVE_FALLBACK" ] && [ "$(cwd_probe "$SERVE_FALLBACK")" = "readable" ] || SERVE_FALLBACK=""
     fi
     note "${RED}WARNING: the server working directory is not readable by the opencode user:${NC}"
@@ -534,7 +539,7 @@ fi
 # proceed without touching the directory (same contract as serve).
 if [ "${1:-}" = "console" ] || [ "${1:-}" = "auth" ]; then
     if [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
-        LOGIN_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6)
+        LOGIN_FALLBACK=$(getent passwd opencode 2>/dev/null | cut -d: -f6 || true)
         if [ -n "$LOGIN_FALLBACK" ] && [ "$(cwd_probe "$LOGIN_FALLBACK")" = "readable" ]; then
             note "${YELLOW}Login runs from $LOGIN_FALLBACK (the current directory is not readable${NC}"
             note "${YELLOW}by the opencode user; device logins carry no project context).${NC}"

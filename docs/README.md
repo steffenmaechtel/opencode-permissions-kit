@@ -66,7 +66,9 @@ warnings (shipped database, upstream watch, curation loop):
 [security-advisories.md](design/security-advisories.md). Test fidelity — why bugs pass
 unit and e2e but hit real terminals, and the patterns that close the
 gap: [test-environment-fidelity.md](design/test-environment-fidelity.md).
-Model-generated code reviews — immutable snapshots plus per-finding
+Review strategy — scopes, cadence, loop stop rule:
+[review-concept.md](design/review-concept.md). Model-generated code
+reviews — immutable snapshots plus per-finding
 resolutions — live in [`design/review/`](design/review/README.md).
 Superseded or
 purely historical records live in [`_archive/`](_archive/) (same

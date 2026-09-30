@@ -117,16 +117,25 @@ def read_config(config_path):
         return f.read()
 
 
-def extract_patterns(config_path):
-    raw = read_config(config_path)
-
-    clean = strip_jsonc_comments(raw)
-
+def load_config(config_path):
+    """Read, comment-strip and parse the config document. Shared by every
+    extract_* entry point (they used to carry identical copies of this
+    try/except — the kind of twin that diverges silently); exits with a
+    diagnostic on unreadable files and invalid JSON (a missing/unreadable
+    config used to surface as a raw OSError traceback while parse errors
+    got the polished message — 0.0.39g Q4)."""
     try:
-        config = json.loads(clean)
+        return json.loads(strip_jsonc_comments(read_config(config_path)))
+    except OSError as e:
+        print(f"Error reading {config_path}: {e}", file=sys.stderr)
+        sys.exit(1)
     except json.JSONDecodeError as e:
         print(f"Error parsing {config_path}: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def extract_patterns(config_path):
+    config = load_config(config_path)
 
     patterns = set()
     permission = config.get('permission', {})
@@ -183,15 +192,7 @@ def extract_tools(config_path):
     not trigger. Top-level "permission": "allow" and "permission.bash":
     "allow" shorthands count as allowing everything. Prints one tool per
     line."""
-    raw = read_config(config_path)
-
-    clean = strip_jsonc_comments(raw)
-
-    try:
-        config = json.loads(clean)
-    except json.JSONDecodeError as e:
-        print(f"Error parsing {config_path}: {e}", file=sys.stderr)
-        sys.exit(1)
+    config = load_config(config_path)
 
     if isinstance(config, list):
         rules = _debug_entry_rules(config)
@@ -227,7 +228,7 @@ def extract_tools(config_path):
         # 2.x-shape project FILES: a top-level "permissions" rule array
         # (the records `opencode debug config` normalizes to). The live
         # probe covers them; the file fallback must too, not silently
-        # report no tools (C14). Appended after the v1 map so last-match-
+        # report no tools (0.0.38 C14). Appended after the v1 map so last-match-
         # wins gives the 2.x records precedence, like later documents.
         permissions = config.get('permissions')
         if isinstance(permissions, list):

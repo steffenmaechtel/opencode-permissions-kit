@@ -8,7 +8,7 @@
 #   - TMP cleanup happens AFTER the install attempt (static order check)
 #   - --only-binary: parsing, gating, confirm text, summary, docs
 # No root required.
-# Run: sh tests/test-update-flags.sh
+# Run: sh tests/unit/test-update-flags.sh
 set -e
 
 RED='\033[0;31m'
@@ -259,6 +259,20 @@ check "channel: missing ref is rejected (arg loop, from a checkout)" \
     sh -c "! sh \"\$1\" --channel >/dev/null 2>&1" _ "$UPDATE"
 check "channel: --help with --channel still works (pre-scan is silent)" \
     sh -c "sh \"\$1\" --channel testref --help >/dev/null 2>&1" _ "$UPDATE"
+check "channel: ref charset is enforced — metacharacters rejected (0.0.39b S1)" \
+    sh -c "! sh \"\$1\" --channel 'foo;rm' >/dev/null 2>&1" _ "$UPDATE"
+check "channel: ref charset is enforced — '..' rejected (URL traversal off the repo prefix, 0.0.39e S4)" \
+    sh -c "! sh \"\$1\" --channel 'a..b' >/dev/null 2>&1" _ "$UPDATE"
+check "channel: ref charset is enforced — newline rejected, also via env" \
+    sh -c "! env KIT_BRANCH=\$(printf 'a\\nb') sh \"\$1\" --help >/dev/null 2>&1" _ "$UPDATE"
+check "channel: a real ref shape passes the gate (stable)" \
+    sh -c "sh \"\$1\" --channel stable --help >/dev/null 2>&1" _ "$UPDATE"
+
+# --- 7b. scratch cleanup (review 0.0.39a C1) --------------------------------------
+check "cleanup: EXIT/INT/TERM trap removes fetch tree, sudoers + conf temps" \
+    sh -c "grep -qF 'trap cleanup EXIT' \"\$1\" && grep -qF \"trap 'cleanup; exit 1' INT TERM\" \"\$1\" && grep -qF '_FETCH_TREE=\"\$base\"' \"\$1\" && grep -qF '_CONF_TMP=' \"\$1\"" _ "$UPDATE"
+check "cleanup: fetched tree survives the self re-exec via the environment" \
+    sh -c "grep -qF 'export _FETCH_TREE' \"\$1\"" _ "$UPDATE"
 
 # --- 8. --major / --version (issue #99: upgrades never cross majors) ------------
 check "flag: --major parsed, only 1 or 2 accepted" \

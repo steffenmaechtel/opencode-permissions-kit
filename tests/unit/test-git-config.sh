@@ -147,6 +147,16 @@ else
     fail "install.sh: re-install re-renders the agent config (backup kept)"
 fi
 
+# The config.sh toggle must have the same data-safety: back up an existing
+# agent config before the template overwrite (review 0.0.39a D1 / 0.0.39b D3).
+CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
+if grep -q '\.bak-' "$CONFIG" \
+   && grep -q 'previous config backed up' "$CONFIG"; then
+    pass "config.sh: git-config toggle backs up the existing agent config"
+else
+    fail "config.sh: git-config toggle backs up the existing agent config"
+fi
+
 # Plan numbering must be dynamic (_plan helper) — a skipped optional step
 # must not leave a gap in the numbered plan the user confirms.
 if grep -q '_plan()' "$INSTALL" && ! grep -Eq 'ui_plan [0-9]' "$INSTALL"; then

@@ -24,8 +24,10 @@ opk config git-config off
 opk config git-config status
 ```
 
-`on` re-renders the agent's `opencode.jsonc` with the deny rules (the
-previous file is backed up); `off` removes them.
+`on` re-renders the agent's `opencode.jsonc` with the deny rules; `off`
+removes them. An existing file is backed up first (timestamped
+`opencode.jsonc.bak-*` next to it) — but note both states render from the
+kit template, so manual edits to the file are always replaced.
 
 ## When to enable
 

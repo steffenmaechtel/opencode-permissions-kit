@@ -10,7 +10,7 @@
 #
 # Static asserts on the repo files + a POSIX-arithmetic check of the
 # mode-mask logic. No root, no WSL required.
-# Run: sh tests/test-wsl-exposure.sh
+# Run: sh tests/unit/test-wsl-exposure.sh
 set -e
 
 RED='\033[0;31m'
@@ -74,7 +74,7 @@ check "status.sh detects a configured-but-pending fix (wsl --shutdown)" \
 check "install.sh gates the exposure info on /mnt/c existing" \
     sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$INSTALL"
 check "install.sh warns about the exposure" \
-    sh -c "grep -q 'WARNING: /mnt/c is world-readable' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\"" _ "$INSTALL"
 check "install.sh never writes /etc/wsl.conf (no tee/append)" \
     sh -c "! grep -q 'tee -a /etc/wsl.conf' \"\$1\"" _ "$INSTALL"
 check "install.sh no longer prompts for the restriction (explicit consent)" \
@@ -115,7 +115,7 @@ check "wrapper stays silent when the mount is restricted (other bit off)" \
 
 # --- update.sh report-only hint -------------------------------------------------
 check "update.sh warns about the world-readable /mnt/c (no prompt)" \
-    sh -c "grep -q 'WARNING: /mnt/c is world-readable' \"\$1\" && ! grep -q 'prompt ' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\" && ! grep -q 'prompt ' \"\$1\"" _ "$UPDATE"
 check "update.sh prints the recommended wsl.conf options" \
     sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027' \"\$1\"" _ "$UPDATE"
 check "update.sh reminds about a configured-but-pending restriction" \

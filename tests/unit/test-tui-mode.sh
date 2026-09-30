@@ -14,7 +14,7 @@
 #     (test-kit-files.sh guards the rest of the list consistency)
 #   - uninstall.sh mentions the leftovers
 #
-# Run: sh tests/test-tui-mode.sh
+# Run: sh tests/unit/test-tui-mode.sh
 set -u
 
 RED='\033[0;31m'
@@ -211,6 +211,34 @@ check_no "register: refuses to touch unparseable cli.json" \
 printf '{"plugins": "not-a-list"}' > "$T2X/bad2.json"
 check_no "register: refuses non-list plugins key" \
     python3 "$REGISTER" "$T2X/bad2.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+
+# 0.0.39g C2: a symlinked cli.json is user structure — stat would restore
+# the TARGET's owner/mode and os.replace would destroy the link; the
+# register must refuse, leaving link and target untouched.
+mkdir -p "$T2X/symhome" "$T2X/dotfiles"
+printf '{"existing": true}\n' > "$T2X/dotfiles/cli.json"
+ln -s "$T2X/dotfiles/cli.json" "$T2X/symhome/cli.json"
+check_no "register: refuses a symlinked cli.json (C2)" \
+    python3 "$REGISTER" "$T2X/symhome/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+check "symlink refusal: the link itself survives" \
+    test -L "$T2X/symhome/cli.json"
+check "symlink refusal: the link target keeps its content" \
+    sh -c '! grep -q kit-mode-2x "$1"' _ "$T2X/dotfiles/cli.json"
+# no-op unregister (nothing to change) stays rc 0 — the refusal only
+# applies when a write would be needed
+check "unregister on a symlinked cli.json without changes is a no-op" \
+    python3 "$REGISTER" "$T2X/symhome/cli.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+check "no-op unregister: link still intact" \
+    test -L "$T2X/symhome/cli.json"
+# 0.0.39g S4: a first-run creation is owned by the config DIR's owner
+# with 0644 (the dir owner is the test user here — assert the mode half)
+mkdir -p "$T2X/fresh"
+check "first-run register creates cli.json (S4)" \
+    python3 "$REGISTER" "$T2X/fresh/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
+check "first-run cli.json has mode 0644" \
+    sh -c '[ "$(stat -c %a "$1")" = "644" ]' _ "$T2X/fresh/cli.json"
+check "first-run cli.json parses and carries the plugin entry" \
+    sh -c 'python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert any(e.get(\"package\",\"\").endswith(\"kit-mode-2x.tsx\") for e in d[\"plugins\"])" "$1"' _ "$T2X/fresh/cli.json"
 
 # --- summary ------------------------------------------------------------------
 echo ""

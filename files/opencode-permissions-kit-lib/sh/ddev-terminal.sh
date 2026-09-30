@@ -302,6 +302,13 @@ _opk_bootstrap_hint() {
     [ "$_opk_type" = "typo3" ] || return 0
     _opk_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
     [ -n "$_opk_docroot" ] || _opk_docroot="."
+    # Same containment policy as ddev-handover's _ddev_docroot_sane
+    # (sourced further down, so inline here): the agent-writable
+    # config.yaml value must stay a contained relative path (0.0.39e S2,
+    # wave-f review — read-only consumer, gated for consistency).
+    case "$_opk_docroot" in
+        /*|*..*|*[!A-Za-z0-9._/-]*) _opk_docroot="." ;;
+    esac
     # shellcheck disable=SC1091  # deployed kit path, checked above
     . /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh
     # Dev-owned (flagged) project: ddev never touches paths outside

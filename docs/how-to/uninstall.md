@@ -39,6 +39,10 @@ hand — the kit never edits `wsl.conf` without your say-so
 
 - Shell RC hook lines (`~/.bashrc` / `~/.zshrc` / `~/.profile`, tagged
   `# opencode permissions kit`) — remove the tagged lines manually.
+- Entries `opk ddev-hosts-add` wrote into the **Windows hosts file**
+  (`C:\Windows\System32\drivers\etc\hosts`) — they keep resolving project
+  domains to `127.0.0.1` after the kit is gone; remove them manually if
+  you no longer need them (`*.ddev.site` names were never added).
 - The default-user `~/.config/opencode/opencode.jsonc` deny-all lockout
   config — delete or rename it if you want to use opencode as your own user
   again (see [the wrapper](../concepts/wrapper.md)).

@@ -3,7 +3,7 @@
     // opencode permissions kit — default permission template
     // SOFT PROTECTION ONLY: these rules are enforced by opencode's own
     // permission layer. The kit no longer mirrors them into Linux ACLs —
-    // see docs/design/DDEV-WORKING.md. Processes spawned outside opencode
+    // see docs/design/ddev-working.md. Processes spawned outside opencode
     // (ddev, its containers) are NOT restricted by them.
     // Bash is ask-by-default ("*": "ask"): every bash command prompts unless
     // explicitly allowlisted or denied below. The long ask-blacklist of the

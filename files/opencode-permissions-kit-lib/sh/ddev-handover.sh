@@ -79,6 +79,13 @@ ddev_devowned_flagged() {
 # doubled. Caller echoes/prints; run as root.
 ddev_devowned_flag() {
     [ -f "${1:-}/.ddev/config.yaml" ] || return 0
+    # 0.0.39g S2: the .ddev tree is agent-group-writable — a planted
+    # symlink at config.yaml must never be written through by the root
+    # cat-rewrite below. A linked config is user structure: skip loudly.
+    if [ -L "${1:-}/.ddev/config.yaml" ]; then
+        printf '%s\n' "  WARNING: ${1:-}/.ddev/config.yaml is a symlink — dev-owned flag NOT written (links are never followed)" >&2
+        return 0
+    fi
     ddf_cfg="${1:-}/.ddev/config.yaml"
     if grep -q '^disable_settings_management:' "$ddf_cfg"; then
         return 0
@@ -90,7 +97,11 @@ ddev_devowned_flag() {
         ddf_anchor='^type:'
     fi
     # Rewrite via temp + `cat >` (same inode: owner and mode of the
-    # committed config.yaml survive, unlike an mv).
+    # committed config.yaml survive, unlike an mv). The temp re-checks
+    # [ -L ] at exec time (fs-baseline deeec30 pattern): the .ddev dir is
+    # agent-writable, a swapped temp name would disclose root-readable
+    # content into the agent-owned config, a swapped cfg would be written
+    # through (0.0.39g S2).
     ddf_tmp=$(mktemp "${ddf_cfg}.opk.XXXXXX") || return 0
     if awk -v opk_anchor="$ddf_anchor" '
         BEGIN {
@@ -123,11 +134,39 @@ ddev_devowned_flag() {
                 print "disable_settings_management: true"
             }
         }
-    ' "$ddf_cfg" > "$ddf_tmp" && cat "$ddf_tmp" > "$ddf_cfg"; then
-        chmod g+w "$ddf_cfg" 2>/dev/null || true
-        echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
+    ' "$ddf_cfg" > "$ddf_tmp"; then
+        if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
+            cat "$ddf_tmp" > "$ddf_cfg"
+            if [ ! -L "$ddf_cfg" ]; then
+                chmod g+w "$ddf_cfg" 2>/dev/null || true
+            fi
+            echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
+        else
+            # 0.0.39h F13: the exec-time recheck tripped (the config or its
+            # temp turned into a symlink mid-write) — announce the skip like
+            # the entry gate above does, instead of ending silently.
+            printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write — dev-owned flag NOT written (links are never followed)" >&2
+        fi
     fi
     rm -f "$ddf_tmp"
+    return 0
+}
+
+# _ddev_docroot_sane <docroot>: containment gate for the docroot value
+# parsed from the group-writable .ddev/config.yaml (0.0.39e S2). The
+# value feeds root-run chown -R/chmod -R paths under the project root —
+# traversal segments or an absolute path must never escape it (the same
+# policy project_path_sane enforces everywhere else). Space-free is part
+# of the contract: the settings-dir list is word-split by every caller.
+# Fails (warns to stderr) on anything not a contained relative path.
+_ddev_docroot_sane() {
+    case "$1" in
+        ""|".") return 0 ;;
+        /*|*..*|*[!A-Za-z0-9._/-]*)
+            printf '%s\n' "  WARNING: ignoring docroot '$1' from .ddev/config.yaml — not a contained relative path" >&2
+            return 1
+            ;;
+    esac
     return 0
 }
 
@@ -140,6 +179,7 @@ ddev_type_settings_dirs() {
     dts_type=$(sed -n 's/^type:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     dts_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ -n "$dts_docroot" ] || dts_docroot="."
+    _ddev_docroot_sane "$dts_docroot" || dts_docroot="."
     case "$dts_type" in
         typo3)
             echo "config/system $dts_docroot/typo3conf typo3conf"
@@ -161,7 +201,7 @@ ddev_type_settings_dirs() {
 # _ddev_migrate_run_as).
 _ddev_handover_run_as() {
     _dhr_u="$1"; shift
-    _dhr_h=$(getent passwd "$_dhr_u" 2>/dev/null | cut -d: -f6)
+    _dhr_h=$(getent passwd "$_dhr_u" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$_dhr_h" ] || return 1
     sudo -u "$_dhr_u" env HOME="$_dhr_h" "$@"
 }
@@ -229,11 +269,15 @@ ddev_handover_project_root() {
     dhq_group="${3:-}"
     dhq_dev="${4:-}"
     [ -n "$dhq_proj" ] && [ -d "$dhq_proj" ] || return 0
+    # [ -L ] gate (0.0.39g S2 class): chown/chmod/stat below dereference a
+    # symlink operand — a linked project root is never handed over/back.
+    [ -L "$dhq_proj" ] && return 0
     [ -f "$dhq_proj/.ddev/config.yaml" ] || return 0
     dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ "$dhq_type" = "typo3" ] || return 0
     dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ -n "$dhq_docroot" ] || dhq_docroot="."
+    _ddev_docroot_sane "$dhq_docroot" || dhq_docroot="."
     if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then
         if [ -n "$dhq_dev" ] && [ "$(stat -c %U "$dhq_proj" 2>/dev/null)" = "$dhq_user" ]; then
             chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || true
@@ -281,7 +325,14 @@ ddev_handover_root() {
     # and write dev-owned flags into fixture configs.
     find "$dhr_root" -type d \( -name vendor -o -name node_modules -o -name testdata \) -prune -o \
         -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r dhr_d; do
+        # [ -L ] recheck immediately before each recursive op (fs-baseline
+        # deeec30 pattern, 0.0.39g S2): find classified the entry at SCAN
+        # time; the scanned trees are agent-group-writable, so a swapped
+        # symlink operand must never reach chown -R/chmod -R — both
+        # dereference a symlink OPERAND and would act on the target tree.
+        [ -L "$dhr_d" ] && continue
         chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || true
+        [ -L "$dhr_d" ] && continue
         chmod -R g+w "$dhr_d" 2>/dev/null || true
         echo "  .ddev handover: $dhr_d -> $dhr_user"
         dhr_p="$(dirname "$dhr_d")"
@@ -317,14 +368,20 @@ ddev_handover_project_back() {
     [ -n "$dhb_dev" ] || return 0
     for dhb_d in $(ddev_type_settings_dirs "$dhb_proj"); do
         [ "$dhb_d" = "." ] && continue
+        # [ -d ] && [ ! -L ] (0.0.39g S2): [ -d ] follows a symlink — a
+        # planted settings-dir link would make chown -R/chmod -R below
+        # dereference the OPERAND into an arbitrary tree. Raceless skip.
         [ -d "$dhb_proj/$dhb_d" ] || continue
+        [ -L "$dhb_proj/$dhb_d" ] && continue
         chown -R "$dhb_dev:$dhb_group" "$dhb_proj/$dhb_d" 2>/dev/null || true
+        [ -L "$dhb_proj/$dhb_d" ] && continue
         chmod -R g+w "$dhb_proj/$dhb_d" 2>/dev/null || true
         echo "  dev-owned handback: $dhb_proj/$dhb_d -> $dhb_dev"
     done
     # Root inode: hand it back only when a previous handover model run
-    # gave it to the kit user (never touches developer-owned roots).
-    if [ "$(stat -c %U "$dhb_proj" 2>/dev/null)" = "$dhb_user" ]; then
+    # gave it to the kit user (never touches developer-owned roots). The
+    # [ -L ] gate: stat/chown follow a symlink operand (0.0.39g S2 class).
+    if [ ! -L "$dhb_proj" ] && [ "$(stat -c %U "$dhb_proj" 2>/dev/null)" = "$dhb_user" ]; then
         chown "$dhb_dev:$dhb_group" "$dhb_proj" 2>/dev/null || true
         chmod 2775 "$dhb_proj" 2>/dev/null || true
         echo "  dev-owned handback: $dhb_proj (root) -> $dhb_dev (2775)"
@@ -347,8 +404,15 @@ ddev_handover_project() {
     [ -f "$dhp_proj/.ddev/config.yaml" ] || return 0
     for dhp_d in $(ddev_type_settings_dirs "$dhp_proj"); do
         [ "$dhp_d" = "." ] && continue
+        # [ -d ] && [ ! -L ] (0.0.39g S2, raceless variant): [ -d ] follows
+        # a symlink — a planted settings-dir link (typo3conf, web, ...) over
+        # an agent-group-writable project tree would make chown -R/chmod -R
+        # dereference the OPERAND and recursively hand an arbitrary tree
+        # to the agent.
         [ -d "$dhp_proj/$dhp_d" ] || continue
+        [ -L "$dhp_proj/$dhp_d" ] && continue
         chown -R "$dhp_user:$dhp_group" "$dhp_proj/$dhp_d" 2>/dev/null || true
+        [ -L "$dhp_proj/$dhp_d" ] && continue
         chmod -R g+w "$dhp_proj/$dhp_d" 2>/dev/null || true
         echo "  ddev settings handover: $dhp_proj/$dhp_d -> $dhp_user"
     done

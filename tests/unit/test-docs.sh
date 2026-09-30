@@ -5,7 +5,7 @@
 # and AGENTS.md, contains a broken relative link or a dangling in-page
 # anchor. HTTP(S)/mailto links are skipped (no network access).
 #
-# Run: sh tests/test-docs.sh
+# Run: sh tests/unit/test-docs.sh
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
@@ -93,6 +93,35 @@ done
 find docs -name '*.md' -type f | sort | while IFS= read -r f; do
     check_file "$f"
 done
+
+# Snapshot <-> resolution pointer integrity (docs/design/review/README.md
+# rule 2): every snapshot whose README index row lists a resolution carries
+# EXACTLY ONE "> Resolution:" pointer; rows without one ("— …") must not
+# carry a pointer. History: the class bit twice in a row (snapshot g, then
+# snapshot l, then this very check's trigger — snapshot m, 0.0.39m D1).
+review_pointer_check() {
+    for snap in docs/design/review/[0-9]*-v*.md; do
+        [ -e "$snap" ] || continue
+        case "$snap" in
+            *-resolution.md|*/template.md) continue ;;
+        esac
+        stem=$(basename "$snap" .md)
+        row=$(grep -F "]($stem.md)" docs/design/review/README.md | head -n 1)
+        if [ -z "$row" ]; then
+            echo "FAIL $stem: no README index row" >> "$TMP"
+            continue
+        fi
+        # 4th table cell ($5 under awk -F'|', cells are 2..6) = resolution column
+        has_res=$(printf '%s\n' "$row" | awk -F'|' '{ gsub(/ /, "", $5); print ($5 ~ /resolution\.md\]/) ? 1 : 0 }')
+        ptr=$(grep -c '^> Resolution:' "$snap")
+        if [ "$has_res" = 1 ] && [ "$ptr" -ne 1 ]; then
+            echo "FAIL $stem: index lists a resolution but the snapshot has $ptr pointer line(s) (README rule 2)" >> "$TMP"
+        elif [ "$has_res" = 0 ] && [ "$ptr" -ne 0 ]; then
+            echo "FAIL $stem: index lists no resolution yet but the snapshot carries a pointer" >> "$TMP"
+        fi
+    done
+}
+review_pointer_check
 
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"

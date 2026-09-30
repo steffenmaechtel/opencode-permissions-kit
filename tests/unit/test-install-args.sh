@@ -8,7 +8,7 @@
 #
 # Static extraction of parse_args() from install.sh, then table-driven
 # checks. No root required.
-# Run: sh tests/test-install-args.sh
+# Run: sh tests/unit/test-install-args.sh
 set -e
 
 RED='\033[0;31m'
@@ -177,9 +177,12 @@ expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agen
 # --- channel stamp (issue #38) -----------------------------------------------
 
 # install.sh stamps the actually-used ref as KIT_CHANNEL into install.conf
-# (the heredoc tee block) and reports it in the final summary.
+# and reports it in the final summary. Since 0.0.39g C5 the stamp is
+# written to a temp file beside it and renamed onto the canonical path —
+# assert the full atomic shape (heredoc tee into the temp + mv).
 if grep -qF "KIT_CHANNEL=\$KIT_BRANCH" "$INSTALL" \
-   && grep -qF "tee /etc/opencode-permissions-kit/install.conf" "$INSTALL" \
+   && grep -qF 'tee "$_INSTALL_CONF_TMP"' "$INSTALL" \
+   && grep -qF 'mv -f "$_INSTALL_CONF_TMP" /etc/opencode-permissions-kit/install.conf' "$INSTALL" \
    && grep -qF 'ui_kv "Channel"' "$INSTALL"; then
     pass "install.sh stamps KIT_CHANNEL and reports the channel"
 else
@@ -197,6 +200,73 @@ if grep -qF 'Restart your terminal (or log in again)' "$INSTALL" \
 else
     fail "install final output tells the user to restart the terminal (issue #73)"
 fi
+
+# --- scratch cleanup (review 0.0.39a C1) ---------------------------------------
+
+# Root-running installer must not leak its temp artifacts on failure or
+# Ctrl-C: fetch tree + sudoers render temp are trapped on EXIT, and the
+# signal handlers EXIT after cleanup (a resuming script would run on with
+# its scratch already deleted). The backup dir is deliberately NOT in the
+# trap (recovery material).
+if grep -qF 'trap cleanup EXIT' "$INSTALL" \
+   && grep -qF "trap 'cleanup; exit 1' INT TERM" "$INSTALL" \
+   && grep -qF '_FETCH_TREE="$base"' "$INSTALL"; then
+    pass "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
+else
+    fail "install.sh traps EXIT + exiting INT/TERM and registers the fetch tree for cleanup"
+fi
+
+# --- scratch cleanup: fetch refuses empty bodies (review 0.0.39e C1) --------------
+# Fake curl: every file gets content EXCEPT etc/umask.sh, which answers
+# HTTP-200-style success with an EMPTY body (captive portal / broken
+# mirror). fetch_kit must abort instead of deploying the empty file.
+FKWORK=$(mktemp -d)
+mkdir -p "$FKWORK/bin"
+cat > "$FKWORK/bin/curl" <<'FAKE'
+#!/bin/sh
+# args: -fsSL <url> -o <tmpfile>
+last=
+for a in "$@"; do last="$a"; done
+case "$2" in
+    */files/etc/umask.sh) : > "$last"; exit 0 ;;   # empty-but-200
+    *) printf 'content\n' > "$last"; exit 0 ;;
+esac
+FAKE
+chmod +x "$FKWORK/bin/curl"
+eval "$(sed -n '/^fetch_kit() {/,/^}/p' "$INSTALL")"
+# fetch_kit registers its fetch temps via _tmp_track (the host script's
+# trap empties the registry; the isolated function only needs it defined).
+_tmp_track() { :; }
+FKOUT=""
+FKRC=0
+FKOUT=$(PATH="$FKWORK/bin:$PATH" KIT_BASE_URL="https://example.test" fetch_kit 2>&1) || FKRC=$?
+if [ "$FKRC" -ne 0 ] && printf '%s' "$FKOUT" | grep -q "empty"; then
+    pass "fetch_kit aborts on an empty (200) body instead of deploying it"
+else
+    fail "fetch_kit aborts on an empty (200) body (rc=$FKRC out=$FKOUT)"
+fi
+UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+if grep -q '\[ ! -s "\$_fk_tmp" \]' "$UPDATE" && grep -q '_fk_url="\$KIT_BASE_URL/VERSION"' "$UPDATE"; then
+    pass "update.sh fetch_kit carries the same empty-body guard (twin in sync)"
+else
+    fail "update.sh fetch_kit carries the same empty-body guard"
+fi
+# Direct call, never a command substitution: a subshell's _FETCH_TREE /
+# registry writes never reach the parent and void the cleanup trap
+# (wave-f review). Anchored — the comments reference the old form, the
+# assignment must not exist.
+if ! grep -q '^    SCRIPT_DIR="$(fetch_kit)"' "$INSTALL" \
+   && ! grep -q '^    SCRIPT_DIR="$(fetch_kit)"' "$UPDATE" \
+   && grep -q '_FK_DIR="\$dir"' "$INSTALL" && grep -q '_FK_DIR="\$dir"' "$UPDATE"; then
+    pass "fetch_kit result leaves the shell via _FK_DIR, not a subshell echo"
+else
+    fail "fetch_kit result leaves the shell via _FK_DIR, not a subshell echo"
+fi
+# the test's own fetch run registered the tree — remove it
+rm -rf "${_FETCH_TREE:-}" 2>/dev/null || true
+rm -rf "$FKWORK"
+# remove the fetched VERSION artifact fetch_kit may have written to CWD
+# (it returns a tree path; nothing lands outside $FKWORK on failure)
 
 echo ""
 if [ "$failures" -gt 0 ]; then

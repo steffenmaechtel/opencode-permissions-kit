@@ -84,8 +84,8 @@ A dedicated **Security advisories** section:
 
 ### Maintainer scan (the curation loop)
 
-`.github/workflows/security-scan.yml` (daily 05:23 UTC, manual runs
-possible) runs `scripts/security-scan.sh`: fetch the upstream feed,
+`.github/workflows/advisory-watch.yml` (daily 05:23 UTC, manual runs
+possible) runs `scripts/advisory-watch.sh`: fetch the upstream feed,
 diff against `advisories_ids opencode`, open **one issue per unknown
 advisory** (deduped by the GHSA id in the title search) with the
 upstream data and a curation checklist. The script never modifies the

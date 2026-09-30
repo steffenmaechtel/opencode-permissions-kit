@@ -1,9 +1,9 @@
-.PHONY: help test lint check-host test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` (everything shipped in files/, plus the
 # maintainer helpers in scripts/).
 SHELLCHECK_FILES = files/install.sh \
-	scripts/release.sh scripts/security-scan.sh \
+	scripts/release.sh scripts/advisory-watch.sh \
 	files/opencode-permissions-kit-lib/management/config.sh files/opencode-permissions-kit-lib/management/update.sh \
 	files/opencode-permissions-kit-lib/management/status.sh files/opencode-permissions-kit-lib/management/uninstall.sh \
 	files/etc/umask.sh \
@@ -15,6 +15,7 @@ SHELLCHECK_FILES = files/install.sh \
 	files/opencode-permissions-kit-lib/sh/ddev-migrate.sh files/opencode-permissions-kit-lib/bin/ddev-migrate \
 	files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
 	files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+	files/opencode-permissions-kit-lib/sh/staged-write.sh \
 	files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh files/opencode-permissions-kit-lib/bin/browser-bridge \
 	files/opencode-permissions-kit-lib/bin/socket-check files/opencode-permissions-kit-lib/bin/cwd-check \
 	files/opencode-permissions-kit-lib/bin/ddev-as-opencode
@@ -25,7 +26,9 @@ SHELLCHECK_FILES = files/install.sh \
 #   SC2034        — sourced libs / fallback blocks define vars used by callers
 #   SC3043        — 'local' is not POSIX but dash AND bash support it; the
 #                  kit targets exactly those two shells
-SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043
+#   SC3040        — guarded `(set -o pipefail)` probe: bash enables it, dash
+#                  skips it (the 2>/dev/null subshell test) — deliberate
+SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -35,6 +38,7 @@ help:
 	@echo "  make lint          ShellCheck over the shipped scripts (needs shellcheck)"
 	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
+	@echo "  make test-staged-write  Run symlink-safe write / handover gate tests (0.0.39g)"
 	@echo "  make test-parser   Run JSONC parser edge-case tests"
 	@echo "  make test-git-config  Run git-config toggle tests"
 	@echo "  make test-container-backend  Run container-backend tests"
@@ -69,7 +73,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint test-opencode-as-opencode test-fs-baseline test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -89,6 +93,19 @@ lint:
 check-host:
 	@echo "=== Contributor host check ==="
 	@sh tests/check-host.sh
+
+# Python syntax gate (review 0.0.39a C5): a syntax error in the shipped
+# py/ scripts otherwise ships green until an e2e run (or a user) hits it.
+# PYTHONPYCACHEPREFIX keeps the bytecode cache out of the repo tree (the
+# workflow-consistency test derives requirements from files/ on disk).
+# The tui/*.tsx assets stay covered by the e2e suites (a real TS check
+# would need a node + typescript install — not a unit-suite dependency).
+check-py:
+	@echo "=== Python syntax check (shipped scripts) ==="
+	@PYTHONPYCACHEPREFIX="$$(mktemp -d)" python3 -m py_compile \
+		files/opencode-permissions-kit-lib/py/jsonc-parser.py \
+		files/opencode-permissions-kit-lib/py/tui-register.py
+	@echo "Python syntax OK."
 
 test-opencode-as-opencode:
 	@echo "=== Wrapper Validation Tests ==="
@@ -229,6 +246,10 @@ test-fs-baseline:
 	@echo "=== Group-Baseline Progress Tests ==="
 	@./tests/unit/test-fs-baseline.sh
 
+test-staged-write:
+	@echo "=== Symlink-Safe Write / Handover Gate Tests (0.0.39g) ==="
+	@./tests/unit/test-staged-write.sh
+
 test-e2e-sources:
 	@echo "=== E2E Source-Consistency Tests ==="
 	@./tests/unit/test-e2e-sources.sh
@@ -240,3 +261,7 @@ test-browser-bridge:
 test-security-advisories:
 	@echo "=== Security Advisory Database/Watch Tests ==="
 	@./tests/unit/test-security-advisories.sh
+
+test-log:
+	@echo "=== Audit Log Tests ==="
+	@./tests/unit/test-log.sh

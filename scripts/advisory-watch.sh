@@ -1,7 +1,7 @@
 #!/bin/sh
-# opencode permissions kit -- scripts/security-scan.sh
+# opencode permissions kit -- scripts/advisory-watch.sh
 # Maintainer security-advisory watch (issue #107, docs/design/
-# security-advisories.md). Runs from CI (.github/workflows/security-scan.yml,
+# security-advisories.md). Runs from CI (.github/workflows/advisory-watch.yml,
 # daily) and compares the upstream opencode advisories against the ids the
 # shipped database (files/opencode-permissions-kit-lib/sh/advisories.sh)
 # knows. Every unknown upstream id opens ONE GitHub issue (deduped by the
@@ -10,8 +10,8 @@
 # never modifies the repo.
 #
 # Usage (CI sets GITHUB_REPOSITORY + GH_TOKEN; locally: export both):
-#   scripts/security-scan.sh
-#   OPK_SCAN_DRY_RUN=1 scripts/security-scan.sh   # print instead of create
+#   scripts/advisory-watch.sh
+#   OPK_SCAN_DRY_RUN=1 scripts/advisory-watch.sh   # print instead of create
 set -eu
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -141,7 +141,7 @@ while IFS='	' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
         printf '  - [ ] Cover the new record in tests/unit/test-security-advisories.sh\n'
         printf '  - [ ] Cut a release (make release VERSION=x.y.z) so opk update ships it\n'
         printf '  - [ ] Close this issue\n\n'
-        printf 'Auto-created by scripts/security-scan.sh (.github/workflows/security-scan.yml).\n'
+        printf 'Auto-created by scripts/advisory-watch.sh (.github/workflows/advisory-watch.yml).\n'
     } > "$BODY"
     if [ -n "${OPK_SCAN_DRY_RUN:-}" ]; then
         say "$ID NOT in the shipped database — dry run, would open:"

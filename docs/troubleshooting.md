@@ -168,7 +168,8 @@ export PATH="/usr/local/bin:$PATH"
 **Cause:** your old containers/volumes lived in your daemon; ddev now runs
 as `opencode` against the kit's rootless daemon. Containers cannot move
 between daemons — SQL dumps are the only portable copy (the installer
-offers to create them before the `.ddev` handover).
+exports them before the `.ddev` handover: automatically in Standard mode,
+on request in Advanced mode).
 
 **Fix:** check what the install already exported:
 

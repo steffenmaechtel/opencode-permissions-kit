@@ -7,10 +7,16 @@
 #   --dry-run    Show what would be removed without changing anything
 #   --debug      Trace execution (set -x)
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-NC='\033[0m'
+# Colors resolved to REAL bytes once at load (printf interprets \033 in
+# the format string; a bare echo does not portably — dash yes, bash
+# prints the literal). Off for NO_COLOR / non-tty, same rule as sh/ui.sh
+# (0.0.39e C10/C12).
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
+    RED=''; GREEN=''; YELLOW=''; NC=''
+else
+    RED=$(printf '\033[0;31m'); GREEN=$(printf '\033[0;32m')
+    YELLOW=$(printf '\033[0;33m'); NC=$(printf '\033[0m')
+fi
 
 YES=false
 DRY_RUN=false
@@ -40,6 +46,18 @@ done
 # installs (no deployed helper yet) uninstallable.
 browser_bridge_remove() { :; }
 for cand in "$(dirname "$0")/../sh/wsl-browser-bridge.sh" "/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+
+# Agent-home link gates (review 0.0.39h F2, same class as the install/update
+# gates): the plugin removal below acts THROUGH a linked parent (~/.config,
+# ~/.config/opencode — agent-replaceable). Stub keeps older installs
+# (pre-0.0.39h deployed library, no walker yet) uninstallable.
+agent_home_sane() { return 0; }
+for cand in "$(dirname "$0")/../sh/staged-write.sh" "/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
@@ -191,6 +209,16 @@ log "cli removed: /usr/local/bin/opk"
 # additive manager leaves unmanaged/broken files untouched.
 if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
     for _un_dir in "/home/opencode/.config/opencode" "/home/$DEFAULT_USER/.config/opencode"; do
+        # Chain gate (review 0.0.39h F2): rm -rf and the tui-register rewrite
+        # below act THROUGH a linked parent (~/.config, ~/.config/opencode —
+        # agent-replaceable): a planted link redirects the removal/rewrite
+        # into the link target. The walker no-ops outside the agent home (the
+        # developer side is trusted). Skip loudly (user-managed).
+        if ! agent_home_sane "$OPENCODE_USER" "$_un_dir"; then
+            echo "  ${YELLOW}WARNING: the chain to $_un_dir contains a symlink — plugin registration left in place (user-managed).${NC}"
+            log "tui plugin removal skipped: symlink in the chain to $_un_dir"
+            continue
+        fi
         run sudo rm -rf "$_un_dir/plugins/opencode-permissions-kit"
         run sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
     done
@@ -385,6 +413,11 @@ echo "      /home/opencode/.config/opencode/tui.json (registers the kit"
 echo "      plugin; opencode skips it when the plugin file is gone),"
 echo "      ~/.config/opencode/tui.json + ~/.config/opencode/themes/"
 echo "      opencode-danger.json (red bypass theme for your user)."
+echo "    - Windows hosts file: entries added by 'opk ddev-hosts-add'"
+echo "      (C:\\Windows\\System32\\drivers\\etc\\hosts) keep resolving"
+echo "      project domains to 127.0.0.1 — remove them manually if you"
+echo "      no longer need them (project domains under *.ddev.site were"
+echo "      never added)."
 echo ""
 # Session hint (issue #73): the running shell still carries kit leftovers
 # a fresh session drops by itself — the ddev() function from the rc hook

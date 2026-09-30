@@ -39,8 +39,11 @@ The full walkthrough (including verification) lives in
 ## Requirements
 
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
+- Ubuntu 22.04 LTS / Debian 12 or newer — the oldest baselines the kit is
+  tested on (older Ubuntu LTS releases are ESM-only; no fixes are made for them)
 - `sudo` access
 - `curl`
+- `python3` (shipped with default WSL2 images)
 - ddev ≥ 1.25 (when ddev is installed)
 
 ## Documentation

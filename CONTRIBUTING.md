@@ -110,7 +110,7 @@ git push origin release/0.0.36
 git checkout master
 git pull origin master
 make release VERSION=0.0.36
-gh release create 0.0.36 --title "0.0.36" --generate-notes --latest
+gh release create 0.0.36 --generate-notes
 ```
 
 `make release VERSION=0.0.36 ARGS=--dry-run` prints the steps without
@@ -129,9 +129,9 @@ User-facing documentation lives in `docs/` and is organized by topic type
 - One page = one topic type, with a first-line purpose statement.
 - All shipped content (scripts, docs, messages) is in English.
 
-Design records for larger decisions live in `docs/design/`, security analyses
-in `docs/security/` — both are historical records; where wording differs from
-the code, the code wins.
+Design records for larger decisions live in `docs/design/`, historical
+security analyses in `docs/_archive/security/` — both are historical
+records; where wording differs from the code, the code wins.
 
 ## Project reviews
 
@@ -154,6 +154,12 @@ instructions for a coding agent doing the review locally.
 After each review, try to shrink the next one: every finding that could be
 turned into a lint rule, unit test, or consistency guard should be — the
 remaining manual surface is what the checklist cannot automate.
+
+Scope and cadence follow the [review concept](docs/design/review-concept.md):
+full reviews are this trigger-based gate; the fixes themselves get a
+**wave review** (diff scope) before their PR — mandatory when a wave
+changes the semantics of root-running scripts — and the review → fix →
+review loop stops only when a full pass returns no new MED/HIGH findings.
 
 ## Version
 

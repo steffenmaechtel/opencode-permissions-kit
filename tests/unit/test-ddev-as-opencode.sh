@@ -10,7 +10,7 @@
 #     already-opencode branch execs the REAL ddev (no recursion)
 #   - no reference to the removed legacy bin/ddev shim anywhere
 #   - wiring: sudoers rule, install.sh/update.sh fetch+deploy+hook,
-#     config.sh / migrate-denies.sh .ddev handover, status.sh reporting,
+#     config.sh .ddev handover, status.sh reporting,
 #     Makefile target, CI workflow chmod lists + test step
 # Run: sh tests/unit/test-ddev-as-opencode.sh
 set -e
@@ -392,7 +392,7 @@ check "template still parses cleanly with the new rules" \
 
 # --- 5. install.sh wiring ------------------------------------------------------
 check "install.sh fetches both new files (fetch_kit list)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys the function file" \
     sh -c "grep -q '\"\$LIBDIR/sh/ddev-terminal.sh\"' \"\$1\"" _ "$INSTALL"
 check "install.sh deploys the helper (mode 755)" \
@@ -406,7 +406,7 @@ check "install.sh hands over ddev paths in the filesystem step" \
 
 # --- 6. update.sh wiring -------------------------------------------------------
 check "update.sh KIT_FILES includes both new files" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
 check "update.sh KIT_FILES includes the handover helper" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-handover.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh deploys the function file" \
@@ -467,6 +467,21 @@ mkdir -p "$HWORK/proj/vendor/typo3/cms-core/Classes/Information"
 touch "$HWORK/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
 check "detected typo3: root handed back with 2775 (g+w restored)" \
     sh -c ". \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2775" _ "$HANDOVER" "$HWORK/proj"
+
+# --- 7c. docroot containment (0.0.39e S2) -----------------------------------------
+# docroot comes from the group-writable .ddev/config.yaml and feeds
+# root-run chown -R paths — traversal or absolute values must fall back
+# to "." (with a warning), never escape the project root.
+printf 'name: d1\ntype: typo3\ndocroot: public\n' > "$HWORK/proj/.ddev/config.yaml"
+check "docroot containment: sane docroot passes through" \
+    sh -c ". \"\$1\" 2>/dev/null && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = 'config/system public/typo3conf typo3conf' ]" _ "$HANDOVER" "$HWORK/proj"
+printf 'name: d2\ntype: typo3\ndocroot: ../../..\n' > "$HWORK/proj/.ddev/config.yaml"
+check "docroot containment: traversal falls back to '.' and warns" \
+    sh -c ". \"\$1\" && out=\$(ddev_type_settings_dirs \"\$2\" 2>&1); case \"\$out\" in *WARNING*) ;; *) exit 1 ;; esac; [ \"\$(printf '%s\n' \"\$out\" | grep -v WARNING)\" = 'config/system ./typo3conf typo3conf' ]" _ "$HANDOVER" "$HWORK/proj"
+printf 'name: d3\ntype: drupal\ndocroot: /etc\n' > "$HWORK/proj/.ddev/config.yaml"
+check "docroot containment: absolute docroot falls back to '.'" \
+    sh -c ". \"\$1\" && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = './sites/default' ]" _ "$HANDOVER" "$HWORK/proj"
+printf 'type: typo3\n' > "$HWORK/proj/.ddev/config.yaml"
 
 check "non-typo3 type: root untouched by the project-root handover" \
     sh -c "printf 'type: php\n' > \"\$2/.ddev/config.yaml\" && chmod 2770 \"\$2\" && . \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2770" _ "$HANDOVER" "$HWORK/proj"

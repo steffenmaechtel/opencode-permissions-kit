@@ -60,9 +60,9 @@ enforced. It does not mean the kit audits or endorses the tool itself.
 - **sudo-spawning tools.** Tools that spawn opencode under `sudo` run it
   as root — outside the kit's model. Report such a tool and we will take
   a look; the kit deliberately grants no root path.
-- **opencode 2.x background service port.** opencode 2.x (pre-release)
-  binds its background service per *channel*, not per user: running a
-  bare 2.x opencode as the developer occupies the port the `opencode`
+- **opencode 2.x background service port.** opencode 2.x (the npm `latest`
+  channel) binds its background service per *channel*, not per user: running
+  a bare 2.x opencode as the developer occupies the port the `opencode`
   user's service needs. Kit starts stay functional (their config probe
   is time-bounded), but bare runs print a load/wait notice. Avoid
   running 2.x opencode outside the kit on the same machine.

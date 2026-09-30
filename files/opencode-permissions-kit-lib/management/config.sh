@@ -23,7 +23,24 @@
 #
 # Options:
 #   --yes   Skip confirmations, assume Yes
-set -e
+# -u/pipefail rationale: see install.sh (review 0.0.39a C2).
+set -eu
+(set -o pipefail) 2>/dev/null && set -o pipefail || true
+
+# Scratch cleanup (review 0.0.39e C3): same contract as install.sh /
+# update.sh — temp artifacts die on any exit path. The mktemps here live
+# in function locals (sudoers render, conf rewrites), so they register
+# in a registry the trap empties; a Ctrl-C must never leak the rendered
+# sudoers tempfile.
+_TMP_REGISTRY=""
+_tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
+cleanup() {
+    # word splitting intended: registry entries are mktemp paths
+    # shellcheck disable=SC2086
+    if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
+}
+trap cleanup EXIT
+trap 'cleanup; exit 1' INT TERM
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
@@ -79,7 +96,8 @@ OPENCODE_USER="${OPENCODE_USER:-opencode}"
 # project_path_sane reads PROJECT_TILDE_HOME.
 PROJECT_TILDE_HOME="$HOME"
 if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
-    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+    # || true: see install.sh — a stale SUDO_USER must not abort (fix-wave review)
+    _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6 || true)"
     if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
 fi
 # Sharing group: the opencode user's own usergroup; prefer the live value
@@ -159,6 +177,18 @@ for cand in "$SCRIPT_DIR/../sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
 done
 command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 
+# Shared symlink-safe privileged write helper (review 0.0.39g S1):
+# git_config_apply writes into the AGENT-owned ~/.config/opencode — root
+# cp/chown must never follow a planted symlink there. Same lookup order
+# as ddev-handover.sh above.
+for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+command -v staged_write >/dev/null 2>&1 || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+
 projects_list() {
     ui_info "Project roots ($PROJECTS_CONF):"
     if [ ! -f "$PROJECTS_CONF" ] || [ ! -s "$PROJECTS_CONF" ]; then
@@ -175,7 +205,11 @@ projects_list() {
             ui_atten "[$num] $line" "missing"
         fi
     done < "$PROJECTS_CONF"
-    [ "$num" -eq 0 ] && ui_detail "(none configured)"
+    # if (not [ ] &&): a false short-circuit as the function's LAST
+    # statement would make projects_list return 1 and kill the script
+    # under set -e whenever roots ARE configured (fix-wave review).
+    if [ "$num" -eq 0 ]; then ui_detail "(none configured)"; fi
+    return 0
 }
 
 # Same policy as install.sh: never run the group baseline (chgrp -R +
@@ -201,6 +235,8 @@ project_path_sane() {
     esac
     case "$_pp" in
         *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
+        *[[:space:]]*) return 1 ;;        # storage format is line-based and
+                                         # space-free (0.0.39b C3)
     esac
     case "$_pp" in
         /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
@@ -211,6 +247,16 @@ project_path_sane() {
             return 1
             ;;
     esac
+    # The agent user's own home is never a valid project root: the group
+    # baseline (chgrp/setfacl -R) would run over the very directory that
+    # carries the agent's config and state (review 0.0.39a S4).
+    [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] && return 1
+    # The developer's whole home as a root is allowed but deserves a
+    # warning: the baseline gives the agent group-write over every file
+    # in it.
+    if [ -n "${PROJECT_TILDE_HOME:-}" ] && [ "$_pp" = "$PROJECT_TILDE_HOME" ]; then
+        echo "  warn     '$PROJECT_TILDE_HOME' is your whole home — the agent gains group-write over it" >&2
+    fi
     return 0
 }
 
@@ -237,7 +283,7 @@ projects_add() {
         # immediately — shared helper with live per-pass progress
         # (issue #14), .git included (issue #17). The agent user enables
         # the exact per-ancestor traversal probe (0750 developer homes).
-            fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
+        fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
         # ddev handover (.ddev + the app-type's settings dirs at any depth):
         # ddev always runs as $OPENCODE_USER and chmods these paths
         # unconditionally — they must belong to it or `ddev start` fails
@@ -262,7 +308,23 @@ projects_remove() {
             ui_detail "skip $p"
             continue
         fi
-        sudo grep -vxF "$p" "$PROJECTS_CONF" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
+        # grep -v rc 1 (empty result — removing the LAST registered
+        # project, 0.0.39g C3) is benign; rc 2 is a REAL read error and
+        # must die BEFORE the .tmp is mv'd over projects.conf: the old
+        # `{ grep -v || true; } | tee` guard masked it into an empty
+        # rewrite that clobbered the file (review 0.0.39h F4). The rc is
+        # captured OUTSIDE the write pipeline — dash has no pipefail, an
+        # `|| rc=$?` on the pipeline would only ever see tee's 0. The
+        # .tmp is registered in the scratch registry.
+        _pr_rc=0
+        _pr_out=$(sudo grep -vxF "$p" "$PROJECTS_CONF" 2>/dev/null) || _pr_rc=$?
+        [ "$_pr_rc" -le 1 ] || die "cannot rewrite $PROJECTS_CONF (grep rc $_pr_rc) — '$p' NOT removed"
+        _tmp_track "$PROJECTS_CONF.tmp"
+        if [ -n "$_pr_out" ]; then
+            printf '%s\n' "$_pr_out" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
+        else
+            sudo tee "$PROJECTS_CONF.tmp" > /dev/null < /dev/null
+        fi
         sudo mv "$PROJECTS_CONF.tmp" "$PROJECTS_CONF"
         ui_success "removed $p"
         log "project removed: $p"
@@ -308,19 +370,56 @@ git_config_apply() {
     done
     [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/../templates/opencode.jsonc, $LIBDIR/templates/opencode.jsonc"
 
-    sudo cp "$template" "$target"
-    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$target"
-    sudo chmod 664 "$target"
+    # Chain gate (review 0.0.39h F2): staged_write secures the destination
+    # NAME only — a replaced PARENT (~/.config or ~/.config/opencode,
+    # agent-replaceable after any completed install) passes `sudo mkdir -p`
+    # silently and would redirect the writes below into the link target.
+    # The requested toggle was NOT applied — die loudly (user-managed link;
+    # the kit never follows links in the agent home).
+    if ! agent_home_sane "$OPENCODE_USER" "$(dirname "$target")"; then
+        die "a parent of $target is a symlink — git-config $enable NOT applied (user-managed link)"
+    fi
+
+    # Back up an existing agent config before the template overwrite — same
+    # data-safety as the install path. Without this, a customized
+    # opencode.jsonc would be destroyed by a plain on/off toggle.
+    # Both writes go through staged_write (review 0.0.39g S1): the target
+    # dir is agent-owned, a pre-planted symlink at the config or backup
+    # name must never be followed by root cp/chown — mv replaces the link
+    # itself, the backup content survives (a link is read, not replaced).
+    backup=""
+    if sudo test -f "$target"; then
+        backup="${target}.bak-$(date +%Y%m%d-%H%M%S)"
+        staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$target" "$backup"
+    fi
+
+    # 0.0.39h F8: render the FINAL content (template + the SECURE_GIT
+    # edit) on a scratch copy and deploy with ONE staged_write — the old
+    # sudo sed -i follow-up was a SECOND privileged write on the
+    # agent-owned destination; a link swapped between the two would
+    # disclose a root-readable file into the agent config.
+    _gca_tmp=$(mktemp)
+    _tmp_track "$_gca_tmp"
+    if [ "$enable" = "on" ]; then
+        sed 's|//SECURE_GIT: ||' "$template" > "$_gca_tmp"
+    else
+        sed '/\/\/SECURE_GIT:/d' "$template" > "$_gca_tmp"
+    fi
+    staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_gca_tmp" "$target"
+    rm -f "$_gca_tmp"
 
     if [ "$enable" = "on" ]; then
-        sudo sed -i 's|//SECURE_GIT: ||' "$target"
         ui_kv "git-config" "ON  ($target, soft-only)" "$UI_GREEN"
     else
-        sudo sed -i '/\/\/SECURE_GIT:/d' "$target"
         ui_kv "git-config" "OFF  ($target)"
     fi
     log "git-config hardening set to $enable ($target)"
-    ui_warn "existing config was overwritten from template. Restart opencode to pick up changes."
+    if [ -n "$backup" ]; then
+        ui_detail "previous config backed up: $backup"
+        ui_warn "existing config was overwritten from template. Restart opencode to pick up changes."
+    else
+        ui_warn "config was rendered from template. Restart opencode to pick up changes."
+    fi
 }
 
 # --- container backend ----------------------------------------------------------
@@ -382,9 +481,10 @@ render_sudoers() {
     esac
     local tmp
     tmp=$(mktemp)
+    _tmp_track "$tmp"
     sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$template" > "$tmp"
     # Validate the RENDERED file before deploying anything: a broken file
-    # in /etc/sudoers.d makes sudo itself refuse to run (S1).
+    # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
     if ! sudo /usr/sbin/visudo -c -f "$tmp" >/dev/null 2>&1; then
         rm -f "$tmp"
         die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."
@@ -403,19 +503,28 @@ render_sudoers() {
 # Update install.conf: rewrite the backend keys while preserving everything else.
 update_install_conf_backend() {
     local backend="$1" docker_host="$2" podman_socket="$3"
-    local tmp
-    tmp=$(mktemp)
+    # rc-narrowed guard (review 0.0.39h F4 — the old `|| true` masked a
+    # real read error into a conf keeping only the re-stamped keys) +
+    # atomic deploy (0.0.39h F6): render the sibling temp BESIDE the
+    # target and mv it in — a truncate-in-place `sudo cp` leaves a
+    # partial install.conf on a mid-write crash. rc captured outside the
+    # pipeline (dash has no pipefail).
+    _ucb_rc=0
+    _ucb_keep=$(grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null) || _ucb_rc=$?
+    [ "$_ucb_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ucb_rc) — backend not switched"
+    _ucb_tmp="$INSTALL_CONF.opk-new"
+    _tmp_track "$_ucb_tmp"
     {
-        if [ -f "$INSTALL_CONF" ]; then
-            grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null
-        fi
+        if [ -n "$_ucb_keep" ]; then printf '%s\n' "$_ucb_keep"; fi
         echo "CONTAINER_BACKEND=$backend"
-        [ -n "$docker_host" ] && echo "OPENCODE_DOCKER_HOST=$docker_host"
-        [ -n "$podman_socket" ] && echo "OPENCODE_PODMAN_SOCKET=$podman_socket"
-    } | sort -u > "$tmp"
-    sudo cp "$tmp" "$INSTALL_CONF"
-    sudo chmod 644 "$INSTALL_CONF"
-    rm -f "$tmp"
+        # if (not [ ] &&): a false short-circuit inside the braced group
+        # would fail the group's pipeline under set -e/pipefail and kill
+        # the script mid-rewrite (docker_host is empty on podman backends)
+        if [ -n "$docker_host" ]; then echo "OPENCODE_DOCKER_HOST=$docker_host"; fi
+        if [ -n "$podman_socket" ]; then echo "OPENCODE_PODMAN_SOCKET=$podman_socket"; fi
+    } | sort -u | sudo tee "$_ucb_tmp" > /dev/null
+    sudo chmod 644 "$_ucb_tmp"
+    sudo mv -f "$_ucb_tmp" "$INSTALL_CONF"
 }
 
 container_backend_apply() {
@@ -442,11 +551,11 @@ container_backend_apply() {
     local setup_out
     setup_out=$(sudo sh "$setup_script" "$new_backend" --yes 2>&1) || {
         ui_error "provisioning failed:"
-        echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
+        echo "$setup_out" | { grep -v '^OPENCODE_' || true; } | sed 's/^/     /'
         ui_warn "backend not changed."
         return 1
     }
-    echo "$setup_out" | grep -v '^OPENCODE_' | sed 's/^/     /'
+    echo "$setup_out" | { grep -v '^OPENCODE_' || true; } | sed 's/^/     /'
     # Capture socket key from the helper output.
     docker_host=$(echo "$setup_out" | sed -n 's/^OPENCODE_DOCKER_HOST=//p' | tail -1)
 
@@ -465,7 +574,7 @@ container_backend_apply() {
             [ -n "$_cand" ] && [ -x "$_cand" ] && { _cand_bin="$_cand"; break; }
         done
         if [ -n "$_cand_bin" ]; then
-            _cand_ver=$("$_cand_bin" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+            _cand_ver=$("$_cand_bin" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)
             # if/else, not `case $?` after a bare call — config.sh runs
             # under set -e and "not needed" is rc=1.
             if ddev_rootless_bindmounts "$OPENCODE_USER" "$new_backend" "$_cand_ver" "$_cand_bin"; then
@@ -553,17 +662,19 @@ ddev_settings_status() {
 
 update_install_conf_ddev_owned() {
     local value="$1"
-    local tmp
-    tmp=$(mktemp)
+    # Same rc-narrowed + atomic shape as update_install_conf_backend
+    # (review 0.0.39h F4/F6).
+    _udd_rc=0
+    _udd_keep=$(grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null) || _udd_rc=$?
+    [ "$_udd_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_udd_rc) — ddev-settings not changed"
+    _udd_tmp="$INSTALL_CONF.opk-new"
+    _tmp_track "$_udd_tmp"
     {
-        if [ -f "$INSTALL_CONF" ]; then
-            grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null
-        fi
+        if [ -n "$_udd_keep" ]; then printf '%s\n' "$_udd_keep"; fi
         echo "DDEV_DEV_OWNED=$value"
-    } | sort -u > "$tmp"
-    sudo cp "$tmp" "$INSTALL_CONF"
-    sudo chmod 644 "$INSTALL_CONF"
-    rm -f "$tmp"
+    } | sort -u | sudo tee "$_udd_tmp" > /dev/null
+    sudo chmod 644 "$_udd_tmp"
+    sudo mv -f "$_udd_tmp" "$INSTALL_CONF"
 }
 
 ddev_settings_apply() {
