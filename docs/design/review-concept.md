@@ -106,9 +106,33 @@ When a review runs as parallel subagents:
   file after every completed section (empty sections get a `clean` line) —
   end-synthesis turns are the primary failure mode, and checkpoints survive
   them,
-- budget ~8 minutes per agent: batched greps, targeted reads, no whole-file
-  reads of the big scripts; unclear after one follow-up read → mark
-  `unverified`, move on,
+- budget **by scope, not one flat number** (revised 2026-10-01 after the
+  0.0.39 loop — the flat ~8 min was a heuristic, not a measurement):
+  - *wave reviews (diff scope)*: **~8 minutes per agent** — validated by
+    0.0.39 j/k: every in-scope finding was found within budget, no
+    triage deferrals. Micro waves (≤ ~50-line diffs) run ~5. Batched
+    greps, targeted reads, no whole-file reads of the big scripts;
+    unclear after one follow-up read → mark `unverified`, move on.
+  - *full-scope passes*: **~15 minutes per agent PLUS a coverage map**.
+    0.0.39l showed ceiling pressure even on a converged tree (install.sh
+    mid-sections "spot checks only", tui assets deferred) — and there is
+    no all-Flash full-pass data on a *rotted* tree (the deep passes
+    0.0.38/e/g ran on the strong model). The coverage map is the real
+    budget, the minutes only its ceiling: every shipped file gets at
+    least one grep-anchored look, and every deferral is recorded as one
+    in the checkpoint (agents cannot watch clocks — they spend
+    sections).
+  - *release-critical full passes*: prefer a **second independent agent
+    per axis** (the 1–2 snapshots cadence above) over a longer single
+    agent — redundancy replaces depth at lower cost, and ghosts
+    cross-cancel before they reach the main agent.
+  The ceiling is a limiter, not a target: the loop's actual rate limiter
+  is the **main agent's verification duty** — every extra agent-minute
+  yields findings that cost verification minutes, and round 3+ agent
+  time mostly re-litigates accepted residuals (see the convergence
+  table above). When checkpoint files carry timestamps (cheap, optional),
+  a future pass can A/B budgets against verified-finding yield and turn
+  this grading into a measurement.
 - final chat answers are status lists only (counters + top-3), never the
   file content.
 
