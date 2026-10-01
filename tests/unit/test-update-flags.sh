@@ -187,7 +187,7 @@ check "docs: cli.md update flag table lists --only-binary" \
 # The stamp read + fallback chain is extracted verbatim and executed with
 # a fake sed on PATH (the stamp comes from install.conf via sed); the fake
 # answers whatever stamp the case needs, independent of the host's /etc.
-CHAN_BLOCK="$(grep -F '_kit_stamped_channel=' "$UPDATE" | head -1)
+CHAN_BLOCK="$(grep -F '_kit_stamped_channel=' -A1 "$UPDATE" | head -2)
 $(grep -F 'KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"' "$UPDATE" | head -1)"
 if [ -n "$(printf '%s' "$CHAN_BLOCK" | grep -F '_kit_stamped_channel=')" ]; then
     pass "channel resolution block extractable from update.sh"

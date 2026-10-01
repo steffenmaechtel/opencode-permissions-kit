@@ -53,7 +53,8 @@ _opk_browser_open() {
 # (_opk_browser_open — WSL interop, which the opencode user must not
 # have).
 _opk_ddev_describe() {
-    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode describe -j 2>/dev/null || true
+    /usr/bin/sudo -u opencode \
+        /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode describe -j 2>/dev/null || true
 }
 
 # _opk_json_get <json> <key>...: the string value at .raw.<key1>.<key2>...
@@ -257,7 +258,9 @@ ddev() {
 # silent, never changes the ddev command's own exit code.
 _opk_ddev_reshare() {
     [ -d "$PWD/.ddev" ] || return 0
-    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-ensure-shared "$PWD/.ddev" >/dev/null 2>&1 || true
+    /usr/bin/sudo -u opencode \
+        /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-ensure-shared "$PWD/.ddev" \
+        >/dev/null 2>&1 || true
     return 0
 }
 

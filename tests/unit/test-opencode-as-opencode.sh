@@ -592,7 +592,7 @@ echo ""
 echo "--- Merged-config container detection (issue #81) ---"
 
 # static: the probe is wired as designed (fault-tolerant, no prompt)
-if grep -q 'sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config' "$WRAPPER_FILE"; then
+if grep -q '/usr/bin/sudo -n -u opencode' "$WRAPPER_FILE" && grep -q 'bin/opencode debug config' "$WRAPPER_FILE"; then
     echo "  ${GREEN}PASS${NC}  wrapper probes the merged config via opencode debug config (sudo -n)"
     passed=$((passed + 1))
 else

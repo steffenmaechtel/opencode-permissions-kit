@@ -83,7 +83,8 @@ ddev_devowned_flag() {
     # symlink at config.yaml must never be written through by the root
     # cat-rewrite below. A linked config is user structure: skip loudly.
     if [ -L "${1:-}/.ddev/config.yaml" ]; then
-        printf '%s\n' "  WARNING: ${1:-}/.ddev/config.yaml is a symlink — dev-owned flag NOT written (links are never followed)" >&2
+        printf '%s\n' "  WARNING: ${1:-}/.ddev/config.yaml is a symlink — dev-owned flag NOT written"\
+" (links are never followed)" >&2
         return 0
     fi
     ddf_cfg="${1:-}/.ddev/config.yaml"
@@ -145,7 +146,8 @@ ddev_devowned_flag() {
             # 0.0.39h F13: the exec-time recheck tripped (the config or its
             # temp turned into a symlink mid-write) — announce the skip like
             # the entry gate above does, instead of ending silently.
-            printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write — dev-owned flag NOT written (links are never followed)" >&2
+            printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write"\
+" — dev-owned flag NOT written (links are never followed)" >&2
         fi
     fi
     rm -f "$ddf_tmp"
@@ -177,7 +179,8 @@ ddev_type_settings_dirs() {
     [ -n "$dts_proj" ] && [ -d "$dts_proj/.ddev" ] || return 0
     [ -f "$dts_proj/.ddev/config.yaml" ] || return 0
     dts_type=$(sed -n 's/^type:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
-    dts_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
+    dts_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null \
+        | head -1 | tr -d " \t\r\"'")
     [ -n "$dts_docroot" ] || dts_docroot="."
     _ddev_docroot_sane "$dts_docroot" || dts_docroot="."
     case "$dts_type" in
@@ -275,7 +278,8 @@ ddev_handover_project_root() {
     [ -f "$dhq_proj/.ddev/config.yaml" ] || return 0
     dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ "$dhq_type" = "typo3" ] || return 0
-    dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
+    dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null \
+        | head -1 | tr -d " \t\r\"'")
     [ -n "$dhq_docroot" ] || dhq_docroot="."
     _ddev_docroot_sane "$dhq_docroot" || dhq_docroot="."
     if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then

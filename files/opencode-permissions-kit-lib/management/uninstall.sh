@@ -34,7 +34,8 @@ done
 # before any removal so the final lines are written before the library and
 # the log directory itself are deleted.
 log() { :; }
-for cand in "$(dirname "$0")/../sh/log.sh" "/usr/local/lib/opencode-permissions-kit/sh/log.sh" "/usr/local/lib/opencode/log.sh"; do
+for cand in "$(dirname "$0")/../sh/log.sh" \
+    "/usr/local/lib/opencode-permissions-kit/sh/log.sh" "/usr/local/lib/opencode/log.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
@@ -45,7 +46,8 @@ done
 # section from /etc/wsl.conf before the library goes. Stub keeps older
 # installs (no deployed helper yet) uninstallable.
 browser_bridge_remove() { :; }
-for cand in "$(dirname "$0")/../sh/wsl-browser-bridge.sh" "/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh"; do
+for cand in "$(dirname "$0")/../sh/wsl-browser-bridge.sh" \
+    "/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"
         break
@@ -91,7 +93,8 @@ else
 fi
 
 if [ "$DEFAULT_USER" = "root" ] || [ "$DEFAULT_USER" = "opencode" ]; then
-    echo "${RED}Do not run as root or opencode. Run as your normal user WITHOUT the 'sudo' prefix (./uninstall.sh).${NC}"
+    echo "${RED}Do not run as root or opencode."\
+"Run as your normal user WITHOUT the 'sudo' prefix (./uninstall.sh).${NC}"
     exit 1
 fi
 
@@ -99,7 +102,8 @@ trace "checking sudo (-n true) ..."
 if ! sudo -n true 2>/dev/null; then
     trace "no cached/passwordless sudo -> sudo -v"
     if ! sudo -v 2>&1; then
-        echo "This script requires sudo. Run it as your normal user (no 'sudo' prefix); you will be asked for your password."
+        echo "This script requires sudo. Run it as your normal user (no 'sudo' prefix);"\
+" you will be asked for your password."
         exit 1
     fi
 fi
@@ -215,12 +219,15 @@ if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
         # into the link target. The walker no-ops outside the agent home (the
         # developer side is trusted). Skip loudly (user-managed).
         if ! agent_home_sane "$OPENCODE_USER" "$_un_dir"; then
-            echo "  ${YELLOW}WARNING: the chain to $_un_dir contains a symlink — plugin registration left in place (user-managed).${NC}"
+            echo "  ${YELLOW}WARNING: the chain to $_un_dir contains a symlink"\
+" — plugin registration left in place (user-managed).${NC}"
             log "tui plugin removal skipped: symlink in the chain to $_un_dir"
             continue
         fi
         run sudo rm -rf "$_un_dir/plugins/opencode-permissions-kit"
-        run sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
+        run sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" \
+            unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
+            --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
     done
 fi
 
@@ -239,7 +246,8 @@ if [ "$DRY_RUN" = true ]; then
 else
     if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null \
        || grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null; then
-        if [ "$(prompt_yn "Remove the kit's wsl.conf bridge block? (kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
+        if [ "$(prompt_yn "Remove the kit's wsl.conf bridge block? ("\
+"kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
             browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
             echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
             log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
@@ -247,7 +255,9 @@ else
             sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl
             echo "wsl.conf left untouched — remove the kit block yourself (WSL never"
             echo "warns about it; no 'wsl --shutdown' needed). It spans these lines:"
-            grep -n '^# opencode permissions kit browser bridge -- begin$\|^# opencode permissions kit browser bridge -- end$' /etc/wsl.conf 2>/dev/null | sed 's/^/    /'
+            grep -n '^# opencode permissions kit browser bridge -- begin$'\
+'|^# opencode permissions kit browser bridge -- end$' \
+                /etc/wsl.conf 2>/dev/null | sed 's/^/    /'
             grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null \
                 && echo "    plus the legacy [opencode-permissions-kit] section (through its root = line)"
             log "wsl browser bridge: wsl.conf block left in place (user declined)"
@@ -361,7 +371,8 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             # No -xdev on purpose: project roots are often separate mounts
             # (the e2e bind-mounts them; NFS/overlay in the wild) — the
             # revert must follow, exactly like the setfacl -R below.
-            run_q sudo find "$root" \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
+            run_q sudo find "$root" \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
+                -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
         else
             echo "    opencode user unknown — skipped (chown manually if files are locked)"
         fi
@@ -379,7 +390,8 @@ run sudo rm -rf /run/opencode-permissions-kit
 run sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
 run sudo rm -rf /etc/opencode-permissions-kit
 echo "Removed."
-log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
+log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit"\
+", /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
 
 echo ""
 echo "--- Removing audit log ---"

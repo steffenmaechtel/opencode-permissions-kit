@@ -17,7 +17,8 @@
 # installs abort with instructions (re-run install.sh).
 #
 # One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
-#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=stable bash
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
+#       | sudo env KIT_BRANCH=stable bash   # update.sh self-fetches its siblings
 #
 # From a checkout (uses the local files):
 #   sudo bash files/update.sh --yes            # skip prompts
@@ -87,7 +88,8 @@ for _arg in "$@"; do
 done
 # || true on the optional-file reads: with pipefail the sed failure on a
 # missing install.conf must not abort (the old tail-masking hid it).
-_kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true)"
+_kit_stamped_channel="$(sed -n 's/^KIT_CHANNEL=//p' /etc/opencode-permissions-kit/install.conf \
+    2>/dev/null | tail -1 || true)"
 KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 # The resolved ref is re-stamped as KIT_CHANNEL into install.conf, which
 # privileged scripts source wholesale — refuse anything outside a git-ref
@@ -95,7 +97,8 @@ KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 # (review 0.0.39b S1).
 case "$KIT_BRANCH" in
     *[!A-Za-z0-9._/-]*|*..*)
-        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
+        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits,"\
+"'.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
         exit 1
         ;;
 esac
@@ -170,7 +173,10 @@ fetch_kit() {
     # Pre-create every subdirectory referenced by KIT_FILES (bin/, sh/,
     # py/, tui/): curl -o cannot write into a missing directory and aborts
     # the fetch with error 23 ("Failure writing output to destination").
-    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" "$dir/etc"
+    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" \
+        "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" \
+        "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" \
+        "$dir/etc"
     for f in $KIT_FILES; do
         echo "  fetching $f ..." >&2
         # Fetch to a temp file and refuse anything unsound (0.0.39e C1):
@@ -368,7 +374,8 @@ if [ -f "$INSTALL_CONF" ]; then
         echo ""
         echo "  Updates are only supported from kit 0.0.14 onwards (older"
         echo "  migrations have been removed). Re-run install.sh instead:"
-        echo "    curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
+        echo "    curl -fsSL https://raw.githubusercontent.com/steffenmaechtel"\
+"/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
         echo ""
         exit 1
     fi
@@ -400,7 +407,8 @@ while [ "$#" -gt 0 ]; do
         --channel)
             # consumed by the pre-scan above (before the self-fetch);
             # accepted here so it never reaches the unknown-option trap
-            [ "$#" -ge 2 ] || { echo "error: --channel requires a ref (stable, master, a feature branch, or a tag)" >&2; exit 1; }
+            [ "$#" -ge 2 ] \
+                || { echo "error: --channel requires a ref (stable, master, a feature branch, or a tag)" >&2; exit 1; }
             shift
             ;;
         --major)
@@ -424,7 +432,8 @@ while [ "$#" -gt 0 ]; do
             cat <<EOF
 opencode permissions kit -- update.sh  v$VERSION
 Re-deploys the kit on an already-installed system. No prompts by default.
-Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path <file>] [--channel <ref>] [--major 1|2] [--version <ver>]
+Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path <file>]
+                  [--channel <ref>] [--major 1|2] [--version <ver>]
   --yes            skip the confirmation prompt
   --refresh        also re-apply the group baseline (chgrp/setgid/default ACLs)
   --binary         also upgrade the opencode binary to the latest release
@@ -501,18 +510,25 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ui.sh"              "$LIBDI
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/advisories.sh"      "$LIBDIR/sh/advisories.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/shell-warn.sh"      "$LIBDIR/sh/shell-warn.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/config.sh"                        "$LIBDIR/management/config.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/update.sh"                        "$LIBDIR/management/update.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/status.sh"                        "$LIBDIR/management/status.sh"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/config.sh" \
+       "$LIBDIR/management/config.sh"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/update.sh" \
+       "$LIBDIR/management/update.sh"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/status.sh" \
+       "$LIBDIR/management/status.sh"
 # sudoers.template: needed by the installed config.sh for backend switches
 # (render_sudoers looks in $LIBDIR/templates first).
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template"                 "$LIBDIR/templates/sudoers.template"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" \
+       "$LIBDIR/templates/sudoers.template"
 sudo chmod 440 "$LIBDIR/templates/sudoers.template"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode.jsonc"                   "$LIBDIR/templates/opencode.jsonc"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode.jsonc" \
+       "$LIBDIR/templates/opencode.jsonc"
 # Same deploy set as install.sh (0.0.38 C19): without this line the deny-all
 # template in $LIBDIR/templates/ went stale on every opk update.
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc"          "$LIBDIR/templates/opencode-deny-all.jsonc"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/uninstall.sh"                     "$LIBDIR/management/uninstall.sh"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
+       "$LIBDIR/templates/opencode-deny-all.jsonc"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/uninstall.sh" \
+       "$LIBDIR/management/uninstall.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/socket-check" "$LIBDIR/bin/socket-check"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/cwd-check" "$LIBDIR/bin/cwd-check"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-terminal.sh"
@@ -533,17 +549,23 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LI
 # TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates.
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" \
+       "$LIBDIR/tui/opencode-danger.theme.json"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
-sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
+sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
+               "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" \
+               "$LIBDIR/sh/wsl-browser-bridge.sh"
+sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" \
+               "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
 sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
-               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
-               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
-               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-migrate" \
-               "$LIBDIR/bin/browser-bridge"
+               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" \
+               "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
+               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" \
+               "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
+               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" \
+               "$LIBDIR/bin/ddev-migrate" "$LIBDIR/bin/browser-bridge"
 
 # --- old-layout cleanup (0.0.29 streamline, docs/design/streamline.md §5) --------
 # Remove the union of pre-0.0.29 deployed paths after the new layout is in
@@ -569,7 +591,8 @@ log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
 # the kit does not edit wsl.conf implicitly (docs/design/wsl-conf-consent.md);
 # the user opts in via 'sudo opk wsl-add-opencode-1-fix'. An existing
 # carrier stays untouched and keeps working.
-[ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+[ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] \
+    && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
 [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] && . "$LIBDIR/sh/wsl-browser-bridge.sh"
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
@@ -605,7 +628,8 @@ if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ];
         *[!A-Za-z0-9_.-]*|'') die "invalid DEFAULT_USER '$DEFAULT_USER' in install.conf" ;;
     esac
     SUDO_TMP=$(mktemp)
-    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
+    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" \
+        "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
     # Validate the RENDERED file before deploying anything: a broken file
     # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
     if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
@@ -645,20 +669,28 @@ fi
 if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
     for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
         [ -f "$cf" ] || continue
-        if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' "$cf" 2>/dev/null; then
-            sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh|/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh|g' "$cf"
+        if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' \
+            "$cf" 2>/dev/null; then
+            sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh'\
+'|/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh|g' "$cf"
         else
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . '\
+'/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'\
+' (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
             ui_success "wrapper-bypass warning hooked into $cf"
             log "shell-startup warning hook appended: $cf"
         fi
         # ddev always runs as the opencode user: hook the `ddev()` shell
         # function (sudoers helper). Only the DEFAULT user — the opencode
         # session must never be wrapped (the function's id check is the guard).
-        if sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh\|opencode-permissions-kit/ddev-as-opencode.sh' "$cf" 2>/dev/null; then
-            sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh|/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh|g' "$cf"
+        if sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh\|opencode-permissions-kit/ddev-as-opencode.sh' \
+            "$cf" 2>/dev/null; then
+            sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh'\
+'|/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh|g' "$cf"
         else
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . '\
+'/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'\
+' (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
             ui_success "ddev terminal hook installed into $cf"
             log "ddev-terminal hook appended: $cf"
         fi
@@ -677,7 +709,8 @@ fi
 if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     # Shared helper: prefer the copy next to this script (checkout — same
     # vintage as the running update.sh), fall back to the deployed library.
-    [ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" ] && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+    [ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" ] \
+        && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh"
     [ -f "$LIBDIR/sh/ddev-handover.sh" ] && . "$LIBDIR/sh/ddev-handover.sh"
     command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
     ui_detail "scanning project roots for ddev directories (large trees: this can take a while) ..."
@@ -712,14 +745,18 @@ if [ -d /mnt/c ]; then
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
         if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
             ui_warn "/mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)"
-            ui_warn "the mount stays world-readable (mode $mnt_mode) and opencode warns on every start until the distro is reopened."
+            ui_warn "the mount stays world-readable (mode $mnt_mode)"\
+" and opencode warns on every start until the distro is reopened."
         else
-            ui_warn "/mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent can read the Windows profile."
+            ui_warn "/mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent"\
+" can read the Windows profile."
             ui_warn "opencode warns on every start until fixed. Recommended fix in /etc/wsl.conf:"
             ui_detail "[automount]"
             ui_detail "enabled = true"
-            ui_detail "options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
-            ui_warn "then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf — apply the snippet yourself."
+            ui_detail "options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),"\
+"gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
+            ui_warn "then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf"\
+" — apply the snippet yourself."
         fi
     fi
 fi
@@ -760,7 +797,8 @@ detect_target() {
     if [ "$arch" = "x64" ] && [ "$os" = "linux" ] && ! grep -qwi avx2 /proc/cpuinfo 2>/dev/null; then
         target="$target-baseline"
     fi
-    if [ "$os" = "linux" ] && { [ -f /etc/alpine-release ] || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; }; then
+    if [ "$os" = "linux" ] && { [ -f /etc/alpine-release ] \
+        || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; }; then
         target="$target-musl"
     fi
     echo "$target"
@@ -845,7 +883,8 @@ except Exception:
             *)  return 1 ;;
         esac
     else
-        _rlov_ver=$(curl -fsSL --max-time 10 https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
+        _rlov_ver=$(curl -fsSL --max-time 10 \
+            https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
             | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
         case "$_rlov_ver" in
             1.*) echo "$_rlov_ver"; return 0 ;;
@@ -867,9 +906,11 @@ fetch_opencode_version() {
     _fov_target=$(detect_target) || return 1
     case "$_fov_ver" in
         2.*)
-            if ! curl -fsSL --max-time 240 "https://registry.npmjs.org/@opencode/cli-$_fov_target/-/cli-$_fov_target-$_fov_ver.tgz" \
+            if ! curl -fsSL --max-time 240 \
+                "https://registry.npmjs.org/@opencode/cli-$_fov_target/-/cli-$_fov_target-$_fov_ver.tgz" \
                     -o "$_fov_dst/opencode.tar.gz" 2>/dev/null; then
-                curl -fsSL --max-time 240 "https://registry.npmjs.org/@opencode-ai/cli-$_fov_target/-/cli-$_fov_target-$_fov_ver.tgz" \
+                curl -fsSL --max-time 240 \
+                    "https://registry.npmjs.org/@opencode-ai/cli-$_fov_target/-/cli-$_fov_target-$_fov_ver.tgz" \
                     -o "$_fov_dst/opencode.tar.gz" || return 1
             fi
             mkdir -p "$_fov_dst/npmx" || return 1
@@ -879,7 +920,8 @@ fetch_opencode_version() {
             rm -rf "$_fov_dst/npmx" "$_fov_dst/opencode.tar.gz"
             ;;
         *)
-            curl -fsSL --max-time 240 "https://github.com/anomalyco/opencode/releases/download/v$_fov_ver/opencode-$_fov_target.tar.gz" \
+            curl -fsSL --max-time 240 \
+                "https://github.com/anomalyco/opencode/releases/download/v$_fov_ver/opencode-$_fov_target.tar.gz" \
                 -o "$_fov_dst/opencode.tar.gz" || return 1
             tar -xzf "$_fov_dst/opencode.tar.gz" -C "$_fov_dst" || return 1
             rm -f "$_fov_dst/opencode.tar.gz"
@@ -898,7 +940,8 @@ fetch_opencode_version() {
 # best-effort on both paths.
 sync_tui_registration() {
     _str_major="$1"
-    for _str_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
+    for _str_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" \
+                         "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
         _str_user_dir="${_str_dir_user%%:*}"
         _str_dir_owner="${_str_dir_user#*:}"
         # Chain gate (review 0.0.39h F2): the gates below check plugins/
@@ -923,14 +966,17 @@ sync_tui_registration() {
         if [ "$_str_major" = 2 ]; then
             sudo mkdir -p "$_str_user_dir/plugins/opencode-permissions-kit"
             sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
-            sudo chown "$_str_dir_owner:$NEW_OPENCODE_GROUP" "$_str_user_dir/plugins" "$_str_user_dir/plugins/opencode-permissions-kit" 2>/dev/null || true
-            sudo chown -h "$_str_dir_owner:$NEW_OPENCODE_GROUP" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
+            sudo chown "$_str_dir_owner:$NEW_OPENCODE_GROUP" "$_str_user_dir/plugins" \
+                "$_str_user_dir/plugins/opencode-permissions-kit" 2>/dev/null || true
+            sudo chown -h "$_str_dir_owner:$NEW_OPENCODE_GROUP" \
+                "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
             log "tui mode registered for 2.x: $_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
         else
             sudo rm -rf "$_str_user_dir/plugins/opencode-permissions-kit"
             log "tui mode 2.x registration removed: $_str_user_dir/plugins/opencode-permissions-kit"
         fi
-        sudo python3 "$LIBDIR/py/tui-register.py" "$_str_user_dir/cli.json" unregister "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
+        sudo python3 "$LIBDIR/py/tui-register.py" "$_str_user_dir/cli.json" unregister \
+            "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
     done
 }
 
@@ -1046,7 +1092,8 @@ fi
 NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)"
 _ddev_probe=""
 if [ -x "$LIBDIR/bin/ddev-as-opencode" ] && id "$OPENCODE_USER" >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-    _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
+    _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null \
+        | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
 fi
 if [ -z "$_ddev_probe" ]; then
     _ddev_bin=""
@@ -1054,7 +1101,8 @@ if [ -z "$_ddev_probe" ]; then
         [ -n "$_ddev_cand" ] && [ -x "$_ddev_cand" ] && { _ddev_bin="$_ddev_cand"; break; }
     done
     if [ -n "$_ddev_bin" ]; then
-        _ddev_probe=$("$_ddev_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
+        _ddev_probe=$("$_ddev_bin" --version 2>/dev/null \
+            | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
     fi
 fi
 if [ -n "$_ddev_probe" ]; then
@@ -1078,7 +1126,8 @@ fi
 _INSTALL_CONF_TMP="$CONFDIR/install.conf.opk-new"
 _tmp_track "$_INSTALL_CONF_TMP"
 _ic_rc=0
-_ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null) || _ic_rc=$?
+_ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' \
+    -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null) || _ic_rc=$?
 [ "$_ic_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ic_rc) — install.conf left untouched"
 {
     if [ -n "$_ic_keep" ]; then printf '%s\n' "$_ic_keep"; fi
@@ -1089,8 +1138,10 @@ _ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' -e '^
 } | sort -u | sudo tee "$_INSTALL_CONF_TMP" > /dev/null
 sudo chmod 644 "$_INSTALL_CONF_TMP"
 sudo mv -f "$_INSTALL_CONF_TMP" "$CONFDIR/install.conf"
-ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
-log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
+ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH"\
+" OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
+log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH"\
+" OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
 
 # --- TUI mode display user files (docs/_archive/design/plan-ui-tui-opencode.md) ---------
 # Same only-if-absent-or-kit-written policy as install.sh (marker key

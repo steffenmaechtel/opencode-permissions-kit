@@ -294,7 +294,7 @@ fi
 check "C3 (0.0.39g) / F4 (0.0.39h): config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + registers the .tmp" \
     sh -c 'grep -qF "_pr_out=\$(sudo grep -vxF \"\$p\" \"\$PROJECTS_CONF\" 2>/dev/null) || _pr_rc=\$?" "$1" && grep -qF "[ \"\$_pr_rc\" -le 1 ] || die" "$1" && grep -qF "_tmp_track \"\$PROJECTS_CONF.tmp\"" "$1"' _ "$CONFIG"
 check "0.0.39h F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)" \
-    sh -c 'grep -qF "_ic_keep=\$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"' -e '"'"'^DDEV_VERSION='"'"' \"\$INSTALL_CONF\" 2>/dev/null) || _ic_rc=\$?" "$1" && grep -qF "_tmp_track \"\$_INSTALL_CONF_TMP\"" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\" \"\$CONFDIR/install.conf\"" "$1"' _ "$UPDATE"
+    sh -c 'grep -qF "_ic_keep=\$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"'" "$1" && grep -qF "-e '"'"'^DDEV_VERSION='"'"' \"\$INSTALL_CONF\" 2>/dev/null) || _ic_rc=\$?" "$1" && grep -qF "_tmp_track \"\$_INSTALL_CONF_TMP\"" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\" \"\$CONFDIR/install.conf\"" "$1"' _ "$UPDATE"
 check "0.0.39h F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)" \
     sh -c 'grep -qF "_ucb_keep=\$(grep -v" "$1" && grep -qF "mv -f \"\$_ucb_tmp\" \"\$INSTALL_CONF\"" "$1" && grep -qF "mv -f \"\$_udd_tmp\" \"\$INSTALL_CONF\"" "$1"' _ "$CONFIG"
 

@@ -74,7 +74,8 @@ fs_ensure_traversable() {
             if _fsb_sudo setfacl -m "g:$fsb_group:X" "$fsb_d" 2>/dev/null; then
                 printf '%s\n' "  traverse ACL g:$fsb_group on $fsb_d (x only — dir stays non-listable)" >&2
             else
-                printf '%s\n' "  WARNING: could not grant traversal on $fsb_d (setfacl failed — ACL support?) — the agent may not reach $fsb_root" >&2
+                printf '%s\n' "  WARNING: could not grant traversal on $fsb_d (setfacl failed — ACL support?)"\
+" — the agent may not reach $fsb_root" >&2
             fi
         fi
         # Fixed-point guard: a relative root would make dirname spin on
@@ -179,7 +180,8 @@ fs_baseline_root() {
     fsb_group="$2"
     [ -n "$fsb_root" ] && [ -d "$fsb_root" ] || return 0
     fs_ensure_traversable "$fsb_root" "$fsb_group" "${3:-}"
-    printf '%s\n' "  group baseline on $fsb_root (group $fsb_group) — large trees can take several minutes; progress per pass:" >&2
+    printf '%s\n' "  group baseline on $fsb_root (group $fsb_group) — large trees can take several minutes;"\
+" progress per pass:" >&2
     _fsb_pass "chgrp"        "$fsb_root" ! -type l          -- chgrp "$fsb_group"
     _fsb_pass "dirs g+rwxs"  "$fsb_root" -type d            -- chmod g+rwxs
     _fsb_pass "files g+rw"   "$fsb_root" -type f            -- chmod g+rw

@@ -222,7 +222,7 @@ if [ -n "$_verline" ] && [ -n "$_advline" ] && [ "$_verline" -lt "$_advline" ]; 
 else
     fail "wrapper: --version early-exec stays ahead of the advisory check ($_verline vs $_advline)"
 fi
-if grep -q 'timeout 5 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version' "$WRAPPER"; then
+if grep -q 'timeout 5 /usr/bin/sudo -n -u opencode' "$WRAPPER" && grep -q 'bin/opencode --version' "$WRAPPER"; then
     pass "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"
 else
     fail "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"

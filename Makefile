@@ -28,7 +28,11 @@ SHELLCHECK_FILES = files/install.sh \
 #                  kit targets exactly those two shells
 #   SC3040        — guarded `(set -o pipefail)` probe: bash enables it, dash
 #                  skips it (the 2>/dev/null subshell test) — deliberate
-SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040
+# SC2140 excluded since the line-length ratchet (tests/unit/test-line-length.sh):
+# wrapping over-long message strings uses the POSIX adjacent-string line
+# continuation idiom ("part one"\
+# "part two") -- byte-identical output, flagged by SC2140 on every split.
+SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040,SC2140
 
 help:
 	@echo "opencode permissions kit — dev makefile"

@@ -3,7 +3,8 @@
 # First-time installer for WSL2 + DDEV environments. Asks interactively.
 #
 # One-liner (fetches this script + all kit files from GitHub at $KIT_BRANCH):
-#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
+#       | sudo env KIT_BRANCH=stable bash
 #
 # From a checkout (same behaviour, uses the local files):
 #   sudo bash files/install.sh
@@ -77,7 +78,8 @@ KIT_BRANCH="${KIT_BRANCH:-master}"
 # instead of persisting shell metacharacters as root (review 0.0.39b S1).
 case "$KIT_BRANCH" in
     *[!A-Za-z0-9._/-]*|*..*)
-        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits, '.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
+        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits,"\
+"'.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
         exit 1
         ;;
 esac
@@ -96,7 +98,10 @@ fetch_kit() {
     # Pre-create every subdirectory referenced by the file list (bin/, sh/,
     # py/, tui/): curl -o cannot write into a missing directory and aborts
     # the fetch with error 23 ("Failure writing output to destination").
-    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" "$dir/etc"
+    mkdir -p "$dir/opencode-permissions-kit-lib/bin" "$dir/opencode-permissions-kit-lib/sh" \
+        "$dir/opencode-permissions-kit-lib/py" "$dir/opencode-permissions-kit-lib/tui" \
+        "$dir/opencode-permissions-kit-lib/management" "$dir/opencode-permissions-kit-lib/templates" \
+        "$dir/etc"
     # Fetch list — FORMAT RULE: one file per line, backslash-continued.
     # Packed multi-name lines make every diff unreadable (test-kit-files
     # compares word-wise and does not care about layout; this format is
@@ -217,7 +222,9 @@ command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
 # Shared ddev database-migration helpers (dev-user registry -> SQL dumps,
 # issue #15). Same sourcing rules as ddev-handover.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
-command -v ddev_migrate_registry >/dev/null 2>&1 || { ddev_migrate_registry() { :; }; ddev_migrate_projects() { :; }; ddev_migrate_done() { return 1; }; }
+command -v ddev_migrate_registry >/dev/null 2>&1 || {
+    ddev_migrate_registry() { :; }; ddev_migrate_projects() { :; }; ddev_migrate_done() { return 1; };
+}
 
 # Shared group-baseline helper with live progress (issue #14). Same
 # sourcing rules as ddev-handover.sh.
@@ -229,7 +236,8 @@ command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 # in CONFDIR, chown/chmod there, mv onto the destination (rename replaces
 # a planted link instead of following it). Same sourcing rules as above.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/staged-write.sh"
-command -v staged_write >/dev/null 2>&1 || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+command -v staged_write >/dev/null 2>&1 \
+    || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
 
 # Shared WSL browser bridge helper (issues #91, #100): deploys the
 # powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
@@ -449,9 +457,11 @@ log "backup dir created: $BACKUP_DIR"
 sudo -u "$DEFAULT_USER" git config --global --list > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || true
 # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
 sudo -u "$OPENCODE_USER" git config --global --list > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
-[ -f /etc/opencode-permissions-kit/sudoers ] && cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
+[ -f /etc/opencode-permissions-kit/sudoers ] \
+    && cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
 [ -f /usr/local/bin/opencode ] && cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null || true
-[ -d /usr/local/lib/opencode-permissions-kit ] && cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null || true
+[ -d /usr/local/lib/opencode-permissions-kit ] \
+    && cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null || true
 
 ui_section "Pre-flight"
 
@@ -487,27 +497,31 @@ fi
 DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
 DDEV_VERSION=""
 if [ -n "$DDEV_BIN" ] && [ -x "$DDEV_BIN" ]; then
-    DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
+    DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null \
+        | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
 fi
 DDEV_BIN_DEV=""
 if [ -z "$DDEV_VERSION" ] && id "$DEFAULT_USER" >/dev/null 2>&1; then
     DDEV_BIN_DEV="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" sh -c 'command -v ddev 2>/dev/null || true')"
     if [ -n "$DDEV_BIN_DEV" ] && [ -x "$DDEV_BIN_DEV" ]; then
-        DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" "$DDEV_BIN_DEV" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
+        DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" "$DDEV_BIN_DEV" version 2>/dev/null \
+            | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
         [ -z "$DDEV_BIN" ] && DDEV_BIN="$DDEV_BIN_DEV"
     fi
 fi
 log "detected ddev: bin=${DDEV_BIN:-none} version=${DDEV_VERSION:-unknown}"
 if command -v ddev >/dev/null 2>&1 || [ -n "$DDEV_BIN" ]; then
     if [ -n "$DDEV_VERSION" ]; then
-        ddev_ok=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); if(a[1]+0>1 || (a[1]+0==1 && a[2]+0>=25)) print "yes"; else print "no"}')
+        ddev_ok=$(awk -v v="$DDEV_VERSION" 'BEGIN{split(v,a,"."); \
+            if(a[1]+0>1 || (a[1]+0==1 && a[2]+0>=25)) print "yes"; else print "no"}')
         if [ "$ddev_ok" != "yes" ]; then
             ui_error "ddev $DDEV_VERSION found — the kit requires ddev >= 1.25 (rootless container support)."
             ui_warn "upgrade ddev (curl -fsSL https://ddev.com/install.sh | bash) and re-run."
             exit 1
         fi
     else
-        ui_warn "ddev found but the version could not be read (as root nor as '$DEFAULT_USER') — continuing anyway (ddev >= 1.25 required)."
+        ui_warn "ddev found but the version could not be read (as root nor as '$DEFAULT_USER')"\
+" — continuing anyway (ddev >= 1.25 required)."
     fi
 else
     ui_warn "ddev not found — continuing anyway (install it later with ddev >= 1.25)."
@@ -524,7 +538,8 @@ OPENCODE_PODMAN_SOCKET=""
 # "already exported" state must be captured here (Step 4b checks it).
 # || true: the file is optional (fresh install) — with pipefail the sed
 # failure must not abort (the old tail-masking hid it).
-DDEV_EXPORTED_PRE=$(sed -n 's/^DDEV_EXPORTED=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 || true)
+DDEV_EXPORTED_PRE=$(sed -n 's/^DDEV_EXPORTED=//p' /etc/opencode-permissions-kit/install.conf \
+    2>/dev/null | tail -1 || true)
 if [ -f /etc/opencode-permissions-kit/install.conf ]; then
     _be=$(sed -n 's/^CONTAINER_BACKEND=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
     _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
@@ -621,9 +636,11 @@ else
 fi
 
 # Existing kit detection: user 'opencode', install.conf, or a wrapper symlink.
-if id "$OPENCODE_USER" >/dev/null 2>&1 || [ -f /etc/opencode-permissions-kit/install.conf ] || [ -L /usr/local/bin/opencode ]; then
+if id "$OPENCODE_USER" >/dev/null 2>&1 || [ -f /etc/opencode-permissions-kit/install.conf ] \
+    || [ -L /usr/local/bin/opencode ]; then
     _ekv="unknown"
-    [ -f /etc/opencode-permissions-kit/install.conf ] && _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
+    [ -f /etc/opencode-permissions-kit/install.conf ] \
+        && _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
     ui_atten "existing kit" "detected (v${_ekv:-?}) — update.sh is the usual upgrade path"
     if [ "$INTERACTIVE" = true ]; then
         # Convention: docs/design/conventions.md — [Y/n] via ui_confirm.
@@ -636,7 +653,8 @@ fi
 
 # opencode binary candidates (the copy+secure step runs later).
 OC_BINARY_FOUND=""
-for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
+for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" \
+    "/usr/local/bin/opencode" "/usr/bin/opencode"; do
     if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
         OC_BINARY_FOUND="$loc"
         ui_have "opencode binary" "$loc — will be secured under the kit"
@@ -927,7 +945,8 @@ else
                 if [ -n "$PROJECTS_ROOTS" ]; then
                     _sel_done=1
                 else
-                    ui_error "invalid selection '$selection' — pick numbers from the list, 'c' for custom, or 's' to skip."
+                    ui_error "invalid selection '$selection' — pick numbers from the list,"\
+"'c' for custom, or 's' to skip."
                 fi
                 ;;
         esac
@@ -1044,8 +1063,10 @@ fi
 
 port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)
 if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
-    if confirm "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443? (host-wide sysctl)"; then
-        if echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
+    if confirm "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443?"\
+" (host-wide sysctl)"; then
+        if echo 'net.ipv4.ip_unprivileged_port_start=80' \
+            | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
             if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
                 ui_success "unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
                 log "net.ipv4.ip_unprivileged_port_start=80 applied"
@@ -1054,12 +1075,14 @@ if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
                 # podman-rootless is daemonless (fresh netns per run) — no restart.
                 oc_uid=$(id -u "$OPENCODE_USER" 2>/dev/null)
                 if [ "$CONTAINER_BACKEND" = "docker-rootless" ] && [ -n "$oc_uid" ]; then
-                    if sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$oc_uid" systemctl --user restart docker.service 2>/dev/null; then
+                    if sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$oc_uid" \
+                        systemctl --user restart docker.service 2>/dev/null; then
                         ui_success "restarted the opencode rootless docker daemon (its netns re-inherits port-start 80)"
                         log "rootless docker daemon restarted for port-start 80"
                     else
                         ui_warn "could not restart the rootless daemon — run it manually:"
-                        echo "  sudo -u $OPENCODE_USER XDG_RUNTIME_DIR=/run/user/$oc_uid systemctl --user restart docker.service"
+                        echo "  sudo -u $OPENCODE_USER XDG_RUNTIME_DIR=/run/user/$oc_uid"\
+" systemctl --user restart docker.service"
                         log "rootless daemon restart failed (admin must restart manually)"
                     fi
                 fi
@@ -1069,7 +1092,8 @@ if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
                 log "sysctl persisted but not activated live"
             fi
         else
-            ui_warn "could not write /etc/sysctl.d/99-ddev-rootless.conf — apply the sysctl manually or use higher router ports."
+            ui_warn "could not write /etc/sysctl.d/99-ddev-rootless.conf"\
+" — apply the sysctl manually or use higher router ports."
         fi
     else
         ui_detail "skipped — either set the sysctl manually or use higher router ports:"
@@ -1126,8 +1150,10 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
     # below into the link target. Skip loudly (user-managed); no CA will
     # exist, so warn like the other no-CA ends (0.0.39h F5).
     if ! agent_home_sane "$OPENCODE_USER" "$caroot"; then
-        ui_warn "mkcert: the chain to $caroot contains a symlink — CA provisioning skipped (the kit never follows links in the agent home)."
-        ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate. Remove the link or place your CA at $caroot and re-run."
+        ui_warn "mkcert: the chain to $caroot contains a symlink — CA provisioning skipped"\
+" (the kit never follows links in the agent home)."
+        ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate."\
+"Remove the link or place your CA at $caroot and re-run."
         log "mkcert CA provisioning skipped: symlink in the chain to $caroot (no CA provisioned)"
     else
         sudo mkdir -p "$caroot"
@@ -1181,7 +1207,8 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
                     sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
                 fi
                 if [ ! -f "$caroot/rootCA.pem" ]; then
-                    ui_warn "no mkcert CA exists at $caroot after the fallback — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
+                    ui_warn "no mkcert CA exists at $caroot after the fallback"\
+" — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
                     log "mkcert CA fallback produced no CA at $caroot"
                 fi
             fi
@@ -1200,11 +1227,14 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
             sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
             if [ -f "$caroot/rootCA.pem" ]; then
                 ui_warn "mkcert: no existing CA found — a new one was created at $caroot."
-                ui_warn "It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER'): browsers will warn."
-                ui_detail "Import $caroot/rootCA.pem into your browser, or run 'sudo env CAROOT=$caroot mkcert -install' yourself."
+                ui_warn "It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER')"\
+": browsers will warn."
+                ui_detail "Import $caroot/rootCA.pem into your browser,"\
+"or run 'sudo env CAROOT=$caroot mkcert -install' yourself."
                 log "mkcert: no existing CA — new one created for $OPENCODE_USER (system trust store not updated)"
             else
-                ui_warn "no mkcert CA exists at $caroot after the install attempt — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
+                ui_warn "no mkcert CA exists at $caroot after the install attempt"\
+" — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
                 log "mkcert: fresh-install attempt produced no CA at $caroot"
             fi
         else
@@ -1237,9 +1267,12 @@ _ddev_mig_gap_warn() {
     _g_have=${_g%% *}
     _g_rest=${_g#* }
     _g_now=${_g_rest%% *}
-    ui_warn "partial ddev export detected: the registry lists $_g_now project(s) under the roots, only $_g_have dump(s) recorded"
-    ui_warn "the missing databases stay in the old daemon — bridge them (docs/troubleshooting.md, 'My databases are gone after the install')"
-    ui_detail "see what is missing: /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate registry $DEFAULT_USER $PROJECTS_ROOTS"
+    ui_warn "partial ddev export detected: the registry lists $_g_now project(s)"\
+" under the roots, only $_g_have dump(s) recorded"
+    ui_warn "the missing databases stay in the old daemon — bridge them"\
+"(docs/troubleshooting.md, 'My databases are gone after the install')"
+    ui_detail "see what is missing: /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
+" registry $DEFAULT_USER $PROJECTS_ROOTS"
     log "ddev migration gap detected: registry=$_g_now dumps=$_g_have"
 }
 if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
@@ -1247,7 +1280,8 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
     if [ "$SKIP_DDEV_MIGRATION" = true ]; then
         ui_detail "skipped (--skip-ddev-migration) — the databases become unreachable"
         ui_detail "with the old daemon; export manually BEFORE using ddev again:"
-        ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export $DEFAULT_USER ${PROJECTS_ROOTS:-<roots>}"
+        ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
+" export $DEFAULT_USER ${PROJECTS_ROOTS:-<roots>}"
         log "ddev database export skipped (--skip-ddev-migration)"
     elif [ "$DDEV_EXPORTED_PRE" = "1" ]; then
         _ddev_mig_gap_warn
@@ -1263,7 +1297,8 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
         log "ddev database export skipped (no project roots)"
     else
         if [ "$MODE" = "advanced" ] && [ "$INTERACTIVE" = true ]; then
-            confirm "Export the dev user's ddev databases before the handover? (recommended — dumps under /var/backups/opencode-permissions-kit)" || SKIP_DDEV_MIGRATION=true
+            confirm "Export the dev user's ddev databases before the handover?"\
+" (recommended — dumps under /var/backups/opencode-permissions-kit)" || SKIP_DDEV_MIGRATION=true
         fi
         if [ "$SKIP_DDEV_MIGRATION" != true ]; then
             # shellcheck disable=SC2086  # word splitting intended (root list)
@@ -1298,9 +1333,11 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
                     if [ "$INTERACTIVE" = true ]; then
                         # Convention: docs/design/conventions.md — default "n":
                         # continuing is the destructive choice here.
-                        if ! ui_confirm "Continue the install anyway? (the listed databases become unreachable)" "n"; then
+                        if ! ui_confirm "Continue the install anyway?"\
+" (the listed databases become unreachable)" "n"; then
                             ui_info "Aborted — the .ddev handover did NOT run, your dev-side ddev still works."
-                            ui_detail "fix the failed projects (ddev start <name> as $DEFAULT_USER), then re-run install.sh"
+                            ui_detail "fix the failed projects (ddev start <name> as $DEFAULT_USER),"\
+" then re-run install.sh"
                             ui_detail "dumps already written stay in $DD_MIG_DUMP_DIR"
                             log "install aborted: $DD_MIG_FAIL ddev export(s) failed (user decision) — no handover ran"
                             exit 1
@@ -1308,17 +1345,20 @@ if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
                     else
                         ui_warn "continuing (--yes): the listed databases become unreachable"
                     fi
-                    log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL dir=$DD_MIG_DUMP_DIR (failures accepted)"
+                    log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL"\
+" dir=$DD_MIG_DUMP_DIR (failures accepted)"
                 fi
             else
                 ui_warn "ddev database export produced no dumps — import manually later if needed"
-                ui_detail "retry after install: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export $DEFAULT_USER $PROJECTS_ROOTS"
+                ui_detail "retry after install: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
+" export $DEFAULT_USER $PROJECTS_ROOTS"
                 log "ddev database export produced no dumps"
             fi
         else
             ui_detail "declined — the dev databases become unreachable with the old daemon"
             ui_detail "export manually BEFORE using ddev again:"
-            ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export $DEFAULT_USER $PROJECTS_ROOTS"
+            ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
+" export $DEFAULT_USER $PROJECTS_ROOTS"
             log "ddev database export declined (advanced prompt)"
         fi
     fi
@@ -1326,7 +1366,8 @@ fi
 # Carry a pre-existing stamp over the install.conf rewrite in Step 2 —
 # without this, every second re-install would re-attempt (and fail) the
 # dev-side export.
-if [ "$DDEV_EXPORTED_PRE" = "1" ] && ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+if [ "$DDEV_EXPORTED_PRE" = "1" ] \
+    && ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
     echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
 fi
 
@@ -1334,7 +1375,8 @@ fi
 
 if [ -n "$PROJECTS_ROOTS" ]; then
     ui_section "Filesystem (group baseline)"
-    ans=$(_yes_no_backup_menu "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots? (changes metadata on ALL files)")
+    ans=$(_yes_no_backup_menu "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots?"\
+" (changes metadata on ALL files)")
     case "$ans" in
         n) ui_detail "skipping filesystem setup." ;;
         b)
@@ -1449,7 +1491,8 @@ if [ -x "$SYSTEM_BIN" ]; then
     log "binary reused on re-install: $SYSTEM_BIN"
 fi
 
-for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" "/usr/local/bin/opencode" "/usr/bin/opencode"; do
+for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" \
+    "/usr/local/bin/opencode" "/usr/bin/opencode"; do
     if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
         ans=$(_yes_no_backup_menu "opencode binary found at $loc. Copy to system path and secure with wrapper?")
         case "$ans" in
@@ -1538,7 +1581,9 @@ for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEF
         # self-installed opencode binary is reported in non-login shells too.
         # The [ -f ... ] guard keeps the line harmless after uninstall.
         if ! sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh' "$cf" 2>/dev/null; then
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . '\
+'/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'\
+' (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
         fi
         # Interactive-shell ddev function: `ddev` always runs as the opencode
         # user (sudoers helper), so the developer terminal and the agent share
@@ -1546,7 +1591,9 @@ for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEF
         # uninstall. Only the DEFAULT user gets it — the opencode session must
         # never be wrapped (the function's id check would be recursive).
         if ! sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null; then
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
+            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . '\
+'/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'\
+' (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
         fi
     fi
 done
@@ -1571,17 +1618,24 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"              "$LIBDI
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/advisories.sh"      "$LIBDIR/sh/advisories.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/shell-warn.sh"      "$LIBDIR/sh/shell-warn.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/config.sh"                        "$LIBDIR/management/config.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh"                        "$LIBDIR/management/update.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/status.sh"                        "$LIBDIR/management/status.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/config.sh" \
+       "$LIBDIR/management/config.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh" \
+       "$LIBDIR/management/update.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/status.sh" \
+       "$LIBDIR/management/status.sh"
 # sudoers.template is deployed alongside config.sh: the installed config.sh
 # re-renders /etc/opencode-permissions-kit/sudoers on container-backend
 # switches and needs the template next to it.
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template"                 "$LIBDIR/templates/sudoers.template"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" \
+       "$LIBDIR/templates/sudoers.template"
 sudo chmod 440 "$LIBDIR/templates/sudoers.template"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc"                   "$LIBDIR/templates/opencode.jsonc"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc"          "$LIBDIR/templates/opencode-deny-all.jsonc"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/uninstall.sh"                     "$LIBDIR/management/uninstall.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" \
+       "$LIBDIR/templates/opencode.jsonc"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
+       "$LIBDIR/templates/opencode-deny-all.jsonc"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/uninstall.sh" \
+       "$LIBDIR/management/uninstall.sh"
 # rootless socket probe helper
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check" "$LIBDIR/bin/socket-check"
 # headless serve cwd probe helper (readable-for-opencode check + fallback)
@@ -1602,18 +1656,23 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/browser-bridge" "$LIBDIR/b
 # TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" "$LIBDIR/tui/opencode-danger.theme.json"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" \
+       "$LIBDIR/tui/opencode-danger.theme.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/py/tui-register.py" "$LIBDIR/py/tui-register.py"
-sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
+sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" \
+               "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
-sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh"
+sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
+               "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh"
 sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
-               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
-               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
-               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-migrate" \
-               "$LIBDIR/bin/browser-bridge"
+               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" \
+               "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
+               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" \
+               "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
+               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" \
+               "$LIBDIR/bin/ddev-migrate" "$LIBDIR/bin/browser-bridge"
 log "library deployed to $LIBDIR"
 ui_success "kit library deployed: $LIBDIR"
 
@@ -1630,7 +1689,8 @@ log "cli symlink: /usr/local/bin/opk -> $LIBDIR/bin/opk"
 
 # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
 SUDO_TMP=$(mktemp)
-sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
+sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" \
+    "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
 # Validate the RENDERED file before anything is deployed: a broken file in
 # /etc/sudoers.d makes sudo itself refuse to run, and recovering would
 # require non-sudo access. Nothing is deployed unless visudo approves.
@@ -1677,14 +1737,16 @@ fi
 # Advanced mode asks here (Standard already asked in its question section;
 # --yes runs skip everything).
 if [ "$GIT_FLAG_GIVEN" != true ] && [ "$INTERACTIVE" = true ] && [ "$MODE" = "advanced" ]; then
-    if confirm "Block .git/config for opencode? (SOFT-only: opencode tools respect it, bash-spawned reads are not OS-blocked)"; then
+    if confirm "Block .git/config for opencode? (SOFT-only: opencode tools respect it,"\
+" bash-spawned reads are not OS-blocked)"; then
         SECURE_GIT_CONFIG=true
     else
         SECURE_GIT_CONFIG=false
     fi
 fi
 if [ "$SECURE_GIT_CONFIG" = true ]; then
-    ui_info "git for the agent: BLOCKED (.git/config deny active, soft-only — enforced by opencode's permission layer, not the OS)"
+    ui_info "git for the agent: BLOCKED (.git/config deny active, soft-only"\
+" — enforced by opencode's permission layer, not the OS)"
 fi
 
 # === Step 8: opencode Home ===
@@ -1758,7 +1820,8 @@ _opk_migrate_one() {
     # developer content THROUGH a linked destination, chown -R would hand
     # the pointed tree to the agent. Skip loudly (user-managed).
     if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
-        ui_warn "agent resources not migrated: the chain to $_opk_dst contains a symlink (user-managed) — $_opk_src left untouched"
+        ui_warn "agent resources not migrated: the chain to $_opk_dst contains a symlink"\
+" (user-managed) — $_opk_src left untouched"
         log "agents migration skipped: symlink in the chain to $_opk_dst"
         return 0
     fi
@@ -1803,7 +1866,8 @@ _opk_migrate_one() {
 }
 _opk_have_agent_dirs=false
 for _opk_d in $MIGRATE_AGENT_DIRS; do
-    [ -d "/home/$DEFAULT_USER/$_opk_d" ] && [ -n "$(ls -A "/home/$DEFAULT_USER/$_opk_d" 2>/dev/null)" ] && _opk_have_agent_dirs=true
+    [ -d "/home/$DEFAULT_USER/$_opk_d" ] && [ -n "$(ls -A "/home/$DEFAULT_USER/$_opk_d" 2>/dev/null)" ] \
+        && _opk_have_agent_dirs=true
 done
 if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]; then
     _opk_ag="${MIGRATE_AGENTS_OPT:-}"
@@ -1811,9 +1875,12 @@ if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]
         if [ "$INTERACTIVE" = true ]; then
             while true; do
                 echo "" >&2
-                printf "[?] Existing agent resources (~/.agents, ~/.claude/skills) — bring them into /home/%s?\n" "$OPENCODE_USER" >&2
-                echo "    (~/.agents moves whole; from ~/.claude only skills/ — credentials like .credentials.json stay in your home)" >&2
-                echo "    (m) Move   — recommended: one canonical copy; you keep read/write via the $OPENCODE_GROUP group" >&2
+                printf "[?] Existing agent resources (~/.agents, ~/.claude/skills)"\
+" — bring them into /home/%s?\n" "$OPENCODE_USER" >&2
+                echo "    (~/.agents moves whole; from ~/.claude only skills/"\
+" — credentials like .credentials.json stay in your home)" >&2
+                echo "    (m) Move   — recommended: one canonical copy;"\
+" you keep read/write via the $OPENCODE_GROUP group" >&2
                 echo "    (c) Copy   — duplicate; both sides keep their own copy (may drift)" >&2
                 echo "    (s) Skip   — leave them in your home (the agent cannot use them)" >&2
                 printf "  > " >&2
@@ -1867,9 +1934,11 @@ _oc_install_agent_config() {
     rm -f "$_oic_tmp"
 }
 if ! agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
-    ui_warn "the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed (user-managed; the kit never follows links in the agent home)."
+    ui_warn "the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed"\
+" (user-managed; the kit never follows links in the agent home)."
     log "agent config skipped: symlink in the parent chain of /home/opencode/.config/opencode"
-elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
+elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] \
+     && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
     _oc_install_agent_config
     if [ "$SECURE_GIT_CONFIG" = true ]; then
         echo "Default config installed (opencode.jsonc) — .git/config blocked (soft)."
@@ -1877,7 +1946,8 @@ elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] && [ ! -f /home/ope
         echo "Default config installed (opencode.jsonc)."
     fi
     log "opencode config installed: /home/opencode/.config/opencode/opencode.jsonc (secure_git=$SECURE_GIT_CONFIG)"
-elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
+elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] \
+     && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
     sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
     _oc_install_agent_config
     if [ "$SECURE_GIT_CONFIG" = true ]; then
@@ -1886,7 +1956,8 @@ elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] && ! grep -q '"permis
         echo "Default config installed (opencode.jsonc — backup saved)."
     fi
     log "opencode config replaced (backup: $BACKUP_DIR/opencode.jsonc-existing)"
-elif [ -f /home/opencode/.config/opencode/opencode.json ] && [ ! -f /home/opencode/.config/opencode/opencode.jsonc ]; then
+elif [ -f /home/opencode/.config/opencode/opencode.json ] \
+     && [ ! -f /home/opencode/.config/opencode/opencode.jsonc ]; then
     ui_detail "opencode.json exists — left untouched (custom user config)"
     log "opencode config kept: custom opencode.json (not overwritten)"
 else
@@ -1901,7 +1972,8 @@ else
     else
         ui_success "agent config re-applied — git allowed (backup saved)"
     fi
-    log "opencode config re-rendered with the chosen git setting (secure_git=$SECURE_GIT_CONFIG, backup: $BACKUP_DIR/opencode.jsonc-existing)"
+    log "opencode config re-rendered with the chosen git setting"\
+" (secure_git=$SECURE_GIT_CONFIG, backup: $BACKUP_DIR/opencode.jsonc-existing)"
 fi
 
 # === Step 8b: Default-user config (self-update bypass protection) ===
@@ -1914,7 +1986,8 @@ DEFAULT_OC_DIR="/home/$DEFAULT_USER/.config/opencode"
 DEFAULT_OC_CONF="$DEFAULT_OC_DIR/opencode.jsonc"
 sudo mkdir -p "$DEFAULT_OC_DIR"
 if [ -f "$DEFAULT_OC_CONF" ]; then
-    if confirm "Default-user config $DEFAULT_OC_CONF already exists. Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?"; then
+    if confirm "Default-user config $DEFAULT_OC_CONF already exists."\
+" Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?"; then
         BAK_STAMP=$(date +%Y%m%d-%H%M%S)
         sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
         ui_success "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
@@ -2020,16 +2093,20 @@ if [ "$OPENCODE_MAJOR" = 2 ]; then
         # dereferences the operand (arbitrary chown to the agent). Skip
         # loudly instead.
         if [ -L "$_oc_user_dir/plugins" ] || [ -L "$_oc_user_dir/plugins/opencode-permissions-kit" ]; then
-            ui_detail "existing $_oc_user_dir/plugins is a symlink — TUI plugin registration skipped (user-managed link)"
+            ui_detail "existing $_oc_user_dir/plugins is a symlink"\
+" — TUI plugin registration skipped (user-managed link)"
             log "tui plugin registration skipped: $_oc_user_dir/plugins is a symlink"
             continue
         fi
         sudo mkdir -p "$_oc_user_dir/plugins/opencode-permissions-kit"
         sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"
-        sudo chown "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/plugins" "$_oc_user_dir/plugins/opencode-permissions-kit"
-        sudo chown -h "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
+        sudo chown "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/plugins" \
+            "$_oc_user_dir/plugins/opencode-permissions-kit"
+        sudo chown -h "$_oc_dir_owner:$OPENCODE_GROUP" \
+            "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
         # best-effort cleanup of inert file-path entries (pre-0.0.35 kits)
-        sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" unregister "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
+        sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" unregister \
+            "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
     done
     ui_success "TUI mode display registered for opencode 2.x: plugins/opencode-permissions-kit/tui.tsx (both users)"
     log "tui mode registered for 2.x: plugin dir + symlink (kit-mode-2x.tsx)"
@@ -2046,7 +2123,8 @@ ui_kv "Channel"  "$KIT_BRANCH (updates track it: opk update)"
 ui_kv "Backend"  "$CONTAINER_BACKEND (owned by 'opencode')"
 [ -n "$PROJECTS_ROOTS" ] && ui_kv "Projects" "$PROJECTS_ROOTS"
 if [ -n "$DD_MIG_DUMP_DIR" ]; then
-    ui_kv_warn "Ddev dumps" "$DD_MIG_DUMP_DIR — import: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import"
+    ui_kv_warn "Ddev dumps" \
+        "$DD_MIG_DUMP_DIR — import: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import"
 fi
 if [ "$SECURE_GIT_CONFIG" = true ]; then
     ui_kv "Git"   "blocked for the agent (.git/config deny active)"
@@ -2092,7 +2170,8 @@ echo ""
 echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"
-[ -n "$DD_MIG_DUMP_DIR" ] && ui_detail "ddev-migrate.sh import          re-import your ddev databases (first start pulls images)"
+[ -n "$DD_MIG_DUMP_DIR" ] && ui_detail \
+    "ddev-migrate.sh import          re-import your ddev databases (first start pulls images)"
 ui_detail "opk status   verify the protection"
 ui_detail "opk config   change settings later (or update/uninstall)"
 ui_detail "Docs:  https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/README.md"

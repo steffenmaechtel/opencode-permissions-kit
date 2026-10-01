@@ -243,6 +243,7 @@ fi
 # fetch an incomplete kit and crash at deploy time (set -e).
 install_list="$(sed -n '/^fetch_kit() {/,/^}/p' "$SCRIPT_DIR/../../files/install.sh" \
     | grep -v 'mkdir' \
+    | grep -vE '^[[:space:]]*("\$dir/[^"]*"[[:space:]]*)+\\?$' \
     | grep -oE '(install|config|update|uninstall|status)\.sh|opencode(-deny-all)?\.jsonc|sudoers\.template|umask\.sh|VERSION|etc/[a-zA-Z0-9./_-]+|opencode-permissions-kit-lib/[a-zA-Z0-9./_-]+' | sort -u)"
 update_list="$(awk '/^KIT_FILES=/{flag=1} flag{printf "%s ", $0} flag && /"[[:space:]]*$/{exit}' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh" \
     | sed -e 's/^KIT_FILES="//' -e 's/"[[:space:]]*$//' -e 's/\\//g' | tr ' ' '\n' | grep -v '^$' | sort -u)"

@@ -400,7 +400,7 @@ check "install.sh deploys the helper (mode 755)" \
 check "install.sh hooks the function into the developer rc files" \
     sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh hooks use the [ -f ] uninstall-safe guard" \
-    sh -c "grep -qF '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF \"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . '\" \"\$1\" && grep -qF \"'/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh\" \"\$1\"" _ "$INSTALL"
 check "install.sh hands over ddev paths in the filesystem step" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$INSTALL"
 
