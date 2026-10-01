@@ -693,9 +693,15 @@ fi
 # every registered project root is developer-owned, the agent's git needs
 # safe.directory to run there. Unconditional so existing installs get it
 # on the first update; the get guard keeps it idempotent.
+# -C / (issue #116): sudo keeps the invoking user's CWD — run from an
+# unreadable developer home (mode 750), git >= 2.55 dies with
+# "fatal: error reading '<cwd>/.git'" before touching the global config,
+# and safe.directory is never ensured. chdir to / first; --global ignores
+# the worktree anyway.
 if command -v git >/dev/null 2>&1; then
-    if ! sudo -u "$OPENCODE_USER" -H git config --global --get-all safe.directory 2>/dev/null | grep -qFx '*'; then
-        sudo -u "$OPENCODE_USER" -H git config --global --add safe.directory '*' \
+    if ! sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
+        2>/dev/null | grep -qFx '*'; then
+        sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*' \
             && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
     fi
     log "git safe.directory ensured for $OPENCODE_USER"
