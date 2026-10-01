@@ -187,7 +187,8 @@ for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
         break
     fi
 done
-command -v staged_write >/dev/null 2>&1 || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+command -v staged_write >/dev/null 2>&1 \
+    || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
 
 projects_list() {
     ui_info "Project roots ($PROJECTS_CONF):"
@@ -368,7 +369,8 @@ git_config_apply() {
             break
         fi
     done
-    [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/../templates/opencode.jsonc, $LIBDIR/templates/opencode.jsonc"
+    [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/../templates/opencode.jsonc"\
+", $LIBDIR/templates/opencode.jsonc"
 
     # Chain gate (review 0.0.39h F2): staged_write secures the destination
     # NAME only — a replaced PARENT (~/.config or ~/.config/opencode,
@@ -510,7 +512,8 @@ update_install_conf_backend() {
     # partial install.conf on a mid-write crash. rc captured outside the
     # pipeline (dash has no pipefail).
     _ucb_rc=0
-    _ucb_keep=$(grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' "$INSTALL_CONF" 2>/dev/null) || _ucb_rc=$?
+    _ucb_keep=$(grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' \
+        "$INSTALL_CONF" 2>/dev/null) || _ucb_rc=$?
     [ "$_ucb_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ucb_rc) — backend not switched"
     _ucb_tmp="$INSTALL_CONF.opk-new"
     _tmp_track "$_ucb_tmp"
@@ -574,7 +577,8 @@ container_backend_apply() {
             [ -n "$_cand" ] && [ -x "$_cand" ] && { _cand_bin="$_cand"; break; }
         done
         if [ -n "$_cand_bin" ]; then
-            _cand_ver=$("$_cand_bin" version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)
+            _cand_ver=$("$_cand_bin" version 2>/dev/null \
+                | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)
             # if/else, not `case $?` after a bare call — config.sh runs
             # under set -e and "not needed" is rc=1.
             if ddev_rootless_bindmounts "$OPENCODE_USER" "$new_backend" "$_cand_ver" "$_cand_bin"; then
@@ -584,7 +588,8 @@ container_backend_apply() {
                 case $? in
                     2) ui_warn "could not set ddev's no-bind-mounts global — an old ddev (1.25.0-1.25.2) on"
                        ui_warn "docker-rootless fails with 'bind mounts can't be used with Docker Rootless'. Fix:"
-                       ui_detail "sudo -u $OPENCODE_USER env HOME=/home/$OPENCODE_USER ddev config global --no-bind-mounts"
+                       ui_detail "sudo -u $OPENCODE_USER env HOME=/home/$OPENCODE_USER "\
+"ddev config global --no-bind-mounts"
                        log "ddev no-bind-mounts setup failed (backend switch)" ;;
                 esac
             fi
@@ -734,7 +739,8 @@ menu() {
                         git_config_apply off
                     fi
                 else
-                    if confirm "Enable .git/config hardening (soft-only)? opencode tools will not touch .git/config."; then
+                    if confirm "Enable .git/config hardening (soft-only)? "\
+"opencode tools will not touch .git/config."; then
                         git_config_apply on
                     fi
                 fi

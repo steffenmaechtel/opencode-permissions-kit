@@ -74,7 +74,8 @@ if [ -f "$INSTALL_CONF" ]; then
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
 
-id "$OPENCODE_USER" >/dev/null 2>&1 || { echo "${RED}User '$OPENCODE_USER' does not exist. Run install.sh first.${NC}" >&2; exit 1; }
+id "$OPENCODE_USER" >/dev/null 2>&1 \
+    || { echo "${RED}User '$OPENCODE_USER' does not exist. Run install.sh first.${NC}" >&2; exit 1; }
 
 OC_UID=$(id -u "$OPENCODE_USER" 2>/dev/null || echo "")
 [ -n "$OC_UID" ] || { echo "${RED}Cannot resolve UID for $OPENCODE_USER.${NC}" >&2; exit 1; }
@@ -182,11 +183,14 @@ setup_docker_rootless() {
     chown "$OPENCODE_USER:$OPENCODE_USER" "/run/user/$OC_UID" 2>/dev/null || true
     chmod 700 "/run/user/$OC_UID" 2>/dev/null || true
 
-    if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user is-active dbus >/dev/null 2>&1; then
+    if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
+            systemctl --user is-active dbus >/dev/null 2>&1; then
         if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user status >/dev/null 2>&1; then
             echo "${RED}systemd --user is not available for $OPENCODE_USER.${NC}" >&2
-            echo "${YELLOW}Docker rootless needs systemd (WSL2: enable via /etc/wsl.conf [boot] systemd=true + reboot).${NC}" >&2
-            echo "${YELLOW}dbus-user-session was just installed — a reboot may be needed for the user session to start.${NC}" >&2
+            echo "${YELLOW}Docker rootless needs systemd"\
+" (WSL2: enable via /etc/wsl.conf [boot] systemd=true + reboot).${NC}" >&2
+            echo "${YELLOW}dbus-user-session was just installed"\
+" — a reboot may be needed for the user session to start.${NC}" >&2
             echo "${YELLOW}Consider podman-rootless instead (daemonless, no systemd required).${NC}" >&2
             # Debug: show what failed (helps diagnose WSL2-specific issues).
             echo "${CYAN}--- diagnostic (stderr) ---${NC}" >&2
@@ -195,9 +199,11 @@ setup_docker_rootless() {
             echo "/run/user/$OC_UID:" >&2
             ls -la "/run/user/$OC_UID" 2>&1 | sed 's/^/  /' >&2
             echo "systemctl --user is-active dbus:" >&2
-            sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user is-active dbus 2>&1 | sed 's/^/  /' >&2
+            sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
+                systemctl --user is-active dbus 2>&1 | sed 's/^/  /' >&2
             echo "systemctl --user status:" >&2
-            sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user status 2>&1 | head -10 | sed 's/^/  /' >&2
+            sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
+                systemctl --user status 2>&1 | head -10 | sed 's/^/  /' >&2
             exit 1
         fi
     fi
@@ -210,7 +216,8 @@ setup_docker_rootless() {
     if ! command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
         echo "  dockerd-rootless-setuptool.sh not found — adding Docker's apt repo ..."
         # Try the distro package first (some distros ship it).
-        if apt_install docker-ce-rootless-extras 2>/dev/null && command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
+        if apt_install docker-ce-rootless-extras 2>/dev/null \
+            && command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
             : # installed from an existing repo
         else
             # Docker's repo is not configured. Add it via the official get.docker.com
@@ -235,7 +242,8 @@ setup_docker_rootless() {
     if ! command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
         echo "${RED}dockerd-rootless-setuptool.sh still not found.${NC}" >&2
         echo "${YELLOW}Could not install docker-ce-rootless-extras (no network, or Docker's repo unavailable).${NC}" >&2
-        echo "${YELLOW}Install Docker + the rootless extras manually from https://docs.docker.com/engine/security/rootless/ and re-run,${NC}" >&2
+        echo "${YELLOW}Install Docker + the rootless extras manually from"\
+" https://docs.docker.com/engine/security/rootless/ and re-run,${NC}" >&2
         echo "${YELLOW}or use podman-rootless instead (daemonless, no Docker repo needed).${NC}" >&2
         exit 1
     fi
@@ -259,7 +267,8 @@ setup_docker_rootless() {
     # at start). Apply it now so a fresh rootless install is ddev-ready out
     # of the box. If it is lowered later, restart the daemon to re-inherit.
     if [ "$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)" -gt 80 ] 2>/dev/null; then
-        echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1 || true
+        echo 'net.ipv4.ip_unprivileged_port_start=80' \
+            | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1 || true
         sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1 || true
         log "docker-rootless: net.ipv4.ip_unprivileged_port_start=80 applied before daemon start"
     fi
@@ -304,7 +313,8 @@ setup_podman_rootless() {
 
     # Verify podman works as the opencode user.
     if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" podman info >/dev/null 2>&1; then
-        echo "${YELLOW}WARNING: 'podman info' as $OPENCODE_USER failed — rootless podman may need a reboot or 'loginctl enable-linger $OPENCODE_USER'.${NC}"
+        echo "${YELLOW}WARNING: 'podman info' as $OPENCODE_USER failed"\
+" — rootless podman may need a reboot or 'loginctl enable-linger $OPENCODE_USER'.${NC}"
         log "podman-rootless: 'podman info' failed for $OPENCODE_USER (may need reboot/linger)"
     else
         echo "  ${GREEN}podman-rootless is ready for $OPENCODE_USER.${NC}"

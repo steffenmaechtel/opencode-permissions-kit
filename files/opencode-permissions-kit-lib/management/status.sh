@@ -43,7 +43,8 @@ LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
 
 # installed = the wrapper is active (user + wrapper + library present)
 installed=false
-if id "$OPENCODE_USER" >/dev/null 2>&1 && [ -x "$LIBDIR/bin/opencode-as-opencode" ] && [ -L /usr/local/bin/opencode ]; then
+if id "$OPENCODE_USER" >/dev/null 2>&1 && [ -x "$LIBDIR/bin/opencode-as-opencode" ] \
+    && [ -L /usr/local/bin/opencode ]; then
     installed=true
 fi
 
@@ -53,7 +54,8 @@ if [ "$installed" = false ]; then
     ui_warn "Hardening NOT active."
     echo ""
     ui_info "Install it with:"
-    ui_detail "curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
+    ui_detail "curl -fsSL https://raw.githubusercontent.com/steffenmaechtel"\
+"/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
     echo ""
     exit 0
 fi
@@ -78,7 +80,8 @@ else
 fi
 ui_kv "Wrapper"  "/usr/local/bin/opencode -> $(readlink /usr/local/bin/opencode 2>/dev/null || echo missing)"
 ui_kv "Library"  "$LIBDIR"
-_occonf="$(ls /home/$OPENCODE_USER/.config/opencode/opencode.jsonc 2>/dev/null || ls /home/$OPENCODE_USER/.config/opencode/opencode.json 2>/dev/null || echo "")"
+_occonf="$(ls /home/$OPENCODE_USER/.config/opencode/opencode.jsonc 2>/dev/null \
+    || ls /home/$OPENCODE_USER/.config/opencode/opencode.json 2>/dev/null || echo "")"
 if [ -n "$_occonf" ]; then
     ui_kv "Config" "$_occonf"
 else
@@ -116,7 +119,8 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     # NOPASSWD rule, anyone else just sees "unknown".
     ADV_VER=""
     if [ -x "$LIBDIR/bin/opencode" ] && command -v sudo >/dev/null 2>&1; then
-        ADV_VER=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+        ADV_VER=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null \
+    | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
     fi
     if [ -n "$ADV_VER" ]; then
         ADV_HITS=$(advisories_matching opencode "$ADV_VER" standalone || true)
@@ -144,7 +148,8 @@ EOF
     # the live check reports "unavailable", never a false "ok".
     if command -v curl >/dev/null 2>&1; then
         ADV_FEED=""
-        ADV_FEED=$(curl -fsSL --max-time 10 "https://api.github.com/repos/anomalyco/opencode/security-advisories" 2>/dev/null || true)
+        ADV_FEED=$(curl -fsSL --max-time 10 \
+    "https://api.github.com/repos/anomalyco/opencode/security-advisories" 2>/dev/null || true)
         ADV_PARSE_OK=false
         ADV_NEW=""
         if [ -n "$ADV_FEED" ] && command -v python3 >/dev/null 2>&1; then
@@ -243,7 +248,8 @@ if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
         # cannot be created in the DDEV source code").
         _st_block=$(_st_root_blocker "$root")
         if [ -n "$_st_block" ]; then
-            ui_atten "$root" "unreachable for $OPENCODE_USER — $_st_block blocks traversal (fix: sudo opk config refresh)"
+            ui_atten "$root" "unreachable for $OPENCODE_USER — $_st_block blocks traversal"\
+" (fix: sudo opk config refresh)"
         fi
     done < "$PROJECTS_CONF"
 else
@@ -334,7 +340,8 @@ fi
 if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-terminal.sh" ]; then
     hooked=""
     for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
-        [ -f "$cf" ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null && hooked="$cf" && break
+        [ -f "$cf" ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null \
+            && hooked="$cf" && break
     done
     if [ -n "$hooked" ]; then
         ui_kv "ddev() hook" "active — $hooked" "$UI_GREEN"
@@ -418,7 +425,8 @@ if [ -n "$_mig_dir" ] && [ -f "$_mig_dir/manifest.conf" ]; then
                 && grep -q 'approot:' "/home/$OPENCODE_USER/.ddev/project_list.yaml" 2>/dev/null; then
                 _mig_imported=1
             else
-                _mig_imported=$(grep -c '^project_info:' "/home/$OPENCODE_USER/.ddev/global_config.yaml" 2>/dev/null || true)
+                _mig_imported=$(grep -c '^project_info:' \
+    "/home/$OPENCODE_USER/.ddev/global_config.yaml" 2>/dev/null || true)
                 _mig_imported=${_mig_imported:-0}
             fi
         fi
@@ -452,11 +460,13 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-migrate.sh" ]; then
             _mig_now=${_mig_rest%% *}
             ui_kv_warn "db dumps" "INCOMPLETE — registry lists $_mig_now project(s), only $_mig_have dump(s) recorded"
             ui_detail "missing databases stay in the old daemon — bridge them (docs/troubleshooting.md,"
-            ui_detail "'My databases are gone after the install'); check: $LIBDIR/bin/ddev-migrate registry $DEFAULT_USER $_mig_roots"
+            ui_detail "'My databases are gone after the install'); check:"\
+" $LIBDIR/bin/ddev-migrate registry $DEFAULT_USER $_mig_roots"
         elif [ -z "$_mig_dir" ] || [ ! -f "$_mig_dir/manifest.conf" ]; then
             # no manifest at all: warn only when the registry HAS projects
             # shellcheck disable=SC2086  # word splitting intended (root list)
-            _mig_reg=$(ddev_migrate_projects "$(ddev_migrate_home "$DEFAULT_USER")/.ddev" $_mig_roots 2>/dev/null | grep -c . || true)
+            _mig_reg=$(ddev_migrate_projects "$(ddev_migrate_home "$DEFAULT_USER")/.ddev" $_mig_roots 2>/dev/null \
+    | grep -c . || true)
             _mig_reg=${_mig_reg:-0}
             if [ "$_mig_reg" -gt 0 ]; then
                 ui_kv_warn "db dumps" "NONE — but the ddev registry lists $_mig_reg project(s)"
@@ -489,13 +499,16 @@ for _st_cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /us
     [ -n "$_st_cand" ] && [ -x "$_st_cand" ] && { _st_bin="$_st_cand"; break; }
 done
 _st_ver=""
-[ -n "$_st_bin" ] && _st_ver=$("$_st_bin" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+[ -n "$_st_bin" ] && _st_ver=$("$_st_bin" --version 2>/dev/null \
+    | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
 _st_helper="${LIBDIR:-/usr/local/lib/opencode-permissions-kit}/bin/ddev-as-opencode"
 if [ -z "$_st_ver" ] && [ -x "$_st_helper" ] && command -v sudo >/dev/null 2>&1; then
-    _st_ver=$(sudo -n -u "${OPENCODE_USER:-opencode}" "$_st_helper" --version 2>/dev/null | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+    _st_ver=$(sudo -n -u "${OPENCODE_USER:-opencode}" "$_st_helper" --version 2>/dev/null \
+    | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
 fi
 if [ -n "$_st_ver" ]; then
-    ddev_low=$(awk -v v="$_st_ver" 'BEGIN{split(v,a,"."); if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
+    ddev_low=$(awk -v v="$_st_ver" 'BEGIN{split(v,a,"."); \
+    if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
     if [ "$ddev_low" = yes ]; then
         ui_kv "ddev version" "$_st_ver (ddev < 1.25 — rootless needs ddev >= 1.25, upgrade ddev)" "$UI_RED"
     else
@@ -520,7 +533,8 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/Sys
             # checkout of ddev's own repository) ship their own .ddev
             # dirs — they are not the user's projects and their
             # hostnames must never hit the Windows hosts file.
-            find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \) \) -prune -o -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r _st_d; do
+            find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \) \) -prune \
+                -o -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r _st_d; do
                 _st_m=$(ddev_hosts_missing "$(dirname "$_st_d")")
                 [ -n "$_st_m" ] || continue
                 ui_kv_warn "hosts (win)" "$(dirname "$_st_d"): missing $(printf '%s' "$_st_m" | tr '\n' ' ')"
@@ -552,7 +566,8 @@ if [ -d /mnt/c ]; then
             ui_detail "  [automount]"
             ui_detail "  enabled = true"
             ui_detail "  options = \"uid=1000,gid=1000,dmask=027,fmask=037\""
-            ui_detail "(replace uid/gid with the default user's; install.sh asks) and run 'wsl --shutdown' from Windows."
+            ui_detail "(replace uid/gid with the default user's; install.sh asks)"\
+" and run 'wsl --shutdown' from Windows."
         fi
     else
         ui_kv "/mnt/c" "restricted (mode ${mnt_mode:-?})" "$UI_GREEN"
@@ -569,7 +584,8 @@ if [ -d /mnt/c ]; then
             ui_detail "fix: sudo opk wsl-add-opencode-1-fix (explicit consent — the kit never edits wsl.conf itself)"
         else
             ui_kv "browser bridge" "missing — 'console login'/'auth login' fails on this mount" "$UI_RED"
-            ui_detail "fix: sudo opk update (deploys the stand-in), then sudo opk wsl-add-opencode-1-fix (wsl.conf carrier)"
+            ui_detail "fix: sudo opk update (deploys the stand-in),"\
+" then sudo opk wsl-add-opencode-1-fix (wsl.conf carrier)"
         fi
     fi
 fi
@@ -614,12 +630,14 @@ ui_section "Root-equivalent access (audit)"
 sra_groups=$(id -nG "$OPENCODE_USER" 2>/dev/null || true)
 sra_finding=false
 # shellcheck disable=SC2086  # word splitting intended: group lists
-sra_red=$(status_groups_hits "$sra_groups" "docker containerd lxd libvirt libvirt-qemu snap disk sudo admin wheel" | tr '\n' ' ')
+sra_red=$(status_groups_hits "$sra_groups" \
+    "docker containerd lxd libvirt libvirt-qemu snap disk sudo admin wheel" | tr '\n' ' ')
 # shellcheck disable=SC2086  # word splitting intended: group lists
 sra_yellow=$(status_groups_hits "$sra_groups" "wireshark adm systemd-journal" | tr '\n' ' ')
 sra_red=${sra_red% } ; sra_yellow=${sra_yellow% }
 if [ -n "$sra_red" ]; then
-    ui_kv "groups (root-equiv)" "$OPENCODE_USER in: $sra_red — full root, remove with: sudo gpasswd -d $OPENCODE_USER <group>" "$UI_RED"
+    ui_kv "groups (root-equiv)" \
+    "$OPENCODE_USER in: $sra_red — full root, remove with: sudo gpasswd -d $OPENCODE_USER <group>" "$UI_RED"
     sra_finding=true
 fi
 if [ -n "$sra_yellow" ]; then
@@ -634,7 +652,8 @@ fi
 sra_sock_list="/var/run/docker.sock /run/containerd/containerd.sock /var/lib/lxd/unix.socket /run/libvirt/libvirt-sock"
 sra_sock_list="${ROOT_EQUIV_SOCKS:-$sra_sock_list}"
 if [ -d /mnt/wsl ]; then
-    sra_sock_list="$sra_sock_list $(find /mnt/wsl -maxdepth 4 \( -type s -o -type l \) \( -name docker.sock -o -name podman.sock -o -name containerd.sock -o -name crio.sock \) 2>/dev/null)"
+    sra_sock_list="$sra_sock_list $(find /mnt/wsl -maxdepth 4 \( -type s -o -type l \) \( -name docker.sock \
+        -o -name podman.sock -o -name containerd.sock -o -name crio.sock \) 2>/dev/null)"
 fi
 sra_seen=""
 for sra_s in $sra_sock_list; do
@@ -720,7 +739,8 @@ if [ -f "$SCAN_CFG" ] && [ -x "$PARSER" ] && command -v python3 >/dev/null 2>&1;
                             scan_tail=${scan_pat#\*\*/}
                             if [ "$scan_tail" != "$scan_pat" ] && [ -n "$scan_tail" ]; then
                                 case "$scan_tail" in
-                                    */*) find "$scan_dir" -maxdepth 4 -type f -path "$scan_dir/$scan_tail" -print 2>/dev/null ;;
+                                    */*) find "$scan_dir" -maxdepth 4 -type f -path "$scan_dir/$scan_tail" \
+                                        -print 2>/dev/null ;;
                                     *)   find "$scan_dir" -maxdepth 4 -type f -name "$scan_tail" -print 2>/dev/null ;;
                                 esac
                             fi

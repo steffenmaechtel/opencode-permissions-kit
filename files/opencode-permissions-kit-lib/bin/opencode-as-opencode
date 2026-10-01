@@ -84,7 +84,8 @@ done
 # work from any directory. 2.x `mini` is an interactive UI and stays
 # bannered like `tui`/`attach`.
 case "${1:-}" in
-    serve|acp|models|agent|providers|session|export|import|stats|account|console|github|pr|mcp|plug|db|generate|web|debug|uninstall|upgrade|api|auth|plugin|service|pair|update)
+    serve|acp|models|agent|providers|session|export|import|stats|account|console|github|\
+    pr|mcp|plug|db|generate|web|debug|uninstall|upgrade|api|auth|plugin|service|pair|update)
         HEADLESS=true
         ;;
     run)
@@ -187,9 +188,11 @@ if [ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
     . /usr/local/lib/opencode-permissions-kit/sh/advisories.sh
     ADV_LINE=""
     if command -v timeout >/dev/null 2>&1; then
-        ADV_LINE=$(timeout 5 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+        ADV_LINE=$(timeout 5 /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
     else
-        ADV_LINE=$(/usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+        ADV_LINE=$(/usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
     fi
     ADV_VERSION=$(advisories_version_of "$ADV_LINE")
     # An unparseable version (empty) matches nothing — the lib fails safe.
@@ -216,7 +219,9 @@ fi
 # PATH re-add) would shadow the wrapper in new shells, and tools may call the
 # absolute path of the real binary. Warn (but keep running) when one is present.
 SHADOW="$HOME/.opencode/bin/opencode"
-if [ -e "$SHADOW" ] && { [ ! -L "$SHADOW" ] || [ "$(readlink -f "$SHADOW" 2>/dev/null || echo "$SHADOW")" != "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; }; then
+if [ -e "$SHADOW" ] && { [ ! -L "$SHADOW" ] \
+    || [ "$(readlink -f "$SHADOW" 2>/dev/null || echo "$SHADOW")" \
+        != "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; }; then
     note "${YELLOW}WARNING: self-installed opencode detected at $SHADOW${NC}"
     note "${YELLOW}New shells would run it instead of this wrapper. Fix: rm -rf $SHADOW${NC}"
     note ""
@@ -256,7 +261,8 @@ if [ -d /mnt/c ]; then
     # (explicit opt-in — the kit never edits wsl.conf implicitly). Warn when
     # the mount is restricted but the bridge is not in place.
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
-        if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ] \
+        if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/\
+WindowsPowerShell/v1.0/powershell.exe ] \
            || ! grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             note "${YELLOW}WARNING: browser bridge missing — 'console login'/'auth login' would fail${NC}"
             note "${YELLOW}on this restricted /mnt/c. Enable it: sudo opk wsl-add-opencode-1-fix${NC}"
@@ -298,9 +304,11 @@ merged_config() {
     # on a real WSL, issue #80). On timeout the wrapper falls back to the
     # project-only scan. 10s covers a cold service boot (~2-4s) generously.
     if command -v timeout >/dev/null 2>&1; then
-        timeout 10 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+        timeout 10 /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
     else
-        /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
+        /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode debug config 2>/dev/null || true
     fi
 }
 tools_from_config() {
@@ -320,9 +328,11 @@ tools_from_config() {
 stop_merged_config_service() {
     [ "${OPENCODE_MAJOR:-}" = 2 ] || return 0
     if command -v timeout >/dev/null 2>&1; then
-        timeout 5 /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+        timeout 5 /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
     else
-        /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
+        /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true
     fi
 }
 CONTAINER_REQUESTED=false
@@ -429,7 +439,8 @@ if [ "$CONTAINER_REQUESTED" = true ]; then
                         CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
                     else
                         note "${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
-                        note "${YELLOW}Running WITHOUT container tools — not downgrading to a root-equivalent path.${NC}"
+                        note "${YELLOW}Running WITHOUT container tools"\
+" — not downgrading to a root-equivalent path.${NC}"
                         note ""
                         CONTAINER_REQUESTED=false
                         CONTAINER_AUTO=false

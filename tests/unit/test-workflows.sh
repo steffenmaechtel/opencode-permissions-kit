@@ -199,6 +199,22 @@ else
     fail "no workflow step carries more than one env block"
 fi
 
+# YAML scalar guard (test-unit.yml chmod breakage 2026-10-01: a plain
+# multi-line `run:` scalar folds every newline to a space, so each shell
+# backslash continuation became an escaped space and chmod received
+# ' ./path' with a leading blank — file not found). Multi-line run
+# scripts MUST use a block literal (`run: |`), never a plain scalar.
+_plain=0
+for _wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
+    _out=$(grep -nE '^[[:space:]]+run: [^|>].*\\$' "$_wf")
+    [ -n "$_out" ] && { echo "$_wf:$_out"; _plain=1; }
+done
+if [ "$_plain" = 0 ]; then
+    pass "no plain multi-line run: scalars (block literals only)"
+else
+    fail "plain multi-line run: scalar(s) above must be 'run: |' block literals"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

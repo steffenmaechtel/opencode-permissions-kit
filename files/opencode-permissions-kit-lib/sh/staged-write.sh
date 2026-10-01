@@ -61,7 +61,8 @@ staged_write() {
     # that variant is refused too; a link to a FILE is still replaced
     # (the S1 contract).
     if _sw_sudo [ -d "$_sw_dst" ]; then
-        echo "error: staged_write: destination '$_sw_dst' is a directory — refusing (mv would move the staged file inside it)" >&2
+        echo "error: staged_write: destination '$_sw_dst' is a directory"\
+" — refusing (mv would move the staged file inside it)" >&2
         _sw_sudo rm -f "$_sw_tmp"
         return 1
     fi
@@ -107,13 +108,15 @@ agent_home_sane() {
                 _ahs_rest="${_ahs_rest#*/}"
                 _ahs_base="$_ahs_base/$_ahs_seg"
                 if [ -L "$_ahs_base" ]; then
-                    printf '%s\n' "  WARNING: $_ahs_base is a symlink inside the agent home — the kit never follows it (user-managed); the affected write is skipped." >&2
+                    printf '%s\n' "  WARNING: $_ahs_base is a symlink inside the agent home — the kit never follows it"\
+" (user-managed); the affected write is skipped." >&2
                     return 1
                 fi
                 ;;
             *)
                 if [ -L "$_ahs_path" ]; then
-                    printf '%s\n' "  WARNING: $_ahs_path is a symlink inside the agent home — the kit never follows it (user-managed); the affected write is skipped." >&2
+                    printf '%s\n' "  WARNING: $_ahs_path is a symlink inside the agent home — the kit never follows it"\
+" (user-managed); the affected write is skipped." >&2
                     return 1
                 fi
                 return 0

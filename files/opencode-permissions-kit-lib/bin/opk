@@ -153,12 +153,14 @@ case "$cmd" in
         # Windows hosts bridge: must run AS THE DEVELOPER (interop + the
         # Windows user's drvfs access), never as root/opencode. Sourced
         # lib, functions called inline — argument passing stays simple.
-        [ -f "$LIBDIR/sh/ddev-hosts.sh" ] || { ui_error "$LIBDIR/sh/ddev-hosts.sh not found — is the kit installed?"; exit 1; }
+        [ -f "$LIBDIR/sh/ddev-hosts.sh" ] \
+            || { ui_error "$LIBDIR/sh/ddev-hosts.sh not found — is the kit installed?"; exit 1; }
         # shellcheck disable=SC1090
         . "$LIBDIR/sh/ddev-hosts.sh"
         if [ "$(id -u)" -eq 0 ]; then
             _kitsu=""
-            [ -f /etc/opencode-permissions-kit/install.conf ] && _kitsu=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode-permissions-kit/install.conf | tail -1)
+            [ -f /etc/opencode-permissions-kit/install.conf ] \
+                && _kitsu=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode-permissions-kit/install.conf | tail -1)
             [ -n "$_kitsu" ] || _kitsu="${SUDO_USER:-}"
             if [ -z "$_kitsu" ] || [ "$(id -u "$_kitsu" 2>/dev/null || echo 0)" = "0" ]; then
                 ui_error "cannot resolve the developer user — run as your user, not as root"
@@ -200,7 +202,8 @@ case "$cmd" in
         # block (pure comments for WSL, issue #100); a legacy 0.0.36
         # section is cleaned up on the way, and only kit content is ever
         # removed or added. Auto-sudo like config/update.
-        [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] || { ui_error "$LIBDIR/sh/wsl-browser-bridge.sh not found — is the kit installed?"; exit 1; }
+        [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] \
+            || { ui_error "$LIBDIR/sh/wsl-browser-bridge.sh not found — is the kit installed?"; exit 1; }
         if [ "$(id -u)" -ne 0 ]; then
             exec sudo sh "$LIBDIR/bin/opk" "$cmd"
         fi
@@ -283,10 +286,12 @@ case "$cmd" in
 /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
 /usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
 /var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
-                    _ho_err "handover: refusing system path '$_ho_np' — hand over project trees, not system (sub)paths" ;;
+                    _ho_err "handover: refusing system path '$_ho_np'"\
+" — hand over project trees, not system (sub)paths" ;;
             esac
             case "$_ho_np" in
-                /home/*) [ "$(dirname "$_ho_np")" = "/home" ] && _ho_err "handover: refusing whole home directory '$_ho_np' — hand over subpaths" ;;
+                /home/*) [ "$(dirname "$_ho_np")" = "/home" ] \
+                    && _ho_err "handover: refusing whole home directory '$_ho_np' — hand over subpaths" ;;
             esac
             [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
         done

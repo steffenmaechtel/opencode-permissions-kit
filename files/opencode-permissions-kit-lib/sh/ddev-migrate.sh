@@ -284,7 +284,8 @@ ddev_migrate_export() {
     # dump set is the #1 migration surprise. Say it loudly, with names.
     dm_outside=$(ddev_migrate_outside "$dm_home/.ddev" "$@")
     if [ -n "$dm_outside" ]; then
-        echo "  WARNING: $(printf '%s\n' "$dm_outside" | grep -c .) registered ddev project(s) are OUTSIDE the given roots — NOT exported:"
+        echo "  WARNING: $(printf '%s\n' "$dm_outside" | grep -c .) registered ddev project(s)"\
+" are OUTSIDE the given roots — NOT exported:"
         printf '%s\n' "$dm_outside" | sed 's/^/    /'
     fi
 
@@ -317,7 +318,8 @@ ddev_migrate_export() {
         echo "  exporting $dm_n ($dm_ar) ..."
         # Resume: intact dump + OK entry in THIS directory — skip the
         # start/export/stop cycle and keep the existing dump.
-        if [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] && grep -q "^OK|$dm_n|" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null; then
+        if [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] \
+           && grep -q "^OK|$dm_n|" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null; then
             echo "    already exported — skipping (resume)"
             continue
         fi
@@ -325,7 +327,8 @@ ddev_migrate_export() {
         # being retried; the old line must not linger — the installer
         # counts FAIL entries and would re-ask the abort question).
         if [ -f "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
-            grep -vE "^(OK|FAIL|SKIP)\|$dm_n\|" "$DD_MIG_DUMP_DIR/manifest.conf" > "$DD_MIG_DUMP_DIR/manifest.conf.tmp" || true
+            grep -vE "^(OK|FAIL|SKIP)\|$dm_n\|" "$DD_MIG_DUMP_DIR/manifest.conf" \
+               > "$DD_MIG_DUMP_DIR/manifest.conf.tmp" || true
             mv "$DD_MIG_DUMP_DIR/manifest.conf.tmp" "$DD_MIG_DUMP_DIR/manifest.conf"
         fi
         # Already handed over? dev-side ddev cannot start it anymore.
@@ -348,7 +351,8 @@ ddev_migrate_export() {
             continue
         fi
         dm_err="$DD_MIG_DUMP_DIR/.export-$dm_n.err"
-        if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" </dev/null >"$dm_err" 2>&1 \
+        if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" \
+           --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" </dev/null >"$dm_err" 2>&1 \
            && [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
             echo "    dump: $DD_MIG_DUMP_DIR/$dm_n.sql.gz"
             echo "OK|$dm_n|$dm_ar|$dm_n.sql.gz" >> "$DD_MIG_DUMP_DIR/manifest.conf"
@@ -432,14 +436,16 @@ ddev_migrate_import() {
     dm_ok=0; dm_failed=""
     while IFS='|' read -r dm_st dm_n dm_ar dm_f; do
         [ "$dm_st" = "OK" ] && [ -n "$dm_n" ] && [ -n "$dm_ar" ] && [ -n "$dm_f" ] || continue
-        [ -f "$dm_dir/$dm_f" ] || { echo "  $dm_n: dump missing ($dm_dir/$dm_f)"; dm_failed="$dm_failed $dm_n"; continue; }
+        [ -f "$dm_dir/$dm_f" ] \
+           || { echo "  $dm_n: dump missing ($dm_dir/$dm_f)"; dm_failed="$dm_failed $dm_n"; continue; }
         echo "  importing $dm_n ($dm_ar) ..."
         # </dev/null: this loop's stdin IS manifest.conf — ddev reads
         # stdin and would consume the manifest mid-iteration (same class
         # as the export-loop finding).
         # shellcheck disable=SC2086  # word splitting intended (env assignments)
         if sudo -u "$dm_oc" env $dm_env "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 \
-           && sudo -u "$dm_oc" env $dm_env "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" </dev/null >/dev/null 2>&1; then
+           && sudo -u "$dm_oc" env $dm_env "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
+              </dev/null >/dev/null 2>&1; then
             echo "    imported: $dm_f"
             dm_ok=$((dm_ok + 1))
         else

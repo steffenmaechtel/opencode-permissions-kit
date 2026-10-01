@@ -28,7 +28,11 @@ SHELLCHECK_FILES = files/install.sh \
 #                  kit targets exactly those two shells
 #   SC3040        — guarded `(set -o pipefail)` probe: bash enables it, dash
 #                  skips it (the 2>/dev/null subshell test) — deliberate
-SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040
+# SC2140 excluded since the line-length ratchet (tests/unit/test-line-length.sh):
+# wrapping over-long message strings uses the POSIX adjacent-string line
+# continuation idiom ("part one"\
+# "part two") -- byte-identical output, flagged by SC2140 on every split.
+SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040,SC2140
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -73,7 +77,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -213,6 +217,10 @@ test-workflows:
 test-docs:
 	@echo "=== Docs Link Check ==="
 	@./tests/unit/test-docs.sh
+
+test-line-length:
+	@echo "=== Line Length Ratchet ==="
+	@./tests/unit/test-line-length.sh
 
 test-install-args:
 	@echo "=== install.sh Arg-Parsing Tests ==="

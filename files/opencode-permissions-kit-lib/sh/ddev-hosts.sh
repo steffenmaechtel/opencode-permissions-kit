@@ -85,9 +85,11 @@ _ddev_hosts_yaml_list() {
 ddev_hosts_list() {
     dhl_proj="${1:-}"
     [ -n "$dhl_proj" ] && [ -f "$dhl_proj/.ddev/config.yaml" ] || return 0
-    dhl_name=$(sed -n 's/^name:[[:space:]]*//p' "$dhl_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d '[:space:]"' | tr '[:upper:]' '[:lower:]')
+    dhl_name=$(sed -n 's/^name:[[:space:]]*//p' "$dhl_proj/.ddev/config.yaml" 2>/dev/null \
+        | head -1 | tr -d '[:space:]"' | tr '[:upper:]' '[:lower:]')
     [ -n "$dhl_name" ] || dhl_name=$(basename "$dhl_proj" | tr '[:upper:]' '[:lower:]')
-    dhl_tld=$(sed -n 's/^project_tld:[[:space:]]*//p' "$dhl_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d '[:space:]"')
+    dhl_tld=$(sed -n 's/^project_tld:[[:space:]]*//p' "$dhl_proj/.ddev/config.yaml" 2>/dev/null \
+        | head -1 | tr -d '[:space:]"')
     [ -n "$dhl_tld" ] || dhl_tld="ddev.site"
     # Collect via command substitution (single stream): nested
     # pipe-while subshells write interleaved and can RACE a downstream
