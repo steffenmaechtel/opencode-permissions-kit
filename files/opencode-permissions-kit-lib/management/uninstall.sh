@@ -93,7 +93,7 @@ else
 fi
 
 if [ "$DEFAULT_USER" = "root" ] || [ "$DEFAULT_USER" = "opencode" ]; then
-    echo "${RED}Do not run as root or opencode."\
+    echo "${RED}Do not run as root or opencode. "\
 "Run as your normal user WITHOUT the 'sudo' prefix (./uninstall.sh).${NC}"
     exit 1
 fi

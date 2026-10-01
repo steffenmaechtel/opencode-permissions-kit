@@ -120,7 +120,7 @@ your user** instead of the wrapper.
 As a safety net, the kit installs a lockout config for the default user
 (`~/.config/opencode/opencode.jsonc`) that denies **everything** — even if
 the real binary takes over, it cannot read or modify anything. Template:
-`files/opencode-deny-all.jsonc`.
+`files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc`.
 
 - During `install.sh`, an existing file is renamed to
   `opencode.jsonc_BAK_<timestamp>` before the deny-all config is installed.

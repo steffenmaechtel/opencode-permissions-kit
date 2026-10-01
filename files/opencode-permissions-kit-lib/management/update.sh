@@ -16,14 +16,15 @@
 # Supported upgrade floor: the installed kit must be >= 0.0.14. Older
 # installs abort with instructions (re-run install.sh).
 #
-# One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH):
-#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
-#       | sudo env KIT_BRANCH=stable bash   # update.sh self-fetches its siblings
+# One-liner (fetches the new update.sh + all kit files at $KIT_BRANCH) —
+# the URL is split at the repo boundary; join it when copying:
+#   curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit\
+# /stable/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=stable bash
 #
 # From a checkout (uses the local files):
-#   sudo bash files/update.sh --yes            # skip prompts
-#   sudo bash files/update.sh --refresh        # also re-apply the group baseline at the end
-#   sudo bash files/update.sh --binary         # also upgrade opencode to the latest release
+#   sudo bash files/opencode-permissions-kit-lib/management/update.sh --yes     # skip prompts
+#   sudo bash files/opencode-permissions-kit-lib/management/update.sh --refresh # re-apply group baseline
+#   sudo bash files/opencode-permissions-kit-lib/management/update.sh --binary  # upgrade the opencode binary
 #
 # `opencode upgrade` cannot work behind the wrapper (the binary is root-owned
 # and opencode runs as an unprivileged user), so this script is the upgrade
@@ -97,7 +98,7 @@ KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 # (review 0.0.39b S1).
 case "$KIT_BRANCH" in
     *[!A-Za-z0-9._/-]*|*..*)
-        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits,"\
+        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits, "\
 "'.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
         exit 1
         ;;
