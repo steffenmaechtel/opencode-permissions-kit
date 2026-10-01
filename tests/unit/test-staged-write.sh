@@ -37,8 +37,10 @@ passed=0
 
 # Deterministic fixture modes (issue #112): the handover's top-inode fast
 # path skips chown -R/chmod -R on already-conforming trees — under a
-# developer's umask 002 freshly mkdir'ed dirs would conform immediately
-# and the chown/chmod stub assertions below would not fire.
+# developer's umask 002 freshly mkdir'ed dirs would conform immediately.
+# Defensive only for THIS suite (its handover calls use literal
+# ocuser/ocgroup, which real stat output never matches — 0.0.40a F7);
+# it turns load-bearing the moment a call here passes real ids.
 umask 022
 
 pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }

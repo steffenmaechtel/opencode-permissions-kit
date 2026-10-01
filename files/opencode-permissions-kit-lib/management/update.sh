@@ -738,7 +738,7 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
         fi
         ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-        log "ddev handover applied under $root"
+        log "ddev handover pass completed under $root"
     done < "$PROJECTS_CONF"
     if [ "$_ho_skip" -gt 0 ]; then
         ui_detail "skipped the ddev handover rescan for $_ho_skip root(s) — nothing changed since the last pass"

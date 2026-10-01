@@ -31,14 +31,19 @@ paths:
    `ddev_handover_stamp_write`): after a complete pass over a root, a
    one-line stamp under `/etc/opencode-permissions-kit/handover/`
    (one file per root, named by the root path's `cksum`) records
-   `root|user|group|scan-rev|dev-owned-mode|dev-user`. A **plain** `opk update`
-   skips roots whose stamp matches; anything doubtful (missing stamp,
-   any field mismatch) falls back to the full scan — the stamp fails
-   *closed* toward more scanning, never less. Invalidated by design on:
-     - user/group re-base (the group is part of the compared shape),
+   `root|user|group|scan-rev|dev-owned-mode|dev-user`. A **plain**
+   `opk update` skips roots whose stamp matches; anything doubtful
+   (missing stamp, any field mismatch) falls back to the full scan —
+   the stamp fails *closed* toward more scanning, never less.
+   Invalidated by design on:
+   - user/group/dev-user re-base (each is part of the compared shape),
    - dev-owned toggles (`opk config ddev-settings`),
    - scan-semantics changes (bump `DDEV_HANDOVER_STAMP_REV`),
-   - new or re-registered roots (no stamp yet).
+   - new roots (no stamp yet).
+   Re-registered roots cannot skip on a stale pass either:
+   `projects remove` leaves the old stamp behind (an orphan that is
+   never consulted while the root is unregistered), and `projects add`
+   always scans and re-stamps.
    The explicit paths — install, `opk update --refresh`,
    `opk config refresh`, `opk config handover <path>`,
    `opk config projects add` — always scan and re-stamp.
