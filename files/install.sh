@@ -447,9 +447,11 @@ echo "Backup directory: $BACKUP_DIR"
 log "backup dir created: $BACKUP_DIR"
 # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
 # -C /: same unreadable-CWD class as issue #116 (git >= 2.55).
-sudo -u "$DEFAULT_USER" git -C / config --global --list > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || true
+sudo -u "$DEFAULT_USER" git -C / config --global --list \
+    > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || true
 # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
-sudo -u "$OPENCODE_USER" git -C / config --global --list > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
+sudo -u "$OPENCODE_USER" git -C / config --global --list \
+    > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
 [ -f /etc/opencode-permissions-kit/sudoers ] && cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
 [ -f /usr/local/bin/opencode ] && cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null || true
 [ -d /usr/local/lib/opencode-permissions-kit ] && cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null || true
@@ -1392,7 +1394,8 @@ fi
 # "fatal: error reading '<cwd>/.git'" before touching the global config.
 # chdir to / first; --global ignores the worktree anyway.
 if command -v git >/dev/null 2>&1; then
-    if ! sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory 2>/dev/null | grep -qFx '*'; then
+    if ! sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
+        2>/dev/null | grep -qFx '*'; then
         sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*' \
             && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
     fi

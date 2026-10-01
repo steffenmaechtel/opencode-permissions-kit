@@ -699,7 +699,8 @@ fi
 # and safe.directory is never ensured. chdir to / first; --global ignores
 # the worktree anyway.
 if command -v git >/dev/null 2>&1; then
-    if ! sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory 2>/dev/null | grep -qFx '*'; then
+    if ! sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
+        2>/dev/null | grep -qFx '*'; then
         sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*' \
             && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
     fi
