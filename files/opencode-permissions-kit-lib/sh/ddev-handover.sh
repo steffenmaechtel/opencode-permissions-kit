@@ -10,9 +10,10 @@
 #
 #   .ddev/          at any depth under a registered root (a root is
 #                   usually a parent folder of several projects), but
-#                   NEVER inside vendor/, node_modules/ or testdata/
-#                   trees (shipped test fixtures are not projects —
-#                   mirrors the hosts-scan pruning, issues #21/#29)
+#                   NEVER inside vendor/, node_modules/, testdata/ or
+#                   .git/ trees (shipped test fixtures are not projects
+#                   — mirrors the hosts-scan pruning, issues #21/#29;
+#                   .git additionally pruned for scan cost, issue #112)
 #   settings dirs   derived from the project's .ddev/config.yaml `type:`:
 #                     typo3     -> config/system, <docroot>/typo3conf,
 #                                  typo3conf (covers composer v12+,
@@ -152,6 +153,79 @@ ddev_devowned_flag() {
     fi
     rm -f "$ddf_tmp"
     return 0
+}
+
+# --- scan-skip stamps (issue #112) -------------------------------------------
+# A plain `opk update` used to re-run the full .ddev handover scan over
+# every registered root on EVERY run — minutes on large project trees
+# for trees that were already fully handed over. The stamp records that
+# a complete pass ran for <root> with the CURRENT user, group, dev-owned
+# mode and scan revision; a matching stamp lets the routine update skip
+# the rescan. Purely an optimization, never a security boundary: the
+# stamps live root-owned under /etc/opencode-permissions-kit/handover/
+# and anything doubtful (missing stamp, any field mismatch) falls back
+# to the full scan. Invalidated by design on: user/group re-base,
+# dev-owned toggles, scan-algorithm changes (bump the rev), and new or
+# re-registered roots (no stamp yet). The explicit paths (install,
+# --refresh, config refresh / handover / projects add) always scan and
+# re-stamp. OPK_HANDOVER_STAMP_DIR overrides the directory for tests.
+
+# Bump when the scan's semantics change (new prune rules, new targets) —
+# every install then re-scans once on the next update.
+DDEV_HANDOVER_STAMP_REV=1
+
+ddev_handover_stamp_dir() {
+    printf '%s\n' "${OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover}"
+}
+
+# ddev_handover_stamp_valid <root> <user> <group>: 0 when a stamp for
+# <root> matches the current scan shape. The root path is ALSO part of
+# the compared content — a cksum filename collision must never skip a
+# different root's scan.
+ddev_handover_stamp_valid() {
+    dhv_root="${1:-}"; dhv_user="${2:-}"; dhv_group="${3:-}"
+    [ -n "$dhv_root" ] || return 1
+    dhv_file="$(ddev_handover_stamp_dir)/$(printf '%s' "$dhv_root" | cksum | cut -d' ' -f1).stamp"
+    [ -f "$dhv_file" ] || return 1
+    if ddev_devowned_enabled; then dhv_mode=on; else dhv_mode=off; fi
+    [ "$(cat "$dhv_file" 2>/dev/null)" = \
+        "$dhv_root|$dhv_user|$dhv_group|$DDEV_HANDOVER_STAMP_REV|$dhv_mode" ]
+}
+
+# ddev_handover_stamp_write <root> <user> <group>: records a completed
+# full pass. Best-effort — callers run as root (plain writes work); a
+# failed write only costs one extra scan on the next update.
+ddev_handover_stamp_write() {
+    dhw_root="${1:-}"; dhw_user="${2:-}"; dhw_group="${3:-}"
+    [ -n "$dhw_root" ] || return 0
+    if ddev_devowned_enabled; then dhw_mode=on; else dhw_mode=off; fi
+    dhw_dir="$(ddev_handover_stamp_dir)"
+    mkdir -p "$dhw_dir" 2>/dev/null || return 0
+    printf '%s\n' "$dhw_root|$dhw_user|$dhw_group|$DDEV_HANDOVER_STAMP_REV|$dhw_mode" \
+        > "$dhw_dir/$(printf '%s' "$dhw_root" | cksum | cut -d' ' -f1).stamp" 2>/dev/null || true
+    return 0
+}
+
+# _ddev_tree_conforms <dir> <user> <group>: cheap top-inode probe for the
+# recursive handover pairs (chown -R + chmod -R g+w, issue #112): when
+# the tree's top directory is already <user>:<group> WITH group-write,
+# the recursive walk is skipped — the kit is the only actor that hands
+# whole trees to <user>, and everything ddev later writes inside them
+# stays <user>-owned. Mid-tree drift (developer-owned files inside a
+# kit-owned tree, e.g. after a bypassing `git checkout` or a manual
+# restore into .ddev/) is NOT seen by the probe; it stays covered by the
+# explicit repair paths (--refresh, config handover, the ddev() hook's
+# ready-made hint). Fails open: unreadable or unexpected stat answers
+# never skip the walk.
+_ddev_tree_conforms() {
+    _dtc_owner=$(stat -c '%U:%G' "$1" 2>/dev/null) || return 1
+    [ "$_dtc_owner" = "$2:$3" ] || return 1
+    # %A layout: type + user rwx + GROUP rwx (write = position 6) + other;
+    # the trailing * also admits the '+' ACL suffix. No match => full walk.
+    case "$(stat -c %A "$1" 2>/dev/null)" in
+        ?????w*) return 0 ;;
+    esac
+    return 1
 }
 
 # _ddev_docroot_sane <docroot>: containment gate for the docroot value
@@ -326,8 +400,12 @@ ddev_handover_root() {
     # found there belongs to a shipped test fixture, not to a project —
     # e.g. a checkout of ddev's own repository carries dozens under
     # cmd/pkg testdata; handing them over would chown third-party files
-    # and write dev-owned flags into fixture configs.
-    find "$dhr_root" -type d \( -name vendor -o -name node_modules -o -name testdata \) -prune -o \
+    # and write dev-owned flags into fixture configs. .git joins the
+    # prune list for the scan's cost (issue #112): it is the densest
+    # directory structure in a project, and a .ddev inside it is never a
+    # project — ddev locates .ddev by walking UP from the cwd, and no
+    # ddev command ever runs from inside .git/.
+    find "$dhr_root" -type d \( -name vendor -o -name node_modules -o -name testdata -o -name .git \) -prune -o \
         -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r dhr_d; do
         # [ -L ] recheck immediately before each recursive op (fs-baseline
         # deeec30 pattern, 0.0.39g S2): find classified the entry at SCAN
@@ -335,10 +413,17 @@ ddev_handover_root() {
         # symlink operand must never reach chown -R/chmod -R — both
         # dereference a symlink OPERAND and would act on the target tree.
         [ -L "$dhr_d" ] && continue
-        chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || true
-        [ -L "$dhr_d" ] && continue
-        chmod -R g+w "$dhr_d" 2>/dev/null || true
-        echo "  .ddev handover: $dhr_d -> $dhr_user"
+        # Top-inode fast path (issue #112): skip the recursive pair when
+        # the tree already conforms — the steady-state re-scan used to
+        # chown -R/chmod -R every .ddev on every update for nothing.
+        if _ddev_tree_conforms "$dhr_d" "$dhr_user" "$dhr_group"; then
+            :
+        else
+            chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || true
+            [ -L "$dhr_d" ] && continue
+            chmod -R g+w "$dhr_d" 2>/dev/null || true
+            echo "  .ddev handover: $dhr_d -> $dhr_user"
+        fi
         dhr_p="$(dirname "$dhr_d")"
         # Dev-owned mode (see file header): write the ddev flag first,
         # then branch on the FLAG (per-project truth, mode-independent).
@@ -377,10 +462,16 @@ ddev_handover_project_back() {
         # dereference the OPERAND into an arbitrary tree. Raceless skip.
         [ -d "$dhb_proj/$dhb_d" ] || continue
         [ -L "$dhb_proj/$dhb_d" ] && continue
-        chown -R "$dhb_dev:$dhb_group" "$dhb_proj/$dhb_d" 2>/dev/null || true
-        [ -L "$dhb_proj/$dhb_d" ] && continue
-        chmod -R g+w "$dhb_proj/$dhb_d" 2>/dev/null || true
-        echo "  dev-owned handback: $dhb_proj/$dhb_d -> $dhb_dev"
+        # Top-inode fast path (issue #112): trees the developer already
+        # owns with group-write skip the recursive pair.
+        if _ddev_tree_conforms "$dhb_proj/$dhb_d" "$dhb_dev" "$dhb_group"; then
+            :
+        else
+            chown -R "$dhb_dev:$dhb_group" "$dhb_proj/$dhb_d" 2>/dev/null || true
+            [ -L "$dhb_proj/$dhb_d" ] && continue
+            chmod -R g+w "$dhb_proj/$dhb_d" 2>/dev/null || true
+            echo "  dev-owned handback: $dhb_proj/$dhb_d -> $dhb_dev"
+        fi
     done
     # Root inode: hand it back only when a previous handover model run
     # gave it to the kit user (never touches developer-owned roots). The
@@ -415,10 +506,16 @@ ddev_handover_project() {
         # to the agent.
         [ -d "$dhp_proj/$dhp_d" ] || continue
         [ -L "$dhp_proj/$dhp_d" ] && continue
-        chown -R "$dhp_user:$dhp_group" "$dhp_proj/$dhp_d" 2>/dev/null || true
-        [ -L "$dhp_proj/$dhp_d" ] && continue
-        chmod -R g+w "$dhp_proj/$dhp_d" 2>/dev/null || true
-        echo "  ddev settings handover: $dhp_proj/$dhp_d -> $dhp_user"
+        # Top-inode fast path (issue #112): trees already handed over with
+        # group-write skip the recursive pair.
+        if _ddev_tree_conforms "$dhp_proj/$dhp_d" "$dhp_user" "$dhp_group"; then
+            :
+        else
+            chown -R "$dhp_user:$dhp_group" "$dhp_proj/$dhp_d" 2>/dev/null || true
+            [ -L "$dhp_proj/$dhp_d" ] && continue
+            chmod -R g+w "$dhp_proj/$dhp_d" 2>/dev/null || true
+            echo "  ddev settings handover: $dhp_proj/$dhp_d -> $dhp_user"
+        fi
     done
     return 0
 }

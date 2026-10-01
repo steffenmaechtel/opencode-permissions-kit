@@ -24,6 +24,7 @@ Uninstall asks before removing the kit block (or assumes yes with
 |---|---|
 | `install.conf` | Install settings (keys below) |
 | `projects.conf` | Project roots (one per line; paths must not contain spaces — the writer splits on them, every consumer reads line-by-line) |
+| `handover/` | Scan-skip stamps for the ddev handover ([issue #112](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/112)): one root-owned file per project root recording the last completed pass — a matching stamp lets a plain `opk update` skip the rescan; `update --refresh` and the `opk config` paths always re-scan. Purely an optimization; deleting it costs one extra scan |
 
 ### `install.conf` keys
 

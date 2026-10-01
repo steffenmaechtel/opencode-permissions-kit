@@ -100,7 +100,14 @@ future updates work without the curl one-liner:
 opk update
 ```
 
-To re-apply the group baseline (chgrp/setgid/default ACLs) as well:
+The ddev handover rescan over your project roots is skipped when nothing
+changed since the last pass (a root-owned stamp under
+`/etc/opencode-permissions-kit/handover/` records the last completed pass
+per root — user, group, dev-owned mode, and scan revision; a matching
+stamp short-circuits the scan, [issue #112](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/112)).
+New or re-registered roots, a group re-base, or a dev-owned toggle
+re-scan automatically. To re-apply the group baseline (chgrp/setgid/
+default ACLs) **and** force the full handover rescan as well:
 
 ```bash
 opk update --refresh

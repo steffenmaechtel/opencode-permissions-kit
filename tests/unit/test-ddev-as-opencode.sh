@@ -42,6 +42,12 @@ E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 failures=0
 passed=0
 
+# Deterministic fixture modes (issue #112): the handover's top-inode fast
+# path skips chown -R/chmod -R (and its echo) on already-conforming
+# trees — under a developer's umask 002 freshly mkdir'ed dirs would
+# conform immediately and flip the first-run assertions below.
+umask 022
+
 pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
 fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 
@@ -646,6 +652,99 @@ check "scan mode off + unflagged: bootstrap root still handed over (2755)" \
     sh -c "test \"\$(stat -c %a \"\$1\")\" = 2755" _ "$DWORK/old/proj"
 rm -rf "$DWORK"
 unset DDEV_DEV_OWNED
+
+# --- 7f. scan performance (issue #112) ---------------------------------------------
+# Three optimizations for large project trees: .git pruned from the scan,
+# a top-inode fast path that skips the recursive chown/chmod pair on
+# already-conforming trees, and scan-skip stamps that let a plain
+# `opk update` skip roots whose last full pass still matches.
+
+# .git prune: a .ddev inside .git/ is never a project (ddev finds .ddev
+# by walking UP from the cwd — no ddev command runs inside .git/).
+rm -rf "$HWORK/gitprune"
+mkdir -p "$HWORK/gitprune/proj/.ddev" "$HWORK/gitprune/proj/.git/modules/sub/.ddev"
+GITPRUNE_OUT=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/gitprune" 2>/dev/null || true)
+check "handover scan skips .ddev inside .git/ (issue #112)" \
+    sh -c "! printf '%s\n' \"\$1\" | grep -q '.git/modules'" _ "$GITPRUNE_OUT"
+check "handover scan still hands over the project .ddev next to .git/" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'proj/.ddev'" _ "$GITPRUNE_OUT"
+rm -rf "$HWORK/gitprune"
+
+# Top-inode fast path: the FIRST pass chowns/chmods and echoes; the
+# second (everything conforms: user:group + group-write on the top
+# inode) stays silent for the recursive pairs. Detected typo3 (vendor
+# marker) so the project-root logic stays silent too (no dev user).
+rm -rf "$HWORK/fastpath"
+mkdir -p "$HWORK/fastpath/proj/.ddev" "$HWORK/fastpath/proj/config/system" \
+    "$HWORK/fastpath/proj/vendor/typo3/cms-core/Classes/Information"
+printf 'type: typo3\n' > "$HWORK/fastpath/proj/.ddev/config.yaml"
+touch "$HWORK/fastpath/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
+FP1=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null || true)
+check "fast path: first pass hands .ddev over" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q '.ddev handover:'" _ "$FP1"
+check "fast path: first pass hands the settings dir over" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'ddev settings handover: .*config/system'" _ "$FP1"
+FP2=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null || true)
+check "fast path: second pass is silent for .ddev + settings dirs" \
+    sh -c "! printf '%s\n' \"\$1\" | grep -qe '.ddev handover:' -e 'ddev settings handover:'" _ "$FP2"
+# ...and the skip is a MODE fact, not luck: the top inode carries g+w now.
+check "fast path: .ddev top inode is group-writable after the pass" \
+    sh -c "case \"\$(stat -c %A \"\$1\")\" in ?????w*) exit 0 ;; *) exit 1 ;; esac" _ "$HWORK/fastpath/proj/.ddev"
+# Mid-tree drift (a developer-owned file inside the conformed tree) is
+# invisible to the probe by design — explicit repair paths cover it.
+rm -rf "$HWORK/fastpath"
+
+# Scan-skip stamps: write -> valid; any field mismatch -> invalid; a
+# cksum filename collision must not validate a different root.
+_112_dir=$(mktemp -d)
+OPK_HANDOVER_STAMP_DIR="$_112_dir/stamps"
+export OPK_HANDOVER_STAMP_DIR
+mkdir -p "$_112_dir/stamps"
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup
+check "stamp: written into the override dir" \
+    sh -c "ls \"\$1\"/*.stamp >/dev/null 2>&1" _ "$_112_dir/stamps"
+check "stamp: valid for the same root/user/group" \
+    sh -c ". \"\$1\" && ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup" _ "$HANDOVER"
+check "stamp: invalid for a different user" \
+    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" otheruser ocgroup; then exit 1; fi" _ "$HANDOVER"
+check "stamp: invalid for a different group" \
+    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser othergroup; then exit 1; fi" _ "$HANDOVER"
+check "stamp: invalid for a different root" \
+    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/other\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+check "stamp: invalid when missing entirely" \
+    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/never-scanned\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+check "stamp: dev-owned toggle invalidates (mode is part of the shape)" \
+    sh -c "DDEV_DEV_OWNED=true . \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+_112_stampfile=$(ls "$_112_dir/stamps"/*.stamp 2>/dev/null || true)
+if [ -n "$_112_stampfile" ]; then
+    sed 's/|1|/|99|/' "$_112_stampfile" > "$_112_stampfile.new" && mv "$_112_stampfile.new" "$_112_stampfile"
+fi
+check "stamp: a scan-rev mismatch invalidates" \
+    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+rm -rf "$_112_dir"
+unset OPK_HANDOVER_STAMP_DIR
+
+# Wiring: update.sh skips via the stamps (plain update only — --refresh
+# forces), re-stamps after every full pass, and says how to force;
+# install.sh + config.sh stamp their explicit passes too.
+check "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid" \
+    sh -c "grep -qF '[ \"\$REFRESH\" != true ] && ddev_handover_stamp_valid' \"\$1\"" _ "$UPDATE"
+check "update.sh: stamps the root after the handover" \
+    sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\"' \"\$1\"" _ "$UPDATE"
+check "update.sh: the scanning detail is printed only for roots actually scanned" \
+    sh -c "grep -qF '_ho_announced=false' \"\$1\" && grep -qF 'if [ \"\$_ho_announced\" = false ]' \"\$1\"" _ "$UPDATE"
+check "update.sh: skip message names both force paths" \
+    sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE"
+check "update.sh: --refresh pass re-stamps" \
+    sh -c "awk '/^if \[ \"\\\$REFRESH\" = true \]/,/^fi/' \"\$1\" | grep -q 'ddev_handover_stamp_write'" _ "$UPDATE"
+check "install.sh: stamps after the install-time handover" \
+    sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
+check "config.sh: refresh + projects add + handover re-stamp" \
+    sh -c '[ "$(grep -c "ddev_handover_stamp_write" "$1")" -ge 3 ]' _ "$CONFIG"
+check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
+    sh -c "grep -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover' \"\$1\"" _ "$HANDOVER"
+check "handover.sh: stamp stubs fail open (valid=1) when the lib is missing" \
+    sh -c "grep -qF 'ddev_handover_stamp_valid() { return 1; }' \"\$1\" && grep -qF 'ddev_handover_stamp_write() { :; }' \"\$1\"" _ "$UPDATE"
 
 # wiring: config.sh / install.sh / status.sh / hook / kit CLI
 check "config.sh dispatches ddev-settings" \

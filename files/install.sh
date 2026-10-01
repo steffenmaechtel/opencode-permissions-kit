@@ -218,6 +218,7 @@ kit_source() {
 # helper sits right next to log.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
+command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
 
 # Shared ddev database-migration helpers (dev-user registry -> SQL dumps,
 # issue #15). Same sourcing rules as ddev-handover.sh.
@@ -1423,6 +1424,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     for root in $PROJECTS_ROOTS; do
         [ -d "$root" ] || continue
         ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
+        ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$OPENCODE_GROUP"
         log "ddev handover applied under $root"
     done
 fi
