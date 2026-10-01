@@ -62,7 +62,8 @@ jobs:
               ./tests/unit/test-release.sh ./tests/unit/test-fs-baseline.sh \
               ./tests/unit/test-staged-write.sh ./tests/unit/test-browser-bridge.sh \
               ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
-              ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./scripts/release.sh \
+              ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./tests/unit/test-string-continuations.sh \
+              ./scripts/release.sh \
               ./scripts/advisory-watch.sh ./tests/check-host.sh ./tests/e2e/run.sh \
               ./tests/e2e/run-docker-rootless.sh ./tests/e2e/run-ddev.sh ./tests/e2e/lib.sh \
               ./files/install.sh ./files/etc/umask.sh \
@@ -157,3 +158,5 @@ jobs:
         run: ./tests/unit/test-browser-bridge.sh
       - name: Run line-length ratchet
         run: ./tests/unit/test-line-length.sh
+      - name: Run string-continuation guard
+        run: ./tests/unit/test-string-continuations.sh

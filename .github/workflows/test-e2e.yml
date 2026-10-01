@@ -215,6 +215,7 @@ jobs:
                    ./tests/unit/test-staged-write.sh ./tests/unit/test-browser-bridge.sh \
                    ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
                    ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
+                   ./tests/unit/test-string-continuations.sh \
                    ./files/opencode-permissions-kit-lib/management/config.sh \
                    ./files/opencode-permissions-kit-lib/management/update.sh \
                    ./files/opencode-permissions-kit-lib/management/uninstall.sh \
@@ -403,6 +404,7 @@ jobs:
                    ./tests/unit/test-staged-write.sh ./tests/unit/test-browser-bridge.sh \
                    ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
                    ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
+                   ./tests/unit/test-string-continuations.sh \
                    ./files/opencode-permissions-kit-lib/management/config.sh \
                    ./files/opencode-permissions-kit-lib/management/update.sh \
                    ./files/opencode-permissions-kit-lib/management/uninstall.sh \

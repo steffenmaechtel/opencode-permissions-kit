@@ -78,7 +78,7 @@ KIT_BRANCH="${KIT_BRANCH:-master}"
 # instead of persisting shell metacharacters as root (review 0.0.39b S1).
 case "$KIT_BRANCH" in
     *[!A-Za-z0-9._/-]*|*..*)
-        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits,"\
+        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits, "\
 "'.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
         exit 1
         ;;
@@ -948,7 +948,7 @@ else
                 if [ -n "$PROJECTS_ROOTS" ]; then
                     _sel_done=1
                 else
-                    ui_error "invalid selection '$selection' — pick numbers from the list,"\
+                    ui_error "invalid selection '$selection' — pick numbers from the list, "\
 "'c' for custom, or 's' to skip."
                 fi
                 ;;
@@ -1155,7 +1155,7 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
     if ! agent_home_sane "$OPENCODE_USER" "$caroot"; then
         ui_warn "mkcert: the chain to $caroot contains a symlink — CA provisioning skipped"\
 " (the kit never follows links in the agent home)."
-        ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate."\
+        ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate. "\
 "Remove the link or place your CA at $caroot and re-run."
         log "mkcert CA provisioning skipped: symlink in the chain to $caroot (no CA provisioned)"
     else
@@ -1232,7 +1232,7 @@ if [ ! -f "$caroot/rootCA.pem" ]; then
                 ui_warn "mkcert: no existing CA found — a new one was created at $caroot."
                 ui_warn "It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER')"\
 ": browsers will warn."
-                ui_detail "Import $caroot/rootCA.pem into your browser,"\
+                ui_detail "Import $caroot/rootCA.pem into your browser, "\
 "or run 'sudo env CAROOT=$caroot mkcert -install' yourself."
                 log "mkcert: no existing CA — new one created for $OPENCODE_USER (system trust store not updated)"
             else
@@ -1272,7 +1272,7 @@ _ddev_mig_gap_warn() {
     _g_now=${_g_rest%% *}
     ui_warn "partial ddev export detected: the registry lists $_g_now project(s)"\
 " under the roots, only $_g_have dump(s) recorded"
-    ui_warn "the missing databases stay in the old daemon — bridge them"\
+    ui_warn "the missing databases stay in the old daemon — bridge them "\
 "(docs/troubleshooting.md, 'My databases are gone after the install')"
     ui_detail "see what is missing: /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
 " registry $DEFAULT_USER $PROJECTS_ROOTS"
