@@ -727,7 +727,8 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         [ -d "$root" ] || continue
-        if [ "$REFRESH" != true ] && ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"; then
+        if [ "$REFRESH" != true ] \
+            && ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"; then
             _ho_skip=$((_ho_skip + 1))
             continue
         fi
@@ -736,7 +737,7 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
             _ho_announced=true
         fi
         ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-        ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"
+        ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         log "ddev handover applied under $root"
     done < "$PROJECTS_CONF"
     if [ "$_ho_skip" -gt 0 ]; then
@@ -1236,7 +1237,7 @@ if [ "$REFRESH" = true ]; then
             [ -d "$root" ] || continue
             fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-            ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP"
+            ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi
     ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"

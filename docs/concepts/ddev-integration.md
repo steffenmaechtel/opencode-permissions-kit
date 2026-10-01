@@ -162,7 +162,7 @@ group baseline — the fast repair after cloning a new project), and on
 `update.sh` — but the routine update skips the rescan when nothing
 changed: a root-owned stamp under `/etc/opencode-permissions-kit/handover/`
 records the last completed pass per root (user, group, dev-owned mode,
-scan revision), and a matching stamp short-circuits the scan
+scan revision, default user), and a matching stamp short-circuits the scan
 ([issue #112](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/112) —
 the unconditional rescan cost minutes on large project trees). Anything
 doubtful falls back to the full scan; `opk update --refresh` always

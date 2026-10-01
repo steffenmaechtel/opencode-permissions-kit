@@ -292,7 +292,7 @@ projects_add() {
         # with "operation not permitted". The registered path may be a
         # parent of several projects.
         ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-        ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
+        ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         ui_success "added $p (group=$OPENCODE_GROUP, setgid, default-acl)"
         log "project added: $p"
     done
@@ -615,7 +615,7 @@ refresh() {
             # Shared helper with live per-pass progress (issue #14).
             fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-            ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
+            ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi
     ui_success "group baseline refreshed."
@@ -645,7 +645,7 @@ handover() {
         fi
         ui_info "ddev handover on $p (.ddev + settings dirs + typo3 bootstrap root) ..."
         ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-        ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP"
+        ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         ui_success "handover applied to $p"
         log "ddev handover: $p"
     done

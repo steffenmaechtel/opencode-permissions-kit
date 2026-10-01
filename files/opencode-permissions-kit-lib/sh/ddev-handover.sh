@@ -159,16 +159,17 @@ ddev_devowned_flag() {
 # A plain `opk update` used to re-run the full .ddev handover scan over
 # every registered root on EVERY run — minutes on large project trees
 # for trees that were already fully handed over. The stamp records that
-# a complete pass ran for <root> with the CURRENT user, group, dev-owned
-# mode and scan revision; a matching stamp lets the routine update skip
-# the rescan. Purely an optimization, never a security boundary: the
-# stamps live root-owned under /etc/opencode-permissions-kit/handover/
-# and anything doubtful (missing stamp, any field mismatch) falls back
-# to the full scan. Invalidated by design on: user/group re-base,
-# dev-owned toggles, scan-algorithm changes (bump the rev), and new or
-# re-registered roots (no stamp yet). The explicit paths (install,
-# --refresh, config refresh / handover / projects add) always scan and
-# re-stamp. OPK_HANDOVER_STAMP_DIR overrides the directory for tests.
+# a complete pass ran for <root> with the CURRENT user, group, dev user,
+# dev-owned mode and scan revision; a matching stamp lets the routine
+# update skip the rescan. Purely an optimization, never a security
+# boundary: the stamps live root-owned under
+# /etc/opencode-permissions-kit/handover/ and anything doubtful (missing
+# stamp, any field mismatch) falls back to the full scan. Invalidated by
+# design on: user/group/dev-user re-base, dev-owned toggles,
+# scan-algorithm changes (bump the rev), and new or re-registered roots
+# (no stamp yet). The explicit paths (install, --refresh, config
+# refresh / handover / projects add) always scan and re-stamp.
+# OPK_HANDOVER_STAMP_DIR overrides the directory for tests.
 
 # Bump when the scan's semantics change (new prune rules, new targets) —
 # every install then re-scans once on the next update.
@@ -178,30 +179,32 @@ ddev_handover_stamp_dir() {
     printf '%s\n' "${OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover}"
 }
 
-# ddev_handover_stamp_valid <root> <user> <group>: 0 when a stamp for
-# <root> matches the current scan shape. The root path is ALSO part of
-# the compared content — a cksum filename collision must never skip a
-# different root's scan.
+# ddev_handover_stamp_valid <root> <user> <group> [dev-user]: 0 when a
+# stamp for <root> matches the current scan shape. The root path is ALSO
+# part of the compared content — a cksum filename collision must never
+# skip a different root's scan. The dev user (the handover's 4th input,
+# handback target) is part of the shape too (0.0.40a F1): a DEFAULT_USER
+# re-base must invalidate, or pending handbacks would wait for --refresh.
 ddev_handover_stamp_valid() {
-    dhv_root="${1:-}"; dhv_user="${2:-}"; dhv_group="${3:-}"
+    dhv_root="${1:-}"; dhv_user="${2:-}"; dhv_group="${3:-}"; dhv_dev="${4:-}"
     [ -n "$dhv_root" ] || return 1
     dhv_file="$(ddev_handover_stamp_dir)/$(printf '%s' "$dhv_root" | cksum | cut -d' ' -f1).stamp"
     [ -f "$dhv_file" ] || return 1
     if ddev_devowned_enabled; then dhv_mode=on; else dhv_mode=off; fi
     [ "$(cat "$dhv_file" 2>/dev/null)" = \
-        "$dhv_root|$dhv_user|$dhv_group|$DDEV_HANDOVER_STAMP_REV|$dhv_mode" ]
+        "$dhv_root|$dhv_user|$dhv_group|$DDEV_HANDOVER_STAMP_REV|$dhv_mode|$dhv_dev" ]
 }
 
-# ddev_handover_stamp_write <root> <user> <group>: records a completed
-# full pass. Best-effort — callers run as root (plain writes work); a
-# failed write only costs one extra scan on the next update.
+# ddev_handover_stamp_write <root> <user> <group> [dev-user]: records a
+# completed full pass. Best-effort — callers run as root (plain writes
+# work); a failed write only costs one extra scan on the next update.
 ddev_handover_stamp_write() {
-    dhw_root="${1:-}"; dhw_user="${2:-}"; dhw_group="${3:-}"
+    dhw_root="${1:-}"; dhw_user="${2:-}"; dhw_group="${3:-}"; dhw_dev="${4:-}"
     [ -n "$dhw_root" ] || return 0
     if ddev_devowned_enabled; then dhw_mode=on; else dhw_mode=off; fi
     dhw_dir="$(ddev_handover_stamp_dir)"
     mkdir -p "$dhw_dir" 2>/dev/null || return 0
-    printf '%s\n' "$dhw_root|$dhw_user|$dhw_group|$DDEV_HANDOVER_STAMP_REV|$dhw_mode" \
+    printf '%s\n' "$dhw_root|$dhw_user|$dhw_group|$DDEV_HANDOVER_STAMP_REV|$dhw_mode|$dhw_dev" \
         > "$dhw_dir/$(printf '%s' "$dhw_root" | cksum | cut -d' ' -f1).stamp" 2>/dev/null || true
     return 0
 }

@@ -31,7 +31,7 @@ paths:
    `ddev_handover_stamp_write`): after a complete pass over a root, a
    one-line stamp under `/etc/opencode-permissions-kit/handover/`
    (one file per root, named by the root path's `cksum`) records
-   `root|user|group|scan-rev|dev-owned-mode`. A **plain** `opk update`
+   `root|user|group|scan-rev|dev-owned-mode|dev-user`. A **plain** `opk update`
    skips roots whose stamp matches; anything doubtful (missing stamp,
    any field mismatch) falls back to the full scan — the stamp fails
    *closed* toward more scanning, never less. Invalidated by design on:

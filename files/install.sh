@@ -1424,7 +1424,7 @@ if [ -n "$PROJECTS_ROOTS" ]; then
     for root in $PROJECTS_ROOTS; do
         [ -d "$root" ] || continue
         ddev_handover_root "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-        ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$OPENCODE_GROUP"
+        ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
         log "ddev handover applied under $root"
     done
 fi

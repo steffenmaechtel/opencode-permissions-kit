@@ -684,7 +684,13 @@ check "fast path: first pass hands .ddev over" \
     sh -c "printf '%s\n' \"\$1\" | grep -q '.ddev handover:'" _ "$FP1"
 check "fast path: first pass hands the settings dir over" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'ddev settings handover: .*config/system'" _ "$FP1"
-FP2=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null || true)
+# 0.0.40a F2: rc must be captured, not swallowed — "no handover echoes"
+# would also hold for a run that died before printing (|| true alone
+# made the silence assertion pass vacuously).
+FP2_RC=0
+FP2=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null) || FP2_RC=$?
+check "fast path: second pass completes (rc 0)" \
+    sh -c '[ "$1" -eq 0 ]' _ "$FP2_RC"
 check "fast path: second pass is silent for .ddev + settings dirs" \
     sh -c "! printf '%s\n' \"\$1\" | grep -qe '.ddev handover:' -e 'ddev settings handover:'" _ "$FP2"
 # ...and the skip is a MODE fact, not luck: the top inode carries g+w now.
@@ -715,12 +721,25 @@ check "stamp: invalid when missing entirely" \
     sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/never-scanned\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
 check "stamp: dev-owned toggle invalidates (mode is part of the shape)" \
     sh -c "DDEV_DEV_OWNED=true . \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+# 0.0.40a F1: the dev user (handback target) is part of the shape — a
+# DEFAULT_USER re-base must invalidate, not wait for --refresh.
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup devuser
+check "stamp: valid for the same dev user (4-arg shape, 0.0.40a F1)" \
+    sh -c ". \"\$1\" && ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup devuser" _ "$HANDOVER"
+check "stamp: invalid for a different dev user (0.0.40a F1)" \
+    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup otherdev; then exit 1; fi" _ "$HANDOVER"
 _112_stampfile=$(ls "$_112_dir/stamps"/*.stamp 2>/dev/null || true)
 if [ -n "$_112_stampfile" ]; then
-    sed 's/|1|/|99|/' "$_112_stampfile" > "$_112_stampfile.new" && mv "$_112_stampfile.new" "$_112_stampfile"
+    # 0.0.40a F3: guarded — under the suite's set -e an unguarded sed/mv
+    # failure would abort BEFORE the rm -rf/unset below, leaking the
+    # exported OPK_HANDOVER_STAMP_DIR and the temp dir into later
+    # sections. A failed tamper just weakens the rev check below (the
+    # written-stamp checks above still gate the feature).
+    sed 's/|1|/|99|/' "$_112_stampfile" > "$_112_stampfile.new" \
+        && mv "$_112_stampfile.new" "$_112_stampfile" || true
 fi
 check "stamp: a scan-rev mismatch invalidates" \
-    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+    sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup devuser; then exit 1; fi" _ "$HANDOVER"
 rm -rf "$_112_dir"
 unset OPK_HANDOVER_STAMP_DIR
 
@@ -728,7 +747,7 @@ unset OPK_HANDOVER_STAMP_DIR
 # forces), re-stamps after every full pass, and says how to force;
 # install.sh + config.sh stamp their explicit passes too.
 check "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid" \
-    sh -c "grep -qF '[ \"\$REFRESH\" != true ] && ddev_handover_stamp_valid' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF '&& ddev_handover_stamp_valid \"\$root\"' \"\$1\"" _ "$UPDATE"
 check "update.sh: stamps the root after the handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\"' \"\$1\"" _ "$UPDATE"
 check "update.sh: the scanning detail is printed only for roots actually scanned" \
