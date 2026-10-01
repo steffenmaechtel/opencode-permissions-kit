@@ -117,6 +117,27 @@ fi
 #   b) the completion panel showed the mapping backwards,
 #   c) a re-install silently ignored the choice (config never re-rendered).
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
+UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+
+# issue #116: sudo keeps the invoking user's CWD — a `git config --global`
+# as the opencode user from an unreadable developer home (mode 750) dies
+# on git >= 2.55 with "fatal: error reading '<cwd>/.git'" and
+# safe.directory is never ensured. Every such call must chdir first
+# (`git -C /`). Verified live: -C / returns rc 0 where the bare call
+# fatals (alpine/git 2.55, unreadable CWD).
+_git_c_calls=$(grep -c 'git -C / config --global' "$INSTALL")
+_git_c_calls_update=$(grep -c 'git -C / config --global' "$UPDATE")
+if [ "$_git_c_calls" -ge 2 ] && [ "$_git_c_calls_update" -ge 2 ]; then
+    pass "issue #116: safe.directory git calls are CWD-safe (git -C /)"
+else
+    fail "issue #116: safe.directory git calls are CWD-safe (git -C /): install=$_git_c_calls update=$_git_c_calls_update"
+fi
+if ! grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' "$INSTALL" \
+    && ! grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' "$UPDATE"; then
+    pass "issue #116: no bare (CWD-inheriting) git config --global calls remain"
+else
+    fail "issue #116: bare git config --global call remains (CWD-inheriting)"
+fi
 
 if grep -q '^SECURE_GIT_CONFIG=true' "$INSTALL"; then
     pass "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
