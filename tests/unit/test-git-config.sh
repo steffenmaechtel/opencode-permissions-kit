@@ -125,15 +125,23 @@ UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.s
 # safe.directory is never ensured. Every such call must chdir first
 # (`git -C /`). Verified live: -C / returns rc 0 where the bare call
 # fatals (alpine/git 2.55, unreadable CWD).
-_git_c_calls=$(grep -c 'git -C / config --global' "$INSTALL")
-_git_c_calls_update=$(grep -c 'git -C / config --global' "$UPDATE")
-if [ "$_git_c_calls" -ge 2 ] && [ "$_git_c_calls_update" -ge 2 ]; then
+# 0.0.39n review hardening: the extraction joins backslash continuations
+# (a wrapped call must not escape either check) and drops comment lines
+# (a commented example must not trip the negative check); the counts are
+# scoped to the safe.directory calls (the --list backups must not
+# satisfy the threshold); `|| true` keeps set -e from aborting the suite
+# on a zero count instead of failing the check.
+_opk_install_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$INSTALL" | grep -v '^[[:space:]]*#' || true)
+_opk_update_j=$(sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$UPDATE" | grep -v '^[[:space:]]*#' || true)
+_git_sd_install=$(printf '%s\n' "$_opk_install_j" | grep -c 'git -C / config --global --get-all safe.directory\|git -C / config --global --add safe.directory' || true)
+_git_sd_update=$(printf '%s\n' "$_opk_update_j" | grep -c 'git -C / config --global --get-all safe.directory\|git -C / config --global --add safe.directory' || true)
+if [ "$_git_sd_install" -ge 2 ] && [ "$_git_sd_update" -ge 2 ]; then
     pass "issue #116: safe.directory git calls are CWD-safe (git -C /)"
 else
-    fail "issue #116: safe.directory git calls are CWD-safe (git -C /): install=$_git_c_calls update=$_git_c_calls_update"
+    fail "issue #116: safe.directory git calls are CWD-safe (git -C /): install=$_git_sd_install update=$_git_sd_update"
 fi
-if ! grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' "$INSTALL" \
-    && ! grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' "$UPDATE"; then
+if ! printf '%s\n' "$_opk_install_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' \
+    && ! printf '%s\n' "$_opk_update_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global'; then
     pass "issue #116: no bare (CWD-inheriting) git config --global calls remain"
 else
     fail "issue #116: bare git config --global call remains (CWD-inheriting)"
