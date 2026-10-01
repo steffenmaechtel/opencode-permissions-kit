@@ -5,13 +5,14 @@
 # Class: wrapping a long string literal as
 #     ui_warn "fragment one."\
 #     "fragment two"
-# concatenates WITHOUT any space unless one fragment carries it -- the
-# message then renders "fragment one.fragment two". The wrap idiom itself
-# is fine (SC2140 is excluded for it, Makefile); the JOIN must stay
-# deliberate. This test fails on joins where prose meets without a space:
-# first fragment ending in [.,;:!?] or alnum, second starting with alnum,
-# quote or '('. Token concatenation (URL segments, comma-separated lists,
-# option strings) does not match that pattern; the few deliberate
+# (single-quote style likewise) concatenates WITHOUT any space unless one
+# fragment carries it -- the message then renders "fragment one.fragment
+# two". The wrap idiom itself is fine (SC2140 is excluded for it,
+# Makefile); the JOIN must stay deliberate. This test fails on joins of
+# either quote style where prose meets without a space: first fragment
+# ending in [.,;:!?] or alnum, second starting with alnum, quote or '('.
+# Token concatenation (URL segments, regex alternatives, comma-separated
+# lists, option strings) does not match that pattern; the few deliberate
 # prose-like no-space joins are allowlisted below with reasons.
 #
 # Limitation (accepted): a line whose closing quote is itself escaped
@@ -29,9 +30,11 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 # Deliberate no-space joins, one entry per line: path-suffix | seam text.
-# Every entry carries its reason as a trailing comment.
+# A reason line starts with '#' and sits above its entry.
 ALLOW="
-management/update.sh|'),gid=   # mount-option list: uid=(...),gid=(...) -- the comma is the separator, no prose space
+# update.sh mount-option list: uid=(...),gid=(...) -- the comma separates
+# options; no prose space
+management/update.sh|'),gid=
 "
 
 TMP="$(mktemp)"
@@ -42,23 +45,33 @@ trap 'rm -f "$TMP"' EXIT
     find files -name '*.sh' -type f
     find files/opencode-permissions-kit-lib/bin -type f
 } | sort -u | while IFS= read -r f; do
-    awk -v f="$f" -v tails='.,;:!?A-Za-z0-9' -v heads="A-Za-z0-9'(" '
-        NR > 1 && prev ~ /"\\$/ && $0 ~ /^[ \t]*"/ {
-            content = substr(prev, 1, length(prev) - 2)
-            tail = substr(content, length(content), 1)
-            l = $0
-            sub(/^[ \t]+/, "", l)
-            head = substr(l, 2, 1)
-            if (tail != " " && head != " " &&
-                tail ~ "[" tails "]" && head ~ "[" heads "]") {
-                start = length(content) - 15
-                if (start < 1) start = 1
-                seam = substr(content, start) substr(l, 2, 16)
-                printf "%s\t%d\t%s\n", f, NR - 1, seam
+    awk -v f="$f" -v tails='.,;:!?A-Za-z0-9' -v heads="A-Za-z0-9'(" \
+        -v sq="'" -v dq='"' '
+        NR > 1 {
+            plen = length(prev)
+            if (plen >= 2 && substr(prev, plen) == "\\") {
+                q = substr(prev, plen - 1, 1)
+                if (q == dq || q == sq) {
+                    l = $0
+                    sub(/^[ \t]+/, "", l)
+                    c1 = substr(l, 1, 1)
+                    if (c1 == dq || c1 == sq) {
+                        content = substr(prev, 1, plen - 2)
+                        tail = substr(content, length(content), 1)
+                        head = substr(l, 2, 1)
+                        if (tail != " " && head != " " &&
+                            tail ~ "[" tails "]" && head ~ "[" heads "]") {
+                            start = length(content) - 15
+                            if (start < 1) start = 1
+                            seam = substr(content, start) substr(l, 2, 16)
+                            printf "%s\t%d\t%s\n", f, NR - 1, seam
+                        }
+                    }
+                }
             }
         }
-        { prev = $0 }
-    ' "$f"
+    { prev = $0 }
+        ' "$f" || printf 'AWK-ERROR\t0\t%s\n' "$f"
 done > "$TMP"
 
 fails=0
@@ -68,9 +81,7 @@ while IFS="$TAB" read -r path line seam; do
     [ -n "$path" ] || continue
     ok=""
     while IFS='|' read -r suffix want; do
-        suffix=$(printf '%s' "$suffix" | sed 's/[[:space:]]*#.*$//')
-        want=$(printf '%s' "$want" | sed 's/[[:space:]]*#.*$//')
-        [ -n "$suffix" ] || continue
+        case "$suffix" in ''|'#'*) continue ;; esac
         case "$path" in
             *"$suffix")
                 case "$seam" in
