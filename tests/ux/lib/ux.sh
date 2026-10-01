@@ -1,6 +1,6 @@
 # opencode permissions kit — DEMO UI helpers (tests/ux/ playground)
 #
-# Candidate for files/opencode-permissions-kit-lib/ui.sh (see
+# Candidate for files/opencode-permissions-kit-lib/sh/ui.sh (see
 # docs/_archive/design/ux-improvement.md). POSIX sh, zero dependencies.
 #
 # Rules:

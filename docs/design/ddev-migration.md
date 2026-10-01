@@ -44,7 +44,7 @@ directories themselves stay in place and are shared via the group baseline.
    (~minutes); that must not block or fail the installation. The install
    summary and `opencode-permissions-kit status` show waiting dumps with
    the commands:
-   - batch: `sudo sh /usr/local/lib/opencode-permissions-kit/ddev-migrate.sh import`
+   - batch: `sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import`
    - per project: `ddev start <name> && ddev import-db <name> --file=<dump>.sql.gz`
      (the `ddev()` shell function already runs as `opencode` — no sudo, no
      chown round-trip).
@@ -71,9 +71,10 @@ directories themselves stay in place and are shared via the group baseline.
 
 ## 3. Implementation
 
-- `files/opencode-permissions-kit-lib/ddev-migrate.sh` — sourced by
-  install.sh (`ddev_migrate_*` functions) AND standalone
-  (`sh ddev-migrate.sh export <dev-user> <roots>... | import | list`).
+- `files/opencode-permissions-kit-lib/sh/ddev-migrate.sh` — sourced by
+  install.sh (`ddev_migrate_*` functions) AND standalone via the CLI entry
+  `files/opencode-permissions-kit-lib/bin/ddev-migrate`
+  (`bin/ddev-migrate export <dev-user> <root> [root ...] | import | list`).
   Parsing is jq-free (awk over the YAML subset ddev writes); running as
   the dev user goes through `sudo -u` with `HOME`/`XDG_RUNTIME_DIR`
   re-set (same env discipline as `bin/ddev-as-opencode`).
@@ -108,7 +109,7 @@ directories themselves stay in place and are shared via the group baseline.
 
 ## 4. Tests / CI
 
-- `tests/test-ddev-migrate.sh`: registry parser (quoted/unquoted approots),
+- `tests/unit/test-ddev-migrate.sh`: registry parser (quoted/unquoted approots),
   root filter, omit_containers detection (inline + block, project +
   global), fake-ddev export run (per-project start→export→stop by NAME,
   single poweroff, db-less SKIP, manifest bookkeeping), static wiring

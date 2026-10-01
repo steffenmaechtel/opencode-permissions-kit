@@ -160,11 +160,11 @@ check "wrapper warns when podman-rootless but podman not installed" \
 echo ""
 echo "-- wrapper rootless socket probe (socket-check.sh) --"
 SOCKCHECK="$REPO/files/opencode-permissions-kit-lib/bin/socket-check"
-check "socket-check.sh exists"  [ -f "$SOCKCHECK" ]
-check "socket-check.sh has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SOCKCHECK"
-check "socket-check.sh only does test -S (no command execution)" \
+check "socket-check exists"  [ -f "$SOCKCHECK" ]
+check "socket-check has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SOCKCHECK"
+check "socket-check only does test -S (no command execution)" \
     grep -Fq '[ -n "$sock" ] && [ -S "$sock" ]' "$SOCKCHECK"
-check "socket-check.sh strips a unix:// prefix" \
+check "socket-check strips a unix:// prefix" \
     grep -Fq 'sock="${sock#unix://}"' "$SOCKCHECK"
 check "wrapper has a sock_reachable probe function" \
     grep -Fq 'sock_reachable()' "$WRAPPER"
