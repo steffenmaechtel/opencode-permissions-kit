@@ -394,6 +394,14 @@ banner() {
     ui_banner "$VERSION" "installs opencode as its own user behind rootless containers"
 }
 
+# === Phase 1: plan + provision (Start .. Step 3) ================================
+# Everything from the first question to the provisioned backend: mode,
+# backup, pre-flight, backend choice, inventory, standard questions,
+# plan + confirm, Steps 1-3 (user + group, project roots, container
+# backend). The body is a verbatim wrap (issue #113): lines stay at
+# column 0 so the extraction diff shows only the phase boundaries and
+# the "no logic change" review stays honest.
+do_plan_phase() {
 # === Start ===
 
 banner
@@ -1027,7 +1035,13 @@ ui_success "container backend provisioned: $CONTAINER_BACKEND"
 _odh_esc=$(printf '%s' "$OPENCODE_DOCKER_HOST" | sed 's/[&\\#]/\\&/g')
 sudo sed -i "s#^OPENCODE_DOCKER_HOST=.*#OPENCODE_DOCKER_HOST=$_odh_esc#" /etc/opencode-permissions-kit/install.conf
 log "container backend provisioned: $CONTAINER_BACKEND"
+}
 
+# === Phase 2: ddev (Step 4 .. Step 4b) ==========================================
+# ddev runtime for the agent user (home, mkcert CA reuse, router ports,
+# bind-mounts switch) and the dev-user database export wave, incl. the
+# DDEV_EXPORTED stamp carry-over. Verbatim wrap — see phase 1.
+do_ddev_phase() {
 # === Step 4: ddev as the opencode user ===
 # /home/<oc>/.ddev is the opencode user's global ddev home (project registry,
 # mutagen state, `ddev auth ssh` key cache). mkcert CA reuse keeps Windows
@@ -1374,7 +1388,14 @@ if [ "$DDEV_EXPORTED_PRE" = "1" ] \
     && ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
     echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
 fi
+}
 
+# === Phase 3: deploy (Step 5 .. Step 9) =========================================
+# Group baseline + ddev handover + git safe.directory, opencode binary +
+# wrapper + shell hooks, library/sudoers/browser-bridge deploy, agent
+# home + resource migrations + configs (default-user deny-all, TUI),
+# stale-runtime cleanup. Verbatim wrap — see phase 1.
+do_deploy_phase() {
 # === Step 5: Filesystem (group baseline) ===
 
 if [ -n "$PROJECTS_ROOTS" ]; then
@@ -2124,6 +2145,17 @@ fi
 
 # === Step 9: Clean stale runtime state ===
 sudo rm -rf /run/opencode-permissions-kit 2>/dev/null || true
+}
+
+# === Main ===
+# The install as a linear phase list; everything above is helpers + phase
+# definitions. The calls are plain statements on purpose: under set -e a
+# failing phase aborts the install exactly like the former top-level code
+# (no `|| true`, no condition context — that would silence set -e for the
+# whole phase body).
+do_plan_phase
+do_ddev_phase
+do_deploy_phase
 
 # === Done ===
 
