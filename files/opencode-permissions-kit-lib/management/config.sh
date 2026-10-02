@@ -191,6 +191,18 @@ done
 command -v staged_write >/dev/null 2>&1 \
     || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
 
+# Shared sudoers pipeline (render + visudo validation + install): one
+# implementation for install.sh, config.sh and update.sh. Same lookup
+# order as staged-write.sh above.
+for cand in "$SCRIPT_DIR/../sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+command -v sudoers_deploy >/dev/null 2>&1 \
+    || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
+
 projects_list() {
     ui_info "Project roots ($PROJECTS_CONF):"
     if [ ! -f "$PROJECTS_CONF" ] || [ ! -s "$PROJECTS_CONF" ]; then
@@ -471,35 +483,18 @@ container_backend_status() {
 }
 
 # Re-render the sudoers. The soft-only template needs only the DEFAULT_USER
-# substitution (no backend/ddev-mode conditionals anymore).
+# substitution (no backend/ddev-mode conditionals anymore); the pipeline
+# (charset gate, visudo validation before anything is deployed, install
+# mode 440, sudoers.d link, legacy-name cleanup) is the shared
+# sudoers_deploy helper.
 render_sudoers() {
     local template=""
     for cand in "$LIBDIR/templates/sudoers.template" "$SCRIPT_DIR/../templates/sudoers.template"; do
         if [ -f "$cand" ]; then template="$cand"; break; fi
     done
     [ -n "$template" ] || die "sudoers.template not found."
-    # The username is sed-interpolated into sudoers — reject exotic names
-    # (e.g. a manually edited install.conf) before they corrupt the syntax.
-    case "$DEFAULT_USER" in
-        *[!A-Za-z0-9_.-]*|'') die "invalid DEFAULT_USER '$DEFAULT_USER' in install.conf" ;;
-    esac
-    local tmp
-    tmp=$(mktemp)
-    _tmp_track "$tmp"
-    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" "$template" > "$tmp"
-    # Validate the RENDERED file before deploying anything: a broken file
-    # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
-    if ! sudo /usr/sbin/visudo -c -f "$tmp" >/dev/null 2>&1; then
-        rm -f "$tmp"
-        die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."
-    fi
-    sudo cp "$tmp" /etc/opencode-permissions-kit/sudoers
-    sudo chmod 440 /etc/opencode-permissions-kit/sudoers
-    rm -f "$tmp"
-    sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
-    # Remove the pre-0.0.10 sudoers symlink so only the new name is active
-    # (same cleanup update.sh performs — C16).
-    sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
+    sudoers_deploy "$template" "$DEFAULT_USER" \
+        || die "sudoers re-deploy failed — nothing was re-deployed (user '$DEFAULT_USER')."
     ui_success "sudoers re-rendered + validated"
     log "sudoers re-rendered"
 }

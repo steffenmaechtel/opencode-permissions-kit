@@ -40,8 +40,9 @@ set -eu
 # creates is removed on ANY exit path — failure, Ctrl-C, TERM, and success.
 # The backup directory is deliberately NOT touched: it holds pre-install
 # copies (sudoers, configs) that are recovery material after a failed run,
-# and the user is told where it is. Fetch tree + sudoers render temp are
-# pure scratch and must not leak as root-owned 0700 leftovers.
+# and the user is told where it is. The fetch tree and every tracked
+# scratch file are pure scratch and must not leak as root-owned 0700
+# leftovers.
 _FETCH_TREE=""
 # Result dir of a streamed fetch_kit run (set by fetch_kit, read by the
 # caller — see the STREAMED block below).
@@ -53,7 +54,6 @@ _TMP_REGISTRY=""
 _tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
 cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
-    if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
     # word splitting intended: registry entries are mktemp paths
     # shellcheck disable=SC2086
     if [ -n "${_TMP_REGISTRY:-}" ]; then rm -f $_TMP_REGISTRY; fi
@@ -135,6 +135,7 @@ fetch_kit() {
              opencode-permissions-kit-lib/sh/ddev-hosts.sh \
              opencode-permissions-kit-lib/sh/fs-baseline.sh \
              opencode-permissions-kit-lib/sh/staged-write.sh \
+             opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
              opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
              opencode-permissions-kit-lib/bin/browser-bridge \
              opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -239,6 +240,13 @@ command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/staged-write.sh"
 command -v staged_write >/dev/null 2>&1 \
     || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+
+# Shared sudoers pipeline (charset gate, render, visudo validation,
+# install, sudoers.d link, legacy cleanup): one implementation for
+# install.sh, config.sh and update.sh.
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/sudoers-deploy.sh"
+command -v sudoers_deploy >/dev/null 2>&1 \
+    || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
 
 # Shared WSL browser bridge helper (issues #91, #100): deploys the
 # powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
@@ -1680,6 +1688,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # browser-bridge stand-in source (deploys into the wsl/ tree; source of
 # 'opk wsl-add-opencode-1-fix' re-runs)
@@ -1696,7 +1705,8 @@ sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR
                "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
 sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
-               "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh"
+               "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" \
+               "$LIBDIR/sh/sudoers-deploy.sh"
 sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
                "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" \
                "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
@@ -1718,23 +1728,16 @@ sudo ln -sf "$LIBDIR/bin/opk" /usr/local/bin/opk
 ui_success "cli installed: opk -> $LIBDIR/bin/opk"
 log "cli symlink: /usr/local/bin/opk -> $LIBDIR/bin/opk"
 
-# sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as /etc/sudoers.d/opencode-permissions-kit
-SUDO_TMP=$(mktemp)
-sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" \
-    "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
-# Validate the RENDERED file before anything is deployed: a broken file in
-# /etc/sudoers.d makes sudo itself refuse to run, and recovering would
-# require non-sudo access. Nothing is deployed unless visudo approves.
-if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
-    rm -f "$SUDO_TMP"
-    ui_error "sudoers template failed validation — nothing was deployed (user '$DEFAULT_USER')."
+# sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as
+# /etc/sudoers.d/opencode-permissions-kit. Shared pipeline
+# (sh/sudoers-deploy.sh): charset gate, render, visudo validation
+# BEFORE anything is deployed, install mode 440, sudoers.d link,
+# legacy-name cleanup. Nothing is deployed unless visudo approves.
+if ! sudoers_deploy "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" "$DEFAULT_USER"; then
+    ui_error "sudoers deployment failed — nothing was deployed (user '$DEFAULT_USER')."
     log "sudoers validation FAILED (rendered template, user $DEFAULT_USER) — install aborted"
     exit 1
 fi
-sudo cp "$SUDO_TMP" /etc/opencode-permissions-kit/sudoers
-sudo chmod 440 /etc/opencode-permissions-kit/sudoers
-rm -f "$SUDO_TMP"
-sudo ln -sf /etc/opencode-permissions-kit/sudoers /etc/sudoers.d/opencode-permissions-kit
 ui_success "sudoers installed + validated (/etc/sudoers.d/opencode-permissions-kit)"
 log "sudoers installed: /etc/opencode-permissions-kit/sudoers -> /etc/sudoers.d/opencode-permissions-kit"
 

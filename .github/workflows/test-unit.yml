@@ -60,7 +60,8 @@ jobs:
               ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh \
               ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-update-flags.sh \
               ./tests/unit/test-release.sh ./tests/unit/test-fs-baseline.sh \
-              ./tests/unit/test-staged-write.sh ./tests/unit/test-browser-bridge.sh \
+              ./tests/unit/test-staged-write.sh ./tests/unit/test-sudoers-deploy.sh \
+              ./tests/unit/test-browser-bridge.sh \
               ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
               ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./tests/unit/test-string-continuations.sh \
               ./scripts/release.sh \
@@ -86,6 +87,7 @@ jobs:
               ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
               ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
               ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
+              ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
               ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
               ./files/opencode-permissions-kit-lib/bin/browser-bridge \
               ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -148,6 +150,8 @@ jobs:
         run: ./tests/unit/test-fs-baseline.sh
       - name: Run staged-write / handover gate tests
         run: ./tests/unit/test-staged-write.sh
+      - name: Run sudoers pipeline tests
+        run: ./tests/unit/test-sudoers-deploy.sh
       - name: Run e2e binary source tests
         run: ./tests/unit/test-e2e-sources.sh
       - name: Run security advisory tests

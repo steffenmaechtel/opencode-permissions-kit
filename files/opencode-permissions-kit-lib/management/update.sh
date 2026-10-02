@@ -152,6 +152,7 @@ opencode-permissions-kit-lib/bin/ddev-migrate \
 opencode-permissions-kit-lib/sh/ddev-hosts.sh \
 opencode-permissions-kit-lib/sh/fs-baseline.sh \
 opencode-permissions-kit-lib/sh/staged-write.sh \
+opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
 opencode-permissions-kit-lib/bin/browser-bridge \
 opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -342,6 +343,16 @@ done
 # open like the pre-gate behavior, the writes above still refuse via
 # staged_write itself.
 command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
+
+# Shared sudoers pipeline (render + visudo validation + install): one
+# implementation for install.sh, config.sh and update.sh. Same lookup
+# order as staged-write.sh.
+_sdl=""
+for _sdl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"; do
+    if [ -f "$_sdl_cand" ]; then . "$_sdl_cand"; _sdl="$_sdl_cand"; break; fi
+done
+[ -n "$_sdl" ] \
+    || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
 
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
@@ -539,6 +550,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # browser-bridge stand-in source (deploys into the wsl/ tree; source of
 # 'opk wsl-add-opencode-1-fix' re-runs)
@@ -556,7 +568,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
                "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" \
-               "$LIBDIR/sh/wsl-browser-bridge.sh"
+               "$LIBDIR/sh/sudoers-deploy.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
 sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" \
                "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
@@ -620,29 +632,12 @@ ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy
 
 # --- re-deploy sudoers -------------------------------------------------------
 
-sudo mkdir -p "$CONFDIR"
-
+# Shared pipeline (sh/sudoers-deploy.sh): charset gate, render, visudo
+# validation BEFORE anything is deployed, install mode 440, sudoers.d
+# link, legacy-name cleanup.
 if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ]; then
-    # The username is sed-interpolated into sudoers — reject exotic names
-    # (e.g. a manually edited install.conf) before they corrupt the syntax.
-    case "$DEFAULT_USER" in
-        *[!A-Za-z0-9_.-]*|'') die "invalid DEFAULT_USER '$DEFAULT_USER' in install.conf" ;;
-    esac
-    SUDO_TMP=$(mktemp)
-    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" \
-        "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
-    # Validate the RENDERED file before deploying anything: a broken file
-    # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
-    if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
-        rm -f "$SUDO_TMP"
-        die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."
-    fi
-    sudo cp "$SUDO_TMP" "$CONFDIR/sudoers"
-    sudo chmod 440 "$CONFDIR/sudoers"
-    rm -f "$SUDO_TMP"
-    sudo ln -sf "$CONFDIR/sudoers" /etc/sudoers.d/opencode-permissions-kit
-    # Remove the pre-0.0.10 sudoers symlink so only the new name is active.
-    sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
+    sudoers_deploy "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" "$DEFAULT_USER" \
+        || die "sudoers re-deploy failed — nothing was re-deployed (user '$DEFAULT_USER')."
     ui_success "sudoers re-deployed + validated (DEFAULT_USER=$DEFAULT_USER)"
     log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
 fi
