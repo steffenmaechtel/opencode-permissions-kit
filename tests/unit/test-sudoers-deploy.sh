@@ -62,7 +62,6 @@ VISUDO_RUNS="$WORK/visudo-runs"; export VISUDO_RUNS
 # placeholders). The shipped template is used as-is; a reject variant
 # renders invalid content via a prepended marker.
 TPL="$WORK/sudoers.template"
-sed 's/^/# /; s/$//' "$TEMPLATE_SRC" > /dev/null  # touch: template must parse as text
 cp "$TEMPLATE_SRC" "$TPL"
 
 # test env: no sudo, stubbed visudo, redirected dirs
@@ -125,6 +124,15 @@ _sd_out=$(
     sudoers_deploy "$TPL" ""; echo "rc=$?"
 )
 case "$_sd_out" in *rc=1*) pass "charset: empty user rejected" ;; *) fail "charset: empty user (got [$_sd_out])" ;; esac
+_sd_out=$(
+    sd_env
+    export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
+    # shellcheck disable=SC2030
+    . "$LIB"
+    sudoers_deploy "$TPL" ALL; echo "rc=$?"
+)
+case "$_sd_out" in *rc=1*) pass "charset: ALL rejected (0.0.41f S3 — renders valid sudoers)" ;; *) fail "charset: ALL (got [$_sd_out])" ;; esac
+check "charset: ALL deploys nothing" test ! -e "$CONF/sudoers"
 
 # --- 4. missing template ---------------------------------------------------
 

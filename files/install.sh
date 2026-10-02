@@ -1693,7 +1693,7 @@ log "cli symlink: /usr/local/bin/opk -> $LIBDIR/bin/opk"
 # legacy-name cleanup. Nothing is deployed unless visudo approves.
 if ! sudoers_deploy "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" "$DEFAULT_USER"; then
     ui_error "sudoers deployment failed — nothing was deployed (user '$DEFAULT_USER')."
-    log "sudoers validation FAILED (rendered template, user $DEFAULT_USER) — install aborted"
+    log "sudoers deployment FAILED (charset gate, render or visudo, user $DEFAULT_USER) — install aborted"
     exit 1
 fi
 ui_success "sudoers installed + validated (/etc/sudoers.d/opencode-permissions-kit)"
@@ -2074,6 +2074,9 @@ if [ "$OPENCODE_MAJOR" = 2 ]; then
         # symlink + chowns + inert-entry unregister. Skip reasons are
         # logged by the helper; rc 2/3 surface as user-managed notes,
         # rc 1 aborts like the former inline body did under set -e.
+        # Explicit if/elif (0.0.41f C2): a bare `[ … ] && ui_detail`
+        # tail would leak status 1 into the loop and make a future
+        # reorder silently abort the install.
         if tui_plugin_sync_user "$OPENCODE_MAJOR" "$_oc_user_dir" "$_oc_dir_owner" \
             "$OPENCODE_GROUP" "$LIBDIR" "$OPENCODE_USER"; then
             :
@@ -2082,11 +2085,13 @@ if [ "$OPENCODE_MAJOR" = 2 ]; then
             if [ "$_oc_tps_rc" -eq 1 ]; then
                 ui_error "TUI plugin registration failed for $_oc_user_dir — aborting."
                 exit 1
-            fi
-            [ "$_oc_tps_rc" -eq 2 ] && ui_detail "the chain to $_oc_user_dir contains a symlink"\
+            elif [ "$_oc_tps_rc" -eq 2 ]; then
+                ui_detail "the chain to $_oc_user_dir contains a symlink"\
 " — TUI plugin registration skipped (user-managed)"
-            [ "$_oc_tps_rc" -eq 3 ] && ui_detail "existing $_oc_user_dir/plugins is a symlink"\
+            elif [ "$_oc_tps_rc" -eq 3 ]; then
+                ui_detail "existing $_oc_user_dir/plugins is a symlink"\
 " — TUI plugin registration skipped (user-managed link)"
+            fi
         fi
     done
     ui_success "TUI mode display registered for opencode 2.x: plugins/opencode-permissions-kit/tui.tsx (both users)"

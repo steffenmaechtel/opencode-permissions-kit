@@ -55,7 +55,6 @@ _TMP_REGISTRY=""
 _tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
 cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
-    if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
     if [ -n "${_BIN_TMP:-}" ]; then rm -rf "$_BIN_TMP"; fi
     # word splitting intended: registry entries are mktemp paths
     # shellcheck disable=SC2086
@@ -611,6 +610,11 @@ if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ];
         || die "sudoers re-deploy failed — nothing was re-deployed (user '$DEFAULT_USER')."
     ui_success "sudoers re-deployed + validated (DEFAULT_USER=$DEFAULT_USER)"
     log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
+else
+    # Conservative skip (0.0.41f S2): the existing validated sudoers stays
+    # active — near-unreachable (fetch list + heal guarantee the file),
+    # but the skip must not be silent.
+    log "sudoers re-deploy skipped: template missing from $FILES_ROOT (existing sudoers kept)"
 fi
 
 # --- re-deploy umask profile -------------------------------------------------
@@ -945,15 +949,21 @@ sync_tui_registration() {
         # Shared per-user sync (sh/tui-plugin.sh): chain gate, plugins
         # gate, plugin dir + symlink + chowns, inert-entry unregister.
         # Skips (rc 2/3) are logged by the helper; rc 1 dies (the old
-        # inline body aborted via set -e, now with a message).
+        # inline body aborted via set -e, now with a message). The
+        # explicit if/fi (0.0.41f C1) keeps skip rcs from leaking as the
+        # loop's last status — a bare `[ … ] && die` tail would return 1
+        # and silently abort the whole update via set -e AFTER it applied.
         if tui_plugin_sync_user "$_str_major" "$_str_user_dir" "$_str_dir_owner" \
             "$NEW_OPENCODE_GROUP" "$LIBDIR" "$OPENCODE_USER"; then
             :
         else
             _str_tps_rc=$?
-            [ "$_str_tps_rc" -eq 1 ] && die "TUI plugin registration failed for $_str_user_dir"
+            if [ "$_str_tps_rc" -eq 1 ]; then
+                die "TUI plugin registration failed for $_str_user_dir"
+            fi
         fi
     done
+    return 0
 }
 
 if [ "$BINARY_UPDATE" = true ]; then

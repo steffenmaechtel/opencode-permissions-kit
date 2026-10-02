@@ -192,7 +192,7 @@ check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"
 T2X=$(mktemp -d)
-trap 'rm -rf "$T2X"' EXIT INT TERM
+TUIWORK=""
 check "register: creates minimal cli.json" \
     python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
     && grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"' "$T2X/cli.json"
@@ -248,7 +248,6 @@ check "first-run cli.json parses and carries the plugin entry" \
 # current user: TR_SUDO wraps sudo with a stub that drops chown (a
 # non-root chown always fails; ownership is asserted by the e2e suites).
 TUIWORK=$(mktemp -d)
-trap "rm -rf \"$TUIWORK\"" EXIT
 mkdir -p "$TUIWORK/tps/bin"
 cat > "$TUIWORK/tps/bin/sudo-stub" <<'EOF'
 #!/bin/sh
@@ -301,6 +300,33 @@ _tps_ah="$TUIWORK/tps/ah/real2"
 _tps_out=$(_tps_run "plugins-skip" 3 2 "$TUIWORK/tps/ah/real2/.config/opencode" ocuser ocgroup "$_LIBROOT" opencode)
 unset _tps_ah
 case "$_tps_out" in *rc=3*) check "plugins gate: rc=3 (user-managed skip)" true ;; *) check "plugins gate: rc=3 (got [$_tps_out])" false ;; esac
+
+# hard failure (0.0.41f C5): a failing privileged op returns rc 1 — the
+# path both callers map to die/exit 1. Stub fails mkdir only.
+mkdir -p "$TUIWORK/tps/bin2"
+cat > "$TUIWORK/tps/bin2/sudo-stub" <<'EOF'
+#!/bin/sh
+case "$1" in mkdir) exit 1 ;; esac
+exec "$@"
+EOF
+chmod +x "$TUIWORK/tps/bin2/sudo-stub"
+TPS4="$TUIWORK/tps/home4/oc/.config/opencode"
+mkdir -p "$TPS4"
+_tps_out=$( TR_SUDO="$TUIWORK/tps/bin2/sudo-stub"
+    OPK_AGENT_HOME="$TUIWORK/tps/home4/oc"
+    export TR_SUDO OPK_AGENT_HOME
+    log() { :; }
+    # shellcheck disable=SC2030,SC2031
+    . "$TUIPLUGIN"
+    # shellcheck disable=SC2030,SC2031
+    . "$STAGEDWRITE"
+    tui_plugin_sync_user 2 "$TPS4" ocuser ocgroup "$_LIBROOT" opencode 2>&1; echo "rc=$?" )
+case "$_tps_out" in *rc=1*) check "hard failure: rc=1 (mapped to die/exit at callers)" true ;; *) check "hard failure: rc=1 (got [$_tps_out])" false ;; esac
+check "hard failure: no plugin dir left behind" test ! -e "$TPS4/plugins"
+
+# ONE merged trap (0.0.41f C4): a second EXIT trap would REPLACE the
+# suite's T2X cleanup — chain both scratch dirs.
+trap 'rm -rf "$T2X" "${TUIWORK:-}"' EXIT INT TERM
 
 # --- summary ------------------------------------------------------------------
 echo ""

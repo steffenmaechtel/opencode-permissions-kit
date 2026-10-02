@@ -41,7 +41,7 @@ lib_deploy() {
     fi
     _dl_sudo mkdir -p "$_dl_lib/bin" "$_dl_lib/sh" "$_dl_lib/py" "$_dl_lib/tui" \
         "$_dl_lib/management" "$_dl_lib/templates" || return 1
-    while IFS=' ' read -r _dl_rel _dl_mode _dl_x; do
+    while IFS=' ' read -r _dl_rel _dl_mode; do
         case "$_dl_rel" in ''|'#'*) continue ;; esac
         _dl_src="$_dl_root/$_dl_rel"
         _dl_dst="$_dl_lib/${_dl_rel#opencode-permissions-kit-lib/}"

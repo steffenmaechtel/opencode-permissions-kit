@@ -154,7 +154,7 @@ ghost_list="$install_list ghost-file.sh"
 _missing=""
 for f in $ghost_list; do
     if [ "$f" = "VERSION" ]; then
-        [ -f "$REPO/VERSION" ] || _missing="$missing $f"
+        [ -f "$REPO/VERSION" ] || _missing="$_missing $f"
     else
         [ -f "$REPO/files/$f" ] || _missing="$_missing $f"
     fi

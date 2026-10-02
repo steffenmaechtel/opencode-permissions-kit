@@ -26,8 +26,10 @@
 # sudo prefix ("" in tests), SD_VISUDO the visudo binary, SD_CONF_DIR
 # the kit config dir, SD_SUDOERS_D the sudoers.d directory. Note the
 # plain "-": SD_SUDO="" must stay empty, a ":-" would re-substitute
-# sudo. Deployed to
-# /usr/local/lib/opencode-permissions-kit/sh/sudoers-deploy.sh.
+# sudo. visudo itself runs WITHOUT the sudo prefix (0.0.41f Q1): every
+# caller runs as root (install/config/update), so the direct call is
+# equivalent — tests and non-root harnesses must stub SD_VISUDO.
+# Deployed to /usr/local/lib/opencode-permissions-kit/sh/sudoers-deploy.sh.
 
 _sd_sudo() { ${SD_SUDO-sudo} "$@"; }
 
@@ -41,8 +43,11 @@ sudoers_deploy() {
     _sd_template="$1"
     _sd_user="$2"
     case "$_sd_user" in
-        *[!A-Za-z0-9_.-]*|'')
-            echo "error: invalid DEFAULT_USER '$_sd_user' (allowed: letters, digits, '_', '.', '-')" >&2
+        ''|*[!A-Za-z0-9_.-]*|ALL)
+            # ALL (0.0.41f S3): renders VALID sudoers ("ALL ALL=(opencode)
+            # NOPASSWD: …") that widens the grant to every local user —
+            # no Unix account can carry that name, so reject it outright.
+            echo "error: invalid DEFAULT_USER '$_sd_user' (allowed: letters, digits, '_', '.', '-'; not 'ALL')" >&2
             return 1
             ;;
     esac
