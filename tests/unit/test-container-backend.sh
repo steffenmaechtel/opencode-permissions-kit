@@ -22,6 +22,7 @@ REPO="$SCRIPT_DIR/../.."
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
@@ -195,8 +196,9 @@ check "install.sh aborts on provisioning failure (no docker-group fallback)" \
     grep -Fq 'Container backend provisioning failed' "$INSTALL"
 check "install.sh fetches socket-check.sh" \
     grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$INSTALL"
-check "install.sh deploys socket-check.sh to LIBDIR/bin" \
-    grep -Fq '"$LIBDIR/bin/socket-check"' "$INSTALL"
+check "install.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/bin/socket-check 755" "$2" \
+        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh fetches setup-container-backend" \
     grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$INSTALL"
 check "install.sh deploys setup-container-backend to LIBDIR" \
@@ -210,12 +212,14 @@ echo ""
 echo "-- update.sh wiring --"
 check "update.sh KIT_FILES includes socket-check.sh" \
     grep -Fq 'opencode-permissions-kit-lib/bin/socket-check' "$UPDATE"
-check "update.sh deploys socket-check.sh to LIBDIR/bin" \
-    grep -Fq '"$LIBDIR/bin/socket-check"' "$UPDATE"
+check "update.sh deploys socket-check.sh to LIBDIR/bin (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/bin/socket-check 755" "$2" \
+        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh KIT_FILES includes setup-container-backend" \
     grep -Fq 'opencode-permissions-kit-lib/bin/setup-container-backend' "$UPDATE"
-check "update.sh deploys setup-container-backend to LIBDIR" \
-    grep -Fq '"$LIBDIR/bin/setup-container-backend"' "$UPDATE"
+check "update.sh deploys setup-container-backend to LIBDIR (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/bin/setup-container-backend 755" "$2" \
+        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh KIT_FILES has NO migrate-denies.sh (legacy cleanup)" \
     sh -c "! sed -n 's/^KIT_FILES=\"\\(.*\\)\"$/\\1/p' \"\$1\" | grep -q migrate-denies" _ "$UPDATE"
 check "update.sh stamps no HARD_DENY_REMOVED key anymore" \

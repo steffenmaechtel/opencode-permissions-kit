@@ -29,6 +29,7 @@ TUIJSON="$TUIDIR/tui.json"
 TUIDANGER="$TUIDIR/tui-danger.json"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 
 failures=0
@@ -114,8 +115,8 @@ check_no "plugin never touches the user's theme (no theme.set/install)" \
 # --- install.sh wiring --------------------------------------------------------
 check "install.sh fetch list includes the tui payload" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$INSTALL"
-check "install.sh deploys the plugin to LIBDIR/tui" \
-    grep -q 'cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"' "$INSTALL"
+check "install.sh deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh installs the opencode-user tui.json (marker policy)" \
     grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$INSTALL"
 check "install.sh installs the default-user danger theme" \
@@ -126,8 +127,8 @@ check "install.sh keeps user-managed tui.json (skip branch)" \
 # --- update.sh wiring ---------------------------------------------------------
 check "update.sh KIT_FILES includes the tui payload" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$UPDATE"
-check "update.sh re-deploys the plugin to LIBDIR/tui" \
-    grep -q 'cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"' "$UPDATE"
+check "update.sh re-deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh refreshes the opencode-user tui.json (marker policy)" \
     grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$UPDATE"
 check "update.sh refreshes the default-user danger theme" \
@@ -172,8 +173,8 @@ check "2x plugin render is defensive (try/catch)" \
     grep -q 'catch' "$PLUGIN2X"
 check "install.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$INSTALL"
-check "install.sh deploys the 2x plugin to LIBDIR/tui" \
-    grep -q 'cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"' "$INSTALL"
+check "install.sh deploys the 2x plugin to LIBDIR/tui (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh registers the 2x plugin as a discovered plugin dir (major-gated)" \
     grep -q 'ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"' "$INSTALL"
 check "install.sh unregisters inert cli.json path entries (2x cleanup)" \

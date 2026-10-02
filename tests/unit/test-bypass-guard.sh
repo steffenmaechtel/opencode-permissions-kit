@@ -20,6 +20,7 @@ WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 SECUREBIN="$REPO/files/opencode-permissions-kit-lib/sh/secure-binary.sh"
+DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UMASK="$REPO/files/etc/umask.sh"
 TEST_YML="$REPO/.github/workflows/test-unit.yml"
 E2E_YML="$REPO/.github/workflows/test-e2e.yml"
@@ -94,8 +95,9 @@ echo ""
 echo "-- install.sh wiring --"
 check "install.sh fetches shell-warn.sh" \
     grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$INSTALL"
-check "install.sh deploys shell-warn.sh to LIBDIR" \
-    grep -Fq '"$LIBDIR/sh/shell-warn.sh"' "$INSTALL"
+check "install.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 755" "$2" \
+        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$INSTALL"
 check "install.sh restricts binary to root:group 750 (shared helper)" \
@@ -107,8 +109,9 @@ echo ""
 echo "-- update.sh wiring --"
 check "update.sh fetches shell-warn.sh" \
     grep -Fq 'opencode-permissions-kit-lib/sh/shell-warn.sh' "$UPDATE"
-check "update.sh deploys shell-warn.sh to LIBDIR" \
-    grep -Fq '"$LIBDIR/sh/shell-warn.sh"' "$UPDATE"
+check "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 755" "$2" \
+        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE"
 check "update.sh re-asserts binary 750 (shared helper)" \

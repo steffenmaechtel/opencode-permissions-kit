@@ -21,6 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
+DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 WRAPPER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 
@@ -140,8 +141,9 @@ check "uninstall.sh asks before removing kit-owned wsl.conf content" \
     sh -c "grep -q \"Remove the kit's wsl.conf bridge block?\" \"\$1\" && grep -q 'prompt_yn' \"\$1\"" _ "$UNINSTALL"
 check "uninstall.sh prints the manual line range when declined" \
     sh -c "grep -q 'browser bridge -- begin\\\$' \"\$1\" && grep -q 'left untouched' \"\$1\"" _ "$UNINSTALL"
-check "install.sh and update.sh deploy bin/browser-bridge into the library" \
-    sh -c "grep -q 'bin/browser-bridge\" \"\$LIBDIR/bin/browser-bridge' \"\$1\" && grep -q 'bin/browser-bridge\" \"\$LIBDIR/bin/browser-bridge' \"\$2\"" _ "$INSTALL" "$UPDATE"
+check "install.sh and update.sh deploy bin/browser-bridge into the library (lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/browser-bridge 755' \"\$3\" \
+        && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$2\"" _ "$INSTALL" "$UPDATE" "$DEPLOYLIB"
 
 # --- mode-mask arithmetic (the exact check status.sh performs) -----------------
 mode_allows_other() {

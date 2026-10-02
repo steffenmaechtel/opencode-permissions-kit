@@ -154,6 +154,7 @@ opencode-permissions-kit-lib/sh/fs-baseline.sh \
 opencode-permissions-kit-lib/sh/staged-write.sh \
 opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
 opencode-permissions-kit-lib/sh/secure-binary.sh \
+opencode-permissions-kit-lib/sh/deploy-lib.sh \
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
 opencode-permissions-kit-lib/bin/browser-bridge \
 opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -365,6 +366,16 @@ done
 [ -n "$_sbl" ] \
     || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
 
+# Shared library deployment manifest (what ships into $LIBDIR, from
+# ONE list — install.sh deploys through it too). Same lookup order as
+# staged-write.sh.
+_dll=""
+for _dll_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/deploy-lib.sh" "$LIBDIR/sh/deploy-lib.sh"; do
+    if [ -f "$_dll_cand" ]; then . "$_dll_cand"; _dll="$_dll_cand"; break; fi
+done
+[ -n "$_dll" ] \
+    || lib_deploy() { echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2; return 1; }
+
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
 INSTALLED_VERSION=""
@@ -520,77 +531,13 @@ if [ "$ONLY_BINARY" != true ]; then
 # --- re-deploy library files (skipped by --only-binary) ------------------------
 
 ui_section "Re-deploying library files"
-sudo mkdir -p "$LIBDIR/bin" "$LIBDIR/sh" "$LIBDIR/py" "$LIBDIR/tui" "$LIBDIR/management" "$LIBDIR/templates"
 
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/opencode-as-opencode" "$LIBDIR/bin/opencode-as-opencode"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/opk"                "$LIBDIR/bin/opk"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/py/jsonc-parser.py"    "$LIBDIR/py/jsonc-parser.py"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/py/tui-register.py"    "$LIBDIR/py/tui-register.py"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/log.sh"             "$LIBDIR/sh/log.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ui.sh"              "$LIBDIR/sh/ui.sh"
-# known security advisories (issue #107): sourced by the wrapper (local
-# check on every start) and status.sh (upstream diff).
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/advisories.sh"      "$LIBDIR/sh/advisories.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/shell-warn.sh"      "$LIBDIR/sh/shell-warn.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/config.sh" \
-       "$LIBDIR/management/config.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/update.sh" \
-       "$LIBDIR/management/update.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/status.sh" \
-       "$LIBDIR/management/status.sh"
-# sudoers.template: needed by the installed config.sh for backend switches
-# (render_sudoers looks in $LIBDIR/templates first).
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" \
-       "$LIBDIR/templates/sudoers.template"
-sudo chmod 440 "$LIBDIR/templates/sudoers.template"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode.jsonc" \
-       "$LIBDIR/templates/opencode.jsonc"
-# Same deploy set as install.sh (0.0.38 C19): without this line the deny-all
-# template in $LIBDIR/templates/ went stale on every opk update.
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
-       "$LIBDIR/templates/opencode-deny-all.jsonc"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/uninstall.sh" \
-       "$LIBDIR/management/uninstall.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/socket-check" "$LIBDIR/bin/socket-check"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/cwd-check" "$LIBDIR/bin/cwd-check"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-terminal.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/sh/ddev-migrate.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/secure-binary.sh" "$LIBDIR/sh/secure-binary.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
-# browser-bridge stand-in source (deploys into the wsl/ tree; source of
-# 'opk wsl-add-opencode-1-fix' re-runs)
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/browser-bridge" "$LIBDIR/bin/browser-bridge"
-# WSL browser bridge (issues #91, #100): the deploy helper joins the
-# library; the stand-in tree + /etc/wsl.conf comment block are (re)applied
-# below after the library is in place.
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
-# TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates.
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" \
-       "$LIBDIR/tui/opencode-danger.theme.json"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
-               "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" \
-               "$LIBDIR/sh/sudoers-deploy.sh" "$LIBDIR/sh/secure-binary.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
-sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" \
-               "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 755 "$LIBDIR/py/tui-register.py"
-sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
-               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" \
-               "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
-               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" \
-               "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
-               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" \
-               "$LIBDIR/bin/ddev-migrate" "$LIBDIR/bin/browser-bridge"
+# Deploy via the shared manifest (sh/deploy-lib.sh): the single source
+# of truth for what ships into $LIBDIR — layout, file set and modes
+# live there, enforced against the fetch lists by test-kit-files. The
+# browser-bridge stand-in tree + wsl.conf carrier are re-applied below,
+# after the library is in place.
+lib_deploy "$FILES_ROOT" "$LIBDIR"
 
 # --- old-layout cleanup (0.0.29 streamline, docs/design/streamline.md §5) --------
 # Remove the union of pre-0.0.29 deployed paths after the new layout is in

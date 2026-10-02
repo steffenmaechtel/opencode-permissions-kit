@@ -137,6 +137,7 @@ fetch_kit() {
              opencode-permissions-kit-lib/sh/staged-write.sh \
              opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
              opencode-permissions-kit-lib/sh/secure-binary.sh \
+             opencode-permissions-kit-lib/sh/deploy-lib.sh \
              opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
              opencode-permissions-kit-lib/bin/browser-bridge \
              opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -255,6 +256,13 @@ command -v sudoers_deploy >/dev/null 2>&1 \
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/secure-binary.sh"
 command -v secure_binary >/dev/null 2>&1 \
     || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
+
+# Shared library deployment manifest: what ships into
+# /usr/local/lib/opencode-permissions-kit, from ONE list (install.sh
+# and update.sh deploy through it).
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/deploy-lib.sh"
+command -v lib_deploy >/dev/null 2>&1 \
+    || lib_deploy() { echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2; return 1; }
 
 # Shared WSL browser bridge helper (issues #91, #100): deploys the
 # powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
@@ -1639,79 +1647,13 @@ log "shell PATH config cleaned/updated for $DEFAULT_USER (wrapper bypass warning
 
 ui_section "Deploying the kit library"
 
-sudo mkdir -p "$LIBDIR/bin" "$LIBDIR/sh" "$LIBDIR/py" "$LIBDIR/tui" "$LIBDIR/management" "$LIBDIR/templates"
-
-# Copy all our scripts into the library directory. Layout (docs/design/streamline.md):
-# bin/ = commands (no extension), sh/ = sourced shell libraries, py/ = python,
-# management/ = the management entry scripts, templates/ = rendered/deployed templates.
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/opencode-as-opencode" "$LIBDIR/bin/opencode-as-opencode"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/opk"                "$LIBDIR/bin/opk"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/py/jsonc-parser.py"    "$LIBDIR/py/jsonc-parser.py"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/log.sh"             "$LIBDIR/sh/log.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"              "$LIBDIR/sh/ui.sh"
-# known security advisories (issue #107): sourced by the wrapper (local
-# check on every start) and status.sh (upstream diff).
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/advisories.sh"      "$LIBDIR/sh/advisories.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/shell-warn.sh"      "$LIBDIR/sh/shell-warn.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/config.sh" \
-       "$LIBDIR/management/config.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/update.sh" \
-       "$LIBDIR/management/update.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/status.sh" \
-       "$LIBDIR/management/status.sh"
-# sudoers.template is deployed alongside config.sh: the installed config.sh
-# re-renders /etc/opencode-permissions-kit/sudoers on container-backend
-# switches and needs the template next to it.
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/sudoers.template" \
-       "$LIBDIR/templates/sudoers.template"
-sudo chmod 440 "$LIBDIR/templates/sudoers.template"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" \
-       "$LIBDIR/templates/opencode.jsonc"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
-       "$LIBDIR/templates/opencode-deny-all.jsonc"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/management/uninstall.sh" \
-       "$LIBDIR/management/uninstall.sh"
-# rootless socket probe helper
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/socket-check" "$LIBDIR/bin/socket-check"
-# headless serve cwd probe helper (readable-for-opencode check + fallback)
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/cwd-check" "$LIBDIR/bin/cwd-check"
-# ddev always runs as the opencode user: the sourced shell function (hooked
-# into the developer's rc files) + the sudoers helper that execs the real ddev.
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-terminal.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/sh/ddev-migrate.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/secure-binary.sh" "$LIBDIR/sh/secure-binary.sh"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
-# browser-bridge stand-in source (deploys into the wsl/ tree; source of
-# 'opk wsl-add-opencode-1-fix' re-runs)
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/browser-bridge" "$LIBDIR/bin/browser-bridge"
-# TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" \
-       "$LIBDIR/tui/opencode-danger.theme.json"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/py/tui-register.py" "$LIBDIR/py/tui-register.py"
-sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" \
-               "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 755 "$LIBDIR/py/tui-register.py"
-sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
-               "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" \
-               "$LIBDIR/sh/sudoers-deploy.sh" "$LIBDIR/sh/secure-binary.sh"
-sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
-               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" \
-               "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
-               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" \
-               "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
-               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" \
-               "$LIBDIR/bin/ddev-migrate" "$LIBDIR/bin/browser-bridge"
+# Deploy the library via the shared manifest (sh/deploy-lib.sh): the
+# single source of truth for what ships into $LIBDIR — layout, file
+# set and modes live there, enforced against the fetch lists by
+# test-kit-files. The browser-bridge stand-in tree + wsl.conf carrier
+# are applied by browser_bridge_install below, after the library is
+# in place.
+lib_deploy "$SCRIPT_DIR" "$LIBDIR"
 log "library deployed to $LIBDIR"
 ui_success "kit library deployed: $LIBDIR"
 
@@ -1745,8 +1687,7 @@ log "sudoers installed: /etc/opencode-permissions-kit/sudoers -> /etc/sudoers.d/
 # never edits wsl.conf implicitly (docs/design/wsl-conf-consent.md); the
 # user opts in explicitly via 'sudo opk wsl-add-opencode-1-fix'. A legacy
 # 0.0.36 section is stripped (kit-owned regression cleanup).
-sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
-sudo chmod 644 "$LIBDIR/sh/wsl-browser-bridge.sh"
+# (The helper library itself ships via the lib_deploy manifest above.)
 if browser_bridge_is_wsl; then
     browser_bridge_install "$SCRIPT_DIR" "$LIBDIR"
     ui_success "WSL browser bridge stand-in deployed"

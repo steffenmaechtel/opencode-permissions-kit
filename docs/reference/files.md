@@ -98,6 +98,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/staged-write.sh` | Shared helper: symlink-safe privileged writes (`staged_write` staging + the `agent_home_sane` walker) |
 | `/usr/local/lib/opencode-permissions-kit/sh/sudoers-deploy.sh` | Shared helper: the sudoers pipeline (charset gate, render, visudo validation, install, sudoers.d link) |
 | `/usr/local/lib/opencode-permissions-kit/sh/secure-binary.sh` | Shared helper: binary hardening (`chown root:<group>` + the load-bearing `chmod 750`, fail-loud) |
+| `/usr/local/lib/opencode-permissions-kit/sh/deploy-lib.sh` | Shared helper: the library deployment manifest (`lib_deploy` — the single source of truth for what ships into `$LIBDIR`) |
 | `/usr/local/lib/opencode-permissions-kit/sh/ui.sh` | Shared helper: labeled output |
 | `/usr/local/lib/opencode-permissions-kit/management/config.sh` | Management: projects, git-config, backend, refresh |
 | `/usr/local/lib/opencode-permissions-kit/management/update.sh` | Management: re-deploy, binary upgrades |

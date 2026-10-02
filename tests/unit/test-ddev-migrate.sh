@@ -28,6 +28,7 @@ BIN_MIG="$FILES/opencode-permissions-kit-lib/bin/ddev-migrate"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
+DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
 E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
@@ -433,15 +434,15 @@ check "install.sh inventory counts the dev user's ddev projects" \
     sh -c "grep -q 'ddev projects' \"\$1\" && grep -q 'ddev_migrate_registry' \"\$1\"" _ "$INSTALL"
 check "install.sh plan mentions the database export when projects exist" \
     sh -c "grep -q 'export ddev databases' \"\$1\"" _ "$INSTALL"
-check "install.sh deploys ddev-migrate.sh to the library" \
-    sh -c "grep -q '\"\$LIBDIR/sh/ddev-migrate.sh\"' \"\$1\" && grep -q '\"\$LIBDIR/bin/ddev-migrate\"' \"\$1\"" _ "$INSTALL"
+check "install.sh deploys ddev-migrate.sh to the library (lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
 
 # --- 7. update.sh / status.sh wiring ------------------------------------------------
 
 check "update.sh KIT_FILES includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$UPDATE"
-check "update.sh deploys ddev-migrate.sh" \
-    sh -c "grep -q '\"\$LIBDIR/sh/ddev-migrate.sh\"' \"\$1\" && grep -q '\"\$LIBDIR/bin/ddev-migrate\"' \"\$1\"" _ "$UPDATE"
+check "update.sh deploys ddev-migrate.sh (lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh 644' \"\$2\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-migrate 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE" "$DEPLOYLIB"
 check "status.sh reports dumps waiting for import" \
     sh -c "grep -q 'db dumps' \"\$1\" && grep -q 'bin/ddev-migrate import' \"\$1\"" _ "$STATUS"
 check "status.sh import detection knows the ddev >= 1.23 project_list.yaml" \

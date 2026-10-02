@@ -135,6 +135,7 @@ jobs:
                    ./tests/unit/test-release.sh ./tests/unit/test-fs-baseline.sh ./tests/unit/test-staged-write.sh \
                    ./tests/unit/test-sudoers-deploy.sh \
                    ./tests/unit/test-secure-binary.sh \
+                   ./tests/unit/test-deploy-lib.sh \
                    ./tests/unit/test-browser-bridge.sh ./tests/unit/test-e2e-sources.sh \
                    ./tests/unit/test-security-advisories.sh ./tests/unit/test-log.sh \
                    ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
@@ -160,6 +161,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
                    ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
                    ./files/opencode-permissions-kit-lib/bin/browser-bridge \
                    ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -219,6 +221,7 @@ jobs:
                    ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-fs-baseline.sh \
                    ./tests/unit/test-staged-write.sh ./tests/unit/test-sudoers-deploy.sh \
                    ./tests/unit/test-secure-binary.sh \
+                   ./tests/unit/test-deploy-lib.sh \
                    ./tests/unit/test-browser-bridge.sh \
                    ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
                    ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
@@ -244,6 +247,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
                    ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
                    ./files/opencode-permissions-kit-lib/bin/browser-bridge \
                    ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -321,6 +325,7 @@ jobs:
                    ./tests/unit/test-release.sh ./tests/unit/test-fs-baseline.sh ./tests/unit/test-staged-write.sh \
                    ./tests/unit/test-sudoers-deploy.sh \
                    ./tests/unit/test-secure-binary.sh \
+                   ./tests/unit/test-deploy-lib.sh \
                    ./tests/unit/test-browser-bridge.sh ./tests/unit/test-e2e-sources.sh \
                    ./tests/unit/test-security-advisories.sh ./tests/unit/test-log.sh \
                    ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
@@ -346,6 +351,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
                    ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
                    ./files/opencode-permissions-kit-lib/bin/browser-bridge \
                    ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -417,6 +423,7 @@ jobs:
                    ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-fs-baseline.sh \
                    ./tests/unit/test-staged-write.sh ./tests/unit/test-sudoers-deploy.sh \
                    ./tests/unit/test-secure-binary.sh \
+                   ./tests/unit/test-deploy-lib.sh \
                    ./tests/unit/test-browser-bridge.sh \
                    ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
                    ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
@@ -442,6 +449,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
                    ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
                    ./files/opencode-permissions-kit-lib/bin/browser-bridge \
                    ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \
