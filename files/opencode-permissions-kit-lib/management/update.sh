@@ -153,6 +153,7 @@ opencode-permissions-kit-lib/sh/ddev-hosts.sh \
 opencode-permissions-kit-lib/sh/fs-baseline.sh \
 opencode-permissions-kit-lib/sh/staged-write.sh \
 opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+opencode-permissions-kit-lib/sh/secure-binary.sh \
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
 opencode-permissions-kit-lib/bin/browser-bridge \
 opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -354,6 +355,16 @@ done
 [ -n "$_sdl" ] \
     || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
 
+# Shared binary hardening (chown root:<group> best-effort + the
+# load-bearing chmod 750, fail-loud): one implementation for
+# install.sh and update.sh. Same lookup order as staged-write.sh.
+_sbl=""
+for _sbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/secure-binary.sh" "$LIBDIR/sh/secure-binary.sh"; do
+    if [ -f "$_sbl_cand" ]; then . "$_sbl_cand"; _sbl="$_sbl_cand"; break; fi
+done
+[ -n "$_sbl" ] \
+    || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
+
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
 INSTALLED_VERSION=""
@@ -551,6 +562,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"
+sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/secure-binary.sh" "$LIBDIR/sh/secure-binary.sh"
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # browser-bridge stand-in source (deploys into the wsl/ tree; source of
 # 'opk wsl-add-opencode-1-fix' re-runs)
@@ -568,7 +580,7 @@ sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui
 sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
                "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" \
-               "$LIBDIR/sh/sudoers-deploy.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
+               "$LIBDIR/sh/sudoers-deploy.sh" "$LIBDIR/sh/secure-binary.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
 sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" \
                "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
@@ -797,12 +809,14 @@ SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 # root:$BINARY_GROUP mode 750 lets the opencode user run the binary and
 # keeps unrelated users out — but it is NOT a developer-side bypass guard:
 # the developer is in the sharing group and CAN exec this path directly;
-# the soft layer (deny-all config + warnings) is what deters that, per
-# the kit's declared model.
+# the soft layer (deny-all config + warnings) is what deters that, per the
+# kit's declared model. Shared fail-loud helper (was a silent `|| true`
+# pair here — a failed re-assert continued the update with an unsecured
+# binary, the exact 0.0.39e C4 shape).
 BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 if [ -x "$SYSTEM_BIN" ]; then
-    sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
-    sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null || true
+    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" \
+        || die "cannot re-secure $SYSTEM_BIN — update aborted."
 fi
 
 # Detect the opencode release target for this host (mirrors the official
@@ -848,8 +862,7 @@ install_binary() {
     sudo pkill -u "$OPENCODE_USER" -f "serve --servic[e]" >/dev/null 2>&1 || true
     current=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     sudo cp "$src" "$SYSTEM_BIN" || return 1
-    sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
-    sudo chmod 750 "$SYSTEM_BIN" || return 1
+    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" || return 1
     new=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     # Re-stamp the major so the wrapper's 2.x --standalone gating follows
     # the binary ("opencode v2..." -> 2, anything else -> 1).

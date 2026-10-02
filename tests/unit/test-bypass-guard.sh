@@ -19,6 +19,7 @@ WARN="$REPO/files/opencode-permissions-kit-lib/sh/shell-warn.sh"
 WRAPPER="$REPO/files/opencode-permissions-kit-lib/bin/opencode-as-opencode"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+SECUREBIN="$REPO/files/opencode-permissions-kit-lib/sh/secure-binary.sh"
 UMASK="$REPO/files/etc/umask.sh"
 TEST_YML="$REPO/.github/workflows/test-unit.yml"
 E2E_YML="$REPO/.github/workflows/test-e2e.yml"
@@ -97,8 +98,8 @@ check "install.sh deploys shell-warn.sh to LIBDIR" \
     grep -Fq '"$LIBDIR/sh/shell-warn.sh"' "$INSTALL"
 check "install.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$INSTALL"
-check "install.sh restricts binary to root:group 750" \
-    grep -Fq 'chmod 750 "$SYSTEM_BIN"' "$INSTALL"
+check "install.sh restricts binary to root:group 750 (shared helper)" \
+    sh -c 'grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1"' _ "$INSTALL" "$SECUREBIN"
 check "install.sh never uses world-executable binary mode" \
     sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1"' _ "$INSTALL"
 
@@ -110,8 +111,8 @@ check "update.sh deploys shell-warn.sh to LIBDIR" \
     grep -Fq '"$LIBDIR/sh/shell-warn.sh"' "$UPDATE"
 check "update.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE"
-check "update.sh re-asserts binary 750" \
-    grep -Fq 'chmod 750 "$SYSTEM_BIN"' "$UPDATE"
+check "update.sh re-asserts binary 750 (shared helper)" \
+    sh -c 'grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1" && grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "sh/secure-binary.sh" "$1"' _ "$UPDATE" "$SECUREBIN"
 check "update.sh never uses world-executable binary mode" \
     sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1"' _ "$UPDATE"
 

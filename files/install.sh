@@ -136,6 +136,7 @@ fetch_kit() {
              opencode-permissions-kit-lib/sh/fs-baseline.sh \
              opencode-permissions-kit-lib/sh/staged-write.sh \
              opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+             opencode-permissions-kit-lib/sh/secure-binary.sh \
              opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
              opencode-permissions-kit-lib/bin/browser-bridge \
              opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -247,6 +248,13 @@ command -v staged_write >/dev/null 2>&1 \
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/sudoers-deploy.sh"
 command -v sudoers_deploy >/dev/null 2>&1 \
     || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
+
+# Shared binary hardening (chown root:<group> best-effort + the
+# load-bearing chmod 750, fail-loud): one implementation for
+# install.sh and update.sh.
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/secure-binary.sh"
+command -v secure_binary >/dev/null 2>&1 \
+    || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
 
 # Shared WSL browser bridge helper (issues #91, #100): deploys the
 # powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
@@ -1484,25 +1492,14 @@ log "umask profile installed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 ui_section "opencode binary + wrapper"
 
 SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
-# root:$BINARY_GROUP mode 750 lets the opencode user (a group member) run
-# the binary and keeps unrelated users out. It is NOT a developer-side
-# bypass guard: the developer is in the sharing group too and CAN exec
-# this path directly — the wrapper-bypass protection for the developer
-# is the soft layer (deny-all config + red theme + warnings), per the
-# kit's declared model.
+# root:$BINARY_GROUP mode 750 (applied by the shared secure_binary
+# helper, sh/secure-binary.sh): lets the opencode user (a group member)
+# run the binary and keeps unrelated users out. It is NOT a
+# developer-side bypass guard: the developer is in the sharing group
+# too and CAN exec this path directly — the soft layer (deny-all
+# config + red theme + warnings) is what deters that, per the kit's
+# declared model.
 BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
-secure_binary() {
-    sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
-    # The 750 is load-bearing: it scopes execution to root + the sharing
-    # group. Fail loud like update.sh's install_binary does — a silent
-    # best-effort chmod reported the binary as secured while it was not
-    # (0.0.39e C4).
-    if ! sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null; then
-        ui_error "cannot chmod 750 $SYSTEM_BIN — aborting."
-        log "secure_binary FAILED: chmod 750 on $SYSTEM_BIN"
-        exit 1
-    fi
-}
 # The wrapper warns about a self-installed binary shadowing it from
 # ~/.opencode/bin. Once our secured copy exists, remove the user-local
 # original (backed up first) so the first wrapper run is warning-free.
@@ -1524,7 +1521,7 @@ opencode_found=false
 # probe reaches the real binary through the wrapper now and reports
 # "already installed", skipping the download, which would abort here).
 if [ -x "$SYSTEM_BIN" ]; then
-    secure_binary
+    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
     opencode_found=true
     ui_detail "binary already secured under the kit — reusing $SYSTEM_BIN"
     log "binary reused on re-install: $SYSTEM_BIN"
@@ -1538,7 +1535,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
             y)
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 sudo cp "$loc" "$SYSTEM_BIN"
-                secure_binary
+                secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                 remove_shadow_binary "$loc"
                 opencode_found=true
                 echo "Copied to $SYSTEM_BIN."
@@ -1549,7 +1546,7 @@ for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/ope
                 cp "$loc" "$BACKUP_DIR/opencode-binary" 2>/dev/null || true
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 sudo cp "$loc" "$SYSTEM_BIN"
-                secure_binary
+                secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                 remove_shadow_binary "$loc"
                 opencode_found=true
                 echo "Backup saved. Copied to $SYSTEM_BIN."
@@ -1569,14 +1566,14 @@ if [ "$opencode_found" = false ]; then
         if [ -x "/root/.opencode/bin/opencode" ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
-            secure_binary
+            secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
             remove_shadow_binary "/root/.opencode/bin/opencode"
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /root/.opencode/bin/opencode -> $SYSTEM_BIN"
         elif [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
             sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
             sudo cp "/home/$DEFAULT_USER/.opencode/bin/opencode" "$SYSTEM_BIN"
-            secure_binary
+            secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
             remove_shadow_binary "/home/$DEFAULT_USER/.opencode/bin/opencode"
             echo "Installed to $SYSTEM_BIN."
             log "binary installed (official installer): /home/$DEFAULT_USER/.opencode/bin/opencode -> $SYSTEM_BIN"
@@ -1689,6 +1686,7 @@ sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"
+sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/secure-binary.sh" "$LIBDIR/sh/secure-binary.sh"
 sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
 # browser-bridge stand-in source (deploys into the wsl/ tree; source of
 # 'opk wsl-add-opencode-1-fix' re-runs)
@@ -1706,7 +1704,7 @@ sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR
 sudo chmod 755 "$LIBDIR/py/tui-register.py"
 sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
                "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" \
-               "$LIBDIR/sh/sudoers-deploy.sh"
+               "$LIBDIR/sh/sudoers-deploy.sh" "$LIBDIR/sh/secure-binary.sh"
 sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
                "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" \
                "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
