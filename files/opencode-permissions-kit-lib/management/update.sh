@@ -708,8 +708,8 @@ fi
 # never chowned — they stay developer-owned (the group baseline makes
 # them group-accessible).
 # Issue #112: the ROUTINE update skips roots whose scan-skip stamp still
-# matches (ddev_handover_stamp_valid — user/group/dev-owned mode/scan
-# rev), because re-scanning every large tree on every update cost
+# matches (ddev_handover_stamp_valid — user/group/dev user/dev-owned
+# mode/scan rev), because re-scanning every large tree on every update cost
 # minutes while nothing had changed. Anything doubtful falls back to the
 # full scan; --refresh and every explicit config path (projects add,
 # refresh, handover) always scan and re-stamp.

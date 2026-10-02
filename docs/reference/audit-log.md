@@ -19,7 +19,8 @@ Every kit script that changes the system writes to
 - backend switches (`container backend switched: ...`)
 - project roots added/removed (`project added: ...`, `project removed: ...`)
 - the git-config toggle (`git-config hardening set to ...`)
-- ddev handovers (`ddev handover: ...`, `ddev handover applied under ...`)
+- ddev handovers (`ddev handover: ...`, `ddev handover applied under ...`,
+  `ddev handover pass completed under ...`)
 - ddev-settings changes (`ddev-settings set to ...`)
 - the agents migration (`agents migration: moved|copied|skipped ...`)
 - ddev database exports (skipped/result lines)

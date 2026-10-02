@@ -706,7 +706,9 @@ _112_dir=$(mktemp -d)
 OPK_HANDOVER_STAMP_DIR="$_112_dir/stamps"
 export OPK_HANDOVER_STAMP_DIR
 mkdir -p "$_112_dir/stamps"
-sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup
+# 0.0.40b: guarded like the tamper below (set -e) — a failed stamp write
+# must not abort the suite before the rm -rf/unset cleanup.
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup || true
 check "stamp: written into the override dir" \
     sh -c "ls \"\$1\"/*.stamp >/dev/null 2>&1" _ "$_112_dir/stamps"
 check "stamp: valid for the same root/user/group" \
@@ -723,7 +725,8 @@ check "stamp: dev-owned toggle invalidates (mode is part of the shape)" \
     sh -c "DDEV_DEV_OWNED=true . \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
 # 0.0.40a F1: the dev user (handback target) is part of the shape — a
 # DEFAULT_USER re-base must invalidate, not wait for --refresh.
-sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup devuser
+# (0.0.40b: guarded — same set -e cleanup rationale as above.)
+sh -c ". \"\$1\" && ddev_handover_stamp_write \"\$2\" \"\$3\" \"\$4\" \"\$5\"" _ "$HANDOVER" "/srv/projects" ocuser ocgroup devuser || true
 check "stamp: valid for the same dev user (4-arg shape, 0.0.40a F1)" \
     sh -c ". \"\$1\" && ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup devuser" _ "$HANDOVER"
 check "stamp: invalid for a different dev user (0.0.40a F1)" \
@@ -747,7 +750,7 @@ unset OPK_HANDOVER_STAMP_DIR
 # forces), re-stamps after every full pass, and says how to force;
 # install.sh + config.sh stamp their explicit passes too.
 check "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid" \
-    sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF '&& ddev_handover_stamp_valid \"\$root\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF '&& ddev_handover_stamp_valid \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$UPDATE"
 check "update.sh: stamps the root after the handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\"' \"\$1\"" _ "$UPDATE"
 check "update.sh: the scanning detail is printed only for roots actually scanned" \
