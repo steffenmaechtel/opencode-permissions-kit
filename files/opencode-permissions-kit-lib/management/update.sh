@@ -138,6 +138,8 @@ opencode-permissions-kit-lib/bin/opk \
 opencode-permissions-kit-lib/py/jsonc-parser.py \
 opencode-permissions-kit-lib/py/tui-register.py \
 opencode-permissions-kit-lib/sh/log.sh \
+opencode-permissions-kit-lib/sh/render-agent-config.sh \
+opencode-permissions-kit-lib/sh/tui-plugin.sh \
 opencode-permissions-kit-lib/sh/ui.sh \
 opencode-permissions-kit-lib/sh/advisories.sh \
 opencode-permissions-kit-lib/sh/shell-warn.sh \
@@ -375,6 +377,16 @@ for _dll_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/deploy-lib.sh" "$L
 done
 [ -n "$_dll" ] \
     || lib_deploy() { echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2; return 1; }
+
+# Shared TUI 2.x plugin registration (per-user plugin-dir sync): one
+# implementation for update.sh's sync_tui_registration and install.sh
+# Step 8c. Same lookup order as staged-write.sh.
+_tpl=""
+for _tpl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/tui-plugin.sh" "$LIBDIR/sh/tui-plugin.sh"; do
+    if [ -f "$_tpl_cand" ]; then . "$_tpl_cand"; _tpl="$_tpl_cand"; break; fi
+done
+[ -n "$_tpl" ] \
+    || tui_plugin_sync_user() { echo "error: tui_plugin_sync_user unavailable (tui-plugin.sh missing)" >&2; return 1; }
 
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
@@ -930,39 +942,17 @@ sync_tui_registration() {
                          "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
         _str_user_dir="${_str_dir_user%%:*}"
         _str_dir_owner="${_str_dir_user#*:}"
-        # Chain gate (review 0.0.39h F2): the gates below check plugins/
-        # and the plugin dir, but the PARENT chain of the config dir is
-        # agent-replaceable too (the agent side) — a linked parent passes
-        # `sudo mkdir -p` silently and redirects the mkdir/ln/chown/rm AND
-        # the tui-register run below through it. The walker no-ops outside
-        # the agent home (the developer side is trusted).
-        if ! agent_home_sane "$OPENCODE_USER" "$_str_user_dir"; then
-            log "tui plugin registration skipped: symlink in the chain to $_str_user_dir (user-managed)"
-            continue
-        fi
-        # 0.0.39g S1 class: the opencode user's config dir is agent-owned.
-        # A planted symlink at plugins/ (or the plugin dir itself) must
-        # never be followed — mkdir -p would create through it, chown
-        # dereferences the operand (arbitrary chown to the agent), and
-        # rm -rf would delete through it. Skip loudly instead.
-        if [ -L "$_str_user_dir/plugins" ] || [ -L "$_str_user_dir/plugins/opencode-permissions-kit" ]; then
-            log "tui plugin registration skipped: $_str_user_dir/plugins is a symlink (user-managed)"
-            continue
-        fi
-        if [ "$_str_major" = 2 ]; then
-            sudo mkdir -p "$_str_user_dir/plugins/opencode-permissions-kit"
-            sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
-            sudo chown "$_str_dir_owner:$NEW_OPENCODE_GROUP" "$_str_user_dir/plugins" \
-                "$_str_user_dir/plugins/opencode-permissions-kit" 2>/dev/null || true
-            sudo chown -h "$_str_dir_owner:$NEW_OPENCODE_GROUP" \
-                "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
-            log "tui mode registered for 2.x: $_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
+        # Shared per-user sync (sh/tui-plugin.sh): chain gate, plugins
+        # gate, plugin dir + symlink + chowns, inert-entry unregister.
+        # Skips (rc 2/3) are logged by the helper; rc 1 dies (the old
+        # inline body aborted via set -e, now with a message).
+        if tui_plugin_sync_user "$_str_major" "$_str_user_dir" "$_str_dir_owner" \
+            "$NEW_OPENCODE_GROUP" "$LIBDIR" "$OPENCODE_USER"; then
+            :
         else
-            sudo rm -rf "$_str_user_dir/plugins/opencode-permissions-kit"
-            log "tui mode 2.x registration removed: $_str_user_dir/plugins/opencode-permissions-kit"
+            _str_tps_rc=$?
+            [ "$_str_tps_rc" -eq 1 ] && die "TUI plugin registration failed for $_str_user_dir"
         fi
-        sudo python3 "$LIBDIR/py/tui-register.py" "$_str_user_dir/cli.json" unregister \
-            "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
     done
 }
 

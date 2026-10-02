@@ -121,6 +121,8 @@ fetch_kit() {
              opencode-permissions-kit-lib/py/jsonc-parser.py \
              opencode-permissions-kit-lib/py/tui-register.py \
              opencode-permissions-kit-lib/sh/log.sh \
+             opencode-permissions-kit-lib/sh/render-agent-config.sh \
+             opencode-permissions-kit-lib/sh/tui-plugin.sh \
              opencode-permissions-kit-lib/sh/ui.sh \
              opencode-permissions-kit-lib/sh/advisories.sh \
              opencode-permissions-kit-lib/sh/shell-warn.sh \
@@ -263,6 +265,22 @@ command -v secure_binary >/dev/null 2>&1 \
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 command -v lib_deploy >/dev/null 2>&1 \
     || lib_deploy() { echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2; return 1; }
+
+# Shared agent-config template render (the SECURE_GIT sed pair): one
+# implementation for install.sh and config.sh's git-config toggle.
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/render-agent-config.sh"
+command -v agent_config_render >/dev/null 2>&1 \
+    || agent_config_render() {
+        echo "error: agent_config_render unavailable (render-agent-config.sh missing)" >&2
+        return 1
+    }
+
+# Shared TUI 2.x plugin registration (per-user plugin-dir sync): one
+# implementation for install.sh Step 8c and update.sh's
+# sync_tui_registration.
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh"
+command -v tui_plugin_sync_user >/dev/null 2>&1 \
+    || tui_plugin_sync_user() { echo "error: tui_plugin_sync_user unavailable (tui-plugin.sh missing)" >&2; return 1; }
 
 # Shared WSL browser bridge helper (issues #91, #100): deploys the
 # powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
@@ -1898,10 +1916,13 @@ fi
 _oc_install_agent_config() {
     _oic_tmp=$(mktemp) || return 1
     _tmp_track "$_oic_tmp"
-    if [ "$SECURE_GIT_CONFIG" = true ]; then
-        sed 's|//SECURE_GIT: ||' "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" > "$_oic_tmp"
-    else
-        sed '/\/\/SECURE_GIT:/d' "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" > "$_oic_tmp"
+    _oic_mode=off
+    [ "$SECURE_GIT_CONFIG" = true ] && _oic_mode=on
+    if ! agent_config_render \
+        "$SCRIPT_DIR/opencode-permissions-kit-lib/templates/opencode.jsonc" \
+        "$_oic_tmp" "$_oic_mode"; then
+        rm -f "$_oic_tmp"
+        return 1
     fi
     staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_oic_tmp" /home/opencode/.config/opencode/opencode.jsonc
     rm -f "$_oic_tmp"
@@ -2049,37 +2070,24 @@ if [ "$OPENCODE_MAJOR" = 2 ]; then
     for _oc_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" "$DEFAULT_OC_DIR:$DEFAULT_USER"; do
         _oc_user_dir="${_oc_dir_user%%:*}"
         _oc_dir_owner="${_oc_dir_user#*:}"
-        # Chain gate (review 0.0.39h F2): the gates below check plugins/ and
-        # the plugin dir, but the PARENT chain of the config dir is
-        # agent-replaceable too (the agent side) — a linked parent passes
-        # `sudo mkdir -p` silently and redirects the mkdir/ln/chown AND the
-        # tui-register run below through it. The walker no-ops outside the
-        # agent home (the developer side is trusted).
-        if ! agent_home_sane "$OPENCODE_USER" "$_oc_user_dir"; then
-            ui_detail "the chain to $_oc_user_dir contains a symlink — TUI plugin registration skipped (user-managed)"
-            log "tui plugin registration skipped: symlink in the chain to $_oc_user_dir"
-            continue
-        fi
-        # 0.0.39g S1 class: the opencode user's config dir is agent-owned.
-        # A planted symlink at plugins/ (or the plugin dir itself) must
-        # never be followed — mkdir -p would create through it, chown
-        # dereferences the operand (arbitrary chown to the agent). Skip
-        # loudly instead.
-        if [ -L "$_oc_user_dir/plugins" ] || [ -L "$_oc_user_dir/plugins/opencode-permissions-kit" ]; then
-            ui_detail "existing $_oc_user_dir/plugins is a symlink"\
+        # Shared per-user sync (sh/tui-plugin.sh): gates + plugin dir +
+        # symlink + chowns + inert-entry unregister. Skip reasons are
+        # logged by the helper; rc 2/3 surface as user-managed notes,
+        # rc 1 aborts like the former inline body did under set -e.
+        if tui_plugin_sync_user "$OPENCODE_MAJOR" "$_oc_user_dir" "$_oc_dir_owner" \
+            "$OPENCODE_GROUP" "$LIBDIR" "$OPENCODE_USER"; then
+            :
+        else
+            _oc_tps_rc=$?
+            if [ "$_oc_tps_rc" -eq 1 ]; then
+                ui_error "TUI plugin registration failed for $_oc_user_dir — aborting."
+                exit 1
+            fi
+            [ "$_oc_tps_rc" -eq 2 ] && ui_detail "the chain to $_oc_user_dir contains a symlink"\
+" — TUI plugin registration skipped (user-managed)"
+            [ "$_oc_tps_rc" -eq 3 ] && ui_detail "existing $_oc_user_dir/plugins is a symlink"\
 " — TUI plugin registration skipped (user-managed link)"
-            log "tui plugin registration skipped: $_oc_user_dir/plugins is a symlink"
-            continue
         fi
-        sudo mkdir -p "$_oc_user_dir/plugins/opencode-permissions-kit"
-        sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"
-        sudo chown "$_oc_dir_owner:$OPENCODE_GROUP" "$_oc_user_dir/plugins" \
-            "$_oc_user_dir/plugins/opencode-permissions-kit"
-        sudo chown -h "$_oc_dir_owner:$OPENCODE_GROUP" \
-            "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
-        # best-effort cleanup of inert file-path entries (pre-0.0.35 kits)
-        sudo python3 "$LIBDIR/py/tui-register.py" "$_oc_user_dir/cli.json" unregister \
-            "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
     done
     ui_success "TUI mode display registered for opencode 2.x: plugins/opencode-permissions-kit/tui.tsx (both users)"
     log "tui mode registered for 2.x: plugin dir + symlink (kit-mode-2x.tsx)"

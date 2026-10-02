@@ -89,10 +89,12 @@ opencode-permissions-kit-lib/sh/ddev-terminal.sh 644
 opencode-permissions-kit-lib/sh/deploy-lib.sh 644
 opencode-permissions-kit-lib/sh/fs-baseline.sh 644
 opencode-permissions-kit-lib/sh/log.sh 755
+opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644
 opencode-permissions-kit-lib/sh/shell-warn.sh 755
 opencode-permissions-kit-lib/sh/staged-write.sh 644
 opencode-permissions-kit-lib/sh/sudoers-deploy.sh 644
+opencode-permissions-kit-lib/sh/tui-plugin.sh 644
 opencode-permissions-kit-lib/sh/ui.sh 755
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh 644
 # tui/ mode display (docs/_archive/design/plan-ui-tui-opencode.md)

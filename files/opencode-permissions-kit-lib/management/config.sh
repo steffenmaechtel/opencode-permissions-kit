@@ -203,6 +203,21 @@ done
 command -v sudoers_deploy >/dev/null 2>&1 \
     || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
 
+# Shared agent-config template render (the SECURE_GIT sed pair): one
+# implementation for config.sh's git-config toggle and install.sh's
+# _oc_install_agent_config. Same lookup order as staged-write.sh.
+for cand in "$SCRIPT_DIR/../sh/render-agent-config.sh" "$LIBDIR/sh/render-agent-config.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+command -v agent_config_render >/dev/null 2>&1 \
+    || agent_config_render() {
+        echo "error: agent_config_render unavailable (render-agent-config.sh missing)" >&2
+        return 1
+    }
+
 projects_list() {
     ui_info "Project roots ($PROJECTS_CONF):"
     if [ ! -f "$PROJECTS_CONF" ] || [ ! -s "$PROJECTS_CONF" ]; then
@@ -413,13 +428,13 @@ git_config_apply() {
     # edit) on a scratch copy and deploy with ONE staged_write — the old
     # sudo sed -i follow-up was a SECOND privileged write on the
     # agent-owned destination; a link swapped between the two would
-    # disclose a root-readable file into the agent config.
+    # disclose a root-readable file into the agent config. The render
+    # itself is the shared agent_config_render helper.
     _gca_tmp=$(mktemp)
     _tmp_track "$_gca_tmp"
-    if [ "$enable" = "on" ]; then
-        sed 's|//SECURE_GIT: ||' "$template" > "$_gca_tmp"
-    else
-        sed '/\/\/SECURE_GIT:/d' "$template" > "$_gca_tmp"
+    if ! agent_config_render "$template" "$_gca_tmp" "$enable"; then
+        rm -f "$_gca_tmp"
+        die "cannot render the agent config template (git-config $enable)"
     fi
     staged_write 664 "$OPENCODE_USER:$OPENCODE_GROUP" "$_gca_tmp" "$target"
     rm -f "$_gca_tmp"

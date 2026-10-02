@@ -32,6 +32,7 @@ UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 INSTALL="$REPO/files/install.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
+TUIPLUGIN="$REPO/files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 
 failures=0
 passed=0
@@ -425,11 +426,14 @@ check "gates: install.sh agents-migration operand gate" \
 check "gates: install.sh mkcert chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$caroot\"" "$1"' _ "$INSTALL"
 check "gates: install.sh agent-config + tui + plugin chain gates" \
-    sh -c 'grep -q "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/.config/opencode" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_oc_user_dir\"" "$1"' _ "$INSTALL"
+    sh -c 'grep -q "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/.config/opencode" "$1" \
+        && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" \
+        && grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$1"' _ "$INSTALL"
 check "gates: update.sh sources staged-write.sh early + walker fallback" \
     sh -c 'grep -q "command -v agent_home_sane >/dev/null 2>&1 \|\| agent_home_sane() { return 0; }" "$1"' _ "$UPDATE"
 check "gates: update.sh sync_tui_registration + tui.json chain gates" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_str_user_dir\"" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1"' _ "$UPDATE"
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" \
+        && grep -qF "sh/tui-plugin.sh" "$1" && grep -qF "agent_home_sane \"\$_tp_oc_user\" \"\$_tp_user_dir\"" "$3"' _ "$UPDATE" "$CONFIG" "$TUIPLUGIN"
 check "gates: config.sh git_config_apply chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$(dirname \"\$target\")\"" "$1"' _ "$CONFIG"
 check "gates: uninstall.sh plugin-removal chain gate" \

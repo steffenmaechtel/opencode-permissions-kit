@@ -75,6 +75,7 @@ jobs:
               ./files/opencode-permissions-kit-lib/management/status.sh \
               ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode \
               ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh \
+                   ./files/opencode-permissions-kit-lib/sh/render-agent-config.sh \
               ./files/opencode-permissions-kit-lib/sh/ui.sh \
               ./files/opencode-permissions-kit-lib/sh/advisories.sh \
               ./files/opencode-permissions-kit-lib/sh/shell-warn.sh \
@@ -90,6 +91,7 @@ jobs:
               ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
               ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
               ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/tui-plugin.sh \
               ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
               ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
               ./files/opencode-permissions-kit-lib/bin/browser-bridge \
