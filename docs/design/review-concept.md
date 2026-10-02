@@ -55,6 +55,23 @@ Two consequences:
   especially robustness fixes — introduce their own bug class. Never skip
   the wave review after a semantics-changing wave.
 
+## Who records what — snapshot, fix commit, resolution, index
+
+Four places carry review knowledge, each with exactly one job (the 0.0.41
+chain blurred them — dispositions front-ran into index rows and snapshot
+prose, and the resolution became a retroactive reconstruction; the roles
+below are the learning codified):
+
+| Place | Records | Mutability |
+|---|---|---|
+| Snapshot (`YYYY-MM-DD-v<VERSION>.md`) | **what was found** — findings as reported, with IDs | immutable after the fact; only the `> Resolution:` pointer may be added |
+| Fix commit (message) | **what was done** — the change itself, finding IDs referenced qualified (`0.0.41f C1`) | git history |
+| Resolution (`…-resolution.md`) | **why + SHA** — the authoritative per-finding disposition (implemented / implemented differently / deliberately not done) and the rationale; grows one row per fix AS the chain runs | live during the chain, final at PR |
+| README index row | one-line summary + links | may be updated anytime |
+
+The resolution is the ledger the next review starts from — an index row
+that carries SHAs is a summary, not a substitute (README rule 4).
+
 ## Verification duty (main agent)
 
 Every reviewer-agent finding is re-verified against the code before it

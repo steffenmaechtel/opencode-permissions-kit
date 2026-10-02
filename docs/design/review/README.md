@@ -31,10 +31,19 @@ which scope (full vs diff) and the loop's stop rule:
    - *implemented* — with the commit SHA that carries it
    - *implemented differently* — with what changed on the way and why
    - *deliberately not done* — with the rationale
-4. **Follow-ups the implementation itself required** (a fix that regressed
+4. **The resolution grows WITH the chain, not after it** (learning from
+   the 0.0.41 chain, where the resolution was reconstructed at the end
+   while dispositions had already front-run into index rows, snapshot
+   prose and commit messages): the resolution file is created with the
+   FIRST fix commit of a chain and gains one row per disposition as the
+   fix lands. Contemporaneous rows cost seconds; a retroactive
+   reconstruction re-derives SHAs and rationales that were current
+   minutes ago and invites drift. The README index row stays a
+   one-line summary — it never substitutes for the resolution.
+5. **Follow-ups the implementation itself required** (a fix that regressed
    something the review could not see, and its fix) are recorded in the
    resolution — they are expected reading for the next review.
-5. Resolutions reference commits, not branch names or issue numbers alone —
+6. Resolutions reference commits, not branch names or issue numbers alone —
    the SHA survives rebases of everything else.
 
 ## Process
