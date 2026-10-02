@@ -166,8 +166,10 @@ ddev_devowned_flag() {
 # /etc/opencode-permissions-kit/handover/ and anything doubtful (missing
 # stamp, any field mismatch) falls back to the full scan. Invalidated by
 # design on: user/group/dev-user re-base, dev-owned toggles,
-# scan-algorithm changes (bump the rev), and new or re-registered roots
-# (no stamp yet). The explicit paths (install, --refresh, config
+# scan-algorithm changes (bump the rev), and new roots (no stamp yet —
+# a REMOVED root's orphaned stamp is never consulted again, and projects
+# add always scans + re-stamps, so re-registered roots cannot skip on a
+# stale pass). The explicit paths (install, --refresh, config
 # refresh / handover / projects add) always scan and re-stamp.
 # OPK_HANDOVER_STAMP_DIR overrides the directory for tests.
 
