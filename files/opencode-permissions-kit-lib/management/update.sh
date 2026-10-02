@@ -55,7 +55,6 @@ _TMP_REGISTRY=""
 _tmp_track() { _TMP_REGISTRY="$_TMP_REGISTRY $1"; }
 cleanup() {
     if [ -n "${_FETCH_TREE:-}" ]; then rm -rf "$_FETCH_TREE"; fi
-    if [ -n "${SUDO_TMP:-}" ]; then rm -f "$SUDO_TMP"; fi
     if [ -n "${_BIN_TMP:-}" ]; then rm -rf "$_BIN_TMP"; fi
     # word splitting intended: registry entries are mktemp paths
     # shellcheck disable=SC2086
@@ -138,6 +137,8 @@ opencode-permissions-kit-lib/bin/opk \
 opencode-permissions-kit-lib/py/jsonc-parser.py \
 opencode-permissions-kit-lib/py/tui-register.py \
 opencode-permissions-kit-lib/sh/log.sh \
+opencode-permissions-kit-lib/sh/render-agent-config.sh \
+opencode-permissions-kit-lib/sh/tui-plugin.sh \
 opencode-permissions-kit-lib/sh/ui.sh \
 opencode-permissions-kit-lib/sh/advisories.sh \
 opencode-permissions-kit-lib/sh/shell-warn.sh \
@@ -152,6 +153,9 @@ opencode-permissions-kit-lib/bin/ddev-migrate \
 opencode-permissions-kit-lib/sh/ddev-hosts.sh \
 opencode-permissions-kit-lib/sh/fs-baseline.sh \
 opencode-permissions-kit-lib/sh/staged-write.sh \
+opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+opencode-permissions-kit-lib/sh/secure-binary.sh \
+opencode-permissions-kit-lib/sh/deploy-lib.sh \
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
 opencode-permissions-kit-lib/bin/browser-bridge \
 opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -343,6 +347,46 @@ done
 # staged_write itself.
 command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
 
+# Shared sudoers pipeline (render + visudo validation + install): one
+# implementation for install.sh, config.sh and update.sh. Same lookup
+# order as staged-write.sh.
+_sdl=""
+for _sdl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"; do
+    if [ -f "$_sdl_cand" ]; then . "$_sdl_cand"; _sdl="$_sdl_cand"; break; fi
+done
+[ -n "$_sdl" ] \
+    || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
+
+# Shared binary hardening (chown root:<group> best-effort + the
+# load-bearing chmod 750, fail-loud): one implementation for
+# install.sh and update.sh. Same lookup order as staged-write.sh.
+_sbl=""
+for _sbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/secure-binary.sh" "$LIBDIR/sh/secure-binary.sh"; do
+    if [ -f "$_sbl_cand" ]; then . "$_sbl_cand"; _sbl="$_sbl_cand"; break; fi
+done
+[ -n "$_sbl" ] \
+    || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
+
+# Shared library deployment manifest (what ships into $LIBDIR, from
+# ONE list — install.sh deploys through it too). Same lookup order as
+# staged-write.sh.
+_dll=""
+for _dll_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/deploy-lib.sh" "$LIBDIR/sh/deploy-lib.sh"; do
+    if [ -f "$_dll_cand" ]; then . "$_dll_cand"; _dll="$_dll_cand"; break; fi
+done
+[ -n "$_dll" ] \
+    || lib_deploy() { echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2; return 1; }
+
+# Shared TUI 2.x plugin registration (per-user plugin-dir sync): one
+# implementation for update.sh's sync_tui_registration and install.sh
+# Step 8c. Same lookup order as staged-write.sh.
+_tpl=""
+for _tpl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/tui-plugin.sh" "$LIBDIR/sh/tui-plugin.sh"; do
+    if [ -f "$_tpl_cand" ]; then . "$_tpl_cand"; _tpl="$_tpl_cand"; break; fi
+done
+[ -n "$_tpl" ] \
+    || tui_plugin_sync_user() { echo "error: tui_plugin_sync_user unavailable (tui-plugin.sh missing)" >&2; return 1; }
+
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
 INSTALLED_VERSION=""
@@ -498,75 +542,13 @@ if [ "$ONLY_BINARY" != true ]; then
 # --- re-deploy library files (skipped by --only-binary) ------------------------
 
 ui_section "Re-deploying library files"
-sudo mkdir -p "$LIBDIR/bin" "$LIBDIR/sh" "$LIBDIR/py" "$LIBDIR/tui" "$LIBDIR/management" "$LIBDIR/templates"
 
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/opencode-as-opencode" "$LIBDIR/bin/opencode-as-opencode"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/opk"                "$LIBDIR/bin/opk"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/py/jsonc-parser.py"    "$LIBDIR/py/jsonc-parser.py"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/py/tui-register.py"    "$LIBDIR/py/tui-register.py"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/log.sh"             "$LIBDIR/sh/log.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ui.sh"              "$LIBDIR/sh/ui.sh"
-# known security advisories (issue #107): sourced by the wrapper (local
-# check on every start) and status.sh (upstream diff).
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/advisories.sh"      "$LIBDIR/sh/advisories.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/shell-warn.sh"      "$LIBDIR/sh/shell-warn.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/config.sh" \
-       "$LIBDIR/management/config.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/update.sh" \
-       "$LIBDIR/management/update.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/status.sh" \
-       "$LIBDIR/management/status.sh"
-# sudoers.template: needed by the installed config.sh for backend switches
-# (render_sudoers looks in $LIBDIR/templates first).
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" \
-       "$LIBDIR/templates/sudoers.template"
-sudo chmod 440 "$LIBDIR/templates/sudoers.template"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode.jsonc" \
-       "$LIBDIR/templates/opencode.jsonc"
-# Same deploy set as install.sh (0.0.38 C19): without this line the deny-all
-# template in $LIBDIR/templates/ went stale on every opk update.
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" \
-       "$LIBDIR/templates/opencode-deny-all.jsonc"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/management/uninstall.sh" \
-       "$LIBDIR/management/uninstall.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/socket-check" "$LIBDIR/bin/socket-check"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/cwd-check" "$LIBDIR/bin/cwd-check"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-terminal.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-as-opencode" "$LIBDIR/bin/ddev-as-opencode"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-migrate.sh"  "$LIBDIR/sh/ddev-migrate.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/ddev-migrate"    "$LIBDIR/bin/ddev-migrate"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh"  "$LIBDIR/sh/fs-baseline.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-hosts.sh"    "$LIBDIR/sh/ddev-hosts.sh"
-# browser-bridge stand-in source (deploys into the wsl/ tree; source of
-# 'opk wsl-add-opencode-1-fix' re-runs)
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/bin/browser-bridge" "$LIBDIR/bin/browser-bridge"
-# WSL browser bridge (issues #91, #100): the deploy helper joins the
-# library; the stand-in tree + /etc/wsl.conf comment block are (re)applied
-# below after the library is in place.
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"
-# TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md): plugin + templates.
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/opencode-danger.theme.json" \
-       "$LIBDIR/tui/opencode-danger.theme.json"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui.json" "$LIBDIR/tui/tui.json"
-sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/tui-danger.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 644 "$LIBDIR/sh/ddev-terminal.sh" "$LIBDIR/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-migrate.sh" \
-               "$LIBDIR/sh/ddev-hosts.sh" "$LIBDIR/sh/fs-baseline.sh" "$LIBDIR/sh/staged-write.sh" \
-               "$LIBDIR/sh/wsl-browser-bridge.sh"
-sudo chmod 644 "$LIBDIR/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode-2x.tsx" "$LIBDIR/tui/opencode-danger.theme.json" \
-               "$LIBDIR/tui/tui.json" "$LIBDIR/tui/tui-danger.json"
-sudo chmod 755 "$LIBDIR/py/tui-register.py"
-sudo chmod 755 "$LIBDIR/bin/opencode-as-opencode" "$LIBDIR/bin/opk" "$LIBDIR/py/jsonc-parser.py" \
-               "$LIBDIR/sh/log.sh" "$LIBDIR/sh/ui.sh" "$LIBDIR/sh/advisories.sh" \
-               "$LIBDIR/sh/shell-warn.sh" "$LIBDIR/bin/setup-container-backend" \
-               "$LIBDIR/management/config.sh" "$LIBDIR/management/update.sh" \
-               "$LIBDIR/management/status.sh" "$LIBDIR/management/uninstall.sh" \
-               "$LIBDIR/bin/socket-check" "$LIBDIR/bin/cwd-check" "$LIBDIR/bin/ddev-as-opencode" \
-               "$LIBDIR/bin/ddev-migrate" "$LIBDIR/bin/browser-bridge"
+# Deploy via the shared manifest (sh/deploy-lib.sh): the single source
+# of truth for what ships into $LIBDIR — layout, file set and modes
+# live there, enforced against the fetch lists by test-kit-files. The
+# browser-bridge stand-in tree + wsl.conf carrier are re-applied below,
+# after the library is in place.
+lib_deploy "$FILES_ROOT" "$LIBDIR"
 
 # --- old-layout cleanup (0.0.29 streamline, docs/design/streamline.md §5) --------
 # Remove the union of pre-0.0.29 deployed paths after the new layout is in
@@ -620,31 +602,19 @@ ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy
 
 # --- re-deploy sudoers -------------------------------------------------------
 
-sudo mkdir -p "$CONFDIR"
-
+# Shared pipeline (sh/sudoers-deploy.sh): charset gate, render, visudo
+# validation BEFORE anything is deployed, install mode 440, sudoers.d
+# link, legacy-name cleanup.
 if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ]; then
-    # The username is sed-interpolated into sudoers — reject exotic names
-    # (e.g. a manually edited install.conf) before they corrupt the syntax.
-    case "$DEFAULT_USER" in
-        *[!A-Za-z0-9_.-]*|'') die "invalid DEFAULT_USER '$DEFAULT_USER' in install.conf" ;;
-    esac
-    SUDO_TMP=$(mktemp)
-    sed -e "s/DEFAULT_USER/$DEFAULT_USER/g" \
-        "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" > "$SUDO_TMP"
-    # Validate the RENDERED file before deploying anything: a broken file
-    # in /etc/sudoers.d makes sudo itself refuse to run (0.0.38 S1).
-    if ! sudo /usr/sbin/visudo -c -f "$SUDO_TMP" >/dev/null 2>&1; then
-        rm -f "$SUDO_TMP"
-        die "sudoers template failed validation — nothing was re-deployed (user '$DEFAULT_USER')."
-    fi
-    sudo cp "$SUDO_TMP" "$CONFDIR/sudoers"
-    sudo chmod 440 "$CONFDIR/sudoers"
-    rm -f "$SUDO_TMP"
-    sudo ln -sf "$CONFDIR/sudoers" /etc/sudoers.d/opencode-permissions-kit
-    # Remove the pre-0.0.10 sudoers symlink so only the new name is active.
-    sudo rm -f /etc/sudoers.d/opencode 2>/dev/null || true
+    sudoers_deploy "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" "$DEFAULT_USER" \
+        || die "sudoers re-deploy failed — nothing was re-deployed (user '$DEFAULT_USER')."
     ui_success "sudoers re-deployed + validated (DEFAULT_USER=$DEFAULT_USER)"
     log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
+else
+    # Conservative skip (0.0.41f S2): the existing validated sudoers stays
+    # active — near-unreachable (fetch list + heal guarantee the file),
+    # but the skip must not be silent.
+    log "sudoers re-deploy skipped: template missing from $FILES_ROOT (existing sudoers kept)"
 fi
 
 # --- re-deploy umask profile -------------------------------------------------
@@ -802,12 +772,14 @@ SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 # root:$BINARY_GROUP mode 750 lets the opencode user run the binary and
 # keeps unrelated users out — but it is NOT a developer-side bypass guard:
 # the developer is in the sharing group and CAN exec this path directly;
-# the soft layer (deny-all config + warnings) is what deters that, per
-# the kit's declared model.
+# the soft layer (deny-all config + warnings) is what deters that, per the
+# kit's declared model. Shared fail-loud helper (was a silent `|| true`
+# pair here — a failed re-assert continued the update with an unsecured
+# binary, the exact 0.0.39e C4 shape).
 BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 if [ -x "$SYSTEM_BIN" ]; then
-    sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
-    sudo chmod 750 "$SYSTEM_BIN" 2>/dev/null || true
+    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" \
+        || die "cannot re-secure $SYSTEM_BIN — update aborted."
 fi
 
 # Detect the opencode release target for this host (mirrors the official
@@ -853,8 +825,7 @@ install_binary() {
     sudo pkill -u "$OPENCODE_USER" -f "serve --servic[e]" >/dev/null 2>&1 || true
     current=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     sudo cp "$src" "$SYSTEM_BIN" || return 1
-    sudo chown "root:$BINARY_GROUP" "$SYSTEM_BIN" 2>/dev/null || true
-    sudo chmod 750 "$SYSTEM_BIN" || return 1
+    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" || return 1
     new=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     # Re-stamp the major so the wrapper's 2.x --standalone gating follows
     # the binary ("opencode v2..." -> 2, anything else -> 1).
@@ -975,40 +946,24 @@ sync_tui_registration() {
                          "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
         _str_user_dir="${_str_dir_user%%:*}"
         _str_dir_owner="${_str_dir_user#*:}"
-        # Chain gate (review 0.0.39h F2): the gates below check plugins/
-        # and the plugin dir, but the PARENT chain of the config dir is
-        # agent-replaceable too (the agent side) — a linked parent passes
-        # `sudo mkdir -p` silently and redirects the mkdir/ln/chown/rm AND
-        # the tui-register run below through it. The walker no-ops outside
-        # the agent home (the developer side is trusted).
-        if ! agent_home_sane "$OPENCODE_USER" "$_str_user_dir"; then
-            log "tui plugin registration skipped: symlink in the chain to $_str_user_dir (user-managed)"
-            continue
-        fi
-        # 0.0.39g S1 class: the opencode user's config dir is agent-owned.
-        # A planted symlink at plugins/ (or the plugin dir itself) must
-        # never be followed — mkdir -p would create through it, chown
-        # dereferences the operand (arbitrary chown to the agent), and
-        # rm -rf would delete through it. Skip loudly instead.
-        if [ -L "$_str_user_dir/plugins" ] || [ -L "$_str_user_dir/plugins/opencode-permissions-kit" ]; then
-            log "tui plugin registration skipped: $_str_user_dir/plugins is a symlink (user-managed)"
-            continue
-        fi
-        if [ "$_str_major" = 2 ]; then
-            sudo mkdir -p "$_str_user_dir/plugins/opencode-permissions-kit"
-            sudo ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
-            sudo chown "$_str_dir_owner:$NEW_OPENCODE_GROUP" "$_str_user_dir/plugins" \
-                "$_str_user_dir/plugins/opencode-permissions-kit" 2>/dev/null || true
-            sudo chown -h "$_str_dir_owner:$NEW_OPENCODE_GROUP" \
-                "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
-            log "tui mode registered for 2.x: $_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"
+        # Shared per-user sync (sh/tui-plugin.sh): chain gate, plugins
+        # gate, plugin dir + symlink + chowns, inert-entry unregister.
+        # Skips (rc 2/3) are logged by the helper; rc 1 dies (the old
+        # inline body aborted via set -e, now with a message). The
+        # explicit if/fi (0.0.41f C1) keeps skip rcs from leaking as the
+        # loop's last status — a bare `[ … ] && die` tail would return 1
+        # and silently abort the whole update via set -e AFTER it applied.
+        if tui_plugin_sync_user "$_str_major" "$_str_user_dir" "$_str_dir_owner" \
+            "$NEW_OPENCODE_GROUP" "$LIBDIR" "$OPENCODE_USER"; then
+            :
         else
-            sudo rm -rf "$_str_user_dir/plugins/opencode-permissions-kit"
-            log "tui mode 2.x registration removed: $_str_user_dir/plugins/opencode-permissions-kit"
+            _str_tps_rc=$?
+            if [ "$_str_tps_rc" -eq 1 ]; then
+                die "TUI plugin registration failed for $_str_user_dir"
+            fi
         fi
-        sudo python3 "$LIBDIR/py/tui-register.py" "$_str_user_dir/cli.json" unregister \
-            "$LIBDIR/tui/kit-mode-2x.tsx" --drop "$LIBDIR/tui/kit-mode.tsx" >/dev/null 2>&1 || true
     done
+    return 0
 }
 
 if [ "$BINARY_UPDATE" = true ]; then

@@ -25,8 +25,10 @@ pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
 fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 
 extract_fn() {
-    # print project_path_sane() { ... } from a script
-    sed -n '/^project_path_sane() {/,/^}/p' "$1"
+    # print project_path_sane() { ... } from a script — indent-tolerant
+    # since 0.0.41g (install.sh's copy is nested in do_plan_phase at +4)
+    sed -n '/^[[:space:]]*project_path_sane() {/,/^[[:space:]]*}/p' "$1" \
+        | sed 's/^[[:space:]]*//'
 }
 
 # Sanity: the function exists in BOTH scripts (policy drift = test failure)
@@ -38,13 +40,14 @@ for f in "$INSTALL" "$CONFIG"; do
     fi
 done
 
-# The two copies must stay byte-identical: the duplication is deliberate
-# (install.sh cannot source config.sh's copy — streamed installs have no
-# siblings yet), so drift must be caught here, not on a user's machine.
+# The two copies must stay content-identical (compared indent-normalized
+# since 0.0.41g): the duplication is deliberate (install.sh cannot source
+# config.sh's copy — streamed installs have no siblings yet), so drift
+# must be caught here, not on a user's machine.
 if [ "$(extract_fn "$INSTALL")" = "$(extract_fn "$CONFIG")" ]; then
     pass "project_path_sane identical in install.sh and config.sh"
 else
-    fail "project_path_sane drifted between install.sh and config.sh (keep the copies byte-identical)"
+    fail "project_path_sane drifted between install.sh and config.sh (keep the copies content-identical)"
 fi
 
 # Load the policy from install.sh

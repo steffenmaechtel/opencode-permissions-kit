@@ -19,6 +19,7 @@ FUNC="$FILES/opencode-permissions-kit-lib/sh/ddev-terminal.sh"
 KIT="$FILES/opencode-permissions-kit-lib/bin/opk"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
+DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
@@ -227,12 +228,12 @@ check "hook preserves ddev's exit code" \
 
 check "install.sh fetch list includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$INSTALL"
-check "install.sh deploys ddev-hosts.sh" \
-    sh -c "grep -q '\"\$LIBDIR/sh/ddev-hosts.sh\"' \"\$1\"" _ "$INSTALL"
+check "install.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
 check "update.sh KIT_FILES includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$UPDATE"
-check "update.sh deploys ddev-hosts.sh" \
-    sh -c "grep -q '\"\$LIBDIR/sh/ddev-hosts.sh\"' \"\$1\"" _ "$UPDATE"
+check "update.sh deploys ddev-hosts.sh (lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE" "$DEPLOYLIB"
 check "status.sh reports missing Windows hostnames" \
     sh -c "grep -q 'hosts (win)' \"\$1\"" _ "$STATUS"
 check "status.sh scan prunes vendor dirs (issue #21)" \

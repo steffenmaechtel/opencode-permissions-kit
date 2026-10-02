@@ -133,6 +133,9 @@ jobs:
                    ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh \
                    ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-update-flags.sh \
                    ./tests/unit/test-release.sh ./tests/unit/test-fs-baseline.sh ./tests/unit/test-staged-write.sh \
+                   ./tests/unit/test-sudoers-deploy.sh \
+                   ./tests/unit/test-secure-binary.sh \
+                   ./tests/unit/test-deploy-lib.sh \
                    ./tests/unit/test-browser-bridge.sh ./tests/unit/test-e2e-sources.sh \
                    ./tests/unit/test-security-advisories.sh ./tests/unit/test-log.sh \
                    ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
@@ -143,6 +146,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/management/status.sh \
                    ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode \
                    ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh \
+                   ./files/opencode-permissions-kit-lib/sh/render-agent-config.sh \
                    ./files/opencode-permissions-kit-lib/sh/ui.sh \
                    ./files/opencode-permissions-kit-lib/sh/advisories.sh \
                    ./files/opencode-permissions-kit-lib/sh/shell-warn.sh \
@@ -156,6 +160,10 @@ jobs:
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
+                   ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+                   ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/tui-plugin.sh \
+                   ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
                    ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
                    ./files/opencode-permissions-kit-lib/bin/browser-bridge \
                    ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -213,7 +221,10 @@ jobs:
                    ./tests/unit/test-kit-cli.sh ./tests/unit/test-project-paths.sh ./tests/unit/test-workflows.sh \
                    ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh \
                    ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-fs-baseline.sh \
-                   ./tests/unit/test-staged-write.sh ./tests/unit/test-browser-bridge.sh \
+                   ./tests/unit/test-staged-write.sh ./tests/unit/test-sudoers-deploy.sh \
+                   ./tests/unit/test-secure-binary.sh \
+                   ./tests/unit/test-deploy-lib.sh \
+                   ./tests/unit/test-browser-bridge.sh \
                    ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
                    ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
                    ./tests/unit/test-string-continuations.sh \
@@ -223,6 +234,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/management/status.sh \
                    ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode \
                    ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh \
+                   ./files/opencode-permissions-kit-lib/sh/render-agent-config.sh \
                    ./files/opencode-permissions-kit-lib/sh/ui.sh \
                    ./files/opencode-permissions-kit-lib/sh/advisories.sh \
                    ./files/opencode-permissions-kit-lib/sh/shell-warn.sh \
@@ -236,6 +248,10 @@ jobs:
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
+                   ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+                   ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/tui-plugin.sh \
+                   ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
                    ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
                    ./files/opencode-permissions-kit-lib/bin/browser-bridge \
                    ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -311,6 +327,9 @@ jobs:
                    ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh \
                    ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-update-flags.sh \
                    ./tests/unit/test-release.sh ./tests/unit/test-fs-baseline.sh ./tests/unit/test-staged-write.sh \
+                   ./tests/unit/test-sudoers-deploy.sh \
+                   ./tests/unit/test-secure-binary.sh \
+                   ./tests/unit/test-deploy-lib.sh \
                    ./tests/unit/test-browser-bridge.sh ./tests/unit/test-e2e-sources.sh \
                    ./tests/unit/test-security-advisories.sh ./tests/unit/test-log.sh \
                    ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
@@ -321,6 +340,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/management/status.sh \
                    ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode \
                    ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh \
+                   ./files/opencode-permissions-kit-lib/sh/render-agent-config.sh \
                    ./files/opencode-permissions-kit-lib/sh/ui.sh \
                    ./files/opencode-permissions-kit-lib/sh/advisories.sh \
                    ./files/opencode-permissions-kit-lib/sh/shell-warn.sh \
@@ -334,6 +354,10 @@ jobs:
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
+                   ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+                   ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/tui-plugin.sh \
+                   ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
                    ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
                    ./files/opencode-permissions-kit-lib/bin/browser-bridge \
                    ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \
@@ -403,7 +427,10 @@ jobs:
                    ./tests/unit/test-kit-cli.sh ./tests/unit/test-project-paths.sh ./tests/unit/test-workflows.sh \
                    ./tests/unit/test-install-args.sh ./tests/unit/test-kit-files.sh ./tests/unit/test-tui-mode.sh \
                    ./tests/unit/test-uninstall.sh ./tests/unit/test-status.sh ./tests/unit/test-fs-baseline.sh \
-                   ./tests/unit/test-staged-write.sh ./tests/unit/test-browser-bridge.sh \
+                   ./tests/unit/test-staged-write.sh ./tests/unit/test-sudoers-deploy.sh \
+                   ./tests/unit/test-secure-binary.sh \
+                   ./tests/unit/test-deploy-lib.sh \
+                   ./tests/unit/test-browser-bridge.sh \
                    ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
                    ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./files/install.sh ./files/etc/umask.sh \
                    ./tests/unit/test-string-continuations.sh \
@@ -413,6 +440,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/management/status.sh \
                    ./files/opencode-permissions-kit-lib/bin/opencode-as-opencode \
                    ./files/opencode-permissions-kit-lib/bin/opk ./files/opencode-permissions-kit-lib/sh/log.sh \
+                   ./files/opencode-permissions-kit-lib/sh/render-agent-config.sh \
                    ./files/opencode-permissions-kit-lib/sh/ui.sh \
                    ./files/opencode-permissions-kit-lib/sh/advisories.sh \
                    ./files/opencode-permissions-kit-lib/sh/shell-warn.sh \
@@ -426,6 +454,10 @@ jobs:
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
+                   ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+                   ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
+                   ./files/opencode-permissions-kit-lib/sh/tui-plugin.sh \
+                   ./files/opencode-permissions-kit-lib/sh/deploy-lib.sh \
                    ./files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
                    ./files/opencode-permissions-kit-lib/bin/browser-bridge \
                    ./files/opencode-permissions-kit-lib/tui/kit-mode.tsx \

@@ -18,6 +18,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 KIT="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
+TUIPLUGIN="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 CLI_MD="$SCRIPT_DIR/../../docs/reference/cli.md"
 
 failures=0
@@ -290,7 +291,7 @@ check "resolve: latest-version resolution guards the requested major" \
 check "resolve: 2.x channel is the npm registry (with scope fallback)" \
     sh -c "grep -q 'registry.npmjs.org/@opencode/cli-' \"\$1\" && grep -q 'registry.npmjs.org/@opencode-ai/cli-' \"\$1\"" _ "$UPDATE"
 check "tui: registration flips with the major (sync function, both directions)" \
-    sh -c "grep -q '^sync_tui_registration() {' \"\$1\" && grep -q 'if \[ \"\$_str_major\" = 2 \]' \"\$1\" && grep -q 'rm -rf \"\$_str_user_dir/plugins/opencode-permissions-kit\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q '^sync_tui_registration() {' \"\$1\" && grep -q 'tui_plugin_sync_user \"\$_str_major\"' \"\$1\" && grep -qF 'rm -rf \"\$_tp_user_dir/plugins/opencode-permissions-kit\"' \"\$2\"" _ "$UPDATE" "$TUIPLUGIN"
 check "tui: a major flip re-anchors the registration even in --only-binary runs" \
     sh -c "grep -n 'sync_tui_registration \"\$_maj_after\"' \"\$1\" | head -1 | cut -d: -f1 | grep -q ." _ "$UPDATE"
 

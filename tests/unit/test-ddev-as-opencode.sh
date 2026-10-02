@@ -28,6 +28,7 @@ SUDOERS="$FILES/opencode-permissions-kit-lib/templates/sudoers.template"
 INSTALL="$FILES/install.sh"
 UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 CONFIG="$FILES/opencode-permissions-kit-lib/management/config.sh"
+DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 KIT="$FILES/opencode-permissions-kit-lib/bin/opk"
 HANDOVER="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 # Hermetic dev-owned checks: never read this machine's real install.conf
@@ -399,10 +400,10 @@ check "template still parses cleanly with the new rules" \
 # --- 5. install.sh wiring ------------------------------------------------------
 check "install.sh fetches both new files (fetch_kit list)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$INSTALL"
-check "install.sh deploys the function file" \
-    sh -c "grep -q '\"\$LIBDIR/sh/ddev-terminal.sh\"' \"\$1\"" _ "$INSTALL"
-check "install.sh deploys the helper (mode 755)" \
-    sh -c "grep -q '\"\$LIBDIR/bin/ddev-as-opencode\"' \"\$1\"" _ "$INSTALL"
+check "install.sh deploys the function file (lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
+check "install.sh deploys the helper (mode 755, lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh hooks the function into the developer rc files" \
     sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh hooks use the [ -f ] uninstall-safe guard" \
@@ -415,10 +416,10 @@ check "update.sh KIT_FILES includes both new files" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh' \"\$1\" && grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$UPDATE"
 check "update.sh KIT_FILES includes the handover helper" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-handover.sh' \"\$1\"" _ "$UPDATE"
-check "update.sh deploys the function file" \
-    sh -c "grep -q '\"\$LIBDIR/sh/ddev-terminal.sh\"' \"\$1\"" _ "$UPDATE"
-check "update.sh deploys the helper (mode 755)" \
-    sh -c "grep -q '\"\$LIBDIR/bin/ddev-as-opencode\"' \"\$1\"" _ "$UPDATE"
+check "update.sh deploys the function file (lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-terminal.sh 644' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE" "$DEPLOYLIB"
+check "update.sh deploys the helper (mode 755, lib_deploy manifest)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"' \"\$1\"" _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh heals the rc-file hook idempotently" \
     sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$UPDATE"
 check "update.sh runs the ddev handover unconditionally" \

@@ -2,12 +2,18 @@
 # test-line-length.sh -- line-length ratchet over the shipped scripts and
 # the CI workflows.
 #
-# Target limit: 120 (pragmatic shell upper bound -- 80 is artificially
-# narrow with long flags, paths and --option=value constructs). The tree
-# is NOT there yet: at adoption (2026-10-01) the shipped files carried
-# ~207 lines over 120 in 18 files, and every workflow chmod inventory
-# line is a 2k+ chars single line. A hard limit would fail on the spot,
-# so this is a RATCHET:
+# Target limit: 120 CONTENT columns (pragmatic shell upper bound -- 80 is
+# artificially narrow with long flags, paths and --option=value
+# constructs). The metric strips leading whitespace first (0.0.41a F4):
+# indentation is structure, not content -- punishing nesting depth with
+# reflows puts pressure on exactly the wrapped-string spots that have a
+# documented bug history (0.0.39o C1: spaces lost at adjacent-string
+# wraps when lines were re-broken for width). Content-width keeps the
+# ratchet's growth guarantee while making (re-)indentation free.
+# The tree is NOT at zero either way: at adoption (2026-10-01) the
+# shipped files carried ~207 lines over 120 in 18 files, and every
+# workflow chmod inventory line is a 2k+ chars single line. A hard limit
+# would fail on the spot, so this is a RATCHET:
 #
 #   - the baseline file next to this test records, per file, the SUM of
 #     characters beyond the limit and the COUNT of offending lines,
@@ -22,7 +28,11 @@
 #
 # Metric note: awk's length() counts bytes in the C locale -- em-dashes
 # and friends count their UTF-8 bytes. That is fine here: the ratchet
-# only ever compares like with like.
+# only ever compares like with like. The leading-whitespace strip is
+# applied in ALL three measurements (baseline regen, growth check,
+# trend) so the metric is consistent everywhere; the baseline was
+# regenerated for the metric switch (deliberate, diff-reviewed --
+# entries can only shrink or vanish, never grow).
 #
 # Scope: files/**/*.sh (incl. files/etc/umask.sh and files/install.sh),
 # the extensionless shell under files/opencode-permissions-kit-lib/bin/,
@@ -48,7 +58,8 @@ if [ "${1:-}" = "--regen" ]; then
         find .github/workflows -name '*.yml' -type f
     } | sort -u | while IFS= read -r f; do
         awk -v lim="$LIMIT" -v f="$f" \
-            'length > lim { s += length - lim; c++ }
+            '{ sub(/^[[:space:]]+/, "") }
+             length > lim { s += length - lim; c++ }
              END { if (s > 0) printf "%s %d %d\n", f, s, c }' "$f"
     done > "$BASELINE"
     echo "baseline regenerated: $(wc -l < "$BASELINE" | tr -d ' ') entries -> $BASELINE"
@@ -68,7 +79,8 @@ trap 'rm -f "$TMP_CUR"' EXIT
     find .github/workflows -name '*.yml' -type f
 } | sort -u | while IFS= read -r f; do
     awk -v lim="$LIMIT" -v f="$f" \
-        'length > lim { s += length - lim; c++ }
+        '{ sub(/^[[:space:]]+/, "") }
+         length > lim { s += length - lim; c++ }
          END { if (s > 0) printf "%s %d %d\n", f, s, c }' "$f"
 done > "$TMP_CUR"
 
@@ -104,7 +116,8 @@ trend=$({
     find files -name '*.sh' -type f
     find files/opencode-permissions-kit-lib/bin -type f
     find .github/workflows -name '*.yml' -type f
-} | sort -u | xargs awk -v lim="$TREND" 'length > lim { c++ } END { print c + 0 }')
+} | sort -u | xargs awk -v lim="$TREND" \
+    '{ sub(/^[[:space:]]+/, "") } length > lim { c++ } END { print c + 0 }')
 over=$(awk '{ n += $3 } END { print n + 0 }' "$TMP_CUR")
 
 if [ "$rc" -ne 0 ]; then

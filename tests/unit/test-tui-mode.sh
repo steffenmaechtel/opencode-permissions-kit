@@ -22,6 +22,8 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+TUIPLUGIN="$REPO/files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
+STAGEDWRITE="$REPO/files/opencode-permissions-kit-lib/sh/staged-write.sh"
 TUIDIR="$REPO/files/opencode-permissions-kit-lib/tui"
 PLUGIN="$TUIDIR/kit-mode.tsx"
 THEME="$TUIDIR/opencode-danger.theme.json"
@@ -29,6 +31,7 @@ TUIJSON="$TUIDIR/tui.json"
 TUIDANGER="$TUIDIR/tui-danger.json"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
+DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 
 failures=0
@@ -114,8 +117,8 @@ check_no "plugin never touches the user's theme (no theme.set/install)" \
 # --- install.sh wiring --------------------------------------------------------
 check "install.sh fetch list includes the tui payload" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$INSTALL"
-check "install.sh deploys the plugin to LIBDIR/tui" \
-    grep -q 'cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"' "$INSTALL"
+check "install.sh deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh installs the opencode-user tui.json (marker policy)" \
     grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$INSTALL"
 check "install.sh installs the default-user danger theme" \
@@ -126,8 +129,8 @@ check "install.sh keeps user-managed tui.json (skip branch)" \
 # --- update.sh wiring ---------------------------------------------------------
 check "update.sh KIT_FILES includes the tui payload" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode.tsx' "$UPDATE"
-check "update.sh re-deploys the plugin to LIBDIR/tui" \
-    grep -q 'cp "$FILES_ROOT/opencode-permissions-kit-lib/tui/kit-mode.tsx" "$LIBDIR/tui/kit-mode.tsx"' "$UPDATE"
+check "update.sh re-deploys the plugin to LIBDIR/tui (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode.tsx 644" "$2" && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh refreshes the opencode-user tui.json (marker policy)" \
     grep -q 'grep -q .\"_opencode_permissions_kit\". \"\$OC_TUI_CONF\"' "$UPDATE"
 check "update.sh refreshes the default-user danger theme" \
@@ -172,17 +175,16 @@ check "2x plugin render is defensive (try/catch)" \
     grep -q 'catch' "$PLUGIN2X"
 check "install.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$INSTALL"
-check "install.sh deploys the 2x plugin to LIBDIR/tui" \
-    grep -q 'cp "$SCRIPT_DIR/opencode-permissions-kit-lib/tui/kit-mode-2x.tsx" "$LIBDIR/tui/kit-mode-2x.tsx"' "$INSTALL"
-check "install.sh registers the 2x plugin as a discovered plugin dir (major-gated)" \
-    grep -q 'ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_oc_user_dir/plugins/opencode-permissions-kit/tui.tsx"' "$INSTALL"
-check "install.sh unregisters inert cli.json path entries (2x cleanup)" \
-    grep -q 'tui-register.py" "$_oc_user_dir/cli.json" unregister' "$INSTALL"
+check "install.sh deploys the 2x plugin to LIBDIR/tui (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644" "$2" && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
+check "install.sh registers the 2x plugin as a discovered plugin dir (major-gated, shared helper)" \
+    sh -c 'grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$1" && grep -qF "tui_plugin_sync_user \"\$OPENCODE_MAJOR\"" "$1"' _ "$INSTALL"
+check "install.sh unregisters inert cli.json path entries (2x cleanup, via sh/tui-plugin.sh)" \
+    grep -qF 'tui-register.py" "$_tp_user_dir/cli.json" unregister' "$TUIPLUGIN"
 check "update.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$UPDATE"
 check "update.sh re-registers the 2x plugin dir (major-gated, sync function)" \
-    grep -q 'ln -sfn "$LIBDIR/tui/kit-mode-2x.tsx" "$_str_user_dir/plugins/opencode-permissions-kit/tui.tsx"' "$UPDATE" \
-    && grep -q 'sync_tui_registration "$_oc_major"' "$UPDATE" \
+    sh -c 'grep -qF "tui_plugin_sync_user \"\$_str_major\"" "$1" && grep -q "sync_tui_registration \"\$_oc_major\"" "$1" && grep -qF "sh/tui-plugin.sh" "$1"' _ "$UPDATE" \
     && grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE"
 check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
     grep -q 'plugins/opencode-permissions-kit' "$UNINSTALL" && grep -q 'kit-mode-2x.tsx' "$UNINSTALL"
@@ -190,7 +192,7 @@ check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"
 T2X=$(mktemp -d)
-trap 'rm -rf "$T2X"' EXIT INT TERM
+TUIWORK=""
 check "register: creates minimal cli.json" \
     python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
     && grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"' "$T2X/cli.json"
@@ -239,6 +241,92 @@ check "first-run cli.json has mode 0644" \
     sh -c '[ "$(stat -c %a "$1")" = "644" ]' _ "$T2X/fresh/cli.json"
 check "first-run cli.json parses and carries the plugin entry" \
     sh -c 'python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert any(e.get(\"package\",\"\").endswith(\"kit-mode-2x.tsx\") for e in d[\"plugins\"])" "$1"' _ "$T2X/fresh/cli.json"
+
+# --- shared per-user sync (sh/tui-plugin.sh, 0.0.41e wave) ----------------------
+# tui_plugin_sync_user replaces the twin inline bodies in install.sh
+# Step 8c and update.sh's sync_tui_registration. Runs here as the
+# current user: TR_SUDO wraps sudo with a stub that drops chown (a
+# non-root chown always fails; ownership is asserted by the e2e suites).
+TUIWORK=$(mktemp -d)
+mkdir -p "$TUIWORK/tps/bin"
+cat > "$TUIWORK/tps/bin/sudo-stub" <<'EOF'
+#!/bin/sh
+# test sudo stub: execute everything except chown (unownable as non-root)
+case "$1" in chown) exit 0 ;; esac
+exec "$@"
+EOF
+chmod +x "$TUIWORK/tps/bin/sudo-stub"
+TPS="$TUIWORK/tps/home/oc/.config/opencode"
+mkdir -p "$TPS"
+
+_tps_run() {
+    _tps_desc="$1"; _tps_expect="$2"; shift 2
+    TR_SUDO="$TUIWORK/tps/bin/sudo-stub"
+    OPK_AGENT_HOME="${_tps_ah:-$TUIWORK/tps/home/oc}"
+    export TR_SUDO OPK_AGENT_HOME
+    log() { :; }
+    # shellcheck disable=SC2030,SC2031
+    . "$TUIPLUGIN"
+    # shellcheck disable=SC2030,SC2031
+    . "$STAGEDWRITE"
+    tui_plugin_sync_user "$@" 2>&1
+    echo "rc=$?"
+}
+
+_LIBROOT="$REPO/files/opencode-permissions-kit-lib"
+_tps_out=$(_tps_run "register" 0 2 "$TPS" ocuser ocgroup "$_LIBROOT" opencode)
+case "$_tps_out" in *rc=0*) check "sync 2.x: rc=0 (registered)" true ;; *) check "sync 2.x: rc=0 (got [$_tps_out])" false ;; esac
+check "sync 2.x: plugin dir exists" test -d "$TPS/plugins/opencode-permissions-kit"
+check "sync 2.x: tui.tsx symlink points into the tree" \
+    sh -c '[ "$(readlink "$1/plugins/opencode-permissions-kit/tui.tsx")" = "$2/tui/kit-mode-2x.tsx" ]' _ "$TPS" "$_LIBROOT"
+
+_tps_out=$(_tps_run "remove" 0 1 "$TPS" ocuser ocgroup "$_LIBROOT" opencode)
+case "$_tps_out" in *rc=0*) check "sync 1.x: rc=0 (removed)" true ;; *) check "sync 1.x: rc=0 (got [$_tps_out])" false ;; esac
+check "sync 1.x: plugin dir removed" test ! -e "$TPS/plugins/opencode-permissions-kit"
+
+# chain gate: a symlinked parent chain inside the agent home is skipped
+# (rc 2), never followed (_tps_ah redirects the walker's base)
+mkdir -p "$TUIWORK/tps/ah/real"
+ln -s "$TUIWORK/tps/ah/real" "$TUIWORK/tps/ah/linked"
+_tps_ah="$TUIWORK/tps/ah"
+_tps_out=$(_tps_run "chain-skip" 2 2 "$TUIWORK/tps/ah/linked/.config/opencode" ocuser ocgroup "$_LIBROOT" opencode)
+unset _tps_ah
+case "$_tps_out" in *rc=2*) check "chain gate: rc=2 (user-managed skip)" true ;; *) check "chain gate: rc=2 (got [$_tps_out])" false ;; esac
+
+# plugins-symlink gate: a symlinked plugins/ dir is skipped (rc 3)
+mkdir -p "$TUIWORK/tps/ah/real2/.config/opencode" "$TUIWORK/tps/real-plugins"
+ln -s "$TUIWORK/tps/real-plugins" "$TUIWORK/tps/ah/real2/.config/opencode/plugins"
+_tps_ah="$TUIWORK/tps/ah/real2"
+_tps_out=$(_tps_run "plugins-skip" 3 2 "$TUIWORK/tps/ah/real2/.config/opencode" ocuser ocgroup "$_LIBROOT" opencode)
+unset _tps_ah
+case "$_tps_out" in *rc=3*) check "plugins gate: rc=3 (user-managed skip)" true ;; *) check "plugins gate: rc=3 (got [$_tps_out])" false ;; esac
+
+# hard failure (0.0.41f C5): a failing privileged op returns rc 1 — the
+# path both callers map to die/exit 1. Stub fails mkdir only.
+mkdir -p "$TUIWORK/tps/bin2"
+cat > "$TUIWORK/tps/bin2/sudo-stub" <<'EOF'
+#!/bin/sh
+case "$1" in mkdir) exit 1 ;; esac
+exec "$@"
+EOF
+chmod +x "$TUIWORK/tps/bin2/sudo-stub"
+TPS4="$TUIWORK/tps/home4/oc/.config/opencode"
+mkdir -p "$TPS4"
+_tps_out=$( TR_SUDO="$TUIWORK/tps/bin2/sudo-stub"
+    OPK_AGENT_HOME="$TUIWORK/tps/home4/oc"
+    export TR_SUDO OPK_AGENT_HOME
+    log() { :; }
+    # shellcheck disable=SC2030,SC2031
+    . "$TUIPLUGIN"
+    # shellcheck disable=SC2030,SC2031
+    . "$STAGEDWRITE"
+    tui_plugin_sync_user 2 "$TPS4" ocuser ocgroup "$_LIBROOT" opencode 2>&1; echo "rc=$?" )
+case "$_tps_out" in *rc=1*) check "hard failure: rc=1 (mapped to die/exit at callers)" true ;; *) check "hard failure: rc=1 (got [$_tps_out])" false ;; esac
+check "hard failure: no plugin dir left behind" test ! -e "$TPS4/plugins"
+
+# ONE merged trap (0.0.41f C4): a second EXIT trap would REPLACE the
+# suite's T2X cleanup — chain both scratch dirs.
+trap 'rm -rf "$T2X" "${TUIWORK:-}"' EXIT INT TERM
 
 # --- summary ------------------------------------------------------------------
 echo ""

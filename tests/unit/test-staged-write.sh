@@ -31,6 +31,8 @@ HANDOVER="$REPO/files/opencode-permissions-kit-lib/sh/ddev-handover.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 CONFIG="$REPO/files/opencode-permissions-kit-lib/management/config.sh"
 INSTALL="$REPO/files/install.sh"
+DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
+TUIPLUGIN="$REPO/files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 
 failures=0
 passed=0
@@ -357,12 +359,14 @@ check "C5: install.conf stamp written via temp + mv" \
     sh -c 'grep -qF "_INSTALL_CONF_TMP=" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\"" "$1"' _ "$INSTALL"
 check "wiring: install.sh fetch list carries staged-write.sh" \
     grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \' "$INSTALL"
-check "wiring: install.sh deploys staged-write.sh" \
-    grep -qF 'sudo cp "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"' "$INSTALL"
+check "wiring: install.sh deploys staged-write.sh (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/staged-write.sh 644" "$2" \
+        && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
 check "wiring: update.sh KIT_FILES carries staged-write.sh" \
     grep -qF 'opencode-permissions-kit-lib/sh/staged-write.sh \' "$UPDATE"
-check "wiring: update.sh deploys staged-write.sh" \
-    grep -qF 'sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"' "$UPDATE"
+check "wiring: update.sh deploys staged-write.sh (lib_deploy manifest)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/staged-write.sh 644" "$2" \
+        && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
 check "wiring: config.sh sources staged-write.sh" \
     grep -qF 'for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"' "$CONFIG"
 check "wiring: update.sh tui.json write goes through staged_write" \
@@ -422,11 +426,14 @@ check "gates: install.sh agents-migration operand gate" \
 check "gates: install.sh mkcert chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$caroot\"" "$1"' _ "$INSTALL"
 check "gates: install.sh agent-config + tui + plugin chain gates" \
-    sh -c 'grep -q "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/.config/opencode" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_oc_user_dir\"" "$1"' _ "$INSTALL"
+    sh -c 'grep -q "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/.config/opencode" "$1" \
+        && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" \
+        && grep -qF "kit_source \"\$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh\"" "$1"' _ "$INSTALL"
 check "gates: update.sh sources staged-write.sh early + walker fallback" \
     sh -c 'grep -q "command -v agent_home_sane >/dev/null 2>&1 \|\| agent_home_sane() { return 0; }" "$1"' _ "$UPDATE"
 check "gates: update.sh sync_tui_registration + tui.json chain gates" \
-    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_str_user_dir\"" "$1" && grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1"' _ "$UPDATE"
+    sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$OC_TUI_DIR\"" "$1" \
+        && grep -qF "sh/tui-plugin.sh" "$1" && grep -qF "agent_home_sane \"\$_tp_oc_user\" \"\$_tp_user_dir\"" "$3"' _ "$UPDATE" "$CONFIG" "$TUIPLUGIN"
 check "gates: config.sh git_config_apply chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$(dirname \"\$target\")\"" "$1"' _ "$CONFIG"
 check "gates: uninstall.sh plugin-removal chain gate" \

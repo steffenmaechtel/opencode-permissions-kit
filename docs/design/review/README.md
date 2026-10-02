@@ -31,10 +31,19 @@ which scope (full vs diff) and the loop's stop rule:
    - *implemented* — with the commit SHA that carries it
    - *implemented differently* — with what changed on the way and why
    - *deliberately not done* — with the rationale
-4. **Follow-ups the implementation itself required** (a fix that regressed
+4. **The resolution grows WITH the chain, not after it** (learning from
+   the 0.0.41 chain, where the resolution was reconstructed at the end
+   while dispositions had already front-run into index rows, snapshot
+   prose and commit messages): the resolution file is created with the
+   FIRST fix commit of a chain and gains one row per disposition as the
+   fix lands. Contemporaneous rows cost seconds; a retroactive
+   reconstruction re-derives SHAs and rationales that were current
+   minutes ago and invites drift. The README index row stays a
+   one-line summary — it never substitutes for the resolution.
+5. **Follow-ups the implementation itself required** (a fix that regressed
    something the review could not see, and its fix) are recorded in the
    resolution — they are expected reading for the next review.
-5. Resolutions reference commits, not branch names or issue numbers alone —
+6. Resolutions reference commits, not branch names or issue numbers alone —
    the SHA survives rebases of everything else.
 
 ## Process
@@ -77,3 +86,10 @@ snapshots (`grep -n "C13" 2026-09-26-v0.0.38.md`).
 | 0.0.40a | [2026-10-02-v0.0.40-a.md](2026-10-02-v0.0.40-a.md) | F1–F3 LOW, F4–F10 INFO, 1 ghost retracted | [2026-10-02-v0.0.40-resolution.md](2026-10-02-v0.0.40-resolution.md) | micro wave review of the issue-#112 perf wave (`3f9387b` on `feature/112-handover-scan-performance` — handover scan-skip stamps, top-inode fast path, `.git` prune); no MED/HIGH; F1–F3 fixed in `2718238`, F4/F6/F7 in `08278a5`, F5/F8/F9/F10 deliberately not done; e2e 272/0 + 47/0 + 70/0 on the fixed tree |
 | 0.0.40b | [2026-10-02-v0.0.40-b.md](2026-10-02-v0.0.40-b.md) | F1–F5 LOW (fixed), Q1–Q2 INFO (fixed), Q3–Q4 INFO | [2026-10-02-v0.0.40-resolution.md](2026-10-02-v0.0.40-resolution.md) | micro wave review of the 0.0.40a fix wave (`e1ede97..bda1c77`: `2718238`+`908f708`+`08278a5`+`bda1c77`); no MED/HIGH; docs/test-hygiene batch fixed in `4dbf56c`; suite-count + e2e-timing corrections carried in the resolution; e2e 272/0 + 47/0 + 70/0 on the fixed tree |
 | 0.0.40c | [2026-10-02-v0.0.40-c.md](2026-10-02-v0.0.40-c.md) | F1 LOW (fixed), Q1–Q3 INFO (Q1–Q3 fixed/Disposition), Q4–Q5 INFO | [2026-10-02-v0.0.40-resolution.md](2026-10-02-v0.0.40-resolution.md) | micro wave review of the 0.0.40b fix wave (`bda1c77..381f8a4`: `4dbf56c`+`381f8a4`, shipped delta comment-only); no MED/HIGH — wave chain converged (two consecutive review-of-review passes clean); audit-log event completed, comment twins fixed in `36d7317`; snapshot-b imprecisions corrected via the resolution |
+| 0.0.41a | [2026-10-02-v0.0.41-a.md](2026-10-02-v0.0.41-a.md) | F1–F4 (2 LOW, 2 INFO) | [2026-10-02-v0.0.41-resolution.md](2026-10-02-v0.0.41-resolution.md) | micro wave review of the issue-#113 phase extraction (`1f6d18a` on `feature/113-install-sh-phase-functions` off `740d650` — install.sh wrapped into `do_plan_phase`/`do_ddev_phase`/`do_deploy_phase`, verbatim, +32/−0); no MED/HIGH; author self-review with mechanical verification; e2e 272/0 + 47/0 |
+| 0.0.41b | [2026-10-02-v0.0.41-b.md](2026-10-02-v0.0.41-b.md) | F1 LOW, F2–F4 INFO | [2026-10-02-v0.0.41-resolution.md](2026-10-02-v0.0.41-resolution.md) | wave review of dedup point 1 (`2ab6e7b`: shared sudoers pipeline `sh/sudoers-deploy.sh`, replacing the triple duplication in install/config/update); no MED/HIGH; F1/F3 dispositioned keep/optional; ratchet caught a 122-char draft line (shortened); make test 31 suites + lint green, e2e deferred to the dedup-wave final gate |
+| 0.0.41c | [2026-10-02-v0.0.41-c.md](2026-10-02-v0.0.41-c.md) | F1 MEDIUM-verdict-clean (deliberate silent→fail-loud change), F2–F4 INFO | [2026-10-02-v0.0.41-resolution.md](2026-10-02-v0.0.41-resolution.md) | wave review of dedup point 2 (`fe7666a`: shared binary hardening `sh/secure-binary.sh`, dissolving install.sh's nested `secure_binary`, update.sh's silent re-assert and the `install_binary` pair); no MED/HIGH; bypass-guard 750 assertions rewired to wiring+enforcement; make test 32 suites + lint green |
+| 0.0.41d | [2026-10-02-v0.0.41-d.md](2026-10-02-v0.0.41-d.md) | F1–F2 LOW (recorded/accepted), F3–F4 INFO | [2026-10-02-v0.0.41-resolution.md](2026-10-02-v0.0.41-resolution.md) | wave review of dedup point 3 (`8bc0414`: library deploy through ONE manifest `sh/deploy-lib.sh` — install/update twin cp listings dissolved, ~95/~70 lines out; test-kit-files gains bidirectional manifest↔fetch equality + canary; 7 suites' wiring greps rewired); no MED/HIGH; make test 33 suites + lint green |
+| 0.0.41e | [2026-10-02-v0.0.41-e.md](2026-10-02-v0.0.41-e.md) | F1 LOW (deliberate fail-loud unification), F2 LOW (test-side, fixed in-wave), F3–F4 INFO | [2026-10-02-v0.0.41-resolution.md](2026-10-02-v0.0.41-resolution.md) | wave review of dedup point 4 (`623d575`: shared `sh/render-agent-config.sh` SECURE_GIT render + `sh/tui-plugin.sh` per-user plugin sync; update.sh's silent sync aborts now die with a message); no MED/HIGH; make test 33 suites + lint green; dedup wave 1–4 complete pending the final e2e gate |
+| 0.0.41f | [2026-10-02-v0.0.41-f.md](2026-10-02-v0.0.41-f.md) | C1/S1 **HIGH** (silent post-apply `opk update` abort on a skip rc — delta-introduced by 0.0.41e, missed by its snapshot, e2e-invisible; both agents converged), C2–C5 LOW, S2–S3 + Q1–Q5 INFO, 1 pre-existing canary typo | [2026-10-02-v0.0.41-resolution.md](2026-10-02-v0.0.41-resolution.md) | full-scope pass on the branch tip `547a4cd` (release-tier trigger: ~1.7k lines + blast radius) with independent `review-security` + `review-quality` subagents; e2e-ddev (70/0) retro-added to the gate; all findings fixed in `0d2e349`; suites re-run on the final tip — branch PR-ready after 272/47/70 re-confirm |
+| 0.0.41g | [2026-10-02-v0.0.41-g.md](2026-10-02-v0.0.41-g.md) | F1–F2 LOW (recorded/accepted), F3–F4 INFO | [2026-10-02-v0.0.41-resolution.md](2026-10-02-v0.0.41-resolution.md) | micro wave review of the 0.0.41a-F1 re-indent (`a4d1c73`: +4 on the three phase bodies; `git diff -w` empty + pairwise proof 1517/1517; heredoc + 37 quote-joins excluded; test-project-paths extract made indent-tolerant); no MED/HIGH; e2e 272/47/70 re-confirmed on the indented tree |

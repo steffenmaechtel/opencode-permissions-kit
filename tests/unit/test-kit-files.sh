@@ -154,7 +154,7 @@ ghost_list="$install_list ghost-file.sh"
 _missing=""
 for f in $ghost_list; do
     if [ "$f" = "VERSION" ]; then
-        [ -f "$REPO/VERSION" ] || _missing="$missing $f"
+        [ -f "$REPO/VERSION" ] || _missing="$_missing $f"
     else
         [ -f "$REPO/files/$f" ] || _missing="$_missing $f"
     fi
@@ -183,6 +183,45 @@ case "$_deploy_missing" in
         fail "canary: deploy-coverage detection works (got: '$_deploy_missing')"
         ;;
 esac
+
+# --- 5. the lib_deploy manifest IS the deploy set (0.0.41d wave) -----------------
+# install.sh and update.sh both deploy through sh/deploy-lib.sh; its
+# manifest must equal the fetch lists' opencode-permissions-kit-lib/
+# subset in BOTH directions:
+#   manifest-only  -> deployed but never fetched: streamed install aborts
+#   fetch-only     -> fetched but never deployed: goes stale in $LIBDIR
+#                     on every update (the 0.0.38 C19 class)
+
+DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
+manifest_list=$(sed -n "/<<'DL_MANIFEST'/,/^DL_MANIFEST\$/p" "$DEPLOYLIB" \
+    | sed -e '1d' -e '$d' | grep -v '^#' | awk 'NF { print $1 }' | sort -u)
+lib_fetch_list=$(printf '%s\n' $update_list | grep '^opencode-permissions-kit-lib/' | sort -u)
+
+if [ -z "$manifest_list" ]; then
+    fail "lib_deploy manifest extracted from deploy-lib.sh (got an empty list)"
+else
+    pass "lib_deploy manifest extracted from deploy-lib.sh ($(printf '%s\n' "$manifest_list" | wc -l) entries)"
+fi
+
+printf '%s\n' "$manifest_list" > "$WORK/manifest.txt"
+printf '%s\n' "$lib_fetch_list" > "$WORK/fetchlib.txt"
+if diff -q "$WORK/manifest.txt" "$WORK/fetchlib.txt" >/dev/null; then
+    pass "lib_deploy manifest == fetch-list lib subset (deploy set has ONE source)"
+else
+    fail "lib_deploy manifest and fetch list DRIFTED:"
+    diff "$WORK/fetchlib.txt" "$WORK/manifest.txt" | sed 's/^/        /'
+fi
+
+# 5b. canary: drop one manifest line from a COPY — the equality check
+# must see the drift.
+sed '/sh\/staged-write\.sh 644/d' "$DEPLOYLIB" > "$WORK/deploy-lib-mutated.sh"
+mutated_manifest=$(sed -n "/<<'DL_MANIFEST'/,/^DL_MANIFEST\$/p" "$WORK/deploy-lib-mutated.sh" \
+    | sed -e '1d' -e '$d' | grep -v '^#' | awk 'NF { print $1 }' | sort -u)
+if [ "$mutated_manifest" != "$lib_fetch_list" ]; then
+    pass "canary: manifest mutation is detected (equality check works)"
+else
+    fail "canary: manifest mutation is detected (equality check is blind!)"
+fi
 
 # --- 5. fetch_kit pre-creates every subdirectory in the list ----------------------
 # curl -o cannot write into a missing directory: the streamed fetch aborts

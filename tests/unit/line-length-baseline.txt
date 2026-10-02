@@ -1,2 +1,2 @@
 files/opencode-permissions-kit-lib/sh/advisories.sh 69 2
-files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh 615 2
+files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh 607 2

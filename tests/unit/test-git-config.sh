@@ -12,6 +12,7 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/templates/opencode.jsonc"
+RENDER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/render-agent-config.sh"
 PARSER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/py/jsonc-parser.py"
 
 failures=0
@@ -193,6 +194,41 @@ if grep -q '_plan()' "$INSTALL" && ! grep -Eq 'ui_plan [0-9]' "$INSTALL"; then
 else
     fail "install.sh: plan numbering is dynamic (no gaps when steps are skipped)"
 fi
+
+# --- shared render helper (sh/render-agent-config.sh, 0.0.41e wave) -------------
+# agent_config_render replaces the SECURE_GIT sed pair that lived in
+# install.sh's _oc_install_agent_config and config.sh's git_config_apply.
+# Lives under $TMPDIR so the suite's EXIT trap covers the cleanup (a
+# second trap would REPLACE it); the expected-failure cases wrap the
+# call in if/else — under set -e a bare failing call would abort the
+# command substitution before "rc=" is echoed.
+ACRWORK="$TMPDIR/acr"
+mkdir -p "$ACRWORK"
+
+acr_out=$( . "$RENDER"
+    if agent_config_render "$TEMPLATE" "$ACRWORK/on.jsonc" on 2>&1; then _acr_rc=0; else _acr_rc=$?; fi
+    echo "rc=$_acr_rc" )
+case "$acr_out" in *rc=0*) pass "render on: rc=0" ;; *) fail "render on: rc (got [$acr_out])" ;; esac
+grep -qE '^[[:space:]]*"\.git/config"' "$ACRWORK/on.jsonc" \
+    && pass "render on: .git/config deny rule active (uncommented)" \
+    || fail "render on: deny rule not active"
+grep -q '//SECURE_GIT' "$ACRWORK/on.jsonc" \
+    && fail "render on: leftover SECURE_GIT markers" \
+    || pass "render on: no leftover markers"
+
+acr_out=$( . "$RENDER"
+    if agent_config_render "$TEMPLATE" "$ACRWORK/off.jsonc" off 2>&1; then _acr_rc=0; else _acr_rc=$?; fi
+    echo "rc=$_acr_rc" )
+case "$acr_out" in *rc=0*) pass "render off: rc=0" ;; *) fail "render off: rc (got [$acr_out])" ;; esac
+grep -qE '^[[:space:]]*"\.git/config"' "$ACRWORK/off.jsonc" \
+    && fail "render off: deny rule must be gone" \
+    || pass "render off: deny rule gone"
+
+acr_out=$( . "$RENDER"
+    if agent_config_render "$TEMPLATE" "$ACRWORK/bad.jsonc" maybe 2>&1; then _acr_rc=0; else _acr_rc=$?; fi
+    echo "rc=$_acr_rc" )
+case "$acr_out" in *rc=1*) pass "render: unknown mode rejected (rc=1)" ;; *) fail "render: unknown mode (got [$acr_out])" ;; esac
+[ ! -e "$ACRWORK/bad.jsonc" ] && pass "render: nothing written on rejection" || fail "render: file written on rejection"
 
 # --- Summary ---
 echo ""
