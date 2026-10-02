@@ -35,6 +35,14 @@ INSTALL="$REPO/files/install.sh"
 failures=0
 passed=0
 
+# Deterministic fixture modes (issue #112): the handover's top-inode fast
+# path skips chown -R/chmod -R on already-conforming trees — under a
+# developer's umask 002 freshly mkdir'ed dirs WOULD conform immediately
+# if the calls here passed real ids (they do not: literal ocuser/ocgroup
+# never match real stat output — 0.0.40a F7). The guard turns
+# load-bearing the moment a call does.
+umask 022
+
 pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
 fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 

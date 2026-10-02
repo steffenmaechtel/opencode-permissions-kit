@@ -707,6 +707,12 @@ fi
 # migrated — the common upgrade path — are healed too. .git dirs are
 # never chowned — they stay developer-owned (the group baseline makes
 # them group-accessible).
+# Issue #112: the ROUTINE update skips roots whose scan-skip stamp still
+# matches (ddev_handover_stamp_valid — user/group/dev user/dev-owned
+# mode/scan rev), because re-scanning every large tree on every update cost
+# minutes while nothing had changed. Anything doubtful falls back to the
+# full scan; --refresh and every explicit config path (projects add,
+# refresh, handover) always scan and re-stamp.
 if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     # Shared helper: prefer the copy next to this script (checkout — same
     # vintage as the running update.sh), fall back to the deployed library.
@@ -714,13 +720,31 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
         && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh"
     [ -f "$LIBDIR/sh/ddev-handover.sh" ] && . "$LIBDIR/sh/ddev-handover.sh"
     command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
-    ui_detail "scanning project roots for ddev directories (large trees: this can take a while) ..."
+    command -v ddev_handover_stamp_valid >/dev/null 2>&1 || ddev_handover_stamp_valid() { return 1; }
+    command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
+    _ho_skip=0
+    _ho_announced=false
     while IFS= read -r root; do
         [ -z "$root" ] && continue
         [ -d "$root" ] || continue
+        if [ "$REFRESH" != true ] \
+            && ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"; then
+            _ho_skip=$((_ho_skip + 1))
+            continue
+        fi
+        if [ "$_ho_announced" = false ]; then
+            ui_detail "scanning project roots for ddev directories (large trees: this can take a while) ..."
+            _ho_announced=true
+        fi
         ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-        log "ddev handover applied under $root"
+        ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
+        log "ddev handover pass completed under $root"
     done < "$PROJECTS_CONF"
+    if [ "$_ho_skip" -gt 0 ]; then
+        ui_detail "skipped the ddev handover rescan for $_ho_skip root(s) — nothing changed since the last pass"
+        ui_detail "force it with 'sudo opk update --refresh' or 'sudo opk config handover <path>'"
+        log "ddev handover rescan skipped for $_ho_skip root(s) (issue #112 stamps)"
+    fi
 fi
 
 # git "dubious ownership" exception for the opencode user (issue #17) —
@@ -1213,6 +1237,7 @@ if [ "$REFRESH" = true ]; then
             [ -d "$root" ] || continue
             fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
+            ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
         done < "$PROJECTS_CONF"
     fi
     ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"

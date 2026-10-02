@@ -158,18 +158,27 @@ install/`projects add`/`refresh`/`update --refresh`.
 
 The handover runs on install, on `config.sh projects add`, on
 `config.sh refresh`, on `config.sh handover <path>` (one project, no
-group baseline — the fast repair after cloning a new project), and
-unconditionally on every `update.sh`. The `ddev` shell hook covers the
-gap between cloning and the next handover run: before `ddev start` /
-`ddev restart` it detects the bootstrap case (fresh `typo3` clone whose
-root still belongs to you) and prints the ready-made
-`config handover` command instead of leaving you with ddev's cryptic
-`operation not permitted`. The scan never descends into `vendor/`,
-`node_modules/` or `testdata/` trees — a `.ddev` directory found there
-is a shipped test fixture, not a project (a checkout of ddev's own
-repository carries dozens, issue #29). Your
-`.git/` stays yours (ownership untouched; the group baseline makes it
-group-accessible — see [the sharing group](sharing-group.md)).
+group baseline — the fast repair after cloning a new project), and on
+`update.sh` — but the routine update skips the rescan when nothing
+changed: a root-owned stamp under `/etc/opencode-permissions-kit/handover/`
+records the last completed pass per root (user, group, dev-owned mode,
+scan revision, default user), and a matching stamp short-circuits the scan
+([issue #112](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/112) —
+the unconditional rescan cost minutes on large project trees). Anything
+doubtful falls back to the full scan; `opk update --refresh` always
+re-scans. The `ddev` shell hook covers the gap between cloning and the
+next handover run: before `ddev start` / `ddev restart` it detects the
+bootstrap case (fresh `typo3` clone whose root still belongs to you)
+and prints the ready-made `config handover` command instead of leaving
+you with ddev's cryptic `operation not permitted`. The scan never
+descends into `vendor/`, `node_modules/`, `testdata/` or `.git/` trees —
+a `.ddev` directory found in the first three is a shipped test fixture,
+not a project (a checkout of ddev's own repository carries dozens,
+issue #29), and inside `.git/` it is never a project either (ddev finds
+`.ddev` by walking up from the working directory — no ddev command runs
+inside `.git/`). Your `.git/` stays yours (ownership untouched; the
+group baseline makes it group-accessible — see
+[the sharing group](sharing-group.md)).
 
 ### Team git workflows: group-write on ddev-created content (issue #94)
 
@@ -194,7 +203,7 @@ writes them as you, with your umask and the inherited ACLs.
 
 Edge case: content written by the *agent's* ddev session (running as
 `opencode` directly, not through your shell function) lacks the automatic
-heal — run any `ddev` command yourself or `opk update` /
+heal — run any `ddev` command yourself or `opk update --refresh` /
 `opk handover opencode <project>` to re-normalize.
 
 ## Dev-owned projects (the alternative to handovers)

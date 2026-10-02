@@ -528,12 +528,15 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/Sys
         while IFS= read -r _st_root; do
             [ -z "$_st_root" ] && continue
             [ -d "$_st_root" ] || continue
-            # vendor/, node_modules/ and testdata/ pruned (issues #21,
-            # #29): composer/npm packages and test fixtures (e.g. a
-            # checkout of ddev's own repository) ship their own .ddev
-            # dirs — they are not the user's projects and their
-            # hostnames must never hit the Windows hosts file.
-            find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \) \) -prune \
+            # vendor/, node_modules/, testdata/ and .git/ pruned (issues
+            # #21, #29, #112): composer/npm packages and test fixtures
+            # (e.g. a checkout of ddev's own repository) ship their own
+            # .ddev dirs — they are not the user's projects and their
+            # hostnames must never hit the Windows hosts file. .git is
+            # additionally the densest tree in a project and never holds
+            # a real project — pruned for scan cost too.
+            find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
+                -o -name .git \) \) -prune \
                 -o -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r _st_d; do
                 _st_m=$(ddev_hosts_missing "$(dirname "$_st_d")")
                 [ -n "$_st_m" ] || continue
