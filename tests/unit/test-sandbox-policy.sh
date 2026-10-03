@@ -1,43 +1,59 @@
 #!/bin/sh
 # test-sandbox-policy.sh -- unit suites never create, delete or
-# re-permission anything outside their scratch space (0.0.42e C1).
+# re-permission anything outside their scratch space, and never carry
+# real-tree path literals at all (0.0.42e C1, hardened 0.0.42f C3).
 #
 # Policy (docs/design/conventions.md, "Test sandbox (unit suites)"):
 # unit suites operate only on their own scratch ($WORK / mktemp) and the
-# sanctioned temp prefixes /tmp, /var/tmp (plus /dev/null). A literal
-# absolute operand of a mutating command pointing anywhere else -- above
-# all real project trees like /var/www/vhosts, /home, /srv, /etc -- fails
-# this guard, in setup and teardown alike. Finding history: the
-# ddev-migrate suite once `rm -rf`'d /var/www/vhosts/alpha and
-# /var/www/vhosts/sub in its cleanup and mkdir'd /srv/other/outside in
-# its setup (0.0.42e C1 -- the rm executed as a live incident on an
-# external review host; paths absent there afterwards, pre-run state
-# unknown).
+# sanctioned temp prefixes /tmp, /var/tmp (plus /dev/null). Finding
+# history: the ddev-migrate suite once rm -rf'd two real-tree host paths
+# in its cleanup and mkdir'd a third in setup (0.0.42e C1 -- executed as
+# a live incident on an external review host).
 #
-# Detection, per command segment of a line:
-#   - comment lines are skipped; everything inside "..." or '...' is
-#     blanked first (assertion payloads and grep patterns are data, not
-#     operands -- escaped quotes are a documented limitation, none in
-#     scope; none may be introduced without an allowlist entry below);
-#   - a mutating verb is one of rm, rmdir, mkdir, ln, cp, mv, chown,
-#     chmod, chgrp, setfacl, touch, truncate, tee, install, sed;
-#   - all-operand verbs (rm, mkdir, chown, chmod, ...) flag EVERY literal
-#     absolute token outside the sanctioned prefixes;
-#   - source-to-destination verbs (cp, mv, ln, install, tee) flag only
-#     the DESTINATION (last non-option operand) -- a literal source is a
-#     read, not a mutation;
-#   - sed flags its last operand only when it carries -i.
-# Variables ($WORK, $TMP, ...) are exempt -- what they hold is the
-# review's job; this guard catches the literal slip.
+# Two checks, both token-based on the quote-blanked, continuation-joined
+# view of each line (comments stripped):
 #
-# Deliberate exceptions, one "file|token" entry per line with a reason
-# comment above it (house style of the string-continuations guard):
-ALLOW=""
-
+# 1. MUTATION: a mutating verb (rm, rmdir, mkdir, ln, cp, mv, chown,
+#    chmod, chgrp, setfacl, touch, truncate, tee, install, `sed -i`)
+#    whose operand is a literal absolute path outside /tmp, /var/tmp,
+#    /dev/null fails. All-operand verbs flag every literal; source-to-
+#    destination verbs (cp, mv, ln, install, tee) only the DESTINATION;
+#    sed only its last operand with -i. Variables are exempt -- what
+#    they hold is the review's job.
+#
+# 2. RATCHET (0.0.42f C3, maintainer directive): a literal absolute
+#    token STARTING with a real-tree prefix (listed in RATCHET_TREES
+#    below) fails even in inert fixture strings -- inert literals are
+#    one broken rewrite away from live (the migrate fixtures carried
+#    them for months behind a sed). Tokens under /tmp or /var/tmp are
+#    exempt (sandboxed fixtures are the point). Policy-INPUT classes
+#    (values fed to screening/parsing functions, never executed) are
+#    allowlisted below with reasons.
+#
+# Backslash-continued commands are joined before scanning (0.0.42f C3:
+# `rm -rf \` + path-on-next-line was invisible to the line-based scan).
+#
 # Run: sh tests/unit/test-sandbox-policy.sh
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
+
+# Real trees that must never appear as literals in unit suites.
+RATCHET_TREES="/var/www/vhosts /srv/other/outside"
+
+# Allowlist for the ratchet: one "file|token" entry per line, a reason
+# comment above it (house style of the string-continuations guard).
+# Policy-INPUT class only: values handed to screening/parsing functions
+# or parse-only argument fixtures -- never executed as paths.
+ALLOW="
+# parse_args argument fixtures (parse-only suite -- the values are
+# parsed, never run)
+tests/unit/test-install-args.sh|/var/www/vhosts
+# project_path_sane screening inputs + expected-verdict call fixtures
+tests/unit/test-project-paths.sh|/var/www/vhosts
+# screening-pattern loop values fed to greps against uninstall.sh
+tests/unit/test-uninstall.sh|/var/www/vhosts
+"
 
 passed=0
 failed=0
@@ -45,109 +61,170 @@ pass() { printf '  PASS  %s\n' "$1"; passed=$((passed + 1)); }
 fail() { printf '  FAIL  %s\n' "$1"; failed=$((failed + 1)); }
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP" "$VIOL"' EXIT
 VIOL="$(mktemp)"
+trap 'rm -f "$TMP" "$VIOL"; [ -n "${PROBE_DIR:-}" ] && rm -rf "$PROBE_DIR"' EXIT
+PROBE_DIR=""
 
-# Every unit suite except this guard itself.
-find tests/unit -name 'test-*.sh' ! -name 'test-sandbox-policy.sh' | sort > "$TMP"
-if [ ! -s "$TMP" ]; then
-    printf '  FAIL  no unit suites found to scan\n'
-    exit 1
-fi
-
-while IFS= read -r f; do
-    awk -v f="$f" -v allow="$ALLOW" -v dq='"' -v sq="'" '
-        function isbad(t) {
-            if (substr(t, 1, 1) != "/") return 0
-            if (t ~ /^\/(tmp\/|var\/tmp\/|dev\/null$)/) return 0
-            if (t !~ /^\/[A-Za-z0-9._\/-]*$/) return 0
-            return 1
-        }
-        function allowed(tok) {
-            if (allow == "") return 0
-            return index("\n" allow "\n", "\n" f "|" tok "\n") > 0
-        }
-        {
-            orig = $0
-            probe = orig; sub(/^[ \t]+/, "", probe)
-            if (substr(probe, 1, 1) == "#") next
-            # blank quoted regions: operands-only view of the line. A
-            # quoted run collapses into one placeholder token (X) so a
-            # quoted variable destination still counts as an operand.
-            ops = ""; indq = 0; insq = 0
-            L = length(orig)
-            for (p = 1; p <= L; p++) {
-                ch = substr(orig, p, 1)
-                if (!insq && ch == dq) {
-                    if (indq) { indq = 0; ops = ops "X" } else indq = 1
-                    continue
-                }
-                if (!indq && ch == sq) {
-                    if (insq) { insq = 0; ops = ops "X" } else insq = 1
-                    continue
-                }
-                if (indq || insq) continue
-                ops = ops ch
+# scan <dir> -- writes "file|line|kind|token" violation rows to $VIOL.
+scan() {
+    _scan_dir="$1"
+    find "$_scan_dir" -name 'test-*.sh' ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
+        awk -v f="$f" -v allow="$ALLOW" -v trees="$RATCHET_TREES" -v dq='"' -v sq="'" '
+            function isbad(t) {
+                if (substr(t, 1, 1) != "/") return 0
+                if (t ~ /^\/(tmp\/|var\/tmp\/|dev\/null$)/) return 0
+                if (t !~ /^\/[A-Za-z0-9._\/-]*$/) return 0
+                return 1
             }
-            # strip an unquoted trailing comment (ops is quote-free now)
-            hp = index(ops, "#")
-            if (hp > 0) ops = substr(ops, 1, hp - 1)
-            # split on unquoted command separators
-            gsub(/\|\|/, "\n", ops); gsub(/&&/, "\n", ops)
-            gsub(/;/, "\n", ops); gsub(/\|/, "\n", ops)
-            m = split(ops, segs, "\n")
-            for (s = 1; s <= m; s++) {
-                n = split(segs[s], tk, /[ \t]+/)
-                if (n == 0) continue
-                vi = 1
-                while (vi <= n && (tk[vi] == "" || tk[vi] ~ /^[A-Za-z_][A-Za-z0-9_]*=/)) vi++
-                if (vi > n) continue
-                verb = tk[vi]
-                if (verb !~ /^(rm|rmdir|mkdir|ln|cp|mv|chown|chmod|chgrp|setfacl|touch|truncate|tee|install|sed)$/) continue
-                if (verb == "cp" || verb == "mv" || verb == "ln" || verb == "install" || verb == "tee") {
-                    last = ""
-                    for (i = n; i > vi; i--) {
-                        if (tk[i] == "") continue
-                        if (tk[i] ~ /^[0-9]{0,2}>/) continue
-                        if (substr(tk[i], 1, 1) == "-") continue
-                        last = tk[i]; break
+            function allowed(tok) {
+                if (allow == "") return 0
+                return index("\n" allow "\n", "\n" f "|" tok "\n") > 0
+            }
+            function ratchet_hit(tok) {
+                if (substr(tok, 1, 1) != "/") return 0
+                if (tok ~ /^\/(tmp\/|var\/tmp\/)/) return 0
+                n = split(trees, tr, " ")
+                for (i = 1; i <= n; i++)
+                    if (substr(tok, 1, length(tr[i])) == tr[i]) return 1
+                return 0
+            }
+            function report(tok, kind) {
+                if (allowed(tok)) return
+                printf "%s|%d|%s|%s\n", f, NR, kind, tok
+            }
+            {
+                # join backslash continuations into logical lines (the
+                # reported line number is the FIRST physical line)
+                if (length($0) > 0 && substr($0, length($0)) == "\\") {
+                    pending = pending substr($0, 1, length($0) - 1)
+                    next
+                }
+                orig = pending $0
+                pending = ""
+                probe = orig; sub(/^[ \t]+/, "", probe)
+                if (substr(probe, 1, 1) == "#") next
+                # blank quoted regions: operands-only view (a quoted run
+                # collapses into one placeholder token so quoted variable
+                # destinations still count as operands; escaped quotes are
+                # a documented limitation, none in scope)
+                ops = ""; indq = 0; insq = 0
+                L = length(orig)
+                for (p = 1; p <= L; p++) {
+                    ch = substr(orig, p, 1)
+                    if (!insq && ch == dq) {
+                        if (indq) { indq = 0; ops = ops "X" } else indq = 1
+                        continue
                     }
-                    if (last != "") {
-                        t = last; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
-                        if (isbad(t) && !allowed(t)) printf "%s|%d|%s\n", f, NR, t
+                    if (!indq && ch == sq) {
+                        if (insq) { insq = 0; ops = ops "X" } else insq = 1
+                        continue
                     }
-                } else if (verb == "sed") {
-                    hasi = 0
-                    for (i = vi + 1; i <= n; i++) if (tk[i] ~ /^-[A-Za-z]*i/) hasi = 1
-                    if (!hasi) continue
-                    last = ""
-                    for (i = n; i > vi; i--) {
-                        if (tk[i] == "") continue
-                        if (tk[i] ~ /^[0-9]{0,2}>/) continue
-                        last = tk[i]; break
-                    }
-                    if (last != "") {
-                        t = last; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
-                        if (isbad(t) && !allowed(t)) printf "%s|%d|%s\n", f, NR, t
-                    }
-                } else {
-                    for (i = vi + 1; i <= n; i++) {
-                        if (tk[i] == "") continue
-                        t = tk[i]; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
-                        if (isbad(t) && !allowed(t)) printf "%s|%d|%s\n", f, NR, t
+                    if (indq || insq) continue
+                    ops = ops ch
+                }
+                # strip an unquoted trailing comment (ops is quote-free)
+                hp = index(ops, "#")
+                if (hp > 0) ops = substr(ops, 1, hp - 1)
+
+                # --- check 2: real-tree literal ratchet (verb-independent)
+                rn = split(ops, rtok, /[ \t]+/)
+                for (ri = 1; ri <= rn; ri++) {
+                    t = rtok[ri]
+                    sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
+                    if (ratchet_hit(t)) report(t, "ratchet")
+                }
+
+                # --- check 1: mutation operand scan (per command segment)
+                segs = ops
+                gsub(/\|\|/, "\n", segs); gsub(/&&/, "\n", segs)
+                gsub(/;/, "\n", segs); gsub(/\|/, "\n", segs)
+                m = split(segs, segsArr, "\n")
+                for (s = 1; s <= m; s++) {
+                    n = split(segsArr[s], tk, /[ \t]+/)
+                    if (n == 0) continue
+                    vi = 1
+                    while (vi <= n && (tk[vi] == "" || tk[vi] ~ /^[A-Za-z_][A-Za-z0-9_]*=/)) vi++
+                    if (vi > n) continue
+                    verb = tk[vi]
+                    if (verb !~ /^(rm|rmdir|mkdir|ln|cp|mv|chown|chmod|chgrp|setfacl|touch|truncate|tee|install|sed)$/) continue
+                    if (verb == "cp" || verb == "mv" || verb == "ln" || verb == "install" || verb == "tee") {
+                        last = ""
+                        for (i = n; i > vi; i--) {
+                            if (tk[i] == "") continue
+                            if (tk[i] ~ /^[0-9]{0,2}>/) continue
+                            if (substr(tk[i], 1, 1) == "-") continue
+                            last = tk[i]; break
+                        }
+                        if (last != "") {
+                            t = last; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
+                            if (isbad(t)) report(t, "mutate")
+                        }
+                    } else if (verb == "sed") {
+                        hasi = 0
+                        for (i = vi + 1; i <= n; i++) if (tk[i] ~ /^-[A-Za-z]*i/) hasi = 1
+                        if (!hasi) continue
+                        last = ""
+                        for (i = n; i > vi; i--) {
+                            if (tk[i] == "") continue
+                            if (tk[i] ~ /^[0-9]{0,2}>/) continue
+                            last = tk[i]; break
+                        }
+                        if (last != "") {
+                            t = last; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
+                            if (isbad(t)) report(t, "mutate")
+                        }
+                    } else {
+                        for (i = vi + 1; i <= n; i++) {
+                            if (tk[i] == "") continue
+                            t = tk[i]; sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
+                            if (isbad(t)) report(t, "mutate")
+                        }
                     }
                 }
             }
-        }
-    ' "$f"
-done < "$TMP" > "$VIOL" || true
+        ' "$f"
+    done
+}
 
+# --- 1. the real tree ---------------------------------------------------------
+: > "$VIOL"
+scan tests/unit > "$VIOL" || true
 if [ -s "$VIOL" ]; then
-    while IFS='|' read -r vf vl vp; do
-        fail "$vf:$vl mutates a literal host path: $vp (policy: /tmp, /var/tmp and \$WORK only -- docs/design/conventions.md)"
+    while IFS='|' read -r vf vl vk vp; do
+        case "$vk" in
+            mutate) fail "$vf:$vl mutates a literal host path: $vp (policy: /tmp, /var/tmp and \$WORK only)" ;;
+            ratchet) fail "$vf:$vl carries a real-tree literal: $vp (sandbox the fixture or allowlist the policy-INPUT class)" ;;
+        esac
     done < "$VIOL"
 else
-    pass "no unit suite mutates a literal host path (sandbox policy holds)"
+    pass "no unit suite mutates or names a literal host path (sandbox policy holds)"
+fi
+
+# --- 2. self-probe: the guard must CATCH (positive controls) ------------------
+PROBE_DIR="$(mktemp -d)"
+mkdir -p "$PROBE_DIR/unit"
+printf '#!/bin/sh\n# probe: continuation-split rm must be caught (0.0.42f C3)\nrm -rf \\\n/var/www/vhosts/probe-evil\n' \
+    > "$PROBE_DIR/unit/test-probe-cont.sh"
+printf '#!/bin/sh\n# probe: inert real-tree literal must be caught (ratchet)\napproot: /var/www/vhosts/probe-two\n' \
+    > "$PROBE_DIR/unit/test-probe-ratchet.sh"
+printf '#!/bin/sh\n# probe: sandboxed fixture passes both checks\napproot: /var/tmp/opencode-ddev-mig-roots/vhosts/x\nrm -rf /var/tmp/opencode-ddev-mig-roots\n' \
+    > "$PROBE_DIR/unit/test-probe-clean.sh"
+: > "$VIOL"
+scan "$PROBE_DIR/unit" > "$VIOL" || true
+if grep -q "test-probe-cont.sh|4|mutate|/var/www/vhosts/probe-evil" "$VIOL"; then
+    pass "self-probe: continuation-split rm -rf is caught"
+else
+    fail "self-probe: continuation-split rm -rf must be caught (0.0.42f C3)"
+fi
+if grep -q "test-probe-ratchet.sh|3|ratchet|/var/www/vhosts/probe-two" "$VIOL"; then
+    pass "self-probe: inert real-tree literal is caught (ratchet)"
+else
+    fail "self-probe: inert real-tree literal must be caught (0.0.42f C3)"
+fi
+if grep -q "test-probe-clean.sh" "$VIOL"; then
+    fail "self-probe: sandboxed probe must not be flagged"
+else
+    pass "self-probe: sandboxed probe passes clean"
 fi
 
 echo ""

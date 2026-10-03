@@ -174,13 +174,12 @@ expect_rc 1 "typo'd flag aborts (--ye)" --ye
 expect_rc 1 "--migrate-agents without a value aborts" --yes --migrate-agents
 expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agents steal
 
-# Glob metacharacters in --projects values are rejected before the
-# unquoted rebuild loop can expand them (0.0.42e C7) — the rejection
-# sits in the main-flow validation (outside parse_args), pinned
-# statically here.
-grep -qF '*[\*\?\[]*' "$INSTALL" \
-    && pass "--projects values with glob characters are refused" \
-    || fail "--projects values with glob characters must be refused (0.0.42e C7)"
+# Glob metacharacters in --projects values are rejected in parse_args on
+# the RAW argument (0.0.42f S2): the old in-loop gate ran after the
+# for-list pathname expansion and never saw a matching glob.
+expect_rc 1 "--projects value with glob characters aborts" --yes --projects '/var/www/vhosts/*'
+expect_rc 1 "--projects value with question mark aborts" --yes --projects '/opt/?vhosts'
+expect_rc 0 "plain --projects value passes parse_args" --yes --projects /var/www/vhosts
 
 # --- channel stamp (issue #38) -----------------------------------------------
 

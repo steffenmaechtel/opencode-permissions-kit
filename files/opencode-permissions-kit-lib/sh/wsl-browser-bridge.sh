@@ -159,8 +159,10 @@ browser_bridge_deploy_tree() {
 # refuses to deploy while `command -v xdg-open` hits anything, and the
 # fixed-path `/usr/bin` checks in update/status let update deploy a shim
 # install would have refused (shadowing a real xdg-open in /usr/sbin,
-# /snap/bin, ...) and kept a stale green verdict. With no shim deployed,
-# this returns exactly what `command -v xdg-open` would.
+# /snap/bin, ...) and kept a stale green verdict. Deliberately narrower
+# than `command -v` (0.0.42f Q1): empty PATH elements (cwd) are skipped
+# — the probe must never consider a cwd-installed binary "real", which
+# would silently drop a needed shim.
 xdg_open_real_exists() {
     _xre_dir=""
     _xre_oldifs="$IFS"

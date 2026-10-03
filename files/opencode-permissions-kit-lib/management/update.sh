@@ -1153,7 +1153,10 @@ fi
 # Keys this update owns: VERSION (re-stamped), OPENCODE_GROUP (re-based to
 # the opencode usergroup), KIT_CHANNEL (re-stamped to the ref just updated
 # from), DDEV_VERSION (re-probed above — the fallback stays fresh).
-_INSTALL_CONF_TMP="$CONFDIR/install.conf.opk-new"
+# Per-process suffix (0.0.42f C1): the fixed name let concurrent runs
+# clobber each other's staging file (root-created by the tee below —
+# mktemp cannot create in the root-only conf dir).
+_INSTALL_CONF_TMP="$CONFDIR/install.conf.opk-new.$$"
 _tmp_track "$_INSTALL_CONF_TMP"
 _ic_rc=0
 _ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' \
