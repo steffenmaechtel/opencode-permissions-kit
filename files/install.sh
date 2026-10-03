@@ -240,8 +240,10 @@ command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
 
 # Shared git presence/version check (soft floor, issue #118): one
 # implementation for the pre-flight here, update.sh and status.sh.
-# The no-op stub keeps a hypothetically helper-less fetch installable —
-# the check is advisory by design (see git-check.sh's header).
+# kit_source above already aborts when the file is missing outright —
+# the stub covers a present-but-incomplete copy: the check is advisory
+# by design, a broken helper must not abort the install (see
+# git-check.sh's header).
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/git-check.sh"
 command -v git_check_report >/dev/null 2>&1 || git_check_report() { :; }
 

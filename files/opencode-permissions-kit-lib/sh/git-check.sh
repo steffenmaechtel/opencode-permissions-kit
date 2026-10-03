@@ -14,11 +14,14 @@
 # covers that end. The floor below only mirrors the documented oldest
 # baseline distros; below it the kit warns, never aborts.
 #
-# POSIX sh, SOURCED by install.sh, update.sh and status.sh (checkout
-# copy first, deployed LIBDIR fallback). Never executed directly.
-# Calls ui.sh helpers (ui_warn/ui_detail/ui_kv) at RUNTIME — every
-# caller sources ui.sh before its phase runs; log.sh is optional (the
-# audit line is best-effort). Deployed to
+# POSIX sh, SOURCED by install.sh, update.sh and status.sh. Never
+# executed directly. install.sh and update.sh source the checkout/fetch
+# copy first with a deployed-LIBDIR fallback (their own sibling
+# convention); status.sh probes the deployed LIBDIR first and falls back
+# to the checkout copy next to itself (cf. its ui.sh block). Calls
+# ui.sh helpers (ui_warn/ui_detail/ui_kv) at RUNTIME — every caller
+# sources ui.sh before its phase runs; log.sh is optional (the audit
+# line is best-effort). Deployed to
 # /usr/local/lib/opencode-permissions-kit/sh/git-check.sh.
 
 # The oldest git the kit is tested on: Debian 12 / Ubuntu 22.04 — the
@@ -60,7 +63,8 @@ git_check_report() {
         return 0
     fi
     if ! git_floor_ok "$GIT_CHECK_VERSION"; then
-        ui_warn "git $GIT_CHECK_VERSION found — the kit is tested with git >= $GIT_TESTED_FLOOR (Debian 12 / Ubuntu 22.04 baseline)."
+        ui_warn "git $GIT_CHECK_VERSION found — the kit is tested with git >= $GIT_TESTED_FLOOR "\
+"(Debian 12 / Ubuntu 22.04 baseline)."
         ui_detail "newer git on Ubuntu: sudo add-apt-repository ppa:git-core/ppa && sudo apt update && sudo apt install git"
     fi
     return 0
