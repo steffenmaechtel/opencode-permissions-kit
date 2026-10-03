@@ -81,6 +81,9 @@ make e2e-rootless        # docker-rootless e2e (skips without systemd-in-contain
 ```
 
 Both e2e suites are part of the definition of done for changes to
-`install.sh`, `update.sh`, the wrapper, or backend provisioning. New
-executable scripts go into the `chmod +x` lists of EVERY CI workflow that runs them
-(enforced by `tests/unit/test-workflows.sh`).
+`install.sh`, `update.sh`, the wrapper, or backend provisioning.
+Executable bits live in the **git index** (issue #123): commit anything
+CI or the kit execute by path with `git update-index --chmod=+x <path>`
+(invariant: 755 <=> executed by path, 644 <=> sourced lib / interpreter
+call / data; enforced by `tests/unit/test-workflows.sh`). Workflows
+carry no `chmod +x` lines — `actions/checkout` preserves tracked modes.
