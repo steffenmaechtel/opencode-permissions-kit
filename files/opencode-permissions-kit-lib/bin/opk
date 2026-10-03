@@ -101,6 +101,7 @@ Commands:
                                     1.x device logins alive on a hardened
                                     /mnt/c (opencode 2.x needs no bridge)
   uninstall [--yes] [--dry-run]   Remove the kit (runs as your user)
+  --version                       Print the deployed kit version and exit
   help                            Show this help
 
 Everything after <command> is passed to the underlying script, so all
@@ -340,6 +341,11 @@ case "$cmd" in
         done
         [ "$_ho_rc" = 0 ] && ui_success "handover complete"
         exit "$_ho_rc"
+        ;;
+    --version)
+        # One-line machine-friendly version probe (issue #130): the same
+        # install.conf stamp as the usage header and status.sh report.
+        echo "opk $VERSION"
         ;;
     help|--help|-h)
         usage
