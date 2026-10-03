@@ -148,6 +148,34 @@ else
     fail "issue #116: bare git config --global call remains (CWD-inheriting)"
 fi
 
+# issue #118: the install pre-flight checks the git version against the
+# tested floor (2.30 — Debian 12 / Ubuntu 22.04, the documented oldest
+# baseline distros). Deliberately warn-only: the kit itself runs ancient
+# plumbing (`git -C <dir> config --global`), and the #116 breakage class
+# lived at the NEW end of the range (covered by CI's git matrix), so a
+# hard abort would exclude working setups without preventing anything.
+# The check must print the git-core PPA upgrade path for old-WSL-Ubuntu
+# users. Scope guard: the floor compare lives in the pre-flight awk (>=30
+# minor), never in an exit — a warn must stay a warn.
+_git_floor_block=$(sed -n '/# git (soft floor, issue #118)/,/^    # ddev version/p' "$INSTALL" || true)
+if printf '%s\n' "$_git_floor_block" | grep -q 'tested with git >= 2.30' \
+    && printf '%s\n' "$_git_floor_block" | grep -q 'ppa:git-core/ppa'; then
+    pass "issue #118: pre-flight warns below the git 2.30 floor with the PPA upgrade hint"
+else
+    fail "issue #118: pre-flight git floor warning or PPA hint missing"
+fi
+if printf '%s\n' "$_git_floor_block" | grep -q 'ui_warn' \
+    && ! printf '%s\n' "$_git_floor_block" | grep -q 'exit 1'; then
+    pass "issue #118: pre-flight git floor check is warn-only (no abort)"
+else
+    fail "issue #118: pre-flight git floor check must warn, never abort"
+fi
+if printf '%s\n' "$_git_floor_block" | grep -q 'git not found'; then
+    pass "issue #118: missing git reported as a warning (agent git hint)"
+else
+    fail "issue #118: missing-git warning missing from the pre-flight"
+fi
+
 if grep -q '^SECURE_GIT_CONFIG=true' "$INSTALL"; then
     pass "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
 else

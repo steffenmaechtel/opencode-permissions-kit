@@ -1,10 +1,31 @@
 FROM ubuntu:24.04
 
+# git channel (issue #118): 'distro' (default) keeps the base image's apt
+# git — 2.43 on noble, close to the documented oldest baseline distros
+# (Debian 12: 2.30, Ubuntu 22.04: 2.34). 'latest' upgrades to the current
+# git-core PPA release, resolved at BUILD time: the weekly cron burn-in
+# therefore catches new-upstream-git behavior drift without a manual pin
+# (same drift design as the opencode version resolution). The #116
+# unreadable-CWD fatal only existed on git >= 2.55 — invisible at the
+# distro floor the suite used to pin. lib.sh forwards E2E_GIT_CHANNEL
+# as --build-arg GIT_CHANNEL=...
+ARG GIT_CHANNEL=distro
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     sudo curl git acl python3 ca-certificates nodejs npm \
     && rm -rf /var/lib/apt/lists/*
+
+RUN if [ "$GIT_CHANNEL" = "latest" ]; then \
+        apt-get update -qq \
+        && apt-get install -y --no-install-recommends software-properties-common \
+        && add-apt-repository -y ppa:git-core/ppa \
+        && apt-get update -qq \
+        && apt-get install -y --no-install-recommends git \
+        && rm -rf /var/lib/apt/lists/* \
+        && git --version; \
+    fi
 
 RUN useradd -m -s /bin/bash -G sudo dev \
     && echo 'dev ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dev \

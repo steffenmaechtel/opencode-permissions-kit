@@ -25,6 +25,11 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# git channel (issue #118), same knob as Dockerfile: CI only exercises
+# 'latest' on the plain e2e suite, but the ARG keeps a local
+# E2E_GIT_CHANNEL=latest make e2e-rootless honest too. See Dockerfile.
+ARG GIT_CHANNEL=distro
+
 # systemd + the pieces dockerd-rootless needs that apt does not install as
 # hard dependencies of docker-ce-rootless-extras on Ubuntu. fuse-overlayfs is
 # the rootless storage driver fallback (overlay2 under user namespaces);
@@ -38,6 +43,16 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     sudo curl git acl python3 ca-certificates nodejs npm \
     uidmap dbus-user-session slirp4netns fuse-overlayfs iproute2 \
     && rm -rf /var/lib/apt/lists/*
+
+RUN if [ "$GIT_CHANNEL" = "latest" ]; then \
+        apt-get update -qq \
+        && apt-get install -y --no-install-recommends software-properties-common \
+        && add-apt-repository -y ppa:git-core/ppa \
+        && apt-get update -qq \
+        && apt-get install -y --no-install-recommends git \
+        && rm -rf /var/lib/apt/lists/* \
+        && git --version; \
+    fi
 
 # dockerd-rootless-setuptool.sh refuses to run unless the nf_tables (or
 # ip_tables) kernel module shows up in /proc/modules or in the kernel's

@@ -128,6 +128,32 @@ or add single paths instead of the wildcard. If the agent side ever
 regresses (e.g. a deleted `~opencode/.gitconfig`), re-run the kit's
 updater — it re-applies the setting.
 
+## git is below the tested version baseline
+
+**Cause:** your distro ships a git older than the kit's tested floor of
+2.30 — the version of the oldest supported baseline distros (Debian 12
+and Ubuntu 22.04 both the documentation and the installer's pre-flight
+refer to). Nothing breaks outright: the kit itself only uses ancient git
+plumbing (`git config --global`), so the installer **warns but does not
+abort**. But agent-side git workflows on older versions are untested,
+and a distro that old is usually ESM-only anyway.
+
+**Fix (WSL Ubuntu):** track the current git via the official git-core
+PPA:
+
+```bash
+sudo add-apt-repository ppa:git-core/ppa
+sudo apt update
+sudo apt install git
+```
+
+The installer's pre-flight prints the same hint when it detects an
+older git. CI exercises both ends of the version range — the Ubuntu
+24.04 distro git and the current PPA git — so newest-release behavior
+drift is caught by the weekly burn-in (the unreadable-CWD fatal of
+[issue #116](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/116)
+existed only on git ≥ 2.55; the fix is version-independent).
+
 ## Wrapper prints a loud bypass warning on start
 
 **Cause:** a real `~/.opencode/bin/opencode` exists — the official installer

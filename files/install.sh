@@ -543,6 +543,32 @@ do_plan_phase() {
         fi
     fi
 
+    # git (soft floor, issue #118): the kit itself only runs ancient git
+    # plumbing — `git -C <dir> config --global` (git >= 1.8.5) — and
+    # safe.directory, which below 2.35.2 is a harmless unknown key in a git
+    # that has no ownership check to begin with. So there is no HARD
+    # requirement to enforce (the #116 breakage class lived at the NEW end
+    # of the version range, covered by CI's git matrix, not down here).
+    # The floor mirrors the documented oldest baseline distros (Debian 12 /
+    # Ubuntu 22.04): older git is untested — warn and show the upgrade
+    # path, never abort.
+    if command -v git >/dev/null 2>&1; then
+        GIT_VERSION="$(git --version 2>/dev/null \
+            | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+        log "detected git: version=${GIT_VERSION:-unknown}"
+        if [ -n "$GIT_VERSION" ]; then
+            git_ok=$(awk -v v="$GIT_VERSION" 'BEGIN{split(v,a,"."); \
+                if(a[1]+0>2 || (a[1]+0==2 && a[2]+0>=30)) print "yes"; else print "no"}')
+            if [ "$git_ok" != "yes" ]; then
+                ui_warn "git $GIT_VERSION found — the kit is tested with git >= 2.30 (Debian 12 / Ubuntu 22.04 baseline)."
+                ui_detail "newer git on Ubuntu: sudo add-apt-repository ppa:git-core/ppa && sudo apt update && sudo apt install git"
+            fi
+        fi
+    else
+        ui_warn "git not found — the agent will not be able to work in repositories."
+        ui_detail "install it: sudo apt install git"
+    fi
+
     # ddev version (hard gate): rootless ddev needs ddev >= 1.25.
     # Probed twice: as root first, then as the DEFAULT user — `ddev version`
     # can come up empty under root (HOME=/root, no docker context) while the
