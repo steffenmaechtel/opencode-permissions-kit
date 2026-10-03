@@ -75,7 +75,8 @@ catch it?" for each area below:
 
 ## 5. CI
 
-- [ ] New executables are in the chmod lists (guarded — should be green)
+- [ ] Executables are committed with the git exec bit (`git update-index
+      --chmod=+x`, 755 <=> executed by path — guarded, should be green)
 - [ ] No workflow step duplicates what a Makefile target already does
 
 ## 6. Shrink the next review

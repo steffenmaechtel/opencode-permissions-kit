@@ -10,7 +10,7 @@
 #       substitution only, visudo-clean shape.
 #   (3) wrapper resolution mirror — rootless backends only, no fallback.
 #   (4) static wiring — install.sh, update.sh, config.sh, status.sh,
-#       setup-container-backend, and the CI chmod lists.
+#       setup-container-backend, and the git exec bit.
 set -e
 
 RED='\033[0;31m'
