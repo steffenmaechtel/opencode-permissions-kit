@@ -128,6 +128,27 @@ When a review runs as parallel subagents:
   header). History: 0.0.38/a–c ran Flash end-to-end on the crashing
   opencode-go provider; d–g ran the judgment agents on GLM-5.3 (gateway
   default) before this policy made all-Flash explicit.
+- ground-truth rule for coverage claims (added 2026-10-04, from the
+  0.0.42d/-e calibration): a claim like "CI runs every suite" is NEVER
+  verified via the mechanism that makes the claim — the -d mechanical
+  agent asserted "CI runs all 33" by counting `.sh` tokens exactly the
+  way the guard does, and 0.0.42e C2 then exposed that guard as
+  token-blind (an argument-position suite never executed). Guards,
+  manifests and checklists are themselves review objects: enumerate the
+  executed commands / on-disk files independently before repeating what
+  they report.
+- external-model passes (added 2026-10-04): a different model family as
+  the second snapshot of a release review is the strongest form of
+  "redundancy replaces depth" — the 0.0.42e external pass (GPT-6 Luna,
+  same tree) caught 16 findings the house pass had missed (2 HIGH incl.
+  the executed host-path `rm`), while the house pass held findings the
+  external one lacked. Integration duties: full per-finding verification
+  by the main agent (25/26 confirmed there), honest provenance in the
+  snapshot header (model, tree, what ran on which host), findings
+  recorded as reported with verification marks, and a calibration
+  section naming what each side missed and why — even retractions can
+  be partially over-turned by the external reviewer's counter-feedback
+  (0.0.42e S3 → LOW carve-out).
 - enforce **checkpoint discipline**: each agent appends findings to a side
   file after every completed section (empty sections get a `clean` line) —
   end-synthesis turns are the primary failure mode, and checkpoints survive
