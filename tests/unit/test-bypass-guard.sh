@@ -5,7 +5,7 @@
 #       when a self-installed opencode binary shadows the wrapper, and stays
 #       quiet when the wrapper is in charge.
 #   (2) Static wiring: install.sh, update.sh, the wrapper, umask.sh and the
-#       CI chmod lists reference the guard consistently so a streamed
+#       git index modes reference the guard consistently so a streamed
 #       `curl | bash` install fetches, deploys, hooks, and updates it.
 set -e
 
@@ -23,7 +23,6 @@ SECUREBIN="$REPO/files/opencode-permissions-kit-lib/sh/secure-binary.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UMASK="$REPO/files/etc/umask.sh"
 TEST_YML="$REPO/.github/workflows/test-unit.yml"
-E2E_YML="$REPO/.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -120,11 +119,12 @@ check "update.sh never uses world-executable binary mode" \
     sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1"' _ "$UPDATE"
 
 echo ""
-echo "-- CI chmod lists --"
-check "test-unit.yml chmods shell-warn.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/sh/shell-warn.sh' "$TEST_YML"
-check "test-e2e.yml chmods shell-warn.sh" \
-    grep -Fq './files/opencode-permissions-kit-lib/sh/shell-warn.sh' "$E2E_YML"
+echo "-- CI wiring (issue #123: exec bits live in the git index) --"
+# shell-warn.sh is a SOURCED lib (rc files, wrapper) — per the repo
+# invariant (755 <=> executed by path) it must be tracked 100644; the
+# deploy manifest re-asserts its LIBDIR mode on every install/update.
+check "shell-warn.sh is a sourced lib (git 100644, not executed by path)" \
+    [ "$(git -C "$REPO" ls-files -s -- files/opencode-permissions-kit-lib/sh/shell-warn.sh | awk '{print $1}')" = "100644" ]
 check "test-unit.yml runs test-bypass-guard.sh" \
     grep -Fq './tests/unit/test-bypass-guard.sh' "$TEST_YML"
 

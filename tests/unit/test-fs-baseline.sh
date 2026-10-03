@@ -21,7 +21,6 @@ UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.s
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
-E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -169,17 +168,13 @@ grep -q 'test-fs-baseline' "$MAKEFILE" \
     && pass "Makefile test target includes test-fs-baseline" \
     || fail "Makefile test target includes test-fs-baseline"
 grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" \
-    && pass "test-unit.yml chmod list includes the new test" \
-    || fail "test-unit.yml chmod list includes the new test"
-grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$TEST_CI" \
-    && pass "test-unit.yml chmod list includes the new lib" \
-    || fail "test-unit.yml chmod list includes the new lib"
-# Every chmod block in test-e2e.yml must list fs-baseline.sh (one
-# occurrence per block; the block count grows with pin/matrix jobs).
-blocks=$(grep -c 'chmod +x' "$E2E_CI")
-[ "$(grep -c 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$E2E_CI")" = "$blocks" ] \
-    && pass "test-e2e.yml chmod lists include the new lib (every job)" \
-    || fail "test-e2e.yml chmod lists include the new lib (every job)"
+    && pass "test-unit.yml run step includes the new test" \
+    || fail "test-unit.yml run step includes the new test"
+# fs-baseline.sh is a sourced lib (install.sh, config.sh, update.sh) —
+# per the repo invariant (755 <=> executed by path) it must be 100644.
+[ "$(git -C "$SCRIPT_DIR/../.." ls-files -s -- files/opencode-permissions-kit-lib/sh/fs-baseline.sh | cut -d' ' -f1)" = "100644" ] \
+    && pass "fs-baseline.sh is a sourced lib (git 100644, not executed by path)" \
+    || fail "fs-baseline.sh is a sourced lib (git 100644, not executed by path)"
 
 # --- 8. exec-time symlink recheck (0.0.39e S1) ------------------------------------------
 # The race itself (swap between find's scan and xargs' exec) cannot be

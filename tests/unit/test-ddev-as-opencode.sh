@@ -11,7 +11,7 @@
 #   - no reference to the removed legacy bin/ddev shim anywhere
 #   - wiring: sudoers rule, install.sh/update.sh fetch+deploy+hook,
 #     config.sh .ddev handover, status.sh reporting,
-#     Makefile target, CI workflow chmod lists + test step
+#     Makefile target, CI run step + git exec bit
 # Run: sh tests/unit/test-ddev-as-opencode.sh
 set -e
 
@@ -38,7 +38,6 @@ export OPK_INSTALL_CONF
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
-E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -807,12 +806,10 @@ check "status.sh reports ddev-as-opencode state" \
 # --- 9. Makefile + CI wiring ---------------------------------------------------
 check "Makefile has a test-ddev-as-opencode target in the test: list" \
     sh -c "grep -q 'test-ddev-as-opencode' \"\$1\"" _ "$MAKEFILE"
-check "test-unit.yml chmod list + run step mention the new test" \
+check "test-unit.yml run step mentions the new test" \
     sh -c "grep -q 'test-ddev-as-opencode.sh' \"\$1\"" _ "$TEST_CI"
-check "test-unit.yml chmod list includes the new lib files" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$TEST_CI"
-check "test-e2e.yml chmod list includes the new lib files" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode' \"\$1\"" _ "$E2E_CI"
+check "bin/ddev-as-opencode is executed by path (git 100755)" \
+    sh -c '[ "$(git -C "$2" ls-files -s -- files/opencode-permissions-kit-lib/bin/ddev-as-opencode | cut -d" " -f1)" = "100755" ]' _ x "$SCRIPT_DIR/../.."
 
 # --- Summary -------------------------------------------------------------------
 echo ""

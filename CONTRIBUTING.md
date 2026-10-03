@@ -32,17 +32,17 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   tracked in git, so a fresh Linux/macOS clone runs `make test` directly —
   but the bits are lost on Windows filesystems, WSL trees on `/mnt/c`, and
   by mode-stripping transfer channels (ZIP downloads, shared folders,
-  `cp`/`scp` without `-p`). `sh <script>` works everywhere; the CI
-  `chmod +x` lists are the second safety net (kept complete by
-  `tests/unit/test-workflows.sh`).
+  `cp`/`scp` without `-p`). `sh <script>` works everywhere.
 - After changes to `install.sh`, `update.sh`, the wrapper, or backend
   provisioning, **both** e2e suites are part of the definition of done — a
   green `make e2e` alone is not sufficient.
-- When adding a new executable under `files/` or a new test script under
-  `tests/`, add it to the `chmod +x` list in **every workflow that runs
-  it** — `tests/unit/test-workflows.sh` enforces the complete set
-  (`test-unit.yml`, `test-e2e.yml`, `test-e2e-ddev.yml`; the ddev suite
-  shares the chmod lists).
+- Executable bits live in the **git index** (issue #123): commit anything
+  executed by path with `git update-index --chmod=+x <path>` — a new test
+  under `tests/unit/`, a new `bin/` command, or a new `scripts/` helper
+  is enforced automatically by `tests/unit/test-workflows.sh`
+  (755 <=> executed by path, 644 <=> sourced lib / interpreter call /
+  data). Workflows carry no `chmod +x` lines; `actions/checkout`
+  preserves the tracked modes.
 - Besides PRs and `master` pushes, CI runs a **weekly scheduled** burn-in
   on `master` (Mondays ~03:00 UTC, issue #78): the e2e suites install the
   *latest* opencode/ddev releases at runtime, so the schedule catches
@@ -59,8 +59,8 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   lifecycle hooks (pre/postinstall) never execute. (A tripwire package
   such as `@lavamoat/preinstall-always-fail` is only needed when a
   project must run *legitimate* postinstall scripts.) The wiring — run
-  step, chmod entry, pin/lockfile sync — is guarded by
-  `tests/unit/test-workflows.sh` section 2c, so the gate cannot be
+  step, pin/lockfile sync — is guarded by
+  `tests/unit/test-workflows.sh`, so the gate cannot be
   silently dropped or weakened.
 
 ## Testing a branch on a real machine

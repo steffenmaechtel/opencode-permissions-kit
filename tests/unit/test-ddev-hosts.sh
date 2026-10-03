@@ -22,8 +22,6 @@ UPDATE="$FILES/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
-TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
-E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -250,12 +248,11 @@ check "kit CLI check output shows per-hostname add commands" \
     sh -c "grep -qF 'ddev-hosts-add /' \"\$1\"" _ "$KIT"
 check "Makefile lint list includes ddev-hosts.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$MAKEFILE"
-check "test-unit.yml chmod list includes ddev-hosts.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$TEST_CI"
-# Every chmod block in test-e2e.yml must list ddev-hosts.sh (one
-# occurrence per block; the block count grows with pin/matrix jobs).
-check "test-e2e.yml chmod lists include ddev-hosts.sh" \
-    sh -c 'blocks=$(grep -c "chmod +x" "$1"); grep -c "opencode-permissions-kit-lib/sh/ddev-hosts.sh" "$1" | grep -q "^${blocks}$"' _ "$E2E_CI"
+# ddev-hosts.sh is a sourced lib (opk, ddev-terminal, status.sh) — per
+# the repo invariant (755 <=> executed by path) it must be tracked 100644;
+# the deploy manifest re-asserts its LIBDIR mode on install/update.
+check "ddev-hosts.sh is a sourced lib (git 100644, not executed by path)" \
+    sh -c '[ "$(git -C "$2" ls-files -s -- files/opencode-permissions-kit-lib/sh/ddev-hosts.sh | cut -d" " -f1)" = "100644" ]' _ x "$SCRIPT_DIR/../.."
 
 # --- behavioral: hostname-mode arg validation (0.0.39g Q6) -------------------------
 # A leading dash must be rejected BEFORE it reaches `ddev hostname` as a

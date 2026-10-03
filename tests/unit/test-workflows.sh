@@ -1,15 +1,17 @@
 #!/bin/sh
-# Unit tests for CI workflow consistency (AGENTS.md rule: every executable
-# goes into the chmod +x list of ALL workflow files that run it):
-#   1. every ./path a workflow chmods must exist in the repo (renames and
-#      typos otherwise fail silently — CI chmods a ghost and loses the bit)
-#   2. every executable CI needs (unit tests, e2e scripts, check-host,
-#      shipped scripts under files/) must be chmodded in ALL workflow
-#      files that run it: test-unit.yml, test-e2e.yml, test-e2e-ddev.yml
-#   3. the e2e workflows must keep their opencode 2.x pin jobs (issue #80)
-#
-# Git checkouts lose the exec bit, so a missing entry means the affected
-# suite breaks only in CI — exactly the drift this test trips on.
+# Unit tests for CI workflow consistency (issue #123):
+#   1. exec bits live in the GIT INDEX, not in workflow chmod lists:
+#      100755 <=> executed by path, 100644 <=> sourced lib / interpreter
+#      call / data. actions/checkout preserves tracked modes, so CI needs
+#      no chmod at all — the chmod lists this file used to enforce
+#      compensated index drift and masked it at the same time (a 100644
+#      file with a chmod entry looked healthy while every fresh checkout
+#      without that workaround was broken).
+#   2. no workflow carries chmod lines anymore (regression guard)
+#   3. every unit suite on disk has a run: step in test-unit.yml (0.0.39a D20)
+#   4. tsx syntax gate wiring (issue #114)
+#   5. opencode 2.x pin jobs (issue #80)
+#   6. YAML structure guards (one env block per step; run: block literals)
 # Run: sh tests/unit/test-workflows.sh
 set -u
 
@@ -21,6 +23,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 WF_TEST="$REPO/.github/workflows/test-unit.yml"
 WF_E2E="$REPO/.github/workflows/test-e2e.yml"
 WF_DDEV_E2E="$REPO/.github/workflows/test-e2e-ddev.yml"
+WF_ADVISORY="$REPO/.github/workflows/advisory-watch.yml"
 
 failures=0
 passed=0
@@ -28,128 +31,108 @@ passed=0
 pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
 fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 
-# Extract all ./tokens from every chmod line of a workflow file. Joins
-# backslash line continuations first (the lists span multiple lines).
-chmod_tokens() {
-    sed -e ':a' -e '/\\$/N; s/\\\n/ /; ta' "$1" \
-        | grep -oE 'chmod \+x .*' \
-        | tr ' ' '\n' \
-        | grep -E '^\./' \
-        | sort -u
+TMP_REQ="$(mktemp)"
+TMP_755="$(mktemp)"
+TMP_RUNS="$(mktemp)"
+trap 'rm -f "$TMP_REQ" "$TMP_755" "$TMP_RUNS"' EXIT INT TERM
+
+# --- 1. exec bits in the git index ---------------------------------------------
+
+# The must-be-755 set: everything CI, make targets, or the kit invoke by
+# path (shebang entry points). Derived from disk globs so the growth
+# axes — new unit tests, new bin/ commands, new scripts/ helpers — are
+# enforced automatically. Everything else (sourced sh/ libs, py/ called
+# via python3, umask.sh via profile.d, ux demos and e2e fixtures run
+# via `sh`, data templates) must stay 100644 — enforced by the inverse
+# check below: a tracked file may only be 100755 if it is in this set.
+collect_required_755() {
+    for f in "$REPO"/tests/unit/test-*.sh \
+             "$REPO"/tests/check-host.sh \
+             "$REPO"/tests/tsx-syntax-gate.sh \
+             "$REPO"/tests/e2e/run.sh \
+             "$REPO"/tests/e2e/run-docker-rootless.sh \
+             "$REPO"/tests/e2e/run-ddev.sh \
+             "$REPO"/scripts/*.sh \
+             "$REPO"/files/install.sh \
+             "$REPO"/files/opencode-permissions-kit-lib/bin/* \
+             "$REPO"/files/opencode-permissions-kit-lib/management/*.sh; do
+        [ -f "$f" ] || continue
+        printf '%s\n' "${f#"$REPO"/}"
+    done | sort -u
 }
+collect_required_755 > "$TMP_REQ"
 
-TMP_TOKENS="$(mktemp)"
-trap 'rm -f "$TMP_TOKENS"' EXIT INT TERM
-
-# --- 1. every chmodded path exists ------------------------------------------
-
-for wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
-    name="${wf##*/}"
-    chmod_tokens "$wf" > "$TMP_TOKENS"
-    ghosts=""
-    while IFS= read -r tok; do
-        [ -n "$tok" ] || continue
-        [ -e "$REPO/$tok" ] || ghosts="$ghosts $tok"
-    done < "$TMP_TOKENS"
-    if [ -z "$ghosts" ]; then
-        pass "$name: every chmodded path exists"
-    else
-        fail "$name: chmodded paths missing in repo:$ghosts"
+_missing=""
+while IFS= read -r rel; do
+    mode="$(git -C "$REPO" ls-files -s -- "./$rel" | awk '{print $1}')"
+    if [ -z "$mode" ]; then
+        _missing="$_missing $rel(not-tracked)"
+    elif [ "$mode" != "100755" ]; then
+        _missing="$_missing $rel($mode)"
     fi
+done < "$TMP_REQ"
+if [ -z "$_missing" ]; then
+    pass "every executed-by-path file is 100755 in the git index"
+else
+    fail "exec-bit drift (git update-index --chmod=+x needed):$_missing"
+fi
+
+# Inverse: no tracked file may be 100755 unless it is executed by path.
+git -C "$REPO" ls-files -s | awk '$1 == "100755" { print $4 }' | sort -u > "$TMP_755"
+_stray="$(comm -13 "$TMP_REQ" "$TMP_755")"
+if [ -z "$_stray" ]; then
+    pass "no sourced/data file carries the exec bit (755 <=> executed by path)"
+else
+    fail "100755 on non-executable file(s) — flip with git update-index --chmod=-x:"
+    echo "$_stray" | sed 's/^/         /'
+fi
+
+# --- 2. workflows carry no chmod lines ------------------------------------------
+
+_chmodhits=""
+for _wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E" "$WF_ADVISORY"; do
+    _hit="$(grep -n 'chmod' "$_wf")"
+    [ -n "$_hit" ] && _chmodhits="$_chmodhits
+${_wf##*/}: $_hit"
 done
+if [ -z "$_chmodhits" ]; then
+    pass "no workflow chmods anything (exec bits come from the git index)"
+else
+    fail "workflow chmod lines — bits belong in the git index (issue #123):$_chmodhits"
+fi
 
-# --- 2. required executables in ALL workflow files -----------------------------
+# --- 3. every unit suite on disk is actually RUN (0.0.39a D20) -------------------
 
-# Canonical set: everything CI executes by path. Derived from disk so a new
-# test-*.sh automatically enforces its own workflow entries. Exceptions are
-# files never executed directly:
-#   files/etc/umask.sh                     sourced via /etc/profile.d
-#   jsonc-parser.py                    invoked via python3
-#   *.jsonc, sudoers.template          data, not code
-required=""
-for f in "$REPO"/tests/unit/test-*.sh \
-         "$REPO"/tests/check-host.sh \
-         "$REPO"/tests/e2e/run.sh \
-         "$REPO"/tests/e2e/run-docker-rootless.sh \
-         "$REPO"/tests/e2e/run-ddev.sh \
-         "$REPO"/tests/e2e/lib.sh; do
-    required="$required ./${f#"$REPO"/}"
-done
-for f in $(find "$REPO/files" -type f | sort); do
-    base="${f##*/}"
-    case "$base" in
-        umask.sh|jsonc-parser.py|tui-register.py|*.jsonc|sudoers.template) continue ;;
-    esac
-    required="$required ./${f#"$REPO"/}"
-done
-
-for wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
-    name="${wf##*/}"
-    chmod_tokens "$wf" > "$TMP_TOKENS"
-    missing=""
-    for req in $required; do
-        grep -qxF "$req" "$TMP_TOKENS" || missing="$missing $req"
-    done
-    if [ -z "$missing" ]; then
-        pass "$name: all required executables chmodded"
-    else
-        fail "$name: missing chmod entries:$missing"
-    fi
-done
-
-# --- 2b. every chmodded unit suite is actually RUN (0.0.39a D20) ----------------
-
-# test-update-flags.sh and test-release.sh sat on the chmod line of
-# test-unit.yml with no run: step — the chmod list only proves the path
-# exists, so the orphaned suites were invisible to every check. Every
-# unit suite chmodded in test-unit.yml must appear in one of its run:
-# lines (local `make test` runs them all; CI must not silently skip any).
+# test-update-flags.sh and test-release.sh once sat on a chmod line with
+# no run: step — invisible to every check. Every unit suite must appear
+# in one of test-unit.yml's run: lines (local `make test` runs them all;
+# CI must not silently skip any).
 run_tokens() {
     grep -E '^[[:space:]]+run: ' "$1" | grep -oE '\./[A-Za-z0-9_./-]+\.sh' | sort -u
 }
 
-TMP_RUNS="$(mktemp)"
-trap 'rm -f "$TMP_TOKENS" "$TMP_RUNS"' EXIT INT TERM
 run_tokens "$WF_TEST" > "$TMP_RUNS"
-orphans=""
-# word splitting is safe: repo paths never contain whitespace
-# shellcheck disable=SC2046
-for tok in $(chmod_tokens "$WF_TEST" | grep -E '^\./tests/unit/test-'); do
-    grep -qxF "$tok" "$TMP_RUNS" || orphans="$orphans $tok"
+_orphans=""
+for _t in "$REPO"/tests/unit/test-*.sh; do
+    _rel="./${_t#"$REPO"/}"
+    grep -qxF "$_rel" "$TMP_RUNS" || _orphans="$_orphans $_rel"
 done
-if [ -z "$orphans" ]; then
-    pass "test-unit.yml: every chmodded unit suite has a run step"
+if [ -z "$_orphans" ]; then
+    pass "test-unit.yml: every unit suite on disk has a run step"
 else
-    fail "test-unit.yml: chmodded but never run:$orphans"
+    fail "test-unit.yml: unit suite(s) without a run step:$_orphans"
 fi
 
-# --- 2b. scripts/ executables in test-unit.yml (0.0.39a D21) --------------------
-
-# The required set above derives from tests/ + files/ only, so
-# scripts/release.sh and scripts/advisory-watch.sh were never enforced.
-# Only test-unit.yml chmods both (the e2e workflows never execute them);
-# the bit matters there because test-release.sh and the advisory suite
-# run them by path.
-_smissing=""
-for _s in ./scripts/release.sh ./scripts/advisory-watch.sh; do
-    chmod_tokens "$WF_TEST" | grep -qxF "$_s" || _smissing="$_smissing $_s"
-done
-if [ -z "$_smissing" ]; then
-    pass "test-unit.yml: scripts/release.sh + scripts/advisory-watch.sh chmodded"
-else
-    fail "test-unit.yml: scripts chmod entries missing:$_smissing"
-fi
-
-# --- 2c. tsx syntax gate wiring (issue #114) ------------------------------------
+# --- 4. tsx syntax gate wiring (issue #114) --------------------------------------
 
 # The parse-only gate for the shipped tui/*.tsx assets lives in
 # tests/tsx-syntax-gate.sh and runs ONLY in test-unit.yml (CI-only:
 # node is not a contributor-host requirement). Silent removal would
 # reopen the gap the gate closes (tsx syntax errors shipping green);
-# these checks trip on it: run step + chmod entry present, the gate
-# covers the whole tui tsx glob instead of a hand-maintained file list,
-# installs via npm ci from the committed lockfile (integrity-verified —
-# an `npm install` regression would drop that), and the pin/lockfile
+# these checks trip on it: run step present, the gate covers the whole
+# tui tsx glob instead of a hand-maintained file list, installs via
+# npm ci from the committed lockfile (integrity-verified — an
+# `npm install` regression would drop that), and the pin/lockfile
 # pair in tests/fixtures/tsx-gate/ is exact and in sync (no dist-tags
 # or ranges; lockfile version == package.json version).
 GATE_SCRIPT="$REPO/tests/tsx-syntax-gate.sh"
@@ -159,8 +142,6 @@ if [ ! -f "$GATE_SCRIPT" ]; then
 else
     _gmissing=""
     grep -qF 'sh tests/tsx-syntax-gate.sh' "$WF_TEST" || _gmissing="$_gmissing no-run-step"
-    chmod_tokens "$WF_TEST" | grep -qxF './tests/tsx-syntax-gate.sh' \
-        || _gmissing="$_gmissing no-chmod-entry"
     grep -qF 'tui/*.tsx' "$GATE_SCRIPT" || _gmissing="$_gmissing no-tsx-glob"
     # Invocation signature (not prose): ci-ness AND the install-scripts
     # hardening in one literal — header comments quoting "npm ci" must
@@ -186,13 +167,13 @@ else
         _gmissing="$_gmissing lockfile-integrity-missing"
     fi
     if [ -z "$_gmissing" ]; then
-        pass "test-unit.yml: tsx syntax gate wired (run + chmod + npm ci lock + exact pin + glob)"
+        pass "test-unit.yml: tsx syntax gate wired (run + npm ci lock + exact pin + glob)"
     else
         fail "test-unit.yml: tsx gate wiring incomplete:$_gmissing"
     fi
 fi
 
-# --- 3. opencode 2.x pin jobs (issue #80) --------------------------------------
+# --- 5. opencode 2.x pin jobs (issue #80) --------------------------------------
 
 # The e2e workflows run the suites a second time against the CURRENT 2.x
 # release (npm dist-tag latest — 2.x ships no GitHub release assets).

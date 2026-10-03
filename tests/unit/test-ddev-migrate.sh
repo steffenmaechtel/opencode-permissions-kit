@@ -31,7 +31,6 @@ STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
-E2E_CI="$SCRIPT_DIR/../../.github/workflows/test-e2e.yml"
 
 failures=0
 passed=0
@@ -454,14 +453,12 @@ check "Makefile lint list includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$MAKEFILE"
 check "Makefile has a test-ddev-migrate target in the test: list" \
     sh -c "grep -q 'test: .*test-ddev-migrate' \"\$1\"" _ "$MAKEFILE"
-check "test-unit.yml chmod list + run step mention the new test" \
+check "test-unit.yml run step mentions the new test" \
     sh -c "grep -q 'test-ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
-check "test-unit.yml chmod list includes ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$TEST_CI"
-# Every chmod block in test-e2e.yml must list ddev-migrate.sh (one
-# occurrence per block; the block count grows with pin/matrix jobs).
-check "test-e2e.yml chmod lists include ddev-migrate.sh" \
-    sh -c 'blocks=$(grep -c "chmod +x" "$1"); grep -c "opencode-permissions-kit-lib/sh/ddev-migrate.sh" "$1" | grep -q "^${blocks}$"' _ "$E2E_CI"
+# ddev-migrate.sh is a sourced lib (bin/ddev-migrate dispatcher, status.sh)
+# — per the repo invariant (755 <=> executed by path) it must be 100644.
+check "ddev-migrate.sh is a sourced lib (git 100644, not executed by path)" \
+    sh -c '[ "$(git -C "$2" ls-files -s -- files/opencode-permissions-kit-lib/sh/ddev-migrate.sh | cut -d" " -f1)" = "100644" ]' _ x "$SCRIPT_DIR/../.."
 
 # --- 9. rootless bind-mounts switch (ddev 1.25.0-1.25.2) ---------------------------
 # ddev_rootless_bindmounts lives in ddev-handover.sh (sourced by the
