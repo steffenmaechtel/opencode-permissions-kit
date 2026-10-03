@@ -98,7 +98,7 @@ outside|/srv/other/outside" "$RESULT"
 
 # --- 2. root filter --------------------------------------------------------------
 
-mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/alpha /var/tmp/opencode-ddev-mig-roots/vhosts/client/beta /srv/other/outside 2>/dev/null || true
+mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/alpha /var/tmp/opencode-ddev-mig-roots/vhosts/client/beta /var/tmp/opencode-ddev-mig-roots/srv/other/outside 2>/dev/null || true
 sed -i "s|/var/www/vhosts/|/var/tmp/opencode-ddev-mig-roots/vhosts/|g; s|/srv/other/outside|/var/tmp/opencode-ddev-mig-roots/srv/other/outside|" "$WORK/devhome/.ddev/global_config.yaml"
 mkdir -p "$WORK/devhome/.ddev"  # sed rewrote the file in place; keep dir
 
@@ -607,8 +607,9 @@ check "bin dispatcher has the registry subcommand" \
 
 # --- Summary ------------------------------------------------------------------------
 
-# Cleanup fixture roots outside WORK.
-rm -rf /var/tmp/opencode-ddev-mig-roots /var/www/vhosts/alpha /var/www/vhosts/sub 2>/dev/null || true
+# Cleanup the fixture sandbox root. Unit-test policy (0.0.42e C1): suites
+# touch only their scratch and /tmp,/var/tmp -- never real project trees.
+rm -rf /var/tmp/opencode-ddev-mig-roots 2>/dev/null || true
 
 echo ""
 echo "========================================"

@@ -94,6 +94,30 @@ Patterns already in this repo:
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
 
+## Test sandbox (unit suites)
+
+Unit suites run on contributor and CI hosts, not in containers — they
+must never create, delete or re-permission anything outside their own
+scratch space. Rule (finding history: 0.0.42e C1, executed as a live
+incident on an external review host):
+
+- Operate only on the suite's scratch (`$WORK`, `mktemp`) and the
+  sanctioned temp prefixes `/tmp`, `/var/tmp` (plus `/dev/null`).
+- Never touch real project or system trees — `/var/www/vhosts`, `/home`,
+  `/srv`, `/etc`, ... — **not in setup, not in teardown**: a cleanup
+  `rm -rf` on a fixed host path deletes real data wherever the path
+  happens to exist.
+- Fixture data referencing real-looking paths (heredoc configs with
+  `approot:` lines and the like) must be rewritten into the sandbox
+  before anything executes against them (the ddev-migrate suite's
+  `sed` rewrite is the pattern).
+
+Enforced by `tests/unit/test-sandbox-policy.sh`: any mutating verb
+(`rm`, `mkdir`, `chown`, `setfacl`, ...) whose operand is a literal
+absolute path outside the sanctioned prefixes fails the guard. Variables
+are exempt — what they hold is the review's job; the guard catches the
+literal slip.
+
 ## Referencing review findings
 
 Every review restarts its finding IDs at S1/C1, so a bare ID is ambiguous

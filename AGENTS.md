@@ -80,6 +80,13 @@ make e2e                 # e2e (Docker needed)
 make e2e-rootless        # docker-rootless e2e (skips without systemd-in-container)
 ```
 
+**Unit suites are sandboxed by policy** (0.0.42e C1): they create/delete
+only inside their own scratch and `/tmp`, `/var/tmp` — never in real
+project or system trees (`/var/www/vhosts`, `/home`, `/srv`, `/etc`, …),
+not even in teardown. Enforced by
+`tests/unit/test-sandbox-policy.sh`; the rule lives in
+`docs/design/conventions.md` ("Test sandbox (unit suites)").
+
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning.
 Executable bits live in the **git index** (issue #123): commit anything

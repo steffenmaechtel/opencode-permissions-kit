@@ -125,3 +125,5 @@ jobs:
         run: ./tests/unit/test-line-length.sh
       - name: Run string-continuation guard
         run: ./tests/unit/test-string-continuations.sh
+      - name: Run unit-suite sandbox policy guard
+        run: ./tests/unit/test-sandbox-policy.sh

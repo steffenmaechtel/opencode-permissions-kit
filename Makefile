@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` (everything shipped in files/, plus the
 # maintainer helpers in scripts/).
@@ -64,6 +64,7 @@ help:
 	@echo "  make test-e2e-sources   Run e2e source-consistency tests"
 	@echo "  make test-browser-bridge  Run WSL browser bridge tests"
 	@echo "  make test-security-advisories  Run advisory database/watch tests"
+	@echo "  make test-sandbox-policy  Run unit-suite host-path sandbox guard (0.0.42e C1)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make e2e E2E_GIT_CHANNEL=latest  Same, with the current git-core PPA git in the container (e2e-rootless forwards the knob too; e2e-ddev deliberately has no git dimension — see run-ddev.sh; issue #118)"
 	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
@@ -78,7 +79,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -279,3 +280,19 @@ test-security-advisories:
 test-log:
 	@echo "=== Audit Log Tests ==="
 	@./tests/unit/test-log.sh
+
+test-deploy-lib:
+	@echo "=== Lib Deploy Manifest Tests (0.0.41d) ==="
+	@./tests/unit/test-deploy-lib.sh
+
+test-secure-binary:
+	@echo "=== Binary Hardening Tests (0.0.41c) ==="
+	@./tests/unit/test-secure-binary.sh
+
+test-sudoers-deploy:
+	@echo "=== Sudoers Pipeline Tests (0.0.41b) ==="
+	@./tests/unit/test-sudoers-deploy.sh
+
+test-sandbox-policy:
+	@echo "=== Unit-Test Sandbox Policy Tests (0.0.42e C1) ==="
+	@./tests/unit/test-sandbox-policy.sh
