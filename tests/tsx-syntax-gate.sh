@@ -20,21 +20,24 @@
 # Node's `--experimental-strip-types --check` cannot replace this: it
 # supports erasable TS syntax only, not JSX.
 #
-# The wiring (this script + its CI step) is guarded by
-# tests/unit/test-workflows.sh so it cannot be silently dropped.
+# typescript comes from tests/fixtures/tsx-gate/ (package.json with an
+# EXACT version pin + committed lockfile): `npm ci` verifies the
+# tarball's integrity hash against the lockfile, so a registry serving
+# different bytes for the same version is rejected before extraction —
+# the gate cannot be supply-chain-drifted silently. --ignore-scripts
+# closes the install-scripts vector (typescript needs none). Bump
+# procedure: edit the pin in package.json, then regenerate the lockfile
+# with `npm install --package-lock-only`; the wiring (run step + chmod
+# entry + pin/lockfile sync) is guarded by tests/unit/test-workflows.sh
+# section 2c.
 #
 # Exit status: 0 = all assets parse, 1 = setup or parse failure.
 
 set -u
 
-# Exact pin, bump deliberately (verify the changelog first): a floating
-# tag would let the gate drift (typescript@latest is 7.x, the native
-# port) and widens the supply-chain surface. typescript has zero
-# runtime dependencies, so the pinned version fully determines the tree.
-TYPESCRIPT_VERSION="5.9.3"
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+GATE_SRC="$REPO_ROOT/tests/fixtures/tsx-gate"
 
 # Shared UI helpers — same visual language as every kit script.
 UI_LIB="$REPO_ROOT/files/opencode-permissions-kit-lib/sh/ui.sh"
@@ -54,17 +57,30 @@ for tool in node npm; do
     fi
 done
 
+for f in package.json package-lock.json; do
+    if [ ! -f "$GATE_SRC/$f" ]; then
+        ui_error "tsx gate: $GATE_SRC/$f missing (pin/lockfile fixture, see script header)"
+        exit 1
+    fi
+done
+TS_VERSION="$(sed -n 's/.*"typescript": "\([0-9][0-9.]*\)".*/\1/p' "$GATE_SRC/package.json" | head -1)"
+if [ -z "$TS_VERSION" ]; then
+    ui_error "tsx gate: cannot read the typescript pin from $GATE_SRC/package.json"
+    exit 1
+fi
+
 # Install into a temp dir OUTSIDE the repo tree — no node_modules/, no
 # npm side files next to the sources the repo-wide tests scan (same
-# trick as check-py's PYTHONPYCACHEPREFIX).
+# trick as check-py's PYTHONPYCACHEPREFIX). The lockfile travels with
+# the copy so npm ci can verify the integrity hash.
 GATE_DIR="$(mktemp -d)"
-NPM_LOG="$GATE_DIR/npm-install.log"
+NPM_LOG="$GATE_DIR/npm-ci.log"
 trap 'rm -rf "$GATE_DIR"' EXIT INT TERM
 
-ui_info "installing pinned typescript@$TYPESCRIPT_VERSION (isolated temp dir, no repo changes)"
-if ! npm install --prefix "$GATE_DIR" --no-save --no-audit --no-fund \
-        "typescript@$TYPESCRIPT_VERSION" >"$NPM_LOG" 2>&1; then
-    ui_error "tsx gate: npm install of typescript@$TYPESCRIPT_VERSION failed:"
+ui_info "installing locked typescript@$TS_VERSION (npm ci, integrity-verified, no repo changes)"
+cp "$GATE_SRC/package.json" "$GATE_SRC/package-lock.json" "$GATE_DIR/"
+if ! (cd "$GATE_DIR" && npm ci --ignore-scripts --no-audit --no-fund) >"$NPM_LOG" 2>&1; then
+    ui_error "tsx gate: npm ci failed (lockfile out of sync with package.json, or integrity mismatch):"
     sed 's/^/     /' "$NPM_LOG"
     exit 1
 fi

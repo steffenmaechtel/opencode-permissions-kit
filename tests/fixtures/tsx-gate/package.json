@@ -1,0 +1,9 @@
+{
+  "name": "opk-tsx-gate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned typescript install for the CI TSX parse gate (tests/tsx-syntax-gate.sh, issue #114). The lockfile next to this file pins the tarball integrity hash: npm ci rejects registry content whose bytes differ from what was locked at commit time. Bump procedure: edit the exact version below (no ranges, no dist-tags), then regenerate the lockfile with: npm install --package-lock-only",
+  "dependencies": {
+    "typescript": "5.9.3"
+  }
+}

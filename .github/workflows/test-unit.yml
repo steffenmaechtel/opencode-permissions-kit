@@ -114,9 +114,10 @@ jobs:
         # CI-only on purpose (issue #114): node/npm are not contributor-
         # host requirements (tests/check-host.sh), and a full type check
         # is impossible without opencode's plugin types — so this is a
-        # pinned-tsc parse check with a wildcard shim. The wiring (run
-        # step + chmod entry + exact version pin) is guarded by
-        # tests/unit/test-workflows.sh.
+        # pinned-tsc parse check with a wildcard shim. typescript comes
+        # from a committed lockfile (npm ci, integrity-verified). The
+        # wiring (run step + chmod entry + pin/lockfile sync) is guarded
+        # by tests/unit/test-workflows.sh.
         run: sh tests/tsx-syntax-gate.sh
       - name: Run wrapper validation tests
         run: ./tests/unit/test-opencode-as-opencode.sh
