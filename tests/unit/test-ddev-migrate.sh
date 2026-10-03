@@ -82,25 +82,26 @@ cat > "$WORK/devhome/.ddev/global_config.yaml" <<'YML'
 last_used_version: v1.24.1
 project_info:
   alpha:
-    approot: /var/www/vhosts/alpha
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
   beta:
-    approot: "/var/www/vhosts/client/beta"
+    approot: "/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta"
   outside:
-    approot: /srv/other/outside
+    approot: /var/tmp/opencode-ddev-mig-roots/srv/other/outside
 webimage: ddev/ddev-webserver
 YML
 
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome/.ddev")
 assert_eq "registry parser reads name|approot pairs (quoted + unquoted)" \
-    "alpha|/var/www/vhosts/alpha
-beta|/var/www/vhosts/client/beta
-outside|/srv/other/outside" "$RESULT"
+    "alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
+outside|/var/tmp/opencode-ddev-mig-roots/srv/other/outside" "$RESULT"
 
 # --- 2. root filter --------------------------------------------------------------
 
+# Fixtures are written sandboxed at the source (maintainer directive
+# 2026-10-04, 0.0.42f C3): unit suites never carry real-tree literals —
+# not even inert ones an earlier sed would have rewritten.
 mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/alpha /var/tmp/opencode-ddev-mig-roots/vhosts/client/beta /var/tmp/opencode-ddev-mig-roots/srv/other/outside 2>/dev/null || true
-sed -i "s|/var/www/vhosts/|/var/tmp/opencode-ddev-mig-roots/vhosts/|g; s|/srv/other/outside|/var/tmp/opencode-ddev-mig-roots/srv/other/outside|" "$WORK/devhome/.ddev/global_config.yaml"
-mkdir -p "$WORK/devhome/.ddev"  # sed rewrote the file in place; keep dir
 
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
 assert_eq "root filter keeps only projects under the registered roots" \
@@ -118,7 +119,7 @@ assert_eq "root filter with no matching dirs yields nothing" "" "$RESULT"
 # global_config.yaml on first run. The parser must read BOTH layouts.
 mkdir -p "$WORK/devhome123/.ddev"
 cat > "$WORK/devhome123/.ddev/project_list.yaml" <<'YML'
-shopware-test-260605:
+client07-test-260605:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
     used_host_ports: []
 beta:
@@ -130,13 +131,13 @@ printf 'last_started_version: v1.25.2\nwebimage: ddev/ddev-webserver\n' > "$WORK
 
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev")
 assert_eq "registry parser reads the ddev >= 1.23 project_list.yaml (quoted + unquoted)" \
-    "shopware-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+    "client07-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
 outside|/var/tmp/opencode-ddev-mig-roots/srv/other/outside" "$RESULT"
 
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome123/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
 assert_eq "root filter applies to project_list.yaml projects too" \
-    "shopware-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+    "client07-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
 
 # Both layouts side by side (mid-migration home): entries from both
@@ -150,7 +151,7 @@ project_info:
 YML
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome123/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
 assert_eq "legacy and modern registry files are BOTH scanned" \
-    "shopware-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+    "client07-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
 legacy-only|/var/tmp/opencode-ddev-mig-roots/vhosts/gamma" "$RESULT"
 
@@ -509,65 +510,66 @@ check "config.sh wires the bind-mounts switch on backend changes" \
     sh -c "grep -q 'ddev_rootless_bindmounts \"\$OPENCODE_USER\"' \"\$1\"" _ "$CONFIG_SH"
 
 # --- 10. partial-export hardening (production finding: 1 of 12) --------------------
-# Real-world registry, verbatim from the report: mixed-case and dotted
-# project names, all approots under one root. The parser must yield all
-# twelve and nothing may fall outside the root.
-mkdir -p "$WORK/uraabe/.ddev"
-cat > "$WORK/uraabe/.ddev/project_list.yaml" <<'YML'
-adk:
-    approot: /home/uraabe/www/vhosts/academy-dk
-blackforest24-SW6:
-    approot: /home/uraabe/www/vhosts/blackforest24-SW6
-bruder-shopware-sw6:
-    approot: /home/uraabe/www/vhosts/bruder-shopware-sw6
-brudertoys-sap:
-    approot: /home/uraabe/www/vhosts/brudertoys-sap
-od-multi-store:
-    approot: /home/uraabe/www/vhosts/od-multi-store
-sascha-advent-calendar:
-    approot: /home/uraabe/www/vhosts/sascha-advent-calendar
-shopware-test-260605:
-    approot: /home/uraabe/www/vhosts/shopware-test-260605
-swdemo-6-7-0-1:
-    approot: /home/uraabe/www/vhosts/swdemo_6_7_0_1
-teamshub:
-    approot: /home/uraabe/www/vhosts/teamshub
-weindepot-vinum:
-    approot: /home/uraabe/www/vhosts/weindepot-vinum
-wf-xmas:
-    approot: /home/uraabe/www/vhosts/wf-xmas
-www.innova-vital.de:
-    approot: /home/uraabe/www/vhosts/www.innova-vital.de
+# Registry fixture preserving the SHAPES of a real-world production
+# report (mixed case, digits, dashes, underscores, dotted domain names,
+# all approots under one root) with fully synthetic names — no real
+# client identifiers in the repo (maintainer directive 2026-10-04).
+mkdir -p "$WORK/maxmustermann/.ddev"
+cat > "$WORK/maxmustermann/.ddev/project_list.yaml" <<'YML'
+shopone:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/shopone
+client24-SW6:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client24-SW6
+client03-shopware-sw6:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client03-shopware-sw6
+client04-sap:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client04-sap
+client05-multi-store:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client05-multi-store
+client06-advent-calendar:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client06-advent-calendar
+client07-test-260605:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client07-test-260605
+client08-6-7-0-1:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client08_6_7_0_1
+client09-hub:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client09-hub
+client10-vinum:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client10-vinum
+client11-xmas:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/client11-xmas
+www.client12-example.test:
+    approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/www.client12-example.test
 YML
 assert_eq "real-world registry: all 12 projects parsed (case + dots)" "12" \
-    "$(sh -c '. "$1" && ddev_migrate_registry "$2"' _ "$MIG" "$WORK/uraabe/.ddev" | grep -c .)"
+    "$(sh -c '. "$1" && ddev_migrate_registry "$2"' _ "$MIG" "$WORK/maxmustermann/.ddev" | grep -c .)"
 assert_eq "real-world registry: nothing outside the root" "" \
-    "$(sh -c '. "$1" && ddev_migrate_outside "$2" /home/uraabe/www/vhosts' _ "$MIG" "$WORK/uraabe/.ddev")"
+    "$(sh -c '. "$1" && ddev_migrate_outside "$2" /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts' _ "$MIG" "$WORK/maxmustermann/.ddev")"
 assert_eq "narrow root: the other 11 are reported outside" "11" \
-    "$(sh -c '. "$1" && ddev_migrate_outside "$2" /home/uraabe/www/vhosts/academy-dk' _ "$MIG" "$WORK/uraabe/.ddev" | grep -c .)"
+    "$(sh -c '. "$1" && ddev_migrate_outside "$2" /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/shopone' _ "$MIG" "$WORK/maxmustermann/.ddev" | grep -c .)"
 
 # The gap detector needs the approots to EXIST (ddev_migrate_projects
 # drops stale entries) — mirror the registry into the fixture tree.
-mkdir -p "$WORK/uraabe2/.ddev"
-sed "s|/home/uraabe/www/vhosts|$WORK/uraabe-vhosts|g" "$WORK/uraabe/.ddev/project_list.yaml" \
-    > "$WORK/uraabe2/.ddev/project_list.yaml"
-sh -c '. "$1" && ddev_migrate_registry "$2"' _ "$MIG" "$WORK/uraabe2/.ddev" \
+mkdir -p "$WORK/maxmustermann2/.ddev"
+sed "s|/var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts|$WORK/maxmustermann-vhosts|g" "$WORK/maxmustermann/.ddev/project_list.yaml" \
+    > "$WORK/maxmustermann2/.ddev/project_list.yaml"
+sh -c '. "$1" && ddev_migrate_registry "$2"' _ "$MIG" "$WORK/maxmustermann2/.ddev" \
     | while IFS='|' read -r _gn _ga; do mkdir -p "$_ga"; done
 mkdir -p "$WORK/gapbackups/ddev-migration-20260909-232704"
-printf 'OK|adk|%s/uraabe-vhosts/academy-dk|adk.sql.gz\n' "$WORK" \
+printf 'OK|shopone|%s/maxmustermann-vhosts/shopone|shopone.sql.gz\n' "$WORK" \
     > "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
-GAP=$(DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/uraabe2" \
-    sh -c '. "$1" && ddev_migrate_gap uraabe "$2"' _ "$MIG" "$WORK/uraabe-vhosts")
+GAP=$(DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
+    sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2"' _ "$MIG" "$WORK/maxmustermann-vhosts")
 assert_eq "gap: 1 dump recorded vs 12 registered -> have/now reported" \
     "1 12 $WORK/gapbackups/ddev-migration-20260909-232704" "$GAP"
-for _gn in blackforest24-SW6 bruder-shopware-sw6 brudertoys-sap od-multi-store \
-           sascha-advent-calendar shopware-test-260605 swdemo-6-7-0-1 teamshub \
-           weindepot-vinum wf-xmas www.innova-vital.de; do
-    printf 'OK|%s|%s/uraabe-vhosts/x|%s.sql.gz\n' "$_gn" "$WORK" "$_gn" \
+for _gn in client24-SW6 client03-shopware-sw6 client04-sap client05-multi-store \
+           client06-advent-calendar client07-test-260605 client08-6-7-0-1 client09-hub \
+           client10-vinum client11-xmas www.client12-example.test; do
+    printf 'OK|%s|%s/maxmustermann-vhosts/x|%s.sql.gz\n' "$_gn" "$WORK" "$_gn" \
         >> "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
 done
-if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/uraabe2" \
-    sh -c '. "$1" && ddev_migrate_gap uraabe "$2" >/dev/null' _ "$MIG" "$WORK/uraabe-vhosts"; then
+if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
+    sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2" >/dev/null' _ "$MIG" "$WORK/maxmustermann-vhosts"; then
     fail "gap: complete manifest reports NO gap"
 else
     pass "gap: complete manifest reports NO gap"
@@ -575,23 +577,23 @@ fi
 # A FAIL entry counts as ATTEMPTED (production: a project whose database
 # was never pulled must not nag the gap warning forever) — 11 OK + 1 FAIL
 # = 12 attempted vs 12 registered: no gap (OK-only counting would warn).
-sed -i '/^OK|teamshub|/d' "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
-printf 'FAIL|teamshub|%s/uraabe-vhosts/x|teamshub.sql.gz\n' "$WORK" \
+sed -i '/^OK|client09-hub|/d' "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
+printf 'FAIL|client09-hub|%s/maxmustermann-vhosts/x|client09-hub.sql.gz\n' "$WORK" \
     >> "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
-if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/uraabe2" \
-    sh -c '. "$1" && ddev_migrate_gap uraabe "$2" >/dev/null' _ "$MIG" "$WORK/uraabe-vhosts"; then
+if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
+    sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2" >/dev/null' _ "$MIG" "$WORK/maxmustermann-vhosts"; then
     fail "gap: FAIL entries count as attempted (no gap)"
 else
     pass "gap: FAIL entries count as attempted (no gap)"
 fi
 
 # registry subcommand (read-only, no root gate): export/outside view
-OUT=$(DDEV_MIG_DEV_HOME="$WORK/uraabe2" sh "$BIN_MIG" registry uraabe "$WORK/uraabe-vhosts")
+OUT=$(DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" sh "$BIN_MIG" registry maxmustermann "$WORK/maxmustermann-vhosts")
 assert_eq "registry cmd: all 12 under the root classified export" "12" \
     "$(printf '%s\n' "$OUT" | grep -c '^  export:')"
 assert_eq "registry cmd: none outside" "0" \
     "$(printf '%s\n' "$OUT" | grep -c '^  outside:')"
-OUT=$(DDEV_MIG_DEV_HOME="$WORK/uraabe2" sh "$BIN_MIG" registry uraabe "$WORK/uraabe-vhosts/academy-dk" 2>/dev/null || true)
+OUT=$(DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" sh "$BIN_MIG" registry maxmustermann "$WORK/maxmustermann-vhosts/shopone" 2>/dev/null || true)
 assert_eq "registry cmd: narrow root -> 1 export, 11 outside" "1 11" \
     "$(printf '%s\n' "$OUT" | grep -c '^  export:') $(printf '%s\n' "$OUT" | grep -c '^  outside:')"
 

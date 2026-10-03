@@ -405,6 +405,18 @@ parse_args() {
             --projects)
                 shift
                 while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
+                    # Glob metacharacters are rejected on the RAW
+                    # argument (0.0.42f S2): any later unquoted
+                    # iteration would pathname-expand a matching glob
+                    # into a different root set than the user typed —
+                    # an in-loop gate runs after that expansion and
+                    # never sees the characters.
+                    case "$1" in
+                        *[\*\?\[]*)
+                            echo "error: --projects value contains glob characters: $1" >&2
+                            exit 1
+                            ;;
+                    esac
                     PREDEFINED_PROJECTS="$PREDEFINED_PROJECTS $1"
                     shift
                 done

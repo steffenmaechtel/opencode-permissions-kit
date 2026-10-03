@@ -209,6 +209,31 @@ else
     fail "handover: sibling real settings dir must still be handed over"
 fi
 
+# 2d. back-function containment (0.0.42f S1): the handBACK twin of 2c —
+# same intermediate-symlinked docroot, root-run chown -R back to the
+# developer must stay inside the resolved project root.
+mkdir -p "$WORK/backproj/.ddev" "$WORK/backproj/config/system" "$WORK/backvictim/typo3conf"
+printf 'type: typo3\ndocroot: websym\n' > "$WORK/backproj/.ddev/config.yaml"
+ln -s "$WORK/backvictim" "$WORK/backproj/websym"
+BACK_OUT="$(PATH="$STUB:$PATH" sh -c '. "$1" && ddev_handover_project_back "$2" devuser devgroup dev' _ "$HANDOVER" "$WORK/backproj" 2>&1)"
+if grep -qF "chown -R dev:devgroup $WORK/backproj/websym/typo3conf" "$OPS" \
+   || grep -qF "chmod -R g+w $WORK/backproj/websym/typo3conf" "$OPS" \
+   || grep -qF "chown -R devuser:devgroup $WORK/backvictim/typo3conf" "$OPS"; then
+    fail "handover back: settings dir through an intermediate symlink is skipped (0.0.42f S1)"
+else
+    pass "handover back: settings dir through an intermediate symlink is skipped (0.0.42f S1)"
+fi
+if echo "$BACK_OUT" | grep -qF "resolves outside the project"; then
+    pass "handover back: intermediate-symlink skip warns with the reason"
+else
+    fail "handover back: intermediate-symlink skip must warn (0.0.42f S1)"
+fi
+if grep -qxF "chown -R dev:devgroup $WORK/backproj/config/system" "$OPS"; then
+    pass "handover back: sibling real settings dir still handed back"
+else
+    fail "handover back: sibling real settings dir must still be handed back"
+fi
+
 # 2b. dev-owned flag: a symlinked config.yaml is skipped, never written
 # through as root (the cat-rewrite follows the link).
 mkdir -p "$WORK/flagproj/.ddev" "$WORK/flagsrc"

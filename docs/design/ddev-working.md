@@ -309,7 +309,7 @@ version jump is the natural marker.
 in a real two-owner project:
 
 ```
-Failed to start pc-database-v2: chmod /var/www/vhosts/pc-database-v2/.ddev/.webimageBuild: operation not permitted
+Failed to start example-shop: chmod /var/www/vhosts/example-shop/.ddev/.webimageBuild: operation not permitted
 ```
 
 `.ddev/` is owned by the developer, but the agent's ddev runs as `opencode`;

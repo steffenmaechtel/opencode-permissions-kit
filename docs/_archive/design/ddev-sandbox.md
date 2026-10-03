@@ -261,7 +261,7 @@ E2E (extend `tests/e2e/run.sh` / the rootless suites with the ddev stub):
   `Warning: require(/var/www/html/config/system/settings.php): Failed to
   open stream: Permission denied in
   /var/www/html/vendor/typo3/cms-core/Classes/Configuration/ConfigurationManager.php
-  on line 121` — reported at https://pc-database-v2.local/
+  on line 121` — reported at https://example-shop.local/
   The agent-side `ddev start` (open) now completes without the chmod error,
   but the web container's PHP process is denied read access to
   `config/system/settings.php`. Working theory: the file is written as

@@ -184,6 +184,7 @@ LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && printf '%s\n/etc\n' "$WORK/fakeproj" | (
     UN_OC_UID=60000
     UN_OC_GID=60001
     UN_DEV_GROUP=devgroup
+    UN_DEV_GID=60001
     DEFAULT_USER=devuser
     eval "$PROJECT_LOOP"
 ) 2>&1 || true)
@@ -229,13 +230,23 @@ fi
 # access entries g:<dev-group> and default entries g:<dev-group>:rwx —
 # `setfacl -R -b/-k` removed EVERY extended ACL incl. pre-existing user
 # entries the kit never owned. -x is a no-op rc 0 on absent entries.
-if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:devgroup' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:devgroup' \
+# Qualifiers use the NUMERIC gid (0.0.42f C2): name qualifiers die at
+# setfacl parse time when the name does not resolve, silently disabling
+# the cleanup; the capture feeds a fallback branch when even the gid is
+# unknown.
+if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60001' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60001' \
    && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -b' \
    && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -k'; then
-    pass "ACL revert: only kit-added g:<dev-group> entries removed (0.0.42e C4)"
+    pass "ACL revert: only kit-added entries removed, via numeric gid (0.0.42e C4 + 0.0.42f C2)"
 else
-    fail "ACL revert must use targeted -x removal, never -b/-k wipes (0.0.42e C4)"
+    fail "ACL revert must use targeted numeric-gid -x removal, never -b/-k wipes (0.0.42e C4, 0.0.42f C2)"
+fi
+if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$UNINSTALL" \
+   && grep -qF '[ -n "$UN_DEV_GID" ]' "$UNINSTALL"; then
+    pass "ACL revert: numeric gid captured with an unknown-gid fallback branch (0.0.42f C2)"
+else
+    fail "ACL revert: numeric gid capture + fallback branch required (0.0.42f C2)"
 fi
 
 # --- 5. cleanup hints match what install.sh leaves behind ----------------------

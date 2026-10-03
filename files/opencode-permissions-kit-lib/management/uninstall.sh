@@ -182,7 +182,12 @@ fi
 UN_OC_UID=$(id -u "$OPENCODE_USER" 2>/dev/null || true)
 UN_OC_GID=$(id -g "$OPENCODE_USER" 2>/dev/null || true)
 UN_DEV_GROUP=$(id -gn "$DEFAULT_USER" 2>/dev/null || true)
-trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP uid=$UN_OC_UID gid=$UN_OC_GID devgroup=$UN_DEV_GROUP"
+# Numeric fallback for the ACL qualifiers (0.0.42f C2): setfacl -x parses
+# `g:<name>` at parse time and dies wholesale (rc 2) on an empty or
+# unresolvable name — a numeric gid never needs resolution.
+UN_DEV_GID=$(id -g "$DEFAULT_USER" 2>/dev/null || true)
+trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP uid=$UN_OC_UID gid=$UN_OC_GID"\
+" devgroup=$UN_DEV_GROUP devgid=$UN_DEV_GID"
 
 trace "first prompt ..."
 ans=$(prompt_yn "Proceed with uninstall?" "n")
@@ -400,9 +405,16 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # `setfacl -R -b`/`-k` wiped ALL extended ACLs — including
         # pre-existing user entries install never owned. -x is a no-op
         # (rc 0) on absent entries, live-verified for both the access
-        # and the default table.
-        run_q sudo setfacl -R -x "g:$UN_DEV_GROUP" "$root"
-        run_q sudo setfacl -R -d -x "g:$UN_DEV_GROUP" "$root"
+        # and the default table. Qualifiers use the NUMERIC gid
+        # (0.0.42f C2): a name qualifier dies at parse time when the
+        # name does not resolve, silently disabling the whole cleanup
+        # (run_q swallows the rc while the log claims removal).
+        if [ -n "$UN_DEV_GID" ]; then
+            run_q sudo setfacl -R -x "g:$UN_DEV_GID" "$root"
+            run_q sudo setfacl -R -d -x "g:$UN_DEV_GID" "$root"
+        else
+            echo "    dev group id unknown — ACL entries left in place (remove manually: setfacl -R -x g:<gid>)"
+        fi
         run_q sudo chmod g-s "$root"
         log "project ownership reverted + kit ACL entries removed: $root"
     done < "$UNINSTALL_PROJECTS_CONF"
