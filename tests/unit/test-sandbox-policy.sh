@@ -21,17 +21,22 @@
 #    sed only its last operand with -i. Variables are exempt -- what
 #    they hold is the review's job.
 #
-# 2. RATCHET (0.0.42f C3, maintainer directive): a literal absolute
-#    token STARTING with a real-tree prefix (listed in RATCHET_TREES
-#    below) fails even in inert fixture strings -- inert literals are
-#    one broken rewrite away from live (the migrate fixtures carried
-#    them for months behind a sed). Tokens under /tmp or /var/tmp are
-#    exempt (sandboxed fixtures are the point). Policy-INPUT classes
-#    (values fed to screening/parsing functions, never executed) are
-#    allowlisted below with reasons.
+# 2. RATCHET (0.0.42f C3, maintainer directive; raw view 0.0.42g C2):
+#    a literal absolute token STARTING with a real-tree prefix (listed
+#    in RATCHET_TREES below) fails even in inert or QUOTED fixture
+#    strings — the ratchet scans the RAW line (quotes stripped from
+#    token edges), only full-comment lines are skipped. Inert literals
+#    are one broken rewrite away from live (the migrate fixtures
+#    carried them for months behind a sed). Tokens under /tmp or
+#    /var/tmp are exempt (sandboxed fixtures are the point); a leading
+#    redirection (2>/path) is stripped before matching (0.0.42g C3).
+#    Policy-INPUT classes (values fed to screening/parsing functions,
+#    never executed) are allowlisted below with reasons.
 #
 # Backslash-continued commands are joined before scanning (0.0.42f C3:
-# `rm -rf \` + path-on-next-line was invisible to the line-based scan).
+# `rm -rf \` + path-on-next-line was invisible to the line-based scan);
+# a joined command reports the LAST physical line's number (awk NR at
+# completion — the self-probes pin the actual behavior).
 #
 # Run: sh tests/unit/test-sandbox-policy.sh
 
@@ -47,10 +52,17 @@ RATCHET_TREES="/var/www/vhosts /srv/other/outside"
 # or parse-only argument fixtures -- never executed as paths.
 ALLOW="
 # parse_args argument fixtures (parse-only suite -- the values are
-# parsed, never run)
+# parsed, never run; the quoted glob probe token cleans up to the bare
+# tree path)
 tests/unit/test-install-args.sh|/var/www/vhosts
+tests/unit/test-install-args.sh|/var/www/vhosts/
 # project_path_sane screening inputs + expected-verdict call fixtures
+# (ACCEPT list carries the bare and trailing-slash form, :147 the
+# space-suffixed client form)
 tests/unit/test-project-paths.sh|/var/www/vhosts
+tests/unit/test-project-paths.sh|/var/www/vhosts/
+tests/unit/test-project-paths.sh|/var/www/vhosts/client
+tests/unit/test-project-paths.sh|/var/www/vhosts/client1
 # screening-pattern loop values fed to greps against uninstall.sh
 tests/unit/test-uninstall.sh|/var/www/vhosts
 "
@@ -126,12 +138,17 @@ scan() {
                 hp = index(ops, "#")
                 if (hp > 0) ops = substr(ops, 1, hp - 1)
 
-                # --- check 2: real-tree literal ratchet (verb-independent)
-                rn = split(ops, rtok, /[ \t]+/)
-                for (ri = 1; ri <= rn; ri++) {
-                    t = rtok[ri]
-                    sub(/^[(=]+/, "", t); sub(/[,;)&|*]+$/, "", t)
+                # --- check 2: real-tree literal ratchet (verb-independent;
+                # RAW view so quoted literals count -- 0.0.42g C2).
+                # Path-shaped substrings are extracted anywhere in the
+                # line -- token-edge prefixes (x=", 2>, ...) must not
+                # hide the literal (0.0.42g C3).
+                rest = orig
+                while (match(rest, /\/[A-Za-z0-9._][A-Za-z0-9._\/-]*/)) {
+                    t = substr(rest, RSTART, RLENGTH)
+                    sub(/[.,;)&|*]+$/, "", t)
                     if (ratchet_hit(t)) report(t, "ratchet")
+                    rest = substr(rest, RSTART + RLENGTH)
                 }
 
                 # --- check 1: mutation operand scan (per command segment)
@@ -207,6 +224,10 @@ printf '#!/bin/sh\n# probe: continuation-split rm must be caught (0.0.42f C3)\nr
     > "$PROBE_DIR/unit/test-probe-cont.sh"
 printf '#!/bin/sh\n# probe: inert real-tree literal must be caught (ratchet)\napproot: /var/www/vhosts/probe-two\n' \
     > "$PROBE_DIR/unit/test-probe-ratchet.sh"
+printf '#!/bin/sh\n# probe: QUOTED real-tree literal must be caught too (0.0.42g C2)\nx="/var/www/vhosts/probe-quoted"\n' \
+    > "$PROBE_DIR/unit/test-probe-quoted.sh"
+printf '#!/bin/sh\n# probe: redirect-glued literal must be caught (0.0.42g C3)\nfoo 2>/var/www/vhosts/probe-redir\n' \
+    > "$PROBE_DIR/unit/test-probe-redir.sh"
 printf '#!/bin/sh\n# probe: sandboxed fixture passes both checks\napproot: /var/tmp/opencode-ddev-mig-roots/vhosts/x\nrm -rf /var/tmp/opencode-ddev-mig-roots\n' \
     > "$PROBE_DIR/unit/test-probe-clean.sh"
 : > "$VIOL"
@@ -220,6 +241,16 @@ if grep -q "test-probe-ratchet.sh|3|ratchet|/var/www/vhosts/probe-two" "$VIOL"; 
     pass "self-probe: inert real-tree literal is caught (ratchet)"
 else
     fail "self-probe: inert real-tree literal must be caught (0.0.42f C3)"
+fi
+if grep -q "test-probe-quoted.sh|3|ratchet|/var/www/vhosts/probe-quoted" "$VIOL"; then
+    pass "self-probe: quoted real-tree literal is caught (raw view)"
+else
+    fail "self-probe: quoted real-tree literal must be caught (0.0.42g C2)"
+fi
+if grep -q "test-probe-redir.sh|3|ratchet|/var/www/vhosts/probe-redir" "$VIOL"; then
+    pass "self-probe: redirect-glued literal is caught"
+else
+    fail "self-probe: redirect-glued literal must be caught (0.0.42g C3)"
 fi
 if grep -q "test-probe-clean.sh" "$VIOL"; then
     fail "self-probe: sandboxed probe must not be flagged"

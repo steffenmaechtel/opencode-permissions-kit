@@ -98,8 +98,9 @@ Patterns already in this repo:
 
 Unit suites run on contributor and CI hosts, not in containers — they
 must never create, delete or re-permission anything outside their own
-scratch space. Rule (finding history: 0.0.42e C1, executed as a live
-incident on an external review host):
+scratch space, and never carry real-tree path literals at all. Rules
+(finding history: 0.0.42e C1, executed as a live incident on an external
+review host):
 
 - Operate only on the suite's scratch (`$WORK`, `mktemp`) and the
   sanctioned temp prefixes `/tmp`, `/var/tmp` (plus `/dev/null`).
@@ -107,16 +108,32 @@ incident on an external review host):
   `/srv`, `/etc`, ... — **not in setup, not in teardown**: a cleanup
   `rm -rf` on a fixed host path deletes real data wherever the path
   happens to exist.
-- Fixture data referencing real-looking paths (heredoc configs with
-  `approot:` lines and the like) must be rewritten into the sandbox
-  before anything executes against them (the ddev-migrate suite's
-  `sed` rewrite is the pattern).
+- Fixture data is written **sandboxed at the source** (heredocs,
+  registries, configs carry `/var/tmp/...` paths directly). Inert
+  real-tree literals behind a later rewrite are forbidden too — they are
+  one broken rewrite away from live (the migrate fixtures carried them
+  for months behind a `sed` that a wave then dropped; maintainer
+  directive 2026-10-04).
 
-Enforced by `tests/unit/test-sandbox-policy.sh`: any mutating verb
-(`rm`, `mkdir`, `chown`, `setfacl`, ...) whose operand is a literal
-absolute path outside the sanctioned prefixes fails the guard. Variables
-are exempt — what they hold is the review's job; the guard catches the
-literal slip.
+Enforced by `tests/unit/test-sandbox-policy.sh`, two checks over every
+unit suite (backslash-continued commands are joined first; full-comment
+lines are skipped):
+
+1. **Mutation check** — a mutating verb (`rm`, `mkdir`, `chown`,
+   `setfacl`, ...) whose operand is a literal absolute path outside the
+   sanctioned prefixes fails. Source-to-destination verbs (`cp`, `mv`,
+   `ln`, ...) flag only the destination; `sed` only with `-i`.
+   Variables are exempt — what they hold is the review's job.
+2. **Real-tree ratchet** — any path-shaped literal starting with a
+   real-tree prefix (`/var/www/vhosts`, `/srv/other/outside`) fails,
+   quoted or not, in fixture strings as much as in commands
+   (0.0.42g C2). Policy-INPUT classes — values handed to
+   screening/parsing functions or parse-only argument fixtures, never
+   executed as paths — are allowlisted in the suite with reasons.
+
+The suite self-probes both checks (continuation-split `rm`, inert and
+quoted and redirect-glued literals, a clean sandboxed control) so the
+guard itself cannot rot silently.
 
 ## Referencing review findings
 

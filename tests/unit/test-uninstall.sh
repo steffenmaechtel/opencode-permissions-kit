@@ -181,8 +181,12 @@ LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && printf '%s\n/etc\n' "$WORK/fakeproj" | (
     run() { echo "RUN: $*"; }
     run_q() { echo "RUN: $*"; }
     log() { :; }
+    # Distinct ids (0.0.42g Q2): UN_OC_GID and UN_DEV_GID must differ so
+    # the ACL pin below can prove BOTH principals are removed — the
+    # identical-ids fixture was the blindness that let the opencode-group
+    # entries survive the dev-gid-only removal (0.0.42g S1).
     UN_OC_UID=60000
-    UN_OC_GID=60001
+    UN_OC_GID=60002
     UN_DEV_GROUP=devgroup
     UN_DEV_GID=60001
     DEFAULT_USER=devuser
@@ -191,7 +195,7 @@ LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && printf '%s\n/etc\n' "$WORK/fakeproj" | (
 if printf '%s' "$LOOP_OUT" | grep -qF "find $WORK/fakeproj" \
    && ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- '-uid 60000' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60001' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60002' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
     pass "ownership revert: uid/gid-matched chown to the developer per root (issue #74)"
@@ -234,19 +238,22 @@ fi
 # setfacl parse time when the name does not resolve, silently disabling
 # the cleanup; the capture feeds a fallback branch when even the gid is
 # unknown.
-if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60001' \
+if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60002' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60002' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60001' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60001' \
    && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -b' \
    && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -k'; then
-    pass "ACL revert: only kit-added entries removed, via numeric gid (0.0.42e C4 + 0.0.42f C2)"
+    pass "ACL revert: both kit principals removed via numeric gids (0.0.42g S1)"
 else
-    fail "ACL revert must use targeted numeric-gid -x removal, never -b/-k wipes (0.0.42e C4, 0.0.42f C2)"
+    fail "ACL revert must remove BOTH principals (opencode group + dev group) via numeric gids (0.0.42g S1)"
 fi
 if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$UNINSTALL" \
-   && grep -qF '[ -n "$UN_DEV_GID" ]' "$UNINSTALL"; then
-    pass "ACL revert: numeric gid captured with an unknown-gid fallback branch (0.0.42f C2)"
+   && grep -qF 'for _un_acl_gid in "$UN_OC_GID" "$UN_DEV_GID"' "$UNINSTALL" \
+   && grep -qF '[ -z "$UN_OC_GID" ] && [ -z "$UN_DEV_GID" ]' "$UNINSTALL"; then
+    pass "ACL revert: both gids captured, loop over principals, unknown-ids fallback branch (0.0.42f C2 + 0.0.42g S1)"
 else
-    fail "ACL revert: numeric gid capture + fallback branch required (0.0.42f C2)"
+    fail "ACL revert: principal loop + fallback branch required (0.0.42g S1)"
 fi
 
 # --- 5. cleanup hints match what install.sh leaves behind ----------------------

@@ -57,7 +57,10 @@ expect_rc() {
     _want="$1"; _desc="$2"; shift 2
     reset_globals
     if [ "$_want" = "0" ]; then
-        if parse_args "$@" 2>/dev/null; then
+        # Subshell (0.0.42g C1): parse_args aborts via exit 1 — a direct
+        # call in this set -e shell would kill the whole suite instead
+        # of recording the FAIL.
+        if ( parse_args "$@" ) 2>/dev/null; then
             pass "$_desc"
         else
             fail "$_desc (unexpected abort)"

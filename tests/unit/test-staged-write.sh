@@ -218,7 +218,7 @@ ln -s "$WORK/backvictim" "$WORK/backproj/websym"
 BACK_OUT="$(PATH="$STUB:$PATH" sh -c '. "$1" && ddev_handover_project_back "$2" devuser devgroup dev' _ "$HANDOVER" "$WORK/backproj" 2>&1)"
 if grep -qF "chown -R dev:devgroup $WORK/backproj/websym/typo3conf" "$OPS" \
    || grep -qF "chmod -R g+w $WORK/backproj/websym/typo3conf" "$OPS" \
-   || grep -qF "chown -R devuser:devgroup $WORK/backvictim/typo3conf" "$OPS"; then
+   || grep -qF "chown -R dev:devgroup $WORK/backvictim/typo3conf" "$OPS"; then
     fail "handover back: settings dir through an intermediate symlink is skipped (0.0.42f S1)"
 else
     pass "handover back: settings dir through an intermediate symlink is skipped (0.0.42f S1)"

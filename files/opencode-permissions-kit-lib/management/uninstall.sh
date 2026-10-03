@@ -176,9 +176,10 @@ fi
 # Kit-user ids, captured BEFORE the user removal below: once userdel ran,
 # project files still owned by opencode carry an ORPHANED uid — the
 # ownership revert in the project section below can only match those
-# numerically (issue #74). UN_DEV_GROUP is the revert target group (the
+# numerically (issue #74). UN_DEV_GROUP feeds the chown revert (the
 # developer's own login group — the kit's sharing group dies with the
-# opencode user).
+# opencode user); the ACL revert uses the NUMERIC gids below (0.0.42g
+# D3: names can stop resolving mid-run, gids never do).
 UN_OC_UID=$(id -u "$OPENCODE_USER" 2>/dev/null || true)
 UN_OC_GID=$(id -g "$OPENCODE_USER" 2>/dev/null || true)
 UN_DEV_GROUP=$(id -gn "$DEFAULT_USER" 2>/dev/null || true)
@@ -399,21 +400,24 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             echo "    opencode user unknown — skipped (chown manually if files are locked)"
         fi
         echo "  Cleaning kit ACLs from: $root"
-        # Targeted removal (0.0.42e C4): the kit's baseline adds access
-        # entries g:<dev-group> (traversal, fs_ensure_traversable) and
-        # default entries g:<dev-group>:rwx (fs-baseline). The former
-        # `setfacl -R -b`/`-k` wiped ALL extended ACLs — including
-        # pre-existing user entries install never owned. -x is a no-op
-        # (rc 0) on absent entries, live-verified for both the access
-        # and the default table. Qualifiers use the NUMERIC gid
-        # (0.0.42f C2): a name qualifier dies at parse time when the
-        # name does not resolve, silently disabling the whole cleanup
-        # (run_q swallows the rc while the log claims removal).
-        if [ -n "$UN_DEV_GID" ]; then
-            run_q sudo setfacl -R -x "g:$UN_DEV_GID" "$root"
-            run_q sudo setfacl -R -d -x "g:$UN_DEV_GID" "$root"
-        else
-            echo "    dev group id unknown — ACL entries left in place (remove manually: setfacl -R -x g:<gid>)"
+        # Dual-principal targeted removal (0.0.42e C4, corrected
+        # 0.0.42g S1): the baseline writes g:<OPENCODE_GROUP> entries
+        # (fs_baseline_root hands the opencode group — access traversal
+        # plus defaults); dev-group qualifiers cover traversal grants
+        # and older kit shapes. The former `setfacl -R -b`/`-k` wiped
+        # ALL extended ACLs — including pre-existing user entries
+        # install never owned. -x is a no-op (rc 0) on absent entries,
+        # live-verified for both the access and the default table.
+        # Qualifiers are NUMERIC (0.0.42f C2): a name qualifier dies at
+        # parse time when the name does not resolve; the gids survive
+        # the userdel above (captured before, orphan-proof).
+        for _un_acl_gid in "$UN_OC_GID" "$UN_DEV_GID"; do
+            [ -n "$_un_acl_gid" ] || continue
+            run_q sudo setfacl -R -x "g:$_un_acl_gid" "$root"
+            run_q sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
+        done
+        if [ -z "$UN_OC_GID" ] && [ -z "$UN_DEV_GID" ]; then
+            echo "    group ids unknown — ACL entries left in place (remove manually: setfacl -R -x g:<gid>)"
         fi
         run_q sudo chmod g-s "$root"
         log "project ownership reverted + kit ACL entries removed: $root"
