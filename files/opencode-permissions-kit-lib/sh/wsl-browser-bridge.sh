@@ -84,7 +84,27 @@ browser_bridge_write_conf() {
     _bb_conf="${OPK_WSL_CONF-/etc/wsl.conf}"
     _bb_tmp="$(mktemp)"
     _tmp_track "$_bb_tmp"
-    printf '# opencode permissions kit browser bridge -- begin\n# Managed by the opencode permissions kit (issues #91, #100). Every line\n# in this block is a comment for WSL -- no section, no key, no effect on\n# WSL itself. The `open` npm package bundled in opencode scans\n# /etc/wsl.conf for the first `root =` line to locate powershell.exe; the\n# carrier line at the end of this block wins that scan and redirects it\n# to the kit stand-in, keeping opencode device logins alive on a\n# hardened /mnt/c. Do not edit -- `opk uninstall` removes this block.\n# ----------------------------------------------------------------------\rroot = %s/wsl\n# opencode permissions kit browser bridge -- end\n\n' "$_bb_libdir" > "$_bb_tmp"
+    # The block below is byte-frozen: the unit tests assert the carrier
+    # line's position (line 9 of the file), the block length, and
+    # idempotency by byte compare. The carrier line's raw \r (CR before
+    # `root =`) is the deliberate hotfix from issue #100 -- do NOT "fix"
+    # it away: open@<=10's JS regex cannot cross a CR, so the leading
+    # `#` never voids the `root =` match, while WSL skips the whole line
+    # as a comment (full story in the header above and
+    # docs/reference/files.md).
+    {
+        printf '%s\n' \
+            '# opencode permissions kit browser bridge -- begin' \
+            '# Managed by the opencode permissions kit (issues #91, #100). Every line' \
+            '# in this block is a comment for WSL -- no section, no key, no effect on' \
+            '# WSL itself. The `open` npm package bundled in opencode scans' \
+            '# /etc/wsl.conf for the first `root =` line to locate powershell.exe; the' \
+            '# carrier line at the end of this block wins that scan and redirects it' \
+            '# to the kit stand-in, keeping opencode device logins alive on a' \
+            '# hardened /mnt/c. Do not edit -- `opk uninstall` removes this block.'
+        printf '# ----------------------------------------------------------------------\rroot = %s/wsl\n' "$_bb_libdir"
+        printf '# opencode permissions kit browser bridge -- end\n\n'
+    } > "$_bb_tmp"
     if [ -f "$_bb_conf" ]; then
         # Strip a previous kit block (including its trailing blank line)
         # and the legacy 0.0.36 section (header through next header,
@@ -129,7 +149,8 @@ browser_bridge_deploy_tree() {
     ${OPK_WSL_SUDO-sudo} chmod 755 "$_bb_libdir/wsl" "$_bb_libdir/wsl/c" "$_bb_libdir/wsl/c/Windows" \
         "$_bb_libdir/wsl/c/Windows/System32" "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell" \
         "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell/v1.0"
-    ${OPK_WSL_SUDO-sudo} install -m 755 "$_bb_src" "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+    ${OPK_WSL_SUDO-sudo} install -m 755 "$_bb_src" \
+        "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 }
 
 # Strip ONLY the legacy 0.0.36 hyphen section (kit-owned regression

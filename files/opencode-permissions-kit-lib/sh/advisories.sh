@@ -30,8 +30,8 @@
 # (">=1.14.30,<1.18.22") so a patched install does not warn.
 ADVISORY_RECORDS='
 opencode|<1.0.216|1.0.216||high|GHSA-vxw4-wv6m-9hhh|Unauthenticated HTTP server allows arbitrary command execution
-opencode|<1.1.10|1.1.10||critical|GHSA-c83v-7274-4vgp|Malicious website can execute commands on the local system through XSS in the OpenCode web UI
-opencode|>=1.14.30,<1.18.22|1.18.22|npm|high|GHSA-632h-h47v-g4x4|Cross-site opencode serve request can install arbitrary packages (npm-managed installations only)
+opencode|<1.1.10|1.1.10||critical|GHSA-c83v-7274-4vgp|Malicious website can run commands via XSS in the OpenCode web UI
+opencode|>=1.14.30,<1.18.22|1.18.22|npm|high|GHSA-632h-h47v-g4x4|Cross-site serve request can install arbitrary packages
 '
 
 # x.y.z of an `opencode --version` line. 1.x prints the bare version
