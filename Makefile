@@ -102,8 +102,9 @@ check-host:
 # py/ scripts otherwise ships green until an e2e run (or a user) hits it.
 # PYTHONPYCACHEPREFIX keeps the bytecode cache out of the repo tree (the
 # workflow-consistency test derives requirements from files/ on disk).
-# The tui/*.tsx assets stay covered by the e2e suites (a real TS check
-# would need a node + typescript install — not a unit-suite dependency).
+# The tui/*.tsx assets are gated CI-only by tests/tsx-syntax-gate.sh
+# (issue #114): a parse check needs node + pinned typescript — kept out
+# of the unit-suite host requirements on purpose.
 check-py:
 	@echo "=== Python syntax check (shipped scripts) ==="
 	@PYTHONPYCACHEPREFIX="$$(mktemp -d)" python3 -m py_compile \

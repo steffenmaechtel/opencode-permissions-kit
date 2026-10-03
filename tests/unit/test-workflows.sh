@@ -140,6 +140,34 @@ else
     fail "test-unit.yml: scripts chmod entries missing:$_smissing"
 fi
 
+# --- 2c. tsx syntax gate wiring (issue #114) ------------------------------------
+
+# The parse-only gate for the shipped tui/*.tsx assets lives in
+# tests/tsx-syntax-gate.sh and runs ONLY in test-unit.yml (CI-only:
+# node is not a contributor-host requirement). Silent removal would
+# reopen the gap the gate closes (tsx syntax errors shipping green);
+# these checks trip on it: run step + chmod entry present, the
+# typescript pin is an exact version (no dist-tags/ranges — keeps the
+# gate deterministic and the supply-chain surface pinned), and the gate
+# covers the whole tui tsx glob instead of a hand-maintained file list.
+GATE_SCRIPT="$REPO/tests/tsx-syntax-gate.sh"
+if [ ! -f "$GATE_SCRIPT" ]; then
+    fail "tests/tsx-syntax-gate.sh missing (issue #114 gate)"
+else
+    _gmissing=""
+    grep -qF 'sh tests/tsx-syntax-gate.sh' "$WF_TEST" || _gmissing="$_gmissing no-run-step"
+    chmod_tokens "$WF_TEST" | grep -qxF './tests/tsx-syntax-gate.sh' \
+        || _gmissing="$_gmissing no-chmod-entry"
+    grep -qE '^TYPESCRIPT_VERSION="[0-9]+\.[0-9]+\.[0-9]+"$' "$GATE_SCRIPT" \
+        || _gmissing="$_gmissing pin-not-exact-version"
+    grep -qF 'tui/*.tsx' "$GATE_SCRIPT" || _gmissing="$_gmissing no-tsx-glob"
+    if [ -z "$_gmissing" ]; then
+        pass "test-unit.yml: tsx syntax gate wired (run + chmod + exact pin + glob)"
+    else
+        fail "test-unit.yml: tsx gate wiring incomplete:$_gmissing"
+    fi
+fi
+
 # --- 3. opencode 2.x pin jobs (issue #80) --------------------------------------
 
 # The e2e workflows run the suites a second time against the CURRENT 2.x
