@@ -416,7 +416,11 @@ package bundled with opencode, which spawns the Windows powershell.exe. On
 a restricted `/mnt/c` the `opencode` user may not execute it, and the login
 dies on that spawn error (issue #91). The kit's browser bridge redirects
 that lookup to a harmless stand-in — the crash means the bridge is not in
-place (broken deploy, hand-edited `/etc/wsl.conf`).
+place (broken deploy, hand-edited `/etc/wsl.conf`). Only applies to
+opencode **< 1.18.33**: since 1.18.33 the bundled `open` access-checks
+powershell and falls back to xdg-open, so the login survives without the
+bridge — a crash on a newer version is a different problem, please report
+it.
 
 **Cause 2:** the login ran from a directory the `opencode` user cannot read
 (typically your `$HOME`, mode 750). Bun's `posix_spawn` — used for the
@@ -472,8 +476,8 @@ stops applying: the `[automount]` restriction stays pending, `[boot]`
 the next `wsl --shutdown` (issue #100).
 
 **Fix:** update the kit (`sudo opk update`, ≥ 0.0.38) — it strips the
-broken section (restoring WSL's ability to parse the file) — then opt in
-to the login-fix carrier yourself:
+broken section (restoring WSL's ability to parse the file) — then, on
+opencode < 1.18.33, opt in to the login-fix carrier yourself:
 
 ```bash
 sudo opk wsl-add-opencode-1-fix

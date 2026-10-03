@@ -596,7 +596,18 @@ if [ -d /mnt/c ]; then
         # device logins (`console login` / `auth login`) die on the spawn
         # error. The wsl.conf carrier is an explicit opt-in (the kit never
         # edits wsl.conf implicitly).
-        if [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ] \
+        # opencode >= 1.18.33 (and every 2.x) bundles `open` 11.x (upstream
+        # PR #51414): powershell access is checked BEFORE spawning with an
+        # xdg-open fallback — no bridge needed there. An unknown version
+        # (probe failed) keeps the old verdicts (safe side).
+        _st_bridge_unneeded=0
+        if [ -n "${ADV_VER:-}" ] && command -v advisories_version_cmp >/dev/null 2>&1 \
+           && [ "$(advisories_version_cmp "$ADV_VER" 1.18.33)" != lt ]; then
+            _st_bridge_unneeded=1
+        fi
+        if [ "$_st_bridge_unneeded" -eq 1 ]; then
+            ui_kv "browser bridge" "not needed — opencode $ADV_VER ships a WSL-safe opener (bridge serves < 1.18.33)" "$UI_GREEN"
+        elif [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ] \
            && grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             ui_kv "browser bridge" "deployed (opencode logins survive the hardened mount)" "$UI_GREEN"
         elif [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then

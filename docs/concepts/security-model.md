@@ -136,7 +136,9 @@ which spawns
 `<first "root =" match in /etc/wsl.conf>c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`.
 On the restricted mount the `opencode` user may not execute that binary —
 and opencode dies on the resulting spawn error (issue #91), right after
-printing URL and device code.
+printing URL and device code. (Fixed upstream in opencode 1.18.33: the
+bundled `open` access-checks powershell and falls back to xdg-open, so
+newer binaries need no bridge.)
 
 The kit solves this **without granting the agent anything**:
 
@@ -178,7 +180,9 @@ no-op path triggers, it prints a one-line hint to the terminal
 (self-test: [troubleshooting](../troubleshooting.md)).
 `opk status` reports the bridge state and names
 `opk wsl-add-opencode-1-fix` when the carrier is missing; the wrapper
-warns the same way on every start. Uninstall asks before removing the
+warns the same way on every start — both skip their warning when the
+installed opencode is >= 1.18.33 (its `open` survives a restricted
+`/mnt/c` on its own). Uninstall asks before removing the
 block (or assumes yes with `--yes`) and always removes the stand-in tree.
 
 ## Other root-equivalent surfaces (audit)

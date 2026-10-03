@@ -260,7 +260,18 @@ if [ -d /mnt/c ]; then
     # to a harmless stand-in via the kit comment block in /etc/wsl.conf
     # (explicit opt-in — the kit never edits wsl.conf implicitly). Warn when
     # the mount is restricted but the bridge is not in place.
-    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
+    # Version gate: opencode >= 1.18.33 (upstream PR #51414) bundles `open`
+    # 11.x, which access-checks powershell.exe BEFORE spawning and falls back
+    # to xdg-open — device logins survive a restricted /mnt/c without the
+    # bridge (live-verified on 1.18.34). Every 2.x ships it too (version_cmp
+    # sorts 2.x above 1.18.33). ADV_VERSION comes from the fail-open probe
+    # above: an unknown version keeps the warning (safe side).
+    _bridge_needed=1
+    if [ -n "${ADV_VERSION:-}" ] \
+       && [ "$(advisories_version_cmp "$ADV_VERSION" 1.18.33)" != lt ]; then
+        _bridge_needed=0
+    fi
+    if [ "$_bridge_needed" -eq 1 ] && [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
         if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/\
 WindowsPowerShell/v1.0/powershell.exe ] \
            || ! grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then

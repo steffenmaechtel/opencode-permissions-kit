@@ -42,7 +42,10 @@
 # with the following character). Newer `open` (wsl-utils based) parses
 # line-based, skips `^\s*#` lines, and checks powershell access before
 # spawning — it ignores the carrier and falls back to xdg-open, so no
-# bridge is needed there.
+# bridge is needed there. opencode >= 1.18.33 bundles it (open 11.0.4,
+# upstream PR #51414): the wrapper and `opk status` skip their bridge
+# warnings from that version on — this bridge (and the carrier) only
+# serve older opencode pins (opk upgrade-opencode --version).
 #
 # POSIX sh, SOURCED (never executed) by install.sh and update.sh.
 # Callers run as root (or via sudo) — plain file writes are fine. All
