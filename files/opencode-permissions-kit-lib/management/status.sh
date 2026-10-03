@@ -596,17 +596,22 @@ if [ -d /mnt/c ]; then
         # device logins (`console login` / `auth login`) die on the spawn
         # error. The wsl.conf carrier is an explicit opt-in (the kit never
         # edits wsl.conf implicitly).
-        # opencode >= 1.18.33 (and every 2.x) bundles `open` 11.x (upstream
-        # PR #51414): powershell access is checked BEFORE spawning with an
-        # xdg-open fallback — no bridge needed there. An unknown version
+        # opencode 1.18.33+ / 2.0.18+ (upstream PR #51414) bundle `open`
+        # 11.x: powershell access is checked BEFORE spawning with an
+        # xdg-open fallback — no bridge needed there (the kit's xdg-open
+        # shim covers that fallback). 2.0.2-2.0.17 bundle open@10.1.2,
+        # like 1.x < 1.18.33, and need the carrier. An unknown version
         # (probe failed) keeps the old verdicts (safe side).
         _st_bridge_unneeded=0
-        if [ -n "${ADV_VER:-}" ] && command -v advisories_version_cmp >/dev/null 2>&1 \
-           && [ "$(advisories_version_cmp "$ADV_VER" 1.18.33)" != lt ]; then
-            _st_bridge_unneeded=1
+        if [ -n "${ADV_VER:-}" ] && command -v advisories_version_cmp >/dev/null 2>&1; then
+            case "$ADV_VER" in
+                1.*) if [ "$(advisories_version_cmp "$ADV_VER" 1.18.33)" != lt ]; then _st_bridge_unneeded=1; fi ;;
+                2.*) if [ "$(advisories_version_cmp "$ADV_VER" 2.0.18)" != lt ]; then _st_bridge_unneeded=1; fi ;;
+            esac
         fi
         if [ "$_st_bridge_unneeded" -eq 1 ]; then
-            ui_kv "browser bridge" "not needed — opencode $ADV_VER ships a WSL-safe opener (bridge serves < 1.18.33)" "$UI_GREEN"
+            ui_kv "browser bridge" "not needed — opencode $ADV_VER ships a WSL-safe opener" "$UI_GREEN"
+            ui_detail "kit carrier serves 1.x < 1.18.33 and 2.x < 2.0.18 only"
         elif [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ] \
            && grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             ui_kv "browser bridge" "deployed (opencode logins survive the hardened mount)" "$UI_GREEN"
@@ -617,6 +622,17 @@ if [ -d /mnt/c ]; then
             ui_kv "browser bridge" "missing — 'console login'/'auth login' fails on this mount" "$UI_RED"
             ui_detail "fix: sudo opk update (deploys the stand-in),"\
 " then sudo opk wsl-add-opencode-1-fix (wsl.conf carrier)"
+        fi
+        # xdg-open fallback shim (bin/xdg-open): open@11's fallback path
+        # crashes opencode 2.x device logins when no xdg-open exists.
+        if [ -L /usr/local/bin/xdg-open ] \
+           && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
+            ui_kv "xdg-open fallback" "deployed (kit shim at /usr/local/bin/xdg-open)" "$UI_GREEN"
+        elif [ -x /usr/local/bin/xdg-open ] || [ -x /usr/bin/xdg-open ]; then
+            ui_kv "xdg-open fallback" "not needed — real xdg-open present" "$UI_GREEN"
+        else
+            ui_kv "xdg-open fallback" "missing — opencode 1.18.33+ / 2.0.18+ device logins crash" "$UI_RED"
+            ui_detail "fix: sudo opk update (deploys the shim when no real xdg-open exists)"
         fi
     fi
 fi

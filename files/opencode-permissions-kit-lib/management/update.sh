@@ -159,6 +159,7 @@ opencode-permissions-kit-lib/sh/secure-binary.sh \
 opencode-permissions-kit-lib/sh/deploy-lib.sh \
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
 opencode-permissions-kit-lib/bin/browser-bridge \
+opencode-permissions-kit-lib/bin/xdg-open \
 opencode-permissions-kit-lib/tui/kit-mode.tsx \
 opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
 opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
@@ -618,6 +619,27 @@ ui_success "wrapper symlink refreshed: /usr/local/bin/opencode -> $LIBDIR/bin/op
 sudo rm -f /usr/local/bin/opencode-permissions-kit
 sudo ln -sf "$LIBDIR/bin/opk" /usr/local/bin/opk
 ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy name removed)"
+
+# --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) -------------
+
+# Deploy only while no real xdg-open exists; heal the shadow case (a real
+# one appeared since install -> the kit stands back).
+if [ -L /usr/local/bin/xdg-open ] \
+   && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
+    if [ -x /usr/bin/xdg-open ]; then
+        sudo rm -f /usr/local/bin/xdg-open
+        ui_detail "xdg-open fallback removed: a real xdg-open (/usr/bin/xdg-open) took over"
+        log "xdg-open shim removed: real xdg-open present (/usr/bin/xdg-open)"
+    else
+        ui_detail "xdg-open fallback active: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
+        log "xdg-open shim active: /usr/local/bin/xdg-open"
+    fi
+elif ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ] \
+   && ! [ -x /usr/bin/xdg-open ]; then
+    sudo ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open
+    ui_success "xdg-open fallback installed: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
+    log "xdg-open shim symlink: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
+fi
 
 # --- re-deploy sudoers -------------------------------------------------------
 

@@ -260,16 +260,20 @@ if [ -d /mnt/c ]; then
     # to a harmless stand-in via the kit comment block in /etc/wsl.conf
     # (explicit opt-in — the kit never edits wsl.conf implicitly). Warn when
     # the mount is restricted but the bridge is not in place.
-    # Version gate: opencode >= 1.18.33 (upstream PR #51414) bundles `open`
-    # 11.x, which access-checks powershell.exe BEFORE spawning and falls back
-    # to xdg-open — device logins survive a restricted /mnt/c without the
-    # bridge (live-verified on 1.18.34). Every 2.x ships it too (version_cmp
-    # sorts 2.x above 1.18.33). ADV_VERSION comes from the fail-open probe
-    # above: an unknown version keeps the warning (safe side).
+    # Version gate: opencode 1.18.33+ and 2.0.18+ (upstream PR #51414)
+    # bundle `open` 11.x, which access-checks powershell.exe BEFORE
+    # spawning and falls back to xdg-open — device logins survive a
+    # restricted /mnt/c without the bridge (the kit ships an xdg-open
+    # fallback shim for that fallback path, see bin/xdg-open). Earlier
+    # versions bundle open@10.1.2 (1.x < 1.18.33, 2.0.2-2.0.17) and DO
+    # need the carrier (2.0.10 verified live). ADV_VERSION comes from
+    # the fail-open probe above: an unknown version keeps the warning.
     _bridge_needed=1
-    if [ -n "${ADV_VERSION:-}" ] \
-       && [ "$(advisories_version_cmp "$ADV_VERSION" 1.18.33)" != lt ]; then
-        _bridge_needed=0
+    if [ -n "${ADV_VERSION:-}" ]; then
+        case "$ADV_VERSION" in
+            1.*) if [ "$(advisories_version_cmp "$ADV_VERSION" 1.18.33)" != lt ]; then _bridge_needed=0; fi ;;
+            2.*) if [ "$(advisories_version_cmp "$ADV_VERSION" 2.0.18)" != lt ]; then _bridge_needed=0; fi ;;
+        esac
     fi
     if [ "$_bridge_needed" -eq 1 ] && [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
         if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/\

@@ -95,11 +95,12 @@ Commands:
                                      mixed-owner trees, e.g. after builds by
                                      both users. --dry-run shows the plan
   wsl-add-opencode-1-fix            Write the WSL browser-bridge carrier into
-                                    /etc/wsl.conf (sudo). The only kit command
-                                    that touches wsl.conf — explicit consent:
-                                    install/update never do. Keeps opencode
-                                    1.x device logins alive on a hardened
-                                    /mnt/c (opencode 2.x needs no bridge)
+                                     /etc/wsl.conf (sudo). The only kit command
+                                     that touches wsl.conf — explicit consent:
+                                     install/update never do. Keeps device
+                                     logins alive on a hardened /mnt/c for
+                                     open@10 versions (1.x < 1.18.33,
+                                     2.x < 2.0.18)
   uninstall [--yes] [--dry-run]   Remove the kit (runs as your user)
   --version                       Print the deployed kit version and exit
   help                            Show this help

@@ -417,10 +417,10 @@ a restricted `/mnt/c` the `opencode` user may not execute it, and the login
 dies on that spawn error (issue #91). The kit's browser bridge redirects
 that lookup to a harmless stand-in — the crash means the bridge is not in
 place (broken deploy, hand-edited `/etc/wsl.conf`). Only applies to
-opencode **< 1.18.33**: since 1.18.33 the bundled `open` access-checks
-powershell and falls back to xdg-open, so the login survives without the
-bridge — a crash on a newer version is a different problem, please report
-it.
+opencode bundling `open` 10.x — 1.x **< 1.18.33** and 2.x **< 2.0.18**:
+newer versions access-check powershell and fall back to xdg-open (see
+the next section), so the login survives without the bridge — a crash
+on a newer version is a different problem, please report it.
 
 **Cause 2:** the login ran from a directory the `opencode` user cannot read
 (typically your `$HOME`, mode 750). Bun's `posix_spawn` — used for the
@@ -464,6 +464,27 @@ OPK_BROWSER_BRIDGE_DEBUG=1 /usr/local/lib/opencode-permissions-kit/wsl/c/Windows
 Run as yourself the trace ends in `forwarding to /mnt/c/...` and the
 browser opens; if it does not, check the mount options (`stat -c %a
 /mnt/c`) — your user must be the mount owner.
+
+## `opencode auth login` (2.x, OpenCode Console account) dies with `Executable not found in $PATH: "xdg-open"`
+
+**Cause:** opencode 1.18.33+/2.0.18+ open the verification URL through
+`open` 11.x, which ignores the wsl.conf carrier, access-checks
+powershell.exe and falls back to `xdg-open` — and WSL distros ship no
+xdg-open by default. On 2.x that failed spawn escapes the CLI's error
+handling as an uncaught defect: the login dies right after printing URL
+and device code (1.x survives it; 2.0.2–2.0.17 with the carrier never
+reach the fallback).
+
+**Fix:** update the kit (`sudo opk update`) — it deploys an xdg-open
+fallback shim to `/usr/local/bin/xdg-open`, but only while no real
+xdg-open exists (`sudo apt install xdg-utils` works too; the kit stands
+back once a real one appears). The login then degrades like on 1.x:
+URL and code stay on screen, open the URL in any browser. Self-test as
+your own user — the browser must open `https://opencode.ai`:
+
+```bash
+OPK_BROWSER_BRIDGE_DEBUG=1 xdg-open https://opencode.ai
+```
 
 ## WSL prints `wsl: Expected ']' in /etc/wsl.conf` after updating to kit 0.0.36
 

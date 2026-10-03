@@ -1,0 +1,51 @@
+#!/bin/sh
+# opencode permissions kit -- bin/xdg-open
+#
+# Deployed into the library and symlinked as /usr/local/bin/xdg-open —
+# only while no real xdg-open exists (install/update never shadow one).
+#
+# Why (the opencode 2.x device-login crash): the browser opener bundled
+# with opencode 1.18.33+/2.0.18+ (npm `open` 11.x, upstream PR #51414)
+# ignores the kit's wsl.conf carrier, access-checks powershell.exe BEFORE
+# spawning and falls back to `xdg-open` — on plain Linux it goes there
+# directly. WSL distros and minimal servers routinely ship no xdg-open,
+# and the failed spawn escapes opencode 2.x's error handling as an
+# uncaught defect: `opencode auth login` (OpenCode Console account) dies
+# right after printing URL and device code. This shim turns that crash
+# into the designed degradation the 1.x bridge already provides.
+#
+# Mechanism: pure delegation to bin/browser-bridge with powershell-style
+# arguments (Start-Process):
+#   - caller may execute the real powershell.exe (the developer on a
+#     hardened mount, anyone on a default 777 mount): browser opens.
+#   - caller may not (the opencode user): browser-bridge prints its
+#     one-line tty hint, exits 0, the login keeps polling.
+# It parses nothing and must never grow privileged behavior — any caller
+# can run it with arbitrary arguments to no effect beyond a possible
+# browser open *as the caller* (same shape as bin/browser-bridge).
+#
+# Diagnostics: OPK_BROWSER_BRIDGE_DEBUG=1 (traced inside browser-bridge).
+set -e
+
+# First non-option argument = the target (open@11 passes exactly one
+# URL; anything else still degrades safely).
+_target=""
+for _arg in "$@"; do
+    case "$_arg" in
+        -*) ;;
+        *) _target="$_arg"; break ;;
+    esac
+done
+[ -n "$_target" ] || exit 0
+
+# PowerShell single-quoted string: URLs cannot carry a raw quote — a
+# target that does (malformed input) gets the silent no-op instead.
+case "$_target" in *"'"*) exit 0 ;; esac
+
+# Resolve through the /usr/local/bin symlink to find the library copy
+# (readlink -f: GNU coreutils, present everywhere the kit runs).
+_self="$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")"
+_bridge="$(dirname -- "$_self")/browser-bridge"
+[ -x "$_bridge" ] || exit 0
+
+exec "$_bridge" -NoProfile -NonInteractive -Command "Start-Process '$_target'"

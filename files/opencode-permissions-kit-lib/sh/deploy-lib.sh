@@ -73,6 +73,7 @@ opencode-permissions-kit-lib/bin/opencode-as-opencode 755
 opencode-permissions-kit-lib/bin/opk 755
 opencode-permissions-kit-lib/bin/setup-container-backend 755
 opencode-permissions-kit-lib/bin/socket-check 755
+opencode-permissions-kit-lib/bin/xdg-open 755
 # py/
 opencode-permissions-kit-lib/py/jsonc-parser.py 755
 opencode-permissions-kit-lib/py/tui-register.py 755

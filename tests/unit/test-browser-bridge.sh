@@ -437,6 +437,68 @@ else
 fi
 
 echo ""
+echo "--- xdg-open fallback shim (bin/xdg-open) ---"
+
+# Deployed layout: shim + browser-bridge side by side, reached through a
+# /usr/local/bin-style symlink (readlink -f resolution).
+XDG_BIN="$WORK/xdgbin"
+mkdir -p "$XDG_BIN" "$WORK/localbin"
+cp "$REPO/files/opencode-permissions-kit-lib/bin/xdg-open" "$XDG_BIN/xdg-open"
+cp "$BRIDGE_BIN" "$XDG_BIN/browser-bridge"
+chmod 755 "$XDG_BIN/xdg-open" "$XDG_BIN/browser-bridge"
+ln -s "$XDG_BIN/xdg-open" "$WORK/localbin/xdg-open"
+
+# 29. no arguments -> exit 0 (nothing to open, never a crash)
+if "$WORK/localbin/xdg-open" >/dev/null 2>&1; then
+    pass "xdg-open shim: no-args invocation exits 0"
+else
+    fail "xdg-open shim: no-args invocation crashes"
+fi
+
+# 30. agent path (no reachable powershell): delegates to browser-bridge's
+#     no-op -> exit 0, silent without the debug env (login keeps polling)
+_xout="$(OPK_WSL_C_ROOT="$WORK/nowhere" "$WORK/localbin/xdg-open" https://opencode.ai 2>&1)"
+if [ -z "$_xout" ]; then
+    pass "xdg-open shim: agent path exits 0, silent"
+else
+    fail "xdg-open shim: agent path leaks output (got: '$_xout')"
+fi
+
+# 31. developer path: forwards Start-Process '<url>' through browser-bridge
+#     to the real powershell.exe (fake prints all args)
+mkdir -p "$WORK/fakec2/Windows/System32/WindowsPowerShell/v1.0"
+cat > "$WORK/fakec2/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" <<'PS'
+#!/bin/sh
+printf 'ARGS:%s\n' "$*"
+PS
+chmod 755 "$WORK/fakec2/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+_xfwd="$(OPK_WSL_C_ROOT="$WORK/fakec2" "$WORK/localbin/xdg-open" 'https://opencode.ai/console/device?user_code=ABCD-EFGH&client_id=opencode-cli' 2>/dev/null)"
+case "$_xfwd" in
+    *Start-Process*https://opencode.ai/console/device*)
+        pass "xdg-open shim: developer path sends Start-Process <url> to powershell.exe" ;;
+    *)
+        fail "xdg-open shim: developer path mangled (got: '$_xfwd')" ;;
+esac
+
+# 32. debug env traces through the delegation (browser-bridge reports)
+if OPK_BROWSER_BRIDGE_DEBUG=1 OPK_WSL_C_ROOT="$WORK/nowhere" "$WORK/localbin/xdg-open" https://opencode.ai 2>&1 \
+   | grep -q "browser-bridge\[debug\]: no real powershell reachable"; then
+    pass "xdg-open shim: debug env traces the delegated no-op decision"
+else
+    fail "xdg-open shim: debug delegation broken"
+fi
+
+# 33. a shim without its browser-bridge sibling degrades to exit 0
+mkdir -p "$WORK/lonelybin"
+cp "$XDG_BIN/xdg-open" "$WORK/lonelybin/xdg-open"
+chmod 755 "$WORK/lonelybin/xdg-open"
+if OPK_WSL_C_ROOT="$WORK/fakec2" "$WORK/lonelybin/xdg-open" https://opencode.ai >/dev/null 2>&1; then
+    pass "xdg-open shim: missing browser-bridge sibling degrades to exit 0"
+else
+    fail "xdg-open shim: crashes without its browser-bridge sibling"
+fi
+
+echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1
