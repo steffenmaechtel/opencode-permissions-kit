@@ -149,8 +149,7 @@ records; where wording differs from the code, the code wins.
 ## Project reviews
 
 Full reviews (security, bugs, quality, docs, CI) are **trigger-based**, not
-on a calendar. Open a review issue from the `project_review` template when
-any of these fires:
+on a calendar. Run a review when any of these fires:
 
 - a **version bump** is planned (before the release),
 - roughly **500+ changed lines or 10+ merged PRs** have accumulated on
@@ -160,9 +159,11 @@ any of these fires:
 
 Findings from a review become issues labeled `review` (actionable soon) or
 `tech-debt` (deliberately deferred, with a reason). A review starts by
-working the backlog, not by re-inventing itself: the checklist lives in
-`.github/ISSUE_TEMPLATE/project_review.md` and doubles as the working
-instructions for a coding agent doing the review locally.
+working the backlog, not by re-inventing itself: method, snapshot and
+resolution mechanics, and the snapshot skeleton live in
+[docs/design/review/README.md](docs/design/review/README.md)
+(`template.md`) — the working instructions for a coding agent doing the
+review locally.
 
 After each review, try to shrink the next one: every finding that could be
 turned into a lint rule, unit test, or consistency guard should be — the
