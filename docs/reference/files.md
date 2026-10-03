@@ -14,7 +14,9 @@ block** at the top (WSL only; its carrier line — a `#` comment containing
 a raw carriage return before `root = …` — wins the `open` package's scan
 and redirects opencode's powershell lookup to the browser bridge
 stand-in; WSL itself only ever sees comments, so no warning, no restart
-needed). The `[automount]` hardening is yours to add manually.
+needed). Only relevant for opencode **< 1.18.33** — newer versions ship
+a WSL-safe browser opener and need no bridge. The `[automount]`
+hardening is yours to add manually.
 Uninstall asks before removing the kit block (or assumes yes with
 `--yes`); your own entries always stay.
 
