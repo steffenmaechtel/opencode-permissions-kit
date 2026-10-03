@@ -14,6 +14,8 @@
 #   git, make, python3, shellcheck
 # Optional (reported, never blocking):
 #   docker, curl, tar + xz  — e2e suites only (make e2e / e2e-rootless)
+#   / make e2e-ddev; the ddev suite additionally needs a real ddev binary
+#   and builds a cached golden image
 
 set -u
 

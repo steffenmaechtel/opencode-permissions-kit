@@ -42,7 +42,7 @@ directories themselves stay in place and are shared via the group baseline.
 3. **Import (manual, post-install):** the import is deliberately NOT part
    of the install. The first opencode-side `ddev start` pulls images
    (~minutes); that must not block or fail the installation. The install
-   summary and `opencode-permissions-kit status` show waiting dumps with
+   summary and `opk status` show waiting dumps with
    the commands:
    - batch: `sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import`
    - per project: `ddev start <name> && ddev import-db <name> --file=<dump>.sql.gz`

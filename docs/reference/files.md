@@ -14,9 +14,10 @@ block** at the top (WSL only; its carrier line — a `#` comment containing
 a raw carriage return before `root = …` — wins the `open` package's scan
 and redirects opencode's powershell lookup to the browser bridge
 stand-in; WSL itself only ever sees comments, so no warning, no restart
-needed). Only relevant for opencode **< 1.18.33** — newer versions ship
-a WSL-safe browser opener and need no bridge. The `[automount]`
-hardening is yours to add manually.
+needed). Only relevant for opencode **1.x < 1.18.33 and 2.x < 2.0.18** —
+newer versions ship a WSL-safe browser opener (open@11 falls back to
+`xdg-open`; the kit deploys a fallback shim when no real one exists).
+The `[automount]` hardening is yours to add manually.
 Uninstall asks before removing the kit block (or assumes yes with
 `--yes`); your own entries always stay.
 
@@ -64,7 +65,11 @@ Uninstall asks before removing the kit block (or assumes yes with
 |---|---|
 | `/home/opencode/.config/opencode/opencode.jsonc` | opencode config with the soft deny list |
 | `/home/opencode/.ddev/` | opencode user's global ddev home |
+| `/home/opencode/.config/opencode/tui.json` | TUI mode display registration (kit-managed; the user's own theme choice is never touched) |
 | `/home/<dev>/.config/opencode/opencode.jsonc` | deny-* lockout config (self-update bypass) |
+| `/home/<dev>/.config/opencode/tui.json` | TUI mode display registration for the default user |
+| `/home/<dev>/.config/opencode/themes/opencode-danger.json` | red danger theme (the bypass warning) |
+| `/home/<dev>/.config/opencode/plugins/opencode-permissions-kit/` | opencode 2.x local CLI plugin dir (kit-mode-2x registration; skipped when user-managed symlinks are present) |
 
 ## /usr/local/
 

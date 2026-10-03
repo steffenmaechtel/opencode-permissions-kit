@@ -101,7 +101,7 @@ Commands:
                                      logins alive on a hardened /mnt/c for
                                      open@10 versions (1.x < 1.18.33,
                                      2.x < 2.0.18)
-  uninstall [--yes] [--dry-run]   Remove the kit (runs as your user)
+  uninstall [--yes] [--dry-run] [--debug]   Remove the kit (runs as your user)
   --version                       Print the deployed kit version and exit
   help                            Show this help
 
@@ -225,7 +225,7 @@ case "$cmd" in
             exit 1
         fi
         browser_bridge_write_conf "$LIBDIR"
-        ui_success "WSL browser bridge active — opencode 1.x device logins survive a hardened /mnt/c"
+        ui_success "WSL browser bridge active — opencode device logins survive a hardened /mnt/c (1.x < 1.18.33, 2.x < 2.0.18)"
         ui_detail "carrier written to /etc/wsl.conf as a comment block (WSL ignores it;"
         ui_detail "takes effect immediately, no 'wsl --shutdown' needed)"
         ui_detail "'opk uninstall' removes the block again"

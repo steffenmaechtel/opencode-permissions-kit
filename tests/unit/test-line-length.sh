@@ -11,8 +11,10 @@
 # wraps when lines were re-broken for width). Content-width keeps the
 # ratchet's growth guarantee while making (re-)indentation free.
 # The tree is NOT at zero either way: at adoption (2026-10-01) the
-# shipped files carried ~207 lines over 120 in 18 files, and every
-# workflow chmod inventory line is a 2k+ chars single line. A hard limit
+# shipped files carried ~207 lines over 120 in 18 files, and the
+# workflow chmod inventory lines of that era were 2k+ chars single
+# lines (those lists are gone since issue #123 — exec bits live in the
+# git index). A hard limit
 # would fail on the spot, so this is a RATCHET:
 #
 #   - the baseline file next to this test records, per file, the SUM of
@@ -36,7 +38,7 @@
 #
 # Scope: files/**/*.sh (incl. files/etc/umask.sh and files/install.sh),
 # the extensionless shell under files/opencode-permissions-kit-lib/bin/,
-# and .github/workflows/*.yml (the chmod inventory lines are exactly the
+# and .github/workflows/*.yml (their long config lines are exactly the
 # hidden growth this guard exists to surface). NOT in scope: py/, tui/,
 # docs/, tests/ themselves, scripts/ (dev tooling).
 #

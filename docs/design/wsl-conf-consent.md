@@ -55,8 +55,12 @@ opt-in commands or printed instructions.
 - Fresh installs land with `opk status` showing the bridge as
   stand-in-only until the user opts in — one explicit command, and the
   wrapper/status explain exactly when it is needed (hardened /mnt/c,
-  opencode 1.x). opencode 2.x never needs it (its `open` access-checks
-  powershell and falls back to xdg-open).
+  opencode 1.x). opencode **≥ 2.0.18** never needs it (its `open`
+  access-checks powershell and falls back to `xdg-open` — the kit ships
+  a fallback shim when no real one exists); 2.0.2–2.0.17 predate that
+  fallback and need the carrier exactly like late 1.x (corrected
+  2026-10-03, finding 0.0.42e D2 — the wrapper's gate at
+  bin/opencode-as-opencode and status.sh carry both thresholds).
 - The /mnt/c hardening UX loses one prompt and gains a printed snippet —
   the wrapper already repeats the snippet on every start until applied.
 - Uninstall behavior: the stand-in tree always goes; the kit block is

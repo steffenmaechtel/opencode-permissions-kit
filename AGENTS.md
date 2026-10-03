@@ -61,7 +61,11 @@ used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
   commands the user runs themselves; `opk wsl-add-opencode-1-fix` is the
   only command that writes wsl.conf, and only on explicit invocation.
   `opk uninstall` asks (or `--yes`) before removing kit-owned wsl.conf
-  content. Rationale: `docs/design/wsl-conf-consent.md`.
+  content. Sanctioned exception (0.0.42e S3, issue #100): install/update
+  strip the broken legacy 0.0.36 hyphen section if present — removal of
+  kit-owned bytes only, restoring WSL parseability; nothing is ever
+  written into the file outside `opk wsl-add-opencode-1-fix`. Rationale:
+  `docs/design/wsl-conf-consent.md`.
 
 ## Testing
 

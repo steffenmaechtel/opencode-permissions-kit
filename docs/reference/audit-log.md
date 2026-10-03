@@ -4,7 +4,7 @@ This page documents what the kit logs, where, and who can read it.
 
 ## Location and modes
 
-Every kit script that changes the system writes to
+Every kit **management** script that changes the system writes to
 `/var/log/opencode-permissions-kit/opencode-permissions-kit.log`:
 
 - directory `750`, file `640`, root-owned, in the default user's primary
@@ -12,6 +12,12 @@ Every kit script that changes the system writes to
 - self-rotating at 1 MB (best-effort),
 - the `opencode` user **cannot** read it; the default user (the kit admin)
   can read it without `sudo`.
+
+Known unlogged operations (finding 0.0.42e D3 — recorded instead of
+silently over-promising): the `opk wsl-add-opencode-1-fix` carrier write
+itself and `opk handover`'s recursive pass run in the dispatcher and its
+helpers without audit-log calls; their outcomes are visible in the
+command output and the filesystem state.
 
 ## Notable events
 

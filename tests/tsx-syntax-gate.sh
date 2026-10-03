@@ -27,8 +27,8 @@
 # the gate cannot be supply-chain-drifted silently. --ignore-scripts
 # closes the install-scripts vector (typescript needs none). Bump
 # procedure: edit the pin in package.json, then regenerate the lockfile
-# with `npm install --package-lock-only`; the wiring (run step + chmod
-# entry + pin/lockfile sync) is guarded by tests/unit/test-workflows.sh
+# with `npm install --package-lock-only`; the wiring (run step +
+# pin/lockfile sync) is guarded by tests/unit/test-workflows.sh
 # section 2c.
 #
 # Exit status: 0 = all assets parse, 1 = setup or parse failure.

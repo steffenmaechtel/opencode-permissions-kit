@@ -233,9 +233,11 @@ stays). `DEFAULT_USER` stays auto-detected (`SUDO_USER`), never asked.
   bits intact, idempotent on second run, docker-group install
   aborts with instructions.
 - **Makefile**: update the test list; `make check-version` unchanged.
-- **CI**: update the `chmod +x` lists and test script lists in **both**
-  `.github/workflows/test-unit.yml` and `.github/workflows/test-e2e.yml` (AGENTS.md
-  rule).
+- **CI**: update the test script lists in **both**
+  `.github/workflows/test-unit.yml` and `.github/workflows/test-e2e.yml`.
+  Executable bits live in the **git index** (issue #123) — the workflows
+  carry no `chmod +x` lines; commit new executed-by-path scripts with
+  `git update-index --chmod=+x` (AGENTS.md rule).
 - **e2e** (`tests/e2e/run.sh`): drop hook/ACL/deny assertions and the ddev
   shim + delegated/sandbox sections; the "README.txt readable (ddev
   compat)" OS check and the stale-ACL heal check around it go too
@@ -349,7 +351,9 @@ shell function + a sudoers helper:
   write can never suffice, ownership is required. Covered types: typo3
   (`config/system`, `<docroot>/typo3conf`), drupal*/backdrop
   (`<docroot>/sites/default`), magento (`app/etc`); wordpress (root file)
-  is documented as user-managed. `.git/` stays developer-owned (mode 700).
+  is documented as user-managed. `.git/` is included in the group
+  baseline (group rw, issue #17) — corrected 2026-10-03, finding
+  0.0.42e D5; fs-baseline.sh is authoritative.
 
 **Trade-off (accepted, documented in MANUAL.md):** `ddev auth ssh` /
 composer private keys now live in `/home/opencode/.ddev` and are
