@@ -107,8 +107,22 @@ fi
 # no run: step — invisible to every check. Every unit suite must appear
 # in one of test-unit.yml's run: lines (local `make test` runs them all;
 # CI must not silently skip any).
+#
+# Command-position only (0.0.42e C2): a .sh path that is an ARGUMENT on
+# a run: line (test-kit-files.sh once carried test-tui-mode.sh that way)
+# does not execute — the extraction below takes the first token of each
+# command segment, so argument tokens never count as coverage.
 run_tokens() {
-    grep -E '^[[:space:]]+run: ' "$1" | grep -oE '\./[A-Za-z0-9_./-]+\.sh' | sort -u
+    grep -E '^[[:space:]]+run: ' "$1" | sed 's/^[[:space:]]*run: *//' | awk '
+        {
+            gsub(/&&/, "\n"); gsub(/\|\|/, "\n"); gsub(/;/, "\n"); gsub(/\|/, "\n")
+            n = split($0, seg, /\n/)
+            for (i = 1; i <= n; i++) {
+                m = split(seg[i], w, /[ \t]+/)
+                for (j = 1; j <= m; j++) if (w[j] != "") { print w[j]; break }
+            }
+        }
+    ' | grep -E '^\./[A-Za-z0-9_./-]+\.sh$' | sort -u
 }
 
 run_tokens "$WF_TEST" > "$TMP_RUNS"
@@ -122,6 +136,25 @@ if [ -z "$_orphans" ]; then
 else
     fail "test-unit.yml: unit suite(s) without a run step:$_orphans"
 fi
+
+# Behavioral pin of the command-position rule itself (0.0.42e C2): an
+# argument-position .sh on a run: line must NOT count as executed.
+_FAKEWF="$(mktemp)"
+TMP_FAKE="$(mktemp)"
+printf '%s\n' \
+    '      - name: one' \
+    '        run: ./tests/unit/test-a.sh ./tests/unit/test-arg-only.sh' \
+    '      - name: two' \
+    '        run: cd x && ./tests/unit/test-b.sh' > "$_FAKEWF"
+run_tokens "$_FAKEWF" > "$TMP_FAKE"
+if grep -qxF './tests/unit/test-a.sh' "$TMP_FAKE" \
+    && grep -qxF './tests/unit/test-b.sh' "$TMP_FAKE" \
+    && ! grep -qxF './tests/unit/test-arg-only.sh' "$TMP_FAKE"; then
+    pass "run_tokens: argument-position .sh paths do not count as executed"
+else
+    fail "run_tokens: command-position extraction is broken (argument counted or command missed)"
+fi
+rm -f "$_FAKEWF" "$TMP_FAKE"
 
 # --- 4. tsx syntax gate wiring (issue #114) --------------------------------------
 
