@@ -96,6 +96,14 @@ case "$out" in
     *) echo "  ${RED}FAIL${NC}  version from install.conf stamp (got: $out)"; failures=$((failures + 1)) ;;
 esac
 
+# --version prints just the version, one line (issue #130)
+out="$(run_kit --version)"
+assert "--version exits 0" "0" "$?"
+assert "--version prints 'opk <stamp>'" "opk 9.9.9" "$out"
+# No install.conf: fallback stamp, never an error (dev checkouts)
+out="$(OPK_INSTALL_CONF="$WORK/no-such.conf" "$BIN/opk" --version 2>/dev/null)"
+assert "--version without install.conf falls back" "opk 0.0.0" "$out"
+
 # status dispatches without sudo (root test envs: euid matches current)
 out="$(run_kit status)"
 assert "status dispatches" "status:euid=$(id -u):args=" "$out"

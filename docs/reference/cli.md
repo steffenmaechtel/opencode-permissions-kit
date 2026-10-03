@@ -41,6 +41,7 @@ opk handover me .gotmp # mixed-owner tree -> yours again
 opk wsl-add-opencode-1-fix   # opt in to the WSL browser-bridge carrier
 opk uninstall
 opk help        # commands + arguments overview
+opk --version   # the deployed kit version
 ```
 
 Everything after the subcommand goes to the underlying script unchanged,
@@ -48,6 +49,11 @@ so all flags below work with both forms. `config`, `update` and `handover`
 elevate via sudo automatically; `status` needs no sudo; `uninstall` runs as
 your user and asks for sudo itself; `ddev-hosts-*` run as your user (they
 drive Windows-side elevation through ddev itself).
+
+`opk --version` prints the deployed kit version in one line (`opk <x.y.z>`)
+— the `VERSION` stamp from `install.conf`, the same value `opk status`
+reports. Without an install (no `install.conf`) it answers `opk 0.0.0`
+instead of failing.
 
 The command is a symlink (`/usr/local/bin/opk`) into
 the kit library — deployed since kit 0.0.14 as `opencode-permissions-kit`
