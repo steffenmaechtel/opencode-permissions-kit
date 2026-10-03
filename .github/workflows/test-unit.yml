@@ -66,7 +66,8 @@ jobs:
               ./tests/unit/test-e2e-sources.sh ./tests/unit/test-security-advisories.sh \
               ./tests/unit/test-log.sh ./tests/unit/test-line-length.sh ./tests/unit/test-string-continuations.sh \
               ./scripts/release.sh \
-              ./scripts/advisory-watch.sh ./tests/check-host.sh ./tests/e2e/run.sh \
+              ./scripts/advisory-watch.sh ./tests/check-host.sh ./tests/tsx-syntax-gate.sh \
+              ./tests/e2e/run.sh \
               ./tests/e2e/run-docker-rootless.sh ./tests/e2e/run-ddev.sh ./tests/e2e/lib.sh \
               ./files/install.sh ./files/etc/umask.sh \
               ./files/opencode-permissions-kit-lib/management/config.sh \
@@ -109,6 +110,15 @@ jobs:
         run: make lint
       - name: Python syntax check
         run: make check-py
+      - name: TSX syntax gate (tui/*.tsx, parse-only)
+        # CI-only on purpose (issue #114): node/npm are not contributor-
+        # host requirements (tests/check-host.sh), and a full type check
+        # is impossible without opencode's plugin types — so this is a
+        # pinned-tsc parse check with a wildcard shim. typescript comes
+        # from a committed lockfile (npm ci, integrity-verified). The
+        # wiring (run step + chmod entry + pin/lockfile sync) is guarded
+        # by tests/unit/test-workflows.sh.
+        run: sh tests/tsx-syntax-gate.sh
       - name: Run wrapper validation tests
         run: ./tests/unit/test-opencode-as-opencode.sh
       - name: Run JSONC parser edge-case tests

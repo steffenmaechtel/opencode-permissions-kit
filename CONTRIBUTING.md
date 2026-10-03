@@ -49,6 +49,19 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   environment drift on a "green" master even when nothing was pushed.
   Scheduled runs use their own concurrency group — they never cancel
   push/PR runs, and a red weekly run blocks the next release by design.
+- One gate is **CI-only** on purpose: the `tui/*.tsx` parse gate
+  (`tests/tsx-syntax-gate.sh`, issue #114). It needs node + typescript,
+  which are not contributor-host requirements, so it never runs in
+  `make test`. Its typescript install is supply-chain-hardened: the
+  version is pinned exactly in `tests/fixtures/tsx-gate/package.json`
+  and installed with `npm ci --ignore-scripts` from the committed
+  lockfile — npm verifies the tarball's integrity hash, and package
+  lifecycle hooks (pre/postinstall) never execute. (A tripwire package
+  such as `@lavamoat/preinstall-always-fail` is only needed when a
+  project must run *legitimate* postinstall scripts.) The wiring — run
+  step, chmod entry, pin/lockfile sync — is guarded by
+  `tests/unit/test-workflows.sh` section 2c, so the gate cannot be
+  silently dropped or weakened.
 
 ## Testing a branch on a real machine
 
