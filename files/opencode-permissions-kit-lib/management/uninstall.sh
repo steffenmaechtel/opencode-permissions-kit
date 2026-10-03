@@ -385,7 +385,10 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             # No -xdev on purpose: project roots are often separate mounts
             # (the e2e bind-mounts them; NFS/overlay in the wild) — the
             # revert must follow, exactly like the setfacl -R below.
-            run_q sudo find "$root" \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
+            # ! -type l (0.0.42e S1): chown on a symlink operand FOLLOWS
+            # it — an agent-planted link in the project must not make the
+            # root-run revert chown an arbitrary target outside it.
+            run_q sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
                 -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
         else
             echo "    opencode user unknown — skipped (chown manually if files are locked)"

@@ -182,6 +182,33 @@ else
     pass "handover: planted symlink produces no handover echo"
 fi
 
+# 2c. intermediate-symlink containment (0.0.42e S2): docroot "websym"
+# symlinked OUT of the project — the settings dir "$proj/websym/typo3conf"
+# is a real dir reached THROUGH the link, so the operand-level [ -L ]
+# gates pass it. The resolved containment check must skip it before the
+# recursive pair; the victim tree outside the project stays untouched.
+mkdir -p "$WORK/symproj/.ddev" "$WORK/symproj/config/system" "$WORK/symvictim/typo3conf"
+printf 'type: typo3\ndocroot: websym\n' > "$WORK/symproj/.ddev/config.yaml"
+ln -s "$WORK/symvictim" "$WORK/symproj/websym"
+SYM_OUT="$(PATH="$STUB:$PATH" sh -c '. "$1" && ddev_handover_project "$2" ocuser ocgroup' _ "$HANDOVER" "$WORK/symproj" 2>&1)"
+if grep -qF "chown -R ocuser:ocgroup $WORK/symproj/websym/typo3conf" "$OPS" \
+   || grep -qF "chmod -R g+w $WORK/symproj/websym/typo3conf" "$OPS" \
+   || grep -qF "chown -R ocuser:ocgroup $WORK/symvictim/typo3conf" "$OPS"; then
+    fail "handover: settings dir through an intermediate symlink is skipped (0.0.42e S2)"
+else
+    pass "handover: settings dir through an intermediate symlink is skipped (0.0.42e S2)"
+fi
+if echo "$SYM_OUT" | grep -qF "resolves outside the project"; then
+    pass "handover: intermediate-symlink skip warns with the reason"
+else
+    fail "handover: intermediate-symlink skip must warn (0.0.42e S2)"
+fi
+if grep -qxF "chown -R ocuser:ocgroup $WORK/symproj/config/system" "$OPS"; then
+    pass "handover: sibling real settings dir still handed over"
+else
+    fail "handover: sibling real settings dir must still be handed over"
+fi
+
 # 2b. dev-owned flag: a symlinked config.yaml is skipped, never written
 # through as root (the cat-rewrite follows the link).
 mkdir -p "$WORK/flagproj/.ddev" "$WORK/flagsrc"

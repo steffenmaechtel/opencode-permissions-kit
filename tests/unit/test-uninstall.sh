@@ -191,10 +191,19 @@ if printf '%s' "$LOOP_OUT" | grep -qF "find $WORK/fakeproj" \
    && ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- '-uid 60000' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60001' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +'; then
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
     pass "ownership revert: uid/gid-matched chown to the developer per root (issue #74)"
 else
     fail "ownership revert loop (out=$(printf '%s' "$LOOP_OUT" | head -5))"
+fi
+# ! -type l (0.0.42e S1): chown follows a symlink operand — without the
+# exclusion, an opencode-planted link inside a project makes the root-run
+# revert chown an arbitrary file OUTSIDE the project to the developer.
+if printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
+    pass "ownership revert: symlinks excluded from the chown find (0.0.42e S1)"
+else
+    fail "ownership revert: chown find must exclude symlinks (0.0.42e S1)"
 fi
 # -xdev would stop at mount boundaries — project roots are regularly
 # separate mounts (bind mounts, NFS): the revert must follow, like the
