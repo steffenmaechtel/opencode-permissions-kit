@@ -31,6 +31,20 @@ e2e_start_container
 # the kit's true default path. See lib.sh e2e_detect_host_layout.
 e2e_detect_host_layout
 
+# Environment fidelity (issue #118): record WHICH git the suite ran against —
+# the #116 unreadable-CWD fatal only existed on git >= 2.55 and was invisible
+# at the distro floor. On the 'latest' channel also assert the PPA git really
+# landed: a silently broken PPA add must not degrade that matrix leg to a
+# second distro run. Floor is noble's stock git (2.43) — bump when the base
+# image moves to a newer distro release.
+E2E_GIT_VERSION="$(E 'git --version 2>/dev/null' | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || true)"
+echo "  container git: ${E2E_GIT_VERSION:-not found} (channel: ${E2E_GIT_CHANNEL:-distro})"
+if [ "${E2E_GIT_CHANNEL:-distro}" = "latest" ]; then
+    check "git channel 'latest': PPA git newer than the distro floor (2.43)" \
+        awk -v v="${E2E_GIT_VERSION:-0}" 'BEGIN{split(v,a,"."); \
+            if(a[1]+0>2 || (a[1]+0==2 && a[2]+0>43)) exit 0; exit 1}'
+fi
+
 echo ""
 echo "--- 1. Install opencode (from cache) ---"
 E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSION"'/opencode' || {

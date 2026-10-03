@@ -148,6 +148,98 @@ else
     fail "issue #116: bare git config --global call remains (CWD-inheriting)"
 fi
 
+# issue #118: the git floor check lives in the shared helper
+# sh/git-check.sh (soft floor 2.30 — Debian 12 / Ubuntu 22.04, the
+# documented oldest baseline distros; warn-only + git-core PPA hint) and
+# is called from install.sh's pre-flight, update.sh's banner phase and
+# status.sh's Core row. Deliberately warn-only: the kit itself runs
+# ancient plumbing (`git -C <dir> config --global`), and the #116
+# breakage class lived at the NEW end of the range (covered by CI's git
+# matrix), so a hard abort would exclude working setups without
+# preventing anything.
+GITCHECK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-check.sh"
+STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
+DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
+
+# Behavioral: source the helper with stubbed ui/log helpers and drive
+# the pure floor compare at (and around) the boundary.
+if (
+    ui_warn() { :; }; ui_detail() { :; }; ui_kv() { :; }; log() { :; }
+    UI_GREEN=""; UI_YELLOW=""
+    # shellcheck disable=SC1090
+    . "$GITCHECK"
+    [ "$GIT_TESTED_FLOOR" = "2.30" ] \
+        && git_floor_ok "2.30" && git_floor_ok "2.30.0" && git_floor_ok "2.43.0" \
+        && git_floor_ok "2.55.0" && git_floor_ok "3.0.0" \
+        && ! git_floor_ok "2.29.9" && ! git_floor_ok "2.25.1" \
+        && ! git_floor_ok "garbage" && ! git_floor_ok ""
+); then
+    pass "issue #118: git_floor_ok boundary behavior (floor 2.30, major bump, garbage)"
+else
+    fail "issue #118: git_floor_ok boundary behavior is off"
+fi
+
+# Warn-only contract (behavioral, subshell-scoped): drive the helper
+# with a fake OLD git (2.25.1) and with NO git at all — both must rc 0,
+# warn exactly once, print the PPA hint and the floor row, never abort.
+# (A structural "no exit" grep cannot work here: the awk floor compare
+# legitimately contains awk-internal exit statements.)
+mkdir -p "$TMPDIR/fakebin"
+printf '%s\n' '#!/bin/sh' 'echo "git version 2.25.1"' > "$TMPDIR/fakebin/git"
+chmod +x "$TMPDIR/fakebin/git"
+if (
+    _warns=0; _details=""; _kv=""; _kvc=""
+    ui_warn()   { _warns=$((_warns+1)); }
+    ui_detail() { _details="$_details|$1"; }
+    ui_kv()     { _kv="$_kv|$2"; _kvc="$_kvc|$3"; }
+    log() { :; }
+    UI_GREEN=""; UI_YELLOW="yellow"
+    # shellcheck disable=SC1090
+    . "$GITCHECK"
+    _oldpath="$PATH"
+    PATH="$TMPDIR/fakebin:$PATH"
+    git_check_report && git_status_row
+    _rc1=$?
+    PATH="/nonexistent"
+    git_check_report
+    _rc2=$?
+    # restore BEFORE the assertions below — they need grep back
+    PATH="$_oldpath"
+    [ "$_rc1" = "0" ] && [ "$_rc2" = "0" ] && [ "$_warns" = "2" ] \
+        && printf '%s' "$_details" | grep -q 'ppa:git-core/ppa' \
+        && printf '%s' "$_kv" | grep -q '2.25.1 — below the 2.30 tested floor' \
+        && printf '%s' "$_kvc" | grep -q 'yellow'
+); then
+    pass "issue #118: git-check is warn-only — old git (2.25.1) + missing git both rc 0 and warn once"
+else
+    fail "issue #118: git-check warn-only/row contract broken"
+fi
+
+# Wiring: all three call sites must use the shared helper.
+if grep -q 'kit_source.*sh/git-check.sh' "$INSTALL" \
+    && grep -q '^[[:space:]]*git_check_report$' "$INSTALL"; then
+    pass "issue #118: install.sh sources + calls git_check_report (pre-flight)"
+else
+    fail "issue #118: install.sh git-check wiring missing"
+fi
+if grep -q 'sh/git-check.sh' "$UPDATE" \
+    && grep -q '^[[:space:]]*git_check_report$' "$UPDATE"; then
+    pass "issue #118: update.sh sources + calls git_check_report (banner phase)"
+else
+    fail "issue #118: update.sh git-check wiring missing"
+fi
+if grep -q 'sh/git-check.sh' "$STATUS" \
+    && grep -q '^[[:space:]]*git_status_row$' "$STATUS"; then
+    pass "issue #118: status.sh sources + calls git_status_row (Core row)"
+else
+    fail "issue #118: status.sh git-check wiring missing"
+fi
+if grep -q 'opencode-permissions-kit-lib/sh/git-check.sh 644' "$DEPLOYLIB"; then
+    pass "issue #118: git-check.sh is in the lib_deploy manifest"
+else
+    fail "issue #118: git-check.sh missing from the lib_deploy manifest"
+fi
+
 if grep -q '^SECURE_GIT_CONFIG=true' "$INSTALL"; then
     pass "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
 else

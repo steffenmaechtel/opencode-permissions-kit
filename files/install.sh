@@ -136,6 +136,7 @@ fetch_kit() {
              opencode-permissions-kit-lib/bin/ddev-migrate \
              opencode-permissions-kit-lib/sh/ddev-hosts.sh \
              opencode-permissions-kit-lib/sh/fs-baseline.sh \
+             opencode-permissions-kit-lib/sh/git-check.sh \
              opencode-permissions-kit-lib/sh/staged-write.sh \
              opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
              opencode-permissions-kit-lib/sh/secure-binary.sh \
@@ -236,6 +237,15 @@ command -v ddev_migrate_registry >/dev/null 2>&1 || {
 # sourcing rules as ddev-handover.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
+
+# Shared git presence/version check (soft floor, issue #118): one
+# implementation for the pre-flight here, update.sh and status.sh.
+# kit_source above already aborts when the file is missing outright —
+# the stub covers a present-but-incomplete copy: the check is advisory
+# by design, a broken helper must not abort the install (see
+# git-check.sh's header).
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/git-check.sh"
+command -v git_check_report >/dev/null 2>&1 || git_check_report() { :; }
 
 # Shared symlink-safe privileged write helper (review 0.0.39g S1): every
 # root write into the agent-owned home goes through staged_write — stage
@@ -542,6 +552,11 @@ do_plan_phase() {
             exit 1
         fi
     fi
+
+    # git (soft floor, issue #118): shared helper sh/git-check.sh —
+    # warn-only (never aborts) with the git-core PPA upgrade hint;
+    # the rationale lives in the helper's header.
+    git_check_report
 
     # ddev version (hard gate): rootless ddev needs ddev >= 1.25.
     # Probed twice: as root first, then as the DEFAULT user — `ddev version`

@@ -73,6 +73,34 @@ check "run-ddev.sh resolves ddev through gh_latest_tag (no bare API call)" \
 check "workflows export the workflow token to the e2e steps" \
     sh -c "grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$1\" && grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
 
+# --- git channel knob (issue #118): lib.sh must forward E2E_GIT_CHANNEL as a
+# build-arg on BOTH builder paths (BuildKit + the classic setuid fallback) —
+# a knob wired to only one path silently degrades the rootless suite and the
+# setuid-rebuild to the distro git. The #116 unreadable-CWD fatal only existed
+# on git >= 2.55: without the 'latest' leg the suite cannot see that class. ---
+DOCKERFILE="$(cd "$(dirname "$0")/../e2e" && pwd)/Dockerfile"
+DOCKERFILE_ROOTLESS="$(cd "$(dirname "$0")/../e2e" && pwd)/Dockerfile.rootless"
+RUN_SH="$(cd "$(dirname "$0")/../e2e" && pwd)/run.sh"
+
+check "lib.sh reads the E2E_GIT_CHANNEL knob (default distro)" \
+    grep_q 'E2E_GIT_CHANNEL="\${E2E_GIT_CHANNEL:-distro}"'
+_git_build_args=$(grep -c -- '--build-arg GIT_CHANNEL' "$LIB")
+if [ "$_git_build_args" -ge 2 ]; then
+    pass "git channel forwarded on both builder paths (BuildKit + classic)"
+else
+    fail "git channel forwarded on $_git_build_args of 2 builder paths"
+fi
+check "non-distro git channels get an image-tag suffix (cache separation)" \
+    grep_q 'E2E_IMAGE="\$E2E_IMAGE-git-\$E2E_GIT_CHANNEL"'
+check "Dockerfile declares the GIT_CHANNEL build arg" \
+    sh -c "grep -q '^ARG GIT_CHANNEL=' \"\$1\" && grep -q '^ARG GIT_CHANNEL=' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
+check "both Dockerfiles upgrade via the git-core PPA on channel latest" \
+    sh -c "grep -q 'ppa:git-core/ppa' \"\$1\" && grep -q 'ppa:git-core/ppa' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
+check "CI matrices the e2e job over the git channel (issue #118)" \
+    sh -c "grep -q 'git: \[distro, latest\]' \"\$1\" && grep -q 'E2E_GIT_CHANNEL: \${{ matrix.git }}' \"\$1\"" _ "$WF_E2E"
+check "run.sh asserts the latest leg really runs PPA git" \
+    grep -q 'E2E_GIT_CHANNEL:-distro}" = "latest"' "$RUN_SH"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

@@ -65,6 +65,7 @@ help:
 	@echo "  make test-browser-bridge  Run WSL browser bridge tests"
 	@echo "  make test-security-advisories  Run advisory database/watch tests"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
+	@echo "  make e2e E2E_GIT_CHANNEL=latest  Same, with the current git-core PPA git in the container (e2e-rootless forwards the knob too; e2e-ddev deliberately has no git dimension — see run-ddev.sh; issue #118)"
 	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
 	@echo "  make e2e-rootless ARGS=--debug   Same, keep the container on failure + dump daemon logs"
 	@echo "  make e2e-ddev       Run the real-ddev e2e suite (golden-image cache; first run builds it, see docs/design/ddev-e2e-test.md)"
@@ -161,10 +162,10 @@ test-ddev-hosts:
 	@./tests/unit/test-ddev-hosts.sh
 
 e2e:
-	@E2E_OC_VERSION='$(E2E_OC_VERSION)' sh ./tests/e2e/run.sh
+	@E2E_OC_VERSION='$(E2E_OC_VERSION)' E2E_GIT_CHANNEL='$(E2E_GIT_CHANNEL)' sh ./tests/e2e/run.sh
 
 e2e-rootless:
-	@E2E_OC_VERSION='$(E2E_OC_VERSION)' sh ./tests/e2e/run-docker-rootless.sh $(if $(ARGS),$(ARGS))
+	@E2E_OC_VERSION='$(E2E_OC_VERSION)' E2E_GIT_CHANNEL='$(E2E_GIT_CHANNEL)' sh ./tests/e2e/run-docker-rootless.sh $(if $(ARGS),$(ARGS))
 
 e2e-ddev:
 	@E2E_OC_VERSION='$(E2E_OC_VERSION)' sh ./tests/e2e/run-ddev.sh $(if $(ARGS),$(ARGS))

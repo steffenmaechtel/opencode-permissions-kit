@@ -28,6 +28,19 @@ else
     exit 1
 fi
 
+# Shared git check (issue #118): the soft tested floor for the Core row.
+# Fail-soft like the rest of status: a missing helper just drops the row.
+GIT_CHECK_LIB="$LIBDIR/sh/git-check.sh"
+if [ ! -f "$GIT_CHECK_LIB" ]; then
+    _self="$(cd "$(dirname "$0")" && pwd)"
+    [ -f "$_self/../sh/git-check.sh" ] && GIT_CHECK_LIB="$_self/../sh/git-check.sh"
+fi
+if [ -f "$GIT_CHECK_LIB" ]; then
+    # shellcheck disable=SC1090
+    . "$GIT_CHECK_LIB"
+fi
+command -v git_status_row >/dev/null 2>&1 || git_status_row() { :; }
+
 VERSION="0.0.0"
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
@@ -98,6 +111,10 @@ if [ -f "$f" ]; then
         ui_kv ".git/config" "OFF"
     fi
 fi
+
+# Host git against the soft tested floor (issue #118): advisory row,
+# same source as the install/update warning (sh/git-check.sh).
+git_status_row
 
 # === Security advisories (issue #107) ============================================
 # Two sources, two jobs: the SHIPPED database (sh/advisories.sh) is the

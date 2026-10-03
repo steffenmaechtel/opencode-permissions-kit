@@ -24,6 +24,12 @@ name: test-e2e
 # master pushes re-verify it before a release is cut, and the weekly
 # run catches 2.x release drift between pushes.
 #
+# The e2e job additionally matrices over the GIT version (issue #118,
+# motivated by the git >= 2.55-only #116 fatal): legs 'distro' (Ubuntu
+# 24.04 apt git) and 'latest' (git-core PPA, resolved at build time so
+# the weekly cron catches new-git drift). See the matrix block for why
+# only this suite carries the dimension.
+#
 # Path filtering (docs-only changes skip): push and PR runs first detect
 # what changed (dorny/paths-filter) — when NOTHING outside docs/**,
 # *.md, LICENSE and .gitignore changed, both jobs skip with a green
@@ -96,6 +102,24 @@ jobs:
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
+    strategy:
+      # One failing git leg must not cancel the other — both verdicts are
+      # needed to see WHICH end of the version range broke.
+      fail-fast: false
+      matrix:
+        # git channel (issue #118): the #116 unreadable-CWD fatal only
+        # existed on git >= 2.55 — a suite pinned to the distro git can
+        # never see that class. 'distro' keeps the Ubuntu 24.04 apt git
+        # (2.43), the floor near the documented oldest baselines (Debian
+        # 12: 2.30, Ubuntu 22.04: 2.34). 'latest' builds the image with
+        # the current git-core PPA git, resolved at BUILD time — the
+        # weekly cron picks up new upstream git releases without a manual
+        # pin, the same drift design as the opencode version resolution.
+        # Matrix lives on this suite only (the big one, 270+ checks);
+        # cross-producting all four jobs would double CI for near-zero
+        # signal: the kit's own git surface is tiny (`git -C <dir>
+        # config --global`, safe.directory).
+        git: [distro, latest]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -159,6 +183,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/bin/ddev-migrate \
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+                   ./files/opencode-permissions-kit-lib/sh/git-check.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
@@ -174,6 +199,9 @@ jobs:
                    ./files/opencode-permissions-kit-lib/bin/ddev-as-opencode
           ./tests/e2e/run.sh
         env:
+          # Git matrix leg (issue #118) — travels via env into lib.sh's
+          # --build-arg GIT_CHANNEL; run.sh asserts the PPA git landed.
+          E2E_GIT_CHANNEL: ${{ matrix.git }}
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag) — the ephemeral workflow token, no secret needed.
           OPK_GH_TOKEN: ${{ github.token }}
@@ -247,6 +275,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/bin/ddev-migrate \
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+                   ./files/opencode-permissions-kit-lib/sh/git-check.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
@@ -353,6 +382,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/bin/ddev-migrate \
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+                   ./files/opencode-permissions-kit-lib/sh/git-check.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
@@ -453,6 +483,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/bin/ddev-migrate \
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+                   ./files/opencode-permissions-kit-lib/sh/git-check.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \

@@ -23,6 +23,15 @@
 #                    leftover itself, see e2e_start_container)
 #   E2E_OLD_VERSION  pinned old opencode for the upgrade test
 #                    (default: 1.18.15; only fetched if e2e_fetch_old is called)
+#   E2E_GIT_CHANNEL  git source of the e2e image: 'distro' (default — the
+#                    base image's apt git, 2.43 on noble) or 'latest' (the
+#                    current git-core PPA release, resolved at BUILD time,
+#                    issue #118). Forwarded as --build-arg GIT_CHANNEL to
+#                    both Dockerfiles; non-distro channels get an image-tag
+#                    suffix so local channel switches keep both images
+#                    cached. CI matrices the plain e2e suite over both
+#                    channels (the #116 unreadable-CWD fatal only existed
+#                    on git >= 2.55 — invisible at the distro floor).
 #
 # Daemon quirk (setuid): a docker daemon unpacking images through the
 # containerd snapshotter — the kit's own rootless docker does this — can strip
@@ -56,6 +65,9 @@ E2E_SKIP_BUILD="${E2E_SKIP_BUILD:-0}"
 E2E_DEBUG="${E2E_DEBUG:-0}"
 E2E_KEEP="${E2E_KEEP:-0}"
 E2E_OLD_VERSION="${E2E_OLD_VERSION:-1.18.15}"
+# git channel knob (issue #118) — see the header block. Read before the
+# image-tag suffix below is derived.
+E2E_GIT_CHANNEL="${E2E_GIT_CHANNEL:-distro}"
 # Pin the opencode version under test (e.g. E2E_OC_VERSION=2.0.11 for the
 # opencode 2.x proof, issue #80). Pinned versions are fetched on demand:
 # 1.x from GitHub release assets, 2.x from the npm registry (2.x ships no
@@ -64,6 +76,16 @@ E2E_OLD_VERSION="${E2E_OLD_VERSION:-1.18.15}"
 # Default (empty): resolve the current latest release.
 E2E_OC_VERSION="${E2E_OC_VERSION:-}"
 E2E_HOST_LAYOUT="unknown"
+
+# Non-distro git channels get an image-tag suffix (issue #118): the runners
+# pin E2E_IMAGE before sourcing, so derive it here — a local distro run and
+# an E2E_GIT_CHANNEL=latest run then keep both images cached instead of
+# evicting each other on every switch. Distro stays on the unsuffixed tag
+# (CI cache/golden-image references keep their meaning).
+case "$E2E_GIT_CHANNEL" in
+    distro|"") : ;;
+    *) E2E_IMAGE="$E2E_IMAGE-git-$E2E_GIT_CHANNEL" ;;
+esac
 
 failures=0
 passed=0
@@ -326,8 +348,9 @@ e2e_detect_host_layout() {
 e2e_start_container() {
     if [ "$E2E_SKIP_BUILD" != "1" ]; then
         echo ""
-        echo "--- Building Docker image ($E2E_DOCKERFILE) ---"
-        docker build -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"
+        echo "--- Building Docker image ($E2E_DOCKERFILE, git channel: $E2E_GIT_CHANNEL) ---"
+        docker build --build-arg GIT_CHANNEL="$E2E_GIT_CHANNEL" \
+            -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"
 
         # Setuid guard: daemons that unpack images through the containerd
         # snapshotter (the rootless docker the kit provisions does this by
@@ -342,7 +365,8 @@ e2e_start_container() {
         if ! docker run --rm --entrypoint sh "$E2E_IMAGE" -c 'test -u /usr/bin/sudo' >/dev/null 2>&1; then
             echo "  ${YELLOW}NOTE${NC} this daemon's BuildKit unpack strips setuid bits (containerd snapshotter) —"
             echo "  rebuilding with the classic builder (DOCKER_BUILDKIT=0) so sudo works in the container..."
-            if ! DOCKER_BUILDKIT=0 docker build -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"; then
+            if ! DOCKER_BUILDKIT=0 docker build --build-arg GIT_CHANNEL="$E2E_GIT_CHANNEL" \
+                -t "$E2E_IMAGE" -f "$SCRIPT_DIR/$E2E_DOCKERFILE" "$SCRIPT_DIR"; then
                 echo "  ${RED}FAIL${NC} classic-builder rebuild failed (removed in this Docker version?)."
                 echo "  Run the suite on a daemon whose images keep setuid bits (e.g. the rootful system docker)."
                 exit 1

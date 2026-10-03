@@ -49,6 +49,14 @@ E2E_CONTAINER="opencode-e2e-ddev-test"
 E2E_DOCKERFILE="Dockerfile.rootless"
 E2E_SYSTEMD=1
 E2E_CMD="/sbin/init"
+# The ddev suite deliberately carries NO git-channel dimension (review
+# 0.0.42a C2): the golden-image cache key is (ddev version, format, site
+# tier) — a git dimension would double the cache for near-zero signal,
+# and the warm start boots the golden image regardless of any channel.
+# Drop an exported E2E_GIT_CHANNEL (issue #118) BEFORE sourcing lib.sh,
+# so its tag-suffix case cannot rename the base image out from under a
+# cached golden run that would silently ignore the channel anyway.
+unset E2E_GIT_CHANNEL
 . "$(dirname "$(readlink -f "$0")")/lib.sh"
 
 # Golden-image cache key (§5). Bump GOLDEN_FORMAT when the warm-up recipe

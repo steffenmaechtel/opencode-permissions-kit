@@ -92,6 +92,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-migrate.sh` | Shared helper: migration functions (sourced by install.sh and `bin/ddev-migrate`) |
 | `/usr/local/lib/opencode-permissions-kit/sh/advisories.sh` | Shared helper: the kit's static security-advisory database (checked by the wrapper on every start, diffed against the upstream feed by `opk status`) |
 | `/usr/local/lib/opencode-permissions-kit/sh/fs-baseline.sh` | Shared helper: group baseline recursion |
+| `/usr/local/lib/opencode-permissions-kit/sh/git-check.sh` | Shared helper: git presence/version probe against the soft tested floor (sourced by the install/update pre-flight and the `git` row in `opk status`) |
 | `/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh` | Shared helper: WSL browser bridge deploy (wsl.conf comment block + stand-in) |
 | `/usr/local/lib/opencode-permissions-kit/sh/log.sh` | Shared helper: audit logging |
 | `/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh` | Shared helper: bypass warnings |

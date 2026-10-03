@@ -35,6 +35,16 @@ else
     fail "status.sh reports the ddev settings mode (stamp-driven)"
 fi
 
+# --- 0b. git row (issue #118): the Core section shows the host git against
+# the soft tested floor, from the shared helper (fail-soft: no helper, no row).
+if grep -q 'git_status_row' "$STATUS" && \
+   grep -q 'sh/git-check.sh' "$STATUS" && \
+   grep -q 'command -v git_status_row' "$STATUS"; then
+    pass "status.sh reports the host git via the shared git-check helper"
+else
+    fail "status.sh reports the host git via the shared git-check helper"
+fi
+
 # status.sh reads absolute paths (LIBDIR, /etc/...). The only seam we can
 # redirect without root is the opencode home it inspects — the interesting
 # branches here (backend case, install.conf sourcing) are exercised by

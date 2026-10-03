@@ -228,9 +228,10 @@ Never touches `projects.conf` or the agent's `opencode.jsonc`. See
 
 ## status.sh
 
-Show the protection status: mode, backend + socket reachability, project
-roots, ddev runtime readiness (`~opencode/.ddev`, router ports, mkcert CA),
-migration state, the security-advisory check (see
+Show the protection status: mode, backend + socket reachability, the
+host git against the tested floor, project roots, ddev runtime readiness
+(`~opencode/.ddev`, router ports, mkcert CA), migration state, the
+security-advisory check (see
 [security advisories](../how-to/update.md#security-advisories)), the WSL2
 `/mnt/c` exposure (including the browser-bridge state), the
 root-equivalent-access audit, and the leak scan — followed by management

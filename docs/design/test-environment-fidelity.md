@@ -121,7 +121,13 @@ production code path touched (draining stdin). Rule for this repo:
 3. **Environment matrix as a test dimension.** For flows that read any
    fd, run the scenario against stdin variants: closed (`<&-`), EOF
    (`</dev/null`), pipe-with-data (`< <(printf ...)`), and PTY (§4.4).
-   A bug in one variant is a bug.
+   A bug in one variant is a bug. The same dimension applies to *tool
+   versions*: the e2e suite matrices over the git build (`E2E_GIT_CHANNEL`,
+   issue #118) — distro apt git vs the current git-core PPA git resolved
+   at build time — because the unreadable-CWD fatal of #116 existed only
+   on git ≥ 2.55 and was invisible at the distro floor the suite pinned.
+   The build-time resolution doubles as drift detection: the weekly cron
+   rebuilds with whatever git the PPA ships that week.
 4. **PTY harnesses**, by weight:
    - `script -qec '<command>' /dev/null` (util-linux) — gives the
      command a real PTY in any CI script; cheap enough for one check

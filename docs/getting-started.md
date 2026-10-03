@@ -14,6 +14,11 @@ background are linked at the end.
 - `curl`
 - `python3` (used for JSON parsing, the baseline progress pipe and version
   resolution — default WSL2 images ship it; the installer probes for it)
+- `git` ≥ 2.30 — what the oldest supported baseline distros ship (Debian 12 /
+  Ubuntu 22.04); any newer git works (WSL Ubuntu 24.04 ships 2.43, the
+  [git-core PPA](troubleshooting.md#git-is-below-the-tested-version-baseline)
+  tracks the current release). The installer warns below that floor; it never
+  aborts over git
 - ddev ≥ 1.25, if ddev is installed (the installer aborts on older versions)
 
 Nothing else — the kit installs the rootless container backend (packages,
@@ -111,9 +116,9 @@ opk status
 ```
 
 It reports the protection mode, backend + socket reachability, ddev runtime
-readiness, the `/mnt/c` exposure, the root-equivalent-access audit, and a
-leak scan, followed by management hints. Everything green means the kit is
-active.
+readiness, the host git against the tested floor, the `/mnt/c` exposure, the
+root-equivalent-access audit, and a leak scan, followed by management hints.
+Everything green means the kit is active.
 
 ## Start your first session
 
