@@ -32,6 +32,15 @@ of what one review pass digests; smaller waves are better reviewed.
 review → fix → review the fixes (wave review) → fix → …
 ```
 
+The loop has a hard seam after verification: the snapshot is written and
+committed BEFORE any fix starts (see [review/README.md](review/README.md),
+Process). Two reasons: the maintainer reads the committed snapshot to see
+what the review found before the tree starts moving — findings must be
+inspectable while nothing has been done about them yet — and a fix applied
+mid-verification would change the very tree the remaining findings are
+verified against. The 0.0.42d session codified this after the maintainer
+asked for the snapshot first.
+
 **Stop when a full pass returns no new MED/HIGH findings.** LOW/INFO
 findings do not extend the loop — they get dispositioned (implemented, or
 deliberately not done with rationale in the resolution) and that is the end

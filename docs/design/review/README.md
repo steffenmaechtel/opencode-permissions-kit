@@ -49,9 +49,26 @@ which scope (full vs diff) and the loop's stop rule:
 ## Process
 
 Reviews are run by a model against a clean working tree of the version under
-review (see a review's header for model, scope, and verification state). The
-review report is committed first, fixes follow on a feature branch with the
-finding IDs in the commit messages, then the resolution closes the loop.
+review (see a review's header for model, scope, and verification state).
+
+**Hard ordering for a review session** (made explicit after 0.0.42d, where
+the maintainer had to ask for the snapshot before fixing started):
+
+1. Run the reviewer agents (parallel subagents per review-concept.md).
+2. Verify every agent finding against the code (main agent) — **no fixing
+   while verifying**: a fix would change the tree later findings are
+   checked against.
+3. Write the snapshot (and its README index row) and **commit it**. The
+   snapshot is the review's deliverable — it must exist in git before any
+   fix touches the tree. Findings that live only in chat scrollback are
+   lost; the snapshot is what survives.
+4. **Pause for the maintainer.** The fix wave starts on their go — the
+   committed snapshot is the visibility point: what was found is
+   inspectable before what will be done about it begins.
+5. Fix wave on a feature branch with the finding IDs in the commit
+   messages; the resolution is created with the first fix commit and grows
+   one row per disposition (rule 4), then the loop closes per
+   review-concept.md's stop rule.
 
 ## Index
 
