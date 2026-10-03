@@ -537,6 +537,19 @@ grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/manage
     && pass "status.sh never-shadow verdict uses the shared probe" \
     || fail "status.sh never-shadow verdict uses the shared probe (0.0.42d S1/C1)"
 
+# 35. a target containing a single quote degrades to the SILENT no-op
+# (0.0.42d Q1 — the shim's only injection defense had zero runtime
+# coverage; the quote-guard fires BEFORE the browser-bridge exec, so
+# the output must stay empty where a bridge invocation would print
+# its tty hint).
+_qt_out="$(OPK_WSL_C_ROOT="$WORK/fakec2" "$WORK/localbin/xdg-open" "https://x.example/It's" 2>&1)"
+_qt_rc=$?
+if [ "$_qt_rc" -eq 0 ] && [ -z "$_qt_out" ]; then
+    pass "xdg-open shim: single-quote target degrades to the silent no-op"
+else
+    fail "xdg-open shim: single-quote target must never reach the bridge (rc=$_qt_rc out=$_qt_out)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

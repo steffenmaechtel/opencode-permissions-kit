@@ -126,6 +126,8 @@ check "2b: traverse grant stays read-less (home not listable)" \
     E '! getfacl -p /home/dev 2>/dev/null | grep -q "^group:opencode:r"'
 check "2b: podman-rootless never sets the ddev bind-mounts switch" \
     E '! grep -q "config global --no-bind-mounts" /tmp/fake-ddev.log'
+check "2b: xdg-open fallback shim deployed (no real xdg-open in the container)" \
+    E 'readlink /usr/local/bin/xdg-open | grep -q "^/usr/local/lib/opencode-permissions-kit/bin/xdg-open$"'
 
 echo ""
 echo "--- 2c. ddev database migration (issue #15) ---"
