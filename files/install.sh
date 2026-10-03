@@ -136,6 +136,7 @@ fetch_kit() {
              opencode-permissions-kit-lib/bin/ddev-migrate \
              opencode-permissions-kit-lib/sh/ddev-hosts.sh \
              opencode-permissions-kit-lib/sh/fs-baseline.sh \
+             opencode-permissions-kit-lib/sh/git-check.sh \
              opencode-permissions-kit-lib/sh/staged-write.sh \
              opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
              opencode-permissions-kit-lib/sh/secure-binary.sh \
@@ -236,6 +237,13 @@ command -v ddev_migrate_registry >/dev/null 2>&1 || {
 # sourcing rules as ddev-handover.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
+
+# Shared git presence/version check (soft floor, issue #118): one
+# implementation for the pre-flight here, update.sh and status.sh.
+# The no-op stub keeps a hypothetically helper-less fetch installable —
+# the check is advisory by design (see git-check.sh's header).
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/git-check.sh"
+command -v git_check_report >/dev/null 2>&1 || git_check_report() { :; }
 
 # Shared symlink-safe privileged write helper (review 0.0.39g S1): every
 # root write into the agent-owned home goes through staged_write — stage
@@ -543,31 +551,10 @@ do_plan_phase() {
         fi
     fi
 
-    # git (soft floor, issue #118): the kit itself only runs ancient git
-    # plumbing — `git -C <dir> config --global` (git >= 1.8.5) — and
-    # safe.directory, which below 2.35.2 is a harmless unknown key in a git
-    # that has no ownership check to begin with. So there is no HARD
-    # requirement to enforce (the #116 breakage class lived at the NEW end
-    # of the version range, covered by CI's git matrix, not down here).
-    # The floor mirrors the documented oldest baseline distros (Debian 12 /
-    # Ubuntu 22.04): older git is untested — warn and show the upgrade
-    # path, never abort.
-    if command -v git >/dev/null 2>&1; then
-        GIT_VERSION="$(git --version 2>/dev/null \
-            | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
-        log "detected git: version=${GIT_VERSION:-unknown}"
-        if [ -n "$GIT_VERSION" ]; then
-            git_ok=$(awk -v v="$GIT_VERSION" 'BEGIN{split(v,a,"."); \
-                if(a[1]+0>2 || (a[1]+0==2 && a[2]+0>=30)) print "yes"; else print "no"}')
-            if [ "$git_ok" != "yes" ]; then
-                ui_warn "git $GIT_VERSION found — the kit is tested with git >= 2.30 (Debian 12 / Ubuntu 22.04 baseline)."
-                ui_detail "newer git on Ubuntu: sudo add-apt-repository ppa:git-core/ppa && sudo apt update && sudo apt install git"
-            fi
-        fi
-    else
-        ui_warn "git not found — the agent will not be able to work in repositories."
-        ui_detail "install it: sudo apt install git"
-    fi
+    # git (soft floor, issue #118): shared helper sh/git-check.sh —
+    # warn-only (never aborts) with the git-core PPA upgrade hint;
+    # the rationale lives in the helper's header.
+    git_check_report
 
     # ddev version (hard gate): rootless ddev needs ddev >= 1.25.
     # Probed twice: as root first, then as the DEFAULT user — `ddev version`

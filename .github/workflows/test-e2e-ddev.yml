@@ -163,6 +163,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/bin/ddev-migrate \
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+                   ./files/opencode-permissions-kit-lib/sh/git-check.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \
@@ -284,6 +285,7 @@ jobs:
                    ./files/opencode-permissions-kit-lib/bin/ddev-migrate \
                    ./files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
                    ./files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
+                   ./files/opencode-permissions-kit-lib/sh/git-check.sh \
                    ./files/opencode-permissions-kit-lib/sh/staged-write.sh \
                    ./files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
                    ./files/opencode-permissions-kit-lib/sh/secure-binary.sh \

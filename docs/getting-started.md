@@ -116,9 +116,9 @@ opk status
 ```
 
 It reports the protection mode, backend + socket reachability, ddev runtime
-readiness, the `/mnt/c` exposure, the root-equivalent-access audit, and a
-leak scan, followed by management hints. Everything green means the kit is
-active.
+readiness, the host git against the tested floor, the `/mnt/c` exposure, the
+root-equivalent-access audit, and a leak scan, followed by management hints.
+Everything green means the kit is active.
 
 ## Start your first session
 

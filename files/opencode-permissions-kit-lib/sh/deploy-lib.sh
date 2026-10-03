@@ -88,6 +88,7 @@ opencode-permissions-kit-lib/sh/ddev-migrate.sh 644
 opencode-permissions-kit-lib/sh/ddev-terminal.sh 644
 opencode-permissions-kit-lib/sh/deploy-lib.sh 644
 opencode-permissions-kit-lib/sh/fs-baseline.sh 644
+opencode-permissions-kit-lib/sh/git-check.sh 644
 opencode-permissions-kit-lib/sh/log.sh 755
 opencode-permissions-kit-lib/sh/render-agent-config.sh 644
 opencode-permissions-kit-lib/sh/secure-binary.sh 644

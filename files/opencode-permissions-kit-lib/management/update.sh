@@ -152,6 +152,7 @@ opencode-permissions-kit-lib/sh/ddev-migrate.sh \
 opencode-permissions-kit-lib/bin/ddev-migrate \
 opencode-permissions-kit-lib/sh/ddev-hosts.sh \
 opencode-permissions-kit-lib/sh/fs-baseline.sh \
+opencode-permissions-kit-lib/sh/git-check.sh \
 opencode-permissions-kit-lib/sh/staged-write.sh \
 opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
 opencode-permissions-kit-lib/sh/secure-binary.sh \
@@ -387,6 +388,18 @@ done
 [ -n "$_tpl" ] \
     || tui_plugin_sync_user() { echo "error: tui_plugin_sync_user unavailable (tui-plugin.sh missing)" >&2; return 1; }
 
+# Shared git presence/version check (soft floor, issue #118): same
+# advisory as install.sh's pre-flight — #116 surfaced during `opk
+# update`, so the upgrade path warns here too. No-op stub keeps an
+# old-library update running when neither copy is around (the check is
+# advisory by design, see git-check.sh's header). Same lookup order as
+# staged-write.sh.
+_tgc=""
+for _tgc_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/git-check.sh" "$LIBDIR/sh/git-check.sh"; do
+    if [ -f "$_tgc_cand" ]; then . "$_tgc_cand"; _tgc="$_tgc_cand"; break; fi
+done
+[ -n "$_tgc" ] || git_check_report() { :; }
+
 DEFAULT_USER=""
 OPENCODE_USER="opencode"
 INSTALLED_VERSION=""
@@ -516,6 +529,12 @@ confirm() {
 
 banner
 log "update started (version $VERSION, refresh=$REFRESH)"
+
+# Soft git floor advisory (issue #118): same warn-only check as the
+# install pre-flight — right behind the banner so it is seen with the
+# confirmation prompt, before any git-touching phase runs (#116
+# surfaced during an update).
+git_check_report
 
 if [ ! -f "$INSTALL_CONF" ]; then
     die "Not installed yet. Run install.sh first."
