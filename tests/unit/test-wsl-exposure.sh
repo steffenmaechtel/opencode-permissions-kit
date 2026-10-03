@@ -144,9 +144,13 @@ check "lib manifest deploys bin/xdg-open 755" \
 check "install.sh deploys the xdg-open shim (guarded, never shadows a real one)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'ln -s \"\$LIBDIR/bin/xdg-open\" /usr/local/bin/xdg-open' \"\$1\"" _ "$INSTALL"
 check "update.sh refreshes and heals the xdg-open shim (stands back for a real one)" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF '/usr/bin/xdg-open' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'xdg_open_real_exists' \"\$1\" && ! grep -qF '/usr/bin/xdg-open' \"\$1\"" _ "$UPDATE"
 check "status.sh reports the xdg-open fallback state" \
     sh -c "grep -qF 'xdg-open fallback' \"\$1\"" _ "$STATUS"
+check "status.sh never-shadow verdict uses the shared PATH probe (0.0.42d S1)" \
+    sh -c "grep -qF 'xdg_open_real_exists' \"\$1\"" _ "$STATUS"
+check "status.sh flags a dangling kit shim instead of green (0.0.42d C2)" \
+    sh -c "grep -qF 'shim symlink dangles' \"\$1\"" _ "$STATUS"
 
 # --- uninstall consent (docs/design/wsl-conf-consent.md) --------------------------
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"

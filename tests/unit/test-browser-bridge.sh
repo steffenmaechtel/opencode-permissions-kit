@@ -498,6 +498,45 @@ else
     fail "xdg-open shim: crashes without its browser-bridge sibling"
 fi
 
+# 34. xdg_open_real_exists (0.0.42d S1/C1): the shared never-shadow probe
+# scans the whole PATH except /usr/local/bin (the kit shim's slot) — a
+# real xdg-open under /usr/sbin or /snap/bin must count, our own shim
+# must not.
+BB_LIB="$REPO/files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+mkdir -p "$WORK/xre/empty1" "$WORK/xre/empty2" "$WORK/xre/real/xdg-home"
+printf '#!/bin/sh\nexit 0\n' > "$WORK/xre/real/xdg-home/xdg-open"
+chmod 755 "$WORK/xre/real/xdg-home/xdg-open"
+# shellcheck disable=SC1090
+. "$BB_LIB"
+_op="$PATH"
+PATH="$WORK/xre/empty1:$WORK/xre/real/xdg-home:$WORK/xre/empty2"
+if xdg_open_real_exists; then
+    pass "xdg_open_real_exists: finds a real xdg-open mid-PATH"
+else
+    fail "xdg_open_real_exists: misses a real xdg-open mid-PATH (0.0.42d S1/C1)"
+fi
+PATH="$WORK/xre/empty1:$WORK/xre/empty2"
+if xdg_open_real_exists; then
+    fail "xdg_open_real_exists: no false positive without any xdg-open"
+else
+    pass "xdg_open_real_exists: no false positive without any xdg-open"
+fi
+# our shim's own slot must be ignored: an empty PATH except /usr/local/bin
+PATH="/usr/local/bin"
+if xdg_open_real_exists; then
+    fail "xdg_open_real_exists: /usr/local/bin alone must not count (shim slot)"
+else
+    pass "xdg_open_real_exists: /usr/local/bin alone must not count (shim slot)"
+fi
+PATH="$_op"; unset _op
+# wiring: update.sh and status.sh route their guards through the helper
+grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/management/update.sh" \
+    && pass "update.sh never-shadow guard uses the shared probe" \
+    || fail "update.sh never-shadow guard uses the shared probe (0.0.42d S1/C1)"
+grep -qF 'xdg_open_real_exists' "$REPO/files/opencode-permissions-kit-lib/management/status.sh" \
+    && pass "status.sh never-shadow verdict uses the shared probe" \
+    || fail "status.sh never-shadow verdict uses the shared probe (0.0.42d S1/C1)"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

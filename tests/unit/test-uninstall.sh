@@ -225,6 +225,19 @@ else
     fail "ownership revert: ids must be captured before userdel (capture=$CAPTURE_LINE userdel=$USERDEL_LINE)"
 fi
 
+# ACL removal is targeted, not a wipe (0.0.42e C4): the kit baseline adds
+# access entries g:<dev-group> and default entries g:<dev-group>:rwx —
+# `setfacl -R -b/-k` removed EVERY extended ACL incl. pre-existing user
+# entries the kit never owned. -x is a no-op rc 0 on absent entries.
+if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:devgroup' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:devgroup' \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -b' \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -k'; then
+    pass "ACL revert: only kit-added g:<dev-group> entries removed (0.0.42e C4)"
+else
+    fail "ACL revert must use targeted -x removal, never -b/-k wipes (0.0.42e C4)"
+fi
+
 # --- 5. cleanup hints match what install.sh leaves behind ----------------------
 
 if grep -qF "still contain" "$UNINSTALL" && grep -qF 'opencode permissions kit' "$UNINSTALL"; then

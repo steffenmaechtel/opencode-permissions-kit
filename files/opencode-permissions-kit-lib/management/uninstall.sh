@@ -393,11 +393,18 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         else
             echo "    opencode user unknown — skipped (chown manually if files are locked)"
         fi
-        echo "  Cleaning ACLs from: $root"
-        run_q sudo setfacl -R -b "$root"
-        run_q sudo setfacl -R -k "$root"
+        echo "  Cleaning kit ACLs from: $root"
+        # Targeted removal (0.0.42e C4): the kit's baseline adds access
+        # entries g:<dev-group> (traversal, fs_ensure_traversable) and
+        # default entries g:<dev-group>:rwx (fs-baseline). The former
+        # `setfacl -R -b`/`-k` wiped ALL extended ACLs — including
+        # pre-existing user entries install never owned. -x is a no-op
+        # (rc 0) on absent entries, live-verified for both the access
+        # and the default table.
+        run_q sudo setfacl -R -x "g:$UN_DEV_GROUP" "$root"
+        run_q sudo setfacl -R -d -x "g:$UN_DEV_GROUP" "$root"
         run_q sudo chmod g-s "$root"
-        log "project ownership reverted + ACLs cleaned: $root"
+        log "project ownership reverted + kit ACL entries removed: $root"
     done < "$UNINSTALL_PROJECTS_CONF"
 fi
 

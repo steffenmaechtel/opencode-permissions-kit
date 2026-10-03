@@ -449,8 +449,8 @@ check "status.sh import detection knows the ddev >= 1.23 project_list.yaml" \
 
 # --- 8. Makefile + CI wiring --------------------------------------------------------
 
-check "Makefile lint list includes ddev-migrate.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$MAKEFILE"
+check "make lint covers ddev-migrate.sh (disk-derived list, 0.0.42d C4)" \
+    sh -c "make -C \"\$2/../..\" -n lint 2>/dev/null | grep -q 'ddev-migrate.sh' && grep -qF 'shellcheck shell=' \"\$1\"" _ "$MAKEFILE" "$SCRIPT_DIR"
 check "Makefile has a test-ddev-migrate target in the test: list" \
     sh -c "grep -q 'test: .*test-ddev-migrate' \"\$1\"" _ "$MAKEFILE"
 check "test-unit.yml run step mentions the new test" \

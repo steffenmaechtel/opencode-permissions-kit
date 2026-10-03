@@ -623,19 +623,22 @@ ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy
 # --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) -------------
 
 # Deploy only while no real xdg-open exists; heal the shadow case (a real
-# one appeared since install -> the kit stands back).
+# one appeared since install -> the kit stands back). Guards share the
+# never-shadow probe with install.sh (0.0.42d S1/C1): xdg_open_real_exists
+# scans the whole PATH except /usr/local/bin (our shim's slot) — a real
+# xdg-open under /usr/sbin or /snap/bin no longer gets shadowed.
 if [ -L /usr/local/bin/xdg-open ] \
    && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
-    if [ -x /usr/bin/xdg-open ]; then
+    if xdg_open_real_exists; then
         sudo rm -f /usr/local/bin/xdg-open
-        ui_detail "xdg-open fallback removed: a real xdg-open (/usr/bin/xdg-open) took over"
-        log "xdg-open shim removed: real xdg-open present (/usr/bin/xdg-open)"
+        ui_detail "xdg-open fallback removed: a real xdg-open on PATH took over"
+        log "xdg-open shim removed: real xdg-open present on PATH"
     else
         ui_detail "xdg-open fallback active: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
         log "xdg-open shim active: /usr/local/bin/xdg-open"
     fi
 elif ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ] \
-   && ! [ -x /usr/bin/xdg-open ]; then
+   && ! xdg_open_real_exists; then
     sudo ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open
     ui_success "xdg-open fallback installed: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
     log "xdg-open shim symlink: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"

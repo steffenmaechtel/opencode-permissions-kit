@@ -807,6 +807,15 @@ do_plan_phase() {
     if [ -n "$PREDEFINED_PROJECTS" ]; then
         _fp_norm=""
         for _fp in $PREDEFINED_PROJECTS; do
+            # Glob metacharacters must be rejected, not expanded (0.0.42e
+            # C7): the unquoted rebuild loop below would expand them into
+            # a different root set than the user typed.
+            case "$_fp" in
+                *[\*\?\[]*)
+                    ui_error "'$_fp' contains glob characters — refusing to use it as a project root."
+                    exit 1
+                    ;;
+            esac
             if ! project_path_sane "$_fp"; then
                 ui_error "'$_fp' is a system path — refusing to use it as a project root."
                 ui_info "Use a dedicated folder like /var/www/vhosts or /home/<you>/projects."
