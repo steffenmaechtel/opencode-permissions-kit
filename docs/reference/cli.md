@@ -11,16 +11,16 @@ command elevates itself):
 sudo opk wsl-add-opencode-1-fix
 ```
 
-Keeps opencode 1.x device logins (`console login`) alive on a hardened
-`/mnt/c`: the carrier is a comment block at the top of your `wsl.conf`
-whose `root =` line wins the bundled `open` package's scan, redirecting
-its powershell.exe lookup to the kit stand-in (forwards for you, exits 0
-for the agent). Takes effect immediately — no `wsl --shutdown` needed,
-WSL only ever sees comments. Only needed for opencode **< 1.18.33**:
-since 1.18.33 (and on every 2.x) the bundled `open` access-checks
-powershell and falls back to xdg-open, so device logins survive a
-hardened `/mnt/c` without the bridge — the kit does not warn for those
-versions.
+Keeps opencode device logins (`console login` / `auth login`) alive on a
+hardened `/mnt/c` for versions bundling `open` 10.x — 1.x **< 1.18.33**
+and 2.x **< 2.0.18**: the carrier is a comment block at the top of your
+`wsl.conf` whose `root =` line wins the bundled `open` package's scan,
+redirecting its powershell.exe lookup to the kit stand-in (forwards for
+you, exits 0 for the agent). Takes effect immediately — no
+`wsl --shutdown` needed, WSL only ever sees comments. Newer versions
+access-check powershell and fall back to xdg-open (the kit ships an
+xdg-open fallback shim for that path), so device logins survive without
+the bridge — the kit does not warn for those versions.
 
 This is the **only** kit command that writes `/etc/wsl.conf` — install
 and update never touch the file; they only deploy the stand-in tree and

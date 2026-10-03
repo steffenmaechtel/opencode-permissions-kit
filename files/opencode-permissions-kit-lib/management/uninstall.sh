@@ -207,6 +207,20 @@ run sudo rm -f /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit
 echo "CLI dispatcher removed."
 log "cli removed: /usr/local/bin/opk"
 
+# xdg-open fallback shim: remove ONLY the kit-owned symlink — a real
+# xdg-open (xdg-utils) or anything else at that path is not ours.
+echo ""
+echo "--- Removing xdg-open fallback ---"
+if [ -L /usr/local/bin/xdg-open ] \
+   && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" \
+      = "/usr/local/lib/opencode-permissions-kit/bin/xdg-open" ]; then
+    run sudo rm -f /usr/local/bin/xdg-open
+    echo "xdg-open fallback removed."
+    log "xdg-open shim removed: /usr/local/bin/xdg-open"
+else
+    echo "xdg-open at /usr/local/bin/xdg-open is not kit-owned — left untouched."
+fi
+
 # opencode 2.x (issue #80): drop the kit's plugin registration before the
 # library goes — the discovered plugin dir (symlinked into LIBDIR) and any
 # inert file-path entries older kits may have written into cli.json. The

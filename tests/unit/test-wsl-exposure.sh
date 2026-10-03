@@ -113,8 +113,8 @@ check "wrapper detects a configured-but-pending restriction" \
     sh -c "grep -q 'PENDING' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$WRAPPER"
 check "wrapper stays silent when the mount is restricted (other bit off)" \
     sh -c "! awk '/if \[ -d \/mnt\/c \]/,/^fi/' \"\$1\" | grep -q 'already restricted'" _ "$WRAPPER"
-check "wrapper skips the bridge warning for opencode >= 1.18.33 (open@11)" \
-    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\"" _ "$WRAPPER"
+check "wrapper skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)" \
+    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\"" _ "$WRAPPER"
 
 # --- update.sh report-only hint -------------------------------------------------
 check "update.sh warns about the world-readable /mnt/c (no prompt)" \
@@ -135,11 +135,23 @@ check "opk wsl-add-opencode-1-fix is the ONLY shipped entry point calling write_
     sh -c "! grep -rl 'browser_bridge_write_conf' \"\$1\" 2>/dev/null | grep -v 'sh/wsl-browser-bridge.sh$' | grep -v 'bin/opk$' | grep -q ." _ "$SCRIPT_DIR/../../files"
 check "status.sh points at the opt-in bridge command" \
     sh -c "grep -q 'opk wsl-add-opencode-1-fix' \"\$1\"" _ "$STATUS"
-check "status.sh skips the bridge warning for opencode >= 1.18.33 (open@11)" \
-    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF 'not needed' \"\$1\"" _ "$STATUS"
+check "status.sh skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)" \
+    sh -c "grep -qF 'advisories_version_cmp' \"\$1\" && grep -qF '1.18.33' \"\$1\" && grep -qF '2.0.18' \"\$1\" && grep -qF 'not needed' \"\$1\"" _ "$STATUS"
+
+# --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) ---------------
+check "lib manifest deploys bin/xdg-open 755" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open 755' \"\$1\"" _ "$DEPLOYLIB"
+check "install.sh deploys the xdg-open shim (guarded, never shadows a real one)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF 'ln -s \"\$LIBDIR/bin/xdg-open\" /usr/local/bin/xdg-open' \"\$1\"" _ "$INSTALL"
+check "update.sh refreshes and heals the xdg-open shim (stands back for a real one)" \
+    sh -c "grep -q 'opencode-permissions-kit-lib/bin/xdg-open' \"\$1\" && grep -qF '/usr/bin/xdg-open' \"\$1\"" _ "$UPDATE"
+check "status.sh reports the xdg-open fallback state" \
+    sh -c "grep -qF 'xdg-open fallback' \"\$1\"" _ "$STATUS"
 
 # --- uninstall consent (docs/design/wsl-conf-consent.md) --------------------------
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
+check "uninstall removes only the kit-owned xdg-open symlink" \
+    sh -c "grep -qF 'not kit-owned' \"\$1\"" _ "$UNINSTALL"
 check "uninstall.sh passes sh -n" sh -n "$UNINSTALL"
 check "uninstall.sh asks before removing kit-owned wsl.conf content" \
     sh -c "grep -q \"Remove the kit's wsl.conf bridge block?\" \"\$1\" && grep -q 'prompt_yn' \"\$1\"" _ "$UNINSTALL"

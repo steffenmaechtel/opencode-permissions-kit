@@ -136,9 +136,12 @@ which spawns
 `<first "root =" match in /etc/wsl.conf>c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`.
 On the restricted mount the `opencode` user may not execute that binary —
 and opencode dies on the resulting spawn error (issue #91), right after
-printing URL and device code. (Fixed upstream in opencode 1.18.33: the
-bundled `open` access-checks powershell and falls back to xdg-open, so
-newer binaries need no bridge.)
+printing URL and device code. (Upstream renewed the opener: opencode
+1.18.33+ / 2.0.18+ bundle `open` 11.x, which access-checks powershell and
+falls back to `xdg-open` — no bridge needed there, but that fallback
+crashes 2.x device logins when no `xdg-open` exists, so the kit also
+ships an **xdg-open fallback shim** at `/usr/local/bin/xdg-open`, see
+below.)
 
 The kit solves this **without granting the agent anything**:
 
@@ -166,10 +169,21 @@ in the file, including the `[automount]` restriction and `[boot]`
 `systemd=true` (issue #100). A parser-valid section name would not help
 either: every unknown key makes WSL print
 `wsl: Unknown key '<section>.root'` on each start. Comments are the only
-carrier WSL never complains about. Newer `open` versions (wsl-utils based)
-parse line-based, ignore the carrier, and check powershell access
-themselves before spawning — they fall back to `xdg-open` and need no
-bridge.
+carrier WSL never complains about. Newer `open` versions (wsl-utils
+based, bundled since opencode 1.18.33 / 2.0.18) parse line-based, ignore
+the carrier, and check powershell access themselves before spawning —
+they fall back to `xdg-open` and need no bridge.
+
+The **xdg-open fallback shim** covers exactly that fallback: WSL distros
+and minimal servers ship no `xdg-open`, and the failed spawn escapes
+opencode 2.x's error handling as an uncaught defect — `opencode auth
+login` (OpenCode Console account) dies right after printing URL and
+device code. The kit deploys `bin/xdg-open` as
+`/usr/local/bin/xdg-open` (only while no real xdg-open exists; update
+stands back once one appears, uninstall removes only the kit-owned
+symlink). The shim is pure delegation to `bin/browser-bridge` with
+powershell-style arguments: the developer gets a browser open, the agent
+gets the same designed no-op — no new capability on either side.
 
 The stand-in parses nothing and holds no privileges — the agent can run it
 with arbitrary arguments to no effect beyond a possible browser open *as
@@ -180,10 +194,11 @@ no-op path triggers, it prints a one-line hint to the terminal
 (self-test: [troubleshooting](../troubleshooting.md)).
 `opk status` reports the bridge state and names
 `opk wsl-add-opencode-1-fix` when the carrier is missing; the wrapper
-warns the same way on every start — both skip their warning when the
-installed opencode is >= 1.18.33 (its `open` survives a restricted
-`/mnt/c` on its own). Uninstall asks before removing the
-block (or assumes yes with `--yes`) and always removes the stand-in tree.
+warns the same way on every start — both skip their warning for versions
+bundling `open` 11.x (1.x >= 1.18.33, 2.x >= 2.0.18; their opener
+survives a restricted `/mnt/c` on its own). Uninstall asks before
+removing the block (or assumes yes with `--yes`) and always removes the
+stand-in tree and the xdg-open fallback symlink.
 
 ## Other root-equivalent surfaces (audit)
 

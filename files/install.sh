@@ -143,6 +143,7 @@ fetch_kit() {
              opencode-permissions-kit-lib/sh/deploy-lib.sh \
              opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
              opencode-permissions-kit-lib/bin/browser-bridge \
+             opencode-permissions-kit-lib/bin/xdg-open \
              opencode-permissions-kit-lib/tui/kit-mode.tsx \
              opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
              opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
@@ -1700,6 +1701,20 @@ do_deploy_phase() {
     sudo ln -sf "$LIBDIR/bin/opk" /usr/local/bin/opk
     ui_success "cli installed: opk -> $LIBDIR/bin/opk"
     log "cli symlink: /usr/local/bin/opk -> $LIBDIR/bin/opk"
+
+    # xdg-open fallback (opencode 1.18.33+ / 2.0.18+ login fix): their
+    # bundled opener (open@11) falls back to xdg-open when powershell.exe
+    # is not executable for the caller — without any xdg-open the device
+    # login dies (2.x: uncaught crash). Deploy the kit shim ONLY while no
+    # real xdg-open exists (never shadow one).
+    if ! command -v xdg-open >/dev/null 2>&1 \
+       && ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ]; then
+        sudo ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open
+        ui_success "xdg-open fallback installed: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
+        log "xdg-open shim symlink: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
+    else
+        log "xdg-open shim skipped: an xdg-open already exists ($(command -v xdg-open || echo /usr/local/bin/xdg-open))"
+    fi
 
     # sudoers -> /etc/opencode-permissions-kit/sudoers, symlinked as
     # /etc/sudoers.d/opencode-permissions-kit. Shared pipeline

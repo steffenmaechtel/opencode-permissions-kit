@@ -78,6 +78,7 @@ The deployed library mirrors the repository layout
 |---|---|
 | `/usr/local/bin/opencode` | Wrapper symlink → `bin/opencode-as-opencode` |
 | `/usr/local/bin/opk` | CLI dispatcher symlink (see [CLI](cli.md)) |
+| `/usr/local/bin/xdg-open` | xdg-open fallback shim symlink → `bin/xdg-open` — deployed only while no real xdg-open exists (opencode 1.18.33+/2.0.18+ device-logins crash without it) |
 | `/usr/local/lib/opencode-permissions-kit/bin/opencode` | The actual opencode binary (`root:opencode` 750) |
 | `/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode` | The wrapper: directory validation, container opt-in, rootless exec |
 | `/usr/local/lib/opencode-permissions-kit/bin/opk` | CLI dispatcher (status/config/update/uninstall routing) |
@@ -87,6 +88,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/bin/socket-check` | Rootless socket probe (`test -S` only) |
 | `/usr/local/lib/opencode-permissions-kit/bin/cwd-check` | Headless serve cwd probe (readable-for-opencode check) |
 | `/usr/local/lib/opencode-permissions-kit/bin/browser-bridge` | WSL browser bridge stand-in source — deployed into the `wsl/` tree (see below); re-deployed by `opk wsl-add-opencode-1-fix` |
+| `/usr/local/lib/opencode-permissions-kit/bin/xdg-open` | xdg-open fallback shim — delegates to `bin/browser-bridge` (Start-Process); symlinked as `/usr/local/bin/xdg-open` while no real xdg-open exists |
 | `/usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` | WSL browser bridge: stand-in the bundled `open` package spawns for device logins — forwards to the real powershell.exe when the caller may execute it, `exit 0` otherwise (WSL only; see [security model](../concepts/security-model.md#wsl2-the-browser-bridge-login-survival-on-a-hardened-mntc)) |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh` | Sourced `ddev()` terminal function (hooked into the default user's rc files) |
 | `/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh` | Shared helper: `.ddev` + settings-dir chown |
