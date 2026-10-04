@@ -312,7 +312,8 @@ case "$cmd" in
             # but "x/" into a project tree is exactly the bypass.
             case "$_ho_a" in
                 */|*/.|*//*)
-                    _ho_err "handover: '$_ho_a' ends in a slash — pass the path itself (symlink gates cannot see through trailing slashes)" ;;
+                    _ho_err "handover: '$_ho_a' ends in a slash — pass the path itself"\
+" (symlink gates cannot see through trailing slashes)" ;;
             esac
             [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
         done

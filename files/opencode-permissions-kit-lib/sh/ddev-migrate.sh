@@ -320,6 +320,32 @@ ddev_migrate_export() {
     # them group-readable; finalized below.
     chown "$dm_dev:$dm_ocg" "$DD_MIG_DUMP_DIR" 2>/dev/null || true
     chmod 2770 "$DD_MIG_DUMP_DIR" 2>/dev/null || true
+    # Root-owned staging (0.0.44a V3): the dump dir is dev:$dm_ocg 2770 —
+    # the AGENT can create/replace entries there for the whole (minutes-
+    # long) export loop, so root must never open a path inside it for
+    # writing: a planted symlink at manifest.conf or .export-*.err would
+    # be truncated/appended/chmodded THROUGH (root-level arbitrary
+    # truncate/append — the invariant the sibling surfaces state as
+    # "a swapped symlink operand must never reach chown/chmod/redirects").
+    # All root bookkeeping lives in .root-stage (700, root-only — nothing
+    # can be planted inside); every manifest mutation is build-new + mv:
+    # rename(2) replaces whatever sits at the destination (a planted link
+    # is overwritten itself, its target never opened). The stage is
+    # removed before finalize so chown -R never hands it to the agent.
+    DM_STAGE="$DD_MIG_DUMP_DIR/.root-stage"
+    rm -rf "$DM_STAGE" 2>/dev/null || true   # stale stage from an aborted run
+    mkdir "$DM_STAGE" || return 1
+    chmod 700 "$DM_STAGE"
+    # _dm_manifest_add <line>: append one line via staging + atomic
+    # rename. Reading the current file THROUGH a planted link is not an
+    # escalation (content only feeds the manifest, which import consumes
+    # as the agent user) — and the rename then replaces the link itself.
+    _dm_manifest_add() {
+        _dma_new="$DM_STAGE/manifest.$$"
+        { cat "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true; \
+          printf '%s\n' "$1"; } > "$_dma_new"
+        mv -f "$_dma_new" "$DD_MIG_DUMP_DIR/manifest.conf"
+    }
 
     # NOTE on loop hygiene: this loop's stdin IS the project list (the
     # printf pipe), and ddev reads stdin (prompt/TUI probing) — without
@@ -331,54 +357,61 @@ ddev_migrate_export() {
         echo "  exporting $dm_n ($dm_ar) ..."
         # Resume: intact dump + OK entry in THIS directory — skip the
         # start/export/stop cycle and keep the existing dump.
+        # (Fixed-string match, 0.0.44a V23: a project name must never be
+        # interpolated as a BRE/ERE — "sh.p" cross-matched "shop".)
         if [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] \
-           && grep -q "^OK|$dm_n|" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null; then
+           && grep -qF "OK|$dm_n|" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null; then
             echo "    already exported — skipping (resume)"
             continue
         fi
         # Drop stale entries for this project (a FAILED or SKIPped run is
         # being retried; the old line must not linger — the installer
         # counts FAIL entries and would re-ask the abort question).
+        # Same staging+rename discipline (0.0.44a V3) and fixed strings
+        # (V23).
         if [ -f "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
-            grep -vE "^(OK|FAIL|SKIP)\|$dm_n\|" "$DD_MIG_DUMP_DIR/manifest.conf" \
-               > "$DD_MIG_DUMP_DIR/manifest.conf.tmp" || true
-            mv "$DD_MIG_DUMP_DIR/manifest.conf.tmp" "$DD_MIG_DUMP_DIR/manifest.conf"
+            grep -v -F -e "OK|$dm_n|" -e "FAIL|$dm_n|" -e "SKIP|$dm_n|" \
+                "$DD_MIG_DUMP_DIR/manifest.conf" > "$DM_STAGE/manifest.$$" || true
+            mv -f "$DM_STAGE/manifest.$$" "$DD_MIG_DUMP_DIR/manifest.conf"
         fi
         # Already handed over? dev-side ddev cannot start it anymore.
         if [ -d "$dm_ar/.ddev" ] && [ "$(stat -c %U "$dm_ar/.ddev" 2>/dev/null)" = "$dm_oc" ]; then
             echo "    SKIP: .ddev already owned by '$dm_oc' (handover done) — dev-side export"
             echo "    is impossible; see docs/troubleshooting.md"
-            echo "SKIP|$dm_n|$dm_ar|handover-done" >> "$DD_MIG_DUMP_DIR/manifest.conf"
+            _dm_manifest_add "SKIP|$dm_n|$dm_ar|handover-done"
             continue
         fi
         # Projects without a db container (omit_containers: [db]) have
         # nothing to export — ddev export-db would just fail.
         if ! ddev_migrate_has_db "$dm_ar" "$dm_home"; then
             echo "    SKIP: no db container (omit_containers)"
-            echo "SKIP|$dm_n|$dm_ar|no-db-container" >> "$DD_MIG_DUMP_DIR/manifest.conf"
+            _dm_manifest_add "SKIP|$dm_n|$dm_ar|no-db-container"
             continue
         fi
         if ! _ddev_migrate_run_as "$dm_dev" "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1; then
             echo "    FAILED: ddev start — project left untouched, import this one manually"
-            echo "FAIL|$dm_n|$dm_ar|" >> "$DD_MIG_DUMP_DIR/manifest.conf"
+            _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
             continue
         fi
-        dm_err="$DD_MIG_DUMP_DIR/.export-$dm_n.err"
+        # err file inside the root-owned stage (0.0.44a V3): the dump dir
+        # itself is agent-writable — a planted .export-<name>.err link
+        # there would be truncated THROUGH by this very redirect.
+        dm_err="$DM_STAGE/export-$dm_n.err"
         if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" \
            --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" </dev/null >"$dm_err" 2>&1 \
            && [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
             echo "    dump: $DD_MIG_DUMP_DIR/$dm_n.sql.gz"
-            echo "OK|$dm_n|$dm_ar|$dm_n.sql.gz" >> "$DD_MIG_DUMP_DIR/manifest.conf"
+            _dm_manifest_add "OK|$dm_n|$dm_ar|$dm_n.sql.gz"
         elif grep -q "service db does not exist" "$dm_err" 2>/dev/null; then
             # Runtime twin of omit_containers: the db service never came up
             # (state=doesnotexist) — nothing to export, not a failure.
             rm -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" 2>/dev/null || true
             echo "    SKIP: no running db service in this project"
-            echo "SKIP|$dm_n|$dm_ar|no-db-service" >> "$DD_MIG_DUMP_DIR/manifest.conf"
+            _dm_manifest_add "SKIP|$dm_n|$dm_ar|no-db-service"
         else
             rm -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" 2>/dev/null || true
             echo "    FAILED: ddev export-db — no dump for $dm_n"
-            echo "FAIL|$dm_n|$dm_ar|" >> "$DD_MIG_DUMP_DIR/manifest.conf"
+            _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
         fi
         rm -f "$dm_err" 2>/dev/null || true
         # Stop this project before the next one starts: a production
@@ -396,11 +429,18 @@ ddev_migrate_export() {
         || echo "  NOTE: ddev poweroff failed — stop the old projects manually before the first opencode-side start"
 
     # Finalize: opencode owns the dumps (the importing side), the sharing
-    # group keeps the developer's read access.
+    # group keeps the developer's read access. The root stage goes FIRST —
+    # chown -R must never hand it to the agent (0.0.44a V3). The chmod
+    # pass rides find ! -type l: the dump dir is agent-writable until this
+    # very chmod 750, and plain `chmod 640 dumpdir/*.sql.gz` dereferences
+    # a planted symlink operand (mode strip on an arbitrary path).
+    rm -rf "$DM_STAGE" 2>/dev/null || true
     chown -R "$dm_oc:$dm_ocg" "$DD_MIG_DUMP_DIR" 2>/dev/null || true
     chmod 750 "$DD_MIG_DUMP_DIR" 2>/dev/null || true
-    chmod 640 "$DD_MIG_DUMP_DIR"/*.sql.gz 2>/dev/null || true
-    chmod 640 "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true
+    find "$DD_MIG_DUMP_DIR" -maxdepth 1 ! -type l -name '*.sql.gz' \
+        -exec chmod 640 {} + 2>/dev/null || true
+    find "$DD_MIG_DUMP_DIR" -maxdepth 1 ! -type l -name 'manifest.conf' \
+        -exec chmod 640 {} + 2>/dev/null || true
 
     # grep -c always prints the count (0 on no match); || true keeps a
     # zero count from tripping set -e via the assignment's exit status.

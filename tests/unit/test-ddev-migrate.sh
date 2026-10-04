@@ -368,6 +368,38 @@ assert_eq "SKIP lines stay single too (nodb + nodbrt)" \
 check_fail "no leftover .export-*.err capture files in the dump directory" \
     sh -c "ls \"\$1\"/.export-*.err >/dev/null 2>&1" _ "$DUMP_DIR"
 
+# --- 4c. planted symlinks in the agent-writable dump dir (0.0.44a V3) ---------------
+# The dump dir is group-writable by design until finalize — the agent can
+# plant entries during the minutes-long export loop. Root-side writes must
+# never act THROUGH a planted link: manifest mutations ride staging +
+# rename (a link at manifest.conf is replaced itself, its target never
+# opened), err captures live in the root-owned .root-stage, and the chmod
+# pass rides find ! -type l.
+echo "VICTIM-MANIFEST-CONTENT" > "$WORK/victim-manifest.conf"
+echo "VICTIM-ERR-CONTENT" > "$WORK/victim-err.conf"
+echo "VICTIM-DUMP-CONTENT" > "$WORK/victim-dump.conf"
+chmod 755 "$WORK/victim-dump.conf"
+rm -f "$DUMP_DIR/manifest.conf"
+ln -s "$WORK/victim-manifest.conf" "$DUMP_DIR/manifest.conf"
+ln -s "$WORK/victim-err.conf" "$DUMP_DIR/.export-alpha.err"
+ln -s "$WORK/victim-dump.conf" "$DUMP_DIR/evil.sql.gz"
+OUT3=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null)
+check "planted manifest.conf symlink is replaced by a regular file (rename, not truncate)" \
+    sh -c "test -f \"\$1\" && test ! -L \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check "manifest link target was never opened (content intact)" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-MANIFEST-CONTENT" _ "$WORK/victim-manifest.conf"
+check "manifest carries fresh OK lines after the rewrite" \
+    sh -c "grep -q '^OK|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+check "planted .export-*.err link is never touched (captures live in .root-stage)" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-ERR-CONTENT" _ "$WORK/victim-err.conf"
+check "chmod pass skips symlink operands (victim keeps its mode)" \
+    sh -c "test \"\$(stat -c %a \"\$1\")\" = 755" _ "$WORK/victim-dump.conf"
+check_fail "the root staging dir is removed before finalize hands the tree over" \
+    test -e "$DUMP_DIR/.root-stage"
+
 # --- 5. import loop (static wiring) ---------------------------------------------
 
 check "import reads the manifest and runs as the opencode user" \
