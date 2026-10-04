@@ -370,35 +370,59 @@ check_fail "no leftover .export-*.err capture files in the dump directory" \
 
 # --- 4c. planted symlinks in the agent-writable dump dir (0.0.44a V3) ---------------
 # The dump dir is group-writable by design until finalize — the agent can
-# plant entries during the minutes-long export loop. Root-side writes must
-# never act THROUGH a planted link: manifest mutations ride staging +
-# rename (a link at manifest.conf is replaced itself, its target never
-# opened), err captures live in the root-owned .root-stage, and the chmod
-# pass rides find ! -type l.
-echo "VICTIM-MANIFEST-CONTENT" > "$WORK/victim-manifest.conf"
+# plant entries during the minutes-long export loop. Root-side writes
+# must never act THROUGH a planted link: manifest mutations ride staging +
+# rename (a link at manifest.conf at export START is now REFUSED — the
+# seed never reads through it, 0.0.44b W2), err captures live in the
+# root-owned .root-stage, and the chmod pass rides find ! -type l.
 echo "VICTIM-ERR-CONTENT" > "$WORK/victim-err.conf"
 echo "VICTIM-DUMP-CONTENT" > "$WORK/victim-dump.conf"
 chmod 755 "$WORK/victim-dump.conf"
-rm -f "$DUMP_DIR/manifest.conf"
-ln -s "$WORK/victim-manifest.conf" "$DUMP_DIR/manifest.conf"
 ln -s "$WORK/victim-err.conf" "$DUMP_DIR/.export-alpha.err"
 ln -s "$WORK/victim-dump.conf" "$DUMP_DIR/evil.sql.gz"
 OUT3=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" \
     PATH="$WORK/bin:$PATH" \
     sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null)
-check "planted manifest.conf symlink is replaced by a regular file (rename, not truncate)" \
-    sh -c "test -f \"\$1\" && test ! -L \"\$1\"" _ "$DUMP_DIR/manifest.conf"
-check "manifest link target was never opened (content intact)" \
-    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-MANIFEST-CONTENT" _ "$WORK/victim-manifest.conf"
-check "manifest carries fresh OK lines after the rewrite" \
-    sh -c "grep -q '^OK|alpha|' \"\$1\"" _ "$DUMP_DIR/manifest.conf"
 check "planted .export-*.err link is never touched (captures live in .root-stage)" \
     sh -c "test \"\$(cat \"\$1\")\" = VICTIM-ERR-CONTENT" _ "$WORK/victim-err.conf"
 check "chmod pass skips symlink operands (victim keeps its mode)" \
     sh -c "test \"\$(stat -c %a \"\$1\")\" = 755" _ "$WORK/victim-dump.conf"
+check "manifest stays a regular file through the run" \
+    sh -c "test -f \"\$1\" && test ! -L \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+# Sticky + stage mode act DURING the run (finalize re-modes the dir to
+# 750) — pinned statically on the mechanisms (W1): chmod 3770 at setup
+# AND on resume, mkdir -m 700 for the stage.
+_grep_n=$(grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' "$MIG")
+[ "$_grep_n" -ge 1 ] \
+    && check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" true \
+    || check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" false
+grep -q 'mkdir -m 700 "\$DM_STAGE"' "$MIG" \
+    && check "stage is created mode 700 in one step (no default-mode window, W1)" true \
+    || check "stage is created mode 700 in one step (no default-mode window, W1)" false
 check_fail "the root staging dir is removed before finalize hands the tree over" \
     test -e "$DUMP_DIR/.root-stage"
+
+# --- 4d. a linked manifest at export START is refused, never read (0.0.44b W2) -------
+# The authoritative copy seeds from the dump-dir manifest only when it is
+# not a symlink — a planted link there means tampering: loud refuse, the
+# link's target is never opened (no read-through disclosure).
+echo "VICTIM-MANIFEST-CONTENT" > "$WORK/victim-manifest.conf"
+rm -f "$DUMP_DIR/manifest.conf"
+ln -s "$WORK/victim-manifest.conf" "$DUMP_DIR/manifest.conf"
+OUT4=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run4.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1 || true)
+check "export refuses a symlinked manifest.conf at start (tamper, W2)" \
+    sh -c "printf '%s' \"\$1\" | grep -q REFUSED" _ "$OUT4"
+check "manifest link target was never opened (content intact, W2)" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-MANIFEST-CONTENT" _ "$WORK/victim-manifest.conf"
+check_fail "the refused run leaves no staging dir behind" \
+    test -e "$DUMP_DIR/.root-stage"
+# restore a regular manifest for the suites below
+rm -f "$DUMP_DIR/manifest.conf"
+printf 'OK|alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|alpha.sql.gz\n' > "$DUMP_DIR/manifest.conf"
 
 # --- 5. import loop (static wiring) ---------------------------------------------
 

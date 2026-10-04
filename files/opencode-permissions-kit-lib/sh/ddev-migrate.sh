@@ -317,34 +317,56 @@ ddev_migrate_export() {
     fi
     mkdir -p "$DD_MIG_DUMP_DIR" || return 1
     # dev writes the dumps, the opencode group (dev is a member) keeps
-    # them group-readable; finalized below.
+    # them group-readable; finalized below. Mode 3770 (0.0.44b W1):
+    # setgid AND sticky — the sticky bit is the load-bearing half. In a
+    # plain 2770 dir any group member (the AGENT — the wave's own threat
+    # premise) could RENAME root's stage/manifest aside by parent write
+    # alone and plant their own; with sticky, rename/unlink of an entry
+    # is limited to the entry's owner (root for stage + published
+    # manifest; dev keeps full reign over their own dumps). The dir
+    # OWNER (dev) stays above sticky by POSIX — accepted: dev is the
+    # cooperating principal, the agent is the contained one.
     chown "$dm_dev:$dm_ocg" "$DD_MIG_DUMP_DIR" 2>/dev/null || true
-    chmod 2770 "$DD_MIG_DUMP_DIR" 2>/dev/null || true
-    # Root-owned staging (0.0.44a V3): the dump dir is dev:$dm_ocg 2770 —
-    # the AGENT can create/replace entries there for the whole (minutes-
-    # long) export loop, so root must never open a path inside it for
-    # writing: a planted symlink at manifest.conf or .export-*.err would
-    # be truncated/appended/chmodded THROUGH (root-level arbitrary
-    # truncate/append — the invariant the sibling surfaces state as
-    # "a swapped symlink operand must never reach chown/chmod/redirects").
-    # All root bookkeeping lives in .root-stage (700, root-only — nothing
-    # can be planted inside); every manifest mutation is build-new + mv:
-    # rename(2) replaces whatever sits at the destination (a planted link
-    # is overwritten itself, its target never opened). The stage is
-    # removed before finalize so chown -R never hands it to the agent.
+    chmod 3770 "$DD_MIG_DUMP_DIR" 2>/dev/null || true
+    # Root-owned staging (0.0.44a V3, hardened 0.0.44b W1/W2): the dump
+    # dir is agent-writable at group level for the whole (minutes-long)
+    # export loop, so root must never open a path inside it for writing
+    # OR reading (a planted symlink would be truncated/appended THROUGH;
+    # reading one copies its target into the agent-readable manifest —
+    # a disclosure, not merely content). Three layers:
+    #   1. .root-stage (mkdir -m 700: no default-mode window) is a NAME
+    #      the agent cannot take or replace — sticky (above) protects
+    #      root-owned entries from group rename, and mkdir fails EEXIST
+    #      on the taken name;
+    #   2. the AUTHORITATIVE manifest lives at $DM_STAGE/manifest.auth —
+    #      root reads/writes only there; the dump-dir manifest.conf is a
+    #      published COPY (build-new + mv: rename replaces a planted
+    #      link itself, never opens its target);
+    #   3. the one-time seed reads the dump-dir manifest.conf only when
+    #      it is not a symlink (a link there means tampering — abort
+    #      loudly); after the first publish it is root-owned and sticky-
+    #      protected, so the check cannot be raced by the agent.
+    # The stage is removed before finalize so chown -R never hands it
+    # to the agent.
     DM_STAGE="$DD_MIG_DUMP_DIR/.root-stage"
     rm -rf "$DM_STAGE" 2>/dev/null || true   # stale stage from an aborted run
-    mkdir "$DM_STAGE" || return 1
-    chmod 700 "$DM_STAGE"
-    # _dm_manifest_add <line>: append one line via staging + atomic
-    # rename. Reading the current file THROUGH a planted link is not an
-    # escalation (content only feeds the manifest, which import consumes
-    # as the agent user) — and the rename then replaces the link itself.
+    mkdir -m 700 "$DM_STAGE" || return 1
+    if [ -L "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+        echo "  REFUSED: $DD_MIG_DUMP_DIR/manifest.conf is a symlink — tampering?" >&2
+        rm -rf "$DM_STAGE"
+        return 1
+    fi
+    if [ -f "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+        cat "$DD_MIG_DUMP_DIR/manifest.conf" > "$DM_STAGE/manifest.auth" 2>/dev/null || true
+    fi
+    [ -f "$DM_STAGE/manifest.auth" ] || : > "$DM_STAGE/manifest.auth"
+    # _dm_manifest_add <line>: append to the AUTHORITATIVE copy inside
+    # the root-only stage, then publish a fresh copy via atomic rename.
     _dm_manifest_add() {
-        _dma_new="$DM_STAGE/manifest.$$"
-        { cat "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true; \
-          printf '%s\n' "$1"; } > "$_dma_new"
-        mv -f "$_dma_new" "$DD_MIG_DUMP_DIR/manifest.conf"
+        printf '%s\n' "$1" >> "$DM_STAGE/manifest.auth"
+        _dma_pub="$DM_STAGE/manifest.$$"
+        cat "$DM_STAGE/manifest.auth" > "$_dma_pub"
+        mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
     }
 
     # NOTE on loop hygiene: this loop's stdin IS the project list (the
@@ -356,24 +378,27 @@ ddev_migrate_export() {
     printf '%s\n' "$dm_list" | while IFS='|' read -r dm_n dm_ar; do
         echo "  exporting $dm_n ($dm_ar) ..."
         # Resume: intact dump + OK entry in THIS directory — skip the
-        # start/export/stop cycle and keep the existing dump.
+        # start/export/stop cycle and keep the existing dump. Reads the
+        # AUTHORITATIVE stage copy (0.0.44b W2), never the dump-dir file.
         # (Fixed-string match, 0.0.44a V23: a project name must never be
         # interpolated as a BRE/ERE — "sh.p" cross-matched "shop".)
         if [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] \
-           && grep -qF "OK|$dm_n|" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null; then
+           && grep -qF "OK|$dm_n|" "$DM_STAGE/manifest.auth" 2>/dev/null; then
             echo "    already exported — skipping (resume)"
             continue
         fi
         # Drop stale entries for this project (a FAILED or SKIPped run is
         # being retried; the old line must not linger — the installer
         # counts FAIL entries and would re-ask the abort question).
-        # Same staging+rename discipline (0.0.44a V3) and fixed strings
-        # (V23).
-        if [ -f "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
-            grep -v -F -e "OK|$dm_n|" -e "FAIL|$dm_n|" -e "SKIP|$dm_n|" \
-                "$DD_MIG_DUMP_DIR/manifest.conf" > "$DM_STAGE/manifest.$$" || true
-            mv -f "$DM_STAGE/manifest.$$" "$DD_MIG_DUMP_DIR/manifest.conf"
-        fi
+        # Same authoritative-copy discipline (0.0.44b W2) and fixed
+        # strings (V23): rewrite auth, publish via rename.
+        grep -v -F -e "OK|$dm_n|" -e "FAIL|$dm_n|" -e "SKIP|$dm_n|" \
+            "$DM_STAGE/manifest.auth" > "$DM_STAGE/manifest.next" || true
+        mv -f "$DM_STAGE/manifest.next" "$DM_STAGE/manifest.auth"
+        # publish the rewrite (same build-new + rename as _dm_manifest_add)
+        _dma_pub="$DM_STAGE/manifest.$$"
+        cat "$DM_STAGE/manifest.auth" > "$_dma_pub"
+        mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
         # Already handed over? dev-side ddev cannot start it anymore.
         if [ -d "$dm_ar/.ddev" ] && [ "$(stat -c %U "$dm_ar/.ddev" 2>/dev/null)" = "$dm_oc" ]; then
             echo "    SKIP: .ddev already owned by '$dm_oc' (handover done) — dev-side export"
