@@ -64,6 +64,22 @@ Two consequences:
   especially robustness fixes — introduce their own bug class. Never skip
   the wave review after a semantics-changing wave.
 
+### Fixes close classes, not sites (added 2026-10-05, from 0.0.44a)
+
+A third consequence, from 0.0.44a's provenance analysis: of 28 findings,
+six were **incomplete closures of earlier fix waves** (0.0.44a V1, V2-claim,
+V8, V9, V11, V12), every one the same shape — the *reported* site was fixed,
+the *class* and its siblings were not: the 0.0.42e C5 tmp-name sweep fixed
+three of four staging sites; the F1 dedup-hoist rationale applies verbatim
+to the gh-dedup left in place; the hardcoded-home class was closed in four
+files but not in the installer that itself contains the correct getent
+pattern. A fix wave therefore owes a **class sweep**: grep the
+anti-pattern across every shipped file (and the docs that claim the
+invariant), not just the finding's file. 0.0.39g's `2db6517` already did
+this ad hoc ("full-class sweep beyond the listed lines"); 0.0.44a makes it
+the rule. The sweep result is recorded in the resolution (what it found
+beyond the listed lines), so the next review can audit it.
+
 ## Who records what — snapshot, fix commit, resolution, index
 
 Four places carry review knowledge, each with exactly one job (the 0.0.41
@@ -80,6 +96,22 @@ below are the learning codified):
 
 The resolution is the ledger the next review starts from — an index row
 that carries SHAs is a summary, not a substitute (README rule 4).
+
+### Finding provenance (added 2026-10-05)
+
+Every full-scope snapshot records **which release introduced each finding**
+— `git log -L`/`-S` to the oldest commit touching the offending code, then
+`git tag --contains` for the first release that shipped it. Precedents:
+0.0.39c (57/59 of the -a/-b rows pre-existing at tag 0.0.38), 0.0.44a
+(26/28 findings predate the fix waves; no MED new at its core, but two
+waves falsely claimed closure of old bugs). The split answers the two
+questions findings alone cannot: how many defects the fix process
+*introduces or reshapes* (regression rate — governs the fix process, see
+"Fixes close classes, not sites") versus how much old backlog each pass
+*surfaces* (detection yield — governs the review budget). Distinguish two
+dates in the table: *bug-form since* (the reported behavior first existed)
+and *code since* (the site's age — older where a fix reshaped an old bug
+without closing it).
 
 ## Verification duty (main agent)
 
@@ -100,7 +132,7 @@ for CI suites, charset gates, project-path policy tests). The next review
 then spends its budget on what automation cannot see. See also
 CONTRIBUTING's "shrink the next one" rule.
 
-Two hard rules learned the hard way:
+Two hard rules learned the hard way, plus one from 0.0.44a:
 
 - **Root-script behavior changes owe the e2e suites immediately**, not
   "later": a pipefail regression once downgraded 21 e2e checks to SKIP and
@@ -109,6 +141,17 @@ Two hard rules learned the hard way:
   host layout). An upstream release on the review day (opencode 1.18.33)
   changed login behavior under the suite; without the version in the
   snapshot, its results are uninterpretable afterwards.
+- **A disposition claim ("closed", "never dereferences", "any … aborts")
+  owes a behavioral test, not prose** (added 2026-10-05, from 0.0.44a):
+  two 0.0.43a/b closure claims were empirically false at first probe —
+  F16's "TOCTOU closed" (0.0.44a V2: a trailing-slash operand defeats both
+  the `[ -L ]` gate and `chown -R -h`, because path resolution goes through
+  the link before lstat ever sees one) and W5's "any single failing entry
+  aborts" (0.0.44a V9: only batch-final failures propagate through the
+  xargs inner loop). Each would have fallen to one behavioral test at fix
+  time. Rule: every such claim in a resolution or code comment names its
+  pinning test in the same wave — otherwise it is not a claim, it is a
+  hope.
 
 ## Parallel reviewer agents (mechanics)
 
@@ -149,6 +192,17 @@ When a review runs as parallel subagents:
   section naming what each side missed and why — even retractions can
   be partially over-turned by the external reviewer's counter-feedback
   (0.0.42e S3 → LOW carve-out).
+- recurring **blind-spot classes** (added 2026-10-05, from 0.0.44a): three
+  classes have each escaped at least one dedicated review — root-run file
+  operations whose operands sit in agent-group-writable directories
+  (0.0.44a V3, alive since 0.0.18 despite four reviews touching the same
+  function), producer/validator pairs built in the same wave whose halves
+  contradict each other (V4, since 0.0.39: the builder joins with `", "`,
+  the validator rejects commas), and path-operand edge forms — trailing
+  slashes — that slip symlink gates (V2, since 0.0.40). Reviewer prompts
+  for these surfaces name the class explicitly, not just the file; a
+  gate/claim about path operands is tested against its slash forms
+  (`x/`, `x//`, `x/.`).
 - enforce **checkpoint discipline**: each agent appends findings to a side
   file after every completed section (empty sections get a `clean` line) —
   end-synthesis turns are the primary failure mode, and checkpoints survive
