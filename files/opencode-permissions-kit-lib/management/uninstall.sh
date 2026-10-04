@@ -410,17 +410,26 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # live-verified for both the access and the default table.
         # Qualifiers are NUMERIC (0.0.42f C2): a name qualifier dies at
         # parse time when the name does not resolve; the gids survive
-        # the userdel above (captured before, orphan-proof).
+        # the userdel above (captured before, orphan-proof). A principal
+        # whose gid is UNKNOWN is skipped loudly with its manual hint —
+        # never silently (0.0.42h S1) — and the closing log line says
+        # "partial" when one was skipped.
+        _un_acl_skipped=""
         for _un_acl_gid in "$UN_OC_GID" "$UN_DEV_GID"; do
-            [ -n "$_un_acl_gid" ] || continue
+            if [ -z "$_un_acl_gid" ]; then
+                _un_acl_skipped=1
+                echo "    group id unknown — its ACL entries left in place (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
+                continue
+            fi
             run_q sudo setfacl -R -x "g:$_un_acl_gid" "$root"
             run_q sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
         done
-        if [ -z "$UN_OC_GID" ] && [ -z "$UN_DEV_GID" ]; then
-            echo "    group ids unknown — ACL entries left in place (remove manually: setfacl -R -x g:<gid>)"
-        fi
         run_q sudo chmod g-s "$root"
-        log "project ownership reverted + kit ACL entries removed: $root"
+        if [ -n "$_un_acl_skipped" ]; then
+            log "project ownership reverted + kit ACL entries PARTIALLY removed (a group id was unknown): $root"
+        else
+            log "project ownership reverted + kit ACL entries removed: $root"
+        fi
     done < "$UNINSTALL_PROJECTS_CONF"
 fi
 

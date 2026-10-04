@@ -40,13 +40,15 @@ chmod +x "$WORK/sudo"
 # exists — true on a dev host with the kit installed, false on a CI
 # runner. Pretend it always exists so the removal plan is complete (and
 # the test hermetic) on every host. -u/-g also feed the ownership-revert
-# capture (issue #74): uid 60000 / gid 60001 must flow into the find.
+# capture (issue #74): uid 60000 must flow into the find; the gids stay
+# DISTINCT per user (opencode 60002, dev 60001 — 0.0.42h C2) so
+# full-script runs never reshape UN_OC_GID == UN_DEV_GID.
 cat > "$WORK/id" <<'EOF'
 #!/bin/sh
 case "$1" in
     -u)  echo 60000 ;;
-    -g)  echo 60001 ;;
-    -gn) echo devgroup ;;
+    -g)  case "$2" in opencode) echo 60002 ;; *) echo 60001 ;; esac ;;
+    -gn) case "$2" in opencode) echo opencodegroup ;; *) echo devgroup ;; esac ;;
     *)   exit 0 ;;
 esac
 EOF
@@ -167,8 +169,9 @@ done
 # uid/gid, because the user removal above may already have orphaned the
 # ids. Functional: the project loop is extracted verbatim (it hardcodes
 # the conf path, so it is fed a fake root via stdin) and run with a
-# logging run() stub; the captured uid/gid (fake id: 60000/60001) must
-# land inside the find, with chown to DEFAULT_USER:<dev-group>. The loop
+# logging run() stub; the captured uid 60000 and the DISTINCT gids
+# (oc 60002 / dev 60001) must land inside the find and the ACL removal,
+# with chown to DEFAULT_USER:<dev-group>. The loop
 # is extracted verbatim except for its stdin redirect (the conf path is
 # hardcoded) — the fake roots are piped in instead.
 PROJECT_LOOP="$(sed -n '/while IFS= read -r root; do/,/done < /p' "$UNINSTALL" | sed 's|done < "$UNINSTALL_PROJECTS_CONF"|done|')"
@@ -250,10 +253,11 @@ else
 fi
 if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$UNINSTALL" \
    && grep -qF 'for _un_acl_gid in "$UN_OC_GID" "$UN_DEV_GID"' "$UNINSTALL" \
-   && grep -qF '[ -z "$UN_OC_GID" ] && [ -z "$UN_DEV_GID" ]' "$UNINSTALL"; then
-    pass "ACL revert: both gids captured, loop over principals, unknown-ids fallback branch (0.0.42f C2 + 0.0.42g S1)"
+   && grep -qF '_un_acl_skipped=1' "$UNINSTALL" \
+   && grep -qF 'kit ACL entries PARTIALLY removed' "$UNINSTALL"; then
+    pass "ACL revert: both gids captured, principal loop, loud per-principal skip + partial log (0.0.42f C2 + 0.0.42g S1 + 0.0.42h S1)"
 else
-    fail "ACL revert: principal loop + fallback branch required (0.0.42g S1)"
+    fail "ACL revert: principal loop + loud skip + partial-log branch required (0.0.42h S1)"
 fi
 
 # --- 5. cleanup hints match what install.sh leaves behind ----------------------

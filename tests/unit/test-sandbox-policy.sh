@@ -10,8 +10,9 @@
 # in its cleanup and mkdir'd a third in setup (0.0.42e C1 -- executed as
 # a live incident on an external review host).
 #
-# Two checks, both token-based on the quote-blanked, continuation-joined
-# view of each line (comments stripped):
+# Two checks over the continuation-joined view of each line (full-comment
+# lines skipped): check 1 scans the quote-blanked operand view, check 2
+# the RAW line (quotes included — see its own header below):
 #
 # 1. MUTATION: a mutating verb (rm, rmdir, mkdir, ln, cp, mv, chown,
 #    chmod, chgrp, setfacl, touch, truncate, tee, install, `sed -i`)
@@ -52,8 +53,8 @@ RATCHET_TREES="/var/www/vhosts /srv/other/outside"
 # or parse-only argument fixtures -- never executed as paths.
 ALLOW="
 # parse_args argument fixtures (parse-only suite -- the values are
-# parsed, never run; the quoted glob probe token cleans up to the bare
-# tree path)
+# parsed, never run; the quoted glob probe token extracts to the
+# trailing-slash form, hence the second entry below)
 tests/unit/test-install-args.sh|/var/www/vhosts
 tests/unit/test-install-args.sh|/var/www/vhosts/
 # project_path_sane screening inputs + expected-verdict call fixtures
@@ -106,7 +107,8 @@ scan() {
             }
             {
                 # join backslash continuations into logical lines (the
-                # reported line number is the FIRST physical line)
+                # reported line number is the LAST physical line — NR at
+                # completion; the self-probes pin this behavior)
                 if (length($0) > 0 && substr($0, length($0)) == "\\") {
                     pending = pending substr($0, 1, length($0) - 1)
                     next
