@@ -222,5 +222,19 @@ if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1
 fi
+# --- 0.0.44b W16: --help carries no code lines (V26); status list (V27) -----------------
+_h_out=$(sh "$RELEASE" --help 2>&1 || true)
+case "$_h_out" in
+    *"set -eu"*|*REPO=*) fail "--help prints only the header comment, no code lines (V26)" ;;
+    *) pass "--help prints only the header comment, no code lines (V26)" ;;
+esac
+_list_line=$(grep -n 'in_progress|queued' "$RELEASE" | head -1)
+case "$_list_line" in
+    *requested*) [ -n "$_list_line" ] && ! printf '%s' "$_list_line" | grep -q action_required \
+        && pass "still-running list: statuses only, requested in, action_required out (V27)" \
+        || fail "still-running list: statuses only, requested in, action_required out (V27)" ;;
+    *) fail "still-running list: statuses only, requested in, action_required out (V27)" ;;
+esac
+
 echo "  ${GREEN}All release-helper tests passed.${NC}"
 exit 0

@@ -857,8 +857,10 @@ do_plan_phase() {
             ui_detail "  ~/projects"
             while true; do
                 _p=$(ui_ask "Project directory (agent workspaces)" "$_pdef")
-                # Empty (no default existed) falls through to the numbered
-                # selection later; only validate what was actually entered.
+                # Empty (no default existed) falls through to the project
+                # selection later — which, since 0.0.44a V6, means the
+                # numbered prompt interactively and the documented skip
+                # under --yes. Only validate what was actually entered.
                 if [ -n "$_p" ]; then
                     if ! project_path_sane "$_p"; then
                         ui_error "'$_p' is a system path — the kit would chgrp -R/setfacl -R over it."
@@ -1054,9 +1056,22 @@ do_plan_phase() {
                     echo "Enter paths (space-separated):"
                     _custom=""
                     custom=""
+                    _custom_empty=0
                     while [ -z "$_custom" ]; do
                         printf "  > "
                         _ui_read custom
+                        # custom-path-bail (0.0.44b W6): the same EOF
+                        # guard as the outer loop — without it a dead
+                        # stdin spun this sub-loop forever.
+                        if [ -z "$custom" ]; then
+                            _custom_empty=$((_custom_empty + 1))
+                            if [ "$_custom_empty" -ge 5 ]; then
+                                ui_error "no usable input after 5 empty reads (EOF without a terminal?) — aborting."
+                                exit 1
+                            fi
+                            continue
+                        fi
+                        _custom_empty=0
                         _custom=""
                         _bad=""
                         for p in $custom; do

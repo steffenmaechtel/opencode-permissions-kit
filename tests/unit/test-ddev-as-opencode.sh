@@ -819,5 +819,10 @@ if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1
 fi
+# describe probe rides sudo -n like every probe (0.0.44b W16/V22)
+grep -q -- 'sudo -n -u opencode' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-terminal.sh" \
+    && pass "describe probe uses sudo -n (V22)" \
+    || fail "describe probe uses sudo -n (V22)"
 echo "  All tests passed."
 echo ""

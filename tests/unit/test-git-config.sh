@@ -325,7 +325,18 @@ case "$acr_out" in *rc=1*) pass "render: unknown mode rejected (rc=1)" ;; *) fai
 # --- Summary ---
 echo ""
 echo "===================================="
+# conf-user homes (0.0.44b W16): the git-config paths ride the conf user
+grep -q '"/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.jsonc"' "$CONFIG" \
+    && pass "git-config paths ride the conf user (V16)" \
+    || fail "git-config paths ride the conf user (V16)"
+if grep -q '/home/opencode/' "$CONFIG"; then
+    fail "config.sh carries no literal /home/opencode path (V16)"
+else
+    pass "config.sh carries no literal /home/opencode path (V16)"
+fi
+
 echo "  ${GREEN}Passed: $passed${NC}"
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1

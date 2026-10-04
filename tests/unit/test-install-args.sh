@@ -235,6 +235,63 @@ if [ -n "$_h_guard" ] && [ -n "$_g_guard" ]; then
         || fail "reuse guard: own primary group passes (V15, rc $_gr_rc)"
 fi
 
+# --- 0.0.44b W6/W14: EOF bails in BOTH Step-2 loops -----------------------------------
+# The 0.0.44a V6 fix closed the outer selection loop only; the custom-
+# path sub-loop still spun forever on a dead stdin (the class rule the
+# wave itself added, applied to itself). Both empty-read guards are
+# extracted and executed against an _ui_read stub that always yields
+# the empty string.
+_loop_w=$(sed -n '/^                    while \[ -z "\$_custom" \]; do$/,/^                    done$/p' "$_install_sh")
+[ -n "$_loop_w" ] \
+    && pass "install.sh: custom-path loop extractable (W6)" \
+    || fail "install.sh: custom-path loop extractable (W6)"
+if [ -n "$_loop_w" ]; then
+    _w6_rc=0
+    (
+        _ui_read() { eval "$1="; }
+        project_path_sane() { return 0; }
+        ui_error() { :; }
+        ui_info()  { :; }
+        _PP_NORM="/var/www/x"
+        _custom=""
+        custom=""
+        _custom_empty=0
+        eval "$_loop_w"
+    ) || _w6_rc=$?
+    [ "$_w6_rc" -eq 1 ] \
+        && pass "custom-path loop aborts on 5 empty reads instead of spinning (W6)" \
+        || fail "custom-path loop aborts on 5 empty reads instead of spinning (W6, rc $_w6_rc)"
+fi
+_outer_bail=$(sed -n '/^            if \[ -z "\$selection" \]; then$/,/^            fi$/p' "$_install_sh")
+[ -n "$_outer_bail" ] \
+    && pass "install.sh: outer empty-read guard extractable (W14)" \
+    || fail "install.sh: outer empty-read guard extractable (W14)"
+if [ -n "$_outer_bail" ]; then
+    _w14_rc=0
+    (
+        ui_error() { :; }
+        _sel_empty=0
+        _n=0
+        while [ "$_n" -lt 5 ]; do
+            selection=""
+            eval "$_outer_bail"
+            [ "$_sel_empty" -gt 0 ] && [ "$_n" -eq 4 ] && exit 1   # not reached: exit comes first
+            _n=$((_n + 1))
+        done
+        exit 0
+    ) || _w14_rc=$?
+    [ "$_w14_rc" -eq 1 ] \
+        && pass "outer selection guard exits on the 5th empty read (W14)" \
+        || fail "outer selection guard exits on the 5th empty read (W14, rc $_w14_rc)"
+fi
+# and --yes takes the documented skip: the SKIP_PROMPTS elif sits before
+# the interactive prompt block (order pin)
+_skip_ln=$(grep -n 'elif \[ "\$SKIP_PROMPTS" = true \]; then' "$_install_sh" | head -1 | cut -d: -f1)
+_prompt_ln=$(grep -n 'ui_section "Project roots"' "$_install_sh" | head -1 | cut -d: -f1)
+[ -n "$_skip_ln" ] && [ -n "$_prompt_ln" ] && [ "$_skip_ln" -lt "$_prompt_ln" ] \
+    && pass "--yes skip branch precedes the interactive prompt (W14)" \
+    || fail "--yes skip branch precedes the interactive prompt (W14)"
+
 # The regression this file exists for: flags AFTER --projects used to be
 # silently dropped (the old loop `break`ed out of the parser).
 reset_globals

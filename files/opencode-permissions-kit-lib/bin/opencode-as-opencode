@@ -300,6 +300,14 @@ if [ -z "${OPENCODE_MAJOR:-}" ]; then
     # installs. The direct fallback covers stamps from kit versions
     # that predate the advisories block (or a missing advisories.sh).
     _MAJOR_SRC="${ADV_LINE:-}"
+    # Accepted trade (0.0.44b W10): when advisories.sh exists but its
+    # 5 s probe failed (cold service in the 5-10 s band, one sudo
+    # flake), the old second 10 s probe no longer retries — the major
+    # resolves fail-open to 1 and --standalone is dropped for that
+    # start (the issue-#80 degradation, self-healing on the next start
+    # once the service answers). Keeping the retry doubled the worst-
+    # case fail-open delay on every unstamped start; the narrowed band
+    # is the cheaper side of that trade.
     if [ -z "$_MAJOR_SRC" ] && [ ! -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
         if command -v timeout >/dev/null 2>&1; then
             _MAJOR_SRC=$(timeout 10 /usr/bin/sudo -n -u opencode \

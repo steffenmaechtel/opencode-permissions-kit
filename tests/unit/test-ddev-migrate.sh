@@ -424,6 +424,32 @@ check_fail "the refused run leaves no staging dir behind" \
 rm -f "$DUMP_DIR/manifest.conf"
 printf 'OK|alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|alpha.sql.gz\n' > "$DUMP_DIR/manifest.conf"
 
+# --- 4e. fixed-string resume: sh.p must not cross-match shop (0.0.44b W13) -------------
+# The resume check and the stale-rewrite are grep -F since 0.0.44a V23 —
+# but nothing pinned it: all fixtures were metacharacter-free, so the old
+# BRE ("sh.p" cross-matches "shop") was indistinguishable. A hand-edited
+# registry (ddev itself enforces [a-z0-9-]) carries both names; the OK
+# line for shop must NOT satisfy sh.p's resume check.
+cat >> "$WORK/devhome/.ddev/project_list.yaml" <<YML
+  shop:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+  sh.p:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+YML
+printf 'dump\n' > "$DUMP_DIR/shop.sql.gz"
+printf 'dump\n' > "$DUMP_DIR/sh.p.sql.gz"
+printf 'OK|shop|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|shop.sql.gz\n' >> "$DUMP_DIR/manifest.conf"
+OUT5=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run5.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1 || true)
+check "dot-name project sh.p is NOT skipped via shop's OK line (W13)" \
+    sh -c "grep -q 'ddev:start sh.p' \"\$1\"" _ "$WORK/ddev-run5.log"
+check "shop itself IS skipped (its own OK line matches, both engines)" \
+    sh -c "grep -q 'ddev:start shop' \"\$1\" && exit 1 || exit 0" _ "$WORK/ddev-run5.log"
+check "the published manifest keeps exactly one OK line per project (W13)" \
+    sh -c "test \"\$(grep -c '^OK|' \"\$1\")\" -eq 5" _ "$DUMP_DIR/manifest.conf"
+
 # --- 5. import loop (static wiring) ---------------------------------------------
 
 check "import reads the manifest and runs as the opencode user" \

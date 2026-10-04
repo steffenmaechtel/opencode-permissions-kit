@@ -315,6 +315,15 @@ assert_exitcode "patterns: top-level number exits 1 (V8)" 1 python3 "$PARSER" "$
 printf '"denied"\n' > "$TMP/nondict.jsonc"
 assert_exitcode "patterns: top-level string exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
 
+# --- 2y. the stderr NOTE discriminates the fix from the old traceback (0.0.44b W12) ----
+# The rc-1/empty-stdout pins above also hold for the old uncaught
+# AttributeError (traceback, stdout empty) — the pins that discriminate
+# are the clean stderr note and the absent traceback.
+printf '%s\n' '[1, 2, 3]' > "$TMP/nondict.jsonc"
+_nd_err=$(python3 "$PARSER" "$TMP/nondict.jsonc" 2>&1 >/dev/null || true)
+assert_contains "non-dict stderr carries the clean note (W12)" "top-level config is not an object" "$_nd_err"
+assert_not_contains "non-dict stderr carries no traceback (W12)" "Traceback" "$_nd_err"
+
 # --- Summary ---
 echo ""
 echo "===================================="

@@ -339,6 +339,11 @@ else
     fail "unknown option aborts before anything runs (V7, rc=$u7_rc out=$u7_out)"
 fi
 
+# uninstall side of the conf-user homes (0.0.44b W16)
+grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL" \
+    && pass "uninstall plugin-unregister rides the conf user (V16)" \
+    || fail "uninstall plugin-unregister rides the conf user (V16)"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

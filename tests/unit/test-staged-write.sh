@@ -355,6 +355,12 @@ else
 fi
 check "C3 (0.0.39g) / F4 (0.0.39h) / 0.0.44a V11: config.sh narrows the guard (rc <= 1 ok, rc 2 dies) + stages per-process" \
     sh -c 'grep -qF "_pr_out=\$(sudo grep -vxF \"\$p\" \"\$PROJECTS_CONF\" 2>/dev/null) || _pr_rc=\$?" "$1" && grep -qF "[ \"\$_pr_rc\" -le 1 ] || die" "$1" && grep -qF "_pr_tmp=\"\$PROJECTS_CONF.tmp.\$\$\"" "$1" && grep -qF "_tmp_track \"\$_pr_tmp\"" "$1"' _ "$CONFIG"
+SD_LIB="$REPO/files/opencode-permissions-kit-lib/sh/sudoers-deploy.sh"
+WSL_LIB="$REPO/files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+check "0.0.44b W16/V10: sudoers replace is stage+mv (atomic, not O_TRUNC cp)" \
+    sh -c 'grep -qF "mktemp" "$1" && grep -qF "mv -f \"\$_sd_stage\" \"\$_sd_conf/sudoers\"" "$1"' _ "$SD_LIB"
+check "0.0.44b W16/V10: wsl.conf replace is stage+mv via _bb_install_conf" \
+    sh -c 'grep -qF "_bb_install_conf" "$1" && grep -qF "mv -f \"\$_bb_stage\" \"\$_bb_conf\"" "$1"' _ "$WSL_LIB"
 check "0.0.39h F4/F6: update.sh install.conf rewrite is narrowed + atomic (temp + mv)" \
     sh -c 'grep -qF "_ic_keep=\$(grep -v -e '"'"'^VERSION='"'"' -e '"'"'^OPENCODE_GROUP='"'"' -e '"'"'^KIT_CHANNEL='"'"'" "$1" && grep -qF "-e '"'"'^DDEV_VERSION='"'"' \"\$INSTALL_CONF\" 2>/dev/null) || _ic_rc=\$?" "$1" && grep -qF "_tmp_track \"\$_INSTALL_CONF_TMP\"" "$1" && grep -qF "mv -f \"\$_INSTALL_CONF_TMP\" \"\$CONFDIR/install.conf\"" "$1"' _ "$UPDATE"
 check "0.0.39h F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep)" \

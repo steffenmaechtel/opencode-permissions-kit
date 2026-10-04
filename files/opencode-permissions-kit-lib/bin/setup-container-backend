@@ -14,7 +14,8 @@
 # Usage:
 #   setup-container-backend <backend> [--yes]
 #     backend: docker-rootless | podman-rootless
-#     --yes:   skip confirmations
+#     --yes:   accepted no-op (install.sh passes it; this provisioner
+#              is non-interactive and never prompts)
 #
 # What it does (for rootless backends):
 #   1. Install prerequisite packages (uidmap, dbus-user-session, podman or
