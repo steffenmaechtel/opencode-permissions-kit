@@ -26,6 +26,14 @@ for arg do
         --yes|-y) YES=true ;;
         --dry-run) DRY_RUN=true ;;
         --debug) DEBUG=true ;;
+        # Unknown options die loudly (0.0.44a V7): a silent drop turned
+        # `opk uninstall --dryrun --yes` (one missing hyphen) into a real
+        # unprompted uninstall — the highest-blast-radius script in the
+        # kit. Every sibling command already rejected unknowns.
+        *)
+            echo "error: unknown option: $arg" >&2
+            echo "usage: opk uninstall [--yes|-y] [--dry-run] [--debug]" >&2
+            exit 1 ;;
     esac
 done
 

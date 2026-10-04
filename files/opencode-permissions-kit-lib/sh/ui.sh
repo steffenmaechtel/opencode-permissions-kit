@@ -144,7 +144,10 @@ ui_confirm() {
     # ui_confirm "Question?" <default y|n>  -> exit status 0 = yes, 1 = no.
     # Convention (docs/design/conventions.md): prompt shows [Y/n] / [y/N]
     # with the DEFAULT as the capital letter; Enter accepts the default;
-    # y/yes/n/no accepted (case-insensitive); EOF/unknown -> default.
+    # y/yes/n/no accepted (case-insensitive); EOF/unknown -> default
+    # (0.0.44a V17: unknown input used to return "no" even when the
+    # default was y — a trailing space after "y" declined what the
+    # prompt's own default promised).
     _q="$1"; _d="${2:-n}"
     [ "$_d" = "y" ] && _hint="[Y/n]" || _hint="[y/N]"
     printf '  %s %s ' "$_q" "$_hint" >&2
@@ -153,7 +156,8 @@ ui_confirm() {
     [ -z "$_ans" ] && _ans="$_d"
     case "$_ans" in
         y|yes) return 0 ;;
-        *)     return 1 ;;
+        n|no)  return 1 ;;
+        *)     [ "$_d" = "y" ] && return 0 || return 1 ;;
     esac
 }
 

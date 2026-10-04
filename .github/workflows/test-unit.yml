@@ -32,9 +32,16 @@ permissions:
 # get their own group: a weekly run must never cancel an in-flight
 # push/PR run of the same ref (a cancelled run on a master sha reads as
 # red to scripts/release.sh's CI gate) — and conversely stays alive to
-# deliver its drift verdict even when master moves under it.
+# deliver its drift verdict even when master moves under it. Manual
+# dispatches share that fate (0.0.44a V13): a workflow_dispatch resolves
+# github.ref to refs/heads/master — the push run's group — and would
+# cancel it, reddening the release gate on exactly the release sha; they
+# run in their own 'manual' group instead.
 concurrency:
-  group: tests-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
+  group: >-
+    tests-${{ github.event_name == 'schedule' && 'weekly'
+    || (github.event_name == 'push' || github.event_name == 'pull_request') && github.ref
+    || 'manual' }}
   cancel-in-progress: true
 
 jobs:

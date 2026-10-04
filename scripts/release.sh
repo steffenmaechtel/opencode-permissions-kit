@@ -36,7 +36,10 @@ SKIP_CI=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -h|--help)
-            sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'
+            # Print the header comment, stopping at the first non-comment
+            # line (0.0.44a V26): the old fixed `2,31p` range rotted every
+            # time the header shrank or grew, and printed code lines.
+            awk 'NR > 1 && $0 !~ /^#/ {exit} NR > 1' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         --dry-run)     DRY_RUN=true ;;
@@ -193,7 +196,13 @@ for r in data.get("workflow_runs", []):
         say "master pushes). First release before any master CI exists?"
         say "Re-run with --skip-ci to override deliberately."
         exit 1
-    elif printf '%s' "$_ci_tsv" | grep -qiE '^(in_progress|queued|waiting|pending|action_required)'; then
+    elif printf '%s' "$_ci_tsv" | grep -qiE '^(in_progress|queued|waiting|requested|pending)'; then
+        # Statuses, not conclusions (0.0.44a V27): `action_required` left
+        # the still-running list (it is a CONCLUSION of completed runs —
+        # dead at line start, fell through to the red count), and
+        # `requested` joined it (a run waiting for its workflow to start
+        # is unfinished, not red — the old list misreported it as
+        # "not green").
         err "CI is still running on this master commit — wait for it to finish."
         printf '%s\n' "$_ci_tsv" | sed 's/^/  say  /'
         exit 1

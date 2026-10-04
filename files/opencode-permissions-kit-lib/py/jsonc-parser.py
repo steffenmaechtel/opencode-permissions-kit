@@ -137,6 +137,15 @@ def load_config(config_path):
 def extract_patterns(config_path):
     config = load_config(config_path)
 
+    # A non-dict top level (list/number/string: hand-mangled or truncated
+    # deploy) carries no permission map (0.0.44a V8, the F13 class's
+    # uncovered shape): exit non-zero so the status.sh caller can say
+    # "unscannable" instead of swallowing the crash into a green
+    # "no matches" over the most interesting configs.
+    if not isinstance(config, dict):
+        print('error: top-level config is not an object', file=sys.stderr)
+        sys.exit(1)
+
     patterns = set()
     permission = config.get('permission', {})
 

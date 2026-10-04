@@ -53,7 +53,11 @@ _opk_browser_open() {
 # (_opk_browser_open — WSL interop, which the opencode user must not
 # have).
 _opk_ddev_describe() {
-    /usr/bin/sudo -u opencode \
+    # -n like every probe (0.0.44a V22, F17's class): a missing/broken
+    # sudoers rule must fail the probe, not attempt authentication —
+    # this is a best-effort URL lookup (|| true below), never the
+    # session exec.
+    /usr/bin/sudo -n -u opencode \
         /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode describe -j 2>/dev/null || true
 }
 

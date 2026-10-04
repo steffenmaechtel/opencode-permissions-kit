@@ -287,4 +287,18 @@ if [ "$failures" -gt 0 ]; then
     exit 1
 fi
 echo "  ${GREEN}All workflow consistency tests passed.$NC"
+# Manual dispatches run in their own concurrency group (0.0.44a V13): a
+# workflow_dispatch resolves github.ref to refs/heads/master — the push
+# run's group — and cancel-in-progress killed the push run, reddening
+# scripts/release.sh's CI gate on exactly the release sha.
+for _wf in test-unit test-e2e test-e2e-ddev; do
+    if grep -qF "(github.event_name == 'push' || github.event_name == 'pull_request') && github.ref" \
+        "$REPO/.github/workflows/$_wf.yml" \
+       && grep -qF "|| 'manual' }}" "$REPO/.github/workflows/$_wf.yml"; then
+        pass "$_wf.yml: dispatch gets its own concurrency group (V13)"
+    else
+        fail "$_wf.yml: dispatch gets its own concurrency group (V13)"
+    fi
+done
+
 exit 0

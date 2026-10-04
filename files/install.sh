@@ -1000,6 +1000,16 @@ do_plan_phase() {
 
     if [ -n "$PREDEFINED_PROJECTS" ]; then
         PROJECTS_ROOTS="$PREDEFINED_PROJECTS"
+    elif [ "$SKIP_PROMPTS" = true ]; then
+        # --yes without --projects (0.0.44a V6): every sibling prompt
+        # honors SKIP_PROMPTS — this selection loop was the one hold-out,
+        # and on EOF without a controlling tty (checkout-mode runs from
+        # cron/CI/ssh -T: no UI_NO_STDIN_FALLBACK there) it spun forever
+        # on `invalid selection ''`. The --yes default is the skip: user
+        # + wrapper, no project baseline.
+        PROJECTS_ROOTS=""
+        ui_info "--yes without --projects: no project baseline configured (skip)"
+        log "project roots: skipped (--yes, no --projects given)"
     else
         ui_section "Project roots"
         echo "Select project directories (space-separated numbers), or 'c' for custom, 's' to skip."
@@ -1020,11 +1030,24 @@ do_plan_phase() {
         echo "  [s] Skip (no project baseline, only user + wrapper)"
         # Re-ask until the selection resolves: an out-of-range number or stray
         # input used to yield an empty root list and silently continue (0.0.38 C11).
+        # Empty reads count toward a bail-out (0.0.44a V6): EOF without a
+        # terminal (checkout runs without --yes from cron/CI/ssh -T) used to
+        # spin this loop forever — five consecutive empties abort loudly.
         _sel_done=""
+        _sel_empty=0
         selection=""
         while [ -z "$_sel_done" ]; do
             printf "  > "
             _ui_read selection
+            if [ -z "$selection" ]; then
+                _sel_empty=$((_sel_empty + 1))
+                if [ "$_sel_empty" -ge 5 ]; then
+                    ui_error "no usable input after 5 empty reads (EOF without a terminal?) — aborting."
+                    exit 1
+                fi
+                continue
+            fi
+            _sel_empty=0
 
             case "$selection" in
                 [Cc]*)

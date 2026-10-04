@@ -193,7 +193,10 @@ try:
 except Exception:
     sys.exit(1)
 for entry in feed or []:
-    print(entry.get("ghsa_id", ""))' 2>/dev/null); then
+    # str(... or ""): a JSON null defeats the .get default (the F7
+    # class, 0.0.44a V19 — advisory-watch got the coercion in 0.0.43a;
+    # this twin printed the literal string "None").
+    print(str(entry.get("ghsa_id") or ""))' 2>/dev/null); then
                 ADV_PARSE_OK=true
                 ADV_KNOWN=$(advisories_ids opencode || true)
                 while IFS= read -r ADV_ID; do
@@ -487,30 +490,42 @@ fi
 if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-migrate.sh" ]; then
     # shellcheck disable=SC1090
     . "$LIBDIR/sh/ddev-migrate.sh"
-    _mig_roots=""
-    [ -f "$PROJECTS_CONF" ] && _mig_roots=$(grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null | tr '\n' ' ')
-    if [ -n "$_mig_roots" ]; then
-        # shellcheck disable=SC2086  # word splitting intended (root list)
-        if _mig_gap=$(DDEV_MIG_BACKUP_ROOT="$_mig_root" ddev_migrate_gap "$DEFAULT_USER" $_mig_roots); then
+    # Roots ride positional parameters, one per line from projects.conf
+    # (0.0.44a V18): the old `tr '\n' ' '` + unquoted call word-split a
+    # spaced root (hand-edited conf) into bogus "roots" and spurious
+    # INCOMPLETE/NONE diagnostics. ddev_migrate_gap/ddev_migrate_projects
+    # take roots one-per-argument; the function keeps the script's own
+    # "$@" intact and skips empty lines.
+    _st_dbdump_gap() {
+        _stg_user="$1"
+        while IFS= read -r _stg_root; do
+            [ -n "$_stg_root" ] || continue
+            set -- "$@" "$_stg_root"
+        done
+        [ "$#" -gt 1 ] || return 0
+        shift  # drop _stg_user; "$@" now holds the roots
+        if _mig_gap=$(DDEV_MIG_BACKUP_ROOT="$_mig_root" ddev_migrate_gap "$_stg_user" "$@"); then
             _mig_have=${_mig_gap%% *}
             _mig_rest=${_mig_gap#* }
             _mig_now=${_mig_rest%% *}
             ui_kv_warn "db dumps" "INCOMPLETE — registry lists $_mig_now project(s), only $_mig_have dump(s) recorded"
             ui_detail "missing databases stay in the old daemon — bridge them (docs/troubleshooting.md,"
-            ui_detail "'My databases are gone after the install'); check:"\
-" $LIBDIR/bin/ddev-migrate registry $DEFAULT_USER $_mig_roots"
+            ui_detail "'My databases are gone after the install'); check:"
+            ui_detail "  $LIBDIR/bin/ddev-migrate registry $_stg_user <configured-root>"
         elif [ -z "$_mig_dir" ] || [ ! -f "$_mig_dir/manifest.conf" ]; then
             # no manifest at all: warn only when the registry HAS projects
-            # shellcheck disable=SC2086  # word splitting intended (root list)
-            _mig_reg=$(ddev_migrate_projects "$(ddev_migrate_home "$DEFAULT_USER")/.ddev" $_mig_roots 2>/dev/null \
+            _mig_reg=$(ddev_migrate_projects "$(ddev_migrate_home "$_stg_user")/.ddev" "$@" 2>/dev/null \
     | grep -c . || true)
             _mig_reg=${_mig_reg:-0}
             if [ "$_mig_reg" -gt 0 ]; then
                 ui_kv_warn "db dumps" "NONE — but the ddev registry lists $_mig_reg project(s)"
                 ui_detail "the install-time export did not run or found nothing; bridge manually:"
-                ui_detail "  sudo $LIBDIR/bin/ddev-migrate export $DEFAULT_USER $_mig_roots"
+                ui_detail "  sudo $LIBDIR/bin/ddev-migrate export $_stg_user <configured-root>"
             fi
         fi
+    }
+    if [ -f "$PROJECTS_CONF" ]; then
+        grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null | _st_dbdump_gap "$DEFAULT_USER" || true
     fi
 fi
 # Live ddev version (issues #56, #72): DDEV_VERSION from install.conf is
@@ -797,7 +812,17 @@ SCAN_CFG="/home/$OPENCODE_USER/.config/opencode/opencode.jsonc"
 ui_section "Leak scan (report-only)"
 
 if [ -f "$SCAN_CFG" ] && [ -x "$PARSER" ] && command -v python3 >/dev/null 2>&1; then
-    scan_patterns=$(python3 "$PARSER" "$SCAN_CFG" 2>/dev/null || true)
+    # The parser's rc matters (0.0.44a V8): a non-dict top level used to
+    # crash into this `|| true`, and empty output then printed the GREEN
+    # "no matches" — the F13 false-green class. rc != 0 now renders as
+    # "unscannable", never as clean.
+    scan_unscannable=false
+    if scan_patterns=$(python3 "$PARSER" "$SCAN_CFG" 2>/dev/null); then
+        :
+    else
+        scan_patterns=""
+        scan_unscannable=true
+    fi
     scan_hits=""
     if [ -n "$scan_patterns" ]; then
         scan_hits=$(
@@ -829,7 +854,10 @@ EOF
         )
     fi
     scan_count=$(printf '%s\n' "$scan_hits" | grep -c . || true)
-    if [ "${scan_count:-0}" -gt 0 ]; then
+    if [ "$scan_unscannable" = true ]; then
+        ui_kv_warn "result" "skipped — agent config unscannable (top level is not an object?)" "$UI_YELLOW"
+        log "leak scan: skipped, parser rejected $SCAN_CFG"
+    elif [ "${scan_count:-0}" -gt 0 ]; then
         ui_warn "$scan_count match(es) — deny-pattern files outside the protected roots:"
         printf '%s\n' "$scan_hits" | head -20 | sed 's/^/     /'
         [ "$scan_count" -gt 20 ] && ui_detail "... and $((scan_count - 20)) more"

@@ -891,13 +891,24 @@ install_binary() {
     new=$(opencode_version_line)
     [ -n "$new" ] || new="unknown"
     # Re-stamp the major so the wrapper's 2.x --standalone gating follows
-    # the binary ("opencode v2..." -> 2, anything else -> 1).
+    # the binary ("opencode v2..." -> 2). ONLY when the probe actually
+    # determined one (0.0.44a V5): an empty/failed probe used to persist
+    # major 1 over a known-good 2 stamp — the wrapper prefers the stamp,
+    # and a 1-stamped 2.x binary attaches sessions to the shared service
+    # (the issue-#80 env breakage --standalone exists to prevent). The
+    # stamp writes fail loud (0.0.44a V20): rc 2 = post-copy failure, the
+    # caller restores from the backup instead of printing "upgraded" over
+    # a stale stamp.
     _new_major=$(printf '%s' "$new" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
-    [ -n "$_new_major" ] || _new_major=1
-    if [ -f "$CONFDIR/install.conf" ] && grep -q '^OPENCODE_MAJOR=' "$CONFDIR/install.conf" 2>/dev/null; then
-        sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf"
-    elif [ -f "$CONFDIR/install.conf" ]; then
-        echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null
+    if [ -n "$_new_major" ]; then
+        if [ -f "$CONFDIR/install.conf" ] && grep -q '^OPENCODE_MAJOR=' "$CONFDIR/install.conf" 2>/dev/null; then
+            sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf" || return 2
+        elif [ -f "$CONFDIR/install.conf" ]; then
+            echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null || return 2
+        fi
+    else
+        echo "  warn: new binary's major could not be determined — OPENCODE_MAJOR stamp left unchanged" >&2
+        log "opencode binary upgraded but major unknown; OPENCODE_MAJOR stamp kept"
     fi
     echo "  opencode binary upgraded: ${current} -> ${new}"
     log "opencode binary upgraded: ${current} -> ${new}"

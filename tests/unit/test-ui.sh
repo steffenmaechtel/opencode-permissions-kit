@@ -139,6 +139,23 @@ check "ui_menu returns the chosen key" [ "$ans" = "2" ]
 ans=$(printf 'zzz\n' | setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
 check "ui_menu falls back to default on unknown input" [ "$ans" = "1" ]
 
+# ui_confirm: unknown input falls back to the DEFAULT (0.0.44a V17) —
+# the case used to return "no" even when the default was y, so a stray
+# trailing space after "y" declined what the prompt's own default
+# promised (conventions.md: "unknown input falls back to the default").
+_uc_rc=0
+printf 'y \n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
+check "ui_confirm: trailing-space y honors the y default (V17)" [ "$_uc_rc" -eq 0 ]
+_uc_rc=0
+printf 'garbage\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
+check "ui_confirm: unknown input falls back to a y default (V17)" [ "$_uc_rc" -eq 0 ]
+_uc_rc=0
+printf 'garbage\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"n\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
+check "ui_confirm: unknown input falls back to an n default (V17)" [ "$_uc_rc" -ne 0 ]
+_uc_rc=0
+printf 'n\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
+check "ui_confirm: explicit no still declines under a y default" [ "$_uc_rc" -ne 0 ]
+
 # --- no-tty gate (streamed installs, 0.0.39b C6 / 0.0.39e C8) ----------------------
 # UI_NO_STDIN_FALLBACK=1 + no controlling tty: the read must HARD-EXIT
 # with guidance instead of consuming piped stdin (which, in a streamed

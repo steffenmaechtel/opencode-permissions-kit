@@ -70,7 +70,10 @@ permissions:
 # red to scripts/release.sh's CI gate) — and conversely stays alive to
 # deliver its drift verdict even when master moves under it.
 concurrency:
-  group: e2e-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
+  group: >-
+    e2e-${{ github.event_name == 'schedule' && 'weekly'
+    || (github.event_name == 'push' || github.event_name == 'pull_request') && github.ref
+    || 'manual' }}
   cancel-in-progress: true
 
 jobs:

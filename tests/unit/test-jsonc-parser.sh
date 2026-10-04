@@ -302,6 +302,19 @@ assert_exitcode "tools-2x: permissions:null exits 0 (no TypeError)" 0 \
 OUT=$(printf '%s\n' '[{ "type": "document", "info": { "permissions": null } }]' | python3 "$PARSER" --tools - 2>/dev/null || true)
 assert_empty "tools-2x: permissions:null document -> no tools, no crash" "$OUT"
 
+# --- 2x. top-level non-dict is a loud rc 1, never a swallowed crash (0.0.44a V8) ---
+# A hand-mangled/truncated config ([..]/42/"x") used to raise inside
+# extract_patterns and the status.sh caller's `|| true` printed a green
+# "no matches" — the F13 false-green class's uncovered shape.
+printf '%s\n' '[1, 2, 3]' > "$TMP/nondict.jsonc"
+assert_exitcode "patterns: top-level list exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
+OUT=$(python3 "$PARSER" "$TMP/nondict.jsonc" 2>/dev/null || true)
+assert_empty "patterns: top-level list prints no patterns (V8)" "$OUT"
+printf '42\n' > "$TMP/nondict.jsonc"
+assert_exitcode "patterns: top-level number exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
+printf '"denied"\n' > "$TMP/nondict.jsonc"
+assert_exitcode "patterns: top-level string exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
+
 # --- Summary ---
 echo ""
 echo "===================================="

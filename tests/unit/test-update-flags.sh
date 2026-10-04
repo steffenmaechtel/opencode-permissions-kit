@@ -307,6 +307,21 @@ check "tui: registration flips with the major (sync function, both directions)" 
 check "tui: a major flip re-anchors the registration even in --only-binary runs" \
     sh -c "grep -n 'sync_tui_registration \"\$_maj_after\"' \"\$1\" | head -1 | cut -d: -f1 | grep -q ." _ "$UPDATE"
 
+# OPENCODE_MAJOR re-stamp discipline (0.0.44a V5/V20): the post-copy probe
+# used to force major 1 on empty and overwrite a known-good 2 stamp (the
+# wrapper prefers the stamp — a 1-stamped 2.x drops --standalone, the
+# issue-#80 breakage); the stamp writes now fail loud (rc 2 = post-copy
+# failure -> the caller restores from the backup).
+_restamp_block=$(sed -n '/^    if \[ -n "\$_new_major" \]; then/,/^    fi$/p' "$UPDATE")
+_restamp_writes=$(printf '%s\n' "$_restamp_block" | grep -c 'OPENCODE_MAJOR=$_new_major')
+_restamp_guards=$(printf '%s\n' "$_restamp_block" | grep -c '|| return 2')
+if grep -qF 'OPENCODE_MAJOR stamp left unchanged' "$UPDATE" \
+   && [ "$_restamp_writes" -eq 2 ] && [ "$_restamp_guards" -eq 2 ]; then
+    pass "re-stamp only on a determined major, writes fail loud (V5/V20)"
+else
+    fail "re-stamp only on a determined major, writes fail loud (V5/V20, writes=$_restamp_writes guards=$_restamp_guards)"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

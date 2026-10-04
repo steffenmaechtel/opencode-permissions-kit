@@ -294,17 +294,24 @@ fi
 # unbounded substitution would hang EVERY start. Fail-open: a failed, hung,
 # or empty probe means major 1 (mirroring install.sh's major detection).
 if [ -z "${OPENCODE_MAJOR:-}" ]; then
-    MAJOR_LINE=""
-    if command -v timeout >/dev/null 2>&1; then
-        MAJOR_LINE=$(timeout 10 /usr/bin/sudo -n -u opencode \
-            /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
-    else
-        MAJOR_LINE=$(/usr/bin/sudo -n -u opencode \
-            /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+    # Reuse ADV_LINE when the advisories probe ran (0.0.44a V21): it is
+    # the SAME bounded `--version` first line — a second serial probe
+    # only added up to 15 s of fail-open delay per start on unstamped
+    # installs. The direct fallback covers stamps from kit versions
+    # that predate the advisories block (or a missing advisories.sh).
+    _MAJOR_SRC="${ADV_LINE:-}"
+    if [ -z "$_MAJOR_SRC" ] && [ ! -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
+        if command -v timeout >/dev/null 2>&1; then
+            _MAJOR_SRC=$(timeout 10 /usr/bin/sudo -n -u opencode \
+                /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+        else
+            _MAJOR_SRC=$(/usr/bin/sudo -n -u opencode \
+                /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+        fi
     fi
-    case "$MAJOR_LINE" in
+    case "$_MAJOR_SRC" in
         "opencode v2"*) OPENCODE_MAJOR=2 ;;
-        *) OPENCODE_MAJOR=1 ;;
+        *)              OPENCODE_MAJOR=1 ;;
     esac
 fi
 
