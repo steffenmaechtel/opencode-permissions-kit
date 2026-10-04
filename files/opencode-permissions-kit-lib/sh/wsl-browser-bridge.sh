@@ -114,7 +114,11 @@ browser_bridge_write_conf() {
         awk '
             in_block {
                 if ($0 ~ /^# opencode permissions kit browser bridge -- end$/) { in_block = 0; next }
-                if ($0 !~ /^#/) { in_block = 0; print; next }
+                # Hand-edited file, end marker destroyed: exit at the first
+                # non-comment line WITHOUT the blank-eater staying armed
+                # (0.0.43a F11) — the next blank, if any, belongs to foreign
+                # content and must survive ("never eat foreign content").
+                if ($0 !~ /^#/) { in_block = 0; pend_blank = 0; print; next }
                 next
             }
             /^# opencode permissions kit browser bridge -- begin$/ { in_block = 1; pend_blank = 1; next }
@@ -227,7 +231,11 @@ browser_bridge_remove() {
         awk '
             in_block {
                 if ($0 ~ /^# opencode permissions kit browser bridge -- end$/) { in_block = 0; next }
-                if ($0 !~ /^#/) { in_block = 0; print; next }
+                # Hand-edited file, end marker destroyed: exit at the first
+                # non-comment line WITHOUT the blank-eater staying armed
+                # (0.0.43a F11) — the next blank, if any, belongs to foreign
+                # content and must survive ("never eat foreign content").
+                if ($0 !~ /^#/) { in_block = 0; pend_blank = 0; print; next }
                 next
             }
             /^# opencode permissions kit browser bridge -- begin$/ { in_block = 1; pend_blank = 1; next }

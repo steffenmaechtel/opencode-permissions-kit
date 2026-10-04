@@ -607,6 +607,65 @@ check "status.sh reports INCOMPLETE dumps vs the dev registry" \
 check "bin dispatcher has the registry subcommand" \
     sh -c "grep -q 'registry)' \"\$1\"" _ "$BIN_MIG"
 
+# --- 6c. spaced-home quoting (0.0.43a F6) --------------------------------------------
+# A developer home with whitespace must not split the per-user ddev
+# candidates (the bare directory prefix used to pass [ -x ] and was
+# emitted AS the binary) and env assignments must stay single arguments.
+# Hermetic: getent + sudo are PATH shims; a non-executable `ddev` shadows
+# nothing (command -v only reports executables); the bin-resolution case
+# is skipped on hosts with a system ddev (its absolute-path candidates
+# would win by design).
+mkdir -p "$WORK/spaced home/.local/bin" "$WORK/spaced"
+printf '#!/bin/sh\necho real-ddev\n' > "$WORK/spaced home/.local/bin/ddev"
+chmod +x "$WORK/spaced home/.local/bin/ddev"
+printf '#!/bin/sh\n' > "$WORK/spaced/ddev"
+# non-executable `ddev` on PATH: command -v must not find it
+cat > "$WORK/getent" <<EOF
+#!/bin/sh
+[ "\$1" = passwd ] && { printf '%s\n' "spaced:x:\$(id -u):\$(id -g)::$WORK/spaced home:/bin/sh"; exit 0; }
+exec $(command -v getent) "\$@"
+EOF
+chmod +x "$WORK/getent"
+if [ -x /usr/local/bin/ddev ] || [ -x /usr/bin/ddev ]; then
+    echo "  SKIP  spaced-home bin resolution (host has a system ddev — absolute-path candidates would win)"
+else
+    cat > "$WORK/binres.sh" <<'WRAP'
+#!/bin/sh
+. "$1"
+_ddev_migrate_bin spaced
+WRAP
+    _bin_out="$(PATH="$WORK:$PATH" sh "$WORK/binres.sh" "$MIG" 2>/dev/null || true)"
+    assert_eq "spaced home: the real binary resolves (not the directory prefix)" \
+        "$WORK/spaced home/.local/bin/ddev" "$_bin_out"
+    check_fail "spaced home: the searchable dir is never emitted as the binary" \
+        sh -c "[ \"\$_bin_out\" = \"\$1\" ]" _ "$WORK/spaced"
+fi
+
+# run-as: each env assignment is ONE argument — a sudo shim prints argv
+# one word per line, so a split HOME would show as separate lines.
+cat > "$WORK/sudo" <<'EOF'
+#!/bin/sh
+for _a in "$@"; do printf '%s\n' "$_a"; done
+EOF
+chmod +x "$WORK/sudo"
+cat > "$WORK/runas.sh" <<'WRAP'
+#!/bin/sh
+. "$1"
+_ddev_migrate_run_as spaced /bin/true
+WRAP
+_runas_out="$(PATH="$WORK:$PATH" sh "$WORK/runas.sh" "$MIG" 2>/dev/null || true)"
+check "run-as passes a spaced HOME as one single argument" \
+    sh -c "printf '%s\n' \"\$2\" | grep -qxF \"HOME=\$1\"" _ "$WORK/spaced home" "$_runas_out"
+
+# static: the import loop builds HOME via getent and rides conditional
+# backend vars as single quoted arguments (0.0.43a F6/F12).
+check "import resolves the agent HOME via getent (not /home/<user>)" \
+    sh -c "grep -qF 'dm_oc_h=\$(getent passwd' \"\$1\"" _ "$MIG"
+check "import passes HOME/XDG as single quoted arguments" \
+    sh -c "grep -qF 'env \"HOME=\$dm_oc_h\" \"XDG_RUNTIME_DIR=/run/user/\$dm_oc_i\"' \"\$1\"" _ "$MIG"
+check_fail "import no longer word-splits an env string" \
+    sh -c "grep -q 'env \$dm_env' \"\$1\"" _ "$MIG"
+
 # --- Summary ------------------------------------------------------------------------
 
 # Cleanup the fixture sandbox root. Unit-test policy (0.0.42e C1): suites

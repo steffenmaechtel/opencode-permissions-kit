@@ -251,7 +251,13 @@ _st_root_blocker() {
     return 0
 }
 
-ui_section "Projects ($(grep -c . "$PROJECTS_CONF" 2>/dev/null || echo 0))"
+# Count robustly (0.0.43a F8): `grep -c .` on an EMPTY file prints 0 AND
+# exits 1 — a bare `|| echo 0` appends a second 0 and the captured
+# "0<newline>0" breaks the header across lines. || true keeps the printed
+# 0; the default covers a missing file (grep prints nothing, exits 2).
+_st_pc=$(grep -c . "$PROJECTS_CONF" 2>/dev/null || true)
+: "${_st_pc:=0}"
+ui_section "Projects ($_st_pc)"
 
 if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
     while IFS= read -r root; do

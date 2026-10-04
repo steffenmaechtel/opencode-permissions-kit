@@ -869,7 +869,12 @@ install_binary() {
     sudo pkill -u "$OPENCODE_USER" -f "serve --servic[e]" >/dev/null 2>&1 || true
     current=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     sudo cp "$src" "$SYSTEM_BIN" || return 1
-    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" || return 1
+    if ! secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"; then
+        # rc 2, not 1 (0.0.43a F9): the new binary is ALREADY deployed —
+        # the caller must restore from the backup (or report the partial
+        # state), never claim "left untouched".
+        return 2
+    fi
     new=$("$SYSTEM_BIN" --version 2>/dev/null | head -1 || echo "unknown")
     # Re-stamp the major so the wrapper's 2.x --standalone gating follows
     # the binary ("opencode v2..." -> 2, anything else -> 1).
@@ -1070,9 +1075,31 @@ if [ "$BINARY_UPDATE" = true ]; then
                 log "opencode major flipped: $_maj_before -> $_maj_after (tui registration synced)"
             fi
         else
-            ui_warn "candidate binary failed verification/install — binary left untouched"
-            log "opencode binary upgrade skipped: candidate failed verification/install"
-            rm -rf "$BACKUP_DIR"
+            _ib_rc=$?
+            if [ "$_ib_rc" = 2 ]; then
+                # Post-copy failure (0.0.43a F9): the candidate IS
+                # deployed (unhardened, major not re-stamped). Restore
+                # the previous binary so "left untouched" becomes true
+                # again; only when that is impossible keep the backup
+                # and report the partial state honestly — the backup is
+                # the recovery material, it must survive this path.
+                if [ -f "$BACKUP_DIR/opencode.current" ] \
+                   && sudo cp "$BACKUP_DIR/opencode.current" "$SYSTEM_BIN" 2>/dev/null \
+                   && secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" >/dev/null 2>&1; then
+                    ui_warn "candidate installed but hardening failed — previous binary restored"
+                    log "opencode binary upgrade failed post-copy; previous binary restored from $BACKUP_DIR"
+                else
+                    ui_warn "candidate installed but hardening FAILED — installed binary is NOT hardened"
+                    ui_warn "previous binary kept at $BACKUP_DIR/opencode.current — restore manually:"
+                    ui_warn "  sudo cp $BACKUP_DIR/opencode.current $SYSTEM_BIN"
+                    log "opencode binary upgrade failed post-copy; PARTIAL state (unhardened), backup kept: $BACKUP_DIR"
+                    BACKUP_DIR=""
+                fi
+            else
+                ui_warn "candidate binary failed verification/install — binary left untouched"
+                log "opencode binary upgrade skipped: candidate failed verification/install"
+            fi
+            [ -n "$BACKUP_DIR" ] && rm -rf "$BACKUP_DIR"
         fi
         # Candidate dir cleanup AFTER the install attempt — never before
         # verification (issue #24).

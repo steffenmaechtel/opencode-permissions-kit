@@ -19,6 +19,14 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 - the kit library under `/usr/local/lib/opencode-permissions-kit/` and the
   `/usr/local/bin/opencode` wrapper
 - sudoers rules, profile scripts, project ACLs/setgid
+- artifacts from kits **before v0.0.10**, if present: the
+  `/etc/sudoers.d/opencode` sudoers symlink (only when it provably points
+  into the kit's legacy `/etc/opencode/` conf dir), the kit-written files
+  under `/etc/opencode/`, the legacy library `/usr/local/lib/opencode/`
+  (recognized by its `wrapper`/`protect-projects.sh` markers) with its
+  `/usr/local/sbin/protect-projects.sh` helper symlink, and the legacy
+  `/etc/profile.d/opencode-umask.sh` profile — foreign content living
+  under those generic names is detected and left untouched
 - kit ownership inside the registered project roots: everything the kit
   handed to the `opencode` user (`.ddev/` trees, ddev settings
   directories, bootstrap project roots) and every file the agent/ddev

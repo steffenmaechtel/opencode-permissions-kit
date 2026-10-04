@@ -160,7 +160,7 @@ assert_eq "missing: absent hosts file => all hostnames reported" \
 check "add runs ddev hostname <name> 127.0.0.1 (ddev native UAC flow)" \
     sh -c "grep -qF '\"\$dha_bin\" hostname \"\$dha_h\" 127.0.0.1' \"\$1\"" _ "$HOSTS"
 check "add re-execs as the DEFAULT user when called via sudo" \
-    sh -c "grep -qF 'sudo -u \"\$dha_dev\" env HOME=\"/home/\$dha_dev\"' \"\$1\"" _ "$HOSTS"
+    sh -c "grep -qF 'sudo -u \"\$dha_dev\" env HOME=\"\$dha_dev_h\"' \"\$1\"" _ "$HOSTS"
 check "add is a no-op when nothing is missing" \
     sh -c "grep -q 'nothing to do' \"\$1\"" _ "$HOSTS"
 check "add prints a manual PowerShell fallback on failure" \

@@ -703,6 +703,29 @@ else
     failures=$((failures + 1))
 fi
 
+# the OPENCODE_MAJOR fallback probe is bounded too (0.0.43a F3): the same
+# issue-#80 hang must not block every start when install.conf lacks the
+# stamp — timeout + head -1, failure/empty means major 1.
+if grep -q 'MAJOR_LINE=$(timeout 10' "$WRAPPER_FILE" \
+   && grep -qF 'case "$MAJOR_LINE" in' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  OPENCODE_MAJOR fallback probe is time-bounded (0.0.43a F3)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  OPENCODE_MAJOR fallback probe is unbounded (0.0.43a F3)"
+    failures=$((failures + 1))
+fi
+
+# the serve fallback cd is guarded like the login twin (0.0.43a F4): the
+# fallback was probed AS opencode — the invoking developer may lack
+# traversal, and under set -e an unguarded cd would kill serve.
+if grep -qF 'cd "$SERVE_FALLBACK" 2>/dev/null || true' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  serve fallback cd fails open (0.0.43a F4)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  serve fallback cd aborts on failure (0.0.43a F4)"
+    failures=$((failures + 1))
+fi
+
 # probe failed + no project config → nothing
 result=$(dt_run EMPTY - '')
 assert_valid "fallback: no project config → no tools" \

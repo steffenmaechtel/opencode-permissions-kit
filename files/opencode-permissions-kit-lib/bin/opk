@@ -322,18 +322,21 @@ case "$cmd" in
         ui_info "handing over to $_ho_user:$_ho_group (recursive, g+w) ..."
         for _ho_a in "$@"; do
             [ "$_ho_a" = "--dry-run" ] && continue
-            # [ -L ] refuse + exec-time recheck (review 0.0.39h F10, the
-            # deeec30 pattern): chown -R/chmod -R dereference a symlink
-            # OPERAND — a planted link at the handed-over path would hand
-            # the pointed tree to the target user.
+            # [ -L ] refuse + race-closed executors (review 0.0.39h F10;
+            # TOCTOU window closed 0.0.43a F16, the accepted residual —
+            # now closed): a link planted AFTER the gate must not make the
+            # root-run pair touch its target — chown -R -h never
+            # dereferences an operand (lchown on a planted link re-owns
+            # the attacker's own link, nothing outside), and the chmod
+            # pass only ever sees non-symlinks (find ! -type l feeds it).
             if [ -L "$_ho_a" ]; then
-                ui_error "handover: '$_ho_a' is a symlink — refusing (chown -R/chmod -R follow it)"
+                ui_error "handover: '$_ho_a' is a symlink — refusing (recursive chown/chmod follow it)"
                 _ho_rc=1
                 continue
             fi
-            if chown -R "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null \
+            if chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null \
                && [ ! -L "$_ho_a" ] \
-               && chmod -R g+w "$_ho_a" 2>/dev/null; then
+               && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null; then
                 echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
             else
                 ui_error "handover failed: $_ho_a"

@@ -289,8 +289,20 @@ fi
 # opencode major version (2.x changes the session-server model, issue #80):
 # normally stamped into install.conf at install/update time; the runtime
 # fallback covers stamps from older kit versions ("opencode v2..." -> 2).
+# The probe is bounded like every sibling (0.0.43a F3): a 2.x service that
+# cannot bind its port makes even `--version` hang (issue #80), and an
+# unbounded substitution would hang EVERY start. Fail-open: a failed, hung,
+# or empty probe means major 1 (mirroring install.sh's major detection).
 if [ -z "${OPENCODE_MAJOR:-}" ]; then
-    case $(/usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null) in
+    MAJOR_LINE=""
+    if command -v timeout >/dev/null 2>&1; then
+        MAJOR_LINE=$(timeout 10 /usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+    else
+        MAJOR_LINE=$(/usr/bin/sudo -n -u opencode \
+            /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
+    fi
+    case "$MAJOR_LINE" in
         "opencode v2"*) OPENCODE_MAJOR=2 ;;
         *) OPENCODE_MAJOR=1 ;;
     esac
@@ -409,7 +421,10 @@ sock_reachable() {
     sock="$1"
     case "$sock" in unix://*) sock="${sock#unix://}";; esac
     [ -S "$sock" ] 2>/dev/null && return 0
-    /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock" 2>/dev/null
+    # -n like every sibling probe (0.0.43a F17): without it a missing
+    # sudoers rule makes sudo try to authenticate (password prompt
+    # interactively, a failed probe headless) instead of failing open.
+    /usr/bin/sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock" 2>/dev/null
 }
 
 CONTAINER_DOCKER_HOST=""
@@ -544,7 +559,12 @@ if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
         note "${YELLOW}Falling back to: $SERVE_FALLBACK${NC}"
         note "${YELLOW}OpenChamber: 'export OPENCHAMBER_OPENCODE_CWD=$SERVE_FALLBACK' picks the server directory.${NC}"
         note ""
-        cd "$SERVE_FALLBACK"
+        # Guarded like the login twin below (0.0.43a F4): the probe ran AS
+        # opencode — the invoking developer may still lack traversal (fresh
+        # group membership activates only at the next login). A failed cd
+        # must not abort serve under set -e; the server then starts from
+        # the inherited (warned-about) cwd — the documented degradation.
+        cd "$SERVE_FALLBACK" 2>/dev/null || true
     else
         note "${YELLOW}No readable fallback found (no projects.conf entry, no opencode home).${NC}"
         note "${YELLOW}Set OPENCHAMBER_OPENCODE_CWD (OpenChamber) to a readable directory.${NC}"

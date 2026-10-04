@@ -1912,32 +1912,33 @@ do_deploy_phase() {
         _opk_ag="${MIGRATE_AGENTS_OPT:-}"
         if [ -z "$_opk_ag" ]; then
             if [ "$INTERACTIVE" = true ]; then
-                while true; do
-                    echo "" >&2
-                    printf "[?] Existing agent resources (~/.agents, ~/.claude/skills)"\
-" — bring them into /home/%s?\n" "$OPENCODE_USER" >&2
-                    echo "    (~/.agents moves whole; from ~/.claude only skills/"\
-" — credentials like .credentials.json stay in your home)" >&2
-                    echo "    (m) Move   — recommended: one canonical copy;"\
-" you keep read/write via the $OPENCODE_GROUP group" >&2
-                    echo "    (c) Copy   — duplicate; both sides keep their own copy (may drift)" >&2
-                    echo "    (s) Skip   — leave them in your home (the agent cannot use them)" >&2
-                    printf "  > " >&2
-                    _opk_ans=""
-                    _ui_read _opk_ans
-                    case "$(printf '%s' "$_opk_ans" | tr '[:upper:]' '[:lower:]')" in
-                        m|move|"") _opk_ag=m; break ;;
-                        c|copy)    _opk_ag=c; break ;;
-                        s|skip)    _opk_ag=s; break ;;
-                    esac
-                done
+                # ui_menu with a NON-destructive default (0.0.43a F18,
+                # conventions.md "install.sh menus"): Enter = Skip. Move —
+                # the recommended action — rm -rf's the developer-side
+                # sources after the copy; it must never ride on an empty
+                # Enter. The explanatory lines stay plain echo >&2 (they
+                # are context, not options).
+                echo "" >&2
+                echo "    Existing agent resources (~/.agents, ~/.claude/skills)" >&2
+                printf "    — bring them into /home/%s?\n" "$OPENCODE_USER" >&2
+                echo "    (~/.agents moves whole; from ~/.claude only skills/" >&2
+                echo "     — credentials like .credentials.json stay in your home)" >&2
+                _opk_ag=$(ui_menu "Bring the developer's agent resources over?" "s" \
+                    "m|Move — recommended: one canonical copy; you keep read/write via the $OPENCODE_GROUP group" \
+                    "c|Copy — duplicate; both sides keep their own copy (may drift)" \
+                    "s|Skip — leave them in your home (the agent cannot use them)")
             else
                 _opk_ag=m
             fi
         fi
+        # Accept both the flag's words and the menu's letters (follow-up
+        # found while converting the prompt, 0.0.43a): --migrate-agents
+        # takes move|copy|skip, the ui_menu keys are m|c|s — the dispatch
+        # matched letters only, silently no-op'ing the documented word
+        # forms.
         case "$_opk_ag" in
-            m|c) for _opk_d in $MIGRATE_AGENT_DIRS; do _opk_migrate_one "$_opk_d"; done ;;
-            s)
+            m|move|c|copy) for _opk_d in $MIGRATE_AGENT_DIRS; do _opk_migrate_one "$_opk_d"; done ;;
+            s|skip)
                 ui_detail "skipped: ~/.agents and ~/.claude/skills stay in your home — the agent cannot use them"
                 log "agents migration: skipped by choice"
                 ;;
@@ -2028,8 +2029,16 @@ do_deploy_phase() {
     DEFAULT_OC_CONF="$DEFAULT_OC_DIR/opencode.jsonc"
     sudo mkdir -p "$DEFAULT_OC_DIR"
     if [ -f "$DEFAULT_OC_CONF" ]; then
-        if confirm "Default-user config $DEFAULT_OC_CONF already exists."\
-" Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?"; then
+        # Default y with backup (0.0.43a F19, maintainer re-decision):
+        # the deny-all config IS the self-update bypass protection —
+        # Standard mode (SKIP_PROMPTS) installs it unconditionally, and
+        # the interactive default must not silently skip it either. "yes"
+        # is reversible (the previous config is kept as
+        # opencode.jsonc_BAK_<timestamp>); declining stays the explicit
+        # opt-out it always was.
+        if [ "$SKIP_PROMPTS" = true ] \
+           || ui_confirm "Default-user config $DEFAULT_OC_CONF already exists."\
+" Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?" "y"; then
             BAK_STAMP=$(date +%Y%m%d-%H%M%S)
             sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
             ui_success "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"

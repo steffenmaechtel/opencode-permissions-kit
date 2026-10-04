@@ -140,6 +140,7 @@ _fsb_pass() {
     done
     shift  # consume --
     [ $# -gt 0 ] || return 0
+    _fsbp_rc=0
     # shellcheck disable=SC2086  # find expression built word-wise above
     _fsb_sudo find "$_fsbp_root" $_fsbp_expr -print0 2>/dev/null \
         | _fsb_count_tee "$_fsbp_label" \
@@ -154,7 +155,17 @@ _fsb_pass() {
                 # shellcheck disable=SC2086  # kit-fixed, space-free words
                 $_c "$_p"
             done
-          ' xargs-sh "$#" "$@"
+          ' xargs-sh "$#" "$@" || _fsbp_rc=$?
+    # Per-pass failure tracking (0.0.43a F10): without pipefail the old
+    # unconditional `return 0` made a wholesale pass failure (rc 123 =
+    # xargs had failing batches, 125/126/127 = xargs/interpreter trouble)
+    # invisible — callers printed "applied" regardless. Counted here,
+    # summarized and propagated by fs_baseline_root below.
+    if [ "$_fsbp_rc" -ne 0 ]; then
+        _FSB_ERRORS=$((_FSB_ERRORS + 1))
+        printf '  warn: baseline pass "%s" hit errors (rc %s) under %s — see the messages above\n' \
+            "$_fsbp_label" "$_fsbp_rc" "$_fsbp_root" >&2
+    fi
     return 0
 }
 
@@ -179,6 +190,17 @@ fs_baseline_root() {
     fsb_root="$1"
     fsb_group="$2"
     [ -n "$fsb_root" ] && [ -d "$fsb_root" ] || return 0
+    # Wholesale-failure detection part 1 (0.0.43a F10): a missing tool
+    # used to die silently inside the pipeline (find's stderr is
+    # redirected, xargs -r succeeds on empty input) and the passes
+    # "completed" with nothing applied. Probe BEFORE walking.
+    for _fsb_tool in find chgrp chmod setfacl; do
+        if ! command -v "$_fsb_tool" >/dev/null 2>&1; then
+            printf '  error: required tool missing for the group baseline: %s\n' "$_fsb_tool" >&2
+            return 1
+        fi
+    done
+    _FSB_ERRORS=0
     fs_ensure_traversable "$fsb_root" "$fsb_group" "${3:-}"
     printf '%s\n' "  group baseline on $fsb_root (group $fsb_group) — large trees can take several minutes;"\
 " progress per pass:" >&2
@@ -186,5 +208,15 @@ fs_baseline_root() {
     _fsb_pass "dirs g+rwxs"  "$fsb_root" -type d            -- chmod g+rwxs
     _fsb_pass "files g+rw"   "$fsb_root" -type f            -- chmod g+rw
     _fsb_pass "default ACLs" "$fsb_root" -type d            -- setfacl -d -m "g:$fsb_group:rwx"
+    # Wholesale-failure detection part 2: propagate the per-pass error
+    # count (0.0.43a F10). Fail-loud on purpose — the callers' success
+    # lines ("group + setgid + default ACLs applied") must not print
+    # over a baseline that did not fully apply; "agent cannot write
+    # project files" weeks later is the worse failure mode.
+    if [ "$_FSB_ERRORS" -gt 0 ]; then
+        printf '  error: %s baseline pass(es) failed on %s — the group baseline may be incomplete\n' \
+            "$_FSB_ERRORS" "$fsb_root" >&2
+        return 1
+    fi
     return 0
 }

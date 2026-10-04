@@ -95,6 +95,13 @@ new issue → curate the record (channel, refined range) → cover it in
 `tests/unit/test-security-advisories.sh` → `make release VERSION=x.y.z`
 → stable mirror → users get it via `opk update`.
 
+Boundary notes: GitHub's repo-advisories endpoint says `medium` where
+the kit's vocabulary says `moderate` — the watch maps it at the feed
+boundary, so issues and `ADVISORY_RECORDS` rows agree. An advisory
+already present in the shipped database is deduped *before* shape
+validation, so curating an advisory greens the watch even if upstream
+fields drift.
+
 Freshness therefore rides the normal release cadence (~1 advisory per
 month upstream — the daily scan + release channel comfortably keep up).
 
