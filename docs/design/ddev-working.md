@@ -135,7 +135,7 @@ The old justification for rootless was "ACL denies hold inside containers"
 | `files/update.sh` | shrink `KIT_FILES`; drop hooks/protect-projects/transaction/shim deploy + `core.hooksPath` re-assert + ddev shim re-link; add the **one-time deny-removal + group migration** (§4); keep `--binary`/`--binary-path`; `--refresh` becomes the migration trigger alias (or is removed) |
 | `files/config.sh` | drop `ddev-mode` subcommand + all sandbox provisioning code (moved to install); `container-backend` accepts only rootless values + `status`; `git-config on/off` stays (soft-only, message updated); `refresh` subcommand removed or re-purposed to re-apply the group baseline (now `g:opencode:rwx`) |
 | `files/status.sh` | drop ACL-protection and ddev-mode sections; add: leftover `u:opencode` deny scan (warns "run update.sh"), rootless socket state, `/home/opencode/.ddev` presence, migration stamp state; group display switches to the `opencode` usergroup |
-| `files/uninstall.sh` | drop hooksPath unset, shim/sudoers remnants already handled; keep `setfacl -R -b/-k` sweep (now the only ACL cleanup) + removal of migration artifacts (`ddev-rewrites.conf`, `/run/opencode-permissions-kit/`); **group note**: `gpasswd -d $DEFAULT_USER opencode` (best-effort) before `userdel -r` so the private group is cleaned up automatically |
+| `management/uninstall.sh` | drop hooksPath unset, shim/sudoers remnants already handled; ~~keep `setfacl -R -b/-k` sweep (now the only ACL cleanup)~~ — **superseded 2026-10-03** (0.0.42e C4 + 0.0.42f C2): the uninstall removes only the kit's own ACL entries via numeric-gid `setfacl -R -x`/`-d -x`; a `-b`/`-k` wipe destroys pre-existing user ACLs; + removal of migration artifacts (`ddev-rewrites.conf`, `/run/opencode-permissions-kit/`); **group note**: `gpasswd -d $DEFAULT_USER opencode` (best-effort) before `userdel -r` so the private group is cleaned up automatically |
 | `files/opencode-permissions-kit-lib/jsonc-parser.py` | keep `--tools`; remove `--allow`/default deny-extraction modes (dead code). **Timing: Phase 6** — until then `test-project-config.sh` (default + `--allow`), `test-git-config.sh` (default mode) and the not-yet-rewritten wrapper (`--allow`) still consume them; trimming earlier would break the green-tests-per-phase rule. Phase 6 also rewrites `test-git-config.sh` to assert SECURE_GIT on/off via grep instead of the parser |
 
 ## 4. Migration of existing installs (update.sh)
@@ -233,9 +233,11 @@ stays). `DEFAULT_USER` stays auto-detected (`SUDO_USER`), never asked.
   bits intact, idempotent on second run, docker-group install
   aborts with instructions.
 - **Makefile**: update the test list; `make check-version` unchanged.
-- **CI**: update the `chmod +x` lists and test script lists in **both**
-  `.github/workflows/test-unit.yml` and `.github/workflows/test-e2e.yml` (AGENTS.md
-  rule).
+- **CI**: update the test script lists in **both**
+  `.github/workflows/test-unit.yml` and `.github/workflows/test-e2e.yml`.
+  Executable bits live in the **git index** (issue #123) — the workflows
+  carry no `chmod +x` lines; commit new executed-by-path scripts with
+  `git update-index --chmod=+x` (AGENTS.md rule).
 - **e2e** (`tests/e2e/run.sh`): drop hook/ACL/deny assertions and the ddev
   shim + delegated/sandbox sections; the "README.txt readable (ddev
   compat)" OS check and the stale-ACL heal check around it go too
@@ -307,7 +309,7 @@ version jump is the natural marker.
 in a real two-owner project:
 
 ```
-Failed to start pc-database-v2: chmod /var/www/vhosts/pc-database-v2/.ddev/.webimageBuild: operation not permitted
+Failed to start example-shop: chmod /var/www/vhosts/example-shop/.ddev/.webimageBuild: operation not permitted
 ```
 
 `.ddev/` is owned by the developer, but the agent's ddev runs as `opencode`;
@@ -349,7 +351,9 @@ shell function + a sudoers helper:
   write can never suffice, ownership is required. Covered types: typo3
   (`config/system`, `<docroot>/typo3conf`), drupal*/backdrop
   (`<docroot>/sites/default`), magento (`app/etc`); wordpress (root file)
-  is documented as user-managed. `.git/` stays developer-owned (mode 700).
+  is documented as user-managed. `.git/` is included in the group
+  baseline (group rw, issue #17) — corrected 2026-10-03, finding
+  0.0.42e D5; fs-baseline.sh is authoritative.
 
 **Trade-off (accepted, documented in MANUAL.md):** `ddev auth ssh` /
 composer private keys now live in `/home/opencode/.ddev` and are

@@ -128,6 +128,13 @@ git_status_row
 if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     # shellcheck disable=SC1090
     . "$LIBDIR/sh/advisories.sh"
+    # Shared never-shadow probe for the xdg-open verdict (0.0.42d S1/C1):
+    # optional like the other libs — a missing lib degrades the verdict
+    # to the red "missing" branch, never to a false green.
+    if [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ]; then
+        # shellcheck disable=SC1090
+        . "$LIBDIR/sh/wsl-browser-bridge.sh"
+    fi
     ui_section "Security advisories"
     # Installed version: probed fresh through the kit's sudo path (same
     # pattern as the wrapper's check; the install.conf stamp would go
@@ -625,10 +632,18 @@ if [ -d /mnt/c ]; then
         fi
         # xdg-open fallback shim (bin/xdg-open): open@11's fallback path
         # crashes opencode 2.x device logins when no xdg-open exists.
+        # Dangling-target check (0.0.42d C2): readlink alone reports a
+        # kit symlink whose library copy is gone as healthy.
         if [ -L /usr/local/bin/xdg-open ] \
            && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
-            ui_kv "xdg-open fallback" "deployed (kit shim at /usr/local/bin/xdg-open)" "$UI_GREEN"
-        elif [ -x /usr/local/bin/xdg-open ] || [ -x /usr/bin/xdg-open ]; then
+            if [ -x "$LIBDIR/bin/xdg-open" ]; then
+                ui_kv "xdg-open fallback" "deployed (kit shim at /usr/local/bin/xdg-open)" "$UI_GREEN"
+            else
+                ui_kv "xdg-open fallback" "broken — shim symlink dangles (library copy missing)" "$UI_RED"
+                ui_detail "fix: sudo opk update (re-deploys the library)"
+            fi
+        elif { command -v xdg_open_real_exists >/dev/null 2>&1 && xdg_open_real_exists; } \
+           || [ -x /usr/local/bin/xdg-open ]; then
             ui_kv "xdg-open fallback" "not needed — real xdg-open present" "$UI_GREEN"
         else
             ui_kv "xdg-open fallback" "missing — opencode 1.18.33+ / 2.0.18+ device logins crash" "$UI_RED"

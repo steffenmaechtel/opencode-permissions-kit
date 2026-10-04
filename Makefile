@@ -1,24 +1,12 @@
-.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
-# Scripts checked by `make lint` (everything shipped in files/, plus the
-# maintainer helpers in scripts/).
-SHELLCHECK_FILES = files/install.sh \
-	scripts/release.sh scripts/advisory-watch.sh \
-	files/opencode-permissions-kit-lib/management/config.sh files/opencode-permissions-kit-lib/management/update.sh \
-	files/opencode-permissions-kit-lib/management/status.sh files/opencode-permissions-kit-lib/management/uninstall.sh \
-	files/etc/umask.sh \
-	files/opencode-permissions-kit-lib/bin/opencode-as-opencode files/opencode-permissions-kit-lib/bin/opk \
-	files/opencode-permissions-kit-lib/sh/log.sh files/opencode-permissions-kit-lib/sh/ui.sh \
-	files/opencode-permissions-kit-lib/sh/advisories.sh \
-	files/opencode-permissions-kit-lib/sh/shell-warn.sh files/opencode-permissions-kit-lib/bin/setup-container-backend \
-	files/opencode-permissions-kit-lib/sh/ddev-terminal.sh files/opencode-permissions-kit-lib/sh/ddev-handover.sh \
-	files/opencode-permissions-kit-lib/sh/ddev-migrate.sh files/opencode-permissions-kit-lib/bin/ddev-migrate \
-	files/opencode-permissions-kit-lib/sh/ddev-hosts.sh \
-	files/opencode-permissions-kit-lib/sh/fs-baseline.sh \
-	files/opencode-permissions-kit-lib/sh/staged-write.sh \
-	files/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh files/opencode-permissions-kit-lib/bin/browser-bridge \
-	files/opencode-permissions-kit-lib/bin/socket-check files/opencode-permissions-kit-lib/bin/cwd-check \
-	files/opencode-permissions-kit-lib/bin/ddev-as-opencode
+# Scripts checked by `make lint` — DERIVED FROM DISK (0.0.42d C4 /
+# 0.0.42e C10): every file under files/ and scripts/ whose first line is
+# a shell shebang or a `# shellcheck shell=` directive. The list cannot
+# rot when scripts are added — the old hand-maintained list had silently
+# dropped seven shipped scripts. Python helpers are gated by check-py.
+SHELLCHECK_FILES = $(shell find files scripts -type f -exec \
+	awk 'FNR == 1 && (/^[#]!\/bin\/sh/ || /^[#] shellcheck shell=/) {print FILENAME}' {} + | sort)
 
 # Intentional deviations, excluded repo-wide:
 #   SC1090/SC1091 — kit scripts source helpers/configs via variables
@@ -64,6 +52,10 @@ help:
 	@echo "  make test-e2e-sources   Run e2e source-consistency tests"
 	@echo "  make test-browser-bridge  Run WSL browser bridge tests"
 	@echo "  make test-security-advisories  Run advisory database/watch tests"
+	@echo "  make test-deploy-lib     Run lib deploy manifest tests (0.0.41d)"
+	@echo "  make test-secure-binary  Run binary hardening tests (0.0.41c)"
+	@echo "  make test-sudoers-deploy Run sudoers pipeline tests (0.0.41b)"
+	@echo "  make test-sandbox-policy  Run unit-suite host-path sandbox guard (0.0.42e C1)"
 	@echo "  make e2e           Run end-to-end test (Docker required)"
 	@echo "  make e2e E2E_GIT_CHANNEL=latest  Same, with the current git-core PPA git in the container (e2e-rootless forwards the knob too; e2e-ddev deliberately has no git dimension — see run-ddev.sh; issue #118)"
 	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
@@ -78,7 +70,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -188,10 +180,13 @@ version:
 
 check-version:
 	@v="$$(cat VERSION)"; \
-	case "$$v" in \
-		[0-9]*.[0-9]*.[0-9]*) ;; \
-		*) echo "VERSION file is not a semver stamp: '$$v'"; exit 1; ;; \
-	esac; \
+	ok=1; \
+	oldifs="$$IFS"; IFS=.; set -- $$v; IFS="$$oldifs"; \
+	[ "$$#" -eq 3 ] || ok=0; \
+	for c in "$$@"; do case "$$c" in ''|*[!0-9]*) ok=0 ;; esac; done; \
+	if [ "$$ok" -ne 1 ]; then \
+		echo "VERSION file is not a semver stamp (X.Y.Z, digits only): '$$v'"; exit 1; \
+	fi; \
 	i="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/install.sh | head -1)"; \
 	u="$$(sed -n 's/.*KIT_BRANCH="\$${KIT_BRANCH:-\([^"]*\)}".*/\1/p' files/opencode-permissions-kit-lib/management/update.sh | head -1)"; \
 	normalize() { printf '%s' "$$1" | sed 's/^\$${[^:]*:-//; s/}$$//'; }; \
@@ -279,3 +274,19 @@ test-security-advisories:
 test-log:
 	@echo "=== Audit Log Tests ==="
 	@./tests/unit/test-log.sh
+
+test-deploy-lib:
+	@echo "=== Lib Deploy Manifest Tests (0.0.41d) ==="
+	@./tests/unit/test-deploy-lib.sh
+
+test-secure-binary:
+	@echo "=== Binary Hardening Tests (0.0.41c) ==="
+	@./tests/unit/test-secure-binary.sh
+
+test-sudoers-deploy:
+	@echo "=== Sudoers Pipeline Tests (0.0.41b) ==="
+	@./tests/unit/test-sudoers-deploy.sh
+
+test-sandbox-policy:
+	@echo "=== Unit-Test Sandbox Policy Tests (0.0.42e C1) ==="
+	@./tests/unit/test-sandbox-policy.sh

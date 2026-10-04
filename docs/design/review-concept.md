@@ -32,6 +32,15 @@ of what one review pass digests; smaller waves are better reviewed.
 review → fix → review the fixes (wave review) → fix → …
 ```
 
+The loop has a hard seam after verification: the snapshot is written and
+committed BEFORE any fix starts (see [review/README.md](review/README.md),
+Process). Two reasons: the maintainer reads the committed snapshot to see
+what the review found before the tree starts moving — findings must be
+inspectable while nothing has been done about them yet — and a fix applied
+mid-verification would change the very tree the remaining findings are
+verified against. The 0.0.42d session codified this after the maintainer
+asked for the snapshot first.
+
 **Stop when a full pass returns no new MED/HIGH findings.** LOW/INFO
 findings do not extend the loop — they get dispositioned (implemented, or
 deliberately not done with rationale in the resolution) and that is the end
@@ -119,6 +128,27 @@ When a review runs as parallel subagents:
   header). History: 0.0.38/a–c ran Flash end-to-end on the crashing
   opencode-go provider; d–g ran the judgment agents on GLM-5.3 (gateway
   default) before this policy made all-Flash explicit.
+- ground-truth rule for coverage claims (added 2026-10-04, from the
+  0.0.42d/-e calibration): a claim like "CI runs every suite" is NEVER
+  verified via the mechanism that makes the claim — the -d mechanical
+  agent asserted "CI runs all 33" by counting `.sh` tokens exactly the
+  way the guard does, and 0.0.42e C2 then exposed that guard as
+  token-blind (an argument-position suite never executed). Guards,
+  manifests and checklists are themselves review objects: enumerate the
+  executed commands / on-disk files independently before repeating what
+  they report.
+- external-model passes (added 2026-10-04): a different model family as
+  the second snapshot of a release review is the strongest form of
+  "redundancy replaces depth" — the 0.0.42e external pass (GPT-6 Luna,
+  same tree) caught 16 findings the house pass had missed (2 HIGH incl.
+  the executed host-path `rm`), while the house pass held findings the
+  external one lacked. Integration duties: full per-finding verification
+  by the main agent (25/26 confirmed there), honest provenance in the
+  snapshot header (model, tree, what ran on which host), findings
+  recorded as reported with verification marks, and a calibration
+  section naming what each side missed and why — even retractions can
+  be partially over-turned by the external reviewer's counter-feedback
+  (0.0.42e S3 → LOW carve-out).
 - enforce **checkpoint discipline**: each agent appends findings to a side
   file after every completed section (empty sections get a `clean` line) —
   end-synthesis turns are the primary failure mode, and checkpoints survive

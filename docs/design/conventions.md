@@ -94,6 +94,47 @@ Patterns already in this repo:
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
 
+## Test sandbox (unit suites)
+
+Unit suites run on contributor and CI hosts, not in containers — they
+must never create, delete or re-permission anything outside their own
+scratch space, and never carry real-tree path literals at all. Rules
+(finding history: 0.0.42e C1, executed as a live incident on an external
+review host):
+
+- Operate only on the suite's scratch (`$WORK`, `mktemp`) and the
+  sanctioned temp prefixes `/tmp`, `/var/tmp` (plus `/dev/null`).
+- Never touch real project or system trees — `/var/www/vhosts`, `/home`,
+  `/srv`, `/etc`, ... — **not in setup, not in teardown**: a cleanup
+  `rm -rf` on a fixed host path deletes real data wherever the path
+  happens to exist.
+- Fixture data is written **sandboxed at the source** (heredocs,
+  registries, configs carry `/var/tmp/...` paths directly). Inert
+  real-tree literals behind a later rewrite are forbidden too — they are
+  one broken rewrite away from live (the migrate fixtures carried them
+  for months behind a `sed` that a wave then dropped; maintainer
+  directive 2026-10-04).
+
+Enforced by `tests/unit/test-sandbox-policy.sh`, two checks over every
+unit suite (backslash-continued commands are joined first; full-comment
+lines are skipped):
+
+1. **Mutation check** — a mutating verb (`rm`, `mkdir`, `chown`,
+   `setfacl`, ...) whose operand is a literal absolute path outside the
+   sanctioned prefixes fails. Source-to-destination verbs (`cp`, `mv`,
+   `ln`, ...) flag only the destination; `sed` only with `-i`.
+   Variables are exempt — what they hold is the review's job.
+2. **Real-tree ratchet** — any path-shaped literal starting with a
+   real-tree prefix (`/var/www/vhosts`, `/srv/other/outside`) fails,
+   quoted or not, in fixture strings as much as in commands
+   (0.0.42g C2). Policy-INPUT classes — values handed to
+   screening/parsing functions or parse-only argument fixtures, never
+   executed as paths — are allowlisted in the suite with reasons.
+
+The suite self-probes both checks (continuation-split `rm`, inert and
+quoted and redirect-glued literals, a clean sandboxed control) so the
+guard itself cannot rot silently.
+
 ## Referencing review findings
 
 Every review restarts its finding IDs at S1/C1, so a bare ID is ambiguous

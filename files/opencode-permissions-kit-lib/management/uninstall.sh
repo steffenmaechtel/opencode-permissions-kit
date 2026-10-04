@@ -176,13 +176,19 @@ fi
 # Kit-user ids, captured BEFORE the user removal below: once userdel ran,
 # project files still owned by opencode carry an ORPHANED uid — the
 # ownership revert in the project section below can only match those
-# numerically (issue #74). UN_DEV_GROUP is the revert target group (the
+# numerically (issue #74). UN_DEV_GROUP feeds the chown revert (the
 # developer's own login group — the kit's sharing group dies with the
-# opencode user).
+# opencode user); the ACL revert uses the NUMERIC gids below (0.0.42g
+# D3: names can stop resolving mid-run, gids never do).
 UN_OC_UID=$(id -u "$OPENCODE_USER" 2>/dev/null || true)
 UN_OC_GID=$(id -g "$OPENCODE_USER" 2>/dev/null || true)
 UN_DEV_GROUP=$(id -gn "$DEFAULT_USER" 2>/dev/null || true)
-trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP uid=$UN_OC_UID gid=$UN_OC_GID devgroup=$UN_DEV_GROUP"
+# Numeric fallback for the ACL qualifiers (0.0.42f C2): setfacl -x parses
+# `g:<name>` at parse time and dies wholesale (rc 2) on an empty or
+# unresolvable name — a numeric gid never needs resolution.
+UN_DEV_GID=$(id -g "$DEFAULT_USER" 2>/dev/null || true)
+trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP uid=$UN_OC_UID gid=$UN_OC_GID"\
+" devgroup=$UN_DEV_GROUP devgid=$UN_DEV_GID"
 
 trace "first prompt ..."
 ans=$(prompt_yn "Proceed with uninstall?" "n")
@@ -385,16 +391,49 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             # No -xdev on purpose: project roots are often separate mounts
             # (the e2e bind-mounts them; NFS/overlay in the wild) — the
             # revert must follow, exactly like the setfacl -R below.
-            run_q sudo find "$root" \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
+            # ! -type l (0.0.42e S1): chown on a symlink operand FOLLOWS
+            # it — an agent-planted link in the project must not make the
+            # root-run revert chown an arbitrary target outside it.
+            run_q sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
                 -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
         else
             echo "    opencode user unknown — skipped (chown manually if files are locked)"
         fi
-        echo "  Cleaning ACLs from: $root"
-        run_q sudo setfacl -R -b "$root"
-        run_q sudo setfacl -R -k "$root"
+        echo "  Cleaning kit ACLs from: $root"
+        # Dual-principal targeted removal (0.0.42e C4, corrected
+        # 0.0.42g S1): the baseline writes g:<OPENCODE_GROUP> entries
+        # (fs_baseline_root hands the opencode group — access traversal
+        # plus defaults); dev-group qualifiers cover traversal grants
+        # and older kit shapes. The former `setfacl -R -b`/`-k` wiped
+        # ALL extended ACLs — including pre-existing user entries
+        # install never owned. -x is a no-op (rc 0) on absent entries,
+        # live-verified for both the access and the default table.
+        # Qualifiers are NUMERIC (0.0.42f C2): a name qualifier dies at
+        # parse time when the name does not resolve; the gids survive
+        # the userdel above (captured before, orphan-proof). A principal
+        # whose gid is UNKNOWN is skipped loudly with its manual hint —
+        # never silently (0.0.42h S1) — and the closing log line says
+        # "partial" when one was skipped.
+        _un_acl_skipped=""
+        for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"; do
+            _un_acl_label="${_un_acl_pair%%:*}"
+            _un_acl_gid="${_un_acl_pair#*:}"
+            if [ -z "$_un_acl_gid" ]; then
+                _un_acl_skipped=1
+                echo "    ${_un_acl_label} id unknown — its ACL entries left in place"\
+" (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
+                continue
+            fi
+            run_q sudo setfacl -R -x "g:$_un_acl_gid" "$root"
+            run_q sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
+        done
         run_q sudo chmod g-s "$root"
-        log "project ownership reverted + ACLs cleaned: $root"
+        if [ -n "$_un_acl_skipped" ]; then
+            log "project ownership reverted + kit ACL entries PARTIALLY removed"\
+" (one or more group ids were unknown): $root"
+        else
+            log "project ownership reverted + kit ACL entries removed: $root"
+        fi
     done < "$UNINSTALL_PROJECTS_CONF"
 fi
 

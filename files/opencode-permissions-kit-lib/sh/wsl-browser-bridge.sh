@@ -153,6 +153,32 @@ browser_bridge_deploy_tree() {
         "$_bb_libdir/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
 }
 
+# xdg_open_real_exists: any real xdg-open on the caller's PATH, ignoring
+# /usr/local/bin where the kit's shim symlink lives (0.0.42d S1/C1).
+# install, update and status must share ONE never-shadow probe: install
+# refuses to deploy while `command -v xdg-open` hits anything, and the
+# fixed-path `/usr/bin` checks in update/status let update deploy a shim
+# install would have refused (shadowing a real xdg-open in /usr/sbin,
+# /snap/bin, ...) and kept a stale green verdict. Deliberately narrower
+# than `command -v` (0.0.42f Q1): empty PATH elements (cwd) are skipped
+# — the probe must never consider a cwd-installed binary "real", which
+# would silently drop a needed shim.
+xdg_open_real_exists() {
+    _xre_dir=""
+    _xre_oldifs="$IFS"
+    IFS=:
+    for _xre_dir in $PATH; do
+        [ -n "$_xre_dir" ] || continue
+        [ "$_xre_dir" = "/usr/local/bin" ] && continue
+        if [ -x "$_xre_dir/xdg-open" ]; then
+            IFS="$_xre_oldifs"
+            return 0
+        fi
+    done
+    IFS="$_xre_oldifs"
+    return 1
+}
+
 # Strip ONLY the legacy 0.0.36 hyphen section (kit-owned regression
 # cleanup, issue #100 — restores WSL's ability to parse the file). Never
 # writes anything new; a valid carrier block is left untouched.

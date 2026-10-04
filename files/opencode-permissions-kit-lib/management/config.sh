@@ -527,7 +527,12 @@ update_install_conf_backend() {
     _ucb_keep=$(grep -v -e '^CONTAINER_BACKEND=' -e '^OPENCODE_DOCKER_HOST=' -e '^OPENCODE_PODMAN_SOCKET=' \
         "$INSTALL_CONF" 2>/dev/null) || _ucb_rc=$?
     [ "$_ucb_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ucb_rc) — backend not switched"
-    _ucb_tmp="$INSTALL_CONF.opk-new"
+    # Unique per-process temp (0.0.42e C5): the fixed `.opk-new` sibling
+    # let two concurrent `opk config` runs clobber each other's staging
+    # file mid-write. Root-created by the sudo tee below — mktemp would
+    # fail here (the conf dir is root-only-writable). $$ separates
+    # processes; within one process the temps are consumed sequentially.
+    _ucb_tmp="$INSTALL_CONF.opk-new.$$"
     _tmp_track "$_ucb_tmp"
     {
         if [ -n "$_ucb_keep" ]; then printf '%s\n' "$_ucb_keep"; fi
@@ -686,7 +691,8 @@ update_install_conf_ddev_owned() {
     _udd_rc=0
     _udd_keep=$(grep -v '^DDEV_DEV_OWNED=' "$INSTALL_CONF" 2>/dev/null) || _udd_rc=$?
     [ "$_udd_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_udd_rc) — ddev-settings not changed"
-    _udd_tmp="$INSTALL_CONF.opk-new"
+    # Unique per-process temp (0.0.42e C5) — see update_install_conf_backend.
+    _udd_tmp="$INSTALL_CONF.opk-new.$$"
     _tmp_track "$_udd_tmp"
     {
         if [ -n "$_udd_keep" ]; then printf '%s\n' "$_udd_keep"; fi

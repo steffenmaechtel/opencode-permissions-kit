@@ -63,11 +63,14 @@ podman.
 
 **Non-interactive (`--yes`) safety:** provisioning installs packages and
 edits `/etc/subuid` — never silently. `--yes` without an explicit
-`--container-backend` asks nothing and provisions nothing; scripts pass
-`--container-backend docker-rootless|podman-rootless` explicitly.
+`--container-backend` defaults to `docker-rootless` (corrected
+2026-10-03, finding 0.0.42e D1 — install.sh sets the default before the
+interactive branch; pass `--container-backend docker-rootless|podman-rootless`
+to choose explicitly).
 
-Post-install switch: `opencode-permissions-kit config container-backend
-<backend>` (reversible, re-provisions via §3).
+Post-install switch: `opk config container-backend <backend>`
+(reversible, re-provisions via §3; the legacy `opencode-permissions-kit`
+CLI name is gone — 0.0.42e D7).
 
 ## 3. Provisioning reference (`setup-container-backend`)
 
@@ -134,10 +137,13 @@ verifies its reachability like the docker-rootless socket.
 
 ## 6. ddev version gate and ports
 
-Docker Rootless and Podman require **ddev ≥ 1.25** (advisory, not an
-install block — the agent's raw-container backend is independent of
-ddev): install/update detect + record `DDEV_VERSION` in `install.conf`
-(querying the real binary, never a PATH shim), `status.sh` flags a
-< 1.25 ddev next to a rootless backend. Rootless router ports: either
+Docker Rootless and Podman require **ddev ≥ 1.25** — install **blocks**
+on a lower version (corrected 2026-10-03, finding 0.0.42e D1:
+install.sh exits with an upgrade hint; status flags it too): the
+agent's raw-container backend is independent of ddev, but ddev-as-
+opencode needs the rootless container support. install/update detect +
+record `DDEV_VERSION` in `install.conf` (querying the real binary,
+never a PATH shim), `status.sh` flags a < 1.25 ddev next to a rootless
+backend. Rootless router ports: either
 the §3.4 sysctl (kit default) or ddev's documented high-port alternative
 (`ddev config global --router-http-port 8080 --router-https-port 8443`).

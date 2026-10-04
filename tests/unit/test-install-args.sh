@@ -57,7 +57,10 @@ expect_rc() {
     _want="$1"; _desc="$2"; shift 2
     reset_globals
     if [ "$_want" = "0" ]; then
-        if parse_args "$@" 2>/dev/null; then
+        # Subshell (0.0.42g C1): parse_args aborts via exit 1 — a direct
+        # call in this set -e shell would kill the whole suite instead
+        # of recording the FAIL.
+        if ( parse_args "$@" ) 2>/dev/null; then
             pass "$_desc"
         else
             fail "$_desc (unexpected abort)"
@@ -173,6 +176,13 @@ expect_rc 1 "--container-backend without a value aborts" --yes --container-backe
 expect_rc 1 "typo'd flag aborts (--ye)" --ye
 expect_rc 1 "--migrate-agents without a value aborts" --yes --migrate-agents
 expect_rc 1 "--migrate-agents with an invalid value aborts" --yes --migrate-agents steal
+
+# Glob metacharacters in --projects values are rejected in parse_args on
+# the RAW argument (0.0.42f S2): the old in-loop gate ran after the
+# for-list pathname expansion and never saw a matching glob.
+expect_rc 1 "--projects value with glob characters aborts" --yes --projects '/var/www/vhosts/*'
+expect_rc 1 "--projects value with question mark aborts" --yes --projects '/opt/?vhosts'
+expect_rc 0 "plain --projects value passes parse_args" --yes --projects /var/www/vhosts
 
 # --- channel stamp (issue #38) -----------------------------------------------
 

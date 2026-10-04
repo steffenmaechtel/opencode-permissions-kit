@@ -49,9 +49,26 @@ which scope (full vs diff) and the loop's stop rule:
 ## Process
 
 Reviews are run by a model against a clean working tree of the version under
-review (see a review's header for model, scope, and verification state). The
-review report is committed first, fixes follow on a feature branch with the
-finding IDs in the commit messages, then the resolution closes the loop.
+review (see a review's header for model, scope, and verification state).
+
+**Hard ordering for a review session** (made explicit after 0.0.42d, where
+the maintainer had to ask for the snapshot before fixing started):
+
+1. Run the reviewer agents (parallel subagents per review-concept.md).
+2. Verify every agent finding against the code (main agent) — **no fixing
+   while verifying**: a fix would change the tree later findings are
+   checked against.
+3. Write the snapshot (and its README index row) and **commit it**. The
+   snapshot is the review's deliverable — it must exist in git before any
+   fix touches the tree. Findings that live only in chat scrollback are
+   lost; the snapshot is what survives.
+4. **Pause for the maintainer.** The fix wave starts on their go — the
+   committed snapshot is the visibility point: what was found is
+   inspectable before what will be done about it begins.
+5. Fix wave on a feature branch with the finding IDs in the commit
+   messages; the resolution is created with the first fix commit and grows
+   one row per disposition (rule 4), then the loop closes per
+   review-concept.md's stop rule.
 
 ## Index
 
@@ -96,3 +113,9 @@ snapshots (`grep -n "C13" 2026-09-26-v0.0.38.md`).
 | 0.0.42a | [2026-10-03-v0.0.42-a.md](2026-10-03-v0.0.42-a.md) | C1 **MED** (wave-introduced ratchet violation — `make test` red on the tip, pipe-masked green claim in `a2403c7`), C2 LOW (ddev golden warm start silently ignores an exported `E2E_GIT_CHANNEL`), D1–D3 LOW, Q1–Q7 INFO, 2 retraction notes | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | wave review of the issue-#118 git-matrix wave (`b3f1b26`+`a2403c7` on `feature/issue-118`); three parallel Flash reviewer agents + main-agent verification; fixes in the C1/C2/D1–D3/Q1 batch; loop continues with snapshot b |
 | 0.0.42b | [2026-10-03-v0.0.42-b.md](2026-10-03-v0.0.42-b.md) | — (no new findings) | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | micro wave review of the 0.0.42a fix wave (`24385b2` + docs/bookkeeping `983ab56`+`1f8adb7`); no MED/HIGH — wave arm converges; e2e 272/47/70 re-confirmed on the fixed tip; branch PR-ready |
 | 0.0.42c | [2026-10-03-v0.0.42-c.md](2026-10-03-v0.0.42-c.md) | D1–D2 LOW (fixed / superseded by template deletion), Q1–Q3 INFO | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | micro wave review of the issue-#123 chmod-list wave (`c05d8ef` on `feature/issue-123` — workflow chmod lists removed, exec bits normalized in the git index, test-workflows guard rewrite); no MED/HIGH; e2e 272/47/70 on the tip |
+| 0.0.42d | [2026-10-03-v0.0.42-d.md](2026-10-03-v0.0.42-d.md) | S1–S3, C1–C4, D1, Q1–Q4 | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | full-scope release review before 0.0.43 (tree `b3418ac`; three parallel Flash agents + main-agent verification; delta focus on the un-wave-reviewed `86a55d7`/`540666c`/`ccebffb`); 2 MED (`make test` runs 30/33 suites, `make lint` list omits 7 shipped scripts) + xdg-open never-shadow guard drift (LOW); loop continues; full gate green on the tree (272/47/70, zero skips) |
+| 0.0.42e | [2026-10-03-v0.0.42-e.md](2026-10-03-v0.0.42-e.md) | S1–S2, C1–C10, D1–D12, Q1 | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | independent external full-scope pass (GPT-6 Luna, same tree `b3418ac`) integrated with per-finding main-agent verification: 25/26 confirmed, 1 MED retracted at review time (S3 later carved out as a live LOW per the reviewer's counter-feedback); 2 HIGH (uninstall chown through symlink; unit suite `rm -rf` on fixed host paths — executed as an incident on the external host) + 6 MED; cross-calibration section vs -d (union drives the fix wave); loop continues |
+| 0.0.42f | [2026-10-04-v0.0.42-f.md](2026-10-04-v0.0.42-f.md) | S1–S2, C1–C3, D1–D3, Q1–Q2 | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | wave review of the 0.0.42d/e fix wave (`e26f379..24ad0d2`, 8 commits; three parallel Flash agents + main-agent verification); 5 MED, all fix-induced/fix-incomplete (back-function containment sibling, glob gate after expansion, staging siblings, group-name ACL qualifier, guard continuation blindness); loop continues with fix wave 2; gate on the tip green (34 suites, e2e 273/47/70, zero skips) |
+| 0.0.42g | [2026-10-04-v0.0.42-g.md](2026-10-04-v0.0.42-g.md) | S1, C1–C3, D1–D3, Q1–Q3 | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | wave review of fix wave 2 (`74a3751..1338c9b`; three parallel Flash agents + main-agent verification); 4 MED — ACL principal mismatch (removal targets dev-gid, baseline writes the opencode group), conventions policy names the dropped sed pattern, ratchet blind to quoted literals, expect_rc-0 suite-kill shape; loop continues with fix wave 3; gate green on the tip |
+| 0.0.42h | [2026-10-04-v0.0.42-h.md](2026-10-04-v0.0.42-h.md) | S1–S2, C1–C2, D1, Q1 | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | wave review of fix wave 3 (`4e22481..75bdb6c`; three parallel Flash agents + main-agent verification, live-executed); 2 MED — one-unknown-gid silent principal skip with lying log line, and the surviving FIRST-line comment (cross-confirmed by all three agents); wave-3 substance verified clean; minimal fix wave 4 follows; gate green on the tip |
+| 0.0.42i | [2026-10-04-v0.0.42-i.md](2026-10-04-v0.0.42-i.md) | Q1–Q3 (INFO) | [2026-10-03-v0.0.42-resolution.md](2026-10-03-v0.0.42-resolution.md) | wave review of fix wave 4 (`2373ea5..838de21`; three parallel Flash agents, live-executed); **zero MED/HIGH — stop rule met, wave chain d–i closes** (3 INFO dispositioned with the closure commit); final gate green (34 suites, e2e 273/47/70, zero skips); branch PR-ready |

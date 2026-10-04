@@ -40,13 +40,15 @@ chmod +x "$WORK/sudo"
 # exists — true on a dev host with the kit installed, false on a CI
 # runner. Pretend it always exists so the removal plan is complete (and
 # the test hermetic) on every host. -u/-g also feed the ownership-revert
-# capture (issue #74): uid 60000 / gid 60001 must flow into the find.
+# capture (issue #74): uid 60000 must flow into the find; the gids stay
+# DISTINCT per user (opencode 60002, dev 60001 — 0.0.42h C2) so
+# full-script runs never reshape UN_OC_GID == UN_DEV_GID.
 cat > "$WORK/id" <<'EOF'
 #!/bin/sh
 case "$1" in
     -u)  echo 60000 ;;
-    -g)  echo 60001 ;;
-    -gn) echo devgroup ;;
+    -g)  case "$2" in opencode) echo 60002 ;; *) echo 60001 ;; esac ;;
+    -gn) case "$2" in opencode) echo opencodegroup ;; *) echo devgroup ;; esac ;;
     *)   exit 0 ;;
 esac
 EOF
@@ -167,8 +169,9 @@ done
 # uid/gid, because the user removal above may already have orphaned the
 # ids. Functional: the project loop is extracted verbatim (it hardcodes
 # the conf path, so it is fed a fake root via stdin) and run with a
-# logging run() stub; the captured uid/gid (fake id: 60000/60001) must
-# land inside the find, with chown to DEFAULT_USER:<dev-group>. The loop
+# logging run() stub; the captured uid 60000 and the DISTINCT gids
+# (oc 60002 / dev 60001) must land inside the find and the ACL removal,
+# with chown to DEFAULT_USER:<dev-group>. The loop
 # is extracted verbatim except for its stdin redirect (the conf path is
 # hardcoded) — the fake roots are piped in instead.
 PROJECT_LOOP="$(sed -n '/while IFS= read -r root; do/,/done < /p' "$UNINSTALL" | sed 's|done < "$UNINSTALL_PROJECTS_CONF"|done|')"
@@ -181,20 +184,34 @@ LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && printf '%s\n/etc\n' "$WORK/fakeproj" | (
     run() { echo "RUN: $*"; }
     run_q() { echo "RUN: $*"; }
     log() { :; }
+    # Distinct ids (0.0.42g Q2): UN_OC_GID and UN_DEV_GID must differ so
+    # the ACL pin below can prove BOTH principals are removed — the
+    # identical-ids fixture was the blindness that let the opencode-group
+    # entries survive the dev-gid-only removal (0.0.42g S1).
     UN_OC_UID=60000
-    UN_OC_GID=60001
+    UN_OC_GID=60002
     UN_DEV_GROUP=devgroup
+    UN_DEV_GID=60001
     DEFAULT_USER=devuser
     eval "$PROJECT_LOOP"
 ) 2>&1 || true)
 if printf '%s' "$LOOP_OUT" | grep -qF "find $WORK/fakeproj" \
    && ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- '-uid 60000' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60001' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +'; then
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60002' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
     pass "ownership revert: uid/gid-matched chown to the developer per root (issue #74)"
 else
     fail "ownership revert loop (out=$(printf '%s' "$LOOP_OUT" | head -5))"
+fi
+# ! -type l (0.0.42e S1): chown follows a symlink operand — without the
+# exclusion, an opencode-planted link inside a project makes the root-run
+# revert chown an arbitrary file OUTSIDE the project to the developer.
+if printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
+    pass "ownership revert: symlinks excluded from the chown find (0.0.42e S1)"
+else
+    fail "ownership revert: chown find must exclude symlinks (0.0.42e S1)"
 fi
 # -xdev would stop at mount boundaries — project roots are regularly
 # separate mounts (bind mounts, NFS): the revert must follow, like the
@@ -214,6 +231,34 @@ if [ -n "$CAPTURE_LINE" ] && [ -n "$USERDEL_LINE" ] && [ "$CAPTURE_LINE" -lt "$U
     pass "ownership revert: ids captured before userdel (orphan-proof)"
 else
     fail "ownership revert: ids must be captured before userdel (capture=$CAPTURE_LINE userdel=$USERDEL_LINE)"
+fi
+
+# ACL removal is targeted, not a wipe (0.0.42e C4): the kit baseline adds
+# access entries g:<dev-group> and default entries g:<dev-group>:rwx —
+# `setfacl -R -b/-k` removed EVERY extended ACL incl. pre-existing user
+# entries the kit never owned. -x is a no-op rc 0 on absent entries.
+# Qualifiers use the NUMERIC gid (0.0.42f C2): name qualifiers die at
+# setfacl parse time when the name does not resolve, silently disabling
+# the cleanup; the capture feeds a fallback branch when even the gid is
+# unknown.
+if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60002' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60002' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60001' \
+   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60001' \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF 'unknown' \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -b' \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -k'; then
+    pass "ACL revert: both kit principals removed via numeric gids, no skip hints (0.0.42g S1 + 0.0.42i Q3)"
+else
+    fail "ACL revert must remove BOTH principals (opencode group + dev group) via numeric gids (0.0.42g S1)"
+fi
+if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$UNINSTALL" \
+   && grep -qF 'for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"' "$UNINSTALL" \
+   && grep -qF '_un_acl_skipped=1' "$UNINSTALL" \
+   && grep -qF 'kit ACL entries PARTIALLY removed' "$UNINSTALL"; then
+    pass "ACL revert: both gids captured, principal loop, loud per-principal skip + partial log (0.0.42f C2 + 0.0.42g S1 + 0.0.42h S1)"
+else
+    fail "ACL revert: principal loop + loud skip + partial-log branch required (0.0.42h S1)"
 fi
 
 # --- 5. cleanup hints match what install.sh leaves behind ----------------------

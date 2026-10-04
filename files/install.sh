@@ -405,6 +405,18 @@ parse_args() {
             --projects)
                 shift
                 while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
+                    # Glob metacharacters are rejected on the RAW
+                    # argument (0.0.42f S2): any later unquoted
+                    # iteration would pathname-expand a matching glob
+                    # into a different root set than the user typed —
+                    # an in-loop gate runs after that expansion and
+                    # never sees the characters.
+                    case "$1" in
+                        *[\*\?\[]*)
+                            echo "error: --projects value contains glob characters: $1" >&2
+                            exit 1
+                            ;;
+                    esac
                     PREDEFINED_PROJECTS="$PREDEFINED_PROJECTS $1"
                     shift
                 done
@@ -807,6 +819,9 @@ do_plan_phase() {
     if [ -n "$PREDEFINED_PROJECTS" ]; then
         _fp_norm=""
         for _fp in $PREDEFINED_PROJECTS; do
+            # Glob characters were already rejected on the raw argument
+            # in parse_args (0.0.42f S2) — pathname expansion can never
+            # widen this loop's word list.
             if ! project_path_sane "$_fp"; then
                 ui_error "'$_fp' is a system path — refusing to use it as a project root."
                 ui_info "Use a dedicated folder like /var/www/vhosts or /home/<you>/projects."
@@ -1044,7 +1059,10 @@ do_plan_phase() {
     ui_info "Writing /etc/opencode-permissions-kit/install.conf ..."
     # Atomic stamp rewrite (0.0.39g C5): tee in place truncated the stamp on a
     # mid-write crash; write the full stamp beside it, then rename it in.
-    _INSTALL_CONF_TMP="/etc/opencode-permissions-kit/install.conf.opk-new"
+    # Per-process suffix (0.0.42f C1): a fixed name let concurrent runs
+    # clobber each other's staging file (root-created by the tee below —
+    # mktemp cannot create in the root-only conf dir).
+    _INSTALL_CONF_TMP="/etc/opencode-permissions-kit/install.conf.opk-new.$$"
     _tmp_track "$_INSTALL_CONF_TMP"
     sudo tee "$_INSTALL_CONF_TMP" > /dev/null <<EOF
 DEFAULT_USER=$DEFAULT_USER

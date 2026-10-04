@@ -57,6 +57,26 @@ fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 [ "$(advisories_version_cmp 1.0.216 1.1.10)" = "lt" ] \
     && pass "version_cmp: 1.0.216 < 1.1.10" \
     || fail "version_cmp: 1.0.216 < 1.1.10"
+# Gate boundaries the wrapper/status routing depends on (0.0.42d Q2):
+# 1.x < 1.18.33 and 2.x < 2.0.18 keep the carrier warning; the
+# thresholds themselves and the unknown-version fail-safe are pinned
+# here so the case routing in bin/opencode-as-opencode and status.sh
+# cannot drift silently.
+[ "$(advisories_version_cmp 1.18.32 1.18.33)" = "lt" ] \
+    && pass "gate boundary: 1.18.32 needs the carrier (< 1.18.33)" \
+    || fail "gate boundary: 1.18.32 needs the carrier (< 1.18.33)"
+[ "$(advisories_version_cmp 1.18.33 1.18.33)" = "eq" ] \
+    && pass "gate boundary: 1.18.33 itself needs no carrier" \
+    || fail "gate boundary: 1.18.33 itself needs no carrier"
+[ "$(advisories_version_cmp 2.0.17 2.0.18)" = "lt" ] \
+    && pass "gate boundary: 2.0.17 needs the carrier (< 2.0.18)" \
+    || fail "gate boundary: 2.0.17 needs the carrier (< 2.0.18)"
+[ "$(advisories_version_cmp 2.0.18 2.0.18)" = "eq" ] \
+    && pass "gate boundary: 2.0.18 itself needs no carrier" \
+    || fail "gate boundary: 2.0.18 itself needs no carrier"
+[ "$(advisories_version_cmp "" 1.18.33)" = "lt" ] \
+    && pass "gate fail-safe: unknown/empty version keeps the warning" \
+    || fail "gate fail-safe: unknown/empty version keeps the warning"
 # segment order, not lexicographic: 1.10.0 > 1.9.0
 [ "$(advisories_version_cmp 1.10.0 1.9.0)" = "gt" ] \
     && pass "version_cmp: 1.10.0 > 1.9.0 (segment order, not lexicographic)" \
@@ -89,10 +109,14 @@ if advisory_range_holds 1.18.22 ">=1.14.30,<1.18.22"; then
 else
     pass "range: conjunction closes at the patched version"
 fi
-if advisory_range_holds 1.1.10 ">= 1.0.0, < 1.1.10"; then
-    fail "range: spaces inside comparators are tolerated"
-else
+# 0.0.42e Q1: the OLD form asserted 1.1.10 against ">= 1.0.0, < 1.1.10"
+# and treated false as success — false is also the outcome when
+# whitespace parsing is broken, so the test passed for the wrong
+# reason. An IN-RANGE version makes true the only correct outcome.
+if advisory_range_holds 1.1.9 ">= 1.0.0, < 1.1.10"; then
     pass "range: spaces inside comparators are tolerated"
+else
+    fail "range: spaces inside comparators are tolerated"
 fi
 if advisory_range_holds 1.1.10 "1.1.10"; then
     pass "range: bare version is an exact match"

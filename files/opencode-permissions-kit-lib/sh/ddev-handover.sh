@@ -467,6 +467,19 @@ ddev_handover_project_back() {
         # dereference the OPERAND into an arbitrary tree. Raceless skip.
         [ -d "$dhb_proj/$dhb_d" ] || continue
         [ -L "$dhb_proj/$dhb_d" ] && continue
+        # Resolved containment (0.0.42f S1 — the back-function sibling
+        # of the forward fix): an INTERMEDIATE symlinked component still
+        # resolves through the operand gates; keep the settings dir
+        # inside the resolved project root or skip with a warning.
+        dhb_real_root="$(readlink -f "$dhb_proj" 2>/dev/null || printf '%s' "$dhb_proj")"
+        dhb_real_dir="$(readlink -f "$dhb_proj/$dhb_d" 2>/dev/null || printf '%s' "$dhb_proj/$dhb_d")"
+        case "$dhb_real_dir" in
+            "$dhb_real_root"|"$dhb_real_root"/*) ;;
+            *)
+                echo "  WARNING: skipping settings dir '$dhb_d' — resolves outside the project (symlinked component?)" >&2
+                continue
+                ;;
+        esac
         # Top-inode fast path (issue #112): trees the developer already
         # owns with group-write skip the recursive pair.
         if _ddev_tree_conforms "$dhb_proj/$dhb_d" "$dhb_dev" "$dhb_group"; then
@@ -511,6 +524,22 @@ ddev_handover_project() {
         # to the agent.
         [ -d "$dhp_proj/$dhp_d" ] || continue
         [ -L "$dhp_proj/$dhp_d" ] && continue
+        # Containment (0.0.42e S2): the [ -L ] gate above catches a
+        # symlink AT the operand — an INTERMEDIATE component (docroot
+        # "web" symlinked out of the project, config.yaml being
+        # agent-writable after a prior handover) still resolves through
+        # and would hand an outside tree to the agent. Resolve both
+        # sides and require containment; a resolution failure falls
+        # back to the lexical paths (contained by construction above).
+        dhp_real_root="$(readlink -f "$dhp_proj" 2>/dev/null || printf '%s' "$dhp_proj")"
+        dhp_real_dir="$(readlink -f "$dhp_proj/$dhp_d" 2>/dev/null || printf '%s' "$dhp_proj/$dhp_d")"
+        case "$dhp_real_dir" in
+            "$dhp_real_root"|"$dhp_real_root"/*) ;;
+            *)
+                echo "  WARNING: skipping settings dir '$dhp_d' — resolves outside the project (symlinked component?)" >&2
+                continue
+                ;;
+        esac
         # Top-inode fast path (issue #112): trees already handed over with
         # group-write skip the recursive pair.
         if _ddev_tree_conforms "$dhp_proj/$dhp_d" "$dhp_user" "$dhp_group"; then

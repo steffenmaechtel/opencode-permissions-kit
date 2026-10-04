@@ -246,8 +246,8 @@ check "kit CLI usage documents the hostname mode (issue #21)" \
     sh -c "grep -qF 'ddev-hosts-add [dir|hostname]' \"\$1\"" _ "$KIT"
 check "kit CLI check output shows per-hostname add commands" \
     sh -c "grep -qF 'ddev-hosts-add /' \"\$1\"" _ "$KIT"
-check "Makefile lint list includes ddev-hosts.sh" \
-    sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-hosts.sh' \"\$1\"" _ "$MAKEFILE"
+check "make lint covers ddev-hosts.sh (disk-derived list, 0.0.42d C4)" \
+    sh -c "make -C \"\$2/../..\" -n lint 2>/dev/null | grep -q 'ddev-hosts.sh' && grep -qF 'shellcheck shell=' \"\$1\"" _ "$MAKEFILE" "$SCRIPT_DIR"
 # ddev-hosts.sh is a sourced lib (opk, ddev-terminal, status.sh) — per
 # the repo invariant (755 <=> executed by path) it must be tracked 100644;
 # the deploy manifest re-asserts its LIBDIR mode on install/update.
