@@ -510,6 +510,22 @@ else
     fail "populated projects.conf counts its roots (got '$_pc_two')"
 fi
 
+# --- 1d. advisory version probe is bounded (0.0.43b W3) ---------------------------
+# The comment claims parity with the wrapper's check — true only with the
+# timeout envelope the wrapper got in 0.0.43a F3. A wedged 2.x service can
+# make even --version hang (issue #80); opk status, the diagnostic for
+# exactly that state, must never hang on it.
+if awk '/ADV_VER=\$\(/,/head -1 \|\| true/' "$STATUS" | grep -q 'timeout 10'; then
+    pass "advisory probe is timeout-bounded (0.0.43b W3)"
+else
+    fail "advisory probe is timeout-bounded (0.0.43b W3)"
+fi
+if grep -qF 'BOUNDED pattern as the wrapper' "$STATUS"; then
+    pass "the probe comment states the bounded parity truthfully"
+else
+    fail "the probe comment states the bounded parity truthfully"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

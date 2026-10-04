@@ -255,6 +255,37 @@ else
 fi
 rm -rf "$EMPTY"
 
+# A find that DIES wholesale mid-walk with an empty stream (0.0.43b W4):
+# xargs -r no-ops green on empty input, so the old pipeline rc said
+# nothing — the baseline printed "applied" over a walk that never ran.
+# The temp-file restructure tracks find's own rc.
+DEAD="$WORK/deadfind"
+mkdir -p "$DEAD"
+cat > "$DEAD/find" <<'EOF'
+#!/bin/sh
+echo "find stub: simulated wholesale failure" >&2
+exit 1
+EOF
+chmod +x "$DEAD/find"
+DFOUT="$(FS_SUDO="" /bin/sh -c '. "$1" && PATH="$2:$PATH" && fs_baseline_root "$3" "$4" && echo BASELINE-RC0' \
+    sh "$LIB" "$DEAD" "$WORK/proj" "$(id -gn)" 2>&1 || true)"
+if printf '%s\n' "$DFOUT" | grep -q BASELINE-RC0; then
+    fail "a wholesale find failure must propagate a non-zero exit (W4)"
+else
+    pass "a wholesale find failure must propagate a non-zero exit (W4)"
+fi
+if printf '%s\n' "$DFOUT" | grep -qF 'baseline pass "chgrp" hit errors (rc 1)'; then
+    pass "the dead find is attributed to its pass with its rc (W4)"
+else
+    fail "the dead find is attributed to its pass with its rc (W4)"
+fi
+if printf '%s\n' "$DFOUT" | grep -qF 'simulated wholesale failure'; then
+    pass "find's stderr survives for diagnosis (the why behind the rc)"
+else
+    fail "find's stderr survives for diagnosis (the why behind the rc)"
+fi
+rm -rf "$DEAD"
+
 # --- Summary ---------------------------------------------------------------------------
 echo ""
 echo "================================================="

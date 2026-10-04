@@ -137,14 +137,21 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     fi
     ui_section "Security advisories"
     # Installed version: probed fresh through the kit's sudo path (same
-    # pattern as the wrapper's check; the install.conf stamp would go
-    # stale the moment a binary is swapped outside opk). sudo -n never
+    # BOUNDED pattern as the wrapper's check — 0.0.43b W3: a wedged 2.x
+    # service can make even --version hang, issue #80, and opk status is
+    # the diagnostic for exactly that state; the install.conf stamp would
+    # go stale the moment a binary is swapped outside opk). sudo -n never
     # prompts: root needs no password, the developer rides the kit's
     # NOPASSWD rule, anyone else just sees "unknown".
     ADV_VER=""
     if [ -x "$LIBDIR/bin/opencode" ] && command -v sudo >/dev/null 2>&1; then
-        ADV_VER=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null \
+        if command -v timeout >/dev/null 2>&1; then
+            ADV_VER=$(timeout 10 sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null \
     | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+        else
+            ADV_VER=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null \
+    | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+        fi
     fi
     if [ -n "$ADV_VER" ]; then
         ADV_HITS=$(advisories_matching opencode "$ADV_VER" standalone || true)

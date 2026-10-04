@@ -141,21 +141,32 @@ _fsb_pass() {
     shift  # consume --
     [ $# -gt 0 ] || return 0
     _fsbp_rc=0
+    _fsbp_nul="$(mktemp "${TMPDIR:-/tmp}/opk-fsb-pass.XXXXXXXX")"
+    # find's own status must survive into the pass bookkeeping (0.0.43b
+    # W4): POSIX sh has no pipefail, a pipeline's rc is the LAST
+    # command's alone, and xargs -r no-ops GREEN on an empty stream — a
+    # find that died wholesale mid-walk still printed "applied". Walk
+    # into a temp file first and track find's rc; its stderr stays
+    # visible (the why behind the rc below). Live counting is
+    # unaffected: the counter streams from the file while xargs chews it.
     # shellcheck disable=SC2086  # find expression built word-wise above
-    _fsb_sudo find "$_fsbp_root" $_fsbp_expr -print0 2>/dev/null \
-        | _fsb_count_tee "$_fsbp_label" \
-        | _fsb_sudo xargs -0 -r sh -c '
-            # $1 = arity of the fixed command, then the kit-fixed command
-            # words, then the batch of NUL-separated paths xargs appended.
-            _n=$1; shift
-            _c=""
-            while [ "$_n" -gt 0 ]; do _c="$_c $1"; shift; _n=$((_n - 1)); done
-            for _p in "$@"; do
-                [ -L "$_p" ] && continue
-                # shellcheck disable=SC2086  # kit-fixed, space-free words
-                $_c "$_p"
-            done
-          ' xargs-sh "$#" "$@" || _fsbp_rc=$?
+    _fsb_sudo find "$_fsbp_root" $_fsbp_expr -print0 >"$_fsbp_nul" || _fsbp_rc=$?
+    if [ "$_fsbp_rc" -eq 0 ]; then
+        _fsb_count_tee "$_fsbp_label" <"$_fsbp_nul" \
+            | _fsb_sudo xargs -0 -r sh -c '
+                # $1 = arity of the fixed command, then the kit-fixed command
+                # words, then the batch of NUL-separated paths xargs appended.
+                _n=$1; shift
+                _c=""
+                while [ "$_n" -gt 0 ]; do _c="$_c $1"; shift; _n=$((_n - 1)); done
+                for _p in "$@"; do
+                    [ -L "$_p" ] && continue
+                    # shellcheck disable=SC2086  # kit-fixed, space-free words
+                    $_c "$_p"
+                done
+              ' xargs-sh "$#" "$@" || _fsbp_rc=$?
+    fi
+    rm -f "$_fsbp_nul"
     # Per-pass failure tracking (0.0.43a F10): without pipefail the old
     # unconditional `return 0` made a wholesale pass failure (rc 123 =
     # xargs had failing batches, 125/126/127 = xargs/interpreter trouble)
