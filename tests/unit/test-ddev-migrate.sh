@@ -446,12 +446,14 @@ check "install.sh skips the export when already stamped" \
 
 # ddev detection: version probe falls back to the DEFAULT user — `ddev
 # version` can come up empty as root while working as the actual user.
+# (HOME rides DEV_HOME since 0.0.44a V14 — getent-resolved, /home/<name>
+# only the fallback.)
 check "install.sh probes the ddev version as the DEFAULT user too" \
-    sh -c "grep -q 'DDEV_BIN_DEV' \"\$1\" && grep -q 'sudo -u \"\$DEFAULT_USER\" env HOME=\"/home/\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'DDEV_BIN_DEV' \"\$1\" && grep -q 'sudo -u \"\$DEFAULT_USER\" env HOME=\"\$DEV_HOME\"' \"\$1\"" _ "$INSTALL"
 check "install.sh inventory distinguishes found-but-unreadable from missing" \
     sh -c "grep -q 'version could not be read' \"\$1\" && grep -q 'not installed (optional' \"\$1\"" _ "$INSTALL"
 check "migration detection is gated on the registry, not the binary" \
-    sh -c "grep -qF 'if [ -d \"/home/\$DEFAULT_USER/.ddev\" ]; then' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'if [ -d \"\$DEV_HOME/.ddev\" ]; then' \"\$1\"" _ "$INSTALL"
 # _ddev_migrate_bin must consider per-user install paths (sudo -u does not
 # inherit the dev user's PATH).
 check "ddev resolution includes the user's private install paths" \

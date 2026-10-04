@@ -272,7 +272,7 @@ fi
 # inert file-path entries older kits may have written into cli.json. The
 # additive manager leaves unmanaged/broken files untouched.
 if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
-    for _un_dir in "/home/opencode/.config/opencode" "/home/$DEFAULT_USER/.config/opencode"; do
+    for _un_dir in "/home/$OPENCODE_USER/.config/opencode" "/home/$DEFAULT_USER/.config/opencode"; do
         # Chain gate (review 0.0.39h F2): rm -rf and the tui-register rewrite
         # below act THROUGH a linked parent (~/.config, ~/.config/opencode —
         # agent-replaceable): a planted link redirects the removal/rewrite
@@ -545,7 +545,7 @@ echo "    - Default-user opencode config at"
 echo "      ~/.config/opencode/opencode.jsonc (and any opencode.jsonc_BAK_*)"
 echo "      is left untouched — delete it manually if you no longer use opencode."
 echo "    - TUI mode display leftovers (all harmless without the kit):"
-echo "      /home/opencode/.config/opencode/tui.json (registers the kit"
+echo "      /home/$OPENCODE_USER/.config/opencode/tui.json (registers the kit"
 echo "      plugin; opencode skips it when the plugin file is gone),"
 echo "      ~/.config/opencode/tui.json + ~/.config/opencode/themes/"
 echo "      opencode-danger.json (red bypass theme for your user)."

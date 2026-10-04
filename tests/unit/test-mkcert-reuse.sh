@@ -43,7 +43,7 @@ check() {
 line_of() { grep -nF "$2" "$1" | head -1 | cut -d: -f1; }
 
 inst_win=$(line_of "$INSTALL" '/mnt/c/Users/*/AppData/Local/mkcert')
-inst_linux=$(line_of "$INSTALL" '/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem')
+inst_linux=$(line_of "$INSTALL" '$DEV_HOME/.local/share/mkcert/rootCA.pem')
 upd_win=$(line_of "$UPDATE" '/mnt/c/Users/*/AppData/Local/mkcert')
 upd_linux=$(line_of "$UPDATE" '/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem')
 
@@ -67,7 +67,7 @@ check "install.sh no longer invokes cmd.exe" \
 check "install.sh requires the CA key too (signing needs it)" \
     sh -c "grep -qF '\"\$wca/rootCA-key.pem\"' \"\$1\"" _ "$INSTALL"
 check "install.sh keeps the developer-Linux CAROOT fallback" \
-    sh -c "grep -qF '/home/\$DEFAULT_USER/.local/share/mkcert/rootCA.pem' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '\$DEV_HOME/.local/share/mkcert/rootCA.pem' \"\$1\"" _ "$INSTALL"
 check "install.sh: Windows scan comes before the Linux fallback" \
     test -n "$inst_win" -a -n "$inst_linux" -a "$inst_win" -lt "$inst_linux"
 
