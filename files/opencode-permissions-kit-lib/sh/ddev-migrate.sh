@@ -186,9 +186,15 @@ _ddev_migrate_run_as() {
     dm_i=$(id -u "$dm_u" 2>/dev/null)
     # Each env assignment is ONE argument (0.0.43a F6): a home path with
     # whitespace must never split into a bogus env word. Positional
-    # parameters are per-function scope — `set --` leaves the caller's.
-    set -- env "HOME=$dm_h"
-    [ -n "$dm_i" ] && [ -d "/run/user/$dm_i" ] && set -- "$@" "XDG_RUNTIME_DIR=/run/user/$dm_i"
+    # parameters are per-function scope — `set --` rebuilds the command
+    # with the caller's "$@" APPENDED (the e2e caught an intermediate
+    # draft that dropped them: every helper call degenerated into a
+    # command-less `env` print with rc 0 — start "succeeded", no dump).
+    if [ -n "$dm_i" ] && [ -d "/run/user/$dm_i" ]; then
+        set -- env "HOME=$dm_h" "XDG_RUNTIME_DIR=/run/user/$dm_i" "$@"
+    else
+        set -- env "HOME=$dm_h" "$@"
+    fi
     sudo -u "$dm_u" "$@"
 }
 

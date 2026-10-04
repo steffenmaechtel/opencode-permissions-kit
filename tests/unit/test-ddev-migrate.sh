@@ -656,6 +656,13 @@ WRAP
 _runas_out="$(PATH="$WORK:$PATH" sh "$WORK/runas.sh" "$MIG" 2>/dev/null || true)"
 check "run-as passes a spaced HOME as one single argument" \
     sh -c "printf '%s\n' \"\$2\" | grep -qxF \"HOME=\$1\"" _ "$WORK/spaced home" "$_runas_out"
+# The caller's COMMAND must survive the env rebuild (e2e regression: a
+# draft dropped "$@" from the set -- and every call degenerated into a
+# command-less `env` print with rc 0 — start "succeeded", no dump).
+check "run-as still executes the caller's command after the env words" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qxF '/bin/true'" _ "$_runas_out"
+check "run-as never runs a command-less env" \
+    sh -c "[ \"\$(printf '%s\n' \"\$1\" | tail -n +5)\" != \"\" ]" _ "$_runas_out"
 
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).
