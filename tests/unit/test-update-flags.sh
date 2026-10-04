@@ -307,19 +307,52 @@ check "tui: registration flips with the major (sync function, both directions)" 
 check "tui: a major flip re-anchors the registration even in --only-binary runs" \
     sh -c "grep -n 'sync_tui_registration \"\$_maj_after\"' \"\$1\" | head -1 | cut -d: -f1 | grep -q ." _ "$UPDATE"
 
-# OPENCODE_MAJOR re-stamp discipline (0.0.44a V5/V20): the post-copy probe
-# used to force major 1 on empty and overwrite a known-good 2 stamp (the
-# wrapper prefers the stamp — a 1-stamped 2.x drops --standalone, the
-# issue-#80 breakage); the stamp writes now fail loud (rc 2 = post-copy
-# failure -> the caller restores from the backup).
-_restamp_block=$(sed -n '/^    if \[ -n "\$_new_major" \]; then/,/^    fi$/p' "$UPDATE")
-_restamp_writes=$(printf '%s\n' "$_restamp_block" | grep -c 'OPENCODE_MAJOR=$_new_major')
-_restamp_guards=$(printf '%s\n' "$_restamp_block" | grep -c '|| return 2')
+# OPENCODE_MAJOR re-stamp discipline (0.0.44a V5/V20, hardened 0.0.44b
+# W4): a RETURNED version line is always a major (2.x prints "opencode
+# vN...", 1.x the bare version — current_opencode_major parity; the old
+# gate treated 1.x as undetermined and kept a stale 2-stamp across the
+# documented `--major 1` downgrade). Only an empty probe (unknown) keeps
+# the previous stamp; both stamp writes fail loud (rc 2 = post-copy).
+_restamp_block=$(sed -n '/^    if \[ "\$new" != "unknown" \]; then/,/^    fi$/p' "$UPDATE")
+_restamp_writes=$(printf '%s\n' "$_restamp_block" | grep -c 'OPENCODE_MAJOR=$_new_major' || true)
+_restamp_guards=$(printf '%s\n' "$_restamp_block" | grep -c 'return 2' || true)
 if grep -qF 'OPENCODE_MAJOR stamp left unchanged' "$UPDATE" \
-   && [ "$_restamp_writes" -eq 2 ] && [ "$_restamp_guards" -eq 2 ]; then
-    pass "re-stamp only on a determined major, writes fail loud (V5/V20)"
+   && [ "$_restamp_writes" -eq 2 ] && [ "$_restamp_guards" -ge 2 ]; then
+    pass "re-stamp only on a probed line, writes fail loud (V5/V20, W4 shape)"
 else
-    fail "re-stamp only on a determined major, writes fail loud (V5/V20, writes=$_restamp_writes guards=$_restamp_guards)"
+    fail "re-stamp only on a probed line, writes fail loud (V5/V20, W4 shape, writes=$_restamp_writes guards=$_restamp_guards)"
+fi
+# behavioral: the extracted block runs against a fixture conf with a
+# direct sudo shim — 0.0.44b W4's regression case (bare 1.x line) must
+# stamp 1 over a stale 2 (the old code kept 2 and the wrapper passed the
+# 2.x-only --standalone to a 1.x binary).
+if [ -n "$_restamp_block" ]; then
+    _rst_conf="$WORK/install.conf"
+    _rst_run() {
+        printf 'OPENCODE_MAJOR=2\n' > "$_rst_conf"
+        (
+            CONFDIR="$WORK"
+            sudo() { "$@"; }
+            log() { :; }
+            new="$_rst_line"
+            eval "$_restamp_block"
+        ) >/dev/null 2>&1
+        sed -n 's/^OPENCODE_MAJOR=//p' "$_rst_conf" | tail -1
+    }
+    _rst_line="opencode v2.0.11"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: 2.x line stamps 2 (W4)" \
+        || fail "re-stamp: 2.x line stamps 2 (W4)"
+    _rst_line="1.18.31"
+    [ "$(_rst_run)" = "1" ] \
+        && pass "re-stamp: bare 1.x line stamps 1 over a stale 2 (W4)" \
+        || fail "re-stamp: bare 1.x line stamps 1 over a stale 2 (W4)"
+    _rst_line="unknown"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: unknown probe keeps the previous stamp (V5)" \
+        || fail "re-stamp: unknown probe keeps the previous stamp (V5)"
+else
+    fail "re-stamp block extractable (W4)"
 fi
 
 # --- Summary ----------------------------------------------------------------------
