@@ -415,10 +415,13 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # never silently (0.0.42h S1) — and the closing log line says
         # "partial" when one was skipped.
         _un_acl_skipped=""
-        for _un_acl_gid in "$UN_OC_GID" "$UN_DEV_GID"; do
+        for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"; do
+            _un_acl_label="${_un_acl_pair%%:*}"
+            _un_acl_gid="${_un_acl_pair#*:}"
             if [ -z "$_un_acl_gid" ]; then
                 _un_acl_skipped=1
-                echo "    group id unknown — its ACL entries left in place (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
+                echo "    ${_un_acl_label} id unknown — its ACL entries left in place"\
+" (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
                 continue
             fi
             run_q sudo setfacl -R -x "g:$_un_acl_gid" "$root"
@@ -426,7 +429,8 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         done
         run_q sudo chmod g-s "$root"
         if [ -n "$_un_acl_skipped" ]; then
-            log "project ownership reverted + kit ACL entries PARTIALLY removed (a group id was unknown): $root"
+            log "project ownership reverted + kit ACL entries PARTIALLY removed"\
+" (one or more group ids were unknown): $root"
         else
             log "project ownership reverted + kit ACL entries removed: $root"
         fi

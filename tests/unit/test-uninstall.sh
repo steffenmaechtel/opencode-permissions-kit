@@ -245,14 +245,15 @@ if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60002' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60002' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60001' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60001' \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF 'unknown' \
    && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -b' \
    && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -k'; then
-    pass "ACL revert: both kit principals removed via numeric gids (0.0.42g S1)"
+    pass "ACL revert: both kit principals removed via numeric gids, no skip hints (0.0.42g S1 + 0.0.42i Q3)"
 else
     fail "ACL revert must remove BOTH principals (opencode group + dev group) via numeric gids (0.0.42g S1)"
 fi
 if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$UNINSTALL" \
-   && grep -qF 'for _un_acl_gid in "$UN_OC_GID" "$UN_DEV_GID"' "$UNINSTALL" \
+   && grep -qF 'for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"' "$UNINSTALL" \
    && grep -qF '_un_acl_skipped=1' "$UNINSTALL" \
    && grep -qF 'kit ACL entries PARTIALLY removed' "$UNINSTALL"; then
     pass "ACL revert: both gids captured, principal loop, loud per-principal skip + partial log (0.0.42f C2 + 0.0.42g S1 + 0.0.42h S1)"
