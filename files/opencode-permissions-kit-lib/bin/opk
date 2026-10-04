@@ -302,18 +302,20 @@ case "$cmd" in
                 /home/*) [ "$(dirname "$_ho_np")" = "/home" ] \
                     && _ho_err "handover: refusing whole home directory '$_ho_np' — hand over subpaths" ;;
             esac
-            # Slash-terminated operands are symlink-gate-blind (0.0.44a V2):
-            # path resolution goes through the link before lstat ever sees
-            # one — [ -L "x/" ] is FALSE while chown -R -h and find x/ both
-            # act on the link's TARGET. Tab completion produces these forms
-            # daily; the documented refusal must hold for them too. Checked
-            # on the RAW operand, after the path policy above (which sees
-            # the resolved form): "/" is a system root, not a form error,
-            # but "x/" into a project tree is exactly the bypass.
+            # Slash-terminated operands are symlink-gate-blind (0.0.44a
+            # V2; dotdot final/mid components added 0.0.44b W3 — same
+            # class): path resolution goes through the link before lstat
+            # ever sees one — [ -L "x/" ] and [ -L "x/.." ] are FALSE
+            # while chown -R -h and find act on the resolved TARGET (a
+            # trailing slash: the link itself; "..": the link target's
+            # PARENT). Checked on the RAW operand, after the path policy
+            # above (which sees the resolved form): "/" is a system
+            # root, not a form error, but "x/", "x/.." and "a/../b" into
+            # a project tree are exactly the bypasses.
             case "$_ho_a" in
-                */|*/.|*//*)
-                    _ho_err "handover: '$_ho_a' ends in a slash — pass the path itself"\
-" (symlink gates cannot see through trailing slashes)" ;;
+                */|*/.|*//*|*/..|*/../*)
+                    _ho_err "handover: '$_ho_a' carries a slash/dotdot path form — pass the path itself"\
+" (symlink gates cannot see through trailing slashes or .. components)" ;;
             esac
             [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
         done

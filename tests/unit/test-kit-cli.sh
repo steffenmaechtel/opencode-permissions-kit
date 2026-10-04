@@ -212,15 +212,26 @@ done
 for _slashed in "$WORK/ho-tree/sub/" "$WORK/ho-tree//" "$WORK/ho-tree/."; do
     errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$_slashed" 2>&1 >/dev/null || true)"
     case "$errout" in
-        *"ends in a slash"*)
+        *"slash/dotdot path form"*)
             echo "  ${GREEN}PASS${NC}  handover refuses slash form $_slashed"; passed=$((passed + 1)) ;;
         *) echo "  ${RED}FAIL${NC}  handover refuses slash form $_slashed (got: $errout)"; failures=$((failures + 1)) ;;
     esac
 done
+# dotdot forms resolve through a link to its target's PARENT (0.0.44b
+# W3): [ -L "x/.." ] is false and realpath follows the link — the same
+# gate-blind class as trailing slashes.
 ln -s "$WORK/ho-tree" "$WORK/ho-link"
+for _dotdot in "$WORK/ho-link/.." "$WORK/ho-tree/sub/../../ho-tree" "$WORK/ho-tree/sub/../sub"; do
+    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$_dotdot" 2>&1 >/dev/null || true)"
+    case "$errout" in
+        *"slash/dotdot path form"*)
+            echo "  ${GREEN}PASS${NC}  handover refuses dotdot form $_dotdot (W3)"; passed=$((passed + 1)) ;;
+        *) echo "  ${RED}FAIL${NC}  handover refuses dotdot form $_dotdot (W3, got: $errout)"; failures=$((failures + 1)) ;;
+    esac
+done
 errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$WORK/ho-link/" 2>&1 >/dev/null || true)"
 case "$errout" in
-    *"ends in a slash"*)
+    *"slash/dotdot path form"*)
         echo "  ${GREEN}PASS${NC}  handover refuses symlink-with-slash before any gate"; passed=$((passed + 1)) ;;
     *) echo "  ${RED}FAIL${NC}  handover refuses symlink-with-slash before any gate (got: $errout)"; failures=$((failures + 1)) ;;
 esac
