@@ -412,6 +412,51 @@ if [ -n "$_known_ln" ] && [ -n "$_valid_ln" ] && [ "$_known_ln" -lt "$_valid_ln"
 else
     fail "advisory-watch.sh: known-id dedup runs before shape validation (F1)"
 fi
+# V12: the gh-issue dedup must also run before validation, and the id
+# charset gate must precede BOTH dedups (the gh search embeds the id).
+_tracked_ln="$(grep -n 'TRACKED=\$(gh issue list' "$SCAN" | head -1 | cut -d: -f1)"
+_idclean_ln="$(grep -n 'scan_id_clean "\$ID"' "$SCAN" | head -1 | cut -d: -f1)"
+if [ -n "$_idclean_ln" ] && [ -n "$_tracked_ln" ] && [ "$_idclean_ln" -lt "$_tracked_ln" ] \
+   && [ -n "$_valid_ln" ] && [ "$_tracked_ln" -lt "$_valid_ln" ]; then
+    pass "advisory-watch.sh: id gate -> both dedups -> validation (V12)"
+else
+    fail "advisory-watch.sh: id gate -> both dedups -> validation (V12)"
+fi
+extract_id_gate() {
+    sed -n '/^scan_id_clean() {/,/^}/p' "$SCAN"
+}
+if [ -n "$(extract_id_gate)" ]; then
+    eval "$(extract_id_gate)"
+    if scan_id_clean "GHSA-632h-h47v-g4x4"; then
+        pass "scan id gate: well-formed id passes"
+    else
+        fail "scan id gate: well-formed id passes"
+    fi
+    if scan_id_clean "GHSA-x is:closed in:title"; then
+        fail "scan id gate: search-qualifier smuggling rejected"
+    else
+        pass "scan id gate: search-qualifier smuggling rejected"
+    fi
+else
+    fail "advisory-watch.sh: id gate extractable (V12)"
+fi
+# V4: the builder joins multi-package patched_versions with ", " — the
+# validator must accept per-element shape, not reject the comma outright.
+if scan_advisory_valid "GHSA-632h-h47v-g4x4" "high" ">=1.14.30, < 1.18.22" "2.0.18, 2.0.18"; then
+    pass "scan guard: multi-package patched (two same-target entries) passes (V4)"
+else
+    fail "scan guard: multi-package patched (two same-target entries) passes (V4)"
+fi
+if scan_advisory_valid "GHSA-632h-h47v-g4x4" "high" ">=1.14.30" "1.18.22, 1.19.0"; then
+    pass "scan guard: comma'd backport patch string passes (V4)"
+else
+    fail "scan guard: comma'd backport patch string passes (V4)"
+fi
+if scan_advisory_valid "GHSA-632h-h47v-g4x4" "high" "<1.0.216" "1.2, abc"; then
+    fail "scan guard: garbage element inside patched rejected (V4)"
+else
+    pass "scan guard: garbage element inside patched rejected (V4)"
+fi
 
 echo ""
 if [ "$failures" -gt 0 ]; then

@@ -89,10 +89,20 @@ scan_advisory_valid() {
         low|moderate|high|critical) ;;
         *) return 1 ;;
     esac
-    _sav_patched=$(printf '%s' "$4" | tr -d ' ')
-    case "$_sav_patched" in
-        *[!0-9.]*) return 1 ;;
-    esac
+    # patched: the builder joins one entry per vulnerabilities[] package
+    # with ", " — validate per ELEMENT like the ranges loop below, never
+    # as one blob (0.0.44a V4: "2.0.18, 2.0.18", GitHub's natural
+    # multi-package shape, used to die at the comma → the advisory was
+    # skipped and the daily watch went red with no tracking issue).
+    # Empty elements and an empty whole field (unpatched) stay valid.
+    _sav_rest="$4,"
+    while [ -n "$_sav_rest" ]; do
+        _sav_cmp="${_sav_rest%%,*}"
+        _sav_rest="${_sav_rest#*,}"
+        _sav_patched=$(printf '%s' "$_sav_cmp" | tr -d ' ')
+        [ -n "$_sav_patched" ] || continue
+        printf '%s' "$_sav_patched" | grep -qE '^[0-9]+(\.[0-9]+)*$' || return 1
+    done
     _sav_rest="$3,"
     while [ -n "$_sav_rest" ]; do
         _sav_cmp="${_sav_rest%%,*}"
@@ -101,6 +111,24 @@ scan_advisory_valid() {
         [ -n "$_sav_cmp" ] || continue
         printf '%s' "$_sav_cmp" | grep -qE '^(>=|<=|<|>|=)?[0-9]+(\.[0-9]+)*$' || return 1
     done
+    return 0
+}
+
+# ID charset gate alone (0.0.44a V12): the dedup steps below must run
+# BEFORE full shape validation (a curated or already-tracked advisory
+# must not keep the watch red on upstream shape drift) — but the gh-issue
+# dedup embeds the ID into a --search query, so the ID needs its charset
+# check BEFORE that, independently of the other fields. Same two cases
+# as inside scan_advisory_valid (kept self-contained for extract-based
+# unit tests).
+scan_id_clean() {
+    case "$1" in
+        GHSA-*) ;;
+        *) return 1 ;;
+    esac
+    case "$1" in
+        *[!A-Za-z0-9-]*) return 1 ;;
+    esac
     return 0
 }
 
@@ -118,24 +146,36 @@ while IFS='|' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
     case "$SEVERITY" in
         medium) SEVERITY=moderate ;;
     esac
-    # Known-id dedup BEFORE shape validation (0.0.43a F1): the grep is
-    # injection-safe (fixed string, whole line, quoted), and a curated
-    # advisory must not keep the watch red on upstream shape drift —
-    # validation only guards fields that reach argv/query, which a
-    # known advisory's never do.
+    # ID charset FIRST (0.0.44a V12): both dedups below must run before
+    # full shape validation — a curated or already-tracked advisory must
+    # not keep the watch red on upstream shape drift (the F1 argument,
+    # now applied to the gh-issue dedup too, not just the shipped-DB
+    # one). But the gh search embeds the ID into a query, so its charset
+    # is checked up here; everything else validates AFTER the dedups.
+    if ! scan_id_clean "$ID"; then
+        SKIPPED=$((SKIPPED + 1))
+        say "WARN: skipping '$ID' — malformed advisory id (feed corruption?)"
+        continue
+    fi
+    # Known-id dedup (grep is injection-safe: fixed string, whole line,
+    # quoted — and the id passed the charset gate above anyway).
     if printf '%s\n' "$KNOWN" | grep -qxF "$ID"; then
         say "$ID known (shipped database) — ok"
         continue
     fi
-    if ! scan_advisory_valid "$ID" "$SEVERITY" "$RANGES" "$PATCHED"; then
-        SKIPPED=$((SKIPPED + 1))
-        say "WARN: skipping '$ID' — malformed feed fields (id/severity/ranges/patched shape; feed corruption?)"
-        continue
-    fi
-    # dedup: GHSA ids are globally unique, the id alone identifies the issue
+    # dedup: GHSA ids are globally unique, the id alone identifies the
+    # issue. Also BEFORE validation (0.0.44a V12): an already-tracked
+    # advisory with drifted upstream fields would otherwise redden the
+    # daily watch although the tracking issue exists and no argv/query
+    # field beyond the charset-gated id is ever used.
     TRACKED=$(gh issue list -R "$GITHUB_REPOSITORY" --state all --search "$ID in:title" --json number --jq 'length' 2>/dev/null || echo 0)
     if [ "$TRACKED" -gt 0 ] 2>/dev/null; then
         say "$ID already tracked (issue exists) — ok"
+        continue
+    fi
+    if ! scan_advisory_valid "$ID" "$SEVERITY" "$RANGES" "$PATCHED"; then
+        SKIPPED=$((SKIPPED + 1))
+        say "WARN: skipping '$ID' — malformed feed fields (severity/ranges/patched shape; feed corruption?)"
         continue
     fi
     NEW=$((NEW + 1))
@@ -155,7 +195,11 @@ while IFS='|' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
         printf '  - [ ] Refine the range against the patched version (upstream opens, patched closes)\n'
         printf '  - [ ] Add the record to ADVISORY_RECORDS in\n'
         printf '        files/opencode-permissions-kit-lib/sh/advisories.sh:\n'
-        printf '        opencode|%s|%s|<channel>|%s|%s|<one-line summary>\n' "$RANGES" "$PATCHED" "$SEVERITY" "$ID"
+        # Schema field 3 is the FIRST patched version; the feed can carry
+        # several (one per package, 0.0.44a V4) — pre-split for the
+        # curator so a comma'd string cannot land in the schema verbatim.
+        _patch_first=$(printf '%s' "$PATCHED" | cut -d, -f1 | tr -d ' ')
+        printf '        opencode|%s|%s|<channel>|%s|%s|<one-line summary>\n' "$RANGES" "$_patch_first" "$SEVERITY" "$ID"
         printf '  - [ ] Cover the new record in tests/unit/test-security-advisories.sh\n'
         printf '  - [ ] Cut a release (make release VERSION=x.y.z) so opk update ships it\n'
         printf '  - [ ] Close this issue\n\n'
