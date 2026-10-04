@@ -116,6 +116,45 @@ else
     fail "dry-run plans user removal (userdel -r)"
 fi
 
+# --- 3b. legacy pre-0.0.10 artifacts (0.0.43a F5) --------------------------------
+# Kits before v0.0.10 wrote /etc/sudoers.d/opencode -> /etc/opencode/sudoers,
+# /etc/profile.d/opencode-umask.sh and /usr/local/lib/opencode (with the
+# root-runnable protect-projects.sh + its /usr/local/sbin symlink). `opk
+# update` refuses pre-0.0.14, so this cohort never migrated names — the
+# uninstall must take the legacy names down with the current ones.
+if printf '%s' "$PLAN" | grep -qF -- "/etc/profile.d/opencode-umask.sh"; then
+    pass "dry-run plans removal of the legacy umask profile"
+else
+    fail "dry-run plans removal of the legacy umask profile"
+fi
+# The gated legacy removals (sudoers symlink, /etc/opencode conf files,
+# legacy lib dir, sbin helper symlink) branch on the REAL /etc state and
+# cannot be staged hermetically — their names and marker gates are pinned
+# statically here (the behavior ships via the e2e suites).
+for _pin in \
+    '/etc/sudoers.d/opencode' \
+    'case "$_un_leg_link" in' \
+    '/etc/opencode/*)' \
+    'for _un_leg in sudoers install.conf projects.conf setup.conf' \
+    '/usr/local/lib/opencode/wrapper' \
+    '/usr/local/lib/opencode/protect-projects.sh' \
+    'case "$_un_pp_link" in'; do
+    if grep -qF -- "$_pin" "$UNINSTALL"; then
+        pass "legacy removal pinned: $_pin"
+    else
+        fail "legacy removal pinned: $_pin"
+    fi
+done
+# The generic legacy names must stay MARKER-GATED, never blanket-removed:
+# anything else living at /etc/sudoers.d/opencode or /usr/local/lib/opencode
+# is not kit-owned.
+if grep -qF 'not kit-owned — left untouched' "$UNINSTALL" \
+   && ! grep -Eq 'rm -rf /etc/opencode($|[^-])' "$UNINSTALL"; then
+    pass "legacy names are marker-gated (foreign content survives)"
+else
+    fail "legacy names are marker-gated (foreign content survives)"
+fi
+
 # --- 4. system paths in projects.conf are never ACL-cleaned --------------------
 # uninstall.sh hardcodes /etc/opencode-permissions-kit/projects.conf (no
 # env override), so this is checked by STATIC extraction: pull the pattern

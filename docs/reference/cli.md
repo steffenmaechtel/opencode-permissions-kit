@@ -92,7 +92,11 @@ and whole home directories are refused — hand over project trees, not
 systems. `/tmp` subpaths are allowed (temp build trees are legitimate
 handover targets). Symlinked paths are refused too: `chown -R`/`chmod -R`
 follow a symlink operand, and the kit never hands a tree over through a
-link (`--dry-run` lists the refusals it would make).
+link (`--dry-run` lists the refusals it would make). The recursive pair
+itself cannot be steered through a link either: the ownership change rides
+`chown -R -h` (never dereferences an operand) and the group-write pass
+only ever sees non-symlinks (`find ! -type l` feeds it) — a link planted
+between the check and the run re-owns nothing outside the tree.
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides

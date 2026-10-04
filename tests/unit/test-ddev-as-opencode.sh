@@ -115,7 +115,7 @@ check "helper falls back to /usr/bin/ddev" \
 check "helper exits 127 with a hint when ddev is missing" \
     sh -c "grep -q 'exit 127' \"\$1\"" _ "$HELPER"
 check "helper re-sets HOME for the opencode user" \
-    sh -c "grep -q 'export HOME=\"/home/\$OPENCODE_USER\"' \"\$1\"" _ "$HELPER"
+    sh -c "grep -qF 'export HOME=\"\${OC_HOME:-/home/\$OPENCODE_USER}\"' \"\$1\" && grep -qF 'OC_HOME=\"\$(getent passwd \"\$OPENCODE_USER\"' \"\$1\"" _ "$HELPER"
 check "helper re-sets XDG_RUNTIME_DIR" \
     sh -c "grep -q 'XDG_RUNTIME_DIR' \"\$1\"" _ "$HELPER"
 check "helper exports DOCKER_HOST for docker-rootless" \

@@ -201,6 +201,46 @@ run sudo rm -f /etc/sudoers.d/opencode-permissions-kit
 echo "sudoers removed."
 log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit"
 
+# Legacy pre-0.0.10 kit names (0.0.43a F5): kits before v0.0.10 wrote
+# /etc/sudoers.d/opencode -> /etc/opencode/sudoers and kept their conf
+# under /etc/opencode/. `opk update` refuses pre-0.0.14, so that cohort
+# can never have migrated names — leaving the legacy symlink behind
+# keeps an ACTIVE kit sudoers grant alive after "Uninstall complete."
+# Marker-gated (the name /etc/sudoers.d/opencode is generic): only a
+# symlink pointing into the legacy conf dir is kit-owned.
+if [ -L /etc/sudoers.d/opencode ]; then
+    _un_leg_link="$(readlink /etc/sudoers.d/opencode 2>/dev/null || true)"
+    case "$_un_leg_link" in
+        /etc/opencode/*)
+            run sudo rm -f /etc/sudoers.d/opencode
+            echo "Legacy sudoers symlink removed (/etc/sudoers.d/opencode)."
+            log "legacy sudoers symlink removed: /etc/sudoers.d/opencode"
+            ;;
+        *)
+            echo "/etc/sudoers.d/opencode -> $_un_leg_link is not kit-owned — left untouched."
+            ;;
+    esac
+elif [ -e /etc/sudoers.d/opencode ]; then
+    echo "/etc/sudoers.d/opencode exists but is not a kit symlink — left untouched."
+fi
+# Legacy conf dir: remove only the files pre-0.0.10 kits created there,
+# then the dir itself only if that emptied it — foreign content under
+# /etc/opencode survives.
+if [ -d /etc/opencode ]; then
+    for _un_leg in sudoers install.conf projects.conf setup.conf; do
+        run sudo rm -f "/etc/opencode/$_un_leg"
+    done
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] sudo rmdir /etc/opencode (only if empty)"
+    elif sudo rmdir /etc/opencode 2>/dev/null; then
+        echo "Legacy conf dir removed (/etc/opencode)."
+        log "legacy conf dir removed: /etc/opencode (kit files)"
+    else
+        echo "/etc/opencode still holds foreign content — kit files removed, dir kept."
+        log "legacy conf dir partially handled: /etc/opencode (foreign content kept)"
+    fi
+fi
+
 echo ""
 echo "--- Removing wrapper ---"
 run sudo rm -f /usr/local/bin/opencode
@@ -294,11 +334,42 @@ run sudo rm -rf /usr/local/lib/opencode-permissions-kit
 echo "opencode library removed."
 log "library removed: /usr/local/lib/opencode-permissions-kit"
 
+# Legacy pre-0.0.10 library (0.0.43a F5): /usr/local/lib/opencode — home
+# of the root-runnable protect-projects.sh the legacy sudoers rules
+# reference — plus its /usr/local/sbin convenience symlink (0.0.9
+# install.sh:438). Marker-gated on the kit files (wrapper /
+# protect-projects.sh): a foreign directory of that name stays.
+if [ -d /usr/local/lib/opencode ] \
+   && { [ -e /usr/local/lib/opencode/wrapper ] \
+        || [ -e /usr/local/lib/opencode/protect-projects.sh ]; }; then
+    run sudo rm -rf /usr/local/lib/opencode
+    echo "Legacy library removed (/usr/local/lib/opencode)."
+    log "legacy library removed: /usr/local/lib/opencode"
+elif [ -d /usr/local/lib/opencode ]; then
+    echo "/usr/local/lib/opencode holds no kit markers — left untouched."
+fi
+if [ -L /usr/local/sbin/protect-projects.sh ]; then
+    _un_pp_link="$(readlink /usr/local/sbin/protect-projects.sh 2>/dev/null || true)"
+    case "$_un_pp_link" in
+        /usr/local/lib/opencode/*)
+            run sudo rm -f /usr/local/sbin/protect-projects.sh
+            echo "Legacy helper symlink removed (/usr/local/sbin/protect-projects.sh)."
+            log "legacy helper symlink removed: /usr/local/sbin/protect-projects.sh"
+            ;;
+        *)
+            echo "/usr/local/sbin/protect-projects.sh -> $_un_pp_link is not kit-owned — left untouched."
+            ;;
+    esac
+fi
+
 echo ""
 echo "--- Removing umask profile ---"
 run sudo rm -f /etc/profile.d/opencode-permissions-kit-umask.sh
+# Legacy pre-0.0.10 name (0.0.43a F5) — the same cleanup update.sh and
+# sudoers-deploy.sh already perform on the install/update path.
+run sudo rm -f /etc/profile.d/opencode-umask.sh
 echo "Umask profile removed."
-log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh"
+log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ legacy opencode-umask.sh)"
 
 echo ""
 echo "--- Removing opencode user ---"

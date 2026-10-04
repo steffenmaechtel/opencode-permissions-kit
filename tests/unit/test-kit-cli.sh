@@ -280,6 +280,21 @@ else
     echo "  ${GREEN}PASS${NC}  stub not in KIT_FILES (never deployed)"; passed=$((passed + 1))
 fi
 
+# ddev-hosts sudo re-exec: HOME via getent (0.0.43b W1). After the re-exec
+# ddev_hosts_add runs AS the developer, so its own getent fix (0.0.43a F12)
+# never fires on this path — the value passed here is the one ddev sees;
+# a hardcoded /home/<user> would reintroduce the F12 symptom on relocated
+# homes, on one of the two documented invocation paths.
+if grep -qF 'env HOME="$_kit_home"' "$BIN/opk" \
+   && grep -qF '_kit_home=$(getent passwd "$_kitsu"' "$BIN/opk" \
+   && ! grep -qF 'HOME="/home/$_kitsu"' "$BIN/opk"; then
+    echo "  ${GREEN}PASS${NC}  ddev-hosts re-exec resolves HOME via getent (0.0.43b W1)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  ddev-hosts re-exec resolves HOME via getent (0.0.43b W1)"
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

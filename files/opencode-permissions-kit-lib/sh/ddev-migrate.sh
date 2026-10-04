@@ -184,10 +184,18 @@ _ddev_migrate_run_as() {
     dm_h=$(getent passwd "$dm_u" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$dm_h" ] || return 1
     dm_i=$(id -u "$dm_u" 2>/dev/null)
-    dm_env="HOME=$dm_h"
-    [ -n "$dm_i" ] && [ -d "/run/user/$dm_i" ] && dm_env="$dm_env XDG_RUNTIME_DIR=/run/user/$dm_i"
-    # shellcheck disable=SC2086  # word splitting intended (env assignments)
-    sudo -u "$dm_u" env $dm_env "$@"
+    # Each env assignment is ONE argument (0.0.43a F6): a home path with
+    # whitespace must never split into a bogus env word. Positional
+    # parameters are per-function scope — `set --` rebuilds the command
+    # with the caller's "$@" APPENDED (the e2e caught an intermediate
+    # draft that dropped them: every helper call degenerated into a
+    # command-less `env` print with rc 0 — start "succeeded", no dump).
+    if [ -n "$dm_i" ] && [ -d "/run/user/$dm_i" ]; then
+        set -- env "HOME=$dm_h" "XDG_RUNTIME_DIR=/run/user/$dm_i" "$@"
+    else
+        set -- env "HOME=$dm_h" "$@"
+    fi
+    sudo -u "$dm_u" "$@"
 }
 
 # _ddev_migrate_bin [user]
@@ -196,13 +204,18 @@ _ddev_migrate_run_as() {
 # installer offers a per-user install, and `sudo -u` does not inherit it.
 _ddev_migrate_bin() {
     dmb_u="${1:-}"
-    dmb_extra=""
+    dmb_h=""
     if [ -n "$dmb_u" ]; then
         dmb_h=$(getent passwd "$dmb_u" 2>/dev/null | cut -d: -f6 || true)
-        [ -n "$dmb_h" ] && dmb_extra="$dmb_h/.local/bin/ddev $dmb_h/bin/ddev $dmb_h/.ddev/bin/ddev"
     fi
-    for dm_c in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev $dmb_extra; do
-        [ -n "$dm_c" ] && [ -x "$dm_c" ] && { echo "$dm_c"; return 0; }
+    # The per-user candidates are separate quoted words (0.0.43a F6): a
+    # home with whitespace used to re-split a string list, and the bare
+    # directory prefix passed [ -x ] — emitting a DIRECTORY as the ddev
+    # binary. ${dmb_h:+...} expands to nothing (no word) when unset.
+    for dm_c in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev \
+        "${dmb_h:+$dmb_h/.local/bin/ddev}" "${dmb_h:+$dmb_h/bin/ddev}" "${dmb_h:+$dmb_h/.ddev/bin/ddev}"; do
+        # -f besides -x: a traversable directory must never qualify.
+        [ -n "$dm_c" ] && [ -f "$dm_c" ] && [ -x "$dm_c" ] && { echo "$dm_c"; return 0; }
     done
     return 1
 }
@@ -427,10 +440,17 @@ ddev_migrate_import() {
     id "$dm_oc" >/dev/null 2>&1 || { echo "ddev-migrate: user '$dm_oc' does not exist"; return 1; }
     dm_bin=$(_ddev_migrate_bin "$dm_oc") || { echo "ddev-migrate: ddev is not installed"; return 1; }
 
-    dm_env="HOME=/home/$dm_oc XDG_RUNTIME_DIR=/run/user/$(id -u "$dm_oc")"
+    # Home via getent, not /home/<user> (0.0.43a F12); every env assignment
+    # is ONE quoted argument — a spaced HOME or DOCKER_HOST must not split
+    # (0.0.43a F6). The conditional backend assignment rides
+    # ${dm_extra:+"$dm_extra"} (empty when the backend needs none).
+    dm_oc_h=$(getent passwd "$dm_oc" 2>/dev/null | cut -d: -f6 || true)
+    [ -n "$dm_oc_h" ] || dm_oc_h="/home/$dm_oc"
+    dm_oc_i=$(id -u "$dm_oc")
+    dm_extra=""
     case "$dm_be" in
-        docker-rootless) [ -n "$dm_dh" ] && dm_env="$dm_env DOCKER_HOST=$dm_dh" ;;
-        podman-rootless) [ -n "$dm_ps" ] && dm_env="$dm_env DOCKER_HOST=$dm_ps" ;;
+        docker-rootless) [ -n "$dm_dh" ] && dm_extra="DOCKER_HOST=$dm_dh" ;;
+        podman-rootless) [ -n "$dm_ps" ] && dm_extra="DOCKER_HOST=$dm_ps" ;;
     esac
 
     dm_ok=0; dm_failed=""
@@ -442,9 +462,10 @@ ddev_migrate_import() {
         # </dev/null: this loop's stdin IS manifest.conf — ddev reads
         # stdin and would consume the manifest mid-iteration (same class
         # as the export-loop finding).
-        # shellcheck disable=SC2086  # word splitting intended (env assignments)
-        if sudo -u "$dm_oc" env $dm_env "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 \
-           && sudo -u "$dm_oc" env $dm_env "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
+        if sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
+               ${dm_extra:+"$dm_extra"} "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 \
+           && sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
+               ${dm_extra:+"$dm_extra"} "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
               </dev/null >/dev/null 2>&1; then
             echo "    imported: $dm_f"
             dm_ok=$((dm_ok + 1))

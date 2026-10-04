@@ -182,6 +182,12 @@ ddev_hosts_add() {
         dha_dev=""
     fi
 
+    # Home via getent, not /home/<user> (0.0.43a F12): relocated homes must
+    # still give ddev its real registry/config directory.
+    dha_dev_h=""
+    [ -n "$dha_dev" ] && dha_dev_h=$(getent passwd "$dha_dev" 2>/dev/null | cut -d: -f6 || true)
+    [ -n "$dha_dev_h" ] || dha_dev_h="/home/$dha_dev"
+
     dha_bin="$(command -v ddev 2>/dev/null || true)"
     [ -n "$dha_bin" ] || { [ -x /usr/local/bin/ddev ] && dha_bin=/usr/local/bin/ddev; }
     [ -n "$dha_bin" ] || { [ -x /usr/bin/ddev ] && dha_bin=/usr/bin/ddev; }
@@ -197,7 +203,7 @@ ddev_hosts_add() {
         esac
         echo "adding $dha_arg (Windows may ask for permission) ..."
         if [ -n "$dha_dev" ]; then
-            sudo -u "$dha_dev" env HOME="/home/$dha_dev" "$dha_bin" hostname "$dha_arg" 127.0.0.1
+            sudo -u "$dha_dev" env HOME="$dha_dev_h" "$dha_bin" hostname "$dha_arg" 127.0.0.1
         else
             "$dha_bin" hostname "$dha_arg" 127.0.0.1
         fi || { echo "  FAILED: $dha_arg — add it manually (see below)"; return 1; }
@@ -232,7 +238,7 @@ ddev_hosts_add() {
         [ -n "$dha_h" ] || continue
         echo "adding $dha_h (Windows may ask for permission) ..."
         if [ -n "$dha_dev" ]; then
-            sudo -u "$dha_dev" env HOME="/home/$dha_dev" "$dha_bin" hostname "$dha_h" 127.0.0.1 \
+            sudo -u "$dha_dev" env HOME="$dha_dev_h" "$dha_bin" hostname "$dha_h" 127.0.0.1 \
                 || { echo "  FAILED: $dha_h — add it manually (see below)"; dha_rc=1; }
         else
             "$dha_bin" hostname "$dha_h" 127.0.0.1 \

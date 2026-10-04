@@ -65,7 +65,9 @@ resources question comes much later in the run, right before the finish):
    Claude Code's home, so credentials like `.credentials.json` stay in
    your home). Choose **move** (recommended — one canonical copy; you
    keep read/write via the sharing group), **copy** (both sides keep
-   their own, may drift) or **skip**. Non-interactive installs move;
+   their own, may drift) or **skip**. The menu's Enter default is
+   **skip** — move removes the developer-side sources after the copy, so
+   it never rides on an empty Enter. Non-interactive installs move;
    `--migrate-agents move|copy|skip` forces a choice.
 
 One exception: when podman is detected, you choose between podman-rootless
@@ -79,7 +81,9 @@ runs with the recommended value.
 
 **Advanced mode** exposes granular prompts for the steps Standard decides
 silently (backend choice, project multi-select, port sysctl, ACL baseline,
-binary handling, deny-all handling). The `/mnt/c` exposure is never a
+binary handling, deny-all handling — an existing default-user config is
+backed up and the deny-all lockout installed, Enter says yes). The
+`/mnt/c` exposure is never a
 prompt in either mode — the kit only *prints* the ready-to-run
 restriction snippet (it never edits `/etc/wsl.conf` itself; see the
 [security model](concepts/security-model.md)). Non-interactive installs

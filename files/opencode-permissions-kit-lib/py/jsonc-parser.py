@@ -140,12 +140,18 @@ def extract_patterns(config_path):
     patterns = set()
     permission = config.get('permission', {})
 
-    for tool in ('read', 'edit'):
-        rules = permission.get(tool, {})
-        if isinstance(rules, dict):
-            for pattern, act in rules.items():
-                if act == 'deny' and pattern != '*':
-                    patterns.add(pattern)
+    # String shorthand ("permission": "deny"/"allow") is valid opencode
+    # config — extract_tools handles the same shape (0.0.43a F13). A
+    # whole-config string carries no per-tool pattern map, so there are
+    # no concrete deny patterns to report; crashing here made callers
+    # swallow the exit and print a false "no matches".
+    if isinstance(permission, dict):
+        for tool in ('read', 'edit'):
+            rules = permission.get(tool, {})
+            if isinstance(rules, dict):
+                for pattern, act in rules.items():
+                    if act == 'deny' and pattern != '*':
+                        patterns.add(pattern)
 
     for p in sorted(patterns):
         print(p)
@@ -168,7 +174,13 @@ def _debug_entry_rules(config):
         info = entry.get('info')
         if not isinstance(info, dict):
             continue
-        for rule in info.get('permissions', []):
+        # `permissions` may exist as JSON null — .get's default only
+        # applies to MISSING keys (0.0.43a F14); guard like every sibling
+        # access instead of raising TypeError on iteration.
+        permissions = info.get('permissions')
+        if not isinstance(permissions, list):
+            continue
+        for rule in permissions:
             if not isinstance(rule, dict):
                 continue
             if rule.get('action') not in ('shell', 'bash', '*'):

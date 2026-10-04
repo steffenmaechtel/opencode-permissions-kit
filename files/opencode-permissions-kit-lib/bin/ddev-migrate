@@ -33,9 +33,18 @@ case "${1:-}" in
     export)
         [ "$(id -u)" = 0 ] || { echo "ddev-migrate: export must run as root"; exit 1; }
         [ $# -ge 3 ] || { _ddev_migrate_usage; exit 1; }
-        dm_ocg=$(id -gn opencode 2>/dev/null || echo opencode)
+        # Agent user/group from install.conf, like the import path
+        # (0.0.43a F15): a hand-edited conf with a custom OPENCODE_USER
+        # must not leave the export's finalize chowns silently root-owned
+        # (they are || true-guarded) — install.sh passes the configured
+        # values too.
+        dm_oc="opencode"
+        [ -f /etc/opencode-permissions-kit/install.conf ] \
+            && . /etc/opencode-permissions-kit/install.conf
+        dm_oc="${OPENCODE_USER:-$dm_oc}"
+        dm_ocg=$(id -gn "$dm_oc" 2>/dev/null || echo "$dm_oc")
         dm_dev="$2"; shift 2
-        ddev_migrate_export "$dm_dev" opencode "$dm_ocg" "$@"
+        ddev_migrate_export "$dm_dev" "$dm_oc" "$dm_ocg" "$@"
         ;;
     import)
         ddev_migrate_import "${2:-}"

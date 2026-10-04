@@ -204,6 +204,88 @@ else
 fi
 rm -rf "$SW"
 
+# --- 7b. pass failures propagate (0.0.43a F10) ----------------------------------------
+# A wholesale pass failure used to be invisible (pipeline status dropped,
+# unconditional return 0) while callers printed "applied" regardless. Now:
+# a failing per-path command warns per pass, the summary names the root,
+# and fs_baseline_root exits non-zero (install/config/update fail loud
+# under set -e instead of lying green).
+FB="$WORK/failroot"
+mkdir -p "$FB/root"
+printf 'x\n' > "$FB/root/f"
+STUBS="$WORK/failstubs"
+mkdir -p "$STUBS"
+cat > "$STUBS/setfacl" <<'EOF'
+#!/bin/sh
+echo "setfacl stub: deliberate failure" >&2
+exit 1
+EOF
+chmod +x "$STUBS/setfacl"
+FBOUT="$(PATH="$STUBS:$PATH" FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3" && echo BASELINE-RC0' \
+    _ "$LIB" "$FB/root" "$(id -gn)" 2>&1 || true)"
+if printf '%s\n' "$FBOUT" | grep -q BASELINE-RC0; then
+    fail "a failing pass must propagate a non-zero exit"
+else
+    pass "a failing pass must propagate a non-zero exit"
+fi
+if printf '%s\n' "$FBOUT" | grep -qF 'baseline pass "default ACLs" hit errors'; then
+    pass "the failing pass is named in the warn line"
+else
+    fail "the failing pass is named in the warn line"
+fi
+if printf '%s\n' "$FBOUT" | grep -qF 'may be incomplete'; then
+    pass "the summary names the root and the risk"
+else
+    fail "the summary names the root and the risk"
+fi
+rm -rf "$FB" "$STUBS"
+
+# A missing required tool dies loudly BEFORE any pass runs (the old code
+# lost find's failure inside the redirected pipeline and xargs -r happily
+# no-op'd on empty input). PATH is narrowed INSIDE the subshell so the
+# /bin/sh invocation itself stays resolvable.
+EMPTY="$WORK/emptypath"
+mkdir -p "$EMPTY"
+MTOUT="$(FS_SUDO="" /bin/sh -c '. "$1" && PATH="$2" && fs_baseline_root "$3" "$4"' \
+    sh "$LIB" "$EMPTY" "$WORK/proj" "$(id -gn)" 2>&1 || true)"
+if printf '%s\n' "$MTOUT" | grep -qF 'required tool missing for the group baseline: find'; then
+    pass "a missing tool is reported before any pass runs"
+else
+    fail "a missing tool is reported before any pass runs"
+fi
+rm -rf "$EMPTY"
+
+# A find that DIES wholesale mid-walk with an empty stream (0.0.43b W4):
+# xargs -r no-ops green on empty input, so the old pipeline rc said
+# nothing — the baseline printed "applied" over a walk that never ran.
+# The temp-file restructure tracks find's own rc.
+DEAD="$WORK/deadfind"
+mkdir -p "$DEAD"
+cat > "$DEAD/find" <<'EOF'
+#!/bin/sh
+echo "find stub: simulated wholesale failure" >&2
+exit 1
+EOF
+chmod +x "$DEAD/find"
+DFOUT="$(FS_SUDO="" /bin/sh -c '. "$1" && PATH="$2:$PATH" && fs_baseline_root "$3" "$4" && echo BASELINE-RC0' \
+    sh "$LIB" "$DEAD" "$WORK/proj" "$(id -gn)" 2>&1 || true)"
+if printf '%s\n' "$DFOUT" | grep -q BASELINE-RC0; then
+    fail "a wholesale find failure must propagate a non-zero exit (W4)"
+else
+    pass "a wholesale find failure must propagate a non-zero exit (W4)"
+fi
+if printf '%s\n' "$DFOUT" | grep -qF 'baseline pass "chgrp" hit errors (rc 1)'; then
+    pass "the dead find is attributed to its pass with its rc (W4)"
+else
+    fail "the dead find is attributed to its pass with its rc (W4)"
+fi
+if printf '%s\n' "$DFOUT" | grep -qF 'simulated wholesale failure'; then
+    pass "find's stderr survives for diagnosis (the why behind the rc)"
+else
+    fail "find's stderr survives for diagnosis (the why behind the rc)"
+fi
+rm -rf "$DEAD"
+
 # --- Summary ---------------------------------------------------------------------------
 echo ""
 echo "================================================="

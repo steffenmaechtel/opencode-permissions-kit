@@ -91,6 +91,7 @@ FUNCS="$WORK/funcs.sh"
 {
     sed -n '/^detect_target() {/,/^}/p' "$UPDATE"
     sed -n '/^version_major() {/,/^}/p' "$UPDATE"
+    sed -n '/^opencode_version_line() {/,/^}/p' "$UPDATE"
     sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE"
     sed -n '/^resolve_latest_opencode_version() {/,/^}/p' "$UPDATE"
     sed -n '/^fetch_opencode_version() {/,/^}/p' "$UPDATE"
@@ -111,6 +112,17 @@ _re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'current_opencode_major')
 [ "$_re" = "2" ] && pass "resolve: 2.x --version line maps to major 2" || fail "resolve: 2.x --version line maps to major 2 (got: '$_re')"
 _re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'current_opencode_major')
 [ "$_re" = "1" ] && pass "resolve: bare 1.x --version line maps to major 1" || fail "resolve: bare 1.x --version line maps to major 1 (got: '$_re')"
+
+# The probes are BOUNDED (0.0.43b W3): a wedged 2.x service can make even
+# --version hang (issue #80) — opk update, the remediation path, must
+# never block on it. Every --version call site routes through the
+# timeout-wrapped helper.
+check "update.sh: bounded --version helper exists (timeout 10 + head -1)" \
+    sh -c "grep -q 'timeout 10 \"\$SYSTEM_BIN\" --version' \"\$1\" && grep -q 'opencode_version_line() {' \"\$1\"" _ "$UPDATE"
+check "update.sh: all --version probes route through the bounded helper" \
+    sh -c "[ \"\$(grep -c 'opencode_version_line' \"\$1\")\" -ge 4 ]" _ "$UPDATE"
+check "update.sh: post-copy failure message never names a backup that was never taken (W6)" \
+    sh -c "grep -qF 'no previous binary was backed up' \"\$1\" && grep -qF '[ -f \"\$BACKUP_DIR/opencode.current\" ]' \"\$1\"" _ "$UPDATE"
 
 # 2b. latest resolution per major (npm dist-tag vs GitHub releases/latest)
 _re=$(run_resolver "$WORK/bin" "$WORK/stub-v2" 'resolve_latest_opencode_version 2')

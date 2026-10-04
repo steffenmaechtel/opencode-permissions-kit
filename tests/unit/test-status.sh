@@ -469,6 +469,63 @@ else
 fi
 rm -rf "$W3"
 
+# --- 1c. empty projects.conf header (0.0.43a F8) ---------------------------------
+# `grep -c .` on an empty file prints 0 AND exits 1 — the old `|| echo 0`
+# appended a second 0 and the captured "0<newline>0" broke the "Projects"
+# header across lines. The shipped counting block is extracted and run
+# with a stubbed ui_section against an empty and a missing projects.conf.
+sed -n '/^_st_pc=/,/^ui_section "Projects/p' "$STATUS" > "$WORK/pc-block.sh"
+if [ -s "$WORK/pc-block.sh" ] && grep -q 'ui_section "Projects' "$WORK/pc-block.sh"; then
+    pass "the projects-count block is extractable from status.sh"
+else
+    fail "the projects-count block is extractable from status.sh"
+fi
+: > "$WORK/empty-projects.conf"
+_pc_empty="$(PROJECTS_CONF="$WORK/empty-projects.conf" sh -c '
+    ui_section() { printf "%s" "$1"; }
+    . "$1"
+' sh "$WORK/pc-block.sh" 2>/dev/null || true)"
+if [ "$_pc_empty" = "Projects (0)" ]; then
+    pass "empty projects.conf renders a one-line 'Projects (0)' header"
+else
+    fail "empty projects.conf renders a one-line 'Projects (0)' header (got '$_pc_empty')"
+fi
+_pc_missing="$(PROJECTS_CONF="$WORK/nope-projects.conf" sh -c '
+    ui_section() { printf "%s" "$1"; }
+    . "$1"
+' sh "$WORK/pc-block.sh" 2>/dev/null || true)"
+if [ "$_pc_missing" = "Projects (0)" ]; then
+    pass "missing projects.conf renders 'Projects (0)' too"
+else
+    fail "missing projects.conf renders 'Projects (0)' too (got '$_pc_missing')"
+fi
+printf '/var/tmp/one\n/var/tmp/two\n' > "$WORK/two-projects.conf"
+_pc_two="$(PROJECTS_CONF="$WORK/two-projects.conf" sh -c '
+    ui_section() { printf "%s" "$1"; }
+    . "$1"
+' sh "$WORK/pc-block.sh" 2>/dev/null || true)"
+if [ "$_pc_two" = "Projects (2)" ]; then
+    pass "populated projects.conf counts its roots"
+else
+    fail "populated projects.conf counts its roots (got '$_pc_two')"
+fi
+
+# --- 1d. advisory version probe is bounded (0.0.43b W3) ---------------------------
+# The comment claims parity with the wrapper's check — true only with the
+# timeout envelope the wrapper got in 0.0.43a F3. A wedged 2.x service can
+# make even --version hang (issue #80); opk status, the diagnostic for
+# exactly that state, must never hang on it.
+if awk '/ADV_VER=\$\(/,/head -1 \|\| true/' "$STATUS" | grep -q 'timeout 10'; then
+    pass "advisory probe is timeout-bounded (0.0.43b W3)"
+else
+    fail "advisory probe is timeout-bounded (0.0.43b W3)"
+fi
+if grep -qF 'BOUNDED pattern as the wrapper' "$STATUS"; then
+    pass "the probe comment states the bounded parity truthfully"
+else
+    fail "the probe comment states the bounded parity truthfully"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

@@ -344,6 +344,75 @@ else
     fail "advisory-watch.sh: quoted argv only, no eval"
 fi
 
+# --- 9. feed boundary: separator, null fields, medium vocabulary ---------------
+# 0.0.43a F1/F2/F7: the feed line format is '|'-separated (a tab is POSIX
+# IFS whitespace — empty fields collapse and shift columns under read),
+# JSON null fields coerce to "" instead of killing the parse, and the
+# shell boundary maps GitHub's "medium" onto the kit's "moderate".
+FEED_PY="$(mktemp)"
+sed -n "/python3 -c '/,/2>\\/dev\\/null); then/p" "$SCAN" \
+    | sed -e "1s/^.*python3 -c '//" -e '$d' > "$FEED_PY"
+if [ -s "$FEED_PY" ] && grep -q '^import json,sys' "$FEED_PY"; then
+    pass "advisory-watch.sh: feed parser extractable"
+else
+    fail "advisory-watch.sh: feed parser extractable"
+fi
+FEED_JSON="$(mktemp)"
+cat > "$FEED_JSON" <<'EOF'
+[
+ {"ghsa_id":"GHSA-1111-1111-1111","severity":"medium","html_url":"https://example/1",
+  "summary":"medium advisory",
+  "vulnerabilities":[{"vulnerable_version_range":">=1.0.0","patched_versions":null}]},
+ {"ghsa_id":"GHSA-2222-2222-2222","severity":null,"html_url":"https://example/2",
+  "summary":"null severity",
+  "vulnerabilities":[{"vulnerable_version_range":"<2.0.0","patched_versions":null}]},
+ {"ghsa_id":null,"severity":null,"html_url":null,"summary":null,"vulnerabilities":[]}
+]
+EOF
+FEED_OUT="$(python3 "$FEED_PY" < "$FEED_JSON" 2>/dev/null)" \
+    && pass "feed parser: null fields do not kill the parse (F7)" \
+    || fail "feed parser: null fields do not kill the parse (F7)"
+EXPECT1='GHSA-1111-1111-1111|medium|>=1.0.0||medium advisory|https://example/1'
+EXPECT2='GHSA-2222-2222-2222||<2.0.0||null severity|https://example/2'
+EXPECT3='|||||'
+if printf '%s\n' "$FEED_OUT" | grep -qxF "$EXPECT1"; then
+    pass "feed parser: empty patched field survives as an empty '|' field (F2)"
+else
+    fail "feed parser: empty patched field survives as an empty '|' field (F2)"
+fi
+if printf '%s\n' "$FEED_OUT" | grep -qxF "$EXPECT2"; then
+    pass "feed parser: null severity coerces to an empty field (F7)"
+else
+    fail "feed parser: null severity coerces to an empty field (F7)"
+fi
+if printf '%s\n' "$FEED_OUT" | grep -qxF "$EXPECT3"; then
+    pass "feed parser: an all-null advisory yields six empty fields"
+else
+    fail "feed parser: an all-null advisory yields six empty fields"
+fi
+rm -f "$FEED_PY" "$FEED_JSON"
+
+# reader side: '|' IFS + the medium->moderate boundary mapping + known-id
+# dedup BEFORE shape validation (a curated advisory must not keep the
+# daily watch red on upstream shape drift).
+if grep -qF "while IFS='|' read -r ID SEVERITY RANGES PATCHED SUMMARY URL" "$SCAN"; then
+    pass "advisory-watch.sh: reader parses the non-whitespace separator (F2)"
+else
+    fail "advisory-watch.sh: reader parses the non-whitespace separator (F2)"
+fi
+if grep -qF 'medium) SEVERITY=moderate ;;' "$SCAN"; then
+    pass "advisory-watch.sh: GitHub's medium maps to the kit's moderate (F1)"
+else
+    fail "advisory-watch.sh: GitHub's medium maps to the kit's moderate (F1)"
+fi
+_known_ln="$(grep -n 'grep -qxF "\$ID"' "$SCAN" | head -1 | cut -d: -f1)"
+_valid_ln="$(grep -n 'scan_advisory_valid "\$ID"' "$SCAN" | head -1 | cut -d: -f1)"
+if [ -n "$_known_ln" ] && [ -n "$_valid_ln" ] && [ "$_known_ln" -lt "$_valid_ln" ]; then
+    pass "advisory-watch.sh: known-id dedup runs before shape validation (F1)"
+else
+    fail "advisory-watch.sh: known-id dedup runs before shape validation (F1)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

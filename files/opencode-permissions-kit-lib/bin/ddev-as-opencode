@@ -83,8 +83,11 @@ if [ -z "$DDEV" ]; then
 fi
 
 # Environment: sudo's env_reset dropped the opencode user's values; the
-# developer's would point at the wrong user.
-export HOME="/home/$OPENCODE_USER"
+# developer's would point at the wrong user. HOME via getent (0.0.43b W2):
+# a custom OPENCODE_USER with a relocated home must still resolve —
+# /home/<name> stays the last-resort fallback only.
+OC_HOME="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
+export HOME="${OC_HOME:-/home/$OPENCODE_USER}"
 if [ -n "$OC_UID" ] && [ "$OC_UID" != "0" ]; then
     export XDG_RUNTIME_DIR="/run/user/$OC_UID"
 fi

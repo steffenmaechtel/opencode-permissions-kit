@@ -27,11 +27,17 @@ command -v gh >/dev/null 2>&1 || die "gh (GitHub CLI) is required"
 command -v python3 >/dev/null 2>&1 || die "python3 is required (feed parser)"
 command -v curl >/dev/null 2>&1 || die "curl is required"
 
-# --- upstream feed -> one TSV line per advisory ---------------------------------
-# id<TAB>severity<TAB>ranges<TAB>patched<TAB>summary<TAB>url — ranges/patched
-# join every vulnerabilities[] entry with ", " (an advisory can carry more
-# than one package/range pair); newlines in summaries become spaces so the
-# TSV stays one line per advisory.
+# --- upstream feed -> one '|' line per advisory ---------------------------------
+# id|severity|ranges|patched|summary|url — ranges/patched join every
+# vulnerabilities[] entry with ", " (an advisory can carry more than one
+# package/range pair); newlines in summaries become spaces so the line
+# stays one per advisory. The separator is '|' (NOT a tab): tab is POSIX
+# IFS whitespace, so empty fields (unpatched advisories: ranges/patched
+# are "string or null") would collapse under `read` and shift every
+# following column (0.0.43a F2) — the shipped database parses with
+# IFS='|' for exactly this reason. JSON null fields coerce to "" (one
+# null must not kill the whole feed parse with a TypeError, 0.0.43a F7);
+# a null severity then fails the per-line vocabulary check loudly.
 FEED=$(curl -fsSL --max-time 30 "$UPSTREAM_API" 2>/dev/null) \
     || die "upstream feed unreachable (offline, blocked, or rate-limited): $UPSTREAM_API"
 if ! UPSTREAM=$(printf '%s' "$FEED" | python3 -c 'import json,sys
@@ -43,8 +49,8 @@ for adv in feed or []:
     vulns = adv.get("vulnerabilities") or []
     ranges = ", ".join(v.get("vulnerable_version_range", "") for v in vulns if v.get("vulnerable_version_range"))
     patched = ", ".join(v.get("patched_versions", "") for v in vulns if v.get("patched_versions"))
-    summary = " ".join(str(adv.get("summary", "")).split())
-    print("\t".join([adv.get("ghsa_id", ""), adv.get("severity", ""), ranges, patched, summary, adv.get("html_url", "")]))
+    summary = " ".join(str(adv.get("summary") or "").split())
+    print("|".join([str(adv.get("ghsa_id") or ""), str(adv.get("severity") or ""), ranges, patched, summary, str(adv.get("html_url") or "")]))
 ' 2>/dev/null); then
     die "failed to parse the upstream feed (expected a JSON advisory list)"
 fi
@@ -62,7 +68,7 @@ KNOWN=$(advisories_ids opencode || true)
 #     double-quoted, printf takes fields as %s arguments, free text
 #     (summary/url) flows only into the body FILE, nothing is ever eval'd
 #   - what CAN be attacked is SEMANTICS: a crafted id ("GHSA-x is:closed",
-#     a tab smuggled into a field shifting the TSV columns) would steer the
+#     a separator smuggled into a field shifting the columns) would steer the
 #     dedup search or garble the issue — so every field that leaves the
 #     script as argv/query is charset-allowlisted first, and anything else
 #     is SKIPPED loudly instead of interpolated
@@ -103,15 +109,27 @@ BODY=$(mktemp)
 trap 'rm -f "$BODY"' EXIT INT TERM
 NEW=0
 SKIPPED=0
-while IFS='	' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
+while IFS='|' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
     [ -n "$ID" ] || continue
+    # GitHub's repo-advisories endpoint says "medium" where the kit's
+    # vocabulary (sh/advisories.sh, the ADVISORY_RECORDS template below)
+    # says "moderate" — map at the boundary (0.0.43a F1) so validation
+    # and the curation template speak the kit's word.
+    case "$SEVERITY" in
+        medium) SEVERITY=moderate ;;
+    esac
+    # Known-id dedup BEFORE shape validation (0.0.43a F1): the grep is
+    # injection-safe (fixed string, whole line, quoted), and a curated
+    # advisory must not keep the watch red on upstream shape drift —
+    # validation only guards fields that reach argv/query, which a
+    # known advisory's never do.
+    if printf '%s\n' "$KNOWN" | grep -qxF "$ID"; then
+        say "$ID known (shipped database) — ok"
+        continue
+    fi
     if ! scan_advisory_valid "$ID" "$SEVERITY" "$RANGES" "$PATCHED"; then
         SKIPPED=$((SKIPPED + 1))
         say "WARN: skipping '$ID' — malformed feed fields (id/severity/ranges/patched shape; feed corruption?)"
-        continue
-    fi
-    if printf '%s\n' "$KNOWN" | grep -qxF "$ID"; then
-        say "$ID known (shipped database) — ok"
         continue
     fi
     # dedup: GHSA ids are globally unique, the id alone identifies the issue

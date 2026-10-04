@@ -171,7 +171,7 @@ check "wrapper has a sock_reachable probe function" \
 check "wrapper probes the socket directly first (root/opencode contexts)" \
     grep -Fq '[ -S "$sock" ] 2>/dev/null && return 0' "$WRAPPER"
 check "wrapper re-probes as the opencode user via socket-check.sh" \
-    grep -Fq 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock"' "$WRAPPER"
+    grep -Fq 'sudo -n -u opencode /usr/local/lib/opencode-permissions-kit/bin/socket-check "$sock"' "$WRAPPER"
 check "docker-rootless branch uses sock_reachable" \
     grep -Fq 'if sock_reachable "$sock_host"; then' "$WRAPPER"
 check "podman-rootless socket branch uses sock_reachable" \

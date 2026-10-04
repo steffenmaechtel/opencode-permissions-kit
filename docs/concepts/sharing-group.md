@@ -62,3 +62,7 @@ If group bits drift (e.g. after unpacking an archive as root), re-apply:
 ```bash
 opk update --refresh
 ```
+
+A pass that fails wholesale (missing tool, mass permission errors) aborts
+the operation with a per-pass warning instead of reporting success — a
+green "ACLs applied" always means the baseline actually landed.

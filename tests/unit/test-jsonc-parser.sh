@@ -284,6 +284,24 @@ assert_exitcode "tools-stdin: garbage top-level exits 3 (fall back)" 3 sh -c 'pr
 OUT=$(printf '%s\n' '{ "permission": {} }' | python3 "$PARSER" --tools - 2>/dev/null || true)
 assert_empty "tools-stdin: dict WITH permission key stays valid (empty tools)" "$OUT"
 
+# --- 0.0.43a F13: string shorthand "permission": "deny" must not crash
+# extract_patterns (the default mode status.sh uses for the leak scan) ---
+printf '%s\n' '{ "permission": "deny" }' > "$TMP/strdeny.jsonc"
+assert_exitcode "patterns: string shorthand exits cleanly (no AttributeError)" 0 \
+    sh -c 'python3 "$0" "$1" >/dev/null 2>&1' "$PARSER" "$TMP/strdeny.jsonc"
+OUT=$(python3 "$PARSER" "$TMP/strdeny.jsonc" 2>/dev/null || true)
+assert_empty "patterns: string shorthand carries no per-path deny patterns" "$OUT"
+printf '%s\n' '{ "permission": "allow" }' > "$TMP/strallow.jsonc"
+assert_exitcode "patterns: string allow shorthand exits cleanly" 0 \
+    sh -c 'python3 "$0" "$1" >/dev/null 2>&1' "$PARSER" "$TMP/strallow.jsonc"
+
+# --- 0.0.43a F14: "permissions": null in a 2.x debug-config document must
+# not raise TypeError on iteration ---
+assert_exitcode "tools-2x: permissions:null exits 0 (no TypeError)" 0 \
+    sh -c 'printf "%s\n" "[{ \"type\": \"document\", \"info\": { \"permissions\": null } }]" | python3 "$0" --tools - >/dev/null 2>&1' "$PARSER"
+OUT=$(printf '%s\n' '[{ "type": "document", "info": { "permissions": null } }]' | python3 "$PARSER" --tools - 2>/dev/null || true)
+assert_empty "tools-2x: permissions:null document -> no tools, no crash" "$OUT"
+
 # --- Summary ---
 echo ""
 echo "===================================="
