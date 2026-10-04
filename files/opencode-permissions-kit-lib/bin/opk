@@ -302,6 +302,18 @@ case "$cmd" in
                 /home/*) [ "$(dirname "$_ho_np")" = "/home" ] \
                     && _ho_err "handover: refusing whole home directory '$_ho_np' — hand over subpaths" ;;
             esac
+            # Slash-terminated operands are symlink-gate-blind (0.0.44a V2):
+            # path resolution goes through the link before lstat ever sees
+            # one — [ -L "x/" ] is FALSE while chown -R -h and find x/ both
+            # act on the link's TARGET. Tab completion produces these forms
+            # daily; the documented refusal must hold for them too. Checked
+            # on the RAW operand, after the path policy above (which sees
+            # the resolved form): "/" is a system root, not a form error,
+            # but "x/" into a project tree is exactly the bypass.
+            case "$_ho_a" in
+                */|*/.|*//*)
+                    _ho_err "handover: '$_ho_a' ends in a slash — pass the path itself (symlink gates cannot see through trailing slashes)" ;;
+            esac
             [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
         done
         if [ "$_ho_dry" = 1 ]; then
@@ -310,6 +322,10 @@ case "$cmd" in
                 # 0.0.39i F4: the dry run previews the symlink refuse too —
                 # what --dry-run announces must match what the real run does
                 # (cli.md documents the refusal without a dry-run carve-out).
+                # Slash-terminated operands never reach here: validation
+                # above refuses them loudly BEFORE the dry-run branch, so
+                # --dry-run previews exactly what the real run would hit
+                # (0.0.44a V2).
                 if [ -L "$_ho_a" ]; then
                     echo "  would refuse: '$_ho_a' is a symlink (chown -R/chmod -R follow it)"
                 else
@@ -330,12 +346,16 @@ case "$cmd" in
         for _ho_a in "$@"; do
             [ "$_ho_a" = "--dry-run" ] && continue
             # [ -L ] refuse + race-closed executors (review 0.0.39h F10;
-            # TOCTOU window closed 0.0.43a F16, the accepted residual —
-            # now closed): a link planted AFTER the gate must not make the
-            # root-run pair touch its target — chown -R -h never
-            # dereferences an operand (lchown on a planted link re-owns
-            # the attacker's own link, nothing outside), and the chmod
-            # pass only ever sees non-symlinks (find ! -type l feeds it).
+            # TOCTOU window closed 0.0.43a F16; slash-form bypass closed
+            # 0.0.44a V2 — validation refuses x/, x//, x/. before this
+            # loop, so both executors below only ever see slash-free
+            # operands). For a slash-free operand planted as a symlink
+            # AFTER the gate: chown -R -h never dereferences it (lchown
+            # re-owns the attacker's own link, nothing outside), and the
+            # chmod pass only ever sees non-symlinks (find ! -type l
+            # feeds it). Note chmod -R WOULD follow an operand link —
+            # the gates are load-bearing for the chmod half; chown -R
+            # (default -P) lchowns operands on its own (0.0.44a V24).
             if [ -L "$_ho_a" ]; then
                 ui_error "handover: '$_ho_a' is a symlink — refusing (recursive chown/chmod follow it)"
                 _ho_rc=1

@@ -205,6 +205,26 @@ for _bad in / /usr /etc /var "/home/$(id -un)" /etc/apache2 /usr/local/foo /var/
     esac
 done
 
+# slash-terminated operands are refused (0.0.44a V2): [ -L "x/" ] is FALSE
+# while chown -R -h and find x/ both act on the link's target — the symlink
+# gate cannot see through trailing slashes, so the operand FORMS are
+# refused at validation (x/, x//, x/., link/ alike).
+for _slashed in "$WORK/ho-tree/sub/" "$WORK/ho-tree//" "$WORK/ho-tree/."; do
+    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$_slashed" 2>&1 >/dev/null || true)"
+    case "$errout" in
+        *"ends in a slash"*)
+            echo "  ${GREEN}PASS${NC}  handover refuses slash form $_slashed"; passed=$((passed + 1)) ;;
+        *) echo "  ${RED}FAIL${NC}  handover refuses slash form $_slashed (got: $errout)"; failures=$((failures + 1)) ;;
+    esac
+done
+ln -s "$WORK/ho-tree" "$WORK/ho-link"
+errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$WORK/ho-link/" 2>&1 >/dev/null || true)"
+case "$errout" in
+    *"ends in a slash"*)
+        echo "  ${GREEN}PASS${NC}  handover refuses symlink-with-slash before any gate"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  handover refuses symlink-with-slash before any gate (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+
 # --dry-run: plan only, no changes, no sudo, exit 0
 rm -f "$WORK/sudo-marker"
 out="$(run_kit handover me "$WORK/ho-tree" --dry-run)"
