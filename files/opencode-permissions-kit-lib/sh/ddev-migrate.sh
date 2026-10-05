@@ -351,12 +351,19 @@ ddev_migrate_export() {
     DM_STAGE="$DD_MIG_DUMP_DIR/.root-stage"
     rm -rf "$DM_STAGE" 2>/dev/null || true   # stale stage from an aborted run
     mkdir -m 700 "$DM_STAGE" || return 1
-    if [ -L "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
-        echo "  REFUSED: $DD_MIG_DUMP_DIR/manifest.conf is a symlink — tampering?" >&2
-        rm -rf "$DM_STAGE"
-        return 1
-    fi
-    if [ -f "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+    # Seed (0.0.44b W2, hardened 0.0.44c C3): trust only a REGULAR file
+    # owned by root or the dev — an agent-owned entry (regular or link)
+    # is tampering: a forged OK|<project>| line makes the loop silently
+    # skip real exports, and wave-a-era resume dirs were non-sticky for
+    # the whole inter-run gap, so planting needs no race there.
+    if [ -e "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
+        _seed_owner=$(stat -c %U "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
+        if [ -L "$DD_MIG_DUMP_DIR/manifest.conf" ] \
+           || { [ "$_seed_owner" != root ] && [ "$_seed_owner" != "$dm_dev" ]; }; then
+            echo "  REFUSED: $DD_MIG_DUMP_DIR/manifest.conf is a symlink or not root/dev-owned — tampering?" >&2
+            rm -rf "$DM_STAGE"
+            return 1
+        fi
         cat "$DD_MIG_DUMP_DIR/manifest.conf" > "$DM_STAGE/manifest.auth" 2>/dev/null || true
     fi
     [ -f "$DM_STAGE/manifest.auth" ] || : > "$DM_STAGE/manifest.auth"
@@ -453,6 +460,19 @@ ddev_migrate_export() {
         && echo "  old ddev powered off (database volumes kept)" \
         || echo "  NOTE: ddev poweroff failed — stop the old projects manually before the first opencode-side start"
 
+    # Accounting reads the AUTHORITATIVE stage copy (0.0.44c C2): the old
+    # finalize grep -c opened the dump-dir manifest AFTER chown -R handed
+    # dir and file to the agent — a replaced FIFO there would hang root's
+    # grep (and the installer) forever. The stage copy is root-only until
+    # removed right below.
+    # grep -c always prints the count (0 on no match); || true keeps a
+    # zero count from tripping set -e via the assignment's exit status.
+    # Only a missing file yields an empty result, hence the :-0 defaults.
+    DD_MIG_OK=$(grep -c '^OK|' "$DM_STAGE/manifest.auth" 2>/dev/null || true)
+    DD_MIG_FAIL=$(grep -c '^FAIL|' "$DM_STAGE/manifest.auth" 2>/dev/null || true)
+    DD_MIG_OK=${DD_MIG_OK:-0}
+    DD_MIG_FAIL=${DD_MIG_FAIL:-0}
+
     # Finalize: opencode owns the dumps (the importing side), the sharing
     # group keeps the developer's read access. The root stage goes FIRST —
     # chown -R must never hand it to the agent (0.0.44a V3). The chmod
@@ -466,14 +486,6 @@ ddev_migrate_export() {
         -exec chmod 640 {} + 2>/dev/null || true
     find "$DD_MIG_DUMP_DIR" -maxdepth 1 ! -type l -name 'manifest.conf' \
         -exec chmod 640 {} + 2>/dev/null || true
-
-    # grep -c always prints the count (0 on no match); || true keeps a
-    # zero count from tripping set -e via the assignment's exit status.
-    # Only a missing file yields an empty result, hence the :-0 defaults.
-    DD_MIG_OK=$(grep -c '^OK|' "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
-    DD_MIG_FAIL=$(grep -c '^FAIL|' "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
-    DD_MIG_OK=${DD_MIG_OK:-0}
-    DD_MIG_FAIL=${DD_MIG_FAIL:-0}
     [ "${DD_MIG_OK:-0}" -gt 0 ]
 }
 

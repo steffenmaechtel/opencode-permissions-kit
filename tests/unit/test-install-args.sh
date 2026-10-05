@@ -248,11 +248,19 @@ _loop_w=$(sed -n '/^                    while \[ -z "\$_custom" \]; do$/,/^     
 if [ -n "$_loop_w" ]; then
     _w6_rc=0
     (
-        _ui_read() { eval "$1="; }
+        _ui_read() {
+            # hang breaker (0.0.44c C5): on a W6 revert the pre-fix loop
+            # spins on empty reads — force-exit 124 after 9 so the pin
+            # FAILS with a name instead of hanging the suite
+            _ui_n=$((_ui_n + 1))
+            [ "$_ui_n" -gt 9 ] && exit 124
+            eval "$1="
+        }
+        _ui_n=0
         project_path_sane() { return 0; }
         ui_error() { :; }
         ui_info()  { :; }
-        _PP_NORM="/var/www/x"
+        _PP_NORM="/var/tmp/x"
         _custom=""
         custom=""
         _custom_empty=0

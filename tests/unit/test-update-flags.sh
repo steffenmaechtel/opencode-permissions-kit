@@ -351,6 +351,12 @@ if [ -n "$_restamp_block" ]; then
     [ "$(_rst_run)" = "2" ] \
         && pass "re-stamp: unknown probe keeps the previous stamp (V5)" \
         || fail "re-stamp: unknown probe keeps the previous stamp (V5)"
+    # a NON-matching non-empty line (a warning grabbed by head -1) is
+    # unparseable, not major 1 — it must keep the stamp too (0.0.44c C6)
+    _rst_line="warn: something odd on stdout"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: unparseable line keeps the previous stamp (C6)" \
+        || fail "re-stamp: unparseable line keeps the previous stamp (C6)"
 else
     fail "re-stamp block extractable (W4)"
 fi

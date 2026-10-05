@@ -217,11 +217,6 @@ grep -q 'make -C "$REPO" test check-version' "$RELEASE" \
     && pass "release runs the suite (make test check-version) by default" \
     || fail "release runs the suite (make test check-version) by default"
 
-echo ""
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}$failures test(s) failed.${NC}"
-    exit 1
-fi
 # --- 0.0.44b W16: --help carries no code lines (V26); status list (V27) -----------------
 _h_out=$(sh "$RELEASE" --help 2>&1 || true)
 case "$_h_out" in
@@ -236,5 +231,10 @@ case "$_list_line" in
     *) fail "still-running list: statuses only, requested in, action_required out (V27)" ;;
 esac
 
+echo ""
+if [ "$failures" -gt 0 ]; then
+    echo "  ${RED}$failures test(s) failed.${NC}"
+    exit 1
+fi
 echo "  ${GREEN}All release-helper tests passed.${NC}"
 exit 0

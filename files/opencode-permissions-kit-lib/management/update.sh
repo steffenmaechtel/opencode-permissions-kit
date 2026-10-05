@@ -908,13 +908,28 @@ install_binary() {
     # over a stale stamp.
     if [ "$new" != "unknown" ]; then
         _new_major=$(printf '%s' "$new" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
-        [ -n "$_new_major" ] || _new_major=1
-        if [ -f "$CONFDIR/install.conf" ] && grep -q '^OPENCODE_MAJOR=' "$CONFDIR/install.conf" 2>/dev/null; then
-            sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf" \
-                || { echo "  error: OPENCODE_MAJOR stamp write failed" >&2; return 2; }
-        elif [ -f "$CONFDIR/install.conf" ]; then
-            echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null \
-                || { echo "  error: OPENCODE_MAJOR stamp write failed" >&2; return 2; }
+        if [ -n "$_new_major" ]; then
+            :   # "opencode v2..." — the 2.x shape
+        elif printf '%s' "$new" | grep -qE '^[0-9]+(\.[0-9]+)*'; then
+            _new_major=1   # bare version line = 1.x (current_opencode_major parity)
+        else
+            # Neither shape (0.0.44c C6): a stdout warning line grabbed by
+            # head -1, an exotic prefix — unparseable. Treat like an empty
+            # probe: keep the previous stamp rather than defaulting to 1
+            # over a known-good 2.
+            _new_major=""
+        fi
+        if [ -n "$_new_major" ]; then
+            if [ -f "$CONFDIR/install.conf" ] && grep -q '^OPENCODE_MAJOR=' "$CONFDIR/install.conf" 2>/dev/null; then
+                sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf" \
+                    || { echo "  error: OPENCODE_MAJOR stamp write failed" >&2; return 2; }
+            elif [ -f "$CONFDIR/install.conf" ]; then
+                echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null \
+                    || { echo "  error: OPENCODE_MAJOR stamp write failed" >&2; return 2; }
+            fi
+        else
+            echo "  warn: new binary's version line is unparseable — OPENCODE_MAJOR stamp left unchanged" >&2
+            log "opencode binary upgraded but major unparseable; OPENCODE_MAJOR stamp kept"
         fi
     else
         echo "  warn: new binary's version could not be probed — OPENCODE_MAJOR stamp left unchanged" >&2

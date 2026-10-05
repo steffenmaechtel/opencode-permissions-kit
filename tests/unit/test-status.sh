@@ -526,11 +526,6 @@ else
     fail "the probe comment states the bounded parity truthfully"
 fi
 
-echo ""
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}$failures test(s) failed.${NC}"
-    exit 1
-fi
 # --- 0.0.44b W12b/W15/W16: unscannable render, line-wise roots, null coercion -----------
 if grep -qF 'scan_unscannable=true' "$STATUS" && grep -qF 'agent config unscannable' "$STATUS"; then
     pass "status.sh renders unscannable (never false-green) for parser rc != 0 (W12b)"
@@ -575,5 +570,10 @@ else
     fail "status.sh: gap function extractable (W15)"
 fi
 
+echo ""
+if [ "$failures" -gt 0 ]; then
+    echo "  ${RED}$failures test(s) failed.${NC}"
+    exit 1
+fi
 echo "  ${GREEN}All status tests passed.${NC}"
 exit 0

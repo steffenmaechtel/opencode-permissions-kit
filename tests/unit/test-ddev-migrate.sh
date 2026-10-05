@@ -393,7 +393,7 @@ check "manifest stays a regular file through the run" \
 # Sticky + stage mode act DURING the run (finalize re-modes the dir to
 # 750) — pinned statically on the mechanisms (W1): chmod 3770 at setup
 # AND on resume, mkdir -m 700 for the stage.
-_grep_n=$(grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' "$MIG")
+_grep_n=$(grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' "$MIG" || true)
 [ "$_grep_n" -ge 1 ] \
     && check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" true \
     || check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" false

@@ -308,10 +308,6 @@ check "setup checks systemd for docker-rootless" grep -Fq 'systemctl --user is-a
 echo ""
 echo "===================================="
 echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
 # --yes is an accepted no-op (0.0.44b W16/V28)
 _v28_out=$(sh "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend" --yes 2>&1 || true)
 case "$_v28_out" in
@@ -320,5 +316,9 @@ case "$_v28_out" in
     *) check "--yes accepted as no-op (V28, got: $_v28_out)" false ;;
 esac
 
+if [ "$failures" -gt 0 ]; then
+    echo "  ${RED}Failed: $failures${NC}"
+    exit 1
+fi
 echo "  All tests passed."
 echo ""
