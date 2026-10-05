@@ -618,6 +618,28 @@ do_plan_phase() {
         ui_warn "ddev not found — continuing anyway (install it later with ddev >= 1.25)."
     fi
 
+    # Existing secured opencode binary (0.0.44f F1): re-installs REUSE it
+    # (Step 6, "binary reused on re-install"), so a wedged binary — a 2.x
+    # that cannot bind its port hangs even --version (issue #80) — would
+    # survive the install. Warn EARLY, before the Step 5 handover; never
+    # abort: the wrapper fail-opens per start (0.0.44b W10) and 'opk
+    # update' replaces the binary. The major stamp itself is anchored in
+    # Step 8 (F1): an unparseable probe leaves it untouched.
+    _pf_oc_bin=/usr/local/lib/opencode-permissions-kit/bin/opencode
+    if [ -x "$_pf_oc_bin" ]; then
+        _pf_oc_ver=$(timeout 10 "$_pf_oc_bin" --version 2>/dev/null | head -1)
+        _pf_oc_maj=$(printf '%s' "$_pf_oc_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
+        if [ -n "$_pf_oc_maj" ]; then
+            log "preflight: existing opencode binary answers --version (major $_pf_oc_maj)"
+        elif printf '%s' "$_pf_oc_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            log "preflight: existing opencode binary answers --version (major 1)"
+        else
+            ui_warn "the existing opencode binary does not answer --version (hang or noise) — continuing"
+            ui_detail "the install reuses this binary; fix it afterwards (e.g. 'opk update' replaces it)"
+            log "preflight: existing opencode binary unresponsive (probe line: '${_pf_oc_ver:-empty}')"
+        fi
+    fi
+
     # Container backend selection. Rootless is MANDATORY: docker-rootless
     # The container backend is rootless-only: docker-rootless (default) or
     # podman-rootless. On a re-install over an existing kit, preserve a
@@ -1734,22 +1756,44 @@ do_deploy_phase() {
 
     # Stamp the installed binary's major into install.conf (issue #80): the
     # wrapper gates opencode 2.x-only flags (session `--standalone`) on it.
-    # "opencode v2..." -> 2, 1.x bare versions and anything else -> 1. Best
-    # effort — a missing stamp makes the wrapper detect at runtime. NOTE:
-    # sed exits 0 even without a match, so the append must be grep-gated.
-    OPENCODE_MAJOR=1
+    # Anchored like the update.sh twins (install_binary's re-stamp and
+    # current_opencode_major — 0.0.44f F1): "opencode v<digits>" -> N, a
+    # full-line bare digit version -> 1, anything else — an EMPTY probe
+    # (wedged binary, issue #80) or noise — leaves the previous stamp
+    # untouched instead of overwriting a good 2 with 1; on a fresh install
+    # the key stays UNSET and the wrapper detects at runtime. NOTE: sed
+    # exits 0 even without a match, so the append must be grep-gated.
     # Bounded probe: every other probe of this binary carries a timeout
     # (wrapper issue #80) — a wedged binary must not hang the installer at
     # the very last step (review 0.0.39b C5).
-    case $(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1) in
-        "opencode v2"*) OPENCODE_MAJOR=2 ;;
-    esac
-    if grep -q '^OPENCODE_MAJOR=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
-        sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$OPENCODE_MAJOR/" /etc/opencode-permissions-kit/install.conf
+    _stamp_ver=$(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1)
+    _stamp_maj=$(printf '%s' "$_stamp_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
+    if [ -n "$_stamp_maj" ]; then
+        :   # "opencode v2..." — the 2.x shape
+    elif printf '%s' "$_stamp_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+        _stamp_maj=1   # bare version line = 1.x, full-line anchored
     else
-        echo "OPENCODE_MAJOR=$OPENCODE_MAJOR" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
+        _stamp_maj=""   # unparseable/empty — keep the previous stamp
     fi
-    log "install.conf stamped: OPENCODE_MAJOR=$OPENCODE_MAJOR"
+    if [ -n "$_stamp_maj" ]; then
+        OPENCODE_MAJOR="$_stamp_maj"
+        if grep -q '^OPENCODE_MAJOR=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+            sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$OPENCODE_MAJOR/" /etc/opencode-permissions-kit/install.conf
+        else
+            echo "OPENCODE_MAJOR=$OPENCODE_MAJOR" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
+        fi
+        log "install.conf stamped: OPENCODE_MAJOR=$OPENCODE_MAJOR"
+    else
+        # The FILE keeps its previous value (or stays unset — the wrapper
+        # detects at runtime); the in-process gate below follows the same
+        # value so the 2.x TUI branch matches what the wrapper resolves.
+        OPENCODE_MAJOR=$(sed -n 's/^OPENCODE_MAJOR=//p' /etc/opencode-permissions-kit/install.conf \
+            2>/dev/null | tail -1 || true)
+        OPENCODE_MAJOR="${OPENCODE_MAJOR:-1}"
+        ui_warn "opencode version probe unparseable — OPENCODE_MAJOR stamp left unchanged"
+        ui_detail "if the binary hangs (issue #80), fix it and re-run install.sh — an unset stamp is detected at runtime"
+        log "major stamp skipped: version probe unparseable (resolved OPENCODE_MAJOR=$OPENCODE_MAJOR)"
+    fi
 
     for cf in "$DEV_HOME/.bashrc" "$DEV_HOME/.zshrc" "$DEV_HOME/.profile"; do
         if [ -f "$cf" ]; then

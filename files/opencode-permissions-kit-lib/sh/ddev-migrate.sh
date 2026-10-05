@@ -278,16 +278,18 @@ ddev_migrate_has_db() {
 # Creates a fresh dump directory, exports every eligible project's
 # database as the dev user, powers the old daemon down, then hands the
 # dumps to the opencode user (group-readable for the developer). Sets
-# DD_MIG_DUMP_DIR / DD_MIG_OK / DD_MIG_FAIL for the caller. OK/FAIL stay
-# EMPTY until the accounting ran (0.0.44e E1): a refused or aborted
-# export leaves them empty, so the caller can tell a COMPLETED export
-# (numeric counts) from an incomplete one — the old entry-time zeroing
-# made a tamper-refused run indistinguishable from a clean 0/0 one and
-# the installer stamped DDEV_EXPORTED=1 over it. Returns 0 when at least
+# DD_MIG_DUMP_DIR / DD_MIG_OK / DD_MIG_FAIL / DD_MIG_FAILLIST for the
+# caller. OK/FAIL stay EMPTY until the accounting ran (0.0.44e E1; the
+# FAILLIST reset joined them 0.0.44f F3 — the completion contract now
+# covers every state var): a refused or aborted export leaves them
+# empty, so the caller can tell a COMPLETED export (numeric counts)
+# from an incomplete one — the old entry-time zeroing made a
+# tamper-refused run indistinguishable from a clean 0/0 one and the
+# installer stamped DDEV_EXPORTED=1 over it. Returns 0 when at least
 # one dump was written.
 ddev_migrate_export() {
     dm_dev="$1"; dm_oc="$2"; dm_ocg="$3"; shift 3
-    DD_MIG_DUMP_DIR=""; DD_MIG_OK=""; DD_MIG_FAIL=""
+    DD_MIG_DUMP_DIR=""; DD_MIG_OK=""; DD_MIG_FAIL=""; DD_MIG_FAILLIST=""
     dm_bin=$(_ddev_migrate_bin "$dm_dev") || {
         echo "  ddev not found — cannot export databases."
         return 1

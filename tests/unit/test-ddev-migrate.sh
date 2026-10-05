@@ -475,7 +475,7 @@ check "finalize keeps the manifest root-owned for the resume seed (F2)" \
 check "install.sh prints the FAIL list from the function state, never a re-grep (F1)" \
     sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL"
 check "export return state starts EMPTY — counters signal completion (E1)" \
-    sh -c "grep -qF 'DD_MIG_DUMP_DIR=\"\"; DD_MIG_OK=\"\"; DD_MIG_FAIL=\"\"' \"\$1\"" _ "$MIG"
+    sh -c "grep -qF 'DD_MIG_DUMP_DIR=\"\"; DD_MIG_OK=\"\"; DD_MIG_FAIL=\"\"; DD_MIG_FAILLIST=\"\"' \"\$1\"" _ "$MIG"
 
 # --- 4h. refused vs completed: only the accounting fills the counters (0.0.44e E1) -------
 cat > "$WORK/run-export-state.sh" <<'WRAP'
@@ -496,14 +496,22 @@ if [ "$(id -u)" != 0 ]; then
         /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>/dev/null || true)
     check "a REFUSED export leaves DD_MIG_OK/FAIL empty (E1)" \
         sh -c "printf '%s' \"\$1\" | grep -q 'OK=\[\] FAIL=\[\]' && printf '%s' \"\$1\" | grep -q 'DUMP=\[.'" _ "$_st_ref"
+else
+    # Visible like the 4f guard's (0.0.44f F5): a silent skip reads as a
+    # gap when a root-run suite log is audited.
+    echo "  SKIP  refused-state pin needs an unprivileged user (root skips the seed refusal)"
 fi
 _st_ok=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run8.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" \
     PATH="$WORK/bin:$PATH" \
     sh "$WORK/run-export-state.sh" "$MIG" "$(id -un)" root "$(id -gn)" \
     /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>/dev/null || true)
+# OK is anchored to >=1 (0.0.44f F2): the fixture exports at least one
+# project, so an honest completed run never prints OK=[0] — a zero here
+# can only mean the fill never ran (entry zeroing restored + dead
+# accounting stayed green under the old [0-9] regex).
 check "a COMPLETED export returns numeric counts (E1)" \
-    sh -c "printf '%s' \"\$1\" | grep -q 'OK=\[[0-9][0-9]*\] FAIL=\[[0-9][0-9]*\]'" _ "$_st_ok"
+    sh -c "printf '%s' \"\$1\" | grep -q 'OK=\[[1-9][0-9]*\] FAIL=\[[0-9][0-9]*\]'" _ "$_st_ok"
 
 # --- 5. import loop (static wiring) ---------------------------------------------
 

@@ -411,6 +411,34 @@ else
     fail "re-stamp block extractable (W4)"
 fi
 
+# --- install.sh install-time major stamp + preflight probe (0.0.44f F1) -----------
+# Statics: the anchored shape must exist at the third site of the class,
+# the bare default-to-1 must be gone, and the preflight must probe the
+# reused binary bounded. The arm statics are scoped to the extracted
+# STAMP block — the preflight probe carries the same idiom and would
+# satisfy a file-wide grep (the 0.0.42d token-blindness class).
+# Behavioral pins for the anchored semantics live above (E2 probes);
+# e2e covers the parseable paths with real binaries.
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
+_f1_dir="$WORK/f1stamp"; mkdir -p "$_f1_dir"
+sed -n '/_stamp_ver=/,/major stamp skipped/p' "$INSTALL" > "$_f1_dir/stampblock"
+if [ -s "$_f1_dir/stampblock" ]; then
+    check "install-time stamp anchors the sed major arm (F1)" \
+        sh -c 'grep -qF "s/^opencode v\\([0-9][0-9]*\\).*" "$1"' _ "$_f1_dir/stampblock"
+    check "install-time stamp anchors the bare-version arm (F1)" \
+        sh -c 'grep -qF "grep -qE '"'"'^[0-9]+(\\.[0-9]+)*$'"'"'" "$1"' _ "$_f1_dir/stampblock"
+    check "unparseable probe keeps the stamp and warns (F1)" \
+        sh -c "grep -qF 'OPENCODE_MAJOR stamp left unchanged' \"\$1\" && grep -qF 'stamp skipped: version probe unparseable' \"\$1\"" _ "$_f1_dir/stampblock"
+else
+    fail "install-time stamp block extractable (F1)"
+fi
+check "install-time stamp has no bare default-to-1 (F1)" \
+    sh -c "! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$1\"" _ "$INSTALL"
+check "preflight probes the reused binary bounded (F1)" \
+    sh -c "grep -qF 'timeout 10 \"\$_pf_oc_bin\" --version' \"\$1\"" _ "$INSTALL"
+check "preflight warns instead of aborting on an unresponsive binary (F1)" \
+    sh -c "grep -qF 'does not answer --version' \"\$1\" && grep -qF \"the install reuses this binary\" \"\$1\"" _ "$INSTALL"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="
