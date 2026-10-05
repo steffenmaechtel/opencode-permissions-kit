@@ -10,7 +10,7 @@
 #
 # Deliberately NOT part of `make test` or tests/check-host.sh: node+npm
 # are not contributor-host requirements. CI runs this gate in
-# test-unit.yml (ubuntu-latest ships node); locally anyone with node can:
+# test-unit.yml (ubuntu-24.04 ships node); locally anyone with node can:
 #
 #   sh tests/tsx-syntax-gate.sh
 #

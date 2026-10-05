@@ -75,7 +75,7 @@ jobs:
   # Changed-path detection for the skip logic (header comment above).
   # 'code' is true when anything outside the docs-only set changed.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -100,7 +100,7 @@ jobs:
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -156,7 +156,7 @@ jobs:
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
