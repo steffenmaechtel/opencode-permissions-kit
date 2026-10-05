@@ -1471,13 +1471,17 @@ do_ddev_phase() {
             if [ "$SKIP_DDEV_MIGRATION" != true ]; then
                 # shellcheck disable=SC2086  # word splitting intended (root list)
                 ddev_migrate_export "$DEFAULT_USER" "$OPENCODE_USER" "$OPENCODE_GROUP" $PROJECTS_ROOTS || true
-                DD_MIG_DUMP_DIR="${DD_MIG_DUMP_DIR:-}"
-                if [ -n "$DD_MIG_DUMP_DIR" ] && [ -s "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
-                    # The manifest is authoritative (the export loop runs in a
-                    # subshell — its variable state does not propagate).
-                    DD_MIG_OK=$(grep -c '^OK|' "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
-                    DD_MIG_FAIL=$(grep -c '^FAIL|' "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
-                    DD_MIG_OK=${DD_MIG_OK:-0}; DD_MIG_FAIL=${DD_MIG_FAIL:-0}
+                # Counts and the FAIL list come from the FUNCTION's return
+                # state (0.0.44d F1): the export sets them from the
+                # authoritative stage copy BEFORE finalize hands the tree
+                # to the agent — re-greping the dump-dir manifest here
+                # would read an agent-owned file as root (forged content
+                # could hide real FAILs past the abort question, or fake
+                # OKs; a replaced FIFO would hang). Only the inner project
+                # loop runs in a subshell; the function-level DD_MIG_*
+                # globals propagate (this block always relied on
+                # DD_MIG_DUMP_DIR doing exactly that).
+                if [ -n "${DD_MIG_DUMP_DIR:-}" ] && [ -n "${DD_MIG_OK:-}${DD_MIG_FAIL:-}" ]; then
                     if [ "$DD_MIG_OK" -gt 0 ]; then
                         ui_success "ddev databases exported: $DD_MIG_OK ok, $DD_MIG_FAIL failed — $DD_MIG_DUMP_DIR"
                     else
@@ -1495,7 +1499,7 @@ do_ddev_phase() {
                         # failure); now the user decides: fix first (abort — the
                         # handover has not run, the dev side still works) or accept.
                         ui_warn "these projects could NOT be exported (no database dump):"
-                        grep '^FAIL|' "$DD_MIG_DUMP_DIR/manifest.conf" | cut -d'|' -f2 | sed 's/^/     /'
+                        printf '%s\n' "${DD_MIG_FAILLIST:-}" | sed '/^$/d; s/^/     /'
                         ui_detail "once the install continues, their databases are only reachable via"
                         ui_detail "the old daemon — a later dev-side export is impossible (handover)."
                         if [ "$INTERACTIVE" = true ]; then
@@ -1516,6 +1520,13 @@ do_ddev_phase() {
                         log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL"\
 " dir=$DD_MIG_DUMP_DIR (failures accepted)"
                     fi
+                elif [ -n "${DD_MIG_DUMP_DIR:-}" ]; then
+                    # dump dir exists but no counts: the export refused
+                    # (tamper guard) or died before accounting — the old
+                    # code fell back to stale manifest numbers here.
+                    ui_warn "ddev database export did not complete — see the REFUSED/failed messages above"
+                    ui_detail "fix the cause and re-run install.sh: the export resumes the dump directory"
+                    log "ddev export incomplete: no counts returned for $DD_MIG_DUMP_DIR"
                 else
                     ui_warn "ddev database export produced no dumps — import manually later if needed"
                     ui_detail "retry after install: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\

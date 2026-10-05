@@ -450,6 +450,25 @@ check "shop itself IS skipped (its own OK line matches, both engines)" \
 check "the published manifest keeps exactly one OK line per project (W13)" \
     sh -c "test \"\$(grep -c '^OK|' \"\$1\")\" -eq 5" _ "$DUMP_DIR/manifest.conf"
 
+# --- 4f. the seed's owner arm refuses a manifest the dev does not own (0.0.44d F4/C3) --
+# The manifest in $DUMP_DIR is owned by the CURRENT user; running the
+# export with dm_dev=nobody (an existing unrelated user) must hit the
+# seed's owner check (owner ∉ {root, dm_dev}) and REFUSE before the loop.
+OUT6=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run6.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" nobody root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1 || true)
+check "seed refuses a manifest owned by neither root nor the dev (C3 owner arm, F4)" \
+    sh -c "printf '%s' \"\$1\" | grep -q 'not root/dev-owned'" _ "$OUT6"
+
+# --- 4g. accounting and installer ride the authoritative path (0.0.44d F1/F4) -----------
+check "export accounting reads the stage copy, not the dump-dir manifest (C2/F4)" \
+    sh -c "grep -q 'manifest.auth' \"\$1\" && ! sed -n '/^    DD_MIG_OK=/,/DD_MIG_FAIL=/p' \"\$1\" | grep -q 'manifest.conf'" _ "$MIG"
+check "finalize keeps the manifest root-owned for the resume seed (F2)" \
+    sh -c "grep -q 'chown \"root:' \"\$1\"" _ "$MIG"
+check "install.sh prints the FAIL list from the function state, never a re-grep (F1)" \
+    sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL"
+
 # --- 5. import loop (static wiring) ---------------------------------------------
 
 check "import reads the manifest and runs as the opencode user" \
@@ -479,8 +498,12 @@ check "install.sh stamps DDEV_EXPORTED=1 after a successful export" \
     sh -c "grep -q 'DDEV_EXPORTED=1' \"\$1\"" _ "$INSTALL"
 check "install.sh gates the DDEV_EXPORTED stamp on zero failures" \
     sh -c "grep -qF '[ \"\$DD_MIG_FAIL\" -eq 0 ]' \"\$1\"" _ "$INSTALL"
-check "install.sh re-reads ok/fail counts from the manifest (subshell-safe)" \
-    sh -c "grep -q 'grep -c .\\^OK|.' \"\$1\" || grep -qF 'grep -c \"^OK|\"' \"\$1\"" _ "$INSTALL"
+# 0.0.44d F1: the counts now come from the export function's return
+# state (set from the authoritative stage copy BEFORE the finalize hands
+# the tree to the agent). A re-grep of the dump-dir manifest here would
+# read an agent-owned file as root — the old pin demanded exactly that.
+check "install.sh uses the propagated DD_MIG_* counts, never a manifest re-grep (F1)" \
+    sh -c "grep -qF '[ -n \"\${DD_MIG_OK:-}\${DD_MIG_FAIL:-}\" ]' \"\$1\" && ! grep -qF 'grep -c \"^OK|\"' \"\$1\"" _ "$INSTALL"
 check "install.sh lists failed projects before continuing" \
     sh -c "grep -q 'could NOT be exported' \"\$1\"" _ "$INSTALL"
 check "install.sh asks before continuing with failed exports (default: abort)" \

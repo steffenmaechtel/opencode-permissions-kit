@@ -357,6 +357,16 @@ if [ -n "$_restamp_block" ]; then
     [ "$(_rst_run)" = "2" ] \
         && pass "re-stamp: unparseable line keeps the previous stamp (C6)" \
         || fail "re-stamp: unparseable line keeps the previous stamp (C6)"
+    # dev-suffixed and digit-leading noise are unparseable too (0.0.44d
+    # F3: the bare-version arm is full-line anchored)
+    _rst_line="2.0.11-dev"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: dev-suffixed line keeps the previous stamp (F3)" \
+        || fail "re-stamp: dev-suffixed line keeps the previous stamp (F3)"
+    _rst_line="404 not found"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: digit-leading noise keeps the previous stamp (F3)" \
+        || fail "re-stamp: digit-leading noise keeps the previous stamp (F3)"
 else
     fail "re-stamp block extractable (W4)"
 fi

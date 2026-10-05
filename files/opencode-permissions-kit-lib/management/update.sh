@@ -910,8 +910,11 @@ install_binary() {
         _new_major=$(printf '%s' "$new" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
         if [ -n "$_new_major" ]; then
             :   # "opencode v2..." — the 2.x shape
-        elif printf '%s' "$new" | grep -qE '^[0-9]+(\.[0-9]+)*'; then
-            _new_major=1   # bare version line = 1.x (current_opencode_major parity)
+        elif printf '%s' "$new" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            _new_major=1   # bare version line = 1.x (current_opencode_major
+                           # parity; FULL-LINE anchored, 0.0.44d F3: "2.0.11-
+                           # dev" and digit-leading noise like "404 not
+                           # found" are unparseable, not major 1)
         else
             # Neither shape (0.0.44c C6): a stdout warning line grabbed by
             # head -1, an exotic prefix — unparseable. Treat like an empty

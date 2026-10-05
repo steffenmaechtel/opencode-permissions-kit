@@ -464,7 +464,10 @@ ddev_migrate_export() {
     # finalize grep -c opened the dump-dir manifest AFTER chown -R handed
     # dir and file to the agent — a replaced FIFO there would hang root's
     # grep (and the installer) forever. The stage copy is root-only until
-    # removed right below.
+    # removed right below. The FAIL project list rides the same copy
+    # (0.0.44d F1): the installer's abort question prints it — re-greping
+    # the agent-owned manifest there was the sibling site C2's class
+    # sweep missed.
     # grep -c always prints the count (0 on no match); || true keeps a
     # zero count from tripping set -e via the assignment's exit status.
     # Only a missing file yields an empty result, hence the :-0 defaults.
@@ -472,6 +475,7 @@ ddev_migrate_export() {
     DD_MIG_FAIL=$(grep -c '^FAIL|' "$DM_STAGE/manifest.auth" 2>/dev/null || true)
     DD_MIG_OK=${DD_MIG_OK:-0}
     DD_MIG_FAIL=${DD_MIG_FAIL:-0}
+    DD_MIG_FAILLIST=$(grep '^FAIL|' "$DM_STAGE/manifest.auth" 2>/dev/null | cut -d'|' -f2 || true)
 
     # Finalize: opencode owns the dumps (the importing side), the sharing
     # group keeps the developer's read access. The root stage goes FIRST —
@@ -486,6 +490,14 @@ ddev_migrate_export() {
         -exec chmod 640 {} + 2>/dev/null || true
     find "$DD_MIG_DUMP_DIR" -maxdepth 1 ! -type l -name 'manifest.conf' \
         -exec chmod 640 {} + 2>/dev/null || true
+    # The manifest stays ROOT-owned (0.0.44d F2): the chown -R above hands
+    # the DUMPS to the agent (import reads them as the agent), but an
+    # agent-owned manifest would be refused by the resume seed's owner
+    # check (0.0.44c C3) — the documented fix-and-re-run path would
+    # dead-end on the kit's own finalize output. root:<sharing-group>
+    # 0640: sticky-protected name, group-readable for dev/import/status,
+    # unwritable for the agent.
+    chown "root:$dm_ocg" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true
     [ "${DD_MIG_OK:-0}" -gt 0 ]
 }
 
