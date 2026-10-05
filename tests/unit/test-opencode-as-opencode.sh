@@ -705,13 +705,18 @@ fi
 
 # the OPENCODE_MAJOR fallback probe is bounded too (0.0.43a F3): the same
 # issue-#80 hang must not block every start when install.conf lacks the
-# stamp — timeout + head -1, failure/empty means major 1.
-if grep -q 'MAJOR_LINE=$(timeout 10' "$WRAPPER_FILE" \
-   && grep -qF 'case "$MAJOR_LINE" in' "$WRAPPER_FILE"; then
-    echo "  ${GREEN}PASS${NC}  OPENCODE_MAJOR fallback probe is time-bounded (0.0.43a F3)"
+# stamp — timeout + head -1, failure/empty means major 1. Since 0.0.44a
+# V21 the unstamped path REUSES the advisories probe's ADV_LINE (the same
+# bounded --version first line — a second serial probe only added fail-
+# open delay); the direct fallback stays bounded for advisories-less
+# stamps and covers the pre-advisories cohort.
+if grep -qF '_MAJOR_SRC="${ADV_LINE:-}"' "$WRAPPER_FILE" \
+   && grep -qF 'case "$_MAJOR_SRC" in' "$WRAPPER_FILE" \
+   && grep -q '_MAJOR_SRC=$(timeout 10' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  OPENCODE_MAJOR fallback probe reuses ADV_LINE, direct fallback bounded (0.0.43a F3, 0.0.44a V21)"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  OPENCODE_MAJOR fallback probe is unbounded (0.0.43a F3)"
+    echo "  ${RED}FAIL${NC}  OPENCODE_MAJOR fallback probe is unbounded or duplicated (0.0.43a F3, 0.0.44a V21)"
     failures=$((failures + 1))
 fi
 

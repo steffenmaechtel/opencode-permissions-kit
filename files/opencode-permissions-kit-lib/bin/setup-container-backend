@@ -14,7 +14,8 @@
 # Usage:
 #   setup-container-backend <backend> [--yes]
 #     backend: docker-rootless | podman-rootless
-#     --yes:   skip confirmations
+#     --yes:   accepted no-op (install.sh passes it; this provisioner
+#              is non-interactive and never prompts)
 #
 # What it does (for rootless backends):
 #   1. Install prerequisite packages (uidmap, dbus-user-session, podman or
@@ -44,11 +45,17 @@ else
 fi
 
 BACKEND=""
-YES=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
         docker-rootless|podman-rootless) BACKEND="$1" ;;
-        --yes|-y) YES=true ;;
+        # Accepted no-op (0.0.44a V28): install.sh calls
+        # `setup-container-backend <backend> --yes` — the flag stays for
+        # that call's shape, but this provisioner is non-interactive and
+        # never prompts, so there is nothing to skip. The dead YES
+        # variable and the confirm() stub are gone (the stub had no
+        # ui_confirm fallback in this file and would have crashed had
+        # anything ever called it).
+        --yes|-y) ;;
         *) echo "${RED}setup-container-backend: unknown arg '$1'${NC}" >&2; exit 1 ;;
     esac
     shift
@@ -84,13 +91,6 @@ id "$OPENCODE_USER" >/dev/null 2>&1 \
 
 OC_UID=$(id -u "$OPENCODE_USER" 2>/dev/null || echo "")
 [ -n "$OC_UID" ] || { echo "${RED}Cannot resolve UID for $OPENCODE_USER.${NC}" >&2; exit 1; }
-
-confirm() {
-    # Convention: docs/design/conventions.md — default capital in the hint,
-    # Enter accepts it, y/yes/n/no case-insensitive.
-    [ "$YES" = true ] && return 0
-    ui_confirm "$1" "n"
-}
 
 # --- package installation -----------------------------------------------------
 

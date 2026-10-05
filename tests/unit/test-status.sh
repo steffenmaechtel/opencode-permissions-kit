@@ -526,6 +526,50 @@ else
     fail "the probe comment states the bounded parity truthfully"
 fi
 
+# --- 0.0.44b W12b/W15/W16: unscannable render, line-wise roots, null coercion -----------
+if grep -qF 'scan_unscannable=true' "$STATUS" && grep -qF 'agent config unscannable' "$STATUS"; then
+    pass "status.sh renders unscannable (never false-green) for parser rc != 0 (W12b)"
+else
+    fail "status.sh renders unscannable (never false-green) for parser rc != 0 (W12b)"
+fi
+if grep -qF 'str(entry.get("ghsa_id") or "")' "$STATUS"; then
+    pass "status.sh coerces a null ghsa_id (the F7 class twin, V19)"
+else
+    fail "status.sh coerces a null ghsa_id (the F7 class twin, V19)"
+fi
+_gap_fn=$(sed -n '/^    _st_dbdump_gap() {/,/^    }$/p' "$STATUS")
+if [ -n "$_gap_fn" ]; then
+    pass "status.sh: gap function extractable (W15)"
+    _gap_work=$(mktemp -d)
+    printf '/var/tmp/root-one\n/var/tmp/my projects\n' > "$_gap_work/projects.conf"
+    _gap_args=""
+    _gap_rc=0
+    (
+        PROJECTS_CONF="$_gap_work/projects.conf"
+        _mig_root=""
+        _mig_dir=""
+        # the stubs write to files: _st_dbdump_gap runs inside the pipe's
+        # subshell, variables would not propagate out
+        ddev_migrate_gap() { shift; printf '%s\n' "$#" > "$_gap_work/argc"; printf '%s\n' "$*" > "$_gap_work/args"; return 1; }
+        ddev_migrate_projects() { printf '' ; }
+        ddev_migrate_home() { printf '/home/x'; }
+        ui_kv_warn() { :; }
+        ui_detail()  { :; }
+        eval "$_gap_fn"
+        grep -v '^[[:space:]]*$' "$PROJECTS_CONF" | _st_dbdump_gap devuser || true
+    ) > "$_gap_work/out" 2>/dev/null || _gap_rc=$?
+    _got_n=$(sed -n '1p' "$_gap_work/argc")
+    _got_roots=$(sed -n '1p' "$_gap_work/args")
+    if [ "$_got_n" = "2" ] && [ "$_got_roots" = "/var/tmp/root-one /var/tmp/my projects" ]; then
+        pass "gap check feeds roots line-wise: spaced root stays ONE argument (W15)"
+    else
+        fail "gap check feeds roots line-wise: spaced root stays ONE argument (W15, n=$_got_n roots=$_got_roots)"
+    fi
+    rm -rf "$_gap_work"
+else
+    fail "status.sh: gap function extractable (W15)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

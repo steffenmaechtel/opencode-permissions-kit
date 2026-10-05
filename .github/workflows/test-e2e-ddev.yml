@@ -65,14 +65,17 @@ permissions:
 # red to scripts/release.sh's CI gate) — and conversely stays alive to
 # deliver its drift verdict even when master moves under it.
 concurrency:
-  group: e2e-ddev-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
+  group: >-
+    e2e-ddev-${{ github.event_name == 'schedule' && 'weekly'
+    || (github.event_name == 'push' || github.event_name == 'pull_request') && github.ref
+    || 'manual' }}
   cancel-in-progress: true
 
 jobs:
   # Changed-path detection for the skip logic (header comment above).
   # 'code' is true when anything outside the docs-only set changed.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -97,7 +100,7 @@ jobs:
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -153,7 +156,7 @@ jobs:
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7

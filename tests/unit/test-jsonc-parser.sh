@@ -302,6 +302,28 @@ assert_exitcode "tools-2x: permissions:null exits 0 (no TypeError)" 0 \
 OUT=$(printf '%s\n' '[{ "type": "document", "info": { "permissions": null } }]' | python3 "$PARSER" --tools - 2>/dev/null || true)
 assert_empty "tools-2x: permissions:null document -> no tools, no crash" "$OUT"
 
+# --- 2x. top-level non-dict is a loud rc 1, never a swallowed crash (0.0.44a V8) ---
+# A hand-mangled/truncated config ([..]/42/"x") used to raise inside
+# extract_patterns and the status.sh caller's `|| true` printed a green
+# "no matches" — the F13 false-green class's uncovered shape.
+printf '%s\n' '[1, 2, 3]' > "$TMP/nondict.jsonc"
+assert_exitcode "patterns: top-level list exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
+OUT=$(python3 "$PARSER" "$TMP/nondict.jsonc" 2>/dev/null || true)
+assert_empty "patterns: top-level list prints no patterns (V8)" "$OUT"
+printf '42\n' > "$TMP/nondict.jsonc"
+assert_exitcode "patterns: top-level number exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
+printf '"denied"\n' > "$TMP/nondict.jsonc"
+assert_exitcode "patterns: top-level string exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
+
+# --- 2y. the stderr NOTE discriminates the fix from the old traceback (0.0.44b W12) ----
+# The rc-1/empty-stdout pins above also hold for the old uncaught
+# AttributeError (traceback, stdout empty) — the pins that discriminate
+# are the clean stderr note and the absent traceback.
+printf '%s\n' '[1, 2, 3]' > "$TMP/nondict.jsonc"
+_nd_err=$(python3 "$PARSER" "$TMP/nondict.jsonc" 2>&1 >/dev/null || true)
+assert_contains "non-dict stderr carries the clean note (W12)" "top-level config is not an object" "$_nd_err"
+assert_not_contains "non-dict stderr carries no traceback (W12)" "Traceback" "$_nd_err"
+
 # --- Summary ---
 echo ""
 echo "===================================="

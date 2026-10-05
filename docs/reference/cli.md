@@ -77,7 +77,7 @@ cd /var/www/vhosts/ddev
 opk handover me .gotmp
 
 # Same idea the other way — give a folder to the agent user:
-opk handover opencode /var/www/vhosts/some-project/
+opk handover opencode /var/www/vhosts/some-project
 
 # Not sure yet? Show what would happen, without sudo:
 opk handover me .gotmp --dry-run
@@ -90,13 +90,18 @@ Plain `chown -R` would need both.
 System roots and their subpaths (`/etc`, `/etc/apache2`, `/usr/local/...`)
 and whole home directories are refused — hand over project trees, not
 systems. `/tmp` subpaths are allowed (temp build trees are legitimate
-handover targets). Symlinked paths are refused too: `chown -R`/`chmod -R`
-follow a symlink operand, and the kit never hands a tree over through a
-link (`--dry-run` lists the refusals it would make). The recursive pair
-itself cannot be steered through a link either: the ownership change rides
-`chown -R -h` (never dereferences an operand) and the group-write pass
-only ever sees non-symlinks (`find ! -type l` feeds it) — a link planted
-between the check and the run re-owns nothing outside the tree.
+handover targets). Symlinked paths are refused too: the kit never hands a
+tree over through a link (`--dry-run` lists the refusals it would make).
+Operands must be slash- and dotdot-free — `x/`, `x//`, `x/.`, `x/..` and
+mid-path `a/../b` are refused with a usage error: a trailing slash or a
+`..` component resolves through a link before the symlink gate can see
+it, so both the gate and the recursive pair would act on the resolved
+target (the link itself, or its parent). The recursive pair itself cannot be steered through a
+planted link either: the ownership change rides `chown -R -h` (lchown on
+a planted operand re-owns the attacker's own link, nothing outside), and
+the group-write pass only ever sees non-symlinks (`find ! -type l` feeds
+it) — a link swapped between the check and the run touches nothing
+outside the tree.
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides

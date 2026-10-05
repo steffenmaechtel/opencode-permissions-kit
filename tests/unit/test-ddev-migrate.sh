@@ -368,6 +368,151 @@ assert_eq "SKIP lines stay single too (nodb + nodbrt)" \
 check_fail "no leftover .export-*.err capture files in the dump directory" \
     sh -c "ls \"\$1\"/.export-*.err >/dev/null 2>&1" _ "$DUMP_DIR"
 
+# --- 4c. planted symlinks in the agent-writable dump dir (0.0.44a V3) ---------------
+# The dump dir is group-writable by design until finalize — the agent can
+# plant entries during the minutes-long export loop. Root-side writes
+# must never act THROUGH a planted link: manifest mutations ride staging +
+# rename (a link at manifest.conf at export START is now REFUSED — the
+# seed never reads through it, 0.0.44b W2), err captures live in the
+# root-owned .root-stage, and the chmod pass rides find ! -type l.
+echo "VICTIM-ERR-CONTENT" > "$WORK/victim-err.conf"
+echo "VICTIM-DUMP-CONTENT" > "$WORK/victim-dump.conf"
+chmod 755 "$WORK/victim-dump.conf"
+ln -s "$WORK/victim-err.conf" "$DUMP_DIR/.export-alpha.err"
+ln -s "$WORK/victim-dump.conf" "$DUMP_DIR/evil.sql.gz"
+OUT3=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null)
+check "planted .export-*.err link is never touched (captures live in .root-stage)" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-ERR-CONTENT" _ "$WORK/victim-err.conf"
+check "chmod pass skips symlink operands (victim keeps its mode)" \
+    sh -c "test \"\$(stat -c %a \"\$1\")\" = 755" _ "$WORK/victim-dump.conf"
+check "manifest stays a regular file through the run" \
+    sh -c "test -f \"\$1\" && test ! -L \"\$1\"" _ "$DUMP_DIR/manifest.conf"
+# Sticky + stage mode act DURING the run (finalize re-modes the dir to
+# 750) — pinned statically on the mechanisms (W1): chmod 3770 at setup
+# AND on resume, mkdir -m 700 for the stage.
+_grep_n=$(grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' "$MIG" || true)
+[ "$_grep_n" -ge 1 ] \
+    && check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" true \
+    || check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" false
+grep -q 'mkdir -m 700 "\$DM_STAGE"' "$MIG" \
+    && check "stage is created mode 700 in one step (no default-mode window, W1)" true \
+    || check "stage is created mode 700 in one step (no default-mode window, W1)" false
+check_fail "the root staging dir is removed before finalize hands the tree over" \
+    test -e "$DUMP_DIR/.root-stage"
+
+# --- 4d. a linked manifest at export START is refused, never read (0.0.44b W2) -------
+# The authoritative copy seeds from the dump-dir manifest only when it is
+# not a symlink — a planted link there means tampering: loud refuse, the
+# link's target is never opened (no read-through disclosure).
+echo "VICTIM-MANIFEST-CONTENT" > "$WORK/victim-manifest.conf"
+rm -f "$DUMP_DIR/manifest.conf"
+ln -s "$WORK/victim-manifest.conf" "$DUMP_DIR/manifest.conf"
+OUT4=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run4.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1 || true)
+check "export refuses a symlinked manifest.conf at start (tamper, W2)" \
+    sh -c "printf '%s' \"\$1\" | grep -q REFUSED" _ "$OUT4"
+check "manifest link target was never opened (content intact, W2)" \
+    sh -c "test \"\$(cat \"\$1\")\" = VICTIM-MANIFEST-CONTENT" _ "$WORK/victim-manifest.conf"
+check_fail "the refused run leaves no staging dir behind" \
+    test -e "$DUMP_DIR/.root-stage"
+# restore a regular manifest for the suites below
+rm -f "$DUMP_DIR/manifest.conf"
+printf 'OK|alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|alpha.sql.gz\n' > "$DUMP_DIR/manifest.conf"
+
+# --- 4e. fixed-string resume: sh.p must not cross-match shop (0.0.44b W13) -------------
+# The resume check and the stale-rewrite are grep -F since 0.0.44a V23 —
+# but nothing pinned it: all fixtures were metacharacter-free, so the old
+# BRE ("sh.p" cross-matches "shop") was indistinguishable. A hand-edited
+# registry (ddev itself enforces [a-z0-9-]) carries both names; the OK
+# line for shop must NOT satisfy sh.p's resume check.
+cat >> "$WORK/devhome/.ddev/project_list.yaml" <<YML
+  shop:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+  sh.p:
+    approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
+YML
+printf 'dump\n' > "$DUMP_DIR/shop.sql.gz"
+printf 'dump\n' > "$DUMP_DIR/sh.p.sql.gz"
+printf 'OK|shop|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|shop.sql.gz\n' >> "$DUMP_DIR/manifest.conf"
+OUT5=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run5.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1 || true)
+check "dot-name project sh.p is NOT skipped via shop's OK line (W13)" \
+    sh -c "grep -q 'ddev:start sh.p' \"\$1\"" _ "$WORK/ddev-run5.log"
+check "shop itself IS skipped (its own OK line matches, both engines)" \
+    sh -c "grep -q 'ddev:start shop' \"\$1\" && exit 1 || exit 0" _ "$WORK/ddev-run5.log"
+check "the published manifest keeps exactly one OK line per project (W13)" \
+    sh -c "test \"\$(grep -c '^OK|' \"\$1\")\" -eq 5" _ "$DUMP_DIR/manifest.conf"
+
+# --- 4f. the seed's owner arm refuses a manifest the dev does not own (0.0.44d F4/C3) --
+# The manifest in $DUMP_DIR is owned by the CURRENT user; running the
+# export with dm_dev=nobody (an existing unrelated user) must hit the
+# seed's owner check (owner ∉ {root, dm_dev}) and REFUSE before the loop.
+# Root guard (0.0.44e E4): as root everything is root-owned — the seed
+# would CORRECTLY accept; the pin only means something unprivileged.
+if [ "$(id -u)" = 0 ]; then
+    echo "  SKIP  owner-arm pin needs an unprivileged user (root owns the fixture here)"
+else
+    OUT6=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run6.log" \
+        DDEV_MIG_DEV_HOME="$WORK/devhome" \
+        PATH="$WORK/bin:$PATH" \
+        sh "$WORK/run-export.sh" "$MIG" nobody root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1 || true)
+    check "seed refuses a manifest owned by neither root nor the dev (C3 owner arm, F4)" \
+        sh -c "printf '%s' \"\$1\" | grep -q 'not root/dev-owned'" _ "$OUT6"
+fi
+
+# --- 4g. accounting and installer ride the authoritative path (0.0.44d F1/F4) -----------
+check "export accounting reads the stage copy, not the dump-dir manifest (C2/F4)" \
+    sh -c "grep -q 'manifest.auth' \"\$1\" && ! sed -n '/^    DD_MIG_OK=/,/DD_MIG_FAIL=/p' \"\$1\" | grep -q 'manifest.conf'" _ "$MIG"
+check "finalize keeps the manifest root-owned for the resume seed (F2)" \
+    sh -c "grep -q 'chown \"root:' \"\$1\"" _ "$MIG"
+check "install.sh prints the FAIL list from the function state, never a re-grep (F1)" \
+    sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL"
+check "export return state starts EMPTY — counters signal completion (E1)" \
+    sh -c "grep -qF 'DD_MIG_DUMP_DIR=\"\"; DD_MIG_OK=\"\"; DD_MIG_FAIL=\"\"; DD_MIG_FAILLIST=\"\"' \"\$1\"" _ "$MIG"
+
+# --- 4h. refused vs completed: only the accounting fills the counters (0.0.44e E1) -------
+cat > "$WORK/run-export-state.sh" <<'WRAP'
+#!/bin/sh
+. "$1"
+_ddev_migrate_run_as() {
+    shift 1
+    "$@"
+}
+ddev_migrate_export "$2" "$3" "$4" "$5" >/dev/null 2>&1 || true
+printf 'DUMP=[%s] OK=[%s] FAIL=[%s]\n' "${DD_MIG_DUMP_DIR:-}" "${DD_MIG_OK:-}" "${DD_MIG_FAIL:-}"
+WRAP
+if [ "$(id -u)" != 0 ]; then
+    _st_ref=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run7.log" \
+        DDEV_MIG_DEV_HOME="$WORK/devhome" \
+        PATH="$WORK/bin:$PATH" \
+        sh "$WORK/run-export-state.sh" "$MIG" nobody root "$(id -gn)" \
+        /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>/dev/null || true)
+    check "a REFUSED export leaves DD_MIG_OK/FAIL empty (E1)" \
+        sh -c "printf '%s' \"\$1\" | grep -q 'OK=\[\] FAIL=\[\]' && printf '%s' \"\$1\" | grep -q 'DUMP=\[.'" _ "$_st_ref"
+else
+    # Visible like the 4f guard's (0.0.44f F5): a silent skip reads as a
+    # gap when a root-run suite log is audited.
+    echo "  SKIP  refused-state pin needs an unprivileged user (root skips the seed refusal)"
+fi
+_st_ok=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run8.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export-state.sh" "$MIG" "$(id -un)" root "$(id -gn)" \
+    /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>/dev/null || true)
+# OK is anchored to >=1 (0.0.44f F2): the fixture exports at least one
+# project, so an honest completed run never prints OK=[0] — a zero here
+# can only mean the fill never ran (entry zeroing restored + dead
+# accounting stayed green under the old [0-9] regex).
+check "a COMPLETED export returns numeric counts (E1)" \
+    sh -c "printf '%s' \"\$1\" | grep -q 'OK=\[[1-9][0-9]*\] FAIL=\[[0-9][0-9]*\]'" _ "$_st_ok"
+
 # --- 5. import loop (static wiring) ---------------------------------------------
 
 check "import reads the manifest and runs as the opencode user" \
@@ -397,8 +542,12 @@ check "install.sh stamps DDEV_EXPORTED=1 after a successful export" \
     sh -c "grep -q 'DDEV_EXPORTED=1' \"\$1\"" _ "$INSTALL"
 check "install.sh gates the DDEV_EXPORTED stamp on zero failures" \
     sh -c "grep -qF '[ \"\$DD_MIG_FAIL\" -eq 0 ]' \"\$1\"" _ "$INSTALL"
-check "install.sh re-reads ok/fail counts from the manifest (subshell-safe)" \
-    sh -c "grep -q 'grep -c .\\^OK|.' \"\$1\" || grep -qF 'grep -c \"^OK|\"' \"\$1\"" _ "$INSTALL"
+# 0.0.44d F1: the counts now come from the export function's return
+# state (set from the authoritative stage copy BEFORE the finalize hands
+# the tree to the agent). A re-grep of the dump-dir manifest here would
+# read an agent-owned file as root — the old pin demanded exactly that.
+check "install.sh uses the propagated DD_MIG_* counts, never a manifest re-grep (F1)" \
+    sh -c "grep -qF '[ -n \"\${DD_MIG_OK:-}\${DD_MIG_FAIL:-}\" ]' \"\$1\" && ! grep -qF 'grep -c \"^OK|\"' \"\$1\"" _ "$INSTALL"
 check "install.sh lists failed projects before continuing" \
     sh -c "grep -q 'could NOT be exported' \"\$1\"" _ "$INSTALL"
 check "install.sh asks before continuing with failed exports (default: abort)" \
@@ -414,12 +563,14 @@ check "install.sh skips the export when already stamped" \
 
 # ddev detection: version probe falls back to the DEFAULT user — `ddev
 # version` can come up empty as root while working as the actual user.
+# (HOME rides DEV_HOME since 0.0.44a V14 — getent-resolved, /home/<name>
+# only the fallback.)
 check "install.sh probes the ddev version as the DEFAULT user too" \
-    sh -c "grep -q 'DDEV_BIN_DEV' \"\$1\" && grep -q 'sudo -u \"\$DEFAULT_USER\" env HOME=\"/home/\$DEFAULT_USER\"' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -q 'DDEV_BIN_DEV' \"\$1\" && grep -q 'sudo -u \"\$DEFAULT_USER\" env HOME=\"\$DEV_HOME\"' \"\$1\"" _ "$INSTALL"
 check "install.sh inventory distinguishes found-but-unreadable from missing" \
     sh -c "grep -q 'version could not be read' \"\$1\" && grep -q 'not installed (optional' \"\$1\"" _ "$INSTALL"
 check "migration detection is gated on the registry, not the binary" \
-    sh -c "grep -qF 'if [ -d \"/home/\$DEFAULT_USER/.ddev\" ]; then' \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF 'if [ -d \"\$DEV_HOME/.ddev\" ]; then' \"\$1\"" _ "$INSTALL"
 # _ddev_migrate_bin must consider per-user install paths (sudo -u does not
 # inherit the dev user's PATH).
 check "ddev resolution includes the user's private install paths" \

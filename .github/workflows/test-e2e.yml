@@ -70,14 +70,17 @@ permissions:
 # red to scripts/release.sh's CI gate) — and conversely stays alive to
 # deliver its drift verdict even when master moves under it.
 concurrency:
-  group: e2e-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
+  group: >-
+    e2e-${{ github.event_name == 'schedule' && 'weekly'
+    || (github.event_name == 'push' || github.event_name == 'pull_request') && github.ref
+    || 'manual' }}
   cancel-in-progress: true
 
 jobs:
   # Changed-path detection for the skip logic (header comment above).
   # 'code' is true when anything outside the docs-only set changed.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -120,7 +123,7 @@ jobs:
         # signal: the kit's own git surface is tiny (`git -C <dir>
         # config --global`, safe.directory).
         git: [distro, latest]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Resolve opencode version
@@ -164,7 +167,7 @@ jobs:
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Resolve opencode version
@@ -206,7 +209,7 @@ jobs:
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Resolve current opencode 2.x (npm dist-tag latest)
@@ -259,7 +262,7 @@ jobs:
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Resolve current opencode 2.x (npm dist-tag latest)

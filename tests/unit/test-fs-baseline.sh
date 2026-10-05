@@ -163,6 +163,60 @@ _n=$(getfacl -p "$TR" 2>/dev/null | grep -c "^group:$GRP:--x")
 assert_eq "traverse grant is idempotent (single ACL entry)" "1" "$_n"
 rm -rf "$TR"
 
+# --- 7b. mid-batch failure fails the baseline (0.0.44a V9) ---------------------------
+# One failing setfacl entry MID-batch must fail the pass: the inner xargs
+# loop used to return only the LAST command's status — a broken entry
+# followed by healthy ones stayed green, the caller printed "applied"
+# over an incomplete baseline (REVIEW-B W5's falsified premise). A stub
+# fails exactly one operand; the rest delegate to the real setfacl.
+V9ROOT=$(mktemp -d)
+mkdir -p "$V9ROOT/d1" "$V9ROOT/d2" "$V9ROOT/d3"
+chmod 700 "$V9ROOT" "$V9ROOT/d1" "$V9ROOT/d2" "$V9ROOT/d3"
+STUBBIN=$(mktemp -d)
+REAL_SETFACL="$(command -v setfacl)"
+cat > "$STUBBIN/setfacl" <<EOF
+#!/bin/sh
+case "\$*" in *"/d2"*) exit 1 ;; esac
+exec "$REAL_SETFACL" "\$@"
+EOF
+chmod +x "$STUBBIN/setfacl"
+_mb_rc=0
+FS_SUDO="" PATH="$STUBBIN:$PATH" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$V9ROOT" "$GRP" >/dev/null 2>&1 \
+    || _mb_rc=$?
+assert_eq "mid-batch ACL failure fails the baseline (V9)" "1" "$_mb_rc"
+rm -rf "$V9ROOT" "$STUBBIN"
+
+# --- 7c. the batch loop fails on a MIDDLE entry regardless of find order (0.0.44b W11) ----
+# The V9 stub test is find-order-dependent (readdir decides which operand
+# is batch-final). The loop body itself is extracted and executed with a
+# FIXED operand list: a failing middle entry must fail the batch, a
+# symlink-last batch must not.
+_batch_body=$(sed -n '/^                _n=\$1; shift$/,/^                \[ "\$_fail" -eq 0 \]$/p' "$LIB")
+if [ -n "$_batch_body" ]; then
+    pass "fs-baseline: batch loop body extractable (W11)"
+    _bstub=$(mktemp -d)
+    cat > "$_bstub/failmid" <<'EOS'
+#!/bin/sh
+case "$1" in *midfail*) exit 1 ;; esac
+exit 0
+EOS
+    chmod +x "$_bstub/failmid"
+    _brc=0
+    sh -c "$_batch_body" xargs-sh 1 "$_bstub/failmid" ok1 midfail ok2 || _brc=$?
+    assert_eq "mid-batch failure fails the batch, order-independent (W11)" "1" "$_brc"
+    _brc=0
+    sh -c "$_batch_body" xargs-sh 1 "$_bstub/failmid" ok1 ok2 || _brc=$?
+    assert_eq "all-healthy batch stays green (W11)" "0" "$_brc"
+    ln -sf /etc/hostname "$_bstub/lnk"
+    _brc=0
+    sh -c "$_batch_body" xargs-sh 1 "$_bstub/failmid" ok1 "$_bstub/lnk" || _brc=$?
+    assert_eq "symlink-last batch stays green (skip is not a failure)" "0" "$_brc"
+    rm -rf "$_bstub"
+else
+    fail "fs-baseline: batch loop body extractable (W11)"
+fi
+
 # --- 8. Makefile + CI wiring -----------------------------------------------------------
 grep -q 'test-fs-baseline' "$MAKEFILE" \
     && pass "Makefile test target includes test-fs-baseline" \

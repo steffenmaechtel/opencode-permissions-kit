@@ -74,10 +74,26 @@ sudoers_deploy() {
         echo "error: sudoers template failed validation — nothing was deployed (user '$_sd_user')." >&2
         return 1
     fi
-    if ! _sd_sudo mkdir -p "$_sd_conf" \
-        || ! _sd_sudo cp "$_sd_tmp" "$_sd_conf/sudoers" \
-        || ! _sd_sudo chmod 440 "$_sd_conf/sudoers"; then
+    if ! _sd_sudo mkdir -p "$_sd_conf"; then
         rm -f "$_sd_tmp"
+        echo "error: cannot create $_sd_conf (user '$_sd_user')." >&2
+        return 1
+    fi
+    # Atomic replace (0.0.44a V10): `cp` onto the live-referenced sudoers
+    # content is O_TRUNC+write — a kill mid-window leaves a truncated
+    # sudoers live (the file's own 0.0.38 S1 rationale: broken sudoers.d
+    # makes sudo refuse for everyone). Stage INSIDE $_sd_conf (same
+    # filesystem, rename(2) is atomic), then mv -f.
+    if ! _sd_stage=$(_sd_sudo mktemp "$_sd_conf/.sudoers.XXXXXXXX"); then
+        rm -f "$_sd_tmp"
+        echo "error: cannot stage sudoers in $_sd_conf (user '$_sd_user')." >&2
+        return 1
+    fi
+    if ! _sd_sudo cp "$_sd_tmp" "$_sd_stage" \
+       || ! _sd_sudo chmod 440 "$_sd_stage" \
+       || ! _sd_sudo mv -f "$_sd_stage" "$_sd_conf/sudoers"; then
+        rm -f "$_sd_tmp"
+        _sd_sudo rm -f "$_sd_stage" 2>/dev/null || true
         echo "error: cannot install sudoers to $_sd_conf (user '$_sd_user')." >&2
         return 1
     fi

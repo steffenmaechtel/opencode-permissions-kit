@@ -69,6 +69,25 @@
 # trap there — the normal code paths still remove their own temps).
 command -v _tmp_track >/dev/null 2>&1 || _tmp_track() { :; }
 
+# _bb_install_conf <src>: atomically replace the wsl.conf carrier
+# (0.0.44a V10). Plain `cp` onto /etc/wsl.conf is O_TRUNC+write — a kill
+# mid-window truncates the carrier AND the user's foreign settings the
+# awk rewrites go to lengths to preserve. Stage BESIDE the target (same
+# filesystem) and mv -f (rename(2) is atomic); mode 644 is the canonical
+# wsl.conf mode (cp-onto-existing used to preserve the old inode's mode
+# implicitly — the rename replaces the inode, so it is set explicitly).
+_bb_install_conf() {
+    _bb_stage="$(dirname "$_bb_conf")/.wsl.conf.opk.$$"
+    _tmp_track "$_bb_stage"
+    if ${OPK_WSL_SUDO-sudo} cp "$1" "$_bb_stage" \
+       && ${OPK_WSL_SUDO-sudo} chmod 644 "$_bb_stage" \
+       && ${OPK_WSL_SUDO-sudo} mv -f "$_bb_stage" "$_bb_conf"; then
+        return 0
+    fi
+    ${OPK_WSL_SUDO-sudo} rm -f "$_bb_stage" 2>/dev/null || true
+    return 1
+}
+
 browser_bridge_is_wsl() {
     [ "${OPK_WSL_FORCE:-0}" = "1" ] && return 0
     grep -qi microsoft /proc/version 2>/dev/null
@@ -134,8 +153,7 @@ browser_bridge_write_conf() {
             { print }
         ' "$_bb_conf" >> "$_bb_tmp"
     fi
-    ${OPK_WSL_SUDO-sudo} cp "$_bb_tmp" "$_bb_conf"
-    ${OPK_WSL_SUDO-sudo} chmod 644 "$_bb_conf"
+    _bb_install_conf "$_bb_tmp"
     rm -f "$_bb_tmp"
 }
 
@@ -200,7 +218,7 @@ browser_bridge_strip_legacy() {
         /^\[opencode-permissions-kit\]$/ { in_legacy = 1; next }
         { print }
     ' "$_bb_conf" > "$_bb_tmp"
-    ${OPK_WSL_SUDO-sudo} cp "$_bb_tmp" "$_bb_conf"
+    _bb_install_conf "$_bb_tmp"
     rm -f "$_bb_tmp"
 }
 
@@ -250,7 +268,7 @@ browser_bridge_remove() {
             /^\[opencode-permissions-kit\]$/ { in_legacy = 1; next }
             { print }
         ' "$_bb_conf" > "$_bb_tmp"
-        ${OPK_WSL_SUDO-sudo} cp "$_bb_tmp" "$_bb_conf"
+        _bb_install_conf "$_bb_tmp"
         rm -f "$_bb_tmp"
     fi
     ${OPK_WSL_SUDO-sudo} rm -rf "${_bb_libdir:?}/wsl"

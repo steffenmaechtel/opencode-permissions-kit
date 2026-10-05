@@ -494,6 +494,15 @@ do_plan_phase() {
         _th="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6 || true)"
         if [ -n "$_th" ]; then PROJECT_TILDE_HOME="$_th"; fi
     fi
+    # Developer home for every developer-side provisioning path (0.0.44a
+    # V14): ddev discovery, the .ddev registry check, binary candidates,
+    # rc-file hooks, agents-migration sources, the deny-all config and the
+    # TUI theme. getent, /home/<name> only as fallback — the same class
+    # the 0.0.43a/b waves closed in the sibling files (F12/W1/W2); a
+    # relocated home must not silently miss the protections.
+    DEV_HOME="/home/$DEFAULT_USER"
+    _opk_dh="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"
+    [ -n "$_opk_dh" ] && DEV_HOME="$_opk_dh"
     log "install started (version $VERSION, default user=$DEFAULT_USER)"
 
     # === Install mode ===
@@ -584,9 +593,9 @@ do_plan_phase() {
     fi
     DDEV_BIN_DEV=""
     if [ -z "$DDEV_VERSION" ] && id "$DEFAULT_USER" >/dev/null 2>&1; then
-        DDEV_BIN_DEV="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" sh -c 'command -v ddev 2>/dev/null || true')"
+        DDEV_BIN_DEV="$(sudo -u "$DEFAULT_USER" env HOME="$DEV_HOME" sh -c 'command -v ddev 2>/dev/null || true')"
         if [ -n "$DDEV_BIN_DEV" ] && [ -x "$DDEV_BIN_DEV" ]; then
-            DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="/home/$DEFAULT_USER" "$DDEV_BIN_DEV" version 2>/dev/null \
+            DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="$DEV_HOME" "$DDEV_BIN_DEV" version 2>/dev/null \
                 | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
             [ -z "$DDEV_BIN" ] && DDEV_BIN="$DDEV_BIN_DEV"
         fi
@@ -607,6 +616,28 @@ do_plan_phase() {
         fi
     else
         ui_warn "ddev not found — continuing anyway (install it later with ddev >= 1.25)."
+    fi
+
+    # Existing secured opencode binary (0.0.44f F1): re-installs REUSE it
+    # (Step 6, "binary reused on re-install"), so a wedged binary — a 2.x
+    # that cannot bind its port hangs even --version (issue #80) — would
+    # survive the install. Warn EARLY, before the Step 5 handover; never
+    # abort: the wrapper fail-opens per start (0.0.44b W10) and 'opk
+    # update' replaces the binary. The major stamp itself is anchored in
+    # Step 8 (F1): an unparseable probe leaves it untouched.
+    _pf_oc_bin=/usr/local/lib/opencode-permissions-kit/bin/opencode
+    if [ -x "$_pf_oc_bin" ]; then
+        _pf_oc_ver=$(timeout 10 "$_pf_oc_bin" --version 2>/dev/null | head -1)
+        _pf_oc_maj=$(printf '%s' "$_pf_oc_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
+        if [ -n "$_pf_oc_maj" ]; then
+            log "preflight: existing opencode binary answers --version (major $_pf_oc_maj)"
+        elif printf '%s' "$_pf_oc_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            log "preflight: existing opencode binary answers --version (major 1)"
+        else
+            ui_warn "the existing opencode binary does not answer --version (hang or noise) — continuing"
+            ui_detail "the install reuses this binary; fix it afterwards (e.g. 'opk update' replaces it)"
+            log "preflight: existing opencode binary unresponsive (probe line: '${_pf_oc_ver:-empty}')"
+        fi
     fi
 
     # Container backend selection. Rootless is MANDATORY: docker-rootless
@@ -697,8 +728,8 @@ do_plan_phase() {
     # Gated on the registry file alone: ddev may live off root's PATH (the
     # binary is resolved again at export time with per-user fallbacks).
     DD_MIG_ALL=""
-    if [ -d "/home/$DEFAULT_USER/.ddev" ]; then
-        DD_MIG_ALL=$(ddev_migrate_registry "/home/$DEFAULT_USER/.ddev")
+    if [ -d "$DEV_HOME/.ddev" ]; then
+        DD_MIG_ALL=$(ddev_migrate_registry "$DEV_HOME/.ddev")
     fi
     DD_MIG_COUNT=$(printf '%s\n' "$DD_MIG_ALL" | grep -c . || true)
     if [ "$DD_MIG_COUNT" -gt 0 ]; then
@@ -735,7 +766,7 @@ do_plan_phase() {
 
     # opencode binary candidates (the copy+secure step runs later).
     OC_BINARY_FOUND=""
-    for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" \
+    for loc in "$DEV_HOME/.opencode/bin/opencode" "/root/.opencode/bin/opencode" \
         "/usr/local/bin/opencode" "/usr/bin/opencode"; do
         if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
             OC_BINARY_FOUND="$loc"
@@ -848,8 +879,10 @@ do_plan_phase() {
             ui_detail "  ~/projects"
             while true; do
                 _p=$(ui_ask "Project directory (agent workspaces)" "$_pdef")
-                # Empty (no default existed) falls through to the numbered
-                # selection later; only validate what was actually entered.
+                # Empty (no default existed) falls through to the project
+                # selection later — which, since 0.0.44a V6, means the
+                # numbered prompt interactively and the documented skip
+                # under --yes. Only validate what was actually entered.
                 if [ -n "$_p" ]; then
                     if ! project_path_sane "$_p"; then
                         ui_error "'$_p' is a system path — the kit would chgrp -R/setfacl -R over it."
@@ -935,6 +968,33 @@ do_plan_phase() {
     ui_info "Creating user + sharing group ..."
     if id "$OPENCODE_USER" >/dev/null 2>&1; then
         confirm "User '$OPENCODE_USER' already exists. Reuse it?" || { ui_info "Aborted."; exit 1; }
+        # reuse-guard-home (0.0.44a V15, maintainer decision: fail-loud):
+        # every agent-side provision writes /home/<agent>, and the runtime
+        # (sudo env_reset, the wrapper) reads the user's REAL passwd home —
+        # a deviating home would park config, TUI registration and CA in a
+        # shadow home nobody reads: protections silently absent under a
+        # success banner. Rejected with remediation instead.
+        _oc_home="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
+        if [ "$_oc_home" != "/home/$OPENCODE_USER" ]; then
+            ui_error "user '$OPENCODE_USER' exists with home '$_oc_home',"\
+" but the kit provisions /home/$OPENCODE_USER — the runtime reads the passwd home,"
+            ui_error "so config, TUI registration and the mkcert CA would land in a shadow home."
+            ui_error "Move the user's home or remove the user, then re-run."
+            log "reuse refused: home deviation ($OPENCODE_USER -> $_oc_home)"
+            exit 1
+        fi
+        # reuse-guard-group (0.0.44a V15): the primary group becomes the
+        # sharing group — the group baseline widens onto it. A foreign
+        # primary group widens the kit onto users it was never meant for.
+        _oc_pgrp="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
+        if [ "$_oc_pgrp" != "$OPENCODE_USER" ]; then
+            ui_error "user '$OPENCODE_USER' exists with primary group '$_oc_pgrp', but the kit's"\
+" sharing group IS the user's own primary usergroup (useradd -m default)"
+            ui_error "— a foreign primary group would widen the group baseline onto it."
+            ui_error "Point the user's primary group at a group of its own name, or remove the user, then re-run."
+            log "reuse refused: primary group deviation ($OPENCODE_USER -> $_oc_pgrp)"
+            exit 1
+        fi
     else
         sudo useradd -m -s /bin/bash "$OPENCODE_USER"
         ui_success "user '$OPENCODE_USER' created"
@@ -964,6 +1024,16 @@ do_plan_phase() {
 
     if [ -n "$PREDEFINED_PROJECTS" ]; then
         PROJECTS_ROOTS="$PREDEFINED_PROJECTS"
+    elif [ "$SKIP_PROMPTS" = true ]; then
+        # --yes without --projects (0.0.44a V6): every sibling prompt
+        # honors SKIP_PROMPTS — this selection loop was the one hold-out,
+        # and on EOF without a controlling tty (checkout-mode runs from
+        # cron/CI/ssh -T: no UI_NO_STDIN_FALLBACK there) it spun forever
+        # on `invalid selection ''`. The --yes default is the skip: user
+        # + wrapper, no project baseline.
+        PROJECTS_ROOTS=""
+        ui_info "--yes without --projects: no project baseline configured (skip)"
+        log "project roots: skipped (--yes, no --projects given)"
     else
         ui_section "Project roots"
         echo "Select project directories (space-separated numbers), or 'c' for custom, 's' to skip."
@@ -984,20 +1054,46 @@ do_plan_phase() {
         echo "  [s] Skip (no project baseline, only user + wrapper)"
         # Re-ask until the selection resolves: an out-of-range number or stray
         # input used to yield an empty root list and silently continue (0.0.38 C11).
+        # Empty reads count toward a bail-out (0.0.44a V6): EOF without a
+        # terminal (checkout runs without --yes from cron/CI/ssh -T) used to
+        # spin this loop forever — five consecutive empties abort loudly.
         _sel_done=""
+        _sel_empty=0
         selection=""
         while [ -z "$_sel_done" ]; do
             printf "  > "
             _ui_read selection
+            if [ -z "$selection" ]; then
+                _sel_empty=$((_sel_empty + 1))
+                if [ "$_sel_empty" -ge 5 ]; then
+                    ui_error "no usable input after 5 empty reads (EOF without a terminal?) — aborting."
+                    exit 1
+                fi
+                continue
+            fi
+            _sel_empty=0
 
             case "$selection" in
                 [Cc]*)
                     echo "Enter paths (space-separated):"
                     _custom=""
                     custom=""
+                    _custom_empty=0
                     while [ -z "$_custom" ]; do
                         printf "  > "
                         _ui_read custom
+                        # custom-path-bail (0.0.44b W6): the same EOF
+                        # guard as the outer loop — without it a dead
+                        # stdin spun this sub-loop forever.
+                        if [ -z "$custom" ]; then
+                            _custom_empty=$((_custom_empty + 1))
+                            if [ "$_custom_empty" -ge 5 ]; then
+                                ui_error "no usable input after 5 empty reads (EOF without a terminal?) — aborting."
+                                exit 1
+                            fi
+                            continue
+                        fi
+                        _custom_empty=0
                         _custom=""
                         _bad=""
                         for p in $custom; do
@@ -1267,8 +1363,8 @@ do_ddev_phase() {
                     fi
                 done
             fi
-            if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem" ]; then
-                src="/home/$DEFAULT_USER/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
+            if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "$DEV_HOME/.local/share/mkcert/rootCA.pem" ]; then
+                src="$DEV_HOME/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
             fi
             if [ -n "$src" ]; then
                 # No && chain: a mid-chain failure silently skipped the chmod 600
@@ -1397,13 +1493,17 @@ do_ddev_phase() {
             if [ "$SKIP_DDEV_MIGRATION" != true ]; then
                 # shellcheck disable=SC2086  # word splitting intended (root list)
                 ddev_migrate_export "$DEFAULT_USER" "$OPENCODE_USER" "$OPENCODE_GROUP" $PROJECTS_ROOTS || true
-                DD_MIG_DUMP_DIR="${DD_MIG_DUMP_DIR:-}"
-                if [ -n "$DD_MIG_DUMP_DIR" ] && [ -s "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
-                    # The manifest is authoritative (the export loop runs in a
-                    # subshell — its variable state does not propagate).
-                    DD_MIG_OK=$(grep -c '^OK|' "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
-                    DD_MIG_FAIL=$(grep -c '^FAIL|' "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
-                    DD_MIG_OK=${DD_MIG_OK:-0}; DD_MIG_FAIL=${DD_MIG_FAIL:-0}
+                # Counts and the FAIL list come from the FUNCTION's return
+                # state (0.0.44d F1): the export sets them from the
+                # authoritative stage copy BEFORE finalize hands the tree
+                # to the agent — re-greping the dump-dir manifest here
+                # would read an agent-owned file as root (forged content
+                # could hide real FAILs past the abort question, or fake
+                # OKs; a replaced FIFO would hang). Only the inner project
+                # loop runs in a subshell; the function-level DD_MIG_*
+                # globals propagate (this block always relied on
+                # DD_MIG_DUMP_DIR doing exactly that).
+                if [ -n "${DD_MIG_DUMP_DIR:-}" ] && [ -n "${DD_MIG_OK:-}${DD_MIG_FAIL:-}" ]; then
                     if [ "$DD_MIG_OK" -gt 0 ]; then
                         ui_success "ddev databases exported: $DD_MIG_OK ok, $DD_MIG_FAIL failed — $DD_MIG_DUMP_DIR"
                     else
@@ -1421,7 +1521,7 @@ do_ddev_phase() {
                         # failure); now the user decides: fix first (abort — the
                         # handover has not run, the dev side still works) or accept.
                         ui_warn "these projects could NOT be exported (no database dump):"
-                        grep '^FAIL|' "$DD_MIG_DUMP_DIR/manifest.conf" | cut -d'|' -f2 | sed 's/^/     /'
+                        printf '%s\n' "${DD_MIG_FAILLIST:-}" | sed '/^$/d; s/^/     /'
                         ui_detail "once the install continues, their databases are only reachable via"
                         ui_detail "the old daemon — a later dev-side export is impossible (handover)."
                         if [ "$INTERACTIVE" = true ]; then
@@ -1442,6 +1542,13 @@ do_ddev_phase() {
                         log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL"\
 " dir=$DD_MIG_DUMP_DIR (failures accepted)"
                     fi
+                elif [ -n "${DD_MIG_DUMP_DIR:-}" ]; then
+                    # dump dir exists but no counts: the export refused
+                    # (tamper guard) or died before accounting — the old
+                    # code fell back to stale manifest numbers here.
+                    ui_warn "ddev database export did not complete — see the REFUSED/failed messages above"
+                    ui_detail "fix the cause and re-run install.sh: the export resumes the dump directory"
+                    log "ddev export incomplete: no counts returned for $DD_MIG_DUMP_DIR"
                 else
                     ui_warn "ddev database export produced no dumps — import manually later if needed"
                     ui_detail "retry after install: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
@@ -1587,7 +1694,7 @@ do_deploy_phase() {
         log "binary reused on re-install: $SYSTEM_BIN"
     fi
 
-    for loc in "/home/$DEFAULT_USER/.opencode/bin/opencode" "/root/.opencode/bin/opencode" \
+    for loc in "$DEV_HOME/.opencode/bin/opencode" "/root/.opencode/bin/opencode" \
         "/usr/local/bin/opencode" "/usr/bin/opencode"; do
         if [ -x "$loc" ] && [ "$loc" != "/usr/local/bin/opencode" ]; then
             ans=$(_yes_no_backup_menu "opencode binary found at $loc. Copy to system path and secure with wrapper?")
@@ -1630,13 +1737,13 @@ do_deploy_phase() {
                 remove_shadow_binary "/root/.opencode/bin/opencode"
                 echo "Installed to $SYSTEM_BIN."
                 log "binary installed (official installer): /root/.opencode/bin/opencode -> $SYSTEM_BIN"
-            elif [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
+            elif [ -x "$DEV_HOME/.opencode/bin/opencode" ]; then
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                sudo cp "/home/$DEFAULT_USER/.opencode/bin/opencode" "$SYSTEM_BIN"
+                sudo cp "$DEV_HOME/.opencode/bin/opencode" "$SYSTEM_BIN"
                 secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
-                remove_shadow_binary "/home/$DEFAULT_USER/.opencode/bin/opencode"
+                remove_shadow_binary "$DEV_HOME/.opencode/bin/opencode"
                 echo "Installed to $SYSTEM_BIN."
-                log "binary installed (official installer): /home/$DEFAULT_USER/.opencode/bin/opencode -> $SYSTEM_BIN"
+                log "binary installed (official installer): $DEV_HOME/.opencode/bin/opencode -> $SYSTEM_BIN"
             else
                 ui_error "Installation failed. Install opencode manually and re-run."
                 exit 1
@@ -1649,24 +1756,46 @@ do_deploy_phase() {
 
     # Stamp the installed binary's major into install.conf (issue #80): the
     # wrapper gates opencode 2.x-only flags (session `--standalone`) on it.
-    # "opencode v2..." -> 2, 1.x bare versions and anything else -> 1. Best
-    # effort — a missing stamp makes the wrapper detect at runtime. NOTE:
-    # sed exits 0 even without a match, so the append must be grep-gated.
-    OPENCODE_MAJOR=1
+    # Anchored like the update.sh twins (install_binary's re-stamp and
+    # current_opencode_major — 0.0.44f F1): "opencode v<digits>" -> N, a
+    # full-line bare digit version -> 1, anything else — an EMPTY probe
+    # (wedged binary, issue #80) or noise — leaves the previous stamp
+    # untouched instead of overwriting a good 2 with 1; on a fresh install
+    # the key stays UNSET and the wrapper detects at runtime. NOTE: sed
+    # exits 0 even without a match, so the append must be grep-gated.
     # Bounded probe: every other probe of this binary carries a timeout
     # (wrapper issue #80) — a wedged binary must not hang the installer at
     # the very last step (review 0.0.39b C5).
-    case $(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1) in
-        "opencode v2"*) OPENCODE_MAJOR=2 ;;
-    esac
-    if grep -q '^OPENCODE_MAJOR=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
-        sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$OPENCODE_MAJOR/" /etc/opencode-permissions-kit/install.conf
+    _stamp_ver=$(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1)
+    _stamp_maj=$(printf '%s' "$_stamp_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
+    if [ -n "$_stamp_maj" ]; then
+        :   # "opencode v2..." — the 2.x shape
+    elif printf '%s' "$_stamp_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+        _stamp_maj=1   # bare version line = 1.x, full-line anchored
     else
-        echo "OPENCODE_MAJOR=$OPENCODE_MAJOR" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
+        _stamp_maj=""   # unparseable/empty — keep the previous stamp
     fi
-    log "install.conf stamped: OPENCODE_MAJOR=$OPENCODE_MAJOR"
+    if [ -n "$_stamp_maj" ]; then
+        OPENCODE_MAJOR="$_stamp_maj"
+        if grep -q '^OPENCODE_MAJOR=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+            sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$OPENCODE_MAJOR/" /etc/opencode-permissions-kit/install.conf
+        else
+            echo "OPENCODE_MAJOR=$OPENCODE_MAJOR" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
+        fi
+        log "install.conf stamped: OPENCODE_MAJOR=$OPENCODE_MAJOR"
+    else
+        # The FILE keeps its previous value (or stays unset — the wrapper
+        # detects at runtime); the in-process gate below follows the same
+        # value so the 2.x TUI branch matches what the wrapper resolves.
+        OPENCODE_MAJOR=$(sed -n 's/^OPENCODE_MAJOR=//p' /etc/opencode-permissions-kit/install.conf \
+            2>/dev/null | tail -1 || true)
+        OPENCODE_MAJOR="${OPENCODE_MAJOR:-1}"
+        ui_warn "opencode version probe unparseable — OPENCODE_MAJOR stamp left unchanged"
+        ui_detail "if the binary hangs (issue #80), fix it and re-run install.sh — an unset stamp is detected at runtime"
+        log "major stamp skipped: version probe unparseable (resolved OPENCODE_MAJOR=$OPENCODE_MAJOR)"
+    fi
 
-    for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
+    for cf in "$DEV_HOME/.bashrc" "$DEV_HOME/.zshrc" "$DEV_HOME/.profile"; do
         if [ -f "$cf" ]; then
             sudo sed -i '\|\.opencode/bin|d' "$cf" 2>/dev/null || true
             if ! sudo grep -q 'export PATH="/usr/local/bin:$PATH"' "$cf" 2>/dev/null; then
@@ -1849,7 +1978,7 @@ do_deploy_phase() {
     # never reach the agent's group-readable home.
     MIGRATE_AGENT_DIRS=".agents .claude/skills"
     _opk_migrate_one() {
-        _opk_src="/home/$DEFAULT_USER/$1"
+        _opk_src="$DEV_HOME/$1"
         _opk_dst="/home/$OPENCODE_USER/$1"
         [ -d "$_opk_src" ] || return 0
         [ -n "$(ls -A "$_opk_src" 2>/dev/null)" ] || return 0
@@ -1905,7 +2034,7 @@ do_deploy_phase() {
     }
     _opk_have_agent_dirs=false
     for _opk_d in $MIGRATE_AGENT_DIRS; do
-        [ -d "/home/$DEFAULT_USER/$_opk_d" ] && [ -n "$(ls -A "/home/$DEFAULT_USER/$_opk_d" 2>/dev/null)" ] \
+        [ -d "$DEV_HOME/$_opk_d" ] && [ -n "$(ls -A "$DEV_HOME/$_opk_d" 2>/dev/null)" ] \
             && _opk_have_agent_dirs=true
     done
     if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]; then
@@ -1931,11 +2060,17 @@ do_deploy_phase() {
                 _opk_ag=m
             fi
         fi
-        # Accept both the flag's words and the menu's letters (follow-up
-        # found while converting the prompt, 0.0.43a): --migrate-agents
-        # takes move|copy|skip, the ui_menu keys are m|c|s — the dispatch
-        # matched letters only, silently no-op'ing the documented word
-        # forms.
+        # normalize-agents-forms (0.0.44a V1): the semantics inside
+        # _opk_migrate_one compare the LETTER (`[ "$_opk_ag" = m ]`), the
+        # flag takes WORDS — the 0.0.43a dispatch fix accepted the words
+        # but never translated them back, so `--migrate-agents move`
+        # silently degraded to a copy. Normalize once, before any
+        # consumer; the dispatch below keeps both forms as belt.
+        case "$_opk_ag" in
+            m|move) _opk_ag=m ;;
+            c|copy) _opk_ag=c ;;
+            s|skip) _opk_ag=s ;;
+        esac
         case "$_opk_ag" in
             m|move|c|copy) for _opk_d in $MIGRATE_AGENT_DIRS; do _opk_migrate_one "$_opk_d"; done ;;
             s|skip)
@@ -2025,7 +2160,7 @@ do_deploy_phase() {
     # 'opencode' would run the real binary as $DEFAULT_USER — bypassing the
     # wrapper and the 'opencode' user. Deploy a deny-* config for the default
     # user so that mode is completely locked down.
-    DEFAULT_OC_DIR="/home/$DEFAULT_USER/.config/opencode"
+    DEFAULT_OC_DIR="$DEV_HOME/.config/opencode"
     DEFAULT_OC_CONF="$DEFAULT_OC_DIR/opencode.jsonc"
     sudo mkdir -p "$DEFAULT_OC_DIR"
     if [ -f "$DEFAULT_OC_CONF" ]; then
@@ -2203,7 +2338,7 @@ fi
 # (and ~/.opencode/bin still first in its $PATH — the rc cleanup above only
 # affects NEW shells). A child process cannot fix the parent shell, so tell
 # the user to restart the terminal.
-if [ -x "/home/$DEFAULT_USER/.opencode/bin/opencode" ]; then
+if [ -x "$DEV_HOME/.opencode/bin/opencode" ]; then
     ui_warn "IMPORTANT: open a NEW terminal before running 'opencode'."
     echo "  Your current shell still resolves the old, unwrapped binary from"
     echo "  ~/.opencode/bin (bash caches the path, and it is still first in \$PATH"

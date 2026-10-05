@@ -328,6 +328,22 @@ else
     fail "final output tells the user to restart the terminal (issue #73)"
 fi
 
+# Unknown options are rejected loudly (0.0.44a V7): `--dryrun --yes`
+# (typo) used to silently drop --dryrun and run a REAL unprompted
+# uninstall — the arg loop now dies on unknowns like every sibling.
+u7_rc=0
+u7_out=$(PATH="$WORK:$PATH" sh "$UNINSTALL" --dryrun --yes 2>&1 >/dev/null) || u7_rc=$?
+if [ "$u7_rc" -eq 1 ] && printf '%s' "$u7_out" | grep -q 'unknown option: --dryrun'; then
+    pass "unknown option aborts before anything runs (V7)"
+else
+    fail "unknown option aborts before anything runs (V7, rc=$u7_rc out=$u7_out)"
+fi
+
+# uninstall side of the conf-user homes (0.0.44b W16)
+grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL" \
+    && pass "uninstall plugin-unregister rides the conf user (V16)" \
+    || fail "uninstall plugin-unregister rides the conf user (V16)"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

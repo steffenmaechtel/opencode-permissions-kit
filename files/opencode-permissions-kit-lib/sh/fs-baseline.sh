@@ -159,11 +159,19 @@ _fsb_pass() {
                 _n=$1; shift
                 _c=""
                 while [ "$_n" -gt 0 ]; do _c="$_c $1"; shift; _n=$((_n - 1)); done
+                # _fail accumulates across the WHOLE batch (0.0.44a V9):
+                # a for-loop status alone is the LAST command executed, so
+                # a chgrp/chmod/setfacl failure on any entry but the final
+                # one left rc 0 — xargs green, the caller printed "applied"
+                # over an incomplete baseline, the falsified W5 premise of
+                # review 0.0.43b. Any failing entry fails the batch now.
+                _fail=0
                 for _p in "$@"; do
                     [ -L "$_p" ] && continue
                     # shellcheck disable=SC2086  # kit-fixed, space-free words
-                    $_c "$_p"
+                    $_c "$_p" || _fail=1
                 done
+                [ "$_fail" -eq 0 ]
               ' xargs-sh "$#" "$@" || _fsbp_rc=$?
     fi
     rm -f "$_fsbp_nul"

@@ -308,6 +308,14 @@ check "setup checks systemd for docker-rootless" grep -Fq 'systemctl --user is-a
 echo ""
 echo "===================================="
 echo "  ${GREEN}Passed: $passed${NC}"
+# --yes is an accepted no-op (0.0.44b W16/V28)
+_v28_out=$(sh "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend" --yes 2>&1 || true)
+case "$_v28_out" in
+    *"unknown arg"*) check "--yes accepted as no-op, usage error only for the missing backend (V28)" false ;;
+    *Usage*) check "--yes accepted as no-op, usage error only for the missing backend (V28)" true ;;
+    *) check "--yes accepted as no-op (V28, got: $_v28_out)" false ;;
+esac
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1

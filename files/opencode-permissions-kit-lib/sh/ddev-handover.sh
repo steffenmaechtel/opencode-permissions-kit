@@ -415,8 +415,11 @@ ddev_handover_root() {
         # [ -L ] recheck immediately before each recursive op (fs-baseline
         # deeec30 pattern, 0.0.39g S2): find classified the entry at SCAN
         # time; the scanned trees are agent-group-writable, so a swapped
-        # symlink operand must never reach chown -R/chmod -R — both
-        # dereference a symlink OPERAND and would act on the target tree.
+        # symlink operand must never reach the recursive pair below.
+        # chmod -R DOES dereference a symlink operand (the load-bearing
+        # half); chown -R (default -P) lchowns operands and never
+        # traverses — the gate stays for it as defense-in-depth
+        # (0.0.44a V24 corrected the earlier "both dereference" claim).
         [ -L "$dhr_d" ] && continue
         # Top-inode fast path (issue #112): skip the recursive pair when
         # the tree already conforms — the steady-state re-scan used to
@@ -463,8 +466,10 @@ ddev_handover_project_back() {
     for dhb_d in $(ddev_type_settings_dirs "$dhb_proj"); do
         [ "$dhb_d" = "." ] && continue
         # [ -d ] && [ ! -L ] (0.0.39g S2): [ -d ] follows a symlink — a
-        # planted settings-dir link would make chown -R/chmod -R below
-        # dereference the OPERAND into an arbitrary tree. Raceless skip.
+        # planted settings-dir link would send the recursive pair below
+        # into an arbitrary tree through chmod -R (which dereferences
+        # operands; chown -R's default -P lchowns and never traverses —
+        # 0.0.44a V24). Raceless skip.
         [ -d "$dhb_proj/$dhb_d" ] || continue
         [ -L "$dhb_proj/$dhb_d" ] && continue
         # Resolved containment (0.0.42f S1 — the back-function sibling
@@ -519,9 +524,9 @@ ddev_handover_project() {
         [ "$dhp_d" = "." ] && continue
         # [ -d ] && [ ! -L ] (0.0.39g S2, raceless variant): [ -d ] follows
         # a symlink — a planted settings-dir link (typo3conf, web, ...) over
-        # an agent-group-writable project tree would make chown -R/chmod -R
-        # dereference the OPERAND and recursively hand an arbitrary tree
-        # to the agent.
+        # an agent-group-writable project tree would hand an arbitrary tree
+        # to the agent through chmod -R (which dereferences operands;
+        # chown -R's default -P lchowns and never traverses — 0.0.44a V24).
         [ -d "$dhp_proj/$dhp_d" ] || continue
         [ -L "$dhp_proj/$dhp_d" ] && continue
         # Containment (0.0.42e S2): the [ -L ] gate above catches a

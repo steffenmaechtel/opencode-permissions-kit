@@ -346,16 +346,21 @@ projects_remove() {
         # captured OUTSIDE the write pipeline — dash has no pipefail, an
         # `|| rc=$?` on the pipeline would only ever see tee's 0. The
         # .tmp is registered in the scratch registry.
+        # Per-process suffix (0.0.42e C5 / 0.0.44a V11): the fixed name
+        # let two concurrent `opk config projects remove` runs clobber
+        # each other's staging file — the three sibling rewrites got
+        # `.opk-new.$$` in 0.0.42e; this fourth site now matches them.
         _pr_rc=0
         _pr_out=$(sudo grep -vxF "$p" "$PROJECTS_CONF" 2>/dev/null) || _pr_rc=$?
         [ "$_pr_rc" -le 1 ] || die "cannot rewrite $PROJECTS_CONF (grep rc $_pr_rc) — '$p' NOT removed"
-        _tmp_track "$PROJECTS_CONF.tmp"
+        _pr_tmp="$PROJECTS_CONF.tmp.$$"
+        _tmp_track "$_pr_tmp"
         if [ -n "$_pr_out" ]; then
-            printf '%s\n' "$_pr_out" | sudo tee "$PROJECTS_CONF.tmp" > /dev/null
+            printf '%s\n' "$_pr_out" | sudo tee "$_pr_tmp" > /dev/null
         else
-            sudo tee "$PROJECTS_CONF.tmp" > /dev/null < /dev/null
+            sudo tee "$_pr_tmp" > /dev/null < /dev/null
         fi
-        sudo mv "$PROJECTS_CONF.tmp" "$PROJECTS_CONF"
+        sudo mv "$_pr_tmp" "$PROJECTS_CONF"
         ui_success "removed $p"
         log "project removed: $p"
     done
@@ -364,8 +369,11 @@ projects_remove() {
 # --- git-config toggle (SOFT-only) ---------------------------------------------
 
 git_config_file() {
-    for f in /home/opencode/.config/opencode/opencode.jsonc \
-             /home/opencode/.config/opencode/opencode.json; do
+    # /home/$OPENCODE_USER, never the literal agent name (0.0.44a V16):
+    # a hand-edited conf with a custom agent user must find the real
+    # config — same class the sibling sites fixed (F15/W2).
+    for f in "/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.jsonc" \
+             "/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.json"; do
         [ -f "$f" ] && { echo "$f"; return; }
     done
     echo ""
@@ -388,7 +396,7 @@ git_config_status() {
 git_config_apply() {
     # Re-renders the bundled opencode.jsonc template with or without SECURE_GIT
     enable="$1"
-    target="/home/opencode/.config/opencode/opencode.jsonc"
+    target="/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.jsonc"
 
     # Find the template: bundled alongside this script, or in the repo, or in the lib dir
     template=""

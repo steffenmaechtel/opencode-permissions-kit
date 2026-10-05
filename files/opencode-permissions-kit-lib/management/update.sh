@@ -885,19 +885,58 @@ install_binary() {
     if ! secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"; then
         # rc 2, not 1 (0.0.43a F9): the new binary is ALREADY deployed —
         # the caller must restore from the backup (or report the partial
-        # state), never claim "left untouched".
+        # state), never claim "left untouched". The stderr note names the
+        # failed step (0.0.44b W7): rc 2 now has more than one source.
+        echo "  error: hardening (secure_binary) failed on the deployed candidate" >&2
         return 2
     fi
     new=$(opencode_version_line)
     [ -n "$new" ] || new="unknown"
     # Re-stamp the major so the wrapper's 2.x --standalone gating follows
-    # the binary ("opencode v2..." -> 2, anything else -> 1).
-    _new_major=$(printf '%s' "$new" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
-    [ -n "$_new_major" ] || _new_major=1
-    if [ -f "$CONFDIR/install.conf" ] && grep -q '^OPENCODE_MAJOR=' "$CONFDIR/install.conf" 2>/dev/null; then
-        sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf"
-    elif [ -f "$CONFDIR/install.conf" ]; then
-        echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null
+    # the binary. ONLY when the probe actually returned a line (0.0.44a
+    # V5): an empty/failed probe used to persist major 1 over a known-
+    # good 2 stamp — the wrapper prefers the stamp, and a 1-stamped 2.x
+    # binary attaches sessions to the shared service (the issue-#80 env
+    # breakage --standalone exists to prevent). A RETURNED line is always
+    # a major (0.0.44b W4): 2.x prints "opencode v2...", 1.x prints the
+    # bare version — same parity as current_opencode_major. The old gate
+    # treated 1.x lines as "undetermined" and kept a stale 2-stamp across
+    # the documented `--major 1` downgrade, so the wrapper passed the
+    # 2.x-only --standalone to a 1.x binary on every start.
+    # The stamp writes fail loud (0.0.44a V20): rc 2 = post-copy failure,
+    # the caller restores from the backup instead of printing "upgraded"
+    # over a stale stamp.
+    if [ "$new" != "unknown" ]; then
+        _new_major=$(printf '%s' "$new" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
+        if [ -n "$_new_major" ]; then
+            :   # "opencode v2..." — the 2.x shape
+        elif printf '%s' "$new" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            _new_major=1   # bare version line = 1.x (current_opencode_major
+                           # parity; FULL-LINE anchored, 0.0.44d F3: "2.0.11-
+                           # dev" and digit-leading noise like "404 not
+                           # found" are unparseable, not major 1)
+        else
+            # Neither shape (0.0.44c C6): a stdout warning line grabbed by
+            # head -1, an exotic prefix — unparseable. Treat like an empty
+            # probe: keep the previous stamp rather than defaulting to 1
+            # over a known-good 2.
+            _new_major=""
+        fi
+        if [ -n "$_new_major" ]; then
+            if [ -f "$CONFDIR/install.conf" ] && grep -q '^OPENCODE_MAJOR=' "$CONFDIR/install.conf" 2>/dev/null; then
+                sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf" \
+                    || { echo "  error: OPENCODE_MAJOR stamp write failed" >&2; return 2; }
+            elif [ -f "$CONFDIR/install.conf" ]; then
+                echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null \
+                    || { echo "  error: OPENCODE_MAJOR stamp write failed" >&2; return 2; }
+            fi
+        else
+            echo "  warn: new binary's version line is unparseable — OPENCODE_MAJOR stamp left unchanged" >&2
+            log "opencode binary upgraded but major unparseable; OPENCODE_MAJOR stamp kept"
+        fi
+    else
+        echo "  warn: new binary's version could not be probed — OPENCODE_MAJOR stamp left unchanged" >&2
+        log "opencode binary upgraded but major unknown; OPENCODE_MAJOR stamp kept"
     fi
     echo "  opencode binary upgraded: ${current} -> ${new}"
     log "opencode binary upgraded: ${current} -> ${new}"
@@ -915,9 +954,24 @@ current_opencode_major() {
     _com_ver=$(opencode_version_line)
     if [ -n "$_com_ver" ]; then
         _com_maj=$(version_major "$_com_ver")
-        [ -n "$_com_maj" ] || _com_maj=1
-        echo "$_com_maj"
-        return 0
+        if [ -n "$_com_maj" ]; then
+            :   # "opencode v2..." — the 2.x shape
+        elif printf '%s' "$_com_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            _com_maj=1   # bare version line = 1.x, full-line anchored —
+                         # parity with install_binary's re-stamp (0.0.44e
+                         # E2: this value picks the UPGRADE CHANNEL, a
+                         # misparsed probe on a 2.x host must not resolve
+                         # the 1.x channel)
+        else
+            # unparseable probe line: fall through to the install.conf
+            # stamp instead of guessing major 1 (the old mapping would
+            # have installed 1.x over a 2.x host on a warning line)
+            _com_maj=""
+        fi
+        if [ -n "$_com_maj" ]; then
+            echo "$_com_maj"
+            return 0
+        fi
     fi
     _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
     echo "${_com_maj:-1}"
@@ -1100,10 +1154,12 @@ if [ "$BINARY_UPDATE" = true ]; then
                 if [ -f "$BACKUP_DIR/opencode.current" ] \
                    && sudo cp "$BACKUP_DIR/opencode.current" "$SYSTEM_BIN" 2>/dev/null \
                    && secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" >/dev/null 2>&1; then
-                    ui_warn "candidate installed but hardening failed — previous binary restored"
+                    ui_warn "candidate installed but a post-install step failed — previous binary restored"
+                    ui_warn "(the step's own error line above names it: hardening or the OPENCODE_MAJOR stamp)"
                     log "opencode binary upgrade failed post-copy; previous binary restored from $BACKUP_DIR"
                 else
-                    ui_warn "candidate installed but hardening FAILED — installed binary is NOT hardened"
+                    ui_warn "candidate installed but a post-install step FAILED — installed binary is NOT verified"
+                    ui_warn "(the step's own error line above names it: hardening or the OPENCODE_MAJOR stamp)"
                     if [ -f "$BACKUP_DIR/opencode.current" ]; then
                         ui_warn "previous binary kept at $BACKUP_DIR/opencode.current — restore manually:"
                         ui_warn "  sudo cp $BACKUP_DIR/opencode.current $SYSTEM_BIN"

@@ -307,6 +307,147 @@ check "tui: registration flips with the major (sync function, both directions)" 
 check "tui: a major flip re-anchors the registration even in --only-binary runs" \
     sh -c "grep -n 'sync_tui_registration \"\$_maj_after\"' \"\$1\" | head -1 | cut -d: -f1 | grep -q ." _ "$UPDATE"
 
+# OPENCODE_MAJOR re-stamp discipline (0.0.44a V5/V20, hardened 0.0.44b
+# W4): a RETURNED version line is always a major (2.x prints "opencode
+# vN...", 1.x the bare version — current_opencode_major parity; the old
+# gate treated 1.x as undetermined and kept a stale 2-stamp across the
+# documented `--major 1` downgrade). Only an empty probe (unknown) keeps
+# the previous stamp; both stamp writes fail loud (rc 2 = post-copy).
+_restamp_block=$(sed -n '/^    if \[ "\$new" != "unknown" \]; then/,/^    fi$/p' "$UPDATE")
+_restamp_writes=$(printf '%s\n' "$_restamp_block" | grep -c 'OPENCODE_MAJOR=$_new_major' || true)
+_restamp_guards=$(printf '%s\n' "$_restamp_block" | grep -c 'return 2' || true)
+if grep -qF 'OPENCODE_MAJOR stamp left unchanged' "$UPDATE" \
+   && [ "$_restamp_writes" -eq 2 ] && [ "$_restamp_guards" -ge 2 ]; then
+    pass "re-stamp only on a probed line, writes fail loud (V5/V20, W4 shape)"
+else
+    fail "re-stamp only on a probed line, writes fail loud (V5/V20, W4 shape, writes=$_restamp_writes guards=$_restamp_guards)"
+fi
+# behavioral: the extracted block runs against a fixture conf with a
+# direct sudo shim — 0.0.44b W4's regression case (bare 1.x line) must
+# stamp 1 over a stale 2 (the old code kept 2 and the wrapper passed the
+# 2.x-only --standalone to a 1.x binary).
+if [ -n "$_restamp_block" ]; then
+    _rst_conf="$WORK/install.conf"
+    _rst_run() {
+        printf 'OPENCODE_MAJOR=2\n' > "$_rst_conf"
+        (
+            CONFDIR="$WORK"
+            sudo() { "$@"; }
+            log() { :; }
+            new="$_rst_line"
+            eval "$_restamp_block"
+        ) >/dev/null 2>&1
+        sed -n 's/^OPENCODE_MAJOR=//p' "$_rst_conf" | tail -1
+    }
+    _rst_line="opencode v2.0.11"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: 2.x line stamps 2 (W4)" \
+        || fail "re-stamp: 2.x line stamps 2 (W4)"
+    _rst_line="1.18.31"
+    [ "$(_rst_run)" = "1" ] \
+        && pass "re-stamp: bare 1.x line stamps 1 over a stale 2 (W4)" \
+        || fail "re-stamp: bare 1.x line stamps 1 over a stale 2 (W4)"
+    _rst_line="unknown"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: unknown probe keeps the previous stamp (V5)" \
+        || fail "re-stamp: unknown probe keeps the previous stamp (V5)"
+    # a NON-matching non-empty line (a warning grabbed by head -1) is
+    # unparseable, not major 1 — it must keep the stamp too (0.0.44c C6)
+    _rst_line="warn: something odd on stdout"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: unparseable line keeps the previous stamp (C6)" \
+        || fail "re-stamp: unparseable line keeps the previous stamp (C6)"
+    # dev-suffixed and digit-leading noise are unparseable too (0.0.44d
+    # F3: the bare-version arm is full-line anchored)
+    _rst_line="2.0.11-dev"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: dev-suffixed line keeps the previous stamp (F3)" \
+        || fail "re-stamp: dev-suffixed line keeps the previous stamp (F3)"
+    _rst_line="404 not found"
+    [ "$(_rst_run)" = "2" ] \
+        && pass "re-stamp: digit-leading noise keeps the previous stamp (F3)" \
+        || fail "re-stamp: digit-leading noise keeps the previous stamp (F3)"
+
+# current_opencode_major anchors the same way (0.0.44e E2): this value
+# picks the UPGRADE CHANNEL — a misparsed probe on a 2.x host must fall
+# through to the install.conf stamp, not resolve the 1.x channel.
+_com_fns=$(sed -n '/^version_major() {/,/^}/p' "$UPDATE")
+_com_c=$(sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE")
+# literal newline in quotes: $(printf '\n') strips it and glues the
+# function bodies together (Syntax error: Bad function name)
+_com_fns="$_com_fns
+$_com_c"
+if [ -n "$_com_fns" ]; then
+    _com_dir="$WORK/comconf"; mkdir -p "$_com_dir"
+    printf 'OPENCODE_MAJOR=2\n' > "$_com_dir/install.conf"
+    _com_run() {
+        (
+            CONFDIR="$_com_dir"
+            opencode_version_line() { printf '%s\n' "$_probe"; }
+            eval "$_com_fns"
+            current_opencode_major
+        )
+    }
+    _probe="opencode v2.0.11"
+    [ "$(_com_run)" = "2" ] \
+        && pass "major probe: 2.x line -> 2 (E2)" \
+        || fail "major probe: 2.x line -> 2 (E2)"
+    _probe="1.18.31"
+    [ "$(_com_run)" = "1" ] \
+        && pass "major probe: bare 1.x line -> 1 (E2)" \
+        || fail "major probe: bare 1.x line -> 1 (E2)"
+    _probe="404 not found"
+    [ "$(_com_run)" = "2" ] \
+        && pass "major probe: noise falls through to the stamp, not 1 (E2)" \
+        || fail "major probe: noise falls through to the stamp, not 1 (E2)"
+    _probe="2.0.11-dev"
+    [ "$(_com_run)" = "2" ] \
+        && pass "major probe: dev-suffixed line falls through to the stamp (E2)" \
+        || fail "major probe: dev-suffixed line falls through to the stamp (E2)"
+else
+    fail "current_opencode_major extractable (E2)"
+fi
+else
+    fail "re-stamp block extractable (W4)"
+fi
+
+# --- install.sh install-time major stamp + preflight probe (0.0.44f F1) -----------
+# Statics: the anchored shape must exist at the third site of the class,
+# the bare default-to-1 must be gone, and the preflight must probe the
+# reused binary bounded. The arm statics are scoped to the extracted
+# STAMP block — the preflight probe carries the same idiom and would
+# satisfy a file-wide grep (the 0.0.42d token-blindness class).
+# Behavioral pins for the anchored semantics live above (E2 probes);
+# e2e covers the parseable paths with real binaries.
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
+_f1_dir="$WORK/f1stamp"; mkdir -p "$_f1_dir"
+sed -n '/_stamp_ver=/,/major stamp skipped/p' "$INSTALL" > "$_f1_dir/stampblock"
+if [ -s "$_f1_dir/stampblock" ]; then
+    # Scoping tripwires (0.0.44g G1): the end anchor above is PROSE (the
+    # log line) — a rewording would silently run the range to EOF and
+    # decay the arm greps back to file-wide/token-blind (the 0.0.42d
+    # class). Both decay modes fail LOUD instead: preflight tokens inside
+    # the block, or a block grown past every legitimate edit's size.
+    check "stamp block scoping: no preflight tokens inside (G1)" \
+        sh -c "! grep -q '_pf_oc' \"\$1\"" _ "$_f1_dir/stampblock"
+    check "stamp block scoping: block stays compact, no EOF over-run (G1)" \
+        sh -c "[ \"\$(wc -l < \"\$1\")\" -le 40 ]" _ "$_f1_dir/stampblock"
+    check "install-time stamp anchors the sed major arm (F1)" \
+        sh -c 'grep -qF "s/^opencode v\\([0-9][0-9]*\\).*" "$1"' _ "$_f1_dir/stampblock"
+    check "install-time stamp anchors the bare-version arm (F1)" \
+        sh -c 'grep -qF "grep -qE '"'"'^[0-9]+(\\.[0-9]+)*$'"'"'" "$1"' _ "$_f1_dir/stampblock"
+    check "unparseable probe keeps the stamp and warns (F1)" \
+        sh -c "grep -qF 'OPENCODE_MAJOR stamp left unchanged' \"\$1\" && grep -qF 'stamp skipped: version probe unparseable' \"\$1\"" _ "$_f1_dir/stampblock"
+else
+    fail "install-time stamp block extractable (F1)"
+fi
+check "install-time stamp has no bare default-to-1 (F1)" \
+    sh -c "! grep -qE '^[[:space:]]+OPENCODE_MAJOR=1\$' \"\$1\"" _ "$INSTALL"
+check "preflight probes the reused binary bounded (F1)" \
+    sh -c "grep -qF 'timeout 10 \"\$_pf_oc_bin\" --version' \"\$1\"" _ "$INSTALL"
+check "preflight warns instead of aborting on an unresponsive binary (F1)" \
+    sh -c "grep -qF 'does not answer --version' \"\$1\" && grep -qF \"the install reuses this binary\" \"\$1\"" _ "$INSTALL"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

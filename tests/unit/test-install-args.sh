@@ -142,6 +142,164 @@ parse_args --projects /var/www/vhosts --migrate-agents copy
     && pass "--migrate-agents works after --projects" \
     || fail "--migrate-agents works after --projects"
 
+# Word forms normalize to the menu letters (0.0.44a V1): the migration
+# semantics compare `[ "$_opk_ag" = m ]` — an untranslated word form made
+# `--migrate-agents move` silently degrade to a copy. The normalization
+# case is extracted from install.sh and executed against every accepted
+# input form.
+_install_sh="$SCRIPT_DIR/../../files/install.sh"
+_extracted_case=$(sed -n '/^        # normalize-agents-forms (0.0.44a V1)/,/^        esac$/p' "$_install_sh")
+[ -n "$_extracted_case" ] \
+    && pass "install.sh: agents-form normalization extractable (V1)" \
+    || fail "install.sh: agents-form normalization extractable (V1)"
+for _pair in "m:m" "move:m" "c:c" "copy:c" "s:s" "skip:s"; do
+    _in=${_pair%%:*}
+    _want=${_pair##*:}
+    _opk_ag="$_in"
+    eval "$(printf '%s\n' "$_extracted_case" | sed -n '/^        case/,$p')"
+    [ "$_opk_ag" = "$_want" ] \
+        && pass "agents form '$_in' normalizes to '$_want' (V1)" \
+        || fail "agents form '$_in' normalizes to '$_want' (V1, got '$_opk_ag')"
+done
+# and it runs BEFORE the dispatch that fires the migration loop
+_norm_ln=$(grep -n 'normalize-agents-forms' "$_install_sh" | head -1 | cut -d: -f1)
+_disp_ln=$(grep -n 'm|move|c|copy)' "$_install_sh" | head -1 | cut -d: -f1)
+[ -n "$_norm_ln" ] && [ -n "$_disp_ln" ] && [ "$_norm_ln" -lt "$_disp_ln" ] \
+    && pass "normalization precedes the migration dispatch (V1)" \
+    || fail "normalization precedes the migration dispatch (V1)"
+
+# Developer-side paths ride DEV_HOME, getent-resolved (0.0.44a V14): the
+# installer used to hardcode /home/$DEFAULT_USER in ~14 provisioning
+# sites (ddev discovery, .ddev registry, rc hooks, agents sources, the
+# deny-all config, TUI theme) although it resolves the same home via
+# getent 20 lines further up.
+if grep -q 'DEV_HOME="/home/\$DEFAULT_USER"' "$_install_sh" \
+   && grep -q 'getent passwd "\$DEFAULT_USER"' "$_install_sh" \
+   && ! grep -q '/home/\$DEFAULT_USER/' "$_install_sh"; then
+    pass "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14)"
+else
+    fail "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14)"
+fi
+
+# V15: the reuse guard aborts on a deviating home or primary group
+# (maintainer decision B) instead of provisioning a shadow home. The two
+# checks are extracted and executed against shims.
+_h_guard=$(sed -n '/^        # reuse-guard-home (0.0.44a V15/,/^        fi$/p' "$_install_sh")
+_g_guard=$(sed -n '/^        # reuse-guard-group (0.0.44a V15/,/^        fi$/p' "$_install_sh")
+[ -n "$_h_guard" ] \
+    && pass "install.sh: reuse home-guard extractable (V15)" \
+    || fail "install.sh: reuse home-guard extractable (V15)"
+[ -n "$_g_guard" ] \
+    && pass "install.sh: reuse group-guard extractable (V15)" \
+    || fail "install.sh: reuse group-guard extractable (V15)"
+if [ -n "$_h_guard" ] && [ -n "$_g_guard" ]; then
+    OPENCODE_USER="octest"
+    ui_error() { :; }
+    ui_info()  { :; }
+    log()      { :; }
+    # deviating home -> rc 1 (|| captures the rc: this suite runs set -e)
+    _gr_rc=0
+    (
+        getent() { [ "$2" = "octest" ] && printf 'x:x:1000:1000::/srv/octest:/bin/sh\n'; }
+        eval "$_h_guard"
+    ) || _gr_rc=$?
+    [ "$_gr_rc" -eq 1 ] \
+        && pass "reuse guard: deviating home aborts (V15)" \
+        || fail "reuse guard: deviating home aborts (V15, rc $_gr_rc)"
+    # matching home -> rc 0
+    _gr_rc=0
+    (
+        getent() { [ "$2" = "octest" ] && printf 'x:x:1000:1000::/home/octest:/bin/sh\n'; }
+        eval "$_h_guard"
+    ) || _gr_rc=$?
+    [ "$_gr_rc" -eq 0 ] \
+        && pass "reuse guard: matching home passes (V15)" \
+        || fail "reuse guard: matching home passes (V15, rc $_gr_rc)"
+    # deviating primary group -> rc 1
+    _gr_rc=0
+    (
+        id() { [ "$1" = "-gn" ] && printf 'users\n'; }
+        eval "$_g_guard"
+    ) || _gr_rc=$?
+    [ "$_gr_rc" -eq 1 ] \
+        && pass "reuse guard: foreign primary group aborts (V15)" \
+        || fail "reuse guard: foreign primary group aborts (V15, rc $_gr_rc)"
+    # own primary group -> rc 0
+    _gr_rc=0
+    (
+        id() { [ "$1" = "-gn" ] && printf 'octest\n'; }
+        eval "$_g_guard"
+    ) || _gr_rc=$?
+    [ "$_gr_rc" -eq 0 ] \
+        && pass "reuse guard: own primary group passes (V15)" \
+        || fail "reuse guard: own primary group passes (V15, rc $_gr_rc)"
+fi
+
+# --- 0.0.44b W6/W14: EOF bails in BOTH Step-2 loops -----------------------------------
+# The 0.0.44a V6 fix closed the outer selection loop only; the custom-
+# path sub-loop still spun forever on a dead stdin (the class rule the
+# wave itself added, applied to itself). Both empty-read guards are
+# extracted and executed against an _ui_read stub that always yields
+# the empty string.
+_loop_w=$(sed -n '/^                    while \[ -z "\$_custom" \]; do$/,/^                    done$/p' "$_install_sh")
+[ -n "$_loop_w" ] \
+    && pass "install.sh: custom-path loop extractable (W6)" \
+    || fail "install.sh: custom-path loop extractable (W6)"
+if [ -n "$_loop_w" ]; then
+    _w6_rc=0
+    (
+        _ui_read() {
+            # hang breaker (0.0.44c C5): on a W6 revert the pre-fix loop
+            # spins on empty reads — force-exit 124 after 9 so the pin
+            # FAILS with a name instead of hanging the suite
+            _ui_n=$((_ui_n + 1))
+            [ "$_ui_n" -gt 9 ] && exit 124
+            eval "$1="
+        }
+        _ui_n=0
+        project_path_sane() { return 0; }
+        ui_error() { :; }
+        ui_info()  { :; }
+        _PP_NORM="/var/tmp/x"
+        _custom=""
+        custom=""
+        _custom_empty=0
+        eval "$_loop_w"
+    ) || _w6_rc=$?
+    [ "$_w6_rc" -eq 1 ] \
+        && pass "custom-path loop aborts on 5 empty reads instead of spinning (W6)" \
+        || fail "custom-path loop aborts on 5 empty reads instead of spinning (W6, rc $_w6_rc)"
+fi
+_outer_bail=$(sed -n '/^            if \[ -z "\$selection" \]; then$/,/^            fi$/p' "$_install_sh")
+[ -n "$_outer_bail" ] \
+    && pass "install.sh: outer empty-read guard extractable (W14)" \
+    || fail "install.sh: outer empty-read guard extractable (W14)"
+if [ -n "$_outer_bail" ]; then
+    _w14_rc=0
+    (
+        ui_error() { :; }
+        _sel_empty=0
+        _n=0
+        while [ "$_n" -lt 5 ]; do
+            selection=""
+            eval "$_outer_bail"
+            [ "$_sel_empty" -gt 0 ] && [ "$_n" -eq 4 ] && exit 1   # not reached: exit comes first
+            _n=$((_n + 1))
+        done
+        exit 0
+    ) || _w14_rc=$?
+    [ "$_w14_rc" -eq 1 ] \
+        && pass "outer selection guard exits on the 5th empty read (W14)" \
+        || fail "outer selection guard exits on the 5th empty read (W14, rc $_w14_rc)"
+fi
+# and --yes takes the documented skip: the SKIP_PROMPTS elif sits before
+# the interactive prompt block (order pin)
+_skip_ln=$(grep -n 'elif \[ "\$SKIP_PROMPTS" = true \]; then' "$_install_sh" | head -1 | cut -d: -f1)
+_prompt_ln=$(grep -n 'ui_section "Project roots"' "$_install_sh" | head -1 | cut -d: -f1)
+[ -n "$_skip_ln" ] && [ -n "$_prompt_ln" ] && [ "$_skip_ln" -lt "$_prompt_ln" ] \
+    && pass "--yes skip branch precedes the interactive prompt (W14)" \
+    || fail "--yes skip branch precedes the interactive prompt (W14)"
+
 # The regression this file exists for: flags AFTER --projects used to be
 # silently dropped (the old loop `break`ed out of the parser).
 reset_globals
