@@ -423,6 +423,15 @@ INSTALL="$SCRIPT_DIR/../../files/install.sh"
 _f1_dir="$WORK/f1stamp"; mkdir -p "$_f1_dir"
 sed -n '/_stamp_ver=/,/major stamp skipped/p' "$INSTALL" > "$_f1_dir/stampblock"
 if [ -s "$_f1_dir/stampblock" ]; then
+    # Scoping tripwires (0.0.44g G1): the end anchor above is PROSE (the
+    # log line) — a rewording would silently run the range to EOF and
+    # decay the arm greps back to file-wide/token-blind (the 0.0.42d
+    # class). Both decay modes fail LOUD instead: preflight tokens inside
+    # the block, or a block grown past every legitimate edit's size.
+    check "stamp block scoping: no preflight tokens inside (G1)" \
+        sh -c "! grep -q '_pf_oc' \"\$1\"" _ "$_f1_dir/stampblock"
+    check "stamp block scoping: block stays compact, no EOF over-run (G1)" \
+        sh -c "[ \"\$(wc -l < \"\$1\")\" -le 40 ]" _ "$_f1_dir/stampblock"
     check "install-time stamp anchors the sed major arm (F1)" \
         sh -c 'grep -qF "s/^opencode v\\([0-9][0-9]*\\).*" "$1"' _ "$_f1_dir/stampblock"
     check "install-time stamp anchors the bare-version arm (F1)" \

@@ -292,7 +292,9 @@ fi
 # The probe is bounded like every sibling (0.0.43a F3): a 2.x service that
 # cannot bind its port makes even `--version` hang (issue #80), and an
 # unbounded substitution would hang EVERY start. Fail-open: a failed, hung,
-# or empty probe means major 1 (mirroring install.sh's major detection).
+# or empty probe means major 1 — a deliberate trade (0.0.44b W10), NOT a
+# mirror of install.sh's stamp (0.0.44f F1/G3): the install-time anchor
+# keeps/leaves the stamp on unparseable probes instead of defaulting to 1.
 if [ -z "${OPENCODE_MAJOR:-}" ]; then
     # Reuse ADV_LINE when the advisories probe ran (0.0.44a V21): it is
     # the SAME bounded `--version` first line — a second serial probe
