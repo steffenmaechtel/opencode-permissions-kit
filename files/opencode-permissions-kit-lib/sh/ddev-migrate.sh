@@ -278,11 +278,16 @@ ddev_migrate_has_db() {
 # Creates a fresh dump directory, exports every eligible project's
 # database as the dev user, powers the old daemon down, then hands the
 # dumps to the opencode user (group-readable for the developer). Sets
-# DD_MIG_DUMP_DIR / DD_MIG_OK / DD_MIG_FAIL for the caller. Returns 0
-# when at least one dump was written.
+# DD_MIG_DUMP_DIR / DD_MIG_OK / DD_MIG_FAIL for the caller. OK/FAIL stay
+# EMPTY until the accounting ran (0.0.44e E1): a refused or aborted
+# export leaves them empty, so the caller can tell a COMPLETED export
+# (numeric counts) from an incomplete one — the old entry-time zeroing
+# made a tamper-refused run indistinguishable from a clean 0/0 one and
+# the installer stamped DDEV_EXPORTED=1 over it. Returns 0 when at least
+# one dump was written.
 ddev_migrate_export() {
     dm_dev="$1"; dm_oc="$2"; dm_ocg="$3"; shift 3
-    DD_MIG_DUMP_DIR=""; DD_MIG_OK=0; DD_MIG_FAIL=0
+    DD_MIG_DUMP_DIR=""; DD_MIG_OK=""; DD_MIG_FAIL=""
     dm_bin=$(_ddev_migrate_bin "$dm_dev") || {
         echo "  ddev not found — cannot export databases."
         return 1
@@ -495,8 +500,11 @@ ddev_migrate_export() {
     # agent-owned manifest would be refused by the resume seed's owner
     # check (0.0.44c C3) — the documented fix-and-re-run path would
     # dead-end on the kit's own finalize output. root:<sharing-group>
-    # 0640: sticky-protected name, group-readable for dev/import/status,
-    # unwritable for the agent.
+    # 0640. NB the finalized dir is 750 agent-owned (no sticky — 0.0.44e
+    # E3 corrected the earlier "sticky-protected" wording): the agent CAN
+    # rename the root-owned manifest there. What actually protects the
+    # resume is the seed's refusal — the agent cannot forge a root- or
+    # dev-OWNED replacement, so anything it plants is refused loudly.
     chown "root:$dm_ocg" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true
     [ "${DD_MIG_OK:-0}" -gt 0 ]
 }

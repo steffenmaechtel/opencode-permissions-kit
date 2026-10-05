@@ -954,9 +954,24 @@ current_opencode_major() {
     _com_ver=$(opencode_version_line)
     if [ -n "$_com_ver" ]; then
         _com_maj=$(version_major "$_com_ver")
-        [ -n "$_com_maj" ] || _com_maj=1
-        echo "$_com_maj"
-        return 0
+        if [ -n "$_com_maj" ]; then
+            :   # "opencode v2..." — the 2.x shape
+        elif printf '%s' "$_com_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            _com_maj=1   # bare version line = 1.x, full-line anchored —
+                         # parity with install_binary's re-stamp (0.0.44e
+                         # E2: this value picks the UPGRADE CHANNEL, a
+                         # misparsed probe on a 2.x host must not resolve
+                         # the 1.x channel)
+        else
+            # unparseable probe line: fall through to the install.conf
+            # stamp instead of guessing major 1 (the old mapping would
+            # have installed 1.x over a 2.x host on a warning line)
+            _com_maj=""
+        fi
+        if [ -n "$_com_maj" ]; then
+            echo "$_com_maj"
+            return 0
+        fi
     fi
     _com_maj=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
     echo "${_com_maj:-1}"

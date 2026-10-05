@@ -367,6 +367,46 @@ if [ -n "$_restamp_block" ]; then
     [ "$(_rst_run)" = "2" ] \
         && pass "re-stamp: digit-leading noise keeps the previous stamp (F3)" \
         || fail "re-stamp: digit-leading noise keeps the previous stamp (F3)"
+
+# current_opencode_major anchors the same way (0.0.44e E2): this value
+# picks the UPGRADE CHANNEL — a misparsed probe on a 2.x host must fall
+# through to the install.conf stamp, not resolve the 1.x channel.
+_com_fns=$(sed -n '/^version_major() {/,/^}/p' "$UPDATE")
+_com_c=$(sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE")
+# literal newline in quotes: $(printf '\n') strips it and glues the
+# function bodies together (Syntax error: Bad function name)
+_com_fns="$_com_fns
+$_com_c"
+if [ -n "$_com_fns" ]; then
+    _com_dir="$WORK/comconf"; mkdir -p "$_com_dir"
+    printf 'OPENCODE_MAJOR=2\n' > "$_com_dir/install.conf"
+    _com_run() {
+        (
+            CONFDIR="$_com_dir"
+            opencode_version_line() { printf '%s\n' "$_probe"; }
+            eval "$_com_fns"
+            current_opencode_major
+        )
+    }
+    _probe="opencode v2.0.11"
+    [ "$(_com_run)" = "2" ] \
+        && pass "major probe: 2.x line -> 2 (E2)" \
+        || fail "major probe: 2.x line -> 2 (E2)"
+    _probe="1.18.31"
+    [ "$(_com_run)" = "1" ] \
+        && pass "major probe: bare 1.x line -> 1 (E2)" \
+        || fail "major probe: bare 1.x line -> 1 (E2)"
+    _probe="404 not found"
+    [ "$(_com_run)" = "2" ] \
+        && pass "major probe: noise falls through to the stamp, not 1 (E2)" \
+        || fail "major probe: noise falls through to the stamp, not 1 (E2)"
+    _probe="2.0.11-dev"
+    [ "$(_com_run)" = "2" ] \
+        && pass "major probe: dev-suffixed line falls through to the stamp (E2)" \
+        || fail "major probe: dev-suffixed line falls through to the stamp (E2)"
+else
+    fail "current_opencode_major extractable (E2)"
+fi
 else
     fail "re-stamp block extractable (W4)"
 fi

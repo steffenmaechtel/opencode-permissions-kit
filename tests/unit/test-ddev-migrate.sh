@@ -454,12 +454,18 @@ check "the published manifest keeps exactly one OK line per project (W13)" \
 # The manifest in $DUMP_DIR is owned by the CURRENT user; running the
 # export with dm_dev=nobody (an existing unrelated user) must hit the
 # seed's owner check (owner ∉ {root, dm_dev}) and REFUSE before the loop.
-OUT6=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run6.log" \
-    DDEV_MIG_DEV_HOME="$WORK/devhome" \
-    PATH="$WORK/bin:$PATH" \
-    sh "$WORK/run-export.sh" "$MIG" nobody root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1 || true)
-check "seed refuses a manifest owned by neither root nor the dev (C3 owner arm, F4)" \
-    sh -c "printf '%s' \"\$1\" | grep -q 'not root/dev-owned'" _ "$OUT6"
+# Root guard (0.0.44e E4): as root everything is root-owned — the seed
+# would CORRECTLY accept; the pin only means something unprivileged.
+if [ "$(id -u)" = 0 ]; then
+    echo "  SKIP  owner-arm pin needs an unprivileged user (root owns the fixture here)"
+else
+    OUT6=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run6.log" \
+        DDEV_MIG_DEV_HOME="$WORK/devhome" \
+        PATH="$WORK/bin:$PATH" \
+        sh "$WORK/run-export.sh" "$MIG" nobody root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>&1 || true)
+    check "seed refuses a manifest owned by neither root nor the dev (C3 owner arm, F4)" \
+        sh -c "printf '%s' \"\$1\" | grep -q 'not root/dev-owned'" _ "$OUT6"
+fi
 
 # --- 4g. accounting and installer ride the authoritative path (0.0.44d F1/F4) -----------
 check "export accounting reads the stage copy, not the dump-dir manifest (C2/F4)" \
@@ -468,6 +474,36 @@ check "finalize keeps the manifest root-owned for the resume seed (F2)" \
     sh -c "grep -q 'chown \"root:' \"\$1\"" _ "$MIG"
 check "install.sh prints the FAIL list from the function state, never a re-grep (F1)" \
     sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL"
+check "export return state starts EMPTY — counters signal completion (E1)" \
+    sh -c "grep -qF 'DD_MIG_DUMP_DIR=\"\"; DD_MIG_OK=\"\"; DD_MIG_FAIL=\"\"' \"\$1\"" _ "$MIG"
+
+# --- 4h. refused vs completed: only the accounting fills the counters (0.0.44e E1) -------
+cat > "$WORK/run-export-state.sh" <<'WRAP'
+#!/bin/sh
+. "$1"
+_ddev_migrate_run_as() {
+    shift 1
+    "$@"
+}
+ddev_migrate_export "$2" "$3" "$4" "$5" >/dev/null 2>&1 || true
+printf 'DUMP=[%s] OK=[%s] FAIL=[%s]\n' "${DD_MIG_DUMP_DIR:-}" "${DD_MIG_OK:-}" "${DD_MIG_FAIL:-}"
+WRAP
+if [ "$(id -u)" != 0 ]; then
+    _st_ref=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run7.log" \
+        DDEV_MIG_DEV_HOME="$WORK/devhome" \
+        PATH="$WORK/bin:$PATH" \
+        sh "$WORK/run-export-state.sh" "$MIG" nobody root "$(id -gn)" \
+        /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>/dev/null || true)
+    check "a REFUSED export leaves DD_MIG_OK/FAIL empty (E1)" \
+        sh -c "printf '%s' \"\$1\" | grep -q 'OK=\[\] FAIL=\[\]' && printf '%s' \"\$1\" | grep -q 'DUMP=\[.'" _ "$_st_ref"
+fi
+_st_ok=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run8.log" \
+    DDEV_MIG_DEV_HOME="$WORK/devhome" \
+    PATH="$WORK/bin:$PATH" \
+    sh "$WORK/run-export-state.sh" "$MIG" "$(id -un)" root "$(id -gn)" \
+    /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null 2>/dev/null || true)
+check "a COMPLETED export returns numeric counts (E1)" \
+    sh -c "printf '%s' \"\$1\" | grep -q 'OK=\[[0-9][0-9]*\] FAIL=\[[0-9][0-9]*\]'" _ "$_st_ok"
 
 # --- 5. import loop (static wiring) ---------------------------------------------
 
