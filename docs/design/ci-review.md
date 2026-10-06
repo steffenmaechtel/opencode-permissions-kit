@@ -6,8 +6,8 @@
 > model policy — with a CI automation layer. Where the two disagree,
 > review-concept.md wins until this record is implemented and revised.
 > Maintainer decisions from 2026-10-06 are recorded under
-> "Decisions" below; only O3's secret name and O6's guard list remain
-> open.
+> "Decisions" below; only O6's guard list and O11's verdict mapping
+> remain open.
 
 ## What issue #122 asks, mapped to the review types
 
@@ -92,7 +92,7 @@ the review quality has proven itself.
 |---|---|
 | O1 | **Maintainer-started only.** Every review costs API budget, and with third-party PRs the maintainer wants to look first and approve. Mechanism: `/review` comment command restricted to write-access actors (`author_association` OWNER/MEMBER/COLLABORATOR); automatic triggers stay off; a GitHub Environment approval gate is an optional later spike, not phase 1 |
 | O2 | `GITHUB_TOKEN` (`github-actions[bot]`); own GitHub App only if a distinct bot identity becomes necessary |
-| O3 | GLM-5.3-Flash via a **provider-agnostic secret** (proposed: `AI_REVIEW_API_KEY`) that the workflow maps onto the provider env var — `ZHIPU_API_KEY` today, `OPENROUTER_API_KEY` or similar later; switching providers then touches only the workflow env block and the model string, never the secret. Name pending confirmation |
+| O3 | GLM-5.3-Flash via the provider-agnostic secret **`REVIEW_MODEL_API_KEY`** that the workflow maps onto the provider env var — `ZHIPU_API_KEY` today, `OPENROUTER_API_KEY` or similar later; switching providers then touches only the workflow env block and the model string, never the secret |
 | O4 | `master-review` starts manually (dispatch) at first; an automated cadence (release-trigger, weekly) is reconsidered once the PR review has proven itself |
 | O5 | Nothing blocks: findings are advisory and AI-unverified; the maintainer verifies in the PR. What a mature version needs (verdicts, gates) is deliberately deferred until quality is known |
 | O7 | Initial values from openchamber + our wave-review data: 15 min re-review throttle, 30 min hard timeout, ~2.5k changed-lines cap; tune from real runs |
@@ -154,7 +154,6 @@ Consequences:
 
 | # | Question | Status |
 |---|---|---|
-| O3 | Secret **name** confirmation — proposal `AI_REVIEW_API_KEY` (alternatives: `REVIEW_API_KEY`, `REVIEW_MODEL_API_KEY`); the mapping pattern itself is decided | pending |
 | O6 | **Trust-guard list** — files whose changes make a PR refuse AI review (`review:human-required`). Rationale: the workflow runs with repo secrets and its behavior is defined by repo files; a PR that edits exactly those files must not be judged by the rules it itself changes — a malicious PR could weaken the reviewer to always return "clean". Proposed set: `.github/workflows/*.yml`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/design/review-concept.md`, `docs/design/ci-review.md`, `scripts/release.sh`. Add/remove entries? | list pending |
 | O11 | Phase-1 **verdict mapping**: built-in `/review` output has no machine-readable verdict, so the workflow cannot map comment → label the openchamber way. Phase 1 either posts the comment under one flat label or skips labels entirely; the marker contract returns with the phase-2 agent | open |
 
