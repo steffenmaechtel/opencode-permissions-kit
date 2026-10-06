@@ -150,6 +150,29 @@ Consequences:
   insufficient, phase 2 commits the agent definition with the allowlist.
 - No machine-readable verdict → O11.
 
+**Addendum (2026-10-06, after the 0.0.45b/-c calibration):** the O8
+verification above checked command *existence* on 1.x v1.18.34 and 2.x
+v2.0.18 — it missed that the two majors *dispatch* the command
+differently (verified in the pinned checkouts; the 2.x reference has
+since been re-pinned to v2.0.22, the version the external calibration
+ran): 1.x registers `/review` with `subtask: true`, so the template runs
+inside ONE build subagent that cannot launch subagents of its own — a
+single context with sequential roles; 2.x injects the template into the
+main session (`ctx.session.prompt`), where the lead can fan out parallel
+reviewer subagents and verify findings empirically. Same model and same
+prompt produced 2 LOW + 2 INFO in the 1.x shape versus 2 HIGH + 6 MED +
+25 LOW/INFO in the 2.x shape (mechanism and numbers:
+[review-concept.md](review-concept.md), "invocation shape governs
+orchestration capacity"). Consequences for this record:
+
+- **Job 1 (`pr-review`, diff scope) is unaffected** — the subtask shape
+  is adequate for wave/diff reviews (the 0.0.45b delta verification was
+  solid; only breadth suffered, which a diff review does not need).
+- **Job 2 (`master-review`, full scope) pins its runner to opencode 2.x**
+  — O3's "pinned opencode binary" becomes a 2.x tag — or moves to the
+  phase-2 custom agent with explicit fan-out; a 1.x runner would cap the
+  full-scope pass at a single-context sweep.
+
 ## Open questions (remaining)
 
 | # | Question | Status |
