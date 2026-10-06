@@ -3,6 +3,27 @@
 This page lists known failure modes — each entry follows
 symptom → cause → fix. If your case is missing, open an issue.
 
+## The install refuses: "Ubuntu <version> is not supported by the kit"
+
+**Symptom:** the streamed install (or a run from a checkout) aborts
+before the first prompt with `Ubuntu <version> is not supported by the
+kit.`
+
+**Cause:** the kit supports Ubuntu 22.04, Ubuntu 24.04 and Debian 12+
+(see the [support matrix](getting-started.md#supported-distros)).
+Ubuntu 26.04 is blocked because of two known upstream errors: its
+default sudo (sudo-rs 0.2.13) permanently freezes the interactive
+prompts of a streamed install, and its systemd (259) sporadically
+refuses to start any user manager — once per boot, for every user. Both
+are tracked in
+[issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145).
+
+**Fix:** use Ubuntu 24.04 — the only field-tested distro. If you know
+what you are doing, re-run the installer with
+`--force-unsupported-distro` (the known blockers may bite; there is no
+support for that path). Existing installs on any distro keep updating
+normally via `opk update` — the gate only guards new installs.
+
 ## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
 
 **Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`,

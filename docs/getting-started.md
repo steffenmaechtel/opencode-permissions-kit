@@ -7,9 +7,9 @@ background are linked at the end.
 ## Prerequisites
 
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
-- Ubuntu 22.04 LTS / Debian 12 or newer — the oldest baselines the kit is
-  tested on (older Ubuntu LTS releases are ESM-only; no fixes are made for
-  them)
+- a supported distro — the installer refuses unsupported Ubuntu versions
+  up front; Debian and other distros pass untested (see the
+  [support matrix](#supported-distros) below)
 - `sudo` access on that machine
 - `curl`
 - `python3` (used for JSON parsing, the baseline progress pipe and version
@@ -24,6 +24,22 @@ background are linked at the end.
 Nothing else — the kit installs the rootless container backend (packages,
 subuid/subgid ranges, linger) itself.
 
+### Supported distros
+
+| Distro / version | Supported | Automated tests | Field-tested |
+|------------------|-----------|-----------------|--------------|
+| Ubuntu 22.04     | yes       | no              | no           |
+| Ubuntu 24.04     | yes       | yes             | yes          |
+| Ubuntu 26.04     | no \*     | no              | no           |
+| Debian 12+       | yes       | no              | no           |
+
+\* Known errors on Ubuntu 26.04 — see
+[issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145).
+Older Ubuntu LTS releases are ESM-only; no fixes are made for them.
+`install.sh --force-unsupported-distro` overrides the check — at your own
+risk, there is no support for that path. Existing installs on any distro
+keep updating normally via `opk update`.
+
 ## Install
 
 Run the one-liner in a terminal on the target machine:
@@ -31,6 +47,11 @@ Run the one-liner in a terminal on the target machine:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
 ```
+
+> On an unsupported Ubuntu version the installer refuses up front —
+> Ubuntu 26.04 has known errors (see the [support matrix](#supported-distros)
+> and [issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145)).
+> `--force-unsupported-distro` overrides at your own risk.
 
 The script detects that it is streamed, fetches its sibling files from the
 same `stable` release mirror, and first prints a **pre-flight inventory** of what it

@@ -161,6 +161,7 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 | `--skip-ddev-migration` | Do not export the dev user's ddev databases (no `Step 4b` dumps) |
 | `--ddev-settings <dev-owned\|ddev>` | Pre-decide the settings mode: `dev-owned` writes `disable_settings_management: true` (recommended), `ddev` keeps ddev managing settings |
 | `--secure-git-config` | Enable `.git/config` hardening up front |
+| `--force-unsupported-distro` | Skip the Ubuntu version whitelist (22.04/24.04; Debian and other distros are never version-gated — see the [support matrix](../getting-started.md#supported-distros)) and install anyway — at your own risk; Ubuntu 26.04 has known errors ([issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145)) |
 | `--migrate-agents <move\|copy\|skip>` | Bring the developer's agent resources into `/home/opencode`: `~/.agents` **whole** (opencode's own namespace) + `~/.claude/skills` **skills/ only** (credentials like `~/.claude/.credentials.json` stay in your home) — move (recommended), copy, or skip; default: ask (`--yes` = move) |
 
 Flags may appear in any order; unknown options abort the install.
