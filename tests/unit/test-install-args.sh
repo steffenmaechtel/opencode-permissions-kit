@@ -48,6 +48,7 @@ reset_globals() {
     MIGRATE_AGENTS_OPT=""
     DDEV_DEV_OWNED=true
     DDEV_SETTINGS_GIVEN=false
+    FORCE_UNSUPPORTED_DISTRO=false
 }
 
 # expect_rc <want-rc> <description> <args...>
@@ -435,6 +436,85 @@ rm -rf "${_FETCH_TREE:-}" 2>/dev/null || true
 rm -rf "$FKWORK"
 # remove the fetched VERSION artifact fetch_kit may have written to CWD
 # (it returns a tree path; nothing lands outside $FKWORK on failure)
+
+# --- distro whitelist gate ----------------------------------------------------
+# Ubuntu whitelist: only 22.04/24.04 install; every other Ubuntu version
+# (incl. unknown/empty) aborts BEFORE the first prompt unless
+# --force-unsupported-distro. Non-Ubuntu distros pass unchanged. Matrix
+# mirrors docs/getting-started.md#supported-distros (issue #145).
+reset_globals
+parse_args --yes --force-unsupported-distro
+[ "$FORCE_UNSUPPORTED_DISTRO" = true ] \
+    && pass "--force-unsupported-distro parses" \
+    || fail "--force-unsupported-distro parses"
+reset_globals
+parse_args --yes
+[ "$FORCE_UNSUPPORTED_DISTRO" = false ] \
+    && pass "force flag defaults to false" \
+    || fail "force flag defaults to false"
+if grep -qF 'sed -n '"'"'s/^ID=//p'"'"' /etc/os-release' "$INSTALL" \
+   && grep -qF 'sed -n '"'"'s/^VERSION_ID=//p'"'"' /etc/os-release' "$INSTALL"; then
+    pass "gate reads ID/VERSION_ID from /etc/os-release (sed, not sourced)"
+else
+    fail "gate reads ID/VERSION_ID from /etc/os-release (sed, not sourced)"
+fi
+if [ -n "$(sed -n '/^_distro_gate() {/,/^}/p' "$INSTALL")" ]; then
+    eval "$(sed -n '/^_distro_gate() {/,/^}/p' "$INSTALL")"
+    ui_error()  { echo "error: $*"; }
+    ui_info()   { echo "info: $*"; }
+    ui_detail() { echo "detail: $*"; }
+    ui_warn()   { echo "warn: $*"; }
+    log() { :; }
+    run_distro_gate() {
+        ( export FORCE_UNSUPPORTED_DISTRO="$1"; _distro_gate "$2" "$3" ) 2>&1
+    }
+    _dg_rc=0; _dg_out=$(run_distro_gate false ubuntu 24.04) || _dg_rc=$?
+    if [ "$_dg_rc" -eq 0 ] && ! printf '%s' "$_dg_out" | grep -q 'error:'; then
+        pass "ubuntu 24.04 passes silently"
+    else
+        fail "ubuntu 24.04 passes silently (rc=$_dg_rc out=$_dg_out)"
+    fi
+    _dg_rc=0; _dg_out=$(run_distro_gate false ubuntu 22.04) || _dg_rc=$?
+    [ "$_dg_rc" -eq 0 ] \
+        && pass "ubuntu 22.04 passes" \
+        || fail "ubuntu 22.04 passes (rc=$_dg_rc out=$_dg_out)"
+    _dg_rc=0; _dg_out=$(run_distro_gate false ubuntu 26.04) || _dg_rc=$?
+    if [ "$_dg_rc" -eq 1 ] && printf '%s' "$_dg_out" | grep -q 'not supported' \
+        && printf '%s' "$_dg_out" | grep -q 'issues/145'; then
+        pass "ubuntu 26.04 aborts with the supported list + issue #145"
+    else
+        fail "ubuntu 26.04 aborts with the supported list + issue #145 (rc=$_dg_rc out=$_dg_out)"
+    fi
+    _dg_rc=0; _dg_out=$(run_distro_gate false ubuntu 25.10) || _dg_rc=$?
+    [ "$_dg_rc" -eq 1 ] \
+        && pass "ubuntu 25.10 (interim) aborts" \
+        || fail "ubuntu 25.10 (interim) aborts (rc=$_dg_rc out=$_dg_out)"
+    _dg_rc=0; _dg_out=$(run_distro_gate false ubuntu '') || _dg_rc=$?
+    [ "$_dg_rc" -eq 1 ] \
+        && pass "ubuntu with unknown version aborts (fail-closed)" \
+        || fail "ubuntu with unknown version aborts (rc=$_dg_rc out=$_dg_out)"
+    _dg_rc=0; _dg_out=$(run_distro_gate false debian 12) || _dg_rc=$?
+    [ "$_dg_rc" -eq 0 ] \
+        && pass "debian 12 passes (non-Ubuntu unchanged)" \
+        || fail "debian 12 passes (rc=$_dg_rc out=$_dg_out)"
+    _dg_rc=0; _dg_out=$(run_distro_gate false debian '') || _dg_rc=$?
+    [ "$_dg_rc" -eq 0 ] \
+        && pass "debian without version passes" \
+        || fail "debian without version passes (rc=$_dg_rc out=$_dg_out)"
+    _dg_rc=0; _dg_out=$(run_distro_gate true ubuntu 26.04) || _dg_rc=$?
+    if [ "$_dg_rc" -eq 0 ] && printf '%s' "$_dg_out" | grep -q 'force-unsupported-distro'; then
+        pass "--force-unsupported-distro overrides ubuntu 26.04 (warn + continue)"
+    else
+        fail "--force-unsupported-distro overrides ubuntu 26.04 (rc=$_dg_rc out=$_dg_out)"
+    fi
+else
+    fail "_distro_gate extractable from install.sh"
+fi
+_dg_call_ln=$(grep -n '^    _distro_gate ' "$INSTALL" | head -1 | cut -d: -f1)
+_dg_menu_ln=$(grep -n 'ui_menu "How do you want to install?"' "$INSTALL" | head -1 | cut -d: -f1)
+[ -n "$_dg_call_ln" ] && [ -n "$_dg_menu_ln" ] && [ "$_dg_call_ln" -lt "$_dg_menu_ln" ] \
+    && pass "distro gate runs before the first interactive menu (order pin)" \
+    || fail "distro gate runs before the first interactive menu (gate=$_dg_call_ln menu=$_dg_menu_ln)"
 
 echo ""
 if [ "$failures" -gt 0 ]; then

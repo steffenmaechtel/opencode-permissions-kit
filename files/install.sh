@@ -26,6 +26,9 @@
 #   --ddev-settings <dev-owned|ddev>  Dev-owned mode: kit writes
 #                          disable_settings_management: true into each
 #                          project's .ddev/config.yaml (default: dev-owned)
+#   --force-unsupported-distro  Skip the distro whitelist gate (Ubuntu
+#                          22.04/24.04 + Debian 12+; see the support matrix
+#                          in docs/getting-started.md) — at your own risk
 #
 # Flags may appear in any order. --projects consumes every following
 # non-flag argument as a project root; parsing continues after them.
@@ -357,6 +360,9 @@ MIGRATE_AGENTS_OPT=""
 DDEV_DEV_OWNED=true
 DDEV_SETTINGS_GIVEN=false
 GIT_FLAG_GIVEN=false
+# Distro whitelist override (see _distro_gate): explicit user opt-in to
+# install on a distro outside the support matrix.
+FORCE_UNSUPPORTED_DISTRO=false
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -364,6 +370,7 @@ parse_args() {
             --yes) SKIP_PROMPTS=true ;;
             --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
             --skip-ddev-migration) SKIP_DDEV_MIGRATION=true ;;
+            --force-unsupported-distro) FORCE_UNSUPPORTED_DISTRO=true ;;
             --migrate-agents)
                 if [ $# -lt 2 ]; then
                     echo "error: --migrate-agents requires a value (move|copy|skip)" >&2
@@ -455,6 +462,46 @@ _yes_no_backup_menu() {
     ui_menu "$1" "n" "y|Yes" "n|No" "b|Backup first, then yes"
 }
 
+# === Distro whitelist gate ======================================================
+# The kit supports Ubuntu 22.04, Ubuntu 24.04 and Debian 12+ (untested) —
+# see the support matrix in docs/getting-started.md. Every OTHER Ubuntu
+# version aborts BEFORE the first prompt: Ubuntu 26.04 ships sudo-rs 0.2.13
+# (interactive streamed installs freeze permanently, sudo-rs#1598) and
+# systemd 259 (per-boot user-manager EBUSY lottery, systemd#41278) — both
+# tracked in issue #145. --force-unsupported-distro overrides at the
+# user's explicit risk. Non-Ubuntu distros pass unchanged (the two known
+# blockers are Ubuntu-specific); an os-release without an ID passes too
+# (exotic system, previous behavior).
+_distro_gate() {
+    case "$1" in
+        ubuntu)
+            case "$2" in
+                22.04|24.04) return 0 ;;
+            esac
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+    _dg_v="$2"
+    [ -n "$_dg_v" ] || _dg_v="(unknown version)"
+    if [ "${FORCE_UNSUPPORTED_DISTRO:-false}" = true ]; then
+        ui_warn "unsupported distro: Ubuntu $_dg_v — continuing (--force-unsupported-distro,"\
+" at your own risk)"
+        ui_detail "known blockers: sudo-rs freezes streamed installs, systemd fails user"
+        ui_detail "managers per boot — issue #145; there is no support for this combination"
+        log "distro gate OVERRIDDEN (--force-unsupported-distro): Ubuntu $_dg_v"
+        return 0
+    fi
+    ui_error "Ubuntu $_dg_v is not supported by the kit."
+    ui_error "Supported: Ubuntu 22.04, Ubuntu 24.04 — Debian 12+ works (untested)."
+    ui_error "Ubuntu 26.04 has known errors:"
+    ui_error "  https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145"
+    ui_info "to install anyway at your own risk, re-run with --force-unsupported-distro"
+    log "distro gate: refused install on Ubuntu $_dg_v"
+    exit 1
+}
+
 banner() {
     ui_banner "$VERSION" "installs opencode as its own user behind rootless containers"
 }
@@ -504,6 +551,13 @@ do_plan_phase() {
     _opk_dh="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"
     [ -n "$_opk_dh" ] && DEV_HOME="$_opk_dh"
     log "install started (version $VERSION, default user=$DEFAULT_USER)"
+
+    # === Distro gate (fail fast, before any prompt) ============================
+    # sed, not sourcing: os-release must not clobber the installer's
+    # variables; tr strips the optional quotes around the values.
+    _dg_id=$(sed -n 's/^ID=//p' /etc/os-release 2>/dev/null | head -1 | tr -d '"')
+    _dg_ver=$(sed -n 's/^VERSION_ID=//p' /etc/os-release 2>/dev/null | head -1 | tr -d '"')
+    _distro_gate "${_dg_id:-unknown}" "$_dg_ver"
 
     # === Install mode ===
     # Standard asks only the essential questions and takes recommended defaults
