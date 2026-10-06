@@ -26,9 +26,10 @@
 #   --ddev-settings <dev-owned|ddev>  Dev-owned mode: kit writes
 #                          disable_settings_management: true into each
 #                          project's .ddev/config.yaml (default: dev-owned)
-#   --force-unsupported-distro  Skip the distro whitelist gate (Ubuntu
-#                          22.04/24.04 + Debian 12+; see the support matrix
-#                          in docs/getting-started.md) — at your own risk
+#   --force-unsupported-distro  Skip the Ubuntu version whitelist
+#                          (22.04/24.04; Debian and other distros are never
+#                          version-gated — see the support matrix in
+#                          docs/getting-started.md) — at your own risk
 #
 # Flags may appear in any order. --projects consumes every following
 # non-flag argument as a project root; parsing continues after them.
@@ -554,9 +555,13 @@ do_plan_phase() {
 
     # === Distro gate (fail fast, before any prompt) ============================
     # sed, not sourcing: os-release must not clobber the installer's
-    # variables; tr strips the optional quotes around the values.
-    _dg_id=$(sed -n 's/^ID=//p' /etc/os-release 2>/dev/null | head -1 | tr -d '"')
-    _dg_ver=$(sed -n 's/^VERSION_ID=//p' /etc/os-release 2>/dev/null | head -1 | tr -d '"')
+    # variables; tr strips both quote styles (both are spec-legal) and a
+    # trailing CR (CRLF-edited file). || true on the reads: a missing
+    # os-release is an exotic system that passes the gate as "unknown" —
+    # under set -eu + pipefail sed's rc 2 would otherwise abort the
+    # install silently with zero output (0.0.45a S1).
+    _dg_id=$(sed -n 's/^ID=//p' /etc/os-release 2>/dev/null | head -1 | tr -d "\"'\r") || true
+    _dg_ver=$(sed -n 's/^VERSION_ID=//p' /etc/os-release 2>/dev/null | head -1 | tr -d "\"'\r") || true
     _distro_gate "${_dg_id:-unknown}" "$_dg_ver"
 
     # === Install mode ===

@@ -7,8 +7,9 @@ background are linked at the end.
 ## Prerequisites
 
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
-- a supported distro — the installer checks this up front and refuses
-  everywhere else (see the [support matrix](#supported-distros) below)
+- a supported distro — the installer refuses unsupported Ubuntu versions
+  up front; Debian and other distros pass untested (see the
+  [support matrix](#supported-distros) below)
 - `sudo` access on that machine
 - `curl`
 - `python3` (used for JSON parsing, the baseline progress pipe and version
@@ -47,9 +48,9 @@ Run the one-liner in a terminal on the target machine:
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
 ```
 
-> On an unsupported distro the installer refuses up front — Ubuntu 26.04
-> has known errors (see the [support matrix](#supported-distros) and
-> [issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145)).
+> On an unsupported Ubuntu version the installer refuses up front —
+> Ubuntu 26.04 has known errors (see the [support matrix](#supported-distros)
+> and [issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145)).
 > `--force-unsupported-distro` overrides at your own risk.
 
 The script detects that it is streamed, fetches its sibling files from the

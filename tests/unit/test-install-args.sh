@@ -6,6 +6,14 @@
 #   - unknown options abort instead of being silently ignored
 #   - --container-backend without a value aborts
 #
+# Unit tests for the distro whitelist gate (issue #145, 0.0.45a):
+#   - --force-unsupported-distro parses / defaults to false
+#   - os-release read pins: static (sed, never sourced) + behavioral
+#     (the real read lines against fixtures: missing file, single-quoted
+#     and CRLF values — 0.0.45a S1/C2)
+#   - extracted _distro_gate functional matrix, verbatim call wiring pin
+#     (0.0.45a C1) + gate-before-menu order pin
+#
 # Static extraction of parse_args() from install.sh, then table-driven
 # checks. No root required.
 # Run: sh tests/unit/test-install-args.sh
@@ -515,6 +523,63 @@ _dg_menu_ln=$(grep -n 'ui_menu "How do you want to install?"' "$INSTALL" | head 
 [ -n "$_dg_call_ln" ] && [ -n "$_dg_menu_ln" ] && [ "$_dg_call_ln" -lt "$_dg_menu_ln" ] \
     && pass "distro gate runs before the first interactive menu (order pin)" \
     || fail "distro gate runs before the first interactive menu (gate=$_dg_call_ln menu=$_dg_menu_ln)"
+# Wiring pin (0.0.45a C1): the order pin only proves A call line exists —
+# a rewired call (e.g. _distro_gate "unknown" "24.04") neuters the gate
+# while every other pin stays green. The verbatim line pins that
+# do_plan_phase passes the parsed os-release values into the gate.
+if grep -qF '_distro_gate "${_dg_id:-unknown}" "$_dg_ver"' "$INSTALL"; then
+    pass "do_plan_phase wires the parsed os-release values into the gate (verbatim call pin)"
+else
+    fail "do_plan_phase wires the parsed os-release values into the gate (verbatim call pin)"
+fi
+# Behavioral read pins (0.0.45a S1/C2): the REAL read lines, extracted,
+# path-swapped onto fixtures and executed under bash with install.sh's
+# own set -eu/pipefail idiom — a missing os-release must survive and
+# parse empty (the || true; without it pipefail propagates sed's rc 2
+# and errexit aborts rc 2 with zero output — invisible under dash, which
+# is why the pins pin bash explicitly), single-quoted and CRLF values
+# must normalize.
+_dg_line_id="$(grep -F "_dg_id=\$(sed -n 's/^ID=//p' /etc/os-release" "$INSTALL" | head -1 | sed 's/^ *//')"
+_dg_line_ver="$(grep -F "_dg_ver=\$(sed -n 's/^VERSION_ID=//p' /etc/os-release" "$INSTALL" | head -1 | sed 's/^ *//')"
+_dg_w="$(mktemp -d)"
+printf 'ID="ubuntu"\nVERSION_ID=%s\n' "'24.04'" > "$_dg_w/quoted"
+printf 'ID=ubuntu\r\nVERSION_ID=24.04\r\n' > "$_dg_w/crlf"
+_dg_eval_reads() {
+    # bash, not the suite's sh: pipefail (the abort mechanism under
+    # test) is a bash option — args: id-line, fixture path, ver-line
+    bash -c '
+        set -eu
+        (set -o pipefail) 2>/dev/null && set -o pipefail || true
+        eval "$(printf "%s\n" "$1" | sed "s|/etc/os-release|$2|")"
+        eval "$(printf "%s\n" "$3" | sed "s|/etc/os-release|$2|")"
+        printf "%s\n%s" "${_dg_id:-}" "${_dg_ver:-}"
+    ' _dg_read_sh "$_dg_line_id" "$1" "$_dg_line_ver"
+}
+if command -v bash >/dev/null 2>&1; then
+    _dg_got_id() { printf '%s\n' "$_dg_out" | sed -n 1p; }
+    _dg_got_ver() { printf '%s\n' "$_dg_out" | sed -n 2p; }
+    _dg_rc=0; _dg_out=$(_dg_eval_reads "$_dg_w/missing") || _dg_rc=$?
+    if [ "$_dg_rc" -eq 0 ] && [ -z "$(printf '%s' "$_dg_out" | tr -d '\n')" ]; then
+        pass "missing os-release survives the reads and parses empty (S1)"
+    else
+        fail "missing os-release survives the reads and parses empty (S1) (rc=$_dg_rc out=$_dg_out)"
+    fi
+    _dg_rc=0; _dg_out=$(_dg_eval_reads "$_dg_w/quoted") || _dg_rc=$?
+    if [ "$_dg_rc" -eq 0 ] && [ "$(_dg_got_id)" = ubuntu ] && [ "$(_dg_got_ver)" = 24.04 ]; then
+        pass "quoted os-release values normalize, both quote styles (C2)"
+    else
+        fail "quoted os-release values normalize, both quote styles (C2) (rc=$_dg_rc id=$(_dg_got_id) ver=$(_dg_got_ver))"
+    fi
+    _dg_rc=0; _dg_out=$(_dg_eval_reads "$_dg_w/crlf") || _dg_rc=$?
+    if [ "$_dg_rc" -eq 0 ] && [ "$(_dg_got_id)" = ubuntu ] && [ "$(_dg_got_ver)" = 24.04 ]; then
+        pass "CRLF-edited os-release parses clean (C2)"
+    else
+        fail "CRLF-edited os-release parses clean (C2) (rc=$_dg_rc id=$(_dg_got_id) ver=$(_dg_got_ver))"
+    fi
+else
+    echo "  SKIP  S1/C2 read pins need bash (pipefail semantics)"
+fi
+rm -rf "$_dg_w"
 
 echo ""
 if [ "$failures" -gt 0 ]; then
