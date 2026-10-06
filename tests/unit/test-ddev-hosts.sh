@@ -191,7 +191,7 @@ assert_eq "add calls ddev hostname once per missing hostname, 127.0.0.1 (*.ddev.
 
 # Hostname mode (issue #21): a non-directory argument adds exactly that
 # one hostname — the per-hostname commands status/hints print.
-rm -f "$WORK/ddev-calls2.log"
+rm -f "${WORK:?}/ddev-calls2.log"
 DDEV_WIN_HOSTS="$WORK/winhosts" DDEV_FAKE_LOG="$WORK/ddev-calls2.log" \
     DDEV_HOSTS_DEV_USER="$(id -un)" SUDO_USER="" \
     PATH="$WORK/bin:$PATH" \

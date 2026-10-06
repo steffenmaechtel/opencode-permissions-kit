@@ -79,7 +79,7 @@ fi
 # --- 2. dry-run executes nothing ----------------------------------------------
 
 printf '#!/bin/sh\necho devuser\n' > "$WORK/whoami"; chmod +x "$WORK/whoami"
-rm -f "$WORK/log"
+rm -f "${WORK:?}/log"
 if PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry-run >/dev/null 2>&1 \
    && [ ! -e "$WORK/log" ]; then
     pass "--dry-run executes no sudo command (log stayed empty)"

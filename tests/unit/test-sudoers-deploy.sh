@@ -148,7 +148,7 @@ case "$_sd_out" in *rc=1*) pass "missing template: rc=1" ;; *) fail "missing tem
 # --- 5. visudo rejection deploys NOTHING -----------------------------------
 
 rm -rf "$CONF"
-rm -f "$SDD/opencode-permissions-kit"
+rm -f "${SDD:?}/opencode-permissions-kit"
 TPL_BAD="$WORK/sudoers-bad.template"
 { echo "REJECT"; cat "$TPL"; } > "$TPL_BAD"
 _sd_out=$(

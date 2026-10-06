@@ -151,7 +151,7 @@ else
 fi
 
 # missing script -> clear error, non-zero
-rm "$LIB/management/update.sh"
+rm "${LIB:?}/management/update.sh"
 if run_kit update >/dev/null 2>&1; then
     echo "  ${RED}FAIL${NC}  missing script exits non-zero"; failures=$((failures + 1))
 else
@@ -237,7 +237,7 @@ case "$errout" in
 esac
 
 # --dry-run: plan only, no changes, no sudo, exit 0
-rm -f "$WORK/sudo-marker"
+rm -f "${WORK:?}/sudo-marker"
 out="$(run_kit handover me "$WORK/ho-tree" --dry-run)"
 assert "handover --dry-run exits 0" "0" "$?"
 case "$out" in
@@ -253,7 +253,7 @@ fi
 
 # real run (no --dry-run): elevates via sudo. With the FAKE sudo it cannot
 # elevate — the loop guard must stop the re-entry instead of recursing.
-rm -f "$WORK/sudo-marker"
+rm -f "${WORK:?}/sudo-marker"
 if [ "$(id -u)" -ne 0 ]; then
     errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$WORK/ho-tree" 2>&1 >/dev/null || true)"
     if [ -f "$WORK/sudo-marker" ]; then

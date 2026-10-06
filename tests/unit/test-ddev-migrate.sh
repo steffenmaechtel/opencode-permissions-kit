@@ -174,11 +174,11 @@ assert_eq "done: bare modern home (empty list) is NOT done" "no" "$(done_check "
 printf 'shopware:\n    approot: /tmp/shopware\n' > "$WORK/ochome/.ddev/project_list.yaml"
 assert_eq "done: project_list.yaml entries count" "yes" "$(done_check "$WORK/ochome")"
 
-rm -f "$WORK/ochome/.ddev/project_list.yaml"
+rm -f "${WORK:?}/ochome/.ddev/project_list.yaml"
 printf 'project_info:\n  p:\n    approot: /tmp/p\n' > "$WORK/ochome/.ddev/global_config.yaml"
 assert_eq "done: legacy project_info block counts" "yes" "$(done_check "$WORK/ochome")"
 
-rm -rf "$WORK/devhome123" "$WORK/ochome"
+rm -rf "${WORK:?}/devhome123" "${WORK:?}/ochome"
 
 # --- 3. omit_containers detection -------------------------------------------------
 
@@ -216,7 +216,7 @@ printf 'omit_containers_global: [db]\n' > "$WORK/devhome/.ddev/global_config.yam
 assert_eq "global omit_containers_global [db] has NO db" "no" "$(has_db "$WORK/p1")"
 printf 'omit_containers_global:\n  - db\n' > "$WORK/devhome/.ddev/global_config.yaml"
 assert_eq "global block omit has NO db" "no" "$(has_db "$WORK/p1")"
-rm -f "$WORK/devhome/.ddev/global_config.yaml"
+rm -f "${WORK:?}/devhome/.ddev/global_config.yaml"
 assert_eq "missing global config keeps the db" "yes" "$(has_db "$WORK/p1")"
 
 # --- 4. export loop with a fake ddev ----------------------------------------------
@@ -408,7 +408,7 @@ check_fail "the root staging dir is removed before finalize hands the tree over"
 # not a symlink — a planted link there means tampering: loud refuse, the
 # link's target is never opened (no read-through disclosure).
 echo "VICTIM-MANIFEST-CONTENT" > "$WORK/victim-manifest.conf"
-rm -f "$DUMP_DIR/manifest.conf"
+rm -f "${DUMP_DIR:?}/manifest.conf"
 ln -s "$WORK/victim-manifest.conf" "$DUMP_DIR/manifest.conf"
 OUT4=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run4.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" \
@@ -421,7 +421,7 @@ check "manifest link target was never opened (content intact, W2)" \
 check_fail "the refused run leaves no staging dir behind" \
     test -e "$DUMP_DIR/.root-stage"
 # restore a regular manifest for the suites below
-rm -f "$DUMP_DIR/manifest.conf"
+rm -f "${DUMP_DIR:?}/manifest.conf"
 printf 'OK|alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|alpha.sql.gz\n' > "$DUMP_DIR/manifest.conf"
 
 # --- 4e. fixed-string resume: sh.p must not cross-match shop (0.0.44b W13) -------------
