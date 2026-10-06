@@ -207,13 +207,28 @@ When a review runs as parallel subagents:
   (0.0.45c, four fresh-context axis subagents + lead verification). Rule:
   full-scope/release reviews run in a main session with fan-out (2.x-style
   invocation or the house flow directly); the 1.x `/review` subtask form
-  is reserved for diff/wave reviews. Skills and pinned agent definitions
-  are exonerated by the same data: the 1.x pass used the review skill's
-  checklist fallback to solid effect on the delta, and house passes with
-  full orchestration reach comparable yields (0.0.43a: 19 findings,
-  0.0.44a: 28) — the harness ceiling, not the skill, was the limiter.
-  The templates themselves are near-identical across majors (three
-  cosmetic lines, v1.18.34 vs v2.0.22).
+  is reserved for diff/wave reviews. The templates themselves are
+  near-identical across majors (three cosmetic lines, v1.18.34 vs
+  v2.0.22).
+  Calibration correction (2026-10-07, maintainer challenge upheld): an
+  earlier revision of this note claimed house passes with full
+  orchestration reach comparable full-scope yields, citing 0.0.43a (19
+  findings) and 0.0.44a (28) — those snapshots were in fact **external
+  integrations** (0.0.42e = GPT-6 Luna; 0.0.43a, 0.0.44a, 0.0.45c =
+  external GLM-5.3 sessions in the v2 lead+fan-out shape, none with kit
+  skills or agent definitions installed; provenance folders in the dev
+  workspace). Corrected record: **every deep full-scope yield so far came
+  from an external pass**, and the only same-tree comparison — 0.0.42d
+  (house, skill mechanics + Flash reviewer agents: 2 MED) vs 0.0.42e
+  (external, same tree: 2 HIGH + 7 MED, 16 findings the house pass
+  missed) — favored the external pass (confounder: the house reviewers
+  ran GLM-5.3-Flash per the cost policy). Skills and pinned agents keep
+  a proven record only in **wave/diff scope** (0.0.45a, 0.0.44b–g,
+  0.0.42f–i repeatedly caught fix-induced bugs; 0.0.45b's delta
+  verification was solid even inside the v1 subtask shape). For full
+  scope their value is unproven, not exonerated — and the standing rule
+  above (external v2-shape pass for release reviews) no longer relies
+  on them.
 - recurring **blind-spot classes** (added 2026-10-05, from 0.0.44a): three
   classes have each escaped at least one dedicated review — root-run file
   operations whose operands sit in agent-group-writable directories
