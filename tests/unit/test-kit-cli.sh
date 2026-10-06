@@ -81,7 +81,7 @@ echo "=== CLI dispatcher tests ==="
 # help lists every subcommand
 out="$(run_kit --help)"
 assert "--help exits 0" "0" "$?"
-for c in status config update uninstall handover help; do
+for c in status config update uninstall handover help fix-user-manager; do
     case "$out" in
         *"$c"*) echo "  ${GREEN}PASS${NC}  --help mentions '$c'"; passed=$((passed + 1)) ;;
         *) echo "  ${RED}FAIL${NC}  --help mentions '$c'"; failures=$((failures + 1)) ;;

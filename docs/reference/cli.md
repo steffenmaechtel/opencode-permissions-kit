@@ -39,6 +39,7 @@ opk status
 opk config projects add /var/www/vhosts/new-project
 opk update --binary
 opk upgrade-opencode   # just the opencode binary
+opk fix-user-manager   # rescue the agent user manager (systemd cgroup bug)
 opk ddev-hosts-add     # in a ddev project dir
 opk handover me .gotmp # mixed-owner tree -> yours again
 opk wsl-add-opencode-1-fix   # opt in to the WSL browser-bridge carrier
@@ -48,8 +49,9 @@ opk --version   # the deployed kit version
 ```
 
 Everything after the subcommand goes to the underlying script unchanged,
-so all flags below work with both forms. `config`, `update` and `handover`
-elevate via sudo automatically; `status` needs no sudo; `uninstall` runs as
+so all flags below work with both forms. `config`, `update`, `handover`
+and `fix-user-manager` elevate via sudo automatically; `status` needs no
+sudo; `uninstall` runs as
 your user and asks for sudo itself; `ddev-hosts-*` run as your user (they
 drive Windows-side elevation through ddev itself).
 
@@ -142,6 +144,33 @@ opk ddev-hosts-add my-fancy-project.local
 works from anywhere). The status scan also skips `vendor/`,
 `node_modules/`, and `testdata/`: composer/npm packages ship their own
 `.ddev` dirs (package development checkouts) which are not your projects.
+
+## fix-user-manager
+
+Rescue command for the systemd cgroup-reuse bug
+([systemd#41278](https://github.com/systemd/systemd/issues/41278),
+affects systemd ≤ 260 — Ubuntu 26.04 ships 259): on some boots every
+attempt to start a user manager fails with
+`Failed to spawn executor: Device or resource busy`, which WSL surfaces
+at login as `wsl: Failed to start the systemd user session for '<you>'`.
+The agent backend dies with it (`docker-rootless`: no daemon;
+`podman-rootless`: no docker-API socket for ddev).
+
+```bash
+sudo opk fix-user-manager
+```
+
+The command un-wedges the agent user's `user@<uid>.service` cgroup
+without a WSL restart: it kills the dead manager's orphaned processes
+(strictly UID-gated to the agent user), clears the leftover cgroup
+controllers bottom-up and restarts the unit — a procedure
+field-validated on Ubuntu 26.04 WSL2. Backend units enabled earlier
+(docker.service, podman.socket) come up with the manager. The installer
+attempts the same rescue automatically when provisioning hits the bug;
+this command is the on-demand variant for later boots. If it does not
+succeed, the remaining way out is a WSL restart from Windows
+(`wsl --shutdown` or `wsl -t <distro>`). Background and the manual
+procedure: [troubleshooting](../troubleshooting.md).
 
 ## install.sh
 

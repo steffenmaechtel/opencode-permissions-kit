@@ -1248,6 +1248,13 @@ EOF
     if [ -n "$_sock" ]; then
         OPENCODE_DOCKER_HOST="${_sock#OPENCODE_DOCKER_HOST=}"
     fi
+    # podman-rootless prints its docker-API socket the same way (0.0.46:
+    # ddev needs the endpoint — absent on a wedged boot, then the key
+    # keeps its previous value until fix-user-manager + re-run).
+    _psock=$(echo "$_setup_out" | sed -n 's/^\(OPENCODE_PODMAN_SOCKET=.*\)/\1/p' | tail -1)
+    if [ -n "$_psock" ]; then
+        OPENCODE_PODMAN_SOCKET="${_psock#OPENCODE_PODMAN_SOCKET=}"
+    fi
     # { grep -v || true }: display-only filter — grep -v exits 1 when the
     # setup output consists solely of OPENCODE_ key lines, which pipefail
     # would turn into an abort right after successful provisioning
@@ -1260,6 +1267,13 @@ EOF
     # rewrite (review 0.0.39b C4).
     _odh_esc=$(printf '%s' "$OPENCODE_DOCKER_HOST" | sed 's/[&\\#]/\\&/g')
     sudo sed -i "s#^OPENCODE_DOCKER_HOST=.*#OPENCODE_DOCKER_HOST=$_odh_esc#" /etc/opencode-permissions-kit/install.conf
+    # Only re-stamp when the helper reported one: an absent socket (wedged
+    # boot) must not erase a previously recorded value.
+    if [ -n "$OPENCODE_PODMAN_SOCKET" ]; then
+        _ops_esc=$(printf '%s' "$OPENCODE_PODMAN_SOCKET" | sed 's/[&\\#]/\\&/g')
+        sudo sed -i "s#^OPENCODE_PODMAN_SOCKET=.*#OPENCODE_PODMAN_SOCKET=$_ops_esc#" \
+            /etc/opencode-permissions-kit/install.conf
+    fi
     log "container backend provisioned: $CONTAINER_BACKEND"
 }
 

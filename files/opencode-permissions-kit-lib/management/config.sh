@@ -584,8 +584,10 @@ container_backend_apply() {
         return 1
     }
     echo "$setup_out" | { grep -v '^OPENCODE_' || true; } | sed 's/^/     /'
-    # Capture socket key from the helper output.
+    # Capture socket keys from the helper output (podman prints its
+    # docker-API socket since 0.0.46 — ddev needs the endpoint).
     docker_host=$(echo "$setup_out" | sed -n 's/^OPENCODE_DOCKER_HOST=//p' | tail -1)
+    podman_socket=$(echo "$setup_out" | sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' | tail -1)
 
     # Update install.conf.
     update_install_conf_backend "$new_backend" "$docker_host" "$podman_socket"

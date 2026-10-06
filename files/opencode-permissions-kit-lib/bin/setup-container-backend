@@ -45,9 +45,15 @@ else
 fi
 
 BACKEND=""
+RESCUE_ONLY=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
         docker-rootless|podman-rootless) BACKEND="$1" ;;
+        # On-demand systemd#41278 rescue ('sudo opk fix-user-manager'):
+        # un-wedge the opencode user manager without a WSL restart. Runs
+        # the same field-validated procedure the docker-rootless fatal
+        # branch tries automatically (see rescue_user_manager).
+        --rescue-user-manager) RESCUE_ONLY=true ;;
         # Accepted no-op (0.0.44a V28): install.sh calls
         # `setup-container-backend <backend> --yes` — the flag stays for
         # that call's shape, but this provisioner is non-interactive and
@@ -60,7 +66,8 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
-[ -n "$BACKEND" ] || { echo "${RED}Usage: setup-container-backend <backend> [--yes]${NC}" >&2; exit 1; }
+[ -n "$BACKEND" ] || [ "$RESCUE_ONLY" = true ] \
+    || { echo "${RED}Usage: setup-container-backend <backend> [--yes] | --rescue-user-manager${NC}" >&2; exit 1; }
 
 # === Shared helpers (sh/ui.sh, sh/log.sh — bin/ sits next to sh/) ===
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
@@ -170,6 +177,64 @@ _systemd_user_ready() {
         systemctl --user status >/dev/null 2>&1
 }
 
+# --- systemd#41278 rescue (field-validated on Ubuntu 26.04 WSL2) ---------------
+# A wedged user@<uid>.service cgroup (every spawn from it fails with EBUSY)
+# can be un-wedged WITHOUT a WSL restart: cgroup v2 demands top-down enable
+# / bottom-up DISABLE semantics, so the dead manager's leftover controllers
+# are cleared deepest-first, then reset-failed + start. Orphan processes of
+# the dead manager inside the tree are killed first — strictly UID-gated:
+# only PIDs owned by $OPENCODE_USER are ever signalled. Fires only on the
+# known signature ("Device or resource busy" in the unit status).
+rescue_user_manager() {
+    _ru_unit="user@$OC_UID.service"
+    _ru_cg="/sys/fs/cgroup/user.slice/user-$OC_UID.slice/$_ru_unit"
+    [ -d "$_ru_cg" ] || return 1
+    systemctl status "$_ru_unit" --no-pager 2>&1 | grep -q 'Device or resource busy' || return 1
+    echo "  attempting the systemd#41278 cgroup un-wedge for $_ru_unit ..."
+    log "rescue: systemd#41278 un-wedge attempt for $_ru_unit"
+    # 1) kill the dead manager's orphans inside the tree (UID-gated).
+    # shellcheck disable=SC2046  # PID list intended; each is validated below
+    find "$_ru_cg" -name cgroup.procs -exec cat {} + 2>/dev/null | sort -u \
+        | while read -r _ru_pid; do
+            [ -n "$_ru_pid" ] || continue
+            [ "$(stat -c %u "/proc/$_ru_pid" 2>/dev/null)" = "$OC_UID" ] || continue
+            kill -9 "$_ru_pid" 2>/dev/null || true
+            echo "  killed orphaned PID $_ru_pid of the dead user manager" >&2
+        done
+    # 2) clear every leftover subtree_control BOTTOM-UP (longest path =
+    #    deepest node first; a parent write stays EBUSY while any child
+    #    still holds a controller).
+    find "$_ru_cg" -name cgroup.subtree_control 2>/dev/null \
+        | awk '{ print length, $0 }' | sort -rn | cut -d' ' -f2- \
+        | while read -r _ru_sc; do
+            _ru_on=$(cat "$_ru_sc" 2>/dev/null)
+            [ -n "$_ru_on" ] || continue
+            _ru_neg=""
+            # word splitting intended: controller list from cgroupfs
+            # shellcheck disable=SC2086
+            for _ru_c in $_ru_on; do _ru_neg="$_ru_neg-$_ru_c "; done
+            printf '%s\n' "${_ru_neg% }" > "$_ru_sc" 2>/dev/null \
+                || echo "  could not clear controllers in $_ru_sc" >&2
+        done
+    # 3) restart attempt + short readiness poll.
+    systemctl reset-failed "$_ru_unit" 2>/dev/null || true
+    systemctl start "$_ru_unit" 2>/dev/null || true
+    _ru_i=0
+    while [ "$_ru_i" -lt 10 ]; do
+        _systemd_user_ready && break
+        _ru_i=$((_ru_i + 1))
+        sleep 1
+    done
+    if _systemd_user_ready; then
+        echo "  ${GREEN}un-wedge successful — the user manager for $OPENCODE_USER is back.${NC}"
+        log "rescue: un-wedge successful for $_ru_unit (systemd#41278)"
+        return 0
+    fi
+    echo "  ${YELLOW}un-wedge did not restore the manager — falling back to diagnostics.${NC}" >&2
+    log "rescue: un-wedge failed for $_ru_unit"
+    return 1
+}
+
 # --- docker-rootless setup ----------------------------------------------------
 
 setup_docker_rootless() {
@@ -219,6 +284,11 @@ setup_docker_rootless() {
     chmod 700 "/run/user/$OC_UID" 2>/dev/null || true
 
     if ! _systemd_user_ready; then
+        # First: the field-validated #41278 un-wedge — when it lands, the
+        # wedged boot is rescued and the install simply continues.
+        rescue_user_manager || true
+    fi
+    if ! _systemd_user_ready; then
         echo "${RED}systemd --user is not available for $OPENCODE_USER.${NC}" >&2
         echo "${YELLOW}Docker rootless needs systemd"\
 " (WSL2: enable via /etc/wsl.conf [boot] systemd=true + reboot).${NC}" >&2
@@ -234,18 +304,18 @@ setup_docker_rootless() {
         echo "systemctl is-active user@$OC_UID.service (system scope):" >&2
         systemctl is-active "user@$OC_UID.service" 2>&1 | sed 's/^/  /' >&2
         # Known upstream defect (systemd <= 260, systemd#41278, fixed in
-        # v261): a sporadically wedged per-user cgroup makes EVERY spawn
-        # from it fail with EBUSY — no user manager can start on that
-        # boot, nothing a script can fix. Name it explicitly instead of
-        # letting the user stare at the diagnostics.
+        # v261): a wedged per-user cgroup makes EVERY spawn from it fail
+        # with EBUSY — no user manager can start on that boot. The un-wedge
+        # above already tried and failed; name the bug + the remaining way
+        # out instead of letting the user stare at the diagnostics.
         if systemctl status "user@$OC_UID.service" --no-pager 2>&1 \
             | grep -q 'Device or resource busy'; then
             echo "${YELLOW}user@$OC_UID.service dies with 'Device or resource busy': the known systemd${NC}" >&2
-            echo "${YELLOW}cgroup-reuse bug (systemd issue #41278, fixed upstream in v261). This boot${NC}" >&2
-            echo "${YELLOW}cannot start ANY user manager (check: systemctl is-active user@\$(id -u).service).${NC}" >&2
-            echo "${YELLOW}Restart WSL from Windows (wsl --shutdown, wait ~10s, reopen the distro) and${NC}" >&2
-            echo "${YELLOW}re-run the install — the failure is sporadic per boot.${NC}" >&2
-            log "user@$OC_UID.service EBUSY (systemd#41278 class) — needs a WSL restart, no in-script fix"
+            echo "${YELLOW}cgroup-reuse bug (systemd issue #41278, fixed upstream in v261). The${NC}" >&2
+            echo "${YELLOW}automatic un-wedge (bottom-up cgroup controller clear) did NOT succeed —${NC}" >&2
+            echo "${YELLOW}restart WSL from Windows (wsl --shutdown, wait ~10s, reopen the distro)${NC}" >&2
+            echo "${YELLOW}and re-run the install — the failure is sporadic per boot.${NC}" >&2
+            log "user@$OC_UID.service EBUSY (systemd#41278) — auto un-wedge failed, needs a WSL restart"
         fi
         echo "/run/user/$OC_UID:" >&2
         ls -la "/run/user/$OC_UID" 2>&1 | sed 's/^/  /' >&2
@@ -356,10 +426,36 @@ setup_podman_rootless() {
     chown "$OPENCODE_USER:$OPENCODE_USER" "/run/user/$OC_UID"
     chmod 700 "/run/user/$OC_UID"
 
-    # Podman is daemonless — no systemd service, no linger, no socket needed.
-    # Optional: enable-linger only if a podman.socket is desired for
-    # docker-CLI compat (OPENCODE_PODMAN_SOCKET). That is an opt-in we do not
-    # provision by default (§9.8: podman-CLI only).
+    # ddev speaks the Docker API: without a docker-compatible endpoint a
+    # podman backend leaves `ddev start` dying against /var/run/docker.sock
+    # (Ubuntu 26.04 field finding). Provision podman.socket in the user
+    # manager — podman itself stays daemonless (the socket spawns the API
+    # service on demand, nothing idles), this is purely the compat
+    # endpoint ddev (and docker-CLI users) need. Best effort: on a
+    # systemd#41278-wedged boot the rescue runs; if that fails too, the
+    # socket (and ddev) comes up later via 'sudo opk fix-user-manager'.
+    systemctl start "user@$OC_UID.service" 2>/dev/null || true
+    _pm_wait=0
+    while [ "$_pm_wait" -lt 10 ]; do
+        _systemd_user_ready && break
+        _pm_wait=$((_pm_wait + 1))
+        sleep 1
+    done
+    _systemd_user_ready || rescue_user_manager || true
+    _pm_sock=""
+    if _systemd_user_ready; then
+        sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
+            systemctl --user enable --now podman.socket 2>/dev/null || true
+        if [ -S "/run/user/$OC_UID/podman/podman.sock" ]; then
+            _pm_sock="unix:///run/user/$OC_UID/podman/podman.sock"
+            echo "  ${GREEN}podman docker-API socket enabled for $OPENCODE_USER (ddev needs it).${NC}"
+            log "podman-rootless: podman.socket enabled (docker-API compat, on-demand service)"
+        fi
+    else
+        echo "${YELLOW}no user manager on this boot — podman.socket NOT enabled; ddev will fail${NC}" >&2
+        echo "${YELLOW}until 'sudo opk fix-user-manager' (or a WSL restart) brings it up.${NC}" >&2
+        log "podman-rootless: podman.socket NOT enabled (no user manager, systemd#41278 class)"
+    fi
 
     # Verify podman works as the opencode user.
     if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" podman info >/dev/null 2>&1; then
@@ -370,10 +466,26 @@ setup_podman_rootless() {
         echo "  ${GREEN}podman-rootless is ready for $OPENCODE_USER.${NC}"
         log "podman-rootless provisioned for $OPENCODE_USER"
     fi
-    # No socket to print (daemonless podman-CLI path).
+    # Print the socket for the caller to record (absent on a wedged boot —
+    # the conf key then stays unset until fix-user-manager + re-run).
+    # Explicit if (not a trailing `&&` tail): the function must return 0
+    # in the socket-less case — under set -e the old tail aborted the
+    # whole provisioning when nothing was provisioned.
+    if [ -n "$_pm_sock" ]; then
+        echo "OPENCODE_PODMAN_SOCKET=$_pm_sock"
+    fi
 }
 
 # --- dispatch -----------------------------------------------------------------
+
+if [ "$RESCUE_ONLY" = true ]; then
+    if _systemd_user_ready; then
+        echo "  the user manager for $OPENCODE_USER is already running — nothing to rescue."
+        exit 0
+    fi
+    rescue_user_manager
+    exit $?
+fi
 
 case "$BACKEND" in
     docker-rootless)  setup_docker_rootless ;;

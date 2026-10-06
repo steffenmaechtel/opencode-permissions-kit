@@ -316,10 +316,55 @@ check "setup diagnoses the user@ unit from the system scope" \
     grep -Fq 'systemctl is-active "user@$OC_UID.service"' "$SETUP"
 check "setup detects the systemd cgroup-reuse EBUSY bug and names the recovery" \
     grep -Fq "grep -q 'Device or resource busy'" "$SETUP"
-check "setup EBUSY hint references the upstream issue and the WSL restart" \
+check "setup EBUSY hint references the upstream issue and the wsl restart" \
     sh -c 'grep -qF "systemd issue #41278" "$1" && grep -qF "wsl --shutdown" "$1"' _ "$SETUP"
 check "setup dbus hint fires only when the package was actually fresh" \
     grep -Fq '_dbus_fresh' "$SETUP"
+
+echo ""
+echo "-- systemd#41278 rescue (field-validated un-wedge) --"
+check "rescue_user_manager defined" \
+    grep -Fq 'rescue_user_manager()' "$SETUP"
+check "rescue fires only on the EBUSY signature (unit status grep)" \
+    sh -c 'grep -qF "systemctl status \"\$_ru_unit\" --no-pager 2>&1 | grep -q '"'"'Device or resource busy'"'"'" "$1"' _ "$SETUP"
+check "rescue kills orphans strictly UID-gated (proc owner vs OC_UID)" \
+    sh -c 'grep -qF "stat -c %u \"/proc/\$_ru_pid\"" "$1" && grep -qF "= \"\$OC_UID\" ] || continue" "$1"' _ "$SETUP"
+check "rescue clears subtree_control bottom-up (longest path first)" \
+    sh -c 'grep -qF "print length, \$0" "$1" && grep -qF "sort -rn | cut -d'"'"' '"'"' -f2-" "$1" && grep -qF "cgroup.subtree_control" "$1"' _ "$SETUP"
+check "rescue restarts via reset-failed + start" \
+    sh -c 'grep -qF "systemctl reset-failed \"\$_ru_unit\"" "$1" && grep -qF "systemctl start \"\$_ru_unit\"" "$1"' _ "$SETUP"
+check "docker-rootless fatal branch attempts the rescue before diagnostics" \
+    grep -Fq 'rescue_user_manager || true' "$SETUP"
+check "fatal EBUSY hint names the failed AUTO un-wedge" \
+    grep -Fq 'automatic un-wedge (bottom-up cgroup controller clear) did NOT succeed' "$SETUP"
+check "on-demand mode: --rescue-user-manager accepted in arg parsing" \
+    grep -Fq -- '--rescue-user-manager) RESCUE_ONLY=true' "$SETUP"
+check "on-demand mode: dispatch runs rescue-only without a backend" \
+    grep -Fq 'if [ "$RESCUE_ONLY" = true ]; then' "$SETUP"
+OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
+check "opk dispatches fix-user-manager to the rescue mode" \
+    sh -c 'grep -qF "fix-user-manager)" "$1" && grep -qF -- "--rescue-user-manager" "$1"' _ "$OPK"
+check "opk usage lists fix-user-manager" \
+    grep -Fq 'fix-user-manager' "$OPK"
+
+echo ""
+echo "-- podman docker-API socket (ddev needs the endpoint) --"
+check "setup enables podman.socket in the user manager" \
+    grep -Fq 'systemctl --user enable --now podman.socket' "$SETUP"
+check "setup verifies the socket inode before announcing it" \
+    grep -Fq '[ -S "/run/user/$OC_UID/podman/podman.sock" ]' "$SETUP"
+check "setup prints OPENCODE_PODMAN_SOCKET for the caller to record" \
+    grep -Fq 'echo "OPENCODE_PODMAN_SOCKET=$_pm_sock"' "$SETUP"
+check "podman path attempts the rescue before going socket-less" \
+    grep -Fq '_systemd_user_ready || rescue_user_manager || true' "$SETUP"
+check "podman path tells ddev users about fix-user-manager on a wedged boot" \
+    grep -Fq "until 'sudo opk fix-user-manager'" "$SETUP"
+check "install.sh captures OPENCODE_PODMAN_SOCKET from the setup output" \
+    grep -Fq 'OPENCODE_PODMAN_SOCKET="${_psock#OPENCODE_PODMAN_SOCKET=}"' "$INSTALL"
+check "install.sh re-stamps the podman socket only when one was reported" \
+    sh -c 'grep -qF "if [ -n \"\$OPENCODE_PODMAN_SOCKET\" ]; then" "$1" && grep -qF "s#^OPENCODE_PODMAN_SOCKET=.*#" "$1"' _ "$INSTALL"
+check "config.sh captures the podman socket on backend switches" \
+    grep -Fq 's/^OPENCODE_PODMAN_SOCKET=//p' "$CONFIG"
 
 echo ""
 echo "===================================="

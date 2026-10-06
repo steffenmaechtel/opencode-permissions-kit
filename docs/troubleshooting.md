@@ -58,23 +58,56 @@ prompt path is affected — `apt` and `sudo -u` calls work fine.
 ## docker-rootless setup aborts: user manager fails with "Device or resource busy"
 
 **Symptom:** the install (or a later backend switch) aborts at
-`systemd --user is not available for opencode`. The diagnostic block shows
-`systemctl is-active user@<uid>.service (system scope): failed` and names
-the systemd cgroup-reuse bug — or `journalctl -u user@<uid>.service`
-carries `Failed to spawn executor: Device or resource busy`. Your own
-user manager is failed too:
+`systemd --user is not available for opencode`, or WSL prints
+`wsl: Failed to start the systemd user session for '<you>'` right after
+opening the distro. The diagnostic block names the systemd cgroup-reuse
+bug, or `journalctl -u user@<uid>.service` carries
+`Failed to spawn executor: Device or resource busy`. Your own user
+manager is failed too:
 `systemctl is-active user@$(id -u).service` → `failed`.
 
-**Cause:** systemd ≤ 260 sporadically leaves a domain controller enabled
+**Cause:** systemd ≤ 260 sporadically leaves domain controllers enabled
 in a per-user cgroup after a failed cleanup; every later spawn into that
 cgroup fails with EBUSY (`clone3(CLONE_INTO_CGROUP)`) — no user manager
 can start for the rest of that boot. Upstream issue
 [#41278](https://github.com/systemd/systemd/issues/41278), fixed in
-systemd v261. Nothing a script (or the kit) can start into that state;
-which boots are affected is a lottery.
+systemd v261. Which boots are affected is a lottery (observed twice per
+day on one Ubuntu 26.04 WSL2 machine).
 
-**Fix:** restart WSL from Windows — `wsl --shutdown`, wait ~10 seconds,
-reopen the distro — then verify
+**Fix:** the boot can be un-wedged **without a WSL restart** — clear the
+dead manager's leftover cgroup controllers bottom-up, then restart the
+unit. Kit ≥ 0.0.46 does this automatically (install attempts it in the
+provisioning step; `systemctl status` of the failed unit shows the
+signature), and on demand:
+
+```bash
+sudo opk fix-user-manager
+```
+
+Manually (what that command does — field-validated on Ubuntu 26.04):
+
+```bash
+U=$(id -u opencode)
+cg=/sys/fs/cgroup/user.slice/user-$U.slice/user@$U.service
+# kill the dead manager's orphaned processes first (they are the wedge)
+sudo find "$cg" -name cgroup.procs -exec cat {} +            # inspect PIDs
+sudo kill -9 <those-pids>
+# clear controllers deepest-first (a parent write stays EBUSY
+# while any child still holds one)
+find "$cg" -name cgroup.subtree_control | awk '{print length, $0}' \
+    | sort -rn | cut -d' ' -f2- | while read f; do
+        on=$(cat "$f"); [ -n "$on" ] || continue
+        neg=$(echo "$on" | tr ' ' '\n' | sed 's/^/-/' | tr '\n' ' ')
+        echo "$neg" | sudo tee "$f"
+    done
+sudo systemctl reset-failed user@$U.service
+sudo systemctl start user@$U.service
+systemctl is-active user@$U.service        # active
+```
+
+If even that fails (or `fix-user-manager` reports no success): restart
+WSL from Windows — `wsl --shutdown` (or `wsl -t <distro>` for one
+distro), wait ~10 seconds, reopen — then verify
 (`systemctl is-active user@$(id -u).service` must say `active`) and
 re-run the install; the kit picks up where it left off. On systemd v261+
 this should not happen anymore — if it does, open an issue.

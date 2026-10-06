@@ -82,6 +82,12 @@ Commands:
                                    for 'update --yes --only-binary' (extra
                                    flags pass through, e.g. --binary-path,
                                    --major 1|2, --version <ver>)
+  fix-user-manager                Rescue the opencode user manager from the
+                                   systemd cgroup bug (Ubuntu 26.04 WSL2:
+                                   user@.service fails with 'Device or
+                                   resource busy') without a WSL restart —
+                                   the same un-wedge the installer tries
+                                   automatically (sudo)
   ddev-hosts-add [dir|hostname]     Add ddev hostnames to the Windows hosts
                                    file (ddev's own UAC flow; run as your
                                    user, Windows asks permission). A dir adds
@@ -141,6 +147,21 @@ case "$cmd" in
             exec sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
         fi
         exec sudo sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
+        ;;
+    fix-user-manager)
+        # On-demand systemd#41278 rescue (Ubuntu 26.04 field finding):
+        # un-wedge the opencode user manager (bottom-up cgroup controller
+        # clear + restart) without a WSL restart. Socket units enabled by
+        # the backend (docker.service / podman.socket) come up with the
+        # manager. Implemented in setup-container-backend — no new file.
+        if [ ! -f "$LIBDIR/bin/setup-container-backend" ]; then
+            ui_error "$LIBDIR/bin/setup-container-backend not found — is the kit installed?"
+            exit 1
+        fi
+        if [ "$(id -u)" -eq 0 ]; then
+            exec sh "$LIBDIR/bin/setup-container-backend" --rescue-user-manager
+        fi
+        exec sudo sh "$LIBDIR/bin/setup-container-backend" --rescue-user-manager
         ;;
     uninstall)
         if [ ! -f "$LIBDIR/management/uninstall.sh" ]; then
