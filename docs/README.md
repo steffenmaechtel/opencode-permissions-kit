@@ -67,7 +67,9 @@ warnings (shipped database, upstream watch, curation loop):
 unit and e2e but hit real terminals, and the patterns that close the
 gap: [test-environment-fidelity.md](design/test-environment-fidelity.md).
 Review strategy — scopes, cadence, loop stop rule:
-[review-concept.md](design/review-concept.md). Model-generated code
+[review-concept.md](design/review-concept.md). CI review — planning
+record for automated AI reviews in GitHub Actions (issue #122):
+[ci-review.md](design/ci-review.md). Model-generated code
 reviews — immutable snapshots plus per-finding
 resolutions — live in [`design/review/`](design/review/README.md).
 Superseded or
