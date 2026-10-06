@@ -114,8 +114,14 @@ review host):
   one broken rewrite away from live (the migrate fixtures carried them
   for months behind a `sed` that a wave then dropped; maintainer
   directive 2026-10-04).
+- `rm -rf` on a quoted variable **with a literal suffix**
+  (`rm -rf "$WORK/sub"`) must guard the variable with `:?`
+  (`rm -rf "${WORK:?}/sub"`): an empty or unset variable degenerates the
+  operand to a fixed absolute path (`/sub`) instead of the harmless
+  empty-operand no-op of the pure-variable form (audit follow-up to
+  0.0.42e C1, maintainer directive 2026-10-06).
 
-Enforced by `tests/unit/test-sandbox-policy.sh`, two checks over every
+Enforced by `tests/unit/test-sandbox-policy.sh`, three checks over every
 unit suite (backslash-continued commands are joined first; full-comment
 lines are skipped):
 
@@ -130,10 +136,15 @@ lines are skipped):
    (0.0.42g C2). Policy-INPUT classes — values handed to
    screening/parsing functions or parse-only argument fixtures, never
    executed as paths — are allowlisted in the suite with reasons.
+3. **rm -rf suffix guard** — `rm -rf` on a quoted variable with a
+   literal suffix must carry the `:?` empty-variable guard
+   (2026-10-06); pure-variable operands are exempt (an empty operand is
+   a verified rm no-op — the dangerous shape is the suffix).
 
-The suite self-probes both checks (continuation-split `rm`, inert and
-quoted and redirect-glued literals, a clean sandboxed control) so the
-guard itself cannot rot silently.
+The suite self-probes all three checks (continuation-split `rm`, inert
+and quoted and redirect-glued literals, the unguarded suffix shape vs
+the guarded one, a clean sandboxed control) so the guard itself cannot
+rot silently.
 
 ## Referencing review findings
 

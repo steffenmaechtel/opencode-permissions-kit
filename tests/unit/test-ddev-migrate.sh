@@ -178,7 +178,7 @@ rm -f "$WORK/ochome/.ddev/project_list.yaml"
 printf 'project_info:\n  p:\n    approot: /tmp/p\n' > "$WORK/ochome/.ddev/global_config.yaml"
 assert_eq "done: legacy project_info block counts" "yes" "$(done_check "$WORK/ochome")"
 
-rm -rf "$WORK/devhome123" "$WORK/ochome"
+rm -rf "${WORK:?}/devhome123" "${WORK:?}/ochome"
 
 # --- 3. omit_containers detection -------------------------------------------------
 

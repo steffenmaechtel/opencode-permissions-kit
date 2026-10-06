@@ -30,7 +30,7 @@ trap 'rm -rf "$WORK"' EXIT INT TERM
 # mkrepo: fresh sandbox at $WORK/r with origin=$WORK/origin.git, master
 # holding one commit (VERSION=1.2.3 + the release script), all pushed.
 mkrepo() {
-    rm -rf "$WORK/r" "$WORK/origin.git"
+    rm -rf "${WORK:?}/r" "${WORK:?}/origin.git"
     git init -q -b master "$WORK/origin.git" --bare
     git init -q -b master "$WORK/r"
     git -C "$WORK/r" config user.email test@invalid

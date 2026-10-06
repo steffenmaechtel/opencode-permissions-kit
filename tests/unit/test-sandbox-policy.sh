@@ -12,7 +12,8 @@
 #
 # Two checks over the continuation-joined view of each line (full-comment
 # lines skipped): check 1 scans the quote-blanked operand view, check 2
-# the RAW line (quotes included — see its own header below):
+# the RAW line (quotes included — see its own header below). Check 3
+# runs its own grep (section 3):
 #
 # 1. MUTATION: a mutating verb (rm, rmdir, mkdir, ln, cp, mv, chown,
 #    chmod, chgrp, setfacl, touch, truncate, tee, install, `sed -i`)
@@ -258,6 +259,40 @@ if grep -q "test-probe-clean.sh" "$VIOL"; then
     fail "self-probe: sandboxed probe must not be flagged"
 else
     pass "self-probe: sandboxed probe passes clean"
+fi
+
+# --- 3. rm -rf suffix form: :? empty-var guard (2026-10-06) -------------------
+# `rm -rf "$VAR/suffix"` degenerates to a fixed absolute path the moment
+# VAR is empty or unset (typo, half-done rewrite): the suffix form must
+# carry the :? guard (`rm -rf "${VAR:?}/suffix"` fails loudly instead
+# of attempting /suffix). Pure-variable operands (`rm -rf "$VAR"`) are
+# exempt — an empty operand is a verified rm no-op; the dangerous shape
+# is the suffix (audit follow-up to 0.0.42e C1, conventions.md "Test
+# sandbox", rule 4).
+sfx_scan() {
+    find "$1" -name 'test-*.sh' ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
+        grep -HnE 'rm -rf "\$[A-Za-z_][A-Za-z0-9_]*/' "$f" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
+    done
+}
+: > "$VIOL"
+sfx_scan tests/unit > "$VIOL" || true
+if [ -s "$VIOL" ]; then
+    while IFS= read -r vrow; do
+        fail "$vrow  <-- rm -rf var+suffix without the :? empty-var guard"
+    done < "$VIOL"
+else
+    pass "every rm -rf suffix operand carries the :? empty-var guard"
+fi
+# self-probe: the unguarded shape must be caught, the guarded one pass
+printf '#!/bin/sh\n# probe: unguarded rm -rf suffix must be caught (check 3)\nrm -rf "$PX/evil"\nrm -rf "${PX:?}/fine"\n' \
+    > "$PROBE_DIR/unit/test-probe-sfx.sh"
+: > "$VIOL"
+sfx_scan "$PROBE_DIR/unit" > "$VIOL" || true
+_sfx_rows=$(grep -c 'test-probe-sfx.sh' "$VIOL")
+if [ "$_sfx_rows" -eq 1 ] && grep -q 'PX/evil' "$VIOL"; then
+    pass "self-probe: unguarded suffix form caught, guarded form passes"
+else
+    fail "self-probe: check 3 must catch the unguarded suffix form only (rows=$_sfx_rows)"
 fi
 
 echo ""

@@ -461,10 +461,10 @@ mkdir -p "$HWORK/proj/vendor/typo3/cms-core/Classes/Information"
 touch "$HWORK/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
 check "typo3 detection: vendor Typo3Version.php => detected (composer mode)" \
     sh -c ". \"\$1\" && ddev_typo3_detected \"\$2\" ." _ "$HANDOVER" "$HWORK/proj"
-rm -rf "$HWORK/proj/vendor"
+rm -rf "${HWORK:?}/proj/vendor"
 check "typo3 detection: docroot typo3 dir => detected (legacy)" \
     sh -c "mkdir -p \"\$2/public/typo3\" && . \"\$1\" && ddev_typo3_detected \"\$2\" public" _ "$HANDOVER" "$HWORK/proj"
-rm -rf "$HWORK/proj/public"
+rm -rf "${HWORK:?}/proj/public"
 
 check "undetected typo3: root becomes 2755 (Perm==0755, ddev chmod is a no-op)" \
     sh -c ". \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2755" _ "$HANDOVER" "$HWORK/proj"
@@ -498,14 +498,14 @@ check "handover_root signature carries the dev user (handback target)" \
 # Functional prune check: a .ddev inside vendor/ is NOT handed over (a
 # shipped test fixture, not a project — issue #21 pattern), the real
 # project .ddev still is.
-rm -rf "$HWORK/scan"
+rm -rf "${HWORK:?}/scan"
 mkdir -p "$HWORK/scan/proj/.ddev" "$HWORK/scan/proj/vendor/some/pkg/.ddev"
 SCAN_OUT=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$HWORK/scan" 2>/dev/null || true)
 check "handover scan skips .ddev inside vendor/" \
     sh -c "! printf '%s\n' \"\$1\" | grep -q 'vendor/some/pkg/.ddev'" _ "$SCAN_OUT"
 check "handover scan still hands over the project .ddev" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'proj/.ddev'" _ "$SCAN_OUT"
-rm -rf "$HWORK/scan"
+rm -rf "${HWORK:?}/scan"
 
 # --- 7c. config.sh handover subcommand (fresh-clone EPERM repair) -----------------
 check "config.sh dispatches the handover action" \
@@ -661,20 +661,20 @@ unset DDEV_DEV_OWNED
 
 # .git prune: a .ddev inside .git/ is never a project (ddev finds .ddev
 # by walking UP from the cwd — no ddev command runs inside .git/).
-rm -rf "$HWORK/gitprune"
+rm -rf "${HWORK:?}/gitprune"
 mkdir -p "$HWORK/gitprune/proj/.ddev" "$HWORK/gitprune/proj/.git/modules/sub/.ddev"
 GITPRUNE_OUT=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/gitprune" 2>/dev/null || true)
 check "handover scan skips .ddev inside .git/ (issue #112)" \
     sh -c "! printf '%s\n' \"\$1\" | grep -q '.git/modules'" _ "$GITPRUNE_OUT"
 check "handover scan still hands over the project .ddev next to .git/" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'proj/.ddev'" _ "$GITPRUNE_OUT"
-rm -rf "$HWORK/gitprune"
+rm -rf "${HWORK:?}/gitprune"
 
 # Top-inode fast path: the FIRST pass chowns/chmods and echoes; the
 # second (everything conforms: user:group + group-write on the top
 # inode) stays silent for the recursive pairs. Detected typo3 (vendor
 # marker) so the project-root logic stays silent too (no dev user).
-rm -rf "$HWORK/fastpath"
+rm -rf "${HWORK:?}/fastpath"
 mkdir -p "$HWORK/fastpath/proj/.ddev" "$HWORK/fastpath/proj/config/system" \
     "$HWORK/fastpath/proj/vendor/typo3/cms-core/Classes/Information"
 printf 'type: typo3\n' > "$HWORK/fastpath/proj/.ddev/config.yaml"
@@ -698,7 +698,7 @@ check "fast path: .ddev top inode is group-writable after the pass" \
     sh -c "case \"\$(stat -c %A \"\$1\")\" in ?????w*) exit 0 ;; *) exit 1 ;; esac" _ "$HWORK/fastpath/proj/.ddev"
 # Mid-tree drift (a developer-owned file inside the conformed tree) is
 # invisible to the probe by design — explicit repair paths cover it.
-rm -rf "$HWORK/fastpath"
+rm -rf "${HWORK:?}/fastpath"
 
 # Scan-skip stamps: write -> valid; any field mismatch -> invalid; a
 # cksum filename collision must not validate a different root.
