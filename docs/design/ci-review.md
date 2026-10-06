@@ -5,6 +5,9 @@
 > It extends [review-concept.md](review-concept.md) — strategy, loop,
 > model policy — with a CI automation layer. Where the two disagree,
 > review-concept.md wins until this record is implemented and revised.
+> Maintainer decisions from 2026-10-06 are recorded under
+> "Decisions" below; only O3's secret name and O6's guard list remain
+> open.
 
 ## What issue #122 asks, mapped to the review types
 
@@ -31,11 +34,11 @@ Inspected at tag **v2.1.1** (read-only clone in the dev workspace,
 
 | Element | What openchamber does | Transfer |
 |---|---|---|
-| Trigger | `pull_request_target` (opened/synchronize/reopened/ready) plus manual `/oc-review` comment with optional focus text | adopt; trigger *model* is an open question below |
+| Trigger | `pull_request_target` (opened/synchronize/reopened/ready) plus manual `/oc-review` comment with optional focus text | mechanism adopted (comment command with focus text); trigger decided the other way — maintainer-started only (O1) |
 | Bot identity | GitHub App (`actions/create-github-app-token`) so comments/labels carry a distinct bot identity | open question (O2) |
 | Trust guard | PRs touching review policy / trust-boundary files (`AGENTS.md`, workflows, the agent prompt itself) are never AI-reviewed: label `review:human-required`, skip with explanation | adopt with a kit-specific guard list (O6) |
 | Read-only agent | `edit: deny`, `bash` allowlist (`gh`, `git`, `rg`, `ls`, `cat` only), no subagents, never checks out the PR branch, never runs builds/tests/linters — PR content is data, not instructions | adopt verbatim; matches our conventions.md untrusted-input rules |
-| Verdict contract | agent posts exactly one comment ending in a hidden marker `<!-- oc-review-meta {"head":"<sha>","verdict":"…"} -->`; the workflow (not the agent) verifies the comment landed, the marker parses, verdict + reviewed HEAD match, and maps it to a `review:*` label | adopt — the workflow-side verification step is what makes a rogue/failed agent run visible |
+| Verdict contract | agent posts exactly one comment ending in a hidden marker `<!-- oc-review-meta {"head":"<sha>","verdict":"…"} -->`; the workflow (not the agent) verifies the comment landed, the marker parses, verdict + reviewed HEAD match, and maps it to a `review:*` label | adopt for phase 2 (custom agent); phase 1 inverts it — the workflow posts, so no marker to verify (O8, O11) |
 | HEAD pinning | review targets one resolved `headRefOid`; if HEAD moved during the run, the run fails rather than labeling a stale review | adopt |
 | Cost control | 15 min throttle on push-triggered re-reviews (manual command always runs), 30 s debounce on `synchronize`, 30 min hard timeout, install retries with backoff | adopt; plus a diff-size cap (O7) |
 | Draft handling | draft PRs clear `review:*` labels instead of reviewing | adopt if we use labels |
@@ -80,6 +83,23 @@ Their reviewer agent runs on `zai-coding-plan/glm-5.3-flash` via a
    permissions are narrowed in its definition file, and the workflow
    independently verifies the output contract; neither trusts the other.
 
+## Decisions (2026-10-06, maintainer)
+
+First round of answers; the workflow stays deliberately minimal until
+the review quality has proven itself.
+
+| # | Decision |
+|---|---|
+| O1 | **Maintainer-started only.** Every review costs API budget, and with third-party PRs the maintainer wants to look first and approve. Mechanism: `/review` comment command restricted to write-access actors (`author_association` OWNER/MEMBER/COLLABORATOR); automatic triggers stay off; a GitHub Environment approval gate is an optional later spike, not phase 1 |
+| O2 | `GITHUB_TOKEN` (`github-actions[bot]`); own GitHub App only if a distinct bot identity becomes necessary |
+| O3 | GLM-5.3-Flash via a **provider-agnostic secret** (proposed: `AI_REVIEW_API_KEY`) that the workflow maps onto the provider env var — `ZHIPU_API_KEY` today, `OPENROUTER_API_KEY` or similar later; switching providers then touches only the workflow env block and the model string, never the secret. Name pending confirmation |
+| O4 | `master-review` starts manually (dispatch) at first; an automated cadence (release-trigger, weekly) is reconsidered once the PR review has proven itself |
+| O5 | Nothing blocks: findings are advisory and AI-unverified; the maintainer verifies in the PR. What a mature version needs (verdicts, gates) is deliberately deferred until quality is known |
+| O7 | Initial values from openchamber + our wave-review data: 15 min re-review throttle, 30 min hard timeout, ~2.5k changed-lines cap; tune from real runs |
+| O8 | **Built-in opencode `/review` first**, fed with prompt text (see "Phase 1" below); the committed custom agent is the phase-2 option |
+| O9 | Minimal label set: `review:pending`, `review:findings`, `review:clean`, `review:human-required`, `review:automation-failed` |
+| O10 | `test-workflows.sh` wiring happens in the implementation PR, when the workflow is real |
+
 ## Proposed shape (sketch, for the later PR)
 
 ### Job 1 — `pr-review` (wave review, diff scope)
@@ -89,36 +109,54 @@ Their reviewer agent runs on `zai-coding-plan/glm-5.3-flash` via a
    `review:human-required` label + skip comment, done.
 3. Size guard (O7): diff above cap → skip comment, done.
 4. Throttle/debounce push-triggered re-reviews.
-5. Install pinned opencode (O3), run
-   `opencode run --agent pr-review-bot` with the model key secret and a
-   `GH_TOKEN` scoped to comment+label. Prompt carries PR URL, number,
-   HEAD SHA, base/head refs.
-6. Verify output contract (comment present, marker parses, HEAD matches),
-   set label, fail loudly on contract violations.
+5. Install pinned opencode (O3) and run the built-in review:
+   `opencode run "/review <PR number> <focus>"` (O8) — the model key
+   secret is mapped onto the provider env var; the review run itself
+   gets NO write token.
+6. Workflow posts the captured stdout as the PR comment (posting cannot
+   be duplicated or injected by PR content) and sets the label (O11).
 
-Agent definition committed in-repo (`.opencode/agent/pr-review-bot.md`,
-English, conventions.md prompt style) — see O8.
+Phase 2 (optional): committed agent `.opencode/agent/pr-review-bot.md`
+(English, conventions.md prompt style) with kit severities, repeat-review
+timeline, and the marker contract.
 
 ### Job 2 — `master-review` (full scope)
 
 Same skeleton, but: full-tree scope, coverage-map discipline from
-review-concept.md, findings filed as an issue (O4), cadence per O4 —
-*not* every master push.
+review-concept.md, findings filed as an issue (O4), manual dispatch
+only at first (O4) — *not* every master push.
 
-## Open questions
+### Phase 1 — built-in `/review` (O8)
 
-| # | Question | Current leaning |
+Verified in the pinned checkouts (opencode 1.x at v1.18.34 and 2.x at
+v2.0.18 — both ship it): the command reviews uncommitted changes, a
+commit hash, a branch, or a PR number/URL (`gh pr view` + `gh pr diff`),
+reads whole files plus conventions files (AGENTS.md et al.), and writes
+its findings to **stdout**. It does not post GitHub comments, carries no
+verdict contract, and does not know our severity vocabulary or the
+repeat-review timeline.
+
+Consequences:
+
+- The **workflow**, not the agent, posts the comment from captured
+  stdout. This inverts openchamber's marker contract (their agent posts,
+  the workflow verifies) and is strictly safer: the review run holds no
+  write token at all, so even a successful prompt injection can at worst
+  burn tokens. The duplicate/missing-comment failure modes disappear
+  together with the agent's posting duty.
+- No agent file means no frontmatter hardening (`edit: deny`, bash
+  allowlist). Phase 1 compensates at the workflow level: ephemeral
+  runner, token only on the posting step, nothing else. If that proves
+  insufficient, phase 2 commits the agent definition with the allowlist.
+- No machine-readable verdict → O11.
+
+## Open questions (remaining)
+
+| # | Question | Status |
 |---|---|---|
-| O1 | **Trigger model for the PR review.** (a) automatic like openchamber, (b) `/review` comment command, (c) `workflow_dispatch` with PR number, (d) GitHub Environment with required reviewer — the literal "maintainer approves, then it runs" gate from issue #122 | start with (b): cheapest, re-review with focus text included, no extra infra; validate (d) in a spike if the approval UX matters. Restrict the command to write-access actors (openchamber lets any commenter trigger — a cost vector we need not copy) |
-| O2 | **Identity/token.** Own GitHub App (distinct bot identity, openchamber model) vs `GITHUB_TOKEN` (`github-actions[bot]`) | `GITHUB_TOKEN` first — solo-maintainer repo, one App fewer to register and rotate; reconsider an App only if the identity needs to stand apart (labels, notifications) |
-| O3 | **Model + opencode pin in CI.** Which provider key/secret, which model, and whether the opencode binary is pinned (like e2e pins) or floating latest | GLM-5.3-Flash via `ZHIPU_API_KEY` (house policy); pin the opencode version and bump it deliberately — reproducibility over novelty |
-| O4 | **Master full review: cadence and artifact.** Every push (issue #122's literal wording) vs release-triggered (VERSION file changed) vs weekly drift review vs dispatch-only; issue vs PR comment vs auto-snapshot | release-triggered (VERSION change) + manual dispatch; findings as a labeled issue; every-push full reviews would burn cost re-litigating accepted residuals (review-concept convergence table) |
-| O5 | **Verification duty in CI.** Post findings marked AI-unverified and stop, or add a second verifying agent pass in the same run | mark unverified, stop — verification is the maintainer's (or the dev agent's, in-PR); a second pass doubles cost for judgment a human still has to own |
-| O6 | **Guard list.** Which files make a PR `review:human-required`: `.github/workflows/`, `AGENTS.md`, `CONTRIBUTING.md`, `.opencode/agent/pr-review-bot.md`, `docs/design/review-concept.md`, `scripts/release.sh` — what else? | the list above as the starting set; the workflow file and agent definition must be on it (self-reference) |
-| O7 | **Cost/size caps.** Throttle window, hard timeout, changed-lines cap before skipping (review-concept: ~2.5k diff lines is one pass's digest limit) | 15 min / 30 min / ~2.5k lines, oriented on openchamber + our own wave-review data; tune from the first runs |
-| O8 | **Agent definition home.** Committed in-repo (needed: CI checks out only the repo; the current reviewer agents live in the maintainer's user config and are German) | `.opencode/agent/pr-review-bot.md` in-repo, English, not shipped in `KIT_FILES`; decide whether the manual review agents move in-repo too (consistency) or stay personal |
-| O9 | **Labels.** openchamber's six `review:*` labels vs a minimal set | minimal: `review:pending`, `review:findings`, `review:clean`, `review:human-required`, `review:automation-failed` |
-| O10 | **Workflow-test wiring.** `tests/unit/test-workflows.sh` guards a fixed workflow list; a new workflow is invisible to it until added | extend the guard list in the same PR; consider a guard that the review workflow itself keeps its allowlist-only agent permissions (drift here is a security regression, not a style issue) |
+| O3 | Secret **name** confirmation — proposal `AI_REVIEW_API_KEY` (alternatives: `REVIEW_API_KEY`, `REVIEW_MODEL_API_KEY`); the mapping pattern itself is decided | pending |
+| O6 | **Trust-guard list** — files whose changes make a PR refuse AI review (`review:human-required`). Rationale: the workflow runs with repo secrets and its behavior is defined by repo files; a PR that edits exactly those files must not be judged by the rules it itself changes — a malicious PR could weaken the reviewer to always return "clean". Proposed set: `.github/workflows/*.yml`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/design/review-concept.md`, `docs/design/ci-review.md`, `scripts/release.sh`. Add/remove entries? | list pending |
+| O11 | Phase-1 **verdict mapping**: built-in `/review` output has no machine-readable verdict, so the workflow cannot map comment → label the openchamber way. Phase 1 either posts the comment under one flat label or skips labels entirely; the marker contract returns with the phase-2 agent | open |
 
 ## Non-goals
 
