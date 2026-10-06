@@ -314,6 +314,10 @@ check "setup factors the readiness probes (_systemd_user_ready = the gate's chec
     grep -Fq '_systemd_user_ready()' "$SETUP"
 check "setup diagnoses the user@ unit from the system scope" \
     grep -Fq 'systemctl is-active "user@$OC_UID.service"' "$SETUP"
+check "setup detects the systemd cgroup-reuse EBUSY bug and names the recovery" \
+    grep -Fq "grep -q 'Device or resource busy'" "$SETUP"
+check "setup EBUSY hint references the upstream issue and the WSL restart" \
+    sh -c 'grep -qF "systemd issue #41278" "$1" && grep -qF "wsl --shutdown" "$1"' _ "$SETUP"
 check "setup dbus hint fires only when the package was actually fresh" \
     grep -Fq '_dbus_fresh' "$SETUP"
 

@@ -55,6 +55,30 @@ prompt path is affected — `apt` and `sudo -u` calls work fine.
   free it with `sudo kill -CONT <pid>` (the stopped subshell of the menu
   read), then answer the prompt or abort it.
 
+## docker-rootless setup aborts: user manager fails with "Device or resource busy"
+
+**Symptom:** the install (or a later backend switch) aborts at
+`systemd --user is not available for opencode`. The diagnostic block shows
+`systemctl is-active user@<uid>.service (system scope): failed` and names
+the systemd cgroup-reuse bug — or `journalctl -u user@<uid>.service`
+carries `Failed to spawn executor: Device or resource busy`. Your own
+user manager is failed too:
+`systemctl is-active user@$(id -u).service` → `failed`.
+
+**Cause:** systemd ≤ 260 sporadically leaves a domain controller enabled
+in a per-user cgroup after a failed cleanup; every later spawn into that
+cgroup fails with EBUSY (`clone3(CLONE_INTO_CGROUP)`) — no user manager
+can start for the rest of that boot. Upstream issue
+[#41278](https://github.com/systemd/systemd/issues/41278), fixed in
+systemd v261. Nothing a script (or the kit) can start into that state;
+which boots are affected is a lottery.
+
+**Fix:** restart WSL from Windows — `wsl --shutdown`, wait ~10 seconds,
+reopen the distro — then verify
+(`systemctl is-active user@$(id -u).service` must say `active`) and
+re-run the install; the kit picks up where it left off. On systemd v261+
+this should not happen anymore — if it does, open an issue.
+
 ## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
 
 **Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`,

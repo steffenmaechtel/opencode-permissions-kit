@@ -233,6 +233,20 @@ setup_docker_rootless() {
         loginctl show-user "$OPENCODE_USER" 2>&1 | sed 's/^/  /' >&2
         echo "systemctl is-active user@$OC_UID.service (system scope):" >&2
         systemctl is-active "user@$OC_UID.service" 2>&1 | sed 's/^/  /' >&2
+        # Known upstream defect (systemd <= 260, systemd#41278, fixed in
+        # v261): a sporadically wedged per-user cgroup makes EVERY spawn
+        # from it fail with EBUSY — no user manager can start on that
+        # boot, nothing a script can fix. Name it explicitly instead of
+        # letting the user stare at the diagnostics.
+        if systemctl status "user@$OC_UID.service" --no-pager 2>&1 \
+            | grep -q 'Device or resource busy'; then
+            echo "${YELLOW}user@$OC_UID.service dies with 'Device or resource busy': the known systemd${NC}" >&2
+            echo "${YELLOW}cgroup-reuse bug (systemd issue #41278, fixed upstream in v261). This boot${NC}" >&2
+            echo "${YELLOW}cannot start ANY user manager (check: systemctl is-active user@\$(id -u).service).${NC}" >&2
+            echo "${YELLOW}Restart WSL from Windows (wsl --shutdown, wait ~10s, reopen the distro) and${NC}" >&2
+            echo "${YELLOW}re-run the install — the failure is sporadic per boot.${NC}" >&2
+            log "user@$OC_UID.service EBUSY (systemd#41278 class) — needs a WSL restart, no in-script fix"
+        fi
         echo "/run/user/$OC_UID:" >&2
         ls -la "/run/user/$OC_UID" 2>&1 | sed 's/^/  /' >&2
         echo "systemctl --user is-active dbus:" >&2
