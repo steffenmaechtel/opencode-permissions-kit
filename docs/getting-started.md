@@ -32,6 +32,13 @@ Run the one-liner in a terminal on the target machine:
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
 ```
 
+> **Ubuntu 26.04:** its default `sudo` (sudo-rs 0.2.13) freezes the
+> interactive prompts of a streamed install. The installer detects this
+> and aborts before the first prompt, pointing at the non-interactive
+> variant — append `bash -s -- --yes --projects /var/www/vhosts` to the
+> one-liner and see
+> [sudo-rs install hang](troubleshooting.md#ubuntu-2604-streamed-install-hangs-after-the-first-question-sudo-rs).
+
 The script detects that it is streamed, fetches its sibling files from the
 same `stable` release mirror, and first prints a **pre-flight inventory** of what it
 found on your system (WSL2, curl/acl, ddev, docker/podman, an existing kit

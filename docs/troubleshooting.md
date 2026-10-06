@@ -3,6 +3,58 @@
 This page lists known failure modes — each entry follows
 symptom → cause → fix. If your case is missing, open an issue.
 
+## Ubuntu 26.04: streamed install hangs after the first question (sudo-rs)
+
+**Symptom:** on Ubuntu 26.04 the streamed install (`curl ... | sudo env
+KIT_BRANCH=stable bash`) either aborts right before the mode menu with a
+sudo-rs error (kit ≥ 0.0.46 — that abort is intentional, see below), or —
+on older kit versions — prints the mode menu and then never reacts again:
+no output, Ctrl+C does nothing.
+
+**Cause:** Ubuntu 26.04 ships [sudo-rs](https://github.com/trifectatechfoundation/sudo-rs)
+as the default `sudo` (0.2.13 at release). Its PTY/signal handling
+permanently stops the read subshell of an interactive prompt when stdin
+is a pipe (exactly the `curl | sudo bash` shape) — upstream issue
+[#1598](https://github.com/trifectatechfoundation/sudo-rs/issues/1598),
+fixed in sudo-rs 0.2.14; until Ubuntu ships the fix (SRU or release
+update), every interactive streamed install on 26.04 hangs. Only the
+prompt path is affected — `apt` and `sudo -u` calls work fine.
+
+**Fix:**
+
+- kit ≥ 0.0.46 aborts such a run **before** the first menu, with the
+  instructions below — nothing hangs anymore, nothing was changed on the
+  system yet. Follow the printed path: install non-interactively (the
+  flags variant never reads the terminal and completes normally):
+
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
+      | sudo env KIT_BRANCH=stable bash -s -- --yes --projects /var/www/vhosts
+  ```
+
+  (`--yes` takes the recommended defaults; add
+  `--container-backend podman-rootless`, `--secure-git-config`,
+  `--ddev-settings dev-owned|ddev`, `--migrate-agents move|copy|skip` as
+  needed — see the [CLI reference](reference/cli.md));
+
+- or switch that machine to the classic sudo — it stays in the Ubuntu
+  archive alongside sudo-rs (26.04 ships both; `/usr/bin/sudo` is an
+  update-alternatives link between `/usr/bin/sudo-rs` and the classic
+  `/usr/bin/sudo.ws`):
+
+  ```bash
+  sudo apt install sudo
+  sudo update-alternatives --config sudo   # pick the classic entry
+  sudo --version                           # must report "Sudo version 1.9.x"
+  ```
+
+  The gate re-opens automatically once the active `sudo` reports the
+  classic implementation or sudo-rs 0.2.14+;
+
+- if an OLDER kit version is currently hanging: from a **second** window,
+  free it with `sudo kill -CONT <pid>` (the stopped subshell of the menu
+  read), then answer the prompt or abort it.
+
 ## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
 
 **Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`,

@@ -304,6 +304,18 @@ check "setup adds Docker apt repo when docker-ce-rootless-extras missing" grep -
 check "setup prints OPENCODE_DOCKER_HOST on stdout" grep -Fq 'echo "OPENCODE_DOCKER_HOST=$SOCK"' "$SETUP"
 check "setup reads opencode user from install.conf" grep -Fq 'OPENCODE_USER="opencode"' "$SETUP"
 check "setup checks systemd for docker-rootless" grep -Fq 'systemctl --user is-active dbus' "$SETUP"
+echo ""
+echo "-- setup-container-backend user-manager start (Ubuntu 26.04 race) --"
+check "setup starts user@<uid>.service deterministically (not just linger-async)" \
+    grep -Fq 'systemctl start "user@$OC_UID.service"' "$SETUP"
+check "setup polls the user manager instead of a fixed sleep" \
+    grep -Fq 'until _systemd_user_ready' "$SETUP"
+check "setup factors the readiness probes (_systemd_user_ready = the gate's checks)" \
+    grep -Fq '_systemd_user_ready()' "$SETUP"
+check "setup diagnoses the user@ unit from the system scope" \
+    grep -Fq 'systemctl is-active "user@$OC_UID.service"' "$SETUP"
+check "setup dbus hint fires only when the package was actually fresh" \
+    grep -Fq '_dbus_fresh' "$SETUP"
 
 echo ""
 echo "===================================="

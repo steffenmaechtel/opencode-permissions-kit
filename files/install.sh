@@ -455,6 +455,55 @@ _yes_no_backup_menu() {
     ui_menu "$1" "n" "y|Yes" "n|No" "b|Backup first, then yes"
 }
 
+# === sudo-rs gate (Ubuntu 26.04) ==============================================
+# Ubuntu 26.04 ships sudo-rs as the default 'sudo'. Its PTY/signal handling
+# below 0.2.14 permanently SIGTTIN-stops the read SUBSHELL of a prompt when
+# stdin is a pipe (trifectatechfoundation/sudo-rs#1598) — exactly the
+# streamed install's shape: the FIRST menu would freeze the terminal for
+# good, and the only rescue (second window, find the stopped PID,
+# kill -CONT) is unreasonable to ask of users. An interactive run with
+# piped stdin therefore aborts HERE, with instructions, BEFORE that menu.
+# --yes runs never prompt and pass (the defect only hits the tty-read
+# path — apt and `sudo -u` work fine under sudo-rs). Version-gated: from
+# sudo-rs 0.2.14 (fix released upstream) the gate opens by itself; an
+# unparseable version counts as affected (fail-closed — the hang has no
+# in-script recovery).
+_sudo_rs_gate() {
+    [ -t 0 ] && return 0
+    _srs_line=$(sudo --version 2>/dev/null | head -1)
+    case "$_srs_line" in
+        *sudo-rs*) ;;
+        *) return 0 ;;
+    esac
+    _srs_ver=$(printf '%s\n' "$_srs_line" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    _srs_ok=no
+    if [ -n "$_srs_ver" ]; then
+        _srs_ok=$(awk -v v="$_srs_ver" 'BEGIN{split(v,a,"."); \
+            if(a[1]+0>0 || (a[1]+0==0 && (a[2]+0>2 || (a[2]+0==2 && a[3]+0>=14)))) print "yes"; else print "no"}')
+    fi
+    if [ "$_srs_ok" = yes ]; then
+        log "preflight: sudo-rs $_srs_ver detected (>= 0.2.14, hang fix present) — no gate needed"
+        return 0
+    fi
+    if [ "$INTERACTIVE" = true ]; then
+        ui_error "sudo-rs ${_srs_ver:-unknown} is the active sudo (Ubuntu 26.04 default)"\
+" — its known PTY bug (sudo-rs issue #1598, fixed in 0.2.14)"
+        ui_error "freezes the interactive prompts of a piped install: the first menu would"\
+" stop responding,"
+        ui_error "Ctrl+C included. This install was aborted BEFORE that point — nothing"\
+" has been changed yet."
+        ui_info "install non-interactively instead (recommended defaults, no prompts):"
+        ui_detail "re-run the one-liner with: bash -s -- --yes --projects /var/www/vhosts"
+        ui_detail "or install the classic sudo first: sudo apt install sudo — then re-run as before"
+        log "preflight: sudo-rs ${_srs_ver:-unknown} + piped stdin + interactive —"\
+" aborted before the first prompt (sudo-rs #1598)"
+        exit 1
+    fi
+    ui_info "sudo-rs ${_srs_ver:-unknown} detected (Ubuntu 26.04) — running with --yes, prompts skipped"
+    log "preflight: sudo-rs detected with piped stdin — non-interactive run, prompts skipped"
+    return 0
+}
+
 banner() {
     ui_banner "$VERSION" "installs opencode as its own user behind rootless containers"
 }
@@ -511,6 +560,11 @@ do_plan_phase() {
     # prompt of the install steps below.
     INTERACTIVE=true
     [ "$SKIP_PROMPTS" = true ] && INTERACTIVE=false
+
+    # Must run BEFORE the first menu: under buggy sudo-rs that menu's read
+    # subshell is the hang point (see _sudo_rs_gate above).
+    _sudo_rs_gate
+
     MODE="standard"
     if [ "$INTERACTIVE" = true ]; then
         _mode=$(ui_menu "How do you want to install?" "1" \

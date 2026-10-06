@@ -159,6 +159,17 @@ enable_linger() {
     fi
 }
 
+# Manager-readiness probe: the same two checks the docker-rootless gate
+# below runs (dbus unit active, else the manager reachable at all).
+# Factored out so the start-up poll in setup_docker_rootless and the gate
+# itself cannot drift apart.
+_systemd_user_ready() {
+    sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
+        systemctl --user is-active dbus >/dev/null 2>&1 && return 0
+    sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
+        systemctl --user status >/dev/null 2>&1
+}
+
 # --- docker-rootless setup ----------------------------------------------------
 
 setup_docker_rootless() {
@@ -171,6 +182,11 @@ setup_docker_rootless() {
     # user has no D-Bus session and `systemctl --user` fails until this
     # package is present. Install uidmap + dbus-user-session first, then
     # enable-linger (which starts user@<uid>.service), then verify.
+    # Track whether dbus-user-session is actually NEW: the failure hint
+    # below names it only when true (the old static text blamed a fresh
+    # install even on systems where the package was already present).
+    _dbus_fresh=false
+    dpkg -l dbus-user-session 2>/dev/null | grep -q "^ii" || _dbus_fresh=true
     apt_install uidmap dbus-user-session
 
     # systemd --user is a hard requirement for the rootless daemon. Enable
@@ -179,38 +195,53 @@ setup_docker_rootless() {
     # not active. enable-linger starts the systemd --user manager for it).
     if command -v loginctl >/dev/null 2>&1; then
         loginctl enable-linger "$OPENCODE_USER" 2>/dev/null || true
-        # loginctl enable-linger starts user@<uid>.service asynchronously;
-        # give it a moment to come up.
-        sleep 1
     fi
+    # Deterministic start + poll instead of the old fixed `sleep 1`:
+    # enable-linger starts user@<uid>.service asynchronously, and on a cold
+    # system (the first user-manager start ever, slow WSL2 I/O) the manager
+    # was not up after one second — the gate below then aborted a perfectly
+    # healthy install (Ubuntu 26.04 field report). Starting the unit
+    # directly as root is idempotent and immediate; the poll waits up to
+    # 20s for readiness before the gate re-checks.
+    systemctl start "user@$OC_UID.service" 2>/dev/null || true
+    _um_waited=0
+    until _systemd_user_ready; do
+        _um_waited=$((_um_waited + 1))
+        if [ "$_um_waited" -ge 20 ]; then
+            echo "  systemd --user manager for $OPENCODE_USER not ready after ${_um_waited}s ..."
+            break
+        fi
+        sleep 1
+    done
     # Ensure the runtime dir exists (systemd --user needs XDG_RUNTIME_DIR).
     mkdir -p "/run/user/$OC_UID" 2>/dev/null || true
     chown "$OPENCODE_USER:$OPENCODE_USER" "/run/user/$OC_UID" 2>/dev/null || true
     chmod 700 "/run/user/$OC_UID" 2>/dev/null || true
 
-    if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
-            systemctl --user is-active dbus >/dev/null 2>&1; then
-        if ! sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" systemctl --user status >/dev/null 2>&1; then
-            echo "${RED}systemd --user is not available for $OPENCODE_USER.${NC}" >&2
-            echo "${YELLOW}Docker rootless needs systemd"\
+    if ! _systemd_user_ready; then
+        echo "${RED}systemd --user is not available for $OPENCODE_USER.${NC}" >&2
+        echo "${YELLOW}Docker rootless needs systemd"\
 " (WSL2: enable via /etc/wsl.conf [boot] systemd=true + reboot).${NC}" >&2
+        if [ "$_dbus_fresh" = true ]; then
             echo "${YELLOW}dbus-user-session was just installed"\
 " — a reboot may be needed for the user session to start.${NC}" >&2
-            echo "${YELLOW}Consider podman-rootless instead (daemonless, no systemd required).${NC}" >&2
-            # Debug: show what failed (helps diagnose WSL2-specific issues).
-            echo "${CYAN}--- diagnostic (stderr) ---${NC}" >&2
-            echo "loginctl show-user $OPENCODE_USER:" >&2
-            loginctl show-user "$OPENCODE_USER" 2>&1 | sed 's/^/  /' >&2
-            echo "/run/user/$OC_UID:" >&2
-            ls -la "/run/user/$OC_UID" 2>&1 | sed 's/^/  /' >&2
-            echo "systemctl --user is-active dbus:" >&2
-            sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
-                systemctl --user is-active dbus 2>&1 | sed 's/^/  /' >&2
-            echo "systemctl --user status:" >&2
-            sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
-                systemctl --user status 2>&1 | head -10 | sed 's/^/  /' >&2
-            exit 1
         fi
+        echo "${YELLOW}Consider podman-rootless instead (daemonless, no systemd required).${NC}" >&2
+        # Debug: show what failed (helps diagnose WSL2-specific issues).
+        echo "${CYAN}--- diagnostic (stderr) ---${NC}" >&2
+        echo "loginctl show-user $OPENCODE_USER:" >&2
+        loginctl show-user "$OPENCODE_USER" 2>&1 | sed 's/^/  /' >&2
+        echo "systemctl is-active user@$OC_UID.service (system scope):" >&2
+        systemctl is-active "user@$OC_UID.service" 2>&1 | sed 's/^/  /' >&2
+        echo "/run/user/$OC_UID:" >&2
+        ls -la "/run/user/$OC_UID" 2>&1 | sed 's/^/  /' >&2
+        echo "systemctl --user is-active dbus:" >&2
+        sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
+            systemctl --user is-active dbus 2>&1 | sed 's/^/  /' >&2
+        echo "systemctl --user status:" >&2
+        sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
+            systemctl --user status 2>&1 | head -10 | sed 's/^/  /' >&2
+        exit 1
     fi
 
     # docker-ce-rootless-extras provides dockerd-rootless-setuptool.sh and

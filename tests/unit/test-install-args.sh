@@ -433,8 +433,81 @@ fi
 # the test's own fetch run registered the tree — remove it
 rm -rf "${_FETCH_TREE:-}" 2>/dev/null || true
 rm -rf "$FKWORK"
-# remove the fetched VERSION artifact fetch_kit may have written to CWD
-# (it returns a tree path; nothing lands outside $FKWORK on failure)
+# --- sudo-rs gate (Ubuntu 26.04): abort, never hang ------------------------------
+# sudo-rs (Ubuntu 26.04's default sudo, < 0.2.14) permanently stops the
+# read subshell of an interactive prompt when stdin is a pipe (upstream
+# #1598): a streamed interactive install would freeze at the FIRST menu,
+# rescue needs a second window + kill -CONT. install.sh must abort such a
+# run BEFORE that menu (fail-closed), pass --yes runs through (no prompts
+# = no hang), open the gate again from 0.2.14 (fix released), and ignore
+# classic sudo entirely.
+if grep -qF '_sudo_rs_gate()' "$INSTALL" \
+   && grep -qF '[ -t 0 ] && return 0' "$INSTALL" \
+   && grep -qF 'sudo --version 2>/dev/null | head -1' "$INSTALL"; then
+    pass "install.sh has the _sudo_rs gate (tty guard + sudo-rs probe)"
+else
+    fail "install.sh has the _sudo_rs gate (tty guard + sudo-rs probe)"
+fi
+_rs_gate_ln=$(grep -n '^    _sudo_rs_gate$' "$INSTALL" | head -1 | cut -d: -f1)
+_rs_menu_ln=$(grep -n 'ui_menu "How do you want to install?"' "$INSTALL" | head -1 | cut -d: -f1)
+[ -n "$_rs_gate_ln" ] && [ -n "$_rs_menu_ln" ] && [ "$_rs_gate_ln" -lt "$_rs_menu_ln" ] \
+    && pass "sudo-rs gate runs before the first interactive menu (order pin)" \
+    || fail "sudo-rs gate runs before the first interactive menu (gate=$_rs_gate_ln menu=$_rs_menu_ln)"
+grep -qF 'a[3]+0>=14' "$INSTALL" \
+    && pass "gate version floor is sudo-rs 0.2.14 (fix release)" \
+    || fail "gate version floor is sudo-rs 0.2.14 (fix release)"
+
+# Functional: the extracted gate against sudo version shims (stdin piped
+# via </dev/null, output stubs, exit 1 confined to a subshell).
+SRSWORK=$(mktemp -d)
+mkdir -p "$SRSWORK/bin"
+mk_sudo_shim() {
+    printf '#!/bin/sh\necho "%s"\n' "$1" > "$SRSWORK/bin/sudo"
+    chmod +x "$SRSWORK/bin/sudo"
+}
+if [ -n "$(sed -n '/^_sudo_rs_gate() {/,/^}/p' "$INSTALL")" ]; then
+    eval "$(sed -n '/^_sudo_rs_gate() {/,/^}/p' "$INSTALL")"
+    ui_error()  { echo "error: $*"; }
+    ui_info()   { echo "info: $*"; }
+    ui_detail() { echo "detail: $*"; }
+    log() { :; }
+    run_gate() {
+        ( export INTERACTIVE="$1" PATH="$SRSWORK/bin:$PATH"; _sudo_rs_gate ) </dev/null 2>&1
+    }
+    mk_sudo_shim 'sudo-rs 0.2.13-0ubuntu1.2'
+    _rg_rc=0; _rg_out=$(run_gate true) || _rg_rc=$?
+    if [ "$_rg_rc" -eq 1 ] && printf '%s' "$_rg_out" | grep -q 'non-interactively'; then
+        pass "buggy sudo-rs + interactive + piped stdin -> abort with instructions (rc 1)"
+    else
+        fail "buggy sudo-rs + interactive + piped stdin -> abort with instructions (rc=$_rg_rc out=$_rg_out)"
+    fi
+    _rg_rc=0; _rg_out=$(run_gate false) || _rg_rc=$?
+    if [ "$_rg_rc" -eq 0 ] && printf '%s' "$_rg_out" | grep -q 'prompts skipped'; then
+        pass "buggy sudo-rs + --yes -> passes with an info line (rc 0)"
+    else
+        fail "buggy sudo-rs + --yes -> passes with an info line (rc=$_rg_rc out=$_rg_out)"
+    fi
+    mk_sudo_shim 'sudo-rs version 0.2.15'
+    _rg_rc=0; _rg_out=$(run_gate true) || _rg_rc=$?
+    if [ "$_rg_rc" -eq 0 ] && ! printf '%s' "$_rg_out" | grep -q 'error:'; then
+        pass "fixed sudo-rs (>= 0.2.14) -> interactive run passes (gate open)"
+    else
+        fail "fixed sudo-rs (>= 0.2.14) -> interactive run passes (rc=$_rg_rc out=$_rg_out)"
+    fi
+    mk_sudo_shim 'sudo-rs version unknown-build'
+    _rg_rc=0; _rg_out=$(run_gate true) || _rg_rc=$?
+    [ "$_rg_rc" -eq 1 ] \
+        && pass "unparseable sudo-rs version -> fail-closed abort (interactive)" \
+        || fail "unparseable sudo-rs version -> fail-closed abort (rc=$_rg_rc out=$_rg_out)"
+    mk_sudo_shim 'Sudo version 1.9.15p5'
+    _rg_rc=0; _rg_out=$(run_gate true) || _rg_rc=$?
+    [ "$_rg_rc" -eq 0 ] \
+        && pass "classic sudo -> gate is a no-op" \
+        || fail "classic sudo -> gate is a no-op (rc=$_rg_rc out=$_rg_out)"
+else
+    fail "_sudo_rs_gate extractable from install.sh"
+fi
+rm -rf "$SRSWORK"
 
 echo ""
 if [ "$failures" -gt 0 ]; then
