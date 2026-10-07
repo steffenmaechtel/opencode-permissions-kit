@@ -92,16 +92,17 @@ and whole home directories are refused — hand over project trees, not
 systems. `/tmp` subpaths are allowed (temp build trees are legitimate
 handover targets). Symlinked paths are refused too: the kit never hands a
 tree over through a link (`--dry-run` lists the refusals it would make).
-Operands must be slash- and dotdot-free — `x/`, `x//`, `x/.`, `x/..` and
-mid-path `a/../b` are refused with a usage error: a trailing slash or a
-`..` component resolves through a link before the symlink gate can see
-it, so both the gate and the recursive pair would act on the resolved
-target (the link itself, or its parent). The recursive pair itself cannot be steered through a
-planted link either: the ownership change rides `chown -R -h` (lchown on
-a planted operand re-owns the attacker's own link, nothing outside), and
-the group-write pass only ever sees non-symlinks (`find ! -type l` feeds
-it) — a link swapped between the check and the run touches nothing
-outside the tree.
+Operands must be slash-, dot- and dotdot-free — `x/`, `x//`, `x/.`,
+`x/./y`, `x/..` and mid-path `a/../b` are refused with a usage error: a
+trailing slash, a `.` or a `..` component resolves through a link before
+the symlink gate can see it, so both the gate and the recursive pair
+would act on the resolved target (the link itself, or its parent). The
+recursive pair itself cannot be steered through a planted link either:
+the group-write pass runs FIRST, while every entry is still yours (the
+agent cannot swap what it cannot write), and the ownership change rides
+`chown -R -h` LAST (lchown on a planted operand re-owns the attacker's
+own link, nothing outside) — a link swapped between the check and the
+run touches nothing outside the tree.
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides

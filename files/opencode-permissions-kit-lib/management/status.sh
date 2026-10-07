@@ -776,9 +776,13 @@ fi
 
 # The agent user itself must have NO sudo rules (the kit grants rules only
 # to the developer, RunAs opencode). Only checkable when status.sh runs as
-# root; otherwise silent.
+# root; otherwise silent. The check keys on the listing HEADER, not on any
+# runas spec (0.0.45c S3): the old regex matched only (ALL...) and
+# (opencode...) runas specs — a manual `(root)` or `(dev)` grant, exactly
+# the "later manual grant" class this row exists to surface, printed the
+# green "none" verdict.
 if [ "$(id -u)" -eq 0 ] && command -v sudo >/dev/null 2>&1; then
-    if sudo -n -l -U "$OPENCODE_USER" 2>/dev/null | grep -Eq '\((ALL|opencode)[^)]*\)' ; then
+    if sudo -n -l -U "$OPENCODE_USER" 2>/dev/null | grep -q 'may run the following commands'; then
         ui_kv "sudo rules" "$OPENCODE_USER may run sudo — the kit grants it none (investigate)" "$UI_RED"
         sra_finding=true
     else

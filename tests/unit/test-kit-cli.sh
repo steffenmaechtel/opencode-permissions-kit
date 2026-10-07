@@ -217,6 +217,17 @@ for _slashed in "$WORK/ho-tree/sub/" "$WORK/ho-tree//" "$WORK/ho-tree/."; do
         *) echo "  ${RED}FAIL${NC}  handover refuses slash form $_slashed (got: $errout)"; failures=$((failures + 1)) ;;
     esac
 done
+# mid single-dot form (0.0.45c S7): "x/./y" passed the filter while
+# [ -L "x/./y" ] is blind to a symlinked INTERMEDIATE component — the
+# handover would run through the link instead of refusing it.
+for _middot in "$WORK/ho-tree/./sub" "$WORK/ho-tree/sub/./file"; do
+    errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" handover me "$_middot" 2>&1 >/dev/null || true)"
+    case "$errout" in
+        *"slash/dotdot path form"*)
+            echo "  ${GREEN}PASS${NC}  handover refuses mid-dot form $_middot (S7)"; passed=$((passed + 1)) ;;
+        *) echo "  ${RED}FAIL${NC}  handover refuses mid-dot form $_middot (S7, got: $errout)"; failures=$((failures + 1)) ;;
+    esac
+done
 # dotdot forms resolve through a link to its target's PARENT (0.0.44b
 # W3): [ -L "x/.." ] is false and realpath follows the link — the same
 # gate-blind class as trailing slashes.
@@ -275,6 +286,22 @@ else
         *"handover: $WORK/ho-tree"*) echo "  ${GREEN}PASS${NC}  handover reports each path (root env)"; passed=$((passed + 1)) ;;
         *) echo "  ${RED}FAIL${NC}  handover reports each path (root env, got: $out)"; failures=$((failures + 1)) ;;
     esac
+fi
+
+# 0.0.45c S4 order pin: the chmod pass must run while the tree is still
+# dev-owned — BEFORE the chown -R -h hand-over. After the hand-over the
+# agent owns the tree and can swap a scanned file for a symlink between
+# find's lstat and chmod's resolution (root chmod g+w through the link on
+# out-of-tree targets). Static line-number pin on the executor (the race
+# itself is not unit-pinnable); reverting the order swaps the numbers.
+_chmod_ln=$(grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' "$KIT" | cut -d: -f1)
+_chown_ln=$(grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' "$KIT" | cut -d: -f1)
+if [ -n "$_chmod_ln" ] && [ -n "$_chown_ln" ] && [ "$_chmod_ln" -lt "$_chown_ln" ]; then
+    echo "  ${GREEN}PASS${NC}  handover: chmod pass precedes the chown hand-over (S4)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  handover: chmod pass must precede the chown hand-over (S4)"
+    failures=$((failures + 1))
 fi
 
 # List drift guard: install.sh's fetch_kit() list and update.sh's KIT_FILES

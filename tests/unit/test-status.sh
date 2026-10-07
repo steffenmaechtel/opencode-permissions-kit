@@ -570,6 +570,49 @@ else
     fail "status.sh: gap function extractable (W15)"
 fi
 
+# --- 0.0.45c S3: sudo-rules audit flags ANY listing, not just ALL/opencode runas --
+# The old regex ('\((ALL|opencode)[^)]*\)') printed the green "none for
+# opencode" for a manual `(root)` or `(dev)` grant — the exact later-
+# manual-grant class the row exists to catch. The check now keys on the
+# `sudo -l` listing header. Behavioral replay: the REAL grep line,
+# extracted verbatim, must flag every representative listing shape and
+# stay green on the not-allowed wording.
+_sudo_grep="$(grep -F "sudo -n -l -U " "$STATUS" | grep 'may run the following commands' | head -1 | sed 's/^ *//')"
+if [ -n "$_sudo_grep" ]; then
+    pass "sudo-rules audit keys on the listing header (S3, verbatim pin)"
+else
+    fail "sudo-rules audit keys on the listing header (S3)"
+fi
+if [ -n "$_sudo_grep" ] && command -v sudo >/dev/null 2>&1; then
+    # strip the `sudo -n -l -U … | ` head and the trailing `; then` —
+    # the pin replays only the grep half against piped listings
+    _s3_grep_only="$(printf '%s\n' "$_sudo_grep" | sed -e 's/^.*| //' -e 's/; then$//')"
+    _s3_flag() { printf '%s\n' "$1" | eval "$_s3_grep_only" >/dev/null 2>&1; }
+    if _s3_flag 'User opencode may run the following commands on host:
+    (root) NOPASSWD: /usr/bin/systemctl restart foo'; then
+        pass "a (root) runas grant is flagged red (S3)"
+    else
+        fail "a (root) runas grant is flagged red (S3)"
+    fi
+    if _s3_flag 'User opencode may run the following commands on host:
+    (dev) NOPASSWD: /bin/foo'; then
+        pass "a (dev) runas grant is flagged red (S3)"
+    else
+        fail "a (dev) runas grant is flagged red (S3)"
+    fi
+    if _s3_flag 'User opencode may run the following commands on host:
+    (ALL : ALL) ALL'; then
+        pass "an (ALL) runas grant stays flagged (S3, old regex parity)"
+    else
+        fail "an (ALL) runas grant stays flagged (S3, old regex parity)"
+    fi
+    if _s3_flag 'User opencode is not allowed to run sudo on host.'; then
+        fail "the not-allowed wording stays green (S3)"
+    else
+        pass "the not-allowed wording stays green (S3)"
+    fi
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

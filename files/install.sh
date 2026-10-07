@@ -309,7 +309,11 @@ command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { 
 # The kit files sit next to this script (checkout or fully fetched temp dir).
 # The fallback covers the OUTPUT helpers only — the interactive prompts
 # (ui_ask/ui_confirm/ui_menu) come solely from ui.sh, so a ui.sh-less run
-# proceeds only up to its first prompt and dies there (set -e).
+# proceeds only up to its first prompt and dies there (set -e). A --yes
+# run never prompts: it needs every OUTPUT helper below for its whole
+# run — ui_have/ui_atten/ui_add/ui_miss included (0.0.45c C5: the old
+# fallback lacked them and a ui.sh-less --yes died at the inventory's
+# first ui_have, "command not found", before any prompt).
 UI_LIB="$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     . "$UI_LIB"
@@ -317,21 +321,17 @@ else
     ui_info()    { echo "  info     $1"; }
     ui_success() { echo "  success  $1"; }
     ui_warn()    { echo "  warn     $1"; }
-    ui_error()   { echo "  error    $1" >&2; }
+    ui_error()   { echo "  error     $1" >&2; }
     ui_detail()  { echo "     $1"; }
     ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
     ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
     ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
     ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
     ui_plan()    { printf '    %s  %s\n' "$1" "$2"; }
-    _ui_read() {
-        if IFS= read -r "$1" </dev/tty 2>/dev/null; then return 0; fi
-        if [ "${UI_NO_STDIN_FALLBACK:-}" = "1" ]; then
-            echo "  error     no terminal available for this prompt — rerun with --yes or from a checkout" >&2
-            exit 1
-        fi
-        IFS= read -r "$1" || :
-    }
+    ui_have()    { echo "  ok        $1  ${2:-}"; }
+    ui_atten()   { echo "  warn      $1  ${2:-}"; }
+    ui_add()     { echo "  add       $1  ${2:-}"; }
+    ui_miss()    { echo "  miss      $1  ${2:-}"; }
     UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
 fi
 
@@ -684,9 +684,14 @@ do_plan_phase() {
     # abort: the wrapper fail-opens per start (0.0.44b W10) and 'opk
     # update' replaces the binary. The major stamp itself is anchored in
     # Step 8 (F1): an unparseable probe leaves it untouched.
+    # || true inside the substitution (0.0.45c C1): under bash +
+    # set -eu + pipefail a timeout KILL (rc 124) took the pipeline's
+    # status and errexit aborted the WHOLE install with zero output —
+    # the exact hang case this block exists to warn about; the same
+    # idiom as the os-release reads above.
     _pf_oc_bin=/usr/local/lib/opencode-permissions-kit/bin/opencode
     if [ -x "$_pf_oc_bin" ]; then
-        _pf_oc_ver=$(timeout 10 "$_pf_oc_bin" --version 2>/dev/null | head -1)
+        _pf_oc_ver=$(timeout 10 "$_pf_oc_bin" --version 2>/dev/null | head -1 || true)
         _pf_oc_maj=$(printf '%s' "$_pf_oc_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
         if [ -n "$_pf_oc_maj" ]; then
             log "preflight: existing opencode binary answers --version (major $_pf_oc_maj)"
@@ -876,7 +881,13 @@ do_plan_phase() {
             *)  return 1 ;;   # relative paths are error-prone in projects.conf
         esac
         case "$_pp" in
-            *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
+            # Dot/empty-segment forms, complete (0.0.45c S1): the old arms
+            # caught only INTERIOR dots — a trailing "/." passed and (with
+            # no /var/*, /home/* catch-all in the blocklist below, by
+            # design) sent the root-side recursive group baseline over /,
+            # /var or every home; a leading "//" resolved outside the
+            # blocklist too. Same arms as bin/opk's handover form filter.
+            *..*|/./|*/./*|./*|*/.|*//*) return 1 ;;   # traversal / dot / empty segments
             *[[:space:]]*) return 1 ;;        # storage format is line-based and
                                              # space-free (0.0.39b C3)
         esac
@@ -1824,8 +1835,13 @@ do_deploy_phase() {
     # exits 0 even without a match, so the append must be grep-gated.
     # Bounded probe: every other probe of this binary carries a timeout
     # (wrapper issue #80) — a wedged binary must not hang the installer at
-    # the very last step (review 0.0.39b C5).
-    _stamp_ver=$(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1)
+    # the very last step (review 0.0.39b C5). || true inside the
+    # substitution (0.0.45c C2): under bash + set -eu + pipefail the
+    # timeout kill (rc 124) used to abort the installer rc 124 with ZERO
+    # output — post-provisioning, a half install — instead of reaching
+    # the keep-the-previous-stamp arm below (which now also covers the
+    # hang case, not just an answer-with-noise probe).
+    _stamp_ver=$(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1 || true)
     _stamp_maj=$(printf '%s' "$_stamp_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
     if [ -n "$_stamp_maj" ]; then
         :   # "opencode v2..." — the 2.x shape
@@ -1943,8 +1959,15 @@ do_deploy_phase() {
     # 0.0.36 section is stripped (kit-owned regression cleanup).
     # (The helper library itself ships via the lib_deploy manifest above.)
     if browser_bridge_is_wsl; then
-        browser_bridge_install "$SCRIPT_DIR" "$LIBDIR"
-        ui_success "WSL browser bridge stand-in deployed"
+        # Failure-honest since 0.0.45c C4: browser_bridge_install propagates
+        # a failed stand-in deploy or legacy strip — the old unconditional
+        # success line reported "deployed" even when nothing was written.
+        if browser_bridge_install "$SCRIPT_DIR" "$LIBDIR"; then
+            ui_success "WSL browser bridge stand-in deployed"
+        else
+            ui_warn "WSL browser bridge: stand-in deploy or legacy wsl.conf strip FAILED"
+            ui_detail "see the errors above; re-run the install or fix /etc/wsl.conf manually"
+        fi
         if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             ui_detail "wsl.conf carrier already present — bridge fully active"
             log "wsl browser bridge stand-in deployed: $LIBDIR/wsl (carrier present)"
@@ -2419,7 +2442,7 @@ echo ""
 ui_info "Next:"
 ui_detail "opencode                       start the agent (new terminal!)"
 [ -n "$DD_MIG_DUMP_DIR" ] && ui_detail \
-    "ddev-migrate.sh import          re-import your ddev databases (first start pulls images)"
+    "sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import  re-import your ddev databases"
 ui_detail "opk status   verify the protection"
 ui_detail "opk config   change settings later (or update/uninstall)"
 ui_detail "Docs:  https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/README.md"

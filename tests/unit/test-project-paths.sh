@@ -150,6 +150,29 @@ else
     pass "rejects paths containing tabs/spaces anywhere"
 fi
 
+# Trailing-/. and empty-segment forms (0.0.45c S1): a trailing "/." matched
+# none of the old interior-dot arms and — with no /var/*, /home/* catch-all
+# in the blocklist — put the ROOT-SIDE recursive group baseline over /,
+# /var or every home; "/home/opencode/." additionally defeated the
+# agent-home exclusion. Leading "//x" bypassed the blocklist the same way
+# (bin/opk's form filter refused it all along).
+for p in "/." "/var/." "/home/." "/home/opencode/." "//x" "//" "/srv/x/." "/home/dev/."; do
+    if project_path_sane "$p"; then
+        fail "rejects trailing-/. or empty-segment form: $p"
+    else
+        pass "rejects trailing-/. or empty-segment form: $p"
+    fi
+done
+# and the same forms behind a trailing slash ("x/./" and "x//" normalize
+# via ${1%/} to "x/." and "x/" before the arms — both stay refused)
+for p in "/var/./" "//x/" "/./"; do
+    if project_path_sane "$p"; then
+        fail "rejects dot/empty-segment form behind a trailing slash: $p"
+    else
+        pass "rejects dot/empty-segment form behind a trailing slash: $p"
+    fi
+done
+
 # install.sh must store the NORMALIZED path, not the raw tilde input, in
 # both entry points — a literal ~/dev in projects.conf is silently skipped
 # by every consumer (review 0.0.39b C1). The standard prompt (line ~593)

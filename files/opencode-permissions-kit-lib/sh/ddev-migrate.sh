@@ -152,8 +152,27 @@ ddev_migrate_outside() {
 ddev_migrate_gap() {
     dmg_dev="$1"; shift
     dmg_dir=$(ddev_migrate_latest_dir)
-    [ -n "$dmg_dir" ] && [ -f "$dmg_dir/manifest.conf" ] || return 1
-    dmg_have=$(grep -cE '^(OK|SKIP|FAIL)\|' "$dmg_dir/manifest.conf" 2>/dev/null || true)
+    [ -n "$dmg_dir" ] || return 1
+    # Root never opens a path inside the agent-replaceable dump dir (the
+    # invariant the export setup states for itself; 0.0.45c S6): the old
+    # `[ -f ]` + grep followed a planted symlink (root read the TARGET —
+    # a line-count oracle) and silently failed on a FIFO, suppressing
+    # the partial-export warning. Delivery into a root-owned temp
+    # instead: find -type f selects only a REGULAR manifest (links and
+    # FIFOs are skipped, never opened), the bounded cat caps the
+    # residual stat-to-read swap window at 5s (rc 124 fails safe into
+    # "no manifest" instead of hanging the installer), and the COPY is
+    # parsed, never the original. An empty copy legitimately counts as
+    # 0 attempted (the gap warning then fires — correct).
+    dmg_stage=$(mktemp) || return 1
+    command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dmg_stage"
+    dmg_found=$(find "$dmg_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>/dev/null)
+    if [ -z "$dmg_found" ] || ! timeout 5 cat "$dmg_found" > "$dmg_stage" 2>/dev/null; then
+        rm -f "$dmg_stage" 2>/dev/null || true
+        return 1
+    fi
+    dmg_have=$(grep -cE '^(OK|SKIP|FAIL)\|' "$dmg_stage" 2>/dev/null || true)
+    rm -f "$dmg_stage" 2>/dev/null || true
     dmg_have=${dmg_have:-0}
     dmg_now=$(ddev_migrate_projects "$(ddev_migrate_home "$dmg_dev")/.ddev" "$@" 2>/dev/null | grep -c . || true)
     dmg_now=${dmg_now:-0}
@@ -484,30 +503,46 @@ ddev_migrate_export() {
     DD_MIG_FAIL=${DD_MIG_FAIL:-0}
     DD_MIG_FAILLIST=$(grep '^FAIL|' "$DM_STAGE/manifest.auth" 2>/dev/null | cut -d'|' -f2 || true)
 
-    # Finalize: opencode owns the dumps (the importing side), the sharing
-    # group keeps the developer's read access. The root stage goes FIRST —
-    # chown -R must never hand it to the agent (0.0.44a V3). The chmod
-    # pass rides find ! -type l: the dump dir is agent-writable until this
-    # very chmod 750, and plain `chmod 640 dumpdir/*.sql.gz` dereferences
-    # a planted symlink operand (mode strip on an arbitrary path).
+    # Finalize — order per 0.0.45c S2/S5: ALL root-side operand operations
+    # happen BEFORE the hand-over, never after it. The old order ran
+    # `chown -R` first: from that moment the agent owned the dump dir (no
+    # sticky restrains the OWNER), could swap manifest.conf for a symlink
+    # and let the trailing root `chown root:<grp>` dereference it
+    # (arbitrary chgrp on e.g. /etc/shadow, 0.0.45c S2), and could swap
+    # dump entries between find's lstat and chmod's resolution (root mode
+    # strip through the link, 0.0.45c S5). New order, three phases:
+    #   1. LOCK: root takes the dir itself and drops group-write — the
+    #      agent (a group member with the old 3770) loses every write
+    #      path into it; sticky is pointless on a root-owned
+    #      non-group-writable dir, 750 keeps the dev's read access.
+    #   2. operand ops on the LOCKED dir: find ! -type l gates static
+    #      plants, and with no agent write path there is no swap race
+    #      either. The root stage went first (above) — nothing of it is
+    #      ever handed over (0.0.44a V3).
+    #   3. hand-over LAST, per entry: the dumps to the agent (import
+    #      reads them as the agent), then the dir itself. Never chown -R
+    #      over the dir — it would hand the root-owned manifest along
+    #      (0.0.44d F2).
     rm -rf "$DM_STAGE" 2>/dev/null || true
-    chown -R "$dm_oc:$dm_ocg" "$DD_MIG_DUMP_DIR" 2>/dev/null || true
+    chown "root:$dm_ocg" "$DD_MIG_DUMP_DIR" 2>/dev/null || true
     chmod 750 "$DD_MIG_DUMP_DIR" 2>/dev/null || true
     find "$DD_MIG_DUMP_DIR" -maxdepth 1 ! -type l -name '*.sql.gz' \
         -exec chmod 640 {} + 2>/dev/null || true
+    # The manifest stays ROOT-owned (0.0.44d F2): an agent-owned manifest
+    # would be refused by the resume seed's owner check (0.0.44c C3) —
+    # the documented fix-and-re-run path would dead-end on the kit's own
+    # finalize output. root:<sharing-group> 0640. NB the finalized dir is
+    # 750 agent-owned, no sticky (0.0.44e E3): the agent CAN rename the
+    # root-owned manifest there. What actually protects the resume is
+    # the seed's refusal — the agent cannot forge a root- or dev-OWNED
+    # replacement, so anything it plants is refused loudly.
+    find "$DD_MIG_DUMP_DIR" -maxdepth 1 ! -type l -name 'manifest.conf' \
+        -exec chown "root:$dm_ocg" {} + 2>/dev/null || true
     find "$DD_MIG_DUMP_DIR" -maxdepth 1 ! -type l -name 'manifest.conf' \
         -exec chmod 640 {} + 2>/dev/null || true
-    # The manifest stays ROOT-owned (0.0.44d F2): the chown -R above hands
-    # the DUMPS to the agent (import reads them as the agent), but an
-    # agent-owned manifest would be refused by the resume seed's owner
-    # check (0.0.44c C3) — the documented fix-and-re-run path would
-    # dead-end on the kit's own finalize output. root:<sharing-group>
-    # 0640. NB the finalized dir is 750 agent-owned (no sticky — 0.0.44e
-    # E3 corrected the earlier "sticky-protected" wording): the agent CAN
-    # rename the root-owned manifest there. What actually protects the
-    # resume is the seed's refusal — the agent cannot forge a root- or
-    # dev-OWNED replacement, so anything it plants is refused loudly.
-    chown "root:$dm_ocg" "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true
+    find "$DD_MIG_DUMP_DIR" -maxdepth 1 ! -type l -name '*.sql.gz' \
+        -exec chown "$dm_oc:$dm_ocg" {} + 2>/dev/null || true
+    chown "$dm_oc:$dm_ocg" "$DD_MIG_DUMP_DIR" 2>/dev/null || true
     [ "${DD_MIG_OK:-0}" -gt 0 ]
 }
 
@@ -522,12 +557,28 @@ ddev_migrate_latest_dir() {
 # dump directory as the opencode user. `ddev start` per project
 # registers it in the opencode registry and pulls images on first run.
 ddev_migrate_import() {
-    [ "$(id -u)" = 0 ] || { echo "ddev-migrate: import must run as root (sudo sh ddev-migrate.sh import)"; return 1; }
+    _mig_entry='/usr/local/lib/opencode-permissions-kit/bin/ddev-migrate'
+    [ "$(id -u)" = 0 ] || { echo "ddev-migrate: import must run as root (sudo $_mig_entry import)"; return 1; }
     dm_dir="${1:-$(ddev_migrate_latest_dir)}"
-    [ -n "$dm_dir" ] && [ -f "$dm_dir/manifest.conf" ] || {
+    # Same S6 discipline as ddev_migrate_gap (0.0.45c): the dump dir is
+    # agent-owned after finalize, so root never READS its manifest.conf
+    # directly — the old `[ -f ]` + `while read <` followed a planted
+    # symlink (root read an attacker-chosen target, line by line).
+    # Delivery into a root-owned temp via find -type f (only a REGULAR
+    # manifest qualifies; links/FIFOs are refused, never opened) with a
+    # bounded cat; the loop below parses the COPY.
+    [ -n "$dm_dir" ] || {
         echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
         return 1
     }
+    dm_manifest=$(mktemp) || return 1
+    command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dm_manifest"
+    dm_found=$(find "$dm_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>/dev/null)
+    if [ -z "$dm_found" ] || ! timeout 5 cat "$dm_found" > "$dm_manifest" 2>/dev/null; then
+        rm -f "$dm_manifest" 2>/dev/null || true
+        echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
+        return 1
+    fi
 
     dm_conf="/etc/opencode-permissions-kit/install.conf"
     dm_oc="opencode"; dm_be=""; dm_dh=""; dm_ps=""
@@ -572,7 +623,8 @@ ddev_migrate_import() {
             echo "    FAILED — import manually: ddev start $dm_n && ddev import-db $dm_n --file=$dm_dir/$dm_f"
             dm_failed="$dm_failed $dm_n"
         fi
-    done < "$dm_dir/manifest.conf"
+    done < "$dm_manifest"
+    rm -f "$dm_manifest" 2>/dev/null || true
 
     echo ""
     echo "  imported $dm_ok database(s) from $dm_dir"
