@@ -381,10 +381,14 @@ case "$cmd" in
             #   entry is agent-owned, and on a tree the agent owned
             #   without group write no agent write path remains — the
             #   chmod pass races no one.
-            # Inherent residual in EITHER order: a tree that already
-            # carries g+w for the sharing group (a previous handover)
-            # stays agent-writable through the run — that re-run window
-            # is pre-existing and accepted, not closed by ordering.
+            # Inherent residual in EITHER order: any mode-based write
+            # path the agent pre-arranged — g+w granted by an earlier
+            # handover, or o+w entries it created while it owned the
+            # tree (modes on owned entries are owner-controlled) —
+            # survives the re-own and keeps those subtrees
+            # agent-writable through the run; pre-existing, accepted,
+            # not closed by ordering (wording broadened 0.0.45e W2:
+            # it was never only the previous-handover g+w case).
             # Plain chmod WOULD follow an operand link — the [ ! -L ]
             # recheck below plus the validation gates are load-bearing
             # for the chmod half's operand; find -P itself skips a link

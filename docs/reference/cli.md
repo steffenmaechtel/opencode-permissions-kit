@@ -106,9 +106,10 @@ own link, nothing outside). Handing over **back to you** (`me`) reverses
 the order — `chown -R -h` runs first, so by the time group write is
 granted no entry is agent-owned anymore and the chmod pass races no one
 on trees the agent owned without group write. Trees that already carry
-group write for the sharing group (earlier handovers) stay
-agent-writable during the run in either order — an inherent, accepted
-residual.
+mode-based write paths the agent pre-arranged — group write from earlier
+handovers, or world-writable entries the agent created while it owned the
+tree — stay agent-writable during the run in either order; no ordering
+closes that (an inherent, accepted residual).
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides

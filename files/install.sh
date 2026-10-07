@@ -2087,6 +2087,13 @@ do_deploy_phase() {
             # normalize the parent the kit just created (mkdir -p leaves it
             # root-owned otherwise) — never /home/opencode itself, whose
             # mode 2750 (no world bit) is by design.
+            # ORDER (0.0.45e W1, the 0.0.45c S4 class): the chmod walks
+            # run FIRST, while the copied-in tree is still dev-owned —
+            # chown-first would walk a just-re-owned, fully agent-writable
+            # tree (re-install over a live agent: scan-then-act for a
+            # racing agent); chown -R hands over LAST.
+            sudo find "$_opk_dst" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
+            sudo find "$_opk_dst" -type f -exec chmod g+rw {} + 2>/dev/null || true
             sudo chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"
             sudo chmod 2775 "$_opk_dst"
             case "$1" in
@@ -2096,8 +2103,6 @@ do_deploy_phase() {
                     sudo chmod 2775 "$_opk_parent" 2>/dev/null || true
                     ;;
             esac
-            sudo find "$_opk_dst" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
-            sudo find "$_opk_dst" -type f -exec chmod g+rw {} + 2>/dev/null || true
             if [ "$_opk_ag" = m ]; then
                 ui_success "agent resources MOVED: $_opk_src -> $_opk_dst (group $OPENCODE_GROUP: both sides read/write)"
                 log "agents migration: moved $_opk_src -> $_opk_dst"

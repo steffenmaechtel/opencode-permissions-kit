@@ -327,7 +327,7 @@ _un_w2_gate() {
     cat "$_un_w2/log" 2>/dev/null || true
 }
 chmod 000 "$_un_w2/fake-home/opencodeux2"
-_un_w2_log="$(_un_w2_gate opencodeux2 .agents)"
+_un_w2_log="$(_un_w2_gate opencodeux2 devuser)"
 if printf '%s\n' "$_un_w2_log" | grep -q '^sudo test -d '; then
     pass "agents-backup gate: privileged existence probe issued despite unreadable home (W2)"
 else

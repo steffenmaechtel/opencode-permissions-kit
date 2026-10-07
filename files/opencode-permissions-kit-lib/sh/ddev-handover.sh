@@ -427,9 +427,23 @@ ddev_handover_root() {
         if _ddev_tree_conforms "$dhr_d" "$dhr_user" "$dhr_group"; then
             :
         else
-            chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || true
-            [ -L "$dhr_d" ] && continue
+            # ORDER is direction-dependent (0.0.45c S4 / 0.0.45d W1 in
+            # bin/opk; this pair joined with 0.0.45e W1): dev->agent
+            # chmods FIRST, while the tree is still dev-owned — the
+            # agent cannot swap what it cannot write — and hands
+            # ownership over LAST (chown -R lchowns, never
+            # dereferences). The old chown-first order ran the walk
+            # over a just-re-owned, fully agent-writable tree: an entry
+            # swapped between the walk's scan and chmod is followed,
+            # root chmod g+w through it on an out-of-tree target.
+            # Inherent residual either way: write modes the agent
+            # pre-arranged (g+w from an earlier handover, o+w entries
+            # it created while owning the tree — modes on owned entries
+            # are owner-controlled) keep those subtrees agent-writable
+            # through the run; not closed by ordering.
             chmod -R g+w "$dhr_d" 2>/dev/null || true
+            [ -L "$dhr_d" ] && continue
+            chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || true
             echo "  .ddev handover: $dhr_d -> $dhr_user"
         fi
         dhr_p="$(dirname "$dhr_d")"
@@ -490,6 +504,13 @@ ddev_handover_project_back() {
         if _ddev_tree_conforms "$dhb_proj/$dhb_d" "$dhb_dev" "$dhb_group"; then
             :
         else
+            # ORDER is direction-dependent (0.0.45e W1): agent->dev
+            # chowns FIRST — after chown -R no entry is agent-owned, so
+            # the chmod pass races no one on trees the agent held
+            # without pre-arranged write modes (the mirrored argument
+            # of the dev->agent pairs above; reverting this to
+            # chmod-first would re-open the scan-then-act window for
+            # exactly this direction).
             chown -R "$dhb_dev:$dhb_group" "$dhb_proj/$dhb_d" 2>/dev/null || true
             [ -L "$dhb_proj/$dhb_d" ] && continue
             chmod -R g+w "$dhb_proj/$dhb_d" 2>/dev/null || true
@@ -550,9 +571,14 @@ ddev_handover_project() {
         if _ddev_tree_conforms "$dhp_proj/$dhp_d" "$dhp_user" "$dhp_group"; then
             :
         else
-            chown -R "$dhp_user:$dhp_group" "$dhp_proj/$dhp_d" 2>/dev/null || true
-            [ -L "$dhp_proj/$dhp_d" ] && continue
+            # ORDER (0.0.45e W1, same direction argument as
+            # ddev_handover_root's pair): dev->agent chmods FIRST while
+            # the tree is still dev-owned, chown -R hands over LAST —
+            # chmod-while-just-re-owned-to-the-agent is the scan-then-act
+            # window the order closed in bin/opk (0.0.45c S4/0.0.45d W1).
             chmod -R g+w "$dhp_proj/$dhp_d" 2>/dev/null || true
+            [ -L "$dhp_proj/$dhp_d" ] && continue
+            chown -R "$dhp_user:$dhp_group" "$dhp_proj/$dhp_d" 2>/dev/null || true
             echo "  ddev settings handover: $dhp_proj/$dhp_d -> $dhp_user"
         fi
     done
