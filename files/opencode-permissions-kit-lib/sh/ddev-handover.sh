@@ -412,14 +412,21 @@ ddev_handover_root() {
     # ddev command ever runs from inside .git/.
     find "$dhr_root" -type d \( -name vendor -o -name node_modules -o -name testdata -o -name .git \) -prune -o \
         -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r dhr_d; do
-        # [ -L ] recheck immediately before each recursive op (fs-baseline
-        # deeec30 pattern, 0.0.39g S2): find classified the entry at SCAN
-        # time; the scanned trees are agent-group-writable, so a swapped
-        # symlink operand must never reach the recursive pair below.
-        # chmod -R DOES dereference a symlink operand (the load-bearing
-        # half); chown -R (default -P) lchowns operands and never
-        # traverses — the gate stays for it as defense-in-depth
-        # (0.0.44a V24 corrected the earlier "both dereference" claim).
+        # [ -L ] gates, roles split by the 0.0.45e W1 order swap (block
+        # reworded 0.0.45f W1 — it still described the old order): this
+        # scan-time gate catches statically planted links — find
+        # classified the entry at SCAN time; the scanned trees are
+        # agent-group-writable (fs-baseline deeec30 pattern, 0.0.39g
+        # S2). The chmod half of the pair below has NO exec-time gate:
+        # chmod -R dereferences a swapped symlink operand (the racing
+        # fixture pins it still hitting the walk); its guard is the
+        # ORDER argument — walk while the tree is dev-owned (see the
+        # ORDER comment at the pair). The mid-recheck between the ops
+        # guards only the SECOND op, the chown hand-over, as
+        # defense-in-depth (chown -R's default -P lchowns and never
+        # traverses — 0.0.44a V24 corrected the earlier "both
+        # dereference" claim) and skips the hand-over echo for a
+        # swapped operand.
         [ -L "$dhr_d" ] && continue
         # Top-inode fast path (issue #112): skip the recursive pair when
         # the tree already conforms — the steady-state re-scan used to

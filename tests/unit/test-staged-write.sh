@@ -366,7 +366,9 @@ fi
 # aware pins): the two dev->agent executors chmod FIRST (walk while the
 # tree is still dev-owned), the back executor chowns FIRST. Line order
 # inside each function block; a reverted swap flips the comparison, a
-# collapsed (order-shared) executor breaks the count.
+# collapsed (order-shared) executor leaves the grep unmatched (rc 1,
+# still discriminating — no count here, unlike bin/opk's exactly-twice
+# pins; wording corrected 0.0.45f W3).
 _dh_order() {
     _dh_blk=$(sed -n "/^$1()/,/^}/p" "$HANDOVER")
     _dh_cl=$(printf '%s\n' "$_dh_blk" | grep -nF 'chmod -R g+w "' | head -1 | cut -d: -f1)
