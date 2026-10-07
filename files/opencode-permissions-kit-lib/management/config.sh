@@ -58,12 +58,27 @@ else
     ui_info()    { echo "  info     $1"; }
     ui_success() { echo "  success  $1"; }
     ui_warn()    { echo "  warn     $1"; }
-    ui_error()   { echo "  error    $1" >&2; }
+    ui_error()   { echo "  error     $1" >&2; }
     ui_detail()  { echo "     $1"; }
     ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
     ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
     ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
     ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
+    # 0.0.45c C9: the body also calls ui_have/ui_atten (projects list)
+    # and ui_confirm/ui_menu/ui_ask (interactive flows) — without these
+    # stubs a ui.sh-less config.sh died rc 127 ("ui_have: not found")
+    # at the first list. Output stubs print plain; the prompt stubs
+    # fail loudly with a hint instead (a library this old cannot read
+    # a tty) — non-interactive paths keep working.
+    ui_have()    { echo "  ok       $1  $2"; }
+    ui_atten()   { echo "  warn     $1  $2"; }
+    _ui_no_prompt() {
+        echo "error: this prompt needs sh/ui.sh — library too old, re-deploy with 'sudo opk update'" >&2
+        return 1
+    }
+    ui_confirm() { _ui_no_prompt; }
+    ui_menu()    { _ui_no_prompt; }
+    ui_ask()     { _ui_no_prompt; }
     UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
 fi
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
@@ -263,7 +278,13 @@ project_path_sane() {
         *)  return 1 ;;   # relative paths are error-prone in projects.conf
     esac
     case "$_pp" in
-        *..*|/./|*/./*|./*) return 1 ;;   # traversal / dot segments
+        # Dot/empty-segment forms, complete (0.0.45c S1): the old arms
+        # caught only INTERIOR dots — a trailing "/." passed and (with
+        # no /var/*, /home/* catch-all in the blocklist below, by
+        # design) sent the root-side recursive group baseline over /,
+        # /var or every home; a leading "//" resolved outside the
+        # blocklist too. Same arms as bin/opk's handover form filter.
+        *..*|/./|*/./*|./*|*/.|*//*) return 1 ;;   # traversal / dot / empty segments
         *[[:space:]]*) return 1 ;;        # storage format is line-based and
                                          # space-free (0.0.39b C3)
     esac

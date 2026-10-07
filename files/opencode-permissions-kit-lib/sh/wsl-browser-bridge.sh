@@ -154,7 +154,12 @@ browser_bridge_write_conf() {
         ' "$_bb_conf" >> "$_bb_tmp"
     fi
     _bb_install_conf "$_bb_tmp"
-    rm -f "$_bb_tmp"
+    _bb_rc=$?
+    rm -f "$_bb_tmp" 2>/dev/null || true
+    # The tmp cleanup must not swallow the install result (0.0.45c C4):
+    # rc 1 = the carrier was NOT written — the caller reports failure
+    # instead of the old unconditional success.
+    return "$_bb_rc"
 }
 
 # Deploy the stand-in tree at the path open() computes. <src> is the
@@ -219,7 +224,9 @@ browser_bridge_strip_legacy() {
         { print }
     ' "$_bb_conf" > "$_bb_tmp"
     _bb_install_conf "$_bb_tmp"
-    rm -f "$_bb_tmp"
+    _bb_rc=$?
+    rm -f "$_bb_tmp" 2>/dev/null || true
+    return "$_bb_rc"   # rc 1 = strip failed, not stripped (0.0.45c C4)
 }
 
 # Deploy the stand-in tree and clean up kit-owned legacy wsl.conf content
@@ -233,7 +240,8 @@ browser_bridge_install() {
     _bb_files_root="$1"
     _bb_libdir="$2"
     browser_bridge_is_wsl || return 0
-    browser_bridge_deploy_tree "$_bb_files_root/opencode-permissions-kit-lib/bin/browser-bridge" "$_bb_libdir"
+    browser_bridge_deploy_tree "$_bb_files_root/opencode-permissions-kit-lib/bin/browser-bridge" "$_bb_libdir" \
+        || return 1
     browser_bridge_strip_legacy
 }
 
@@ -269,7 +277,15 @@ browser_bridge_remove() {
             { print }
         ' "$_bb_conf" > "$_bb_tmp"
         _bb_install_conf "$_bb_tmp"
-        rm -f "$_bb_tmp"
+        _bb_rc=$?
+        rm -f "$_bb_tmp" 2>/dev/null || true
+        # rc 1 = the kit block was NOT removed (0.0.45c C4) — propagate
+        # after the tmp cleanup; the tree removal below is best-effort
+        # either way (uninstall continues, the failure is reported).
+        if [ "$_bb_rc" -ne 0 ]; then
+            ${OPK_WSL_SUDO-sudo} rm -rf "${_bb_libdir:?}/wsl" 2>/dev/null || true
+            return "$_bb_rc"
+        fi
     fi
     ${OPK_WSL_SUDO-sudo} rm -rf "${_bb_libdir:?}/wsl"
 }

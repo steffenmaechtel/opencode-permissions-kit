@@ -310,6 +310,57 @@ else
     fail "fresh-install path broken"
 fi
 
+# 18b. write/strip/remove PROPAGATE a failed wsl.conf install (0.0.45c C4):
+# an unwritable conf directory makes _bb_install_conf fail — the old
+# trailing `rm -f` swallowed that rc and opk unconditionally printed
+# "carrier written to /etc/wsl.conf" (and install/update logged the
+# legacy strip as done when it was not).
+mkdir -p "$WORK/ro-dir"
+printf '[boot]\nsystemd=true\n' > "$WORK/ro-dir/wsl.conf"
+printf '[opencode-permissions-kit]\nroot = /old/wsl\n\n[boot]\nsystemd=true\n' \
+    > "$WORK/ro-dir/wsl-legacy.conf"
+printf '# opencode permissions kit browser bridge -- begin\n# x\n# opencode permissions kit browser bridge -- end\n\n[boot]\nsystemd=true\n' \
+    > "$WORK/ro-dir/wsl-remove.conf"
+chmod 555 "$WORK/ro-dir"
+if OPK_WSL_CONF="$WORK/ro-dir/wsl.conf" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
+    sh -c '. "$1" && browser_bridge_write_conf "$2"' _ "$BRIDGE_SH" "$LIBDIR" 2>/dev/null; then
+    fail "write_conf returns 1 when the carrier cannot be installed (C4)"
+else
+    pass "write_conf returns 1 when the carrier cannot be installed (C4)"
+fi
+check_eq_c4() { # <label> <expected-content-file> <actual-file>
+    if diff -q "$2" "$3" >/dev/null 2>&1; then
+        pass "$1 (C4)"
+    else
+        fail "$1 (C4)"
+    fi
+}
+printf '[boot]\nsystemd=true\n' > "$WORK/ro-plain.expect"
+check_eq_c4 "failed write leaves wsl.conf untouched" "$WORK/ro-plain.expect" "$WORK/ro-dir/wsl.conf"
+if OPK_WSL_CONF="$WORK/ro-dir/wsl-legacy.conf" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
+    sh -c '. "$1" && browser_bridge_strip_legacy' _ "$BRIDGE_SH" 2>/dev/null; then
+    fail "strip_legacy returns 1 when the rewrite cannot be installed (C4)"
+else
+    pass "strip_legacy returns 1 when the rewrite cannot be installed (C4)"
+fi
+printf '[opencode-permissions-kit]\nroot = /old/wsl\n\n[boot]\nsystemd=true\n' \
+    > "$WORK/ro-legacy.expect"
+check_eq_c4 "failed strip leaves the legacy section in place" "$WORK/ro-legacy.expect" "$WORK/ro-dir/wsl-legacy.conf"
+if OPK_WSL_CONF="$WORK/ro-dir/wsl-remove.conf" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
+    sh -c '. "$1" && browser_bridge_remove "$2"' _ "$BRIDGE_SH" "$LIBDIR" 2>/dev/null; then
+    fail "remove returns 1 when the kit block cannot be removed (C4)"
+else
+    pass "remove returns 1 when the kit block cannot be removed (C4)"
+fi
+chmod 755 "$WORK/ro-dir"
+OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
+if grep -q 'if browser_bridge_write_conf "$LIBDIR"; then' "$OPK" \
+   && grep -q 'could not write the carrier to /etc/wsl.conf' "$OPK"; then
+    pass "opk wsl-add-opencode-1-fix reports failure instead of lying (C4)"
+else
+    fail "opk wsl-add-opencode-1-fix reports failure instead of lying (C4)"
+fi
+
 # 19. remove restores the original conf byte-for-byte and drops the tree
 cat > "$CONF" <<'CONF'
 [boot]

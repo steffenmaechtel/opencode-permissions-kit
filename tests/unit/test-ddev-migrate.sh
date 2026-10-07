@@ -513,6 +513,53 @@ _st_ok=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run8.log" \
 check "a COMPLETED export returns numeric counts (E1)" \
     sh -c "printf '%s' \"\$1\" | grep -q 'OK=\[[1-9][0-9]*\] FAIL=\[[0-9][0-9]*\]'" _ "$_st_ok"
 
+# --- 4i. finalize: root-side ops BEFORE the hand-over (0.0.45c S2/S5) --------------
+# The swap race itself is not unit-pinnable — the pins are (a) ORDER
+# statics on the extracted finalize block (the old order: chown -R first,
+# operand chmod/chown after — the trailing `chown root:` dereferenced a
+# planted manifest link (S2, arbitrary chgrp) and the find-chmods raced
+# swapped dumps (S5, arbitrary mode strip)) and (b) the behavioral end
+# state on a fixture with planted links. Restoring any chown -R over the
+# dump dir, the bare `chown root:… manifest.conf` operand, or an operand
+# op after the hand-over chown fails these pins (sabotage duty).
+sed -n '/^    rm -rf "\$DM_STAGE" 2>\/dev\/null || true$/,/^    \[ "\${DD_MIG_OK:-0}" -gt 0 \]$/p' \
+    "$MIG" > "$WORK/finblock"
+if [ -s "$WORK/finblock" ]; then
+    check "finalize block scoping: compact, no EOF over-run (4i)" \
+        sh -c "[ \"\$(wc -l < \"\$1\")\" -le 45 ]" _ "$WORK/finblock"
+    check "finalize never chown -R's the dump dir — per-entry hand-over only (S2)" \
+        sh -c "! grep -q 'chown -R' \"\$1\"" _ "$WORK/finblock"
+    check "finalize: the bare manifest operand chown (the S2 dereference shape) is gone" \
+        sh -c "! grep -qF 'chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR/manifest.conf\"' \"\$1\"" _ "$WORK/finblock"
+    check "finalize: the manifest re-take rides the find gate (S2)" \
+        sh -c "grep -qF -- '-exec chown \"root:\$dm_ocg\" {} +' \"\$1\"" _ "$WORK/finblock"
+    check "finalize: dir lock (root takes the dir) precedes every operand op (S2/S5)" \
+        sh -c 'lock_ln=$(grep -n "^    chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR\" " "$1" | head -1 | cut -d: -f1); op_ln=$(grep -n "chmod 640" "$1" | head -1 | cut -d: -f1); [ -n "$lock_ln" ] && [ -n "$op_ln" ] && [ "$lock_ln" -lt "$op_ln" ]' _ "$WORK/finblock"
+    check "finalize: NO operand mutation after the first agent hand-over (S2/S5)" \
+        sh -c 'last_mut=$(grep -n "chmod" "$1" | tail -1 | cut -d: -f1); first_ho=$(grep -n "chown \"\$dm_oc:" "$1" | head -1 | cut -d: -f1); [ -n "$last_mut" ] && [ -n "$first_ho" ] && [ "$last_mut" -lt "$first_ho" ]' _ "$WORK/finblock"
+    # behavioral end state: planted links survive untouched, dumps and
+    # manifest end 640, the dir 750, the stage is gone (unprivileged:
+    # chowns fail EPERM into || true — the end STATE is still exactly
+    # the contract; the order statics above are the discriminators).
+    _fbd="$WORK/fin-fixture"; mkdir -p "$_fbd/.root-stage"
+    : > "$_fbd/.root-stage/stale"
+    printf 'dump\n' > "$_fbd/alpha.sql.gz"; chmod 644 "$_fbd/alpha.sql.gz"
+    printf 'manifest\n' > "$_fbd/manifest.conf"; chmod 644 "$_fbd/manifest.conf"
+    printf 'VICTIM-DUMP\n' > "$WORK/fin-victim"; chmod 755 "$WORK/fin-victim"
+    ln -s "$WORK/fin-victim" "$_fbd/evil.sql.gz"
+    DD_MIG_DUMP_DIR="$_fbd" DM_STAGE="$_fbd/.root-stage" DD_MIG_OK=1 \
+        dm_oc="$(id -un)" dm_ocg="$(id -gn)" \
+        sh -c 'eval "$(cat "$1")" >/dev/null 2>&1 || true' _ "$WORK/finblock" || true
+    assert_eq "finalize end state: dump dir is 750" "750" "$(stat -c %a "$_fbd")"
+    assert_eq "finalize end state: dump is 640" "640" "$(stat -c %a "$_fbd/alpha.sql.gz")"
+    assert_eq "finalize end state: manifest is 640" "640" "$(stat -c %a "$_fbd/manifest.conf")"
+    check "finalize end state: planted dump link is skipped, victim keeps 755" \
+        sh -c "test -L \"\$1/evil.sql.gz\" && test \"\$(stat -c %a \"\$2\")\" = 755" _ "$_fbd" "$WORK/fin-victim"
+    check_fail "finalize end state: the root stage is removed" test -e "$_fbd/.root-stage"
+else
+    fail "finalize block extractable (4i)"
+fi
+
 # --- 5. import loop (static wiring) ---------------------------------------------
 
 check "import reads the manifest and runs as the opencode user" \
@@ -738,6 +785,43 @@ else
     pass "gap: FAIL entries count as attempted (no gap)"
 fi
 
+# --- 10b. gap/import never read the dump-dir manifest as root (0.0.45c S6) --------
+# After finalize the dump dir belongs to the agent — root must never OPEN
+# a path inside it: the old `[ -f ]` + grep followed a planted symlink
+# (root read the TARGET) and silently passed on a FIFO (warning
+# suppressed). Delivery into a root-owned temp via find -type f only:
+# links and FIFOs are skipped, never opened; the COPY is parsed.
+_GDIR="$WORK/gapbackups/ddev-migration-20260909-232704"
+mv "$_GDIR/manifest.conf" "$_GDIR/manifest.conf.keep"
+printf 'no manifest lines here\n' > "$WORK/gap-victim.conf"
+ln -s "$WORK/gap-victim.conf" "$_GDIR/manifest.conf"
+GAP2=$(DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
+    timeout 10 sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2"' _ "$MIG" "$WORK/maxmustermann-vhosts" 2>/dev/null || true)
+if [ -z "$GAP2" ]; then
+    pass "gap: a symlinked manifest is refused, never read through (S6)"
+else
+    fail "gap: a symlinked manifest is refused, never read through (S6, got: $GAP2)"
+fi
+check "gap: the symlink target was never parsed as manifest content (S6)" \
+    sh -c "test \"\$(cat \"\$1\")\" = 'no manifest lines here'" _ "$WORK/gap-victim.conf"
+rm -f "${_GDIR:?}/manifest.conf"
+mkfifo "$_GDIR/manifest.conf"
+GAP3=$(DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
+    timeout 10 sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2"' _ "$MIG" "$WORK/maxmustermann-vhosts" 2>/dev/null || true)
+if [ -z "$GAP3" ]; then
+    pass "gap: a FIFO manifest is skipped without hanging (S6, fail-safe no-gap)"
+else
+    fail "gap: a FIFO manifest is skipped without hanging (S6, got: $GAP3)"
+fi
+rm -f "${_GDIR:?}/manifest.conf"
+mv "$_GDIR/manifest.conf.keep" "$_GDIR/manifest.conf"
+check "gap: manifest delivery is find -type f into a root-owned temp (S6)" \
+    sh -c 'grep -qF "dmg_found=\$(find \"\$dmg_dir\" -maxdepth 1 -type f -name manifest.conf" "$1" && ! grep -q "dmg_dir/manifest.conf" "$1"' _ "$MIG"
+check "import: the read loop parses the staged copy, never the dump-dir manifest (S6)" \
+    sh -c 'grep -qF "done < \"\$dm_manifest\"" "$1" && ! grep -qF "done < \"\$dm_dir/manifest.conf\"" "$1"' _ "$MIG"
+check "import: manifest delivery is find -type f with a bounded cat (S6)" \
+    sh -c 'grep -qF "dm_found=\$(find \"\$dm_dir\" -maxdepth 1 -type f -name manifest.conf" "$1" && grep -qF "timeout 5 cat \"\$dm_found\" > \"\$dm_manifest\"" "$1"' _ "$MIG"
+
 # registry subcommand (read-only, no root gate): export/outside view
 OUT=$(DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" sh "$BIN_MIG" registry maxmustermann "$WORK/maxmustermann-vhosts")
 assert_eq "registry cmd: all 12 under the root classified export" "12" \
@@ -814,6 +898,51 @@ check "run-as still executes the caller's command after the env words" \
     sh -c "printf '%s\n' \"\$1\" | grep -qxF '/bin/true'" _ "$_runas_out"
 check "run-as never runs a command-less env" \
     sh -c "[ \"\$(printf '%s\n' \"\$1\" | tail -n +5)\" != \"\" ]" _ "$_runas_out"
+
+# --- 0.0.45d W5: import's failure paths report their real cause --------------------
+# The old conflation printed "no dump directory with a manifest found"
+# for every failure: a cat timeout / unreadable manifest masqueraded as
+# the genuine no-manifest case, a mktemp failure returned 1 SILENTLY.
+# Distinct messages now. The root guard is bypassed with an id shim —
+# every path under test exits before the first sudo call.
+_w5dir="$(mktemp -d)"
+mkdir -p "$_w5dir/bin" "$_w5dir/bin-mk" "$_w5dir/dump"
+printf '#!/bin/sh\necho 0\n' > "$_w5dir/bin/id"
+cp "$_w5dir/bin/id" "$_w5dir/bin-mk/id"
+printf '#!/bin/sh\nexit 1\n' > "$_w5dir/bin-mk/mktemp"
+chmod +x "$_w5dir/bin/id" "$_w5dir/bin-mk/id" "$_w5dir/bin-mk/mktemp"
+_w5_import() {
+    PATH="$_w5dir/$1:$PATH" sh -c '. "$1" && ddev_migrate_import "$2"' \
+        _ "$MIG" "$_w5dir/dump" 2>&1 || true
+
+}
+printf 'OK|alpha|/roots/alpha|alpha.sql.gz\n' > "$_w5dir/dump/manifest.conf"
+chmod 000 "$_w5dir/dump/manifest.conf"
+_w5_out="$(_w5_import bin)"
+case "$_w5_out" in
+    *"manifest found but unreadable"*)
+        pass "import: unreadable manifest reports its cause, not 'no manifest' (W5)" ;;
+    *"no dump directory"*)
+        fail "import: unreadable manifest must not claim 'no dump directory' (W5)" ;;
+    *)
+        fail "import: unreadable manifest must report the unreadable cause (W5, got: $_w5_out)" ;;
+esac
+rm -f "${_w5dir:?}/dump/manifest.conf"
+_w5_out="$(_w5_import bin)"
+case "$_w5_out" in
+    *"no dump directory with a manifest found"*)
+        pass "import: the genuine no-manifest case keeps its message (W5)" ;;
+    *)
+        fail "import: the genuine no-manifest case must keep its message (W5, got: $_w5_out)" ;;
+esac
+_w5_out="$(_w5_import bin-mk)"
+case "$_w5_out" in
+    *"cannot create a staging temp"*)
+        pass "import: mktemp failure reports instead of exiting silently (W5)" ;;
+    *)
+        fail "import: mktemp failure must report its cause (W5, got: $_w5_out)" ;;
+esac
+rm -rf "${_w5dir:?}"
 
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).

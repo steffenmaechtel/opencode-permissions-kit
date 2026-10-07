@@ -255,6 +255,15 @@ if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
     # registrations) never reach this shell (wave-f review).
     fetch_kit || { echo "error: Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
     SCRIPT_DIR="$_FK_DIR"
+    # A streamed update's stdin IS the script body (curl | sudo bash):
+    # the prompt helpers must never fall back to reading it — they would
+    # consume script bytes as the confirm answer and unknown input
+    # silently resolves to the default y, an update without any consent
+    # on the record (review 0.0.39b C6 closed this for install.sh; the
+    # update path lacked it — 0.0.45c S8). See _ui_read in sh/ui.sh.
+    # Exported: the re-exec'd copy below inherits it.
+    UI_NO_STDIN_FALLBACK=1
+    export UI_NO_STDIN_FALLBACK
     # Do NOT continue executing this (installed, possibly older) copy: the
     # deploy below overwrites $LIBDIR/management/update.sh with the freshly fetched one,
     # which would replace the very file we are still running from. bash reads
@@ -313,7 +322,17 @@ else
     ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
     ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
     ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_plan()    { printf '    %s  %s\n' "$1" "$2"; }
+    # 0.0.45d W4: the body's confirm() calls ui_confirm — without a
+    # stub a ui.sh-less update died rc 127 at the confirm prompt
+    # instead of failing with a re-deploy hint (0.0.45c C9 fixed the
+    # same class in config.sh; the C9 sweep missed this fallback).
+    # Loud-fail stub: non-interactive paths keep working, the one
+    # prompt fails with a message instead of "command not found".
+    _ui_no_prompt() {
+        echo "error: this prompt needs sh/ui.sh — library too old, re-deploy with 'sudo opk update'" >&2
+        return 1
+    }
+    ui_confirm() { _ui_no_prompt; }
     UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
 fi
 
@@ -490,7 +509,9 @@ while [ "$#" -gt 0 ]; do
         -h|--help)
             cat <<EOF
 opencode permissions kit -- update.sh  v$VERSION
-Re-deploys the kit on an already-installed system. No prompts by default.
+Re-deploys the kit on an already-installed system. Asks one confirmation
+question unless --yes is given (tty-less streamed runs without --yes fail
+the prompt loudly instead of reading script bytes — 0.0.45c S8).
 Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path <file>]
                   [--channel <ref>] [--major 1|2] [--version <ver>]
   --yes            skip the confirmation prompt
@@ -600,15 +621,23 @@ log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
 if browser_bridge_is_wsl; then
-    browser_bridge_install "$FILES_ROOT" "$LIBDIR"
-    if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
-        ui_success "WSL browser bridge re-applied (carrier present — fully active)"
-        log "wsl browser bridge re-applied: $LIBDIR/wsl (carrier present)"
+    # Failure-honest since 0.0.45c C4: browser_bridge_install propagates a
+    # failed stand-in deploy or legacy strip — the old unconditional
+    # success line reported "re-applied" even when nothing was written.
+    if browser_bridge_install "$FILES_ROOT" "$LIBDIR"; then
+        if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
+            ui_success "WSL browser bridge re-applied (carrier present — fully active)"
+            log "wsl browser bridge re-applied: $LIBDIR/wsl (carrier present)"
+        else
+            ui_success "WSL browser bridge stand-in re-applied (no wsl.conf carrier)"
+            ui_detail "enable the opencode 1.x login fix yourself (the kit does not edit /etc/wsl.conf):"
+            ui_detail "  sudo opk wsl-add-opencode-1-fix"
+            log "wsl browser bridge stand-in re-applied: $LIBDIR/wsl (carrier left to 'opk wsl-add-opencode-1-fix')"
+        fi
     else
-        ui_success "WSL browser bridge stand-in re-applied (no wsl.conf carrier)"
-        ui_detail "enable the opencode 1.x login fix yourself (the kit does not edit /etc/wsl.conf):"
-        ui_detail "  sudo opk wsl-add-opencode-1-fix"
-        log "wsl browser bridge stand-in re-applied: $LIBDIR/wsl (carrier left to 'opk wsl-add-opencode-1-fix')"
+        ui_warn "WSL browser bridge: stand-in deploy or legacy wsl.conf strip FAILED"
+        ui_detail "see the errors above; re-run the update or fix /etc/wsl.conf manually"
+        log "wsl browser bridge re-apply FAILED (deploy/strip)"
     fi
 fi
 
@@ -1036,14 +1065,14 @@ fetch_opencode_version() {
             tar -xzf "$_fov_dst/opencode.tar.gz" -C "$_fov_dst/npmx" || return 1
             [ -x "$_fov_dst/npmx/package/bin/opencode" ] || return 1
             mv "$_fov_dst/npmx/package/bin/opencode" "$_fov_dst/opencode" || return 1
-            rm -rf "$_fov_dst/npmx" "$_fov_dst/opencode.tar.gz"
+            rm -rf "${_fov_dst:?}/npmx" "${_fov_dst:?}/opencode.tar.gz"
             ;;
         *)
             curl -fsSL --max-time 240 \
                 "https://github.com/anomalyco/opencode/releases/download/v$_fov_ver/opencode-$_fov_target.tar.gz" \
                 -o "$_fov_dst/opencode.tar.gz" || return 1
             tar -xzf "$_fov_dst/opencode.tar.gz" -C "$_fov_dst" || return 1
-            rm -f "$_fov_dst/opencode.tar.gz"
+            rm -f "${_fov_dst:?}/opencode.tar.gz"
             ;;
     esac
     [ -x "$_fov_dst/opencode" ] || return 1

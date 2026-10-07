@@ -181,6 +181,18 @@ if echo "$OUT" | grep -qF "ddev settings handover: $WORK/proj/typo3conf"; then
 else
     pass "handover: planted symlink produces no handover echo"
 fi
+# 0.0.45e W1 behavioral order pin: the ops log records invocations in
+# execution order — for the dev->agent pair the chmod walk must run
+# BEFORE the chown hand-over (walk while the tree is still dev-owned;
+# chown-first re-opens the scan-then-act window the swap closed in
+# bin/opk). Line numbers in the log ARE the execution order.
+_or_chmod=$(grep -n "^chmod -R g+w $WORK/proj/web/typo3conf$" "$OPS" | cut -d: -f1)
+_or_chown=$(grep -n "^chown -R ocuser:ocgroup $WORK/proj/web/typo3conf$" "$OPS" | cut -d: -f1)
+if [ -n "$_or_chmod" ] && [ -n "$_or_chown" ] && [ "$_or_chmod" -lt "$_or_chown" ]; then
+    pass "handover: settings pair chmods before chowning (W1, dev->agent)"
+else
+    fail "handover: settings pair order violated (W1: chmod=$_or_chmod chown=$_or_chown)"
+fi
 
 # 2c. intermediate-symlink containment (0.0.42e S2): docroot "websym"
 # symlinked OUT of the project — the settings dir "$proj/websym/typo3conf"
@@ -261,8 +273,10 @@ check "dev-owned flag: exec-time recheck skip is announced" \
 # --- 2c/2d. ddev_handover_root scan loop (0.0.39h F9 — S2's core had no
 # behavioral coverage): the .ddev tree reaches chown -R AND chmod -R, and
 # the exec-time [ -L ] recheck BETWEEN them closes the swapped-symlink
-# window. The racing chown stub swaps the real .ddev for a symlink WHEN
-# chown runs — the race, deterministically.
+# window. Since 0.0.45e W1 chmod -R runs FIRST (dev->agent: walk while
+# the tree is still dev-owned) — the racing chmod stub swaps the real
+# .ddev for a symlink WHEN the walk runs (the race, deterministically);
+# the recheck then skips the chown hand-over.
 mkdir -p "$WORK/hr/proj/.ddev" "$WORK/hr/proj/web/typo3conf" "$WORK/hr-victim" "$WORK/stubhr"
 printf 'type: typo3\ndocroot: web\n' > "$WORK/hr/proj/.ddev/config.yaml"
 printf '#!/bin/sh\necho "chown $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr/chown"
@@ -278,20 +292,28 @@ check "handover_root: scan-loop settings handover runs (web/typo3conf)" \
     grep -qxF "chown -R ocuser:ocgroup $WORK/hr/proj/web/typo3conf" "$OPS_HR_LOG"
 check "handover_root: handover echoed" \
     echo "$OUT_HR" | grep -qF ".ddev handover: $WORK/hr/proj/.ddev -> ocuser"
-# racing variant: the stub swaps .ddev for a symlink at chown time
+# 0.0.45e W1 behavioral order pin: chmod walk before the chown hand-over.
+_or_chmod=$(grep -n "^chmod -R g+w $WORK/hr/proj/.ddev$" "$OPS_HR_LOG" | cut -d: -f1)
+_or_chown=$(grep -n "^chown -R ocuser:ocgroup $WORK/hr/proj/.ddev$" "$OPS_HR_LOG" | cut -d: -f1)
+if [ -n "$_or_chmod" ] && [ -n "$_or_chown" ] && [ "$_or_chmod" -lt "$_or_chown" ]; then
+    pass "handover_root: .ddev pair chmods before chowning (W1, dev->agent)"
+else
+    fail "handover_root: .ddev pair order violated (W1: chmod=$_or_chmod chown=$_or_chown)"
+fi
+# racing variant: the stub swaps .ddev for a symlink at chmod (walk) time
 mkdir -p "$WORK/hr2/proj/.ddev" "$WORK/hr2/proj/web/typo3conf" "$WORK/hr2-victim" "$WORK/stubhr2"
 printf 'type: typo3\ndocroot: web\n' > "$WORK/hr2/proj/.ddev/config.yaml"
-printf '#!/bin/sh\ncase " $* " in *" $RACE_D "*) rm -rf "$RACE_D"; ln -s "$RACE_V" "$RACE_D";; esac\necho "chown $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr2/chown"
-printf '#!/bin/sh\necho "chmod $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr2/chmod"
+printf '#!/bin/sh\necho "chown $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr2/chown"
+printf '#!/bin/sh\ncase " $* " in *" $RACE_D "*) rm -rf "$RACE_D"; ln -s "$RACE_V" "$RACE_D";; esac\necho "chmod $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr2/chmod"
 chmod +x "$WORK/stubhr2/chown" "$WORK/stubhr2/chmod"
 RACE_D="$WORK/hr2/proj/.ddev"; RACE_V="$WORK/hr2-victim"; export RACE_D RACE_V
 OUT_HR2="$(PATH="$WORK/stubhr2:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/hr2")"
-check "handover_root recheck: swapped .ddev still hit chown -R (the stub ran first)" \
-    grep -qxF "chown -R ocuser:ocgroup $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"
-if grep -qxF "chmod -R g+w $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"; then
-    fail "handover_root recheck: swapped-symlink .ddev never reaches chmod -R"
+check "handover_root recheck: swapped .ddev still hit the chmod walk (the stub ran first)" \
+    grep -qxF "chmod -R g+w $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"
+if grep -qxF "chown -R ocuser:ocgroup $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"; then
+    fail "handover_root recheck: swapped-symlink .ddev never reaches chown -R"
 else
-    pass "handover_root recheck: swapped-symlink .ddev never reaches chmod -R"
+    pass "handover_root recheck: swapped-symlink .ddev never reaches chown -R"
 fi
 if echo "$OUT_HR2" | grep -qF ".ddev handover: $WORK/hr2/proj/.ddev"; then
     fail "handover_root recheck: swapped .ddev produces no handover echo"
@@ -321,6 +343,16 @@ else
 fi
 check "project_back: kit-owned root (stat=ocuser) is handed back" \
     sh -c 'grep -qxF "chown devuser:ocgroup '"$WORK"'/bk/proj" "$1" && grep -qxF "chmod 2775 '"$WORK"'/bk/proj" "$1"' _ "$OPS_BK_LOG"
+# 0.0.45e W1 behavioral order pin: agent->dev chowns FIRST (after it no
+# entry is agent-owned, the chmod pass races no one) — the mirrored
+# argument of the dev->agent pairs.
+_or_chown=$(grep -n "^chown -R devuser:ocgroup $WORK/bk/proj/web/typo3conf$" "$OPS_BK_LOG" | cut -d: -f1)
+_or_chmod=$(grep -n "^chmod -R g+w $WORK/bk/proj/web/typo3conf$" "$OPS_BK_LOG" | cut -d: -f1)
+if [ -n "$_or_chown" ] && [ -n "$_or_chmod" ] && [ "$_or_chown" -lt "$_or_chmod" ]; then
+    pass "project_back: settings pair chowns before chmodding (W1, agent->dev)"
+else
+    fail "project_back: settings pair order violated (W1: chown=$_or_chown chmod=$_or_chmod)"
+fi
 : > "$OPS_BK_LOG"
 STAT_OWNER=devuser
 PATH="$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_project_back "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/bk/proj" >/dev/null 2>&1
@@ -329,6 +361,27 @@ if grep -qxF "chown devuser:ocgroup $WORK/bk/proj" "$OPS_BK_LOG"; then
 else
     pass "project_back: developer-owned root (stat=devuser) is NOT touched"
 fi
+
+# --- 2f. 0.0.45e W1 static order pins (mirroring bin/opk's direction-
+# aware pins): the two dev->agent executors chmod FIRST (walk while the
+# tree is still dev-owned), the back executor chowns FIRST. Line order
+# inside each function block; a reverted swap flips the comparison, a
+# collapsed (order-shared) executor leaves the grep unmatched (rc 1,
+# still discriminating — no count here, unlike bin/opk's exactly-twice
+# pins; wording corrected 0.0.45f W3).
+_dh_order() {
+    _dh_blk=$(sed -n "/^$1()/,/^}/p" "$HANDOVER")
+    _dh_cl=$(printf '%s\n' "$_dh_blk" | grep -nF 'chmod -R g+w "' | head -1 | cut -d: -f1)
+    _dh_hl=$(printf '%s\n' "$_dh_blk" | grep -nF 'chown -R "' | head -1 | cut -d: -f1)
+    [ -n "$_dh_cl" ] && [ -n "$_dh_hl" ] || return 1
+    if [ "$2" = chmod ]; then [ "$_dh_cl" -lt "$_dh_hl" ]; else [ "$_dh_hl" -lt "$_dh_cl" ]; fi
+}
+check "W1 static order: ddev_handover_root chmods before chowning (dev->agent)" \
+    _dh_order ddev_handover_root chmod
+check "W1 static order: ddev_handover_project chmods before chowning (dev->agent)" \
+    _dh_order ddev_handover_project chmod
+check "W1 static order: ddev_handover_project_back chowns before chmodding (agent->dev)" \
+    _dh_order ddev_handover_project_back chown
 
 # --- 3. projects_remove rewrite (C3 / 0.0.39h F4) ---------------------------------
 # GNU grep -v exits 1 when the result is EMPTY (removing the last project
@@ -481,6 +534,18 @@ check "gates: install.sh Step 8 chowns every operand it creates (0.0.39j F1)" \
     sh -c 'grep -qF "sudo chown -R \"\$OPENCODE_USER:\$OPENCODE_GROUP\" /home/opencode/.config/opencode" "$1"' _ "$INSTALL"
 check "gates: install.sh agents-migration operand gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$_opk_dst\"" "$1"' _ "$INSTALL"
+# 0.0.45e W1: the migration chmod walks run before the chown hand-over
+# (walk while the copied-in tree is still dev-owned; chown-first is the
+# scan-then-act window on re-installs over a live agent) — static line
+# order inside _opk_migrate_one (defined indented inside Step 8a).
+_mig_blk="$(sed -n '/^    _opk_migrate_one() {/,/^    }$/p' "$INSTALL")"
+_mig_chmod="$(printf '%s\n' "$_mig_blk" | grep -nF 'find "$_opk_dst" -type d -exec chmod g+rwxs' | cut -d: -f1)"
+_mig_chown="$(printf '%s\n' "$_mig_blk" | grep -nF 'chown -R "$OPENCODE_USER:$OPENCODE_GROUP" "$_opk_dst"' | cut -d: -f1)"
+if [ -n "$_mig_chmod" ] && [ -n "$_mig_chown" ] && [ "$_mig_chmod" -lt "$_mig_chown" ]; then
+    pass "gates: install.sh agents migration chmods before chown -R (W1)"
+else
+    fail "gates: install.sh agents migration order violated (W1: chmod=$_mig_chmod chown=$_mig_chown)"
+fi
 check "gates: install.sh mkcert chain gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"\$caroot\"" "$1"' _ "$INSTALL"
 check "gates: install.sh agent-config + tui + plugin chain gates" \

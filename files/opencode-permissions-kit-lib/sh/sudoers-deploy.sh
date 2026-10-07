@@ -104,6 +104,6 @@ sudoers_deploy() {
     fi
     # Remove the pre-0.0.10 sudoers symlink so only the new name is
     # active (unifies the cleanup config.sh and update.sh already did).
-    _sd_sudo rm -f "$_sd_d/opencode" 2>/dev/null || true
+    _sd_sudo rm -f "${_sd_d:?}/opencode" 2>/dev/null || true
     return 0
 }

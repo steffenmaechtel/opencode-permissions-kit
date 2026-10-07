@@ -92,16 +92,24 @@ and whole home directories are refused — hand over project trees, not
 systems. `/tmp` subpaths are allowed (temp build trees are legitimate
 handover targets). Symlinked paths are refused too: the kit never hands a
 tree over through a link (`--dry-run` lists the refusals it would make).
-Operands must be slash- and dotdot-free — `x/`, `x//`, `x/.`, `x/..` and
-mid-path `a/../b` are refused with a usage error: a trailing slash or a
-`..` component resolves through a link before the symlink gate can see
-it, so both the gate and the recursive pair would act on the resolved
-target (the link itself, or its parent). The recursive pair itself cannot be steered through a
-planted link either: the ownership change rides `chown -R -h` (lchown on
-a planted operand re-owns the attacker's own link, nothing outside), and
-the group-write pass only ever sees non-symlinks (`find ! -type l` feeds
-it) — a link swapped between the check and the run touches nothing
-outside the tree.
+Operands must be slash-, dot- and dotdot-free — `x/`, `x//`, `x/.`,
+`x/./y`, `x/..` and mid-path `a/../b` are refused with a usage error: a
+trailing slash, a `.` or a `..` component resolves through a link before
+the symlink gate can see it, so both the gate and the recursive pair
+would act on the resolved target (the link itself, or its parent). The
+recursive pair cannot be steered through a planted link either, and its
+order follows the direction: handing over **to the agent** runs the
+group-write pass first, while every entry is still yours (the agent
+cannot swap what it cannot write), and the ownership change rides
+`chown -R -h` last (lchown on a planted operand re-owns the attacker's
+own link, nothing outside). Handing over **back to you** (`me`) reverses
+the order — `chown -R -h` runs first, so by the time group write is
+granted no entry is agent-owned anymore and the chmod pass races no one
+on trees the agent owned without group write. Trees that already carry
+mode-based write paths the agent pre-arranged — group write from earlier
+handovers, or world-writable entries the agent created while it owned the
+tree — stay agent-writable during the run in either order; no ordering
+closes that (an inherent, accepted residual).
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides

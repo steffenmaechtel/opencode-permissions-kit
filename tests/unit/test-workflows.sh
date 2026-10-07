@@ -249,6 +249,27 @@ check_2x "$WF_DDEV_E2E" \
     '\^2\\\.\[0' \
     '::error::npm dist-tag latest'
 
+# 0.0.45c C8: every v1 "Resolve opencode version" step (e2e + e2e-rootless
+# in test-e2e.yml, e2e-ddev in test-e2e-ddev.yml) is authenticated (the
+# ephemeral token, provisioned at the step — an anonymous rate-limit 403
+# from a shared runner IP used to go green with an empty OC_VERSION and a
+# degraded cache key) and anchored-validated like the 2x twins: a bad
+# resolution fails the step loudly instead of reaching the cache key.
+check_v1_resolve() {
+    # args: workflow, expected step count, label
+    _wf="$1"; _want="$2"; _label="$3"
+    _hdr=$(grep -c -- '-H "Authorization: Bearer $OPK_GH_TOKEN"' "$_wf" || true)
+    _err=$(grep -c '::error::opencode releases/latest resolved' "$_wf" || true)
+    _gate=$(grep -c 'OC_VERSION=$OCV' "$_wf" || true)
+    if [ "$_hdr" = "$_want" ] && [ "$_err" = "$_want" ] && [ "$_gate" = "$_want" ]; then
+        pass "$_label: v1 resolve steps authenticated + validated (C8)"
+    else
+        fail "$_label: v1 resolve steps authenticated + validated (C8, hdr=$_hdr err=$_err gate=$_gate want=$_want)"
+    fi
+}
+check_v1_resolve "$WF_E2E" 2 "test-e2e.yml (e2e + e2e-rootless)"
+check_v1_resolve "$WF_DDEV_E2E" 1 "test-e2e-ddev.yml (e2e-ddev)"
+
 # Structural YAML guard (workflow-upload breakage 2026-09-25: a second
 # env: block on a step that already had one made GitHub reject the whole
 # file): every step may carry at most ONE env: block.

@@ -162,10 +162,9 @@ on a calendar. Run a review when any of these fires:
 Findings from a review become issues labeled `review` (actionable soon) or
 `tech-debt` (deliberately deferred, with a reason). A review starts by
 working the backlog, not by re-inventing itself: method, snapshot and
-resolution mechanics, and the snapshot skeleton live in
-[docs/design/review/README.md](docs/design/review/README.md)
-(`template.md`) — the working instructions for a coding agent doing the
-review locally.
+resolution mechanics, and the snapshot-format rule (external verbatim
+embedding since 0.0.45d) live in
+[docs/design/review/README.md](docs/design/review/README.md).
 
 After each review, try to shrink the next one: every finding that could be
 turned into a lint rule, unit test, or consistency guard should be — the

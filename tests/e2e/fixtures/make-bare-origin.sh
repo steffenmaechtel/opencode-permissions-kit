@@ -52,7 +52,7 @@ git -C "$WORK" commit -q -m "site master (camino fixture, DD12 baseline)"
 
 git -C "$WORK" checkout -q -b feature/top-level
 printf "# camino e2e — top-level file replaced on feature/top-level\n" > "$WORK/README.md"
-rm "$WORK/LICENSE"
+rm "${WORK:?}/LICENSE"
 git -C "$WORK" add -A
 git -C "$WORK" commit -q -m "replace README.md, drop LICENSE (top-level unlink/recreate)"
 
@@ -64,7 +64,7 @@ git -C "$WORK" add -A
 git -C "$WORK" commit -q -m "modify tracked settings/site config"
 
 git -C "$WORK" checkout -q -b feature/ddev-tree main
-rm "$WORK/.ddev/commands/host/hello"
+rm "${WORK:?}/.ddev/commands/host/hello"
 sed -i 's/^nodejs_version: .*/nodejs_version: 20/' "$WORK/.ddev/config.yaml"
 git -C "$WORK" add -A
 git -C "$WORK" commit -q -m "drop custom host command, tweak ddev config"

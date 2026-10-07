@@ -253,6 +253,18 @@ PUSH_NEEDED=false
 [ -z "$TAG_REV" ] && PUSH_NEEDED=true
 { [ "$STABLE_KNOWN" = true ] && [ "$(git -C "$REPO" rev-parse origin/stable)" != "$HEAD_REV" ]; } && PUSH_NEEDED=true
 [ "$STABLE_KNOWN" = false ] && PUSH_NEEDED=true
+# 0.0.45c C7: the resume path must check the tag on ORIGIN, not only
+# locally — TAG_REV comes from the local refs, so a previous run whose
+# push moved stable but FAILED on the tag ref (per-ref partial failure),
+# or an unpushed maintainer tag (explicitly welcomed above), printed
+# "nothing to push ... released" while tag-pinned installs (the
+# KIT_BRANCH=<version> pins AGENTS.md documents) 404'd. ls-remote is
+# the origin truth; a failed probe conservatively pushes (idempotent).
+if git -C "$REPO" ls-remote --tags origin "refs/tags/$VERSION" 2>/dev/null | grep -q .; then
+    :
+else
+    PUSH_NEEDED=true
+fi
 if [ "$PUSH_NEEDED" = true ]; then
     run git -C "$REPO" push origin "refs/tags/$VERSION" refs/heads/stable
 else

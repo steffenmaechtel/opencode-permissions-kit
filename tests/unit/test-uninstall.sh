@@ -84,9 +84,11 @@ if PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry-run 
    && [ ! -e "$WORK/log" ]; then
     pass "--dry-run executes no sudo command (log stayed empty)"
 else
-    # The credential probe (sudo -n true) is expected and harmless; any
-    # OTHER sudo command in dry-run mode is a bug.
-    _destructive="$(grep -vE '^sudo -n true( |$)' "$WORK/log" 2>/dev/null || true)"
+    # The credential probe (sudo -n true) is expected and harmless; so are
+    # the agents-backup probes (0.0.45c C6 + 0.0.45d W2: sudo ls -A and
+    # sudo test -d — read-only, the gate must fail safe in dry-run too);
+    # any OTHER sudo command in dry-run mode is a bug.
+    _destructive="$(grep -vE '^sudo -n true( |$)|^sudo ls -A /home/[^ ]*/\.(agents|claude)$|^sudo test -d /home/[^ ]*/\.(agents|claude)$' "$WORK/log" 2>/dev/null || true)"
     if [ -z "$_destructive" ]; then
         pass "--dry-run executes no destructive sudo command (only the -n true probe)"
     else
@@ -271,6 +273,84 @@ if [ -n "$CAPTURE_LINE" ] && [ -n "$USERDEL_LINE" ] && [ "$CAPTURE_LINE" -lt "$U
 else
     fail "ownership revert: ids must be captured before userdel (capture=$CAPTURE_LINE userdel=$USERDEL_LINE)"
 fi
+
+# 0.0.45c C6: the agents-backup gate probes with sudo and fails SAFE —
+# the old unprivileged `ls -A` silently skipped the whole backup block
+# when the invoking user could not read the agent home (group dropped,
+# different DEFAULT_USER), and userdel -r then deleted .agents/.claude
+# without the warning. An unreadable dir counts as NON-EMPTY now.
+if grep -qF 'sudo ls -A "$_un_ag_src"' "$UNINSTALL" \
+   && grep -qF '_un_ag_ls="probe-failed"' "$UNINSTALL"; then
+    pass "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
+else
+    fail "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
+fi
+
+# 0.0.45d W2: the EXISTENCE probe must be privileged too — the 0.0.45c
+# fix kept an unprivileged `[ -d ]` in front of the sudo listing, but
+# that stat needs search on /home/<opencode> (2750 opencode:<sharing
+# group>) and fails for exactly the invokers C6 exists to protect
+# (different DEFAULT_USER, dropped membership in a fresh session): the
+# block was skipped silently and userdel -r deleted the resources with
+# no backup and no warning. Static pin: the privileged existence gate
+# is in, the unprivileged one is gone.
+if grep -qF 'if sudo test -d "$_un_ag_src"; then' "$UNINSTALL" \
+   && ! grep -qF 'if [ -d "$_un_ag_src" ]; then' "$UNINSTALL"; then
+    pass "agents-backup gate: existence probe rides sudo (W2)"
+else
+    fail "agents-backup gate: existence probe must be privileged, not [ -d ] (W2)"
+fi
+
+# W2 behavioral pin: run the REAL extracted gate loop (paths swapped
+# onto scratch) with a logging sudo that degrades to the current user.
+# Fixture one: the agent home is mode 000 — the unprivileged stat fails
+# exactly as in the C6 scenarios; what is pinned is that the privileged
+# existence probe is still ISSUED (logged). With the old unprivileged
+# [ -d ] short-circuiting, no sudo call happens at all and the block
+# skips silently. Fixture two: a readable .agents arms the backup branch
+# (test -d, ls -A, mkdir, cp all logged). Fixture three: a nonexistent
+# home enters none of them (no WARNING noise for what does not exist).
+_un_w2="$(mktemp -d)"
+mkdir -p "$_un_w2/fake-home/opencodeux/.agents" "$_un_w2/fake-home/opencodeux2" "$_un_w2/backups"
+echo skills > "$_un_w2/fake-home/opencodeux/.agents/agents.md"
+printf '#!/bin/sh\necho "sudo $*" >> "%s/log"\nexec "$@"\n' "$_un_w2" > "$_un_w2/sudo"
+chmod +x "$_un_w2/sudo"
+_un_w2_gate() {
+    {
+        printf 'DRY_RUN=false\nlog() { :; }\nDEFAULT_USER=%s\nOPENCODE_USER=%s\nPATH="%s:$PATH"\n' \
+            "$2" "$1" "$_un_w2"
+        sed -n '/^        for _un_ag_dirname in \.agents \.claude; do$/,/^        done$/p' "$UNINSTALL" \
+            | sed -e "s#/home/#$_un_w2/fake-home/#g" -e "s#/var/backups/opencode-permissions-kit#$_un_w2/backups#"
+    } > "$_un_w2/run.sh"
+    : > "$_un_w2/log"
+    sh "$_un_w2/run.sh" >/dev/null 2>&1 || true
+    cat "$_un_w2/log" 2>/dev/null || true
+}
+chmod 000 "$_un_w2/fake-home/opencodeux2"
+_un_w2_log="$(_un_w2_gate opencodeux2 devuser)"
+if printf '%s\n' "$_un_w2_log" | grep -q '^sudo test -d '; then
+    pass "agents-backup gate: privileged existence probe issued despite unreadable home (W2)"
+else
+    fail "agents-backup gate: no privileged probe against the unreadable home (W2 log: $_un_w2_log)"
+fi
+_un_w2_log="$(_un_w2_gate opencodeux devuser)"
+if printf '%s\n' "$_un_w2_log" | grep -q '^sudo test -d .*agents$' \
+   && printf '%s\n' "$_un_w2_log" | grep -q '^sudo ls -A .*agents$' \
+   && printf '%s\n' "$_un_w2_log" | grep -q '^sudo mkdir -p .*agents-backup-' \
+   && printf '%s\n' "$_un_w2_log" | grep -q '^sudo cp -a .*agents'; then
+    pass "agents-backup gate: readable .agents arms the backup branch (W2)"
+else
+    fail "agents-backup gate: readable .agents must issue test-d/ls-A/mkdir/cp (W2 log: $_un_w2_log)"
+fi
+_un_w2_log="$(_un_w2_gate opencodeux-missing devuser)"
+if ! printf '%s\n' "$_un_w2_log" | grep -q 'mkdir -p' \
+   && ! printf '%s\n' "$_un_w2_log" | grep -q 'cp -a'; then
+    pass "agents-backup gate: nonexistent home enters no backup call (W2)"
+else
+    fail "agents-backup gate: nonexistent home must skip the backup branch (W2 log: $_un_w2_log)"
+fi
+chmod 700 "$_un_w2/fake-home/opencodeux2" 2>/dev/null || true
+rm -rf "${_un_w2:?}"
 
 # ACL removal is targeted, not a wipe (0.0.42e C4): the kit baseline adds
 # access entries g:<dev-group> and default entries g:<dev-group>:rwx —

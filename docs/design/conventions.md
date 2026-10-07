@@ -115,12 +115,15 @@ review host):
   for months behind a `sed` that a wave then dropped; maintainer
   directive 2026-10-04).
 - An `rm` — any flag form (`rm`, `rm -f`, `rm -r`, `rm -rf`, `rm -fr`,
-  …), any operand position — on a quoted variable **with a literal
-  suffix** (`rm -rf "$WORK/sub"`, `rm -f "$WORK/mark"`) must guard the
-  variable with `:?` (`rm -rf "${WORK:?}/sub"`): an empty or unset
-  variable degenerates the operand to a fixed absolute path (`/sub`)
-  instead of the harmless empty-operand no-op of the pure-variable form
-  (audit follow-up to 0.0.42e C1, maintainer directive 2026-10-06).
+  …), any operand position — on a variable **with a literal suffix**
+  (`rm -rf "$WORK/sub"`, `rm -f "$WORK/mark"`, `rm -rf "${WORK}/sub"`,
+  `rm -rf "$WORK"/sub`, `rm -rf $WORK/sub` — every spelling degenerates
+  the same way on an empty variable) must guard the variable with `:?`
+  (`rm -rf "${WORK:?}/sub"`): an empty or unset variable degenerates the
+  operand to a fixed absolute path (`/sub`) instead of the harmless
+  empty-operand no-op of the pure-variable form (audit follow-up to
+  0.0.42e C1, maintainer directive 2026-10-06; all suffix spellings
+  enforced since 0.0.45c C3).
   Pure-variable operands (`rm -f "$CONF"`) are deliberately exempt.
   Destructive permission verbs (`chmod`/`chown`/... with `"$VAR/suffix"`)
   stay unguarded by design: fixture setup uses them heavily, they are
@@ -142,11 +145,23 @@ lines are skipped):
    (0.0.42g C2). Policy-INPUT classes — values handed to
    screening/parsing functions or parse-only argument fixtures, never
    executed as paths — are allowlisted in the suite with reasons.
+   Unit-suite-scoped: e2e scripts legitimately name container paths
+   (/var/www/vhosts fixtures), so they are not in this check's scope.
 3. **rm suffix guard** — any `rm` invocation (flag order and operand
-   position aware, statement-scoped) on a quoted variable with a
-   literal suffix must carry the `:?` empty-variable guard
-   (2026-10-06); pure-variable operands are exempt (an empty operand is
-   a verified rm no-op — the dangerous shape is the suffix).
+   position aware, statement-scoped) on a variable with a literal suffix
+   must carry the `:?` empty-variable guard — quoted unbraced
+   (`"$V/x"`), quoted braced (`"${V}/x"`), slash-outside-the-quotes
+   (`"$V"/x`) and unquoted (`$V/x`) spellings alike (2026-10-06;
+   all spellings enforced since 0.0.45c C3); pure-variable operands are
+   exempt (an empty operand is a verified rm no-op — the dangerous
+   shape is the suffix). Scope since 0.0.45d (0.0.45b C1): the unit
+   suites AND the e2e helper scripts (`tests/e2e/**/*.sh` — the three
+   host-side sites that carried no guard are swept with this change).
+   The same `:?` standard applies to shipped code's `rm` var+suffix
+   sites, root context included (0.0.45b C2): the shipped tree is
+   swept clean with this change, and new sites must not regress it
+   (convention, enforced by review — the unit guard's scan deliberately
+   stops at tests/).
 
 The suite self-probes all three checks (continuation-split `rm`, inert
 and quoted and redirect-glued literals, the unguarded suffix shapes —
@@ -165,8 +180,8 @@ review stem (the snapshot's file-name stem without the date):
 
 Grep-able by design: `grep -rn "0.0.38 S1"`. The
 [review index](review/README.md#index) maps stems to snapshots, ID ranges,
-and resolutions; the snapshot's own
-[template](review/template.md) carries the rule.
+and resolutions; the snapshot-format rule (external verbatim embedding
+since 0.0.45d) lives in the [review README](review/README.md).
 
 ## Language
 

@@ -581,6 +581,92 @@ else
 fi
 rm -rf "$_dg_w"
 
+# Behavioral probe pins (0.0.45c C1/C2): the REAL probe lines, extracted
+# verbatim, binary-swapped onto a hanging shim and executed under bash
+# with install.sh's own set -eu/pipefail idiom — a wedged binary (the
+# timeout kill, rc 124) must NOT abort the installer: the old shape died
+# rc 124 with ZERO output (dash hides the pipefail mechanism, hence
+# bash-explicit, same as the os-release pins above). The duration is
+# swapped 10 -> 1s (shim sleeps 3) to keep the suite fast — the swap
+# touches only the timeout argument; the pipefail-able pipeline shape
+# stays verbatim, so removing the || true re-aborts rc 124 and fails
+# both pins.
+_pb_w="$(mktemp -d)"
+printf '#!/bin/sh\nsleep 3\n' > "$_pb_w/hang"
+chmod +x "$_pb_w/hang"
+_pb_pf="$(grep -F '_pf_oc_ver=$(timeout 10 "$_pf_oc_bin" --version' "$INSTALL" | head -1 | sed 's/^ *//' | sed 's/timeout 10/timeout 1/')"
+_pb_st="$(grep -F '_stamp_ver=$(timeout 10 "$SYSTEM_BIN" --version' "$INSTALL" | head -1 | sed 's/^ *//' | sed 's/timeout 10/timeout 1/')"
+if command -v bash >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1 \
+   && [ -n "$_pb_pf" ] && [ -n "$_pb_st" ]; then
+    _pb_rc=0; _pb_out=$(bash -c '
+        set -eu
+        (set -o pipefail) 2>/dev/null && set -o pipefail || true
+        _pf_oc_bin="$2"
+        eval "$1"
+        printf "[%s]" "${_pf_oc_ver:-}"
+    ' _pb_sh "$_pb_pf" "$_pb_w/hang") || _pb_rc=$?
+    if [ "$_pb_rc" -eq 0 ] && [ -z "$(printf '%s' "$_pb_out" | tr -d '[]')" ]; then
+        pass "preflight probe: a hung binary never aborts the install (C1)"
+    else
+        fail "preflight probe: a hung binary never aborts the install (C1) (rc=$_pb_rc out=$_pb_out)"
+    fi
+    _pb_rc=0; _pb_out=$(bash -c '
+        set -eu
+        (set -o pipefail) 2>/dev/null && set -o pipefail || true
+        SYSTEM_BIN="$2"
+        eval "$1"
+        printf "[%s]" "${_stamp_ver:-}"
+    ' _pb_sh "$_pb_st" "$_pb_w/hang") || _pb_rc=$?
+    if [ "$_pb_rc" -eq 0 ] && [ -z "$(printf '%s' "$_pb_out" | tr -d '[]')" ]; then
+        pass "major-stamp probe: a hung binary never aborts the install (C2)"
+    else
+        fail "major-stamp probe: a hung binary never aborts the install (C2) (rc=$_pb_rc out=$_pb_out)"
+    fi
+else
+    echo "  SKIP  C1/C2 probe pins need bash + timeout (pipefail semantics)"
+fi
+rm -rf "$_pb_w"
+
+# --- ui.sh-less fallback (0.0.45c C5) --------------------------------------------
+# A --yes run never prompts, so the fallback must carry EVERY output
+# helper for its whole run — the old block lacked ui_have/ui_atten/
+# ui_add/ui_miss and a ui.sh-less --yes install died rc 127 at the
+# inventory's first ui_have, before any prompt. The local _ui_read
+# fallback was dead code (only ui.sh's prompt helpers call it) and is
+# gone with them.
+_uifb=$(sed -n '/^    ui_info()    { echo "  info     $1"; }$/,/^    UI_GREEN=/p' "$INSTALL")
+if [ -n "$_uifb" ]; then
+    if printf '%s\n' "$_uifb" | grep -q 'ui_have()' \
+       && printf '%s\n' "$_uifb" | grep -q 'ui_atten()' \
+       && printf '%s\n' "$_uifb" | grep -q 'ui_add()' \
+       && printf '%s\n' "$_uifb" | grep -q 'ui_miss()'; then
+        pass "ui.sh-less fallback defines the inventory helpers (C5)"
+    else
+        fail "ui.sh-less fallback defines the inventory helpers (C5)"
+    fi
+    if printf '%s\n' "$_uifb" | grep -q '_ui_read'; then
+        fail "dead local _ui_read fallback removed (C5)"
+    else
+        pass "dead local _ui_read fallback removed (C5)"
+    fi
+    # Process-log label alignment (maintainer PR review 2026-10-08): ui.sh's
+    # _ui_label prints a 7-char label field + 2 separator spaces, so the
+    # message starts at column 11 — the echo stubs must match that exactly,
+    # or a degraded (ui.sh-less) run misaligns its lines against the ui.sh
+    # path. Verbatim pin: c80da5d slipped a stray space into ui_error's
+    # label (unlisted in its message, unseen by reviews b–f).
+    if printf '%s\n' "$_uifb" | grep -qF 'ui_info()    { echo "  info     $1"; }' \
+       && printf '%s\n' "$_uifb" | grep -qF 'ui_success() { echo "  success  $1"; }' \
+       && printf '%s\n' "$_uifb" | grep -qF 'ui_warn()    { echo "  warn     $1"; }' \
+       && printf '%s\n' "$_uifb" | grep -qF 'ui_error()   { echo "  error    $1" >&2; }'; then
+        pass "fallback process-log labels match ui.sh's column-11 alignment (PR review)"
+    else
+        fail "fallback process-log labels match ui.sh's column-11 alignment (PR review)"
+    fi
+else
+    fail "ui.sh-less fallback block extractable (C5)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

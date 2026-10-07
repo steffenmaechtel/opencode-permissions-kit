@@ -231,11 +231,19 @@ case "$cmd" in
             ui_error "stand-in missing and no $LIBDIR/bin/browser-bridge — run 'sudo opk update' first"
             exit 1
         fi
-        browser_bridge_write_conf "$LIBDIR"
-        ui_success "WSL browser bridge active — opencode device logins survive a hardened /mnt/c (1.x < 1.18.33, 2.x < 2.0.18)"
-        ui_detail "carrier written to /etc/wsl.conf as a comment block (WSL ignores it;"
-        ui_detail "takes effect immediately, no 'wsl --shutdown' needed)"
-        ui_detail "'opk uninstall' removes the block again"
+        # 0.0.45c C4: the write's rc decides the message — the old
+        # unconditional success lied when _bb_install_conf failed (the
+        # trailing tmp-cleanup used to swallow the failure).
+        if browser_bridge_write_conf "$LIBDIR"; then
+            ui_success "WSL browser bridge active — opencode device logins survive a hardened /mnt/c (1.x < 1.18.33, 2.x < 2.0.18)"
+            ui_detail "carrier written to /etc/wsl.conf as a comment block (WSL ignores it;"
+            ui_detail "takes effect immediately, no 'wsl --shutdown' needed)"
+            ui_detail "'opk uninstall' removes the block again"
+        else
+            ui_error "could not write the carrier to /etc/wsl.conf — nothing was changed"
+            ui_detail "check the errors above (permissions, disk space); /etc/wsl.conf is untouched"
+            exit 1
+        fi
         ;;
     handover)
         # Generic ownership switch between the two kit users, for
@@ -304,16 +312,18 @@ case "$cmd" in
             esac
             # Slash-terminated operands are symlink-gate-blind (0.0.44a
             # V2; dotdot final/mid components added 0.0.44b W3 — same
-            # class): path resolution goes through the link before lstat
-            # ever sees one — [ -L "x/" ] and [ -L "x/.." ] are FALSE
-            # while chown -R -h and find act on the resolved TARGET (a
-            # trailing slash: the link itself; "..": the link target's
-            # PARENT). Checked on the RAW operand, after the path policy
-            # above (which sees the resolved form): "/" is a system
-            # root, not a form error, but "x/", "x/.." and "a/../b" into
+            # class; the MID single-dot form joined 0.0.45c S7): path
+            # resolution goes through the link before lstat ever sees
+            # one — [ -L "x/" ], [ -L "x/.." ] and [ -L "x/./y" ] are
+            # FALSE while chown -R -h and find act on the resolved
+            # TARGET (a trailing slash: the link itself; "..": the link
+            # target's PARENT; "./": through an intermediate link).
+            # Checked on the RAW operand, after the path policy above
+            # (which sees the resolved form): "/" is a system root, not
+            # a form error, but "x/", "x/..", "a/../b" and "x/./y" into
             # a project tree are exactly the bypasses.
             case "$_ho_a" in
-                */|*/.|*//*|*/..|*/../*)
+                */|*/.|*//*|*/./*|*/..|*/../*)
                     _ho_err "handover: '$_ho_a' carries a slash/dotdot path form — pass the path itself"\
 " (symlink gates cannot see through trailing slashes or .. components)" ;;
             esac
@@ -348,29 +358,67 @@ case "$cmd" in
         ui_info "handing over to $_ho_user:$_ho_group (recursive, g+w) ..."
         for _ho_a in "$@"; do
             [ "$_ho_a" = "--dry-run" ] && continue
-            # [ -L ] refuse + race-closed executors (review 0.0.39h F10;
+            # [ -L ] refuse + race-aware executors (review 0.0.39h F10;
             # TOCTOU window closed 0.0.43a F16; slash-form bypass closed
-            # 0.0.44a V2 — validation refuses x/, x//, x/. before this
-            # loop, so both executors below only ever see slash-free
-            # operands). For a slash-free operand planted as a symlink
-            # AFTER the gate: chown -R -h never dereferences it (lchown
-            # re-owns the attacker's own link, nothing outside), and the
-            # chmod pass only ever sees non-symlinks (find ! -type l
-            # feeds it). Note chmod -R WOULD follow an operand link —
-            # the gates are load-bearing for the chmod half; chown -R
-            # (default -P) lchowns operands on its own (0.0.44a V24).
+            # 0.0.44a V2, mid-dot 0.0.45c S7 — validation refuses x/,
+            # x//, x/., x/./y before this loop, so both executors below
+            # only ever see slash-free operands). ORDER is DIRECTION-
+            # DEPENDENT (0.0.45c S4 dev->agent; 0.0.45d W1 restored the
+            # reverse for agent->dev — the S4 reorder had closed the
+            # dev->agent window but re-opened scan-then-act for `me`):
+            #   handover opencode (dev->agent): the tree is dev-owned and
+            #   not agent-writable — the find+chmod pass runs FIRST, the
+            #   agent cannot swap what it cannot write; chown -R -h runs
+            #   LAST, race-free by construction (lchown never
+            #   dereferences — a link planted after the scan is re-owned
+            #   as the agent's own link, nothing outside the tree,
+            #   0.0.44a V24).
+            #   handover me (agent->dev): the reclaimed tree is
+            #   agent-owned or mixed — chmod FIRST would run while the
+            #   agent can still swap a scanned file for a symlink (root
+            #   chmod g+w through the link on out-of-tree targets).
+            #   chown -R -h to the dev runs FIRST instead: after it no
+            #   entry is agent-owned, and on a tree the agent owned
+            #   without group write no agent write path remains — the
+            #   chmod pass races no one.
+            # Inherent residual in EITHER order: any mode-based write
+            # path the agent pre-arranged — g+w granted by an earlier
+            # handover, or o+w entries it created while it owned the
+            # tree (modes on owned entries are owner-controlled) —
+            # survives the re-own and keeps those subtrees
+            # agent-writable through the run; pre-existing, accepted,
+            # not closed by ordering (wording broadened 0.0.45e W2:
+            # it was never only the previous-handover g+w case).
+            # Plain chmod WOULD follow an operand link — the [ ! -L ]
+            # recheck below plus the validation gates are load-bearing
+            # for the chmod half's operand; find -P itself skips a link
+            # operand (! -type l).
             if [ -L "$_ho_a" ]; then
                 ui_error "handover: '$_ho_a' is a symlink — refusing (recursive chown/chmod follow it)"
                 _ho_rc=1
                 continue
             fi
-            if chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null \
-               && [ ! -L "$_ho_a" ] \
-               && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null; then
-                echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
+            if [ "$_ho_target" = opencode ]; then
+                # dev->agent: group write while dev-owned, hand over last
+                if [ ! -L "$_ho_a" ] \
+                   && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null \
+                   && chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null; then
+                    echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
+                else
+                    ui_error "handover failed: $_ho_a"
+                    _ho_rc=1
+                fi
             else
-                ui_error "handover failed: $_ho_a"
-                _ho_rc=1
+                # agent->dev: re-own FIRST (no agent write path once
+                # every entry is dev's), then grant group write
+                if [ ! -L "$_ho_a" ] \
+                   && chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null \
+                   && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null; then
+                    echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
+                else
+                    ui_error "handover failed: $_ho_a"
+                    _ho_rc=1
+                fi
             fi
         done
         [ "$_ho_rc" = 0 ] && ui_success "handover complete"

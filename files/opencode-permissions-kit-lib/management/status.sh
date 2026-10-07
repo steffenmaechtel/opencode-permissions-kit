@@ -776,9 +776,24 @@ fi
 
 # The agent user itself must have NO sudo rules (the kit grants rules only
 # to the developer, RunAs opencode). Only checkable when status.sh runs as
-# root; otherwise silent.
+# root; otherwise silent. The check keys on the listing HEADER, not on any
+# runas spec (0.0.45c S3): the old regex matched only (ALL...) and
+# (opencode...) runas specs — a manual `(root)` or `(dev)` grant, exactly
+# the "later manual grant" class this row exists to surface, printed the
+# green "none" verdict. 0.0.45d W3: the header grep alone was locale-
+# fragile — sudo localizes the -l listing (gettext catalogs) and its
+# default env_keep preserves LANG/LC_*, so a translated header escaped
+# the English pattern. LC_ALL=C pins the listing's language, and a
+# structural runas-spec disjunct (any indented `(...) ...` listing line)
+# flags grants even where the locale survives (belt and braces — it is
+# the old syntax-based idea, widened to every runas).
 if [ "$(id -u)" -eq 0 ] && command -v sudo >/dev/null 2>&1; then
-    if sudo -n -l -U "$OPENCODE_USER" 2>/dev/null | grep -Eq '\((ALL|opencode)[^)]*\)' ; then
+    # LC_ALL=C pins the listing's language (W3: sudo localizes the -l
+    # listing and its default env_keep preserves LANG/LC_*); the runas
+    # disjunct is the structural belt-and-braces for any locale that
+    # survives anyway.
+    _sra_pat='may run the following commands|^[[:space:]]*\([^)]+\)'
+    if LC_ALL=C sudo -n -l -U "$OPENCODE_USER" 2>/dev/null | grep -Eq "$_sra_pat"; then
         ui_kv "sudo rules" "$OPENCODE_USER may run sudo — the kit grants it none (investigate)" "$UI_RED"
         sra_finding=true
     else
