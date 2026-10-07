@@ -171,8 +171,8 @@ review stem (the snapshot's file-name stem without the date):
 
 Grep-able by design: `grep -rn "0.0.38 S1"`. The
 [review index](review/README.md#index) maps stems to snapshots, ID ranges,
-and resolutions; the snapshot's own
-[template](review/template.md) carries the rule.
+and resolutions; the snapshot-format rule (external verbatim embedding
+since 0.0.45d) lives in the [review README](review/README.md).
 
 ## Language
 
