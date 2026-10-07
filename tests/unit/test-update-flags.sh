@@ -448,6 +448,18 @@ check "preflight probes the reused binary bounded (F1)" \
 check "preflight warns instead of aborting on an unresponsive binary (F1)" \
     sh -c "grep -qF 'does not answer --version' \"\$1\" && grep -qF \"the install reuses this binary\" \"\$1\"" _ "$INSTALL"
 
+# --- streamed stdin guard (0.0.45c S8) + help-text drift (D2) ---------------------
+# A streamed update (curl | sudo bash) has the script body on stdin: the
+# prompt helpers must never fall back to reading it — install.sh has set
+# UI_NO_STDIN_FALLBACK since 0.0.39b C6; update.sh, the one remaining
+# streamed entry point, consumed script bytes as the confirm answer and
+# unknown input silently resolved to the default y. Set AND exported:
+# the re-exec'd fetched copy below inherits it.
+check "streamed update never reads the confirm answer from the script stream (S8)" \
+    sh -c "grep -qF 'UI_NO_STDIN_FALLBACK=1' \"\$1\" && grep -qF 'export UI_NO_STDIN_FALLBACK' \"\$1\"" _ "$UPDATE"
+check "update.sh --help no longer claims prompt-free defaults (D2)" \
+    sh -c "! grep -qF 'No prompts by default' \"\$1\"" _ "$UPDATE"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

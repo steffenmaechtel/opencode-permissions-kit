@@ -262,22 +262,24 @@ else
 fi
 
 # --- 3. rm suffix form: :? empty-var guard (2026-10-06) -----------------------
-# ANY rm invocation (flag form and operand position aware) on a quoted
-# variable with a literal suffix: an empty/unset var degenerates the
-# operand to a fixed absolute path (rm -rf "$HWORK/proj/vendor" with
-# empty HWORK attempts /proj/vendor) instead of the verified no-op of
-# the pure-variable form. The suffix form must carry the :? guard
-# (`rm -rf "${VAR:?}/suffix"` fails loudly instead). Pure-variable
-# operands (`rm -rf "$VAR"`) are exempt — an empty operand is a
-# verified rm no-op; the dangerous shape is the suffix (audit follow-up
-# to 0.0.42e C1, conventions.md "Test sandbox", rule 4). The pattern
-# chains rm + flags + complete quoted arguments only — an unquoted
-# `;`/redirect boundary breaks the chain, so var+suffix operands of
-# OTHER statements on the same line are not flagged (the printf-embedded
-# fixture in test-staged-write must stay green).
+# ANY rm invocation (flag form and operand position aware) on a variable
+# with a literal suffix: an empty/unset var degenerates the operand to a
+# fixed absolute path (rm -rf "$HWORK/proj/vendor" with empty HWORK
+# attempts /proj/vendor) instead of the verified no-op of the
+# pure-variable form. ALL spelling forms of the suffix operand are
+# flagged (0.0.45c C3): quoted unbraced ("$V/x"), quoted braced
+# ("${V}/x"), slash OUTSIDE the quotes ("$V"/x) and unquoted ($V/x)
+# degenerate identically; the guarded "${V:?}" carries the colon and
+# cannot match. Pure-variable operands (`rm -rf "$VAR"`) are exempt —
+# an empty operand is a verified rm no-op; the dangerous shape is the
+# suffix. The pattern chains rm + flags + complete arguments (quoted or
+# unquoted) only — an unquoted `;`/redirect boundary breaks the chain,
+# so var+suffix operands of OTHER statements on the same line are not
+# flagged (the printf-embedded fixture in test-staged-write must stay
+# green).
 sfx_scan() {
     find "$1" -name 'test-*.sh' ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
-        grep -HnE 'rm( -[A-Za-z]+)*( "[^"]*")* "\$[A-Za-z_][A-Za-z0-9_]*/' "$f" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
+        grep -HnE 'rm( -[A-Za-z]+| "[^"]*"| [^";&| ]+)*( "\$[A-Za-z_][A-Za-z0-9_]*/| "\$\{[A-Za-z_][A-Za-z0-9_]*\}/| "\$[A-Za-z_][A-Za-z0-9_]*"/| \$[A-Za-z_][A-Za-z0-9_]*/)' "$f" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
     done
 }
 : > "$VIOL"
@@ -290,17 +292,21 @@ else
     pass "every rm suffix operand carries the :? empty-var guard"
 fi
 # self-probe: the unguarded shapes must be caught (flag orders, bare rm,
-# multi-operand), the guarded ones pass
-printf '#!/bin/sh\n# probe: unguarded rm suffix variants must be caught (check 3)\nrm -rf "$PX/evil"\nrm -fr "$PX/evil2"\nrm "$PX/evil3"\nrm -rf "$PX/ok" "$PX/evil4"\nrm "${PX:?}/fine"\nrm -f "${PX:?}/fine2"\n' \
+# multi-operand, and the 0.0.45c C3 forms — braced, slash-outside-quotes,
+# unquoted), the guarded and pure-variable ones pass
+printf '#!/bin/sh\n# probe: unguarded rm suffix variants must be caught (check 3)\nrm -rf "$PX/evil"\nrm -fr "$PX/evil2"\nrm "$PX/evil3"\nrm -rf "$PX/ok" "$PX/evil4"\nrm "${PX:?}/fine"\nrm -f "${PX:?}/fine2"\nrm -rf "${PX}/evil5"\nrm -rf "$PX"/evil6\nrm -rf $PX/evil7\nrm -rf "${PX:?}/sub/fine3"\nrm -f "$PX"\n' \
     > "$PROBE_DIR/unit/test-probe-sfx.sh"
 : > "$VIOL"
 sfx_scan "$PROBE_DIR/unit" > "$VIOL" || true
 _sfx_rows=$(grep -c 'test-probe-sfx.sh' "$VIOL")
-if [ "$_sfx_rows" -eq 4 ] && grep -q 'PX/evil' "$VIOL" && grep -q 'PX/evil2' "$VIOL" \
-    && grep -q 'PX/evil3' "$VIOL" && grep -q 'PX/evil4' "$VIOL"; then
-    pass "self-probe: unguarded suffix forms caught (rf, fr, bare rm, multi-operand), guarded pass"
+if [ "$_sfx_rows" -eq 7 ] && grep -q 'PX/evil' "$VIOL" && grep -q 'PX/evil2' "$VIOL" \
+    && grep -q 'PX/evil3' "$VIOL" && grep -q 'PX/evil4' "$VIOL" \
+    && grep -q 'PX}/evil5' "$VIOL" && grep -q 'PX./evil6' "$VIOL" \
+    && grep -q 'PX/evil7' "$VIOL"; then
+    pass "self-probe: unguarded suffix forms caught (rf, fr, bare rm, multi-operand, braced, slash-outside, unquoted), guarded/pure pass"
 else
     fail "self-probe: check 3 must catch the unguarded suffix variants only (rows=$_sfx_rows)"
+    grep 'test-probe-sfx.sh' "$VIOL" || true
 fi
 
 echo ""

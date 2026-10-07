@@ -173,6 +173,25 @@ printf '%s' "$LAST_OUT" | grep -q "nothing to push" \
     && pass "second run recognizes nothing to push" \
     || fail "second run recognizes nothing to push (out=$LAST_OUT)"
 
+# --- 6a. resume after a PARTIAL push: tag missing on origin (0.0.45c C7) ----------
+# A previous run can move stable but fail on the tag ref (per-ref partial
+# push failure) — or the maintainer created the tag without pushing it.
+# The resume path used to derive PUSH_NEEDED from the LOCAL tag only and
+# printed "nothing to push ... released" while tag-pinned installs
+# (KIT_BRANCH=<version>) 404'd. The ls-remote probe closes it: the tag
+# must exist on ORIGIN.
+git -C "$WORK/origin.git" tag -d 1.2.3 >/dev/null
+expect_rc 0 "resume with tag missing on origin exits 0" \
+    sh "$WORK/r/scripts/release.sh" 1.2.3 --skip-tests
+if printf '%s' "$LAST_OUT" | grep -q "nothing to push"; then
+    fail "resume re-pushes a tag that never reached origin (C7, out says nothing-to-push)"
+else
+    pass "resume re-pushes a tag that never reached origin (C7)"
+fi
+[ "$(git -C "$WORK/origin.git" rev-parse 'refs/tags/1.2.3^{commit}' 2>/dev/null)" = "$MASTER_REV" ] \
+    && pass "the missing tag actually landed on origin (C7)" \
+    || fail "the missing tag actually landed on origin (C7)"
+
 # --- 6b. CI pre-flight (master must be green before the mirror is cut) ------------
 # The fake gh (set up next to mkrepo, green by default, already on PATH)
 # answers `run list` with the post--jq TSV the script expects. FAKE_GH_*

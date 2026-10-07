@@ -84,9 +84,11 @@ if PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry-run 
    && [ ! -e "$WORK/log" ]; then
     pass "--dry-run executes no sudo command (log stayed empty)"
 else
-    # The credential probe (sudo -n true) is expected and harmless; any
-    # OTHER sudo command in dry-run mode is a bug.
-    _destructive="$(grep -vE '^sudo -n true( |$)' "$WORK/log" 2>/dev/null || true)"
+    # The credential probe (sudo -n true) is expected and harmless; so is
+    # the agents-backup listing probe (0.0.45c C6: sudo ls -A — read-only,
+    # the gate must fail safe in dry-run too); any OTHER sudo command in
+    # dry-run mode is a bug.
+    _destructive="$(grep -vE '^sudo -n true( |$)|^sudo ls -A /home/[^ ]*/\.(agents|claude)$' "$WORK/log" 2>/dev/null || true)"
     if [ -z "$_destructive" ]; then
         pass "--dry-run executes no destructive sudo command (only the -n true probe)"
     else
@@ -270,6 +272,18 @@ if [ -n "$CAPTURE_LINE" ] && [ -n "$USERDEL_LINE" ] && [ "$CAPTURE_LINE" -lt "$U
     pass "ownership revert: ids captured before userdel (orphan-proof)"
 else
     fail "ownership revert: ids must be captured before userdel (capture=$CAPTURE_LINE userdel=$USERDEL_LINE)"
+fi
+
+# 0.0.45c C6: the agents-backup gate probes with sudo and fails SAFE —
+# the old unprivileged `ls -A` silently skipped the whole backup block
+# when the invoking user could not read the agent home (group dropped,
+# different DEFAULT_USER), and userdel -r then deleted .agents/.claude
+# without the warning. An unreadable dir counts as NON-EMPTY now.
+if grep -qF 'sudo ls -A "$_un_ag_src"' "$UNINSTALL" \
+   && grep -qF '_un_ag_ls="probe-failed"' "$UNINSTALL"; then
+    pass "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
+else
+    fail "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
 fi
 
 # ACL removal is targeted, not a wipe (0.0.42e C4): the kit baseline adds

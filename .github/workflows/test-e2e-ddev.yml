@@ -106,10 +106,21 @@ jobs:
       - uses: actions/checkout@v7
       - name: Resolve opencode version
         id: version
+        # 0.0.45c C8: authenticated + anchored-validated like the
+        # test-e2e.yml twins — an anonymous rate-limit 403 must fail the
+        # step, not silently green an empty cache key.
+        env:
+          OPK_GH_TOKEN: ${{ github.token }}
         run: |
-          echo "OC_VERSION=$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-              https://api.github.com/repos/anomalyco/opencode/releases/latest\
-               | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')" >> "$GITHUB_OUTPUT"
+          OCV="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+              -H "Authorization: Bearer $OPK_GH_TOKEN" \
+              https://api.github.com/repos/anomalyco/opencode/releases/latest \
+              | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"
+          if printf '%s' "$OCV" | grep -qE '^[0-9]+\.[0-9]+(\.[0-9]+)*$'; then
+            echo "OC_VERSION=$OCV" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::opencode releases/latest resolved '${OCV:-unresolved}', expected a semver" && exit 1
+          fi
       - name: Cache opencode binaries + installer (per version, shared with the other e2e jobs)
         uses: actions/cache@v6
         with:

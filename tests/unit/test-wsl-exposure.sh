@@ -118,7 +118,7 @@ check "wrapper skips the bridge warning for open@11 versions (1.18.33 / 2.0.18)"
 
 # --- update.sh report-only hint -------------------------------------------------
 check "update.sh warns about the world-readable /mnt/c (no prompt)" \
-    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\" && ! grep -q 'prompt ' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF 'ui_warn \"/mnt/c is world-readable' \"\$1\" && ! sed -n '/restriction configured but still pending/,/kit never edits \\/etc\\/wsl.conf/p' \"\$1\" | grep -Eq 'ui_confirm|ui_ask|ui_menu'" _ "$UPDATE"
 check "update.sh prints the recommended wsl.conf options" \
     sh -c "grep -qF '[automount]' \"\$1\" && grep -q 'dmask=027' \"\$1\"" _ "$UPDATE"
 check "update.sh reminds about a configured-but-pending restriction" \

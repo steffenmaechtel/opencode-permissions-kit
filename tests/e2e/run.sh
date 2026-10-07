@@ -156,7 +156,7 @@ check "2c: --yes continued past the failed export (non-interactive)" \
 check_fail "2c: DDEV_EXPORTED stamp NOT set while exports failed" \
     E 'sudo grep -q "^DDEV_EXPORTED=" /etc/opencode-permissions-kit/install.conf'
 check "2c: install summary shows the dumps + import hint" \
-    E 'grep -q "ddev-migrate.sh import" /tmp/install-out.log'
+    E 'grep -q "bin/ddev-migrate import" /tmp/install-out.log'
 check "2c: recursive group baseline — subdir carries setgid" \
     E 'test -g /var/www/vhosts/perm-check/sub'
 check "2c: recursive group baseline — pre-existing file is group-writable" \

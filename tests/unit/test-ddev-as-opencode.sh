@@ -803,6 +803,27 @@ rm -rf "$HWORK"
 check "status.sh reports ddev-as-opencode state" \
     sh -c "grep -q 'ddev-as-opencode' \"\$1\"" _ "$STATUS"
 
+# --- 8b. config.sh ui.sh fallback (0.0.45c C9) ----------------------------------
+# The body calls ui_have/ui_atten (projects list) and ui_confirm/ui_menu/
+# ui_ask (interactive flows); the fallback block must define them all —
+# the old block died rc 127 ("ui_have: not found") at the first list on
+# an install whose library predates ui.sh, contradicting its own
+# "keeps config.sh working" comment.
+_cfgfb=$(sed -n '/^    ui_info()    { echo "  info     $1"; }$/,/^    UI_GREEN=/p' "$CONFIG")
+if [ -n "$_cfgfb" ]; then
+    if printf '%s\n' "$_cfgfb" | grep -q 'ui_have()' \
+       && printf '%s\n' "$_cfgfb" | grep -q 'ui_atten()' \
+       && printf '%s\n' "$_cfgfb" | grep -q 'ui_confirm()' \
+       && printf '%s\n' "$_cfgfb" | grep -q 'ui_menu()' \
+       && printf '%s\n' "$_cfgfb" | grep -q 'ui_ask()'; then
+        pass "config.sh ui.sh fallback defines every helper the body calls (C9)"
+    else
+        fail "config.sh ui.sh fallback defines every helper the body calls (C9)"
+    fi
+else
+    fail "config.sh ui.sh fallback block extractable (C9)"
+fi
+
 # --- 9. Makefile + CI wiring ---------------------------------------------------
 check "Makefile has a test-ddev-as-opencode target in the test: list" \
     sh -c "grep -q 'test-ddev-as-opencode' \"\$1\"" _ "$MAKEFILE"

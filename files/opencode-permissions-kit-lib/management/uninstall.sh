@@ -394,11 +394,21 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
         # userdel -r deletes /home/<opencode> INCLUDING migrated agent
         # resources (issue #19 move mode: ~/.agents and ~/.claude with
         # the developer's skills). Back them up to the developer's
-        # ownership before the home goes away. (ls without sudo: the
-        # developer is in the sharing group and can list the dirs.)
+        # ownership before the home goes away. The listing probe runs
+        # with sudo and fails SAFE (0.0.45c C6): the old unprivileged
+        # `ls -A` assumed the developer can read the agent home — when
+        # they cannot (group membership dropped, different
+        # DEFAULT_USER), the probe failed silently, the backup block
+        # was skipped and userdel -r deleted the resources without the
+        # warning. An unreadable dir now counts as NON-EMPTY: the
+        # backup (or its failure warning) always happens.
         for _un_ag_dirname in .agents .claude; do
             _un_ag_src="/home/$OPENCODE_USER/$_un_ag_dirname"
-            if [ -d "$_un_ag_src" ] && [ -n "$(ls -A "$_un_ag_src" 2>/dev/null)" ]; then
+            _un_ag_ls=""
+            if [ -d "$_un_ag_src" ]; then
+                _un_ag_ls=$(sudo ls -A "$_un_ag_src" 2>/dev/null) || _un_ag_ls="probe-failed"
+            fi
+            if [ -n "$_un_ag_ls" ]; then
                 _un_ag_stamp="$(date +%Y%m%d-%H%M%S)"
                 _un_ag_dir="/var/backups/opencode-permissions-kit/$_un_ag_dirname-backup-$_un_ag_stamp"
                 if [ "$DRY_RUN" = true ]; then
