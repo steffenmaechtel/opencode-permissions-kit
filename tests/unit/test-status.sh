@@ -570,24 +570,31 @@ else
     fail "status.sh: gap function extractable (W15)"
 fi
 
-# --- 0.0.45c S3: sudo-rules audit flags ANY listing, not just ALL/opencode runas --
+# --- 0.0.45c S3 / 0.0.45d W3: sudo-rules audit flags ANY listing, locale-proof --
 # The old regex ('\((ALL|opencode)[^)]*\)') printed the green "none for
 # opencode" for a manual `(root)` or `(dev)` grant — the exact later-
-# manual-grant class the row exists to catch. The check now keys on the
-# `sudo -l` listing header. Behavioral replay: the REAL grep line,
-# extracted verbatim, must flag every representative listing shape and
-# stay green on the not-allowed wording.
-_sudo_grep="$(grep -F "sudo -n -l -U " "$STATUS" | grep 'may run the following commands' | head -1 | sed 's/^ *//')"
-if [ -n "$_sudo_grep" ]; then
-    pass "sudo-rules audit keys on the listing header (S3, verbatim pin)"
+# manual-grant class the row exists to catch (S3). W3: the header grep
+# alone was locale-fragile — sudo localizes the -l listing and its
+# default env_keep preserves LANG/LC_*, so a translated header escaped
+# the English pattern; the probe now pins LC_ALL=C and the pattern gains
+# a structural runas disjunct. Verbatim pins on both, behavioral replay
+# of the REAL extracted pattern against representative listings incl. a
+# TRANSLATED header.
+_sudo_grep="$(grep -F "LC_ALL=C sudo -n -l -U " "$STATUS" | head -1 | sed 's/^ *//')"
+_sra_pat="$(grep -F "_sra_pat=" "$STATUS" | head -1 | sed -e 's/^ *//' -e "s/^_sra_pat=//" -e "s/^'//" -e "s/'\$//")"
+if printf '%s\n' "$_sudo_grep" | grep -q 'grep -Eq'; then
+    pass "sudo-rules audit probes with LC_ALL=C (S3+W3, verbatim pin)"
 else
-    fail "sudo-rules audit keys on the listing header (S3)"
+    fail "sudo-rules audit must pin the listing locale with LC_ALL=C (W3)"
 fi
-if [ -n "$_sudo_grep" ] && command -v sudo >/dev/null 2>&1; then
-    # strip the `sudo -n -l -U … | ` head and the trailing `; then` —
-    # the pin replays only the grep half against piped listings
-    _s3_grep_only="$(printf '%s\n' "$_sudo_grep" | sed -e 's/^.*| //' -e 's/; then$//')"
-    _s3_flag() { printf '%s\n' "$1" | eval "$_s3_grep_only" >/dev/null 2>&1; }
+if printf '%s\n' "$_sra_pat" | grep -qF 'may run the following commands' \
+   && printf '%s\n' "$_sra_pat" | grep -qF '\([^)]+\)'; then
+    pass "audit pattern: listing header + structural runas disjunct (W3)"
+else
+    fail "audit pattern must keep the header and add the runas disjunct (W3)"
+fi
+if [ -n "$_sra_pat" ]; then
+    _s3_flag() { printf '%s\n' "$1" | grep -Eq "$_sra_pat" >/dev/null 2>&1; }
     if _s3_flag 'User opencode may run the following commands on host:
     (root) NOPASSWD: /usr/bin/systemctl restart foo'; then
         pass "a (root) runas grant is flagged red (S3)"
@@ -606,10 +613,21 @@ if [ -n "$_sudo_grep" ] && command -v sudo >/dev/null 2>&1; then
     else
         fail "an (ALL) runas grant stays flagged (S3, old regex parity)"
     fi
+    if _s3_flag 'Benutzer opencode darf die folgenden Befehle auf diesem Host ausfuehren:
+    (root) NOPASSWD: /usr/bin/foo'; then
+        pass "a TRANSLATED header with a runas grant is still flagged (W3)"
+    else
+        fail "a translated header with a runas grant must be flagged via the runas disjunct (W3)"
+    fi
     if _s3_flag 'User opencode is not allowed to run sudo on host.'; then
         fail "the not-allowed wording stays green (S3)"
     else
         pass "the not-allowed wording stays green (S3)"
+    fi
+    if _s3_flag 'Benutzer opencode darf sudo auf diesem Host nicht ausfuehren.'; then
+        fail "the translated not-allowed wording stays green (W3)"
+    else
+        pass "the translated not-allowed wording stays green (W3)"
     fi
 fi
 

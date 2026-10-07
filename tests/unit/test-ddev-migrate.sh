@@ -899,6 +899,51 @@ check "run-as still executes the caller's command after the env words" \
 check "run-as never runs a command-less env" \
     sh -c "[ \"\$(printf '%s\n' \"\$1\" | tail -n +5)\" != \"\" ]" _ "$_runas_out"
 
+# --- 0.0.45d W5: import's failure paths report their real cause --------------------
+# The old conflation printed "no dump directory with a manifest found"
+# for every failure: a cat timeout / unreadable manifest masqueraded as
+# the genuine no-manifest case, a mktemp failure returned 1 SILENTLY.
+# Distinct messages now. The root guard is bypassed with an id shim —
+# every path under test exits before the first sudo call.
+_w5dir="$(mktemp -d)"
+mkdir -p "$_w5dir/bin" "$_w5dir/bin-mk" "$_w5dir/dump"
+printf '#!/bin/sh\necho 0\n' > "$_w5dir/bin/id"
+cp "$_w5dir/bin/id" "$_w5dir/bin-mk/id"
+printf '#!/bin/sh\nexit 1\n' > "$_w5dir/bin-mk/mktemp"
+chmod +x "$_w5dir/bin/id" "$_w5dir/bin-mk/id" "$_w5dir/bin-mk/mktemp"
+_w5_import() {
+    PATH="$_w5dir/$1:$PATH" sh -c '. "$1" && ddev_migrate_import "$2"' \
+        _ "$MIG" "$_w5dir/dump" 2>&1 || true
+
+}
+printf 'OK|alpha|/roots/alpha|alpha.sql.gz\n' > "$_w5dir/dump/manifest.conf"
+chmod 000 "$_w5dir/dump/manifest.conf"
+_w5_out="$(_w5_import bin)"
+case "$_w5_out" in
+    *"manifest found but unreadable"*)
+        pass "import: unreadable manifest reports its cause, not 'no manifest' (W5)" ;;
+    *"no dump directory"*)
+        fail "import: unreadable manifest must not claim 'no dump directory' (W5)" ;;
+    *)
+        fail "import: unreadable manifest must report the unreadable cause (W5, got: $_w5_out)" ;;
+esac
+rm -f "${_w5dir:?}/dump/manifest.conf"
+_w5_out="$(_w5_import bin)"
+case "$_w5_out" in
+    *"no dump directory with a manifest found"*)
+        pass "import: the genuine no-manifest case keeps its message (W5)" ;;
+    *)
+        fail "import: the genuine no-manifest case must keep its message (W5, got: $_w5_out)" ;;
+esac
+_w5_out="$(_w5_import bin-mk)"
+case "$_w5_out" in
+    *"cannot create a staging temp"*)
+        pass "import: mktemp failure reports instead of exiting silently (W5)" ;;
+    *)
+        fail "import: mktemp failure must report its cause (W5, got: $_w5_out)" ;;
+esac
+rm -rf "${_w5dir:?}"
+
 # static: the import loop builds HOME via getent and rides conditional
 # backend vars as single quoted arguments (0.0.43a F6/F12).
 check "import resolves the agent HOME via getent (not /home/<user>)" \

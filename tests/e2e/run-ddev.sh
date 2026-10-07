@@ -107,7 +107,7 @@ if [ ! -x "$DD_BIN" ]; then
         || { echo "  ${RED}FAIL${NC}  ddev $DD_WANT download failed"; exit 1; }
     tar -xzf "$DD_CACHE/ddev.tar.gz" -C "$DD_CACHE" \
         || { echo "  ${RED}FAIL${NC}  cannot extract ddev tarball"; exit 1; }
-    rm -f "$DD_CACHE/ddev.tar.gz"
+    rm -f "${DD_CACHE:?}/ddev.tar.gz"
     chmod +x "$DD_BIN" 2>/dev/null || true
 fi
 [ -s "$DD_BIN" ] || { echo "  ${RED}FAIL${NC}  cached ddev binary is empty"; exit 1; }

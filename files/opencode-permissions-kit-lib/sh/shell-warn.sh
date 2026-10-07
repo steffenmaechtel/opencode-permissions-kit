@@ -42,7 +42,7 @@ cat >&2 <<EOF
   The real binary runs as YOUR user — not the dedicated opencode user the
   kit's wrapper enforces.
   Fix:
-      rm -rf "$HOME/.opencode/bin"
+      rm -rf "${HOME:?}/.opencode/bin"
       sudo opk update
   New shells keep warning until this is resolved.
 

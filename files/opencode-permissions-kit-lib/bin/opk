@@ -358,35 +358,63 @@ case "$cmd" in
         ui_info "handing over to $_ho_user:$_ho_group (recursive, g+w) ..."
         for _ho_a in "$@"; do
             [ "$_ho_a" = "--dry-run" ] && continue
-            # [ -L ] refuse + race-free executors (review 0.0.39h F10;
+            # [ -L ] refuse + race-aware executors (review 0.0.39h F10;
             # TOCTOU window closed 0.0.43a F16; slash-form bypass closed
             # 0.0.44a V2, mid-dot 0.0.45c S7 — validation refuses x/,
             # x//, x/., x/./y before this loop, so both executors below
-            # only ever see slash-free operands). ORDER (0.0.45c S4):
-            # the find+chmod pass runs FIRST, while every entry is still
-            # dev-owned — the agent cannot swap what it cannot write, so
-            # no symlink can appear between find's lstat and chmod's
-            # resolution (the old chown-first order signaled the
-            # hand-over via one ATTRIB per file and raced exactly
-            # there). chown -R -h runs LAST, race-free by construction:
-            # lchown never dereferences — a link planted after the scan
-            # is re-owned as the agent's own link, nothing outside the
-            # tree (0.0.44a V24). Note plain chmod WOULD follow an
-            # operand link — the [ ! -L ] recheck below plus the
-            # validation gates are load-bearing for the chmod half's
-            # operand; find -P itself skips a link operand (! -type l).
+            # only ever see slash-free operands). ORDER is DIRECTION-
+            # DEPENDENT (0.0.45c S4 dev->agent; 0.0.45d W1 restored the
+            # reverse for agent->dev — the S4 reorder had closed the
+            # dev->agent window but re-opened scan-then-act for `me`):
+            #   handover opencode (dev->agent): the tree is dev-owned and
+            #   not agent-writable — the find+chmod pass runs FIRST, the
+            #   agent cannot swap what it cannot write; chown -R -h runs
+            #   LAST, race-free by construction (lchown never
+            #   dereferences — a link planted after the scan is re-owned
+            #   as the agent's own link, nothing outside the tree,
+            #   0.0.44a V24).
+            #   handover me (agent->dev): the reclaimed tree is
+            #   agent-owned or mixed — chmod FIRST would run while the
+            #   agent can still swap a scanned file for a symlink (root
+            #   chmod g+w through the link on out-of-tree targets).
+            #   chown -R -h to the dev runs FIRST instead: after it no
+            #   entry is agent-owned, and on a tree the agent owned
+            #   without group write no agent write path remains — the
+            #   chmod pass races no one.
+            # Inherent residual in EITHER order: a tree that already
+            # carries g+w for the sharing group (a previous handover)
+            # stays agent-writable through the run — that re-run window
+            # is pre-existing and accepted, not closed by ordering.
+            # Plain chmod WOULD follow an operand link — the [ ! -L ]
+            # recheck below plus the validation gates are load-bearing
+            # for the chmod half's operand; find -P itself skips a link
+            # operand (! -type l).
             if [ -L "$_ho_a" ]; then
                 ui_error "handover: '$_ho_a' is a symlink — refusing (recursive chown/chmod follow it)"
                 _ho_rc=1
                 continue
             fi
-            if [ ! -L "$_ho_a" ] \
-               && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null \
-               && chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null; then
-                echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
+            if [ "$_ho_target" = opencode ]; then
+                # dev->agent: group write while dev-owned, hand over last
+                if [ ! -L "$_ho_a" ] \
+                   && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null \
+                   && chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null; then
+                    echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
+                else
+                    ui_error "handover failed: $_ho_a"
+                    _ho_rc=1
+                fi
             else
-                ui_error "handover failed: $_ho_a"
-                _ho_rc=1
+                # agent->dev: re-own FIRST (no agent write path once
+                # every entry is dev's), then grant group write
+                if [ ! -L "$_ho_a" ] \
+                   && chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null \
+                   && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null; then
+                    echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
+                else
+                    ui_error "handover failed: $_ho_a"
+                    _ho_rc=1
+                fi
             fi
         done
         [ "$_ho_rc" = 0 ] && ui_success "handover complete"

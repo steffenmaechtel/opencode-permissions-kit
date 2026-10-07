@@ -33,6 +33,24 @@ check() {
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
+# --- 0.0.45d W4: update.sh's ui.sh-less fallback covers its one prompt ----------
+# The body's confirm() calls ui_confirm; the old fallback defined only
+# output helpers, so a ui.sh-less run (damaged checkout + predating
+# library) died rc 127 at the confirm instead of failing with the
+# re-deploy hint — the exact class 0.0.45c C9 fixed in config.sh (the
+# C9 sweep missed this fallback). The fallback must fail loudly.
+_updfb="$(sed -n '/^    ui_info()    { echo "  info     $1"; }$/,/^    UI_GREEN=/p' "$UPDATE")"
+if [ -n "$_updfb" ]; then
+    if printf '%s\n' "$_updfb" | grep -q '_ui_no_prompt()' \
+       && printf '%s\n' "$_updfb" | grep -q 'ui_confirm()'; then
+        pass "update.sh ui.sh fallback fails loudly at its one prompt (W4)"
+    else
+        fail "update.sh ui.sh fallback must define the ui_confirm loud-fail stub (W4)"
+    fi
+else
+    fail "update.sh ui.sh fallback block extractable (W4)"
+fi
+
 # --- 1. flag parsing (static extraction, same pattern as test-install-args) ------
 extract_fn() {
     sed -n "/^$1() {/,/^}/p" "$UPDATE"
@@ -303,7 +321,7 @@ check "resolve: latest-version resolution guards the requested major" \
 check "resolve: 2.x channel is the npm registry (with scope fallback)" \
     sh -c "grep -q 'registry.npmjs.org/@opencode/cli-' \"\$1\" && grep -q 'registry.npmjs.org/@opencode-ai/cli-' \"\$1\"" _ "$UPDATE"
 check "tui: registration flips with the major (sync function, both directions)" \
-    sh -c "grep -q '^sync_tui_registration() {' \"\$1\" && grep -q 'tui_plugin_sync_user \"\$_str_major\"' \"\$1\" && grep -qF 'rm -rf \"\$_tp_user_dir/plugins/opencode-permissions-kit\"' \"\$2\"" _ "$UPDATE" "$TUIPLUGIN"
+    sh -c "grep -q '^sync_tui_registration() {' \"\$1\" && grep -q 'tui_plugin_sync_user \"\$_str_major\"' \"\$1\" && grep -qF 'rm -rf \"\${_tp_user_dir:?}/plugins/opencode-permissions-kit\"' \"\$2\"" _ "$UPDATE" "$TUIPLUGIN"
 check "tui: a major flip re-anchors the registration even in --only-binary runs" \
     sh -c "grep -n 'sync_tui_registration \"\$_maj_after\"' \"\$1\" | head -1 | cut -d: -f1 | grep -q ." _ "$UPDATE"
 

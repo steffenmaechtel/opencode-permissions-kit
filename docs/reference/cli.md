@@ -97,12 +97,18 @@ Operands must be slash-, dot- and dotdot-free — `x/`, `x//`, `x/.`,
 trailing slash, a `.` or a `..` component resolves through a link before
 the symlink gate can see it, so both the gate and the recursive pair
 would act on the resolved target (the link itself, or its parent). The
-recursive pair itself cannot be steered through a planted link either:
-the group-write pass runs FIRST, while every entry is still yours (the
-agent cannot swap what it cannot write), and the ownership change rides
-`chown -R -h` LAST (lchown on a planted operand re-owns the attacker's
-own link, nothing outside) — a link swapped between the check and the
-run touches nothing outside the tree.
+recursive pair cannot be steered through a planted link either, and its
+order follows the direction: handing over **to the agent** runs the
+group-write pass first, while every entry is still yours (the agent
+cannot swap what it cannot write), and the ownership change rides
+`chown -R -h` last (lchown on a planted operand re-owns the attacker's
+own link, nothing outside). Handing over **back to you** (`me`) reverses
+the order — `chown -R -h` runs first, so by the time group write is
+granted no entry is agent-owned anymore and the chmod pass races no one
+on trees the agent owned without group write. Trees that already carry
+group write for the sharing group (earlier handovers) stay
+agent-writable during the run in either order — an inherent, accepted
+residual.
 
 The change is recursive and only flips the **owner** — the group stays the
 kit's sharing group and group-write access is re-applied, so both sides

@@ -1453,7 +1453,7 @@ do_ddev_phase() {
                     log "mkcert CA reused from $src_label for $OPENCODE_USER"
                 else
                     ui_warn "mkcert CA reuse from $src_label FAILED — removing the partial copy, falling back to a new CA."
-                    sudo rm -f "$caroot/rootCA.pem" "$caroot/rootCA-key.pem"
+                    sudo rm -f "${caroot:?}/rootCA.pem" "${caroot:?}/rootCA-key.pem"
                     log "mkcert CA reuse FAILED (source: $src_label) — partial copy removed"
                     # The elif below no longer applies once this branch ran — do
                     # the new-CA fallback here, and VERIFY it: a failed step above

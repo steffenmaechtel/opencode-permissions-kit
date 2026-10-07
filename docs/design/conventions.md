@@ -145,6 +145,8 @@ lines are skipped):
    (0.0.42g C2). Policy-INPUT classes — values handed to
    screening/parsing functions or parse-only argument fixtures, never
    executed as paths — are allowlisted in the suite with reasons.
+   Unit-suite-scoped: e2e scripts legitimately name container paths
+   (/var/www/vhosts fixtures), so they are not in this check's scope.
 3. **rm suffix guard** — any `rm` invocation (flag order and operand
    position aware, statement-scoped) on a variable with a literal suffix
    must carry the `:?` empty-variable guard — quoted unbraced
@@ -152,7 +154,14 @@ lines are skipped):
    (`"$V"/x`) and unquoted (`$V/x`) spellings alike (2026-10-06;
    all spellings enforced since 0.0.45c C3); pure-variable operands are
    exempt (an empty operand is a verified rm no-op — the dangerous
-   shape is the suffix).
+   shape is the suffix). Scope since 0.0.45d (0.0.45b C1): the unit
+   suites AND the e2e helper scripts (`tests/e2e/**/*.sh` — the three
+   host-side sites that carried no guard are swept with this change).
+   The same `:?` standard applies to shipped code's `rm` var+suffix
+   sites, root context included (0.0.45b C2): the shipped tree is
+   swept clean with this change, and new sites must not regress it
+   (convention, enforced by review — the unit guard's scan deliberately
+   stops at tests/).
 
 The suite self-probes all three checks (continuation-split `rm`, inert
 and quoted and redirect-glued literals, the unguarded suffix shapes —

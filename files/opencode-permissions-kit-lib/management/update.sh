@@ -322,7 +322,17 @@ else
     ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
     ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
     ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_plan()    { printf '    %s  %s\n' "$1" "$2"; }
+    # 0.0.45d W4: the body's confirm() calls ui_confirm — without a
+    # stub a ui.sh-less update died rc 127 at the confirm prompt
+    # instead of failing with a re-deploy hint (0.0.45c C9 fixed the
+    # same class in config.sh; the C9 sweep missed this fallback).
+    # Loud-fail stub: non-interactive paths keep working, the one
+    # prompt fails with a message instead of "command not found".
+    _ui_no_prompt() {
+        echo "error: this prompt needs sh/ui.sh — library too old, re-deploy with 'sudo opk update'" >&2
+        return 1
+    }
+    ui_confirm() { _ui_no_prompt; }
     UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
 fi
 
@@ -1055,14 +1065,14 @@ fetch_opencode_version() {
             tar -xzf "$_fov_dst/opencode.tar.gz" -C "$_fov_dst/npmx" || return 1
             [ -x "$_fov_dst/npmx/package/bin/opencode" ] || return 1
             mv "$_fov_dst/npmx/package/bin/opencode" "$_fov_dst/opencode" || return 1
-            rm -rf "$_fov_dst/npmx" "$_fov_dst/opencode.tar.gz"
+            rm -rf "${_fov_dst:?}/npmx" "${_fov_dst:?}/opencode.tar.gz"
             ;;
         *)
             curl -fsSL --max-time 240 \
                 "https://github.com/anomalyco/opencode/releases/download/v$_fov_ver/opencode-$_fov_target.tar.gz" \
                 -o "$_fov_dst/opencode.tar.gz" || return 1
             tar -xzf "$_fov_dst/opencode.tar.gz" -C "$_fov_dst" || return 1
-            rm -f "$_fov_dst/opencode.tar.gz"
+            rm -f "${_fov_dst:?}/opencode.tar.gz"
             ;;
     esac
     [ -x "$_fov_dst/opencode" ] || return 1

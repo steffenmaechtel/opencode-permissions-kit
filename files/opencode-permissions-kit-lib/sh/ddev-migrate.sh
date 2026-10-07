@@ -463,11 +463,11 @@ ddev_migrate_export() {
         elif grep -q "service db does not exist" "$dm_err" 2>/dev/null; then
             # Runtime twin of omit_containers: the db service never came up
             # (state=doesnotexist) — nothing to export, not a failure.
-            rm -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" 2>/dev/null || true
+            rm -f "${DD_MIG_DUMP_DIR:?}/$dm_n.sql.gz" 2>/dev/null || true
             echo "    SKIP: no running db service in this project"
             _dm_manifest_add "SKIP|$dm_n|$dm_ar|no-db-service"
         else
-            rm -f "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" 2>/dev/null || true
+            rm -f "${DD_MIG_DUMP_DIR:?}/$dm_n.sql.gz" 2>/dev/null || true
             echo "    FAILED: ddev export-db — no dump for $dm_n"
             _dm_manifest_add "FAIL|$dm_n|$dm_ar|"
         fi
@@ -571,12 +571,25 @@ ddev_migrate_import() {
         echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
         return 1
     }
-    dm_manifest=$(mktemp) || return 1
+    # 0.0.45d W5: the three failure causes report distinctly — the old
+    # conflation printed "no dump directory with a manifest found" for
+    # all of them: a mktemp failure returned 1 SILENTLY, and a cat
+    # timeout (rc 124, the S6 stat-to-read swap residual) or an
+    # unreadable manifest masqueraded as the genuine no-manifest case.
+    dm_manifest=$(mktemp) || {
+        echo "ddev-migrate: cannot create a staging temp for the manifest (disk full?)"
+        return 1
+    }
     command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dm_manifest"
     dm_found=$(find "$dm_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>/dev/null)
-    if [ -z "$dm_found" ] || ! timeout 5 cat "$dm_found" > "$dm_manifest" 2>/dev/null; then
+    if [ -z "$dm_found" ]; then
         rm -f "$dm_manifest" 2>/dev/null || true
         echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
+        return 1
+    fi
+    if ! timeout 5 cat "$dm_found" > "$dm_manifest" 2>/dev/null; then
+        rm -f "$dm_manifest" 2>/dev/null || true
+        echo "ddev-migrate: manifest found but unreadable (timeout or permissions) — refusing to import from $dm_dir"
         return 1
     fi
 

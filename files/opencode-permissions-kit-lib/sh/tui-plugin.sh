@@ -61,7 +61,7 @@ tui_plugin_sync_user() {
             "$_tp_user_dir/plugins/opencode-permissions-kit/tui.tsx" 2>/dev/null || true
         log "tui mode registered for 2.x: $_tp_user_dir/plugins/opencode-permissions-kit/tui.tsx"
     else
-        _tp_sudo rm -rf "$_tp_user_dir/plugins/opencode-permissions-kit" || return 1
+        _tp_sudo rm -rf "${_tp_user_dir:?}/plugins/opencode-permissions-kit" || return 1
         log "tui mode 2.x registration removed: $_tp_user_dir/plugins/opencode-permissions-kit"
     fi
     # best-effort cleanup of inert file-path entries (pre-0.0.35 kits)

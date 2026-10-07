@@ -288,21 +288,74 @@ else
     esac
 fi
 
-# 0.0.45c S4 order pin: the chmod pass must run while the tree is still
-# dev-owned — BEFORE the chown -R -h hand-over. After the hand-over the
-# agent owns the tree and can swap a scanned file for a symlink between
-# find's lstat and chmod's resolution (root chmod g+w through the link on
-# out-of-tree targets). Static line-number pin on the executor (the race
-# itself is not unit-pinnable); reverting the order swaps the numbers.
-_chmod_ln=$(grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' "$KIT" | cut -d: -f1)
-_chown_ln=$(grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' "$KIT" | cut -d: -f1)
-if [ -n "$_chmod_ln" ] && [ -n "$_chown_ln" ] && [ "$_chmod_ln" -lt "$_chown_ln" ]; then
-    echo "  ${GREEN}PASS${NC}  handover: chmod pass precedes the chown hand-over (S4)"
+# 0.0.45c S4 / 0.0.45d W1 direction-aware order pins: the executor is
+# per-direction since W1 — `handover opencode` (dev->agent) chmods while
+# the tree is dev-owned and hands over LAST; `handover me` (agent->dev)
+# re-owns FIRST (after chown -R -h no entry is agent-owned, so the chmod
+# pass races no one) and grants group write second. The opencode branch
+# comes first in the file; each executor line appears exactly twice.
+# Static line-number pins (the race itself is not unit-pinnable);
+# reverting an order inside a branch swaps its numbers, collapsing back
+# to the old single unconditional executor removes the second match.
+_ho_chmod_lns=$(grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' "$KIT" | cut -d: -f1)
+_ho_chown_lns=$(grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' "$KIT" | cut -d: -f1)
+_ho_nchmod=$(printf '%s\n' "$_ho_chmod_lns" | grep -c .)
+_ho_nchown=$(printf '%s\n' "$_ho_chown_lns" | grep -c .)
+_ho_c1=$(printf '%s\n' "$_ho_chmod_lns" | head -1)
+_ho_c2=$(printf '%s\n' "$_ho_chmod_lns" | tail -1)
+_ho_h1=$(printf '%s\n' "$_ho_chown_lns" | head -1)
+_ho_h2=$(printf '%s\n' "$_ho_chown_lns" | tail -1)
+if [ "$_ho_nchmod" = 2 ] && [ "$_ho_nchown" = 2 ] \
+   && [ "$_ho_c1" -lt "$_ho_h1" ] && [ "$_ho_h2" -lt "$_ho_c2" ] \
+   && [ "$_ho_c1" -lt "$_ho_c2" ] && [ "$_ho_h1" -lt "$_ho_h2" ]; then
+    echo "  ${GREEN}PASS${NC}  handover: opencode branch chmod-before-chown, me branch chown-before-chmod (S4+W1)"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  handover: chmod pass must precede the chown hand-over (S4)"
+    echo "  ${RED}FAIL${NC}  handover: per-direction order violated (S4+W1: chmod=$_ho_chmod_lns chown=$_ho_chown_lns)"
     failures=$((failures + 1))
 fi
+
+# W1 behavioral pin: run the REAL extracted executor loop per direction
+# with shims that log every chown/chmod invocation — the log order pins
+# the execution order causally (line-number statics above cannot see a
+# rewired branch body). chown is shimmed to log+noop (unprivileged env,
+# ownership itself is pinned by the root-env block above); chmod logs
+# the operand's CURRENT owner at invocation time and then really runs.
+_ho_pin_dir="$(mktemp -d)"
+mkdir -p "$_ho_pin_dir/bin" "$_ho_pin_dir/tree"
+echo keep > "$_ho_pin_dir/tree/file"
+printf '#!/bin/sh\necho "chown $*" >> "$HO_LOG"\nexit 0\n' > "$_ho_pin_dir/bin/chown"
+printf '#!/bin/sh\nfor _a do case "$_a" in -*) ;; *) [ -e "$_a" ] && echo "chmod $(stat -c %%U "$_a" 2>/dev/null || echo ?) $_a" >> "$HO_LOG" ;; esac; done\nexec /usr/bin/chmod "$@"\n' > "$_ho_pin_dir/bin/chmod"
+chmod +x "$_ho_pin_dir/bin/chown" "$_ho_pin_dir/bin/chmod"
+_ho_extract() {
+    sed -n '/^        _ho_rc=0$/,/^        done$/p' "$KIT"
+}
+for _ho_tgt in opencode me; do
+    rm -f "${_ho_pin_dir:?}/log"
+    HO_LOG="$_ho_pin_dir/log" _ho_target="$_ho_tgt" _ho_user="$(id -un)" \
+        _ho_group="$(id -gn)" _ho_rc=0 \
+        PATH="$_ho_pin_dir/bin:$PATH" sh -c "$( \
+            printf 'ui_info() { :; }\nui_error() { echo "$1" >&2; }\nset -- "%s"\n' "${_ho_pin_dir}/tree"; \
+            _ho_extract)" >/dev/null 2>&1 || true
+    _ho_first_chown=$(grep -n '^chown ' "$_ho_pin_dir/log" 2>/dev/null | head -1 | cut -d: -f1)
+    _ho_first_chmod=$(grep -n '^chmod ' "$_ho_pin_dir/log" 2>/dev/null | head -1 | cut -d: -f1)
+    if [ -n "$_ho_first_chown" ] && [ -n "$_ho_first_chmod" ]; then
+        if [ "$_ho_tgt" = opencode ] && [ "$_ho_first_chmod" -lt "$_ho_first_chown" ]; then
+            echo "  ${GREEN}PASS${NC}  handover opencode: chmod pass executes before the chown hand-over (W1)"
+            passed=$((passed + 1))
+        elif [ "$_ho_tgt" = me ] && [ "$_ho_first_chown" -lt "$_ho_first_chmod" ]; then
+            echo "  ${GREEN}PASS${NC}  handover me: chown hand-over executes before the chmod pass (W1)"
+            passed=$((passed + 1))
+        else
+            echo "  ${RED}FAIL${NC}  handover $_ho_tgt: execution order wrong (chown=$_ho_first_chown chmod=$_ho_first_chmod, W1)"
+            failures=$((failures + 1))
+        fi
+    else
+        echo "  ${RED}FAIL${NC}  handover $_ho_tgt: executor did not run both passes (chown=$_ho_first_chown chmod=$_ho_first_chmod, W1)"
+        failures=$((failures + 1))
+    fi
+done
+rm -rf "${_ho_pin_dir:?}"
 
 # List drift guard: install.sh's fetch_kit() list and update.sh's KIT_FILES
 # must carry the same file set — a missing entry means streamed installs

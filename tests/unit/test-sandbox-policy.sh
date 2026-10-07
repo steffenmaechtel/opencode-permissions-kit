@@ -277,13 +277,19 @@ fi
 # so var+suffix operands of OTHER statements on the same line are not
 # flagged (the printf-embedded fixture in test-staged-write must stay
 # green).
+# Scope (0.0.45b C1, closed 0.0.45d): the unit suites AND the e2e
+# helper scripts — the three host-side e2e sites of exactly this shape
+# carried no :? while the scan stopped at tests/unit. Checks 1/2 stay
+# unit-scoped: e2e scripts legitimately name container paths
+# (/var/www/vhosts fixtures) that the real-tree ratchet would flag.
 sfx_scan() {
-    find "$1" -name 'test-*.sh' ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
+    find "$1" -name "${2:-test-*.sh}" ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
         grep -HnE 'rm( -[A-Za-z]+| "[^"]*"| [^";&| ]+)*( "\$[A-Za-z_][A-Za-z0-9_]*/| "\$\{[A-Za-z_][A-Za-z0-9_]*\}/| "\$[A-Za-z_][A-Za-z0-9_]*"/| \$[A-Za-z_][A-Za-z0-9_]*/)' "$f" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
     done
 }
 : > "$VIOL"
 sfx_scan tests/unit > "$VIOL" || true
+sfx_scan tests/e2e '*.sh' >> "$VIOL" || true
 if [ -s "$VIOL" ]; then
     while IFS= read -r vrow; do
         fail "$vrow  <-- rm on a var+suffix operand without the :? empty-var guard"
