@@ -321,7 +321,7 @@ else
     ui_info()    { echo "  info     $1"; }
     ui_success() { echo "  success  $1"; }
     ui_warn()    { echo "  warn     $1"; }
-    ui_error()   { echo "  error     $1" >&2; }
+    ui_error()   { echo "  error    $1" >&2; }
     ui_detail()  { echo "     $1"; }
     ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
     ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }

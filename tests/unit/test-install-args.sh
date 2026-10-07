@@ -649,6 +649,20 @@ if [ -n "$_uifb" ]; then
     else
         pass "dead local _ui_read fallback removed (C5)"
     fi
+    # Process-log label alignment (maintainer PR review 2026-10-08): ui.sh's
+    # _ui_label prints a 7-char label field + 2 separator spaces, so the
+    # message starts at column 11 — the echo stubs must match that exactly,
+    # or a degraded (ui.sh-less) run misaligns its lines against the ui.sh
+    # path. Verbatim pin: c80da5d slipped a stray space into ui_error's
+    # label (unlisted in its message, unseen by reviews b–f).
+    if printf '%s\n' "$_uifb" | grep -qF 'ui_info()    { echo "  info     $1"; }' \
+       && printf '%s\n' "$_uifb" | grep -qF 'ui_success() { echo "  success  $1"; }' \
+       && printf '%s\n' "$_uifb" | grep -qF 'ui_warn()    { echo "  warn     $1"; }' \
+       && printf '%s\n' "$_uifb" | grep -qF 'ui_error()   { echo "  error    $1" >&2; }'; then
+        pass "fallback process-log labels match ui.sh's column-11 alignment (PR review)"
+    else
+        fail "fallback process-log labels match ui.sh's column-11 alignment (PR review)"
+    fi
 else
     fail "ui.sh-less fallback block extractable (C5)"
 fi
