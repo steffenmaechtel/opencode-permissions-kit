@@ -38,6 +38,24 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
 - After changes to `install.sh`, `update.sh`, the wrapper, or backend
   provisioning, **both** e2e suites are part of the definition of done — a
   green `make e2e` alone is not sufficient.
+- The e2e suites may run **in parallel** on one Docker host: their
+  scaffolding is disjoint (per-suite container names and images,
+  `mktemp -d` project fixtures, no published host ports, no docker-wide
+  cleanup — each suite removes only its own container). One
+  precondition: the shared binary cache (`tests/e2e/cache/`) must be
+  warm — after an opencode version bump run one suite alone first, or
+  two suites download the same version into the same path concurrently.
+  Each suite gets slower under the CPU contention of a parallel run;
+  `e2e-ddev` is the heavyweight (golden image + inner rootless daemon).
+  Define `TS` before the first `&` — in `A && B & C`, C runs before the
+  backgrounded assignments take effect:
+
+  ```bash
+  TS=$(date +%Y%m%d-%H%M%S); make e2e > /tmp/e2e-$TS.log 2>&1 & P1=$!
+  make e2e-rootless > /tmp/e2e-rootless-$TS.log 2>&1 & P2=$!
+  wait $P1; R1=$?; wait $P2; R2=$?; echo "e2e=$R1 e2e-rootless=$R2"
+  ```
+
 - Executable bits live in the **git index** (issue #123): commit anything
   executed by path with `git update-index --chmod=+x <path>` — a new test
   under `tests/unit/`, a new `bin/` command, or a new `scripts/` helper
