@@ -56,6 +56,18 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   wait $P1; R1=$?; wait $P2; R2=$?; echo "e2e=$R1 e2e-rootless=$R2"
   ```
 
+  All three at once — the ddev suite dominates the wall clock, so the
+  total barely exceeds a lone `make e2e-ddev`; watch RAM/CPU pressure on
+  smaller hosts:
+
+  ```bash
+  TS=$(date +%Y%m%d-%H%M%S); make e2e > /tmp/e2e-$TS.log 2>&1 & P1=$!
+  make e2e-rootless > /tmp/e2e-rootless-$TS.log 2>&1 & P2=$!
+  make e2e-ddev > /tmp/e2e-ddev-$TS.log 2>&1 & P3=$!
+  wait $P1; R1=$?; wait $P2; R2=$?; wait $P3; R3=$?
+  echo "e2e=$R1 e2e-rootless=$R2 e2e-ddev=$R3"
+  ```
+
 - Executable bits live in the **git index** (issue #123): commit anything
   executed by path with `git update-index --chmod=+x <path>` — a new test
   under `tests/unit/`, a new `bin/` command, or a new `scripts/` helper
