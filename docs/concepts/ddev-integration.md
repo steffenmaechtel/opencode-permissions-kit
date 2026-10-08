@@ -231,6 +231,19 @@ explicit one-command fix it prints is
 sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-ensure-shared <project>/.ddev
 ```
 
+### Multiple checkouts of one repo (git worktrees)
+
+`ddev config` writes a `name:` key into `.ddev/config.yaml`. Committing
+it is fine — it gives the project a stable identity across the team. But
+ddev then derives the same project name for **every checkout** of the
+repo: one project registration, one set of containers. Starting a second
+checkout on the same host (classic with git worktrees) fails with
+*"a project (web container) in running state already exists for …
+created at \<other-path\>"*. Remove the `name:` key from the committed
+config and ddev derives the project name from the directory instead —
+every checkout becomes its own project with its own containers and
+database, which is exactly what parallel worktrees want.
+
 ## Dev-owned projects (the alternative to handovers)
 
 The handover model exists because ddev chmods settings paths outside
