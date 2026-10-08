@@ -538,6 +538,41 @@ printf 'type: typo3\n' > "$HWORK/proj/.ddev/config.yaml"
 check "non-typo3 type: root untouched by the project-root handover" \
     sh -c "printf 'type: php\n' > \"\$2/.ddev/config.yaml\" && chmod 2770 \"\$2\" && . \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2770" _ "$HANDOVER" "$HWORK/proj"
 
+# --- 7c-2. unmapped types join the map (issue #149, finding 5) --------------------
+# ddev's generic CreateSettingsFile chmods Dir(SiteSettingsPath) for every
+# type with settings paths — maho (app/etc) and modx (<docroot>/core/config)
+# are dir types like magento/drupal; codeigniter/shopware6/symfony are
+# root-file types (.env/.env.local at the root) handled via the project-root
+# inode (permanent while unflagged, handed back once flagged).
+printf 'type: maho\n' > "$HWORK/proj/.ddev/config.yaml"
+check "type map: maho -> app/etc (magento fork)" \
+    sh -c ". \"\$1\" && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = 'app/etc' ]" _ "$HANDOVER" "$HWORK/proj"
+printf 'type: modx\ndocroot: html\n' > "$HWORK/proj/.ddev/config.yaml"
+check "type map: modx -> <docroot>/core/config" \
+    sh -c ". \"\$1\" && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = 'html/core/config' ]" _ "$HANDOVER" "$HWORK/proj"
+printf 'type: codeigniter\n' > "$HWORK/proj/.ddev/config.yaml"
+check "type map: root-file types have no settings dirs (root inode instead)" \
+    sh -c ". \"\$1\" && [ -z \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" ]" _ "$HANDOVER" "$HWORK/proj"
+
+chmod 2770 "$HWORK/proj"
+check "root-file type (symfony): unflagged root handed to the kit user 2755" \
+    sh -c "printf 'type: symfony\n' > \"\$2/.ddev/config.yaml\" && chmod 2770 \"\$2\" && . \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2755" _ "$HANDOVER" "$HWORK/proj"
+check "root-file type (shopware6): same permanent root handover" \
+    sh -c "printf 'type: shopware6\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2755" _ "$HANDOVER" "$HWORK/proj"
+check "root-file type (codeigniter): same permanent root handover" \
+    sh -c "printf 'type: codeigniter\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2755" _ "$HANDOVER" "$HWORK/proj"
+check "root-file types: flagged project gets the root back (handback)" \
+    sh -c "printf 'type: symfony\ndisable_settings_management: true\n' > \"\$2/.ddev/config.yaml\" && . \"\$1\" && ddev_handover_project_back \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2775" _ "$HANDOVER" "$HWORK/proj"
+
+# hint coverage (static): the bootstrap hint names the new type classes
+check "hint: covers maho/modx settings dirs (issue #149 finding 5)" \
+    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'maho|modx'" _ "$FUNC"
+check "hint: covers the root-file types (codeigniter/shopware6/symfony)" \
+    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'codeigniter|shopware6|symfony'" _ "$FUNC"
+check "hint: typo3 wording unchanged (e2e greps it)" \
+    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'hint: fresh typo3 clone'" _ "$FUNC"
+printf 'type: typo3\n' > "$HWORK/proj/.ddev/config.yaml"
+
 check "handover_root signature carries the dev user (handback target)" \
     sh -c "grep -qF 'dhr_dev=\"\${4:-}\"' \"\$1\"" _ "$HANDOVER"
 

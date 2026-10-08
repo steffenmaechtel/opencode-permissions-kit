@@ -140,7 +140,17 @@ like `/var/www/vhosts` holding several projects):
 |---|---|
 | `typo3` | `config/system`, `<docroot>/typo3conf`, and bare `typo3conf` (repo-root fallback for legacy installs; composer v12+, legacy v12 `system/`, v11−) |
 | `drupal*`, `backdrop` | `<docroot>/sites/default` |
-| `magento*` | `app/etc` |
+| `magento*`, `maho` | `app/etc` (maho is the magento fork, issue #149) |
+| `modx` | `<docroot>/core/config` |
+
+**Root-file types (`codeigniter`, `shopware6`, `symfony`).** Their
+settings file lives at the project root (`.env`, `.env.local`) and
+ddev's generic settings machinery chmods the **root directory** on every
+run — the same mechanics as the typo3 bootstrap, but permanent (no
+detection switch ends it). For an unflagged project the kit hands the
+root *inode* to `opencode` with mode `2755` (ddev's `0755` chmod becomes
+a no-op); the moment the dev-owned flag appears, the root is handed back
+to you permanently and ddev never chmods it again.
 
 **The project root during bootstrap.** A freshly cloned `typo3` project
 has no `vendor/` yet — ddev cannot detect the installation and falls back
@@ -168,9 +178,11 @@ the unconditional rescan cost minutes on large project trees). Anything
 doubtful falls back to the full scan; `opk update --refresh` always
 re-scans. The `ddev` shell hook covers the gap between cloning and the
 next handover run: before `ddev start` / `ddev restart` it detects the
-bootstrap case (fresh `typo3` clone whose root still belongs to you)
-and prints the ready-made `config handover` command instead of leaving
-you with ddev's cryptic `operation not permitted`. The scan never
+cases that would fail with ddev's cryptic `operation not permitted` —
+the typo3 bootstrap (fresh clone whose root still belongs to you) and,
+since issue #149, dev-owned settings dirs of `maho`/`modx` and the
+root-file types (`codeigniter`, `shopware6`, `symfony`) — and prints the
+ready-made `config handover` command instead. The scan never
 descends into `vendor/`, `node_modules/`, `testdata/` or `.git/` trees —
 a `.ddev` directory found in the first three is a shipped test fixture,
 not a project (a checkout of ddev's own repository carries dozens,
@@ -256,11 +268,14 @@ Notes:
 - ddev resets a settings directory's mode to `0755` on each start — you
   keep editing the **files** (group-writable), and `update.sh`/`refresh`
   re-applies `g+w` to the directory.
-- **wordpress** manages `wp-config.php`, a *file* at the project root — the
-  kit does not hand the project root over. Keep the file user-managed
+- **wordpress** manages `wp-config.php`, a *file* at the project root —
+  like the root-file types above, but deliberately excluded from the
+  root handover (documented exception). Keep the file user-managed
   (remove the `#ddev-generated` marker) or set
   `disable_settings_management: true` in `.ddev/config.yaml`.
-- Unknown app types (e.g. `php`) are skipped.
+- Unknown app types (e.g. `php`, `generic`, `joomla`, `laravel`,
+  `silverstripe`, `wp-bedrock`) manage no settings outside `.ddev/` and
+  are skipped.
 
 ## Provisioned by the kit
 

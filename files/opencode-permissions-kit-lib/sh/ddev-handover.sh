@@ -19,13 +19,24 @@
 #                                  typo3conf (covers composer v12+,
 #                                  legacy v12 system/, and v11-)
 #                     drupal*/backdrop -> <docroot>/sites/default
-#                     magento*  -> app/etc
-#   project root    the directory INODE itself (never recursive) — only
-#                   for typo3 projects whose TYPO3 is not yet installed
+#                     magento*|maho -> app/etc (maho is the magento
+#                                  fork — same layout, issue #149)
+#                     modx      -> <docroot>/core/config
+#   project root    the directory INODE itself (never recursive) — for
+#                   typo3 projects whose TYPO3 is not yet installed
 #                   (fresh clone, no vendor/): ddev's settings-path
 #                   fallback then targets the APP ROOT, and its chmod
 #                   needs ownership. Handed BACK to the developer once
 #                   TYPO3 is detected (see ddev_handover_project_root).
+#                   Root-FILE types (codeigniter, shopware6, symfony —
+#                   issue #149 finding 5) permanently: their settings
+#                   file lives at the project root (.env/.env.local)
+#                   and ddev's generic CreateSettingsFile chmods
+#                   Dir(SiteSettingsPath) = the ROOT on every run —
+#                   same mechanics as the typo3 bootstrap, but with no
+#                   detection switch to end it. The dev-owned flag is
+#                   the durable way out (ddev_handover_project_back
+#                   returns the root to the developer once flagged).
 #
 # Everything is best-effort (|| true) and idempotent. POSIX sh, SOURCED
 # (never executed) by install.sh, update.sh and config.sh (projects add,
@@ -291,8 +302,11 @@ ddev_type_settings_dirs() {
         drupal*|backdrop)
             echo "$dts_docroot/sites/default"
             ;;
-        magento*)
+        magento*|maho)
             echo "app/etc"
+            ;;
+        modx)
+            echo "$dts_docroot/core/config"
             ;;
     esac
     return 0
@@ -339,18 +353,28 @@ ddev_rootless_bindmounts() {
 
 # ddev_handover_project_root <project-dir> <oc-user> <group> [dev-user]
 # Manages the project's ROOT DIRECTORY (the inode only, never its
-# contents) for the TYPO3 bootstrap case.
+# contents) for the TYPO3 bootstrap case and the root-file types.
 #
-# Why: a fresh `git clone` made by the developer with the kit's umask 002
-# + setgid parent is dev-owned mode 2775. Until TYPO3 is detectable
-# (vendor/ absent), ddev's setTypo3SiteSettingsPaths fallback puts the
-# settings file at the APP ROOT (pkg/ddevapp/typo3.go: "As long as TYPO3
-# is not installed ..."), and CreateSettingsFile then chmods
+# Why (typo3): a fresh `git clone` made by the developer with the kit's
+# umask 002 + setgid parent is dev-owned mode 2775. Until TYPO3 is
+# detectable (vendor/ absent), ddev's setTypo3SiteSettingsPaths fallback
+# puts the settings file at the APP ROOT (pkg/ddevapp/typo3.go: "As long
+# as TYPO3 is not installed ..."), and CreateSettingsFile then chmods
 # Dir(SiteSettingsPath) — the project root — to 0755 (apptypes.go).
 # util.Chmod skips only when Perm() == 0755 EXACTLY, so 2775 fires a real
 # chmod; chmod is owner-only, the dir belongs to dev, ddev runs as the
 # kit user => EPERM, and `ddev start` aborts BEFORE composer install
 # could ever make the app detectable (bootstrap deadlock).
+#
+# Why (codeigniter/shopware6/symfony — issue #149 finding 5): their
+# settings file lives at the project root (.env / .env.local,
+# setCodeIgniter/setShopware6/setSymfonySiteSettingsPaths: Dir of
+# SiteSettingsPath is the ROOT in the standard layout), so ddev's generic
+# CreateSettingsFile chmods the ROOT on EVERY run — permanently, with no
+# detection switch that would end it (unlike the typo3 bootstrap). While
+# the project is UNFLAGGED the root must belong to <oc-user> 2755; the
+# moment the dev-owned flag appears, ddev_handover_project_back returns
+# it to the developer (2775) and ddev never chmods it again.
 #
 # The rule (mirrors ddev's own detection, see ddev_typo3_detected):
 #   undetected  -> root belongs to <oc-user>, mode 2755: Perm() == 0755
@@ -378,22 +402,34 @@ ddev_handover_project_root() {
     [ -L "$dhq_proj" ] && return 0
     [ -f "$dhq_proj/.ddev/config.yaml" ] || return 0
     dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
-    [ "$dhq_type" = "typo3" ] || return 0
     dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null \
         | head -1 | tr -d " \t\r\"'")
     [ -n "$dhq_docroot" ] || dhq_docroot="."
     _ddev_docroot_sane "$dhq_docroot" || dhq_docroot="."
-    if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then
-        if [ -n "$dhq_dev" ] && [ "$(stat -c %U "$dhq_proj" 2>/dev/null)" = "$dhq_user" ]; then
-            chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || true
-            chmod 2775 "$dhq_proj" 2>/dev/null || true
-            echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
-        fi
-    else
-        chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || true
-        chmod 2755 "$dhq_proj" 2>/dev/null || true
-        echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
-    fi
+    case "$dhq_type" in
+        typo3)
+            if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then
+                if [ -n "$dhq_dev" ] && [ "$(stat -c %U "$dhq_proj" 2>/dev/null)" = "$dhq_user" ]; then
+                    chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || true
+                    chmod 2775 "$dhq_proj" 2>/dev/null || true
+                    echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
+                fi
+            else
+                chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || true
+                chmod 2755 "$dhq_proj" 2>/dev/null || true
+                echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
+            fi
+            ;;
+        codeigniter|shopware6|symfony)
+            # Root-file types: the root IS the permanent chmod target
+            # while unflagged (see function header). 2755 for the same
+            # Perm() == 0755 no-op reason as the typo3 bootstrap.
+            chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || true
+            chmod 2755 "$dhq_proj" 2>/dev/null || true
+            echo "  project-root handover: $dhq_proj -> $dhq_user ($dhq_type settings"
+            echo "  file lives at the root; the dev-owned flag hands it back)"
+            ;;
+    esac
     return 0
 }
 
