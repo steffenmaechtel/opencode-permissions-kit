@@ -221,8 +221,9 @@ until the next scan.
 
 Edge case: content written by the *agent's* ddev session (running as
 `opencode` directly, not through your shell function) lacks the automatic
-heal — run any `ddev` command yourself or `opk update --refresh` /
-`opk handover opencode <project>` to re-normalize. `opk status` detects
+heal — run a tree-creating `ddev` command yourself (`config`, `get`,
+`start` or `restart`; other commands heal nothing) or use
+`opk update --refresh` / `opk handover opencode <project>` to re-normalize. `opk status` detects
 the state per project (a `ddev share … group-write missing` line) so a
 failing `git pull` on `.ddev/` content does not stay unexplained; the
 explicit one-command fix it prints is

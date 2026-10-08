@@ -284,9 +284,15 @@ _opk_ddev_reshare() {
 # the helper call fails (best-effort, never fails the ddev command).
 _opk_devowned_flag() {
     [ -f "$PWD/.ddev/config.yaml" ] || return 0
-    [ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh ] || return 0
-    # shellcheck disable=SC1091  # deployed kit path, checked above
-    . /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh
+    # OPK_DDEV_HANDOVER_LIB overrides the lib path for tests (same
+    # convention as OPK_BROWSER_CMDS_CONF above / OPK_INSTALL_CONF in the
+    # lib) — keeps the hook's gates functionally pinnable on hosts
+    # without a deployed kit (0.0.46a F2; the sudo call itself stays
+    # static-pinned: it uses the absolute /usr/bin/sudo).
+    _opk_dhl="${OPK_DDEV_HANDOVER_LIB:-/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh}"
+    [ -f "$_opk_dhl" ] || return 0
+    # shellcheck disable=SC1090  # test override / deployed kit path, checked above
+    . "$_opk_dhl"
     ddev_devowned_enabled || return 0
     ddev_devowned_flagged "$PWD" && return 0
     /usr/bin/sudo -n -u opencode \
@@ -338,7 +344,10 @@ _opk_hosts_hint() {
 # (dev-owned: ddev never touches paths outside .ddev/), or the kit lib
 # missing.
 _opk_bootstrap_hint() {
-    [ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh ] || return 0
+    # OPK_DDEV_HANDOVER_LIB: test override like in _opk_devowned_flag
+    # above (0.0.46a F2/F6 — functional hint-arm pins need it).
+    _opk_dhl="${OPK_DDEV_HANDOVER_LIB:-/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh}"
+    [ -f "$_opk_dhl" ] || return 0
     [ -f "$PWD/.ddev/config.yaml" ] || return 0
     _opk_type=$(sed -n 's/^type:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     case "$_opk_type" in
@@ -354,8 +363,8 @@ _opk_bootstrap_hint() {
     case "$_opk_docroot" in
         /*|*..*|*[!A-Za-z0-9._/-]*) _opk_docroot="." ;;
     esac
-    # shellcheck disable=SC1091  # deployed kit path, checked above
-    . /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh
+    # shellcheck disable=SC1090  # test override / deployed kit path, checked above
+    . "$_opk_dhl"
     # Dev-owned (flagged) project: ddev never touches paths outside
     # .ddev/ — the EPERM cannot occur, stay silent.
     ddev_devowned_flagged "$PWD" && return 0

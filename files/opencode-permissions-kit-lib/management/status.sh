@@ -409,9 +409,17 @@ esac
 # with "permission denied". Report-only detection per registered root,
 # same prune rules as the handover scan (vendor/, node_modules/,
 # testdata/ and .git/ trees are fixtures/dense, never projects).
-if [ -f "$LIBDIR/sh/ddev-handover.sh" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
-    # shellcheck disable=SC1091  # deployed lib, checked above
-    . "$LIBDIR/sh/ddev-handover.sh"
+# 0.0.46a F4: resolve the detection lib like ui.sh/git-check.sh above,
+# but CHECKOUT-FIRST — a checkout status.sh must render its own
+# detection even when the deployed kit is older and its lib still
+# lacks ddev_reshare_needed (deployed-first would leave that case
+# swallowed by the `|| continue` below); deployed mode resolves to the
+# identical file anyway.
+_st_dhl="$(cd "$(dirname "$0")" && pwd)/../sh/ddev-handover.sh"
+[ -f "$_st_dhl" ] || _st_dhl="$LIBDIR/sh/ddev-handover.sh"
+if [ -f "$_st_dhl" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
+    # shellcheck disable=SC1090  # checkout or deployed lib, resolved above
+    . "$_st_dhl"
     if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
         while IFS= read -r _st_root; do
             [ -z "$_st_root" ] && continue
@@ -421,7 +429,7 @@ if [ -f "$LIBDIR/sh/ddev-handover.sh" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_U
                 -o -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r _st_d; do
                 ddev_reshare_needed "$_st_d" "$OPENCODE_USER" || continue
                 ui_kv_warn "ddev share" "$(dirname "$_st_d")/.ddev: group-write missing (agent-side ddev run without the heal)"
-                ui_detail "fix: any ddev command in the project (your hook heals), or:"
+                ui_detail "fix: a tree-creating ddev command (config/get/start/restart — your hook heals), or:"
                 ui_detail "      sudo -u $OPENCODE_USER $LIBDIR/bin/ddev-as-opencode --opk-ensure-shared \"$_st_d\""
             done
         done < "$PROJECTS_CONF"

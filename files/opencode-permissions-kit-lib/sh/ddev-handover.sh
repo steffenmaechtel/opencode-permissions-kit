@@ -115,7 +115,17 @@ ddev_devowned_flag() {
     # agent-writable, a swapped temp name would disclose root-readable
     # content into the agent-owned config, a swapped cfg would be written
     # through (0.0.39g S2).
-    ddf_tmp=$(mktemp "${ddf_cfg}.opk.XXXXXX") || return 0
+    # 0.0.46a F1: the opencode-uid caller (ddev-as-opencode
+    # --opk-devowned-flag, issue #149) can actually fail these writes —
+    # a clone whose .ddev arrived 0755/0644 dev-owned is outside the
+    # kit's group baseline. Stay best-effort (never fail the caller),
+    # but never lie and never go silent: each failed write announces
+    # itself like the symlink gates above.
+    ddf_tmp=$(mktemp "${ddf_cfg}.opk.XXXXXX") || {
+        printf '%s\n' "  WARNING: ${1:-}/.ddev not writable (mktemp failed) —"\
+" dev-owned flag NOT written" >&2
+        return 0
+    }
     if awk -v opk_anchor="$ddf_anchor" '
         BEGIN {
             c1 = "# opencode permissions kit: dev-owned mode — ddev must not"
@@ -149,11 +159,18 @@ ddev_devowned_flag() {
         }
     ' "$ddf_cfg" > "$ddf_tmp"; then
         if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
-            cat "$ddf_tmp" > "$ddf_cfg"
-            if [ ! -L "$ddf_cfg" ]; then
-                chmod g+w "$ddf_cfg" 2>/dev/null || true
+            if cat "$ddf_tmp" > "$ddf_cfg" 2>/dev/null; then
+                if [ ! -L "$ddf_cfg" ]; then
+                    chmod g+w "$ddf_cfg" 2>/dev/null || true
+                fi
+                echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
+            else
+                # 0.0.46a F1: the write itself failed (not opencode-
+                # writable config.yaml) — the old code printed the
+                # success note anyway.
+                printf '%s\n' "  WARNING: $ddf_cfg not writable — dev-owned flag NOT"\
+" written (the next root-run scan retries)" >&2
             fi
-            echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
         else
             # 0.0.39h F13: the exec-time recheck tripped (the config or its
             # temp turned into a symlink mid-write) — announce the skip like

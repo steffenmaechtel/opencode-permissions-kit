@@ -620,6 +620,34 @@ check "hook bootstrap hint stays silent when the root is already handed over" \
 check "hook exports the bootstrap hint for bash children" \
     sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint' \"\$1\"" _ "$FUNC"
 
+# --- 7d-1b. maho/modx hint arms, functional (0.0.46a F6) ------------------------
+# Static greps cannot catch a typo'd target path, and e2e DD16 covers
+# maho + symfony only — a broken modx arm would ship green. Functional
+# via the OPK_DDEV_HANDOVER_LIB stub (unflagged, mode off so the
+# dev-owned tail note stays out) and a PATH stub for stat(1) answering
+# as the developer (the owner gate compares against "opencode"). The
+# arm only prints when its target DIR exists — exactly the path fact
+# these pins verify.
+BH=$(mktemp -d)
+mkdir -p "$BH/bin" "$BH/m/.ddev" "$BH/m/app/etc" "$BH/x/.ddev" "$BH/x/html/core/config"
+printf 'name: bm\ntype: maho\n' > "$BH/m/.ddev/config.yaml"
+printf 'name: bx\ntype: modx\ndocroot: html\n' > "$BH/x/.ddev/config.yaml"
+printf '#!/bin/sh\necho some-developer\n' > "$BH/bin/stat"
+chmod 755 "$BH/bin/stat"
+printf 'ddev_devowned_flagged() { return 1; }\nddev_devowned_enabled() { return 1; }\n' > "$BH/lib.sh"
+BH_M=$(cd "$BH/m" && PATH="$BH/bin:$PATH" OPK_DDEV_HANDOVER_LIB="$BH/lib.sh" sh -c '. "$1" && _opk_bootstrap_hint' _ "$FUNC")
+check "hint arm: maho prints the app/etc settings-dir hint (functional, 0.0.46a F6)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q \"hint: this maho project's settings dir\"" _ "$BH_M"
+BH_X=$(cd "$BH/x" && PATH="$BH/bin:$PATH" OPK_DDEV_HANDOVER_LIB="$BH/lib.sh" sh -c '. "$1" && _opk_bootstrap_hint' _ "$FUNC")
+check "hint arm: modx builds <docroot>/core/config (functional, 0.0.46a F6)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q \"hint: this modx project's settings dir\"" _ "$BH_X"
+# owner gate: an opencode-owned target must stay silent
+printf '#!/bin/sh\necho opencode\n' > "$BH/bin/stat"
+BH_S=$(cd "$BH/x" && PATH="$BH/bin:$PATH" OPK_DDEV_HANDOVER_LIB="$BH/lib.sh" sh -c '. "$1" && _opk_bootstrap_hint' _ "$FUNC")
+check "hint arm: opencode-owned target stays silent (functional)" \
+    sh -c "[ -z \"\$1\" ]" _ "$BH_S"
+rm -rf "$BH"
+
 # --- 7d. reshare wiring (issue #94) ----------------------------------------------
 # The ddev() function must re-assert group-write after the tree-creating
 # commands (ddev's explicit 0755/0644 modes otherwise keep the developer
@@ -658,13 +686,37 @@ check "devowned hook: best-effort — never fails the ddev command" \
     sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -qF '|| true'" _ "$FUNC"
 check "devowned hook: exported for bash children (issue #18)" \
     sh -c "grep -q '_opk_ddev_reshare _opk_devowned_flag' \"\$1\"" _ "$FUNC"
-# Functional (mode off, hermetic via the exported OPK_INSTALL_CONF and a
-# stripped DDEV_DEV_OWNED): must return silently WITHOUT any flag write —
-# proves the mode gate runs before the sudo call, so mode-off machines
-# never pay the exec.
-check "devowned hook: mode off is a silent no-op in a project dir" \
-    env -u DDEV_DEV_OWNED sh -c "cd \"\$2/proj\" && . \"\$1\" && _opk_devowned_flag && ! grep -q '^disable_settings_management:' .ddev/config.yaml" _ "$FUNC" "$DFH"
-rm -rf "$DFH"
+# Functional mode pins, hermetic via OPK_DDEV_HANDOVER_LIB (0.0.46a F2):
+# the old check sourced the FIXED deployed lib path — on CI (no deployed
+# kit) the lib gate returned before the mode gate ever ran, so "mode off
+# is a no-op" passed vacuously (the review's F2). The stub libs record
+# gate reach inside the project dir: mode ON must reach the flagged gate
+# (the step right before the sudo call), mode OFF must stop BEFORE it.
+# The sudo exec itself uses the absolute /usr/bin/sudo — not
+# PATH-interceptable (see section 3a) — and stays static-pinned above.
+DFH2=$(mktemp -d)
+mkdir -p "$DFH2/on/.ddev" "$DFH2/off/.ddev"
+printf 'name: fh1\ntype: typo3\n' > "$DFH2/on/.ddev/config.yaml"
+printf 'name: fh2\ntype: typo3\n' > "$DFH2/off/.ddev/config.yaml"
+cat > "$DFH2/on-lib.sh" <<'STUB'
+# 0.0.46a F2 stub: mode ON, unflagged — the flagged probe records that
+# execution passed the mode gate (reached the pre-sudo gating).
+ddev_devowned_enabled() { return 0; }
+ddev_devowned_flagged() { : >> "$1/.opk-f2-flaggate"; return 1; }
+STUB
+cat > "$DFH2/off-lib.sh" <<'STUB'
+# 0.0.46a F2 stub: mode OFF — the flagged probe must NEVER run (its
+# marker file appearing means the mode gate was skipped or reordered).
+ddev_devowned_enabled() { return 1; }
+ddev_devowned_flagged() { : >> "$1/.opk-f2-flaggate"; return 1; }
+STUB
+check "devowned hook: mode on reaches the flag write gating (hermetic, 0.0.46a F2)" \
+    env OPK_DDEV_HANDOVER_LIB="$DFH2/on-lib.sh" sh -c "cd \"\$2/on\" && . \"\$1\" && _opk_devowned_flag && test -f .opk-f2-flaggate" _ "$FUNC" "$DFH2"
+check "devowned hook: mode off stops before the flag gate (hermetic, 0.0.46a F2)" \
+    env OPK_DDEV_HANDOVER_LIB="$DFH2/off-lib.sh" sh -c "cd \"\$2/off\" && . \"\$1\" && _opk_devowned_flag && ! test -e .opk-f2-flaggate && ! grep -q '^disable_settings_management:' .ddev/config.yaml" _ "$FUNC" "$DFH2"
+check "devowned hook: the lib path is stubbable via OPK_DDEV_HANDOVER_LIB (0.0.46a F2)" \
+    sh -c "grep -qF '_opk_dhl=\"\${OPK_DDEV_HANDOVER_LIB:-/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh}\"' \"\$1\"" _ "$FUNC"
+rm -rf "$DFH" "$DFH2"
 
 # --- 7d-3. reshare detection (issue #149, finding 2) ------------------------------
 # Agent-side ddev runs (real binary, no hook) leave .ddev entries with the
@@ -693,7 +745,11 @@ check "reshare detect: capped directory is detected" \
 chmod 2775 "$RN/proj/.ddev/commands"
 check "reshare detect: pruned db_snapshots does not count (heal parity)" \
     sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/proj/.ddev\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
-check "reshare detect: entries of OTHER users never count (heal is owner-only)" \
+# 0.0.46a F6: description corrected — this pins find's UNKNOWN-user
+# error path (stderr swallowed, output empty, `!` holds); the -user
+# filter's exclusivity against a live second user is real but would
+# need root to construct and stays unpinned.
+check "reshare detect: unknown user yields no findings (find -user error path; live second-user exclusivity needs root)" \
     sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/proj/.ddev\" \"opencode-no-such-user-424242\"" _ "$HANDOVER" "$RN"
 check "reshare detect: missing dir is a clean no-need" \
     sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/does-not-exist\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
@@ -701,6 +757,10 @@ check "reshare detect: status.sh wires ddev_reshare_needed per project root" \
     sh -c "grep -q 'ddev_reshare_needed' \"\$1\" && grep -qF 'ui_kv_warn \"ddev share\"' \"\$1\"" _ "$STATUS"
 check "reshare detect: status.sh prints the --opk-ensure-shared one-command fix" \
     sh -c "grep -q -- '--opk-ensure-shared' \"\$1\"" _ "$STATUS"
+check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4)" \
+    sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS"
+check "reshare detect: status fix names the healing command set, not 'any' (0.0.46a F7)" \
+    sh -c "grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'any ddev command' \"\$1\"" _ "$STATUS"
 rm -rf "$RN"
 
 # --- 7e. dev-owned mode (docs/design/ddev-dev-owned-projects.md) ------------------
@@ -751,6 +811,29 @@ mkdir -p "$DWORK/fw7/.ddev"
 printf 'webimage: config.yaml\nhooks:\n  post-start:\n    - exec: \"ls\"\n' > "$DWORK/fw7/.ddev/config.yaml"
 check "flag writer: no anchor key at all -> top of the file (issue #28)" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; [ \"\$(grep -n '^disable_settings_management: true' \"\$2/.ddev/config.yaml\" | cut -d: -f1)\" = 3 ] && [ \"\$(grep -c '^\$' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw7"
+
+# 0.0.46a F1: the opencode-uid caller (ddev-as-opencode
+# --opk-devowned-flag) can actually fail the write — a clone whose
+# config.yaml arrived 0644 dev-owned. The failure must be loud and
+# honest: a WARNING, never the unconditional success note (and never
+# silence). Owner-mode bits block the CURRENT non-root user — the same
+# self-blocking fixture shape as the chmod 007 cwd in section 2b.
+mkdir -p "$DWORK/f1a/.ddev"
+printf 'name: f1a\ntype: typo3\n' > "$DWORK/f1a/.ddev/config.yaml"
+chmod 444 "$DWORK/f1a/.ddev/config.yaml"
+F1A_RC=0
+F1A_OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/f1a" 2>&1) || F1A_RC=$?
+check "flag writer: unwritable config.yaml warns instead of lying (0.0.46a F1)" \
+    sh -c "[ \"\$2\" = 0 ] && printf '%s\n' \"\$1\" | grep -q 'not writable — dev-owned flag NOT' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$F1A_OUT" "$F1A_RC"
+chmod 644 "$DWORK/f1a/.ddev/config.yaml"
+mkdir -p "$DWORK/f1b/.ddev"
+printf 'name: f1b\ntype: typo3\n' > "$DWORK/f1b/.ddev/config.yaml"
+chmod 555 "$DWORK/f1b/.ddev"
+F1B_RC=0
+F1B_OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/f1b" 2>&1) || F1B_RC=$?
+check "flag writer: unwritable .ddev dir warns (mktemp branch, 0.0.46a F1)" \
+    sh -c "[ \"\$2\" = 0 ] && printf '%s\n' \"\$1\" | grep -q 'not writable (mktemp failed)' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$F1B_OUT" "$F1B_RC"
+chmod 755 "$DWORK/f1b/.ddev"
 
 # flagged detection
 check "flagged detection: true" \
