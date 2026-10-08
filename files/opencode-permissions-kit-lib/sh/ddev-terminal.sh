@@ -279,7 +279,10 @@ _opk_ddev_reshare() {
 # config.yaml was just written by opencode, or is group-writable in a
 # clone). New projects are dev-owned from birth; without this they
 # silently ran the handover model until the next root-run scan. The
-# helper prints the one-line "commit it" note. Silent whenever anything
+# helper prints the one-line "commit it" note — and its WARNINGs, which
+# this mode routes to stdout (0.0.46b W1): the 2>/dev/null on the sudo
+# call below discards stderr, which used to swallow every
+# ddev_devowned_flag warning on this exact path. Silent whenever anything
 # is off: mode off, no project config in the cwd, already flagged, or
 # the helper call fails (best-effort, never fails the ddev command).
 _opk_devowned_flag() {

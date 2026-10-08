@@ -165,11 +165,17 @@ ddev_devowned_flag() {
                 fi
                 echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
             else
-                # 0.0.46a F1: the write itself failed (not opencode-
-                # writable config.yaml) — the old code printed the
-                # success note anyway.
-                printf '%s\n' "  WARNING: $ddf_cfg not writable — dev-owned flag NOT"\
-" written (the next root-run scan retries)" >&2
+                # 0.0.46a F1 / 0.0.46b W2: the write itself failed (not
+                # opencode-writable config.yaml, or a full disk) — the
+                # old code printed the success note anyway. Never claim
+                # "NOT written": a failed cat may have written PART of
+                # the temp (config.yaml can end up truncated). And the
+                # retry must be the explicit paths — the stamp-skipped
+                # plain `opk update` never comes back for this root
+                # (issue #112).
+                printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed"\
+" (config.yaml may be truncated; retry: sudo opk config handover or"\
+" opk update --refresh)" >&2
             fi
         else
             # 0.0.39h F13: the exec-time recheck tripped (the config or its

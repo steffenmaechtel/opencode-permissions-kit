@@ -263,6 +263,39 @@ check "devowned-flag: handled before the ddev binary resolution" \
 check "devowned-flag: helper respects the OPK_INSTALL_CONF override" \
     sh -c "grep -qF 'INSTALL_CONF=\"\${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}\"' \"\$1\"" _ "$HELPER"
 
+# 0.0.46b W1: the delivery pins. The hook's sudo call runs this mode as
+# `... 2>/dev/null || true`, so everything on stderr is discarded on
+# exactly the path this mode exists for — which swallowed all four
+# ddev_devowned_flag warnings (the two 0.0.46a F1 write failures and
+# the two pre-existing symlink gates). The mode therefore routes its
+# diagnostics to STDOUT (exec 2>&1 in the helper branch). These pins
+# run the REAL helper with stderr suppressed — the hook's exact
+# redirect shape — and assert each reachable warning still arrives; the
+# mid-write symlink race (0.0.39h F13) shares the same stream merge and
+# is not hermetically constructible (the static exec pin plus these
+# cover the class).
+DFW=$(mktemp -d)
+mkdir -p "$DFW/cat/.ddev" "$DFW/tmp/.ddev" "$DFW/lnk/.ddev"
+printf 'name: fwc\ntype: typo3\n' > "$DFW/cat/.ddev/config.yaml"
+printf 'name: fwt\ntype: typo3\n' > "$DFW/tmp/.ddev/config.yaml"
+printf 'target\n' > "$DFW/lnk/real-config.yaml"
+ln -s "$DFW/lnk/real-config.yaml" "$DFW/lnk/.ddev/config.yaml"
+chmod 444 "$DFW/cat/.ddev/config.yaml"
+chmod 555 "$DFW/tmp/.ddev"
+DFW_CAT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DFW/cat" 2>/dev/null)
+check "W1 delivery: cat-write warning arrives on stdout despite the hook's stderr suppression (0.0.46b W1)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'dev-owned flag write to .* failed'" _ "$DFW_CAT"
+DFW_TMP=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DFW/tmp" 2>/dev/null)
+check "W1 delivery: mktemp warning arrives on stdout (class sweep, 0.0.46b W1)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'not writable (mktemp failed)'" _ "$DFW_TMP"
+DFW_LNK=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DFW/lnk" 2>/dev/null)
+check "W1 delivery: symlink-gate warning arrives on stdout (pre-existing 0.0.39g S2 class, 0.0.46b W1)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'config.yaml is a symlink'" _ "$DFW_LNK"
+check "W1 delivery: the flag mode carries the stdout merge (exec 2>&1 inside the branch, 0.0.46b W1)" \
+    sh -c "awk 'b&&/^[[:space:]]*exec 2>&1\$/{e=NR} /--opk-devowned-flag/{if(!b)b=NR} b&&/^fi\$/{f=NR} END{exit !(e>0 && e>b && e<f)}' \"\$1\"" _ "$HELPER"
+chmod 755 "$DFW/tmp/.ddev"
+rm -rf "$DFW"
+
 rm -rf "$DF" "$DF_STUB"
 
 # --- 3. function file: sourcing + both branches -------------------------------
@@ -824,7 +857,11 @@ chmod 444 "$DWORK/f1a/.ddev/config.yaml"
 F1A_RC=0
 F1A_OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/f1a" 2>&1) || F1A_RC=$?
 check "flag writer: unwritable config.yaml warns instead of lying (0.0.46a F1)" \
-    sh -c "[ \"\$2\" = 0 ] && printf '%s\n' \"\$1\" | grep -q 'not writable — dev-owned flag NOT' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$F1A_OUT" "$F1A_RC"
+    sh -c "[ \"\$2\" = 0 ] && printf '%s\n' \"\$1\" | grep -q 'dev-owned flag write to .* failed' && ! printf '%s\n' \"\$1\" | grep -q 'flag written'" _ "$F1A_OUT" "$F1A_RC"
+check "flag writer: failed write never claims NOT written — ENOSPC may leave a partial file (0.0.46b W2)" \
+    sh -c "! printf '%s\n' \"\$1\" | grep -q 'flag NOT'" _ "$F1A_OUT"
+check "flag writer: retry hint names the explicit paths, not the stamp-skipped scan (0.0.46b W2)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'sudo opk config handover' && printf '%s\n' \"\$1\" | grep -q 'opk update --refresh' && ! printf '%s\n' \"\$1\" | grep -q 'next root-run scan retries'" _ "$F1A_OUT"
 chmod 644 "$DWORK/f1a/.ddev/config.yaml"
 mkdir -p "$DWORK/f1b/.ddev"
 printf 'name: f1b\ntype: typo3\n' > "$DWORK/f1b/.ddev/config.yaml"

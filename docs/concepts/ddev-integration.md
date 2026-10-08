@@ -217,7 +217,10 @@ After `ddev config` the same hook also writes the dev-owned flag into the
 fresh `.ddev/config.yaml` when dev-owned mode is on
 ([below](#dev-owned-projects-the-alternative-to-handovers)) — new projects
 are dev-owned from birth instead of silently running the handover model
-until the next scan.
+until the next scan. When the write fails (a clone whose
+`.ddev/config.yaml` arrived without group write), the hook prints a
+WARNING naming the retry commands — the `ddev` command itself still
+succeeds.
 
 Edge case: content written by the *agent's* ddev session (running as
 `opencode` directly, not through your shell function) lacks the automatic

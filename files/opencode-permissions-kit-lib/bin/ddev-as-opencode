@@ -82,9 +82,20 @@ fi
 # clone's config.yaml is group-writable — and ddev_devowned_flag itself
 # skips symlinked configs and never writes through them. The mode check
 # (ddev_devowned_enabled) lives inside, so callers may invoke
-# unconditionally; the function's echo ("commit it") is the
-# developer-visible hint. Best-effort, never fails.
+# unconditionally; the function's outputs — the "commit it" note and its
+# WARNINGs — are the developer-visible hints. Best-effort, never fails.
 if [ "${1:-}" = "--opk-devowned-flag" ]; then
+    # 0.0.46b W1: diagnostics ride STDOUT in this mode. The hook's sudo
+    # call runs it as `... 2>/dev/null || true` — stderr never reaches
+    # the developer on exactly the path this mode exists for, which
+    # swallowed all four ddev_devowned_flag warnings (the two 0.0.46a F1
+    # write failures and the two pre-existing symlink gates). exec 2>&1
+    # (redirection only — no command, the shell continues) merges the
+    # whole branch, including the shell's own redirection errors, onto
+    # the stream the hook passes through. Root-run scans that source the
+    # lib directly keep their stderr semantics — this stays branch-local
+    # (the main ddev exec below must not lose its stderr stream).
+    exec 2>&1
     _opk_proj="${2:-}"
     # The flag writer ships as a sibling lib (repo checkout and deployed
     # kit alike); the fixed deployed path when invoked without a slash.
