@@ -32,10 +32,14 @@ name: test-e2e-ddev
 # 'skipped' conclusion (job-level on purpose: the run still EXISTS for
 # its sha, so scripts/release.sh's gate — which accepts skipped but not
 # absent runs — stays satisfied even on a docs-only master push; and a
-# docs-only push never cuts a release anyway). Schedule and manual
-# dispatch always run (drift checks / explicit human intent — the GB
-# downloads are the point there). test-unit.yml is NOT filtered:
-# test-docs.sh validates links across docs/ + root Markdown.
+# docs-only push never cuts a release anyway). Job-level skipping is
+# safe here because this workflow has NO matrix jobs — if one is added,
+# gate it at STEP level like test-e2e.yml's e2e matrix (a job-level if
+# collapses matrix legs; required expanded-leg checks never report and
+# the PR hangs). Schedule and manual dispatch always run (drift checks /
+# explicit human intent — the GB downloads are the point there).
+# test-unit.yml is NOT filtered: test-docs.sh validates links across
+# docs/ + root Markdown.
 on:
   push:
     branches:

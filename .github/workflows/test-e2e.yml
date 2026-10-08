@@ -31,11 +31,17 @@ name: test-e2e
 # only this suite carries the dimension.
 #
 # Path filtering (docs-only changes skip): push and PR runs first detect
-# what changed (dorny/paths-filter) — when NOTHING outside docs/**,
-# *.md, LICENSE and .gitignore changed, both jobs skip with a green
-# 'skipped' conclusion (job-level on purpose: the run still EXISTS for
-# its sha, so scripts/release.sh's gate — which accepts skipped but not
-# absent runs — stays satisfied even on a docs-only master push).
+# what changed (dorny/paths-filter) — when NOTHING outside the code set
+# changed, the suites skip. The NON-matrix jobs skip at job level (the
+# run still EXISTS for its sha with a green 'skipped' conclusion, so
+# scripts/release.sh's gate — which accepts skipped but not absent runs
+# — stays satisfied even on a docs-only master push). The MATRIX e2e job
+# gates at STEP level instead: a job-level `if` collapses the matrix
+# into one bare 'e2e' skipped check while branch protection requires the
+# expanded leg names 'e2e (distro)' / 'e2e (latest)' — on the first
+# docs-only PR those legs sat "Expected — waiting for status" forever
+# and blocked the merge. Step gating keeps both legs reporting (noop
+# success without the suite on docs-only push/PR, full suite otherwise).
 # Schedule and manual dispatch always run (drift checks / explicit
 # human intent). test-unit.yml is NOT filtered: test-docs.sh validates
 # links across docs/ + the root Markdown files, so docs changes are
@@ -101,10 +107,13 @@ jobs:
 
   e2e:
     needs: changes
-    # docs-only changes skip; schedule/dispatch always run (see header)
-    if: >-
-      ${{ github.event_name != 'push' && github.event_name != 'pull_request'
-      || needs.changes.outputs.code == 'true' }}
+    # Docs-only skip is STEP-level here on purpose (matrix job): a
+    # job-level `if` collapses the matrix into one bare 'e2e' skipped
+    # check — branch protection requires the expanded leg names
+    # 'e2e (distro)' / 'e2e (latest)', which then never report (the
+    # docs-only PR hangs on "Expected — waiting for status"). The noop
+    # step below plus per-step gates keep every leg reporting; schedule
+    # and dispatch always run the suite.
     strategy:
       # One failing git leg must not cancel the other — both verdicts are
       # needed to see WHICH end of the version range broke.
@@ -125,8 +134,19 @@ jobs:
         git: [distro, latest]
     runs-on: ubuntu-24.04
     steps:
+      - name: 'Docs-only change — suite skipped (leg reports success for required checks)'
+        if: >-
+          ${{ (github.event_name == 'push' || github.event_name == 'pull_request')
+          && needs.changes.outputs.code != 'true' }}
+        run: echo "docs-only change — e2e suite not run for this sha"
       - uses: actions/checkout@v7
+        if: >-
+          ${{ github.event_name != 'push' && github.event_name != 'pull_request'
+          || needs.changes.outputs.code == 'true' }}
       - name: Resolve opencode version
+        if: >-
+          ${{ github.event_name != 'push' && github.event_name != 'pull_request'
+          || needs.changes.outputs.code == 'true' }}
         id: version
         # 0.0.45c C8: authenticated (the same ephemeral token the run
         # steps provision for rate-limit resilience — an anonymous 403
@@ -147,11 +167,17 @@ jobs:
             echo "::error::opencode releases/latest resolved '${OCV:-unresolved}', expected a semver" && exit 1
           fi
       - name: Read pinned OLD version (for cache key)
+        if: >-
+          ${{ github.event_name != 'push' && github.event_name != 'pull_request'
+          || needs.changes.outputs.code == 'true' }}
         id: old
         run: |
           echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
               tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
       - name: Cache opencode binaries + installer (per version)
+        if: >-
+          ${{ github.event_name != 'push' && github.event_name != 'pull_request'
+          || needs.changes.outputs.code == 'true' }}
         uses: actions/cache@v6
         with:
           path: tests/e2e/cache
@@ -162,6 +188,9 @@ jobs:
           restore-keys: |
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
       - name: Run E2E test
+        if: >-
+          ${{ github.event_name != 'push' && github.event_name != 'pull_request'
+          || needs.changes.outputs.code == 'true' }}
         run: |
           ./tests/e2e/run.sh
         env:
