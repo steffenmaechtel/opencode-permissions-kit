@@ -822,13 +822,24 @@ check "DD13: .ddev/config.yaml group-writable right after config (Finding 1 fixe
     E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/config.yaml) & 0020 )) -ne 0'
 check "DD13: dev can edit .ddev/config.yaml right after config (Finding 1 fixed — issue #94 heal)" \
     DEVSH 'cd /var/www/vhosts/dd13-proj && printf "\n" >> .ddev/config.yaml'
+# issue #149 finding 1: dev-owned mode (on since DD12) flags the project
+# the moment `ddev config` creates it — no silent handover-model state
+# until the next root-run scan (the stamp-skipped update never got there).
+check "DD13: dev-owned flag written right after config (issue #149 finding 1)" \
+    E 'grep -q "^disable_settings_management: true" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
+check "DD13: hook prints the commit-it note with the flag" \
+    E 'grep -q "commit it" /tmp/dd13-config.log'
+# Burn-in tripwire (the pre-#149 state, now explicitly constructed): strip
+# the hook-written flag as root — an unflagged dev-owned bootstrap root
+# must still fail EPERM on start and print the hook hint.
+E 'sudo sed -i "/^disable_settings_management:/d" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
 DEVSH 'cd /var/www/vhosts/dd13-proj && ddev start >/tmp/dd13-start1.log 2>&1' && _dd13_first=0 || _dd13_first=1
 check "DD13: first start prints the bootstrap hint (hook promise)" \
     E 'grep -q "hint: fresh typo3 clone" /tmp/dd13-start1.log'
-check "DD13: TRIPWIRE first start fails EPERM until handover (burn-in flow)" \
+check "DD13: TRIPWIRE first start fails EPERM without the flag (burn-in flow)" \
     test "$_dd13_first" = 1
 E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd13-proj >/tmp/dd13-handover.log 2>&1'
-check "DD13: handover writes the dev-owned flag (durable fix)" \
+check "DD13: handover re-writes the dev-owned flag (durable fix)" \
     E 'grep -q "^disable_settings_management: true" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
 check "DD13: dev can edit .ddev/config.yaml after handover" \
     DEVSH 'cd /var/www/vhosts/dd13-proj && printf "# dd13 edit\n" >> .ddev/config.yaml'

@@ -247,6 +247,11 @@ ddev() {
     case "${1:-}" in
         config|get|start|restart) _opk_ddev_reshare ;;
     esac
+    # issue #149 finding 1: dev-owned mode flags the project the moment
+    # `ddev config` creates it (silent when off or already flagged).
+    case "${1:-}" in
+        config) _opk_devowned_flag ;;
+    esac
     case "${1:-}" in
         start|restart) _opk_hosts_hint 2>/dev/null || true ;;
     esac
@@ -265,6 +270,28 @@ _opk_ddev_reshare() {
     /usr/bin/sudo -u opencode \
         /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-ensure-shared "$PWD/.ddev" \
         >/dev/null 2>&1 || true
+    return 0
+}
+
+# _opk_devowned_flag (issue #149, finding 1): after `ddev config` created
+# a project, dev-owned mode writes the disable_settings_management flag
+# into the fresh .ddev/config.yaml via the sudoers helper (as opencode —
+# config.yaml was just written by opencode, or is group-writable in a
+# clone). New projects are dev-owned from birth; without this they
+# silently ran the handover model until the next root-run scan. The
+# helper prints the one-line "commit it" note. Silent whenever anything
+# is off: mode off, no project config in the cwd, already flagged, or
+# the helper call fails (best-effort, never fails the ddev command).
+_opk_devowned_flag() {
+    [ -f "$PWD/.ddev/config.yaml" ] || return 0
+    [ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh ] || return 0
+    # shellcheck disable=SC1091  # deployed kit path, checked above
+    . /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh
+    ddev_devowned_enabled || return 0
+    ddev_devowned_flagged "$PWD" && return 0
+    /usr/bin/sudo -n -u opencode \
+        /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-devowned-flag "$PWD" \
+        2>/dev/null || true
     return 0
 }
 
@@ -363,7 +390,7 @@ _opk_bootstrap_hint() {
 # workarounds — see docs/troubleshooting.md.
 # shellcheck disable=SC3045  # bash-only block, guarded above
 if [ -n "${BASH_VERSION:-}" ]; then
-    export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare 2>/dev/null || true
+    export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare _opk_devowned_flag 2>/dev/null || true
     if [ -z "${BASH_ENV:-}" ]; then
         # shellcheck disable=SC3028  # bash-only variable in a guarded block
         _opk_hook="${BASH_SOURCE:-}"

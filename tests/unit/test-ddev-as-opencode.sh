@@ -219,6 +219,52 @@ check "heal: handled before the ddev binary resolution" \
 
 rm -rf "$SH" "$SH_STUB"
 
+# --- 2c. --opk-devowned-flag (issue #149, finding 1) ---------------------------
+# Dev-owned mode must flag a project the moment `ddev config` creates it
+# (the dev's ddev() hook routes through this helper mode). The uid guard
+# is satisfied with the same stubbed id(1) as the heal tests; the mode is
+# hermetic via DDEV_DEV_OWNED / the exported OPK_INSTALL_CONF override
+# (the helper must respect it — checked below).
+DF_STUB=$(mktemp -d)
+printf '#!/bin/sh\necho 4242\n' > "$DF_STUB/id"
+chmod 755 "$DF_STUB/id"
+
+DF=$(mktemp -d)
+mkdir -p "$DF/on/.ddev" "$DF/off/.ddev" "$DF/none"
+printf 'name: flagon\ntype: typo3\ndocroot: public\n' > "$DF/on/.ddev/config.yaml"
+printf 'name: flagoff\ntype: typo3\ndocroot: public\n' > "$DF/off/.ddev/config.yaml"
+
+DF_ON_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/on" 2>&1)
+DF_ON_RC=$?
+check "devowned-flag: exits 0 (mode on)" [ "$DF_ON_RC" = 0 ]
+check "devowned-flag: writes disable_settings_management: true" \
+    sh -c "grep -qx 'disable_settings_management: true' \"\$1/.ddev/config.yaml\"" _ "$DF/on"
+check "devowned-flag: flag sits below the head (issue #28 shape, after type:)" \
+    [ "$(grep -n '^disable_settings_management: true' "$DF/on/.ddev/config.yaml" | cut -d: -f1)" = 6 ]
+check "devowned-flag: prints the commit-it note (dev-visible hint)" \
+    sh -c "printf '%s' \"\$1\" | grep -q 'commit it'" _ "$DF_ON_OUT"
+DF_ON2_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/on" 2>&1)
+check "devowned-flag: idempotent — one flag, second run silent" \
+    [ "$(grep -c '^disable_settings_management:' "$DF/on/.ddev/config.yaml")" = 1 ] && [ -z "$DF_ON2_OUT" ]
+
+DF_OFF_OUT=$(env -u DDEV_DEV_OWNED PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/off" 2>&1)
+DF_OFF_RC=$?
+check "devowned-flag: mode off writes nothing and stays silent" \
+    [ "$DF_OFF_RC" = 0 ] && [ -z "$DF_OFF_OUT" ] && ! grep -q '^disable_settings_management:' "$DF/off/.ddev/config.yaml"
+
+DF_NONE_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/none" 2>&1)
+check "devowned-flag: project without .ddev/config.yaml is a clean no-op" \
+    [ "$?" = 0 ] && [ -z "$DF_NONE_OUT" ]
+
+check "devowned-flag: helper sources the sibling ddev-handover.sh lib" \
+    sh -c "grep -q 'sh/ddev-handover.sh' \"\$1\"" _ "$HELPER"
+check "devowned-flag: handled before the ddev binary resolution" \
+    sh -c "awk '/--opk-devowned-flag/{h=NR} /DDEV=\"\"/{d=NR} END{exit !(h>0 && d>0 && h<d)}' \"\$1\"" _ "$HELPER"
+check "devowned-flag: helper respects the OPK_INSTALL_CONF override" \
+    sh -c "grep -qF 'INSTALL_CONF=\"\${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}\"' \"\$1\"" _ "$HELPER"
+
+rm -rf "$DF" "$DF_STUB"
+
 # --- 3. function file: sourcing + both branches -------------------------------
 # Fixture: a fake ddev on PATH so the already-opencode branch runs something
 # observable instead of the (absent) real ddev.
@@ -555,6 +601,35 @@ check "reshare: exported for bash children (issue #18)" \
     sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
 check "reshare: browser-command path heals after its internal start too" \
     sh -c "awk '/_opk_ddev_browser\(\)/,/^}/' \"\$1\" | grep -A5 'ddev-as-opencode start' | grep -q _opk_ddev_reshare" _ "$FUNC"
+
+# --- 7d-2. dev-owned flag wiring (issue #149, finding 1) --------------------------
+# The ddev() function must flag a fresh project right after `ddev config`
+# (dev-owned mode on): mode-gated, flagged-gated, never prompting for a
+# sudo password (-n), never failing the ddev command.
+DFH=$(mktemp -d)
+mkdir -p "$DFH/proj/.ddev"
+printf 'name: dfh\ntype: typo3\ndocroot: public\n' > "$DFH/proj/.ddev/config.yaml"
+check "devowned hook: _opk_devowned_flag calls the helper's flag mode" \
+    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-devowned-flag'" _ "$FUNC"
+check "devowned hook: flag write runs after ddev config" \
+    sh -c "grep -q 'config) _opk_devowned_flag' \"\$1\"" _ "$FUNC"
+check "devowned hook: gated on the dev-owned mode (ddev_devowned_enabled)" \
+    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -q 'ddev_devowned_enabled || return 0'" _ "$FUNC"
+check "devowned hook: already-flagged projects skip the sudo call" \
+    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -q 'ddev_devowned_flagged \"\$PWD\" && return 0'" _ "$FUNC"
+check "devowned hook: sudo never prompts (-n, V22 pattern)" \
+    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -qF 'sudo -n -u opencode'" _ "$FUNC"
+check "devowned hook: best-effort — never fails the ddev command" \
+    sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -qF '|| true'" _ "$FUNC"
+check "devowned hook: exported for bash children (issue #18)" \
+    sh -c "grep -q '_opk_ddev_reshare _opk_devowned_flag' \"\$1\"" _ "$FUNC"
+# Functional (mode off, hermetic via the exported OPK_INSTALL_CONF and a
+# stripped DDEV_DEV_OWNED): must return silently WITHOUT any flag write —
+# proves the mode gate runs before the sudo call, so mode-off machines
+# never pay the exec.
+check "devowned hook: mode off is a silent no-op in a project dir" \
+    env -u DDEV_DEV_OWNED sh -c "cd \"\$2/proj\" && . \"\$1\" && _opk_devowned_flag && ! grep -q '^disable_settings_management:' .ddev/config.yaml" _ "$FUNC" "$DFH"
+rm -rf "$DFH"
 
 # --- 7e. dev-owned mode (docs/design/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED

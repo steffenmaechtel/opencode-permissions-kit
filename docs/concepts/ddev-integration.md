@@ -201,6 +201,12 @@ its own files, no new privilege). Heavy generated subtrees are pruned
 transient). Trees that arrived via git itself never need the heal — git
 writes them as you, with your umask and the inherited ACLs.
 
+After `ddev config` the same hook also writes the dev-owned flag into the
+fresh `.ddev/config.yaml` when dev-owned mode is on
+([below](#dev-owned-projects-the-alternative-to-handovers)) — new projects
+are dev-owned from birth instead of silently running the handover model
+until the next scan.
+
 Edge case: content written by the *agent's* ddev session (running as
 `opencode` directly, not through your shell function) lacks the automatic
 heal — run any `ddev` command yourself or `opk update --refresh` /
@@ -215,7 +221,11 @@ writes `disable_settings_management: true` into each project's committed
 on|off|status`) — inserted directly below the head of the file (after
 `corepack_enable:`, `type:` as fallback), never appended at the end
 where ddev's default template hides it behind a wall of commented
-examples (issue #28). Fixture `.ddev` dirs under `vendor/`,
+examples (issue #28). The flag is written by the scans (install,
+`projects add`, `refresh`, `handover`, `update --refresh`) **and directly
+after `ddev config`** — the `ddev()` shell function routes the fresh
+project through the sudoers helper, so a new project never starts its
+life unflagged. Fixture `.ddev` dirs under `vendor/`,
 `node_modules/` and `testdata/` are never flagged. ddev then never
 writes or chmods anything outside
 `.ddev/`. Settings dirs and project roots stay developer-owned
