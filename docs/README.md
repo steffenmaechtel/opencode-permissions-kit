@@ -61,7 +61,10 @@ selection reference for the rootless container backends. Release model:
 [release-handling.md](design/release-handling.md) — channels, the
 `stable` mirror, and the phased adoption roadmap (issue #38). opencode
 2.x compatibility (service model, detection, open items):
-[opencode-2x.md](design/opencode-2x.md). Known-security-advisory
+[opencode-2x.md](design/opencode-2x.md). The issue #149 ddev workflow
+audit — replay method, findings, resolutions, and the app-type chmod
+matrix: [ddev-workflow-improvements.md](design/ddev-workflow-improvements.md).
+Known-security-advisory
 warnings (shipped database, upstream watch, curation loop):
 [security-advisories.md](design/security-advisories.md). Test fidelity — why bugs pass
 unit and e2e but hit real terminals, and the patterns that close the
