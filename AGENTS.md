@@ -93,6 +93,10 @@ not even in teardown. Enforced by
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning.
+The e2e suites may run in parallel on one host (disjoint containers,
+images and fixtures; warm `tests/e2e/cache/` required — after a version
+bump run one suite alone first); the invocation pattern lives in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 Executable bits live in the **git index** (issue #123): commit anything
 CI or the kit execute by path with `git update-index --chmod=+x <path>`
 (invariant: 755 <=> executed by path, 644 <=> sourced lib / interpreter
