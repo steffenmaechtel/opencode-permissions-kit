@@ -173,6 +173,28 @@ ddev_devowned_flag() {
 # refresh / handover / projects add) always scan and re-stamp.
 # OPK_HANDOVER_STAMP_DIR overrides the directory for tests.
 
+# ddev_reshare_needed <.ddev-dir> <user>: true (0) when the tree carries
+# <user>-owned entries WITHOUT group-write — the state ddev's hardcoded
+# 0755/0644 modes leave behind (ACL mask capped below g+w) after runs
+# that the dev-side ddev() hook did not follow (agent sessions run the
+# real ddev directly; issue #94's edge case, issue #149 finding 2). Those
+# entries are exactly what the heal (bin/ddev-as-opencode
+# --opk-ensure-shared) fixes; dev-owned entries without g+w are the
+# developer's own umask business and deliberately not reported. Heavy
+# generated subtrees are pruned like the heal itself (db_snapshots is
+# chmod 0777 by ddev, import dumps are transient). One capped entry is
+# enough (-quit); the .ddev start dir is included in the walk.
+ddev_reshare_needed() {
+    _drn_dir="${1:-}"
+    _drn_user="${2:-}"
+    [ -n "$_drn_dir" ] && [ -d "$_drn_dir" ] || return 1
+    [ -n "$_drn_user" ] || return 1
+    [ -n "$(find "$_drn_dir" \
+        -type d \( -name db_snapshots -o -name import-db -o -name import-files \) -prune -o \
+        ! -perm -g+w -user "$_drn_user" -print -quit 2>/dev/null)" ]
+}
+
+
 # Bump when the scan's semantics change (new prune rules, new targets) —
 # every install then re-scans once on the next update.
 DDEV_HANDOVER_STAMP_REV=1

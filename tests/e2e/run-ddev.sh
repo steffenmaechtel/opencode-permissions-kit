@@ -848,6 +848,15 @@ check "DD13: root stays dev-owned (dev-owned mode)" \
 if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
     check "DD13: start succeeds after handover (burn-in end state)" \
         E 'grep -q "Successfully started" /tmp/dd13-start2.log'
+    # issue #149 finding 2: the AGENT-side start above left ddev-written
+    # .ddev content with the ACL mask capped (no dev hook on this side —
+    # the #94 edge case). opk status must surface the gap per project,
+    # and the dev's own ddev() hook must heal it on the next run.
+    check "DD13: opk status detects the agent-side group-write gap (issue #149 finding 2)" \
+        E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status1.log 2>&1 && grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status1.log'
+    DEVSH 'cd /var/www/vhosts/dd13-proj && ddev restart >/tmp/dd13-restart.log 2>&1'
+    check "DD13: dev-side ddev command heals the gap (hook reshare)" \
+        E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status2.log 2>&1 && ! grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status2.log'
 
     echo ""
     echo "--- DD14. ddev composer create-project (exit-23 burn-in finding) ---"

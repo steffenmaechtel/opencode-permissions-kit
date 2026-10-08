@@ -631,6 +631,43 @@ check "devowned hook: mode off is a silent no-op in a project dir" \
     env -u DDEV_DEV_OWNED sh -c "cd \"\$2/proj\" && . \"\$1\" && _opk_devowned_flag && ! grep -q '^disable_settings_management:' .ddev/config.yaml" _ "$FUNC" "$DFH"
 rm -rf "$DFH"
 
+# --- 7d-3. reshare detection (issue #149, finding 2) ------------------------------
+# Agent-side ddev runs (real binary, no hook) leave .ddev entries with the
+# ACL mask capped below g+w — the dev's git pull then fails. Detection:
+# ddev_reshare_needed <dir> <user> finds user-owned entries without
+# group-write (pruned like the heal itself); status.sh surfaces it.
+RN=$(mktemp -d)
+mkdir -p "$RN/proj/.ddev/commands" "$RN/proj/.ddev/db_snapshots"
+printf 'cfg\n' > "$RN/proj/.ddev/config.yaml"
+printf 'cmd\n' > "$RN/proj/.ddev/commands/hostcmd"
+printf 'snap\n' > "$RN/proj/.ddev/db_snapshots/db.sql.gz"
+chmod 2775 "$RN/proj/.ddev" "$RN/proj/.ddev/commands"
+chmod 664 "$RN/proj/.ddev/config.yaml" "$RN/proj/.ddev/commands/hostcmd"
+chmod 755 "$RN/proj/.ddev/db_snapshots"
+chmod 644 "$RN/proj/.ddev/db_snapshots/db.sql.gz"
+RN_U=$(id -un)
+check "reshare detect: conforming tree needs no heal" \
+    sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/proj/.ddev\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
+chmod 644 "$RN/proj/.ddev/config.yaml"
+check "reshare detect: capped opencode-owned file is detected" \
+    sh -c ". \"\$1\" && ddev_reshare_needed \"\$2/proj/.ddev\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
+chmod 664 "$RN/proj/.ddev/config.yaml"
+chmod 755 "$RN/proj/.ddev/commands"
+check "reshare detect: capped directory is detected" \
+    sh -c ". \"\$1\" && ddev_reshare_needed \"\$2/proj/.ddev\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
+chmod 2775 "$RN/proj/.ddev/commands"
+check "reshare detect: pruned db_snapshots does not count (heal parity)" \
+    sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/proj/.ddev\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
+check "reshare detect: entries of OTHER users never count (heal is owner-only)" \
+    sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/proj/.ddev\" \"opencode-no-such-user-424242\"" _ "$HANDOVER" "$RN"
+check "reshare detect: missing dir is a clean no-need" \
+    sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/does-not-exist\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
+check "reshare detect: status.sh wires ddev_reshare_needed per project root" \
+    sh -c "grep -q 'ddev_reshare_needed' \"\$1\" && grep -qF 'ui_kv_warn \"ddev share\"' \"\$1\"" _ "$STATUS"
+check "reshare detect: status.sh prints the --opk-ensure-shared one-command fix" \
+    sh -c "grep -q -- '--opk-ensure-shared' \"\$1\"" _ "$STATUS"
+rm -rf "$RN"
+
 # --- 7e. dev-owned mode (docs/design/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED
 # project (mode-written or repo-committed) keeps settings dirs + root as
