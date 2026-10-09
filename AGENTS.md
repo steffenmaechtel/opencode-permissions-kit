@@ -91,6 +91,16 @@ not even in teardown. Enforced by
 `tests/unit/test-sandbox-policy.sh`; the rule lives in
 `docs/design/conventions.md` ("Test sandbox (unit suites)").
 
+**Sabotage-verify only against secured work.** Before mutating the tree
+to prove a pin fails (mutation verification), commit the finished work or
+`git stash` it first — an in-place `sed` sabotage followed by a
+`git restore` on a dirty tree resets to HEAD and silently wipes every
+uncommitted change (learned the hard way, 2026-10). And sabotage by
+*deleting* the construct, not commenting it out: grep-count pins still
+count commented lines, so a commented-out sabotage can pass green. After
+the sabotage run, restore the good state from the commit/stash (or a copy
+kept outside the tree) and re-run the suite to confirm green.
+
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning.
 The e2e suites may run in parallel on one host (disjoint containers,
