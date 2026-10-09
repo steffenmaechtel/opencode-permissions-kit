@@ -11,7 +11,10 @@ verification: Sep 2026, opencode 1.18.31 / 2.0.6 (internals:
 [design/opencode-2x.md](../design/opencode-2x.md)); Oct 2026,
 OpenChamber 2.x with kit-managed opencode 2.0.26 / 2.0.20 (works,
 including the version probe through the wrapper) and 2.0.19 (update
-screen, one-click bypass verified — see the caveats below).
+screen, one-click bypass verified — see the caveats below; the bypass's
+stale settings pin additionally blocks the managed server start after
+the binaries are removed, until the `opencodeBinary` settings line is
+deleted too).
 
 ## How the kit intercepts tools
 

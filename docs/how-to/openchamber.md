@@ -56,12 +56,24 @@ Do **not** use OpenChamber's own update affordances:
   service in your user context (see the [background-service
   caveat](../reference/compatibility.md#caveats)).
 
-If the one-click install already happened, recovery is simple: delete
-`~/.opencode/bin/opencode` (and the `opencode2` shim next to it) and
-restart OpenChamber — it falls back to the kit's wrapper on the next
-start. Optionally clear the `opencodeBinary` entry in
-`~/.config/openchamber/settings.json` (a stale entry pointing at a
-deleted binary is ignored automatically).
+If the one-click install already happened, recovery has **two steps** —
+the settings pin must go too:
+
+1. Delete `~/.opencode/bin/opencode` (and the `opencode2` shim next to
+   it).
+2. Remove the `opencodeBinary` line from
+   `~/.config/openchamber/settings.json` (or set it to `""`), then
+   restart OpenChamber.
+
+Deleting the binaries alone is not enough: OpenChamber starts its
+managed server with strict validation of the pinned path, and a pin
+pointing at a deleted binary aborts the start — the UI hangs loading
+and its API answers `"OpenCode port is not available"` (verified Oct
+2026, survives a reboot). The stale pin stays silent as long as the
+kit's opencode is below 2.0.20, because then the compatibility check
+(which does fall back to the kit's wrapper) shows the update screen
+before a start is ever attempted — the pin only strikes once the kit
+reaches a compatible version again.
 
 ## Just run it
 
@@ -183,8 +195,18 @@ mode has no projectless chats.
   the one-click update installed its own opencode to
   `~/.opencode/bin/opencode` and pinned it in
   `~/.config/openchamber/settings.json`; the managed server now runs as
-  you without the kit's UID separation. Delete the binaries and restart
-  OpenChamber (it falls back to the kit's wrapper), see
+  you without the kit's UID separation. Delete the binaries **and**
+  remove the `opencodeBinary` settings line, then restart OpenChamber —
+  see
+  [OpenChamber 2.x requires opencode 2.0.20+](#openchamber-2x-requires-opencode-2020).
+
+- **UI hangs loading, API answers "OpenCode port is not available"** —
+  a stale `opencodeBinary` pin in
+  `~/.config/openchamber/settings.json` pointing at a deleted binary
+  aborts the managed server start. Typical after removing a
+  self-installed opencode without clearing the pin, and it bites only
+  once the kit's opencode is ≥ 2.0.20 again (below that the update
+  screen masks it). Remove the line and restart OpenChamber — see
   [OpenChamber 2.x requires opencode 2.0.20+](#openchamber-2x-requires-opencode-2020).
 
 - **HTTP 500 on `/api/*` requests (Unexpected server error)** — the
