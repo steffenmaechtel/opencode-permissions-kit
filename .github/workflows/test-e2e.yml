@@ -197,6 +197,9 @@ jobs:
           # Git matrix leg (issue #118) — travels via env into lib.sh's
           # --build-arg GIT_CHANNEL; run.sh asserts the PPA git landed.
           E2E_GIT_CHANNEL: ${{ matrix.git }}
+          # Base image via the Google Docker Hub mirror: auth.docker.io
+          # 504s (2026-10) killed every suite at metadata resolve.
+          E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag) — the ephemeral workflow token, no secret needed.
           OPK_GH_TOKEN: ${{ github.token }}
@@ -246,6 +249,9 @@ jobs:
         run: |
           E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run-docker-rootless.sh
         env:
+          # Base image via the Google Docker Hub mirror: auth.docker.io
+          # 504s (2026-10) killed every suite at metadata resolve.
+          E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
           OPK_GH_TOKEN: ${{ github.token }}
 
   # opencode 2.x pin (issue #80): the same suite against the CURRENT 2.x
@@ -305,6 +311,9 @@ jobs:
           # Resolved npm version travels via env, never interpolated into
           # the run: shell (S6: defense-in-depth on top of the anchored check).
           E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
+          # Base image via the Google Docker Hub mirror: auth.docker.io
+          # 504s (2026-10) killed every suite at metadata resolve.
+          E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
           OPK_GH_TOKEN: ${{ github.token }}
 
   # docker-rootless daemon e2e, opencode 2.x pin (issue #80) — the same
@@ -355,4 +364,7 @@ jobs:
           # Resolved npm version travels via env, never interpolated into
           # the run: shell (S6: defense-in-depth on top of the anchored check).
           E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
+          # Base image via the Google Docker Hub mirror: auth.docker.io
+          # 504s (2026-10) killed every suite at metadata resolve.
+          E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
           OPK_GH_TOKEN: ${{ github.token }}
