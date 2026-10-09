@@ -8,7 +8,10 @@ resolve opencode 1.x from GitHub releases/latest and 2.x from the npm
 dist-tag `latest`, plus a weekly scheduled burn-in on `master`) — so the
 matrix tracks the latest versions without a manual stamp. Last manual
 verification: Sep 2026, opencode 1.18.31 / 2.0.6 (internals:
-[design/opencode-2x.md](../design/opencode-2x.md)).
+[design/opencode-2x.md](../design/opencode-2x.md)); Oct 2026,
+OpenChamber 2.x with kit-managed opencode 2.0.26 / 2.0.20 (works,
+including the version probe through the wrapper) and 2.0.19 (update
+screen, one-click bypass verified — see the caveats below).
 
 ## How the kit intercepts tools
 
@@ -29,7 +32,7 @@ to every session regardless of which tool started it.
 
 | Tool | Kind | Invocation | Status |
 |---|---|---|---|
-| [OpenChamber](https://openchamber.dev) (web/desktop/VS Code) | UI | `opencode serve` | works (headless serve since 0.0.16; projectless chats need OpenChamber ≥ 1.22.2, see [the how-to](../how-to/openchamber.md#projectless-chats)) |
+| [OpenChamber](https://openchamber.dev) (web/desktop/VS Code) | UI | `opencode serve` | works (headless serve since 0.0.16; OpenChamber 2.x additionally requires opencode ≥ 2.0.20 managed by the kit — and its self-update bypasses the kit, see below; projectless chats need OpenChamber ≥ 1.22.2, see [the how-to](../how-to/openchamber.md#projectless-chats)) |
 | CodeWalk | remote UI | user-run `opencode serve` | works |
 | OpenCode Mobile, P4OC | mobile clients | user-run `opencode serve` | works |
 | [cezar](https://github.com/lukaszuznanski/cezar) | orchestrator | `opencode serve` + `opencode models` | works (headless queries since 0.0.22) |
@@ -48,6 +51,16 @@ enforced. It does not mean the kit audits or endorses the tool itself.
 
 ## Caveats
 
+- **OpenChamber 2.x version gate and self-update.** OpenChamber 2.x
+  requires opencode ≥ 2.0.20 (major 2) and refuses to open on older
+  versions, showing its own update screen instead. The in-app updates
+  do not go through the kit: the harmless "update available" toast
+  fails cleanly (no install method for the kit binary), but the
+  one-click update below 2.0.20 installs `~/.opencode/bin/opencode`,
+  pins it in OpenChamber's settings, and runs the server as the
+  developer — outside the kit's UID separation. Keep the kit's opencode
+  at ≥ 2.0.20 via `opk upgrade-opencode`; recovery steps in
+  [the how-to](../how-to/openchamber.md#openchamber-2x-requires-opencode-2020).
 - **OpenChamber projectless chats.** The managed chats root defaults to
   a path under the developer's `$HOME` that the `opencode` user cannot
   reach. OpenChamber ≥ 1.22.2 relocates it via `OPENCHAMBER_CHATS_DIR`;
@@ -65,7 +78,10 @@ enforced. It does not mean the kit audits or endorses the tool itself.
   a bare 2.x opencode as the developer occupies the port the `opencode`
   user's service needs. Kit starts stay functional (their config probe
   is time-bounded), but bare runs print a load/wait notice. Avoid
-  running 2.x opencode outside the kit on the same machine.
+  running 2.x opencode outside the kit on the same machine. OpenChamber
+  2.x's one-click self-install (see above) is exactly such a bare run —
+  it starts the background service in the developer's user context
+  (verified Oct 2026).
 
 ## Keeping this page current
 
