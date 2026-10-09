@@ -862,6 +862,9 @@ check "flag writer: failed write never claims NOT written — ENOSPC may leave a
     sh -c "! printf '%s\n' \"\$1\" | grep -q 'flag NOT'" _ "$F1A_OUT"
 check "flag writer: retry hint names the explicit paths, not the stamp-skipped scan (0.0.46b W2)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'sudo opk config handover' && printf '%s\n' \"\$1\" | grep -q 'opk update --refresh' && ! printf '%s\n' \"\$1\" | grep -q 'next root-run scan retries'" _ "$F1A_OUT"
+F1A_RETRY="sudo opk config handover \"$DWORK/f1a\""
+check "flag writer: retry hint is verbatim-runnable — prints the root's path (0.0.46c C1)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -F \"\$2\"" _ "$F1A_OUT" "$F1A_RETRY"
 chmod 644 "$DWORK/f1a/.ddev/config.yaml"
 mkdir -p "$DWORK/f1b/.ddev"
 printf 'name: f1b\ntype: typo3\n' > "$DWORK/f1b/.ddev/config.yaml"

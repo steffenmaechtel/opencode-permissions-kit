@@ -172,9 +172,13 @@ ddev_devowned_flag() {
                 # the temp (config.yaml can end up truncated). And the
                 # retry must be the explicit paths — the stamp-skipped
                 # plain `opk update` never comes back for this root
-                # (issue #112).
+                # (issue #112). The handover retry carries the root's
+                # path verbatim (0.0.46c C1): bare, it dies on usage,
+                # and the fresh clone is typically unregistered —
+                # there the path-ful form is the only retry that
+                # reaches the project.
                 printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed"\
-" (config.yaml may be truncated; retry: sudo opk config handover or"\
+" (config.yaml may be truncated; retry: sudo opk config handover \"${1:-}\" or"\
 " opk update --refresh)" >&2
             fi
         else
