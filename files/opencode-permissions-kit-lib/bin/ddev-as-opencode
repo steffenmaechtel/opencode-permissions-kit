@@ -22,7 +22,10 @@
 # Deployed to /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode.
 set -u
 
-INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
+# OPK_INSTALL_CONF overrides the stamp path for tests (same convention as
+# ddev-handover.sh) — keeps the sourced mode stamp hermetic on hosts that
+# run a real kit install next to the repo checkout.
+INSTALL_CONF="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
 
 OPENCODE_USER="opencode"
 CONTAINER_BACKEND=""
@@ -63,6 +66,49 @@ if [ "${1:-}" = "--opk-ensure-shared" ]; then
             -type d \( -name db_snapshots -o -name import-db -o -name import-files \) -prune -o \
             -print0 2>/dev/null \
             | xargs -0 -r chmod g+w 2>/dev/null || true
+    fi
+    exit 0
+fi
+
+# --opk-devowned-flag <project-dir> (issue #149, finding 1): dev-owned
+# mode writes disable_settings_management: true into the project's
+# .ddev/config.yaml right after `ddev config` created it — new projects
+# are dev-owned from birth instead of silently running the handover
+# model until the next root-run scan (the stamp-skipped `opk update`
+# never picks new projects up, and no EPERM ever told the developer).
+# Reached from the developer's ddev() hook through the same sudoers
+# rule; runs as the opencode user (guard above) but needs no new
+# privilege: a fresh `ddev config` wrote config.yaml AS opencode, a
+# clone's config.yaml is group-writable — and ddev_devowned_flag itself
+# skips symlinked configs and never writes through them. The mode check
+# (ddev_devowned_enabled) lives inside, so callers may invoke
+# unconditionally; the function's outputs — the "commit it" note and its
+# WARNINGs — are the developer-visible hints. Best-effort, never fails.
+if [ "${1:-}" = "--opk-devowned-flag" ]; then
+    # 0.0.46b W1: diagnostics ride STDOUT in this mode. The hook's sudo
+    # call runs it as `... 2>/dev/null || true` — stderr never reaches
+    # the developer on exactly the path this mode exists for, which
+    # swallowed all four ddev_devowned_flag warnings (the two 0.0.46a F1
+    # write failures and the two pre-existing symlink gates). exec 2>&1
+    # (redirection only — no command, the shell continues) merges the
+    # whole branch, including the shell's own redirection errors, onto
+    # the stream the hook passes through. Root-run scans that source the
+    # lib directly keep their stderr semantics — this stays branch-local
+    # (the main ddev exec below must not lose its stderr stream).
+    exec 2>&1
+    _opk_proj="${2:-}"
+    # The flag writer ships as a sibling lib (repo checkout and deployed
+    # kit alike); the fixed deployed path when invoked without a slash.
+    case "$0" in
+        */*) _opk_lib="$(dirname "$0")/../sh/ddev-handover.sh" ;;
+        *)   _opk_lib="/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh" ;;
+    esac
+    if [ -n "$_opk_proj" ] && [ -f "$_opk_proj/.ddev/config.yaml" ] && [ -f "$_opk_lib" ]; then
+        # shellcheck disable=SC1091  # sibling lib, checked above
+        . "$_opk_lib"
+        if ddev_devowned_enabled; then
+            ddev_devowned_flag "$_opk_proj"
+        fi
     fi
     exit 0
 fi

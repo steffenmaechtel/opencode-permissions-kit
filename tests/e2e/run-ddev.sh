@@ -366,6 +366,8 @@ OC_DD2()   { OC_CWD=/var/www/vhosts/dd2        OC "$1"; }
 OC_DD13()  { OC_CWD=/var/www/vhosts/dd13-proj  OC "$1"; }
 OC_CAM()   { OC_CWD=/var/www/vhosts/camino-e2e OC "$1"; }
 OC_DD12()  { OC_CWD=/var/www/vhosts/dd12-proj  OC "$1"; }
+OC_DD16M() { OC_CWD=/var/www/vhosts/dd16-maho   OC "$1"; }
+OC_DD16S() { OC_CWD=/var/www/vhosts/dd16-symfony OC "$1"; }
 DEVSH() { docker exec -u dev "$E2E_CONTAINER" bash -ic "$1" 2>&1; }
 
 _act_ok=false
@@ -822,13 +824,24 @@ check "DD13: .ddev/config.yaml group-writable right after config (Finding 1 fixe
     E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/config.yaml) & 0020 )) -ne 0'
 check "DD13: dev can edit .ddev/config.yaml right after config (Finding 1 fixed — issue #94 heal)" \
     DEVSH 'cd /var/www/vhosts/dd13-proj && printf "\n" >> .ddev/config.yaml'
+# issue #149 finding 1: dev-owned mode (on since DD12) flags the project
+# the moment `ddev config` creates it — no silent handover-model state
+# until the next root-run scan (the stamp-skipped update never got there).
+check "DD13: dev-owned flag written right after config (issue #149 finding 1)" \
+    E 'grep -q "^disable_settings_management: true" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
+check "DD13: hook prints the commit-it note with the flag" \
+    E 'grep -q "commit it" /tmp/dd13-config.log'
+# Burn-in tripwire (the pre-#149 state, now explicitly constructed): strip
+# the hook-written flag as root — an unflagged dev-owned bootstrap root
+# must still fail EPERM on start and print the hook hint.
+E 'sudo sed -i "/^disable_settings_management:/d" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
 DEVSH 'cd /var/www/vhosts/dd13-proj && ddev start >/tmp/dd13-start1.log 2>&1' && _dd13_first=0 || _dd13_first=1
 check "DD13: first start prints the bootstrap hint (hook promise)" \
     E 'grep -q "hint: fresh typo3 clone" /tmp/dd13-start1.log'
-check "DD13: TRIPWIRE first start fails EPERM until handover (burn-in flow)" \
+check "DD13: TRIPWIRE first start fails EPERM without the flag (burn-in flow)" \
     test "$_dd13_first" = 1
 E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd13-proj >/tmp/dd13-handover.log 2>&1'
-check "DD13: handover writes the dev-owned flag (durable fix)" \
+check "DD13: handover re-writes the dev-owned flag (durable fix)" \
     E 'grep -q "^disable_settings_management: true" /var/www/vhosts/dd13-proj/.ddev/config.yaml'
 check "DD13: dev can edit .ddev/config.yaml after handover" \
     DEVSH 'cd /var/www/vhosts/dd13-proj && printf "# dd13 edit\n" >> .ddev/config.yaml'
@@ -837,6 +850,15 @@ check "DD13: root stays dev-owned (dev-owned mode)" \
 if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
     check "DD13: start succeeds after handover (burn-in end state)" \
         E 'grep -q "Successfully started" /tmp/dd13-start2.log'
+    # issue #149 finding 2: the AGENT-side start above left ddev-written
+    # .ddev content with the ACL mask capped (no dev hook on this side —
+    # the #94 edge case). opk status must surface the gap per project,
+    # and the dev's own ddev() hook must heal it on the next run.
+    check "DD13: opk status detects the agent-side group-write gap (issue #149 finding 2)" \
+        E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status1.log 2>&1 && grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status1.log'
+    DEVSH 'cd /var/www/vhosts/dd13-proj && ddev restart >/tmp/dd13-restart.log 2>&1'
+    check "DD13: dev-side ddev command heals the gap (hook reshare)" \
+        E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status2.log 2>&1 && ! grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status2.log'
 
     echo ""
     echo "--- DD14. ddev composer create-project (exit-23 burn-in finding) ---"
@@ -881,5 +903,56 @@ fi
 
 # Leave the kit in its default state for subsequent runs.
 E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings on >/dev/null 2>&1' || true
+
+echo ""
+echo "--- DD16. unmapped-type clones (issue #149 finding 5) ---"
+# maho (dir type, app/etc) and symfony (root-file type, .env.local at the
+# root): cloned dev-owned + unflagged, both used to fail `ddev start` with
+# a cryptic EPERM — no kit handover, no hint (the map knew typo3/drupal/
+# backdrop/magento only). Now: the hook hint names the one-command fix
+# BEFORE the failure, handover (mode on) flags the project and keeps
+# everything dev-owned, and the real start succeeds.
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes ddev-settings on >/dev/null 2>&1'
+E 'sudo mkdir -p /var/www/vhosts/dd16-maho/app/etc /var/www/vhosts/dd16-maho/.ddev && sudo chown -R dev:dev /var/www/vhosts/dd16-maho && printf "type: maho\n" > /var/www/vhosts/dd16-maho/.ddev/config.yaml && printf "<localxml/>\n" > /var/www/vhosts/dd16-maho/app/etc/local.xml && chmod 2775 /var/www/vhosts/dd16-maho'
+DEVSH 'cd /var/www/vhosts/dd16-maho && ddev start >/tmp/dd16-maho1.log 2>&1' && _dd16_maho=0 || _dd16_maho=1
+check "DD16: TRIPWIRE unflagged maho clone start fails EPERM (app/etc chmod)" \
+    test "$_dd16_maho" = 1
+check "DD16: maho clone prints the settings-dir hint (hook promise)" \
+    E 'grep -q "hint: this maho project" /tmp/dd16-maho1.log'
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd16-maho >/dev/null 2>&1'
+check "DD16: handover flags the maho project (durable fix)" \
+    E 'grep -q "^disable_settings_management: true" /var/www/vhosts/dd16-maho/.ddev/config.yaml'
+check "DD16: maho settings dir + root stay dev-owned (flagged)" \
+    E 'test "$(stat -c %U /var/www/vhosts/dd16-maho/app/etc)" = dev && test "$(stat -c %U /var/www/vhosts/dd16-maho)" = dev'
+# The web container itself dies on the empty exotic-type fixture (type
+# nginx template, no app files) — a ddev quirk OUTSIDE the kit's scope.
+# The DD16 promise is the PERMISSION stage: start must get past the
+# settings chmod (no EPERM) and reach the container stage.
+OC_DD16M 'ddev start >/tmp/dd16-maho2.log 2>&1' || true
+check "DD16: maho start passes the settings stage (no chmod EPERM after handover)" \
+    E '! grep -qiE "could not change permissions|operation not permitted" /tmp/dd16-maho2.log'
+check "DD16: maho start reaches the container stage (settings chmod behind us)" \
+    E 'grep -qE "Waiting for containers to become ready|Successfully started" /tmp/dd16-maho2.log'
+OC_DD16M 'ddev delete -Oy >/dev/null 2>&1' || true
+
+E 'sudo mkdir -p /var/www/vhosts/dd16-symfony/.ddev && sudo chown -R dev:dev /var/www/vhosts/dd16-symfony && printf "type: symfony\n" > /var/www/vhosts/dd16-symfony/.ddev/config.yaml && chmod 2775 /var/www/vhosts/dd16-symfony'
+DEVSH 'cd /var/www/vhosts/dd16-symfony && ddev start >/tmp/dd16-symfony1.log 2>&1' && _dd16_sym=0 || _dd16_sym=1
+check "DD16: TRIPWIRE unflagged symfony clone start fails EPERM (root chmod)" \
+    test "$_dd16_sym" = 1
+check "DD16: symfony clone prints the root-file hint (hook promise)" \
+    E 'grep -q "hint: this symfony project" /tmp/dd16-symfony1.log'
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/config.sh --yes handover /var/www/vhosts/dd16-symfony >/dev/null 2>&1'
+check "DD16: handover flags the symfony project (durable fix)" \
+    E 'grep -q "^disable_settings_management: true" /var/www/vhosts/dd16-symfony/.ddev/config.yaml'
+check "DD16: symfony root stays dev-owned after the flagged handover" \
+    E 'test "$(stat -c %U /var/www/vhosts/dd16-symfony)" = dev'
+# Same as maho above: the permission stage is the DD16 promise (the empty
+# fixture's web container dies on ddev's type template, outside kit scope).
+OC_DD16S 'ddev start >/tmp/dd16-symfony2.log 2>&1' || true
+check "DD16: symfony start passes the settings stage (no root chmod EPERM)" \
+    E '! grep -qiE "could not change permissions|operation not permitted" /tmp/dd16-symfony2.log'
+check "DD16: symfony start reaches the container stage (root chmod behind us)" \
+    E 'grep -qE "Waiting for containers to become ready|Successfully started" /tmp/dd16-symfony2.log'
+OC_DD16S 'ddev delete -Oy >/dev/null 2>&1' || true
 
 e2e_finish

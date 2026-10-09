@@ -247,6 +247,11 @@ ddev() {
     case "${1:-}" in
         config|get|start|restart) _opk_ddev_reshare ;;
     esac
+    # issue #149 finding 1: dev-owned mode flags the project the moment
+    # `ddev config` creates it (silent when off or already flagged).
+    case "${1:-}" in
+        config) _opk_devowned_flag ;;
+    esac
     case "${1:-}" in
         start|restart) _opk_hosts_hint 2>/dev/null || true ;;
     esac
@@ -265,6 +270,37 @@ _opk_ddev_reshare() {
     /usr/bin/sudo -u opencode \
         /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-ensure-shared "$PWD/.ddev" \
         >/dev/null 2>&1 || true
+    return 0
+}
+
+# _opk_devowned_flag (issue #149, finding 1): after `ddev config` created
+# a project, dev-owned mode writes the disable_settings_management flag
+# into the fresh .ddev/config.yaml via the sudoers helper (as opencode —
+# config.yaml was just written by opencode, or is group-writable in a
+# clone). New projects are dev-owned from birth; without this they
+# silently ran the handover model until the next root-run scan. The
+# helper prints the one-line "commit it" note — and its WARNINGs, which
+# this mode routes to stdout (0.0.46b W1): the 2>/dev/null on the sudo
+# call below discards stderr, which used to swallow every
+# ddev_devowned_flag warning on this exact path. Silent whenever anything
+# is off: mode off, no project config in the cwd, already flagged, or
+# the helper call fails (best-effort, never fails the ddev command).
+_opk_devowned_flag() {
+    [ -f "$PWD/.ddev/config.yaml" ] || return 0
+    # OPK_DDEV_HANDOVER_LIB overrides the lib path for tests (same
+    # convention as OPK_BROWSER_CMDS_CONF above / OPK_INSTALL_CONF in the
+    # lib) — keeps the hook's gates functionally pinnable on hosts
+    # without a deployed kit (0.0.46a F2; the sudo call itself stays
+    # static-pinned: it uses the absolute /usr/bin/sudo).
+    _opk_dhl="${OPK_DDEV_HANDOVER_LIB:-/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh}"
+    [ -f "$_opk_dhl" ] || return 0
+    # shellcheck disable=SC1090  # test override / deployed kit path, checked above
+    . "$_opk_dhl"
+    ddev_devowned_enabled || return 0
+    ddev_devowned_flagged "$PWD" && return 0
+    /usr/bin/sudo -n -u opencode \
+        /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-devowned-flag "$PWD" \
+        2>/dev/null || true
     return 0
 }
 
@@ -293,21 +329,35 @@ _opk_hosts_hint() {
     return 0
 }
 
-# _opk_bootstrap_hint: before start/restart, detect the TYPO3 bootstrap
-# case (fresh clone) that makes `ddev start` fail with EPERM: without
-# vendor/ ddev cannot detect the installation, writes its settings file
-# at the PROJECT ROOT and chmods the root directory — an owner-only
-# operation, and the root belongs to the developer, not to opencode.
-# Prints the one-command fix (config.sh handover — root-run, hands the
-# root back once TYPO3 is installed). Silent whenever anything is off:
-# no project in the cwd, not typo3, TYPO3 detected, root already handed
-# over, or the kit lib missing.
+# _opk_bootstrap_hint: before start/restart, detect the cases that make
+# `ddev start` fail with a cryptic EPERM (chmod is owner-only, ddev runs
+# as opencode, the target belongs to the developer) and print the
+# one-command fix (config.sh handover — root-run; with dev-owned mode on
+# it also writes the flag, the durable fix). Covered cases:
+#   typo3      fresh clone, TYPO3 undetected: ddev's settings fallback
+#              chmods the PROJECT ROOT.
+#   maho/modx  settings dirs (app/etc, <docroot>/core/config) chmod'd
+#              every start — EPERM when they arrived dev-owned via git
+#              (issue #149 finding 5).
+#   codeigniter/shopware6/symfony  settings file at the project root
+#              (.env/.env.local): ddev chmods the ROOT every start —
+#              permanently, no detection switch (issue #149 finding 5).
+# Silent whenever anything is off: no project in the cwd, other types,
+# TYPO3 detected, targets already opencode-owned, project flagged
+# (dev-owned: ddev never touches paths outside .ddev/), or the kit lib
+# missing.
 _opk_bootstrap_hint() {
-    [ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh ] || return 0
+    # OPK_DDEV_HANDOVER_LIB: test override like in _opk_devowned_flag
+    # above (0.0.46a F2/F6 — functional hint-arm pins need it).
+    _opk_dhl="${OPK_DDEV_HANDOVER_LIB:-/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh}"
+    [ -f "$_opk_dhl" ] || return 0
     [ -f "$PWD/.ddev/config.yaml" ] || return 0
-    _opk_type=$(sed -n 's/^type:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
-    [ "$_opk_type" = "typo3" ] || return 0
-    _opk_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\"'")
+    _opk_type=$(sed -n 's/^type:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
+    case "$_opk_type" in
+        typo3|maho|modx|codeigniter|shopware6|symfony) ;;
+        *) return 0 ;;
+    esac
+    _opk_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     [ -n "$_opk_docroot" ] || _opk_docroot="."
     # Same containment policy as ddev-handover's _ddev_docroot_sane
     # (sourced further down, so inline here): the agent-writable
@@ -316,20 +366,48 @@ _opk_bootstrap_hint() {
     case "$_opk_docroot" in
         /*|*..*|*[!A-Za-z0-9._/-]*) _opk_docroot="." ;;
     esac
-    # shellcheck disable=SC1091  # deployed kit path, checked above
-    . /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh
+    # shellcheck disable=SC1090  # test override / deployed kit path, checked above
+    . "$_opk_dhl"
     # Dev-owned (flagged) project: ddev never touches paths outside
-    # .ddev/ — the bootstrap EPERM cannot occur, stay silent.
+    # .ddev/ — the EPERM cannot occur, stay silent.
     ddev_devowned_flagged "$PWD" && return 0
-    ddev_typo3_detected "$PWD" "$_opk_docroot" && return 0
-    [ "$(stat -c %U "$PWD" 2>/dev/null)" = "opencode" ] && return 0
-    echo ""
-    echo "  hint: fresh typo3 clone — until composer install, ddev writes its"
-    echo "  settings file at the project root and must chmod it (owner-only;"
-    echo "  the root belongs to you, ddev runs as opencode). Hand it over once"
-    echo "  (the kit hands it back after install):"
-    echo ""
-    echo "    sudo opk config handover \"$PWD\""
+    case "$_opk_type" in
+        typo3)
+            ddev_typo3_detected "$PWD" "$_opk_docroot" && return 0
+            [ "$(stat -c %U "$PWD" 2>/dev/null)" = "opencode" ] && return 0
+            echo ""
+            echo "  hint: fresh typo3 clone — until composer install, ddev writes its"
+            echo "  settings file at the project root and must chmod it (owner-only;"
+            echo "  the root belongs to you, ddev runs as opencode). Hand it over once"
+            echo "  (the kit hands it back after install):"
+            echo ""
+            echo "    sudo opk config handover \"$PWD\""
+            ;;
+        maho|modx)
+            case "$_opk_type" in
+                maho) _opk_tgt="$PWD/app/etc" ;;
+                *)    _opk_tgt="$PWD/$_opk_docroot/core/config" ;;
+            esac
+            [ -d "$_opk_tgt" ] || return 0
+            [ "$(stat -c %U "$_opk_tgt" 2>/dev/null)" = "opencode" ] && return 0
+            echo ""
+            echo "  hint: this $_opk_type project's settings dir must be chmod'd by"
+            echo "  ddev on every start (owner-only; it arrived dev-owned via git,"
+            echo "  ddev runs as opencode). Hand it over once:"
+            echo ""
+            echo "    sudo opk config handover \"$PWD\""
+            ;;
+        codeigniter|shopware6|symfony)
+            [ "$(stat -c %U "$PWD" 2>/dev/null)" = "opencode" ] && return 0
+            echo ""
+            echo "  hint: this $_opk_type project's settings file lives at the"
+            echo "  project root — ddev chmods the ROOT on every start (owner-only;"
+            echo "  the root belongs to you, ddev runs as opencode). Hand it over"
+            echo "  once (the dev-owned flag is the durable fix):"
+            echo ""
+            echo "    sudo opk config handover \"$PWD\""
+            ;;
+    esac
     # Dev-owned mode: the same command also writes
     # disable_settings_management: true (the durable fix — ddev then never
     # touches paths outside .ddev/, the root stays yours permanently).
@@ -363,7 +441,7 @@ _opk_bootstrap_hint() {
 # workarounds — see docs/troubleshooting.md.
 # shellcheck disable=SC3045  # bash-only block, guarded above
 if [ -n "${BASH_VERSION:-}" ]; then
-    export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare 2>/dev/null || true
+    export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare _opk_devowned_flag 2>/dev/null || true
     if [ -z "${BASH_ENV:-}" ]; then
         # shellcheck disable=SC3028  # bash-only variable in a guarded block
         _opk_hook="${BASH_SOURCE:-}"

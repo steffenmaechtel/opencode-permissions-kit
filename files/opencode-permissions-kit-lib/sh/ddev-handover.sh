@@ -19,13 +19,24 @@
 #                                  typo3conf (covers composer v12+,
 #                                  legacy v12 system/, and v11-)
 #                     drupal*/backdrop -> <docroot>/sites/default
-#                     magento*  -> app/etc
-#   project root    the directory INODE itself (never recursive) — only
-#                   for typo3 projects whose TYPO3 is not yet installed
+#                     magento*|maho -> app/etc (maho is the magento
+#                                  fork — same layout, issue #149)
+#                     modx      -> <docroot>/core/config
+#   project root    the directory INODE itself (never recursive) — for
+#                   typo3 projects whose TYPO3 is not yet installed
 #                   (fresh clone, no vendor/): ddev's settings-path
 #                   fallback then targets the APP ROOT, and its chmod
 #                   needs ownership. Handed BACK to the developer once
 #                   TYPO3 is detected (see ddev_handover_project_root).
+#                   Root-FILE types (codeigniter, shopware6, symfony —
+#                   issue #149 finding 5) permanently: their settings
+#                   file lives at the project root (.env/.env.local)
+#                   and ddev's generic CreateSettingsFile chmods
+#                   Dir(SiteSettingsPath) = the ROOT on every run —
+#                   same mechanics as the typo3 bootstrap, but with no
+#                   detection switch to end it. The dev-owned flag is
+#                   the durable way out (ddev_handover_project_back
+#                   returns the root to the developer once flagged).
 #
 # Everything is best-effort (|| true) and idempotent. POSIX sh, SOURCED
 # (never executed) by install.sh, update.sh and config.sh (projects add,
@@ -104,7 +115,17 @@ ddev_devowned_flag() {
     # agent-writable, a swapped temp name would disclose root-readable
     # content into the agent-owned config, a swapped cfg would be written
     # through (0.0.39g S2).
-    ddf_tmp=$(mktemp "${ddf_cfg}.opk.XXXXXX") || return 0
+    # 0.0.46a F1: the opencode-uid caller (ddev-as-opencode
+    # --opk-devowned-flag, issue #149) can actually fail these writes —
+    # a clone whose .ddev arrived 0755/0644 dev-owned is outside the
+    # kit's group baseline. Stay best-effort (never fail the caller),
+    # but never lie and never go silent: each failed write announces
+    # itself like the symlink gates above.
+    ddf_tmp=$(mktemp "${ddf_cfg}.opk.XXXXXX") || {
+        printf '%s\n' "  WARNING: ${1:-}/.ddev not writable (mktemp failed) —"\
+" dev-owned flag NOT written" >&2
+        return 0
+    }
     if awk -v opk_anchor="$ddf_anchor" '
         BEGIN {
             c1 = "# opencode permissions kit: dev-owned mode — ddev must not"
@@ -138,11 +159,28 @@ ddev_devowned_flag() {
         }
     ' "$ddf_cfg" > "$ddf_tmp"; then
         if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
-            cat "$ddf_tmp" > "$ddf_cfg"
-            if [ ! -L "$ddf_cfg" ]; then
-                chmod g+w "$ddf_cfg" 2>/dev/null || true
+            if cat "$ddf_tmp" > "$ddf_cfg" 2>/dev/null; then
+                if [ ! -L "$ddf_cfg" ]; then
+                    chmod g+w "$ddf_cfg" 2>/dev/null || true
+                fi
+                echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
+            else
+                # 0.0.46a F1 / 0.0.46b W2: the write itself failed (not
+                # opencode-writable config.yaml, or a full disk) — the
+                # old code printed the success note anyway. Never claim
+                # "NOT written": a failed cat may have written PART of
+                # the temp (config.yaml can end up truncated). And the
+                # retry must be the explicit paths — the stamp-skipped
+                # plain `opk update` never comes back for this root
+                # (issue #112). The handover retry carries the root's
+                # path verbatim (0.0.46c C1): bare, it dies on usage,
+                # and the fresh clone is typically unregistered —
+                # there the path-ful form is the only retry that
+                # reaches the project.
+                printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed"\
+" (config.yaml may be truncated; retry: sudo opk config handover \"${1:-}\" or"\
+" opk update --refresh)" >&2
             fi
-            echo "  dev-owned flag written: $ddf_cfg (disable_settings_management: true — commit it)"
         else
             # 0.0.39h F13: the exec-time recheck tripped (the config or its
             # temp turned into a symlink mid-write) — announce the skip like
@@ -172,6 +210,28 @@ ddev_devowned_flag() {
 # stale pass). The explicit paths (install, --refresh, config
 # refresh / handover / projects add) always scan and re-stamp.
 # OPK_HANDOVER_STAMP_DIR overrides the directory for tests.
+
+# ddev_reshare_needed <.ddev-dir> <user>: true (0) when the tree carries
+# <user>-owned entries WITHOUT group-write — the state ddev's hardcoded
+# 0755/0644 modes leave behind (ACL mask capped below g+w) after runs
+# that the dev-side ddev() hook did not follow (agent sessions run the
+# real ddev directly; issue #94's edge case, issue #149 finding 2). Those
+# entries are exactly what the heal (bin/ddev-as-opencode
+# --opk-ensure-shared) fixes; dev-owned entries without g+w are the
+# developer's own umask business and deliberately not reported. Heavy
+# generated subtrees are pruned like the heal itself (db_snapshots is
+# chmod 0777 by ddev, import dumps are transient). One capped entry is
+# enough (-quit); the .ddev start dir is included in the walk.
+ddev_reshare_needed() {
+    _drn_dir="${1:-}"
+    _drn_user="${2:-}"
+    [ -n "$_drn_dir" ] && [ -d "$_drn_dir" ] || return 1
+    [ -n "$_drn_user" ] || return 1
+    [ -n "$(find "$_drn_dir" \
+        -type d \( -name db_snapshots -o -name import-db -o -name import-files \) -prune -o \
+        ! -perm -g+w -user "$_drn_user" -print -quit 2>/dev/null)" ]
+}
+
 
 # Bump when the scan's semantics change (new prune rules, new targets) —
 # every install then re-scans once on the next update.
@@ -269,8 +329,11 @@ ddev_type_settings_dirs() {
         drupal*|backdrop)
             echo "$dts_docroot/sites/default"
             ;;
-        magento*)
+        magento*|maho)
             echo "app/etc"
+            ;;
+        modx)
+            echo "$dts_docroot/core/config"
             ;;
     esac
     return 0
@@ -317,18 +380,28 @@ ddev_rootless_bindmounts() {
 
 # ddev_handover_project_root <project-dir> <oc-user> <group> [dev-user]
 # Manages the project's ROOT DIRECTORY (the inode only, never its
-# contents) for the TYPO3 bootstrap case.
+# contents) for the TYPO3 bootstrap case and the root-file types.
 #
-# Why: a fresh `git clone` made by the developer with the kit's umask 002
-# + setgid parent is dev-owned mode 2775. Until TYPO3 is detectable
-# (vendor/ absent), ddev's setTypo3SiteSettingsPaths fallback puts the
-# settings file at the APP ROOT (pkg/ddevapp/typo3.go: "As long as TYPO3
-# is not installed ..."), and CreateSettingsFile then chmods
+# Why (typo3): a fresh `git clone` made by the developer with the kit's
+# umask 002 + setgid parent is dev-owned mode 2775. Until TYPO3 is
+# detectable (vendor/ absent), ddev's setTypo3SiteSettingsPaths fallback
+# puts the settings file at the APP ROOT (pkg/ddevapp/typo3.go: "As long
+# as TYPO3 is not installed ..."), and CreateSettingsFile then chmods
 # Dir(SiteSettingsPath) — the project root — to 0755 (apptypes.go).
 # util.Chmod skips only when Perm() == 0755 EXACTLY, so 2775 fires a real
 # chmod; chmod is owner-only, the dir belongs to dev, ddev runs as the
 # kit user => EPERM, and `ddev start` aborts BEFORE composer install
 # could ever make the app detectable (bootstrap deadlock).
+#
+# Why (codeigniter/shopware6/symfony — issue #149 finding 5): their
+# settings file lives at the project root (.env / .env.local,
+# setCodeIgniter/setShopware6/setSymfonySiteSettingsPaths: Dir of
+# SiteSettingsPath is the ROOT in the standard layout), so ddev's generic
+# CreateSettingsFile chmods the ROOT on EVERY run — permanently, with no
+# detection switch that would end it (unlike the typo3 bootstrap). While
+# the project is UNFLAGGED the root must belong to <oc-user> 2755; the
+# moment the dev-owned flag appears, ddev_handover_project_back returns
+# it to the developer (2775) and ddev never chmods it again.
 #
 # The rule (mirrors ddev's own detection, see ddev_typo3_detected):
 #   undetected  -> root belongs to <oc-user>, mode 2755: Perm() == 0755
@@ -356,22 +429,34 @@ ddev_handover_project_root() {
     [ -L "$dhq_proj" ] && return 0
     [ -f "$dhq_proj/.ddev/config.yaml" ] || return 0
     dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
-    [ "$dhq_type" = "typo3" ] || return 0
     dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null \
         | head -1 | tr -d " \t\r\"'")
     [ -n "$dhq_docroot" ] || dhq_docroot="."
     _ddev_docroot_sane "$dhq_docroot" || dhq_docroot="."
-    if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then
-        if [ -n "$dhq_dev" ] && [ "$(stat -c %U "$dhq_proj" 2>/dev/null)" = "$dhq_user" ]; then
-            chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || true
-            chmod 2775 "$dhq_proj" 2>/dev/null || true
-            echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
-        fi
-    else
-        chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || true
-        chmod 2755 "$dhq_proj" 2>/dev/null || true
-        echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
-    fi
+    case "$dhq_type" in
+        typo3)
+            if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then
+                if [ -n "$dhq_dev" ] && [ "$(stat -c %U "$dhq_proj" 2>/dev/null)" = "$dhq_user" ]; then
+                    chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || true
+                    chmod 2775 "$dhq_proj" 2>/dev/null || true
+                    echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
+                fi
+            else
+                chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || true
+                chmod 2755 "$dhq_proj" 2>/dev/null || true
+                echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
+            fi
+            ;;
+        codeigniter|shopware6|symfony)
+            # Root-file types: the root IS the permanent chmod target
+            # while unflagged (see function header). 2755 for the same
+            # Perm() == 0755 no-op reason as the typo3 bootstrap.
+            chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || true
+            chmod 2755 "$dhq_proj" 2>/dev/null || true
+            echo "  project-root handover: $dhq_proj -> $dhq_user ($dhq_type settings"
+            echo "  file lives at the root; the dev-owned flag hands it back)"
+            ;;
+    esac
     return 0
 }
 

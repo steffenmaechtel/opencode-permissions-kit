@@ -58,6 +58,13 @@ Per project (faster, no full baseline):
 sudo opk config handover /var/www/vhosts/<project>
 ```
 
+**New projects are flagged the moment they are created:** after
+`ddev config`, your `ddev` shell function writes the flag into the fresh
+`.ddev/config.yaml` (through the sudoers helper, as `opencode` — no
+root, no scan). The one-line note it prints tells you to commit the
+line. Projects configured while the mode is off (or by teammates without
+the kit) stay unflagged until one of the commands above runs.
+
 **Commit the added `disable_settings_management: true` line** — it is
 regular repo content. Teammates without the kit get it via the repo;
 their ddev also stops touching settings (a standard ddev flag, safe to
