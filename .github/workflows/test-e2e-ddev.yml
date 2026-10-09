@@ -141,6 +141,10 @@ jobs:
             ${{ (github.event_name != 'workflow_dispatch' || inputs.site_tier == true)
             && 'camino' || 'none' }}
           DDEV_VERSION: ${{ inputs.ddev_version }}
+          # Base image via the Google Docker Hub mirror: auth.docker.io
+          # 504s (2026-10) killed every suite at metadata resolve. (Inner
+          # ddev image pulls still go to Docker Hub directly.)
+          E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
           # gh_latest_tag) — the ephemeral workflow token, no secret needed.
           OPK_GH_TOKEN: ${{ github.token }}
@@ -215,6 +219,10 @@ jobs:
           # Resolved npm version travels via env, never interpolated into
           # the run: shell (S6: defense-in-depth on top of the anchored check).
           E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
+          # Base image via the Google Docker Hub mirror: auth.docker.io
+          # 504s (2026-10) killed every suite at metadata resolve. (Inner
+          # ddev image pulls still go to Docker Hub directly.)
+          E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
           OPK_GH_TOKEN: ${{ github.token }}
         run: |
           ./tests/e2e/run-ddev.sh

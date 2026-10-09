@@ -101,6 +101,29 @@ check "CI matrices the e2e job over the git channel (issue #118)" \
 check "run.sh asserts the latest leg really runs PPA git" \
     grep -q 'E2E_GIT_CHANNEL:-distro}" = "latest"' "$RUN_SH"
 
+# --- base image knob (auth.docker.io 504 outage 2026-10): CI pulls ubuntu
+# through the Google Docker Hub mirror; local runs stay on docker.io. Same
+# contract class as E2E_GIT_CHANNEL: knob in lib.sh, forwarded on BOTH
+# builder paths, ARG-before-FROM in BOTH Dockerfiles, exported by BOTH
+# workflow files. ---
+check "lib.sh reads the E2E_BASE_IMAGE knob (default ubuntu:24.04)" \
+    grep_q 'E2E_BASE_IMAGE="\${E2E_BASE_IMAGE:-ubuntu:24.04}"'
+_base_build_args=$(grep -c -- '--build-arg BASE_IMAGE' "$LIB")
+if [ "$_base_build_args" -ge 2 ]; then
+    pass "base image forwarded on both builder paths (BuildKit + classic)"
+else
+    fail "base image forwarded on $_base_build_args of 2 builder paths"
+fi
+check "both Dockerfiles pin the default base image (ARG BASE_IMAGE)" \
+    sh -c "grep -q '^ARG BASE_IMAGE=ubuntu:24.04' \"\$1\" \
+&& grep -q '^ARG BASE_IMAGE=ubuntu:24.04' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
+check "both Dockerfiles pull the configurable base (FROM \${BASE_IMAGE})" \
+    sh -c "grep -q '^FROM \${BASE_IMAGE}' \"\$1\" \
+&& grep -q '^FROM \${BASE_IMAGE}' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
+check "workflows export the mirror base image to the e2e steps" \
+    sh -c "grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$1\" \
+&& grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

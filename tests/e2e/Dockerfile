@@ -1,4 +1,10 @@
-FROM ubuntu:24.04
+# Base image knob (auth.docker.io outage 2026-10): lib.sh forwards
+# E2E_BASE_IMAGE as --build-arg BASE_IMAGE (ARG before FROM). CI pulls
+# through the Google Docker Hub mirror so a 504 on the anonymous token
+# endpoint cannot kill every suite at metadata resolution; the default
+# keeps local runs on docker.io.
+ARG BASE_IMAGE=ubuntu:24.04
+FROM ${BASE_IMAGE}
 
 # git channel (issue #118): 'distro' (default) keeps the base image's apt
 # git — 2.43 on noble, close to the documented oldest baseline distros
