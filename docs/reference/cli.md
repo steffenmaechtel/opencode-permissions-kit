@@ -2,6 +2,31 @@
 
 This page lists the kit's commands and flags.
 
+## openchamber-secure
+
+Pin OpenChamber to the kit wrapper (sudo — the command elevates itself):
+
+```bash
+sudo opk openchamber-secure [--yes]
+```
+
+Writes the admin-owned policy `/etc/openchamber/policy.json`
+(`opencodeBinary` → `/usr/local/bin/opencode`), which makes OpenChamber's
+web UI, desktop app, and VS Code extension spawn the kit wrapper
+regardless of their own settings pin — defusing a one-click bypass
+retroactively. OpenChamber's self-update affordances stop working;
+updates go through `opk upgrade-opencode` exclusively. The command also
+removes leftover bypass binaries (`~/.opencode/bin/opencode`,
+`opencode2`) and the `opencodeBinary` settings pin (asks first; `--yes`
+skips the question) and records the opt-in so `opk update` re-applies
+the pin. Idempotent. A pre-existing policy file with other content is
+announced and replaced by this command; `opk update` and the install opt-in
+never overwrite such a file — they skip it with a warning (admin-owned
+content). `opk uninstall` removes the file only when it still pins the kit
+wrapper (marker-gated).
+Background and manual steps:
+[the how-to](../how-to/openchamber.md#prevent-the-bypass-the-policy-pin).
+
 ## wsl-add-opencode-1-fix
 
 Write the WSL browser-bridge carrier into `/etc/wsl.conf` (sudo — the
@@ -41,6 +66,7 @@ opk update --binary
 opk upgrade-opencode   # just the opencode binary
 opk ddev-hosts-add     # in a ddev project dir
 opk handover me .gotmp # mixed-owner tree -> yours again
+opk openchamber-secure # pin OpenChamber to the kit wrapper
 opk wsl-add-opencode-1-fix   # opt in to the WSL browser-bridge carrier
 opk uninstall
 opk help        # commands + arguments overview

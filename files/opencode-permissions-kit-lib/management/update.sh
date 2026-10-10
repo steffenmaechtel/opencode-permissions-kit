@@ -701,6 +701,33 @@ if [ -f "$FILES_ROOT/etc/umask.sh" ]; then
     log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 fi
 
+# --- OpenChamber policy pin (issue #154) ---------------------------------------
+# Re-apply only when the install opted in (install.conf
+# OPENCHAMBER_POLICY=yes — sourced above). A policy.json without the opt-in
+# is admin-owned and never touched here; without the opt-in the file is
+# also never created (opt-in only, see the design record).
+# 0.0.47a F1: the re-apply is additionally gated on the file still being
+# kit-shaped (byte-identical to the one-liner the kit writes) — a file the
+# admin extended or replaced is NEVER overwritten; the skip is loud.
+if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
+    _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
+    if [ -f /etc/openchamber/policy.json ] \
+        && [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
+        ui_warn "openchamber policy pin NOT re-applied: /etc/openchamber/policy.json"
+        ui_warn "diverges from the kit pin (admin-owned content) — left untouched"
+        ui_detail "force it with: sudo opk openchamber-secure (replaces the file)"
+        log "openchamber policy pin NOT re-applied: existing file diverges (admin-owned)"
+    else
+        sudo mkdir -p /etc/openchamber
+        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
+            | sudo tee /etc/openchamber/policy.json > /dev/null
+        sudo chown root:root /etc/openchamber/policy.json 2>/dev/null || true
+        sudo chmod 644 /etc/openchamber/policy.json
+        ui_success "openchamber policy pin re-applied: /etc/openchamber/policy.json"
+        log "openchamber policy pin re-applied: /etc/openchamber/policy.json"
+    fi
+fi
+
 # --- shell-startup hooks (rewrite old paths, append when missing) ---------------
 # Older installs lack the interactive-shell hooks — append them idempotently
 # so a self-installed opencode binary is reported and `ddev()` stays wrapped.

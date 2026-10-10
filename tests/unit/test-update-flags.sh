@@ -478,6 +478,27 @@ check "streamed update never reads the confirm answer from the script stream (S8
 check "update.sh --help no longer claims prompt-free defaults (D2)" \
     sh -c "! grep -qF 'No prompts by default' \"\$1\"" _ "$UPDATE"
 
+# --- OpenChamber policy pin re-apply (issue #154, Tier 2) -------------------------
+# Opt-in only: the pin is re-applied when install.conf says
+# OPENCHAMBER_POLICY=yes (sourced above), never created without the
+# opt-in, and an admin-owned policy.json without the opt-in stays
+# untouched.
+check "update re-applies the policy pin when opted in" \
+    sh -c "grep -qF '[ \"\${OPENCHAMBER_POLICY:-}\" = \"yes\" ]' \"\$1\" \
+        && grep -qF 'sudo tee /etc/openchamber/policy.json' \"\$1\"" _ "$UPDATE"
+check "update never creates the policy pin without the opt-in" \
+    sh -c "! grep -qF 'OPENCHAMBER_POLICY=\"yes\"' \"\$1\"" _ "$UPDATE"
+# 0.0.47a F1: the re-apply never overwrites admin content — byte-gate on
+# the kit one-liner, loud skip (not a silent tee) when the file diverges,
+# and the write sits in the gated else branch.
+check "update re-apply is byte-gated on kit-shaped content (0.0.47a F1)" \
+    sh -c "grep -qF '_oc_expected=' \"\$1\" \
+        && grep -qF '!= \"\$_oc_expected\" ]' \"\$1\" \
+        && grep -qF 'diverges from the kit pin (admin-owned content) — left untouched' \"\$1\"" _ "$UPDATE"
+check "install twin carries the same admin-content gate (0.0.47a F1)" \
+    sh -c "grep -qF 'diverges from the kit pin' \"\$1\"" _ \
+    "$SCRIPT_DIR/../../files/install.sh"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

@@ -30,6 +30,12 @@
 #                          (22.04/24.04; Debian and other distros are never
 #                          version-gated — see the support matrix in
 #                          docs/getting-started.md) — at your own risk
+#   --openchamber-policy <yes|no>  Pin OpenChamber's opencode spawn to the
+#                          kit wrapper via /etc/openchamber/policy.json
+#                          (disables OpenChamber's self-update buttons).
+#                          Default: asked when OpenChamber is detected,
+#                          off under --yes without the flag; later:
+#                          sudo opk openchamber-secure
 #
 # Flags may appear in any order. --projects consumes every following
 # non-flag argument as a project root; parsing continues after them.
@@ -364,6 +370,15 @@ GIT_FLAG_GIVEN=false
 # Distro whitelist override (see _distro_gate): explicit user opt-in to
 # install on a distro outside the support matrix.
 FORCE_UNSUPPORTED_DISTRO=false
+# OpenChamber policy pin (issue #154, docs/design/openchamber-2x-hardening.md):
+# opt-in — write /etc/openchamber/policy.json pinning OpenChamber's opencode
+# spawn to the kit wrapper. It changes third-party app behavior (OpenChamber's
+# self-update affordances stop working), hence never silently on. "" = decide
+# via detection + prompt below (an earlier opt-in stays); --openchamber-policy
+# forces yes|no.
+OPENCHAMBER_POLICY=""
+OPENCHAMBER_POLICY_OPT=""
+OPENCHAMBER_POLICY_GIVEN=false
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -372,6 +387,20 @@ parse_args() {
             --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
             --skip-ddev-migration) SKIP_DDEV_MIGRATION=true ;;
             --force-unsupported-distro) FORCE_UNSUPPORTED_DISTRO=true ;;
+            --openchamber-policy)
+                if [ $# -lt 2 ]; then
+                    echo "error: --openchamber-policy requires a value (yes|no)" >&2
+                    exit 1
+                fi
+                case "$2" in
+                    yes|no) OPENCHAMBER_POLICY_OPT="$2"; OPENCHAMBER_POLICY_GIVEN=true ;;
+                    *)
+                        echo "error: --openchamber-policy must be yes or no (got: $2)" >&2
+                        exit 1
+                        ;;
+                esac
+                shift
+                ;;
             --migrate-agents)
                 if [ $# -lt 2 ]; then
                     echo "error: --migrate-agents requires a value (move|copy|skip)" >&2
@@ -979,6 +1008,40 @@ do_plan_phase() {
         fi
     fi
 
+    # === OpenChamber policy pin (issue #154) =======================================
+    # OpenChamber's one-click "Update to OpenCode 2" pins its own opencode
+    # binary (~/.opencode/bin/...) in settings.json — every OpenChamber
+    # session then runs OUTSIDE the kit. An admin-owned policy file
+    # (/etc/openchamber/policy.json) pins it back to the kit wrapper,
+    # retroactively. Opt-in: it disables OpenChamber's self-update buttons
+    # (updates go through `opk upgrade-opencode`). Asked only when
+    # OpenChamber is present; --yes without the flag keeps it off; an
+    # earlier opt-in survives re-installs; later: sudo opk openchamber-secure.
+    if [ "$OPENCHAMBER_POLICY_GIVEN" != true ]; then
+        _oc_seen=false
+        [ -d "$DEV_HOME/.config/openchamber" ] && _oc_seen=true
+        [ -e "$DEV_HOME/.opencode/bin/opencode" ] && _oc_seen=true
+        [ -e "$DEV_HOME/.opencode/bin/opencode2" ] && _oc_seen=true
+        [ -f /etc/openchamber/policy.json ] && _oc_seen=true
+        command -v openchamber >/dev/null 2>&1 && _oc_seen=true
+        _oc_prev=""
+        if [ -f /etc/opencode-permissions-kit/install.conf ]; then
+            _oc_prev=$(sed -n 's/^OPENCHAMBER_POLICY=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
+        fi
+        if [ "$INTERACTIVE" = true ] && [ "$_oc_seen" = true ]; then
+            if ui_confirm "Protect OpenChamber sessions too? (policy pin — its self-update buttons go dark)" "y"; then
+                OPENCHAMBER_POLICY=yes
+            else
+                OPENCHAMBER_POLICY=no
+            fi
+        elif [ "$_oc_prev" = "yes" ]; then
+            OPENCHAMBER_POLICY=yes   # keep an earlier opt-in (non-interactive)
+        fi
+    else
+        OPENCHAMBER_POLICY="$OPENCHAMBER_POLICY_OPT"
+    fi
+    [ -n "$OPENCHAMBER_POLICY" ] || OPENCHAMBER_POLICY=no
+
     # === Plan + confirmation ========================================================
     # The full plan with the effective values; C proceeds, A switches to the
     # granular prompts (Advanced), X aborts. Non-interactive runs print the plan
@@ -1004,6 +1067,9 @@ do_plan_phase() {
         _plan "ddev dev-owned mode" "(writes disable_settings_management: true into .ddev/config.yaml)"
     fi
     _plan "secure the opencode binary + wrapper" "root:opencode 750"
+    if [ "$OPENCHAMBER_POLICY" = yes ]; then
+        _plan "pin OpenChamber to the kit wrapper" "(/etc/openchamber/policy.json — self-update off)"
+    fi
     if [ -d /mnt/c ]; then
         _pm=$(stat -c %a /mnt/c 2>/dev/null || echo "")
         if [ -n "$_pm" ] && [ $((0$_pm & 0004)) -ne 0 ]; then
@@ -1239,6 +1305,7 @@ CONTAINER_BACKEND=$CONTAINER_BACKEND
 OPENCODE_DOCKER_HOST=$OPENCODE_DOCKER_HOST
 OPENCODE_PODMAN_SOCKET=$OPENCODE_PODMAN_SOCKET
 DDEV_DEV_OWNED=$DDEV_DEV_OWNED
+OPENCHAMBER_POLICY=$OPENCHAMBER_POLICY
 KIT_CHANNEL=$KIT_BRANCH
 VERSION=$VERSION
 EOF
@@ -1924,6 +1991,34 @@ do_deploy_phase() {
     ui_success "cli installed: opk -> $LIBDIR/bin/opk"
     log "cli symlink: /usr/local/bin/opk -> $LIBDIR/bin/opk"
 
+    # OpenChamber policy pin (issue #154): admin-owned file, read by
+    # OpenChamber's web server, desktop app, and VS Code extension. Pins
+    # their opencode spawn to the kit wrapper — beats the settings pin,
+    # env, and PATH, retroactively. root:root 0644 is sufficient
+    # (OpenChamber only reads it as the user; live-verified, see the
+    # design record).
+    # 0.0.47a F1: never overwrite a divergent existing file — admin-owned
+    # content is skipped loudly (same rule as update.sh's re-apply).
+    if [ "$OPENCHAMBER_POLICY" = yes ]; then
+        _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
+        if [ -f /etc/openchamber/policy.json ] \
+            && [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
+            ui_warn "existing /etc/openchamber/policy.json diverges from the kit pin"
+            ui_warn "(admin-owned content) — left untouched"
+            ui_detail "force it with: sudo opk openchamber-secure (replaces the file)"
+            log "openchamber policy pin skipped at install: existing file diverges (admin-owned)"
+        else
+            ui_info "Pinning OpenChamber to the kit wrapper ..."
+            sudo mkdir -p /etc/openchamber
+            printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
+                | sudo tee /etc/openchamber/policy.json > /dev/null
+            sudo chown root:root /etc/openchamber/policy.json
+            sudo chmod 644 /etc/openchamber/policy.json
+            ui_success "openchamber policy pin: /etc/openchamber/policy.json"
+            log "openchamber policy pin written: /etc/openchamber/policy.json"
+        fi
+    fi
+
     # xdg-open fallback (opencode 1.18.33+ / 2.0.18+ login fix): their
     # bundled opener (open@11) falls back to xdg-open when powershell.exe
     # is not executable for the caller — without any xdg-open the device
@@ -2406,6 +2501,9 @@ if [ "$SECURE_GIT_CONFIG" = true ]; then
     ui_kv "Git"   "blocked for the agent (.git/config deny active)"
 else
     ui_kv "Git"   "allowed"
+fi
+if [ "$OPENCHAMBER_POLICY" = yes ]; then
+    ui_kv "OpenChamber"   "policy pin active (sessions secured, self-update off)"
 fi
 ui_kv "Backup"   "$BACKUP_DIR"
 echo ""

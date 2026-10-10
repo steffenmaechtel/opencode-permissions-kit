@@ -42,10 +42,17 @@ Uninstall asks before removing the kit block (or assumes yes with
 | `DDEV_DEV_OWNED` | `true` = dev-owned settings mode (kit writes `disable_settings_management: true`), `false` = ddev-managed (handover model); toggled by `opk config ddev-settings` |
 | `DDEV_EXPORTED` | `1` once a ddev database export wave completed — later installs/updates skip the export |
 | `OPENCODE_MAJOR` | installed opencode binary's major (1 or 2); gates the wrapper's 2.x-only flags. Best effort — the wrapper detects at runtime when missing |
+| `OPENCHAMBER_POLICY` | `yes` = the OpenChamber policy pin is active (opt-in from the install prompt, `--openchamber-policy yes`, or `opk openchamber-secure`); `opk update` re-applies the pin only on `yes` |
 | `KIT_CHANNEL` | Ref installs/updates track (`stable`, `master`, a feature branch, or a pinned tag) — set by `install.sh`, re-stamped by `update.sh`, shown by `opk status` |
 | `OPENCODE_GROUP` | Always the `opencode` usergroup (informational) |
 | `HARD_DENY_REMOVED` | unused (historical migration stamp; updates from < 0.0.14 are refused — see [update](../how-to/update.md)) |
 | `VERSION` | Deployed kit version |
+
+## /etc/openchamber/
+
+| Path | Purpose |
+|---|---|
+| `policy.json` | Kit-owned when it pins `opencodeBinary` to `/usr/local/bin/opencode` (`root:root 0644`): makes OpenChamber spawn the kit wrapper machine-wide (web, desktop, VS Code) regardless of its settings pin — see [the how-to](../how-to/openchamber.md#prevent-the-bypass-the-policy-pin). Written by the install opt-in or `opk openchamber-secure`, re-applied by `opk update` only while the file still matches the kit one-liner — a file with other content is admin-owned: install/update skip it with a warning, and only `opk openchamber-secure` replaces it (announced). `opk uninstall` removes it only when it pins the kit wrapper |
 
 ## /etc/sudoers.d/
 

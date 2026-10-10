@@ -631,6 +631,185 @@ if [ -n "$_sra_pat" ]; then
     fi
 fi
 
+# OpenChamber state line (issue #154, Tier 3): the verdicts — secured via
+# the policy pin, BYPASSED (leftover binaries/settings pin without it),
+# advice when OpenChamber is present but unpinned, shadow note when only
+# self-installed binaries exist without OpenChamber (0.0.47a F4). Static
+# pins below; the verdict matrix itself runs functionally further down.
+if grep -q 'secured via policy pin' "$STATUS" \
+    && grep -q 'BYPASSED' "$STATUS" \
+    && grep -q "sudo opk openchamber-secure" "$STATUS"; then
+    pass "status shows the OpenChamber state (secured/bypassed/advice)"
+else
+    fail "status lost the OpenChamber state line"
+fi
+# detection reuses the wrapper's semantics: a pin on the kit wrapper itself
+# is not a bypass, an empty pin counts as unset
+if grep -q '_oc_secured=true' "$STATUS" \
+    && grep -qF '[ "$_oc_pin" = "/usr/local/bin/opencode" ]' "$STATUS"; then
+    pass "status pin detection matches the wrapper semantics"
+else
+    fail "status pin detection diverges from the wrapper"
+fi
+# home resolution via getent with /home/<user> fallback (0.0.47b W2, the
+# 0.0.43a F12 class): relocated homes must not blank the verdicts
+if grep -q 'getent passwd "${DEFAULT_USER:-$USER}"' "$STATUS" \
+    && grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-$USER}}"' "$STATUS"; then
+    pass "openchamber verdicts resolve the home via getent (0.0.47b W2)"
+else
+    fail "openchamber home resolution regressed to /home hardcode (0.0.47b W2)"
+fi
+# 0.0.47c C1: EXECUTE the real home-resolution lines (the matrix below
+# rewrites them away, so neither getent nor fallback ever runs there) —
+# both directions. root's passwd home (/root) differs from the
+# /home/<user> fallback on every suite host, so anything that discards
+# getent's result (a planted or reordered hardcode assignment keeping
+# both pinned lines intact) fails the first assert; an unresolvable user
+# takes the fallback without crashing (the L1 failure path).
+# Environment-dependent (0.0.46a F2 class): needs getent + root's home
+# at /root — true on every Linux host the suite runs on; without getent,
+# status.sh itself degrades to the fallback everywhere.
+OCV_HOME_SRC="$(awk '/^_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^f="\/home/) exit; print }' "$STATUS" \
+    | grep '^_oc_home=' || true)"
+if [ -n "$OCV_HOME_SRC" ]; then
+    pass "openchamber home-resolution lines extractable (0.0.47c C1)"
+else
+    fail "openchamber home-resolution lines not extractable (0.0.47c C1)"
+fi
+_oc_home_probe() {
+    (
+        DEFAULT_USER="$1"
+        USER=_oc_probe_unused
+        eval "$OCV_HOME_SRC"
+        printf '%s\n' "$_oc_home"
+    )
+}
+_oc_probe_root="$(_oc_home_probe root)"
+if [ "$_oc_probe_root" = "/root" ]; then
+    pass "openchamber home resolution: getent wins over the /home fallback (0.0.47c C1)"
+else
+    fail "openchamber home resolution discards getent — expected /root, got '$_oc_probe_root' (0.0.47c C1)"
+fi
+_oc_probe_none="$(_oc_home_probe oc-no-such-user-0.0.47c)"
+if [ "$_oc_probe_none" = "/home/oc-no-such-user-0.0.47c" ]; then
+    pass "openchamber home resolution: fallback taken on unresolvable user (0.0.47c C1)"
+else
+    fail "openchamber home resolution fallback broken — got '$_oc_probe_none' (0.0.47c C1)"
+fi
+
+# --- OpenChamber verdict matrix — functional (0.0.47a F3/F4) ---------------------
+# Extract the verdict block, rewrite the absolute paths (policy file, kit
+# wrapper, kit bin, default-user home) to fixtures, eval it with a stubbed
+# ui_kv, and drive every state — including the kit-symlink exemption (F3:
+# wrapper guard semantics) and the shadow-binary-without-OpenChamber
+# verdict (F4: BYPASSED only when OpenChamber is actually installed).
+OCV_ROOT="$WORK/ocv"
+OCV_POLICY="$OCV_ROOT/policy.json"
+OCV_HOME="$OCV_ROOT/home"
+OCV_WRAPPER="$OCV_ROOT/kit-wrapper"
+OCV_KITBIN="$OCV_ROOT/kit-bin"
+OCV_BINDIR="$OCV_ROOT/bin"
+mkdir -p "$OCV_HOME" "$OCV_BINDIR"
+: > "$OCV_WRAPPER"
+: > "$OCV_KITBIN"
+# Extract from `_oc_policy=` up to (excluding) the `f="/home/...` line that
+# follows the block — the block contains col-0 `fi` lines of its inner ifs,
+# so a sed range on `^fi$` would stop early.
+OCV_BLOCK="$(awk '/^_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^f="\/home/) exit; print }' "$STATUS" \
+    | sed -e "s|/etc/openchamber/policy.json|$OCV_POLICY|g" \
+        -e "s|/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode|$OCV_WRAPPER|g" \
+        -e "s|/usr/local/bin/opencode|$OCV_KITBIN|g" \
+        -e "s|^_oc_home=.*|_oc_home=\"$OCV_HOME\"|")"
+if [ -n "$OCV_BLOCK" ]; then
+    pass "openchamber verdict block extractable from status.sh"
+else
+    fail "openchamber verdict block not extractable from status.sh"
+fi
+# ocv_run <with|without> — eval the block; "with" puts a fake openchamber
+# command on PATH, "without" leaves it absent. Prints the ui_kv lines.
+ocv_run() {
+    (
+        [ "$1" = with ] && PATH="$OCV_BINDIR:$PATH"
+        ui_kv() { printf '%s %s\n' "$1" "$2"; }
+        eval "$OCV_BLOCK"
+    )
+}
+
+# 1. clean home, no OpenChamber -> no line at all
+out="$(ocv_run without)"
+if [ -z "$out" ]; then
+    pass "verdict matrix: clean state prints no OpenChamber line"
+else
+    fail "verdict matrix: clean state prints no OpenChamber line (got: $out)"
+fi
+
+# 2. F3: a symlink to the kit wrapper is NOT a bypass binary -> still quiet
+mkdir -p "$OCV_HOME/.opencode/bin"
+ln -s "$OCV_WRAPPER" "$OCV_HOME/.opencode/bin/opencode"
+out="$(ocv_run without)"
+if [ -z "$out" ]; then
+    pass "verdict matrix: kit-owned symlink ignored (0.0.47a F3)"
+else
+    fail "verdict matrix: kit-owned symlink ignored (0.0.47a F3) (got: $out)"
+fi
+
+# 3. F4: plain shadow binary, OpenChamber not installed -> shadow note,
+#    never the red BYPASSED verdict
+rm -f "${OCV_HOME:?}/.opencode/bin/opencode"
+echo fake > "$OCV_HOME/.opencode/bin/opencode"
+out="$(ocv_run without)"
+if printf '%s' "$out" | grep -q 'not installed' \
+    && ! printf '%s' "$out" | grep -q 'BYPASSED'; then
+    pass "verdict matrix: shadow binary without OpenChamber is not BYPASSED (0.0.47a F4)"
+else
+    fail "verdict matrix: shadow binary without OpenChamber is not BYPASSED (0.0.47a F4) (got: $out)"
+fi
+
+# 4. settings pin (config dir present) -> BYPASSED
+mkdir -p "$OCV_HOME/.config/openchamber"
+printf '{ "opencodeBinary": "/tmp/evil-opencode" }\n' \
+    > "$OCV_HOME/.config/openchamber/settings.json"
+out="$(ocv_run without)"
+if printf '%s' "$out" | grep -q 'BYPASSED'; then
+    pass "verdict matrix: settings pin without policy -> BYPASSED"
+else
+    fail "verdict matrix: settings pin without policy -> BYPASSED (got: $out)"
+fi
+
+# 5. policy pins the kit bin -> secured, leftovers noted as inert
+printf '{ "opencodeBinary": "%s" }\n' "$OCV_KITBIN" > "$OCV_POLICY"
+out="$(ocv_run without)"
+if printf '%s' "$out" | grep -q 'secured via policy pin' \
+    && printf '%s' "$out" | grep -q 'leftover bypass files present'; then
+    pass "verdict matrix: policy secures, leftovers called inert"
+else
+    fail "verdict matrix: policy secures, leftovers called inert (got: $out)"
+fi
+
+# 6. F3 under policy: only the kit symlink remains (plain binary and
+#    settings pin removed) -> secured without a leftover note
+rm -f "${OCV_HOME:?}/.opencode/bin/opencode" "${OCV_HOME:?}/.config/openchamber/settings.json"
+ln -s "$OCV_WRAPPER" "$OCV_HOME/.opencode/bin/opencode"
+out="$(ocv_run without)"
+if printf '%s' "$out" | grep -q 'secured via policy pin' \
+    && ! printf '%s' "$out" | grep -q 'leftover'; then
+    pass "verdict matrix: kit symlink under policy is not a leftover (0.0.47a F3)"
+else
+    fail "verdict matrix: kit symlink under policy is not a leftover (0.0.47a F3) (got: $out)"
+fi
+
+# 7. advice state via the command marker (no files, fake openchamber on PATH)
+rm -f "${OCV_HOME:?}/.opencode/bin/opencode" "${OCV_POLICY:?}" \
+    "${OCV_HOME:?}/.config/openchamber/settings.json"
+printf '#!/bin/sh\n' > "$OCV_BINDIR/openchamber"
+chmod +x "$OCV_BINDIR/openchamber"
+out="$(ocv_run with)"
+if printf '%s' "$out" | grep -q 'policy pin missing'; then
+    pass "verdict matrix: command marker alone -> advice line"
+else
+    fail "verdict matrix: command marker alone -> advice line (got: $out)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

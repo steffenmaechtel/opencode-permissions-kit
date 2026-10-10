@@ -19,6 +19,13 @@ used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
 `opk update`; `master` stays the development channel. Channels and the
 `stable` mirror discipline: `docs/design/release-handling.md`.
 
+## Issue reports from other installations
+
+GitHub issue links the USER sends (issues in this repo) come from machines
+running an INSTALLED kit: reported paths, logs, versions and failure modes
+describe that machine, not this checkout. Reproduce and fix here; don't
+expect the reported paths to exist locally.
+
 ## Layout
 
 - `files/` — the streamed entry point (`install.sh`) and templates
@@ -103,10 +110,14 @@ kept outside the tree) and re-run the suite to confirm green.
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning.
-The e2e suites may run in parallel on one host (disjoint containers,
-images and fixtures; warm `tests/e2e/cache/` required — after a version
-bump run one suite alone first); the invocation pattern lives in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+**Run them in parallel when the preconditions hold — not sequentially**
+(the suites are disjoint: per-suite containers, images and fixtures;
+sequential runs cost the other suite's full runtime for no benefit).
+Preconditions: a warm `tests/e2e/cache/` and no opencode version bump
+since the last suite run — after a version bump run one suite alone
+first, or two suites download the same version into the same cache path
+concurrently. The invocation pattern (including the three-suite variant
+with `e2e-ddev`) lives in [CONTRIBUTING.md](CONTRIBUTING.md).
 Executable bits live in the **git index** (issue #123): commit anything
 CI or the kit execute by path with `git update-index --chmod=+x <path>`
 (invariant: 755 <=> executed by path, 644 <=> sourced lib / interpreter
@@ -136,3 +147,21 @@ rationale and evidence lives in
   re-check the operand immediately before acting, chmod before chown.
 - **Fix waves are first-class code:** every fix wave gets its micro-wave
   review, and fixes bring their own pins.
+
+## Checkout ownership on kit-managed installs
+
+When this repo is worked on through the kit itself (the agent runs as the
+`opencode` user), the checkout is owned by the human user with group write
+for `opencode`: file CONTENTS are editable, but `chmod`/`chown` are not —
+the agent is not the owner (`git update-index --chmod=…` still works; it
+only touches the index). When a mode change is needed:
+
+1. Stage the authoritative change yourself:
+   `git update-index --chmod=+x <path>` (or `--chmod=-x`) — the index is
+   what commits and what CI checks out.
+2. **Tell the USER right away** and hand over the exact matching `chmod`
+   commands so the working tree aligns with the index (e.g.
+   `chmod +x tests/unit/test-foo.sh`). Until aligned, `make test` can
+   fail locally on files whose disk mode lags the index (fresh clones
+   always match — `sh tests/unit/test-*.sh` sidesteps the disk mode
+   entirely). Never silently leave worktree and index out of sync.

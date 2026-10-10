@@ -215,17 +215,92 @@ EOF
     note ""
 fi
 
-# Self-check: a self-installed opencode binary (official installer re-run or
-# PATH re-add) would shadow the wrapper in new shells, and tools may call the
-# absolute path of the real binary. Warn (but keep running) when one is present.
-SHADOW="$HOME/.opencode/bin/opencode"
-if [ -e "$SHADOW" ] && { [ ! -L "$SHADOW" ] \
-    || [ "$(readlink -f "$SHADOW" 2>/dev/null || echo "$SHADOW")" \
-        != "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; }; then
-    note "${YELLOW}WARNING: self-installed opencode detected at $SHADOW${NC}"
-    note "${YELLOW}New shells would run it instead of this wrapper. Fix: rm -rf $SHADOW${NC}"
+# Self-check: self-installed opencode binaries and OpenChamber's settings
+# pin (issue #154). The official installer re-run puts ~/.opencode/bin/
+# opencode (+ the opencode2 shim) back on disk; OpenChamber's one-click
+# "Update to OpenCode 2" installs the same files AND pins them via
+# "opencodeBinary" in ~/.config/openchamber/settings.json — from then on
+# every OpenChamber session spawns the pinned binary directly and runs
+# OUTSIDE the kit (no dedicated user, no permission layer), while a pin
+# whose binaries are gone hangs OpenChamber at startup ("OpenCode port is
+# not available"). Warn (but keep running), state-specific; the fix advice
+# is always TWO steps — binaries AND settings line — because a half fix
+# produces the hang state. With /etc/openchamber/policy.json pinning the
+# wrapper (kit opt-in / opk openchamber-secure) sessions are secured and
+# leftover files are inert: print a cleanup note instead of a warning.
+openchamber_guard() {
+    _oc_bins=""
+    for _oc_name in opencode opencode2; do
+        _oc_path="$HOME/.opencode/bin/$_oc_name"
+        if [ -e "$_oc_path" ]; then
+            if [ -L "$_oc_path" ] && [ "$(readlink -f "$_oc_path" 2>/dev/null || echo "$_oc_path")" \
+                = "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; then
+                :   # kit-owned symlink — not a shadow
+            else
+                _oc_bins="$_oc_bins $_oc_path"
+            fi
+        fi
+    done
+    # OpenChamber settings pin. settings.json is untrusted user input:
+    # one targeted sed extraction, no eval, and the VALUE never flows into
+    # note() (printf %b would expand its escape sequences — only the file
+    # and key are named). Empty string counts as unset (openchamber's
+    # optionalText semantics); a pin on the kit wrapper is secured.
+    _oc_pin=""
+    if [ -f "$HOME/.config/openchamber/settings.json" ]; then
+        _oc_pin=$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+            "$HOME/.config/openchamber/settings.json" 2>/dev/null | tail -n 1)
+        if [ -z "$_oc_pin" ] || [ "$_oc_pin" = "/usr/local/bin/opencode" ]; then
+            _oc_pin=""
+        fi
+    fi
+    if [ -z "$_oc_bins" ] && [ -z "$_oc_pin" ]; then
+        return 0
+    fi
+    # kit-written policy pin on the wrapper defuses the settings pin
+    # (openchamber: policy wins, never falls back). Leftovers are inert —
+    # name BOTH kinds (0.0.47a F2: a pin-only leftover must not dangle
+    # behind an empty binaries list).
+    if [ -f /etc/openchamber/policy.json ] \
+        && [ "$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+            /etc/openchamber/policy.json 2>/dev/null | tail -n 1)" = "/usr/local/bin/opencode" ]; then
+        note "${CYAN}NOTE: OpenChamber is pinned to the kit wrapper via /etc/openchamber/policy.json;${NC}"
+        if [ -n "$_oc_bins" ]; then
+            note "${CYAN}leftover bypass binaries are inert and safe to remove:$_oc_bins${NC}"
+        fi
+        if [ -n "$_oc_pin" ]; then
+            note "${CYAN}the \"opencodeBinary\" pin in $HOME/.config/openchamber/settings.json is${NC}"
+            note "${CYAN}inert — remove the line, or run: sudo opk openchamber-secure${NC}"
+        fi
+        note ""
+        return 0
+    fi
+    if [ -n "$_oc_bins" ] && [ -n "$_oc_pin" ]; then
+        note "${YELLOW}WARNING: OpenChamber sessions run OUTSIDE the kit (bypass detected):${NC}"
+        note "${YELLOW}self-installed binaries:$_oc_bins${NC}"
+        note "${YELLOW}plus an \"opencodeBinary\" pin in $HOME/.config/openchamber/settings.json${NC}"
+        note "${YELLOW}Fix (BOTH steps — a half fix hangs OpenChamber at startup):${NC}"
+        note "${YELLOW}  rm -f$_oc_bins${NC}"
+        note "${YELLOW}  remove the \"opencodeBinary\" line from $HOME/.config/openchamber/settings.json${NC}"
+        note "${YELLOW}See docs/how-to/openchamber.md${NC}"
+        note ""
+        return 0
+    fi
+    if [ -n "$_oc_bins" ]; then
+        note "${YELLOW}WARNING: self-installed opencode detected:$_oc_bins${NC}"
+        note "${YELLOW}New shells would run it instead of this wrapper. Fix: rm -f$_oc_bins${NC}"
+        note "${YELLOW}OpenChamber users: also check for an \"opencodeBinary\" pin in${NC}"
+        note "${YELLOW}$HOME/.config/openchamber/settings.json — see docs/how-to/openchamber.md${NC}"
+        note ""
+        return 0
+    fi
+    note "${YELLOW}WARNING: OpenChamber settings pin without binary — OpenChamber will hang${NC}"
+    note "${YELLOW}at startup (\"OpenCode port is not available\").${NC}"
+    note "${YELLOW}Fix: remove the \"opencodeBinary\" line from $HOME/.config/openchamber/settings.json${NC}"
+    note "${YELLOW}See docs/how-to/openchamber.md${NC}"
     note ""
-fi
+}
+openchamber_guard
 RESOLVED=$(command -v opencode 2>/dev/null || true)
 if [ -n "$RESOLVED" ] && [ "$RESOLVED" != "/usr/local/bin/opencode" ]; then
     note "${YELLOW}WARNING: 'opencode' on this PATH resolves to $RESOLVED, not the kit wrapper.${NC}"
