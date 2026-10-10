@@ -57,7 +57,9 @@ Do **not** use OpenChamber's own update affordances:
   caveat](../reference/compatibility.md#caveats)).
 
 If the one-click install already happened, recovery has **two steps** —
-the settings pin must go too:
+the settings pin must go too. `sudo opk openchamber-secure` does both
+(and pins OpenChamber to the kit wrapper so it cannot happen again —
+see [below](#prevent-the-bypass-the-policy-pin)); manually:
 
 1. Delete `~/.opencode/bin/opencode` (and the `opencode2` shim next to
    it).
@@ -74,6 +76,57 @@ kit's opencode is below 2.0.20, because then the compatibility check
 (which does fall back to the kit's wrapper) shows the update screen
 before a start is ever attempted — the pin only strikes once the kit
 reaches a compatible version again.
+
+The kit's wrapper warns about all of this on every terminal session
+start while bypass files are present (binaries and/or settings pin,
+with state-specific fix advice) — `opk status` shows the same state
+without starting a session.
+
+## Prevent the bypass: the policy pin
+
+OpenChamber honors an admin-owned policy file,
+`/etc/openchamber/policy.json`. Pinned to the kit wrapper it makes every
+OpenChamber surface — web UI, desktop app, VS Code extension — spawn
+`/usr/local/bin/opencode` regardless of its settings pin, environment
+variables, or PATH, including **retroactively**: an existing one-click
+pin is defused without anything to clean up first (live-verified against
+OpenChamber 2.2.0). OpenChamber's own update affordances stop working;
+updates go through `opk upgrade-opencode` exclusively.
+
+The kit can own that file for you — **opt-in**, because it changes
+third-party app behavior:
+
+- **At install time**: answer *Yes* to "Protect OpenChamber sessions
+  too?" (asked when OpenChamber is detected; `--openchamber-policy
+  yes|no` for unattended installs — under `--yes` without the flag the
+  pin stays off).
+- **Any time later**:
+
+  ```bash
+  sudo opk openchamber-secure
+  ```
+
+  Writes the pin, removes leftover bypass binaries and the settings pin
+  (asks first; `--yes` skips the question), and records the opt-in so
+  `opk update` re-applies the pin after kit updates. `opk uninstall`
+  removes it again. `opk status` shows the OpenChamber state: *secured
+  via policy pin*, *BYPASSED*, or the advice line when OpenChamber is
+  present but unpinned.
+
+The manual equivalent of what the command writes:
+
+```bash
+sudo mkdir -p /etc/openchamber
+printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
+    | sudo tee /etc/openchamber/policy.json
+sudo chown root:root /etc/openchamber/policy.json
+sudo chmod 644 /etc/openchamber/policy.json
+```
+
+Desktop note: an Electron desktop app running **inside** WSL reads this
+file; a Windows-side desktop app reads Windows policy paths instead —
+run the desktop app inside WSL or pin it in its Windows policy location
+yourself.
 
 ## Just run it
 
@@ -195,9 +248,10 @@ mode has no projectless chats.
   the one-click update installed its own opencode to
   `~/.opencode/bin/opencode` and pinned it in
   `~/.config/openchamber/settings.json`; the managed server now runs as
-  you without the kit's UID separation. Delete the binaries **and**
-  remove the `opencodeBinary` settings line, then restart OpenChamber —
-  see
+  you without the kit's UID separation. Run `sudo opk openchamber-secure`
+  (pins OpenChamber to the kit wrapper and cleans both) or delete the
+  binaries **and** remove the `opencodeBinary` settings line, then
+  restart OpenChamber — see
   [OpenChamber 2.x requires opencode 2.0.20+](#openchamber-2x-requires-opencode-2020).
 
 - **UI hangs loading, API answers "OpenCode port is not available"** —

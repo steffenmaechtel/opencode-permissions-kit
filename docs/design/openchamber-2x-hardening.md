@@ -1,12 +1,12 @@
 # OpenChamber 2.x hardening — design record
 
-> Status: **CURRENT (verification done, implementation pending).** How the
-> kit closes the OpenChamber settings-pin bypass: wrapper detection
-> (Tier 1), an admin-owned policy pin (Tier 2), and `opk` integration
-> (Tier 3). Issue #154, follow-up to #144 (2.x compatibility, PR #153).
-> Mechanism findings are source-verified (openchamber v2.2.0 and opencode
-> v2.0.22 checkouts); the policy pin was live-verified end-to-end on a
-> second WSL install (2026-10-10, §6). User-facing how-to:
+> Status: **CURRENT (shipped — all three tiers).** How the kit closes the
+> OpenChamber settings-pin bypass: wrapper detection (Tier 1), an
+> admin-owned policy pin (Tier 2), and `opk` integration (Tier 3).
+> Issue #154, follow-up to #144 (2.x compatibility, PR #153). Mechanism
+> findings are source-verified (openchamber v2.2.0 and opencode v2.0.22
+> checkouts); the policy pin was live-verified end-to-end on a second WSL
+> install (2026-10-10, §6). User-facing how-to:
 > [openchamber.md](../how-to/openchamber.md).
 
 ## 1. Problem: the one-click bypass
@@ -209,8 +209,25 @@ extension (policy read is code-verified).
 ## 10. Implementation order
 
 1. **Tier 1** — guard extension + unit tests; e2e per the wrapper DoD.
+   **Shipped**: `openchamber_guard()` in `opencode-as-opencode`
+   (functional unit tests via block extraction; the policy-secured
+   state prints a cleanup note instead of a warning).
 2. ~~Live verification of the policy pin~~ — done (§6).
 3. **Tier 2** — policy via install/update/uninstall + opt-in prompt.
+   **Shipped**: `--openchamber-policy <yes|no>`, detection-gated prompt
+   (asked only when OpenChamber is present; `--yes` without the flag
+   keeps it off; an earlier opt-in survives re-installs), install.conf
+   key `OPENCHAMBER_POLICY`, update re-apply (opt-in only), uninstall
+   removal (marker-gated).
 4. **Tier 3** — `opk status` line + `opk openchamber-secure`.
-5. Docs sync with each tier: how-to extension, compatibility caveat,
-   cli reference for the new command.
+   **Shipped**: status shows *secured via policy pin* / *BYPASSED* /
+   *policy missing*; `openchamber-secure [--yes]` writes the pin,
+   records the opt-in, and cleans leftover binaries + settings pin
+   (python3 JSON edit as the default user, manual-fix fallback).
+5. Docs sync — **shipped with the tiers**: how-to section
+   ("Prevent the bypass: the policy pin"), cli reference, files
+   reference, compatibility caveat.
+6. E2E coverage — **shipped**: e2e section 12k (opt-in default-off,
+   bypass fixture → BYPASSED, secure → pin + cleanup + status flip,
+   idempotency, update re-apply, uninstall removal). e2e with a real
+   OpenChamber stays out (decision C, §7).
