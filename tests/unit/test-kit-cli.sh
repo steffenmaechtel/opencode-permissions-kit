@@ -81,7 +81,7 @@ echo "=== CLI dispatcher tests ==="
 # help lists every subcommand
 out="$(run_kit --help)"
 assert "--help exits 0" "0" "$?"
-for c in status config update uninstall handover help; do
+for c in status config update uninstall handover help openchamber-secure; do
     case "$out" in
         *"$c"*) echo "  ${GREEN}PASS${NC}  --help mentions '$c'"; passed=$((passed + 1)) ;;
         *) echo "  ${RED}FAIL${NC}  --help mentions '$c'"; failures=$((failures + 1)) ;;
@@ -135,6 +135,29 @@ fi
 # uninstall dispatches as the current user (no forced sudo)
 out="$(run_kit uninstall --dry-run)"
 assert "uninstall passes flags" "uninstall:euid=$(id -u):args=--dry-run" "$out"
+
+# --- openchamber-secure (issue #154, Tier 3) -----------------------------------
+# Inline command: static wiring pins (functional run needs root + /etc —
+# covered by the e2e suite instead).
+grep -q '    openchamber-secure)' "$KIT" \
+    && echo "  ${GREEN}PASS${NC}  openchamber-secure dispatch exists" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  openchamber-secure dispatch exists"; failures=$((failures + 1)); }
+grep -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"' "$KIT" \
+    && echo "  ${GREEN}PASS${NC}  openchamber-secure auto-elevates with flags intact" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  openchamber-secure auto-elevates with flags intact"; failures=$((failures + 1)); }
+grep -qF '> /etc/openchamber/policy.json' "$KIT" \
+    && grep -qF 'OPENCHAMBER_POLICY=yes' "$KIT" \
+    && echo "  ${GREEN}PASS${NC}  openchamber-secure writes the pin + records the opt-in" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  openchamber-secure writes the pin + records the opt-in"; failures=$((failures + 1)); }
+
+# unknown flag for openchamber-secure aborts before elevation (runs as
+# non-root with the fake sudo, so the flag check fires first). Direct
+# call: run_kit swallows stderr, ui_error writes to stderr.
+errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" openchamber-secure --bogus 2>&1 >/dev/null || true)"
+case "$errout" in
+    *"unknown flag"*) echo "  ${GREEN}PASS${NC}  openchamber-secure rejects unknown flags"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  openchamber-secure rejects unknown flags (got: $errout)"; failures=$((failures + 1)) ;;
+esac
 
 # unknown command fails with exit 1
 if run_kit frobnicate >/dev/null 2>&1; then

@@ -631,6 +631,26 @@ if [ -n "$_sra_pat" ]; then
     fi
 fi
 
+# OpenChamber state line (issue #154, Tier 3): the three verdicts — secured
+# via the policy pin, BYPASSED (leftover binaries/settings pin without it),
+# advice when OpenChamber is present but unpinned. Static pins; the state
+# logic itself is exercised functionally in the e2e container.
+if grep -q 'secured via policy pin' "$STATUS" \
+    && grep -q 'BYPASSED' "$STATUS" \
+    && grep -q "sudo opk openchamber-secure" "$STATUS"; then
+    pass "status shows the OpenChamber state (secured/bypassed/advice)"
+else
+    fail "status lost the OpenChamber state line"
+fi
+# detection reuses the wrapper's semantics: a pin on the kit wrapper itself
+# is not a bypass, an empty pin counts as unset
+if grep -q '_oc_secured=true' "$STATUS" \
+    && grep -qF '[ "$_oc_pin" = "/usr/local/bin/opencode" ]' "$STATUS"; then
+    pass "status pin detection matches the wrapper semantics"
+else
+    fail "status pin detection diverges from the wrapper"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

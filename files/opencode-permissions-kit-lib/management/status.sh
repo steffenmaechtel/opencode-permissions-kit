@@ -102,6 +102,46 @@ else
 fi
 ui_kv "Sharing"  "group '$OPENCODE_GROUP' (default user: ${DEFAULT_USER:-unknown})"
 
+# OpenChamber state (issue #154, docs/design/openchamber-2x-hardening.md):
+# policy pin on the wrapper => secured (leftovers inert); no policy but
+# OpenChamber present => advice; bypass files (self-installed binaries,
+# settings pin) without the policy => BYPASSED. Evaluated for the default
+# user — the kit's model has exactly one developer.
+_oc_policy="/etc/openchamber/policy.json"
+_oc_secured=false
+if [ -f "$_oc_policy" ] \
+    && [ "$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        "$_oc_policy" 2>/dev/null | tail -n 1)" = "/usr/local/bin/opencode" ]; then
+    _oc_secured=true
+fi
+_oc_home="/home/${DEFAULT_USER:-$USER}"
+_oc_bins=""
+for _ocn in opencode opencode2; do
+    [ -e "$_oc_home/.opencode/bin/$_ocn" ] && _oc_bins="$_oc_bins ~/.opencode/bin/$_ocn"
+done
+_oc_pin=""
+if [ -f "$_oc_home/.config/openchamber/settings.json" ]; then
+    _oc_pin=$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        "$_oc_home/.config/openchamber/settings.json" 2>/dev/null | tail -n 1)
+    if [ -z "$_oc_pin" ] || [ "$_oc_pin" = "/usr/local/bin/opencode" ]; then
+        _oc_pin=""
+    fi
+fi
+if command -v openchamber >/dev/null 2>&1 || [ -n "$_oc_bins" ] || [ -n "$_oc_pin" ] \
+    || [ -d "$_oc_home/.config/openchamber" ] || [ "$_oc_secured" = true ]; then
+    if [ "$_oc_secured" = true ]; then
+        if [ -n "$_oc_bins" ] || [ -n "$_oc_pin" ]; then
+            ui_kv "OpenChamber" "secured via policy pin (leftover bypass files present — inert)" "$UI_GREEN"
+        else
+            ui_kv "OpenChamber" "secured via policy pin (/etc/openchamber/policy.json)" "$UI_GREEN"
+        fi
+    elif [ -n "$_oc_bins" ] || [ -n "$_oc_pin" ]; then
+        ui_kv "OpenChamber" "BYPASSED — run 'sudo opk openchamber-secure'" "$UI_RED"
+    else
+        ui_kv "OpenChamber" "installed, policy pin missing — 'sudo opk openchamber-secure'" "$UI_YELLOW"
+    fi
+fi
+
 f="/home/$OPENCODE_USER/.config/opencode/opencode.jsonc"
 [ -f "$f" ] || f="/home/$OPENCODE_USER/.config/opencode/opencode.json"
 if [ -f "$f" ]; then

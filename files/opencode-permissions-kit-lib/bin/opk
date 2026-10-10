@@ -40,6 +40,16 @@ else
     ui_info()    { echo "  info     $1"; }
     ui_success() { echo "  ok       $1"; }
     ui_detail()  { echo "           $1"; }
+    ui_confirm() { # <question> <y|n default> — reads /dev/tty, fails closed
+        printf '  %s ' "$1" >&2
+        case "$2" in y|Y) printf '[Y/n] ' >&2 ;; *) printf '[y/N] ' >&2 ;; esac
+        IFS= read -r _uic < /dev/tty 2>/dev/null || _uic=""
+        case "$_uic" in
+            y|Y|yes|YES) return 0 ;;
+            n|N|no|NO)   return 1 ;;
+            *)           case "$2" in y|Y) return 0 ;; *) return 1 ;; esac ;;
+        esac
+    }
 fi
 
 # Version from install.conf (the deployed stamp — same source as status.sh;
@@ -82,6 +92,12 @@ Commands:
                                    for 'update --yes --only-binary' (extra
                                    flags pass through, e.g. --binary-path,
                                    --major 1|2, --version <ver>)
+  openchamber-secure [--yes]       Pin OpenChamber's opencode spawn to the
+                                   kit wrapper (/etc/openchamber/policy.json
+                                   — its self-update buttons go dark, updates
+                                   go through opk upgrade-opencode) and remove
+                                   leftover one-click bypass files. Idempotent;
+                                   the later equivalent of the install prompt
   ddev-hosts-add [dir|hostname]     Add ddev hostnames to the Windows hosts
                                    file (ddev's own UAC flow; run as your
                                    user, Windows asks permission). A dir adds
@@ -141,6 +157,96 @@ case "$cmd" in
             exec sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
         fi
         exec sudo sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
+        ;;
+    openchamber-secure)
+        # OpenChamber hardening (issue #154, docs/design/openchamber-2x-hardening.md):
+        # write the admin-owned policy pin (/etc/openchamber/policy.json) that
+        # makes OpenChamber spawn the kit wrapper — retroactively defusing a
+        # one-click settings pin — record the opt-in (opk update re-applies
+        # the pin), and with consent remove leftover bypass binaries + the
+        # settings pin (a pin without binaries hangs OpenChamber at startup).
+        # Idempotent. Auto-sudo like config/update.
+        OC_YES=false
+        for _oca in "$@"; do
+            case "$_oca" in
+                --yes) OC_YES=true ;;
+                *) ui_error "unknown flag for openchamber-secure: $_oca (only --yes)"; exit 1 ;;
+            esac
+        done
+        if [ "$(id -u)" -ne 0 ]; then
+            exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"
+        fi
+        # Running as root from here.
+        _oc_duser=$(sed -n 's/^DEFAULT_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -1)
+        if [ -z "$_oc_duser" ]; then
+            ui_error "DEFAULT_USER not found in $INSTALL_CONF — is the kit installed?"
+            exit 1
+        fi
+        ui_info "Writing the OpenChamber policy pin ..."
+        mkdir -p /etc/openchamber
+        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > /etc/openchamber/policy.json
+        chown root:root /etc/openchamber/policy.json
+        chmod 644 /etc/openchamber/policy.json
+        ui_success "policy pin active: /etc/openchamber/policy.json -> /usr/local/bin/opencode"
+        # Record the opt-in so update.sh keeps re-applying the pin.
+        if grep -q '^OPENCHAMBER_POLICY=' "$INSTALL_CONF" 2>/dev/null; then
+            sed -i 's/^OPENCHAMBER_POLICY=.*/OPENCHAMBER_POLICY=yes/' "$INSTALL_CONF"
+        else
+            printf '\nOPENCHAMBER_POLICY=yes\n' >> "$INSTALL_CONF"
+        fi
+        # Leftover bypass files: inert under the policy, but removing them
+        # now avoids the startup hang if the policy ever disappears.
+        _oc_home="/home/$_oc_duser"
+        _oc_found=""
+        for _ocn in opencode opencode2; do
+            [ -e "$_oc_home/.opencode/bin/$_ocn" ] && _oc_found="x"
+        done
+        _oc_settings="$_oc_home/.config/openchamber/settings.json"
+        if grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null; then
+            _oc_found="x$_oc_found"
+        fi
+        if [ -z "$_oc_found" ]; then
+            ui_detail "no leftover bypass files found"
+            ui_detail "restart OpenChamber if it is running (full stop + start)"
+            exit 0
+        fi
+        echo ""
+        ui_info "Leftover bypass files found (inert under the policy):"
+        for _ocn in opencode opencode2; do
+            [ -e "$_oc_home/.opencode/bin/$_ocn" ] \
+                && ui_detail "  $_oc_home/.opencode/bin/$_ocn"
+        done
+        grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null \
+            && ui_detail "  settings pin: \"opencodeBinary\" in $_oc_settings"
+        if [ "$OC_YES" != true ]; then
+            if ! ui_confirm "Remove them now?" "y"; then
+                ui_detail "kept — 'sudo opk openchamber-secure' removes them later"
+                exit 0
+            fi
+        fi
+        rm -f "$_oc_home/.opencode/bin/opencode" "$_oc_home/.opencode/bin/opencode2"
+        ui_success "bypass binaries removed (if present)"
+        if grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null; then
+            if command -v python3 >/dev/null 2>&1 \
+                && sudo -u "$_oc_duser" python3 - "$_oc_settings" <<'PYEOF'
+import json, sys, pathlib
+p = pathlib.Path(sys.argv[1])
+try:
+    d = json.loads(p.read_text())
+except ValueError:
+    sys.exit(1)
+if isinstance(d, dict) and "opencodeBinary" in d:
+    del d["opencodeBinary"]
+    p.write_text(json.dumps(d, indent=2) + "\n")
+PYEOF
+            then
+                ui_success "settings pin removed from $_oc_settings"
+            else
+                ui_error "could not update $_oc_settings — remove the \"opencodeBinary\""
+                ui_error "line by hand (docs/how-to/openchamber.md)"
+            fi
+        fi
+        ui_detail "restart OpenChamber if it is running (full stop + start)"
         ;;
     uninstall)
         if [ ! -f "$LIBDIR/management/uninstall.sh" ]; then
