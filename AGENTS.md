@@ -19,6 +19,13 @@ used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
 `opk update`; `master` stays the development channel. Channels and the
 `stable` mirror discipline: `docs/design/release-handling.md`.
 
+## Issue reports from other installations
+
+GitHub issue links the USER sends (issues in this repo) come from machines
+running an INSTALLED kit: reported paths, logs, versions and failure modes
+describe that machine, not this checkout. Reproduce and fix here; don't
+expect the reported paths to exist locally.
+
 ## Layout
 
 - `files/` — the streamed entry point (`install.sh`) and templates
@@ -116,3 +123,21 @@ CI or the kit execute by path with `git update-index --chmod=+x <path>`
 (invariant: 755 <=> executed by path, 644 <=> sourced lib / interpreter
 call / data; enforced by `tests/unit/test-workflows.sh`). Workflows
 carry no `chmod +x` lines — `actions/checkout` preserves tracked modes.
+
+## Checkout ownership on kit-managed installs
+
+When this repo is worked on through the kit itself (the agent runs as the
+`opencode` user), the checkout is owned by the human user with group write
+for `opencode`: file CONTENTS are editable, but `chmod`/`chown` are not —
+the agent is not the owner (`git update-index --chmod=…` still works; it
+only touches the index). When a mode change is needed:
+
+1. Stage the authoritative change yourself:
+   `git update-index --chmod=+x <path>` (or `--chmod=-x`) — the index is
+   what commits and what CI checks out.
+2. **Tell the USER right away** and hand over the exact matching `chmod`
+   commands so the working tree aligns with the index (e.g.
+   `chmod +x tests/unit/test-foo.sh`). Until aligned, `make test` can
+   fail locally on files whose disk mode lags the index (fresh clones
+   always match — `sh tests/unit/test-*.sh` sidesteps the disk mode
+   entirely). Never silently leave worktree and index out of sync.
