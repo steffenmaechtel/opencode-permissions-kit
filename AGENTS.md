@@ -103,10 +103,14 @@ kept outside the tree) and re-run the suite to confirm green.
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning.
-The e2e suites may run in parallel on one host (disjoint containers,
-images and fixtures; warm `tests/e2e/cache/` required — after a version
-bump run one suite alone first); the invocation pattern lives in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+**Run them in parallel when the preconditions hold — not sequentially**
+(the suites are disjoint: per-suite containers, images and fixtures;
+sequential runs cost the other suite's full runtime for no benefit).
+Preconditions: a warm `tests/e2e/cache/` and no opencode version bump
+since the last suite run — after a version bump run one suite alone
+first, or two suites download the same version into the same cache path
+concurrently. The invocation pattern (including the three-suite variant
+with `e2e-ddev`) lives in [CONTRIBUTING.md](CONTRIBUTING.md).
 Executable bits live in the **git index** (issue #123): commit anything
 CI or the kit execute by path with `git update-index --chmod=+x <path>`
 (invariant: 755 <=> executed by path, 644 <=> sourced lib / interpreter

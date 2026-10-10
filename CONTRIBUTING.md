@@ -38,7 +38,9 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
 - After changes to `install.sh`, `update.sh`, the wrapper, or backend
   provisioning, **both** e2e suites are part of the definition of done — a
   green `make e2e` alone is not sufficient.
-- The e2e suites may run **in parallel** on one Docker host: their
+- The e2e suites **should run in parallel** on one Docker host whenever
+  the cache precondition below holds — sequential runs cost the other
+  suite's full runtime for no benefit: their
   scaffolding is disjoint (per-suite container names and images,
   `mktemp -d` project fixtures, no published host ports, no docker-wide
   cleanup — each suite removes only its own container). One
