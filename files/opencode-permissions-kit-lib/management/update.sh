@@ -701,6 +701,21 @@ if [ -f "$FILES_ROOT/etc/umask.sh" ]; then
     log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 fi
 
+# --- OpenChamber policy pin (issue #154) ---------------------------------------
+# Re-apply only when the install opted in (install.conf
+# OPENCHAMBER_POLICY=yes — sourced above). A policy.json without the opt-in
+# is admin-owned and never touched here; without the opt-in the file is
+# also never created (opt-in only, see the design record).
+if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
+    sudo mkdir -p /etc/openchamber
+    printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
+        | sudo tee /etc/openchamber/policy.json > /dev/null
+    sudo chown root:root /etc/openchamber/policy.json 2>/dev/null || true
+    sudo chmod 644 /etc/openchamber/policy.json
+    ui_success "openchamber policy pin re-applied: /etc/openchamber/policy.json"
+    log "openchamber policy pin re-applied: /etc/openchamber/policy.json"
+fi
+
 # --- shell-startup hooks (rewrite old paths, append when missing) ---------------
 # Older installs lack the interactive-shell hooks — append them idempotently
 # so a self-installed opencode binary is reported and `ddev()` stays wrapped.

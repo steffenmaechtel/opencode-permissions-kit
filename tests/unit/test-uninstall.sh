@@ -424,6 +424,17 @@ grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL" \
     && pass "uninstall plugin-unregister rides the conf user (V16)" \
     || fail "uninstall plugin-unregister rides the conf user (V16)"
 
+# OpenChamber policy pin removal (issue #154, Tier 2): kit-owned content
+# only — the policy.json goes when (and only when) it pins OUR wrapper;
+# any other content is admin-owned and must survive the uninstall.
+if grep -q 'grep -q .\"opencodeBinary\".*\"/usr/local/bin/opencode\"' "$UNINSTALL" \
+    && grep -q 'rm -f /etc/openchamber/policy.json' "$UNINSTALL" \
+    && grep -q 'rmdir /etc/openchamber' "$UNINSTALL"; then
+    pass "openchamber policy removed marker-gated (kit content only)"
+else
+    fail "openchamber policy removal lost its marker gate"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

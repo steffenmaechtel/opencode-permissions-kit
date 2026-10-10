@@ -478,6 +478,17 @@ check "streamed update never reads the confirm answer from the script stream (S8
 check "update.sh --help no longer claims prompt-free defaults (D2)" \
     sh -c "! grep -qF 'No prompts by default' \"\$1\"" _ "$UPDATE"
 
+# --- OpenChamber policy pin re-apply (issue #154, Tier 2) -------------------------
+# Opt-in only: the pin is re-applied when install.conf says
+# OPENCHAMBER_POLICY=yes (sourced above), never created without the
+# opt-in, and an admin-owned policy.json without the opt-in stays
+# untouched.
+check "update re-applies the policy pin when opted in" \
+    sh -c "grep -qF '[ \"\${OPENCHAMBER_POLICY:-}\" = \"yes\" ]' \"\$1\" \
+        && grep -qF 'sudo tee /etc/openchamber/policy.json' \"\$1\"" _ "$UPDATE"
+check "update never creates the policy pin without the opt-in" \
+    sh -c "! grep -qF 'OPENCHAMBER_POLICY=\"yes\"' \"\$1\"" _ "$UPDATE"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

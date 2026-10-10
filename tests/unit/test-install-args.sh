@@ -57,6 +57,9 @@ reset_globals() {
     DDEV_DEV_OWNED=true
     DDEV_SETTINGS_GIVEN=false
     FORCE_UNSUPPORTED_DISTRO=false
+    OPENCHAMBER_POLICY=""
+    OPENCHAMBER_POLICY_OPT=""
+    OPENCHAMBER_POLICY_GIVEN=false
 }
 
 # expect_rc <want-rc> <description> <args...>
@@ -131,6 +134,28 @@ parse_args --yes
 [ "$SKIP_DDEV_MIGRATION" = false ] \
     && pass "ddev migration stays ON by default" \
     || fail "ddev migration stays ON by default"
+
+# --openchamber-policy (issue #154): valid values captured, invalid aborts,
+# undecided by default (opt-in — detection + prompt decide, --yes keeps off).
+for _ocp_v in yes no; do
+    reset_globals
+    parse_args --openchamber-policy "$_ocp_v"
+    [ "$OPENCHAMBER_POLICY_OPT" = "$_ocp_v" ] && [ "$OPENCHAMBER_POLICY_GIVEN" = true ] \
+        && pass "--openchamber-policy $_ocp_v is captured" \
+        || fail "--openchamber-policy $_ocp_v is captured"
+done
+reset_globals
+parse_args --yes
+[ "$OPENCHAMBER_POLICY_OPT" = "" ] && [ "$OPENCHAMBER_POLICY_GIVEN" = false ] \
+    && pass "openchamber policy undecided by default (opt-in)" \
+    || fail "openchamber policy undecided by default (opt-in)"
+reset_globals
+parse_args --projects /var/www/vhosts --openchamber-policy yes
+[ "$OPENCHAMBER_POLICY_OPT" = "yes" ] \
+    && pass "--openchamber-policy works after --projects" \
+    || fail "--openchamber-policy works after --projects"
+expect_rc 1 "--openchamber-policy with an invalid value aborts" --openchamber-policy maybe
+expect_rc 1 "--openchamber-policy without a value aborts" --openchamber-policy
 
 # --migrate-agents (issue #19): valid values captured, invalid abort.
 for _ma_v in move copy skip; do

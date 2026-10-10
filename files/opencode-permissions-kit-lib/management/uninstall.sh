@@ -536,6 +536,17 @@ echo ""
 echo "--- Removing kit config directories + runtime artifacts ---"
 run sudo rm -rf /run/opencode-permissions-kit
 run sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
+# OpenChamber policy pin (issue #154): remove only what the kit wrote — a
+# policy.json pinning OUR wrapper. Any other content is admin-owned and
+# stays; /etc/openchamber itself only goes when empty (OpenChamber may own
+# more files in it).
+if [ -f /etc/openchamber/policy.json ] \
+    && grep -q '"opencodeBinary"[[:space:]]*:[[:space:]]*"/usr/local/bin/opencode"' \
+        /etc/openchamber/policy.json 2>/dev/null; then
+    run sudo rm -f /etc/openchamber/policy.json
+    run sudo rmdir /etc/openchamber 2>/dev/null || true
+    log "openchamber policy pin removed (kit-owned content only)"
+fi
 run sudo rm -rf /etc/opencode-permissions-kit
 echo "Removed."
 log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit"\
