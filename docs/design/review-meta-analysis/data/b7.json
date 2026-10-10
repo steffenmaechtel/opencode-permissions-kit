@@ -1,0 +1,572 @@
+{
+  "batch": "b7",
+  "snapshots": [
+    {
+      "stem": "0.0.44c",
+      "file": "docs/design/review/2026-10-05-v0.0.44-c.md",
+      "date": "2026-10-05",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 1 subagent",
+      "subject": "Wave-2 fix wave; per-claim verification of all 17 wave-b dispositions",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 3, "LOW": 3, "INFO": 2 },
+      "findings": [
+        {
+          "id": "C1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": "fix-regression",
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Four wave-b pin blocks placed after the summary exit gate: fail-but-green; mechanism reverts keep suites green.",
+          "cross_refs": ["0.0.44b W11–W17"],
+          "status": "reported"
+        },
+        {
+          "id": "C2",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "perm-model",
+          "secondary_class": "claim-drift",
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Finalize accounting reads dump-dir manifest as root after agent handover; planted FIFO hangs installer, falsifying W2 claim.",
+          "cross_refs": ["0.0.44b W2"],
+          "status": "reported"
+        },
+        {
+          "id": "C3",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "perm-model",
+          "secondary_class": "race-toctou",
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "Seed trusts any regular manifest file: agent-plantable/forged OK lines silently skip real exports; resume window needs no race.",
+          "cross_refs": ["0.0.44b W2"],
+          "status": "reported"
+        },
+        {
+          "id": "C4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "fix-regression",
+          "secondary_class": "shell-semantics",
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "W17's unguarded grep -c class reintroduced in same wave: W1 revert aborts suite unnamed, skipping later checks.",
+          "cross_refs": ["0.0.44b W17", "0.0.44b W1"],
+          "status": "reported"
+        },
+        {
+          "id": "C5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "W6 extract pin hangs (rc 124 via timeout) on revert instead of recording a named failure.",
+          "cross_refs": ["0.0.44b W6"],
+          "status": "reported"
+        },
+        {
+          "id": "C6",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "update.sh",
+          "provenance": "fix-induced",
+          "summary": "Re-stamp default maps any non-empty unparsed line to major 1, overwriting a known-good 2 stamp.",
+          "cross_refs": ["0.0.44a V5", "0.0.44b W4"],
+          "status": "reported"
+        },
+        {
+          "id": "C7",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "C6 garbage-line re-stamp edge unpinned; W4 pin covers only 2.x, bare 1.x and unknown shapes.",
+          "cross_refs": ["0.0.44b W4"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Gates: all 13 touched suites green on HEAD; full gate on wave-2 tip (lint, unit, e2e 273/0, rootless 47/0, ddev 70/0); revert-discrimination on three trees.",
+        "Two unnumbered INFO rows retroactively named C7/C8 by the resolution; C7 extracted, C8 (W3 arms verified precise) is verified-OK prose, skipped per spec.",
+        "Considered-and-rejected table: 4 suspicions dropped (sticky semantics, umask, cross-fs mv, resume dirs) — verification notes, not findings."
+      ]
+    },
+    {
+      "stem": "0.0.44d",
+      "file": "docs/design/review/2026-10-05-v0.0.44-d.md",
+      "date": "2026-10-05",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 1 fresh-context subagent",
+      "subject": "Wave-3 fix commit 9aa64e4; per-claim verification C1–C6",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 2, "LOW": 2, "INFO": 0 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "perm-model",
+          "area": "install.sh",
+          "provenance": "pre-existing",
+          "summary": "C2 closure falsified one call frame up: install.sh re-greps agent-owned dump-dir manifest as root after handover.",
+          "cross_refs": ["0.0.44c C2"],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "fix-regression",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "C3 owner check refuses kit's own agent-owned finalize manifest; documented resume path dead-ends, harness masked it.",
+          "cross_refs": ["0.0.44c C3"],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "update.sh",
+          "provenance": "fix-induced",
+          "summary": "Bare-version arm unanchored: digit-leading noise and dev-suffixed 2.x lines still stamp major 1.",
+          "cross_refs": ["0.0.44c C6"],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Wave-3's own mechanisms unpinned: manifest.auth accounting and C3 owner arm have no tests.",
+          "cross_refs": ["0.0.44c C2", "0.0.44c C3"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Method: sabotage/revert simulations in a scratch copy; all 7 touched suites + lint + check-version green on the tip.",
+        "Considered-and-rejected: 4 suspicions dropped (seed FIFO TOCTOU, status.sh read, bin CLI reads, scope leaks) — none elevated to findings."
+      ]
+    },
+    {
+      "stem": "0.0.44e",
+      "file": "docs/design/review/2026-10-05-v0.0.44-e.md",
+      "date": "2026-10-05",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 1 fresh-context subagent",
+      "subject": "Wave-4 fix commit c2a621a; per-claim verification F1–F4",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 1, "INFO": 2 },
+      "findings": [
+        {
+          "id": "E1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "fix-regression",
+          "area": "multiple",
+          "provenance": "fix-induced",
+          "summary": "Entry state pre-zeroed makes honest 'did not complete' branch dead: refusal stamps DDEV_EXPORTED=1, handover silently proceeds.",
+          "cross_refs": ["0.0.44d F1", "0.0.44d F2"],
+          "status": "reported"
+        },
+        {
+          "id": "E2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "silent-failure",
+          "area": "update.sh",
+          "provenance": "pre-existing",
+          "summary": "F3 class sibling unswept: current_opencode_major maps noise to major 1, picking the wrong upgrade channel.",
+          "cross_refs": ["0.0.44d F3"],
+          "status": "reported"
+        },
+        {
+          "id": "E3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": null,
+          "summary": "Finalize comment claims 'sticky-protected name' but finalize strips sticky; real protection is the seed owner refusal.",
+          "cross_refs": ["0.0.44c C3"],
+          "status": "reported"
+        },
+        {
+          "id": "E4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "hardcoded-env",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Owner-arm pin assumes non-root suite user; run as root it fails against correct code — needs skip guard.",
+          "cross_refs": ["0.0.44d F4"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Method: behavioral simulation of refused path, sabotage/revert sims for every F4 pin, ground-truth probe of cached real 1.x binaries.",
+        "Considered-and-rejected: 4 suspicions dropped (subshell global-eating, word-splitting, root-owned manifest consumers, 1.x shapes)."
+      ]
+    },
+    {
+      "stem": "0.0.44f",
+      "file": "docs/design/review/2026-10-05-v0.0.44-f.md",
+      "date": "2026-10-05",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 1 GLM-5.3-Flash subagent (security)",
+      "subject": "Wave-5 fix commit 4d0aab2; per-claim verification E1–E4; stop-rule gate",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 4 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "silent-failure",
+          "area": "install.sh",
+          "provenance": "pre-existing",
+          "summary": "E2-class third site outside swept pair: empty probe rewrites correct install-time 2 stamp to 1; wrapper never re-probes.",
+          "cross_refs": ["0.0.44e E2", "#80"],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Completed-run pin regex accepts OK=[0]: combined revert stays green; accounting fill itself unpinned.",
+          "cross_refs": ["0.0.44e E1"],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "Entry reset clears three of four state vars; FAILLIST not cleared — header contract not fully implemented.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "update.sh",
+          "provenance": "pre-existing",
+          "summary": "No stamp plus unparseable probe still resolves major 1 (documented last resort); E2 scope is stamp-present only.",
+          "cross_refs": ["0.0.44e E2"],
+          "status": "reported"
+        },
+        {
+          "id": "F5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Refused-path root guard skips silently — no SKIP line, unlike the 4f guard's visible one.",
+          "cross_refs": ["0.0.44e E4"],
+          "status": "reported"
+        },
+        {
+          "id": "F6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "pre-existing",
+          "summary": "Accepted W2-class display residual: agent renames finalized manifest and plants a file; opk status shows forged counts.",
+          "cross_refs": ["0.0.44b W2"],
+          "status": "reported"
+        },
+        {
+          "id": "R1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": null,
+          "summary": "RETRACTED sub-review claim: opk status manifest grep FIFO-hangable — the -f guard excludes FIFOs; only F6 residual remains.",
+          "cross_refs": ["0.0.44c C2"],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "First stop-rule-met snapshot; chain a–f converges (28→17→6→4→4 findings; MEDs 4→7→3→2→1→0).",
+        "Review ran the wave-owed e2e gate (273/0, rootless 47/0, ddev 70/0, zero skips) — the wave-5 resolution had recorded no gate numbers.",
+        "Sabotage table S1–S3: all pins flip as expected except the F2 combined-revert blind spot.",
+        "One recorded retraction (sub-agent FIFO-hang claim) kept deliberately to calibrate future FIFO-shaped claims."
+      ]
+    },
+    {
+      "stem": "0.0.44g",
+      "file": "docs/design/review/2026-10-05-v0.0.44-g.md",
+      "date": "2026-10-05",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 2 GLM-5.3-Flash subagents (security, quality)",
+      "subject": "Wave-6 fix commit b0ddfaa; per-claim verification of wave-f dispositions",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 1 },
+      "findings": [
+        {
+          "id": "G1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Scoping end-anchor is a prose log string: rewording decays arm statics to token-blind file-wide matching, failing soft.",
+          "cross_refs": ["0.0.42d class"],
+          "status": "reported"
+        },
+        {
+          "id": "G2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": null,
+          "summary": "Stale-kept-stamp corner: changed binary plus unparseable probe mis-majors; wrapper trusts stamp, fails loud. Accepted trade suggested.",
+          "cross_refs": ["0.0.44f F1", "0.0.44b W4"],
+          "status": "reported"
+        },
+        {
+          "id": "G3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "bin-wrappers",
+          "provenance": "fix-induced",
+          "summary": "Wrapper comment 'mirrors install.sh's major detection' now inaccurate: install keeps stamps, wrapper still fail-opens.",
+          "cross_refs": ["0.0.44b W10"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Gates run by wave 6 itself (34 suites, lint, check-version, e2e 273/0, rootless 47/0, ddev 70/0 re-run after F3).",
+        "Quality agent independently re-derived both pin sabotages; G2 lead-narrowed from the security agent's report (wording, not severity).",
+        "G1 is prospective decay only — scoping verified correct at this tree; resolution later closed the wave with e2e not re-run (test- and comment-only delta)."
+      ]
+    },
+    {
+      "stem": "0.0.45a",
+      "file": "docs/design/review/2026-10-06-v0.0.45-a.md",
+      "date": "2026-10-06",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 2 GLM-5.3-Flash subagents (security, quality)",
+      "subject": "Issue-#145 distro whitelist gate wave (feature branch, commit cf6aa85)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 5, "INFO": 4 },
+      "findings": [
+        {
+          "id": "S1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "shell-semantics",
+          "area": "install.sh",
+          "provenance": "wave-introduced",
+          "summary": "Missing /etc/os-release silently kills streamed install (pipefail rc 2, zero output) — the 0.0.39b C2 class.",
+          "cross_refs": ["0.0.39b C2"],
+          "status": "reported"
+        },
+        {
+          "id": "C1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Gate-call wiring unpinned (0.0.42d class): rewired '_distro_gate unknown' call keeps suite green, pins token-blind.",
+          "cross_refs": ["0.0.42d class"],
+          "status": "downgraded"
+        },
+        {
+          "id": "C2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "hardcoded-env",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "wave-introduced",
+          "summary": "tr strips only double quotes: single-quoted or CRLF VERSION_ID misses whitelist, falsely refusing supported distros.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "D1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Getting-started docs overstate gate: 'refuses everywhere else' — actually unsupported Ubuntu versions only; Debian/Mint pass.",
+          "cross_refs": [],
+          "status": "downgraded"
+        },
+        {
+          "id": "D2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Flag docs imply a Debian 12+ floor is enforced; gate never checks Debian versions (Debian 11 passes).",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "D3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Point-release VERSION_ID 22.04.3 refused although matrix row reads Ubuntu 22.04 yes; fail-closed, footnote at most.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Suite header still self-describes as parse_args()-only; 18 new gate/order assertions undocumented in header list.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "S2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "wave-introduced",
+          "summary": "Root performs streamed sibling fetch and sources fetched libs before gate refuses; self-contained gate could precede fetch_kit.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "S3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "wave-introduced",
+          "summary": "FORCE_UNSUPPORTED_DISTRO clobbered before parse_args: env carry-through dead, CLI-only as documented — support, not security, boundary.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "R1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": null,
+          "summary": "RETRACTED: SIGPIPE sed-to-head rc 141 on huge single-line os-release under pipefail — unreachable, files spec-bound tiny.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "R2",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": null,
+          "summary": "RETRACTED: _dg_v/_dg_id leak as shell globals — established underscore pattern, no collision in install.sh.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "R3",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": null,
+          "summary": "RETRACTED: terminal-escape injection via raw os-release bytes onto root terminal — requires /etc write, attacker already root.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "R4",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "RETRACTED: sed function-extraction range could truncate on nested brace — no column-0 brace exists in body.",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "Two sub-agent MEDs downgraded to LOW after lead verification (C1 prospective-only rewiring gap, D1 docs wording); 4 ghost suspicions retracted.",
+        "Gates re-verified and extended by the review (rootless 47/0, ddev 70/0 added — the commit had not claimed them).",
+        "Provenance section added pre-push at maintainer request: all 9 findings unreleased (branch commit, no tag, not on master/stable).",
+        "Retracted rows carry no severity in the snapshot — INFO inferred; IDs R1–R4 synthesized (table uses a dash)."
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "0.0.44",
+      "file": "docs/design/review/2026-10-05-v0.0.44-resolution.md",
+      "dispositions": { "implemented": 64, "implemented_differently": 0, "not_done": 6 },
+      "follow_ups_recorded": 0,
+      "notes": "Chain a–g fully dispositioned; stop rule met at f and g. Not-done: V25 format-inherent; wave-c C8 no action (C7 closed via C6 pin); f F4 fail-open trade; f F6 accepted display residual (revisit deferred); g G2 documented trade."
+    }
+  ]
+}
