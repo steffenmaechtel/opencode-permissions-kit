@@ -72,7 +72,11 @@ gap: [test-environment-fidelity.md](design/test-environment-fidelity.md).
 Review strategy — scopes, cadence, loop stop rule:
 [review-concept.md](design/review-concept.md). CI review — planning
 record for automated AI reviews in GitHub Actions (issue #122):
-[ci-review.md](design/ci-review.md). Model-generated code
+[ci-review.md](design/ci-review.md). Review meta-analysis — error-class
+statistics and recurrence chains from snapshots 0.0.38–0.0.46, plus the
+per-wave learnings checklist (re-runnable record):
+[review-meta-analysis/](design/review-meta-analysis/README.md).
+Model-generated code
 reviews — immutable snapshots plus per-finding
 resolutions — live in [`design/review/`](design/review/README.md).
 Superseded or
