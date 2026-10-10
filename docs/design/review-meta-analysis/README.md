@@ -37,10 +37,14 @@ recorded.
    did not stop it — the enforced step did.
 4. **`tests-unit` is hotspot #1** (92 findings; dominated by `test-vacuous` +
    `test-gap`): the tests themselves are the least-verified code we ship.
-5. **External full reviews are the only reliable source of `perm-model`
-   HIGHs.** Same tree `b3418ac`: internal pass 0.0.42d found 2 MED; the
-   external pass 0.0.42e found 2 HIGH + 6 MED (incl. the uninstall-symlink
-   chown and the `rm -rf` sandbox breach).
+5. **Full passes through opencode v2's built-in `/review` are the only
+   reliable source of `perm-model` HIGHs.** Same tree `b3418ac`: internal
+   pass 0.0.42d (v1 custom review skill + Flash subagents) found 2 MED; the
+   external 0.0.42e found 2 HIGH + 6 MED (incl. the uninstall-symlink chown
+   and the `rm -rf` sandbox breach). Same tree and model again, one day
+   apart: 0.0.45b on opencode 1.18.34 + kit skills found zero MED/HIGH;
+   0.0.45c on opencode 2.0.22 found 8 — **the tooling is the differentiator,
+   not the model** (maintainer calibration, 2026-10-10).
 
 ## Recurring classes, with their chains
 

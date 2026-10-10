@@ -99,9 +99,12 @@ These already collapsed their classes — they stay binding:
 - **Same-PR docs** (`docs-policy` 25 → 0)
 - **Sabotage-verify per pin** (`test-vacuous` 12 → 2)
 - **Class-sweep discipline** (`sibling-sweep` → 0 in 0.0.46)
-- **External pre-release full review** — the only reliable source of
-  `perm-model` HIGHs (internal 2 MED vs external 2 HIGH + 6 MED on the same
-  tree, `0.0.42d`/`0.0.42e`)
+- **Pre-release full pass via opencode v2's built-in `/review`** (fresh
+  external session) — the only reliable source of `perm-model` HIGHs
+  (internal v1: 2 MED vs external pass: 2 HIGH + 6 MED on the same tree,
+  `0.0.42d`/`0.0.42e`; and same tree/model one day apart: `0.0.45b` on
+  opencode 1.18.34 + kit skills found zero MED/HIGH, `0.0.45c` on opencode
+  2.0.22 found 8 — the tooling is the differentiator, not the model)
 - **Snapshot with the first fix commit** — chain convergence fell from 16
   snapshots (0.0.39) to 3 (0.0.46)
 

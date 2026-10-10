@@ -22,6 +22,21 @@ precise; lead verification catches the false positives. Retractions cluster
 in high-volume wave reviews (0.0.43b: 13, 0.0.44a: 11 rejected) — fresh-context
 sessions also document their "considered and rejected" discipline better.
 
+**What the grouping cannot show (maintainer calibration, 2026-10-10):** the
+axis above is the *model* — but the model was never the big difference
+between the review eras. The **tooling** was:
+
+| Era | Tooling | Snapshots |
+|---|---|---|
+| A | opencode v1, kit's custom review skill, single session (no subagents) | 0.0.38, 0.0.39a–e |
+| B | opencode v1, kit's custom review skill + custom fresh-context subagents (GLM-5.3-Flash) | internal snapshots ~0.0.42–0.0.45 |
+| C | opencode **v2 with its built-in `/review` skill** | 0.0.45c–f, 0.0.46b–c (external); 0.0.46a ran the v2 agent in the repo session; 0.0.42e (GPT-6 Luna) was the early external full pass that established the pattern |
+
+The v2 built-in `/review` is much stronger than v1's `/review` and much
+stronger than the kit's custom project review skill. The precision table
+above is confounded with this timeline (the C-era sessions are also the
+fresh-context external ones) — it must not be read as a model ranking.
+
 ## 2) Escape and provenance
 
 | Provenance | Share | Meaning |
@@ -35,18 +50,35 @@ wave reviews catch exactly these (0.0.42f: all 5 MED fix-induced/fix-incomplete;
 0.0.44d: 2 of 4). The loop's economy is right: one micro-wave review per fix
 wave. (Also the reason for L6 in [learnings.md](learnings.md).)
 
-## 3) Blind spots: internal vs external, wave vs full
+## 3) Blind spots: review tooling (v1 custom skill vs v2 `/review`), wave vs full
 
-- **Same tree, two reviews, different depth:** 0.0.42d (internal, tree
-  `b3418ac`) found 2 MED — 0.0.42e (GPT-6 external, *same tree*) found
-  2 HIGH + 6 MED, including the uninstall chown symlink (S1) and the unit
-  suite `rm -rf` on fixed host paths (S2, executed as an incident on the
-  external host).
-- **Both external full passes (0.0.42e, 0.0.45c) delivered 8 HIGH+MED each**,
+Maintainer calibration (2026-10-10): what separated the deep passes from the
+shallow ones was never mainly the model — it was the session tooling.
+"Internal" reviews ran opencode v1 with the kit's custom project review
+skill (first solo — era A — then with custom GLM-5.3-Flash subagents — era
+B); the deep external passes ran **opencode v2 with its built-in `/review`
+skill**, which is much stronger than v1's `/review` and much stronger than
+the custom project review skill.
+
+- **Same tree, two reviews, different depth:** 0.0.42d (internal, v1 custom
+  skill + Flash subagents, tree `b3418ac`) found 2 MED — 0.0.42e (external,
+  *same tree*) found 2 HIGH + 6 MED, including the uninstall chown symlink
+  (S1) and the unit suite `rm -rf` on fixed host paths (S2, executed as an
+  incident on the external host).
+- **The cleanest tooling comparison in the corpus — same tree, same model,
+  one day apart:** 0.0.45b (external, but opencode **1.18.34 with the kit's
+  own skills**, three sequential roles, no subagent tool) found 4 findings,
+  zero MED/HIGH, verdict "release-ready". 0.0.45c (external, opencode
+  **2.0.22**, lead + four fresh-context axis subagents) found **2 HIGH +
+  6 MED** on the same tree — including both HIGHs that shaped 0.0.46. The
+  skill made the difference; neither the model nor externality alone did.
+- **Both v2-era full passes (0.0.42e, 0.0.45c) delivered 8 HIGH+MED each**,
   including 4 of the 12 HIGHs overall. Wave reviews almost never find HIGHs
   (their scope is the diff).
-- **Keep:** the external pre-release full review (established since
-  0.0.42e / 0.0.45b–c) is the only proven source of `perm-model` HIGHs.
+- **Keep:** a pre-release full pass through **opencode v2's built-in
+  `/review`** in a fresh external session (established since 0.0.42e /
+  0.0.45b–c) — the only proven source of `perm-model` HIGHs. Fresh eyes
+  help; the v2 `/review` tooling is why it works.
 
 ## 4) Convergence speed
 
