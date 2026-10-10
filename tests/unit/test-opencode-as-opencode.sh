@@ -709,10 +709,21 @@ printf '{ "opencodeBinary": "%s" }\n' "$OC_KIT_BIN" > "$OC_POLICY"
 out=$(oc_run "$TMPDIR/oc-both")
 assert_valid "openchamber guard: policy secures -> NOTE not WARNING" "1" \
     "$(printf '%s' "$out" | grep -c '^C:NOTE')"
-assert_valid "openchamber guard: policy secures -> leftovers called inert" "1" \
+assert_valid "openchamber guard: policy secures -> both leftovers called inert" "2" \
     "$(printf '%s' "$out" | grep -c 'inert')"
+assert_valid "openchamber guard: policy secures -> stale settings pin named" "1" \
+    "$(printf '%s' "$out" | grep -c 'settings.json is')"
 assert_valid "openchamber guard: policy secures -> no bypass wording" "0" \
     "$(printf '%s' "$out" | grep -c 'OUTSIDE the kit')"
+# policy + pin-only leftover (0.0.47a F2): the stale settings pin is named,
+# no dangling "safe to remove:" list without binaries
+out=$(oc_run "$TMPDIR/oc-pin")
+assert_valid "openchamber guard: policy + pin-only -> NOTE not WARNING" "1" \
+    "$(printf '%s' "$out" | grep -c '^C:NOTE')"
+assert_valid "openchamber guard: policy + pin-only -> stale pin named" "1" \
+    "$(printf '%s' "$out" | grep -c 'settings.json is')"
+assert_valid "openchamber guard: policy + pin-only -> no dangling remove list" "0" \
+    "$(printf '%s' "$out" | grep -c 'safe to remove:')"
 : > "$OC_POLICY"
 
 # settings.json without the key -> quiet

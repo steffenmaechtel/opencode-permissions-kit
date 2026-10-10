@@ -115,7 +115,10 @@ Effects (all code-verified, §2; the first three live-verified, §6):
 
 Rollout lives in `files/opencode-permissions-kit-lib/management/` — the
 same lifecycles as sudoers/Projects.conf: install prompt + update.sh
-re-apply (only when chosen or already present) + uninstall.sh removal.
+re-apply (only when chosen — and only while the file still matches the kit
+one-liner; divergent content is admin-owned, skipped loudly, never
+overwritten: 0.0.47a F1) + uninstall.sh removal (marker-gated: only when
+the file pins our wrapper).
 The file is new kit-owned property in `/etc` — no third-party config is
 edited (the `wsl-conf-consent` precedence does not apply; the opt-in
 prompt exists anyway, §7 A).
@@ -217,11 +220,16 @@ extension (policy read is code-verified).
    **Shipped**: `--openchamber-policy <yes|no>`, detection-gated prompt
    (asked only when OpenChamber is present; `--yes` without the flag
    keeps it off; an earlier opt-in survives re-installs), install.conf
-   key `OPENCHAMBER_POLICY`, update re-apply (opt-in only), uninstall
-   removal (marker-gated).
+   key `OPENCHAMBER_POLICY`, update re-apply (opt-in only, and only while
+   the file matches the kit one-liner — admin-extended content is skipped
+   loudly, never overwritten; 0.0.47a F1), uninstall removal
+   (marker-gated).
 4. **Tier 3** — `opk status` line + `opk openchamber-secure`.
    **Shipped**: status shows *secured via policy pin* / *BYPASSED* /
-   *policy missing*; `openchamber-secure [--yes]` writes the pin,
+   *policy missing* — binaries only count as a bypass when OpenChamber is
+   actually installed, otherwise a plain shadow note (0.0.47a F4), and a
+   symlink to the kit wrapper is never a bypass binary (wrapper guard
+   semantics, 0.0.47a F3); `openchamber-secure [--yes]` writes the pin,
    records the opt-in, and cleans leftover binaries + settings pin
    (python3 JSON edit as the default user, manual-fix fallback).
 5. Docs sync — **shipped with the tiers**: how-to section

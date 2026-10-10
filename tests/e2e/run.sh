@@ -1148,11 +1148,15 @@ echo "--- 12k. OpenChamber hardening (issue #154) ---"
 # Opt-in only: the --yes install above must not have written anything.
 check_fail "12k: --yes install wrote no /etc/openchamber (opt-in only)" \
     E 'test -e /etc/openchamber'
-# Fake the one-click bypass state as the developer (binary + opencode2 shim
-# + settings pin).
-E 'mkdir -p /home/dev/.opencode/bin /home/dev/.config/openchamber \
+# Fake the one-click bypass state as the developer, in two stages: binaries
+# first (shadow state WITHOUT OpenChamber — 0.0.47a F4), then the settings
+# pin (full bypass).
+E 'mkdir -p /home/dev/.opencode/bin \
     && printf "fake-binary" > /home/dev/.opencode/bin/opencode \
-    && printf "# shim" > /home/dev/.opencode/bin/opencode2 \
+    && printf "# shim" > /home/dev/.opencode/bin/opencode2'
+check "12k: shadow binaries without OpenChamber are not BYPASSED (0.0.47a F4)" \
+    E 'opk status 2>&1 | grep OpenChamber | grep -q "not installed"'
+E 'mkdir -p /home/dev/.config/openchamber \
     && printf "{\"opencodeBinary\": \"/home/dev/.opencode/bin/opencode\", \"port\": 3000}\n" \
         > /home/dev/.config/openchamber/settings.json'
 check "12k: opk status reports BYPASSED" \
@@ -1174,6 +1178,16 @@ check "12k: opk status reports secured via policy pin" \
     E 'opk status 2>&1 | grep -q "secured via policy pin"'
 check "12k: openchamber-secure is idempotent (re-run exits 0)" \
     E 'sudo opk openchamber-secure --yes >/dev/null 2>&1'
+# 0.0.47a F3: a kit-owned symlink at ~/.opencode/bin/opencode is not a
+# bypass binary (wrapper guard semantics) — openchamber-secure leaves it
+# alone, status shows no leftover note.
+E 'ln -s /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode /home/dev/.opencode/bin/opencode'
+E 'sudo opk openchamber-secure --yes >/dev/null 2>&1'
+check "12k: kit-owned symlink survives openchamber-secure (0.0.47a F3)" \
+    E 'test -L /home/dev/.opencode/bin/opencode'
+check "12k: kit-owned symlink is not a leftover (no bypass note)" \
+    E '! opk status 2>&1 | grep -q "leftover bypass files present"'
+E 'rm -f /home/dev/.opencode/bin/opencode'
 # opk update re-applies the pin when the opt-in is recorded: remove the
 # policy, run a full update from a repo copy (same pattern as section 11 —
 # the local VERSION file makes update.sh treat the copy as the local
@@ -1185,7 +1199,17 @@ E 'rm -rf /tmp/oc-update-test && mkdir -p /tmp/oc-update-test/files \
     && sudo bash /tmp/oc-update-test/files/opencode-permissions-kit-lib/management/update.sh --yes'
 check "12k: opk update re-applies the policy pin (opt-in recorded)" \
     E 'test -f /etc/openchamber/policy.json'
-E 'rm -rf /tmp/oc-update-test'
+# 0.0.47a F1: an admin-extended policy file is never overwritten by the
+# update re-apply — the skip is loud, the admin keys survive.
+E 'sudo sed -i "s/}$/, \"enterpriseMode\": true }/" /etc/openchamber/policy.json'
+check "12k: admin-extended policy staged" \
+    E 'grep -q enterpriseMode /etc/openchamber/policy.json'
+E 'sudo bash /tmp/oc-update-test/files/opencode-permissions-kit-lib/management/update.sh --yes > /tmp/oc-update-2.log 2>&1'
+check "12k: update leaves admin-extended policy untouched (0.0.47a F1)" \
+    E 'grep -q enterpriseMode /etc/openchamber/policy.json'
+check "12k: update announces the skip" \
+    E 'grep -q "left untouched" /tmp/oc-update-2.log'
+E 'rm -rf /tmp/oc-update-test /tmp/oc-update-2.log'
 
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"

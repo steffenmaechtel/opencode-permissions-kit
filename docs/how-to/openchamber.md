@@ -108,10 +108,14 @@ third-party app behavior:
 
   Writes the pin, removes leftover bypass binaries and the settings pin
   (asks first; `--yes` skips the question), and records the opt-in so
-  `opk update` re-applies the pin after kit updates. `opk uninstall`
-  removes it again. `opk status` shows the OpenChamber state: *secured
-  via policy pin*, *BYPASSED*, or the advice line when OpenChamber is
-  present but unpinned.
+  `opk update` re-applies the pin after kit updates — a policy file whose
+  content differs from the kit's one-liner (e.g. extended by an admin) is
+  never overwritten by an update; the update says so instead. `opk
+  uninstall` removes it again, but only when the file still pins the kit
+  wrapper. `opk status` shows the OpenChamber state: *secured via policy
+  pin*, *BYPASSED*, or the advice line when OpenChamber is present but
+  unpinned — self-installed binaries without an OpenChamber installation
+  get a plain shadow note instead of the red bypass verdict.
 
 The manual equivalent of what the command writes:
 

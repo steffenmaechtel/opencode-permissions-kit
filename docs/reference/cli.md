@@ -19,8 +19,11 @@ updates go through `opk upgrade-opencode` exclusively. The command also
 removes leftover bypass binaries (`~/.opencode/bin/opencode`,
 `opencode2`) and the `opencodeBinary` settings pin (asks first; `--yes`
 skips the question) and records the opt-in so `opk update` re-applies
-the pin. Idempotent; `opk uninstall` removes the file again
-(marker-gated — a policy file with other content is never touched).
+the pin. Idempotent. A pre-existing policy file with other content is
+announced and replaced by this command; `opk update` and the install opt-in
+never overwrite such a file — they skip it with a warning (admin-owned
+content). `opk uninstall` removes the file only when it still pins the kit
+wrapper (marker-gated).
 Background and manual steps:
 [the how-to](../how-to/openchamber.md#prevent-the-bypass-the-policy-pin).
 

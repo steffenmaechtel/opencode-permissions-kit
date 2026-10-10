@@ -52,6 +52,18 @@ else
     }
 fi
 
+# OpenChamber bypass-binary probe (0.0.47a F3): shared semantics with the
+# wrapper's guard — a file at ~/.opencode/bin/<name> that symlinks to the
+# kit wrapper is NOT a bypass binary (never listed, never removed).
+oc_bypass_bin() { # <path> -> rc 0 when the path is a bypass binary
+    [ -e "$1" ] || return 1
+    if [ -L "$1" ] && [ "$(readlink -f "$1" 2>/dev/null || echo "$1")" \
+        = "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; then
+        return 1
+    fi
+    return 0
+}
+
 # Version from install.conf (the deployed stamp — same source as status.sh;
 # a standalone VERSION file is not deployed to the library). OPK_INSTALL_CONF
 # overrides the path for tests only.
@@ -183,6 +195,13 @@ case "$cmd" in
             exit 1
         fi
         ui_info "Writing the OpenChamber policy pin ..."
+        # 0.0.47a F1: this explicit command DOES replace divergent content
+        # (that is its job) — but never silently: announce the replacement.
+        _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
+        if [ -f /etc/openchamber/policy.json ] \
+            && [ "$(cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
+            ui_info "existing /etc/openchamber/policy.json diverges from the kit pin — replacing it"
+        fi
         mkdir -p /etc/openchamber
         printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > /etc/openchamber/policy.json
         chown root:root /etc/openchamber/policy.json
@@ -196,10 +215,18 @@ case "$cmd" in
         fi
         # Leftover bypass files: inert under the policy, but removing them
         # now avoids the startup hang if the policy ever disappears.
-        _oc_home="/home/$_oc_duser"
+        # HOME via getent, not /home/<user> (0.0.43b W1 class); a kit
+        # symlink to the wrapper is never a bypass binary (0.0.47a F3).
+        _oc_home=$(getent passwd "$_oc_duser" 2>/dev/null | cut -d: -f6 || true)
+        if [ -z "$_oc_home" ]; then
+            ui_detail "could not resolve the home of '$_oc_duser' — leftover scan skipped"
+            exit 0
+        fi
         _oc_found=""
         for _ocn in opencode opencode2; do
-            [ -e "$_oc_home/.opencode/bin/$_ocn" ] && _oc_found="x"
+            if oc_bypass_bin "$_oc_home/.opencode/bin/$_ocn"; then
+                _oc_found="x"
+            fi
         done
         _oc_settings="$_oc_home/.config/openchamber/settings.json"
         if grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null; then
@@ -213,7 +240,7 @@ case "$cmd" in
         echo ""
         ui_info "Leftover bypass files found (inert under the policy):"
         for _ocn in opencode opencode2; do
-            [ -e "$_oc_home/.opencode/bin/$_ocn" ] \
+            oc_bypass_bin "$_oc_home/.opencode/bin/$_ocn" \
                 && ui_detail "  $_oc_home/.opencode/bin/$_ocn"
         done
         grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null \
@@ -224,7 +251,10 @@ case "$cmd" in
                 exit 0
             fi
         fi
-        rm -f "$_oc_home/.opencode/bin/opencode" "$_oc_home/.opencode/bin/opencode2"
+        for _ocn in opencode opencode2; do
+            oc_bypass_bin "$_oc_home/.opencode/bin/$_ocn" \
+                && rm -f "$_oc_home/.opencode/bin/$_ocn"
+        done
         ui_success "bypass binaries removed (if present)"
         if grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null; then
             if command -v python3 >/dev/null 2>&1 \

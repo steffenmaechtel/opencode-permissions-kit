@@ -52,7 +52,7 @@ Uninstall asks before removing the kit block (or assumes yes with
 
 | Path | Purpose |
 |---|---|
-| `policy.json` | Kit-owned when it pins `opencodeBinary` to `/usr/local/bin/opencode` (`root:root 0644`): makes OpenChamber spawn the kit wrapper machine-wide (web, desktop, VS Code) regardless of its settings pin — see [the how-to](../how-to/openchamber.md#prevent-the-bypass-the-policy-pin). Written by the install opt-in or `opk openchamber-secure`, re-applied by `opk update` (opt-in only), removed marker-gated by `opk uninstall`. Any other content is admin-owned — the kit never touches it |
+| `policy.json` | Kit-owned when it pins `opencodeBinary` to `/usr/local/bin/opencode` (`root:root 0644`): makes OpenChamber spawn the kit wrapper machine-wide (web, desktop, VS Code) regardless of its settings pin — see [the how-to](../how-to/openchamber.md#prevent-the-bypass-the-policy-pin). Written by the install opt-in or `opk openchamber-secure`, re-applied by `opk update` only while the file still matches the kit one-liner — a file with other content is admin-owned: install/update skip it with a warning, and only `opk openchamber-secure` replaces it (announced). `opk uninstall` removes it only when it pins the kit wrapper |
 
 ## /etc/sudoers.d/
 

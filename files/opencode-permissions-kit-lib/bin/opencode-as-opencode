@@ -258,12 +258,21 @@ openchamber_guard() {
         return 0
     fi
     # kit-written policy pin on the wrapper defuses the settings pin
-    # (openchamber: policy wins, never falls back)
+    # (openchamber: policy wins, never falls back). Leftovers are inert —
+    # name BOTH kinds (0.0.47a F2: a pin-only leftover must not dangle
+    # behind an empty binaries list).
     if [ -f /etc/openchamber/policy.json ] \
         && [ "$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
             /etc/openchamber/policy.json 2>/dev/null | tail -n 1)" = "/usr/local/bin/opencode" ]; then
         note "${CYAN}NOTE: OpenChamber is pinned to the kit wrapper via /etc/openchamber/policy.json;${NC}"
-        note "${CYAN}leftover bypass files are inert and safe to remove:$_oc_bins${NC}"
+        if [ -n "$_oc_bins" ]; then
+            note "${CYAN}leftover bypass binaries are inert and safe to remove:$_oc_bins${NC}"
+        fi
+        if [ -n "$_oc_pin" ]; then
+            note "${CYAN}the \"opencodeBinary\" pin in $HOME/.config/openchamber/settings.json is${NC}"
+            note "${CYAN}inert too — remove the line, or run: sudo opk openchamber-secure${NC}"
+        fi
+        note ""
         return 0
     fi
     if [ -n "$_oc_bins" ] && [ -n "$_oc_pin" ]; then

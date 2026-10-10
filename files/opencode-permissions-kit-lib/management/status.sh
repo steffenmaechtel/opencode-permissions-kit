@@ -105,8 +105,11 @@ ui_kv "Sharing"  "group '$OPENCODE_GROUP' (default user: ${DEFAULT_USER:-unknown
 # OpenChamber state (issue #154, docs/design/openchamber-2x-hardening.md):
 # policy pin on the wrapper => secured (leftovers inert); no policy but
 # OpenChamber present => advice; bypass files (self-installed binaries,
-# settings pin) without the policy => BYPASSED. Evaluated for the default
-# user — the kit's model has exactly one developer.
+# settings pin) without the policy => BYPASSED — binaries only count as a
+# bypass when OpenChamber is actually installed (0.0.47a F4), and a symlink
+# to the kit wrapper is never a bypass binary (wrapper guard semantics,
+# 0.0.47a F3). Evaluated for the default user — the kit's model has exactly
+# one developer.
 _oc_policy="/etc/openchamber/policy.json"
 _oc_secured=false
 if [ -f "$_oc_policy" ] \
@@ -115,9 +118,14 @@ if [ -f "$_oc_policy" ] \
     _oc_secured=true
 fi
 _oc_home="/home/${DEFAULT_USER:-$USER}"
+_oc_kit_wrapper="/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode"
 _oc_bins=""
 for _ocn in opencode opencode2; do
-    [ -e "$_oc_home/.opencode/bin/$_ocn" ] && _oc_bins="$_oc_bins ~/.opencode/bin/$_ocn"
+    _ocp="$_oc_home/.opencode/bin/$_ocn"
+    if [ -e "$_ocp" ] && { [ ! -L "$_ocp" ] \
+        || [ "$(readlink -f "$_ocp" 2>/dev/null || echo "$_ocp")" != "$_oc_kit_wrapper" ]; }; then
+        _oc_bins="$_oc_bins ~/.opencode/bin/$_ocn"
+    fi
 done
 _oc_pin=""
 if [ -f "$_oc_home/.config/openchamber/settings.json" ]; then
@@ -127,6 +135,11 @@ if [ -f "$_oc_home/.config/openchamber/settings.json" ]; then
         _oc_pin=""
     fi
 fi
+# OpenChamber installed at all? (command or config dir — the installation
+# markers; without them, binaries are the classic installer shadow)
+_oc_present=false
+command -v openchamber >/dev/null 2>&1 && _oc_present=true
+[ -d "$_oc_home/.config/openchamber" ] && _oc_present=true
 if command -v openchamber >/dev/null 2>&1 || [ -n "$_oc_bins" ] || [ -n "$_oc_pin" ] \
     || [ -d "$_oc_home/.config/openchamber" ] || [ "$_oc_secured" = true ]; then
     if [ "$_oc_secured" = true ]; then
@@ -135,8 +148,10 @@ if command -v openchamber >/dev/null 2>&1 || [ -n "$_oc_bins" ] || [ -n "$_oc_pi
         else
             ui_kv "OpenChamber" "secured via policy pin (/etc/openchamber/policy.json)" "$UI_GREEN"
         fi
-    elif [ -n "$_oc_bins" ] || [ -n "$_oc_pin" ]; then
+    elif [ -n "$_oc_pin" ] || { [ -n "$_oc_bins" ] && [ "$_oc_present" = true ]; }; then
         ui_kv "OpenChamber" "BYPASSED — run 'sudo opk openchamber-secure'" "$UI_RED"
+    elif [ -n "$_oc_bins" ]; then
+        ui_kv "OpenChamber" "not installed — self-installed opencode present:$_oc_bins (remove it)" "$UI_YELLOW"
     else
         ui_kv "OpenChamber" "installed, policy pin missing — 'sudo opk openchamber-secure'" "$UI_YELLOW"
     fi

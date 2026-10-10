@@ -149,6 +149,15 @@ grep -qF '> /etc/openchamber/policy.json' "$KIT" \
     && grep -qF 'OPENCHAMBER_POLICY=yes' "$KIT" \
     && echo "  ${GREEN}PASS${NC}  openchamber-secure writes the pin + records the opt-in" && passed=$((passed + 1)) \
     || { echo "  ${RED}FAIL${NC}  openchamber-secure writes the pin + records the opt-in"; failures=$((failures + 1)); }
+# 0.0.47a F1: replacing divergent policy content is announced, never silent
+grep -qF 'diverges from the kit pin — replacing it' "$KIT" \
+    && echo "  ${GREEN}PASS${NC}  openchamber-secure announces replacing divergent content (F1)" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  openchamber-secure announces replacing divergent content (F1)"; failures=$((failures + 1)); }
+# 0.0.47a F3: the kit-symlink exemption helper exists and is used at the
+# detection, listing and removal sites
+[ "$(grep -c 'oc_bypass_bin' "$KIT")" -ge 4 ] \
+    && echo "  ${GREEN}PASS${NC}  openchamber-secure exempts kit-owned symlinks (F3)" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  openchamber-secure exempts kit-owned symlinks (F3)"; failures=$((failures + 1)); }
 
 # unknown flag for openchamber-secure aborts before elevation (runs as
 # non-root with the fake sudo, so the flag check fires first). Direct

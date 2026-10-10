@@ -1997,15 +1997,26 @@ do_deploy_phase() {
     # env, and PATH, retroactively. root:root 0644 is sufficient
     # (OpenChamber only reads it as the user; live-verified, see the
     # design record).
+    # 0.0.47a F1: never overwrite a divergent existing file — admin-owned
+    # content is skipped loudly (same rule as update.sh's re-apply).
     if [ "$OPENCHAMBER_POLICY" = yes ]; then
-        ui_info "Pinning OpenChamber to the kit wrapper ..."
-        sudo mkdir -p /etc/openchamber
-        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
-            | sudo tee /etc/openchamber/policy.json > /dev/null
-        sudo chown root:root /etc/openchamber/policy.json
-        sudo chmod 644 /etc/openchamber/policy.json
-        ui_success "openchamber policy pin: /etc/openchamber/policy.json"
-        log "openchamber policy pin written: /etc/openchamber/policy.json"
+        _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
+        if [ -f /etc/openchamber/policy.json ] \
+            && [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
+            ui_warn "existing /etc/openchamber/policy.json diverges from the kit pin"
+            ui_warn "(admin-owned content) — left untouched"
+            ui_detail "force it with: sudo opk openchamber-secure (replaces the file)"
+            log "openchamber policy pin skipped at install: existing file diverges (admin-owned)"
+        else
+            ui_info "Pinning OpenChamber to the kit wrapper ..."
+            sudo mkdir -p /etc/openchamber
+            printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
+                | sudo tee /etc/openchamber/policy.json > /dev/null
+            sudo chown root:root /etc/openchamber/policy.json
+            sudo chmod 644 /etc/openchamber/policy.json
+            ui_success "openchamber policy pin: /etc/openchamber/policy.json"
+            log "openchamber policy pin written: /etc/openchamber/policy.json"
+        fi
     fi
 
     # xdg-open fallback (opencode 1.18.33+ / 2.0.18+ login fix): their
