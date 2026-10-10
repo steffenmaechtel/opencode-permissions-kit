@@ -659,6 +659,43 @@ if grep -q 'getent passwd "${DEFAULT_USER:-$USER}"' "$STATUS" \
 else
     fail "openchamber home resolution regressed to /home hardcode (0.0.47b W2)"
 fi
+# 0.0.47c C1: EXECUTE the real home-resolution lines (the matrix below
+# rewrites them away, so neither getent nor fallback ever runs there) —
+# both directions. root's passwd home (/root) differs from the
+# /home/<user> fallback on every suite host, so anything that discards
+# getent's result (a planted or reordered hardcode assignment keeping
+# both pinned lines intact) fails the first assert; an unresolvable user
+# takes the fallback without crashing (the L1 failure path).
+# Environment-dependent (0.0.46a F2 class): needs getent + root's home
+# at /root — true on every Linux host the suite runs on; without getent,
+# status.sh itself degrades to the fallback everywhere.
+OCV_HOME_SRC="$(awk '/^_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^f="\/home/) exit; print }' "$STATUS" \
+    | grep '^_oc_home=' || true)"
+if [ -n "$OCV_HOME_SRC" ]; then
+    pass "openchamber home-resolution lines extractable (0.0.47c C1)"
+else
+    fail "openchamber home-resolution lines not extractable (0.0.47c C1)"
+fi
+_oc_home_probe() {
+    (
+        DEFAULT_USER="$1"
+        USER=_oc_probe_unused
+        eval "$OCV_HOME_SRC"
+        printf '%s\n' "$_oc_home"
+    )
+}
+_oc_probe_root="$(_oc_home_probe root)"
+if [ "$_oc_probe_root" = "/root" ]; then
+    pass "openchamber home resolution: getent wins over the /home fallback (0.0.47c C1)"
+else
+    fail "openchamber home resolution discards getent — expected /root, got '$_oc_probe_root' (0.0.47c C1)"
+fi
+_oc_probe_none="$(_oc_home_probe oc-no-such-user-0.0.47c)"
+if [ "$_oc_probe_none" = "/home/oc-no-such-user-0.0.47c" ]; then
+    pass "openchamber home resolution: fallback taken on unresolvable user (0.0.47c C1)"
+else
+    fail "openchamber home resolution fallback broken — got '$_oc_probe_none' (0.0.47c C1)"
+fi
 
 # --- OpenChamber verdict matrix — functional (0.0.47a F3/F4) ---------------------
 # Extract the verdict block, rewrite the absolute paths (policy file, kit

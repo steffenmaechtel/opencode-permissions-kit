@@ -249,6 +249,7 @@ case "$cmd" in
         if [ "$OC_YES" != true ]; then
             if ! ui_confirm "Remove them now?" "y"; then
                 ui_detail "kept — 'sudo opk openchamber-secure' removes them later"
+                ui_detail "restart OpenChamber if it is running (full stop + start)"
                 exit 0
             fi
         fi
