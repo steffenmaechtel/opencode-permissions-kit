@@ -61,7 +61,11 @@ selection reference for the rootless container backends. Release model:
 [release-handling.md](design/release-handling.md) — channels, the
 `stable` mirror, and the phased adoption roadmap (issue #38). opencode
 2.x compatibility (service model, detection, open items):
-[opencode-2x.md](design/opencode-2x.md). The issue #149 ddev workflow
+[opencode-2x.md](design/opencode-2x.md). OpenChamber 2.x hardening —
+the settings-pin bypass, the policy-pin countermeasure, and `opk`
+integration (issue #154):
+[openchamber-2x-hardening.md](design/openchamber-2x-hardening.md). The
+issue #149 ddev workflow
 audit — replay method, findings, resolutions, and the app-type chmod
 matrix: [ddev-workflow-improvements.md](design/ddev-workflow-improvements.md).
 Known-security-advisory
