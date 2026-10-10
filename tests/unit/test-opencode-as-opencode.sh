@@ -582,6 +582,170 @@ else
     failures=$((failures + 1))
 fi
 
+# --- OpenChamber bypass guard (issue #154, Tier 1) ---
+# openchamber_guard() warns state-specifically about self-installed
+# binaries (~/.opencode/bin/opencode + opencode2) and the OpenChamber
+# settings pin (~/.config/openchamber/settings.json "opencodeBinary"):
+#   bins + pin  -> bypass warning, fix is TWO steps (a half fix hangs
+#                  OpenChamber at startup)
+#   bins only   -> shadow warning (classic installer re-run)
+#   pin only    -> hang warning (pin outlives deleted binaries)
+#   kit policy  -> secured note, leftovers inert (Tier 2 defuses the pin)
+# Functional via the static-extraction technique (HL_BLOCK et al.): the
+# absolute kit paths are rewritten to TMPDIR fixtures so the block runs
+# portably (no kit install needed), note() is stubbed, colors distinguish
+# warning (W:) from note (C:).
+echo ""
+echo "--- OpenChamber bypass guard (issue #154) ---"
+
+OC_BLOCK="$(sed -n '/^openchamber_guard()/,/^}/p' "$WRAPPER_FILE")"
+if [ -n "$OC_BLOCK" ]; then
+    echo "  ${GREEN}PASS${NC}  openchamber_guard function extractable"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  openchamber_guard function not extractable"
+    failures=$((failures + 1))
+fi
+
+OC_KIT_WRAPPER="$TMPDIR/oc-kit-wrapper"
+OC_KIT_BIN="$TMPDIR/oc-kit-bin"
+OC_POLICY="$TMPDIR/oc-policy.json"
+: > "$OC_KIT_WRAPPER"
+: > "$OC_KIT_BIN"
+OC_BLOCK="$(printf '%s\n' "$OC_BLOCK" | sed \
+    -e "s|/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode|$OC_KIT_WRAPPER|g" \
+    -e "s|/usr/local/bin/opencode|$OC_KIT_BIN|g" \
+    -e "s|/etc/openchamber/policy.json|$OC_POLICY|g")"
+
+# oc_run <home> — eval the block with a stubbed note(), run the guard,
+# print every non-empty note prefixed with its color stub (W: warning,
+# C: note). Empty output = guard stayed quiet.
+oc_run() {
+    _home="$1"
+    (
+        HOME="$_home"
+        RED='' GREEN='' CYAN='C:' YELLOW='W:' NC=''
+        _oc_notes=""
+        note() { if [ -n "$1" ]; then _oc_notes="$_oc_notes
+$1"; fi; }
+        eval "$OC_BLOCK"
+        openchamber_guard
+        printf '%s' "$_oc_notes"
+    )
+}
+
+# fixture helper
+oc_mkbin() { # <home> [names...] — real shadow binaries
+    _h="$1"; shift
+    mkdir -p "$_h/.opencode/bin"
+    for _n in "$@"; do echo "fake" > "$_h/.opencode/bin/$_n"; done
+}
+
+# clean home -> quiet
+mkdir -p "$TMPDIR/oc-clean"
+out=$(oc_run "$TMPDIR/oc-clean")
+assert_valid "openchamber guard: clean home -> quiet" "" "$out"
+
+# bins only -> shadow warning, both names, rm -f fix, no bypass wording
+mkdir -p "$TMPDIR/oc-bins"
+oc_mkbin "$TMPDIR/oc-bins" opencode opencode2
+out=$(oc_run "$TMPDIR/oc-bins")
+assert_valid "openchamber guard: bins only -> warns (shadow)" "1" \
+    "$(printf '%s' "$out" | grep -c 'self-installed opencode detected')"
+assert_valid "openchamber guard: bins only -> names both binaries (detect + fix lines)" "2" \
+    "$(printf '%s' "$out" | grep -c 'bin/opencode .*bin/opencode2')"
+assert_valid "openchamber guard: bins only -> rm -f fix, no rm -rf" "1" \
+    "$(printf '%s' "$out" | grep -c 'Fix: rm -f ')"
+
+# pin only -> hang warning + settings line fix
+mkdir -p "$TMPDIR/oc-pin/.config/openchamber"
+printf '{ "opencodeBinary": "%s/.opencode/bin/opencode" }\n' "$TMPDIR/oc-pin" \
+    > "$TMPDIR/oc-pin/.config/openchamber/settings.json"
+out=$(oc_run "$TMPDIR/oc-pin")
+assert_valid "openchamber guard: pin only -> hang warning" "1" \
+    "$(printf '%s' "$out" | grep -c 'will hang')"
+assert_valid "openchamber guard: pin only -> fix removes the settings line" "1" \
+    "$(printf '%s' "$out" | grep -c 'remove the .opencodeBinary. line')"
+
+# bins + pin -> bypass warning, BOTH steps
+mkdir -p "$TMPDIR/oc-both/.config/openchamber"
+oc_mkbin "$TMPDIR/oc-both" opencode opencode2
+printf '{ "opencodeBinary": "/home/dev/.opencode/bin/opencode" }\n' \
+    > "$TMPDIR/oc-both/.config/openchamber/settings.json"
+out=$(oc_run "$TMPDIR/oc-both")
+assert_valid "openchamber guard: bins+pin -> bypass wording" "1" \
+    "$(printf '%s' "$out" | grep -c 'OUTSIDE the kit')"
+assert_valid "openchamber guard: bins+pin -> BOTH-steps fix advice" "1" \
+    "$(printf '%s' "$out" | grep -c 'BOTH steps')"
+assert_valid "openchamber guard: bins+pin -> fix names binaries AND settings line" "2" \
+    "$(printf '%s' "$out" | grep -c -e 'rm -f ' -e 'remove the .opencodeBinary. line')"
+
+# pin on the kit wrapper -> secured, quiet
+mkdir -p "$TMPDIR/oc-wrapped/.config/openchamber"
+printf '{ "opencodeBinary": "%s" }\n' "$OC_KIT_BIN" \
+    > "$TMPDIR/oc-wrapped/.config/openchamber/settings.json"
+out=$(oc_run "$TMPDIR/oc-wrapped")
+assert_valid "openchamber guard: pin on the kit wrapper -> quiet" "" "$out"
+
+# empty-string pin -> unset (openchamber optionalText semantics), quiet
+mkdir -p "$TMPDIR/oc-empty/.config/openchamber"
+printf '{ "opencodeBinary": "" }\n' > "$TMPDIR/oc-empty/.config/openchamber/settings.json"
+out=$(oc_run "$TMPDIR/oc-empty")
+assert_valid "openchamber guard: empty pin counts as unset" "" "$out"
+
+# kit-owned symlink -> not a shadow; the plain opencode2 shim still is
+mkdir -p "$TMPDIR/oc-link/.opencode/bin"
+ln -s "$OC_KIT_WRAPPER" "$TMPDIR/oc-link/.opencode/bin/opencode"
+echo "sh shim" > "$TMPDIR/oc-link/.opencode/bin/opencode2"
+out=$(oc_run "$TMPDIR/oc-link")
+assert_valid "openchamber guard: kit symlink not listed, shim still is (2 lines)" "2" \
+    "$(printf '%s' "$out" | grep -c 'bin/opencode2')"
+assert_valid "openchamber guard: kit symlink ignored (no pair listing)" "0" \
+    "$(printf '%s' "$out" | grep -c 'bin/opencode .*bin/opencode2')"
+
+# kit policy pins the wrapper -> secured NOTE (cyan), not a bypass warning,
+# even with bins + settings pin present
+printf '{ "opencodeBinary": "%s" }\n' "$OC_KIT_BIN" > "$OC_POLICY"
+out=$(oc_run "$TMPDIR/oc-both")
+assert_valid "openchamber guard: policy secures -> NOTE not WARNING" "1" \
+    "$(printf '%s' "$out" | grep -c '^C:NOTE')"
+assert_valid "openchamber guard: policy secures -> leftovers called inert" "1" \
+    "$(printf '%s' "$out" | grep -c 'inert')"
+assert_valid "openchamber guard: policy secures -> no bypass wording" "0" \
+    "$(printf '%s' "$out" | grep -c 'OUTSIDE the kit')"
+: > "$OC_POLICY"
+
+# settings.json without the key -> quiet
+mkdir -p "$TMPDIR/oc-otherkey/.config/openchamber"
+printf '{ "theme": "dark", "port": 3000 }\n' \
+    > "$TMPDIR/oc-otherkey/.config/openchamber/settings.json"
+out=$(oc_run "$TMPDIR/oc-otherkey")
+assert_valid "openchamber guard: foreign settings keys -> quiet" "" "$out"
+
+# untrusted pin value must never reach the output (printf %b expansion,
+# $(...) smuggling — only file and key are named)
+mkdir -p "$TMPDIR/oc-evil/.config/openchamber"
+printf '{ "opencodeBinary": "/tmp/x\\n\\033[31mFAKE $(touch %s/pwned)" }\n' "$TMPDIR" \
+    > "$TMPDIR/oc-evil/.config/openchamber/settings.json"
+out=$(oc_run "$TMPDIR/oc-evil")
+assert_valid "openchamber guard: pin VALUE never printed" "0" \
+    "$(printf '%s' "$out" | grep -c 'FAKE')"
+if [ -e "$TMPDIR/pwned" ]; then
+    assert_valid "openchamber guard: pin value not executed" "0" "1"
+else
+    assert_valid "openchamber guard: pin value not executed" "1" "1"
+fi
+
+# static wiring: the wrapper calls the guard and links the how-to
+if grep -q '^openchamber_guard$' "$WRAPPER_FILE" \
+    && grep -q 'docs/how-to/openchamber.md' "$WRAPPER_FILE"; then
+    echo "  ${GREEN}PASS${NC}  wrapper calls openchamber_guard and links the how-to"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  wrapper lost the openchamber_guard call or how-to link"
+    failures=$((failures + 1))
+fi
+
 # --- Container-tool detection from the final merged config (issue #81) ---
 # The wrapper asks opencode itself (`opencode debug config`, run as the
 # opencode user from the cwd) for the session's FINAL permission config and
