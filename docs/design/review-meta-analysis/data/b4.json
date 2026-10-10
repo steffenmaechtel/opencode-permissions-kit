@@ -1,0 +1,893 @@
+{
+  "batch": "b4",
+  "snapshots": [
+    {
+      "stem": "0.0.41d",
+      "file": "docs/design/review/2026-10-02-v0.0.41-d.md",
+      "date": "2026-10-02",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 self-review (authoring session)",
+      "subject": "Dedup point 3: shared library deploy manifest (sh/deploy-lib.sh)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 2 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Mid-manifest failure leaves half-deployed LIBDIR until re-run; loud, non-atomic, pre-existing property",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "wiring-gate",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Rewired wiring greps encode new manifest mechanism literally; brittleness accepted, outcome truth elsewhere",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "hardcoded-env",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Manifest '-' entries keep copied mode; pathological root umask 077 lands 600 (unchanged)",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": null,
+          "summary": "Informational: extraction series removed more install.sh lines than phase wrap added",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "e2e deferred to the dedup-wave final gate (points 1-4)",
+        "single-agent self-review; no MED/HIGH; F1/F2 dispositioned accepted/not owed"
+      ]
+    },
+    {
+      "stem": "0.0.41e",
+      "file": "docs/design/review/2026-10-02-v0.0.41-e.md",
+      "date": "2026-10-02",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 self-review (authoring session)",
+      "subject": "Dedup point 4: shared SECURE_GIT render + TUI plugin sync libs",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 2 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "Deliberate delta: sync failures now die with message; plugin-dir chown unified fail-loud",
+          "cross_refs": ["0.0.41c F1"],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Test-side set -e rc-capture and EXIT-trap replacement hazards; fixed in-wave",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": null,
+          "summary": "rc contract documented and honored; rc-1 handling differs by caller deliberately (both loud)",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "chown unit coverage neutralized by stub; ownership assertions live in e2e by design",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "final e2e gate deferred to after snapshot",
+        "resolution later corrected snapshot e 'never a function's last statement' claim (0.0.41f C1 delta-introduced here)"
+      ]
+    },
+    {
+      "stem": "0.0.41f",
+      "file": "docs/design/review/2026-10-02-v0.0.41-f.md",
+      "date": "2026-10-02",
+      "scope": "full",
+      "reviewer": "GLM-5.3-Flash subagents x2 (security, quality) + GLM-5.3 main verification",
+      "subject": "Full-scope review of dedup-wave branch tip 547a4cd (0.0.41)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 1, "MED": 0, "LOW": 4, "INFO": 7 },
+      "findings": [
+        {
+          "id": "C1/S1",
+          "severity": "HIGH",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "shell-semantics",
+          "area": "management",
+          "provenance": "delta-introduced",
+          "summary": "Skip rc leaked as status 1; set -e silently killed opk update after deploy",
+          "cross_refs": ["0.0.41e"],
+          "status": "reported"
+        },
+        {
+          "id": "C2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "delta-introduced",
+          "summary": "Same rc-relay in install.sh safe only by luck of following statements; normalized",
+          "cross_refs": ["0.0.41f C1"],
+          "status": "reported"
+        },
+        {
+          "id": "C3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "delta-introduced",
+          "summary": "Dead SUDO_TMP cleanup branch survived sudoers extraction; removed",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "C4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "shell-semantics",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Suite's second EXIT trap replaced cleanup trap — hazard sibling suites share",
+          "cross_refs": ["0.0.41e F2"],
+          "status": "reported"
+        },
+        {
+          "id": "C5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "No unit case drove tui_plugin_sync_user rc 1; die/exit mapping untested",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "S2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": null,
+          "summary": "sudoers re-deploy silently skipped when template missing; now logged",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "S3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": null,
+          "summary": "Charset gate accepts DEFAULT_USER=ALL, widening sudoers grant to all users; now rejected",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "delta-introduced",
+          "summary": "visudo now unprefixed — undocumented semantic delta; header documents root-callers assumption",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "delta-introduced",
+          "summary": "Audit line blamed visudo for non-visudo rejections; reworded to cover all modes",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "delta-introduced",
+          "summary": "Unused swallow-var silently ignored manifest trailing junk; dropped, chmod now fails loud",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "No-op sed decoration in suite (rc unchecked, output discarded); removed",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "no-ID-1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "pre-existing",
+          "summary": "4b canary appends to wrong variable in dead VERSION branch; canary path blinded",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "ghost-1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "race-toctou",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Gate-then-use TOCTOU in agent home retracted — accepted 0.0.39g/h design residual",
+          "cross_refs": ["0.0.39g", "0.0.39h"],
+          "status": "retracted"
+        },
+        {
+          "id": "ghost-2",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Developer-home writes without chain gates retracted — developer trusted per model",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "ghost-3",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "install_binary running downloaded candidate as root retracted — documented trust assumption",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "ghost-4",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "perm-model",
+          "secondary_class": "race-toctou",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "deploy-lib cp following fetch-tree symlinks retracted — supply-chain boundary",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "ghost-5",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "'Manifest equality can pass vacuously' retracted after verification",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "ghost-6",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "deploy-shape",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "'Old kits end up without new libs' retracted after verification",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "ghost-7",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "'local breaks dash' retracted after verification",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "C1/S1 carries dual stated severity: HIGH (quality agent) vs LOW (security agent view) — HIGH recorded as primary",
+        "ghost/retracted items carry no stated severity and no IDs; INFO inferred, ghost-N IDs assigned by extractor",
+        "snapshot table has no Q3 row, yet the resolution dispositions '0.0.41f Q3' (accepted, cosmetic output-channel change)",
+        "e2e-ddev suite retro-added to the final gate for this pass; HIGH found by both agents, missed by five wave self-reviews"
+      ]
+    },
+    {
+      "stem": "0.0.41g",
+      "file": "docs/design/review/2026-10-02-v0.0.41-g.md",
+      "date": "2026-10-02",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 self-review (mechanical proofs)",
+      "subject": "Phase-body re-indent in install.sh (deferred 0.0.41a F1)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 2 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "wave-introduced",
+          "summary": "37 column-0 quote-join continuations look inconsistent; invite future split; guarded by test",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Twin-copy check weakened to content-normalized; indent-only drift now passes (accepted)",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": null,
+          "summary": "install.conf heredoc byte-identical after re-indent; exclusion zone verified",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": null,
+          "area": "other",
+          "provenance": null,
+          "summary": "Script-produced re-indent vindicated exclusion-zone handling; 0.0.41a F1 acceptance criteria met",
+          "cross_refs": ["0.0.41a F1"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "verification mechanical: git diff -w empty plus pairwise 1517-line +4-spaces proof",
+        "e2e 272/47/70 with zero skips on the indented tree"
+      ]
+    },
+    {
+      "stem": "0.0.42a",
+      "file": "docs/design/review/2026-10-03-v0.0.42-a.md",
+      "date": "2026-10-03",
+      "scope": "wave",
+      "reviewer": "GLM-5.3-Flash subagents x3 (security/quality/mechanical) + GLM-5.3 main",
+      "subject": "Issue #118: git version matrix in e2e CI + git-check helper",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 5, "INFO": 0 },
+      "findings": [
+        {
+          "id": "C1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "wiring-gate",
+          "secondary_class": "claim-drift",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "125-column ui_warn line breaks 120 ratchet; make test RED; commit claimed green (pipe-masked rc)",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "C2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "test-vacuous",
+          "area": "tests-e2e",
+          "provenance": "wave-introduced",
+          "summary": "Exported E2E_GIT_CHANNEL silently ignored by golden warm start; suite runs wrong git",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "D1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "docs-policy",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "cli.md status enumeration missing new host-git row; CLI reference stale",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "D2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "wave-introduced",
+          "summary": "Comment claims stub keeps helper-less fetch installable; kit_source already exits — wrong",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "D3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "Header source-order claim backwards for status.sh (LIBDIR-first); scope sentence",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q1",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "docs-policy",
+          "secondary_class": null,
+          "area": "build-ci",
+          "provenance": "wave-introduced",
+          "summary": "Makefile help documents git-channel knob unevenly; e2e-ddev non-forwarding undocumented",
+          "cross_refs": ["0.0.42a C2"],
+          "status": "reported"
+        },
+        {
+          "id": "Q2",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "command -v log && log could trip errexit if log() returns nonzero; latent",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q3",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "Two-component git version would misreport as 'git not found'; theoretical, demoted",
+          "cross_refs": [],
+          "status": "downgraded"
+        },
+        {
+          "id": "Q4",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "tests-e2e",
+          "provenance": "wave-introduced",
+          "summary": "Banner wording near-miss between run.sh and lib.sh '(channel:' vs 'git channel:'",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q5",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": "wave-introduced",
+          "summary": "git-2.55 fact restated eight times; drift-prone, accepted",
+          "cross_refs": ["#116"],
+          "status": "reported"
+        },
+        {
+          "id": "Q6",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "Fake git on root PATH passes floor; warn-only, accepted fail-open",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q7",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-e2e",
+          "provenance": "wave-introduced",
+          "summary": "Floor-warn path e2e-dead: both matrix legs run git >= 2.43",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "retracted-1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "wiring-gate",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": null,
+          "summary": "Mechanical agent's 3-lines-over-120 claim retracted — byte counting; only line 63 exceeds",
+          "cross_refs": ["0.0.42a C1"],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "make test RED at review time; commit message claimed green because author piped make through grep|head (rc masked)",
+        "Q1-Q7 sit in a 'Quality (minor)' table with no severity column; LOW inferred per MINOR mapping",
+        "one retraction (3-line width claim) plus one demotion (Q3); run-ddev channel leak flagged by two agents, counted once",
+        "process ledger: suite results in commit messages must come from un-piped runs"
+      ]
+    },
+    {
+      "stem": "0.0.42b",
+      "file": "docs/design/review/2026-10-03-v0.0.42-b.md",
+      "date": "2026-10-03",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 self-review (mechanical)",
+      "subject": "Fix wave for 0.0.42a findings (wrap, unset, docs)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 0 },
+      "findings": [],
+      "process_notes": [
+        "make test rc taken from make itself, un-piped (0.0.42a C1 lesson applied)",
+        "zero findings; e2e 272/47/70 on fixed tip, ddev warm start doubles as C2 behavioral proof"
+      ]
+    },
+    {
+      "stem": "0.0.42c",
+      "file": "docs/design/review/2026-10-03-v0.0.42-c.md",
+      "date": "2026-10-03",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 self-review (mechanical)",
+      "subject": "Issue #123: drop workflow chmod lists; exec bits in git index",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 0 },
+      "findings": [
+        {
+          "id": "D1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "docs-policy",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Review checklist still cites removed workflow chmod lists; stale on landing",
+          "cross_refs": ["#123"],
+          "status": "reported"
+        },
+        {
+          "id": "D2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Suite header still lists CI chmod lists as wiring surface; header and code disagree",
+          "cross_refs": ["#123"],
+          "status": "reported"
+        },
+        {
+          "id": "Q1",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "deploy-shape",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Manifest deploys sourced libs 755 while git index tracks 644; conservatism, out of scope",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q2",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "hardcoded-env",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Wiring checks now require git checkout; tarball contributors unsupported (recorded)",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q3",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "other",
+          "provenance": "wave-introduced",
+          "summary": "Commit message '~500 lines' vs actual 363 workflow lines; loose parenthetical",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "new inverse guard flagged three sourced libs during the wave; flipped in-wave before the wave commit",
+        "Q1-Q3 sit in a severity-less 'Quality (minor)' table; LOW inferred",
+        "fresh-clone proof: guard suite green, sourced libs clone 644; e2e 272/47/70 on tip"
+      ]
+    },
+    {
+      "stem": "0.0.42d",
+      "file": "docs/design/review/2026-10-03-v0.0.42-d.md",
+      "date": "2026-10-03",
+      "scope": "full",
+      "reviewer": "GLM-5.3-Flash subagents x3 (security/mechanical/quality) + GLM-5.3 main",
+      "subject": "Release review of full 0.0.42 tree before 0.0.43 tag",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 2, "LOW": 4, "INFO": 2 },
+      "findings": [
+        {
+          "id": "S1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "silent-failure",
+          "area": "multiple",
+          "provenance": "delta-introduced",
+          "summary": "Never-shadow probe drift: update/status use fixed paths; update can silently shadow real xdg-open",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "S2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "race-toctou",
+          "secondary_class": "perm-model",
+          "area": "bin-wrappers",
+          "provenance": null,
+          "summary": "chmod g+w lacks per-operand [ -L ] recheck root-side pattern uses; owner-only, no gain",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "S3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "pre-existing",
+          "summary": "sed rewrite escapes & \\ # but not newlines; kit-controlled value, recorded",
+          "cross_refs": ["0.0.39b C4"],
+          "status": "reported"
+        },
+        {
+          "id": "C1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "silent-failure",
+          "area": "multiple",
+          "provenance": "delta-introduced",
+          "summary": "Cross-confirmation of S1 by quality agent (same finding, two independent agents)",
+          "cross_refs": ["0.0.42d S1"],
+          "status": "reported"
+        },
+        {
+          "id": "C2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "delta-introduced",
+          "summary": "Status verdict reports healthy on dangling kit symlink; needs -x target check",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "C3",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "wiring-gate",
+          "secondary_class": "claim-drift",
+          "area": "build-ci",
+          "provenance": "pre-existing",
+          "summary": "make test runs 30/33 suites; three lack targets — local gate weaker than CI",
+          "cross_refs": ["0.0.41d"],
+          "status": "reported"
+        },
+        {
+          "id": "C4",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "wiring-gate",
+          "secondary_class": "claim-drift",
+          "area": "build-ci",
+          "provenance": "pre-existing",
+          "summary": "SHELLCHECK_FILES omits seven shipped scripts; header claims everything; unguarded against disk",
+          "cross_refs": ["0.0.41"],
+          "status": "reported"
+        },
+        {
+          "id": "D1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "docs-policy",
+          "secondary_class": "claim-drift",
+          "area": "docs",
+          "provenance": "pre-existing",
+          "summary": "Stale chmod-list wording (live instruction + test comments) describes removed workflow mechanism",
+          "cross_refs": ["#123"],
+          "status": "reported"
+        },
+        {
+          "id": "Q1",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "delta-introduced",
+          "summary": "Shim's quote-injection guard has zero runtime coverage; static greps only",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q2",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "delta-introduced",
+          "summary": "Gate routing and uninstall removal pinned only by static literal greps; behavioral asserts owed",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q3",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-e2e",
+          "provenance": "delta-introduced",
+          "summary": "e2e full installs never assert deployed xdg-open shim; one-line assert would pin wiring",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q4",
+          "severity": "LOW",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": null,
+          "summary": "sort -V ranks beta above release; harmless (suffixes stripped pre-compare), recorded",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "retracted-1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "docs-policy",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": null,
+          "summary": "5-site stale-chmod family narrowed: 3 sites are design-record history; D1 kept for 2",
+          "cross_refs": ["0.0.42d D1"],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "stop rule explicitly NOT met (two MEDIUM, both test-integrity)",
+        "S1 = C1: same finding found independently by two agents (cross-confirmation), extracted as two rows",
+        "Q1-Q4 sit in a severity-less 'Quality (minor)' table; LOW inferred",
+        "recorded deferrals: ddev-terminal beyond sudo-call shapes, tui/*.tsx; one agent-deferred trace closed by main agent",
+        "e2e-rootless and e2e-ddev results recorded in same-session loop-status addendum (47/0, 70/0)"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "0.0.41",
+      "file": "docs/design/review/2026-10-02-v0.0.41-resolution.md",
+      "dispositions": { "implemented": 17, "implemented_differently": 2, "not_done": 18 },
+      "follow_ups_recorded": 4,
+      "notes": "Retroactive resolution written after chain closed — friction spawned the incremental-resolution rule; snapshot e's verified-clean claims corrected re C1 leak; 0.0.41f Q3 dispositioned though absent from snapshot table; double charset gate intentionally kept."
+    }
+  ]
+}

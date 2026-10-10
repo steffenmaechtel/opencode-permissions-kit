@@ -1,0 +1,419 @@
+{
+  "batch": "b9",
+  "snapshots": [
+    {
+      "stem": "0.0.45f",
+      "file": "docs/design/review/2026-10-08-v0.0.45-f.md",
+      "date": "2026-10-08",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 single-session lead (empirical verification)",
+      "subject": "Mandatory wave review of 0.0.45e fix: dev→agent walk-order class closure",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 2 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "Op-swap orphaned gate comment above root pair; stale claims contradict new chmod-first mechanics",
+          "cross_refs": ["0.0.44a V24"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "race-toctou",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "pre-existing",
+          "summary": "Step 8 chown-then-chmod operand shape: agent-home replaceability residual, inherent, accepted; no action",
+          "cross_refs": ["0.0.45e W2"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Pin comment claims collapse 'breaks the count'; no count exists — greps discriminate, prose wrong",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Gates re-run: 34 suites green, e2e 273/0 zero skips; e2e-rootless/e2e-ddev corroborated, not re-run",
+        "All four recorded sabotages independently re-derived on scratch copies; chmod/chown ground truth verified on host",
+        "Own class sweep over every chown -R / recursive chmod site: no dev→agent walk-order site remains"
+      ]
+    },
+    {
+      "stem": "0.0.46a",
+      "file": "docs/design/review/2026-10-08-v0.0.46-a.md",
+      "date": "2026-10-08",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 2 axis subagents (security, quality)",
+      "subject": "Issue-#149 ddev workflow improvements wave (five commits)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 7, "INFO": 5 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "delta-introduced",
+          "summary": "Opencode-uid flag write: mktemp failure silent, cat failure prints lying success note",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Hook's only functional check vacuous on CI: lib-path gate precedes mode gate, never runs there",
+          "cross_refs": [],
+          "status": "downgraded"
+        },
+        {
+          "id": "F3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "perf",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "Status detection walks every registered root unstamped per run; seconds on large trees, interactive cost",
+          "cross_refs": ["#112 class"],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "deploy-shape",
+          "secondary_class": "silent-failure",
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "Detection sources deployed lib only; checkout status.sh against older kit silently renders nothing (rc 127 swallowed)",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "hardcoded-env",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "delta-introduced",
+          "summary": "New hook/hint arms hardcode user 'opencode'; custom OPENCODE_USER installs silently never flag or silence hint",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F6",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": "test-vacuous",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "modx hint arm has zero functional coverage; unknown-user pin vacuously tests find's error path",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F7",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "pre-existing",
+          "summary": "Docs say any ddev command heals gaps; only config/get/start/restart trigger the heal",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F8",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "race-toctou",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Pre-existing [! -L]-vs-cat TOCTOU in flag write now triggerable at opencode uid; no escalation",
+          "cross_refs": ["0.0.39g S2"],
+          "status": "reported"
+        },
+        {
+          "id": "F9",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "bin-wrappers",
+          "provenance": "wave-introduced",
+          "summary": "Comment claims writer skips symlinked configs; symlinked .ddev component not gated, written through",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F10",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "race-toctou",
+          "secondary_class": "perm-model",
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Pre-existing operand-swap race on root-run project-root chown/chmod; new type arms join primitive",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F11",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "hardcoded-env",
+          "secondary_class": "silent-failure",
+          "area": "sh-lib",
+          "provenance": "delta-introduced",
+          "summary": "Restrictive root umask stamps install.conf 0600; dev-side hook silently never fires (fail-soft)",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F12",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": "pre-existing",
+          "summary": "Assorted: sudo -n asymmetry, subdir config missed, uid-gate fallback inconsistency, settings-dir scope, docs precision",
+          "cross_refs": ["V22"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Sabotage re-derivation on full repo copy; ddev_reshare_needed matrix (8 cases) and helper mode verified functionally",
+        "One sub-agent severity downgraded with rationale (their MED → F2 LOW)",
+        "e2e 273/0 and e2e-ddev 86/86 re-run by review; e2e-rootless not re-run"
+      ]
+    },
+    {
+      "stem": "0.0.46b",
+      "file": "docs/design/review/2026-10-09-v0.0.46-b.md",
+      "date": "2026-10-09",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 2 axis subagents (security, quality)",
+      "subject": "Wave review of the 0.0.46a fix commit 3428974",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 0, "INFO": 4 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "fix-regression",
+          "secondary_class": "silent-failure",
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "F1 fix's new warnings go to stderr; hook swallows them — disposition claim false at named path",
+          "cross_refs": ["0.0.46a F1", "0.0.39g S2", "0.0.39h F13", "0.0.42f W11–W15", "0.0.44d F1/F2"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "New warnings' wording corners: 'NOT written' can be false after partial write; retry parenthetical stamp-optimistic",
+          "cross_refs": ["#112"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": "fix-induced",
+          "summary": "Fixed wording 'other commands heal nothing' over-corrects: browser commands heal via internal start",
+          "cross_refs": ["0.0.46a F7"],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "F2 mode-on pin's sudo leg executes for real on kit hosts; 'hermetic' label overstates",
+          "cross_refs": ["0.0.46a F2"],
+          "status": "reported"
+        },
+        {
+          "id": "W5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": "perm-model",
+          "area": "management",
+          "provenance": "pre-existing",
+          "summary": "status.sh interpolates find-derived, agent-influenceable path into copy-paste sudo fix line; crafted name alters command",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Session ran as uid opencode — W1 stderr swallow verified first-hand under hook's redirect shape",
+        "Both axis subagents independently converged on W1 (quality: MED claim-failure; security: INFO impact)",
+        "Stop rule NOT met (W1 MED): fix wave owed; every -a sabotage claim reproduced"
+      ]
+    },
+    {
+      "stem": "0.0.46c",
+      "file": "docs/design/review/2026-10-09-v0.0.46-c.md",
+      "date": "2026-10-09",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 2 axis subagents (security, quality)",
+      "subject": "Wave review of the 0.0.46b fix commit f73b861 + resolution docs",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 6 },
+      "findings": [
+        {
+          "id": "C1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "Retry hint prints 'sudo opk config handover' without path; copy-paste dies on usage line",
+          "cross_refs": ["0.0.46b W2", "0.0.46a F7"],
+          "status": "downgraded"
+        },
+        {
+          "id": "C2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": "claim-drift",
+          "area": "tests-unit",
+          "provenance": "pre-existing",
+          "summary": "No unit pin guards hook's stdout passthrough; future >/dev/null 2>&1 passes unit pins (e2e catches)",
+          "cross_refs": ["0.0.46b W1"],
+          "status": "reported"
+        },
+        {
+          "id": "C3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": "claim-drift",
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Static merge pin's awk window extends to file's last top-level fi; 'inside branch' claim overstates reach",
+          "cross_refs": ["0.0.46b W1"],
+          "status": "reported"
+        },
+        {
+          "id": "C4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "bin-wrappers",
+          "provenance": "fix-induced",
+          "summary": "Stream merge routes raw dash/mktemp diagnostics onto developer's terminal mid-ddev-output; mildly noisy",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "C5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "shell-semantics",
+          "secondary_class": "perm-model",
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Control bytes in path components land verbatim in new warning arms; no new reach, pre-existing family",
+          "cross_refs": ["0.0.46b W5", "0.0.46a F5", "0.0.46a F8"],
+          "status": "reported"
+        },
+        {
+          "id": "C6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "bin-wrappers",
+          "provenance": "pre-existing",
+          "summary": "Uid-guard rejection message still swallowed by hook's 2>/dev/null; custom-user host silently no-ops",
+          "cross_refs": ["0.0.46a F5"],
+          "status": "reported"
+        },
+        {
+          "id": "C7",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Hook honors dev-env DDEV_DEV_OWNED, helper reads root stamp only; env-only window diverges, helper no-ops",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "R1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "Sub-agent claimed uid-guard rejection arm has zero coverage — false; real-helper exit-1 pin exists",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "W1 delivery verified first-hand as helper uid under hook's exact redirect shape; 4/4/1 sabotages reproduced",
+        "Method note, self-caught: first FAIL grep missed ANSI-wrapped FAIL markers (summary line authoritative)",
+        "Quality axis rated C1 MED; lead downgraded to LOW with rationale. One security-axis claim retracted as false",
+        "Retraction section carries no finding ID; 'R1' assigned by extraction"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "0.0.46",
+      "file": "docs/design/review/2026-10-08-v0.0.46-resolution.md",
+      "dispositions": { "implemented": 8, "implemented_differently": 0, "not_done": 16 },
+      "follow_ups_recorded": 7,
+      "notes": "Single resolution covering snapshots a+b+c: 8 implemented, 16 deliberately not done (mostly record-only class-map INFOs; F3 deferred to #112-class pass). Snapshot-b MED reopened loop; W1 and C1 fixes closed chain. e2e-ddev skipped on final tip (maintainer directive, disclosed). Retracted sub-agent claim needs no disposition."
+    }
+  ]
+}

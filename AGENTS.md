@@ -124,6 +124,30 @@ CI or the kit execute by path with `git update-index --chmod=+x <path>`
 call / data; enforced by `tests/unit/test-workflows.sh`). Workflows
 carry no `chmod +x` lines — `actions/checkout` preserves tracked modes.
 
+## Review learnings (recurring error classes)
+
+The meta-analysis of all review snapshots 0.0.38–0.0.46 found the same
+defect classes recurring with every new feature. The per-wave checklist with
+rationale and evidence lives in
+[docs/design/review-meta-analysis/learnings.md](docs/design/review-meta-analysis/learnings.md)
+— apply it while fixing and before declaring a wave done. Short form:
+
+- **Class sweep:** a fix for a finding class is only "implemented" after
+  sweeping all same-shape sibling sites; the resolution records the grep
+  pattern and the sites checked.
+- **Fail-loud pins:** every new `|| true`, stderr redirect, or probe pipe in
+  feature code gets a pin that executes the failure path, observed the way
+  production observes it (a caller that discards stderr makes stderr-only
+  pins vacuous).
+- **Claim audit:** every behavior claim the wave touches (comments, docs,
+  message texts) either carries a pin or is deleted/weakened.
+- **Pins discriminate and sit before the suite's summary gate** — on top of
+  the sabotage-verify duty above (which covers green-when-broken).
+- **Root ops on agent-writable trees:** `[ -L ]` on every path component,
+  re-check the operand immediately before acting, chmod before chown.
+- **Fix waves are first-class code:** every fix wave gets its micro-wave
+  review, and fixes bring their own pins.
+
 ## Checkout ownership on kit-managed installs
 
 When this repo is worked on through the kit itself (the agent runs as the
