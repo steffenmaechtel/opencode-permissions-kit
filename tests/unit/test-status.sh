@@ -651,6 +651,14 @@ if grep -q '_oc_secured=true' "$STATUS" \
 else
     fail "status pin detection diverges from the wrapper"
 fi
+# home resolution via getent with /home/<user> fallback (0.0.47b W2, the
+# 0.0.43a F12 class): relocated homes must not blank the verdicts
+if grep -q 'getent passwd "${DEFAULT_USER:-$USER}"' "$STATUS" \
+    && grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-$USER}}"' "$STATUS"; then
+    pass "openchamber verdicts resolve the home via getent (0.0.47b W2)"
+else
+    fail "openchamber home resolution regressed to /home hardcode (0.0.47b W2)"
+fi
 
 # --- OpenChamber verdict matrix — functional (0.0.47a F3/F4) ---------------------
 # Extract the verdict block, rewrite the absolute paths (policy file, kit

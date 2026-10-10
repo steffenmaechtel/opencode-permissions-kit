@@ -270,7 +270,7 @@ openchamber_guard() {
         fi
         if [ -n "$_oc_pin" ]; then
             note "${CYAN}the \"opencodeBinary\" pin in $HOME/.config/openchamber/settings.json is${NC}"
-            note "${CYAN}inert too — remove the line, or run: sudo opk openchamber-secure${NC}"
+            note "${CYAN}inert — remove the line, or run: sudo opk openchamber-secure${NC}"
         fi
         note ""
         return 0

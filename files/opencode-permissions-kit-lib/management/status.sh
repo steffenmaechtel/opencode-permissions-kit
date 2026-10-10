@@ -117,7 +117,10 @@ if [ -f "$_oc_policy" ] \
         "$_oc_policy" 2>/dev/null | tail -n 1)" = "/usr/local/bin/opencode" ]; then
     _oc_secured=true
 fi
-_oc_home="/home/${DEFAULT_USER:-$USER}"
+# Home via getent, /home/<user> only as fallback (0.0.47b W2, the
+# 0.0.43a F12 class — relocated homes must not blank the verdicts).
+_oc_home=$(getent passwd "${DEFAULT_USER:-$USER}" 2>/dev/null | cut -d: -f6 || true)
+_oc_home="${_oc_home:-/home/${DEFAULT_USER:-$USER}}"
 _oc_kit_wrapper="/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode"
 _oc_bins=""
 for _ocn in opencode opencode2; do

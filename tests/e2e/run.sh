@@ -1210,6 +1210,27 @@ check "12k: update leaves admin-extended policy untouched (0.0.47a F1)" \
 check "12k: update announces the skip" \
     E 'grep -q "left untouched" /tmp/oc-update-2.log'
 E 'rm -rf /tmp/oc-update-test /tmp/oc-update-2.log'
+# 0.0.47b W3: the install twin of the admin-content gate — a full install
+# with the opt-in flag never replaces the divergent file either (the state
+# is already staged: admin-extended policy + recorded opt-in).
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev --openchamber-policy yes > /tmp/oc-install-twin.log 2>&1'
+check "12k: install twin leaves admin-extended policy untouched (0.0.47b W3)" \
+    E 'grep -q enterpriseMode /etc/openchamber/policy.json'
+check "12k: install twin announces the skip" \
+    E 'grep -q "left untouched" /tmp/oc-install-twin.log'
+E 'rm -f /tmp/oc-install-twin.log'
+# 0.0.47b W4: the getent failure path — an unresolvable DEFAULT_USER skips
+# the leftover scan loudly (rc 0, pin write unaffected); riding: the
+# explicit command's announced replacement of the divergent file, asserted
+# functionally for the first time (was static-only via 0.0.47a F1).
+E 'sudo sed -i "s/^DEFAULT_USER=.*/DEFAULT_USER=oc-nohome/" /etc/opencode-permissions-kit/install.conf'
+E 'sudo opk openchamber-secure --yes > /tmp/oc-nohome.log 2>&1'
+check "12k: unresolvable home skips the leftover scan loudly (0.0.47b W4)" \
+    E 'grep -q "leftover scan skipped" /tmp/oc-nohome.log'
+check "12k: openchamber-secure announces replacing divergent content (0.0.47a F1, functional)" \
+    E 'grep -q "replacing it" /tmp/oc-nohome.log'
+E 'sudo sed -i "s/^DEFAULT_USER=.*/DEFAULT_USER=dev/" /etc/opencode-permissions-kit/install.conf'
+E 'rm -f /tmp/oc-nohome.log'
 
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"

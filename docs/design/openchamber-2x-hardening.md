@@ -175,7 +175,8 @@ extension (policy read is code-verified).
 - **A — rollout: opt-in install prompt** ("Protect OpenChamber sessions
   too?"), because it changes third-party app behavior (update buttons
   disappear). `opk openchamber-secure` retrofits; update re-applies only
-  when chosen or already present.
+  on the recorded opt-in — and only while the file is still kit-shaped
+  (0.0.47a F1).
 - **B — command name: `opk openchamber-secure`.**
 - **C — no e2e with real OpenChamber in stage 1** — unit tests for the
   guard states + the manual verification checklist folded into the docs;

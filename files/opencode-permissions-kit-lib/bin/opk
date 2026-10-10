@@ -220,6 +220,7 @@ case "$cmd" in
         _oc_home=$(getent passwd "$_oc_duser" 2>/dev/null | cut -d: -f6 || true)
         if [ -z "$_oc_home" ]; then
             ui_detail "could not resolve the home of '$_oc_duser' — leftover scan skipped"
+            ui_detail "restart OpenChamber if it is running (full stop + start)"
             exit 0
         fi
         _oc_found=""
