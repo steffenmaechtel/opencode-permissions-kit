@@ -1144,6 +1144,50 @@ check "12j: root run logs the finding to the audit log" \
 E 'rm -rf /tmp/leak-e2e /tmp/leak-e2e-clean'
 
 echo ""
+echo "--- 12k. OpenChamber hardening (issue #154) ---"
+# Opt-in only: the --yes install above must not have written anything.
+check_fail "12k: --yes install wrote no /etc/openchamber (opt-in only)" \
+    E 'test -e /etc/openchamber'
+# Fake the one-click bypass state as the developer (binary + opencode2 shim
+# + settings pin).
+E 'mkdir -p /home/dev/.opencode/bin /home/dev/.config/openchamber \
+    && printf "fake-binary" > /home/dev/.opencode/bin/opencode \
+    && printf "# shim" > /home/dev/.opencode/bin/opencode2 \
+    && printf "{\"opencodeBinary\": \"/home/dev/.opencode/bin/opencode\", \"port\": 3000}\n" \
+        > /home/dev/.config/openchamber/settings.json'
+check "12k: opk status reports BYPASSED" \
+    E 'opk status 2>&1 | grep -q "BYPASSED"'
+E 'sudo opk openchamber-secure --yes' && \
+    echo "  ${GREEN}OK${NC}  opk openchamber-secure completed"
+check "12k: policy pin written, pinning the kit wrapper" \
+    E 'grep -q "\"opencodeBinary\": \"/usr/local/bin/opencode\"" /etc/openchamber/policy.json'
+check "12k: policy pin is root:root 0644" \
+    E 'sudo stat -c "%U:%G %a" /etc/openchamber/policy.json | grep -q "^root:root 644$"'
+check "12k: bypass binaries removed" \
+    E '! test -e /home/dev/.opencode/bin/opencode && ! test -e /home/dev/.opencode/bin/opencode2'
+check "12k: settings pin removed, rest of the file kept" \
+    E '! grep -q opencodeBinary /home/dev/.config/openchamber/settings.json \
+        && grep -q "\"port\": 3000" /home/dev/.config/openchamber/settings.json'
+check "12k: opt-in recorded in install.conf" \
+    E 'grep -q "^OPENCHAMBER_POLICY=yes$" /etc/opencode-permissions-kit/install.conf'
+check "12k: opk status reports secured via policy pin" \
+    E 'opk status 2>&1 | grep -q "secured via policy pin"'
+check "12k: openchamber-secure is idempotent (re-run exits 0)" \
+    E 'sudo opk openchamber-secure --yes >/dev/null 2>&1'
+# opk update re-applies the pin when the opt-in is recorded: remove the
+# policy, run a full update from a repo copy (same pattern as section 11 —
+# the local VERSION file makes update.sh treat the copy as the local
+# checkout instead of fetching upstream).
+E 'rm -rf /tmp/oc-update-test && mkdir -p /tmp/oc-update-test/files \
+    && cp -r /home/dev/repo/files/* /tmp/oc-update-test/files/ \
+    && echo "9.9.8-oc-test" > /tmp/oc-update-test/VERSION \
+    && sudo rm /etc/openchamber/policy.json \
+    && sudo bash /tmp/oc-update-test/files/opencode-permissions-kit-lib/management/update.sh --yes'
+check "12k: opk update re-applies the policy pin (opt-in recorded)" \
+    E 'test -f /etc/openchamber/policy.json'
+E 'rm -rf /tmp/oc-update-test'
+
+echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' && \
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
@@ -1157,6 +1201,7 @@ check_fail "opencode usergroup removed (died with the user)" E 'getent group ope
 check_fail "developer no longer in the opencode group" E 'id dev | grep -q opencode'
 check_fail "/run/opencode-permissions-kit removed"    E 'test -e /run/opencode-permissions-kit'
 check_fail "router-port sysctl file removed"          E 'test -e /etc/sysctl.d/99-ddev-rootless.conf'
+check_fail "openchamber policy pin removed (issue #154)" E 'test -e /etc/openchamber/policy.json'
 check_fail "Project ACLs cleaned"     E 'getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode"'
 check_fail "Audit log removed"        E 'test -e /var/log/opencode-permissions-kit'
 
