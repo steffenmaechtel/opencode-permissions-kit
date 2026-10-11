@@ -232,7 +232,7 @@ failing `git pull` on `.ddev/` content does not stay unexplained; the
 explicit one-command fix it prints is
 
 ```bash
-sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode --opk-ensure-shared <project>/.ddev
+opk ensure-shared <project>/.ddev
 ```
 
 ### Multiple checkouts of one repo (git worktrees)

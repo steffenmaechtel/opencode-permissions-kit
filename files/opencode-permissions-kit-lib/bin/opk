@@ -122,6 +122,12 @@ Commands:
                                      group stays, so both sides keep access. For
                                      mixed-owner trees, e.g. after builds by
                                      both users. --dry-run shows the plan
+  ensure-shared [<dir>]             Re-assert group-write on a .ddev tree an
+                                     agent-side ddev run left without it — the
+                                     'ddev share' fix opk status prints.
+                                     <dir> defaults to ./.ddev; runs as the
+                                     agent user (sudo -u) and changes modes
+                                     only, never ownership
   wsl-add-opencode-1-fix            Write the WSL browser-bridge carrier into
                                      /etc/wsl.conf (sudo). The only kit command
                                      that touches wsl.conf — explicit consent:
@@ -561,6 +567,54 @@ PYEOF
         done
         [ "$_ho_rc" = 0 ] && ui_success "handover complete"
         exit "$_ho_rc"
+        ;;
+    ensure-shared)
+        # Short heal wrapper (issue #159): the one-command fix `opk
+        # status` prints for a flagged .ddev tree used to be the full
+        # sudo path to bin/ddev-as-opencode --opk-ensure-shared. This
+        # subcommand is that exact call behind a short name. No new
+        # privilege: the sudoers grant for the helper predates it
+        # (templates/sudoers.template allows the developer any args on
+        # that exact binary), the helper's uid guard still demands the
+        # agent user, and its chmod stays owner-only — opencode-owned
+        # entries only, never an ownership change (dev-owned entries
+        # without g+w are the developer's umask business, the same
+        # parity ddev_reshare_needed detects on). Validation runs
+        # BEFORE the sudo hop, so usage errors need no elevation.
+        _es_err() {
+            ui_error "$1"
+            echo "  usage: opk ensure-shared [<project>/.ddev]   (default: ./.ddev)" >&2
+            exit 1
+        }
+        [ "$#" -le 1 ] || _es_err "ensure-shared: exactly one directory expected (got $# arguments)"
+        _es_dir="${1:-$PWD/.ddev}"
+        [ -f "$INSTALL_CONF" ] || _es_err "ensure-shared: $INSTALL_CONF not found — is the kit installed?"
+        _es_user=$(sed -n 's/^OPENCODE_USER=//p' "$INSTALL_CONF" 2>/dev/null | tail -1)
+        [ -n "$_es_user" ] || _es_err "ensure-shared: install.conf has no OPENCODE_USER"
+        id -u "$_es_user" >/dev/null 2>&1 || _es_err "ensure-shared: user '$_es_user' does not exist"
+        _es_helper="$LIBDIR/bin/ddev-as-opencode"
+        [ -f "$_es_helper" ] || _es_err "ensure-shared: $_es_helper not found — is the kit installed?"
+        [ -d "$_es_dir" ] || _es_err "ensure-shared: no such directory: $_es_dir (pass the project's .ddev tree)"
+        if [ "$(id -u)" = "$(id -u "$_es_user" 2>/dev/null || echo x)" ]; then
+            # Already the agent user (e.g. an agent session running the
+            # heal itself): direct call, no sudo hop.
+            ui_info "re-asserting group-write on $_es_dir ..."
+            "$_es_helper" --opk-ensure-shared "$_es_dir"
+            _es_rc=$?
+        else
+            ui_info "re-asserting group-write on $_es_dir as user '$_es_user' ..."
+            sudo -u "$_es_user" "$_es_helper" --opk-ensure-shared "$_es_dir"
+            _es_rc=$?
+        fi
+        if [ "$_es_rc" -eq 0 ]; then
+            ui_success "group-write re-asserted on $_es_dir (owner-only chmod, ownership untouched)"
+            ui_detail "still flagged by 'opk status'? dev-owned entries without g+w are"
+            ui_detail "deliberately not healed; 'opk config handover <project-root>' re-runs the full handover"
+        else
+            ui_error "the heal could not run (exit $_es_rc); the underlying call, for direct use:"
+            ui_detail "      sudo -u $_es_user $_es_helper --opk-ensure-shared \"$_es_dir\""
+            exit "$_es_rc"
+        fi
         ;;
     --version)
         # One-line machine-friendly version probe (issue #130): the same
