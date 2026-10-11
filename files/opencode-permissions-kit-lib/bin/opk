@@ -611,7 +611,7 @@ PYEOF
             ui_detail "still flagged by 'opk status'? dev-owned entries without g+w are"
             ui_detail "deliberately not healed; 'opk config handover <project-root>' re-runs the full handover"
         else
-            ui_error "the heal could not run (exit $_es_rc); the direct long form still works:"
+            ui_error "the heal could not run (exit $_es_rc); the underlying call, for direct use:"
             ui_detail "      sudo -u $_es_user $_es_helper --opk-ensure-shared \"$_es_dir\""
             exit "$_es_rc"
         fi
