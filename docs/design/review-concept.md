@@ -41,10 +41,49 @@ mid-verification would change the very tree the remaining findings are
 verified against. The 0.0.42d session codified this after the maintainer
 asked for the snapshot first.
 
-**Stop when a full pass returns no new MED/HIGH findings.** LOW/INFO
-findings do not extend the loop — they get dispositioned (implemented, or
-deliberately not done with rationale in the resolution) and that is the end
-of them.
+**Stop when a round leaves review-relevant code untouched** (revised
+2026-10-11, from the 0.0.46a→0.0.46b and 0.0.47b→0.0.47c chains — the
+prior form, "stop when a full pass returns no new MED/HIGH", closed
+chains whose LOW fixes then changed code). A round is a review plus the
+disposition of its findings; the loop closes when that disposition
+changed no review-relevant code.
+
+Review-relevant is everything that has or wires behavior: `files/`
+(including the sudoers/config templates), tests and their pins, the
+Makefile, workflows, `scripts/`. Comments, `docs/`, CHANGELOG and
+resolution/index bookkeeping are not. There is deliberately no
+"trivial" carve-out. Three consequences:
+
+- "No findings at all" and "every finding deliberately not done" are
+  special cases — nothing changed, nothing to review.
+- A round whose fixes stay in comments/docs/bookkeeping closes the loop
+  (0.0.45f precedent: the comment-only micro fix `014d5eb` needed no
+  successor pass).
+- **Any round whose fixes touch production or test code — regardless of
+  the findings' severity — owes one more review: a wave review of the
+  fix diff, not a full pass** ("did the fixes break or lie?" is the
+  right question for LOW fixes too). Severity prioritizes; only code
+  change extends the loop.
+
+Why the revision: "no new MED/HIGH" measures what the reviewer found,
+not what the fix wave then did to the tree — but the loop's own
+strongest argument (below: round d, fixes introduce their own bug
+class) is severity-independent, and the record kept disproving the
+severity gate from below. 0.0.46a closed with the stop rule MET on
+7 LOW; the LOW fixes (F1/F2/F4/F6/F7) went in, and 0.0.46b found
+W1 MED caused by exactly those fixes (superseding the -a loop's
+closure claim). 0.0.47b (MET on 4 LOW) → fixes → 0.0.47c found the
+W2 fix itself statically pinned only, without functional coverage.
+L6 agrees across the whole corpus: 20 % of all findings are
+fix-induced, 11 of them MED/HIGH. The 0.0.47c snapshot records the
+dual reading this revision resolves — its maintainer-commissioned pass
+followed the L6/cadence reading against the 0.0.45f/0.0.46c
+"LOW/INFO do not extend the loop" precedent; under this rule both
+converge: comment-only rounds close, code-touching rounds continue.
+
+If a chain still has not converged after five rounds, stop and hand
+the call to the maintainer — the recorded chains converge within
+2–7 snapshots; a longer tail is taste ping-pong, not defect removal.
 
 Why a stop rule instead of a fixed number of rounds: the process converges.
 The project's own history:
@@ -276,6 +315,7 @@ When a review runs as parallel subagents:
 
 ## Release gate
 
-Before cutting a release: the loop's stop condition must hold (last full
-pass free of new MED/HIGH) **and** both e2e suites are at baseline level
-with zero skips. Only then tag.
+Before cutting a release: the loop's stop condition must hold (the last
+round's dispositions touched no review-relevant code — see "The loop and
+the stop rule") **and** both e2e suites are at baseline level with zero
+skips. Only then tag.
