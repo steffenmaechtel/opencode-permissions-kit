@@ -129,6 +129,17 @@ review host):
   stay unguarded by design: fixture setup uses them heavily, they are
   not deletion, and a degenerate target fails on permissions for the
   non-root suite user.
+- Code extracted from shipped scripts and eval'd or run by a test
+  executes under a **controlled PATH**, never the inherited host PATH:
+  any `command -v` inside the extracted block must not see tools that
+  merely happen to be installed on the contributor's machine. The
+  0.0.48 release blocker: the status verdict matrix evals a block whose
+  `command -v openchamber` found the maintainer's nvm-installed
+  OpenChamber, flipping the "without OpenChamber" cases red on local
+  `make release` while CI (no OpenChamber) stayed green — the
+  0.0.46a F2 environment-dependence class. Build a scratch bin with
+  symlinks to the block's few externals instead of rewriting the probe
+  lines away — the real probe keeps executing (0.0.47c C1 direction).
 
 Enforced by `tests/unit/test-sandbox-policy.sh`, three checks over every
 unit suite (backslash-continued commands are joined first; full-comment
