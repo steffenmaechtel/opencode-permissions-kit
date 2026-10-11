@@ -271,10 +271,13 @@ EOF
         else
             ui_kv_ok "opencode $ADV_VER" "no known advisory affects this install (kit $VERSION database)"
         fi
-    else
+    elif [ -x "$LIBDIR/bin/opencode" ]; then
         # 0.0.48b W3: unknown at this caller's privilege is NOT a finding
         # (an agent-user or dev cron would be permanently non-green
         # otherwise) — informational row, never counted. sudo resolves it.
+        # 0.0.48d D1: present-binary shapes only — the missing shape
+        # already warned above, and no privilege resolves it there: the
+        # "sudo opk status" advice would be a dead end for that row.
         ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)"
     fi
     # Upstream freshness (live, best-effort): GitHub's advisory feed vs

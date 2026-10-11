@@ -1241,6 +1241,73 @@ if [ -n "$W48C_BLOCK_ADV" ]; then
     rm -rf "$_c1dir"
 fi
 
+# --- 0.0.48d D1: the unknown row is present-binary shapes ONLY -----------------
+# The 0.0.48c prescription's second leg, pinned: with the binary missing
+# the stale "unknown — probe failed (run: sudo opk status)" row must NOT
+# print (the counted warn above already spoke; the advice cannot work for
+# that shape) — while a present-but-failing binary keeps the W3
+# privilege-unknown row (over-suppression would hide the legit shape).
+# Behavioral: gate + render blocks against three fixture LIBDIRs.
+W48D_BLOCK_RENDER="$(sed -n '/^    if \[ -n "\$ADV_VER" \]; then$/,/^    fi$/p' "$STATUS")"
+if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'elif [ -x "$LIBDIR/bin/opencode" ]' \
+    && printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ui_kv "opencode version" "unknown — probe failed'; then
+    pass "D1 render block extractable (elif-gated unknown row)"
+else
+    fail "D1 render block not extractable (anchor drift?)"
+fi
+w48d_run() {
+    (
+        ui_kv_warn() { echo "WARN|$1|$2"; }
+        ui_kv() { echo "KV|$1|$2"; }
+        ui_kv_ok() { echo "OK|$1|$2"; }
+        ui_kv_bad() { echo "BAD|$1|$2"; }
+        ui_detail() { echo "DETAIL|$1"; }
+        # render-only stub: no advisories database in the fixture — the
+        # OK branch is the one under test, not the matching logic.
+        advisories_matching() { return 1; }
+        timeout() { shift 1; "$@"; }
+        sudo() { shift 3; "$@"; }
+        LIBDIR="$1"
+        OPENCODE_USER=opencode
+        VERSION=0.0.0
+        ADV_VER=""
+        eval "$W48C_BLOCK_ADV"
+        eval "$W48D_BLOCK_RENDER"
+    )
+}
+if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
+    _d1dir=$(mktemp -d)
+    # missing binary: warn row, NO unknown row (the D1 property)
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "D1: missing binary prints the warn, not the unknown row"
+    else
+        fail "D1: missing binary must not print the unknown row (got: $_d1out)"
+    fi
+    # working binary: probe renders the OK row, no unknown row
+    mkdir -p "$_d1dir/bin"
+    printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_d1dir/bin/opencode"
+    chmod +x "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^OK|opencode 9.9.9|' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "D1: working binary renders the OK row, no unknown row"
+    else
+        fail "D1: working binary must render via ADV_VER (got: $_d1out)"
+    fi
+    # present but failing binary: the W3 privilege-unknown row STAYS
+    printf '#!/bin/sh\nexit 1\n' > "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if ! printf '%s' "$_d1out" | grep -q '^WARN|' \
+        && printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
+        pass "D1: present-but-failing binary keeps the unknown row (W3 shape)"
+    else
+        fail "D1: over-suppression — the privilege-unknown row is gone (got: $_d1out)"
+    fi
+    rm -rf "$_d1dir"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
