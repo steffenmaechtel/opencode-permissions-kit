@@ -788,8 +788,10 @@ check "reshare detect: missing dir is a clean no-need" \
     sh -c ". \"\$1\" && ! ddev_reshare_needed \"\$2/does-not-exist\" \"\$3\"" _ "$HANDOVER" "$RN" "$RN_U"
 check "reshare detect: status.sh wires ddev_reshare_needed per project root" \
     sh -c "grep -q 'ddev_reshare_needed' \"\$1\" && grep -qF 'ui_kv_warn \"ddev share\"' \"\$1\"" _ "$STATUS"
-check "reshare detect: status.sh prints the --opk-ensure-shared one-command fix" \
-    sh -c "grep -q -- '--opk-ensure-shared' \"\$1\"" _ "$STATUS"
+check "reshare detect: status.sh prints the opk ensure-shared one-command fix (issue #159)" \
+    sh -c "grep -qF 'opk ensure-shared \\\"\$_st_d\\\"' \"\$1\"" _ "$STATUS"
+check "reshare detect: status.sh fix line is the short form only (no raw helper call)" \
+    sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\"" _ "$STATUS"
 check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4)" \
     sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS"
 check "reshare detect: status fix names the healing command set, not 'any' (0.0.46a F7)" \

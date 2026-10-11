@@ -488,7 +488,9 @@ if [ -f "$_st_dhl" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null ||
                 ddev_reshare_needed "$_st_d" "$OPENCODE_USER" || continue
                 ui_kv_warn "ddev share" "$(dirname "$_st_d")/.ddev: group-write missing (agent-side ddev run without the heal)"
                 ui_detail "fix: a tree-creating ddev command (config/get/start/restart — your hook heals), or:"
-                ui_detail "      sudo -u $OPENCODE_USER $LIBDIR/bin/ddev-as-opencode --opk-ensure-shared \"$_st_d\""
+                # Short form since issue #159 — the dispatcher's ensure-shared
+                # subcommand wraps the sudo -u ddev-as-opencode heal.
+                ui_detail "      opk ensure-shared \"$_st_d\""
             done
         done < "$PROJECTS_CONF"
     fi

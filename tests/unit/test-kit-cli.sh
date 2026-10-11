@@ -56,6 +56,14 @@ mkdir -p "$FAKEBIN"
 cat > "$FAKEBIN/sudo" <<'EOF'
 #!/bin/sh
 echo "sudo-called" >> "$(dirname "$0")/../sudo-marker"
+# Pass through `sudo [-u <user>] <cmd...>`: strip the user hop (-u and
+# its argument), exec the rest unchanged. config/update elevate plain;
+# ensure-shared hops to the agent user — the stub still runs everything
+# as the current user, which is all the dispatch pins need.
+while [ "$1" = "-u" ]; do
+    shift
+    [ "$#" -gt 0 ] && shift
+done
 exec "$@"
 EOF
 chmod +x "$FAKEBIN/sudo"
@@ -81,7 +89,7 @@ echo "=== CLI dispatcher tests ==="
 # help lists every subcommand
 out="$(run_kit --help)"
 assert "--help exits 0" "0" "$?"
-for c in status config update uninstall handover help openchamber-secure; do
+for c in status config update uninstall handover help openchamber-secure ensure-shared; do
     case "$out" in
         *"$c"*) echo "  ${GREEN}PASS${NC}  --help mentions '$c'"; passed=$((passed + 1)) ;;
         *) echo "  ${RED}FAIL${NC}  --help mentions '$c'"; failures=$((failures + 1)) ;;
@@ -395,6 +403,132 @@ for _ho_tgt in opencode me; do
     fi
 done
 rm -rf "${_ho_pin_dir:?}"
+
+# --- ensure-shared: short heal wrapper (issue #159) ----------------------------
+# The real helper (bin/ddev-as-opencode) is stubbed with an argument
+# recorder — this suite pins dispatch, validation and the sudo hop; the
+# heal itself is pinned by test-ddev-as-opencode.sh.
+mkdir -p "$WORK/es-proj/.ddev"
+cat > "$WORK/es-helper-master" <<'EOF'
+#!/bin/sh
+echo "args=$*" >> "$ES_MARKER"
+exit 0
+EOF
+cp "$WORK/es-helper-master" "$LIB/bin/ddev-as-opencode"
+chmod +x "$LIB/bin/ddev-as-opencode"
+export ES_MARKER="$WORK/es-marker"
+# Second conf: OPENCODE_USER is an existing user that is never the current
+# one (root or not) — forces the sudo -u hop.
+printf 'DEFAULT_USER=%s\nOPENCODE_USER=nobody\nOPENCODE_GROUP=%s\nVERSION=9.9.9\n' \
+    "$(id -un)" "$(id -gn)" > "$WORK/install-nobody.conf"
+
+# explicit dir, agent user == current user (fake conf): direct call, no sudo
+rm -f "${WORK:?}/sudo-marker"
+: > "$WORK/es-marker"
+out="$(run_kit ensure-shared "$WORK/es-proj/.ddev" 2>&1)"
+assert "ensure-shared exits 0" "0" "$?"
+case "$out" in
+    *"group-write re-asserted on $WORK/es-proj/.ddev"*)
+        echo "  ${GREEN}PASS${NC}  ensure-shared reports success"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  ensure-shared reports success (got: $out)"; failures=$((failures + 1)) ;;
+esac
+assert "ensure-shared passes the dir to the helper" \
+    "args=--opk-ensure-shared $WORK/es-proj/.ddev" "$(tail -1 "$WORK/es-marker")"
+if [ -f "$WORK/sudo-marker" ]; then
+    echo "  ${RED}FAIL${NC}  ensure-shared needs no sudo as the agent user"; failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  ensure-shared needs no sudo as the agent user"; passed=$((passed + 1))
+fi
+
+# no argument: defaults to ./.ddev from the current directory
+: > "$WORK/es-marker"
+( cd "$WORK/es-proj" && OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" ensure-shared >/dev/null 2>&1 )
+assert "ensure-shared defaults to ./.ddev" \
+    "args=--opk-ensure-shared $WORK/es-proj/.ddev" "$(tail -1 "$WORK/es-marker")"
+
+# nonexistent dir -> loud usage error BEFORE any sudo hop (nobody conf:
+# the happy path would elevate, the error path must not)
+rm -f "${WORK:?}/sudo-marker"
+errout="$(OPK_INSTALL_CONF="$WORK/install-nobody.conf" "$BIN/opk" ensure-shared "$WORK/does-not-exist" 2>&1 >/dev/null || true)"
+case "$errout" in
+    *"no such directory"*) echo "  ${GREEN}PASS${NC}  ensure-shared rejects nonexistent dirs"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  ensure-shared rejects nonexistent dirs (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+if [ -f "$WORK/sudo-marker" ]; then
+    echo "  ${RED}FAIL${NC}  ensure-shared validates before the sudo hop"; failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  ensure-shared validates before the sudo hop"; passed=$((passed + 1))
+fi
+
+# more than one argument -> usage error
+errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" ensure-shared a b 2>&1 >/dev/null || true)"
+case "$errout" in
+    *"exactly one directory"*) echo "  ${GREEN}PASS${NC}  ensure-shared rejects extra arguments"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  ensure-shared rejects extra arguments (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+
+# no install.conf / no OPENCODE_USER -> loud error, no elevation
+errout="$(OPK_INSTALL_CONF="$WORK/no-such.conf" "$BIN/opk" ensure-shared "$WORK/es-proj/.ddev" 2>&1 >/dev/null || true)"
+case "$errout" in
+    *"is the kit installed"*) echo "  ${GREEN}PASS${NC}  ensure-shared names a missing install.conf"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  ensure-shared names a missing install.conf (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+printf 'DEFAULT_USER=%s\nVERSION=9.9.9\n' "$(id -un)" > "$WORK/install-nouser.conf"
+errout="$(OPK_INSTALL_CONF="$WORK/install-nouser.conf" "$BIN/opk" ensure-shared "$WORK/es-proj/.ddev" 2>&1 >/dev/null || true)"
+case "$errout" in
+    *"no OPENCODE_USER"*) echo "  ${GREEN}PASS${NC}  ensure-shared names a missing OPENCODE_USER"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  ensure-shared names a missing OPENCODE_USER (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+
+# missing helper -> loud error
+rm "${LIB:?}/bin/ddev-as-opencode"
+errout="$(OPK_INSTALL_CONF="$WORK/install.conf" "$BIN/opk" ensure-shared "$WORK/es-proj/.ddev" 2>&1 >/dev/null || true)"
+case "$errout" in
+    *"is the kit installed"*) echo "  ${GREEN}PASS${NC}  ensure-shared names a missing helper"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  ensure-shared names a missing helper (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+cp "$WORK/es-helper-master" "$LIB/bin/ddev-as-opencode"
+chmod +x "$LIB/bin/ddev-as-opencode"
+
+# different agent user (nobody): hops through sudo -u, args intact
+rm -f "${WORK:?}/sudo-marker"
+: > "$WORK/es-marker"
+out="$(OPK_INSTALL_CONF="$WORK/install-nobody.conf" "$BIN/opk" ensure-shared "$WORK/es-proj/.ddev" 2>&1)"
+assert "ensure-shared (sudo path) exits 0" "0" "$?"
+assert "ensure-shared (sudo path) passes the dir to the helper" \
+    "args=--opk-ensure-shared $WORK/es-proj/.ddev" "$(tail -1 "$WORK/es-marker")"
+if [ -f "$WORK/sudo-marker" ]; then
+    echo "  ${GREEN}PASS${NC}  ensure-shared hops to the agent user via sudo -u"; passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  ensure-shared hops to the agent user via sudo -u"; failures=$((failures + 1))
+fi
+
+# failing sudo: loud error naming the long-form fallback (fail-loud pin —
+# the helper itself never fails, so a swallowed sudo failure would look
+# like a successful heal)
+FAILBIN="$WORK/failbin"
+mkdir -p "$FAILBIN"
+printf '#!/bin/sh\nexit 1\n' > "$FAILBIN/sudo"
+chmod +x "$FAILBIN/sudo"
+_es_rc=0
+PATH="$FAILBIN:$PATH" OPK_INSTALL_CONF="$WORK/install-nobody.conf" \
+    "$BIN/opk" ensure-shared "$WORK/es-proj/.ddev" >/dev/null 2>&1 || _es_rc=$?
+if [ "$_es_rc" -ne 0 ]; then
+    echo "  ${GREEN}PASS${NC}  ensure-shared exits non-zero when sudo fails"; passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  ensure-shared exits non-zero when sudo fails"; failures=$((failures + 1))
+fi
+errout="$(PATH="$FAILBIN:$PATH" OPK_INSTALL_CONF="$WORK/install-nobody.conf" \
+    "$BIN/opk" ensure-shared "$WORK/es-proj/.ddev" 2>&1 || true)"
+case "$errout" in
+    *"could not run"*) echo "  ${GREEN}PASS${NC}  ensure-shared reports the failed heal"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  ensure-shared reports the failed heal (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+case "$errout" in
+    *"--opk-ensure-shared"*) echo "  ${GREEN}PASS${NC}  ensure-shared prints the long-form fallback"; passed=$((passed + 1)) ;;
+    *) echo "  ${RED}FAIL${NC}  ensure-shared prints the long-form fallback (got: $errout)"; failures=$((failures + 1)) ;;
+esac
+unset ES_MARKER
 
 # List drift guard: install.sh's fetch_kit() list and update.sh's KIT_FILES
 # must carry the same file set — a missing entry means streamed installs
