@@ -265,7 +265,10 @@ EOF
             ui_kv_ok "opencode $ADV_VER" "no known advisory affects this install (kit $VERSION database)"
         fi
     else
-        ui_kv_warn "opencode version" "unknown — probe failed (run: sudo opk status)"
+        # 0.0.48b W3: unknown at this caller's privilege is NOT a finding
+        # (an agent-user or dev cron would be permanently non-green
+        # otherwise) — informational row, never counted. sudo resolves it.
+        ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)"
     fi
     # Upstream freshness (live, best-effort): GitHub's advisory feed vs
     # the ids the shipped database knows. Never decides affectedness.
@@ -412,7 +415,7 @@ case "${CONTAINER_BACKEND:-}" in
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv_ok "socket" "reachable — $sock"
             elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
-                ui_kv_warn "socket" "unknown — needs root to check (run: sudo opk status)"
+                ui_kv "socket" "unknown — needs root to check (run: sudo opk status)"
             else
                 ui_kv_bad "socket" "NOT reachable — $sock"
             fi
@@ -436,7 +439,7 @@ case "${CONTAINER_BACKEND:-}" in
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
                 ui_kv_ok "socket" "reachable — $sock"
             elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
-                ui_kv_warn "socket" "unknown — needs root to check (run: sudo opk status)"
+                ui_kv "socket" "unknown — needs root to check (run: sudo opk status)"
             else
                 ui_kv_bad "socket" "NOT reachable — $sock"
             fi
@@ -585,9 +588,13 @@ else
     # caller cannot stat the file, so "missing" may just mean "unchecked".
     # Only root can genuinely confirm absence.
     if [ "$(id -u)" -ne 0 ] && [ -d "/home/$OPENCODE_USER" ]; then
-        ui_kv_warn "mkcert CA" "unknown — needs root to check (run: sudo opk status)"
+        # 0.0.48b W3: same rule as the socket/version unknowns — an
+        # unprivileged caller cannot judge this, so it must not count.
+        ui_kv "mkcert CA" "unknown — needs root to check (run: sudo opk status)"
     else
-        ui_kv_warn "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)"
+        # 0.0.48b W3: "optional" in the text means exactly that — ddev
+        # HTTPS only; not a finding for the verdict.
+        ui_kv "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)"
     fi
 fi
 # Migration dumps (issue #15): databases exported from the developer's
@@ -1081,6 +1088,11 @@ fi
 # from temp files for exactly that reason (a `cmd | while` pipeline
 # bumps counters in a subshell, where they die). The counts snapshot
 # BEFORE the verdict row prints, so the row itself never counts.
+# NOT counted by design (0.0.48b W3): rows the caller cannot judge at
+# their own privilege ("unknown — needs root") and optional-feature rows
+# ("missing (optional …") — unknown ≠ finding, and a permanent warn for
+# every unprivileged or HTTPS-less host would make green unattainable
+# and the cron alert worthless. They stay visible as plain ui_kv rows.
 # Exit code carries the verdict for callers and cron:
 #   0 all green · 1 alert(s) · 2 warning(s) only · 64 usage error.
 _st_alerts=$UI_ROWS_BAD

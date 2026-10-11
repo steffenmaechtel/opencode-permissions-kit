@@ -281,9 +281,10 @@ host git against the tested floor, project roots, ddev runtime readiness
 security-advisory check (see
 [security advisories](../how-to/update.md#security-advisories)), the WSL2
 `/mnt/c` exposure (including the browser-bridge state), the
-root-equivalent-access audit, and the leak scan — ending with a one-line
-verdict (the **Summary** row: *All green* or the alert/warning tally)
-followed by management hints (`opk update`, `opk config`, ...).
+root-equivalent-access audit, and the leak scan — followed by management
+hints (`opk update`, `opk config`, ...) and, as the very last line, the
+one-line verdict (the **Summary** row: *All green* or the alert/warning
+tally).
 
 ```bash
 sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh
@@ -297,7 +298,10 @@ The full report uses the same exit codes (an installed-but-degraded kit
 is visible to callers, not just to readers). The one exception: without
 an install the full report stays `0` — status is a diagnostic and does
 not "fail" for reporting absence — while `--short` reports that state as
-`1`.
+`1`. Rows the caller cannot judge at their own privilege ("unknown —
+needs root to check", a failed version probe without sudo rights) and
+optional-feature rows (the mkcert CA) are informational: they never count
+toward the verdict — `sudo opk status` resolves the unknowns.
 
 `--short` is cron/timer friendly — alert yourself only when something is
 off:

@@ -17,11 +17,12 @@
 # POSIX sh, SOURCED by install.sh, update.sh and status.sh. Never
 # executed directly. install.sh and update.sh source the checkout/fetch
 # copy first with a deployed-LIBDIR fallback (their own sibling
-# convention); status.sh probes the deployed LIBDIR first and falls back
-# to the checkout copy next to itself (cf. its ui.sh block). Calls
-# ui.sh helpers (ui_warn/ui_detail/ui_kv_ok/ui_kv_warn) at RUNTIME — every
-# caller sources ui.sh before its phase runs; log.sh is optional (the audit
-# line is best-effort). Deployed to
+# convention); status.sh resolves its sibling copies CHECKOUT-FIRST with
+# the deployed LIBDIR as fallback (issue #158, cf. its ui.sh block — an
+# older deployed lib must not drop the semantic rows the summary
+# counts). Calls ui.sh helpers (ui_warn/ui_detail/ui_kv_ok/ui_kv_warn)
+# at RUNTIME — every caller sources ui.sh before its phase runs; log.sh
+# is optional (the audit line is best-effort). Deployed to
 # /usr/local/lib/opencode-permissions-kit/sh/git-check.sh.
 
 # The oldest git the kit is tested on: Debian 12 / Ubuntu 22.04 — the

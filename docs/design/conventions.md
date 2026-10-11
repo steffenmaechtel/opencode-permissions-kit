@@ -55,8 +55,11 @@ Two consequences for report scripts:
 - Rows printed inside a pipeline (`cmd | while ...; ui_kv_warn ...; done`)
   count in the pipe's subshell and the tally loses them — feed such
   loops from a temp file and read it via redirect (`while ... done < "$f"`).
-- `UI_SILENT=1` mutes every print helper while the counters keep
-  running — the base for one-line report modes (`opk status --short`).
+- `UI_SILENT=1` mutes every non-interactive print helper while the
+  counters keep running — the base for one-line report modes
+  (`opk status --short`). The question helpers (`ui_ask`/`ui_confirm`/
+  `ui_menu`) are deliberately not muted: a muted report mode must not
+  fall through to an invisible prompt.
 
 Report commands carry their verdict in the exit code (`opk status`:
 `0` all green, `1` alert(s), `2` warning(s) only, `64` usage error) so

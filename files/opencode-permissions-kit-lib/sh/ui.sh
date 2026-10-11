@@ -18,8 +18,11 @@
 #   - Severity rows count themselves (UI_ROWS_OK/WARN/BAD, issue #158): a
 #     summary can tally findings by CALL SITE, not by color bytes — colors
 #     are empty under NO_COLOR/piping and could not be counted.
-#   - UI_SILENT=1 mutes every print helper while the counters keep
-#     running — the base for one-line report modes (status.sh --short).
+#   - UI_SILENT=1 mutes every non-interactive print helper while the
+#     counters keep running — the base for one-line report modes
+#     (status.sh --short). The question helpers (ui_ask/ui_confirm/
+#     ui_menu) are deliberately NOT muted: a muted report mode must not
+#     fall through to an invisible prompt.
 #
 # Sourced (never executed):
 #   . /usr/local/lib/opencode-permissions-kit/sh/ui.sh

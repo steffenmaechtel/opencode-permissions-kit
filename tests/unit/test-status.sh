@@ -944,6 +944,11 @@ if [ -n "$SUMMARY_BLOCK" ]; then
     # output plus its exit code. ui_section records itself so the pin can
     # prove --short suppresses the section header. The `|| _rs_rc=$?`
     # capture keeps the suite's set -e alive through the verdict exits.
+    # 0.0.48b W4: the harness presets UI_SILENT exactly the way the arg
+    # parser does (1 iff --short) — without that, the mute→restore
+    # interplay was never simulated and deleting the block's
+    # UI_SILENT=0 restore kept every pin green while real --short went
+    # fully silent.
     run_summary() {
         _rs_rc=0
         _rs_out=$(
@@ -952,6 +957,7 @@ if [ -n "$SUMMARY_BLOCK" ]; then
                 . "$UI_LIB"
                 UI_ROWS_BAD=$1; UI_ROWS_WARN=$2; UI_ROWS_OK=$3
                 STATUS_SHORT=$4
+                if [ "$STATUS_SHORT" = true ]; then UI_SILENT=1; else UI_SILENT=0; fi
                 ui_section() { printf 'SECTION:%s\n' "$1"; }
                 eval "$SUMMARY_BLOCK"
             ) 2>&1
@@ -1113,6 +1119,76 @@ if ! grep -qE '_(share_list|hosts_list|gap_roots)=/dev/null' "$STATUS"; then
     pass "W2 class sweep: no /dev/null fallback assignment remains"
 else
     fail "W2 class sweep: a /dev/null fallback survived"
+fi
+
+# --- 0.0.48b W3: privilege-unknown and optional rows never count -------------
+# The verdict counts findings, not unknowns: "unknown — needs root" and
+# "missing (optional …" rows are plain ui_kv (uncounted) — otherwise every
+# unprivileged or HTTPS-less host would be permanently non-green and the
+# cron alert worthless. Pins the five converted rows incl. both socket
+# twins, plus the negative sweep (no unknown/optional row via ui_kv_warn).
+if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS" \
+    && [ "$(grep -cF 'ui_kv "socket" "unknown — needs root to check' "$STATUS")" = "2" ] \
+    && grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$STATUS" \
+    && grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS" \
+    && ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" \
+    && ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS"; then
+    pass "W3: unknown/optional rows are uncounted (plain ui_kv, both socket twins)"
+else
+    fail "W3: an unknown/optional row still counts (or the conversion drifted)"
+fi
+
+# --- 0.0.48b W4: the --short output guards are pinned behaviorally ------------
+# The static one-line pin covered only the hosts-scan echo conversion;
+# the leak-scan hit-list guard and the management-block guard now run as
+# extracted blocks through both STATUS_SHORT states — muted means really
+# nothing prints, full mode means the content prints.
+w4_run() {
+    (
+        head() { echo "HEAD-CALLED"; }
+        sed() { cat; }
+        ui_info() { echo "INFO|$1"; }
+        ui_detail() { echo "DETAIL|$1"; }
+        scan_hits="w4hit"
+        scan_count=1
+        STATUS_SHORT=$2
+        eval "$1"
+    )
+}
+W4_BLOCK_HITLIST="$(sed -n '/# Hit list prints in full mode only/,/^ *fi$/p' "$STATUS")"
+W4_BLOCK_MGMT="$(sed -n '/# --short skips the block: one verdict line means one line/,/^fi$/p' "$STATUS")"
+if [ -n "$W4_BLOCK_HITLIST" ] && [ -n "$W4_BLOCK_MGMT" ]; then
+    pass "W4 guard blocks extractable from status.sh"
+else
+    fail "W4 guard blocks not extractable (anchor drift?)"
+fi
+if [ -n "$W4_BLOCK_HITLIST" ]; then
+    _w4out=$(w4_run "$W4_BLOCK_HITLIST" true || true)
+    if [ -z "$(printf '%s' "$_w4out" | grep -v '^ *$')" ]; then
+        pass "W4 hit list: --short prints none of it"
+    else
+        fail "W4 hit list leaks into --short (got: $_w4out)"
+    fi
+    _w4out=$(w4_run "$W4_BLOCK_HITLIST" false || true)
+    if printf '%s' "$_w4out" | grep -q 'HEAD-CALLED'; then
+        pass "W4 hit list: full mode prints it (control)"
+    else
+        fail "W4 hit list control broken (got: $_w4out)"
+    fi
+fi
+if [ -n "$W4_BLOCK_MGMT" ]; then
+    _w4out=$(w4_run "$W4_BLOCK_MGMT" true || true)
+    if ! printf '%s' "$_w4out" | grep -q 'INFO|'; then
+        pass "W4 management block: --short prints none of it"
+    else
+        fail "W4 management block leaks into --short (got: $_w4out)"
+    fi
+    _w4out=$(w4_run "$W4_BLOCK_MGMT" false || true)
+    if printf '%s' "$_w4out" | grep -q 'INFO|Management (run in a terminal)'; then
+        pass "W4 management block: full mode prints it (control)"
+    else
+        fail "W4 management control broken (got: $_w4out)"
+    fi
 fi
 
 echo ""
