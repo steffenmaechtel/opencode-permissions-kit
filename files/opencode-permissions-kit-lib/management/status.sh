@@ -238,7 +238,14 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     # prompts: root needs no password, the developer rides the kit's
     # NOPASSWD rule, anyone else just sees "unknown".
     ADV_VER=""
-    if [ -x "$LIBDIR/bin/opencode" ] && command -v sudo >/dev/null 2>&1; then
+    # 0.0.48c C1: a missing/unexecutable managed binary is a BROKEN KIT,
+    # not an unknown — the advisory check cannot run, the wrapper would
+    # fail at the first agent session, and no privilege resolves it (sudo
+    # hits this same [ -x ] gate). Counts; the privilege-unknown shape
+    # below does not.
+    if [ ! -x "$LIBDIR/bin/opencode" ]; then
+        ui_kv_warn "opencode binary" "missing or not executable — advisory check skipped (fix: sudo opk update)"
+    elif command -v sudo >/dev/null 2>&1; then
         if command -v timeout >/dev/null 2>&1; then
             ADV_VER=$(timeout 10 sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null \
     | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)

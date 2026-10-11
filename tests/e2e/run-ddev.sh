@@ -863,7 +863,7 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
         E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status1.log 2>&1; grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status1.log'
     DEVSH 'cd /var/www/vhosts/dd13-proj && ddev restart >/tmp/dd13-restart.log 2>&1'
     check "DD13: dev-side ddev command heals the gap (hook reshare)" \
-        E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status2.log 2>&1; ! grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status2.log'
+        E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status2.log 2>&1; test -s /tmp/dd13-status2.log && ! grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status2.log'
 
     echo ""
     echo "--- DD14. ddev composer create-project (exit-23 burn-in finding) ---"

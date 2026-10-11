@@ -301,7 +301,9 @@ not "fail" for reporting absence — while `--short` reports that state as
 `1`. Rows the caller cannot judge at their own privilege ("unknown —
 needs root to check", a failed version probe without sudo rights) and
 optional-feature rows (the mkcert CA) are informational: they never count
-toward the verdict — `sudo opk status` resolves the unknowns.
+toward the verdict — `sudo opk status` resolves the privilege unknowns.
+A missing or non-executable managed binary is the exception: it is
+reported as a warning, because no privilege can resolve it.
 
 `--short` is cron/timer friendly — alert yourself only when something is
 off:

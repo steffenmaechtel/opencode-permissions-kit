@@ -1191,6 +1191,56 @@ if [ -n "$W4_BLOCK_MGMT" ]; then
     fi
 fi
 
+# --- 0.0.48c C1: a missing/unexecutable managed binary is a FINDING ------------
+# W3's uncounted "unknown" class must not swallow a broken kit: with
+# $LIBDIR/bin/opencode gone, the gate warns (counted) and never reaches
+# the probe; with a working binary, the probe path runs and no warn
+# fires. Behavioral: the extracted gate block against fixture LIBDIRs.
+W48C_BLOCK_ADV="$(sed -n '/^    ADV_VER=""$/,/^    fi$/p' "$STATUS")"
+if printf '%s' "$W48C_BLOCK_ADV" | grep -q 'ui_kv_warn "opencode binary"' \
+    && printf '%s' "$W48C_BLOCK_ADV" | grep -q 'elif command -v sudo'; then
+    pass "C1 gate block extractable (warn + elif shape)"
+else
+    fail "C1 gate block not extractable (anchor drift?)"
+fi
+w48c_run() {
+    (
+        ui_kv_warn() { echo "WARN|$1|$2"; }
+        ui_kv() { echo "KV|$1|$2"; }
+        # timeout is external — it would exec the REAL sudo, invisible to
+        # the stub below; drop the duration and exec in-shell instead.
+        timeout() { shift 1; "$@"; }
+        sudo() { shift 3; "$@"; }
+        LIBDIR="$1"
+        OPENCODE_USER=opencode
+        eval "$2"
+        echo "ADV_VER=${ADV_VER:-unset}"
+    )
+}
+if [ -n "$W48C_BLOCK_ADV" ]; then
+    # broken kit: no bin/opencode under LIBDIR
+    _c1dir=$(mktemp -d)
+    _c1out=$(w48c_run "$_c1dir" "$W48C_BLOCK_ADV" || true)
+    if printf '%s' "$_c1out" | grep -q '^WARN|opencode binary|missing or not executable' \
+        && printf '%s' "$_c1out" | grep -q '^ADV_VER=unset$'; then
+        pass "C1: missing binary warns (counted), probe never runs"
+    else
+        fail "C1: missing binary must warn loudly (got: $_c1out)"
+    fi
+    # control: executable fake binary -> probe path runs, no warn
+    mkdir -p "$_c1dir/bin"
+    printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_c1dir/bin/opencode"
+    chmod +x "$_c1dir/bin/opencode"
+    _c1out=$(w48c_run "$_c1dir" "$W48C_BLOCK_ADV" || true)
+    if ! printf '%s' "$_c1out" | grep -q '^WARN|' \
+        && printf '%s' "$_c1out" | grep -q '^ADV_VER=9.9.9$'; then
+        pass "C1: working binary probes (control), no warn"
+    else
+        fail "C1 control broken (got: $_c1out)"
+    fi
+    rm -rf "$_c1dir"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
