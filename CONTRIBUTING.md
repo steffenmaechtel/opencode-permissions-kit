@@ -211,7 +211,9 @@ Scope and cadence follow the [review concept](docs/design/review-concept.md):
 full reviews are this trigger-based gate; the fixes themselves get a
 **wave review** (diff scope) before their PR — mandatory when a wave
 changes the semantics of root-running scripts — and the review → fix →
-review loop stops only when a full pass returns no new MED/HIGH findings.
+review loop stops only when a round's dispositions touch no
+production/test code: severity prioritizes, but any code-touching round
+— LOW fixes included — owes its wave review before the loop closes.
 
 ## Version
 

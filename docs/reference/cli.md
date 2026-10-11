@@ -66,6 +66,7 @@ opk update --binary
 opk upgrade-opencode   # just the opencode binary
 opk ddev-hosts-add     # in a ddev project dir
 opk handover me .gotmp # mixed-owner tree -> yours again
+opk ensure-shared      # re-assert group-write on ./.ddev (ddev share fix)
 opk openchamber-secure # pin OpenChamber to the kit wrapper
 opk wsl-add-opencode-1-fix   # opt in to the WSL browser-bridge carrier
 opk uninstall
@@ -75,7 +76,8 @@ opk --version   # the deployed kit version
 
 Everything after the subcommand goes to the underlying script unchanged,
 so all flags below work with both forms. `config`, `update` and `handover`
-elevate via sudo automatically; `status` needs no sudo; `uninstall` runs as
+elevate via sudo automatically; `ensure-shared` hops to the agent user
+(`sudo -u opencode`) automatically; `status` needs no sudo; `uninstall` runs as
 your user and asks for sudo itself; `ddev-hosts-*` run as your user (they
 drive Windows-side elevation through ddev itself).
 
@@ -144,6 +146,28 @@ handovers, see [ddev integration](../concepts/ddev-integration.md)).
 System roots (`/`, `/usr`, `/var`, ...) and whole home directories are
 refused — hand over trees, not systems. The command elevates via sudo
 itself; `--dry-run` validates and prints the plan without sudo.
+
+## ensure-shared
+
+Re-assert group-write on a `.ddev` tree an agent-side ddev run left
+without it — the short form of the fix `opk status` prints for its
+`ddev share … group-write missing` line (issue #159):
+
+```bash
+opk ensure-shared                     # heals ./.ddev
+opk ensure-shared /var/www/vhosts/some-project/.ddev
+```
+
+Runs the kit's heal helper as the agent user (`sudo -u opencode`,
+passwordless through the kit's sudoers grant). The heal is an
+**owner-only chmod**: it widens the mode of agent-owned entries to `g+w`
+(what ddev's hardcoded `0755`/`0644` modes cap away) and never touches
+ownership — dev-owned entries without group-write are your umask's
+business and are deliberately left alone (`opk config handover
+<project-root>` re-runs the full handover if a tree needs more).
+Heavy generated subtrees (`db_snapshots`, import dumps) are pruned.
+Idempotent and best-effort. Background:
+[ddev integration](../concepts/ddev-integration.md#team-git-workflows-group-write-on-ddev-created-content-issue-94).
 
 ## ddev-hosts-add / ddev-hosts-check
 
