@@ -15,6 +15,11 @@
 #   - ui_ask/ui_menu print their prompt to stderr and the answer to stdout,
 #     so $(...) capture stays clean; they read from /dev/tty when possible
 #     (stdin may be the curl|bash script stream).
+#   - Severity rows count themselves (UI_ROWS_OK/WARN/BAD, issue #158): a
+#     summary can tally findings by CALL SITE, not by color bytes — colors
+#     are empty under NO_COLOR/piping and could not be counted.
+#   - UI_SILENT=1 mutes every print helper while the counters keep
+#     running — the base for one-line report modes (status.sh --short).
 #
 # Sourced (never executed):
 #   . /usr/local/lib/opencode-permissions-kit/sh/ui.sh
@@ -38,26 +43,42 @@ else
     UI_SYM_ADD='+'; UI_SYM_ARROW='→'; UI_SYM_RULE='─'
 fi
 
+# --- severity tallies (issue #158) ---------------------------------------------
+# Bumped by the semantic helpers (ui_kv_ok/ui_kv_warn/ui_kv_bad,
+# ui_have/ui_atten/ui_miss, ui_warn/ui_error) in the sourcing shell.
+# Rows printed inside pipelines run in subshells and do NOT count —
+# callers that need the tally keep their ui_* calls in the main shell
+# (status.sh feeds such loops from temp files for this reason). Inert
+# for scripts that never read the counters.
+UI_ROWS_OK=0
+UI_ROWS_WARN=0
+UI_ROWS_BAD=0
+
 # --- process log lines ------------------------------------------------------------
 # info     Checking Node.js...
 # success  Node.js v24 found
 
 _ui_label() {
     # _ui_label <color> <label> <message...>
+    if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
     printf '  %s%s%s  %s\n' "$1" "$2" "${UI_NC}" "$3"
 }
 
+# Counting: warn/error are severity rows (issue #158); info/success are
+# progress lines, not findings — they stay uncounted.
 ui_info()    { _ui_label "$UI_BLUE"   'info   ' "$1"; }
 ui_success() { _ui_label "$UI_GREEN"  'success' "$1"; }
-ui_warn()    { _ui_label "$UI_YELLOW" 'warn   ' "$1"; }
-ui_error()   { _ui_label "$UI_RED"    'error  ' "$1"; }
+ui_warn()    { UI_ROWS_WARN=$((UI_ROWS_WARN + 1)); _ui_label "$UI_YELLOW" 'warn   ' "$1"; }
+ui_error()   { UI_ROWS_BAD=$((UI_ROWS_BAD + 1));  _ui_label "$UI_RED"   'error  ' "$1"; }
 
 # Indented, dimmed detail line (belongs to the previous ui_* line).
-ui_detail()  { printf '     %s%s%s\n' "$UI_DIM" "$1" "$UI_NC"; }
+ui_detail()  { if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
+    printf '     %s%s%s\n' "$UI_DIM" "$1" "$UI_NC"; }
 
 # --- sections & banner --------------------------------------------------------------
 
 ui_section() {
+    if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
     # Section rule:  ── Pre-flight ─────────────────
     _t="$1"
     printf '\n  %s%s── %s ──' "$UI_BOLD" "$UI_CYAN" "$_t"
@@ -67,6 +88,7 @@ ui_section() {
 }
 
 ui_banner() {
+    if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
     # Slim banner.
     printf '\n  %s%s opencode permissions kit%s  %sv%s\n\n' \
         "$UI_BOLD" "$UI_CYAN" "$UI_NC" "$UI_DIM" "${1:-0.0.0}"
@@ -77,32 +99,56 @@ ui_banner() {
 
 _ui_item() {
     # _ui_item <color> <symbol> <label> <note>  (note optional)
+    if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
     printf '  %s%s%s  %-30s %s\n' "$1" "$2" "$UI_NC" "$3" "${4:-}"
 }
 
-ui_have()  { _ui_item "$UI_GREEN"  "$UI_SYM_OK"   "$1" "$2"; }  # present/ready
+# Counting: the checklist verdicts are severity rows (issue #158);
+# ui_add is a plan line, not a finding — uncounted.
+ui_have()  { UI_ROWS_OK=$((UI_ROWS_OK + 1));     _ui_item "$UI_GREEN"  "$UI_SYM_OK"   "$1" "$2"; }  # present/ready
 ui_add()   { _ui_item "$UI_CYAN"   "$UI_SYM_ADD"  "$1" "$2"; }  # will be added
-ui_atten() { _ui_item "$UI_YELLOW" "$UI_SYM_WARN" "$1" "$2"; }  # needs attention
-ui_miss()  { _ui_item "$UI_RED"    "$UI_SYM_BAD"  "$1" "$2"; }  # missing/blocked
+ui_atten() { UI_ROWS_WARN=$((UI_ROWS_WARN + 1)); _ui_item "$UI_YELLOW" "$UI_SYM_WARN" "$1" "$2"; }  # needs attention
+ui_miss()  { UI_ROWS_BAD=$((UI_ROWS_BAD + 1));   _ui_item "$UI_RED"    "$UI_SYM_BAD"  "$1" "$2"; }  # missing/blocked
 
 # --- aligned key/value panels (status, summaries) --------------------------------------
 
 ui_kv() {
     # ui_kv <key> <value> [color-for-value]
+    # Informational row — never counted (not a finding). Colored verdicts
+    # use the semantic helpers below so the summary can tally them.
+    if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
     printf '  %-14s %s%s%s\n' "$1" "${3:-$UI_NC}" "$2" "$UI_NC"
 }
 
 ui_kv_warn() {
     # Like ui_kv, but with a warn symbol — value column aligns with ui_kv
     # (2 + 1 sym + 2 + 11 label + 1 space = same offset as 2 + 14 + 1).
+    # Count BEFORE the silent guard: a muted row is still a finding.
+    UI_ROWS_WARN=$((UI_ROWS_WARN + 1))
+    if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
     printf '  %s%s%s  %-11s %s%s%s\n' \
         "$UI_YELLOW" "$UI_SYM_WARN" "$UI_NC" "$1" "$UI_YELLOW" "$2" "$UI_NC"
+}
+
+# Semantic severity rows (issue #158): severity by NAME, so a summary can
+# count findings without reading color bytes (empty under NO_COLOR/pipes).
+# ui_kv_ok/ui_kv_bad render exactly like ui_kv with the color argument;
+# for the yellow class use ui_kv_warn (carries the warn symbol).
+ui_kv_ok() {
+    UI_ROWS_OK=$((UI_ROWS_OK + 1))
+    ui_kv "$1" "$2" "$UI_GREEN"
+}
+
+ui_kv_bad() {
+    UI_ROWS_BAD=$((UI_ROWS_BAD + 1))
+    ui_kv "$1" "$2" "$UI_RED"
 }
 
 # --- plan list (numbered) ----------------------------------------------------------------
 
 ui_plan() {
     # ui_plan <n> <text> [note]
+    if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
     printf '    %s%d%s  %-42s %s\n' "$UI_DIM" "$1" "$UI_NC" "$2" "${3:-}"
 }
 

@@ -8,18 +8,41 @@
 # Deliberately set -u ONLY (no -e/pipefail): status is a read-only report —
 # one failing probe must not kill the remaining sections; failures render
 # as "unknown" rows instead (same fail-soft class as uninstall.sh).
+#
+# CLI (issue #158): --short/-s prints only the final verdict line and
+# carries it in the exit code (0 all green, 1 alert(s), 2 warning(s)
+# only, 64 usage error) — cron/timer friendly.
 set -u
+
+# --- CLI (issue #158) ------------------------------------------------------------
+# --short/-s: one verdict line. UI_SILENT mutes the ui.sh printers while
+# the severity counters keep counting; the verdict line prints at the
+# very end (UI_SILENT off again). Usage errors exit 64 (EX_USAGE) so
+# they never collide with the verdict codes 1/2.
+STATUS_SHORT=false
+for _st_arg in "$@"; do
+    case "$_st_arg" in
+        --short|-s) STATUS_SHORT=true ;;
+        *)
+            echo "usage: sh $(basename "$0") [--short]" >&2
+            exit 64
+            ;;
+    esac
+done
+if [ "$STATUS_SHORT" = true ]; then
+    UI_SILENT=1
+fi
 
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 
-# Shared UI helpers: installed library first, then the checkout layout.
-UI_LIB="$LIBDIR/sh/ui.sh"
-if [ ! -f "$UI_LIB" ]; then
-    _self="$(cd "$(dirname "$0")" && pwd)"
-    [ -f "$_self/../sh/ui.sh" ] && UI_LIB="$_self/../sh/ui.sh"
-fi
+# Shared UI helpers (checkout-first, 0.0.46a F4 pattern like ddev-handover
+# below): the checkout's status.sh needs its OWN ui.sh — the deployed one
+# can predate ui_kv_ok/ui_kv_bad (issue #158) and would drop those rows.
+# A deployed run resolves to the identical file anyway.
+UI_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/ui.sh"
+[ -f "$UI_LIB" ] || UI_LIB="/usr/local/lib/opencode-permissions-kit/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     # shellcheck disable=SC1090
     . "$UI_LIB"
@@ -30,11 +53,11 @@ fi
 
 # Shared git check (issue #118): the soft tested floor for the Core row.
 # Fail-soft like the rest of status: a missing helper just drops the row.
-GIT_CHECK_LIB="$LIBDIR/sh/git-check.sh"
-if [ ! -f "$GIT_CHECK_LIB" ]; then
-    _self="$(cd "$(dirname "$0")" && pwd)"
-    [ -f "$_self/../sh/git-check.sh" ] && GIT_CHECK_LIB="$_self/../sh/git-check.sh"
-fi
+# Checkout-first for the same reason as ui.sh above: an older deployed
+# git-check.sh would render its row via plain ui_kv and the summary
+# (issue #158) would not count it.
+GIT_CHECK_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/git-check.sh"
+[ -f "$GIT_CHECK_LIB" ] || GIT_CHECK_LIB="$LIBDIR/sh/git-check.sh"
 if [ -f "$GIT_CHECK_LIB" ]; then
     # shellcheck disable=SC1090
     . "$GIT_CHECK_LIB"
@@ -64,12 +87,21 @@ fi
 ui_banner "$VERSION" "protection status"
 
 if [ "$installed" = false ]; then
+    if [ "$STATUS_SHORT" = true ]; then
+        # Machine mode: one line, verdict in the exit code — "not
+        # installed" is the loudest not-green state there is.
+        echo "not installed — hardening NOT active (run 'opk status' for the full report)"
+        exit 1
+    fi
     ui_warn "Hardening NOT active."
     echo ""
     ui_info "Install it with:"
     ui_detail "curl -fsSL https://raw.githubusercontent.com/steffenmaechtel"\
 "/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
     echo ""
+    # Full mode keeps exit 0 here on purpose: status.sh is a diagnostic
+    # that must not "fail" for reporting absence (the summary's exit
+    # codes apply to installed reports; --short reports this state as 1).
     exit 0
 fi
 
@@ -77,7 +109,7 @@ fi
 
 ui_section "Core"
 
-ui_kv "Mode"     "dedicated user (soft permissions only)" "$UI_GREEN"
+ui_kv_ok "Mode"     "dedicated user (soft permissions only)"
 # Channel stamp (issue #38): the ref installs/updates track. Unstamped =
 # installed before the beta channel split — such installs update from
 # 'master' until their next opk update re-stamps it.
@@ -89,7 +121,7 @@ fi
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ui_kv "User"  "$OPENCODE_USER — exists"
 else
-    ui_kv "User"  "$OPENCODE_USER — MISSING" "$UI_RED"
+    ui_kv_bad "User"  "$OPENCODE_USER — MISSING"
 fi
 ui_kv "Wrapper"  "/usr/local/bin/opencode -> $(readlink /usr/local/bin/opencode 2>/dev/null || echo missing)"
 ui_kv "Library"  "$LIBDIR"
@@ -98,7 +130,7 @@ _occonf="$(ls /home/$OPENCODE_USER/.config/opencode/opencode.jsonc 2>/dev/null \
 if [ -n "$_occonf" ]; then
     ui_kv "Config" "$_occonf"
 else
-    ui_kv "Config" "none" "$UI_YELLOW"
+    ui_kv_warn "Config" "none"
 fi
 ui_kv "Sharing"  "group '$OPENCODE_GROUP' (default user: ${DEFAULT_USER:-unknown})"
 
@@ -147,26 +179,30 @@ if command -v openchamber >/dev/null 2>&1 || [ -n "$_oc_bins" ] || [ -n "$_oc_pi
     || [ -d "$_oc_home/.config/openchamber" ] || [ "$_oc_secured" = true ]; then
     if [ "$_oc_secured" = true ]; then
         if [ -n "$_oc_bins" ] || [ -n "$_oc_pin" ]; then
-            ui_kv "OpenChamber" "secured via policy pin (leftover bypass files present — inert)" "$UI_GREEN"
+            ui_kv_ok "OpenChamber" "secured via policy pin (leftover bypass files present — inert)"
         else
-            ui_kv "OpenChamber" "secured via policy pin (/etc/openchamber/policy.json)" "$UI_GREEN"
+            ui_kv_ok "OpenChamber" "secured via policy pin (/etc/openchamber/policy.json)"
         fi
     elif [ -n "$_oc_pin" ] || { [ -n "$_oc_bins" ] && [ "$_oc_present" = true ]; }; then
-        ui_kv "OpenChamber" "BYPASSED — run 'sudo opk openchamber-secure'" "$UI_RED"
+        ui_kv_bad "OpenChamber" "BYPASSED — run 'sudo opk openchamber-secure'"
     elif [ -n "$_oc_bins" ]; then
-        ui_kv "OpenChamber" "not installed — self-installed opencode present:$_oc_bins (remove it)" "$UI_YELLOW"
+        ui_kv_warn "OpenChamber" "not installed — self-installed opencode present:$_oc_bins (remove it)"
     else
-        ui_kv "OpenChamber" "installed, policy pin missing — 'sudo opk openchamber-secure'" "$UI_YELLOW"
+        ui_kv_warn "OpenChamber" "installed, policy pin missing — 'sudo opk openchamber-secure'"
     fi
 fi
 
 f="/home/$OPENCODE_USER/.config/opencode/opencode.jsonc"
 [ -f "$f" ] || f="/home/$OPENCODE_USER/.config/opencode/opencode.json"
 if [ -f "$f" ]; then
+    # Wording (issue #158): ON/OFF said nothing about who may do what.
+    # ON  = the deny rules are active  -> agent tools never touch it.
+    # OFF = a deliberate config choice -> agent tools may edit it
+    #       (kept NEUTRAL: a conscious decision is a hint, not a warning).
     if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
-        ui_kv ".git/config" "ON (soft-only — opencode tools)" "$UI_GREEN"
+        ui_kv_ok ".git/config" "protected (soft-only — agent tools blocked)"
     else
-        ui_kv ".git/config" "OFF"
+        ui_kv ".git/config" "access allowed (agent tools may edit git config)"
     fi
 fi
 
@@ -214,7 +250,7 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     if [ -n "$ADV_VER" ]; then
         ADV_HITS=$(advisories_matching opencode "$ADV_VER" standalone || true)
         if [ -n "$ADV_HITS" ]; then
-            ui_kv "opencode $ADV_VER" "AFFECTED by a known advisory — upgrade now" "$UI_RED"
+            ui_kv_bad "opencode $ADV_VER" "AFFECTED by a known advisory — upgrade now"
             while IFS= read -r ADV_LINE; do
                 IFS='|' read -r ADV_PKG ADV_RANGES ADV_PATCHED ADV_CHANNEL ADV_SEV ADV_ID ADV_SUMMARY <<EOF
 $ADV_LINE
@@ -226,10 +262,10 @@ $ADV_HITS
 EOF
             ui_detail "fix: opk upgrade-opencode"
         else
-            ui_kv "opencode $ADV_VER" "no known advisory affects this install (kit $VERSION database)" "$UI_GREEN"
+            ui_kv_ok "opencode $ADV_VER" "no known advisory affects this install (kit $VERSION database)"
         fi
     else
-        ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)" "$UI_YELLOW"
+        ui_kv_warn "opencode version" "unknown — probe failed (run: sudo opk status)"
     fi
     # Upstream freshness (live, best-effort): GitHub's advisory feed vs
     # the ids the shipped database knows. Never decides affectedness.
@@ -271,9 +307,9 @@ EOF
             ui_detail "the database travels with kit releases — run: sudo opk update"
             ui_detail "(already current? the entry is being curated — see the upstream advisory page)"
         elif [ "$ADV_PARSE_OK" = true ]; then
-            ui_kv "upstream" "live check ok — nothing beyond the shipped database" "$UI_GREEN"
+            ui_kv_ok "upstream" "live check ok — nothing beyond the shipped database"
         else
-            ui_kv "upstream" "live check unavailable (offline, blocked, or python3 missing)" "$UI_YELLOW"
+            ui_kv_warn "upstream" "live check unavailable (offline, blocked, or python3 missing)"
         fi
     fi
 fi
@@ -360,7 +396,7 @@ ui_section "Container backend"
 
 case "${CONTAINER_BACKEND:-}" in
     docker-rootless)
-        ui_kv "backend" "docker-rootless" "$UI_GREEN"
+        ui_kv_ok "backend" "docker-rootless"
         sock="${OPENCODE_DOCKER_HOST:-}"
         sockpath="$sock"
         case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
@@ -374,14 +410,14 @@ case "${CONTAINER_BACKEND:-}" in
         # daemon was down). A traversable dir without a socket stays red.
         if [ -n "$sock" ]; then
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
-                ui_kv "socket" "reachable — $sock" "$UI_GREEN"
+                ui_kv_ok "socket" "reachable — $sock"
             elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
-                ui_kv "socket" "unknown — needs root to check (run: sudo opk status)" "$UI_YELLOW"
+                ui_kv_warn "socket" "unknown — needs root to check (run: sudo opk status)"
             else
-                ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
+                ui_kv_bad "socket" "NOT reachable — $sock"
             fi
         else
-            ui_kv "socket" "not configured" "$UI_YELLOW"
+            ui_kv_warn "socket" "not configured"
         fi
         # linger is best-effort: loginctl may need auth, ignore errors.
         if command -v loginctl >/dev/null 2>&1; then
@@ -390,7 +426,7 @@ case "${CONTAINER_BACKEND:-}" in
         fi
         ;;
     podman-rootless)
-        ui_kv "backend" "podman-rootless" "$UI_GREEN"
+        ui_kv_ok "backend" "podman-rootless"
         sock="${OPENCODE_PODMAN_SOCKET:-}"
         if [ -n "$sock" ]; then
             # Optional podman docker-CLI-compat socket (see docker-rootless
@@ -398,22 +434,22 @@ case "${CONTAINER_BACKEND:-}" in
             sockpath="$sock"
             case "$sockpath" in unix://*) sockpath="${sockpath#unix://}";; esac
             if [ -S "$sockpath" ] 2>/dev/null || sudo -n test -S "$sockpath" 2>/dev/null; then
-                ui_kv "socket" "reachable — $sock" "$UI_GREEN"
+                ui_kv_ok "socket" "reachable — $sock"
             elif [ -d "$(dirname "$sockpath")" ] && [ ! -x "$(dirname "$sockpath")" ]; then
-                ui_kv "socket" "unknown — needs root to check (run: sudo opk status)" "$UI_YELLOW"
+                ui_kv_warn "socket" "unknown — needs root to check (run: sudo opk status)"
             else
-                ui_kv "socket" "NOT reachable — $sock" "$UI_RED"
+                ui_kv_bad "socket" "NOT reachable — $sock"
             fi
         elif command -v podman >/dev/null 2>&1; then
             # Daemonless podman-CLI path (no socket needed, §9.8).
             pver=$(podman --version 2>/dev/null | sed -n 's/.*version \([0-9][0-9.]*\).*/\1/p' | head -1)
-            ui_kv "podman CLI" "installed${pver:+  ($pver)}" "$UI_GREEN"
+            ui_kv_ok "podman CLI" "installed${pver:+  ($pver)}"
         else
-            ui_kv "podman CLI" "NOT installed" "$UI_RED"
+            ui_kv_bad "podman CLI" "NOT installed"
         fi
         ;;
     *)
-        ui_kv "backend" "unknown ('${CONTAINER_BACKEND:-none}')" "$UI_RED"
+        ui_kv_bad "backend" "unknown ('${CONTAINER_BACKEND:-none}')"
         ui_detail "re-run install.sh with a rootless backend:"
         ui_detail "sudo bash files/install.sh --container-backend docker-rootless|podman-rootless"
         ;;
@@ -424,16 +460,16 @@ esac
 ui_section "ddev runtime (as user $OPENCODE_USER)"
 
 if [ -d "/home/$OPENCODE_USER/.ddev" ]; then
-    ui_kv "ddev home" "present — /home/$OPENCODE_USER/.ddev" "$UI_GREEN"
+    ui_kv_ok "ddev home" "present — /home/$OPENCODE_USER/.ddev"
 else
-    ui_kv "ddev home" "missing — created by install.sh / update.sh" "$UI_YELLOW"
+    ui_kv_warn "ddev home" "missing — created by install.sh / update.sh"
 fi
 # ddev always runs as the opencode user: the sudoers helper + the shell
 # function hooked into the default user's rc files.
 if [ -x "$LIBDIR/bin/ddev-as-opencode" ]; then
-    ui_kv "helper" "deployed — $LIBDIR/bin/ddev-as-opencode" "$UI_GREEN"
+    ui_kv_ok "helper" "deployed — $LIBDIR/bin/ddev-as-opencode"
 else
-    ui_kv "helper" "missing — run opk update to deploy" "$UI_YELLOW"
+    ui_kv_warn "helper" "missing — run opk update to deploy"
 fi
 if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-terminal.sh" ]; then
     hooked=""
@@ -442,9 +478,9 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-terminal.sh" ]; then
             && hooked="$cf" && break
     done
     if [ -n "$hooked" ]; then
-        ui_kv "ddev() hook" "active — $hooked" "$UI_GREEN"
+        ui_kv_ok "ddev() hook" "active — $hooked"
     else
-        ui_kv "ddev() hook" "not hooked — run opk update" "$UI_YELLOW"
+        ui_kv_warn "ddev() hook" "not hooked — run opk update"
     fi
 fi
 # Dev-owned mode (docs/design/ddev-dev-owned-projects.md): on = the kit
@@ -454,7 +490,7 @@ fi
 _dv_stamp=$(sed -n 's/^DDEV_DEV_OWNED=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1)
 case "${_dv_stamp:-}" in
     true|TRUE|1|yes)
-        ui_kv "ddev settings" "dev-owned — kit writes disable_settings_management (permanent 2775/664)" "$UI_GREEN"
+        ui_kv_ok "ddev settings" "dev-owned — kit writes disable_settings_management (permanent 2775/664)"
         ;;
     false|FALSE|0|no|"")
         ui_kv "ddev settings" "ddev-managed — handover model (config.sh ddev-settings on to switch)"
@@ -482,14 +518,22 @@ if [ -f "$_st_dhl" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null ||
         while IFS= read -r _st_root; do
             [ -z "$_st_root" ] && continue
             [ -d "$_st_root" ] || continue
+            # Findings print in the MAIN shell (issue #158): ui_kv_warn
+            # inside a `find | while` pipeline would bump the summary's
+            # severity counter inside the pipe's subshell, and the tally
+            # would silently lose it. The find output goes to a temp
+            # file; the reporting loop reads it via redirect.
+            _st_share_list=$(mktemp) || _st_share_list=/dev/null
             find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
                 -o -name .git \) \) -prune \
-                -o -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r _st_d; do
+                -o -type d -name .ddev -prune -print 2>/dev/null > "$_st_share_list"
+            while IFS= read -r _st_d; do
                 ddev_reshare_needed "$_st_d" "$OPENCODE_USER" || continue
                 ui_kv_warn "ddev share" "$(dirname "$_st_d")/.ddev: group-write missing (agent-side ddev run without the heal)"
                 ui_detail "fix: a tree-creating ddev command (config/get/start/restart — your hook heals), or:"
                 ui_detail "      sudo -u $OPENCODE_USER $LIBDIR/bin/ddev-as-opencode --opk-ensure-shared \"$_st_d\""
-            done
+            done < "$_st_share_list"
+            rm -f "$_st_share_list"
         done < "$PROJECTS_CONF"
     fi
 fi
@@ -499,15 +543,15 @@ fi
 # started before the sysctl was applied).
 port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
 if [ "${port_start:-1024}" -le 80 ] 2>/dev/null; then
-    ui_kv "router ports" "ready (ip_unprivileged_port_start=$port_start)" "$UI_GREEN"
+    ui_kv_ok "router ports" "ready (ip_unprivileged_port_start=$port_start)"
 else
-    ui_kv "router ports" "NOT ready (ip_unprivileged_port_start=$port_start > 80)" "$UI_RED"
+    ui_kv_bad "router ports" "NOT ready (ip_unprivileged_port_start=$port_start > 80)"
     ui_detail "ddev-router cannot bind 80/443 — fix: sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80"
 fi
 # mkcert CAROOT readiness for the opencode user (ddev HTTPS).
 ca="/home/$OPENCODE_USER/.local/share/mkcert/rootCA.pem"
 if [ -f "$ca" ]; then
-    ui_kv "mkcert CA" "present — $ca" "$UI_GREEN"
+    ui_kv_ok "mkcert CA" "present — $ca"
     # Mismatch check (report-only): if a Windows mkcert CA exists but the
     # opencode CAROOT holds a DIFFERENT CA, Windows browsers trust the
     # Windows one and ddev's certs show as "not secure". Happens when the
@@ -522,7 +566,7 @@ if [ -f "$ca" ]; then
         oc_fp=$(openssl x509 -in "$ca" -noout -fingerprint -sha256 2>/dev/null || true)
         win_fp=$(openssl x509 -in "$win_ca" -noout -fingerprint -sha256 2>/dev/null || true)
         if [ -n "$oc_fp" ] && [ -n "$win_fp" ] && [ "$oc_fp" != "$win_fp" ]; then
-            ui_kv "mkcert CA" "MISMATCH — opencode CA != Windows CA ($win_ca)" "$UI_RED"
+            ui_kv_bad "mkcert CA" "MISMATCH — opencode CA != Windows CA ($win_ca)"
             ui_detail "Windows browsers will show ddev sites as not-secure."
             ui_detail "fix: copy the Windows CA (rootCA.pem + rootCA-key.pem) to"
             ui_detail "$ca's directory, then remove ~/.ddev/traefik/certs/* and 'ddev restart'"
@@ -533,9 +577,9 @@ else
     # caller cannot stat the file, so "missing" may just mean "unchecked".
     # Only root can genuinely confirm absence.
     if [ "$(id -u)" -ne 0 ] && [ -d "/home/$OPENCODE_USER" ]; then
-        ui_kv "mkcert CA" "unknown — needs root to check (run: sudo opk status)" "$UI_YELLOW"
+        ui_kv_warn "mkcert CA" "unknown — needs root to check (run: sudo opk status)"
     else
-        ui_kv "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)" "$UI_YELLOW"
+        ui_kv_warn "mkcert CA" "missing (optional — ddev HTTPS will need a trusted CA)"
     fi
 fi
 # Migration dumps (issue #15): databases exported from the developer's
@@ -562,7 +606,7 @@ if [ -n "$_mig_dir" ] && [ -f "$_mig_dir/manifest.conf" ]; then
             fi
         fi
         if [ "$_mig_imported" -gt 0 ]; then
-            ui_kv "db dumps" "$_mig_ok dump(s) — ${_mig_dir##*/}" "$UI_GREEN"
+            ui_kv_ok "db dumps" "$_mig_ok dump(s) — ${_mig_dir##*/}"
             ui_detail "if some databases are missing in the opencode projects, import manually:"
             ui_detail "  sudo $LIBDIR/bin/ddev-migrate import"
         else
@@ -616,7 +660,14 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-migrate.sh" ]; then
         fi
     }
     if [ -f "$PROJECTS_CONF" ]; then
-        grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null | _st_dbdump_gap "$DEFAULT_USER" || true
+        # Redirect, not a pipe (issue #158): _st_dbdump_gap's ui_kv_warn
+        # rows must run in the MAIN shell so the summary's severity
+        # counters see them — a `grep | _st_dbdump_gap` pipeline would
+        # count inside the pipe's subshell and lose the tally.
+        _st_gap_roots=$(mktemp) || _st_gap_roots=/dev/null
+        grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null > "$_st_gap_roots" || true
+        _st_dbdump_gap "$DEFAULT_USER" < "$_st_gap_roots" || true
+        rm -f "$_st_gap_roots"
     fi
 fi
 # Live ddev version (issues #56, #72): DDEV_VERSION from install.conf is
@@ -653,12 +704,12 @@ if [ -n "$_st_ver" ]; then
     ddev_low=$(awk -v v="$_st_ver" 'BEGIN{split(v,a,"."); \
     if(a[1]+0<1 || (a[1]+0==1 && a[2]+0<25)) print "yes"; else print "no"}' 2>/dev/null)
     if [ "$ddev_low" = yes ]; then
-        ui_kv "ddev version" "$_st_ver (ddev < 1.25 — rootless needs ddev >= 1.25, upgrade ddev)" "$UI_RED"
+        ui_kv_bad "ddev version" "$_st_ver (ddev < 1.25 — rootless needs ddev >= 1.25, upgrade ddev)"
     else
         ui_kv "ddev version" "$_st_ver"
     fi
 elif [ -n "${DDEV_VERSION:-}" ]; then
-    ui_kv "ddev version" "$DDEV_VERSION (recorded at install time — ddev binary not found now)" "$UI_YELLOW"
+    ui_kv_warn "ddev version" "$DDEV_VERSION (recorded at install time — ddev binary not found now)"
 fi
 # Windows hosts readiness (WSL2): custom-tld projects need their hostnames
 # in the Windows hosts file for the browser; ddev (running as opencode)
@@ -678,16 +729,22 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/Sys
             # hostnames must never hit the Windows hosts file. .git is
             # additionally the densest tree in a project and never holds
             # a real project — pruned for scan cost too.
+            _st_hosts_list=$(mktemp) || _st_hosts_list=/dev/null
             find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
                 -o -name .git \) \) -prune \
-                -o -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r _st_d; do
+                -o -type d -name .ddev -prune -print 2>/dev/null > "$_st_hosts_list"
+            # Main-shell loop via redirect (issue #158 — the summary's
+            # severity counters must see the ui_kv_warn rows; see the
+            # ddev share scan above).
+            while IFS= read -r _st_d; do
                 _st_m=$(ddev_hosts_missing "$(dirname "$_st_d")")
                 [ -n "$_st_m" ] || continue
                 ui_kv_warn "hosts (win)" "$(dirname "$_st_d"): missing $(printf '%s' "$_st_m" | tr '\n' ' ')"
                 for _st_h in $_st_m; do
-                    echo "     add: opk ddev-hosts-add $_st_h"
+                    ui_detail "add: opk ddev-hosts-add $_st_h"
                 done
-            done
+            done < "$_st_hosts_list"
+            rm -f "$_st_hosts_list"
         done < "$PROJECTS_CONF"
     fi
 fi
@@ -703,10 +760,10 @@ if [ -d /mnt/c ]; then
     mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
     if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
         if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
-            ui_kv "/mnt/c" "fix configured, pending" "$UI_YELLOW"
+            ui_kv_warn "/mnt/c" "fix configured, pending"
             ui_detail "wsl.conf carries the restriction — run 'wsl --shutdown' from Windows to apply"
         else
-            ui_kv "/mnt/c" "world-readable (mode $mnt_mode)" "$UI_RED"
+            ui_kv_bad "/mnt/c" "world-readable (mode $mnt_mode)"
             ui_detail "the agent user can read the whole Windows profile"
             ui_detail "fix: restrict the drvfs mount to the developer in /etc/wsl.conf:"
             ui_detail "  [automount]"
@@ -716,7 +773,7 @@ if [ -d /mnt/c ]; then
 " and run 'wsl --shutdown' from Windows."
         fi
     else
-        ui_kv "/mnt/c" "restricted (mode ${mnt_mode:-?})" "$UI_GREEN"
+        ui_kv_ok "/mnt/c" "restricted (mode ${mnt_mode:-?})"
         # Browser bridge (issues #91, #100): on the restricted mount the
         # opencode user cannot execute powershell.exe — without the bridge,
         # device logins (`console login` / `auth login`) die on the spawn
@@ -736,16 +793,16 @@ if [ -d /mnt/c ]; then
             esac
         fi
         if [ "$_st_bridge_unneeded" -eq 1 ]; then
-            ui_kv "browser bridge" "not needed — opencode $ADV_VER ships a WSL-safe opener" "$UI_GREEN"
+            ui_kv_ok "browser bridge" "not needed — opencode $ADV_VER ships a WSL-safe opener"
             ui_detail "kit carrier serves 1.x < 1.18.33 and 2.x < 2.0.18 only"
         elif [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ] \
            && grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
-            ui_kv "browser bridge" "deployed (opencode logins survive the hardened mount)" "$UI_GREEN"
+            ui_kv_ok "browser bridge" "deployed (opencode logins survive the hardened mount)"
         elif [ -x "$LIBDIR/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
-            ui_kv "browser bridge" "stand-in only — no wsl.conf carrier ('console login' fails on this mount)" "$UI_RED"
+            ui_kv_bad "browser bridge" "stand-in only — no wsl.conf carrier ('console login' fails on this mount)"
             ui_detail "fix: sudo opk wsl-add-opencode-1-fix (explicit consent — the kit never edits wsl.conf itself)"
         else
-            ui_kv "browser bridge" "missing — 'console login'/'auth login' fails on this mount" "$UI_RED"
+            ui_kv_bad "browser bridge" "missing — 'console login'/'auth login' fails on this mount"
             ui_detail "fix: sudo opk update (deploys the stand-in),"\
 " then sudo opk wsl-add-opencode-1-fix (wsl.conf carrier)"
         fi
@@ -756,16 +813,16 @@ if [ -d /mnt/c ]; then
         if [ -L /usr/local/bin/xdg-open ] \
            && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
             if [ -x "$LIBDIR/bin/xdg-open" ]; then
-                ui_kv "xdg-open fallback" "deployed (kit shim at /usr/local/bin/xdg-open)" "$UI_GREEN"
+                ui_kv_ok "xdg-open fallback" "deployed (kit shim at /usr/local/bin/xdg-open)"
             else
-                ui_kv "xdg-open fallback" "broken — shim symlink dangles (library copy missing)" "$UI_RED"
+                ui_kv_bad "xdg-open fallback" "broken — shim symlink dangles (library copy missing)"
                 ui_detail "fix: sudo opk update (re-deploys the library)"
             fi
         elif { command -v xdg_open_real_exists >/dev/null 2>&1 && xdg_open_real_exists; } \
            || [ -x /usr/local/bin/xdg-open ]; then
-            ui_kv "xdg-open fallback" "not needed — real xdg-open present" "$UI_GREEN"
+            ui_kv_ok "xdg-open fallback" "not needed — real xdg-open present"
         else
-            ui_kv "xdg-open fallback" "missing — opencode 1.18.33+ / 2.0.18+ device logins crash" "$UI_RED"
+            ui_kv_bad "xdg-open fallback" "missing — opencode 1.18.33+ / 2.0.18+ device logins crash"
             ui_detail "fix: sudo opk update (deploys the shim when no real xdg-open exists)"
         fi
     fi
@@ -817,12 +874,12 @@ sra_red=$(status_groups_hits "$sra_groups" \
 sra_yellow=$(status_groups_hits "$sra_groups" "wireshark adm systemd-journal" | tr '\n' ' ')
 sra_red=${sra_red% } ; sra_yellow=${sra_yellow% }
 if [ -n "$sra_red" ]; then
-    ui_kv "groups (root-equiv)" \
-    "$OPENCODE_USER in: $sra_red — full root, remove with: sudo gpasswd -d $OPENCODE_USER <group>" "$UI_RED"
+    ui_kv_bad "groups (root-equiv)" \
+    "$OPENCODE_USER in: $sra_red — full root, remove with: sudo gpasswd -d $OPENCODE_USER <group>"
     sra_finding=true
 fi
 if [ -n "$sra_yellow" ]; then
-    ui_kv "groups (sensitive)" "$OPENCODE_USER in: $sra_yellow — log/packet access can leak credentials" "$UI_YELLOW"
+    ui_kv_warn "groups (sensitive)" "$OPENCODE_USER in: $sra_yellow — log/packet access can leak credentials"
     sra_finding=true
 fi
 
@@ -844,10 +901,10 @@ for sra_s in $sra_sock_list; do
     case " $sra_seen " in *" $sra_r "*) continue ;; esac
     sra_seen="$sra_seen $sra_r"
     if status_sock_agent_reachable "$sra_s" "$sra_groups"; then
-        ui_kv "socket" "$sra_s — AGENT-REACHABLE (root-equivalent daemon)" "$UI_RED"
+        ui_kv_bad "socket" "$sra_s — AGENT-REACHABLE (root-equivalent daemon)"
         sra_finding=true
     else
-        ui_kv "socket" "$sra_s — present, not agent-reachable" "$UI_GREEN"
+        ui_kv_ok "socket" "$sra_s — present, not agent-reachable"
     fi
 done
 
@@ -858,10 +915,10 @@ done
 if [ -e /mnt/c/Windows/System32 ]; then
     sra_mode=$(stat -c %a /mnt/c/Windows/System32/cmd.exe 2>/dev/null || true)
     if [ -n "$sra_mode" ] && [ $((0$sra_mode & 0001)) -ne 0 ]; then
-        ui_kv "win interop" "agent can execute Windows binaries (/mnt/c world-executable)" "$UI_RED"
+        ui_kv_bad "win interop" "agent can execute Windows binaries (/mnt/c world-executable)"
         sra_finding=true
     else
-        ui_kv "win interop" "blocked for the agent (/mnt/c restricted)" "$UI_GREEN"
+        ui_kv_ok "win interop" "blocked for the agent (/mnt/c restricted)"
     fi
 fi
 
@@ -885,15 +942,15 @@ if [ "$(id -u)" -eq 0 ] && command -v sudo >/dev/null 2>&1; then
     # survives anyway.
     _sra_pat='may run the following commands|^[[:space:]]*\([^)]+\)'
     if LC_ALL=C sudo -n -l -U "$OPENCODE_USER" 2>/dev/null | grep -Eq "$_sra_pat"; then
-        ui_kv "sudo rules" "$OPENCODE_USER may run sudo — the kit grants it none (investigate)" "$UI_RED"
+        ui_kv_bad "sudo rules" "$OPENCODE_USER may run sudo — the kit grants it none (investigate)"
         sra_finding=true
     else
-        ui_kv "sudo rules" "none for $OPENCODE_USER" "$UI_GREEN"
+        ui_kv_ok "sudo rules" "none for $OPENCODE_USER"
     fi
 fi
 
 if [ "$sra_finding" = false ]; then
-    ui_kv "result" "no root-equivalent access found for $OPENCODE_USER" "$UI_GREEN"
+    ui_kv_ok "result" "no root-equivalent access found for $OPENCODE_USER"
 fi
 
 # === Sensitive-file leak scan (report-only) =====================================
@@ -961,28 +1018,69 @@ EOF
     fi
     scan_count=$(printf '%s\n' "$scan_hits" | grep -c . || true)
     if [ "$scan_unscannable" = true ]; then
-        ui_kv_warn "result" "skipped — agent config unscannable (top level is not an object?)" "$UI_YELLOW"
+        ui_kv_warn "result" "skipped — agent config unscannable (top level is not an object?)"
         log "leak scan: skipped, parser rejected $SCAN_CFG"
     elif [ "${scan_count:-0}" -gt 0 ]; then
         ui_warn "$scan_count match(es) — deny-pattern files outside the protected roots:"
-        printf '%s\n' "$scan_hits" | head -20 | sed 's/^/     /'
-        [ "$scan_count" -gt 20 ] && ui_detail "... and $((scan_count - 20)) more"
+        # Hit list prints in full mode only — --short reduces the report
+        # to the verdict line (the warn row above already counted).
+        if [ "$STATUS_SHORT" = false ]; then
+            printf '%s\n' "$scan_hits" | head -20 | sed 's/^/     /'
+            [ "$scan_count" -gt 20 ] && ui_detail "... and $((scan_count - 20)) more"
+        fi
         ui_detail "inspect and remove manually (report-only; renamed copies stay invisible)"
         log "leak scan: $scan_count deny-pattern match(es) in scratch dirs (report-only)"
     else
-        ui_kv "result" "no matches in: $LEAK_DIRS" "$UI_GREEN"
+        ui_kv_ok "result" "no matches in: $LEAK_DIRS"
     fi
 else
-    ui_kv "result" "skipped (global config or parser not available)" "$UI_YELLOW"
+    ui_kv_warn "result" "skipped (global config or parser not available)"
 fi
 
 # === Management ==================================================================
 
-echo ""
 # Management hints use the opk shorthand (issue #62): shorter than the
 # library paths, and the dispatcher elevates itself where needed.
-ui_info "Management (run in a terminal):"
-ui_detail "sudo opk config      change settings"
-ui_detail "sudo opk update      re-deploy kit after an update"
-ui_detail "opk uninstall        remove the kit"
-echo ""
+# --short skips the block: one verdict line means one line (issue #158).
+if [ "$STATUS_SHORT" = false ]; then
+    echo ""
+    ui_info "Management (run in a terminal):"
+    ui_detail "sudo opk config      change settings"
+    ui_detail "sudo opk update      re-deploy kit after an update"
+    ui_detail "opk uninstall        remove the kit"
+    echo ""
+fi
+
+# === Summary (issue #158) ========================================================
+# One verdict line at the end: instead of scrolling the whole report, the
+# eye (and cron) gets "All green" or the alert/warning tally. Severities
+# are counted BY CALL in the semantic ui helpers (ui_kv_ok/ui_kv_warn/
+# ui_kv_bad, ui_have/ui_atten/ui_miss, ui_warn/ui_error) — color bytes
+# are empty under NO_COLOR/piping and could not be counted. The tally
+# only sees MAIN-shell rows: the scans above feed their reporting loops
+# from temp files for exactly that reason (a `cmd | while` pipeline
+# bumps counters in a subshell, where they die). The counts snapshot
+# BEFORE the verdict row prints, so the row itself never counts.
+# Exit code carries the verdict for callers and cron:
+#   0 all green · 1 alert(s) · 2 warning(s) only · 64 usage error.
+_st_alerts=$UI_ROWS_BAD
+_st_warns=$UI_ROWS_WARN
+_st_passes=$UI_ROWS_OK
+if [ "$STATUS_SHORT" = true ]; then
+    UI_SILENT=0
+    _st_tail="— run 'opk status' for the full report"
+else
+    ui_section "Summary"
+    _st_tail="— see the sections above"
+fi
+if [ "$_st_alerts" -gt 0 ]; then
+    ui_kv_bad "result" "$_st_alerts alert(s), $_st_warns warning(s) $_st_tail"
+    _st_rc=1
+elif [ "$_st_warns" -gt 0 ]; then
+    ui_kv_warn "result" "$_st_warns warning(s) $_st_tail"
+    _st_rc=2
+else
+    ui_kv_ok "result" "All green — $_st_passes checks passed, no alerts, no warnings"
+    _st_rc=0
+fi
+exit "$_st_rc"

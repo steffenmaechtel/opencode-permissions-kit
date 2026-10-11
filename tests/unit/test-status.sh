@@ -751,12 +751,17 @@ else
 fi
 # ocv_run <with|without> — eval the block under the hermetic PATH;
 # "with" prepends the fake-openchamber bin, "without" sees no openchamber
-# at all — the host's real one included. Prints the ui_kv lines.
+# at all — the host's real one included. Prints the ui_kv lines. The
+# semantic verdict helpers (issue #158 sweep) are stubbed to the same
+# shape — the matrix judges the VERDICT TEXT, not the counting.
 ocv_run() {
     (
         PATH="$OCV_HBIN"
         [ "$1" = with ] && PATH="$OCV_BINDIR:$PATH"
         ui_kv() { printf '%s %s\n' "$1" "$2"; }
+        ui_kv_ok() { printf '%s %s\n' "$1" "$2"; }
+        ui_kv_warn() { printf '%s %s\n' "$1" "$2"; }
+        ui_kv_bad() { printf '%s %s\n' "$1" "$2"; }
         eval "$OCV_BLOCK"
     )
 }
@@ -848,6 +853,172 @@ if [ -z "$out" ]; then
     pass "verdict matrix ignores a host openchamber on PATH (0.0.48 leak)"
 else
     fail "verdict matrix leaks the host PATH into the verdicts (got: $out)"
+fi
+
+# --- issue #158: verdict summary, --short, .git/config wording --------------------
+# Static pins first (wording + sweep invariants), then the extracted
+# summary block driven through every verdict/exit-code combination.
+
+# .git/config wording: "protected"/"access allowed" instead of ON/OFF;
+# OFF deliberately NEUTRAL (a conscious config choice is a hint, not a
+# warning — maintainer decision on the ticket).
+if grep -qF 'ui_kv_ok ".git/config" "protected (soft-only — agent tools blocked)"' "$STATUS" \
+   && grep -qF 'ui_kv ".git/config" "access allowed (agent tools may edit git config)"' "$STATUS" \
+   && ! grep -qF '"ON (soft-only' "$STATUS" \
+   && ! grep -qF 'ui_kv ".git/config" "OFF"' "$STATUS"; then
+    pass ".git/config row reads protected / access allowed (issue #158)"
+else
+    fail ".git/config row wording regressed to ON/OFF"
+fi
+
+# Sweep invariant: status.sh carries NO raw color-argument ui_kv rows
+# anymore — every verdict row goes through the semantic helpers, so the
+# summary cannot miss one (class sweep of the 62 sites, 0.0.46a F2 style).
+if ! grep -qE '"\$UI_(GREEN|YELLOW|RED)"' "$STATUS" \
+   && grep -q 'ui_kv_ok ' "$STATUS" && grep -q 'ui_kv_bad ' "$STATUS"; then
+    pass "status.sh: all colored rows use semantic helpers (countable)"
+else
+    fail "status.sh: raw colored ui_kv row survived the sweep"
+fi
+GIT_CHECK_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-check.sh"
+if ! grep -qE 'ui_kv .*"\$UI_(GREEN|YELLOW|RED)"' "$GIT_CHECK_SH"; then
+    pass "git-check.sh: Core row uses semantic helpers too"
+else
+    fail "git-check.sh still colors rows via raw ui_kv (uncounted)"
+fi
+
+# Severity tallies only see MAIN-shell rows: the three scanning loops
+# feed from temp files via redirect, never from a `cmd | while` pipe
+# (counter bumps inside a pipe subshell die there). Shape pins per site.
+if grep -qF 'done < "$_st_share_list"' "$STATUS" \
+   && grep -qF 'done < "$_st_hosts_list"' "$STATUS" \
+   && grep -qF '_st_dbdump_gap "$DEFAULT_USER" < "$_st_gap_roots"' "$STATUS"; then
+    pass "scan loops run in the main shell (redirect, not pipe)"
+else
+    fail "a scan loop prints its findings from a pipe subshell again"
+fi
+
+# One-line mode must be exactly one line: no raw echo/printf leaks past
+# UI_SILENT (the hosts-scan add-lines and the leak-scan hit list are the
+# two raw-print sites; both are guarded/converted).
+if grep -qF 'ui_detail "add: opk ddev-hosts-add' "$STATUS" \
+   && ! grep -qF 'echo "     add' "$STATUS"; then
+    pass "--short: raw-print sites converted/guarded (one-line discipline)"
+else
+    fail "a raw print site can leak past UI_SILENT"
+fi
+
+# Checkout-first lib resolution (0.0.46a F4 pattern): a checkout run must
+# source ITS OWN ui.sh/git-check.sh — a deployed pre-#158 copy would drop
+# every ui_kv_ok/ui_kv_bad row (command not found) and the verdict.
+if grep -qF 'UI_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/ui.sh"' "$STATUS" \
+   && grep -qF 'GIT_CHECK_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/git-check.sh"' "$STATUS"; then
+    pass "status.sh resolves ui.sh/git-check.sh checkout-first"
+else
+    fail "status.sh resolves ui.sh/git-check.sh deployed-first (pre-#158 skew)"
+fi
+
+# usage error: unknown flag -> exit 64 + usage line, before any probing
+# (deterministic on every host, installed or not). rc=0 sentinel + `|| u_rc=$?`
+# — the test script runs under set -e and a bare failing capture would
+# abort the whole suite here.
+u_rc=0
+u_out=$(sh "$STATUS" --bogus 2>&1) || u_rc=$?
+if [ "$u_rc" = "64" ] && printf '%s' "$u_out" | grep -q 'usage:'; then
+    pass "unknown flag: usage error, exit 64"
+else
+    fail "unknown flag must exit 64 with a usage line (rc=$u_rc out=$u_out)"
+fi
+
+# Summary block, functional: extract from the snapshot lines to the final
+# exit and drive every verdict/exit-code combination (0.0.45d W3-style
+# behavioral replay; the extraction rewrites nothing).
+SUMMARY_BLOCK="$(sed -n '/^_st_alerts=/,/^exit "\$_st_rc"$/p' "$STATUS")"
+if [ -n "$SUMMARY_BLOCK" ] && printf '%s\n' "$SUMMARY_BLOCK" | grep -q '^exit "\$_st_rc"$'; then
+    pass "summary block extractable from status.sh"
+else
+    fail "summary block not extractable (anchor drift?)"
+fi
+if [ -n "$SUMMARY_BLOCK" ]; then
+    # run_summary <bad> <warn> <ok> <short true|false> — prints the block
+    # output plus its exit code. ui_section records itself so the pin can
+    # prove --short suppresses the section header. The `|| _rs_rc=$?`
+    # capture keeps the suite's set -e alive through the verdict exits.
+    run_summary() {
+        _rs_rc=0
+        _rs_out=$(
+            (
+                set -u; set +e
+                . "$UI_LIB"
+                UI_ROWS_BAD=$1; UI_ROWS_WARN=$2; UI_ROWS_OK=$3
+                STATUS_SHORT=$4
+                ui_section() { printf 'SECTION:%s\n' "$1"; }
+                eval "$SUMMARY_BLOCK"
+            ) 2>&1
+        ) || _rs_rc=$?
+        printf '%s\nrc=%s\n' "$_rs_out" "$_rs_rc"
+    }
+    _sum=$(run_summary 1 2 5 false)
+    if printf '%s' "$_sum" | grep -q '1 alert(s), 2 warning(s)' \
+       && printf '%s' "$_sum" | grep -q 'see the sections above' \
+       && printf '%s' "$_sum" | grep -q 'SECTION:Summary' \
+       && printf '%s' "$_sum" | grep -q 'rc=1'; then
+        pass "verdict: alerts+warnings rendered, exit 1, full mode"
+    else
+        fail "verdict alert case broken (got: $_sum)"
+    fi
+    # counts snapshot BEFORE the verdict row: the alert row itself bumps
+    # UI_ROWS_BAD — a snapshot after it would print 2 alert(s)
+    _sum=$(run_summary 1 2 5 false)
+    if ! printf '%s' "$_sum" | grep -q '2 alert(s)'; then
+        pass "verdict row excluded from its own tally (snapshot first)"
+    else
+        fail "verdict row counts itself (snapshot sits too late)"
+    fi
+    _sum=$(run_summary 0 1 5 false)
+    if printf '%s' "$_sum" | grep -q '1 warning(s)' \
+       && printf '%s' "$_sum" | grep -q 'rc=2'; then
+        pass "verdict: warnings only, exit 2"
+    else
+        fail "verdict warning case broken (got: $_sum)"
+    fi
+    _sum=$(run_summary 0 0 7 false)
+    if printf '%s' "$_sum" | grep -q 'All green' \
+       && printf '%s' "$_sum" | grep -q '7 checks passed' \
+       && printf '%s' "$_sum" | grep -q 'rc=0'; then
+        pass "verdict: all green with the pass count, exit 0"
+    else
+        fail "verdict green case broken (got: $_sum)"
+    fi
+    _sum=$(run_summary 1 2 5 true)
+    if printf '%s' "$_sum" | grep -q "run 'opk status' for the full report" \
+       && ! printf '%s' "$_sum" | grep -q 'SECTION:Summary' \
+       && printf '%s' "$_sum" | grep -q 'rc=1'; then
+        pass "verdict --short: one line, no section header, exit 1"
+    else
+        fail "verdict --short case broken (got: $_sum)"
+    fi
+fi
+
+# not-installed + --short: one line, exit 1 (machine mode reports the
+# loudest not-green state; full mode keeps exit 0 — pin below stays).
+if ! id opencode >/dev/null 2>&1; then
+    ni_rc=0
+    ni_out=$(sh "$STATUS" --short 2>&1) || ni_rc=$?
+    if [ "$ni_rc" = "1" ] && printf '%s' "$ni_out" | grep -q 'not installed — hardening NOT active' \
+       && [ "$(printf '%s\n' "$ni_out" | grep -c .)" = "1" ]; then
+        pass "not-installed + --short: exactly one line, exit 1"
+    else
+        fail "not-installed + --short broken (rc=$ni_rc out=$ni_out)"
+    fi
+else
+    echo "  info   opencode user exists on this host — skipping not-installed --short check"
+fi
+# wording pin for the same path (runs everywhere)
+if grep -qF 'not installed — hardening NOT active (run' "$STATUS"; then
+    pass "not-installed --short line wording pinned"
+else
+    fail "not-installed --short line wording drifted"
 fi
 
 echo ""

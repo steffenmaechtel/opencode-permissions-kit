@@ -191,7 +191,12 @@ if (
     _warns=0; _details=""; _kv=""; _kvc=""
     ui_warn()   { _warns=$((_warns+1)); }
     ui_detail() { _details="$_details|$1"; }
+    # Row observation via the semantic helpers (issue #158 sweep):
+    # git_status_row renders ui_kv_warn/ui_kv_ok — the stubs record the
+    # severity by NAME, the way the summary counts it in production.
     ui_kv()     { _kv="$_kv|$2"; _kvc="$_kvc|$3"; }
+    ui_kv_warn() { _kv="$_kv|$2"; _kvc="$_kvc|warn"; }
+    ui_kv_ok()  { _kv="$_kv|$2"; _kvc="$_kvc|ok"; }
     log() { :; }
     UI_GREEN=""; UI_YELLOW="yellow"
     # shellcheck disable=SC1090
@@ -208,7 +213,7 @@ if (
     [ "$_rc1" = "0" ] && [ "$_rc2" = "0" ] && [ "$_warns" = "2" ] \
         && printf '%s' "$_details" | grep -q 'ppa:git-core/ppa' \
         && printf '%s' "$_kv" | grep -q '2.25.1 — below the 2.30 tested floor' \
-        && printf '%s' "$_kvc" | grep -q 'yellow'
+        && printf '%s' "$_kvc" | grep -q 'warn'
 ); then
     pass "issue #118: git-check is warn-only — old git (2.25.1) + missing git both rc 0 and warn once"
 else

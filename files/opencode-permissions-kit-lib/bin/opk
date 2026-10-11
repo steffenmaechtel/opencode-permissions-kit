@@ -81,7 +81,9 @@ opencode permissions kit  v$VERSION
 Usage: opk <command> [args...]
 
 Commands:
-  status                          Show the protection status (no sudo needed)
+  status [--short]                 Show the protection status (no sudo needed);
+                                   --short: only the final verdict line, with it
+                                   in the exit code (0 green, 1 alerts, 2 warnings)
   config <args...>                Change settings: status (git-config +
                                   projects overview), projects
                                   list|add|remove,
