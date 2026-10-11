@@ -700,9 +700,10 @@ fi
 # --- OpenChamber verdict matrix — functional (0.0.47a F3/F4) ---------------------
 # Extract the verdict block, rewrite the absolute paths (policy file, kit
 # wrapper, kit bin, default-user home) to fixtures, eval it with a stubbed
-# ui_kv, and drive every state — including the kit-symlink exemption (F3:
-# wrapper guard semantics) and the shadow-binary-without-OpenChamber
-# verdict (F4: BYPASSED only when OpenChamber is actually installed).
+# ui_kv under a hermetic PATH, and drive every state — including the
+# kit-symlink exemption (F3: wrapper guard semantics) and the
+# shadow-binary-without-OpenChamber verdict (F4: BYPASSED only when
+# OpenChamber is actually installed).
 OCV_ROOT="$WORK/ocv"
 OCV_POLICY="$OCV_ROOT/policy.json"
 OCV_HOME="$OCV_ROOT/home"
@@ -712,6 +713,29 @@ OCV_BINDIR="$OCV_ROOT/bin"
 mkdir -p "$OCV_HOME" "$OCV_BINDIR"
 : > "$OCV_WRAPPER"
 : > "$OCV_KITBIN"
+# Hermetic PATH for the eval below (0.0.48 release blocker, the 0.0.46a
+# F2 environment-dependence class): the block probes `command -v
+# openchamber`, so the host PATH must never be inherited — the
+# maintainer machine runs a real OpenChamber (nvm install) that flipped
+# the "without" verdicts and broke `make release` locally while CI
+# stayed green. The scratch bin symlinks the block's only externals
+# (sed, tail, readlink — getent/cut sit on the rewritten-away _oc_home
+# lines); nothing else on PATH is reachable from the eval.
+OCV_HBIN="$OCV_ROOT/hermit-bin"
+OCV_HMISSING=""
+mkdir -p "$OCV_HBIN"
+for _ocvh in sed tail readlink; do
+    if _ocvt="$(command -v "$_ocvh" 2>/dev/null)"; then
+        ln -s "$_ocvt" "$OCV_HBIN/$_ocvh"
+    else
+        OCV_HMISSING="$_ocvh $OCV_HMISSING"
+    fi
+done
+if [ -z "$OCV_HMISSING" ]; then
+    pass "verdict matrix hermetic bin complete (sed/tail/readlink linked)"
+else
+    fail "verdict matrix hermetic bin incomplete: $OCV_HMISSING"
+fi
 # Extract from `_oc_policy=` up to (excluding) the `f="/home/...` line that
 # follows the block — the block contains col-0 `fi` lines of its inner ifs,
 # so a sed range on `^fi$` would stop early.
@@ -725,10 +749,12 @@ if [ -n "$OCV_BLOCK" ]; then
 else
     fail "openchamber verdict block not extractable from status.sh"
 fi
-# ocv_run <with|without> — eval the block; "with" puts a fake openchamber
-# command on PATH, "without" leaves it absent. Prints the ui_kv lines.
+# ocv_run <with|without> — eval the block under the hermetic PATH;
+# "with" prepends the fake-openchamber bin, "without" sees no openchamber
+# at all — the host's real one included. Prints the ui_kv lines.
 ocv_run() {
     (
+        PATH="$OCV_HBIN"
         [ "$1" = with ] && PATH="$OCV_BINDIR:$PATH"
         ui_kv() { printf '%s %s\n' "$1" "$2"; }
         eval "$OCV_BLOCK"
@@ -808,6 +834,20 @@ if printf '%s' "$out" | grep -q 'policy pin missing'; then
     pass "verdict matrix: command marker alone -> advice line"
 else
     fail "verdict matrix: command marker alone -> advice line (got: $out)"
+fi
+
+# 8. a host openchamber on the CALLER's PATH must not leak into the matrix
+#    (the 0.0.48 release blocker: a real openchamber — nvm-installed on
+#    the maintainer host, absent on CI — flipped cases 1-3 red only on
+#    `make release` runs from that machine). The poisoned prefix is the
+#    old bug's exact channel: ocv_run used to inherit the host PATH on
+#    "without" runs; under the hermetic PATH the prefix dies with it.
+rm -rf "${OCV_HOME:?}/.config" "${OCV_HOME:?}/.opencode"
+out="$(PATH="$OCV_BINDIR:$PATH" ocv_run without)"
+if [ -z "$out" ]; then
+    pass "verdict matrix ignores a host openchamber on PATH (0.0.48 leak)"
+else
+    fail "verdict matrix leaks the host PATH into the verdicts (got: $out)"
 fi
 
 echo ""
