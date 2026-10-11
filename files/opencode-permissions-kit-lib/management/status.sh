@@ -523,7 +523,15 @@ if [ -f "$_st_dhl" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null ||
             # severity counter inside the pipe's subshell, and the tally
             # would silently lose it. The find output goes to a temp
             # file; the reporting loop reads it via redirect.
-            _st_share_list=$(mktemp) || _st_share_list=/dev/null
+            # 0.0.48b W2: mktemp failure skips the scan LOUDLY — the old
+            # /dev/null fallback died silently (tally saw nothing, the
+            # verdict could be "All green" over a dead scan) and its
+            # cleanup rm -f'd the device node when root ran it.
+            _st_share_list=$(mktemp) || _st_share_list=""
+            if [ -z "$_st_share_list" ]; then
+                ui_kv_warn "ddev share" "scan skipped for $_st_root — mktemp failed (check TMPDIR / /tmp)"
+                continue
+            fi
             find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
                 -o -name .git \) \) -prune \
                 -o -type d -name .ddev -prune -print 2>/dev/null > "$_st_share_list"
@@ -664,10 +672,16 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-migrate.sh" ]; then
         # rows must run in the MAIN shell so the summary's severity
         # counters see them — a `grep | _st_dbdump_gap` pipeline would
         # count inside the pipe's subshell and lose the tally.
-        _st_gap_roots=$(mktemp) || _st_gap_roots=/dev/null
-        grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null > "$_st_gap_roots" || true
-        _st_dbdump_gap "$DEFAULT_USER" < "$_st_gap_roots" || true
-        rm -f "$_st_gap_roots"
+        # 0.0.48b W2: same fail-loud rule as the share scan — never a
+        # /dev/null fallback for a failed mktemp.
+        _st_gap_roots=$(mktemp) || _st_gap_roots=""
+        if [ -z "$_st_gap_roots" ]; then
+            ui_kv_warn "db dumps" "gap scan skipped — mktemp failed (check TMPDIR / /tmp)"
+        else
+            grep -v '^[[:space:]]*$' "$PROJECTS_CONF" 2>/dev/null > "$_st_gap_roots" || true
+            _st_dbdump_gap "$DEFAULT_USER" < "$_st_gap_roots" || true
+            rm -f "$_st_gap_roots"
+        fi
     fi
 fi
 # Live ddev version (issues #56, #72): DDEV_VERSION from install.conf is
@@ -729,7 +743,13 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/Sys
             # hostnames must never hit the Windows hosts file. .git is
             # additionally the densest tree in a project and never holds
             # a real project — pruned for scan cost too.
-            _st_hosts_list=$(mktemp) || _st_hosts_list=/dev/null
+            # 0.0.48b W2: fail-loud mktemp (no /dev/null fallback — see
+            # the ddev share scan above for the rationale).
+            _st_hosts_list=$(mktemp) || _st_hosts_list=""
+            if [ -z "$_st_hosts_list" ]; then
+                ui_kv_warn "hosts (win)" "scan skipped for $_st_root — mktemp failed (check TMPDIR / /tmp)"
+                continue
+            fi
             find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
                 -o -name .git \) \) -prune \
                 -o -type d -name .ddev -prune -print 2>/dev/null > "$_st_hosts_list"

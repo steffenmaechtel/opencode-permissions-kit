@@ -1021,6 +1021,100 @@ else
     fail "not-installed --short line wording drifted"
 fi
 
+# --- 0.0.48b W2: mktemp failure is LOUD — never a /dev/null fallback ------
+# Behavioral failure-path pins (L1): each scan site's mktemp block is
+# extracted verbatim and run with a FAILING mktemp — the skip warning
+# must fire (a warn row counts, so the summary reflects the dead scan),
+# the scan itself must NOT run, and nothing may be rm'd (the wave's
+# /dev/null fallback silently killed the tally and its cleanup rm -f'd
+# the device node when root ran it). A control run with a working mktemp
+# proves the harness exercises the real block (find flows, cleanup runs).
+W2_BLOCK_SHARE="$(sed -n '/_st_share_list=\$(mktemp)/,/^ *rm -f "\$_st_share_list"$/p' "$STATUS")"
+W2_BLOCK_HOSTS="$(sed -n '/_st_hosts_list=\$(mktemp)/,/^ *rm -f "\$_st_hosts_list"$/p' "$STATUS")"
+W2_BLOCK_GAP="$(sed -n '/_st_gap_roots=\$(mktemp)/,/^ *fi$/p' "$STATUS")"
+if [ -n "$W2_BLOCK_SHARE" ] && [ -n "$W2_BLOCK_HOSTS" ] && [ -n "$W2_BLOCK_GAP" ]; then
+    pass "W2 scan blocks extractable from status.sh"
+else
+    fail "W2 scan blocks not extractable (anchor drift?)"
+fi
+
+# w2_run <block> <mktemp-works true|false> — runs an extracted scan block
+# in the loop context the real script provides (`continue` is legal
+# there), with the scan helpers stubbed to markers. The suite runs under
+# set -e: callers capture with `|| true`.
+w2_run() {
+    (
+        if [ "$2" = true ]; then
+            _w2_dir=$(command mktemp -d)
+            mktemp() { printf '%s/list\n' "$_w2_dir"; }
+        else
+            mktemp() { return 1; }
+        fi
+        find() { echo "FIND-CALLED"; }
+        rm() { echo "RM-CALLED $*"; }
+        grep() { echo "GREP-CALLED"; }
+        ui_kv_warn() { echo "WARN|$1|$2"; }
+        ui_detail() { :; }
+        ddev_reshare_needed() { return 1; }
+        ddev_hosts_missing() { echo ""; }
+        _st_dbdump_gap() { echo "GAP-CALLED"; }
+        OPENCODE_USER=opencode
+        LIBDIR=/usr/local/lib/opencode-permissions-kit
+        PROJECTS_CONF=/nonexistent-w2-projects.conf
+        DEFAULT_USER=w2user
+        while IFS= read -r _st_root; do
+            eval "$1"
+        done <<EOF
+/var/www/w2-proj
+EOF
+        if [ "$2" = true ] && [ -n "${_w2_dir:-}" ]; then command rm -rf "$_w2_dir"; fi
+    )
+}
+
+if [ -n "$W2_BLOCK_SHARE" ]; then
+    _w2out=$(w2_run "$W2_BLOCK_SHARE" false || true)
+    if printf '%s' "$_w2out" | grep -q '^WARN|ddev share|scan skipped for /var/www/w2-proj' \
+        && ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' \
+        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+        pass "W2 share scan: mktemp failure warns loudly, no find, no rm"
+    else
+        fail "W2 share scan: mktemp failure must warn and skip (got: $_w2out)"
+    fi
+    _w2out=$(w2_run "$W2_BLOCK_SHARE" true || true)
+    if ! printf '%s' "$_w2out" | grep -q 'scan skipped' \
+        && printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+        pass "W2 share scan: working mktemp flows find→report→cleanup (control)"
+    else
+        fail "W2 share scan control broken (got: $_w2out)"
+    fi
+fi
+if [ -n "$W2_BLOCK_HOSTS" ]; then
+    _w2out=$(w2_run "$W2_BLOCK_HOSTS" false || true)
+    if printf '%s' "$_w2out" | grep -q '^WARN|hosts (win)|scan skipped for /var/www/w2-proj' \
+        && ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' \
+        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+        pass "W2 hosts scan: mktemp failure warns loudly, no find, no rm"
+    else
+        fail "W2 hosts scan: mktemp failure must warn and skip (got: $_w2out)"
+    fi
+fi
+if [ -n "$W2_BLOCK_GAP" ]; then
+    _w2out=$(w2_run "$W2_BLOCK_GAP" false || true)
+    if printf '%s' "$_w2out" | grep -q '^WARN|db dumps|gap scan skipped' \
+        && ! printf '%s' "$_w2out" | grep -q 'GAP-CALLED' \
+        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+        pass "W2 dbdump gap: mktemp failure warns loudly, scan skipped"
+    else
+        fail "W2 dbdump gap: mktemp failure must warn and skip (got: $_w2out)"
+    fi
+fi
+# class sweep (L2): no /dev/null fallback assignment survives anywhere
+if ! grep -qE '_(share_list|hosts_list|gap_roots)=/dev/null' "$STATUS"; then
+    pass "W2 class sweep: no /dev/null fallback assignment remains"
+else
+    fail "W2 class sweep: a /dev/null fallback survived"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
