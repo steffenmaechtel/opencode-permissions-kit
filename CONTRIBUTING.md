@@ -50,7 +50,12 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   Each suite gets slower under the CPU contention of a parallel run;
   `e2e-ddev` is the heavyweight (golden image + inner rootless daemon).
   Define `TS` before the first `&` — in `A && B & C`, C runs before the
-  backgrounded assignments take effect:
+  backgrounded assignments take effect. The same precedence swallows a
+  leading `cd … &&`: it joins the backgrounded chain too, so the
+  foreground shell keeps the old cwd (and its variables) — relative log
+  paths like `../logs/…` then resolve against the wrong directory and
+  the redirect fails before the suite even starts. Run `cd` as its own
+  statement first, never `cd … && make e2e … &`:
 
   ```bash
   TS=$(date +%Y%m%d-%H%M%S); make e2e > /tmp/e2e-$TS.log 2>&1 & P1=$!

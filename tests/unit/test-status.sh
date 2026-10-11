@@ -751,12 +751,17 @@ else
 fi
 # ocv_run <with|without> — eval the block under the hermetic PATH;
 # "with" prepends the fake-openchamber bin, "without" sees no openchamber
-# at all — the host's real one included. Prints the ui_kv lines.
+# at all — the host's real one included. Prints the ui_kv lines. The
+# semantic verdict helpers (issue #158 sweep) are stubbed to the same
+# shape — the matrix judges the VERDICT TEXT, not the counting.
 ocv_run() {
     (
         PATH="$OCV_HBIN"
         [ "$1" = with ] && PATH="$OCV_BINDIR:$PATH"
         ui_kv() { printf '%s %s\n' "$1" "$2"; }
+        ui_kv_ok() { printf '%s %s\n' "$1" "$2"; }
+        ui_kv_warn() { printf '%s %s\n' "$1" "$2"; }
+        ui_kv_bad() { printf '%s %s\n' "$1" "$2"; }
         eval "$OCV_BLOCK"
     )
 }
@@ -848,6 +853,459 @@ if [ -z "$out" ]; then
     pass "verdict matrix ignores a host openchamber on PATH (0.0.48 leak)"
 else
     fail "verdict matrix leaks the host PATH into the verdicts (got: $out)"
+fi
+
+# --- issue #158: verdict summary, --short, .git/config wording --------------------
+# Static pins first (wording + sweep invariants), then the extracted
+# summary block driven through every verdict/exit-code combination.
+
+# .git/config wording: "protected"/"access allowed" instead of ON/OFF;
+# OFF deliberately NEUTRAL (a conscious config choice is a hint, not a
+# warning — maintainer decision on the ticket).
+if grep -qF 'ui_kv_ok ".git/config" "protected (soft-only — agent tools blocked)"' "$STATUS" \
+   && grep -qF 'ui_kv ".git/config" "access allowed (agent tools may edit git config)"' "$STATUS" \
+   && ! grep -qF '"ON (soft-only' "$STATUS" \
+   && ! grep -qF 'ui_kv ".git/config" "OFF"' "$STATUS"; then
+    pass ".git/config row reads protected / access allowed (issue #158)"
+else
+    fail ".git/config row wording regressed to ON/OFF"
+fi
+
+# Sweep invariant: status.sh carries NO raw color-argument ui_kv rows
+# anymore — every verdict row goes through the semantic helpers, so the
+# summary cannot miss one (class sweep of the 62 sites, 0.0.46a F2 style).
+if ! grep -qE '"\$UI_(GREEN|YELLOW|RED)"' "$STATUS" \
+   && grep -q 'ui_kv_ok ' "$STATUS" && grep -q 'ui_kv_bad ' "$STATUS"; then
+    pass "status.sh: all colored rows use semantic helpers (countable)"
+else
+    fail "status.sh: raw colored ui_kv row survived the sweep"
+fi
+GIT_CHECK_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/git-check.sh"
+if ! grep -qE 'ui_kv .*"\$UI_(GREEN|YELLOW|RED)"' "$GIT_CHECK_SH"; then
+    pass "git-check.sh: Core row uses semantic helpers too"
+else
+    fail "git-check.sh still colors rows via raw ui_kv (uncounted)"
+fi
+
+# Severity tallies only see MAIN-shell rows: the three scanning loops
+# feed from temp files via redirect, never from a `cmd | while` pipe
+# (counter bumps inside a pipe subshell die there). Shape pins per site.
+if grep -qF 'done < "$_st_share_list"' "$STATUS" \
+   && grep -qF 'done < "$_st_hosts_list"' "$STATUS" \
+   && grep -qF '_st_dbdump_gap "$DEFAULT_USER" < "$_st_gap_roots"' "$STATUS"; then
+    pass "scan loops run in the main shell (redirect, not pipe)"
+else
+    fail "a scan loop prints its findings from a pipe subshell again"
+fi
+
+# One-line mode must be exactly one line: no raw echo/printf leaks past
+# UI_SILENT (the hosts-scan add-lines and the leak-scan hit list are the
+# two raw-print sites; both are guarded/converted).
+if grep -qF 'ui_detail "add: opk ddev-hosts-add' "$STATUS" \
+   && ! grep -qF 'echo "     add' "$STATUS"; then
+    pass "--short: raw-print sites converted/guarded (one-line discipline)"
+else
+    fail "a raw print site can leak past UI_SILENT"
+fi
+
+# Checkout-first lib resolution (0.0.46a F4 pattern): a checkout run must
+# source ITS OWN ui.sh/git-check.sh — a deployed pre-#158 copy would drop
+# every ui_kv_ok/ui_kv_bad row (command not found) and the verdict.
+if grep -qF 'UI_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/ui.sh"' "$STATUS" \
+   && grep -qF 'GIT_CHECK_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/git-check.sh"' "$STATUS"; then
+    pass "status.sh resolves ui.sh/git-check.sh checkout-first"
+else
+    fail "status.sh resolves ui.sh/git-check.sh deployed-first (pre-#158 skew)"
+fi
+
+# usage error: unknown flag -> exit 64 + usage line, before any probing
+# (deterministic on every host, installed or not). rc=0 sentinel + `|| u_rc=$?`
+# — the test script runs under set -e and a bare failing capture would
+# abort the whole suite here.
+u_rc=0
+u_out=$(sh "$STATUS" --bogus 2>&1) || u_rc=$?
+if [ "$u_rc" = "64" ] && printf '%s' "$u_out" | grep -q 'usage:'; then
+    pass "unknown flag: usage error, exit 64"
+else
+    fail "unknown flag must exit 64 with a usage line (rc=$u_rc out=$u_out)"
+fi
+
+# Summary block, functional: extract from the snapshot lines to the final
+# exit and drive every verdict/exit-code combination (0.0.45d W3-style
+# behavioral replay; the extraction rewrites nothing).
+SUMMARY_BLOCK="$(sed -n '/^_st_alerts=/,/^exit "\$_st_rc"$/p' "$STATUS")"
+if [ -n "$SUMMARY_BLOCK" ] && printf '%s\n' "$SUMMARY_BLOCK" | grep -q '^exit "\$_st_rc"$'; then
+    pass "summary block extractable from status.sh"
+else
+    fail "summary block not extractable (anchor drift?)"
+fi
+if [ -n "$SUMMARY_BLOCK" ]; then
+    # run_summary <bad> <warn> <ok> <short true|false> — prints the block
+    # output plus its exit code. ui_section records itself so the pin can
+    # prove --short suppresses the section header. The `|| _rs_rc=$?`
+    # capture keeps the suite's set -e alive through the verdict exits.
+    # 0.0.48b W4: the harness presets UI_SILENT exactly the way the arg
+    # parser does (1 iff --short) — without that, the mute→restore
+    # interplay was never simulated and deleting the block's
+    # UI_SILENT=0 restore kept every pin green while real --short went
+    # fully silent.
+    run_summary() {
+        _rs_rc=0
+        _rs_out=$(
+            (
+                set -u; set +e
+                . "$UI_LIB"
+                UI_ROWS_BAD=$1; UI_ROWS_WARN=$2; UI_ROWS_OK=$3
+                STATUS_SHORT=$4
+                if [ "$STATUS_SHORT" = true ]; then UI_SILENT=1; else UI_SILENT=0; fi
+                ui_section() { printf 'SECTION:%s\n' "$1"; }
+                eval "$SUMMARY_BLOCK"
+            ) 2>&1
+        ) || _rs_rc=$?
+        printf '%s\nrc=%s\n' "$_rs_out" "$_rs_rc"
+    }
+    _sum=$(run_summary 1 2 5 false)
+    if printf '%s' "$_sum" | grep -q '1 alert(s), 2 warning(s)' \
+       && printf '%s' "$_sum" | grep -q 'see the sections above' \
+       && printf '%s' "$_sum" | grep -q 'SECTION:Summary' \
+       && printf '%s' "$_sum" | grep -q 'rc=1'; then
+        pass "verdict: alerts+warnings rendered, exit 1, full mode"
+    else
+        fail "verdict alert case broken (got: $_sum)"
+    fi
+    # counts snapshot BEFORE the verdict row: the alert row itself bumps
+    # UI_ROWS_BAD — a snapshot after it would print 2 alert(s)
+    _sum=$(run_summary 1 2 5 false)
+    if ! printf '%s' "$_sum" | grep -q '2 alert(s)'; then
+        pass "verdict row excluded from its own tally (snapshot first)"
+    else
+        fail "verdict row counts itself (snapshot sits too late)"
+    fi
+    _sum=$(run_summary 0 1 5 false)
+    if printf '%s' "$_sum" | grep -q '1 warning(s)' \
+       && printf '%s' "$_sum" | grep -q 'rc=2'; then
+        pass "verdict: warnings only, exit 2"
+    else
+        fail "verdict warning case broken (got: $_sum)"
+    fi
+    _sum=$(run_summary 0 0 7 false)
+    if printf '%s' "$_sum" | grep -q 'All green' \
+       && printf '%s' "$_sum" | grep -q '7 checks passed' \
+       && printf '%s' "$_sum" | grep -q 'rc=0'; then
+        pass "verdict: all green with the pass count, exit 0"
+    else
+        fail "verdict green case broken (got: $_sum)"
+    fi
+    _sum=$(run_summary 1 2 5 true)
+    if printf '%s' "$_sum" | grep -q "run 'opk status' for the full report" \
+       && ! printf '%s' "$_sum" | grep -q 'SECTION:Summary' \
+       && printf '%s' "$_sum" | grep -q 'rc=1'; then
+        pass "verdict --short: one line, no section header, exit 1"
+    else
+        fail "verdict --short case broken (got: $_sum)"
+    fi
+fi
+
+# not-installed + --short: one line, exit 1 (machine mode reports the
+# loudest not-green state; full mode keeps exit 0 — pin below stays).
+if ! id opencode >/dev/null 2>&1; then
+    ni_rc=0
+    ni_out=$(sh "$STATUS" --short 2>&1) || ni_rc=$?
+    if [ "$ni_rc" = "1" ] && printf '%s' "$ni_out" | grep -q 'not installed — hardening NOT active' \
+       && [ "$(printf '%s\n' "$ni_out" | grep -c .)" = "1" ]; then
+        pass "not-installed + --short: exactly one line, exit 1"
+    else
+        fail "not-installed + --short broken (rc=$ni_rc out=$ni_out)"
+    fi
+else
+    echo "  info   opencode user exists on this host — skipping not-installed --short check"
+fi
+# wording pin for the same path (runs everywhere)
+if grep -qF 'not installed — hardening NOT active (run' "$STATUS"; then
+    pass "not-installed --short line wording pinned"
+else
+    fail "not-installed --short line wording drifted"
+fi
+
+# --- 0.0.48b W2: mktemp failure is LOUD — never a /dev/null fallback ------
+# Behavioral failure-path pins (L1): each scan site's mktemp block is
+# extracted verbatim and run with a FAILING mktemp — the skip warning
+# must fire (a warn row counts, so the summary reflects the dead scan),
+# the scan itself must NOT run, and nothing may be rm'd (the wave's
+# /dev/null fallback silently killed the tally and its cleanup rm -f'd
+# the device node when root ran it). A control run with a working mktemp
+# proves the harness exercises the real block (find flows, cleanup runs).
+W2_BLOCK_SHARE="$(sed -n '/_st_share_list=\$(mktemp)/,/^ *rm -f "\$_st_share_list"$/p' "$STATUS")"
+W2_BLOCK_HOSTS="$(sed -n '/_st_hosts_list=\$(mktemp)/,/^ *rm -f "\$_st_hosts_list"$/p' "$STATUS")"
+W2_BLOCK_GAP="$(sed -n '/_st_gap_roots=\$(mktemp)/,/^ *fi$/p' "$STATUS")"
+if [ -n "$W2_BLOCK_SHARE" ] && [ -n "$W2_BLOCK_HOSTS" ] && [ -n "$W2_BLOCK_GAP" ]; then
+    pass "W2 scan blocks extractable from status.sh"
+else
+    fail "W2 scan blocks not extractable (anchor drift?)"
+fi
+
+# w2_run <block> <mktemp-works true|false> — runs an extracted scan block
+# in the loop context the real script provides (`continue` is legal
+# there), with the scan helpers stubbed to markers. The suite runs under
+# set -e: callers capture with `|| true`.
+w2_run() {
+    (
+        if [ "$2" = true ]; then
+            _w2_dir=$(command mktemp -d)
+            mktemp() { printf '%s/list\n' "$_w2_dir"; }
+        else
+            mktemp() { return 1; }
+        fi
+        find() { echo "FIND-CALLED"; }
+        rm() { echo "RM-CALLED $*"; }
+        grep() { echo "GREP-CALLED"; }
+        ui_kv_warn() { echo "WARN|$1|$2"; }
+        ui_detail() { :; }
+        ddev_reshare_needed() { return 1; }
+        ddev_hosts_missing() { echo ""; }
+        _st_dbdump_gap() { echo "GAP-CALLED"; }
+        OPENCODE_USER=opencode
+        LIBDIR=/usr/local/lib/opencode-permissions-kit
+        PROJECTS_CONF=/nonexistent-w2-projects.conf
+        DEFAULT_USER=w2user
+        while IFS= read -r _st_root; do
+            eval "$1"
+        done <<EOF
+/var/www/w2-proj
+EOF
+        if [ "$2" = true ] && [ -n "${_w2_dir:-}" ]; then command rm -rf "$_w2_dir"; fi
+    )
+}
+
+if [ -n "$W2_BLOCK_SHARE" ]; then
+    _w2out=$(w2_run "$W2_BLOCK_SHARE" false || true)
+    if printf '%s' "$_w2out" | grep -q '^WARN|ddev share|scan skipped for /var/www/w2-proj' \
+        && ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' \
+        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+        pass "W2 share scan: mktemp failure warns loudly, no find, no rm"
+    else
+        fail "W2 share scan: mktemp failure must warn and skip (got: $_w2out)"
+    fi
+    _w2out=$(w2_run "$W2_BLOCK_SHARE" true || true)
+    if ! printf '%s' "$_w2out" | grep -q 'scan skipped' \
+        && printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+        pass "W2 share scan: working mktemp flows find→report→cleanup (control)"
+    else
+        fail "W2 share scan control broken (got: $_w2out)"
+    fi
+fi
+if [ -n "$W2_BLOCK_HOSTS" ]; then
+    _w2out=$(w2_run "$W2_BLOCK_HOSTS" false || true)
+    if printf '%s' "$_w2out" | grep -q '^WARN|hosts (win)|scan skipped for /var/www/w2-proj' \
+        && ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' \
+        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+        pass "W2 hosts scan: mktemp failure warns loudly, no find, no rm"
+    else
+        fail "W2 hosts scan: mktemp failure must warn and skip (got: $_w2out)"
+    fi
+fi
+if [ -n "$W2_BLOCK_GAP" ]; then
+    _w2out=$(w2_run "$W2_BLOCK_GAP" false || true)
+    if printf '%s' "$_w2out" | grep -q '^WARN|db dumps|gap scan skipped' \
+        && ! printf '%s' "$_w2out" | grep -q 'GAP-CALLED' \
+        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+        pass "W2 dbdump gap: mktemp failure warns loudly, scan skipped"
+    else
+        fail "W2 dbdump gap: mktemp failure must warn and skip (got: $_w2out)"
+    fi
+fi
+# class sweep (L2): no /dev/null fallback assignment survives anywhere
+if ! grep -qE '_(share_list|hosts_list|gap_roots)=/dev/null' "$STATUS"; then
+    pass "W2 class sweep: no /dev/null fallback assignment remains"
+else
+    fail "W2 class sweep: a /dev/null fallback survived"
+fi
+
+# --- 0.0.48b W3: privilege-unknown and optional rows never count -------------
+# The verdict counts findings, not unknowns: "unknown — needs root" and
+# "missing (optional …" rows are plain ui_kv (uncounted) — otherwise every
+# unprivileged or HTTPS-less host would be permanently non-green and the
+# cron alert worthless. Pins the five converted rows incl. both socket
+# twins, plus the negative sweep (no unknown/optional row via ui_kv_warn).
+if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS" \
+    && [ "$(grep -cF 'ui_kv "socket" "unknown — needs root to check' "$STATUS")" = "2" ] \
+    && grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$STATUS" \
+    && grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS" \
+    && ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" \
+    && ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS"; then
+    pass "W3: unknown/optional rows are uncounted (plain ui_kv, both socket twins)"
+else
+    fail "W3: an unknown/optional row still counts (or the conversion drifted)"
+fi
+
+# --- 0.0.48b W4: the --short output guards are pinned behaviorally ------------
+# The static one-line pin covered only the hosts-scan echo conversion;
+# the leak-scan hit-list guard and the management-block guard now run as
+# extracted blocks through both STATUS_SHORT states — muted means really
+# nothing prints, full mode means the content prints.
+w4_run() {
+    (
+        head() { echo "HEAD-CALLED"; }
+        sed() { cat; }
+        ui_info() { echo "INFO|$1"; }
+        ui_detail() { echo "DETAIL|$1"; }
+        scan_hits="w4hit"
+        scan_count=1
+        STATUS_SHORT=$2
+        eval "$1"
+    )
+}
+W4_BLOCK_HITLIST="$(sed -n '/# Hit list prints in full mode only/,/^ *fi$/p' "$STATUS")"
+W4_BLOCK_MGMT="$(sed -n '/# --short skips the block: one verdict line means one line/,/^fi$/p' "$STATUS")"
+if [ -n "$W4_BLOCK_HITLIST" ] && [ -n "$W4_BLOCK_MGMT" ]; then
+    pass "W4 guard blocks extractable from status.sh"
+else
+    fail "W4 guard blocks not extractable (anchor drift?)"
+fi
+if [ -n "$W4_BLOCK_HITLIST" ]; then
+    _w4out=$(w4_run "$W4_BLOCK_HITLIST" true || true)
+    if [ -z "$(printf '%s' "$_w4out" | grep -v '^ *$')" ]; then
+        pass "W4 hit list: --short prints none of it"
+    else
+        fail "W4 hit list leaks into --short (got: $_w4out)"
+    fi
+    _w4out=$(w4_run "$W4_BLOCK_HITLIST" false || true)
+    if printf '%s' "$_w4out" | grep -q 'HEAD-CALLED'; then
+        pass "W4 hit list: full mode prints it (control)"
+    else
+        fail "W4 hit list control broken (got: $_w4out)"
+    fi
+fi
+if [ -n "$W4_BLOCK_MGMT" ]; then
+    _w4out=$(w4_run "$W4_BLOCK_MGMT" true || true)
+    if ! printf '%s' "$_w4out" | grep -q 'INFO|'; then
+        pass "W4 management block: --short prints none of it"
+    else
+        fail "W4 management block leaks into --short (got: $_w4out)"
+    fi
+    _w4out=$(w4_run "$W4_BLOCK_MGMT" false || true)
+    if printf '%s' "$_w4out" | grep -q 'INFO|Management (run in a terminal)'; then
+        pass "W4 management block: full mode prints it (control)"
+    else
+        fail "W4 management control broken (got: $_w4out)"
+    fi
+fi
+
+# --- 0.0.48c C1: a missing/unexecutable managed binary is a FINDING ------------
+# W3's uncounted "unknown" class must not swallow a broken kit: with
+# $LIBDIR/bin/opencode gone, the gate warns (counted) and never reaches
+# the probe; with a working binary, the probe path runs and no warn
+# fires. Behavioral: the extracted gate block against fixture LIBDIRs.
+W48C_BLOCK_ADV="$(sed -n '/^    ADV_VER=""$/,/^    fi$/p' "$STATUS")"
+if printf '%s' "$W48C_BLOCK_ADV" | grep -q 'ui_kv_warn "opencode binary"' \
+    && printf '%s' "$W48C_BLOCK_ADV" | grep -q 'elif command -v sudo'; then
+    pass "C1 gate block extractable (warn + elif shape)"
+else
+    fail "C1 gate block not extractable (anchor drift?)"
+fi
+w48c_run() {
+    (
+        ui_kv_warn() { echo "WARN|$1|$2"; }
+        ui_kv() { echo "KV|$1|$2"; }
+        # timeout is external — it would exec the REAL sudo, invisible to
+        # the stub below; drop the duration and exec in-shell instead.
+        timeout() { shift 1; "$@"; }
+        sudo() { shift 3; "$@"; }
+        LIBDIR="$1"
+        OPENCODE_USER=opencode
+        eval "$2"
+        echo "ADV_VER=${ADV_VER:-unset}"
+    )
+}
+if [ -n "$W48C_BLOCK_ADV" ]; then
+    # broken kit: no bin/opencode under LIBDIR
+    _c1dir=$(mktemp -d)
+    _c1out=$(w48c_run "$_c1dir" "$W48C_BLOCK_ADV" || true)
+    if printf '%s' "$_c1out" | grep -q '^WARN|opencode binary|missing or not executable' \
+        && printf '%s' "$_c1out" | grep -q '^ADV_VER=unset$'; then
+        pass "C1: missing binary warns (counted), probe never runs"
+    else
+        fail "C1: missing binary must warn loudly (got: $_c1out)"
+    fi
+    # control: executable fake binary -> probe path runs, no warn
+    mkdir -p "$_c1dir/bin"
+    printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_c1dir/bin/opencode"
+    chmod +x "$_c1dir/bin/opencode"
+    _c1out=$(w48c_run "$_c1dir" "$W48C_BLOCK_ADV" || true)
+    if ! printf '%s' "$_c1out" | grep -q '^WARN|' \
+        && printf '%s' "$_c1out" | grep -q '^ADV_VER=9.9.9$'; then
+        pass "C1: working binary probes (control), no warn"
+    else
+        fail "C1 control broken (got: $_c1out)"
+    fi
+    rm -rf "$_c1dir"
+fi
+
+# --- 0.0.48d D1: the unknown row is present-binary shapes ONLY -----------------
+# The 0.0.48c prescription's second leg, pinned: with the binary missing
+# the stale "unknown — probe failed (run: sudo opk status)" row must NOT
+# print (the counted warn above already spoke; the advice cannot work for
+# that shape) — while a present-but-failing binary keeps the W3
+# privilege-unknown row (over-suppression would hide the legit shape).
+# Behavioral: gate + render blocks against three fixture LIBDIRs.
+W48D_BLOCK_RENDER="$(sed -n '/^    if \[ -n "\$ADV_VER" \]; then$/,/^    fi$/p' "$STATUS")"
+if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'elif [ -x "$LIBDIR/bin/opencode" ]' \
+    && printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ui_kv "opencode version" "unknown — probe failed'; then
+    pass "D1 render block extractable (elif-gated unknown row)"
+else
+    fail "D1 render block not extractable (anchor drift?)"
+fi
+w48d_run() {
+    (
+        ui_kv_warn() { echo "WARN|$1|$2"; }
+        ui_kv() { echo "KV|$1|$2"; }
+        ui_kv_ok() { echo "OK|$1|$2"; }
+        ui_kv_bad() { echo "BAD|$1|$2"; }
+        ui_detail() { echo "DETAIL|$1"; }
+        # render-only stub: no advisories database in the fixture — the
+        # OK branch is the one under test, not the matching logic.
+        advisories_matching() { return 1; }
+        timeout() { shift 1; "$@"; }
+        sudo() { shift 3; "$@"; }
+        LIBDIR="$1"
+        OPENCODE_USER=opencode
+        VERSION=0.0.0
+        ADV_VER=""
+        eval "$W48C_BLOCK_ADV"
+        eval "$W48D_BLOCK_RENDER"
+    )
+}
+if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
+    _d1dir=$(mktemp -d)
+    # missing binary: warn row, NO unknown row (the D1 property)
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "D1: missing binary prints the warn, not the unknown row"
+    else
+        fail "D1: missing binary must not print the unknown row (got: $_d1out)"
+    fi
+    # working binary: probe renders the OK row, no unknown row
+    mkdir -p "$_d1dir/bin"
+    printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_d1dir/bin/opencode"
+    chmod +x "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^OK|opencode 9.9.9|' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "D1: working binary renders the OK row, no unknown row"
+    else
+        fail "D1: working binary must render via ADV_VER (got: $_d1out)"
+    fi
+    # present but failing binary: the W3 privilege-unknown row STAYS
+    printf '#!/bin/sh\nexit 1\n' > "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if ! printf '%s' "$_d1out" | grep -q '^WARN|' \
+        && printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
+        pass "D1: present-but-failing binary keeps the unknown row (W3 shape)"
+    else
+        fail "D1: over-suppression — the privilege-unknown row is gone (got: $_d1out)"
+    fi
+    rm -rf "$_d1dir"
 fi
 
 echo ""

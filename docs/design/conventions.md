@@ -44,6 +44,27 @@ labeled lines `info`/`success`/`warn`/`error` via `ui.sh`, slim banner,
 Unicode symbols with `UI_ASCII=1` fallback, `NO_COLOR` and non-tty
 honored.
 
+Severity rows are **semantic, not colorized `ui_kv` calls** (issue
+#158): verdict rows use `ui_kv_ok` / `ui_kv_warn` / `ui_kv_bad` (and the
+checklist helpers `ui_have` / `ui_atten` / `ui_miss`), which render the
+same output but also bump the counters `UI_ROWS_OK/WARN/BAD` — a summary
+(`status.sh`'s verdict line) can tally findings by call site, where
+counting color bytes would fail (they are empty under `NO_COLOR`/piping).
+Two consequences for report scripts:
+
+- Rows printed inside a pipeline (`cmd | while ...; ui_kv_warn ...; done`)
+  count in the pipe's subshell and the tally loses them — feed such
+  loops from a temp file and read it via redirect (`while ... done < "$f"`).
+- `UI_SILENT=1` mutes every non-interactive print helper while the
+  counters keep running — the base for one-line report modes
+  (`opk status --short`). The question helpers (`ui_ask`/`ui_confirm`/
+  `ui_menu`) are deliberately not muted: a muted report mode must not
+  fall through to an invisible prompt.
+
+Report commands carry their verdict in the exit code (`opk status`:
+`0` all green, `1` alert(s), `2` warning(s) only, `64` usage error) so
+cron/timers can react without parsing output.
+
 File lists in code (fetch/deploy lists such as `KIT_FILES`, install.sh's
 fetch list, and the `lib_deploy` manifest): **one file per line**,
 backslash-continued. Packed multi-name lines make diffs unreadable;

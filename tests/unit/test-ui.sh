@@ -175,6 +175,34 @@ out=$(run_ui 'ui_plan 3 "Apply ACLs" "group rwx"')
 check "plan line is numbered and carries the note" \
     sh -c "printf %s \"\$1\" | grep -q '^    3  Apply ACLs'" _ "$out"
 
+# --- severity counters (issue #158) ---------------------------------------------------------------
+# Counting must be color-blind: these run in $(...) (non-tty => colors
+# resolve to empty strings) — if the helpers counted color bytes, every
+# count here would come out 0.
+out=$(run_ui 'ui_kv_ok "a" "x"; ui_kv_warn "b" "y"; ui_kv_bad "c" "z"; ui_have "d" "1"; ui_atten "e" "2"; ui_miss "f" "3"; ui_warn "w"; ui_error "E"; printf "OK=%s WARN=%s BAD=%s" "$UI_ROWS_OK" "$UI_ROWS_WARN" "$UI_ROWS_BAD"')
+check "counters bump per severity helper (colors off)" \
+    sh -c "printf %s \"\$1\" | grep -q 'OK=2 WARN=3 BAD=3'" _ "$out"
+
+# UI_SILENT=1: every printer is a no-op, the counters keep counting. The
+# warn row is the trap: its silent guard sits AFTER the increment — a
+# muted row is still a finding (status.sh --short builds on exactly
+# that).
+out=$(UI_SILENT=1 run_ui 'ui_kv_ok "a" "x"; ui_kv_warn "b" "y"; ui_kv_bad "c" "z"; ui_have "d" "1"; ui_atten "e" "2"; ui_miss "f" "3"; ui_warn "w"; ui_error "E"; ui_section "S"; ui_banner; ui_detail "d"; printf "OK=%s WARN=%s BAD=%s" "$UI_ROWS_OK" "$UI_ROWS_WARN" "$UI_ROWS_BAD"')
+check "UI_SILENT: no output, counters still advance" \
+    sh -c "printf %s \"\$1\" | grep -q 'OK=2 WARN=3 BAD=3'" _ "$out"
+check "UI_SILENT: printers stay mute (only the printf survives)" \
+    sh -c "[ \"\$(printf %s \"\$1\" | grep -c .)\" -eq 1 ]" _ "$out"
+
+# plain ui_kv is an informational row — never counted (not a finding)
+out=$(run_ui 'ui_kv "k" "v"; printf "OK=%s WARN=%s BAD=%s" "$UI_ROWS_OK" "$UI_ROWS_WARN" "$UI_ROWS_BAD"')
+check "plain ui_kv rows stay uncounted" \
+    sh -c "printf %s \"\$1\" | grep -q 'OK=0 WARN=0 BAD=0'" _ "$out"
+
+# NO_COLOR must not disable counting either (same class, explicit env)
+out=$(NO_COLOR=1 run_ui 'ui_kv_warn "b" "y"; printf "WARN=%s" "$UI_ROWS_WARN"')
+check "NO_COLOR=1 keeps counting" \
+    sh -c "printf %s \"\$1\" | grep -q 'WARN=1'" _ "$out"
+
 # --- Summary --------------------------------------------------------------------------------------------
 echo ""
 echo "===================================="
