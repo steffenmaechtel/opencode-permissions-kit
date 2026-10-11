@@ -64,6 +64,14 @@ echo ""
 echo "--- 1b. status.sh before install (not-installed state) ---"
 check "status.sh (not installed) reports hardening NOT active" \
     E 'cd /tmp && sh /home/dev/repo/files/opencode-permissions-kit-lib/management/status.sh 2>&1 | grep -q "NOT active"'
+# 0.0.48b W1: the exit contract at the one deterministic not-installed
+# point — full mode stays 0 (status is a diagnostic, never "failed" for
+# reporting absence), --short reports the loudest not-green state as 1
+# and prints exactly one line (issue #158).
+check "status.sh (not installed) full mode exits 0 (issue #158)" \
+    E 'cd /tmp && sh /home/dev/repo/files/opencode-permissions-kit-lib/management/status.sh >/dev/null 2>&1; test $? -eq 0'
+check "status.sh (not installed) --short: one line, exit 1 (issue #158)" \
+    E 'cd /tmp && sh /home/dev/repo/files/opencode-permissions-kit-lib/management/status.sh --short >/tmp/st-notinst-short.log 2>&1; test $? -eq 1 && test "$(grep -c . /tmp/st-notinst-short.log)" = 1'
 
 echo ""
 echo "--- 2. Run install (from local repo checkout, podman-rootless backend) ---"
@@ -1161,6 +1169,16 @@ E 'mkdir -p /home/dev/.config/openchamber \
         > /home/dev/.config/openchamber/settings.json'
 check "12k: opk status reports BYPASSED" \
     E 'opk status 2>&1 | grep -q "BYPASSED"'
+# 0.0.48b W1: the exit contract at a deterministic verdict point — the
+# BYPASSED row is an alert (ui_kv_bad), so the full report must exit
+# exactly 1, and --short must print exactly one line and exit 1. Pins
+# the summary's exit mapping (and the UI_SILENT one-line discipline in
+# the installed state) where the verdict state is pinned by the check
+# above — rc-dependent `&&` chaining is what broke DD13 (0.0.48b W1).
+check "12k: full report carries the alert verdict in its exit code (issue #158)" \
+    E 'opk status >/dev/null 2>&1; test $? -eq 1'
+check "12k: --short is exactly one line and exits 1 on alerts (issue #158)" \
+    E 'opk status --short >/tmp/st-12k-short.log 2>&1; test $? -eq 1 && test "$(grep -c . /tmp/st-12k-short.log)" = 1'
 E 'sudo opk openchamber-secure --yes' && \
     echo "  ${GREEN}OK${NC}  opk openchamber-secure completed"
 check "12k: policy pin written, pinning the kit wrapper" \
