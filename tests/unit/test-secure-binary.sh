@@ -145,6 +145,28 @@ check "atomic: killed cp leaves the OLD binary byte-identical (issue #163)" \
 check "atomic: killed cp leaves no temp behind" \
     sh -c '[ -z "$(find "$1" -maxdepth 1 -name "cba-installed.tmp.*" -print)" ]' _ "$WORK"
 
+# 5c. failing mv: the copy landed in the temp but the rename dies —
+# the old binary must survive byte-identical, the temp must be cleaned
+# (the rm leg of the mv failure), rc=1. Closes the L1 duty for the
+# helper's second failure leg (the 5b pins cover only the cp leg).
+mkdir -p "$WORK/failing-mv-bin"
+printf '#!/bin/sh\nexit 1\n' > "$WORK/failing-mv-bin/mv"
+chmod +x "$WORK/failing-mv-bin/mv"
+printf 'OLD-BINARY-BYTES' > "$CBA_DST"
+_sd_out=$(
+    SB_SUDO=""
+    PATH="$WORK/failing-mv-bin:$PATH"
+    export SB_SUDO PATH
+    # shellcheck disable=SC2031
+    . "$LIB"
+    copy_binary_atomic "$CBA_SRC" "$CBA_DST" 2>&1; echo "rc=$?"
+)
+case "$_sd_out" in *rc=1*) pass "atomic: failing mv fails the deploy rc=1" ;; *) fail "atomic: failing mv rc (got [$_sd_out])" ;; esac
+check "atomic: failing mv leaves the OLD binary byte-identical" \
+    sh -c '[ "$(cat "$1")" = "OLD-BINARY-BYTES" ]' _ "$CBA_DST"
+check "atomic: failing mv cleans its temp up" \
+    sh -c '[ -z "$(find "$1" -maxdepth 1 -name "cba-installed.tmp.*" -print)" ]' _ "$WORK"
+
 # --- summary ----------------------------------------------------------------
 
 echo ""

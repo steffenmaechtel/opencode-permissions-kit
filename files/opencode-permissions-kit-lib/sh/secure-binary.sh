@@ -61,6 +61,12 @@ secure_binary() {
 # binary-writing site: update.sh's deploy, its pre-upgrade backup (a
 # half-written backup is a poisoned restore source) and its fallback
 # restore, plus install.sh's four first-install copies.
+# A run killed between the two legs leaves one root-owned temp behind
+# ($$-suffixed, inert to status/wrapper, never colliding with a later
+# run); sweeping stale temps with a root glob rm would be the bigger
+# footgun — the rare litter is the accepted trade-off. L5 note: every
+# operand lives on root-owned trees (kit bin dir, root mktemp backup
+# dir), never on agent-writable paths.
 copy_binary_atomic() {
     _cba_src="$1"
     _cba_dst="$2"
