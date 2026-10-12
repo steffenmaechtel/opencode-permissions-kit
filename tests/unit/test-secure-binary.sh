@@ -175,6 +175,13 @@ check "atomic: failing mv cleans its temp up" \
 # BEFORE the mv. Mode discrimination: 640 differs from the cp-natural
 # 644 the source carries under the test umask, so a reverted
 # cp-then-chmod-after shows 644 at the rename.
+# 0.0.49c F4: pin the umask for §6 — the 640-vs-644 discrimination
+# collapses under an invoking umask of 027/007 (cp-natural of the 644
+# source is then exactly 640), leaving the 6a/6d pins green but blind
+# to a chmod-after-mv revert. 022 keeps every §6 pin discriminating
+# regardless of the caller's shell (house pattern:
+# test-ddev-as-opencode.sh).
+umask 022
 
 CFA_SRC="$WORK/cfa-source"
 CFA_DST="$WORK/cfa-profile"
