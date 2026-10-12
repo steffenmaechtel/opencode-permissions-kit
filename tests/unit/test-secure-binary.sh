@@ -167,6 +167,109 @@ check "atomic: failing mv leaves the OLD binary byte-identical" \
 check "atomic: failing mv cleans its temp up" \
     sh -c '[ -z "$(find "$1" -maxdepth 1 -name "cba-installed.tmp.*" -print)" ]' _ "$WORK"
 
+# --- 6. copy_file_atomic: mode-atomic file deploys (0.0.49b C1) ---------------
+# The umask profile's helper (install.sh + update.sh route their
+# /etc/profile.d/ deploys through it — wiring pinned in
+# test-bypass-guard.sh): the same failure/ordering axes the lib
+# deploys carry (0.0.49a W2) — killed cp, failing mv, and the mode
+# BEFORE the mv. Mode discrimination: 640 differs from the cp-natural
+# 644 the source carries under the test umask, so a reverted
+# cp-then-chmod-after shows 644 at the rename.
+
+CFA_SRC="$WORK/cfa-source"
+CFA_DST="$WORK/cfa-profile"
+printf 'NEW-PROFILE-BYTES' > "$CFA_SRC"
+chmod 644 "$CFA_SRC"
+
+# 6a. happy path: new bytes + the EXPLICIT mode land, no litter
+printf 'OLD-PROFILE-BYTES' > "$CFA_DST"
+_sd_out=$(
+    SB_SUDO=""
+    export SB_SUDO
+    # shellcheck disable=SC2031
+    . "$LIB"
+    copy_file_atomic "$CFA_SRC" "$CFA_DST" 640 2>&1; echo "rc=$?"
+)
+case "$_sd_out" in *rc=0*) pass "file atomic: happy path rc=0" ;; *) fail "file atomic: happy path rc (got [$_sd_out])" ;; esac
+check "file atomic: new bytes in place after the mv" cmp -s "$CFA_DST" "$CFA_SRC"
+check "file atomic: explicit mode applied (640, not cp-natural 644)" \
+    sh -c '[ "$(stat -c %a "$1")" = 640 ]' _ "$CFA_DST"
+check "file atomic: no temp litter next to the target" \
+    sh -c '[ -z "$(find "$1" -maxdepth 1 -name "cfa-profile.tmp.*" -print)" ]' _ "$WORK"
+
+# 6b. killed cp: the copy leg dies mid-write — the old entry survives
+# byte-identical, the temp is cleaned (cp stub from 5b reused).
+printf 'OLD-PROFILE-BYTES' > "$CFA_DST"
+_sd_out=$(
+    SB_SUDO=""
+    export SB_SUDO
+    PATH="$WORK/killing-bin:$PATH"
+    export SB_SUDO PATH
+    # shellcheck disable=SC2031
+    . "$LIB"
+    copy_file_atomic "$CFA_SRC" "$CFA_DST" 640 2>&1; echo "rc=$?"
+)
+case "$_sd_out" in *rc=1*) pass "file atomic: killed cp fails the deploy rc=1" ;; *) fail "file atomic: killed cp rc (got [$_sd_out])" ;; esac
+check "file atomic: killed cp leaves the OLD entry byte-identical (0.0.49b C1)" \
+    sh -c '[ "$(cat "$1")" = "OLD-PROFILE-BYTES" ]' _ "$CFA_DST"
+check "file atomic: killed cp leaves no temp behind" \
+    sh -c '[ -z "$(find "$1" -maxdepth 1 -name "cfa-profile.tmp.*" -print)" ]' _ "$WORK"
+
+# 6c. failing mv: copy + chmod landed in the temp, the rename dies —
+# old entry survives byte-identical, temp cleaned (mv stub from 5c).
+printf 'OLD-PROFILE-BYTES' > "$CFA_DST"
+_sd_out=$(
+    SB_SUDO=""
+    PATH="$WORK/failing-mv-bin:$PATH"
+    export SB_SUDO PATH
+    # shellcheck disable=SC2031
+    . "$LIB"
+    copy_file_atomic "$CFA_SRC" "$CFA_DST" 640 2>&1; echo "rc=$?"
+)
+case "$_sd_out" in *rc=1*) pass "file atomic: failing mv fails the deploy rc=1" ;; *) fail "file atomic: failing mv rc (got [$_sd_out])" ;; esac
+check "file atomic: failing mv leaves the OLD entry byte-identical" \
+    sh -c '[ "$(cat "$1")" = "OLD-PROFILE-BYTES" ]' _ "$CFA_DST"
+check "file atomic: failing mv cleans its temp up" \
+    sh -c '[ -z "$(find "$1" -maxdepth 1 -name "cfa-profile.tmp.*" -print)" ]' _ "$WORK"
+
+# 6d. mode-before-mv ordering: a capturing mv stub records the staged
+# temp's mode at rename time — 640 AT the mv, never the cp-natural 644
+# a chmod-after-the-mv shape would show (the 0.0.49a W2 4c axis).
+mkdir -p "$WORK/capture-cfa-bin"
+MV_REAL="$(command -v mv)"
+MODE_CAPT="$WORK/cfa-mv-modes.txt"
+export MV_REAL MODE_CAPT
+cat > "$WORK/capture-cfa-bin/mv" <<'CAPCFA'
+#!/bin/sh
+# capture the staged temp's mode at rename time — the SOURCE is the
+# last-but-one argument (`mv -f src dst` puts -f first)
+_cap_src=
+_cap_prev=
+for _cap_a in "$@"; do
+    _cap_prev=$_cap_src
+    _cap_src=$_cap_a
+done
+printf '%s %s\n' "$(stat -c %a "$_cap_prev" 2>/dev/null || echo none)" "$_cap_prev" >> "$MODE_CAPT"
+exec "$MV_REAL" "$@"
+CAPCFA
+chmod +x "$WORK/capture-cfa-bin/mv"
+printf 'OLD-PROFILE-BYTES' > "$CFA_DST"
+_sd_out=$(
+    SB_SUDO=""
+    PATH="$WORK/capture-cfa-bin:$PATH"
+    export SB_SUDO PATH
+    # shellcheck disable=SC2031
+    . "$LIB"
+    copy_file_atomic "$CFA_SRC" "$CFA_DST" 640 2>&1; echo "rc=$?"
+)
+case "$_sd_out" in *rc=0*) pass "file atomic: capturing-mv deploy rc=0" ;; *) fail "file atomic: capturing-mv rc (got [$_sd_out])" ;; esac
+check "file atomic: staged temp is 640 at mv time (mode rides before the rename)" \
+    sh -c 'grep -q "^640 .*cfa-profile\.tmp\." "$1"' _ "$MODE_CAPT"
+check "file atomic: capturing-mv run leaves the deployed mode correct" \
+    sh -c '[ "$(stat -c %a "$1")" = 640 ]' _ "$CFA_DST"
+check "file atomic: capturing-mv run leaves no temp behind" \
+    sh -c '[ -z "$(find "$1" -maxdepth 1 -name "cfa-profile.tmp.*" -print)" ]' _ "$WORK"
+
 # --- summary ----------------------------------------------------------------
 
 echo ""

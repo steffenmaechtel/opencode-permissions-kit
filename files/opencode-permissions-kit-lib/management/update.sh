@@ -389,6 +389,8 @@ done
     || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
 [ -n "$_sbl" ] \
     || copy_binary_atomic() { echo "error: copy_binary_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
+[ -n "$_sbl" ] \
+    || copy_file_atomic() { echo "error: copy_file_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
 
 # Shared library deployment manifest (what ships into $LIBDIR, from
 # ONE list — install.sh deploys through it too). Same lookup order as
@@ -695,8 +697,14 @@ fi
 # --- re-deploy umask profile -------------------------------------------------
 
 if [ -f "$FILES_ROOT/etc/umask.sh" ]; then
-    sudo cp "$FILES_ROOT/etc/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
-    sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
+    # 0.0.49b C1: atomic re-deploy — a plain in-place cp killed
+    # mid-write leaves a truncated profile with intact mode bits,
+    # sourced at every login (the #163 class on a protection layer).
+    # Same shape as the lib deploys (0.0.49a W2): sibling temp in the
+    # target dir, mode 644 before the mv.
+    copy_file_atomic "$FILES_ROOT/etc/umask.sh" \
+        /etc/profile.d/opencode-permissions-kit-umask.sh 644 \
+        || die "umask profile re-deploy failed (atomic deploy)"
     # Remove the pre-0.0.10 umask profile so only the new name is loaded.
     sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
     ui_success "umask profile re-deployed"

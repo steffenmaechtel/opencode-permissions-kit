@@ -80,3 +80,37 @@ copy_binary_atomic() {
         return 1
     fi
 }
+
+# copy_file_atomic <src> <dst> <mode>
+# Atomic file replacement with an explicit mode (0.0.49b C1): the umask
+# profile's deploy shape, same construction as copy_binary_atomic above
+# and lib_deploy's per-entry loop (0.0.49a W2) — sibling temp next to
+# the target (same directory = same filesystem, so the mv renames; the
+# cross-device unlink+copy fallback cannot reopen the truncate window),
+# mode applied BEFORE the rename so content and mode appear together.
+# Needed because /etc/profile.d/ is sourced by every user's login
+# shell: a cp killed mid-write over the profile leaves a truncated
+# script with intact mode bits (the #163 class on a protection layer),
+# and a cp-natural mode under a stricter root umask (077) would deploy
+# an unreadable profile that non-root shells silently skip. rm -f
+# cleanup on every failure leg keeps the old entry byte-identical.
+# L5 note: targets sit on root-owned trees (/etc/profile.d), never on
+# agent-writable paths — the pid-suffixed temp cannot be pre-created.
+copy_file_atomic() {
+    _cfa_src="$1"
+    _cfa_dst="$2"
+    _cfa_mode="$3"
+    _cfa_tmp="${_cfa_dst}.tmp.$$"
+    if ! _sb_sudo cp "$_cfa_src" "$_cfa_tmp"; then
+        _sb_sudo rm -f "$_cfa_tmp"
+        return 1
+    fi
+    if ! _sb_sudo chmod "$_cfa_mode" "$_cfa_tmp"; then
+        _sb_sudo rm -f "$_cfa_tmp"
+        return 1
+    fi
+    if ! _sb_sudo mv -f "$_cfa_tmp" "$_cfa_dst"; then
+        _sb_sudo rm -f "$_cfa_tmp"
+        return 1
+    fi
+}

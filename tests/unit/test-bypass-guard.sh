@@ -120,6 +120,17 @@ check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
     sh -c '! grep -Fq "sudo cp \"\$loc\" \"\$SYSTEM_BIN\"" "$1" \
         && ! grep -Fq "sudo cp \"/root/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1" \
         && ! grep -Fq "sudo cp \"\$DEV_HOME/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1"' _ "$INSTALL"
+# 0.0.49b C1: the umask profile deploys through the mode-atomic file
+# helper too — a cp killed mid-write over /etc/profile.d/ leaves a
+# truncated profile with intact mode bits, sourced at every login
+# (the #163 class on a protection layer). Behavioral pins for the
+# helper live in test-secure-binary.sh §6.
+check "install.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
+    sh -c 'grep -Fq "copy_file_atomic() { echo \"error: copy_file_atomic unavailable" "$1"' _ "$INSTALL"
+check "install.sh deploys the umask profile through the atomic file helper (0.0.49b C1)" \
+    sh -c 'grep -Fq "copy_file_atomic \"\$SCRIPT_DIR/etc/umask.sh\"" "$1"' _ "$INSTALL"
+check "install.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
+    sh -c '! grep -Fq "sudo cp \"\$SCRIPT_DIR/etc/umask.sh\" /etc/profile.d" "$1"' _ "$INSTALL"
 
 echo ""
 echo "-- update.sh wiring --"
@@ -130,6 +141,15 @@ check "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
         && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE"
+# 0.0.49b C1 (update twin of the install pins above): the umask
+# re-deploy routes through the atomic file helper, never an in-place
+# sudo cp over the sourced profile.
+check "update.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
+    sh -c 'grep -Fq "copy_file_atomic() { echo \"error: copy_file_atomic unavailable" "$1"' _ "$UPDATE"
+check "update.sh re-deploys the umask profile through the atomic file helper (0.0.49b C1)" \
+    sh -c 'grep -Fq "copy_file_atomic \"\$FILES_ROOT/etc/umask.sh\"" "$1"' _ "$UPDATE"
+check "update.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
+    sh -c '! grep -Fq "sudo cp \"\$FILES_ROOT/etc/umask.sh\" /etc/profile.d" "$1"' _ "$UPDATE"
 check "update.sh re-asserts binary 750 (shared helper)" \
     sh -c 'grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1" && grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "sh/secure-binary.sh" "$1"' _ "$UPDATE" "$SECUREBIN"
 check "update.sh never uses world-executable binary mode" \

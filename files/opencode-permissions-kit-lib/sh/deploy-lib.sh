@@ -64,8 +64,9 @@ lib_deploy() {
         # shape as sh/secure-binary.sh's copy_binary_atomic, staged here
         # separately because lib_deploy owns the per-entry mode and its
         # own _dl_sudo. A run killed between the legs leaves one
-        # $$-suffixed temp behind — inert, and the next run's cp
-        # overwrites it.
+        # root-owned $$-suffixed temp behind — inert (nothing executes
+        # it by name) and never colliding with a later run's temp
+        # (0.0.49b C2 wording, aligned with copy_binary_atomic's note).
         _dl_tmp="$_dl_dst.tmp.$$"
         if ! _dl_sudo cp "$_dl_src" "$_dl_tmp"; then
             _dl_sudo rm -f "$_dl_tmp"
