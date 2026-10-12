@@ -108,10 +108,14 @@ check "install.sh never uses world-executable binary mode" \
 # plain in-place cp killed mid-write leaves a truncated binary with
 # intact mode bits (dead at the first agent session). Behavioral pins
 # for the helper itself live in test-secure-binary.sh.
+# 0.0.49a W6: the count pattern carries the opening quote of the first
+# argument, so it counts CALL SITES only (the `command -v` wiring line
+# and the fallback definition don't match) — and -eq, not -ge: adding a
+# fifth site must be a conscious pin update, not a silent pass.
 check "install.sh defines the atomic-copy fallback for a missing lib (#163)" \
     sh -c 'grep -Fq "copy_binary_atomic() { echo \"error: copy_binary_atomic unavailable" "$1"' _ "$INSTALL"
-check "install.sh deploys the binary through the atomic helper at all four sites (#163)" \
-    sh -c '[ "$(grep -cF "copy_binary_atomic " "$1")" -ge 4 ]' _ "$INSTALL"
+check "install.sh deploys the binary through the atomic helper at exactly four call sites (#163, 0.0.49a W6)" \
+    sh -c '[ "$(grep -cF "copy_binary_atomic \"" "$1")" -eq 4 ]' _ "$INSTALL"
 check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
     sh -c '! grep -Fq "sudo cp \"\$loc\" \"\$SYSTEM_BIN\"" "$1" \
         && ! grep -Fq "sudo cp \"/root/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1" \
