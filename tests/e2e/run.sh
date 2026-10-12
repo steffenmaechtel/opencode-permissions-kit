@@ -1250,6 +1250,27 @@ check "12k: openchamber-secure announces replacing divergent content (0.0.47a F1
 E 'sudo sed -i "s/^DEFAULT_USER=.*/DEFAULT_USER=dev/" /etc/opencode-permissions-kit/install.conf'
 E 'rm -f /tmp/oc-nohome.log'
 
+echo "--- 12l. Corrupt-binary detection (issue #163) ---"
+# The recorded reachability was an update cp killed mid-write: a
+# truncated binary with intact mode bits. Recreate the exact shape in
+# place (partial bytes over the deployed path, mode untouched), assert
+# the counted warn — and NOT the uncounted privilege-unknown row that
+# used to paper over a dead wrapper with "All green" — then restore
+# and assert the warn is gone. pkill first: a lingering 2.x service
+# would hold the old inode (ETXTBSY on the overwrite; same belt as
+# install_binary's service stop).
+E 'sudo pkill -f "serve --servic[e]" >/dev/null 2>&1; true'
+E 'sudo cp /usr/local/lib/opencode-permissions-kit/bin/opencode /tmp/opencode-good.bin'
+E 'printf corrupt | sudo tee /usr/local/lib/opencode-permissions-kit/bin/opencode >/dev/null'
+check "12l: corrupt binary renders the counted warn row (#163)" \
+    E 'opk status 2>&1 | grep -q "present but broken"'
+check "12l: the privilege-unknown row does not paper over it (#163)" \
+    E '! opk status 2>&1 | grep -q "unknown — probe failed"'
+E 'sudo cp /tmp/opencode-good.bin /usr/local/lib/opencode-permissions-kit/bin/opencode'
+E 'rm -f /tmp/opencode-good.bin'
+check "12l: restored binary renders no corrupt warn (#163)" \
+    E '! opk status 2>&1 | grep -q "present but broken"'
+
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' && \

@@ -1,10 +1,12 @@
 # shellcheck shell=sh
 # opencode permissions kit -- secure-binary.sh
 #
-# Shared binary hardening — ONE implementation for install.sh and
-# update.sh (both carried their own copy of the chown/chmod pair, in
-# three divergent flavors: fail-loud in install.sh (0.0.39e C4), a
-# silent re-assert and a fail-loud path inside update.sh).
+# Shared binary hardening + atomic deploys — ONE implementation for
+# install.sh and update.sh (both carried their own copy of the
+# chown/chmod pair, in three divergent flavors: fail-loud in
+# install.sh (0.0.39e C4), a silent re-assert and a fail-loud path
+# inside update.sh; issue #163 then moved the atomic binary
+# replacement here for the same one-implementation reason).
 #
 # root:<sharing-group> mode 750 lets the opencode user (a group member)
 # run the binary and keeps unrelated users out. It is NOT a
@@ -42,4 +44,33 @@ secure_binary() {
         return 1
     fi
     return 0
+}
+
+# copy_binary_atomic <src> <dst>
+# Atomic binary replacement (issue #163): copy to a sibling temp file
+# next to the target, then mv into place. A plain in-place cp that
+# dies mid-write (Ctrl-C, OOM, power loss) leaves a truncated binary
+# with intact mode bits — present and executable, dead at the first
+# agent session, and before issue #163 exactly the shape opk status
+# papered over with an uncounted "unknown" row and an "All green"
+# verdict. The mv renames within the same directory (same filesystem),
+# so the target is always the complete old or the complete new file,
+# never half of either. Riding benefit: the rename swaps the inode, so
+# a running 2.x service keeps its old mapping instead of watching cp
+# truncate the file under it (issue #80 context). Sweeps every
+# binary-writing site: update.sh's deploy, its pre-upgrade backup (a
+# half-written backup is a poisoned restore source) and its fallback
+# restore, plus install.sh's four first-install copies.
+copy_binary_atomic() {
+    _cba_src="$1"
+    _cba_dst="$2"
+    _cba_tmp="${_cba_dst}.tmp.$$"
+    if ! _sb_sudo cp "$_cba_src" "$_cba_tmp"; then
+        _sb_sudo rm -f "$_cba_tmp"
+        return 1
+    fi
+    if ! _sb_sudo mv -f "$_cba_tmp" "$_cba_dst"; then
+        _sb_sudo rm -f "$_cba_tmp"
+        return 1
+    fi
 }

@@ -190,6 +190,30 @@ LAST_TMP_RM=$(grep -n 'rm -rf "\$TMP"' "$UPDATE" | tail -1 | cut -d: -f1)
 check "cleanup: candidate dir removed only AFTER the install attempt (issue #24)" \
     sh -c "[ -n \"\$1\" ] && [ -n \"\$2\" ] && [ \"\$2\" -gt \"\$1\" ]" _ "$IB_LINE" "$LAST_TMP_RM"
 
+# --- 3a. atomic binary replacement (issue #163) ---------------------------------
+# update.sh:940's plain in-place `sudo cp` was the recorded reachability
+# for a corrupt managed binary: a copy killed mid-write left a truncated
+# binary with intact mode bits, and opk status reported "All green" over
+# it. Every binary-writing site in update.sh must go through the shared
+# copy_binary_atomic helper (sh/secure-binary.sh — behavioral pins in
+# test-secure-binary.sh): the deploy, the pre-upgrade backup (a
+# half-written backup is a poisoned restore source) and the fallback
+# restore.
+check "#163: install_binary deploys through the atomic helper" \
+    sh -c "grep -qF 'copy_binary_atomic \"\$src\" \"\$SYSTEM_BIN\" || return 1' \"\$1\"" _ "$UPDATE"
+check "#163: the pre-upgrade backup copy is atomic" \
+    sh -c "grep -qF 'copy_binary_atomic \"\$SYSTEM_BIN\" \"\$BACKUP_DIR/opencode.current\"' \"\$1\"" _ "$UPDATE"
+check "#163: the fallback restore is atomic" \
+    sh -c "grep -qF 'copy_binary_atomic \"\$BACKUP_DIR/opencode.current\" \"\$SYSTEM_BIN\"' \"\$1\"" _ "$UPDATE"
+check "#163: no direct sudo-cp onto/from SYSTEM_BIN remains" \
+    sh -c "! grep -qF 'sudo cp \"\$src\" \"\$SYSTEM_BIN\"' \"\$1\" \
+        && ! grep -qF 'sudo cp \"\$SYSTEM_BIN\" \"\$BACKUP_DIR/opencode.current\"' \"\$1\" \
+        && ! grep -qF 'sudo cp \"\$BACKUP_DIR/opencode.current\" \"\$SYSTEM_BIN\"' \"\$1\"" _ "$UPDATE"
+check "#163: the missing-lib fallback fails loud for the helper too" \
+    sh -c "grep -qF 'copy_binary_atomic() { echo \"error: copy_binary_atomic unavailable' \"\$1\"" _ "$UPDATE"
+check "#163: the manual-restore advice teaches the atomic shape" \
+    sh -c "grep -qF 'sudo mv \${SYSTEM_BIN}.tmp \$SYSTEM_BIN' \"\$1\"" _ "$UPDATE"
+
 # --- 4. --only-binary (issue #24 feature) -----------------------------------------
 check "flag: --only-binary parsed, implies BINARY_UPDATE" \
     sh -c "grep -q -- '--only-binary)' \"\$1\" && grep -A4 -- '--only-binary)' \"\$1\" | grep -q 'BINARY_UPDATE=true'" _ "$UPDATE"

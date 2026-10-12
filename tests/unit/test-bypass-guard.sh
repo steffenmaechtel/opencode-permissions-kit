@@ -103,6 +103,19 @@ check "install.sh restricts binary to root:group 750 (shared helper)" \
     sh -c 'grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1"' _ "$INSTALL" "$SECUREBIN"
 check "install.sh never uses world-executable binary mode" \
     sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1"' _ "$INSTALL"
+# Issue #163: install.sh's four binary deploys (found-binary menu x2,
+# official-installer x2) must go through the shared atomic helper — a
+# plain in-place cp killed mid-write leaves a truncated binary with
+# intact mode bits (dead at the first agent session). Behavioral pins
+# for the helper itself live in test-secure-binary.sh.
+check "install.sh defines the atomic-copy fallback for a missing lib (#163)" \
+    sh -c 'grep -Fq "copy_binary_atomic() { echo \"error: copy_binary_atomic unavailable" "$1"' _ "$INSTALL"
+check "install.sh deploys the binary through the atomic helper at all four sites (#163)" \
+    sh -c '[ "$(grep -cF "copy_binary_atomic " "$1")" -ge 4 ]' _ "$INSTALL"
+check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
+    sh -c '! grep -Fq "sudo cp \"\$loc\" \"\$SYSTEM_BIN\"" "$1" \
+        && ! grep -Fq "sudo cp \"/root/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1" \
+        && ! grep -Fq "sudo cp \"\$DEV_HOME/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1"' _ "$INSTALL"
 
 echo ""
 echo "-- update.sh wiring --"
