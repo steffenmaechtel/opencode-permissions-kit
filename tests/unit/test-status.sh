@@ -1296,13 +1296,17 @@ w48d_run() {
 }
 if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
     _d1dir=$(mktemp -d)
-    # missing binary: warn row, NO unknown row (the D1 property)
+    # missing binary: warn row, NO unknown row (the D1 property); the
+    # advice must name the working repair — upgrade-opencode, not plain
+    # update (0.0.49a W1: a plain update never touches the binary).
     _d1out=$(w48d_run "$_d1dir" || true)
     if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|' \
+        && printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|.*fix: sudo opk upgrade-opencode' \
+        && ! printf '%s' "$_d1out" | grep -q 'fix: sudo opk update)' \
         && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
-        pass "D1: missing binary prints the warn, not the unknown row"
+        pass "D1: missing binary warns, naming the working repair (0.0.49a W1)"
     else
-        fail "D1: missing binary must not print the unknown row (got: $_d1out)"
+        fail "D1: missing binary warn must name upgrade-opencode, not plain update (got: $_d1out)"
     fi
     # working binary: probe renders the OK row, no unknown row
     mkdir -p "$_d1dir/bin"
@@ -1323,10 +1327,12 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
     printf '\177ELFbroken-fixture' > "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" || true)
     if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|present but broken' \
+        && printf '%s' "$_d1out" | grep -q 'fix: sudo opk upgrade-opencode' \
+        && ! printf '%s' "$_d1out" | grep -q 'fix: sudo opk update)' \
         && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
-        pass "D1/#163: corrupt binary counts a warn, not the privilege unknown"
+        pass "D1/#163: corrupt binary counts a warn with the working repair (0.0.49a W1)"
     else
-        fail "D1/#163: corrupt binary must warn (counted), not the unknown row (got: $_d1out)"
+        fail "D1/#163: corrupt binary must warn (counted) naming upgrade-opencode, not plain update (got: $_d1out)"
     fi
     # privilege-unknown shape (0.0.48b W3) under the #163 split: sudo
     # refuses, the binary itself is healthy — the direct classifier

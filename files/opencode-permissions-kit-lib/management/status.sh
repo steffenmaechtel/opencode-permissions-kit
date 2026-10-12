@@ -244,7 +244,14 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     # hits this same [ -x ] gate). Counts; the privilege-unknown shape
     # below does not.
     if [ ! -x "$LIBDIR/bin/opencode" ]; then
-        ui_kv_warn "opencode binary" "missing or not executable — advisory check skipped (fix: sudo opk update)"
+        # 0.0.49a W1: upgrade-opencode, not plain update — a plain
+        # `opk update` never touches the managed binary (BINARY_UPDATE
+        # is opt-in; the deploy manifest ships no bin/opencode), so the
+        # old advice dead-ended while update reported success over the
+        # broken kit. upgrade-opencode reinstalls in both shapes
+        # (missing and corrupt: the major resolves through the
+        # install.conf stamp when the probe is empty).
+        ui_kv_warn "opencode binary" "missing or not executable — advisory check skipped (fix: sudo opk upgrade-opencode)"
     elif command -v sudo >/dev/null 2>&1; then
         if command -v timeout >/dev/null 2>&1; then
             ADV_VER=$(timeout 10 sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null \
@@ -294,7 +301,10 @@ EOF
                 || ADV_DIRECT_RC=$?
         fi
         if [ "$ADV_DIRECT_RC" != 0 ]; then
-            ui_kv_warn "opencode binary" "present but broken — direct probe exited rc $ADV_DIRECT_RC (fix: sudo opk update)"
+            # 0.0.49a W1: the repair command is upgrade-opencode (the
+            # AFFECTED row's precedent) — plain update cannot fix this.
+            ui_kv_warn "opencode binary" "present but broken — direct probe exited rc $ADV_DIRECT_RC"\
+" (fix: sudo opk upgrade-opencode)"
         else
             # 0.0.48b W3: unknown at this caller's privilege is NOT a
             # finding (an agent-user or dev cron would be permanently

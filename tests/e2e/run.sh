@@ -1262,8 +1262,8 @@ echo "--- 12l. Corrupt-binary detection (issue #163) ---"
 E 'sudo pkill -f "serve --servic[e]" >/dev/null 2>&1; true'
 E 'sudo cp /usr/local/lib/opencode-permissions-kit/bin/opencode /tmp/opencode-good.bin'
 E 'printf corrupt | sudo tee /usr/local/lib/opencode-permissions-kit/bin/opencode >/dev/null'
-check "12l: corrupt binary renders the counted warn row (#163)" \
-    E 'opk status 2>&1 | grep -q "present but broken"'
+check "12l: corrupt binary renders the counted warn row, naming the working repair (#163, 0.0.49a W1)" \
+    E 'opk status 2>&1 | grep -q "present but broken.*fix: sudo opk upgrade-opencode"'
 check "12l: the privilege-unknown row does not paper over it (#163)" \
     E '! opk status 2>&1 | grep -q "unknown — probe failed"'
 E 'sudo cp /tmp/opencode-good.bin /usr/local/lib/opencode-permissions-kit/bin/opencode'
