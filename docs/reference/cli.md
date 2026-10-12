@@ -326,8 +326,12 @@ not "fail" for reporting absence — while `--short` reports that state as
 needs root to check", a failed version probe without sudo rights) and
 optional-feature rows (the mkcert CA) are informational: they never count
 toward the verdict — `sudo opk status` resolves the privilege unknowns.
-A missing or non-executable managed binary is the exception: it is
-reported as a warning, because no privilege can resolve it.
+A missing, non-executable, or corrupt managed binary is the exception:
+each is reported as a warning, because no privilege can resolve it
+(a corrupt binary — present and executable by mode bits, but failing to
+run, e.g. after an interrupted deploy — is detected by exec'ing it
+directly at the caller's own privilege: the kernel's verdict on a
+truncated or wrong-arch binary is the same for every user).
 
 `--short` is cron/timer friendly — alert yourself only when something is
 off:

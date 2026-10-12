@@ -273,12 +273,17 @@ kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/sudoers-deploy.sh"
 command -v sudoers_deploy >/dev/null 2>&1 \
     || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
 
-# Shared binary hardening (chown root:<group> best-effort + the
-# load-bearing chmod 750, fail-loud): one implementation for
+# Shared binary hardening + atomic deploys (chown root:<group>
+# best-effort + the load-bearing chmod 750, fail-loud; the temp+mv
+# binary replacement, issue #163): one implementation for
 # install.sh and update.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/secure-binary.sh"
 command -v secure_binary >/dev/null 2>&1 \
     || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
+command -v copy_binary_atomic >/dev/null 2>&1 \
+    || copy_binary_atomic() { echo "error: copy_binary_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
+command -v copy_file_atomic >/dev/null 2>&1 \
+    || copy_file_atomic() { echo "error: copy_file_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
 
 # Shared library deployment manifest: what ships into
 # /usr/local/lib/opencode-permissions-kit, from ONE list (install.sh
@@ -1787,8 +1792,15 @@ do_deploy_phase() {
         log "git safe.directory ensured for $OPENCODE_USER"
     fi
 
-    sudo cp "$SCRIPT_DIR/etc/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
-    sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
+    # 0.0.49b C1: atomic umask deploy — a plain in-place cp killed
+    # mid-write leaves a truncated profile with intact mode bits,
+    # sourced at every login (the #163 class on a protection layer).
+    # Same shape as the lib deploys (0.0.49a W2): sibling temp in the
+    # target dir, mode 644 before the mv (every user's shell must be
+    # able to read the profile).
+    copy_file_atomic "$SCRIPT_DIR/etc/umask.sh" \
+        /etc/profile.d/opencode-permissions-kit-umask.sh 644 \
+        || { echo "error: umask profile deploy failed" >&2; exit 1; }
     log "umask profile installed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 
     # === Step 6: opencode binary ===
@@ -1838,7 +1850,7 @@ do_deploy_phase() {
             case "$ans" in
                 y)
                     sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                    sudo cp "$loc" "$SYSTEM_BIN"
+                    copy_binary_atomic "$loc" "$SYSTEM_BIN"
                     secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                     remove_shadow_binary "$loc"
                     opencode_found=true
@@ -1849,7 +1861,7 @@ do_deploy_phase() {
                 b)
                     cp "$loc" "$BACKUP_DIR/opencode-binary" 2>/dev/null || true
                     sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                    sudo cp "$loc" "$SYSTEM_BIN"
+                    copy_binary_atomic "$loc" "$SYSTEM_BIN"
                     secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                     remove_shadow_binary "$loc"
                     opencode_found=true
@@ -1869,14 +1881,14 @@ do_deploy_phase() {
             # installs into /root/.opencode/bin. Locally it lands in the user's home.
             if [ -x "/root/.opencode/bin/opencode" ]; then
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                sudo cp "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
+                copy_binary_atomic "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
                 secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                 remove_shadow_binary "/root/.opencode/bin/opencode"
                 echo "Installed to $SYSTEM_BIN."
                 log "binary installed (official installer): /root/.opencode/bin/opencode -> $SYSTEM_BIN"
             elif [ -x "$DEV_HOME/.opencode/bin/opencode" ]; then
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
-                sudo cp "$DEV_HOME/.opencode/bin/opencode" "$SYSTEM_BIN"
+                copy_binary_atomic "$DEV_HOME/.opencode/bin/opencode" "$SYSTEM_BIN"
                 secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                 remove_shadow_binary "$DEV_HOME/.opencode/bin/opencode"
                 echo "Installed to $SYSTEM_BIN."

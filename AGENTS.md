@@ -130,7 +130,12 @@ The meta-analysis of all review snapshots 0.0.38–0.0.46 found the same
 defect classes recurring with every new feature. The per-wave checklist with
 rationale and evidence lives in
 [docs/design/review-meta-analysis/learnings.md](docs/design/review-meta-analysis/learnings.md)
-— apply it while fixing and before declaring a wave done. Short form:
+— apply it to every change that touches shipped code or its tests —
+features included, not only fix waves: the corpus's core finding is
+that every new feature is a new instance of a known class. Run the
+L1–L7 checklist explicitly before committing and again before
+declaring the work done; the short form below is a memory aid,
+learnings.md is authoritative. Short form:
 
 - **Class sweep:** a fix for a finding class is only "implemented" after
   sweeping all same-shape sibling sites; the resolution records the grep

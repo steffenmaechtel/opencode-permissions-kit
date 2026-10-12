@@ -32,6 +32,10 @@ _dl_sudo() { ${DL_SUDO-sudo} "$@"; }
 # for data templates whose mode follows the source under the umask).
 # Returns 1 loud — BEFORE writing the entry — when a source is
 # missing, so a broken fetch cannot half-deploy silently.
+# Each entry deploys ATOMICALLY (0.0.49a W2): the copy lands in a
+# sibling temp that gets its final mode, then one mv renames it into
+# place — an interrupted run can never leave a half-written or
+# wrongly-moded script at a path the kit executes.
 lib_deploy() {
     _dl_root="$1"
     _dl_lib="$2"
@@ -49,8 +53,33 @@ lib_deploy() {
             echo "error: lib_deploy: missing source: $_dl_src" >&2
             return 1
         fi
-        _dl_sudo cp "$_dl_src" "$_dl_dst" || return 1
-        [ "$_dl_mode" = "-" ] || _dl_sudo chmod "$_dl_mode" "$_dl_dst" || return 1
+        # Atomic per-entry deploy (0.0.49a W2): a plain in-place cp over
+        # bin/opk or management/update.sh, killed mid-write, leaves a
+        # truncated script with intact mode bits — the #163 class on the
+        # kit's own repair tooling. Sibling temp = same directory = same
+        # filesystem, so the mv renames: the entry is always the complete
+        # old or the complete new file. chmod rides BEFORE the mv, so the
+        # mode is atomic too (sudoers.template never sits at a cp-natural
+        # 644 — it is 440 the moment the name appears). Same two-leg
+        # shape as sh/secure-binary.sh's copy_binary_atomic, staged here
+        # separately because lib_deploy owns the per-entry mode and its
+        # own _dl_sudo. A run killed between the legs leaves one
+        # root-owned $$-suffixed temp behind — inert (nothing executes
+        # it by name) and never colliding with a later run's temp
+        # (0.0.49b C2 wording, aligned with copy_binary_atomic's note).
+        _dl_tmp="$_dl_dst.tmp.$$"
+        if ! _dl_sudo cp "$_dl_src" "$_dl_tmp"; then
+            _dl_sudo rm -f "$_dl_tmp"
+            return 1
+        fi
+        if [ "$_dl_mode" != "-" ] && ! _dl_sudo chmod "$_dl_mode" "$_dl_tmp"; then
+            _dl_sudo rm -f "$_dl_tmp"
+            return 1
+        fi
+        if ! _dl_sudo mv -f "$_dl_tmp" "$_dl_dst"; then
+            _dl_sudo rm -f "$_dl_tmp"
+            return 1
+        fi
     done <<'DL_MANIFEST'
 # management entry scripts
 opencode-permissions-kit-lib/management/config.sh 755

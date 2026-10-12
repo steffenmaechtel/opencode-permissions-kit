@@ -103,6 +103,48 @@ check "install.sh restricts binary to root:group 750 (shared helper)" \
     sh -c 'grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1"' _ "$INSTALL" "$SECUREBIN"
 check "install.sh never uses world-executable binary mode" \
     sh -c '! grep -Fq "chmod 755 \"\$SYSTEM_BIN\"" "$1"' _ "$INSTALL"
+# Issue #163: install.sh's four binary deploys (found-binary menu x2,
+# official-installer x2) must go through the shared atomic helper — a
+# plain in-place cp killed mid-write leaves a truncated binary with
+# intact mode bits (dead at the first agent session). Behavioral pins
+# for the helper itself live in test-secure-binary.sh.
+# 0.0.49a W6: the count pattern carries the opening quote of the first
+# argument, so it counts CALL SITES only (the `command -v` wiring line
+# and the fallback definition don't match) — and -eq, not -ge: adding a
+# fifth site must be a conscious pin update, not a silent pass.
+check "install.sh defines the atomic-copy fallback for a missing lib (#163)" \
+    sh -c 'grep -Fq "copy_binary_atomic() { echo \"error: copy_binary_atomic unavailable" "$1"' _ "$INSTALL"
+check "install.sh deploys the binary through the atomic helper at exactly four call sites (#163, 0.0.49a W6)" \
+    sh -c '[ "$(grep -cF "copy_binary_atomic \"" "$1")" -eq 4 ]' _ "$INSTALL"
+check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
+    sh -c '! grep -Fq "sudo cp \"\$loc\" \"\$SYSTEM_BIN\"" "$1" \
+        && ! grep -Fq "sudo cp \"/root/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1" \
+        && ! grep -Fq "sudo cp \"\$DEV_HOME/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1"' _ "$INSTALL"
+# 0.0.49b C1: the umask profile deploys through the mode-atomic file
+# helper too — a cp killed mid-write over /etc/profile.d/ leaves a
+# truncated profile with intact mode bits, sourced at every login
+# (the #163 class on a protection layer). Behavioral pins for the
+# helper live in test-secure-binary.sh §6.
+# 0.0.49c F2: the wiring pins carry the MODE — 644 is load-bearing
+# (an unreadable profile is silently skipped by non-root shells), and
+# a 644→600 mutation matched no pin before (greps covered the call
+# prefix only; e2e checks existence + content, not mode). The old
+# in-place shape matches neither grep (its chmod orders 644 BEFORE
+# the path), so the combined pin discriminates both axes.
+check "install.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
+    sh -c 'grep -Fq "copy_file_atomic() { echo \"error: copy_file_atomic unavailable" "$1"' _ "$INSTALL"
+check "install.sh deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
+    sh -c 'grep -Fq "copy_file_atomic \"\$SCRIPT_DIR/etc/umask.sh\"" "$1" \
+        && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$INSTALL"
+# 0.0.49c F3: W6's count-pin shape for the new helper — the pattern
+# carries the opening quote, so it counts CALL SITES only (the
+# command -v wiring line and the fallback definition don't match);
+# -eq, not -ge: a second copy_file_atomic deploy must be a conscious
+# pin update, not a silent pass.
+check "install.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3)" \
+    sh -c '[ "$(grep -cF "copy_file_atomic \"" "$1")" -eq 1 ]' _ "$INSTALL"
+check "install.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
+    sh -c '! grep -Fq "sudo cp \"\$SCRIPT_DIR/etc/umask.sh\" /etc/profile.d" "$1"' _ "$INSTALL"
 
 echo ""
 echo "-- update.sh wiring --"
@@ -113,6 +155,19 @@ check "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
         && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE"
+# 0.0.49b C1 (update twin of the install pins above): the umask
+# re-deploy routes through the atomic file helper, never an in-place
+# sudo cp over the sourced profile. 0.0.49c F2/F3: mode-carrying
+# deploy pin + call-site count, twin-for-twin with the install pins.
+check "update.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
+    sh -c 'grep -Fq "copy_file_atomic() { echo \"error: copy_file_atomic unavailable" "$1"' _ "$UPDATE"
+check "update.sh re-deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
+    sh -c 'grep -Fq "copy_file_atomic \"\$FILES_ROOT/etc/umask.sh\"" "$1" \
+        && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$UPDATE"
+check "update.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3)" \
+    sh -c '[ "$(grep -cF "copy_file_atomic \"" "$1")" -eq 1 ]' _ "$UPDATE"
+check "update.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
+    sh -c '! grep -Fq "sudo cp \"\$FILES_ROOT/etc/umask.sh\" /etc/profile.d" "$1"' _ "$UPDATE"
 check "update.sh re-asserts binary 750 (shared helper)" \
     sh -c 'grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1" && grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "sh/secure-binary.sh" "$1"' _ "$UPDATE" "$SECUREBIN"
 check "update.sh never uses world-executable binary mode" \

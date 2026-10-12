@@ -387,6 +387,10 @@ for _sbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/secure-binary.sh" 
 done
 [ -n "$_sbl" ] \
     || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
+[ -n "$_sbl" ] \
+    || copy_binary_atomic() { echo "error: copy_binary_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
+[ -n "$_sbl" ] \
+    || copy_file_atomic() { echo "error: copy_file_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
 
 # Shared library deployment manifest (what ships into $LIBDIR, from
 # ONE list — install.sh deploys through it too). Same lookup order as
@@ -693,8 +697,14 @@ fi
 # --- re-deploy umask profile -------------------------------------------------
 
 if [ -f "$FILES_ROOT/etc/umask.sh" ]; then
-    sudo cp "$FILES_ROOT/etc/umask.sh" /etc/profile.d/opencode-permissions-kit-umask.sh
-    sudo chmod 644 /etc/profile.d/opencode-permissions-kit-umask.sh
+    # 0.0.49b C1: atomic re-deploy — a plain in-place cp killed
+    # mid-write leaves a truncated profile with intact mode bits,
+    # sourced at every login (the #163 class on a protection layer).
+    # Same shape as the lib deploys (0.0.49a W2): sibling temp in the
+    # target dir, mode 644 before the mv.
+    copy_file_atomic "$FILES_ROOT/etc/umask.sh" \
+        /etc/profile.d/opencode-permissions-kit-umask.sh 644 \
+        || die "umask profile re-deploy failed (atomic deploy)"
     # Remove the pre-0.0.10 umask profile so only the new name is loaded.
     sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
     ui_success "umask profile re-deployed"
@@ -937,7 +947,7 @@ install_binary() {
     sudo pkill -u "$OPENCODE_USER" -f "serve --servic[e]" >/dev/null 2>&1 || true
     current=$(opencode_version_line)
     [ -n "$current" ] || current="unknown"
-    sudo cp "$src" "$SYSTEM_BIN" || return 1
+    copy_binary_atomic "$src" "$SYSTEM_BIN" || return 1
     if ! secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"; then
         # rc 2, not 1 (0.0.43a F9): the new binary is ALREADY deployed —
         # the caller must restore from the backup (or report the partial
@@ -1184,7 +1194,7 @@ if [ "$BINARY_UPDATE" = true ]; then
     if [ -n "$SRC" ]; then
         BACKUP_DIR="$(mktemp -d /tmp/opencode-upgrade-backup.XXXXXX)"
         if [ -x "$SYSTEM_BIN" ]; then
-            sudo cp "$SYSTEM_BIN" "$BACKUP_DIR/opencode.current"
+            copy_binary_atomic "$SYSTEM_BIN" "$BACKUP_DIR/opencode.current"
         fi
         _maj_before=$(current_opencode_major)
         if install_binary "$SRC"; then
@@ -1208,7 +1218,7 @@ if [ "$BINARY_UPDATE" = true ]; then
                 # and report the partial state honestly — the backup is
                 # the recovery material, it must survive this path.
                 if [ -f "$BACKUP_DIR/opencode.current" ] \
-                   && sudo cp "$BACKUP_DIR/opencode.current" "$SYSTEM_BIN" 2>/dev/null \
+                   && copy_binary_atomic "$BACKUP_DIR/opencode.current" "$SYSTEM_BIN" 2>/dev/null \
                    && secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" >/dev/null 2>&1; then
                     ui_warn "candidate installed but a post-install step failed — previous binary restored"
                     ui_warn "(the step's own error line above names it: hardening or the OPENCODE_MAJOR stamp)"
@@ -1218,7 +1228,8 @@ if [ "$BINARY_UPDATE" = true ]; then
                     ui_warn "(the step's own error line above names it: hardening or the OPENCODE_MAJOR stamp)"
                     if [ -f "$BACKUP_DIR/opencode.current" ]; then
                         ui_warn "previous binary kept at $BACKUP_DIR/opencode.current — restore manually:"
-                        ui_warn "  sudo cp $BACKUP_DIR/opencode.current $SYSTEM_BIN"
+                        ui_warn "  sudo cp $BACKUP_DIR/opencode.current ${SYSTEM_BIN}.tmp"
+                        ui_warn "  sudo mv ${SYSTEM_BIN}.tmp $SYSTEM_BIN"
                         log "opencode binary upgrade failed post-copy; PARTIAL state (unhardened), backup kept: $BACKUP_DIR"
                     else
                         # 0.0.43b W6: no binary was executable before the

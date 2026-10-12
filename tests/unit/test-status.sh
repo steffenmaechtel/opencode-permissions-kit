@@ -1245,15 +1245,27 @@ fi
 # The 0.0.48c prescription's second leg, pinned: with the binary missing
 # the stale "unknown — probe failed (run: sudo opk status)" row must NOT
 # print (the counted warn above already spoke; the advice cannot work for
-# that shape) — while a present-but-failing binary keeps the W3
-# privilege-unknown row (over-suppression would hide the legit shape).
-# Behavioral: gate + render blocks against three fixture LIBDIRs.
+# that shape) — while the privilege-unknown shape keeps the W3 row
+# (over-suppression would hide the legit shape). Behavioral: gate +
+# render blocks against fixture LIBDIRs. Issue #163 re-specifies the
+# third fixture: a present-but-failing binary is no longer one class —
+# the direct classifier splits it into corrupt (rc != 0, counted warn)
+# vs. privilege-gap (sudo refused, binary healthy, uncounted row).
 W48D_BLOCK_RENDER="$(sed -n '/^    if \[ -n "\$ADV_VER" \]; then$/,/^    fi$/p' "$STATUS")"
 if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'elif [ -x "$LIBDIR/bin/opencode" ]' \
     && printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ui_kv "opencode version" "unknown — probe failed'; then
     pass "D1 render block extractable (elif-gated unknown row)"
 else
     fail "D1 render block not extractable (anchor drift?)"
+fi
+# Issue #163: the direct classifier must live INSIDE the extracted
+# render block (the harness evals gate + render; a classifier placed
+# outside would be untested here and drift silently).
+if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ADV_DIRECT_RC=$?' \
+    && printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'present but broken'; then
+    pass "D1/#163: direct-probe classifier extractable in the render block"
+else
+    fail "D1/#163: classifier not extractable from the render block (anchor drift?)"
 fi
 w48d_run() {
     (
@@ -1266,7 +1278,14 @@ w48d_run() {
         # OK branch is the one under test, not the matching logic.
         advisories_matching() { return 1; }
         timeout() { shift 1; "$@"; }
-        sudo() { shift 3; "$@"; }
+        # "refuse-sudo": mirror sudo -n's password refusal (rc 1, empty
+        # output) — the W3 privilege shape. Otherwise the working-sudo
+        # stub (strip the -n -u <user> prefix, exec as-is).
+        if [ "$2" = "refuse-sudo" ]; then
+            sudo() { return 1; }
+        else
+            sudo() { shift 3; "$@"; }
+        fi
         LIBDIR="$1"
         OPENCODE_USER=opencode
         VERSION=0.0.0
@@ -1277,13 +1296,17 @@ w48d_run() {
 }
 if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
     _d1dir=$(mktemp -d)
-    # missing binary: warn row, NO unknown row (the D1 property)
+    # missing binary: warn row, NO unknown row (the D1 property); the
+    # advice must name the working repair — upgrade-opencode, not plain
+    # update (0.0.49a W1: a plain update never touches the binary).
     _d1out=$(w48d_run "$_d1dir" || true)
     if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|' \
+        && printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|.*fix: sudo opk upgrade-opencode' \
+        && ! printf '%s' "$_d1out" | grep -q 'fix: sudo opk update)' \
         && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
-        pass "D1: missing binary prints the warn, not the unknown row"
+        pass "D1: missing binary warns, naming the working repair (0.0.49a W1)"
     else
-        fail "D1: missing binary must not print the unknown row (got: $_d1out)"
+        fail "D1: missing binary warn must name upgrade-opencode, not plain update (got: $_d1out)"
     fi
     # working binary: probe renders the OK row, no unknown row
     mkdir -p "$_d1dir/bin"
@@ -1296,14 +1319,33 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
     else
         fail "D1: working binary must render via ADV_VER (got: $_d1out)"
     fi
-    # present but failing binary: the W3 privilege-unknown row STAYS
-    printf '#!/bin/sh\nexit 1\n' > "$_d1dir/bin/opencode"
+    # present but BROKEN binary (issue #163): the recorded reachability
+    # was a cp killed mid-write — a truncated binary with intact mode
+    # bits. The direct probe classifies it (rc != 0, caller-independent)
+    # into a COUNTED warn; the "sudo opk status" advice must not print
+    # because no privilege resolves this shape.
+    printf '\177ELFbroken-fixture' > "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|present but broken' \
+        && printf '%s' "$_d1out" | grep -q 'fix: sudo opk upgrade-opencode' \
+        && ! printf '%s' "$_d1out" | grep -q 'fix: sudo opk update)' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "D1/#163: corrupt binary counts a warn with the working repair (0.0.49a W1)"
+    else
+        fail "D1/#163: corrupt binary must warn (counted) naming upgrade-opencode, not plain update (got: $_d1out)"
+    fi
+    # privilege-unknown shape (0.0.48b W3) under the #163 split: sudo
+    # refuses, the binary itself is healthy — the direct classifier
+    # returns 0 and the uncounted row STAYS (over-suppression would
+    # hide the legit agent-user/cron shape).
+    printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_d1dir/bin/opencode"
+    chmod +x "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
     if ! printf '%s' "$_d1out" | grep -q '^WARN|' \
         && printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
-        pass "D1: present-but-failing binary keeps the unknown row (W3 shape)"
+        pass "D1/#163: sudo-refused + healthy binary keeps the unknown row (W3)"
     else
-        fail "D1: over-suppression — the privilege-unknown row is gone (got: $_d1out)"
+        fail "D1/#163: over-suppression — the privilege-unknown row is gone (got: $_d1out)"
     fi
     rm -rf "$_d1dir"
 fi

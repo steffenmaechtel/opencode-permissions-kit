@@ -244,7 +244,14 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     # hits this same [ -x ] gate). Counts; the privilege-unknown shape
     # below does not.
     if [ ! -x "$LIBDIR/bin/opencode" ]; then
-        ui_kv_warn "opencode binary" "missing or not executable — advisory check skipped (fix: sudo opk update)"
+        # 0.0.49a W1: upgrade-opencode, not plain update — a plain
+        # `opk update` never touches the managed binary (BINARY_UPDATE
+        # is opt-in; the deploy manifest ships no bin/opencode), so the
+        # old advice dead-ended while update reported success over the
+        # broken kit. upgrade-opencode reinstalls in both shapes
+        # (missing and corrupt: the major resolves through the
+        # install.conf stamp when the probe is empty).
+        ui_kv_warn "opencode binary" "missing or not executable — advisory check skipped (fix: sudo opk upgrade-opencode)"
     elif command -v sudo >/dev/null 2>&1; then
         if command -v timeout >/dev/null 2>&1; then
             ADV_VER=$(timeout 10 sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/opencode" --version 2>/dev/null \
@@ -272,13 +279,42 @@ EOF
             ui_kv_ok "opencode $ADV_VER" "no known advisory affects this install (kit $VERSION database)"
         fi
     elif [ -x "$LIBDIR/bin/opencode" ]; then
-        # 0.0.48b W3: unknown at this caller's privilege is NOT a finding
-        # (an agent-user or dev cron would be permanently non-green
-        # otherwise) — informational row, never counted. sudo resolves it.
-        # 0.0.48d D1: present-binary shapes only — the missing shape
-        # already warned above, and no privilege resolves it there: the
-        # "sudo opk status" advice would be a dead end for that row.
-        ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)"
+        # Issue #163: before settling for the uncounted unknown, ask the
+        # kernel directly — exec the binary as THIS caller. Exec-ability
+        # is caller-independent (a truncated or wrong-arch binary fails
+        # for every user the mode bits admit, while a healthy --version
+        # exits 0 for any of them — the kit's own runnability criterion,
+        # update.sh's candidate check), so this separates a BROKEN
+        # binary from a privilege gap. sudo cannot resolve the former
+        # and the probe above cannot see it: sudo normalizes a refused
+        # exec to rc 1, the same rc as its own password refusal, so the
+        # corrupt shape rides the empty-probe path into the unknown row
+        # — counted warn here instead, naming the fix that repairs it.
+        # A root-side --version probe is house precedent (update.sh's
+        # opencode_version_line); bounded like every probe (issue #80).
+        ADV_DIRECT_RC=0
+        if command -v timeout >/dev/null 2>&1; then
+            timeout 10 "$LIBDIR/bin/opencode" --version >/dev/null 2>&1 \
+                || ADV_DIRECT_RC=$?
+        else
+            "$LIBDIR/bin/opencode" --version >/dev/null 2>&1 \
+                || ADV_DIRECT_RC=$?
+        fi
+        if [ "$ADV_DIRECT_RC" != 0 ]; then
+            # 0.0.49a W1: the repair command is upgrade-opencode (the
+            # AFFECTED row's precedent) — plain update cannot fix this.
+            ui_kv_warn "opencode binary" "present but broken — direct probe exited rc $ADV_DIRECT_RC"\
+" (fix: sudo opk upgrade-opencode)"
+        else
+            # 0.0.48b W3: unknown at this caller's privilege is NOT a
+            # finding (an agent-user or dev cron would be permanently
+            # non-green otherwise) — informational row, never counted.
+            # sudo resolves it. 0.0.48d D1: present-binary shapes only —
+            # the missing shape already warned above, and no privilege
+            # resolves it there: the "sudo opk status" advice would be a
+            # dead end for that row.
+            ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)"
+        fi
     fi
     # Upstream freshness (live, best-effort): GitHub's advisory feed vs
     # the ids the shipped database knows. Never decides affectedness.
