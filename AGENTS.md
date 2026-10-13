@@ -12,7 +12,7 @@ this repository — the router. Detail lives next to its audience:
 - [agent/test-fidelity.md](agent/test-fidelity.md) — why bugs pass unit
   and e2e suites but still hit real terminals
 - [internal/reviews/README.md](internal/reviews/README.md) — review
-  mechanics: vorgang folders (birth-PR key), snapshots/resolutions,
+  mechanics: case folders (birth-PR key), snapshots/resolutions,
   citation format
 - [internal/process/](internal/process/) — maintainer process: review
   concept, release handling, CI-review planning
@@ -54,7 +54,7 @@ expect the reported paths to exist locally.
 - `agent/` — agent working rules: conventions, learnings, test fidelity
 - `internal/` — project memory: maintainer process (`process/`), design
   records (`records/`, archive under `records/_archive/` incl.
-  evaluations), review evidence (`reviews/`, one vorgang folder per
+  evaluations), review evidence (`reviews/`, one case folder per
   birth-PR + generated INDEX), review meta-analysis runs
   (`reviews-meta/`)
 

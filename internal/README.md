@@ -10,5 +10,5 @@ differs from the code, the code wins.
 |---|---|---|
 | [process/](process/) | how the project is run: review concept, release handling, CI-review planning | CURRENT |
 | [records/](records/) | design + decision records ("why is it built this way?") | frozen after implementation |
-| [reviews/](reviews/) | review evidence: one vorgang folder per birth-PR, generated index | snapshots frozen, resolutions CURRENT |
+| [reviews/](reviews/) | review evidence: one case folder per birth-PR, generated index | snapshots frozen, resolutions CURRENT |
 | [reviews-meta/](reviews-meta/) | recurring meta-analysis runs over the review corpus | one frozen folder per run |

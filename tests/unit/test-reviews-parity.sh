@@ -1,5 +1,5 @@
 #!/bin/sh
-# test-reviews-parity.sh -- generated INDEX <-> vorgang folders + pointer
+# test-reviews-parity.sh -- generated INDEX <-> case folders + pointer
 # integrity over internal/reviews/ (supersedes the review_pointer_check
 # that lived in test-docs.sh before the structure wave).
 #
@@ -8,7 +8,7 @@
 #   2. regenerating the INDEX reproduces the file byte-for-byte — a
 #      hand edit drifts and fails
 #   3. every snapshot carries exactly one "> Resolution:" pointer line
-#      iff its vorgang has a resolution.md (README rule 1/2)
+#      iff its case has a resolution.md (README rule 1/2)
 #
 # Run: sh tests/unit/test-reviews-parity.sh
 

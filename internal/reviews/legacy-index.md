@@ -1,12 +1,12 @@
-# legacy-index — pre-restructure review names → vorgang folders
+# legacy-index — pre-restructure review names → case folders
 
 > **Frozen 2026-10-14, generated once, never regenerated.** Maps the
 > pre-restructure citation format (`0.0.49b C1`) and file names
-> (`2026-10-12-v0.0.49-b.md`) onto the vorgang folders. The corpus
-> covers snapshots 0.0.38–0.0.49; new vorgänge (with review-meta
+> (`2026-10-12-v0.0.49-b.md`) onto the case folders. The corpus
+> covers snapshots 0.0.38–0.0.49; new cases (with review-meta
 > headers) never appear here — see [INDEX.md](INDEX.md).
 
-## Stem → vorgang map
+## Stem → case map
 
 | Key | Stem | First snapshot | Snapshots | Resolution |
 |---|---|---|---|---|

@@ -1,7 +1,7 @@
 # Code reviews (internal/reviews/)
 
 Model-generated code reviews of the kit live here: one folder per
-vorgang, keyed by the pull request that carried the review into the repo.
+case, keyed by the pull request that carried the review into the repo.
 Reviews are **evidence** — for the agent (pins, learnings corpus) and the
 maintainer (release gates). When to review at all, which scope (full vs
 diff), and the loop's stop rule:
@@ -14,21 +14,21 @@ internal/reviews/
 ├── README.md        # this file — mechanics only (the index is generated)
 ├── INDEX.md         # GENERATED — never hand-edit (parity test pins it)
 ├── legacy-index.md  # frozen map: old file names → new locations
-└── pr-NNNNN/        # one vorgang; NNNNN = 5-digit birth-PR number
+└── pr-NNNNN/        # one case; NNNNN = 5-digit birth-PR number
     ├── review-a.md  # first snapshot; chain letters a, b, c … (aa after z)
     ├── review-b.md  # micro-wave review of the a-wave's fixes
     └── resolution.md
 ```
 
-- **Birth-PR rule:** the vorgang key is the PR that carries the FIRST
-  snapshot into the repo. One birth-PR = one vorgang. Later snapshots of
+- **Birth-PR rule:** the case key is the PR that carries the FIRST
+  snapshot into the repo. One birth-PR = one case. Later snapshots of
   the chain may ride other PRs. Open the (draft) PR before the review
   runs — GitHub allocates the number, so parallel features can never
   collide.
 - **Snapshot letters** are uniform from `a` — no special case for the
   first file. Beyond `z`: `review-aa.md`.
-- Exactly **one `resolution.md`** per vorgang.
-- Legacy corpus (snapshots 0.0.38–0.0.49, vorgänge pr-00109…pr-00171):
+- Exactly **one `resolution.md`** per case.
+- Legacy corpus (snapshots 0.0.38–0.0.49, cases pr-00109…pr-00171):
   pre-restructure citation format stays valid — see legacy-index.md.
 
 ## Snapshot format
@@ -37,7 +37,7 @@ The snapshot body is the reviewer's output **verbatim** (external
 machine format since 0.0.45d; older house-format snapshots keep their
 era's shape — both stay citable as history). House-owned parts:
 
-- The **mandatory header** (new vorgänge, first lines of the file):
+- The **mandatory header** (new cases, first lines of the file):
 
   ```
   <!-- review-meta
@@ -52,7 +52,7 @@ era's shape — both stay citable as history). House-owned parts:
   -->
   ```
 
-  The lint test pins ID↔folder and Snapshot↔file name. (Legacy vorgänge
+  The lint test pins ID↔folder and Snapshot↔file name. (Legacy cases
   predate the header; their stem + dates live in legacy-index.md.)
 - The **one pointer line**
 
@@ -120,7 +120,7 @@ Reviews run against a clean working tree of the version under review
 ## Index
 
 [INDEX.md](INDEX.md) is **generated** by
-`scripts/gen-review-index.py` — one row per vorgang (key, stem/subject,
+`scripts/gen-review-index.py` — one row per case (key, stem/subject,
 scope, base, date, snapshots, status). The parity test pins index ↔
 folders in both directions. The frozen
 [legacy-index.md](legacy-index.md) maps every pre-restructure file name

@@ -2,14 +2,14 @@
 # test-reviews-lint.sh -- structural lint over internal/reviews/
 #
 # Rules (internal/reviews/README.md):
-#   - vorgang folders are named pr-NNNNN (5-digit zero-padded PR number)
+#   - case folders are named pr-NNNNN (5-digit zero-padded PR number)
 #   - snapshots are review-<letter>.md with letters contiguous from "a"
 #     (z is followed by aa)
-#   - at most one resolution.md per vorgang
-#   - no stray files at the reviews/ root or inside vorgang folders
-#   - new-style vorgänge (review-meta header present): the header ID
+#   - at most one resolution.md per case
+#   - no stray files at the reviews/ root or inside case folders
+#   - new-style cases (review-meta header present): the header ID
 #     matches the folder and the Snapshot field matches the file name
-#     (legacy vorgänge predate headers; their identity lives in
+#     (legacy cases predate headers; their identity lives in
 #     legacy-index.md)
 #
 # Run: sh tests/unit/test-reviews-lint.sh
@@ -52,14 +52,14 @@ for d in internal/reviews/pr-*; do
     # 3. at most one resolution
     n=$(ls "$d"/resolution.md 2>/dev/null | wc -l | tr -d ' ')
     [ "$n" -le 1 ] || echo "FAIL $key: $n resolution files" >> "$TMP"
-    # 4. no stray files inside the vorgang folder
+    # 4. no stray files inside the case folder
     for f in "$d"/*; do
         case "$(basename "$f")" in
             review-*.md|resolution.md) ;;
             *) echo "FAIL stray file: $f" >> "$TMP" ;;
         esac
     done
-    # 5. header consistency for new-style vorgänge
+    # 5. header consistency for new-style cases
     for f in "$d"/review-*.md; do
         [ -e "$f" ] || continue
         if grep -q '<!-- review-meta' "$f"; then
@@ -78,4 +78,4 @@ if [ -s "$TMP" ]; then
     cat "$TMP"
     exit 1
 fi
-echo "reviews lint: OK ($(ls -d internal/reviews/pr-* | wc -l | tr -d ' ') vorgänge)"
+echo "reviews lint: OK ($(ls -d internal/reviews/pr-* | wc -l | tr -d ' ') cases)"

@@ -203,9 +203,9 @@ sandboxed control) so the guard itself cannot rot silently.
 ## Referencing review findings
 
 Every review restarts its finding IDs at S1/C1, so a bare ID is ambiguous
-across vorgänge. Always qualify the ID — two citation eras:
+across cases. Always qualify the ID — two citation eras:
 
-- **New vorgänge (birth-PR key, since the 2026-10 restructure):**
+- **New cases (birth-PR key, since the 2026-10 restructure):**
   `(#176 a W1)` — PR number, snapshot letter, finding ID. The PR number
   is allocated by GitHub when the maintainer opens the birth-PR, so
   parallel features can never collide.
@@ -214,7 +214,7 @@ across vorgänge. Always qualify the ID — two citation eras:
   [legacy-index.md](../internal/reviews/legacy-index.md) or grep.
 
 Grep-able by design: `grep -rn "#176 a W1"`, `grep -rn "0.0.38 S1"`.
-The vorgang map is the generated
+The case map is the generated
 [INDEX](../internal/reviews/INDEX.md); naming, formats, and the
 mechanics live in the [review README](../internal/reviews/README.md).
 
