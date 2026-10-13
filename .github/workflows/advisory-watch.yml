@@ -1,6 +1,6 @@
 name: advisory-watch
 
-# Security advisory watch (issue #107, docs/design/security-advisories.md):
+# Security advisory watch (issue #107, internal/records/security-advisories.md):
 # daily diff of the upstream opencode advisories (GitHub) against the ids the
 # shipped database (files/opencode-permissions-kit-lib/sh/advisories.sh)
 # knows. Every unknown upstream id opens one maintainer issue with the

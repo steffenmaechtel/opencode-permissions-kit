@@ -65,7 +65,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'cleanup; exit 1' INT TERM
 
-# Ref the kit updates from. Resolution (issue #38, docs/design/
+# Ref the kit updates from. Resolution (issue #38, internal/process/
 # release-handling.md): --channel flag (pre-scanned below) > explicit
 # KIT_BRANCH env > KIT_CHANNEL stamp in install.conf (the channel this
 # machine installed/last updated from) > master (development channel;
@@ -108,7 +108,7 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 # the pre-deploy verification (ensure_local_file), so the two can never drift
 # and a stale installed update.sh fetching an incomplete temp dir is healed
 # before the deploy cp's run.
-# Layout (docs/design/streamline.md): bin/ = commands, sh/ = sourced libs,
+# Layout (internal/records/streamline.md): bin/ = commands, sh/ = sourced libs,
 # py/ = python, tui/ = assets; the management scripts and templates keep
 # their files/ root paths (streamed entry points) and deploy into
 # management/ and templates/.
@@ -545,7 +545,7 @@ banner() {
 die() { ui_error "$*"; exit 1; }
 
 confirm() {
-    # Convention: docs/design/conventions.md — [Y/n] default capital,
+    # Convention: agent/conventions.md — [Y/n] default capital,
     # Enter accepts it, y/yes/n/no case-insensitive.
     [ "$YES" = true ] && return 0
     ui_confirm "$1" "y"
@@ -595,7 +595,7 @@ ui_section "Re-deploying library files"
 # after the library is in place.
 lib_deploy "$FILES_ROOT" "$LIBDIR"
 
-# --- old-layout cleanup (0.0.29 streamline, docs/design/streamline.md §5) --------
+# --- old-layout cleanup (0.0.29 streamline, internal/records/streamline.md §5) --------
 # Remove the union of pre-0.0.29 deployed paths after the new layout is in
 # place. Idempotent rm -f — covers every historical location since 0.0.14.
 for _opk_old in \
@@ -616,7 +616,7 @@ log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
 # --- WSL browser bridge (issues #91, #100) -------------------------------------
 # (Re)apply the stand-in tree and strip the legacy 0.0.36 section (kit-owned
 # regression cleanup). The /etc/wsl.conf carrier is NEVER written here —
-# the kit does not edit wsl.conf implicitly (docs/design/wsl-conf-consent.md);
+# the kit does not edit wsl.conf implicitly (internal/records/wsl-conf-consent.md);
 # the user opts in via 'sudo opk wsl-add-opencode-1-fix'. An existing
 # carrier stays untouched and keeps working.
 [ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] \
@@ -1047,7 +1047,7 @@ current_opencode_major() {
 # silently. 1.x resolves through GitHub releases/latest (still the 1.x
 # channel), 2.x through the npm dist-tag `latest` of @opencode/cli-<target>
 # — the channel the official v2 installer resolves through; 2.x ships no
-# GitHub release assets (docs/design/opencode-2x.md §8). A resolution
+# GitHub release assets (internal/records/opencode-2x.md §8). A resolution
 # outside the requested major fails loudly instead of crossing majors.
 resolve_latest_opencode_version() {
     _rlov_major="$1"
@@ -1350,7 +1350,7 @@ ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH"\
 log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH"\
 " OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
 
-# --- TUI mode display user files (docs/_archive/design/plan-ui-tui-opencode.md) ---------
+# --- TUI mode display user files (internal/records/_archive/design/plan-ui-tui-opencode.md) ---------
 # Same only-if-absent-or-kit-written policy as install.sh (marker key
 # _opencode_permissions_kit): user edits survive updates. The write goes
 # through the shared staged_write helper (review 0.0.39g S1 — sourced

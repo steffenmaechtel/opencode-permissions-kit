@@ -7,7 +7,7 @@ This page lists every file and directory the kit manages, and every key in
 
 Never written by the kit — your WSL configuration stays yours: install
 and update only *print* snippets for you to apply yourself
-([why](../design/wsl-conf-consent.md)). One optional kit artifact can
+([why](../../internal/records/wsl-conf-consent.md)). One optional kit artifact can
 live in it, written by a single explicit command:
 `sudo opk wsl-add-opencode-1-fix` places the browser-bridge **comment
 block** at the top (WSL only; its carrier line — a `#` comment containing

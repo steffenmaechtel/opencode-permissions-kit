@@ -46,7 +46,7 @@
 #
 # Deployed to /usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh.
 #
-# DEV-OWNED MODE (docs/design/ddev-dev-owned-projects.md): when enabled
+# DEV-OWNED MODE (internal/records/ddev-dev-owned-projects.md): when enabled
 # (DDEV_DEV_OWNED=true or the install.conf stamp, see
 # ddev_devowned_enabled), the scan also writes
 # disable_settings_management: true into each project's .ddev/config.yaml.

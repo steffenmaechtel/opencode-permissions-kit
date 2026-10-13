@@ -1,6 +1,6 @@
 name: test-e2e-ddev
 
-# Real-ddev e2e suite (tests/e2e/run-ddev.sh, docs/design/ddev-e2e-test.md).
+# Real-ddev e2e suite (tests/e2e/run-ddev.sh, internal/records/ddev-e2e-test.md).
 # Runs on master pushes and manual dispatch. NOT on pull requests (test-e2e.yml
 # keeps the PR gate): this suite downloads GBs of images and runs a real
 # ddev project lifecycle — too heavy per PR, but master is the staging
@@ -23,7 +23,7 @@ name: test-e2e-ddev
 # releases (releases/latest stays 1.x), so the job resolves the npm
 # dist-tag 'latest' at run time and fails loudly when that tag ever
 # leaves 2.* — the upstream flip the kit must react to
-# (docs/design/opencode-2x.md). Same (heavy) triggers as the v1 job:
+# (internal/records/opencode-2x.md). Same (heavy) triggers as the v1 job:
 # master pushes, weekly schedule, manual dispatch — not PRs.
 #
 # Path filtering (docs-only changes skip): push runs first detect what
@@ -167,7 +167,7 @@ jobs:
   # release, resolved from the npm registry at run time — 2.x ships no
   # GitHub release assets (releases/latest stays 1.x). A resolution
   # outside 2.* fails the job loudly: that is the upstream flip the kit
-  # must react to (docs/design/opencode-2x.md). Same triggers + docs-only
+  # must react to (internal/records/opencode-2x.md). Same triggers + docs-only
   # skip as the v1 job (no PRs — the GB downloads are the point).
   e2e-ddev-2x:
     needs: changes
@@ -196,7 +196,7 @@ jobs:
             echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
           else
             echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
-                (upstream flip? docs/design/opencode-2x.md)" && exit 1
+                (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
       - name: Cache opencode binaries (per 2.x version, warm-start from the other e2e caches)
         uses: actions/cache@v6

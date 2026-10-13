@@ -19,7 +19,7 @@ name: test-e2e
 # the npm registry, not GitHub releases (releases/latest stays 1.x), so
 # these jobs resolve the npm dist-tag 'latest' at run time and fail the
 # job loudly when that tag ever leaves 2.* — the upstream flip the kit
-# must react to (docs/design/opencode-2x.md). Same triggers and
+# must react to (internal/records/opencode-2x.md). Same triggers and
 # docs-only skip as the v1 jobs: PRs get the 2.x verdict before merge,
 # master pushes re-verify it before a release is cut, and the weekly
 # run catches 2.x release drift between pushes.
@@ -258,7 +258,7 @@ jobs:
   # release, resolved from the npm registry at run time — 2.x ships no
   # GitHub release assets (releases/latest stays 1.x). A resolution
   # outside 2.* fails the job loudly: that is the upstream flip the kit
-  # must react to (docs/design/opencode-2x.md). Same triggers + docs-only
+  # must react to (internal/records/opencode-2x.md). Same triggers + docs-only
   # skip as the v1 jobs. The exact cache key is 2x-only and shared with
   # e2e-rootless-2x (parallel saves of the same key are best-effort, one
   # simply wins); the v1 restore prefix warm-starts the OLD binary and
@@ -289,7 +289,7 @@ jobs:
             echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
           else
             echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
-                (upstream flip? docs/design/opencode-2x.md)" && exit 1
+                (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
       - name: Read pinned OLD version (for cache key)
         id: old
@@ -342,7 +342,7 @@ jobs:
             echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
           else
             echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
-                (upstream flip? docs/design/opencode-2x.md)" && exit 1
+                (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
       - name: Read pinned OLD version (for cache key)
         id: old

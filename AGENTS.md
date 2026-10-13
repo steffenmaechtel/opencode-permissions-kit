@@ -1,8 +1,25 @@
 # AGENTS
 
-This file gives AI coding agents (and human contributors) the essential rules
-for working in this repository. It complements [CONTRIBUTING.md](CONTRIBUTING.md)
-(workflow + tests) and the [docs index](docs/README.md).
+Always-on rules for AI coding agents (and human contributors) working in
+this repository — the router. Detail lives next to its audience:
+
+- [agent/conventions.md](agent/conventions.md) — **BINDING** style guide
+  for shipped code: interactive prompts, output style, shell security,
+  unit-test sandbox, review-finding citations
+- [agent/learnings.md](agent/learnings.md) — the L1–L7 checklist of
+  recurring review error classes; run it before committing and again
+  before declaring work done
+- [agent/test-fidelity.md](agent/test-fidelity.md) — why bugs pass unit
+  and e2e suites but still hit real terminals
+- [agent/review-concept.md](agent/review-concept.md) — the review
+  process: loop, stop rule, verification duty, reviewer mechanics
+- [internal/reviews/README.md](internal/reviews/README.md) — review
+  mechanics: case folders (birth-PR key), snapshots/resolutions,
+  citation format
+- [internal/process/](internal/process/) — maintainer process: review
+  triggers & gates (review.md), release handling, CI-review planning
+- [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, PR checklist, e2e
+  invocation patterns; user docs: [docs index](docs/README.md)
 
 ## What this repo is
 
@@ -17,7 +34,7 @@ docs' default), the script self-fetches its siblings from the same ref, and
 everything is deployed to `/usr/local/lib/opencode-permissions-kit/`. The
 used ref is stamped as `KIT_CHANNEL` in `install.conf` and followed by
 `opk update`; `master` stays the development channel. Channels and the
-`stable` mirror discipline: `docs/design/release-handling.md`.
+`stable` mirror discipline: `internal/process/release-handling.md`.
 
 ## Issue reports from other installations
 
@@ -35,8 +52,13 @@ expect the reported paths to exist locally.
 - `tests/` — shell unit tests (`unit/`), host pre-flight (`check-host.sh`),
   fixtures (`fixtures/`), Docker e2e suites (`e2e/`),
   UX demos (`ux/`)
-- `docs/` — user documentation (concepts / how-to / reference), design
-  records (`design/`), superseded records (`_archive/`)
+- `docs/` — user documentation only (concepts / how-to / reference)
+- `agent/` — agent working rules: conventions, learnings, test fidelity
+- `internal/` — project memory: maintainer process (`process/`), design
+  records (`records/`, archive under `records/_archive/` incl.
+  evaluations), review evidence (`reviews/`, one case folder per
+  birth-PR + generated INDEX), review meta-analysis runs
+  (`reviews-meta/`)
 
 ## Rules
 
@@ -44,7 +66,7 @@ expect the reported paths to exist locally.
   pull request with green CI. The agent commits its finished work on the
   feature branch; push/pull and PRs are the maintainer's job.
 - **All shipped content is English** — scripts, docs, prompts, messages.
-- **Follow `docs/design/conventions.md`** for interactive prompts, output
+- **Follow `agent/conventions.md`** for interactive prompts, output
   style, shell security (untrusted input), and other shipped-code
   conventions.
 - **Docs change with the code:** a PR that changes user-facing behavior
@@ -61,7 +83,7 @@ expect the reported paths to exist locally.
   (`scripts/release.sh` — bump lands via PR first, the script tags and
   mirrors).
 - The security model is deliberately **soft-only** — never re-introduce
-  OS-level deny ACLs. Background: `docs/design/ddev-working.md`,
+  OS-level deny ACLs. Background: `internal/records/ddev-working.md`,
   current model: `docs/concepts/security-model.md`.
 - **The kit never edits user-owned system config on its own — above all
   `/etc/wsl.conf`.** Install/update only *show* snippets or name opt-in
@@ -72,7 +94,7 @@ expect the reported paths to exist locally.
   strip the broken legacy 0.0.36 hyphen section if present — removal of
   kit-owned bytes only, restoring WSL parseability; nothing is ever
   written into the file outside `opk wsl-add-opencode-1-fix`. Rationale:
-  `docs/design/wsl-conf-consent.md`.
+  `internal/records/wsl-conf-consent.md`.
 
 ## Testing
 
@@ -96,7 +118,7 @@ only inside their own scratch and `/tmp`, `/var/tmp` — never in real
 project or system trees (`/var/www/vhosts`, `/home`, `/srv`, `/etc`, …),
 not even in teardown. Enforced by
 `tests/unit/test-sandbox-policy.sh`; the rule lives in
-`docs/design/conventions.md` ("Test sandbox (unit suites)").
+`agent/conventions.md` ("Test sandbox (unit suites)").
 
 **Sabotage-verify only against secured work.** Before mutating the tree
 to prove a pin fails (mutation verification), commit the finished work or
@@ -126,32 +148,25 @@ carry no `chmod +x` lines — `actions/checkout` preserves tracked modes.
 
 ## Review learnings (recurring error classes)
 
-The meta-analysis of all review snapshots 0.0.38–0.0.46 found the same
-defect classes recurring with every new feature. The per-wave checklist with
-rationale and evidence lives in
-[docs/design/review-meta-analysis/learnings.md](docs/design/review-meta-analysis/learnings.md)
-— apply it to every change that touches shipped code or its tests —
-features included, not only fix waves: the corpus's core finding is
-that every new feature is a new instance of a known class. Run the
-L1–L7 checklist explicitly before committing and again before
-declaring the work done; the short form below is a memory aid,
-learnings.md is authoritative. Short form:
+[agent/learnings.md](agent/learnings.md) is authoritative. The corpus
+finding (meta-analysis 0.0.38–0.0.46): every new feature is a new
+instance of a known error class — the checklist applies to features,
+not only fix waves. Run L1–L7 before committing and again before
+declaring the work done. Memory aid:
 
-- **Class sweep:** a fix for a finding class is only "implemented" after
-  sweeping all same-shape sibling sites; the resolution records the grep
-  pattern and the sites checked.
-- **Fail-loud pins:** every new `|| true`, stderr redirect, or probe pipe in
-  feature code gets a pin that executes the failure path, observed the way
-  production observes it (a caller that discards stderr makes stderr-only
-  pins vacuous).
-- **Claim audit:** every behavior claim the wave touches (comments, docs,
-  message texts) either carries a pin or is deleted/weakened.
-- **Pins discriminate and sit before the suite's summary gate** — on top of
-  the sabotage-verify duty above (which covers green-when-broken).
-- **Root ops on agent-writable trees:** `[ -L ]` on every path component,
-  re-check the operand immediately before acting, chmod before chown.
-- **Fix waves are first-class code:** every fix wave gets its micro-wave
-  review, and fixes bring their own pins.
+- **Class sweep** — a class fix counts only after all same-shape sibling
+  sites are swept; record the grep pattern and sites checked.
+- **Fail-loud pins** — every new `|| true`, stderr redirect, or probe
+  pipe gets a pin that executes the failure path, observed the way
+  production observes it.
+- **Claim audit** — every behavior claim the wave touches carries a pin
+  or is deleted/weakened.
+- **Pins discriminate** and sit before the suite's summary gate.
+- **Root ops on agent-writable trees** — `[ -L ]` on every path
+  component, re-check the operand immediately before acting, chmod
+  before chown.
+- **Fix waves are first-class code** — every fix wave gets its
+  micro-wave review; fixes bring their own pins.
 
 ## Checkout ownership on kit-managed installs
 

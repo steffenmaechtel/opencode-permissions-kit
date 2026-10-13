@@ -32,8 +32,21 @@ file_anchors() {
     strip_fences < "$1" | grep -E '^#{1,6} ' | sed -E 's/^#{1,6} //'
 }
 
+# Frozen-history exemption (structure wave 2026-10): immutable review
+# snapshots and archived records may reference paths that later moved —
+# history is not rewritten for link hygiene. Living docs (resolutions,
+# READMEs, records, user docs) must stay fully linked.
+is_frozen() {
+    case "$1" in
+        internal/reviews/pr-*/review-*.md) return 0 ;;
+        internal/records/_archive/*) return 0 ;;
+    esac
+    return 1
+}
+
 check_file() {
     f="$1"
+    is_frozen "$f" && return 0
     strip_fences < "$f" | grep -oE '\]\([^)]+\)' | sed -e 's/^](//' -e 's/)$//' | while IFS= read -r target; do
         # strip optional link title after the path
         target="${target%% *}"
@@ -90,38 +103,40 @@ for f in README.md CONTRIBUTING.md AGENTS.md; do
     [ -e "$f" ] || continue
     check_file "$f"
 done
-find docs -name '*.md' -type f | sort | while IFS= read -r f; do
+# Docs scope (structure wave 2026-10): user docs stay under docs/, internal
+# areas live at agent/ and internal/ (process/records/reviews/reviews-meta).
+for dir in docs agent internal; do
+    find "$dir" -name '*.md' -type f
+done | sort | while IFS= read -r f; do
     check_file "$f"
 done
 
-# Snapshot <-> resolution pointer integrity (docs/design/review/README.md
-# rule 2): every snapshot whose README index row lists a resolution carries
-# EXACTLY ONE "> Resolution:" pointer; rows without one ("— …") must not
-# carry a pointer. History: the class bit twice in a row (snapshot g, then
-# snapshot l, then this very check's trigger — snapshot m, 0.0.39m D1).
-review_pointer_check() {
-    for snap in docs/design/review/[0-9]*-v*.md; do
-        [ -e "$snap" ] || continue
-        case "$snap" in
-            *-resolution.md|*/template.md) continue ;;
-        esac
-        stem=$(basename "$snap" .md)
-        row=$(grep -F "]($stem.md)" docs/design/review/README.md | head -n 1)
-        if [ -z "$row" ]; then
-            echo "FAIL $stem: no README index row" >> "$TMP"
+# Records status consistency (structure wave 2026-10, PR 3): every
+# internal/records/*.md carries a "> Status: **WORD**" line (corpus
+# vocabulary IMPLEMENTED | CURRENT | SUPERSEDED) and the records index
+# README shows the same word in that record's table row.
+records_status_check() {
+    for f in internal/records/*.md; do
+        case "$f" in */README.md) continue ;; esac
+        base=$(basename "$f")
+        word=$(sed -n 's/^> Status: \*\*\([A-Z][A-Z]*\).*/\1/p' "$f" | head -n 1)
+        if [ -z "$word" ]; then
+            echo "FAIL $base: no '> Status: **WORD**' line" >> "$TMP"
             continue
         fi
-        # 4th table cell ($5 under awk -F'|', cells are 2..6) = resolution column
-        has_res=$(printf '%s\n' "$row" | awk -F'|' '{ gsub(/ /, "", $5); print ($5 ~ /resolution\.md\]/) ? 1 : 0 }')
-        ptr=$(grep -c '^> Resolution:' "$snap")
-        if [ "$has_res" = 1 ] && [ "$ptr" -ne 1 ]; then
-            echo "FAIL $stem: index lists a resolution but the snapshot has $ptr pointer line(s) (README rule 2)" >> "$TMP"
-        elif [ "$has_res" = 0 ] && [ "$ptr" -ne 0 ]; then
-            echo "FAIL $stem: index lists no resolution yet but the snapshot carries a pointer" >> "$TMP"
+        case "$word" in
+            IMPLEMENTED|CURRENT|SUPERSEDED) ;;
+            *) echo "FAIL $base: status word '$word' outside the vocabulary" >> "$TMP" ;;
+        esac
+        row=$(grep -F "]($base)" internal/records/README.md)
+        if [ -z "$row" ]; then
+            echo "FAIL $base: no records/README index row" >> "$TMP"
+        elif ! printf '%s\n' "$row" | grep -Fq "| $word |"; then
+            echo "FAIL $base: file says $word, README row differs" >> "$TMP"
         fi
     done
 }
-review_pointer_check
+records_status_check
 
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"

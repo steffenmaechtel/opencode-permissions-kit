@@ -17,7 +17,7 @@
 # forwards to the real powershell.exe whenever the calling user may
 # execute it and exits 0 otherwise — see bin/browser-bridge.
 #
-# Consent policy (docs/design/wsl-conf-consent.md): the kit NEVER writes
+# Consent policy (internal/records/wsl-conf-consent.md): the kit NEVER writes
 # /etc/wsl.conf implicitly. install.sh/update.sh deploy only the stand-in
 # tree and strip kit-owned legacy content (the broken 0.0.36 section);
 # writing the carrier block is reserved for the explicit user command

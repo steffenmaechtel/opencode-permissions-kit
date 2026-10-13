@@ -8,7 +8,7 @@ resolve opencode 1.x from GitHub releases/latest and 2.x from the npm
 dist-tag `latest`, plus a weekly scheduled burn-in on `master`) — so the
 matrix tracks the latest versions without a manual stamp. Last manual
 verification: Sep 2026, opencode 1.18.31 / 2.0.6 (internals:
-[design/opencode-2x.md](../design/opencode-2x.md)); Oct 2026,
+[records/opencode-2x.md](../../internal/records/opencode-2x.md)); Oct 2026,
 OpenChamber 2.x with kit-managed opencode 2.0.26 / 2.0.20 (works,
 including the version probe through the wrapper) and 2.0.19 (update
 screen, one-click bypass verified — see the caveats below; the bypass's

@@ -7,7 +7,7 @@
 # install.sh (0.0.38 C19)" — the denial-of-drift comment that a single
 # list makes unnecessary).
 #
-# Layout (docs/design/streamline.md): bin/ = commands (no extension),
+# Layout (internal/records/streamline.md): bin/ = commands (no extension),
 # sh/ = sourced shell libraries, py/ = python, management/ = the
 # management entry scripts, templates/ = rendered/deployed templates.
 # The manifest below is the SINGLE SOURCE OF TRUTH for what ships into
@@ -128,7 +128,7 @@ opencode-permissions-kit-lib/sh/sudoers-deploy.sh 644
 opencode-permissions-kit-lib/sh/tui-plugin.sh 644
 opencode-permissions-kit-lib/sh/ui.sh 755
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh 644
-# tui/ mode display (docs/_archive/design/plan-ui-tui-opencode.md)
+# tui/ mode display (internal/records/_archive/design/plan-ui-tui-opencode.md)
 opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644
 opencode-permissions-kit-lib/tui/kit-mode.tsx 644
 opencode-permissions-kit-lib/tui/opencode-danger.theme.json 644

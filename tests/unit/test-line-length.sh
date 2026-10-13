@@ -51,6 +51,21 @@ LIMIT=120
 TREND=100
 BASELINE="$(dirname "$0")/line-length-baseline.txt"
 
+# Docs scope (structure wave 2026-10, E4 = 120): house-written markdown —
+# agent/, internal/ (living parts), docs/, root README/AGENTS/CONTRIBUTING.
+# Exempt: frozen history (archived records, immutable review snapshots —
+# verbatim > wrap) and machine-generated files (INDEX, legacy-index).
+docs_scope() {
+    for f in README.md CONTRIBUTING.md AGENTS.md; do
+        [ -e "$f" ] && printf '%s\n' "$f"
+    done
+    find agent internal docs -name '*.md' -type f \
+        ! -path 'internal/records/_archive/*' \
+        ! -path 'internal/reviews/pr-*/review-*' \
+        ! -name 'INDEX.md' \
+        ! -name 'legacy-index.md'
+}
+
 # --regen: rewrite the baseline from the current tree (deliberate
 # exception path -- review the diff, never regenerate to silence a fail).
 if [ "${1:-}" = "--regen" ]; then
@@ -58,6 +73,7 @@ if [ "${1:-}" = "--regen" ]; then
         find files -name '*.sh' -type f
         find files/opencode-permissions-kit-lib/bin -type f
         find .github/workflows -name '*.yml' -type f
+        docs_scope
     } | sort -u | while IFS= read -r f; do
         awk -v lim="$LIMIT" -v f="$f" \
             '{ sub(/^[[:space:]]+/, "") }
@@ -79,6 +95,7 @@ trap 'rm -f "$TMP_CUR"' EXIT
     find files -name '*.sh' -type f
     find files/opencode-permissions-kit-lib/bin -type f
     find .github/workflows -name '*.yml' -type f
+    docs_scope
 } | sort -u | while IFS= read -r f; do
     awk -v lim="$LIMIT" -v f="$f" \
         '{ sub(/^[[:space:]]+/, "") }
@@ -118,6 +135,7 @@ trend=$({
     find files -name '*.sh' -type f
     find files/opencode-permissions-kit-lib/bin -type f
     find .github/workflows -name '*.yml' -type f
+    docs_scope
 } | sort -u | xargs awk -v lim="$TREND" \
     '{ sub(/^[[:space:]]+/, "") } length > lim { c++ } END { print c + 0 }')
 over=$(awk '{ n += $3 } END { print n + 0 }' "$TMP_CUR")

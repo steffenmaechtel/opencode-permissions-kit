@@ -1,6 +1,6 @@
 #!/bin/sh
 # opencode permissions kit -- scripts/advisory-watch.sh
-# Maintainer security-advisory watch (issue #107, docs/design/
+# Maintainer security-advisory watch (issue #107, internal/records/
 # security-advisories.md). Runs from CI (.github/workflows/advisory-watch.yml,
 # daily) and compares the upstream opencode advisories against the ids the
 # shipped database (files/opencode-permissions-kit-lib/sh/advisories.sh)
@@ -189,7 +189,7 @@ while IFS='|' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
         printf '  - vulnerable ranges: %s\n' "$RANGES"
         printf '  - patched versions: %s\n' "$PATCHED"
         printf '  - url: %s\n\n' "$URL"
-        printf 'Curation checklist (docs/design/security-advisories.md):\n\n'
+        printf 'Curation checklist (internal/records/security-advisories.md):\n\n'
         printf '  - [ ] Decide the affected install channel — upstream data is channel-blind\n'
         printf '        (npm-only advisories do not hit kit installs, the kit deploys the binary itself)\n'
         printf '  - [ ] Refine the range against the patched version (upstream opens, patched closes)\n'

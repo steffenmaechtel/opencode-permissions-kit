@@ -548,7 +548,7 @@ else
     failures=$((failures + 1))
 fi
 
-# Compat-stub guard retired with 0.0.29 (docs/design/streamline.md): no
+# Compat-stub guard retired with 0.0.29 (internal/records/streamline.md): no
 # compatibility stubs are kept for pre-0.0.29 fetch lists — old update.sh
 # copies 404 on the moved paths and users migrate via the streamed
 # one-liner instead. The stub file and its KIT_FILES entry must both be

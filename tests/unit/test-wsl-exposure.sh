@@ -70,7 +70,7 @@ check "status.sh detects a configured-but-pending fix (wsl --shutdown)" \
     sh -c "grep -q 'pending' \"\$1\" && grep -q \"options *=.*dmask\" \"\$1\"" _ "$STATUS"
 
 # --- install.sh report-only restriction (consent policy) ------------------------
-# The kit never writes /etc/wsl.conf (docs/design/wsl-conf-consent.md):
+# The kit never writes /etc/wsl.conf (internal/records/wsl-conf-consent.md):
 # install prints the snippet, the user applies it.
 check "install.sh gates the exposure info on /mnt/c existing" \
     sh -c "grep -qF '[ -d /mnt/c ]' \"\$1\"" _ "$INSTALL"
@@ -152,7 +152,7 @@ check "status.sh never-shadow verdict uses the shared PATH probe (0.0.42d S1)" \
 check "status.sh flags a dangling kit shim instead of green (0.0.42d C2)" \
     sh -c "grep -qF 'shim symlink dangles' \"\$1\"" _ "$STATUS"
 
-# --- uninstall consent (docs/design/wsl-conf-consent.md) --------------------------
+# --- uninstall consent (internal/records/wsl-conf-consent.md) --------------------------
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
 check "uninstall removes only the kit-owned xdg-open symlink" \
     sh -c "grep -qF 'not kit-owned' \"\$1\"" _ "$UNINSTALL"

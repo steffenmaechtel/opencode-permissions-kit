@@ -798,7 +798,7 @@ check "reshare detect: status fix names the healing command set, not 'any' (0.0.
     sh -c "grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'any ddev command' \"\$1\"" _ "$STATUS"
 rm -rf "$RN"
 
-# --- 7e. dev-owned mode (docs/design/ddev-dev-owned-projects.md) ------------------
+# --- 7e. dev-owned mode (internal/records/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED
 # project (mode-written or repo-committed) keeps settings dirs + root as
 # the developer's (handback), unflagged projects keep the handover.

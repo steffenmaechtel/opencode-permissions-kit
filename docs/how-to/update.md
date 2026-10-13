@@ -42,7 +42,7 @@ sudo env KIT_BRANCH=0.0.29 opk update
 
 A switch re-stamps `KIT_CHANNEL` — subsequent plain `opk update` runs stay
 on the new channel. Background and rollout plan:
-[release-handling design record](../design/release-handling.md).
+[release-handling design record](../../internal/process/release-handling.md).
 
 ## Supported upgrade paths
 
@@ -72,7 +72,7 @@ Then open a new terminal (so the rewritten `ddev()` hook loads) and
 verify with `opk status`. From 0.0.29 onwards, `opk update` works again
 as usual. A fresh install via the `install.sh` one-liner works too —
 your `projects.conf` and opencode configs are preserved either way.
-Background: [streamline design record](../design/streamline.md).
+Background: [streamline design record](../../internal/records/streamline.md).
 
 ## Update the kit
 
@@ -168,7 +168,7 @@ Two things to know:
   flags advisories newer than your kit release.
 
 Background and design decisions:
-[security-advisories design record](../design/security-advisories.md).
+[security-advisories design record](../../internal/records/security-advisories.md).
 
 ## Verify
 

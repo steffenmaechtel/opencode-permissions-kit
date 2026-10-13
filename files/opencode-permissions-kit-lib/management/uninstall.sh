@@ -120,7 +120,7 @@ trace "sudo OK"
 prompt_yn() {
     # prompt_yn "message" default
     # Returns "y" or "n"
-    # Prompt convention: docs/design/conventions.md — [Y/n] / [y/N],
+    # Prompt convention: agent/conventions.md — [Y/n] / [y/N],
     # default as capital letter, Enter accepts it.
     local msg="$1" default="$2"
     local hint="[y/N]"
@@ -148,7 +148,7 @@ if [ "$DRY_RUN" = true ]; then
     echo ""
 fi
 
-# Direct invocation only — no eval, no `sh -c` (docs/design/conventions.md).
+# Direct invocation only — no eval, no `sh -c` (agent/conventions.md).
 # Failures print their error and the uninstall continues (no set -e here).
 run() {
     if [ "$DRY_RUN" = true ]; then
@@ -301,7 +301,7 @@ fi
 
 echo ""
 echo "--- Removing WSL browser bridge ---"
-# (issues #91, #100) Consent policy (docs/design/wsl-conf-consent.md): the
+# (issues #91, #100) Consent policy (internal/records/wsl-conf-consent.md): the
 # kit never edits /etc/wsl.conf on its own — not even here. When kit-owned
 # content is present (the bridge comment block, or the legacy 0.0.36
 # section), ASK before removing it; --yes assumes yes, declining leaves

@@ -1,6 +1,6 @@
 #!/bin/sh
 # opencode permissions kit -- scripts/release.sh
-# Maintainer release helper (issue #38, docs/design/release-handling.md).
+# Maintainer release helper (issue #38, internal/process/release-handling.md).
 # A release is: tag x.y.z on master + fast-forward of the 'stable' mirror
 # (byte-identical to master). The script does the mechanics; the judgment
 # calls (when to release, release notes, announcements) stay with you.
@@ -136,7 +136,7 @@ else
         err "origin/stable has diverged from master — a fast-forward is impossible."
         say "Never force-push. Investigate: git log --oneline origin/stable ^master"
         say "Reconcile via a PR master <- stable differences (the mirror must be"
-        say "byte-identical to master, docs/design/release-handling.md)."
+        say "byte-identical to master, internal/process/release-handling.md)."
         exit 1
     fi
     if [ "$(git -C "$REPO" rev-parse origin/stable)" = "$HEAD_REV" ]; then

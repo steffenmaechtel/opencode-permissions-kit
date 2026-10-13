@@ -427,7 +427,7 @@ options = "uid=1000,gid=1000,dmask=027,fmask=037"
 
 (replace `uid`/`gid` with your default WSL user's), then from Windows run
 `wsl --shutdown` and restart WSL. The kit never edits `/etc/wsl.conf`
-itself — applying the snippet is yours ([why](design/wsl-conf-consent.md)).
+itself — applying the snippet is yours ([why](../internal/records/wsl-conf-consent.md)).
 Details: [security model](concepts/security-model.md).
 
 ## `opencode console login` / `opencode auth login` crashes with EACCES on powershell.exe
@@ -460,7 +460,7 @@ sudo opk wsl-add-opencode-1-fix
 It (re)deploys the stand-in under
 `/usr/local/lib/opencode-permissions-kit/wsl/` and writes the kit comment
 block into `/etc/wsl.conf` — the one kit command that touches the file,
-and only because you ran it ([why](design/wsl-conf-consent.md)). The
+and only because you ran it ([why](../internal/records/wsl-conf-consent.md)). The
 block takes effect immediately (only `open` reads it; WSL sees comments
 — no `wsl --shutdown` needed). If the stand-in itself is missing, run
 `sudo opk update` first. Without a bridge, the login still works when you

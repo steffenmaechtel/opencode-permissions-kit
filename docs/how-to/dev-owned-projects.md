@@ -6,7 +6,7 @@ permanently group-writable — no ownership juggling, `git checkout` /
 `mv` / `rm` always work, even on a fresh clone.
 
 Background: [ddev integration](../concepts/ddev-integration.md) ·
-design: [ddev-dev-owned-projects](../design/ddev-dev-owned-projects.md)
+design: [ddev-dev-owned-projects](../../internal/records/ddev-dev-owned-projects.md)
 
 ## What it does
 
