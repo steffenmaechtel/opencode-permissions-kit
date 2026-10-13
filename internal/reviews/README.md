@@ -66,22 +66,38 @@ era's shape — both stay citable as history). House-owned parts:
 
 The resolution's core is a **dispositions table** — one row per finding
 ID, in ID order, qualified with the snapshot letter for findings from an
-earlier snapshot of the chain (`a W1` = W1 from review-a.md):
+earlier snapshot of the chain (`a W1` = W1 from review-a.md). Rows stay
+**≤ 120 columns** (the line-length ratchet pins this): the table is the
+control panel, not the narrative. Evidence that does not fit a row goes
+into the **Evidence detail** prose section below — nothing is dropped.
 
 ```markdown
-| Finding | Disposition | Commit | Notes |
+## Dispositions
+
+| Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a W1 (MED) | **implemented** | `abc1234` | evidence: pins green, sabotage 2 FAILs, class sweep pattern + sites |
-| a W2 (LOW) | **deliberately not done** | — | rationale |
+| a W1 (MED) | **implemented** | `abc1234` | DD13 decoupled; 4 e2e pins; sabotage red→green |
+| a W2 (LOW) | **deliberately not done** | — | never-fails contract; riders disclose |
+
+## Evidence detail
+
+### a W1 (MED) — <topic>
+
+<full narrative as wrapped prose: mechanism, pins, sabotage counts,
+class-sweep pattern and sites — the row above links to it by finding>
 ```
 
 - Dispositions: `implemented` / `implemented differently` /
   `deliberately not done` — nothing else.
-- **Notes carry evidence or a blocker reason** — never a bare claim, no
-  "skipped".
+- **Key evidence or a blocker reason, never a bare claim** — if the
+  row cannot carry it, the Evidence detail block must (and does).
 - The resolution is created with the FIRST fix commit of the chain and
-  grows one row per disposition as fixes land — never reconstructed
-  afterwards. Referenced commits carry SHAs, not branch names.
+  grows one row (and, where needed, one detail block) per disposition
+  as fixes land — never reconstructed afterwards. Referenced commits
+  carry SHAs, not branch names.
+- Legacy resolutions (pr-00109…pr-00171) predate the two-part form:
+  their long rows are baseline-pinned and stay as written — the format
+  binds everything written from here on.
 
 ## Rules
 
