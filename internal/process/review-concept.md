@@ -32,6 +32,13 @@ of what one review pass digests; smaller waves are better reviewed.
 review → fix → review the fixes (wave review) → fix → …
 ```
 
+Before the loop starts: **the maintainer opens the (draft) birth-PR**
+and tells the reviewer its number — that number is the case key
+(`internal/reviews/pr-NNNNN/`; mechanics:
+[review/README.md](../reviews/README.md)). Opening the PR first keeps
+parallel features safe: GitHub allocates the number, so two features
+can never claim the same case folder.
+
 The loop has a hard seam after verification: the snapshot is written and
 committed BEFORE any fix starts (see [review/README.md](../reviews/README.md),
 Process). Two reasons: the maintainer reads the committed snapshot to see
@@ -128,10 +135,10 @@ below are the learning codified):
 
 | Place | Records | Mutability |
 |---|---|---|
-| Snapshot (`YYYY-MM-DD-v<VERSION>.md`) | **what was found** — findings as reported, with IDs | immutable after the fact; only the `> Resolution:` pointer may be added |
-| Fix commit (message) | **what was done** — the change itself, finding IDs referenced qualified (`0.0.41f C1`) | git history |
-| Resolution (`…-resolution.md`) | **why + SHA** — the authoritative per-finding disposition (implemented / implemented differently / deliberately not done) and the rationale; grows one row per fix AS the chain runs | live during the chain, final at PR |
-| README index row | one-line summary + links | may be updated anytime |
+| Snapshot (`review-<l>.md`, case folder) | **what was found** — findings as reported, with IDs | immutable after the fact; only the `> Resolution:` pointer may be added |
+| Fix commit (message) | **what was done**; finding IDs qualified (`#176 a W1`, legacy `0.0.41f C1`) | git history |
+| Resolution (`resolution.md`) | **why + SHA** — the authoritative per-finding disposition (implemented / implemented differently / deliberately not done) and the rationale; grows one row per fix AS the chain runs | live during the chain, final at PR |
+| INDEX row (generated) | per-case summary: key, subject, scope, dates, status | generated — hand edits fail the parity test |
 
 The resolution is the ledger the next review starts from — an index row
 that carries SHAs is a summary, not a substitute (README rule 4).
