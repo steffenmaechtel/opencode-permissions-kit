@@ -1,7 +1,7 @@
 # Review meta-analysis — recurring error classes and learnings
 
 > **Status: CURRENT (analysis run 2026-10-10).** Corpus: every review snapshot
-> and resolution under [design/review/](../../../docs/design/review/README.md) for versions
+> and resolution under [design/review/](../../reviews/README.md) for versions
 > **0.0.38–0.0.46** (2026-09-26 → 2026-10-09): 54 snapshots, 9 resolutions,
 > 620 extracted finding rows. The numbers in this folder are a **point-in-time
 > measurement of that corpus**, not a live statistic — re-run the extraction to

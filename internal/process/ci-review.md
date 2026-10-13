@@ -75,7 +75,7 @@ Their reviewer agent runs on `zai-coding-plan/glm-5.3-flash` via a
    manual wave review does. Test coverage questions remain with the
    existing workflows.
 4. **Snapshots stay human-owned.** CI never commits to
-   `docs/design/review/` and never writes resolutions. Full-scope CI
+   `internal/reviews/` and never writes resolutions. Full-scope CI
    output goes to an issue; promoting findings into the snapshot/resolution
    loop is the maintainer's call (review-concept.md, "Who records what").
 5. **English only** (AGENTS.md) — comments, labels, agent definition.
@@ -177,7 +177,7 @@ orchestration capacity"). Consequences for this record:
 
 | # | Question | Status |
 |---|---|---|
-| O6 | **Trust-guard list** — files whose changes make a PR refuse AI review (`review:human-required`). Rationale: the workflow runs with repo secrets and its behavior is defined by repo files; a PR that edits exactly those files must not be judged by the rules it itself changes — a malicious PR could weaken the reviewer to always return "clean". Proposed set: `.github/workflows/*.yml`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/design/review-concept.md`, `docs/design/ci-review.md`, `scripts/release.sh`. Add/remove entries? | list pending |
+| O6 | **Trust-guard list** — files whose changes make a PR refuse AI review (`review:human-required`). Rationale: the workflow runs with repo secrets and its behavior is defined by repo files; a PR that edits exactly those files must not be judged by rules it itself changes (a malicious PR could weaken the reviewer). Proposed set: `.github/workflows/*.yml`, `AGENTS.md`, `CONTRIBUTING.md`, `internal/process/review-concept.md`, `internal/process/ci-review.md`, `scripts/release.sh`. Add/remove entries? | list pending |
 | O11 | Phase-1 **verdict mapping**: built-in `/review` output has no machine-readable verdict, so the workflow cannot map comment → label the openchamber way. Phase 1 either posts the comment under one flat label or skips labels entirely; the marker contract returns with the phase-2 agent | open |
 
 ## Non-goals

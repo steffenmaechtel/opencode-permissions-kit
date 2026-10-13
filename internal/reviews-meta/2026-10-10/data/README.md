@@ -2,7 +2,7 @@
 
 This folder holds the **immutable output of one analysis run** (2026-10-10,
 corpus: review snapshots 0.0.38–0.0.46, 2026-09-26 → 2026-10-09). Like the
-snapshots in [design/review/](../../../../docs/design/review/README.md), run data is never
+snapshots in [design/review/](../../../reviews/README.md), run data is never
 edited after the fact — a later re-run archives this folder's files under
 `data/<YYYY-MM-DD>/` and writes fresh ones (recipe in the
 [record README](../README.md#re-running-this-analysis)).

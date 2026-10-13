@@ -1,0 +1,144 @@
+# Review resolution — 2026-10-12, v0.0.49 (stems a–d)
+
+## Stem a (issue #163, branch `feature/issue-163-corrupt-binary-status`)
+
+- **Review (a):** [review-a.md](review-a.md) — wave
+  review of the issue-#163 branch (`master..ad7a4ca`: corrupt-binary
+  detection + atomic deploys `ed42ef2`, e2e sudo fix `4b4b47b`,
+  learnings-audit closure `358a5ae`, AGENTS rider `ad7a4ca`); GLM-5.3 lead;
+  **stop rule NOT met — 1 MED (W1), 1 LOW (W2), 4 INFO (W3–W6)**; gates at
+  review time: 4 touched unit suites + lint + check-version re-run green,
+  e2e 301/301 + rootless 47/47 corroborated from same-day branch logs.
+
+## Dispositions
+
+| Finding | Disposition | Commit | Notes |
+|---|---|---|---|
+| W1 (MED) | **implemented** | `2e5598c` | Both binary warn rows (corrupt, status.sh #163 block; missing, 0.0.48c C1 sibling — swept in the same commit per L2) now name `sudo opk upgrade-opencode` instead of the dead-end `sudo opk update` (a plain update never touches the managed binary: `BINARY_UPDATE` is opt-in, the deploy manifest ships no `bin/opencode`, and the chmod re-assert succeeds over the corrupt file). `upgrade-opencode` (= `update.sh --yes --only-binary`) repairs both shapes; the major resolves through the install.conf stamp when the probe is empty. L2 boundary: the `sudo opk update` advice at status.sh:871/884/891 STAYS — those rows repair library content (wsl stand-in, xdg-open shim), which a plain update does re-deploy via `lib_deploy`. (Line numbers are the reviewed tree `ad7a4ca`'s — 881/894/901 on the fix tip; qualified per 0.0.49b C3.) Pins: both D1 behavioral fixtures assert the new advice and reject the old one (`! grep 'fix: sudo opk update)'`); e2e 12l greps the full advice. Sabotages on the final SHA: corrupt-row revert → exactly 1 FAIL, missing-row revert → exactly 1 FAIL, both → 2 FAILs; restored green each time. The line-length ratchet caught the first draft (122-byte warn line) — wrapped adjacent-string style with the leading space explicit (0.0.39o C1 class), message text unchanged. |
+| W2 (LOW) | **implemented** | `9797169` | `lib_deploy`'s in-place cp was the remaining interrupted-write site of the #163 class — on the kit's own repair tooling (a truncated `bin/opk`/`update.sh` blocks the documented self-heal). Each manifest entry now deploys through a sibling temp (same dir = same fs) that receives its final mode BEFORE the `mv`, so content AND mode are atomic — sudoers.template is 440 the moment its name appears, never cp-natural 644 (closes the old cp→chmod window as a riding benefit). Same two-leg shape as `copy_binary_atomic`, staged separately because `lib_deploy` owns the per-entry mode and its own `_dl_sudo`; `staged_write` was considered and rejected (its stage dir `/etc/opencode-permissions-kit` is not guaranteed same-filesystem as `$LIBDIR` — a cross-device mv would break the rename contract). Pins (behavioral, test-deploy-lib.sh §4): killed-cp and failing-mv stubs assert the OLD entry survives byte-identical with no temp left; a capturing mv stub (last-but-one arg — `-f` rides first) asserts sudoers.template (checkout 664, deployed 440) is 440 at rename time. Sabotages: revert to in-place cp → exactly 4 direct FAILs (killed-cp bytes, failing-mv rc + bytes, mode-ordering); rm-cleanup legs deleted → exactly 2 FAILs (both temp-litter pins); restored green each time. |
+| W3 (INFO) | **deliberately not done** | — | Transient source-mode window between the mv and `secure_binary`'s chmod: milliseconds on a root-owned directory; closing it would pull group/mode knowledge into the generic helper (the group is `secure_binary`'s parameter, not `copy_binary_atomic`'s). Recorded as accepted behavior change. |
+| W4 (INFO) | **deliberately not done** | — | rc 124 (probe timeout) classified "present but broken": matches house probe precedent (`opencode_version_line`'s 10s bound treats a non-returning probe as not-runnable); rewording would churn the freshly pinned messages (D1 + e2e 12l) without changing behavior. |
+| W5 (INFO) | **implemented (rider in the W2 commit)** | `9797169` | The e2e 12l restore leg now uses the same temp+mv shape instead of the plain in-place `sudo cp` the wave removed from shipped code — with W2 landed, no in-place cp onto an executed path remained in the lib deploy paths. *(Sentence corrected per 0.0.49b C1: as written it claimed "anywhere in repo code", which the umask profile sites falsified — closed in `cb33e98`; boundary that legitimately stays: the jsonc/theme data `sudo cp`s are not executed content, and the WSL stand-in's `install` unlinks the destination first, so a killed run leaves a MISSING, detectable file — not the silent corrupt-with-intact-mode class.)* No separate pin (e2e-check covered territory; the restore is asserted by the following `! present but broken` check). |
+| W6 (INFO) | **implemented (rider in the W2 commit)** | `9797169` | The bypass-guard count pin's pattern carries the first argument's opening quote (`copy_binary_atomic "` — matches the four call sites only; the `command -v` wiring line and the fallback definition no longer count) and tightens `-ge 4` to `-eq 4`: a fifth site must be a conscious pin update. Sabotage: one call site removed → exactly 1 FAIL. |
+
+## Corrections to the snapshot
+
+- None — every finding held against the code at disposition time as
+  described.
+
+## Gates on the fix tips
+
+- **`2e5598c` (W1):** all 34 unit suites · `make lint` · `make check-version`
+  green; e2e **301/301** + rootless **47/47** parallel, zero skips — the
+  extended 12l check (full advice string) PASS live against the deployed
+  status.sh.
+- **`9797169` (W2/W5/W6):** all 34 unit suites · `make lint` ·
+  `make check-version` green; e2e **301/301** + rootless **47/47**
+  parallel, zero skips (install-path change owed the re-run; 12l green
+  through the new temp+mv restore shape).
+
+## Chain state
+
+- Two fix commits touched review-relevant code (`2e5598c` status.sh rows +
+  pins; `9797169` deploy-lib.sh + pins) → per review-concept's revised stop
+  rule and L6, one micro wave review covering both (`0.0.49b`) is owed
+  before the PR.
+- W3/W4 remain record-only; no finding is left undispositioned.
+
+## Stem b (0.0.49b)
+
+- **Review (b):** [review-b.md](review-b.md) — micro
+  wave review of the stem-a fix waves (`ad7a4ca..d0bc10d`: `2e5598c` W1 +
+  `9797169` W2/W5/W6 + docs `2deedd2`/`d0bc10d`); GLM-5.3 lead, no
+  subagents (small diff; 0.0.49a precedent); **no new MED/HIGH — 1 LOW
+  (C1), 3 INFO (C2–C4)**; every stem-a sabotage independently reproduced
+  with exact counts; gates at review time: all 34 suites + lint +
+  check-version re-run green, e2e 301/301 + rootless 47/47 corroborated
+  from same-day logs on both fix tips.
+
+### Stem-b dispositions
+
+| Finding | Disposition | Commit | Notes |
+|---|---|---|---|
+| C1 (LOW) | **implemented** | `cb33e98` | New shared `copy_file_atomic <src> <dst> <mode>` in `sh/secure-binary.sh` (charter already covers "atomic deploys"; both callers source it and gained the fail-loud fallback twin next to `copy_binary_atomic`'s): sibling temp in the target dir (same fs ⇒ the mv renames; the W2 `staged_write` rejection applies — its stage dir is not guaranteed same-fs), mode BEFORE the mv (a cp-natural mode under a stricter root umask would deploy an unreadable profile that non-root shells silently skip), `rm -f` cleanup on every failure leg. update.sh fails via `die` (set -eu shape), install.sh via `echo`+`exit 1` (house shape; 0.0.49c F1 corrected an earlier aside here — the old shape in fact aborted under set -eu on a failing cp BEFORE the log line; its real gaps were the silent kill-mid-write truncation and the missing kit-context message, both closed by this commit). Class sweep re-run after the fix: `grep -rn 'sudo cp\|_sudo cp' files/` — the remaining sites are temp-staged helpers, data payloads (jsonc/themes, not executed), backup copies, and the stand-in's unlink-first `install` (killed ⇒ MISSING file, detectable, re-applied every update) — no in-place cp onto an executed/sourced path remains. Pins: test-secure-binary §6 (happy path incl. explicit mode 640-vs-cp-natural-644, killed cp, failing mv, capturing-mv mode-ordering) + six wiring pins in test-bypass-guard (fallback defined, helper call present, in-place shape absent — per script). Sabotages (scratch clone, restored green each time): rm-legs deleted → exactly 2 FAILs (both temp-litter pins); chmod-after-mv → exactly 1 (mode-ordering); update.sh wiring reverted → 2; install.sh wiring reverted → 2; helper reverted to in-place cp+chmod → 4 (killed-cp bytes, failing-mv rc + bytes, mode-at-mv). |
+| C2 (INFO) | **implemented (comment-only rider in the C1 commit)** | `cb33e98` | deploy-lib.sh's stale-temp comment reworded to `copy_binary_atomic`'s accurate wording: stale temps are inert and never collide with a later run's — nothing overwrites them (the old text claimed the next run's cp would). Comment-only ⇒ does not extend the loop. |
+| C3 (INFO) | **implemented** | `this docs commit` | The W1 row's boundary line numbers are now qualified in place (ad7a4ca's numbering; 881/894/901 on the fix tip), and the W5 row's falsified "anywhere in repo code" sentence is corrected in place (see the row) — resolution-wording corrections per README rule 6 / the "Corrections" duty. The snapshot is untouched (immutable). |
+| C4 (INFO) | **deliberately not done** | — | The `-`-entry mode normalization is contract-conforming ("mode follows the source under the umask") and recorded in the snapshot; no code change wanted. |
+
+### Corrections to the snapshot (stem b)
+
+- None — every C1–C4 claim held against the code at disposition time as
+  described.
+
+### Gates on the stem-b fix tip (`cb33e98`)
+
+- All 34 unit suites · `make lint` · `make check-version` green (re-run by
+  the fix wave and again over the docs state); e2e **301/301** + rootless
+  **47/47** parallel, zero skips (install.sh + update.sh changed ⇒ both
+  suites owed per AGENTS).
+
+## Stem c (0.0.49c)
+
+- **Review (c):** [review-c.md](review-c.md) — micro
+  wave review of the stem-b fix wave (`cb33e98` + docs `12b9840`); GLM-5.3
+  lead, no subagents (small diff; 0.0.49b precedent); **no new MED/HIGH —
+  1 LOW (F2), 3 INFO (F1, F3, F4)**; all five stem-b sabotages reproduced
+  with exact counts (2/1/2/2/4) plus two derived probes (mode `644→600`
+  at both call sites → 0 FAILs pre-fix; decoy third call site → 0 FAILs);
+  gates re-run green, e2e 301/301 + 47/47 corroborated from the same-day
+  23:29 logs.
+
+### Stem-c dispositions
+
+| Finding | Disposition | Commit | Notes |
+|---|---|---|---|
+| F2 (LOW) | **implemented** | `9de1dae` | Both wiring pins now carry the mode: the call-site grep is &&-combined with `grep -Fq "opencode-permissions-kit-umask.sh 644"` per script — the old in-place shape matches neither grep (its chmod orders 644 before the path), so one pin discriminates shape AND mode. Sabotages: `644→600` at both call sites → exactly **2** FAILs (one per script); the wiring reverts now trip **3** pins each (call+mode, count, no-in-place — stricter than stem b's recorded 2, updated count noted here). The e2e alternative (a `stat` assertion at run.sh:613) was not taken; the unit pins fail on the same commit. L2 class sweep (pattern `chmod [0-9]\|install -m [0-9]` over `files/`, pin lookup per site — recorded per learnings L2): secure_binary 750 (test-secure-binary §1 behavioral + bypass-guard wiring pins), lib_deploy manifest modes 755/644/440 (test-deploy-lib mode checks + test-kit-files manifest equality + the 440-at-mv ordering pin), sudoers stage 440 (test-sudoers-deploy "happy path: mode 440"), WSL stand-in `install -m 755` (test-browser-bridge §4 `[ -f ] && [ -x ]` — the load-bearing bit; a killed run leaves a MISSING detectable file, 0.0.49b C1 boundary) — the two umask 644 sites were the only unpinned members of the class; the 664/644 jsonc/theme/install.conf writes are data modes out of class (same boundary). |
+| F3 (INFO) | **implemented (rider in the F2 commit)** | `9de1dae` | W6's count-pin shape on the new helper: `[ "$(grep -cF "copy_file_atomic \"" …)" -eq 1 ]` per script — the quote-carrying pattern counts CALL SITES only (the `command -v` wiring line and the fallback definition don't match). Sabotage: decoy third call site (mode 600) → exactly **1** FAIL. |
+| F4 (INFO) | **implemented (rider in the F2 commit)** | `9de1dae` | `umask 022` pinned at the top of test-secure-binary §6 (house pattern: test-ddev-as-opencode.sh). Before/after proof under an outer umask 027 with the chmod-after-mv sabotage: pre-fix **0** FAILs (the ordering pin blind — cp-natural of the 644 source is exactly 640), post-fix exactly **1** FAIL; clean baselines green under 022 and 027. |
+| F1 (INFO) | **implemented** | `this docs commit` | The stem-b C1 row's aside corrected in place — the old install shape never logged over a failed cp (set -eu at install.sh:46 + the plain phase call at :2497–2499 abort on the failing cp first; probed empirically in 0.0.49c). The snapshot is untouched (it never made the claim). |
+
+### Corrections to the snapshot (stem c)
+
+- None — every F1–F4 claim held against the code as described.
+
+### Session follow-up (recorded per README rule 5)
+
+- The snapshot commit `5678cf7` briefly left the tip red: `test-docs.sh`
+  enforces README rule 2 (an index row linking a resolution requires the
+  snapshot's pointer line), and the pointer was planned for this docs
+  commit only. Full suites were re-run for the review itself but not
+  after the docs edit — the 0.0.42a C1 class, caught one commit later.
+  Repaired by the pointer line under the snapshot's header (this commit).
+
+### Gates on the stem-c fix tip (`9de1dae`)
+
+- Test-only wave (no shipped-code delta): all 34 unit suites · `make lint` ·
+  `make check-version` green; e2e not owed (AGENTS owes both suites only
+  for install.sh/update.sh/wrapper/backend changes — none here). Every new
+  pin sabotage-verified on a scratch clone (mode 2 / decoy 1 / wiring
+  reverts 3+3 / helper in-place 4 / rm-legs 2 / chmod-after 1, plus the
+  umask-027 before/after pair), restored green each time.
+
+## Stem d (0.0.49d)
+
+- **Review (d):** [review-d.md](review-d.md) — micro
+  wave review of the stem-c fix wave (`9de1dae` + docs `f4ee345`/`5ff63ee`);
+  GLM-5.3 lead, no subagents (micro wave, 0.0.49c precedent; session produced
+  none of the waves); **no new findings — stop rule met, the 0.0.49 a→d chain
+  converges**; every stem-c disposition and sabotage claim independently
+  reproduced on a scratch clone (2/1/3/3/4/2/1 + the umask-027 pair on both
+  trees; the `5678cf7` test-docs red verified with its exact FAIL line),
+  the L2 sweep re-run matches the F2 row's inventory; gates re-run green
+  (34 suites + lint + check-version), e2e not owed (test-only wave).
+
+### Stem-d dispositions
+
+- None owed — the snapshot records no findings.
+
+## Chain state (stems a–d)
+
+- Stem-c dispositions: F2/F3/F4 in test code (`9de1dae`), F1 in this docs
+  commit → the test-code change owed the **0.0.49d micro pass** per the
+  revised stop rule before the PR. That pass ran (snapshot above): **0 new
+  findings, stop rule met — the 0.0.49 a→b→c→d chain is CLOSED, the branch
+  is PR-ready** (merge on the maintainer's call).

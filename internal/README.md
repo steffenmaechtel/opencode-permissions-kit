@@ -10,8 +10,5 @@ differs from the code, the code wins.
 |---|---|---|
 | [process/](process/) | how the project is run: review concept, release handling, CI-review planning | living |
 | [records/](records/) | design + decision records ("why is it built this way?") | frozen after implementation |
+| [reviews/](reviews/) | review evidence: one vorgang folder per birth-PR (snapshots frozen, resolutions grow), generated index | snapshots frozen, resolutions living |
 | [reviews-meta/](reviews-meta/) | recurring meta-analysis runs over the review corpus | one frozen folder per run |
-
-`reviews/` (review evidence: per-vorgang snapshots and resolutions)
-joins this folder with the review-system wave; until then the evidence
-lives at `docs/design/review/`.

@@ -1,0 +1,374 @@
+# Code Review — opencode permissions kit — 0.0.48, snapshot-b wave review (status verdict summary / --short, issue #158)
+
+> Resolution: [resolution.md](resolution.md)
+
+- **Date:** 2026-10-11
+- **Reviewer:** GLM-5.3 (OpenCode v2 agent, `/review` prompt in the repo
+  session at the maintainer's request — same provenance shape as snapshots
+  0.0.47a–c and 0.0.48a). Two fresh-context axis subagents on
+  GLM-5.3-Flash (security + quality) per the review-concept model policy;
+  every sub-agent finding re-verified by the lead before entering this
+  snapshot (one sub-agent absolutism corrected, see Retracted).
+- **Tree reviewed:** `feature/issue-158-status-messages` @ `5e58a45`
+  (VERSION 0.0.48), working tree clean. Base is merged master `0a34a01`
+  (PR #157); the later master commits through PR #160 (incl. snapshot
+  0.0.48a's branch for issue #159) are NOT in this branch's ancestry —
+  this snapshot is the stem's second snapshot **of this branch's own
+  wave**, ordered after 0.0.48a in the index. **Wave under review:**
+  `0a34a01..5e58a45`, 2 commits — the feature `b72d2f5`
+  (*feat (#158): status verdict summary, --short mode, .git/config
+  wording*, 9 files, +497/−109) and the no-code rider `5e58a45`
+  (CONTRIBUTING: e2e parallel-invocation `cd` precedence trap, +6/−1,
+  claim verified correct).
+- **Result:** **2 MED, 5 LOW, 4 INFO. Stop rule NOT met — a fix wave is
+  owed before the PR.** W1 MED: the full-mode exit-code change breaks the
+  e2e-ddev suite's two DD13 checks (`&&`-chained greps; empirically the
+  suite's only 2 FAILs, 84/86) — the wave shipped without the e2e gate
+  its own behavior change owes, and the rider commit documents that the
+  session ran only `make e2e` + `make e2e-rootless`. W2 MED: the three
+  new `X=$(mktemp) || X=/dev/null` fallbacks both unlink `/dev/null` as
+  root and silently disable their scans (false "All green"/rc 0) when
+  mktemp fails — unpinned failure path. Everything else verified clean,
+  including the 63-site semantic sweep (byte-identical full-mode output,
+  base e2e 294/294 + rootless 47/47 green), the counting semantics
+  (color-blind, mute-proof, snapshot-before-verdict) and the docs exit
+  contract.
+
+## Method
+
+- Gates re-run by this review on the reviewed tree: `sh tests/check-host.sh`
+  (host ready), `make test` (all 34 suites green incl. ShellCheck lint),
+  `make check-version` (0.0.48 consistent), and all three e2e suites
+  **in parallel** (warm cache, no opencode version delta — the AGENTS
+  preconditions; pinned `E2E_OC_VERSION=1.18.35`): `make e2e` —
+  **294/294, zero skips**, `make e2e-rootless` — **47/47, zero skips**,
+  `make e2e-ddev` — **84/86, zero skips, 2 FAILs** (both wave-introduced,
+  W1). The ddev run was owed by the hard rule ("root-script behavior
+  changes owe the e2e suites immediately") and is where W1 surfaced.
+- Full read of every wave-touched file beyond the diff hunks:
+  `management/status.sh` in full (1086 lines — every ui_* call site
+  classified, every raw `echo`/`printf` located against the `--short`
+  one-line discipline), `sh/ui.sh` in full (guard coverage of every
+  printer, counting equivalence of the three helper families),
+  `sh/git-check.sh` in full (callers, stale header claim — W7),
+  the `opk` dispatcher's status branch (`exec sh … "$@"` — args and exit
+  codes propagate), the three touched unit suites' harnesses, and the
+  two docs pages.
+- **Live probes on the review host** (a kit-managed machine — the agent
+  uid exists, an installed kit reports): full mode exits **1** with
+  `1 alert(s), 4 warning(s)` (the behavior change is real, W8);
+  `--short` prints **exactly one line** and exits 1 (installed state —
+  the discipline the unit suite can only pin statically there);
+  `--bogus` → usage + exit 64; the DD13 command shape
+  (`status.sh >log 2>&1 && grep …`) reproduced failing on this host.
+- **Sabotage verification on the committed tree** (work secured at
+  `5e58a45`, clean tree; `git restore` after each run, green re-confirmed
+  on restore — discriminating: (1) checkout-first resolution inverted
+  back to deployed-first → exactly 1 FAIL; (2) `ui_kv_warn`'s increment
+  moved after its silent guard → test-ui FAILs the UI_SILENT counter
+  pin. **Non-discriminating (W4's evidence):** (3) the leak-scan hit-list
+  `STATUS_SHORT` guard deleted → suite stays green; (4) the summary's
+  `UI_SILENT=0` restore deleted → suite stays green although real
+  `--short` then prints **nothing at all** (the verdict row dies in the
+  mute) — the `run_summary` harness never presets `UI_SILENT=1`.
+- **W2 mechanism empirically mini-reproduced** (scratch under /tmp):
+  `TMPDIR=/nonexistent` → `X=$(mktemp) || X=/dev/null` → two planted
+  findings vanish (`rows_seen=0`) and `rm -f /dev/null` fails only
+  because the probe ran unprivileged (EACCES); as root the same unlink
+  succeeds and later redirects recreate `/dev/null` as a regular file.
+  Attacker-vector analysis: `opk status` never self-elevates; the
+  sudoers template's `env_keep` is `DOCKER_HOST XDG_RUNTIME_DIR
+  OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME` — TMPDIR cannot
+  ride a sudo transition, so the realistic trigger is mktemp failure
+  (full/read-only /tmp), not injection.
+- **Learnings L1–L7 applied per rule:** L1 → the wave's new fail-soft
+  spots enumerated: the three `|| X=/dev/null` fallbacks are unpinned
+  failure paths AND fail-silent (W2); L2 → consumer sweep of the new
+  exit contract across shipped code (none), tui/ and py/ (none), e2e
+  (found the DD13 `&&` chaining — W1) and docs (found W3/W5); class
+  sweep of raw colored rows (0 remain, pinned); L3 → claim audit:
+  commit-message claims verified true except "62-site" (63 measured,
+  W11); stale claims found in git-check.sh's header (W7), ui.sh's/
+  conventions' "every print helper" (W6), cli.md's output-order sentence
+  (W5); L4 → sabotages above, incl. two non-discriminating pins (W4);
+  the not-installed behavioral pins are env-guarded (skipped on kit
+  hosts — observed here) and documented as such; L5 → no new root file
+  operations except the `rm -f` on a mktemp result (W2 — the operand
+  inventory found the /dev/null fallback); L6 → this snapshot is the
+  wave's review; the wave brought pins but left its central new
+  mechanisms (hit-list guard, UI_SILENT restore, installed-state exit
+  codes) unpinned (W4); L7 → n/a (no new shell files; status.sh keeps
+  its deliberate set -u-only fail-soft profile).
+
+## Findings index
+
+| ID | Severity | Site | Summary |
+|---|---|---|---|
+| W1 | **MED** | `tests/e2e/run-ddev.sh:858,861` + `management/status.sh:1076–1086` | Full-mode exit codes (1/2 on findings) break the DD13 checks' `status.sh … && grep …` chaining — e2e-ddev red at exactly these 2 checks (84/86); the wave shipped without the ddev gate its behavior change owes |
+| W2 | **MED** | `management/status.sh:526/536, 667/670, 732/747` | `X=$(mktemp) \|\| X=/dev/null` fallback: root runs `rm -f /dev/null` (device node gone, later redirects recreate it as a regular file), and the scans silently no-op → "All green"/exit 0 while the gap/hosts/dbdump scans never ran; failure path unpinned |
+| W3 | LOW | `docs/reference/cli.md` cron example + `status.sh` warn semantics | "one line when green" is unattainable for many real setups — permanent caller/host-conditional warn rows (version probe as agent user, live check offline, socket/mkcert "needs root" for non-root, mkcert optional-missing, "(none configured)") keep `--short` at exit 2; the documented `\|\| echo` alert fires daily on healthy kits |
+| W4 | LOW | `tests/unit/test-status.sh` (run_summary harness) | The wave's central `--short`/exit mechanisms are unpinned end-to-end: hit-list guard and `UI_SILENT=0` restore deletable with the suite green (sabotages 3+4), the harness never simulates `UI_SILENT=1`, and no executed pin anywhere asserts a real installed status.sh's exit code (e2e included) |
+| W5 | LOW | `docs/reference/cli.md:287–291` | Output-order sentence inverted: docs say the verdict is "followed by management hints"; the code prints the Management block first, the Summary verdict last |
+| W6 | LOW | `sh/ui.sh:21`, `docs/design/conventions.md` (new section) | "UI_SILENT=1 mutes every print helper" is false as stated — `ui_ask`/`ui_confirm`/`ui_menu` prompts are (correctly) not muted; the conventions rule repeats the overclaim, no pin carries it |
+| W7 | LOW | `sh/git-check.sh:19–21` | Header still describes status.sh's lib resolution as "deployed LIBDIR first … falls back to the checkout copy" — the wave flipped status.sh to checkout-first (it updated the helper list on the very next line of the same header) |
+| W8 | INFO | `management/status.sh` (summary exit), docs | Behavior change: full-mode `opk status` now exits 1/2 on findings (always 0 before) — deliberate, documented incl. the not-installed exception, live-verified rc 1 on this host; `set -e` wrappers of `opk status` newly abort |
+| W9 | INFO | `management/status.sh:50–51` | ui.sh-missing hard-exits 1, which the new contract defines as "alert(s)" — a broken library state and a real alert are indistinguishable to the cron pattern |
+| W10 | INFO | `sh/ui.sh` + `deploy-lib.sh` manifest | A stale deployed ui.sh paired with the new status.sh would leave `ui_kv_ok/bad` undefined — `set -u` does not catch missing functions → error spam + false "All green"/rc 0; unrealistic (both ship in one deploy manifest), checkout-first already covers the checkout-side skew |
+| W11 | INFO | commit message `b72d2f5`, `sh/ui.sh:75` | "62-site sweep" — 63 colored sites existed pre-wave, all 63 converted (precision nit); `ui_detail`'s inline-guard one-liner drifts from the file's dominant function style |
+
+## Findings detail
+
+### W1 (MED) — the exit-code change broke the ddev suite's DD13 checks; the wave shipped without the gate it owed
+
+`status.sh` now ends every installed report with the verdict in the exit
+code (W8 — deliberate and documented). `tests/e2e/run-ddev.sh` chains two
+DD13 checks on the OLD always-0 contract:
+
+```sh
+E 'sudo bash …/status.sh >/tmp/dd13-status1.log 2>&1 && grep -q "dd13-proj/.ddev: group-write missing" …'
+E 'sudo bash …/status.sh >/tmp/dd13-status2.log 2>&1 && ! grep -q "dd13-proj/.ddev: group-write missing" …'
+```
+
+`E` is `sh -c` (`lib.sh:421`) and `check` passes only on rc 0 — so the
+first check now fails **deterministically whenever detection works** (the
+asserted gap warning itself guarantees WARN ≥ 1 → exit 2 → the `&&` chain
+dies before the grep), and the second fails whenever any other warn row
+exists in that container. Empirically: this review's `make e2e-ddev` run
+is **84/86 with exactly these two FAILs** — the suite's only red, on a
+wave whose detection logic itself is intact (the report in the log file
+is correct; only the chaining broke).
+
+The wave's own rider (`5e58a45`) documents that the #158 session ran
+`make e2e` + `make e2e-rootless` in parallel — the ddev suite was
+skipped, and `status.sh` exit semantics are exactly the "root-script
+behavior change" class the review concept says owes the suites
+immediately. Fix shape: decouple rc from the grep chain at both sites
+(`;` separator, as `run.sh:1143` already does) — and ride W4's missing
+pin by adding an e2e check for the exit contract itself (full-mode rc,
+`--short` one-line + rc) so the next consumer-shape break is caught by
+the suite, not by red CI.
+
+### W2 (MED) — the mktemp `/dev/null` fallback deletes `/dev/null` as root and silently disables the scans
+
+Three new sites (the wave's pipe→redirect conversion for the main-shell
+tally):
+
+```sh
+_st_share_list=$(mktemp) || _st_share_list=/dev/null
+find … > "$_st_share_list"
+while … done < "$_st_share_list"
+rm -f "$_st_share_list"
+```
+
+(same shape at `:667` for the dbdump gap roots and `:732` for the
+Windows-hosts scan).
+
+**Facet A — root unlinks the device node.** When mktemp fails (/tmp full
+or read-only, fd exhaustion, admin-broken TMPDIR), the variable holds the
+literal `/dev/null`; the scan writes to the device (harmless), the loop
+reads nothing, and `rm -f /dev/null` runs. Unprivileged: EACCES noise
+only. Under `sudo opk status` — the documented root invocation; the
+share/hosts scans' `id -u != opencode` gate and the unconditional gap
+site all execute there — the unlink **succeeds**, and every later
+`> /dev/null` redirect on the host recreates it as a root-owned regular
+file (0644): system-wide breakage until `mknod`. Not attacker-reachable
+(the dispatcher never elevates; sudo `env_reset` + the template's short
+`env_keep` strip TMPDIR) — a reliability footgun with a rare trigger but
+system-wide blast.
+
+**Facet B — fail-silent false green (the L1 class).** On the same mktemp
+failure, all three scans produce zero findings: no `ui_kv_warn` rows, no
+counter bumps — and the report can end "All green"/exit 0 (or `--short`
+exit 0) while the #94/#149 group-write gap, the Windows-hosts and the
+dbdump-gap scans never ran. The new cron contract
+(`opk status --short || alert`) reports healthy on exactly the host where
+the checks are dead. Empirically mini-reproduced (two planted findings →
+`rows_seen=0`); no pin anywhere executes the mktemp-failure path.
+
+Fix shape (both facets at once): fail loud instead of falling back — on
+mktemp failure emit a warn row (it counts, so the verdict reflects the
+dead scan) and skip the block; or keep the fallback but never `rm -f` the
+`/dev/null` branch. Add the failure-path pin (a stubbed `mktemp` failing
+in the extracted-block harness). Lesser facet (recorded here): the temp
+files have no trap cleanup — an interrupt between mktemp and rm litters
+invoker-owned 0600 files in /tmp (paths of projects); mktemp's O_EXCL +
+sticky /tmp close the symlink window.
+
+### W3 (LOW) — the cron example's "one line when green" is unattainable for many real setups
+
+The new exit contract counts *every* warn row, including rows that are
+permanent for a given caller or host without anything being wrong:
+
+- as the **agent user**, the advisory version probe is `sudo -n` (only the
+  developer rides the NOPASSWD rule) → "opencode version unknown — probe
+  failed" fires **always** (observed live on this host);
+- the upstream live check is offline/blocked on many hosts → warn;
+- as **non-root** on a docker-rootless host, the socket row reads
+  "unknown — needs root" whenever `/run/user/<uid>` is not traversable,
+  and the mkcert row likewise — permanent warns for dev-user crons
+  without root;
+- at root, "mkcert CA missing (optional — ddev HTTPS …)" is a warn on
+  every host without an mkcert CA; "(none configured)" projects warn on
+  fresh installs; "fix configured, pending" warns until the next
+  `wsl --shutdown`.
+
+Consequence: `opk status --short || echo …` (the docs' flagship example)
+alerts daily on healthy kits for those setups → alert fatigue → the check
+gets disabled — the opposite of the feature's goal. Severity depends on
+the caller/host mix (a root cron on a fully-provisioned HTTPS host can
+ legitimately reach green). Fix shapes (maintainer's call): exclude
+"unknown — needs root"/"optional" rows from the verdict tally (they are
+unknowns/hints, not findings — they'd become plain `ui_kv`), or reword
+the example to acknowledge the warning tier (`|| [ $? -eq 1 ] …`), or add
+a strictness flag.
+
+### W4 (LOW) — the wave's central `--short`/exit mechanisms are unpinned end-to-end
+
+Three gaps, proven by this review's sabotages on the committed tree:
+
+1. the leak-scan hit-list `STATUS_SHORT` guard (`status.sh:1027`) is
+   deletable with the suite green — the "raw-print sites
+   converted/guarded" pin is static and covers only the hosts-scan
+   `echo`→`ui_detail` conversion;
+2. the summary's `UI_SILENT=0` restore (`:1070`) is deletable with the
+   suite green, although real `--short` then prints **nothing at all**
+   (the verdict row dies inside the mute) — the `run_summary` harness
+   extracts the block and evals it with `UI_SILENT` unset, never `1`, so
+   the mute→restore interplay production depends on is never simulated;
+3. no executed pin anywhere (unit or e2e) asserts a real **installed**
+   status.sh's exit code or `--short` line count — the not-installed
+   behavioral pins are env-guarded (skipped on kit hosts — observed
+   skipped on this host) and exit before the summary; the e2e containers
+   have installed kits and would be the natural home (see W1's fix
+   shape).
+
+Not a shipped defect (behavior verified live by this review), but exactly
+the "wave's own mechanisms unpinned" learning (0.0.44d F4 class): the
+next refactor of these lines ships green while breaking the feature.
+
+### W5 (LOW) — cli.md describes the report's ending in the wrong order
+
+`cli.md`: "*ending with a one-line verdict (the **Summary** row …)
+followed by management hints*". The code prints the Management block
+(`status.sh:1045–1052`) **before** the Summary (`:1054–1086`) — the
+verdict is the last thing on screen (which is the feature's point). The
+sentence was reworked by the wave and inverted the order. One-line docs
+fix.
+
+### W6 (LOW) — "UI_SILENT=1 mutes every print helper" overclaims
+
+`ui.sh:21` and the new conventions.md paragraph say "every print helper"
+— `ui_ask`/`ui_confirm`/`ui_menu` print prompts (to stderr) and read,
+with no guard, and arguably *should* stay unmuted. No current call path
+sets `UI_SILENT` with prompts (only status.sh sets it, never exported),
+so this is wording, not behavior — but conventions.md turns it into a
+rule for future report scripts, where a reader may rely on it and get an
+interactive prompt inside a "silent" run. Either scope the claim to the
+non-interactive printers or add the guard with a loud "silent mode cannot
+prompt" error.
+
+### W7 (LOW) — git-check.sh's header still describes the old resolution order
+
+`git-check.sh:19–21`: "*status.sh probes the deployed LIBDIR first and
+falls back to the checkout copy next to itself (cf. its ui.sh block)*".
+The wave flipped status.sh to checkout-first for ui.sh **and**
+git-check.sh (its own adjacent comment in status.sh says so), and edited
+the helper list on line 22 of the same header — line 20's claim is now
+the opposite of the code 40 lines below. Comment-only, one line.
+
+### W8–W11 (INFO)
+
+- **W8** — full-mode exit codes are a deliberate, documented behavior
+  change (cli.md: full report uses the same codes; not-installed stays 0;
+  `--short` reports it as 1). Live-verified on this host (rc 1 with
+  1 alert / 4 warns). Flagged for visibility: user scripts wrapping
+  `opk status` under `set -e` newly abort on warnings — that is the
+  feature, but it reaches every existing wrapper the moment this ships.
+- **W9** — the ui.sh-missing hard error exits 1 ("alerts" in the new
+  contract); 64/71-ish would keep the cron pattern honest about a broken
+  install vs a degraded one. Pre-existing exit, newly ambiguous meaning.
+- **W10** — a stale *deployed* ui.sh paired with a new status.sh would
+  call undefined `ui_kv_ok/bad` (dash: "not found" to stderr, script
+  continues under set -u — functions are not parameters) → rows lost,
+  counters zero, false "All green"/rc 0. Unrealistic (both files ship in
+  one `deploy-lib.sh` manifest), and checkout-first already fixed the
+  realistic checkout-side skew; recorded for the class map.
+- **W11** — commit message says "62-site sweep", 63 colored sites existed
+  pre-wave (all 63 converted, sweep-invariant pin green); `ui_detail`'s
+  inline `{ if …; fi … }` one-liner drifts from the file's style.
+
+## Verified clean (sub-agent findings corroborated by the lead)
+
+- **Counting semantics:** all three helper families count color-blind
+  (pinned under non-tty and `NO_COLOR`), plain `ui_kv` stays uncounted
+  (pinned), `ui_kv_warn` counts before its mute guard (pinned — sabotage
+  2 discriminates), `ui_kv_ok/bad` ≡ `ui_kv` + increment under
+  `UI_SILENT`; counters snapshot before the verdict row (pinned, harness
+  proves the alert row itself does not double-count).
+- **Tally sweep:** all 71 finding rows in status.sh match their pre-wave
+  colors (no misclassification in the sweep); the deliberately uncounted
+  rows (`ddev settings ddev-managed`, `.git/config access allowed`,
+  Channel/Wrapper/Library informational rows) are consistent with the
+  wave's documented neutral-choice rationale; no raw colored row remains
+  (0 of 63, invariant pinned); no remaining `cmd | while` reporting loop
+  (the three converted shapes are pinned; the advisory/projects loops
+  were already heredoc/redirect-fed).
+- **`--short` output discipline:** every raw print site in status.sh is
+  either a ui helper (muted), stderr (usage, ui.sh-missing), or the two
+  STATUS_SHORT-guarded blocks; the bare-called scan helpers
+  (`ddev_reshare_needed`, `ddev_hosts_missing`) emit no stray stdout;
+  live-verified installed: exactly one line, and not-installed: exactly
+  one line, exit 1 (pinned, env-guarded).
+- **Exit contract vs docs:** 0/1/2/64 and both not-installed behaviors
+  match code, `opk` usage text and cli.md (W5's ordering aside); the
+  dispatcher `exec` preserves codes and passes flags; usage errors exit
+  before any probing (pinned, deterministic on every host).
+- **Caller sweep:** no shipped rc consumer of `status.sh`/`opk status`
+  outside the e2e suites (files/, tui/, py/ swept — text hints and the
+  `exec` propagation only); base e2e and rootless status checks are all
+  pipe-tailed (rc = grep's) or `;`-separated — both suites green at
+  baseline (294/294, 47/47).
+- **Checkout-first resolution:** correct in both directions (checkout
+  runs get their own libs — the wave's stated skew case; deployed runs
+  resolve to the identical root-owned file); the static pin discriminates
+  (sabotage 1).
+- **ui.sh security posture:** `UI_SILENT` is set only inside status.sh,
+  never exported (children unaffected); no prompt helper is reachable
+  under it; the `.git/config` wording matches what the deny rules
+  actually enforce (templates/opencode.jsonc); no printf-format
+  injection in the new interpolations; no new sudo surface.
+- **Rider `5e58a45`:** the documented `cd … && … &` precedence trap is
+  shell-accurate (the whole and-list, `cd` included, backgrounds; the
+  foreground shell keeps cwd and variables).
+
+## Retracted / corrected during verification
+
+- **Lead retraction — `set --` scope:** the pipe→redirect change moved
+  `_st_dbdump_gap` from a pipeline subshell into the main shell, and the
+  function uses `set --`/`shift`; the lead initially suspected the
+  caller's `$@` is now clobbered. Disproven empirically (dash + bash):
+  POSIX function scope restores positional parameters on return — the
+  function's own comment ("keeps the script's own `"$@"` intact") stays
+  true. No finding.
+- **Sub-agent correction — "guaranteed for non-root" (quality #1):** the
+  socket/mkcert "unknown — needs root" warns are host-conditional (a
+  present CA renders ok; the agent user's own traversal reaches the
+  socket), not literally guaranteed; the substance (permanent warn rows
+  for common caller/host mixes) survived verification and is W3 with the
+  corrected conditionality.
+- Severity adjustments with rationale: security's trap-cleanup LOW folded
+  into W2 as a lesser facet; quality's MEDs #2/#3 (docs order, print-
+  helper wording) lead-downgraded to LOW (docs-sentence/wording with no
+  functional path); quality's MED #4 merged into W4 (LOW — test gap, not
+  shipped defect); security's LOW #5 (stale deployed ui.sh) kept INFO
+  (unrealistic precondition, manifest discipline).
+
+## Recommendation
+
+Fix wave before the PR, smallest-first: (1) W1 — decouple the two DD13
+`&&` chains and add the exit-contract e2e pin (rides W4.3); (2) W2 — fail
+loud on mktemp failure + failure-path pin (+ never `rm` the fallback);
+(3) W3 maintainer decision on the warn-tier semantics + example wording;
+(4) W4 pins (UI_SILENT=1 in the harness, hit-list/management guards,
+installed rc); (5) W5–W7 wording one-liners; W8–W11 record-only. Then the
+obligatory micro wave review of that fix wave per the loop.

@@ -203,17 +203,20 @@ sandboxed control) so the guard itself cannot rot silently.
 ## Referencing review findings
 
 Every review restarts its finding IDs at S1/C1, so a bare ID is ambiguous
-across reviews (v0.0.38 and 0.0.39a both have an `S1`). In-code comments,
-commit messages, and resolutions therefore always qualify the ID with the
-review stem (the snapshot's file-name stem without the date):
+across vorgänge. Always qualify the ID — two citation eras:
 
-- `(0.0.38 S1)` — v0.0.38 review, security finding 1
-- `(0.0.39a C1)` / `(0.0.39b S1)` — same-day variant snapshots
+- **New vorgänge (birth-PR key, since the 2026-10 restructure):**
+  `(#176 a W1)` — PR number, snapshot letter, finding ID. The PR number
+  is allocated by GitHub when the maintainer opens the birth-PR, so
+  parallel features can never collide.
+- **Legacy corpus (stems 0.0.38–0.0.49):** `(0.0.38 S1)`,
+  `(0.0.39a C1)` — the stem stays the qualifier. Resolve via
+  [legacy-index.md](../internal/reviews/legacy-index.md) or grep.
 
-Grep-able by design: `grep -rn "0.0.38 S1"`. The
-[review index](../docs/design/review/README.md#index) maps stems to snapshots, ID ranges,
-and resolutions; the snapshot-format rule (external verbatim embedding
-since 0.0.45d) lives in the [review README](../docs/design/review/README.md).
+Grep-able by design: `grep -rn "#176 a W1"`, `grep -rn "0.0.38 S1"`.
+The vorgang map is the generated
+[INDEX](../internal/reviews/INDEX.md); naming, formats, and the
+mechanics live in the [review README](../internal/reviews/README.md).
 
 ## Language
 

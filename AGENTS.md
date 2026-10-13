@@ -39,9 +39,9 @@ expect the reported paths to exist locally.
 - `agent/` — agent working rules: conventions, learnings, test fidelity
 - `internal/` — project memory: maintainer process (`process/`), design
   records (`records/`, archive under `records/_archive/` incl.
-  evaluations), review meta-analysis runs (`reviews-meta/`);
-  review snapshots/resolutions stay at `docs/design/review/` until the
-  review-system wave moves them
+  evaluations), review evidence (`reviews/`, one vorgang folder per
+  birth-PR + generated INDEX), review meta-analysis runs
+  (`reviews-meta/`)
 
 ## Rules
 
