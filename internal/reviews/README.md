@@ -76,6 +76,18 @@ era's shape — both stay citable as history). House-owned parts:
   A review that cannot deliver these four is reshaped by the embedding
   agent before commit — a snapshot without citable IDs or severities
   breaks disposition, citation, and the stop rule at once.
+- The **finding-provenance classification** (fifth deliverable): every
+  finding is classified where the defect comes from, using the
+  meta-analysis vocabulary so extraction stays comparable —
+  `wave-introduced` (the reviewed wave itself) · `fix-induced` (an
+  earlier fix wave's output) · `delta-introduced` (this delta over the
+  last reviewed state) · `pre-existing` (older backlog) · `unstated`
+  only when the reviewer genuinely cannot tell. Cheap for the reviewer
+  (the diff is in scope); the split feeds regression-rate vs detection
+  yield and the meta runs' `prov` dimension. This is finding-level
+  provenance — distinct from point 4's run provenance (model, tree,
+  gates); the deep release-dating method for full scopes lives in
+  [review-concept: Finding provenance](../../agent/review-concept.md).
 
 ## Resolution format
 
