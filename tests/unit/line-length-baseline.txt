@@ -16,10 +16,10 @@ docs/reference/cli.md 727 11
 docs/reference/compatibility.md 390 4
 docs/reference/files.md 2569 31
 docs/troubleshooting.md 43 3
-internal/README.md 48 1
-internal/process/ci-review.md 2104 18
+internal/README.md 12 1
+internal/process/ci-review.md 2085 18
 internal/process/review-concept.md 470 7
-internal/records/README.md 53 5
+internal/records/README.md 49 5
 internal/records/ddev-dev-owned-projects.md 152 3
 internal/records/ddev-e2e-test.md 3891 37
 internal/records/ddev-workflow-improvements.md 277 3
