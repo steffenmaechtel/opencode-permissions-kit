@@ -8,20 +8,20 @@ archive).
 
 | Record | Topic | Status |
 |---|---|---|
-| [ddev-working.md](ddev-working.md) | soft-only model origin: ACL denies dropped, ddev keeps working | implemented |
-| [streamline.md](streamline.md) | file/folder taxonomy; extension = usage; repo mirrors deployed lib | implemented |
-| [ddev-dev-owned-projects.md](ddev-dev-owned-projects.md) | permanently group-writable projects for dev-owned trees | implemented |
-| [ddev-e2e-test.md](ddev-e2e-test.md) | the real-ddev e2e suite with a cached golden container | implemented |
-| [ddev-migration.md](ddev-migration.md) | database bridge for the daemon switch at install time | implemented |
-| [ddev-url-transports.md](ddev-url-transports.md) | how browser commands get their URL to the Windows side | implemented |
-| [ddev-workflow-improvements.md](ddev-workflow-improvements.md) | issue #149 workflow audit: replay method, findings, fixes | implemented |
-| [handover-scan-skip.md](handover-scan-skip.md) | fast `opk update` on large trees (scan-skip stamps) | implemented |
-| [openchamber-2x-hardening.md](openchamber-2x-hardening.md) | OpenChamber 2.x settings-pin bypass + policy-pin fix | implemented |
-| [root-ancestor-traversal.md](root-ancestor-traversal.md) | root ancestor traversal + versioned no-bind-mounts | implemented |
-| [wsl-conf-consent.md](wsl-conf-consent.md) | the kit never writes /etc/wsl.conf implicitly — scope | implemented |
-| [rootless-backend.md](rootless-backend.md) | rootless backends: provisioning + selection reference | living |
-| [opencode-2x.md](opencode-2x.md) | opencode 2.x compatibility: model, detection, open items | living |
-| [security-advisories.md](security-advisories.md) | advisory warnings: database, upstream watch, curation | living |
+| [ddev-working.md](ddev-working.md) | soft-only model origin: ACL denies dropped, ddev keeps working | IMPLEMENTED |
+| [streamline.md](streamline.md) | file/folder taxonomy; extension = usage; repo mirrors deployed lib | IMPLEMENTED |
+| [ddev-dev-owned-projects.md](ddev-dev-owned-projects.md) | permanently group-writable projects for dev-owned trees | IMPLEMENTED |
+| [ddev-e2e-test.md](ddev-e2e-test.md) | the real-ddev e2e suite with a cached golden container | IMPLEMENTED |
+| [ddev-migration.md](ddev-migration.md) | database bridge for the daemon switch at install time | IMPLEMENTED |
+| [ddev-url-transports.md](ddev-url-transports.md) | how browser commands get their URL to the Windows side | IMPLEMENTED |
+| [ddev-workflow-improvements.md](ddev-workflow-improvements.md) | issue #149 workflow audit: replay method, findings, fixes | IMPLEMENTED |
+| [handover-scan-skip.md](handover-scan-skip.md) | fast `opk update` on large trees (scan-skip stamps) | CURRENT |
+| [openchamber-2x-hardening.md](openchamber-2x-hardening.md) | OpenChamber 2.x settings-pin bypass + policy-pin fix | CURRENT |
+| [root-ancestor-traversal.md](root-ancestor-traversal.md) | root ancestor traversal + versioned no-bind-mounts | IMPLEMENTED |
+| [wsl-conf-consent.md](wsl-conf-consent.md) | the kit never writes /etc/wsl.conf implicitly — scope | CURRENT |
+| [rootless-backend.md](rootless-backend.md) | rootless backends: provisioning + selection reference | CURRENT |
+| [opencode-2x.md](opencode-2x.md) | opencode 2.x compatibility: model, detection, open items | CURRENT |
+| [security-advisories.md](security-advisories.md) | advisory warnings: database, upstream watch, curation | CURRENT |
 
 Superseded and purely historical records live in
 [_archive/](_archive/) — `design/` (pre-streamline records),

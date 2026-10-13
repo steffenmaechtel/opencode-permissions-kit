@@ -1,7 +1,8 @@
 # Root ancestor traversal + versioned no-bind-mounts
 
-Date: 2026-09-09
-Status: accepted
+> Status: **IMPLEMENTED** — ADR decided 2026-09-09; shipped as
+> `_fsb_ancestor_traversable` in `sh/fs-baseline.sh` (traversal) plus the
+> versioned no-bind-mounts handling decided below.
 
 ## Context
 

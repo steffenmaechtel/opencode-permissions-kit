@@ -111,6 +111,33 @@ done | sort | while IFS= read -r f; do
     check_file "$f"
 done
 
+# Records status consistency (structure wave 2026-10, PR 3): every
+# internal/records/*.md carries a "> Status: **WORD**" line (corpus
+# vocabulary IMPLEMENTED | CURRENT | SUPERSEDED) and the records index
+# README shows the same word in that record's table row.
+records_status_check() {
+    for f in internal/records/*.md; do
+        case "$f" in */README.md) continue ;; esac
+        base=$(basename "$f")
+        word=$(sed -n 's/^> Status: \*\*\([A-Z][A-Z]*\).*/\1/p' "$f" | head -n 1)
+        if [ -z "$word" ]; then
+            echo "FAIL $base: no '> Status: **WORD**' line" >> "$TMP"
+            continue
+        fi
+        case "$word" in
+            IMPLEMENTED|CURRENT|SUPERSEDED) ;;
+            *) echo "FAIL $base: status word '$word' outside the vocabulary" >> "$TMP" ;;
+        esac
+        row=$(grep -F "]($base)" internal/records/README.md)
+        if [ -z "$row" ]; then
+            echo "FAIL $base: no records/README index row" >> "$TMP"
+        elif ! printf '%s\n' "$row" | grep -Fq "| $word |"; then
+            echo "FAIL $base: file says $word, README row differs" >> "$TMP"
+        fi
+    done
+}
+records_status_check
+
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"
     cat "$TMP"

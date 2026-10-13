@@ -1,8 +1,23 @@
 # AGENTS
 
-This file gives AI coding agents (and human contributors) the essential rules
-for working in this repository. It complements [CONTRIBUTING.md](CONTRIBUTING.md)
-(workflow + tests) and the [docs index](docs/README.md).
+Always-on rules for AI coding agents (and human contributors) working in
+this repository — the router. Detail lives next to its audience:
+
+- [agent/conventions.md](agent/conventions.md) — **BINDING** style guide
+  for shipped code: interactive prompts, output style, shell security,
+  unit-test sandbox, review-finding citations
+- [agent/learnings.md](agent/learnings.md) — the L1–L7 checklist of
+  recurring review error classes; run it before committing and again
+  before declaring work done
+- [agent/test-fidelity.md](agent/test-fidelity.md) — why bugs pass unit
+  and e2e suites but still hit real terminals
+- [internal/reviews/README.md](internal/reviews/README.md) — review
+  mechanics: vorgang folders (birth-PR key), snapshots/resolutions,
+  citation format
+- [internal/process/](internal/process/) — maintainer process: review
+  concept, release handling, CI-review planning
+- [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, PR checklist, e2e
+  invocation patterns; user docs: [docs index](docs/README.md)
 
 ## What this repo is
 
@@ -131,32 +146,25 @@ carry no `chmod +x` lines — `actions/checkout` preserves tracked modes.
 
 ## Review learnings (recurring error classes)
 
-The meta-analysis of all review snapshots 0.0.38–0.0.46 found the same
-defect classes recurring with every new feature. The per-wave checklist with
-rationale and evidence lives in
-[agent/learnings.md](agent/learnings.md)
-— apply it to every change that touches shipped code or its tests —
-features included, not only fix waves: the corpus's core finding is
-that every new feature is a new instance of a known class. Run the
-L1–L7 checklist explicitly before committing and again before
-declaring the work done; the short form below is a memory aid,
-learnings.md is authoritative. Short form:
+[agent/learnings.md](agent/learnings.md) is authoritative. The corpus
+finding (meta-analysis 0.0.38–0.0.46): every new feature is a new
+instance of a known error class — the checklist applies to features,
+not only fix waves. Run L1–L7 before committing and again before
+declaring the work done. Memory aid:
 
-- **Class sweep:** a fix for a finding class is only "implemented" after
-  sweeping all same-shape sibling sites; the resolution records the grep
-  pattern and the sites checked.
-- **Fail-loud pins:** every new `|| true`, stderr redirect, or probe pipe in
-  feature code gets a pin that executes the failure path, observed the way
-  production observes it (a caller that discards stderr makes stderr-only
-  pins vacuous).
-- **Claim audit:** every behavior claim the wave touches (comments, docs,
-  message texts) either carries a pin or is deleted/weakened.
-- **Pins discriminate and sit before the suite's summary gate** — on top of
-  the sabotage-verify duty above (which covers green-when-broken).
-- **Root ops on agent-writable trees:** `[ -L ]` on every path component,
-  re-check the operand immediately before acting, chmod before chown.
-- **Fix waves are first-class code:** every fix wave gets its micro-wave
-  review, and fixes bring their own pins.
+- **Class sweep** — a class fix counts only after all same-shape sibling
+  sites are swept; record the grep pattern and sites checked.
+- **Fail-loud pins** — every new `|| true`, stderr redirect, or probe
+  pipe gets a pin that executes the failure path, observed the way
+  production observes it.
+- **Claim audit** — every behavior claim the wave touches carries a pin
+  or is deleted/weakened.
+- **Pins discriminate** and sit before the suite's summary gate.
+- **Root ops on agent-writable trees** — `[ -L ]` on every path
+  component, re-check the operand immediately before acting, chmod
+  before chown.
+- **Fix waves are first-class code** — every fix wave gets its
+  micro-wave review; fixes bring their own pins.
 
 ## Checkout ownership on kit-managed installs
 
