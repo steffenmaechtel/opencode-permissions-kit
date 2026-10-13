@@ -19,6 +19,7 @@ archive).
 | [openchamber-2x-hardening.md](openchamber-2x-hardening.md) | OpenChamber 2.x settings-pin bypass + policy-pin fix | CURRENT |
 | [root-ancestor-traversal.md](root-ancestor-traversal.md) | root ancestor traversal + versioned no-bind-mounts | IMPLEMENTED |
 | [wsl-conf-consent.md](wsl-conf-consent.md) | the kit never writes /etc/wsl.conf implicitly — scope | CURRENT |
+| [restructure-docs.md](restructure-docs.md) | docs restructure: two-world split, birth-PR review cases | IMPLEMENTED |
 | [rootless-backend.md](rootless-backend.md) | rootless backends: provisioning + selection reference | CURRENT |
 | [opencode-2x.md](opencode-2x.md) | opencode 2.x compatibility: model, detection, open items | CURRENT |
 | [security-advisories.md](security-advisories.md) | advisory warnings: database, upstream watch, curation | CURRENT |
