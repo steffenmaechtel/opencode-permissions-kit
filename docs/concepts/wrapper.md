@@ -177,8 +177,8 @@ time and stamped as `OPENCODE_MAJOR` in install.conf):
   symlinked into the kit's library. Remove that directory to opt out.
 
 Design background:
-[plan-ui-tui-opencode](../_archive/design/plan-ui-tui-opencode.md)
-(archived) and [opencode-2x](../design/opencode-2x.md) (current).
+[plan-ui-tui-opencode](../../internal/records/_archive/design/plan-ui-tui-opencode.md)
+(archived) and [opencode-2x](../../internal/records/opencode-2x.md) (current).
 
 ## Wrapper-bypass guard (detect, then warn loudly)
 

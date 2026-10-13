@@ -18,7 +18,7 @@ must be computed **as opencode** (only that side sees the rootless daemon
 `ddev start` on every call) and then opened **as the developer**. The
 `ddev()` shell function routes the whole class through
 `_opk_ddev_browser` (ddev-as-opencode.sh); the user-facing story is in
-[ddev integration](../concepts/ddev-integration.md).
+[ddev integration](../../docs/concepts/ddev-integration.md).
 
 ## 2. Current transport: `ddev describe -j` (issue #20 rework)
 

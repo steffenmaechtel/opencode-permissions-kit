@@ -39,7 +39,7 @@ purpose, they are not confirmations.
 
 ## Script output style
 
-See `docs/_archive/design/ux-improvement.md` (decisions, archived):
+See `internal/records/_archive/design/ux-improvement.md` (decisions, archived):
 labeled lines `info`/`success`/`warn`/`error` via `ui.sh`, slim banner,
 Unicode symbols with `UI_ASCII=1` fallback, `NO_COLOR` and non-tty
 honored.
@@ -211,9 +211,9 @@ review stem (the snapshot's file-name stem without the date):
 - `(0.0.39a C1)` / `(0.0.39b S1)` — same-day variant snapshots
 
 Grep-able by design: `grep -rn "0.0.38 S1"`. The
-[review index](review/README.md#index) maps stems to snapshots, ID ranges,
+[review index](../docs/design/review/README.md#index) maps stems to snapshots, ID ranges,
 and resolutions; the snapshot-format rule (external verbatim embedding
-since 0.0.45d) lives in the [review README](review/README.md).
+since 0.0.45d) lives in the [review README](../docs/design/review/README.md).
 
 ## Language
 

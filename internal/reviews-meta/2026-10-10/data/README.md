@@ -2,7 +2,7 @@
 
 This folder holds the **immutable output of one analysis run** (2026-10-10,
 corpus: review snapshots 0.0.38–0.0.46, 2026-09-26 → 2026-10-09). Like the
-snapshots in [design/review/](../../review/README.md), run data is never
+snapshots in [design/review/](../../../../docs/design/review/README.md), run data is never
 edited after the fact — a later re-run archives this folder's files under
 `data/<YYYY-MM-DD>/` and writes fresh ones (recipe in the
 [record README](../README.md#re-running-this-analysis)).
@@ -13,8 +13,8 @@ edited after the fact — a later re-run archives this folder's files under
 |---|---|
 | `extraction-spec.md` | The taxonomy (17 error classes with decision rules), the JSON schema, and the extraction instructions every agent batch received |
 | `b1.json` … `b9.json` | Finding-level extraction, one file per agent batch: per snapshot (metadata, stop-rule, findings) and per resolution (disposition summary). 620 rows over 54 snapshots |
-| `stats.json` | Aggregates produced by `aggregate.py`: totals, severity, class stats, class × version matrix, provenance, areas, reviewer groups, trend, and the 45 backward `crossref_backward` edges |
-| `aggregate.py` | The aggregation script (stdlib only). Re-run: `cd docs/design/review-meta-analysis/data && python3 aggregate.py` |
+| `stats.json` | Aggregates produced by `scripts/reviews-meta-aggregate.py`: totals, severity, class stats, class × version matrix, provenance, areas, reviewer groups, trend, and the 45 backward `crossref_backward` edges |
+| (moved) | The aggregation script lives at `scripts/reviews-meta-aggregate.py` (repo-wide dev tooling, stdlib only). Re-run: `python3 scripts/reviews-meta-aggregate.py internal/reviews-meta/2026-10-10/data` |
 
 ## Provenance
 
@@ -45,8 +45,8 @@ edited after the fact — a later re-run archives this folder's files under
 2. Split into batches of ~8–10 files / ≤110 KB; one extraction agent per
    batch, spec verbatim (`extraction-spec.md` — change it only in a new run,
    and say so in the run notes; a changed taxonomy breaks comparability).
-3. Aggregate (`python3 aggregate.py` inside this folder), archive the old run
+3. Aggregate (`python3 scripts/reviews-meta-aggregate.py <run>/data`), archive the old run
    to `data/<old-date>/`, update the tables in
    [../statistics.md](../statistics.md) and [../README.md](../README.md)
    headers with the new run date, and check the learnings trends
-   ([../learnings.md](../learnings.md), "When a rule fails").
+   ([../learnings.md](../../../../agent/learnings.md), "When a rule fails").

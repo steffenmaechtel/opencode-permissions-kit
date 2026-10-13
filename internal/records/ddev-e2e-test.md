@@ -24,7 +24,7 @@
 > job timeout by that full-tier run. Latest addition: **DD15**
 > (2026-09-18) drives both `ddev-migrate` loops (export + import) with
 > REAL ddev — the b14a198 stdin-drain class locked at the real-binary
-> tier (see [test-environment-fidelity.md](test-environment-fidelity.md)
+> tier (see [test-fidelity.md](../../agent/test-fidelity.md)
 > §4.2); mutation-verified: stripping the loop's `</dev/null` flips the
 > import checks to first-only.
 >

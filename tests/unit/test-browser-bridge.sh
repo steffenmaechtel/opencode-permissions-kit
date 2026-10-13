@@ -5,7 +5,7 @@
 #      on a hardened /mnt/c — the login flow must survive the spawn).
 #   2. sh/wsl-browser-bridge.sh: install deploys ONLY the stand-in tree and
 #      never writes /etc/wsl.conf (consent policy,
-#      docs/design/wsl-conf-consent.md) — it merely strips the broken
+#      internal/records/wsl-conf-consent.md) — it merely strips the broken
 #      legacy 0.0.36 section. The carrier write (the opk
 #      wsl-add-opencode-1-fix path, browser_bridge_write_conf) prepends a
 #      pure-comment kit block (WSL-silent by construction, issue #100)

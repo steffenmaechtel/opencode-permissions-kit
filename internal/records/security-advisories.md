@@ -119,7 +119,7 @@ A malformed advisory is skipped loudly and fails the run. Payload
 attempts (command substitution, qualifier smuggling, column shifts) are
 unit-tested in `tests/unit/test-security-advisories.sh` (§8). The
 rules are codified repo-wide in
-[conventions.md — Shell security (untrusted input)](conventions.md#shell-security-untrusted-input).
+[conventions.md — Shell security (untrusted input)](../../agent/conventions.md#shell-security-untrusted-input).
 
 ## Initial database (2026-09)
 

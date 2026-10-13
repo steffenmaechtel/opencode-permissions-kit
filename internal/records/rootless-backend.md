@@ -5,8 +5,8 @@
 > `opencode` user. Successor of the current sections of the archived
 > `docs/_archive/design/docker-rootless.md` (historical plan, ACL-era
 > rationale); usage docs: [switch the container
-> backend](../how-to/switch-container-backend.md); the security
-> guarantee: [security model](../concepts/security-model.md).
+> backend](../../docs/how-to/switch-container-backend.md); the security
+> guarantee: [security model](../../docs/concepts/security-model.md).
 
 ## 1. Why rootless, and why per-user
 

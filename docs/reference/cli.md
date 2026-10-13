@@ -49,7 +49,7 @@ the bridge — the kit does not warn for those versions.
 
 This is the **only** kit command that writes `/etc/wsl.conf` — install
 and update never touch the file; they only deploy the stand-in tree and
-tell you about this command ([why](../design/wsl-conf-consent.md)). The
+tell you about this command ([why](../../internal/records/wsl-conf-consent.md)). The
 command is idempotent and also cleans up the broken kit-0.0.36 section if
 one is present. `opk uninstall` asks before removing the block again
 (`--yes` assumes yes).

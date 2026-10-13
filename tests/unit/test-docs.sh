@@ -32,8 +32,21 @@ file_anchors() {
     strip_fences < "$1" | grep -E '^#{1,6} ' | sed -E 's/^#{1,6} //'
 }
 
+# Frozen-history exemption (structure wave 2026-10): immutable review
+# snapshots and archived records may reference paths that later moved —
+# history is not rewritten for link hygiene. Living docs (resolutions,
+# READMEs, records, user docs) must stay fully linked.
+is_frozen() {
+    case "$1" in
+        docs/design/review/[0-9]*-v*.md) [ "${1##*-}" != "resolution.md" ] && return 0 ;;
+        internal/records/_archive/*) return 0 ;;
+    esac
+    return 1
+}
+
 check_file() {
     f="$1"
+    is_frozen "$f" && return 0
     strip_fences < "$f" | grep -oE '\]\([^)]+\)' | sed -e 's/^](//' -e 's/)$//' | while IFS= read -r target; do
         # strip optional link title after the path
         target="${target%% *}"
@@ -90,7 +103,11 @@ for f in README.md CONTRIBUTING.md AGENTS.md; do
     [ -e "$f" ] || continue
     check_file "$f"
 done
-find docs -name '*.md' -type f | sort | while IFS= read -r f; do
+# Docs scope (structure wave 2026-10): user docs stay under docs/, internal
+# areas live at agent/ and internal/ (process/records/reviews/reviews-meta).
+for dir in docs agent internal; do
+    find "$dir" -name '*.md' -type f
+done | sort | while IFS= read -r f; do
     check_file "$f"
 done
 

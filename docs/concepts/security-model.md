@@ -105,7 +105,7 @@ apply it; takes effect after `wsl --shutdown` from Windows),
 `update.sh` prints a warning with the same snippet, `status.sh` reports
 the exposure, and the **wrapper warns on every `opencode` start** until
 the restriction is applied. Rationale for the no-write rule:
-[design: wsl.conf consent](../design/wsl-conf-consent.md).
+[design: wsl.conf consent](../../internal/records/wsl-conf-consent.md).
 
 Manual fix via `/etc/wsl.conf`:
 

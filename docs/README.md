@@ -45,45 +45,11 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 - [Troubleshooting](troubleshooting.md) — symptom → cause → fix
 
-## Evaluations (internal)
+## Internal documentation
 
-- [Evaluations](evaluate/README.md) — third-party tools and addons
-  assessed against the kit's model, with verdicts (issues #40, #41)
+Everything that is not user documentation lives outside this folder:
 
-## Design records (internal)
-
-`design/` holds planning and analysis records for CURRENT behavior —
-where wording differs from the code, the code wins. Notable living
-references: [conventions.md](design/conventions.md) — the binding style
-guide for shipped code (prompts, output, language, shell security) — and
-[rootless-backend.md](design/rootless-backend.md) — the provisioning and
-selection reference for the rootless container backends. Release model:
-[release-handling.md](design/release-handling.md) — channels, the
-`stable` mirror, and the phased adoption roadmap (issue #38). opencode
-2.x compatibility (service model, detection, open items):
-[opencode-2x.md](design/opencode-2x.md). OpenChamber 2.x hardening —
-the settings-pin bypass, the policy-pin countermeasure, and `opk`
-integration (issue #154):
-[openchamber-2x-hardening.md](design/openchamber-2x-hardening.md). The
-issue #149 ddev workflow
-audit — replay method, findings, resolutions, and the app-type chmod
-matrix: [ddev-workflow-improvements.md](design/ddev-workflow-improvements.md).
-Known-security-advisory
-warnings (shipped database, upstream watch, curation loop):
-[security-advisories.md](design/security-advisories.md). Test fidelity — why bugs pass
-unit and e2e but hit real terminals, and the patterns that close the
-gap: [test-environment-fidelity.md](design/test-environment-fidelity.md).
-Review strategy — scopes, cadence, loop stop rule:
-[review-concept.md](design/review-concept.md). CI review — planning
-record for automated AI reviews in GitHub Actions (issue #122):
-[ci-review.md](design/ci-review.md). Review meta-analysis — error-class
-statistics and recurrence chains from snapshots 0.0.38–0.0.46, plus the
-per-wave learnings checklist (re-runnable record):
-[review-meta-analysis/](design/review-meta-analysis/README.md).
-Model-generated code
-reviews — immutable snapshots plus per-finding
-resolutions — live in [`design/review/`](design/review/README.md).
-Superseded or
-purely historical records live in [`_archive/`](_archive/) (same
-subfolder structure: `_archive/design/`, `_archive/security/`) — they
-document how the kit got here, not how it works today.
+- [`agent/`](../agent/README.md) — working rules for coding agents
+  (conventions, learnings checklist, test fidelity)
+- [`internal/`](../internal/README.md) — project memory: maintainer
+  process, design records, review evidence, meta-analysis runs

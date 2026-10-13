@@ -2,7 +2,7 @@
 # e2e/run-ddev.sh — real-ddev e2e suite with a cached golden container
 # Run from repo root: ./tests/e2e/run-ddev.sh   (or: make e2e-ddev)
 #
-# Implements docs/design/ddev-e2e-test.md. Unlike the other two suites this
+# Implements internal/records/ddev-e2e-test.md. Unlike the other two suites this
 # one runs the REAL ddev against the REAL inner docker-rootless daemon
 # inside the systemd test container (Dockerfile.rootless, like
 # run-docker-rootless.sh) — the burn-in class (issues #18 #20 #21 #25, the

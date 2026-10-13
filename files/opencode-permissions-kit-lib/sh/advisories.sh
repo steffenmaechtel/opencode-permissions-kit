@@ -1,7 +1,7 @@
 # shellcheck shell=sh
 # opencode permissions kit — known security advisories (sh/advisories.sh)
 #
-# The kit's advisory database (issue #107, docs/design/security-advisories.md):
+# The kit's advisory database (issue #107, internal/records/security-advisories.md):
 # a static, curated list shipped with every kit release. NO real database, no
 # service, no runtime network — the wrapper checks it locally on every start
 # and `opk status` diffs it against the upstream GitHub feed. Fresh entries

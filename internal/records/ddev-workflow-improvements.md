@@ -86,7 +86,7 @@ documented residual, no machinery.
 Committing `name:` is fine (stable identity) until the same repo is
 checked out twice on one host (git worktrees): the second `ddev start`
 fails with "a project … already exists". Documented in
-[concepts/ddev-integration.md](../concepts/ddev-integration.md)
+[concepts/ddev-integration.md](../../docs/concepts/ddev-integration.md)
 (multiple checkouts section): drop `name:` and ddev derives per-checkout
 identity from the directory.
 

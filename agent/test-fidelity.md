@@ -5,9 +5,9 @@
 > those gaps, and the patterns and tools that close them. Motivating
 > incident: commit `b14a198` (ddev consumed the export loop's stdin —
 > one database dump per run, production finding; see the partial-export
-> entry in [troubleshooting](../troubleshooting.md)). The real-ddev
+> entry in [troubleshooting](../docs/troubleshooting.md)). The real-ddev
 > answer to one instance of the class is
-> [ddev-e2e-test.md](ddev-e2e-test.md); this record generalizes it.
+> [ddev-e2e-test.md](../internal/records/ddev-e2e-test.md); this record generalizes it.
 
 ## 1. The execution environments
 
@@ -186,7 +186,7 @@ Adopting either is a maintainer decision; nothing here blocks on it.
 
 - Commit `b14a198` — the stdin-draining production bug and the
   double-fidelity fix (regression tests both tiers).
-- [ddev-e2e-test.md](ddev-e2e-test.md) — the real-ddev golden-image
+- [ddev-e2e-test.md](../internal/records/ddev-e2e-test.md) — the real-ddev golden-image
   suite; §1 names the fake-ddev coverage gap this record generalizes.
 - Martin Fowler, *Mocks Aren't Stubs* — test double vocabulary
   (dummy/fake/stub/spy/mock), classical vs mockist testing:

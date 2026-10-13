@@ -7,7 +7,7 @@
 > findings are source-verified (openchamber v2.2.0 and opencode v2.0.22
 > checkouts); the policy pin was live-verified end-to-end on a second WSL
 > install (2026-10-10, §6). User-facing how-to:
-> [openchamber.md](../how-to/openchamber.md).
+> [openchamber.md](../../docs/how-to/openchamber.md).
 
 ## 1. Problem: the one-click bypass
 
@@ -126,7 +126,7 @@ prompt exists anyway, §7 A).
 Upstream risk: OpenChamber could change the policy format. Mitigation: a
 release check in the compatibility process (like the opencode matrix);
 an advisories-style break check would be overkill —
-[compatibility.md](../reference/compatibility.md) keeps the page current.
+[compatibility.md](../../docs/reference/compatibility.md) keeps the page current.
 
 ## 5. Tier 3 — repair and visibility: `opk`
 

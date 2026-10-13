@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-"""Aggregate the 9 extraction batches into stats for the review-of-reviews."""
-import json, glob, re
+"""Aggregate the 9 extraction batches into stats for the review-of-reviews.
+
+Usage: python3 scripts/reviews-meta-aggregate.py <data-dir>
+(<data-dir> = the run folder that holds b*.json, e.g.
+internal/reviews-meta/2026-10-10/data). Writes <data-dir>/stats.json.
+Stdlib only.
+"""
+import json, glob, re, sys
 from collections import Counter, defaultdict
 
-RAW = sorted(glob.glob('b*.json'))
+DATA = sys.argv[1] if len(sys.argv) > 1 else '.'
+RAW = sorted(glob.glob(DATA + '/b*.json'))
 snapshots, resolutions = [], []
 for f in RAW:
     d = json.load(open(f))
@@ -138,7 +145,7 @@ for s in snaps:
                   'n': len(fs), 'hm': hm, 'stop': s.get('stop_rule')})
 out['trend'] = trend
 
-with open('stats.json', 'w') as fh:
+with open(DATA + '/stats.json', 'w') as fh:
     json.dump(out, fh, indent=1, default=list)
 
 # console summary

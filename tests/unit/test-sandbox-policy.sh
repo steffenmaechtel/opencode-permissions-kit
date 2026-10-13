@@ -3,7 +3,7 @@
 # re-permission anything outside their scratch space, and never carry
 # real-tree path literals at all (0.0.42e C1, hardened 0.0.42f C3).
 #
-# Policy (docs/design/conventions.md, "Test sandbox (unit suites)"):
+# Policy (agent/conventions.md, "Test sandbox (unit suites)"):
 # unit suites operate only on their own scratch ($WORK / mktemp) and the
 # sanctioned temp prefixes /tmp, /var/tmp (plus /dev/null). Finding
 # history: the ddev-migrate suite once rm -rf'd two real-tree host paths

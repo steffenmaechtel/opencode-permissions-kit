@@ -1,6 +1,6 @@
 #!/bin/sh
 # tests/e2e/fixtures/make-bare-origin.sh — build the per-run bare git origin
-# for the e2e-ddev git-flow tier (docs/design/ddev-e2e-test.md §7.2, DD12).
+# for the e2e-ddev git-flow tier (internal/records/ddev-e2e-test.md §7.2, DD12).
 # Run via `sh` (like fake-ddev, it carries no exec bit; tracked 644 per
 # the git-index invariant, issue #123). Reconciled against the real burn-in bare repo
 # (local/TEST-PROJECT-INSTALL.txt, 2026-08-22): the tracked set there is

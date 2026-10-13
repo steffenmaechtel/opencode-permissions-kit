@@ -134,7 +134,7 @@ else
 fi
 ui_kv "Sharing"  "group '$OPENCODE_GROUP' (default user: ${DEFAULT_USER:-unknown})"
 
-# OpenChamber state (issue #154, docs/design/openchamber-2x-hardening.md):
+# OpenChamber state (issue #154, internal/records/openchamber-2x-hardening.md):
 # policy pin on the wrapper => secured (leftovers inert); no policy but
 # OpenChamber present => advice; bypass files (self-installed binaries,
 # settings pin) without the policy => BYPASSED — binaries only count as a
@@ -532,7 +532,7 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-terminal.sh" ]; then
         ui_kv_warn "ddev() hook" "not hooked — run opk update"
     fi
 fi
-# Dev-owned mode (docs/design/ddev-dev-owned-projects.md): on = the kit
+# Dev-owned mode (internal/records/ddev-dev-owned-projects.md): on = the kit
 # writes disable_settings_management: true into projects' .ddev/config.yaml
 # and keeps settings dirs + project root developer-owned; off = ddev
 # manages settings (handover model). install.conf is world-readable.

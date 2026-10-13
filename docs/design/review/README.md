@@ -4,7 +4,7 @@ Model-generated code reviews of the kit live in this folder. The convention
 keeps two things separate: **what the review found** (immutable) and **what
 the maintainers did about it** (the resolution). When to review at all,
 which scope (full vs diff) and the loop's stop rule:
-[review-concept.md](../review-concept.md).
+[review-concept.md](../../../internal/process/review-concept.md).
 
 ## File naming
 
@@ -68,7 +68,7 @@ on the fix tips", and a "Chain state" closing paragraph.
    Outside the snapshot, IDs always carry the review stem — `0.0.38 S1`,
    never a bare `S1` — because every review restarts at S1/C1; the mapping
    lives in the [index](#index) below and
-   [conventions.md](../conventions.md#referencing-review-findings).
+   [conventions.md](../../../agent/conventions.md#referencing-review-findings).
 2. **The snapshot carries one pointer line** at the top — `> Resolution:
    <file>` — once a resolution exists. That is the only edit allowed.
 3. **The resolution dispositiones every finding**, one of:

@@ -3,7 +3,7 @@
 #
 # One visual language for every kit script (install/update/config/status).
 # POSIX sh, zero dependencies. Style decisions are recorded in
-# docs/_archive/design/ux-improvement.md: labeled log lines (info/success/warn/error),
+# internal/records/_archive/design/ux-improvement.md: labeled log lines (info/success/warn/error),
 # slim banner, Unicode symbols with ASCII fallback.
 #
 # Rules:
@@ -191,7 +191,7 @@ ui_ask() {
 
 ui_confirm() {
     # ui_confirm "Question?" <default y|n>  -> exit status 0 = yes, 1 = no.
-    # Convention (docs/design/conventions.md): prompt shows [Y/n] / [y/N]
+    # Convention (agent/conventions.md): prompt shows [Y/n] / [y/N]
     # with the DEFAULT as the capital letter; Enter accepts the default;
     # y/yes/n/no accepted (case-insensitive); EOF/unknown -> default
     # (0.0.44a V17: unknown input used to return "no" even when the

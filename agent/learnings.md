@@ -3,9 +3,9 @@
 > **Status: CURRENT (derived from the analysis run 2026-10-10, corpus 0.0.38–0.0.46).**
 > This is the enforcement short-form — every rule here is backed by a recurring
 > defect class measured across the review corpus. Evidence, chains and full
-> tables: [README.md](README.md) · [statistics.md](statistics.md) ·
-> [further-analyses.md](further-analyses.md). Agents get this page via
-> [AGENTS.md](../../../AGENTS.md); reading the statistics is NOT required to
+> tables: [README.md](../internal/reviews-meta/2026-10-10/README.md) · [statistics.md](../internal/reviews-meta/2026-10-10/statistics.md) ·
+> [further-analyses.md](../internal/reviews-meta/2026-10-10/further-analyses.md). Agents get this page via
+> [AGENTS.md](../AGENTS.md); reading the statistics is NOT required to
 > apply the rules.
 
 ## Why these rules exist
@@ -82,7 +82,7 @@ Every fix wave gets its micro-wave review before the PR (binding since 0.0.42
 — keep it), and fixes bring **their own pins**: "the wave's own mechanisms
 unpinned" was repeatedly its own finding (`0.0.44d F4`). A fix to a
 root/symlink class also re-runs the L5 inventory check. The stop rule
-agrees since 2026-10-11 ([review-concept.md](../review-concept.md),
+agrees since 2026-10-11 ([review-concept.md](../internal/process/review-concept.md),
 revised from the 0.0.46a→0.0.46b chain): a round whose fixes touch code —
 LOW fixes included, the 0.0.46b W1 MED arrived through exactly those —
 owes its micro-wave review; only comment/docs/disposition-only rounds
@@ -95,7 +95,7 @@ structurally fixed, individual forms remain.*
 New shell files start from the house skeleton: `set -euo pipefail`, guarded
 empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read -r`
 for TSV/line reads, no bare `cd` under `set -e`, full quoting pass. (Candidate
-for a skeleton block in [conventions.md](../conventions.md).)
+for a skeleton block in [conventions.md](conventions.md).)
 
 ## Keep doing (trend-proven)
 

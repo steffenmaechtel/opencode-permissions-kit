@@ -12,7 +12,7 @@
 # To re-deploy the kit without prompts after it is already installed,
 # use update.sh instead. To change settings later, use config.sh.
 #
-# Soft protection model (docs/design/ddev-working.md): no hard ACL denies.
+# Soft protection model (internal/records/ddev-working.md): no hard ACL denies.
 # The kit creates the opencode user, provisions a MANDATORY rootless container
 # backend (docker-rootless or podman-rootless), prepares ddev to run as that
 # user, and sets up the opencode usergroup as the sharing group.
@@ -364,7 +364,7 @@ SKIP_DDEV_MIGRATION=false
 # ~/.agents migration (issue #19): empty = decide via prompt (--yes takes
 # the recommended "move"); --migrate-agents forces move|copy|skip.
 MIGRATE_AGENTS_OPT=""
-# Dev-owned mode (docs/design/ddev-dev-owned-projects.md): true = the kit
+# Dev-owned mode (internal/records/ddev-dev-owned-projects.md): true = the kit
 # writes disable_settings_management: true into each project's committed
 # .ddev/config.yaml; settings dirs + project root stay developer-owned
 # (recommended default). false = ddev keeps managing settings (handover
@@ -375,7 +375,7 @@ GIT_FLAG_GIVEN=false
 # Distro whitelist override (see _distro_gate): explicit user opt-in to
 # install on a distro outside the support matrix.
 FORCE_UNSUPPORTED_DISTRO=false
-# OpenChamber policy pin (issue #154, docs/design/openchamber-2x-hardening.md):
+# OpenChamber policy pin (issue #154, internal/records/openchamber-2x-hardening.md):
 # opt-in — write /etc/openchamber/policy.json pinning OpenChamber's opencode
 # spawn to the kit wrapper. It changes third-party app behavior (OpenChamber's
 # self-update affordances stop working), hence never silently on. "" = decide
@@ -854,7 +854,7 @@ do_plan_phase() {
             && _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
         ui_atten "existing kit" "detected (v${_ekv:-?}) — update.sh is the usual upgrade path"
         if [ "$INTERACTIVE" = true ]; then
-            # Convention: docs/design/conventions.md — [Y/n] via ui_confirm.
+            # Convention: agent/conventions.md — [Y/n] via ui_confirm.
             if ! ui_confirm "Re-configure the existing installation with install.sh?" "y"; then
                 ui_info "Aborted — run: opk update"
                 exit 0
@@ -1434,7 +1434,7 @@ do_ddev_phase() {
     fi
 
     # WSL2 /mnt/c restriction (report-only — the kit NEVER writes /etc/wsl.conf,
-    # docs/design/wsl-conf-consent.md): the drvfs mount runs with the Windows
+    # internal/records/wsl-conf-consent.md): the drvfs mount runs with the Windows
     # session token, so NTFS ACLs do NOT distinguish WSL users — the
     # world-readable default (mode 777) exposes the whole Windows profile
     # (.ssh, NTUSER.DAT, browser data) to every WSL user, including the
@@ -1667,7 +1667,7 @@ do_ddev_phase() {
                         ui_detail "once the install continues, their databases are only reachable via"
                         ui_detail "the old daemon — a later dev-side export is impossible (handover)."
                         if [ "$INTERACTIVE" = true ]; then
-                            # Convention: docs/design/conventions.md — default "n":
+                            # Convention: agent/conventions.md — default "n":
                             # continuing is the destructive choice here.
                             if ! ui_confirm "Continue the install anyway?"\
 " (the listed databases become unreachable)" "n"; then
@@ -1757,7 +1757,7 @@ do_deploy_phase() {
         # root (a root is often a parent of several projects). Idempotent;
         # .git dirs are never chowned — they stay developer-owned (the group
         # baseline above makes them group-accessible). With the dev-owned
-        # mode on (DDEV_DEV_OWNED, see docs/design/ddev-dev-owned-projects.md)
+        # mode on (DDEV_DEV_OWNED, see internal/records/ddev-dev-owned-projects.md)
         # the scan instead flags the project and keeps settings dirs + root
         # developer-owned. Advanced mode decides here (Standard/--yes already
         # did, --ddev-settings forces).
@@ -2061,7 +2061,7 @@ do_deploy_phase() {
     # WSL browser bridge (issues #91, #100): the helper library is always
     # deployed; the stand-in tree only materializes on WSL (the helper no-ops
     # elsewhere). The /etc/wsl.conf carrier is NOT written here — the kit
-    # never edits wsl.conf implicitly (docs/design/wsl-conf-consent.md); the
+    # never edits wsl.conf implicitly (internal/records/wsl-conf-consent.md); the
     # user opts in explicitly via 'sudo opk wsl-add-opencode-1-fix'. A legacy
     # 0.0.36 section is stripped (kit-owned regression cleanup).
     # (The helper library itself ships via the lib_deploy manifest above.)
@@ -2384,7 +2384,7 @@ do_deploy_phase() {
         log "deny-all config installed for default user: $DEFAULT_OC_CONF"
     fi
 
-    # === Step 8c: TUI mode display (docs/_archive/design/plan-ui-tui-opencode.md) ============
+    # === Step 8c: TUI mode display (internal/records/_archive/design/plan-ui-tui-opencode.md) ============
     # Two HOME-keyed effects, no env transport (sudo's env_reset rewrites
     # HOME, the TUI loads its global config from $HOME):
     #   opencode user  -> kit tui.json registers the mode plugin (text row

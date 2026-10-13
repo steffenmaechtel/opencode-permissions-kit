@@ -1,6 +1,6 @@
 # Fixture: camino — real TYPO3 v14 site with the Camino theme
 
-The real-site payload for the e2e-ddev suite (`docs/design/ddev-e2e-test.md`
+The real-site payload for the e2e-ddev suite (`internal/records/ddev-e2e-test.md`
 §7.1, DD10/DD11) and the bare-origin generator (§7.2, DD12). Harvested
 2026-08-22 from the manual burn-in install (`local/TEST-PROJECT-INSTALL.txt`).
 

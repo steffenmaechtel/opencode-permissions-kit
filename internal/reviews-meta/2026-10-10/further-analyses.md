@@ -48,7 +48,7 @@ fresh-context external ones) — it must not be read as a model ranking.
 The most expensive phase is not the feature, it is the **fix wave** — and the
 wave reviews catch exactly these (0.0.42f: all 5 MED fix-induced/fix-incomplete;
 0.0.44d: 2 of 4). The loop's economy is right: one micro-wave review per fix
-wave. (Also the reason for L6 in [learnings.md](learnings.md).)
+wave. (Also the reason for L6 in [learnings.md](../../../agent/learnings.md).)
 
 ## 3) Blind spots: review tooling (v1 custom skill vs v2 `/review`), wave vs full
 
@@ -114,7 +114,7 @@ The stock gets cleaner (internal passes 16 → 2), but **every new subsystem
 92 findings touch unit tests; 60 % of those are `test-vacuous`/`test-gap`.
 The e2e suites almost never collect findings (7). Unit coverage grows with
 every feature, but its own quality is the least verified — L4 in
-[learnings.md](learnings.md) targets exactly this.
+[learnings.md](../../../agent/learnings.md) targets exactly this.
 
 ## 7) Analyses worth running next (ideas, no data yet)
 

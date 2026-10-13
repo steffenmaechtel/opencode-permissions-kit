@@ -60,7 +60,7 @@ help:
 	@echo "  make e2e E2E_GIT_CHANNEL=latest  Same, with the current git-core PPA git in the container (e2e-rootless forwards the knob too; e2e-ddev deliberately has no git dimension — see run-ddev.sh; issue #118)"
 	@echo "  make e2e-rootless   Run docker-rootless daemon end-to-end test (Docker + systemd-in-container required; skips if unavailable)"
 	@echo "  make e2e-rootless ARGS=--debug   Same, keep the container on failure + dump daemon logs"
-	@echo "  make e2e-ddev       Run the real-ddev e2e suite (golden-image cache; first run builds it, see docs/design/ddev-e2e-test.md)"
+	@echo "  make e2e-ddev       Run the real-ddev e2e suite (golden-image cache; first run builds it, see internal/records/ddev-e2e-test.md)"
 	@echo "  make e2e-ddev ARGS='--fresh'     Force a golden-image rebuild (new ddev version, recipe bump)"
 	@echo "  make e2e-ddev-fresh Same as e2e-ddev ARGS=--fresh"
 	@echo "  make e2e-all        Run both e2e suites"
@@ -176,7 +176,7 @@ clean:
 version:
 	@[ -n "$(VERSION)" ] || { echo "Usage: make version VERSION=x.y.z"; exit 1; }
 	@echo "$(VERSION)" > VERSION
-	@echo "Version stamp set to $(VERSION) (VERSION file). Release: tag it, then fast-forward 'stable' to master (docs/design/release-handling.md)."
+	@echo "Version stamp set to $(VERSION) (VERSION file). Release: tag it, then fast-forward 'stable' to master (internal/process/release-handling.md)."
 
 check-version:
 	@v="$$(cat VERSION)"; \

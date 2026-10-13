@@ -30,7 +30,7 @@ ever touch it:
 1. **Explicit opt-in command:** `sudo opk wsl-add-opencode-1-fix` —
    deploys the browser-bridge stand-in tree and writes the kit comment
    block (pure comments, WSL-silent; see
-   [security model](../concepts/security-model.md)). Called by the user,
+   [security model](../../docs/concepts/security-model.md)). Called by the user,
    nothing else. status.sh and the wrapper advertise it whenever the
    mount is hardened but the carrier is missing.
 2. **Printed snippets:** install.sh prints the ready-to-run

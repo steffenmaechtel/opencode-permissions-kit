@@ -2,14 +2,14 @@
 
 This record defines the review **strategy**: triggers, scope, loop cadence
 and the stop rule. The file mechanics (snapshot immutability, resolution
-format, naming) live in [review/README.md](review/README.md); the trigger
+format, naming) live in [review/README.md](../../docs/design/review/README.md); the trigger
 list for full reviews also lives in
 [CONTRIBUTING.md](../../CONTRIBUTING.md#project-reviews). Finding-ID
-referencing: [conventions.md](conventions.md#referencing-review-findings).
+referencing: [conventions.md](../../agent/conventions.md#referencing-review-findings).
 
 It was written after three review rounds on 0.0.38/0.0.39 (snapshots
-[0.0.38](review/2026-09-26-v0.0.38.md),
-[a](review/2026-09-27-v0.0.39-a.md)/[b](review/2026-09-27-v0.0.39-b.md)/[c](review/2026-09-27-v0.0.39-c.md)/[d](review/2026-09-28-v0.0.39-d.md))
+[0.0.38](../../docs/design/review/2026-09-26-v0.0.38.md),
+[a](../../docs/design/review/2026-09-27-v0.0.39-a.md)/[b](../../docs/design/review/2026-09-27-v0.0.39-b.md)/[c](../../docs/design/review/2026-09-27-v0.0.39-c.md)/[d](../../docs/design/review/2026-09-28-v0.0.39-d.md))
 — the numbers below are that history, not theory.
 
 ## Two review types, two jobs
@@ -33,7 +33,7 @@ review → fix → review the fixes (wave review) → fix → …
 ```
 
 The loop has a hard seam after verification: the snapshot is written and
-committed BEFORE any fix starts (see [review/README.md](review/README.md),
+committed BEFORE any fix starts (see [review/README.md](../../docs/design/review/README.md),
 Process). Two reasons: the maintainer reads the committed snapshot to see
 what the review found before the tree starts moving — findings must be
 inspectable while nothing has been done about them yet — and a fix applied

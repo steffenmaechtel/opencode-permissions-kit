@@ -140,7 +140,7 @@ Use a throwaway WSL2/dev box — the kit is alpha software.
 
 Releases are maintainer-only and fully scripted
 ([`scripts/release.sh`](scripts/release.sh), issue #38; model:
-[release-handling](docs/design/release-handling.md) — a release is the
+[release-handling](internal/process/release-handling.md) — a release is the
 tag `x.y.z` on `master` plus a fast-forward of the `stable` mirror, which
 must stay **byte-identical** to `master`).
 
@@ -181,8 +181,8 @@ User-facing documentation lives in `docs/` and is organized by topic type
 - One page = one topic type, with a first-line purpose statement.
 - All shipped content (scripts, docs, messages) is in English.
 
-Design records for larger decisions live in `docs/design/`, historical
-security analyses in `docs/_archive/security/` — both are historical
+Design records for larger decisions live in `internal/records/`, historical
+security analyses in `internal/records/_archive/security/` — both are historical
 records; where wording differs from the code, the code wins.
 
 ## Project reviews
@@ -207,7 +207,7 @@ After each review, try to shrink the next one: every finding that could be
 turned into a lint rule, unit test, or consistency guard should be — the
 remaining manual surface is what the checklist cannot automate.
 
-Scope and cadence follow the [review concept](docs/design/review-concept.md):
+Scope and cadence follow the [review concept](internal/process/review-concept.md):
 full reviews are this trigger-based gate; the fixes themselves get a
 **wave review** (diff scope) before their PR — mandatory when a wave
 changes the semantics of root-running scripts — and the review → fix →

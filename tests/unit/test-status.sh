@@ -26,7 +26,7 @@ fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
-# --- 0. dev-owned mode line (docs/design/ddev-dev-owned-projects.md) -------------
+# --- 0. dev-owned mode line (internal/records/ddev-dev-owned-projects.md) -------------
 if grep -q 'ui_kv "ddev settings"' "$STATUS" && \
    grep -q 'dev-owned — kit writes disable_settings_management' "$STATUS" && \
    grep -qF 'DDEV_DEV_OWNED=' "$STATUS"; then

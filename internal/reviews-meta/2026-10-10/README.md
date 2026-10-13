@@ -1,12 +1,12 @@
 # Review meta-analysis — recurring error classes and learnings
 
 > **Status: CURRENT (analysis run 2026-10-10).** Corpus: every review snapshot
-> and resolution under [design/review/](../review/README.md) for versions
+> and resolution under [design/review/](../../../docs/design/review/README.md) for versions
 > **0.0.38–0.0.46** (2026-09-26 → 2026-10-09): 54 snapshots, 9 resolutions,
 > 620 extracted finding rows. The numbers in this folder are a **point-in-time
 > measurement of that corpus**, not a live statistic — re-run the extraction to
 > extend them (recipe at the bottom). Enforcement short-form:
-> [learnings.md](learnings.md) — the per-wave checklist every agent gets
+> [learnings.md](../../../agent/learnings.md) — the per-wave checklist every agent gets
 > (linked from AGENTS.md; no statistics reading required to apply it).
 > Companion pages:
 > [statistics.md](statistics.md) (full tables, as of this run),
@@ -19,7 +19,7 @@
 The review loop produces snapshots and resolutions per version, but nothing
 aggregate: *do the same mistakes come back with every new feature?* This
 analysis answers that once for the whole corpus, and turns the answer into
-the per-wave checklist in [learnings.md](learnings.md) (linked from
+the per-wave checklist in [learnings.md](../../../agent/learnings.md) (linked from
 [AGENTS.md](../../../AGENTS.md)) so the learnings are enforced, not just
 recorded.
 
@@ -112,7 +112,7 @@ under new pipefail) is structurally fixed; what remains are individual forms
 
 ## Learnings (per-wave checklist)
 
-The rules live in **[learnings.md](learnings.md)** — one page, no statistics
+The rules live in **[learnings.md](../../../agent/learnings.md)** — one page, no statistics
 required to apply them: **L1** fail-loud pins · **L2** class sweep · **L3**
 claim audit · **L4** pins discriminate + sit before the summary gate · **L5**
 root-operand inventory · **L6** fix waves are first-class code · **L7** script
@@ -156,12 +156,12 @@ The corpus grows with every review; this record is designed to be re-measured
    — batches of ~8–10 files / ≤110 KB, one JSON per batch. Parallelism rule
    from the 2026-10-10 run: at most 5 concurrent GLM-5.3 subagents; larger
    batches (or retries after rate-limit failures) run on GLM-5.3-Flash.
-3. Aggregate: `cd docs/design/review-meta-analysis/data && python3 aggregate.py`
+3. Aggregate: `python3 scripts/reviews-meta-aggregate.py internal/reviews-meta/2026-10-10/data`
    → fresh `stats.json`.
 4. Archive the previous run's files into `data/<YYYY-MM-DD>/` (runs are
    immutable once written, like snapshots), put the new run's files in
    `data/`, update the tables in statistics.md / this page with the new
-   run date in the header, and check [learnings.md](learnings.md#when-a-rule-fails):
+   run date in the header, and check [learnings.md](../../../agent/learnings.md#when-a-rule-fails):
    a class recurring after its rule landed means the rule needs sharpening.
 5. Compare: the class × version matrix grows to the right; a class that
    recurs after its learning landed is a failed learning — escalate it

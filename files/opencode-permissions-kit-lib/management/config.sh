@@ -153,7 +153,7 @@ banner() {
 die() { ui_error "$*"; exit 1; }
 
 confirm() {
-    # Convention: docs/design/conventions.md — default capital in the hint,
+    # Convention: agent/conventions.md — default capital in the hint,
     # Enter accepts it, y/yes/n/no case-insensitive. ui_confirm handles all
     # of that; this wrapper only adds the --yes shortcut.
     [ "$YES" = true ] && return 0
@@ -697,7 +697,7 @@ handover() {
 
 # --- ddev-settings (dev-owned mode) ----------------------------------------------
 
-# Dev-owned mode (docs/design/ddev-dev-owned-projects.md): while ON, the
+# Dev-owned mode (internal/records/ddev-dev-owned-projects.md): while ON, the
 # handover scans write disable_settings_management: true into each
 # project's committed .ddev/config.yaml; flagged projects keep their
 # settings dirs + project root (ddev never chmods outside .ddev/ then).
