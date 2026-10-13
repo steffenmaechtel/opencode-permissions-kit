@@ -11,11 +11,13 @@ this repository — the router. Detail lives next to its audience:
   before declaring work done
 - [agent/test-fidelity.md](agent/test-fidelity.md) — why bugs pass unit
   and e2e suites but still hit real terminals
+- [agent/review-concept.md](agent/review-concept.md) — the review
+  process: loop, stop rule, verification duty, reviewer mechanics
 - [internal/reviews/README.md](internal/reviews/README.md) — review
   mechanics: case folders (birth-PR key), snapshots/resolutions,
   citation format
 - [internal/process/](internal/process/) — maintainer process: review
-  concept, release handling, CI-review planning
+  triggers & gates (review.md), release handling, CI-review planning
 - [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, PR checklist, e2e
   invocation patterns; user docs: [docs index](docs/README.md)
 

@@ -52,7 +52,7 @@
 Fix wave 1 complete on `feature/issue-149-ddev-workflow` (`3428974`): 5
 implemented, 7 deliberately not done with rationale. The stop rule was
 met at review time (no MED/HIGH); per
-[review-concept.md](../../process/review-concept.md) LOW/INFO findings do not
+[review-concept.md](../../../agent/review-concept.md) LOW/INFO findings do not
 extend the loop — with all twelve findings dispositioned, the loop
 closes (0.0.45a precedent). Branch PR-ready for the 0.0.46 release.
 
@@ -98,7 +98,7 @@ W1 closed with the discriminating pin set the review named (class sweep
 over all four warnings — delivery is behavioral-pinned under the hook's
 exact redirect shape), W2 riding, W3–W5 dispositioned. The -b snapshot's
 stop rule was NOT met, so the loop stays open per
-[review-concept.md](../../process/review-concept.md) ("never skip the wave review
+[review-concept.md](../../../agent/review-concept.md) ("never skip the wave review
 after a semantics-changing wave"): this wave owes its snapshot-c pass —
 run in the repo session at the maintainer's request, like -b — before
 the 0.0.46 PR.
@@ -150,7 +150,7 @@ the 0.0.46 PR.
 
 Fix wave 3 complete on `feature/issue-149-ddev-workflow` (`d2ba55a`):
 C1 implemented, C2–C7 record-only. The -c snapshot's stop rule was MET
-(no new MED/HIGH); per [review-concept.md](../../process/review-concept.md)
+(no new MED/HIGH); per [review-concept.md](../../../agent/review-concept.md)
 LOW/INFO findings do not extend the loop — with C1–C7 dispositioned the
 chain closes (0.0.45a precedent: LOW fixes after a met stop rule ride
 the disposition, no further snapshot owed). The -a closure claim the -b

@@ -2,14 +2,17 @@
 
 This record defines the review **strategy**: triggers, scope, loop cadence
 and the stop rule. The file mechanics (snapshot immutability, resolution
-format, naming) live in [review/README.md](../reviews/README.md); the trigger
+format, naming) live in [review/README.md](../internal/reviews/README.md); the trigger
 list for full reviews also lives in
-[CONTRIBUTING.md](../../CONTRIBUTING.md#project-reviews). Finding-ID
-referencing: [conventions.md](../../agent/conventions.md#referencing-review-findings).
+[CONTRIBUTING.md](../CONTRIBUTING.md#project-reviews). Finding-ID
+referencing: [conventions.md](conventions.md#referencing-review-findings).
 
 It was written after three review rounds on 0.0.38/0.0.39 (snapshots
-[0.0.38](../reviews/pr-00109/review-a.md),
-[a](../reviews/pr-00115/review-a.md)/[b](../reviews/pr-00115/review-b.md)/[c](../reviews/pr-00115/review-c.md)/[d](../reviews/pr-00115/review-d.md))
+[0.0.38](../internal/reviews/pr-00109/review-a.md),
+[a](../internal/reviews/pr-00115/review-a.md)/
+[b](../internal/reviews/pr-00115/review-b.md)/
+[c](../internal/reviews/pr-00115/review-c.md)/
+[d](../internal/reviews/pr-00115/review-d.md))
 — the numbers below are that history, not theory.
 
 ## Two review types, two jobs
@@ -35,12 +38,12 @@ review → fix → review the fixes (wave review) → fix → …
 Before the loop starts: **the maintainer opens the (draft) birth-PR**
 and tells the reviewer its number — that number is the case key
 (`internal/reviews/pr-NNNNN/`; mechanics:
-[review/README.md](../reviews/README.md)). Opening the PR first keeps
+[review/README.md](../internal/reviews/README.md)). Opening the PR first keeps
 parallel features safe: GitHub allocates the number, so two features
 can never claim the same case folder.
 
 The loop has a hard seam after verification: the snapshot is written and
-committed BEFORE any fix starts (see [review/README.md](../reviews/README.md),
+committed BEFORE any fix starts (see [review/README.md](../internal/reviews/README.md),
 Process). Two reasons: the maintainer reads the committed snapshot to see
 what the review found before the tree starts moving — findings must be
 inspectable while nothing has been done about them yet — and a fix applied

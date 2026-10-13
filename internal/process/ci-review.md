@@ -2,7 +2,7 @@
 
 > **Status: planning (issue #122).** Nothing here is implemented. This
 > record exists to settle the open questions before any workflow lands.
-> It extends [review-concept.md](review-concept.md) — strategy, loop,
+> It extends [review-concept.md](../../agent/review-concept.md) — strategy, loop,
 > model policy — with a CI automation layer. Where the two disagree,
 > review-concept.md wins until this record is implemented and revised.
 > Maintainer decisions from 2026-10-06 are recorded under
@@ -162,7 +162,7 @@ main session (`ctx.session.prompt`), where the lead can fan out parallel
 reviewer subagents and verify findings empirically. Same model and same
 prompt produced 2 LOW + 2 INFO in the 1.x shape versus 2 HIGH + 6 MED +
 25 LOW/INFO in the 2.x shape (mechanism and numbers:
-[review-concept.md](review-concept.md), "invocation shape governs
+[review-concept.md](../../agent/review-concept.md), "invocation shape governs
 orchestration capacity"). Consequences for this record:
 
 - **Job 1 (`pr-review`, diff scope) is unaffected** — the subtask shape
@@ -177,7 +177,7 @@ orchestration capacity"). Consequences for this record:
 
 | # | Question | Status |
 |---|---|---|
-| O6 | **Trust-guard list** — files whose changes make a PR refuse AI review (`review:human-required`). Rationale: the workflow runs with repo secrets and its behavior is defined by repo files; a PR that edits exactly those files must not be judged by rules it itself changes (a malicious PR could weaken the reviewer). Proposed set: `.github/workflows/*.yml`, `AGENTS.md`, `CONTRIBUTING.md`, `internal/process/review-concept.md`, `internal/process/ci-review.md`, `scripts/release.sh`. Add/remove entries? | list pending |
+| O6 | **Trust-guard list** — files whose changes make a PR refuse AI review (`review:human-required`). Rationale: the workflow runs with repo secrets and its behavior is defined by repo files; a PR that edits exactly those files must not be judged by rules it itself changes (a malicious PR could weaken the reviewer). Proposed set: `.github/workflows/*.yml`, `AGENTS.md`, `CONTRIBUTING.md`, `internal/agent/review-concept.md`, `internal/process/ci-review.md`, `scripts/release.sh`. Add/remove entries? | list pending |
 | O11 | Phase-1 **verdict mapping**: built-in `/review` output has no machine-readable verdict, so the workflow cannot map comment → label the openchamber way. Phase 1 either posts the comment under one flat label or skips labels entirely; the marker contract returns with the phase-2 agent | open |
 
 ## Non-goals

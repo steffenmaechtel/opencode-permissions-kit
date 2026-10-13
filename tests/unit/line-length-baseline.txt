@@ -3,6 +3,7 @@ README.md 354 7
 agent/README.md 41 3
 agent/conventions.md 49 2
 agent/learnings.md 19 1
+agent/review-concept.md 441 6
 agent/test-fidelity.md 181 6
 docs/concepts/ddev-integration.md 164 3
 docs/concepts/security-model.md 617 8
@@ -16,9 +17,8 @@ docs/reference/cli.md 727 11
 docs/reference/compatibility.md 390 4
 docs/reference/files.md 2569 31
 docs/troubleshooting.md 43 3
-internal/README.md 12 1
-internal/process/ci-review.md 2085 18
-internal/process/review-concept.md 470 7
+internal/README.md 11 2
+internal/process/ci-review.md 2083 18
 internal/records/README.md 49 5
 internal/records/ddev-dev-owned-projects.md 152 3
 internal/records/ddev-e2e-test.md 3891 37

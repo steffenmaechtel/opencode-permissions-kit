@@ -5,7 +5,7 @@ case, keyed by the pull request that carried the review into the repo.
 Reviews are **evidence** — for the agent (pins, learnings corpus) and the
 maintainer (release gates). When to review at all, which scope (full vs
 diff), and the loop's stop rule:
-[review-concept.md](../process/review-concept.md).
+[review-concept.md](../../agent/review-concept.md).
 
 ## Layout and naming
 

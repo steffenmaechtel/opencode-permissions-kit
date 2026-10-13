@@ -7,7 +7,7 @@ learnings distilled into [agent/learnings.md](../../agent/learnings.md).
 - Run identifier = run date (`YYYY-MM-DD`); each run's README names the
   exact corpus cutoff.
 - Cadence: the maintainer commissions a run roughly monthly or after
-  ~8–10 new review vorgänge (rule: `internal/process/review-concept.md`).
+  ~8–10 new review vorgänge (rule: `internal/agent/review-concept.md`).
 - A new run reuses the extraction recipe from the latest run folder; the
   aggregation tool is `scripts/reviews-meta-aggregate.py`.
 - Every run updates `agent/learnings.md` — the checklist lives with the

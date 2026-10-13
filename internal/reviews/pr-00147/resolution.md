@@ -35,7 +35,7 @@
 Fix wave 1 complete on `feature/distro-whitelist-gate` (`a2accf3`): 6
 implemented, 3 deliberately not done with rationale. The stop rule was
 met at review time (no new MED/HIGH); per
-[review-concept.md](../../process/review-concept.md) the loop closes — no further
+[review-concept.md](../../../agent/review-concept.md) the loop closes — no further
 wave owed.
 
 **Final gate on the fix tip:** `make lint` pass · `make test` (34 suites)
@@ -102,7 +102,7 @@ ddev **70/0**, zero skips. Branch PR-ready.
 | 0.0.45c Q3 | **deliberately not done** — `timeout-minutes` on the e2e jobs and the `dorny/paths-filter` SHA pin are CI-hardening, not shipped code; the natural home is the ci-review implementation wave (docs/design/ci-review.md, issue #122), where workflow pinning rules will be decided once for ALL workflows | — |
 
 Class sweeps beyond the listed lines (per
-[review-concept.md](../../process/review-concept.md)):
+[review-concept.md](../../../agent/review-concept.md)):
 
 - **Path-form validators:** `project_path_sane` fixed in both
   content-identical copies (enforced twin), opk's handover filter gained
@@ -121,7 +121,7 @@ Class sweeps beyond the listed lines (per
 
 Wave 1 of snapshot c complete: 18 implemented (7 HIGH/MED findings incl.
 the S2+S5 and C1/C2 pairs, 11 LOW), 15 INFO deliberately not done with
-rationale. Per [review-concept.md](../../process/review-concept.md) the wave review
+rationale. Per [review-concept.md](../../../agent/review-concept.md) the wave review
 of this fix diff is mandatory before the PR (root-script semantics
 changed: install.sh probes, ddev-migrate finalize/gap/import, opk
 handover, status.sh audit, update.sh stream guard) — it is the next loop
@@ -178,7 +178,7 @@ Wave of snapshot d complete: W1+W2 (MED), W3/W4 (LOW), W5 (INFO) and the
 riding 0.0.45b C1/C2 LOWs implemented; 0.0.45b C3/S1 disposition rows
 complete the -b record (C3 closed by the c wave's widening, S1 accepted
 design); W6 corrected in this record. Per
-[review-concept.md](../../process/review-concept.md) the wave review of THIS fix
+[review-concept.md](../../../agent/review-concept.md) the wave review of THIS fix
 diff is mandatory before the 0.0.46 PR (handover executor semantics,
 uninstall backup gate, status audit and import error paths changed) —
 external v2 `/review`, embedded verbatim per the snapshot-format rule.
@@ -216,7 +216,7 @@ new pin sabotage-verified before commit.
 ## Loop status (snapshot e wave)
 
 Wave of snapshot e complete: W1 (MED) + W2/W3 (INFO) implemented in
-`00ebd17`. Per [review-concept.md](../../process/review-concept.md) the wave review
+`00ebd17`. Per [review-concept.md](../../../agent/review-concept.md) the wave review
 of THIS fix diff is mandatory before the 0.0.46 PR (the ddev handover
 executors and install.sh's migration order changed — root-script
 semantics): external v2 `/review`, embedded verbatim as snapshot
@@ -259,7 +259,7 @@ sabotage-verified before commit.
 Comment-only micro fix complete: W1 + W3 implemented in `014d5eb`, W2
 recorded above (no action requested — accepted residual). The stop rule
 was met at review time (no MED/HIGH); per
-[review-concept.md](../../process/review-concept.md) LOW/INFO dispositions do not
+[review-concept.md](../../../agent/review-concept.md) LOW/INFO dispositions do not
 extend the loop — **the 0.0.45 wave chain (c → d → e → f) is closed**.
 The branch is PR-ready for the 0.0.46 release (release gate: stop
 condition holds, e2e baseline re-confirmed below).

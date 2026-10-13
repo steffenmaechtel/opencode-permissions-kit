@@ -82,7 +82,7 @@ Every fix wave gets its micro-wave review before the PR (binding since 0.0.42
 — keep it), and fixes bring **their own pins**: "the wave's own mechanisms
 unpinned" was repeatedly its own finding (`0.0.44d F4`). A fix to a
 root/symlink class also re-runs the L5 inventory check. The stop rule
-agrees since 2026-10-11 ([review-concept.md](../internal/process/review-concept.md),
+agrees since 2026-10-11 ([review-concept.md](review-concept.md),
 revised from the 0.0.46a→0.0.46b chain): a round whose fixes touch code —
 LOW fixes included, the 0.0.46b W1 MED arrived through exactly those —
 owes its micro-wave review; only comment/docs/disposition-only rounds
