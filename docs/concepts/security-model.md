@@ -35,7 +35,7 @@ are the "ddev must work" decision:
 > bash) can read every project file — including `settings.php`, which ddev's
 > web container needs to boot.
 
-The design record is `internal/records/ddev-working.md`.
+The design record is [ddev-working](../../internal/records/ddev-working.md).
 
 | Guarantee | Mechanism |
 |---|---|
