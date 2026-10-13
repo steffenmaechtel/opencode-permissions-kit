@@ -61,6 +61,21 @@ era's shape — both stay citable as history). House-owned parts:
 ```
 
   once a resolution exists — the only edit ever allowed on a snapshot.
+- The **reviewer output contract**: the body stays verbatim, but it is
+  an interface the house reads — every snapshot must deliver:
+
+  1. **stable, unique finding IDs** (scheme free — W1, F3, Q7 … — one
+     scheme per snapshot; citations and dispositions use them),
+  2. **a severity per finding** on the house scale
+     `HIGH / MED / LOW / INFO` (the stop rule reads MED/HIGH; a
+     foreign scale is mapped during verification),
+  3. **a findings index early** in the document (table), and
+  4. **provenance, gates, and a recommendation** at the end (model,
+     tree, gates run).
+
+  A review that cannot deliver these four is reshaped by the embedding
+  agent before commit — a snapshot without citable IDs or severities
+  breaks disposition, citation, and the stop rule at once.
 
 ## Resolution format
 
