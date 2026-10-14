@@ -30,7 +30,7 @@ The `KIT_BRANCH` environment variable does the same for every entry point
 
 ```bash
 # update from the stable release mirror (recommended default)
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh | sudo env KIT_BRANCH=stable bash
 
 # switch to the development channel
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=master bash
@@ -39,6 +39,11 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/refs/heads/<branch>/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=<branch> bash
 sudo env KIT_BRANCH=0.0.29 opk update
 ```
+
+The Pages entry always serves the **stable** channel, so master/branch/
+tag installs address the raw refs directly (the ref is part of the URL —
+that self-pinning is exactly what a channel-fixed entry URL cannot
+provide).
 
 A switch re-stamps `KIT_CHANNEL` — subsequent plain `opk update` runs stay
 on the new channel. Background and rollout plan:
@@ -51,7 +56,7 @@ Updates are supported from kit **0.0.14 onwards**. On older installs
 keeps your projects and deny list where possible:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh \
   | sudo env KIT_BRANCH=stable bash
 ```
 
@@ -66,7 +71,7 @@ removes the old files, and rewrites the kit-owned shell-hook lines in
 your `.bashrc`/`.zshrc`/`.profile` in place):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh | sudo env KIT_BRANCH=stable bash
 ```
 
 Then open a new terminal (so the rewritten `ddev()` hook loads) and
@@ -86,7 +91,7 @@ opk update
 The curl one-liner (forces the `stable` channel regardless of the stamp):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh | sudo env KIT_BRANCH=stable bash
 ```
 
 `update.sh` re-deploys the kit files and refreshes the `install.conf` version

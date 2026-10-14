@@ -205,11 +205,11 @@ works from anywhere). The status scan also skips `vendor/`,
 
 Installs the kit. Stream it from GitHub or run it from a checkout; when
 streamed, it self-fetches its sibling files from the same ref. The docs
-one-liner uses the `stable` release mirror:
+one-liner uses the GitHub Pages entry (a copy of the `stable` channel,
+served at `steffenmaechtel.github.io/opencode-permissions-kit/`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
-  | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh | sudo env KIT_BRANCH=stable bash
 ```
 
 | Flag | Meaning |
@@ -284,7 +284,7 @@ Command notes:
 Re-deploy the kit after an update; upgrades the opencode binary.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/opencode-permissions-kit-lib/management/update.sh | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh | sudo env KIT_BRANCH=stable bash
 ```
 
 Without `KIT_BRANCH` set, the deployed `update.sh` follows the channel

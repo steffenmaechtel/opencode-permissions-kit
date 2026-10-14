@@ -26,7 +26,7 @@ are opencode's soft layer only (see [Security Model](docs/concepts/security-mode
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh | sudo env KIT_BRANCH=stable bash
 ```
 
 The `stable` ref is the release mirror (recommended); `master` is the

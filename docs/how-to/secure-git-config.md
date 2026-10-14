@@ -13,7 +13,7 @@ see the [security model](../concepts/security-model.md)).
 At install time:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh \
   | sudo env KIT_BRANCH=stable bash -s -- --secure-git-config
 ```
 
