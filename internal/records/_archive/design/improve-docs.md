@@ -28,7 +28,7 @@ The kit's documentation has grown organically and now has structural problems:
 
 ## 2. Research summary
 
-Sources (full notes: `local/research/2026-08-17-docs-research.md`):
+Sources (full notes were workspace-internal research, since deleted):
 
 | Source | Key takeaway applied here |
 |---|---|
@@ -212,7 +212,7 @@ anyway (style rule).
   anchors inside `docs/` + README (no npm — pure grep/wget-less parsing).
   Add to `test.yml` next to the existing unit tests.
 - **Explicitly out of scope:** MkDocs/Starlight site, i18n, versioned docs.
-  Revisit when the kit leaves alpha (see `local/TODO.md` release question).
+  Revisit when the kit leaves alpha (the release open question).
 
 ## 8. Phases (one issue + PR each)
 
@@ -244,8 +244,8 @@ phase 3 = #7, phase 4 = #8. PR bodies use `Closes #N`.
    The table documents *why* the handover exists (the EPERM fixes), which
    is explanation; `reference/files.md` links to it instead of copying.
 5. **AGENTS.md rule: rewritten in the same PR as the migration** — plus the
-   AGENTS.md split itself (own decision, from `local/TODO.md` "Zusatz
-   Task"):
+   AGENTS.md split itself (own decision, an extra task in the workspace
+   TODO, since deleted):
    - `repo/AGENTS.md` **goes into git** (English, repo-relevant rules only:
      branch/PR rules, testing, executable bits, docs rule → new `docs/`
      paths, no VERSION bump without the developer). Committing AGENTS.md is

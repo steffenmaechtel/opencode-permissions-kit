@@ -3,7 +3,7 @@
 # for the e2e-ddev git-flow tier (internal/records/ddev-e2e-test.md §7.2, DD12).
 # Run via `sh` (like fake-ddev, it carries no exec bit; tracked 644 per
 # the git-index invariant, issue #123). Reconciled against the real burn-in bare repo
-# (local/TEST-PROJECT-INSTALL.txt, 2026-08-22): the tracked set there is
+# (2026-08-22 manual burn-in; workspace notes since deleted): the tracked set there is
 # .ddev/config.yaml + the composer/TYPO3 tree — no AGENTS.md, so the
 # top-level branch works on README.md/LICENSE instead.
 #
