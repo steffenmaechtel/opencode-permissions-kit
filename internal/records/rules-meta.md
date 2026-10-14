@@ -63,6 +63,9 @@ Body rules:
 - **RM references appear only where load-bearing** — the unit's
   trailing ref and genuine dependencies inside a rationale; never as
   narrative decoration in logs or prose. (RM-00034)
+- **Examples use the abstract token `RM-NNNNN`**, never a real meta's
+  number — a real number inside an example is indistinguishable from
+  a reference in IDE searches. (RM-00035)
 
 ## Quality bar for rationales
 
