@@ -208,21 +208,38 @@ streamed, it self-fetches its sibling files from the same ref. The docs
 one-liner uses the `stable` release mirror:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
+  | sudo env KIT_BRANCH=stable bash
 ```
 
 | Flag | Meaning |
 |---|---|
 | `--yes` | Skip all prompts, assume Yes (Standard mode with defaults) |
-| `--projects <path...>` | Pre-define project roots, skip interactive selection (consumes every following non-flag argument) |
+| `--projects <path...>` | Pre-define project roots, skip interactive selection |
 | `--container-backend <docker-rootless\|podman-rootless>` | Non-interactive backend choice |
 | `--skip-ddev-migration` | Do not export the dev user's ddev databases (no `Step 4b` dumps) |
-| `--ddev-settings <dev-owned\|ddev>` | Pre-decide the settings mode: `dev-owned` writes `disable_settings_management: true` (recommended), `ddev` keeps ddev managing settings |
+| `--ddev-settings <dev-owned\|ddev>` | Pre-decide the settings mode: `dev-owned` (recommended) or `ddev` |
 | `--secure-git-config` | Enable `.git/config` hardening up front |
-| `--force-unsupported-distro` | Skip the Ubuntu version whitelist (22.04/24.04; Debian and other distros are never version-gated — see the [support matrix](../getting-started.md#supported-distros)) and install anyway — at your own risk; Ubuntu 26.04 has known errors ([issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145)) |
-| `--migrate-agents <move\|copy\|skip>` | Bring the developer's agent resources into `/home/opencode`: `~/.agents` **whole** (opencode's own namespace) + `~/.claude/skills` **skills/ only** (credentials like `~/.claude/.credentials.json` stay in your home) — move (recommended), copy, or skip; default: ask (`--yes` = move) |
+| `--force-unsupported-distro` | Skip the Ubuntu version whitelist, install anyway — at your own risk |
+| `--migrate-agents <move\|copy\|skip>` | Bring the developer's agent resources into `/home/opencode` |
 
 Flags may appear in any order; unknown options abort the install.
+`--projects` consumes every following non-flag argument.
+
+Flag notes:
+
+- `--ddev-settings dev-owned` writes
+  `disable_settings_management: true`; `ddev` keeps ddev managing
+  settings.
+- `--force-unsupported-distro`: the whitelist covers Ubuntu 22.04/24.04;
+  Debian and other distros are never version-gated — see the
+  [support matrix](../getting-started.md#supported-distros). Ubuntu 26.04
+  has known errors
+  ([issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145)).
+- `--migrate-agents` moves `~/.agents` **whole** (opencode's own
+  namespace) plus `~/.claude/skills` **skills/ only** — credentials like
+  `~/.claude/.credentials.json` stay in your home. Values: `move`
+  (recommended), `copy`, or `skip`; default: ask (`--yes` = move).
 
 Environment: `KIT_BRANCH` (default `master`) selects the ref to fetch
 siblings from — any branch or version tag works (`stable` release mirror,
@@ -246,12 +263,21 @@ sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh <command>
 | `projects list` | Show configured project roots |
 | `projects add <path...>` | Register roots + apply group baseline + ddev handover |
 | `projects remove <path...>` | Remove the `projects.conf` lines (files untouched) |
-| `git-config on\|off\|status` | Manage the `.git/config` deny (see [harden .git/config](../how-to/secure-git-config.md)) |
-| `container-backend docker-rootless\|podman-rootless` | Switch the backend (see [switch the backend](../how-to/switch-container-backend.md)) |
+| `git-config on\|off\|status` | Manage the `.git/config` deny ([hardening how-to](../how-to/secure-git-config.md)) |
+| `container-backend docker-rootless\|podman-rootless` | Switch the rootless backend |
 | `container-backend status` | Show the configured backend + socket state |
 | `refresh` | Re-apply the group baseline (chgrp/setgid/default ACLs) |
-| `handover <path...>` | Re-run the ddev handover for one project — the fresh-clone EPERM repair (see [ddev integration](../concepts/ddev-integration.md)) |
-| `ddev-settings on\|off\|status` | Dev-owned projects: kit writes `disable_settings_management: true` (see [dev-owned projects](../how-to/dev-owned-projects.md)) |
+| `handover <path...>` | Re-run the ddev handover for one project |
+| `ddev-settings on\|off\|status` | Dev-owned projects: kit writes `disable_settings_management: true` |
+
+Command notes:
+
+- `container-backend`: see
+  [switch the backend](../how-to/switch-container-backend.md).
+- `handover` is the fresh-clone EPERM repair — see
+  [ddev integration](../concepts/ddev-integration.md).
+- `ddev-settings` details:
+  [dev-owned projects](../how-to/dev-owned-projects.md).
 
 ## update.sh
 
@@ -316,9 +342,10 @@ sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh
 
 | Flag | Meaning |
 |---|---|
-| `--short`, `-s` | Print only the verdict line. The exit code carries the verdict: `0` all green, `1` alert(s), `2` warning(s) only, `64` usage error |
+| `--short`, `-s` | Print only the verdict line; the exit code carries the verdict |
 
-The full report uses the same exit codes (an installed-but-degraded kit
+Exit codes: `0` all green, `1` alert(s), `2` warning(s) only, `64` usage
+error. The full report uses the same exit codes (an installed-but-degraded kit
 is visible to callers, not just to readers). The one exception: without
 an install the full report stays `0` — status is a diagnostic and does
 not "fail" for reporting absence — while `--short` reports that state as

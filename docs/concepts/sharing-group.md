@@ -27,9 +27,13 @@ take minutes per pass:
 | Operation | Scope |
 |---|---|
 | `chgrp -R opencode` | every file and directory |
-| `chmod g+rwxs` (setgid + group rwx) | every directory — the group can create entries in pre-existing directories, and new files anywhere in the tree inherit the sharing group, not just directly under the root |
+| `chmod g+rwxs` (setgid + group rwx) | every directory (notes) |
 | `chmod g+rw` | every existing file, so you and the agent can edit each other's pre-install files |
 | default ACLs `g:opencode:rwx` | every directory (governs new files' access) |
+
+`chmod g+rwxs` detail: the group can create entries in pre-existing
+directories, and new files anywhere in the tree inherit the sharing
+group — not just directly under the root.
 
 **`.git/` directories are included** in the baseline (issue #17): they
 stay developer-owned but get the same group access, so the agent's git

@@ -35,22 +35,26 @@ to every session regardless of which tool started it.
 
 | Tool | Kind | Invocation | Status |
 |---|---|---|---|
-| [OpenChamber](https://openchamber.dev) (web/desktop/VS Code) | UI | `opencode serve` | works (headless serve since 0.0.16; OpenChamber 2.x additionally requires opencode ≥ 2.0.20 managed by the kit — and its self-update bypasses the kit unless you pin it via `opk openchamber-secure`, see below; projectless chats need OpenChamber ≥ 1.22.2, see [the how-to](../how-to/openchamber.md#projectless-chats)) |
+| [OpenChamber](https://openchamber.dev) (web/desktop/VS Code) | UI | `opencode serve` | works (0.0.16+; see caveats) |
 | CodeWalk | remote UI | user-run `opencode serve` | works |
 | OpenCode Mobile, P4OC | mobile clients | user-run `opencode serve` | works |
-| [cezar](https://github.com/lukaszuznanski/cezar) | orchestrator | `opencode serve` + `opencode models` | works (headless queries since 0.0.22) |
+| [cezar](https://github.com/lukaszuznanski/cezar) | orchestrator | `serve` + `models` | works (headless 0.0.22+) |
 | Vibe Kanban | kanban orchestrator | `opencode run` | works (headless run since 0.0.22) |
 | eval-harness | skill testing | `opencode run` | works (headless run since 0.0.22) |
 | opencode-actions | CI (GitHub Actions) | `opencode run` | works (headless run since 0.0.22) |
 | Telegram/harness bots (kimaki, GolemBot, …) | chat bots | `opencode run` / `serve` | works |
 | opencode.nvim, opencode-vim | editor frontends | `opencode run` / SDK | works |
 | ACP-based IDE agents | IDE | `opencode acp` (JSON-RPC stdio) | works (headless acp since 0.0.22) |
-| awesome-opencode plugins | plugins | load inside the agent process | unaffected — the soft layer applies to their tool calls |
-| [OpenHarness](https://github.com/HKUDS/OpenHarness) | own harness | does not invoke opencode (own auth: `~/.claude/.credentials.json`, `~/.codex/auth.json`) | no interaction with the kit |
+| awesome-opencode plugins | plugins | load inside the agent process | unaffected — the soft layer covers tool calls |
+| [OpenHarness](https://github.com/HKUDS/OpenHarness) | own harness | does not invoke opencode | no kit interaction |
 
 "Works" means: the tool's spawn pattern passes the wrapper and opencode
 runs under the kit's UID separation with the soft permission layer
 enforced. It does not mean the kit audits or endorses the tool itself.
+
+OpenHarness does not invoke opencode at all — it ships its own auth
+(`~/.claude/.credentials.json`, `~/.codex/auth.json`) — so it has no
+interaction with the kit.
 
 ## Caveats
 

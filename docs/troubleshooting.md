@@ -77,7 +77,8 @@ with the opencode-owned `.ddev/`.
 - or run the inner ddev command directly (it works in your terminal):
 
   ```bash
-  ddev exec vendor/bin/phpstan analyse -c vendor/somepath/phpstan/phpstan.neon --verbose --no-progress --no-interaction --memory-limit 4G
+  ddev exec vendor/bin/phpstan analyse -c vendor/somepath/phpstan/phpstan.neon \
+    --verbose --no-progress --no-interaction --memory-limit 4G
   ```
 
 ## ddev fails with "all predefined address pools have been fully subnetted"
@@ -478,8 +479,9 @@ decision (caller identity, powershell scan, forward/no-op). Self-test as
 your own user — the browser must open `https://opencode.ai`:
 
 ```bash
-OPK_BROWSER_BRIDGE_DEBUG=1 /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe \
-    -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand UwB0AGEAcgB0ACAAIgBoAHQAdABwAHMAOgAvAC8AbwBwAGUAbgBjAG8AZABlAC4AYQBpACIA
+STANDIN=/usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
+OPK_BROWSER_BRIDGE_DEBUG=1 "$STANDIN" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+    -EncodedCommand UwB0AGEAcgB0ACAAIgBoAHQAdABwAHMAOgAvAC8AbwBwAGUAbgBjAG8AZABlAC4AYQBpACIA
 ```
 
 Run as yourself the trace ends in `forwarding to /mnt/c/...` and the

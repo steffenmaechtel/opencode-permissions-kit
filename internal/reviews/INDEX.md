@@ -17,4 +17,5 @@ The parity test regenerates and compares. -->
 | pr-00156 | v0.0.47 | legacy | — | 2026-10-10 | a–c | resolved |
 | pr-00160 | v0.0.48 | legacy | — | 2026-10-11 | a–e | resolved |
 | pr-00171 | v0.0.49 | legacy | — | 2026-10-12 | a–d | resolved |
+| pr-00179 | issue-173 docs reflow baseline (feature wave) | wave | v0.0.50 @ ee54ca0 | 2026-10-14 | a | closed |
 
