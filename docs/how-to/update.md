@@ -9,7 +9,7 @@ The kit ships from two refs; which one you use is stamped into
 
 | Channel | What it is | Who needs it |
 |---|---|---|
-| `stable` | Release mirror — byte-identical to `master` at release points, only moves on a release | The default recommendation; installs and updates track it |
+| `stable` | Release mirror; byte-identical to `master`, moves only on releases | The default recommendation |
 | `master` | Development channel — moves with every merged PR | Testing the newest changes |
 | `<branch>` / `x.y.z` | Any feature branch, or an exact version tag (e.g. `0.0.29`) | Testing a PR, pinning a version |
 
@@ -51,7 +51,8 @@ Updates are supported from kit **0.0.14 onwards**. On older installs
 keeps your projects and deny list where possible:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
+  | sudo env KIT_BRANCH=stable bash
 ```
 
 ## Migrating to ≥ 0.0.29 (one-time, layout change)
