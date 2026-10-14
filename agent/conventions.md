@@ -21,7 +21,7 @@ Every yes/no question in shipped scripts follows one pattern:
 - **Default choice:** `n` for anything that changes the system (remove,
   provision, proceed with destructive steps), `y` only where "no" is the
   surprising/riskier answer (e.g. the recommended audit-log deletion during
-  uninstall).
+  uninstall). (RM-00002)
 - Don't invent alternatives (`(yes/no)`, `Y/N`, `[yes|no]` …). If a choice
   needs more than yes/no, use a numbered/keyed menu (`ui_menu`).
 
