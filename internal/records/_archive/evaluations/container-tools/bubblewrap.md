@@ -45,8 +45,8 @@ determined by the arguments": the policy is your argv.
   handover breaks. Keeping ddev working means rw-binding the project,
   the rootless `DOCKER_HOST` socket, `~/.ddev`/`~/.docker`, and
   near-open networking — which guts the deny surface.
-- **History:** explored pre-0.0.11 (`local/IDEA-BUBBLEWRAP+DDEV.md`,
-  workspace-internal) and set aside when the kit moved to the soft-only
+- **History:** explored pre-0.0.11 (workspace-internal notes, since
+  deleted) and set aside when the kit moved to the soft-only
   model — this evaluation confirms that outcome.
 
 ## Verdict

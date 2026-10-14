@@ -34,8 +34,8 @@ Decisions:
 
 ## 3. Visual language
 
-Reference: `local/LAYOUT-EXAMPLES.txt` (openchamber) and
-`github/openchamber/scripts/install.sh`.
+Reference: openchamber layout transcripts (workspace notes, since
+deleted) and `github/openchamber/scripts/install.sh`.
 
 Two building blocks, one per context:
 
@@ -237,4 +237,4 @@ the default; piped/EOF input falls back to defaults).
   `get.docker.com`, pnpm / bun / deno one-liners, ddev's install script.
 - `NO_COLOR` convention — https://no-color.org.
 - Most useful thing you can provide: raw terminal transcripts of tools whose
-  output you like (like `local/LAYOUT-EXAMPLES.txt`), one file per tool.
+  output you like, one file per tool.

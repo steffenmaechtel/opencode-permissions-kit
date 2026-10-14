@@ -7,7 +7,7 @@
 > consumes it), dead files deleted, CI/Makefile/e2e updated (`make e2e`
 > green: 183 checks), docs rewritten. Where this plan conflicts with the
 > code, the code wins. This is the design record for the epic change
-> sketched in the (internal) `local/MAJOR_CHANGE.md`.
+> (originally sketched in workspace notes, since deleted).
 
 ## 1. Problem
 

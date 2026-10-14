@@ -518,5 +518,5 @@ and `protect-projects.sh` are unchanged.
 - Not replacing the ACL denies — rootless is a complement, not a substitute;
   the deny rules in `opencode.jsonc` and the wrapper's single-path policy stay.
 - Not supporting `bubblewrap`/`sbx`-style process sandboxes here (see
-  `local/IDEA-BUBBLEWRAP+DDEV.md` / `local/IDEA-SBX+DDEV.md` for those
-  explorations — out of scope for this doc).
+  `internal/records/_archive/evaluations/container-tools/bubblewrap.md`
+  for the bubblewrap exploration — out of scope for this doc).

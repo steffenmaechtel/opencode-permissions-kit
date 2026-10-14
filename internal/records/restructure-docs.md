@@ -115,5 +115,5 @@ wave), `b8fbd26` + `0dd7c26` (review-system wave + exec-bit fix),
 `78b8ae1` + `9c68b09` + `d8ba19e` (status vocabulary, AGENTS router,
 baseline burn-down, case rename). The full planning trail — including
 the 19-project research base and the double-verified birth-PR map —
-lives in the maintainer's dev workspace (`local/restructure-docs/`,
-not shipped).
+stayed workspace-internal (disposable working surface, not shipped);
+this record is the durable remainder.

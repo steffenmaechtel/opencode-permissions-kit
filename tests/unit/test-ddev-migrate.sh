@@ -606,7 +606,7 @@ check "install.sh keeps exporting the remaining projects on failure (non-fatal l
 check "install.sh skips the export when already stamped" \
     sh -c "grep -q 'DDEV_EXPORTED_PRE' \"\$1\"" _ "$INSTALL"
 
-# --- 6b. production-WSL findings (local/nb-laptop-output) -----------------------
+# --- 6b. production-WSL findings (nb-laptop burn-in; workspace notes deleted) ----
 
 # ddev detection: version probe falls back to the DEFAULT user — `ddev
 # version` can come up empty as root while working as the actual user.
