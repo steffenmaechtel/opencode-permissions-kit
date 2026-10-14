@@ -51,14 +51,14 @@ jobs:
           cp .github/pages/index.md .github/pages/_config.yml site/
           cp stable/files/install.sh site/
           cp stable/files/opencode-permissions-kit-lib/management/update.sh site/
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/jekyll-build-pages@v1
         with:
           source: site
           destination: ./_site
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: ./_site
       - name: Deployment
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
