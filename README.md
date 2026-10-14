@@ -32,6 +32,8 @@ curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh
 The `stable` ref is the release mirror (recommended); `master` is the
 development channel — see [Update channels](docs/how-to/update.md#channels).
 
+An installed kit updates itself: `sudo opk update`.
+
 The installer asks a few questions and shows a plan before touching anything.
 The full walkthrough (including verification) lives in
 [Getting Started](docs/getting-started.md).
