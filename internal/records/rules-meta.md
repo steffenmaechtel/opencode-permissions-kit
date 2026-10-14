@@ -22,20 +22,20 @@ holds.
 
 | # | Topic | Decision |
 |---|-------|----------|
-| 1 | Main rule | every rule carries a rationale, externalized into a meta file referenced from the rule |
-| 2 | Rule unit | one bullet / list item (not file, not section) — an estimated 100+ metas at full rollout |
-| 3 | ID format | `RM-00037` — 5 digits zero-padded; globally sequential; never recycled, never renumbered (a retired rule keeps its number). Allocation is chronological (next free number), not positional; `RM-00001` stays reserved for the main rule itself |
-| 4 | Reference syntax | `(RM-00037)` at the end of the bullet (last line of the item); no dates or history inline in rule files |
-| 5 | Storage | `internal/rules-meta/` — flat, no subfolders (naming precedent: `internal/reviews-meta/`) |
-| 6 | Index | `internal/rules-meta/INDEX.md`, regenerated on every audit run, grouped by source file + section (precedent: the generated review `INDEX.md`) |
+| 1 | Main rule | every rule carries a rationale, externalized into a meta file referenced from the rule (RM-00020) |
+| 2 | Rule unit | one bullet / list item (not file, not section) — an estimated 100+ metas at full rollout (RM-00021) |
+| 3 | ID format | `RM-NNNNN` — 5 digits zero-padded; globally sequential; never recycled, never renumbered (a retired rule keeps its number). Allocation is chronological (next free number), not positional; `RM-00001` stays reserved for the main rule itself (RM-00022) |
+| 4 | Reference syntax | `(RM-NNNNN)` at the end of the bullet (last line of the item); no dates or history inline in rule files (RM-00023) |
+| 5 | Storage | `internal/rules-meta/` — flat, no subfolders (naming precedent: `internal/reviews-meta/`) (RM-00024) |
+| 6 | Index | `internal/rules-meta/INDEX.md`, regenerated on every audit run, grouped by source file + section (precedent: the generated review `INDEX.md`) (RM-00025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
-| 8 | Language | English — repo rule: all content is English |
+| 8 | Language | English — repo rule: all content is English (RM-00026) |
 
 ## Meta format v1.1
 
 ```markdown
 ---
-id: RM-00014
+id: RM-NNNNN
 rule: agent/conventions.md#shell-security-untrusted-input
 quote: "first words of the bullet"
 created: 2026-10-14
@@ -66,15 +66,15 @@ Body rules:
 A rationale is a falsifiable claim about the world — the external
 fact that necessitates the rule (version pin, incident, upstream
 behavior, environment property). Revisit question: *does this fact
-still hold?* A rationale that merely restates the rule is a defect.
+still hold?* A rationale that merely restates the rule is a defect. (RM-00027)
 
 ## Revisit ladder
 
-- Every new meta starts at `1m`.
-- Clean revisit → up one step: `1m → 6m → 1y → 2y` (`2y` is the max).
-- Revisit with findings or changes → back to `1m`.
+- Every new meta starts at `1m`. (RM-00031)
+- Clean revisit → up one step: `1m → 6m → 1y → 2y` (`2y` is the max). (RM-00028)
+- Revisit with findings or changes → back to `1m`. (RM-00032)
 - `next-revisit` = revisit date + new interval — never computed from
-  the stale due date (lateness must not compound).
+  the stale due date (lateness must not compound). (RM-00033)
 
 ## Audit invariants (deterministic, CI)
 
@@ -92,14 +92,14 @@ still hold?* A rationale that merely restates the rule is a defect.
 8. `INDEX.md` is regenerated on every run.
 
 CI blocks on 1–6; an overdue meta is a maintenance signal, not a
-broken build.
+broken build. (RM-00030)
 
 ## Retire
 
 The rule bullet is removed from the rule file; the meta stays with
 `status: retired`. Metas are never deleted — they are the
 institutional memory. Retired metas are exempt from the back-ref
-invariant.
+invariant. (RM-00029)
 
 ## Rollout
 
