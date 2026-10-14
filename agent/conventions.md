@@ -142,14 +142,12 @@ review host):
   the same way on an empty variable) must guard the variable with `:?`
   (`rm -rf "${WORK:?}/sub"`): an empty or unset variable degenerates the
   operand to a fixed absolute path (`/sub`) instead of the harmless
-  empty-operand no-op of the pure-variable form (audit follow-up to
-  0.0.42e C1, maintainer directive 2026-10-06; all suffix spellings
-  enforced since 0.0.45c C3).
+  empty-operand no-op of the pure-variable form.
   Pure-variable operands (`rm -f "$CONF"`) are deliberately exempt.
   Destructive permission verbs (`chmod`/`chown`/... with `"$VAR/suffix"`)
   stay unguarded by design: fixture setup uses them heavily, they are
   not deletion, and a degenerate target fails on permissions for the
-  non-root suite user.
+  non-root suite user. (RM-00003)
 - Code extracted from shipped scripts and eval'd or run by a test
   executes under a **controlled PATH**, never the inherited host PATH:
   any `command -v` inside the extracted block must not see tools that
