@@ -60,6 +60,9 @@ Body rules:
   maintainer raw note") — provenance is never overstated. Rationale
   content originates with the maintainer wherever possible; the agent
   formalizes.
+- **RM references appear only where load-bearing** — the unit's
+  trailing ref and genuine dependencies inside a rationale; never as
+  narrative decoration in logs or prose. (RM-00034)
 
 ## Quality bar for rationales
 
