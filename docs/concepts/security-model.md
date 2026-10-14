@@ -12,7 +12,7 @@ own **soft** layer (see below):
 |---|---|
 | Agent ≠ developer | wrapper execs `sudo -u opencode`; the developer's home is `750` and not group-shared |
 | Containers ≠ root | rootless backend owned by `opencode` (per-user socket / daemonless podman) |
-| No developer-RunAs | the sudoers carry only `(opencode)` rules for the kit binary, the socket probe, and the ddev-as-opencode helper |
+| No developer-RunAs | sudoers carry only `(opencode)` rules — kit binary, socket probe, ddev helper |
 
 Concretely:
 
@@ -39,9 +39,15 @@ The design record is [ddev-working](../../internal/records/ddev-working.md).
 
 | Guarantee | Mechanism |
 |---|---|
-| File denies (`.env`, keys, …) | `opencode.jsonc` soft rules — enforced by opencode's tools, prompted via bash tripwires |
+| File denies (`.env`, keys, …) | `opencode.jsonc` soft rules — opencode's tools + bash tripwires |
 | Developer ↔ agent file sharing | the `opencode` usergroup: setgid + default group ACLs + umask 002 |
-| ddev runs as one user | the `ddev()` terminal function + the sudoers helper exec the real ddev as `opencode` (sole exception: browser-opening commands — `launch`, `mailpit`, `phpmyadmin`, … — compute the URL as `opencode` and only the browser open runs as the developer, which needs the Windows interop the agent must not have; see [ddev integration](ddev-integration.md#browser-opening-commands-issue-20)) |
+| ddev runs as one user | the `ddev()` function + the sudoers helper exec ddev as `opencode` |
+
+The sole exception to the last row: **browser-opening commands**
+(`launch`, `mailpit`, `phpmyadmin`, …) compute the URL as `opencode`, but
+only the browser open runs as the developer — it needs the Windows
+interop the agent must not have. See
+[ddev integration](ddev-integration.md#browser-opening-commands-issue-20).
 
 ## Known residual gaps
 
@@ -209,13 +215,26 @@ them, because removing access is an admin decision:
 
 | Surface | Why it matters | Default on WSL2 |
 |---|---|---|
-| Rootful docker socket (`/var/run/docker.sock`) / `docker` group | full root, classic escape | installed by many devs — fine while the agent user stays out of the group |
-| Docker Desktop / Rancher Desktop integration sockets under `/mnt/wsl` | root-equivalent daemon in the Windows VM, exposed **world-usable** to every WSL distro user | present whenever Docker Desktop's WSL integration is enabled — remove the agent's distro from it or restrict the socket |
+| Rootful docker socket (`/var/run/docker.sock`) / `docker` group | full root, classic escape | common on dev hosts |
+| Docker/Rancher Desktop sockets under `/mnt/wsl` | root-equivalent, world-usable | present when integration is on |
 | `containerd` socket | full root | root-only by default |
 | LXD/LXC, libvirt (`lxd`, `libvirt` groups + sockets) | full root (host VMs/mounts) | not installed by default |
-| `sudo`/`admin`/`wheel`/`disk`/`snap` groups for the agent user | full root | never granted by the kit — the audit catches later manual grants |
-| `wireshark`/`adm`/`systemd-journal` groups | not root, but packet/log access can leak credentials | not granted by the kit |
-| Windows interop (executing `.exe` via `/mnt/c`) | runs code as the Windows session user | blocked by the `/mnt/c` restriction above; the audit probes the exec bit explicitly |
+| `sudo`/`admin`/`wheel`/`disk`/`snap` groups for the agent user | full root | never granted (notes) |
+| `wireshark`/`adm`/`systemd-journal` groups | not root, but can leak credentials | not granted by the kit |
+| Windows interop (executing `.exe` via `/mnt/c`) | runs code as Windows user | blocked via the `/mnt/c` restriction |
+
+Surface notes (detail that does not fit the rows):
+
+- The rootful docker socket / `docker` group is installed by many devs —
+  fine while the agent user stays out of the group.
+- The Docker/Rancher Desktop **integration sockets** under `/mnt/wsl`
+  expose a root-equivalent daemon in the Windows VM, **world-usable** to
+  every WSL distro user whenever the WSL integration is enabled — remove
+  the agent's distro from it or restrict the socket.
+- The `sudo`/`admin`/`wheel`/`disk`/`snap` groups are never granted by
+  the kit — the audit catches later manual grants.
+- Windows interop is blocked by the `/mnt/c` restriction above; the
+  audit probes the exec bit explicitly.
 
 Deliberately **not** flagged:
 

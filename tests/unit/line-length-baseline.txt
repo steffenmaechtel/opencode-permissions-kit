@@ -6,7 +6,6 @@ agent/learnings.md 19 1
 agent/review-concept.md 441 6
 agent/test-fidelity.md 181 6
 docs/concepts/ddev-integration.md 164 3
-docs/concepts/security-model.md 617 8
 docs/concepts/sharing-group.md 92 1
 docs/getting-started.md 23 1
 docs/how-to/container-tools.md 155 3
