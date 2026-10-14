@@ -45,8 +45,7 @@ keep updating normally via `opk update`.
 Run the one-liner in a terminal on the target machine:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/stable/files/install.sh \
-  | sudo env KIT_BRANCH=stable bash
+curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh | sudo env KIT_BRANCH=stable bash
 ```
 
 > On an unsupported Ubuntu version the installer refuses up front —

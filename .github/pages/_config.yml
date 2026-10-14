@@ -1,0 +1,3 @@
+title: opencode permissions kit
+description: opencode as its own Linux user against a rootless container backend
+theme: jekyll-theme-cayman

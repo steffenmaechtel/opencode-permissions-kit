@@ -1,0 +1,64 @@
+name: pages
+
+# GitHub Pages entry site (short install URLs, issue context: line-length
+# baseline debt of the raw.githubusercontent one-liners):
+# steffenmaechtel.github.io/opencode-permissions-kit serves a landing page
+# plus copies of install.sh / update.sh, so the docs one-liners get a
+# 68/69-char URL instead of the 98/139-char raw URLs.
+#
+# Channel discipline: the SCRIPT copies always come from the `stable`
+# release mirror — the public entry URLs must never serve dev state, no
+# matter which ref triggered the run (a manual dispatch from master is
+# fine for the landing page, but the scripts stay pinned to stable).
+# Landing page template: from the triggering ref (at release time
+# stable == master anyway).
+#
+# Pages settings must be ONCE set in the repo to "GitHub Actions"
+# (Settings -> Pages -> Build and deployment -> Source).
+
+on:
+  push:
+    branches: [stable]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Deployments are sequential state machines — an in-flight deploy must
+# not be cancelled halfway (official actions/deploy-pages pattern).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check out the stable channel for the served scripts
+        uses: actions/checkout@v7
+        with:
+          ref: stable
+          path: stable
+      - name: Assemble site
+        run: |
+          mkdir -p site
+          cp .github/pages/index.md .github/pages/_config.yml site/
+          cp stable/files/install.sh site/
+          cp stable/files/opencode-permissions-kit-lib/management/update.sh site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: site
+          destination: ./_site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site
+      - name: Deployment
+        id: deployment
+        uses: actions/deploy-pages@v4

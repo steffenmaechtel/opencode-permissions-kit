@@ -1,12 +1,11 @@
 CONTRIBUTING.md 72 3
-README.md 354 7
+README.md 331 6
 agent/README.md 41 3
 agent/conventions.md 49 2
 agent/learnings.md 19 1
 agent/review-concept.md 441 6
 agent/test-fidelity.md 181 6
-docs/how-to/update.md 325 5
-docs/reference/cli.md 62 1
+docs/how-to/update.md 139 2
 internal/README.md 11 2
 internal/process/ci-review.md 2083 18
 internal/records/README.md 49 5

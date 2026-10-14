@@ -362,6 +362,15 @@ no-runtime philosophy regardless of scale.
 6. Optional: GitHub Action that fast-forwards `stable` on tag push and
    fails loudly if `git diff master stable` would not be empty.
 7. e2e: no changes (suites already pin `KIT_BASE_URL` per branch).
+8. Pages entry site (2026-10, short one-liner URLs): `.github/pages/`
+   landing page (Cayman) plus `install.sh`/`update.sh` copies, deployed
+   by `.github/workflows/pages.yml` on every `stable` push (and manual
+   dispatch). The docs' stable-channel one-liners use
+   `steffenmaechtel.github.io/opencode-permissions-kit/...` (68/69-char
+   URL); master/branch/tag pins keep the ref-addressed raw URLs — a
+   channel-fixed entry cannot self-pin. The workflow checks `stable`
+   out explicitly for the served scripts, so the entry can never serve
+   dev state even when dispatched from another branch.
 
 ## 8. Open questions
 
