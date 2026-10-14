@@ -15,7 +15,6 @@ docs/how-to/secure-git-config.md 49 1
 docs/how-to/update.md 389 7
 docs/reference/cli.md 727 11
 docs/reference/compatibility.md 390 4
-docs/reference/files.md 2569 31
 docs/troubleshooting.md 43 3
 internal/README.md 11 2
 internal/process/ci-review.md 2083 18
