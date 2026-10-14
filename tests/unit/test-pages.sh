@@ -74,9 +74,19 @@ grep -qF 'layout: default' "$INDEX" \
 grep -qF "$ENTRY_INSTALL" "$INDEX" \
     && pass "landing page shows the entry install one-liner" \
     || fail "landing page lacks the entry install URL"
-grep -qF "$ENTRY_UPDATE" "$INDEX" \
-    && pass "landing page shows the entry update one-liner" \
-    || fail "landing page lacks the entry update URL"
+grep -qF 'sudo opk update' "$INDEX" \
+    && pass "landing page names sudo opk update as the update path" \
+    || fail "landing page lacks sudo opk update"
+if grep -qF "$ENTRY_UPDATE" "$INDEX"; then
+    fail "landing page still shows the curl update URL"
+else
+    pass "landing page omits the curl update URL (opk update is primary)"
+fi
+if grep -qF 'raw.githubusercontent.com' "$INDEX"; then
+    fail "landing page shows raw ref URLs (channel detail belongs in docs)"
+else
+    pass "landing page omits raw ref URLs (channel detail lives in docs)"
+fi
 
 [ -f "$CONFIG" ] && pass ".github/pages/_config.yml exists" \
     || fail ".github/pages/_config.yml missing"
