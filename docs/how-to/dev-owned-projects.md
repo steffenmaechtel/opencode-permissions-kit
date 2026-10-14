@@ -34,7 +34,10 @@ ddev source: settings creation returns early). Consequences:
 | Path | Owner | Mode |
 |---|---|---|
 | `.ddev/` | `opencode` | 2775 / 664 (ddev's internal churn stays contained) |
-| settings dirs (`config/system`, `typo3conf`, …), project root, everything else | **you** | 2775 / 664 (group baseline, permanent) |
+| settings dirs, project root, everything else | **you** | 2775 / 664 (group baseline, permanent) |
+
+Settings dirs means your CMS's config directories (`config/system`,
+`typo3conf`, …).
 
 The trade-off: **your repo owns the CMS settings file.** ddev no longer
 generates `AdditionalConfiguration.php` (TYPO3) or `settings.ddev.php`

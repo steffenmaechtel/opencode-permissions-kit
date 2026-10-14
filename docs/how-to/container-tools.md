@@ -11,13 +11,16 @@ way:
 
 | | **no ddev/docker** | **with ddev/docker** |
 |---|---|---|
-| Enabled by | final config has no docker/ddev allow | final merged `permission.bash` allows `docker *` / `ddev *` (broadly, not subcommand-only) — from the project's `opencode.json[c]` or the opencode user's global config |
-| opencode runs as | `opencode` user | `opencode` user, `DOCKER_HOST` → the user's rootless socket (docker-rootless), or the daemonless podman CLI |
+| Enabled by | final config has no docker/ddev allow | merged `permission.bash` allows `docker *` / `ddev *` (notes) |
+| opencode runs as | `opencode` user | `opencode` user; `DOCKER_HOST` → rootless socket, or daemonless podman |
 | ddev | denied | runs as `opencode` — always (terminal and agent) |
 
 The wrapper asks opencode itself for that final config (`opencode debug
 config`, resolved as the `opencode` user from the project directory), so a
-broad allow counts no matter which file declares it. If the probe is
+broad allow counts no matter which file declares it. The allow must be
+broad — `docker *` / `ddev *`, not subcommand-only — and may live in the
+project's `opencode.json[c]` or in the opencode user's global config. If
+the probe is
 unavailable (opencode too old for `debug config`, sudo denied), it falls
 back to scanning the project config only.
 
@@ -58,7 +61,8 @@ docker/ddev in **every** session — including projects without their own
 **global** config:
 
 ```bash
-sudo sed -i 's/"docker \*": "deny"/"docker *": "allow"/; s/"ddev \*": "deny"/"ddev *": "allow"/' /home/opencode/.config/opencode/opencode.jsonc
+sudo sed -i 's/"docker \*": "deny"/"docker *": "allow"/; s/"ddev \*": "deny"/"ddev *": "allow"/' \
+  /home/opencode/.config/opencode/opencode.jsonc
 ```
 
 Flip the values **where they are** — do not move or re-add rules: the

@@ -82,8 +82,8 @@ overridden.
 | Who calls `ddev`? | What happens |
 |---|---|
 | You, in a terminal | The function intercepts the call → runs via the sudoers helper as `opencode` ✔ |
-| A bash script started from your terminal (e.g. `vendor/bin/runTests.sh`, also behind its `#!/bin/sh` wrapper) | Gets the function via `export -f` / `BASH_ENV` → runs as `opencode` ✔ |
-| A pure `#!/bin/sh` (dash) target script, cronjob, IDE task — anything outside your shell environment | Calls the **real ddev binary** as your user — the function never applies ✘ |
+| A bash script started from your terminal | Gets the function via `export -f` / `BASH_ENV` → runs as `opencode` ✔ |
+| Outside your shell (dash script, cronjob, IDE task) | **Real ddev binary** as your user — function never applies ✘ |
 
 In the last case ddev runs as your user instead of `opencode` — two
 owners for `.ddev/`, a different daemon: exactly the state the kit
@@ -138,10 +138,13 @@ like `/var/www/vhosts` holding several projects):
 
 | App type (`.ddev/config.yaml` `type:`) | Handed-over directories |
 |---|---|
-| `typo3` | `config/system`, `<docroot>/typo3conf`, and bare `typo3conf` (repo-root fallback for legacy installs; composer v12+, legacy v12 `system/`, v11−) |
+| `typo3` | `config/system`, `<docroot>/typo3conf`, bare `typo3conf` (legacy fallback — notes) |
 | `drupal*`, `backdrop` | `<docroot>/sites/default` |
 | `magento*`, `maho` | `app/etc` (maho is the magento fork, issue #149) |
 | `modx` | `<docroot>/core/config` |
+
+Typo3 note: bare `typo3conf` is the repo-root fallback for legacy
+installs — composer v12+, legacy v12 `system/`, v11−.
 
 **Root-file types (`codeigniter`, `shopware6`, `symfony`).** Their
 settings file lives at the project root (`.env`, `.env.local`) and
