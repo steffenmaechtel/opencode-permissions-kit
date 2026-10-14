@@ -32,16 +32,6 @@ shows it). Advanced paths — streamed updates, channel switches, version
 pins — live in the
 [update guide](https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/how-to/update.md).
 
-## Other channels
-
-This page always serves the **stable** channel. Development or pinned
-installs address the raw refs directly (any branch or version tag):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/master/files/install.sh \
-  | sudo env KIT_BRANCH=master bash
-```
-
 ## Documentation
 
 - [Getting started](https://github.com/steffenmaechtel/opencode-permissions-kit/blob/master/docs/getting-started.md)

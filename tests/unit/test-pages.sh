@@ -82,6 +82,11 @@ if grep -qF "$ENTRY_UPDATE" "$INDEX"; then
 else
     pass "landing page omits the curl update URL (opk update is primary)"
 fi
+if grep -qF 'raw.githubusercontent.com' "$INDEX"; then
+    fail "landing page shows raw ref URLs (channel detail belongs in docs)"
+else
+    pass "landing page omits raw ref URLs (channel detail lives in docs)"
+fi
 
 [ -f "$CONFIG" ] && pass ".github/pages/_config.yml exists" \
     || fail ".github/pages/_config.yml missing"
