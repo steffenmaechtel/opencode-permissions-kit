@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (external /review session)
 
 # Review — pr-00179 snapshot a — issue #173 docs reflow baseline
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave under review: the whole branch `master..HEAD` (5 commits, 12 docs
 files + `tests/unit/line-length-baseline.txt`, +226/−82): reflow of the
 overlong lines in `docs/` and the matching line-length-baseline burn-down
