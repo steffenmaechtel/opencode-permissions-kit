@@ -2,7 +2,9 @@
 """Generate internal/reviews/INDEX.md from the case folders.
 
 One row per case (pr-NNNNN): key, stem/subject, scope, base, started,
-snapshots, status. Data sources, in order:
+snapshots, status. Cases live four one-digit shard levels deep
+(internal/reviews/N/N/N/N/pr-NNNNN — the first four PR digits; every
+node holds at most 10 entries). Data sources, in order:
 
 1. the mandatory review-meta header in review-a.md (new cases), and
 2. the frozen legacy-index.md stem map (pre-restructure corpus).
@@ -84,7 +86,9 @@ def status(folder, meta):
 def main():
     legacy = parse_legacy()
     rows = []
-    for folder in sorted(glob.glob(os.path.join(REVIEWS, 'pr-*'))):
+    for folder in sorted(glob.glob(
+            os.path.join(REVIEWS, '[0-9]', '[0-9]', '[0-9]', '[0-9]',
+                         'pr-*'))):
         if not os.path.isdir(folder):
             continue
         key = os.path.basename(folder)

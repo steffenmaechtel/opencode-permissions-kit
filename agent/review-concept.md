@@ -8,11 +8,11 @@ list for full reviews also lives in
 referencing: [conventions.md](conventions.md#referencing-review-findings).
 
 It was written after three review rounds on 0.0.38/0.0.39 (snapshots
-[0.0.38](../internal/reviews/pr-00109/review-a.md),
-[a](../internal/reviews/pr-00115/review-a.md)/
-[b](../internal/reviews/pr-00115/review-b.md)/
-[c](../internal/reviews/pr-00115/review-c.md)/
-[d](../internal/reviews/pr-00115/review-d.md))
+[0.0.38](../internal/reviews/0/0/1/0/pr-00109/review-a.md),
+[a](../internal/reviews/0/0/1/1/pr-00115/review-a.md)/
+[b](../internal/reviews/0/0/1/1/pr-00115/review-b.md)/
+[c](../internal/reviews/0/0/1/1/pr-00115/review-c.md)/
+[d](../internal/reviews/0/0/1/1/pr-00115/review-d.md))
 — the numbers below are that history, not theory.
 
 ## Two review types, two jobs
@@ -37,7 +37,7 @@ review → fix → review the fixes (wave review) → fix → …
 
 Before the loop starts: **the maintainer opens the (draft) birth-PR**
 and tells the reviewer its number — that number is the case key
-(`internal/reviews/pr-NNNNN/`; mechanics:
+(`internal/reviews/N/N/N/N/pr-NNNNN/`; mechanics:
 [review/README.md](../internal/reviews/README.md)). Opening the PR first keeps
 parallel features safe: GitHub allocates the number, so two features
 can never claim the same case folder.

@@ -61,7 +61,7 @@ docs_scope() {
     done
     find agent internal docs -name '*.md' -type f \
         ! -path 'internal/records/_archive/*' \
-        ! -path 'internal/reviews/pr-*/review-*' \
+        ! -path 'internal/reviews/*/pr-*/review-*' \
         ! -name 'INDEX.md' \
         ! -name 'legacy-index.md'
 }

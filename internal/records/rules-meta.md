@@ -1,6 +1,6 @@
 # Rule-Meta System (RM) — design record
 
-> Status: **ACTIVE BUILD-OUT** — pilot running since 2026-10-14 on
+> Status: **CURRENT** — pilot/build-out running since 2026-10-14 on
 > `feature/rules-meta-pilot`. This is the design record for the
 > rule-rationale system; the governed rule texts live in `agent/*.md`
 > and in the `## Rules` section of `AGENTS.md`. Where this record
@@ -24,10 +24,10 @@ holds.
 |---|-------|----------|
 | 1 | Main rule | every rule carries a rationale, externalized into a meta file referenced from the rule (RM-0020) |
 | 2 | Rule unit | one bullet / list item (not file, not section) — an estimated 100+ metas at full rollout (RM-0021) |
-| 3 | ID format | `RM-NNNN` — 4 digits zero-padded; globally sequential; never recycled, never renumbered (a retired rule keeps its number). Allocation is chronological (next free number), not positional; `RM-0001` stays reserved for the main rule itself (RM-0022) |
-| 4 | Reference syntax | `(RM-NNNN)` at the end of the bullet (last line of the item); no dates or history inline in rule files (RM-0023) |
-| 5 | Storage | `internal/rules-meta/N/N/N/` — three one-digit levels: every node, folders and files alike, holds at most 10 entries; a leaf holds the ten IDs sharing the first three digits. No scroll walls anywhere; the root stays a single `0/` until IDs reach 1000. Every level is computable from the token alone (no bookkeeping; a rule moving between files can never affect storage). Naming precedent: `internal/reviews-meta/`. Migrated 2026-10-16 while young — a pure `git mv` (RM-0024) |
-| 6 | Index & report | **both**: a committed `internal/rules-meta/INDEX.md` (regenerated on every audit run; grouped by source file + section; leads with an Actionable section — review-pending and overdue) **and** the audit's stdout report. Decided 2026-10-15 after reviewing a real prototype; the earlier uncertainty is resolved (RM-0025) |
+| 3 | ID format | `RM-NNNN` — 4 digits zero-padded, globally sequential, never recycled or renumbered (RM-0022) |
+| 4 | Reference syntax | `(RM-NNNN)` at the bullet's end; no dates or history inline in rule files (RM-0023) |
+| 5 | Storage | `internal/rules-meta/N/N/N/` — three one-digit levels, 10 entries max per node (RM-0024) |
+| 6 | Index & report | **both**: committed `INDEX.md` regenerated per audit run + the audit's stdout report (RM-0025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
 | 8 | Language | English — repo rule: all content is English (RM-0026) |
 
@@ -113,7 +113,7 @@ invariant. (RM-0029)
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | Pilot `conventions.md`: RM-0003 approved (`c3b1a5b`), RM-0002 committed as draft (`c3755be`), interval policy (`9c8f109`) | running |
+| 0 | Pilot `conventions.md` — first metas landed, interval policy set | running |
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | open |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | open |
 | 3 | Remaining `agent/` files + `AGENTS.md ## Rules` | open |

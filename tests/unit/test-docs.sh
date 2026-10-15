@@ -38,7 +38,7 @@ file_anchors() {
 # READMEs, records, user docs) must stay fully linked.
 is_frozen() {
     case "$1" in
-        internal/reviews/pr-*/review-*.md) return 0 ;;
+        internal/reviews/*/pr-*/review-*.md) return 0 ;;
         internal/records/_archive/*) return 0 ;;
     esac
     return 1

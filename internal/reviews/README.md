@@ -14,11 +14,17 @@ internal/reviews/
 ├── README.md        # this file — mechanics only (the index is generated)
 ├── INDEX.md         # GENERATED — never hand-edit (parity test pins it)
 ├── legacy-index.md  # frozen map: old file names → new locations
-└── pr-NNNNN/        # one case; NNNNN = 5-digit birth-PR number
-    ├── review-a.md  # first snapshot; chain letters a, b, c … (aa after z)
-    ├── review-b.md  # micro-wave review of the a-wave's fixes
-    └── resolution.md
+└── N/N/N/N/         # digit shard — the first four digits of the PR number
+    └── pr-NNNNN/    # one case; NNNNN = 5-digit birth-PR number
+        ├── review-a.md  # first snapshot; chain letters a, b, c … (aa after z)
+        ├── review-b.md  # micro-wave review of the a-wave's fixes
+        └── resolution.md
 ```
+
+- **Shard rule:** case `pr-ABCDE` lives at `internal/reviews/A/B/C/D/`
+  — four one-digit levels, at most 10 entries per node, the path
+  computable from the key alone. Enforced by
+  `tests/unit/test-reviews-lint.sh`.
 
 - **Birth-PR rule:** the case key is the PR that carries the FIRST
   snapshot into the repo. One birth-PR = one case. Later snapshots of

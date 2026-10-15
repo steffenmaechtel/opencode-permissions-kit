@@ -62,7 +62,7 @@ suites incl. sandbox policy, line length, docs links) pass · `make e2e`
 **273/0** · `make e2e-rootless` **47/0** · `make e2e-ddev` **70/0** ·
 `make check-version` consistent.
 
-Per [review-concept.md](../../../agent/review-concept.md) the wave changed semantics
+Per [review-concept.md](../../../../../../../agent/review-concept.md) the wave changed semantics
 of root-running scripts (`opk` handover, `ddev-migrate` export,
 `sudoers-deploy`, `wsl-browser-bridge`, `update.sh` binary path) — a
 wave review of this diff is mandatory before the PR. **Wave review ran
