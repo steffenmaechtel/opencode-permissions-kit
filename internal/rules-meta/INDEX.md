@@ -4,11 +4,11 @@
 > audit (`scripts/rules-audit.sh`, phase 2). Grouped by source file +
 > section, derived from each meta's `rule:` back-reference.
 
-**18 metas · 18 active · 0 retired · 2 review-pending · next due 2026-11-14**
+**18 metas · 18 active · 0 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0022, RM-0024, RM-0025
+- **Review pending:** none
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -33,10 +33,10 @@
 |---|---|---|---|---|---|
 | [RM-0020](0/0/2/RM-0020.md) | Main rule — every rule carries a rationale | active | approved | 1m | 2026-11-14 |
 | [RM-0021](0/0/2/RM-0021.md) | Rule unit = one bullet / list item | active | approved | 1m | 2026-11-14 |
-| [RM-0022](0/0/2/RM-0022.md) | ID format — 4 digits, never recycled | active | **pending** | 1m | 2026-11-14 |
+| [RM-0022](0/0/2/RM-0022.md) | ID format — 4 digits, never recycled | active | approved | 1m | 2026-11-14 |
 | [RM-0023](0/0/2/RM-0023.md) | Ref at bullet end, nothing inline | active | approved | 1m | 2026-11-14 |
-| [RM-0024](0/0/2/RM-0024.md) | Storage — `N/N/N`, ≤10 per node | active | **pending** | 1m | 2026-11-14 |
-| [RM-0025](0/0/2/RM-0025.md) | Index + report (both) | active | **pending** | 1m | 2026-11-14 |
+| [RM-0024](0/0/2/RM-0024.md) | Storage — `N/N/N`, ≤10 per node | active | approved | 1m | 2026-11-14 |
+| [RM-0025](0/0/2/RM-0025.md) | Index + report (both) | active | approved | 1m | 2026-11-14 |
 | [RM-0026](0/0/2/RM-0026.md) | Language: English | active | approved | 1m | 2026-11-14 |
 
 ### Quality bar for rationales
