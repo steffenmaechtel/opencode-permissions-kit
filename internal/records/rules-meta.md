@@ -27,7 +27,7 @@ holds.
 | 3 | ID format | `RM-NNNNN` — 5 digits zero-padded; globally sequential; never recycled, never renumbered (a retired rule keeps its number). Allocation is chronological (next free number), not positional; `RM-00001` stays reserved for the main rule itself (RM-00022) |
 | 4 | Reference syntax | `(RM-NNNNN)` at the end of the bullet (last line of the item); no dates or history inline in rule files (RM-00023) |
 | 5 | Storage | `internal/rules-meta/NN/NN/` — two-level shard: level 1 = the first two ID digits, level 2 = the next two; a leaf holds the ten IDs sharing the first four digits. Every level is computable from the token alone (no bookkeeping; a rule moving between files can never affect storage). Level 1 stays `00/` until ID 10,000, then caps the top level naturally. Naming precedent: `internal/reviews-meta/`. Migrated 2026-10-15 while young — a pure `git mv` (RM-00024) |
-| 6 | Index | **kept for now**: `internal/rules-meta/INDEX.md`, regenerated on every audit run, grouped by source file + section (precedent: the generated review `INDEX.md`). **We are unsure here** — alternative on record: drop the committed index in favor of an on-demand `make rules-report` (stdout: id · rule · status · next-revisit · overdue — never stale, no CI churn); the first revisits decide with evidence (RM-00025) |
+| 6 | Index & report | **both**: a committed `internal/rules-meta/INDEX.md` (regenerated on every audit run; grouped by source file + section; leads with an Actionable section — review-pending and overdue) **and** the audit's stdout report. Decided 2026-10-15 after reviewing a real prototype; the earlier uncertainty is resolved (RM-00025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
 | 8 | Language | English — repo rule: all content is English (RM-00026) |
 
@@ -40,6 +40,7 @@ rule: agent/conventions.md#shell-security-untrusted-input
 quote: "first words of the bullet"
 created: 2026-10-14
 status: active            # active | retired
+reviewed: 2026-10-15      # maintainer approval date; absent = review pending
 revisit-interval: 1m      # ladder: 1m 6m 1y 2y — always starts at 1m
 next-revisit: 2026-11-14
 ---
