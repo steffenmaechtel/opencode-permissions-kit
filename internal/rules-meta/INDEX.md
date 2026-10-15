@@ -8,7 +8,7 @@
 
 ## Actionable
 
-- **Review pending:** RM-00024, RM-00025
+- **Review pending:** RM-0022, RM-0024, RM-0025
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -17,13 +17,13 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-00002](00/00/RM-00002.md) | Default choice: `n` for system-changing steps | active | approved | 1m | 2026-11-14 |
+| [RM-0002](0/0/0/RM-0002.md) | Default choice: `n` for system-changing steps | active | approved | 1m | 2026-11-14 |
 
 ### Test sandbox (unit suites)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-00003](00/00/RM-00003.md) | `rm` var+suffix needs the `:?` guard | active | approved | 1m | 2026-11-14 |
+| [RM-0003](0/0/0/RM-0003.md) | `rm` var+suffix needs the `:?` guard | active | approved | 1m | 2026-11-14 |
 
 ## internal/records/rules-meta.md
 
@@ -31,44 +31,44 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-00020](00/02/RM-00020.md) | Main rule — every rule carries a rationale | active | approved | 1m | 2026-11-14 |
-| [RM-00021](00/02/RM-00021.md) | Rule unit = one bullet / list item | active | approved | 1m | 2026-11-14 |
-| [RM-00022](00/02/RM-00022.md) | ID format — never recycled, chronological allocation | active | approved | 1m | 2026-11-14 |
-| [RM-00023](00/02/RM-00023.md) | Ref at bullet end, nothing inline | active | approved | 1m | 2026-11-14 |
-| [RM-00024](00/02/RM-00024.md) | Storage — `NN/NN` two-level shard | active | **pending** | 1m | 2026-11-14 |
-| [RM-00025](00/02/RM-00025.md) | Index kept / report alternative (uncertain) | active | **pending** | 1m | 2026-11-14 |
-| [RM-00026](00/02/RM-00026.md) | Language: English | active | approved | 1m | 2026-11-14 |
+| [RM-0020](0/0/2/RM-0020.md) | Main rule — every rule carries a rationale | active | approved | 1m | 2026-11-14 |
+| [RM-0021](0/0/2/RM-0021.md) | Rule unit = one bullet / list item | active | approved | 1m | 2026-11-14 |
+| [RM-0022](0/0/2/RM-0022.md) | ID format — 4 digits, never recycled | active | **pending** | 1m | 2026-11-14 |
+| [RM-0023](0/0/2/RM-0023.md) | Ref at bullet end, nothing inline | active | approved | 1m | 2026-11-14 |
+| [RM-0024](0/0/2/RM-0024.md) | Storage — `N/N/N`, ≤10 per node | active | **pending** | 1m | 2026-11-14 |
+| [RM-0025](0/0/2/RM-0025.md) | Index + report (both) | active | **pending** | 1m | 2026-11-14 |
+| [RM-0026](0/0/2/RM-0026.md) | Language: English | active | approved | 1m | 2026-11-14 |
 
 ### Quality bar for rationales
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-00027](00/02/RM-00027.md) | Rationale = falsifiable claim | active | approved | 1m | 2026-11-14 |
+| [RM-0027](0/0/2/RM-0027.md) | Rationale = falsifiable claim | active | approved | 1m | 2026-11-14 |
 
 ### Revisit ladder
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-00031](00/03/RM-00031.md) | Every new meta starts at `1m` | active | approved | 1m | 2026-11-15 |
-| [RM-00028](00/03/RM-00028.md) | Clean revisit → up one step (max 2y) | active | approved | 1m | 2026-11-14 |
-| [RM-00032](00/03/RM-00032.md) | Findings → back to `1m` | active | approved | 1m | 2026-11-15 |
-| [RM-00033](00/03/RM-00033.md) | Bump from revisit date, not due date | active | approved | 1m | 2026-11-15 |
+| [RM-0031](0/0/3/RM-0031.md) | Every new meta starts at `1m` | active | approved | 1m | 2026-11-15 |
+| [RM-0028](0/0/2/RM-0028.md) | Clean revisit → up one step (max 2y) | active | approved | 1m | 2026-11-14 |
+| [RM-0032](0/0/3/RM-0032.md) | Findings → back to `1m` | active | approved | 1m | 2026-11-15 |
+| [RM-0033](0/0/3/RM-0033.md) | Bump from revisit date, not due date | active | approved | 1m | 2026-11-15 |
 
 ### Retire
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-00029](00/03/RM-00029.md) | Metas are never deleted | active | approved | 1m | 2026-11-14 |
+| [RM-0029](0/0/2/RM-0029.md) | Metas are never deleted | active | approved | 1m | 2026-11-14 |
 
 ### Audit invariants
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-00030](00/03/RM-00030.md) | CI blocks on structure; overdue only reports | active | approved | 1m | 2026-11-14 |
+| [RM-0030](0/0/3/RM-0030.md) | CI blocks on structure; overdue only reports | active | approved | 1m | 2026-11-14 |
 
 ### Meta format (body rules)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-00034](00/03/RM-00034.md) | RM refs only where load-bearing | active | approved | 1m | 2026-11-15 |
-| [RM-00035](00/03/RM-00035.md) | Examples use the abstract `RM-NNNNN` | active | approved | 1m | 2026-11-15 |
+| [RM-0034](0/0/3/RM-0034.md) | RM refs only where load-bearing | active | approved | 1m | 2026-11-15 |
+| [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract `RM-NNNN` | active | approved | 1m | 2026-11-15 |

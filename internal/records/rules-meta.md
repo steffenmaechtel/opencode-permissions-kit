@@ -22,20 +22,20 @@ holds.
 
 | # | Topic | Decision |
 |---|-------|----------|
-| 1 | Main rule | every rule carries a rationale, externalized into a meta file referenced from the rule (RM-00020) |
-| 2 | Rule unit | one bullet / list item (not file, not section) — an estimated 100+ metas at full rollout (RM-00021) |
-| 3 | ID format | `RM-NNNNN` — 5 digits zero-padded; globally sequential; never recycled, never renumbered (a retired rule keeps its number). Allocation is chronological (next free number), not positional; `RM-00001` stays reserved for the main rule itself (RM-00022) |
-| 4 | Reference syntax | `(RM-NNNNN)` at the end of the bullet (last line of the item); no dates or history inline in rule files (RM-00023) |
-| 5 | Storage | `internal/rules-meta/NN/NN/` — two-level shard: level 1 = the first two ID digits, level 2 = the next two; a leaf holds the ten IDs sharing the first four digits. Every level is computable from the token alone (no bookkeeping; a rule moving between files can never affect storage). Level 1 stays `00/` until ID 10,000, then caps the top level naturally. Naming precedent: `internal/reviews-meta/`. Migrated 2026-10-15 while young — a pure `git mv` (RM-00024) |
-| 6 | Index & report | **both**: a committed `internal/rules-meta/INDEX.md` (regenerated on every audit run; grouped by source file + section; leads with an Actionable section — review-pending and overdue) **and** the audit's stdout report. Decided 2026-10-15 after reviewing a real prototype; the earlier uncertainty is resolved (RM-00025) |
+| 1 | Main rule | every rule carries a rationale, externalized into a meta file referenced from the rule (RM-0020) |
+| 2 | Rule unit | one bullet / list item (not file, not section) — an estimated 100+ metas at full rollout (RM-0021) |
+| 3 | ID format | `RM-NNNN` — 4 digits zero-padded; globally sequential; never recycled, never renumbered (a retired rule keeps its number). Allocation is chronological (next free number), not positional; `RM-0001` stays reserved for the main rule itself (RM-0022) |
+| 4 | Reference syntax | `(RM-NNNN)` at the end of the bullet (last line of the item); no dates or history inline in rule files (RM-0023) |
+| 5 | Storage | `internal/rules-meta/N/N/N/` — three one-digit levels: every node, folders and files alike, holds at most 10 entries; a leaf holds the ten IDs sharing the first three digits. No scroll walls anywhere; the root stays a single `0/` until IDs reach 1000. Every level is computable from the token alone (no bookkeeping; a rule moving between files can never affect storage). Naming precedent: `internal/reviews-meta/`. Migrated 2026-10-16 while young — a pure `git mv` (RM-0024) |
+| 6 | Index & report | **both**: a committed `internal/rules-meta/INDEX.md` (regenerated on every audit run; grouped by source file + section; leads with an Actionable section — review-pending and overdue) **and** the audit's stdout report. Decided 2026-10-15 after reviewing a real prototype; the earlier uncertainty is resolved (RM-0025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
-| 8 | Language | English — repo rule: all content is English (RM-00026) |
+| 8 | Language | English — repo rule: all content is English (RM-0026) |
 
 ## Meta format v1.1
 
 ```markdown
 ---
-id: RM-NNNNN
+id: RM-NNNN
 rule: agent/conventions.md#shell-security-untrusted-input
 quote: "first words of the bullet"
 created: 2026-10-14
@@ -63,33 +63,33 @@ Body rules:
   formalizes.
 - **RM references appear only where load-bearing** — the unit's
   trailing ref and genuine dependencies inside a rationale; never as
-  narrative decoration in logs or prose. (RM-00034)
-- **Examples use the abstract token `RM-NNNNN`**, never a real meta's
+  narrative decoration in logs or prose. (RM-0034)
+- **Examples use the abstract token `RM-NNNN`**, never a real meta's
   number — a real number inside an example is indistinguishable from
-  a reference in IDE searches. (RM-00035)
+  a reference in IDE searches. (RM-0035)
 
 ## Quality bar for rationales
 
 A rationale is a falsifiable claim about the world — the external
 fact that necessitates the rule (version pin, incident, upstream
 behavior, environment property). Revisit question: *does this fact
-still hold?* A rationale that merely restates the rule is a defect. (RM-00027)
+still hold?* A rationale that merely restates the rule is a defect. (RM-0027)
 
 ## Revisit ladder
 
-- Every new meta starts at `1m`. (RM-00031)
-- Clean revisit → up one step: `1m → 6m → 1y → 2y` (`2y` is the max). (RM-00028)
-- Revisit with findings or changes → back to `1m`. (RM-00032)
+- Every new meta starts at `1m`. (RM-0031)
+- Clean revisit → up one step: `1m → 6m → 1y → 2y` (`2y` is the max). (RM-0028)
+- Revisit with findings or changes → back to `1m`. (RM-0032)
 - `next-revisit` = revisit date + new interval — never computed from
-  the stale due date (lateness must not compound). (RM-00033)
+  the stale due date (lateness must not compound). (RM-0033)
 
 ## Audit invariants (deterministic, CI)
 
 `scripts/rules-audit.sh`, pinned by `tests/unit/test-rules-meta.sh`:
 
-1. Every rule unit in audit scope carries exactly one `(RM-000xx)` ref.
-2. Every ref resolves: `internal/rules-meta/<NN>/<NN>/RM-xxxxx.md`
-   exists (buckets = the ref's first four ID digits).
+1. Every rule unit in audit scope carries exactly one `(RM-xxxx)` ref.
+2. Every ref resolves: `internal/rules-meta/<N>/<N>/<N>/RM-xxxx.md`
+   exists (buckets = the ref's first three ID digits).
 3. 1:1 — no meta is referenced by two units; an active meta without a
    back-ref fails (orphan).
 4. Filename ↔ `id:` identical; IDs unique.
@@ -100,25 +100,25 @@ still hold?* A rationale that merely restates the rule is a defect. (RM-00027)
 8. `INDEX.md` is regenerated on every run.
 
 CI blocks on 1–6; an overdue meta is a maintenance signal, not a
-broken build. (RM-00030)
+broken build. (RM-0030)
 
 ## Retire
 
 The rule bullet is removed from the rule file; the meta stays with
 `status: retired`. Metas are never deleted — they are the
 institutional memory. Retired metas are exempt from the back-ref
-invariant. (RM-00029)
+invariant. (RM-0029)
 
 ## Rollout
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | Pilot `conventions.md`: RM-00003 approved (`c3b1a5b`), RM-00002 committed as draft (`c3755be`), interval policy (`9c8f109`) | running |
-| 1 | Remaining `conventions.md` units (`RM-00004` ff.) | open |
+| 0 | Pilot `conventions.md`: RM-0003 approved (`c3b1a5b`), RM-0002 committed as draft (`c3755be`), interval policy (`9c8f109`) | running |
+| 1 | Remaining `conventions.md` units (`RM-0004` ff.) | open |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | open |
 | 3 | Remaining `agent/` files + `AGENTS.md ## Rules` | open |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
-| 5 | Self-application: the main rule gets `RM-00001` | open |
+| 5 | Self-application: the main rule gets `RM-0001` | open |
 
 ## Open defaults (the pilot validates them)
 

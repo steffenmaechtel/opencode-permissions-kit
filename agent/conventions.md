@@ -21,7 +21,7 @@ Every yes/no question in shipped scripts follows one pattern:
 - **Default choice:** `n` for anything that changes the system (remove,
   provision, proceed with destructive steps), `y` only where "no" is the
   surprising/riskier answer (e.g. the recommended audit-log deletion during
-  uninstall). (RM-00002)
+  uninstall). (RM-0002)
 - Don't invent alternatives (`(yes/no)`, `Y/N`, `[yes|no]` …). If a choice
   needs more than yes/no, use a numbered/keyed menu (`ui_menu`).
 
@@ -147,7 +147,7 @@ review host):
   Destructive permission verbs (`chmod`/`chown`/... with `"$VAR/suffix"`)
   stay unguarded by design: fixture setup uses them heavily, they are
   not deletion, and a degenerate target fails on permissions for the
-  non-root suite user. (RM-00003)
+  non-root suite user. (RM-0003)
 - Code extracted from shipped scripts and eval'd or run by a test
   executes under a **controlled PATH**, never the inherited host PATH:
   any `command -v` inside the extracted block must not see tools that
