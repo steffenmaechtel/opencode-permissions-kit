@@ -23,6 +23,7 @@ archive).
 | [rootless-backend.md](rootless-backend.md) | rootless backends: provisioning + selection reference | CURRENT |
 | [opencode-2x.md](opencode-2x.md) | opencode 2.x compatibility: model, detection, open items | CURRENT |
 | [security-advisories.md](security-advisories.md) | advisory warnings: database, upstream watch, curation | CURRENT |
+| [rules-meta.md](rules-meta.md) | rule-rationale system: metas, revisit ladder, audit invariants | CURRENT |
 
 Superseded and purely historical records live in
 [_archive/](_archive/) — `design/` (pre-streamline records),

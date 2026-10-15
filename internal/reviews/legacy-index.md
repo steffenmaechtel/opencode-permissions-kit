@@ -33,9 +33,9 @@ Take the stem from the old citation, find the key above, then:
 
 Examples:
 
-- `0.0.49b C1` → `internal/reviews/pr-00171/review-b.md` (finding C1)
-- `0.0.38 S1` → `internal/reviews/pr-00109/review-a.md` (finding S1)
-- `2026-09-28-v0.0.39-resolution.md` → `internal/reviews/pr-00115/resolution.md`
+- `0.0.49b C1` → `internal/reviews/0/0/1/7/pr-00171/review-b.md` (finding C1)
+- `0.0.38 S1` → `internal/reviews/0/0/1/0/pr-00109/review-a.md` (finding S1)
+- `2026-09-28-v0.0.39-resolution.md` → `internal/reviews/0/0/1/1/pr-00115/resolution.md`
 
 `grep -r "0.0.49b" internal/reviews/` works too — stems and qualified
 finding IDs appear inside the snapshots and resolutions.

@@ -98,6 +98,8 @@ jobs:
         run: ./tests/unit/test-reviews-lint.sh
       - name: Run review index/pointer parity (structure wave 2026-10)
         run: ./tests/unit/test-reviews-parity.sh
+      - name: Run rules-meta index parity (rule-meta pilot 2026-10)
+        run: ./tests/unit/test-rules-index-parity.sh
       - name: Run CLI dispatcher tests
         run: ./tests/unit/test-kit-cli.sh
       - name: Run project path policy tests
