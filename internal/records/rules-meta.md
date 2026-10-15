@@ -26,8 +26,8 @@ holds.
 | 2 | Rule unit | one bullet / list item (not file, not section) — an estimated 100+ metas at full rollout (RM-00021) |
 | 3 | ID format | `RM-NNNNN` — 5 digits zero-padded; globally sequential; never recycled, never renumbered (a retired rule keeps its number). Allocation is chronological (next free number), not positional; `RM-00001` stays reserved for the main rule itself (RM-00022) |
 | 4 | Reference syntax | `(RM-NNNNN)` at the end of the bullet (last line of the item); no dates or history inline in rule files (RM-00023) |
-| 5 | Storage | `internal/rules-meta/` — flat, no subfolders (naming precedent: `internal/reviews-meta/`) (RM-00024) |
-| 6 | Index | `internal/rules-meta/INDEX.md`, regenerated on every audit run, grouped by source file + section (precedent: the generated review `INDEX.md`) (RM-00025) |
+| 5 | Storage | `internal/rules-meta/NN/` — sharded by the first two ID digits: 100 buckets à 1000 IDs, the bucket is computable from the token alone (no bookkeeping, moves between rule files can never affect storage). Naming precedent: `internal/reviews-meta/`. Migrated 2026-10-15 while young — a pure `git mv`, nothing had pinned the old paths yet (RM-00024) |
+| 6 | Index | **kept for now**: `internal/rules-meta/INDEX.md`, regenerated on every audit run, grouped by source file + section (precedent: the generated review `INDEX.md`). **We are unsure here** — alternative on record: drop the committed index in favor of an on-demand `make rules-report` (stdout: id · rule · status · next-revisit · overdue — never stale, no CI churn); the first revisits decide with evidence (RM-00025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
 | 8 | Language | English — repo rule: all content is English (RM-00026) |
 
@@ -87,7 +87,8 @@ still hold?* A rationale that merely restates the rule is a defect. (RM-00027)
 `scripts/rules-audit.sh`, pinned by `tests/unit/test-rules-meta.sh`:
 
 1. Every rule unit in audit scope carries exactly one `(RM-000xx)` ref.
-2. Every ref resolves: `internal/rules-meta/RM-000xx.md` exists.
+2. Every ref resolves: `internal/rules-meta/<NN>/RM-xxxxx.md` exists
+   (bucket = the ref's first two ID digits).
 3. 1:1 — no meta is referenced by two units; an active meta without a
    back-ref fails (orphan).
 4. Filename ↔ `id:` identical; IDs unique.
