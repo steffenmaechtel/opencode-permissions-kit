@@ -1,7 +1,9 @@
 # Review resolution — pr-00189 (issue-187 y/n prompt consistency)
 
-Status: in chain — fix wave `4fb7ebd` landed (a W1, a W2); micro-wave
-review `b` owed per the stop rule (code was touched).
+Status: closed — fix wave `4fb7ebd` (a W1, a W2) dispositioned; micro-
+wave review `b` (fix commit only): 0 HIGH/MED/LOW, 2 INFO — both
+deliberately not done, no code touched by the dispositions, stop rule
+met.
 
 Case: wave review `a` of `feature/y-n-prompt-consistency`
 (`d7a2d87..43bd33e`, prompt-shape/semantics fix wave). Verdict at review
@@ -13,10 +15,12 @@ helper, W3/W4 no action).
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a W1 (LOW) | **implemented** | `4fb7ebd` | `script` row in check-host.sh + header list fixed (setsid was missing there too); probe renders on every run |
-| a W2 (LOW) | **implemented** | `4fb7ebd` | `IFS=` dropped in `_ui_read` ×2 + opk fallback read; uninstall unchanged (reference); 8 padded pins across 3 suites; sabotage 4/2/2 FAILs, restored green |
-| a W3 (INFO) | **deliberately not done** | — | intended RM-0006 semantics (unknown → default); maintainer acknowledged the y-default consent surface in chat — see detail |
+| a W1 (LOW) | **implemented** | `4fb7ebd` | check-host `script` row + header list — see detail |
+| a W2 (LOW) | **implemented** | `4fb7ebd` | `IFS=` dropped ×3; 8 padded pins; sabotage 4/2/2 — see detail |
+| a W3 (INFO) | **deliberately not done** | — | intended RM-0006 semantics; maintainer acknowledged — see detail |
 | a W4 (INFO) | **deliberately not done** | — | pty-ordering note for future flake triage; no action owed |
+| b B1 (INFO) | **deliberately not done** | — | whitespace-only = empty read, 5-empty abort intent — review-b |
+| b B2 (INFO) | **deliberately not done** | — | presence-only probe; util-linux named in why-text — review-b |
 
 ## Evidence detail
 
