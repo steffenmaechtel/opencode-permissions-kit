@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**34 metas · 34 active · 0 retired · 4 review-pending · next due 2026-11-14**
+**34 metas · 34 active · 0 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0010, RM-0011, RM-0012, RM-0013
+- **Review pending:** none
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -36,10 +36,10 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0010](0/0/1/RM-0010.md) | Quoting. Every expansion of external data is… | active | **pending** | 1m | 2026-11-16 |
-| [RM-0011](0/0/1/RM-0011.md) | printf '%s' style | active | **pending** | 1m | 2026-11-16 |
-| [RM-0012](0/0/1/RM-0012.md) | Free text flows through files, not argv | active | **pending** | 1m | 2026-11-16 |
-| [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | **pending** | 1m | 2026-11-16 |
+| [RM-0010](0/0/1/RM-0010.md) | Quoting. Every expansion of external data is… | active | approved | 1m | 2026-11-16 |
+| [RM-0011](0/0/1/RM-0011.md) | printf '%s' style | active | approved | 1m | 2026-11-16 |
+| [RM-0012](0/0/1/RM-0012.md) | Free text flows through files, not argv | active | approved | 1m | 2026-11-16 |
+| [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | approved | 1m | 2026-11-16 |
 
 ### Test sandbox (unit suites)
 

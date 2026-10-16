@@ -119,7 +119,7 @@ invariant. (RM-0029)
 | Phase | Content | Status |
 |---|---|---|
 | 0 | Pilot `conventions.md` — first metas landed, interval policy set | done |
-| 1 | Remaining `conventions.md` units (`RM-0004` ff.) | drafted (RM-0004–0019) — maintainer review pending |
+| 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | open |
 | 3 | Remaining `agent/` files + `AGENTS.md ## Rules` | open |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
