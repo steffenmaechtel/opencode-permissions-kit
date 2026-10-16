@@ -16,9 +16,7 @@ Every yes/no question in shipped scripts follows one pattern:
 - **Format:** `<question> [Y/n]` or `<question> [y/N]` — square
   brackets, the **default as the capital letter**; the line carries
   the two-space indent of the standard output style and no extra
-  marker (issue #187 B: the `[?]` marker existed only in uninstall's
-  `prompt_yn` and was dropped so every kit command renders the same
-  shape). (RM-0004)
+  marker. (RM-0004)
 - **Enter accepts the default** (empty answer = default). (RM-0005)
 - Accepted input: `y`, `yes`, `n`, `no` — case-insensitive. Unknown input
   falls back to the default. (RM-0006)
