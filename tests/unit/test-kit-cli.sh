@@ -622,6 +622,8 @@ oc_pin "opk fallback: mixed-case Yes accepted under an n default (issue #187 C)"
 oc_pin "opk fallback: mixed-case No declines under a y default (issue #187 C)" No y no
 oc_pin "opk fallback: unknown input falls back to a y default (issue #187 A class)" garbage y yes
 oc_pin "opk fallback: unknown input falls back to an n default (issue #187 A class)" garbage n no
+oc_pin "opk fallback: padded ' y' accepted under an n default (#189 a W2)" " y" n yes
+oc_pin "opk fallback: trailing-space 'no ' declines under a y default (#189 a W2)" "no " y no
 oc_pin "opk fallback: empty input fails closed to the default" "" n no
 _ocline=$(opk_uc "" y)
 if printf '%s' "$_ocline" | grep -qF '  Remove them now? [Y/n] ' \

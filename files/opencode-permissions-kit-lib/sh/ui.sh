@@ -164,14 +164,18 @@ ui_plan() {
 # sets UI_NO_STDIN_FALLBACK=1 and gets a hard error instead of script
 # bytes being consumed as the answer (review 0.0.39b C6).
 _ui_read() {
-    if IFS= read -r "$1" </dev/tty 2>/dev/null; then
+    # No IFS= on purpose (#189 a W2): read's field splitting trims
+    # leading/trailing whitespace, so a padded answer (" y", "no ")
+    # counts as an explicit answer — the trim uninstall.sh's prompt_yn
+    # always had; IFS= here would silently re-open that divergence.
+    if read -r "$1" </dev/tty 2>/dev/null; then
         return 0
     fi
     if [ "${UI_NO_STDIN_FALLBACK:-}" = "1" ]; then
         printf '  error     no terminal available for this prompt — rerun with --yes or from a checkout\n' >&2
         exit 1
     fi
-    IFS= read -r "$1" || :
+    read -r "$1" || :
 }
 
 ui_ask() {
@@ -197,6 +201,8 @@ ui_confirm() {
     # (0.0.44a V17: unknown input used to return "no" even when the
     # default was y — a trailing space after "y" declined what the
     # prompt's own default promised).
+    # (#189 a W2: edge whitespace is trimmed in _ui_read — a padded
+    # answer is explicit input, not unknown input.)
     _q="$1"; _d="${2:-n}"
     [ "$_d" = "y" ] && _hint="[Y/n]" || _hint="[y/N]"
     printf '  %s %s ' "$_q" "$_hint" >&2

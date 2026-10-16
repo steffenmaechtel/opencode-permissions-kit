@@ -18,8 +18,10 @@ Every yes/no question in shipped scripts follows one pattern:
   the two-space indent of the standard output style and no extra
   marker. (RM-0004)
 - **Enter accepts the default** (empty answer = default). (RM-0005)
-- Accepted input: `y`, `yes`, `n`, `no` — case-insensitive. Unknown input
-  falls back to the default. (RM-0006)
+- Accepted input: `y`, `yes`, `n`, `no` — case-insensitive;
+  leading/trailing whitespace is trimmed before matching (a padded
+  ` y` is an explicit answer, #189 a W2). Unknown input falls back
+  to the default. (RM-0006)
 - **Default choice:** `n` for anything that changes the system (remove,
   provision, proceed with destructive steps), `y` only where "no" is the
   surprising/riskier answer (e.g. the recommended audit-log deletion during

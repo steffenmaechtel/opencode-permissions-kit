@@ -473,6 +473,8 @@ py_pin "prompt_yn: unknown input falls back to a y default (issue #187 A)" j y y
 py_pin "prompt_yn: unknown input falls back to an n default (issue #187 A)" j n n
 py_pin "prompt_yn: mixed-case Yes accepted under an n default (issue #187 C class)" Yes n y
 py_pin "prompt_yn: mixed-case No declines under a y default (issue #187 C class)" No y n
+py_pin "prompt_yn: padded ' y' accepted under an n default (#189 a W2 — pins the pre-existing trim)" " y" n y
+py_pin "prompt_yn: trailing-space 'no ' declines under a y default (#189 a W2)" "no " y n
 py_pin "prompt_yn: Enter accepts the y default (regression guard)" "" y y
 # Shape (issue #187 B): two-space indent, no [?] marker, capital default.
 _pyline=$(py_ask "" n)

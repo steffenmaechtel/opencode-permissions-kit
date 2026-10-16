@@ -43,13 +43,13 @@ else
     ui_confirm() { # <question> <y|n default> — reads /dev/tty, fails closed
         printf '  %s ' "$1" >&2
         case "$2" in y|Y) printf '[Y/n] ' >&2 ;; *) printf '[y/N] ' >&2 ;; esac
-        IFS= read -r _uic < /dev/tty 2>/dev/null || _uic=""
+        read -r _uic < /dev/tty 2>/dev/null || _uic=""
         # Lowercase BEFORE matching (issue #187 C): mixed-case answers
         # (Yes/No/yEs) used to miss the arms and silently become the
         # DEFAULT — an explicit No under a y default answered yes.
         # Semantics mirror ui.sh's ui_confirm: y/yes/n/no accepted
-        # case-insensitively, anything else (EOF, garbage, padded
-        # input) falls back to the default.
+        # case-insensitively; the read trims edge whitespace (#189 a
+        # W2), anything else (EOF, garbage) falls back to the default.
         _uic="$(printf '%s' "$_uic" | tr '[:upper:]' '[:lower:]')"
         case "$_uic" in
             y|yes) return 0 ;;

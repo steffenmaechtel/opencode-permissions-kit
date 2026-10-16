@@ -130,11 +130,17 @@ check "ui_ask returns the default on EOF" [ "$ans" = "yes" ]
 ans=$(printf 'no\n' | setsid sh -c ". \"\$1\"; ui_ask \"Proceed?\" \"yes\"" _ "$UI" 2>/dev/null)
 check "ui_ask returns typed input" [ "$ans" = "no" ]
 
+ans=$(printf ' name \n' | setsid sh -c ". \"\$1\"; ui_ask \"Proceed?\" \"yes\"" _ "$UI" 2>/dev/null)
+check "ui_ask: edge whitespace trimmed from typed input (#189 a W2)" [ "$ans" = "name" ]
+
 ans=$(run_ui 'ui_menu "Mode?" "1" "1|Standard" "2|Advanced"')
 check "ui_menu returns the default key on EOF" [ "$ans" = "1" ]
 
 ans=$(printf '2\n' | setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
 check "ui_menu returns the chosen key" [ "$ans" = "2" ]
+
+ans=$(printf ' 2\n' | setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
+check "ui_menu: padded key ' 2' trimmed to the chosen key (#189 a W2)" [ "$ans" = "2" ]
 
 ans=$(printf 'zzz\n' | setsid sh -c ". \"\$1\"; ui_menu \"Mode?\" \"1\" \"1|Standard\" \"2|Advanced\"" _ "$UI" 2>/dev/null)
 check "ui_menu falls back to default on unknown input" [ "$ans" = "1" ]
@@ -143,9 +149,11 @@ check "ui_menu falls back to default on unknown input" [ "$ans" = "1" ]
 # the case used to return "no" even when the default was y, so a stray
 # trailing space after "y" declined what the prompt's own default
 # promised (conventions.md: "unknown input falls back to the default").
+# Since #189 a W2 the trailing space no longer reaches the arms: answers
+# are edge-trimmed in _ui_read, so 'y ' is EXPLICIT input (pin below).
 _uc_rc=0
 printf 'y \n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
-check "ui_confirm: trailing-space y honors the y default (V17)" [ "$_uc_rc" -eq 0 ]
+check "ui_confirm: trailing-space 'y ' trimmed to an explicit yes (#189 a W2)" [ "$_uc_rc" -eq 0 ]
 _uc_rc=0
 printf 'garbage\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
 check "ui_confirm: unknown input falls back to a y default (V17)" [ "$_uc_rc" -eq 0 ]
@@ -155,6 +163,18 @@ check "ui_confirm: unknown input falls back to an n default (V17)" [ "$_uc_rc" -
 _uc_rc=0
 printf 'n\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
 check "ui_confirm: explicit no still declines under a y default" [ "$_uc_rc" -ne 0 ]
+
+# Padded answers are explicit answers (#189 a W2): _ui_read trims edge
+# whitespace, so ' y' accepts under an n default and 'no ' declines
+# under a y default — both used to fall to the default instead (the
+# stdin-fallback read is exercised here; the pty paths of opk's
+# fallback and prompt_yn are pinned in their own suites).
+_uc_rc=0
+printf ' y\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"n\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
+check "ui_confirm: padded ' y' accepted under an n default (#189 a W2)" [ "$_uc_rc" -eq 0 ]
+_uc_rc=0
+printf 'no \n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
+check "ui_confirm: padded 'no ' declines under a y default (#189 a W2)" [ "$_uc_rc" -ne 0 ]
 
 # ui_confirm shape + case-insensitivity (issue #187 B/C): the prompt
 # renders `  <question> [Y/n] ` (output-style indent, NO extra marker,

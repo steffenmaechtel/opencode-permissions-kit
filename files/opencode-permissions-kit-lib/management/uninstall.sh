@@ -124,7 +124,9 @@ prompt_yn() {
     # default as capital letter, Enter accepts it; unknown input
     # falls back to the default (issue #187 A — same semantics as
     # ui.sh's ui_confirm since the 0.0.44a V17 fix; this standalone
-    # sibling was missed by that sweep).
+    # sibling was missed by that sweep). The un-prefixed reads trim
+    # edge whitespace — the shared answer pipeline since #189 a W2
+    # (a padded " y" is an explicit y in every implementation).
     local msg="$1" default="$2"
     local hint="[y/N]"
     [ "$default" = "y" ] && hint="[Y/n]"
