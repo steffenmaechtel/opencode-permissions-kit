@@ -60,17 +60,22 @@ then, unless the USER defines otherwise for a case:
 
 ```
 Session A (implement):  build the feature/bugfix, commit
-Session B (review 1):   fresh review → commit the report → apply
-                        the fixes in the SAME session
+Session B (review 1):   fresh review → commit the report → [GO] →
+                        apply the fixes in the SAME session
 Session C (review 2):   fresh review (fix diff + any new scope) →
-                        commit the report → apply the fixes in the
-                        SAME session
+                        commit the report → [GO] → apply the fixes
+                        in the SAME session
 …                       until the stop rule holds
 ```
 
 - The session that reviews also fixes — no handoff back; what the
   rotation buys is that every review pass starts with fresh context
   (a round's author never reviews their own fixes).
+- Sessions don't chain themselves: each round's session ends with its
+  commits; the maintainer starts the next one
+  ([internal/process/review.md](../internal/process/review.md):
+  "start a fresh session per review round") — the pauses between
+  sessions are the maintainer's, not the agent's.
 - Inside a review session, the mechanics below apply unchanged
   (fresh-context Flash subagents + main-agent verification).
 - The hard seam above is unchanged, and so is the maintainer pause
