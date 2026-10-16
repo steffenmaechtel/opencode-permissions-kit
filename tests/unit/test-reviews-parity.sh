@@ -20,13 +20,19 @@ trap 'rm -f "$TMP" "$TMP.gen"' EXIT
 
 INDEX=internal/reviews/INDEX.md
 
-# 1. folder <-> row parity
+# 1. folder <-> row parity (rows carry linked keys: | [pr-N](N/N/N/N/pr-N) |)
 find internal/reviews -type d -name 'pr-[0-9][0-9][0-9][0-9][0-9]' 2>/dev/null | sed 's|.*/||' | sort > "$TMP.folders"
-grep -E '^\| pr-[0-9]{5} ' "$INDEX" | awk -F'|' '{ gsub(/ /, "", $2); print $2 }' | sort > "$TMP.rows"
-comm -23 "$TMP.folders" "$TMP.rows" | while IFS= read -r k; do
+grep -E '^\| \[pr-[0-9]{5}\]\([0-9](/[0-9]){3}/pr-[0-9]{5}\) \|' "$INDEX" \
+    | sed 's/^| \[\(pr-[0-9]\{5\}\)\](\([^)]*\)).*/\1 \2/' > "$TMP.rows"
+awk '{ print $1 }' "$TMP.rows" | sort > "$TMP.keys"
+# 1b. a row's link target must be the row key's own case folder
+awk '{ base = $2; sub(/.*\//, "", base)
+       if ($1 != base) printf "FAIL %s: link target %s is not its own folder\n", $1, $2 }' \
+    "$TMP.rows" >> "$TMP"
+comm -23 "$TMP.folders" "$TMP.keys" | while IFS= read -r k; do
     echo "FAIL $k: folder without INDEX row" >> "$TMP"
 done
-comm -13 "$TMP.folders" "$TMP.rows" | while IFS= read -r k; do
+comm -13 "$TMP.folders" "$TMP.keys" | while IFS= read -r k; do
     echo "FAIL $k: INDEX row without folder" >> "$TMP"
 done
 

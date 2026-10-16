@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Generate internal/reviews/INDEX.md from the case folders.
 
-One row per case (pr-NNNNN): key, stem/subject, scope, base, started,
-snapshots, status. Cases live four one-digit shard levels deep
-(internal/reviews/N/N/N/N/pr-NNNNN — the first four PR digits; every
-node holds at most 10 entries). Data sources, in order:
+One row per case (pr-NNNNN): key (linked to the case folder, relative to
+this INDEX — same convention as the rules-meta index), stem/subject,
+scope, base, started, snapshots, status. Cases live four one-digit shard
+levels deep (internal/reviews/N/N/N/N/pr-NNNNN — the first four PR
+digits; every node holds at most 10 entries). Data sources, in order:
 
 1. the mandatory review-meta header in review-a.md (new cases), and
 2. the frozen legacy-index.md stem map (pre-restructure corpus).
@@ -92,6 +93,7 @@ def main():
         if not os.path.isdir(folder):
             continue
         key = os.path.basename(folder)
+        rel = os.path.relpath(folder, REVIEWS)
         meta = None
         first = os.path.join(folder, 'review-a.md')
         if os.path.exists(first):
@@ -109,8 +111,8 @@ def main():
             scope, base = 'legacy', '—'
         else:
             stem, started, scope, base = '?', '?', '?', '?'
-        rows.append((key, stem, scope, base, started, span(ls),
-                     status(folder, meta)))
+        rows.append(('[%s](%s)' % (key, rel), stem, scope, base, started,
+                     span(ls), status(folder, meta)))
     lines = [
         '# INDEX — review cases',
         '',

@@ -169,8 +169,9 @@ Reviews run against a clean working tree of the version under review
 ## Index
 
 [INDEX.md](INDEX.md) is **generated** by
-`scripts/gen-review-index.py` — one row per case (key, stem/subject,
-scope, base, date, snapshots, status). The parity test pins index ↔
+`scripts/gen-review-index.py` — one row per case (key, linked to its
+case folder like the rules-meta index, stem/subject, scope, base, date,
+snapshots, status). The parity test pins index ↔
 folders in both directions. The frozen
 [legacy-index.md](legacy-index.md) maps every pre-restructure file name
 (`0.0.39a`) to its new home.

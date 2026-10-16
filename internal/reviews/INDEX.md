@@ -5,17 +5,17 @@ The parity test regenerates and compares. -->
 
 | Key | Stem / Subject | Scope | Base | Started | Snapshots | Status |
 |---|---|---|---|---|---|---|
-| pr-00109 | v0.0.38 | legacy | — | 2026-09-26 | a | resolved |
-| pr-00115 | v0.0.39 | legacy | — | 2026-09-27 | a–p | resolved |
-| pr-00125 | v0.0.40 | legacy | — | 2026-10-02 | a–c | resolved |
-| pr-00127 | v0.0.41 | legacy | — | 2026-10-02 | a–g | resolved |
-| pr-00133 | v0.0.42 | legacy | — | 2026-10-03 | a–i | resolved |
-| pr-00140 | v0.0.43 | legacy | — | 2026-10-04 | a–b | resolved |
-| pr-00142 | v0.0.44 | legacy | — | 2026-10-05 | a–g | resolved |
-| pr-00147 | v0.0.45 | legacy | — | 2026-10-06 | a–f | resolved |
-| pr-00151 | v0.0.46 | legacy | — | 2026-10-08 | a–c | resolved |
-| pr-00156 | v0.0.47 | legacy | — | 2026-10-10 | a–c | resolved |
-| pr-00160 | v0.0.48 | legacy | — | 2026-10-11 | a–e | resolved |
-| pr-00171 | v0.0.49 | legacy | — | 2026-10-12 | a–d | resolved |
-| pr-00179 | issue-173 docs reflow baseline (feature wave) | wave | v0.0.50 @ ee54ca0 | 2026-10-14 | a | closed |
+| [pr-00109](0/0/1/0/pr-00109) | v0.0.38 | legacy | — | 2026-09-26 | a | resolved |
+| [pr-00115](0/0/1/1/pr-00115) | v0.0.39 | legacy | — | 2026-09-27 | a–p | resolved |
+| [pr-00125](0/0/1/2/pr-00125) | v0.0.40 | legacy | — | 2026-10-02 | a–c | resolved |
+| [pr-00127](0/0/1/2/pr-00127) | v0.0.41 | legacy | — | 2026-10-02 | a–g | resolved |
+| [pr-00133](0/0/1/3/pr-00133) | v0.0.42 | legacy | — | 2026-10-03 | a–i | resolved |
+| [pr-00140](0/0/1/4/pr-00140) | v0.0.43 | legacy | — | 2026-10-04 | a–b | resolved |
+| [pr-00142](0/0/1/4/pr-00142) | v0.0.44 | legacy | — | 2026-10-05 | a–g | resolved |
+| [pr-00147](0/0/1/4/pr-00147) | v0.0.45 | legacy | — | 2026-10-06 | a–f | resolved |
+| [pr-00151](0/0/1/5/pr-00151) | v0.0.46 | legacy | — | 2026-10-08 | a–c | resolved |
+| [pr-00156](0/0/1/5/pr-00156) | v0.0.47 | legacy | — | 2026-10-10 | a–c | resolved |
+| [pr-00160](0/0/1/6/pr-00160) | v0.0.48 | legacy | — | 2026-10-11 | a–e | resolved |
+| [pr-00171](0/0/1/7/pr-00171) | v0.0.49 | legacy | — | 2026-10-12 | a–d | resolved |
+| [pr-00179](0/0/1/7/pr-00179) | issue-173 docs reflow baseline (feature wave) | wave | v0.0.50 @ ee54ca0 | 2026-10-14 | a | closed |
 
