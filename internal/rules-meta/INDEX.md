@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**34 metas · 34 active · 0 retired · 7 review-pending · next due 2026-11-14**
+**34 metas · 34 active · 0 retired · 6 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0008, RM-0009, RM-0010, RM-0011, RM-0012, RM-0013, RM-0016
+- **Review pending:** RM-0008, RM-0009, RM-0010, RM-0011, RM-0012, RM-0013
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -48,7 +48,7 @@
 | [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | approved | 1m | 2026-11-14 |
 | [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | approved | 1m | 2026-11-16 |
 | [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 1m | 2026-11-16 |
-| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | **pending** | 1m | 2026-11-16 |
+| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 1m | 2026-11-16 |
 | [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 1m | 2026-11-16 |
 
 ### Referencing review findings
