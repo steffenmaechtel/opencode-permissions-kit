@@ -54,9 +54,11 @@ asked for the snapshot first.
 ### Session rotation (added 2026-10-17, from pr-00189)
 
 pr-00189 snapshot b reviewed its own fix wave inside the implementing
-session — honestly labeled in the header, but the author's context
-carries its blind spots into the review of the fix. Default since
-then, unless the USER defines otherwise for a case:
+session — its header carried only the usual "house session" label,
+identical in shape to snapshot a's; the same-session fact surfaced
+in maintainer chat, never in the snapshot (#189 c C5). The author's
+context carries its blind spots into the review of the fix. Default
+since then, unless the USER defines otherwise for a case:
 
 ```
 Session A (implement):  build the feature/bugfix, commit
