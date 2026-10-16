@@ -2,8 +2,10 @@
 
 Status: closed — fix wave `4fb7ebd` (a W1, a W2) dispositioned; micro-
 wave review `b` (fix commit only): 0 HIGH/MED/LOW, 2 INFO — both
-deliberately not done, no code touched by the dispositions, stop rule
-met.
+deliberately not done. Backup pass `c` (fresh session per the rotation
+standard): 0 HIGH/MED/LOW, 6 INFO — c C5 implemented as a docs reword
+(`839d074`), the rest deliberately not done; dispositions touched docs
+only, stop rule met.
 
 Case: wave review `a` of `feature/y-n-prompt-consistency`
 (`d7a2d87..43bd33e`, prompt-shape/semantics fix wave). Verdict at review
@@ -21,6 +23,12 @@ helper, W3/W4 no action).
 | a W4 (INFO) | **deliberately not done** | — | pty-ordering note for future flake triage; no action owed |
 | b B1 (INFO) | **deliberately not done** | — | whitespace-only = empty read, 5-empty abort intent — review-b |
 | b B2 (INFO) | **deliberately not done** | — | presence-only probe; util-linux named in why-text — review-b |
+| c C1 (INFO) | **deliberately not done** | — | label/mechanism split disclosed in the a W2 evidence — review-c |
+| c C2 (INFO) | **deliberately not done** | — | commit message immutable; this ledger has the correct count |
+| c C3 (INFO) | **deliberately not done** | — | three sites verified path-taking; claim substance holds — review-c |
+| c C4 (INFO) | **deliberately not done** | — | CR-in-pipe edge falls to the default, same class as before — review-c |
+| c C5 (INFO) | **implemented** | `839d074` | one-line reword in agent/review-concept.md — see detail |
+| c C6 (INFO) | **deliberately not done** | — | follows B1's semantics; a pin would owe micro-wave d — review-c |
 
 ## Evidence detail
 
@@ -92,6 +100,20 @@ loaded host is triaged in seconds (answer pins unaffected); the ordering
 is near-deterministic (the piped input reaches the pty master at spawn,
 before fork/exec/eval complete).
 
+### c C5 (INFO) — "honestly labeled in the header" overstates
+
+Reworded in agent/review-concept.md (Session rotation, `839d074`):
+snapshot b's Reviewer line — "house session, main agent" — is the
+house/external axis, identical in shape to snapshot a's, and cannot
+encode session identity; the same-session fact surfaced in maintainer
+chat, never in the committed artifacts. The new wording states the
+label as it was and where the fact surfaced, keeping the Reviewer-line
+bullet (headers record the session) as the forward rule. Snapshot b is
+immutable, so the doc sentence was the only fixable site; the claims
+axis's contrary reading ("house idiom suffices") and the downgrade
+from an initial LOW stay recorded in review-c C5. Docs-only touch —
+closes per the 0.0.45f precedent, no successor review owed.
+
 ## Gates at disposition time
 
 Full unit sweep (`make test`) green after the fix; make lint green;
@@ -100,3 +122,9 @@ of the extended bullet); reviews lint + parity green after the index
 regen; check-host run shows the new probe. e2e not owed (no
 install.sh/update.sh/wrapper/backend change; uninstall.sh answer
 semantics are covered by the behavioral pins).
+
+c round: snapshot-committed tree verified with check-host, make lint
+and the full unit sweep green, sabotage matrix 4/2/2 reproduced and
+restored green (see review-c); dispositions (`839d074` + this file)
+re-ran reviews lint + parity + line-length ratchet green and the full
+sweep — docs-only, e2e stays not owed.
