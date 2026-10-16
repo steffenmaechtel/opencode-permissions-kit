@@ -12,6 +12,7 @@
 #
 # Required for the unit suite (make test):
 #   git, make, python3, shellcheck
+#   setsid + script (util-linux) — hermetic/pty ui prompt tests
 # Optional (reported, never blocking):
 #   docker, curl, tar + xz  — e2e suites only (make e2e / e2e-rootless)
 #   / make e2e-ddev; the ddev suite additionally needs a real ddev binary
@@ -74,6 +75,7 @@ check make     "make test / make lint / make e2e"            "$APT make / $BREW 
 check python3  "jsonc parser + kit CLI + git-config tests"   "$APT python3 / $BREW python"
 check shellcheck "static analysis of the shipped scripts (make lint)" "$APT shellcheck / $BREW shellcheck"
 check setsid   "hermetic ui tests (detach the controlling tty)"  "$APT util-linux"
+check script   "pty capture for prompt pins — test-ui, test-kit-cli, test-uninstall, test-browser-bridge (util-linux -qec)"  "$APT util-linux"
 
 ui_section "Optional (e2e suites only — make e2e / e2e-rootless)"
 check_opt docker "runs the containerized e2e suites"         "$APT docker-ce"

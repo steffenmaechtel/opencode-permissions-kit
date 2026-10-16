@@ -51,6 +51,41 @@ mid-verification would change the very tree the remaining findings are
 verified against. The 0.0.42d session codified this after the maintainer
 asked for the snapshot first.
 
+### Session rotation (added 2026-10-17, from pr-00189)
+
+pr-00189 snapshot b reviewed its own fix wave inside the implementing
+session — its header carried only the usual "house session" label,
+identical in shape to snapshot a's; the same-session fact surfaced
+in maintainer chat, never in the snapshot (#189 c C5). The author's
+context carries its blind spots into the review of the fix. Default
+since then, unless the USER defines otherwise for a case:
+
+```
+Session A (implement):  build the feature/bugfix, commit
+Session B (review 1):   fresh review → commit the report → [GO] →
+                        apply the fixes in the SAME session
+Session C (review 2):   fresh review (fix diff + any new scope) →
+                        commit the report → [GO] → apply the fixes
+                        in the SAME session
+…                       until the stop rule holds
+```
+
+- The session that reviews also fixes — no handoff back; what the
+  rotation buys is that every review pass starts with fresh context
+  (a round's author never reviews their own fixes).
+- Sessions don't chain themselves: each round's session ends with its
+  commits; the maintainer starts the next one
+  ([internal/process/review.md](../internal/process/review.md):
+  "start a fresh session per review round") — the pauses between
+  sessions are the maintainer's, not the agent's.
+- Inside a review session, the mechanics below apply unchanged
+  (fresh-context Flash subagents + main-agent verification).
+- The hard seam above is unchanged, and so is the maintainer pause
+  (README Process: the fix wave starts on their go) — the session
+  that reviewed applies the fixes itself once the go is given.
+- The snapshot header's Reviewer line records which session ran the
+  pass, so the rotation stays auditable after the fact.
+
 **Stop when a round leaves review-relevant code untouched** (revised
 2026-10-11, from the 0.0.46a→0.0.46b and 0.0.47b→0.0.47c chains — the
 prior form, "stop when a full pass returns no new MED/HIGH", closed

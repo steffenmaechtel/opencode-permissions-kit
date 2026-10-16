@@ -435,6 +435,62 @@ else
     fail "openchamber policy removal lost its marker gate"
 fi
 
+# --- prompt_yn: answer semantics + shape (issue #187 A/B) -----------------------
+# Extract-and-run under a real pty (script(1), like test-browser-bridge):
+# prompt_yn hard-exits without a terminal (by design), so the setsid
+# pattern of test-ui.sh cannot drive it. Unknown input must fall back
+# to the DEFAULT — the 0.0.44a V17 sweep fixed ui.sh's ui_confirm but
+# missed this standalone sibling; mixed-case answers are honored; the
+# prompt renders the shared marker-less shape.
+PROMPT_YN="$(sed -n '/^prompt_yn() {/,/^}/p' "$UNINSTALL")"
+if [ -n "$PROMPT_YN" ] && printf '%s' "$PROMPT_YN" | grep -qF 'n|no)'; then
+    pass "prompt_yn extractable from uninstall.sh (n|no arm present)"
+else
+    fail "prompt_yn extractable from uninstall.sh (n|no arm present)"
+fi
+printf '%s\n' "$PROMPT_YN" > "$WORK/prompt-yn.sh"
+cat > "$WORK/py-driver.sh" <<'PYEOF'
+#!/bin/sh
+# $1 = default; prints prompt_yn's answer on stdout
+RED='' NC='' YES=false
+trace() { :; }
+. "${PY_SRC:?}"
+prompt_yn "Delete audit log too?" "${1:?}"
+PYEOF
+py_ask() { # <typed-line> <default> -> last pty line (prompt + answer)
+    printf '%s\n' "$1" | PY_SRC="$WORK/prompt-yn.sh" \
+        script -qec "sh '$WORK/py-driver.sh' '$2'" /dev/null 2>/dev/null \
+        | tr -d '\r' | tail -1
+}
+py_pin() { # <desc> <typed> <default> <expected answer y|n>
+    _pyline=$(py_ask "$2" "$3")
+    case "$_pyline" in
+        *" $4") pass "$1" ;;
+        *) fail "$1 (got: $_pyline)" ;;
+    esac
+}
+py_pin "prompt_yn: unknown input falls back to a y default (issue #187 A)" j y y
+py_pin "prompt_yn: unknown input falls back to an n default (issue #187 A)" j n n
+py_pin "prompt_yn: mixed-case Yes accepted under an n default (issue #187 C class)" Yes n y
+py_pin "prompt_yn: mixed-case No declines under a y default (issue #187 C class)" No y n
+py_pin "prompt_yn: padded ' y' accepted under an n default (#189 a W2 — pins the pre-existing trim)" " y" n y
+py_pin "prompt_yn: trailing-space 'no ' declines under a y default (#189 a W2)" "no " y n
+py_pin "prompt_yn: Enter accepts the y default (regression guard)" "" y y
+# Shape (issue #187 B): two-space indent, no [?] marker, capital default.
+_pyline=$(py_ask "" n)
+if printf '%s' "$_pyline" | grep -qF '  Delete audit log too? [y/N] ' \
+    && ! printf '%s' "$_pyline" | grep -qF '[?]'; then
+    pass "prompt_yn shape: '  <question> [y/N] ' — no marker (issue #187 B)"
+else
+    fail "prompt_yn shape: '  <question> [y/N] ' — no marker (got: $_pyline)"
+fi
+# Static sweep: the removed marker must not creep back into the script.
+if grep -qF '[?]' "$UNINSTALL"; then
+    fail "uninstall.sh is free of the removed [?] marker"
+else
+    pass "uninstall.sh is free of the removed [?] marker"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

@@ -14,6 +14,12 @@ details, verification duty, reviewer agents — lives in
   area changed (`set -e`/pipefail semantics, traps, sudoers, wrapper).
   Wave reviews are NOT yours to trigger — the agent owes one after
   every fix wave, before its PR.
+- **New session when?** Implement runs in one session; every review
+  round runs in a NEW session, and that session also applies its fixes
+  (report committed first, then the fixes — default since 2026-10-17,
+  pr-00189; full rule in
+  [agent/review-concept.md](../../agent/review-concept.md), "Session
+  rotation"). Your part: start a fresh session per review round.
 - **Pause point:** the committed snapshot is your visibility window.
   The fix wave starts on your go, not before.
 - **Stop-rule call:** the loop closes when a round leaves

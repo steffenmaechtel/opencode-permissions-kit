@@ -579,6 +579,62 @@ else
     failures=$((failures + 1))
 fi
 
+# --- damaged-library fallback ui_confirm (issue #187 C) -------------------------
+# The fallback definition in bin/opk exists only for a damaged library
+# (sh/ui.sh missing) — extract it and run it standalone under a real
+# pty (script(1)): it reads /dev/tty ONLY (no stdin fallback, fails
+# closed). Mixed-case answers must be honored — the old arms
+# y|Y|yes|YES mapped Yes/No/yEs to the DEFAULT, silently declining an
+# explicit yes and accepting an explicit no under a y default. Unknown
+# input falls back to the default; the shape is ui_confirm's
+# marker-less render.
+OPK_UC="$(sed -n '/^    ui_confirm() {/,/^    }/p' "$KIT")"
+if [ -n "$OPK_UC" ] && printf '%s' "$OPK_UC" | grep -qF "tr '[:upper:]' '[:lower:]'"; then
+    echo "  ${GREEN}PASS${NC}  opk fallback ui_confirm extractable (lowercased, issue #187 C)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  opk fallback ui_confirm extractable (lowercased, issue #187 C)"
+    failures=$((failures + 1))
+fi
+printf '%s\n' "$OPK_UC" > "$WORK/opk-uc-fn.sh"
+cat > "$WORK/opk-uc-driver.sh" <<'OCEOF'
+#!/bin/sh
+eval "$(cat "${OPK_UC_SRC:?}")"
+if ui_confirm "Remove them now?" "${1:?}"; then
+    echo "RESULT=yes"
+else
+    echo "RESULT=no"
+fi
+OCEOF
+opk_uc() { # <typed-line> <default> -> last pty line (prompt + RESULT)
+    printf '%s\n' "$1" | OPK_UC_SRC="$WORK/opk-uc-fn.sh" \
+        script -qec "sh '$WORK/opk-uc-driver.sh' '$2'" /dev/null 2>/dev/null \
+        | tr -d '\r' | tail -1
+}
+oc_pin() { # <desc> <typed> <default> <expected result yes|no>
+    _ocline=$(opk_uc "$2" "$3")
+    case "$_ocline" in
+        *"RESULT=$4") echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)) ;;
+        *) echo "  ${RED}FAIL${NC}  $1 (got: $_ocline)"; failures=$((failures + 1)) ;;
+    esac
+}
+oc_pin "opk fallback: mixed-case Yes accepted under an n default (issue #187 C)" Yes n yes
+oc_pin "opk fallback: mixed-case No declines under a y default (issue #187 C)" No y no
+oc_pin "opk fallback: unknown input falls back to a y default (issue #187 A class)" garbage y yes
+oc_pin "opk fallback: unknown input falls back to an n default (issue #187 A class)" garbage n no
+oc_pin "opk fallback: padded ' y' accepted under an n default (#189 a W2)" " y" n yes
+oc_pin "opk fallback: trailing-space 'no ' declines under a y default (#189 a W2)" "no " y no
+oc_pin "opk fallback: empty input fails closed to the default" "" n no
+_ocline=$(opk_uc "" y)
+if printf '%s' "$_ocline" | grep -qF '  Remove them now? [Y/n] ' \
+    && ! printf '%s' "$_ocline" | grep -qF '[?]'; then
+    echo "  ${GREEN}PASS${NC}  opk fallback shape: '  <question> [Y/n] ' — no marker (issue #187 B)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  opk fallback shape: '  <question> [Y/n] ' — no marker (got: $_ocline)"
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"
