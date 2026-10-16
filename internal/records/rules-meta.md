@@ -95,7 +95,8 @@ still hold?* A rationale that merely restates the rule is a defect. (RM-0027)
    back-ref fails (orphan).
 4. Filename ↔ `id:` identical; IDs unique.
 5. The `rule:` back-ref exists; the `quote:` prefix is findable in the
-   target file.
+   target file (normalized: code backticks/bold stripped, wrapped
+   lines joined; needle = the quote's first five words).
 6. Frontmatter complete, ISO dates, `next-revisit` ≥ `created`.
 7. Report (non-blocking): overdue list, sorted by lateness.
 8. `INDEX.md` is regenerated on every run.
@@ -120,7 +121,7 @@ invariant. (RM-0029)
 |---|---|---|
 | 0 | Pilot `conventions.md` — first metas landed, interval policy set | done |
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
-| 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | open |
+| 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | built — review pending |
 | 3 | Remaining `agent/` files + `AGENTS.md ## Rules` | open |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
