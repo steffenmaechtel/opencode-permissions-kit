@@ -156,6 +156,26 @@ _uc_rc=0
 printf 'n\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
 check "ui_confirm: explicit no still declines under a y default" [ "$_uc_rc" -ne 0 ]
 
+# ui_confirm shape + case-insensitivity (issue #187 B/C): the prompt
+# renders `  <question> [Y/n] ` (output-style indent, NO extra marker,
+# trailing space before the cursor) — same shape as uninstall's
+# prompt_yn and opk's fallback; mixed-case answers must be honored,
+# not silently mapped to the default (the opk fallback bug class).
+_uc_rc=0
+printf 'Yes\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"n\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
+check "ui_confirm: mixed-case Yes accepted under an n default (issue #187 C class)" [ "$_uc_rc" -eq 0 ]
+_uc_rc=0
+printf 'No\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
+check "ui_confirm: mixed-case No declines under a y default (issue #187 C class)" [ "$_uc_rc" -ne 0 ]
+_uc_err=$(mktemp)
+printf 'n\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"n\"" _ "$UI" 2>"$_uc_err" >/dev/null || :
+if grep -qF '  Proceed? [y/N] ' "$_uc_err" && ! grep -qF '[?]' "$_uc_err"; then
+    pass "ui_confirm prompt shape: '  <question> [y/N] ' — no marker (issue #187 B)"
+else
+    fail "ui_confirm prompt shape: '  <question> [y/N] ' — no marker (issue #187 B)"
+fi
+rm -f "$_uc_err"
+
 # --- no-tty gate (streamed installs, 0.0.39b C6 / 0.0.39e C8) ----------------------
 # UI_NO_STDIN_FALLBACK=1 + no controlling tty: the read must HARD-EXIT
 # with guidance instead of consuming piped stdin (which, in a streamed

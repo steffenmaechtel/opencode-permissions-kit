@@ -20,7 +20,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0002](0/0/0/RM-0002.md) | Default choice: n for anything that changes the… | active | approved | 1m | 2026-11-14 |
-| [RM-0004](0/0/0/RM-0004.md) | Format: [?] <question> [Y/n] or [?] <question>… | active | approved | 1m | 2026-11-16 |
+| [RM-0004](0/0/0/RM-0004.md) | Format: <question> [Y/n] or <question> [y/N] | active | approved | 1m | 2026-11-16 |
 | [RM-0005](0/0/0/RM-0005.md) | Enter accepts the default (empty answer =… | active | approved | 1m | 2026-11-16 |
 | [RM-0006](0/0/0/RM-0006.md) | Accepted input: y, yes, n, no — case-insensitive | active | approved | 1m | 2026-11-16 |
 | [RM-0007](0/0/0/RM-0007.md) | Don't invent alternatives | active | approved | 1m | 2026-11-16 |

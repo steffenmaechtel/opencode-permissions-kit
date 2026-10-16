@@ -121,7 +121,10 @@ prompt_yn() {
     # prompt_yn "message" default
     # Returns "y" or "n"
     # Prompt convention: agent/conventions.md — [Y/n] / [y/N],
-    # default as capital letter, Enter accepts it.
+    # default as capital letter, Enter accepts it; unknown input
+    # falls back to the default (issue #187 A — same semantics as
+    # ui.sh's ui_confirm since the 0.0.44a V17 fix; this standalone
+    # sibling was missed by that sweep).
     local msg="$1" default="$2"
     local hint="[y/N]"
     [ "$default" = "y" ] && hint="[Y/n]"
@@ -134,13 +137,17 @@ prompt_yn() {
         echo "${RED}No terminal available. Run interactively or use --yes to skip prompts.${NC}" >&2
         exit 1
     fi
-    printf "[?] %s %s " "$msg" "$hint" >&2
+    printf '  %s %s ' "$msg" "$hint" >&2
     trace "prompt '$msg': waiting for input"
     read -r answer </dev/tty 2>/dev/null || read -r answer
     trace "prompt '$msg': got '$answer'"
     answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]')
     [ -z "$answer" ] && answer="$default"
-    case "$answer" in y|yes) echo "y" ;; *) echo "n" ;; esac
+    case "$answer" in
+        y|yes) echo "y" ;;
+        n|no)  echo "n" ;;
+        *)     [ "$default" = "y" ] && echo "y" || echo "n" ;;
+    esac
 }
 
 if [ "$DRY_RUN" = true ]; then
