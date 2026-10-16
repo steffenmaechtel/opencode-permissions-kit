@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (house session, main agent — single-pass wave review, every 
 
 # Review — pr-00189 snapshot a — issue #187 y/n prompt consistency
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave under review: `origin/master...HEAD` (2 commits, 9 files,
 +183/−20): one marker-less y/n prompt shape and one answer semantics
 across the three implementations — `sh/ui.sh`'s `ui_confirm` (reference),
