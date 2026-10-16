@@ -1,7 +1,8 @@
 # Rule-Meta System (RM) — design record
 
-> Status: **CURRENT** — pilot/build-out running since 2026-10-14 on
-> `feature/rules-meta-pilot`. This is the design record for the
+> Status: **CURRENT** — pilot/build-out running since 2026-10-14, now on
+> `feature/rules-meta-conventions` (the pilot branch merged via #184).
+> This is the design record for the
 > rule-rationale system; the governed rule texts live in `agent/*.md`
 > and in the `## Rules` section of `AGENTS.md`. Where this record
 > conflicts with the implemented audit script, the code wins. The
@@ -94,12 +95,17 @@ still hold?* A rationale that merely restates the rule is a defect. (RM-0027)
    back-ref fails (orphan).
 4. Filename ↔ `id:` identical; IDs unique.
 5. The `rule:` back-ref exists; the `quote:` prefix is findable in the
-   target file.
+   target file (normalized: code backticks/bold stripped, wrapped
+   lines joined; needle = the quote's first five words).
 6. Frontmatter complete, ISO dates, `next-revisit` ≥ `created`.
 7. Report (non-blocking): overdue list, sorted by lateness.
 8. `INDEX.md` is regenerated on every run.
+9. Approval consistency: `reviewed:` is set exactly when the review
+   log carries an `approved by maintainer` entry of the same date —
+   absent field with approval line, or field without line, both fail
+   (provenance must never overstate; maintainer decision 2026-10-16).
 
-CI blocks on 1–6; an overdue meta is a maintenance signal, not a
+CI blocks on 1–6 and 9; an overdue meta is a maintenance signal, not a
 broken build. (RM-0030)
 
 ## Retire
@@ -113,9 +119,9 @@ invariant. (RM-0029)
 
 | Phase | Content | Status |
 |---|---|---|
-| 0 | Pilot `conventions.md` — first metas landed, interval policy set | running |
-| 1 | Remaining `conventions.md` units (`RM-0004` ff.) | open |
-| 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | open |
+| 0 | Pilot `conventions.md` — first metas landed, interval policy set | done |
+| 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
+| 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
 | 3 | Remaining `agent/` files + `AGENTS.md ## Rules` | open |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |

@@ -6,7 +6,7 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**18 metas · 18 active · 0 retired · 0 review-pending · next due 2026-11-14**
+**34 metas · 34 active · 0 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
@@ -20,12 +20,43 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0002](0/0/0/RM-0002.md) | Default choice: n for anything that changes the… | active | approved | 1m | 2026-11-14 |
+| [RM-0004](0/0/0/RM-0004.md) | Format: [?] <question> [Y/n] or [?] <question>… | active | approved | 1m | 2026-11-16 |
+| [RM-0005](0/0/0/RM-0005.md) | Enter accepts the default (empty answer =… | active | approved | 1m | 2026-11-16 |
+| [RM-0006](0/0/0/RM-0006.md) | Accepted input: y, yes, n, no — case-insensitive | active | approved | 1m | 2026-11-16 |
+| [RM-0007](0/0/0/RM-0007.md) | Don't invent alternatives | active | approved | 1m | 2026-11-16 |
+
+### Script output style
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | approved | 1m | 2026-11-16 |
+| [RM-0009](0/0/0/RM-0009.md) | UI_SILENT=1 mutes every non-interactive print… | active | approved | 1m | 2026-11-16 |
+
+### Shell security (untrusted input)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0010](0/0/1/RM-0010.md) | Quoting. Every expansion of external data is… | active | approved | 1m | 2026-11-16 |
+| [RM-0011](0/0/1/RM-0011.md) | printf '%s' style | active | approved | 1m | 2026-11-16 |
+| [RM-0012](0/0/1/RM-0012.md) | Free text flows through files, not argv | active | approved | 1m | 2026-11-16 |
+| [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | approved | 1m | 2026-11-16 |
 
 ### Test sandbox (unit suites)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | approved | 1m | 2026-11-14 |
+| [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | approved | 1m | 2026-11-16 |
+| [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 1m | 2026-11-16 |
+| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 1m | 2026-11-16 |
+| [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 1m | 2026-11-16 |
+
+### Referencing review findings
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0018](0/0/1/RM-0018.md) | New cases (birth-PR key, since the 2026-10… | active | approved | 1m | 2026-11-16 |
+| [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 1m | 2026-11-16 |
 
 ## internal/records/rules-meta.md
 
@@ -36,9 +67,9 @@
 | [RM-0020](0/0/2/RM-0020.md) | every rule carries a rationale | active | approved | 1m | 2026-11-14 |
 | [RM-0021](0/0/2/RM-0021.md) | one bullet / list item | active | approved | 1m | 2026-11-14 |
 | [RM-0022](0/0/2/RM-0022.md) | 4 digits zero-padded | active | approved | 1m | 2026-11-14 |
-| [RM-0023](0/0/2/RM-0023.md) | at the end of the bullet | active | approved | 1m | 2026-11-14 |
+| [RM-0023](0/0/2/RM-0023.md) | at the bullet's end | active | approved | 1m | 2026-11-14 |
 | [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 1m | 2026-11-14 |
-| [RM-0025](0/0/2/RM-0025.md) | regenerated on every audit run | active | approved | 1m | 2026-11-14 |
+| [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-11-14 |
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
 
 ### Meta format v1.1
