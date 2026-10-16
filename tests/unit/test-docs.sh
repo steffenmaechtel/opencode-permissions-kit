@@ -72,6 +72,12 @@ check_file() {
                 continue
             fi
             if [ -d "$base" ]; then
+                # review case folders link to the listing itself: lint
+                # forbids any extra file inside a case (no README.md can
+                # ever exist there)
+                case "$base" in
+                    internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-[0-9][0-9][0-9][0-9][0-9]) continue ;;
+                esac
                 # directory link: GitHub renders its README.md
                 if [ ! -e "$base/README.md" ]; then
                     echo "FAIL $f -> $target (directory has no README.md)" >> "$TMP"
