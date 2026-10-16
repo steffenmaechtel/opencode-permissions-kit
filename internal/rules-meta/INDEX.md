@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**34 metas · 34 active · 0 retired · 6 review-pending · next due 2026-11-14**
+**34 metas · 34 active · 0 retired · 5 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0008, RM-0009, RM-0010, RM-0011, RM-0012, RM-0013
+- **Review pending:** RM-0009, RM-0010, RM-0011, RM-0012, RM-0013
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -29,7 +29,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | **pending** | 1m | 2026-11-16 |
+| [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | approved | 1m | 2026-11-16 |
 | [RM-0009](0/0/0/RM-0009.md) | UI_SILENT=1 mutes every non-interactive print… | active | **pending** | 1m | 2026-11-16 |
 
 ### Shell security (untrusted input)
