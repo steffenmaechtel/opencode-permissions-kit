@@ -20,10 +20,8 @@ details, verification duty, reviewer agents — lives in
   pr-00189; full rule in
   [agent/review-concept.md](../../agent/review-concept.md), "Session
   rotation"). Your part: start a fresh session per review round.
-- **Pause point (override):** by default the review session proceeds
-  straight to its fixes; if you want to read the snapshot first, say
-  so — then the fix wave starts on your go. The committed snapshot is
-  your visibility window either way.
+- **Pause point:** the committed snapshot is your visibility window.
+  The fix wave starts on your go, not before.
 - **Stop-rule call:** the loop closes when a round leaves
   review-relevant code untouched. When only LOW/INFO findings remain,
   closing the chain is your call — the agent proposes, you decide.

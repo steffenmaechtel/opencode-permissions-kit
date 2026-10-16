@@ -49,9 +49,7 @@ what the review found before the tree starts moving — findings must be
 inspectable while nothing has been done about them yet — and a fix applied
 mid-verification would change the very tree the remaining findings are
 verified against. The 0.0.42d session codified this after the maintainer
-asked for the snapshot first. (The session-rotation standard below
-keeps this seam as a commit-order guarantee — the wall-clock pause
-became the exception.)
+asked for the snapshot first.
 
 ### Session rotation (added 2026-10-17, from pr-00189)
 
@@ -75,11 +73,9 @@ Session C (review 2):   fresh review (fix diff + any new scope) →
   (a round's author never reviews their own fixes).
 - Inside a review session, the mechanics below apply unchanged
   (fresh-context Flash subagents + main-agent verification).
-- The hard seam above survives as a commit-order guarantee: the
-  report is committed before that session's first fix commit. The
-  standing maintainer pause ("fix on my go") becomes a per-case
-  override, not the default — an invoked override is recorded in the
-  resolution.
+- The hard seam above is unchanged, and so is the maintainer pause
+  (README Process: the fix wave starts on their go) — the session
+  that reviewed applies the fixes itself once the go is given.
 - The snapshot header's Reviewer line records which session ran the
   pass, so the rotation stays auditable after the fact.
 
