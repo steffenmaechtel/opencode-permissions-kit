@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**18 metas · 18 active · 0 retired · 0 review-pending · next due 2026-11-14**
+**34 metas · 34 active · 0 retired · 7 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0008, RM-0009, RM-0010, RM-0011, RM-0012, RM-0013, RM-0016
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -20,12 +20,43 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0002](0/0/0/RM-0002.md) | Default choice: n for anything that changes the… | active | approved | 1m | 2026-11-14 |
+| [RM-0004](0/0/0/RM-0004.md) | Format: [?] <question> [Y/n] or [?] <question>… | active | approved | 1m | 2026-11-16 |
+| [RM-0005](0/0/0/RM-0005.md) | Enter accepts the default (empty answer =… | active | approved | 1m | 2026-11-16 |
+| [RM-0006](0/0/0/RM-0006.md) | Accepted input: y, yes, n, no — case-insensitive | active | approved | 1m | 2026-11-16 |
+| [RM-0007](0/0/0/RM-0007.md) | Don't invent alternatives | active | approved | 1m | 2026-11-16 |
+
+### Script output style
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | **pending** | 1m | 2026-11-16 |
+| [RM-0009](0/0/0/RM-0009.md) | UI_SILENT=1 mutes every non-interactive print… | active | **pending** | 1m | 2026-11-16 |
+
+### Shell security (untrusted input)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0010](0/0/1/RM-0010.md) | Quoting. Every expansion of external data is… | active | **pending** | 1m | 2026-11-16 |
+| [RM-0011](0/0/1/RM-0011.md) | printf '%s' style | active | **pending** | 1m | 2026-11-16 |
+| [RM-0012](0/0/1/RM-0012.md) | Free text flows through files, not argv | active | **pending** | 1m | 2026-11-16 |
+| [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | **pending** | 1m | 2026-11-16 |
 
 ### Test sandbox (unit suites)
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0003](0/0/0/RM-0003.md) | An rm — any flag form, on a variable with a… | active | approved | 1m | 2026-11-14 |
+| [RM-0014](0/0/1/RM-0014.md) | Operate only on the suite's scratch | active | approved | 1m | 2026-11-16 |
+| [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 1m | 2026-11-16 |
+| [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | **pending** | 1m | 2026-11-16 |
+| [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 1m | 2026-11-16 |
+
+### Referencing review findings
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0018](0/0/1/RM-0018.md) | New cases (birth-PR key, since the 2026-10… | active | approved | 1m | 2026-11-16 |
+| [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 1m | 2026-11-16 |
 
 ## internal/records/rules-meta.md
 

@@ -14,16 +14,16 @@ Every yes/no question in shipped scripts follows one pattern:
 ```
 
 - **Format:** `[?] <question> [Y/n]` or `[?] <question> [y/N]` — square
-  brackets, the **default as the capital letter**.
-- **Enter accepts the default** (empty answer = default).
+  brackets, the **default as the capital letter**. (RM-0004)
+- **Enter accepts the default** (empty answer = default). (RM-0005)
 - Accepted input: `y`, `yes`, `n`, `no` — case-insensitive. Unknown input
-  falls back to the default.
+  falls back to the default. (RM-0006)
 - **Default choice:** `n` for anything that changes the system (remove,
   provision, proceed with destructive steps), `y` only where "no" is the
   surprising/riskier answer (e.g. the recommended audit-log deletion during
   uninstall). (RM-0002)
 - Don't invent alternatives (`(yes/no)`, `Y/N`, `[yes|no]` …). If a choice
-  needs more than yes/no, use a numbered/keyed menu (`ui_menu`).
+  needs more than yes/no, use a numbered/keyed menu (`ui_menu`). (RM-0007)
 
 Implementation:
 
@@ -54,12 +54,12 @@ Two consequences for report scripts:
 
 - Rows printed inside a pipeline (`cmd | while ...; ui_kv_warn ...; done`)
   count in the pipe's subshell and the tally loses them — feed such
-  loops from a temp file and read it via redirect (`while ... done < "$f"`).
+  loops from a temp file and read it via redirect (`while ... done < "$f"`). (RM-0008)
 - `UI_SILENT=1` mutes every non-interactive print helper while the
   counters keep running — the base for one-line report modes
   (`opk status --short`). The question helpers (`ui_ask`/`ui_confirm`/
   `ui_menu`) are deliberately not muted: a muted report mode must not
-  fall through to an invisible prompt.
+  fall through to an invisible prompt. (RM-0009)
 
 Report commands carry their verdict in the exit code (`opk status`:
 `0` all green, `1` alert(s), `2` warning(s) only, `64` usage error) so
@@ -79,13 +79,13 @@ never shell *structure*:
 
 1. **Quoting.** Every expansion of external data is double-quoted. No
    `eval`, no `sh -c` with interpolated values, no unquoted `$var`
-   (word splitting and globbing are injection surfaces).
+   (word splitting and globbing are injection surfaces). (RM-0010)
 2. **`printf '%s'` style.** External values are arguments to a fixed
    format string, never the format itself — `printf "$EXT"` interprets
-   `%` and `\` sequences from the data.
+   `%` and `\` sequences from the data. (RM-0011)
 3. **Free text flows through files, not argv.** Long untrusted content
    (issue bodies, messages) goes via a temp file (`--body-file`), never
-   through argv, where a crafted value could steer a flag or a query.
+   through argv, where a crafted value could steer a flag or a query. (RM-0012)
 4. **Allowlist before argv/query.** Any field that leaves the script as
    an argument or inside a query string (`gh --search ...`) is
    shape-validated first:
@@ -97,7 +97,7 @@ never shell *structure*:
      `grep -qE '^[0-9]+(\.[0-9]+)*$'`)
    - vocabulary `case` for enums (severity, channel, backend)
    - fixed-string exact matches (`grep -qxF`) for ids — no regex
-     metacharacter interpretation, no query steering
+     metacharacter interpretation, no query steering (RM-0013)
 5. **Fail loud vs. fail open.** Maintainer automation skips malformed
    data with a warning and exits non-zero (a red CI run is the
    visibility). The wrapper's hot path fails open instead — an
@@ -124,17 +124,17 @@ scratch space, and never carry real-tree path literals at all. Rules
 review host):
 
 - Operate only on the suite's scratch (`$WORK`, `mktemp`) and the
-  sanctioned temp prefixes `/tmp`, `/var/tmp` (plus `/dev/null`).
+  sanctioned temp prefixes `/tmp`, `/var/tmp` (plus `/dev/null`). (RM-0014)
 - Never touch real project or system trees — `/var/www/vhosts`, `/home`,
   `/srv`, `/etc`, ... — **not in setup, not in teardown**: a cleanup
   `rm -rf` on a fixed host path deletes real data wherever the path
-  happens to exist.
+  happens to exist. (RM-0015)
 - Fixture data is written **sandboxed at the source** (heredocs,
   registries, configs carry `/var/tmp/...` paths directly). Inert
   real-tree literals behind a later rewrite are forbidden too — they are
   one broken rewrite away from live (the migrate fixtures carried them
   for months behind a `sed` that a wave then dropped; maintainer
-  directive 2026-10-04).
+  directive 2026-10-04). (RM-0016)
 - An `rm` — any flag form (`rm`, `rm -f`, `rm -r`, `rm -rf`, `rm -fr`,
   …), any operand position — on a variable **with a literal suffix**
   (`rm -rf "$WORK/sub"`, `rm -f "$WORK/mark"`, `rm -rf "${WORK}/sub"`,
@@ -158,7 +158,7 @@ review host):
   `make release` while CI (no OpenChamber) stayed green — the
   0.0.46a F2 environment-dependence class. Build a scratch bin with
   symlinks to the block's few externals instead of rewriting the probe
-  lines away — the real probe keeps executing (0.0.47c C1 direction).
+  lines away — the real probe keeps executing (0.0.47c C1 direction). (RM-0017)
 
 Enforced by `tests/unit/test-sandbox-policy.sh`, three checks over every
 unit suite (backslash-continued commands are joined first; full-comment
@@ -206,10 +206,10 @@ across cases. Always qualify the ID — two citation eras:
 - **New cases (birth-PR key, since the 2026-10 restructure):**
   `(#176 a W1)` — PR number, snapshot letter, finding ID. The PR number
   is allocated by GitHub when the maintainer opens the birth-PR, so
-  parallel features can never collide.
+  parallel features can never collide. (RM-0018)
 - **Legacy corpus (stems 0.0.38–0.0.49):** `(0.0.38 S1)`,
   `(0.0.39a C1)` — the stem stays the qualifier. Resolve via
-  [legacy-index.md](../internal/reviews/legacy-index.md) or grep.
+  [legacy-index.md](../internal/reviews/legacy-index.md) or grep. (RM-0019)
 
 Grep-able by design: `grep -rn "#176 a W1"`, `grep -rn "0.0.38 S1"`.
 The case map is the generated
