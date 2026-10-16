@@ -452,6 +452,17 @@ bare-origin flow (DD12).
   scripts/release.sh's gate satisfied (it accepts `skipped`, aborts on
   absent runs). Schedule and manual dispatch always run.
   `test-unit.yml` stays unfiltered — test-docs.sh validates docs links.
+  Delta 2026-10-16: the code set narrowed to the e2e INPUTS
+  (`files/**`, `tests/e2e/**`, `.github/**`, `Makefile`, `VERSION`)
+  in both e2e workflows — `tests/**` → `tests/e2e/**`, `scripts/**`
+  dropped. The suites source nothing from `scripts/` or the non-e2e
+  test trees (`tests/unit`, `tests/ux`, top-level `tests/fixtures`,
+  `check-host.sh`, `tsx-syntax-gate.sh`), so unit-test and
+  dev-tooling waves no longer burn the e2e runners on their PRs.
+  Wiring anything from those trees into a suite necessarily touches
+  `tests/e2e/**` or the Makefile (both trigger); test-workflows.sh §7
+  pins the set against silent re-broadening. Weekly cron and the
+  pre-release pass backstop the rest.
 - **Docs:** this record + a MANUAL.md "troubleshooting with e2e-ddev" note +
   README testing mention in the same PR as the runner (repo rule: docs move
   with code).

@@ -26,13 +26,15 @@ name: test-e2e-ddev
 # (internal/records/opencode-2x.md). Same (heavy) triggers as the v1 job:
 # master pushes, weekly schedule, manual dispatch — not PRs.
 #
-# Path filtering (docs-only changes skip): push runs first detect what
-# changed (dorny/paths-filter) — when NOTHING outside docs/**, *.md,
-# LICENSE and .gitignore changed, the suite job skips with a green
+# Path filtering (non-e2e-input changes skip): push runs first detect
+# what changed (dorny/paths-filter) — the 'code' set is the same e2e
+# INPUT set as test-e2e.yml (files/**, tests/e2e/**, .github/**,
+# Makefile, VERSION; rationale documented there). When NOTHING in it
+# changed, the suite job skips with a green
 # 'skipped' conclusion (job-level on purpose: the run still EXISTS for
 # its sha, so scripts/release.sh's gate — which accepts skipped but not
-# absent runs — stays satisfied even on a docs-only master push; and a
-# docs-only push never cuts a release anyway). Job-level skipping is
+# absent runs — stays satisfied even on a non-code master push; and a
+# non-code push never cuts a release anyway). Job-level skipping is
 # safe here because this workflow has NO matrix jobs — if one is added,
 # gate it at STEP level like test-e2e.yml's e2e matrix (a job-level if
 # collapses matrix legs; required expanded-leg checks never report and
@@ -77,7 +79,8 @@ concurrency:
 
 jobs:
   # Changed-path detection for the skip logic (header comment above).
-  # 'code' is true when anything outside the docs-only set changed.
+  # 'code' is true when any e2e INPUT changed (files/ kit, the suite
+  # itself, the workflows, the invocation, the version).
   changes:
     runs-on: ubuntu-24.04
     permissions:
@@ -92,15 +95,14 @@ jobs:
           filters: |
             code:
               - 'files/**'
-              - 'tests/**'
-              - 'scripts/**'
+              - 'tests/e2e/**'
               - '.github/**'
               - 'Makefile'
               - 'VERSION'
 
   e2e-ddev:
     needs: changes
-    # docs-only changes skip; schedule/dispatch always run (see header)
+    # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
@@ -167,11 +169,12 @@ jobs:
   # release, resolved from the npm registry at run time — 2.x ships no
   # GitHub release assets (releases/latest stays 1.x). A resolution
   # outside 2.* fails the job loudly: that is the upstream flip the kit
-  # must react to (internal/records/opencode-2x.md). Same triggers + docs-only
-  # skip as the v1 job (no PRs — the GB downloads are the point).
+  # must react to (internal/records/opencode-2x.md). Same (heavy) triggers as
+  # the v1 job: master pushes, weekly schedule, manual dispatch — not PRs
+  # (the GB downloads are the point there).
   e2e-ddev-2x:
     needs: changes
-    # docs-only changes skip; schedule/dispatch always run (see header)
+    # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
