@@ -20,7 +20,8 @@ name: test-e2e
 # these jobs resolve the npm dist-tag 'latest' at run time and fail the
 # job loudly when that tag ever leaves 2.* — the upstream flip the kit
 # must react to (internal/records/opencode-2x.md). Same triggers and
-# docs-only skip as the v1 jobs: PRs get the 2.x verdict before merge,
+# skip rule as the v1 jobs (non-e2e-input changes skip, see the
+# path-filtering paragraph): PRs get the 2.x verdict before merge,
 # master pushes re-verify it before a release is cut, and the weekly
 # run catches 2.x release drift between pushes.
 #
@@ -30,18 +31,28 @@ name: test-e2e
 # the weekly cron catches new-git drift). See the matrix block for why
 # only this suite carries the dimension.
 #
-# Path filtering (docs-only changes skip): push and PR runs first detect
-# what changed (dorny/paths-filter) — when NOTHING outside the code set
-# changed, the suites skip. The NON-matrix jobs skip at job level (the
+# Path filtering (non-e2e-input changes skip): push and PR runs first
+# detect what changed (dorny/paths-filter) — the 'code' set is the e2e
+# INPUTS only: files/** (the kit under test), tests/e2e/** (the suite
+# itself), .github/** (the workflows), Makefile (invocation), VERSION
+# (release pins). The suites source NOTHING from scripts/ or the
+# non-e2e test trees (tests/unit, tests/ux, top-level tests/fixtures,
+# check-host.sh, tsx-syntax-gate.sh) — those feed the UNFILTERED unit
+# workflow — so dev-tooling and unit-test waves no longer burn the e2e
+# runners. Safety of the narrowing: wiring anything from scripts/ or a
+# new tests/ tree INTO the suite necessarily touches tests/e2e/** or
+# the Makefile (both trigger), and the weekly cron plus the pre-release
+# review pass backstop the rest. When NOTHING in the code set changed,
+# the suites skip. The NON-matrix jobs skip at job level (the
 # run still EXISTS for its sha with a green 'skipped' conclusion, so
 # scripts/release.sh's gate — which accepts skipped but not absent runs
-# — stays satisfied even on a docs-only master push). The MATRIX e2e job
+# — stays satisfied even on a non-code master push). The MATRIX e2e job
 # gates at STEP level instead: a job-level `if` collapses the matrix
 # into one bare 'e2e' skipped check while branch protection requires the
 # expanded leg names 'e2e (distro)' / 'e2e (latest)' — on the first
 # docs-only PR those legs sat "Expected — waiting for status" forever
 # and blocked the merge. Step gating keeps both legs reporting (noop
-# success without the suite on docs-only push/PR, full suite otherwise).
+# success without the suite on non-code push/PR, full suite otherwise).
 # Schedule and manual dispatch always run (drift checks / explicit
 # human intent). test-unit.yml is NOT filtered: test-docs.sh validates
 # links across docs/ + the root Markdown files, so docs changes are
@@ -84,7 +95,8 @@ concurrency:
 
 jobs:
   # Changed-path detection for the skip logic (header comment above).
-  # 'code' is true when anything outside the docs-only set changed.
+  # 'code' is true when any e2e INPUT changed (files/ kit, the suite
+  # itself, the workflows, the invocation, the version).
   changes:
     runs-on: ubuntu-24.04
     permissions:
@@ -99,15 +111,14 @@ jobs:
           filters: |
             code:
               - 'files/**'
-              - 'tests/**'
-              - 'scripts/**'
+              - 'tests/e2e/**'
               - '.github/**'
               - 'Makefile'
               - 'VERSION'
 
   e2e:
     needs: changes
-    # Docs-only skip is STEP-level here on purpose (matrix job): a
+    # The code-filter skip is STEP-level here on purpose (matrix job): a
     # job-level `if` collapses the matrix into one bare 'e2e' skipped
     # check — branch protection requires the expanded leg names
     # 'e2e (distro)' / 'e2e (latest)', which then never report (the
@@ -134,11 +145,11 @@ jobs:
         git: [distro, latest]
     runs-on: ubuntu-24.04
     steps:
-      - name: 'Docs-only change — suite skipped (leg reports success for required checks)'
+      - name: 'No e2e-relevant change — suite skipped (leg reports success for required checks)'
         if: >-
           ${{ (github.event_name == 'push' || github.event_name == 'pull_request')
           && needs.changes.outputs.code != 'true' }}
-        run: echo "docs-only change — e2e suite not run for this sha"
+        run: echo "no e2e-relevant change — e2e suite not run for this sha"
       - uses: actions/checkout@v7
         if: >-
           ${{ github.event_name != 'push' && github.event_name != 'pull_request'
@@ -209,7 +220,7 @@ jobs:
   # when the runner cannot provide them (see run-docker-rootless.sh).
   e2e-rootless:
     needs: changes
-    # docs-only changes skip; schedule/dispatch always run (see header)
+    # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
@@ -258,14 +269,14 @@ jobs:
   # release, resolved from the npm registry at run time — 2.x ships no
   # GitHub release assets (releases/latest stays 1.x). A resolution
   # outside 2.* fails the job loudly: that is the upstream flip the kit
-  # must react to (internal/records/opencode-2x.md). Same triggers + docs-only
+  # must react to (internal/records/opencode-2x.md). Same triggers + code-filter
   # skip as the v1 jobs. The exact cache key is 2x-only and shared with
   # e2e-rootless-2x (parallel saves of the same key are best-effort, one
   # simply wins); the v1 restore prefix warm-starts the OLD binary and
   # installer.
   e2e-2x:
     needs: changes
-    # docs-only changes skip; schedule/dispatch always run (see header)
+    # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}
@@ -321,7 +332,7 @@ jobs:
   # npm resolution rationale and e2e-rootless for the skip semantics.
   e2e-rootless-2x:
     needs: changes
-    # docs-only changes skip; schedule/dispatch always run (see header)
+    # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
       ${{ github.event_name != 'push' && github.event_name != 'pull_request'
       || needs.changes.outputs.code == 'true' }}

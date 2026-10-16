@@ -302,12 +302,41 @@ else
     fail "plain multi-line run: scalar(s) above must be 'run: |' block literals"
 fi
 
-echo ""
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}$failures test(s) failed.${NC}"
-    exit 1
-fi
-echo "  ${GREEN}All workflow consistency tests passed.$NC"
+# --- 7. e2e path-filter = e2e inputs --------------------------------------------
+#
+# The e2e workflows' 'code' set must stay the e2e INPUTS only
+# (files/**, tests/e2e/**, .github/**, Makefile, VERSION — rationale in
+# the workflow headers): the suites source nothing from scripts/ or the
+# non-e2e test trees, so those waves must not burn the e2e runners.
+# Silent re-broadening (tests/**, scripts/**) trips these checks; a
+# DELIBERATE re-widening — wiring a scripts/ helper or a new tests/
+# tree into the suite — updates the lists here together with the
+# workflow (and necessarily touches tests/e2e/** or the Makefile, which
+# trigger the suites anyway).
+
+filter_block() {  # print the dorny/paths-filter entry list of a workflow
+    awk '/filters: \|/{f=1; next} f && /^[^[:space:]]/ {f=0} f' "$1"
+}
+
+check_e2e_filter() {
+    _wf="$1"; _name="${_wf##*/}"
+    _blk="$(filter_block "$_wf")"
+    _missing=""
+    for _pat in "- 'files/**'" "- 'tests/e2e/**'" "- '.github/**'" "- 'Makefile'" "- 'VERSION'"; do
+        printf '%s\n' "$_blk" | grep -qF -- "$_pat" || _missing="$_missing [$_pat]"
+    done
+    _broad=""
+    printf '%s\n' "$_blk" | grep -qF -- "- 'tests/**'" && _broad="$_broad [tests/**]"
+    printf '%s\n' "$_blk" | grep -qF -- "- 'scripts/**'" && _broad="$_broad [scripts/**]"
+    if [ -z "$_missing" ] && [ -z "$_broad" ]; then
+        pass "$_name: code filter = e2e inputs (files/, tests/e2e/, .github/, Makefile, VERSION)"
+    else
+        fail "$_name: code filter drifted:$_missing$_broad"
+    fi
+}
+check_e2e_filter "$WF_E2E"
+check_e2e_filter "$WF_DDEV_E2E"
+
 # Manual dispatches run in their own concurrency group (0.0.44a V13): a
 # workflow_dispatch resolves github.ref to refs/heads/master — the push
 # run's group — and cancel-in-progress killed the push run, reddening
@@ -322,4 +351,14 @@ for _wf in test-unit test-e2e test-e2e-ddev; do
     fi
 done
 
+# Summary gate LAST (fail-but-green defect fixed with the e2e path-filter
+# wave, the L4 class 0.0.44c C1): this block used to sit two sections
+# early — everything checked after it (V13) could print FAIL and still
+# exit 0, and any earlier failure skipped those checks entirely.
+echo ""
+if [ "$failures" -gt 0 ]; then
+    echo "  ${RED}$failures test(s) failed.${NC}"
+    exit 1
+fi
+echo "  ${GREEN}All workflow consistency tests passed.$NC"
 exit 0
