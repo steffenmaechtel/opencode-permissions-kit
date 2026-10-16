@@ -49,7 +49,39 @@ what the review found before the tree starts moving — findings must be
 inspectable while nothing has been done about them yet — and a fix applied
 mid-verification would change the very tree the remaining findings are
 verified against. The 0.0.42d session codified this after the maintainer
-asked for the snapshot first.
+asked for the snapshot first. (The session-rotation standard below
+keeps this seam as a commit-order guarantee — the wall-clock pause
+became the exception.)
+
+### Session rotation (added 2026-10-17, from pr-00189)
+
+pr-00189 snapshot b reviewed its own fix wave inside the implementing
+session — honestly labeled in the header, but the author's context
+carries its blind spots into the review of the fix. Default since
+then, unless the USER defines otherwise for a case:
+
+```
+Session A (implement):  build the feature/bugfix, commit
+Session B (review 1):   fresh review → commit the report → apply
+                        the fixes in the SAME session
+Session C (review 2):   fresh review (fix diff + any new scope) →
+                        commit the report → apply the fixes in the
+                        SAME session
+…                       until the stop rule holds
+```
+
+- The session that reviews also fixes — no handoff back; what the
+  rotation buys is that every review pass starts with fresh context
+  (a round's author never reviews their own fixes).
+- Inside a review session, the mechanics below apply unchanged
+  (fresh-context Flash subagents + main-agent verification).
+- The hard seam above survives as a commit-order guarantee: the
+  report is committed before that session's first fix commit. The
+  standing maintainer pause ("fix on my go") becomes a per-case
+  override, not the default — an invoked override is recorded in the
+  resolution.
+- The snapshot header's Reviewer line records which session ran the
+  pass, so the rotation stays auditable after the fact.
 
 **Stop when a round leaves review-relevant code untouched** (revised
 2026-10-11, from the 0.0.46a→0.0.46b and 0.0.47b→0.0.47c chains — the

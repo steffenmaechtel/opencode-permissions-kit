@@ -160,7 +160,10 @@ Reviews run against a clean working tree of the version under review
 2. Verify every finding against the code — **no fixing while
    verifying**.
 3. Write the snapshot (+ README index row is generated) and commit it.
-4. Pause for the maintainer — the fix wave starts on their go.
+4. Default: no pause — the review session proceeds to its fixes
+   directly (session rotation, see agent/review-concept.md); a
+   maintainer pause is a per-case override, recorded in the
+   resolution.
 5. Fix wave on the feature branch; the resolution is created with the
    first fix commit and grows per disposition; the loop closes per the
    stop rule. Run the L1–L7 checklist
