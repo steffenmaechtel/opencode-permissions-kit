@@ -67,9 +67,9 @@
 | [RM-0020](0/0/2/RM-0020.md) | every rule carries a rationale | active | approved | 1m | 2026-11-14 |
 | [RM-0021](0/0/2/RM-0021.md) | one bullet / list item | active | approved | 1m | 2026-11-14 |
 | [RM-0022](0/0/2/RM-0022.md) | 4 digits zero-padded | active | approved | 1m | 2026-11-14 |
-| [RM-0023](0/0/2/RM-0023.md) | at the end of the bullet | active | approved | 1m | 2026-11-14 |
+| [RM-0023](0/0/2/RM-0023.md) | at the bullet's end | active | approved | 1m | 2026-11-14 |
 | [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 1m | 2026-11-14 |
-| [RM-0025](0/0/2/RM-0025.md) | regenerated on every audit run | active | approved | 1m | 2026-11-14 |
+| [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-11-14 |
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
 
 ### Meta format v1.1
