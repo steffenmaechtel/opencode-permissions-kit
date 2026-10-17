@@ -32,6 +32,7 @@ holds.
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
 | 8 | Language | English — repo rule: all content is English (RM-0026) |
 | 9 | Rule prose | rule-bearing paragraphs are rewritten as list items — paragraphs stay narrative/lookup (RM-0045) |
+| 10 | learnings.md | out of meta scope: rationale = inline corpus stats, lifecycle = meta-analysis runs (RM-0046) |
 
 ## Meta format v1.1
 
@@ -127,7 +128,7 @@ invariant. (RM-0029)
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
-| 3 | Remaining `agent/` files + `AGENTS.md ## Rules` | open |
+| 3 | Remaining `agent/` files + `AGENTS.md ## Rules` (learnings.md out: decision 10) | open |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
 
@@ -136,8 +137,10 @@ invariant. (RM-0029)
 - Table rows in rule files are not rule units (lookup info).
 - Narrative-heavy sections start outside the audit scope; the section
   allowlist lives in the audit script and is reviewable.
-- `learnings.md` "Keep doing (trend-proven)" is in scope — starts at
-  `1m` like everything else; the ladder shapes intervals from there.
+- `learnings.md` is out of meta scope (decision 10): its rationales
+  are the inline corpus statistics and the meta-analysis runs own its
+  lifecycle; the run-L1–L7 obligation itself gets its meta via
+  `AGENTS.md ## Rules`.
 
 ## Rejected alternatives
 
