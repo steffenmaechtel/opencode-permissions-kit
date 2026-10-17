@@ -40,17 +40,16 @@ one project, and the resume logic made each re-run dump exactly the next
 one. The import loop had the same class (its stdin was the manifest
 itself).
 
-Two lessons:
-
-- **Call sites:** every child process invoked inside a data-driven loop
-  gets an explicit `</dev/null` unless it genuinely needs stdin. The
-  child's stdin behavior is not the loop's to rely on — util-linux'
-  own `script(1)` documents the same trap ("avoid use of script in
-  command pipes, as script can read more input than you would expect").
-- **Doubles:** the e2e `fake-ddev` never read stdin — the suite was
-  structurally unable to catch the bug. The fix taught the fakes the
-  behavior: the unit fake eats stdin under `DDEV_EAT_STDIN=1`, the e2e
-  fake reads stdin unconditionally (`docker exec` provides EOF).
+Two lessons. Call sites: every child process invoked inside a
+data-driven loop gets an explicit `</dev/null` unless it genuinely
+needs stdin — the child's stdin behavior is not the loop's to rely on
+(util-linux' own `script(1)` documents the same trap: "avoid use of
+script in command pipes, as script can read more input than you would
+expect"); §6 carries the rule. Doubles: the e2e `fake-ddev` never
+read stdin — the suite was structurally unable to catch the bug. The
+fix taught the fakes the behavior: the unit fake eats stdin under
+`DDEV_EAT_STDIN=1`, the e2e fake reads stdin unconditionally
+(`docker exec` provides EOF).
 
 ### 2.2 rc-file loading — the hook installation class
 
@@ -87,25 +86,27 @@ during e2e.
 Following Fowler/Meszaros ("Mocks Aren't Stubs"): a **test double** is
 any stand-in for a real dependency; the relevant kinds here are
 
-- **stub** — canned answers, no behavior;
-- **fake** — working lightweight implementation (the kit's `fake-ddev`);
-- **mock** — pre-programmed call expectations.
+| Kind | Definition |
+|---|---|
+| stub | canned answers, no behavior |
+| fake | working lightweight implementation (the kit's `fake-ddev`) |
+| mock | pre-programmed call expectations |
 
 The incident was a **fidelity gap**: the fake was faithful to the
 calls/outputs the tests asserted, but not to an I/O side effect the
 production code path touched (draining stdin). Rule for this repo:
 
-> A double must replicate every observable behavior the code under test
-> can touch — arguments, exit codes, output, **and stdio side effects**
-> (stdin consumption, tty probing). When the real binary surprises you,
-> encode the surprise in the double plus a regression test, so the
-> fidelity is locked.
+- A double must replicate every observable behavior the code under
+  test can touch — arguments, exit codes, output, **and stdio side
+  effects** (stdin consumption, tty probing). When the real binary
+  surprises you, encode the surprise in the double plus a regression
+  test, so the fidelity is locked. (RM-0047)
 
 ## 4. Patterns that close the gaps
 
 1. **Behavioral doubles + contract lock** (cheap, hermetic — first line
    of defense). When real-binary behavior bites, the double learns it
-   (`DDEV_EAT_STDIN`) and a regression test keeps it.
+   (`DDEV_EAT_STDIN`) and a regression test keeps it. (RM-0048)
 2. **Real-binary tiers** (expensive, authoritative — the `e2e-ddev`
    golden-image suite). Where a fake's fidelity can't be trusted
    (ddev's chmod/mutagen/router behavior), run the real thing; cache the
@@ -117,7 +118,7 @@ production code path touched (draining stdin). Rule for this repo:
    mutation-verified — removing its `</dev/null` makes only the first
    project import. Caveat learned there: a FAILING real ddev never
    reaches its stdin probing, so a fail-path scenario proves loop
-   survival only — the drain itself needs the success path).
+   survival only — the drain itself needs the success path). (RM-0049)
 3. **Environment matrix as a test dimension.** For flows that read any
    fd, run the scenario against stdin variants: closed (`<&-`), EOF
    (`</dev/null`), pipe-with-data (`< <(printf ...)`), and PTY (§4.4).
@@ -127,25 +128,24 @@ production code path touched (draining stdin). Rule for this repo:
    at build time — because the unreadable-CWD fatal of #116 existed only
    on git ≥ 2.55 and was invisible at the distro floor the suite pinned.
    The build-time resolution doubles as drift detection: the weekly cron
-   rebuilds with whatever git the PPA ships that week.
-4. **PTY harnesses**, by weight:
-   - `script -qec '<command>' /dev/null` (util-linux) — gives the
-     command a real PTY in any CI script; cheap enough for one check
-     per prompt flow: does it ask, does it accept the default, does the
-     default-fallback work.
-   - **pexpect** (Python) / **expect** (Tcl) — spawn, `expect` a
-     pattern, `send` input; the tool for multi-step dialogues (the
-     installer's y/n chains). pexpect documents the flip side: programs
-     *only* show interactive behavior when they detect a terminal.
-   - **tmux** (`send-keys`/`capture-pane`) — pragmatic harness for TUI
-     surfaces (the kit-mode TUI) where even pexpect gets awkward.
-   - `bash -lic '<cmd>'` / `su - <user> -c '<cmd>'` — not a PTY, but
-     exercises rc-file loading (§2.2).
-5. **Recording real sessions** to derive double contracts: `script
-   --log-io` (input+output streams, timing) or asciinema capture of a
-   real run — then codify the observed stdio behavior into the fake.
-   Cheapest way to keep fakes honest without running real binaries in
-   every suite.
+   rebuilds with whatever git the PPA ships that week. (RM-0050)
+PTY harnesses, by weight: `script -qec '<command>' /dev/null`
+(util-linux) gives the command a real PTY in any CI script — cheap
+enough for one check per prompt flow: does it ask, does it accept the
+default, does the default-fallback work. **pexpect** (Python) /
+**expect** (Tcl) spawn, `expect` a pattern, `send` input — the tool
+for multi-step dialogues (the installer's y/n chains); pexpect
+documents the flip side: programs *only* show interactive behavior
+when they detect a terminal. **tmux** (`send-keys`/`capture-pane`) is
+the pragmatic harness for TUI surfaces (the kit-mode TUI) where even
+pexpect gets awkward. And `bash -lic '<cmd>'` / `su - <user> -c
+'<cmd>'` — not a PTY, but exercises rc-file loading (§2.2).
+
+Recording real sessions derives double contracts: `script --log-io`
+(input+output streams, timing) or asciinema capture of a real run —
+then codify the observed stdio behavior into the fake. The cheapest
+way to keep fakes honest without running real binaries in every
+suite.
 
 ## 5. Framework options for shell tests
 
@@ -171,16 +171,16 @@ Adopting either is a maintainer decision; nothing here blocks on it.
 
 - Child process inside a `while read`/pipe loop → `</dev/null` at the
   call site unless stdin is genuinely wanted (audit the existing
-  call sites when touched).
-- Prompt → `read </dev/tty` via `ui.sh` helpers, never bare stdin.
+  call sites when touched). (RM-0051)
+- Prompt → `read </dev/tty` via `ui.sh` helpers, never bare stdin. (RM-0052)
 - New fake/shim → replicate the real binary's stdio behavior (stdin
   consumption, tty probing), and add a contract/regression test that
-  would fail if the double regressed or the real binary changed.
+  would fail if the double regressed or the real binary changed. (RM-0053)
 - rc-installed behavior (functions, hooks, PATH) → needs a
-  fresh-login-shell check in e2e, not just sourced-function unit tests.
+  fresh-login-shell check in e2e, not just sourced-function unit tests. (RM-0054)
 - Interactive-only surfaces (browser launch, Windows hosts file) →
   assert the container-side half only, as `e2e-ddev` does (non-goal
-  there: the Windows side).
+  there: the Windows side). (RM-0055)
 
 ## References
 
