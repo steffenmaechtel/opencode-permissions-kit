@@ -3,7 +3,7 @@
 #
 # Every blocking invariant gets a scratch-tree failure path that must
 # redden the audit AND name the invariant; the report-only lanes
-# (pending units, overdue, INDEX regeneration) must NOT redden it.
+# (overdue, INDEX regeneration) must NOT redden it.
 # Scratch trees carry abstract IDs (RM-9xxx) and live under /tmp only.
 #
 # Run: sh tests/unit/test-rules-meta.sh
@@ -131,12 +131,6 @@ fi
 new_scratch n1
 sed -i 's/ (RM-9002)//' "$SCRATCH/agent/conventions.md"
 expect_block "inv1 ref-less unit" "[inv1]"
-
-# 1b. ref-less unit matching a pending prefix stays report-only
-new_scratch n1b
-printf '%s\n' '5. **Fail loud vs. fail open.** scratch shape' \
-    >> "$SCRATCH/agent/conventions.md"
-expect_ok "inv1 pending shape not blocking" "pending units"
 
 # 2. inv 2 -- dangling ref
 new_scratch n2

@@ -31,6 +31,7 @@ holds.
 | 6 | Index & report | **both**: committed `INDEX.md` regenerated per audit run + the audit's stdout report (RM-0025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
 | 8 | Language | English — repo rule: all content is English (RM-0026) |
+| 9 | Rule prose | rule-bearing paragraphs are rewritten as list items — paragraphs stay narrative/lookup (RM-0045) |
 
 ## Meta format v1.1
 
@@ -106,7 +107,10 @@ still hold?* A rationale that merely restates the rule is a defect. (RM-0027)
    (provenance must never overstate; maintainer decision 2026-10-16).
 
 CI blocks on 1–6 and 9; an overdue meta is a maintenance signal, not a
-broken build. (RM-0030)
+broken build. (RM-0030) The Phase-2 pending-unit parking valve
+(prefix-matched ref-less units reported non-blocking) was retired
+2026-10-17 when its five occupants received metas — a ref-less unit
+in an active section now always blocks.
 
 ## Retire
 
@@ -122,6 +126,7 @@ invariant. (RM-0029)
 | 0 | Pilot `conventions.md` — first metas landed, interval policy set | done |
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
+| 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
 | 3 | Remaining `agent/` files + `AGENTS.md ## Rules` | open |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
