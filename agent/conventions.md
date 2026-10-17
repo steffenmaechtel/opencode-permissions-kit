@@ -38,8 +38,8 @@ Implementation:
 | uninstall.sh (standalone, no ui.sh) | local `prompt_yn` (same display rules) |
 | opk with a damaged library | fallback `ui_confirm` in `bin/opk` (same display rules) |
 
-Free-text questions (`ui_ask`) show `[default] >` — different shape on
-purpose, they are not confirmations.
+- Free-text questions (`ui_ask`) show `[default] >` — different shape on
+  purpose, they are not confirmations. (RM-0036)
 
 ## Script output style
 
@@ -48,13 +48,13 @@ labeled lines `info`/`success`/`warn`/`error` via `ui.sh`, slim banner,
 Unicode symbols with `UI_ASCII=1` fallback, `NO_COLOR` and non-tty
 honored.
 
-Severity rows are **semantic, not colorized `ui_kv` calls** (issue
-#158): verdict rows use `ui_kv_ok` / `ui_kv_warn` / `ui_kv_bad` (and the
-checklist helpers `ui_have` / `ui_atten` / `ui_miss`), which render the
-same output but also bump the counters `UI_ROWS_OK/WARN/BAD` — a summary
-(`status.sh`'s verdict line) can tally findings by call site, where
-counting color bytes would fail (they are empty under `NO_COLOR`/piping).
-Two consequences for report scripts:
+- Severity rows are **semantic, not colorized `ui_kv` calls** (issue
+  #158): verdict rows use `ui_kv_ok` / `ui_kv_warn` / `ui_kv_bad` (and the
+  checklist helpers `ui_have` / `ui_atten` / `ui_miss`), which render the
+  same output but also bump the counters `UI_ROWS_OK/WARN/BAD` — a summary
+  (`status.sh`'s verdict line) can tally findings by call site, where
+  counting color bytes would fail (they are empty under `NO_COLOR`/piping).
+  Two consequences for report scripts follow. (RM-0037)
 
 - Rows printed inside a pipeline (`cmd | while ...; ui_kv_warn ...; done`)
   count in the pipe's subshell and the tally loses them — feed such
@@ -65,15 +65,17 @@ Two consequences for report scripts:
   `ui_menu`) are deliberately not muted: a muted report mode must not
   fall through to an invisible prompt. (RM-0009)
 
-Report commands carry their verdict in the exit code (`opk status`:
-`0` all green, `1` alert(s), `2` warning(s) only, `64` usage error) so
-cron/timers can react without parsing output.
+Additional script output style rules:
 
-File lists in code (fetch/deploy lists such as `KIT_FILES`, install.sh's
-fetch list, and the `lib_deploy` manifest): **one file per line**,
-backslash-continued. Packed multi-name lines make diffs unreadable;
-consumers and tests compare word-wise, so the layout is pure
-convention — keep it when adding entries.
+- Report commands carry their verdict in the exit code (`opk status`:
+  `0` all green, `1` alert(s), `2` warning(s) only, `64` usage error) so
+  cron/timers can react without parsing output. (RM-0038)
+
+- File lists in code (fetch/deploy lists such as `KIT_FILES`, install.sh's
+  fetch list, and the `lib_deploy` manifest): **one file per line**,
+  backslash-continued. Packed multi-name lines make diffs unreadable;
+  consumers and tests compare word-wise, so the layout is pure
+  convention — keep it when adding entries. (RM-0039)
 
 ## Shell security (untrusted input)
 
@@ -105,10 +107,10 @@ never shell *structure*:
 5. **Fail loud vs. fail open.** Maintainer automation skips malformed
    data with a warning and exits non-zero (a red CI run is the
    visibility). The wrapper's hot path fails open instead — an
-   unavailable check must never keep a session from starting.
+   unavailable check must never keep a session from starting. (RM-0040)
 6. **Prove it in tests.** Payload attempts (command substitution,
    qualifier smuggling, column shifts) are unit-tested, with a
-   marker-file proof that nothing ever executed.
+   marker-file proof that nothing ever executed. (RM-0041)
 
 Patterns already in this repo:
 
@@ -172,30 +174,27 @@ lines are skipped):
    `setfacl`, ...) whose operand is a literal absolute path outside the
    sanctioned prefixes fails. Source-to-destination verbs (`cp`, `mv`,
    `ln`, ...) flag only the destination; `sed` only with `-i`.
-   Variables are exempt — what they hold is the review's job.
+   Variables are exempt — what they hold is the review's job. (RM-0042)
 2. **Real-tree ratchet** — any path-shaped literal starting with a
    real-tree prefix (`/var/www/vhosts`, `/srv/other/outside`) fails,
-   quoted or not, in fixture strings as much as in commands
-   (0.0.42g C2). Policy-INPUT classes — values handed to
+   quoted or not, in fixture strings as much as in commands.
+   Policy-INPUT classes — values handed to
    screening/parsing functions or parse-only argument fixtures, never
    executed as paths — are allowlisted in the suite with reasons.
    Unit-suite-scoped: e2e scripts legitimately name container paths
    (/var/www/vhosts fixtures), so they are not in this check's scope.
+   (RM-0043)
 3. **rm suffix guard** — any `rm` invocation (flag order and operand
    position aware, statement-scoped) on a variable with a literal suffix
    must carry the `:?` empty-variable guard — quoted unbraced
    (`"$V/x"`), quoted braced (`"${V}/x"`), slash-outside-the-quotes
-   (`"$V"/x`) and unquoted (`$V/x`) spellings alike (2026-10-06;
-   all spellings enforced since 0.0.45c C3); pure-variable operands are
-   exempt (an empty operand is a verified rm no-op — the dangerous
-   shape is the suffix). Scope since 0.0.45d (0.0.45b C1): the unit
-   suites AND the e2e helper scripts (`tests/e2e/**/*.sh` — the three
-   host-side sites that carried no guard are swept with this change).
-   The same `:?` standard applies to shipped code's `rm` var+suffix
-   sites, root context included (0.0.45b C2): the shipped tree is
-   swept clean with this change, and new sites must not regress it
-   (convention, enforced by review — the unit guard's scan deliberately
-   stops at tests/).
+   (`"$V"/x`) and unquoted (`$V/x`) spellings alike; pure-variable
+   operands are exempt (an empty operand is a verified rm no-op — the
+   dangerous shape is the suffix). Scope: the unit suites AND the e2e
+   helper scripts (`tests/e2e/**/*.sh`). The same `:?` standard
+   applies to shipped code's `rm` var+suffix sites, root context
+   included: new sites must not regress it (convention, enforced by
+   review — the unit guard's scan deliberately stops at tests/). (RM-0044)
 
 The suite self-probes all three checks (continuation-split `rm`, inert
 and quoted and redirect-glued literals, the unguarded suffix shapes —
