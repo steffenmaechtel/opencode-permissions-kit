@@ -21,8 +21,11 @@
 #      log carries an "approved by maintainer" line of the same date
 #
 # Report-only (non-blocking, per RM-0030): 7. overdue list sorted by
-# lateness; 8. INDEX.md regenerated on every run (stale -> warning);
-# pending units (ref-less units awaiting a maintainer decision).
+# lateness; 8. INDEX.md regenerated on every run (stale -> warning).
+# The Phase-2 pending-unit parking valve (prefix-matched ref-less
+# units reported non-blocking) was retired 2026-10-17 when its five
+# occupants received metas -- a ref-less unit in an ACTIVE section
+# now always blocks.
 #
 # Scope lives HERE, reviewable (record: "the section allowlist lives
 # in the audit script"): SCOPE_FILES are scanned for refs (2, 3);
@@ -51,18 +54,9 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#test-sandbox-unit-suites"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-review-findings"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
 
-# Ref-less units pending a maintainer decision -- reported every run,
-# never blocking. A ref-less unit NOT matching any prefix fails inv 1.
-PENDING_PREFIXES="Fail loud vs. fail open"
-PENDING_PREFIXES="$PENDING_PREFIXES|Prove it in tests"
-PENDING_PREFIXES="$PENDING_PREFIXES|Mutation check"
-PENDING_PREFIXES="$PENDING_PREFIXES|Real-tree ratchet"
-PENDING_PREFIXES="$PENDING_PREFIXES|rm suffix guard"
-
 WORK=$(mktemp -d /tmp/rules-audit.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT
 V=$WORK/violations; : > "$V"
-PEND=$WORK/pending; : > "$PEND"
 OVER=$WORK/overdue; : > "$OVER"
 
 block() { printf '[inv%s] %s\n' "$1" "$2" >> "$V"; }
@@ -116,7 +110,7 @@ HEADS=$WORK/heads; : > "$HEADS"
 
 for f in $SCOPE_FILES; do
     [ -f "$ROOT/$f" ] || { block 2 "scope file missing: $f"; continue; }
-    awk -v fname="$f" -v act="$ACTIVE_SECTIONS" -v PENDPAT="$PENDING_PREFIXES" '
+    awk -v fname="$f" -v act="$ACTIVE_SECTIONS" '
         BEGIN {
             n = split(act, a, " ")
             for (i = 1; i <= n; i++) active[a[i]] = 1
@@ -125,8 +119,7 @@ for f in $SCOPE_FILES; do
         function flush() {
             if (unitopen && !hasref) {
                 gsub(/ +/, " ", buf)
-                tag = (buf ~ PENDPAT) ? "PEND" : "UNIT"
-                printf "%s\t%s#%s\t%s\n", tag, fname, sec, substr(buf, 1, 70)
+                printf "UNIT\t%s#%s\t%s\n", fname, sec, substr(buf, 1, 70)
             }
             unitopen = 0; buf = ""; hasref = 0
         }
@@ -166,7 +159,6 @@ for f in $SCOPE_FILES; do
         case $tag in
             REF)  printf '%s\n' "$rest" >> "$REFS" ;;
             UNIT) printf '%s\n' "$rest" >> "$UNITS" ;;
-            PEND) printf '%s\n' "$rest" >> "$PEND" ;;
             HEAD) printf '%s\n' "$rest" >> "$HEADS" ;;
         esac
     done
@@ -294,21 +286,16 @@ fi
 
 # ------------------------------------------------------------- summary
 nv=$(wc -l < "$V" | tr -d ' ')
-np=$(wc -l < "$PEND" | tr -d ' ')
 no=$(wc -l < "$OVER" | tr -d ' ')
 
-if [ "$np" -gt 0 ]; then
-    echo "pending units (decision open, not blocking):"
-    while IFS='	' read -r _loc _text; do echo "  $_loc -- $_text"; done < "$PEND"
-fi
 if [ "$no" -gt 0 ]; then
     echo "overdue metas (maintenance signal, not blocking):"
     LC_ALL=C sort "$OVER" | while IFS='	' read -r d r; do echo "  $r (due $d)"; done
 fi
 
 if [ "$nv" -gt 0 ]; then
-    echo "rules-audit: $nv blocking violation(s), $np pending, $no overdue"
+    echo "rules-audit: $nv blocking violation(s), $no overdue"
     cat "$V"
     exit 1
 fi
-echo "rules-audit: 0 blocking violations, $np pending, $no overdue"
+echo "rules-audit: 0 blocking violations, $no overdue"
