@@ -55,7 +55,6 @@ honored.
   (`status.sh`'s verdict line) can tally findings by call site, where
   counting color bytes would fail (they are empty under `NO_COLOR`/piping).
   Two consequences for report scripts follow. (RM-0037)
-
 - Rows printed inside a pipeline (`cmd | while ...; ui_kv_warn ...; done`)
   count in the pipe's subshell and the tally loses them — feed such
   loops from a temp file and read it via redirect (`while ... done < "$f"`). (RM-0008)
@@ -70,7 +69,6 @@ Additional script output style rules:
 - Report commands carry their verdict in the exit code (`opk status`:
   `0` all green, `1` alert(s), `2` warning(s) only, `64` usage error) so
   cron/timers can react without parsing output. (RM-0038)
-
 - File lists in code (fetch/deploy lists such as `KIT_FILES`, install.sh's
   fetch list, and the `lib_deploy` manifest): **one file per line**,
   backslash-continued. Packed multi-name lines make diffs unreadable;
