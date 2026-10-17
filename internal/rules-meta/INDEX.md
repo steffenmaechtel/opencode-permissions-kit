@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**34 metas · 34 active · 0 retired · 0 review-pending · next due 2026-11-14**
+**44 metas · 44 active · 0 retired · 10 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0036, RM-0037, RM-0038, RM-0039, RM-0040, RM-0041, RM-0042, RM-0043, RM-0044, RM-0045
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -24,6 +24,7 @@
 | [RM-0005](0/0/0/RM-0005.md) | Enter accepts the default (empty answer =… | active | approved | 1m | 2026-11-16 |
 | [RM-0006](0/0/0/RM-0006.md) | Accepted input: y, yes, n, no — case-insensitive | active | approved | 1m | 2026-11-16 |
 | [RM-0007](0/0/0/RM-0007.md) | Don't invent alternatives | active | approved | 1m | 2026-11-16 |
+| [RM-0036](0/0/3/RM-0036.md) | Free-text questions (ui_ask) show [default] | active | **pending** | 1m | 2026-11-17 |
 
 ### Script output style
 
@@ -31,6 +32,9 @@
 |---|---|---|---|---|---|
 | [RM-0008](0/0/0/RM-0008.md) | Rows printed inside a pipeline | active | approved | 1m | 2026-11-16 |
 | [RM-0009](0/0/0/RM-0009.md) | UI_SILENT=1 mutes every non-interactive print… | active | approved | 1m | 2026-11-16 |
+| [RM-0037](0/0/3/RM-0037.md) | Severity rows are semantic, not | active | **pending** | 1m | 2026-11-17 |
+| [RM-0038](0/0/3/RM-0038.md) | Report commands carry their verdict in | active | **pending** | 1m | 2026-11-17 |
+| [RM-0039](0/0/3/RM-0039.md) | File lists in code (fetch/deploy | active | **pending** | 1m | 2026-11-17 |
 
 ### Shell security (untrusted input)
 
@@ -40,6 +44,8 @@
 | [RM-0011](0/0/1/RM-0011.md) | printf '%s' style | active | approved | 1m | 2026-11-16 |
 | [RM-0012](0/0/1/RM-0012.md) | Free text flows through files, not argv | active | approved | 1m | 2026-11-16 |
 | [RM-0013](0/0/1/RM-0013.md) | Allowlist before argv/query | active | approved | 1m | 2026-11-16 |
+| [RM-0040](0/0/4/RM-0040.md) | Fail loud vs. fail open. Maintainer | active | **pending** | 1m | 2026-11-17 |
+| [RM-0041](0/0/4/RM-0041.md) | Prove it in tests. Payload attempts | active | **pending** | 1m | 2026-11-17 |
 
 ### Test sandbox (unit suites)
 
@@ -50,6 +56,9 @@
 | [RM-0015](0/0/1/RM-0015.md) | Never touch real project or system trees | active | approved | 1m | 2026-11-16 |
 | [RM-0016](0/0/1/RM-0016.md) | Fixture data is written sandboxed at the source | active | approved | 1m | 2026-11-16 |
 | [RM-0017](0/0/1/RM-0017.md) | Code extracted from shipped scripts and eval'd… | active | approved | 1m | 2026-11-16 |
+| [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | **pending** | 1m | 2026-11-17 |
+| [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | **pending** | 1m | 2026-11-17 |
+| [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | **pending** | 1m | 2026-11-17 |
 
 ### Referencing review findings
 
@@ -71,6 +80,7 @@
 | [RM-0024](0/0/2/RM-0024.md) | three one-digit levels | active | approved | 1m | 2026-11-14 |
 | [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-11-14 |
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
+| [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | **pending** | 1m | 2026-11-17 |
 
 ### Meta format v1.1
 
