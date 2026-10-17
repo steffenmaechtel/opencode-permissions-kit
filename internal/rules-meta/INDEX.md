@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**44 metas · 44 active · 0 retired · 0 review-pending · next due 2026-11-14**
+**45 metas · 45 active · 0 retired · 1 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0046
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -81,6 +81,7 @@
 | [RM-0025](0/0/2/RM-0025.md) | regenerated per audit run | active | approved | 1m | 2026-11-14 |
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
 | [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | approved | 1m | 2026-11-17 |
+| [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | **pending** | 1m | 2026-11-17 |
 
 ### Meta format v1.1
 
