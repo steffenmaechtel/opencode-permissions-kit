@@ -523,6 +523,156 @@ check "install twin carries the same admin-content gate (0.0.47a F1)" \
     sh -c "grep -qF 'diverges from the kit pin' \"\$1\"" _ \
     "$SCRIPT_DIR/../../files/install.sh"
 
+# --- shell-startup hook re-apply via getent home (issue #192) --------------------
+# The rc-hook section must reach the REAL developer home (getent-resolved
+# DEFAULT_HOME). On the root-shell installs the installer now refuses,
+# the old /home/$DEFAULT_USER gate pointed at /home/root (never exists)
+# and this whole section SKIPPED SILENTLY — while status.sh kept telling
+# users "run opk update". Pins: uid-0 developer -> loud skip, no writes;
+# missing home -> loud skip; healthy home -> the hook line is appended.
+_hk_block="$(sed -n '/^# Root-shell installs (issue #192)/,/^fi$/p' "$UPDATE")"
+if [ -n "$_hk_block" ]; then
+    pass "shell-startup hook block extractable from update.sh (issue #192)"
+    _hk_run() {
+        # $1=DEFAULT_USER $2=uid|empty=id-fails $3=DEFAULT_HOME — sudo runs
+        # inlined (the suite is rootless), ui/log echo, so arms assert on
+        # output. An EMPTY uid makes id fail, executing the probe's
+        # `|| echo 1` fallback arm (#196 a T2).
+        (
+            DEFAULT_USER="$1"; DEFAULT_HOME="$3"
+            export DEFAULT_USER DEFAULT_HOME
+            HK_UID="$2"
+            export HK_UID
+            id() { [ "${1:-}" = "-u" ] || return 1; [ -n "$HK_UID" ] \
+                && printf '%s\n' "$HK_UID" || return 1; }
+            sudo() { "$@"; }
+            ui_warn()   { echo "warn: $*"; }
+            ui_detail() { echo "detail: $*"; }
+            ui_success(){ echo "success: $*"; }
+            log()       { echo "log: $*"; }
+            eval "$_hk_block"
+        ) 2>&1
+    }
+    _rc=0; _out=$(_hk_run root 0 "$WORK/hku-root") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'shell-startup hooks skipped' \
+       && printf '%s' "$_out" | grep -q 'uid 0' \
+       && ! printf '%s' "$_out" | grep -q 'ddev terminal hook installed'; then
+        pass "uid-0 developer: loud skip, no hook provisioning for root"
+    else
+        fail "uid-0 developer: loud skip, no hook provisioning for root (rc=$_rc out=$_out)"
+    fi
+    _rc=0; _out=$(_hk_run hku-dev 1000 "$WORK/hku-missing") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'does not exist' \
+       && ! printf '%s' "$_out" | grep -q 'ddev terminal hook installed'; then
+        pass "missing home: loud skip instead of the old silent one"
+    else
+        fail "missing home: loud skip instead of the old silent one (rc=$_rc out=$_out)"
+    fi
+    mkdir -p "$WORK/hku-home"
+    printf '# plain rc\n' > "$WORK/hku-home/.bashrc"
+    _rc=0; _out=$(_hk_run hku-dev 1000 "$WORK/hku-home") || _rc=$?
+    if [ "$_rc" -eq 0 ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$WORK/hku-home/.bashrc" \
+       && grep -q 'opencode-permissions-kit/sh/shell-warn.sh' "$WORK/hku-home/.bashrc" \
+       && printf '%s' "$_out" | grep -qF "ddev terminal hook installed into $WORK/hku-home/.bashrc"; then
+        pass "healthy home: shell-warn + ddev hook lines appended to the real rc"
+    else
+        fail "healthy home: shell-warn + ddev hook lines appended to the real rc (rc=$_rc out=$_out rcfile=$(cat "$WORK/hku-home/.bashrc" 2>/dev/null))"
+    fi
+    # id-probe failure arm (#196 a T2): unresolvable developer → id fails
+    # → `|| echo 1` sentinel → NOT the uid-0 loud skip; the healthy home
+    # still provisions. Fresh rc file — hku-home above is already hooked,
+    # a re-run would take the sed branch and stay silent.
+    mkdir -p "$WORK/hku-idfail"
+    printf '# plain rc\n' > "$WORK/hku-idfail/.bashrc"
+    _rc=0; _out=$(_hk_run hku-dev2 "" "$WORK/hku-idfail") || _rc=$?
+    if [ "$_rc" -eq 0 ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$WORK/hku-idfail/.bashrc" \
+       && ! printf '%s' "$_out" | grep -q 'uid 0'; then
+        pass "id-probe failure: sentinel uid provisions, no false uid-0 skip (executed)"
+    else
+        fail "id-probe failure: sentinel uid provisions, no false uid-0 skip (rc=$_rc out=$_out)"
+    fi
+else
+    fail "shell-startup hook block extractable from update.sh (issue #192)"
+fi
+# DEFAULT_HOME is getent-resolved once, beside the DEFAULT_USER default
+# (V14 sibling resolution — every developer-side site below rides it).
+# Negative sweep tightened (#196 a T1; braced spelling added by
+# #196 b B2; survivor list completed by #196 c C2): every slash form
+# of the literal /home/$DEFAULT_USER spelling counts, braced included
+# — the old gate was exactly the slash-less
+# `[ -d "/home/$DEFAULT_USER" ]`. Allowed survivors: comment lines,
+# the getent-failure fallback (`|| var="/home/$DEFAULT_USER"`), and
+# the braced self-default fallback
+# (`var="${var:-/home/${DEFAULT_USER:-$USER}}"` — sanctioned shape,
+# status.sh's openchamber home).
+_up_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UPDATE" 2>/dev/null \
+    | grep -v '^[[:space:]]*#' \
+    | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
+    | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
+if grep -q 'DEFAULT_HOME="$(getent passwd "$DEFAULT_USER"' "$UPDATE" \
+   && [ -z "$_up_bad" ]; then
+    pass "update.sh resolves DEFAULT_HOME via getent, no hardcoded usage site"
+else
+    fail "update.sh resolves DEFAULT_HOME via getent, no hardcoded usage site (${_up_bad:-no getent})"
+fi
+
+# --- DEFAULT_HOME probe fallback executes (#196 a T2) ----------------------------
+# The two resolution lines run with a stubbed getent: the miss arm MUST
+# land on the /home/<name> fallback, the hit arm MUST keep the passwd
+# home. Value pins — a deleted fallback or a broken getent line fails on
+# the VALUE, not just on a missing branch.
+_dh_lines="$(sed -n '/^DEFAULT_HOME="\$(getent passwd/p' "$UPDATE"; \
+    sed -n '/^\[ -n "\$DEFAULT_HOME" \] || DEFAULT_HOME="\/home/p' "$UPDATE")"
+if [ "$(printf '%s\n' "$_dh_lines" | wc -l | tr -d ' ')" = "2" ]; then
+    pass "DEFAULT_HOME resolution lines extractable from update.sh"
+    _dh_arm() {
+        (
+            DEFAULT_USER="hku-dh"; DH_HOME="$1"
+            export DEFAULT_USER DH_HOME
+            getent() { [ -n "$DH_HOME" ] && printf 'x:x:1000:1000::%s:/bin/sh\n' "$DH_HOME"; }
+            eval "$_dh_lines"
+            printf '%s\n' "$DEFAULT_HOME"
+        )
+    }
+    _rc=0; _out=$(_dh_arm "") || _rc=$?
+    if [ "$_rc" -eq 0 ] && [ "$_out" = "/home/hku-dh" ]; then
+        pass "DEFAULT_HOME getent miss falls back to /home/<name> (executed)"
+    else
+        fail "DEFAULT_HOME getent miss falls back to /home/<name> (rc=$_rc out=$_out)"
+    fi
+    _rc=0; _out=$(_dh_arm "/relocated/home") || _rc=$?
+    if [ "$_rc" -eq 0 ] && [ "$_out" = "/relocated/home" ]; then
+        pass "DEFAULT_HOME getent hit keeps the passwd home (executed)"
+    else
+        fail "DEFAULT_HOME getent hit keeps the passwd home (rc=$_rc out=$_out)"
+    fi
+else
+    fail "DEFAULT_HOME resolution lines extractable from update.sh"
+fi
+
+# id-probe sentinel value (#196 a T2): `|| echo 1` must yield exactly "1"
+# for an unresolvable developer — `|| true` (empty uid) keeps every branch
+# pin above green while silently re-arming the uid-0 loud skip for ghosts.
+_du_line="$(grep '^ *_du_uid=' "$UPDATE" | head -1)"
+if [ -n "$_du_line" ]; then
+    _rc=0; _out=$(
+        (
+            DEFAULT_USER="hku-duval"
+            export DEFAULT_USER
+            id() { return 1; }
+            eval "$_du_line"
+            printf '%s\n' "${_du_uid:-}"
+        )
+    ) || _rc=$?
+    if [ "$_rc" -eq 0 ] && [ "$_out" = "1" ]; then
+        pass "update.sh id probe: unresolvable developer resolves to sentinel 1 (executed)"
+    else
+        fail "update.sh id probe: unresolvable developer resolves to sentinel 1 (rc=$_rc out=$_out)"
+    fi
+else
+    fail "update.sh id probe line extractable from update.sh"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

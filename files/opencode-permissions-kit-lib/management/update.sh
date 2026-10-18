@@ -438,6 +438,13 @@ fi
 VERSION="$KIT_VERSION"
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# Developer home via getent (issue #192, the 0.0.44a V14 class in the
+# sibling management scripts): /home/$DEFAULT_USER is a guess that misses
+# relocated homes — and on a root-shell install (DEFAULT_USER=root) it
+# points at /home/root, which never exists, so whole sections silently
+# skipped. Resolved once here, used by every developer-side site below.
+DEFAULT_HOME="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"
+[ -n "$DEFAULT_HOME" ] || DEFAULT_HOME="/home/$DEFAULT_USER"
 
 # --- upgrade floor: >= 0.0.14 -------------------------------------------------
 # Updates are only supported from 0.0.14 onwards (all older migrations were
@@ -747,35 +754,52 @@ fi
 # The kit-owned line is therefore REWRITTEN in place (exact path match —
 # user lines are never touched, the guard keeps the line harmless after
 # uninstall); the hook is only appended when no kit hook line exists at all.
-if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
-    for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
-        [ -f "$cf" ] || continue
-        if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' \
-            "$cf" 2>/dev/null; then
-            sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh'\
+# Root-shell installs (issue #192) registered root as the developer:
+# update must not paper over that by provisioning root's rc files — the
+# real developer still gets nothing. Warn loudly and skip; a missing
+# home gets the same loud skip instead of the old silent one (the row in
+# status.sh told users "run opk update", which this very section then
+# skipped without a word).
+if [ -n "$DEFAULT_USER" ]; then
+    _du_uid="$(id -u "$DEFAULT_USER" 2>/dev/null || echo 1)"
+    if [ "$_du_uid" = "0" ]; then
+        ui_warn "shell-startup hooks skipped: the install recorded '$DEFAULT_USER' (uid 0)"
+        ui_warn "as the developer — a root-shell install cannot be updated into shape"
+        ui_detail "reinstall from your normal user (issue #192): opk update cannot fix this"
+        log "shell-startup hooks skipped: DEFAULT_USER=$DEFAULT_USER is uid 0 (issue #192)"
+    elif [ -d "$DEFAULT_HOME" ]; then
+        for cf in "$DEFAULT_HOME/.bashrc" "$DEFAULT_HOME/.zshrc" "$DEFAULT_HOME/.profile"; do
+            [ -f "$cf" ] || continue
+            if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' \
+                "$cf" 2>/dev/null; then
+                sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh'\
 '|/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh|g' "$cf"
-        else
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . '\
+            else
+                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . '\
 '/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'\
 ' (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
-            ui_success "wrapper-bypass warning hooked into $cf"
-            log "shell-startup warning hook appended: $cf"
-        fi
-        # ddev always runs as the opencode user: hook the `ddev()` shell
-        # function (sudoers helper). Only the DEFAULT user — the opencode
-        # session must never be wrapped (the function's id check is the guard).
-        if sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh\|opencode-permissions-kit/ddev-as-opencode.sh' \
-            "$cf" 2>/dev/null; then
-            sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh'\
+                ui_success "wrapper-bypass warning hooked into $cf"
+                log "shell-startup warning hook appended: $cf"
+            fi
+            # ddev always runs as the opencode user: hook the `ddev()` shell
+            # function (sudoers helper). Only the DEFAULT user — the opencode
+            # session must never be wrapped (the function's id check is the guard).
+            if sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh\|opencode-permissions-kit/ddev-as-opencode.sh' \
+                "$cf" 2>/dev/null; then
+                sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh'\
 '|/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh|g' "$cf"
-        else
-            echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . '\
+            else
+                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . '\
 '/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'\
 ' (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
-            ui_success "ddev terminal hook installed into $cf"
-            log "ddev-terminal hook appended: $cf"
-        fi
-    done
+                ui_success "ddev terminal hook installed into $cf"
+                log "ddev-terminal hook appended: $cf"
+            fi
+        done
+    else
+        ui_warn "shell-startup hooks skipped: home '$DEFAULT_HOME' of '$DEFAULT_USER' does not exist"
+        log "shell-startup hooks skipped: missing developer home $DEFAULT_HOME"
+    fi
 fi
 
 # --- .ddev + settings-dir handover (ddev always runs as the opencode user) -----
@@ -1126,7 +1150,7 @@ fetch_opencode_version() {
 sync_tui_registration() {
     _str_major="$1"
     for _str_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" \
-                         "/home/$DEFAULT_USER/.config/opencode:$DEFAULT_USER"; do
+                         "$DEFAULT_HOME/.config/opencode:$DEFAULT_USER"; do
         _str_user_dir="${_str_dir_user%%:*}"
         _str_dir_owner="${_str_dir_user#*:}"
         # Shared per-user sync (sh/tui-plugin.sh): chain gate, plugins
@@ -1270,8 +1294,8 @@ fi
 # --- ensure default-user deny-all config (self-update bypass protection) ------
 # Older installs predate this config. Deploy it only if the default user has
 # no config yet — update.sh must not silently clobber an existing one.
-if [ -n "$DEFAULT_USER" ] && [ -d "/home/$DEFAULT_USER" ]; then
-    DEFAULT_OC_CONF="/home/$DEFAULT_USER/.config/opencode/opencode.jsonc"
+if [ -n "$DEFAULT_USER" ] && [ -d "$DEFAULT_HOME" ]; then
+    DEFAULT_OC_CONF="$DEFAULT_HOME/.config/opencode/opencode.jsonc"
     if [ ! -f "$DEFAULT_OC_CONF" ]; then
         sudo mkdir -p "$(dirname "$DEFAULT_OC_CONF")"
         sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
@@ -1375,8 +1399,8 @@ else
         log "tui mode display refreshed: $OC_TUI_CONF"
     fi
 fi
-DEFAULT_TUI_CONF="/home/$DEFAULT_USER/.config/opencode/tui.json"
-DEFAULT_THEME_DIR="/home/$DEFAULT_USER/.config/opencode/themes"
+DEFAULT_TUI_CONF="$DEFAULT_HOME/.config/opencode/tui.json"
+DEFAULT_THEME_DIR="$DEFAULT_HOME/.config/opencode/themes"
 if [ ! -f "$DEFAULT_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$DEFAULT_TUI_CONF" 2>/dev/null; then
     sudo mkdir -p "$DEFAULT_THEME_DIR"
     sudo cp "$LIBDIR/tui/opencode-danger.theme.json" "$DEFAULT_THEME_DIR/opencode-danger.json"

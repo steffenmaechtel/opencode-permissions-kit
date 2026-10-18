@@ -541,6 +541,31 @@ banner() {
     ui_banner "$VERSION" "installs opencode as its own user behind rootless containers"
 }
 
+# Root-shell guard (issue #192): a root login (wsl -u root, su -, a root
+# ssh session) has no SUDO_USER, so whoami wins and the developer would
+# resolve to root. Every developer-side provision then targets root (rc
+# hooks into /root, sharing-group membership for root, sudoers with root
+# as the developer) while the real developer gets nothing — a defect
+# status.sh/update.sh can only report, never repair. Abort before the
+# first prompt, fail-closed like the charset gate that calls this.
+# Trust model (#196 a S1): `sudo env SUDO_USER=... bash install.sh`
+# overrides the variable after sudo sets it — that operator already has
+# root and deceives only themselves; deliberately not defended.
+_root_user_gate() {
+    _rug_name="$1"
+    _rug_uid="$(id -u "$_rug_name" 2>/dev/null || true)"
+    if [ "$_rug_name" != "root" ] && [ "$_rug_uid" != "0" ]; then
+        return 0
+    fi
+    ui_error "The installer must run from your normal user account with sudo,"
+    ui_error "not from a root shell (DEFAULT_USER resolved to '$_rug_name')."
+    ui_error "Open a shell as your regular user and re-run the install command:"
+    ui_error "  curl ... | sudo env KIT_BRANCH=stable bash"
+    ui_detail "background: https://github.com/steffenmaechtel/opencode-permissions-kit/issues/192"
+    log "root-user gate: refused install (DEFAULT_USER=$_rug_name uid=${_rug_uid:-unknown})"
+    exit 1
+}
+
 # === Phase 1: plan + provision (Start .. Step 3) ================================
 # Everything from the first question to the provisioned backend: mode,
 # backup, pre-flight, backend choice, inventory, standard questions,
@@ -564,6 +589,11 @@ do_plan_phase() {
             exit 1
             ;;
     esac
+
+    # Root-shell installs register root as the developer (issue #192) —
+    # refuse them before the first prompt. Runs before the distro gate:
+    # a root shell is a broken install no later choice can repair.
+    _root_user_gate "$DEFAULT_USER"
 
     # ~ in project paths must expand to the DEFAULT user's home, not $HOME:
     # under `curl | sudo bash` / `sudo bash install.sh`, $HOME is /root and
