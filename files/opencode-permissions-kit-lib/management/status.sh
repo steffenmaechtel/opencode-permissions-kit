@@ -52,17 +52,20 @@ else
 fi
 
 # Shared git check (issue #118): the soft tested floor for the Core row.
-# Fail-soft like the rest of status: a missing helper just drops the row.
 # Checkout-first for the same reason as ui.sh above: an older deployed
 # git-check.sh would render its row via plain ui_kv and the summary
 # (issue #158) would not count it.
+# Missing-lib behavior (issue #165, #199 a W3): the old fail-soft
+# contract ("a missing helper just drops the row") is retired — on a
+# deployed run both resolution candidates are the same path, so a
+# missing file is a broken kit; the call site below renders a counted
+# warn row instead of silently dropping the Core git row.
 GIT_CHECK_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/git-check.sh"
 [ -f "$GIT_CHECK_LIB" ] || GIT_CHECK_LIB="$LIBDIR/sh/git-check.sh"
 if [ -f "$GIT_CHECK_LIB" ]; then
     # shellcheck disable=SC1090
     . "$GIT_CHECK_LIB"
 fi
-command -v git_status_row >/dev/null 2>&1 || git_status_row() { :; }
 
 VERSION="0.0.0"
 DEFAULT_USER=""
@@ -208,7 +211,16 @@ fi
 
 # Host git against the soft tested floor (issue #118): advisory row,
 # same source as the install/update warning (sh/git-check.sh).
-git_status_row
+# Missing-lib fallback (issue #165, #199 a W3): git_status_row is
+# undefined when neither the checkout nor the deployed sh/git-check.sh
+# delivered it — a broken kit, not an optional feature. Counted warn
+# row instead of the old noop stub: the verdict must never stay green
+# over a Core check that never ran.
+if command -v git_status_row >/dev/null 2>&1; then
+    git_status_row
+else
+    ui_kv_warn "git" "not checked — kit file sh/git-check.sh missing or outdated (fix: sudo opk update)"
+fi
 
 # === Security advisories (issue #107) ============================================
 # Two sources, two jobs: the SHIPPED database (sh/advisories.sh) is the
@@ -629,6 +641,14 @@ if [ -f "$_st_dhl" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null ||
             rm -f "$_st_share_list"
         done < "$PROJECTS_CONF"
     fi
+elif [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
+    # Issue #165 (#199 a W1): same broken-kit class as the other lib
+    # guards. Checkout-first covers version skew for checkout runs, but a
+    # deployed run resolves both candidates to the same path — a
+    # developer-uid run with the detection lib gone is a damaged tree and
+    # the resharde scan must not vanish silently behind its guard. The
+    # guard stays compound so agent-uid runs stay row-free.
+    ui_kv_warn "ddev share" "not checked — kit file sh/ddev-handover.sh missing (fix: sudo opk update)"
 fi
 # Router-port readiness: rootless ddev-router cannot bind 80/443 unless
 # ip_unprivileged_port_start <= 80. Shows the HOST value (the docker-rootless

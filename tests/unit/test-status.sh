@@ -1676,6 +1676,185 @@ if [ -n "$_h165" ]; then
     fi
 fi
 
+# d3) hosts readiness CHAIN semantics (#199 a W2): the arms in d)
+# inject _st_hosts_ready directly, and the /mnt/c file tests are
+# host-fixed, so the chain's operator/sentinel semantics are pinned by
+# EXECUTING the real uid condition — carved out of the real readiness
+# line (the #196 sentinel-pin pattern), run with id stubs: flipping !=
+# to = or dropping the || echo 1 sentinel turns arms red. The full
+# chain is additionally executed once (any host): it must yield a
+# boolean, never an error.
+_h165r_cond="$(sed -n 's/^   && \[ -n "${DEFAULT_USER:-}" \] && \(.*\); then$/\1/p' "$STATUS")"
+if [ -n "$_h165r_cond" ] \
+    && printf '%s' "$_h165r_cond" | grep -qF '[ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]'; then
+    pass "165: readiness uid condition extractable from the real chain line"
+else
+    fail "165: readiness uid condition not extractable (anchor drift?)"
+fi
+_h165r_run() {
+    (
+        _h165r_myuid="$1"; _h165r_ocuid="$2"
+        set -u; set +e
+        OPENCODE_USER=opencode
+        id() {
+            [ "${1:-}" = "-u" ] || return 1
+            if [ "$#" -eq 1 ]; then printf '%s\n' "$_h165r_myuid"; return 0; fi
+            if [ "${2:-}" = "$OPENCODE_USER" ] && [ -n "$_h165r_ocuid" ]; then
+                printf '%s\n' "$_h165r_ocuid"
+                return 0
+            fi
+            return 1
+        }
+        if eval "$_h165r_cond"; then echo ready; else echo unready; fi
+    ) 2>&1
+}
+if [ -n "$_h165r_cond" ]; then
+    # operator pin: caller uid == agent uid (agent-side run) must NOT be
+    # ready — a flipped != to = in status.sh fails exactly here.
+    _h165r_out=$(_h165r_run 1000 1000 || true)
+    if [ "$_h165r_out" = "unready" ]; then
+        pass "165: readiness uid condition: agent-uid run stays unready (!= executed)"
+    else
+        fail "165: readiness uid condition: agent-uid must stay unready — != drifted? (got: $_h165r_out)"
+    fi
+    _h165r_out=$(_h165r_run 1000 1500 || true)
+    if [ "$_h165r_out" = "ready" ]; then
+        pass "165: readiness uid condition: developer-uid run is ready (!= executed)"
+    else
+        fail "165: readiness uid condition: developer-uid must be ready (got: $_h165r_out)"
+    fi
+    # sentinel pin: an unresolvable agent user resolves to uid 1, and a
+    # developer-uid caller is ready — dropping || echo 1 fails here (the
+    # half-empty test errors and reads as unready).
+    _h165r_out=$(_h165r_run 1000 "" || true)
+    if [ "$_h165r_out" = "ready" ]; then
+        pass "165: readiness uid condition: unresolvable agent user -> sentinel 1, developer ready"
+    else
+        fail "165: readiness uid condition sentinel drifted (got: $_h165r_out)"
+    fi
+fi
+# full-chain execution smoke (host-independent by design): the /mnt/c
+# file tests answer whatever THIS host answers; the pin only asserts
+# the chain still executes to a boolean under set -u.
+_h165r_chain=$(
+    (
+        set -u; set +e
+        DEFAULT_USER=dev
+        OPENCODE_USER=opencode
+        eval "$_h165pre"
+        printf '%s\n' "$_st_hosts_ready"
+    ) 2>&1
+) || true
+case "$_h165r_chain" in
+    true|false) pass "165: readiness chain executes to a boolean (real block, set -u)" ;;
+    *) fail "165: readiness chain no longer executes cleanly (got: $_h165r_chain)" ;;
+esac
+
+# g) ddev-handover (#199 a W1): the resharde scan's lib guard is the
+# same broken-kit class — developer-uid run + missing lib renders the
+# counted row, agent-uid runs stay row-free, and a present lib runs the
+# real scan (control). The harness runs from tests/, so the checkout-first
+# candidate never exists and the deployed LIBDIR fixture decides.
+_s165="$(sed -n '/^_st_dhl=/,/^fi$/p' "$STATUS")"
+if printf '%s' "$_s165" | grep -qF 'ui_kv_warn "ddev share" "not checked — kit file sh/ddev-handover.sh missing (fix: sudo opk update)"'; then
+    pass "165: ddev-handover block extractable (elif row present)"
+else
+    fail "165: ddev-handover block not extractable (anchor drift?)"
+fi
+_s165_dir=$(mktemp -d "$WORK/s165.XXXXXX")
+_s165_run() {
+    (
+        _s165_myuid="$1"; _s165_ocuid="$2"; _s165_lib="$3"; _s165_conf="$4"
+        set -u; set +e
+        OPENCODE_USER=opencode
+        LIBDIR="$_s165_lib"
+        PROJECTS_CONF="$_s165_conf"
+        id() {
+            [ "${1:-}" = "-u" ] || return 1
+            if [ "$#" -eq 1 ]; then printf '%s\n' "$_s165_myuid"; return 0; fi
+            if [ "${2:-}" = "$OPENCODE_USER" ] && [ -n "$_s165_ocuid" ]; then
+                printf '%s\n' "$_s165_ocuid"
+                return 0
+            fi
+            return 1
+        }
+        ui_kv_ok()   { echo "OK|$1|$2"; }
+        ui_kv_warn() { echo "WARN|$1|$2"; }
+        ui_detail()  { echo "DETAIL|$1"; }
+        eval "$_s165"
+        exit 0
+    ) 2>&1
+}
+if [ -n "$_s165" ]; then
+    _s165_out=$(_s165_run 1000 1500 "$_s165_dir" "$_s165_dir/no-projects.conf" || true)
+    if printf '%s' "$_s165_out" | grep -q '^WARN|ddev share|not checked — kit file sh/ddev-handover.sh missing'; then
+        pass "165: missing ddev-handover lib warns on developer-uid runs (counted)"
+    else
+        fail "165: missing ddev-handover lib must warn (got: $_s165_out)"
+    fi
+    _s165_out=$(_s165_run 1000 1000 "$_s165_dir" "$_s165_dir/no-projects.conf" || true)
+    if [ -z "$_s165_out" ]; then
+        pass "165: agent-uid run stays row-free (handover guard holds)"
+    else
+        fail "165: agent-uid run must not fire the handover row (got: $_s165_out)"
+    fi
+    # control: lib present + a project root with .ddev, stub flags a gap
+    # -> the guarded body renders the real share row (family ran)
+    mkdir -p "$_s165_dir/sh" "$_s165_dir/root/proj/.ddev"
+    printf 'ddev_reshare_needed() { return 0; }\n' > "$_s165_dir/sh/ddev-handover.sh"
+    printf '%s/root\n' "$_s165_dir" > "$_s165_dir/projects.conf"
+    _s165_out=$(_s165_run 1000 1500 "$_s165_dir" "$_s165_dir/projects.conf" || true)
+    if printf '%s' "$_s165_out" | grep -qF "WARN|ddev share|$_s165_dir/root/proj/.ddev: group-write missing" \
+        && ! printf '%s' "$_s165_out" | grep -q 'not checked'; then
+        pass "165: present ddev-handover lib renders the share scan (control)"
+    else
+        fail "165: ddev-handover control broken (got: $_s165_out)"
+    fi
+fi
+
+# g2) git floor row (#199 a W3): the Core git row must not vanish
+# silently when neither resolution candidate delivers git_status_row —
+# counted warn row at the call site; control with the helper defined
+# renders its row and stays row-free.
+_g165="$(sed -n '/^if command -v git_status_row >\/dev\/null 2>&1; then$/,/^fi$/p' "$STATUS")"
+if printf '%s' "$_g165" | grep -qF 'ui_kv_warn "git" "not checked — kit file sh/git-check.sh missing or outdated (fix: sudo opk update)"'; then
+    pass "165: git-floor fallback block extractable (helper check + counted row)"
+else
+    fail "165: git-floor fallback block not extractable (anchor drift?)"
+fi
+if [ -n "$_g165" ]; then
+    _g165_out=$(
+        (
+            set -u; set +e
+            ui_kv_warn() { echo "WARN|$1|$2"; }
+            ui_kv_ok()   { echo "OK|$1|$2"; }
+            eval "$_g165"
+            exit 0
+        ) 2>&1
+    ) || true
+    if printf '%s' "$_g165_out" | grep -q '^WARN|git|not checked — kit file sh/git-check.sh missing'; then
+        pass "165: undefined git_status_row renders the counted fallback row"
+    else
+        fail "165: undefined git_status_row must warn (got: $_g165_out)"
+    fi
+    _g165_out=$(
+        (
+            set -u; set +e
+            git_status_row() { echo "OK|git|2.39.0 — ok (>= 2.30 tested floor)"; }
+            ui_kv_warn() { echo "WARN|$1|$2"; }
+            ui_kv_ok()   { echo "OK|$1|$2"; }
+            eval "$_g165"
+            exit 0
+        ) 2>&1
+    ) || true
+    if printf '%s' "$_g165_out" | grep -q '^OK|git|' \
+        && ! printf '%s' "$_g165_out" | grep -q '^WARN|'; then
+        pass "165: defined git_status_row renders its row, no fallback (control)"
+    else
+        fail "165: git-floor control broken (got: $_g165_out)"
+    fi
+fi
+
 # e) verdict/exit leg (L1: observe the way production does) — the row
 # must COUNT through the real ui.sh into the real summary block: full
 # mode renders it and exits 2; --short mutes the row but keeps the
@@ -1719,15 +1898,25 @@ else
     fail "165: --short must count silently and exit 2 (rc=$_a165v_rc out=$_a165v_out)"
 fi
 
-# f) keep-as-is sites (issue #165 spec): wsl-browser-bridge degrades
-# its own verdict to red by design and log.sh stays a silent best-effort
-# audit line — neither may grow a row of this class (over-sweep would
-# fire for legitimate optional states).
-if ! grep -q 'kit file sh/wsl-browser-bridge.sh missing' "$STATUS" \
-    && ! grep -q 'kit file sh/log.sh missing' "$STATUS"; then
-    pass "165: wsl-browser-bridge/log.sh keep their designed degradation (no row)"
+# f) keep-as-is sites, class-set pin (issue #165 spec, #199 a W5):
+# wsl-browser-bridge degrades its own verdict to red by design and
+# log.sh stays a silent best-effort audit line — neither may grow a row
+# of this class (over-sweep would fire for legitimate optional states).
+# Hardened from two exact strings to the full class set: the
+# "kit file sh/<name>.sh missing" rows in status.sh must be EXACTLY the
+# five broken-kit sites — any over-sweep with this wording, any file,
+# fails with the actual set printed (a growing set is a deliberate
+# ratchet edit: extend _k165_want alongside the new site).
+_k165_want='kit file sh/ddev-handover.sh missing
+kit file sh/ddev-hosts.sh missing
+kit file sh/ddev-migrate.sh missing
+kit file sh/ddev-terminal.sh missing
+kit file sh/git-check.sh missing'
+_k165_got="$(grep -o 'kit file sh/[a-z0-9-]*\.sh missing' "$STATUS" | LC_ALL=C sort -u)"
+if [ "$_k165_got" = "$_k165_want" ]; then
+    pass "165: missing-lib rows are exactly the five broken-kit sites (bridge/log keep their design)"
 else
-    fail "165: keep-as-is sites grew a missing-lib row (over-sweep)"
+    fail "165: missing-lib row set drifted (got: $(printf '%s' "$_k165_got" | tr '\n' ';'))"
 fi
 
 # id-probe sentinel value (#196 a T2): `|| echo 1` must yield exactly "1"
