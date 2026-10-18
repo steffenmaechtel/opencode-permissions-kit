@@ -126,11 +126,14 @@ row). Measured vs recorded:
 | S2 git fallback row line deleted | 4 FAILs (extraction, 2 arms, set pin) | "5 FAILs" |
 | S3b `!=` → `=` on :853 | 4 FAILs | 4 ✓ |
 | S4b sentinel dropped on :853 | 1 FAIL (extraction pin) | 1 ✓ |
-| S5 bogus bridge row inserted | shape-dependent: 1 at an inert insertion point, 3 in the claims-axis /tmp copy, 6 here (the advisories anchor moved in this run) | "6 FAILs" |
+| S5 bogus bridge row inserted | shape-dependent (see below) | "6 FAILs" |
 
 All five red, all restores green — the pins discriminate; the deltas
 come from mutation shape (the a-wave runs deleted larger constructs /
-hit a moved anchor), which the entries above did not spell out.
+hit a moved anchor), which the entries above did not spell out. S5's
+spread: 1 FAIL at an inert insertion point (snapshot b main agent),
+3 in the claims-axis /tmp copy, 6 in the a-wave run — where the bogus
+row also moved the advisories anchor; the count follows the shape.
 Pass lines: the fix wave adds 13 `pass "` lines (d3:5, g:4, g2:3, f:1),
 not 10 — 10 is right only when the three extraction pins are excluded;
 32 pins carry the `165:` label, 131 pass lines total in the suite.
