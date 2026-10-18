@@ -1,10 +1,16 @@
 # Resolution — pr-00198 (issue #164 openchamber probe authority gates)
 
 Chain: review-a (snapshot `c771d71`, 0 HIGH / 3 MED / 3 LOW / 5 INFO) →
-fix wave `bdcf9ed` (W1/W2/W3/W4/W5/W7) → this ledger. Snapshot findings
-are cited as `a <ID>`; the full narrative lives in
-[review-a.md](review-a.md) (incl. the retracted Flash M4 / M-claim —
-retracted findings carry no disposition row).
+fix wave `bdcf9ed` (W1/W2/W3/W4/W5/W7) → review-b (snapshot `ebe4474`,
+micro-wave review of the fix wave: 0 HIGH / 1 MED / 2 LOW / 1 INFO, no
+behavior bug) → b-wave fix `fa938b8` (b B1), b B2/b B3/b B4 corrected
+below. Loop closed at b (comment/ledger-only round — stop rule).
+Snapshot findings are cited as `a <ID>` / `b <ID>`; the narratives live
+in [review-a.md](review-a.md) (incl. the retracted Flash M4 / M-claim —
+retracted findings carry no disposition row) and
+[review-b.md](review-b.md).
+
+Status: closed
 
 ## Dispositions
 
@@ -21,6 +27,10 @@ retracted findings carry no disposition row).
 | a W9 (INFO) | **deliberately not done** | — | verification record: all three rationales confirmed correct |
 | a W10 (INFO) | **deliberately not done** | — | install twin static-only; behavioral coverage via update.sh harness |
 | a W11 (INFO) | **deliberately not done** | — | fidelity note, recorded for the next harness touch |
+| b B1 (MED) | **implemented** | `fa938b8` | sweep comment: 12th hit dispositioned (uninstall's [ -d /etc/opencode ]) |
+| b B2 (LOW) | **implemented** | — | W1 roster completed cross-file in place below (this resolution commit) |
+| b B3 (LOW) | **implemented** | — | true uid-0 consequence recorded in the a W3 evidence below (this commit) |
+| b B4 (INFO) | **implemented** | — | `16+1` → 16 in the a W5 evidence below (this resolution commit) |
 
 ## Evidence detail
 
@@ -51,14 +61,28 @@ plain per the same recorded rationale as `update.sh:618/:680` in the
 wave's sweep account. The `/etc/sudoers.d` site was the class's one
 live-relevant sibling (active grant × plausible 0750) — fixed.
 
+Roster completed per `#198 b B2`: the class has a third
+plain-gate→sudo-rm site outside uninstall.sh — update.sh:670-673
+(`[ -L /usr/local/bin/xdg-open ]` + `readlink` marker gate →
+`sudo rm -f`) — left plain per the same rationale (/usr/local/bin is
+0755 by convention, so no developer-blind read; disagreement keeps a
+stale shim; no grant rides it). install.sh:2072 (the never-shadow
+twin) stays unclaimed as review-a W9 already recorded. Counting them,
+the "one live-relevant sibling" disposition above still holds.
+
 ### a W2 (MED) — sweep account made reproducible
 
 The test comment now states the literal pattern, its 12 base hits, the
 per-site dispositions (fixed / deliberately plain, with reasons), the
 two out-of-pattern class sites, and names the `-L` sibling closure
 (`#198 a W1`). Line-number citations replaced by anchors (also closes
-a W7). The PR-body text on GitHub still carries the old 6-site list —
-maintainer to update the description (out of the repo's reach).
+a W7). Corrected per `#198 b B1`: as shipped the comment dispositioned
+only 11 of the 12 hits; the 12th — uninstall's
+`[ -d /etc/opencode ]` legacy conf-dir gate — joined the
+deliberately-plain list in `fa938b8` (/etc world-searchable, benign
+leftover, no active grant). The PR-body text on GitHub still carries
+the old 6-site list — maintainer to update the description (out of the
+repo's reach).
 
 ### a W3 (MED) — balanced sabotage + environment marking
 
@@ -73,6 +97,17 @@ environment-marking; house form per test-browser-bridge.sh). S1/S2 stay
 unguarded — both pass either way (stub flips the fixture dir open
 around read-only probes).
 
+Consequence corrected per `#198 b B3`: review-a's W3 guidance sentence
+"without the guard the correction would break root-run suite hosts"
+(immutable in the snapshot) is inverted — as root the balanced
+`[ -f path ]` succeeds through mode 000, S2's leftover content equals
+`_oc_expected`, so the else branch fires the write and S3 passes
+VACUOUSLY, not red (same else-branch mechanism the M4 retraction
+traced for the broken form). The guard's real effect: converting a
+vacuous green into an honest, environment-marked SKIP. This ledger's
+own a W3 wording above was already accurate; the note keeps the true
+consequence on record so the snapshot's guidance is not re-imported.
+
 ### a W4 / a W5 (LOW) — pin hardening
 
 W4: the negative static pin dropped its `if ` prefix — any plain
@@ -80,7 +115,8 @@ W4: the negative static pin dropped its `if ` prefix — any plain
 (no legitimate occurrence exists there; install.sh's deliberate opt-in
 detection is a different file). Sabotage: probe re-planted in non-`if`
 dress → red (the old if-anchored form stayed green — the exact W4 gap).
-W5: the extracted block is bounded (≤ 20 lines; actual 16+1) so a
+W5: the extracted block is bounded (≤ 20 lines; actual 16 — the
+original `16+1` was off by one, corrected per `#198 b B4`) so a
 drifted `^    fi$` anchor over-capturing to EOF fails the extraction
 check itself. Sabotage: gate `fi` re-indented → `FAIL … not extractable
 (anchor drift?)` → restore → green.
