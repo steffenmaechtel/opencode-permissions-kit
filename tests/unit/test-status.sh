@@ -1117,11 +1117,30 @@ if [ -n "$W2_BLOCK_GAP" ]; then
         fail "W2 dbdump gap: mktemp failure must warn and skip (got: $_w2out)"
     fi
 fi
-# class sweep (L2): no /dev/null fallback assignment survives anywhere
-if ! grep -qE '_(share_list|hosts_list|gap_roots)=/dev/null' "$STATUS"; then
-    pass "W2 class sweep: no /dev/null fallback assignment remains"
+# class sweep (L2, widened per issue #168): no mktemp whose failure falls
+# back to a FIXED PATH survives in any shipped script — pattern-based, not
+# var-name-based (the pre-#168 sweep knew only the three 0.0.48b W2 names
+# in status.sh; a fresh name anywhere else sailed past it). Shapes covered
+# (single-line, the historical W2 form):
+#   (a) assignment fallback: X=$(mktemp ...) || X=/dev/null — any
+#       /dev/null, /tmp, /var/tmp literal, quoted or not ([^/]? eats one
+#       leading quote); an optional prefix (sudo mktemp) is allowed
+#   (b) fallback inside the substitution: X=$(mktemp ... || echo /dev/null),
+#       with 2>/dev/null muffling before the || included
+# The sanctioned fallbacks (|| return 1, || X="", || { ... }) do not match.
+# Deliberately NOT swept (scope decision, #168): a bare 2>/dev/null
+# swallowing into a fixed file with no || fallback (stderr redirects are
+# ubiquitous in sanctioned code; a line-blind grep false-positives) and
+# multi-line fallbacks (grep is line-scoped). Class history (0.0.48b W2):
+# the /dev/null fallback silently killed the tally and its cleanup rm -f'd
+# the device node when root ran it.
+W2_FIXPATH_A='\$\(([^)|]*[[:space:]])?mktemp[^)]*\)[^|]*\|\|[^|]*=[[:space:]]*[^/]?/(dev/null|tmp|var/tmp)'
+W2_FIXPATH_B='\$\(([^)|]*[[:space:]])?mktemp[^|)]*\|\|[^)]*echo[[:space:]]+[^/]?/(dev/null|tmp|var/tmp)'
+_w2_fall_hits="$(grep -rnE "$W2_FIXPATH_A|$W2_FIXPATH_B" "$SCRIPT_DIR/../../files" || true)"
+if [ -z "$_w2_fall_hits" ]; then
+    pass "W2 class sweep: no mktemp fixed-path fallback in any shipped script (#168)"
 else
-    fail "W2 class sweep: a /dev/null fallback survived"
+    fail "W2 class sweep: mktemp fixed-path fallback survived (got: $_w2_fall_hits)"
 fi
 
 # --- 0.0.48b W3: privilege-unknown and optional rows never count -------------
