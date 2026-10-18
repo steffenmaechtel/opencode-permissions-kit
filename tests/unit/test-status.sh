@@ -36,7 +36,10 @@ else
 fi
 
 # --- 0b. git row (issue #118): the Core section shows the host git against
-# the soft tested floor, from the shared helper (fail-soft: no helper, no row).
+# the soft tested floor, from the shared helper. Missing-lib behavior since
+# #199 a W3: a missing or outdated helper renders the counted warn row at
+# the call site (section g2 pins it); the old fail-soft contract
+# ("a missing helper just drops the row") is retired.
 if grep -q 'git_status_row' "$STATUS" && \
    grep -q 'sh/git-check.sh' "$STATUS" && \
    grep -q 'command -v git_status_row' "$STATUS"; then

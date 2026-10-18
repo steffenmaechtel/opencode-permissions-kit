@@ -645,9 +645,10 @@ elif [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
     # Issue #165 (#199 a W1): same broken-kit class as the other lib
     # guards. Checkout-first covers version skew for checkout runs, but a
     # deployed run resolves both candidates to the same path — a
-    # developer-uid run with the detection lib gone is a damaged tree and
-    # the resharde scan must not vanish silently behind its guard. The
-    # guard stays compound so agent-uid runs stay row-free.
+    # non-agent-uid run (developer or root via sudo, the row's two
+    # realistic callers) with the detection lib gone is a damaged tree
+    # and the resharde scan must not vanish silently behind its guard.
+    # The guard stays compound so agent-uid runs stay row-free.
     ui_kv_warn "ddev share" "not checked — kit file sh/ddev-handover.sh missing (fix: sudo opk update)"
 fi
 # Router-port readiness: rootless ddev-router cannot bind 80/443 unless
