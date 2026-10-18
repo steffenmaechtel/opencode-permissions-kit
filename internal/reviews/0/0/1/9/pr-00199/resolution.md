@@ -9,6 +9,9 @@ Snapshot b (`8ece3e5`) reviewed that fix wave (0 HIGH, 0 MED, 3 LOW,
 bookkeeping-only, so the chain closes with this round per the stop rule
 (no review-relevant code touched).
 
+Status: closed — b-wave dispositions (`47c83dd`, `561efc1`, this file)
+touched comments/docs/bookkeeping only; stop rule met, no snapshot c.
+
 ## Dispositions
 
 | Finding | Disposition | Commit | Key evidence |
