@@ -554,8 +554,11 @@ run sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
 # policy.json pinning OUR wrapper. Any other content is admin-owned and
 # stays; /etc/openchamber itself only goes when empty (OpenChamber may own
 # more files in it).
-if [ -f /etc/openchamber/policy.json ] \
-    && grep -q '"opencodeBinary"[[:space:]]*:[[:space:]]*"/usr/local/bin/opencode"' \
+# Issue #164: uninstall.sh runs as the developer (root is refused), so the
+# presence probe and the content grep run at the write's authority (sudo) —
+# an admin 0700 /etc/openchamber must not hide a kit pin from removal.
+if sudo test -f /etc/openchamber/policy.json \
+    && sudo grep -q '"opencodeBinary"[[:space:]]*:[[:space:]]*"/usr/local/bin/opencode"' \
         /etc/openchamber/policy.json 2>/dev/null; then
     run sudo rm -f /etc/openchamber/policy.json
     run sudo rmdir /etc/openchamber 2>/dev/null || true

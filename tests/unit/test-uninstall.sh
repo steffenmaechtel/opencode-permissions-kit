@@ -86,14 +86,28 @@ if PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry-run 
 else
     # The credential probe (sudo -n true) is expected and harmless; so are
     # the agents-backup probes (0.0.45c C6 + 0.0.45d W2: sudo ls -A and
-    # sudo test -d — read-only, the gate must fail safe in dry-run too);
-    # any OTHER sudo command in dry-run mode is a bug.
-    _destructive="$(grep -vE '^sudo -n true( |$)|^sudo ls -A /home/[^ ]*/\.(agents|claude)$|^sudo test -d /home/[^ ]*/\.(agents|claude)$' "$WORK/log" 2>/dev/null || true)"
+    # sudo test -d — read-only, the gate must fail safe in dry-run too)
+    # and the issue #164 openchamber presence/content probes (sudo
+    # test -f + sudo grep -q — read-only, and deliberately OUTSIDE run()
+    # so they see the file at the rm's authority); any OTHER sudo command
+    # in dry-run mode is a bug.
+    _destructive="$(grep -vE '^sudo -n true( |$)|^sudo ls -A /home/[^ ]*/\.(agents|claude)$|^sudo test -d /home/[^ ]*/\.(agents|claude)$|^sudo test -f /etc/openchamber/policy\.json$|^sudo grep -q .* /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/null || true)"
     if [ -z "$_destructive" ]; then
-        pass "--dry-run executes no destructive sudo command (only the -n true probe)"
+        pass "--dry-run executes no destructive sudo command (only read-only probes)"
     else
         fail "--dry-run executed commands: $_destructive"
     fi
+fi
+
+# Issue #164 behavioral: uninstall.sh runs as the developer (root is
+# refused above), so the openchamber gate MUST probe through sudo — an
+# admin 0700 /etc/openchamber would otherwise hide a kit pin from
+# removal. The fake sudo logs the probe in the real call sequence.
+if grep -q '^sudo test -f /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/null \
+    && grep -q '^sudo grep -q .* /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/null; then
+    pass "openchamber gate probes via sudo in the real call sequence (issue #164)"
+else
+    fail "openchamber gate must probe via sudo, not at developer authority (issue #164)"
 fi
 
 # --- 3. dry-run plans the removals --------------------------------------------
@@ -427,9 +441,14 @@ grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL" \
 # OpenChamber policy pin removal (issue #154, Tier 2): kit-owned content
 # only — the policy.json goes when (and only when) it pins OUR wrapper;
 # any other content is admin-owned and must survive the uninstall.
+# Issue #164: presence + content run at the rm's authority (sudo) — the
+# script runs as the developer, an admin 0700 /etc/openchamber must not
+# hide a kit pin from removal.
 if grep -q 'grep -q .\"opencodeBinary\".*\"/usr/local/bin/opencode\"' "$UNINSTALL" \
     && grep -q 'rm -f /etc/openchamber/policy.json' "$UNINSTALL" \
-    && grep -q 'rmdir /etc/openchamber' "$UNINSTALL"; then
+    && grep -q 'rmdir /etc/openchamber' "$UNINSTALL" \
+    && grep -qF 'sudo test -f /etc/openchamber/policy.json' "$UNINSTALL" \
+    && grep -qF 'sudo grep -q ' "$UNINSTALL"; then
     pass "openchamber policy removed marker-gated (kit content only)"
 else
     fail "openchamber policy removal lost its marker gate"
