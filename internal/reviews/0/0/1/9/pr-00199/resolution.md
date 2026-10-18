@@ -103,6 +103,28 @@ file — fails with the actual set printed; a deliberate sixth site is a
 ratchet edit (`_k165_want`). Sabotage S5 (bogus bridge over-sweep row):
 6 FAILs (the advisories anchor moved too, and the set pin fired).
 
+### b F2 (LOW, snapshot b) — evidence-count errata (re-measured)
+
+Snapshot b's main agent re-executed the sabotage matrix above against
+the committed tree with MINIMAL mutation shapes (delete exactly the
+named line; flip/drop on the readiness line :853; insert one bogus
+row). Measured vs recorded:
+
+| Mutation (minimal shape) | Measured in snapshot b | Recorded above |
+|---|---|---|
+| S1 handover row line deleted | 5 FAILs (extraction, 3 arms, set pin) | "6 FAILs" |
+| S2 git fallback row line deleted | 4 FAILs (extraction, 2 arms, set pin) | "5 FAILs" |
+| S3b `!=` → `=` on :853 | 4 FAILs | 4 ✓ |
+| S4b sentinel dropped on :853 | 1 FAIL (extraction pin) | 1 ✓ |
+| S5 bogus bridge row inserted | shape-dependent: 1 at an inert insertion point, 3 in the claims-axis /tmp copy, 6 here (the advisories anchor moved in this run) | "6 FAILs" |
+
+All five red, all restores green — the pins discriminate; the deltas
+come from mutation shape (the a-wave runs deleted larger constructs /
+hit a moved anchor), which the entries above did not spell out.
+Pass lines: the fix wave adds 13 `pass "` lines (d3:5, g:4, g2:3, f:1),
+not 10 — 10 is right only when the three extraction pins are excluded;
+32 pins carry the `165:` label, 131 pass lines total in the suite.
+
 ### Class sweep of the fix wave (L2)
 
 Pattern `kit file sh/[a-z0-9-]*\.sh missing` over `files/`: exactly the
