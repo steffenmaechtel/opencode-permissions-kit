@@ -596,13 +596,15 @@ else
 fi
 # DEFAULT_HOME is getent-resolved once, beside the DEFAULT_USER default
 # (V14 sibling resolution — every developer-side site below rides it).
-# Negative sweep tightened (#196 a T1): ANY /home/$DEFAULT_USER form
-# counts — the old gate was exactly the slash-less
-# `[ -d "/home/$DEFAULT_USER" ]`. Allowed survivors: comment lines and
-# the getent-failure fallback assignment, nothing else.
-_up_bad="$(grep '/home/\$DEFAULT_USER' "$UPDATE" 2>/dev/null \
+# Negative sweep tightened (#196 a T1; braced spelling added by
+# #196 b B2): every slash form of the literal /home/$DEFAULT_USER
+# spelling counts, braced included — the old gate was exactly the
+# slash-less `[ -d "/home/$DEFAULT_USER" ]`. Allowed survivors: comment
+# lines and the getent-failure fallback assignment, nothing else.
+_up_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UPDATE" 2>/dev/null \
     | grep -v '^[[:space:]]*#' \
-    | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' || true)"
+    | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
+    | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
 if grep -q 'DEFAULT_HOME="$(getent passwd "$DEFAULT_USER"' "$UPDATE" \
    && [ -z "$_up_bad" ]; then
     pass "update.sh resolves DEFAULT_HOME via getent, no hardcoded usage site"

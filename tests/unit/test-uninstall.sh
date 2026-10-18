@@ -496,18 +496,21 @@ fi
 # install recorded root as the developer, and the hardcoded
 # /home/$DEFAULT_USER dir never exists — the cleanup silently missed
 # root's config dir. Shape pins (execution needs the tui-register gate).
-# Negative sweep tightened (#196 a T1): flag ANY /home/$DEFAULT_USER
-# occurrence, not just the trailing-slash form — survivors allowed are
-# comment lines and the getent-failure fallback assignment only.
-_un_bad="$(grep '/home/\$DEFAULT_USER' "$UNINSTALL" 2>/dev/null \
+# Negative sweep tightened (#196 a T1; braced spelling added by
+# #196 b B2, survivor diagnostic by #196 b B7): flag every slash form
+# of the literal /home/$DEFAULT_USER spelling, braced included — not
+# just the trailing-slash form. Survivors allowed are comment lines
+# and the getent-failure fallback assignment only.
+_un_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UNINSTALL" 2>/dev/null \
     | grep -v '^[[:space:]]*#' \
-    | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' || true)"
+    | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
+    | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
 if grep -qF '_un_dev_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"' "$UNINSTALL" \
    && grep -qF '"$_un_dev_home/.config/opencode"' "$UNINSTALL" \
    && [ -z "$_un_bad" ]; then
     pass "uninstall.sh resolves the developer home via getent for the cleanup loop"
 else
-    fail "uninstall.sh resolves the developer home via getent for the cleanup loop"
+    fail "uninstall.sh resolves the developer home via getent for the cleanup loop (${_un_bad:-no getent})"
 fi
 
 echo ""

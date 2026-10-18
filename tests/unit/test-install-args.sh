@@ -206,29 +206,40 @@ _disp_ln=$(grep -n 'm|move|c|copy)' "$_install_sh" | head -1 | cut -d: -f1)
 # installer used to hardcode /home/$DEFAULT_USER in ~14 provisioning
 # sites (ddev discovery, .ddev registry, rc hooks, agents sources, the
 # deny-all config, TUI theme) although it resolves the same home via
-# getent 20 lines further up.
+# getent 20 lines further up. Swept like the siblings below since
+# #196 b B1: the former trailing-slash-only negation let the old gate
+# shape `[ -d "/home/$DEFAULT_USER" ]` back in green. The initializer
+# line itself is the one sanctioned slash-less site — positively pinned
+# by the first grep and subtracted from the negative sweep.
+_v14i_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$_install_sh" 2>/dev/null \
+    | grep -v '^[[:space:]]*#' \
+    | grep -v '^[[:space:]]*DEV_HOME="/home/\$DEFAULT_USER"$' || true)"
 if grep -q 'DEV_HOME="/home/\$DEFAULT_USER"' "$_install_sh" \
    && grep -q 'getent passwd "\$DEFAULT_USER"' "$_install_sh" \
-   && ! grep -q '/home/\$DEFAULT_USER/' "$_install_sh"; then
+   && [ -z "$_v14i_bad" ]; then
     pass "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14)"
 else
-    fail "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14)"
+    fail "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14: ${_v14i_bad:-no initializer or getent})"
 fi
 
-# V14 sibling sweep (issue #192, tightened by #196 a T1): the management
-# scripts lagged install.sh and kept hardcoded /home/$DEFAULT_USER usage
-# sites — on the root-shell installs the new gate refuses, that path
-# pointed at /home/root (never exists), so status warned "run opk update"
-# while update silently skipped the whole hook section. The sweep must
-# flag the slash-LESS form too: the old update.sh gate was exactly
+# V14 sibling sweep (issue #192, tightened by #196 a T1; braced spelling
+# added by #196 b B2): the management scripts lagged install.sh and kept
+# hardcoded /home/$DEFAULT_USER usage sites — on the root-shell installs
+# the new gate refuses, that path pointed at /home/root (never exists),
+# so status warned "run opk update" while update silently skipped the
+# whole hook section. The sweep flags every slash form of the literal
+# spelling, braced included — the old update.sh gate was exactly
 # `[ -d "/home/$DEFAULT_USER" ]`, and a trailing-slash-only pattern would
-# let that exact shape back in green. Allowed survivors: comment lines
-# and the getent-failure fallback (`|| var="/home/$DEFAULT_USER"`).
+# let that exact shape back in green. Allowed survivors: comment lines,
+# the getent-failure fallback (`|| var="/home/$DEFAULT_USER"`), and the
+# braced self-default fallback (`var="${var:-/home/${DEFAULT_USER:-$USER}}"`
+# — status.sh's openchamber home, positively pinned by the 0.0.47c C1 rows).
 for _v14_sib in status update uninstall; do
     _v14_sh="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/$_v14_sib.sh"
-    _v14_bad="$(grep '/home/\$DEFAULT_USER' "$_v14_sh" 2>/dev/null \
+    _v14_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$_v14_sh" 2>/dev/null \
         | grep -v '^[[:space:]]*#' \
-        | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' || true)"
+        | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
+        | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
     if grep -q 'getent passwd "\$DEFAULT_USER"' "$_v14_sh" && [ -z "$_v14_bad" ]; then
         pass "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling)"
     else
