@@ -597,10 +597,14 @@ fi
 # DEFAULT_HOME is getent-resolved once, beside the DEFAULT_USER default
 # (V14 sibling resolution — every developer-side site below rides it).
 # Negative sweep tightened (#196 a T1; braced spelling added by
-# #196 b B2): every slash form of the literal /home/$DEFAULT_USER
-# spelling counts, braced included — the old gate was exactly the
-# slash-less `[ -d "/home/$DEFAULT_USER" ]`. Allowed survivors: comment
-# lines and the getent-failure fallback assignment, nothing else.
+# #196 b B2; survivor list completed by #196 c C2): every slash form
+# of the literal /home/$DEFAULT_USER spelling counts, braced included
+# — the old gate was exactly the slash-less
+# `[ -d "/home/$DEFAULT_USER" ]`. Allowed survivors: comment lines,
+# the getent-failure fallback (`|| var="/home/$DEFAULT_USER"`), and
+# the braced self-default fallback
+# (`var="${var:-/home/${DEFAULT_USER:-$USER}}"` — sanctioned shape,
+# status.sh's openchamber home).
 _up_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UPDATE" 2>/dev/null \
     | grep -v '^[[:space:]]*#' \
     | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \

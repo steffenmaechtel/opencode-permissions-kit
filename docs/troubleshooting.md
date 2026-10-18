@@ -47,9 +47,9 @@ reinstall and re-register your project roots when the installer asks.
 
 If your distro has no regular user yet (some minimal WSL images start
 as root), create one first from the root shell — `useradd -m -G sudo
--s /bin/bash <name>` plus `passwd <name>` — switch into it
-(`wsl -d <distro> -u <name>` on WSL, `su - <name>` elsewhere) and run
-the install from there.
+-s /bin/bash <name>` plus `passwd <name>` — switch into it (from
+Windows: `wsl -d <distro> -u <name>`; from inside the root shell:
+`su - <name>`) and run the install from there.
 
 ## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
 

@@ -497,10 +497,13 @@ fi
 # /home/$DEFAULT_USER dir never exists — the cleanup silently missed
 # root's config dir. Shape pins (execution needs the tui-register gate).
 # Negative sweep tightened (#196 a T1; braced spelling added by
-# #196 b B2, survivor diagnostic by #196 b B7): flag every slash form
-# of the literal /home/$DEFAULT_USER spelling, braced included — not
-# just the trailing-slash form. Survivors allowed are comment lines
-# and the getent-failure fallback assignment only.
+# #196 b B2, survivor diagnostic by #196 b B7; survivor list completed
+# by #196 c C1): flag every slash form of the literal
+# /home/$DEFAULT_USER spelling, braced included — not just the
+# trailing-slash form. Survivors allowed are comment lines, the
+# getent-failure fallback (`|| var="/home/$DEFAULT_USER"`), and the
+# braced self-default fallback (`var="${var:-/home/${DEFAULT_USER:-$USER}}"`
+# — sanctioned shape, status.sh's openchamber home).
 _un_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UNINSTALL" 2>/dev/null \
     | grep -v '^[[:space:]]*#' \
     | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
