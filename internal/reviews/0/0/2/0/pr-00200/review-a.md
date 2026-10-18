@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (house session — main agent + 2 GLM-5.3-Flash axis subagents
 
 # Review — pr-00200 snapshot a — issue-166 (status C1 gate: mode bits vs caller's [ -x ])
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave question: did the fix break or lie? Wave = eed9604 (PR #200):
 `files/opencode-permissions-kit-lib/management/status.sh` (C1 gate
 re-scoped to mode bits + new render elif), `tests/unit/test-status.sh`
