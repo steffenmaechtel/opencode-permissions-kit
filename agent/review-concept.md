@@ -37,7 +37,7 @@ review → fix → review the fixes (wave review) → fix → …
 
 Before the loop starts: **the maintainer opens the (draft) birth-PR**
 and tells the reviewer its number — that number is the case key
-(`internal/reviews/N/N/N/N/pr-NNNNN/`; mechanics:
+(`internal/reviews/A/B/C/D/pr-ABCDE/`; mechanics:
 [review/README.md](../internal/reviews/README.md)). Opening the PR first keeps
 parallel features safe: GitHub allocates the number, so two features
 can never claim the same case folder.

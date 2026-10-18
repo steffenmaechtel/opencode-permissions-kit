@@ -8,7 +8,7 @@ details, verification duty, reviewer agents — lives in
 
 - **Open the birth-PR before the review runs** (draft is fine) and tell
   the reviewer its number — that number is the case key
-  (`internal/reviews/N/N/N/N/pr-NNNNN/`). PR-first keeps parallel features safe.
+  (`internal/reviews/A/B/C/D/pr-ABCDE/`). PR-first keeps parallel features safe.
 - **Trigger a full review** when a version bump is planned, ~500+
   changed lines or 10+ PRs have accumulated, or a high blast-radius
   area changed (`set -e`/pipefail semantics, traps, sudoers, wrapper).
