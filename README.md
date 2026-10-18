@@ -1,6 +1,13 @@
 # opencode permissions kit
 
-> ⚠️ **ALPHA — not for production use.** This kit is still in active development and has not been audited. The scripts and sudoers configuration may change in breaking ways between releases. Run it on a throwaway WSL2/dev box, not on a production server.
+> **BETA — ready for real-use testing.** The kit is field-tested on
+> production systems, but young: the scripts and sudoers configuration
+> may still change in breaking ways between releases, and it has not
+> been audited — the security model is deliberately soft-only (see
+> [Security Model](docs/concepts/security-model.md)). Run it on your
+> real dev machine, not just a throwaway WSL2 box — and when something
+> breaks, [open an issue](https://github.com/steffenmaechtel/opencode-permissions-kit/issues)
+> so it gets fixed.
 
 Runs [opencode](https://opencode.ai) as its own Linux user against a **rootless container backend**, so the agent is UID-separated from you while ddev keeps working. File permissions are opencode's own **soft** permission layer (`opencode.jsonc`).
 
