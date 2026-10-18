@@ -1363,15 +1363,18 @@ if [ -n "$_hk_block" ]; then
     pass "ddev() hook row block extractable from status.sh (issue #192)"
     mkdir -p "$WORK/libkit/sh"
     : > "$WORK/libkit/sh/ddev-terminal.sh"
-    # _hk_run <user> <uid> <home|empty-for-getent-miss>: prints the row
-    # output; stubs decide id/getent so no arm depends on host users.
+    # _hk_run <user> <uid|empty=id-fails> <home|empty-for-getent-miss>:
+    # prints the row output; stubs decide id/getent so no arm depends on
+    # host users. An EMPTY uid makes id fail, executing the probe's
+    # `|| echo 1` fallback arm (#196 a T2).
     _hk_run() {
         (
             HK_USER="$1"; HK_UID="$2"; HK_HOME="$3"
             export HK_USER HK_UID HK_HOME DEFAULT_USER LIBDIR
             DEFAULT_USER="$HK_USER"
             LIBDIR="$WORK/libkit"
-            id() { [ "${1:-}" = "-u" ] && printf '%s\n' "$HK_UID"; }
+            id() { [ "${1:-}" = "-u" ] || return 1; [ -n "$HK_UID" ] \
+                && printf '%s\n' "$HK_UID" || return 1; }
             getent() {
                 [ "${1:-}" = passwd ] && [ "${2:-}" = "$HK_USER" ] && [ -n "$HK_HOME" ] \
                     && printf 'x:x:1000:1000::%s:/bin/sh\n' "$HK_HOME"
@@ -1426,8 +1429,43 @@ if [ -n "$_hk_block" ]; then
     else
         fail "getent miss: fallback path still reports cannot-check (rc=$_rc out=$_out)"
     fi
+    # id-probe failure arm (#196 a T2): id fails -> `|| echo 1` sentinel ->
+    # NOT the uid-0 defect row; the hook is still read via the real home.
+    mkdir -p "$WORK/hk-idfail"
+    printf '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh\n' \
+        > "$WORK/hk-idfail/.bashrc"
+    _rc=0; _out=$(_hk_run hk-idfail "" "$WORK/hk-idfail") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF "OK|ddev() hook|active — $WORK/hk-idfail/.bashrc" \
+       && ! printf '%s' "$_out" | grep -q 'install broken'; then
+        pass "id-probe failure: sentinel uid reads the hook, no false uid-0 row (executed)"
+    else
+        fail "id-probe failure: sentinel uid reads the hook, no false uid-0 row (rc=$_rc out=$_out)"
+    fi
 else
     fail "ddev() hook row block extractable from status.sh (issue #192)"
+fi
+
+# id-probe sentinel value (#196 a T2): `|| echo 1` must yield exactly "1"
+# for an unresolvable developer — `|| true` (empty uid) keeps every branch
+# pin above green while silently re-arming the uid-0 defect row for ghosts.
+_st_line="$(grep '^ *_st_dev_uid=' "$STATUS" | head -1)"
+if [ -n "$_st_line" ]; then
+    _rc=0; _out=$(
+        (
+            DEFAULT_USER="hk-stval"
+            export DEFAULT_USER
+            id() { return 1; }
+            eval "$_st_line"
+            printf '%s\n' "${_st_dev_uid:-}"
+        )
+    ) || _rc=$?
+    if [ "$_rc" -eq 0 ] && [ "$_out" = "1" ]; then
+        pass "status.sh id probe: unresolvable developer resolves to sentinel 1 (executed)"
+    else
+        fail "status.sh id probe: unresolvable developer resolves to sentinel 1 (rc=$_rc out=$_out)"
+    fi
+else
+    fail "status.sh id probe line extractable from status.sh"
 fi
 
 echo ""

@@ -41,9 +41,14 @@ and no `opk update` can repair that
 
 **Fix:** open a shell as your regular user and re-run the install
 command there (piped through `sudo`). If an earlier root-shell install
-already completed, uninstall it first (`opk uninstall`), then reinstall
-from your normal user — and re-register your project roots when the
-installer asks.
+already completed, uninstall it first — run `opk uninstall` from your
+regular user too (it refuses to start from a root shell) — then
+reinstall and re-register your project roots when the installer asks.
+
+If your distro has no regular user yet (some minimal WSL images start
+as root), create one first from the root shell — `useradd -m -G sudo
+-s /bin/bash <name>` plus `passwd <name>` — and run the install from
+that account.
 
 ## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
 

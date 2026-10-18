@@ -548,6 +548,9 @@ banner() {
 # as the developer) while the real developer gets nothing — a defect
 # status.sh/update.sh can only report, never repair. Abort before the
 # first prompt, fail-closed like the charset gate that calls this.
+# Trust model (#196 a S1): `sudo env SUDO_USER=... bash install.sh`
+# overrides the variable after sudo sets it — that operator already has
+# root and deceives only themselves; deliberately not defended.
 _root_user_gate() {
     _rug_name="$1"
     _rug_uid="$(id -u "$_rug_name" 2>/dev/null || true)"

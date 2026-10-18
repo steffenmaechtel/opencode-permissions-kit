@@ -215,20 +215,24 @@ else
     fail "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14)"
 fi
 
-# V14 sibling sweep (issue #192): the management scripts lagged install.sh
-# and kept hardcoded /home/$DEFAULT_USER usage sites — on the root-shell
-# installs the new gate refuses, that path pointed at /home/root (never
-# exists), so status warned "run opk update" while update silently skipped
-# the whole hook section. Every sibling now resolves the home via getent;
-# the /home/$DEFAULT_USER form survives only as getent-failure fallback
-# (no trailing-slash usage site left).
+# V14 sibling sweep (issue #192, tightened by #196 a T1): the management
+# scripts lagged install.sh and kept hardcoded /home/$DEFAULT_USER usage
+# sites — on the root-shell installs the new gate refuses, that path
+# pointed at /home/root (never exists), so status warned "run opk update"
+# while update silently skipped the whole hook section. The sweep must
+# flag the slash-LESS form too: the old update.sh gate was exactly
+# `[ -d "/home/$DEFAULT_USER" ]`, and a trailing-slash-only pattern would
+# let that exact shape back in green. Allowed survivors: comment lines
+# and the getent-failure fallback (`|| var="/home/$DEFAULT_USER"`).
 for _v14_sib in status update uninstall; do
     _v14_sh="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/$_v14_sib.sh"
-    if grep -q 'getent passwd "\$DEFAULT_USER"' "$_v14_sh" \
-       && ! grep -q '/home/\$DEFAULT_USER/' "$_v14_sh"; then
+    _v14_bad="$(grep '/home/\$DEFAULT_USER' "$_v14_sh" 2>/dev/null \
+        | grep -v '^[[:space:]]*#' \
+        | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' || true)"
+    if grep -q 'getent passwd "\$DEFAULT_USER"' "$_v14_sh" && [ -z "$_v14_bad" ]; then
         pass "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling)"
     else
-        fail "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling)"
+        fail "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling: ${_v14_bad:-no getent})"
     fi
 done
 
