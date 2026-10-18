@@ -23,4 +23,5 @@ The parity test regenerates and compares. -->
 | [pr-00198](0/0/1/9/pr-00198) | issue-164 openchamber probe authority gates (fix wave) | wave | v0.0.52 @ 0ce2e6b | 2026-10-18 | a–b | closed |
 | [pr-00199](0/0/1/9/pr-00199) | issue-165 feature wave — silently-droppable lib guards warn loudly | wave | v0.0.52 @ 21cf179 | 2026-10-18 | a–b | closed |
 | [pr-00200](0/0/2/0/pr-00200) | issue-166 fix wave — status advisory C1 gate reads mode bits, not the caller's [ -x ] | wave | v0.0.52 @ 99e3fd1 | 2026-10-19 | a–b | closed |
+| [pr-00202](0/0/2/0/pr-00202) | issue-168 fix wave — widen the mktemp fixed-path fallback class sweep repo-wide (test-status.sh only) | wave | v0.0.52 @ 5975524 | 2026-10-19 | a | no-resolution |
 
