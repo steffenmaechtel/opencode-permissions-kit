@@ -536,7 +536,12 @@ check "install twin carries the same admin-content gate (0.0.47a F1)" \
 # /etc/opencode-permissions-kit backup/heal/install.conf reads (root==root
 # or a benign re-prompt; the opt-in detection's branch writes nothing),
 # update.sh's /etc/alpine-release OS detect (no write branch), and
-# uninstall's [ -e /etc/sudoers.d/opencode ] message-only arm. Outside
+# uninstall's [ -e /etc/sudoers.d/opencode ] message-only arm and
+# [ -d /etc/opencode ] legacy conf-dir gate — the account's 12th hit
+# (#198 b B1): /etc is world-searchable on every realistic host, so
+# the probe cannot read developer-blind; disagreement leaves inactive
+# legacy files, and no active grant rides it (the grant is the a W1
+# symlink). Outside
 # the pattern's letters but inside its class, checked and left plain:
 # update.sh's old-layout rm ([ -e "$_opk_old" ] under $LIBDIR —
 # disagreement leaves a benign leftover) and the xdg-open never-shadow
