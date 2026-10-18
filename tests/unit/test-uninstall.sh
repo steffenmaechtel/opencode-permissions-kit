@@ -86,12 +86,14 @@ if PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry-run 
 else
     # The credential probe (sudo -n true) is expected and harmless; so are
     # the agents-backup probes (0.0.45c C6 + 0.0.45d W2: sudo ls -A and
-    # sudo test -d — read-only, the gate must fail safe in dry-run too)
-    # and the issue #164 openchamber presence/content probes (sudo
-    # test -f + sudo grep -q — read-only, and deliberately OUTSIDE run()
-    # so they see the file at the rm's authority); any OTHER sudo command
-    # in dry-run mode is a bug.
-    _destructive="$(grep -vE '^sudo -n true( |$)|^sudo ls -A /home/[^ ]*/\.(agents|claude)$|^sudo test -d /home/[^ ]*/\.(agents|claude)$|^sudo test -f /etc/openchamber/policy\.json$|^sudo grep -q .* /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/null || true)"
+    # sudo test -d — read-only, the gate must fail safe in dry-run too),
+    # the issue #164 openchamber presence/content probes (sudo test -f +
+    # sudo grep -q — read-only, and deliberately OUTSIDE run() so they
+    # see the file at the rm's authority), and the #198 a W1 legacy
+    # sudoers probes (sudo test -L + sudo readlink — same read-only
+    # gate-at-the-write's-authority class); any OTHER sudo command in
+    # dry-run mode is a bug.
+    _destructive="$(grep -vE '^sudo -n true( |$)|^sudo ls -A /home/[^ ]*/\.(agents|claude)$|^sudo test -d /home/[^ ]*/\.(agents|claude)$|^sudo test -f /etc/openchamber/policy\.json$|^sudo grep -q .* /etc/openchamber/policy\.json$|^sudo test -L /etc/sudoers\.d/opencode$|^sudo readlink /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null || true)"
     if [ -z "$_destructive" ]; then
         pass "--dry-run executes no destructive sudo command (only read-only probes)"
     else
@@ -108,6 +110,18 @@ if grep -q '^sudo test -f /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/nul
     pass "openchamber gate probes via sudo in the real call sequence (issue #164)"
 else
     fail "openchamber gate must probe via sudo, not at developer authority (issue #164)"
+fi
+
+# #198 a W1 behavioral: the legacy sudoers gate must probe at the rm's
+# authority too — /etc/sudoers.d is 0750 on hardened hosts, and a
+# developer-blind dir would hide an ACTIVE kit grant from removal. The
+# fake sudo exits 0, so both the -L probe and the readlink fire in the
+# real call sequence (a plain [ -L ] re-plant drops them from the log).
+if grep -q '^sudo test -L /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null \
+    && grep -q '^sudo readlink /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null; then
+    pass "legacy sudoers gate probes via sudo in the real call sequence (#198 a W1)"
+else
+    fail "legacy sudoers gate must probe via sudo, not at developer authority (#198 a W1)"
 fi
 
 # --- 3. dry-run plans the removals --------------------------------------------
@@ -148,6 +162,7 @@ fi
 # cannot be staged hermetically — their names and marker gates are pinned
 # statically here (the behavior ships via the e2e suites).
 for _pin in \
+    'sudo test -L /etc/sudoers.d/opencode' \
     '/etc/sudoers.d/opencode' \
     'case "$_un_leg_link" in' \
     '/etc/opencode/*)' \

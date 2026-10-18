@@ -225,8 +225,12 @@ log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit"
 # keeps an ACTIVE kit sudoers grant alive after "Uninstall complete."
 # Marker-gated (the name /etc/sudoers.d/opencode is generic): only a
 # symlink pointing into the legacy conf dir is kit-owned.
-if [ -L /etc/sudoers.d/opencode ]; then
-    _un_leg_link="$(readlink /etc/sudoers.d/opencode 2>/dev/null || true)"
+# #198 a W1: the symlink probe + readlink run at the rm's authority
+# (sudo) — /etc/sudoers.d is 0750 on hardened hosts, and a developer-
+# blind dir must not hide an ACTIVE kit grant from removal (same class
+# as the issue #164 openchamber gates).
+if sudo test -L /etc/sudoers.d/opencode; then
+    _un_leg_link="$(sudo readlink /etc/sudoers.d/opencode 2>/dev/null || true)"
     case "$_un_leg_link" in
         /etc/opencode/*)
             run sudo rm -f /etc/sudoers.d/opencode

@@ -527,18 +527,26 @@ check "install twin carries the same admin-content gate (0.0.47a F1)" \
 # The openchamber gate probed /etc/openchamber/policy.json at INVOKING-user
 # level while its else branch writes via sudo: with an admin-created 0700
 # /etc/openchamber a direct non-root run read "absent" and the sudo write
-# reconfigured admin-owned state. Sweep (L2, pattern '\[ -[fde] /etc' over
-# install.sh/update.sh/uninstall.sh): update.sh:731 + install.sh:2046 (the
-# two gate-before-sudo-write sites, fixed), uninstall.sh:557 (same gate
-# before sudo rm, live-relevant — uninstall refuses root, so the gate
-# ALWAYS runs as the developer; fixed incl. the content grep), install.sh
-# 1060 (opt-in prompt detection, branch writes nothing — left plain),
-# update.sh:618 (old-layout rm, disagreement direction is a benign
-# leftover), update.sh:680 (xdg-open never-shadow gate — ln without -f
-# fails loudly on a hidden existing target, no overwrite).
+# reconfigured admin-owned state.
+# Sweep account (#198 a W2 — reproducible): the literal pattern
+# '\[ -[fde] /etc' over install.sh/update.sh/uninstall.sh yields 12 hits
+# at the wave base. Fixed in the wave: the three openchamber gates
+# (update.sh re-apply, install.sh install-time twin, uninstall.sh
+# removal gate incl. its content grep). Deliberately plain: install.sh's
+# /etc/opencode-permissions-kit backup/heal/install.conf reads (root==root
+# or a benign re-prompt; the opt-in detection's branch writes nothing),
+# update.sh's /etc/alpine-release OS detect (no write branch), and
+# uninstall's [ -e /etc/sudoers.d/opencode ] message-only arm. Outside
+# the pattern's letters but inside its class, checked and left plain:
+# update.sh's old-layout rm ([ -e "$_opk_old" ] under $LIBDIR —
+# disagreement leaves a benign leftover) and the xdg-open never-shadow
+# gate (/usr/local/bin — ln without -f cannot overwrite a hidden
+# target). #198 a W1 closed the class's one live sibling the pattern
+# cannot see (-L is not in [fde]): uninstall's legacy sudoers symlink
+# gate — its [ -L ] + readlink now ride sudo.
 check "update openchamber presence probe escalates like the write (issue #164)" \
     sh -c "grep -qF 'sudo test -f /etc/openchamber/policy.json' \"\$1\" \
-        && ! grep -qF 'if [ -f /etc/openchamber/policy.json ]' \"\$1\"" _ "$UPDATE"
+        && ! grep -qF '[ -f /etc/openchamber/policy.json ]' \"\$1\"" _ "$UPDATE"
 check "install twin probes at the same authority (issue #164)" \
     sh -c "grep -qF 'sudo test -f /etc/openchamber/policy.json' \"\$1\"" _ \
     "$SCRIPT_DIR/../../files/install.sh"
@@ -556,7 +564,11 @@ check "uninstall twin probes at the same authority (issue #164)" \
 # In-vitro sabotage (plain [ -f ] re-planted) -> the bug fires: the same
 # blind state slips into the sudo write, proving the pin discriminates.
 OC164_BLOCK="$(sed -n '/^    _oc_expected=/,/^    fi$/p' "$UPDATE")"
+# #198 a W5: a drifted end anchor over-captures to EOF — bound the block
+# so anchor drift fails HERE, loudly, instead of surfacing later as a
+# confusing S1/S2 'got:' dump (the block is 16 lines).
 if [ -n "$OC164_BLOCK" ] \
+    && [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 20 ] \
     && printf '%s' "$OC164_BLOCK" | grep -qF 'sudo test -f /etc/openchamber/policy.json'; then
     pass "openchamber gate block extractable from update.sh (issue #164)"
 else
@@ -598,7 +610,7 @@ oc164_run() {
 if [ -n "$OC164_BLOCK" ]; then
     OC164_FIXED="$(printf '%s' "$OC164_BLOCK" | sed "s|/etc/openchamber|$OC164_ETC|g")"
     OC164_SABOTAGE="$(printf '%s' "$OC164_FIXED" \
-        | sed 's|sudo test -f |[ -f |')"
+        | sed 's|sudo test -f \([^ ]*\) |[ -f \1 ] |')"
     # S1: admin 0700 dir (mode 000 = caller-blind), divergent content.
     printf '{ "opencodeBinary": "/usr/local/bin/somewhere-else" }\n' \
         > "$OC164_ETC/policy.json"
@@ -623,13 +635,22 @@ if [ -n "$OC164_BLOCK" ]; then
         fail "#164 S2: control must reach the write branch (got: $_out)"
     fi
     # S3 in-vitro sabotage: the old plain [ -f ] shape over the same blind
-    # state MUST fire the sudo write — the discrimination proof.
-    chmod 000 "$OC164_ETC"; OC164_MODE=000
-    _out="$(oc164_run "$OC164_SABOTAGE" || true)"
-    if printf '%s' "$_out" | grep -q 'SUDO-WRITE'; then
-        pass "#164 S3: plain [ -f ] sabotage slips into the write (discriminates)"
+    # state MUST fire the sudo write — the discrimination proof. The
+    # replacement keeps the test command BALANCED ([ -f <path> ]; #198 a
+    # W3: the unbalanced form discriminated via a broken-test rc-2
+    # fallthrough, not the blind-probe mechanism). uid 0 has no
+    # caller-blind state (CAP_DAC_OVERRIDE sees through mode 000), so the
+    # pin is environment-marked and skipped for root (L4b).
+    if [ "$(id -u)" = 0 ]; then
+        echo "  SKIP  #164 S3 sabotage discrimination (uid 0: no caller-blind state; needs non-root)"
     else
-        fail "#164 S3: sabotage run must fire the write (pin is vacuous?)"
+        chmod 000 "$OC164_ETC"; OC164_MODE=000
+        _out="$(oc164_run "$OC164_SABOTAGE" || true)"
+        if printf '%s' "$_out" | grep -q 'SUDO-WRITE'; then
+            pass "#164 S3: plain [ -f ] sabotage slips into the write (discriminates)"
+        else
+            fail "#164 S3: sabotage run must fire the write (pin is vacuous?)"
+        fi
     fi
     chmod 755 "$OC164_ETC"
 fi
