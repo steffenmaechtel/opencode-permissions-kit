@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (house session — single-pass main agent, no subagents — mi
 
 # Review — pr-00202 snapshot a — issue-168 (W2 class sweep widened to pattern form)
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave question: did the fix break or lie? Wave = 63c9f02 (PR #202):
 rewrites the 0.0.48b W2 class-sweep pin in `tests/unit/test-status.sh`
 from a var-name-scoped grep (`_(share_list|hosts_list|gap_roots)=/dev/null`
