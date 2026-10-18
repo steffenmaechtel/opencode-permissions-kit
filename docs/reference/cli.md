@@ -358,7 +358,24 @@ each is reported as a warning, because no privilege can resolve it
 (a corrupt binary — present and executable by mode bits, but failing to
 run, e.g. after an interrupted deploy — is detected by exec'ing it
 directly at the caller's own privilege: the kernel's verdict on a
-truncated or wrong-arch binary is the same for every user).
+truncated or wrong-arch binary is the same for every user). A missing
+kit library file is the same exception: when a report section sources
+its library from the deployed `sh/` tree — the advisories database,
+the ddev terminal hook, the migration-gap detector, the Windows-hosts
+check, the ddev-share resharde scan, the host git floor — and that
+file is missing (a damaged or partially deployed tree), the check
+family renders a warning row carrying the repair hint
+(`fix: sudo opk update`; the row names the missing kit file — the
+advisories row names the skipped security checks instead) and counts
+toward the verdict instead of silently vanishing while it reads
+"All green". The row appears where the family's own preconditions
+hold — a stamped developer for the hook and migration rows, a
+non-agent caller for the resharde scan, a WSL-ready host for the
+hosts row (the checks themselves are gated the same way; an agent-uid
+run or an unstamped install stays row-free for those families). The
+deliberately optional pieces are exempt: the browser-bridge probe
+degrades its own verdict to red on its own, and the audit-log line
+stays best-effort.
 
 `--short` is cron/timer friendly — alert yourself only when something is
 off:
