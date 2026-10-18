@@ -19,5 +19,5 @@ The parity test regenerates and compares. -->
 | [pr-00171](0/0/1/7/pr-00171) | v0.0.49 | legacy | — | 2026-10-12 | a–d | resolved |
 | [pr-00179](0/0/1/7/pr-00179) | issue-173 docs reflow baseline (feature wave) | wave | v0.0.50 @ ee54ca0 | 2026-10-14 | a | closed |
 | [pr-00189](0/0/1/8/pr-00189) | issue-187 y/n prompt consistency (fix wave) | wave | v0.0.50 @ d7a2d87 | 2026-10-17 | a–c | closed |
-| [pr-00196](0/0/1/9/pr-00196) | issue-192 root-shell install gate + getent developer homes (feature wave) | wave | v0.0.51 @ d3e187d | 2026-10-18 | a | open |
+| [pr-00196](0/0/1/9/pr-00196) | issue-192 root-shell install gate + getent developer homes (feature wave) | wave | v0.0.51 @ d3e187d | 2026-10-18 | a–b | open |
 
