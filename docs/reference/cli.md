@@ -353,12 +353,17 @@ not "fail" for reporting absence — while `--short` reports that state as
 needs root to check", a failed version probe without sudo rights) and
 optional-feature rows (the mkcert CA) are informational: they never count
 toward the verdict — `sudo opk status` resolves the privilege unknowns.
-A missing, non-executable, or corrupt managed binary is the exception:
-each is reported as a warning, because no privilege can resolve it
-(a corrupt binary — present and executable by mode bits, but failing to
-run, e.g. after an interrupted deploy — is detected by exec'ing it
-directly at the caller's own privilege: the kernel's verdict on a
-truncated or wrong-arch binary is the same for every user). A missing
+A missing managed binary, a binary no mode bit lets anyone execute, or
+a corrupt one is the exception: each is reported as a warning, because
+no privilege can resolve it (a corrupt binary — present and executable
+by mode bits, but failing to run, e.g. after an interrupted deploy — is
+detected by exec'ing it directly at the caller's own privilege: the
+kernel's verdict on a truncated or wrong-arch binary is the same for
+every user). A binary that is executable by its audience (root, the
+opencode group — per the mode bits) but not by the current caller is
+not a warning: the "executable" verdict is read from the mode bits, not
+the caller's own access, so it renders the same informational unknown —
+privilege does resolve it (`sudo opk status` executes it). A missing
 kit library file is the same exception: when a report section sources
 its library from the deployed `sh/` tree — the advisories database,
 the ddev terminal hook, the migration-gap detector, the Windows-hosts
