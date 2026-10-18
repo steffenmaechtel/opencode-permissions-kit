@@ -359,9 +359,9 @@ no privilege can resolve it (a corrupt binary — present and executable
 by mode bits, but failing to run, e.g. after an interrupted deploy — is
 detected by exec'ing it directly at the caller's own privilege: the
 kernel's verdict on a truncated or wrong-arch binary is the same for
-every user). A binary that is executable by its audience (root, the
-opencode group — per the mode bits) but not by the current caller is
-not a warning: the "executable" verdict is read from the mode bits, not
+every user). A binary that is executable by its audience (whoever
+the mode bits grant x — for the deployed 750: root and the opencode
+group) but not by the current caller is not a warning: the "executable" verdict is read from the mode bits, not
 the caller's own access, so it renders the same informational unknown —
 privilege does resolve it (`sudo opk status` executes it). A missing
 kit library file is the same exception: when a report section sources

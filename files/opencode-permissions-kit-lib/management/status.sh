@@ -271,16 +271,20 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     # That shape is a privilege question (sudo resolves it), not a
     # finding; it falls through to the unknown row below.
     ADV_BIN_ANYX=false
-    # stat -c %a: octal mode (GNU coreutils; the kit is Linux/WSL only).
-    # Absent file, dangling symlink, or a stat that cannot answer: empty
-    # stays false — the loud direction (a broken kit must not read
-    # green). Pure case patterns, no arithmetic: dash has no base#n
-    # ($((8#750)) is bash-only), and an octal digit carries the execute
-    # bit exactly when it is ODD (1=x 3=wx 5=rx 7=rwx) in one of the
+    # stat -L -c %a: TARGET mode bits, octal (GNU coreutils; the kit is
+    # Linux/WSL only). -L dereferences (#200 a W1): without it stat
+    # reports a symlink's constant 777, so a dangling link or a no-x
+    # target reads any-x — silently downgrading a broken kit to the
+    # uncounted unknown row. Absent file, dangling symlink, or a stat
+    # that cannot answer: empty stays false — the loud direction (a
+    # broken kit must not read green). Pure case patterns, no
+    # arithmetic: dash has no base#n ($((8#750)) is bash-only), and an
+    # octal digit carries the execute bit exactly when it is ODD
+    # (1=x 3=wx 5=rx 7=rwx) in one of the
     # last three positions — owner, group, other. The special digit
     # (setuid/setgid/sticky, a 4-digit mode) grants nothing without an
     # x bit and is deliberately not counted.
-    ADV_BIN_MODE="$(stat -c '%a' "$LIBDIR/bin/opencode" 2>/dev/null || true)"
+    ADV_BIN_MODE="$(stat -L -c '%a' "$LIBDIR/bin/opencode" 2>/dev/null || true)"
     case "$ADV_BIN_MODE" in
         *[!0-7]*|'') ;;
         *[1357]|*[1357]?|*[1357]??) ADV_BIN_ANYX=true ;;
