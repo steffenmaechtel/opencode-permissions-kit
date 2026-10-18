@@ -113,12 +113,12 @@ production code path touched (draining stdin). Rule for this repo:
    provisioned environment so repeat runs stay cheap. Keep coverage of
    each loop/plumbing path there too, not only happy-path lifecycles —
    the stdin bug was in a loop the real-binary suite did not drive. (RM-0049)
-3. **Environment matrix as a test dimension.** For flows that read any
-   file descriptor (fd), run the scenario against stdin variants: closed (`<&-`), EOF
-   (`</dev/null`), pipe-with-data (`< <(printf ...)`), and PTY (§4.4).
-   A bug in one variant is a bug. The same dimension applies to *tool
-   versions*: the e2e suite matrices over the git build
-   (`E2E_GIT_CHANNEL`, issue #118). (RM-0050)
+3. **Environment matrix as a test dimension.** For flows that read
+   any file descriptor (fd), run the scenario against stdin
+   variants: closed (`<&-`), EOF (`</dev/null`), pipe-with-data
+   (`< <(printf ...)`), and PTY (§4.4). A bug in one variant is a
+   bug. The same dimension applies to *tool versions*: the e2e suite
+   matrices over the git build (`E2E_GIT_CHANNEL`, issue #118). (RM-0050)
 PTY harnesses, by weight: `script -qec '<command>' /dev/null`
 (util-linux) gives the command a real PTY in any CI script — cheap
 enough for one check per prompt flow: does it ask, does it accept the
