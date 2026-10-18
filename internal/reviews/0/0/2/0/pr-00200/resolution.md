@@ -3,6 +3,9 @@
 Case: [pr-00200](review-a.md) · birth-PR #200 · snapshot a reviewed
 eed9604 (99e3fd1..eed9604) on 2026-10-19; fix wave e563874.
 
+Status: closed — snapshot b (`b1b7161`, micro-wave of `e563874`) found
+no code findings; b-wave dispositions touch bookkeeping/docs only.
+
 ## Dispositions
 
 | Finding | Disposition | Commit | Key evidence |
@@ -11,6 +14,9 @@ eed9604 (99e3fd1..eed9604) on 2026-10-19; fix wave e563874.
 | a W2 (LOW) | **implemented** | `e563874` | 4400 pin + corrupt-007 compound pin; before the summary gate |
 | a W3 (INFO) | **implemented** | `e563874` | cli.md parenthetical widened to the mode-bit rule |
 | a W4 (INFO) | **deliberately not done** | — | pre-existing 0.0.48b-W3 cell; out of wave scope (backlog) |
+| b W1 (INFO) | **implemented** | this file | stale pre-amend `88aad0d` → `e563874` in the stop-rule note |
+| b W2 (INFO) | **deliberately not done** | — | no code change owed; full sweep enumeration in snapshot b |
+| b W3 (INFO) | **implemented** | `41424f4` | whitespace-only rewrap; line-length/pages/update-flags green |
 
 ## Evidence detail
 
@@ -53,7 +59,35 @@ remaining `%U`/`%G` reads are ownership checks on kit-managed paths.
 No sibling repeats the wave's shape (a mode-bit any-x verdict silently
 downgrading a counted broken-kit warn) — C1 is the only instance.
 
+### b W1 (INFO) — stale pre-amend SHA in the stop-rule note
+
+The fix commit went through reflog churn (`88aad0d` → amends → reset →
+`e563874`, identical tree); the stop-rule section written mid-churn
+still named `88aad0d` (dangling, on no branch) while the dispositions
+table already carried `e563874`. Fixed by rewriting that section for
+the post-b state (this file). Ledger-only: no code, no pins owed.
+
+### b W2 (INFO) — class-sweep site list was a subset
+
+The a-wave sweep pattern was right but the recorded site list omitted
+`status.sh:477` (project-root setgid display) and `:1038`
+(socket-reachability heuristic) — both pre-existing `stat` without
+`-L` on variable paths, both landing in atten/info rows, neither
+downgrading a counted warn. No code change owed (the wave's class was
+any-x warn gates, and C1 is the only one); the complete enumeration
+(22 sites, pattern recorded) lives in snapshot b's Class sweep — the
+next sweep starts from there instead of this subset.
+
+### b W3 (INFO) — unwrapped prose line
+
+Rewrap only (`41424f4`); prose byte-identical, all lines ≤ ~80 cols.
+`test-line-length`, `test-pages`, `test-update-flags` green after.
+
 ### Stop-rule status
 
-The fix wave touched production and test code → snapshot b (micro-wave
-review of 88aad0d) is owed in a fresh session before the PR can close.
+Snapshot b (`b1b7161`) reviewed the fix wave `9e72ea3..e563874`: code
+clean, 3 INFO (bookkeeping/docs). The b-wave dispositions above touch
+only resolution bookkeeping and a docs rewrap — no review-relevant
+code (review-concept: comments, docs, bookkeeping do not extend the
+loop). Stop rule met; chain closed; no snapshot c owed. Release gate
+remains: both e2e suites at baseline with zero skips before tagging.
