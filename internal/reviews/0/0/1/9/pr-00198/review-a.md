@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (house session, fresh; main agent + 2 Flash axis subagents —
 
 # Review — pr-00198 snapshot a — issue #164 openchamber probe authority gates
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave scope: `git diff 0ce2e6b..1738948` (5 files, +147/−9). The wave
 moves the openchamber presence probes in `install.sh` (~2046),
 `update.sh` (~732), and `uninstall.sh` (~560) from invoking-user
