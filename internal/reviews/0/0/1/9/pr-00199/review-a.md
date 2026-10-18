@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (house session — main agent + 2 GLM-5.3-Flash axis subagents
 
 # Review — pr-00199 snapshot a — issue-165 feature wave (status.sh missing-lib rows)
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave under review: feature commit `28c2e0e` (3 files, +331/−2) —
 `management/status.sh` gains counted `ui_kv_warn` fallback rows for four
 silently-droppable lib guards (advisories, ddev-terminal, ddev-migrate,
