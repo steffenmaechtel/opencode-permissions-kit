@@ -726,9 +726,12 @@ fi
 # 0.0.47a F1: the re-apply is additionally gated on the file still being
 # kit-shaped (byte-identical to the one-liner the kit writes) — a file the
 # admin extended or replaced is NEVER overwritten; the skip is loud.
+# Issue #164: the presence probe runs at the write's authority (sudo) —
+# an admin 0700 /etc/openchamber must not read as "absent" to a direct
+# non-root run and slip the branch into the sudo write.
 if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
     _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
-    if [ -f /etc/openchamber/policy.json ] \
+    if sudo test -f /etc/openchamber/policy.json \
         && [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
         ui_warn "openchamber policy pin NOT re-applied: /etc/openchamber/policy.json"
         ui_warn "diverges from the kit pin (admin-owned content) — left untouched"

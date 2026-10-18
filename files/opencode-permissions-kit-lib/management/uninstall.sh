@@ -225,8 +225,12 @@ log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit"
 # keeps an ACTIVE kit sudoers grant alive after "Uninstall complete."
 # Marker-gated (the name /etc/sudoers.d/opencode is generic): only a
 # symlink pointing into the legacy conf dir is kit-owned.
-if [ -L /etc/sudoers.d/opencode ]; then
-    _un_leg_link="$(readlink /etc/sudoers.d/opencode 2>/dev/null || true)"
+# #198 a W1: the symlink probe + readlink run at the rm's authority
+# (sudo) — /etc/sudoers.d is 0750 on hardened hosts, and a developer-
+# blind dir must not hide an ACTIVE kit grant from removal (same class
+# as the issue #164 openchamber gates).
+if sudo test -L /etc/sudoers.d/opencode; then
+    _un_leg_link="$(sudo readlink /etc/sudoers.d/opencode 2>/dev/null || true)"
     case "$_un_leg_link" in
         /etc/opencode/*)
             run sudo rm -f /etc/sudoers.d/opencode
@@ -554,8 +558,11 @@ run sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
 # policy.json pinning OUR wrapper. Any other content is admin-owned and
 # stays; /etc/openchamber itself only goes when empty (OpenChamber may own
 # more files in it).
-if [ -f /etc/openchamber/policy.json ] \
-    && grep -q '"opencodeBinary"[[:space:]]*:[[:space:]]*"/usr/local/bin/opencode"' \
+# Issue #164: uninstall.sh runs as the developer (root is refused), so the
+# presence probe and the content grep run at the write's authority (sudo) —
+# an admin 0700 /etc/openchamber must not hide a kit pin from removal.
+if sudo test -f /etc/openchamber/policy.json \
+    && sudo grep -q '"opencodeBinary"[[:space:]]*:[[:space:]]*"/usr/local/bin/opencode"' \
         /etc/openchamber/policy.json 2>/dev/null; then
     run sudo rm -f /etc/openchamber/policy.json
     run sudo rmdir /etc/openchamber 2>/dev/null || true

@@ -2041,9 +2041,11 @@ do_deploy_phase() {
     # design record).
     # 0.0.47a F1: never overwrite a divergent existing file — admin-owned
     # content is skipped loudly (same rule as update.sh's re-apply).
+    # Issue #164: the presence probe runs at the write's authority (sudo),
+    # keeping the gate honest if install.sh is ever run outside root.
     if [ "$OPENCHAMBER_POLICY" = yes ]; then
         _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
-        if [ -f /etc/openchamber/policy.json ] \
+        if sudo test -f /etc/openchamber/policy.json \
             && [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
             ui_warn "existing /etc/openchamber/policy.json diverges from the kit pin"
             ui_warn "(admin-owned content) — left untouched"
