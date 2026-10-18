@@ -53,6 +53,13 @@ curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh
 > and [issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145)).
 > `--force-unsupported-distro` overrides at your own risk.
 
+Run the installer from your **normal user account** via `sudo` — not from
+a root shell. A root shell (for example `wsl -u root` on Windows) has no
+`SUDO_USER`, so the installer would register `root` as the developer; it
+refuses such runs up front with `The installer must run from your normal
+user account with sudo`
+([issue #192](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/192)).
+
 The script detects that it is streamed, fetches its sibling files from the
 same `stable` release mirror, and first prints a **pre-flight inventory** of what it
 found on your system (WSL2, curl/acl, ddev, docker/podman, an existing kit

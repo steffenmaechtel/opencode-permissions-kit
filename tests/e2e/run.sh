@@ -125,6 +125,20 @@ E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --c
 echo "  Install complete."
 
 echo ""
+echo "--- 2a. root-shell install refused (issue #192) ---"
+# A root login (wsl -u root, su -) has no SUDO_USER, so the developer
+# would resolve to root: hooks into /root, sharing group for root, and a
+# ddev() hook warning no opk update can heal. The gate must abort the
+# run BEFORE anything is provisioned. docker exec defaults to the IMAGE
+# user — dev in this suite's Dockerfile — so -u 0 is required to model
+# the root shell (the rootless suite's image has no USER directive and
+# defaults to root already).
+check "2a: install.sh refuses a root-shell run with the guidance message" \
+    docker exec -u 0 "$E2E_CONTAINER" bash -c 'cd /home/dev/repo && bash files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts >/tmp/root-run.log 2>&1; rc=$?; [ "$rc" -ne 0 ] && grep -q "normal user account" /tmp/root-run.log && grep -q "issues/192" /tmp/root-run.log'
+check "2a: the root-shell run provisioned nothing (wrapper symlink unchanged)" \
+    docker exec -u 0 "$E2E_CONTAINER" bash -c 'test "$(readlink /usr/local/bin/opencode)" = /usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode'
+
+echo ""
 echo "--- 2b. ancestor traversal (root under the 0750 dev home) ---"
 check "2b: traverse-only ACL granted on the dev home" \
     E 'getfacl -p /home/dev 2>/dev/null | grep -q "^group:opencode:--x"'

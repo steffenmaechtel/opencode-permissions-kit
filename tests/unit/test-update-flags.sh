@@ -523,6 +523,70 @@ check "install twin carries the same admin-content gate (0.0.47a F1)" \
     sh -c "grep -qF 'diverges from the kit pin' \"\$1\"" _ \
     "$SCRIPT_DIR/../../files/install.sh"
 
+# --- shell-startup hook re-apply via getent home (issue #192) --------------------
+# The rc-hook section must reach the REAL developer home (getent-resolved
+# DEFAULT_HOME). On the root-shell installs the installer now refuses,
+# the old /home/$DEFAULT_USER gate pointed at /home/root (never exists)
+# and this whole section SKIPPED SILENTLY — while status.sh kept telling
+# users "run opk update". Pins: uid-0 developer -> loud skip, no writes;
+# missing home -> loud skip; healthy home -> the hook line is appended.
+_hk_block="$(sed -n '/^# Root-shell installs (issue #192)/,/^fi$/p' "$UPDATE")"
+if [ -n "$_hk_block" ]; then
+    pass "shell-startup hook block extractable from update.sh (issue #192)"
+    _hk_run() {
+        # $1=DEFAULT_USER $2=uid $3=DEFAULT_HOME — sudo runs inlined (the
+        # suite is rootless), ui/log echo, so arms assert on output.
+        (
+            DEFAULT_USER="$1"; DEFAULT_HOME="$3"
+            export DEFAULT_USER DEFAULT_HOME
+            HK_UID="$2"
+            export HK_UID
+            id() { [ "${1:-}" = "-u" ] && printf '%s\n' "$HK_UID"; }
+            sudo() { "$@"; }
+            ui_warn()   { echo "warn: $*"; }
+            ui_detail() { echo "detail: $*"; }
+            ui_success(){ echo "success: $*"; }
+            log()       { echo "log: $*"; }
+            eval "$_hk_block"
+        ) 2>&1
+    }
+    _rc=0; _out=$(_hk_run root 0 "$WORK/hku-root") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'shell-startup hooks skipped' \
+       && printf '%s' "$_out" | grep -q 'uid 0' \
+       && ! printf '%s' "$_out" | grep -q 'ddev terminal hook installed'; then
+        pass "uid-0 developer: loud skip, no hook provisioning for root"
+    else
+        fail "uid-0 developer: loud skip, no hook provisioning for root (rc=$_rc out=$_out)"
+    fi
+    _rc=0; _out=$(_hk_run hku-dev 1000 "$WORK/hku-missing") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'does not exist' \
+       && ! printf '%s' "$_out" | grep -q 'ddev terminal hook installed'; then
+        pass "missing home: loud skip instead of the old silent one"
+    else
+        fail "missing home: loud skip instead of the old silent one (rc=$_rc out=$_out)"
+    fi
+    mkdir -p "$WORK/hku-home"
+    printf '# plain rc\n' > "$WORK/hku-home/.bashrc"
+    _rc=0; _out=$(_hk_run hku-dev 1000 "$WORK/hku-home") || _rc=$?
+    if [ "$_rc" -eq 0 ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$WORK/hku-home/.bashrc" \
+       && grep -q 'opencode-permissions-kit/sh/shell-warn.sh' "$WORK/hku-home/.bashrc" \
+       && printf '%s' "$_out" | grep -qF "ddev terminal hook installed into $WORK/hku-home/.bashrc"; then
+        pass "healthy home: shell-warn + ddev hook lines appended to the real rc"
+    else
+        fail "healthy home: shell-warn + ddev hook lines appended to the real rc (rc=$_rc out=$_out rcfile=$(cat "$WORK/hku-home/.bashrc" 2>/dev/null))"
+    fi
+else
+    fail "shell-startup hook block extractable from update.sh (issue #192)"
+fi
+# DEFAULT_HOME is getent-resolved once, beside the DEFAULT_USER default
+# (V14 sibling resolution — every developer-side site below rides it).
+if grep -q 'DEFAULT_HOME="$(getent passwd "$DEFAULT_USER"' "$UPDATE" \
+   && ! grep -q '/home/\$DEFAULT_USER/' "$UPDATE"; then
+    pass "update.sh resolves DEFAULT_HOME via getent, no hardcoded usage site"
+else
+    fail "update.sh resolves DEFAULT_HOME via getent, no hardcoded usage site"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

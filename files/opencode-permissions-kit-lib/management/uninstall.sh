@@ -289,7 +289,12 @@ fi
 # inert file-path entries older kits may have written into cli.json. The
 # additive manager leaves unmanaged/broken files untouched.
 if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
-    for _un_dir in "/home/$OPENCODE_USER/.config/opencode" "/home/$DEFAULT_USER/.config/opencode"; do
+    # Developer home via getent (issue #192, V14 class): a root-shell
+    # install recorded root as the developer — /home/root never exists
+    # and the plugin cleanup would silently miss root's config dir.
+    _un_dev_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"
+    [ -n "$_un_dev_home" ] || _un_dev_home="/home/$DEFAULT_USER"
+    for _un_dir in "/home/$OPENCODE_USER/.config/opencode" "$_un_dev_home/.config/opencode"; do
         # Chain gate (review 0.0.39h F2): rm -rf and the tui-register rewrite
         # below act THROUGH a linked parent (~/.config, ~/.config/opencode —
         # agent-replaceable): a planted link redirects the removal/rewrite

@@ -491,6 +491,19 @@ else
     pass "uninstall.sh is free of the removed [?] marker"
 fi
 
+# --- developer home via getent (issue #192, V14 sibling) ---------------------------
+# The plugin-cleanup loop must reach the REAL developer home: a root-shell
+# install recorded root as the developer, and the hardcoded
+# /home/$DEFAULT_USER dir never exists — the cleanup silently missed
+# root's config dir. Shape pins (execution needs the tui-register gate).
+if grep -qF '_un_dev_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"' "$UNINSTALL" \
+   && grep -qF '"$_un_dev_home/.config/opencode"' "$UNINSTALL" \
+   && ! grep -q '/home/\$DEFAULT_USER/' "$UNINSTALL"; then
+    pass "uninstall.sh resolves the developer home via getent for the cleanup loop"
+else
+    fail "uninstall.sh resolves the developer home via getent for the cleanup loop"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

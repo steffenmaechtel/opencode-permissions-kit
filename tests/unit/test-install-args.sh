@@ -215,6 +215,23 @@ else
     fail "install.sh: DEV_HOME via getent, no hardcoded /home/\$DEFAULT_USER left (V14)"
 fi
 
+# V14 sibling sweep (issue #192): the management scripts lagged install.sh
+# and kept hardcoded /home/$DEFAULT_USER usage sites — on the root-shell
+# installs the new gate refuses, that path pointed at /home/root (never
+# exists), so status warned "run opk update" while update silently skipped
+# the whole hook section. Every sibling now resolves the home via getent;
+# the /home/$DEFAULT_USER form survives only as getent-failure fallback
+# (no trailing-slash usage site left).
+for _v14_sib in status update uninstall; do
+    _v14_sh="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/$_v14_sib.sh"
+    if grep -q 'getent passwd "\$DEFAULT_USER"' "$_v14_sh" \
+       && ! grep -q '/home/\$DEFAULT_USER/' "$_v14_sh"; then
+        pass "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling)"
+    else
+        fail "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling)"
+    fi
+done
+
 # V15: the reuse guard aborts on a deviating home or primary group
 # (maintainer decision B) instead of provisioning a shadow home. The two
 # checks are extracted and executed against shims.
@@ -690,6 +707,75 @@ if [ -n "$_uifb" ]; then
     fi
 else
     fail "ui.sh-less fallback block extractable (C5)"
+fi
+
+# --- root-shell guard (issue #192) ---------------------------------------------
+# A root login (wsl -u root, su -) has no SUDO_USER: whoami wins and the
+# developer used to resolve to root — the whole install provisioned for
+# root (rc hooks into /root, sharing group for root) while the real
+# developer got nothing, and the resulting "ddev() hook not hooked"
+# warning survived every opk update (update skipped the /home/root
+# phantom silently). _root_user_gate aborts before the first prompt; it
+# must fire on the NAME root and on ANY uid-0 developer, independently.
+_rug_fn="$(sed -n '/^_root_user_gate() {/,/^}/p' "$INSTALL")"
+if [ -n "$_rug_fn" ]; then
+    pass "_root_user_gate extractable from install.sh"
+    eval "$_rug_fn"
+    # _rug_run <name> <stubbed-uid> — id/getent stubs keep the arms
+    # deterministic on every host (which users exist locally must not
+    # decide the pin, the 0.0.46a F2 class). Output merged the way a
+    # user sees it (stderr + stdout).
+    _rug_run() {
+        (
+            RUG_UID="$2"
+            export RUG_UID
+            id() { [ "${1:-}" = "-u" ] && printf '%s\n' "$RUG_UID"; }
+            ui_error()  { echo "error: $*"; }
+            ui_detail() { echo "detail: $*"; }
+            log()       { :; }
+            _root_user_gate "$1"
+        ) 2>&1
+    }
+    _rc=0; _out=$(_rug_run root 0) || _rc=$?
+    if [ "$_rc" -eq 1 ] && printf '%s' "$_out" | grep -q 'normal user account' \
+       && printf '%s' "$_out" | grep -q 'issues/192'; then
+        pass "root gate: DEFAULT_USER=root aborts with the guidance (issue link)"
+    else
+        fail "root gate: DEFAULT_USER=root aborts with the guidance (rc=$_rc out=$_out)"
+    fi
+    _rc=0; _out=$(_rug_run root 1000) || _rc=$?
+    [ "$_rc" -eq 1 ] \
+        && pass "root gate: the name 'root' aborts even with a bogus uid" \
+        || fail "root gate: the name 'root' aborts even with a bogus uid (rc=$_rc out=$_out)"
+    _rc=0; _out=$(_rug_run rug-toor 0) || _rc=$?
+    [ "$_rc" -eq 1 ] \
+        && pass "root gate: any uid-0 developer aborts (name arm independent)" \
+        || fail "root gate: any uid-0 developer aborts (rc=$_rc out=$_out)"
+    _rc=0; _out=$(_rug_run rug-dev 1000) || _rc=$?
+    if [ "$_rc" -eq 0 ] && [ -z "$_out" ]; then
+        pass "root gate: a regular developer passes silently"
+    else
+        fail "root gate: a regular developer passes silently (rc=$_rc out=$_out)"
+    fi
+else
+    fail "_root_user_gate extractable from install.sh"
+fi
+# Wiring + order (0.0.45a C1 discipline): the gate call must sit after
+# the charset case (same validation cluster) and before the distro gate
+# and the first menu — a root shell is unrepairable, so it refuses first.
+if grep -qF '_root_user_gate "$DEFAULT_USER"' "$INSTALL"; then
+    pass "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
+else
+    fail "do_plan_phase wires DEFAULT_USER into _root_user_gate (verbatim call pin)"
+fi
+_rug_call_ln=$(grep -n '^    _root_user_gate ' "$INSTALL" | head -1 | cut -d: -f1)
+_rug_charset_ln=$(grep -n "Invalid user name" "$INSTALL" | head -1 | cut -d: -f1)
+_rug_distro_ln=$(grep -n '^    _distro_gate ' "$INSTALL" | head -1 | cut -d: -f1)
+if [ -n "$_rug_call_ln" ] && [ -n "$_rug_charset_ln" ] && [ -n "$_rug_distro_ln" ] \
+   && [ "$_rug_charset_ln" -lt "$_rug_call_ln" ] && [ "$_rug_call_ln" -lt "$_rug_distro_ln" ]; then
+    pass "root gate runs after the charset gate, before the distro gate (order pin)"
+else
+    fail "root gate runs after the charset gate, before the distro gate (charset=$_rug_charset_ln gate=$_rug_call_ln distro=$_rug_distro_ln)"
 fi
 
 echo ""

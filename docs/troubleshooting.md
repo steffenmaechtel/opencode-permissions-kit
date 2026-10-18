@@ -24,6 +24,27 @@ what you are doing, re-run the installer with
 support for that path). Existing installs on any distro keep updating
 normally via `opk update` — the gate only guards new installs.
 
+## The install refuses: "The installer must run from your normal user account with sudo"
+
+**Symptom:** the installer aborts before the first prompt with
+`The installer must run from your normal user account with sudo, not
+from a root shell (DEFAULT_USER resolved to 'root')`.
+
+**Cause:** the installer was started from a root shell — typically
+`wsl -u root` on Windows, `su -`, or a root ssh session. Those have no
+`SUDO_USER`, so the installer would register `root` as the developer:
+the shell hooks land in `/root/.bashrc`, the sharing group gets `root`,
+and the real developer account gets nothing. `opk status` would then
+show `ddev() hook: install broken — developer 'root' has uid 0` forever,
+and no `opk update` can repair that
+([issue #192](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/192)).
+
+**Fix:** open a shell as your regular user and re-run the install
+command there (piped through `sudo`). If an earlier root-shell install
+already completed, uninstall it first (`opk uninstall`), then reinstall
+from your normal user — and re-register your project roots when the
+installer asks.
+
 ## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
 
 **Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`,

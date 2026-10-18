@@ -1350,6 +1350,86 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
     rm -rf "$_d1dir"
 fi
 
+# --- ddev() hook row via getent home (issue #192) --------------------------------
+# The row must find the hook in the REAL home (getent), not a hardcoded
+# /home/$DEFAULT_USER: on the root-shell installs the installer now
+# refuses, that path was /home/root (never exists) and the row degraded
+# to a permanent "not hooked — run opk update" warning that opk update
+# could never heal. A uid-0 developer is reported as the install defect
+# it is. Arms run the extracted block with stubbed id/getent and a fake
+# LIBDIR; all homes live under $WORK.
+_hk_block="$(sed -n '/^# ddev() hook row (issue #192)/,/^fi$/p' "$STATUS")"
+if [ -n "$_hk_block" ]; then
+    pass "ddev() hook row block extractable from status.sh (issue #192)"
+    mkdir -p "$WORK/libkit/sh"
+    : > "$WORK/libkit/sh/ddev-terminal.sh"
+    # _hk_run <user> <uid> <home|empty-for-getent-miss>: prints the row
+    # output; stubs decide id/getent so no arm depends on host users.
+    _hk_run() {
+        (
+            HK_USER="$1"; HK_UID="$2"; HK_HOME="$3"
+            export HK_USER HK_UID HK_HOME DEFAULT_USER LIBDIR
+            DEFAULT_USER="$HK_USER"
+            LIBDIR="$WORK/libkit"
+            id() { [ "${1:-}" = "-u" ] && printf '%s\n' "$HK_UID"; }
+            getent() {
+                [ "${1:-}" = passwd ] && [ "${2:-}" = "$HK_USER" ] && [ -n "$HK_HOME" ] \
+                    && printf 'x:x:1000:1000::%s:/bin/sh\n' "$HK_HOME"
+            }
+            ui_kv_ok()   { echo "OK|$1|$2"; }
+            ui_kv_warn() { echo "WARN|$1|$2"; }
+            ui_detail()  { echo "DETAIL|$1"; }
+            eval "$_hk_block"
+        ) 2>&1
+    }
+    # root developer: the loud install-defect row, never "not hooked"
+    _rc=0; _out=$(_hk_run root 0 "$WORK/anywhere") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q "WARN|ddev() hook|install broken — developer 'root' has uid 0" \
+       && printf '%s' "$_out" | grep -q 'opk update cannot fix this' \
+       && ! printf '%s' "$_out" | grep -q 'not hooked'; then
+        pass "uid-0 developer reports the broken install + reinstall fix"
+    else
+        fail "uid-0 developer reports the broken install + reinstall fix (rc=$_rc out=$_out)"
+    fi
+    # relocated home with the hook line: active, via the getent home
+    mkdir -p "$WORK/hk-homeA"
+    printf '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh\n' \
+        > "$WORK/hk-homeA/.bashrc"
+    _rc=0; _out=$(_hk_run hk-dev 1000 "$WORK/hk-homeA") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF "OK|ddev() hook|active — $WORK/hk-homeA/.bashrc"; then
+        pass "relocated home: hook found active via getent home"
+    else
+        fail "relocated home: hook found active via getent home (rc=$_rc out=$_out)"
+    fi
+    # home exists, no hook line: the classic repairable warning stays
+    mkdir -p "$WORK/hk-homeB"
+    printf '# plain rc without kit hooks\n' > "$WORK/hk-homeB/.bashrc"
+    _rc=0; _out=$(_hk_run hk-dev 1000 "$WORK/hk-homeB") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'WARN|ddev() hook|not hooked — run opk update'; then
+        pass "existing home without hook keeps the repairable warning"
+    else
+        fail "existing home without hook keeps the repairable warning (rc=$_rc out=$_out)"
+    fi
+    # home missing: honest "cannot check" instead of unfulfillable advice
+    _rc=0; _out=$(_hk_run hk-dev 1000 "$WORK/hk-missing") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'WARN|ddev() hook|cannot check — home' \
+       && ! printf '%s' "$_out" | grep -q 'run opk update'; then
+        pass "missing home: cannot-check row, no unfulfillable update advice"
+    else
+        fail "missing home: cannot-check row, no unfulfillable update advice (rc=$_rc out=$_out)"
+    fi
+    # getent miss: falls back to /home/<name> (never exists here — the
+    # user name is suite-unique) — same honest cannot-check row
+    _rc=0; _out=$(_hk_run rug-nouser-x 1000 "") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'cannot check — home'; then
+        pass "getent miss: fallback path still reports cannot-check"
+    else
+        fail "getent miss: fallback path still reports cannot-check (rc=$_rc out=$_out)"
+    fi
+else
+    fail "ddev() hook row block extractable from status.sh (issue #192)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

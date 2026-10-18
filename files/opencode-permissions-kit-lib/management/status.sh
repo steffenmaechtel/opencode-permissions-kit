@@ -520,16 +520,34 @@ if [ -x "$LIBDIR/bin/ddev-as-opencode" ]; then
 else
     ui_kv_warn "helper" "missing — run opk update to deploy"
 fi
+# ddev() hook row (issue #192): the developer home comes from getent —
+# a hardcoded /home/$DEFAULT_USER missed relocated homes and, on the
+# root-shell installs the installer now refuses, looked in /home/root
+# (never exists): the row degraded to a permanent "not hooked — run opk
+# update" warning that opk update could not heal. A uid-0 developer is
+# reported as the install defect it is, with the reinstall fix.
 if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-terminal.sh" ]; then
-    hooked=""
-    for cf in "/home/$DEFAULT_USER/.bashrc" "/home/$DEFAULT_USER/.zshrc" "/home/$DEFAULT_USER/.profile"; do
-        [ -f "$cf" ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null \
-            && hooked="$cf" && break
-    done
-    if [ -n "$hooked" ]; then
-        ui_kv_ok "ddev() hook" "active — $hooked"
+    _st_dev_uid="$(id -u "$DEFAULT_USER" 2>/dev/null || echo 1)"
+    _st_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"
+    [ -n "$_st_home" ] || _st_home="/home/$DEFAULT_USER"
+    if [ "$_st_dev_uid" = "0" ]; then
+        ui_kv_warn "ddev() hook" "install broken — developer '$DEFAULT_USER' has uid 0"
+        ui_detail "the install ran from a root shell (issue #192); reinstall from your"
+        ui_detail "normal user — opk update cannot fix this"
     else
-        ui_kv_warn "ddev() hook" "not hooked — run opk update"
+        hooked=""
+        for cf in "$_st_home/.bashrc" "$_st_home/.zshrc" "$_st_home/.profile"; do
+            [ -f "$cf" ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null \
+                && hooked="$cf" && break
+        done
+        if [ -n "$hooked" ]; then
+            ui_kv_ok "ddev() hook" "active — $hooked"
+        elif [ -d "$_st_home" ]; then
+            ui_kv_warn "ddev() hook" "not hooked — run opk update"
+        else
+            ui_kv_warn "ddev() hook" "cannot check — home '$_st_home' of '$DEFAULT_USER' missing"
+            ui_detail "if '$DEFAULT_USER' is not your user, the install is broken — reinstall it"
+        fi
     fi
 fi
 # Dev-owned mode (internal/records/ddev-dev-owned-projects.md): on = the kit
