@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**55 metas · 55 active · 0 retired · 7 review-pending · next due 2026-11-14**
+**55 metas · 55 active · 0 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0050, RM-0051, RM-0052, RM-0053, RM-0054, RM-0055, RM-0056
+- **Review pending:** none
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -81,17 +81,17 @@
 |---|---|---|---|---|---|
 | [RM-0048](0/0/4/RM-0048.md) | Behavioral doubles + contract lock | active | approved | 1m | 2026-11-17 |
 | [RM-0049](0/0/4/RM-0049.md) | Real-binary tiers | active | approved | 1m | 2026-11-17 |
-| [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | **pending** | 1m | 2026-11-17 |
+| [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | approved | 1m | 2026-11-17 |
 
 ### 6. Checklist for new kit code
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0051](0/0/5/RM-0051.md) | Child process inside a while | active | **pending** | 1m | 2026-11-17 |
-| [RM-0052](0/0/5/RM-0052.md) | Prompt → read </dev/tty via | active | **pending** | 1m | 2026-11-17 |
-| [RM-0053](0/0/5/RM-0053.md) | New fake/shim → replicate the | active | **pending** | 1m | 2026-11-17 |
-| [RM-0054](0/0/5/RM-0054.md) | rc-installed behavior (functions, hooks, PATH) | active | **pending** | 1m | 2026-11-17 |
-| [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | **pending** | 1m | 2026-11-17 |
+| [RM-0051](0/0/5/RM-0051.md) | Child process inside a while | active | approved | 1m | 2026-11-17 |
+| [RM-0052](0/0/5/RM-0052.md) | Prompt → read </dev/tty via | active | approved | 1m | 2026-11-17 |
+| [RM-0053](0/0/5/RM-0053.md) | New fake/shim → replicate the | active | approved | 1m | 2026-11-17 |
+| [RM-0054](0/0/5/RM-0054.md) | rc-installed behavior (functions, hooks, PATH) | active | approved | 1m | 2026-11-17 |
+| [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | approved | 1m | 2026-11-17 |
 
 ## internal/records/rules-meta.md
 
@@ -108,7 +108,7 @@
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
 | [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | approved | 1m | 2026-11-17 |
 | [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 1m | 2026-11-17 |
-| [RM-0056](0/0/5/RM-0056.md) | the rule plus a one-line why; | active | **pending** | 1m | 2026-11-18 |
+| [RM-0056](0/0/5/RM-0056.md) | the rule plus a one-line why; | active | approved | 1m | 2026-11-18 |
 
 ### Meta format v1.1
 
