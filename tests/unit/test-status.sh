@@ -1127,7 +1127,10 @@ fi
 #       leading quote); an optional prefix (sudo mktemp) is allowed
 #   (b) fallback inside the substitution: X=$(mktemp ... || echo /dev/null),
 #       with 2>/dev/null muffling before the || included
-# The sanctioned fallbacks (|| return 1, || X="", || { ... }) do not match.
+# Sanctioned fallbacks do not match (|| return 1 / || exit 1, || X="",
+# warn-only || { ... } braces). A brace that ASSIGNS a fixed path
+# (X=$(mktemp) || { X=/dev/null; }) DOES match shape (a) — by design:
+# that is the dangerous form (#202 a W2).
 # Deliberately NOT swept (scope decision, #168): a bare 2>/dev/null
 # swallowing into a fixed file with no || fallback (stderr redirects are
 # ubiquitous in sanctioned code; a line-blind grep false-positives) and
@@ -1141,6 +1144,25 @@ if [ -z "$_w2_fall_hits" ]; then
     pass "W2 class sweep: no mktemp fixed-path fallback in any shipped script (#168)"
 else
     fail "W2 class sweep: mktemp fixed-path fallback survived (got: $_w2_fall_hits)"
+fi
+# canary (#202 a W1): the sweep above greps real files/ and finds nothing
+# by design — its FAIL branch never runs in-suite, so a broken regex would
+# stay green while blind. Prove both alternations still trip: two offending
+# shapes + one sanctioned line in scratch, SAME expression (test-kit-files
+# §4 class: a guard that cannot fail is decoration).
+_w2_can_file="$WORK/w2-canary.sh"
+{
+    echo '_w2_can_a=$(mktemp) || _w2_can_a=/dev/null'
+    echo '_w2_can_b=$(mktemp 2>/dev/null || echo /dev/null)'
+    echo '_w2_can_ok=$(mktemp) || return 1'
+} > "$_w2_can_file"
+_w2_can_hits="$(grep -nE "$W2_FIXPATH_A|$W2_FIXPATH_B" "$_w2_can_file" || true)"
+if printf '%s' "$_w2_can_hits" | grep -q '^1:' \
+   && printf '%s' "$_w2_can_hits" | grep -q '^2:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^3:'; then
+    pass "W2 sweep canary: pattern catches both offending shapes, spares the sanctioned"
+else
+    fail "W2 sweep canary: pattern is blind or over-broad (got: $_w2_can_hits)"
 fi
 
 # --- 0.0.48b W3: privilege-unknown and optional rows never count -------------
