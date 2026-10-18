@@ -4,6 +4,10 @@ Case: issue #165 feature wave (birth PR #199). Snapshot a: wave review of
 `28c2e0e`. This resolution records the a-wave dispositions; the fix wave
 lands as one commit (`696e3a3`) and owes snapshot b (fresh session per
 the rotation rule — the fixing session does not review its own fixes).
+Snapshot b (`8ece3e5`) reviewed that fix wave (0 HIGH, 0 MED, 3 LOW,
+3 INFO); its dispositions are the `b` rows below — comment/docs/
+bookkeeping-only, so the chain closes with this round per the stop rule
+(no review-relevant code touched).
 
 ## Dispositions
 
@@ -18,6 +22,12 @@ the rotation rule — the fixing session does not review its own fixes).
 | a W7 (INFO) | **deliberately not done** | — | benign evaluation-order delta; no observable behavior change |
 | a W8 (INFO) | **deliberately not done** | — | pre-existing loud-crash class; #165 scopes "missing" only |
 | a W9 (INFO) | **deliberately not done** | — | record-only finding; sibling scripts clean |
+| b F1 (LOW) | **implemented** | `47c83dd` | 0b comment states the counted-row contract, points to g2 |
+| b F2 (LOW) | **implemented** | `561efc1` | errata block: re-measured counts, mutation shapes, 13 pass lines |
+| b F3 (LOW) | **implemented** | `47c83dd` | docs qualifier names the family preconditions; comment widened |
+| b F4 (INFO) | **deliberately not done** | — | wording-scoped ratchet; boundary documented in the pin comment |
+| b F5 (INFO) | **deliberately not done** | — | contrived override shape; real drift classes pinned by d3 |
+| b F6 (INFO) | **deliberately not done** | — | no defect; double-id record only |
 
 ## Evidence detail
 

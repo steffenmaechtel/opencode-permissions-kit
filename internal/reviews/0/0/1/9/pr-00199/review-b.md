@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (house session — fresh session per the rotation rule, not th
 
 # Review — pr-00199 snapshot b — fix wave of the issue-165 chain (micro-wave)
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave under review: fix commit `696e3a3` (3 files, +232/−20) — the
 dispositions of snapshot a's W1–W5: handover elif row (a W1), git-floor
 fallback row + noop-stub retirement (a W3), readiness-semantics execution
