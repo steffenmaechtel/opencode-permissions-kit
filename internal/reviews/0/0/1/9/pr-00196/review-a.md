@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (house session, fresh; main agent + 3 Flash axis subagents —
 
 # Review — pr-00196 snapshot a — issue #192 root-shell gate + getent developer homes
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave scope: `git diff d3e187d..a470bab` (11 files, +396/−37). The wave
 refuses root-shell installs up front (`_root_user_gate` in `install.sh`,
 charset→root→distro gate order) and resolves developer homes via getent in
