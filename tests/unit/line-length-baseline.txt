@@ -1,5 +1,5 @@
 CONTRIBUTING.md 72 3
-README.md 331 6
+README.md 197 5
 agent/README.md 41 3
 agent/conventions.md 49 2
 agent/learnings.md 19 1

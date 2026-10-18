@@ -134,7 +134,9 @@ Switching back to a channel later is the same call with `stable` (or
 [update guide](docs/how-to/update.md#channels)).
 
 (`make check-version` ensures `KIT_BRANCH` stays consistent for `master`.)
-Use a throwaway WSL2/dev box — the kit is alpha software.
+Use a throwaway WSL2/dev box for branch testing — this runs unreleased
+development code, not the released `stable` channel (see the README
+status note).
 
 ## Making a release
 
