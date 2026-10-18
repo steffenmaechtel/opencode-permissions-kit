@@ -33,6 +33,7 @@ holds.
 | 8 | Language | English — repo rule: all content is English (RM-0026) |
 | 9 | Rule prose | rule-bearing paragraphs are rewritten as list items — paragraphs stay narrative/lookup (RM-0045) |
 | 10 | learnings.md | out of meta scope: rationale = inline corpus stats, lifecycle = meta-analysis runs (RM-0046) |
+| 11 | Rule-text detail | the rule plus a one-line why; detailed provenance lives in the meta rationale (RM-0056) |
 
 ## Meta format v1.1
 

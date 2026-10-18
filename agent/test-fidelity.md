@@ -112,23 +112,13 @@ production code path touched (draining stdin). Rule for this repo:
    (ddev's chmod/mutagen/router behavior), run the real thing; cache the
    provisioned environment so repeat runs stay cheap. Keep coverage of
    each loop/plumbing path there too, not only happy-path lifecycles —
-   the stdin bug was in a loop the real-binary suite did not drive
-   (shipped since 2026-09-18: suite section DD15 drives both
-   ddev-migrate loops with real ddev; the import-loop check is
-   mutation-verified — removing its `</dev/null` makes only the first
-   project import. Caveat learned there: a FAILING real ddev never
-   reaches its stdin probing, so a fail-path scenario proves loop
-   survival only — the drain itself needs the success path). (RM-0049)
+   the stdin bug was in a loop the real-binary suite did not drive. (RM-0049)
 3. **Environment matrix as a test dimension.** For flows that read any
    fd, run the scenario against stdin variants: closed (`<&-`), EOF
    (`</dev/null`), pipe-with-data (`< <(printf ...)`), and PTY (§4.4).
    A bug in one variant is a bug. The same dimension applies to *tool
-   versions*: the e2e suite matrices over the git build (`E2E_GIT_CHANNEL`,
-   issue #118) — distro apt git vs the current git-core PPA git resolved
-   at build time — because the unreadable-CWD fatal of #116 existed only
-   on git ≥ 2.55 and was invisible at the distro floor the suite pinned.
-   The build-time resolution doubles as drift detection: the weekly cron
-   rebuilds with whatever git the PPA ships that week. (RM-0050)
+   versions*: the e2e suite matrices over the git build
+   (`E2E_GIT_CHANNEL`, issue #118). (RM-0050)
 PTY harnesses, by weight: `script -qec '<command>' /dev/null`
 (util-linux) gives the command a real PTY in any CI script — cheap
 enough for one check per prompt flow: does it ask, does it accept the
