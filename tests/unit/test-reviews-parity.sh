@@ -3,7 +3,7 @@
 # integrity over internal/reviews/ (supersedes the review_pointer_check
 # that lived in test-docs.sh before the structure wave).
 #
-#   1. every sharded case folder (N/N/N/N/pr-NNNNN) has exactly one
+#   1. every sharded case folder (A/B/C/D/pr-ABCDE) has exactly one
 #      INDEX row, every INDEX row has a folder (both directions)
 #   2. regenerating the INDEX reproduces the file byte-for-byte — a
 #      hand edit drifts and fails

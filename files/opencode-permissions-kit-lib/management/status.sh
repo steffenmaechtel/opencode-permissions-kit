@@ -260,12 +260,36 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     # prompts: root needs no password, the developer rides the kit's
     # NOPASSWD rule, anyone else just sees "unknown".
     ADV_VER=""
-    # 0.0.48c C1: a missing/unexecutable managed binary is a BROKEN KIT,
-    # not an unknown — the advisory check cannot run, the wrapper would
-    # fail at the first agent session, and no privilege resolves it (sudo
-    # hits this same [ -x ] gate). Counts; the privilege-unknown shape
-    # below does not.
-    if [ ! -x "$LIBDIR/bin/opencode" ]; then
+    # 0.0.48c C1, re-scoped by issue #166: a managed binary NO ONE can
+    # execute is a BROKEN KIT, not an unknown — the advisory check cannot
+    # run, the wrapper would fail at the first agent session, and no
+    # privilege resolves it (not even root: exec needs at least one x
+    # bit). Counts; the privilege-unknown shape below does not. "No one"
+    # is read from the MODE BITS, caller-independent: [ -x ] speaks for
+    # THIS caller, and the deployed binary is 750 root:opencode — a
+    # caller outside that audience fails [ -x ] over a healthy kit.
+    # That shape is a privilege question (sudo resolves it), not a
+    # finding; it falls through to the unknown row below.
+    ADV_BIN_ANYX=false
+    # stat -L -c %a: TARGET mode bits, octal (GNU coreutils; the kit is
+    # Linux/WSL only). -L dereferences (#200 a W1): without it stat
+    # reports a symlink's constant 777, so a dangling link or a no-x
+    # target reads any-x — silently downgrading a broken kit to the
+    # uncounted unknown row. Absent file, dangling symlink, or a stat
+    # that cannot answer: empty stays false — the loud direction (a
+    # broken kit must not read green). Pure case patterns, no
+    # arithmetic: dash has no base#n ($((8#750)) is bash-only), and an
+    # octal digit carries the execute bit exactly when it is ODD
+    # (1=x 3=wx 5=rx 7=rwx) in one of the
+    # last three positions — owner, group, other. The special digit
+    # (setuid/setgid/sticky, a 4-digit mode) grants nothing without an
+    # x bit and is deliberately not counted.
+    ADV_BIN_MODE="$(stat -L -c '%a' "$LIBDIR/bin/opencode" 2>/dev/null || true)"
+    case "$ADV_BIN_MODE" in
+        *[!0-7]*|'') ;;
+        *[1357]|*[1357]?|*[1357]??) ADV_BIN_ANYX=true ;;
+    esac
+    if [ "$ADV_BIN_ANYX" != true ]; then
         # 0.0.49a W1: upgrade-opencode, not plain update — a plain
         # `opk update` never touches the managed binary (BINARY_UPDATE
         # is opt-in; the deploy manifest ships no bin/opencode), so the
@@ -337,6 +361,17 @@ EOF
             # dead end for that row.
             ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)"
         fi
+    elif [ "$ADV_BIN_ANYX" = true ]; then
+        # Issue #166: the mode bits promise an audience (root / the
+        # opencode group) can execute it — THIS caller cannot. A
+        # privilege question, not a finding: sudo renders the verdict,
+        # and the corrupt-vs-healthy split (#163) is root's to judge —
+        # classifying requires exec'ing it, which this caller lacks.
+        # Uncounted (W3's reasoning: a caller outside the audience must
+        # not read red over a healthy kit); the counted warn stays for
+        # the shapes no privilege resolves (missing / no x bit /
+        # corrupt).
+        ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)"
     fi
     # Upstream freshness (live, best-effort): GitHub's advisory feed vs
     # the ids the shipped database knows. Never decides affectedness.

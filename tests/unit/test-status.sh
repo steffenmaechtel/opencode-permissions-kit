@@ -1350,6 +1350,88 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
     else
         fail "D1/#163: over-suppression — the privilege-unknown row is gone (got: $_d1out)"
     fi
+    # issue #166: the C1 gate reads the MODE BITS, not the caller's [ -x ]
+    # (the deployed binary is 750 root:opencode — a caller outside that
+    # audience must not read a counted warn over a healthy kit). The
+    # simulation is real, not a stub: this fixture is owned by the suite
+    # user with mode 007 — the owner class carries --- (the caller's
+    # [ -x ] fails), other carries rwx (stat reports any-x). A root-run
+    # suite cannot produce the shape (root execs anything with an x
+    # bit); that environment notes the skip instead of counting vacuous
+    # passes (the 0.0.46a F2 class).
+    chmod 007 "$_d1dir/bin/opencode"
+    if [ -x "$_d1dir/bin/opencode" ]; then
+        echo "  info   suite runs as root — 007 fixture cannot simulate a caller outside the audience (issue #166)"
+    else
+        _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
+        if ! printf '%s' "$_d1out" | grep -q '^WARN|' \
+            && printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
+            pass "#166: binary executable only by its audience (007, caller denied) renders the unknown row, no warn"
+        else
+            fail "#166: caller-denied binary must not count a warn over a healthy kit (got: $_d1out)"
+        fi
+        # #200 a W2: the compound shape — corrupt CONTENT behind the
+        # caller-denied mode — must render the SAME unknown row: the
+        # #163 classifier is [ -x ]-gated, so content cannot change this
+        # arm's verdict (the corrupt-vs-healthy split stays root's to
+        # judge, the elif's documented contract).
+        chmod 700 "$_d1dir/bin/opencode"
+        printf '\177ELFbroken-fixture' > "$_d1dir/bin/opencode"
+        chmod 007 "$_d1dir/bin/opencode"
+        _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
+        if ! printf '%s' "$_d1out" | grep -q '^WARN|' \
+            && printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
+            pass "#200 a W2: corrupt content behind a caller-denied mode keeps the unknown row (content-independent)"
+        else
+            fail "#200 a W2: caller-denied arm must not observe content (got: $_d1out)"
+        fi
+    fi
+    # the re-scoped warn shape: present but NO execute bit for anyone —
+    # broken kit, counted warn. Mode bits only, caller-independent, so
+    # this pin holds under a root-run suite too.
+    chmod 644 "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "#166: no-execute-bit binary keeps the counted warn (broken kit)"
+    else
+        fail "#166: no-execute-bit binary must stay a counted warn (got: $_d1out)"
+    fi
+    # #200 a W2: the special digit grants nothing — setuid with no x
+    # bit for anyone is still a counted warn (the comment's claim,
+    # pinned; caller-independent, so root-run suites hold too).
+    chmod 4400 "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "#200 a W2: setuid with no x bit (4400) keeps the counted warn"
+    else
+        fail "#200 a W2: special digit must not fake any-x (got: $_d1out)"
+    fi
+    # #200 a W1: stat must DEREFERENCE. A symlink's own mode is always
+    # 777 — without -L a dangling link or a no-x target reads any-x and
+    # downgrades the counted warn to the uncounted unknown row (dead-end
+    # advice: even root cannot exec these shapes). Both pins judge the
+    # TARGET's bits and fail for every caller equally — they hold under
+    # a root-run suite too.
+    ln -sf /nonexistent-opk-166 "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "#200 a W1: dangling symlink counts the warn (broken kit)"
+    else
+        fail "#200 a W1: dangling symlink must stay a counted warn (got: $_d1out)"
+    fi
+    printf 'x' > "$_d1dir/nox-target"
+    chmod 644 "$_d1dir/nox-target"
+    ln -sf "$_d1dir/nox-target" "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" || true)
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+        pass "#200 a W1: symlink judged by its TARGET's bits (no-x target counts the warn)"
+    else
+        fail "#200 a W1: symlink must be judged by its target, not the link's 777 (got: $_d1out)"
+    fi
     rm -rf "$_d1dir"
 fi
 
