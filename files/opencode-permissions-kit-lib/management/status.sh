@@ -219,6 +219,16 @@ git_status_row
 # install is affected (upstream ranges are channel-blind — a npm-only
 # advisory ranges over standalone versions too). The kit installs the
 # binary itself, so its install channel is always 'standalone'.
+# Missing-lib fallback (issue #165): the guard below must degrade LOUDLY,
+# not silently — a missing advisories database means a damaged or partially
+# deployed sh/ tree (a broken kit, not an optional feature), and the C1/D1
+# managed-binary gates live inside the guarded block. A counted warn row
+# instead of a vanished section: the verdict can never stay green over
+# security checks that never ran.
+if [ ! -f "$LIBDIR/sh/advisories.sh" ]; then
+    ui_section "Security advisories"
+    ui_kv_warn "advisories database" "missing — security checks skipped (fix: sudo opk update)"
+fi
 if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     # shellcheck disable=SC1090
     . "$LIBDIR/sh/advisories.sh"
@@ -549,6 +559,12 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-terminal.sh" ]; then
             ui_detail "if '$DEFAULT_USER' is not your user, the install is broken — reinstall it"
         fi
     fi
+elif [ -n "$DEFAULT_USER" ]; then
+    # Issue #165: the terminal-hook lib ships with the kit — a stamped
+    # developer plus a missing lib is a damaged tree (broken kit), not an
+    # unconfigured feature. Counted warn, never a silently skipped row;
+    # the guard stays compound so an unstamped install stays row-free.
+    ui_kv_warn "ddev() hook" "not checked — kit file sh/ddev-terminal.sh missing (fix: sudo opk update)"
 fi
 # Dev-owned mode (internal/records/ddev-dev-owned-projects.md): on = the kit
 # writes disable_settings_management: true into projects' .ddev/config.yaml
@@ -756,6 +772,12 @@ if [ -n "$DEFAULT_USER" ] && [ -f "$LIBDIR/sh/ddev-migrate.sh" ]; then
             rm -f "$_st_gap_roots"
         fi
     fi
+elif [ -n "$DEFAULT_USER" ]; then
+    # Issue #165: same broken-kit class as the other lib guards — the
+    # migration-gap check must not vanish silently behind its guard; a
+    # stamped developer plus a missing lib is a damaged tree. The row
+    # stays away for unstamped installs (guard stays compound).
+    ui_kv_warn "db dumps" "not checked — kit file sh/ddev-migrate.sh missing (fix: sudo opk update)"
 fi
 # Live ddev version (issues #56, #72): DDEV_VERSION from install.conf is
 # an install-time stamp and goes stale the moment the developer upgrades
@@ -801,8 +823,17 @@ fi
 # Windows hosts readiness (WSL2): custom-tld projects need their hostnames
 # in the Windows hosts file for the browser; ddev (running as opencode)
 # cannot manage that file. Report-only, per project root.
-if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/System32/drivers/etc/hosts ] \
+# Readiness split (issue #165): host preconditions and the lib guard are
+# separate conditions now — a missing lib on an otherwise-ready host is a
+# broken kit (counted warn), not a silently skipped check, while every
+# unmet host precondition (no /mnt/c, agent-uid run, no developer) stays
+# row-free as before.
+_st_hosts_ready=false
+if [ -d /mnt/c ] && [ -f /mnt/c/Windows/System32/drivers/etc/hosts ] \
    && [ -n "${DEFAULT_USER:-}" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]; then
+    _st_hosts_ready=true
+fi
+if [ "$_st_hosts_ready" = true ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ]; then
     # shellcheck disable=SC1091  # deployed lib, checked above
     . "$LIBDIR/sh/ddev-hosts.sh"
     if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
@@ -840,6 +871,10 @@ if [ -d /mnt/c ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ] && [ -f /mnt/c/Windows/Sys
             rm -f "$_st_hosts_list"
         done < "$PROJECTS_CONF"
     fi
+elif [ "$_st_hosts_ready" = true ]; then
+    # Issue #165: readiness held, only the kit file is missing — broken
+    # kit, counted warn (see the readiness split above).
+    ui_kv_warn "hosts (win)" "not checked — kit file sh/ddev-hosts.sh missing (fix: sudo opk update)"
 fi
 
 # === WSL2 /mnt/c exposure (drvfs world-readable by default) =====================
