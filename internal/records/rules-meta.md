@@ -33,6 +33,7 @@ holds.
 | 8 | Language | English — repo rule: all content is English (RM-0026) |
 | 9 | Rule prose | rule-bearing paragraphs are rewritten as list items — paragraphs stay narrative/lookup (RM-0045) |
 | 10 | learnings.md | out of meta scope: rationale = inline corpus stats, lifecycle = meta-analysis runs (RM-0046) |
+| 11 | Rule-text detail | the rule plus a one-line why; detailed provenance lives in the meta rationale (RM-0056) |
 
 ## Meta format v1.1
 
@@ -128,7 +129,7 @@ invariant. (RM-0029)
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
-| 3 | Remaining `agent/` files + `AGENTS.md ## Rules` (learnings.md out: decision 10) | open |
+| 3 | `test-fidelity.md` + `review-concept.md` + `AGENTS.md ## Rules` | test-fidelity done (approved 2026-10-18) |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
 

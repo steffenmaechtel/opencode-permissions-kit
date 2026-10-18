@@ -46,13 +46,16 @@ fi
 TODAY=${FORCE_TODAY:-$(date +%F)}
 METAS=internal/rules-meta
 
-SCOPE_FILES="agent/conventions.md internal/records/rules-meta.md"
+SCOPE_FILES="agent/conventions.md agent/test-fidelity.md internal/records/rules-meta.md"
 ACTIVE_SECTIONS="agent/conventions.md#interactive-prompts-yn"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#script-output-style"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-security-untrusted-input"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#test-sandbox-unit-suites"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-review-findings"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#3-terminology-test-doubles-and-fidelity"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#4-patterns-that-close-the-gaps"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#6-checklist-for-new-kit-code"
 
 WORK=$(mktemp -d /tmp/rules-audit.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT

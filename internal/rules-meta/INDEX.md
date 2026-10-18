@@ -6,7 +6,7 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**45 metas · 45 active · 0 retired · 0 review-pending · next due 2026-11-14**
+**55 metas · 55 active · 0 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
@@ -67,6 +67,32 @@
 | [RM-0018](0/0/1/RM-0018.md) | New cases (birth-PR key, since the 2026-10… | active | approved | 1m | 2026-11-16 |
 | [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 1m | 2026-11-16 |
 
+## agent/test-fidelity.md
+
+### 3. Terminology: test doubles and fidelity
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0047](0/0/4/RM-0047.md) | A double must replicate every observable | active | approved | 1m | 2026-11-17 |
+
+### 4. Patterns that close the gaps
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0048](0/0/4/RM-0048.md) | Behavioral doubles + contract lock | active | approved | 1m | 2026-11-17 |
+| [RM-0049](0/0/4/RM-0049.md) | Real-binary tiers | active | approved | 1m | 2026-11-17 |
+| [RM-0050](0/0/5/RM-0050.md) | Environment matrix as a test | active | approved | 1m | 2026-11-17 |
+
+### 6. Checklist for new kit code
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0051](0/0/5/RM-0051.md) | Child process inside a while | active | approved | 1m | 2026-11-17 |
+| [RM-0052](0/0/5/RM-0052.md) | Prompt → read </dev/tty via | active | approved | 1m | 2026-11-17 |
+| [RM-0053](0/0/5/RM-0053.md) | New fake/shim → replicate the | active | approved | 1m | 2026-11-17 |
+| [RM-0054](0/0/5/RM-0054.md) | rc-installed behavior (functions, hooks, PATH) | active | approved | 1m | 2026-11-17 |
+| [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | approved | 1m | 2026-11-17 |
+
 ## internal/records/rules-meta.md
 
 ### Decisions
@@ -82,6 +108,7 @@
 | [RM-0026](0/0/2/RM-0026.md) | all content is English | active | approved | 1m | 2026-11-14 |
 | [RM-0045](0/0/4/RM-0045.md) | rule-bearing paragraphs are rewritten as | active | approved | 1m | 2026-11-17 |
 | [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 1m | 2026-11-17 |
+| [RM-0056](0/0/5/RM-0056.md) | the rule plus a one-line why; | active | approved | 1m | 2026-11-18 |
 
 ### Meta format v1.1
 
