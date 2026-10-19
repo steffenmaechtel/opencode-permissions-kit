@@ -287,13 +287,21 @@ fi
 # Issue #205: the git-config rows keep the ON/OFF prefix (it mirrors the
 # on|off subcommands) but spell out the effect with the same phrases
 # `opk status` uses (issue #158 wording) — no bare "ON  (...)"/"OFF  (...)"
-# rows may survive anywhere in config.sh (status AND apply sites).
-_gc_on='ui_kv "git-config" "ON — protected (soft-only, agent tools blocked)"'
+# rows may survive anywhere in config.sh (status AND apply sites), and the
+# phrases must match status.sh VERBATIM (a W1: the wave claimed equality
+# while config.sh and status.sh disagreed on the ON punctuation — the
+# agreement itself is pinned here, not just config.sh's internal shape).
+_gc_on='ui_kv "git-config" "ON — protected (soft-only — agent tools blocked)"'
 _gc_off='ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"'
+STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh"
+_gc_prot='protected (soft-only — agent tools blocked)'
+_gc_allow='access allowed (agent tools may edit git config)'
 if grep -qF "$_gc_on" "$CONFIG" \
    && grep -qF "$_gc_off" "$CONFIG" \
    && [ "$(grep -cF "$_gc_on" "$CONFIG")" -ge 2 ] \
    && [ "$(grep -cF "$_gc_off" "$CONFIG")" -ge 3 ] \
+   && grep -qF "$_gc_prot" "$STATUS" \
+   && grep -qF "$_gc_allow" "$STATUS" \
    && ! grep -qF '"ON  (' "$CONFIG" \
    && ! grep -qF '"OFF  (' "$CONFIG"; then
     pass "issue #205: git-config rows read ON/OFF + protected/access allowed"

@@ -34,13 +34,23 @@ kit template, so manual edits to the file are always replaced.
 and spells out what the state means — the same wording `opk status` shows:
 
 ```text
-  git-config     ON — protected (soft-only, agent tools blocked)
+  git-config     ON — protected (soft-only — agent tools blocked)
      /home/opencode/.config/opencode/opencode.jsonc
 ```
 
 ```text
   git-config     OFF — access allowed (agent tools may edit git config)
      /home/opencode/.config/opencode/opencode.jsonc
+```
+
+A config left over from an older kit version (or hand-edited) may still
+carry the `//SECURE_GIT` comment markers — rules present but inactive.
+`status` reports that state with a hint on the detail line; `on`/`off`
+re-render from the template and drop the markers:
+
+```text
+  git-config     OFF — access allowed (agent tools may edit git config)
+     /home/opencode/.config/opencode/opencode.jsonc (markers present, rules inactive)
 ```
 
 ## When to enable
