@@ -1,19 +1,21 @@
 # Resolution — pr-00202 (issue-168 mktemp fallback class-sweep widening)
 
 Chain: [review-a.md](review-a.md) · [review-b.md](review-b.md) ·
-[review-c.md](review-c.md) · [review-d.md](review-d.md) — micro-wave
-reviews of the #168 wave (63c9f02), its fixes (119b122, dd25de8), the
-c-wave fix (d19919c) and the d pass over it. Base v0.0.52 @ 5975524.
+[review-c.md](review-c.md) · [review-d.md](review-d.md) ·
+[review-e.md](review-e.md) — micro-wave reviews of the #168 wave
+(63c9f02), its fixes (119b122, dd25de8), the c-wave fix (d19919c), the
+d pass and its follow-up. Base v0.0.52 @ 5975524.
 
 ## Dispositions
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a W1 (LOW) | **implemented** | `119b122` | canary beside the sweep, SAME expression; sabotage A → canary FAIL; restored → green |
+| a W1 (LOW) | **implemented** | `119b122` | canary beside the sweep, SAME expression; sabotage A red, restored green |
 | a W2 (INFO) | **implemented** | `119b122` | comment now states brace-assign fixed path matches shape (a) by design |
-| b W1 (LOW) | **implemented** | `dd25de8` | canary pins all 7 comment claims; brace-blind + over-broad sabotage red, restored green |
-| c W1 (LOW) | **implemented** | `d19919c` | canary pins all remaining claims — 6 match / 8 spared incl. multi-line; alternation-narrow + strip-to-path sabotage red, restored green |
-| d W1 (INFO) | **implemented** | — | correction below: "165 PASS" was an output label, not a count — 137 passes on every chain tree |
+| b W1 (LOW) | **implemented** | `dd25de8` | canary pins all 7 claims; brace-blind + over-broad sabotage red, green |
+| c W1 (LOW) | **implemented** | `d19919c` | canary pins remaining claims (6 match / 8 spared); sabotages red, green |
+| d W1 (INFO) | **implemented** | — | correction below: "165 PASS" was an output label, not a count (138 passes) |
+| e W1 (INFO) | **implemented** | — | correction below: 138 passes; the lowercase summary never matched the count |
 
 ## Evidence detail
 
@@ -106,10 +108,11 @@ restored green after each run):
 Snapshot d could not reproduce the "165 PASS" gate figure carried by
 review-a.md:96, review-b.md:84 and review-c.md:111. Measured with
 `grep -c PASS` over `sh tests/unit/test-status.sh` output at every
-chain tree (`119b122`, `dd25de8`, `d3b7afc`, HEAD): **138** — 137
-test passes plus the closing "All status tests passed." summary
-line — with 0 FAIL and 0 SKIP, rc=0 (the canary contributes exactly
-one pass line in every version, so the count is chain-stable).
+chain tree (`119b122`, `dd25de8`, `d3b7afc`, HEAD): **138** — 138 test
+passes; the closing "All status tests passed." summary is lowercase and
+does not itself match the case-sensitive count (split corrected by
+#202 e W1) — with 0 FAIL and 0 SKIP, rc=0 (the canary contributes
+exactly one pass line in every version, so the count is chain-stable).
 
 Mechanism: the issue-#165 test block labelled its messages with a
 bare `165:` prefix — 32 PASS lines read `PASS 165: …` near the log's
@@ -120,7 +123,7 @@ c-session transcript — maintainer-provided, outside the repo —
 noticed 138 vs 165 late and attributed it to the label, but the
 committed snapshots stayed. Snapshot d's own guess that the figure
 came from counting static `pass` sites was wrong; this note is the
-correction.) Authoritative figure for the whole chain: 137 passes,
+correction.) Authoritative figure for the whole chain: 138 passes,
 0 FAIL, 0 SKIP, rc=0.
 
 Class closure: the 65 bare `165:` message prefixes in test-status.sh
@@ -131,6 +134,35 @@ tests/e2e now returns zero hits — no bare numeric label prefix
 remains that could masquerade as a counter. Test code, messages
 only: suite 138 PASS / 0 FAIL / 0 SKIP rc=0, `make lint` green.
 
+### e W1 (INFO) — pass-count split corrected (138 passes, not 137)
+
+Snapshot e re-measured on HEAD (`9a39433`): 138 lines match
+case-sensitive `grep -c PASS`, and every one of them matches the
+pass-helper shape (`\033[0;32mPASS\033[0m` + two spaces; `grep -v` for
+that exact shape returns zero lines). The closing summary
+"All status tests passed." is lowercase and cannot contribute to the
+count. Correct decomposition: **138 test passes**, summary separate —
+the 138 grep figure cited since snapshot d was right, the
+"137 passes + summary" split (review-d.md, d W1 evidence above) was
+off by one; both occurrences above are corrected and cite `#202 e W1`.
+No shipped code involved; bookkeeping only.
+
+### Addendum (e-disposition session): line-length ratchet restored
+
+While committing the e W1 correction,
+`tests/unit/test-line-length.sh` failed: resolution.md is ratchet docs
+scope (only `review-*` snapshots are exempt) and had grown from 0 to 5
+lines over 120 columns across the chain (`dd25de8`: 1, `d19919c`: 2,
+`e516be7`: 3, `9a39433`: 4, the e W1 row: 5) without ever entering the
+baseline — a regression the wave gates never saw: snapshots b–e gated
+on test-status, lint, check-version and reviews lint/parity; the
+ratchet runs in `make test` and CI (test-unit.yml line 143). First
+breach: the b-wave fix `dd25de8`. Fix: all six dispositions-table rows
+reflowed under 120 columns (the reviews-README row limit all along;
+full narratives live in the evidence sections below) — the file now
+carries zero long lines and needs no baseline entry. Resolution
+bookkeeping only; the stop rule is unaffected.
+
 ## Stop-rule note
 
 The a-wave fix touched test code → snapshot b ran (1 LOW). The b-wave
@@ -139,5 +171,7 @@ c-wave fix (`d19919c`) again touched test code → snapshot d ran
 (1 INFO, bookkeeping — the correction note above). The d W1
 disposition itself changed no review-relevant code, but the
 maintainer-commissioned label normalization (`fcb815a`) touches test
-code → one more micro-wave pass (snapshot e, fresh session per the
-rotation rule) is owed over that diff before the chain closes.
+code → snapshot e ran over that diff (fresh session per the rotation
+rule; 1 INFO, bookkeeping). The e W1 disposition is again
+resolution-only: the round touched no review-relevant code — **the
+chain closes under the stop rule.**
