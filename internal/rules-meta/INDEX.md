@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**90 metas · 88 active · 2 retired · 25 review-pending · next due 2026-11-14**
+**90 metas · 88 active · 2 retired · 24 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0062, RM-0068, RM-0069, RM-0070, RM-0071, RM-0072, RM-0073, RM-0074, RM-0075, RM-0076, RM-0077, RM-0078, RM-0079, RM-0080, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
+- **Review pending:** RM-0068, RM-0069, RM-0070, RM-0071, RM-0072, RM-0073, RM-0074, RM-0075, RM-0076, RM-0077, RM-0078, RM-0079, RM-0080, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -93,7 +93,7 @@
 |---|---|---|---|---|---|
 | [RM-0060](0/0/6/RM-0060.md) | The session that reviews also | active | approved | 1m | 2026-11-19 |
 | [RM-0061](0/0/6/RM-0061.md) | Sessions do not chain themselves: | active | approved | 1m | 2026-11-19 |
-| [RM-0062](0/0/6/RM-0062.md) | The hard seam and the maintainer | retired | **pending** | 1m | 2026-11-19 |
+| [RM-0062](0/0/6/RM-0062.md) | The hard seam and the maintainer | retired | approved | 1m | 2026-11-19 |
 | [RM-0063](0/0/6/RM-0063.md) | The snapshot header's Reviewer line | active | approved | 1m | 2026-11-19 |
 
 ### Fixes close classes, not sites
