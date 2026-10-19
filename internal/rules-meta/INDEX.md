@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**55 metas · 55 active · 0 retired · 0 review-pending · next due 2026-11-14**
+**95 metas · 93 active · 2 retired · 1 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0068
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -67,6 +67,94 @@
 | [RM-0018](0/0/1/RM-0018.md) | New cases (birth-PR key, since the 2026-10… | active | approved | 1m | 2026-11-16 |
 | [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 1m | 2026-11-16 |
 
+## agent/review-concept.md
+
+### Two review types, two jobs
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0057](0/0/5/RM-0057.md) | A wave diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
+
+### The loop and the stop rule
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0058](0/0/5/RM-0058.md) | Before the loop starts, the maintainer | active | approved | 1m | 2026-11-19 |
+| [RM-0059](0/0/5/RM-0059.md) | The snapshot is written and committed | active | approved | 1m | 2026-11-19 |
+| [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 1m | 2026-11-19 |
+| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-11-19 |
+| [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-11-19 |
+| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-11-19 |
+| [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | **pending** | 1m | 2026-11-19 |
+
+### Session rotation
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0060](0/0/6/RM-0060.md) | The session that reviews also | active | approved | 1m | 2026-11-19 |
+| [RM-0061](0/0/6/RM-0061.md) | Sessions do not chain themselves: | active | approved | 1m | 2026-11-19 |
+| [RM-0062](0/0/6/RM-0062.md) | The hard seam and the maintainer | retired | approved | 1m | 2026-11-19 |
+| [RM-0063](0/0/6/RM-0063.md) | The snapshot header's Reviewer line | active | approved | 1m | 2026-11-19 |
+
+### Fixes close classes, not sites
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0069](0/0/6/RM-0069.md) | A fix wave owes a class | active | approved | 1m | 2026-11-19 |
+| [RM-0070](0/0/7/RM-0070.md) | The sweep result is recorded | active | approved | 1m | 2026-11-19 |
+
+### Who records what
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0071](0/0/7/RM-0071.md) | The resolution is the ledger | active | approved | 1m | 2026-11-19 |
+
+### Finding provenance
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0072](0/0/7/RM-0072.md) | Every full-scope snapshot records | active | approved | 1m | 2026-11-19 |
+| [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | approved | 1m | 2026-11-19 |
+
+### Verification duty
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | approved | 1m | 2026-11-19 |
+| [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
+
+### Suites are the standing review
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | approved | 1m | 2026-11-19 |
+| [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 1m | 2026-11-19 |
+| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-11-19 |
+| [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 1m | 2026-11-19 |
+
+### Parallel reviewer agents
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0080](0/0/8/RM-0080.md) | The main agent runs a strong | active | approved | 1m | 2026-11-19 |
+| [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | approved | 1m | 2026-11-19 |
+| [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | approved | 1m | 2026-11-19 |
+| [RM-0083](0/0/8/RM-0083.md) | For release reviews, a second | active | approved | 1m | 2026-11-19 |
+| [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-11-19 |
+| [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | approved | 1m | 2026-11-19 |
+| [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | approved | 1m | 2026-11-19 |
+| [RM-0087](0/0/8/RM-0087.md) | Wave reviews (diff scope): | active | approved | 1m | 2026-11-19 |
+| [RM-0088](0/0/8/RM-0088.md) | Full-scope passes: ~15 minutes | active | approved | 1m | 2026-11-19 |
+| [RM-0089](0/0/8/RM-0089.md) | Release-critical full passes: prefer | active | approved | 1m | 2026-11-19 |
+| [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | approved | 1m | 2026-11-19 |
+| [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 1m | 2026-11-19 |
+
+### Release gate
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0091](0/0/9/RM-0091.md) | Before cutting a release: | active | approved | 1m | 2026-11-19 |
+
 ## agent/test-fidelity.md
 
 ### 3. Terminology: test doubles and fidelity
@@ -116,6 +204,8 @@
 |---|---|---|---|---|---|
 | [RM-0034](0/0/3/RM-0034.md) | only where load-bearing | active | approved | 1m | 2026-11-15 |
 | [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 1m | 2026-11-15 |
+| [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
+| [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
 
 ### Quality bar for rationales
 
@@ -143,3 +233,10 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0029](0/0/2/RM-0029.md) | Metas are never deleted | active | approved | 1m | 2026-11-14 |
+
+### Open defaults (the pilot validates them)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0095](0/0/9/RM-0095.md) | Table rows in rule files | active | approved | 1m | 2026-11-19 |
+| [RM-0096](0/0/9/RM-0096.md) | Narrative-heavy sections start outside | active | approved | 1m | 2026-11-19 |

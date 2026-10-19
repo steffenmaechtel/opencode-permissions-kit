@@ -86,6 +86,7 @@ new_scratch() {  # green baseline tree
         "$SCRATCH/internal/rules-meta"
     cp scripts/gen-rules-index.py "$SCRATCH/scripts/"
     : > "$SCRATCH/agent/test-fidelity.md"   # in SCOPE_FILES; empty = no units
+    : > "$SCRATCH/agent/review-concept.md"  # in SCOPE_FILES; empty = no units
     cat > "$SCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 
@@ -163,6 +164,15 @@ expect_block "inv5 quote" "[inv5]"
 new_scratch n5b
 sed -i 's#interactive-prompts-yn#no-such-section#' "$(meta_file RM-9002)"
 expect_block "inv5 anchor" "[inv5]"
+
+# 5c. inv 5 -- retired metas are exempt (rule bullet removed, quote
+#     unfindable by construction -- RM-0029; pins the exemption)
+new_scratch n5c
+sed -i '/^- Second demo rule\. (RM-9002)$/d' "$SCRATCH/agent/conventions.md"
+sed -i 's/^status: active/status: retired/;
+        s/^quote: "Second demo rule"/quote: "Words absent from target"/' \
+    "$(meta_file RM-9002)"
+expect_ok "inv5 retired exempt" "0 blocking"
 
 # 6a. inv 6 -- next-revisit before created
 new_scratch n6a

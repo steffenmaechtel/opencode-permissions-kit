@@ -50,7 +50,7 @@ next-revisit: 2026-11-14
 ---
 <3-6 plain sentences: the external, checkable fact that makes the
 rule necessary — not a paraphrase of the rule.>
-Check: <one sentence — how a revisit verifies the fact still holds.>
+Check: <optional: one sentence — how a revisit verifies the fact still holds.>
 Source: <one line finding/directive/issue — only if one exists.>
 
 ## Review log
@@ -59,15 +59,16 @@ Source: <one line finding/directive/issue — only if one exists.>
 
 Body rules:
 
-- 3-6 simple sentences; no long paragraphs; `Check:` and `Source:`
-  lines are optional.
 - **The review log names the true author** ("agent draft" vs. "from
   maintainer raw note") — provenance is never overstated. Rationale
   content originates with the maintainer wherever possible; the agent
-  formalizes.
+  formalizes. (RM-0094)
 - **RM references appear only where load-bearing** — the unit's
   trailing ref and genuine dependencies inside a rationale; never as
   narrative decoration in logs or prose. (RM-0034)
+- **In meta bodies, cross-references name the rule's text, not its
+  ID** — a reader holding one meta cannot resolve an RM number, and
+  IDE search hits both refs and prose. (RM-0093)
 - **Examples use the abstract token `RM-NNNN`**, never a real meta's
   number — a real number inside an example is indistinguishable from
   a reference in IDE searches. (RM-0035)
@@ -129,19 +130,33 @@ invariant. (RM-0029)
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
-| 3 | `test-fidelity.md` + `review-concept.md` + `AGENTS.md ## Rules` | test-fidelity done (approved 2026-10-18) |
+| 3 | remaining agent files + AGENTS Rules | test-fidelity 2026-10-18; review-concept 2026-10-19; AGENTS open |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
 
+The 2026-10-19 review-concept step split the file: operative rules in
+`agent/review-concept.md`, history and calibration data in
+`internal/records/review-calibration.md`. All metas RM-0057–0092
+maintainer-approved 2026-10-19 (same day, direct chat review), with
+revisions: RM-0062 retired (merged into the reviews-also-fixes
+bullet), RM-0068 retired (obsolete — no fully automated chains),
+RM-0083 cause-corrected (skill bias, not model family), RM-0084
+reworded (fan-out preferred for every review), RM-0092 added
+(checkpoint timestamps, maintainer proposal). The record's own body
+rules and scope defaults were equipped the same day (RM-0093–0096;
+both sections now audit-active; the format-spec bullet was folded
+into the template).
+
 ## Open defaults (the pilot validates them)
 
-- Table rows in rule files are not rule units (lookup info).
+- Table rows in rule files are not rule units (lookup info). (RM-0095)
 - Narrative-heavy sections start outside the audit scope; the section
-  allowlist lives in the audit script and is reviewable.
-- `learnings.md` is out of meta scope (decision 10): its rationales
-  are the inline corpus statistics and the meta-analysis runs own its
-  lifecycle; the run-L1–L7 obligation itself gets its meta via
-  `AGENTS.md ## Rules`.
+  allowlist lives in the audit script and is reviewable. (RM-0096)
+
+learnings.md is out of meta scope (decision 10): its rationales are
+the inline corpus statistics and the meta-analysis runs own its
+lifecycle; the run-L1–L7 obligation itself gets its meta via
+`AGENTS.md ## Rules`.
 
 ## Rejected alternatives
 

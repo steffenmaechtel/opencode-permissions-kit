@@ -14,7 +14,10 @@
 #      quote: prefix is findable -- both sides normalized: code
 #      backticks and bold markers stripped, wrapped lines joined,
 #      whitespace squeezed; the needle is the quote's first five
-#      words (plain-text rendering, the established meta practice)
+#      words (plain-text rendering, the established meta practice).
+#      Retired metas are exempt (RM-0029): retirement removes the
+#      rule bullet, so neither anchor-quote pairing nor quote
+#      findability can hold.
 #   6. frontmatter complete, ISO dates, next-revisit >= created,
 #      status/interval vocabulary
 #   9. approval consistency: reviewed: is set exactly when the review
@@ -46,16 +49,28 @@ fi
 TODAY=${FORCE_TODAY:-$(date +%F)}
 METAS=internal/rules-meta
 
-SCOPE_FILES="agent/conventions.md agent/test-fidelity.md internal/records/rules-meta.md"
+SCOPE_FILES="agent/conventions.md agent/test-fidelity.md agent/review-concept.md internal/records/rules-meta.md"
 ACTIVE_SECTIONS="agent/conventions.md#interactive-prompts-yn"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#script-output-style"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-security-untrusted-input"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#test-sandbox-unit-suites"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-review-findings"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#meta-format-v11"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#open-defaults-the-pilot-validates-them"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#3-terminology-test-doubles-and-fidelity"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#4-patterns-that-close-the-gaps"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#6-checklist-for-new-kit-code"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#two-review-types-two-jobs"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#the-loop-and-the-stop-rule"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#session-rotation"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#fixes-close-classes-not-sites"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#who-records-what"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#finding-provenance"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#verification-duty"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#suites-are-the-standing-review"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#parallel-reviewer-agents"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#release-gate"
 
 WORK=$(mktemp -d /tmp/rules-audit.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT
@@ -228,22 +243,26 @@ find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort | while 
     fi
 
     # 5: rule back-ref file + anchor + quote prefix findable
-    rule=$(fm_get "$m" rule)
-    tpath=${rule%%#*}; tanch=${rule#*#}
-    [ -z "$tanch" ] && tanch="__none__"
-    if [ ! -f "$ROOT/$tpath" ]; then
-        block 5 "$rel -- rule target missing: $tpath"
-    else
-        if ! grep -qF "$tpath	$tanch" "$HEADS"; then
-            block 5 "$rel -- anchor '$tanch' not a heading in $tpath"
+    # (retired metas are exempt: the rule bullet is gone, so the
+    # quote cannot be findable -- RM-0029)
+    if [ "$st" != retired ]; then
+        rule=$(fm_get "$m" rule)
+        tpath=${rule%%#*}; tanch=${rule#*#}
+        [ -z "$tanch" ] && tanch="__none__"
+        if [ ! -f "$ROOT/$tpath" ]; then
+            block 5 "$rel -- rule target missing: $tpath"
+        else
+            if ! grep -qF "$tpath	$tanch" "$HEADS"; then
+                block 5 "$rel -- anchor '$tanch' not a heading in $tpath"
+            fi
+            quote=$(fm_get "$m" quote)
+            needle=$(first5 "$quote")
+            hay=$(norm_join "$ROOT/$tpath")
+            case $hay in
+                *"$needle"*) ;;
+                *) block 5 "$rel -- quote prefix not findable (normalized): '$needle'" ;;
+            esac
         fi
-        quote=$(fm_get "$m" quote)
-        needle=$(first5 "$quote")
-        hay=$(norm_join "$ROOT/$tpath")
-        case $hay in
-            *"$needle"*) ;;
-            *) block 5 "$rel -- quote prefix not findable (normalized): '$needle'" ;;
-        esac
     fi
 
     # 9: approval consistency (field <=> review-log line, same date --
