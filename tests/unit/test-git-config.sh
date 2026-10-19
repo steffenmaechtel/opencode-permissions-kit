@@ -284,6 +284,23 @@ else
     fail "config.sh: git-config toggle backs up the existing agent config"
 fi
 
+# Issue #205: the git-config rows keep the ON/OFF prefix (it mirrors the
+# on|off subcommands) but spell out the effect with the same phrases
+# `opk status` uses (issue #158 wording) — no bare "ON  (...)"/"OFF  (...)"
+# rows may survive anywhere in config.sh (status AND apply sites).
+_gc_on='ui_kv "git-config" "ON — protected (soft-only, agent tools blocked)"'
+_gc_off='ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"'
+if grep -qF "$_gc_on" "$CONFIG" \
+   && grep -qF "$_gc_off" "$CONFIG" \
+   && [ "$(grep -cF "$_gc_on" "$CONFIG")" -ge 2 ] \
+   && [ "$(grep -cF "$_gc_off" "$CONFIG")" -ge 3 ] \
+   && ! grep -qF '"ON  (' "$CONFIG" \
+   && ! grep -qF '"OFF  (' "$CONFIG"; then
+    pass "issue #205: git-config rows read ON/OFF + protected/access allowed"
+else
+    fail "issue #205: git-config row wording regressed to bare ON/OFF"
+fi
+
 # Plan numbering must be dynamic (_plan helper) — a skipped optional step
 # must not leave a gap in the numbered plan the user confirms.
 if grep -q '_plan()' "$INSTALL" && ! grep -Eq 'ui_plan [0-9]' "$INSTALL"; then
