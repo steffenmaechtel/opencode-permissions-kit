@@ -1363,8 +1363,9 @@ fi
 # section). Behavioral pin: the extracted guard block with the REAL
 # advisories.sh comparator (not a stub) discriminates every shape the
 # verdict names — both eq boundaries (1.18.33, 2.0.18) asserted on
-# their own arm, plus above/below/unknown — so neither the comparator
-# direction nor a boundary constant can drift silently (#209 a W1).
+# their own arm, above (1.19.0, 2.0.19) and below (1.18.32, 2.0.17)
+# per arm, and unknown — so neither the comparator direction nor a
+# boundary constant can drift silently (#209 a W1, b W1).
 ADV_SRC="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/advisories.sh"
 W201_BLOCK_BRIDGE="$(sed -n '/^        _st_bridge_unneeded=0$/,/^        fi$/p' "$STATUS")"
 if [ -f "$ADV_SRC" ] && [ -n "$W201_BLOCK_BRIDGE" ]; then
@@ -1378,11 +1379,35 @@ if [ -f "$ADV_SRC" ] && [ -n "$W201_BLOCK_BRIDGE" ]; then
         )
     }
     if [ "$(w201_bridge 1.19.0)" = 1 ] && [ "$(w201_bridge 1.18.33)" = 1 ] \
-        && [ "$(w201_bridge 2.0.18)" = 1 ] && [ "$(w201_bridge 2.0.17)" = 0 ] \
-        && [ "$(w201_bridge 1.18.32)" = 0 ] && [ "$(w201_bridge "")" = 0 ]; then
+        && [ "$(w201_bridge 2.0.19)" = 1 ] && [ "$(w201_bridge 2.0.18)" = 1 ] \
+        && [ "$(w201_bridge 2.0.17)" = 0 ] && [ "$(w201_bridge 1.18.32)" = 0 ] \
+        && [ "$(w201_bridge "")" = 0 ]; then
         pass "#201: bridge verdict keys on ADV_VER (1.18.33+/2.0.18+ unneeded, older/unknown keep the carrier)"
     else
         fail "#201: bridge ADV_VER keying drifted (extract: $W201_BLOCK_BRIDGE)"
+    fi
+    # #209 b W2: the comparator-availability guard is load-bearing, not
+    # decorative — without it, a broken kit (advisories.sh missing) plus
+    # a successful version probe renders a false "not needed" row (an
+    # empty command substitution satisfies `!= lt`). Pin: the same
+    # block, eval'd with NO comparator available — function unset, PATH
+    # emptied so a host binary of the same name cannot satisfy the
+    # guard either (0.0.46a F2 class) — keeps the carrier verdict on
+    # both arms and unknown.
+    w201_bridge_nocmp() {
+        (
+            unset -f advisories_version_cmp
+            PATH=
+            ADV_VER="$1"
+            eval "$W201_BLOCK_BRIDGE"
+            printf '%s\n' "$_st_bridge_unneeded"
+        )
+    }
+    if [ "$(w201_bridge_nocmp 1.19.0)" = 0 ] && [ "$(w201_bridge_nocmp 2.0.18)" = 0 ] \
+        && [ "$(w201_bridge_nocmp "")" = 0 ]; then
+        pass "#201: missing comparator keeps the carrier (guard fails safe)"
+    else
+        fail "#201: bridge guard lost its fail-safe (extract: $W201_BLOCK_BRIDGE)"
     fi
 else
     fail "#201: bridge guard block not extractable (anchor drift?)"
