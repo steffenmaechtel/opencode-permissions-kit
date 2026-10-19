@@ -133,16 +133,17 @@ invariant. (RM-0029)
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
-| 3 | remaining agent files + AGENTS Rules | test-fidelity 2026-10-18; review-concept draft 2026-10-19; AGENTS open |
+| 3 | remaining agent files + AGENTS Rules | test-fidelity 2026-10-18; review-concept 2026-10-19; AGENTS open |
 
 The 2026-10-19 review-concept step split the file: operative rules in
-`agent/review-concept.md` (metas RM-0057–0091), history and
-calibration data in
-`internal/records/review-calibration.md`. First maintainer review
-2026-10-19: RM-0057–0061 and 0063–0067 approved (0060/0061/0065 with
-additions), RM-0062 retired (rule merged into the reviews-also-fixes
-bullet), RM-0068 retired (obsolete — no fully automated chains);
-RM-0069–0091 review pending.
+`agent/review-concept.md`, history and calibration data in
+`internal/records/review-calibration.md`. All metas RM-0057–0092
+maintainer-approved 2026-10-19 (same day, direct chat review), with
+revisions: RM-0062 retired (merged into the reviews-also-fixes
+bullet), RM-0068 retired (obsolete — no fully automated chains),
+RM-0083 cause-corrected (skill bias, not model family), RM-0084
+reworded (fan-out preferred for every review), RM-0092 added
+(checkpoint timestamps, maintainer proposal).
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
 
