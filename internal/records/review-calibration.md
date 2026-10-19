@@ -156,6 +156,12 @@ calibrates how much to trust the next unverified claim.
 - 0.0.38/a–c ran Flash end-to-end on the crashing opencode-go
   provider; d–g ran the judgment agents on GLM-5.3 (gateway default)
   before the policy made all-Flash explicit.
+- opencode-go provider detail (maintainer account 2026-10-19):
+  tokens/s so slow that a thinking subagent hit its ~10-minute
+  timeout; the main agent received only a "Failed" status — with no
+  hint that ~38 minutes of work had already gone in. This is the
+  origin incident behind checkpoint discipline (and, by extension,
+  the checkpoint timestamps adopted 2026-10-19).
 - The former pinned reviewer definition files (`review-mechanical.md`
   and siblings) were global session configs outside this repo and have
   since been removed; the durable spec any reviewer prompt implements
@@ -265,8 +271,13 @@ passes 0.0.38/e/g ran on the strong model); hence the coverage map as
 the real budget and the minutes only its ceiling. Agents cannot watch
 clocks — they spend sections. When checkpoint files carry timestamps
 (cheap, optional), a future pass can A/B budgets against
-verified-finding yield and turn the grading into a measurement. The
+verified-finding yield and turn the grading into a measurement —
+adopted as a rule the same day (maintainer decision 2026-10-19):
+checkpoint files timestamp every subagent (launch/return) as
+passive evidence. The
 ceiling is a limiter, not a target: the loop's actual rate limiter is
 the main agent's verification duty — every extra agent-minute yields
 findings that cost verification minutes, and round 3+ agent time
-mostly re-litigates accepted residuals.
+mostly re-litigates accepted residuals. Caveat (maintainer,
+2026-10-19): the minutes are guidance, not enforced limits —
+subagents frequently run longer.

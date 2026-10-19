@@ -181,6 +181,10 @@ CONTRIBUTING's "shrink the next one" rule):
   side file after every completed section (empty sections get a
   `clean` line) — end-synthesis turns are the primary failure mode,
   and checkpoints survive them. (RM-0086)
+- Checkpoint files timestamp every subagent (one line at launch, one
+  at return) — the minute budgets are guidance without enforcement;
+  the timestamps are the evidence base that will validate or
+  recalibrate them. (RM-0092)
 - Wave reviews (diff scope): ~8 minutes per agent; micro waves
   (≤ ~50-line diffs) run ~5 — batched greps, targeted reads, no
   whole-file reads of the big scripts; unclear after one follow-up

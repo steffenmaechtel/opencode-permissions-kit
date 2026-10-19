@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**90 metas · 88 active · 2 retired · 8 review-pending · next due 2026-11-14**
+**91 metas · 89 active · 2 retired · 3 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0068, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
+- **Review pending:** RM-0068, RM-0090, RM-0092
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -141,18 +141,19 @@
 | [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | approved | 1m | 2026-11-19 |
 | [RM-0083](0/0/8/RM-0083.md) | For release reviews, a second | active | approved | 1m | 2026-11-19 |
 | [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-11-19 |
-| [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | **pending** | 1m | 2026-11-19 |
-| [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | **pending** | 1m | 2026-11-19 |
-| [RM-0087](0/0/8/RM-0087.md) | Wave reviews (diff scope): | active | **pending** | 1m | 2026-11-19 |
-| [RM-0088](0/0/8/RM-0088.md) | Full-scope passes: ~15 minutes | active | **pending** | 1m | 2026-11-19 |
-| [RM-0089](0/0/8/RM-0089.md) | Release-critical full passes: prefer | active | **pending** | 1m | 2026-11-19 |
+| [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | approved | 1m | 2026-11-19 |
+| [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | approved | 1m | 2026-11-19 |
+| [RM-0087](0/0/8/RM-0087.md) | Wave reviews (diff scope): | active | approved | 1m | 2026-11-19 |
+| [RM-0088](0/0/8/RM-0088.md) | Full-scope passes: ~15 minutes | active | approved | 1m | 2026-11-19 |
+| [RM-0089](0/0/8/RM-0089.md) | Release-critical full passes: prefer | active | approved | 1m | 2026-11-19 |
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | **pending** | 1m | 2026-11-19 |
+| [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | **pending** | 1m | 2026-11-19 |
 
 ### Release gate
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0091](0/0/9/RM-0091.md) | Before cutting a release: | active | **pending** | 1m | 2026-11-19 |
+| [RM-0091](0/0/9/RM-0091.md) | Before cutting a release: | active | approved | 1m | 2026-11-19 |
 
 ## agent/test-fidelity.md
 
