@@ -1145,22 +1145,33 @@ if [ -z "$_w2_fall_hits" ]; then
 else
     fail "W2 class sweep: mktemp fixed-path fallback survived (got: $_w2_fall_hits)"
 fi
-# canary (#202 a W1): the sweep above greps real files/ and finds nothing
-# by design — its FAIL branch never runs in-suite, so a broken regex would
-# stay green while blind. Prove both alternations still trip: two offending
-# shapes + one sanctioned line in scratch, SAME expression (test-kit-files
-# §4 class: a guard that cannot fail is decoration).
+# canary (#202 a W1, extended #202 b W1): the sweep above greps real
+# files/ and finds nothing by design — its FAIL branch never runs
+# in-suite, so a broken regex would stay green while blind. Pin every
+# discrimination claim the comment above makes: three offending shapes
+# (assignment, in-substitution, brace-assign fixed path) must match, all
+# four sanctioned forms (return/exit, X="", warn-only brace) must not —
+# SAME expression (test-kit-files §4 class: a guard that cannot fail is
+# decoration).
 _w2_can_file="$WORK/w2-canary.sh"
 {
     echo '_w2_can_a=$(mktemp) || _w2_can_a=/dev/null'
     echo '_w2_can_b=$(mktemp 2>/dev/null || echo /dev/null)'
+    echo '_w2_can_c=$(mktemp) || { _w2_can_c=/dev/null; }'
     echo '_w2_can_ok=$(mktemp) || return 1'
+    echo '_w2_can_ok2=$(mktemp) || exit 1'
+    echo '_w2_can_ok3=$(mktemp) || _w2_can_ok3=""'
+    echo '_w2_can_ok4=$(mktemp) || { echo warn >&2; }'
 } > "$_w2_can_file"
 _w2_can_hits="$(grep -nE "$W2_FIXPATH_A|$W2_FIXPATH_B" "$_w2_can_file" || true)"
 if printf '%s' "$_w2_can_hits" | grep -q '^1:' \
    && printf '%s' "$_w2_can_hits" | grep -q '^2:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^3:'; then
-    pass "W2 sweep canary: pattern catches both offending shapes, spares the sanctioned"
+   && printf '%s' "$_w2_can_hits" | grep -q '^3:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^4:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^5:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^6:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^7:'; then
+    pass "W2 sweep canary: catches all three offending shapes (incl. brace-assign), spares all four sanctioned"
 else
     fail "W2 sweep canary: pattern is blind or over-broad (got: $_w2_can_hits)"
 fi
