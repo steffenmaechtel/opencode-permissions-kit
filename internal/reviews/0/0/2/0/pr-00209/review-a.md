@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (external /review session — single-pass main agent, no subag
 
 # Wave review — pr-00209 snapshot a — issue-201 direct-capture wave
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave question: did the fixes break or lie? Wave = `4f98611`
 (`f07f2fb..4f98611`, 3 files): the #163 direct probe now CAPTURES the
 `--version` stdout it used to discard and feeds it through the same
