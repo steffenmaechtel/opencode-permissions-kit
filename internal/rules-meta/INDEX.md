@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**95 metas · 93 active · 2 retired · 5 review-pending · next due 2026-11-14**
+**95 metas · 93 active · 2 retired · 1 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0068, RM-0093, RM-0094, RM-0095, RM-0096
+- **Review pending:** RM-0068
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -204,8 +204,8 @@
 |---|---|---|---|---|---|
 | [RM-0034](0/0/3/RM-0034.md) | only where load-bearing | active | approved | 1m | 2026-11-15 |
 | [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 1m | 2026-11-15 |
-| [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | **pending** | 1m | 2026-11-19 |
-| [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | **pending** | 1m | 2026-11-19 |
+| [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
+| [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
 
 ### Quality bar for rationales
 
@@ -238,5 +238,5 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0095](0/0/9/RM-0095.md) | Table rows in rule files | active | **pending** | 1m | 2026-11-19 |
-| [RM-0096](0/0/9/RM-0096.md) | Narrative-heavy sections start outside | active | **pending** | 1m | 2026-11-19 |
+| [RM-0095](0/0/9/RM-0095.md) | Table rows in rule files | active | approved | 1m | 2026-11-19 |
+| [RM-0096](0/0/9/RM-0096.md) | Narrative-heavy sections start outside | active | approved | 1m | 2026-11-19 |
