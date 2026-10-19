@@ -169,10 +169,11 @@ CONTRIBUTING's "shrink the next one" rule):
   provenance in the snapshot header (model, tree, what ran on which
   host), findings recorded as reported with verification marks, and a
   calibration section naming what each side missed and why. (RM-0083)
-- Invocation shape governs orchestration capacity: a review setup
-  that cannot fan out subagents (the 1.x `/review` subtask shape)
-  covers only diff/wave scope adequately; full-scope/release reviews
-  require a fan-out-capable main session. (RM-0084)
+- Invocation shape governs orchestration capacity: a fan-out-capable
+  main session is the preferred shape for every review; a setup that
+  cannot fan out subagents (the 1.x `/review` subtask shape) is
+  merely adequate for diff/wave scope and never enough for
+  full-scope/release reviews. (RM-0084)
 - Reviewer prompts for recurring blind-spot surfaces name the class
   explicitly, not just the file; a gate or claim about path operands
   is tested against its slash forms (`x/`, `x//`, `x/.`). (RM-0085)
