@@ -1145,14 +1145,16 @@ if [ -z "$_w2_fall_hits" ]; then
 else
     fail "W2 class sweep: mktemp fixed-path fallback survived (got: $_w2_fall_hits)"
 fi
-# canary (#202 a W1, extended #202 b W1): the sweep above greps real
-# files/ and finds nothing by design — its FAIL branch never runs
-# in-suite, so a broken regex would stay green while blind. Pin every
-# discrimination claim the comment above makes: three offending shapes
-# (assignment, in-substitution, brace-assign fixed path) must match, all
-# four sanctioned forms (return/exit, X="", warn-only brace) must not —
-# SAME expression (test-kit-files §4 class: a guard that cannot fail is
-# decoration).
+# canary (#202 a W1, extended #202 b W1, #202 c W1): the sweep above
+# greps real files/ and finds nothing by design — its FAIL branch never
+# runs in-suite, so a broken regex would stay green while blind. Pin
+# every discrimination claim the comment above makes: six offending
+# lines (assignment, muffled in-substitution, brace-assign fixed path,
+# quoted /tmp literal, sudo-prefixed /var/tmp, un-muffled echo /tmp)
+# must match; every must-not-match claim (return/exit, X="", warn-only
+# brace, bare 2>/dev/null without ||, the three-line multi-line
+# fallback) must not — SAME expression (test-kit-files §4 class: a
+# guard that cannot fail is decoration).
 _w2_can_file="$WORK/w2-canary.sh"
 {
     echo '_w2_can_a=$(mktemp) || _w2_can_a=/dev/null'
@@ -1162,6 +1164,13 @@ _w2_can_file="$WORK/w2-canary.sh"
     echo '_w2_can_ok2=$(mktemp) || exit 1'
     echo '_w2_can_ok3=$(mktemp) || _w2_can_ok3=""'
     echo '_w2_can_ok4=$(mktemp) || { echo warn >&2; }'
+    echo '_w2_can_d=$(mktemp) || _w2_can_d="/tmp"'
+    echo '_w2_can_e=$(sudo mktemp) || _w2_can_e=/var/tmp'
+    echo '_w2_can_ok5=$(mktemp 2>/dev/null)'
+    echo '_w2_can_f=$(mktemp || echo /tmp)'
+    echo '_w2_can_g=$(mktemp) || {'
+    echo '    _w2_can_g=/dev/null'
+    echo '}'
 } > "$_w2_can_file"
 _w2_can_hits="$(grep -nE "$W2_FIXPATH_A|$W2_FIXPATH_B" "$_w2_can_file" || true)"
 if printf '%s' "$_w2_can_hits" | grep -q '^1:' \
@@ -1170,8 +1179,15 @@ if printf '%s' "$_w2_can_hits" | grep -q '^1:' \
    && ! printf '%s' "$_w2_can_hits" | grep -q '^4:' \
    && ! printf '%s' "$_w2_can_hits" | grep -q '^5:' \
    && ! printf '%s' "$_w2_can_hits" | grep -q '^6:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^7:'; then
-    pass "W2 sweep canary: catches all three offending shapes (incl. brace-assign), spares all four sanctioned"
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^7:' \
+   && printf '%s' "$_w2_can_hits" | grep -q '^8:' \
+   && printf '%s' "$_w2_can_hits" | grep -q '^9:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^10:' \
+   && printf '%s' "$_w2_can_hits" | grep -q '^11:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^12:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^13:' \
+   && ! printf '%s' "$_w2_can_hits" | grep -q '^14:'; then
+    pass "W2 sweep canary: catches all six offending lines (incl. quoted, prefixed, un-muffled), spares all eight non-match lines"
 else
     fail "W2 sweep canary: pattern is blind or over-broad (got: $_w2_can_hits)"
 fi
