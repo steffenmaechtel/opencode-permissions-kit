@@ -129,7 +129,12 @@ invariant. (RM-0029)
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
-| 3 | `test-fidelity.md` + `review-concept.md` + `AGENTS.md ## Rules` | test-fidelity done (approved 2026-10-18) |
+| 3 | remaining agent files + AGENTS Rules | test-fidelity 2026-10-18; review-concept draft 2026-10-19; AGENTS open |
+
+The 2026-10-19 review-concept step split the file: operative rules in
+`agent/review-concept.md` (metas RM-0057–0091, maintainer review
+pending), history and calibration data in
+`internal/records/review-calibration.md`.
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
 

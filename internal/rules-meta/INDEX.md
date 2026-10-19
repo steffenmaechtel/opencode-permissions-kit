@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**55 metas · 55 active · 0 retired · 0 review-pending · next due 2026-11-14**
+**90 metas · 90 active · 0 retired · 35 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0057, RM-0058, RM-0059, RM-0060, RM-0061, RM-0062, RM-0063, RM-0064, RM-0065, RM-0066, RM-0067, RM-0068, RM-0069, RM-0070, RM-0071, RM-0072, RM-0073, RM-0074, RM-0075, RM-0076, RM-0077, RM-0078, RM-0079, RM-0080, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -66,6 +66,93 @@
 |---|---|---|---|---|---|
 | [RM-0018](0/0/1/RM-0018.md) | New cases (birth-PR key, since the 2026-10… | active | approved | 1m | 2026-11-16 |
 | [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 1m | 2026-11-16 |
+
+## agent/review-concept.md
+
+### Two review types, two jobs
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0057](0/0/5/RM-0057.md) | A wave diff of ~2.5k lines | active | **pending** | 1m | 2026-11-19 |
+
+### The loop and the stop rule
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0058](0/0/5/RM-0058.md) | Before the loop starts, the maintainer | active | **pending** | 1m | 2026-11-19 |
+| [RM-0059](0/0/5/RM-0059.md) | The snapshot is written and committed | active | **pending** | 1m | 2026-11-19 |
+| [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | **pending** | 1m | 2026-11-19 |
+| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | **pending** | 1m | 2026-11-19 |
+| [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | **pending** | 1m | 2026-11-19 |
+| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | **pending** | 1m | 2026-11-19 |
+| [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | active | **pending** | 1m | 2026-11-19 |
+
+### Session rotation
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0060](0/0/6/RM-0060.md) | The session that reviews also | active | **pending** | 1m | 2026-11-19 |
+| [RM-0061](0/0/6/RM-0061.md) | Sessions do not chain themselves: | active | **pending** | 1m | 2026-11-19 |
+| [RM-0062](0/0/6/RM-0062.md) | The hard seam and the maintainer | active | **pending** | 1m | 2026-11-19 |
+| [RM-0063](0/0/6/RM-0063.md) | The snapshot header's Reviewer line | active | **pending** | 1m | 2026-11-19 |
+
+### Fixes close classes, not sites
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0069](0/0/6/RM-0069.md) | A fix wave owes a class | active | **pending** | 1m | 2026-11-19 |
+| [RM-0070](0/0/7/RM-0070.md) | The sweep result is recorded | active | **pending** | 1m | 2026-11-19 |
+
+### Who records what
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0071](0/0/7/RM-0071.md) | The resolution is the ledger | active | **pending** | 1m | 2026-11-19 |
+
+### Finding provenance
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0072](0/0/7/RM-0072.md) | Every full-scope snapshot records | active | **pending** | 1m | 2026-11-19 |
+| [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | **pending** | 1m | 2026-11-19 |
+
+### Verification duty
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | **pending** | 1m | 2026-11-19 |
+| [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | **pending** | 1m | 2026-11-19 |
+
+### Suites are the standing review
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | **pending** | 1m | 2026-11-19 |
+| [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | **pending** | 1m | 2026-11-19 |
+| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | **pending** | 1m | 2026-11-19 |
+| [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | **pending** | 1m | 2026-11-19 |
+
+### Parallel reviewer agents
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0080](0/0/8/RM-0080.md) | The main agent runs the | active | **pending** | 1m | 2026-11-19 |
+| [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | **pending** | 1m | 2026-11-19 |
+| [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | **pending** | 1m | 2026-11-19 |
+| [RM-0083](0/0/8/RM-0083.md) | For release reviews, a second | active | **pending** | 1m | 2026-11-19 |
+| [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | **pending** | 1m | 2026-11-19 |
+| [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | **pending** | 1m | 2026-11-19 |
+| [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | **pending** | 1m | 2026-11-19 |
+| [RM-0087](0/0/8/RM-0087.md) | Wave reviews (diff scope): | active | **pending** | 1m | 2026-11-19 |
+| [RM-0088](0/0/8/RM-0088.md) | Full-scope passes: ~15 minutes | active | **pending** | 1m | 2026-11-19 |
+| [RM-0089](0/0/8/RM-0089.md) | Release-critical full passes: prefer | active | **pending** | 1m | 2026-11-19 |
+| [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | **pending** | 1m | 2026-11-19 |
+
+### Release gate
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0091](0/0/9/RM-0091.md) | Before cutting a release: | active | **pending** | 1m | 2026-11-19 |
 
 ## agent/test-fidelity.md
 

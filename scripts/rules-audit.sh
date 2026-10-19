@@ -46,7 +46,7 @@ fi
 TODAY=${FORCE_TODAY:-$(date +%F)}
 METAS=internal/rules-meta
 
-SCOPE_FILES="agent/conventions.md agent/test-fidelity.md internal/records/rules-meta.md"
+SCOPE_FILES="agent/conventions.md agent/test-fidelity.md agent/review-concept.md internal/records/rules-meta.md"
 ACTIVE_SECTIONS="agent/conventions.md#interactive-prompts-yn"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#script-output-style"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-security-untrusted-input"
@@ -56,6 +56,16 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#3-terminology-test-doubles-and-fidelity"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#4-patterns-that-close-the-gaps"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#6-checklist-for-new-kit-code"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#two-review-types-two-jobs"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#the-loop-and-the-stop-rule"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#session-rotation"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#fixes-close-classes-not-sites"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#who-records-what"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#finding-provenance"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#verification-duty"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#suites-are-the-standing-review"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#parallel-reviewer-agents"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#release-gate"
 
 WORK=$(mktemp -d /tmp/rules-audit.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT
