@@ -1,7 +1,8 @@
 # Resolution — pr-00202 (issue-168 mktemp fallback class-sweep widening)
 
-Chain: [review-a.md](review-a.md) · [review-b.md](review-b.md) — micro-wave
-reviews of the #168 wave (63c9f02) and its fixes (119b122).
+Chain: [review-a.md](review-a.md) · [review-b.md](review-b.md) ·
+[review-c.md](review-c.md) — micro-wave reviews of the #168 wave
+(63c9f02), its fixes (119b122, dd25de8) and the c-wave fix (d19919c).
 Base v0.0.52 @ 5975524.
 
 ## Dispositions
@@ -11,6 +12,7 @@ Base v0.0.52 @ 5975524.
 | a W1 (LOW) | **implemented** | `119b122` | canary beside the sweep, SAME expression; sabotage A → canary FAIL; restored → green |
 | a W2 (INFO) | **implemented** | `119b122` | comment now states brace-assign fixed path matches shape (a) by design |
 | b W1 (LOW) | **implemented** | `dd25de8` | canary pins all 7 comment claims; brace-blind + over-broad sabotage red, restored green |
+| c W1 (LOW) | **implemented** | `d19919c` | canary pins all remaining claims — 6 match / 8 spared incl. multi-line; alternation-narrow + strip-to-path sabotage red, restored green |
 
 ## Evidence detail
 
@@ -63,9 +65,45 @@ green after each run):
 - restored → `sh tests/unit/test-status.sh` green rc=0, `make lint`
   green.
 
+### c W1 (LOW) — remaining discrimination claims pinned
+
+Canary grew from 7 to 14 scratch lines, closing the gap between the
+"every discrimination claim" sentence and its coverage (L2 class sweep
+— beyond the finding's named four lines, the multi-line non-sweep
+claim is the same class sibling and went in too; the sentence would
+otherwise keep over-claiming). New pins, still the SAME
+`$W2_FIXPATH_A|$W2_FIXPATH_B` expression:
+
+- offending (must match): `_w2_can_d=… || _w2_can_d="/tmp"` (quoted
+  /tmp literal), `_w2_can_e=$(sudo mktemp) || … /var/tmp` (prefix +
+  /var/tmp), `_w2_can_f=$(mktemp || echo /tmp)` (un-muffled shape b) —
+  asserted via `^8:`/`^9:`/`^11:`;
+- must NOT match: `_w2_can_ok5=$(mktemp 2>/dev/null)` (bare redirect,
+  no `||` — asserted absent via `^10:`) and the three-line multi-line
+  fallback `_w2_can_g` (asserted absent via `^12:`–`^14:`).
+
+Every claim sentence in the sweep comment (shapes, literals, quoting,
+prefix, sanctioned forms, deliberately-unswept forms) now has a line.
+
+Mutation verification (work committed at `d19919c` first, tree
+restored green after each run):
+
+- fixed-path alternation narrowed `(dev/null|tmp|var/tmp)` →
+  `(dev/null)` in both shapes (the W1 drift scenario): canary FAIL
+  "blind or over-broad (got: 1:… 2:… 3:…)" — precisely the three new
+  offending lines (`^8:`/`^9:`/`^11:`) going uncaught; suite rc=1;
+- shape A stripped to the bare path alternation
+  (`'/dev/null|/tmp|/var/tmp'`): canary FAIL over-broad with got
+  1,2,3,8,9,10,11,13 — the new negatives `^10:` (bare `2>/dev/null`)
+  and `^13:` (multi-line middle line) fire; suite rc=1;
+- restored → `sh tests/unit/test-status.sh` green rc=0 ("catches all
+  six offending lines … spares all eight non-match lines"),
+  `make lint` green.
+
 ## Stop-rule note
 
 The a-wave fix touched test code → snapshot b ran (1 LOW). The b-wave
-fix (`dd25de8`) also touches test code → one final micro-wave pass
-(snapshot c) is owed in a fresh session per the rotation rule
+fix (`dd25de8`) also touched test code → snapshot c ran (1 LOW). The
+c-wave fix (`d19919c`) again touches test code → one final micro-wave
+pass (snapshot d) is owed in a fresh session per the rotation rule
 (review-concept.md, "Session rotation").
