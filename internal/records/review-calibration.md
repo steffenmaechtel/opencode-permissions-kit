@@ -171,14 +171,39 @@ suite never executed).
 
 ## External-model passes
 
-A different model family as the second snapshot of a release review is
-the strongest form of "redundancy replaces depth" — the 0.0.42e
-external pass (GPT-6 Luna, same tree) caught 16 findings the house
-pass had missed (2 HIGH incl. the executed host-path `rm`), while the
-house pass held findings the external one lacked. Integration
-outcome: 25/26 findings confirmed by main-agent verification; even
-retractions can be partially over-turned by the external reviewer's
-counter-feedback (0.0.42e S3 → LOW carve-out).
+The 0.0.42e external pass (GPT-6 Luna, same tree) caught 16 findings
+the house pass had missed (2 HIGH incl. the executed host-path `rm`),
+while the house pass held findings the external one lacked.
+Integration outcome: 25/26 findings confirmed by main-agent
+verification; even retractions can be partially over-turned by the
+external reviewer's counter-feedback (0.0.42e S3 → LOW carve-out).
+
+Cause correction (2026-10-19, maintainer account): the yield
+difference was environmental, not model-family causation — see the
+next section.
+
+## Skill-bias origin (the review skill that buried C1)
+
+The house reviewers of 0.0.42d ran with the global review-project
+skill, whose lesson B said: "Repository test scripts are NOT
+affected ... Do NOT report such patterns as review findings." That
+lesson originated from an unrelated UX request. opencode confirms
+every agent `rm` tool call ("ask" — deliberate config, still today);
+during review sessions the agents' ad-hoc temp-test cleanups
+(`rm -rf /tmp/opencode/test-1`) prompted constantly, and when the
+maintainer asked to stop being pestered with rm prompts, the writing
+agent over-generalized the request into a review exemption for `rm`
+in repo test scripts — conflating prompt relief (UX) with finding
+exemption (review quality). 0.0.42d's reviewers applied that
+exemption to the ddev-migrate teardown's literal host-path operands
+(C1) and buried it; the skill-less external pass surfaced it through
+the executed host incident, not foresight. The skill was corrected
+2026-10-04 (nb-ai-skills c5ad310): prompt and finding are separate
+axes, the operands decide — literal host paths in test scripts are
+findings. Standing lesson: the second snapshot's value lies in
+context difference (different training AND freedom from the house
+skills' biases); a skill lesson that exempts a finding class must
+name its exact scope.
 
 ## Invocation-shape calibration (0.0.45b/-c) and its correction
 

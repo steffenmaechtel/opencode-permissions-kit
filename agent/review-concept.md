@@ -162,12 +162,13 @@ CONTRIBUTING's "shrink the next one" rule):
   claim — guards, manifests and checklists are themselves review
   objects: enumerate the executed commands / on-disk files
   independently before repeating what they report. (RM-0082)
-- For release reviews, a second snapshot from a different model family
-  is the strongest redundancy. Integration duties: full per-finding
-  verification by the main agent, honest provenance in the snapshot
-  header (model, tree, what ran on which host), findings recorded as
-  reported with verification marks, and a calibration section naming
-  what each side missed and why. (RM-0083)
+- For release reviews, a second independent snapshot from a different
+  context — a different model family and/or a setup without the house
+  skills and their biases — is the strongest redundancy. Integration
+  duties: full per-finding verification by the main agent, honest
+  provenance in the snapshot header (model, tree, what ran on which
+  host), findings recorded as reported with verification marks, and a
+  calibration section naming what each side missed and why. (RM-0083)
 - Invocation shape governs orchestration capacity: full-scope/release
   reviews run in a main session with fan-out capability; a review
   command form that cannot fan out subagents (the 1.x `/review`
