@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (house session — maintainer-requested micro pass, single-pas
 
 # Review — pr-00208 snapshot a — issue-205 git-config wording
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave question: did the wave break or lie? Wave = `9d89dea`: the
 `opk config git-config status` rows drop the bare `ON  ($f, soft-only)`
 shape for `ON — protected (soft-only, agent tools blocked)` /
