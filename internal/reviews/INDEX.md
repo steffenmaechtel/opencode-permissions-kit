@@ -24,4 +24,5 @@ The parity test regenerates and compares. -->
 | [pr-00199](0/0/1/9/pr-00199) | issue-165 feature wave — silently-droppable lib guards warn loudly | wave | v0.0.52 @ 21cf179 | 2026-10-18 | a–b | closed |
 | [pr-00200](0/0/2/0/pr-00200) | issue-166 fix wave — status advisory C1 gate reads mode bits, not the caller's [ -x ] | wave | v0.0.52 @ 99e3fd1 | 2026-10-19 | a–b | closed |
 | [pr-00202](0/0/2/0/pr-00202) | issue-168 fix wave — widen the mktemp fixed-path fallback class sweep repo-wide (test-status.sh only) | wave | v0.0.52 @ 5975524 | 2026-10-19 | a–e | closed |
+| [pr-00208](0/0/2/0/pr-00208) | issue-205 git-config status/apply wording (feature wave) | wave | v0.0.53 @ f07f2fb | 2026-10-20 | a–c | closed |
 

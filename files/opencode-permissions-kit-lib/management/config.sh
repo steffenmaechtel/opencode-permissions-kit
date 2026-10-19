@@ -405,12 +405,18 @@ git_config_status() {
     [ -z "$f" ] && { echo "No opencode config installed for $OPENCODE_USER."; return; }
     # ON  = .git/config deny rule is active (uncommented) in the config
     # OFF = rule absent or still a //SECURE_GIT comment
+    # Wording (issue #205): the ON/OFF prefix stays — it mirrors the
+    # on|off subcommands — but the effect is spelled out with the same
+    # phrases `opk status` uses (issue #158), so both outputs agree.
     if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
-        ui_kv "git-config" "ON  ($f, soft-only)" "$UI_GREEN"
+        ui_kv "git-config" "ON — protected (soft-only — agent tools blocked)" "$UI_GREEN"
+        ui_detail "$f"
     elif grep -q '//SECURE_GIT' "$f" 2>/dev/null; then
-        ui_kv "git-config" "OFF  ($f — markers present, rules inactive)"
+        ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"
+        ui_detail "$f (markers present, rules inactive)"
     else
-        ui_kv "git-config" "OFF  ($f)"
+        ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"
+        ui_detail "$f"
     fi
 }
 
@@ -469,10 +475,11 @@ git_config_apply() {
     rm -f "$_gca_tmp"
 
     if [ "$enable" = "on" ]; then
-        ui_kv "git-config" "ON  ($target, soft-only)" "$UI_GREEN"
+        ui_kv "git-config" "ON — protected (soft-only — agent tools blocked)" "$UI_GREEN"
     else
-        ui_kv "git-config" "OFF  ($target)"
+        ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"
     fi
+    ui_detail "$target"
     log "git-config hardening set to $enable ($target)"
     if [ -n "$backup" ]; then
         ui_detail "previous config backed up: $backup"

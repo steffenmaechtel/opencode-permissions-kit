@@ -1,6 +1,6 @@
 #!/bin/sh
-# test-line-length.sh -- line-length ratchet over the shipped scripts and
-# the CI workflows.
+# test-line-length.sh -- line-length ratchet over the shipped scripts,
+# the CI workflows, and the house-written markdown.
 #
 # Target limit: 120 CONTENT columns (pragmatic shell upper bound -- 80 is
 # artificially narrow with long flags, paths and --option=value
@@ -36,11 +36,16 @@
 # regenerated for the metric switch (deliberate, diff-reviewed --
 # entries can only shrink or vanish, never grow).
 #
-# Scope: files/**/*.sh (incl. files/etc/umask.sh and files/install.sh),
-# the extensionless shell under files/opencode-permissions-kit-lib/bin/,
-# and .github/workflows/*.yml (their long config lines are exactly the
-# hidden growth this guard exists to surface). NOT in scope: py/, tui/,
-# docs/, tests/ themselves, scripts/ (dev tooling).
+# Scope: TWO halves, one baseline. Shell/yml half: files/**/*.sh (incl.
+# files/etc/umask.sh and files/install.sh), the extensionless shell
+# under files/opencode-permissions-kit-lib/bin/, and
+# .github/workflows/*.yml (their long config lines are exactly the
+# hidden growth this guard exists to surface). Markdown half
+# (docs_scope below, structure wave 2026-10 E4): agent/, internal/,
+# docs/ and the root README/CONTRIBUTING/AGENTS *.md -- living text,
+# and that INCLUDES review resolutions (only frozen history is
+# exempt). NOT in scope: py/, tui/, tests/ themselves, scripts/ (dev
+# tooling).
 #
 # Run: sh tests/unit/test-line-length.sh
 
