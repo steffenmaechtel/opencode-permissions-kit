@@ -1616,9 +1616,9 @@ fi
 _a165="$(sed -n '/^# Missing-lib fallback (issue #165):/,/^fi$/p' "$STATUS")"
 if printf '%s' "$_a165" | grep -qF 'if [ ! -f "$LIBDIR/sh/advisories.sh" ]' \
     && printf '%s' "$_a165" | grep -qF 'ui_kv_warn "advisories database" "missing — security checks skipped (fix: sudo opk update)"'; then
-    pass "165: advisories fallback block extractable (negated guard + counted row)"
+    pass "#165: advisories fallback block extractable (negated guard + counted row)"
 else
-    fail "165: advisories fallback block not extractable (anchor drift?)"
+    fail "#165: advisories fallback block not extractable (anchor drift?)"
 fi
 _a165_run() {
     (
@@ -1632,9 +1632,9 @@ _a165_dir=$(mktemp -d "$WORK/a165.XXXXXX")
 _a165_out=$(_a165_run "$_a165_dir" || true)
 if printf '%s' "$_a165_out" | grep -q '^SECTION|Security advisories$' \
     && printf '%s' "$_a165_out" | grep -q '^WARN|advisories database|missing — security checks skipped'; then
-    pass "165: missing advisories lib renders the counted row, section named"
+    pass "#165: missing advisories lib renders the counted row, section named"
 else
-    fail "165: missing advisories lib must warn loudly (got: $_a165_out)"
+    fail "#165: missing advisories lib must warn loudly (got: $_a165_out)"
 fi
 # control: lib present -> fallback silent; then through the REAL guard
 # head (shipped guard + shipped sourcing + shipped section header; the
@@ -1643,9 +1643,9 @@ mkdir -p "$_a165_dir/sh"
 : > "$_a165_dir/sh/advisories.sh"
 _a165_out=$(_a165_run "$_a165_dir" || true)
 if [ -z "$_a165_out" ]; then
-    pass "165: present advisories lib keeps the fallback silent (control)"
+    pass "#165: present advisories lib keeps the fallback silent (control)"
 else
-    fail "165: present advisories lib must not fire the fallback (got: $_a165_out)"
+    fail "#165: present advisories lib must not fire the fallback (got: $_a165_out)"
 fi
 _a165_head="$(sed -n '/^if \[ -f "\$LIBDIR\/sh\/advisories.sh" \]; then$/,/ui_section "Security advisories"/p' "$STATUS")"
 if [ -n "$_a165_head" ]; then
@@ -1659,21 +1659,21 @@ if [ -n "$_a165_head" ]; then
     ) || true
     if printf '%s' "$_a165_out" | grep -q '^SECTION|Security advisories$' \
         && ! printf '%s' "$_a165_out" | grep -q '^WARN|'; then
-        pass "165: present advisories lib renders the section via the real guard (control)"
+        pass "#165: present advisories lib renders the section via the real guard (control)"
     else
-        fail "165: advisories real-guard control broken (got: $_a165_out)"
+        fail "#165: advisories real-guard control broken (got: $_a165_out)"
     fi
 else
-    fail "165: advisories guard head not extractable (anchor drift?)"
+    fail "#165: advisories guard head not extractable (anchor drift?)"
 fi
 
 # b) ddev-terminal: compound guard + elif — complete block
 _t165="$(sed -n '/^if \[ -n "\$DEFAULT_USER" \] && \[ -f "\$LIBDIR\/sh\/ddev-terminal.sh" \]; then$/,/^fi$/p' "$STATUS")"
 if printf '%s' "$_t165" | grep -qF 'elif [ -n "$DEFAULT_USER" ]; then' \
     && printf '%s' "$_t165" | grep -qF 'ui_kv_warn "ddev() hook" "not checked — kit file sh/ddev-terminal.sh missing (fix: sudo opk update)"'; then
-    pass "165: ddev-terminal block extractable (compound guard + elif row)"
+    pass "#165: ddev-terminal block extractable (compound guard + elif row)"
 else
-    fail "165: ddev-terminal block not extractable (anchor drift?)"
+    fail "#165: ddev-terminal block not extractable (anchor drift?)"
 fi
 _t165_run() {
     (
@@ -1698,15 +1698,15 @@ printf '# kit hook line: opencode-permissions-kit/sh/ddev-terminal.sh\n' > "$_t1
 if [ -n "$_t165" ]; then
     _t165_out=$(_t165_run dev "$_t165_dir" "" || true)
     if printf '%s' "$_t165_out" | grep -q '^WARN|ddev() hook|not checked — kit file sh/ddev-terminal.sh missing'; then
-        pass "165: missing ddev-terminal lib warns (counted), row not silently dropped"
+        pass "#165: missing ddev-terminal lib warns (counted), row not silently dropped"
     else
-        fail "165: missing ddev-terminal lib must warn (got: $_t165_out)"
+        fail "#165: missing ddev-terminal lib must warn (got: $_t165_out)"
     fi
     _t165_out=$(_t165_run "" "$_t165_dir" "" || true)
     if [ -z "$_t165_out" ]; then
-        pass "165: unstamped install stays row-free (compound guard holds)"
+        pass "#165: unstamped install stays row-free (compound guard holds)"
     else
-        fail "165: unstamped install must not fire the row (got: $_t165_out)"
+        fail "#165: unstamped install must not fire the row (got: $_t165_out)"
     fi
     # control: lib present -> the hook row renders through the real body
     mkdir -p "$_t165_dir/sh"
@@ -1714,18 +1714,18 @@ if [ -n "$_t165" ]; then
     _t165_out=$(_t165_run dev "$_t165_dir" "$_t165_dir/hooked" || true)
     if printf '%s' "$_t165_out" | grep -qF "OK|ddev() hook|active — $_t165_dir/hooked/.bashrc" \
         && ! printf '%s' "$_t165_out" | grep -q '^WARN|'; then
-        pass "165: present ddev-terminal lib renders the hook row (control)"
+        pass "#165: present ddev-terminal lib renders the hook row (control)"
     else
-        fail "165: ddev-terminal control broken (got: $_t165_out)"
+        fail "#165: ddev-terminal control broken (got: $_t165_out)"
     fi
 fi
 
 # c) ddev-migrate: compound guard + elif — complete block
 _m165="$(sed -n '/^if \[ -n "\$DEFAULT_USER" \] && \[ -f "\$LIBDIR\/sh\/ddev-migrate.sh" \]; then$/,/^fi$/p' "$STATUS")"
 if printf '%s' "$_m165" | grep -qF 'ui_kv_warn "db dumps" "not checked — kit file sh/ddev-migrate.sh missing (fix: sudo opk update)"'; then
-    pass "165: ddev-migrate block extractable (elif row present)"
+    pass "#165: ddev-migrate block extractable (elif row present)"
 else
-    fail "165: ddev-migrate block not extractable (anchor drift?)"
+    fail "#165: ddev-migrate block not extractable (anchor drift?)"
 fi
 _m165_dir=$(mktemp -d "$WORK/m165.XXXXXX")
 _m165_run() {
@@ -1746,15 +1746,15 @@ _m165_run() {
 if [ -n "$_m165" ]; then
     _m165_out=$(_m165_run dev "$_m165_dir" "$_m165_dir/no-projects.conf" || true)
     if printf '%s' "$_m165_out" | grep -q '^WARN|db dumps|not checked — kit file sh/ddev-migrate.sh missing'; then
-        pass "165: missing ddev-migrate lib warns (counted)"
+        pass "#165: missing ddev-migrate lib warns (counted)"
     else
-        fail "165: missing ddev-migrate lib must warn (got: $_m165_out)"
+        fail "#165: missing ddev-migrate lib must warn (got: $_m165_out)"
     fi
     _m165_out=$(_m165_run "" "$_m165_dir" "$_m165_dir/no-projects.conf" || true)
     if [ -z "$_m165_out" ]; then
-        pass "165: unstamped install stays row-free (migrate guard holds)"
+        pass "#165: unstamped install stays row-free (migrate guard holds)"
     else
-        fail "165: unstamped install must not fire the migrate row (got: $_m165_out)"
+        fail "#165: unstamped install must not fire the migrate row (got: $_m165_out)"
     fi
     # control: lib present, its gap stub answers -> the guarded body
     # renders the real INCOMPLETE row (proves the check family ran)
@@ -1764,9 +1764,9 @@ if [ -n "$_m165" ]; then
     _m165_out=$(_m165_run dev "$_m165_dir" "$_m165_dir/projects.conf" || true)
     if printf '%s' "$_m165_out" | grep -q '^WARN|db dumps|INCOMPLETE — registry lists 2 project(s), only 1 dump(s) recorded$' \
         && ! printf '%s' "$_m165_out" | grep -q 'not checked'; then
-        pass "165: present ddev-migrate lib renders the gap check (control)"
+        pass "#165: present ddev-migrate lib renders the gap check (control)"
     else
-        fail "165: ddev-migrate control broken (got: $_m165_out)"
+        fail "#165: ddev-migrate control broken (got: $_m165_out)"
     fi
 fi
 
@@ -1776,15 +1776,15 @@ if printf '%s' "$_h165pre" | grep -qF '[ -d /mnt/c ]' \
     && printf '%s' "$_h165pre" | grep -qF '[ -f /mnt/c/Windows/System32/drivers/etc/hosts ]' \
     && printf '%s' "$_h165pre" | grep -qF '[ -n "${DEFAULT_USER:-}" ]' \
     && printf '%s' "$_h165pre" | grep -qF 'id -u "$OPENCODE_USER"'; then
-    pass "165: hosts readiness block extractable, preconditions preserved verbatim"
+    pass "#165: hosts readiness block extractable, preconditions preserved verbatim"
 else
-    fail "165: hosts readiness block not extractable (anchor drift?)"
+    fail "#165: hosts readiness block not extractable (anchor drift?)"
 fi
 _h165="$(sed -n '/^if \[ "\$_st_hosts_ready" = true \] && \[ -f "\$LIBDIR\/sh\/ddev-hosts.sh" \]; then$/,/^fi$/p' "$STATUS")"
 if printf '%s' "$_h165" | grep -qF 'ui_kv_warn "hosts (win)" "not checked — kit file sh/ddev-hosts.sh missing (fix: sudo opk update)"'; then
-    pass "165: hosts guard block extractable (flag + lib + elif row)"
+    pass "#165: hosts guard block extractable (flag + lib + elif row)"
 else
-    fail "165: hosts guard block not extractable (anchor drift?)"
+    fail "#165: hosts guard block not extractable (anchor drift?)"
 fi
 _h165_dir=$(mktemp -d "$WORK/h165.XXXXXX")
 _h165_run() {
@@ -1804,15 +1804,15 @@ _h165_run() {
 if [ -n "$_h165" ]; then
     _h165_out=$(_h165_run true "$_h165_dir" "$_h165_dir/no-projects.conf" || true)
     if printf '%s' "$_h165_out" | grep -q '^WARN|hosts (win)|not checked — kit file sh/ddev-hosts.sh missing'; then
-        pass "165: ready host + missing ddev-hosts lib warns (counted)"
+        pass "#165: ready host + missing ddev-hosts lib warns (counted)"
     else
-        fail "165: ready host + missing ddev-hosts lib must warn (got: $_h165_out)"
+        fail "#165: ready host + missing ddev-hosts lib must warn (got: $_h165_out)"
     fi
     _h165_out=$(_h165_run false "$_h165_dir" "$_h165_dir/no-projects.conf" || true)
     if [ -z "$_h165_out" ]; then
-        pass "165: unready host stays row-free (readiness split holds)"
+        pass "#165: unready host stays row-free (readiness split holds)"
     else
-        fail "165: unready host must not fire the hosts row (got: $_h165_out)"
+        fail "#165: unready host must not fire the hosts row (got: $_h165_out)"
     fi
     # control: lib present, project root with .ddev, stub answers ->
     # the guarded body renders its real missing-hosts row
@@ -1823,9 +1823,9 @@ if [ -n "$_h165" ]; then
     if printf '%s' "$_h165_out" | grep -qF "WARN|hosts (win)|$_h165_dir/root/p1: missing tld.example" \
         && printf '%s' "$_h165_out" | grep -q '^DETAIL|add: opk ddev-hosts-add tld.example$' \
         && ! printf '%s' "$_h165_out" | grep -q 'not checked'; then
-        pass "165: present ddev-hosts lib renders the hosts check (control)"
+        pass "#165: present ddev-hosts lib renders the hosts check (control)"
     else
-        fail "165: ddev-hosts control broken (got: $_h165_out)"
+        fail "#165: ddev-hosts control broken (got: $_h165_out)"
     fi
 fi
 
@@ -1840,9 +1840,9 @@ fi
 _h165r_cond="$(sed -n 's/^   && \[ -n "${DEFAULT_USER:-}" \] && \(.*\); then$/\1/p' "$STATUS")"
 if [ -n "$_h165r_cond" ] \
     && printf '%s' "$_h165r_cond" | grep -qF '[ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]'; then
-    pass "165: readiness uid condition extractable from the real chain line"
+    pass "#165: readiness uid condition extractable from the real chain line"
 else
-    fail "165: readiness uid condition not extractable (anchor drift?)"
+    fail "#165: readiness uid condition not extractable (anchor drift?)"
 fi
 _h165r_run() {
     (
@@ -1866,24 +1866,24 @@ if [ -n "$_h165r_cond" ]; then
     # ready — a flipped != to = in status.sh fails exactly here.
     _h165r_out=$(_h165r_run 1000 1000 || true)
     if [ "$_h165r_out" = "unready" ]; then
-        pass "165: readiness uid condition: agent-uid run stays unready (!= executed)"
+        pass "#165: readiness uid condition: agent-uid run stays unready (!= executed)"
     else
-        fail "165: readiness uid condition: agent-uid must stay unready — != drifted? (got: $_h165r_out)"
+        fail "#165: readiness uid condition: agent-uid must stay unready — != drifted? (got: $_h165r_out)"
     fi
     _h165r_out=$(_h165r_run 1000 1500 || true)
     if [ "$_h165r_out" = "ready" ]; then
-        pass "165: readiness uid condition: developer-uid run is ready (!= executed)"
+        pass "#165: readiness uid condition: developer-uid run is ready (!= executed)"
     else
-        fail "165: readiness uid condition: developer-uid must be ready (got: $_h165r_out)"
+        fail "#165: readiness uid condition: developer-uid must be ready (got: $_h165r_out)"
     fi
     # sentinel pin: an unresolvable agent user resolves to uid 1, and a
     # developer-uid caller is ready — dropping || echo 1 fails here (the
     # half-empty test errors and reads as unready).
     _h165r_out=$(_h165r_run 1000 "" || true)
     if [ "$_h165r_out" = "ready" ]; then
-        pass "165: readiness uid condition: unresolvable agent user -> sentinel 1, developer ready"
+        pass "#165: readiness uid condition: unresolvable agent user -> sentinel 1, developer ready"
     else
-        fail "165: readiness uid condition sentinel drifted (got: $_h165r_out)"
+        fail "#165: readiness uid condition sentinel drifted (got: $_h165r_out)"
     fi
 fi
 # full-chain execution smoke (host-independent by design): the /mnt/c
@@ -1899,8 +1899,8 @@ _h165r_chain=$(
     ) 2>&1
 ) || true
 case "$_h165r_chain" in
-    true|false) pass "165: readiness chain executes to a boolean (real block, set -u)" ;;
-    *) fail "165: readiness chain no longer executes cleanly (got: $_h165r_chain)" ;;
+    true|false) pass "#165: readiness chain executes to a boolean (real block, set -u)" ;;
+    *) fail "#165: readiness chain no longer executes cleanly (got: $_h165r_chain)" ;;
 esac
 
 # g) ddev-handover (#199 a W1): the resharde scan's lib guard is the
@@ -1910,9 +1910,9 @@ esac
 # candidate never exists and the deployed LIBDIR fixture decides.
 _s165="$(sed -n '/^_st_dhl=/,/^fi$/p' "$STATUS")"
 if printf '%s' "$_s165" | grep -qF 'ui_kv_warn "ddev share" "not checked — kit file sh/ddev-handover.sh missing (fix: sudo opk update)"'; then
-    pass "165: ddev-handover block extractable (elif row present)"
+    pass "#165: ddev-handover block extractable (elif row present)"
 else
-    fail "165: ddev-handover block not extractable (anchor drift?)"
+    fail "#165: ddev-handover block not extractable (anchor drift?)"
 fi
 _s165_dir=$(mktemp -d "$WORK/s165.XXXXXX")
 _s165_run() {
@@ -1941,15 +1941,15 @@ _s165_run() {
 if [ -n "$_s165" ]; then
     _s165_out=$(_s165_run 1000 1500 "$_s165_dir" "$_s165_dir/no-projects.conf" || true)
     if printf '%s' "$_s165_out" | grep -q '^WARN|ddev share|not checked — kit file sh/ddev-handover.sh missing'; then
-        pass "165: missing ddev-handover lib warns on developer-uid runs (counted)"
+        pass "#165: missing ddev-handover lib warns on developer-uid runs (counted)"
     else
-        fail "165: missing ddev-handover lib must warn (got: $_s165_out)"
+        fail "#165: missing ddev-handover lib must warn (got: $_s165_out)"
     fi
     _s165_out=$(_s165_run 1000 1000 "$_s165_dir" "$_s165_dir/no-projects.conf" || true)
     if [ -z "$_s165_out" ]; then
-        pass "165: agent-uid run stays row-free (handover guard holds)"
+        pass "#165: agent-uid run stays row-free (handover guard holds)"
     else
-        fail "165: agent-uid run must not fire the handover row (got: $_s165_out)"
+        fail "#165: agent-uid run must not fire the handover row (got: $_s165_out)"
     fi
     # control: lib present + a project root with .ddev, stub flags a gap
     # -> the guarded body renders the real share row (family ran)
@@ -1959,9 +1959,9 @@ if [ -n "$_s165" ]; then
     _s165_out=$(_s165_run 1000 1500 "$_s165_dir" "$_s165_dir/projects.conf" || true)
     if printf '%s' "$_s165_out" | grep -qF "WARN|ddev share|$_s165_dir/root/proj/.ddev: group-write missing" \
         && ! printf '%s' "$_s165_out" | grep -q 'not checked'; then
-        pass "165: present ddev-handover lib renders the share scan (control)"
+        pass "#165: present ddev-handover lib renders the share scan (control)"
     else
-        fail "165: ddev-handover control broken (got: $_s165_out)"
+        fail "#165: ddev-handover control broken (got: $_s165_out)"
     fi
 fi
 
@@ -1971,9 +1971,9 @@ fi
 # renders its row and stays row-free.
 _g165="$(sed -n '/^if command -v git_status_row >\/dev\/null 2>&1; then$/,/^fi$/p' "$STATUS")"
 if printf '%s' "$_g165" | grep -qF 'ui_kv_warn "git" "not checked — kit file sh/git-check.sh missing or outdated (fix: sudo opk update)"'; then
-    pass "165: git-floor fallback block extractable (helper check + counted row)"
+    pass "#165: git-floor fallback block extractable (helper check + counted row)"
 else
-    fail "165: git-floor fallback block not extractable (anchor drift?)"
+    fail "#165: git-floor fallback block not extractable (anchor drift?)"
 fi
 if [ -n "$_g165" ]; then
     _g165_out=$(
@@ -1986,9 +1986,9 @@ if [ -n "$_g165" ]; then
         ) 2>&1
     ) || true
     if printf '%s' "$_g165_out" | grep -q '^WARN|git|not checked — kit file sh/git-check.sh missing'; then
-        pass "165: undefined git_status_row renders the counted fallback row"
+        pass "#165: undefined git_status_row renders the counted fallback row"
     else
-        fail "165: undefined git_status_row must warn (got: $_g165_out)"
+        fail "#165: undefined git_status_row must warn (got: $_g165_out)"
     fi
     _g165_out=$(
         (
@@ -2002,9 +2002,9 @@ if [ -n "$_g165" ]; then
     ) || true
     if printf '%s' "$_g165_out" | grep -q '^OK|git|' \
         && ! printf '%s' "$_g165_out" | grep -q '^WARN|'; then
-        pass "165: defined git_status_row renders its row, no fallback (control)"
+        pass "#165: defined git_status_row renders its row, no fallback (control)"
     else
-        fail "165: git-floor control broken (got: $_g165_out)"
+        fail "#165: git-floor control broken (got: $_g165_out)"
     fi
 fi
 
@@ -2027,9 +2027,9 @@ _a165v_out=$(
 if [ "$_a165v_rc" = "2" ] \
     && printf '%s' "$_a165v_out" | grep -q 'advisories database' \
     && printf '%s' "$_a165v_out" | grep -q '1 warning(s)'; then
-    pass "165: full mode counts the row (warning verdict, exit 2)"
+    pass "#165: full mode counts the row (warning verdict, exit 2)"
 else
-    fail "165: full mode must count the row into exit 2 (rc=$_a165v_rc out=$_a165v_out)"
+    fail "#165: full mode must count the row into exit 2 (rc=$_a165v_rc out=$_a165v_out)"
 fi
 _a165v_rc=0
 _a165v_out=$(
@@ -2046,9 +2046,9 @@ _a165v_out=$(
 if [ "$_a165v_rc" = "2" ] \
     && printf '%s' "$_a165v_out" | grep -q "1 warning(s) — run 'opk status' for the full report" \
     && ! printf '%s' "$_a165v_out" | grep -q 'advisories database'; then
-    pass "165: --short mutes the row but counts it (one verdict line, exit 2)"
+    pass "#165: --short mutes the row but counts it (one verdict line, exit 2)"
 else
-    fail "165: --short must count silently and exit 2 (rc=$_a165v_rc out=$_a165v_out)"
+    fail "#165: --short must count silently and exit 2 (rc=$_a165v_rc out=$_a165v_out)"
 fi
 
 # f) keep-as-is sites, class-set pin (issue #165 spec, #199 a W5):
@@ -2067,9 +2067,9 @@ kit file sh/ddev-terminal.sh missing
 kit file sh/git-check.sh missing'
 _k165_got="$(grep -o 'kit file sh/[a-z0-9-]*\.sh missing' "$STATUS" | LC_ALL=C sort -u)"
 if [ "$_k165_got" = "$_k165_want" ]; then
-    pass "165: missing-lib rows are exactly the five broken-kit sites (bridge/log keep their design)"
+    pass "#165: missing-lib rows are exactly the five broken-kit sites (bridge/log keep their design)"
 else
-    fail "165: missing-lib row set drifted (got: $(printf '%s' "$_k165_got" | tr '\n' ';'))"
+    fail "#165: missing-lib row set drifted (got: $(printf '%s' "$_k165_got" | tr '\n' ';'))"
 fi
 
 # id-probe sentinel value (#196 a T2): `|| echo 1` must yield exactly "1"
