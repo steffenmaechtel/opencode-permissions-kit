@@ -1,9 +1,7 @@
 # opencode permissions kit
 
 > **BETA — ready for real-use testing.** The kit is field-tested on
-> production systems, but young: the scripts and sudoers configuration
-> may still change in breaking ways between releases, and it has not
-> been audited — the security model is deliberately soft-only (see
+> production systems. The security model is deliberately soft-only (see
 > [Security Model](docs/concepts/security-model.md)). Run it on your
 > real dev machine, not just a throwaway WSL2 box — and when something
 > breaks, [open an issue](https://github.com/steffenmaechtel/opencode-permissions-kit/issues)
