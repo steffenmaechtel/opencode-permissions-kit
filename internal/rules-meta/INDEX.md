@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**90 metas · 88 active · 2 retired · 24 review-pending · next due 2026-11-14**
+**90 metas · 88 active · 2 retired · 13 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0068, RM-0069, RM-0070, RM-0071, RM-0072, RM-0073, RM-0074, RM-0075, RM-0076, RM-0077, RM-0078, RM-0079, RM-0080, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
+- **Review pending:** RM-0068, RM-0080, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -100,37 +100,37 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0069](0/0/6/RM-0069.md) | A fix wave owes a class | active | **pending** | 1m | 2026-11-19 |
-| [RM-0070](0/0/7/RM-0070.md) | The sweep result is recorded | active | **pending** | 1m | 2026-11-19 |
+| [RM-0069](0/0/6/RM-0069.md) | A fix wave owes a class | active | approved | 1m | 2026-11-19 |
+| [RM-0070](0/0/7/RM-0070.md) | The sweep result is recorded | active | approved | 1m | 2026-11-19 |
 
 ### Who records what
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0071](0/0/7/RM-0071.md) | The resolution is the ledger | active | **pending** | 1m | 2026-11-19 |
+| [RM-0071](0/0/7/RM-0071.md) | The resolution is the ledger | active | approved | 1m | 2026-11-19 |
 
 ### Finding provenance
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0072](0/0/7/RM-0072.md) | Every full-scope snapshot records | active | **pending** | 1m | 2026-11-19 |
-| [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | **pending** | 1m | 2026-11-19 |
+| [RM-0072](0/0/7/RM-0072.md) | Every full-scope snapshot records | active | approved | 1m | 2026-11-19 |
+| [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | approved | 1m | 2026-11-19 |
 
 ### Verification duty
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | **pending** | 1m | 2026-11-19 |
-| [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | **pending** | 1m | 2026-11-19 |
+| [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | approved | 1m | 2026-11-19 |
+| [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
 
 ### Suites are the standing review
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | **pending** | 1m | 2026-11-19 |
-| [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | **pending** | 1m | 2026-11-19 |
-| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | **pending** | 1m | 2026-11-19 |
-| [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | **pending** | 1m | 2026-11-19 |
+| [RM-0076](0/0/7/RM-0076.md) | Every finding class that can | active | approved | 1m | 2026-11-19 |
+| [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 1m | 2026-11-19 |
+| [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-11-19 |
+| [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 1m | 2026-11-19 |
 
 ### Parallel reviewer agents
 
