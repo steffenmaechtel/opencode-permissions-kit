@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**90 metas · 88 active · 2 retired · 9 review-pending · next due 2026-11-14**
+**90 metas · 88 active · 2 retired · 8 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0068, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
+- **Review pending:** RM-0068, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -140,7 +140,7 @@
 | [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | approved | 1m | 2026-11-19 |
 | [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | approved | 1m | 2026-11-19 |
 | [RM-0083](0/0/8/RM-0083.md) | For release reviews, a second | active | approved | 1m | 2026-11-19 |
-| [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | **pending** | 1m | 2026-11-19 |
+| [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-11-19 |
 | [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | **pending** | 1m | 2026-11-19 |
 | [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | **pending** | 1m | 2026-11-19 |
 | [RM-0087](0/0/8/RM-0087.md) | Wave reviews (diff scope): | active | **pending** | 1m | 2026-11-19 |
