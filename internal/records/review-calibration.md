@@ -50,7 +50,9 @@ changed.
 ## Convergence data
 
 Why a stop rule instead of a fixed number of rounds: the process
-converges. The project's own history:
+converges — every chain recorded in internal/reviews/ converged
+within 2–7 snapshots; a longer tail is taste ping-pong, not defect
+removal. The project's own history:
 
 | Round | Findings | Character |
 |---|---|---|

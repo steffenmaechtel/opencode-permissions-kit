@@ -58,16 +58,16 @@ Session C (review 2):   fresh review (fix diff + any new scope) →
 …                       until the stop rule holds
 ```
 
-- The session that reviews also fixes — no handoff back; what the
-  rotation buys is that every review pass starts with fresh context:
-  a round's author never reviews their own fixes. (RM-0060)
+- The session that reviews also fixes — no handoff back, and not
+  before the maintainer's go (the hard seam and the pause stay
+  unchanged); what the rotation buys is that every review pass starts
+  with fresh context: a round's author never reviews their own
+  fixes. (RM-0060)
 - Sessions do not chain themselves: each round's session ends with its
   commits; the maintainer starts the next one
   ([internal/process/review.md](../internal/process/review.md): "start
   a fresh session per review round"). The pauses between sessions are
   the maintainer's, not the agent's. (RM-0061)
-- The hard seam and the maintainer pause are unchanged: the session
-  that reviewed applies the fixes itself once the go is given. (RM-0062)
 - The snapshot header's Reviewer line records which session ran the
   pass, so the rotation stays auditable after the fact. (RM-0063)
 
@@ -89,8 +89,6 @@ nothing to review.
   the findings' severity — owes one more review: a wave review of the
   fix diff, not a full pass. Severity prioritizes; only code change
   extends the loop. (RM-0067)
-- If a chain has not converged after five rounds, stop and hand the
-  call to the maintainer. (RM-0068)
 
 ## Fixes close classes, not sites
 

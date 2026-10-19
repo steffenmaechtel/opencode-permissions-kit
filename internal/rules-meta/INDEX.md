@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**90 metas · 90 active · 0 retired · 35 review-pending · next due 2026-11-14**
+**90 metas · 88 active · 2 retired · 25 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0057, RM-0058, RM-0059, RM-0060, RM-0061, RM-0062, RM-0063, RM-0064, RM-0065, RM-0066, RM-0067, RM-0068, RM-0069, RM-0070, RM-0071, RM-0072, RM-0073, RM-0074, RM-0075, RM-0076, RM-0077, RM-0078, RM-0079, RM-0080, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
+- **Review pending:** RM-0062, RM-0068, RM-0069, RM-0070, RM-0071, RM-0072, RM-0073, RM-0074, RM-0075, RM-0076, RM-0077, RM-0078, RM-0079, RM-0080, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -73,28 +73,28 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0057](0/0/5/RM-0057.md) | A wave diff of ~2.5k lines | active | **pending** | 1m | 2026-11-19 |
+| [RM-0057](0/0/5/RM-0057.md) | A wave diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
 
 ### The loop and the stop rule
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0058](0/0/5/RM-0058.md) | Before the loop starts, the maintainer | active | **pending** | 1m | 2026-11-19 |
-| [RM-0059](0/0/5/RM-0059.md) | The snapshot is written and committed | active | **pending** | 1m | 2026-11-19 |
-| [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | **pending** | 1m | 2026-11-19 |
-| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | **pending** | 1m | 2026-11-19 |
-| [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | **pending** | 1m | 2026-11-19 |
-| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | **pending** | 1m | 2026-11-19 |
-| [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | active | **pending** | 1m | 2026-11-19 |
+| [RM-0058](0/0/5/RM-0058.md) | Before the loop starts, the maintainer | active | approved | 1m | 2026-11-19 |
+| [RM-0059](0/0/5/RM-0059.md) | The snapshot is written and committed | active | approved | 1m | 2026-11-19 |
+| [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 1m | 2026-11-19 |
+| [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-11-19 |
+| [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-11-19 |
+| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-11-19 |
+| [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | **pending** | 1m | 2026-11-19 |
 
 ### Session rotation
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0060](0/0/6/RM-0060.md) | The session that reviews also | active | **pending** | 1m | 2026-11-19 |
-| [RM-0061](0/0/6/RM-0061.md) | Sessions do not chain themselves: | active | **pending** | 1m | 2026-11-19 |
-| [RM-0062](0/0/6/RM-0062.md) | The hard seam and the maintainer | active | **pending** | 1m | 2026-11-19 |
-| [RM-0063](0/0/6/RM-0063.md) | The snapshot header's Reviewer line | active | **pending** | 1m | 2026-11-19 |
+| [RM-0060](0/0/6/RM-0060.md) | The session that reviews also | active | approved | 1m | 2026-11-19 |
+| [RM-0061](0/0/6/RM-0061.md) | Sessions do not chain themselves: | active | approved | 1m | 2026-11-19 |
+| [RM-0062](0/0/6/RM-0062.md) | The hard seam and the maintainer | retired | **pending** | 1m | 2026-11-19 |
+| [RM-0063](0/0/6/RM-0063.md) | The snapshot header's Reviewer line | active | approved | 1m | 2026-11-19 |
 
 ### Fixes close classes, not sites
 

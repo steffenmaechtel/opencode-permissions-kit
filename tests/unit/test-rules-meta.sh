@@ -165,6 +165,15 @@ new_scratch n5b
 sed -i 's#interactive-prompts-yn#no-such-section#' "$(meta_file RM-9002)"
 expect_block "inv5 anchor" "[inv5]"
 
+# 5c. inv 5 -- retired metas are exempt (rule bullet removed, quote
+#     unfindable by construction -- RM-0029; pins the exemption)
+new_scratch n5c
+sed -i '/^- Second demo rule\. (RM-9002)$/d' "$SCRATCH/agent/conventions.md"
+sed -i 's/^status: active/status: retired/;
+        s/^quote: "Second demo rule"/quote: "Words absent from target"/' \
+    "$(meta_file RM-9002)"
+expect_ok "inv5 retired exempt" "0 blocking"
+
 # 6a. inv 6 -- next-revisit before created
 new_scratch n6a
 sed -i 's/^next-revisit: 2026-11-16/next-revisit: 2026-10-01/' "$(meta_file RM-9001)"

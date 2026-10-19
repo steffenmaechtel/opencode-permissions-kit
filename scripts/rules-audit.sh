@@ -14,7 +14,10 @@
 #      quote: prefix is findable -- both sides normalized: code
 #      backticks and bold markers stripped, wrapped lines joined,
 #      whitespace squeezed; the needle is the quote's first five
-#      words (plain-text rendering, the established meta practice)
+#      words (plain-text rendering, the established meta practice).
+#      Retired metas are exempt (RM-0029): retirement removes the
+#      rule bullet, so neither anchor-quote pairing nor quote
+#      findability can hold.
 #   6. frontmatter complete, ISO dates, next-revisit >= created,
 #      status/interval vocabulary
 #   9. approval consistency: reviewed: is set exactly when the review
@@ -238,22 +241,26 @@ find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort | while 
     fi
 
     # 5: rule back-ref file + anchor + quote prefix findable
-    rule=$(fm_get "$m" rule)
-    tpath=${rule%%#*}; tanch=${rule#*#}
-    [ -z "$tanch" ] && tanch="__none__"
-    if [ ! -f "$ROOT/$tpath" ]; then
-        block 5 "$rel -- rule target missing: $tpath"
-    else
-        if ! grep -qF "$tpath	$tanch" "$HEADS"; then
-            block 5 "$rel -- anchor '$tanch' not a heading in $tpath"
+    # (retired metas are exempt: the rule bullet is gone, so the
+    # quote cannot be findable -- RM-0029)
+    if [ "$st" != retired ]; then
+        rule=$(fm_get "$m" rule)
+        tpath=${rule%%#*}; tanch=${rule#*#}
+        [ -z "$tanch" ] && tanch="__none__"
+        if [ ! -f "$ROOT/$tpath" ]; then
+            block 5 "$rel -- rule target missing: $tpath"
+        else
+            if ! grep -qF "$tpath	$tanch" "$HEADS"; then
+                block 5 "$rel -- anchor '$tanch' not a heading in $tpath"
+            fi
+            quote=$(fm_get "$m" quote)
+            needle=$(first5 "$quote")
+            hay=$(norm_join "$ROOT/$tpath")
+            case $hay in
+                *"$needle"*) ;;
+                *) block 5 "$rel -- quote prefix not findable (normalized): '$needle'" ;;
+            esac
         fi
-        quote=$(fm_get "$m" quote)
-        needle=$(first5 "$quote")
-        hay=$(norm_join "$ROOT/$tpath")
-        case $hay in
-            *"$needle"*) ;;
-            *) block 5 "$rel -- quote prefix not findable (normalized): '$needle'" ;;
-        esac
     fi
 
     # 9: approval consistency (field <=> review-log line, same date --

@@ -68,6 +68,10 @@ Body rules:
 - **RM references appear only where load-bearing** — the unit's
   trailing ref and genuine dependencies inside a rationale; never as
   narrative decoration in logs or prose. (RM-0034)
+- **In meta bodies, cross-references name the rule's text, not its
+  ID** — a reader holding one meta cannot resolve an RM number, and
+  IDE search hits both refs and prose. (maintainer decision
+  2026-10-19, first review of the review-concept batch)
 - **Examples use the abstract token `RM-NNNN`**, never a real meta's
   number — a real number inside an example is indistinguishable from
   a reference in IDE searches. (RM-0035)
@@ -132,9 +136,13 @@ invariant. (RM-0029)
 | 3 | remaining agent files + AGENTS Rules | test-fidelity 2026-10-18; review-concept draft 2026-10-19; AGENTS open |
 
 The 2026-10-19 review-concept step split the file: operative rules in
-`agent/review-concept.md` (metas RM-0057–0091, maintainer review
-pending), history and calibration data in
-`internal/records/review-calibration.md`.
+`agent/review-concept.md` (metas RM-0057–0091), history and
+calibration data in
+`internal/records/review-calibration.md`. First maintainer review
+2026-10-19: RM-0057–0061 and 0063–0067 approved (0060/0061/0065 with
+additions), RM-0062 retired (rule merged into the reviews-also-fixes
+bullet), RM-0068 retired (obsolete — no fully automated chains);
+RM-0069–0091 review pending.
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
 
