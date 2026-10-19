@@ -1,9 +1,9 @@
 # Resolution — pr-00202 (issue-168 mktemp fallback class-sweep widening)
 
 Chain: [review-a.md](review-a.md) · [review-b.md](review-b.md) ·
-[review-c.md](review-c.md) — micro-wave reviews of the #168 wave
-(63c9f02), its fixes (119b122, dd25de8) and the c-wave fix (d19919c).
-Base v0.0.52 @ 5975524.
+[review-c.md](review-c.md) · [review-d.md](review-d.md) — micro-wave
+reviews of the #168 wave (63c9f02), its fixes (119b122, dd25de8), the
+c-wave fix (d19919c) and the d pass over it. Base v0.0.52 @ 5975524.
 
 ## Dispositions
 
@@ -13,6 +13,7 @@ Base v0.0.52 @ 5975524.
 | a W2 (INFO) | **implemented** | `119b122` | comment now states brace-assign fixed path matches shape (a) by design |
 | b W1 (LOW) | **implemented** | `dd25de8` | canary pins all 7 comment claims; brace-blind + over-broad sabotage red, restored green |
 | c W1 (LOW) | **implemented** | `d19919c` | canary pins all remaining claims — 6 match / 8 spared incl. multi-line; alternation-narrow + strip-to-path sabotage red, restored green |
+| d W1 (INFO) | **implemented** | — | correction below: "165 PASS" was an output label, not a count — 137 passes on every chain tree |
 
 ## Evidence detail
 
@@ -100,10 +101,43 @@ restored green after each run):
   six offending lines … spares all eight non-match lines"),
   `make lint` green.
 
+### d W1 (INFO) — gate-count correction ("165 PASS" is a test label, not a count)
+
+Snapshot d could not reproduce the "165 PASS" gate figure carried by
+review-a.md:96, review-b.md:84 and review-c.md:111. Measured with
+`grep -c PASS` over `sh tests/unit/test-status.sh` output at every
+chain tree (`119b122`, `dd25de8`, `d3b7afc`, HEAD): **138** — 137
+test passes plus the closing "All status tests passed." summary
+line — with 0 FAIL and 0 SKIP, rc=0 (the canary contributes exactly
+one pass line in every version, so the count is chain-stable).
+
+Mechanism: the issue-#165 test block labelled its messages with a
+bare `165:` prefix — 32 PASS lines read `PASS 165: …` near the log's
+end, and the output carries no counter. The a-session read the
+highest visible label as a running pass count and recorded "165
+PASS"; b and c repeated the gates line without recounting. (The
+c-session transcript — maintainer-provided, outside the repo —
+noticed 138 vs 165 late and attributed it to the label, but the
+committed snapshots stayed. Snapshot d's own guess that the figure
+came from counting static `pass` sites was wrong; this note is the
+correction.) Authoritative figure for the whole chain: 137 passes,
+0 FAIL, 0 SKIP, rc=0.
+
+Class closure: the 65 bare `165:` message prefixes in test-status.sh
+were normalized to `#165:` in `fcb815a` (#202 d W1 follow-up,
+maintainer-commissioned), matching the `#166:` label style already
+in the same file. Sweep `(pass|fail) "[0-9]+:` across tests/unit and
+tests/e2e now returns zero hits — no bare numeric label prefix
+remains that could masquerade as a counter. Test code, messages
+only: suite 138 PASS / 0 FAIL / 0 SKIP rc=0, `make lint` green.
+
 ## Stop-rule note
 
 The a-wave fix touched test code → snapshot b ran (1 LOW). The b-wave
 fix (`dd25de8`) also touched test code → snapshot c ran (1 LOW). The
-c-wave fix (`d19919c`) again touches test code → one final micro-wave
-pass (snapshot d) is owed in a fresh session per the rotation rule
-(review-concept.md, "Session rotation").
+c-wave fix (`d19919c`) again touched test code → snapshot d ran
+(1 INFO, bookkeeping — the correction note above). The d W1
+disposition itself changed no review-relevant code, but the
+maintainer-commissioned label normalization (`fcb815a`) touches test
+code → one more micro-wave pass (snapshot e, fresh session per the
+rotation rule) is owed over that diff before the chain closes.
