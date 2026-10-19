@@ -1,5 +1,8 @@
 # Resolution — pr-00202 (issue-168 mktemp fallback class-sweep widening)
 
+Status: closed — chain a–e; stop rule met at the e-round disposition
+(bookkeeping only, no review-relevant code touched)
+
 Chain: [review-a.md](review-a.md) · [review-b.md](review-b.md) ·
 [review-c.md](review-c.md) · [review-d.md](review-d.md) ·
 [review-e.md](review-e.md) — micro-wave reviews of the #168 wave
