@@ -1,12 +1,14 @@
 # Resolution — pr-00208 (issue-205 git-config wording)
 
-Chain: [review-a.md](review-a.md) · [review-b.md](review-b.md) · birth
-PR #208 · branch `feature/205-git-config-status-wording`. Fix commit:
-`7c790b8`; snapshot b reviewed it at `f6fe328`.
+Chain: [review-a.md](review-a.md) · [review-b.md](review-b.md) ·
+[review-c.md](review-c.md) · birth PR #208 · branch
+`feature/205-git-config-status-wording`. Fix commits: `7c790b8`
+(a-wave), `670aa41`/`da6b08a` (b-wave), `f1dc37e` (b W3, reopened);
+snapshots b (`f6fe328`) and c reviewed them.
 
-Status: closed — snapshot b found 1 MED (the resolution's own rows vs
-the line-length ratchet); b-wave dispositions touch bookkeeping and
-one test-file comment only.
+Status: closed — b-wave was 1 MED bookkeeping + comments; the
+maintainer reopened b W3 post-closure (`f1dc37e`); snapshot c found
+zero findings; chain closed.
 
 ## Dispositions
 
@@ -16,7 +18,7 @@ one test-file comment only.
 | a W2 (LOW) | **implemented** | `7c790b8` | how-to shows the markers shape + on/off re-render note (docs-only) |
 | b W1 (MED) | **implemented** | this file | rows trimmed into the 120-col budget; overflow in Evidence detail |
 | b W2 (LOW) | **implemented** | `670aa41` | ratchet header names both scope halves; resolutions named as pinned |
-| b W3 (INFO) | **deliberately not done** | — | pre-existing opk-status gap; no claim breaks (see snapshot b) |
+| b W3 (INFO) | **implemented** | `f1dc37e` | maintainer reopened post-closure; hint aligned + pinned both sides |
 
 ## Evidence detail
 
@@ -82,15 +84,18 @@ ratchet's scan, so no baseline effect; shellcheck green.
 
 ### b W3 (INFO) — markers hint is git-config-status-only
 
-`opk status` (status.sh:205-209) has no markers-present branch — a
-markers config renders the plain OFF row there, while the
-`(markers present, rules inactive)` hint exists only in
-`opk config git-config status`. Pre-existing behavior; the wave's
-docs sentence stays literally true under the page's naming
-convention and config.sh:408-410's "both outputs agree" holds at
-phrase level. Deliberately not done: no claim breaks, no consumer
-parses it; recorded in snapshot b for whichever future wave wants
-`opk status` to mirror the hint.
+Initially deliberately not done (pre-existing behavior, no claim
+breaks, no consumer parses it). The maintainer reopened it
+post-closure — the alignment is the chain's own spirit, and the
+#158 neutrality rationale covers only CONSCIOUS OFF choices, not
+leftovers. `f1dc37e`: status.sh gains the markers-present elif
+(same neutral OFF row + `ui_detail "$f (markers present, rules
+inactive)"`, byte-identical to config.sh:416, muted under --short);
+the agreement pin requires the markers literal in BOTH files
+(sabotage: rewording either side → suite rc=1, restored green);
+behavioral smoke via `agent_config_render` over the real template
+(on → ON, raw → MARKERS, off → CLEAN); how-to sentence now credits
+both commands. Snapshot c (`da6b08a..f1dc37e`): zero findings.
 
 ## Follow-ups the implementation required
 
@@ -105,8 +110,10 @@ Snapshot b (`f6fe328`) reviewed the a-wave fix `4bca8e1..bc1a5db`:
 the fix itself verified correct (byte-identity, sabotage both
 directions reproduced, docs rendering-exact); 1 MED was this
 resolution's own rows breaking the line-length ratchet. The b-wave
-dispositions above trim resolution rows and complete a test-file
-comment — no review-relevant code (review-concept: comments and
-bookkeeping do not extend the loop). Stop rule met; chain closed; no
-snapshot c owed. Release gate remains: both e2e suites at baseline
-with zero skips before tagging.
+dispositions trim resolution rows and complete a test-file comment —
+no review-relevant code. The maintainer then reopened b W3: `f1dc37e`
+touches status.sh (review-relevant → one more review owed); snapshot
+c reviewed `da6b08a..f1dc37e` and found zero findings, so the
+c-round disposition is this bookkeeping only. Stop rule met (twice);
+chain closed; no snapshot d owed. Release gate remains: both e2e
+suites at baseline with zero skips before tagging.
