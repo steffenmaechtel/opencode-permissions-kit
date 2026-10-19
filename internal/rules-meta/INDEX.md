@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**91 metas · 89 active · 2 retired · 3 review-pending · next due 2026-11-14**
+**91 metas · 89 active · 2 retired · 2 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0068, RM-0090, RM-0092
+- **Review pending:** RM-0068, RM-0090
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -147,7 +147,7 @@
 | [RM-0088](0/0/8/RM-0088.md) | Full-scope passes: ~15 minutes | active | approved | 1m | 2026-11-19 |
 | [RM-0089](0/0/8/RM-0089.md) | Release-critical full passes: prefer | active | approved | 1m | 2026-11-19 |
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | **pending** | 1m | 2026-11-19 |
-| [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | **pending** | 1m | 2026-11-19 |
+| [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 1m | 2026-11-19 |
 
 ### Release gate
 
