@@ -45,8 +45,9 @@ and spells out what the state means — the same wording `opk status` shows:
 
 A config left over from an older kit version (or hand-edited) may still
 carry the `//SECURE_GIT` comment markers — rules present but inactive.
-`status` reports that state with a hint on the detail line; `on`/`off`
-re-render from the template and drop the markers:
+Both `status` and `opk status` report that state with the same hint on
+the detail line; `on`/`off` re-render from the template and drop the
+markers:
 
 ```text
   git-config     OFF — access allowed (agent tools may edit git config)

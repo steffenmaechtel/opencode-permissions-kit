@@ -202,8 +202,14 @@ if [ -f "$f" ]; then
     # ON  = the deny rules are active  -> agent tools never touch it.
     # OFF = a deliberate config choice -> agent tools may edit it
     #       (kept NEUTRAL: a conscious decision is a hint, not a warning).
+    # Markers left over (old kit version, hand edit) are NOT a deliberate
+    # choice — same neutral row plus the hint line git-config status
+    # shows (issue #205: both outputs agree on all three shapes).
     if grep -qE '^[[:space:]]*"\.git/config"' "$f" 2>/dev/null; then
         ui_kv_ok ".git/config" "protected (soft-only — agent tools blocked)"
+    elif grep -q '//SECURE_GIT' "$f" 2>/dev/null; then
+        ui_kv ".git/config" "access allowed (agent tools may edit git config)"
+        ui_detail "$f (markers present, rules inactive)"
     else
         ui_kv ".git/config" "access allowed (agent tools may edit git config)"
     fi
