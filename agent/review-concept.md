@@ -149,9 +149,10 @@ CONTRIBUTING's "shrink the next one" rule):
 
 ## Parallel reviewer agents
 
-- The main agent runs the strong default model and owns the
-  verification duty; every reviewer subagent runs on the fast model
-  (GLM-5.3-Flash). (RM-0080)
+- The main agent runs a strong default model and owns the
+  verification duty; every reviewer subagent runs the provider's
+  cheaper fast tier (house instance: GLM-5.3 + GLM-5.3-Flash —
+  substitute your provider's strong/fast pair). (RM-0080)
 - Reviewer subagents get ad-hoc axis prompts per session (mechanical
   sweep, security, quality); the durable spec any reviewer prompt
   implements is the reviewer output contract

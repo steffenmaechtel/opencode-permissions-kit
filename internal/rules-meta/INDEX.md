@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**90 metas · 88 active · 2 retired · 13 review-pending · next due 2026-11-14**
+**90 metas · 88 active · 2 retired · 12 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0068, RM-0080, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
+- **Review pending:** RM-0068, RM-0081, RM-0082, RM-0083, RM-0084, RM-0085, RM-0086, RM-0087, RM-0088, RM-0089, RM-0090, RM-0091
 - **Overdue:** none
 
 ## agent/conventions.md
@@ -136,7 +136,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0080](0/0/8/RM-0080.md) | The main agent runs the | active | **pending** | 1m | 2026-11-19 |
+| [RM-0080](0/0/8/RM-0080.md) | The main agent runs a strong | active | approved | 1m | 2026-11-19 |
 | [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | **pending** | 1m | 2026-11-19 |
 | [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | **pending** | 1m | 2026-11-19 |
 | [RM-0083](0/0/8/RM-0083.md) | For release reviews, a second | active | **pending** | 1m | 2026-11-19 |
