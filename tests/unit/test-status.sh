@@ -1358,10 +1358,13 @@ if printf '%s' "$W201_BLOCK_CAPTURE" | grep -qF 'timeout 10 "$LIBDIR/bin/opencod
 else
     fail "#201: direct capture probe lost its timeout envelope"
 fi
-# Issue #201 claim audit: the direct capture strenghtens ADV_VER consumers
+# Issue #201 claim audit: the direct capture strengthens ADV_VER consumers
 # too — the browser-bridge verdict keys on ADV_VER (status.sh's WSL
 # section). Behavioral pin: the extracted guard block with the REAL
-# advisories.sh comparator (not a stub) discriminates all four shapes.
+# advisories.sh comparator (not a stub) discriminates every shape the
+# verdict names — both eq boundaries (1.18.33, 2.0.18) asserted on
+# their own arm, plus above/below/unknown — so neither the comparator
+# direction nor a boundary constant can drift silently (#209 a W1).
 ADV_SRC="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/advisories.sh"
 W201_BLOCK_BRIDGE="$(sed -n '/^        _st_bridge_unneeded=0$/,/^        fi$/p' "$STATUS")"
 if [ -f "$ADV_SRC" ] && [ -n "$W201_BLOCK_BRIDGE" ]; then
@@ -1374,7 +1377,8 @@ if [ -f "$ADV_SRC" ] && [ -n "$W201_BLOCK_BRIDGE" ]; then
             printf '%s\n' "$_st_bridge_unneeded"
         )
     }
-    if [ "$(w201_bridge 1.19.0)" = 1 ] && [ "$(w201_bridge 2.0.18)" = 1 ] \
+    if [ "$(w201_bridge 1.19.0)" = 1 ] && [ "$(w201_bridge 1.18.33)" = 1 ] \
+        && [ "$(w201_bridge 2.0.18)" = 1 ] && [ "$(w201_bridge 2.0.17)" = 0 ] \
         && [ "$(w201_bridge 1.18.32)" = 0 ] && [ "$(w201_bridge "")" = 0 ]; then
         pass "#201: bridge verdict keys on ADV_VER (1.18.33+/2.0.18+ unneeded, older/unknown keep the carrier)"
     else
