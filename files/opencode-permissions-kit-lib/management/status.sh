@@ -307,6 +307,42 @@ if [ -f "$LIBDIR/sh/advisories.sh" ]; then
     | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
         fi
     fi
+    # Issue #201: a caller who can exec the binary directly already
+    # holds what the sudo probe could not get — the deployed shape is
+    # 750 root:opencode, so root, the sharing group and the agent user
+    # (primary group opencode) all pass [ -x ], and --version answers
+    # the same version for every one of them (one binary file). #163
+    # ran exactly this probe to split corrupt from healthy but
+    # DISCARDED the stdout it then reported as "unknown", advising
+    # "sudo opk status" — a dead end for a group member without sudo
+    # rights (the kit's NOPASSWD rules cover only the developer) over
+    # a kit that needs no repair. Capture the output and feed it
+    # through the same strict extract as the sudo path: the advisory
+    # verdict and every ADV_VER consumer (the browser-bridge row
+    # below) then answer at this caller's own privilege. Counting
+    # follows the answer, not the caller — a version known at ANY
+    # privilege is a real verdict (0.0.48b W3's uncounted rule covers
+    # unknowns, and only those stay uncounted). Do NOT infer anything
+    # from a failed sudo exit code — sudo -n collapses "refused" and
+    # "password required" into rc 1 — the direct probe's own rc is
+    # the reliable signal already in hand (bounded like every probe,
+    # issue #80).
+    ADV_DIRECT_OUT=""
+    ADV_DIRECT_RC=""
+    if [ -z "$ADV_VER" ] && [ -x "$LIBDIR/bin/opencode" ]; then
+        ADV_DIRECT_RC=0
+        if command -v timeout >/dev/null 2>&1; then
+            ADV_DIRECT_OUT=$(timeout 10 "$LIBDIR/bin/opencode" --version 2>/dev/null) \
+                || ADV_DIRECT_RC=$?
+        else
+            ADV_DIRECT_OUT=$("$LIBDIR/bin/opencode" --version 2>/dev/null) \
+                || ADV_DIRECT_RC=$?
+        fi
+        if [ "$ADV_DIRECT_RC" = 0 ] && [ -n "$ADV_DIRECT_OUT" ]; then
+            ADV_VER=$(printf '%s\n' "$ADV_DIRECT_OUT" \
+    | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+        fi
+    fi
     if [ -n "$ADV_VER" ]; then
         ADV_HITS=$(advisories_matching opencode "$ADV_VER" standalone || true)
         if [ -n "$ADV_HITS" ]; then
@@ -324,43 +360,26 @@ EOF
         else
             ui_kv_ok "opencode $ADV_VER" "no known advisory affects this install (kit $VERSION database)"
         fi
-    elif [ -x "$LIBDIR/bin/opencode" ]; then
-        # Issue #163: before settling for the uncounted unknown, ask the
-        # kernel directly — exec the binary as THIS caller. Exec-ability
-        # is caller-independent (a truncated or wrong-arch binary fails
+    elif [ -n "${ADV_DIRECT_RC:-}" ] && [ "${ADV_DIRECT_RC:-}" != 0 ]; then
+        # Issue #163 (the probe itself moved ahead of this render by
+        # #201, which needs its output before the matching): exec-ability
+        # is caller-independent — a truncated or wrong-arch binary fails
         # for every user the mode bits admit, while a healthy --version
-        # exits 0 for any of them — the kit's own runnability criterion,
-        # update.sh's candidate check), so this separates a BROKEN
-        # binary from a privilege gap. sudo cannot resolve the former
-        # and the probe above cannot see it: sudo normalizes a refused
-        # exec to rc 1, the same rc as its own password refusal, so the
-        # corrupt shape rides the empty-probe path into the unknown row
-        # — counted warn here instead, naming the fix that repairs it.
-        # A root-side --version probe is house precedent (update.sh's
-        # opencode_version_line); bounded like every probe (issue #80).
-        ADV_DIRECT_RC=0
-        if command -v timeout >/dev/null 2>&1; then
-            timeout 10 "$LIBDIR/bin/opencode" --version >/dev/null 2>&1 \
-                || ADV_DIRECT_RC=$?
-        else
-            "$LIBDIR/bin/opencode" --version >/dev/null 2>&1 \
-                || ADV_DIRECT_RC=$?
-        fi
-        if [ "$ADV_DIRECT_RC" != 0 ]; then
-            # 0.0.49a W1: the repair command is upgrade-opencode (the
-            # AFFECTED row's precedent) — plain update cannot fix this.
-            ui_kv_warn "opencode binary" "present but broken — direct probe exited rc $ADV_DIRECT_RC"\
+        # exits 0 for any of them (the kit's own runnability criterion,
+        # update.sh's candidate check) — so a non-zero direct rc is a
+        # BROKEN binary, not a privilege gap; no sudo resolves it.
+        # 0.0.49a W1: the repair command is upgrade-opencode (the
+        # AFFECTED row's precedent) — plain update cannot fix this.
+        ui_kv_warn "opencode binary" "present but broken — direct probe exited rc $ADV_DIRECT_RC"\
 " (fix: sudo opk upgrade-opencode)"
-        else
-            # 0.0.48b W3: unknown at this caller's privilege is NOT a
-            # finding (an agent-user or dev cron would be permanently
-            # non-green otherwise) — informational row, never counted.
-            # sudo resolves it. 0.0.48d D1: present-binary shapes only —
-            # the missing shape already warned above, and no privilege
-            # resolves it there: the "sudo opk status" advice would be a
-            # dead end for that row.
-            ui_kv "opencode version" "unknown — probe failed (run: sudo opk status)"
-        fi
+    elif [ "${ADV_DIRECT_RC:-}" = 0 ]; then
+        # Issue #201: the binary ran (rc 0) but --version carried no
+        # parsable version. Still not a finding (0.0.48b W3 — an
+        # agent-user or dev cron must not be permanently non-green),
+        # and the old "sudo opk status" advice would dead-end twice
+        # over: this caller may hold no sudo rights, and sudo would
+        # exec the same binary to the same unparsable answer.
+        ui_kv "opencode version" "unknown — binary runs for this caller, --version carries no parsable version"
     elif [ "$ADV_BIN_ANYX" = true ]; then
         # Issue #166: the mode bits promise an audience (root / the
         # opencode group) can execute it — THIS caller cannot. A

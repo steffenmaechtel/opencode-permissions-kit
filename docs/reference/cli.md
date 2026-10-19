@@ -350,9 +350,18 @@ is visible to callers, not just to readers). The one exception: without
 an install the full report stays `0` — status is a diagnostic and does
 not "fail" for reporting absence — while `--short` reports that state as
 `1`. Rows the caller cannot judge at their own privilege ("unknown —
-needs root to check", a failed version probe without sudo rights) and
-optional-feature rows (the mkcert CA) are informational: they never count
-toward the verdict — `sudo opk status` resolves the privilege unknowns.
+needs root to check") and optional-feature rows (the mkcert CA) are
+informational: they never count toward the verdict — `sudo opk status`
+resolves the privilege unknowns. The opencode version is the deliberate
+exception: it resolves at the caller's own privilege whenever the caller
+can execute the managed binary (root and the sharing group, the agent
+user included) — the report runs `--version` directly and the
+security-advisory check answers on it, so a group member without sudo
+rights gets the real verdict, and an affected version counts as an
+alert at any privilege. A caller outside that audience keeps the
+informational unknown with the sudo advice (privilege does resolve it),
+and a `--version` output without a parsable version is informational
+too (sudo would exec the same binary to the same answer).
 A missing managed binary, a binary no mode bit lets anyone execute, or
 a corrupt one is the exception: each is reported as a warning, because
 no privilege can resolve it (a corrupt binary — present and executable
