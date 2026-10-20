@@ -810,6 +810,72 @@ else
     fail "update.sh id probe line extractable from update.sh"
 fi
 
+# --- git safe.directory audit honesty (#211 a F4) --------------------------------
+# A failed `git config --global --add safe.directory '*'` used to print
+# nothing while the audit log unconditionally recorded "ensured" — the
+# agent's git then failed with 'dubious ownership' long after, with no
+# trail pointing at the cause. Extract the real block and drive all
+# three arms with stubbed sudo/git (hermetic: the test user's real
+# ~/.gitconfig never matters — environment-dependence class 0.0.46a F2).
+_f4_block="$(sed -n '/^# The audit line must match reality/,/^fi$/p' "$UPDATE")"
+if [ -n "$_f4_block" ]; then
+    pass "safe.directory block extractable from update.sh (#211 a F4)"
+    _f4_run() {
+        (
+            OPENCODE_USER=ocuser
+            F4_MODE="$1"
+            sudo() {
+                # Answer both git invocations here — a pass-through
+                # "$@" would choke on sudo's own flags (-u ocuser -H).
+                case " $* " in
+                    *" --add "*)
+                        [ "$F4_MODE" = fail ] && return 1
+                        return 0 ;;
+                    *" --get-all "*)
+                        [ "$F4_MODE" = alreadysel ] && { echo '*'; return 0; }
+                        return 0 ;;
+                esac
+                return 0
+            }
+            ui_success(){ echo "success: $*"; }
+            ui_warn()   { echo "warn: $*"; }
+            log()       { echo "log: $*"; }
+            eval "$_f4_block"
+        ) 2>&1
+    }
+    _out=$(_f4_run fail) || true
+    if printf '%s' "$_out" | grep -q "warn: could not set git safe.directory" \
+       && printf '%s' "$_out" | grep -q 'log: git safe.directory NOT ensured' \
+       && ! printf '%s' "$_out" | grep -q 'success:'; then
+        pass "failed --add: warn + NOT-ensured log, no success line (#211 a F4)"
+    else
+        fail "failed --add: warn + NOT-ensured log, no success line (out=$_out)"
+    fi
+    _out=$(_f4_run ok) || true
+    if printf '%s' "$_out" | grep -q 'success: git safe.directory' \
+       && printf '%s' "$_out" | grep -q 'log: git safe.directory ensured for ocuser' \
+       && ! printf '%s' "$_out" | grep -q 'NOT ensured'; then
+        pass "successful --add: success line + ensured log (#211 a F4)"
+    else
+        fail "successful --add: success line + ensured log (out=$_out)"
+    fi
+    _out=$(_f4_run alreadysel) || true
+    if printf '%s' "$_out" | grep -q 'log: git safe.directory ensured for ocuser (already set)' \
+       && ! printf '%s' "$_out" | grep -q 'success:'; then
+        pass "already set: audit notes it, no redundant add (#211 a F4)"
+    else
+        fail "already set: audit notes it, no redundant add (out=$_out)"
+    fi
+else
+    fail "safe.directory block extractable from update.sh (#211 a F4)"
+fi
+# The install.sh twin carries the same honest arms (sweep pin).
+if grep -q 'git safe.directory NOT ensured' "$SCRIPT_DIR/../../files/install.sh"; then
+    pass "install.sh twin logs NOT-ensured on failure too (#211 a F4 sweep)"
+else
+    fail "install.sh twin logs NOT-ensured on failure too (#211 a F4 sweep)"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

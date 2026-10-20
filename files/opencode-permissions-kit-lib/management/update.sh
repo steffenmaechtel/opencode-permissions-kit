@@ -871,13 +871,22 @@ fi
 # "fatal: error reading '<cwd>/.git'" before touching the global config,
 # and safe.directory is never ensured. chdir to / first; --global ignores
 # the worktree anyway.
+# The audit line must match reality (#211 a F4): a failed --add used to
+# print nothing while the log claimed "ensured" — agent git then failed
+# with 'dubious ownership' long after, with nothing in the audit trail
+# pointing at the cause.
 if command -v git >/dev/null 2>&1; then
-    if ! sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
+    if sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
         2>/dev/null | grep -qFx '*'; then
-        sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*' \
-            && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+        log "git safe.directory ensured for $OPENCODE_USER (already set)"
+    elif sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*'; then
+        ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+        log "git safe.directory ensured for $OPENCODE_USER"
+    else
+        ui_warn "could not set git safe.directory '*' for $OPENCODE_USER — agent git may fail"\
+" with 'dubious ownership' (git config --global --add failed)"
+        log "git safe.directory NOT ensured for $OPENCODE_USER (git config --add failed)"
     fi
-    log "git safe.directory ensured for $OPENCODE_USER"
 fi
 
 # --- WSL2 /mnt/c restriction (report-only — update.sh stays prompt-free) -------
