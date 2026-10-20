@@ -19,8 +19,25 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F7 (LOW) | **implemented** | `9dee2f3` | fail-safe stub rc 0 (never-shadow); pin evals the real line |
 | a F8 (LOW) | **implemented** | `f86cf01` | uncounted unknown row per W3; both arms pinned; sabotage red→green |
 | a F9 (LOW) | **implemented** | `edf5c84` | ${USER:-} chain; unset-env pin; W2 wiring pin updated |
+| a F10 (LOW) | **implemented** | `c3c6f9c` | carry-over on podman switches; real-function conf pin; sabotage red |
 
 ## Evidence detail
+
+### a F10 (LOW) — backend switch drops hand-set podman socket key
+
+container_backend_apply now reads the pre-existing
+`OPENCODE_PODMAN_SOCKET` from install.conf when switching TO
+podman-rootless and hands it to update_install_conf_backend (which
+already re-added non-empty values — the bug was purely the caller's
+always-empty variable). Switching AWAY clears the key: it is
+podman-specific, and a stale docker-CLI socket under docker-rootless
+would be noise (documented direction, pinned). Pins run the REAL
+conf-rewrite function against a scratch conf through stubbed
+sudo/_tmp_track (key survives the podman switch with CONTAINER_BACKEND
+updated; clears on the away switch) plus a caller wiring grep.
+Sabotage (deleting the carry-over) → red; restored → green. Sweep:
+install.sh's re-install path already preserves the key (:787-792);
+no other caller of update_install_conf_backend exists.
 
 ### a F9 (LOW) — set -u abort when USER and DEFAULT_USER both unset
 
