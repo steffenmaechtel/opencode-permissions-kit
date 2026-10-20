@@ -18,8 +18,24 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F6 (LOW) | **implemented** | `724e4f8` | else-log like the sudoers twin; both arms pinned; sabotage red→green |
 | a F7 (LOW) | **implemented** | `9dee2f3` | fail-safe stub rc 0 (never-shadow); pin evals the real line |
 | a F8 (LOW) | **implemented** | `f86cf01` | uncounted unknown row per W3; both arms pinned; sabotage red→green |
+| a F9 (LOW) | **implemented** | `edf5c84` | ${USER:-} chain; unset-env pin; W2 wiring pin updated |
 
 ## Evidence detail
+
+### a F9 (LOW) — set -u abort when USER and DEFAULT_USER both unset
+
+The default chain deepens to `${DEFAULT_USER:-${USER:-}}` at both
+sites (status.sh:157-158): a cron/timer environment without USER and a
+conf without the stamp no longer aborts with rc 2 — the code the
+contract defines as "warnings only" — over no verdict at all; the
+degraded `/home/` fallback stands and the report continues. Pins: the
+real probe lines are extracted and executed with both vars unset
+(`env -u USER`, hermetic — the host's install.conf never runs), rc 0
+asserted; sabotage (reverting to the shallow chain) → red; restored →
+green. The pre-existing 0.0.47b W2 wiring grep pinned the OLD literals
+and went red on the fix — updated to the new literals, its intent
+(getent resolution, no /home hardcode) unchanged. Sweep: `$USER`
+appears nowhere else in status.sh.
 
 ### a F8 (LOW) — upstream "unavailable" counted as warning
 
