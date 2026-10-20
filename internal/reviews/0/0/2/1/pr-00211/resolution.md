@@ -12,8 +12,21 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 |---|---|---|---|
 | a F1 (HIGH) | **implemented** | `fd13a19` | race + spaces pins, sabotage red→green, class sweep — detail below |
 | a F2 (MED) | **implemented** | `e7349e5` | loud stubs + abort pin + update.sh twin swept — detail below |
+| a F3 (MED) | **implemented** | `56bc585` | if/fi tail; real-binary pins both ways; sabotage red→green |
 
 ## Evidence detail
+
+### a F3 (MED) — ddev-migrate list inverted rc
+
+The `list` arm ended in `[ "$dm_found" = 0 ] && echo …` — under the
+script's `set -u` (no `-e`) the failed test became the arm's exit
+status: rc 1 with dumps present, rc 0 when none. Explicit `if/fi`
+ends the arm; rc 0 now means "listed fine" both ways. Pins drive the
+REAL bin/ddev-migrate against a scratch `DDEV_MIG_BACKUP_ROOT`
+(present: rc 0 + dir listed; empty: rc 0 + "no dump directories"),
+before the summary gate; sabotage (reverting to a bare `&&` tail)
+turned the pin red, restore green. No sibling sites: no other case arm
+in bin/ ends in a bare `&&` tail (swept `grep -n '&& echo' bin/`).
 
 ### a F2 (MED) — config.sh silent noops over success claims
 
