@@ -137,22 +137,13 @@ invariant. (RM-0029)
 
 The 2026-10-19 review-concept step split the file: operative rules in
 `agent/review-concept.md`, history and calibration data in
-`internal/records/review-calibration.md`. All metas RM-0057–0092
-maintainer-approved 2026-10-19 (same day, direct chat review), with
-revisions: RM-0062 retired (merged into the reviews-also-fixes
-bullet), RM-0068 retired (obsolete — no fully automated chains),
-RM-0083 cause-corrected (skill bias, not model family), RM-0084
-reworded (fan-out preferred for every review), RM-0092 added
-(checkpoint timestamps, maintainer proposal). The record's own body
-rules and scope defaults were equipped the same day (RM-0093–0096;
-both sections now audit-active; the format-spec bullet was folded
-into the template).
+`internal/records/review-calibration.md`. Metas RM-0057–0092 and the
+record's own body rules and scope defaults (RM-0093–0096, both
+sections audit-active) were maintainer-approved the same day (direct
+chat review); revision details live in the metas' review logs.
 
-The AGENTS Rules metas RM-0097–0105 were maintainer-approved the
-same day (direct chat review), with revisions: RM-0100 reworded (the
-update-path sentence was unclear), RM-0104 extended (the breakage
-surfaced only after `wsl --shutdown` — wsl.conf takes effect at
-instance start).
+The AGENTS Rules metas RM-0097–0105 were maintainer-approved
+2026-10-20 (direct chat review).
 
 ## Open defaults (the pilot validates them)
 
