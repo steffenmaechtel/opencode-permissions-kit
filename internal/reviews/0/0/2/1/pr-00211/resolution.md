@@ -24,8 +24,23 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F12 (LOW) | **implemented** | `27db42a` | _tmp_track registration; recording pin; sabotage red→green |
 | a F13 (LOW) | **implemented** | `911987b` | three honest linger arms; 3-arm stub pins; sabotage red→green |
 | a F14 (LOW) | **implemented** | `578c070` | honest lines at all three pairs; ok/fail pins; sabotage red→green |
+| a F15 (LOW) | **implemented** | `5e7f913` | readlink -f full chain; chained-symlink dispatch pin |
 
 ## Evidence detail
+
+### a F15 (LOW) — opk single-hop symlink resolution
+
+bin/opk resolves its library root with `readlink -f` (the sibling
+shape ddev-migrate/xdg-open already use): chained user symlinks
+(~/bin/opk -> /usr/local/bin/opk -> lib) no longer stop one hop short
+and mis-report "not installed". Pin development notes: the first
+draft asserted --help output — which never consults LIBDIR, so the
+single-hop sabotage stayed GREEN (caught during sabotage
+verification; rewritten to dispatch status through the two-hop chain
+and assert the fake-lib stub answers, `a40d58b`). Sabotage now red,
+restored green. Sweep: bin/ddev-migrate:13 and bin/xdg-open:47
+already use readlink -f; browser-bridge/socket-check/cwd-check are
+invoked by absolute path (no self-resolution).
 
 ### a F14 (LOW) — silent handover pairs, unconditional success
 
