@@ -21,8 +21,25 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F9 (LOW) | **implemented** | `edf5c84` | ${USER:-} chain; unset-env pin; W2 wiring pin updated |
 | a F10 (LOW) | **implemented** | `c3c6f9c` | carry-over on podman switches; real-function conf pin; sabotage red |
 | a F11 (LOW) | **implemented** | `727c76d` | usage gate + status-as-SUB; 7-case loop pin; sabotage red→green |
+| a F12 (LOW) | **implemented** | `27db42a` | _tmp_track registration; recording pin; sabotage red→green |
 
 ## Evidence detail
+
+### a F12 (LOW) — unregistered pass scratch
+
+_fsb_pass's NUL temp registers with the caller's `_tmp_track` trap
+(staged-write.sh's shape, `command -v` guarded for contexts without
+the host script's trap); the plain rm still covers the normal path.
+Pin: the real lib sourced with a RECORDING `_tmp_track` (one-argument
+signature, registry via env — the first draft invented a second
+argument the real call never passes), one pass run, the
+opk-fsb-pass temp asserted present. Sabotage (registration deleted)
+→ red; restored → green. Sweep: `grep -rn mktemp files/` —
+staged-write registers; sudoers-deploy / wsl-browser-bridge /
+ddev-migrate / fetch_kit carry inline rm-or-trap cleanup (verified in
+snapshot a by D1/A2); install.sh:659 is the deliberate backup
+survivor; install.sh:2334 and :103 sit inside install's own
+trap-covered scratch dirs.
 
 ### a F11 (LOW) — config.sh silently swallows unknown tokens
 
