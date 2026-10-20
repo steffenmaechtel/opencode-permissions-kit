@@ -17,8 +17,23 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F5 (LOW) | **implemented** | `e3dd92c` | first-wins loops at both sites; origin-marker pins; sabotage red→green |
 | a F6 (LOW) | **implemented** | `724e4f8` | else-log like the sudoers twin; both arms pinned; sabotage red→green |
 | a F7 (LOW) | **implemented** | `9dee2f3` | fail-safe stub rc 0 (never-shadow); pin evals the real line |
+| a F8 (LOW) | **implemented** | `f86cf01` | uncounted unknown row per W3; both arms pinned; sabotage red→green |
 
 ## Evidence detail
+
+### a F8 (LOW) — upstream "unavailable" counted as warning
+
+The row renders as a plain uncounted `ui_kv` with the "unknown —"
+wording (the file's own W3 idiom for cannot-judge rows); real findings
+(new advisories upstream) remain counted warns. Pins extract the real
+three-arm block and drive both arms (unknown → plain row, no
+`kvwarn:`; new-advisory → warn). Sabotage (re-counting the unknown
+row) → red; restored → green. Sweep: `grep -n 'ui_kv_warn' status.sh`
+walked — every remaining counted warn either carries a fix hint or
+names a concrete broken state; the two borderline "result skipped"
+rows (~:1236/:1252, scan-skip states with reasons) stay counted as
+pre-existing and out of F8's offline-permanence scope — noted for the
+next full pass if the maintainer wants them unknown-rows too.
 
 ### a F7 (LOW) — unguarded xdg_open_real_exists
 
