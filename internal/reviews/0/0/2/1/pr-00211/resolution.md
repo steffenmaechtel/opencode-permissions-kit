@@ -10,7 +10,7 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a F1 (HIGH) | **implemented** | `fd13a19` | component walk in the replay worker; deterministic race pin (victim 600, rc 0) + spaces pin; sabotage red→green; sweep below |
+| a F1 (HIGH) | **implemented** | `fd13a19` | race + spaces pins, sabotage red→green, class sweep — detail below |
 
 ## Evidence detail
 
