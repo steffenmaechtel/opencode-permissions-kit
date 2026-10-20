@@ -440,7 +440,13 @@ EOF
         elif [ "$ADV_PARSE_OK" = true ]; then
             ui_kv_ok "upstream" "live check ok — nothing beyond the shipped database"
         else
-            ui_kv_warn "upstream" "live check unavailable (offline, blocked, or python3 missing)"
+            # Uncounted by design (0.0.48b W3, #211 a F8): the caller
+            # cannot judge this row (offline, blocked, python3 missing) —
+            # a counted warn made every air-gapped/proxied host exit 2
+            # forever, which is exactly the "green unattainable, cron
+            # alert worthless" case the rule names. Real findings (new
+            # advisories, the arm above) stay counted warns.
+            ui_kv "upstream" "unknown — live check unavailable (offline, blocked, or python3 missing)"
         fi
     fi
 fi

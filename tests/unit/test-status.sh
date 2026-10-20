@@ -2188,6 +2188,44 @@ else
     fail "status.sh id probe line extractable from status.sh"
 fi
 
+# --- upstream "unavailable" row is uncounted (0.0.48b W3, #211 a F8) -----------
+# The row the caller cannot judge (offline/blocked/python3-less) used to
+# be a counted ui_kv_warn: every air-gapped host exited 2 forever — the
+# exact "green unattainable, cron alert worthless" case the file's own
+# W3 rule names. Extract the real three-arm block and drive it: the
+# unknown arm must render as a plain (uncounted) row; a REAL finding
+# (new advisories) must still count as a warn.
+_f8_block="$(sed -n '/^        if \[ -n "\$ADV_NEW" \]; then$/,/^        fi$/p' "$STATUS")"
+if [ -n "$_f8_block" ]; then
+    pass "upstream verdict block extractable from status.sh (#211 a F8)"
+    _f8_run() {
+        (
+            ADV_NEW="$1"
+            ADV_PARSE_OK=false
+            ui_kv()      { echo "kv: $*"; }
+            ui_kv_ok()   { echo "kvok: $*"; }
+            ui_kv_warn() { echo "kvwarn: $*"; }
+            ui_detail()  { :; }
+            eval "$_f8_block"
+        ) 2>&1
+    }
+    _out=$(_f8_run "") || true
+    if printf '%s' "$_out" | grep -q 'kv: upstream unknown' \
+       && ! printf '%s' "$_out" | grep -q 'kvwarn:'; then
+        pass "unavailable arm: plain uncounted row, no warn bump (#211 a F8)"
+    else
+        fail "unavailable arm: plain uncounted row, no warn bump (out=$_out)"
+    fi
+    _out=$(_f8_run "GHSA-test-1") || true
+    if printf '%s' "$_out" | grep -q 'kvwarn: upstream'; then
+        pass "new-advisory arm still a counted warn (#211 a F8)"
+    else
+        fail "new-advisory arm still a counted warn (out=$_out)"
+    fi
+else
+    fail "upstream verdict block extractable from status.sh (#211 a F8)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
