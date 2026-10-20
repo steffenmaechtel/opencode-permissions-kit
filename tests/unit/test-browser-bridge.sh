@@ -601,6 +601,44 @@ else
     fail "xdg-open shim: single-quote target must never reach the bridge (rc=$_qt_rc out=$_qt_out)"
 fi
 
+# --- F18: marker-less kit block cannot eat foreign comments -----------------------
+# The stripper consumed EVERY comment line below a begin marker whose
+# end marker was hand-destroyed — "never eat foreign content" held for
+# code, not for comments. The consumption is bounded to the kit block's
+# 9 inner lines now; anything past that prints. Build the worst case:
+# begin + 9 kit lines, NO end marker, then foreign comments + content.
+CONF2="$WORK/f18.conf"
+{
+    printf '%s\n' \
+        '# opencode permissions kit browser bridge -- begin' \
+        '# Managed by the opencode permissions kit (issues #91, #100). Every line' \
+        '# in this block is a comment for WSL -- no section, no key, no effect on' \
+        '# WSL itself. The `open` npm package bundled in opencode scans' \
+        '# /etc/wsl.conf for the first `root =` line to locate powershell.exe; the' \
+        '# carrier line at the end of this block wins that scan and redirects it' \
+        '# to the kit stand-in, keeping opencode device logins alive on a' \
+        '# hardened /mnt/c. Do not edit -- `opk uninstall` removes this block.' \
+        '# ----------------------------------------------------------------------\rroot = /usr/local/lib/opencode-permissions-kit/wsl'
+    printf '%s\n' \
+        '# my own comment stays (F18)' \
+        '[boot]' \
+        'systemd=true'
+} > "$CONF2"
+BB_CALL='browser_bridge_write_conf "$1"' bb "$LIBDIR" >/dev/null 2>&1 || true
+if grep -q '^# my own comment stays (F18)$' "$CONF2" \
+   && grep -q '^systemd=true$' "$CONF2"; then
+    pass "marker-less block: foreign comments survive the bounded stripper (#211 a F18)"
+else
+    fail "marker-less block: foreign comments survive the bounded stripper (#211 a F18)"
+fi
+if grep -q 'managed by the opencode permissions kit (issues #91' "$CONF2" 2>/dev/null \
+   || [ "$(grep -c 'Managed by the opencode permissions kit' "$CONF2")" = "1" ]; then
+    pass "the fresh kit block is written (strip + prepend still work) (#211 a F18)"
+else
+    fail "the fresh kit block is written (strip + prepend still work) (#211 a F18)"
+fi
+CONF="$WORK/orig.conf"   # restore for any later sections
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
