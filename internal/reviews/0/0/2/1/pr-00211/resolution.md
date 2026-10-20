@@ -16,8 +16,23 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F4 (LOW) | **implemented** | `31a755a` | three honest arms, both twins; 3-arm stub pins; sabotage red→green |
 | a F5 (LOW) | **implemented** | `e3dd92c` | first-wins loops at both sites; origin-marker pins; sabotage red→green |
 | a F6 (LOW) | **implemented** | `724e4f8` | else-log like the sudoers twin; both arms pinned; sabotage red→green |
+| a F7 (LOW) | **implemented** | `9dee2f3` | fail-safe stub rc 0 (never-shadow); pin evals the real line |
 
 ## Evidence detail
+
+### a F7 (LOW) — unguarded xdg_open_real_exists
+
+update.sh now carries the same guard its sibling status.sh has had
+since 0.0.46a F4: a `command -v` fail-safe stub. Semantics: rc 0 =
+"assume a real xdg-open might exist" — with the probe's lib missing,
+the keep-arm removes a kit shim (a real one may have appeared) and the
+install-arm withholds the shim (cannot prove absence): both err on the
+never-shadow side of 0.0.42d S1 instead of the 127-driven shadowing
+side. Pin greps the real stub line out of update.sh, evals it and
+asserts rc 0; sabotage (stub flipped to rc 1) → red; restored →
+green. The sed-range extraction this pin originally used ran to EOF —
+this sed build never closes a range on its start line — noted here so
+the next pin author greps single lines instead.
 
 ### a F6 (LOW) — silent umask skip
 
