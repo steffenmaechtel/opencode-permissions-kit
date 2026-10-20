@@ -148,6 +148,12 @@ rules and scope defaults were equipped the same day (RM-0093–0096;
 both sections now audit-active; the format-spec bullet was folded
 into the template).
 
+The AGENTS Rules metas RM-0097–0105 were maintainer-approved the
+same day (direct chat review), with revisions: RM-0100 reworded (the
+update-path sentence was unclear), RM-0104 extended (the breakage
+surfaced only after `wsl --shutdown` — wsl.conf takes effect at
+instance start).
+
 ## Open defaults (the pilot validates them)
 
 - Table rows in rule files are not rule units (lookup info). (RM-0095)
