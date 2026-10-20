@@ -19,14 +19,12 @@ set -u
 
 # Resolve the library root through the /usr/local/bin/opk symlink. The
 # dispatcher lives in bin/, so the root is one directory up.
-SELF="$0"
-if [ -L "$SELF" ]; then
-    target=$(readlink "$SELF" 2>/dev/null || true)
-    case "$target" in
-        /*) SELF="$target" ;;
-        *)  SELF="$(dirname "$SELF")/$target" ;;
-    esac
-fi
+# FULL chain (#211 a F15): the single-hop readlink broke chained user
+# symlinks (~/bin/opk -> /usr/local/bin/opk -> lib) — SELF stopped one
+# hop short, LIBDIR resolved wrong, and every subcommand reported
+# "not found" with a misleading "is the kit installed?" error. Sibling
+# shape: bin/ddev-migrate:13, bin/xdg-open:47.
+SELF="$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")"
 LIBDIR="$(cd "$(dirname "$SELF")/.." && pwd -P)"
 
 # Shared UI helpers — same visual language as every kit script (labeled

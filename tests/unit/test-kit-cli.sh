@@ -781,6 +781,22 @@ else
     failures=$((failures + 1))
 fi
 
+# --- chained user symlink resolves (#211 a F15) -----------------------------------
+# A second hop (~/bin/opk -> $BIN/opk -> lib) used to defeat the
+# single-hop readlink: LIBDIR resolved one level short and every
+# subcommand reported "not found". readlink -f walks the whole chain
+# (sibling shape: ddev-migrate, xdg-open).
+mkdir -p "$WORK/bin2"
+ln -s "$BIN/opk" "$WORK/bin2/opk"
+_out="$(OPK_INSTALL_CONF="$WORK/install.conf" "$WORK/bin2/opk" --help 2>/dev/null)" || true
+if [ -n "$_out" ] && printf '%s' "$_out" | grep -q 'status'; then
+    echo "  ${GREEN}PASS${NC}  chained symlink dispatches (readlink -f, #211 a F15)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  chained symlink dispatches (#211 a F15, got: $_out)"
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"
