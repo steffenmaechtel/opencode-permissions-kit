@@ -94,7 +94,7 @@ jobs:
         run: ./tests/unit/test-docs.sh
       - name: Run pages entry tests (short one-liner URLs)
         run: ./tests/unit/test-pages.sh
-      - name: Run review vorgang lint (structure wave 2026-10)
+      - name: Run review case lint (structure wave 2026-10)
         run: ./tests/unit/test-reviews-lint.sh
       - name: Run review index/pointer parity (structure wave 2026-10)
         run: ./tests/unit/test-reviews-parity.sh

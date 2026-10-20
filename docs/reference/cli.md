@@ -214,10 +214,11 @@ curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh
 
 | Flag | Meaning |
 |---|---|
-| `--yes` | Skip all prompts, assume Yes (Standard mode with defaults) |
+| `--yes`, `-y` | Skip all prompts, assume Yes (Standard mode with defaults) |
 | `--projects <path...>` | Pre-define project roots, skip interactive selection |
 | `--container-backend <docker-rootless\|podman-rootless>` | Non-interactive backend choice |
 | `--skip-ddev-migration` | Do not export the dev user's ddev databases (no `Step 4b` dumps) |
+| `--openchamber-policy <yes\|no>` | Pre-decide the OpenChamber policy pin (non-interactive installs) |
 | `--ddev-settings <dev-owned\|ddev>` | Pre-decide the settings mode: `dev-owned` (recommended) or `ddev` |
 | `--secure-git-config` | Enable `.git/config` hardening up front |
 | `--force-unsupported-distro` | Skip the Ubuntu version whitelist, install anyway — at your own risk |
@@ -297,7 +298,7 @@ sudo opk update --channel stable   # or master, a feature branch, or a tag
 
 | Flag | Meaning |
 |---|---|
-| `--yes` | Skip the confirmation prompt |
+| `--yes`, `-y` | Skip the confirmation prompt |
 | `--refresh` | Also re-apply the group baseline |
 | `--binary` | Also upgrade the opencode binary to the latest release **of the current major** |
 | `--only-binary` | Skip every kit step, only upgrade the opencode binary |
@@ -414,6 +415,6 @@ bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh
 
 | Flag | Meaning |
 |---|---|
-| `--yes` | Skip all prompts |
+| `--yes`, `-y` | Skip all prompts |
 | `--dry-run` | Show what would be removed, change nothing |
 | `--debug` | Trace execution (`set -x`) |
