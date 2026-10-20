@@ -22,8 +22,22 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F10 (LOW) | **implemented** | `c3c6f9c` | carry-over on podman switches; real-function conf pin; sabotage red |
 | a F11 (LOW) | **implemented** | `727c76d` | usage gate + status-as-SUB; 7-case loop pin; sabotage red→green |
 | a F12 (LOW) | **implemented** | `27db42a` | _tmp_track registration; recording pin; sabotage red→green |
+| a F13 (LOW) | **implemented** | `911987b` | three honest linger arms; 3-arm stub pins; sabotage red→green |
 
 ## Evidence detail
+
+### a F13 (LOW) — linger success claimed over failure
+
+enable_linger now has three honest arms: ok → success line + log;
+failed → stderr warn naming the consequence (rootless daemon dies at
+logout) + retry hint + FAILED log; no loginctl → silent skip
+(containers, WSL — the block's existing contract). Pins drive the
+extracted real function through all three arms with a stubbed
+loginctl; the absent arm needed an empty PATH plus an absolute sh
+(dash applies PATH assignments before command search) and the first
+draft let the host's real loginctl leak in — the 0.0.46a F2 class
+caught in the pin's own development. Sabotage (unconditional success
+restored) → red; restored → green.
 
 ### a F12 (LOW) — unregistered pass scratch
 
