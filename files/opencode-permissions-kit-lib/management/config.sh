@@ -624,6 +624,15 @@ container_backend_apply() {
 
     # Provision the new backend.
     local docker_host="" podman_socket=""
+    # Preserve a hand-configured podman docker-CLI socket (#211 a F10):
+    # install.sh keeps this key across re-installs (it never writes it
+    # itself — setup-container-backend:313), but the switch used to
+    # grep-drop it silently: update_install_conf_backend below removes
+    # all three backend keys and re-adds only what it is handed. Carry
+    # the pre-existing value over when switching TO podman-rootless.
+    if [ "$new_backend" = "podman-rootless" ] && [ -f "$INSTALL_CONF" ]; then
+        podman_socket=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)
+    fi
     local setup_out
     setup_out=$(sudo sh "$setup_script" "$new_backend" --yes 2>&1) || {
         ui_error "provisioning failed:"

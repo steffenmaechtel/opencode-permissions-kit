@@ -316,6 +316,62 @@ case "$_v28_out" in
     *) check "--yes accepted as no-op (V28, got: $_v28_out)" false ;;
 esac
 
+# --- backend switch preserves a hand-set OPENCODE_PODMAN_SOCKET (#211 a F10) ---
+# update_install_conf_backend grep-removes all three backend keys and
+# re-adds only what the caller hands it; container_backend_apply used
+# to hand an always-empty podman_socket, silently deleting a key the
+# user added by hand (install.sh preserves it across re-installs).
+# Pin: the REAL function against a scratch conf — the key survives a
+# switch TO podman-rootless and clears when switching away — plus the
+# caller-side carry-over wiring.
+_f10_fn="$(sed -n '/^update_install_conf_backend() {/,/^}/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
+if [ -n "$_f10_fn" ]; then
+    check "update_install_conf_backend extractable (#211 a F10)" true
+    F10=$(mktemp -d)
+    printf 'DEFAULT_USER=dev\nOPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock\nCONTAINER_BACKEND=docker-rootless\n' \
+        > "$F10/install.conf"
+    _f10_run() {
+        # $1..$3 = backend, docker_host, podman_socket — runs the REAL
+        # function against $F10/install.conf with stubbed sudo/_tmp_track.
+        (
+            INSTALL_CONF="$F10/install.conf"
+            _tmp_track() { :; }
+            die() { echo "die: $*"; exit 1; }
+            sudo() {
+                case "$1" in
+                    tee) shift; tee "$@" ;;
+                    *)   "$@" ;;
+                esac
+            }
+            eval "$_f10_fn"
+            update_install_conf_backend "$1" "$2" "$3"
+        )
+    }
+    _f10_run podman-rootless "" "unix:///run/user/1000/podman/podman.sock" >/dev/null 2>&1 || true
+    if grep -q '^OPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock$' "$F10/install.conf" \
+       && grep -q '^CONTAINER_BACKEND=podman-rootless$' "$F10/install.conf"; then
+        check "hand-set podman socket survives the switch TO podman (#211 a F10)" true
+    else
+        check "hand-set podman socket survives the switch TO podman (#211 a F10)" false
+    fi
+    _f10_run docker-rootless "unix:///run/user/1000/docker.sock" "" >/dev/null 2>&1 || true
+    if grep -q '^OPENCODE_PODMAN_SOCKET=' "$F10/install.conf"; then
+        check "socket key clears when switching away (documented direction)" false
+    else
+        check "socket key clears when switching away (documented direction)" true
+    fi
+    rm -rf "$F10"
+    if grep -q 'podman_socket=\$(sed -n .s/\^OPENCODE_PODMAN_SOCKET=//p' \
+        "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"; then
+        check "caller carries the pre-existing key over (#211 a F10 wiring)" true
+    else
+        check "caller carries the pre-existing key over (#211 a F10 wiring)" false
+    fi
+else
+    check "update_install_conf_backend extractable (#211 a F10)" false
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1
