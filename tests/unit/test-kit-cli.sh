@@ -635,6 +635,76 @@ else
     failures=$((failures + 1))
 fi
 
+# --- #211 a F2: missing-lib fallbacks for the mutating helpers fail loud ------
+# config.sh used to degrade silently when sh/ libs were missing:
+# fs_baseline_root and ddev_handover_root were no-op stubs and
+# ddev_rootless_bindmounts was not stubbed at all — projects add /
+# refresh and the backend switch printed success ("setgid, default-acl",
+# "baseline refreshed", "backend switched") over work that never ran.
+# The stubs now fail loud like the write helpers (staged_write & co).
+# Extract each stub from the real config.sh and execute it the way a
+# damaged kit would (the lookup loop found nothing, only the stub ran).
+CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
+_stubs=$(mktemp -d)
+sed -n '/^\[ -n "\$_handover" \] || ddev_handover_root/,/^}$/p' "$CONFIG" > "$_stubs/ho.sh"
+sed -n '/^\[ -n "\$_handover" \] || ddev_rootless_bindmounts/,/^}$/p' "$CONFIG" > "$_stubs/rb.sh"
+sed -n '/^command -v fs_baseline_root/,/^}$/p' "$CONFIG" > "$_stubs/fsb.sh"
+for _s in ho rb fsb; do
+    if [ -s "$_stubs/$_s.sh" ] && grep -q 'unavailable' "$_stubs/$_s.sh"; then
+        echo "  ${GREEN}PASS${NC}  F2: $_s stub present and names its cause"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  F2: $_s stub present and names its cause"
+        failures=$((failures + 1))
+    fi
+done
+_out=$(_handover="" sh -c '. "$1" >/dev/null 2>&1; ddev_handover_root /proj u g d' \
+    sh "$_stubs/ho.sh" 2>&1) || _rc=$?
+assert "F2: ddev_handover_root stub returns 1 (loud, not 127-silent)" "1" "${_rc:-0}"
+case "$_out" in
+    *"ddev_handover_root unavailable"*)
+        echo "  ${GREEN}PASS${NC}  F2: ddev_handover_root stub names the missing lib on stderr"
+        passed=$((passed + 1)) ;;
+    *)  echo "  ${RED}FAIL${NC}  F2: ddev_handover_root stub names the missing lib on stderr (got: $_out)"
+        failures=$((failures + 1)) ;;
+esac
+_out=$(_handover="" sh -c '. "$1" >/dev/null 2>&1; fs_baseline_root /proj g u' \
+    sh "$_stubs/fsb.sh" 2>&1) || _rc=$?
+assert "F2: fs_baseline_root stub returns 1 (no false 'baseline refreshed')" "1" "${_rc:-0}"
+# The success-line mechanism itself: under set -e the loud stub aborts
+# BEFORE any caller success line can print (0.0.44a V9's sibling class).
+_reached=""
+_out=$(sh -c 'set -e; _handover=""; . "$1" >/dev/null 2>&1; ddev_handover_root /proj u g d; echo REACHED' \
+    sh "$_stubs/ho.sh" 2>&1) || _rc=$?
+case "$_out" in
+    *REACHED*) _reached=yes ;;
+esac
+if [ -z "$_reached" ]; then
+    echo "  ${GREEN}PASS${NC}  F2: set -e aborts before any success line (REACHED not printed)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  F2: set -e aborts before any success line (REACHED printed)"
+    failures=$((failures + 1))
+fi
+# ddev_rootless_bindmounts: rc 2 = the backend switch's warn arm — the
+# gate must not evaluate as success (rc 127 fell through silently).
+_rc=0
+_handover="" sh -c '. "$1" >/dev/null 2>&1; ddev_rootless_bindmounts u b v bin' \
+    sh "$_stubs/rb.sh" >/dev/null 2>&1 || _rc=$?
+assert "F2: ddev_rootless_bindmounts stub returns 2 (caller's warn arm)" "2" "$_rc"
+# The update.sh twin of the same stub (#211 a F2 sweep — its loop logs
+# "ddev handover pass completed" unconditionally): loud rc 1 as well.
+sed -n '/^    command -v ddev_handover_root/,/^    }$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh" > "$_stubs/uho.sh"
+if [ -s "$_stubs/uho.sh" ] && grep -q 'unavailable' "$_stubs/uho.sh"; then
+    echo "  ${GREEN}PASS${NC}  F2 sweep: update.sh handover stub loud too"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  F2 sweep: update.sh handover stub loud too"
+    failures=$((failures + 1))
+fi
+rm -rf "$_stubs"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

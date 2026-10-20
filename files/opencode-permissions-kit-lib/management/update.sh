@@ -826,7 +826,15 @@ if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     [ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" ] \
         && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh"
     [ -f "$LIBDIR/sh/ddev-handover.sh" ] && . "$LIBDIR/sh/ddev-handover.sh"
-    command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
+    command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
+        # Loud like config.sh's stubs (#211 a F2 sweep): a silent no-op
+        # let the loop below log "ddev handover pass completed" over a
+        # pass that never ran. Near-unreachable (lib_deploy refreshed
+        # the library above) — the contract is what matters: fail loud,
+        # let set -e stop the update instead of lying in the audit log.
+        echo "error: ddev_handover_root unavailable (ddev-handover.sh missing)" >&2
+        return 1
+    }
     command -v ddev_handover_stamp_valid >/dev/null 2>&1 || ddev_handover_stamp_valid() { return 1; }
     command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
     _ho_skip=0

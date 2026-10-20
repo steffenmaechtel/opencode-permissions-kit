@@ -180,7 +180,24 @@ for cand in "$SCRIPT_DIR/../sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; 
         break
     fi
 done
-[ -n "$_handover" ] || ddev_handover_root() { :; }
+# Fallback stubs for a damaged/partially deployed library (missing
+# ddev-handover.sh): the MUTATING helper fails loud like the write
+# helpers below (#211 a F2) — a silent no-op let projects add / refresh
+# / handover print success ("setgid, default-acl", "baseline refreshed")
+# over a baseline that never ran. The stamp helpers stay fail-safe:
+# stamp_valid rc 1 = "stamp unknown" forces the full scan, stamp_write
+# no-ops (unreachable once ddev_handover_root aborts under set -e).
+[ -n "$_handover" ] || ddev_handover_root() {
+    echo "error: ddev_handover_root unavailable (ddev-handover.sh missing)" >&2
+    return 1
+}
+[ -n "$_handover" ] || ddev_rootless_bindmounts() {
+    echo "error: ddev_rootless_bindmounts unavailable (ddev-handover.sh missing)" >&2
+    # rc 2 = the caller's "could not set" arm: the backend switch warns
+    # with the manual fix instead of reporting an unevaluated gate as
+    # success.
+    return 2
+}
 [ -n "$_handover" ] || { ddev_handover_stamp_valid() { return 1; }; ddev_handover_stamp_write() { :; }; }
 
 # Shared group-baseline helper with live progress (issue #14). Same
@@ -191,7 +208,10 @@ for cand in "$SCRIPT_DIR/../sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
         break
     fi
 done
-command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
+command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
+    echo "error: fs_baseline_root unavailable (fs-baseline.sh missing)" >&2
+    return 1
+}
 
 # Shared symlink-safe privileged write helper (review 0.0.39g S1):
 # git_config_apply writes into the AGENT-owned ~/.config/opencode — root
