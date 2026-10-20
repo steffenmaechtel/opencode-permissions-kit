@@ -533,10 +533,18 @@ ddev_handover_root() {
             # it created while owning the tree — modes on owned entries
             # are owner-controlled) keep those subtrees agent-writable
             # through the run; not closed by ordering.
-            chmod -R g+w "$dhr_d" 2>/dev/null || true
+            _dhr_ok=true
+            chmod -R g+w "$dhr_d" 2>/dev/null || _dhr_ok=false
             [ -L "$dhr_d" ] && continue
-            chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || true
-            echo "  .ddev handover: $dhr_d -> $dhr_user"
+            chown -R "$dhr_user:$dhr_group" "$dhr_d" 2>/dev/null || _dhr_ok=false
+            if [ "$_dhr_ok" = true ]; then
+                echo "  .ddev handover: $dhr_d -> $dhr_user"
+            else
+                # Best-effort stays (root context, self-heals on the next
+                # rescan) but the line must not claim a completed
+                # handover (#211 a F14).
+                echo "  warn: .ddev handover incomplete for $dhr_d (chmod/chown errors — the next update rescans and heals)" >&2
+            fi
         fi
         dhr_p="$(dirname "$dhr_d")"
         # Dev-owned mode (see file header): write the ddev flag first,
@@ -603,10 +611,15 @@ ddev_handover_project_back() {
             # of the dev->agent pairs above; reverting this to
             # chmod-first would re-open the scan-then-act window for
             # exactly this direction).
-            chown -R "$dhb_dev:$dhb_group" "$dhb_proj/$dhb_d" 2>/dev/null || true
+            _dhb_ok=true
+            chown -R "$dhb_dev:$dhb_group" "$dhb_proj/$dhb_d" 2>/dev/null || _dhb_ok=false
             [ -L "$dhb_proj/$dhb_d" ] && continue
-            chmod -R g+w "$dhb_proj/$dhb_d" 2>/dev/null || true
-            echo "  dev-owned handback: $dhb_proj/$dhb_d -> $dhb_dev"
+            chmod -R g+w "$dhb_proj/$dhb_d" 2>/dev/null || _dhb_ok=false
+            if [ "$_dhb_ok" = true ]; then
+                echo "  dev-owned handback: $dhb_proj/$dhb_d -> $dhb_dev"
+            else
+                echo "  warn: dev-owned handback incomplete for $dhb_proj/$dhb_d (chown/chmod errors — the next update rescans and heals)" >&2
+            fi
         fi
     done
     # Root inode: hand it back only when a previous handover model run
@@ -668,10 +681,15 @@ ddev_handover_project() {
             # the tree is still dev-owned, chown -R hands over LAST —
             # chmod-while-just-re-owned-to-the-agent is the scan-then-act
             # window the order closed in bin/opk (0.0.45c S4/0.0.45d W1).
-            chmod -R g+w "$dhp_proj/$dhp_d" 2>/dev/null || true
+            _dhp_ok=true
+            chmod -R g+w "$dhp_proj/$dhp_d" 2>/dev/null || _dhp_ok=false
             [ -L "$dhp_proj/$dhp_d" ] && continue
-            chown -R "$dhp_user:$dhp_group" "$dhp_proj/$dhp_d" 2>/dev/null || true
-            echo "  ddev settings handover: $dhp_proj/$dhp_d -> $dhp_user"
+            chown -R "$dhp_user:$dhp_group" "$dhp_proj/$dhp_d" 2>/dev/null || _dhp_ok=false
+            if [ "$_dhp_ok" = true ]; then
+                echo "  ddev settings handover: $dhp_proj/$dhp_d -> $dhp_user"
+            else
+                echo "  warn: ddev settings handover incomplete for $dhp_proj/$dhp_d (chmod/chown errors — the next update rescans and heals)" >&2
+            fi
         fi
     done
     return 0

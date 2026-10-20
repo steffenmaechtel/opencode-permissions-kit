@@ -1113,6 +1113,48 @@ grep -q -- 'sudo -n -u opencode' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-terminal.sh" \
     && pass "describe probe uses sudo -n (V22)" \
     || fail "describe probe uses sudo -n (V22)"
+# --- #211 a F14: handover lines honest about pair failures -----------------------
+# The root-run handover pairs were `|| true`-silent with unconditional
+# success echoes — a partial handover (EPERM, immutable flag) reported
+# as done. The pairs stay best-effort (self-heal on the next rescan)
+# but the line now tells the truth. Extract the REAL site-1 block and
+# drive it with stubbed chmod/chown; sites 2/3 are wiring-grepped.
+_f14_block="$(sed -n '/^            _dhr_ok=true$/,/^            fi$/p' "$HANDOVER")"
+if [ -n "$_f14_block" ]; then
+    pass "dhr handover pair block extractable (#211 a F14)"
+    _f14_run() {
+        F14MODE="$1" sh -c '
+            dhr_d="/x/dir"; dhr_user=oc; dhr_group=g
+            chmod() { [ "$F14MODE" = chmodfail ] && return 1; return 0; }
+            chown() { [ "$F14MODE" = chownfail ] && return 1; return 0; }
+            eval "$1"
+        ' sh "$_f14_block" 2>&1
+    }
+    _out=$(_f14_run ok) || true
+    case "$_out" in
+        *".ddev handover: /x/dir -> oc"*) pass "healthy pair: success line (#211 a F14)" ;;
+        *) fail "healthy pair: success line (got: $_out)" ;;
+    esac
+    _out=$(_f14_run chmodfail) || true
+    case "$_out" in
+        *"warn: .ddev handover incomplete"*) pass "chmod failure: warn, no success line (#211 a F14)" ;;
+        *) fail "chmod failure: warn (got: $_out)" ;;
+    esac
+    _out=$(_f14_run chownfail) || true
+    case "$_out" in
+        *"warn: .ddev handover incomplete"*) pass "chown failure: warn, no success line (#211 a F14)" ;;
+        *) fail "chown failure: warn (got: $_out)" ;;
+    esac
+else
+    fail "dhr handover pair block extractable (#211 a F14)"
+fi
+grep -q 'warn: dev-owned handback incomplete' "$HANDOVER" \
+    && pass "dhb site honest too (#211 a F14 sweep)" \
+    || fail "dhb site honest too (#211 a F14 sweep)"
+grep -q 'warn: ddev settings handover incomplete' "$HANDOVER" \
+    && pass "dhp site honest too (#211 a F14 sweep)" \
+    || fail "dhp site honest too (#211 a F14 sweep)"
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1
