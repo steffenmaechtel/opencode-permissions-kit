@@ -711,6 +711,76 @@ else
 fi
 rm -rf "$_stubs"
 
+# --- config arg loop: junk is a usage error, not silence (#211 a F11) -----------
+# Unknown tokens fell into TARGETS and were ignored with rc 0 for every
+# action that takes no positionals — `config git-config ON` rendered the
+# status view as if nothing was wrong. Extract the REAL loop+gate and
+# drive it: junk/misplaced die; projects add keeps paths; --yes clean.
+_f11_block="$(sed -n '/^for arg do$/,/#211 a F11 gate end/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
+if [ -n "$_f11_block" ]; then
+    echo "  ${GREEN}PASS${NC}  config arg loop + F11 gate extractable (#211 a F11)"
+    passed=$((passed + 1))
+    _f11_run() {
+        (
+            YES=false; ACTION=""; SUB=""; TARGETS=""
+            die() { echo "die: $*"; exit 1; }
+            eval "$_f11_block"
+            echo "OK ACTION=[$ACTION] SUB=[$SUB] TARGETS=[$TARGETS]"
+        )
+    }
+    _out=$(_f11_run git-config ON) || true
+    case "$_out" in
+        *"die: unknown or misplaced argument(s):ON"*)
+            echo "  ${GREEN}PASS${NC}  junk token after an action dies loudly (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  junk token after an action dies loudly (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run status refresh) || true
+    case "$_out" in
+        *die:*) echo "  ${GREEN}PASS${NC}  misplaced second action word dies (#211 a F11)"
+                passed=$((passed + 1)) ;;
+        *)      echo "  ${RED}FAIL${NC}  misplaced second action word dies (out=$_out)"
+                failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run projects add /a/proj) || true
+    case "$_out" in
+        *"OK ACTION=[projects] SUB=[add] TARGETS=[/a/proj]"*)
+            echo "  ${GREEN}PASS${NC}  projects add keeps its path targets (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  projects add keeps its path targets (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run git-config status) || true
+    case "$_out" in
+        *"OK ACTION=[git-config] SUB=[status] TARGETS=[]"*)
+            echo "  ${GREEN}PASS${NC}  git-config status consumed as SUB, e2e flow intact (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  git-config status consumed as SUB (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run handover /a/proj) || true
+    case "$_out" in
+        *"OK ACTION=[handover] SUB=[] TARGETS=[/a/proj]"*)
+            echo "  ${GREEN}PASS${NC}  handover keeps its documented path target (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  handover keeps its documented path target (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run --yes) || true
+    case "$_out" in
+        *"OK ACTION=[] SUB=[] TARGETS=[]"*)
+            echo "  ${GREEN}PASS${NC}  bare --yes stays clean (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  bare --yes stays clean (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+else
+    echo "  ${RED}FAIL${NC}  config arg loop + F11 gate extractable (#211 a F11)"
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

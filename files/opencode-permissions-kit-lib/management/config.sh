@@ -132,6 +132,11 @@ for arg do
         projects|git-config|refresh|status|container-backend|handover|ddev-settings)
             [ -z "$ACTION" ] && ACTION="$arg" && continue
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
+            # `status` doubles as a read-only SUB once an action is set
+            # (the dispatch's usage strings name it; e2e pins
+            # `config git-config status`): consume it, not TARGETS
+            # (#211 a F11).
+            [ "$arg" = "status" ] && SUB="status" && continue
             TARGETS="$TARGETS $arg"
             ;;
         on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg"
@@ -145,6 +150,25 @@ for arg do
     esac
 done
 TARGETS="${TARGETS# }"
+
+# Unknown or misplaced tokens are a usage error, not silence (#211 a
+# F11): junk fell into TARGETS and was ignored with rc 0 for every
+# action that takes no positionals — `config git-config ON` rendered
+# the status view as if nothing was wrong, a third usage contract next
+# to uninstall.sh's and status.sh's loud rejections. projects add/remove
+# legitimately carries path TARGETS.
+case "$ACTION" in
+    # projects add/remove and handover carry path targets (the header
+    # documents `config.sh handover <path>`).
+    projects|handover) ;;
+    *)  # if/fi, not a bare `&& die` tail (0.0.41f C1): the empty-TARGETS
+        # case would exit 1 under set -e and abort config for every
+        # legitimate no-argument invocation.
+        if [ -n "$TARGETS" ]; then
+            die "unknown or misplaced argument(s):$TARGETS — run 'opk config' for the menu"
+        fi ;;
+esac
+# --- #211 a F11 gate end ---
 
 banner() {
     ui_banner "${VERSION:-}" "config — change settings"
