@@ -1,7 +1,7 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
-Status: open — a F1 implemented; F2–F37 await disposition (follow-up
-waves; maintainer prioritization pending).
+Status: open — all 37 findings dispositioned (33 implemented, 4 deliberately
+not done); wave review b pending (planned next session).
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
@@ -41,8 +41,43 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F29 (INFO) | **implemented** | `52f1a90` | note() %s; literal-passthrough pin |
 | a F33 (INFO) | **implemented** | `9af93b4` | --refresh skip named under --only-binary |
 | a F34 (INFO) | **implemented** | `9af93b4` | header describes the manifest reality |
+| a F31 (INFO) | **implemented** | `17336fc` | 10 comment refs re-pointed to internal/records/ |
+| a F35 (INFO) | **deliberately not done** | — | TLS-only trust anchor is the documented model — detail below |
+| a F36 (INFO) | **implemented** | `3ced7ea` | cli.md flags tracked against parse_args; sabotage red |
+| a F30 (INFO) | **deliberately not done** | — | 755 on sourced libs: accepted at 0.0.49, pinned by test-bypass-guard |
+| a F32 (INFO) | **deliberately not done** | — | project_path_sane twins: structural refactor, own wave — detail below |
+| a F37 (INFO) | **deliberately not done** | — | partial set-skeletons: no defect found — detail below |
 
 ## Evidence detail
+
+### a F30, F32, F35, F37 (INFO) — deliberately not done
+
+**a F30** — the four sourced-only sh/ libs deploy mode 755 (deploy-lib
+manifest). Carried unchanged since 0.0.41d, explicitly accepted by the
+0.0.49 full review, and test-bypass-guard PINS the 755s (C2 verified
+the pin during review a). Changing the manifest would fight both a
+standing pin and a prior accepted disposition for zero behavior —
+the 644-sourced-lib invariant gains nothing here.
+
+**a F32** — `project_path_sane` exists as two near-identical copies
+(install.sh:930, config.sh:263). Unifying means moving the gate into
+a sourced lib that install.sh can use BEFORE the library is deployed
+(install-time chicken-and-egg: install.sh self-fetches its siblings
+and runs pre-deploy) — a structural refactor with deploy-order risk
+on the security gate that bounds the recursive group baseline. Own
+wave, not a drive-by. Both copies verified consistent at this tree.
+
+**a F35** — the update trust anchor is TLS-only transport to a
+tracked branch ref. That IS the documented streaming-install model
+(security-model.md's supply-chain paragraph, updated by a F22); the
+reviewer's report explicitly asked for no change.
+
+**a F37** — the bin/ family's partial `set` skeletons (`set -e` xor
+`set -u`). Both review agents traced every fallible site: the
+wrapper's fail-open hot path is intact, no unguarded defect exists.
+Forcing `set -euo pipefail` uniformly would change failure semantics
+on the session-start hot path for no measured gain — risk without a
+finding behind it.
 
 ### a F24–F29, F33, F34 (INFO) — small-honesty batch
 
