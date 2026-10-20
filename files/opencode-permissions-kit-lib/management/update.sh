@@ -1,8 +1,9 @@
 #!/bin/sh
 # opencode permissions kit -- update.sh
-# Re-deploys the KIT (wrapper, kit cli, jsonc-parser, sudoers template,
-# umask profile, uninstall.sh, config.sh, status.sh, log.sh) onto a system
-# that has already been installed via install.sh. Does NOT touch:
+# Re-deploys the KIT onto a system that has already been installed via
+# install.sh: the wrapper and cli symlinks, the full library via the
+# deploy-lib.sh manifest (~40 files — layout and modes live there),
+# sudoers, the umask profile and the agent/binary state. Does NOT touch:
 #   - existing /etc/opencode-permissions-kit/projects.conf
 #   - existing /etc/opencode-permissions-kit/install.conf (except the
 #     VERSION stamp and the OPENCODE_GROUP re-base)
@@ -587,6 +588,14 @@ else
 fi
 if ! confirm "$_uc_msg"; then
     echo "Aborted."; exit 0
+fi
+
+# #211 a F33: the group-baseline refresh lives in the kit (non-
+# only-binary) block below — the combination used to drop --refresh
+# without a word.
+if [ "$ONLY_BINARY" = true ] && [ "$REFRESH" = true ]; then
+    ui_detail "note: --refresh is skipped under --only-binary (no kit state is touched)"
+    log "update --refresh --only-binary: refresh skipped by design"
 fi
 
 if [ "$ONLY_BINARY" != true ]; then
