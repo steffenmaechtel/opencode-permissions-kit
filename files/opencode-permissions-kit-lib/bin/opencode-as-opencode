@@ -105,7 +105,11 @@ note() {
     _fd=1
     [ "$HEADLESS" = true ] && _fd=2
     if [ -n "$1" ]; then
-        printf '  %b\n' "$1" >&"$_fd"
+        # %s, not %b (#211 a F29): note() interpolates paths ($CWD,
+        # $SERVE_FALLBACK) — a directory named like an escape sequence
+        # garbled the warning. No caller relies on escape expansion
+        # (grepped); static text is unaffected.
+        printf '  %s\n' "$1" >&"$_fd"
     else
         printf '\n' >&"$_fd"
     fi
