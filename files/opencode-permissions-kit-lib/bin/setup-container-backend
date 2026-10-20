@@ -120,10 +120,22 @@ allocate_range() {
         return 0
     fi
     while true; do
-        local overlap=false
+        local overlap=false _bad=0
         while IFS=: read -r u s c; do
             [ -z "$u" ] && continue
-            local s2="${s:-0}" c2="${c:-0}"
+            # Malformed lines are counted and skipped (#211 a F16): raw
+            # fields used to feed shell arithmetic — digit-leading junk
+            # aborted provisioning under set -e (the shell dies on the
+            # arithmetic syntax error), leading zeros misparsed as octal
+            # silently skewing the overlap math. NB: the done-level
+            # 2>/dev/null swallows stderr INSIDE the loop — the warn is
+            # printed after it, never from within. The concat "$s$c"
+            # check also rejects a zero-START field: a 0 start owns an
+            # empty range at best.
+            case "$s$c" in
+                *[!0-9]*|0?*|"") _bad=$((_bad + 1)); continue ;;
+            esac
+            local s2="$s" c2="$c"
             # Overlap check: [start, start+count) vs [s2, s2+c2)
             local end=$((start + count))
             local end2=$((s2 + c2))
@@ -132,6 +144,10 @@ allocate_range() {
                 break
             fi
         done < "$file" 2>/dev/null || true
+        if [ "$_bad" -gt 0 ]; then
+            printf '  warn: %s malformed line(s) skipped in %s (non-numeric or leading-zero ranges)\n' \
+                "$_bad" "$file" >&2
+        fi
         if [ "$overlap" = false ]; then
             break
         fi

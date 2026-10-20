@@ -415,6 +415,38 @@ else
     check "enable_linger extractable (#211 a F13)" false
 fi
 
+# --- subuid/subgid fields validated before arithmetic (#211 a F16) ----------------
+# allocate_range fed raw /etc/subuid fields into $(( )) — digit-leading
+# junk aborted provisioning under set -e with a cryptic foreign error,
+# leading zeros misparsed as octal. Malformed lines now warn and skip.
+# Pin: the REAL function against a scratch file carrying one good and
+# three malformed lines — warns for the bad ones, correct allocation
+# past the good range, rc 0.
+_f16_fn="$(sed -n '/^allocate_range() {/,/^}$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend")"
+if [ -n "$_f16_fn" ]; then
+    check "allocate_range extractable (#211 a F16)" true
+    F16=$(mktemp -d)
+    printf 'gooduser:100000:65536\njunk:12abc:100\nzeros:010:100\nalpha:abc:100\n' > "$F16/subuid"
+    _out=$(F16FILE="$F16/subuid" sh -c '
+        log() { :; }
+        eval "$1"
+        allocate_range "$F16FILE" f16user
+    ' sh "$_f16_fn" 2>&1) || _f16_rc=$?
+    _f16_warn=$(printf '%s\n' "$_out" | grep -c 'malformed line(s) skipped')
+    _f16_cnt=$(printf '%s\n' "$_out" | sed -n 's/.*warn: \([0-9]*\) malformed.*/\1/p')
+    _f16_alloc=$(grep -c '^f16user:165536:65536$' "$F16/subuid" 2>/dev/null)
+    if [ "${_f16_rc:-0}" -eq 0 ] && [ "$_f16_warn" = "1" ] && [ "$_f16_cnt" = "3" ] \
+       && [ "$_f16_alloc" = "1" ]; then
+        check "malformed lines warn+skip, allocation correct (#211 a F16)" true
+    else
+        check "malformed lines warn+skip, allocation correct (rc=${_f16_rc:-0} warns=$_f16_cnt alloc=$_f16_alloc out=$_out)" false
+    fi
+    rm -rf "$F16"
+else
+    check "allocate_range extractable (#211 a F16)" false
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1
