@@ -43,10 +43,10 @@ against a rewritten scratch root — the real /etc path is unwritable
 for the suite). Sabotage (direct write restored) → red; restored →
 green. Three legacy pins asserting the old direct-write literals were
 carried along (test-update-flags ×2, test-kit-cli ×1); the #198 a W5
-line-bound rose 20→26 for the grown else arm. Sweep: the remaining
-truncate-in-place writes on protection layers are none —
-`grep -n '> /etc\|tee /etc' bin/ management/` shows only staged
-targets now.
+line-bound rose 20→26 for the grown else arm. Sweep: `grep -n
+'> /etc\|tee /etc' bin/ management/` — one remaining truncate-in-place
+write, setup-container-backend's sysctl drop-in (:302): tuning knob,
+best-effort `|| true`, not a protection layer; left as is.
 
 ### a F16 (LOW) — unvalidated subuid/subgid arithmetic
 
