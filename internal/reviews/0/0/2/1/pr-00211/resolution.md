@@ -23,8 +23,23 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F11 (LOW) | **implemented** | `727c76d` | usage gate + status-as-SUB; 7-case loop pin; sabotage red→green |
 | a F12 (LOW) | **implemented** | `27db42a` | _tmp_track registration; recording pin; sabotage red→green |
 | a F13 (LOW) | **implemented** | `911987b` | three honest linger arms; 3-arm stub pins; sabotage red→green |
+| a F14 (LOW) | **implemented** | `578c070` | honest lines at all three pairs; ok/fail pins; sabotage red→green |
 
 ## Evidence detail
+
+### a F14 (LOW) — silent handover pairs, unconditional success
+
+All three root-run pairs (dhr dev->agent, dhb dev-owned handback, dhp
+settings — mirrored op orders kept intact) now print their success
+line only when both ops ran clean; a partial pair warns on stderr
+naming the tree and the self-heal. The pairs stay best-effort by
+design (0.0.45e W1's position: root context, EPERM unlikely,
+next-rescan heals) — the rc contract is unchanged, only the message
+stopped lying. Pins drive the extracted real site-1 block with
+stubbed chmod/chown through ok/chmodfail/chownfail (the `continue`
+inside the extracted fragment is parse-safe — it sits right of a
+false `[ -L ]`); sites 2/3 wiring-grepped. Sabotage (unconditional
+success restored at site 1) → red; restored → green.
 
 ### a F13 (LOW) — linger success claimed over failure
 

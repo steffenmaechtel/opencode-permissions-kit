@@ -543,7 +543,8 @@ ddev_handover_root() {
                 # Best-effort stays (root context, self-heals on the next
                 # rescan) but the line must not claim a completed
                 # handover (#211 a F14).
-                echo "  warn: .ddev handover incomplete for $dhr_d (chmod/chown errors — the next update rescans and heals)" >&2
+                echo "  warn: .ddev handover incomplete for $dhr_d (chmod/chown errors —"\
+" the next update rescans and heals)" >&2
             fi
         fi
         dhr_p="$(dirname "$dhr_d")"
@@ -618,7 +619,8 @@ ddev_handover_project_back() {
             if [ "$_dhb_ok" = true ]; then
                 echo "  dev-owned handback: $dhb_proj/$dhb_d -> $dhb_dev"
             else
-                echo "  warn: dev-owned handback incomplete for $dhb_proj/$dhb_d (chown/chmod errors — the next update rescans and heals)" >&2
+                echo "  warn: dev-owned handback incomplete for $dhb_proj/$dhb_d"\
+" (chown/chmod errors — the next update rescans and heals)" >&2
             fi
         fi
     done
@@ -688,7 +690,8 @@ ddev_handover_project() {
             if [ "$_dhp_ok" = true ]; then
                 echo "  ddev settings handover: $dhp_proj/$dhp_d -> $dhp_user"
             else
-                echo "  warn: ddev settings handover incomplete for $dhp_proj/$dhp_d (chmod/chown errors — the next update rescans and heals)" >&2
+                echo "  warn: ddev settings handover incomplete for $dhp_proj/$dhp_d"\
+" (chmod/chown errors — the next update rescans and heals)" >&2
             fi
         fi
     done
