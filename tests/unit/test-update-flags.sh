@@ -509,7 +509,7 @@ check "update.sh --help no longer claims prompt-free defaults (D2)" \
 # untouched.
 check "update re-applies the policy pin when opted in" \
     sh -c "grep -qF '[ \"\${OPENCHAMBER_POLICY:-}\" = \"yes\" ]' \"\$1\" \
-        && grep -qF 'sudo tee /etc/openchamber/policy.json' \"\$1\"" _ "$UPDATE"
+        && grep -qF 'sudo mv -f \"\$_ocp_tmp\" /etc/openchamber/policy.json' \"\$1\"" _ "$UPDATE"
 check "update never creates the policy pin without the opt-in" \
     sh -c "! grep -qF 'OPENCHAMBER_POLICY=\"yes\"' \"\$1\"" _ "$UPDATE"
 # 0.0.47a F1: the re-apply never overwrites admin content — byte-gate on
@@ -571,9 +571,10 @@ check "uninstall twin probes at the same authority (issue #164)" \
 OC164_BLOCK="$(sed -n '/^    _oc_expected=/,/^    fi$/p' "$UPDATE")"
 # #198 a W5: a drifted end anchor over-captures to EOF — bound the block
 # so anchor drift fails HERE, loudly, instead of surfacing later as a
-# confusing S1/S2 'got:' dump (the block is 16 lines).
+# confusing S1/S2 'got:' dump (the block is 23 lines since #211 a F17's
+# atomic stage+mv grew the else arm).
 if [ -n "$OC164_BLOCK" ] \
-    && [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 20 ] \
+    && [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 26 ] \
     && printf '%s' "$OC164_BLOCK" | grep -qF 'sudo test -f /etc/openchamber/policy.json'; then
     pass "openchamber gate block extractable from update.sh (issue #164)"
 else
@@ -988,6 +989,58 @@ if [ -n "$_f7_stub" ]; then
     fi
 else
     fail "xdg_open_real_exists stub extractable from update.sh (#211 a F7)"
+fi
+
+# --- openchamber policy pin: atomic stage+mv (#211 a F17) --------------------------
+# Both write sites (update.sh re-apply + opk openchamber-secure) used
+# truncate-in-place writes — a kill mid-write left a truncated/empty
+# policy.json and a silently inactive pin (the 0.0.44a V10 atomic-write
+# wave's unswept siblings). Mechanism pins: recording stubs prove the
+# content lands on a pid-suffixed temp and the live file flips via mv
+# only; no write may target the final path directly.
+_f17_block="$(sed -n '/#211 a F17, opk twin/,/sudo mv -f/p' "$UPDATE")"
+if [ -n "$_f17_block" ]; then
+    pass "openchamber stage+mv block extractable (#211 a F17)"
+    _out=$(sh -c '
+        sudo() {
+            case "$1" in
+                mkdir|chown|chmod) return 0 ;;
+                tee) shift; printf "TEE %s\n" "$1" >&2 ;;
+                mv)  shift; case "$1" in -*) shift ;; esac
+                     printf "MV %s -> %s\n" "$1" "$2" ;;
+            esac
+        }
+        eval "$1"
+    ' sh "$_f17_block" 2>&1) || true
+    if printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json.opk-new\.' \
+       && printf '%s' "$_out" | grep -q 'MV /etc/openchamber/policy.json.opk-new\.[0-9]* -> /etc/openchamber/policy.json' \
+       && ! printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json$'; then
+        pass "update.sh: content staged on temp, live file flips via mv (#211 a F17)"
+    else
+        fail "update.sh: staged write + mv (out=$_out)"
+    fi
+else
+    fail "openchamber stage+mv block extractable (#211 a F17)"
+fi
+_f17_opk_block="$(sed -n '/#211 a F17, the 0.0.44a V10 sibling gap/,/^        mv -f/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk")"
+if [ -n "$_f17_opk_block" ]; then
+    # Hermetic: rewrite /etc/openchamber to scratch so the redirect can
+    # actually write (the mechanism — temp + mv to the final name — is
+    # what the pin asserts).
+    F17=$(mktemp -d)
+    mkdir -p "$F17/oc"
+    _f17_opk_block="$(printf '%s\n' "$_f17_opk_block" | sed "s|/etc/openchamber|$F17/oc|g")"
+    _out=$(sh -c 'mv() { case "$1" in -*) shift ;; esac; printf "MV %s -> %s\n" "$1" "$2"; }; eval "$1"' \
+        sh "$_f17_opk_block" 2>&1) || true
+    if printf '%s' "$_out" | grep -q "MV $F17/oc/policy.json.opk-new\.[0-9]* -> $F17/oc/policy.json"; then
+        pass "opk twin: same stage+mv shape (#211 a F17 sweep)"
+    else
+        fail "opk twin: same stage+mv shape (out=$_out)"
+    fi
+    rm -rf "$F17"
+else
+    fail "opk openchamber block extractable (#211 a F17)"
 fi
 
 # --- Summary ----------------------------------------------------------------------

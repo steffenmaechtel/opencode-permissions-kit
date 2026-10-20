@@ -216,9 +216,16 @@ case "$cmd" in
             ui_info "existing /etc/openchamber/policy.json diverges from the kit pin — replacing it"
         fi
         mkdir -p /etc/openchamber
-        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > /etc/openchamber/policy.json
-        chown root:root /etc/openchamber/policy.json
-        chmod 644 /etc/openchamber/policy.json
+        # Atomic stage+mv (#211 a F17, the 0.0.44a V10 sibling gap): a
+        # kill mid-redirect used to leave a truncated/empty policy.json
+        # and silently deactivate the pin — the live file now flips via
+        # rename only, the truncate window sits on the pid-suffixed
+        # temp (0.0.42e C5 shape).
+        _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
+        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > "$_ocp_tmp"
+        chown root:root "$_ocp_tmp" 2>/dev/null || true
+        chmod 644 "$_ocp_tmp"
+        mv -f "$_ocp_tmp" /etc/openchamber/policy.json
         ui_success "policy pin active: /etc/openchamber/policy.json -> /usr/local/bin/opencode"
         # Record the opt-in so update.sh keeps re-applying the pin.
         if grep -q '^OPENCHAMBER_POLICY=' "$INSTALL_CONF" 2>/dev/null; then

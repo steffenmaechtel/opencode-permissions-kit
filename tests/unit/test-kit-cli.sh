@@ -153,10 +153,10 @@ grep -q '    openchamber-secure)' "$KIT" \
 grep -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"' "$KIT" \
     && echo "  ${GREEN}PASS${NC}  openchamber-secure auto-elevates with flags intact" && passed=$((passed + 1)) \
     || { echo "  ${RED}FAIL${NC}  openchamber-secure auto-elevates with flags intact"; failures=$((failures + 1)); }
-grep -qF '> /etc/openchamber/policy.json' "$KIT" \
+grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$KIT" \
     && grep -qF 'OPENCHAMBER_POLICY=yes' "$KIT" \
-    && echo "  ${GREEN}PASS${NC}  openchamber-secure writes the pin + records the opt-in" && passed=$((passed + 1)) \
-    || { echo "  ${RED}FAIL${NC}  openchamber-secure writes the pin + records the opt-in"; failures=$((failures + 1)); }
+    && echo "  ${GREEN}PASS${NC}  openchamber-secure writes the pin (atomic) + records the opt-in" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  openchamber-secure writes the pin (atomic) + records the opt-in"; failures=$((failures + 1)); }
 # 0.0.47a F1: replacing divergent policy content is announced, never silent
 grep -qF 'diverges from the kit pin — replacing it' "$KIT" \
     && echo "  ${GREEN}PASS${NC}  openchamber-secure announces replacing divergent content (F1)" && passed=$((passed + 1)) \

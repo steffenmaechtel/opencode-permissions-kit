@@ -759,10 +759,15 @@ if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
         log "openchamber policy pin NOT re-applied: existing file diverges (admin-owned)"
     else
         sudo mkdir -p /etc/openchamber
+        # Atomic stage+mv (#211 a F17, opk twin): the live policy.json
+        # flips via rename only — a kill mid-tee used to leave a
+        # truncated file and a silently inactive pin.
+        _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
         printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
-            | sudo tee /etc/openchamber/policy.json > /dev/null
-        sudo chown root:root /etc/openchamber/policy.json 2>/dev/null || true
-        sudo chmod 644 /etc/openchamber/policy.json
+            | sudo tee "$_ocp_tmp" > /dev/null
+        sudo chown root:root "$_ocp_tmp" 2>/dev/null || true
+        sudo chmod 644 "$_ocp_tmp"
+        sudo mv -f "$_ocp_tmp" /etc/openchamber/policy.json
         ui_success "openchamber policy pin re-applied: /etc/openchamber/policy.json"
         log "openchamber policy pin re-applied: /etc/openchamber/policy.json"
     fi
