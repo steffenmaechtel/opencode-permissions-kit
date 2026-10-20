@@ -2251,6 +2251,65 @@ else
     fail "_oc_home probe lines extractable from status.sh (#211 a F9)"
 fi
 
+# --- F25: unjudgeable probes render as uncounted unknowns (#211 a F25) ------------
+# Both blocks used the probe's fallback glyph ("?") inside a COUNTED
+# verdict: a failed /proc read printed ui_kv_bad "(? > 80)" (false
+# alarm), a failed stat printed ui_kv_ok "restricted (mode ?)" (false
+# green). Extract both real blocks, drive them with failing probes.
+_f25_ports="$(sed -n '/^port_start=\$(cat \/proc\/sys\/net\/ipv4\/ip_unprivileged_port_start/,/^fi$/p' "$STATUS")"
+if [ -n "$_f25_ports" ]; then
+    F25P=$(mktemp -d)
+    mkdir -p "$F25P/bin"
+    printf '#!/bin/sh\nexit 1\n' > "$F25P/bin/cat"; chmod +x "$F25P/bin/cat"
+    _f25_sh="$(command -v sh)"
+    _out=$(PATH="$F25P/bin" "$_f25_sh" -c '
+        ui_kv()     { echo "kv: $*"; }
+        ui_kv_ok()  { echo "kvok: $*"; }
+        ui_kv_bad() { echo "kvbad: $*"; }
+        ui_detail() { :; }
+        eval "$1"
+    ' sh "$_f25_ports" 2>&1) || true
+    rm -rf "$F25P"
+    if printf '%s' "$_out" | grep -q 'kv: router ports unknown' \
+       && ! printf '%s' "$_out" | grep -q 'kvbad:'; then
+        echo "  ${GREEN}PASS${NC}  unreadable port_start: uncounted unknown, no false alarm (#211 a F25)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  unreadable port_start: uncounted unknown (out=$_out)"
+        failures=$((failures + 1))
+    fi
+else
+    echo "  ${RED}FAIL${NC}  F25 ports block extractable"
+    failures=$((failures + 1))
+fi
+_f25_mnt="$(sed -n '/^    mnt_mode=\$(stat -c %a \/mnt\/c/,/^    fi$/p' "$STATUS")"
+if [ -n "$_f25_mnt" ]; then
+    F25=$(mktemp -d)
+    mkdir -p "$F25/bin"
+    printf '#!/bin/sh\nexit 1\n' > "$F25/bin/stat"; chmod +x "$F25/bin/stat"
+    _f25_sh="$(command -v sh)"
+    _out=$(PATH="$F25/bin" "$_f25_sh" -c '
+        ui_kv()     { echo "kv: $*"; }
+        ui_kv_ok()  { echo "kvok: $*"; }
+        ui_kv_warn(){ echo "kvwarn: $*"; }
+        ui_kv_bad() { echo "kvbad: $*"; }
+        ui_detail() { :; }
+        eval "$1"
+    ' sh "$_f25_mnt" 2>&1) || true
+    if printf '%s' "$_out" | grep -q 'kv: /mnt/c unknown' \
+       && ! printf '%s' "$_out" | grep -q 'kvok:.*mode ?'; then
+        echo "  ${GREEN}PASS${NC}  failing /mnt/c stat: uncounted unknown, no false green (#211 a F25)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  failing /mnt/c stat: uncounted unknown (out=$_out)"
+        failures=$((failures + 1))
+    fi
+    rm -rf "$F25"
+else
+    echo "  ${RED}FAIL${NC}  F25 mnt block extractable"
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
