@@ -876,6 +876,57 @@ else
     fail "install.sh twin logs NOT-ensured on failure too (#211 a F4 sweep)"
 fi
 
+# --- first-wins lib lookups (#211 a F5) --------------------------------------------
+# update.sh sourced the checkout copy AND the deployed LIBDIR copy of
+# wsl-browser-bridge.sh / ddev-handover.sh back-to-back — LIBDIR last,
+# its definitions silently won, inverting the documented "prefer the
+# checkout copy". Extract both real loops and drive them with fixture
+# libs whose markers name their origin: checkout must win when present,
+# LIBDIR is the fallback only.
+F5=$(mktemp -d)
+mkdir -p "$F5/froot/opencode-permissions-kit-lib/sh" "$F5/ldir/sh"
+printf 'wbb_marker() { echo CHECKOUT; }\n' > "$F5/froot/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+printf 'wbb_marker() { echo LIBDIR; }\n'   > "$F5/ldir/sh/wsl-browser-bridge.sh"
+printf 'dh_marker() { echo CHECKOUT; }\n'  > "$F5/froot/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+printf 'dh_marker() { echo LIBDIR; }\n'    > "$F5/ldir/sh/ddev-handover.sh"
+_f5_loop_wbb="$(sed -n '/#211 a F5, wsl-browser-bridge site/,/^done$/p' "$UPDATE")"
+_f5_loop_dh="$(sed -n '/#211 a F5, ddev-handover site/,/^    done$/p' "$UPDATE")"
+if [ -n "$_f5_loop_wbb" ] && [ -n "$_f5_loop_dh" ]; then
+    pass "both first-wins loops extractable from update.sh (#211 a F5)"
+    _f5_eval() {
+        (
+            FILES_ROOT="$F5/froot"
+            LIBDIR="$F5/ldir"
+            eval "$1"
+            "$2"
+        )
+    }
+    if [ "$(_f5_eval "$_f5_loop_wbb" wbb_marker)" = CHECKOUT ]; then
+        pass "checkout copy wins over LIBDIR (wsl-browser-bridge) (#211 a F5)"
+    else
+        fail "checkout copy wins over LIBDIR (wsl-browser-bridge) (#211 a F5)"
+    fi
+    if [ "$(_f5_eval "$_f5_loop_dh" dh_marker)" = CHECKOUT ]; then
+        pass "checkout copy wins over LIBDIR (ddev-handover) (#211 a F5)"
+    else
+        fail "checkout copy wins over LIBDIR (ddev-handover) (#211 a F5)"
+    fi
+    rm -rf "${F5:?}/froot"
+    if [ "$(_f5_eval "$_f5_loop_wbb" wbb_marker)" = LIBDIR ]; then
+        pass "LIBDIR fallback when checkout copy absent (bridge) (#211 a F5)"
+    else
+        fail "LIBDIR fallback when checkout copy absent (bridge) (#211 a F5)"
+    fi
+    if [ "$(_f5_eval "$_f5_loop_dh" dh_marker)" = LIBDIR ]; then
+        pass "LIBDIR fallback when checkout copy absent (handover) (#211 a F5)"
+    else
+        fail "LIBDIR fallback when checkout copy absent (handover) (#211 a F5)"
+    fi
+else
+    fail "both first-wins loops extractable from update.sh (#211 a F5)"
+fi
+rm -rf "$F5"
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="

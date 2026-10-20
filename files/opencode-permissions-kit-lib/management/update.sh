@@ -626,9 +626,16 @@ log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
 # the kit does not edit wsl.conf implicitly (internal/records/wsl-conf-consent.md);
 # the user opts in via 'sudo opk wsl-add-opencode-1-fix'. An existing
 # carrier stays untouched and keeps working.
-[ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] \
-    && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
-[ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] && . "$LIBDIR/sh/wsl-browser-bridge.sh"
+# First-wins lookup (#211 a F5, wsl-browser-bridge site): the old
+# back-to-back sourcing let the deployed LIBDIR copy override the
+# checkout copy — the documented "prefer the checkout vintage" was
+# inverted in code. Sibling shape: config.sh's helper lookups.
+for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
 if browser_bridge_is_wsl; then
@@ -823,9 +830,15 @@ fi
 if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     # Shared helper: prefer the copy next to this script (checkout — same
     # vintage as the running update.sh), fall back to the deployed library.
-    [ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" ] \
-        && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh"
-    [ -f "$LIBDIR/sh/ddev-handover.sh" ] && . "$LIBDIR/sh/ddev-handover.sh"
+    # First-wins lookup (#211 a F5, ddev-handover site): same fix as the
+    # wsl-browser-bridge site above — LIBDIR must never shadow a checkout
+    # copy that is present.
+    for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; do
+        if [ -f "$cand" ]; then
+            . "$cand"
+            break
+        fi
+    done
     command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
         # Loud like config.sh's stubs (#211 a F2 sweep): a silent no-op
         # let the loop below log "ddev handover pass completed" over a
