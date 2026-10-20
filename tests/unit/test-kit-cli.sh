@@ -798,6 +798,47 @@ case "$_out" in
         failures=$((failures + 1)) ;;
 esac
 
+# --- F24: a missing staged-write.sh names itself, not a symlink --------------------
+# agent_home_sane returning 127 (lib missing) used to die with "a parent
+# is a symlink" — wrong diagnosis for a broken kit. Extract the guard
+# block and drive both arms with a fixed $target.
+_f24_block="$(sed -n '/#211 a F24/,/^    fi$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
+if [ -n "$_f24_block" ]; then
+    echo "  ${GREEN}PASS${NC}  F24 guard block extractable"
+    passed=$((passed + 1))
+    _f24_run() {
+        # $1 = define sane fn (yes|no)
+        (
+            OPENCODE_USER=oc
+            target=/home/oc/.config/opencode/settings.json
+            die() { echo "die: $*"; exit 1; }
+            if [ "$1" = yes ]; then agent_home_sane() { return 0; }; fi
+            eval "$_f24_block"
+            echo "NOT-REACHED"
+        )
+    }
+    _out=$(_f24_run no) || true
+    case "$_out" in
+        *"die: kit file sh/staged-write.sh missing"*)
+            echo "  ${GREEN}PASS${NC}  missing lib names itself (#211 a F24)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  missing lib names itself (got: $_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f24_run yes) || true
+    case "$_out" in
+        *NOT-REACHED*)
+            echo "  ${GREEN}PASS${NC}  healthy helper passes through (#211 a F24)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  healthy helper passes through (got: $_out)"
+            failures=$((failures + 1)) ;;
+    esac
+else
+    echo "  ${RED}FAIL${NC}  F24 guard block extractable"
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

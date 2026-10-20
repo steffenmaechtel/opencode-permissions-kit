@@ -485,7 +485,12 @@ git_config_apply() {
     # agent-replaceable after any completed install) passes `sudo mkdir -p`
     # silently and would redirect the writes below into the link target.
     # The requested toggle was NOT applied — die loudly (user-managed link;
-    # the kit never follows links in the agent home).
+    # the kit never follows links in the agent home). Missing lib gets its
+    # own diagnosis (#211 a F24): a 127 from an absent staged-write.sh
+    # used to misattribute a broken kit to "a parent is a symlink".
+    if ! command -v agent_home_sane >/dev/null 2>&1; then
+        die "kit file sh/staged-write.sh missing — cannot check $target (run: sudo opk update)"
+    fi
     if ! agent_home_sane "$OPENCODE_USER" "$(dirname "$target")"; then
         die "a parent of $target is a symlink — git-config $enable NOT applied (user-managed link)"
     fi
