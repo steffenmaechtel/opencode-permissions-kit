@@ -150,6 +150,13 @@ _fsb_pass() {
     [ $# -gt 0 ] || return 0
     _fsbp_rc=0
     _fsbp_nul="$(mktemp "${TMPDIR:-/tmp}/opk-fsb-pass.XXXXXXXX")"
+    # Scratch registered with the caller's cleanup trap (#211 a F12,
+    # staged-write.sh:44 shape): an aborted pass (Ctrl-C on a large
+    # tree, minutes per pass) used to leave the root-owned NUL file
+    # behind in /tmp. The plain rm below still covers the normal path.
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_fsbp_nul"
+    fi
     # find's own status must survive into the pass bookkeeping (0.0.43b
     # W4): POSIX sh has no pipefail, a pipeline's rc is the LAST
     # command's alone, and xargs -r no-ops GREEN on an empty stream — a

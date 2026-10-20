@@ -398,6 +398,26 @@ assert_eq "walker: spaces in components and names survive the walk" "620" \
     "$(stat -c %a "$F1SP/proj/a/dir two/has space.txt")"
 rm -rf "$F1SP"
 
+# --- 10. pass scratch registered with the caller's cleanup trap (#211 a F12) ------
+# _fsb_pass's NUL temp was a plain mktemp + rm: an aborted pass (Ctrl-C
+# during the minutes-long walk) left the root-owned file in /tmp. The
+# staged-write shape registers it with the caller's _tmp_track trap.
+# Pin: source the real lib with a RECORDING _tmp_track, run one pass,
+# assert the opk-fsb-pass temp was registered.
+F12S=$(mktemp -d)
+mkdir -p "$F12S/root"
+printf 'x\n' > "$F12S/root/f"
+F12_TRACK="$F12S/tracked" FS_SUDO="" \
+    sh -c '. "$1" && _tmp_track() { printf "%s\n" "$1" >> "$F12_TRACK"; } \
+    && _fsb_pass "f12" "$2" -type f -- chmod g+w' \
+    _ "$LIB" "$F12S/root" >/dev/null 2>&1 || true
+if grep -q 'opk-fsb-pass' "$F12S/tracked" 2>/dev/null; then
+    pass "pass scratch registered with _tmp_track (#211 a F12)"
+else
+    fail "pass scratch registered with _tmp_track (#211 a F12)"
+fi
+rm -rf "$F12S"
+
 # --- Summary ---------------------------------------------------------------------------
 echo ""
 echo "================================================="
