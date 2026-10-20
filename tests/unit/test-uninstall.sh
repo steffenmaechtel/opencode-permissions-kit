@@ -584,6 +584,44 @@ else
     fail "bridge removal block extractable (#211 a F27)"
 fi
 
+# --- F28: group removal exact + honest (#211 a F28) --------------------------------
+# The membership probe was a substring grep (a group 'opencode2' matched
+# 'opencode') and the success echo printed over a silenced gpasswd
+# failure. Extract the real block; stub id/run_q/log; drive all arms.
+_f28_block="$(sed -n '/^if id "\$DEFAULT_USER" >\/dev\/null 2>&1 \\/,/^fi$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh")"
+if [ -n "$_f28_block" ]; then
+    pass "group removal block extractable (#211 a F28)"
+    _f28_run() {
+        # $1 = groups-print, $2 = gpasswd rc
+        (
+            DEFAULT_USER=dev
+            OPENCODE_GROUP=opencode
+            id() { printf '%s\n' "uid=1(dev) gid=1(dev) groups=1(dev),$F28GRPS"; return 0; }
+            run_q() { return "$F28GP"; }
+            log() { echo "log: $*"; }
+            eval "$_f28_block"
+        )
+    }
+    _out=$(F28GP=0 F28GRPS="50(opencode)" _f28_run) || true
+    case "$_out" in
+        *"Removed dev from group opencode."*) pass "member + gpasswd ok: removed reported (#211 a F28)" ;;
+        *) fail "member + gpasswd ok: removed reported (got: $_out)" ;;
+    esac
+    _out=$(F28GP=1 F28GRPS="50(opencode)" _f28_run 2>&1) || true
+    case "$_out" in
+        *"WARN: could not remove dev from group opencode"*) pass "gpasswd failure: warn, no false removed (#211 a F28)" ;;
+        *) fail "gpasswd failure: warn (got: $_out)" ;;
+    esac
+    _out=$(F28GP=0 F28GRPS="50(opencode2)" _f28_run) || true
+    case "$_out" in
+        *"Removed"*) fail "opencode2 must NOT count as membership (#211 a F28)" ;;
+        *) pass "exact-name match: opencode2 is not opencode (#211 a F28)" ;;
+    esac
+else
+    fail "group removal block extractable (#211 a F28)"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1

@@ -410,11 +410,18 @@ log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ 
 echo ""
 echo "--- Removing opencode user ---"
 # Remove the developer from the sharing group FIRST so userdel can clean up
-# the opencode usergroup (its primary group) automatically.
-if id "$DEFAULT_USER" >/dev/null 2>&1 && id "$DEFAULT_USER" | grep -q "$OPENCODE_GROUP"; then
-    run_q sudo gpasswd -d "$DEFAULT_USER" "$OPENCODE_GROUP"
-    echo "Removed $DEFAULT_USER from group $OPENCODE_GROUP."
-    log "removed $DEFAULT_USER from group $OPENCODE_GROUP"
+# the opencode usergroup (its primary group) automatically. Exact-name
+# match (#211 a F28): a bare substring grep matched opencode2 too, and the
+# success echo printed over a silenced gpasswd failure.
+if id "$DEFAULT_USER" >/dev/null 2>&1 \
+    && id "$DEFAULT_USER" | grep -qF "($OPENCODE_GROUP)"; then
+    if run_q sudo gpasswd -d "$DEFAULT_USER" "$OPENCODE_GROUP"; then
+        echo "Removed $DEFAULT_USER from group $OPENCODE_GROUP."
+        log "removed $DEFAULT_USER from group $OPENCODE_GROUP"
+    else
+        echo "WARN: could not remove $DEFAULT_USER from group $OPENCODE_GROUP (gpasswd failed)" >&2
+        log "group removal FAILED for $DEFAULT_USER (gpasswd)"
+    fi
 fi
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ans=$(prompt_yn "Remove user '$OPENCODE_USER' and their home directory?" "n")
