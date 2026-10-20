@@ -638,6 +638,13 @@ for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" 
 done
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
+# Fail-safe stub (#211 a F7): if the never-shadow probe itself is
+# unavailable (wsl-browser-bridge.sh missing from both lookup sites),
+# both call sites below must err on the never-shadow side — rc 0
+# ("a real one might exist") removes/withholds the shim instead of
+# shadowing one. Sibling guard: status.sh wraps its call in
+# command -v (0.0.46a F4); update.sh was the unswept twin.
+command -v xdg_open_real_exists >/dev/null 2>&1 || xdg_open_real_exists() { return 0; }
 if browser_bridge_is_wsl; then
     # Failure-honest since 0.0.45c C4: browser_bridge_install propagates a
     # failed stand-in deploy or legacy strip — the old unconditional

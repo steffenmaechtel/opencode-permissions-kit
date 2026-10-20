@@ -968,6 +968,28 @@ else
     fail "umask block extractable from update.sh (#211 a F6)"
 fi
 
+# --- xdg_open_real_exists fail-safe stub (#211 a F7) --------------------------------
+# Without the stub, a missing wsl-browser-bridge.sh made both call
+# sites see rc 127: `if xdg_open_real_exists` kept the shim, and
+# `! xdg_open_real_exists` INSTALLED it — both the shadowing direction
+# (0.0.42d S1's never-shadow probe silently gone). The stub answers
+# rc 0 = "assume a real one might exist". Pin: the stub is extracted
+# from the real update.sh and executed — rc must be 0 (deleting the
+# stub yields 127 and the pin goes red).
+_f7_stub="$(grep -m1 '^command -v xdg_open_real_exists' "$UPDATE")"
+if [ -n "$_f7_stub" ]; then
+    pass "xdg_open_real_exists stub extractable from update.sh (#211 a F7)"
+    _f7_rc=0
+    _f7_out=$(eval "$_f7_stub" >/dev/null 2>&1; xdg_open_real_exists) || _f7_rc=$?
+    if [ "$_f7_rc" -eq 0 ]; then
+        pass "stub answers rc 0 — never-shadow direction when probe missing (#211 a F7)"
+    else
+        fail "stub answers rc 0 (got rc $_f7_rc) (#211 a F7)"
+    fi
+else
+    fail "xdg_open_real_exists stub extractable from update.sh (#211 a F7)"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="
