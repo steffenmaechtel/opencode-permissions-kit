@@ -788,14 +788,15 @@ fi
 # (sibling shape: ddev-migrate, xdg-open).
 mkdir -p "$WORK/bin2"
 ln -s "$BIN/opk" "$WORK/bin2/opk"
-_out="$(OPK_INSTALL_CONF="$WORK/install.conf" "$WORK/bin2/opk" --help 2>/dev/null)" || true
-if [ -n "$_out" ] && printf '%s' "$_out" | grep -q 'status'; then
-    echo "  ${GREEN}PASS${NC}  chained symlink dispatches (readlink -f, #211 a F15)"
-    passed=$((passed + 1))
-else
-    echo "  ${RED}FAIL${NC}  chained symlink dispatches (#211 a F15, got: $_out)"
-    failures=$((failures + 1))
-fi
+_out="$(OPK_INSTALL_CONF="$WORK/install.conf" "$WORK/bin2/opk" status 2>/dev/null)" || true
+case "$_out" in
+    *"status:euid="*)
+        echo "  ${GREEN}PASS${NC}  chained symlink dispatches (readlink -f, #211 a F15)"
+        passed=$((passed + 1)) ;;
+    *)
+        echo "  ${RED}FAIL${NC}  chained symlink dispatches (#211 a F15, got: $_out)"
+        failures=$((failures + 1)) ;;
+esac
 
 echo ""
 if [ "$failures" -gt 0 ]; then
