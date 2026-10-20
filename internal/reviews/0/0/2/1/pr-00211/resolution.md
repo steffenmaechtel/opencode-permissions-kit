@@ -25,8 +25,26 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F13 (LOW) | **implemented** | `911987b` | three honest linger arms; 3-arm stub pins; sabotage red→green |
 | a F14 (LOW) | **implemented** | `578c070` | honest lines at all three pairs; ok/fail pins; sabotage red→green |
 | a F15 (LOW) | **implemented** | `5e7f913` | readlink -f full chain; chained-symlink dispatch pin |
+| a F16 (LOW) | **implemented** | `6f9dd75` | field validation + counted warn; real-function pin; sabotage red |
 
 ## Evidence detail
+
+### a F16 (LOW) — unvalidated subuid/subgid arithmetic
+
+Malformed /etc/subuid(subgid) lines are counted and skipped before
+any `$(( ))` sees them: digit-leading junk no longer kills
+provisioning under set -e (dash dies rc 2 on the arithmetic syntax
+error — reproduced during pin development), leading zeros no longer
+skew the overlap math as octal, and zero-START fields are rejected
+too. The summary warn prints AFTER the read loop: the done-level
+`2>/dev/null` swallows stderr INSIDE the loop — the pin's first draft
+warned from within and never saw its own output (recorded here as
+the redirect-scope trap for the next pin author). Pins drive the REAL
+function against a scratch file (good line moves the allocation,
+three malformed lines → one counted warn, rc 0). Sabotage (validation
+deleted) → red; restored → green. Sweep: `grep -n '\$((\$' bin/ sh/`
+— no other shipped site feeds file-read fields into arithmetic
+unvalidated.
 
 ### a F15 (LOW) — opk single-hop symlink resolution
 
