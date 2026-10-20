@@ -14,8 +14,23 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F2 (MED) | **implemented** | `e7349e5` | loud stubs + abort pin + update.sh twin swept — detail below |
 | a F3 (MED) | **implemented** | `56bc585` | if/fi tail; real-binary pins both ways; sabotage red→green |
 | a F4 (LOW) | **implemented** | `31a755a` | three honest arms, both twins; 3-arm stub pins; sabotage red→green |
+| a F5 (LOW) | **implemented** | `e3dd92c` | first-wins loops at both sites; origin-marker pins; sabotage red→green |
 
 ## Evidence detail
+
+### a F5 (LOW) — dual-source last-wins vs "prefer checkout"
+
+Both update.sh sites (wsl-browser-bridge.sh, ddev-handover.sh) now use
+the sibling for/break first-wins shape; the deployed LIBDIR copy can
+no longer override a present checkout copy. Pins extract both real
+loops (sed-anchored on the per-site fix comments — the handover loop's
+`done` is indented, its end anchor is `^    done$`) and drive them
+with fixture libs whose marker functions name their origin: CHECKOUT
+must win when both exist, LIBDIR answers only in the fallback.
+Sabotage (reverting one site to back-to-back sourcing) → red;
+restored → green. Sweep: `grep -n '&& . "\$LIBDIR' update.sh` — no
+remaining back-to-back source pair; config.sh/install.sh lookups were
+already first-wins.
 
 ### a F4 (LOW) — safe.directory audit claims ensured over failure
 
