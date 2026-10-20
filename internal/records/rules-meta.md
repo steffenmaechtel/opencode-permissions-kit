@@ -1,7 +1,8 @@
 # Rule-Meta System (RM) — design record
 
-> Status: **CURRENT** — pilot/build-out running since 2026-10-14, now on
-> `feature/rules-meta-conventions` (the pilot branch merged via #184).
+> Status: **CURRENT** — pilot/build-out running since 2026-10-14;
+> the AGENTS-Rules wave runs on `feature/rules-meta-agents-rules`
+> (the pilot branch merged via #184).
 > This is the design record for the
 > rule-rationale system; the governed rule texts live in `agent/*.md`
 > and in the `## Rules` section of `AGENTS.md`. Where this record
@@ -130,22 +131,19 @@ invariant. (RM-0029)
 | 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
-| 3 | remaining agent files + AGENTS Rules | test-fidelity 2026-10-18; review-concept 2026-10-19; AGENTS open |
+| 3 | agent files + AGENTS Rules | done — test-fidelity 2026-10-18; review-concept 2026-10-19; AGENTS 2026-10-20 |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
 
 The 2026-10-19 review-concept step split the file: operative rules in
 `agent/review-concept.md`, history and calibration data in
-`internal/records/review-calibration.md`. All metas RM-0057–0092
-maintainer-approved 2026-10-19 (same day, direct chat review), with
-revisions: RM-0062 retired (merged into the reviews-also-fixes
-bullet), RM-0068 retired (obsolete — no fully automated chains),
-RM-0083 cause-corrected (skill bias, not model family), RM-0084
-reworded (fan-out preferred for every review), RM-0092 added
-(checkpoint timestamps, maintainer proposal). The record's own body
-rules and scope defaults were equipped the same day (RM-0093–0096;
-both sections now audit-active; the format-spec bullet was folded
-into the template).
+`internal/records/review-calibration.md`. Metas RM-0057–0092 and the
+record's own body rules and scope defaults (RM-0093–0096, both
+sections audit-active) were maintainer-approved the same day (direct
+chat review); revision details live in the metas' review logs.
+
+The AGENTS Rules metas RM-0097–0105 were maintainer-approved
+2026-10-20 (direct chat review).
 
 ## Open defaults (the pilot validates them)
 
@@ -155,8 +153,10 @@ into the template).
 
 learnings.md is out of meta scope (decision 10): its rationales are
 the inline corpus statistics and the meta-analysis runs own its
-lifecycle; the run-L1–L7 obligation itself gets its meta via
-`AGENTS.md ## Rules`.
+lifecycle; the run-L1–L7 obligation got its meta via the
+`AGENTS.md ## Rules` bullet — one of nine Rules units equipped on
+2026-10-20 (RM-0097–0105). The rule-bearing sentence moved out of
+the "Review learnings" narrative (decision 9).
 
 ## Rejected alternatives
 

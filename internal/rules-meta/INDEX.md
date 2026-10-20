@@ -6,12 +6,28 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**95 metas · 93 active · 2 retired · 1 review-pending · next due 2026-11-14**
+**104 metas · 102 active · 2 retired · 1 review-pending · next due 2026-11-14**
 
 ## Actionable
 
 - **Review pending:** RM-0068
 - **Overdue:** none
+
+## AGENTS.md
+
+### Rules
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0097](0/0/9/RM-0097.md) | Never commit on master | active | approved | 1m | 2026-11-20 |
+| [RM-0098](0/0/9/RM-0098.md) | All shipped content is English | active | approved | 1m | 2026-11-20 |
+| [RM-0099](0/0/9/RM-0099.md) | Follow agent/conventions.md for interactive… | active | approved | 1m | 2026-11-20 |
+| [RM-0100](0/1/0/RM-0100.md) | Docs change with the code | active | approved | 1m | 2026-11-20 |
+| [RM-0101](0/1/0/RM-0101.md) | Don't rename scripts in files/ | active | approved | 1m | 2026-11-20 |
+| [RM-0102](0/1/0/RM-0102.md) | Don't bump VERSION unless the maintainer asks | active | approved | 1m | 2026-11-20 |
+| [RM-0103](0/1/0/RM-0103.md) | The security model is deliberately | active | approved | 1m | 2026-11-20 |
+| [RM-0104](0/1/0/RM-0104.md) | The kit never edits user-owned | active | approved | 1m | 2026-11-20 |
+| [RM-0105](0/1/0/RM-0105.md) | Run the L1–L7 checklist before | active | approved | 1m | 2026-11-20 |
 
 ## agent/conventions.md
 

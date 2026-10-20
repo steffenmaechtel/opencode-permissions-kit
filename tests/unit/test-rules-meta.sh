@@ -87,6 +87,7 @@ new_scratch() {  # green baseline tree
     cp scripts/gen-rules-index.py "$SCRATCH/scripts/"
     : > "$SCRATCH/agent/test-fidelity.md"   # in SCOPE_FILES; empty = no units
     : > "$SCRATCH/agent/review-concept.md"  # in SCOPE_FILES; empty = no units
+    : > "$SCRATCH/AGENTS.md"                # in SCOPE_FILES; empty = no units
     cat > "$SCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 

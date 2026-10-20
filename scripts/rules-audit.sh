@@ -32,8 +32,9 @@
 #
 # Scope lives HERE, reviewable (record: "the section allowlist lives
 # in the audit script"): SCOPE_FILES are scanned for refs (2, 3);
-# ACTIVE_SECTIONS additionally enforce unit refs (1). Phase 3 extends
-# the lists as the remaining agent/ files get metas.
+# ACTIVE_SECTIONS additionally enforce unit refs (1). Phase 3 is
+# complete: the agent/ files and AGENTS.md ## Rules are in scope;
+# learnings.md stays out (record decision 10).
 #
 # Exit: 1 on blocking violations (1-6, 9), 0 otherwise.
 # Env: RM_AUDIT_ROOT (run against another tree -- tests),
@@ -49,8 +50,9 @@ fi
 TODAY=${FORCE_TODAY:-$(date +%F)}
 METAS=internal/rules-meta
 
-SCOPE_FILES="agent/conventions.md agent/test-fidelity.md agent/review-concept.md internal/records/rules-meta.md"
-ACTIVE_SECTIONS="agent/conventions.md#interactive-prompts-yn"
+SCOPE_FILES="AGENTS.md agent/conventions.md agent/test-fidelity.md agent/review-concept.md internal/records/rules-meta.md"
+ACTIVE_SECTIONS="AGENTS.md#rules"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#interactive-prompts-yn"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#script-output-style"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-security-untrusted-input"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#test-sandbox-unit-suites"
