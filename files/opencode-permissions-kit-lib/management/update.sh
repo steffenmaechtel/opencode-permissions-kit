@@ -723,6 +723,12 @@ if [ -f "$FILES_ROOT/etc/umask.sh" ]; then
     sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
     ui_success "umask profile re-deployed"
     log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
+else
+    # Conservative skip, loud like the sudoers twin above (0.0.41f S2
+    # shape, #211 a F6): near-unreachable (fetch list + heal guarantee
+    # the file), but the skip must not be silent — an update that
+    # quietly dropped a protection-layer deploy is undebuggable.
+    log "umask profile re-deploy skipped: $FILES_ROOT/etc/umask.sh missing (existing profile kept)"
 fi
 
 # --- OpenChamber policy pin (issue #154) ---------------------------------------

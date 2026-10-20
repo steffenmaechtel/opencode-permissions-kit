@@ -927,6 +927,47 @@ else
 fi
 rm -rf "$F5"
 
+# --- umask skip is loud like its sudoers twin (#211 a F6) ---------------------------
+# A missing $FILES_ROOT/etc/umask.sh used to skip the umask re-deploy
+# with zero output while the sudoers twin above logs its identical
+# conservative skip (0.0.41f S2: "the skip must not be silent").
+# Extract the real block and drive both arms.
+_f6_block="$(sed -n '/^if \[ -f "\$FILES_ROOT\/etc\/umask.sh" \]; then$/,/^fi$/p' "$UPDATE")"
+if [ -n "$_f6_block" ]; then
+    pass "umask block extractable from update.sh (#211 a F6)"
+    _f6_run() {
+        # $1 = FILES_ROOT (missing or present umask.sh)
+        (
+            FILES_ROOT="$1"
+            copy_file_atomic() { return 0; }
+            sudo() { return 0; }
+            die() { echo "die: $*"; exit 1; }
+            ui_success(){ echo "success: $*"; }
+            log()       { echo "log: $*"; }
+            eval "$_f6_block"
+        ) 2>&1
+    }
+    F6=$(mktemp -d)
+    _out=$(_f6_run "$F6/missing-root") || true
+    if printf '%s' "$_out" | grep -q 'log: umask profile re-deploy skipped'; then
+        pass "missing umask.sh: skip is logged, not silent (#211 a F6)"
+    else
+        fail "missing umask.sh: skip is logged, not silent (out=$_out)"
+    fi
+    mkdir -p "$F6/root/etc"
+    printf 'umask 027\n' > "$F6/root/etc/umask.sh"
+    _out=$(_f6_run "$F6/root") || true
+    if printf '%s' "$_out" | grep -q 'log: umask profile re-deployed' \
+       && ! printf '%s' "$_out" | grep -q 'skipped'; then
+        pass "present umask.sh: deploy path unchanged (#211 a F6)"
+    else
+        fail "present umask.sh: deploy path unchanged (out=$_out)"
+    fi
+    rm -rf "$F6"
+else
+    fail "umask block extractable from update.sh (#211 a F6)"
+fi
+
 # --- Summary ----------------------------------------------------------------------
 echo ""
 echo "===================================="
