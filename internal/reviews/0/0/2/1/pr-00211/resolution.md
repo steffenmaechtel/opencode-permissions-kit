@@ -27,8 +27,26 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F15 (LOW) | **implemented** | `5e7f913` | readlink -f full chain; chained-symlink dispatch pin |
 | a F16 (LOW) | **implemented** | `6f9dd75` | field validation + counted warn; real-function pin; sabotage red |
 | a F17 (LOW) | **implemented** | `120270f` | stage+mv at both sites; recorder pins; sabotage red→green |
+| a F18 (LOW) | **implemented** | `d07b103` | 8-line consumption bound, both strip paths; worst-case pin |
 
 ## Evidence detail
+
+### a F18 (LOW) — stripper eats foreign comments on a marker-less block
+
+Both strip paths bound their in_block consumption to the kit block's
+8 inner lines (7 comments + carrier): a 9th consumed line means the
+end marker was hand-destroyed — the stripper stops there and foreign
+comments survive, "never eat foreign content" now holds for comments
+too. Pin history (all three failure modes recorded for the next pin
+author): the first draft was VACUOUS (bb() pins the default conf, the
+fixture was never written — both asserts greened on untouched input);
+the second drove the real conf and exposed an OFF-BY-ONE (bound 9 ate
+the first foreign comment — the block has 8 inner lines); the
+sabotage-restore also wiped the uncommitted bound fix (the
+AGENTS.md stash-first trap, hit for real). Final: worst-case fixture
+(marker-less block + foreign comment + section) through the REAL
+write path, sabotage (bound neutralized) red, restored green
+(`d07b103` + `271eed8`).
 
 ### a F17 (LOW) — non-atomic openchamber policy writes
 
