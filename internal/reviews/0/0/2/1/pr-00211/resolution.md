@@ -13,8 +13,24 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F1 (HIGH) | **implemented** | `fd13a19` | race + spaces pins, sabotage red→green, class sweep — detail below |
 | a F2 (MED) | **implemented** | `e7349e5` | loud stubs + abort pin + update.sh twin swept — detail below |
 | a F3 (MED) | **implemented** | `56bc585` | if/fi tail; real-binary pins both ways; sabotage red→green |
+| a F4 (LOW) | **implemented** | `31a755a` | three honest arms, both twins; 3-arm stub pins; sabotage red→green |
 
 ## Evidence detail
+
+### a F4 (LOW) — safe.directory audit claims ensured over failure
+
+Both twins (install.sh + update.sh) now carry three honest arms:
+already-set (audit notes it, no redundant add — the old unconditional
+log was at least true there), add-success (ui_success + ensured log),
+add-failure (ui_warn naming 'dubious ownership' + NOT-ensured log).
+Pins: the extracted REAL update.sh block runs through all three arms
+with a sudo stub that answers both git invocations itself (hermetic —
+a pass-through stub would choke on sudo's own -u/-H flags and read the
+host's ~/.gitconfig, the 0.0.46a F2 class); the install twin is
+grep-pinned for the NOT-ensured arm (sweep). Sabotage (deleting the
+else arm) → red; restored → green. Sweep: `grep -rn '&& ui_success'`
+over install/update — no other `&&`-tailed success-over-possible-
+failure pair remains in the two scripts.
 
 ### a F3 (MED) — ddev-migrate list inverted rc
 
