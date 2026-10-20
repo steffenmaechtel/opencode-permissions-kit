@@ -953,6 +953,29 @@ check "import passes HOME/XDG as single quoted arguments" \
 check_fail "import no longer word-splits an env string" \
     sh -c "grep -q 'env \$dm_env' \"\$1\"" _ "$MIG"
 
+# --- bin/ddev-migrate list: rc 0 means "listed fine" (#211 a F3) ------------------
+# The list arm's bare `[ "$dm_found" = 0 ] && echo` tail made the arm
+# exit 1 whenever dump directories EXISTED — success read as failure.
+# Drive the real binary against a scratch backup root both ways.
+F3ROOT=$(mktemp -d)
+mkdir -p "$F3ROOT/ddev-migration-20261020-1200"
+printf 'db.sql\n' > "$F3ROOT/ddev-migration-20261020-1200/db.sql"
+F3RC=0
+F3OUT="$(DDEV_MIG_BACKUP_ROOT="$F3ROOT" "$BIN_MIG" list 2>&1)" || F3RC=$?
+if [ "${F3RC:-0}" -eq 0 ] && printf '%s' "$F3OUT" | grep -q 'ddev-migration-20261020-1200'; then
+    pass "list exits 0 with dump directories present (#211 a F3)"
+else
+    fail "list exits 0 with dump directories present (#211 a F3, rc ${F3RC:-0})"
+fi
+F3RC=0
+F3OUT="$(DDEV_MIG_BACKUP_ROOT="$F3ROOT/empty" "$BIN_MIG" list 2>&1)" || F3RC=$?
+if [ "$F3RC" -eq 0 ] && printf '%s' "$F3OUT" | grep -q 'no dump directories'; then
+    pass "list exits 0 and reports none when empty (#211 a F3)"
+else
+    fail "list exits 0 and reports none when empty (#211 a F3, rc $F3RC)"
+fi
+rm -rf "$F3ROOT"
+
 # --- Summary ------------------------------------------------------------------------
 
 # Cleanup the fixture sandbox root. Unit-test policy (0.0.42e C1): suites

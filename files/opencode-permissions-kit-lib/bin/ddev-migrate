@@ -28,7 +28,13 @@ case "${1:-}" in
             echo "$dm_d:"
             ls -1 "$dm_d" 2>/dev/null | sed 's/^/    /'
         done
-        [ "$dm_found" = 0 ] && echo "no dump directories under $DDEV_MIG_BACKUP_ROOT"
+        # rc 0 means "listed fine" regardless of whether dumps exist
+        # (#211 a F3): the bare `&& echo` tail made the case arm's rc
+        # 1 whenever dump directories WERE found — success read as
+        # failure for every scripted caller of a diagnostics command.
+        if [ "$dm_found" = 0 ]; then
+            echo "no dump directories under $DDEV_MIG_BACKUP_ROOT"
+        fi
         ;;
     export)
         [ "$(id -u)" = 0 ] || { echo "ddev-migrate: export must run as root"; exit 1; }
