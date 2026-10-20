@@ -15,8 +15,20 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F3 (MED) | **implemented** | `56bc585` | if/fi tail; real-binary pins both ways; sabotage red→green |
 | a F4 (LOW) | **implemented** | `31a755a` | three honest arms, both twins; 3-arm stub pins; sabotage red→green |
 | a F5 (LOW) | **implemented** | `e3dd92c` | first-wins loops at both sites; origin-marker pins; sabotage red→green |
+| a F6 (LOW) | **implemented** | `724e4f8` | else-log like the sudoers twin; both arms pinned; sabotage red→green |
 
 ## Evidence detail
+
+### a F6 (LOW) — silent umask skip
+
+The umask re-deploy's missing-template arm now logs its conservative
+skip with the same shape as the sudoers twin directly above it
+(0.0.41f S2: "the skip must not be silent"). Pins extract the real
+block and drive both arms (missing → skip log; present → deploy path
+unchanged). Sabotage (deleting the skip arm, syntax kept valid) → red
+at the skip-log assert; restored → green. Sweep: the fetch list +
+heal loop guarantee the file, so no other silent-template-skip
+remains — `grep -n 're-deploy' update.sh` shows both arms logging.
 
 ### a F5 (LOW) — dual-source last-wins vs "prefer checkout"
 
