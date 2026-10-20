@@ -1323,20 +1323,94 @@ fi
 # the direct classifier splits it into corrupt (rc != 0, counted warn)
 # vs. privilege-gap (sudo refused, binary healthy, uncounted row).
 W48D_BLOCK_RENDER="$(sed -n '/^    if \[ -n "\$ADV_VER" \]; then$/,/^    fi$/p' "$STATUS")"
-if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'elif [ -x "$LIBDIR/bin/opencode" ]' \
+# Issue #201: the capture block is a third extracted region — the
+# harness below evals gate + capture + render; a construct placed
+# outside all three would be untested here and drift silently.
+W201_BLOCK_CAPTURE="$(sed -n '/^    ADV_DIRECT_OUT=""$/,/^    fi$/p' "$STATUS")"
+if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'elif [ -n "${ADV_DIRECT_RC:-}" ]' \
     && printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ui_kv "opencode version" "unknown — probe failed'; then
     pass "D1 render block extractable (elif-gated unknown row)"
 else
     fail "D1 render block not extractable (anchor drift?)"
 fi
-# Issue #163: the direct classifier must live INSIDE the extracted
-# render block (the harness evals gate + render; a classifier placed
-# outside would be untested here and drift silently).
-if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ADV_DIRECT_RC=$?' \
+# Issue #163/#201: the classifier now lives in the capture block and
+# feeds ADV_VER/ADV_DIRECT_RC into the render — pin both halves.
+if [ -n "$W201_BLOCK_CAPTURE" ] \
+    && printf '%s' "$W201_BLOCK_CAPTURE" | grep -qF 'ADV_DIRECT_RC=$?' \
+    && printf '%s' "$W201_BLOCK_CAPTURE" | grep -qF 'grep -m1 -oE' \
     && printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'present but broken'; then
-    pass "D1/#163: direct-probe classifier extractable in the render block"
+    pass "#201/#163: capture block extractable (rc + version extract), render keeps the broken arm"
 else
-    fail "D1/#163: classifier not extractable from the render block (anchor drift?)"
+    fail "#201/#163: capture block not extractable (anchor drift?)"
+fi
+# Issue #201: the dead-end advice lives ONLY in the #166 cell now —
+# exactly one literal (a second occurrence would mean a healthy-direct
+# or unparsable cell advising sudo again).
+if [ "$(grep -cF 'unknown — probe failed (run: sudo opk status)' "$STATUS")" = "1" ]; then
+    pass "#201: the sudo-opk-status advice is #166-cell only (one literal)"
+else
+    fail "#201: the sudo-advice literal count drifted (expected exactly 1)"
+fi
+# Issue #201 claim audit: the direct capture stays timeout-bounded
+# (issue #80) like the sudo probe it complements.
+if printf '%s' "$W201_BLOCK_CAPTURE" | grep -qF 'timeout 10 "$LIBDIR/bin/opencode"'; then
+    pass "#201: direct capture probe is timeout-bounded (issue #80)"
+else
+    fail "#201: direct capture probe lost its timeout envelope"
+fi
+# Issue #201 claim audit: the direct capture strengthens ADV_VER consumers
+# too — the browser-bridge verdict keys on ADV_VER (status.sh's WSL
+# section). Behavioral pin: the extracted guard block with the REAL
+# advisories.sh comparator (not a stub) discriminates every shape the
+# verdict names — both eq boundaries (1.18.33, 2.0.18) asserted on
+# their own arm, above (1.19.0, 2.0.19) and below (1.18.32, 2.0.17)
+# per arm, and unknown — so neither the comparator direction nor a
+# boundary constant can drift silently (#209 a W1, b W1).
+ADV_SRC="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/advisories.sh"
+W201_BLOCK_BRIDGE="$(sed -n '/^        _st_bridge_unneeded=0$/,/^        fi$/p' "$STATUS")"
+if [ -f "$ADV_SRC" ] && [ -n "$W201_BLOCK_BRIDGE" ]; then
+    w201_bridge() {
+        (
+            # shellcheck disable=SC1090
+            . "$ADV_SRC"
+            ADV_VER="$1"
+            eval "$W201_BLOCK_BRIDGE"
+            printf '%s\n' "$_st_bridge_unneeded"
+        )
+    }
+    if [ "$(w201_bridge 1.19.0)" = 1 ] && [ "$(w201_bridge 1.18.33)" = 1 ] \
+        && [ "$(w201_bridge 2.0.19)" = 1 ] && [ "$(w201_bridge 2.0.18)" = 1 ] \
+        && [ "$(w201_bridge 2.0.17)" = 0 ] && [ "$(w201_bridge 1.18.32)" = 0 ] \
+        && [ "$(w201_bridge "")" = 0 ]; then
+        pass "#201: bridge verdict keys on ADV_VER (1.18.33+/2.0.18+ unneeded, older/unknown keep the carrier)"
+    else
+        fail "#201: bridge ADV_VER keying drifted (extract: $W201_BLOCK_BRIDGE)"
+    fi
+    # #209 b W2: the comparator-availability guard is load-bearing, not
+    # decorative — without it, a broken kit (advisories.sh missing) plus
+    # a successful version probe renders a false "not needed" row (an
+    # empty command substitution satisfies `!= lt`). Pin: the same
+    # block, eval'd with NO comparator available — function unset, PATH
+    # emptied so a host binary of the same name cannot satisfy the
+    # guard either (0.0.46a F2 class) — keeps the carrier verdict on
+    # both arms and unknown.
+    w201_bridge_nocmp() {
+        (
+            unset -f advisories_version_cmp
+            PATH=
+            ADV_VER="$1"
+            eval "$W201_BLOCK_BRIDGE"
+            printf '%s\n' "$_st_bridge_unneeded"
+        )
+    }
+    if [ "$(w201_bridge_nocmp 1.19.0)" = 0 ] && [ "$(w201_bridge_nocmp 2.0.18)" = 0 ] \
+        && [ "$(w201_bridge_nocmp "")" = 0 ]; then
+        pass "#201: missing comparator keeps the carrier (guard fails safe)"
+    else
+        fail "#201: bridge guard lost its fail-safe (extract: $W201_BLOCK_BRIDGE)"
+    fi
+else
+    fail "#201: bridge guard block not extractable (anchor drift?)"
 fi
 w48d_run() {
     (
@@ -1362,10 +1436,11 @@ w48d_run() {
         VERSION=0.0.0
         ADV_VER=""
         eval "$W48C_BLOCK_ADV"
+        eval "${W201_BLOCK_CAPTURE:-}"
         eval "$W48D_BLOCK_RENDER"
     )
 }
-if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
+if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_CAPTURE" ]; then
     _d1dir=$(mktemp -d)
     # missing binary: warn row, NO unknown row (the D1 property); the
     # advice must name the working repair — upgrade-opencode, not plain
@@ -1405,18 +1480,36 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ]; then
     else
         fail "D1/#163: corrupt binary must warn (counted) naming upgrade-opencode, not plain update (got: $_d1out)"
     fi
-    # privilege-unknown shape (0.0.48b W3) under the #163 split: sudo
-    # refuses, the binary itself is healthy — the direct classifier
-    # returns 0 and the uncounted row STAYS (over-suppression would
-    # hide the legit agent-user/cron shape).
+    # issue #201 (was the 0.0.48b W3 shape under #163): sudo refuses,
+    # the binary itself is healthy — the capture now USES the stdout
+    # #163 used to discard: the caller gets the real advisory verdict
+    # at their own privilege, never the dead-end "sudo opk status"
+    # advice they cannot act on. The 007 pins below keep the genuinely
+    # privilege-bound shapes uncounted (W3 survives there).
     printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_d1dir/bin/opencode"
     chmod +x "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
-    if ! printf '%s' "$_d1out" | grep -q '^WARN|' \
-        && printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
-        pass "D1/#163: sudo-refused + healthy binary keeps the unknown row (W3)"
+    if printf '%s' "$_d1out" | grep -q '^OK|opencode 9.9.9|' \
+        && ! printf '%s' "$_d1out" | grep -q '^WARN|' \
+        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed' \
+        && ! printf '%s' "$_d1out" | grep -q 'sudo opk status'; then
+        pass "#201: sudo-refused + healthy binary renders the real verdict, no dead-end advice"
     else
-        fail "D1/#163: over-suppression — the privilege-unknown row is gone (got: $_d1out)"
+        fail "#201: healthy binary at a sudo-less caller must answer, not advise (got: $_d1out)"
+    fi
+    # issue #201 residual cell: rc 0 but --version carries no parsable
+    # semver (a dev build) — informational unknown WITHOUT the sudo
+    # advice: this caller may hold no sudo rights, and sudo would exec
+    # the same binary to the same unparsable answer.
+    printf '#!/bin/sh\necho "opencode dev-custom-build"\n' > "$_d1dir/bin/opencode"
+    chmod +x "$_d1dir/bin/opencode"
+    _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
+    if printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — binary runs for this caller' \
+        && ! printf '%s' "$_d1out" | grep -q '^WARN|' \
+        && ! printf '%s' "$_d1out" | grep -q 'sudo opk status'; then
+        pass "#201: rc 0 without a parsable version stays informational, no dead-end advice"
+    else
+        fail "#201: unparsable --version must not advise sudo (got: $_d1out)"
     fi
     # issue #166: the C1 gate reads the MODE BITS, not the caller's [ -x ]
     # (the deployed binary is 750 root:opencode — a caller outside that
