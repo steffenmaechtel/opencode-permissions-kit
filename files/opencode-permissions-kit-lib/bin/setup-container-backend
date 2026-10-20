@@ -153,9 +153,19 @@ allocate_subuid_subgid() {
 
 enable_linger() {
     if command -v loginctl >/dev/null 2>&1; then
-        loginctl enable-linger "$OPENCODE_USER" 2>/dev/null || true
-        echo "  Linger enabled for $OPENCODE_USER (daemon survives logout)."
-        log "linger enabled for $OPENCODE_USER"
+        # Failure-honest (#211 a F13): the old `|| true` + unconditional
+        # success line told the user the daemon survives logout even when
+        # enable-linger failed (logind degraded, read-only /var) — the
+        # rootless daemon then died with the session and ddev "randomly"
+        # lost its backend. Warn with the retry hint instead.
+        if loginctl enable-linger "$OPENCODE_USER" 2>/dev/null; then
+            echo "  Linger enabled for $OPENCODE_USER (daemon survives logout)."
+            log "linger enabled for $OPENCODE_USER"
+        else
+            echo "  WARN: could not enable linger for $OPENCODE_USER — the rootless daemon dies at logout." >&2
+            echo "        retry: loginctl enable-linger $OPENCODE_USER (logind degraded?)" >&2
+            log "linger enable FAILED for $OPENCODE_USER"
+        fi
     fi
 }
 

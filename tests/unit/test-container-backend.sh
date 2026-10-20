@@ -372,6 +372,49 @@ else
     check "update_install_conf_backend extractable (#211 a F10)" false
 fi
 
+# --- linger message conditioned on its rc (#211 a F13) ----------------------------
+# `loginctl enable-linger ... || true` + an unconditional "Linger
+# enabled" line claimed session-survival even when enabling failed —
+# the rootless daemon died at logout and ddev "randomly" lost its
+# backend. Extract the REAL enable_linger and drive it with stubbed
+# loginctl: ok -> success, fail -> warn + retry hint, absent -> silent.
+_f13_fn="$(sed -n '/^enable_linger() {/,/^}$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend")"
+if [ -n "$_f13_fn" ]; then
+    check "enable_linger extractable (#211 a F13)" true
+    F13=$(mktemp -d)
+    mkdir -p "$F13/bin"
+    printf '#!/bin/sh\nexit 0\n' > "$F13/bin/loginctl"; chmod +x "$F13/bin/loginctl"
+    _out=$(OPENCODE_USER=oc F13LOG="$F13/log" PATH="$F13/bin:$PATH" \
+        sh -c 'log() { echo "$*" >> "$F13LOG"; }; eval "$1"; enable_linger' sh "$_f13_fn" 2>&1) || true
+    case "$_out" in
+        *"Linger enabled for oc"*) check "ok rc: success line (#211 a F13)" true ;;
+        *) check "ok rc: success line (#211 a F13, got: $_out)" false ;;
+    esac
+    printf '#!/bin/sh\nexit 1\n' > "$F13/bin/loginctl"
+    _out=$(OPENCODE_USER=oc F13LOG="$F13/log" PATH="$F13/bin:$PATH" \
+        sh -c 'log() { echo "$*" >> "$F13LOG"; }; eval "$1"; enable_linger' sh "$_f13_fn" 2>&1) || true
+    case "$_out" in
+        *"WARN: could not enable linger"*"retry: loginctl enable-linger oc"*)
+            check "failed rc: warn + retry hint, no success line (#211 a F13)" true ;;
+        *) check "failed rc: warn + retry hint (got: $_out)" false ;;
+    esac
+    mkdir -p "$F13/emptybin"
+    _f13_sh="$(command -v sh)"
+    _out=$(OPENCODE_USER=oc F13LOG="$F13/log" PATH="$F13/emptybin" \
+        "$_f13_sh" -c 'log() { echo "$*" >> "$F13LOG"; }; eval "$1"; enable_linger' sh "$_f13_fn" 2>&1) || true
+    case "$_out" in
+        "") check "no loginctl: block silent (#211 a F13)" true ;;
+        *) check "no loginctl: block silent (got: $_out)" false ;;
+    esac
+    grep -q 'linger enable FAILED for oc' "$F13/log" \
+        && check "failed rc logged (#211 a F13)" true \
+        || check "failed rc logged (#211 a F13)" false
+    rm -rf "$F13"
+else
+    check "enable_linger extractable (#211 a F13)" false
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1
