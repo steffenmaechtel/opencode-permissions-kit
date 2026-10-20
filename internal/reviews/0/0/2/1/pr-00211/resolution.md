@@ -26,8 +26,27 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F14 (LOW) | **implemented** | `578c070` | honest lines at all three pairs; ok/fail pins; sabotage red→green |
 | a F15 (LOW) | **implemented** | `5e7f913` | readlink -f full chain; chained-symlink dispatch pin |
 | a F16 (LOW) | **implemented** | `6f9dd75` | field validation + counted warn; real-function pin; sabotage red |
+| a F17 (LOW) | **implemented** | `120270f` | stage+mv at both sites; recorder pins; sabotage red→green |
 
 ## Evidence detail
+
+### a F17 (LOW) — non-atomic openchamber policy writes
+
+Both sites (opk's openchamber-secure, update.sh's opt-in re-apply)
+stage the pin on a pid-suffixed sibling temp and flip the live
+policy.json via mv only — the 0.0.42e C5/0.0.44a V10 shape the
+sudoers, umask and lib deploys already use; these two 0.0.47a
+additions had missed the wave. Mechanism pins: recording stubs prove
+the content lands on `policy.json.opk-new.$$` and the final path is
+only ever an mv target, never a write target (the opk extract runs
+against a rewritten scratch root — the real /etc path is unwritable
+for the suite). Sabotage (direct write restored) → red; restored →
+green. Three legacy pins asserting the old direct-write literals were
+carried along (test-update-flags ×2, test-kit-cli ×1); the #198 a W5
+line-bound rose 20→26 for the grown else arm. Sweep: the remaining
+truncate-in-place writes on protection layers are none —
+`grep -n '> /etc\|tee /etc' bin/ management/` shows only staged
+targets now.
 
 ### a F16 (LOW) — unvalidated subuid/subgid arithmetic
 
