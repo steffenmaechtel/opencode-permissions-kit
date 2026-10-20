@@ -905,7 +905,7 @@ if [ -z "$ACTION" ]; then
 fi
 
 case "$ACTION" in
-    status)     banner; git_config_status; echo ""; projects_list ;;
+    status)     banner; git_config_status; container_backend_status 2>/dev/null || true; echo ""; projects_list ;;
     projects)
         case "$SUB" in
             list)   banner; projects_list ;;

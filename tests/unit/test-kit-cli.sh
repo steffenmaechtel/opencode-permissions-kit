@@ -839,6 +839,16 @@ else
     failures=$((failures + 1))
 fi
 
+# --- F26: config.sh status shows the backend row like the menu --------------------
+if grep -q 'status).*banner; git_config_status; container_backend_status' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"; then
+    echo "  ${GREEN}PASS${NC}  config status lists the backend row (menu parity, #211 a F26)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  config status lists the backend row (#211 a F26)"
+    failures=$((failures + 1))
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"
