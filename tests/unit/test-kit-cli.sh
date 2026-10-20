@@ -658,6 +658,7 @@ for _s in ho rb fsb; do
         failures=$((failures + 1))
     fi
 done
+_rc=0
 _out=$(_handover="" sh -c '. "$1" >/dev/null 2>&1; ddev_handover_root /proj u g d' \
     sh "$_stubs/ho.sh" 2>&1) || _rc=$?
 assert "F2: ddev_handover_root stub returns 1 (loud, not 127-silent)" "1" "${_rc:-0}"
@@ -668,12 +669,17 @@ case "$_out" in
     *)  echo "  ${RED}FAIL${NC}  F2: ddev_handover_root stub names the missing lib on stderr (got: $_out)"
         failures=$((failures + 1)) ;;
 esac
+# _rc must be reset before EVERY capture — a stale value from the
+# previous block masked a silent-stub regression during the F2 pin's
+# own sabotage verification (L4).
+_rc=0
 _out=$(_handover="" sh -c '. "$1" >/dev/null 2>&1; fs_baseline_root /proj g u' \
     sh "$_stubs/fsb.sh" 2>&1) || _rc=$?
 assert "F2: fs_baseline_root stub returns 1 (no false 'baseline refreshed')" "1" "${_rc:-0}"
 # The success-line mechanism itself: under set -e the loud stub aborts
 # BEFORE any caller success line can print (0.0.44a V9's sibling class).
 _reached=""
+_rc=0
 _out=$(sh -c 'set -e; _handover=""; . "$1" >/dev/null 2>&1; ddev_handover_root /proj u g d; echo REACHED' \
     sh "$_stubs/ho.sh" 2>&1) || _rc=$?
 case "$_out" in
