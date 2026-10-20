@@ -16,11 +16,11 @@ Base v0.0.53 @ f07f2fb.
 | a W2 (INFO) | **implemented** | `1dc553f` | typo "strenghtens" → "strengthens" |
 | b W1 (LOW) | **implemented** | `c776ab2` | 2.0.19 asserted; 2.x-arm `= eq` mutation now red (survived review b) |
 | b W2 (INFO) | **implemented** | `c776ab2` | nocmp pin asserts the fail-safe; guard-deletion mutation red |
-| b W3 (LOW) | **implemented** | this amendment | sweep record corrected: wiring pins listed, no drift power |
-| c W1 (LOW) | **implemented** | this amendment | b W2 sweep sentence narrowed to the comparator guard (see detail) |
-| c W2 (LOW) | **implemented** | this amendment | wrapper parenthetical replaced with the real fail-safe mechanism |
+| b W3 (LOW) | **implemented** | `145570b` | sweep record corrected: wiring pins listed, no drift power |
+| c W1 (LOW) | **implemented** | `cb48e27` | b W2 sweep sentence narrowed to the comparator guard (see detail) |
+| c W2 (LOW) | **implemented** | `cb48e27` | wrapper parenthetical replaced with the real fail-safe mechanism |
 | c W3 (INFO) | **deliberately not done** | — | env-inheritance edge, contrived preconditions; backlog note |
-| c W4 (INFO) | **implemented** | this amendment | wiring-pin ranges corrected to 116–117 / 138–139 |
+| c W4 (INFO) | **implemented** | `cb48e27` | wiring-pin ranges corrected to 116–117 / 138–139 |
 | c W5 (INFO) | **deliberately not done** | — | `unset -f` is deliberate F2 hardening; keep (see detail) |
 | c W6 (INFO) | **deliberately not done** | — | `3.*)` arm owed only when opencode 3.x ships; fall-through is safe |
 
@@ -122,7 +122,7 @@ site (mechanism corrected per #209 c W2).
 
 ### b W3 (LOW) — class-sweep record corrected
 
-The a W1 evidence paragraph above was amended (this commit): the
+The a W1 evidence paragraph above was amended (`145570b`): the
 enumerated site list now includes test-wsl-exposure.sh's wiring pins
 and corrects the comparator citation to the full block (65–79), with
 the observed note that presence-greps have no drift-discriminating
@@ -139,8 +139,8 @@ extraction): the adv extract (eval'd at test-status.sh:1438) carries
 (eval'd at :1439) carries `command -v timeout`. Amended above to the
 substantive claim that was actually swept: no other eval'd extract
 carries a `command -v advisories_version_cmp` guard. The twin sentence
-in c776ab2's commit message is immutable git history; this amendment
-is the correction of record.
+in c776ab2's commit message is immutable git history; the `cb48e27`
+amendment is the correction of record.
 
 ### c W2 (LOW) — wrapper mechanism corrected
 
