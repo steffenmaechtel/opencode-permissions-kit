@@ -33,8 +33,32 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F21 (LOW) | **implemented** | `e3b187e` | 'review case lint' in Makefile + workflow |
 | a F22 (LOW) | **implemented** | `e3b187e` | supply-chain paragraph names Pages/stable |
 | a F23 (LOW) | **implemented** | `e3b187e` | --openchamber-policy row + -y aliases in cli.md |
+| a F24 (INFO) | **implemented** | `f653615` | command -v guard names the missing lib; both arms pinned |
+| a F25 (INFO) | **implemented** | `01b5fce` | uncounted unknown rows; failing-probe pins (cat/stat stubs) |
+| a F26 (INFO) | **implemented** | `c881b13` | status action lists the backend row (menu parity) |
+| a F27 (INFO) | **implemented** | `5fa9a1e` | bridge stub fails; removal echo follows rc; both arms pinned |
+| a F28 (INFO) | **implemented** | `5496327` | exact group match + honest gpasswd arms; 3-case pin |
+| a F29 (INFO) | **implemented** | `52f1a90` | note() %s; literal-passthrough pin |
+| a F33 (INFO) | **implemented** | `9af93b4` | --refresh skip named under --only-binary |
+| a F34 (INFO) | **implemented** | `9af93b4` | header describes the manifest reality |
 
 ## Evidence detail
+
+### a F24–F29, F33, F34 (INFO) — small-honesty batch
+
+F24 (`f653615`): a missing sh/staged-write.sh dies as "kit file
+missing" instead of a phantom symlink warning (command -v guard; both
+arms pinned). F25 (`01b5fce`): the two unjudgeable probes render as
+uncounted unknown rows (failing cat/stat stubs pin the unknown row and
+the absence of the counted verdict). F26 (`c881b13`): `config status`
+lists the backend row like the menu. F27 (`5fa9a1e`): the
+browser_bridge_remove stub fails and the removal echo follows its rc.
+F28 (`5496327`): exact group-name match + gpasswd-rc-conditioned
+messages (member-ok / gpasswd-fail / opencode2-non-member pinned).
+F29 (`52f1a90`): note() uses %s — escape-looking directory names
+print literally (no caller relied on %b; grepped). F33/F34
+(`9af93b4`): --refresh's skip under --only-binary is named; the
+header describes the manifest-based re-deploy.
 
 ### a F19–F23 (LOW) — docs/CI drift batch (`e3b187e`)
 
