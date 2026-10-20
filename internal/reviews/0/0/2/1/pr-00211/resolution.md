@@ -20,8 +20,26 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F8 (LOW) | **implemented** | `f86cf01` | uncounted unknown row per W3; both arms pinned; sabotage red→green |
 | a F9 (LOW) | **implemented** | `edf5c84` | ${USER:-} chain; unset-env pin; W2 wiring pin updated |
 | a F10 (LOW) | **implemented** | `c3c6f9c` | carry-over on podman switches; real-function conf pin; sabotage red |
+| a F11 (LOW) | **implemented** | `727c76d` | usage gate + status-as-SUB; 7-case loop pin; sabotage red→green |
 
 ## Evidence detail
+
+### a F11 (LOW) — config.sh silently swallows unknown tokens
+
+Leftover TARGETS now die as a usage error for every action that takes
+no positionals; projects add/remove and handover keep their documented
+path targets (the header names `config.sh handover <path>`), and
+`status` after a set action is consumed as the read-only SUB the
+dispatch's own usage strings already name — the e2e-pinned
+`config.sh git-config status` flow now reaches it via SUB instead of
+by silently ignoring TARGETS. Two pin-caught near-misses recorded: the
+bare `&& die` tail aborted under set -e for every empty-TARGETS call
+(0.0.41f C1 — rewritten as if/fi), and a prose line starting with a
+paren broke the loop's parse (caught by sh -n + the extract pin).
+Pins: seven cases through the extracted real loop+gate. Sabotage
+(gate deleted) → red; restored → green. Sweep: uninstall.sh and
+status.sh already reject unknown args loudly (B1's original contrast);
+bin/opk dispatches fixed names only.
 
 ### a F10 (LOW) — backend switch drops hand-set podman socket key
 
