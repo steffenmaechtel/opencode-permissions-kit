@@ -64,16 +64,16 @@ expect the reported paths to exist locally.
 
 - **Never commit on `master`.** Work on `feature/<name>` branches, merged via
   pull request with green CI. The agent commits its finished work on the
-  feature branch; push/pull and PRs are the maintainer's job.
-- **All shipped content is English** — scripts, docs, prompts, messages.
+  feature branch; push/pull and PRs are the maintainer's job. (RM-0097)
+- **All shipped content is English** — scripts, docs, prompts, messages. (RM-0098)
 - **Follow `agent/conventions.md`** for interactive prompts, output
   style, shell security (untrusted input), and other shipped-code
-  conventions.
+  conventions. (RM-0099)
 - **Docs change with the code:** a PR that changes user-facing behavior
   updates the affected page under `docs/` in the same PR. One page = one
-  topic type; see `docs/README.md` for the structure.
+  topic type; see `docs/README.md` for the structure. (RM-0100)
 - **Don't rename scripts** in `files/` — the Makefile, tests, docs, and the
-  install/update deploy lists (`KIT_FILES`) reference them everywhere.
+  install/update deploy lists (`KIT_FILES`) reference them everywhere. (RM-0101)
 - **Don't bump `VERSION`** unless the maintainer asks. Release tags (when
   set at all) are the bare version stamp **without a `v` prefix** —
   `0.0.17`, not `v0.0.17` (matches the `VERSION` file). Tags are also
@@ -81,10 +81,10 @@ expect the reported paths to exist locally.
   `stable` mirror branch, fast-forwarded to `master` on release.
   Releases are cut with `make release VERSION=x.y.z`
   (`scripts/release.sh` — bump lands via PR first, the script tags and
-  mirrors).
+  mirrors). (RM-0102)
 - The security model is deliberately **soft-only** — never re-introduce
   OS-level deny ACLs. Background: `internal/records/ddev-working.md`,
-  current model: `docs/concepts/security-model.md`.
+  current model: `docs/concepts/security-model.md`. (RM-0103)
 - **The kit never edits user-owned system config on its own — above all
   `/etc/wsl.conf`.** Install/update only *show* snippets or name opt-in
   commands the user runs themselves; `opk wsl-add-opencode-1-fix` is the
@@ -94,7 +94,10 @@ expect the reported paths to exist locally.
   strip the broken legacy 0.0.36 hyphen section if present — removal of
   kit-owned bytes only, restoring WSL parseability; nothing is ever
   written into the file outside `opk wsl-add-opencode-1-fix`. Rationale:
-  `internal/records/wsl-conf-consent.md`.
+  `internal/records/wsl-conf-consent.md`. (RM-0104)
+- **Run the L1–L7 checklist before committing and again before declaring
+  the work done** — every new feature is a new instance of a known error
+  class; `agent/learnings.md` is authoritative. (RM-0105)
 
 ## Testing
 
@@ -151,8 +154,7 @@ carry no `chmod +x` lines — `actions/checkout` preserves tracked modes.
 [agent/learnings.md](agent/learnings.md) is authoritative. The corpus
 finding (meta-analysis 0.0.38–0.0.46): every new feature is a new
 instance of a known error class — the checklist applies to features,
-not only fix waves. Run L1–L7 before committing and again before
-declaring the work done. Memory aid:
+not only fix waves (running it is a Rules bullet above). Memory aid:
 
 - **Class sweep** — a class fix counts only after all same-shape sibling
   sites are swept; record the grep pattern and sites checked.
