@@ -144,6 +144,18 @@ records_status_check() {
 }
 records_status_check
 
+# --- F36: cli.md's install flag table tracks the parser (#211 a F36) --------------
+# Claim-drift guard: every flag install.sh's parse_args accepts must
+# appear in docs/reference/cli.md (the table F23 filled). Sabotage:
+# delete a row or add a parser flag — this goes red.
+_cli_md="$REPO_ROOT/docs/reference/cli.md"
+for _f36_flag in $(sed -n '/^parse_args()/,/^}/p' "$REPO_ROOT/files/install.sh" \
+        | grep -oE '\-\-[a-z0-9-]+' | sort -u); do
+    if ! grep -qF -e "$_f36_flag" "$_cli_md"; then
+        echo "FAIL cli.md: install flag '$_f36_flag' missing from the reference" >> "$TMP"
+    fi
+done
+
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"
     cat "$TMP"
