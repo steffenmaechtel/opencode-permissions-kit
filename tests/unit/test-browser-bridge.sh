@@ -624,7 +624,10 @@ CONF2="$WORK/f18.conf"
         '[boot]' \
         'systemd=true'
 } > "$CONF2"
-BB_CALL='browser_bridge_write_conf "$1"' bb "$LIBDIR" >/dev/null 2>&1 || true
+# Direct call with OPK_WSL_CONF on the fixture (bb() pins the default
+# $CONF — routing through it made the first draft of this pin vacuous).
+OPK_WSL_CONF="$CONF2" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
+    sh -c '. "$1" && browser_bridge_write_conf "$2"' _ "$BRIDGE_SH" "$LIBDIR" >/dev/null 2>&1 || true
 if grep -q '^# my own comment stays (F18)$' "$CONF2" \
    && grep -q '^systemd=true$' "$CONF2"; then
     pass "marker-less block: foreign comments survive the bounded stripper (#211 a F18)"

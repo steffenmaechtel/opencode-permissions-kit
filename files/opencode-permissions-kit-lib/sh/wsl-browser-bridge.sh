@@ -134,12 +134,12 @@ browser_bridge_write_conf() {
             in_block {
                 if ($0 ~ /^# opencode permissions kit browser bridge -- end$/) { in_block = 0; next }
                 # Consumption bound (#211 a F18): the kit block is begin
-                # + 8 comments + carrier + end — at most 9 consumed lines
-                # before the end marker. A 10th means the marker was
-                # hand-destroyed: stop consuming here (foreign comments
+                # + 7 comments + carrier + end — at most 8 consumed lines
+                # before the end marker. A 9th means the marker was
+                # hand-destroyed: stop consuming there (foreign comments
                 # below a begin marker survive), never eat unbounded.
                 blk_n++
-                if (blk_n > 9) { in_block = 0; pend_blank = 0; print; next }
+                if (blk_n > 8) { in_block = 0; pend_blank = 0; print; next }
                 # Hand-edited file, end marker destroyed: exit at the first
                 # non-comment line WITHOUT the blank-eater staying armed
                 # (0.0.43a F11) — the next blank, if any, belongs to foreign
@@ -265,12 +265,12 @@ browser_bridge_remove() {
             in_block {
                 if ($0 ~ /^# opencode permissions kit browser bridge -- end$/) { in_block = 0; next }
                 # Consumption bound (#211 a F18): the kit block is begin
-                # + 8 comments + carrier + end — at most 9 consumed lines
-                # before the end marker. A 10th means the marker was
-                # hand-destroyed: stop consuming here (foreign comments
+                # + 7 comments + carrier + end — at most 8 consumed lines
+                # before the end marker. A 9th means the marker was
+                # hand-destroyed: stop consuming there (foreign comments
                 # below a begin marker survive), never eat unbounded.
                 blk_n++
-                if (blk_n > 9) { in_block = 0; pend_blank = 0; print; next }
+                if (blk_n > 8) { in_block = 0; pend_blank = 0; print; next }
                 # Hand-edited file, end marker destroyed: exit at the first
                 # non-comment line WITHOUT the blank-eater staying armed
                 # (0.0.43a F11) — the next blank, if any, belongs to foreign
