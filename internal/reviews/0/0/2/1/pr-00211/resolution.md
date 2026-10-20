@@ -28,8 +28,31 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F16 (LOW) | **implemented** | `6f9dd75` | field validation + counted warn; real-function pin; sabotage red |
 | a F17 (LOW) | **implemented** | `120270f` | stage+mv at both sites; recorder pins; sabotage red→green |
 | a F18 (LOW) | **implemented** | `d07b103` | 8-line consumption bound, both strip paths; worst-case pin |
+| a F19 (LOW) | **implemented** | `e3b187e` | sudoers row names all four rules |
+| a F20 (LOW) | **implemented** | `e3b187e` | Makefile targets + test: chain; make test runs 41 suites |
+| a F21 (LOW) | **implemented** | `e3b187e` | 'review case lint' in Makefile + workflow |
+| a F22 (LOW) | **implemented** | `e3b187e` | supply-chain paragraph names Pages/stable |
+| a F23 (LOW) | **implemented** | `e3b187e` | --openchamber-policy row + -y aliases in cli.md |
 
 ## Evidence detail
+
+### a F19–F23 (LOW) — docs/CI drift batch (`e3b187e`)
+
+F19: security-model.md's sudoers row now names all four granted rules
+(cwd-check was missing — files.md was already correct). F22: the
+supply-chain paragraph names the real default channel (Pages/stable)
+instead of the dev `master` ref — test-pages' stable-entry URL pins
+stay green. F23: cli.md's install table gains
+`--openchamber-policy <yes|no>` (matching install.sh:395-403's parser)
+and every `--yes` that accepts `-y` lists it. F20: test-pages and
+test-rules-index-parity gained Makefile targets and joined the
+`test:` chain (both targets executed green locally; the CI run: steps
+stay as they were — test-workflows' coverage pin untouched). F21:
+the German step name is English now (Makefile echo + workflow step).
+Verification: test-docs, test-pages, test-workflows, and both new
+targets green. NB: no automated pin compares cli.md flag rows against
+the parsers — that gap is a F36 (the finding's own note) and stays
+open there.
 
 ### a F18 (LOW) — stripper eats foreign comments on a marker-less block
 
