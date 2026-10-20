@@ -52,8 +52,10 @@ done
 
 # WSL browser bridge helper (issue #91): needed below to strip the kit
 # section from /etc/wsl.conf before the library goes. Stub keeps older
-# installs (no deployed helper yet) uninstallable.
-browser_bridge_remove() { :; }
+# installs (no deployed helper yet) uninstallable — it FAILS (#211 a
+# F27): the old silent no-op let the caller below claim "removed" over
+# a removal that never ran.
+browser_bridge_remove() { return 1; }
 for cand in "$(dirname "$0")/../sh/wsl-browser-bridge.sh" \
     "/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh"; do
     if [ -f "$cand" ]; then
@@ -334,9 +336,17 @@ else
        || grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null; then
         if [ "$(prompt_yn "Remove the kit's wsl.conf bridge block? ("\
 "kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
-            browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
-            echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
-            log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
+            if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
+                echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
+                log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
+            else
+                # #211 a F27: near-unreachable (the block writer ships in
+                # the same lib) — but a missing helper must not read as a
+                # completed removal.
+                echo "WARN: could not remove the wsl.conf bridge block (kit helper unavailable)" >&2
+                echo "      remove the marked lines yourself — the kit block is comment-only" >&2
+                log "wsl browser bridge removal FAILED (helper unavailable)"
+            fi
         else
             sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl
             echo "wsl.conf left untouched — remove the kit block yourself (WSL never"

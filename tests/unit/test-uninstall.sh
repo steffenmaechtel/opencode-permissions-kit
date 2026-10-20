@@ -551,6 +551,39 @@ else
 fi
 
 echo ""
+# --- F27: bridge removal honesty (#211 a F27) ---------------------------------------
+# The silent noop stub + unconditional echo claimed a removal that never
+# ran when the helper was missing. Extract the real consent block and
+# drive both arms with a stubbed browser_bridge_remove + auto-yes prompt.
+_f27_block="$(sed -n "/Remove the kit's wsl.conf bridge block/,/^        fi$/p" \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh")"
+if [ -n "$_f27_block" ] && printf '%s' "$_f27_block" | grep -q 'browser_bridge_remove'; then
+    pass "bridge removal block extractable (#211 a F27)"
+    _f27_run() {
+        (
+            prompt_yn() { printf 'y'; }
+            log() { echo "log: $*"; }
+            browser_bridge_remove() {
+                [ "$F27MODE" = ok ] && return 0
+                return 1
+            }
+            eval "$_f27_block"
+        ) 2>&1
+    }
+    _out=$(F27MODE=ok _f27_run 0) || true
+    case "$_out" in
+        *"WSL browser bridge removed"*) pass "helper present: removal reported (#211 a F27)" ;;
+        *) fail "helper present: removal reported (got: $_out)" ;;
+    esac
+    _out=$(F27MODE=fail _f27_run 1) || true
+    case "$_out" in
+        *"WARN: could not remove the wsl.conf bridge block"*) pass "helper missing: warn, no false removed (#211 a F27)" ;;
+        *) fail "helper missing: warn, no false removed (got: $_out)" ;;
+    esac
+else
+    fail "bridge removal block extractable (#211 a F27)"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1
