@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 // opencode permissions kit -- TUI mode display, opencode 2.x CLI plugin
-// (docs/design/opencode-2x.md; the v1 counterpart is kit-mode.tsx)
+// (internal/records/opencode-2x.md; the v1 counterpart is kit-mode.tsx)
 //
 // Renders the kit's container-tools state inline in the built-in footer
 // rows (home screen and session prompt):

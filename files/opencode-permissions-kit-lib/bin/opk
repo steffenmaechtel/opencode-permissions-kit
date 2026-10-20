@@ -11,7 +11,7 @@
 #                                            asks for sudo itself)
 #
 # wsl-add-opencode-1-fix is implemented inline (explicit-consent wsl.conf
-# write, docs/design/wsl-conf-consent.md).
+# write, internal/records/wsl-conf-consent.md).
 #
 # Everything after the subcommand is passed through to the script, so all
 # script flags work unchanged (see docs/reference/cli.md).
@@ -184,7 +184,7 @@ case "$cmd" in
         exec sudo sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
         ;;
     openchamber-secure)
-        # OpenChamber hardening (issue #154, docs/design/openchamber-2x-hardening.md):
+        # OpenChamber hardening (issue #154, internal/records/openchamber-2x-hardening.md):
         # write the admin-owned policy pin (/etc/openchamber/policy.json) that
         # makes OpenChamber spawn the kit wrapper — retroactively defusing a
         # one-click settings pin — record the opt-in (opk update re-applies
@@ -363,7 +363,7 @@ PYEOF
         ;;
     wsl-add-opencode-1-fix)
         # Explicit consent for the /etc/wsl.conf browser-bridge carrier
-        # (docs/design/wsl-conf-consent.md): install/update never write
+        # (internal/records/wsl-conf-consent.md): install/update never write
         # wsl.conf — only THIS command, run by the user, does. It (re)deploys
         # the stand-in tree from the library and writes the kit comment
         # block (pure comments for WSL, issue #100); a legacy 0.0.36

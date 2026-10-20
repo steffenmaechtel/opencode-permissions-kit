@@ -29,7 +29,7 @@
 #      install.conf. For podman-rootless daemonless, nothing is printed.
 #
 # Must run as root. The opencode user must already exist.
-# See docs/design/rootless-backend.md (provisioning reference).
+# See internal/records/rootless-backend.md (provisioning reference).
 set -e
 
 # Colors resolved to REAL bytes once at load (printf interprets \033 in
