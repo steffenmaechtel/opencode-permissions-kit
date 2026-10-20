@@ -11,8 +11,35 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
 | a F1 (HIGH) | **implemented** | `fd13a19` | race + spaces pins, sabotage red→green, class sweep — detail below |
+| a F2 (MED) | **implemented** | `e7349e5` | loud stubs + abort pin + update.sh twin swept — detail below |
 
 ## Evidence detail
+
+### a F2 (MED) — config.sh silent noops over success claims
+
+config.sh's mutating-helper fallbacks became loud, fail-fast stubs
+(error line naming the missing lib + rc 1): `fs_baseline_root`,
+`ddev_handover_root`; `ddev_rootless_bindmounts` gained a stub returning
+rc 2 (the backend switch's existing warn arm — the manual-fix hint
+prints instead of an unevaluated gate reading as success). The stamp
+stubs stay fail-safe by design (valid=1 forces a rescan; write is
+unreachable after the loud abort) — commented in-code.
+
+Sweep (L2): update.sh's `ddev_handover_root` twin carried the same
+silent no-op under an unconditional "ddev handover pass completed" log
+— now loud too (same commit). Remaining silent `() { :; }` shapes are
+guards, not mutators: the two stamp stubs (above) and uninstall.sh's
+`browser_bridge_remove` (own finding, a F27).
+
+Pins (test-kit-cli.sh, before the summary gate): each stub is sed-
+extracted from the real script and executed — rc + stderr message +
+the set -e abort contract (a REACHED marker after the call must not
+print) + the rc-2 arm + the sweep presence. Sabotage (reverting one
+stub to `() { :; }`) first stayed GREEN — the capture variable `_rc`
+was stale from the previous block — fixed by resetting before every
+capture (`cfe12f4`), re-sabotaged RED at the right assert, restored
+green. The masking itself is recorded here because it is the L4 class
+in miniature: a pin that cannot fail is not a pin.
 
 ### a F1 (HIGH) — parent-symlink TOCTOU in the group baseline
 
