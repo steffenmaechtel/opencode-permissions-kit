@@ -11,6 +11,9 @@ Reviewer: GLM-5.3 main agent (verification duty held in-session) + 10x GLM-5.3-F
 
 # Full-scope review — pr-00211 snapshot a — release 0.0.55
 
+> Resolution: [resolution.md](resolution.md)
+
+
 Release full pass ("what rotted sideways?") over the whole tree at
 ad9467d (VERSION 0.0.55). PR #211 itself is the one-line VERSION bump;
 the reviewed object is the tree. Ten reviewer subagents ran five axes
