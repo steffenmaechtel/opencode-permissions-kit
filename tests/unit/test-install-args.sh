@@ -239,7 +239,10 @@ for _v14_sib in status update uninstall; do
     _v14_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$_v14_sh" 2>/dev/null \
         | grep -v '^[[:space:]]*#' \
         | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
-        | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
+        | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' \
+        | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\${USER:-}}}"$' || true)"
+    # (the last allow-arm: the F9-deepened fallback #211 a F9 — set -u
+    # survives both-unset; same self-default shape, one level deeper)
     if grep -q 'getent passwd "\$DEFAULT_USER"' "$_v14_sh" && [ -z "$_v14_bad" ]; then
         pass "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling)"
     else
