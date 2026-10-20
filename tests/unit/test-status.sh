@@ -655,9 +655,12 @@ else
     fail "status pin detection diverges from the wrapper"
 fi
 # home resolution via getent with /home/<user> fallback (0.0.47b W2, the
-# 0.0.43a F12 class): relocated homes must not blank the verdicts
-if grep -q 'getent passwd "${DEFAULT_USER:-$USER}"' "$STATUS" \
-    && grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-$USER}}"' "$STATUS"; then
+# 0.0.43a F12 class): relocated homes must not blank the verdicts.
+# Literals updated for #211 a F9: the default chain deepened to
+# ${USER:-} so set -u survives both-unset (cron env) — same getent
+# resolution, same fallback shape, one level deeper.
+if grep -q 'getent passwd "${DEFAULT_USER:-${USER:-}}"' "$STATUS" \
+    && grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"' "$STATUS"; then
     pass "openchamber verdicts resolve the home via getent (0.0.47b W2)"
 else
     fail "openchamber home resolution regressed to /home hardcode (0.0.47b W2)"
@@ -2224,6 +2227,28 @@ if [ -n "$_f8_block" ]; then
     fi
 else
     fail "upstream verdict block extractable from status.sh (#211 a F8)"
+fi
+
+# --- set -u survives unset USER + DEFAULT_USER (#211 a F9) ----------------------
+# ${DEFAULT_USER:-$USER} aborted status.sh with rc 2 under set -u when
+# both were unset (cron/timer env + conf without the stamp) — the rc
+# the contract defines as "warnings only", printed over NO verdict at
+# all. Extract the real probe lines and run them with both unset:
+# rc must be 0 and the degraded /home/ fallback stands. Hermetic —
+# the host's install.conf never runs (0.0.46a F2 class).
+_f9_lines="$(sed -n '/^_oc_home=\$(getent passwd/,+1p' "$STATUS")"
+if [ -n "$_f9_lines" ]; then
+    pass "_oc_home probe lines extractable from status.sh (#211 a F9)"
+    _f9_rc=0
+    _f9_out=$(env -u USER sh -c 'set -u; unset DEFAULT_USER 2>/dev/null || true
+        eval "$1"; printf "home=[%s]" "$_oc_home"' sh "$_f9_lines" 2>&1) || _f9_rc=$?
+    if [ "$_f9_rc" -eq 0 ] && printf '%s' "$_f9_out" | grep -q 'home=\[/home/\]*\]'; then
+        pass "both unset: no set -u abort, degraded /home/ fallback (#211 a F9)"
+    else
+        fail "both unset: no set -u abort, degraded fallback (rc=$_f9_rc out=$_f9_out)"
+    fi
+else
+    fail "_oc_home probe lines extractable from status.sh (#211 a F9)"
 fi
 
 echo ""

@@ -154,8 +154,11 @@ if [ -f "$_oc_policy" ] \
 fi
 # Home via getent, /home/<user> only as fallback (0.0.47b W2, the
 # 0.0.43a F12 class — relocated homes must not blank the verdicts).
-_oc_home=$(getent passwd "${DEFAULT_USER:-$USER}" 2>/dev/null | cut -d: -f6 || true)
-_oc_home="${_oc_home:-/home/${DEFAULT_USER:-$USER}}"
+# Empty-default chain (#211 a F9): under set -u, ${DEFAULT_USER:-$USER}
+# aborted with rc 2 when BOTH were unset (cron/timer env + conf without
+# the stamp) — colliding with the "2 = warnings only" verdict contract.
+_oc_home=$(getent passwd "${DEFAULT_USER:-${USER:-}}" 2>/dev/null | cut -d: -f6 || true)
+_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"
 _oc_kit_wrapper="/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode"
 _oc_bins=""
 for _ocn in opencode opencode2; do
