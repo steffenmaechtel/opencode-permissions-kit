@@ -437,24 +437,46 @@ ddev_handover_project_root() {
         typo3)
             if ddev_typo3_detected "$dhq_proj" "$dhq_docroot"; then
                 if [ -n "$dhq_dev" ] && [ "$(stat -c %U "$dhq_proj" 2>/dev/null)" = "$dhq_user" ]; then
-                    chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || true
-                    chmod 2775 "$dhq_proj" 2>/dev/null || true
-                    echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
+                    # Single-inode pair, honest like the a F14 -R pairs
+                    # (#211 b W9 — the a-wave's sweep stopped at the
+                    # recursive pairs): best-effort stays, the line
+                    # stops claiming success over a failed op.
+                    _dhq_ok=true
+                    chown "$dhq_dev:$dhq_group" "$dhq_proj" 2>/dev/null || _dhq_ok=false
+                    chmod 2775 "$dhq_proj" 2>/dev/null || _dhq_ok=false
+                    if [ "$_dhq_ok" = true ]; then
+                        echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
+                    else
+                        echo "  warn: project-root handback incomplete for $dhq_proj"\
+" (chown/chmod errors — the next update rescans and heals)" >&2
+                    fi
                 fi
             else
-                chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || true
-                chmod 2755 "$dhq_proj" 2>/dev/null || true
-                echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
+                _dhq_ok=true
+                chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || _dhq_ok=false
+                chmod 2755 "$dhq_proj" 2>/dev/null || _dhq_ok=false
+                if [ "$_dhq_ok" = true ]; then
+                    echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
+                else
+                    echo "  warn: project-root handover incomplete for $dhq_proj"\
+" (chown/chmod errors — the next update rescans and heals)" >&2
+                fi
             fi
             ;;
         codeigniter|shopware6|symfony)
             # Root-file types: the root IS the permanent chmod target
             # while unflagged (see function header). 2755 for the same
             # Perm() == 0755 no-op reason as the typo3 bootstrap.
-            chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || true
-            chmod 2755 "$dhq_proj" 2>/dev/null || true
-            echo "  project-root handover: $dhq_proj -> $dhq_user ($dhq_type settings"
-            echo "  file lives at the root; the dev-owned flag hands it back)"
+            _dhq_ok=true
+            chown "$dhq_user:$dhq_group" "$dhq_proj" 2>/dev/null || _dhq_ok=false
+            chmod 2755 "$dhq_proj" 2>/dev/null || _dhq_ok=false
+            if [ "$_dhq_ok" = true ]; then
+                echo "  project-root handover: $dhq_proj -> $dhq_user ($dhq_type settings"
+                echo "  file lives at the root; the dev-owned flag hands it back)"
+            else
+                echo "  warn: project-root handover incomplete for $dhq_proj"\
+" (chown/chmod errors — the next update rescans and heals)" >&2
+            fi
             ;;
     esac
     return 0
@@ -628,9 +650,17 @@ ddev_handover_project_back() {
     # gave it to the kit user (never touches developer-owned roots). The
     # [ -L ] gate: stat/chown follow a symlink operand (0.0.39g S2 class).
     if [ ! -L "$dhb_proj" ] && [ "$(stat -c %U "$dhb_proj" 2>/dev/null)" = "$dhb_user" ]; then
-        chown "$dhb_dev:$dhb_group" "$dhb_proj" 2>/dev/null || true
-        chmod 2775 "$dhb_proj" 2>/dev/null || true
-        echo "  dev-owned handback: $dhb_proj (root) -> $dhb_dev (2775)"
+        # Single-inode sibling of the recursive pair above (#211 b W9):
+        # best-effort stays, the line stops claiming success.
+        _dhb_ok=true
+        chown "$dhb_dev:$dhb_group" "$dhb_proj" 2>/dev/null || _dhb_ok=false
+        chmod 2775 "$dhb_proj" 2>/dev/null || _dhb_ok=false
+        if [ "$_dhb_ok" = true ]; then
+            echo "  dev-owned handback: $dhb_proj (root) -> $dhb_dev (2775)"
+        else
+            echo "  warn: dev-owned handback incomplete for $dhb_proj (root inode"\
+" — chown/chmod errors, the next update rescans and heals)" >&2
+        fi
     fi
     return 0
 }
