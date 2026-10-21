@@ -92,6 +92,12 @@ reset_globals
 parse_args --yes
 [ "$SKIP_PROMPTS" = true ] && pass "--yes sets SKIP_PROMPTS" || fail "--yes sets SKIP_PROMPTS"
 
+# #211 b W2: the -y alias cli.md documents — same family shape as
+# update/config/uninstall.
+reset_globals
+parse_args -y
+[ "$SKIP_PROMPTS" = true ] && pass "-y alias sets SKIP_PROMPTS (#211 b W2)" || fail "-y alias sets SKIP_PROMPTS (#211 b W2)"
+
 reset_globals
 parse_args --secure-git-config
 [ "$SECURE_GIT_CONFIG" = true ] && [ "$GIT_FLAG_GIVEN" = true ] \

@@ -388,7 +388,10 @@ OPENCHAMBER_POLICY_GIVEN=false
 parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
-            --yes) SKIP_PROMPTS=true ;;
+            # -y alias (#211 b W2): update/config/uninstall accept it;
+            # cli.md documents it for install too — the family stays
+            # uniform.
+            --yes|-y) SKIP_PROMPTS=true ;;
             --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
             --skip-ddev-migration) SKIP_DDEV_MIGRATION=true ;;
             --force-unsupported-distro) FORCE_UNSUPPORTED_DISTRO=true ;;
