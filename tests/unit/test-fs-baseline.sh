@@ -420,6 +420,46 @@ assert_eq "walker: spaces in components and names survive the walk" "620" \
     "$(stat -c %a "$F1SP/proj/a/dir two/has space.txt")"
 rm -rf "$F1SP"
 
+# Spaced-path PARENT-SWAP RACE (external mini-review follow-up, post-b):
+# the happy-path drive above proves chmod still APPLIES on spaced paths
+# (620) — it cannot notice a walk regression that silently stops SKIPPING
+# (the operand still chmods, the pin stays green; the b W6 class, missed
+# on this pin), and the a F1 race fixture drives unspaced paths only.
+# Same deterministic seam as section 9, with spaces in every component:
+# find records the operand, the stub swaps the parent for a symlink to a
+# victim dir OUTSIDE the tree — the walk must skip (victim stays 600);
+# a word-splitting or voided walk chmods through the link (victim 620).
+F1SPD=$(mktemp -d)
+F1SPS=$(mktemp -d)
+mkdir -p "$F1SPD/proj/a/dir two" "$F1SPD/victim dir"
+printf 'secret\n' > "$F1SPD/proj/a/dir two/has space.txt"
+printf 'victim\n' > "$F1SPD/victim dir/has space.txt"
+chmod 600 "$F1SPD/proj/a/dir two/has space.txt" "$F1SPD/victim dir/has space.txt"
+cat > "$F1SPS/find" <<EOF
+#!/bin/sh
+"$(command -v find)" "\$@"
+_rc=\$?
+if [ -d "$F1SPD/proj/a/dir two" ] && [ ! -L "$F1SPD/proj/a/dir two" ]; then
+    mv "$F1SPD/proj/a/dir two" "$F1SPD/proj/a/moved away"
+    ln -s "$F1SPD/victim dir" "$F1SPD/proj/a/dir two"
+fi
+exit \$_rc
+EOF
+chmod +x "$F1SPS/find"
+F1SPDRC=0
+FS_SUDO="" PATH="$F1SPS:$PATH" \
+    sh -c '. "$1" && _fsb_pass "spaces-race" "$2" -type f -- chmod g+w' \
+    _ "$LIB" "$F1SPD/proj" >/dev/null 2>&1 || F1SPDRC=$?
+if [ -f "$F1SPD/proj/a/moved away/has space.txt" ] && [ -L "$F1SPD/proj/a/dir two" ]; then
+    pass "spaces race: seam fired (parent swapped between scan and replay)"
+else
+    fail "spaces race: seam fired (parent swapped between scan and replay)"
+fi
+assert_eq "spaces race: victim outside the tree keeps its mode (walk skips)" "600" \
+    "$(stat -c %a "$F1SPD/victim dir/has space.txt")"
+assert_eq "spaces race: skip is not a failure (rc 0)" "0" "$F1SPDRC"
+rm -rf "$F1SPD" "$F1SPS"
+
 # --- 10. pass scratch registered with the caller's cleanup trap (#211 a F12) ------
 # _fsb_pass's NUL temp was a plain mktemp + rm: an aborted pass (Ctrl-C
 # during the minutes-long walk) left the root-owned file in /tmp. The
