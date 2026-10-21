@@ -141,6 +141,21 @@ if counted:
 # and skips the operand when any of them is a symlink.
 _fsb_pass() {
     _fsbp_label="$1"; _fsbp_root="$2"; shift 2
+    # Normalize the root's form (#211 b W7): find emits children without
+    # the root's trailing slash, so a slashed root never matched the
+    # worker's "$_root"/* walk pattern — the component walk silently
+    # voided for the whole pass. Shipped callers feed project_path_sane'd
+    # roots; this is defense in depth for future callers. '/' normalizes
+    # to the empty string: a recursive baseline over the whole filesystem
+    # is never legitimate (project_path_sane blocklists it) — refuse
+    # loud rather than degrade the walk silently.
+    while [ "${_fsbp_root%/}" != "$_fsbp_root" ]; do
+        _fsbp_root="${_fsbp_root%/}"
+    done
+    if [ -z "$_fsbp_root" ]; then
+        echo "fs-baseline: refusing scan root '${_fsbp_root:-$2}' (the whole filesystem is never a baseline root)" >&2
+        return 1
+    fi
     _fsbp_expr=""
     while [ $# -gt 0 ] && [ "$1" != "--" ]; do
         _fsbp_expr="$_fsbp_expr $1"

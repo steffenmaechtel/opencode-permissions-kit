@@ -373,9 +373,13 @@ exit \$_rc
 EOF
 chmod +x "$F1STUB/find"
 F1RC=0
+# Slashed root on purpose (#211 b W7): this one drive covers both the
+# a F1 walk (victim keeps its mode only when the walk runs) and the
+# b W7 normalization (an unnormalized root voids the walk pattern —
+# victim would go 620).
 FS_SUDO="" PATH="$F1STUB:$PATH" \
     sh -c '. "$1" && _fsb_pass "parent-swap" "$2" -type f -- chmod g+w' \
-    _ "$LIB" "$F1DIR/proj" >/dev/null 2>&1 || F1RC=$?
+    _ "$LIB" "$F1DIR/proj/" >/dev/null 2>&1 || F1RC=$?
 if [ -f "$F1DIR/proj/x/moved-away/secret" ] && [ -L "$F1DIR/proj/x/y" ]; then
     pass "race fixture: parent swapped between scan and replay (seam fired)"
 else
@@ -385,6 +389,16 @@ assert_eq "parent-swap: victim outside the tree keeps its mode (#211 a F1)" "600
     "$(stat -c %a "$F1DIR/victim/secret")"
 assert_eq "parent-swap: skipped operand does not fail the pass (rc 0)" "0" "$F1RC"
 rm -rf "$F1DIR" "$F1STUB"
+
+# Root '/' is refused loud, never walked (#211 b W7): the refusal fires
+# before any find runs — nothing on the host is touched.
+F1RRC=0
+F1RMSG=$(FS_SUDO="" sh -c '. "$1" && _fsb_pass "refuse" "/" -type f -- chmod g+w' _ "$LIB" 2>&1) || F1RRC=$?
+assert_eq "root / refused: rc 1 (#211 b W7)" "1" "$F1RRC"
+case "$F1RMSG" in
+    *never*) pass "root / refused: loud message (#211 b W7)" ;;
+    *) fail "root / refused: loud message (got: $F1RMSG)" ;;
+esac
 
 # Walker string safety: components and names with spaces flow through
 # the prefix-peeling without word splitting — the chmod still applies.
