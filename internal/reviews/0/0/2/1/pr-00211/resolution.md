@@ -58,6 +58,8 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W15 (LOW) | **implemented** | `37f079d` | sweep paragraph corrected (browser_bridge_remove loud since a F27) |
 | b W22 (INFO) | **implemented** | `37f079d` | browser_bridge_install noted in-code as guarded non-path; enumeration exact |
 | b W7 (LOW) | **implemented** | `d071a16` | trailing slashes normalized in `_fsb_pass`; `/` refused loud; race pin drives a slashed root |
+| b W13 (LOW) | **implemented** | `a1b2b76` | spaces drive rc captured + asserted (sibling `\|\| rc=$?` shape); sabotage red with tally |
+| b W27 (INFO) | **implemented** | `a1b2b76` | one comment records the W11 root-arg rationale |
 
 ## Evidence detail
 
