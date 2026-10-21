@@ -1,11 +1,15 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
-Status: closed for review — all 37 a-findings, 30 b-findings, 11
-c-findings and 3 d-findings dispositioned; the d-round's fixes stayed
-in bookkeeping (ledger text only), so the stop rule closes the loop
-(review-concept RM-0066). Both e2e suites at baseline on the b-wave
-HEAD (303 / 47); the c-wave's production changes owe both suites
-before release (RM-0091).
+Status: open — rotation deviation recorded: snapshot d ran in the
+c-wave's own session (review-concept RM-0060/0061 want a fresh session
+per review round — a round's author never reviews their own fixes);
+d's findings and bookkeeping fixes stand as evidence, but the loop
+closure they claimed is NOT authoritative. A fresh-session review e
+over `ce7cbc5..HEAD` (c-wave fixes + d bookkeeping) confirms or
+reopens. Substantively: 37 a-, 30 b-, 11 c-, 3 d-findings
+dispositioned; the d-round's fixes stayed in bookkeeping; both e2e
+suites owed before release (RM-0091) — the c-wave changed production
+code after the b W18 baseline run.
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
@@ -112,6 +116,16 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
   pins. Commit `82cdd4a`.
 
 ## Follow-ups after snapshot c
+
+- **Rotation deviation (process, for review e's reviewer)**: snapshot d
+  was produced in the SAME session that authored the c-wave fixes —
+  the maintainer's stop between rounds was skipped (RM-0061) and the
+  author held the verification duty over their own fixes (RM-0060).
+  The d reviewer subagents were fresh contexts, but the pass as a
+  whole lacks the rotation's guarantee. Review e (fresh session) is
+  the authoritative round for the `ce7cbc5..HEAD` diff: it should
+  treat snapshot d as a lead, not as a completed review — re-verify
+  d's clean verdicts alongside its own pass.
 
 - **Revert-loop closing log** (c W1's class sweep, beyond the named
   lines): uninstall.sh's per-root closing log "project ownership
