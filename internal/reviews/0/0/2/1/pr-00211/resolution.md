@@ -69,6 +69,15 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W5 (MED) | **implemented** | `98dca3f` | F24 fixture path moved to /var/tmp (RM-0016 shape); sandbox policy green |
 | b W23 (INFO) | **implemented** | `98dca3f` | F11 (47l) + F24 (5l) extracts line-bounded (OC164 shape) |
 | b W6 (MED) | **implemented** | `e6a4c7a` | write-half asserts the fresh `-- end` marker; dead disjunct gone; sabotage red on neutered drive |
+| b W26 (INFO) | **implemented** | e6a4c7a | dead lowercase disjunct removed with the W6 rewrite |
+| b W28 (INFO) | **implemented** | `2796e04` | empty parse_args extraction fails loud (tripwire) |
+| b W30 (INFO) | **implemented** | `2796e04` | reverse direction: doc flags must exist in parser; phantom-row sabotage red |
+| b W17 (LOW) | **implemented** | `d9d0abf` | config.sh --yes/-y documented in cli.md |
+| b W21 (INFO) | **implemented** | `d9d0abf` | both %b comments reworded to the %s rationale |
+| b W4 (MED) | **implemented** | `a0396c3` | advisories.sh + ui.sh 755 manifest pins (install+update); rationale names real coverage; sabotage red |
+| b W16 (LOW) | **implemented** | `<s16>` | F12 enumeration completed (45 hits/12 files, all checked safe) |
+| b W25 (INFO) | **implemented** | `<s16>` | F17 legacy-pin count corrected (one write-literal pin, not ×2) |
+| b W29 (INFO) | **implemented** | `<s16>` | F16 sweep pattern corrected (reproducible `\$((` form) |
 
 ## Evidence detail
 
@@ -186,9 +195,13 @@ the content lands on `policy.json.opk-new.$$` and the final path is
 only ever an mv target, never a write target (the opk extract runs
 against a rewritten scratch root — the real /etc path is unwritable
 for the suite). Sabotage (direct write restored) → red; restored →
-green. Three legacy pins asserting the old direct-write literals were
-carried along (test-update-flags ×2, test-kit-cli ×1); the #198 a W5
-line-bound rose 20→26 for the grown else arm. Sweep: `grep -n
+green. Legacy pins corrected (b W25: this line originally claimed
+"three legacy pins (test-update-flags ×2)" — only ONE write-literal
+pin exists there (:512, carried to the mv form); the other openchamber
+pins assert the write-shape-agnostic `sudo test -f` probe authority,
+and kit-cli's single write-literal pin went to the mv form too); the
+#198 a W5 line-bound rose 20→26 for the grown else arm, then 26→30
+for b W8's registration line. Sweep: `grep -n
 '> /etc\|tee /etc' bin/ management/` — one remaining truncate-in-place
 write, setup-container-backend's sysctl drop-in (:302): tuning knob,
 best-effort `|| true`, not a protection layer; left as is.
@@ -208,7 +221,11 @@ function against a scratch file (good line moves the allocation,
 three malformed lines → one counted warn, rc 0). Sabotage (validation
 deleted) → red; restored → green. Sweep: `grep -n '\$((\$' bin/ sh/`
 — no other shipped site feeds file-read fields into arithmetic
-unvalidated.
+unvalidated. (b W29: that recorded pattern matches nothing at HEAD —
+not even the fixed site, whose arithmetic is brace-less
+`$((start + count - 1))`; the reproducible pattern is
+`grep -n '\$((' bin/ sh/`, which shows only loop counters and the
+validated allocator — the prose conclusion held.)
 
 ### a F15 (LOW) — opk single-hop symlink resolution
 
@@ -265,7 +282,13 @@ staged-write registers; sudoers-deploy / wsl-browser-bridge /
 ddev-migrate / fetch_kit carry inline rm-or-trap cleanup (verified in
 snapshot a by D1/A2); install.sh:659 is the deliberate backup
 survivor; install.sh:2334 and :103 sit inside install's own
-trap-covered scratch dirs.
+trap-covered scratch dirs. Completed for b W16: the full grep at HEAD
+shows 45 hits in 12 files — the remaining sites (ddev-handover.sh:124,
+config.sh:517, update.sh:228/:1266/:1279, status.sh:694/:861/:947,
+setup-container-backend:261) were checked in review b: every one
+carries inline rm cleanup on all paths, a _tmp_track registration, or
+sits inside a trap-covered scratch dir — no leak found; the
+enumeration is now exhaustive as written.
 
 ### a F11 (LOW) — config.sh silently swallows unknown tokens
 
