@@ -634,11 +634,17 @@ if grep -q '^# my own comment stays (F18)$' "$CONF2" \
 else
     fail "marker-less block: foreign comments survive the bounded stripper (#211 a F18)"
 fi
-if grep -q 'managed by the opencode permissions kit (issues #91' "$CONF2" 2>/dev/null \
-   || [ "$(grep -c 'Managed by the opencode permissions kit' "$CONF2")" = "1" ]; then
+# The fresh block's end marker is the discriminator (#211 b W6): the
+# fixture's marker-less block has NO '-- end' line — only a real
+# browser_bridge_write_conf run puts one there. Without this assert a
+# dead/no-op write function passed the old check (the fixture's own
+# 'Managed by' line satisfied the count). The lowercase 'managed by'
+# disjunct never matched the real 'Managed by' text and is gone
+# (#211 b W26).
+if grep -q '^# opencode permissions kit browser bridge -- end\r\?$' "$CONF2"; then
     pass "the fresh kit block is written (strip + prepend still work) (#211 a F18)"
 else
-    fail "the fresh kit block is written (strip + prepend still work) (#211 a F18)"
+    fail "the fresh kit block is written (strip + prepend still work) (#211 b W6)"
 fi
 CONF="$WORK/orig.conf"   # restore for any later sections
 
