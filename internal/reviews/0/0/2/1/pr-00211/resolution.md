@@ -53,6 +53,10 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W11 (LOW) | **implemented** | `6bb715b` | no-markers arm if-wrapped with FAILED log; wiring pin |
 | b W14 (LOW) | **implemented** | `6bb715b` | sudo stubbed in the F27 extract drive |
 | b W2 (MED) | **implemented** | `9ffb51e` | parser gains `--yes\|-y`; alias pinned; sabotage red-by-abort, green restored |
+| b W3 (MED) | **implemented** | `37f079d` | stub loud like both siblings; both update.sh stubs pin-executed; sabotage red |
+| b W12 (LOW) | **implemented** | `37f079d` | F2 sweep pin executes both stubs (rc 1 + stderr), no longer presence-only |
+| b W15 (LOW) | **implemented** | `37f079d` | sweep paragraph corrected (browser_bridge_remove loud since a F27) |
+| b W22 (INFO) | **implemented** | `37f079d` | browser_bridge_install noted in-code as guarded non-path; enumeration exact |
 
 ## Evidence detail
 
