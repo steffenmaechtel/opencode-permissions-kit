@@ -86,7 +86,7 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | c W3 (LOW) | **implemented** | `7d652cf` | _tmp_track above the tee; TRACK-before-TEE order pin; sab. red |
 | c W4 (LOW) | **implemented** | `1d2e2ae` | reverse-direction empty-extraction tripwire; heading-drift sab. red |
 | c W5 (LOW) | **implemented** | `aed81ee` | -y drive abort-contained (subshell print); sab. red at the tally |
-| c W6 (LOW) | **implemented** | `bc56a17` | Follow-ups wording corrected (spaces in the swapped components) |
+| c W6 (LOW) | **implemented** | `0885c9f` | Follow-ups wording corrected (spaces in the swapped components) |
 | c W7 (INFO) | **implemented** | `2bda35b` | staging write `|| { rm; ui_error; exit 1; }`; printf-fail pin; sab. red |
 | c W8 (INFO) | **deliberately not done** | — | disclosed kill-window residue; trap/glob-clean risk > inert residue |
 | c W9 (INFO) | **implemented** | `9ac107c` | `-le 4294967295` value caps both fields; u32max fixture pin; sab. red |
@@ -112,7 +112,8 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 
 - **Revert-loop closing log** (c W1's class sweep, beyond the named
   lines): uninstall.sh's per-root closing log "project ownership
-  reverted + kit ACL entries removed" (:598) aggregates four rc-blind
+  reverted + kit ACL entries removed" (:598 at the c-wave fix commit
+  `47e07f9`, :605 at HEAD after the note below — #211 d W2) aggregates four rc-blind
   `run_q` operations (`find -exec chown` :560, `setfacl -x` ×2
   :590-591, `chmod g-s` :593) — the same lie class c W1 fixed at
   userdel/audit-log, but on a root-run revert loop with its own
@@ -205,7 +206,11 @@ here), and the revert loop's four ops (find-chown :560, setfacl ×2
 :590-591, chmod g-s :593) whose closing log (:598) claims completion
 over them — the same class, deliberately deferred to its own wave
 (see Follow-ups after snapshot c; in-code note at the site). No other
-file carries run_q.
+file carries run_q. NB (#211 d W2): anchors and the 15-hit count are
+as of the fix commit `47e07f9`; the in-code note this wave added below
+the closing log shifted userdel to :509, the audit rm to :644, the
+closing log to :605 — and its own run_q mention pushed the sweep
+count to 16 at HEAD.
 
 c W8 (deliberately not done): opk's kill-window residue is disclosed
 in-code ("opk carries no cleanup trap", b W8) and inert — a stranded
