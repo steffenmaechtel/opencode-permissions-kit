@@ -1,7 +1,9 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
 Status: open — all 37 findings dispositioned (33 implemented, 4 deliberately
-not done); wave review b pending (planned next session).
+not done); wave review b committed ([review-b.md](review-b.md), 30 findings
+over the a-wave diff 2e7d781..6d082565) — b-findings pending the
+maintainer's go.
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
