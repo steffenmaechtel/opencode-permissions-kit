@@ -129,11 +129,20 @@ allocate_range() {
             # arithmetic syntax error), leading zeros misparsed as octal
             # silently skewing the overlap math. NB: the done-level
             # 2>/dev/null swallows stderr INSIDE the loop — the warn is
-            # printed after it, never from within. The concat "$s$c"
-            # check also rejects a zero-START field: a 0 start owns an
-            # empty range at best.
-            case "$s$c" in
-                *[!0-9]*|0?*|"") _bad=$((_bad + 1)); continue ;;
+            # printed after it, never from within.
+            # Per-field validation (#211 b W10 — the a-wave's concat
+            # "$s$c" check left two gaps): a leading-zero COUNT passed
+            # ("u:1000:09" concatenated to "100009", then dash aborted
+            # provisioning on the octal-looking $((s2 + c2))), and there
+            # was no length cap — a 20-digit digit-run wraps in $(( )).
+            # subuid/subgid are u32 (max 4294967295, 10 digits): 11+
+            # digits is malformed. Per-field also stops false-rejecting
+            # a legitimate 10-digit start followed by a short count.
+            case "$s" in
+                *[!0-9]*|0?*|???????????*|"") _bad=$((_bad + 1)); continue ;;
+            esac
+            case "$c" in
+                *[!0-9]*|0?*|???????????*|"") _bad=$((_bad + 1)); continue ;;
             esac
             local s2="$s" c2="$c"
             # Overlap check: [start, start+count) vs [s2, s2+c2)
