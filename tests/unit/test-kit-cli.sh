@@ -698,17 +698,28 @@ _rc=0
 _handover="" sh -c '. "$1" >/dev/null 2>&1; ddev_rootless_bindmounts u b v bin' \
     sh "$_stubs/rb.sh" >/dev/null 2>&1 || _rc=$?
 assert "F2: ddev_rootless_bindmounts stub returns 2 (caller's warn arm)" "2" "$_rc"
-# The update.sh twin of the same stub (#211 a F2 sweep — its loop logs
-# "ddev handover pass completed" unconditionally): loud rc 1 as well.
+# The update.sh twins of the same stub (#211 a F2 sweep — its loop logs
+# "ddev handover pass completed" unconditionally; #211 b W3 — the
+# fs_baseline_root stub in the --refresh section was missed by the same
+# sweep): loud rc 1 as well. EXECUTED, not just grepped (#211 b W12):
+# a presence-only pin passes a `return 0` regression with the echo kept.
 sed -n '/^    command -v ddev_handover_root/,/^    }$/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh" > "$_stubs/uho.sh"
-if [ -s "$_stubs/uho.sh" ] && grep -q 'unavailable' "$_stubs/uho.sh"; then
-    echo "  ${GREEN}PASS${NC}  F2 sweep: update.sh handover stub loud too"
-    passed=$((passed + 1))
-else
-    echo "  ${RED}FAIL${NC}  F2 sweep: update.sh handover stub loud too"
-    failures=$((failures + 1))
-fi
+sed -n '/^    command -v fs_baseline_root/,/^    }$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh" > "$_stubs/ufsbl.sh"
+for _stubpair in uho:ddev_handover_root:handover ufsbl:fs_baseline_root:baseline; do
+    _short="${_stubpair%%:*}"; _rest="${_stubpair#*:}"
+    _fn="${_rest%%:*}"; _lbl="${_rest##*:}"
+    _rc=0
+    _msg=$(sh -c '. "$1"; "$2" u b v' sh "$_stubs/$_short.sh" "$_fn" 2>&1 >/dev/null) || _rc=$?
+    if [ "$_rc" -eq 1 ] && printf '%s' "$_msg" | grep -q 'unavailable'; then
+        echo "  ${GREEN}PASS${NC}  F2 sweep: update.sh $_lbl stub loud (executes: rc 1 + stderr) (#211 b W3, b W12)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  F2 sweep: update.sh $_lbl stub loud (rc=$_rc msg=$_msg) (#211 b W3, b W12)"
+        failures=$((failures + 1))
+    fi
+done
 rm -rf "$_stubs"
 
 # --- config arg loop: junk is a usage error, not silence (#211 a F11) -----------

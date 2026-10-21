@@ -387,9 +387,19 @@ unreachable after the loud abort) — commented in-code.
 
 Sweep (L2): update.sh's `ddev_handover_root` twin carried the same
 silent no-op under an unconditional "ddev handover pass completed" log
-— now loud too (same commit). Remaining silent `() { :; }` shapes are
-guards, not mutators: the two stamp stubs (above) and uninstall.sh's
-`browser_bridge_remove` (own finding, a F27).
+— now loud too (same commit). Remaining silent `() { :; }` shapes —
+re-enumerated exactly after b W3/W15/W22: the stamp stubs (config.sh's
+pair + update.sh's pair — guards: valid=1 forces a rescan, the write
+stub is unreachable after its loud sibling aborts) and update.sh's
+`browser_bridge_install` (mutator-named but unreachable in silence:
+the is_wsl stub keeps its call block closed — noted in-code since
+b W22). uninstall.sh's `browser_bridge_remove`, listed here as a
+remaining silent shape when written, went LOUD with a F27 in the same
+wave — the original enumeration was stale the day it landed. The
+`fs_baseline_root` stub in this file's --refresh section was missed
+entirely by this sweep — found by review b as W3, now loud
+(`#211 b W3`), both update.sh stubs executed by the F2 pin (b W12:
+the pin was presence-only before).
 
 Pins (test-kit-cli.sh, before the summary gate): each stub is sed-
 extracted from the real script and executed — rc + stderr message +

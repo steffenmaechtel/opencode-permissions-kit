@@ -646,6 +646,9 @@ for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" 
     fi
 done
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
+# Guard, not a mutator path (#211 b W22): unreachable in silence — the
+# is_wsl stub above keeps the re-apply block below closed when the lib
+# is missing from both lookup sites.
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
 # Fail-safe stub (#211 a F7): if the never-shadow probe itself is
 # unavailable (wsl-browser-bridge.sh missing from both lookup sites),
@@ -1490,7 +1493,14 @@ if [ "$REFRESH" = true ]; then
     for _fsbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
         if [ -f "$_fsbl_cand" ]; then . "$_fsbl_cand"; _fsbl="$_fsbl_cand"; break; fi
     done
-    [ -n "$_fsbl" ] || fs_baseline_root() { :; }
+    # Loud like the config.sh twin and the ddev_handover_root stub above
+    # (#211 b W3 — the a F2 sweep stopped at this file's handover stub):
+    # a silent no-op let --refresh log "group baseline refreshed" over a
+    # pass that never ran. Fail loud, let set -e stop the update.
+    command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
+        echo "error: fs_baseline_root unavailable (fs-baseline.sh missing)" >&2
+        return 1
+    }
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r root; do
             [ -z "$root" ] && continue
