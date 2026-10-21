@@ -402,6 +402,21 @@ case "$F1RMSG" in
     *never*) pass "root / refused: loud message (#211 b W7)" ;;
     *) fail "root / refused: loud message (got: $F1RMSG)" ;;
 esac
+# The message must name the refused ROOT (#211 c W2): the shift at the
+# prologue renumbers positionals, so a ${_fsbp_root:-$2} fallback named
+# a find-expression word instead ('/' drive) — and the '//' drive shows
+# the ORIGINAL form, proving the capture happened before the shift.
+case "$F1RMSG" in
+    *"refusing scan root '/'"*) pass "root / refused: names the refused root (#211 c W2)" ;;
+    *) fail "root / refused: names the refused root (got: $F1RMSG) (#211 c W2)" ;;
+esac
+F1R2RC=0
+F1R2MSG=$(FS_SUDO="" sh -c '. "$1" && _fsb_pass "refuse" "//" -type f -- chmod g+w' _ "$LIB" 2>&1) || F1R2RC=$?
+assert_eq "root // refused: rc 1 (#211 c W2)" "1" "$F1R2RC"
+case "$F1R2MSG" in
+    *"refusing scan root '//'"*) pass "root // refused: original form named (#211 c W2)" ;;
+    *) fail "root // refused: original form named (got: $F1R2MSG) (#211 c W2)" ;;
+esac
 
 # Walker string safety: components and names with spaces flow through
 # the prefix-peeling without word splitting — the chmod still applies.

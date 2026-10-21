@@ -140,7 +140,7 @@ if counted:
 # the operand (chain-walker shape of agent_home_sane, staged-write.sh)
 # and skips the operand when any of them is a symlink.
 _fsb_pass() {
-    _fsbp_label="$1"; _fsbp_root="$2"; shift 2
+    _fsbp_label="$1"; _fsbp_root="$2"; _fsbp_orig_root="$2"; shift 2
     # Normalize the root's form (#211 b W7): find emits children without
     # the root's trailing slash, so a slashed root never matched the
     # worker's "$_root"/* walk pattern — the component walk silently
@@ -153,7 +153,10 @@ _fsb_pass() {
         _fsbp_root="${_fsbp_root%/}"
     done
     if [ -z "$_fsbp_root" ]; then
-        echo "fs-baseline: refusing scan root '${_fsbp_root:-$2}' (the whole filesystem is never a baseline root)" >&2
+        # The ORIGINAL root, captured before the shift (#211 c W2): the
+        # positionals are renumbered by now, so $2 would name a find
+        # expression word, never the refused root.
+        echo "fs-baseline: refusing scan root '$_fsbp_orig_root' (the whole filesystem is never a baseline root)" >&2
         return 1
     fi
     _fsbp_expr=""
