@@ -729,7 +729,10 @@ rm -rf "$_stubs"
 # drive it: junk/misplaced die; projects add keeps paths; --yes clean.
 _f11_block="$(sed -n '/^for arg do$/,/#211 a F11 gate end/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
-if [ -n "$_f11_block" ]; then
+# #211 b W23 (the #198 a W5 / F7 shapes): end anchors are a shipped
+# marker comment (F11) — if it ever drifts, the extract runs to EOF and
+# the eval fails confusingly. Bound it: the loop+gate is 47 lines.
+if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 50 ]; then
     echo "  ${GREEN}PASS${NC}  config arg loop + F11 gate extractable (#211 a F11)"
     passed=$((passed + 1))
     _f11_run() {
@@ -831,14 +834,19 @@ esac
 # block and drive both arms with a fixed $target.
 _f24_block="$(sed -n '/#211 a F24/,/^    fi$/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
-if [ -n "$_f24_block" ]; then
+# #211 b W23: first-fi end anchor — bound the extract (guard block is
+# 5 lines) so anchor drift fails HERE instead of eval-ing to EOF.
+if [ -n "$_f24_block" ] && [ "$(printf '%s\n' "$_f24_block" | wc -l)" -le 8 ]; then
     echo "  ${GREEN}PASS${NC}  F24 guard block extractable"
     passed=$((passed + 1))
     _f24_run() {
         # $1 = define sane fn (yes|no)
+        # /var/tmp path (#211 b W5): the first draft carried a real-tree
+        # /home/... literal — inert (both arms are FS-free) but forbidden
+        # by the sandbox shape (RM-0016 inert-literal rule).
         (
             OPENCODE_USER=oc
-            target=/home/oc/.config/opencode/settings.json
+            target=/var/tmp/opk-f24-fixture/settings.json
             die() { echo "die: $*"; exit 1; }
             if [ "$1" = yes ]; then agent_home_sane() { return 0; }; fi
             eval "$_f24_block"
