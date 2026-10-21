@@ -57,6 +57,7 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W12 (LOW) | **implemented** | `37f079d` | F2 sweep pin executes both stubs (rc 1 + stderr), no longer presence-only |
 | b W15 (LOW) | **implemented** | `37f079d` | sweep paragraph corrected (browser_bridge_remove loud since a F27) |
 | b W22 (INFO) | **implemented** | `37f079d` | browser_bridge_install noted in-code as guarded non-path; enumeration exact |
+| b W7 (LOW) | **implemented** | `d071a16` | trailing slashes normalized in `_fsb_pass`; `/` refused loud; race pin drives a slashed root |
 
 ## Evidence detail
 
