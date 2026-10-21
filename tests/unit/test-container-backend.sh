@@ -427,7 +427,7 @@ _f16_fn="$(sed -n '/^allocate_range() {/,/^}$/p' \
 if [ -n "$_f16_fn" ]; then
     check "allocate_range extractable (#211 a F16)" true
     F16=$(mktemp -d)
-    printf 'gooduser:100000:65536\njunk:12abc:100\nzeros:010:100\nalpha:abc:100\nzerocount:1000:09\noverflow:99999999999999999999:1\n' > "$F16/subuid"
+    printf 'gooduser:100000:65536\njunk:12abc:100\nzeros:010:100\nalpha:abc:100\nzerocount:1000:09\noverflow:99999999999999999999:1\nu32max:9999999999:100\nzerostart:0:1000\n' > "$F16/subuid"
     _out=$(F16FILE="$F16/subuid" sh -c '
         log() { :; }
         eval "$1"
@@ -436,9 +436,13 @@ if [ -n "$_f16_fn" ]; then
     _f16_warn=$(printf '%s\n' "$_out" | grep -c 'malformed line(s) skipped')
     _f16_cnt=$(printf '%s\n' "$_out" | sed -n 's/.*warn: \([0-9]*\) malformed.*/\1/p')
     _f16_alloc=$(grep -c '^f16user:165536:65536$' "$F16/subuid" 2>/dev/null)
-    if [ "${_f16_rc:-0}" -eq 0 ] && [ "$_f16_warn" = "1" ] && [ "$_f16_cnt" = "5" ] \
+    # u32max (10 digits > 4294967295) is malformed on VALUE (#211 c W9)
+    # — the length gate alone passed it. zerostart "0" is a GOOD line
+    # (#211 c W10): accepted as an occupied empty range, so it must NOT
+    # bump the malformed count — both sit in the fixture above.
+    if [ "${_f16_rc:-0}" -eq 0 ] && [ "$_f16_warn" = "1" ] && [ "$_f16_cnt" = "6" ] \
        && [ "$_f16_alloc" = "1" ]; then
-        check "malformed lines warn+skip, allocation correct (#211 a F16; b W10: zero-count + overflow)" true
+        check "malformed lines warn+skip, allocation correct (#211 a F16; b W10: zero-count + overflow; c W9: u32 value cap; c W10: zero-start accepted)" true
     else
         check "malformed lines warn+skip, allocation correct (rc=${_f16_rc:-0} warns=$_f16_cnt alloc=$_f16_alloc out=$_out)" false
     fi

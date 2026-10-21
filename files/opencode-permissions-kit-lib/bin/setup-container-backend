@@ -138,12 +138,21 @@ allocate_range() {
             # subuid/subgid are u32 (max 4294967295, 10 digits): 11+
             # digits is malformed. Per-field also stops false-rejecting
             # a legitimate 10-digit start followed by a short count.
+            # Value cap (#211 c W9): the length gate alone lets a
+            # 10-digit field ABOVE the u32 max through — rejected on
+            # value here.
+            # A single "0" START is accepted now (#211 c W10): the old
+            # concat gate rejected it ("0"+"1000" = "01000" matched
+            # 0?*), but an empty range registered occupied is the
+            # safer reading than skip-and-allocate-over — intentional.
             case "$s" in
                 *[!0-9]*|0?*|???????????*|"") _bad=$((_bad + 1)); continue ;;
             esac
+            [ "$s" -le 4294967295 ] || { _bad=$((_bad + 1)); continue; }
             case "$c" in
                 *[!0-9]*|0?*|???????????*|"") _bad=$((_bad + 1)); continue ;;
             esac
+            [ "$c" -le 4294967295 ] || { _bad=$((_bad + 1)); continue; }
             local s2="$s" c2="$c"
             # Overlap check: [start, start+count) vs [s2, s2+c2)
             local end=$((start + count))
