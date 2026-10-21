@@ -1002,6 +1002,7 @@ _f17_block="$(sed -n '/#211 a F17, opk twin/,/sudo mv -f/p' "$UPDATE")"
 if [ -n "$_f17_block" ]; then
     pass "openchamber stage+mv block extractable (#211 a F17)"
     _out=$(sh -c '
+        _tmp_track() { echo "TRACK $1" >&2; }
         sudo() {
             case "$1" in
                 mkdir|chown|chmod) return 0 ;;
@@ -1014,15 +1015,21 @@ if [ -n "$_f17_block" ]; then
     ' sh "$_f17_block" 2>&1) || true
     if printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json.opk-new\.' \
        && printf '%s' "$_out" | grep -q 'MV /etc/openchamber/policy.json.opk-new\.[0-9]* -> /etc/openchamber/policy.json' \
+       && printf '%s' "$_out" | grep -q 'TRACK /etc/openchamber/policy.json.opk-new\.' \
        && ! printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json$'; then
         pass "update.sh: content staged on temp, live file flips via mv (#211 a F17)"
     else
         fail "update.sh: staged write + mv (out=$_out)"
     fi
+    if printf '%s' "$_out" | grep -q 'TRACK /etc/openchamber/policy.json.opk-new\.'; then
+        pass "update.sh: staged temp registered with the cleanup trap (#211 b W8)"
+    else
+        fail "update.sh: staged temp registered with the cleanup trap (out=$_out) (#211 b W8)"
+    fi
 else
     fail "openchamber stage+mv block extractable (#211 a F17)"
 fi
-_f17_opk_block="$(sed -n '/#211 a F17, the 0.0.44a V10 sibling gap/,/^        mv -f/p' \
+_f17_opk_block="$(sed -n '/#211 a F17, the 0.0.44a V10 sibling gap/,/^        fi$/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk")"
 if [ -n "$_f17_opk_block" ]; then
     # Hermetic: rewrite /etc/openchamber to scratch so the redirect can
@@ -1031,12 +1038,30 @@ if [ -n "$_f17_opk_block" ]; then
     F17=$(mktemp -d)
     mkdir -p "$F17/oc"
     _f17_opk_block="$(printf '%s\n' "$_f17_opk_block" | sed "s|/etc/openchamber|$F17/oc|g")"
-    _out=$(sh -c 'mv() { case "$1" in -*) shift ;; esac; printf "MV %s -> %s\n" "$1" "$2"; }; eval "$1"' \
+    _out=$(sh -c 'mv() { case "$1" in -*) shift ;; esac; printf "MV %s -> %s\n" "$1" "$2"; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
         sh "$_f17_opk_block" 2>&1) || true
     if printf '%s' "$_out" | grep -q "MV $F17/oc/policy.json.opk-new\.[0-9]* -> $F17/oc/policy.json"; then
         pass "opk twin: same stage+mv shape (#211 a F17 sweep)"
     else
         fail "opk twin: same stage+mv shape (out=$_out)"
+    fi
+    # The happy-path drive's mv is a stub — its temp stays on disk.
+    # Clean it so the failure-arm residue count below sees only its own
+    # drive's file.
+    rm -f "$F17/oc"/policy.json.opk-new.* 2>/dev/null || true
+    # Failure arm (#211 b W8): chmod failing must clean the staged temp
+    # and die loud — no stranded root-owned residue. rm runs REAL (the
+    # temp really exists on disk — the printf above wrote it), so the
+    # residue assert discriminates the actual deletion.
+    _f17_rc=0
+    _out=$(sh -c 'chmod() { return 1; }; mv() { return 0; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
+        sh "$_f17_opk_block" 2>&1) || _f17_rc=$?
+    _f17_residue=$(find "$F17/oc" -name 'policy.json.opk-new.*' 2>/dev/null | wc -l)
+    if [ "$_f17_rc" -eq 1 ] && [ "$_f17_residue" -eq 0 ] \
+       && printf '%s' "$_out" | grep -q 'UIERR'; then
+        pass "opk twin: chmod failure cleans the temp, dies loud (#211 b W8)"
+    else
+        fail "opk twin: chmod failure cleanup (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 b W8)"
     fi
     rm -rf "$F17"
 else

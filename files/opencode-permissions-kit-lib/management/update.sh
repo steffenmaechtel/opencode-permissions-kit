@@ -777,8 +777,15 @@ if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
         _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
         printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
             | sudo tee "$_ocp_tmp" > /dev/null
+        # Registered with the cleanup trap (#211 b W8): a set -e abort
+        # between staging and the flip used to strand the root-owned
+        # temp in /etc — the pid suffix means no later run cleans it.
+        _tmp_track "$_ocp_tmp"
         sudo chown root:root "$_ocp_tmp" 2>/dev/null || true
         sudo chmod 644 "$_ocp_tmp"
+        # mv replaces a symlink at policy.json rather than writing
+        # through it (#211 b W19) — the announced replace is this
+        # block's documented job.
         sudo mv -f "$_ocp_tmp" /etc/openchamber/policy.json
         ui_success "openchamber policy pin re-applied: /etc/openchamber/policy.json"
         log "openchamber policy pin re-applied: /etc/openchamber/policy.json"

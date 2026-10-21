@@ -224,8 +224,17 @@ case "$cmd" in
         _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
         printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > "$_ocp_tmp"
         chown root:root "$_ocp_tmp" 2>/dev/null || true
-        chmod 644 "$_ocp_tmp"
-        mv -f "$_ocp_tmp" /etc/openchamber/policy.json
+        # Failure path cleans the staged temp (#211 b W8): opk carries
+        # no cleanup trap, and the pid suffix means a stranded
+        # root-owned .opk-new.$$ in /etc is never cleaned by a later
+        # run. mv -f replaces a symlink at policy.json rather than
+        # writing through it (#211 b W19) — the announced replace is
+        # this command's documented job.
+        if ! { chmod 644 "$_ocp_tmp" && mv -f "$_ocp_tmp" /etc/openchamber/policy.json; }; then
+            rm -f "$_ocp_tmp"
+            ui_error "could not install the policy pin (chmod/mv on the staged temp failed)"
+            exit 1
+        fi
         ui_success "policy pin active: /etc/openchamber/policy.json -> /usr/local/bin/opencode"
         # Record the opt-in so update.sh keeps re-applying the pin.
         if grep -q '^OPENCHAMBER_POLICY=' "$INSTALL_CONF" 2>/dev/null; then
