@@ -1,9 +1,10 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
-Status: open — all 37 findings dispositioned (33 implemented, 4 deliberately
-not done); wave review b committed ([review-b.md](review-b.md), 30 findings
-over the a-wave diff 2e7d781..6d082565) — b-findings pending the
-maintainer's go.
+Status: open — all 37 a-findings dispositioned (33 implemented, 4
+deliberately not done); wave review b's 30 findings all implemented
+(b W1–b W30, dispositions below). Both e2e suites at baseline on the
+b-wave HEAD (303 / 47). Review c owed per the stop rule: the b-wave
+touched production and test code.
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
@@ -66,6 +67,7 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W15 (LOW) | **implemented** | `37f079d` | sweep paragraph corrected (browser_bridge_remove loud since a F27) |
 | b W16 (LOW) | **implemented** | `bc56a17` | F12 enumeration completed (45 hits/12 files, all checked safe) |
 | b W17 (LOW) | **implemented** | `d9d0abf` | config.sh --yes/-y documented in cli.md |
+| b W18 (LOW) | **implemented** | see a F1 gates note | both e2e suites at post-fix HEAD: e2e 303, rootless 47, unit green |
 | b W19 (INFO) | **implemented** | `cdb9916` | mv-replaces-symlink delta noted at both sites |
 | b W20 (INFO) | **implemented** | `f2d7b03` | status consumed only while SUB empty; clobber dies at gate (pinned) |
 | b W21 (INFO) | **implemented** | `d9d0abf` | both %b comments reworded to the %s rationale |
@@ -506,3 +508,7 @@ nothing to amend.
 
 Gates owed by a root-script behavior change (RM-0077): unit suite +
 both e2e suites run on the fix — results recorded in the chain.
+Discharged by b W18 (the in-chain evidence this line pointed at never
+existed — review b's finding): at the b-wave fix HEAD, `make test`
+rc=0, `make e2e` 303 passed, `make e2e-rootless` 47 passed — both
+suites at baseline, zero skips.
