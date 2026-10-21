@@ -49,6 +49,9 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F30 (INFO) | **deliberately not done** | — | 755 on sourced libs: accepted at 0.0.49, pinned by test-bypass-guard |
 | a F32 (INFO) | **deliberately not done** | — | project_path_sane twins: structural refactor, own wave — detail below |
 | a F37 (INFO) | **deliberately not done** | — | partial set-skeletons: no defect found — detail below |
+| b W1 (MED) | **implemented** | `6bb715b` | direct silenced sudo call, rc-captured; pin drives the real wiring (sudo stub) + DRY arm |
+| b W11 (LOW) | **implemented** | `6bb715b` | no-markers arm if-wrapped with FAILED log; wiring pin |
+| b W14 (LOW) | **implemented** | `6bb715b` | sudo stubbed in the F27 extract drive |
 
 ## Evidence detail
 
@@ -80,6 +83,25 @@ wrapper's fail-open hot path is intact, no unguarded defect exists.
 Forcing `set -euo pipefail` uniformly would change failure semantics
 on the session-start hot path for no measured gain — risk without a
 finding behind it.
+
+### b W1 (MED) — gpasswd rc now reaches the honesty arms
+
+`run_q`'s body ends in `|| true` (rc 0 unconditionally), so a F28's
+`if run_q sudo gpasswd …` could never take its else arm — the false
+"Removed" echo and the removal audit log persisted over every failure
+mode the fix's own comment names. The block now silences the call
+itself (`>/dev/null 2>&1`) and captures the rc (`_grp_rc`), with a
+DRY_RUN echo arm (the file's run/run_q convention: dry-run reports the
+intended outcome). Pins (test-uninstall.sh): the F28 drive stubs
+`sudo` — the REAL seam — instead of an rc-propagating run_q fake that
+contradicted the shipped contract; new DRY-run arm. Sabotage (revert
+to the run_q wiring): ok-arm + DRY pins RED; restored green. Sweep:
+`grep -rn 'if run_q' files/` — the gpasswd site was the only
+rc-conditioned run_q call; the remaining run_q uses are bare
+best-effort cleanup calls by design. b W11/W14 ride the same commit:
+the no-markers bridge arm is if-wrapped like its consent sibling
+(wiring pin, F14's sites-2/3 precedent — the arm is the stub path),
+and the F27 extract's live `sudo rm -rf` is behind a stubbed sudo.
 
 ### a F24–F29, F33, F34 (INFO) — small-honesty batch
 
