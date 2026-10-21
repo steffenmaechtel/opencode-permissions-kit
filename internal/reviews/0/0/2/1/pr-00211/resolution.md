@@ -52,6 +52,7 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W1 (MED) | **implemented** | `6bb715b` | direct silenced sudo call, rc-captured; pin drives the real wiring (sudo stub) + DRY arm |
 | b W11 (LOW) | **implemented** | `6bb715b` | no-markers arm if-wrapped with FAILED log; wiring pin |
 | b W14 (LOW) | **implemented** | `6bb715b` | sudo stubbed in the F27 extract drive |
+| b W2 (MED) | **implemented** | `9ffb51e` | parser gains `--yes\|-y`; alias pinned; sabotage red-by-abort, green restored |
 
 ## Evidence detail
 
