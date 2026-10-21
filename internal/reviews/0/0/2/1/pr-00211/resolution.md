@@ -81,6 +81,18 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W29 (INFO) | **implemented** | `bc56a17` | F16 sweep pattern corrected (reproducible `\$((` form) |
 | b W30 (INFO) | **implemented** | `2796e04` | reverse direction: doc flags must exist in parser; sab. red |
 
+## Follow-ups after snapshot b
+
+- **Spaced-path race pin** (maintainer's external mini-review, post-b;
+  review b missed it — the b W6 class on the a F1 pin): the happy-path
+  spaces drive proves chmod APPLIES on spaced paths but cannot notice a
+  walk that silently stops SKIPPING them; the a F1 race fixture drove
+  unspaced paths only. Pinned with the same deterministic find-stub
+  seam, spaces in every component (victim stays 600, rc 0, seam fired).
+  Sabotage both ways: `for _p in $@` (word-splitting) goes red at the
+  happy-path assert; the skip probe neutered goes red at BOTH race
+  pins. Commit `82cdd4a`.
+
 ## Evidence detail
 
 ### a F30, F32, F35, F37 (INFO) — deliberately not done
