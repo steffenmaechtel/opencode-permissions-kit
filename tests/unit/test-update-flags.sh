@@ -571,10 +571,11 @@ check "uninstall twin probes at the same authority (issue #164)" \
 OC164_BLOCK="$(sed -n '/^    _oc_expected=/,/^    fi$/p' "$UPDATE")"
 # #198 a W5: a drifted end anchor over-captures to EOF — bound the block
 # so anchor drift fails HERE, loudly, instead of surfacing later as a
-# confusing S1/S2 'got:' dump (the block is 23 lines since #211 a F17's
-# atomic stage+mv grew the else arm).
+# confusing S1/S2 'got:' dump (the block is 28 lines: 21 after #211 a
+# F17's atomic stage+mv, +7 from #211 b W8's trap registration and mv
+# -semantics comments).
 if [ -n "$OC164_BLOCK" ] \
-    && [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 26 ] \
+    && [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 30 ] \
     && printf '%s' "$OC164_BLOCK" | grep -qF 'sudo test -f /etc/openchamber/policy.json'; then
     pass "openchamber gate block extractable from update.sh (issue #164)"
 else
