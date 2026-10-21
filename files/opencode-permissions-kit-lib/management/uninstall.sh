@@ -359,8 +359,15 @@ else
             log "wsl browser bridge: wsl.conf block left in place (user declined)"
         fi
     else
-        browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
-        log "wsl browser bridge removed (no wsl.conf content found; library wsl/ tree dropped)"
+        # Same honesty as the consent arm above (#211 b W11): with the
+        # helper missing (F27's failing stub) the log must not claim a
+        # removal that never ran.
+        if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
+            log "wsl browser bridge removed (no wsl.conf content found; library wsl/ tree dropped)"
+        else
+            echo "WARN: could not remove the wsl browser bridge (kit helper unavailable)" >&2
+            log "wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)"
+        fi
     fi
 fi
 
@@ -415,7 +422,18 @@ echo "--- Removing opencode user ---"
 # success echo printed over a silenced gpasswd failure.
 if id "$DEFAULT_USER" >/dev/null 2>&1 \
     && id "$DEFAULT_USER" | grep -qF "($OPENCODE_GROUP)"; then
-    if run_q sudo gpasswd -d "$DEFAULT_USER" "$OPENCODE_GROUP"; then
+    # The rc must reach the arms (#211 b W1): run_q ends in `|| true`
+    # by design, so wiring a F28's honesty arms through it left the
+    # else arm dead code — a failed gpasswd still printed "Removed".
+    # DRY_RUN keeps the [DRY] echo and the success lines (the file's
+    # run/run_q convention: dry-run reports the intended outcome).
+    _grp_rc=0
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] sudo gpasswd -d $DEFAULT_USER $OPENCODE_GROUP"
+    else
+        sudo gpasswd -d "$DEFAULT_USER" "$OPENCODE_GROUP" >/dev/null 2>&1 || _grp_rc=$?
+    fi
+    if [ "$_grp_rc" -eq 0 ]; then
         echo "Removed $DEFAULT_USER from group $OPENCODE_GROUP."
         log "removed $DEFAULT_USER from group $OPENCODE_GROUP"
     else

@@ -563,6 +563,10 @@ if [ -n "$_f27_block" ] && printf '%s' "$_f27_block" | grep -q 'browser_bridge_r
         (
             prompt_yn() { printf 'y'; }
             log() { echo "log: $*"; }
+            # #211 b W14: the extract spans the declined-consent arm's
+            # live `sudo rm -rf` — stub sudo so no future drive can
+            # execute it for real on a kit-managed host.
+            sudo() { echo "sudo: $*"; return 0; }
             browser_bridge_remove() {
                 [ "$F27MODE" = ok ] && return 0
                 return 1
@@ -593,12 +597,16 @@ _f28_block="$(sed -n '/^if id "\$DEFAULT_USER" >\/dev\/null 2>&1 \\/,/^fi$/p' \
 if [ -n "$_f28_block" ]; then
     pass "group removal block extractable (#211 a F28)"
     _f28_run() {
-        # $1 = groups-print, $2 = gpasswd rc
+        # $1 = groups-print, $2 = gpasswd rc — sudo stubbed (#211 b W1):
+        # the block calls sudo directly now (run_q is rc-blind by design
+        # and must not be faked into propagating), so the pin drives the
+        # real shipped wiring at the real seam.
         (
             DEFAULT_USER=dev
             OPENCODE_GROUP=opencode
+            DRY_RUN="${DRY_RUN:-false}"
             id() { printf '%s\n' "uid=1(dev) gid=1(dev) groups=1(dev),$F28GRPS"; return 0; }
-            run_q() { return "$F28GP"; }
+            sudo() { return "$F28GP"; }
             log() { echo "log: $*"; }
             eval "$_f28_block"
         )
@@ -618,8 +626,27 @@ if [ -n "$_f28_block" ]; then
         *"Removed"*) fail "opencode2 must NOT count as membership (#211 a F28)" ;;
         *) pass "exact-name match: opencode2 is not opencode (#211 a F28)" ;;
     esac
+    _out=$(F28GP=1 F28GRPS="50(opencode)" DRY_RUN=true _f28_run 2>&1) || true
+    case "$_out" in
+        *"[DRY] sudo gpasswd"*"Removed dev from group opencode."*)
+            pass "dry run: [DRY] echo + success lines despite rc (#211 b W1)" ;;
+        *) fail "dry run: [DRY] echo + success lines (got: $_out)" ;;
+    esac
 else
     fail "group removal block extractable (#211 a F28)"
+fi
+
+# --- W11: the no-markers bridge arm follows the helper's rc (#211 b W11) ----------
+# The consent arm went honest in a F27; this sibling arm (no wsl.conf
+# markers found — library wsl/ tree drop only) kept its unconditional
+# success log. Wiring pin (F14's sites-2/3 precedent: the arm is the
+# near-unreachable stub path): the call is if-wrapped and the FAILED
+# log line exists.
+if grep -q 'if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then' "$UNINSTALL" \
+   && grep -q 'wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)' "$UNINSTALL"; then
+    pass "no-markers bridge arm conditions its log on the rc (#211 b W11)"
+else
+    fail "no-markers bridge arm conditions its log on the rc (#211 b W11)"
 fi
 
 if [ "$failures" -gt 0 ]; then
