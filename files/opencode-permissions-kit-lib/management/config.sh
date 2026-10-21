@@ -135,8 +135,12 @@ for arg do
             # `status` doubles as a read-only SUB once an action is set
             # (the dispatch's usage strings name it; e2e pins
             # `config git-config status`): consume it, not TARGETS
-            # (#211 a F11).
-            [ "$arg" = "status" ] && SUB="status" && continue
+            # (#211 a F11). Only when SUB is still empty (#211 b W20):
+            # consuming it over an already-set SUB silently swapped the
+            # action — `git-config off status` rendered the status view
+            # with the toggle not applied; the token now dies at the
+            # usage gate below instead.
+            [ "$arg" = "status" ] && [ -z "$SUB" ] && SUB="status" && continue
             TARGETS="$TARGETS $arg"
             ;;
         on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg"

@@ -771,6 +771,22 @@ if [ -n "$_f11_block" ]; then
         *)  echo "  ${RED}FAIL${NC}  git-config status consumed as SUB (out=$_out)"
             failures=$((failures + 1)) ;;
     esac
+    _out=$(_f11_run git-config off status) || true
+    case "$_out" in
+        *"die: unknown or misplaced argument(s):status"*)
+            echo "  ${GREEN}PASS${NC}  status no longer clobbers a set SUB — dies loud (#211 b W20)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  status no longer clobbers a set SUB (out=$_out) (#211 b W20)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run refresh status) || true
+    case "$_out" in
+        *"OK ACTION=[refresh] SUB=[status] TARGETS=[]"*)
+            echo "  ${GREEN}PASS${NC}  refresh status still consumed (SUB was empty) (#211 b W20)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  refresh status still consumed (out=$_out) (#211 b W20)"
+            failures=$((failures + 1)) ;;
+    esac
     _out=$(_f11_run handover /a/proj) || true
     case "$_out" in
         *"OK ACTION=[handover] SUB=[] TARGETS=[/a/proj]"*)
