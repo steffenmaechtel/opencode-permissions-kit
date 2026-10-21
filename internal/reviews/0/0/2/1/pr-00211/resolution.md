@@ -67,7 +67,7 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W15 (LOW) | **implemented** | `37f079d` | sweep paragraph corrected (browser_bridge_remove loud since a F27) |
 | b W16 (LOW) | **implemented** | `bc56a17` | F12 enumeration completed (45 hits/12 files, all checked safe) |
 | b W17 (LOW) | **implemented** | `d9d0abf` | config.sh --yes/-y documented in cli.md |
-| b W18 (LOW) | **implemented** | see a F1 gates note | both e2e suites at post-fix HEAD: e2e 303, rootless 47, unit green |
+| b W18 (LOW) | **implemented** | — | e2e 303 + rootless 47 at post-fix HEAD; detail: a F1 gates note |
 | b W19 (INFO) | **implemented** | `cdb9916` | mv-replaces-symlink delta noted at both sites |
 | b W20 (INFO) | **implemented** | `f2d7b03` | status consumed only while SUB empty; clobber dies at gate (pinned) |
 | b W21 (INFO) | **implemented** | `d9d0abf` | both %b comments reworded to the %s rationale |
