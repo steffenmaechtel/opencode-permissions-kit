@@ -93,10 +93,17 @@ parse_args --yes
 [ "$SKIP_PROMPTS" = true ] && pass "--yes sets SKIP_PROMPTS" || fail "--yes sets SKIP_PROMPTS"
 
 # #211 b W2: the -y alias cli.md documents — same family shape as
-# update/config/uninstall.
+# update/config/uninstall. Abort-contained (#211 c W5): a reverted
+# alias aborts parse_args (exit 1) — a bare call under this suite's
+# set -e would kill the whole suite pre-tally instead of recording
+# this FAIL (the expect_rc convention, 0.0.42g C1). The state is
+# printed INSIDE the subshell — the assignment cannot cross it.
 reset_globals
-parse_args -y
-[ "$SKIP_PROMPTS" = true ] && pass "-y alias sets SKIP_PROMPTS (#211 b W2)" || fail "-y alias sets SKIP_PROMPTS (#211 b W2)"
+_cw5_out="$( ( parse_args -y && printf '%s\n' "$SKIP_PROMPTS" ) 2>/dev/null )" || true
+case "$_cw5_out" in
+    true) pass "-y alias sets SKIP_PROMPTS (#211 b W2)" ;;
+    *) fail "-y alias sets SKIP_PROMPTS (#211 b W2) (got: ${_cw5_out:-abort})" ;;
+esac
 
 reset_globals
 parse_args --secure-git-config
