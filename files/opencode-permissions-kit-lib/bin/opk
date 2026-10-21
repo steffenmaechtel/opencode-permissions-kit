@@ -222,7 +222,15 @@ case "$cmd" in
         # rename only, the truncate window sits on the pid-suffixed
         # temp (0.0.42e C5 shape).
         _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
-        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > "$_ocp_tmp"
+        # The write's rc is gated too (#211 c W7): opk carries no set -e,
+        # so a partially-written temp (create ok, write fails — ENOSPC)
+        # flowed through chown || true and chmod+mv — both succeed on the
+        # truncated file — installing a broken pin under ui_success.
+        # (Deliberately an `|| { …; }` one-liner: the F17 pin's extract
+        # ends at this block's first 8-space `fi` — a second one would
+        # truncate it.)
+        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > "$_ocp_tmp" \
+            || { rm -f "$_ocp_tmp"; ui_error "could not stage the policy pin (write to the temp failed)"; exit 1; }
         chown root:root "$_ocp_tmp" 2>/dev/null || true
         # Failure path cleans the staged temp (#211 b W8): opk carries
         # no cleanup trap, and the pid suffix means a stranded

@@ -1076,6 +1076,20 @@ if [ -n "$_f17_opk_block" ]; then
     else
         fail "opk twin: chmod failure cleanup (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 b W8)"
     fi
+    # Staging-write gate (#211 c W7): opk has no set -e, so a partial
+    # write (printf fails mid-file) must die loud itself — chown's
+    # `|| true` and a succeeding chmod+mv would otherwise install the
+    # truncated temp as the live pin.
+    _f17_rc=0
+    _out=$(sh -c 'printf() { return 1; }; chmod() { return 0; }; mv() { return 0; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
+        sh "$_f17_opk_block" 2>&1) || _f17_rc=$?
+    _f17_residue=$(find "$F17/oc" -name 'policy.json.opk-new.*' 2>/dev/null | wc -l)
+    if [ "$_f17_rc" -eq 1 ] && [ "$_f17_residue" -eq 0 ] \
+       && printf '%s' "$_out" | grep -q 'UIERR'; then
+        pass "opk twin: staging write failure dies loud, no flip (#211 c W7)"
+    else
+        fail "opk twin: staging write gate (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 c W7)"
+    fi
     rm -rf "$F17"
 else
     fail "opk openchamber block extractable (#211 a F17)"
