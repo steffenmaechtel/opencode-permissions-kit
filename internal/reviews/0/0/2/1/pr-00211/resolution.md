@@ -63,6 +63,7 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W8 (LOW) | **implemented** | `cdb9916` | update.sh temp trap-registered (TRACK pin); opk fail-loud arm cleans temp (rc/residue/UIERR pin) |
 | b W19 (INFO) | **implemented** | `cdb9916` | mv-replaces-symlink delta noted at both sites |
 | b W24 (INFO) | **implemented** | `33bc64b` | OC164 comment honest (28 lines), bound 26→30 for the W8 growth |
+| b W9 (LOW) | **implemented** | `a337527` | all four pairs honest (`_dhq_ok`/`_dhb_ok` shape); one driven + three wiring-grepped; sabotage red |
 
 ## Evidence detail
 
