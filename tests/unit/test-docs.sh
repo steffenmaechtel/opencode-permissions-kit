@@ -170,6 +170,12 @@ done
 _f36_docflags="$(sed -n '/^## install.sh/,/^## /p' "$_cli_md" \
     | grep '^| ' | grep -v '^| Flag' \
     | sed -n 's/^| \([^|]*\) |.*/\1/p' | tr -d '`,' | tr -s ' ' '\n' | grep -E '^-.-?' | sort -u)"
+# Tripwire (#211 c W4 — the W28 class on the reverse direction): a
+# drifted '## install.sh' heading must not silently iterate zero flags
+# and pass.
+if [ -z "$_f36_docflags" ]; then
+    echo "FAIL cli.md: install-table extraction empty — '## install.sh' anchor drift? (#211 c W4)" >> "$TMP"
+fi
 for _f36_df in $_f36_docflags; do
     case "$_f36_df" in
         --*)
