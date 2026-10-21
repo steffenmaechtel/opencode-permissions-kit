@@ -203,6 +203,9 @@ exit 0
 EOS
     chmod +x "$_bstub/failmid"
     _brc=0
+    # Root arg is deliberately a path that cannot exist (#211 b W27):
+    # the W11 drives assert batch rc semantics, not root-relative walks
+    # — an absent root keeps the drives about the operands alone.
     sh -c "$_batch_body" xargs-sh 1 /nonexistent-opk-root "$_bstub/failmid" ok1 midfail ok2 || _brc=$?
     assert_eq "mid-batch failure fails the batch, order-independent (W11)" "1" "$_brc"
     _brc=0
@@ -402,12 +405,17 @@ esac
 
 # Walker string safety: components and names with spaces flow through
 # the prefix-peeling without word splitting — the chmod still applies.
+# rc captured (#211 b W13): the drive used to run unguarded under the
+# suite's set -e, aborting the whole suite pre-tally on a walker
+# regression instead of recording a FAIL.
 F1SP=$(mktemp -d)
 mkdir -p "$F1SP/proj/a/dir two"
 printf 's\n' > "$F1SP/proj/a/dir two/has space.txt"
 chmod 600 "$F1SP/proj/a/dir two/has space.txt"
+F1SPRC=0
 FS_SUDO="" sh -c '. "$1" && _fsb_pass "spaces" "$2" -type f -- chmod g+w' \
-    _ "$LIB" "$F1SP/proj" >/dev/null 2>&1
+    _ "$LIB" "$F1SP/proj" >/dev/null 2>&1 || F1SPRC=$?
+assert_eq "walker: spaces drive exits 0 (#211 b W13)" "0" "$F1SPRC"
 assert_eq "walker: spaces in components and names survive the walk" "620" \
     "$(stat -c %a "$F1SP/proj/a/dir two/has space.txt")"
 rm -rf "$F1SP"
