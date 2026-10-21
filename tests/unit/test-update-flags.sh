@@ -1027,6 +1027,17 @@ if [ -n "$_f17_block" ]; then
     else
         fail "update.sh: staged temp registered with the cleanup trap (out=$_out) (#211 b W8)"
     fi
+    # Order (#211 c W3): registration must precede staging — an abort
+    # DURING the tee (temp created, write fails) strands the temp unless
+    # the trap already knows it. The stub recording is chronological,
+    # so the TRACK line must carry the smaller line number.
+    _f17_trk=$(printf '%s\n' "$_out" | grep -n 'TRACK /etc/openchamber/policy.json.opk-new\.' | cut -d: -f1)
+    _f17_tee=$(printf '%s\n' "$_out" | grep -n 'TEE /etc/openchamber/policy.json.opk-new\.' | cut -d: -f1)
+    if [ -n "$_f17_trk" ] && [ -n "$_f17_tee" ] && [ "$_f17_trk" -lt "$_f17_tee" ]; then
+        pass "update.sh: temp registered BEFORE staging (#211 c W3)"
+    else
+        fail "update.sh: temp registered before staging (trk=${_f17_trk:-none} tee=${_f17_tee:-none}) (#211 c W3)"
+    fi
 else
     fail "openchamber stage+mv block extractable (#211 a F17)"
 fi

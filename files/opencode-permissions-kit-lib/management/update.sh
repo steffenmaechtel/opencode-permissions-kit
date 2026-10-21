@@ -775,12 +775,13 @@ if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
         # flips via rename only — a kill mid-tee used to leave a
         # truncated file and a silently inactive pin.
         _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
+        # Registered BEFORE staging (#211 b W8, order per #211 c W3):
+        # the trap's rm -f tolerates an absent path, so an abort DURING
+        # the tee (temp created, write fails — ENOSPC under set -e) is
+        # covered too, not just aborts between staging and the flip.
+        _tmp_track "$_ocp_tmp"
         printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
             | sudo tee "$_ocp_tmp" > /dev/null
-        # Registered with the cleanup trap (#211 b W8): a set -e abort
-        # between staging and the flip used to strand the root-owned
-        # temp in /etc — the pid suffix means no later run cleans it.
-        _tmp_track "$_ocp_tmp"
         sudo chown root:root "$_ocp_tmp" 2>/dev/null || true
         sudo chmod 644 "$_ocp_tmp"
         # mv replaces a symlink at policy.json rather than writing
