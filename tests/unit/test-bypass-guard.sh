@@ -97,6 +97,13 @@ check "install.sh fetches shell-warn.sh" \
 check "install.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 755" "$2" \
         && grep -qF "lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"" "$1"' _ "$INSTALL" "$DEPLOYLIB"
+# #211 b W4: the 755-sourced-lib invariant needs a pin per lib —
+# shell-warn.sh was the only one here (log.sh via test-deploy-lib);
+# advisories.sh and ui.sh had no mode pin anywhere.
+check "install.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 755)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 755" "$2"' _ "$INSTALL" "$DEPLOYLIB"
+check "install.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 755)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 755" "$2"' _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$INSTALL"
 check "install.sh restricts binary to root:group 750 (shared helper)" \
@@ -153,6 +160,11 @@ check "update.sh fetches shell-warn.sh" \
 check "update.sh deploys shell-warn.sh to LIBDIR (lib_deploy manifest)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/shell-warn.sh 755" "$2" \
         && grep -qF "lib_deploy \"\$FILES_ROOT\" \"\$LIBDIR\"" "$1"' _ "$UPDATE" "$DEPLOYLIB"
+# #211 b W4: update twins of the advisories/ui mode pins above.
+check "update.sh deploys advisories.sh to LIBDIR (lib_deploy manifest, 755)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/advisories.sh 755" "$2"' _ "$UPDATE" "$DEPLOYLIB"
+check "update.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 755)" \
+    sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 755" "$2"' _ "$UPDATE" "$DEPLOYLIB"
 check "update.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$UPDATE"
 # 0.0.49b C1 (update twin of the install pins above): the umask

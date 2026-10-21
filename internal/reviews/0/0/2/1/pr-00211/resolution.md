@@ -75,11 +75,15 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 ### a F30, F32, F35, F37 (INFO) — deliberately not done
 
 **a F30** — the four sourced-only sh/ libs deploy mode 755 (deploy-lib
-manifest). Carried unchanged since 0.0.41d, explicitly accepted by the
-0.0.49 full review, and test-bypass-guard PINS the 755s (C2 verified
-the pin during review a). Changing the manifest would fight both a
-standing pin and a prior accepted disposition for zero behavior —
-the 644-sourced-lib invariant gains nothing here.
+manifest). Carried unchanged since 0.0.41d and explicitly accepted by
+the 0.0.49 full review. The original rationale overclaimed the pin
+coverage (b W4): test-bypass-guard pinned shell-warn.sh only, log.sh
+lives in test-deploy-lib — advisories.sh and ui.sh had no mode pin
+anywhere. All four are pinned now (bypass-guard carries the
+advisories/ui manifest rows beside shell-warn's, install and update
+wiring both). Changing the manifest fights the standing pins and a
+prior accepted disposition for zero behavior — the 644-sourced-lib
+invariant gains nothing here.
 
 **a F32** — `project_path_sane` exists as two near-identical copies
 (install.sh:930, config.sh:263). Unifying means moving the gate into
