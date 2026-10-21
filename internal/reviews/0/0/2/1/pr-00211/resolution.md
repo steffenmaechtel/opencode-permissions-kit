@@ -217,6 +217,15 @@ not done): the rootless-47 count is internally consistent; the next
 e2e run records a fresh comparator and the release gate (RM-0091)
 re-runs both suites regardless.
 
+### c W3 (LOW) — registration precedes staging
+
+Order-class sweep (`grep -rn '_tmp_track "' files/` — 20 sites):
+every other site registers immediately after its mktemp with no
+external command in between; the policy staging tee was the only
+write-before-register shape. Pin asserts TRACK fires before TEE in
+the chronological stub recording; sabotage (registration deleted)
+went red at three pins, restored green.
+
 ### a F24–F29, F33, F34 (INFO) — small-honesty batch
 
 F24 (`f653615`): a missing sh/staged-write.sh dies as "kit file
