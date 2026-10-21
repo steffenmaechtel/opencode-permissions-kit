@@ -591,6 +591,13 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             run_q sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
         done
         run_q sudo chmod g-s "$root"
+        # NB (#211 c W1 sweep): this closing log aggregates rc-blind
+        # run_q operations (find-chown, setfacl x2, chmod g-s) — the
+        # same lie class c W1 fixed at userdel/audit-log, on a root-run
+        # revert loop with its own partial semantics. Deliberately not
+        # changed in this wave: recorded as a follow-up candidate for
+        # its own wave (needs its fixture updated with it), the a F1
+        # ddev-handover precedent.
         if [ -n "$_un_acl_skipped" ]; then
             log "project ownership reverted + kit ACL entries PARTIALLY removed"\
 " (one or more group ids were unknown): $root"

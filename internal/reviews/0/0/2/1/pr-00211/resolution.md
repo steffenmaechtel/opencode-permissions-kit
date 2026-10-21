@@ -1,10 +1,11 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
 Status: open — all 37 a-findings dispositioned (33 implemented, 4
-deliberately not done); wave review b's 30 findings all implemented
-(b W1–b W30, dispositions below). Both e2e suites at baseline on the
-b-wave HEAD (303 / 47). Review c owed per the stop rule: the b-wave
-touched production and test code.
+deliberately not done); wave review b's 30 findings all implemented;
+wave review c's 11 findings dispositioned (9 implemented, 2
+deliberately not done). Both e2e suites at baseline on the b-wave HEAD
+(303 / 47). Snapshot d owed per the stop rule: the c-wave touched
+production and test code.
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
@@ -80,6 +81,17 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W28 (INFO) | **implemented** | `2796e04` | empty parse_args extraction fails loud (tripwire) |
 | b W29 (INFO) | **implemented** | `bc56a17` | F16 sweep pattern corrected (reproducible `\$((` form) |
 | b W30 (INFO) | **implemented** | `2796e04` | reverse direction: doc flags must exist in parser; sab. red |
+| c W1 (MED) | **implemented** | `47e07f9` | userdel + audit-rm honest arms; sudo-stub pins ok/fail/dry; sab. red |
+| c W2 (LOW) | **implemented** | `fce42af` | original root captured pre-shift; `/` + `//` message pins; sab. red |
+| c W3 (LOW) | **implemented** | `7d652cf` | _tmp_track above the tee; TRACK-before-TEE order pin; sab. red |
+| c W4 (LOW) | **implemented** | `1d2e2ae` | reverse-direction empty-extraction tripwire; heading-drift sab. red |
+| c W5 (LOW) | **implemented** | `aed81ee` | -y drive abort-contained (subshell print); sab. red at the tally |
+| c W6 (LOW) | **implemented** | `bc56a17` | Follow-ups wording corrected (spaces in the swapped components) |
+| c W7 (INFO) | **implemented** | `2bda35b` | staging write `|| { rm; ui_error; exit 1; }`; printf-fail pin; sab. red |
+| c W8 (INFO) | **deliberately not done** | — | disclosed kill-window residue; trap/glob-clean risk > inert residue |
+| c W9 (INFO) | **implemented** | `9ac107c` | `-le 4294967295` value caps both fields; u32max fixture pin; sab. red |
+| c W10 (INFO) | **implemented** | `9ac107c` | zero-START acceptance recorded in-code; zerostart fixture counts good |
+| c W11 (INFO) | **deliberately not done** | — | count anchored at the next e2e run; release gate owes both anyway |
 
 ## Follow-ups after snapshot b
 
@@ -88,10 +100,28 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
   spaces drive proves chmod APPLIES on spaced paths but cannot notice a
   walk that silently stops SKIPPING them; the a F1 race fixture drove
   unspaced paths only. Pinned with the same deterministic find-stub
-  seam, spaces in every component (victim stays 600, rc 0, seam fired).
+  seam, spaces in the swapped parent, the operand and the victim
+  (`dir two`, `has space.txt`, `victim dir` — the scan root and the
+  `proj`/`a` components stay unspaced; c W6 corrected this text, which
+  claimed "every component"): victim stays 600, rc 0, seam fired.
   Sabotage both ways: `for _p in $@` (word-splitting) goes red at the
   happy-path assert; the skip probe neutered goes red at BOTH race
   pins. Commit `82cdd4a`.
+
+## Follow-ups after snapshot c
+
+- **Revert-loop closing log** (c W1's class sweep, beyond the named
+  lines): uninstall.sh's per-root closing log "project ownership
+  reverted + kit ACL entries removed" (:598) aggregates four rc-blind
+  `run_q` operations (`find -exec chown` :560, `setfacl -x` ×2
+  :590-591, `chmod g-s` :593) — the same lie class c W1 fixed at
+  userdel/audit-log, but on a root-run revert loop with its own
+  documented partial semantics (0.0.42g/h era) and e2e-pinned state
+  checks. Deliberately deferred to its own wave (the a F1
+  ddev-handover precedent): noted in-code at the site; needs its
+  fixture updated with it. The e2e pins assert the reverted STATE
+  (stat), not the log string — a honesty arm there will not break
+  them, but the change deserves its own reviewed diff.
 
 ## Evidence detail
 
@@ -141,11 +171,51 @@ intended outcome). Pins (test-uninstall.sh): the F28 drive stubs
 contradicted the shipped contract; new DRY-run arm. Sabotage (revert
 to the run_q wiring): ok-arm + DRY pins RED; restored green. Sweep:
 `grep -rn 'if run_q' files/` — the gpasswd site was the only
-rc-conditioned run_q call; the remaining run_q uses are bare
-best-effort cleanup calls by design. b W11/W14 ride the same commit:
+rc-conditioned run_q call; the remaining run_q uses were recorded
+here as "bare best-effort cleanup calls by design" — **that claim was
+false as written** (review c's W1): `userdel -r` (the primary
+destructive op) and the audit-log rm both lied in the gpasswd shape.
+Both went honest in c W1; the full-call sweep (`grep -rn 'run_q'
+files/` — 15 hits, one file) is recorded under c W1 below, including
+the deferred revert-loop closing log it surfaced. b W11/W14 ride the same commit:
 the no-markers bridge arm is if-wrapped like its consent sibling
 (wiring pin, F14's sites-2/3 precedent — the arm is the stub path),
 and the F27 extract's live `sudo rm -rf` is behind a stubbed sudo.
+
+### c W1 (MED) — userdel + audit-log arms honest, run_q sweep complete
+
+Both sites the b W1 sweep mischaracterized got the gpasswd treatment:
+silenced direct sudo call, rc captured (`_udel_rc`/`_al_rc`), DRY echo
+arm, success echo+log only on rc 0, WARN-to-stderr + FAILED log
+otherwise. The audit arm's log line moved AFTER the act (outcome, not
+intent). Pins (test-uninstall.sh): both real blocks extracted and
+driven through a per-command `sudo` stub — userdel block with
+prompt_yn/id/run_q(real contract)/sleep stubs, ok/fail/dry arms; audit
+block with prompt_yn/sudo stubs, ok/fail/dry arms. The fail drives
+assert three things at once (WARN present, FAILED log present, false
+"removed" absent). Sabotage (rc capture deleted from both blocks):
+both failure pins RED; restored green.
+
+Class sweep (L2), full-call this time — `grep -rn 'run_q' files/`:
+15 hits, all in uninstall.sh. Disposition of every call site:
+gpasswd (b W1, direct silenced call now), loginctl/systemctl/podman/
+pkill teardown (:490-498 — genuinely best-effort by design, no success
+claim rides them), userdel (:500, fixed here), audit rm (:615, fixed
+here), and the revert loop's four ops (find-chown :560, setfacl ×2
+:590-591, chmod g-s :593) whose closing log (:598) claims completion
+over them — the same class, deliberately deferred to its own wave
+(see Follow-ups after snapshot c; in-code note at the site). No other
+file carries run_q.
+
+c W8 (deliberately not done): opk's kill-window residue is disclosed
+in-code ("opk carries no cleanup trap", b W8) and inert — a stranded
+root-owned staging file nothing reads. An EXIT/INT/TERM trap would
+change the wrapper-family's failure semantics (a F37's tradeoff), a
+glob clean of `policy.json.opk-new.*` would be root rm on a glob in
+/etc (L5) — both disproportionate to the residue. c W11 (deliberately
+not done): the rootless-47 count is internally consistent; the next
+e2e run records a fresh comparator and the release gate (RM-0091)
+re-runs both suites regardless.
 
 ### a F24–F29, F33, F34 (INFO) — small-honesty batch
 
