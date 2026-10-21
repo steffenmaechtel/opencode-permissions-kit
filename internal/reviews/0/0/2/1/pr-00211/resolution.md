@@ -49,35 +49,35 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | a F30 (INFO) | **deliberately not done** | — | 755 on sourced libs: accepted at 0.0.49, pinned by test-bypass-guard |
 | a F32 (INFO) | **deliberately not done** | — | project_path_sane twins: structural refactor, own wave — detail below |
 | a F37 (INFO) | **deliberately not done** | — | partial set-skeletons: no defect found — detail below |
-| b W1 (MED) | **implemented** | `6bb715b` | direct silenced sudo call, rc-captured; pin drives the real wiring (sudo stub) + DRY arm |
-| b W11 (LOW) | **implemented** | `6bb715b` | no-markers arm if-wrapped with FAILED log; wiring pin |
-| b W14 (LOW) | **implemented** | `6bb715b` | sudo stubbed in the F27 extract drive |
-| b W2 (MED) | **implemented** | `9ffb51e` | parser gains `--yes\|-y`; alias pinned; sabotage red-by-abort, green restored |
-| b W3 (MED) | **implemented** | `37f079d` | stub loud like both siblings; both update.sh stubs pin-executed; sabotage red |
-| b W12 (LOW) | **implemented** | `37f079d` | F2 sweep pin executes both stubs (rc 1 + stderr), no longer presence-only |
-| b W15 (LOW) | **implemented** | `37f079d` | sweep paragraph corrected (browser_bridge_remove loud since a F27) |
-| b W22 (INFO) | **implemented** | `37f079d` | browser_bridge_install noted in-code as guarded non-path; enumeration exact |
-| b W7 (LOW) | **implemented** | `d071a16` | trailing slashes normalized in `_fsb_pass`; `/` refused loud; race pin drives a slashed root |
-| b W13 (LOW) | **implemented** | `a1b2b76` | spaces drive rc captured + asserted (sibling `\|\| rc=$?` shape); sabotage red with tally |
-| b W27 (INFO) | **implemented** | `a1b2b76` | one comment records the W11 root-arg rationale |
-| b W8 (LOW) | **implemented** | `cdb9916` | update.sh temp trap-registered (TRACK pin); opk fail-loud arm cleans temp (rc/residue/UIERR pin) |
-| b W19 (INFO) | **implemented** | `cdb9916` | mv-replaces-symlink delta noted at both sites |
-| b W24 (INFO) | **implemented** | `33bc64b` | OC164 comment honest (28 lines), bound 26→30 for the W8 growth |
-| b W9 (LOW) | **implemented** | `a337527` | all four pairs honest (`_dhq_ok`/`_dhb_ok` shape); one driven + three wiring-grepped; sabotage red |
-| b W10 (LOW) | **implemented** | `f194ce8` | per-field validation (u32 cap, zero-count gap closed); fixture 5 malformed shapes; sabotage red |
-| b W20 (INFO) | **implemented** | `f2d7b03` | status consumed only while SUB empty; clobber case dies at the F11 gate (pinned both ways) |
+| b W1 (MED) | **implemented** | `6bb715b` | silenced direct sudo call, rc-captured; pin drives real wiring; sab. red |
+| b W2 (MED) | **implemented** | `9ffb51e` | parser gains `--yes\|-y`; alias pinned; sabotage red-by-abort |
+| b W3 (MED) | **implemented** | `37f079d` | stub loud like both siblings; stubs pin-executed; sabotage red |
+| b W4 (MED) | **implemented** | `a0396c3` | advisories/ui 755 manifest pins (install+update); sabotage red |
 | b W5 (MED) | **implemented** | `98dca3f` | F24 fixture path moved to /var/tmp (RM-0016 shape); sandbox policy green |
-| b W23 (INFO) | **implemented** | `98dca3f` | F11 (47l) + F24 (5l) extracts line-bounded (OC164 shape) |
-| b W6 (MED) | **implemented** | `e6a4c7a` | write-half asserts the fresh `-- end` marker; dead disjunct gone; sabotage red on neutered drive |
-| b W26 (INFO) | **implemented** | e6a4c7a | dead lowercase disjunct removed with the W6 rewrite |
-| b W28 (INFO) | **implemented** | `2796e04` | empty parse_args extraction fails loud (tripwire) |
-| b W30 (INFO) | **implemented** | `2796e04` | reverse direction: doc flags must exist in parser; phantom-row sabotage red |
+| b W6 (MED) | **implemented** | `e6a4c7a` | write-half asserts fresh `-- end` marker; dead disjunct gone; sab. red |
+| b W7 (LOW) | **implemented** | `d071a16` | slash roots normalized; `/` refused loud; race pin drives slashed root |
+| b W8 (LOW) | **implemented** | `cdb9916` | temp trap-registered (TRACK pin); opk arm cleans (residue pin) |
+| b W9 (LOW) | **implemented** | `a337527` | four pairs honest (`_ok` flags); 1 driven + 3 grepped; sabotage red |
+| b W10 (LOW) | **implemented** | `f194ce8` | per-field validation (u32 cap, zero-count gap); sabotage red |
+| b W11 (LOW) | **implemented** | `6bb715b` | no-markers arm if-wrapped with FAILED log; wiring pin |
+| b W12 (LOW) | **implemented** | `37f079d` | F2 pin executes both stubs (rc 1 + stderr); sabotage red |
+| b W13 (LOW) | **implemented** | `a1b2b76` | spaces drive rc captured + asserted; sabotage red with tally |
+| b W14 (LOW) | **implemented** | `6bb715b` | sudo stubbed in the F27 extract drive |
+| b W15 (LOW) | **implemented** | `37f079d` | sweep paragraph corrected (browser_bridge_remove loud since a F27) |
+| b W16 (LOW) | **implemented** | `bc56a17` | F12 enumeration completed (45 hits/12 files, all checked safe) |
 | b W17 (LOW) | **implemented** | `d9d0abf` | config.sh --yes/-y documented in cli.md |
+| b W19 (INFO) | **implemented** | `cdb9916` | mv-replaces-symlink delta noted at both sites |
+| b W20 (INFO) | **implemented** | `f2d7b03` | status consumed only while SUB empty; clobber dies at gate (pinned) |
 | b W21 (INFO) | **implemented** | `d9d0abf` | both %b comments reworded to the %s rationale |
-| b W4 (MED) | **implemented** | `a0396c3` | advisories.sh + ui.sh 755 manifest pins (install+update); rationale names real coverage; sabotage red |
-| b W16 (LOW) | **implemented** | `<s16>` | F12 enumeration completed (45 hits/12 files, all checked safe) |
-| b W25 (INFO) | **implemented** | `<s16>` | F17 legacy-pin count corrected (one write-literal pin, not ×2) |
-| b W29 (INFO) | **implemented** | `<s16>` | F16 sweep pattern corrected (reproducible `\$((` form) |
+| b W22 (INFO) | **implemented** | `37f079d` | browser_bridge_install noted in-code as guarded non-path |
+| b W23 (INFO) | **implemented** | `98dca3f` | F11 (47l) + F24 (5l) extracts line-bounded (OC164 shape) |
+| b W24 (INFO) | **implemented** | `33bc64b` | OC164 comment honest (28 lines), bound 26→30 for the W8 growth |
+| b W25 (INFO) | **implemented** | `bc56a17` | F17 legacy-pin count corrected (one write-literal pin, not ×2) |
+| b W26 (INFO) | **implemented** | `e6a4c7a` | dead lowercase disjunct removed with the W6 rewrite |
+| b W27 (INFO) | **implemented** | `a1b2b76` | one comment records the W11 root-arg rationale |
+| b W28 (INFO) | **implemented** | `2796e04` | empty parse_args extraction fails loud (tripwire) |
+| b W29 (INFO) | **implemented** | `bc56a17` | F16 sweep pattern corrected (reproducible `\$((` form) |
+| b W30 (INFO) | **implemented** | `2796e04` | reverse direction: doc flags must exist in parser; sab. red |
 
 ## Evidence detail
 
