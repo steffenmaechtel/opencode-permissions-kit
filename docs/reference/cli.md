@@ -258,6 +258,9 @@ Change settings on an installed kit.
 sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh <command>
 ```
 
+Flags: `--yes` (alias `-y`) assumes yes where config.sh would ask
+(#211 b W17 — the same family shape update/uninstall document).
+
 | Command | Meaning |
 |---|---|
 | `status` | Quick overview: git-config state + configured project roots |

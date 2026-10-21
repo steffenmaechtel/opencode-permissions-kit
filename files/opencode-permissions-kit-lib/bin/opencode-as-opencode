@@ -99,8 +99,10 @@ esac
 
 # Wrapper diagnostics: interactive starts print to the terminal, headless
 # mode redirects to stderr so stdout carries only opencode's own output.
-# printf '%b' (not echo) so the \033 color escapes render identically
-# under dash and bash. An empty argument prints a blank separator line.
+# printf '%s' (#211 a F29): arguments print literally — escape sequences
+# in directory names cannot garble the line (the color vars below carry
+# real ESC bytes, which %s passes through untouched). An empty argument
+# prints a blank separator line.
 note() {
     _fd=1
     [ "$HEADLESS" = true ] && _fd=2
@@ -247,9 +249,10 @@ openchamber_guard() {
     done
     # OpenChamber settings pin. settings.json is untrusted user input:
     # one targeted sed extraction, no eval, and the VALUE never flows into
-    # note() (printf %b would expand its escape sequences — only the file
-    # and key are named). Empty string counts as unset (openchamber's
-    # optionalText semantics); a pin on the kit wrapper is secured.
+    # note() (printf %s prints it literally — only the file and key are
+    # named, belt and suspenders). Empty string counts as unset
+    # (openchamber's optionalText semantics); a pin on the kit wrapper
+    # is secured.
     _oc_pin=""
     if [ -f "$HOME/.config/openchamber/settings.json" ]; then
         _oc_pin=$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
