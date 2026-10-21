@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 main agent (verification duty held in-session) + 5x GLM-5.3-Fl
 
 # Wave review — pr-00211 snapshot c — the b-wave fix diff
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave-scope pass ("did the fixes break or lie?") over the b-wave: 32
 commits `f439832..47954da`, +530/-78 across 22 files (9 shipped files,
 12 unit suites, docs/reference/cli.md, resolution.md), dispositioning
