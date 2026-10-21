@@ -649,6 +649,95 @@ else
     fail "no-markers bridge arm conditions its log on the rc (#211 b W11)"
 fi
 
+# --- c W1: userdel + audit-log arms honest (#211 c W1) ------------------------------
+# The b W1 sweep claim called the remaining run_q uses "bare best-effort
+# cleanup" — userdel (the primary destructive op) and the audit-log rm
+# both lied in the gpasswd shape: rc-blind call, unconditional success
+# echo/log. Extract both real blocks; stub sudo (the REAL seam — run_q
+# is rc-blind by design and must not be faked into propagating) and
+# drive every arm.
+_cw1_udel_block="$(sed -n '/^if id "\$OPENCODE_USER" >\/dev\/null 2>&1; then$/,/^fi$/p' "$UNINSTALL")"
+if [ -n "$_cw1_udel_block" ]; then
+    pass "user removal block extractable (#211 c W1)"
+    _cw1_udel_run() {
+        (
+            OPENCODE_USER=oc
+            DEFAULT_USER=dev
+            DRY_RUN="${CW1DRY:-false}"
+            id() { [ "$1" = "-u" ] && printf '900\n'; return 0; }
+            prompt_yn() { printf 'y\n'; }
+            sleep() { :; }
+            sudo() { case "$1" in userdel) return "$CW1UDEL";; esac; return 0; }
+            run_q() {
+                if [ "$DRY_RUN" = true ]; then echo "  [DRY] $*"; else "$@" >/dev/null 2>&1 || true; fi
+            }
+            log() { echo "log: $*"; }
+            eval "$_cw1_udel_block"
+        )
+    }
+    _out=$(CW1UDEL=0 _cw1_udel_run) || true
+    case "$_out" in
+        *"User 'oc' removed."*"log: user removed: oc"*)
+            pass "userdel ok: removal reported (#211 c W1)" ;;
+        *) fail "userdel ok: removal reported (got: $_out) (#211 c W1)" ;;
+    esac
+    _out=$(CW1UDEL=1 _cw1_udel_run 2>&1) || true
+    _cw1_ok=0
+    case "$_out" in *"WARN: could not remove user 'oc' (userdel failed)"*) ;; *) _cw1_ok=1 ;; esac
+    case "$_out" in *"log: user removal FAILED for oc (userdel)"*) ;; *) _cw1_ok=1 ;; esac
+    case "$_out" in *"User 'oc' removed."*) _cw1_ok=1 ;; esac
+    if [ "$_cw1_ok" -eq 0 ]; then
+        pass "userdel failure: warn + FAILED log, no false removed (#211 c W1)"
+    else
+        fail "userdel failure arms (got: $_out) (#211 c W1)"
+    fi
+    _out=$(CW1UDEL=1 CW1DRY=true _cw1_udel_run 2>&1) || true
+    case "$_out" in
+        *"[DRY] sudo userdel -r oc"*"User 'oc' removed."*)
+            pass "userdel dry run: [DRY] echo + success lines despite rc (#211 c W1)" ;;
+        *) fail "userdel dry run: [DRY] echo + success lines (got: $_out) (#211 c W1)" ;;
+    esac
+else
+    fail "user removal block extractable (#211 c W1)"
+fi
+_cw1_al_block="$(sed -n '/^if \[ "\$(prompt_yn "Delete audit log too/,/^fi$/p' "$UNINSTALL")"
+if [ -n "$_cw1_al_block" ]; then
+    pass "audit-log block extractable (#211 c W1)"
+    _cw1_al_run() {
+        (
+            DRY_RUN="${CW1DRY:-false}"
+            prompt_yn() { printf 'y\n'; }
+            sudo() { return "$CW1AL"; }
+            log() { echo "log: $*"; }
+            eval "$_cw1_al_block"
+        )
+    }
+    _out=$(CW1AL=0 _cw1_al_run) || true
+    case "$_out" in
+        *"Audit log removed."*"log: audit log removed: /var/log/opencode-permissions-kit"*)
+            pass "audit rm ok: removal reported after the act (#211 c W1)" ;;
+        *) fail "audit rm ok: removal reported (got: $_out) (#211 c W1)" ;;
+    esac
+    _out=$(CW1AL=1 _cw1_al_run 2>&1) || true
+    _cw1_ok=0
+    case "$_out" in *"WARN: could not remove the audit log"*) ;; *) _cw1_ok=1 ;; esac
+    case "$_out" in *"log: audit log removal FAILED"*) ;; *) _cw1_ok=1 ;; esac
+    case "$_out" in *"Audit log removed."*) _cw1_ok=1 ;; esac
+    if [ "$_cw1_ok" -eq 0 ]; then
+        pass "audit rm failure: warn + FAILED log, no false removed (#211 c W1)"
+    else
+        fail "audit rm failure arms (got: $_out) (#211 c W1)"
+    fi
+    _out=$(CW1AL=1 CW1DRY=true _cw1_al_run 2>&1) || true
+    case "$_out" in
+        *"[DRY] sudo rm -rf /var/log/opencode-permissions-kit"*"Audit log removed."*)
+            pass "audit rm dry run: [DRY] echo + success lines despite rc (#211 c W1)" ;;
+        *) fail "audit rm dry run: [DRY] echo + success lines (got: $_out) (#211 c W1)" ;;
+    esac
+else
+    fail "audit-log block extractable (#211 c W1)"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1

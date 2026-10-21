@@ -497,9 +497,24 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
         # Kill stragglers (best-effort), then remove the user.
         run_q sudo pkill -9 -u "$OPENCODE_USER"
         sleep 1
-        run_q sudo userdel -r "$OPENCODE_USER"
-        echo "User '$OPENCODE_USER' removed."
-        log "user removed: $OPENCODE_USER"
+        # The rc must reach the arms (#211 c W1): run_q ends in `|| true`
+        # by design, so a failed userdel still printed "User … removed" —
+        # userdel refuses while ANY process of the user runs (a straggler
+        # the pkill above can miss). DRY_RUN keeps the [DRY] echo and the
+        # success lines (the file's run/run_q convention).
+        _udel_rc=0
+        if [ "$DRY_RUN" = true ]; then
+            echo "  [DRY] sudo userdel -r $OPENCODE_USER"
+        else
+            sudo userdel -r "$OPENCODE_USER" >/dev/null 2>&1 || _udel_rc=$?
+        fi
+        if [ "$_udel_rc" -eq 0 ]; then
+            echo "User '$OPENCODE_USER' removed."
+            log "user removed: $OPENCODE_USER"
+        else
+            echo "WARN: could not remove user '$OPENCODE_USER' (userdel failed)" >&2
+            log "user removal FAILED for $OPENCODE_USER (userdel)"
+        fi
     else
         echo "User '$OPENCODE_USER' kept."
     fi
@@ -611,9 +626,23 @@ log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit"\
 echo ""
 echo "--- Removing audit log ---"
 if [ "$(prompt_yn "Delete audit log too? (recommended)" "y")" = "y" ]; then
-    log "audit log removed: /var/log/opencode-permissions-kit"
-    run_q sudo rm -rf /var/log/opencode-permissions-kit
-    echo "Audit log removed."
+    # Log the outcome, not the intent (#211 c W1): the log line used to
+    # fire BEFORE the rm — a removal run_q silenced could fail with the
+    # audit trail already claiming success. DRY_RUN keeps the [DRY] echo
+    # and the success lines (the run/run_q convention).
+    _al_rc=0
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] sudo rm -rf /var/log/opencode-permissions-kit"
+    else
+        sudo rm -rf /var/log/opencode-permissions-kit >/dev/null 2>&1 || _al_rc=$?
+    fi
+    if [ "$_al_rc" -eq 0 ]; then
+        echo "Audit log removed."
+        log "audit log removed: /var/log/opencode-permissions-kit"
+    else
+        echo "WARN: could not remove the audit log (/var/log/opencode-permissions-kit)" >&2
+        log "audit log removal FAILED (/var/log/opencode-permissions-kit)"
+    fi
 else
     log "audit log kept (requested by user)"
     echo "Audit log kept at /var/log/opencode-permissions-kit"
