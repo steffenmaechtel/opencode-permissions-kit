@@ -65,6 +65,7 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W24 (INFO) | **implemented** | `33bc64b` | OC164 comment honest (28 lines), bound 26→30 for the W8 growth |
 | b W9 (LOW) | **implemented** | `a337527` | all four pairs honest (`_dhq_ok`/`_dhb_ok` shape); one driven + three wiring-grepped; sabotage red |
 | b W10 (LOW) | **implemented** | `f194ce8` | per-field validation (u32 cap, zero-count gap closed); fixture 5 malformed shapes; sabotage red |
+| b W20 (INFO) | **implemented** | `f2d7b03` | status consumed only while SUB empty; clobber case dies at the F11 gate (pinned both ways) |
 
 ## Evidence detail
 
