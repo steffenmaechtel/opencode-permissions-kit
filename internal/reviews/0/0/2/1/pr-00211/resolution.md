@@ -1,11 +1,11 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
-Status: open — all 37 a-findings dispositioned (33 implemented, 4
-deliberately not done); wave review b's 30 findings all implemented;
-wave review c's 11 findings dispositioned (9 implemented, 2
-deliberately not done). Both e2e suites at baseline on the b-wave HEAD
-(303 / 47). Snapshot d owed per the stop rule: the c-wave touched
-production and test code.
+Status: closed for review — all 37 a-findings, 30 b-findings, 11
+c-findings and 3 d-findings dispositioned; the d-round's fixes stayed
+in bookkeeping (ledger text only), so the stop rule closes the loop
+(review-concept RM-0066). Both e2e suites at baseline on the b-wave
+HEAD (303 / 47); the c-wave's production changes owe both suites
+before release (RM-0091).
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
@@ -92,6 +92,9 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | c W9 (INFO) | **implemented** | `9ac107c` | `-le 4294967295` value caps both fields; u32max fixture pin; sab. red |
 | c W10 (INFO) | **implemented** | `9ac107c` | zero-START acceptance recorded in-code; zerostart fixture counts good |
 | c W11 (INFO) | **deliberately not done** | — | count anchored at the next e2e run; release gate owes both anyway |
+| d W1 (MED) | **implemented** | `35d5549` | c W6 row's SHA corrected: bc56a17 (b-wave, out of range) → 0885c9f |
+| d W2 (LOW) | **implemented** | `35d5549` | c W1 anchors + sweep count dated to 47e07f9 (16 at HEAD, note-driven) |
+| d W3 (INFO) | **deliberately not done** | — | revert-path stub noise only; discrimination intact (d W3 detail) |
 
 ## Follow-ups after snapshot b
 
@@ -230,6 +233,19 @@ external command in between; the policy staging tee was the only
 write-before-register shape. Pin asserts TRACK fires before TEE in
 the chronological stub recording; sabotage (registration deleted)
 went red at three pins, restored green.
+
+### d W3 (INFO) — deliberately not done: revert-path stub noise
+
+The audit-block drive (test-uninstall.sh) stubs prompt_yn/sudo/log
+but no run_q: a REVERTED block calls run_q and the transcript shows
+"run_q: not found" noise instead of a controlled contract. The pin
+still discriminates for the right reason — the false "Audit log
+removed." absence-assert is the load-bearing check, and it trips on
+exactly the lie c W1 retired. The current-shape block never calls
+run_q, so the green path is exact; adding a run_q stub would only
+prettify a failure transcript. Recorded so the asymmetry vs the
+userdel drive (which carries a real-contract run_q stub, because its
+block DOES call run_q today) is not re-litigated.
 
 ### a F24–F29, F33, F34 (INFO) — small-honesty batch
 
