@@ -60,6 +60,9 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | b W7 (LOW) | **implemented** | `d071a16` | trailing slashes normalized in `_fsb_pass`; `/` refused loud; race pin drives a slashed root |
 | b W13 (LOW) | **implemented** | `a1b2b76` | spaces drive rc captured + asserted (sibling `\|\| rc=$?` shape); sabotage red with tally |
 | b W27 (INFO) | **implemented** | `a1b2b76` | one comment records the W11 root-arg rationale |
+| b W8 (LOW) | **implemented** | `cdb9916` | update.sh temp trap-registered (TRACK pin); opk fail-loud arm cleans temp (rc/residue/UIERR pin) |
+| b W19 (INFO) | **implemented** | `cdb9916` | mv-replaces-symlink delta noted at both sites |
+| b W24 (INFO) | **implemented** | `33bc64b` | OC164 comment honest (28 lines), bound 26→30 for the W8 growth |
 
 ## Evidence detail
 
