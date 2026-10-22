@@ -6,7 +6,7 @@
 > and in the `## Rules` section of `AGENTS.md`. Where this record
 > conflicts with the implemented audit script, the code wins. The
 > decisions in this record are equipped with rule-metas — the record
-> documents itself (RM-0093–0096).
+> documents itself.
 
 ## Problem
 
