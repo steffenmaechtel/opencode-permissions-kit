@@ -647,8 +647,10 @@ if [ "$(prompt_yn "Delete audit log too? (recommended)" "y")" = "y" ]; then
         echo "Audit log removed."
         log "audit log removed: /var/log/opencode-permissions-kit"
     else
-        echo "WARN: could not remove the audit log (/var/log/opencode-permissions-kit)" >&2
-        log "audit log removal FAILED (/var/log/opencode-permissions-kit)"
+        # Names the failing command like the userdel/gpasswd arms
+        # (#211 e W3 — review-e wording finding).
+        echo "WARN: could not remove the audit log at /var/log/opencode-permissions-kit (rm failed)" >&2
+        log "audit log removal FAILED for /var/log/opencode-permissions-kit (rm)"
     fi
 else
     log "audit log kept (requested by user)"

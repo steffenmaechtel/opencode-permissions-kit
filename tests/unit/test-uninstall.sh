@@ -721,6 +721,8 @@ if [ -n "$_cw1_al_block" ]; then
     _out=$(CW1AL=1 _cw1_al_run 2>&1) || true
     _cw1_ok=0
     case "$_out" in *"WARN: could not remove the audit log"*) ;; *) _cw1_ok=1 ;; esac
+    # The arm names the failing command like its siblings (#211 e W3).
+    case "$_out" in *"(rm failed)"*) ;; *) _cw1_ok=1 ;; esac
     case "$_out" in *"log: audit log removal FAILED"*) ;; *) _cw1_ok=1 ;; esac
     case "$_out" in *"Audit log removed."*) _cw1_ok=1 ;; esac
     if [ "$_cw1_ok" -eq 0 ]; then
