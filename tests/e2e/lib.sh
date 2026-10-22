@@ -329,6 +329,12 @@ e2e_resolve_cache() {
     fi
 
     # Cache the installer script too, so the container needs no network for it.
+    # Deliberately still the v1 installer URL although the default lane runs
+    # 2.x (issue #197): the suites run it with `--binary <cached path>`, and
+    # BOTH installers then only place that binary and patch PATH — same
+    # ~/.opencode/bin layout, proven green with both majors. The v2 URL is
+    # reserved for install.sh's real bootstrap (fresh machines, no binary
+    # yet); flip this only if the v1 URL ever dies upstream.
     OC_INSTALLER="$OC_CACHE_DIR/install.sh"
     if [ ! -f "$OC_INSTALLER" ]; then
         curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 60 \
