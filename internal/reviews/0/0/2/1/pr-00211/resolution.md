@@ -6,7 +6,9 @@ over `ce7cbc5..a6f2705`) re-verified all of d's clean verdicts
 below. The e-wave fixed one ledger text (e W1) and two production
 strings (e W2, e W3) — per RM-0067 a wave review f over the e-wave
 diff is owed before the loop can close. Both e2e suites re-run green
-at the e-wave HEAD after the fixes (e2e 303, rootless 47): the
+at the e-wave HEAD `750d4e7` after the fixes (e2e 303, rootless 47 —
+independently re-executed and SHA-anchored by review-f, closing the
+f W4 anchor gap): the
 c-wave's e2e debt (RM-0077/0091) is discharged and both counts carry
 a fresh anchor. Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7
 e-findings dispositioned.
@@ -240,6 +242,16 @@ by then. The `0885c9f` note sits ABOVE the closing log (inserted
 after chmod g-s :593) and moved the audit rm :637→:644 and the closing
 log :598→:605 — userdel (:509) is above the note and unmoved by it —
 and the note's own run_q mention pushed the sweep count to 16 at HEAD.
+
+NB (#211 f W3 — correction of review-e's own W1 table): the
+snapshot's comparison row "run_q count | 15 | 15 | 16" overcounts
+the PRE-fix column — measured `grep -c run_q` at ce7cbc5 is **13**;
+the 15 the table shows there is the 47e07f9 arithmetic (13 − 2 calls
+the c W1 fix converted to direct sudo + 4 run_q mentions the fix's
+comments added). Every anchor the corrected NB above dates is
+measured true (review-f re-measured all four refs independently);
+review-e.md stays immutable as history — this NB is the correction
+record.
 
 c W8 (deliberately not done): opk's kill-window residue is disclosed
 in-code ("opk carries no cleanup trap", b W8) and inert — a stranded
