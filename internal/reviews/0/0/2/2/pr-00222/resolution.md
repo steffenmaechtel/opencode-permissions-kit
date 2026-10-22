@@ -1,7 +1,7 @@
 # Resolution — pr-00222
 
-Case: [pr-00222](../README.md) · birth-PR #222 · snapshot chain:
-[a](review-a.md) · dispositions below grow as fixes land.
+Case pr-00222 (shard `internal/reviews/0/0/2/2/`) · birth-PR #222 ·
+snapshot chain: [a](review-a.md) · dispositions below grow as fixes land.
 
 ## Dispositions
 
