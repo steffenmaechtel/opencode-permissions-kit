@@ -1,5 +1,12 @@
 # Resolution — pr-00221 (issue #210 scan progress)
 
+Status: closed (maintainer, 2026-10-22) — confirmed the stop rule: the
+c-round's dispositions (c W1/c W2, `9005338`) stayed in bookkeeping
+(resolution.md only — no review-relevant code), so RM-0064/0066 hold.
+Chain a–c: a W1..a W15 (3 MED, 5 LOW, 7 INFO), b W1/b W2, c W1/c W2 —
+all dispositioned below. Recorded follow-up for a NEW case: the
+fs-baseline W3-class sibling (Class sweeps below).
+
 Chain: [review-a.md](review-a.md) → [review-b.md](review-b.md) →
 [review-c.md](review-c.md) → this wave. Dispositions refer to
 `a W<n>`/`b W<n>`/`c W<n>` = finding W<n> of snapshot a/b/c.
