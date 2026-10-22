@@ -2565,6 +2565,7 @@ _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-brk1.txt"
 _st_ddev_scan "win hosts: scanning $T210" "$T210" "$WORK/t210-brk2.txt"
 echo "SCAN-FINISHED"
 EOF
+rm -f "$T210_PROBE"   # pin isolation: pin 6's gate-drift probe must not seed this count
 script -qec "sh $WORK/t210-broken.sh" /dev/null > "$WORK/t210-brk.raw" 2>&1
 if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk1.txt" \
     && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk2.txt" \

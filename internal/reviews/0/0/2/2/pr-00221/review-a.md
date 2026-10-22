@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 main agent (verification duty held in-session) + 3x GLM-5.3-Fl
 
 # Wave review — pr-00221 snapshot a — issue #210 scan progress
 
+> Resolution: [resolution.md](resolution.md)
+
 Micro/wave pass ("did the fixes break or lie?") over the feature diff
 `14050d8..c059409`: `_st_progress_tee` + `_st_ddev_scan` in
 management/status.sh, the two converted scan sites (ddev share, win
