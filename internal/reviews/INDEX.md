@@ -29,5 +29,5 @@ The parity test regenerates and compares. -->
 | [pr-00211](0/0/2/1/pr-00211) | release 0.0.55 full-scope review (pre-tag) | full | v0.0.55 @ ad9467d | 2026-10-20 | a–g | closed |
 | [pr-00221](0/0/2/2/pr-00221) | issue-210 live progress for the status project-root scans (feature wave) | wave | v0.0.55 @ 14050d8 | 2026-10-22 | a–c | closed |
 | [pr-00222](0/0/2/2/pr-00222) | rules-meta phases 4-5 — revisit workflow + RM-0001 (feature wave) | wave | master @ 14050d8 | 2026-10-22 | a–c | closed |
-| [pr-00224](0/0/2/2/pr-00224) | issue-197 e2e default flip to opencode 2.x, -1x lanes + v2 installer bootstrap (feature wave) | wave | master @ 9f9fd32 | 2026-10-22 | a–c | open |
+| [pr-00224](0/0/2/2/pr-00224) | issue-197 e2e default flip to opencode 2.x, -1x lanes + v2 installer bootstrap (feature wave) | wave | master @ 9f9fd32 | 2026-10-22 | a–c | closed |
 

@@ -1,11 +1,12 @@
 # Resolution — pr-00224 (issue #197 e2e default flip to 2.x)
 
-Status: open — micro review c DONE in a fresh session (`review-c.md`,
-2026-10-23: zero findings, loop-closure expectation with the RM-0115
-check cited there; closure for the maintainer to confirm). Round c pin
-committed (`871f1b1`, maintainer go 2026-10-23): b W1 hard-fail pin
-built early, a W7 discharged by registry evidence (below), e2e debt
-discharged (below).
+Status: closed (maintainer, 2026-10-23) — confirmed the stop rule: the
+last round (c) ran its owed fresh-session review (`review-c.md`, zero
+findings) and its disposition touched no review-relevant code — files
+touched = review-c.md + INDEX.md + this ledger (bookkeeping, RM-0065).
+Round c pin committed (`871f1b1`, maintainer go 2026-10-23): b W1
+hard-fail pin built early, a W7 discharged by registry evidence
+(below), e2e debt discharged (below).
 
 Chain: [review-a.md](review-a.md) → this wave. Dispositions refer to
 `a W<n>` = finding W<n> of snapshot a. Commits on `feature/e2e-default-2x`
