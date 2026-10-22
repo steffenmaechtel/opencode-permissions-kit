@@ -2,8 +2,10 @@
 # Unit tests for the e2e binary sources (tests/e2e/lib.sh, e2e_fetch_opencode):
 # the download channel must be picked by major — 1.x from GitHub release
 # assets, 2.x from the npm registry (2.x ships no GitHub assets) with the
-# legacy @opencode-ai scope as fallback. Structural greps, like
-# test-bypass-guard.sh: lib.sh is e2e scaffolding, not unit-testable code.
+# legacy @opencode-ai scope as fallback. Mostly structural greps (like
+# test-bypass-guard.sh — lib.sh's runner-facing plumbing is e2e
+# scaffolding), plus behavioral probes of the self-contained helpers
+# (npm_dist_latest via a fake curl, the test-update-flags.sh pattern).
 # Run: sh tests/unit/test-e2e-sources.sh
 set -u
 
@@ -50,6 +52,84 @@ check "1.x downloads stay on GitHub release assets" \
 check "1.x asset name keeps the target suffix" \
     grep_q 'opencode-\$target\.tar\.gz'
 
+# --- default lane = 2.x (issue #197): with E2E_OC_VERSION empty, lib.sh
+# resolves the npm dist-tag 'latest' (GitHub releases/latest stays 1.x
+# and is the E2E_OC_VERSION pin / -1x CI lane). The resolved value is
+# anchored-validated against 2.x before use — registry output is
+# untrusted — and an unreachable registry falls back to the newest
+# cached binary (the offline chain must stay). ---
+check "npm_dist_latest helper exists in lib.sh" \
+    grep -q '^npm_dist_latest() {' "$LIB"
+check "default resolution goes through npm_dist_latest" \
+    grep_q 'OC_VERSION=\$(npm_dist_latest "\$target")'
+check "npm_dist_latest reads the per-target packument" \
+    grep_q 'registry\.npmjs\.org/@opencode/cli-\$tgt'
+check "default resolution is gated on an anchored 2.x semver" \
+    sh -c "grep -q '\\^2\\\\\\.\\[0' \"\$1\"" _ "$LIB"
+check "2.x gate message names the E2E_OC_VERSION escape hatch" \
+    grep_q 'pin E2E_OC_VERSION=<ver> to test another major'
+check "offline fallback to the newest cached binary stays" \
+    grep_q 'WARNING: version endpoint unreachable'
+check "offline fallback prefers the newest cached 2.x (lane major, #224 a W1)" \
+    grep_q 'OC_CACHE_DIR./opencode-2\.\* 2'
+check "off-major offline degradation is named, never silent (#224 a W1)" \
+    grep_q 'no cached 2x, using cached opencode'
+check "off-major warning names the E2E_OC_VERSION escape hatch (#224 a W1)" \
+    grep_q "off the default lane's 2.x major"
+# Empty-cache hard fail (b W1 follow-up): both halves must exist AND sit
+# together — the FAIL message alone without the exit would print red and
+# keep going (OC_VERSION empty -> messy failure far downstream), the exit
+# without the message fails silently. Presence + adjacency pins the pair.
+check "empty cache fails loud (FAIL message + adjacent exit 1, #224 b W1)" \
+    sh -c "grep -q 'cannot resolve opencode version and no cached version available' \"\$1\" && grep -A1 'cannot resolve opencode version' \"\$1\" | grep -q 'exit 1'" _ "$LIB"
+# The pin must not just EXIST but WIN: the assignment has to sit before the
+# default resolution, or the resolved value is clobbered after the fact
+# (#224 a W6 — presence-only would stay green under reordering).
+_pin_ln=$(grep -n 'OC_VERSION="\$E2E_OC_VERSION"' "$LIB" | head -1 | cut -d: -f1)
+_res_ln=$(grep -n 'OC_VERSION=\$(npm_dist_latest "\$target")' "$LIB" | head -1 | cut -d: -f1)
+if [ -n "$_pin_ln" ] && [ -n "$_res_ln" ] && [ "$_pin_ln" -lt "$_res_ln" ]; then
+    pass "a pin wins before any resolution (order pinned, line $_pin_ln < $_res_ln)"
+else
+    fail "pin-before-resolution order violated (pin line: ${_pin_ln:-missing}, resolve line: ${_res_ln:-missing})"
+fi
+
+# --- behavioral: npm_dist_latest against a fake registry (fake curl on
+# PATH, the test-update-flags.sh pattern). Proves the happy path prints
+# the dist-tag version, and that garbage or an unreachable registry
+# prints EMPTY (the caller's fallback premise) — never a partial value
+# or an abort under lib.sh's set -e. ---
+NPMWORK="$(mktemp -d)"
+mkdir -p "$NPMWORK/bin" 
+cat > "$NPMWORK/bin/curl" <<'CURLEOF'
+#!/bin/sh
+# fake registry endpoint, switched by FAKE_CURL_MODE:
+#   ok   -> packument whose dist-tags.latest is 2.1.7
+#   junk -> non-JSON body (python3 parse fails)
+#   down -> connection refused (curl exit 1)
+case "${FAKE_CURL_MODE:-ok}" in
+    ok)   printf '{"dist-tags":{"latest":"2.1.7","next":"2.2.0-beta.1"}}\n' ;;
+    junk) printf '<html>502 Bad Gateway</html>\n' ;;
+    down) exit 1 ;;
+esac
+CURLEOF
+chmod +x "$NPMWORK/bin/curl"
+sed -n '/^npm_dist_latest() {/,/^}/p' "$LIB" > "$NPMWORK/fn.sh"
+
+_npmres() {
+    FAKE_CURL_MODE="$1" PATH="$NPMWORK/bin:$PATH" \
+        sh -c '. "$1"; npm_dist_latest linux-x64' _ "$NPMWORK/fn.sh" 2>/dev/null
+}
+_npmout=$(_npmres ok)
+[ "$_npmout" = "2.1.7" ] && pass "npm_dist_latest: dist-tag latest resolves (2.1.7)" \
+    || fail "npm_dist_latest: dist-tag latest resolves (got: '$_npmout')"
+_npmout=$(_npmres junk)
+[ -z "$_npmout" ] && pass "npm_dist_latest: unparseable registry output -> empty (fallback premise)" \
+    || fail "npm_dist_latest: unparseable registry output -> empty (got: '$_npmout')"
+_npmout=$(_npmres down)
+[ -z "$_npmout" ] && pass "npm_dist_latest: unreachable registry -> empty (fallback premise)" \
+    || fail "npm_dist_latest: unreachable registry -> empty (got: '$_npmout')"
+rm -rf "$NPMWORK"
+
 # --- both fetch paths route through the shared helper -------------------------
 check "e2e_resolve_cache uses e2e_fetch_opencode" \
     grep_q 'e2e_fetch_opencode "\$OC_VERSION"'
@@ -70,7 +150,11 @@ check "version resolution falls back to the releases/latest redirect" \
     sh -c "grep -q 'url_effective' \"\$1\" && grep -q '/tag/v' \"\$1\"" _ "$LIB"
 check "run-ddev.sh resolves ddev through gh_latest_tag (no bare API call)" \
     sh -c "grep -q 'gh_latest_tag ddev/ddev' \"\$1\" && ! grep -q 'https://api.github.com/repos/ddev' \"\$1\"" _ "$RUN_DDEV"
-check "workflows export the workflow token to the e2e steps" \
+# Token backstop (#224 a W3: since the #197 flip only the GitHub-calling
+# steps need it — the -1x lane resolves and both ddev jobs' gh_latest_tag;
+# the per-job auth contract lives in test-workflows.sh's lane pins, this
+# file-level grep is the coarse "no workflow went fully tokenless" net).
+check "workflows export the workflow token to the api.github.com-calling steps" \
     sh -c "grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$1\" && grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
 
 # --- git channel knob (issue #118): lib.sh must forward E2E_GIT_CHANNEL as a

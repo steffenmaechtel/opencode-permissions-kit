@@ -809,6 +809,23 @@ else
     fail "root gate runs after the charset gate, before the distro gate (charset=$_rug_charset_ln gate=$_rug_call_ln distro=$_rug_distro_ln)"
 fi
 
+# --- bootstrap installer channel (issue #197): the optional fallback
+# install (opencode missing) streams the official V2 installer — fresh
+# machines get the current 2.x through the npm registry. The v1 URL
+# must not come back (it resolves GitHub 1.x); the v2 installer keeps
+# the ~/.opencode/bin layout, so the pickup paths are version-agnostic.
+_v2hits=$(grep -c 'https://opencode.ai/v2/install' "$INSTALL" || true)
+if [ "$_v2hits" -ge 2 ]; then
+    pass "bootstrap streams the v2 installer (prompt + curl, $_v2hits sites)"
+else
+    fail "bootstrap v2 installer URL missing (expected prompt + curl, found $_v2hits)"
+fi
+if grep -qF 'https://opencode.ai/install' "$INSTALL"; then
+    fail "bootstrap still references the v1 installer URL (resolves 1.x)"
+else
+    pass "no v1 installer URL left in install.sh"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

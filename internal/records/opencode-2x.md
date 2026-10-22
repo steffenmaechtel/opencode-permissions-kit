@@ -126,19 +126,34 @@ installer `https://opencode.ai/v2/install` via
 assets, 2.x from npm (legacy `@opencode-ai` scope as fallback for
 pre-migration versions) — `make e2e E2E_OC_VERSION=2.0.11` works on any
 online machine without pre-seeding. Building from source via the recipe
-below remains the option for unreleased tags. The default (empty) still
-resolves `releases/latest`. Verified green against **2.0.11** (2026-09-20,
+below remains the option for unreleased tags. Since the 2026-10 flip
+(issue #197) the default (empty `E2E_OC_VERSION`) resolves the current
+2.x from the npm dist-tag `latest` (`npm_dist_latest` in lib.sh,
+anchored `2.*` gate — the flip signal; GitHub `releases/latest` stays
+1.x and is the `E2E_OC_VERSION=<pin>` escape hatch for explicit 1.x
+runs; an unreachable registry falls back to the newest cached **2.x**
+binary — a cache without any 2.x degrades to the newest cached version
+with a named off-major warning, #224 a W1). With the 2.x default, the
+upgrade test
+(`E2E_OLD_VERSION=1.18.15`) covers the production 1.x → 2.x path by
+default. Verified green against **2.0.11** (2026-09-20,
 binary built from the tag with the recipe below, suite re-run against the
 npm-downloaded binary): `e2e` + `e2e-rootless` + `e2e-ddev` (261 + 47 + 70
 checks, zero failures) — no breaking changes against the kit's 2.x
 handling; the upgrade path (1.18.15 → 2.0.11 via `opk upgrade-opencode`)
 is covered by the `e2e` run. Earlier pins: 2.0.6 (`e2e` + `e2e-rootless`,
-261 + 47) and 1.x latest (258 + 47). CI runs the suites against the
-current 2.x release too (shipped 2026-09-23): `e2e-2x` + `e2e-rootless-2x`
-(PRs, master pushes, weekly) and `e2e-ddev-2x` (master pushes, weekly)
-resolve the npm dist-tag `latest` at run time and pin `E2E_OC_VERSION`
-to it — the npm tarball is a stable, CI-reproducible source — and a
-resolution outside `2.*` fails the jobs loudly (the flip signal, §10.5).
+261 + 47) and 1.x latest (258 + 47). CI ran the suites against the
+current 2.x release as a second lane from 2026-09-23 (`e2e-2x`,
+`e2e-rootless-2x`, `e2e-ddev-2x`). Flipped 2026-10-22 (issue #197):
+the DEFAULT jobs (`e2e`, `e2e-rootless`, `e2e-ddev`) resolve the npm
+dist-tag `latest` (2.x — what the installations run) and fail loudly
+outside `2.*`; the renamed `-1x` twins (`e2e-1x`, `e2e-rootless-1x`,
+`e2e-ddev-1x`, same triggers/cadence as their default lanes) resolve
+GitHub `releases/latest` and fail loudly outside `1.*` — the mirror
+flip signal for the legacy major. The lanes swapped cache-key
+schemes with the flip (default = the former `opencode-e2e-2x-*`
+keys, `-1x` = the former `opencode-e2e-old*-latest*` /
+`opencode-e2e-latest*` keys), byte-identical, so both stayed warm.
 
 ### Build recipe (local, containerized)
 
@@ -239,6 +254,14 @@ issues #80/#81:
     suites a second time pinned to the npm dist-tag `latest`, resolved
     at run time (§8); runner cost accepted for PRs, master pushes, and
     the weekly drift runs.
+    *Update 2026-10-22 (issue #197):* the lanes flipped — 2.x is the
+    DEFAULT everywhere (lib.sh's empty-`E2E_OC_VERSION` resolution and
+    the default CI jobs resolve npm dist-tag `latest`), and 1.x is the
+    explicit, named `-1x` lane (GitHub `releases/latest`, guarded
+    `1.*`), kept while the kit still ships 1.x support. Same cadence
+    as the default lanes (PR twins + ddev on pushes/weekly). The
+    optional install.sh bootstrap moved to the v2 installer URL the
+    same day (see §10.5).
 3. **Merge as a normal PR** once manual validation satisfies. Everything
    is already in production shape; nothing in the PR depends on 2.x
    being released.
@@ -256,3 +279,12 @@ issues #80/#81:
    kit reuses (`https://opencode.ai/install`, still GitHub/v1
    resolution); watch that it does not switch to the npm/update-API
    resolution of `/v2/install`.
+   *Update 2026-10-22 (issue #197):* the kit no longer waits on that
+   URL — install.sh's optional bootstrap (opencode missing) streams
+   `https://opencode.ai/v2/install` directly, so fresh machines get
+   the current 2.x through the npm channel (verified: the v2
+   installer keeps the `~/.opencode/bin` layout and the `--binary`
+   flag, so install.sh's pickup paths are unchanged). Residual
+   watch: the v1 URL's retirement upstream (harmless to the kit) and
+   `releases/latest` flipping to 2.x, which retires the `-1x` CI
+   lanes' premise — they fail loudly when it happens.
