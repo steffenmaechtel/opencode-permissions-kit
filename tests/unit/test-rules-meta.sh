@@ -135,6 +135,18 @@ new_scratch n1
 sed -i 's/ (RM-9002)//' "$SCRATCH/agent/conventions.md"
 expect_block "inv1 ref-less unit" "[inv1]"
 
+# 1b. inv 1 -- the record's main-rule section is audit-active (phase-5
+#     wiring: its ACTIVE_SECTIONS entry is load-bearing -- losing it
+#     would silently stop enforcing the self-application unit)
+new_scratch n1b
+cat >> "$SCRATCH/internal/records/rules-meta.md" <<'EOF'
+
+## The main rule
+
+- Unreferenced demo rule.
+EOF
+expect_block "inv1 main-rule section enforced" "the-main-rule"
+
 # 2. inv 2 -- dangling ref
 new_scratch n2
 sed -i 's/ (RM-9002)/(RM-9009)/' "$SCRATCH/agent/conventions.md"
