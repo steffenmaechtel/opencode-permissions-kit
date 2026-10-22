@@ -1,9 +1,11 @@
 # Resolution — pr-00224 (issue #197 e2e default flip to 2.x)
 
-Status: open — pin wave round c committed (`871f1b1`, maintainer go
-2026-10-23): b W1 hard-fail pin built early, a W7 discharged by registry
-evidence (below), e2e debt discharged (below). Micro review c owed to a
-FRESH session (rotation — this session authored the pin wave).
+Status: open — micro review c DONE in a fresh session (`review-c.md`,
+2026-10-23: zero findings, loop-closure expectation with the RM-0115
+check cited there; closure for the maintainer to confirm). Round c pin
+committed (`871f1b1`, maintainer go 2026-10-23): b W1 hard-fail pin
+built early, a W7 discharged by registry evidence (below), e2e debt
+discharged (below).
 
 Chain: [review-a.md](review-a.md) → this wave. Dispositions refer to
 `a W<n>` = finding W<n> of snapshot a. Commits on `feature/e2e-default-2x`
@@ -112,7 +114,8 @@ next to the structural greps.
 4. **b W1 pin — DONE early (`871f1b1`, maintainer go 2026-10-23):** the
    empty-cache hard-fail now carries the FAIL+exit-1 adjacency pin
    (both halves sabotage-verified on the committed tree). Micro review
-   c owed to a fresh session (rotation).
+   c ran in the owed fresh session — `review-c.md`, zero findings,
+   sabotages S1–S3 re-verified (incl. the adjacency half).
 
 ## Addendum (2026-10-23) — learnings refresh 2026-10-22 applied
 
