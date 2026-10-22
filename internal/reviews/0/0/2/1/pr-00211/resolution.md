@@ -1,17 +1,20 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
-Status: open — review g (fresh session over `750d4e7..79582d9`: the
-f-wave's two strings + pins, ledger) found 4 (2 LOW, 2 INFO), all
-dispositioned below; every g-fix stayed in bookkeeping (resolution NBs
-— g W1 anchors, g W2 pattern record; the round's commits touch
-resolution.md + INDEX.md only), so per RM-0066 this round's
-dispositions changed no review-relevant code — the stop-rule check is
-cited, and per ISSUE item 10 the closure call belongs to the
-maintainer, not to this round's commits. The f-wave's code fixes hold
-under g's executed verification (both sabotages red at the right pins;
-make test rc=0 at 79582d9 — the ledger's first full-suite record at
-the f-wave HEAD). Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7 e-, 7 f-,
-4 g-findings dispositioned.
+Status: closed (maintainer, 2026-10-22) — confirmed the cited stop-rule
+check: review g's dispositions (and every commit after the f-wave's
+last code change) touched bookkeeping only (resolution.md, INDEX.md),
+so RM-0064/0066 hold. Closing round: review g (fresh session over
+`750d4e7..79582d9`: the f-wave's two strings + pins, ledger) found 4
+(2 LOW, 2 INFO), all dispositioned below; every g-fix stayed in
+bookkeeping (g W1 anchors, g W2 pattern record). The f-wave's code
+fixes hold under g's executed verification (both sabotages red at the
+right pins; make test rc=0 at 79582d9 — the ledger's first full-suite
+record at the f-wave HEAD). Closure retires nothing recorded as
+follow-up (revert-loop closing log since c W1, spaced-path race pin
+since b — own waves when picked up), and the release gate stands: both
+e2e suites at the final tree before tagging (RM-0091; comparator
+303/47 @ 750d4e7). Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7 e-, 7
+f-, 4 g-findings dispositioned — 99 across seven snapshots.
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
