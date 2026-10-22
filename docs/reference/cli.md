@@ -352,9 +352,7 @@ On a terminal, the two project-root scans (the ddev-share group-write
 check and the Windows-hosts check) show a live progress line
 (`<scan>: scanning <root> — N found, M:SS`) while they walk your
 project roots — a WSL host with many git projects and a cold page cache
-can take minutes per scan
-([issue #210](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/210)).
-The line is transient: it is erased when the scan finishes and never
+can take minutes per scan. The line is transient: it is erased when the scan finishes and never
 appears in piped output, log files, cron mail or `--short` mode —
 captured output stays byte-identical, and the scans run identically
 without `python3` (they only lose the progress display).
