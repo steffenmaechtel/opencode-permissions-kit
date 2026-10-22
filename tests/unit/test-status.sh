@@ -77,6 +77,11 @@ fi
 # ui_kv is defined by ui.sh — source the real one
 UI_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
 
+# Live-scan helpers (issue #210): extracted once here — the #165 control
+# harnesses below eval the real scan sites (which call _st_ddev_scan
+# since #210) and the issue-210 pins exercise both helpers directly.
+SCAN_HELPERS="$(sed -n '/^_st_progress_tee()/,/^}/p;/^_st_ddev_scan()/,/^}/p' "$STATUS")"
+
 run_case() {
     (
         # Everything inside: PATH (with the shims below), set -u (the B1
@@ -1893,6 +1898,7 @@ _h165_run() {
         ui_kv_ok()   { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
         ui_detail()  { echo "DETAIL|$1"; }
+        eval "$SCAN_HELPERS"
         eval "$_h165"
         exit 0
     ) 2>&1
@@ -2030,6 +2036,7 @@ _s165_run() {
         ui_kv_ok()   { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
         ui_detail()  { echo "DETAIL|$1"; }
+        eval "$SCAN_HELPERS"
         eval "$_s165"
         exit 0
     ) 2>&1
@@ -2308,6 +2315,333 @@ if [ -n "$_f25_mnt" ]; then
 else
     echo "  ${RED}FAIL${NC}  F25 mnt block extractable"
     failures=$((failures + 1))
+fi
+
+# --- issue #210: live progress for the project-root scans ------------------------
+# The ddev share scan and the Windows hosts scan walk every registered
+# root with find — minutes in complete silence on a WSL host with many
+# git projects and a cold page cache (the report froze right after the
+# "ddev settings" row). Both sites now run through _st_ddev_scan with
+# _st_progress_tee in the pipeline — the fs-baseline live-counter
+# pattern (issue #14), tuned for a report: found-count + elapsed line
+# on a terminal, erased at EOF, byte-identical output everywhere else.
+# Pins: tee passthrough verbatim (a progress display must never corrupt
+# the scan it reports on), the three fallback paths keep the exact
+# bytes of the pre-#210 bare find, a terminal sees the live line AND
+# its erase, --short never does, and both scan sites call the helper.
+# NOT pinned (documented): a killed find mid-walk truncates the scan
+# list silently — unchecked rc is the pre-#210 behavior of the bare
+# find (parity, not a new fail-soft spot).
+if [ -n "$SCAN_HELPERS" ] \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q '^_st_progress_tee() {' \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q '^_st_ddev_scan() {'; then
+    pass "#210: scan helpers extractable from status.sh"
+else
+    fail "#210: scan helpers not extractable (anchor drift?)"
+fi
+if grep -qF '_st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"' "$STATUS" \
+    && grep -qF '_st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"' "$STATUS" \
+    && ! grep -qE 'find "\$_st_root" .* -name \.ddev' "$STATUS"; then
+    pass "#210: both scan sites run through the shared helper (emitter sweep)"
+else
+    fail "#210: a scan site bypasses _st_ddev_scan (sweep incomplete)"
+fi
+
+# Fixture: two projects plus one pruned .ddev per prune class — the
+# reference file is the PRE-#210 bare find, verbatim.
+T210="$WORK/t210-tree"
+mkdir -p "$T210/p1/.ddev" "$T210/p1/vendor/pkg/.ddev" "$T210/p1/node_modules/x/.ddev" \
+    "$T210/p1/testdata/f/.ddev" "$T210/p1/sub/.git/.ddev" "$T210/p2/.ddev" \
+    "$T210/p2/deep/nested/.ddev"
+find "$T210" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
+    -o -name .git \) \) -prune \
+    -o -type d -name .ddev -prune -print 2>/dev/null > "$WORK/t210-ref.txt"
+if [ "$(grep -c . "$WORK/t210-ref.txt")" = "3" ]; then
+    pass "#210: fixture has exactly the 3 unpruned .ddev trees"
+else
+    fail "#210: fixture prune expectation broken ($(grep -c . "$WORK/t210-ref.txt") trees)"
+fi
+
+# 1) non-tty run: byte-identical scan list, zero stderr bytes
+T210_ERR="$WORK/t210.err"
+(
+    eval "$SCAN_HELPERS"
+    _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-new.txt"
+) 2>"$T210_ERR"
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-new.txt" && [ ! -s "$T210_ERR" ]; then
+    pass "#210: non-tty run: scan bytes identical, stderr empty (logs/cron unchanged)"
+else
+    fail "#210: non-tty run must be byte-identical and silent"
+fi
+
+# 2) python3-less host (L1: the new gate must degrade to the FULL scan,
+#    never to a skipped one) — hermetic bin with find/tr only
+T210_BIN="$WORK/t210-bin"
+mkdir -p "$T210_BIN"
+for _t210_t in find tr; do
+    ln -s "$(command -v "$_t210_t")" "$T210_BIN/$_t210_t"
+done
+(
+    eval "$SCAN_HELPERS"
+    PATH="$T210_BIN"
+    export PATH
+    _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-nopy.txt"
+) 2>"$T210_ERR"
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-nopy.txt" && [ ! -s "$T210_ERR" ]; then
+    pass "#210: python3-less host: fallback scan stays complete (L1 fail-soft observed)"
+else
+    fail "#210: python3-less host must scan identically (L1)"
+fi
+
+# 3) tee contract: the NUL stream passes through VERBATIM — a progress
+#    display must never corrupt the scan it reports on
+printf 'a\0b\0c\0d' > "$WORK/t210-in.bin"
+(
+    eval "$SCAN_HELPERS"
+    _st_progress_tee "label-t210" < "$WORK/t210-in.bin" > "$WORK/t210-out.bin"
+) 2>"$T210_ERR"
+if cmp -s "$WORK/t210-in.bin" "$WORK/t210-out.bin" && [ ! -s "$T210_ERR" ]; then
+    pass "#210: progress tee passes scan bytes through verbatim"
+else
+    fail "#210: progress tee corrupted the scan stream"
+fi
+
+# 4) terminal run (pty): the live line draws (label + "found,"), the
+#    erase run (76 spaces, longer than any draw pad with this label)
+#    follows, the scan list stays byte-identical, and output after the
+#    scan continues cleanly. The first frame is drawn synchronously
+#    before any byte is pumped, so "found," is deterministic even on an
+#    instant scan; later frames may carry a live count (race, not
+#    asserted).
+export SCAN_HELPERS
+cat > "$WORK/t210-pty.sh" <<EOF
+eval "\$SCAN_HELPERS"
+_st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-pty.txt"
+echo "SCAN-FINISHED"
+EOF
+script -qec "sh $WORK/t210-pty.sh" /dev/null > "$WORK/t210-pty.raw" 2>&1
+if grep -aq "found," "$WORK/t210-pty.raw" \
+    && grep -aq "scanning" "$WORK/t210-pty.raw" \
+    && grep -aq "SCAN-FINISHED" "$WORK/t210-pty.raw" \
+    && grep -aqE ' {70,}' "$WORK/t210-pty.raw" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-pty.txt"; then
+    pass "#210: terminal run: live line + erase, scan bytes identical"
+else
+    fail "#210: terminal run must show the live line and stay byte-identical"
+fi
+# 4b) a >76-char label truncates with a leader instead of wrapping the
+#     tty line (the tail carries — the path end matters more than the
+#     prefix). Separate driver: truncation drops "scanning" from the
+#     drawn line, so the label assertions above cannot run against it.
+cat > "$WORK/t210-trunc.sh" <<EOF
+eval "\$SCAN_HELPERS"
+_st_ddev_scan "ddev share: scanning $T210/p2/very/deep/nested/path/to/a/long/root" \
+    "$T210" "$WORK/t210-trunc.txt"
+echo "SCAN-FINISHED"
+EOF
+script -qec "sh $WORK/t210-trunc.sh" /dev/null > "$WORK/t210-trunc.raw" 2>&1
+if grep -aq "found," "$WORK/t210-trunc.raw" \
+    && grep -aq "long/root" "$WORK/t210-trunc.raw" \
+    && grep -aq "$(printf '\342\200\246')" "$WORK/t210-trunc.raw" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-trunc.txt"; then
+    pass "#210: over-long labels truncate with a leader, keep the path tail"
+else
+    fail "#210: label truncation broken (>76-char label)"
+fi
+
+# 5) --short (UI_SILENT) on a terminal: no live line at all — the
+#    one-line discipline holds even where drawing would be possible
+cat > "$WORK/t210-silent.sh" <<EOF
+eval "\$SCAN_HELPERS"
+UI_SILENT=1 _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-sil.txt"
+echo "SCAN-FINISHED"
+EOF
+script -qec "sh $WORK/t210-silent.sh" /dev/null > "$WORK/t210-sil.raw" 2>&1
+if ! grep -aq "found," "$WORK/t210-sil.raw" \
+    && ! grep -aq "scanning" "$WORK/t210-sil.raw" \
+    && grep -aq "SCAN-FINISHED" "$WORK/t210-sil.raw" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-sil.txt"; then
+    pass "#210: UI_SILENT (--short) draws nothing on a terminal either"
+else
+    fail "#210: UI_SILENT must never draw the progress line"
+fi
+
+# 3b) (#221 a W11) multi-chunk verbatim passthrough: ~2.5 MB — several
+#     read1 chunks with NULs inside each and a NUL-less tail. read1 must
+#     forward byte-for-byte across chunk boundaries (reorder/drop reds
+#     the cmp; a single-chunk 7-byte probe cannot see this class).
+T210_BIG="$WORK/t210-big.bin"
+python3 -c 'import sys
+buf = b"".join((b"chunk%d" % i) * 70000 + b"\0" for i in range(5)) + b"tail-no-nul"
+sys.stdout.buffer.write(buf)' > "$T210_BIG"
+(
+    eval "$SCAN_HELPERS"
+    _st_progress_tee "label-big" < "$T210_BIG" > "$WORK/t210-big-out.bin"
+) 2>"$T210_ERR"
+if cmp -s "$T210_BIG" "$WORK/t210-big-out.bin" && [ ! -s "$T210_ERR" ]; then
+    pass "#221: multi-chunk (2.5 MB) stream passes through verbatim"
+else
+    fail "#221: multi-chunk passthrough corrupted the scan stream"
+fi
+
+# 3c) (#221 a W1) counter timeliness: records available at t=0, EOF at
+#     t=2 — the 0:01 frame must already carry "3 found". A full-buffer
+#     read starves the counter (every frame "0 found" until EOF); read1
+#     returns available bytes at once. 1 s of margin on both sides of
+#     the 0:01 draw makes this deterministic, not a race.
+cat > "$WORK/t210-w1.sh" <<EOF
+eval "\$SCAN_HELPERS"
+( printf 'a\0b\0c\0'; sleep 2 ) | _st_progress_tee "w1pin" > /dev/null
+EOF
+script -qec "sh $WORK/t210-w1.sh" /dev/null > "$WORK/t210-w1.raw" 2>&1
+if grep -aq 'w1pin — 3 found, 0:01' "$WORK/t210-w1.raw"; then
+    pass "#221: found-counter engages mid-stream (read1, not buffered read)"
+else
+    fail "#221: counter starved — frames show 0 found while records flow"
+fi
+
+# 4c) (#221 a W2) join latency: an instant scan must not pay the
+#     ticker's second — Event.set wakes the wait, bool+sleep made join()
+#     sit out the full sleep (>= 1 s floor, measured 1014 ms). Min of 3
+#     runs vs a 700 ms bound: ~5x above a healthy pty run, 300 ms under
+#     the broken floor. TIMING-SENSITIVE (L4b): the min-of-3 absorbs CI
+#     load spikes; if this ever flakes, fix is a slower bound, not a
+#     sleep — the broken floor scales with the tick period, not load.
+T210_MIN=999999
+for _t210_i in 1 2 3; do
+    cat > "$WORK/t210-w2.sh" <<EOF
+eval "\$SCAN_HELPERS"
+_s=\$(date +%s%N)
+_st_ddev_scan "w2pin" "$T210" "$WORK/t210-w2.txt"
+_e=\$(date +%s%N)
+echo "W2-ELAPSED-MS=\$(( (_e - _s) / 1000000 ))"
+EOF
+    script -qec "sh $WORK/t210-w2.sh" /dev/null > "$WORK/t210-w2.raw" 2>&1
+    _t210_ms=$(grep -ao 'W2-ELAPSED-MS=[0-9]*' "$WORK/t210-w2.raw" | tail -1 | cut -d= -f2)
+    [ -n "$_t210_ms" ] || _t210_ms=999999
+    [ "$_t210_ms" -lt "$T210_MIN" ] && T210_MIN=$_t210_ms
+done
+if [ "$T210_MIN" -lt 700 ] && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-w2.txt"; then
+    pass "#221: instant scan joins immediately (min ${T210_MIN}ms of 3, bound 700ms)"
+else
+    fail "#221: join latency — instant scan took >= 700ms (min ${T210_MIN}ms)"
+fi
+
+# 6) (#221 a W4) gate drift made observable: on a non-tty run python3
+#    must not be invoked AT ALL. The shim writes a marker FILE, not
+#    stderr — the production probe discards its own stderr, so a
+#    stderr-observing pin would prove nothing (L1). Catches a
+#    dropped/inverted [ -t 2 ] (probe would start, marker appears) and
+#    the pre-fix shape (command -v alone — tee runs, dies, list empties,
+#    cmp reds too).
+T210_PYBIN="$WORK/t210-pybin"
+T210_PROBE="$WORK/t210-probe.log"
+mkdir -p "$T210_PYBIN"
+printf '#!/bin/sh\necho x >> "%s"\nexit 9\n' "$T210_PROBE" > "$T210_PYBIN/python3"
+chmod +x "$T210_PYBIN/python3"
+rm -f "$T210_PROBE"
+(
+    eval "$SCAN_HELPERS"
+    PATH="$T210_PYBIN:$PATH"
+    export PATH
+    _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-gate.txt"
+) 2>"$T210_ERR"
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-gate.txt" && [ ! -f "$T210_PROBE" ]; then
+    pass "#221: non-tty run never invokes python3 (gate drift observable)"
+else
+    fail "#221: non-tty run started python3 — gate drifted"
+fi
+
+# 7) (#221 a W3, a W12) broken-but-findable python3 on a TERMINAL: the
+#    health probe fires exactly ONCE (cache across both scans), drops
+#    both scans to the bare-find branch — full lists, no live line, no
+#    traceback, run proceeds. Pre-fix shape: tee branch taken, tee dies
+#    at startup, EMPTY list (the false-green), marker written twice.
+cat > "$WORK/t210-broken.sh" <<EOF
+PATH="$T210_PYBIN:\$PATH"
+export PATH
+eval "\$SCAN_HELPERS"
+_st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-brk1.txt"
+_st_ddev_scan "win hosts: scanning $T210" "$T210" "$WORK/t210-brk2.txt"
+echo "SCAN-FINISHED"
+EOF
+rm -f "$T210_PROBE"   # pin isolation: pin 6's gate-drift probe must not seed this count
+script -qec "sh $WORK/t210-broken.sh" /dev/null > "$WORK/t210-brk.raw" 2>&1
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk1.txt" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk2.txt" \
+    && grep -aq "SCAN-FINISHED" "$WORK/t210-brk.raw" \
+    && ! grep -aq "found," "$WORK/t210-brk.raw" \
+    && [ -f "$T210_PROBE" ] \
+    && [ "$(wc -l < "$T210_PROBE" 2>/dev/null || echo 0)" = 1 ]; then
+    pass "#221: broken python3 on a tty: probe once, bare-find fallback, full scans"
+else
+    fail "#221: broken python3 must fall back to complete scans (probe cached)"
+fi
+
+# 8) (#221 a W8) extraction integrity beyond presence: the extracted
+#    helpers must PARSE (sh -n) and carry the tee's full body — an
+#    early col-0 brace truncating the range leaves def ticker/draw
+#    behind; unterminated quoting fails sh -n outright.
+if printf '%s\n' "$SCAN_HELPERS" | sh -n 2>/dev/null \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'def draw' \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'def ticker' \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'read1'; then
+    pass "#221: extracted scan helpers parse and carry the full tee body"
+else
+    fail "#221: SCAN_HELPERS extraction truncated or unparsable"
+fi
+
+# 9) (#221 b W1) SIGINT mid-stream: the tee's KeyboardInterrupt path
+#    must stay SILENT. A pty Ctrl-C is flaky to aim (snapshot a W6:
+#    the repro delivered the signal to the shell, not python), and a
+#    backgrounded pipeline is NO alternative either: POSIX starts
+#    async commands with SIGINT set to SIG_IGN, a non-interactive
+#    shell cannot reset an ignored signal, and python keeps it — the
+#    kill lands, nothing happens, the pin passes vacuously green
+#    (found the hard way in this wave's own sabotage run). So the tee
+#    stays FOREGROUND (default SIGINT disposition) and only the
+#    SENDER is async: it polls until the record has been forwarded
+#    (the tee then sits blocked in read1) and kill -INTs the pid that
+#    the PATH-first wrapper recorded before exec'ing the real
+#    interpreter. Green = signal delivered (sender rc), zero stderr
+#    (no traceback), forwarded byte intact, exit 0. Sabotaging the
+#    except tuple drops the traceback into the stderr asserted empty.
+T210_SIGBIN="$WORK/t210-sigbin"
+T210_SIGPID="$WORK/t210-sigpid"
+mkdir -p "$T210_SIGBIN"
+_t210_realpy="$(command -v python3)"
+printf '#!/bin/sh\necho $$ > "%s"\nexec "%s" "$@"\n' \
+    "$T210_SIGPID" "$_t210_realpy" > "$T210_SIGBIN/python3"
+chmod +x "$T210_SIGBIN/python3"
+# async sender: poll for the forwarded byte, then INT the tee's pid
+cat > "$WORK/t210-sig-send.sh" <<EOF
+_n=0
+while [ ! -s "$WORK/t210-sig.out" ] && [ "\$_n" -lt 100 ]; do
+    _n=\$((_n + 1))
+    sleep 0.05
+done
+[ -s "$T210_SIGPID" ] && kill -INT "\$(cat "$T210_SIGPID")"
+EOF
+sh "$WORK/t210-sig-send.sh" &
+_t210_sender=$!
+_t210_wrc=0
+(
+    eval "$SCAN_HELPERS"
+    PATH="$T210_SIGBIN:$PATH"
+    export PATH
+    ( printf 'a\0'; sleep 2 ) | _st_progress_tee "sigpin" \
+        > "$WORK/t210-sig.out" 2> "$WORK/t210-sig.err"
+) || _t210_wrc=$?
+_t210_krc=0
+wait "$_t210_sender" || _t210_krc=$?
+printf 'a\0' > "$WORK/t210-sig.exp"
+if [ "$_t210_krc" -eq 0 ] \
+    && [ "$_t210_wrc" -eq 0 ] \
+    && cmp -s "$WORK/t210-sig.exp" "$WORK/t210-sig.out" \
+    && [ ! -s "$WORK/t210-sig.err" ]; then
+    pass "#221: SIGINT mid-stream: tee silent, bytes intact, exit 0 (b W1)"
+else
+    fail "#221: KeyboardInterrupt must not print a traceback (b W1)"
 fi
 
 echo ""
