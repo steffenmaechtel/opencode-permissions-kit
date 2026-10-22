@@ -477,8 +477,10 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
                     echo "Agent resources backed up: $_un_ag_dir (restore with: cp -a $_un_ag_dir/. ~/$_un_ag_dirname/)"
                     log "agents backup before userdel: $_un_ag_dir"
                 else
-                    echo "WARNING: could not back up $_un_ag_src — its content will be deleted with the user."
-                    log "agents backup FAILED before userdel: $_un_ag_dirname"
+                    # Names the failing commands like the WARN siblings
+                    # (#211 f W2 — review-f class sweep).
+                    echo "WARNING: could not back up $_un_ag_src — its content will be deleted with the user (mkdir/cp failed)."
+                    log "agents backup FAILED before userdel: $_un_ag_dirname (mkdir/cp)"
                 fi
             fi
         done

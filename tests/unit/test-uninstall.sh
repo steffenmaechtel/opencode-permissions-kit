@@ -742,6 +742,41 @@ else
     fail "audit-log block extractable (#211 c W1)"
 fi
 
+# --- agents-backup failure arm names the failing commands (#211 f W2) ----------
+_f2_bak_block="$(sed -n '/^        for _un_ag_dirname in \.agents \.claude; do$/,/^        done$/p' "$UNINSTALL")"
+if [ -n "$_f2_bak_block" ]; then
+    pass "agents-backup loop extractable (#211 f W2)"
+    _f2_bak_run() {
+        (
+            OPENCODE_USER=oc
+            DRY_RUN="${F2DRY:-false}"
+            sudo() {
+                case "$1" in
+                    test) return 0 ;;
+                    ls) echo "agent-resource"; return 0 ;;
+                    mkdir|cp) return "${F2BAKRC:-1}" ;;
+                    *) return 0 ;;
+                esac
+            }
+            log() { echo "log: $*"; }
+            eval "$_f2_bak_block"
+        )
+    }
+    _out=$(F2BAKRC=1 _f2_bak_run 2>&1) || true
+    _f2_ok=0
+    case "$_out" in *"WARNING: could not back up /home/oc/.agents"*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"(mkdir/cp failed)"*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"log: agents backup FAILED before userdel: .agents (mkdir/cp)"*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"Agent resources backed up:"*) _f2_ok=1 ;; esac
+    if [ "$_f2_ok" -eq 0 ]; then
+        pass "backup failure: warning names mkdir/cp, no false backed-up (#211 f W2)"
+    else
+        fail "backup failure arm (got: $_out) (#211 f W2)"
+    fi
+else
+    fail "agents-backup loop extractable (#211 f W2)"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1
