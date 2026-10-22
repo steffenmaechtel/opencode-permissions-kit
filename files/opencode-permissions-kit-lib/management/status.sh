@@ -128,14 +128,24 @@ _st_progress_tee() {
     # plus — when stderr is a tty — a line "<label> — N found, M:SS"
     # rewritten once a second and erased at EOF. Pipeline member like
     # _fsb_count_tee: terminates with the stream. stderr is written as
-    # raw bytes so a LANG=C terminal or an odd root path degrades to
-    # "?", never to a traceback.
+    # raw UTF-8 bytes — a non-UTF-8 terminal shows mojibake that the
+    # next frame or the erase self-heals, and undecodable argv bytes
+    # degrade to "?"; never a traceback (#221 a W10).
+    # read1, not read (#221 a W1): a full-buffer read waits for 1 MiB
+    # or EOF, and real scans stream kilobytes — every frame said
+    # "0 found" for the whole walk. read1 returns what is available.
+    # Event, not bool+sleep (#221 a W2): join() waited out the in-flight
+    # sleep(1) — up to +1 s dead time per scan on every terminal run;
+    # wait(1) wakes on set(). KeyboardInterrupt is swallowed with
+    # BrokenPipeError (#221 a W6): Ctrl-C must stay as silent as the
+    # bare find it replaced (rc of a pipeline member is discarded —
+    # status.sh runs without pipefail).
     python3 -c '
 import sys, threading, time
 label = sys.argv[1]
 count = 0
 start = time.monotonic()
-done = False
+done = threading.Event()
 
 def out(text):
     sys.stderr.buffer.write(text.encode("utf-8", "replace"))
@@ -151,25 +161,25 @@ def draw():
     out("\r%-76s" % line)
 
 def ticker():
-    while not done:
+    while not done.is_set():
         draw()
-        time.sleep(1)
+        done.wait(1)
 
 draw()  # first frame at once: a slow walk with zero hits still shows life
 t = threading.Thread(target=ticker)
 t.start()
 try:
     while True:
-        chunk = sys.stdin.buffer.read(1 << 20)
+        chunk = sys.stdin.buffer.read1(1 << 20)
         if not chunk:
             break
         count += chunk.count(b"\0")
         sys.stdout.buffer.write(chunk)
         sys.stdout.buffer.flush()
-except BrokenPipeError:
+except (BrokenPipeError, KeyboardInterrupt):
     pass
 finally:
-    done = True
+    done.set()
     t.join()
     if sys.stderr.isatty():
         out("\r" + " " * 76 + "\r")
@@ -188,7 +198,24 @@ _st_ddev_scan() {
     _sts_label="$1"; _sts_root="$2"; _sts_out="$3"
     _sts_expr='-type d ( -name vendor -o -name node_modules -o -name testdata -o -name .git )'
     _sts_expr="$_sts_expr -prune -o -type d -name .ddev -prune"
-    if [ "${UI_SILENT:-0}" != 1 ] && [ -t 2 ] && command -v python3 >/dev/null 2>&1; then
+    # Progress only on an interactive terminal. The python3 check is a
+    # HEALTH probe, not just presence (#221 a W3): `command -v` alone
+    # accepts a findable-but-broken interpreter (pyenv shim to a removed
+    # version, poisoned PYTHONHOME/PYTHONPATH) — the tee would die at
+    # startup and hand the consumer loop an EMPTY scan list, a silent
+    # false-green over a dead scan. Probed once per run (_st_py_checked
+    # caches, _st_py_ok carries the verdict), and only on the tty path —
+    # piped/--short runs never start python3.
+    _sts_progress=false
+    if [ "${UI_SILENT:-0}" != 1 ] && [ -t 2 ] && [ "${_st_py_checked:-0}" != 1 ]; then
+        _st_py_checked=1
+        _st_py_ok=0
+        command -v python3 >/dev/null 2>&1 \
+            && python3 -c 'import sys, threading, time' >/dev/null 2>&1 \
+            && _st_py_ok=1
+    fi
+    [ "${UI_SILENT:-0}" != 1 ] && [ -t 2 ] && [ "${_st_py_ok:-0}" = 1 ] && _sts_progress=true
+    if [ "$_sts_progress" = true ]; then
         # shellcheck disable=SC2086  # find expression words, built above
         find "$_sts_root" $_sts_expr -print0 2>/dev/null \
             | _st_progress_tee "$_sts_label" \

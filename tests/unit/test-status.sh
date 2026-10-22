@@ -2466,6 +2466,130 @@ else
     fail "#210: UI_SILENT must never draw the progress line"
 fi
 
+# 3b) (#221 a W11) multi-chunk verbatim passthrough: ~2.5 MB — several
+#     read1 chunks with NULs inside each and a NUL-less tail. read1 must
+#     forward byte-for-byte across chunk boundaries (reorder/drop reds
+#     the cmp; a single-chunk 7-byte probe cannot see this class).
+T210_BIG="$WORK/t210-big.bin"
+python3 -c 'import sys
+buf = b"".join((b"chunk%d" % i) * 70000 + b"\0" for i in range(5)) + b"tail-no-nul"
+sys.stdout.buffer.write(buf)' > "$T210_BIG"
+(
+    eval "$SCAN_HELPERS"
+    _st_progress_tee "label-big" < "$T210_BIG" > "$WORK/t210-big-out.bin"
+) 2>"$T210_ERR"
+if cmp -s "$T210_BIG" "$WORK/t210-big-out.bin" && [ ! -s "$T210_ERR" ]; then
+    pass "#221: multi-chunk (2.5 MB) stream passes through verbatim"
+else
+    fail "#221: multi-chunk passthrough corrupted the scan stream"
+fi
+
+# 3c) (#221 a W1) counter timeliness: records available at t=0, EOF at
+#     t=2 — the 0:01 frame must already carry "3 found". A full-buffer
+#     read starves the counter (every frame "0 found" until EOF); read1
+#     returns available bytes at once. 1 s of margin on both sides of
+#     the 0:01 draw makes this deterministic, not a race.
+cat > "$WORK/t210-w1.sh" <<EOF
+eval "\$SCAN_HELPERS"
+( printf 'a\0b\0c\0'; sleep 2 ) | _st_progress_tee "w1pin" > /dev/null
+EOF
+script -qec "sh $WORK/t210-w1.sh" /dev/null > "$WORK/t210-w1.raw" 2>&1
+if grep -aq 'w1pin — 3 found, 0:01' "$WORK/t210-w1.raw"; then
+    pass "#221: found-counter engages mid-stream (read1, not buffered read)"
+else
+    fail "#221: counter starved — frames show 0 found while records flow"
+fi
+
+# 4c) (#221 a W2) join latency: an instant scan must not pay the
+#     ticker's second — Event.set wakes the wait, bool+sleep made join()
+#     sit out the full sleep (>= 1 s floor, measured 1014 ms). Min of 3
+#     runs vs a 700 ms bound: ~5x above a healthy pty run, 300 ms under
+#     the broken floor. TIMING-SENSITIVE (L4b): the min-of-3 absorbs CI
+#     load spikes; if this ever flakes, fix is a slower bound, not a
+#     sleep — the broken floor scales with the tick period, not load.
+T210_MIN=999999
+for _t210_i in 1 2 3; do
+    cat > "$WORK/t210-w2.sh" <<EOF
+eval "\$SCAN_HELPERS"
+_s=\$(date +%s%N)
+_st_ddev_scan "w2pin" "$T210" "$WORK/t210-w2.txt"
+_e=\$(date +%s%N)
+echo "W2-ELAPSED-MS=\$(( (_e - _s) / 1000000 ))"
+EOF
+    script -qec "sh $WORK/t210-w2.sh" /dev/null > "$WORK/t210-w2.raw" 2>&1
+    _t210_ms=$(grep -ao 'W2-ELAPSED-MS=[0-9]*' "$WORK/t210-w2.raw" | tail -1 | cut -d= -f2)
+    [ -n "$_t210_ms" ] || _t210_ms=999999
+    [ "$_t210_ms" -lt "$T210_MIN" ] && T210_MIN=$_t210_ms
+done
+if [ "$T210_MIN" -lt 700 ] && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-w2.txt"; then
+    pass "#221: instant scan joins immediately (min ${T210_MIN}ms of 3, bound 700ms)"
+else
+    fail "#221: join latency — instant scan took >= 700ms (min ${T210_MIN}ms)"
+fi
+
+# 6) (#221 a W4) gate drift made observable: on a non-tty run python3
+#    must not be invoked AT ALL. The shim writes a marker FILE, not
+#    stderr — the production probe discards its own stderr, so a
+#    stderr-observing pin would prove nothing (L1). Catches a
+#    dropped/inverted [ -t 2 ] (probe would start, marker appears) and
+#    the pre-fix shape (command -v alone — tee runs, dies, list empties,
+#    cmp reds too).
+T210_PYBIN="$WORK/t210-pybin"
+T210_PROBE="$WORK/t210-probe.log"
+mkdir -p "$T210_PYBIN"
+printf '#!/bin/sh\necho x >> "%s"\nexit 9\n' "$T210_PROBE" > "$T210_PYBIN/python3"
+chmod +x "$T210_PYBIN/python3"
+rm -f "$T210_PROBE"
+(
+    eval "$SCAN_HELPERS"
+    PATH="$T210_PYBIN:$PATH"
+    export PATH
+    _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-gate.txt"
+) 2>"$T210_ERR"
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-gate.txt" && [ ! -f "$T210_PROBE" ]; then
+    pass "#221: non-tty run never invokes python3 (gate drift observable)"
+else
+    fail "#221: non-tty run started python3 — gate drifted"
+fi
+
+# 7) (#221 a W3, a W12) broken-but-findable python3 on a TERMINAL: the
+#    health probe fires exactly ONCE (cache across both scans), drops
+#    both scans to the bare-find branch — full lists, no live line, no
+#    traceback, run proceeds. Pre-fix shape: tee branch taken, tee dies
+#    at startup, EMPTY list (the false-green), marker written twice.
+cat > "$WORK/t210-broken.sh" <<EOF
+PATH="$T210_PYBIN:\$PATH"
+export PATH
+eval "\$SCAN_HELPERS"
+_st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-brk1.txt"
+_st_ddev_scan "win hosts: scanning $T210" "$T210" "$WORK/t210-brk2.txt"
+echo "SCAN-FINISHED"
+EOF
+script -qec "sh $WORK/t210-broken.sh" /dev/null > "$WORK/t210-brk.raw" 2>&1
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk1.txt" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk2.txt" \
+    && grep -aq "SCAN-FINISHED" "$WORK/t210-brk.raw" \
+    && ! grep -aq "found," "$WORK/t210-brk.raw" \
+    && [ -f "$T210_PROBE" ] \
+    && [ "$(wc -l < "$T210_PROBE" 2>/dev/null || echo 0)" = 1 ]; then
+    pass "#221: broken python3 on a tty: probe once, bare-find fallback, full scans"
+else
+    fail "#221: broken python3 must fall back to complete scans (probe cached)"
+fi
+
+# 8) (#221 a W8) extraction integrity beyond presence: the extracted
+#    helpers must PARSE (sh -n) and carry the tee's full body — an
+#    early col-0 brace truncating the range leaves def ticker/draw
+#    behind; unterminated quoting fails sh -n outright.
+if printf '%s\n' "$SCAN_HELPERS" | sh -n 2>/dev/null \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'def draw' \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'def ticker' \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'read1'; then
+    pass "#221: extracted scan helpers parse and carry the full tee body"
+else
+    fail "#221: SCAN_HELPERS extraction truncated or unparsable"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
