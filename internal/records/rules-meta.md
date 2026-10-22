@@ -160,7 +160,7 @@ invariant. (RM-0029)
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
 | 3 | agent files + AGENTS Rules | done — test-fidelity 2026-10-18; review-concept 2026-10-19; AGENTS 2026-10-20 |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | done 2026-10-22 |
-| 5 | Self-application: the main rule gets `RM-0001` | done 2026-10-22 |
+| 5 | Self-application: the main rule gets the first number, 0001 | done 2026-10-22 |
 
 The 2026-10-19 review-concept step split the file: operative rules in
 `agent/review-concept.md`, history and calibration data in
