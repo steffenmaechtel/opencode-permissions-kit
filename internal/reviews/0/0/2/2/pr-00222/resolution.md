@@ -7,10 +7,10 @@ Case: [pr-00222](../README.md) · birth-PR #222 · snapshot chain:
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a W1 (MED) | **implemented** | see Evidence | V12 + V13 pins execute the count-guard failure path; sabotage red→green below |
-| a W2 (LOW) | **implemented** | see Evidence | lane a one-verdict shape; count stable 25→21, no SCOPE_FILES drift; PR-text remainder handed to maintainer |
-| a W3 (LOW) | **implemented** | see Evidence | R7–R12 + V14–V16 pin every fixture-triggerable die arm; sweep table below |
-| a W4 (LOW) | **implemented** | see Evidence | case split retired/corrupt; V17 pins the new arm; V7 stays green |
+| a W1 (MED) | **implemented** | `7e0e67b` | V12/V13 run the count-guard failure path; sabotage red/green |
+| a W2 (LOW) | **implemented** | `7e0e67b` | lane a one verdict; count stable at 21; PR text -> maintainer |
+| a W3 (LOW) | **implemented** | `7e0e67b` | R7-R12 + V14-V16 pin every die arm; sweep table below |
+| a W4 (LOW) | **implemented** | `7e0e67b` | case split retired/corrupt; V17 pins the new arm; V7 stays green |
 | a W5–W9 (INFO) | **deliberately not done** | — | accepted as informational (rationale below) |
 
 ## Evidence detail
