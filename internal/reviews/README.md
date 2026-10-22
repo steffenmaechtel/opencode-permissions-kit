@@ -63,6 +63,11 @@ era's shape — both stay citable as history). House-owned parts:
 
   The lint test pins ID↔folder and Snapshot↔file name. (Legacy cases
   predate the header; their stem + dates live in legacy-index.md.)
+- Catch-up and backup reviews (e.g. the successor after a rotation
+  deviation) add no Scope value: Scope stays `wave`, the Subject
+  names the catch-up ("rotation-deviation catch-up"), and the
+  mandate's source of truth is the resolution's Follow-ups entry that
+  commissioned it.
 - The **one pointer line**
 
 ```
@@ -85,6 +90,10 @@ era's shape — both stay citable as history). House-owned parts:
   A review that cannot deliver these four is reshaped by the embedding
   agent before commit — a snapshot without citable IDs or severities
   breaks disposition, citation, and the stop rule at once.
+  Renumbering into the snapshot's own scheme is the standard move:
+  predecessor axis IDs (P1/T2/L1 …) map into the snapshot's W-scheme
+  with the original IDs preserved in a "Reported by" column —
+  citations always resolve through the snapshot that owns the scheme.
 - The **finding-provenance classification** (fifth deliverable): every
   finding is classified where the defect comes from, using the
   meta-analysis vocabulary so extraction stays comparable —
@@ -127,6 +136,14 @@ class-sweep pattern and sites — the row above links to it by finding>
   `deliberately not done` — nothing else.
 - **Key evidence or a blocker reason, never a bare claim** — if the
   row cannot carry it, the Evidence detail block must (and does).
+- **Dated anchors are measured, never restated:** dating a line anchor
+  means looking it up at the named commit
+  (`git show <ref>:<file> | grep -n …`) — line numbers quoted from an
+  earlier review describe a different tree by definition. Prefer
+  content anchors (grep-able strings); a line number only with its
+  dated ref next to it. A prose narrative about history (what shifted
+  what) is a claim like a SHA citation: verify each hop at its ref
+  before writing it.
 - The resolution is created with the FIRST fix commit of the chain and
   grows one row (and, where needed, one detail block) per disposition
   as fixes land — never reconstructed afterwards. Referenced commits
@@ -162,12 +179,25 @@ Reviews run against a clean working tree of the version under review
    (parallel subagents per review-concept.md).
 2. Verify every finding against the code — **no fixing while
    verifying**.
-3. Write the snapshot (+ README index row is generated) and commit it.
+3. Write the snapshot and commit it — regenerating the INDEX
+   (`scripts/gen-review-index.py`) as part of every snapshot and
+   resolution commit; the parity test catches a stale INDEX only
+   after the fact.
 4. Pause for the maintainer — the fix wave starts on their go.
 5. Fix wave on the feature branch; the resolution is created with the
    first fix commit and grows per disposition; the loop closes per the
    stop rule. Run the L1–L7 checklist
    ([agent/learnings.md](../../agent/learnings.md)) before committing.
+6. The owed wave review of a round starts on the maintainer's go too:
+   the agent reports round completion (naming owed-but-not-run
+   reviews) and waits — never self-advances into the next pass.
+
+A round that ran in the authoring session (rotation deviation) is
+recovered, not improvised: its findings stay `open` in the resolution,
+a Follow-ups entry names the deviation and instructs the successor,
+and the successor re-verifies the prior snapshot's clean verdicts
+before its own pass (full rule: agent/review-concept.md, "Session
+rotation").
 
 ## Index
 

@@ -38,7 +38,10 @@ A fix for a finding is only dispositioned *implemented* after sweeping **all
 same-shape sibling sites**, and the resolution records the evidence: the grep
 pattern used and the sites checked. "Fixed at the site the finding named" is
 the definition of this defect class (`0.0.39h F1` HIGH: "missed sibling
-despite full-class claim").
+despite full-class claim"). Diagnostic messages that ENUMERATE causes
+("non-numeric or leading-zero …") are sweep sites of the same rank as a doc
+claiming the invariant: a fix that adds a rejection/skip/failure cause sweeps
+every message that enumerates causes, not just the code and the docs.
 
 ### L3 — Claim audit per wave
 *Class: `claim-drift` — 77 findings, rank 1 by count, still nonzero in 0.0.46.*
@@ -47,6 +50,11 @@ Every behavior claim the wave touches — comment blocks, hint/message strings,
 doc sentences — either **carries a pin** or is **deleted/weakened**. Claims
 age outside diffs, so wave reviews never catch their drift ("never abort"
 `0.0.45c C1`, "race-free" `0.0.45d W1`, "31 suites" for 27 `0.0.39d D1`).
+History narratives are the prose shape of this class: a resolution narrative
+about what shifted what is a claim like a SHA citation — verify each hop at
+its ref before writing it, and date line anchors by MEASURING at the named
+commit (`git show <ref>:<file> | grep -n`), never by restating an earlier
+review's numbers (those describe a different tree by definition).
 
 ### L4 — Pins must discriminate, and sit before the summary gate
 *Class: `test-vacuous` — 37 findings; named "the 0.0.42d class" three times.*
