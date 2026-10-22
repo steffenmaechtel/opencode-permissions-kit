@@ -3,8 +3,7 @@
 Case pr-00222 (shard `internal/reviews/0/0/2/2/`) · birth-PR #222 ·
 snapshot chain: [a](review-a.md) · dispositions below grow as fixes land.
 
-Status: resolved   <!-- since 2026-10-22: chain closed per the stop rule
-     (c disposition round stayed in bookkeeping); see Follow-ups -->
+Status: closed
 
 ## Dispositions
 
