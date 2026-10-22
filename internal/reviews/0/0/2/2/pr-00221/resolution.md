@@ -129,14 +129,18 @@ fs-baseline follow-up.
   only the new tee. `_fsb_count_tee` has NO except clause: if the
   downstream xargs dies first, the tee ends in a traceback (pre-
   existing, cosmetic) — rides the fs-baseline follow-up below.
-- **W3 shape** `grep -rn 'command -v python3' files/` → status.sh:534
+- **W3 shape** `grep -rn 'command -v python3' files/` → FIVE hits:
+  status.sh:215 (the a-W3 health probe itself — IN-DIFF fix site,
+  exercised by pins 6/7, not a pre-existing sibling; listed so the
+  record reconciles with the grep, #221 c W2), status.sh:536
   (advisories: probe failure renders a loud row, not silence),
-  status.sh:1329 (parser guarded by `-x` too, fail-soft display),
+  status.sh:1331 (parser guarded by `-x` too, fail-soft display),
   install.sh:688 (install-time hard check), bin/opk:299 (openchamber
   settings-pin removal: a broken interpreter fails the `&&` chain
   into the explicit else → `ui_error` with by-hand remediation —
   fail-loud, not the W3 silence; missed on this record's first
-  pass, caught by #221 b W2). **Sibling found (pre-
+  pass, caught by #221 b W2; refs here shifted +2 by the b-wave
+  comment and refreshed, #221 c W1). **Sibling found (pre-
   existing, follow-up recommended):** `sh/fs-baseline.sh:186-189` puts
   `_fsb_count_tee` in the DATA pipeline of a MUTATING pass
   (`tee < nul | sudo xargs -0 -r sh -c 'chgrp/chmod/setfacl …'`) with
