@@ -1,0 +1,772 @@
+{
+  "batch": "b8",
+  "snapshots": [
+    {
+      "stem": "pr-00221a",
+      "file": "internal/reviews/0/0/2/2/pr-00221/review-a.md",
+      "date": "2026-10-22",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main + 3x GLM-5.3-Flash subagents (axes A/B/C)",
+      "subject": "issue #210 live progress for status project-root scans (feature wave)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 3, "LOW": 5, "INFO": 7 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "read(1<<20) blocks until 1 MiB/EOF; KB-scale scan streams keep every frame at '0 found' — found-counter never engages.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "perf",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Bool-flag + sleep(1) ticker: join() waits out in-flight sleep — up to +1s dead time per scan; frame lingers after EOF.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "python3 gate accepts broken interpreter; tee dies, scan list 0 bytes, checks blind, report green — false-green over dead scan.",
+          "cross_refs": ["0.0.48b W2"],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Non-tty pin cannot catch removal of the [ -t 2 ] gate; python isatty() is the unpinned second gate.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Erase math counts characters, terminal counts columns; CJK/emoji paths wrap — erase cleans only last physical line, residue persists.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W6",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Ctrl-C mid-scan prints KeyboardInterrupt traceback after the join wait; exit signaling stays correct — display noise only.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W7",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "SIGTERM/SIGHUP kill without finally leaves the progress frame painted on the tty after a killed run.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W8",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Extraction pin is presence-only; sed over-capture (re-indented closing brace) escapes anchor greps — pty pins could stay green.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W9",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "delta-introduced",
+          "summary": "Outfile write errors now surface via tr stderr (old find had 2>/dev/null) — silent-to-loud delta, acceptable.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W10",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Comment overstates degradation: encode('utf-8','replace') never yields '?' on a LANG=C tty; '?' only for undecodable argv bytes.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W11",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Verbatim passthrough pin uses 7 bytes, below the 1 MiB chunk size — multi-chunk reorder/accumulation bugs invisible.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W12",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "New python-death trigger on the rc-exclusion surface is unpinned (ties to W3); the documented rc exclusion itself is sound.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W13",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Emitter sweep is textual (old variable shape only); a renamed bare-find reimplementation slips it — positive call-string pins compensate.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W14",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "Third .ddev project-root walk in ddev-handover.sh unconverted — judged out of scope (active chown tool, find form pinned elsewhere).",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W15",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Transient frame label 'win hosts' vs report row 'hosts (win)' — naming split on an erased line, cosmetic.",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "No explicit severity-count line; counts derived from the 15-row table and confirmed by resolution.md ('3 MED, 5 LOW, 7 INFO').",
+        "18 subagent findings merged to 15 (A1=B3); none retracted.",
+        "Gates: test-status.sh green incl. 9 new #210 pins; shellcheck 0 new findings; pty/timing experiments under /tmp/opencode/review-221/."
+      ]
+    },
+    {
+      "stem": "pr-00221b",
+      "file": "internal/reviews/0/0/2/2/pr-00221/review-b.md",
+      "date": "2026-10-22",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main agent (no subagents)",
+      "subject": "a-wave fixes for #210 scan progress (read1, Event wait, health probe, pins)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 0 },
+      "findings": [
+        {
+          "id": "b W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "a W6 KeyboardInterrupt-swallow mechanism dispositioned implemented with no behavioral pin — no suite test executes any SIGINT path.",
+          "cross_refs": ["0.0.44d F4"],
+          "status": "reported"
+        },
+        {
+          "id": "b W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "process",
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "Recorded L2 sweep lists three of four 'command -v python3' sites — bin/opk:299 missing; the site itself is benign (fail-loud).",
+          "cross_refs": ["pr-00221 a W3"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Micro-wave pass per RM-0087 (no subagents); review-meta Scope line says wave.",
+        "All five a-wave sabotage reds re-executed on the committed tree (mutate, red, restore, green).",
+        "No explicit severity-count line; both table findings are LOW.",
+        "Requested range read inclusive of the fix commit per stop rule RM-0067."
+      ]
+    },
+    {
+      "stem": "pr-00221c",
+      "file": "internal/reviews/0/0/2/2/pr-00221/review-c.md",
+      "date": "2026-10-22",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main + 1x GLM-5.3-Flash subagent",
+      "subject": "b-wave fixes: pin 9 SIGINT pin, comment pointer, opk:299 sweep entry",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 0 },
+      "findings": [
+        {
+          "id": "c W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "process",
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "W3-shape sweep record's line refs went stale (+2 shift from b-wave comment lines); opk:299 entry appended without refreshing them.",
+          "cross_refs": ["pr-00221 a W3"],
+          "status": "reported"
+        },
+        {
+          "id": "c W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "process",
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "Record lists four of five grep hits — status.sh:215 (the a-wave probe) unlisted while the addendum claims the enumeration complete.",
+          "cross_refs": ["pr-00221 b W2", "pr-00221 a W3"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Micro-wave pass; one fresh-context subagent (~3.5 min, within ~5-min micro budget RM-0087); review-meta Scope line says wave.",
+        "Sabotage red re-executed on the committed tree; loop closes via bookkeeping-only round (no wave d owed)."
+      ]
+    },
+    {
+      "stem": "pr-00222a",
+      "file": "internal/reviews/0/0/2/2/pr-00222/review-a.md",
+      "date": "2026-10-22",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main + 2x GLM-5.3-Flash subagents (S: scripts, T: tests)",
+      "subject": "rules-meta phases 4-5: revisit workflow + RM-0001 (feature wave)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 3, "INFO": 5 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Five rewrite-validation arms (awk END guard, sed|grep field checks, tail log check) unpinned — 'no partial writes' net can rot silently.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "PR body '16 to 17 pins' understates — suite prints 25; printed count drifts with SCOPE_FILES length.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Report's per-meta fail-loud arms (no id, bad status, bad interval, non-ISO next-revisit) and missing-tree die are unpinned.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Missing/empty status yields rc=1 with garbled 'RM-NNNN is -- retired' message — env failure misclassified as domain refusal.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Bare 'reviewed:' line counts pending in the report but approved in the INDEX — contradicts 'same definition as INDEX' comment.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "find 2>/dev/null swallows find errors; an unreadable subtree could silently truncate the worklist (total-empty case is caught).",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W7",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "R0 real-tree pin freezes FORCE_TODAY=2026-10-16 — immune to wall-clock lateness; only backdated metas redden it.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W8",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "Count needles are unanchored substrings ('overdue: 1' matches 'overdue: 12'); fixture geometry keeps false green unreachable today.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W9",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "V10 'meta untouched' check counts revisit-interval lines, not content; pinned scenario dies pre-mktemp — belt-and-braces only.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "G1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Apparent 'leap = y % 4 ==,0' syntax error — diff rendering artifact; repo file valid.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G2",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "wiring-gate",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "755-but-invoked-via-sh vs the executed-by-path invariant — same shape as established rules-audit.sh on master.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G3",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "pre-existing",
+          "summary": "date_ok accepts Feb 30 — pre-existing same-shape from the audit; lane comparisons don't crash.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G4",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Review-log line could land outside the review-log section — triggerless; every current meta ends with the log.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G5",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Retired-count arithmetic suspicion — verified consistent.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G6",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "wiring-gate",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "R0 as hidden CI gate on overdue work — retracted; frozen FORCE_TODAY makes lateness un-accumulable (kept as W7).",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G7",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Retired-but-unapproved leak into the approval queue — by design, INDEX parity.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G8",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "|| true in pin-10 lane a — harness plumbing; result checked via -n.",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "No Prov column in the findings table; provenance left null (ghost G3 carries its own 'pre-existing' claim).",
+        "Axis-T line numbers re-anchored during verification (had been taken from the diff, not the sources).",
+        "G1-G8 are the eight dissolved subagent findings from the Retracted/ghost section (status retracted, severity inferred INFO).",
+        "Gates: revisit 24 pins, meta 25 pins, kit-cli, update-flags 130, index-parity 105 rows, lint clean, audit 0 blocking/0 overdue."
+      ]
+    },
+    {
+      "stem": "pr-00222b",
+      "file": "internal/reviews/0/0/2/2/pr-00222/review-b.md",
+      "date": "2026-10-22",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main + 2x GLM-5.3-Flash subagents (S: scripts+claims, T: tests)",
+      "subject": "a-wave fixes 7e0e67b (W1-W4 pins, status taxonomy split, lane-a consolidation)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 3, "INFO": 2 },
+      "findings": [
+        {
+          "id": "b W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "claim-drift",
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "'Pin every die arm' sweep misses the next-revisit-computation die (:132) — triggerable, unpinned, absent from the L2 table.",
+          "cross_refs": ["pr-00222 a W3"],
+          "status": "reported"
+        },
+        {
+          "id": "b W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "V13 fixture keeps c1=2/c2=0 — the guard's c2 operand is undiscriminated (c1-only sabotage stays green); c2=2 shape unpinned.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "b W3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Header claims 'bad/missing status dies loud, meta untouched' — missing-status shape has no fixture; 'untouched' asserted only by V12.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "b W4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "other",
+          "provenance": "wave-introduced",
+          "summary": "Commit message 'V12/V13 assert byte-identical' overstates — only V12 carries the before/after comparison; V13 checks rc + needle.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "b W5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "$(cat) comparison is content modulo trailing newlines — 'byte-identical' overstated by the newline delta; unrealistic in the die path.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "b W6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "delta-introduced",
+          "summary": "Stale pre-wave line anchors in resolution: W1 evidence and five sweep-table rows shifted (report rows current).",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "G1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Stale-consumer suspicion for the old any-non-active rc=1 semantics — none exists.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G2",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "V7 breakage from the reworded retired message — needle matches, stays green.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G3",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Third-status misclassification — vocabulary closed at active|retired.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G4",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Two probe artifacts (ROOT resolution) — re-confirmed the :88 refuse.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G5",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "R7-R10 silent chain break — every link fails loud on needle mismatch.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G6",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "Lane-a red path losing detail — per-line filename prefix preserved.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G7",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "Meta count 21 wrong — run confirmed 21 green.",
+          "cross_refs": [],
+          "status": "retracted"
+        },
+        {
+          "id": "G8",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "Sandbox violation by sed -i — all targets under $WORK.",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "Provenance line stated in the snapshot: b W1-b W5 wave-introduced, b W6 delta-introduced.",
+        "All 12 new pins sabotage-verified (S1/S3/S6 reddened V17/V12/R7); main-agent sabotages in a tree copy; gates 36/21, lint, sandbox, line-length green.",
+        "G1-G8 are the dissolved axis-S/T suspicions from the Retracted/ghost section (status retracted, severity inferred INFO; G4 covers two artifacts)."
+      ]
+    },
+    {
+      "stem": "pr-00222c",
+      "file": "internal/reviews/0/0/2/2/pr-00222/review-c.md",
+      "date": "2026-10-22",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main + 1x GLM-5.3-Flash subagent (tests axis)",
+      "subject": "b-wave fixes 54f2ce6 (V13 rebuild, V18-V20 pins, anchor refresh)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 3 },
+      "findings": [
+        {
+          "id": "c W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "claim-drift",
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "a W1 evidence prose still describes the $(cat) mechanism that b W5 replaced with cp+cmp — paragraph not swept.",
+          "cross_refs": ["pr-00222 a W1", "pr-00222 b W5"],
+          "status": "reported"
+        },
+        {
+          "id": "c W2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "Sweep table has no rows for the retired-refuse (:97) and bad-status (:98) arms — '19/19 dispositioned' holds only counting prose.",
+          "cross_refs": ["pr-00222 a W4"],
+          "status": "reported"
+        },
+        {
+          "id": "c W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "Six b-wave resolution rows shipped with literal SHA_b placeholders (same-commit self-reference impossible); follow-up b4a1ccf resolves them.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "c W4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Header 'untouched' claim: V17 (paused) has no untouched assert of its own — cmp-asserted via V20 only; asymmetric.",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Single-agent micro pass per RM-0087; sabotage reproduced in a tree copy; suites 39/21, lint, sandbox, line-length green.",
+        "Provenance stated in the snapshot: c W1 fix-induced, c W2-c W4 wave-introduced.",
+        "Retracted/ghost section says 'None' — the six 'checked and cleared' items treated as coverage notes, not findings."
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "pr-00221",
+      "file": "internal/reviews/0/0/2/2/pr-00221/resolution.md",
+      "dispositions": { "implemented": 13, "implemented_differently": 0, "not_done": 6 },
+      "follow_ups_recorded": 1,
+      "notes": "13 implemented, 6 deliberately not done (cosmetic/scope calls). Follow-up for a NEW case: fs-baseline W3-class sibling (root-run mutating site). Post-close: line-length ratchet red on b W1 row — snapshot c's 120-col claim wrong; fix waves run the full unit suite."
+    },
+    {
+      "stem": "pr-00222",
+      "file": "internal/reviews/0/0/2/2/pr-00222/resolution.md",
+      "dispositions": { "implemented": 11, "implemented_differently": 0, "not_done": 8 },
+      "follow_ups_recorded": 1,
+      "notes": "11 implemented, 8 deliberately not done (INFO accepted as informational; commit text is history). Only follow-up: maintainer-side PR-text pin-count corrections (24 to 39, 16 to 21, name pin 10). Chain closed via bookkeeping-only c round (RM-0066)."
+    }
+  ]
+}

@@ -1,0 +1,314 @@
+{
+  "batch": "b5",
+  "snapshots": [
+    {
+      "stem": "pr-00200a",
+      "file": "internal/reviews/0/0/2/0/pr-00200/review-a.md",
+      "date": "2026-10-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main agent + 2 GLM-5.3-Flash axis subagents",
+      "subject": "issue-166 fix wave: status advisory C1 gate mode bits vs caller's [ -x ]",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 1, "INFO": 2 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "claim-drift",
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "stat without -L reads link's constant 777; dangling/no-x-target symlinks regress counted warn into uncounted dead-end unknown row",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "delta-introduced",
+          "summary": "Pin deficit: symlink shapes, 4-digit special modes, caller-denied+corrupt compound carry no pins — W1 passed suite through this gap",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "delta-introduced",
+          "summary": "Docs audience parenthetical enumerates fewer audiences than code counts; other-class x bit (705) unmentioned",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "pre-existing",
+          "summary": "Group member without sudo rights gets dead-end 'sudo opk status' advice on healthy binary — pre-existing, backlog",
+          "cross_refs": ["0.0.48b W3"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "W1 severity: edge-forms subagent reported HIGH (E1), main agent scoped MED — both readings recorded for calibration",
+        "4096-mode brute force over case patterns: mismatches=0; W1 confirmed empirically twice independently",
+        "e2e not owed — render-only status.sh change"
+      ]
+    },
+    {
+      "stem": "pr-00200b",
+      "file": "internal/reviews/0/0/2/0/pr-00200/review-b.md",
+      "date": "2026-10-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 single-pass, fresh session (no subagents)",
+      "subject": "micro-wave of a-wave fix: stat -L, four new pins, cli.md wording",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 3 },
+      "findings": [
+        {
+          "id": "b W1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "delta-introduced",
+          "summary": "Stop-rule section cites stale pre-amend SHA 88aad0d for fix; dispositions table already carries correct e563874",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "b W2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "silent-failure",
+          "area": "internal",
+          "provenance": "pre-existing",
+          "summary": "Class-sweep site list subset of real stat population: variable-path no--L reads status.sh:477/:1038 unnamed; sweep conclusion still holds",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "b W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "delta-introduced",
+          "summary": "Rewritten cli.md prose line left unwrapped (111 cols vs ~78 neighbors) — merge artifact of 3-line replacement",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "R1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "Alleged compound pin root-skip undocumented; false on read — 007 else-branch info line names the exact reason",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "Sabotage (deletion form): stat -L -> stat makes suite rc=1, both W1 pins fail — red-to-green independently reproduced",
+        "Independent sweep enumeration: 22 stat sites across files/; two variable-path no--L reads recorded as b W2"
+      ]
+    },
+    {
+      "stem": "pr-00202a",
+      "file": "internal/reviews/0/0/2/0/pr-00202/review-a.md",
+      "date": "2026-10-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 single-pass, no subagents (maintainer-requested quick pass)",
+      "subject": "issue-168: mktemp fixed-path fallback class sweep widened repo-wide in test-status.sh",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 1 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Widened zero-match sweep has no canary; fail branch never executes in-suite — future regex edits stay green while blind",
+          "cross_refs": ["0.0.42e C2"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Pin comment over-claims sanctioned fallbacks never match: brace that assigns fixed path does match shape A",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "R1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": null,
+          "summary": "Alleged shape A false-positives on sanctioned in-substitution substitutions; impossible — shape A requires || after closing paren",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "Scratch-file probes (tree untouched): 7 offending + 6 sanctioned shapes all classified correctly; no in-tree sabotage run",
+        "Wave closes pr-00160 review-c C7 as claimed"
+      ]
+    },
+    {
+      "stem": "pr-00202b",
+      "file": "internal/reviews/0/0/2/0/pr-00202/review-b.md",
+      "date": "2026-10-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 single-pass, fresh session (no subagents)",
+      "subject": "a-wave fixes: W2 sweep canary plus sanctioned-fallback comment precision",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 0 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "a-W2 comment's brace-form discrimination claims carry no pin; same-commit canary's three lines include no brace shape",
+          "cross_refs": ["pr-00202 a W1", "pr-00202 a W2"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Sabotage both directions (blind shape A, over-broad) re-verified red, restored green",
+        "No sibling zero-match pattern sweeps elsewhere in tests/unit"
+      ]
+    },
+    {
+      "stem": "pr-00202c",
+      "file": "internal/reviews/0/0/2/0/pr-00202/review-c.md",
+      "date": "2026-10-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 single-pass, fresh session (no subagents)",
+      "subject": "b-wave fix: canary discrimination pins extended from 3 to 7 lines",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 0 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "test-vacuous",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "'Every discrimination claim' sentence over-claims: /tmp, /var/tmp, quoted, sudo-prefix, un-muffled shape B, bare 2>/dev/null non-match stay unpinned",
+          "cross_refs": ["pr-00202 a W1", "pr-00202 b W1"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Both sabotage directions re-verified (brace-blind, fixed-path tail dropped)",
+        "One sabotage initially no-op'd (uniqueness assert aborted mutation) — discarded, not counted as discrimination proof"
+      ]
+    },
+    {
+      "stem": "pr-00202d",
+      "file": "internal/reviews/0/0/2/0/pr-00202/review-d.md",
+      "date": "2026-10-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 single-pass, fresh session (no subagents)",
+      "subject": "c-wave fix: canary discrimination pins extended from 7 to 14 lines",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 1 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "pre-existing",
+          "summary": "Snapshot c gate line '165 PASS' does not reproduce; same metric yields 138 — correction belongs in resolution",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Ground truth: extracted patterns match exactly lines 1 2 3 8 9 11 of a 14-line replica; both sabotages red",
+        "Combinatorial literal variants explicitly dropped — taste ping-pong the five-round stop rule prevents",
+        "Maintainer-commissioned label normalization (fcb815a) afterwards touched test code, triggering snapshot e"
+      ]
+    },
+    {
+      "stem": "pr-00202e",
+      "file": "internal/reviews/0/0/2/0/pr-00202/review-e.md",
+      "date": "2026-10-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 single-pass, fresh session (no subagents)",
+      "subject": "d-wave follow-up: issue-165 test labels normalized from 165: to #165:",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 1 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "pre-existing",
+          "summary": "d W1 correction's '137 passes + summary' split off by one; 138 pass lines, lowercase summary never counted",
+          "cross_refs": ["pr-00202 d W1"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Wave is message text only (65 sites), no mutations needed; no consumer of the old bare-label form anywhere"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "pr-00200",
+      "file": "internal/reviews/0/0/2/0/pr-00200/resolution.md",
+      "dispositions": { "implemented": 5, "implemented_differently": 0, "not_done": 2 },
+      "follow_ups_recorded": 1,
+      "notes": "a W4 (pre-existing 0.0.48b-W3 dead-end advice cell) deliberately not done — backlog. b W2 no code owed; full 22-site stat enumeration recorded in snapshot b. Release gate: both e2e suites at baseline before tagging."
+    },
+    {
+      "stem": "pr-00202",
+      "file": "internal/reviews/0/0/2/0/pr-00202/resolution.md",
+      "dispositions": { "implemented": 6, "implemented_differently": 0, "not_done": 0 },
+      "follow_ups_recorded": 1,
+      "notes": "All six findings implemented. Addendum records unseen regression: resolution.md grew 5 ratchet-breaching long lines since dd25de8; reflowed. '165 PASS' was a label artifact; authoritative count 138 passes."
+    }
+  ]
+}
