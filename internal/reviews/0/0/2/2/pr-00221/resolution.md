@@ -1,9 +1,9 @@
 # Resolution — pr-00221 (issue #210 scan progress)
 
-Chain: [review-a.md](review-a.md) → [review-b.md](review-b.md) → this
-wave. Dispositions refer to `a W<n>`/`b W<n>` = finding W<n> of
-snapshot a/b. All commits on `feature/status-scan-progress`
-(birth PR #221).
+Chain: [review-a.md](review-a.md) → [review-b.md](review-b.md) →
+[review-c.md](review-c.md) → this wave. Dispositions refer to
+`a W<n>`/`b W<n>`/`c W<n>` = finding W<n> of snapshot a/b/c.
+All commits on `feature/status-scan-progress` (birth PR #221).
 
 ## Dispositions
 
@@ -26,6 +26,8 @@ snapshot a/b. All commits on `feature/status-scan-progress`
 | a W15 (INFO) | **deliberately not done** | — | transient-label cosmetic; churn not worth it |
 | b W1 (LOW) | **implemented** | `c298b83` | pin 9: foreground tee + async SIGINT sender — zero stderr, byte intact, rc 0; sabotage reds (detail) |
 | b W2 (LOW) | **implemented** | `c298b83` | opk:299 recorded in the W3-shape sweep above (fail-loud, benign) |
+| c W1 (LOW) | **implemented** | `9005338` | refs refreshed +2 (536/1331); record re-reconciled vs grep (detail) |
+| c W2 (LOW) | **implemented** | `9005338` | fifth hit listed (status.sh:215, in-diff probe); 5/5 enumerated |
 
 ## Evidence detail
 
@@ -116,6 +118,18 @@ the mechanism, not the terminal dance. Sweep (L2):
 fs-baseline's tee has no except clause at all — rides the recorded
 fs-baseline follow-up.
 
+### c W1 / c W2 (LOW) — sweep record reconciled with its own grep
+
+Snapshot c flagged that the W3-shape record did not reconcile:
+`grep -rn 'command -v python3' files/` yields FIVE hits on the
+post-`c298b83` tree — status.sh:215 (the wave's own a-W3 probe),
+:536, :1331, install.sh:688, bin/opk:299 — while the record listed
+four and carried the a-wave positions 534/1329 (correct when
+written at `eeac08c`, shifted +2 by the b-wave's comment lines).
+Fix (`9005338`): refs refreshed, the in-diff probe listed as such.
+Verified by re-running the grep against the edited record — every
+hit has exactly one matching ref, 5/5.
+
 ### Class sweeps (L2)
 
 - **W1 shape** `grep -rn 'read(1 << 20)' files/` → 2 sites.
@@ -179,3 +193,13 @@ fs-baseline follow-up.
   detail); the W3-shape sweep record completed with opk:299 (b W2).
 - **L3**: the status.sh comment claim now names its pin (b W1).
 - **L5/L7**: test + comment only; no root operands, no new scripts.
+
+### L1–L7 addendum (c-wave `9005338` — bookkeeping-only)
+
+- **L2**: the W3-shape record now reconciles with its grep (5/5,
+  refs current); the b-wave addendum's "completed" claim above is
+  superseded by this reconciliation (c W2 detail).
+- **L5/L7**: resolution record only — no shipped code, no root
+  operands, no scripts.
+- **Loop closes with this round** (RM-0066): both dispositions
+  stayed in bookkeeping; no wave d owed.
