@@ -12,8 +12,10 @@ details, verification duty, reviewer agents — lives in
 - **Trigger a full review** when a version bump is planned, ~500+
   changed lines or 10+ PRs have accumulated, or a high blast-radius
   area changed (`set -e`/pipefail semantics, traps, sudoers, wrapper).
-  Wave reviews are NOT yours to trigger — the agent owes one after
-  every fix wave, before its PR.
+- **Your go gates the wave review too:** the agent owes one after
+  every fix wave, reports round completion (including owed-but-not-run
+  reviews) and waits — fix waves and their wave reviews both start on
+  your go, never self-advanced.
 - **New session when?** Implement runs in one session; every review
   round runs in a NEW session, and that session also applies its fixes
   (report committed first, then the fixes — default since 2026-10-17,

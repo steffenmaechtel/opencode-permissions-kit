@@ -131,18 +131,29 @@ uncommitted change (learned the hard way, 2026-10). And sabotage by
 *deleting* the construct, not commenting it out: grep-count pins still
 count commented lines, so a commented-out sabotage can pass green. After
 the sabotage run, restore the good state from the commit/stash (or a copy
-kept outside the tree) and re-run the suite to confirm green.
+kept outside the tree) and re-run the suite to confirm green. During a
+review fan-out the tree is a shared read substrate: sabotage only (a)
+before the reviewers launch, (b) after all returned, or (c) in a scratch
+worktree — the window and screening rules live in
+[review-concept.md](agent/review-concept.md#parallel-reviewer-agents).
 
 Both e2e suites are part of the definition of done for changes to
-`install.sh`, `update.sh`, the wrapper, or backend provisioning.
-**Run them in parallel when the preconditions hold — not sequentially**
+`install.sh`, `update.sh`, the wrapper, or backend provisioning — and for
+semantics changes (rc contracts, traps, sudoers, provisioning) to any other
+root-run script (`uninstall.sh`, `opk`, `fs-baseline.sh`, …): those owe both
+suites in the wave itself. Message- or comment-only changes to root-run
+scripts may ride to the release gate; a later session that runs both suites
+green on a committed tree discharges the debt (record tree SHA + counts).
+**Run them in parallel when the precondition holds — not sequentially**
 (the suites are disjoint: per-suite containers, images and fixtures;
 sequential runs cost the other suite's full runtime for no benefit).
-Preconditions: a warm `tests/e2e/cache/` and no opencode version bump
-since the last suite run — after a version bump run one suite alone
-first, or two suites download the same version into the same cache path
-concurrently. The invocation pattern (including the three-suite variant
-with `e2e-ddev`) lives in [CONTRIBUTING.md](CONTRIBUTING.md).
+Precondition: the suites resolve the opencode version at runtime
+(current latest — `E2E_OC_VERSION` pins it), so a "warm"
+`tests/e2e/cache/` only covers the version the last run used. After any
+time gap — or on a first run — run one suite alone first, confirm it
+resolved and cached its version; parallel runs are safe from there. The
+invocation pattern (including the three-suite variant with `e2e-ddev`)
+lives in [CONTRIBUTING.md](CONTRIBUTING.md).
 Executable bits live in the **git index** (issue #123): commit anything
 CI or the kit execute by path with `git update-index --chmod=+x <path>`
 (invariant: 755 <=> executed by path, 644 <=> sourced lib / interpreter
