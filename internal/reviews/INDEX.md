@@ -27,5 +27,5 @@ The parity test regenerates and compares. -->
 | [pr-00208](0/0/2/0/pr-00208) | issue-205 git-config status/apply wording (feature wave) | wave | v0.0.53 @ f07f2fb | 2026-10-20 | a–c | closed |
 | [pr-00209](0/0/2/0/pr-00209) | issue-201 fix wave — status.sh direct --version capture ends the sudo-advice dead end | wave | v0.0.53 @ f07f2fb | 2026-10-20 | a–c | closed |
 | [pr-00211](0/0/2/1/pr-00211) | release 0.0.55 full-scope review (pre-tag) | full | v0.0.55 @ ad9467d | 2026-10-20 | a–g | closed |
-| [pr-00222](0/0/2/2/pr-00222) | rules-meta phases 4-5 — revisit workflow + RM-0001 (feature wave) | wave | master @ 14050d8 | 2026-10-22 | a–c | open |
+| [pr-00222](0/0/2/2/pr-00222) | rules-meta phases 4-5 — revisit workflow + RM-0001 (feature wave) | wave | master @ 14050d8 | 2026-10-22 | a–c | resolved |
 
