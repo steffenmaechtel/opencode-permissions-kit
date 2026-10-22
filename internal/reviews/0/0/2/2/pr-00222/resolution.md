@@ -12,6 +12,12 @@ snapshot chain: [a](review-a.md) · dispositions below grow as fixes land.
 | a W3 (LOW) | **implemented** | `7e0e67b` | R7-R12 + V14-V16 pin every die arm; sweep table below |
 | a W4 (LOW) | **implemented** | `7e0e67b` | case split retired/corrupt; V17 pins the new arm; V7 stays green |
 | a W5–W9 (INFO) | **deliberately not done** | — | accepted as informational (rationale below) |
+| b W1 (MED) | **implemented** | `SHA_b` | V19 pins the :132 arm; table row added; sabotage red/green |
+| b W2 (LOW) | **implemented** | `SHA_b` | V13 rebuilt clean (c1=1, c2=0); V18 pins c2=2; c1-only guard reds both |
+| b W3 (LOW) | **implemented** | `SHA_b` | V20 missing-status pin + untouched assert; header claim now backed |
+| b W4 (LOW) | **deliberately not done** | — | commit text is history; V13 now asserts untouched in substance |
+| b W5 (INFO) | **implemented** | `SHA_b` | untouched checks byte-exact: cmp -s against saved copies (V12/V13/V18/V20) |
+| b W6 (INFO) | **implemented** | `SHA_b` | sweep-table + W1 evidence anchors re-anchored to post-wave numbering |
 
 ## Evidence detail
 
@@ -29,7 +35,7 @@ after each restore.
 ### a W1 (MED) — rewrite-validation arms pinned
 
 Two new pins execute the awk count-guard failure path in
-`scripts/rules-revisit.sh:144-151`:
+`scripts/rules-revisit.sh:147-154` (b W6: re-anchored from :144-151):
 
 - **V12** — fixture with a duplicated `revisit-interval:` line (merge
   residue shape): expects rc=2 + "not found exactly once" AND the meta
@@ -88,11 +94,12 @@ scripts/rules-revisit.sh` — every arm enumerated and dispositioned:
 | revisit | multiline note (:77) | V5 (existing) |
 | revisit | missing python (:79) | V10 (existing) |
 | revisit | unknown meta (:88, refuse rc=1) | V6 (existing) |
-| revisit | bad interval (:99) | V8b (existing) |
-| revisit | no review log (:131) | V8c (existing) |
-| revisit | count guard (:151) | V12/V13 (new, W1) |
-| revisit | rewrite checks (:154-159) | internal consistency — see W1 |
-| revisit | mktemp/mv (:142/:161) | skipped — an unwritable meta dir also breaks teardown; value judged marginal |
+| revisit | bad interval (:102) | V8b (existing) |
+| revisit | next-revisit computation (:132) | V19 (new, b W1) |
+| revisit | no review log (:134) | V8c (existing) |
+| revisit | count guard (:154) | V12/V13/V18 (W1, b W2) |
+| revisit | rewrite checks (:157-162) | internal consistency — see W1 |
+| revisit | mktemp/mv (:145/:164) | skipped — an unwritable meta dir also breaks teardown; value judged marginal |
 
 Sabotage spot-checks (one per new arm family): deleted the
 `no id` die line → R7 FAILED; deleted the `[ -d … ] || die` tree
@@ -128,9 +135,24 @@ die/block on bad status (report :93 rc=2, audit inv 6 blocking).
 - W7/W8/W9 (pin-shape observations): no false-green reachable today;
   recorded for the next suite touch.
 
+### b-wave (snapshot b findings, maintainer go 2026-10-22)
+
+V19 pins the previously untabled `next-revisit computation` die (b W1);
+V13 was rebuilt from a clean single-interval fixture so it isolates the
+c2=0 operand, and V18 pins the c2=2 shape (duplicated next-revisit) that
+a weakened guard would silently normalize (b W2); V20 pins the missing-
+status shape (b W3); all untouched checks are now byte-exact
+(`cp` + `cmp -s`, b W5). Sabotage runs (tree copy, restored after each):
+guard weakened to `c1 != 1` only → suite red at V13 AND V18; the
+bad-status arm special-cased to `[ -n "$st" ] && die` → red at V20 only
+(V17 stays green — the shapes discriminate); the `:132` die deleted →
+red at V19. Suite: 36 → 39 pins green; meta suite unchanged at 21; lint,
+sandbox, line-length green. b W4: commit text cannot be edited — V13
+asserting the untouched meta closes the gap in substance.
+
 ### Follow-ups the implementation required
 
 None beyond the maintainer-side PR-text correction (W2): pin counts
-"24" → 36 (revisit suite) and "16 → 17" → 16 → 21 (meta suite), plus
-naming pin 10 in the PR body. The wave touches test + script code →
-micro-wave review b is owed before the PR merges (stop rule).
+"24" → 39 (revisit suite, 36 + V18-V20) and "16 → 17" → 16 → 21 (meta
+suite), plus naming pin 10 in the PR body. The b-wave touched test code
+→ micro-wave review c is owed before the PR merges (stop rule).

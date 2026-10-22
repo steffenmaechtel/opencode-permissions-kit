@@ -16,8 +16,9 @@
 # from the REVISIT date -- never from the stale due date;
 # 2y is the max; findings resets to 1m and requires a note; notes
 # stay single-line; unknown and retired metas are refused; corrupt
-# frontmatter (bad/missing status, duplicated or missing fields)
-# dies loud with the meta untouched; month
+# frontmatter (bad or missing status, duplicated or missing fields)
+# dies loud with the meta untouched; an unparsable revisit date dies
+# loud inside the date math; month
 # arithmetic clamps at month end (Jan 31 + 1m -> Feb 28); the
 # approval state is never touched; the audit stays green on a
 # revisited tree (a revisit log line is not an approval); no temp
@@ -542,27 +543,31 @@ EOF
 SCRATCH=$DSCRATCH
 T=2026-06-15
 DM="$db/RM-9001.md"
-dbefore=$(cat "$DM")
+cp "$DM" "$WORK/v12.before"
 run_revisit RM-9001 clean
 if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" \
-    && [ "$dbefore" = "$(cat "$DM")" ]; then
+    && cmp -s "$WORK/v12.before" "$DM"; then
     pass
 else
     fail "V12 duplicated field: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
 
-# V13. a missing next-revisit field hits the same count guard (c2=0)
+# V13. a missing next-revisit field hits the same count guard -- the
+#      c2=0 direction on an otherwise clean meta (b W2: built from a
+#      single-interval fixture so a weakened guard cannot hide behind c1)
 MSCRATCH=$WORK/noNext$$
-mb="$MSCRATCH/internal/rules-meta/9/0/0"
-mkdir -p "$mb"
-sed '/^next-revisit: /d' "$DM" > "$mb/RM-9001.md"
+write_meta "$MSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
+MN=$(meta_path "$MSCRATCH" RM-9001)
+sed -i '/^next-revisit: /d' "$MN"
+cp "$MN" "$WORK/v13.before"
 SCRATCH=$MSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
-if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once"; then
+if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" \
+    && cmp -s "$WORK/v13.before" "$MN"; then
     pass
 else
-    fail "V13 missing next-revisit: expected rc=2 naming it, got rc=$RC: $OUT"
+    fail "V13 missing next-revisit: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
 
 # V14. an un-enterable RM_AUDIT_ROOT fails loud (env arm)
@@ -608,6 +613,55 @@ if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'"; then
     pass
 else
     fail "V17 corrupt status: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# V18. a duplicated next-revisit field (c2=2) is the same violation in
+#      the other operand direction -- without the count guard both
+#      copies would be silently rewritten to the new value (b W2)
+NSCRATCH=$WORK/dupnr$$
+write_meta "$NSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
+NM=$(meta_path "$NSCRATCH" RM-9001)
+sed -i '/^next-revisit: /p' "$NM"
+cp "$NM" "$WORK/v18.before"
+SCRATCH=$NSCRATCH
+T=2026-06-15
+run_revisit RM-9001 clean
+if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" \
+    && cmp -s "$WORK/v18.before" "$NM"; then
+    pass
+else
+    fail "V18 duplicated next-revisit: expected rc=2 + untouched meta, got rc=$RC: $OUT"
+fi
+
+# V19. an unparsable revisit date dies loud inside the date math (the
+#      revisit counterpart of the report's R6) -- b W1: this die arm was
+#      the one the a-wave sweep table missed
+one_scratch 1m 2026-06-01 v19
+SCRATCH=$VSCRATCH
+T=2026-13-99
+run_revisit RM-9001 clean
+if [ "$RC" -eq 2 ] && contains "$OUT" "next-revisit computation failed"; then
+    pass
+else
+    fail "V19 bad FORCE_TODAY: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# V20. a missing status field is the corrupt shape that motivated the
+#      W4 split -- it must die rc=2 (run the audit), never fall into a
+#      refusal branch (b W3: pinned shape, not just the paused variant)
+SSCRATCH=$WORK/nostatus$$
+write_meta "$SSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
+SM=$(meta_path "$SSCRATCH" RM-9001)
+sed -i '/^status: /d' "$SM"
+cp "$SM" "$WORK/v20.before"
+SCRATCH=$SSCRATCH
+T=2026-06-15
+run_revisit RM-9001 clean
+if [ "$RC" -eq 2 ] && contains "$OUT" "bad status ''" \
+    && cmp -s "$WORK/v20.before" "$SM"; then
+    pass
+else
+    fail "V20 missing status: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
 
 # ------------------------------------------------------------- summary
