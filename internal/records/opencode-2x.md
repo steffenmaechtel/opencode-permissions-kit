@@ -6,7 +6,8 @@
 > `releases/latest` stays on 1.x), what was verified, and what is
 > still open. Issue #80. The 2.x migration guide
 > (<https://opencode.ai/v2/docs/migrate-v1/>) is the upstream reference;
-> where wording differs from the code, the code wins.
+> where wording differs from the code, the code wins. Claims verified
+> against the code 2026-10-23 (issue #176).
 
 ## 1. What changed in opencode 2.x (kit-relevant)
 
@@ -34,6 +35,10 @@ with the merged config object; 2.x answers with the document-entry list.
 map (file order, last match wins) and the 2.x entries (documents in
 priority order, `shell`/`bash` rules, concatenated in order, last match
 wins). Rules with actions other than `shell`/`bash`/`*` never count.
+The file fallback (the project-only scan) also accepts a 2.x-shape
+top-level `permissions` array in project `opencode.json[c]`, appended
+after the v1 map so 2.x records win (0.0.38 C14; noted 2026-10-23,
+issue #176).
 
 Config files themselves stay in the v1 shape on both majors — 2.x
 normalizes on load and never rewrites them (verified against the
@@ -102,18 +107,29 @@ tui.json/danger theme are major-agnostic and stay), even in
 
 ## 6. Headless classification: subcommand union
 
-The wrapper's HEADLESS list keeps every 1.x name (unknown to 2.x, which
-errors on them anyway) and adds the 2.x additions `api`, `auth`,
-`plugin`, `service`, `pair`, `update`. 2.x `mini` is an interactive UI
-and stays bannered like `tui`/`attach`.
+The wrapper's HEADLESS list keeps every 1.x name (`console` included,
+#91; `console`/`auth` fall back to the opencode home as cwd when the
+inherited one is unreadable — device logins carry no project context)
+and adds the 2.x additions `api`, `auth`, `plugin`, `service`, `pair`,
+`update`. 2.x `mini` is an interactive UI and stays bannered like
+`tui`/`attach`.
 
 ## 7. `OPENCODE_MAJOR` stamp
 
 `install.sh` stamps the installed binary's major into `install.conf`
-(`OPENCODE_MAJOR=1|2`, derived from `--version`: `opencode v…` → 2);
-`update.sh` re-stamps on every binary replacement. The wrapper falls
-back to runtime detection (one extra `--version` exec) for stamps from
-older kit versions. All 2.x-only behavior hangs off this one variable.
+(`OPENCODE_MAJOR=1|2`, derived from `--version`: `opencode v…` → 2, a
+bare version line → 1; an unparseable probe keeps the previous stamp).
+`update.sh` re-stamps after a binary replacement only when the new
+binary's version line is parseable — otherwise the stamp is kept and a
+warning printed (0.0.44a V5 / 0.0.44b W4; corrected here 2026-10-23,
+issue #176). For a missing stamp (older kit versions) the wrapper
+resolves the major at runtime by reusing the advisory probe's bounded
+`--version` line — same first line, no second serial probe (0.0.44a
+V21); a direct `timeout 10` probe runs only when `sh/advisories.sh`
+is absent. Accepted trade (0.0.44b W10): when the 5 s advisory probe
+fails, the major fail-opens to 1 without a retry — `--standalone` is
+dropped for that one start and self-heals on the next. All 2.x-only
+behavior hangs off this one variable.
 
 ## 8. Proving it: version-pinned e2e
 
@@ -154,6 +170,9 @@ flip signal for the legacy major. The lanes swapped cache-key
 schemes with the flip (default = the former `opencode-e2e-2x-*`
 keys, `-1x` = the former `opencode-e2e-old*-latest*` /
 `opencode-e2e-latest*` keys), byte-identical, so both stayed warm.
+All e2e jobs — both lanes — also skip on non-e2e-input changes:
+push/PR runs go through a dorny/paths-filter `code` set first;
+schedule and manual dispatch always run (noted 2026-10-23, issue #176).
 
 ### Build recipe (local, containerized)
 

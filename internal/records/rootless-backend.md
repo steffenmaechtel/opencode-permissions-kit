@@ -7,6 +7,7 @@
 > rationale); usage docs: [switch the container
 > backend](../../docs/how-to/switch-container-backend.md); the security
 > guarantee: [security model](../../docs/concepts/security-model.md).
+> Verified against the code 2026-10-23 (issue #176).
 
 ## 1. Why rootless, and why per-user
 
@@ -46,14 +47,24 @@ governs which safe runtime the machine runs.
 
 ## 2. Backend selection & defaults
 
-Decision flow at install time (auto-detect, priority order):
+Rootless is **mandatory**: the choice is `docker-rootless` or
+`podman-rootless` — there is no "none", and the legacy `docker-group`
+is offered nowhere (the wrapper never falls back to a root-equivalent
+path). Decision flow at install time (install.sh, "Container backend
+selection"; corrected 2026-10-23, issue #176):
 
-1. **docker-rootless already active for `opencode`** → reuse it, no change.
-2. **else podman available** (`command -v podman`) → podman-rootless
-   ("using your existing podman" — nothing new to install).
-3. **else interactive choice**: `docker-rootless` (recommended),
-   `podman-rootless`, or none. The legacy `docker-group` is no longer
-   offered — the wrapper never falls back to a root-equivalent path.
+1. **Re-install over an existing kit** → the previously configured
+   backend from `install.conf` is preserved — including
+   `OPENCODE_DOCKER_HOST` / `OPENCODE_PODMAN_SOCKET` — unless a flag
+   overrides.
+2. **`--container-backend docker-rootless|podman-rootless`** overrides
+   everything (the scripting path); any other value aborts.
+3. **Interactive, advanced mode** → a menu with exactly two entries:
+   `docker-rootless` (default) or `podman-rootless`.
+4. **Interactive, standard mode** → asks only when podman is installed
+   ("Podman is installed. Which rootless backend should the agent
+   use?", highlight = the pending default); with podman absent the
+   silent default applies, no prompt.
 
 **Default: docker-rootless.** The target audience (DDEV/WSL2)
 overwhelmingly runs Docker, the kit's permission rules speak `docker *`,
@@ -62,15 +73,19 @@ podman-rootless is the right choice when the developer already runs
 podman.
 
 **Non-interactive (`--yes`) safety:** provisioning installs packages and
-edits `/etc/subuid` — never silently. `--yes` without an explicit
-`--container-backend` defaults to `docker-rootless` (corrected
-2026-10-03, finding 0.0.42e D1 — install.sh sets the default before the
-interactive branch; pass `--container-backend docker-rootless|podman-rootless`
-to choose explicitly).
+edits `/etc/subuid` — never silently. `--yes` skips the prompts and
+keeps the pending default — `docker-rootless` on a fresh install, the
+preserved backend on a re-install (corrected 2026-10-03, finding
+0.0.42e D1 — install.sh sets the default before the interactive branch;
+pass `--container-backend docker-rootless|podman-rootless` to choose
+explicitly; `-y` is an accepted alias).
 
 Post-install switch: `opk config container-backend <backend>`
-(reversible, re-provisions via §3; the legacy `opencode-permissions-kit`
-CLI name is gone — 0.0.42e D7).
+(reversible, re-provisions via §3, deliberately does NOT tear down the
+previous backend — 0.0.42e C6; a hand-set `OPENCODE_PODMAN_SOCKET`
+survives a switch to podman-rootless, sudoers are re-rendered, and a
+switch to docker-rootless applies the ddev no-bind-mounts global; the
+legacy `opencode-permissions-kit` CLI name is gone — 0.0.42e D7).
 
 ## 3. Provisioning reference (`setup-container-backend`)
 
@@ -79,19 +94,28 @@ step is a no-op when already in place.
 
 1. **Packages** (only if missing, via apt): `uidmap`,
    `dbus-user-session`, plus `docker-ce-rootless-extras` (docker) or
-   `podman` + `slirp4netns` (podman). `docker-ce-rootless-extras` is the
-   only Docker-related package ever added — it ships
-   `dockerd-rootless-setuptool.sh`, not a second Docker.
+   `podman` + `slirp4netns` (podman). The docker path also needs
+   `docker-ce` itself (the `dockerd` binary `dockerd-rootless.sh`
+   wraps) — the distro repo is tried first, and when it does not ship
+   the extras, the official get.docker.com installer adds Docker's apt
+   repo and installs both (corrected 2026-10-23, issue #176 — "only
+   `docker-ce-rootless-extras`, not a second Docker" described the
+   distro-repo path, not the get.docker.com one).
 2. **subuid/subgid auto-allocation:** a free contiguous range for
    `opencode` in `/etc/subuid` + `/etc/subgid` — starting at 100000,
    65536 entries per user, skipping any overlap with existing entries,
    never reusing another user's range. Existing entries for `opencode`
-   are kept as-is.
+   are kept as-is. Read entries are validated per field (added #211):
+   digits only, no leading zeros, at most 10 digits, value within the
+   u32 cap — malformed lines are counted and skipped with a warning
+   naming the causes; a bare `0` start is deliberately accepted.
 3. **docker-rootless only:** enable linger (starts the `systemd --user`
-   manager for a user that has no login session), then run
-   `dockerd-rootless-setuptool.sh install` **as `opencode`** (rootless
-   setup must never run as root), enable + start
-   `systemctl --user docker.service`.
+   manager for a user that has no login session) — a failed enable
+   warns with a retry hint instead of printing success (#211 a F13) —
+   then run `dockerd-rootless-setuptool.sh install` **as `opencode`**
+   (rootless setup must never run as root), enable + start
+   `systemctl --user docker.service`. A missing user systemd dumps
+   loginctl/systemctl diagnostics and suggests podman-rootless.
 4. **Router ports:** rootless containers cannot bind <1024 unless
    `net.ipv4.ip_unprivileged_port_start <= 80` — applied before the
    daemon starts (the netns inherits the value at start) via
@@ -101,8 +125,9 @@ step is a no-op when already in place.
    `install.conf` (`OPENCODE_DOCKER_HOST`). podman-rootless prints
    nothing (daemonless).
 
-The wrapper re-probes the socket on every start — from the `opencode`
-user's own context via the `socket-check.sh` sudoers rule, because
+The wrapper re-probes the socket on every start that resolves container
+tools (the project opt-in or `serve`) — from the `opencode` user's own
+context via the `socket-check.sh` sudoers rule, because
 `/run/user/<uid>` is mode 700 and a developer-running wrapper cannot
 stat inside it. Unreachable socket → run WITHOUT container tools + loud
 warning, never a downgrade to a root-equivalent path.
@@ -133,7 +158,9 @@ project's `docker *` permission rules therefore do NOT match on the
 podman backend (documented asymmetry; use `podman *` rules). The
 optional `OPENCODE_PODMAN_SOCKET` re-enables docker-CLI compatibility
 (point a `docker` CLI at the podman socket); when set, the wrapper
-verifies its reachability like the docker-rootless socket.
+verifies its reachability like the docker-rootless socket — and the
+compat socket serves ddev too: `ddev-as-opencode` exports it as
+`DOCKER_HOST` for the `opencode` user.
 
 ## 6. ddev version gate and ports
 
@@ -144,6 +171,16 @@ agent's raw-container backend is independent of ddev, but ddev-as-
 opencode needs the rootless container support. install/update detect +
 record `DDEV_VERSION` in `install.conf` (querying the real binary,
 never a PATH shim), `status.sh` flags a < 1.25 ddev next to a rootless
-backend. Rootless router ports: either
+backend. The block has soft edges: an unreadable ddev version or a
+missing ddev warns and continues. `status.sh` resolves ddev the way
+`ddev-as-opencode` does — the helper first, the stamp only as a last
+resort. Sub-gate (verified 2026-10-23, issue #176): ddev 1.25.0–1.25.2
+on docker-rootless need `ddev config global --no-bind-mounts` (upstream
+fixed rootless bind mounts in 1.25.3) — install applies it and warns
+with the manual fix on failure; the first `ddev start` would
+hard-error otherwise. Rootless router ports: either
 the §3.4 sysctl (kit default) or ddev's documented high-port alternative
 (`ddev config global --router-http-port 8080 --router-https-port 8443`).
+Install can also apply the sysctl late — Step 4 asks on confirm, then
+restarts the docker-rootless daemon so its netns re-inherits port 80
+(podman is daemonless, fresh netns per run — no restart).

@@ -1,7 +1,8 @@
 # Security advisory warnings
 
 > Status: **CURRENT** — the shipped advisory database and the warning
-> paths (wrapper, `opk status`, maintainer scan). Issue #107.
+> paths (wrapper, `opk status`, maintainer scan). Issue #107. Claims
+> verified against the code 2026-10-23 (issue #176).
 
 ## Problem
 
@@ -67,25 +68,38 @@ start** (the user-facing decision for #107: always, never throttled):
   summary, patched version), then
   `Please upgrade opencode with 'opk upgrade-opencode'.` — stderr in
   headless mode like every wrapper warning.
+- One probe serves three consumers (0.0.44a V21): the advisory check,
+  the wrapper's `OPENCODE_MAJOR` resolution, and the browser-bridge
+  version gate all read the same bounded `--version` line.
 
 ### `opk status`
 
 A dedicated **Security advisories** section:
 
-- probes the version (same sudo path), matches the shipped database →
+- probes the version (same sudo path; a failed sudo probe falls back
+  to a direct `--version` exec), matches the shipped database →
   red `AFFECTED` + advisory lines + fix hint, or green
-  `no known advisory affects this install`
+  `no known advisory affects this install (kit $VERSION database)`
 - **live upstream check** (the user-facing decision for #107): fetches
   GitHub's advisory list with a 10 s timeout, diffs the ids against the
   shipped database. An unknown upstream id means **the kit release
   lags, not that this install is affected** — output is a warn line
   plus `run: sudo opk update`. Offline / blocked / python3 missing →
-  `live check unavailable`, never a false green.
+  `live check unavailable`, never a false green (the row is
+  deliberately uncounted; without `curl` the upstream row is skipped
+  entirely).
+
+Arms added since the first cut (verified 2026-10-23, issue #176): a
+missing advisory database counts a warn; a managed binary without the
+exec bit gates on `opk upgrade-opencode`; a broken binary is named;
+rows that cannot be judged render as uncounted unknowns.
 
 ### Maintainer scan (the curation loop)
 
 `.github/workflows/advisory-watch.yml` (daily 05:23 UTC, manual runs
-possible) runs `scripts/advisory-watch.sh`: fetch the upstream feed,
+possible; concurrency group, explicit `contents: read` / `issues:
+write` permissions, runner pinned to ubuntu-24.04) runs
+`scripts/advisory-watch.sh`: fetch the upstream feed,
 diff against `advisories_ids opencode`, open **one issue per unknown
 advisory** (deduped by the GHSA id in the title search) with the
 upstream data and a curation checklist. The script never modifies the
@@ -110,12 +124,18 @@ month upstream — the daily scan + release channel comfortably keep up).
 double-quoted, `printf '%s'`-style takes fields as arguments, free text
 (summary/url) flows only into the body FILE, nothing is ever `eval`'d.
 What can still be attacked is *semantics*: a crafted id could steer the
-`--search` query, a smuggled tab could shift the TSV columns. So every
-field that leaves the script as argv or query passes
-`scan_advisory_valid` first — charset allowlists (the id pattern is a
-negated-class match, never a prefix glob — a `*` tail would swallow
-payloads), anchored regexes for ranges/patched, vocabulary for severity.
-A malformed advisory is skipped loudly and fails the run. Payload
+`--search` query, a smuggled tab could shift the TSV columns. The
+validation order reflects that (0.0.44a V12; corrected here
+2026-10-23, issue #176): the **id charset is checked first**
+(`scan_id_clean`, negated-class match, never a prefix glob — a `*`
+tail would swallow payloads) so the id may safely enter the two dedup
+queries — the shipped-database and already-tracked dedups run before
+full validation (a curated or tracked advisory must not keep the watch
+red on upstream shape drift). Only then does `scan_advisory_valid`
+gate the remaining argv/body fields: anchored regexes for ranges and
+patched (patched validates per comma element — GitHub's feed can list
+several), vocabulary for severity. A malformed advisory is skipped
+loudly and fails the run. Payload
 attempts (command substitution, qualifier smuggling, column shifts) are
 unit-tested in `tests/unit/test-security-advisories.sh` (§8). The
 rules are codified repo-wide in
@@ -155,7 +175,10 @@ lines), `sort -V` segment order (1.10.0 > 1.9.0), range conjunctions
 and boundaries, record shape (7 fields, vocabulary, comparators),
 matching against the real shipped database — including the headline
 property (patched versions and standalone installs do not hit the
-npm-only advisory) — and the wrapper/status wiring (early-exec order,
-timeout-bounded probe, upgrade hints). The e2e suites run the wrapper
-with the database deployed (its npm-only record stays silent on kit
-installs, so golden outputs are unaffected).
+npm-only advisory) — the wrapper/status wiring (early-exec order,
+timeout-bounded probe, upgrade hints), the scan script's
+untrusted-input guard (§8), and the feed boundary — `|` separator
+against IFS whitespace, JSON null fields, `medium` → `moderate`
+mapping (§9; noted 2026-10-23, issue #176). The e2e suites run the
+wrapper with the database deployed (its npm-only record stays silent
+on kit installs, so golden outputs are unaffected).
