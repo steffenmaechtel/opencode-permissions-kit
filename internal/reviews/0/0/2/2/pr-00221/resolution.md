@@ -1,8 +1,9 @@
 # Resolution — pr-00221 (issue #210 scan progress)
 
-Chain: [review-a.md](review-a.md) → this wave. Dispositions below refer to
-`a W<n>` = finding W<n> of snapshot a. All commits on
-`feature/status-scan-progress` (birth PR #221).
+Chain: [review-a.md](review-a.md) → [review-b.md](review-b.md) → this
+wave. Dispositions refer to `a W<n>`/`b W<n>` = finding W<n> of
+snapshot a/b. All commits on `feature/status-scan-progress`
+(birth PR #221).
 
 ## Dispositions
 
@@ -23,6 +24,8 @@ Chain: [review-a.md](review-a.md) → this wave. Dispositions below refer to
 | a W13 (INFO) | **deliberately not done** | — | positive pins compensate; semantic pin would duplicate |
 | a W14 (INFO) | **deliberately not done** | — | out of scope: active chown walk (see sweeps) |
 | a W15 (INFO) | **deliberately not done** | — | transient-label cosmetic; churn not worth it |
+| b W1 (LOW) | **implemented** | `c298b83` | pin 9: foreground tee + async SIGINT sender — zero stderr, byte intact, rc 0; sabotage reds (detail) |
+| b W2 (LOW) | **implemented** | `c298b83` | opk:299 recorded in the W3-shape sweep above (fail-loud, benign) |
 
 ## Evidence detail
 
@@ -86,6 +89,33 @@ alone) and the helper ends with an explicit `return 0` regardless.
 - **a W10 / a W13 / a W14 / a W15**: comment/pin polish and scope
   calls, fully covered by the rows above and the sweeps below.
 
+### b W1 (LOW) — SIGINT silence pinned
+
+Snapshot b flagged the a W6 mechanism as claimed-but-unpinned
+(RM-0079). Pin 9 avoids the two known aim problems: no pty (the a W6
+repro delivered SIGINT to the shell, not python) and no backgrounded
+pipeline — POSIX starts async commands with SIGINT on SIG_IGN, a
+non-interactive shell cannot reset an inherited-ignored signal, and
+python keeps it. The first draft ran the pipeline async anyway and
+passed GREEN under sabotage: the kill landed, nothing happened
+(experiment-verified before the restructure — the vacuous-green
+draft is the documented lesson in the pin's comment). Final shape:
+the tee runs FOREGROUND with stderr to a file, a PATH-first python3
+wrapper records its pid and execs the real interpreter (same pid),
+and an async sender polls for the forwarded byte (the tee then sits
+in read1) and kill -INTs that pid. Asserts: sender rc 0 (signal
+delivered — no vacuous green), pipeline rc 0, stderr file empty (no
+traceback — the claim's exact words), forwarded byte byte-equal.
+Sabotage after commit: `except (BrokenPipeError, KeyboardInterrupt)`
+→ `except BrokenPipeError` reds pin 9 (the traceback lands in the
+asserted-empty stderr); restored, suite green. Boundary, unchanged
+from snapshot b: the pty choreography of a real Ctrl-C (signal to
+the foreground process group) stays unpinned — the pinned claim is
+the mechanism, not the terminal dance. Sweep (L2):
+`grep -rn KeyboardInterrupt files/` → only the status tee;
+fs-baseline's tee has no except clause at all — rides the recorded
+fs-baseline follow-up.
+
 ### Class sweeps (L2)
 
 - **W1 shape** `grep -rn 'read(1 << 20)' files/` → 2 sites.
@@ -135,3 +165,13 @@ alone) and the helper ends with an explicit `return 0` regardless.
   review b owed and scheduled for the NEXT session (stop rule,
   maintainer instruction 2026-10-22).
 - **L7**: no new script files; both touched files keep house form.
+
+### L1–L7 addendum (b-wave `c298b83`)
+
+- **L1/L4**: pin 9's failure path is executed under sabotage (the
+  except-tuple red above); the wave's own vacuous-green draft became
+  the documented lesson (async SIG_IGN) instead of a shipped hole.
+- **L2**: `KeyboardInterrupt` sweep — no other shipped site (b W1
+  detail); the W3-shape sweep record completed with opk:299 (b W2).
+- **L3**: the status.sh comment claim now names its pin (b W1).
+- **L5/L7**: test + comment only; no root operands, no new scripts.
