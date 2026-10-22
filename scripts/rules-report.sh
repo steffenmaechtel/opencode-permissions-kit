@@ -14,12 +14,12 @@
 #
 # Exit codes: 0 -- report produced. Overdue work does NOT change the
 # exit code: an overdue meta is a maintenance signal, not a broken
-# build (RM-0030); CI stays governed by the audit alone. 2 -- usage
+# build; CI stays governed by the audit alone. 2 -- usage
 # or environment error (bad HORIZON, missing meta tree, missing
 # python3); the report never prints a partial worklist.
 #
 # Retired metas are outside the revisit cycle and never appear in the
-# overdue/horizon lanes (RM-0029); they may still appear in the
+# overdue/horizon lanes; they may still appear in the
 # approval queue -- a retired meta that was never approved keeps a
 # pending review log, and the INDEX reports it the same way.
 #

@@ -1059,7 +1059,7 @@ if [ -n "$_f17_opk_block" ]; then
     fi
     # The happy-path drive's mv is a stub — its temp stays on disk.
     # Clean it so the failure-arm residue count below sees only its own
-    # drive's file. (:? guard per RM-0044 — the sandbox policy caught
+    # drive's file. (:? guard per the sandbox empty-var rule — the sandbox policy caught
     # the first spelling.)
     rm -f "${F17:?}/oc"/policy.json.opk-new.* 2>/dev/null || true
     # Failure arm (#211 b W8): chmod failing must clean the staged temp

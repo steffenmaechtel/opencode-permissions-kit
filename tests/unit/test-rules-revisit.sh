@@ -11,7 +11,7 @@
 # python interpreter).
 #
 # Revisit pins: clean bumps the ladder and computes the next date
-# from the REVISIT date -- never from the stale due date (RM-0033);
+# from the REVISIT date -- never from the stale due date;
 # 2y is the max; findings resets to 1m and requires a note; notes
 # stay single-line; unknown and retired metas are refused; month
 # arithmetic clamps at month end (Jan 31 + 1m -> Feb 28); the
@@ -212,7 +212,7 @@ one_scratch() {  # $1 interval  $2 next  -> fresh tree with RM-9001 active
     write_meta "$VSCRATCH" RM-9001 active "$1" "$2" 2026-05-01
 }
 
-# V1. clean: 1m -> 6m, next from the REVISIT date (RM-0033), never
+# V1. clean: 1m -> 6m, next from the REVISIT date, never
 #     from the stale due date (due+6m would be 2026-12-01)
 one_scratch 1m 2026-06-01 v1
 SCRATCH=$VSCRATCH
@@ -231,7 +231,7 @@ else
     fail "V1 clean ladder: wrong update, rc=$RC: $OUT"
 fi
 if line_is "$M" "next-revisit: 2026-12-01"; then
-    fail "V1 RM-0033: next computed from the stale due date (2026-12-01)"
+    fail "V1 revisit-date basis: next computed from the stale due date (2026-12-01)"
 else
     pass
 fi

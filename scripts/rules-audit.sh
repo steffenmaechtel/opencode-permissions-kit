@@ -15,7 +15,7 @@
 #      backticks and bold markers stripped, wrapped lines joined,
 #      whitespace squeezed; the needle is the quote's first five
 #      words (plain-text rendering, the established meta practice).
-#      Retired metas are exempt (RM-0029): retirement removes the
+#      Retired metas are exempt (the retire rule): retirement removes the
 #      rule bullet, so neither anchor-quote pairing nor quote
 #      findability can hold.
 #   6. frontmatter complete, ISO dates, next-revisit >= created,
@@ -23,8 +23,8 @@
 #   9. approval consistency: reviewed: is set exactly when the review
 #      log carries an "approved by maintainer" line of the same date
 #
-# Report-only (non-blocking, per RM-0030): 7. overdue list sorted by
-# lateness; 8. INDEX.md regenerated on every run (stale -> warning).
+# Report-only (non-blocking -- overdue is a maintenance signal):
+# 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
 # The Phase-2 pending-unit parking valve (prefix-matched ref-less
 # units reported non-blocking) was retired 2026-10-17 when its five
 # occupants received metas -- a ref-less unit in an ACTIVE section
@@ -247,7 +247,7 @@ find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort | while 
 
     # 5: rule back-ref file + anchor + quote prefix findable
     # (retired metas are exempt: the rule bullet is gone, so the
-    # quote cannot be findable -- RM-0029)
+    # quote cannot be findable -- the retire exemption)
     if [ "$st" != retired ]; then
         rule=$(fm_get "$m" rule)
         tpath=${rule%%#*}; tanch=${rule#*#}

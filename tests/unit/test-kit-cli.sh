@@ -843,7 +843,7 @@ if [ -n "$_f24_block" ] && [ "$(printf '%s\n' "$_f24_block" | wc -l)" -le 8 ]; t
         # $1 = define sane fn (yes|no)
         # /var/tmp path (#211 b W5): the first draft carried a real-tree
         # /home/... literal — inert (both arms are FS-free) but forbidden
-        # by the sandbox shape (RM-0016 inert-literal rule).
+        # by the sandbox shape (the inert-literal sandbox rule).
         (
             OPENCODE_USER=oc
             target=/var/tmp/opk-f24-fixture/settings.json

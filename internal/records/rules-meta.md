@@ -155,21 +155,21 @@ invariant. (RM-0029)
 | Phase | Content | Status |
 |---|---|---|
 | 0 | Pilot `conventions.md` — first metas landed, interval policy set | done |
-| 1 | Remaining `conventions.md` units (`RM-0004` ff.) | done — RM-0004–0019 approved 2026-10-16 |
+| 1 | Remaining `conventions.md` units (metas 0004 ff.) | done — approved 2026-10-16 |
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
-| 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
+| 2b | conventions.md coverage complete: every unit carries a meta | done — approved 2026-10-17 |
 | 3 | agent files + AGENTS Rules | done — test-fidelity 2026-10-18; review-concept 2026-10-19; AGENTS 2026-10-20 |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | done 2026-10-22 |
 | 5 | Self-application: the main rule gets the first number, 0001 | done 2026-10-22 |
 
 The 2026-10-19 review-concept step split the file: operative rules in
 `agent/review-concept.md`, history and calibration data in
-`internal/records/review-calibration.md`. Metas RM-0057–0092 and the
-record's own body rules and scope defaults (RM-0093–0096, both
-sections audit-active) were maintainer-approved the same day (direct
-chat review); revision details live in the metas' review logs.
+`internal/records/review-calibration.md`. The review-concept metas and
+the record's own body rules and scope defaults were maintainer-approved
+the same day (direct chat review); revision details live in the metas'
+review logs.
 
-The AGENTS Rules metas RM-0097–0105 were maintainer-approved
+The nine AGENTS Rules metas were maintainer-approved
 2026-10-20 (direct chat review).
 
 ## Open defaults (the pilot validates them)
@@ -182,7 +182,7 @@ learnings.md is out of meta scope (decision 10): its rationales are
 the inline corpus statistics and the meta-analysis runs own its
 lifecycle; the run-L1–L7 obligation got its meta via the
 `AGENTS.md ## Rules` bullet — one of nine Rules units equipped on
-2026-10-20 (RM-0097–0105). The rule-bearing sentence moved out of
+2026-10-20. The rule-bearing sentence moved out of
 the "Review learnings" narrative (decision 9).
 
 ## Rejected alternatives

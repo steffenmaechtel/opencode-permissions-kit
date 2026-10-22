@@ -17,7 +17,7 @@
 #                normal fix flow (rule text, rationale, or both)
 #
 # next-revisit is computed from the REVISIT date, never from the
-# stale due date -- lateness must not compound (RM-0033). Interval
+# stale due date -- lateness must not compound. Interval
 # math is calendar-correct with end-of-month clamp (Jan 31 + 1m ->
 # Feb 28), via python3 stdlib (required contributor tool,
 # tests/check-host.sh).
@@ -93,7 +93,7 @@ fm() {  # frontmatter value of $1 ('' when absent)
 st=$(fm status)
 iv=$(fm revisit-interval)
 [ "$st" = active ] || refuse \
-    "$ID is $st -- retired metas are outside the revisit cycle (RM-0029)"
+    "$ID is $st -- retired metas are outside the revisit cycle"
 case $iv in
     1m | 6m | 1y | 2y) ;;
     *) die "$ID: bad revisit-interval '$iv' (run the audit)" ;;
