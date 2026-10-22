@@ -208,17 +208,20 @@ fi
 
 # --- 5. e2e version lanes (issues #80 + #197) ----------------------------------
 #
-# Since the 2026-10 flip (issue #197) the DEFAULT e2e jobs run the
-# CURRENT opencode 2.x from the npm dist-tag latest (2.x ships no
-# GitHub release assets; releases/latest stays 1.x), and the -1x twins
-# keep 1.x an explicit lane from GitHub releases/latest. Both
-# resolutions are anchored-validated against their lane's major and
-# fail the job loudly on a mismatch (the upstream flip signals); the
-# 1x pin reaches the runner as an env value, never interpolated into a
-# run: shell. Silent removal, a re-swap of the lanes, or one lane
-# drifting onto the wrong registry trips these checks. File-level
-# greps cannot tell WHICH job carries which resolution — the checks
-# run against the per-job block instead.
+# Since the 2026-10 flip (issue #197) the 2x lanes run the CURRENT
+# opencode 2.x from the npm dist-tag latest (2.x ships no GitHub
+# release assets; releases/latest stays 1.x), and the -1x twins
+# keep 1.x an explicit lane from GitHub releases/latest. Job names
+# are major-explicit (lane-naming wave 2026-10-23): no bare default
+# name survives, and the core suite's git dimension is a pair of
+# explicit jobs (e2e-2x-git-distro / e2e-2x-git-latest) instead of a
+# matrix. Both resolutions are anchored-validated against their lane's
+# major and fail the job loudly on a mismatch (the upstream flip
+# signals); the 1x pin reaches the runner as an env value, never
+# interpolated into a run: shell. Silent removal, a re-swap of the
+# lanes, or one lane drifting onto the wrong registry trips these
+# checks. File-level greps cannot tell WHICH job carries which
+# resolution — the checks run against the per-job block instead.
 
 job_block() {  # $1 = workflow file, $2 = job id -> the job's lines on stdout
     awk -v hdr="  $2:" '
@@ -246,24 +249,40 @@ check_job_lane() {  # wf label job ere-pattern...
     fi
 }
 
-# Default lanes: npm dist-tag latest, anchored 2.x guard, the former
+# 2x lanes: npm dist-tag latest, anchored 2.x guard, the former
 # 2x-lane cache keys (adopted byte-identical with the flip so the warm
-# caches carried over). The default jobs run the suite UNPINNED — lib.sh
+# caches carried over). The 2x jobs run the suite UNPINNED — lib.sh
 # resolves the same npm channel itself at run time; the step resolution
 # exists for the cache key and the flip signal.
-for _job in e2e e2e-rootless; do
-    check_job_lane "$WF_E2E" "test-e2e.yml: '$_job' (default) resolves npm 2.x (guard + 2x cache key)" "$_job" \
+for _job in e2e-2x-git-distro e2e-2x-git-latest e2e-rootless-2x; do
+    check_job_lane "$WF_E2E" "test-e2e.yml: '$_job' resolves npm 2.x (guard + 2x cache key)" "$_job" \
         'registry\.npmjs\.org/@opencode/cli-linux-x64/latest' \
         '\^2\\\.\[0' \
         '::error::npm dist-tag latest' \
         'key: opencode-e2e-2x-'
 done
-check_job_lane "$WF_DDEV_E2E" "test-e2e-ddev.yml: 'e2e-ddev' (default) resolves npm 2.x (guard + 2x cache key)" e2e-ddev \
+check_job_lane "$WF_DDEV_E2E" "test-e2e-ddev.yml: 'e2e-ddev-2x' resolves npm 2.x (guard + 2x cache key)" e2e-ddev-2x \
     'registry\.npmjs\.org/@opencode/cli-linux-x64/latest' \
     '\^2\\\.\[0' \
     '::error::npm dist-tag latest' \
     'key: opencode-e2e-2x-npm' \
     'OPK_GH_TOKEN: \$\{\{ github\.token \}\}'
+
+# The git pair must stay explicit and complete (issue #118 / #116):
+# the PPA leg is the only lane that can see new-git breakage — a lost
+# env value would silently collapse it onto the distro channel. Both
+# halves NAME their channel (convention: no git suffix = git-distro).
+check_job_lane "$WF_E2E" "test-e2e.yml: 'e2e-2x-git-latest' runs the PPA git leg (E2E_GIT_CHANNEL)" e2e-2x-git-latest \
+    'E2E_GIT_CHANNEL: latest'
+check_job_lane "$WF_E2E" "test-e2e.yml: 'e2e-2x-git-distro' names the distro channel (E2E_GIT_CHANNEL)" e2e-2x-git-distro \
+    'E2E_GIT_CHANNEL: distro'
+_n_latest=$(grep -c 'E2E_GIT_CHANNEL: latest' "$WF_E2E" || true)
+_n_distro=$(grep -c 'E2E_GIT_CHANNEL: distro' "$WF_E2E" || true)
+if [ "$_n_latest" = 1 ] && [ "$_n_distro" = 1 ]; then
+    pass "git channel values appear exactly once each (latest + distro, git pair only)"
+else
+    fail "git channel value counts off (latest:$_n_latest, distro:$_n_distro — expected 1/1)"
+fi
 
 # Explicit 1x lanes (renamed from the -2x twins, issue #197): GitHub
 # releases/latest, authenticated (0.0.45c C8 contract kept through the
@@ -289,14 +308,16 @@ check_job_lane "$WF_DDEV_E2E" "test-e2e-ddev.yml: 'e2e-ddev-1x' resolves GitHub 
     'E2E_OC_VERSION: \$\{\{' \
     'key: opencode-e2e-latest'
 
-# The -2x twins must be GONE (renamed to -1x with the flip): a surviving
-# -2x job would duplicate the default lane's 2.x coverage and mask the
-# rename in branch-protection/required-check configs.
-_leftover="$(grep -hE '^  e2e(-rootless|-ddev)?-2x:' "$WF_E2E" "$WF_DDEV_E2E" || true)"
-if [ -z "$_leftover" ]; then
-    pass "no leftover -2x jobs (renamed to -1x, issue #197)"
+# The implicit-default job names must stay GONE (lane-naming wave
+# 2026-10-23): the bare 'e2e'/'e2e-rootless'/'e2e-ddev' names silently
+# changed meaning at every major flip — a surviving or reintroduced
+# bare name recreates exactly that ambiguity in branch-protection and
+# status references. Names carry the major now.
+_bare="$(grep -hE '^  e2e(-rootless|-ddev)?:$' "$WF_E2E" "$WF_DDEV_E2E" || true)"
+if [ -z "$_bare" ]; then
+    pass "no implicit-default job names (bare e2e/e2e-rootless/e2e-ddev) — names carry the major"
 else
-    fail "leftover -2x job(s) after the lane rename:$_leftover"
+    fail "implicit-default job name(s) survive the lane-naming wave:$_bare"
 fi
 
 # Structural YAML guard (workflow-upload breakage 2026-09-25: a second
