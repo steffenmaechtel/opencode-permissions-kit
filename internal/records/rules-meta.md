@@ -1,8 +1,8 @@
 # Rule-Meta System (RM) — design record
 
 > Status: **CURRENT** — rollout complete (phases 0–5, 2026-10-14 …
-> 2026-10-22); `RM-0001` maintainer approval pending. The phase-4/5
-> wave runs on `feature/rules-meta-phase-4`.
+> 2026-10-22); `RM-0001` maintainer-approved 2026-10-22. The
+> phase-4/5 wave runs on `feature/rules-meta-phase-4`.
 > This is the design record for the
 > rule-rationale system; the governed rule texts live in `agent/*.md`
 > and in the `## Rules` section of `AGENTS.md`. Where this record

@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**105 metas · 103 active · 2 retired · 2 review-pending · next due 2026-11-14**
+**105 metas · 103 active · 2 retired · 1 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0001, RM-0068
+- **Review pending:** RM-0068
 - **Overdue:** none
 
 ## AGENTS.md
@@ -203,7 +203,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0001](0/0/0/RM-0001.md) | Every rule carries a falsifiable rationale | active | **pending** | 1m | 2026-11-22 |
+| [RM-0001](0/0/0/RM-0001.md) | Every rule carries a falsifiable rationale | active | approved | 1m | 2026-11-22 |
 
 ### Decisions
 
