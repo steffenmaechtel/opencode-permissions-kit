@@ -1,15 +1,15 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
-Status: open — rotation deviation recorded: snapshot d ran in the
-c-wave's own session (review-concept RM-0060/0061 want a fresh session
-per review round — a round's author never reviews their own fixes);
-d's findings and bookkeeping fixes stand as evidence, but the loop
-closure they claimed is NOT authoritative. A fresh-session review e
-over `ce7cbc5..HEAD` (c-wave fixes + d bookkeeping) confirms or
-reopens. Substantively: 37 a-, 30 b-, 11 c-, 3 d-findings
-dispositioned; the d-round's fixes stayed in bookkeeping; both e2e
-suites owed before release (RM-0091) — the c-wave changed production
-code after the b W18 baseline run.
+Status: open — review e (fresh session, rotation-deviation catch-up
+over `ce7cbc5..a6f2705`) re-verified all of d's clean verdicts
+(holding) and found 7 (1 MED, 1 LOW, 5 INFO), all dispositioned
+below. The e-wave fixed one ledger text (e W1) and two production
+strings (e W2, e W3) — per RM-0067 a wave review f over the e-wave
+diff is owed before the loop can close. Both e2e suites re-run green
+at the e-wave HEAD after the fixes (e2e 303, rootless 47): the
+c-wave's e2e debt (RM-0077/0091) is discharged and both counts carry
+a fresh anchor. Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7
+e-findings dispositioned.
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
@@ -99,6 +99,13 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | d W1 (MED) | **implemented** | `35d5549` | c W6 row's SHA corrected: bc56a17 (b-wave, out of range) → 0885c9f |
 | d W2 (LOW) | **implemented** | `35d5549` | c W1 anchors + sweep count dated to 47e07f9 (16 at HEAD, note-driven) |
 | d W3 (INFO) | **deliberately not done** | — | revert-path stub noise only; discrimination intact (d W3 detail) |
+| e W1 (MED) | **implemented** | `47b7531` | NB history corrected: anchors measured at 4 refs, shifts re-attributed |
+| e W2 (LOW) | **implemented** | `6fc2cf2` | warn enumerates all three skip causes; F16-drive enumeration pin |
+| e W3 (INFO) | **implemented** | `67749e7` | audit WARN names (rm failed) like its siblings; 4th fail-drive case arm |
+| e W4 (INFO) | **deliberately not done** | — | loud via test-builtin error — cosmetic assert shape not worth churn |
+| e W5 (INFO) | **deliberately not done** | — | red-not-silent holds; d's phrasing corrected in snapshot e, no code |
+| e W6 (INFO) | **deliberately not done** | — | DRY asserts are convention pins by design; fail drives discriminate |
+| e W7 (INFO) | **deliberately not done** | — | git history immutable; retraction recorded consistently in 3 loci |
 
 ## Follow-ups after snapshot b
 
