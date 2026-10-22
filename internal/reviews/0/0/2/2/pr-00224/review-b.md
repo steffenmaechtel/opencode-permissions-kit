@@ -23,7 +23,7 @@ mutated in it (sabotage probes ran on /tmp/opencode copies).
 
 | ID | Sev | Location | One-line summary | Verified | Prov |
 |---|---|---|---|---|---|
-| W1 | INFO | internal/reviews/0/0/2/2/pr-00224/resolution.md:76-77 (L1 walkthrough) | the L1 sentence claims the empty-cache hard-fail "keeps its FAIL and its pin" — the FAIL exists (lib.sh:328) but NO pin covers it: `grep -rn 'cannot resolve opencode' tests/` hits only lib.sh itself, pre-wave neither; deleting the FAIL branch (`exit 1` included) leaves every pin green (OC_VERSION stays empty and fails later, messily, in e2e_fetch_opencode). Record-accuracy gap plus a named unpinned surface — fix is either a one-line reword of the resolution (bookkeeping, loop closes per RM-0066) or a new hard-fail pin (test code, owes micro-wave c) | yes (grep across tests/ pre- and post-wave; pin-green-under-deletion traced by reading all fallback pins) | wave-introduced |
+| W1 | INFO | internal/reviews/0/0/2/2/pr-00224/resolution.md:76-77 (L1 walkthrough) | the L1 sentence claims the empty-cache hard-fail "keeps its FAIL and its pin" — the FAIL exists (lib.sh:328) but NO pin covers it: `grep -rn 'cannot resolve opencode' tests/` hits only lib.sh itself, pre-wave neither; deleting the FAIL branch (`exit 1` included) leaves every pin green (OC_VERSION stays empty and fails later, messily, in e2e_fetch_opencode). Record-accuracy gap plus a named unpinned surface — fix is either a one-line reword of the resolution (bookkeeping, loop closes per the stop rule) or a new hard-fail pin (test code, owes micro-wave c) | yes (grep across tests/ pre- and post-wave; pin-green-under-deletion traced by reading all fallback pins) | wave-introduced |
 
 Verified clean (all re-verified against the code this session):
 
@@ -55,7 +55,7 @@ Verified clean (all re-verified against the code this session):
 - **a W4 header accuracy**: the file header now names the behavioral
   fake-curl probes next to the structural greps — matches the file's
   content.
-- **Class sweep reconciled (RM-0082 — re-run independently)**: the
+- **Class sweep reconciled (re-run independently)**: the
   addendum's grep reproduces exactly: 7 hits, 7/7 classified the same
   (lib.sh 319/321/323/325 = the wave's own lines; the pin pattern
   itself; run-ddev.sh:88 ddev fallback with no major-lane contract
@@ -83,6 +83,6 @@ a pinned message, not worth churn.
 - Recommendation: **GO for round b disposition of b W1** — one INFO
   finding, record-text. Recommended disposition: reword the L1 sentence
   ("keeps its FAIL; the FAIL branch is unpinned — pre-existing") —
-  bookkeeping only, loop closes (RM-0066). Alternative (add a
+  bookkeeping only, loop closes. Alternative (add a
   `cannot resolve opencode version` pin) touches test code and would
   owe micro-wave review c; take it only if the pin is wanted now.

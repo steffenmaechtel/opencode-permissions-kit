@@ -2,9 +2,8 @@
 
 Status: open — pin wave round c committed (`871f1b1`, maintainer go
 2026-10-23): b W1 hard-fail pin built early, a W7 discharged by registry
-evidence (below). Micro review c owed to a FRESH session (rotation,
-RM-0060 — this session authored the pin wave). E2e discharge runs on
-the committed tree (RM-0113).
+evidence (below), e2e debt discharged (below). Micro review c owed to a
+FRESH session (rotation — this session authored the pin wave).
 
 Chain: [review-a.md](review-a.md) → this wave. Dispositions refer to
 `a W<n>` = finding W<n> of snapshot a. Commits on `feature/e2e-default-2x`
@@ -88,7 +87,7 @@ next to the structural greps.
   sabotage-verified (glob, warning, presence, ordering).
 - L5: no root operands touched.
 - L6: fixes bring their own pins; micro-wave review b owed — reported,
-  not self-advanced (RM-0107).
+  not self-advanced.
 - L7: no new scripts; house form kept.
 
 ## Follow-ups
@@ -102,11 +101,14 @@ next to the structural greps.
    `cli-linux-x64` same). The only 404 (`cli-linux-arm64-baseline`) is
    unreachable: lib.sh appends `-baseline` only for `x64`. Time-of-check
    evidence; a future loud fail on a baseline/musl host means re-check.
-3. **Birth-PR wave e2e debt (RM-0113):** the PR wave changed install.sh
-   (bootstrap URL → v2 installer, root-run) and lib.sh resolution
-   semantics — the PR's own CI runs the flipped lanes on the PR and the
-   merge run re-verifies on master; an explicit discharge record (tree
-   SHA + counts) may be noted here by a later session.
+3. **Birth-PR wave e2e debt — DISCHARGED 2026-10-23:** both suites
+   green on the committed tree `02860c2` (clean checkout):
+   `make e2e` **309 passed / 0 failed**, `make e2e-rootless`
+   **47 passed / 0 failed**. Default lane resolved **opencode 2.1.3**
+   fresh from the npm registry (cache held only 1.x pre-run) — first
+   full-suite proof of the flipped lane incl. the a-W1-fixed resolution
+   path; suite 2 launched parallel after suite 1's resolve was
+   confirmed cached (CONTRIBUTING precondition).
 4. **b W1 pin — DONE early (`871f1b1`, maintainer go 2026-10-23):** the
    empty-cache hard-fail now carries the FAIL+exit-1 adjacency pin
    (both halves sabotage-verified on the committed tree). Micro review
@@ -144,5 +146,5 @@ tightened evidence:
 - Full `make test` green on the merged tree (incl. master's new
   test-reviews-meta-aggregate.sh).
 
-This addendum is bookkeeping only (RM-0066) — no review-relevant code
+This addendum is bookkeeping only — no review-relevant code
 touched; the owed micro-wave review b covers `3956c70` + this record.
