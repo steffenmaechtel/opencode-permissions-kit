@@ -41,6 +41,15 @@ review → fix → review the fixes (wave review) → fix → …
   Findings must be inspectable while nothing has been done about them
   yet, and a fix applied mid-verification would change the very tree
   the remaining findings are verified against. (RM-0059)
+- A round's disposition covers ALL findings of its review — fixed or
+  deliberately-not-done, each one. An instruction like "fix F1 first"
+  sequences work INSIDE the round; it does not end the round. One wave
+  review per round, batching all of the round's fixes — never one per
+  finding or per ad-hoc slice. (RM-0106)
+- The wave review fires on the maintainer's go once the round's
+  dispositions are complete — it owes a go exactly like the fixes do.
+  Round completion is reported (naming owed-but-not-run reviews),
+  never self-advanced into the next pass. (RM-0107)
 
 ### Session rotation
 
@@ -68,8 +77,22 @@ Session C (review 2):   fresh review (fix diff + any new scope) →
   ([internal/process/review.md](../internal/process/review.md): "start
   a fresh session per review round"). The pauses between sessions are
   the maintainer's, not the agent's. (RM-0061)
+- Rotation is measured in SESSIONS, not reviewer contexts: the
+  fresh-context subagents below are the mechanics of a review pass
+  INSIDE the rotating session — they do not allow the session that
+  authored a round's fixes to review them. A single-session chain is
+  a USER decision for the case (recorded in snapshot provenance),
+  never an agent's self-declared mode. (RM-0109)
 - The snapshot header's Reviewer line records which session ran the
   pass, so the rotation stays auditable after the fact. (RM-0063)
+- A rotation violated anyway (a round ran in the authoring session)
+  is recovered, not improvised: the round is recorded as
+  non-authoritative — its findings' resolution status stays open and
+  a Follow-ups entry names the deviation and instructs the successor.
+  The successor's mandate has two mandatory parts: re-verify the prior
+  snapshot's CLEAN verdicts (not only its findings) and run its own
+  pass over the same range. The prior snapshot stays immutable
+  evidence — its findings stand, its verdicts are leads. (RM-0110)
 
 **Stop rule.** A round is a review plus the disposition of its
 findings. A round with no findings at all, or with every finding
@@ -89,6 +112,12 @@ nothing to review.
   the findings' severity — owes one more review: a wave review of the
   fix diff, not a full pass. Severity prioritizes; only code change
   extends the loop. (RM-0067)
+- A round's own commits never declare the loop closed — closure is
+  confirmed by the NEXT round (or the maintainer) checking the stop
+  rule against the round's dispositions. A fixing round may state the
+  expectation only with the check cited ("this round's dispositions
+  touched no review-relevant code: files touched = …"); a closure
+  later retracted follows the rotation-deviation recovery above. (RM-0115)
 
 ## Fixes close classes, not sites
 
@@ -130,6 +159,13 @@ Four places carry review knowledge, each with exactly one job:
 - Retractions stay visible in the snapshot's "Retracted/ghost findings"
   section — they calibrate how much to trust the next unverified
   claim. (RM-0075)
+- A review round MAY run sabotage spot-checks — execute a failure
+  path instead of reasoning about it: delete (never comment out) the
+  construct on a committed, clean tree, observe the failure the way
+  production would, restore, re-run green; reader-window conditions
+  per "Parallel reviewer agents". When a prior snapshot's verdict was
+  reached by reasoning alone, the successor executes at least one
+  representative failure path of it. (RM-0112)
 
 ## Suites are the standing review
 
@@ -140,6 +176,14 @@ CONTRIBUTING's "shrink the next one" rule):
   guard becomes one in the same wave that fixes it. (RM-0076)
 - Root-script behavior changes owe the e2e suites immediately, not
   "later". (RM-0077)
+- The debt's due date splits by change class: root-run script changes
+  that alter SEMANTICS (rc contracts, traps, sudoers, provisioning,
+  wrapper) owe both e2e suites in the wave itself; message- or
+  comment-only changes to root-run scripts may ride to the release
+  gate. Either way the debt is recorded once — and any later session
+  that runs both suites green on a committed tree discharges it (tree
+  SHA + counts into the ledger; that record doubles as the fresh
+  comparator the next count claim needs). (RM-0113)
 - Record the environment in the snapshot (opencode binary version,
   host layout). (RM-0078)
 - A disposition claim ("closed", "never dereferences", "any … aborts")
@@ -174,6 +218,22 @@ CONTRIBUTING's "shrink the next one" rule):
   cannot fan out subagents (the 1.x `/review` subtask shape) is
   merely adequate for diff/wave scope and never enough for
   full-scope/release reviews. (RM-0084)
+- Fan-out is staged, never launched at once: the standard cap is 5
+  concurrent reviewer subagents on ANY tier — the provider's burst
+  limit is account-wide, not per-model (ten simultaneous flash
+  launches cost three restarts in pr-00211) — backfilling one seat as
+  each agent returns. An explicit USER-named cap for the case (10, 20,
+  … bigger plans allow more) overrides the standard upward; the agent
+  never raises the cap on its own. (RM-0108)
+- Sabotage spot-checks mutate the tree the fan-out reads: they run
+  only (a) before the fan-out launches, (b) after all reviewer agents
+  returned, or (c) in a scratch worktree. A window that overlapped
+  readers anyway is disclosed in run provenance (windows + mutated
+  files), and every subagent report is then screened in BOTH
+  directions: findings shaped like a sabotage artifact (false
+  findings) and clean verdicts on mutated constructs citing no
+  clean-tree anchor (false cleans). An unanchored verdict on a
+  mutated construct is not evidence — re-verify or re-run that unit. (RM-0111)
 - Reviewer prompts for recurring blind-spot surfaces name the class
   explicitly, not just the file; a gate or claim about path operands
   is tested against its slash forms (`x/`, `x//`, `x/.`). (RM-0085)
@@ -185,6 +245,10 @@ CONTRIBUTING's "shrink the next one" rule):
   at return) — the minute budgets are guidance without enforcement;
   the timestamps are the evidence base that will validate or
   recalibrate them. (RM-0092)
+- Agents stamp with their own (sandbox) clock — the main agent records
+  one HOST timestamp at fan-out start and end so subagent windows can
+  be normalized against it, and notes observed skew in run
+  provenance. (RM-0114)
 - Wave reviews (diff scope): ~8 minutes per agent; micro waves
   (≤ ~50-line diffs) run ~5 — batched greps, targeted reads, no
   whole-file reads of the big scripts; unclear after one follow-up

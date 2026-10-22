@@ -44,9 +44,12 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   scaffolding is disjoint (per-suite container names and images,
   `mktemp -d` project fixtures, no published host ports, no docker-wide
   cleanup — each suite removes only its own container). One
-  precondition: the shared binary cache (`tests/e2e/cache/`) must be
-  warm — after an opencode version bump run one suite alone first, or
-  two suites download the same version into the same path concurrently.
+  precondition: the suites resolve the opencode version at runtime
+  (current latest unless `E2E_OC_VERSION` pins it), so a warm shared
+  binary cache (`tests/e2e/cache/`) only covers the version the last
+  run used — after any time gap, or on a first run, run one suite
+  alone first and confirm it resolved and cached its version; parallel
+  runs are safe from there.
   Each suite gets slower under the CPU contention of a parallel run;
   `e2e-ddev` is the heavyweight (golden image + inner rootless daemon).
   Define `TS` before the first `&` — in `A && B & C`, C runs before the
