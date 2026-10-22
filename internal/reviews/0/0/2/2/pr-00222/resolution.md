@@ -18,8 +18,8 @@ snapshot chain: [a](review-a.md) · dispositions below grow as fixes land.
 | b W4 (LOW) | **deliberately not done** | — | commit text is history; V13 now asserts untouched in substance |
 | b W5 (INFO) | **implemented** | `54f2ce6` | untouched checks byte-exact: cp + cmp -s (V12/V13/V18/V20) |
 | b W6 (INFO) | **implemented** | `54f2ce6` | sweep-table + W1 evidence anchors re-anchored to post-wave numbering |
-| c W1 (LOW) | **implemented** |b2ad393 | a W1 evidence describes cp+cmp; V13 sentence notes the b W2 rebuild |
-| c W2 (INFO) | **implemented** |b2ad393 | table rows :97 retired / :98 bad status added; table now 19/19 |
+| c W1 (LOW) | **implemented** | `8e020c9` | a W1 evidence describes cp+cmp; V13 sentence notes the b W2 rebuild |
+| c W2 (INFO) | **implemented** | `8e020c9` | table rows :97 retired / :98 bad status added; table now 19/19 |
 | c W3 (INFO) | **deliberately not done** | — | process note; placeholders already resolved by b4a1ccf |
 | c W4 (INFO) | **deliberately not done** | — | :98 die precedes any write; V20 cmp-asserts the same arm |
 
