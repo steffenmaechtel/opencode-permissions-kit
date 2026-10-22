@@ -34,8 +34,9 @@ e2e_detect_host_layout
 # Environment fidelity (issue #118): record WHICH git the suite ran against —
 # the #116 unreadable-CWD fatal only existed on git >= 2.55 and was invisible
 # at the distro floor. On the 'latest' channel also assert the PPA git really
-# landed: a silently broken PPA add must not degrade that matrix leg to a
-# second distro run. Floor is noble's stock git (2.43) — bump when the base
+# landed: a silently broken PPA add must not degrade the git-latest lane
+# (the e2e-2x-git-latest job) to a second distro run. Floor is noble's
+# stock git (2.43) — bump when the base
 # image moves to a newer distro release.
 E2E_GIT_VERSION="$(E 'git --version 2>/dev/null' | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || true)"
 echo "  container git: ${E2E_GIT_VERSION:-not found} (channel: ${E2E_GIT_CHANNEL:-distro})"

@@ -9,10 +9,11 @@
 # ancient plumbing — `git -C <dir> config --global` (git >= 1.8.5) and
 # safe.directory, a harmless unknown key below 2.35.2 where no ownership
 # check exists either. The #116 breakage class (the unreadable-CWD
-# fatal) lived at the NEW end of the version range — CI's git matrix
-# (test-e2e.yml: distro vs git-core PPA latest, resolved at build time)
-# covers that end. The floor below only mirrors the documented oldest
-# baseline distros; below it the kit warns, never aborts.
+# fatal) lived at the NEW end of the version range — CI's git pair
+# (test-e2e.yml: e2e-2x-git-distro vs e2e-2x-git-latest, the PPA git
+# resolved at build time) covers that end. The floor below only mirrors
+# the documented oldest baseline distros; below it the kit warns, never
+# aborts.
 #
 # POSIX sh, SOURCED by install.sh, update.sh and status.sh. Never
 # executed directly. install.sh and update.sh source the checkout/fetch
