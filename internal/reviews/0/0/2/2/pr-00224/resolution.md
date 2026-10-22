@@ -1,8 +1,9 @@
 # Resolution — pr-00224 (issue #197 e2e default flip to 2.x)
 
-Status: open — round a dispositions complete; micro-wave review b owed
-(the fixes touched review-relevant code: tests/e2e/lib.sh +
-tests/unit/test-e2e-sources.sh, RM-0067).
+Status: open — micro-wave review b committed ([review-b.md](review-b.md),
+one INFO finding `b W1`: the L1 sentence below overstates — the
+empty-cache FAIL exists but has no pin). Round b dispositions owed;
+no fix applied before the maintainer's go (RM-0107).
 
 Chain: [review-a.md](review-a.md) → this wave. Dispositions refer to
 `a W<n>` = finding W<n> of snapshot a. Commits on `feature/e2e-default-2x`
