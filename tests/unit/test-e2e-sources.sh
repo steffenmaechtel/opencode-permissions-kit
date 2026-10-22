@@ -180,8 +180,13 @@ check "Dockerfile declares the GIT_CHANNEL build arg" \
     sh -c "grep -q '^ARG GIT_CHANNEL=' \"\$1\" && grep -q '^ARG GIT_CHANNEL=' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
 check "both Dockerfiles upgrade via the git-core PPA on channel latest" \
     sh -c "grep -q 'ppa:git-core/ppa' \"\$1\" && grep -q 'ppa:git-core/ppa' \"\$2\"" _ "$DOCKERFILE" "$DOCKERFILE_ROOTLESS"
-check "CI matrices the e2e job over the git channel (issue #118)" \
-    sh -c "grep -q 'git: \[distro, latest\]' \"\$1\" && grep -q 'E2E_GIT_CHANNEL: \${{ matrix.git }}' \"\$1\"" _ "$WF_E2E"
+# The git channel pair runs as two explicit jobs (lane-naming wave
+# 2026-10-23, was a matrix): stable per-leg check names for branch
+# protection, and a job-level skip can no longer collapse the legs.
+# The per-leg channel assignment is pinned by test-workflows.sh
+# (per-job blocks); this is the presence + no-matrix pin.
+check "CI covers the git pair as explicit jobs (distro + latest legs, issue #118)" \
+    sh -c "grep -q 'e2e-2x-git-distro:' \"\$1\" && grep -q 'e2e-2x-git-latest:' \"\$1\" && ! grep -qE 'matrix\.git|git: \[distro' \"\$1\"" _ "$WF_E2E"
 check "run.sh asserts the latest leg really runs PPA git" \
     grep -q 'E2E_GIT_CHANNEL:-distro}" = "latest"' "$RUN_SH"
 

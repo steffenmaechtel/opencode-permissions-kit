@@ -7,7 +7,8 @@ name: test-unit
 # 'stable' release mirror — it must be green before a release is cut
 # (scripts/release.sh checks exactly this run). A branch push with an
 # open PR fires only `pull_request`, avoiding the classic double-run.
-# A weekly schedule (Mon 03:07 UTC, issue #78) re-runs the suite on
+# A daily schedule (05:07 UTC; issue #78 ran it weekly until
+# 2026-10-23) re-runs the suite on
 # master even when nothing was pushed — runner image updates
 # (ubuntu-latest) and environment drift can break a "green" master
 # between releases. Scheduled runs always target the default branch.
@@ -20,7 +21,7 @@ on:
       - master
   workflow_dispatch:
   schedule:
-    - cron: '7 3 * * 1'  # Mondays 03:07 UTC (off-peak, off the hour)
+    - cron: '7 5 * * *'  # daily 05:07 UTC (off-peak, off the hour)
 
 # Least-privilege token (CodeQL actions/missing-workflow-permissions):
 # read-only access to the repository is all this workflow needs.
@@ -29,7 +30,7 @@ permissions:
 
 # Cancel a superseded run when a new commit lands on the same ref; also
 # dedupes if two events somehow fire for the same push. Scheduled runs
-# get their own group: a weekly run must never cancel an in-flight
+# get their own group: a scheduled run must never cancel an in-flight
 # push/PR run of the same ref (a cancelled run on a master sha reads as
 # red to scripts/release.sh's CI gate) — and conversely stays alive to
 # deliver its drift verdict even when master moves under it. Manual
@@ -39,13 +40,13 @@ permissions:
 # run in their own 'manual' group instead.
 concurrency:
   group: >-
-    tests-${{ github.event_name == 'schedule' && 'weekly'
+    tests-${{ github.event_name == 'schedule' && 'daily'
     || (github.event_name == 'push' || github.event_name == 'pull_request') && github.ref
     || 'manual' }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

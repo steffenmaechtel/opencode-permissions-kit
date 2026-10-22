@@ -200,7 +200,7 @@ The installer's and updater's pre-flight prints the same hint when it
 detects an older git, and `opk status` shows the host git against the
 tested floor in its Core section. CI exercises both ends of the version
 range — the Ubuntu 24.04 distro git and the current PPA git — so
-newest-release behavior drift is caught by the weekly burn-in (the
+newest-release behavior drift is caught by the daily burn-in (the
 unreadable-CWD fatal of
 [issue #116](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/116)
 existed only on git ≥ 2.55; the fix is version-independent).

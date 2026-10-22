@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  watch:
+  advisory-watch:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

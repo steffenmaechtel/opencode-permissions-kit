@@ -173,6 +173,21 @@ keys, `-1x` = the former `opencode-e2e-old*-latest*` /
 All e2e jobs — both lanes — also skip on non-e2e-input changes:
 push/PR runs go through a dorny/paths-filter `code` set first;
 schedule and manual dispatch always run (noted 2026-10-23, issue #176).
+*Update 2026-10-23 (lane-naming wave):* the job names are
+major-explicit now — no bare default name survives, because those
+silently changed meaning at every flip. The 2x lanes are
+`e2e-2x-git-distro`, `e2e-2x-git-latest`, `e2e-rootless-2x`,
+`e2e-ddev-2x`; the 1x lanes keep their names. The core suite's git
+dimension (issue #118) dissolved from a matrix into the explicit
+`e2e-2x-git-*` pair (stable per-leg check names; a job-level skip can
+no longer collapse the legs). Convention: no git suffix = git-distro.
+`test-unit.yml`'s job is `unit`, `advisory-watch.yml`'s is
+`advisory-watch`. Resolutions, gates, tokens, and cache keys are
+unchanged — this was naming and job structure only. The schedule
+cadence flipped the same day too: all three test workflows run
+**daily** now (05:07 / 05:17 / 05:27 UTC, verdict chain kept; issue
+#78's weekly cadence until then) — upstream drift on a quiet master
+is now bounded to one day, not seven.
 
 ### Build recipe (local, containerized)
 

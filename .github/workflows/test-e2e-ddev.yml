@@ -6,7 +6,8 @@ name: test-e2e-ddev
 # ddev project lifecycle — too heavy per PR, but master is the staging
 # area for the 'stable' release mirror and must be fully green before a
 # release is cut (scripts/release.sh includes these runs in its CI gate).
-# A weekly schedule (Mon 03:27 UTC, issue #78) re-runs the suite on
+# A daily schedule (05:27 UTC; issue #78 ran it weekly until
+# 2026-10-23) re-runs the suite on
 # master even when nothing was pushed — the design doc's planned
 # burn-in (§8/R6): the suite installs the LATEST ddev and rebuilds the
 # golden image warm from scratch, catching ddev/opencode release drift
@@ -18,15 +19,15 @@ name: test-e2e-ddev
 # CI rebuilds the golden image warm every run (the cache is a
 # local-workspace concept, design doc §6 R6).
 #
-# The e2e-ddev job runs the suite against the CURRENT opencode 2.x
-# release by default (issue #197): all real installations run 2.x, and
+# The e2e-ddev-2x job runs the suite against the CURRENT opencode 2.x
+# release (issue #197): all real installations run 2.x, and
 # 2.x ships via the npm registry, not GitHub releases (releases/latest
 # stays 1.x), so the job resolves the npm dist-tag 'latest' at run time
 # and fails loudly when that tag ever leaves 2.* — the upstream flip
 # the kit must react to (internal/records/opencode-2x.md). The
 # e2e-ddev-1x twin keeps 1.x an explicit lane (GitHub releases/latest,
 # loud failure when that leaves 1.*). Same (heavy) triggers as the
-# default job: master pushes, weekly schedule, manual dispatch — not
+# 2x job: master pushes, daily schedule, manual dispatch — not
 # PRs.
 #
 # Path filtering (non-e2e-input changes skip): push runs first detect
@@ -38,10 +39,11 @@ name: test-e2e-ddev
 # its sha, so scripts/release.sh's gate — which accepts skipped but not
 # absent runs — stays satisfied even on a non-code master push; and a
 # non-code push never cuts a release anyway). Job-level skipping is
-# safe here because this workflow has NO matrix jobs — if one is added,
-# gate it at STEP level like test-e2e.yml's e2e matrix (a job-level if
-# collapses matrix legs; required expanded-leg checks never report and
-# the PR hangs). Schedule and manual dispatch always run (drift checks /
+# safe here because this workflow has NO matrix jobs (test-e2e.yml's
+# git pair are explicit single-channel jobs for exactly that reason: a
+# job-level `if` on a matrix collapses the legs, required expanded-leg
+# checks never report, and the PR hangs — if a matrix is ever added
+# here anyway, gate it at STEP level). Schedule and manual dispatch always run (drift checks /
 # explicit human intent — the GB downloads are the point there).
 # test-unit.yml is NOT filtered: test-docs.sh validates links across
 # docs/ + root Markdown.
@@ -62,20 +64,20 @@ on:
         default: ''
         type: string
   schedule:
-    - cron: '27 3 * * 1'  # Mondays 03:27 UTC (after test-e2e's verdict)
+    - cron: '27 5 * * *'  # daily 05:27 UTC (after test-e2e's verdict)
 
 permissions:
   contents: read
 
 # Cancel a superseded run when a new commit lands on the same ref; also
 # dedupes if two events somehow fire for the same push. Scheduled runs
-# get their own group: a weekly run must never cancel an in-flight
+# get their own group: a scheduled run must never cancel an in-flight
 # push run of the same ref (a cancelled run on a master sha reads as
 # red to scripts/release.sh's CI gate) — and conversely stays alive to
 # deliver its drift verdict even when master moves under it.
 concurrency:
   group: >-
-    e2e-ddev-${{ github.event_name == 'schedule' && 'weekly'
+    e2e-ddev-${{ github.event_name == 'schedule' && 'daily'
     || (github.event_name == 'push' || github.event_name == 'pull_request') && github.ref
     || 'manual' }}
   cancel-in-progress: true
@@ -103,7 +105,7 @@ jobs:
               - 'Makefile'
               - 'VERSION'
 
-  e2e-ddev:
+  e2e-ddev-2x:
     needs: changes
     # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
@@ -172,7 +174,7 @@ jobs:
           # Via env, never interpolated into the run: shell (S6).
           E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
         run: |
-          echo "### ddev-e2e (run-ddev.sh, opencode ${E2E_OC_VERSION:-unresolved})" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ddev-e2e-2x (run-ddev.sh, opencode ${E2E_OC_VERSION:-unresolved})" >> "$GITHUB_STEP_SUMMARY"
           echo "- site tier: ${E2E_DDEV_SITE:-none}" >> "$GITHUB_STEP_SUMMARY"
           echo "- ddev: ${DDEV_VERSION:-latest}" >> "$GITHUB_STEP_SUMMARY"
 
@@ -183,7 +185,7 @@ jobs:
   # fails the job loudly: when GitHub flips releases/latest to 2.x, this
   # lane's premise is gone and the kit must drop it (the mirror image of
   # the default lane's 2.x flip signal, internal/records/opencode-2x.md).
-  # Same (heavy) triggers as the default job: master pushes, weekly
+  # Same (heavy) triggers as the 2x job: master pushes, daily
   # schedule, manual dispatch — not PRs (the GB downloads are the point
   # there).
   e2e-ddev-1x:
