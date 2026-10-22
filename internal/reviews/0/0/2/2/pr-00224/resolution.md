@@ -1,9 +1,10 @@
 # Resolution — pr-00224 (issue #197 e2e default flip to 2.x)
 
-Status: open — micro-wave review b committed ([review-b.md](review-b.md),
-one INFO finding `b W1`: the L1 sentence below overstates — the
-empty-cache FAIL exists but has no pin). Round b dispositions owed;
-no fix applied before the maintainer's go (RM-0107).
+Status: open — round b dispositions complete (b W1 → `ea0af17`).
+Expectation: loop closes — this round's dispositions touched no
+review-relevant code (files touched = this resolution.md only,
+bookkeeping per RM-0065/RM-0066). Closure confirmation per RM-0115
+sits with the maintainer / the next round's check, not this commit.
 
 Chain: [review-a.md](review-a.md) → this wave. Dispositions refer to
 `a W<n>` = finding W<n> of snapshot a. Commits on `feature/e2e-default-2x`
@@ -20,6 +21,7 @@ Chain: [review-a.md](review-a.md) → this wave. Dispositions refer to
 | a W5 (INFO) | **deliberately not done** | — | display-only summary label; the run stays unpinned by design |
 | a W6 (INFO) | **implemented** | `3956c70` | order pin (assignment < resolve line); reorder sabotage reds |
 | a W7 (INFO) | **deliberately not done** | — | suffixed npm packages unverified upstream; loud fail; watch item |
+| b W1 (INFO) | **implemented** | `ea0af17` | L1 reworded (FAIL branch unpinned, pre-existing); bookkeeping |
 
 ## Evidence detail
 
@@ -100,6 +102,10 @@ next to the structural greps.
    semantics — the PR's own CI runs the flipped lanes on the PR and the
    merge run re-verifies on master; an explicit discharge record (tree
    SHA + counts) may be noted here by a later session.
+4. **b W1 (optional, next touch):** the lib.sh empty-cache hard-fail
+   (`cannot resolve opencode version and no cached version available`)
+   carries no pin — add one the next time test-e2e-sources.sh is
+   touched; a wave that adds it owes its own micro review.
 
 ## Addendum (2026-10-23) — learnings refresh 2026-10-22 applied
 
