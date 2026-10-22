@@ -154,8 +154,11 @@ if [ -f "$_oc_policy" ] \
 fi
 # Home via getent, /home/<user> only as fallback (0.0.47b W2, the
 # 0.0.43a F12 class — relocated homes must not blank the verdicts).
-_oc_home=$(getent passwd "${DEFAULT_USER:-$USER}" 2>/dev/null | cut -d: -f6 || true)
-_oc_home="${_oc_home:-/home/${DEFAULT_USER:-$USER}}"
+# Empty-default chain (#211 a F9): under set -u, ${DEFAULT_USER:-$USER}
+# aborted with rc 2 when BOTH were unset (cron/timer env + conf without
+# the stamp) — colliding with the "2 = warnings only" verdict contract.
+_oc_home=$(getent passwd "${DEFAULT_USER:-${USER:-}}" 2>/dev/null | cut -d: -f6 || true)
+_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"
 _oc_kit_wrapper="/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode"
 _oc_bins=""
 for _ocn in opencode opencode2; do
@@ -440,7 +443,13 @@ EOF
         elif [ "$ADV_PARSE_OK" = true ]; then
             ui_kv_ok "upstream" "live check ok — nothing beyond the shipped database"
         else
-            ui_kv_warn "upstream" "live check unavailable (offline, blocked, or python3 missing)"
+            # Uncounted by design (0.0.48b W3, #211 a F8): the caller
+            # cannot judge this row (offline, blocked, python3 missing) —
+            # a counted warn made every air-gapped/proxied host exit 2
+            # forever, which is exactly the "green unattainable, cron
+            # alert worthless" case the rule names. Real findings (new
+            # advisories, the arm above) stay counted warns.
+            ui_kv "upstream" "unknown — live check unavailable (offline, blocked, or python3 missing)"
         fi
     fi
 fi
@@ -716,7 +725,12 @@ fi
 # daemon netns inherits it at start; the daemon may need a restart if it
 # started before the sysctl was applied).
 port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo "?")
-if [ "${port_start:-1024}" -le 80 ] 2>/dev/null; then
+if [ "$port_start" = "?" ]; then
+    # Uncounted unknown (0.0.48b W3, #211 a F25): an unreadable sysctl
+    # used to land in the else-arm as a counted ui_kv_bad "(? > 80)" —
+    # a false alarm the caller cannot act on.
+    ui_kv "router ports" "unknown — cannot read ip_unprivileged_port_start"
+elif [ "${port_start:-1024}" -le 80 ] 2>/dev/null; then
     ui_kv_ok "router ports" "ready (ip_unprivileged_port_start=$port_start)"
 else
     ui_kv_bad "router ports" "NOT ready (ip_unprivileged_port_start=$port_start > 80)"
@@ -982,7 +996,14 @@ if [ -d /mnt/c ]; then
 " and run 'wsl --shutdown' from Windows."
         fi
     else
-        ui_kv_ok "/mnt/c" "restricted (mode ${mnt_mode:-?})"
+        if [ -n "$mnt_mode" ]; then
+            ui_kv_ok "/mnt/c" "restricted (mode $mnt_mode)"
+        else
+            # Uncounted unknown (0.0.48b W3, #211 a F25): a failing
+            # stat used to land here as a counted ui_kv_ok
+            # "restricted (mode ?)" — a false green.
+            ui_kv "/mnt/c" "unknown — cannot stat the mount"
+        fi
         # Browser bridge (issues #91, #100): on the restricted mount the
         # opencode user cannot execute powershell.exe — without the bridge,
         # device logins (`console login` / `auth login`) die on the spawn

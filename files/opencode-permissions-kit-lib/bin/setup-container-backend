@@ -29,7 +29,7 @@
 #      install.conf. For podman-rootless daemonless, nothing is printed.
 #
 # Must run as root. The opencode user must already exist.
-# See docs/design/rootless-backend.md (provisioning reference).
+# See internal/records/rootless-backend.md (provisioning reference).
 set -e
 
 # Colors resolved to REAL bytes once at load (printf interprets \033 in
@@ -120,10 +120,40 @@ allocate_range() {
         return 0
     fi
     while true; do
-        local overlap=false
+        local overlap=false _bad=0
         while IFS=: read -r u s c; do
             [ -z "$u" ] && continue
-            local s2="${s:-0}" c2="${c:-0}"
+            # Malformed lines are counted and skipped (#211 a F16): raw
+            # fields used to feed shell arithmetic — digit-leading junk
+            # aborted provisioning under set -e (the shell dies on the
+            # arithmetic syntax error), leading zeros misparsed as octal
+            # silently skewing the overlap math. NB: the done-level
+            # 2>/dev/null swallows stderr INSIDE the loop — the warn is
+            # printed after it, never from within.
+            # Per-field validation (#211 b W10 — the a-wave's concat
+            # "$s$c" check left two gaps): a leading-zero COUNT passed
+            # ("u:1000:09" concatenated to "100009", then dash aborted
+            # provisioning on the octal-looking $((s2 + c2))), and there
+            # was no length cap — a 20-digit digit-run wraps in $(( )).
+            # subuid/subgid are u32 (max 4294967295, 10 digits): 11+
+            # digits is malformed. Per-field also stops false-rejecting
+            # a legitimate 10-digit start followed by a short count.
+            # Value cap (#211 c W9): the length gate alone lets a
+            # 10-digit field ABOVE the u32 max through — rejected on
+            # value here.
+            # A single "0" START is accepted now (#211 c W10): the old
+            # concat gate rejected it ("0"+"1000" = "01000" matched
+            # 0?*), but an empty range registered occupied is the
+            # safer reading than skip-and-allocate-over — intentional.
+            case "$s" in
+                *[!0-9]*|0?*|???????????*|"") _bad=$((_bad + 1)); continue ;;
+            esac
+            [ "$s" -le 4294967295 ] || { _bad=$((_bad + 1)); continue; }
+            case "$c" in
+                *[!0-9]*|0?*|???????????*|"") _bad=$((_bad + 1)); continue ;;
+            esac
+            [ "$c" -le 4294967295 ] || { _bad=$((_bad + 1)); continue; }
+            local s2="$s" c2="$c"
             # Overlap check: [start, start+count) vs [s2, s2+c2)
             local end=$((start + count))
             local end2=$((s2 + c2))
@@ -132,6 +162,13 @@ allocate_range() {
                 break
             fi
         done < "$file" 2>/dev/null || true
+        if [ "$_bad" -gt 0 ]; then
+            # The enumeration names every skip cause (#211 e W2): the
+            # value cap (#211 c W9) added a third — a 10-digit field
+            # above the u32 max is none of the older two.
+            printf '  warn: %s malformed line(s) skipped in %s (non-numeric, leading-zero, or above-u32-max ranges)\n' \
+                "$_bad" "$file" >&2
+        fi
         if [ "$overlap" = false ]; then
             break
         fi
@@ -153,9 +190,19 @@ allocate_subuid_subgid() {
 
 enable_linger() {
     if command -v loginctl >/dev/null 2>&1; then
-        loginctl enable-linger "$OPENCODE_USER" 2>/dev/null || true
-        echo "  Linger enabled for $OPENCODE_USER (daemon survives logout)."
-        log "linger enabled for $OPENCODE_USER"
+        # Failure-honest (#211 a F13): the old `|| true` + unconditional
+        # success line told the user the daemon survives logout even when
+        # enable-linger failed (logind degraded, read-only /var) — the
+        # rootless daemon then died with the session and ddev "randomly"
+        # lost its backend. Warn with the retry hint instead.
+        if loginctl enable-linger "$OPENCODE_USER" 2>/dev/null; then
+            echo "  Linger enabled for $OPENCODE_USER (daemon survives logout)."
+            log "linger enabled for $OPENCODE_USER"
+        else
+            echo "  WARN: could not enable linger for $OPENCODE_USER — the rootless daemon dies at logout." >&2
+            echo "        retry: loginctl enable-linger $OPENCODE_USER (logind degraded?)" >&2
+            log "linger enable FAILED for $OPENCODE_USER"
+        fi
     fi
 }
 

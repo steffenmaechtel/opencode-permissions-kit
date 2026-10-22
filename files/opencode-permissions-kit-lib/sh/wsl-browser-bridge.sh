@@ -133,6 +133,13 @@ browser_bridge_write_conf() {
         awk '
             in_block {
                 if ($0 ~ /^# opencode permissions kit browser bridge -- end$/) { in_block = 0; next }
+                # Consumption bound (#211 a F18): the kit block is begin
+                # + 7 comments + carrier + end — at most 8 consumed lines
+                # before the end marker. A 9th means the marker was
+                # hand-destroyed: stop consuming there (foreign comments
+                # below a begin marker survive), never eat unbounded.
+                blk_n++
+                if (blk_n > 8) { in_block = 0; pend_blank = 0; print; next }
                 # Hand-edited file, end marker destroyed: exit at the first
                 # non-comment line WITHOUT the blank-eater staying armed
                 # (0.0.43a F11) — the next blank, if any, belongs to foreign
@@ -140,7 +147,7 @@ browser_bridge_write_conf() {
                 if ($0 !~ /^#/) { in_block = 0; pend_blank = 0; print; next }
                 next
             }
-            /^# opencode permissions kit browser bridge -- begin$/ { in_block = 1; pend_blank = 1; next }
+            /^# opencode permissions kit browser bridge -- begin$/ { in_block = 1; pend_blank = 1; blk_n = 0; next }
             pend_blank == 1 {
                 pend_blank = 0
                 if ($0 == "") next
@@ -257,6 +264,13 @@ browser_bridge_remove() {
         awk '
             in_block {
                 if ($0 ~ /^# opencode permissions kit browser bridge -- end$/) { in_block = 0; next }
+                # Consumption bound (#211 a F18): the kit block is begin
+                # + 7 comments + carrier + end — at most 8 consumed lines
+                # before the end marker. A 9th means the marker was
+                # hand-destroyed: stop consuming there (foreign comments
+                # below a begin marker survive), never eat unbounded.
+                blk_n++
+                if (blk_n > 8) { in_block = 0; pend_blank = 0; print; next }
                 # Hand-edited file, end marker destroyed: exit at the first
                 # non-comment line WITHOUT the blank-eater staying armed
                 # (0.0.43a F11) — the next blank, if any, belongs to foreign
@@ -264,7 +278,7 @@ browser_bridge_remove() {
                 if ($0 !~ /^#/) { in_block = 0; pend_blank = 0; print; next }
                 next
             }
-            /^# opencode permissions kit browser bridge -- begin$/ { in_block = 1; pend_blank = 1; next }
+            /^# opencode permissions kit browser bridge -- begin$/ { in_block = 1; pend_blank = 1; blk_n = 0; next }
             pend_blank == 1 {
                 pend_blank = 0
                 if ($0 == "") next

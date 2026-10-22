@@ -203,14 +203,17 @@ exit 0
 EOS
     chmod +x "$_bstub/failmid"
     _brc=0
-    sh -c "$_batch_body" xargs-sh 1 "$_bstub/failmid" ok1 midfail ok2 || _brc=$?
+    # Root arg is deliberately a path that cannot exist (#211 b W27):
+    # the W11 drives assert batch rc semantics, not root-relative walks
+    # — an absent root keeps the drives about the operands alone.
+    sh -c "$_batch_body" xargs-sh 1 /nonexistent-opk-root "$_bstub/failmid" ok1 midfail ok2 || _brc=$?
     assert_eq "mid-batch failure fails the batch, order-independent (W11)" "1" "$_brc"
     _brc=0
-    sh -c "$_batch_body" xargs-sh 1 "$_bstub/failmid" ok1 ok2 || _brc=$?
+    sh -c "$_batch_body" xargs-sh 1 /nonexistent-opk-root "$_bstub/failmid" ok1 ok2 || _brc=$?
     assert_eq "all-healthy batch stays green (W11)" "0" "$_brc"
     ln -sf /etc/hostname "$_bstub/lnk"
     _brc=0
-    sh -c "$_batch_body" xargs-sh 1 "$_bstub/failmid" ok1 "$_bstub/lnk" || _brc=$?
+    sh -c "$_batch_body" xargs-sh 1 /nonexistent-opk-root "$_bstub/failmid" ok1 "$_bstub/lnk" || _brc=$?
     assert_eq "symlink-last batch stays green (skip is not a failure)" "0" "$_brc"
     rm -rf "$_bstub"
 else
@@ -231,13 +234,16 @@ grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" \
     || fail "fs-baseline.sh is a sourced lib (git 100644, not executed by path)"
 
 # --- 8. exec-time symlink recheck (0.0.39e S1) ------------------------------------------
-# The race itself (swap between find's scan and xargs' exec) cannot be
-# scripted deterministically — what CAN be asserted is the guard: the
-# consumer re-tests [ -L ] immediately before running the command, so a
-# path that is a symlink AT EXEC TIME is skipped even when find's
-# expression matched it. Simulate by driving _fsb_pass with an
-# expression (-true) that deliberately includes symlinks: the target
-# OUTSIDE the root must keep its mode, the regular file inside must not.
+# The leaf race (swap between find's scan and xargs' exec) cannot be
+# scripted deterministically via stream interleaving — what CAN be
+# asserted is the guard: the consumer re-tests [ -L ] immediately before
+# running the command, so a path that is a symlink AT EXEC TIME is
+# skipped even when find's expression matched it. (The PARENT-swap form
+# IS scripted deterministically — section 9's wrapper find performs the
+# swap between scan output and replay.) Simulate by driving _fsb_pass
+# with an expression (-true) that deliberately includes symlinks: the
+# target OUTSIDE the root must keep its mode, the regular file inside
+# must not.
 SW=$(mktemp -d)
 mkdir -p "$SW/root"
 printf 'inside\n' > "$SW/root/in-file"
@@ -339,6 +345,155 @@ else
     fail "find's stderr survives for diagnosis (the why behind the rc)"
 fi
 rm -rf "$DEAD"
+
+# --- 9. parent-swap race: component walk (#211 a F1, 0.0.39h F2 class) ------------------
+# The scan->act window spans the whole temp-file replay, and the agent
+# can swap a PARENT directory for a symlink inside it: find recorded
+# proj/x/y/secret as a regular file, then x/y becomes a link to a dir
+# OUTSIDE the tree — the operand now resolves there, and the leaf-only
+# [ -L ] recheck passes (the leaf is a regular file). Deterministic
+# seam: a PATH-stubbed find runs the REAL find (paths land in the temp
+# file), performs the swap, then exits — the replay then chews stale
+# paths. Without the component walk, chmod g+w hits the victim (mode
+# 600 -> 620); with it, the operand is skipped and the pass stays green
+# (a skip is not a failure).
+F1DIR=$(mktemp -d)
+F1STUB=$(mktemp -d)
+F1REAL="$(command -v find)"
+mkdir -p "$F1DIR/proj/x/y" "$F1DIR/victim"
+printf 'secret\n' > "$F1DIR/proj/x/y/secret"
+printf 'victim\n' > "$F1DIR/victim/secret"
+chmod 600 "$F1DIR/proj/x/y/secret" "$F1DIR/victim/secret"
+cat > "$F1STUB/find" <<EOF
+#!/bin/sh
+"$F1REAL" "\$@"
+_rc=\$?
+if [ -d "$F1DIR/proj/x/y" ] && [ ! -L "$F1DIR/proj/x/y" ]; then
+    mv "$F1DIR/proj/x/y" "$F1DIR/proj/x/moved-away"
+    ln -s "$F1DIR/victim" "$F1DIR/proj/x/y"
+fi
+exit \$_rc
+EOF
+chmod +x "$F1STUB/find"
+F1RC=0
+# Slashed root on purpose (#211 b W7): this one drive covers both the
+# a F1 walk (victim keeps its mode only when the walk runs) and the
+# b W7 normalization (an unnormalized root voids the walk pattern —
+# victim would go 620).
+FS_SUDO="" PATH="$F1STUB:$PATH" \
+    sh -c '. "$1" && _fsb_pass "parent-swap" "$2" -type f -- chmod g+w' \
+    _ "$LIB" "$F1DIR/proj/" >/dev/null 2>&1 || F1RC=$?
+if [ -f "$F1DIR/proj/x/moved-away/secret" ] && [ -L "$F1DIR/proj/x/y" ]; then
+    pass "race fixture: parent swapped between scan and replay (seam fired)"
+else
+    fail "race fixture: parent swapped between scan and replay (seam fired)"
+fi
+assert_eq "parent-swap: victim outside the tree keeps its mode (#211 a F1)" "600" \
+    "$(stat -c %a "$F1DIR/victim/secret")"
+assert_eq "parent-swap: skipped operand does not fail the pass (rc 0)" "0" "$F1RC"
+rm -rf "$F1DIR" "$F1STUB"
+
+# Root '/' is refused loud, never walked (#211 b W7): the refusal fires
+# before any find runs — nothing on the host is touched.
+F1RRC=0
+F1RMSG=$(FS_SUDO="" sh -c '. "$1" && _fsb_pass "refuse" "/" -type f -- chmod g+w' _ "$LIB" 2>&1) || F1RRC=$?
+assert_eq "root / refused: rc 1 (#211 b W7)" "1" "$F1RRC"
+case "$F1RMSG" in
+    *never*) pass "root / refused: loud message (#211 b W7)" ;;
+    *) fail "root / refused: loud message (got: $F1RMSG)" ;;
+esac
+# The message must name the refused ROOT (#211 c W2): the shift at the
+# prologue renumbers positionals, so a ${_fsbp_root:-$2} fallback named
+# a find-expression word instead ('/' drive) — and the '//' drive shows
+# the ORIGINAL form, proving the capture happened before the shift.
+case "$F1RMSG" in
+    *"refusing scan root '/'"*) pass "root / refused: names the refused root (#211 c W2)" ;;
+    *) fail "root / refused: names the refused root (got: $F1RMSG) (#211 c W2)" ;;
+esac
+F1R2RC=0
+F1R2MSG=$(FS_SUDO="" sh -c '. "$1" && _fsb_pass "refuse" "//" -type f -- chmod g+w' _ "$LIB" 2>&1) || F1R2RC=$?
+assert_eq "root // refused: rc 1 (#211 c W2)" "1" "$F1R2RC"
+case "$F1R2MSG" in
+    *"refusing scan root '//'"*) pass "root // refused: original form named (#211 c W2)" ;;
+    *) fail "root // refused: original form named (got: $F1R2MSG) (#211 c W2)" ;;
+esac
+
+# Walker string safety: components and names with spaces flow through
+# the prefix-peeling without word splitting — the chmod still applies.
+# rc captured (#211 b W13): the drive used to run unguarded under the
+# suite's set -e, aborting the whole suite pre-tally on a walker
+# regression instead of recording a FAIL.
+F1SP=$(mktemp -d)
+mkdir -p "$F1SP/proj/a/dir two"
+printf 's\n' > "$F1SP/proj/a/dir two/has space.txt"
+chmod 600 "$F1SP/proj/a/dir two/has space.txt"
+F1SPRC=0
+FS_SUDO="" sh -c '. "$1" && _fsb_pass "spaces" "$2" -type f -- chmod g+w' \
+    _ "$LIB" "$F1SP/proj" >/dev/null 2>&1 || F1SPRC=$?
+assert_eq "walker: spaces drive exits 0 (#211 b W13)" "0" "$F1SPRC"
+assert_eq "walker: spaces in components and names survive the walk" "620" \
+    "$(stat -c %a "$F1SP/proj/a/dir two/has space.txt")"
+rm -rf "$F1SP"
+
+# Spaced-path PARENT-SWAP RACE (external mini-review follow-up, post-b):
+# the happy-path drive above proves chmod still APPLIES on spaced paths
+# (620) — it cannot notice a walk regression that silently stops SKIPPING
+# (the operand still chmods, the pin stays green; the b W6 class, missed
+# on this pin), and the a F1 race fixture drives unspaced paths only.
+# Same deterministic seam as section 9, with spaces in every component:
+# find records the operand, the stub swaps the parent for a symlink to a
+# victim dir OUTSIDE the tree — the walk must skip (victim stays 600);
+# a word-splitting or voided walk chmods through the link (victim 620).
+F1SPD=$(mktemp -d)
+F1SPS=$(mktemp -d)
+mkdir -p "$F1SPD/proj/a/dir two" "$F1SPD/victim dir"
+printf 'secret\n' > "$F1SPD/proj/a/dir two/has space.txt"
+printf 'victim\n' > "$F1SPD/victim dir/has space.txt"
+chmod 600 "$F1SPD/proj/a/dir two/has space.txt" "$F1SPD/victim dir/has space.txt"
+cat > "$F1SPS/find" <<EOF
+#!/bin/sh
+"$(command -v find)" "\$@"
+_rc=\$?
+if [ -d "$F1SPD/proj/a/dir two" ] && [ ! -L "$F1SPD/proj/a/dir two" ]; then
+    mv "$F1SPD/proj/a/dir two" "$F1SPD/proj/a/moved away"
+    ln -s "$F1SPD/victim dir" "$F1SPD/proj/a/dir two"
+fi
+exit \$_rc
+EOF
+chmod +x "$F1SPS/find"
+F1SPDRC=0
+FS_SUDO="" PATH="$F1SPS:$PATH" \
+    sh -c '. "$1" && _fsb_pass "spaces-race" "$2" -type f -- chmod g+w' \
+    _ "$LIB" "$F1SPD/proj" >/dev/null 2>&1 || F1SPDRC=$?
+if [ -f "$F1SPD/proj/a/moved away/has space.txt" ] && [ -L "$F1SPD/proj/a/dir two" ]; then
+    pass "spaces race: seam fired (parent swapped between scan and replay)"
+else
+    fail "spaces race: seam fired (parent swapped between scan and replay)"
+fi
+assert_eq "spaces race: victim outside the tree keeps its mode (walk skips)" "600" \
+    "$(stat -c %a "$F1SPD/victim dir/has space.txt")"
+assert_eq "spaces race: skip is not a failure (rc 0)" "0" "$F1SPDRC"
+rm -rf "$F1SPD" "$F1SPS"
+
+# --- 10. pass scratch registered with the caller's cleanup trap (#211 a F12) ------
+# _fsb_pass's NUL temp was a plain mktemp + rm: an aborted pass (Ctrl-C
+# during the minutes-long walk) left the root-owned file in /tmp. The
+# staged-write shape registers it with the caller's _tmp_track trap.
+# Pin: source the real lib with a RECORDING _tmp_track, run one pass,
+# assert the opk-fsb-pass temp was registered.
+F12S=$(mktemp -d)
+mkdir -p "$F12S/root"
+printf 'x\n' > "$F12S/root/f"
+F12_TRACK="$F12S/tracked" FS_SUDO="" \
+    sh -c '. "$1" && _tmp_track() { printf "%s\n" "$1" >> "$F12_TRACK"; } \
+    && _fsb_pass "f12" "$2" -type f -- chmod g+w' \
+    _ "$LIB" "$F12S/root" >/dev/null 2>&1 || true
+if grep -q 'opk-fsb-pass' "$F12S/tracked" 2>/dev/null; then
+    pass "pass scratch registered with _tmp_track (#211 a F12)"
+else
+    fail "pass scratch registered with _tmp_track (#211 a F12)"
+fi
+rm -rf "$F12S"
 
 # --- Summary ---------------------------------------------------------------------------
 echo ""

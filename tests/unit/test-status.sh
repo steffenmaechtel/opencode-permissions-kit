@@ -655,9 +655,12 @@ else
     fail "status pin detection diverges from the wrapper"
 fi
 # home resolution via getent with /home/<user> fallback (0.0.47b W2, the
-# 0.0.43a F12 class): relocated homes must not blank the verdicts
-if grep -q 'getent passwd "${DEFAULT_USER:-$USER}"' "$STATUS" \
-    && grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-$USER}}"' "$STATUS"; then
+# 0.0.43a F12 class): relocated homes must not blank the verdicts.
+# Literals updated for #211 a F9: the default chain deepened to
+# ${USER:-} so set -u survives both-unset (cron env) — same getent
+# resolution, same fallback shape, one level deeper.
+if grep -q 'getent passwd "${DEFAULT_USER:-${USER:-}}"' "$STATUS" \
+    && grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"' "$STATUS"; then
     pass "openchamber verdicts resolve the home via getent (0.0.47b W2)"
 else
     fail "openchamber home resolution regressed to /home hardcode (0.0.47b W2)"
@@ -2186,6 +2189,125 @@ if [ -n "$_st_line" ]; then
     fi
 else
     fail "status.sh id probe line extractable from status.sh"
+fi
+
+# --- upstream "unavailable" row is uncounted (0.0.48b W3, #211 a F8) -----------
+# The row the caller cannot judge (offline/blocked/python3-less) used to
+# be a counted ui_kv_warn: every air-gapped host exited 2 forever — the
+# exact "green unattainable, cron alert worthless" case the file's own
+# W3 rule names. Extract the real three-arm block and drive it: the
+# unknown arm must render as a plain (uncounted) row; a REAL finding
+# (new advisories) must still count as a warn.
+_f8_block="$(sed -n '/^        if \[ -n "\$ADV_NEW" \]; then$/,/^        fi$/p' "$STATUS")"
+if [ -n "$_f8_block" ]; then
+    pass "upstream verdict block extractable from status.sh (#211 a F8)"
+    _f8_run() {
+        (
+            ADV_NEW="$1"
+            ADV_PARSE_OK=false
+            ui_kv()      { echo "kv: $*"; }
+            ui_kv_ok()   { echo "kvok: $*"; }
+            ui_kv_warn() { echo "kvwarn: $*"; }
+            ui_detail()  { :; }
+            eval "$_f8_block"
+        ) 2>&1
+    }
+    _out=$(_f8_run "") || true
+    if printf '%s' "$_out" | grep -q 'kv: upstream unknown' \
+       && ! printf '%s' "$_out" | grep -q 'kvwarn:'; then
+        pass "unavailable arm: plain uncounted row, no warn bump (#211 a F8)"
+    else
+        fail "unavailable arm: plain uncounted row, no warn bump (out=$_out)"
+    fi
+    _out=$(_f8_run "GHSA-test-1") || true
+    if printf '%s' "$_out" | grep -q 'kvwarn: upstream'; then
+        pass "new-advisory arm still a counted warn (#211 a F8)"
+    else
+        fail "new-advisory arm still a counted warn (out=$_out)"
+    fi
+else
+    fail "upstream verdict block extractable from status.sh (#211 a F8)"
+fi
+
+# --- set -u survives unset USER + DEFAULT_USER (#211 a F9) ----------------------
+# ${DEFAULT_USER:-$USER} aborted status.sh with rc 2 under set -u when
+# both were unset (cron/timer env + conf without the stamp) — the rc
+# the contract defines as "warnings only", printed over NO verdict at
+# all. Extract the real probe lines and run them with both unset:
+# rc must be 0 and the degraded /home/ fallback stands. Hermetic —
+# the host's install.conf never runs (0.0.46a F2 class).
+_f9_lines="$(sed -n '/^_oc_home=\$(getent passwd/,+1p' "$STATUS")"
+if [ -n "$_f9_lines" ]; then
+    pass "_oc_home probe lines extractable from status.sh (#211 a F9)"
+    _f9_rc=0
+    _f9_out=$(env -u USER sh -c 'set -u; unset DEFAULT_USER 2>/dev/null || true
+        eval "$1"; printf "home=[%s]" "$_oc_home"' sh "$_f9_lines" 2>&1) || _f9_rc=$?
+    if [ "$_f9_rc" -eq 0 ] && printf '%s' "$_f9_out" | grep -q 'home=\[/home/\]*\]'; then
+        pass "both unset: no set -u abort, degraded /home/ fallback (#211 a F9)"
+    else
+        fail "both unset: no set -u abort, degraded fallback (rc=$_f9_rc out=$_f9_out)"
+    fi
+else
+    fail "_oc_home probe lines extractable from status.sh (#211 a F9)"
+fi
+
+# --- F25: unjudgeable probes render as uncounted unknowns (#211 a F25) ------------
+# Both blocks used the probe's fallback glyph ("?") inside a COUNTED
+# verdict: a failed /proc read printed ui_kv_bad "(? > 80)" (false
+# alarm), a failed stat printed ui_kv_ok "restricted (mode ?)" (false
+# green). Extract both real blocks, drive them with failing probes.
+_f25_ports="$(sed -n '/^port_start=\$(cat \/proc\/sys\/net\/ipv4\/ip_unprivileged_port_start/,/^fi$/p' "$STATUS")"
+if [ -n "$_f25_ports" ]; then
+    F25P=$(mktemp -d)
+    mkdir -p "$F25P/bin"
+    printf '#!/bin/sh\nexit 1\n' > "$F25P/bin/cat"; chmod +x "$F25P/bin/cat"
+    _f25_sh="$(command -v sh)"
+    _out=$(PATH="$F25P/bin" "$_f25_sh" -c '
+        ui_kv()     { echo "kv: $*"; }
+        ui_kv_ok()  { echo "kvok: $*"; }
+        ui_kv_bad() { echo "kvbad: $*"; }
+        ui_detail() { :; }
+        eval "$1"
+    ' sh "$_f25_ports" 2>&1) || true
+    rm -rf "$F25P"
+    if printf '%s' "$_out" | grep -q 'kv: router ports unknown' \
+       && ! printf '%s' "$_out" | grep -q 'kvbad:'; then
+        echo "  ${GREEN}PASS${NC}  unreadable port_start: uncounted unknown, no false alarm (#211 a F25)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  unreadable port_start: uncounted unknown (out=$_out)"
+        failures=$((failures + 1))
+    fi
+else
+    echo "  ${RED}FAIL${NC}  F25 ports block extractable"
+    failures=$((failures + 1))
+fi
+_f25_mnt="$(sed -n '/^    mnt_mode=\$(stat -c %a \/mnt\/c/,/^    fi$/p' "$STATUS")"
+if [ -n "$_f25_mnt" ]; then
+    F25=$(mktemp -d)
+    mkdir -p "$F25/bin"
+    printf '#!/bin/sh\nexit 1\n' > "$F25/bin/stat"; chmod +x "$F25/bin/stat"
+    _f25_sh="$(command -v sh)"
+    _out=$(PATH="$F25/bin" "$_f25_sh" -c '
+        ui_kv()     { echo "kv: $*"; }
+        ui_kv_ok()  { echo "kvok: $*"; }
+        ui_kv_warn(){ echo "kvwarn: $*"; }
+        ui_kv_bad() { echo "kvbad: $*"; }
+        ui_detail() { :; }
+        eval "$1"
+    ' sh "$_f25_mnt" 2>&1) || true
+    if printf '%s' "$_out" | grep -q 'kv: /mnt/c unknown' \
+       && ! printf '%s' "$_out" | grep -q 'kvok:.*mode ?'; then
+        echo "  ${GREEN}PASS${NC}  failing /mnt/c stat: uncounted unknown, no false green (#211 a F25)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  failing /mnt/c stat: uncounted unknown (out=$_out)"
+        failures=$((failures + 1))
+    fi
+    rm -rf "$F25"
+else
+    echo "  ${RED}FAIL${NC}  F25 mnt block extractable"
+    failures=$((failures + 1))
 fi
 
 echo ""

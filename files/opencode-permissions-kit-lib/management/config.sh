@@ -132,6 +132,15 @@ for arg do
         projects|git-config|refresh|status|container-backend|handover|ddev-settings)
             [ -z "$ACTION" ] && ACTION="$arg" && continue
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
+            # `status` doubles as a read-only SUB once an action is set
+            # (the dispatch's usage strings name it; e2e pins
+            # `config git-config status`): consume it, not TARGETS
+            # (#211 a F11). Only when SUB is still empty (#211 b W20):
+            # consuming it over an already-set SUB silently swapped the
+            # action — `git-config off status` rendered the status view
+            # with the toggle not applied; the token now dies at the
+            # usage gate below instead.
+            [ "$arg" = "status" ] && [ -z "$SUB" ] && SUB="status" && continue
             TARGETS="$TARGETS $arg"
             ;;
         on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg"
@@ -145,6 +154,25 @@ for arg do
     esac
 done
 TARGETS="${TARGETS# }"
+
+# Unknown or misplaced tokens are a usage error, not silence (#211 a
+# F11): junk fell into TARGETS and was ignored with rc 0 for every
+# action that takes no positionals — `config git-config ON` rendered
+# the status view as if nothing was wrong, a third usage contract next
+# to uninstall.sh's and status.sh's loud rejections. projects add/remove
+# legitimately carries path TARGETS.
+case "$ACTION" in
+    # projects add/remove and handover carry path targets (the header
+    # documents `config.sh handover <path>`).
+    projects|handover) ;;
+    *)  # if/fi, not a bare `&& die` tail (0.0.41f C1): the empty-TARGETS
+        # case would exit 1 under set -e and abort config for every
+        # legitimate no-argument invocation.
+        if [ -n "$TARGETS" ]; then
+            die "unknown or misplaced argument(s):$TARGETS — run 'opk config' for the menu"
+        fi ;;
+esac
+# --- #211 a F11 gate end ---
 
 banner() {
     ui_banner "${VERSION:-}" "config — change settings"
@@ -180,7 +208,24 @@ for cand in "$SCRIPT_DIR/../sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; 
         break
     fi
 done
-[ -n "$_handover" ] || ddev_handover_root() { :; }
+# Fallback stubs for a damaged/partially deployed library (missing
+# ddev-handover.sh): the MUTATING helper fails loud like the write
+# helpers below (#211 a F2) — a silent no-op let projects add / refresh
+# / handover print success ("setgid, default-acl", "baseline refreshed")
+# over a baseline that never ran. The stamp helpers stay fail-safe:
+# stamp_valid rc 1 = "stamp unknown" forces the full scan, stamp_write
+# no-ops (unreachable once ddev_handover_root aborts under set -e).
+[ -n "$_handover" ] || ddev_handover_root() {
+    echo "error: ddev_handover_root unavailable (ddev-handover.sh missing)" >&2
+    return 1
+}
+[ -n "$_handover" ] || ddev_rootless_bindmounts() {
+    echo "error: ddev_rootless_bindmounts unavailable (ddev-handover.sh missing)" >&2
+    # rc 2 = the caller's "could not set" arm: the backend switch warns
+    # with the manual fix instead of reporting an unevaluated gate as
+    # success.
+    return 2
+}
 [ -n "$_handover" ] || { ddev_handover_stamp_valid() { return 1; }; ddev_handover_stamp_write() { :; }; }
 
 # Shared group-baseline helper with live progress (issue #14). Same
@@ -191,7 +236,10 @@ for cand in "$SCRIPT_DIR/../sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
         break
     fi
 done
-command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
+command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
+    echo "error: fs_baseline_root unavailable (fs-baseline.sh missing)" >&2
+    return 1
+}
 
 # Shared symlink-safe privileged write helper (review 0.0.39g S1):
 # git_config_apply writes into the AGENT-owned ~/.config/opencode — root
@@ -441,7 +489,12 @@ git_config_apply() {
     # agent-replaceable after any completed install) passes `sudo mkdir -p`
     # silently and would redirect the writes below into the link target.
     # The requested toggle was NOT applied — die loudly (user-managed link;
-    # the kit never follows links in the agent home).
+    # the kit never follows links in the agent home). Missing lib gets its
+    # own diagnosis (#211 a F24): a 127 from an absent staged-write.sh
+    # used to misattribute a broken kit to "a parent is a symlink".
+    if ! command -v agent_home_sane >/dev/null 2>&1; then
+        die "kit file sh/staged-write.sh missing — cannot check $target (run: sudo opk update)"
+    fi
     if ! agent_home_sane "$OPENCODE_USER" "$(dirname "$target")"; then
         die "a parent of $target is a symlink — git-config $enable NOT applied (user-managed link)"
     fi
@@ -604,6 +657,15 @@ container_backend_apply() {
 
     # Provision the new backend.
     local docker_host="" podman_socket=""
+    # Preserve a hand-configured podman docker-CLI socket (#211 a F10):
+    # install.sh keeps this key across re-installs (it never writes it
+    # itself — setup-container-backend:313), but the switch used to
+    # grep-drop it silently: update_install_conf_backend below removes
+    # all three backend keys and re-adds only what it is handed. Carry
+    # the pre-existing value over when switching TO podman-rootless.
+    if [ "$new_backend" = "podman-rootless" ] && [ -f "$INSTALL_CONF" ]; then
+        podman_socket=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)
+    fi
     local setup_out
     setup_out=$(sudo sh "$setup_script" "$new_backend" --yes 2>&1) || {
         ui_error "provisioning failed:"
@@ -847,7 +909,7 @@ if [ -z "$ACTION" ]; then
 fi
 
 case "$ACTION" in
-    status)     banner; git_config_status; echo ""; projects_list ;;
+    status)     banner; git_config_status; container_backend_status 2>/dev/null || true; echo ""; projects_list ;;
     projects)
         case "$SUB" in
             list)   banner; projects_list ;;

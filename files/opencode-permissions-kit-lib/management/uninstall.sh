@@ -52,8 +52,10 @@ done
 
 # WSL browser bridge helper (issue #91): needed below to strip the kit
 # section from /etc/wsl.conf before the library goes. Stub keeps older
-# installs (no deployed helper yet) uninstallable.
-browser_bridge_remove() { :; }
+# installs (no deployed helper yet) uninstallable — it FAILS (#211 a
+# F27): the old silent no-op let the caller below claim "removed" over
+# a removal that never ran.
+browser_bridge_remove() { return 1; }
 for cand in "$(dirname "$0")/../sh/wsl-browser-bridge.sh" \
     "/usr/local/lib/opencode-permissions-kit/sh/wsl-browser-bridge.sh"; do
     if [ -f "$cand" ]; then
@@ -334,9 +336,17 @@ else
        || grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null; then
         if [ "$(prompt_yn "Remove the kit's wsl.conf bridge block? ("\
 "kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
-            browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
-            echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
-            log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
+            if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
+                echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
+                log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
+            else
+                # #211 a F27: near-unreachable (the block writer ships in
+                # the same lib) — but a missing helper must not read as a
+                # completed removal.
+                echo "WARN: could not remove the wsl.conf bridge block (kit helper unavailable)" >&2
+                echo "      remove the marked lines yourself — the kit block is comment-only" >&2
+                log "wsl browser bridge removal FAILED (helper unavailable)"
+            fi
         else
             sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl
             echo "wsl.conf left untouched — remove the kit block yourself (WSL never"
@@ -349,8 +359,15 @@ else
             log "wsl browser bridge: wsl.conf block left in place (user declined)"
         fi
     else
-        browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"
-        log "wsl browser bridge removed (no wsl.conf content found; library wsl/ tree dropped)"
+        # Same honesty as the consent arm above (#211 b W11): with the
+        # helper missing (F27's failing stub) the log must not claim a
+        # removal that never ran.
+        if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
+            log "wsl browser bridge removed (no wsl.conf content found; library wsl/ tree dropped)"
+        else
+            echo "WARN: could not remove the wsl browser bridge (kit helper unavailable)" >&2
+            log "wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)"
+        fi
     fi
 fi
 
@@ -400,11 +417,29 @@ log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ 
 echo ""
 echo "--- Removing opencode user ---"
 # Remove the developer from the sharing group FIRST so userdel can clean up
-# the opencode usergroup (its primary group) automatically.
-if id "$DEFAULT_USER" >/dev/null 2>&1 && id "$DEFAULT_USER" | grep -q "$OPENCODE_GROUP"; then
-    run_q sudo gpasswd -d "$DEFAULT_USER" "$OPENCODE_GROUP"
-    echo "Removed $DEFAULT_USER from group $OPENCODE_GROUP."
-    log "removed $DEFAULT_USER from group $OPENCODE_GROUP"
+# the opencode usergroup (its primary group) automatically. Exact-name
+# match (#211 a F28): a bare substring grep matched opencode2 too, and the
+# success echo printed over a silenced gpasswd failure.
+if id "$DEFAULT_USER" >/dev/null 2>&1 \
+    && id "$DEFAULT_USER" | grep -qF "($OPENCODE_GROUP)"; then
+    # The rc must reach the arms (#211 b W1): run_q ends in `|| true`
+    # by design, so wiring a F28's honesty arms through it left the
+    # else arm dead code — a failed gpasswd still printed "Removed".
+    # DRY_RUN keeps the [DRY] echo and the success lines (the file's
+    # run/run_q convention: dry-run reports the intended outcome).
+    _grp_rc=0
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] sudo gpasswd -d $DEFAULT_USER $OPENCODE_GROUP"
+    else
+        sudo gpasswd -d "$DEFAULT_USER" "$OPENCODE_GROUP" >/dev/null 2>&1 || _grp_rc=$?
+    fi
+    if [ "$_grp_rc" -eq 0 ]; then
+        echo "Removed $DEFAULT_USER from group $OPENCODE_GROUP."
+        log "removed $DEFAULT_USER from group $OPENCODE_GROUP"
+    else
+        echo "WARN: could not remove $DEFAULT_USER from group $OPENCODE_GROUP (gpasswd failed)" >&2
+        log "group removal FAILED for $DEFAULT_USER (gpasswd)"
+    fi
 fi
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ans=$(prompt_yn "Remove user '$OPENCODE_USER' and their home directory?" "n")
@@ -442,8 +477,10 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
                     echo "Agent resources backed up: $_un_ag_dir (restore with: cp -a $_un_ag_dir/. ~/$_un_ag_dirname/)"
                     log "agents backup before userdel: $_un_ag_dir"
                 else
-                    echo "WARNING: could not back up $_un_ag_src — its content will be deleted with the user."
-                    log "agents backup FAILED before userdel: $_un_ag_dirname"
+                    # Names the failing commands like the WARN siblings
+                    # (#211 f W2 — review-f class sweep).
+                    echo "WARNING: could not back up $_un_ag_src — its content will be deleted with the user (mkdir/cp failed)."
+                    log "agents backup FAILED before userdel: $_un_ag_dirname (mkdir/cp)"
                 fi
             fi
         done
@@ -462,9 +499,24 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
         # Kill stragglers (best-effort), then remove the user.
         run_q sudo pkill -9 -u "$OPENCODE_USER"
         sleep 1
-        run_q sudo userdel -r "$OPENCODE_USER"
-        echo "User '$OPENCODE_USER' removed."
-        log "user removed: $OPENCODE_USER"
+        # The rc must reach the arms (#211 c W1): run_q ends in `|| true`
+        # by design, so a failed userdel still printed "User … removed" —
+        # userdel refuses while ANY process of the user runs (a straggler
+        # the pkill above can miss). DRY_RUN keeps the [DRY] echo and the
+        # success lines (the file's run/run_q convention).
+        _udel_rc=0
+        if [ "$DRY_RUN" = true ]; then
+            echo "  [DRY] sudo userdel -r $OPENCODE_USER"
+        else
+            sudo userdel -r "$OPENCODE_USER" >/dev/null 2>&1 || _udel_rc=$?
+        fi
+        if [ "$_udel_rc" -eq 0 ]; then
+            echo "User '$OPENCODE_USER' removed."
+            log "user removed: $OPENCODE_USER"
+        else
+            echo "WARN: could not remove user '$OPENCODE_USER' (userdel failed)" >&2
+            log "user removal FAILED for $OPENCODE_USER (userdel)"
+        fi
     else
         echo "User '$OPENCODE_USER' kept."
     fi
@@ -541,6 +593,13 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             run_q sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
         done
         run_q sudo chmod g-s "$root"
+        # NB (#211 c W1 sweep): this closing log aggregates rc-blind
+        # run_q operations (find-chown, setfacl x2, chmod g-s) — the
+        # same lie class c W1 fixed at userdel/audit-log, on a root-run
+        # revert loop with its own partial semantics. Deliberately not
+        # changed in this wave: recorded as a follow-up candidate for
+        # its own wave (needs its fixture updated with it), the a F1
+        # ddev-handover precedent.
         if [ -n "$_un_acl_skipped" ]; then
             log "project ownership reverted + kit ACL entries PARTIALLY removed"\
 " (one or more group ids were unknown): $root"
@@ -576,9 +635,25 @@ log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit"\
 echo ""
 echo "--- Removing audit log ---"
 if [ "$(prompt_yn "Delete audit log too? (recommended)" "y")" = "y" ]; then
-    log "audit log removed: /var/log/opencode-permissions-kit"
-    run_q sudo rm -rf /var/log/opencode-permissions-kit
-    echo "Audit log removed."
+    # Log the outcome, not the intent (#211 c W1): the log line used to
+    # fire BEFORE the rm — a removal run_q silenced could fail with the
+    # audit trail already claiming success. DRY_RUN keeps the [DRY] echo
+    # and the success lines (the run/run_q convention).
+    _al_rc=0
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] sudo rm -rf /var/log/opencode-permissions-kit"
+    else
+        sudo rm -rf /var/log/opencode-permissions-kit >/dev/null 2>&1 || _al_rc=$?
+    fi
+    if [ "$_al_rc" -eq 0 ]; then
+        echo "Audit log removed."
+        log "audit log removed: /var/log/opencode-permissions-kit"
+    else
+        # Names the failing command like the userdel/gpasswd arms
+        # (#211 e W3 — review-e wording finding).
+        echo "WARN: could not remove the audit log at /var/log/opencode-permissions-kit (rm failed)" >&2
+        log "audit log removal FAILED for /var/log/opencode-permissions-kit (rm)"
+    fi
 else
     log "audit log kept (requested by user)"
     echo "Audit log kept at /var/log/opencode-permissions-kit"

@@ -1,0 +1,765 @@
+# Resolution — pr-00211 (release 0.0.55 full-scope review)
+
+Status: closed (maintainer, 2026-10-22) — confirmed the cited stop-rule
+check: review g's dispositions (and every commit after the f-wave's
+last code change) touched bookkeeping only (resolution.md, INDEX.md),
+so RM-0064/0066 hold. Closing round: review g (fresh session over
+`750d4e7..79582d9`: the f-wave's two strings + pins, ledger) found 4
+(2 LOW, 2 INFO), all dispositioned below; every g-fix stayed in
+bookkeeping (g W1 anchors, g W2 pattern record). The f-wave's code
+fixes hold under g's executed verification (both sabotages red at the
+right pins; make test rc=0 at 79582d9 — the ledger's first full-suite
+record at the f-wave HEAD). Closure retires nothing recorded as
+follow-up (revert-loop closing log since c W1, spaced-path race pin
+since b — own waves when picked up), and the release gate stands: both
+e2e suites at the final tree before tagging (RM-0091; comparator
+303/47 @ 750d4e7). Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7 e-, 7
+f-, 4 g-findings dispositioned — 99 across seven snapshots.
+
+Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
+subagents, 37 findings). Base v0.0.55 @ ad9467d.
+
+## Dispositions
+
+| Finding | Disposition | Commit | Key evidence |
+|---|---|---|---|
+| a F1 (HIGH) | **implemented** | `fd13a19` | race + spaces pins, sabotage red→green, class sweep — detail below |
+| a F2 (MED) | **implemented** | `e7349e5` | loud stubs + abort pin + update.sh twin swept — detail below |
+| a F3 (MED) | **implemented** | `56bc585` | if/fi tail; real-binary pins both ways; sabotage red→green |
+| a F4 (LOW) | **implemented** | `31a755a` | three honest arms, both twins; 3-arm stub pins; sabotage red→green |
+| a F5 (LOW) | **implemented** | `e3dd92c` | first-wins loops at both sites; origin-marker pins; sabotage red→green |
+| a F6 (LOW) | **implemented** | `724e4f8` | else-log like the sudoers twin; both arms pinned; sabotage red→green |
+| a F7 (LOW) | **implemented** | `9dee2f3` | fail-safe stub rc 0 (never-shadow); pin evals the real line |
+| a F8 (LOW) | **implemented** | `f86cf01` | uncounted unknown row per W3; both arms pinned; sabotage red→green |
+| a F9 (LOW) | **implemented** | `edf5c84` | ${USER:-} chain; unset-env pin; W2 wiring pin updated |
+| a F10 (LOW) | **implemented** | `c3c6f9c` | carry-over on podman switches; real-function conf pin; sabotage red |
+| a F11 (LOW) | **implemented** | `727c76d` | usage gate + status-as-SUB; 7-case loop pin; sabotage red→green |
+| a F12 (LOW) | **implemented** | `27db42a` | _tmp_track registration; recording pin; sabotage red→green |
+| a F13 (LOW) | **implemented** | `911987b` | three honest linger arms; 3-arm stub pins; sabotage red→green |
+| a F14 (LOW) | **implemented** | `578c070` | honest lines at all three pairs; ok/fail pins; sabotage red→green |
+| a F15 (LOW) | **implemented** | `5e7f913` | readlink -f full chain; chained-symlink dispatch pin |
+| a F16 (LOW) | **implemented** | `6f9dd75` | field validation + counted warn; real-function pin; sabotage red |
+| a F17 (LOW) | **implemented** | `120270f` | stage+mv at both sites; recorder pins; sabotage red→green |
+| a F18 (LOW) | **implemented** | `d07b103` | 8-line consumption bound, both strip paths; worst-case pin |
+| a F19 (LOW) | **implemented** | `e3b187e` | sudoers row names all four rules |
+| a F20 (LOW) | **implemented** | `e3b187e` | Makefile targets + test: chain; make test runs 41 suites |
+| a F21 (LOW) | **implemented** | `e3b187e` | 'review case lint' in Makefile + workflow |
+| a F22 (LOW) | **implemented** | `e3b187e` | supply-chain paragraph names Pages/stable |
+| a F23 (LOW) | **implemented** | `e3b187e` | --openchamber-policy row + -y aliases in cli.md |
+| a F24 (INFO) | **implemented** | `f653615` | command -v guard names the missing lib; both arms pinned |
+| a F25 (INFO) | **implemented** | `01b5fce` | uncounted unknown rows; failing-probe pins (cat/stat stubs) |
+| a F26 (INFO) | **implemented** | `c881b13` | status action lists the backend row (menu parity) |
+| a F27 (INFO) | **implemented** | `5fa9a1e` | bridge stub fails; removal echo follows rc; both arms pinned |
+| a F28 (INFO) | **implemented** | `5496327` | exact group match + honest gpasswd arms; 3-case pin |
+| a F29 (INFO) | **implemented** | `52f1a90` | note() %s; literal-passthrough pin |
+| a F33 (INFO) | **implemented** | `9af93b4` | --refresh skip named under --only-binary |
+| a F34 (INFO) | **implemented** | `9af93b4` | header describes the manifest reality |
+| a F31 (INFO) | **implemented** | `17336fc` | 10 comment refs re-pointed to internal/records/ |
+| a F35 (INFO) | **deliberately not done** | — | TLS-only trust anchor is the documented model — detail below |
+| a F36 (INFO) | **implemented** | `3ced7ea` | cli.md flags tracked against parse_args; sabotage red |
+| a F30 (INFO) | **deliberately not done** | — | 755 on sourced libs: accepted at 0.0.49, pinned by test-bypass-guard |
+| a F32 (INFO) | **deliberately not done** | — | project_path_sane twins: structural refactor, own wave — detail below |
+| a F37 (INFO) | **deliberately not done** | — | partial set-skeletons: no defect found — detail below |
+| b W1 (MED) | **implemented** | `6bb715b` | silenced direct sudo call, rc-captured; pin drives real wiring; sab. red |
+| b W2 (MED) | **implemented** | `9ffb51e` | parser gains `--yes\|-y`; alias pinned; sabotage red-by-abort |
+| b W3 (MED) | **implemented** | `37f079d` | stub loud like both siblings; stubs pin-executed; sabotage red |
+| b W4 (MED) | **implemented** | `a0396c3` | advisories/ui 755 manifest pins (install+update); sabotage red |
+| b W5 (MED) | **implemented** | `98dca3f` | F24 fixture path moved to /var/tmp (RM-0016 shape); sandbox policy green |
+| b W6 (MED) | **implemented** | `e6a4c7a` | write-half asserts fresh `-- end` marker; dead disjunct gone; sab. red |
+| b W7 (LOW) | **implemented** | `d071a16` | slash roots normalized; `/` refused loud; race pin drives slashed root |
+| b W8 (LOW) | **implemented** | `cdb9916` | temp trap-registered (TRACK pin); opk arm cleans (residue pin) |
+| b W9 (LOW) | **implemented** | `a337527` | four pairs honest (`_ok` flags); 1 driven + 3 grepped; sabotage red |
+| b W10 (LOW) | **implemented** | `f194ce8` | per-field validation (u32 cap, zero-count gap); sabotage red |
+| b W11 (LOW) | **implemented** | `6bb715b` | no-markers arm if-wrapped with FAILED log; wiring pin |
+| b W12 (LOW) | **implemented** | `37f079d` | F2 pin executes both stubs (rc 1 + stderr); sabotage red |
+| b W13 (LOW) | **implemented** | `a1b2b76` | spaces drive rc captured + asserted; sabotage red with tally |
+| b W14 (LOW) | **implemented** | `6bb715b` | sudo stubbed in the F27 extract drive |
+| b W15 (LOW) | **implemented** | `37f079d` | sweep paragraph corrected (browser_bridge_remove loud since a F27) |
+| b W16 (LOW) | **implemented** | `bc56a17` | F12 enumeration completed (45 hits/12 files, all checked safe) |
+| b W17 (LOW) | **implemented** | `d9d0abf` | config.sh --yes/-y documented in cli.md |
+| b W18 (LOW) | **implemented** | — | e2e 303 + rootless 47 at post-fix HEAD; detail: a F1 gates note |
+| b W19 (INFO) | **implemented** | `cdb9916` | mv-replaces-symlink delta noted at both sites |
+| b W20 (INFO) | **implemented** | `f2d7b03` | status consumed only while SUB empty; clobber dies at gate (pinned) |
+| b W21 (INFO) | **implemented** | `d9d0abf` | both %b comments reworded to the %s rationale |
+| b W22 (INFO) | **implemented** | `37f079d` | browser_bridge_install noted in-code as guarded non-path |
+| b W23 (INFO) | **implemented** | `98dca3f` | F11 (47l) + F24 (5l) extracts line-bounded (OC164 shape) |
+| b W24 (INFO) | **implemented** | `33bc64b` | OC164 comment honest (28 lines), bound 26→30 for the W8 growth |
+| b W25 (INFO) | **implemented** | `bc56a17` | F17 legacy-pin count corrected (one write-literal pin, not ×2) |
+| b W26 (INFO) | **implemented** | `e6a4c7a` | dead lowercase disjunct removed with the W6 rewrite |
+| b W27 (INFO) | **implemented** | `a1b2b76` | one comment records the W11 root-arg rationale |
+| b W28 (INFO) | **implemented** | `2796e04` | empty parse_args extraction fails loud (tripwire) |
+| b W29 (INFO) | **implemented** | `bc56a17` | F16 sweep pattern corrected (reproducible `\$((` form) |
+| b W30 (INFO) | **implemented** | `2796e04` | reverse direction: doc flags must exist in parser; sab. red |
+| c W1 (MED) | **implemented** | `47e07f9` | userdel + audit-rm honest arms; sudo-stub pins ok/fail/dry; sab. red |
+| c W2 (LOW) | **implemented** | `fce42af` | original root captured pre-shift; `/` + `//` message pins; sab. red |
+| c W3 (LOW) | **implemented** | `7d652cf` | _tmp_track above the tee; TRACK-before-TEE order pin; sab. red |
+| c W4 (LOW) | **implemented** | `1d2e2ae` | reverse-direction empty-extraction tripwire; heading-drift sab. red |
+| c W5 (LOW) | **implemented** | `aed81ee` | -y drive abort-contained (subshell print); sab. red at the tally |
+| c W6 (LOW) | **implemented** | `0885c9f` | Follow-ups wording corrected (spaces in the swapped components) |
+| c W7 (INFO) | **implemented** | `2bda35b` | staging write `|| { rm; ui_error; exit 1; }`; printf-fail pin; sab. red |
+| c W8 (INFO) | **deliberately not done** | — | disclosed kill-window residue; trap/glob-clean risk > inert residue |
+| c W9 (INFO) | **implemented** | `9ac107c` | `-le 4294967295` value caps both fields; u32max fixture pin; sab. red |
+| c W10 (INFO) | **implemented** | `9ac107c` | zero-START acceptance recorded in-code; zerostart fixture counts good |
+| c W11 (INFO) | **deliberately not done** | — | count anchored at the next e2e run; release gate owes both anyway |
+| d W1 (MED) | **implemented** | `35d5549` | c W6 row's SHA corrected: bc56a17 (b-wave, out of range) → 0885c9f |
+| d W2 (LOW) | **implemented** | `35d5549` | c W1 anchors + sweep count dated to 47e07f9 (16 at HEAD, note-driven) |
+| d W3 (INFO) | **deliberately not done** | — | revert-path stub noise only; discrimination intact (d W3 detail) |
+| e W1 (MED) | **implemented** | `47b7531` | NB history corrected: anchors measured at 4 refs, shifts re-attributed |
+| e W2 (LOW) | **implemented** | `6fc2cf2` | warn enumerates all three skip causes; F16-drive enumeration pin |
+| e W3 (INFO) | **implemented** | `67749e7` | audit WARN names (rm failed) like its siblings; 4th fail-drive case arm |
+| e W4 (INFO) | **deliberately not done** | — | loud via test-builtin error — cosmetic assert shape not worth churn |
+| e W5 (INFO) | **deliberately not done** | — | red-not-silent holds; d's phrasing corrected in snapshot e, no code |
+| e W6 (INFO) | **deliberately not done** | — | DRY asserts are convention pins by design; fail drives discriminate |
+| e W7 (INFO) | **deliberately not done** | — | git history immutable; retraction recorded consistently in 3 loci |
+| f W1 (LOW) | **implemented** | `4bf080a` | full-wording log pin; tail-revert sabotage RED (detail) |
+| f W2 (LOW) | **implemented** | `2be6fc3` | backup arm names (mkdir/cp); labeled fail-drive pin; sweep below (detail) |
+| f W3 (LOW) | **implemented** | `5f5d5d0` | NB: e-table cell 15→13 @ce7cbc5; snapshot immutable |
+| f W4 (INFO) | **implemented** | `5f5d5d0` | status e2e claim SHA-anchored at `750d4e7` (re-executed by review-f) |
+| f W5 (INFO) | **deliberately not done** | — | label asymmetry cosmetic; fail path dumps `$_out` (traceable) |
+| f W6 (INFO) | **deliberately not done** | — | sole-emitter discrimination verified; note in review-f.md |
+| f W7 (INFO) | **deliberately not done** | — | subsumptions defensible; in-code comment names the intent |
+| g W1 (LOW) | **implemented** | `9fa331e` | NB: sweep anchors measured at 2be6fc3 (:517/:654/:482-483) — detail below |
+| g W2 (LOW) | **implemented** | `9fa331e` | NB: full emitter pattern set recorded; result re-confirmed — detail below |
+| g W3 (INFO) | **deliberately not done** | — | fail-only pin scope by design; F2DRY stays as future drive hook |
+| g W4 (INFO) | **deliberately not done** | — | solo shape disclosed in review-g provenance; no code action exists |
+
+## Follow-ups after snapshot b
+
+- **Spaced-path race pin** (maintainer's external mini-review, post-b;
+  review b missed it — the b W6 class on the a F1 pin): the happy-path
+  spaces drive proves chmod APPLIES on spaced paths but cannot notice a
+  walk that silently stops SKIPPING them; the a F1 race fixture drove
+  unspaced paths only. Pinned with the same deterministic find-stub
+  seam, spaces in the swapped parent, the operand and the victim
+  (`dir two`, `has space.txt`, `victim dir` — the scan root and the
+  `proj`/`a` components stay unspaced; c W6 corrected this text, which
+  claimed "every component"): victim stays 600, rc 0, seam fired.
+  Sabotage both ways: `for _p in $@` (word-splitting) goes red at the
+  happy-path assert; the skip probe neutered goes red at BOTH race
+  pins. Commit `82cdd4a`.
+
+## Follow-ups after snapshot c
+
+- **Rotation deviation (process, for review e's reviewer)**: snapshot d
+  was produced in the SAME session that authored the c-wave fixes —
+  the maintainer's stop between rounds was skipped (RM-0061) and the
+  author held the verification duty over their own fixes (RM-0060).
+  The d reviewer subagents were fresh contexts, but the pass as a
+  whole lacks the rotation's guarantee. Review e (fresh session) is
+  the authoritative round for the `ce7cbc5..HEAD` diff: it should
+  treat snapshot d as a lead, not as a completed review — re-verify
+  d's clean verdicts alongside its own pass.
+
+- **Revert-loop closing log** (c W1's class sweep, beyond the named
+  lines): uninstall.sh's per-root closing log "project ownership
+  reverted + kit ACL entries removed" (:598 at the c-wave fix commit
+  `47e07f9`, :605 at HEAD after the note below — #211 d W2) aggregates four rc-blind
+  `run_q` operations (`find -exec chown` :560, `setfacl -x` ×2
+  :590-591, `chmod g-s` :593) — the same lie class c W1 fixed at
+  userdel/audit-log, but on a root-run revert loop with its own
+  documented partial semantics (0.0.42g/h era) and e2e-pinned state
+  checks. Deliberately deferred to its own wave (the a F1
+  ddev-handover precedent): noted in-code at the site; needs its
+  fixture updated with it. The e2e pins assert the reverted STATE
+  (stat), not the log string — a honesty arm there will not break
+  them, but the change deserves its own reviewed diff.
+
+## Evidence detail
+
+### a F30, F32, F35, F37 (INFO) — deliberately not done
+
+**a F30** — the four sourced-only sh/ libs deploy mode 755 (deploy-lib
+manifest). Carried unchanged since 0.0.41d and explicitly accepted by
+the 0.0.49 full review. The original rationale overclaimed the pin
+coverage (b W4): test-bypass-guard pinned shell-warn.sh only, log.sh
+lives in test-deploy-lib — advisories.sh and ui.sh had no mode pin
+anywhere. All four are pinned now (bypass-guard carries the
+advisories/ui manifest rows beside shell-warn's, install and update
+wiring both). Changing the manifest fights the standing pins and a
+prior accepted disposition for zero behavior — the 644-sourced-lib
+invariant gains nothing here.
+
+**a F32** — `project_path_sane` exists as two near-identical copies
+(install.sh:930, config.sh:263). Unifying means moving the gate into
+a sourced lib that install.sh can use BEFORE the library is deployed
+(install-time chicken-and-egg: install.sh self-fetches its siblings
+and runs pre-deploy) — a structural refactor with deploy-order risk
+on the security gate that bounds the recursive group baseline. Own
+wave, not a drive-by. Both copies verified consistent at this tree.
+
+**a F35** — the update trust anchor is TLS-only transport to a
+tracked branch ref. That IS the documented streaming-install model
+(security-model.md's supply-chain paragraph, updated by a F22); the
+reviewer's report explicitly asked for no change.
+
+**a F37** — the bin/ family's partial `set` skeletons (`set -e` xor
+`set -u`). Both review agents traced every fallible site: the
+wrapper's fail-open hot path is intact, no unguarded defect exists.
+Forcing `set -euo pipefail` uniformly would change failure semantics
+on the session-start hot path for no measured gain — risk without a
+finding behind it.
+
+### b W1 (MED) — gpasswd rc now reaches the honesty arms
+
+`run_q`'s body ends in `|| true` (rc 0 unconditionally), so a F28's
+`if run_q sudo gpasswd …` could never take its else arm — the false
+"Removed" echo and the removal audit log persisted over every failure
+mode the fix's own comment names. The block now silences the call
+itself (`>/dev/null 2>&1`) and captures the rc (`_grp_rc`), with a
+DRY_RUN echo arm (the file's run/run_q convention: dry-run reports the
+intended outcome). Pins (test-uninstall.sh): the F28 drive stubs
+`sudo` — the REAL seam — instead of an rc-propagating run_q fake that
+contradicted the shipped contract; new DRY-run arm. Sabotage (revert
+to the run_q wiring): ok-arm + DRY pins RED; restored green. Sweep:
+`grep -rn 'if run_q' files/` — the gpasswd site was the only
+rc-conditioned run_q call; the remaining run_q uses were recorded
+here as "bare best-effort cleanup calls by design" — **that claim was
+false as written** (review c's W1): `userdel -r` (the primary
+destructive op) and the audit-log rm both lied in the gpasswd shape.
+Both went honest in c W1; the full-call sweep (`grep -rn 'run_q'
+files/` — 15 hits, one file) is recorded under c W1 below, including
+the deferred revert-loop closing log it surfaced. b W11/W14 ride the same commit:
+the no-markers bridge arm is if-wrapped like its consent sibling
+(wiring pin, F14's sites-2/3 precedent — the arm is the stub path),
+and the F27 extract's live `sudo rm -rf` is behind a stubbed sudo.
+
+### c W1 (MED) — userdel + audit-log arms honest, run_q sweep complete
+
+Both sites the b W1 sweep mischaracterized got the gpasswd treatment:
+silenced direct sudo call, rc captured (`_udel_rc`/`_al_rc`), DRY echo
+arm, success echo+log only on rc 0, WARN-to-stderr + FAILED log
+otherwise. The audit arm's log line moved AFTER the act (outcome, not
+intent). Pins (test-uninstall.sh): both real blocks extracted and
+driven through a per-command `sudo` stub — userdel block with
+prompt_yn/id/run_q(real contract)/sleep stubs, ok/fail/dry arms; audit
+block with prompt_yn/sudo stubs, ok/fail/dry arms. The fail drives
+assert three things at once (WARN present, FAILED log present, false
+"removed" absent). Sabotage (rc capture deleted from both blocks):
+both failure pins RED; restored green.
+
+Class sweep (L2), full-call this time — `grep -rn 'run_q' files/`:
+15 hits, all in uninstall.sh. Disposition of every call site (anchors
+at the fix commit `47e07f9`; review-c had quoted the PRE-fix
+positions :500/:615 — corrected NB below):
+gpasswd (b W1, direct silenced call now), loginctl/systemctl/podman/
+pkill teardown (:490-498 — genuinely best-effort by design, no success
+claim rides them), userdel (:509, fixed here), audit rm (:637, fixed
+here), and the revert loop's four ops (find-chown :560, setfacl ×2
+:590-591, chmod g-s :593) whose closing log (:598) claims completion
+over them — the same class, deliberately deferred to its own wave
+(see Follow-ups after snapshot c; in-code note at the site). No other
+file carries run_q. NB (#211 d W2; history corrected per review-e W1):
+the anchors and the 15-hit count are as of the fix commit `47e07f9` —
+review-c's :500/:615 were the PRE-fix positions (measured at ce7cbc5);
+the fix's own comment lines had already moved the calls to :509/:637
+by then. The `0885c9f` note sits ABOVE the closing log (inserted
+after chmod g-s :593) and moved the audit rm :637→:644 and the closing
+log :598→:605 — userdel (:509) is above the note and unmoved by it —
+and the note's own run_q mention pushed the sweep count to 16 at HEAD.
+
+NB (#211 f W3 — correction of review-e's own W1 table): the
+snapshot's comparison row "run_q count | 15 | 15 | 16" overcounts
+the PRE-fix column — measured `grep -c run_q` at ce7cbc5 is **13**;
+the 15 the table shows there is the 47e07f9 arithmetic (13 − 2 calls
+the c W1 fix converted to direct sudo + 4 run_q mentions the fix's
+comments added). Every anchor the corrected NB above dates is
+measured true (review-f re-measured all four refs independently);
+review-e.md stays immutable as history — this NB is the correction
+record.
+
+c W8 (deliberately not done): opk's kill-window residue is disclosed
+in-code ("opk carries no cleanup trap", b W8) and inert — a stranded
+root-owned staging file nothing reads. An EXIT/INT/TERM trap would
+change the wrapper-family's failure semantics (a F37's tradeoff), a
+glob clean of `policy.json.opk-new.*` would be root rm on a glob in
+/etc (L5) — both disproportionate to the residue. c W11 (deliberately
+not done): the rootless-47 count is internally consistent; the next
+e2e run records a fresh comparator and the release gate (RM-0091)
+re-runs both suites regardless.
+
+### c W3 (LOW) — registration precedes staging
+
+Order-class sweep (`grep -rn '_tmp_track "' files/` — 20 sites):
+every other site registers immediately after its mktemp with no
+external command in between; the policy staging tee was the only
+write-before-register shape. Pin asserts TRACK fires before TEE in
+the chronological stub recording; sabotage (registration deleted)
+went red at three pins, restored green.
+
+### d W3 (INFO) — deliberately not done: revert-path stub noise
+
+The audit-block drive (test-uninstall.sh) stubs prompt_yn/sudo/log
+but no run_q: a REVERTED block calls run_q and the transcript shows
+"run_q: not found" noise instead of a controlled contract. The pin
+still discriminates for the right reason — the false "Audit log
+removed." absence-assert is the load-bearing check, and it trips on
+exactly the lie c W1 retired. The current-shape block never calls
+run_q, so the green path is exact; adding a run_q stub would only
+prettify a failure transcript. Recorded so the asymmetry vs the
+userdel drive (which carries a real-contract run_q stub, because its
+block DOES call run_q today) is not re-litigated.
+
+### a F24–F29, F33, F34 (INFO) — small-honesty batch
+
+F24 (`f653615`): a missing sh/staged-write.sh dies as "kit file
+missing" instead of a phantom symlink warning (command -v guard; both
+arms pinned). F25 (`01b5fce`): the two unjudgeable probes render as
+uncounted unknown rows (failing cat/stat stubs pin the unknown row and
+the absence of the counted verdict). F26 (`c881b13`): `config status`
+lists the backend row like the menu. F27 (`5fa9a1e`): the
+browser_bridge_remove stub fails and the removal echo follows its rc.
+F28 (`5496327`): exact group-name match + gpasswd-rc-conditioned
+messages (member-ok / gpasswd-fail / opencode2-non-member pinned).
+F29 (`52f1a90`): note() uses %s — escape-looking directory names
+print literally (no caller relied on %b; grepped). F33/F34
+(`9af93b4`): --refresh's skip under --only-binary is named; the
+header describes the manifest-based re-deploy.
+
+### a F19–F23 (LOW) — docs/CI drift batch (`e3b187e`)
+
+F19: security-model.md's sudoers row now names all four granted rules
+(cwd-check was missing — files.md was already correct). F22: the
+supply-chain paragraph names the real default channel (Pages/stable)
+instead of the dev `master` ref — test-pages' stable-entry URL pins
+stay green. F23: cli.md's install table gains
+`--openchamber-policy <yes|no>` (matching install.sh:395-403's parser)
+and every `--yes` that accepts `-y` lists it. F20: test-pages and
+test-rules-index-parity gained Makefile targets and joined the
+`test:` chain (both targets executed green locally; the CI run: steps
+stay as they were — test-workflows' coverage pin untouched). F21:
+the German step name is English now (Makefile echo + workflow step).
+Verification: test-docs, test-pages, test-workflows, and both new
+targets green. NB: no automated pin compares cli.md flag rows against
+the parsers — that gap is a F36 (the finding's own note) and stays
+open there.
+
+### a F18 (LOW) — stripper eats foreign comments on a marker-less block
+
+Both strip paths bound their in_block consumption to the kit block's
+8 inner lines (7 comments + carrier): a 9th consumed line means the
+end marker was hand-destroyed — the stripper stops there and foreign
+comments survive, "never eat foreign content" now holds for comments
+too. Pin history (all three failure modes recorded for the next pin
+author): the first draft was VACUOUS (bb() pins the default conf, the
+fixture was never written — both asserts greened on untouched input);
+the second drove the real conf and exposed an OFF-BY-ONE (bound 9 ate
+the first foreign comment — the block has 8 inner lines); the
+sabotage-restore also wiped the uncommitted bound fix (the
+AGENTS.md stash-first trap, hit for real). Final: worst-case fixture
+(marker-less block + foreign comment + section) through the REAL
+write path, sabotage (bound neutralized) red, restored green
+(`d07b103` + `271eed8`).
+
+### a F17 (LOW) — non-atomic openchamber policy writes
+
+Both sites (opk's openchamber-secure, update.sh's opt-in re-apply)
+stage the pin on a pid-suffixed sibling temp and flip the live
+policy.json via mv only — the 0.0.42e C5/0.0.44a V10 shape the
+sudoers, umask and lib deploys already use; these two 0.0.47a
+additions had missed the wave. Mechanism pins: recording stubs prove
+the content lands on `policy.json.opk-new.$$` and the final path is
+only ever an mv target, never a write target (the opk extract runs
+against a rewritten scratch root — the real /etc path is unwritable
+for the suite). Sabotage (direct write restored) → red; restored →
+green. Legacy pins corrected (b W25: this line originally claimed
+"three legacy pins (test-update-flags ×2)" — only ONE write-literal
+pin exists there (:512, carried to the mv form); the other openchamber
+pins assert the write-shape-agnostic `sudo test -f` probe authority,
+and kit-cli's single write-literal pin went to the mv form too); the
+#198 a W5 line-bound rose 20→26 for the grown else arm, then 26→30
+for b W8's registration line. Sweep: `grep -n
+'> /etc\|tee /etc' bin/ management/` — one remaining truncate-in-place
+write, setup-container-backend's sysctl drop-in (:302): tuning knob,
+best-effort `|| true`, not a protection layer; left as is.
+
+### a F16 (LOW) — unvalidated subuid/subgid arithmetic
+
+Malformed /etc/subuid(subgid) lines are counted and skipped before
+any `$(( ))` sees them: digit-leading junk no longer kills
+provisioning under set -e (dash dies rc 2 on the arithmetic syntax
+error — reproduced during pin development), leading zeros no longer
+skew the overlap math as octal, and zero-START fields are rejected
+too. The summary warn prints AFTER the read loop: the done-level
+`2>/dev/null` swallows stderr INSIDE the loop — the pin's first draft
+warned from within and never saw its own output (recorded here as
+the redirect-scope trap for the next pin author). Pins drive the REAL
+function against a scratch file (good line moves the allocation,
+three malformed lines → one counted warn, rc 0). Sabotage (validation
+deleted) → red; restored → green. Sweep: `grep -n '\$((\$' bin/ sh/`
+— no other shipped site feeds file-read fields into arithmetic
+unvalidated. (b W29: that recorded pattern matches nothing at HEAD —
+not even the fixed site, whose arithmetic is brace-less
+`$((start + count - 1))`; the reproducible pattern is
+`grep -n '\$((' bin/ sh/`, which shows only loop counters and the
+validated allocator — the prose conclusion held.)
+
+### a F15 (LOW) — opk single-hop symlink resolution
+
+bin/opk resolves its library root with `readlink -f` (the sibling
+shape ddev-migrate/xdg-open already use): chained user symlinks
+(~/bin/opk -> /usr/local/bin/opk -> lib) no longer stop one hop short
+and mis-report "not installed". Pin development notes: the first
+draft asserted --help output — which never consults LIBDIR, so the
+single-hop sabotage stayed GREEN (caught during sabotage
+verification; rewritten to dispatch status through the two-hop chain
+and assert the fake-lib stub answers, `a40d58b`). Sabotage now red,
+restored green. Sweep: bin/ddev-migrate:13 and bin/xdg-open:47
+already use readlink -f; browser-bridge/socket-check/cwd-check are
+invoked by absolute path (no self-resolution).
+
+### a F14 (LOW) — silent handover pairs, unconditional success
+
+All three root-run pairs (dhr dev->agent, dhb dev-owned handback, dhp
+settings — mirrored op orders kept intact) now print their success
+line only when both ops ran clean; a partial pair warns on stderr
+naming the tree and the self-heal. The pairs stay best-effort by
+design (0.0.45e W1's position: root context, EPERM unlikely,
+next-rescan heals) — the rc contract is unchanged, only the message
+stopped lying. Pins drive the extracted real site-1 block with
+stubbed chmod/chown through ok/chmodfail/chownfail (the `continue`
+inside the extracted fragment is parse-safe — it sits right of a
+false `[ -L ]`); sites 2/3 wiring-grepped. Sabotage (unconditional
+success restored at site 1) → red; restored → green.
+
+### a F13 (LOW) — linger success claimed over failure
+
+enable_linger now has three honest arms: ok → success line + log;
+failed → stderr warn naming the consequence (rootless daemon dies at
+logout) + retry hint + FAILED log; no loginctl → silent skip
+(containers, WSL — the block's existing contract). Pins drive the
+extracted real function through all three arms with a stubbed
+loginctl; the absent arm needed an empty PATH plus an absolute sh
+(dash applies PATH assignments before command search) and the first
+draft let the host's real loginctl leak in — the 0.0.46a F2 class
+caught in the pin's own development. Sabotage (unconditional success
+restored) → red; restored → green.
+
+### a F12 (LOW) — unregistered pass scratch
+
+_fsb_pass's NUL temp registers with the caller's `_tmp_track` trap
+(staged-write.sh's shape, `command -v` guarded for contexts without
+the host script's trap); the plain rm still covers the normal path.
+Pin: the real lib sourced with a RECORDING `_tmp_track` (one-argument
+signature, registry via env — the first draft invented a second
+argument the real call never passes), one pass run, the
+opk-fsb-pass temp asserted present. Sabotage (registration deleted)
+→ red; restored → green. Sweep: `grep -rn mktemp files/` —
+staged-write registers; sudoers-deploy / wsl-browser-bridge /
+ddev-migrate / fetch_kit carry inline rm-or-trap cleanup (verified in
+snapshot a by D1/A2); install.sh:659 is the deliberate backup
+survivor; install.sh:2334 and :103 sit inside install's own
+trap-covered scratch dirs. Completed for b W16: the full grep at HEAD
+shows 45 hits in 12 files — the remaining sites (ddev-handover.sh:124,
+config.sh:517, update.sh:228/:1266/:1279, status.sh:694/:861/:947,
+setup-container-backend:261) were checked in review b: every one
+carries inline rm cleanup on all paths, a _tmp_track registration, or
+sits inside a trap-covered scratch dir — no leak found; the
+enumeration is now exhaustive as written.
+
+### a F11 (LOW) — config.sh silently swallows unknown tokens
+
+Leftover TARGETS now die as a usage error for every action that takes
+no positionals; projects add/remove and handover keep their documented
+path targets (the header names `config.sh handover <path>`), and
+`status` after a set action is consumed as the read-only SUB the
+dispatch's own usage strings already name — the e2e-pinned
+`config.sh git-config status` flow now reaches it via SUB instead of
+by silently ignoring TARGETS. Two pin-caught near-misses recorded: the
+bare `&& die` tail aborted under set -e for every empty-TARGETS call
+(0.0.41f C1 — rewritten as if/fi), and a prose line starting with a
+paren broke the loop's parse (caught by sh -n + the extract pin).
+Pins: seven cases through the extracted real loop+gate. Sabotage
+(gate deleted) → red; restored → green. Sweep: uninstall.sh and
+status.sh already reject unknown args loudly (B1's original contrast);
+bin/opk dispatches fixed names only.
+
+### a F10 (LOW) — backend switch drops hand-set podman socket key
+
+container_backend_apply now reads the pre-existing
+`OPENCODE_PODMAN_SOCKET` from install.conf when switching TO
+podman-rootless and hands it to update_install_conf_backend (which
+already re-added non-empty values — the bug was purely the caller's
+always-empty variable). Switching AWAY clears the key: it is
+podman-specific, and a stale docker-CLI socket under docker-rootless
+would be noise (documented direction, pinned). Pins run the REAL
+conf-rewrite function against a scratch conf through stubbed
+sudo/_tmp_track (key survives the podman switch with CONTAINER_BACKEND
+updated; clears on the away switch) plus a caller wiring grep.
+Sabotage (deleting the carry-over) → red; restored → green. Sweep:
+install.sh's re-install path already preserves the key (:787-792);
+no other caller of update_install_conf_backend exists.
+
+### a F9 (LOW) — set -u abort when USER and DEFAULT_USER both unset
+
+The default chain deepens to `${DEFAULT_USER:-${USER:-}}` at both
+sites (status.sh:157-158): a cron/timer environment without USER and a
+conf without the stamp no longer aborts with rc 2 — the code the
+contract defines as "warnings only" — over no verdict at all; the
+degraded `/home/` fallback stands and the report continues. Pins: the
+real probe lines are extracted and executed with both vars unset
+(`env -u USER`, hermetic — the host's install.conf never runs), rc 0
+asserted; sabotage (reverting to the shallow chain) → red; restored →
+green. The pre-existing 0.0.47b W2 wiring grep pinned the OLD literals
+and went red on the fix — updated to the new literals, its intent
+(getent resolution, no /home hardcode) unchanged. Sweep: `$USER`
+appears nowhere else in status.sh.
+
+### a F8 (LOW) — upstream "unavailable" counted as warning
+
+The row renders as a plain uncounted `ui_kv` with the "unknown —"
+wording (the file's own W3 idiom for cannot-judge rows); real findings
+(new advisories upstream) remain counted warns. Pins extract the real
+three-arm block and drive both arms (unknown → plain row, no
+`kvwarn:`; new-advisory → warn). Sabotage (re-counting the unknown
+row) → red; restored → green. Sweep: `grep -n 'ui_kv_warn' status.sh`
+walked — every remaining counted warn either carries a fix hint or
+names a concrete broken state; the two borderline "result skipped"
+rows (~:1236/:1252, scan-skip states with reasons) stay counted as
+pre-existing and out of F8's offline-permanence scope — noted for the
+next full pass if the maintainer wants them unknown-rows too.
+
+### a F7 (LOW) — unguarded xdg_open_real_exists
+
+update.sh now carries the same guard its sibling status.sh has had
+since 0.0.46a F4: a `command -v` fail-safe stub. Semantics: rc 0 =
+"assume a real xdg-open might exist" — with the probe's lib missing,
+the keep-arm removes a kit shim (a real one may have appeared) and the
+install-arm withholds the shim (cannot prove absence): both err on the
+never-shadow side of 0.0.42d S1 instead of the 127-driven shadowing
+side. Pin greps the real stub line out of update.sh, evals it and
+asserts rc 0; sabotage (stub flipped to rc 1) → red; restored →
+green. The sed-range extraction this pin originally used ran to EOF —
+this sed build never closes a range on its start line — noted here so
+the next pin author greps single lines instead.
+
+### a F6 (LOW) — silent umask skip
+
+The umask re-deploy's missing-template arm now logs its conservative
+skip with the same shape as the sudoers twin directly above it
+(0.0.41f S2: "the skip must not be silent"). Pins extract the real
+block and drive both arms (missing → skip log; present → deploy path
+unchanged). Sabotage (deleting the skip arm, syntax kept valid) → red
+at the skip-log assert; restored → green. Sweep: the fetch list +
+heal loop guarantee the file, so no other silent-template-skip
+remains — `grep -n 're-deploy' update.sh` shows both arms logging.
+
+### a F5 (LOW) — dual-source last-wins vs "prefer checkout"
+
+Both update.sh sites (wsl-browser-bridge.sh, ddev-handover.sh) now use
+the sibling for/break first-wins shape; the deployed LIBDIR copy can
+no longer override a present checkout copy. Pins extract both real
+loops (sed-anchored on the per-site fix comments — the handover loop's
+`done` is indented, its end anchor is `^    done$`) and drive them
+with fixture libs whose marker functions name their origin: CHECKOUT
+must win when both exist, LIBDIR answers only in the fallback.
+Sabotage (reverting one site to back-to-back sourcing) → red;
+restored → green. Sweep: `grep -n '&& . "\$LIBDIR' update.sh` — no
+remaining back-to-back source pair; config.sh/install.sh lookups were
+already first-wins.
+
+### a F4 (LOW) — safe.directory audit claims ensured over failure
+
+Both twins (install.sh + update.sh) now carry three honest arms:
+already-set (audit notes it, no redundant add — the old unconditional
+log was at least true there), add-success (ui_success + ensured log),
+add-failure (ui_warn naming 'dubious ownership' + NOT-ensured log).
+Pins: the extracted REAL update.sh block runs through all three arms
+with a sudo stub that answers both git invocations itself (hermetic —
+a pass-through stub would choke on sudo's own -u/-H flags and read the
+host's ~/.gitconfig, the 0.0.46a F2 class); the install twin is
+grep-pinned for the NOT-ensured arm (sweep). Sabotage (deleting the
+else arm) → red; restored → green. Sweep: `grep -rn '&& ui_success'`
+over install/update — no other `&&`-tailed success-over-possible-
+failure pair remains in the two scripts.
+
+### a F3 (MED) — ddev-migrate list inverted rc
+
+The `list` arm ended in `[ "$dm_found" = 0 ] && echo …` — under the
+script's `set -u` (no `-e`) the failed test became the arm's exit
+status: rc 1 with dumps present, rc 0 when none. Explicit `if/fi`
+ends the arm; rc 0 now means "listed fine" both ways. Pins drive the
+REAL bin/ddev-migrate against a scratch `DDEV_MIG_BACKUP_ROOT`
+(present: rc 0 + dir listed; empty: rc 0 + "no dump directories"),
+before the summary gate; sabotage (reverting to a bare `&&` tail)
+turned the pin red, restore green. No sibling sites: no other case arm
+in bin/ ends in a bare `&&` tail (swept `grep -n '&& echo' bin/`).
+
+### a F2 (MED) — config.sh silent noops over success claims
+
+config.sh's mutating-helper fallbacks became loud, fail-fast stubs
+(error line naming the missing lib + rc 1): `fs_baseline_root`,
+`ddev_handover_root`; `ddev_rootless_bindmounts` gained a stub returning
+rc 2 (the backend switch's existing warn arm — the manual-fix hint
+prints instead of an unevaluated gate reading as success). The stamp
+stubs stay fail-safe by design (valid=1 forces a rescan; write is
+unreachable after the loud abort) — commented in-code.
+
+Sweep (L2): update.sh's `ddev_handover_root` twin carried the same
+silent no-op under an unconditional "ddev handover pass completed" log
+— now loud too (same commit). Remaining silent `() { :; }` shapes —
+re-enumerated exactly after b W3/W15/W22: the stamp stubs (config.sh's
+pair + update.sh's pair — guards: valid=1 forces a rescan, the write
+stub is unreachable after its loud sibling aborts) and update.sh's
+`browser_bridge_install` (mutator-named but unreachable in silence:
+the is_wsl stub keeps its call block closed — noted in-code since
+b W22). uninstall.sh's `browser_bridge_remove`, listed here as a
+remaining silent shape when written, went LOUD with a F27 in the same
+wave — the original enumeration was stale the day it landed. The
+`fs_baseline_root` stub in this file's --refresh section was missed
+entirely by this sweep — found by review b as W3, now loud
+(`#211 b W3`), both update.sh stubs executed by the F2 pin (b W12:
+the pin was presence-only before).
+
+Pins (test-kit-cli.sh, before the summary gate): each stub is sed-
+extracted from the real script and executed — rc + stderr message +
+the set -e abort contract (a REACHED marker after the call must not
+print) + the rc-2 arm + the sweep presence. Sabotage (reverting one
+stub to `() { :; }`) first stayed GREEN — the capture variable `_rc`
+was stale from the previous block — fixed by resetting before every
+capture (`cfe12f4`), re-sabotaged RED at the right assert, restored
+green. The masking itself is recorded here because it is the L4 class
+in miniature: a pin that cannot fail is not a pin.
+
+### a F1 (HIGH) — parent-symlink TOCTOU in the group baseline
+
+Mechanism fixed: `_fsb_pass`'s xargs worker now receives the scan root
+as a fixed argv element and re-tests EVERY component between the root
+and the operand (`[ -L ]` chain walk, the `agent_home_sane` shape from
+staged-write.sh) immediately before acting; a symlinked parent skips
+the operand (skip ≠ failure — same semantic as the existing leaf skip).
+String-ops only, no word splitting (spaces pinned).
+
+Pins (tests/unit/test-fs-baseline.sh, section 9 — before the summary
+gate):
+- **Deterministic race**: a PATH-stubbed `find` runs the real find,
+  then swaps `proj/x/y` (recorded dir) for a symlink to a victim dir
+  OUTSIDE the tree, then exits — the replay chews the stale path.
+  Asserts: victim mode stays 600 (sabotage expectation: 620), pass rc
+  stays 0, seam-fired proof (`moved-away` exists, `x/y` is a link).
+  This supersedes section 8's old "cannot be scripted deterministically"
+  comment (narrowed to the leaf form).
+- **Walker string safety**: component and file names with spaces still
+  get chmod g+w applied (620) — the prefix peeling does not split.
+- Existing pins 1–4 (final state via `fs_baseline_root`), section 8
+  (leaf recheck) and 7b/7c (mid-batch failure) stay green — the walk
+  changes no happy-path behavior (48/48).
+- Sabotage (L4): walker deleted → race pin RED (victim 620); restored
+  from `fd13a19` → 48/48 green. Recorded below in this chain.
+
+Class sweep (L2 — pattern `[ -L ]` gates + find consumers, all shipped
+files inspected):
+- `sh/fs-baseline.sh` replay worker — the finding's site; the ONLY
+  root-run temp-file replay in the kit — FIXED.
+- `sh/ddev-handover.sh` `.ddev` handover pair (leaf-only `[ -L
+  "$dhr_d" ]` ×2): same class ADJACENT but deliberately not changed in
+  this wave — no temp-file replay (discovery→act within one loop
+  iteration), guarded by the 0.0.45e W1 ORDER argument with the
+  residual documented in-code, and pinned by an existing racing
+  fixture. Recorded as a follow-up candidate for its own wave (needs
+  its fixture updated with it).
+- `bin/ddev-as-opencode` `--opk-ensure-shared` (`find -print0 | xargs
+  chmod g+w`, NO gate): inspected, not applicable — runs unprivileged
+  as the agent user (chmod on non-owned targets fails EPERM; no root
+  operand), best-effort by design.
+- `sh/staged-write.sh` `agent_home_sane`: already walks every
+  component — the shape this fix adopts.
+- `install.sh` sites (881, 1504/1547/1579, 2436–2450): single controlled
+  operands with chain gates (0.0.39h F2 era) — conforming.
+
+Docs (L3): no doc claims the recheck's leaf-only scope (grepped
+security-model/sharing-group/manage-projects — no recheck wording);
+nothing to amend.
+
+Gates owed by a root-script behavior change (RM-0077): unit suite +
+both e2e suites run on the fix — results recorded in the chain.
+Discharged by b W18 (the in-chain evidence this line pointed at never
+existed — review b's finding): at the b-wave fix HEAD, `make test`
+rc=0, `make e2e` 303 passed, `make e2e-rootless` 47 passed — both
+suites at baseline, zero skips.
+
+### f W1 (LOW) — the audit log line's changed tail is pinned
+
+`4bf080a` extends the CW1 audit fail drive's log arm from the
+pre-wave prefix (`log: audit log removal FAILED`) to the full changed
+wording (`… FAILED for /var/log/opencode-permissions-kit (rm)`),
+mirroring the userdel sibling's arm. Sabotage (scratch copy of the
+committed f-wave HEAD): log tail reverted alone → suite rc=1 exactly
+at the aggregate arm (pre-fix the same revert stayed rc=0 — review-f
+sab3); committed-state baseline rc=0. Logs:
+/tmp/opencode/rev-f-sab/logs/un2-{base,sabf1}.log.
+
+### f W2 (LOW) — the backup failure arm names its commands + the owed sweep
+
+`2be6fc3`: the agents-backup failure arm (uninstall.sh, userdel
+section) now carries "(mkdir/cp failed)" / "… (mkdir/cp)" like its
+gpasswd/userdel/rm siblings — the failing construct is the compound
+`sudo mkdir -p && sudo cp -a`. New labeled pin in test-uninstall.sh:
+extraction anchor
+`^        for _un_ag_dirname in \.agents \.claude; do$` … `^        done$`
+(unique, 1 hit), stubbed sudo (test/ls succeed, mkdir/cp return 1 —
+L1: the failure path is EXECUTED), asserts the WARNING names the
+source, both tails carry (mkdir/cp), and no false "Agent resources
+backed up:" claim rides the failure; sits before the summary gate
+(L4). Sabotage: both strings reverted → rc=1 at exactly this check
+(logs: un2-sabf2.log).
+
+Class sweep (L2 — the sweep e W3 owed, RM-0069/0070), pattern
+`grep -rn 'WARN' files/opencode-permissions-kit-lib/{management/*.sh,bin/*}`
+plus cause-enumerating messages (ISSUE item 5), sites checked:
+- uninstall.sh :440 gpasswd ✓, :515 userdel ✓, :652 rm ✓ (wave-fixed),
+  :480 backup — FIXED here; :310 symlink-chain WARNING (informational,
+  names its cause — not a command-failure arm); :346/:368 wsl arms
+  ("kit helper unavailable" — cause named, consistent pair).
+- setup-container-backend :202 linger (cause + retry hint names the
+  command), :368 podman info (names the command).
+- opencode-as-opencode note() rows — advisory UI warnings naming their
+  subjects, not rc-gated command failures.
+Result: zero unnamed rc-gated failure arms remain in the shipped tree.
+The rc-blind closing-log aggregation over the revert loop's run_q ops
+stays deliberately deferred (recorded since c W1 as its own follow-up
+wave — a completion claim, not a WARN arm; different class).
+
+NB (#211 g W1 — anchors corrected, ISSUE item 4 class): the sites list
+above restated review-f's anchors as measured at `750d4e7`; this wave's
+own +2-line insertion shifted every site below the backup arm. Measured
+at the fix commit `2be6fc3` (= HEAD): gpasswd :440 (above the insertion,
+unshifted), backup :482-483, userdel WARN :517 / log :518, audit WARN
+:654 / log :655. The verdicts (✓ / FIXED here) were correct at every
+ref — only the numbers were stale (the exact error f W3 corrected in
+the e-table one commit earlier). Content anchors ("WARN: could not
+remove user") preferred over line numbers going forward.
+
+NB (#211 g W2 — pattern record completed): the recorded pattern sees
+neither the `ui_warn` emitter class (lowercase — ~50 call sites across
+install.sh, management/, sh/) nor `files/install.sh` nor the `sh/`
+printf arms, so it cannot re-derive the tree-wide result it is cited
+for. The complete pattern set for the class: `grep -rn 'WARN' files/`
+(uppercase — raw WARN arms, note() rows, printf WARNINGs) plus
+`grep -rn 'ui_warn ' files/` (call sites; the def lives in sh/ui.sh; no
+other lowercase emitter exists — verified). Review g enumerated both
+over the whole tree: every arm names its command, operation or exact
+cause — the result stands, now on a reproducible record (RM-0070/0082).
+
+E2e (ISSUE item 6 split): message-only change to a root-run file →
+gated at the release gate, not in-wave; the SHA-anchored 303/47 @
+750d4e7 record above is the comparator the g-round needs.
+
+### f W3 / f W4 (bookkeeping) — see `5f5d5d0`
+
+f W3: NB added at the corrected c W1 NB (13 vs 15 @ce7cbc5, arithmetic
+and refs there). f W4: the status SHA-anchors the 303/47 claim at
+`750d4e7` — review-f independently re-executed both suites (rc=0)
+rather than trusting the claim (RM-0082).
+
+### g W1 / g W2 (bookkeeping) — see `9fa331e`
+
+g W1: the f W2 sweep's anchors were review-f's 750d4e7 numbers restated
+(ISSUE item 4 class); the NB measures at the fix commit — gpasswd :440
+unshifted, backup :482-483, userdel :517/:518, audit :654/:655 — and
+prefers grep-able content anchors going forward. g W2: the NB records
+the complete two-pattern emitter set (`grep -rn 'WARN' files/` plus
+`grep -rn 'ui_warn ' files/`); review g's independent enumeration over
+both confirmed zero unnamed rc-gated failure arms — the tree-wide
+result the original one-pattern record could not re-derive. Both fixes
+are resolution-only: this round's dispositions touched no
+review-relevant code (files touched: resolution.md, INDEX.md).

@@ -1113,6 +1113,90 @@ grep -q -- 'sudo -n -u opencode' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-terminal.sh" \
     && pass "describe probe uses sudo -n (V22)" \
     || fail "describe probe uses sudo -n (V22)"
+# --- #211 a F14: handover lines honest about pair failures -----------------------
+# The root-run handover pairs were `|| true`-silent with unconditional
+# success echoes — a partial handover (EPERM, immutable flag) reported
+# as done. The pairs stay best-effort (self-heal on the next rescan)
+# but the line now tells the truth. Extract the REAL site-1 block and
+# drive it with stubbed chmod/chown; sites 2/3 are wiring-grepped.
+_f14_block="$(sed -n '/^            _dhr_ok=true$/,/^            fi$/p' "$HANDOVER")"
+if [ -n "$_f14_block" ]; then
+    pass "dhr handover pair block extractable (#211 a F14)"
+    _f14_run() {
+        F14MODE="$1" sh -c '
+            dhr_d="/x/dir"; dhr_user=oc; dhr_group=g
+            chmod() { [ "$F14MODE" = chmodfail ] && return 1; return 0; }
+            chown() { [ "$F14MODE" = chownfail ] && return 1; return 0; }
+            eval "$1"
+        ' sh "$_f14_block" 2>&1
+    }
+    _out=$(_f14_run ok) || true
+    case "$_out" in
+        *".ddev handover: /x/dir -> oc"*) pass "healthy pair: success line (#211 a F14)" ;;
+        *) fail "healthy pair: success line (got: $_out)" ;;
+    esac
+    _out=$(_f14_run chmodfail) || true
+    case "$_out" in
+        *"warn: .ddev handover incomplete"*) pass "chmod failure: warn, no success line (#211 a F14)" ;;
+        *) fail "chmod failure: warn (got: $_out)" ;;
+    esac
+    _out=$(_f14_run chownfail) || true
+    case "$_out" in
+        *"warn: .ddev handover incomplete"*) pass "chown failure: warn, no success line (#211 a F14)" ;;
+        *) fail "chown failure: warn (got: $_out)" ;;
+    esac
+else
+    fail "dhr handover pair block extractable (#211 a F14)"
+fi
+grep -q 'warn: dev-owned handback incomplete' "$HANDOVER" \
+    && pass "dhb site honest too (#211 a F14 sweep)" \
+    || fail "dhb site honest too (#211 a F14 sweep)"
+grep -q 'warn: ddev settings handover incomplete' "$HANDOVER" \
+    && pass "dhp site honest too (#211 a F14 sweep)" \
+    || fail "dhp site honest too (#211 a F14 sweep)"
+
+# --- #211 b W9: the four single-inode pairs the a F14 sweep missed ----------------
+# Same shape, one inode: chown+chmod || true with an unconditional
+# success echo (project-root handback/handover x3, dev-owned root-inode
+# handback). Extract the typo3-bootstrap site and drive it; the other
+# three are wiring-grepped by their warn lines.
+_w9_block="$(sed -n '/^                _dhq_ok=true$/,/^                fi$/p' "$HANDOVER" | sed -n '1,10p')"
+if [ -n "$_w9_block" ] && printf '%s' "$_w9_block" | grep -q 'project-root handover:'; then
+    pass "typo3-bootstrap pair block extractable (#211 b W9)"
+    _w9_run() {
+        W9MODE="$1" sh -c '
+            dhq_proj=/x/p; dhq_user=oc; dhq_group=g
+            chmod() { [ "$W9MODE" = chmodfail ] && return 1; return 0; }
+            chown() { [ "$W9MODE" = chownfail ] && return 1; return 0; }
+            eval "$1"
+        ' sh "$_w9_block" 2>&1
+    }
+    _out=$(_w9_run ok) || true
+    case "$_out" in
+        *"project-root handover: /x/p -> oc"*) pass "healthy pair: success line (#211 b W9)" ;;
+        *) fail "healthy pair: success line (got: $_out)" ;;
+    esac
+    _out=$(_w9_run chmodfail) || true
+    case "$_out" in
+        *"warn: project-root handover incomplete"*) pass "chmod failure: warn, no success line (#211 b W9)" ;;
+        *) fail "chmod failure: warn (got: $_out)" ;;
+    esac
+    _out=$(_w9_run chownfail) || true
+    case "$_out" in
+        *"warn: project-root handover incomplete"*) pass "chown failure: warn, no success line (#211 b W9)" ;;
+        *) fail "chown failure: warn (got: $_out)" ;;
+    esac
+else
+    fail "typo3-bootstrap pair block extractable (#211 b W9)"
+fi
+_n_w9=$(grep -c 'warn: project-root hand\(back\|over\) incomplete' "$HANDOVER")
+[ "$_n_w9" -ge 3 ] \
+    && pass "all three project-root warn lines present (#211 b W9)" \
+    || fail "all three project-root warn lines present (got $_n_w9) (#211 b W9)"
+grep -q 'warn: dev-owned handback incomplete for $dhb_proj (root inode' "$HANDOVER" \
+    && pass "root-inode handback warn line present (#211 b W9)" \
+    || fail "root-inode handback warn line present (#211 b W9)"
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1

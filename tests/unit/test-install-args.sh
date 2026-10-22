@@ -92,6 +92,19 @@ reset_globals
 parse_args --yes
 [ "$SKIP_PROMPTS" = true ] && pass "--yes sets SKIP_PROMPTS" || fail "--yes sets SKIP_PROMPTS"
 
+# #211 b W2: the -y alias cli.md documents — same family shape as
+# update/config/uninstall. Abort-contained (#211 c W5): a reverted
+# alias aborts parse_args (exit 1) — a bare call under this suite's
+# set -e would kill the whole suite pre-tally instead of recording
+# this FAIL (the expect_rc convention, 0.0.42g C1). The state is
+# printed INSIDE the subshell — the assignment cannot cross it.
+reset_globals
+_cw5_out="$( ( parse_args -y && printf '%s\n' "$SKIP_PROMPTS" ) 2>/dev/null )" || true
+case "$_cw5_out" in
+    true) pass "-y alias sets SKIP_PROMPTS (#211 b W2)" ;;
+    *) fail "-y alias sets SKIP_PROMPTS (#211 b W2) (got: ${_cw5_out:-abort})" ;;
+esac
+
 reset_globals
 parse_args --secure-git-config
 [ "$SECURE_GIT_CONFIG" = true ] && [ "$GIT_FLAG_GIVEN" = true ] \
@@ -239,7 +252,10 @@ for _v14_sib in status update uninstall; do
     _v14_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$_v14_sh" 2>/dev/null \
         | grep -v '^[[:space:]]*#' \
         | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
-        | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
+        | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' \
+        | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\${USER:-}}}"$' || true)"
+    # (the last allow-arm: the F9-deepened fallback #211 a F9 — set -u
+    # survives both-unset; same self-default shape, one level deeper)
     if grep -q 'getent passwd "\$DEFAULT_USER"' "$_v14_sh" && [ -z "$_v14_bad" ]; then
         pass "$_v14_sib.sh: developer home via getent, no hardcoded usage site (V14 sibling)"
     else

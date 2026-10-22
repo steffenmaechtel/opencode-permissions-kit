@@ -972,6 +972,26 @@ else
     failures=$((failures + 1))
 fi
 
+# --- F29: note() does not expand escape sequences in interpolated paths ----------
+# note() used printf %b — a directory named like a \-sequence garbled the
+# warning that interpolates it. Extract the REAL note() and assert a
+# literal passthrough.
+_f29_fn="$(sed -n '/^note() {/,/^}$/p' "$WRAPPER_FILE")"
+if [ -n "$_f29_fn" ]; then
+    _out=$(HEADLESS=false sh -c 'eval "$1"; note "$2"' sh "$_f29_fn" '\tdangerous-name') || true
+    if printf '%s' "$_out" | grep -qF '\tdangerous-name' \
+       && ! printf '%s' "$_out" | grep -q "$(printf '\t')dangerous"; then
+        echo "  ${GREEN}PASS${NC}  note() prints escape-looking names literally (#211 a F29)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  note() prints escape-looking names literally (got: $_out)"
+        failures=$((failures + 1))
+    fi
+else
+    echo "  ${RED}FAIL${NC}  note() extractable (#211 a F29)"
+    failures=$((failures + 1))
+fi
+
 # --- Summary ---
 echo ""
 echo "===================================="

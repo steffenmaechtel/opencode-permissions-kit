@@ -153,10 +153,10 @@ grep -q '    openchamber-secure)' "$KIT" \
 grep -qF 'exec sudo sh "$LIBDIR/bin/opk" openchamber-secure "$@"' "$KIT" \
     && echo "  ${GREEN}PASS${NC}  openchamber-secure auto-elevates with flags intact" && passed=$((passed + 1)) \
     || { echo "  ${RED}FAIL${NC}  openchamber-secure auto-elevates with flags intact"; failures=$((failures + 1)); }
-grep -qF '> /etc/openchamber/policy.json' "$KIT" \
+grep -qF 'mv -f "$_ocp_tmp" /etc/openchamber/policy.json' "$KIT" \
     && grep -qF 'OPENCHAMBER_POLICY=yes' "$KIT" \
-    && echo "  ${GREEN}PASS${NC}  openchamber-secure writes the pin + records the opt-in" && passed=$((passed + 1)) \
-    || { echo "  ${RED}FAIL${NC}  openchamber-secure writes the pin + records the opt-in"; failures=$((failures + 1)); }
+    && echo "  ${GREEN}PASS${NC}  openchamber-secure writes the pin (atomic) + records the opt-in" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  openchamber-secure writes the pin (atomic) + records the opt-in"; failures=$((failures + 1)); }
 # 0.0.47a F1: replacing divergent policy content is announced, never silent
 grep -qF 'diverges from the kit pin — replacing it' "$KIT" \
     && echo "  ${GREEN}PASS${NC}  openchamber-secure announces replacing divergent content (F1)" && passed=$((passed + 1)) \
@@ -632,6 +632,255 @@ if printf '%s' "$_ocline" | grep -qF '  Remove them now? [Y/n] ' \
     passed=$((passed + 1))
 else
     echo "  ${RED}FAIL${NC}  opk fallback shape: '  <question> [Y/n] ' — no marker (got: $_ocline)"
+    failures=$((failures + 1))
+fi
+
+# --- #211 a F2: missing-lib fallbacks for the mutating helpers fail loud ------
+# config.sh used to degrade silently when sh/ libs were missing:
+# fs_baseline_root and ddev_handover_root were no-op stubs and
+# ddev_rootless_bindmounts was not stubbed at all — projects add /
+# refresh and the backend switch printed success ("setgid, default-acl",
+# "baseline refreshed", "backend switched") over work that never ran.
+# The stubs now fail loud like the write helpers (staged_write & co).
+# Extract each stub from the real config.sh and execute it the way a
+# damaged kit would (the lookup loop found nothing, only the stub ran).
+CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
+_stubs=$(mktemp -d)
+sed -n '/^\[ -n "\$_handover" \] || ddev_handover_root/,/^}$/p' "$CONFIG" > "$_stubs/ho.sh"
+sed -n '/^\[ -n "\$_handover" \] || ddev_rootless_bindmounts/,/^}$/p' "$CONFIG" > "$_stubs/rb.sh"
+sed -n '/^command -v fs_baseline_root/,/^}$/p' "$CONFIG" > "$_stubs/fsb.sh"
+for _s in ho rb fsb; do
+    if [ -s "$_stubs/$_s.sh" ] && grep -q 'unavailable' "$_stubs/$_s.sh"; then
+        echo "  ${GREEN}PASS${NC}  F2: $_s stub present and names its cause"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  F2: $_s stub present and names its cause"
+        failures=$((failures + 1))
+    fi
+done
+_rc=0
+_out=$(_handover="" sh -c '. "$1" >/dev/null 2>&1; ddev_handover_root /proj u g d' \
+    sh "$_stubs/ho.sh" 2>&1) || _rc=$?
+assert "F2: ddev_handover_root stub returns 1 (loud, not 127-silent)" "1" "${_rc:-0}"
+case "$_out" in
+    *"ddev_handover_root unavailable"*)
+        echo "  ${GREEN}PASS${NC}  F2: ddev_handover_root stub names the missing lib on stderr"
+        passed=$((passed + 1)) ;;
+    *)  echo "  ${RED}FAIL${NC}  F2: ddev_handover_root stub names the missing lib on stderr (got: $_out)"
+        failures=$((failures + 1)) ;;
+esac
+# _rc must be reset before EVERY capture — a stale value from the
+# previous block masked a silent-stub regression during the F2 pin's
+# own sabotage verification (L4).
+_rc=0
+_out=$(_handover="" sh -c '. "$1" >/dev/null 2>&1; fs_baseline_root /proj g u' \
+    sh "$_stubs/fsb.sh" 2>&1) || _rc=$?
+assert "F2: fs_baseline_root stub returns 1 (no false 'baseline refreshed')" "1" "${_rc:-0}"
+# The success-line mechanism itself: under set -e the loud stub aborts
+# BEFORE any caller success line can print (0.0.44a V9's sibling class).
+_reached=""
+_rc=0
+_out=$(sh -c 'set -e; _handover=""; . "$1" >/dev/null 2>&1; ddev_handover_root /proj u g d; echo REACHED' \
+    sh "$_stubs/ho.sh" 2>&1) || _rc=$?
+case "$_out" in
+    *REACHED*) _reached=yes ;;
+esac
+if [ -z "$_reached" ]; then
+    echo "  ${GREEN}PASS${NC}  F2: set -e aborts before any success line (REACHED not printed)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  F2: set -e aborts before any success line (REACHED printed)"
+    failures=$((failures + 1))
+fi
+# ddev_rootless_bindmounts: rc 2 = the backend switch's warn arm — the
+# gate must not evaluate as success (rc 127 fell through silently).
+_rc=0
+_handover="" sh -c '. "$1" >/dev/null 2>&1; ddev_rootless_bindmounts u b v bin' \
+    sh "$_stubs/rb.sh" >/dev/null 2>&1 || _rc=$?
+assert "F2: ddev_rootless_bindmounts stub returns 2 (caller's warn arm)" "2" "$_rc"
+# The update.sh twins of the same stub (#211 a F2 sweep — its loop logs
+# "ddev handover pass completed" unconditionally; #211 b W3 — the
+# fs_baseline_root stub in the --refresh section was missed by the same
+# sweep): loud rc 1 as well. EXECUTED, not just grepped (#211 b W12):
+# a presence-only pin passes a `return 0` regression with the echo kept.
+sed -n '/^    command -v ddev_handover_root/,/^    }$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh" > "$_stubs/uho.sh"
+sed -n '/^    command -v fs_baseline_root/,/^    }$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh" > "$_stubs/ufsbl.sh"
+for _stubpair in uho:ddev_handover_root:handover ufsbl:fs_baseline_root:baseline; do
+    _short="${_stubpair%%:*}"; _rest="${_stubpair#*:}"
+    _fn="${_rest%%:*}"; _lbl="${_rest##*:}"
+    _rc=0
+    _msg=$(sh -c '. "$1"; "$2" u b v' sh "$_stubs/$_short.sh" "$_fn" 2>&1 >/dev/null) || _rc=$?
+    if [ "$_rc" -eq 1 ] && printf '%s' "$_msg" | grep -q 'unavailable'; then
+        echo "  ${GREEN}PASS${NC}  F2 sweep: update.sh $_lbl stub loud (executes: rc 1 + stderr) (#211 b W3, b W12)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  F2 sweep: update.sh $_lbl stub loud (rc=$_rc msg=$_msg) (#211 b W3, b W12)"
+        failures=$((failures + 1))
+    fi
+done
+rm -rf "$_stubs"
+
+# --- config arg loop: junk is a usage error, not silence (#211 a F11) -----------
+# Unknown tokens fell into TARGETS and were ignored with rc 0 for every
+# action that takes no positionals — `config git-config ON` rendered the
+# status view as if nothing was wrong. Extract the REAL loop+gate and
+# drive it: junk/misplaced die; projects add keeps paths; --yes clean.
+_f11_block="$(sed -n '/^for arg do$/,/#211 a F11 gate end/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
+# #211 b W23 (the #198 a W5 / F7 shapes): end anchors are a shipped
+# marker comment (F11) — if it ever drifts, the extract runs to EOF and
+# the eval fails confusingly. Bound it: the loop+gate is 47 lines.
+if [ -n "$_f11_block" ] && [ "$(printf '%s\n' "$_f11_block" | wc -l)" -le 50 ]; then
+    echo "  ${GREEN}PASS${NC}  config arg loop + F11 gate extractable (#211 a F11)"
+    passed=$((passed + 1))
+    _f11_run() {
+        (
+            YES=false; ACTION=""; SUB=""; TARGETS=""
+            die() { echo "die: $*"; exit 1; }
+            eval "$_f11_block"
+            echo "OK ACTION=[$ACTION] SUB=[$SUB] TARGETS=[$TARGETS]"
+        )
+    }
+    _out=$(_f11_run git-config ON) || true
+    case "$_out" in
+        *"die: unknown or misplaced argument(s):ON"*)
+            echo "  ${GREEN}PASS${NC}  junk token after an action dies loudly (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  junk token after an action dies loudly (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run status refresh) || true
+    case "$_out" in
+        *die:*) echo "  ${GREEN}PASS${NC}  misplaced second action word dies (#211 a F11)"
+                passed=$((passed + 1)) ;;
+        *)      echo "  ${RED}FAIL${NC}  misplaced second action word dies (out=$_out)"
+                failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run projects add /a/proj) || true
+    case "$_out" in
+        *"OK ACTION=[projects] SUB=[add] TARGETS=[/a/proj]"*)
+            echo "  ${GREEN}PASS${NC}  projects add keeps its path targets (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  projects add keeps its path targets (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run git-config status) || true
+    case "$_out" in
+        *"OK ACTION=[git-config] SUB=[status] TARGETS=[]"*)
+            echo "  ${GREEN}PASS${NC}  git-config status consumed as SUB, e2e flow intact (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  git-config status consumed as SUB (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run git-config off status) || true
+    case "$_out" in
+        *"die: unknown or misplaced argument(s):status"*)
+            echo "  ${GREEN}PASS${NC}  status no longer clobbers a set SUB — dies loud (#211 b W20)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  status no longer clobbers a set SUB (out=$_out) (#211 b W20)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run refresh status) || true
+    case "$_out" in
+        *"OK ACTION=[refresh] SUB=[status] TARGETS=[]"*)
+            echo "  ${GREEN}PASS${NC}  refresh status still consumed (SUB was empty) (#211 b W20)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  refresh status still consumed (out=$_out) (#211 b W20)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run handover /a/proj) || true
+    case "$_out" in
+        *"OK ACTION=[handover] SUB=[] TARGETS=[/a/proj]"*)
+            echo "  ${GREEN}PASS${NC}  handover keeps its documented path target (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  handover keeps its documented path target (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f11_run --yes) || true
+    case "$_out" in
+        *"OK ACTION=[] SUB=[] TARGETS=[]"*)
+            echo "  ${GREEN}PASS${NC}  bare --yes stays clean (#211 a F11)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  bare --yes stays clean (out=$_out)"
+            failures=$((failures + 1)) ;;
+    esac
+else
+    echo "  ${RED}FAIL${NC}  config arg loop + F11 gate extractable (#211 a F11)"
+    failures=$((failures + 1))
+fi
+
+# --- chained user symlink resolves (#211 a F15) -----------------------------------
+# A second hop (~/bin/opk -> $BIN/opk -> lib) used to defeat the
+# single-hop readlink: LIBDIR resolved one level short and every
+# subcommand reported "not found". readlink -f walks the whole chain
+# (sibling shape: ddev-migrate, xdg-open).
+mkdir -p "$WORK/bin2"
+ln -s "$BIN/opk" "$WORK/bin2/opk"
+_out="$(OPK_INSTALL_CONF="$WORK/install.conf" "$WORK/bin2/opk" status 2>/dev/null)" || true
+case "$_out" in
+    *"status:euid="*)
+        echo "  ${GREEN}PASS${NC}  chained symlink dispatches (readlink -f, #211 a F15)"
+        passed=$((passed + 1)) ;;
+    *)
+        echo "  ${RED}FAIL${NC}  chained symlink dispatches (#211 a F15, got: $_out)"
+        failures=$((failures + 1)) ;;
+esac
+
+# --- F24: a missing staged-write.sh names itself, not a symlink --------------------
+# agent_home_sane returning 127 (lib missing) used to die with "a parent
+# is a symlink" — wrong diagnosis for a broken kit. Extract the guard
+# block and drive both arms with a fixed $target.
+_f24_block="$(sed -n '/#211 a F24/,/^    fi$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
+# #211 b W23: first-fi end anchor — bound the extract (guard block is
+# 5 lines) so anchor drift fails HERE instead of eval-ing to EOF.
+if [ -n "$_f24_block" ] && [ "$(printf '%s\n' "$_f24_block" | wc -l)" -le 8 ]; then
+    echo "  ${GREEN}PASS${NC}  F24 guard block extractable"
+    passed=$((passed + 1))
+    _f24_run() {
+        # $1 = define sane fn (yes|no)
+        # /var/tmp path (#211 b W5): the first draft carried a real-tree
+        # /home/... literal — inert (both arms are FS-free) but forbidden
+        # by the sandbox shape (RM-0016 inert-literal rule).
+        (
+            OPENCODE_USER=oc
+            target=/var/tmp/opk-f24-fixture/settings.json
+            die() { echo "die: $*"; exit 1; }
+            if [ "$1" = yes ]; then agent_home_sane() { return 0; }; fi
+            eval "$_f24_block"
+            echo "NOT-REACHED"
+        )
+    }
+    _out=$(_f24_run no) || true
+    case "$_out" in
+        *"die: kit file sh/staged-write.sh missing"*)
+            echo "  ${GREEN}PASS${NC}  missing lib names itself (#211 a F24)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  missing lib names itself (got: $_out)"
+            failures=$((failures + 1)) ;;
+    esac
+    _out=$(_f24_run yes) || true
+    case "$_out" in
+        *NOT-REACHED*)
+            echo "  ${GREEN}PASS${NC}  healthy helper passes through (#211 a F24)"
+            passed=$((passed + 1)) ;;
+        *)  echo "  ${RED}FAIL${NC}  healthy helper passes through (got: $_out)"
+            failures=$((failures + 1)) ;;
+    esac
+else
+    echo "  ${RED}FAIL${NC}  F24 guard block extractable"
+    failures=$((failures + 1))
+fi
+
+# --- F26: config.sh status shows the backend row like the menu --------------------
+if grep -q 'status).*banner; git_config_status; container_backend_status' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"; then
+    echo "  ${GREEN}PASS${NC}  config status lists the backend row (menu parity, #211 a F26)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  config status lists the backend row (#211 a F26)"
     failures=$((failures + 1))
 fi
 

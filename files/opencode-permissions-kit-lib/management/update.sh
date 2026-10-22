@@ -1,8 +1,9 @@
 #!/bin/sh
 # opencode permissions kit -- update.sh
-# Re-deploys the KIT (wrapper, kit cli, jsonc-parser, sudoers template,
-# umask profile, uninstall.sh, config.sh, status.sh, log.sh) onto a system
-# that has already been installed via install.sh. Does NOT touch:
+# Re-deploys the KIT onto a system that has already been installed via
+# install.sh: the wrapper and cli symlinks, the full library via the
+# deploy-lib.sh manifest (~40 files — layout and modes live there),
+# sudoers, the umask profile and the agent/binary state. Does NOT touch:
 #   - existing /etc/opencode-permissions-kit/projects.conf
 #   - existing /etc/opencode-permissions-kit/install.conf (except the
 #     VERSION stamp and the OPENCODE_GROUP re-base)
@@ -589,6 +590,14 @@ if ! confirm "$_uc_msg"; then
     echo "Aborted."; exit 0
 fi
 
+# #211 a F33: the group-baseline refresh lives in the kit (non-
+# only-binary) block below — the combination used to drop --refresh
+# without a word.
+if [ "$ONLY_BINARY" = true ] && [ "$REFRESH" = true ]; then
+    ui_detail "note: --refresh is skipped under --only-binary (no kit state is touched)"
+    log "update --refresh --only-binary: refresh skipped by design"
+fi
+
 if [ "$ONLY_BINARY" != true ]; then
 
 # --- re-deploy library files (skipped by --only-binary) ------------------------
@@ -626,11 +635,28 @@ log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
 # the kit does not edit wsl.conf implicitly (internal/records/wsl-conf-consent.md);
 # the user opts in via 'sudo opk wsl-add-opencode-1-fix'. An existing
 # carrier stays untouched and keeps working.
-[ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" ] \
-    && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
-[ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] && . "$LIBDIR/sh/wsl-browser-bridge.sh"
+# First-wins lookup (#211 a F5, wsl-browser-bridge site): the old
+# back-to-back sourcing let the deployed LIBDIR copy override the
+# checkout copy — the documented "prefer the checkout vintage" was
+# inverted in code. Sibling shape: config.sh's helper lookups.
+for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
 command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
+# Guard, not a mutator path (#211 b W22): unreachable in silence — the
+# is_wsl stub above keeps the re-apply block below closed when the lib
+# is missing from both lookup sites.
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
+# Fail-safe stub (#211 a F7): if the never-shadow probe itself is
+# unavailable (wsl-browser-bridge.sh missing from both lookup sites),
+# both call sites below must err on the never-shadow side — rc 0
+# ("a real one might exist") removes/withholds the shim instead of
+# shadowing one. Sibling guard: status.sh wraps its call in
+# command -v (0.0.46a F4); update.sh was the unswept twin.
+command -v xdg_open_real_exists >/dev/null 2>&1 || xdg_open_real_exists() { return 0; }
 if browser_bridge_is_wsl; then
     # Failure-honest since 0.0.45c C4: browser_bridge_install propagates a
     # failed stand-in deploy or legacy strip — the old unconditional
@@ -716,6 +742,12 @@ if [ -f "$FILES_ROOT/etc/umask.sh" ]; then
     sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
     ui_success "umask profile re-deployed"
     log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
+else
+    # Conservative skip, loud like the sudoers twin above (0.0.41f S2
+    # shape, #211 a F6): near-unreachable (fetch list + heal guarantee
+    # the file), but the skip must not be silent — an update that
+    # quietly dropped a protection-layer deploy is undebuggable.
+    log "umask profile re-deploy skipped: $FILES_ROOT/etc/umask.sh missing (existing profile kept)"
 fi
 
 # --- OpenChamber policy pin (issue #154) ---------------------------------------
@@ -739,10 +771,23 @@ if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
         log "openchamber policy pin NOT re-applied: existing file diverges (admin-owned)"
     else
         sudo mkdir -p /etc/openchamber
+        # Atomic stage+mv (#211 a F17, opk twin): the live policy.json
+        # flips via rename only — a kill mid-tee used to leave a
+        # truncated file and a silently inactive pin.
+        _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
+        # Registered BEFORE staging (#211 b W8, order per #211 c W3):
+        # the trap's rm -f tolerates an absent path, so an abort DURING
+        # the tee (temp created, write fails — ENOSPC under set -e) is
+        # covered too, not just aborts between staging and the flip.
+        _tmp_track "$_ocp_tmp"
         printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
-            | sudo tee /etc/openchamber/policy.json > /dev/null
-        sudo chown root:root /etc/openchamber/policy.json 2>/dev/null || true
-        sudo chmod 644 /etc/openchamber/policy.json
+            | sudo tee "$_ocp_tmp" > /dev/null
+        sudo chown root:root "$_ocp_tmp" 2>/dev/null || true
+        sudo chmod 644 "$_ocp_tmp"
+        # mv replaces a symlink at policy.json rather than writing
+        # through it (#211 b W19) — the announced replace is this
+        # block's documented job.
+        sudo mv -f "$_ocp_tmp" /etc/openchamber/policy.json
         ui_success "openchamber policy pin re-applied: /etc/openchamber/policy.json"
         log "openchamber policy pin re-applied: /etc/openchamber/policy.json"
     fi
@@ -823,10 +868,24 @@ fi
 if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
     # Shared helper: prefer the copy next to this script (checkout — same
     # vintage as the running update.sh), fall back to the deployed library.
-    [ -f "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" ] \
-        && . "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh"
-    [ -f "$LIBDIR/sh/ddev-handover.sh" ] && . "$LIBDIR/sh/ddev-handover.sh"
-    command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() { :; }
+    # First-wins lookup (#211 a F5, ddev-handover site): same fix as the
+    # wsl-browser-bridge site above — LIBDIR must never shadow a checkout
+    # copy that is present.
+    for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; do
+        if [ -f "$cand" ]; then
+            . "$cand"
+            break
+        fi
+    done
+    command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
+        # Loud like config.sh's stubs (#211 a F2 sweep): a silent no-op
+        # let the loop below log "ddev handover pass completed" over a
+        # pass that never ran. Near-unreachable (lib_deploy refreshed
+        # the library above) — the contract is what matters: fail loud,
+        # let set -e stop the update instead of lying in the audit log.
+        echo "error: ddev_handover_root unavailable (ddev-handover.sh missing)" >&2
+        return 1
+    }
     command -v ddev_handover_stamp_valid >/dev/null 2>&1 || ddev_handover_stamp_valid() { return 1; }
     command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
     _ho_skip=0
@@ -863,13 +922,22 @@ fi
 # "fatal: error reading '<cwd>/.git'" before touching the global config,
 # and safe.directory is never ensured. chdir to / first; --global ignores
 # the worktree anyway.
+# The audit line must match reality (#211 a F4): a failed --add used to
+# print nothing while the log claimed "ensured" — agent git then failed
+# with 'dubious ownership' long after, with nothing in the audit trail
+# pointing at the cause.
 if command -v git >/dev/null 2>&1; then
-    if ! sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
+    if sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
         2>/dev/null | grep -qFx '*'; then
-        sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*' \
-            && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+        log "git safe.directory ensured for $OPENCODE_USER (already set)"
+    elif sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*'; then
+        ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+        log "git safe.directory ensured for $OPENCODE_USER"
+    else
+        ui_warn "could not set git safe.directory '*' for $OPENCODE_USER — agent git may fail"\
+" with 'dubious ownership' (git config --global --add failed)"
+        log "git safe.directory NOT ensured for $OPENCODE_USER (git config --add failed)"
     fi
-    log "git safe.directory ensured for $OPENCODE_USER"
 fi
 
 # --- WSL2 /mnt/c restriction (report-only — update.sh stays prompt-free) -------
@@ -1433,7 +1501,14 @@ if [ "$REFRESH" = true ]; then
     for _fsbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
         if [ -f "$_fsbl_cand" ]; then . "$_fsbl_cand"; _fsbl="$_fsbl_cand"; break; fi
     done
-    [ -n "$_fsbl" ] || fs_baseline_root() { :; }
+    # Loud like the config.sh twin and the ddev_handover_root stub above
+    # (#211 b W3 — the a F2 sweep stopped at this file's handover stub):
+    # a silent no-op let --refresh log "group baseline refreshed" over a
+    # pass that never ran. Fail loud, let set -e stop the update.
+    command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
+        echo "error: fs_baseline_root unavailable (fs-baseline.sh missing)" >&2
+        return 1
+    }
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r root; do
             [ -z "$root" ] && continue

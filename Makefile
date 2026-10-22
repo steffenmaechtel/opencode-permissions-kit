@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-reviews-lint test-reviews-parity test-rules-meta test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-reviews-lint test-reviews-parity test-rules-meta test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` — DERIVED FROM DISK (0.0.42d C4 /
 # 0.0.42e C10): every file under files/ and scripts/ whose first line is
@@ -71,7 +71,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-reviews-lint test-reviews-parity test-rules-meta test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-reviews-lint test-reviews-parity test-rules-meta test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -292,8 +292,16 @@ test-sandbox-policy:
 	@echo "=== Unit-Test Sandbox Policy Tests (0.0.42e C1) ==="
 	@./tests/unit/test-sandbox-policy.sh
 
+test-pages:
+	@echo "=== Pages Site Tests ==="
+	@./tests/unit/test-pages.sh
+
+test-rules-index-parity:
+	@echo "=== Rules INDEX Parity Tests ==="
+	@./tests/unit/test-rules-index-parity.sh
+
 test-reviews-lint:
-	@echo "=== Review Vorgang Lint (structure wave 2026-10) ==="
+	@echo "=== Review Case Lint (structure wave 2026-10) ==="
 	@./tests/unit/test-reviews-lint.sh
 
 test-reviews-parity:

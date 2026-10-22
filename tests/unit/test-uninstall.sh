@@ -551,6 +551,232 @@ else
 fi
 
 echo ""
+# --- F27: bridge removal honesty (#211 a F27) ---------------------------------------
+# The silent noop stub + unconditional echo claimed a removal that never
+# ran when the helper was missing. Extract the real consent block and
+# drive both arms with a stubbed browser_bridge_remove + auto-yes prompt.
+_f27_block="$(sed -n "/Remove the kit's wsl.conf bridge block/,/^        fi$/p" \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh")"
+if [ -n "$_f27_block" ] && printf '%s' "$_f27_block" | grep -q 'browser_bridge_remove'; then
+    pass "bridge removal block extractable (#211 a F27)"
+    _f27_run() {
+        (
+            prompt_yn() { printf 'y'; }
+            log() { echo "log: $*"; }
+            # #211 b W14: the extract spans the declined-consent arm's
+            # live `sudo rm -rf` — stub sudo so no future drive can
+            # execute it for real on a kit-managed host.
+            sudo() { echo "sudo: $*"; return 0; }
+            browser_bridge_remove() {
+                [ "$F27MODE" = ok ] && return 0
+                return 1
+            }
+            eval "$_f27_block"
+        ) 2>&1
+    }
+    _out=$(F27MODE=ok _f27_run 0) || true
+    case "$_out" in
+        *"WSL browser bridge removed"*) pass "helper present: removal reported (#211 a F27)" ;;
+        *) fail "helper present: removal reported (got: $_out)" ;;
+    esac
+    _out=$(F27MODE=fail _f27_run 1) || true
+    case "$_out" in
+        *"WARN: could not remove the wsl.conf bridge block"*) pass "helper missing: warn, no false removed (#211 a F27)" ;;
+        *) fail "helper missing: warn, no false removed (got: $_out)" ;;
+    esac
+else
+    fail "bridge removal block extractable (#211 a F27)"
+fi
+
+# --- F28: group removal exact + honest (#211 a F28) --------------------------------
+# The membership probe was a substring grep (a group 'opencode2' matched
+# 'opencode') and the success echo printed over a silenced gpasswd
+# failure. Extract the real block; stub id/run_q/log; drive all arms.
+_f28_block="$(sed -n '/^if id "\$DEFAULT_USER" >\/dev\/null 2>&1 \\/,/^fi$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh")"
+if [ -n "$_f28_block" ]; then
+    pass "group removal block extractable (#211 a F28)"
+    _f28_run() {
+        # $1 = groups-print, $2 = gpasswd rc — sudo stubbed (#211 b W1):
+        # the block calls sudo directly now (run_q is rc-blind by design
+        # and must not be faked into propagating), so the pin drives the
+        # real shipped wiring at the real seam.
+        (
+            DEFAULT_USER=dev
+            OPENCODE_GROUP=opencode
+            DRY_RUN="${DRY_RUN:-false}"
+            id() { printf '%s\n' "uid=1(dev) gid=1(dev) groups=1(dev),$F28GRPS"; return 0; }
+            sudo() { return "$F28GP"; }
+            log() { echo "log: $*"; }
+            eval "$_f28_block"
+        )
+    }
+    _out=$(F28GP=0 F28GRPS="50(opencode)" _f28_run) || true
+    case "$_out" in
+        *"Removed dev from group opencode."*) pass "member + gpasswd ok: removed reported (#211 a F28)" ;;
+        *) fail "member + gpasswd ok: removed reported (got: $_out)" ;;
+    esac
+    _out=$(F28GP=1 F28GRPS="50(opencode)" _f28_run 2>&1) || true
+    case "$_out" in
+        *"WARN: could not remove dev from group opencode"*) pass "gpasswd failure: warn, no false removed (#211 a F28)" ;;
+        *) fail "gpasswd failure: warn (got: $_out)" ;;
+    esac
+    _out=$(F28GP=0 F28GRPS="50(opencode2)" _f28_run) || true
+    case "$_out" in
+        *"Removed"*) fail "opencode2 must NOT count as membership (#211 a F28)" ;;
+        *) pass "exact-name match: opencode2 is not opencode (#211 a F28)" ;;
+    esac
+    _out=$(F28GP=1 F28GRPS="50(opencode)" DRY_RUN=true _f28_run 2>&1) || true
+    case "$_out" in
+        *"[DRY] sudo gpasswd"*"Removed dev from group opencode."*)
+            pass "dry run: [DRY] echo + success lines despite rc (#211 b W1)" ;;
+        *) fail "dry run: [DRY] echo + success lines (got: $_out)" ;;
+    esac
+else
+    fail "group removal block extractable (#211 a F28)"
+fi
+
+# --- W11: the no-markers bridge arm follows the helper's rc (#211 b W11) ----------
+# The consent arm went honest in a F27; this sibling arm (no wsl.conf
+# markers found — library wsl/ tree drop only) kept its unconditional
+# success log. Wiring pin (F14's sites-2/3 precedent: the arm is the
+# near-unreachable stub path): the call is if-wrapped and the FAILED
+# log line exists.
+if grep -q 'if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then' "$UNINSTALL" \
+   && grep -q 'wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)' "$UNINSTALL"; then
+    pass "no-markers bridge arm conditions its log on the rc (#211 b W11)"
+else
+    fail "no-markers bridge arm conditions its log on the rc (#211 b W11)"
+fi
+
+# --- c W1: userdel + audit-log arms honest (#211 c W1) ------------------------------
+# The b W1 sweep claim called the remaining run_q uses "bare best-effort
+# cleanup" — userdel (the primary destructive op) and the audit-log rm
+# both lied in the gpasswd shape: rc-blind call, unconditional success
+# echo/log. Extract both real blocks; stub sudo (the REAL seam — run_q
+# is rc-blind by design and must not be faked into propagating) and
+# drive every arm.
+_cw1_udel_block="$(sed -n '/^if id "\$OPENCODE_USER" >\/dev\/null 2>&1; then$/,/^fi$/p' "$UNINSTALL")"
+if [ -n "$_cw1_udel_block" ]; then
+    pass "user removal block extractable (#211 c W1)"
+    _cw1_udel_run() {
+        (
+            OPENCODE_USER=oc
+            DEFAULT_USER=dev
+            DRY_RUN="${CW1DRY:-false}"
+            id() { [ "$1" = "-u" ] && printf '900\n'; return 0; }
+            prompt_yn() { printf 'y\n'; }
+            sleep() { :; }
+            sudo() { case "$1" in userdel) return "$CW1UDEL";; esac; return 0; }
+            run_q() {
+                if [ "$DRY_RUN" = true ]; then echo "  [DRY] $*"; else "$@" >/dev/null 2>&1 || true; fi
+            }
+            log() { echo "log: $*"; }
+            eval "$_cw1_udel_block"
+        )
+    }
+    _out=$(CW1UDEL=0 _cw1_udel_run) || true
+    case "$_out" in
+        *"User 'oc' removed."*"log: user removed: oc"*)
+            pass "userdel ok: removal reported (#211 c W1)" ;;
+        *) fail "userdel ok: removal reported (got: $_out) (#211 c W1)" ;;
+    esac
+    _out=$(CW1UDEL=1 _cw1_udel_run 2>&1) || true
+    _cw1_ok=0
+    case "$_out" in *"WARN: could not remove user 'oc' (userdel failed)"*) ;; *) _cw1_ok=1 ;; esac
+    case "$_out" in *"log: user removal FAILED for oc (userdel)"*) ;; *) _cw1_ok=1 ;; esac
+    case "$_out" in *"User 'oc' removed."*) _cw1_ok=1 ;; esac
+    if [ "$_cw1_ok" -eq 0 ]; then
+        pass "userdel failure: warn + FAILED log, no false removed (#211 c W1)"
+    else
+        fail "userdel failure arms (got: $_out) (#211 c W1)"
+    fi
+    _out=$(CW1UDEL=1 CW1DRY=true _cw1_udel_run 2>&1) || true
+    case "$_out" in
+        *"[DRY] sudo userdel -r oc"*"User 'oc' removed."*)
+            pass "userdel dry run: [DRY] echo + success lines despite rc (#211 c W1)" ;;
+        *) fail "userdel dry run: [DRY] echo + success lines (got: $_out) (#211 c W1)" ;;
+    esac
+else
+    fail "user removal block extractable (#211 c W1)"
+fi
+_cw1_al_block="$(sed -n '/^if \[ "\$(prompt_yn "Delete audit log too/,/^fi$/p' "$UNINSTALL")"
+if [ -n "$_cw1_al_block" ]; then
+    pass "audit-log block extractable (#211 c W1)"
+    _cw1_al_run() {
+        (
+            DRY_RUN="${CW1DRY:-false}"
+            prompt_yn() { printf 'y\n'; }
+            sudo() { return "$CW1AL"; }
+            log() { echo "log: $*"; }
+            eval "$_cw1_al_block"
+        )
+    }
+    _out=$(CW1AL=0 _cw1_al_run) || true
+    case "$_out" in
+        *"Audit log removed."*"log: audit log removed: /var/log/opencode-permissions-kit"*)
+            pass "audit rm ok: removal reported after the act (#211 c W1)" ;;
+        *) fail "audit rm ok: removal reported (got: $_out) (#211 c W1)" ;;
+    esac
+    _out=$(CW1AL=1 _cw1_al_run 2>&1) || true
+    _cw1_ok=0
+    case "$_out" in *"WARN: could not remove the audit log"*) ;; *) _cw1_ok=1 ;; esac
+    # The arm names the failing command like its siblings (#211 e W3);
+    # the log line's changed tail is pinned too, mirroring the userdel
+    # sibling's full-wording arm (#211 f W1).
+    case "$_out" in *"(rm failed)"*) ;; *) _cw1_ok=1 ;; esac
+    case "$_out" in *"log: audit log removal FAILED for /var/log/opencode-permissions-kit (rm)"*) ;; *) _cw1_ok=1 ;; esac
+    case "$_out" in *"Audit log removed."*) _cw1_ok=1 ;; esac
+    if [ "$_cw1_ok" -eq 0 ]; then
+        pass "audit rm failure: warn + FAILED log, no false removed (#211 c W1)"
+    else
+        fail "audit rm failure arms (got: $_out) (#211 c W1)"
+    fi
+    _out=$(CW1AL=1 CW1DRY=true _cw1_al_run 2>&1) || true
+    case "$_out" in
+        *"[DRY] sudo rm -rf /var/log/opencode-permissions-kit"*"Audit log removed."*)
+            pass "audit rm dry run: [DRY] echo + success lines despite rc (#211 c W1)" ;;
+        *) fail "audit rm dry run: [DRY] echo + success lines (got: $_out) (#211 c W1)" ;;
+    esac
+else
+    fail "audit-log block extractable (#211 c W1)"
+fi
+
+# --- agents-backup failure arm names the failing commands (#211 f W2) ----------
+_f2_bak_block="$(sed -n '/^        for _un_ag_dirname in \.agents \.claude; do$/,/^        done$/p' "$UNINSTALL")"
+if [ -n "$_f2_bak_block" ]; then
+    pass "agents-backup loop extractable (#211 f W2)"
+    _f2_bak_run() {
+        (
+            OPENCODE_USER=oc
+            DRY_RUN="${F2DRY:-false}"
+            sudo() {
+                case "$1" in
+                    test) return 0 ;;
+                    ls) echo "agent-resource"; return 0 ;;
+                    mkdir|cp) return "${F2BAKRC:-1}" ;;
+                    *) return 0 ;;
+                esac
+            }
+            log() { echo "log: $*"; }
+            eval "$_f2_bak_block"
+        )
+    }
+    _out=$(F2BAKRC=1 _f2_bak_run 2>&1) || true
+    _f2_ok=0
+    case "$_out" in *"WARNING: could not back up /home/oc/.agents"*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"(mkdir/cp failed)"*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"log: agents backup FAILED before userdel: .agents (mkdir/cp)"*) ;; *) _f2_ok=1 ;; esac
+    case "$_out" in *"Agent resources backed up:"*) _f2_ok=1 ;; esac
+    if [ "$_f2_ok" -eq 0 ]; then
+        pass "backup failure: warning names mkdir/cp, no false backed-up (#211 f W2)"
+    else
+        fail "backup failure arm (got: $_out) (#211 f W2)"
+    fi
+else
+    fail "agents-backup loop extractable (#211 f W2)"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1

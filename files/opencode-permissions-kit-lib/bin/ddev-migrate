@@ -2,7 +2,7 @@
 # opencode permissions kit -- bin/ddev-migrate
 # CLI dispatcher for the ddev database migration bridge (issue #15).
 # The functions live in sh/ddev-migrate.sh (sourced by install.sh);
-# this entry point makes them a command (docs/design/streamline.md):
+# this entry point makes them a command (internal/records/streamline.md):
 #   sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export <dev-user> <root> [root ...]
 #   sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import [dump-dir]
 #   /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate list
@@ -28,7 +28,13 @@ case "${1:-}" in
             echo "$dm_d:"
             ls -1 "$dm_d" 2>/dev/null | sed 's/^/    /'
         done
-        [ "$dm_found" = 0 ] && echo "no dump directories under $DDEV_MIG_BACKUP_ROOT"
+        # rc 0 means "listed fine" regardless of whether dumps exist
+        # (#211 a F3): the bare `&& echo` tail made the case arm's rc
+        # 1 whenever dump directories WERE found — success read as
+        # failure for every scripted caller of a diagnostics command.
+        if [ "$dm_found" = 0 ]; then
+            echo "no dump directories under $DDEV_MIG_BACKUP_ROOT"
+        fi
         ;;
     export)
         [ "$(id -u)" = 0 ] || { echo "ddev-migrate: export must run as root"; exit 1; }

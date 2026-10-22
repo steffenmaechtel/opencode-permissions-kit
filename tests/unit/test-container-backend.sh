@@ -316,6 +316,148 @@ case "$_v28_out" in
     *) check "--yes accepted as no-op (V28, got: $_v28_out)" false ;;
 esac
 
+# --- backend switch preserves a hand-set OPENCODE_PODMAN_SOCKET (#211 a F10) ---
+# update_install_conf_backend grep-removes all three backend keys and
+# re-adds only what the caller hands it; container_backend_apply used
+# to hand an always-empty podman_socket, silently deleting a key the
+# user added by hand (install.sh preserves it across re-installs).
+# Pin: the REAL function against a scratch conf — the key survives a
+# switch TO podman-rootless and clears when switching away — plus the
+# caller-side carry-over wiring.
+_f10_fn="$(sed -n '/^update_install_conf_backend() {/,/^}/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh")"
+if [ -n "$_f10_fn" ]; then
+    check "update_install_conf_backend extractable (#211 a F10)" true
+    F10=$(mktemp -d)
+    printf 'DEFAULT_USER=dev\nOPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock\nCONTAINER_BACKEND=docker-rootless\n' \
+        > "$F10/install.conf"
+    _f10_run() {
+        # $1..$3 = backend, docker_host, podman_socket — runs the REAL
+        # function against $F10/install.conf with stubbed sudo/_tmp_track.
+        (
+            INSTALL_CONF="$F10/install.conf"
+            _tmp_track() { :; }
+            die() { echo "die: $*"; exit 1; }
+            sudo() {
+                case "$1" in
+                    tee) shift; tee "$@" ;;
+                    *)   "$@" ;;
+                esac
+            }
+            eval "$_f10_fn"
+            update_install_conf_backend "$1" "$2" "$3"
+        )
+    }
+    _f10_run podman-rootless "" "unix:///run/user/1000/podman/podman.sock" >/dev/null 2>&1 || true
+    if grep -q '^OPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock$' "$F10/install.conf" \
+       && grep -q '^CONTAINER_BACKEND=podman-rootless$' "$F10/install.conf"; then
+        check "hand-set podman socket survives the switch TO podman (#211 a F10)" true
+    else
+        check "hand-set podman socket survives the switch TO podman (#211 a F10)" false
+    fi
+    _f10_run docker-rootless "unix:///run/user/1000/docker.sock" "" >/dev/null 2>&1 || true
+    if grep -q '^OPENCODE_PODMAN_SOCKET=' "$F10/install.conf"; then
+        check "socket key clears when switching away (documented direction)" false
+    else
+        check "socket key clears when switching away (documented direction)" true
+    fi
+    rm -rf "$F10"
+    if grep -q 'podman_socket=\$(sed -n .s/\^OPENCODE_PODMAN_SOCKET=//p' \
+        "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"; then
+        check "caller carries the pre-existing key over (#211 a F10 wiring)" true
+    else
+        check "caller carries the pre-existing key over (#211 a F10 wiring)" false
+    fi
+else
+    check "update_install_conf_backend extractable (#211 a F10)" false
+fi
+
+# --- linger message conditioned on its rc (#211 a F13) ----------------------------
+# `loginctl enable-linger ... || true` + an unconditional "Linger
+# enabled" line claimed session-survival even when enabling failed —
+# the rootless daemon died at logout and ddev "randomly" lost its
+# backend. Extract the REAL enable_linger and drive it with stubbed
+# loginctl: ok -> success, fail -> warn + retry hint, absent -> silent.
+_f13_fn="$(sed -n '/^enable_linger() {/,/^}$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend")"
+if [ -n "$_f13_fn" ]; then
+    check "enable_linger extractable (#211 a F13)" true
+    F13=$(mktemp -d)
+    mkdir -p "$F13/bin"
+    printf '#!/bin/sh\nexit 0\n' > "$F13/bin/loginctl"; chmod +x "$F13/bin/loginctl"
+    _out=$(OPENCODE_USER=oc F13LOG="$F13/log" PATH="$F13/bin:$PATH" \
+        sh -c 'log() { echo "$*" >> "$F13LOG"; }; eval "$1"; enable_linger' sh "$_f13_fn" 2>&1) || true
+    case "$_out" in
+        *"Linger enabled for oc"*) check "ok rc: success line (#211 a F13)" true ;;
+        *) check "ok rc: success line (#211 a F13, got: $_out)" false ;;
+    esac
+    printf '#!/bin/sh\nexit 1\n' > "$F13/bin/loginctl"
+    _out=$(OPENCODE_USER=oc F13LOG="$F13/log" PATH="$F13/bin:$PATH" \
+        sh -c 'log() { echo "$*" >> "$F13LOG"; }; eval "$1"; enable_linger' sh "$_f13_fn" 2>&1) || true
+    case "$_out" in
+        *"WARN: could not enable linger"*"retry: loginctl enable-linger oc"*)
+            check "failed rc: warn + retry hint, no success line (#211 a F13)" true ;;
+        *) check "failed rc: warn + retry hint (got: $_out)" false ;;
+    esac
+    mkdir -p "$F13/emptybin"
+    _f13_sh="$(command -v sh)"
+    _out=$(OPENCODE_USER=oc F13LOG="$F13/log" PATH="$F13/emptybin" \
+        "$_f13_sh" -c 'log() { echo "$*" >> "$F13LOG"; }; eval "$1"; enable_linger' sh "$_f13_fn" 2>&1) || true
+    case "$_out" in
+        "") check "no loginctl: block silent (#211 a F13)" true ;;
+        *) check "no loginctl: block silent (got: $_out)" false ;;
+    esac
+    grep -q 'linger enable FAILED for oc' "$F13/log" \
+        && check "failed rc logged (#211 a F13)" true \
+        || check "failed rc logged (#211 a F13)" false
+    rm -rf "$F13"
+else
+    check "enable_linger extractable (#211 a F13)" false
+fi
+
+# --- subuid/subgid fields validated before arithmetic (#211 a F16) ----------------
+# allocate_range fed raw /etc/subuid fields into $(( )) — digit-leading
+# junk aborted provisioning under set -e with a cryptic foreign error,
+# leading zeros misparsed as octal. Malformed lines now warn and skip.
+# Pin: the REAL function against a scratch file carrying one good and
+# three malformed lines — warns for the bad ones, correct allocation
+# past the good range, rc 0.
+_f16_fn="$(sed -n '/^allocate_range() {/,/^}$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/setup-container-backend")"
+if [ -n "$_f16_fn" ]; then
+    check "allocate_range extractable (#211 a F16)" true
+    F16=$(mktemp -d)
+    printf 'gooduser:100000:65536\njunk:12abc:100\nzeros:010:100\nalpha:abc:100\nzerocount:1000:09\noverflow:99999999999999999999:1\nu32max:9999999999:100\nzerostart:0:1000\n' > "$F16/subuid"
+    _out=$(F16FILE="$F16/subuid" sh -c '
+        log() { :; }
+        eval "$1"
+        allocate_range "$F16FILE" f16user
+    ' sh "$_f16_fn" 2>&1) || _f16_rc=$?
+    _f16_warn=$(printf '%s\n' "$_out" | grep -c 'malformed line(s) skipped')
+    _f16_cnt=$(printf '%s\n' "$_out" | sed -n 's/.*warn: \([0-9]*\) malformed.*/\1/p')
+    _f16_alloc=$(grep -c '^f16user:165536:65536$' "$F16/subuid" 2>/dev/null)
+    # u32max (10 digits > 4294967295) is malformed on VALUE (#211 c W9)
+    # — the length gate alone passed it. zerostart "0" is a GOOD line
+    # (#211 c W10): accepted as an occupied empty range, so it must NOT
+    # bump the malformed count — both sit in the fixture above.
+    if [ "${_f16_rc:-0}" -eq 0 ] && [ "$_f16_warn" = "1" ] && [ "$_f16_cnt" = "6" ] \
+       && [ "$_f16_alloc" = "1" ]; then
+        check "malformed lines warn+skip, allocation correct (#211 a F16; b W10: zero-count + overflow; c W9: u32 value cap; c W10: zero-start accepted)" true
+    else
+        check "malformed lines warn+skip, allocation correct (rc=${_f16_rc:-0} warns=$_f16_cnt alloc=$_f16_alloc out=$_out)" false
+    fi
+    # The warn's enumeration must name EVERY skip cause (#211 e W2):
+    # the value cap (c W9) added a third — an above-u32-max line is
+    # neither non-numeric nor leading-zero, and the fixture drives it.
+    case "$_out" in
+        *"above-u32-max"*) check "malformed warn names all skip causes incl. value cap (#211 e W2)" true ;;
+        *) check "malformed warn names the value-cap cause (out=$_out) (#211 e W2)" false ;;
+    esac
+    rm -rf "$F16"
+else
+    check "allocate_range extractable (#211 a F16)" false
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1

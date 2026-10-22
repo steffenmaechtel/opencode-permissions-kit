@@ -11,7 +11,7 @@
 #                                            asks for sudo itself)
 #
 # wsl-add-opencode-1-fix is implemented inline (explicit-consent wsl.conf
-# write, docs/design/wsl-conf-consent.md).
+# write, internal/records/wsl-conf-consent.md).
 #
 # Everything after the subcommand is passed through to the script, so all
 # script flags work unchanged (see docs/reference/cli.md).
@@ -19,14 +19,12 @@ set -u
 
 # Resolve the library root through the /usr/local/bin/opk symlink. The
 # dispatcher lives in bin/, so the root is one directory up.
-SELF="$0"
-if [ -L "$SELF" ]; then
-    target=$(readlink "$SELF" 2>/dev/null || true)
-    case "$target" in
-        /*) SELF="$target" ;;
-        *)  SELF="$(dirname "$SELF")/$target" ;;
-    esac
-fi
+# FULL chain (#211 a F15): the single-hop readlink broke chained user
+# symlinks (~/bin/opk -> /usr/local/bin/opk -> lib) — SELF stopped one
+# hop short, LIBDIR resolved wrong, and every subcommand reported
+# "not found" with a misleading "is the kit installed?" error. Sibling
+# shape: bin/ddev-migrate:13, bin/xdg-open:47.
+SELF="$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")"
 LIBDIR="$(cd "$(dirname "$SELF")/.." && pwd -P)"
 
 # Shared UI helpers — same visual language as every kit script (labeled
@@ -186,7 +184,7 @@ case "$cmd" in
         exec sudo sh "$LIBDIR/management/update.sh" --yes --only-binary "$@"
         ;;
     openchamber-secure)
-        # OpenChamber hardening (issue #154, docs/design/openchamber-2x-hardening.md):
+        # OpenChamber hardening (issue #154, internal/records/openchamber-2x-hardening.md):
         # write the admin-owned policy pin (/etc/openchamber/policy.json) that
         # makes OpenChamber spawn the kit wrapper — retroactively defusing a
         # one-click settings pin — record the opt-in (opk update re-applies
@@ -218,9 +216,33 @@ case "$cmd" in
             ui_info "existing /etc/openchamber/policy.json diverges from the kit pin — replacing it"
         fi
         mkdir -p /etc/openchamber
-        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > /etc/openchamber/policy.json
-        chown root:root /etc/openchamber/policy.json
-        chmod 644 /etc/openchamber/policy.json
+        # Atomic stage+mv (#211 a F17, the 0.0.44a V10 sibling gap): a
+        # kill mid-redirect used to leave a truncated/empty policy.json
+        # and silently deactivate the pin — the live file now flips via
+        # rename only, the truncate window sits on the pid-suffixed
+        # temp (0.0.42e C5 shape).
+        _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
+        # The write's rc is gated too (#211 c W7): opk carries no set -e,
+        # so a partially-written temp (create ok, write fails — ENOSPC)
+        # flowed through chown || true and chmod+mv — both succeed on the
+        # truncated file — installing a broken pin under ui_success.
+        # (Deliberately an `|| { …; }` one-liner: the F17 pin's extract
+        # ends at this block's first 8-space `fi` — a second one would
+        # truncate it.)
+        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > "$_ocp_tmp" \
+            || { rm -f "$_ocp_tmp"; ui_error "could not stage the policy pin (write to the temp failed)"; exit 1; }
+        chown root:root "$_ocp_tmp" 2>/dev/null || true
+        # Failure path cleans the staged temp (#211 b W8): opk carries
+        # no cleanup trap, and the pid suffix means a stranded
+        # root-owned .opk-new.$$ in /etc is never cleaned by a later
+        # run. mv -f replaces a symlink at policy.json rather than
+        # writing through it (#211 b W19) — the announced replace is
+        # this command's documented job.
+        if ! { chmod 644 "$_ocp_tmp" && mv -f "$_ocp_tmp" /etc/openchamber/policy.json; }; then
+            rm -f "$_ocp_tmp"
+            ui_error "could not install the policy pin (chmod/mv on the staged temp failed)"
+            exit 1
+        fi
         ui_success "policy pin active: /etc/openchamber/policy.json -> /usr/local/bin/opencode"
         # Record the opt-in so update.sh keeps re-applying the pin.
         if grep -q '^OPENCHAMBER_POLICY=' "$INSTALL_CONF" 2>/dev/null; then
@@ -358,7 +380,7 @@ PYEOF
         ;;
     wsl-add-opencode-1-fix)
         # Explicit consent for the /etc/wsl.conf browser-bridge carrier
-        # (docs/design/wsl-conf-consent.md): install/update never write
+        # (internal/records/wsl-conf-consent.md): install/update never write
         # wsl.conf — only THIS command, run by the user, does. It (re)deploys
         # the stand-in tree from the library and writes the kit comment
         # block (pure comments for WSL, issue #100); a legacy 0.0.36

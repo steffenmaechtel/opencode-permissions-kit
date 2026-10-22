@@ -12,7 +12,7 @@ own **soft** layer (see below):
 |---|---|
 | Agent ≠ developer | wrapper execs `sudo -u opencode`; the developer's home is `750` and not group-shared |
 | Containers ≠ root | rootless backend owned by `opencode` (per-user socket / daemonless podman) |
-| No developer-RunAs | sudoers carry only `(opencode)` rules — kit binary, socket probe, ddev helper |
+| No developer-RunAs | sudoers carry only `(opencode)` rules — kit binary, socket probe, cwd check, ddev helper |
 
 Concretely:
 
@@ -78,7 +78,8 @@ Documented rather than hidden:
   at the cost of the `*.ddev.site` wildcard and per-project manual
   provisioning.
 - **Supply chain (trust assumption):** the one-liner streams `install.sh`
-  from `master` over HTTPS, `update.sh` re-fetches every kit file from the
+  from the tracked channel (default `stable` via the Pages mirror — see
+  [getting-started](../getting-started.md)) over HTTPS, `update.sh` re-fetches every kit file from the
   tracked ref under the same TLS-only model (no checksums, signatures, or
   commit pinning), and `update.sh --binary` downloads the opencode release
   tarball — the "verification" is a liveness check (`opencode --version`

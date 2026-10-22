@@ -388,7 +388,10 @@ OPENCHAMBER_POLICY_GIVEN=false
 parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
-            --yes) SKIP_PROMPTS=true ;;
+            # -y alias (#211 b W2): update/config/uninstall accept it;
+            # cli.md documents it for install too — the family stays
+            # uniform.
+            --yes|-y) SKIP_PROMPTS=true ;;
             --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
             --skip-ddev-migration) SKIP_DDEV_MIGRATION=true ;;
             --force-unsupported-distro) FORCE_UNSUPPORTED_DISTRO=true ;;
@@ -1813,13 +1816,20 @@ do_deploy_phase() {
     # unreadable home (the developer's, mode 750), git >= 2.55 dies with
     # "fatal: error reading '<cwd>/.git'" before touching the global config.
     # chdir to / first; --global ignores the worktree anyway.
+    # The audit line must match reality (#211 a F4, update.sh twin): a
+    # failed --add used to print nothing while the log claimed "ensured".
     if command -v git >/dev/null 2>&1; then
-        if ! sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
+        if sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
             2>/dev/null | grep -qFx '*'; then
-            sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*' \
-                && ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+            log "git safe.directory ensured for $OPENCODE_USER (already set)"
+        elif sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*'; then
+            ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+            log "git safe.directory ensured for $OPENCODE_USER"
+        else
+            ui_warn "could not set git safe.directory '*' for $OPENCODE_USER — agent git may fail"\
+" with 'dubious ownership' (git config --global --add failed)"
+            log "git safe.directory NOT ensured for $OPENCODE_USER (git config --add failed)"
         fi
-        log "git safe.directory ensured for $OPENCODE_USER"
     fi
 
     # 0.0.49b C1: atomic umask deploy — a plain in-place cp killed

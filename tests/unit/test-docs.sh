@@ -144,6 +144,52 @@ records_status_check() {
 }
 records_status_check
 
+# --- F36: cli.md's install flag table tracks the parser (#211 a F36) --------------
+# Claim-drift guard: every flag install.sh's parse_args accepts must
+# appear in docs/reference/cli.md (the table F23 filled). Sabotage:
+# delete a row or add a parser flag — this goes red.
+# #211 b W28: tripwire — a drifted parse_args anchor must not silently
+# iterate zero flags and pass.
+# #211 b W30: reverse direction — every flag documented in cli.md's
+# install table must exist in the parser. The original one-directional
+# pin shipped W2 exactly this way: a documented `-y` the parser
+# rejected was invisible to it.
+_cli_md="$REPO_ROOT/docs/reference/cli.md"
+_f36_flags="$(sed -n '/^parse_args()/,/^}/p' "$REPO_ROOT/files/install.sh" \
+    | grep -oE '\-\-[a-z0-9-]+' | sort -u)"
+if [ -z "$_f36_flags" ]; then
+    echo "FAIL cli.md: parse_args extraction empty — anchor drift? (#211 b W28)" >> "$TMP"
+fi
+for _f36_flag in $_f36_flags; do
+    if ! grep -qF -e "$_f36_flag" "$_cli_md"; then
+        echo "FAIL cli.md: install flag '$_f36_flag' missing from the reference" >> "$TMP"
+    fi
+done
+# Reverse: the install table sits under '## install.sh' (## section,
+# table rows `| \`--flag\`, \`-y\` | ...`).
+_f36_docflags="$(sed -n '/^## install.sh/,/^## /p' "$_cli_md" \
+    | grep '^| ' | grep -v '^| Flag' \
+    | sed -n 's/^| \([^|]*\) |.*/\1/p' | tr -d '`,' | tr -s ' ' '\n' | grep -E '^-.-?' | sort -u)"
+# Tripwire (#211 c W4 — the W28 class on the reverse direction): a
+# drifted '## install.sh' heading must not silently iterate zero flags
+# and pass.
+if [ -z "$_f36_docflags" ]; then
+    echo "FAIL cli.md: install-table extraction empty — '## install.sh' anchor drift? (#211 c W4)" >> "$TMP"
+fi
+for _f36_df in $_f36_docflags; do
+    case "$_f36_df" in
+        --*)
+            printf '%s\n' "$_f36_flags" | grep -qxF -- "$_f36_df" \
+                || echo "FAIL cli.md: documented install flag '$_f36_df' not in the parser (#211 b W30)" >> "$TMP"
+            ;;
+        -?)
+            sed -n '/^parse_args()/,/^}/p' "$REPO_ROOT/files/install.sh" \
+                | grep -qF -- "|$_f36_df)" \
+                || echo "FAIL cli.md: documented alias '$_f36_df' not in the parser (#211 b W30)" >> "$TMP"
+            ;;
+    esac
+done
+
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"
     cat "$TMP"

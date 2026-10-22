@@ -509,7 +509,7 @@ check "update.sh --help no longer claims prompt-free defaults (D2)" \
 # untouched.
 check "update re-applies the policy pin when opted in" \
     sh -c "grep -qF '[ \"\${OPENCHAMBER_POLICY:-}\" = \"yes\" ]' \"\$1\" \
-        && grep -qF 'sudo tee /etc/openchamber/policy.json' \"\$1\"" _ "$UPDATE"
+        && grep -qF 'sudo mv -f \"\$_ocp_tmp\" /etc/openchamber/policy.json' \"\$1\"" _ "$UPDATE"
 check "update never creates the policy pin without the opt-in" \
     sh -c "! grep -qF 'OPENCHAMBER_POLICY=\"yes\"' \"\$1\"" _ "$UPDATE"
 # 0.0.47a F1: the re-apply never overwrites admin content — byte-gate on
@@ -571,9 +571,11 @@ check "uninstall twin probes at the same authority (issue #164)" \
 OC164_BLOCK="$(sed -n '/^    _oc_expected=/,/^    fi$/p' "$UPDATE")"
 # #198 a W5: a drifted end anchor over-captures to EOF — bound the block
 # so anchor drift fails HERE, loudly, instead of surfacing later as a
-# confusing S1/S2 'got:' dump (the block is 16 lines).
+# confusing S1/S2 'got:' dump (the block is 28 lines: 21 after #211 a
+# F17's atomic stage+mv, +7 from #211 b W8's trap registration and mv
+# -semantics comments).
 if [ -n "$OC164_BLOCK" ] \
-    && [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 20 ] \
+    && [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 30 ] \
     && printf '%s' "$OC164_BLOCK" | grep -qF 'sudo test -f /etc/openchamber/policy.json'; then
     pass "openchamber gate block extractable from update.sh (issue #164)"
 else
@@ -808,6 +810,289 @@ if [ -n "$_du_line" ]; then
     fi
 else
     fail "update.sh id probe line extractable from update.sh"
+fi
+
+# --- git safe.directory audit honesty (#211 a F4) --------------------------------
+# A failed `git config --global --add safe.directory '*'` used to print
+# nothing while the audit log unconditionally recorded "ensured" — the
+# agent's git then failed with 'dubious ownership' long after, with no
+# trail pointing at the cause. Extract the real block and drive all
+# three arms with stubbed sudo/git (hermetic: the test user's real
+# ~/.gitconfig never matters — environment-dependence class 0.0.46a F2).
+_f4_block="$(sed -n '/^# The audit line must match reality/,/^fi$/p' "$UPDATE")"
+if [ -n "$_f4_block" ]; then
+    pass "safe.directory block extractable from update.sh (#211 a F4)"
+    _f4_run() {
+        (
+            OPENCODE_USER=ocuser
+            F4_MODE="$1"
+            sudo() {
+                # Answer both git invocations here — a pass-through
+                # "$@" would choke on sudo's own flags (-u ocuser -H).
+                case " $* " in
+                    *" --add "*)
+                        [ "$F4_MODE" = fail ] && return 1
+                        return 0 ;;
+                    *" --get-all "*)
+                        [ "$F4_MODE" = alreadysel ] && { echo '*'; return 0; }
+                        return 0 ;;
+                esac
+                return 0
+            }
+            ui_success(){ echo "success: $*"; }
+            ui_warn()   { echo "warn: $*"; }
+            log()       { echo "log: $*"; }
+            eval "$_f4_block"
+        ) 2>&1
+    }
+    _out=$(_f4_run fail) || true
+    if printf '%s' "$_out" | grep -q "warn: could not set git safe.directory" \
+       && printf '%s' "$_out" | grep -q 'log: git safe.directory NOT ensured' \
+       && ! printf '%s' "$_out" | grep -q 'success:'; then
+        pass "failed --add: warn + NOT-ensured log, no success line (#211 a F4)"
+    else
+        fail "failed --add: warn + NOT-ensured log, no success line (out=$_out)"
+    fi
+    _out=$(_f4_run ok) || true
+    if printf '%s' "$_out" | grep -q 'success: git safe.directory' \
+       && printf '%s' "$_out" | grep -q 'log: git safe.directory ensured for ocuser' \
+       && ! printf '%s' "$_out" | grep -q 'NOT ensured'; then
+        pass "successful --add: success line + ensured log (#211 a F4)"
+    else
+        fail "successful --add: success line + ensured log (out=$_out)"
+    fi
+    _out=$(_f4_run alreadysel) || true
+    if printf '%s' "$_out" | grep -q 'log: git safe.directory ensured for ocuser (already set)' \
+       && ! printf '%s' "$_out" | grep -q 'success:'; then
+        pass "already set: audit notes it, no redundant add (#211 a F4)"
+    else
+        fail "already set: audit notes it, no redundant add (out=$_out)"
+    fi
+else
+    fail "safe.directory block extractable from update.sh (#211 a F4)"
+fi
+# The install.sh twin carries the same honest arms (sweep pin).
+if grep -q 'git safe.directory NOT ensured' "$SCRIPT_DIR/../../files/install.sh"; then
+    pass "install.sh twin logs NOT-ensured on failure too (#211 a F4 sweep)"
+else
+    fail "install.sh twin logs NOT-ensured on failure too (#211 a F4 sweep)"
+fi
+
+# --- first-wins lib lookups (#211 a F5) --------------------------------------------
+# update.sh sourced the checkout copy AND the deployed LIBDIR copy of
+# wsl-browser-bridge.sh / ddev-handover.sh back-to-back — LIBDIR last,
+# its definitions silently won, inverting the documented "prefer the
+# checkout copy". Extract both real loops and drive them with fixture
+# libs whose markers name their origin: checkout must win when present,
+# LIBDIR is the fallback only.
+F5=$(mktemp -d)
+mkdir -p "$F5/froot/opencode-permissions-kit-lib/sh" "$F5/ldir/sh"
+printf 'wbb_marker() { echo CHECKOUT; }\n' > "$F5/froot/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+printf 'wbb_marker() { echo LIBDIR; }\n'   > "$F5/ldir/sh/wsl-browser-bridge.sh"
+printf 'dh_marker() { echo CHECKOUT; }\n'  > "$F5/froot/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+printf 'dh_marker() { echo LIBDIR; }\n'    > "$F5/ldir/sh/ddev-handover.sh"
+_f5_loop_wbb="$(sed -n '/#211 a F5, wsl-browser-bridge site/,/^done$/p' "$UPDATE")"
+_f5_loop_dh="$(sed -n '/#211 a F5, ddev-handover site/,/^    done$/p' "$UPDATE")"
+if [ -n "$_f5_loop_wbb" ] && [ -n "$_f5_loop_dh" ]; then
+    pass "both first-wins loops extractable from update.sh (#211 a F5)"
+    _f5_eval() {
+        (
+            FILES_ROOT="$F5/froot"
+            LIBDIR="$F5/ldir"
+            eval "$1"
+            "$2"
+        )
+    }
+    if [ "$(_f5_eval "$_f5_loop_wbb" wbb_marker)" = CHECKOUT ]; then
+        pass "checkout copy wins over LIBDIR (wsl-browser-bridge) (#211 a F5)"
+    else
+        fail "checkout copy wins over LIBDIR (wsl-browser-bridge) (#211 a F5)"
+    fi
+    if [ "$(_f5_eval "$_f5_loop_dh" dh_marker)" = CHECKOUT ]; then
+        pass "checkout copy wins over LIBDIR (ddev-handover) (#211 a F5)"
+    else
+        fail "checkout copy wins over LIBDIR (ddev-handover) (#211 a F5)"
+    fi
+    rm -rf "${F5:?}/froot"
+    if [ "$(_f5_eval "$_f5_loop_wbb" wbb_marker)" = LIBDIR ]; then
+        pass "LIBDIR fallback when checkout copy absent (bridge) (#211 a F5)"
+    else
+        fail "LIBDIR fallback when checkout copy absent (bridge) (#211 a F5)"
+    fi
+    if [ "$(_f5_eval "$_f5_loop_dh" dh_marker)" = LIBDIR ]; then
+        pass "LIBDIR fallback when checkout copy absent (handover) (#211 a F5)"
+    else
+        fail "LIBDIR fallback when checkout copy absent (handover) (#211 a F5)"
+    fi
+else
+    fail "both first-wins loops extractable from update.sh (#211 a F5)"
+fi
+rm -rf "$F5"
+
+# --- umask skip is loud like its sudoers twin (#211 a F6) ---------------------------
+# A missing $FILES_ROOT/etc/umask.sh used to skip the umask re-deploy
+# with zero output while the sudoers twin above logs its identical
+# conservative skip (0.0.41f S2: "the skip must not be silent").
+# Extract the real block and drive both arms.
+_f6_block="$(sed -n '/^if \[ -f "\$FILES_ROOT\/etc\/umask.sh" \]; then$/,/^fi$/p' "$UPDATE")"
+if [ -n "$_f6_block" ]; then
+    pass "umask block extractable from update.sh (#211 a F6)"
+    _f6_run() {
+        # $1 = FILES_ROOT (missing or present umask.sh)
+        (
+            FILES_ROOT="$1"
+            copy_file_atomic() { return 0; }
+            sudo() { return 0; }
+            die() { echo "die: $*"; exit 1; }
+            ui_success(){ echo "success: $*"; }
+            log()       { echo "log: $*"; }
+            eval "$_f6_block"
+        ) 2>&1
+    }
+    F6=$(mktemp -d)
+    _out=$(_f6_run "$F6/missing-root") || true
+    if printf '%s' "$_out" | grep -q 'log: umask profile re-deploy skipped'; then
+        pass "missing umask.sh: skip is logged, not silent (#211 a F6)"
+    else
+        fail "missing umask.sh: skip is logged, not silent (out=$_out)"
+    fi
+    mkdir -p "$F6/root/etc"
+    printf 'umask 027\n' > "$F6/root/etc/umask.sh"
+    _out=$(_f6_run "$F6/root") || true
+    if printf '%s' "$_out" | grep -q 'log: umask profile re-deployed' \
+       && ! printf '%s' "$_out" | grep -q 'skipped'; then
+        pass "present umask.sh: deploy path unchanged (#211 a F6)"
+    else
+        fail "present umask.sh: deploy path unchanged (out=$_out)"
+    fi
+    rm -rf "$F6"
+else
+    fail "umask block extractable from update.sh (#211 a F6)"
+fi
+
+# --- xdg_open_real_exists fail-safe stub (#211 a F7) --------------------------------
+# Without the stub, a missing wsl-browser-bridge.sh made both call
+# sites see rc 127: `if xdg_open_real_exists` kept the shim, and
+# `! xdg_open_real_exists` INSTALLED it — both the shadowing direction
+# (0.0.42d S1's never-shadow probe silently gone). The stub answers
+# rc 0 = "assume a real one might exist". Pin: the stub is extracted
+# from the real update.sh and executed — rc must be 0 (deleting the
+# stub yields 127 and the pin goes red).
+_f7_stub="$(grep -m1 '^command -v xdg_open_real_exists' "$UPDATE")"
+if [ -n "$_f7_stub" ]; then
+    pass "xdg_open_real_exists stub extractable from update.sh (#211 a F7)"
+    _f7_rc=0
+    _f7_out=$(eval "$_f7_stub" >/dev/null 2>&1; xdg_open_real_exists) || _f7_rc=$?
+    if [ "$_f7_rc" -eq 0 ]; then
+        pass "stub answers rc 0 — never-shadow direction when probe missing (#211 a F7)"
+    else
+        fail "stub answers rc 0 (got rc $_f7_rc) (#211 a F7)"
+    fi
+else
+    fail "xdg_open_real_exists stub extractable from update.sh (#211 a F7)"
+fi
+
+# --- openchamber policy pin: atomic stage+mv (#211 a F17) --------------------------
+# Both write sites (update.sh re-apply + opk openchamber-secure) used
+# truncate-in-place writes — a kill mid-write left a truncated/empty
+# policy.json and a silently inactive pin (the 0.0.44a V10 atomic-write
+# wave's unswept siblings). Mechanism pins: recording stubs prove the
+# content lands on a pid-suffixed temp and the live file flips via mv
+# only; no write may target the final path directly.
+_f17_block="$(sed -n '/#211 a F17, opk twin/,/sudo mv -f/p' "$UPDATE")"
+if [ -n "$_f17_block" ]; then
+    pass "openchamber stage+mv block extractable (#211 a F17)"
+    _out=$(sh -c '
+        _tmp_track() { echo "TRACK $1" >&2; }
+        sudo() {
+            case "$1" in
+                mkdir|chown|chmod) return 0 ;;
+                tee) shift; printf "TEE %s\n" "$1" >&2 ;;
+                mv)  shift; case "$1" in -*) shift ;; esac
+                     printf "MV %s -> %s\n" "$1" "$2" ;;
+            esac
+        }
+        eval "$1"
+    ' sh "$_f17_block" 2>&1) || true
+    if printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json.opk-new\.' \
+       && printf '%s' "$_out" | grep -q 'MV /etc/openchamber/policy.json.opk-new\.[0-9]* -> /etc/openchamber/policy.json' \
+       && printf '%s' "$_out" | grep -q 'TRACK /etc/openchamber/policy.json.opk-new\.' \
+       && ! printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json$'; then
+        pass "update.sh: content staged on temp, live file flips via mv (#211 a F17)"
+    else
+        fail "update.sh: staged write + mv (out=$_out)"
+    fi
+    if printf '%s' "$_out" | grep -q 'TRACK /etc/openchamber/policy.json.opk-new\.'; then
+        pass "update.sh: staged temp registered with the cleanup trap (#211 b W8)"
+    else
+        fail "update.sh: staged temp registered with the cleanup trap (out=$_out) (#211 b W8)"
+    fi
+    # Order (#211 c W3): registration must precede staging — an abort
+    # DURING the tee (temp created, write fails) strands the temp unless
+    # the trap already knows it. The stub recording is chronological,
+    # so the TRACK line must carry the smaller line number.
+    _f17_trk=$(printf '%s\n' "$_out" | grep -n 'TRACK /etc/openchamber/policy.json.opk-new\.' | cut -d: -f1)
+    _f17_tee=$(printf '%s\n' "$_out" | grep -n 'TEE /etc/openchamber/policy.json.opk-new\.' | cut -d: -f1)
+    if [ -n "$_f17_trk" ] && [ -n "$_f17_tee" ] && [ "$_f17_trk" -lt "$_f17_tee" ]; then
+        pass "update.sh: temp registered BEFORE staging (#211 c W3)"
+    else
+        fail "update.sh: temp registered before staging (trk=${_f17_trk:-none} tee=${_f17_tee:-none}) (#211 c W3)"
+    fi
+else
+    fail "openchamber stage+mv block extractable (#211 a F17)"
+fi
+_f17_opk_block="$(sed -n '/#211 a F17, the 0.0.44a V10 sibling gap/,/^        fi$/p' \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk")"
+if [ -n "$_f17_opk_block" ]; then
+    # Hermetic: rewrite /etc/openchamber to scratch so the redirect can
+    # actually write (the mechanism — temp + mv to the final name — is
+    # what the pin asserts).
+    F17=$(mktemp -d)
+    mkdir -p "$F17/oc"
+    _f17_opk_block="$(printf '%s\n' "$_f17_opk_block" | sed "s|/etc/openchamber|$F17/oc|g")"
+    _out=$(sh -c 'mv() { case "$1" in -*) shift ;; esac; printf "MV %s -> %s\n" "$1" "$2"; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
+        sh "$_f17_opk_block" 2>&1) || true
+    if printf '%s' "$_out" | grep -q "MV $F17/oc/policy.json.opk-new\.[0-9]* -> $F17/oc/policy.json"; then
+        pass "opk twin: same stage+mv shape (#211 a F17 sweep)"
+    else
+        fail "opk twin: same stage+mv shape (out=$_out)"
+    fi
+    # The happy-path drive's mv is a stub — its temp stays on disk.
+    # Clean it so the failure-arm residue count below sees only its own
+    # drive's file. (:? guard per RM-0044 — the sandbox policy caught
+    # the first spelling.)
+    rm -f "${F17:?}/oc"/policy.json.opk-new.* 2>/dev/null || true
+    # Failure arm (#211 b W8): chmod failing must clean the staged temp
+    # and die loud — no stranded root-owned residue. rm runs REAL (the
+    # temp really exists on disk — the printf above wrote it), so the
+    # residue assert discriminates the actual deletion.
+    _f17_rc=0
+    _out=$(sh -c 'chmod() { return 1; }; mv() { return 0; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
+        sh "$_f17_opk_block" 2>&1) || _f17_rc=$?
+    _f17_residue=$(find "$F17/oc" -name 'policy.json.opk-new.*' 2>/dev/null | wc -l)
+    if [ "$_f17_rc" -eq 1 ] && [ "$_f17_residue" -eq 0 ] \
+       && printf '%s' "$_out" | grep -q 'UIERR'; then
+        pass "opk twin: chmod failure cleans the temp, dies loud (#211 b W8)"
+    else
+        fail "opk twin: chmod failure cleanup (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 b W8)"
+    fi
+    # Staging-write gate (#211 c W7): opk has no set -e, so a partial
+    # write (printf fails mid-file) must die loud itself — chown's
+    # `|| true` and a succeeding chmod+mv would otherwise install the
+    # truncated temp as the live pin.
+    _f17_rc=0
+    _out=$(sh -c 'printf() { return 1; }; chmod() { return 0; }; mv() { return 0; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
+        sh "$_f17_opk_block" 2>&1) || _f17_rc=$?
+    _f17_residue=$(find "$F17/oc" -name 'policy.json.opk-new.*' 2>/dev/null | wc -l)
+    if [ "$_f17_rc" -eq 1 ] && [ "$_f17_residue" -eq 0 ] \
+       && printf '%s' "$_out" | grep -q 'UIERR'; then
+        pass "opk twin: staging write failure dies loud, no flip (#211 c W7)"
+    else
+        fail "opk twin: staging write gate (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 c W7)"
+    fi
+    rm -rf "$F17"
+else
+    fail "opk openchamber block extractable (#211 a F17)"
 fi
 
 # --- Summary ----------------------------------------------------------------------

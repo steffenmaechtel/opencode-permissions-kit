@@ -131,8 +131,34 @@ if counted:
 # with [ -L ] immediately before its command runs; anything that is a
 # symlink NOW is skipped. The command words are kit-fixed and space-free
 # by construction (same contract as the find expression above).
+# Component walk (#211 a F1, the 0.0.39h F2 class): a gate on the LEAF
+# alone is bypassed by a PARENT directory swapped for a symlink inside
+# the window — the whole find output is replayed from a temp file, so
+# the window spans the full walk (minutes on large trees), and an
+# operand whose parent is a link NOW resolves outside the tree. The
+# worker therefore re-tests EVERY component between the scan root and
+# the operand (chain-walker shape of agent_home_sane, staged-write.sh)
+# and skips the operand when any of them is a symlink.
 _fsb_pass() {
-    _fsbp_label="$1"; _fsbp_root="$2"; shift 2
+    _fsbp_label="$1"; _fsbp_root="$2"; _fsbp_orig_root="$2"; shift 2
+    # Normalize the root's form (#211 b W7): find emits children without
+    # the root's trailing slash, so a slashed root never matched the
+    # worker's "$_root"/* walk pattern — the component walk silently
+    # voided for the whole pass. Shipped callers feed project_path_sane'd
+    # roots; this is defense in depth for future callers. '/' normalizes
+    # to the empty string: a recursive baseline over the whole filesystem
+    # is never legitimate (project_path_sane blocklists it) — refuse
+    # loud rather than degrade the walk silently.
+    while [ "${_fsbp_root%/}" != "$_fsbp_root" ]; do
+        _fsbp_root="${_fsbp_root%/}"
+    done
+    if [ -z "$_fsbp_root" ]; then
+        # The ORIGINAL root, captured before the shift (#211 c W2): the
+        # positionals are renumbered by now, so $2 would name a find
+        # expression word, never the refused root.
+        echo "fs-baseline: refusing scan root '$_fsbp_orig_root' (the whole filesystem is never a baseline root)" >&2
+        return 1
+    fi
     _fsbp_expr=""
     while [ $# -gt 0 ] && [ "$1" != "--" ]; do
         _fsbp_expr="$_fsbp_expr $1"
@@ -142,6 +168,13 @@ _fsb_pass() {
     [ $# -gt 0 ] || return 0
     _fsbp_rc=0
     _fsbp_nul="$(mktemp "${TMPDIR:-/tmp}/opk-fsb-pass.XXXXXXXX")"
+    # Scratch registered with the caller's cleanup trap (#211 a F12,
+    # staged-write.sh:44 shape): an aborted pass (Ctrl-C on a large
+    # tree, minutes per pass) used to leave the root-owned NUL file
+    # behind in /tmp. The plain rm below still covers the normal path.
+    if command -v _tmp_track >/dev/null 2>&1; then
+        _tmp_track "$_fsbp_nul"
+    fi
     # find's own status must survive into the pass bookkeeping (0.0.43b
     # W4): POSIX sh has no pipefail, a pipeline's rc is the LAST
     # command's alone, and xargs -r no-ops GREEN on an empty stream — a
@@ -154,9 +187,12 @@ _fsb_pass() {
     if [ "$_fsbp_rc" -eq 0 ]; then
         _fsb_count_tee "$_fsbp_label" <"$_fsbp_nul" \
             | _fsb_sudo xargs -0 -r sh -c '
-                # $1 = arity of the fixed command, then the kit-fixed command
-                # words, then the batch of NUL-separated paths xargs appended.
+                # $1 = arity of the fixed command, $2 = the scan root (for
+                # the component walk below), then the kit-fixed command
+                # words, then the batch of NUL-separated paths xargs
+                # appended.
                 _n=$1; shift
+                _root=$1; shift
                 _c=""
                 while [ "$_n" -gt 0 ]; do _c="$_c $1"; shift; _n=$((_n - 1)); done
                 # _fail accumulates across the WHOLE batch (0.0.44a V9):
@@ -168,11 +204,30 @@ _fsb_pass() {
                 _fail=0
                 for _p in "$@"; do
                     [ -L "$_p" ] && continue
+                    # Parent-component recheck (#211 a F1): skip operands
+                    # whose path crosses a symlinked DIRECTORY below the
+                    # scan root — [ -L ] on the leaf alone misses a parent
+                    # swapped in the scan->act window. String ops only
+                    # (no word splitting): entries with spaces survive.
+                    case "$_p" in
+                    "$_root"/*)
+                        _pre="$_root"
+                        _rest="${_p#"$_root"/}"
+                        while [ -n "$_rest" ]; do
+                            case "$_rest" in
+                                */*) _pre="$_pre/${_rest%%/*}"
+                                     _rest="${_rest#*/}" ;;
+                                *)   _pre="$_p"; _rest="" ;;
+                            esac
+                            [ -L "$_pre" ] && continue 2
+                        done
+                        ;;
+                    esac
                     # shellcheck disable=SC2086  # kit-fixed, space-free words
                     $_c "$_p" || _fail=1
                 done
                 [ "$_fail" -eq 0 ]
-              ' xargs-sh "$#" "$@" || _fsbp_rc=$?
+              ' xargs-sh "$#" "$_fsbp_root" "$@" || _fsbp_rc=$?
     fi
     rm -f "$_fsbp_nul"
     # Per-pass failure tracking (0.0.43a F10): without pipefail the old
