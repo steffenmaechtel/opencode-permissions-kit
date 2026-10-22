@@ -108,6 +108,99 @@ if [ "$installed" = false ]; then
     exit 0
 fi
 
+# --- live progress for the project-root scans (issue #210) ------------------------
+# The ddev share scan and the Windows hosts scan below walk every
+# registered project root with find — on WSL with many git projects and
+# a cold page cache that runs minutes in complete silence right after
+# the "ddev settings" row (issue #210). Same live-counter pattern as
+# the group baseline's _fsb_count_tee (issue #14, sh/fs-baseline.sh),
+# tuned for a report: the tee sits IN the find pipeline (it starts and
+# dies with the stream — no background process that could outlive a
+# killed status run), rewrites "<label> — N found, M:SS" on stderr
+# once a second and ERASES the line at EOF, so the report surface
+# itself stays byte-identical. Only an interactive terminal sees
+# movement; piped, --short (UI_SILENT) and python3-less runs keep the
+# exact output of the bare find.
+
+_st_progress_tee() {
+    # _st_progress_tee <label>: NUL-separated stdin -> stdout VERBATIM
+    # (a progress display must never corrupt the scan it reports on),
+    # plus — when stderr is a tty — a line "<label> — N found, M:SS"
+    # rewritten once a second and erased at EOF. Pipeline member like
+    # _fsb_count_tee: terminates with the stream. stderr is written as
+    # raw bytes so a LANG=C terminal or an odd root path degrades to
+    # "?", never to a traceback.
+    python3 -c '
+import sys, threading, time
+label = sys.argv[1]
+count = 0
+start = time.monotonic()
+done = False
+
+def out(text):
+    sys.stderr.buffer.write(text.encode("utf-8", "replace"))
+    sys.stderr.flush()
+
+def draw():
+    if not sys.stderr.isatty():
+        return
+    el = int(time.monotonic() - start)
+    line = "  %s — %d found, %d:%02d" % (label, count, el // 60, el % 60)
+    if len(line) > 76:
+        line = "  …" + line[-73:]
+    out("\r%-76s" % line)
+
+def ticker():
+    while not done:
+        draw()
+        time.sleep(1)
+
+draw()  # first frame at once: a slow walk with zero hits still shows life
+t = threading.Thread(target=ticker)
+t.start()
+try:
+    while True:
+        chunk = sys.stdin.buffer.read(1 << 20)
+        if not chunk:
+            break
+        count += chunk.count(b"\0")
+        sys.stdout.buffer.write(chunk)
+        sys.stdout.buffer.flush()
+except BrokenPipeError:
+    pass
+finally:
+    done = True
+    t.join()
+    if sys.stderr.isatty():
+        out("\r" + " " * 76 + "\r")
+' "$1"
+}
+
+_st_ddev_scan() {
+    # _st_ddev_scan <label> <root> <outfile>: every .ddev directory
+    # under <root>, one path per line, into <outfile> — with the live
+    # progress above on a terminal, and silently otherwise (UI_SILENT,
+    # non-tty stderr, or no python3: the scan never depends on its
+    # progress display). Same prune rules the handover scan set (issues
+    # #21, #29, #112, #94/#149): vendor/, node_modules/, testdata/ and
+    # .git/ trees are fixtures or dense non-projects — .git additionally
+    # the densest tree in a project, pruned for scan cost too.
+    _sts_label="$1"; _sts_root="$2"; _sts_out="$3"
+    _sts_expr='-type d ( -name vendor -o -name node_modules -o -name testdata -o -name .git )'
+    _sts_expr="$_sts_expr -prune -o -type d -name .ddev -prune"
+    if [ "${UI_SILENT:-0}" != 1 ] && [ -t 2 ] && command -v python3 >/dev/null 2>&1; then
+        # shellcheck disable=SC2086  # find expression words, built above
+        find "$_sts_root" $_sts_expr -print0 2>/dev/null \
+            | _st_progress_tee "$_sts_label" \
+            | tr '\0' '\n' > "$_sts_out"
+    else
+        # shellcheck disable=SC2086  # find expression words, built above
+        find "$_sts_root" $_sts_expr -print0 2>/dev/null \
+            | tr '\0' '\n' > "$_sts_out"
+    fi
+    return 0
+}
+
 # === Core ======================================================================
 
 ui_section "Core"
@@ -696,9 +789,11 @@ if [ -f "$_st_dhl" ] && [ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null ||
                 ui_kv_warn "ddev share" "scan skipped for $_st_root — mktemp failed (check TMPDIR / /tmp)"
                 continue
             fi
-            find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
-                -o -name .git \) \) -prune \
-                -o -type d -name .ddev -prune -print 2>/dev/null > "$_st_share_list"
+            # Live progress (issue #210): on a terminal the scan helper
+            # streams a found-count + elapsed line while the walk runs —
+            # minutes on a WSL host with many projects and a cold cache;
+            # piped runs stay byte-identical to a bare find.
+            _st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"
             while IFS= read -r _st_d; do
                 ddev_reshare_needed "$_st_d" "$OPENCODE_USER" || continue
                 ui_kv_warn "ddev share" "$(dirname "$_st_d")/.ddev: group-write missing (agent-side ddev run without the heal)"
@@ -949,9 +1044,9 @@ if [ "$_st_hosts_ready" = true ] && [ -f "$LIBDIR/sh/ddev-hosts.sh" ]; then
                 ui_kv_warn "hosts (win)" "scan skipped for $_st_root — mktemp failed (check TMPDIR / /tmp)"
                 continue
             fi
-            find "$_st_root" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
-                -o -name .git \) \) -prune \
-                -o -type d -name .ddev -prune -print 2>/dev/null > "$_st_hosts_list"
+            # Shared scan helper (see the ddev share scan above): same
+            # prune rules, same live progress line (issue #210).
+            _st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"
             # Main-shell loop via redirect (issue #158 — the summary's
             # severity counters must see the ui_kv_warn rows; see the
             # ddev share scan above).

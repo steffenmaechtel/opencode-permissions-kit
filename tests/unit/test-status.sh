@@ -77,6 +77,11 @@ fi
 # ui_kv is defined by ui.sh — source the real one
 UI_LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
 
+# Live-scan helpers (issue #210): extracted once here — the #165 control
+# harnesses below eval the real scan sites (which call _st_ddev_scan
+# since #210) and the issue-210 pins exercise both helpers directly.
+SCAN_HELPERS="$(sed -n '/^_st_progress_tee()/,/^}/p;/^_st_ddev_scan()/,/^}/p' "$STATUS")"
+
 run_case() {
     (
         # Everything inside: PATH (with the shims below), set -u (the B1
@@ -1893,6 +1898,7 @@ _h165_run() {
         ui_kv_ok()   { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
         ui_detail()  { echo "DETAIL|$1"; }
+        eval "$SCAN_HELPERS"
         eval "$_h165"
         exit 0
     ) 2>&1
@@ -2030,6 +2036,7 @@ _s165_run() {
         ui_kv_ok()   { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
         ui_detail()  { echo "DETAIL|$1"; }
+        eval "$SCAN_HELPERS"
         eval "$_s165"
         exit 0
     ) 2>&1
@@ -2308,6 +2315,155 @@ if [ -n "$_f25_mnt" ]; then
 else
     echo "  ${RED}FAIL${NC}  F25 mnt block extractable"
     failures=$((failures + 1))
+fi
+
+# --- issue #210: live progress for the project-root scans ------------------------
+# The ddev share scan and the Windows hosts scan walk every registered
+# root with find — minutes in complete silence on a WSL host with many
+# git projects and a cold page cache (the report froze right after the
+# "ddev settings" row). Both sites now run through _st_ddev_scan with
+# _st_progress_tee in the pipeline — the fs-baseline live-counter
+# pattern (issue #14), tuned for a report: found-count + elapsed line
+# on a terminal, erased at EOF, byte-identical output everywhere else.
+# Pins: tee passthrough verbatim (a progress display must never corrupt
+# the scan it reports on), the three fallback paths keep the exact
+# bytes of the pre-#210 bare find, a terminal sees the live line AND
+# its erase, --short never does, and both scan sites call the helper.
+# NOT pinned (documented): a killed find mid-walk truncates the scan
+# list silently — unchecked rc is the pre-#210 behavior of the bare
+# find (parity, not a new fail-soft spot).
+if [ -n "$SCAN_HELPERS" ] \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q '^_st_progress_tee() {' \
+    && printf '%s\n' "$SCAN_HELPERS" | grep -q '^_st_ddev_scan() {'; then
+    pass "#210: scan helpers extractable from status.sh"
+else
+    fail "#210: scan helpers not extractable (anchor drift?)"
+fi
+if grep -qF '_st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"' "$STATUS" \
+    && grep -qF '_st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"' "$STATUS" \
+    && ! grep -qE 'find "\$_st_root" .* -name \.ddev' "$STATUS"; then
+    pass "#210: both scan sites run through the shared helper (emitter sweep)"
+else
+    fail "#210: a scan site bypasses _st_ddev_scan (sweep incomplete)"
+fi
+
+# Fixture: two projects plus one pruned .ddev per prune class — the
+# reference file is the PRE-#210 bare find, verbatim.
+T210="$WORK/t210-tree"
+mkdir -p "$T210/p1/.ddev" "$T210/p1/vendor/pkg/.ddev" "$T210/p1/node_modules/x/.ddev" \
+    "$T210/p1/testdata/f/.ddev" "$T210/p1/sub/.git/.ddev" "$T210/p2/.ddev" \
+    "$T210/p2/deep/nested/.ddev"
+find "$T210" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
+    -o -name .git \) \) -prune \
+    -o -type d -name .ddev -prune -print 2>/dev/null > "$WORK/t210-ref.txt"
+if [ "$(grep -c . "$WORK/t210-ref.txt")" = "3" ]; then
+    pass "#210: fixture has exactly the 3 unpruned .ddev trees"
+else
+    fail "#210: fixture prune expectation broken ($(grep -c . "$WORK/t210-ref.txt") trees)"
+fi
+
+# 1) non-tty run: byte-identical scan list, zero stderr bytes
+T210_ERR="$WORK/t210.err"
+(
+    eval "$SCAN_HELPERS"
+    _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-new.txt"
+) 2>"$T210_ERR"
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-new.txt" && [ ! -s "$T210_ERR" ]; then
+    pass "#210: non-tty run: scan bytes identical, stderr empty (logs/cron unchanged)"
+else
+    fail "#210: non-tty run must be byte-identical and silent"
+fi
+
+# 2) python3-less host (L1: the new gate must degrade to the FULL scan,
+#    never to a skipped one) — hermetic bin with find/tr only
+T210_BIN="$WORK/t210-bin"
+mkdir -p "$T210_BIN"
+for _t210_t in find tr; do
+    ln -s "$(command -v "$_t210_t")" "$T210_BIN/$_t210_t"
+done
+(
+    eval "$SCAN_HELPERS"
+    PATH="$T210_BIN"
+    export PATH
+    _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-nopy.txt"
+) 2>"$T210_ERR"
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-nopy.txt" && [ ! -s "$T210_ERR" ]; then
+    pass "#210: python3-less host: fallback scan stays complete (L1 fail-soft observed)"
+else
+    fail "#210: python3-less host must scan identically (L1)"
+fi
+
+# 3) tee contract: the NUL stream passes through VERBATIM — a progress
+#    display must never corrupt the scan it reports on
+printf 'a\0b\0c\0d' > "$WORK/t210-in.bin"
+(
+    eval "$SCAN_HELPERS"
+    _st_progress_tee "label-t210" < "$WORK/t210-in.bin" > "$WORK/t210-out.bin"
+) 2>"$T210_ERR"
+if cmp -s "$WORK/t210-in.bin" "$WORK/t210-out.bin" && [ ! -s "$T210_ERR" ]; then
+    pass "#210: progress tee passes scan bytes through verbatim"
+else
+    fail "#210: progress tee corrupted the scan stream"
+fi
+
+# 4) terminal run (pty): the live line draws (label + "found,"), the
+#    erase run (76 spaces, longer than any draw pad with this label)
+#    follows, the scan list stays byte-identical, and output after the
+#    scan continues cleanly. The first frame is drawn synchronously
+#    before any byte is pumped, so "found," is deterministic even on an
+#    instant scan; later frames may carry a live count (race, not
+#    asserted).
+export SCAN_HELPERS
+cat > "$WORK/t210-pty.sh" <<EOF
+eval "\$SCAN_HELPERS"
+_st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-pty.txt"
+echo "SCAN-FINISHED"
+EOF
+script -qec "sh $WORK/t210-pty.sh" /dev/null > "$WORK/t210-pty.raw" 2>&1
+if grep -aq "found," "$WORK/t210-pty.raw" \
+    && grep -aq "scanning" "$WORK/t210-pty.raw" \
+    && grep -aq "SCAN-FINISHED" "$WORK/t210-pty.raw" \
+    && grep -aqE ' {70,}' "$WORK/t210-pty.raw" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-pty.txt"; then
+    pass "#210: terminal run: live line + erase, scan bytes identical"
+else
+    fail "#210: terminal run must show the live line and stay byte-identical"
+fi
+# 4b) a >76-char label truncates with a leader instead of wrapping the
+#     tty line (the tail carries — the path end matters more than the
+#     prefix). Separate driver: truncation drops "scanning" from the
+#     drawn line, so the label assertions above cannot run against it.
+cat > "$WORK/t210-trunc.sh" <<EOF
+eval "\$SCAN_HELPERS"
+_st_ddev_scan "ddev share: scanning $T210/p2/very/deep/nested/path/to/a/long/root" \
+    "$T210" "$WORK/t210-trunc.txt"
+echo "SCAN-FINISHED"
+EOF
+script -qec "sh $WORK/t210-trunc.sh" /dev/null > "$WORK/t210-trunc.raw" 2>&1
+if grep -aq "found," "$WORK/t210-trunc.raw" \
+    && grep -aq "long/root" "$WORK/t210-trunc.raw" \
+    && grep -aq "$(printf '\342\200\246')" "$WORK/t210-trunc.raw" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-trunc.txt"; then
+    pass "#210: over-long labels truncate with a leader, keep the path tail"
+else
+    fail "#210: label truncation broken (>76-char label)"
+fi
+
+# 5) --short (UI_SILENT) on a terminal: no live line at all — the
+#    one-line discipline holds even where drawing would be possible
+cat > "$WORK/t210-silent.sh" <<EOF
+eval "\$SCAN_HELPERS"
+UI_SILENT=1 _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-sil.txt"
+echo "SCAN-FINISHED"
+EOF
+script -qec "sh $WORK/t210-silent.sh" /dev/null > "$WORK/t210-sil.raw" 2>&1
+if ! grep -aq "found," "$WORK/t210-sil.raw" \
+    && ! grep -aq "scanning" "$WORK/t210-sil.raw" \
+    && grep -aq "SCAN-FINISHED" "$WORK/t210-sil.raw" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-sil.txt"; then
+    pass "#210: UI_SILENT (--short) draws nothing on a terminal either"
+else
+    fail "#210: UI_SILENT must never draw the progress line"
 fi
 
 echo ""
