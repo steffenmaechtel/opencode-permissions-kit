@@ -215,19 +215,24 @@ assert three things at once (WARN present, FAILED log present, false
 both failure pins RED; restored green.
 
 Class sweep (L2), full-call this time — `grep -rn 'run_q' files/`:
-15 hits, all in uninstall.sh. Disposition of every call site:
+15 hits, all in uninstall.sh. Disposition of every call site (anchors
+at the fix commit `47e07f9`; review-c had quoted the PRE-fix
+positions :500/:615 — corrected NB below):
 gpasswd (b W1, direct silenced call now), loginctl/systemctl/podman/
 pkill teardown (:490-498 — genuinely best-effort by design, no success
-claim rides them), userdel (:500, fixed here), audit rm (:615, fixed
+claim rides them), userdel (:509, fixed here), audit rm (:637, fixed
 here), and the revert loop's four ops (find-chown :560, setfacl ×2
 :590-591, chmod g-s :593) whose closing log (:598) claims completion
 over them — the same class, deliberately deferred to its own wave
 (see Follow-ups after snapshot c; in-code note at the site). No other
-file carries run_q. NB (#211 d W2): anchors and the 15-hit count are
-as of the fix commit `47e07f9`; the in-code note this wave added below
-the closing log shifted userdel to :509, the audit rm to :644, the
-closing log to :605 — and its own run_q mention pushed the sweep
-count to 16 at HEAD.
+file carries run_q. NB (#211 d W2; history corrected per review-e W1):
+the anchors and the 15-hit count are as of the fix commit `47e07f9` —
+review-c's :500/:615 were the PRE-fix positions (measured at ce7cbc5);
+the fix's own comment lines had already moved the calls to :509/:637
+by then. The `0885c9f` note sits ABOVE the closing log (inserted
+after chmod g-s :593) and moved the audit rm :637→:644 and the closing
+log :598→:605 — userdel (:509) is above the note and unmoved by it —
+and the note's own run_q mention pushed the sweep count to 16 at HEAD.
 
 c W8 (deliberately not done): opk's kill-window residue is disclosed
 in-code ("opk carries no cleanup trap", b W8) and inert — a stranded
