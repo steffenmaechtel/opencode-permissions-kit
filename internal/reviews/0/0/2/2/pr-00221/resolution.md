@@ -31,7 +31,7 @@ All commits on `feature/status-scan-progress` (birth PR #221).
 | a W13 (INFO) | **deliberately not done** | — | positive pins compensate; semantic pin would duplicate |
 | a W14 (INFO) | **deliberately not done** | — | out of scope: active chown walk (see sweeps) |
 | a W15 (INFO) | **deliberately not done** | — | transient-label cosmetic; churn not worth it |
-| b W1 (LOW) | **implemented** | `c298b83` | pin 9: foreground tee + async SIGINT sender — zero stderr, byte intact, rc 0; sabotage reds (detail) |
+| b W1 (LOW) | **implemented** | `c298b83` | pin 9: SIGINT mid-stream — zero stderr, rc 0; sabotage reds (detail) |
 | b W2 (LOW) | **implemented** | `c298b83` | opk:299 recorded in the W3-shape sweep above (fail-loud, benign) |
 | c W1 (LOW) | **implemented** | `9005338` | refs refreshed +2 (536/1331); record re-reconciled vs grep (detail) |
 | c W2 (LOW) | **implemented** | `9005338` | fifth hit listed (status.sh:215, in-diff probe); 5/5 enumerated |
@@ -210,3 +210,14 @@ hit has exactly one matching ref, 5/5.
   operands, no scripts.
 - **Loop closes with this round** (RM-0066): both dispositions
   stayed in bookkeeping; no wave d owed.
+
+### Post-close correction (line-length ratchet, 2026-10-22)
+
+`sh tests/unit/test-line-length.sh` red on the b W1 disposition
+row (147 chars, shipped with `d4bdb8e`; neither the b-wave's gates
+nor snapshot c's ran the ratchet — snapshot c's "rows stay ≤ 120
+cols" claim was therefore WRONG for this row; the snapshot stays
+immutable, the correction lives here). Row rewrapped to ≤ 120
+(sabotage/byte-intact detail unchanged in the b W1 section below);
+ratchet green again. Gate lesson: fix waves run the FULL unit
+suite (`sh tests/unit/test-*.sh`), not only the named suites.
