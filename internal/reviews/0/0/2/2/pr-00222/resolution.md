@@ -12,12 +12,12 @@ snapshot chain: [a](review-a.md) · dispositions below grow as fixes land.
 | a W3 (LOW) | **implemented** | `7e0e67b` | R7-R12 + V14-V16 pin every die arm; sweep table below |
 | a W4 (LOW) | **implemented** | `7e0e67b` | case split retired/corrupt; V17 pins the new arm; V7 stays green |
 | a W5–W9 (INFO) | **deliberately not done** | — | accepted as informational (rationale below) |
-| b W1 (MED) | **implemented** | `SHA_b` | V19 pins the :132 arm; table row added; sabotage red/green |
-| b W2 (LOW) | **implemented** | `SHA_b` | V13 rebuilt clean (c1=1, c2=0); V18 pins c2=2; c1-only guard reds both |
-| b W3 (LOW) | **implemented** | `SHA_b` | V20 missing-status pin + untouched assert; header claim now backed |
+| b W1 (MED) | **implemented** | `54f2ce6` | V19 pins the :132 arm; table row added; sabotage red/green |
+| b W2 (LOW) | **implemented** | `54f2ce6` | V13 rebuilt clean (c1=1, c2=0); V18 pins c2=2; c1-only guard reds both |
+| b W3 (LOW) | **implemented** | `54f2ce6` | V20 missing-status pin + untouched assert; header claim now backed |
 | b W4 (LOW) | **deliberately not done** | — | commit text is history; V13 now asserts untouched in substance |
-| b W5 (INFO) | **implemented** | `SHA_b` | untouched checks byte-exact: cmp -s against saved copies (V12/V13/V18/V20) |
-| b W6 (INFO) | **implemented** | `SHA_b` | sweep-table + W1 evidence anchors re-anchored to post-wave numbering |
+| b W5 (INFO) | **implemented** | `54f2ce6` | untouched checks byte-exact: cp + cmp -s (V12/V13/V18/V20) |
+| b W6 (INFO) | **implemented** | `54f2ce6` | sweep-table + W1 evidence anchors re-anchored to post-wave numbering |
 
 ## Evidence detail
 
