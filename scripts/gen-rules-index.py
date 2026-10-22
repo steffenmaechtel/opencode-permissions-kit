@@ -60,7 +60,7 @@ def parse_meta(path):
 
 
 def bucket_rel(rmid):
-    """RM-0020 -> 0/0/2/RM-0020.md (first three digits, one per level)."""
+    """RM-NNNN -> N/N/N/RM-NNNN.md (first three digits, one per level)."""
     digs = rmid[3:]
     return '%s/%s/%s/%s.md' % (digs[0], digs[1], digs[2], rmid)
 

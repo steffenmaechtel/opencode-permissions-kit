@@ -1,5 +1,7 @@
 #!/bin/sh
 # test-rules-meta.sh -- pins scripts/rules-audit.sh (invariants 1-9)
+# plus the no-fake-findings pin 10: outside the trailing (RM-NNNN)
+# ref form, no real ID may appear in any scope file.
 #
 # Every blocking invariant gets a scratch-tree failure path that must
 # redden the audit AND name the invariant; the report-only lanes
@@ -135,6 +137,18 @@ new_scratch n1
 sed -i 's/ (RM-9002)//' "$SCRATCH/agent/conventions.md"
 expect_block "inv1 ref-less unit" "[inv1]"
 
+# 1b. inv 1 -- the record's main-rule section is audit-active (phase-5
+#     wiring: its ACTIVE_SECTIONS entry is load-bearing -- losing it
+#     would silently stop enforcing the self-application unit)
+new_scratch n1b
+cat >> "$SCRATCH/internal/records/rules-meta.md" <<'EOF'
+
+## The main rule
+
+- Unreferenced demo rule.
+EOF
+expect_block "inv1 main-rule section enforced" "the-main-rule"
+
 # 2. inv 2 -- dangling ref
 new_scratch n2
 sed -i 's/ (RM-9002)/(RM-9009)/' "$SCRATCH/agent/conventions.md"
@@ -167,7 +181,7 @@ sed -i 's#interactive-prompts-yn#no-such-section#' "$(meta_file RM-9002)"
 expect_block "inv5 anchor" "[inv5]"
 
 # 5c. inv 5 -- retired metas are exempt (rule bullet removed, quote
-#     unfindable by construction -- RM-0029; pins the exemption)
+#     unfindable by construction; pins the retire exemption)
 new_scratch n5c
 sed -i '/^- Second demo rule\. (RM-9002)$/d' "$SCRATCH/agent/conventions.md"
 sed -i 's/^status: active/status: retired/;
@@ -209,6 +223,87 @@ printf 'hand edit\n' >> "$SCRATCH/internal/rules-meta/INDEX.md"
 expect_ok "inv8 stale INDEX non-blocking" "INDEX regenerated"
 if grep -q '^hand edit$' "$SCRATCH/internal/rules-meta/INDEX.md"; then
     fail "inv8: INDEX was not rewritten to the generated state"
+else
+    pass
+fi
+
+# 10. no fake findings -- every real meta ID occurs exactly TWICE in
+#     the living tree: once as the trailing (RM-NNNN) ref at its rule
+#     unit, once as the id: line in its meta file. Every other
+#     occurrence is a bug (ID ranges, prose, comments, cross-refs):
+#     searching an ID must only ever hit genuine sites.
+#     Exempt: the generated INDEX.md, frozen history (internal/reviews,
+#     internal/records/_archive), and the 9xxx abstract test namespace.
+#     Lanes: (a) scope files -- only ref-form tokens; (b) meta files --
+#     only the own id line; (c) everywhere else -- no real ID at all.
+#     Scope list is derived from the audit script (drifts loud: an
+#     empty extraction fails this pin's setup).
+SCOPE=$(sed -n 's/^SCOPE_FILES="\(.*\)"$/\1/p' "$REPO_ROOT/scripts/rules-audit.sh")
+if [ -n "$SCOPE" ]; then
+    pass
+else
+    fail "pin10 setup: SCOPE_FILES not extractable from rules-audit.sh"
+fi
+# lane a: scope files -- only ref-form tokens. One verdict for the
+# whole lane (per-file detail lands in the failure output), so the
+# suite's printed pin count does not drift with SCOPE_FILES length
+# (a W2 fix; the shape mirrors lanes b and c).
+: > "$WORK/p10a"
+for f in $SCOPE; do
+    if [ ! -f "$REPO_ROOT/$f" ]; then
+        fail "pin10 setup: scope file missing: $f"
+        continue
+    fi
+    sed 's/(RM-[0-9][0-9][0-9][0-9])//g' "$REPO_ROOT/$f" \
+        | grep -n 'RM-[0-9][0-9][0-9][0-9]' \
+        | sed "s|^|$f:|" >> "$WORK/p10a" || true
+done
+if [ -s "$WORK/p10a" ]; then
+    fail "pin10 lane a, fake ID mention(s) in scope files:"
+    sed 's/^/         /' "$WORK/p10a" >> "$FAILS"
+else
+    pass
+fi
+
+# lane b: meta files carry only their own id -- cross-references in
+# meta bodies name the rule text, never an ID
+: > "$WORK/p10b"
+find "$REPO_ROOT/internal/rules-meta" -type f -name 'RM-*.md' 2>/dev/null \
+    | LC_ALL=C sort | while IFS= read -r m; do
+    own=$(basename "$m" .md)
+    sed "s/^id: $own\$//" "$m" \
+        | grep -n 'RM-[0-9][0-9][0-9][0-9]' \
+        | sed "s|^|${m#"$REPO_ROOT"/}:|" >> "$WORK/p10b"
+done
+if [ -s "$WORK/p10b" ]; then
+    fail "pin10 lane b, foreign ID mention(s) inside meta files:"
+    sed 's/^/         /' "$WORK/p10b" >> "$FAILS"
+else
+    pass
+fi
+
+# lane c: the rest of the living tree carries no real ID at all
+: > "$WORK/p10c"
+grep -rn "RM-[0-9][0-9][0-9][0-9]" \
+    --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
+    "$REPO_ROOT" 2>/dev/null \
+    | grep -v "/internal/rules-meta/" \
+    | grep -v "/internal/reviews/" \
+    | grep -v "/internal/records/_archive/" \
+    | while IFS= read -r _l; do
+        _rel=${_l%%:*}
+        _rel=${_rel#"$REPO_ROOT"/}
+        case " $SCOPE " in
+            *" $_rel "*) continue ;;
+        esac
+        _l=$(printf '%s' "$_l" | sed 's/RM-9[0-9][0-9][0-9]//g')
+        case $_l in
+            *RM-[0-9][0-9][0-9][0-9]*) printf '%s\n' "$_l" ;;
+        esac
+    done > "$WORK/p10c"
+if [ -s "$WORK/p10c" ]; then
+    fail "pin10 lane c, real ID(s) outside refs and meta files:"
+    sed 's/^/         /' "$WORK/p10c" >> "$FAILS"
 else
     pass
 fi

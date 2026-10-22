@@ -102,6 +102,8 @@ jobs:
         run: ./tests/unit/test-rules-index-parity.sh
       - name: Run rules-meta audit pins (invariants 1-9, phase 2)
         run: ./tests/unit/test-rules-meta.sh
+      - name: Run rules-meta revisit workflow pins (phase 4)
+        run: ./tests/unit/test-rules-revisit.sh
       - name: Run CLI dispatcher tests
         run: ./tests/unit/test-kit-cli.sh
       - name: Run project path policy tests

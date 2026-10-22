@@ -6,7 +6,7 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**104 metas · 102 active · 2 retired · 1 review-pending · next due 2026-11-14**
+**105 metas · 103 active · 2 retired · 1 review-pending · next due 2026-11-14**
 
 ## Actionable
 
@@ -198,6 +198,12 @@
 | [RM-0055](0/0/5/RM-0055.md) | Interactive-only surfaces (browser launch,… | active | approved | 1m | 2026-11-17 |
 
 ## internal/records/rules-meta.md
+
+### The main rule
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0001](0/0/0/RM-0001.md) | Every rule carries a falsifiable rationale | active | approved | 1m | 2026-11-22 |
 
 ### Decisions
 
