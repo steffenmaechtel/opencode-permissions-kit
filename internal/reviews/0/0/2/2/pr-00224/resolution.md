@@ -75,7 +75,8 @@ next to the structural greps.
 
 - L1: the off-major path is a deliberate warn-not-fail (offline compat
   kept); the warning's presence is pinned; the hard-fail path (empty cache)
-  keeps its FAIL and its pin.
+  keeps its FAIL — the FAIL branch itself carries no pin (pre-existing
+  before this wave, `b W1`; see Follow-ups).
 - L2: sweep above, recorded.
 - L3: wave-touched claims re-audited — the lib.sh resolution comment, the
   record's fallback sentence, and the test header now match the code (all
