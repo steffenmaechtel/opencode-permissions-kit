@@ -2,8 +2,10 @@
 # Unit tests for the e2e binary sources (tests/e2e/lib.sh, e2e_fetch_opencode):
 # the download channel must be picked by major — 1.x from GitHub release
 # assets, 2.x from the npm registry (2.x ships no GitHub assets) with the
-# legacy @opencode-ai scope as fallback. Structural greps, like
-# test-bypass-guard.sh: lib.sh is e2e scaffolding, not unit-testable code.
+# legacy @opencode-ai scope as fallback. Mostly structural greps (like
+# test-bypass-guard.sh — lib.sh's runner-facing plumbing is e2e
+# scaffolding), plus behavioral probes of the self-contained helpers
+# (npm_dist_latest via a fake curl, the test-update-flags.sh pattern).
 # Run: sh tests/unit/test-e2e-sources.sh
 set -u
 
@@ -68,8 +70,22 @@ check "2.x gate message names the E2E_OC_VERSION escape hatch" \
     grep_q 'pin E2E_OC_VERSION=<ver> to test another major'
 check "offline fallback to the newest cached binary stays" \
     grep_q 'WARNING: version endpoint unreachable'
-check "a pin wins before any resolution (E2E_OC_VERSION is intent)" \
-    grep_q 'OC_VERSION="\$E2E_OC_VERSION"'
+check "offline fallback prefers the newest cached 2.x (lane major, #224 a W1)" \
+    grep_q 'OC_CACHE_DIR./opencode-2\.\* 2'
+check "off-major offline degradation is named, never silent (#224 a W1)" \
+    grep_q 'no cached 2x, using cached opencode'
+check "off-major warning names the E2E_OC_VERSION escape hatch (#224 a W1)" \
+    grep_q "off the default lane's 2.x major"
+# The pin must not just EXIST but WIN: the assignment has to sit before the
+# default resolution, or the resolved value is clobbered after the fact
+# (#224 a W6 — presence-only would stay green under reordering).
+_pin_ln=$(grep -n 'OC_VERSION="\$E2E_OC_VERSION"' "$LIB" | head -1 | cut -d: -f1)
+_res_ln=$(grep -n 'OC_VERSION=\$(npm_dist_latest "\$target")' "$LIB" | head -1 | cut -d: -f1)
+if [ -n "$_pin_ln" ] && [ -n "$_res_ln" ] && [ "$_pin_ln" -lt "$_res_ln" ]; then
+    pass "a pin wins before any resolution (order pinned, line $_pin_ln < $_res_ln)"
+else
+    fail "pin-before-resolution order violated (pin line: ${_pin_ln:-missing}, resolve line: ${_res_ln:-missing})"
+fi
 
 # --- behavioral: npm_dist_latest against a fake registry (fake curl on
 # PATH, the test-update-flags.sh pattern). Proves the happy path prints
@@ -128,7 +144,11 @@ check "version resolution falls back to the releases/latest redirect" \
     sh -c "grep -q 'url_effective' \"\$1\" && grep -q '/tag/v' \"\$1\"" _ "$LIB"
 check "run-ddev.sh resolves ddev through gh_latest_tag (no bare API call)" \
     sh -c "grep -q 'gh_latest_tag ddev/ddev' \"\$1\" && ! grep -q 'https://api.github.com/repos/ddev' \"\$1\"" _ "$RUN_DDEV"
-check "workflows export the workflow token to the e2e steps" \
+# Token backstop (#224 a W3: since the #197 flip only the GitHub-calling
+# steps need it — the -1x lane resolves and both ddev jobs' gh_latest_tag;
+# the per-job auth contract lives in test-workflows.sh's lane pins, this
+# file-level grep is the coarse "no workflow went fully tokenless" net).
+check "workflows export the workflow token to the api.github.com-calling steps" \
     sh -c "grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$1\" && grep -q 'OPK_GH_TOKEN: \${{ github.token }}' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
 
 # --- git channel knob (issue #118): lib.sh must forward E2E_GIT_CHANNEL as a

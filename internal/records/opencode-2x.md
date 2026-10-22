@@ -131,8 +131,10 @@ below remains the option for unreleased tags. Since the 2026-10 flip
 2.x from the npm dist-tag `latest` (`npm_dist_latest` in lib.sh,
 anchored `2.*` gate — the flip signal; GitHub `releases/latest` stays
 1.x and is the `E2E_OC_VERSION=<pin>` escape hatch for explicit 1.x
-runs; an unreachable registry falls back to the newest cached binary
-as before). With the 2.x default, the upgrade test
+runs; an unreachable registry falls back to the newest cached **2.x**
+binary — a cache without any 2.x degrades to the newest cached version
+with a named off-major warning, #224 a W1). With the 2.x default, the
+upgrade test
 (`E2E_OLD_VERSION=1.18.15`) covers the production 1.x → 2.x path by
 default. Verified green against **2.0.11** (2026-09-20,
 binary built from the tag with the recipe below, suite re-run against the

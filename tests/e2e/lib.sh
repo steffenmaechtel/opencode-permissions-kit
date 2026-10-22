@@ -295,7 +295,10 @@ e2e_resolve_cache() {
     # packument is registry-derived, i.e. untrusted, so the value is
     # anchored-validated before use; same shape as update.sh's
     # resolve_latest_opencode_version). If the registry is unreachable,
-    # fall back to the newest cached version so repeat runs work offline.
+    # fall back to the newest cached 2.x so repeat runs work offline and
+    # stay on-lane; a cache without any 2.x degrades to the newest cached
+    # version with a NAMED off-major warning (#224 a W1 — the resolve gate
+    # above cannot run offline, so the warning is the lane's only voice).
     # A pinned version that is not cached yet is downloaded on demand (see
     # e2e_fetch_opencode).
     OC_VERSION="$E2E_OC_VERSION"
@@ -309,12 +312,22 @@ e2e_resolve_cache() {
         fi
     fi
     if [ -z "$OC_VERSION" ]; then
-        OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
+        # Offline fallback, prefer the lane's major (#224 a W1): newest
+        # cached 2.x first; only a cache without any 2.x degrades to the
+        # newest cached version at all — and that degradation is named,
+        # never silent.
+        OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-2.* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
         if [ -n "$OC_VERSION" ]; then
             echo "  ${YELLOW}WARNING: version endpoint unreachable - using cached opencode $OC_VERSION${NC}"
         else
-            echo "  ${RED}FAIL${NC}  cannot resolve opencode version and no cached version available."
-            exit 1
+            OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
+            if [ -n "$OC_VERSION" ]; then
+                echo "  ${YELLOW}WARNING: version endpoint unreachable - no cached 2x, using cached opencode $OC_VERSION${NC}"
+                echo "         (off the default lane's 2.x major; pin E2E_OC_VERSION=<ver> to test another major on purpose)"
+            else
+                echo "  ${RED}FAIL${NC}  cannot resolve opencode version and no cached version available."
+                exit 1
+            fi
         fi
     fi
 
