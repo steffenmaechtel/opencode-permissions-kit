@@ -1,9 +1,8 @@
 # Rule-Meta System (RM) — design record
 
-> Status: **CURRENT** — rollout phases 0–4 done (2026-10-14 …
-> 2026-10-22); phase 5 (the self-application meta `RM-0001`) is the
-> remaining step. The phase-4 wave runs on
-> `feature/rules-meta-phase-4`.
+> Status: **CURRENT** — rollout complete (phases 0–5, 2026-10-14 …
+> 2026-10-22); `RM-0001` maintainer approval pending. The phase-4/5
+> wave runs on `feature/rules-meta-phase-4`.
 > This is the design record for the
 > rule-rationale system; the governed rule texts live in `agent/*.md`
 > and in the `## Rules` section of `AGENTS.md`. Where this record
@@ -20,6 +19,11 @@ surfaces only by accident. The rule-meta system gives every rule a
 falsifiable rationale, a revisit cycle, and a history, so a reviewing
 agent can detect obsolescence by checking whether the rationale still
 holds.
+
+## The main rule
+
+- Every rule carries a falsifiable rationale in an externalized
+  meta file, referenced from the rule — this rule included. (RM-0001)
 
 ## Decisions
 
@@ -158,7 +162,7 @@ invariant. (RM-0029)
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
 | 3 | agent files + AGENTS Rules | done — test-fidelity 2026-10-18; review-concept 2026-10-19; AGENTS 2026-10-20 |
 | 4 | Revisit workflow: `make rules-report` + agent revisit command | done 2026-10-22 |
-| 5 | Self-application: the main rule gets `RM-0001` | open |
+| 5 | Self-application: the main rule gets `RM-0001` | done 2026-10-22 |
 
 The 2026-10-19 review-concept step split the file: operative rules in
 `agent/review-concept.md`, history and calibration data in

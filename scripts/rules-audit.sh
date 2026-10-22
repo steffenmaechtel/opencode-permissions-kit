@@ -58,6 +58,7 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-security-untrusted-
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#test-sandbox-unit-suites"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-review-findings"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#the-main-rule"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#meta-format-v11"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#open-defaults-the-pilot-validates-them"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#3-terminology-test-doubles-and-fidelity"
