@@ -18,6 +18,10 @@ snapshot chain: [a](review-a.md) · dispositions below grow as fixes land.
 | b W4 (LOW) | **deliberately not done** | — | commit text is history; V13 now asserts untouched in substance |
 | b W5 (INFO) | **implemented** | `54f2ce6` | untouched checks byte-exact: cp + cmp -s (V12/V13/V18/V20) |
 | b W6 (INFO) | **implemented** | `54f2ce6` | sweep-table + W1 evidence anchors re-anchored to post-wave numbering |
+| c W1 (LOW) | **implemented** |b2ad393 | a W1 evidence describes cp+cmp; V13 sentence notes the b W2 rebuild |
+| c W2 (INFO) | **implemented** |b2ad393 | table rows :97 retired / :98 bad status added; table now 19/19 |
+| c W3 (INFO) | **deliberately not done** | — | process note; placeholders already resolved by b4a1ccf |
+| c W4 (INFO) | **deliberately not done** | — | :98 die precedes any write; V20 cmp-asserts the same arm |
 
 ## Evidence detail
 
@@ -39,10 +43,11 @@ Two new pins execute the awk count-guard failure path in
 
 - **V12** — fixture with a duplicated `revisit-interval:` line (merge
   residue shape): expects rc=2 + "not found exactly once" AND the meta
-  byte-identical before/after (`$(cat)` comparison — content, not line
-  counts).
-- **V13** — fixture with `next-revisit:` deleted: same die, the
-  `c2=0` operand direction of the guard.
+  byte-identical before/after (cp + `cmp -s` against a saved copy since
+  the b-wave, b W5; `$(cat)` content comparison before it).
+- **V13** — fixture with `next-revisit:` deleted: same die, the `c2=0`
+  operand direction of the guard (the b-wave rebuilt it from a clean
+  single-interval fixture so the direction actually discriminates — b W2).
 
 The three post-rewrite consistency checks (`sed | grep -qx` ×2,
 `tail -n 1`) verify the awk output itself; no fixture can fail them
@@ -94,6 +99,8 @@ scripts/rules-revisit.sh` — every arm enumerated and dispositioned:
 | revisit | multiline note (:77) | V5 (existing) |
 | revisit | missing python (:79) | V10 (existing) |
 | revisit | unknown meta (:88, refuse rc=1) | V6 (existing) |
+| revisit | retired meta (:97, refuse rc=1) | V7 (existing; c W2) |
+| revisit | bad status (:98) | V17/V20 (W4, b W3; c W2) |
 | revisit | bad interval (:102) | V8b (existing) |
 | revisit | next-revisit computation (:132) | V19 (new, b W1) |
 | revisit | no review log (:134) | V8c (existing) |
@@ -154,5 +161,6 @@ asserting the untouched meta closes the gap in substance.
 
 None beyond the maintainer-side PR-text correction (W2): pin counts
 "24" → 39 (revisit suite, 36 + V18-V20) and "16 → 17" → 16 → 21 (meta
-suite), plus naming pin 10 in the PR body. The b-wave touched test code
-→ micro-wave review c is owed before the PR merges (stop rule).
+suite), plus naming pin 10 in the PR body. Micro-wave reviews b (bc893fa)
+and c (1950d40) are done; the c disposition round stayed in resolution
+bookkeeping → the review chain is closed (stop rule, RM-0066).
