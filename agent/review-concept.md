@@ -218,11 +218,13 @@ CONTRIBUTING's "shrink the next one" rule):
   cannot fan out subagents (the 1.x `/review` subtask shape) is
   merely adequate for diff/wave scope and never enough for
   full-scope/release reviews. (RM-0084)
-- Fan-out is staged, never launched at once: at most 5 concurrent
-  reviewer subagents on ANY tier — the provider's burst limit is
-  account-wide, not per-model (ten simultaneous flash launches cost
-  three restarts in pr-00211) — backfilling one seat as each agent
-  returns. (RM-0108)
+- Fan-out is staged, never launched at once: the standard cap is 5
+  concurrent reviewer subagents on ANY tier — the provider's burst
+  limit is account-wide, not per-model (ten simultaneous flash
+  launches cost three restarts in pr-00211) — backfilling one seat as
+  each agent returns. An explicit USER-named cap for the case (10, 20,
+  … bigger plans allow more) overrides the standard upward; the agent
+  never raises the cap on its own. (RM-0108)
 - Sabotage spot-checks mutate the tree the fan-out reads: they run
   only (a) before the fan-out launches, (b) after all reviewer agents
   returned, or (c) in a scratch worktree. A window that overlapped

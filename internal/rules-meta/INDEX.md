@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**115 metas · 113 active · 2 retired · 11 review-pending · next due 2026-11-14**
+**115 metas · 113 active · 2 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0068, RM-0106, RM-0107, RM-0108, RM-0109, RM-0110, RM-0111, RM-0112, RM-0113, RM-0114, RM-0115
+- **Review pending:** none
 - **Overdue:** none
 
 ## AGENTS.md
@@ -101,10 +101,10 @@
 | [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-11-19 |
 | [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-11-19 |
 | [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-11-19 |
-| [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | **pending** | 1m | 2026-11-19 |
-| [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | **pending** | 1m | 2026-11-22 |
-| [RM-0107](0/1/0/RM-0107.md) | The wave review fires on | active | **pending** | 1m | 2026-11-22 |
-| [RM-0115](0/1/1/RM-0115.md) | A round's own commits never | active | **pending** | 1m | 2026-11-22 |
+| [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | approved | 1m | 2026-11-19 |
+| [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | approved | 1m | 2026-11-22 |
+| [RM-0107](0/1/0/RM-0107.md) | The wave review fires on | active | approved | 1m | 2026-11-22 |
+| [RM-0115](0/1/1/RM-0115.md) | A round's own commits never | active | approved | 1m | 2026-11-22 |
 
 ### Session rotation
 
@@ -114,8 +114,8 @@
 | [RM-0061](0/0/6/RM-0061.md) | Sessions do not chain themselves: | active | approved | 1m | 2026-11-19 |
 | [RM-0062](0/0/6/RM-0062.md) | The hard seam and the maintainer | retired | approved | 1m | 2026-11-19 |
 | [RM-0063](0/0/6/RM-0063.md) | The snapshot header's Reviewer line | active | approved | 1m | 2026-11-19 |
-| [RM-0109](0/1/0/RM-0109.md) | Rotation is measured in SESSIONS | active | **pending** | 1m | 2026-11-22 |
-| [RM-0110](0/1/1/RM-0110.md) | A rotation violated anyway | active | **pending** | 1m | 2026-11-22 |
+| [RM-0109](0/1/0/RM-0109.md) | Rotation is measured in SESSIONS | active | approved | 1m | 2026-11-22 |
+| [RM-0110](0/1/1/RM-0110.md) | A rotation violated anyway | active | approved | 1m | 2026-11-22 |
 
 ### Fixes close classes, not sites
 
@@ -143,7 +143,7 @@
 |---|---|---|---|---|---|
 | [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | approved | 1m | 2026-11-19 |
 | [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
-| [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | **pending** | 1m | 2026-11-22 |
+| [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-11-22 |
 
 ### Suites are the standing review
 
@@ -153,7 +153,7 @@
 | [RM-0077](0/0/7/RM-0077.md) | Root-script behavior changes owe | active | approved | 1m | 2026-11-19 |
 | [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-11-19 |
 | [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 1m | 2026-11-19 |
-| [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | **pending** | 1m | 2026-11-22 |
+| [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | approved | 1m | 2026-11-22 |
 
 ### Parallel reviewer agents
 
@@ -171,9 +171,9 @@
 | [RM-0089](0/0/8/RM-0089.md) | Release-critical full passes: prefer | active | approved | 1m | 2026-11-19 |
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | approved | 1m | 2026-11-19 |
 | [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 1m | 2026-11-19 |
-| [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | **pending** | 1m | 2026-11-22 |
-| [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | **pending** | 1m | 2026-11-22 |
-| [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | **pending** | 1m | 2026-11-22 |
+| [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 1m | 2026-11-22 |
+| [RM-0111](0/1/1/RM-0111.md) | Sabotage spot-checks mutate the | active | approved | 1m | 2026-11-22 |
+| [RM-0114](0/1/1/RM-0114.md) | Agents stamp with their own | active | approved | 1m | 2026-11-22 |
 
 ### Release gate
 
