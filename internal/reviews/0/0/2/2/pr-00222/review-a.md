@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 main agent (verification duty held in-session) + 2x GLM-5.3-Fl
 
 # Wave review — pr-00222 snapshot a — rules-meta phases 4–5
 
+> Resolution: [resolution.md](resolution.md)
+
 Maintainer brief: micro-wave over the branch, focus **unit tests and
 scripts**, snapshot a. Two fresh-context reviewer subagents ran (S:
 scripts, T: tests); the main agent re-verified every finding against

@@ -244,19 +244,26 @@ if [ -n "$SCOPE" ]; then
 else
     fail "pin10 setup: SCOPE_FILES not extractable from rules-audit.sh"
 fi
+# lane a: scope files -- only ref-form tokens. One verdict for the
+# whole lane (per-file detail lands in the failure output), so the
+# suite's printed pin count does not drift with SCOPE_FILES length
+# (a W2 fix; the shape mirrors lanes b and c).
+: > "$WORK/p10a"
 for f in $SCOPE; do
     if [ ! -f "$REPO_ROOT/$f" ]; then
         fail "pin10 setup: scope file missing: $f"
         continue
     fi
-    _hits=$(sed 's/(RM-[0-9][0-9][0-9][0-9])//g' "$REPO_ROOT/$f" \
-        | grep -n 'RM-[0-9][0-9][0-9][0-9]' || true)
-    if [ -n "$_hits" ]; then
-        fail "pin10 lane a, fake ID mention(s) in $f: $_hits"
-    else
-        pass
-    fi
+    sed 's/(RM-[0-9][0-9][0-9][0-9])//g' "$REPO_ROOT/$f" \
+        | grep -n 'RM-[0-9][0-9][0-9][0-9]' \
+        | sed "s|^|$f:|" >> "$WORK/p10a" || true
 done
+if [ -s "$WORK/p10a" ]; then
+    fail "pin10 lane a, fake ID mention(s) in scope files:"
+    sed 's/^/         /' "$WORK/p10a" >> "$FAILS"
+else
+    pass
+fi
 
 # lane b: meta files carry only their own id -- cross-references in
 # meta bodies name the rule text, never an ID

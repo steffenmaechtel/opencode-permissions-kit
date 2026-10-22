@@ -31,7 +31,7 @@
 #
 # Exit: 0 -- recorded. 1 -- domain refusal (unknown meta, retired
 # meta). 2 -- usage or environment error (bad arguments, note
-# shape, missing python3).
+# shape, missing python3, corrupt frontmatter).
 #
 # Env: RM_AUDIT_ROOT (revisit a meta in another tree -- tests),
 # FORCE_TODAY (pin the revisit date -- tests), RULES_PYTHON
@@ -92,8 +92,11 @@ fm() {  # frontmatter value of $1 ('' when absent)
 }
 st=$(fm status)
 iv=$(fm revisit-interval)
-[ "$st" = active ] || refuse \
-    "$ID is $st -- retired metas are outside the revisit cycle"
+case $st in
+    active) ;;
+    retired) refuse "$ID is retired -- retired metas are outside the revisit cycle" ;;
+    *) die "$ID: bad status '$st' (run the audit)" ;;
+esac
 case $iv in
     1m | 6m | 1y | 2y) ;;
     *) die "$ID: bad revisit-interval '$iv' (run the audit)" ;;

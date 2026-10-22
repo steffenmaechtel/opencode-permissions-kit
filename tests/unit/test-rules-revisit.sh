@@ -8,12 +8,16 @@
 # queue); the due-TODAY boundary counts as horizon, not overdue;
 # HORIZON overrides discriminate; retired metas never enter the
 # revisit lanes; usage/env arms fail loud (bad HORIZON, missing
-# python interpreter).
+# python interpreter, missing/bad root, missing meta tree); corrupt
+# metas die loud per meta (no id, bad status, bad interval,
+# non-ISO next-revisit) before any lane prints.
 #
 # Revisit pins: clean bumps the ladder and computes the next date
 # from the REVISIT date -- never from the stale due date;
 # 2y is the max; findings resets to 1m and requires a note; notes
-# stay single-line; unknown and retired metas are refused; month
+# stay single-line; unknown and retired metas are refused; corrupt
+# frontmatter (bad/missing status, duplicated or missing fields)
+# dies loud with the meta untouched; month
 # arithmetic clamps at month end (Jan 31 + 1m -> Feb 28); the
 # approval state is never touched; the audit stays green on a
 # revisited tree (a revisit log line is not an approval); no temp
@@ -204,6 +208,74 @@ if [ "$RC" -eq 2 ] && contains "$OUT" "horizon date computation failed"; then
     pass
 else
     fail "R6 bad FORCE_TODAY: expected rc=2, got rc=$RC: $OUT"
+fi
+
+# R7-R10. corrupt metas die loud per meta, before any lane prints
+#      (a W3 pin: every per-meta die arm of the report executes)
+CSCRATCH=$WORK/corrupt$$
+write_meta "$CSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
+CM=$(meta_path "$CSCRATCH" RM-9001)
+
+# R7. meta without an id in the frontmatter
+sed -i 's/^id: RM-9001$/id:/' "$CM"
+SCRATCH=$CSCRATCH
+T=2026-06-15
+run_report
+if [ "$RC" -eq 2 ] && contains "$OUT" "no id in frontmatter"; then
+    pass
+else
+    fail "R7 no id: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# R8. meta with a status outside the vocabulary
+sed -i 's/^id:$/id: RM-9001/; s/^status: active$/status: paused/' "$CM"
+run_report
+if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'"; then
+    pass
+else
+    fail "R8 bad status: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# R9. active meta with a malformed interval
+sed -i 's/^status: paused$/status: active/; s/^revisit-interval: 1m$/revisit-interval: 3w/' "$CM"
+run_report
+if [ "$RC" -eq 2 ] && contains "$OUT" "bad revisit-interval '3w'"; then
+    pass
+else
+    fail "R9 bad interval: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# R10. active meta with a non-ISO next-revisit
+sed -i -e 's/^revisit-interval: 3w$/revisit-interval: 1m/' \
+    -e 's/^next-revisit: 2026-06-01$/next-revisit: soon/' "$CM"
+run_report
+if [ "$RC" -eq 2 ] && contains "$OUT" "active meta without ISO next-revisit"; then
+    pass
+else
+    fail "R10 non-ISO next-revisit: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# R11. a root without the meta tree is an env failure, not an empty
+#      report
+NOTREE=$WORK/notree$$
+mkdir -p "$NOTREE"
+OUT=$(RM_AUDIT_ROOT="$NOTREE" FORCE_TODAY=2026-06-15 \
+    sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
+RC=$?
+if [ "$RC" -eq 2 ] && contains "$OUT" "no meta tree at"; then
+    pass
+else
+    fail "R11 no meta tree: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# R12. an un-enterable RM_AUDIT_ROOT fails loud (env arm)
+OUT=$(RM_AUDIT_ROOT="$WORK/gone$$" FORCE_TODAY=2026-06-15 \
+    sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
+RC=$?
+if [ "$RC" -eq 2 ] && contains "$OUT" "cannot enter RM_AUDIT_ROOT"; then
+    pass
+else
+    fail "R12 bad root: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
 
 # ---------------------------------------------------------- revisit pins
@@ -438,6 +510,104 @@ if [ "$RC" -eq 0 ] && [ "$ARC" -eq 0 ] && contains "$AOUT" "0 blocking" \
     pass
 else
     fail "V11 audit interplay: revisit rc=$RC, audit rc=$ARC: $AOUT"
+fi
+
+# V12. duplicated frontmatter field refuses loud BEFORE any write --
+#      the rewrite validates each field occurs exactly once (W1 pin:
+#      without the count guard a duplicated field would be rewritten
+#      in place and swapped in silently)
+DSCRATCH=$WORK/dup$$
+db="$DSCRATCH/internal/rules-meta/9/0/0"
+mkdir -p "$db"
+cat > "$db/RM-9001.md" <<'EOF'
+---
+id: RM-9001
+rule: agent/conventions.md#interactive-prompts-yn
+quote: "Demo rule RM-9001"
+created: 2026-01-10
+status: active
+reviewed: 2026-05-01
+revisit-interval: 1m
+revisit-interval: 1m
+next-revisit: 2026-06-01
+---
+
+Body of RM-9001.
+
+## Review log
+
+- 2026-01-10 created — agent draft; maintainer review pending.
+- 2026-05-01 approved by maintainer (direct chat review).
+EOF
+SCRATCH=$DSCRATCH
+T=2026-06-15
+DM="$db/RM-9001.md"
+dbefore=$(cat "$DM")
+run_revisit RM-9001 clean
+if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" \
+    && [ "$dbefore" = "$(cat "$DM")" ]; then
+    pass
+else
+    fail "V12 duplicated field: expected rc=2 + untouched meta, got rc=$RC: $OUT"
+fi
+
+# V13. a missing next-revisit field hits the same count guard (c2=0)
+MSCRATCH=$WORK/noNext$$
+mb="$MSCRATCH/internal/rules-meta/9/0/0"
+mkdir -p "$mb"
+sed '/^next-revisit: /d' "$DM" > "$mb/RM-9001.md"
+SCRATCH=$MSCRATCH
+T=2026-06-15
+run_revisit RM-9001 clean
+if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once"; then
+    pass
+else
+    fail "V13 missing next-revisit: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# V14. an un-enterable RM_AUDIT_ROOT fails loud (env arm)
+OUT=$(RM_AUDIT_ROOT="$WORK/gone$$" FORCE_TODAY=2026-06-15 \
+    sh "$REPO_ROOT/scripts/rules-revisit.sh" RM-9001 clean 2>&1)
+RC=$?
+if [ "$RC" -eq 2 ] && contains "$OUT" "cannot enter RM_AUDIT_ROOT"; then
+    pass
+else
+    fail "V14 bad root: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# V15. wrong argument count is a usage error
+one_scratch 1m 2026-06-01 v15
+SCRATCH=$VSCRATCH
+T=2026-06-15
+run_revisit
+if [ "$RC" -eq 2 ] && contains "$OUT" "usage:"; then
+    pass
+else
+    fail "V15 usage: expected rc=2 with usage line, got rc=$RC: $OUT"
+fi
+
+# V16. a malformed id is a usage error
+one_scratch 1m 2026-06-01 v16
+SCRATCH=$VSCRATCH
+T=2026-06-15
+run_revisit RM-99 clean
+if [ "$RC" -eq 2 ] && contains "$OUT" "bad id 'RM-99'"; then
+    pass
+else
+    fail "V16 bad id: expected rc=2 naming it, got rc=$RC: $OUT"
+fi
+
+# V17. a corrupt status is an env failure, not a domain refusal
+#      (W4: only a genuine retired meta is refused rc=1)
+PSCRATCH=$WORK/paused$$
+write_meta "$PSCRATCH" RM-9001 paused 1m 2026-06-01 2026-05-01
+SCRATCH=$PSCRATCH
+T=2026-06-15
+run_revisit RM-9001 clean
+if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'"; then
+    pass
+else
+    fail "V17 corrupt status: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
 
 # ------------------------------------------------------------- summary
