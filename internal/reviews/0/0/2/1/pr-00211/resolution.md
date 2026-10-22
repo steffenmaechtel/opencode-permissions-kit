@@ -1,14 +1,17 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
-Status: open — review f (fresh session over `031fa3e..750d4e7`: the
-e-wave's two strings, two pin lines, ledger) found 7 (3 LOW, 4 INFO),
-all dispositioned below; the f-wave implemented W1-W4 (W1/W2 code
-with their own pins and executed sabotage proofs, W3/W4 bookkeeping)
-— per RM-0067 a micro wave review g over the f-wave diff is owed
-before the loop can close. Review e's substance held under f (its
-e2e claim re-executed green at `750d4e7`, e2e 303 + rootless 47).
-Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7 e-, 7 f-findings
-dispositioned.
+Status: open — review g (fresh session over `750d4e7..79582d9`: the
+f-wave's two strings + pins, ledger) found 4 (2 LOW, 2 INFO), all
+dispositioned below; every g-fix stayed in bookkeeping (resolution NBs
+— g W1 anchors, g W2 pattern record; the round's commits touch
+resolution.md + INDEX.md only), so per RM-0066 this round's
+dispositions changed no review-relevant code — the stop-rule check is
+cited, and per ISSUE item 10 the closure call belongs to the
+maintainer, not to this round's commits. The f-wave's code fixes hold
+under g's executed verification (both sabotages red at the right pins;
+make test rc=0 at 79582d9 — the ledger's first full-suite record at
+the f-wave HEAD). Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7 e-, 7 f-,
+4 g-findings dispositioned.
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
@@ -112,6 +115,10 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | f W5 (INFO) | **deliberately not done** | — | label asymmetry cosmetic; fail path dumps `$_out` (traceable) |
 | f W6 (INFO) | **deliberately not done** | — | sole-emitter discrimination verified; note in review-f.md |
 | f W7 (INFO) | **deliberately not done** | — | subsumptions defensible; in-code comment names the intent |
+| g W1 (LOW) | **implemented** | `9fa331e` | NB: sweep anchors measured at 2be6fc3 (:517/:654/:482-483) — detail below |
+| g W2 (LOW) | **implemented** | `9fa331e` | NB: full emitter pattern set recorded; result re-confirmed — detail below |
+| g W3 (INFO) | **deliberately not done** | — | fail-only pin scope by design; F2DRY stays as future drive hook |
+| g W4 (INFO) | **deliberately not done** | — | solo shape disclosed in review-g provenance; no code action exists |
 
 ## Follow-ups after snapshot b
 
@@ -740,3 +747,16 @@ f W3: NB added at the corrected c W1 NB (13 vs 15 @ce7cbc5, arithmetic
 and refs there). f W4: the status SHA-anchors the 303/47 claim at
 `750d4e7` — review-f independently re-executed both suites (rc=0)
 rather than trusting the claim (RM-0082).
+
+### g W1 / g W2 (bookkeeping) — see `9fa331e`
+
+g W1: the f W2 sweep's anchors were review-f's 750d4e7 numbers restated
+(ISSUE item 4 class); the NB measures at the fix commit — gpasswd :440
+unshifted, backup :482-483, userdel :517/:518, audit :654/:655 — and
+prefers grep-able content anchors going forward. g W2: the NB records
+the complete two-pattern emitter set (`grep -rn 'WARN' files/` plus
+`grep -rn 'ui_warn ' files/`); review g's independent enumeration over
+both confirmed zero unnamed rc-gated failure arms — the tree-wide
+result the original one-pattern record could not re-derive. Both fixes
+are resolution-only: this round's dispositions touched no
+review-relevant code (files touched: resolution.md, INDEX.md).
