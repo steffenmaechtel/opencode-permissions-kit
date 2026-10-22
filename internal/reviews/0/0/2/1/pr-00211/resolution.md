@@ -1,17 +1,14 @@
 # Resolution — pr-00211 (release 0.0.55 full-scope review)
 
-Status: open — review e (fresh session, rotation-deviation catch-up
-over `ce7cbc5..a6f2705`) re-verified all of d's clean verdicts
-(holding) and found 7 (1 MED, 1 LOW, 5 INFO), all dispositioned
-below. The e-wave fixed one ledger text (e W1) and two production
-strings (e W2, e W3) — per RM-0067 a wave review f over the e-wave
-diff is owed before the loop can close. Both e2e suites re-run green
-at the e-wave HEAD `750d4e7` after the fixes (e2e 303, rootless 47 —
-independently re-executed and SHA-anchored by review-f, closing the
-f W4 anchor gap): the
-c-wave's e2e debt (RM-0077/0091) is discharged and both counts carry
-a fresh anchor. Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7
-e-findings dispositioned.
+Status: open — review f (fresh session over `031fa3e..750d4e7`: the
+e-wave's two strings, two pin lines, ledger) found 7 (3 LOW, 4 INFO),
+all dispositioned below; the f-wave implemented W1-W4 (W1/W2 code
+with their own pins and executed sabotage proofs, W3/W4 bookkeeping)
+— per RM-0067 a micro wave review g over the f-wave diff is owed
+before the loop can close. Review e's substance held under f (its
+e2e claim re-executed green at `750d4e7`, e2e 303 + rootless 47).
+Substantively: 37 a-, 30 b-, 11 c-, 3 d-, 7 e-, 7 f-findings
+dispositioned.
 
 Chain: [review-a.md](review-a.md) — full-scope snapshot (10 reviewer
 subagents, 37 findings). Base v0.0.55 @ ad9467d.
@@ -108,6 +105,13 @@ subagents, 37 findings). Base v0.0.55 @ ad9467d.
 | e W5 (INFO) | **deliberately not done** | — | red-not-silent holds; d's phrasing corrected in snapshot e, no code |
 | e W6 (INFO) | **deliberately not done** | — | DRY asserts are convention pins by design; fail drives discriminate |
 | e W7 (INFO) | **deliberately not done** | — | git history immutable; retraction recorded consistently in 3 loci |
+| f W1 (LOW) | **implemented** | `4bf080a` | full-wording log pin; tail-revert sabotage RED (detail) |
+| f W2 (LOW) | **implemented** | `2be6fc3` | backup arm names (mkdir/cp); labeled fail-drive pin; sweep below (detail) |
+| f W3 (LOW) | **implemented** | `5f5d5d0` | NB: e-table cell 15→13 @ce7cbc5; snapshot immutable |
+| f W4 (INFO) | **implemented** | `5f5d5d0` | status e2e claim SHA-anchored at `750d4e7` (re-executed by review-f) |
+| f W5 (INFO) | **deliberately not done** | — | label asymmetry cosmetic; fail path dumps `$_out` (traceable) |
+| f W6 (INFO) | **deliberately not done** | — | sole-emitter discrimination verified; note in review-f.md |
+| f W7 (INFO) | **deliberately not done** | — | subsumptions defensible; in-code comment names the intent |
 
 ## Follow-ups after snapshot b
 
@@ -662,3 +666,56 @@ Discharged by b W18 (the in-chain evidence this line pointed at never
 existed — review b's finding): at the b-wave fix HEAD, `make test`
 rc=0, `make e2e` 303 passed, `make e2e-rootless` 47 passed — both
 suites at baseline, zero skips.
+
+### f W1 (LOW) — the audit log line's changed tail is pinned
+
+`4bf080a` extends the CW1 audit fail drive's log arm from the
+pre-wave prefix (`log: audit log removal FAILED`) to the full changed
+wording (`… FAILED for /var/log/opencode-permissions-kit (rm)`),
+mirroring the userdel sibling's arm. Sabotage (scratch copy of the
+committed f-wave HEAD): log tail reverted alone → suite rc=1 exactly
+at the aggregate arm (pre-fix the same revert stayed rc=0 — review-f
+sab3); committed-state baseline rc=0. Logs:
+/tmp/opencode/rev-f-sab/logs/un2-{base,sabf1}.log.
+
+### f W2 (LOW) — the backup failure arm names its commands + the owed sweep
+
+`2be6fc3`: the agents-backup failure arm (uninstall.sh, userdel
+section) now carries "(mkdir/cp failed)" / "… (mkdir/cp)" like its
+gpasswd/userdel/rm siblings — the failing construct is the compound
+`sudo mkdir -p && sudo cp -a`. New labeled pin in test-uninstall.sh:
+extraction anchor
+`^        for _un_ag_dirname in \.agents \.claude; do$` … `^        done$`
+(unique, 1 hit), stubbed sudo (test/ls succeed, mkdir/cp return 1 —
+L1: the failure path is EXECUTED), asserts the WARNING names the
+source, both tails carry (mkdir/cp), and no false "Agent resources
+backed up:" claim rides the failure; sits before the summary gate
+(L4). Sabotage: both strings reverted → rc=1 at exactly this check
+(logs: un2-sabf2.log).
+
+Class sweep (L2 — the sweep e W3 owed, RM-0069/0070), pattern
+`grep -rn 'WARN' files/opencode-permissions-kit-lib/{management/*.sh,bin/*}`
+plus cause-enumerating messages (ISSUE item 5), sites checked:
+- uninstall.sh :440 gpasswd ✓, :515 userdel ✓, :652 rm ✓ (wave-fixed),
+  :480 backup — FIXED here; :310 symlink-chain WARNING (informational,
+  names its cause — not a command-failure arm); :346/:368 wsl arms
+  ("kit helper unavailable" — cause named, consistent pair).
+- setup-container-backend :202 linger (cause + retry hint names the
+  command), :368 podman info (names the command).
+- opencode-as-opencode note() rows — advisory UI warnings naming their
+  subjects, not rc-gated command failures.
+Result: zero unnamed rc-gated failure arms remain in the shipped tree.
+The rc-blind closing-log aggregation over the revert loop's run_q ops
+stays deliberately deferred (recorded since c W1 as its own follow-up
+wave — a completion claim, not a WARN arm; different class).
+
+E2e (ISSUE item 6 split): message-only change to a root-run file →
+gated at the release gate, not in-wave; the SHA-anchored 303/47 @
+750d4e7 record above is the comparator the g-round needs.
+
+### f W3 / f W4 (bookkeeping) — see `5f5d5d0`
+
+f W3: NB added at the corrected c W1 NB (13 vs 15 @ce7cbc5, arithmetic
+and refs there). f W4: the status SHA-anchors the 303/47 claim at
+`750d4e7` — review-f independently re-executed both suites (rc=0)
+rather than trusting the claim (RM-0082).
