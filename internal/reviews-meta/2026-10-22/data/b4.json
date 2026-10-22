@@ -1,0 +1,461 @@
+{
+  "batch": "b4",
+  "snapshots": [
+    {
+      "stem": "pr-00198a",
+      "file": "internal/reviews/0/0/1/9/pr-00198/review-a.md",
+      "date": "2026-10-18",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 house, fresh (main + 2 Flash axis subagents)",
+      "subject": "issue #164 openchamber probe authority gates (fix wave)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 3, "LOW": 3, "INFO": 5 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "race-toctou",
+          "area": "uninstall.sh",
+          "provenance": "pre-existing",
+          "summary": "Legacy sudoers symlink gate probes at developer authority while removal runs via sudo; unswept same-class sibling, grant can survive.",
+          "cross_refs": ["#164", "0.0.43a F5"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "sibling-sweep",
+          "area": "tests-unit",
+          "provenance": "delta-introduced",
+          "summary": "Sweep claim doesn't reproduce: pattern yields 12 base hits, 6 sites accounted (2 not hits), 8 hits unaccounted.",
+          "cross_refs": ["L2", "L3"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": "claim-drift",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "S3 sabotage pin builds broken test command (missing ']'); discriminates via rc-2 fallthrough, not claimed blind-probe mechanism; stderr leaks.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Negative static pin matches only exact 'if [ -f … ]' master shape; re-planted probe in other dress passes.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Block extraction range over-captures on fi-indent drift; extraction guard passes polluted blocks; failure surfaces later, confusingly.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W6",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Call-sequence pin asserts both probes present, not ordered; reordered regression still passes.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W7",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Sweep comment cites line numbers already drifted at HEAD; will rot further; cite anchors instead.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W8",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": "pre-existing",
+          "summary": "Sudo-absent edge note: rc-127 routes gates to write branch, dies loudly at sudo mkdir; unreachable, no silent write.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W9",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": null,
+          "summary": "Verification record: all three 'deliberately not changed' rationales confirmed correct (fail-safe detection, benign leftovers).",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W10",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Install.sh gate twin pinned statically only; no behavioral S1-equivalent; coverage rides on update.sh harness. Acceptable.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W11",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Harness fidelity note: sudo() stub models DAC override on suite-owned dir; cannot model truly non-chmodable dir.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "M4",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "hardcoded-env",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Retracted: claimed S3 fails on root-run hosts (plain probe succeeds via CAP_DAC_OVERRIDE); refuted — broken-[ rc-2 path is uid-independent.",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "Gates: unit suites (108 update-flags incl. 7 #164 pins, uninstall pass), lint, sandbox policy green; e2e NOT run — owed before merge (install/update/uninstall touched).",
+        "Retracted Flash M4 on runtime evidence; refuted L3 'sh -n' instrument claim — sh -n inadequate for [-form mutations.",
+        "Provenance split stated by snapshot: W1 pre-existing site with delta-introduced sweep miss; W2 delta-introduced; W3-W7 wave-introduced; W8 pre-existing; W9-W11 informational. Recommendation: fix-then-ship."
+      ]
+    },
+    {
+      "stem": "pr-00198b",
+      "file": "internal/reviews/0/0/1/9/pr-00198/review-b.md",
+      "date": "2026-10-18",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 house, fresh rotation pass C (main + 2 Flash axis subagents)",
+      "subject": "issue-164 a-wave fix (a W1/W2/W3/W4/W5/W7) micro-wave review",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 2, "INFO": 1 },
+      "findings": [
+        {
+          "id": "B1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "sibling-sweep",
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Sweep account dispositions only 11 of its own 12 hits; uninstall's [ -d /etc/opencode ] gate-before-sudo-rm unaccounted.",
+          "cross_refs": ["pr-00198 a W2", "pr-00198 a W1"],
+          "status": "reported"
+        },
+        {
+          "id": "B2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "claim-drift",
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "W1 class-sweep roster scoped to uninstall.sh; same-shape site update.sh:670-673 unrecorded — benign, operative claim still true.",
+          "cross_refs": ["pr-00198 a W1", "pr-00198 a W2", "pr-00198 a W9"],
+          "status": "downgraded"
+        },
+        {
+          "id": "B3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "Resolution's uid-0-guard rationale states wrong consequence: root hosts pass S3 vacuously, not break; guard converts vacuous green to SKIP.",
+          "cross_refs": ["pr-00198 a W3", "pr-00198 a M4"],
+          "status": "reported"
+        },
+        {
+          "id": "B4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "Ledger count nit: 'actual 16+1' — block is 16 lines by the pin's own wc -l.",
+          "cross_refs": ["pr-00198 a W5"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Re-run 3-mutation sabotage matrix (red → restore → green) against committed wave; all six new/changed pins discriminate.",
+        "Severity calibration by main agent: B1 raised LOW→MED (claims axis), B2 lowered MED→LOW after verification; no retracted findings.",
+        "E2e still owed before merge. Recommendation fix-then-close — comment/ledger-only round closes chain per stop rule."
+      ]
+    },
+    {
+      "stem": "pr-00199a",
+      "file": "internal/reviews/0/0/1/9/pr-00199/review-a.md",
+      "date": "2026-10-18",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 house (main + 2 Flash axis subagents)",
+      "subject": "issue-165 feature wave — silently-droppable lib guards warn loudly",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 2, "LOW": 3, "INFO": 4 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "silent-failure",
+          "area": "status.sh",
+          "provenance": "pre-existing",
+          "summary": "ddev-handover guard silently drops ddev-share family on damaged deployed trees; sweep's 'covered' disposition hollow; no elif row, no rationale.",
+          "cross_refs": ["0.0.46a F4", "#165"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Hosts readiness logic never executed by pins: flag injected directly, only static grep fragments; operator/sentinel drift stays green.",
+          "cross_refs": ["0.0.44c C1", "pr-00196"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "claim-drift",
+          "area": "status.sh",
+          "provenance": "pre-existing",
+          "summary": "git-check silent noop-stub drop not dispositioned against wave's own 'broken kit' ruling; stale fail-soft rationale needs recorded exclusion.",
+          "cross_refs": ["#165", "#118", "#158"],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Docs promise 'warning row naming the file'; advisories row names neither advisories.sh nor any sh/ path.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Keep-as-is pin greps two exact strings only; over-sweep row with different wording passes green.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Extraction anchors unanchored first-match regexes; brittle but fail loud ('anchor drift?'), never false-pass.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W7",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Readiness evaluation-order delta: id -u probe now runs in states that previously short-circuited; benign, no observable difference.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W8",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "pre-existing",
+          "summary": "Present-but-unreadable lib (mode 000) escapes guards; dash aborts dot mid-report — loud crash, rc=2, no verdict line.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W9",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": "pre-existing",
+          "summary": "Sibling sweep record: update.sh guarded sources fail-safe noop stubs; install.sh kit_source exits loud; no same-class silence.",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "4-mutation sabotage matrix (M1/M2/M3/M5) all red; M5-style precondition-drop run by main agent (red via static fragment).",
+        "One claims-axis finding reshaped ('sweep claim FALSE' overstated; PR enumeration complete) and folded into W1/W3; none retracted.",
+        "E2e not owed: status.sh not in AGENTS e2e list; no healthy install gains a row. Recommendation: fix-first, then snapshot b."
+      ]
+    },
+    {
+      "stem": "pr-00199b",
+      "file": "internal/reviews/0/0/1/9/pr-00199/review-b.md",
+      "date": "2026-10-19",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 house, fresh rotation session (main + 2 Flash axis subagents)",
+      "subject": "issue-165 fix wave — a W1-W5 dispositions (micro-wave review)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 3, "INFO": 3 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Stale '(fail-soft: no helper, no row)' contract comment survives in test file; wave retired that contract in status.sh.",
+          "cross_refs": ["pr-00199 a W3"],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "Resolution evidence counts don't reproduce: S1/S2/S5 FAIL counts differ under minimal mutations; '10 new pass lines' vs 13.",
+          "cross_refs": ["pr-00199 a W1", "pr-00199 a W3", "pr-00199 a W5"],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Docs promise missing-lib row unconditionally; four of six families gate it on caller/state preconditions the text never names.",
+          "cross_refs": ["pr-00199 a W4"],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Class-set ratchet pins only exact row phrasing; reworded over-sweep row escapes — documented residual in pin's own comment.",
+          "cross_refs": ["pr-00199 a W5"],
+          "status": "reported"
+        },
+        {
+          "id": "F5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "d3 pins can't see result-override mutation (hardcoded _st_hosts_ready=true after fi, line kept verbatim); contrived shape.",
+          "cross_refs": ["pr-00199 a W2"],
+          "status": "reported"
+        },
+        {
+          "id": "F6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Double id -u evaluation at handover guard benign; no uid transition mid-script exists; record only.",
+          "cross_refs": ["pr-00199 a W1"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Sabotage matrix re-executed with minimal mutations; count deltas vs resolution recordings feed F2 (S1 5 vs 6, S2 4 vs 5, S5 shape-dependent 1/3/6).",
+        "Fresh session per rotation rule — the a-wave fixing session did not review its own fixes; no retracted findings.",
+        "All findings comment/docs/ledger-only in fix shape; dispositions close chain per stop rule, no snapshot c owed."
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "pr-00198",
+      "file": "internal/reviews/0/0/1/9/pr-00198/resolution.md",
+      "dispositions": { "implemented": 10, "implemented_differently": 0, "not_done": 5 },
+      "follow_ups_recorded": 2,
+      "notes": "Loop closed at b (comment/ledger-only round). Five deliberately-not-done (W6 order pin, W8 sudo premise, W9-W11 records). E2e both suites owed before merge; GitHub PR body still shows stale 6-site sweep list."
+    },
+    {
+      "stem": "pr-00199",
+      "file": "internal/reviews/0/0/1/9/pr-00199/resolution.md",
+      "dispositions": { "implemented": 7, "implemented_differently": 1, "not_done": 7 },
+      "follow_ups_recorded": 0,
+      "notes": "Closed at b; stop rule met (comment/docs/bookkeeping only). a W2 implemented differently — carved uid condition executed, full-chain true leg host-unreachable. Seven not-done incl. F4-F6 documented residuals."
+    }
+  ]
+}
