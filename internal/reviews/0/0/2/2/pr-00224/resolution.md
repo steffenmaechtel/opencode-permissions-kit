@@ -1,10 +1,10 @@
 # Resolution — pr-00224 (issue #197 e2e default flip to 2.x)
 
-Status: open — round b dispositions complete (b W1 → `ea0af17`).
-Expectation: loop closes — this round's dispositions touched no
-review-relevant code (files touched = this resolution.md only,
-bookkeeping per RM-0065/RM-0066). Closure confirmation per RM-0115
-sits with the maintainer / the next round's check, not this commit.
+Status: open — pin wave round c committed (`871f1b1`, maintainer go
+2026-10-23): b W1 hard-fail pin built early, a W7 discharged by registry
+evidence (below). Micro review c owed to a FRESH session (rotation,
+RM-0060 — this session authored the pin wave). E2e discharge runs on
+the committed tree (RM-0113).
 
 Chain: [review-a.md](review-a.md) → this wave. Dispositions refer to
 `a W<n>` = finding W<n> of snapshot a. Commits on `feature/e2e-default-2x`
@@ -22,6 +22,7 @@ Chain: [review-a.md](review-a.md) → this wave. Dispositions refer to
 | a W6 (INFO) | **implemented** | `3956c70` | order pin (assignment < resolve line); reorder sabotage reds |
 | a W7 (INFO) | **deliberately not done** | — | suffixed npm packages unverified upstream; loud fail; watch item |
 | b W1 (INFO) | **implemented** | `ea0af17` | L1 reworded (FAIL branch unpinned, pre-existing); bookkeeping |
+| b W1 pin (FU 4) | **implemented** | `871f1b1` | FAIL+exit-1 adjacency pin; sabotage both halves; owes micro c |
 
 ## Evidence detail
 
@@ -94,18 +95,22 @@ next to the structural greps.
 
 1. **a W2 (merge-time, maintainer):** update branch protection — require
    `e2e-1x` / `e2e-rootless-1x` / `e2e-ddev-1x`, drop the `-2x` names.
-2. **a W7 (watch):** the first local default-lane run on a baseline/musl
-   host answers whether suffixed `@opencode/cli-<target>` packages exist
-   (loud failure if not; nothing to do until then).
+2. **a W7 (watch — DISCHARGED 2026-10-23 by registry evidence):** all
+   suffixed packages the resolver can build exist —
+   `@opencode/cli-linux-x64-baseline`, `-x64-musl`, `-arm64`,
+   `-arm64-musl` each HTTP 200 with dist-tags.latest 2.1.3 (control
+   `cli-linux-x64` same). The only 404 (`cli-linux-arm64-baseline`) is
+   unreachable: lib.sh appends `-baseline` only for `x64`. Time-of-check
+   evidence; a future loud fail on a baseline/musl host means re-check.
 3. **Birth-PR wave e2e debt (RM-0113):** the PR wave changed install.sh
    (bootstrap URL → v2 installer, root-run) and lib.sh resolution
    semantics — the PR's own CI runs the flipped lanes on the PR and the
    merge run re-verifies on master; an explicit discharge record (tree
    SHA + counts) may be noted here by a later session.
-4. **b W1 (optional, next touch):** the lib.sh empty-cache hard-fail
-   (`cannot resolve opencode version and no cached version available`)
-   carries no pin — add one the next time test-e2e-sources.sh is
-   touched; a wave that adds it owes its own micro review.
+4. **b W1 pin — DONE early (`871f1b1`, maintainer go 2026-10-23):** the
+   empty-cache hard-fail now carries the FAIL+exit-1 adjacency pin
+   (both halves sabotage-verified on the committed tree). Micro review
+   c owed to a fresh session (rotation).
 
 ## Addendum (2026-10-23) — learnings refresh 2026-10-22 applied
 
