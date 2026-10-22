@@ -14,16 +14,21 @@ name: test-e2e
 # release is cut. Scheduled runs use the defaults (E2E_STRICT=0, like
 # push runs; the strict input only applies to manual dispatch).
 #
-# The e2e-2x / e2e-rootless-2x jobs run the same suites a second time,
-# pinned to the CURRENT opencode 2.x release (issue #80): 2.x ships via
-# the npm registry, not GitHub releases (releases/latest stays 1.x), so
-# these jobs resolve the npm dist-tag 'latest' at run time and fail the
-# job loudly when that tag ever leaves 2.* — the upstream flip the kit
-# must react to (internal/records/opencode-2x.md). Same triggers and
-# skip rule as the v1 jobs (non-e2e-input changes skip, see the
-# path-filtering paragraph): PRs get the 2.x verdict before merge,
-# master pushes re-verify it before a release is cut, and the weekly
-# run catches 2.x release drift between pushes.
+# The e2e / e2e-rootless jobs run the suites against the CURRENT opencode
+# 2.x release by default (issue #197): all real installations run 2.x,
+# and 2.x ships via the npm registry, not GitHub releases
+# (releases/latest stays 1.x), so these jobs resolve the npm dist-tag
+# 'latest' at run time and fail the job loudly when that tag ever leaves
+# 2.* — the upstream flip the kit must react to
+# (internal/records/opencode-2x.md). The e2e-1x / e2e-rootless-1x twins
+# keep 1.x an explicit, named lane while the kit still ships 1.x support
+# (OPENCODE_MAJOR gating, v1 config shapes): they resolve GitHub
+# releases/latest and fail loudly when that resolution leaves 1.* — the
+# mirror image of the 2.x flip signal. Same triggers and skip rule for
+# both lanes (non-e2e-input changes skip, see the path-filtering
+# paragraph): PRs get the verdict before merge, master pushes re-verify
+# it before a release is cut, and the weekly run catches release drift
+# between pushes.
 #
 # The e2e job additionally matrices over the GIT version (issue #118,
 # motivated by the git >= 2.55-only #116 fatal): legs 'distro' (Ubuntu
@@ -154,28 +159,26 @@ jobs:
         if: >-
           ${{ github.event_name != 'push' && github.event_name != 'pull_request'
           || needs.changes.outputs.code == 'true' }}
-      - name: Resolve opencode version
+      - name: Resolve current opencode 2.x (npm dist-tag latest)
         if: >-
           ${{ github.event_name != 'push' && github.event_name != 'pull_request'
           || needs.changes.outputs.code == 'true' }}
-        id: version
-        # 0.0.45c C8: authenticated (the same ephemeral token the run
-        # steps provision for rate-limit resilience — an anonymous 403
-        # from a shared runner IP used to go green with an empty
-        # OC_VERSION) and anchored-validated before the value reaches
-        # the cache key, mirroring the 2x twins' contract: a resolution
-        # failure fails THIS step loudly instead of degrading the key.
-        env:
-          OPK_GH_TOKEN: ${{ github.token }}
+        id: version2x
+        # Default lane = 2.x since the issue #197 flip (what the
+        # installations run; releases/latest stays 1.x). Anchored
+        # validation before the value reaches GITHUB_OUTPUT or the cache
+        # key — the packument is npm-registry-derived (untrusted); a bare
+        # "2.*" prefix gate would let shell metacharacters through.
         run: |
-          OCV="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-              -H "Authorization: Bearer $OPK_GH_TOKEN" \
-              https://api.github.com/repos/anomalyco/opencode/releases/latest \
-              | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"
-          if printf '%s' "$OCV" | grep -qE '^[0-9]+\.[0-9]+(\.[0-9]+)*$'; then
-            echo "OC_VERSION=$OCV" >> "$GITHUB_OUTPUT"
+          OC2="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+              https://registry.npmjs.org/@opencode/cli-linux-x64/latest \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' \
+              2>/dev/null || true)"
+          if printf '%s' "$OC2" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
+            echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::opencode releases/latest resolved '${OCV:-unresolved}', expected a semver" && exit 1
+            echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
+                (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
       - name: Read pinned OLD version (for cache key)
         if: >-
@@ -185,18 +188,21 @@ jobs:
         run: |
           echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
               tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
-      - name: Cache opencode binaries + installer (per version)
+      - name: Cache opencode binaries + installer (per 2.x version)
         if: >-
           ${{ github.event_name != 'push' && github.event_name != 'pull_request'
           || needs.changes.outputs.code == 'true' }}
         uses: actions/cache@v6
         with:
           path: tests/e2e/cache
-          # Exact key for the (OLD, latest) combo. When the latest opencode
-          # bumps, restore-keys below reuses the previous cache (same OLD +
-          # installer), so run.sh only re-downloads the one new binary.
-          key: opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-latest${{ steps.version.outputs.OC_VERSION }}
+          # Exact key for the (OLD, npm-latest) combo. The key scheme was
+          # the 2x twins' until the issue #197 flip — the default lane
+          # adopted it byte-identical, so the warm caches carried over;
+          # the v1-era restore prefix below still warm-starts the OLD
+          # binary + installer from pre-flip default runs.
+          key: opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-npm${{ steps.version2x.outputs.OC2_VERSION }}
           restore-keys: |
+            opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
       - name: Run E2E test
         if: >-
@@ -211,9 +217,6 @@ jobs:
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
-          # Authorize api.github.com calls (rate-limit resilience, lib.sh
-          # gh_latest_tag) — the ephemeral workflow token, no secret needed.
-          OPK_GH_TOKEN: ${{ github.token }}
 
   # docker-rootless daemon e2e (Phase 3). Same triggers + shared binary cache;
   # needs systemd-in-container + nested user namespaces, and SKIPs wholesale
@@ -227,34 +230,37 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - name: Resolve opencode version
-        id: version
-        # 0.0.45c C8: authenticated + anchored-validated like the e2e job
-        # above — an anonymous rate-limit 403 must fail the step, not
-        # silently green an empty cache key.
-        env:
-          OPK_GH_TOKEN: ${{ github.token }}
+      - name: Resolve current opencode 2.x (npm dist-tag latest)
+        id: version2x
+        # Default lane = 2.x since the issue #197 flip; anchored-validated
+        # like the e2e job above — a bad resolution fails the step loudly,
+        # never a silently degraded cache key (0.0.45c C8 contract).
         run: |
-          OCV="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-              -H "Authorization: Bearer $OPK_GH_TOKEN" \
-              https://api.github.com/repos/anomalyco/opencode/releases/latest \
-              | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"
-          if printf '%s' "$OCV" | grep -qE '^[0-9]+\.[0-9]+(\.[0-9]+)*$'; then
-            echo "OC_VERSION=$OCV" >> "$GITHUB_OUTPUT"
+          OC2="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+              https://registry.npmjs.org/@opencode/cli-linux-x64/latest \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' \
+              2>/dev/null || true)"
+          if printf '%s' "$OC2" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
+            echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::opencode releases/latest resolved '${OCV:-unresolved}', expected a semver" && exit 1
+            echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
+                (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
       - name: Read pinned OLD version (for cache key)
         id: old
         run: |
           echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
               tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
-      - name: Cache opencode binaries + installer (per version, shared with e2e job)
+      - name: Cache opencode binaries + installer (per 2.x version, shared with e2e job)
         uses: actions/cache@v6
         with:
           path: tests/e2e/cache
-          key: opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-latest${{ steps.version.outputs.OC_VERSION }}
+          # Same key scheme as the e2e job (the former 2x-twin keys, warm
+          # across the issue #197 flip); parallel saves of the same key
+          # are best-effort, one simply wins.
+          key: opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-npm${{ steps.version2x.outputs.OC2_VERSION }}
           restore-keys: |
+            opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
       - name: Run docker-rootless E2E test
         run: |
@@ -263,18 +269,19 @@ jobs:
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
-          OPK_GH_TOKEN: ${{ github.token }}
 
-  # opencode 2.x pin (issue #80): the same suite against the CURRENT 2.x
-  # release, resolved from the npm registry at run time — 2.x ships no
-  # GitHub release assets (releases/latest stays 1.x). A resolution
-  # outside 2.* fails the job loudly: that is the upstream flip the kit
-  # must react to (internal/records/opencode-2x.md). Same triggers + code-filter
-  # skip as the v1 jobs. The exact cache key is 2x-only and shared with
-  # e2e-rootless-2x (parallel saves of the same key are best-effort, one
-  # simply wins); the v1 restore prefix warm-starts the OLD binary and
-  # installer.
-  e2e-2x:
+  # opencode 1.x lane (issue #197): the same suite against the CURRENT
+  # 1.x release, resolved from GitHub releases/latest at run time — the
+  # explicit legacy-major lane while the kit still ships 1.x support
+  # (OPENCODE_MAJOR gating, v1 config shapes). A resolution outside 1.*
+  # fails the job loudly: when GitHub flips releases/latest to 2.x, this
+  # lane's premise is gone and the kit must drop it (the mirror image of
+  # the default lane's 2.x flip signal, internal/records/opencode-2x.md).
+  # Same triggers + code-filter skip as the default lane. The exact cache
+  # key is the v1-era default scheme (warm from all pre-flip default
+  # runs); the 2x-lane restore prefix warm-starts the OLD binary and
+  # installer from the post-flip default caches.
+  e2e-1x:
     needs: changes
     # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
@@ -283,23 +290,25 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - name: Resolve current opencode 2.x (npm dist-tag latest)
-        id: version2x
-        # linux-x64: runners and the e2e container are amd64 Linux. This is
-        # the same npm source tests/e2e/lib.sh downloads the pinned 2.x
-        # binary from — the channel the official v2 installer resolves.
+      - name: Resolve opencode 1.x (GitHub releases/latest)
+        id: version
+        # 0.0.45c C8 contract kept through the issue #197 flip:
+        # authenticated (the ephemeral token — an anonymous 403 from a
+        # shared runner IP used to go green with an empty OC_VERSION and
+        # a degraded cache key) and anchored-validated, now against the
+        # lane's expected major: a resolution failure fails THIS step
+        # loudly instead of degrading the key.
+        env:
+          OPK_GH_TOKEN: ${{ github.token }}
         run: |
-          OC2="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-              https://registry.npmjs.org/@opencode/cli-linux-x64/latest \
-              | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' \
-              2>/dev/null || true)"
-          # Anchored validation before the value reaches GITHUB_OUTPUT or a
-          # run: line — the packument is npm-registry-derived (untrusted);
-          # a bare "2.*" prefix gate would let shell metacharacters through.
-          if printf '%s' "$OC2" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
-            echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
+          OCV="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+              -H "Authorization: Bearer $OPK_GH_TOKEN" \
+              https://api.github.com/repos/anomalyco/opencode/releases/latest \
+              | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"
+          if printf '%s' "$OCV" | grep -qE '^1\.[0-9]+(\.[0-9]+)*$'; then
+            echo "OC_VERSION=$OCV" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
+            echo "::error::opencode releases/latest resolved '${OCV:-unresolved}', expected a 1.x semver \
                 (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
       - name: Read pinned OLD version (for cache key)
@@ -307,30 +316,33 @@ jobs:
         run: |
           echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
               tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
-      - name: Cache opencode binaries + installer (per 2.x version)
+      - name: Cache opencode binaries + installer (per 1.x version)
         uses: actions/cache@v6
         with:
           path: tests/e2e/cache
-          key: opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-npm${{ steps.version2x.outputs.OC2_VERSION }}
+          # The v1-era default keys (opencode-e2e-old<OLD>-latest<ver>):
+          # warm from every pre-flip default run; the 2x restore prefix
+          # bridges to the post-flip default caches for the OLD binary.
+          key: opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-latest${{ steps.version.outputs.OC_VERSION }}
           restore-keys: |
-            opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
-      - name: Run E2E test (opencode 2.x pin)
+            opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
+      - name: Run E2E test (opencode 1.x pin)
         run: |
           ./tests/e2e/run.sh
         env:
-          # Resolved npm version travels via env, never interpolated into
+          # Resolved 1.x version travels via env, never interpolated into
           # the run: shell (S6: defense-in-depth on top of the anchored check).
-          E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
+          E2E_OC_VERSION: ${{ steps.version.outputs.OC_VERSION }}
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
-          OPK_GH_TOKEN: ${{ github.token }}
 
-  # docker-rootless daemon e2e, opencode 2.x pin (issue #80) — the same
-  # mirrored trigger/cache layout as its v1 job above; see e2e-2x for the
-  # npm resolution rationale and e2e-rootless for the skip semantics.
-  e2e-rootless-2x:
+  # docker-rootless daemon e2e, opencode 1.x lane (issue #197) — the
+  # same mirrored trigger/cache layout as its default job above; see
+  # e2e-1x for the GitHub resolution rationale and e2e-rootless for the
+  # skip semantics.
+  e2e-rootless-1x:
     needs: changes
     # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
@@ -339,20 +351,21 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - name: Resolve current opencode 2.x (npm dist-tag latest)
-        id: version2x
+      - name: Resolve opencode 1.x (GitHub releases/latest)
+        id: version
+        # Same authenticated + anchored-validated contract as e2e-1x
+        # (0.0.45c C8), gated on the lane's expected major.
+        env:
+          OPK_GH_TOKEN: ${{ github.token }}
         run: |
-          OC2="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-              https://registry.npmjs.org/@opencode/cli-linux-x64/latest \
-              | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' \
-              2>/dev/null || true)"
-          # Anchored validation before the value reaches GITHUB_OUTPUT or a
-          # run: line — the packument is npm-registry-derived (untrusted);
-          # a bare "2.*" prefix gate would let shell metacharacters through.
-          if printf '%s' "$OC2" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
-            echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
+          OCV="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+              -H "Authorization: Bearer $OPK_GH_TOKEN" \
+              https://api.github.com/repos/anomalyco/opencode/releases/latest \
+              | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"
+          if printf '%s' "$OCV" | grep -qE '^1\.[0-9]+(\.[0-9]+)*$'; then
+            echo "OC_VERSION=$OCV" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
+            echo "::error::opencode releases/latest resolved '${OCV:-unresolved}', expected a 1.x semver \
                 (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
       - name: Read pinned OLD version (for cache key)
@@ -360,22 +373,23 @@ jobs:
         run: |
           echo "OLD_VERSION=$(sed -n 's/^E2E_OLD_VERSION="${E2E_OLD_VERSION:-\([0-9.]*\)}".*/\1/p' \
               tests/e2e/lib.sh | head -1)" >> "$GITHUB_OUTPUT"
-      - name: Cache opencode binaries + installer (per 2.x version, shared with e2e-2x)
+      - name: Cache opencode binaries + installer (per 1.x version, shared with e2e-1x)
         uses: actions/cache@v6
         with:
           path: tests/e2e/cache
-          key: opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-npm${{ steps.version2x.outputs.OC2_VERSION }}
+          # v1-era default scheme (see e2e-1x); parallel saves of the same
+          # key are best-effort, one simply wins.
+          key: opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-latest${{ steps.version.outputs.OC_VERSION }}
           restore-keys: |
-            opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
             opencode-e2e-old${{ steps.old.outputs.OLD_VERSION }}-
-      - name: Run docker-rootless E2E test (opencode 2.x pin)
+            opencode-e2e-2x-old${{ steps.old.outputs.OLD_VERSION }}-
+      - name: Run docker-rootless E2E test (opencode 1.x pin)
         run: |
           E2E_STRICT="${{ inputs.strict == true && '1' || '0' }}" ./tests/e2e/run-docker-rootless.sh
         env:
-          # Resolved npm version travels via env, never interpolated into
+          # Resolved 1.x version travels via env, never interpolated into
           # the run: shell (S6: defense-in-depth on top of the anchored check).
-          E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
+          E2E_OC_VERSION: ${{ steps.version.outputs.OC_VERSION }}
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve.
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
-          OPK_GH_TOKEN: ${{ github.token }}

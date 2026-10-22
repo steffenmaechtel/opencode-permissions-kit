@@ -84,7 +84,8 @@ Documented rather than hidden:
   commit pinning), and `update.sh --binary` downloads the opencode release
   tarball — the "verification" is a liveness check (`opencode --version`
   runs). Rootless backend provisioning runs get.docker.com, and the
-  fallback opencode install streams `https://opencode.ai/install` — both
+  fallback opencode install streams `https://opencode.ai/v2/install`
+  (the official v2 installer, npm-registry resolution) — both
   as root. Installing means trusting GitHub, the opencode releases, and
   get.docker.com at install time. A pinned-release checksum manifest
   (published as a repo artifact per release) would close the gap without

@@ -18,13 +18,16 @@ name: test-e2e-ddev
 # CI rebuilds the golden image warm every run (the cache is a
 # local-workspace concept, design doc §6 R6).
 #
-# The e2e-ddev-2x job runs the same suite pinned to the CURRENT opencode
-# 2.x release (issue #80): 2.x ships via the npm registry, not GitHub
-# releases (releases/latest stays 1.x), so the job resolves the npm
-# dist-tag 'latest' at run time and fails loudly when that tag ever
-# leaves 2.* — the upstream flip the kit must react to
-# (internal/records/opencode-2x.md). Same (heavy) triggers as the v1 job:
-# master pushes, weekly schedule, manual dispatch — not PRs.
+# The e2e-ddev job runs the suite against the CURRENT opencode 2.x
+# release by default (issue #197): all real installations run 2.x, and
+# 2.x ships via the npm registry, not GitHub releases (releases/latest
+# stays 1.x), so the job resolves the npm dist-tag 'latest' at run time
+# and fails loudly when that tag ever leaves 2.* — the upstream flip
+# the kit must react to (internal/records/opencode-2x.md). The
+# e2e-ddev-1x twin keeps 1.x an explicit lane (GitHub releases/latest,
+# loud failure when that leaves 1.*). Same (heavy) triggers as the
+# default job: master pushes, weekly schedule, manual dispatch — not
+# PRs.
 #
 # Path filtering (non-e2e-input changes skip): push runs first detect
 # what changed (dorny/paths-filter) — the 'code' set is the same e2e
@@ -110,32 +113,37 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - name: Resolve opencode version
-        id: version
-        # 0.0.45c C8: authenticated + anchored-validated like the
-        # test-e2e.yml twins — an anonymous rate-limit 403 must fail the
-        # step, not silently green an empty cache key.
-        env:
-          OPK_GH_TOKEN: ${{ github.token }}
+      - name: Resolve current opencode 2.x (npm dist-tag latest)
+        id: version2x
+        # Default lane = 2.x since the issue #197 flip. linux-x64: runners
+        # and the e2e container are amd64 Linux; this is the same npm
+        # source tests/e2e/lib.sh resolves/downloads through. Anchored
+        # validation before the value reaches GITHUB_OUTPUT or the cache
+        # key — the packument is npm-registry-derived (untrusted).
         run: |
-          OCV="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-              -H "Authorization: Bearer $OPK_GH_TOKEN" \
-              https://api.github.com/repos/anomalyco/opencode/releases/latest \
-              | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"
-          if printf '%s' "$OCV" | grep -qE '^[0-9]+\.[0-9]+(\.[0-9]+)*$'; then
-            echo "OC_VERSION=$OCV" >> "$GITHUB_OUTPUT"
+          OC2="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+              https://registry.npmjs.org/@opencode/cli-linux-x64/latest \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' \
+              2>/dev/null || true)"
+          if printf '%s' "$OC2" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
+            echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::opencode releases/latest resolved '${OCV:-unresolved}', expected a semver" && exit 1
+            echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
+                (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
-      - name: Cache opencode binaries + installer (per version, shared with the other e2e jobs)
+      - name: Cache opencode binaries + installer (per 2.x version, shared with the other e2e jobs)
         uses: actions/cache@v6
         with:
           path: tests/e2e/cache
-          key: opencode-e2e-latest${{ steps.version.outputs.OC_VERSION }}
-          # No trailing dash: the prefix must match the primary keys of
-          # previous runs (opencode-e2e-latest<ver>) to warm-start the
-          # binary when the latest version bumps.
+          # Key scheme of the former 2x lane (warm across the issue #197
+          # flip). No trailing dash on the restore prefixes: they must
+          # prefix-match the primary keys of previous runs
+          # (opencode-e2e-2x-... from the e2e workflow's 2x-era jobs and
+          # this file's former 2x job, opencode-e2e-latest<ver> from the
+          # v1-era ddev job) to warm-start the binary on version bumps.
+          key: opencode-e2e-2x-npm${{ steps.version2x.outputs.OC2_VERSION }}
           restore-keys: |
+            opencode-e2e-2x-
             opencode-e2e-latest
       - name: Run real-ddev E2E test
         env:
@@ -148,7 +156,8 @@ jobs:
           # ddev image pulls still go to Docker Hub directly.)
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
           # Authorize api.github.com calls (rate-limit resilience, lib.sh
-          # gh_latest_tag) — the ephemeral workflow token, no secret needed.
+          # gh_latest_tag resolves the ddev version) — the ephemeral
+          # workflow token, no secret needed.
           OPK_GH_TOKEN: ${{ github.token }}
         run: |
           ./tests/e2e/run-ddev.sh
@@ -160,19 +169,24 @@ jobs:
             ${{ (github.event_name != 'workflow_dispatch' || inputs.site_tier == true)
             && 'camino' || 'none' }}
           DDEV_VERSION: ${{ inputs.ddev_version }}
+          # Via env, never interpolated into the run: shell (S6).
+          E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
         run: |
-          echo "### ddev-e2e (run-ddev.sh)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ddev-e2e (run-ddev.sh, opencode ${E2E_OC_VERSION:-unresolved})" >> "$GITHUB_STEP_SUMMARY"
           echo "- site tier: ${E2E_DDEV_SITE:-none}" >> "$GITHUB_STEP_SUMMARY"
           echo "- ddev: ${DDEV_VERSION:-latest}" >> "$GITHUB_STEP_SUMMARY"
 
-  # opencode 2.x pin (issue #80): the same suite against the CURRENT 2.x
-  # release, resolved from the npm registry at run time — 2.x ships no
-  # GitHub release assets (releases/latest stays 1.x). A resolution
-  # outside 2.* fails the job loudly: that is the upstream flip the kit
-  # must react to (internal/records/opencode-2x.md). Same (heavy) triggers as
-  # the v1 job: master pushes, weekly schedule, manual dispatch — not PRs
-  # (the GB downloads are the point there).
-  e2e-ddev-2x:
+  # opencode 1.x lane (issue #197): the same suite against the CURRENT
+  # 1.x release, resolved from GitHub releases/latest at run time — the
+  # explicit legacy-major lane while the kit still ships 1.x support
+  # (OPENCODE_MAJOR gating, v1 config shapes). A resolution outside 1.*
+  # fails the job loudly: when GitHub flips releases/latest to 2.x, this
+  # lane's premise is gone and the kit must drop it (the mirror image of
+  # the default lane's 2.x flip signal, internal/records/opencode-2x.md).
+  # Same (heavy) triggers as the default job: master pushes, weekly
+  # schedule, manual dispatch — not PRs (the GB downloads are the point
+  # there).
+  e2e-ddev-1x:
     needs: changes
     # non-code changes skip; schedule/dispatch always run (see header)
     if: >-
@@ -182,50 +196,51 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - name: Resolve current opencode 2.x (npm dist-tag latest)
-        id: version2x
-        # linux-x64: runners and the e2e container are amd64 Linux. This is
-        # the same npm source tests/e2e/lib.sh downloads the pinned 2.x
-        # binary from — the channel the official v2 installer resolves.
+      - name: Resolve opencode 1.x (GitHub releases/latest)
+        id: version
+        # 0.0.45c C8 contract kept through the issue #197 flip:
+        # authenticated + anchored-validated against the lane's expected
+        # major — a bad resolution fails the step, never a silently
+        # degraded cache key.
+        env:
+          OPK_GH_TOKEN: ${{ github.token }}
         run: |
-          OC2="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
-              https://registry.npmjs.org/@opencode/cli-linux-x64/latest \
-              | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' \
-              2>/dev/null || true)"
-          # Anchored validation before the value reaches GITHUB_OUTPUT or a
-          # run: line — the packument is npm-registry-derived (untrusted);
-          # a bare "2.*" prefix gate would let shell metacharacters through.
-          if printf '%s' "$OC2" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
-            echo "OC2_VERSION=$OC2" >> "$GITHUB_OUTPUT"
+          OCV="$(curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 \
+              -H "Authorization: Bearer $OPK_GH_TOKEN" \
+              https://api.github.com/repos/anomalyco/opencode/releases/latest \
+              | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"
+          if printf '%s' "$OCV" | grep -qE '^1\.[0-9]+(\.[0-9]+)*$'; then
+            echo "OC_VERSION=$OCV" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::npm dist-tag latest is '${OC2:-unresolved}', expected a 2.x semver \
+            echo "::error::opencode releases/latest resolved '${OCV:-unresolved}', expected a 1.x semver \
                 (upstream flip? internal/records/opencode-2x.md)" && exit 1
           fi
-      - name: Cache opencode binaries (per 2.x version, warm-start from the other e2e caches)
+      - name: Cache opencode binaries (per 1.x version, warm-start from the other e2e caches)
         uses: actions/cache@v6
         with:
           path: tests/e2e/cache
-          # No trailing dash on the restore prefixes: they must prefix-match
-          # the primary keys of previous runs (opencode-e2e-2x-... from the
-          # e2e workflow's 2x jobs, opencode-e2e-latest<ver> from the v1
-          # ddev job) to warm-start the binary on version bumps.
-          key: opencode-e2e-2x-npm${{ steps.version2x.outputs.OC2_VERSION }}
+          # The v1-era ddev default keys (opencode-e2e-latest<ver>): warm
+          # from every pre-flip default run. No trailing dash: the prefix
+          # must prefix-match the primary keys of previous runs.
+          key: opencode-e2e-latest${{ steps.version.outputs.OC_VERSION }}
           restore-keys: |
-            opencode-e2e-2x-
             opencode-e2e-latest
-      - name: Run real-ddev E2E test (opencode 2.x pin)
+      - name: Run real-ddev E2E test (opencode 1.x pin)
         env:
           E2E_DDEV_SITE: >-
             ${{ (github.event_name != 'workflow_dispatch' || inputs.site_tier == true)
             && 'camino' || 'none' }}
           DDEV_VERSION: ${{ inputs.ddev_version }}
-          # Resolved npm version travels via env, never interpolated into
+          # Resolved 1.x version travels via env, never interpolated into
           # the run: shell (S6: defense-in-depth on top of the anchored check).
-          E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
+          E2E_OC_VERSION: ${{ steps.version.outputs.OC_VERSION }}
           # Base image via the Google Docker Hub mirror: auth.docker.io
           # 504s (2026-10) killed every suite at metadata resolve. (Inner
           # ddev image pulls still go to Docker Hub directly.)
           E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04
+          # Authorize api.github.com calls (rate-limit resilience, lib.sh
+          # gh_latest_tag resolves the ddev version) — the ephemeral
+          # workflow token, no secret needed.
           OPK_GH_TOKEN: ${{ github.token }}
         run: |
           ./tests/e2e/run-ddev.sh
@@ -237,8 +252,8 @@ jobs:
             && 'camino' || 'none' }}
           DDEV_VERSION: ${{ inputs.ddev_version }}
           # Via env, never interpolated into the run: shell (S6).
-          E2E_OC_VERSION: ${{ steps.version2x.outputs.OC2_VERSION }}
+          E2E_OC_VERSION: ${{ steps.version.outputs.OC_VERSION }}
         run: |
-          echo "### ddev-e2e-2x (run-ddev.sh, opencode ${E2E_OC_VERSION:-unresolved})" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ddev-e2e-1x (run-ddev.sh, opencode ${E2E_OC_VERSION:-unresolved})" >> "$GITHUB_STEP_SUMMARY"
           echo "- site tier: ${E2E_DDEV_SITE:-none}" >> "$GITHUB_STEP_SUMMARY"
           echo "- ddev: ${DDEV_VERSION:-latest}" >> "$GITHUB_STEP_SUMMARY"

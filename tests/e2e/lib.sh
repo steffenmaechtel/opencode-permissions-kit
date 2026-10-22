@@ -22,7 +22,10 @@
 #                    exec manual retries inside it; the next run removes the
 #                    leftover itself, see e2e_start_container)
 #   E2E_OLD_VERSION  pinned old opencode for the upgrade test
-#                    (default: 1.18.15; only fetched if e2e_fetch_old is called)
+#                    (default: 1.18.15; only fetched if e2e_fetch_old is called).
+#                    With the 2.x default under test this makes the upgrade
+#                    check cover the 1.x -> 2.x path (issue #197) — exactly
+#                    what the production machines went through.
 #   E2E_GIT_CHANNEL  git source of the e2e image: 'distro' (default — the
 #                    base image's apt git, 2.43 on noble) or 'latest' (the
 #                    current git-core PPA release, resolved at BUILD time,
@@ -79,12 +82,14 @@ E2E_OLD_VERSION="${E2E_OLD_VERSION:-1.18.15}"
 E2E_GIT_CHANNEL="${E2E_GIT_CHANNEL:-distro}"
 # Base image knob — see the header block.
 E2E_BASE_IMAGE="${E2E_BASE_IMAGE:-ubuntu:24.04}"
-# Pin the opencode version under test (e.g. E2E_OC_VERSION=2.0.11 for the
-# opencode 2.x proof, issue #80). Pinned versions are fetched on demand:
+# Pin the opencode version under test (e.g. E2E_OC_VERSION=1.18.15 for an
+# explicit 1.x lane run, issue #197). Pinned versions are fetched on demand:
 # 1.x from GitHub release assets, 2.x from the npm registry (2.x ships no
 # GitHub assets — the channel the official v2 installer,
-# https://opencode.ai/v2/install, resolves through).
-# Default (empty): resolve the current latest release.
+# https://opencode.ai/v2/install, resolves through). A pin is explicit
+# intent and is never major-gated. Default (empty): resolve the current
+# 2.x from the npm dist-tag 'latest' (the flip of issue #197 — 2.x is
+# what the installations run; GitHub releases/latest stays 1.x).
 E2E_OC_VERSION="${E2E_OC_VERSION:-}"
 E2E_HOST_LAYOUT="unknown"
 
@@ -232,33 +237,37 @@ gh_latest_tag() {
     printf '%s\n' "$tag"
 }
 
+# Resolve the current 2.x release from the npm dist-tag 'latest' of the
+# per-target CLI package — the channel the official v2 installer and
+# update.sh's resolve_latest_opencode_version use (2.x ships no GitHub
+# release assets; releases/latest stays 1.x — the default-lane source
+# since the issue #197 flip). python3 is the kit's canonical JSON parser
+# (grep/sed on a packument can match a stray 'latest': occurrence
+# elsewhere). Prints the bare version, or nothing when the registry
+# refuses (the caller falls back to the binary cache).
+# $1 = platform target (e.g. linux-x64, darwin-arm64).
+npm_dist_latest() {
+    local tgt="$1" ver
+    ver=$(curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 \
+        "https://registry.npmjs.org/@opencode/cli-$tgt" 2>/dev/null \
+        | python3 -c 'import json,sys
+try:
+    dist = json.load(sys.stdin)["dist-tags"]
+    print(dist["latest"])
+except Exception:
+    sys.exit(1)
+' 2>/dev/null || true)
+    printf '%s\n' "$ver"
+}
+
 e2e_resolve_cache() {
     OC_CACHE_DIR="$SCRIPT_DIR/cache"
     mkdir -p "$OC_CACHE_DIR"
 
-    # Resolve the opencode version under test. E2E_OC_VERSION pins it; the
-    # default resolves the current latest from GitHub releases (rate-limit
-    # resilient, see gh_latest_tag). If the endpoint is unreachable, fall
-    # back to the newest cached version so repeat runs work offline. A
-    # pinned version that is not cached yet is downloaded on demand (see
-    # e2e_fetch_opencode).
-    OC_VERSION="$E2E_OC_VERSION"
-    if [ -z "$OC_VERSION" ]; then
-        OC_VERSION=$(gh_latest_tag anomalyco/opencode)
-    fi
-    if [ -z "$OC_VERSION" ]; then
-        OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
-        if [ -n "$OC_VERSION" ]; then
-            echo "  ${YELLOW}WARNING: version endpoint unreachable - using cached opencode $OC_VERSION${NC}"
-        else
-            echo "  ${RED}FAIL${NC}  cannot resolve opencode version and no cached version available."
-            exit 1
-        fi
-    fi
-
-    # Detect the platform target for this host (mirrors the official
+    # Detect the platform target for this host FIRST (mirrors the official
     # installers — both the v1 GitHub assets and the v2 npm packages key
-    # on it, including the -baseline and -musl suffixes).
+    # on it, including the -baseline and -musl suffixes): the default
+    # version resolution below queries the npm registry per target.
     os=$(uname -s | tr '[:upper:]' '[:lower:]')
     case "$os" in
         darwin*) os="darwin" ;;
@@ -274,6 +283,39 @@ e2e_resolve_cache() {
     fi
     if [ "$os" = "linux" ] && { [ -f /etc/alpine-release ] || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; }; then
         target="$target-musl"
+    fi
+
+    # Resolve the opencode version under test. E2E_OC_VERSION pins it (any
+    # major — a pin is explicit intent and never gated). The default
+    # (empty) resolves the current 2.x from the npm dist-tag 'latest'
+    # (issue #197 flip: 2.x is what the installations run; GitHub
+    # releases/latest stays 1.x and is the E2E_OC_VERSION pin / -1x CI
+    # lane instead). A resolved value outside 2.x aborts loudly — that is
+    # the upstream flip signal, mirrored from the CI default jobs (the
+    # packument is registry-derived, i.e. untrusted, so the value is
+    # anchored-validated before use; same shape as update.sh's
+    # resolve_latest_opencode_version). If the registry is unreachable,
+    # fall back to the newest cached version so repeat runs work offline.
+    # A pinned version that is not cached yet is downloaded on demand (see
+    # e2e_fetch_opencode).
+    OC_VERSION="$E2E_OC_VERSION"
+    if [ -z "$OC_VERSION" ]; then
+        OC_VERSION=$(npm_dist_latest "$target")
+        if [ -n "$OC_VERSION" ] \
+            && ! printf '%s' "$OC_VERSION" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
+            echo "  ${RED}FAIL${NC}  npm dist-tag latest is '$OC_VERSION', expected a 2.x semver"
+            echo "         (upstream flip? internal/records/opencode-2x.md; pin E2E_OC_VERSION=<ver> to test another major)"
+            exit 1
+        fi
+    fi
+    if [ -z "$OC_VERSION" ]; then
+        OC_VERSION=$(ls -1d "$OC_CACHE_DIR"/opencode-* 2>/dev/null | sed 's|.*/opencode-||' | sort -V | tail -1)
+        if [ -n "$OC_VERSION" ]; then
+            echo "  ${YELLOW}WARNING: version endpoint unreachable - using cached opencode $OC_VERSION${NC}"
+        else
+            echo "  ${RED}FAIL${NC}  cannot resolve opencode version and no cached version available."
+            exit 1
+        fi
     fi
 
     OC_BIN="$OC_CACHE_DIR/opencode-$OC_VERSION/opencode"

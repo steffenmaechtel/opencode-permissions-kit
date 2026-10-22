@@ -3,9 +3,10 @@
 This page lists third-party tools that spawn or front opencode, how they
 invoke it, and whether they work on a machine where the kit owns the
 `opencode` command. The kit supports both majors; CI exercises them
-continuously against the **current** releases at run time (the e2e jobs
-resolve opencode 1.x from GitHub releases/latest and 2.x from the npm
-dist-tag `latest`, plus a weekly scheduled burn-in on `master`) — so the
+continuously against the **current** releases at run time (the default
+e2e jobs resolve opencode 2.x from the npm dist-tag `latest`; explicit
+1.x lanes resolve GitHub releases/latest, plus a weekly scheduled
+burn-in on `master`) — so the
 matrix tracks the latest versions without a manual stamp. Last manual
 verification: Sep 2026, opencode 1.18.31 / 2.0.6 (internals:
 [records/opencode-2x.md](../../internal/records/opencode-2x.md)); Oct 2026,

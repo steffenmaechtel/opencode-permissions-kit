@@ -206,69 +206,98 @@ else
     fi
 fi
 
-# --- 5. opencode 2.x pin jobs (issue #80) --------------------------------------
+# --- 5. e2e version lanes (issues #80 + #197) ----------------------------------
+#
+# Since the 2026-10 flip (issue #197) the DEFAULT e2e jobs run the
+# CURRENT opencode 2.x from the npm dist-tag latest (2.x ships no
+# GitHub release assets; releases/latest stays 1.x), and the -1x twins
+# keep 1.x an explicit lane from GitHub releases/latest. Both
+# resolutions are anchored-validated against their lane's major and
+# fail the job loudly on a mismatch (the upstream flip signals); the
+# 1x pin reaches the runner as an env value, never interpolated into a
+# run: shell. Silent removal, a re-swap of the lanes, or one lane
+# drifting onto the wrong registry trips these checks. File-level
+# greps cannot tell WHICH job carries which resolution — the checks
+# run against the per-job block instead.
 
-# The e2e workflows run the suites a second time against the CURRENT 2.x
-# release (npm dist-tag latest — 2.x ships no GitHub release assets).
-# Silent removal would weaken 2.x coverage with no local signal; these
-# checks trip on it. Patterns per file:
-#   job id           — one 2x job per suite the workflow runs
-#   npm resolution   — the version comes from the npm registry, the
-#                      source tests/e2e/lib.sh downloads 2.x pins from
-#   E2E_OC_VERSION   — the runner receives the resolved version as a pin
-#   anchored guard   — the version is validated against an anchored
-#                      2.x semver regex (grep -qE '^2\.[0-9]+(\.[0-9]+)*$')
-#                      before it reaches GITHUB_OUTPUT; the BRE pattern below
-#                      matches the literal "^2\.[0" head of that regex
+job_block() {  # $1 = workflow file, $2 = job id -> the job's lines on stdout
+    awk -v hdr="  $2:" '
+        index($0, hdr) == 1 { p = 1; next }
+        p && /^  [A-Za-z0-9_-]+:/ { exit }
+        p { print }
+    ' "$1"
+}
 
-check_2x() {
-    _wf="$1"; _name="${_wf##*/}"; shift
+check_job_lane() {  # wf label job ere-pattern...
+    _wf="$1"; _label="$2"; _job="$3"; shift 3
+    _blk="$(job_block "$_wf" "$_job")"
+    if [ -z "$_blk" ]; then
+        fail "$_label (job '$_job' not found)"
+        return
+    fi
     _missing=""
     for _pat in "$@"; do
-        grep -q -- "$_pat" "$_wf" || _missing="$_missing [$_pat]"
+        printf '%s\n' "$_blk" | grep -qE -- "$_pat" || _missing="$_missing [$_pat]"
     done
     if [ -z "$_missing" ]; then
-        pass "$_name: 2.x pin jobs present (npm resolution + pin + 2.* guard)"
+        pass "$_label"
     else
-        fail "$_name: 2.x pin wiring incomplete:$_missing"
+        fail "$_label:$_missing"
     fi
 }
 
-check_2x "$WF_E2E" \
-    '^  e2e-2x:' \
-    '^  e2e-rootless-2x:' \
-    'registry.npmjs.org/@opencode/cli-linux-x64/latest' \
-    'E2E_OC_VERSION' \
+# Default lanes: npm dist-tag latest, anchored 2.x guard, the former
+# 2x-lane cache keys (adopted byte-identical with the flip so the warm
+# caches carried over). The default jobs run the suite UNPINNED — lib.sh
+# resolves the same npm channel itself at run time; the step resolution
+# exists for the cache key and the flip signal.
+for _job in e2e e2e-rootless; do
+    check_job_lane "$WF_E2E" "test-e2e.yml: '$_job' (default) resolves npm 2.x (guard + 2x cache key)" "$_job" \
+        'registry\.npmjs\.org/@opencode/cli-linux-x64/latest' \
+        '\^2\\\.\[0' \
+        '::error::npm dist-tag latest' \
+        'key: opencode-e2e-2x-'
+done
+check_job_lane "$WF_DDEV_E2E" "test-e2e-ddev.yml: 'e2e-ddev' (default) resolves npm 2.x (guard + 2x cache key)" e2e-ddev \
+    'registry\.npmjs\.org/@opencode/cli-linux-x64/latest' \
     '\^2\\\.\[0' \
-    '::error::npm dist-tag latest'
+    '::error::npm dist-tag latest' \
+    'key: opencode-e2e-2x-npm' \
+    'OPK_GH_TOKEN: \$\{\{ github\.token \}\}'
 
-check_2x "$WF_DDEV_E2E" \
-    '^  e2e-ddev-2x:' \
-    'registry.npmjs.org/@opencode/cli-linux-x64/latest' \
-    'E2E_OC_VERSION' \
-    '\^2\\\.\[0' \
-    '::error::npm dist-tag latest'
+# Explicit 1x lanes (renamed from the -2x twins, issue #197): GitHub
+# releases/latest, authenticated (0.0.45c C8 contract kept through the
+# flip — the ephemeral token, never an anonymous call from a shared
+# runner IP), anchored 1.x guard, the version as an env pin, the former
+# v1-era default cache keys.
+for _job in e2e-1x e2e-rootless-1x; do
+    check_job_lane "$WF_E2E" "test-e2e.yml: '$_job' resolves GitHub 1.x (auth + guard + env pin + v1 cache key)" "$_job" \
+        'api\.github\.com/repos/anomalyco/opencode/releases/latest' \
+        '-H "Authorization: Bearer \$OPK_GH_TOKEN"' \
+        '\^1\\\.\[0' \
+        '::error::opencode releases/latest resolved' \
+        'OC_VERSION=\$OCV' \
+        'E2E_OC_VERSION: \$\{\{' \
+        'key: opencode-e2e-old'
+done
+check_job_lane "$WF_DDEV_E2E" "test-e2e-ddev.yml: 'e2e-ddev-1x' resolves GitHub 1.x (auth + guard + env pin + v1 cache key)" e2e-ddev-1x \
+    'api\.github\.com/repos/anomalyco/opencode/releases/latest' \
+    '-H "Authorization: Bearer \$OPK_GH_TOKEN"' \
+    '\^1\\\.\[0' \
+    '::error::opencode releases/latest resolved' \
+    'OC_VERSION=\$OCV' \
+    'E2E_OC_VERSION: \$\{\{' \
+    'key: opencode-e2e-latest'
 
-# 0.0.45c C8: every v1 "Resolve opencode version" step (e2e + e2e-rootless
-# in test-e2e.yml, e2e-ddev in test-e2e-ddev.yml) is authenticated (the
-# ephemeral token, provisioned at the step — an anonymous rate-limit 403
-# from a shared runner IP used to go green with an empty OC_VERSION and a
-# degraded cache key) and anchored-validated like the 2x twins: a bad
-# resolution fails the step loudly instead of reaching the cache key.
-check_v1_resolve() {
-    # args: workflow, expected step count, label
-    _wf="$1"; _want="$2"; _label="$3"
-    _hdr=$(grep -c -- '-H "Authorization: Bearer $OPK_GH_TOKEN"' "$_wf" || true)
-    _err=$(grep -c '::error::opencode releases/latest resolved' "$_wf" || true)
-    _gate=$(grep -c 'OC_VERSION=$OCV' "$_wf" || true)
-    if [ "$_hdr" = "$_want" ] && [ "$_err" = "$_want" ] && [ "$_gate" = "$_want" ]; then
-        pass "$_label: v1 resolve steps authenticated + validated (C8)"
-    else
-        fail "$_label: v1 resolve steps authenticated + validated (C8, hdr=$_hdr err=$_err gate=$_gate want=$_want)"
-    fi
-}
-check_v1_resolve "$WF_E2E" 2 "test-e2e.yml (e2e + e2e-rootless)"
-check_v1_resolve "$WF_DDEV_E2E" 1 "test-e2e-ddev.yml (e2e-ddev)"
+# The -2x twins must be GONE (renamed to -1x with the flip): a surviving
+# -2x job would duplicate the default lane's 2.x coverage and mask the
+# rename in branch-protection/required-check configs.
+_leftover="$(grep -hE '^  e2e(-rootless|-ddev)?-2x:' "$WF_E2E" "$WF_DDEV_E2E" || true)"
+if [ -z "$_leftover" ]; then
+    pass "no leftover -2x jobs (renamed to -1x, issue #197)"
+else
+    fail "leftover -2x job(s) after the lane rename:$_leftover"
+fi
 
 # Structural YAML guard (workflow-upload breakage 2026-09-25: a second
 # env: block on a step that already had one made GitHub reject the whole

@@ -50,6 +50,64 @@ check "1.x downloads stay on GitHub release assets" \
 check "1.x asset name keeps the target suffix" \
     grep_q 'opencode-\$target\.tar\.gz'
 
+# --- default lane = 2.x (issue #197): with E2E_OC_VERSION empty, lib.sh
+# resolves the npm dist-tag 'latest' (GitHub releases/latest stays 1.x
+# and is the E2E_OC_VERSION pin / -1x CI lane). The resolved value is
+# anchored-validated against 2.x before use — registry output is
+# untrusted — and an unreachable registry falls back to the newest
+# cached binary (the offline chain must stay). ---
+check "npm_dist_latest helper exists in lib.sh" \
+    grep -q '^npm_dist_latest() {' "$LIB"
+check "default resolution goes through npm_dist_latest" \
+    grep_q 'OC_VERSION=\$(npm_dist_latest "\$target")'
+check "npm_dist_latest reads the per-target packument" \
+    grep_q 'registry\.npmjs\.org/@opencode/cli-\$tgt'
+check "default resolution is gated on an anchored 2.x semver" \
+    sh -c "grep -q '\\^2\\\\\\.\\[0' \"\$1\"" _ "$LIB"
+check "2.x gate message names the E2E_OC_VERSION escape hatch" \
+    grep_q 'pin E2E_OC_VERSION=<ver> to test another major'
+check "offline fallback to the newest cached binary stays" \
+    grep_q 'WARNING: version endpoint unreachable'
+check "a pin wins before any resolution (E2E_OC_VERSION is intent)" \
+    grep_q 'OC_VERSION="\$E2E_OC_VERSION"'
+
+# --- behavioral: npm_dist_latest against a fake registry (fake curl on
+# PATH, the test-update-flags.sh pattern). Proves the happy path prints
+# the dist-tag version, and that garbage or an unreachable registry
+# prints EMPTY (the caller's fallback premise) — never a partial value
+# or an abort under lib.sh's set -e. ---
+NPMWORK="$(mktemp -d)"
+mkdir -p "$NPMWORK/bin" 
+cat > "$NPMWORK/bin/curl" <<'CURLEOF'
+#!/bin/sh
+# fake registry endpoint, switched by FAKE_CURL_MODE:
+#   ok   -> packument whose dist-tags.latest is 2.1.7
+#   junk -> non-JSON body (python3 parse fails)
+#   down -> connection refused (curl exit 1)
+case "${FAKE_CURL_MODE:-ok}" in
+    ok)   printf '{"dist-tags":{"latest":"2.1.7","next":"2.2.0-beta.1"}}\n' ;;
+    junk) printf '<html>502 Bad Gateway</html>\n' ;;
+    down) exit 1 ;;
+esac
+CURLEOF
+chmod +x "$NPMWORK/bin/curl"
+sed -n '/^npm_dist_latest() {/,/^}/p' "$LIB" > "$NPMWORK/fn.sh"
+
+_npmres() {
+    FAKE_CURL_MODE="$1" PATH="$NPMWORK/bin:$PATH" \
+        sh -c '. "$1"; npm_dist_latest linux-x64' _ "$NPMWORK/fn.sh" 2>/dev/null
+}
+_npmout=$(_npmres ok)
+[ "$_npmout" = "2.1.7" ] && pass "npm_dist_latest: dist-tag latest resolves (2.1.7)" \
+    || fail "npm_dist_latest: dist-tag latest resolves (got: '$_npmout')"
+_npmout=$(_npmres junk)
+[ -z "$_npmout" ] && pass "npm_dist_latest: unparseable registry output -> empty (fallback premise)" \
+    || fail "npm_dist_latest: unparseable registry output -> empty (got: '$_npmout')"
+_npmout=$(_npmres down)
+[ -z "$_npmout" ] && pass "npm_dist_latest: unreachable registry -> empty (fallback premise)" \
+    || fail "npm_dist_latest: unreachable registry -> empty (got: '$_npmout')"
+rm -rf "$NPMWORK"
+
 # --- both fetch paths route through the shared helper -------------------------
 check "e2e_resolve_cache uses e2e_fetch_opencode" \
     grep_q 'e2e_fetch_opencode "\$OC_VERSION"'

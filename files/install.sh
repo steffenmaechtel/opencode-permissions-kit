@@ -1915,10 +1915,14 @@ do_deploy_phase() {
     done
 
     if [ "$opencode_found" = false ]; then
-        if confirm "opencode not found. Run official installer (curl -fsSL https://opencode.ai/install | bash)?"; then
-            curl -fsSL https://opencode.ai/install | bash
-            # When run via the one-liner (sudo bash), the official installer
-            # installs into /root/.opencode/bin. Locally it lands in the user's home.
+        if confirm "opencode not found. Run official installer (curl -fsSL https://opencode.ai/v2/install | bash)?"; then
+            curl -fsSL https://opencode.ai/v2/install | bash
+            # The v2 installer (issue #197): resolves the current 2.x
+            # through the npm registry and installs into ~/.opencode/bin —
+            # the same layout the v1 installer used, so the pickup paths
+            # below are unchanged. When run via the one-liner (sudo bash),
+            # it installs into /root/.opencode/bin. Locally it lands in
+            # the user's home.
             if [ -x "/root/.opencode/bin/opencode" ]; then
                 sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                 copy_binary_atomic "/root/.opencode/bin/opencode" "$SYSTEM_BIN"
