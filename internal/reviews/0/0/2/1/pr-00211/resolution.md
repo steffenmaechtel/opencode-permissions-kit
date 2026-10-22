@@ -709,6 +709,27 @@ The rc-blind closing-log aggregation over the revert loop's run_q ops
 stays deliberately deferred (recorded since c W1 as its own follow-up
 wave — a completion claim, not a WARN arm; different class).
 
+NB (#211 g W1 — anchors corrected, ISSUE item 4 class): the sites list
+above restated review-f's anchors as measured at `750d4e7`; this wave's
+own +2-line insertion shifted every site below the backup arm. Measured
+at the fix commit `2be6fc3` (= HEAD): gpasswd :440 (above the insertion,
+unshifted), backup :482-483, userdel WARN :517 / log :518, audit WARN
+:654 / log :655. The verdicts (✓ / FIXED here) were correct at every
+ref — only the numbers were stale (the exact error f W3 corrected in
+the e-table one commit earlier). Content anchors ("WARN: could not
+remove user") preferred over line numbers going forward.
+
+NB (#211 g W2 — pattern record completed): the recorded pattern sees
+neither the `ui_warn` emitter class (lowercase — ~50 call sites across
+install.sh, management/, sh/) nor `files/install.sh` nor the `sh/`
+printf arms, so it cannot re-derive the tree-wide result it is cited
+for. The complete pattern set for the class: `grep -rn 'WARN' files/`
+(uppercase — raw WARN arms, note() rows, printf WARNINGs) plus
+`grep -rn 'ui_warn ' files/` (call sites; the def lives in sh/ui.sh; no
+other lowercase emitter exists — verified). Review g enumerated both
+over the whole tree: every arm names its command, operation or exact
+cause — the result stands, now on a reproducible record (RM-0070/0082).
+
 E2e (ISSUE item 6 split): message-only change to a root-run file →
 gated at the release gate, not in-wave; the SHA-anchored 303/47 @
 750d4e7 record above is the comparator the g-round needs.
