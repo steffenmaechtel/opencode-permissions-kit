@@ -446,6 +446,13 @@ if [ -n "$_f16_fn" ]; then
     else
         check "malformed lines warn+skip, allocation correct (rc=${_f16_rc:-0} warns=$_f16_cnt alloc=$_f16_alloc out=$_out)" false
     fi
+    # The warn's enumeration must name EVERY skip cause (#211 e W2):
+    # the value cap (c W9) added a third — an above-u32-max line is
+    # neither non-numeric nor leading-zero, and the fixture drives it.
+    case "$_out" in
+        *"above-u32-max"*) check "malformed warn names all skip causes incl. value cap (#211 e W2)" true ;;
+        *) check "malformed warn names the value-cap cause (out=$_out) (#211 e W2)" false ;;
+    esac
     rm -rf "$F16"
 else
     check "allocate_range extractable (#211 a F16)" false

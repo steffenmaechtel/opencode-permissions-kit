@@ -163,7 +163,10 @@ allocate_range() {
             fi
         done < "$file" 2>/dev/null || true
         if [ "$_bad" -gt 0 ]; then
-            printf '  warn: %s malformed line(s) skipped in %s (non-numeric or leading-zero ranges)\n' \
+            # The enumeration names every skip cause (#211 e W2): the
+            # value cap (#211 c W9) added a third — a 10-digit field
+            # above the u32 max is none of the older two.
+            printf '  warn: %s malformed line(s) skipped in %s (non-numeric, leading-zero, or above-u32-max ranges)\n' \
                 "$_bad" "$file" >&2
         fi
         if [ "$overlap" = false ]; then
