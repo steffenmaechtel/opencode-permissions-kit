@@ -1,0 +1,709 @@
+{
+  "batch": "b1",
+  "snapshots": [
+    {
+      "stem": "0.0.47a",
+      "file": "internal/reviews/0/0/1/5/pr-00156/review-a.md",
+      "date": "2026-10-10",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead (single-session, repo session)",
+      "subject": "OpenChamber hardening three-tier wave (issue #154)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 3, "INFO": 2 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "claim-drift",
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "update re-apply unconditionally overwrites admin-extended /etc/openchamber/policy.json; admin keys silently lost, contradicting docs' never-touched promise",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "bin-wrappers",
+          "provenance": "wave-introduced",
+          "summary": "policy-secured NOTE dangles on settings-pin-only leftover; stale pin never named, advice not actionable",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "claim-drift",
+          "area": "multiple",
+          "provenance": "wave-introduced",
+          "summary": "status/opk detection lacks wrapper's kit-symlink exemption: false red BYPASSED; openchamber-secure offers rm of kit-owned symlink",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "BYPASSED verdict fires with OpenChamber not installed; verdict overstates, advice writes policy for absent app",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "Q1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "bin-opk",
+          "provenance": null,
+          "summary": "fallback ui_confirm accepts only exact-case answers; no divergence on sole default-y call site",
+          "cross_refs": ["0.0.44a V17"],
+          "status": "reported"
+        },
+        {
+          "id": "Q2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "hardcoded-env",
+          "secondary_class": null,
+          "area": "install.sh",
+          "provenance": "wave-introduced",
+          "summary": "install-time openchamber probe runs under installer's root PATH; dev-local npm installs invisible (best-effort prompt gating)",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "gates re-run by review: e2e 284/284, rootless 47/47, zero skips",
+        "F1 verified empirically on a scratch copy under /tmp",
+        "_oc_prev decision matrix walked through all eight combinations; e2e-ddev not re-run (no ddev-path delta)"
+      ]
+    },
+    {
+      "stem": "0.0.47b",
+      "file": "internal/reviews/0/0/1/5/pr-00156/review-b.md",
+      "date": "2026-10-11",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead (single-session, repo session)",
+      "subject": "0.0.47a fix wave + parallel-e2e and AGENTS riders",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 4, "INFO": 3 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "claim-drift",
+          "area": "docs",
+          "provenance": "pre-existing",
+          "summary": "'or already present' survives in design record §7A; resolution F1 row overclaims 'gone from the record'",
+          "cross_refs": ["0.0.47a F1", "L2", "L3"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "hardcoded-env",
+          "area": "management",
+          "provenance": "pre-existing",
+          "summary": "status.sh OpenChamber block left on hardcoded /home resolution — unswept sibling of the wave's getent riding fix",
+          "cross_refs": ["0.0.43b W1", "0.0.43a F12"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-e2e",
+          "provenance": "wave-introduced",
+          "summary": "install twin of F1 admin-content gate statically pinned only; gate inversion fails no test, no functional stage",
+          "cross_refs": ["0.0.47a F1", "L4"],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": null,
+          "area": "bin-opk",
+          "provenance": "wave-introduced",
+          "summary": "new getent || true home resolution unpinned; loud leftover-scan-skipped failure path never asserted",
+          "cross_refs": ["L1"],
+          "status": "reported"
+        },
+        {
+          "id": "W5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "gate existence probe runs unprivileged while write escalates via sudo; 0700 /etc/openchamber lets overwrite bypass the gate",
+          "cross_refs": ["0.0.47a F1"],
+          "status": "reported"
+        },
+        {
+          "id": "W6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": "wave-introduced",
+          "summary": "cosmetics: 'inert too' dangles on pin-only state; getent-skip exit omits restart hint every other path prints",
+          "cross_refs": ["0.0.47a F2"],
+          "status": "reported"
+        },
+        {
+          "id": "R1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "other",
+          "provenance": "wave-introduced",
+          "summary": "rider commit message names workspace-AGENTS contents the unversioned file no longer carries; unverifiable in git",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "5 of 6 resolution sabotage claims reproduced with exact FAIL counts; substring-rename methodology note recorded",
+        "first parallel e2e run under the rider's new default (290/0 and 47/0)",
+        "lead rulings: security trap-cleanup LOW folded into W2; quality MEDs downgraded into W4/W5/W6; security LOW #5 kept INFO as W10; lead's own set-- suspicion retracted empirically (no finding)"
+      ]
+    },
+    {
+      "stem": "0.0.47c",
+      "file": "internal/reviews/0/0/1/5/pr-00156/review-c.md",
+      "date": "2026-10-11",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead (single-session, repo session)",
+      "subject": "0.0.47b fix wave (W1-W4, W6)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 1 },
+      "findings": [
+        {
+          "id": "C1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": "test-gap",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "W2's fix statically pinned only: additive inversion stays green (proven by probe); fallback path never executes under test",
+          "cross_refs": ["0.0.47b W2", "0.0.47b W3", "0.0.46a F2", "L4", "L1"],
+          "status": "reported"
+        },
+        {
+          "id": "C2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "test-gap",
+          "area": "bin-opk",
+          "provenance": "wave-introduced",
+          "summary": "resolution W6 row claims 'every completing path ends with restart hint' — confirm-decline path lacks it; no pin anywhere",
+          "cross_refs": ["0.0.47b W6", "0.0.47b W1", "L3"],
+          "status": "reported"
+        },
+        {
+          "id": "C3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-e2e",
+          "provenance": "wave-introduced",
+          "summary": "install-twin skip-announce grep matches four other 'left untouched' sites; discrimination state-empirical, survival check load-bearing",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "inversion probe beyond the resolution's sabotages: planted third _oc_home= override leaves suite green (C1 evidence)",
+        "all three sabotage tallies reproduced exactly (1 / 1 / 3+1)",
+        "both e2e suites pinned E2E_OC_VERSION=1.18.35 (version endpoint unavailable from review box)"
+      ]
+    },
+    {
+      "stem": "0.0.48a",
+      "file": "internal/reviews/0/0/1/6/pr-00160/review-a.md",
+      "date": "2026-10-11",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead (/review prompt, repo session)",
+      "subject": "opk ensure-shared short-form heal command (issue #159)",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 4 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "bin-opk",
+          "provenance": "wave-introduced",
+          "summary": "failed-hop hint 'the direct long form still works' overclaims; false whenever sudo itself is missing or denied",
+          "cross_refs": ["L3"],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "bin-opk",
+          "provenance": "wave-introduced",
+          "summary": "success line 'group-write re-asserted' unconditional; helper's no-op paths (all chmod EPERM swallowed by || true) still print it",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "deploy-shape",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "pre-existing",
+          "summary": "old printed fix line interpolated checkout $LIBDIR (not sudoers-covered) into sudo command; short form closes the gap",
+          "cross_refs": ["0.0.46a F4", "0.0.46b W5"],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "race-toctou",
+          "secondary_class": null,
+          "area": "bin-opk",
+          "provenance": "wave-introduced",
+          "summary": "new [ -d ] operand accepts symlinked/trailing-slash dirs (V2 class); audited benign — agent-user executor, chmod-only",
+          "cross_refs": ["V2"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "three sabotage runs reproduced exact FAIL counts (1/3/2), all direct",
+        "every commit-message claim audited true against the code",
+        "wave brought 20 new checks; e2e-ddev not run (no ddev-path delta)"
+      ]
+    },
+    {
+      "stem": "0.0.48b",
+      "file": "internal/reviews/0/0/1/6/pr-00160/review-b.md",
+      "date": "2026-10-11",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead + 2 GLM-5.3-Flash subagents (security+quality)",
+      "subject": "status verdict summary, --short mode, exit codes (issue #158)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 2, "LOW": 5, "INFO": 4 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "wiring-gate",
+          "secondary_class": "shell-semantics",
+          "area": "tests-e2e",
+          "provenance": "wave-introduced",
+          "summary": "full-mode exit codes break DD13 checks' &&-grep chaining (e2e-ddev 84/86); wave shipped without the owed ddev gate",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "test-gap",
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "mktemp||/dev/null fallback: root runs rm -f /dev/null; scans silently no-op -> false 'All green'/exit 0; failure path unpinned",
+          "cross_refs": ["L1", "#94", "#149"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "cron example 'one line when green' unattainable; permanent warn rows keep --short at exit 2 -> alert fatigue",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": "test-gap",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "central --short/exit mechanisms unpinned: hit-list guard and UI_SILENT restore deletable with suite green; no installed-rc pin",
+          "cross_refs": ["0.0.44d F4"],
+          "status": "downgraded"
+        },
+        {
+          "id": "W5",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "cli.md output-order sentence inverted: docs say verdict then hints; code prints management block first, verdict last",
+          "cross_refs": [],
+          "status": "downgraded"
+        },
+        {
+          "id": "W6",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": "wave-introduced",
+          "summary": "'UI_SILENT=1 mutes every print helper' false — prompts correctly unmuted; conventions rule repeats the overclaim, no pin",
+          "cross_refs": [],
+          "status": "downgraded"
+        },
+        {
+          "id": "W7",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "git-check.sh header still describes deployed-first lib resolution; wave flipped status.sh to checkout-first",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W8",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "behavior change: full-mode opk status now exits 1/2 on findings (was 0); set -e wrappers newly abort",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W9",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "pre-existing",
+          "summary": "ui.sh-missing hard-exit 1 now reads as 'alerts' — broken library state indistinguishable from real alert in cron pattern",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W10",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "deploy-shape",
+          "secondary_class": "silent-failure",
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "stale deployed ui.sh + new status.sh: ui_kv_ok/bad undefined -> rows lost, false 'All green'/rc 0",
+          "cross_refs": [],
+          "status": "downgraded"
+        },
+        {
+          "id": "W11",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "other",
+          "provenance": "wave-introduced",
+          "summary": "commit message says '62-site sweep', 63 colored sites existed; ui_detail inline-guard style drifts from file style",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "live probes on kit-managed host: full mode rc 1, --short exactly one line",
+        "sabotages 3+4 non-discriminating (W4 evidence); W2 mechanism mini-reproduced, TMPDIR cannot ride sudo",
+        "downgrades are lead rulings over sub-agent severities within the snapshot: quality MEDs #2/#3 to LOW (W5/W6), MED #4 merged into W4, security LOW #5 kept INFO (W10); lead's set-- retraction disproven empirically (no finding)"
+      ]
+    },
+    {
+      "stem": "0.0.48c",
+      "file": "internal/reviews/0/0/1/6/pr-00160/review-c.md",
+      "date": "2026-10-11",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 lead + 2 GLM-5.3-Flash subagents (same session)",
+      "subject": "0.0.48b fix waves (W1-W7) micro review",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 2, "INFO": 4 },
+      "findings": [
+        {
+          "id": "C1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "fix-regression",
+          "secondary_class": "silent-failure",
+          "area": "management",
+          "provenance": "fix-induced",
+          "summary": "W3 conversion makes missing/unexecutable managed binary invisible to verdict: dead advisory check reports 'All green'/exit 0 even under sudo",
+          "cross_refs": ["0.0.48b W3"],
+          "status": "reported"
+        },
+        {
+          "id": "C2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-e2e",
+          "provenance": "fix-induced",
+          "summary": "healed-side DD13 check passes vacuously when log missing/empty — negated grep over absent evidence",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "C3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "resolution W3 row says 'five privilege-unknown rows' but enumerates four (+1 optional); immutable commit message carries miscount",
+          "cross_refs": ["0.0.48b W3"],
+          "status": "reported"
+        },
+        {
+          "id": "C4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "resolution W2 row's 'a control run' misreadable as per-site; control exists for share site only",
+          "cross_refs": ["0.0.48b W2"],
+          "status": "reported"
+        },
+        {
+          "id": "C5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "resolution W4 row 'presets UI_SILENT exactly like the arg parser' overstates; harness sets 0, production leaves unset",
+          "cross_refs": ["0.0.48b W4"],
+          "status": "reported"
+        },
+        {
+          "id": "C6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "resolution W3 row's named 'real states' are examples, not the census; should cite the L2 sweep",
+          "cross_refs": ["0.0.48b W3"],
+          "status": "reported"
+        },
+        {
+          "id": "C7",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "class-sweep pin var-name-scoped; a future differently-named mktemp||/dev/null fallback elsewhere would pass it",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "provenance deviation recorded: subagents ran in the same session (maintainer-directed); quality agent read-only, delivered in-band",
+        "security agent's socket-twin concern retracted to verified-clean (documented contract)",
+        "C1 traced statically; gates run by lead on fix tips (298/298, 47/47, 86/86)"
+      ]
+    },
+    {
+      "stem": "0.0.48d",
+      "file": "internal/reviews/0/0/1/6/pr-00160/review-d.md",
+      "date": "2026-10-11",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 lead + 2 GLM-5.3-Flash subagents (fresh session)",
+      "subject": "0.0.48c fix wave (C1/C2) micro review",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 3, "INFO": 2 },
+      "findings": [
+        {
+          "id": "D1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "test-gap",
+          "area": "multiple",
+          "provenance": "fix-induced",
+          "summary": "C1's prescribed split half-implemented: stale uncounted 'unknown — probe failed' row still prints for missing binary; three claims contradict; unpinned",
+          "cross_refs": ["0.0.48c C1", "0.0.44e E1", "0.0.46b W1", "0.0.42f", "0.0.47c C1", "0.0.47c C2"],
+          "status": "downgraded"
+        },
+        {
+          "id": "D2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "sabotage ledger says 'unit 10x'; the rows record 9 runs (same convention as pre-wave's 7)",
+          "cross_refs": ["0.0.48c C3"],
+          "status": "reported"
+        },
+        {
+          "id": "D3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "claim-drift",
+          "area": "management",
+          "provenance": "pre-existing",
+          "summary": "present-but-corrupt binary (non-atomic update cp) renders only uncounted unknown row -> 'All green'/exit 0 over dead wrapper",
+          "cross_refs": ["0.0.48b W3", "0.0.48b W8", "L3"],
+          "status": "reported"
+        },
+        {
+          "id": "D4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "pre-existing",
+          "summary": "advisories section behind [ -f advisories.sh ] guard; missing lib silently drops the section, no counted row",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "D5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "sudo(){ shift 3; } stub coupled to production arg shape; acceptable — drift fails loudly; class-map record",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "fresh-session pass; empirical simulations of gate+render double row on scratch fixtures",
+        "first parallel ddev run hit an environment flake (DD13 skip); 86/86 corroborated by solo re-run",
+        "downgrade is a lead ruling with corpus-precedent trace (quality axis MED -> LOW, D1); security axis S3/S4 folded into verified-clean/D5"
+      ]
+    },
+    {
+      "stem": "0.0.48e",
+      "file": "internal/reviews/0/0/1/6/pr-00160/review-e.md",
+      "date": "2026-10-11",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 lead + 2 GLM-5.3-Flash subagents (fresh session)",
+      "subject": "0.0.48d disposition rider (D1) micro review",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 3 },
+      "findings": [
+        {
+          "id": "E1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "process",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "wave-introduced",
+          "summary": "'Chain CLOSED — PR-ready' committed before the -d-recommended rider micro check had any record; rule-conformant, this pass supplies it",
+          "cross_refs": ["0.0.47b"],
+          "status": "downgraded"
+        },
+        {
+          "id": "E2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "race-toctou",
+          "secondary_class": null,
+          "area": "management",
+          "provenance": "wave-introduced",
+          "summary": "binary removed between gate and render [ -x ] checks loses the unknown row; root-only reachable, uncounted",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "E3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "perm-model",
+          "secondary_class": "claim-drift",
+          "area": "management",
+          "provenance": "pre-existing",
+          "summary": "C1 warn's [ -x ] is caller-relative: callers outside root/opencode get counted 'fix: sudo opk update' warn over healthy kit",
+          "cross_refs": ["0.0.48c C1"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "fresh-session rider micro check the -d pass recommended; rider committed mid-review by maintainer, claims audited against committed bytes",
+        "both rider sabotages reproduced exactly (2/1); all rider gate claims re-run and matched",
+        "downgrade is a lead ruling with trace (quality axis LOW -> INFO, E1)"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "0.0.47",
+      "file": "internal/reviews/0/0/1/5/pr-00156/resolution.md",
+      "dispositions": { "implemented": 11, "implemented_differently": 0, "not_done": 5 },
+      "follow_ups_recorded": 0,
+      "notes": "Three fix waves (91ff7bc, bdfdb89, a9e606b) close the a-b-c chain. Not-done: Q1/Q2 class-map INFO; W5 gate asymmetry, R1 commit-message claim, C3 grep ambiguity record-only. Riding getent fix per rule 5."
+    },
+    {
+      "stem": "0.0.48",
+      "file": "internal/reviews/0/0/1/6/pr-00160/resolution.md",
+      "dispositions": { "implemented": 16, "implemented_differently": 0, "not_done": 14 },
+      "follow_ups_recorded": 1,
+      "notes": "Grew in parallel on two branches; rows unioned at merge. E2 tracked as issue #167 (closed wontfix). D3 corrupt-binary residual recorded with future fix shape; W8-W11 and D4/D5 record-only; chains a and b-e closed."
+    }
+  ]
+}

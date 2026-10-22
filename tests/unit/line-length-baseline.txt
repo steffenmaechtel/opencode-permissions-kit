@@ -2,8 +2,7 @@ CONTRIBUTING.md 72 3
 README.md 197 5
 agent/README.md 41 3
 agent/conventions.md 49 2
-agent/learnings.md 19 1
-agent/review-concept.md 441 6
+agent/review-concept.md 397 5
 agent/test-fidelity.md 181 6
 docs/how-to/update.md 139 2
 internal/README.md 11 2

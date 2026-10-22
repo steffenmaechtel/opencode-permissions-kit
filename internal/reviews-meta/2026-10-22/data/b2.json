@@ -1,0 +1,309 @@
+{
+  "batch": "b2",
+  "snapshots": [
+    {
+      "stem": "0.0.49a",
+      "file": "internal/reviews/0/0/1/7/pr-00171/review-a.md",
+      "date": "2026-10-12",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 lead, no subagents",
+      "subject": "Wave review: issue #163 corrupt-binary detection + atomic deploys branch",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 1, "INFO": 4 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Corrupt-binary warn advises sudo opk update, which cannot repair the binary — dead-end advice on the repair-naming row.",
+          "cross_refs": ["0.0.48c C1", "#163", "L3", "L2"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "deploy-shape",
+          "area": "sh-lib",
+          "provenance": "pre-existing",
+          "summary": "lib_deploy still in-place-cps every shipped script — same interrupted-write corruption class the wave fixes for the binary.",
+          "cross_refs": ["L2"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "perm-model",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "wave-introduced",
+          "summary": "Transient mode window after mv: temp lands source's mode until secure_binary chmods; recorded behavior change, no action.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "wave-introduced",
+          "summary": "Probe timeout rc 124 classified 'present but broken'; message overstates a timeout; matches house probe precedent.",
+          "cross_refs": ["#163"],
+          "status": "reported"
+        },
+        {
+          "id": "W5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "deploy-shape",
+          "area": "tests-e2e",
+          "provenance": "wave-introduced",
+          "summary": "e2e 12l restore leg reuses the plain in-place sudo cp the wave removes from shipped code; killed restore poisons later sections.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Count pin '>=4' also matches the command -v wiring line; one reverted call site still passes in isolation.",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Stop rule not met — W1 fix wave owed before PR",
+        "E2e 301/301 + rootless 47/47 corroborated from same-day logs, not re-run; e2e-ddev not owed",
+        "Single lead pass; findings verified against full-file reads and live gate re-runs"
+      ]
+    },
+    {
+      "stem": "0.0.49b",
+      "file": "internal/reviews/0/0/1/7/pr-00171/review-b.md",
+      "date": "2026-10-12",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 lead, no subagents",
+      "subject": "Micro review: 0.0.49a fix waves (W1 advice rows, W2/W5/W6 atomic lib deploys)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 3 },
+      "findings": [
+        {
+          "id": "C1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "sibling-sweep",
+          "secondary_class": "deploy-shape",
+          "area": "multiple",
+          "provenance": "pre-existing",
+          "summary": "Umask profile still deploys in-place onto /etc/profile.d/ (sourced at every login); falsifies resolution W5 'anywhere in repo code' claim.",
+          "cross_refs": ["0.0.49a W2", "W5", "#163"],
+          "status": "reported"
+        },
+        {
+          "id": "C2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "Comment claims next run's cp overwrites a stale pid-suffixed temp — false; stale temps never cleaned (inert litter).",
+          "cross_refs": ["L3"],
+          "status": "reported"
+        },
+        {
+          "id": "C3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "Resolution W1 row and README index cite staying advice rows at pre-fix line numbers; pointers stale when written.",
+          "cross_refs": ["W1"],
+          "status": "reported"
+        },
+        {
+          "id": "C4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "sh-lib",
+          "provenance": "fix-induced",
+          "summary": "Behavior change: '-' manifest entries (jsonc templates) land umask-natural mode on redeploy; contract-conforming, recorded.",
+          "cross_refs": ["W2"],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Stop rule conditional on C1 disposition; C1 got a code fix, so a 0.0.49c micro pass was owed",
+        "All stem-a sabotages independently re-derived on a scratch clone with exact recorded counts",
+        "All 34 unit suites green; e2e 301/301 + 47/47 corroborated from same-day logs on both fix tips"
+      ]
+    },
+    {
+      "stem": "0.0.49c",
+      "file": "internal/reviews/0/0/1/7/pr-00171/review-c.md",
+      "date": "2026-10-12",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 lead, no subagents",
+      "subject": "Micro review: 0.0.49b fix wave (C1 atomic umask deploys + C2 comment rider)",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 3 },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "fix-induced",
+          "summary": "Resolution C1 row and commit message falsely claim the old shape logged over a failed cp; set -eu aborted first.",
+          "cross_refs": ["C1", "L3"],
+          "status": "reported"
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "multiple",
+          "provenance": "fix-induced",
+          "summary": "Deployed mode 644 pinned nowhere: a 644-to-600 mutation at both call sites stays green in every suite including e2e.",
+          "cross_refs": ["0.0.45a C1"],
+          "status": "reported"
+        },
+        {
+          "id": "F3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "No count pin on copy_file_atomic call sites; a decoy third site (mode 600) passes green.",
+          "cross_refs": ["0.0.49a W6"],
+          "status": "reported"
+        },
+        {
+          "id": "F4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": "hardcoded-env",
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Section 6 mode discrimination collapses under invoking umask 027/007; pins stay green but stop discriminating.",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Stop rule conditional on F2 disposition; F2 got a code fix, so a 0.0.49d micro pass was owed",
+        "Two derived probes beyond the recorded sabotage set (mode 644-to-600, decoy call site)",
+        "All five stem-b sabotages reproduced with exact counts 2/1/2/2/4"
+      ]
+    },
+    {
+      "stem": "0.0.49d",
+      "file": "internal/reviews/0/0/1/7/pr-00171/review-d.md",
+      "date": "2026-10-13",
+      "scope": "micro",
+      "reviewer": "GLM-5.3 lead, no subagents",
+      "subject": "Micro review: 0.0.49c fix wave (F2/F3/F4 test pins) — zero findings",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 0 },
+      "findings": [],
+      "process_notes": [
+        "Zero findings — stop rule met, the 0.0.49 a-to-d chain converges",
+        "E2e not owed (test-only wave); same-day e2e pair predates the wave — recorded, not cited",
+        "Recorded session follow-up (5678cf7 test-docs rule-2 red) verified with its exact FAIL line"
+      ]
+    },
+    {
+      "stem": "pr-00179a",
+      "file": "internal/reviews/0/0/1/7/pr-00179/review-a.md",
+      "date": "2026-10-14",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 external /review session, single lead pass",
+      "subject": "Issue #173 docs reflow + line-length baseline burn-down",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 2 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "install.sh one-liners wrapped but six update.sh streaming one-liners left overlong — inconsistent treatment, no behavior impact.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "Three reworded table cells lost specificity; each nuance recovers from surrounding prose on the same page.",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "'(notes)' cell pointer wording inconsistent; some targets are unlabeled prose paragraphs.",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Docs-only wave; e2e not owed",
+        "Baseline integrity recomputed by hand; normalized token-diff fidelity sweep against master",
+        "Stop rule met — loop closes with this snapshot (docs/bookkeeping are not review-relevant code)"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "0.0.49",
+      "file": "internal/reviews/0/0/1/7/pr-00171/resolution.md",
+      "dispositions": { "implemented": 11, "implemented_differently": 0, "not_done": 3 },
+      "follow_ups_recorded": 1,
+      "notes": "W3/W4/C4 deliberately not done (accepted behavior changes, house precedent). W5 row's 'anywhere in repo code' corrected per 0.0.49b C1. Session follow-up: snapshot commit briefly red on test-docs rule 2, repaired. Chain a-d closed, PR-ready."
+    },
+    {
+      "stem": "pr-00179",
+      "file": "internal/reviews/0/0/1/7/pr-00179/resolution.md",
+      "dispositions": { "implemented": 0, "implemented_differently": 0, "not_done": 3 },
+      "follow_ups_recorded": 0,
+      "notes": "All three findings deliberately not done: update.sh URLs unbreakable under 120 (documented baseline remainder); nuances recoverable in same-page prose; W3 labeling convention recorded for a future docs wave."
+    }
+  ]
+}

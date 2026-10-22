@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Aggregate the 9 extraction batches into stats for the review-of-reviews.
+"""Aggregate the extraction batches into stats for the review-of-reviews.
 
 Usage: python3 scripts/reviews-meta-aggregate.py <data-dir>
 (<data-dir> = the run folder that holds b*.json, e.g.
-internal/reviews-meta/2026-10-10/data). Writes <data-dir>/stats.json.
+internal/reviews-meta/2026-10-22/data). Writes <data-dir>/stats.json.
 Stdlib only.
+
+Stem eras: legacy version stems (0.0.47b) group by version (0.0.47);
+PR-keyed stems (pr-00211g) group by case (pr-00211). Version groups
+sort before PR groups, PR groups by number — both follow corpus
+chronology. Regenerating the 2026-10-10 data must reproduce its frozen
+stats.json byte-for-byte (compat pin).
 """
 import json, glob, re, sys
 from collections import Counter, defaultdict
@@ -18,10 +24,17 @@ for f in RAW:
     resolutions.extend(d.get('resolutions', []))
 
 def stem_key(stem):
+    # PR-keyed era: pr-00211g -> (1, 211, 0, 0, ord('g'))
+    m = re.match(r'pr-(\d+)([a-z]?)', stem)
+    if m:
+        return (1, int(m.group(1)), 0, 0, ord(m.group(2)) if m.group(2) else 0)
+    # Legacy version era: 0.0.47b -> (0, 0, 0, 47, ord('b'))
     m = re.match(r'(\d+)\.(\d+)\.(\d+)([a-z]?)', stem)
-    return tuple(int(x) for x in m.groups()[:3]) + (ord(m.group(4)) if m.group(4) else 0,)
+    return (0,) + tuple(int(x) for x in m.groups()[:3]) + (ord(m.group(4)) if m.group(4) else 0,)
 
 def vgroup(stem):
+    m = re.match(r'pr-(\d+)', stem)
+    if m: return 'pr-' + m.group(1)
     return re.match(r'\d+\.\d+\.\d+', stem).group(0)
 
 def sev_norm(s):
@@ -103,7 +116,7 @@ out['areas'] = dict(Counter(str(f.get('area')) for f in reported).most_common(20
 edges, issue_refs = [], Counter()
 for f in reported:
     for r in f.get('cross_refs') or []:
-        m = re.search(r'0\.0\.\d+', r)
+        m = re.search(r'0\.0\.\d+|pr-\d{1,5}', r)
         if m: edges.append({'from': f['_stem'] + ' ' + f['id'], 'from_group': vgroup(f['_stem']), 'to_group': m.group(0), 'ref': r})
         elif r.startswith('#'): issue_refs[r] += 1
 out['crossref_edges'] = edges

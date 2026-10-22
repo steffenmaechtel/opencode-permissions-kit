@@ -16,3 +16,4 @@ learnings distilled into [agent/learnings.md](../../agent/learnings.md).
 | Run | Corpus |
 |---|---|
 | [2026-10-10/](2026-10-10/) | snapshots + resolutions 0.0.38–0.0.46: 54 snapshots, 9 resolutions, 620 finding rows |
+| [2026-10-22/](2026-10-22/) | 0.0.47–0.0.49 + PR-keyed pr-00179–pr-00222: 49 snapshots, 15 resolutions, 325 rows |

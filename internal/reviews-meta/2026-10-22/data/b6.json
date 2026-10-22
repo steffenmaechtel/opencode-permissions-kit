@@ -1,0 +1,315 @@
+{
+  "batch": "b6",
+  "snapshots": [
+    {
+      "stem": "pr-00208a",
+      "file": "internal/reviews/0/0/2/0/pr-00208/review-a.md",
+      "date": "2026-10-20",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main agent (house session, no subagents)",
+      "subject": "issue-205 git-config status/apply wording feature wave",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 0 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "test-gap",
+          "area": "multiple",
+          "provenance": "wave-introduced",
+          "summary": "ON phrase punctuation differs from status.sh; the wave's same-wording claim (PR, comment, docs) fails",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "docs-policy",
+          "secondary_class": null,
+          "area": "docs",
+          "provenance": "wave-introduced",
+          "summary": "How-to documents the status output but omits the markers-present third shape and its detail suffix",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Wording-only wave, no sabotage needed; suite green 34/34; GO, with W1's string-alignment fix owing snapshot b"
+      ]
+    },
+    {
+      "stem": "pr-00208b",
+      "file": "internal/reviews/0/0/2/0/pr-00208/review-b.md",
+      "date": "2026-10-20",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main agent + 2 glm-5.3-flash axes",
+      "subject": "Micro-wave of a-wave fixes: phrase alignment, agreement pin, docs third shape",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 1, "LOW": 1, "INFO": 1 },
+      "findings": [
+        {
+          "id": "b W1",
+          "severity": "MED",
+          "severity_inferred": false,
+          "class": "wiring-gate",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "delta-introduced",
+          "summary": "Resolution dispositions rows exceed the 120-column ratchet; line-length test red at committed HEAD",
+          "cross_refs": ["L6", "L4"],
+          "status": "reported"
+        },
+        {
+          "id": "b W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "pre-existing",
+          "summary": "Ratchet header comment names only the shell/workflow scope half; markdown half unmentioned, enabling misread",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "b W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "ux-output",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "delta-introduced",
+          "summary": "Markers-present hint renders only in opk config git-config status, not in top-level opk status",
+          "cross_refs": [],
+          "status": "reported"
+        },
+        {
+          "id": "R1",
+          "severity": "INFO",
+          "severity_inferred": true,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": null,
+          "summary": "Alleged README overstates ratchet scope (internal/ uncovered); retracted after running the test",
+          "cross_refs": [],
+          "status": "retracted"
+        }
+      ],
+      "process_notes": [
+        "Sabotage both directions independently reproduced; suite red at HEAD caused by the chain's own resolution rows",
+        "Maintainer first waived the reviewer fan-out, then left the started pair running; retracted ghost labeled R1 here (unlabeled in file)"
+      ]
+    },
+    {
+      "stem": "pr-00208c",
+      "file": "internal/reviews/0/0/2/0/pr-00208/review-c.md",
+      "date": "2026-10-20",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main agent + glm-5.3-flash axis (same session)",
+      "subject": "Micro-wave: b W3 alignment, opk status shows the markers hint",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 0, "INFO": 0 },
+      "findings": [],
+      "process_notes": [
+        "Zero findings; maintainer reopened b W3 post-closure and ordered same-session snapshot c (rotation deviation recorded); sabotage both directions green"
+      ]
+    },
+    {
+      "stem": "pr-00209a",
+      "file": "internal/reviews/0/0/2/0/pr-00209/review-a.md",
+      "date": "2026-10-20",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main agent (external /review session, no subagents)",
+      "subject": "issue-201: status.sh direct --version capture ends sudo-advice dead end",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 1, "INFO": 1 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "test-vacuous",
+          "secondary_class": "claim-drift",
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Bridge pin claims 1.18.33+ unneeded but never asserts the 1.x eq boundary; mutations stay green",
+          "cross_refs": ["L4"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "Typo strenghtens in the new test comment (test-status.sh:1361)",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Three sabotage mutations run, one survived (became W1); full unit suite, lint and check-version green"
+      ]
+    },
+    {
+      "stem": "pr-00209b",
+      "file": "internal/reviews/0/0/2/0/pr-00209/review-b.md",
+      "date": "2026-10-20",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main agent + 2 GLM-5.3-Flash subagents",
+      "subject": "Micro-wave of a-wave fix: bridge pin boundary assertions",
+      "stop_rule": "not_met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 1 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": "test-vacuous",
+          "area": "tests-unit",
+          "provenance": "fix-induced",
+          "summary": "Fix comment overclaims 'discriminates every shape'; 2.x above-boundary unasserted, comparator mutation survives suite",
+          "cross_refs": ["pr-00209 a W1"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "test-gap",
+          "secondary_class": "silent-failure",
+          "area": "status.sh",
+          "provenance": "pre-existing",
+          "summary": "Comparator-availability guard unpinned; removal stays green; broken kit could yield a false not-needed row",
+          "cross_refs": ["#165"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "delta-introduced",
+          "summary": "Resolution class-sweep record under-enumerates sites; comparator citation covers only half the gate block",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Two flash subagent axes (B1/B2); 25 enumerated mutations, one survives; one B2 sub-claim retracted with evidence"
+      ]
+    },
+    {
+      "stem": "pr-00209c",
+      "file": "internal/reviews/0/0/2/0/pr-00209/review-c.md",
+      "date": "2026-10-20",
+      "scope": "wave",
+      "reviewer": "GLM-5.3 main agent + 2 GLM-5.3-Flash subagents",
+      "subject": "Micro-wave of b-wave fix: shape-gap assertion plus guard fail-safe pin",
+      "stop_rule": "met",
+      "stated_counts": { "HIGH": 0, "MED": 0, "LOW": 2, "INFO": 4 },
+      "findings": [
+        {
+          "id": "W1",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "delta-introduced",
+          "summary": "Sweep record says eval'd extracts carry no command -v; the adv and capture extracts do",
+          "cross_refs": ["pr-00209 b W3"],
+          "status": "reported"
+        },
+        {
+          "id": "W2",
+          "severity": "LOW",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "delta-introduced",
+          "summary": "Resolution records wrong wrapper mechanism (unconditional sourcing); actual [ -f ] guard keeps carrier safe",
+          "cross_refs": ["pr-00209 b W2"],
+          "status": "reported"
+        },
+        {
+          "id": "W3",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "silent-failure",
+          "secondary_class": "shell-semantics",
+          "area": "bin-wrappers",
+          "provenance": "pre-existing",
+          "summary": "Exported ADV_VERSION with missing advisories.sh suppresses bridge warning via empty substitution; unsafe side",
+          "cross_refs": ["pr-00209 b W2"],
+          "status": "reported"
+        },
+        {
+          "id": "W4",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "claim-drift",
+          "secondary_class": null,
+          "area": "internal",
+          "provenance": "delta-introduced",
+          "summary": "Wiring-pin citations overshoot by one line each; correct ranges are 116-117 and 138-139",
+          "cross_refs": ["pr-00209 b W3"],
+          "status": "reported"
+        },
+        {
+          "id": "W5",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "tests-unit",
+          "provenance": "wave-introduced",
+          "summary": "unset -f in nocmp pin is a deliberate defensive no-op; empty PATH is the operative mechanism",
+          "cross_refs": ["0.0.46a F2"],
+          "status": "reported"
+        },
+        {
+          "id": "W6",
+          "severity": "INFO",
+          "severity_inferred": false,
+          "class": "other",
+          "secondary_class": null,
+          "area": "status.sh",
+          "provenance": "pre-existing",
+          "summary": "Future opencode 3.x falls through the bridge case arms; carrier verdict kept, safe side",
+          "cross_refs": [],
+          "status": "reported"
+        }
+      ],
+      "process_notes": [
+        "Two flash subagent axes (C1/C2); one C2 sub-claim retracted (fail-safe direction wrong, preserved as W3); full make test rc=0"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "stem": "pr-00208",
+      "file": "internal/reviews/0/0/2/0/pr-00208/resolution.md",
+      "dispositions": { "implemented": 5, "implemented_differently": 0, "not_done": 0 },
+      "follow_ups_recorded": 0,
+      "notes": "All five findings implemented; b W3 initially not done, maintainer reopened post-closure, then aligned (snapshot c zero findings). Stop rule met twice; release gate: both e2e suites at baseline."
+    },
+    {
+      "stem": "pr-00209",
+      "file": "internal/reviews/0/0/2/0/pr-00209/resolution.md",
+      "dispositions": { "implemented": 8, "implemented_differently": 0, "not_done": 3 },
+      "follow_ups_recorded": 2,
+      "notes": "Eleven findings: eight implemented, three deliberately not done (contrived edge, deliberate hardening, owed only when opencode 3.x ships). Resolution record inaccuracies amended in-chain; closed."
+    }
+  ]
+}

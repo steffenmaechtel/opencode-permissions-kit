@@ -176,9 +176,10 @@ way). Exceptions, in order of precedence:
 ## Review learnings (recurring error classes)
 
 [agent/learnings.md](agent/learnings.md) is authoritative. The corpus
-finding (meta-analysis 0.0.38–0.0.46): every new feature is a new
-instance of a known error class — the checklist applies to features,
-not only fix waves (running it is a Rules bullet above). Memory aid:
+finding (meta-analyses 0.0.38–0.0.46 and 0.0.47–0.0.55): every new feature
+is a new instance of a known error class — the checklist applies to
+features, not only fix waves (running it is a Rules bullet above). Memory
+aid:
 
 - **Class sweep** — a class fix counts only after all same-shape sibling
   sites are swept; record the grep pattern and sites checked.
