@@ -5,7 +5,7 @@ invoke it, and whether they work on a machine where the kit owns the
 `opencode` command. The kit supports both majors; CI exercises them
 continuously against the **current** releases at run time (the
 e2e-2x-* jobs resolve opencode 2.x from the npm dist-tag `latest`; the
-e2e-1x lanes resolve GitHub releases/latest, plus a weekly scheduled
+e2e-1x lanes resolve GitHub releases/latest, plus a daily scheduled
 burn-in on `master`) — so the
 matrix tracks the latest versions without a manual stamp. Last manual
 verification: Sep 2026, opencode 1.18.31 / 2.0.6 (internals:

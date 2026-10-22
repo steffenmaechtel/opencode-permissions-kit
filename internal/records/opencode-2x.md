@@ -183,7 +183,11 @@ dimension (issue #118) dissolved from a matrix into the explicit
 no longer collapse the legs). Convention: no git suffix = git-distro.
 `test-unit.yml`'s job is `unit`, `advisory-watch.yml`'s is
 `advisory-watch`. Resolutions, gates, tokens, and cache keys are
-unchanged — this was naming and job structure only.
+unchanged — this was naming and job structure only. The schedule
+cadence flipped the same day too: all three test workflows run
+**daily** now (05:07 / 05:17 / 05:27 UTC, verdict chain kept; issue
+#78's weekly cadence until then) — upstream drift on a quiet master
+is now bounded to one day, not seven.
 
 ### Build recipe (local, containerized)
 

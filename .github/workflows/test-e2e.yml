@@ -7,7 +7,8 @@ name: test-e2e
 # staging area for the 'stable' release mirror — it must be green before
 # a release is cut (scripts/release.sh checks exactly this run). A
 # branch push with an open PR fires only `pull_request` — no double-run.
-# A weekly schedule (Mon 03:17 UTC, issue #78) re-runs both suites on
+# A daily schedule (05:17 UTC; issue #78 ran it weekly until
+# 2026-10-23) re-runs both suites on
 # master even when nothing was pushed: the suites resolve the LATEST
 # opencode release at runtime, so a new opencode version can break a
 # "green" master between pushes — the cron catches that drift before a
@@ -29,7 +30,7 @@ name: test-e2e
 # mirror image of the 2.x flip signal. Same triggers and skip rule for
 # all lanes (non-e2e-input changes skip, see the path-filtering
 # paragraph): PRs get the verdict before merge, master pushes re-verify
-# it before a release is cut, and the weekly run catches release drift
+# it before a release is cut, and the daily run catches release drift
 # between pushes.
 #
 # The git dimension is explicit where it varies, implicit by convention
@@ -38,7 +39,7 @@ name: test-e2e
 # motivated by the git >= 2.55-only #116 fatal): e2e-2x-git-distro
 # keeps the Ubuntu 24.04 apt git (2.43, the floor near the documented
 # oldest baselines), e2e-2x-git-latest builds the image with the
-# current git-core PPA git, resolved at BUILD time so the weekly cron
+# current git-core PPA git, resolved at BUILD time so the daily cron
 # catches new-git drift. The pair are two explicit jobs, not a matrix:
 # each leg then reports under its own stable name (required checks
 # match names), and a job-level skip cannot collapse them. Cross-
@@ -56,7 +57,7 @@ name: test-e2e
 # workflow — so dev-tooling and unit-test waves no longer burn the e2e
 # runners. Safety of the narrowing: wiring anything from scripts/ or a
 # new tests/ tree INTO the suite necessarily touches tests/e2e/** or
-# the Makefile (both trigger), and the weekly cron plus the pre-release
+# the Makefile (both trigger), and the daily cron plus the pre-release
 # review pass backstop the rest. When NOTHING in the code set changed,
 # the suites skip. All jobs skip at job level (the run still EXISTS for
 # its sha with a green 'skipped' conclusion, so scripts/release.sh's
@@ -85,7 +86,7 @@ on:
     branches:
       - master
   schedule:
-    - cron: '17 3 * * 1'  # Mondays 03:17 UTC (after test-unit's verdict)
+    - cron: '17 5 * * *'  # daily 05:17 UTC (after test-unit's verdict)
 
 # Least-privilege token (CodeQL actions/missing-workflow-permissions):
 # read-only access is enough (checkout + cache only — no artifacts,
@@ -95,13 +96,13 @@ permissions:
 
 # Cancel a superseded run when a new commit lands on the same ref; also
 # dedupes if two events somehow fire for the same push. Scheduled runs
-# get their own group: a weekly run must never cancel an in-flight
+# get their own group: a scheduled run must never cancel an in-flight
 # push/PR run of the same ref (a cancelled run on a master sha reads as
 # red to scripts/release.sh's CI gate) — and conversely stays alive to
 # deliver its drift verdict even when master moves under it.
 concurrency:
   group: >-
-    e2e-${{ github.event_name == 'schedule' && 'weekly'
+    e2e-${{ github.event_name == 'schedule' && 'daily'
     || (github.event_name == 'push' || github.event_name == 'pull_request') && github.ref
     || 'manual' }}
   cancel-in-progress: true
@@ -195,7 +196,7 @@ jobs:
 
   # Core setuid-docker suite, opencode 2.x lane, git-latest — the
   # floating half of the git pair (issue #118): builds the image with
-  # the current git-core PPA git, resolved at BUILD time, so the weekly
+  # the current git-core PPA git, resolved at BUILD time, so the daily
   # cron catches new-git drift (the #116 unreadable-CWD fatal only
   # existed on git >= 2.55; a distro-only suite can never see that
   # class). run.sh asserts the PPA git landed. Shares the binary cache

@@ -85,12 +85,13 @@ make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-containe
   (755 <=> executed by path, 644 <=> sourced lib / interpreter call /
   data). Workflows carry no `chmod +x` lines; `actions/checkout`
   preserves the tracked modes.
-- Besides PRs and `master` pushes, CI runs a **weekly scheduled** burn-in
-  on `master` (Mondays ~03:00 UTC, issue #78): the e2e suites install the
-  *latest* opencode/ddev releases at runtime, so the schedule catches
-  environment drift on a "green" master even when nothing was pushed.
-  Scheduled runs use their own concurrency group — they never cancel
-  push/PR runs, and a red weekly run blocks the next release by design.
+- Besides PRs and `master` pushes, CI runs a **daily scheduled** burn-in
+  on `master` (05:07–05:27 UTC staggered; issue #78 ran it weekly until
+  2026-10-23): the e2e suites install the *latest* opencode/ddev
+  releases at runtime, so the schedule catches environment drift on a
+  "green" master even when nothing was pushed. Scheduled runs use their
+  own concurrency group — they never cancel push/PR runs, and a red
+  scheduled run blocks the next release by design.
 - One gate is **CI-only** on purpose: the `tui/*.tsx` parse gate
   (`tests/tsx-syntax-gate.sh`, issue #114). It needs node + typescript,
   which are not contributor-host requirements, so it never runs in
