@@ -102,7 +102,11 @@ alone) and the helper ends with an explicit `return 0` regardless.
 - **W3 shape** `grep -rn 'command -v python3' files/` → status.sh:534
   (advisories: probe failure renders a loud row, not silence),
   status.sh:1329 (parser guarded by `-x` too, fail-soft display),
-  install.sh:688 (install-time hard check). **Sibling found (pre-
+  install.sh:688 (install-time hard check), bin/opk:299 (openchamber
+  settings-pin removal: a broken interpreter fails the `&&` chain
+  into the explicit else → `ui_error` with by-hand remediation —
+  fail-loud, not the W3 silence; missed on this record's first
+  pass, caught by #221 b W2). **Sibling found (pre-
   existing, follow-up recommended):** `sh/fs-baseline.sh:186-189` puts
   `_fsb_count_tee` in the DATA pipeline of a MUTATING pass
   (`tee < nul | sudo xargs -0 -r sh -c 'chgrp/chmod/setfacl …'`) with

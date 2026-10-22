@@ -139,7 +139,9 @@ _st_progress_tee() {
     # wait(1) wakes on set(). KeyboardInterrupt is swallowed with
     # BrokenPipeError (#221 a W6): Ctrl-C must stay as silent as the
     # bare find it replaced (rc of a pipeline member is discarded —
-    # status.sh runs without pipefail).
+    # status.sh runs without pipefail). Pinned: the SIGINT pin in
+    # tests/unit/test-status.sh (#221 b W1) kills the tee's python3
+    # mid-stream and asserts zero stderr and a clean exit.
     python3 -c '
 import sys, threading, time
 label = sys.argv[1]

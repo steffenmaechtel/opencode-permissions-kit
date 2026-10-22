@@ -2591,6 +2591,59 @@ else
     fail "#221: SCAN_HELPERS extraction truncated or unparsable"
 fi
 
+# 9) (#221 b W1) SIGINT mid-stream: the tee's KeyboardInterrupt path
+#    must stay SILENT. A pty Ctrl-C is flaky to aim (snapshot a W6:
+#    the repro delivered the signal to the shell, not python), and a
+#    backgrounded pipeline is NO alternative either: POSIX starts
+#    async commands with SIGINT set to SIG_IGN, a non-interactive
+#    shell cannot reset an ignored signal, and python keeps it — the
+#    kill lands, nothing happens, the pin passes vacuously green
+#    (found the hard way in this wave's own sabotage run). So the tee
+#    stays FOREGROUND (default SIGINT disposition) and only the
+#    SENDER is async: it polls until the record has been forwarded
+#    (the tee then sits blocked in read1) and kill -INTs the pid that
+#    the PATH-first wrapper recorded before exec'ing the real
+#    interpreter. Green = signal delivered (sender rc), zero stderr
+#    (no traceback), forwarded byte intact, exit 0. Sabotaging the
+#    except tuple drops the traceback into the stderr asserted empty.
+T210_SIGBIN="$WORK/t210-sigbin"
+T210_SIGPID="$WORK/t210-sigpid"
+mkdir -p "$T210_SIGBIN"
+_t210_realpy="$(command -v python3)"
+printf '#!/bin/sh\necho $$ > "%s"\nexec "%s" "$@"\n' \
+    "$T210_SIGPID" "$_t210_realpy" > "$T210_SIGBIN/python3"
+chmod +x "$T210_SIGBIN/python3"
+# async sender: poll for the forwarded byte, then INT the tee's pid
+cat > "$WORK/t210-sig-send.sh" <<EOF
+_n=0
+while [ ! -s "$WORK/t210-sig.out" ] && [ "\$_n" -lt 100 ]; do
+    _n=\$((_n + 1))
+    sleep 0.05
+done
+[ -s "$T210_SIGPID" ] && kill -INT "\$(cat "$T210_SIGPID")"
+EOF
+sh "$WORK/t210-sig-send.sh" &
+_t210_sender=$!
+_t210_wrc=0
+(
+    eval "$SCAN_HELPERS"
+    PATH="$T210_SIGBIN:$PATH"
+    export PATH
+    ( printf 'a\0'; sleep 2 ) | _st_progress_tee "sigpin" \
+        > "$WORK/t210-sig.out" 2> "$WORK/t210-sig.err"
+) || _t210_wrc=$?
+_t210_krc=0
+wait "$_t210_sender" || _t210_krc=$?
+printf 'a\0' > "$WORK/t210-sig.exp"
+if [ "$_t210_krc" -eq 0 ] \
+    && [ "$_t210_wrc" -eq 0 ] \
+    && cmp -s "$WORK/t210-sig.exp" "$WORK/t210-sig.out" \
+    && [ ! -s "$WORK/t210-sig.err" ]; then
+    pass "#221: SIGINT mid-stream: tee silent, bytes intact, exit 0 (b W1)"
+else
+    fail "#221: KeyboardInterrupt must not print a traceback (b W1)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
