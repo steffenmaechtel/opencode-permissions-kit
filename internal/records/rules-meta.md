@@ -1,14 +1,15 @@
 # Rule-Meta System (RM) — design record
 
-> Status: **CURRENT** — pilot/build-out running since 2026-10-14;
-> the AGENTS-Rules wave runs on `feature/rules-meta-agents-rules`
-> (the pilot branch merged via #184).
+> Status: **CURRENT** — rollout phases 0–4 done (2026-10-14 …
+> 2026-10-22); phase 5 (the self-application meta `RM-0001`) is the
+> remaining step. The phase-4 wave runs on
+> `feature/rules-meta-phase-4`.
 > This is the design record for the
 > rule-rationale system; the governed rule texts live in `agent/*.md`
 > and in the `## Rules` section of `AGENTS.md`. Where this record
 > conflicts with the implemented audit script, the code wins. The
-> decisions in this record are being equipped with rule-metas as the
-> second pilot wave (the record documents itself).
+> decisions in this record are equipped with rule-metas — the record
+> documents itself (RM-0093–0096).
 
 ## Problem
 
@@ -89,6 +90,30 @@ still hold?* A rationale that merely restates the rule is a defect. (RM-0027)
 - `next-revisit` = revisit date + new interval — never computed from
   the stale due date (lateness must not compound). (RM-0033)
 
+## Revisit workflow
+
+The ladder defines the intervals; this is how a revisit runs (phase
+4). `make rules-report` (`scripts/rules-report.sh`) is the worklist:
+overdue metas first (most overdue first), then everything due within
+a 30-day horizon (`HORIZON=<days>` overrides), then the approval
+queue (metas without maintainer approval — the same membership the
+INDEX reports). It is a report, not a gate: overdue work never
+reddens CI (the audit's overdue lane is non-blocking by design), and
+the report's exit code only signals usage or environment failures.
+
+A revisit has two halves. The judgment half is the agent's: read the
+rationale, run its `Check:` probe where present, and decide whether
+the external fact still holds. The mechanical half is scripted —
+`sh scripts/rules-revisit.sh RM-NNNN clean|findings ["note"]` bumps
+the ladder (clean: up one step, 2y max; findings: reset to 1m),
+computes the next date calendar-correct from the revisit day itself,
+and appends one review-log line. A revisit log line is not an
+approval — `reviewed:` stays with the maintainer. A `findings`
+verdict enters the normal fix flow: rule text and rationale are
+corrected like any other code, in a PR. The first real wave lands
+2026-11-14 – 2026-11-20 (the pilot-era metas, ~100 at once — expect
+a bulk session, not one-off touches).
+
 ## Audit invariants (deterministic, CI)
 
 `scripts/rules-audit.sh`, pinned by `tests/unit/test-rules-meta.sh`:
@@ -132,7 +157,7 @@ invariant. (RM-0029)
 | 2 | `scripts/rules-audit.sh` + `tests/unit/test-rules-meta.sh` + CI wiring + INDEX | done |
 | 2b | conventions.md coverage complete: every unit carries a meta | done — RM-0036–0045 approved 2026-10-17 |
 | 3 | agent files + AGENTS Rules | done — test-fidelity 2026-10-18; review-concept 2026-10-19; AGENTS 2026-10-20 |
-| 4 | Revisit workflow: `make rules-report` + agent revisit command | open |
+| 4 | Revisit workflow: `make rules-report` + agent revisit command | done 2026-10-22 |
 | 5 | Self-application: the main rule gets `RM-0001` | open |
 
 The 2026-10-19 review-concept step split the file: operative rules in
