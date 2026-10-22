@@ -11,6 +11,8 @@ Reviewer: GLM-5.3 (external /review session, single pass, no fan-out — wave sc
 
 # Wave review — pr-00224 snapshot a — issue #197 e2e default flip to 2.x
 
+> Resolution: [resolution.md](resolution.md)
+
 Wave pass over the two PR commits (cea5da4 + 5640116; the master merge
 7eeb33c excluded per the maintainer's scoping): the lane flip in both e2e
 workflows, `npm_dist_latest` + reordered resolution in tests/e2e/lib.sh,
