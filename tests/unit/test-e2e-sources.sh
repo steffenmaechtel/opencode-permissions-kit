@@ -76,6 +76,12 @@ check "off-major offline degradation is named, never silent (#224 a W1)" \
     grep_q 'no cached 2x, using cached opencode'
 check "off-major warning names the E2E_OC_VERSION escape hatch (#224 a W1)" \
     grep_q "off the default lane's 2.x major"
+# Empty-cache hard fail (b W1 follow-up): both halves must exist AND sit
+# together — the FAIL message alone without the exit would print red and
+# keep going (OC_VERSION empty -> messy failure far downstream), the exit
+# without the message fails silently. Presence + adjacency pins the pair.
+check "empty cache fails loud (FAIL message + adjacent exit 1, #224 b W1)" \
+    sh -c "grep -q 'cannot resolve opencode version and no cached version available' \"\$1\" && grep -A1 'cannot resolve opencode version' \"\$1\" | grep -q 'exit 1'" _ "$LIB"
 # The pin must not just EXIST but WIN: the assignment has to sit before the
 # default resolution, or the resolved value is clobbered after the fact
 # (#224 a W6 — presence-only would stay green under reordering).
