@@ -972,6 +972,123 @@ check "fast path: .ddev top inode is group-writable after the pass" \
 # invisible to the probe by design — explicit repair paths cover it.
 rm -rf "${HWORK:?}/fastpath"
 
+# --- 7f-2. exec-time parent-swap race on the .ddev pair (#215, #211 a F1 class) --
+# The chmod half of the .ddev pair dereferences its operand: a PARENT
+# directory swapped for a symlink between find's scan and the pair
+# redirects root chmod -R g+w outside the scan root while every leaf
+# gate passes (the leaf is a real dir). Deterministic seam — the a F1
+# pin pattern from tests/unit/test-fs-baseline.sh: a PATH-stubbed find
+# runs the REAL find into a buffer, swaps the project dir for a symlink
+# to a victim tree OUTSIDE the scan root, and only then releases the
+# scan stream (the buffer is the barrier — a stream-through stub races
+# the consumer loop). The component walk must skip the WHOLE
+# iteration; a deleted or voided walk chmods through the link (victim
+# 620) and the pins go red. The slashed scan root (b W7 shape) rides in
+# the same drive: an unnormalized root voids the walk's prefix match
+# the same way. The victim carries config.yaml + a settings dir so the
+# drive also pins the iteration TAIL (ddev_handover_project) never
+# acting through the swapped parent.
+RACE=$(mktemp -d)
+RACESTUB=$(mktemp -d)
+mkdir -p "$RACE/scan/proj/.ddev" "$RACE/scan/proj/config/system" \
+    "$RACE/victim/.ddev" "$RACE/victim/config/system"
+printf 'type: typo3\n' > "$RACE/scan/proj/.ddev/config.yaml"
+printf 'type: typo3\n' > "$RACE/victim/.ddev/config.yaml"
+printf 'victim-secret\n' > "$RACE/victim/.ddev/secret"
+printf 'victim-settings\n' > "$RACE/victim/config/system/settings.php"
+chmod 600 "$RACE/victim/.ddev/secret" "$RACE/victim/config/system/settings.php"
+# No g+w on the victim .ddev top inode: the fast-path probe must NOT
+# void the gate (a conforming tree skips the pair — and with it the
+# walk; the pin would go green for the wrong reason, the b W6 class).
+chmod 755 "$RACE/victim/.ddev"
+cat > "$RACESTUB/find" <<EOF
+#!/bin/sh
+# Buffer the real find's output, perform the swap, THEN release the
+# scan stream — a stream-through stub races the consumer loop (the
+# loop can run the whole iteration while the stub is still between
+# find and mv; measured ~8% flake before the buffer). The temp file is
+# the a F1 barrier, moved into the stub because ddev_handover_root
+# streams find directly into the while loop.
+_out=\$(mktemp)
+"$(command -v find)" "\$@" > "\$_out"
+_rc=\$?
+if [ -d "$RACE/scan/proj" ] && [ ! -L "$RACE/scan/proj" ]; then
+    mv "$RACE/scan/proj" "$RACE/scan/moved-away"
+    ln -s "$RACE/victim" "$RACE/scan/proj"
+fi
+cat "\$_out"
+rm -f "\$_out"
+exit \$_rc
+EOF
+chmod +x "$RACESTUB/find"
+RACE_RC=0
+RACE_OUT=$(PATH="$RACESTUB:$PATH" sh -c \
+    '. "$1" && ddev_handover_root "$2" "$(id -un)" "$(id -gn)"' \
+    _ "$HANDOVER" "$RACE/scan/" 2>&1) || RACE_RC=$?
+if [ -d "$RACE/scan/moved-away/.ddev" ] && [ -L "$RACE/scan/proj" ]; then
+    pass "race fixture: parent swapped between scan and the pair (seam fired)"
+else
+    fail "race fixture: parent swapped between scan and the pair (seam fired)"
+fi
+assert_eq "parent-swap: victim .ddev keeps its mode (component walk skips, #215)" "600" \
+    "$(stat -c %a "$RACE/victim/.ddev/secret")"
+assert_eq "parent-swap: victim settings dir untouched — iteration tail skipped too (#215)" "600" \
+    "$(stat -c %a "$RACE/victim/config/system/settings.php")"
+assert_eq "parent-swap: skip is not a failure (rc 0, #215)" "0" "$RACE_RC"
+case "$RACE_OUT" in
+    *"warn: skipping .ddev handover"*)
+        pass "parent-swap: the skip announces itself with the reason (#215)" ;;
+    *) fail "parent-swap: the skip must announce itself (got: $RACE_OUT) (#215)" ;;
+esac
+case "$RACE_OUT" in
+    *".ddev handover:"*|*"ddev settings handover:"*)
+        fail "parent-swap: no success echo over a skipped operand (#215)" ;;
+    *) pass "parent-swap: no success echo over a skipped operand (#215)" ;;
+esac
+rm -rf "${RACE:?}" "${RACESTUB:?}"
+
+# Spaced-component variant (the 82cdd4a lesson from fs-baseline): the
+# happy-path drives cannot catch a walk regression that stops SKIPPING,
+# and a word-splitting rewrite of the prefix-peeling would chmod through
+# the link on spaced names while unspaced paths stay green. Spaces in
+# every swapped component; same deterministic seam.
+RACESP=$(mktemp -d)
+RACESPS=$(mktemp -d)
+mkdir -p "$RACESP/scan/pro j/.ddev" "$RACESP/vic tim/.ddev"
+printf 'type: typo3\n' > "$RACESP/scan/pro j/.ddev/config.yaml"
+printf 'spaced-victim\n' > "$RACESP/vic tim/.ddev/has space.txt"
+chmod 600 "$RACESP/vic tim/.ddev/has space.txt"
+chmod 755 "$RACESP/vic tim/.ddev"
+cat > "$RACESPS/find" <<EOF
+#!/bin/sh
+# Same buffered seam as the plain drive: swap first, then release the
+# scan stream — never let the consumer loop lap the swap.
+_out=\$(mktemp)
+"$(command -v find)" "\$@" > "\$_out"
+_rc=\$?
+if [ -d "$RACESP/scan/pro j" ] && [ ! -L "$RACESP/scan/pro j" ]; then
+    mv "$RACESP/scan/pro j" "$RACESP/scan/moved away"
+    ln -s "$RACESP/vic tim" "$RACESP/scan/pro j"
+fi
+cat "\$_out"
+rm -f "\$_out"
+exit \$_rc
+EOF
+chmod +x "$RACESPS/find"
+RACESP_RC=0
+PATH="$RACESPS:$PATH" sh -c \
+    '. "$1" && ddev_handover_root "$2" "$(id -un)" "$(id -gn)"' \
+    _ "$HANDOVER" "$RACESP/scan" >/dev/null 2>&1 || RACESP_RC=$?
+if [ -d "$RACESP/scan/moved away/.ddev" ] && [ -L "$RACESP/scan/pro j" ]; then
+    pass "spaces race: seam fired (parent swapped between scan and the pair)"
+else
+    fail "spaces race: seam fired (parent swapped between scan and the pair)"
+fi
+assert_eq "spaces race: victim outside the tree keeps its mode (walk skips on spaced components)" "600" \
+    "$(stat -c %a "$RACESP/vic tim/.ddev/has space.txt")"
+assert_eq "spaces race: skip is not a failure (rc 0)" "0" "$RACESP_RC"
+rm -rf "${RACESP:?}" "${RACESPS:?}"
+
 # Scan-skip stamps: write -> valid; any field mismatch -> invalid; a
 # cksum filename collision must not validate a different root.
 _112_dir=$(mktemp -d)
