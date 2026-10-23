@@ -1,16 +1,19 @@
 # Resolution — pr-00235 (agent-skills pilot, issue #178)
 
 Chain: review-a (snapshot 2026-10-23, 21 findings) → fix wave
-2026-10-24 (`787c3b0` tests, `d77a446` rules, `b549a22` skill/docs).
-All 21 findings dispositioned **implemented**; none deliberately not
-done (maintainer go 2026-10-24: "implement all").
+2026-10-24 (`787c3b0` tests, `d77a446` rules, `b549a22` skill/docs)
+→ review-b (snapshot 2026-10-24, 15 reported / 12 unique findings,
+1 retracted) → fix wave 2 (`9cb41b8` tests+rules, this ledger).
+a-round: all 21 dispositioned **implemented**; none deliberately not
+done (maintainer go 2026-10-24: "implement all"). b-round: second
+dispositions table below.
 
 ## Dispositions
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
 | a S1 (MED) | **implemented** | `787c3b0` | strip conditional on closure; probe3 unclosed fixture; sabotage red→green |
-| a S2 (MED) | **implemented** | `787c3b0` | 10 FAIL sites, 14 pins; fixtures for root/open/close/>400 |
+| a S2 (MED) | **implemented** | `787c3b0` | 10 FAIL sites, 13 pins — 14 was a miscount (#235 b S2/Q1) |
 | a S3 (LOW) | **implemented** | `787c3b0` | pattern `(^|[^.[:alnum:]_/-])local/|\.\./local/`; both-direction pins |
 | a S4 (LOW) | **implemented** | `787c3b0` | close via awk NR scan, no head window; S4-sabotage (19-line fm) moot |
 | a Q1 (MED) | **implemented** | `b549a22` | mapping written in reviews README + SKILL.md; matches recorded practice |
@@ -156,16 +159,103 @@ depends on the shell.
 - Q11: header now states the frontmatter-switch regen measured a no-op
   (35 entries, unchanged) instead of implying a reviewed diff.
 
-## Class sweeps (recorded)
+## Dispositions — review b (fix wave 2, 2026-10-24)
 
-- Frontmatter-strip directions: 4 probe fixtures (closed-fm, prose,
-  non-md, unclosed) — both failure directions pinned.
-- FAIL-site inventory (skills lint): 10 sites ↔ 14 pins (incl. 2
-  negative); grep pattern used for the sweep: `echo "FAIL` over
+| Finding | Disposition | Commit | Key evidence |
+|---|---|---|---|
+| b B1 (MED) | **implemented** | `9cb41b8` | 2 pattern alternatives + 2 miss pins (sabotage-red); x/-family exempt |
+| b S1 (MED) | **implemented** | this ledger | sweep grep corrected to `-E` form; result re-measured (Class sweeps) |
+| b S2/Q1 (LOW) | **implemented** | this ledger | 14→13 pin count corrected in a-row + Class sweeps |
+| b S3 (LOW) | **implemented** | `9cb41b8` | fixture description no longer self-matches; err-isolation negative pin |
+| b S4/B2 (LOW) | **implemented** | `9cb41b8` | find rc observed → err: sentinel; opk-find-err pin (uid-guarded, L4) |
+| b Q2/B4 (LOW) | **implemented** | `9cb41b8` | Check text names extension set + SCOPE_FILES/RM-9xxx exemptions |
+| b Q3 (INFO) | **implemented** | `9cb41b8` | "blocks on 1–6 and 9 (7–8 report-only)" replaces "carries" |
+| b Q4 (INFO) | **implemented** | this ledger | Gates parenthetical names the real file classes |
+| b B3 (LOW) | **implemented** | `9cb41b8` | probe4 pins pseudo-close semantics; probe header claims corrected |
+| b B5 (INFO) | **deliberately not done** | — | rule-6 + shard pins backstop; coupling already in Follow-ups |
+| b B6 (INFO) | **deliberately not done** | — | fail-loud direction only; acceptance documented in the header |
+
+Beyond findings (maintainer directive 2026-10-24): conventions.md
+"(this README's peers)" → "— `internal/reviews/README.md` and its
+living peers —" (explicit path; b S5 was retracted in the snapshot,
+the wording improved anyway).
+
+### b B1 — local/ guard soft-miss shapes
+
+Pattern now `(^|[^.[:alnum:]_/-])local/|\.\./local/|\./local/|…` plus
+this checkout's absolute workspace-local path (`WS_LOCAL`, computed
+from REPO_ROOT at runtime, escaped for ERE — the opk-abs-local
+fixture derives its reference from the same variable, so pattern and
+pin relocate together). The dot-slash family (`./local/`,
+`x/./local/`, `.././local/`) is caught by the new `\./local/`
+alternative. New fixtures opk-dot-local + opk-abs-local pin the miss
+direction; both sabotage-red (alternative deleted → "PIN BROKEN").
+Deliberately out of scope, pinned as such via opk-legit-paths:
+repo-internal segments (`x/local/`, `x//local/`) and
+identifier-embedded shapes — none of them resolve into the disposable
+workspace dir; the suite header documents the full shape table. L1
+note: if REPO_ROOT resolution ever degenerated, WS_LOCAL would
+collapse to "/local" and false-FAIL `/usr/local` paths — fail-loud,
+not silent.
+
+### b S3 / b S4/B2 — scan stages isolated and loud
+
+opk-scan-err's description no longer contains a ` local/ ` substring
+(the old text tripped the hit branch alongside err); a negative pin
+asserts the err path now fires alone. The find stage got its own rc
+check: `_flist` capture preserves find's exit status and rc > 0
+appends an `err:find-rc=…` sentinel → the existing "scan errored"
+FAIL. New fixture opk-find-err (valid frontmatter + mode-000 subdir)
+pins it; the pin is uid-guarded (root reads through 000 — skip line
+per L4 environment-dependent marking); executed as non-root here.
+Sabotage-red: err append deleted → "PIN BROKEN: find error silently
+clean".
+
+### b B3 — pseudo-close semantics pinned
+
+probe4 (hr-opened prose with a second `---` before a >120 line)
+asserts the offending-line count is exactly 1: the span up to the
+next `---` counts as frontmatter, post-close prose does not. That
+pins the documented semantics (closure = next `---` line anywhere;
+YAML validity not assessed) in place of the overstated "both
+directions" claim; measure_file's comment and the probe header state
+it. Sabotage (strip runs past the close) → PROBE BROKEN with
+prose=''/pseudo=''.
+
+### b Q2/B4, b Q3 — RM-0116 Check text vs enforcement
+
+The Check paragraph now names the scanned extension set (md/sh/py/yml
+— e.g. the frozen JSON corpus under `internal/reviews-meta/` is not
+scanned), the two non-obvious exemptions (SCOPE_FILES → lane a;
+RM-9xxx demo IDs) alongside the four corpus sets; the invariant
+citation reads "blocks on invariants 1–6 and 9 (7–8 are
+report-only)". Review log carries the revision; test-rules-meta and
+rules-audit green (inv5 needle, inv9 unaffected).
+
+### b S1 / b S2/Q1 / b Q4 — ledger corrections
+
+Corrected in place with #235 b markers: the a S2 row (13 pins), the
+Class sweeps section (`-E` grep + re-measured result, pseudo-close
+claim, 17-pin growth), the a-Gates parenthetical (real file classes).
+
+## Class sweeps (a round, recorded)
+
+- Frontmatter-strip directions: 4 probe fixtures at the time
+  (closed-fm, prose, non-md, unclosed) — the "both failure
+  directions pinned" claim was overstated: the pseudo-close variant
+  (strip through a LATER `---` line) stayed unpinned until the b
+  round's probe4 (#235 b B3).
+- FAIL-site inventory (skills lint): 10 sites ↔ 13 pins at the time
+  (14 was a miscount, #235 b S2/Q1; the b round grows the suite to
+  17 pin blocks); grep pattern used for the sweep: `echo "FAIL` over
   lint_skills vs the pin case-block.
 - RM-ID citations in wave-added text: `git diff caeb9a8..9cfef7f |
-  grep '^+' | grep 'RM-[0-9]{4}'` → only the two README lines (fixed);
-  lane c now enforces the living README going forward.
+  grep '^+' | grep -E 'RM-[0-9]{4}'` (`-E` added 2026-10-24, #235
+  b S1 — the recorded BRE form `grep 'RM-[0-9]{4}'` was inert: `{4}`
+  is a literal in BRE and the pipeline matched nothing) → the two
+  reviews-README ref lines (fixed by this wave) plus meta-internal
+  diff noise (`+++ b/…RM-*.md`, `id:`, INDEX row); lane c now
+  enforces the living README going forward.
 - Scope-keyword consistency: skill scope table ↔ README Scope enum —
   both sides now define micro→wave.
 - Sabotage windows: 3 windows consistent across skill and rules.
@@ -180,13 +270,45 @@ depends on the shell.
   (S1×1, S2×1, S3×1, X2×1, X4×1, Q8×1, Q4×2), each restored and
   re-verified green.
 - e2e suites: not owed — the wave and its fixes touch no `files/`
-  script and no root-run script semantics (tests, Makefile, workflows,
-  markdown only).
+  script and no root-run script semantics (the diff is tests,
+  markdown and `scripts/rules-audit.sh` only — no Makefile or
+  workflows; corrected #235 b Q4).
+
+## Class sweeps (b round)
+
+- Fail-soft inventory over the fix diff: the only stderr redirects
+  are find (rc now checked and pinned) and the per-file grep (pinned
+  via opk-scan-err); `WS_LOCAL` escape pipeline assessed under b B1
+  (fail-loud direction); no new `|| true`.
+- `local/` pattern sites: single code site
+  (`tests/unit/test-skills-lint.sh:70`); documentation sites are the
+  suite header and this ledger — both updated.
+- Frontmatter parsers: skills-lint's awk takes the FIRST later `---`
+  (frontmatter must be the leading block — no pseudo-close ambiguity
+  there); measure_file is the only span-parser, now probe4-pinned.
+
+## Gates (fix wave 2)
+
+- `make test` green (full unit suite), `make lint` green,
+  `sh scripts/rules-audit.sh` 0 blocking; reviews lint/parity green
+  after INDEX regen; sandbox policy green (mode-000 fixture lives in
+  mktemp scratch only).
+- Sabotage runs: 4 mutation checks red against the intended pins
+  (b B1×2, b S4/B2×1, b B3×1), each restored and re-verified green.
+- e2e suites: not owed — tests, markdown and rule text only; no
+  `files/`, no root-run script semantics.
 
 ## Follow-ups
 
-- **The fix wave owes its wave review** (diff `ab0f771..b549a22`,
-  ~300 changed lines): fires on the maintainer's go, per the loop.
+- review-b discharged the a-wave's owed review (snapshot committed
+  at `17a3092` over diff `ab0f771..a234763`); its fix wave 2
+  (`9cb41b8` + this ledger) touches test code, so the round owes the
+  next wave review on the maintainer's go — the loop cannot close
+  this round (RM-0067).
+- The skills-lint workspace-absolute alternative is computed from
+  REPO_ROOT at runtime (`WS_LOCAL`); the opk-abs-local fixture
+  derives its reference from the same variable, so pattern and pin
+  relocate together across checkouts (#235 b B1).
 - The lane-c helper's case-folder regex pins the shard shape
   `A/B/C/D/pr-ABCDE` — if the shard rule ever deepens, the regex and
   its scratch pin must move together (the scratch pin's exempt-path
