@@ -221,6 +221,30 @@ review loop stops only when a round's dispositions touch no
 production/test code: severity prioritizes, but any code-touching round
 — LOW fixes included — owes its wave review before the loop closes.
 
+## External review machines (bias-reduced checkout)
+
+The second, independent snapshot of a release review must come from a
+genuinely different context — a different model family on a checkout
+without the house's review memory. A normal clone carries that memory
+(`agent/`, `.agents/`, `internal/`), so the external machine carves it
+out with a sparse checkout; `git status` stays clean, no tracked-file
+deletion, stable across pulls:
+
+```bash
+cd <repo clone>
+git sparse-checkout set --no-cone '/*' '!/agent/' '!/.agents/' '!/internal/'
+git status --short   # must be empty (clean)
+```
+
+The reviewed tree is "HEAD minus house memory" — name the sparse shape
+in the snapshot's run provenance. The test suites run partially red on
+that machine (several guards expect `agent/`): it is a review
+substrate, not a dev environment. What stays visible (AGENTS.md,
+`docs/`, `tests/`) is deliberate — the reviewer should understand the
+product without inheriting the house's conclusions. The full
+trade-off analysis (including the rejected alternatives) lives in
+[internal/records/review-independence.md](internal/records/review-independence.md).
+
 ## Version
 
 Do not bump `VERSION` unless the maintainer asks for a release.
