@@ -236,6 +236,31 @@ git sparse-checkout set --no-cone '/*' '!/agent/' '!/.agents/' '!/internal/'
 git status --short   # must be empty (clean)
 ```
 
+How a pass runs in practice (maintainer recipe):
+
+1. **Fresh second WSL installation** — no global skills, no opencode
+   configuration: nothing of the house context exists on that machine
+   by construction. Clone the repo and set up the sparse checkout as
+   above.
+2. **Commission the pass** with opencode's built-in `/review`, telling
+   it the scope and where to write:
+
+   ```
+   /review full project review at <tag or SHA>; write the report and
+   all findings to /tmp/opencode/review-<topic>/ (create the directory)
+   ```
+
+   Use a different model family than the house pass when available —
+   the redundancy axis is "and/or", every added difference pays.
+   `/tmp` is volatile: hand the result over before a reboot.
+3. **Hand over to the house agent:** copy the result directory to the
+   house machine and let the house session integrate it — verbatim
+   embedding under the house snapshot header (run provenance names the
+   sparse shape), per-finding verification with verification marks,
+   and the calibration section naming what each side missed
+   ("Parallel reviewer agents" in
+   [agent/review-concept.md](agent/review-concept.md)).
+
 The reviewed tree is "HEAD minus house memory" — name the sparse shape
 in the snapshot's run provenance. The test suites run partially red on
 that machine (several guards expect `agent/`): it is a review
