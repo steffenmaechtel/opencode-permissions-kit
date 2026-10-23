@@ -242,12 +242,17 @@ How a pass runs in practice (maintainer recipe):
    configuration: nothing of the house context exists on that machine
    by construction. Clone the repo and set up the sparse checkout as
    above.
-2. **Commission the pass** with opencode's built-in `/review`, telling
-   it the scope and where to write:
+2. **Commission the pass** with opencode's built-in `/review`, naming
+   the environment, the scope and where to write:
 
    ```
-   /review full project review at <tag or SHA>; write the report and
-   all findings to /tmp/opencode/review-<topic>/ (create the directory)
+   /review You are reviewing a sparse checkout at <tag or SHA>: the
+   directories agent/, .agents/ and internal/ are deliberately
+   excluded (bias-reduced setup) — links into them dangle by design,
+   their absence is not a finding. Full project review of the shipped
+   code and docs; do not run the test suite (the house side runs it
+   on the full tree). Write the report and all findings to
+   /tmp/opencode/review-<topic>/ (create the directory).
    ```
 
    Use a different model family than the house pass when available —
@@ -262,12 +267,17 @@ How a pass runs in practice (maintainer recipe):
    [agent/review-concept.md](agent/review-concept.md)).
 
 The reviewed tree is "HEAD minus house memory" — name the sparse shape
-in the snapshot's run provenance. The test suites run partially red on
-that machine (several guards expect `agent/`): it is a review
-substrate, not a dev environment. What stays visible (AGENTS.md,
-`docs/`, `tests/`) is deliberate — the reviewer should understand the
-product without inheriting the house's conclusions. The full
-trade-off analysis (including the rejected alternatives) lives in
+in the snapshot's run provenance. The unit suite runs partially red on
+that machine BY DESIGN: the guards over `agent/`, `.agents/` and
+`internal/` correctly fail when their tracked inputs are absent
+(measured 2026-10-23: line-length stale baselines, skills lint,
+rules-meta/index/revisit, reviews lint/parity, docs dangling links —
+including CONTRIBUTING's own links into `internal/`). Do not weaken
+the guards for this — the suite is a full-tree instrument; that
+machine reviews, the house side runs the suite. What stays visible
+(AGENTS.md, `docs/`, `tests/`) is deliberate — the reviewer should
+understand the product without inheriting the house's conclusions. The
+full trade-off analysis (including the rejected alternatives) lives in
 [internal/records/review-independence.md](internal/records/review-independence.md).
 
 ## Version
