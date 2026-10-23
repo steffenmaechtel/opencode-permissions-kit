@@ -58,7 +58,7 @@ era's shape — both stay citable as history). House-owned parts:
   Diff: e26f379..24ad0d2
   Date: 2026-10-15
   Reviewer: GLM-5.3 (external /review session)
-  Skills: review-pass        (optional — skills that ran the pass)
+  Skills: opk-review-pass        (optional — skills that ran the pass)
   -->
   ```
 

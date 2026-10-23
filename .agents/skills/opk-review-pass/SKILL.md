@@ -1,9 +1,9 @@
 ---
-name: review-pass
+name: opk-review-pass
 description: Execute a code-review pass over this repository (micro, wave, or full/release scope) — load when a round's wave review fires or the maintainer commissions a pass. Covers reviewer fan-out staging, axis prompts, checkpoints, screening, verification, snapshot writing; the rules live in agent/review-concept.md. External redundancy passes do NOT load this skill.
 ---
 
-# review-pass — executing a review pass
+# opk-review-pass — executing a review pass
 
 This skill is the **execution choreography** for a review pass. It is not
 the rules and never a source of finding judgments:
@@ -25,8 +25,12 @@ the rules and never a source of finding judgments:
 
 ## 0. Calibrated against opencode's built-in /review template
 
-The external release pass runs via opencode's `/review`; its template
-and this skill converge on the verification-strengthening lines
+The external release pass runs via opencode's `/review`. Calibrated
+against opencode **v2.1.4** (template:
+`packages/core/src/plugin/command/review.txt` in the opencode source)
+— recheck this section when a newer opencode changes the /review
+template. Template and this skill converge on the
+verification-strengthening lines
 (realistic trigger scenario per finding, no overstated severity,
 context around every hunk, style findings must source a house rule) —
 shared strictness is not shared bias. Deliberate divergences, kept on
@@ -123,7 +127,7 @@ agents").
 1. Copy the header block from the chain's latest snapshot (the freshest
    template is always the previous file) and update: Snapshot letter
    (next in sequence), Scope, Base, Diff, Date, Reviewer, and a
-   `Skills: review-pass` provenance line (environment record; the
+   `Skills: opk-review-pass` provenance line (environment record; the
    header contract: internal/reviews/README.md, "Snapshot format").
 2. Body: the reviewers' findings **verbatim**, plus house sections per
    the contract (findings index, retracted/ghosts, run provenance with

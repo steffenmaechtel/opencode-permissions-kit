@@ -194,8 +194,8 @@ CONTRIBUTING's "shrink the next one" rule):
 ## Parallel reviewer agents
 
 Execution choreography (fan-out staging, axis-prompt construction,
-checkpoint mechanics, snapshot writing): load the `review-pass` skill
-(`.agents/skills/review-pass/`) — the rules below stay authoritative
+checkpoint mechanics, snapshot writing): load the `opk-review-pass` skill
+(`.agents/skills/opk-review-pass/`) — the rules below stay authoritative
 here.
 
 - The main agent runs a strong default model and owns the

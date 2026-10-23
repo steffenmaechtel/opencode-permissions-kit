@@ -12,6 +12,11 @@
 #   - every entry under .agents/skills/ is a skill directory with a
 #     SKILL.md (a bare .md at the skills root would load too, but the
 #     house shape is one directory per skill)
+#   - skill directories carry the house namespace prefix `opk-`: global
+#     maintainer skills (ddev-*, typo3-*, ...) and project skills share
+#     one skill list per session — the prefix keeps IDs collision-free
+#     and marks the origin (the loader keys skills by ID; two skills
+#     with the same ID overwrite each other)
 #   - SKILL.md starts with a `---` frontmatter block that closes
 #   - frontmatter carries a non-empty `name:` equal to the directory
 #     name (the loader IDs a skill by its directory; a diverging name
@@ -41,6 +46,10 @@ lint_skills() {
     for _d in "$_root"/*/; do
         [ -d "$_d" ] || continue
         _name=$(basename "$_d")
+        case "$_name" in
+            opk-*) ;;
+            *) echo "FAIL $_name: missing opk- namespace prefix" ;;
+        esac
         _f="$_d/SKILL.md"
         if [ ! -f "$_f" ]; then
             echo "FAIL $_name: no SKILL.md"
@@ -77,57 +86,68 @@ lint_skills() {
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK:?}" "$TMP"' EXIT
 
-mkdir -p "$WORK/skills/good-skill" "$WORK/skills/no-desc" \
-         "$WORK/skills/wrong-name" "$WORK/skills/local-ref" \
-         "$WORK/skills/no-skill-md"
-cat > "$WORK/skills/good-skill/SKILL.md" <<'EOF'
+mkdir -p "$WORK/skills/opk-good-skill" "$WORK/skills/opk-no-desc" \
+         "$WORK/skills/opk-wrong-name" "$WORK/skills/opk-local-ref" \
+         "$WORK/skills/opk-no-skill-md" "$WORK/skills/no-prefix"
+cat > "$WORK/skills/opk-good-skill/SKILL.md" <<'EOF'
 ---
-name: good-skill
+name: opk-good-skill
 description: Valid fixture skill used only by the skills lint self-test.
 ---
 Body.
 EOF
-cat > "$WORK/skills/no-desc/SKILL.md" <<'EOF'
+cat > "$WORK/skills/opk-no-desc/SKILL.md" <<'EOF'
 ---
-name: no-desc
+name: opk-no-desc
 ---
 Body.
 EOF
-cat > "$WORK/skills/wrong-name/SKILL.md" <<'EOF'
+cat > "$WORK/skills/opk-wrong-name/SKILL.md" <<'EOF'
 ---
 name: something-else
 description: Fixture whose name diverges from its directory.
 ---
 Body.
 EOF
-cat > "$WORK/skills/local-ref/SKILL.md" <<'EOF'
+cat > "$WORK/skills/opk-local-ref/SKILL.md" <<'EOF'
 ---
-name: local-ref
+name: opk-local-ref
 description: Fixture that references the disposable workspace.
 ---
 See local/legacy-2026-10/restructure-docs.
 EOF
-echo "not a skill" > "$WORK/skills/no-skill-md/note.txt"
+echo "not a skill" > "$WORK/skills/opk-no-skill-md/note.txt"
+cat > "$WORK/skills/no-prefix/SKILL.md" <<'EOF'
+---
+name: no-prefix
+description: Fixture that lacks the house namespace prefix.
+---
+Body.
+EOF
 
 _out=$(lint_skills "$WORK/skills")
 case "$_out" in
-    *"FAIL no-desc"*) echo "  pin ok: missing description caught" ;;
+    *"FAIL no-prefix"*) echo "  pin ok: missing opk- prefix caught" ;;
+    *) echo "  PIN BROKEN: missing opk- prefix not caught" >> "$TMP" ;;
+esac
+case "$_out" in
+    *"FAIL opk-no-desc"*) echo "  pin ok: missing description caught" ;;
     *) echo "  PIN BROKEN: missing description not caught" >> "$TMP" ;;
 esac
 case "$_out" in
-    *"FAIL wrong-name"*) echo "  pin ok: name mismatch caught" ;;
+    *"FAIL opk-wrong-name"*) echo "  pin ok: name mismatch caught" ;;
     *) echo "  PIN BROKEN: name mismatch not caught" >> "$TMP" ;;
 esac
 case "$_out" in
-    *"FAIL local-ref"*) echo "  pin ok: local/ reference caught" ;;
+    *"FAIL opk-local-ref"*) echo "  pin ok: local/ reference caught" ;;
     *) echo "  PIN BROKEN: local/ reference not caught" >> "$TMP" ;;
 esac
 case "$_out" in
-    *"FAIL no-skill-md"*) echo "  pin ok: missing SKILL.md caught" ;;
+    *"FAIL opk-no-skill-md"*) echo "  pin ok: missing SKILL.md caught" ;;
     *) echo "  PIN BROKEN: missing SKILL.md not caught" >> "$TMP" ;;
 esac
 case "$_out" in
-    *"good-skill"*) echo "  PIN BROKEN: valid fixture flagged" >> "$TMP" ;;
+    *"opk-good-skill"*) echo "  PIN BROKEN: valid fixture flagged" >> "$TMP" ;;
     *) echo "  pin ok: valid fixture passes clean" ;;
 esac
 
