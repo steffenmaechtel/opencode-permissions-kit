@@ -76,6 +76,10 @@ era's shape — both stay citable as history). House-owned parts:
   names the catch-up ("rotation-deviation catch-up"), and the
   mandate's source of truth is the resolution's Follow-ups entry that
   commissioned it.
+- Micro-wave reviews (fix waves with ≤ ~50-line diffs) likewise record
+  `Scope: wave` and name the micro shape in the Subject ("micro-wave
+  review of …") — `micro` is a commissioning/budget keyword for the
+  executing skill, not a header value.
 - The **one pointer line**
 
 ```

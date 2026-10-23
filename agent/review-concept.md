@@ -250,7 +250,9 @@ here.
 - Checkpoint discipline: each reviewer agent appends findings to a
   side file after every completed section (empty sections get a
   `clean` line) — end-synthesis turns are the primary failure mode,
-  and checkpoints survive them. (RM-0086)
+  and checkpoints survive them. Side files live under session scratch
+  OUTSIDE the reviewed tree; the snapshot's run provenance absorbs
+  them. (RM-0086)
 - Checkpoint files timestamp every subagent (one line at launch, one
   at return) — the minute budgets are guidance without enforcement;
   the timestamps are the evidence base that will validate or

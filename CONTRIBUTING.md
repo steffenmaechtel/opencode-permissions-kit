@@ -270,14 +270,14 @@ The reviewed tree is "HEAD minus house memory" — name the sparse shape
 in the snapshot's run provenance. The unit suite runs partially red on
 that machine BY DESIGN: the guards over `agent/`, `.agents/` and
 `internal/` correctly fail when their tracked inputs are absent
-(measured 2026-10-23: line-length stale baselines, skills lint,
-rules-meta/index/revisit, reviews lint/parity, docs dangling links —
-including CONTRIBUTING's own links into `internal/`). Do not weaken
+(measured 2026-10-24: docs dangling links, line-length stale
+baselines, reviews lint/parity, reviews-meta-aggregate,
+rules-meta/index/revisit, skills lint — 9 of 42 suites). Do not weaken
 the guards for this — the suite is a full-tree instrument; that
-machine reviews, the house side runs the suite. What stays visible
-(AGENTS.md, `docs/`, `tests/`) is deliberate — the reviewer should
-understand the product without inheriting the house's conclusions. The
-full trade-off analysis (including the rejected alternatives) lives in
+machine reviews, the house side runs it. What stays visible (AGENTS.md,
+`docs/`, `tests/`) is deliberate — the reviewer should understand the
+product without inheriting the house's conclusions. The full trade-off
+analysis (including the rejected alternatives) lives in
 [internal/records/review-independence.md](internal/records/review-independence.md).
 
 ## Version

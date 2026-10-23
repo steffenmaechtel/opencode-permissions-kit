@@ -92,8 +92,12 @@ agents").
    known blind-spot surfaces in the axis prompt — a gate or claim about
    path operands is tested against `x/`, `x//`, `x/.` forms
    ("Parallel reviewer agents").
-4. Checkpoint locations: one side file per reviewer agent, outside the
-   case folder until the snapshot takes them over.
+4. Checkpoint locations: one side file per reviewer agent under
+   session scratch OUTSIDE the reviewed tree (e.g.
+   `/tmp/opencode/<case>-<letter>/checkpoints/`) — never inside the
+   repo: the tree must stay clean and is a shared read substrate, and
+   case folders take no stray files (reviews lint rule 6). The
+   snapshot's run provenance absorbs the checkpoint lines.
 
 ## 4. Fan-out
 
@@ -112,8 +116,8 @@ agents").
   agents").
 - **The tree is a shared read substrate while reviewers run**: no
   sabotage spot-checks, no fixes, no writes into the reviewed tree.
-  Sabotage windows are before launch or after all return ("Parallel
-  reviewer agents").
+  Sabotage windows are before launch, after all reviewers returned, or
+  in a scratch worktree ("Parallel reviewer agents").
 
 ## 5. Screening and verification
 
@@ -136,6 +140,9 @@ agents").
    (next in sequence), Scope, Base, Diff, Date, Reviewer, and a
    `Skills: opk-review-pass` provenance line (environment record; the
    header contract: internal/reviews/README.md, "Snapshot format").
+   A `micro` pass records `Scope: wave` and names the micro shape in
+   the Subject — there is no `micro` header value (README, "Snapshot
+   format").
 2. Body: the reviewers' findings **verbatim**, plus house sections per
    the contract (findings index, retracted/ghosts, run provenance with
    the host timestamps and per-agent windows, calibration when a second
