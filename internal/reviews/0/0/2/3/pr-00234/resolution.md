@@ -1,5 +1,11 @@
 # Resolution — pr-00234 (issue #215 exec-time symlink gate on the .ddev pair)
 
+Status: closed (maintainer, 2026-10-24) — confirmed the stop rule: the
+last round (b, review-b) saw all three findings dispositioned and its
+fix wave touched no review-relevant code — files touched =
+resolution.md, review-a.md pointer line, INDEX.md (bookkeeping,
+RM-0065).
+
 Chain: [review-a.md](review-a.md) (wave review of 395fee7, five-axis
 fan-out) → fix wave d1dcf34 → [review-b.md](review-b.md) (micro-wave
 review of the fix diff, single-pass) → b-wave fix (this chain's latest).
