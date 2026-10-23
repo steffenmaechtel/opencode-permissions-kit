@@ -64,11 +64,13 @@ era's shape — both stay citable as history). House-owned parts:
 
   The lint test pins ID↔folder and Snapshot↔file name. (Legacy cases
   predate the header; their stem + dates live in legacy-index.md.)
-  `Skills:` is part of the environment record (RM-0078) and makes the
-  skill usage auditable: it names every `.agents/skills/` procedure
+  `Skills:` is part of the environment record (see
+  agent/review-concept.md, "Suites are the standing review") and makes
+  the skill usage auditable: it names every `.agents/skills/` procedure
   that choreographed the pass. A redundancy pass that ran WITH a house
   skill must record it — the line is what makes a collapsed redundancy
-  axis visible (RM-0083).
+  axis visible (see agent/review-concept.md, "Parallel reviewer
+  agents").
 - Catch-up and backup reviews (e.g. the successor after a rotation
   deviation) add no Scope value: Scope stays `wave`, the Subject
   names the catch-up ("rotation-deviation catch-up"), and the

@@ -219,12 +219,18 @@ mechanics live in the [review README](../internal/reviews/README.md).
 
 ## Referencing house rules (RM keys)
 
-Every RM key appears exactly twice in the living tree: as the trailing
-`(RM-NNNN)` of its rule unit, and as the `id:` line of its meta file —
-new text (files, skills, comments, cross-references) cites a rule by
-file and section, never by its ID, because a third mention breaks the
-rules audit's invariant that searching an ID only ever hits genuine
-sites. (RM-0116)
+Citations in new text name the file and section, never the bare ID:
+
+- Every RM key appears exactly twice in the audit's closed world: as
+  the trailing `(RM-NNNN)` of its rule unit and as the `id:` line of
+  its meta file — new text (files, skills, comments, cross-references)
+  cites a rule by file and section, never by its ID, because a third
+  mention breaks the rules audit's invariant that searching an ID only
+  ever hits genuine sites. The closed world is what the no-fake
+  findings pin measures (tests/unit/test-rules-meta.sh, pin 10): the
+  generated indexes and the frozen reviews corpus sit outside the
+  count; living files under `internal/reviews/` (this README's peers)
+  do not. (RM-0116)
 
 ## Language
 
