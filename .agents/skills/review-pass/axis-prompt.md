@@ -20,12 +20,24 @@ anti-pattern grep list for this wave's classes and sweep every sibling
 site, not just the diff's files. Security: root operations, symlink
 windows, untrusted input reaching argv/eval/format strings, fail-open
 paths. Quality: claim-vs-behavior drift, dead code, naming, docs that
-lie.>
+lie. Every axis: unintentional BEHAVIOR CHANGES are findings in their
+own right — raise them especially when the change looks accidental.>
 
 <BLIND-SPOT LINES — name the known blind surfaces for THIS material
 explicitly: e.g. "gates that check path operands are tested against
 `x/`, `x//`, `x/.` forms" (the blind-spot rule in
 agent/review-concept.md, "Parallel reviewer agents").>
+
+## Context before flags
+
+Diffs alone are not enough: read the surrounding function or section
+of every hunk before flagging it — code that looks wrong in isolation
+may be correct given the surrounding logic, and vice versa (budget
+discipline unchanged: no whole-file reads of the big scripts in
+micro/wave scope). Style/convention findings only when a house file
+actually forbids the pattern — NAME the file (AGENTS.md,
+agent/conventions.md); a violation you cannot source to a house rule
+is a suggestion, not a finding.
 
 ## Budget and sections
 
@@ -52,6 +64,13 @@ verbatim into the snapshot, so:
   (<AXIS LETTER>), numbered from 1, in report order.
 - Each finding: severity (HIGH/MED/LOW/INFO), one-line summary, then
   file:line evidence (quote the offending lines), then why it matters.
+- Be certain before you flag: name the realistic scenario or inputs
+  that trigger the problem — an edge case without a realistic trigger
+  is not a finding, it is a hypothetical. Do not overstate severity;
+  when severity depends on conditions, name the conditions in the same
+  breath as the severity.
+- Matter-of-fact tone, no flattery, no filler — the reader must grasp
+  the issue from the one-liner and the evidence alone.
 - Findings index EARLY: the ID + severity + one-liner table first, the
   detail after.
 - Provenance per finding: wave-introduced / fix-induced /
@@ -59,7 +78,8 @@ verbatim into the snapshot, so:
 - A coverage line at the end: what you covered, what you deferred and
   why — deferrals are recorded, never hidden.
 - Cite file:line for every claim; if you cannot verify a suspicion
-  after one follow-up read, mark it `unverified` and move on.
+  after one follow-up read, mark it `unverified` and move on — and
+  say what you could not verify rather than flagging it as definite.
 
 Do not reason from sandbox assumptions ("this is only a test path, not
 a finding") — the main session verifies and disposes; report what the

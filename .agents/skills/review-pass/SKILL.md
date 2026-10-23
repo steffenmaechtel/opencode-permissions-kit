@@ -23,6 +23,23 @@ the rules and never a source of finding judgments:
   family) deliberately run WITHOUT this skill; their value is freedom
   from exactly this context.
 
+## 0. Calibrated against opencode's built-in /review template
+
+The external release pass runs via opencode's `/review`; its template
+and this skill converge on the verification-strengthening lines
+(realistic trigger scenario per finding, no overstated severity,
+context around every hunk, style findings must source a house rule) —
+shared strictness is not shared bias. Deliberate divergences, kept on
+purpose — do not "align" them away:
+
+- **Pre-existing code IS reviewable** — it maps to the `pre-existing`
+  provenance class; full passes cover the whole tree.
+- **No untracked-file catch** — snapshots run on committed, clean
+  trees only; net-new files are inside the diff by construction.
+- **No unconditional whole-file reads** — the budget and coverage-map
+  discipline governs (micro/wave: greps + targeted reads).
+- **No web-search guidance** — reviewer subagent tool sets vary.
+
 ## 1. Collect the commission
 
 Never self-advance into a pass — the wave review fires on the
