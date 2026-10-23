@@ -19,9 +19,9 @@ rationale) is accepted as recorded.
 | a W7 (INFO) | **deliberately not done** | — | inherent window + F8; also in security-model.md |
 | a W8 (INFO) | **implemented** | `d1dcf34` | consume-time wording; -type d as the plant filter |
 | a W9 (INFO) | **deliberately not done** | — | verification finding (sweep exact, 44 hits re-run); nothing owed |
-| b W1 (MED) | **implemented** | `<SHA>` | 6 rows wrapped, pointer added, INDEX regen; make test green re-run |
+| b W1 (MED) | **implemented** | `f1fd24e` | 6 rows wrapped, pointer added; make test green re-run |
 | b W2 (INFO) | **deliberately not done** | — | headline residual claim true; rewording optional |
-| b W3 (INFO) | **implemented** | `<SHA>` | sweep recorded: _fsb_pass refuses, agent_home_sane base never / |
+| b W3 (INFO) | **implemented** | `f1fd24e` | sweep recorded: _fsb_pass refuses, agent_home_sane base never / |
 
 The retracted ghost (a-review C2, sabotage-count asymmetry) needs no
 disposition; the derivation lives in the snapshot.
@@ -110,7 +110,8 @@ written before the resolution file existed and never re-verified —
 review-b reproduced all three on the pristine HEAD). Fixed: the six
 rows wrapped (full content preserved in the Evidence detail blocks
 above), the pointer line added to review-a.md (the one allowed
-post-hoc snapshot edit), INDEX regenerated. Class sweep: the ratchet
+post-hoc snapshot edit), INDEX regenerated with the review-b snapshot
+commit (a3ecc9b, flipping the stale "no-resolution" row to open). Class sweep: the ratchet
 itself is the class gate — its green re-run below is the sweep
 evidence (no other in-scope file grew).
 
