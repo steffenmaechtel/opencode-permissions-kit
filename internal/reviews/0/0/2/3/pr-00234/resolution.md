@@ -1,22 +1,27 @@
 # Resolution — pr-00234 (issue #215 exec-time symlink gate on the .ddev pair)
 
 Chain: [review-a.md](review-a.md) (wave review of 395fee7, five-axis
-fan-out) → fix wave (this chain). Snapshot a's severity mapping note
-(C1 reported HIGH, mapped MED with rationale) is accepted as recorded.
+fan-out) → fix wave d1dcf34 → [review-b.md](review-b.md) (micro-wave
+review of the fix diff, single-pass) → b-wave fix (this chain's latest).
+Snapshot a's severity mapping note (C1 reported HIGH, mapped MED with
+rationale) is accepted as recorded.
 
 ## Dispositions
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a W1 (MED) | **implemented** | `d1dcf34` | gate hoisted above `_ddev_tree_conforms` (ddev-handover.sh); conforming-victim drive red without it |
-| a W2 (LOW) | **implemented** | `d1dcf34` | 2 new drives (10 pins): conforming race 5x, dev-owned flag race 5x; old fixture comment re-scoped |
+| a W1 (MED) | **implemented** | `d1dcf34` | gate hoisted above the conform probe; conforming drive red without it |
+| a W2 (LOW) | **implemented** | `d1dcf34` | 2 new drives (10 pins); old fixture comment re-scoped |
 | a W3 (LOW) | **implemented** | `d1dcf34` | warn now "a path component (parent or operand) is a symlink" |
-| a W4 (LOW) | **implemented** | `d1dcf34` | loud `/` refusal in the walk (mirrors `_fsb_pass`); header contract edges documented |
+| a W4 (LOW) | **implemented** | `d1dcf34` | loud '/' refusal; contract edges documented |
 | a W5 (LOW) | **implemented** | `d1dcf34` | security-model.md "Known residual gaps" entry (gate + residual window) |
-| a W6 (INFO) | **deliberately not done** | — | operator-invoked surface, validation→exec window incl. `exec sudo` hop; Follow-ups below |
-| a W7 (INFO) | **deliberately not done** | — | inherent non-atomic window + F8 documented in code and now in security-model.md (a W5) |
-| a W8 (INFO) | **implemented** | `d1dcf34` | "consume-time leaf gate" wording; find's `-type d` named as the plant filter |
+| a W6 (INFO) | **deliberately not done** | — | operator-invoked surface; Follow-ups below |
+| a W7 (INFO) | **deliberately not done** | — | inherent window + F8; also in security-model.md |
+| a W8 (INFO) | **implemented** | `d1dcf34` | consume-time wording; -type d as the plant filter |
 | a W9 (INFO) | **deliberately not done** | — | verification finding (sweep exact, 44 hits re-run); nothing owed |
+| b W1 (MED) | **implemented** | `<SHA>` | 6 rows wrapped, pointer added, INDEX regen; make test green re-run |
+| b W2 (INFO) | **deliberately not done** | — | headline residual claim true; rewording optional |
+| b W3 (INFO) | **implemented** | `<SHA>` | sweep recorded: _fsb_pass refuses, agent_home_sane base never / |
 
 The retracted ghost (a-review C2, sabotage-count asymmetry) needs no
 disposition; the derivation lives in the snapshot.
@@ -92,14 +97,54 @@ added: the gate, the skip-with-warning semantics, and the honest
 residuals (non-atomic gate→op window, leaf-only mid-recheck, accepted
 flag-write TOCTOU with a link to ddev-integration.md).
 
+### b W1 (MED) — ratchet + reviews-parity red at the a-wave HEAD
+
+The a-wave's disposition rows ran 124-146 content columns while the
+ratchet scope includes review resolutions (only review-* snapshots are
+exempt — verbatim over wrap), and two reviews-parity members were red
+with them: review-a.md lacked its `> Resolution:` pointer line and the
+committed INDEX still said pr-00234 "no-resolution". The a-wave Gates
+section's "make test green / line-length ratchet green" claims were
+therefore false at d1dcf34..ca4c564 (three red members; the claim was
+written before the resolution file existed and never re-verified —
+review-b reproduced all three on the pristine HEAD). Fixed: the six
+rows wrapped (full content preserved in the Evidence detail blocks
+above), the pointer line added to review-a.md (the one allowed
+post-hoc snapshot edit), INDEX regenerated. Class sweep: the ratchet
+itself is the class gate — its green re-run below is the sweep
+evidence (no other in-scope file grew).
+
+### b W2 (INFO) — residual wording
+
+The security-model residual sentence names "the recursive pair" as the
+op exposed in the gate→op window; on the conforming branch the first
+unguarded ops are the flag write and the settings pairs. The headline
+claims (non-atomic gate, leaf-only mid-recheck) are true and the entry
+names the residuals honestly — deliberately not reworded; a future
+touch of that entry can generalize to "the iteration's first op".
+
+### b W3 (INFO) — a W4 sweep recorded
+
+Same-shape walker sweep for the loud '/' refusal (pattern: chain
+walkers normalizing a scan root): `_fsb_pass` (fs-baseline.sh) already
+refuses '/' loudly — the "mirrors _fsb_pass" claim holds;
+`agent_home_sane` (staged-write.sh) walks below a base of
+`/home/<user>` (OPK_AGENT_HOME override is test-only) — structurally
+never '/'. No sibling site needs the refusal.
+
 ### Gates (this fix wave)
 
 `sh tests/unit/test-ddev-as-opencode.sh` green (288 PASS incl. the 10
-new race pins + 4 walk-edge pins); `make test` green; `make lint`
-green; `make check-version` green; line-length ratchet green (no new
-offenders); sandbox policy green. Sabotage, executed on the committed
-tree (d1dcf34), observed the way production observes (suite output),
-restore + re-run green after each:
+new race pins + 4 walk-edge pins); `make lint` green; `make check-version`
+green. Correction (b W1): this section originally claimed "`make test`
+green; line-length ratchet green (no new offenders)" — false at this
+wave's tree: the ratchet, the reviews-parity pointer and the INDEX were
+all red (see b W1 above); the claims were written before resolution.md
+existed and not re-verified after. The b-wave re-run below is the
+verified state. Sabotage, executed on the committed tree (d1dcf34),
+observed the way production observes (suite output), restore + re-run
+green after each — all three counts re-executed and confirmed by
+review-b on the pristine tree:
 
 - gate-call deletion: **10 pins red** (plain drive 4 — victim .ddev
   620, victim settings 620, warn absent, success echo; spaced 1 —
@@ -116,6 +161,16 @@ Both e2e suites on the fix-wave tree (d1dcf34): `make e2e` **309/0**,
 `make e2e-rootless` **47/0** (opencode 2.1.4, cache warm from the
 birth wave's run).
 
+### Gates (b-wave fix) — measured on this tree
+
+`make test` green (full unit suite, rc 0, includes the ratchet,
+reviews-parity and reviews-lint that were red before the wrap);
+`sh tests/unit/test-line-length.sh` rc 0 (resolution.md now 0 lines
+over 120; no other in-scope file grew — the ratchet itself is the
+class-sweep gate); `test-reviews-parity` OK (26 rows, pointer added);
+`test-reviews-lint` OK (26 cases). No production file touched by this
+wave — the ddev suite's 288/0 (review-b) still describes the code.
+
 ## Follow-ups
 
 - **a W6 (INFO):** `bin/opk` handover executors recheck the operand
@@ -125,9 +180,12 @@ birth wave's run).
   seconds, requires the operator to run the command at all). Next
   class pass over `chmod -R|chown -R` should decide between an
   ancestor walk there or an explicit accepted-residual record.
-- **Owed micro-wave review (review-b):** this fix wave changed
-  production code (ddev-handover.sh), tests and docs — per the stop
-  rule it owes a wave review of the fix diff; fires on the
-  maintainer's go.
+- **Owed micro-wave review (review-b):** ran — snapshot
+  [review-b.md](review-b.md) (a3ecc9b) over the fix diff; all three
+  findings dispositioned above. This b-wave's dispositions touched no
+  review-relevant code (files touched: resolution.md, review-a.md
+  pointer line, INDEX.md — bookkeeping only), so per the stop rule the
+  chain closes with this round; confirmation belongs to the maintainer
+  or the next round per RM-0115.
 - **e2e:** both suites run green on the fix-wave tree (d1dcf34):
   `make e2e` 309/0, `make e2e-rootless` 47/0 — recorded in Gates above.

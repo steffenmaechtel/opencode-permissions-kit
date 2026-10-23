@@ -9,6 +9,8 @@ Date: 2026-10-23
 Reviewer: GLM-5.3 (main, verification duty) + 5x GLM-5.3-Flash axes (S/Q/T/C/P fan-out)
 -->
 
+> Resolution: [resolution.md](resolution.md)
+
 # Wave review — pr-00234 snapshot a — issue #215 exec-time gate on the .ddev pair
 
 Wave pass over 395fee7 (single commit): `_ddev_components_sane` — the
