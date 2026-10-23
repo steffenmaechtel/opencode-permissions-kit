@@ -514,15 +514,29 @@ ddev_typo3_detected() {
 # before acting, string ops only (spaces survive). The root's trailing
 # slashes are normalized first (#211 b W7 shape: find emits children
 # WITHOUT the root's trailing slash — an unnormalized root voids the
-# prefix match and with it the whole walk). Returns 1 when any
-# component (the leaf included — the walk's last step is the operand
-# itself) is a symlink NOW; the caller skips the whole iteration (skip
-# != failure, the scan-time leaf-skip semantics).
+# prefix match and with it the whole walk); a root of '/' refuses LOUD
+# like _fsb_pass does (pr-00234 a W4) — a whole-filesystem handover
+# scan is never legitimate, and silent degradation is not how the
+# template behaves. Contract edges (pr-00234 a W4): an operand that IS
+# the scan root (a .ddev-named root — no registered root is) or sits
+# outside it returns 0 — there is nothing below the root to walk, and
+# the caller's leaf gate covers the operand itself. Returns 1 when any
+# component below the root (the leaf included — the walk's last step
+# is the operand itself) is a symlink NOW; the caller skips the whole
+# iteration (skip != failure, the leaf-skip semantics at the loop
+# head).
 _ddev_components_sane() {
     _dcs_root="$1"
     while [ "${_dcs_root%/}" != "$_dcs_root" ]; do
         _dcs_root="${_dcs_root%/}"
     done
+    if [ -z "$_dcs_root" ]; then
+        # '/' normalized away (pr-00234 a W4): refuse loud like
+        # _fsb_pass — never walk the whole filesystem silently.
+        printf '%s\n' "  warn: refusing scan root '$1' in the component walk —"\
+" the whole filesystem is never a scan root" >&2
+        return 1
+    fi
     case "$2" in
         "$_dcs_root"/*)
             _dcs_pre="$_dcs_root"
@@ -560,31 +574,43 @@ ddev_handover_root() {
     # ddev command ever runs from inside .git/.
     find "$dhr_root" -type d \( -name vendor -o -name node_modules -o -name testdata -o -name .git \) -prune -o \
         -type d -name .ddev -prune -print 2>/dev/null | while IFS= read -r dhr_d; do
-        # [ -L ] gates, roles split by the 0.0.45e W1 order swap (block
-        # reworded 0.0.45f W1 — it still described the old order; again
-        # for #215): this scan-time gate catches statically planted
-        # links — find classified the entry at SCAN time; the scanned
-        # trees are agent-group-writable (fs-baseline deeec30 pattern,
-        # 0.0.39g S2). The exec-time half is the component walk below
-        # (#215, the #211 a F1 class transfer): a PARENT directory
-        # swapped for a symlink inside the scan->exec window redirects
-        # the pair's chmod -R (which dereferences operands) outside the
-        # tree while every leaf-only gate passes — _ddev_components_sane
-        # re-tests each component between the scan root and the operand
-        # immediately before the pair and skips the WHOLE iteration (the
-        # project handovers below must not act through a swapped parent
-        # either). The mid-recheck between the ops guards only the
-        # SECOND op, the chown hand-over, as defense-in-depth (chown -R
-        # defaults to -P: lchowns, never traverses — 0.0.44a V24
-        # corrected the earlier "both dereference" claim) and skips the
-        # hand-over echo for a swapped operand. Class sweep boundary
-        # (#215): the ddev_devowned_flag write TOCTOU (0.0.46a F8,
-        # accepted residual — effect capped at opencode privilege) is
-        # deliberately OUT of this gate's scope, and the settings-dir /
-        # handback pairs carry their own exec-time gates (leaf [ -L ] +
-        # resolved containment, 0.0.42e S2 / 0.0.42f S1) — this walk
-        # covers the one site that had none.
+        # Consume-time leaf gate (roles split by the 0.0.45e W1 order
+        # swap; wording corrected for #215 / pr-00234 a W8 — it claimed
+        # to catch statically planted links at SCAN time): find's
+        # `-type d` keeps planted links out of the scan output entirely
+        # (find without -L never classifies a symlink as a directory) —
+        # what this [ -L ] catches is a leaf SWAPPED in the
+        # emit->consume window, re-tested per entry as the stream is
+        # consumed. The scanned trees are agent-group-writable
+        # (fs-baseline deeec30 pattern, 0.0.39g S2).
         [ -L "$dhr_d" ] && continue
+        # Exec-time component walk (#215; hoisted above the fast-path
+        # probe by pr-00234 a W1): re-test EVERY component between the
+        # scan root and the operand immediately before the iteration
+        # acts — a parent swapped since the scan resolves the operand
+        # outside the scan root, and chmod -R (which dereferences
+        # operands) would root-walk the swap target. The walk MUST run
+        # before the conform probe, not only before the pair: a swap
+        # victim's .ddev is exactly a top inode that already conforms
+        # (every previously handed-over project), and the settings
+        # pairs' own gates cannot catch a relocated project root —
+        # their resolved containment (0.0.42e S2 / 0.0.42f S1)
+        # canonicalizes BOTH sides through the swapped parent, so the
+        # victim stays "contained". A fired gate skips the WHOLE
+        # iteration: the dev-owned flag write and the project handovers
+        # below must not act through a swapped parent either. Skip !=
+        # failure (the leaf-skip semantics above), but announced: find
+        # never descends or prints through a link, so no legitimate
+        # tree trips this gate — a symlinked component can only be a
+        # swap. Class sweep boundary (#215): the ddev_devowned_flag
+        # write's own mid-write TOCTOU (0.0.46a F8, accepted residual —
+        # effect capped at opencode privilege) stays out of this gate's
+        # scope.
+        if ! _ddev_components_sane "$dhr_root" "$dhr_d"; then
+            printf '%s\n' "  warn: skipping .ddev handover for $dhr_d — a path"\
+" component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+            continue
+        fi
         # Top-inode fast path (issue #112): skip the recursive pair when
         # the tree already conforms — the steady-state re-scan used to
         # chown -R/chmod -R every .ddev on every update for nothing.
@@ -604,20 +630,13 @@ ddev_handover_root() {
             # pre-arranged (g+w from an earlier handover, o+w entries
             # it created while owning the tree — modes on owned entries
             # are owner-controlled) keep those subtrees agent-writable
-            # through the run; not closed by ordering.
-            # Exec-time component walk (#215): run immediately before
-            # the pair — a parent swapped since the scan resolves the
-            # operand outside the scan root, and chmod -R dereferences
-            # it. Skip the WHOLE iteration (flag write and project
-            # handovers included — they must not act through a swapped
-            # parent either). Skip != failure (the leaf-skip semantics
-            # above), but announce it: a symlinked parent can only be
-            # a swap — find never descends a link, so no legitimate
-            # tree trips this gate.
-            if ! _ddev_components_sane "$dhr_root" "$dhr_d"; then
-                printf '%s\n' "  warn: skipping .ddev handover for $dhr_d — a parent component is a symlink (swapped mid-scan?)" >&2
-                continue
-            fi
+            # through the run; not closed by ordering. The walk above
+            # shrunk the swap window from scan length to gate->op
+            # length; a swap inside THAT window stays undetected (the
+            # mid-recheck below is leaf-only, defense-in-depth for the
+            # SECOND op, the chown hand-over — chown -R defaults to -P:
+            # lchowns, never traverses, 0.0.44a V24 — and it skips the
+            # hand-over echo for a swapped operand).
             _dhr_ok=true
             chmod -R g+w "$dhr_d" 2>/dev/null || _dhr_ok=false
             [ -L "$dhr_d" ] && continue

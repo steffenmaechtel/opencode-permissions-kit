@@ -997,9 +997,11 @@ printf 'type: typo3\n' > "$RACE/victim/.ddev/config.yaml"
 printf 'victim-secret\n' > "$RACE/victim/.ddev/secret"
 printf 'victim-settings\n' > "$RACE/victim/config/system/settings.php"
 chmod 600 "$RACE/victim/.ddev/secret" "$RACE/victim/config/system/settings.php"
-# No g+w on the victim .ddev top inode: the fast-path probe must NOT
-# void the gate (a conforming tree skips the pair — and with it the
-# walk; the pin would go green for the wrong reason, the b W6 class).
+# No g+w on the victim .ddev top inode: this drive pins the PAIR half —
+# a conforming top inode would take the fast path and skip the pair
+# even with no gate at all (the pin would go green for the wrong
+# reason, the b W6 class). The conforming-victim drives below cover the
+# fast-path branch (pr-00234 a W1).
 chmod 755 "$RACE/victim/.ddev"
 cat > "$RACESTUB/find" <<EOF
 #!/bin/sh
@@ -1088,6 +1090,141 @@ assert_eq "spaces race: victim outside the tree keeps its mode (walk skips on sp
     "$(stat -c %a "$RACESP/vic tim/.ddev/has space.txt")"
 assert_eq "spaces race: skip is not a failure (rc 0)" "0" "$RACESP_RC"
 rm -rf "${RACESP:?}" "${RACESPS:?}"
+
+# Conforming-victim drive (pr-00234 a W1 / a W2): the victim's .ddev
+# top inode ALREADY conforms (current user:group + g+w — mkdir/chmod
+# as the running user; the steady state of every handed-over project),
+# so the pre-fix gate inside the else branch never fired: the fast
+# path took the PAIR out, but the iteration TAIL still acted through
+# the swapped parent — the settings pairs' resolved containment
+# canonicalizes both sides through the swap and cannot catch a
+# relocated project root. The hoisted walk must skip the WHOLE
+# iteration. The victim's settings dir is non-conforming (755 top
+# inode, 600 files): without the hoist, the forward settings pair
+# chmod -R g+w's it through the link (620) — the pin discriminates
+# through exactly the W1 mechanism.
+RACEC=$(mktemp -d)
+RACECT=$(mktemp -d)
+mkdir -p "$RACEC/scan/proj/.ddev" "$RACEC/victim/.ddev" \
+    "$RACEC/victim/config/system"
+printf 'type: typo3\n' > "$RACEC/scan/proj/.ddev/config.yaml"
+printf 'type: typo3\n' > "$RACEC/victim/.ddev/config.yaml"
+printf 'victim-secret\n' > "$RACEC/victim/.ddev/secret"
+printf 'victim-settings\n' > "$RACEC/victim/config/system/settings.php"
+chmod 600 "$RACEC/victim/.ddev/secret" "$RACEC/victim/config/system/settings.php"
+chmod 775 "$RACEC/victim/.ddev"
+chmod 755 "$RACEC/victim/config/system"
+cat > "$RACECT/find" <<EOF
+#!/bin/sh
+# Same buffered seam as the plain drive: swap the parent AFTER the
+# real find classified it, BEFORE the stream reaches the consumer.
+_out=\$(mktemp)
+"$(command -v find)" "\$@" > "\$_out"
+_rc=\$?
+if [ -d "$RACEC/scan/proj" ] && [ ! -L "$RACEC/scan/proj" ]; then
+    mv "$RACEC/scan/proj" "$RACEC/scan/moved-away"
+    ln -s "$RACEC/victim" "$RACEC/scan/proj"
+fi
+cat "\$_out"
+rm -f "\$_out"
+exit \$_rc
+EOF
+chmod +x "$RACECT/find"
+RACEC_RC=0
+RACEC_OUT=$(PATH="$RACECT:$PATH" sh -c \
+    '. "$1" && ddev_handover_root "$2" "$(id -un)" "$(id -gn)"' \
+    _ "$HANDOVER" "$RACEC/scan" 2>&1) || RACEC_RC=$?
+if [ -d "$RACEC/scan/moved-away/.ddev" ] && [ -L "$RACEC/scan/proj" ]; then
+    pass "conforming race: seam fired (parent swapped before the fast-path branch)"
+else
+    fail "conforming race: seam fired (parent swapped before the fast-path branch)"
+fi
+assert_eq "conforming race: victim settings untouched — tail skipped on the fast-path branch (#234 a W1)" "600" \
+    "$(stat -c %a "$RACEC/victim/config/system/settings.php")"
+assert_eq "conforming race: skip is not a failure (rc 0)" "0" "$RACEC_RC"
+case "$RACEC_OUT" in
+    *"warn: skipping .ddev handover"*)
+        pass "conforming race: the skip announces itself (#234 a W1)" ;;
+    *) fail "conforming race: the skip must announce itself (got: $RACEC_OUT) (#234 a W1)" ;;
+esac
+case "$RACEC_OUT" in
+    *"ddev settings handover:"*)
+        fail "conforming race: no settings echo over a skipped operand (#234 a W1)" ;;
+    *) pass "conforming race: no settings echo over a skipped operand (#234 a W1)" ;;
+esac
+rm -rf "${RACEC:?}" "${RACECT:?}"
+
+# Flag-write half (pr-00234 a W2): the raced drives so far run dev-owned
+# mode OFF — the "flag write included" claim of the whole-iteration
+# skip was unexercisable. With DDEV_DEV_OWNED=true the flag write must
+# not reach the victim's committed config.yaml through the swapped
+# parent (project unflagged: without the walk, ddev_devowned_flag
+# writes the key through the link and echoes success).
+RACEF=$(mktemp -d)
+RACEFT=$(mktemp -d)
+mkdir -p "$RACEF/scan/proj/.ddev" "$RACEF/victim/.ddev" \
+    "$RACEF/victim/config/system"
+printf 'type: typo3\n' > "$RACEF/scan/proj/.ddev/config.yaml"
+printf 'type: typo3\n' > "$RACEF/victim/.ddev/config.yaml"
+printf 'victim-settings\n' > "$RACEF/victim/config/system/settings.php"
+chmod 600 "$RACEF/victim/config/system/settings.php"
+chmod 775 "$RACEF/victim/.ddev"
+chmod 755 "$RACEF/victim/config/system"
+cat > "$RACEFT/find" <<EOF
+#!/bin/sh
+_out=\$(mktemp)
+"$(command -v find)" "\$@" > "\$_out"
+_rc=\$?
+if [ -d "$RACEF/scan/proj" ] && [ ! -L "$RACEF/scan/proj" ]; then
+    mv "$RACEF/scan/proj" "$RACEF/scan/moved-away"
+    ln -s "$RACEF/victim" "$RACEF/scan/proj"
+fi
+cat "\$_out"
+rm -f "\$_out"
+exit \$_rc
+EOF
+chmod +x "$RACEFT/find"
+RACEF_RC=0
+RACEF_OUT=$(DDEV_DEV_OWNED=true PATH="$RACEFT:$PATH" sh -c \
+    '. "$1" && ddev_handover_root "$2" "$(id -un)" "$(id -gn)"' \
+    _ "$HANDOVER" "$RACEF/scan" 2>&1) || RACEF_RC=$?
+if [ -d "$RACEF/scan/moved-away/.ddev" ] && [ -L "$RACEF/scan/proj" ]; then
+    pass "flag race: seam fired (parent swapped before the flag write)"
+else
+    fail "flag race: seam fired (parent swapped before the flag write)"
+fi
+if grep -q '^disable_settings_management:' "$RACEF/victim/.ddev/config.yaml"; then
+    fail "flag race: the dev-owned flag must not be written through a swapped parent (#234 a W1)"
+else
+    pass "flag race: the dev-owned flag must not be written through a swapped parent (#234 a W1)"
+fi
+case "$RACEF_OUT" in
+    *"dev-owned flag written:"*)
+        fail "flag race: no flag-written echo over a skipped operand (#234 a W1)" ;;
+    *) pass "flag race: no flag-written echo over a skipped operand (#234 a W1)" ;;
+esac
+assert_eq "flag race: victim settings untouched too (whole iteration skipped)" "600" \
+    "$(stat -c %a "$RACEF/victim/config/system/settings.php")"
+assert_eq "flag race: skip is not a failure (rc 0)" "0" "$RACEF_RC"
+rm -rf "${RACEF:?}" "${RACEFT:?}"
+
+# Walk contract edges (pr-00234 a W4): a scan root of '/' refuses LOUD
+# like _fsb_pass — rc 1 plus a warn on stderr (the failure path
+# executes, observed the way a caller would). An operand equal to the
+# scan root returns 0 silently — nothing below the root to walk, the
+# documented contract edge (the caller's leaf gate covers the operand).
+DCS_RC=0
+DCS_OUT=$(sh -c '. "$1" && _ddev_components_sane "/" "/tmp"' _ "$HANDOVER" 2>&1) || DCS_RC=$?
+assert_eq "walk: root '/' refuses loud — rc 1 (#234 a W4)" "1" "$DCS_RC"
+case "$DCS_OUT" in
+    *"refusing scan root '/'"*)
+        pass "walk: the '/' refusal announces itself (#234 a W4)" ;;
+    *) fail "walk: the '/' refusal must announce itself (got: $DCS_OUT) (#234 a W4)" ;;
+esac
+DCS2_RC=0
+DCS2_OUT=$(sh -c '. "$1" && _ddev_components_sane "/tmp" "/tmp"' _ "$HANDOVER" 2>&1) || DCS2_RC=$?
+assert_eq "walk: operand == scan root returns 0 (contract edge, #234 a W4)" "0" "$DCS2_RC"
+assert_eq "walk: operand == scan root stays silent (contract edge, #234 a W4)" "" "$DCS2_OUT"
 
 # Scan-skip stamps: write -> valid; any field mismatch -> invalid; a
 # cksum filename collision must not validate a different root.

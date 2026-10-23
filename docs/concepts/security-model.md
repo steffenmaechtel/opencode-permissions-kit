@@ -59,6 +59,17 @@ Documented rather than hidden:
   opencode host UID).
 - **Renamed copies** of secrets are invisible to the name-based
   [leak scan](../how-to/customize-deny-list.md).
+- **Scan→exec symlink swaps on handover trees (gated; a window
+  remains):** the root-run `.ddev` handover re-tests every path
+  component between the scan root and the operand immediately before
+  the iteration acts, on every branch — a directory swapped for a
+  symlink mid-scan makes the whole iteration skip with a warning
+  instead of chmod/chown-ing or writing through the link. Residual:
+  the gate is not atomic — a swap in the short window between the
+  gate and the recursive pair itself stays undetected (a leaf-only
+  mid-recheck covers just the chown half), and dev-owned mode's
+  flag-write TOCTOU stays accepted (opencode-privilege-capped; see
+  [ddev integration](ddev-integration.md)).
 - The kit protects **locations, not information flows** — once content
   leaves the project roots, no scan recaptures it.
 - **mkcert CA key in the agent's home (deliberate):** ddev signs its
