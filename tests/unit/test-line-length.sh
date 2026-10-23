@@ -10,6 +10,13 @@
 # documented bug history (0.0.39o C1: spaces lost at adjacent-string
 # wraps when lines were re-broken for width). Content-width keeps the
 # ratchet's growth guarantee while making (re-)indentation free.
+# For markdown files the metric ALSO strips the YAML frontmatter block
+# (a leading --- ... --- pair, issue #178 wave): frontmatter is machine-
+# parsed DATA, not prose to wrap — a skill description changes length
+# with every legitimate edit, and baselining such a line buys churn
+# without protection (the description bound lives where the data is
+# validated: tests/unit/test-skills-lint.sh). Same spirit as the
+# machine-generated INDEX exemption.
 # The tree is NOT at zero either way: at adoption (2026-10-01) the
 # shipped files carried ~207 lines over 120 in 18 files, and the
 # workflow chmod inventory lines of that era were 2k+ chars single
@@ -30,10 +37,11 @@
 #
 # Metric note: awk's length() counts bytes in the C locale -- em-dashes
 # and friends count their UTF-8 bytes. That is fine here: the ratchet
-# only ever compares like with like. The leading-whitespace strip is
-# applied in ALL three measurements (baseline regen, growth check,
-# trend) so the metric is consistent everywhere; the baseline was
-# regenerated for the metric switch (deliberate, diff-reviewed --
+# only ever compares like with like. The leading-whitespace strip and
+# the markdown frontmatter strip are applied in ALL three measurements
+# (baseline regen, growth check, trend) via the shared measure() helper
+# so the metric stays consistent everywhere; the baseline was
+# regenerated for the metric switches (deliberate, diff-reviewed --
 # entries can only shrink or vanish, never grow).
 #
 # Scope: TWO halves, one baseline. Shell/yml half: files/**/*.sh (incl.
@@ -71,41 +79,78 @@ docs_scope() {
         ! -name 'legacy-index.md'
 }
 
+# scope_files -- the ratchet's full scope, one path per line.
+scope_files() {
+    find files -name '*.sh' -type f
+    find files/opencode-permissions-kit-lib/bin -type f
+    find .github/workflows -name '*.yml' -type f
+    docs_scope
+}
+
+# measure_file <file> <limit> -- the ONE metric every measurement uses
+# (regen, growth check, trend, self-probe): strips leading whitespace
+# (content, not structure) and, for markdown files only, the leading
+# YAML frontmatter block (data, not prose -- see header). Prints
+# "<file> <sum-beyond-limit> <offending-line-count>" when there is
+# excess, nothing when clean.
+measure_file() {
+    _mf="$1"; _ml="$2"
+    case "$_mf" in
+        *.md) _mfm=1 ;;
+        *) _mfm=0 ;;
+    esac
+    awk -v lim="$_ml" -v f="$_mf" -v fm="$_mfm" '
+        FNR == 1 && fm && $0 == "---" { infm = 1; next }
+        fm && infm { if ($0 == "---") infm = 0; next }
+        { sub(/^[[:space:]]+/, "") }
+        length > lim { s += length - lim; c++ }
+        END { if (s > 0) printf "%s %d %d\n", f, s, c }' "$_mf"
+}
+
 # --regen: rewrite the baseline from the current tree (deliberate
 # exception path -- review the diff, never regenerate to silence a fail).
 if [ "${1:-}" = "--regen" ]; then
-    {
-        find files -name '*.sh' -type f
-        find files/opencode-permissions-kit-lib/bin -type f
-        find .github/workflows -name '*.yml' -type f
-        docs_scope
-    } | sort -u | while IFS= read -r f; do
-        awk -v lim="$LIMIT" -v f="$f" \
-            '{ sub(/^[[:space:]]+/, "") }
-             length > lim { s += length - lim; c++ }
-             END { if (s > 0) printf "%s %d %d\n", f, s, c }' "$f"
+    scope_files | sort -u | while IFS= read -r f; do
+        measure_file "$f" "$LIMIT"
     done > "$BASELINE"
     echo "baseline regenerated: $(wc -l < "$BASELINE" | tr -d ' ') entries -> $BASELINE"
     exit 0
 fi
 
 TMP_CUR="$(mktemp)"
-trap 'rm -f "$TMP_CUR"' EXIT
+TMP_PROBE="$(mktemp)"
+trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT
 
 [ -f "$BASELINE" ] || { echo "line length ratchet: FAILED (baseline missing)"; exit 1; }
 
+# --- metric self-probe (the strip must discriminate, L4) ----------------
+# The frontmatter strip is a new fail-soft spot in the "strips too
+# much" direction (an over-eager strip would silently exempt prose).
+# The probe runs the REAL measure_file helper on scratch fixtures:
+# frontmatter lines not counted, prose counted, non-markdown files
+# never stripped (a YAML --- document start is content there).
+PROBE_DIR="$(mktemp -d)"
+trap 'rm -rf "${PROBE_DIR:?}" "$TMP_CUR" "$TMP_PROBE"' EXIT
+mkdir -p "$PROBE_DIR"
+printf -- '---\nname: probe\ndescription: %s\n---\nshort prose line\n' \
+    "$(printf 'x%.0s' $(seq 1 130))" > "$PROBE_DIR/probe.md"
+printf -- '---\nshort frontmatter line\n---\n%s\n' \
+    "$(printf 'y%.0s' $(seq 1 130))" > "$PROBE_DIR/probe2.md"
+printf -- '---\n%s\n' \
+    "$(printf 'z%.0s' $(seq 1 130))" > "$PROBE_DIR/probe.yml"
+_p1=$(measure_file "$PROBE_DIR/probe.md" "$LIMIT")   # frontmatter only
+_p2=$(measure_file "$PROBE_DIR/probe2.md" "$LIMIT")  # prose long line
+_p3=$(measure_file "$PROBE_DIR/probe.yml" "$LIMIT")  # non-md: not stripped
+if [ -z "$_p1" ] && [ "${_p2#*probe2.md }" != "$_p2" ] && [ "${_p3#*probe.yml }" != "$_p3" ]; then
+    echo "  probe ok: frontmatter stripped (md), prose and non-md counted"
+else
+    echo "  PROBE BROKEN: fm-only='$_p1' prose='$_p2' non-md='$_p3'" >> "$TMP_PROBE"
+fi
+
 # Current state: "path sum count" for every scope file with excess > 0.
 # Paths in this repo contain no spaces (word-splitting over find is safe).
-{
-    find files -name '*.sh' -type f
-    find files/opencode-permissions-kit-lib/bin -type f
-    find .github/workflows -name '*.yml' -type f
-    docs_scope
-} | sort -u | while IFS= read -r f; do
-    awk -v lim="$LIMIT" -v f="$f" \
-        '{ sub(/^[[:space:]]+/, "") }
-         length > lim { s += length - lim; c++ }
-         END { if (s > 0) printf "%s %d %d\n", f, s, c }' "$f"
+scope_files | sort -u | while IFS= read -r f; do
+    measure_file "$f" "$LIMIT"
 done > "$TMP_CUR"
 
 rc=0
@@ -136,15 +181,19 @@ while read -r b_path b_sum b_cnt; do
 done < "$BASELINE"
 
 # 3. trend: lines over the warning threshold, never fatal.
-trend=$({
-    find files -name '*.sh' -type f
-    find files/opencode-permissions-kit-lib/bin -type f
-    find .github/workflows -name '*.yml' -type f
-    docs_scope
-} | sort -u | xargs awk -v lim="$TREND" \
-    '{ sub(/^[[:space:]]+/, "") } length > lim { c++ } END { print c + 0 }')
+_trend_files="$(scope_files | sort -u)"
+trend=0
+for f in $_trend_files; do
+    _t=$(measure_file "$f" "$TREND")
+    [ -n "$_t" ] && trend=$((trend + ${_t##* }))
+done
 over=$(awk '{ n += $3 } END { print n + 0 }' "$TMP_CUR")
 
+if [ -s "$TMP_PROBE" ]; then
+    echo "line length ratchet: FAILED"
+    cat "$TMP_PROBE"
+    exit 1
+fi
 if [ "$rc" -ne 0 ]; then
     echo "line length ratchet: FAILED"
     echo "  fix the lines above, or (deliberate exception, review the diff):"
