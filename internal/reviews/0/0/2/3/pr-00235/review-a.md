@@ -10,6 +10,8 @@ Reviewer: GLM-5.3 house session (opk-review-pass skill) + 3 fresh-context review
 Skills: opk-review-pass
 -->
 
+> Resolution: [resolution.md](resolution.md)
+
 # Review a — agent-skills pilot wave (issue #178)
 
 First snapshot of the case; commissioned by the maintainer over PR
