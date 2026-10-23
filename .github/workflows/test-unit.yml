@@ -97,6 +97,8 @@ jobs:
         run: ./tests/unit/test-pages.sh
       - name: Run review case lint (structure wave 2026-10)
         run: ./tests/unit/test-reviews-lint.sh
+      - name: Run agent skills lint (issue #178)
+        run: ./tests/unit/test-skills-lint.sh
       - name: Run review index/pointer parity (structure wave 2026-10)
         run: ./tests/unit/test-reviews-parity.sh
       - name: Run reviews-meta aggregator pins (meta run 2026-10-22)

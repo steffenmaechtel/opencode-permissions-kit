@@ -58,11 +58,16 @@ era's shape — both stay citable as history). House-owned parts:
   Diff: e26f379..24ad0d2
   Date: 2026-10-15
   Reviewer: GLM-5.3 (external /review session)
+  Skills: review-pass        (optional — skills that ran the pass)
   -->
   ```
 
   The lint test pins ID↔folder and Snapshot↔file name. (Legacy cases
   predate the header; their stem + dates live in legacy-index.md.)
+  `Skills:` is part of the environment record (RM-0078) and makes the
+  skill usage auditable: it names every `.agents/skills/` procedure
+  that choreographed the pass (external redundancy passes run without
+  them and omit the line — RM-0083).
 - Catch-up and backup reviews (e.g. the successor after a rotation
   deviation) add no Scope value: Scope stays `wave`, the Subject
   names the catch-up ("rotation-deviation catch-up"), and the

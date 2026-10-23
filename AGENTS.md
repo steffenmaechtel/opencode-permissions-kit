@@ -13,6 +13,10 @@ this repository — the router. Detail lives next to its audience:
   and e2e suites but still hit real terminals
 - [agent/review-concept.md](agent/review-concept.md) — the review
   process: loop, stop rule, verification duty, reviewer mechanics
+- `.agents/skills/` — loadable procedures for on-demand workflows
+  (opencode loads them by description match): the session EXECUTING a
+  review pass loads the `review-pass` skill first — rules stay in
+  agent/, the skill carries the choreography only (issue #178)
 - [internal/reviews/README.md](internal/reviews/README.md) — review
   mechanics: case folders (birth-PR key), snapshots/resolutions,
   citation format

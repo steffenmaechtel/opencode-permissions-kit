@@ -193,6 +193,11 @@ CONTRIBUTING's "shrink the next one" rule):
 
 ## Parallel reviewer agents
 
+Execution choreography (fan-out staging, axis-prompt construction,
+checkpoint mechanics, snapshot writing): load the `review-pass` skill
+(`.agents/skills/review-pass/`) — the rules below stay authoritative
+here.
+
 - The main agent runs a strong default model and owns the
   verification duty; every reviewer subagent runs the provider's
   cheaper fast tier (house instance: GLM-5.3 + GLM-5.3-Flash —
