@@ -95,11 +95,26 @@ flag-write TOCTOU with a link to ddev-integration.md).
 ### Gates (this fix wave)
 
 `sh tests/unit/test-ddev-as-opencode.sh` green (288 PASS incl. the 10
-new pins); `make test` green; `make lint` green; `make check-version`
-green; line-length ratchet green (no new offenders); sandbox policy
-green. Sabotage verification (committed tree): see the wave-review
-hand-off below — gate-call deletion and hoist deletion were executed
-red, restore re-run green (counts recorded in the round report).
+new race pins + 4 walk-edge pins); `make test` green; `make lint`
+green; `make check-version` green; line-length ratchet green (no new
+offenders); sandbox policy green. Sabotage, executed on the committed
+tree (d1dcf34), observed the way production observes (suite output),
+restore + re-run green after each:
+
+- gate-call deletion: **10 pins red** (plain drive 4 — victim .ddev
+  620, victim settings 620, warn absent, success echo; spaced 1 —
+  mode 620; conforming 3 — settings 620, warn absent, settings echo;
+  flag 2 — flag written into the victim's config, success echo).
+- position sabotage (gate re-inserted inside the `else`, the pre-fix
+  shape): **5 pins red** — exactly the two new drives; the
+  pre-existing drives stay green (their victims are non-conforming),
+  proving the new drives pin the HOIST, not just the gate's existence.
+- '/' refusal deletion: **2 pins red** (rc 0 instead of 1, warn
+  absent).
+
+Both e2e suites on the fix-wave tree (d1dcf34): `make e2e` **309/0**,
+`make e2e-rootless` **47/0** (opencode 2.1.4, cache warm from the
+birth wave's run).
 
 ## Follow-ups
 
@@ -114,5 +129,5 @@ red, restore re-run green (counts recorded in the round report).
   production code (ddev-handover.sh), tests and docs — per the stop
   rule it owes a wave review of the fix diff; fires on the
   maintainer's go.
-- **e2e:** both suites run on the fix-wave tree (see round report);
-  counts recorded there.
+- **e2e:** both suites run green on the fix-wave tree (d1dcf34):
+  `make e2e` 309/0, `make e2e-rootless` 47/0 — recorded in Gates above.
