@@ -8,14 +8,14 @@ fan-out) → fix wave (this chain). Snapshot a's severity mapping note
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a W1 (MED) | **implemented** | `<SHA>` | gate hoisted above `_ddev_tree_conforms` (ddev-handover.sh); conforming-victim drive red without it |
-| a W2 (LOW) | **implemented** | `<SHA>` | 2 new drives (10 pins): conforming race 5x, dev-owned flag race 5x; old fixture comment re-scoped |
-| a W3 (LOW) | **implemented** | `<SHA>` | warn now "a path component (parent or operand) is a symlink" |
-| a W4 (LOW) | **implemented** | `<SHA>` | loud `/` refusal in the walk (mirrors `_fsb_pass`); header contract edges documented |
-| a W5 (LOW) | **implemented** | `<SHA>` | security-model.md "Known residual gaps" entry (gate + residual window) |
+| a W1 (MED) | **implemented** | `d1dcf34` | gate hoisted above `_ddev_tree_conforms` (ddev-handover.sh); conforming-victim drive red without it |
+| a W2 (LOW) | **implemented** | `d1dcf34` | 2 new drives (10 pins): conforming race 5x, dev-owned flag race 5x; old fixture comment re-scoped |
+| a W3 (LOW) | **implemented** | `d1dcf34` | warn now "a path component (parent or operand) is a symlink" |
+| a W4 (LOW) | **implemented** | `d1dcf34` | loud `/` refusal in the walk (mirrors `_fsb_pass`); header contract edges documented |
+| a W5 (LOW) | **implemented** | `d1dcf34` | security-model.md "Known residual gaps" entry (gate + residual window) |
 | a W6 (INFO) | **deliberately not done** | — | operator-invoked surface, validation→exec window incl. `exec sudo` hop; Follow-ups below |
 | a W7 (INFO) | **deliberately not done** | — | inherent non-atomic window + F8 documented in code and now in security-model.md (a W5) |
-| a W8 (INFO) | **implemented** | `<SHA>` | "consume-time leaf gate" wording; find's `-type d` named as the plant filter |
+| a W8 (INFO) | **implemented** | `d1dcf34` | "consume-time leaf gate" wording; find's `-type d` named as the plant filter |
 | a W9 (INFO) | **deliberately not done** | — | verification finding (sweep exact, 44 hits re-run); nothing owed |
 
 The retracted ghost (a-review C2, sabotage-count asymmetry) needs no
@@ -94,7 +94,7 @@ flag-write TOCTOU with a link to ddev-integration.md).
 
 ### Gates (this fix wave)
 
-`sh tests/unit/test-ddev-as-opencode.sh` green (284 PASS incl. the 10
+`sh tests/unit/test-ddev-as-opencode.sh` green (288 PASS incl. the 10
 new pins); `make test` green; `make lint` green; `make check-version`
 green; line-length ratchet green (no new offenders); sandbox policy
 green. Sabotage verification (committed tree): see the wave-review
