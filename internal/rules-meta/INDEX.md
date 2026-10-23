@@ -6,7 +6,7 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**115 metas · 113 active · 2 retired · 0 review-pending · next due 2026-11-14**
+**116 metas · 114 active · 2 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
@@ -82,6 +82,12 @@
 |---|---|---|---|---|---|
 | [RM-0018](0/0/1/RM-0018.md) | New cases (birth-PR key, since the 2026-10… | active | approved | 1m | 2026-11-16 |
 | [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 1m | 2026-11-16 |
+
+### Referencing house rules (RM keys)
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0116](0/1/1/RM-0116.md) | Every RM key appears exactly twice | active | approved | 1m | 2026-11-23 |
 
 ## agent/review-concept.md
 

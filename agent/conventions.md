@@ -217,6 +217,15 @@ The case map is the generated
 [INDEX](../internal/reviews/INDEX.md); naming, formats, and the
 mechanics live in the [review README](../internal/reviews/README.md).
 
+## Referencing house rules (RM keys)
+
+Every RM key appears exactly twice in the living tree: as the trailing
+`(RM-NNNN)` of its rule unit, and as the `id:` line of its meta file —
+new text (files, skills, comments, cross-references) cites a rule by
+file and section, never by its ID, because a third mention breaks the
+rules audit's invariant that searching an ID only ever hits genuine
+sites. (RM-0116)
+
 ## Language
 
 All shipped content (scripts, docs, prompts, messages) is English — see
