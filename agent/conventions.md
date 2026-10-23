@@ -229,8 +229,9 @@ Citations in new text name the file and section, never the bare ID:
   ever hits genuine sites. The closed world is what the no-fake
   findings pin measures (tests/unit/test-rules-meta.sh, pin 10): the
   generated indexes and the frozen reviews corpus sit outside the
-  count; living files under `internal/reviews/` (this README's peers)
-  do not. (RM-0116)
+  count; living files under `internal/reviews/` —
+  `internal/reviews/README.md` and its living peers — do not.
+  (RM-0116)
 
 ## Language
 

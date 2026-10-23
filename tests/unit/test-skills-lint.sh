@@ -32,10 +32,20 @@
 #     loader needs to pick them reliably")
 #   - no workspace `local/` references — workspace rule (AGENTS.md,
 #     global): repo content must never point into the disposable
-#     workspace. The pattern matches `local/` and `../local/` but NOT
-#     `~/.local/` (XDG) or `/usr/local/` (system prefix) — those are
-#     legitimate paths a skill may name (#235 a S3/X1); a scan ERROR
-#     (grep rc 2) is a FAIL too, never a silent clean (#235 a X2)
+#     workspace. Matched shapes: `local/…` and `../local/…` (relative
+#     from workspace root / repo), the dot-slash family `./local/…`
+#     (incl. `x/./local/`, `.././local/`), prose-prefixed occurrences,
+#     and this checkout's absolute workspace-local path (computed at
+#     runtime below). NOT matched, deliberately: `~/.local/` (XDG),
+#     `/usr/local/` (system prefix), identifier-embedded shapes
+#     (`opencode-local/`, `foo.local/`) and repo-internal segments
+#     (`x/local/`) — none of those resolve into the disposable dir
+#     (#235 a S3/X1, #235 b B1). A scan ERROR is a FAIL at BOTH
+#     stages — grep rc 2 (dangling or unreadable operand) and find
+#     rc > 0 (unreadable subdir) — never a silent clean (#235 a X2,
+#     #235 b S4/B2). The hit:/err: sentinels are matched as path
+#     text; a `:`-bearing path would false-FAIL — fail-loud by
+#     design (#235 b B6).
 #
 # Frontmatter fields are read only BETWEEN the opening and closing ---
 # (body lines cannot satisfy them) and the close search has no head
@@ -49,6 +59,15 @@
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
+
+# This checkout's absolute workspace-local path (sibling of repo/):
+# matched literally so absolute references into the disposable dir
+# are caught without flagging /usr/local (system prefix). Escaped for
+# ERE; the fixtures below generate their reference dynamically too,
+# so pattern and pins move together across checkouts (#235 b B1).
+WS_LOCAL="$(cd "$REPO_ROOT/.." && pwd)/local"
+WS_LOCAL_ESC="$(printf '%s' "$WS_LOCAL" | sed 's/[.\^$()*+?[|\\]/\\&/g')"
+LOCAL_SHAPES="(^|[^.[:alnum:]_/-])local/|\.\./local/|\./local/|$WS_LOCAL_ESC"
 
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
@@ -92,20 +111,24 @@ lint_skills() {
                     echo "FAIL $_name: description $_dlen bytes > 400"
             fi
         fi
-        # no workspace local/ references (disposable dir next to repo/):
-        # `local/` or `../local/` matches; ~/.local/ and /usr/local/
-        # are legitimate and must NOT match; a scan ERROR (grep rc 2,
-        # e.g. a dangling or unreadable path) is a FAIL too, never a
-        # silent clean (#235 a X2) -- per-file grep so a symlink
-        # operand reliably reports rc 2 (grep -r skips dir-internal
-        # symlinks entirely)
-        _scan=$(find "$_d" \( -type f -o -type l \) -print 2>/dev/null \
-            | while IFS= read -r _p; do
-                  grep -qE '(^|[^.[:alnum:]_/-])local/|\.\./local/' "$_p" 2>/dev/null
+        # no workspace local/ references (disposable dir next to
+        # repo/): shapes documented in the header. Per-file grep so a
+        # symlink operand reliably reports rc 2 (grep -r skips
+        # dir-internal symlinks entirely). BOTH stages must be loud:
+        # find rc > 0 (unreadable subdir -- its entries are invisible
+        # to the scan) becomes an err: sentinel too, never a silent
+        # clean (#235 b S4/B2).
+        _flist=$(find "$_d" \( -type f -o -type l \) -print 2>/dev/null)
+        _frc=$?
+        _scan=$(printf '%s\n' "$_flist" | while IFS= read -r _p; do
+                  [ -n "$_p" ] || continue
+                  grep -qE "$LOCAL_SHAPES" "$_p" 2>/dev/null
                   _rc=$?
                   [ "$_rc" -eq 0 ] && printf 'hit:%s\n' "$_p"
                   [ "$_rc" -gt 1 ] && printf 'err:%s\n' "$_p"
               done)
+        [ "$_frc" -eq 0 ] || _scan="$_scan
+err:find-rc=$_frc $_d"
         case "$_scan" in
             *hit:*) echo "FAIL $_name: references local/ (disposable workspace)" ;;
         esac
@@ -130,7 +153,9 @@ mkdir -p "$WORK/skills/opk-good-skill" "$WORK/skills/opk-no-desc" \
          "$WORK/skills/opk-no-skill-md" "$WORK/skills/no-prefix" \
          "$WORK/skills/opk-broken-open" "$WORK/skills/opk-unclosed" \
          "$WORK/skills/opk-long-desc" "$WORK/skills/opk-legit-paths" \
-         "$WORK/skills/opk-body-field" "$WORK/skills/opk-scan-err"
+         "$WORK/skills/opk-body-field" "$WORK/skills/opk-scan-err" \
+         "$WORK/skills/opk-dot-local" "$WORK/skills/opk-abs-local" \
+         "$WORK/skills/opk-find-err/sub"
 cat > "$WORK/skills/opk-good-skill/SKILL.md" <<'EOF'
 ---
 name: opk-good-skill
@@ -193,6 +218,8 @@ description: Fixture naming system and XDG local paths that stay legal.
 ---
 Deploys to /usr/local/lib/opencode-permissions-kit/ and reads
 ~/.local/share/opencode — neither is the disposable workspace.
+Repo-internal segments like tests/fixtures/local/demo resolve inside
+the repo, not into the workspace — unflagged by design (#235 b B1).
 EOF
 cat > "$WORK/skills/opk-body-field/SKILL.md" <<'EOF'
 ---
@@ -206,11 +233,37 @@ EOF
 cat > "$WORK/skills/opk-scan-err/SKILL.md" <<'EOF'
 ---
 name: opk-scan-err
-description: Fixture whose local/ scan hits an unreadable path.
+description: Fixture with an unreadable path in its file scan.
 ---
 Body.
 EOF
 ln -s /nonexistent-target-for-skills-lint "$WORK/skills/opk-scan-err/dangling"
+cat > "$WORK/skills/opk-dot-local/SKILL.md" <<'EOF'
+---
+name: opk-dot-local
+description: Fixture referencing the workspace via dot-slash shapes.
+---
+See ./local/notes.md and .././local/scratch — both resolve into the
+disposable workspace (#235 b B1).
+EOF
+{
+    printf -- '---\nname: opk-abs-local\ndescription: %s\n---\n' \
+        "Fixture using the checkout-absolute workspace-local path."
+    printf 'Archive at %s/scratch — the disposable workspace.\n' "$WS_LOCAL"
+} > "$WORK/skills/opk-abs-local/SKILL.md"
+# find-stage error: valid frontmatter, but the unreadable subdir makes
+# find itself fail (rc > 0) with its entries invisible to the scan --
+# only the err sentinel may report that (#235 b S4/B2). Root reads
+# through mode 000, so the pin below is uid-guarded (L4:
+# environment-dependent pins are marked).
+cat > "$WORK/skills/opk-find-err/SKILL.md" <<'EOF'
+---
+name: opk-find-err
+description: Fixture whose scan dies inside an unreadable subdir.
+---
+Body.
+EOF
+chmod 000 "$WORK/skills/opk-find-err/sub"
 
 _out=$(lint_skills "$WORK/skills")
 case "$_out" in
@@ -253,6 +306,27 @@ case "$_out" in
     *"FAIL opk-scan-err: local/ scan errored"*) echo "  pin ok: scan error is a FAIL, not a clean" ;;
     *) echo "  PIN BROKEN: scan error silently clean" >> "$TMP" ;;
 esac
+case "$_out" in
+    *"FAIL opk-scan-err: references local/"*)
+        echo "  PIN BROKEN: scan-err fixture also trips the hit branch (b S3)" >> "$TMP" ;;
+    *) echo "  pin ok: scan-err fixture exercises the err path alone" ;;
+esac
+case "$_out" in
+    *"FAIL opk-dot-local: references local/"*) echo "  pin ok: dot-slash workspace refs caught" ;;
+    *) echo "  PIN BROKEN: ./local/ reference not caught (b B1)" >> "$TMP" ;;
+esac
+case "$_out" in
+    *"FAIL opk-abs-local: references local/"*) echo "  pin ok: absolute workspace-local ref caught" ;;
+    *) echo "  PIN BROKEN: absolute workspace-local reference not caught (b B1)" >> "$TMP" ;;
+esac
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  pin skipped: find-error needs a non-root uid (root reads through 000)"
+else
+    case "$_out" in
+        *"FAIL opk-find-err: local/ scan errored"*) echo "  pin ok: find-stage error is a FAIL, not a clean" ;;
+        *) echo "  PIN BROKEN: find error silently clean (b S4/B2)" >> "$TMP" ;;
+    esac
+fi
 case "$_out" in
     *"FAIL opk-legit-paths"*) echo "  PIN BROKEN: legit /usr/local or ~/.local path flagged" >> "$TMP" ;;
     *) echo "  pin ok: system/XDG local paths not flagged" ;;

@@ -99,8 +99,12 @@ scope_files() {
 # (content, not structure) and, for markdown files only, the leading
 # YAML frontmatter block (data, not prose -- see header). The strip is
 # conditional on the block CLOSING: an unclosed leading --- counts in
-# full (#235 a S1). Prints "<file> <sum-beyond-limit> <offending-line-
-# count>" when there is excess, nothing when clean.
+# full (#235 a S1). "Closing" means the next --- line anywhere in the
+# file -- YAML validity is not assessed, so a prose file opening with
+# a --- rule and containing another --- line has that span stripped;
+# pinned as documented behavior by probe4 (#235 b B3). Prints
+# "<file> <sum-beyond-limit> <offending-line-count>" when there is
+# excess, nothing when clean.
 measure_file() {
     _mf="$1"; _ml="$2"
     case "$_mf" in
@@ -139,13 +143,17 @@ trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT
 [ -f "$BASELINE" ] || { echo "line length ratchet: FAILED (baseline missing)"; exit 1; }
 
 # --- metric self-probe (the strip must discriminate, L4) ----------------
-# The frontmatter strip is a new fail-soft spot in two directions:
-# "strips too little" (frontmatter counted as prose) and "strips too
-# much" (prose silently exempt -- the unclosed-block case, #235 a S1).
-# The probe runs the REAL measure_file helper on scratch fixtures:
-# frontmatter lines not counted, prose counted, non-markdown files
-# never stripped (a YAML --- document start is content there), and an
-# UNCLOSED leading --- counted in full.
+# The frontmatter strip is a fail-soft spot in these directions:
+# "strips too little" (frontmatter counted as prose), "strips too
+# much" (prose silently exempt -- the unclosed-block case, #235 a S1),
+# and the pseudo-close variant of "too much": the span between a
+# leading --- and a LATER --- line is stripped as frontmatter even
+# when the file is prose with horizontal rules (#235 b B3). The probe
+# runs the REAL measure_file helper on scratch fixtures: frontmatter
+# lines not counted, prose counted, non-markdown files never stripped
+# (a YAML --- document start is content there), an UNCLOSED leading
+# --- counted in full, and a pseudo-close span stripped with only
+# post-close prose counted.
 PROBE_DIR="$(mktemp -d)"
 trap 'rm -rf "${PROBE_DIR:?}" "$TMP_CUR" "$TMP_PROBE"' EXIT
 mkdir -p "$PROBE_DIR"
@@ -157,16 +165,21 @@ printf -- '---\n%s\n' \
     "$(printf 'z%.0s' $(seq 1 130))" > "$PROBE_DIR/probe.yml"
 printf -- '---\nunclosed block, prose must count: %s\n' \
     "$(printf 'w%.0s' $(seq 1 130))" > "$PROBE_DIR/probe3.md"
+printf -- '---\n%s\n---\n%s\n' \
+    "$(printf 'p%.0s' $(seq 1 130))" \
+    "$(printf 'q%.0s' $(seq 1 130))" > "$PROBE_DIR/probe4.md"
 _p1=$(measure_file "$PROBE_DIR/probe.md" "$LIMIT")   # frontmatter only
 _p2=$(measure_file "$PROBE_DIR/probe2.md" "$LIMIT")  # prose long line
 _p3=$(measure_file "$PROBE_DIR/probe.yml" "$LIMIT")  # non-md: not stripped
 _p4=$(measure_file "$PROBE_DIR/probe3.md" "$LIMIT")  # unclosed md: counts
+_p5=$(measure_file "$PROBE_DIR/probe4.md" "$LIMIT")  # pseudo-close span
 if [ -z "$_p1" ] && [ "${_p2#*probe2.md }" != "$_p2" ] \
    && [ "${_p3#*probe.yml }" != "$_p3" ] \
-   && [ "${_p4#*probe3.md }" != "$_p4" ]; then
-    echo "  probe ok: closed fm stripped, prose and non-md counted, unclosed counts"
+   && [ "${_p4#*probe3.md }" != "$_p4" ] \
+   && [ "${_p5#*probe4.md }" != "$_p5" ] && [ "${_p5##* }" = "1" ]; then
+    echo "  probe ok: closed fm stripped, prose and non-md counted, unclosed counts, pseudo-close span stripped"
 else
-    echo "  PROBE BROKEN: fm-only='$_p1' prose='$_p2' non-md='$_p3' unclosed='$_p4'" >> "$TMP_PROBE"
+    echo "  PROBE BROKEN: fm-only='$_p1' prose='$_p2' non-md='$_p3' unclosed='$_p4' pseudo='$_p5'" >> "$TMP_PROBE"
 fi
 
 # Current state: "path sum count" for every scope file with excess > 0.
