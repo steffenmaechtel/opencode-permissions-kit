@@ -212,8 +212,13 @@ here.
   objects: enumerate the executed commands / on-disk files
   independently before repeating what they report. (RM-0082)
 - For release reviews, a second independent snapshot from a different
-  context — a different model family and/or a setup without the house
-  skills and their biases — is the strongest redundancy. Integration
+  context — a different model family and/or an operator setup that
+  keeps the house skills out — is the strongest redundancy. Repo-level
+  skills are visible to every session in the checkout, so that
+  independence is the commissioning operator's doing, not the loading
+  agent's self-restraint; a redundancy pass that loaded a house skill
+  anyway discloses it in its snapshot's `Skills:` provenance line.
+  Integration
   duties: full per-finding verification by the main agent, honest
   provenance in the snapshot header (model, tree, what ran on which
   host), findings recorded as reported with verification marks, and a

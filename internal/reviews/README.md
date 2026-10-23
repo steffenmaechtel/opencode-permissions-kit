@@ -66,8 +66,9 @@ era's shape — both stay citable as history). House-owned parts:
   predate the header; their stem + dates live in legacy-index.md.)
   `Skills:` is part of the environment record (RM-0078) and makes the
   skill usage auditable: it names every `.agents/skills/` procedure
-  that choreographed the pass (external redundancy passes run without
-  them and omit the line — RM-0083).
+  that choreographed the pass. A redundancy pass that ran WITH a house
+  skill must record it — the line is what makes a collapsed redundancy
+  axis visible (RM-0083).
 - Catch-up and backup reviews (e.g. the successor after a rotation
   deviation) add no Scope value: Scope stays `wave`, the Subject
   names the catch-up ("rotation-deviation catch-up"), and the

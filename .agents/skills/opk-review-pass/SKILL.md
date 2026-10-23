@@ -1,6 +1,6 @@
 ---
 name: opk-review-pass
-description: Execute a code-review pass over this repository (micro, wave, or full/release scope) — load when a round's wave review fires or the maintainer commissions a pass. Covers reviewer fan-out staging, axis prompts, checkpoints, screening, verification, snapshot writing; the rules live in agent/review-concept.md. External redundancy passes do NOT load this skill.
+description: Execute a house review pass (micro, wave, or full/release scope) — load when a round's wave review fires or the maintainer commissions one. Covers fan-out staging, axis prompts, checkpoints, screening, verification, snapshot writing; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup — one that loads this skill anyway discloses it in its Skills: line.
 ---
 
 # opk-review-pass — executing a review pass
@@ -19,9 +19,16 @@ the rules and never a source of finding judgments:
   reading is wrong — the code and the rules decide (background:
   [review-calibration.md](../../../internal/records/review-calibration.md),
   "Skill-bias origin").
-- External redundancy passes (second release snapshot, different model
-  family) deliberately run WITHOUT this skill; their value is freedom
-  from exactly this context.
+- Redundancy passes (second release snapshot, different model family)
+  stay independent of this skill — that independence is the
+  **commissioning operator's setup** (different model, external
+  /review), never the loading agent's self-assessment: no session can
+  know it is "the external one", and nothing technically stops a
+  session from reading this file anyway. The visible control is
+  provenance: a pass that ran WITH this skill records it in its
+  `Skills:` line — the calibration section then names the collapsed
+  axis honestly (shared strictness is not shared bias, but shared
+  context must be disclosed).
 
 ## 0. Calibrated against opencode's built-in /review template
 
