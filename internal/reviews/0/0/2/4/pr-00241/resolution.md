@@ -1,5 +1,11 @@
 # Resolution — pr-00241 (issues #237/#238 review-process docs + parity pin)
 
+Status: closed (maintainer, 2026-10-24) — confirmed the stop rule:
+the last round (fix wave 2, #241 b T1/W1/T2) dispositioned all three
+findings as ledger edits and touched no review-relevant code —
+files touched = resolution.md only (bookkeeping, RM-0065, loop
+closed per RM-0066).
+
 Chain: [review-a.md](review-a.md) (micro-wave snapshot 2026-10-24, 6
 findings, in-session pass on maintainer commission — single-session
 chain, USER decision) → fix wave 1 (`400ff20` fixes + this ledger,
