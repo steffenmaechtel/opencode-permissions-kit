@@ -8,17 +8,17 @@ ledger). Birth PR #243, branch `feature/218-uninstall-revert-log-honesty`.
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a S1 (MED) | **implemented** | `<SHA>` | config-dirs rms through un_revert_q; degraded closing + WARN; 4 cfg arms |
-| a S2 (LOW) | **implemented** | `<SHA>` | openchamber rm rc-observed; FAILED log + WARN pinned on stderr |
-| a S3 (LOW) | **implemented** | `<SHA>` | two-root arm: root 2 closes clean, root 1 degraded — reset per-root |
-| a X1 (LOW) | **implemented** | `<SHA>` | degraded line "revert PARTIALLY completed (causes)"; no false clause |
-| a X2 (LOW) | **implemented** | `<SHA>` | form gate (absolute + dot/empty arms); //etc, /var/. and . skipped |
-| a Q1 (MED) | **implemented** | `<SHA>` | docs: template with <gid> placeholder; the template string pinned |
-| a Q2 (LOW) | **implemented** | `<SHA>` | docs: stderr WARN + audit-log "PARTIALLY completed" as the surfaces |
-| a Q3 (LOW) | **implemented** | `<SHA>` | driver splits streams; WARN-channel pin (stderr section only) |
-| a Q4 (LOW) | **implemented** | `<SHA>` | _unarm_show: red arms print log:/WARN:/skip lines, not the sudo-call tail |
-| a Q5 (INFO) | **implemented** | `<SHA>` | dry arm pins the sudo-log section empty |
-| a Q6 (INFO) | **implemented** | `<SHA>` | comment: 4 call sites vs 6 invocations with both gids |
+| a S1 (MED) | **implemented** | `a31e62b` | config-dirs rms through un_revert_q; degraded closing + WARN; 4 cfg arms |
+| a S2 (LOW) | **implemented** | `a31e62b` | openchamber rm rc-observed; FAILED log + WARN pinned on stderr |
+| a S3 (LOW) | **implemented** | `a31e62b` | two-root arm: root 2 closes clean, root 1 degraded — reset per-root |
+| a X1 (LOW) | **implemented** | `a31e62b` | degraded line "revert PARTIALLY completed (causes)"; no false clause |
+| a X2 (LOW) | **implemented** | `a31e62b` | form gate (absolute + dot/empty arms); //etc, /var/. and . skipped |
+| a Q1 (MED) | **implemented** | `a31e62b` | docs: template with <gid> placeholder; the template string pinned |
+| a Q2 (LOW) | **implemented** | `a31e62b` | docs: stderr WARN + audit-log "PARTIALLY completed" as the surfaces |
+| a Q3 (LOW) | **implemented** | `a31e62b` | driver splits streams; WARN-channel pin (stderr section only) |
+| a Q4 (LOW) | **implemented** | `a31e62b` | _unarm_show: red arms print log:/WARN:/skip lines, not the sudo-call tail |
+| a Q5 (INFO) | **implemented** | `a31e62b` | dry arm pins the sudo-log section empty |
+| a Q6 (INFO) | **implemented** | `a31e62b` | comment: 4 call sites vs 6 invocations with both gids |
 
 ## Evidence detail
 
@@ -175,13 +175,25 @@ instead of "the four ops".
   warm cache; the uninstall pass exercises the converted section +
   revert loop (openchamber pin, project ACLs, 13a ownership revert).
   `make e2e-rootless` green — 47 passed per container (systemd-in-
-  container podman-rootless). Tree: the fix commit's content (`<SHA>`
-  filled below; files/ identical between the runs and the commit).
+  container podman-rootless). Tree: the fix commit's content (`a31e62b`;
+  files/ identical between the runs and the commit).
   These runs also discharge the #218 wave's recorded e2e debt
   (observation-layer change riding to the release gate — snapshot a
   run provenance).
-- Sabotage spot-checks (after the fix commit, per AGENTS.md):
-  E2E_SABOTAGE_PLACEHOLDER
+- Sabotage spot-checks (after the fix commit, per AGENTS.md; each:
+  delete the construct, run the suite, observe the FAIL, restore from
+  HEAD, re-run green):
+  1. X2 form gate (malformed case block deleted): the malformed-roots
+     arm RED — output shows `//etc` actually processed (the bypass the
+     finding described).
+  2. S1 closing conditioning (else-branch deleted, success
+     unconditional): both cfg failure arms RED (openchamber + section).
+  3. S3 per-root reset (loop reset lines deleted): the two-roots
+     isolation arm RED — root 2's record carried root 1's cause.
+  4. Q5 discriminating shape (dry branch executes silently, rc
+     swallowed): the dry-run arm RED — and the pre-existing
+     "--dry-run executed commands" pin caught it independently (two
+     detectors).
 
 ## Follow-ups
 
