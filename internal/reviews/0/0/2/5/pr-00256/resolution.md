@@ -2,8 +2,17 @@
 
 Chain: snapshot a (wave review of 716b8c0..b69a336, 11 effective findings)
 → snapshot b (micro review of the a-wave fix's test-docs.sh pins,
-2 findings B1-B2, both fixed in the b fix wave).
+2 findings B1-B2, both fixed in the b fix wave)
+→ snapshot c (micro claim audit of the b-wave resolution record,
+0 findings, every claim verified).
 This file is created with the first fix commit and grows per disposition.
+
+Status: closed — all findings dispositioned: a W1-W10 implemented +
+W11 deliberately not done (`d01c7eb`), b B1/B2 implemented (`03fdbfe`);
+round c (`778280a`) audited the b-wave resolution record: 0 findings,
+every claim verified against the code and re-witnessed on /tmp copies.
+Stop-rule check: no open dispositions, no reviews owed-but-not-run.
+Closure confirmed by the maintainer in-session after round c.
 
 ## Dispositions
 
@@ -235,6 +244,8 @@ Sabotage spot-checks on the committed tree (delete-never-comment;
 
 ## Follow-ups
 
-- Round c (micro-wave review of the b fix diff) is OWED: the wave touches
-  test code (test-docs.sh pins), which is review-relevant (RM-0105) — the
-  review starts on the maintainer's go, not before.
+- Round c ran as snapshot `778280a` (solo micro claim audit of the
+  b-wave resolution record, USER commission): 0 findings, all claims
+  HOLDS. Case closed on the maintainer's in-session confirmation after
+  round c; stop-rule check cited in the Status line above. No successor
+  review owed.
