@@ -10,6 +10,8 @@ Reviewer: GLM-5.3 house session (opk-review-pass skill) + 3 fresh-context review
 Skills: opk-review-pass
 -->
 
+> Resolution: [resolution.md](resolution.md)
+
 # Review a — wave review (pr-00244)
 
 Round a over the feature-wave diff `e4952dd..b6d9b4c` (one commit,

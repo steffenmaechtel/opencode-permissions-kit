@@ -99,11 +99,14 @@ fs_ensure_traversable() {
 # or broken dies at startup, xargs -r no-ops GREEN on the empty stream,
 # and the baseline is silently not applied (false-green at a root-run
 # site). `command -v` alone accepts a findable-but-broken interpreter
-# (pyenv shim to a removed version, poisoned PYTHONHOME/PYTHONPATH), so
-# the probe also RUNS it (importing what the tee imports). Probed once
-# per run (_fsb_py_checked caches, _fsb_py_ok carries the verdict); on
-# any doubt the pass degrades to a plain passthrough — it loses its
-# live counter, never its data. One warn line names the degradation.
+# (a pyenv shim to a removed version, a corrupt install), so the probe
+# also RUNS it — isolated: `python3 -I` ignores PYTHONHOME/PYTHONPATH
+# (#244 a S1), so neither breaking nor functional (module-shadowing)
+# env poison can reach the probe or the tee; the imports are exactly
+# the tee's. Probed once per run (_fsb_py_checked caches, _fsb_py_ok
+# carries the verdict); on any doubt the pass degrades to a plain
+# passthrough — it loses its live counter, never its data. One warn
+# line names the degradation.
 # Callers: _fsb_pass from the MAIN shell BEFORE the pipeline (a
 # pipeline member forks, and a cache written inside the fork dies with
 # it — the tee would re-probe and re-warn on every pass), plus
@@ -114,7 +117,7 @@ _fsb_py_probe() {
         _fsb_py_checked=1
         _fsb_py_ok=0
         command -v python3 >/dev/null 2>&1 \
-            && python3 -c 'import os, sys' >/dev/null 2>&1 \
+            && python3 -I -c 'import os, sys' >/dev/null 2>&1 \
             && _fsb_py_ok=1
         if [ "$_fsb_py_ok" != 1 ]; then
             printf '  warn: live progress unavailable (python3 missing or broken) — passes apply without entry counters\n' >&2
@@ -129,18 +132,20 @@ _fsb_py_probe() {
 # heredoc would consume stdin for the script itself and the tee would
 # read nothing. Gated by _fsb_py_probe above (#223): without a healthy
 # python3 the tee is a plain passthrough (cat) — the pass data never
-# depends on the progress display.
+# depends on the progress display. Runs isolated (`-I`) like the probe:
+# env poison cannot shadow the tee's imports either (#244 a S1).
 _fsb_count_tee() {
     _fsb_py_probe
     if [ "${_fsb_py_ok:-0}" != 1 ]; then
         cat
         return 0
     fi
-    python3 -c '
+    python3 -I -c '
 import os, sys
 label = sys.argv[1]
 counted = 0
 shown = 0
+aborted = False
 try:
     while True:
         chunk = sys.stdin.buffer.read(1 << 20)
@@ -156,13 +161,23 @@ try:
 except (BrokenPipeError, KeyboardInterrupt):
     # A dead consumer (xargs died first — the pr-00221 W2/W6 sweep
     # recorded this missing clause — or Ctrl-C hit the whole pipeline,
-    # #221 a W6 shape) must not end the tee in a traceback. The
-    # interpreter shutdown flush over the broken pipe would print one
-    # anyway, so point stdout at devnull before exiting (the CPython
-    # SIGPIPE idiom); rc of a pipeline member is discarded either way
-    # — the callers run without pipefail.
+    # #221 a W6 shape) must not end the tee in a traceback, and an
+    # aborted pass must not print its completion line — counted is
+    # bytes READ, not entries applied (#244 a S2/W3/Q4). The
+    # interpreter shutdown flush over the broken pipe would print a
+    # traceback anyway, so point stdout at devnull before exiting (the
+    # CPython SIGPIPE idiom). rc contract, stated truly (#244 a Q1):
+    # the production callers run bash WITH pipefail (install.sh:47,
+    # config.sh:28, update.sh:39) and the rc of this pipeline lands
+    # in the _fsbp_rc capture of _fsb_pass — exiting 0 on EPIPE is
+    # deliberate: a consumer that closed early cannot fail the pass
+    # alone, while a consumer that DIED leaves its own rc in the
+    # pipeline and pipefail fails the pass through it. Unit tests
+    # observe dash (no pipefail); the 11c bash rider pins the
+    # production shape.
+    aborted = True
     os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
-if counted:
+if counted and not aborted:
     sys.stderr.write("\r    %-16s %d entries — done\n" % (label, counted))
     sys.stderr.flush()
 ' "$1"

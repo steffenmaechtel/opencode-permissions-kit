@@ -16,6 +16,13 @@
 #
 # Static extraction of parse_args() from install.sh, then table-driven
 # checks. No root required.
+#
+# Unit tests for the python3 health gate (#244 a W1/S1):
+#   - extracted _py3_health_probe functional matrix: healthy passes,
+#     absent and broken-shim abort loud (two distinct error classes),
+#     hostile PYTHONPATH is ignored (-I isolation)
+#   - verbatim call wiring pin + old inline-gate replacement count pin
+#
 # Run: sh tests/unit/test-install-args.sh
 set -e
 
@@ -824,6 +831,87 @@ if grep -qF 'https://opencode.ai/install' "$INSTALL"; then
     fail "bootstrap still references the v1 installer URL (resolves 1.x)"
 else
     pass "no v1 installer URL left in install.sh"
+fi
+
+# --- python3 health gate (#244 a W1/S1) ------------------------------------------------
+# Presence-only was the findable-but-broken hole (a pyenv shim installs
+# green, every later consumer fails attributelessly): the gate must RUN
+# the interpreter — isolated (-I), so PYTHONHOME/PYTHONPATH poison can
+# neither break nor shadow it. Functional matrix on the extracted
+# function + verbatim call wiring pin (the _distro_gate pattern,
+# 0.0.45a C1).
+if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
+    eval "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")"
+    pass "_py3_health_probe defined in install.sh"
+    _py3w="$(mktemp -d)"
+    mkdir -p "$_py3w/empty" "$_py3w/shim"
+    printf '#!/bin/sh\nexit 9\n' > "$_py3w/shim/python3"
+    chmod +x "$_py3w/shim/python3"
+    mkdir -p "$_py3w/shadow"
+    # json.py (NOT os.py): os is preloaded in sys.modules at -c startup,
+    # an os.py shadow never loads and the pin would be vacuous — caught
+    # by sabotage during the fix wave; json is imported by the probe and
+    # a shadow FIRES without -I.
+    printf 'import sys\nsys.exit(9)\n' > "$_py3w/shadow/json.py"
+    # _py3case <desc> <PATH> <PYTHONPATH-or-empty> — runs the extracted
+    # gate in a subshell (its exit must not kill the suite), ui_error
+    # stubbed onto a marker file: observe the message the way a real
+    # terminal does, not via a 2>&1 that production never runs.
+    _py3case() {
+        _p3d="$1" _p3p="$2" _p3e="$3"
+        rm -f "${_py3w:?}/err"
+        (
+            PATH="$_p3p"
+            [ -n "$_p3e" ] && export PYTHONPATH="$_p3e" || unset PYTHONPATH
+            ui_error() { printf '%s\n' "$1" >&2; }
+            _py3_health_probe
+        ) 2>"$_py3w/err"
+        return $?
+    }
+    _p3rc=0; _py3case healthy "$PATH" "" || _p3rc=$?
+    if [ "$_p3rc" -eq 0 ] && [ ! -s "$_py3w/err" ]; then
+        pass "gate: healthy python3 passes silently"
+    else
+        fail "gate: healthy python3 passes silently (rc=$_p3rc)"
+    fi
+    _p3rc=0; _py3case absent "$_py3w/empty" "" || _p3rc=$?
+    if [ "$_p3rc" -eq 1 ] && grep -qF 'not installed' "$_py3w/err"; then
+        pass "gate: absent python3 aborts loud, names the class"
+    else
+        fail "gate: absent python3 aborts loud (rc=$_p3rc err=$(cat "$_py3w/err"))"
+    fi
+    _p3rc=0; _py3case broken "$_py3w/shim" "" || _p3rc=$?
+    if [ "$_p3rc" -eq 1 ] && grep -qF 'present but broken' "$_py3w/err"; then
+        pass "gate: broken shim aborts loud, names the OTHER class (#244 a W1)"
+    else
+        fail "gate: broken shim aborts loud (rc=$_p3rc err=$(cat "$_py3w/err"))"
+    fi
+    _p3rc=0; _py3case poisoned "$PATH" "$_py3w/shadow" || _p3rc=$?
+    if [ "$_p3rc" -eq 0 ]; then
+        pass "gate: hostile PYTHONPATH ignored (-I isolation, #244 a S1)"
+    else
+        fail "gate: hostile PYTHONPATH ignored (rc=$_p3rc err=$(cat "$_py3w/err"))"
+    fi
+    rm -rf "$_py3w"
+    # Wiring pin: the matrix proves the function works — the verbatim
+    # call line proves the pre-flight runs it (a dropped call leaves
+    # every matrix pin green). The presence-check count pins that the
+    # old inline gate is GONE from the main flow: exactly one
+    # occurrence survives, the one inside the function itself.
+    if grep -qF '    _py3_health_probe' "$INSTALL"; then
+        pass "pre-flight wires the health gate (verbatim call pin)"
+    else
+        fail "pre-flight wires the health gate (verbatim call pin)"
+    fi
+    _p3old=0
+    _p3old=$(grep -cF 'if ! command -v python3 >/dev/null 2>&1; then' "$INSTALL") || true
+    if [ "$_p3old" -eq 1 ]; then
+        pass "old presence-only gate replaced (check survives only inside the function)"
+    else
+        fail "old presence-only gate replaced (found $_p3old occurrences, want 1)"
+    fi
+else
+    fail "_py3_health_probe defined in install.sh"
 fi
 
 echo ""

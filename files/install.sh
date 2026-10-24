@@ -540,6 +540,29 @@ _distro_gate() {
     exit 1
 }
 
+# _py3_health_probe: loud abort when python3 is missing or broken.
+# Presence alone (`command -v`) accepts a findable-but-broken
+# interpreter — a pyenv shim to a removed version installs green and
+# every later consumer fails attributelessly (update's version
+# resolution degrades to "could not resolve", opk ddev URL opening
+# silently downgrades; #244 a W1). The health arm RUNS the interpreter
+# isolated (`-I`): PYTHONHOME/PYTHONPATH poison cannot reach it
+# (#244 a S1), and the imports are the union of the kit's shipped
+# import surface (jsonc parser: fnmatch/json/re/sys, the fs-baseline
+# counter tee: os/sys, ddev describe JSON: json/sys). Two distinct
+# errors name the two failure classes. Functional matrix + verbatim
+# wiring pin: tests/unit/test-install-args.sh.
+_py3_health_probe() {
+    if ! command -v python3 >/dev/null 2>&1; then
+        ui_error "python3 is required but not installed (apt install python3)."
+        exit 1
+    fi
+    if ! python3 -I -c 'import fnmatch, json, os, re, sys' >/dev/null 2>&1; then
+        ui_error "python3 is present but broken (a shim to a removed interpreter? a corrupt install?) — fix it, then re-run."
+        exit 1
+    fi
+}
+
 banner() {
     ui_banner "$VERSION" "installs opencode as its own user behind rootless containers"
 }
@@ -682,13 +705,13 @@ do_plan_phase() {
         exit 1
     fi
 
-    # python3 is a hard runtime dependency (fs-baseline progress pipe, ddev
-    # describe JSON parsing, 2.x version resolution, status checks) — probe
-    # it up front instead of failing mid-install (review 0.0.39a D8).
-    if ! command -v python3 >/dev/null 2>&1; then
-        ui_error "python3 is required but not installed (apt install python3)."
-        exit 1
-    fi
+    # python3 is a hard runtime dependency (ddev describe JSON parsing,
+    # 2.x version resolution, status checks, the jsonc parser — the
+    # group baseline itself degrades without it, #223) — probe presence
+    # AND health up front instead of failing mid-install (0.0.39a D8;
+    # the old presence-only gate was the findable-but-broken hole,
+    # #244 a W1/W2).
+    _py3_health_probe
 
     if ! command -v setfacl >/dev/null 2>&1; then
         if confirm "'acl' package not installed (setfacl/getfacl missing). Install it now?"; then

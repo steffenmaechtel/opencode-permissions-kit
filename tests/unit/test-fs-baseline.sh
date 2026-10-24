@@ -7,9 +7,10 @@
 #     tree keep their group — xargs chgrp would follow them)
 #   - .git is included (issue #17 semantics carried over)
 #   - the python3 health gate (#223): a missing or broken interpreter
-#     degrades the passes to a silent-but-applied fallback instead of
-#     the old false green, probes once per run, and a dead consumer
-#     ends the tee silently (pr-00221 W2/W6 rider)
+#     degrades the passes to a warned-but-applied fallback (one warn
+#     line — not silent, #244 a Q2) instead of the old false green,
+#     probes once per run, and a dead consumer ends the tee silently
+#     (pr-00221 W2/W6 rider)
 # Runs against the repo lib as the CURRENT user (FS_SUDO="") — no root.
 # Run: sh tests/unit/test-fs-baseline.sh
 set -e
@@ -608,19 +609,128 @@ rm -rf "$W23NP" "$W23NPBIN" "$W23NPBIN2"
 # file; the devnull dup2 in the clause keeps the interpreter's own
 # shutdown flush quiet too ("Exception ignored").
 W23BP="$WORK/issue223-bp"
-W23BPBIN="$WORK/issue223-bp-bin"
-mkdir -p "$W23BPBIN"
 python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' > "$W23BP"
-W23BPRC=0
 FS_SUDO="" sh -c '. "$1" && _fsb_count_tee bp < "$2" | sh -c "exit 0"' \
-    _ "$LIB" "$W23BP" 2>"$W23BP.err" || W23BPRC=$?
-assert_eq "#223 broken pipe: pipeline stays green (reader rc)" "0" "$W23BPRC"
+    _ "$LIB" "$W23BP" 2>"$W23BP.err"
+# rc assert dropped (#244 a Q5): under this suite's dash (no pipefail)
+# the reader rc is 0 regardless of tee behavior — dead weight that
+# could never fail. The stderr greps below are the discriminators.
 if grep -q 'Traceback\|Exception ignored' "$W23BP.err"; then
     fail "#223 broken pipe: tee dies silently when xargs goes first"
 else
     pass "#223 broken pipe: tee dies silently when xargs goes first"
 fi
-rm -rf "$W23BP" "$W23BPBIN"
+# No completion line for an aborted pass (#244 a S2/W3/Q4): counted is
+# bytes READ, not entries applied — the consumer died mid-stream.
+if grep -q '— done' "$W23BP.err"; then
+    fail "#244 broken pipe: no completion line for an aborted pass"
+else
+    pass "#244 broken pipe: no completion line for an aborted pass"
+fi
+# Production-shape rider (#244 a Q1): install/update/config run bash
+# WITH pipefail — the tee must exit 0 on EPIPE or a green pass fails
+# through the old traceback rc. Environment-dependent (L4b): skipped
+# with a note where bash is absent.
+if command -v bash >/dev/null 2>&1; then
+    W23PFRC=0
+    FS_SUDO="" bash -c 'set -o pipefail; . "$1" && _fsb_count_tee pf < "$2" | sh -c "exit 0"' \
+        _ "$LIB" "$W23BP" 2>/dev/null || W23PFRC=$?
+    assert_eq "#244 pipefail rider: tee exits 0 on EPIPE under bash pipefail" "0" "$W23PFRC"
+else
+    echo "  note: bash absent — pipefail rider skipped (#244 a Q1)"
+fi
+rm -rf "$W23BP"
+
+# --- 11d. env poison cannot reach the gate (#244 a S1) --------------------------------
+# PYTHONHOME poison: without -I a bogus PYTHONHOME breaks interpreter
+# startup (rc 1) and the probe would degrade the passes to a
+# counter-less fallback; with -I the interpreter ignores the env
+# entirely — the baseline runs WITH its live counters. (An os.py
+# PYTHONPATH shadow cannot be the vehicle here: os is already in
+# sys.modules at -c startup, the shadow never loads — a vacuous-pin
+# trap caught by sabotage during the fix wave.)
+W23EP="$WORK/issue223-envpoison"
+mkdir -p "$W23EP/proj"
+chmod 700 "$W23EP/proj"
+printf 'env\n' > "$W23EP/proj/f"
+chmod 600 "$W23EP/proj/f"
+W23EPRC=0
+W23EPOUT="$(FS_SUDO="" PYTHONHOME=/nonexistent-opk \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23EP/proj" "$(id -gn)" 2>&1)" \
+    || W23EPRC=$?
+assert_eq "#244 env poison: baseline applies despite hostile PYTHONHOME (rc 0)" "0" "$W23EPRC"
+assert_eq "#244 env poison: file got group rw (600 -> 660)" "660" \
+    "$(stat -c %a "$W23EP/proj/f")"
+if printf '%s\n' "$W23EPOUT" | grep -q 'entries — done'; then
+    pass "#244 env poison: live counters still run (the -I isolation works)"
+else
+    fail "#244 env poison: live counters still run (got: $W23EPOUT)"
+fi
+if printf '%s\n' "$W23EPOUT" | grep -q 'live progress unavailable'; then
+    fail "#244 env poison: no degradation warn (isolation, not fallback)"
+else
+    pass "#244 env poison: no degradation warn (isolation, not fallback)"
+fi
+rm -rf "$W23EP"
+
+# --- 11e. Ctrl-C ends the tee silently (#244 a W4 — the KI arm of 11c's clause) --------
+# 11c pins BrokenPipeError; the except tuple's OTHER arm —
+# KeyboardInterrupt — needs its own executed failure path (L1). The
+# tee reads a FIFO a writer holds open: counted > 0, then blocked in
+# read. setsid gives the tee its own process group so kill -INT reaches
+# the python itself (a bare kill of the sh parent would orphan it and
+# the tee would finish normally on EOF — a false pass). Asserts are on
+# stderr content only: the sh wrapper's rc after SIGINT is
+# shell-dependent.
+W23KI="$WORK/issue223-ki"
+mkdir -p "$W23KI"
+W23KIF="$W23KI/in.fifo"
+mkfifo "$W23KIF"
+# fd 3 on the SUBSHELL (exec 3>): the write end must stay open through
+# the sleep — a redirect on the python command alone closes it when
+# python exits, the tee sees EOF, finishes normally and prints its
+# completion line before the signal ever arrives (fixture bug caught
+# by this very pin on first run).
+( exec 3>"$W23KIF"
+  python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >&3 2>/dev/null
+  sleep 10 ) &
+W23KIWR=$!
+# The async-list SIGINT rule (POSIX): a background command of a
+# non-interactive shell starts with SIGINT IGNORED — CPython then never
+# installs its KeyboardInterrupt handler and kill -INT would be a
+# silent no-op: the pin could not fire AT ALL (caught live — the
+# completion line still appeared and the no-traceback assert passed
+# vacuously). The wrapper RESTORES the disposition — a caught signal
+# resets to default across exec — then execs the real sh+tee.
+setsid python3 -c 'import os, signal, sys
+signal.signal(signal.SIGINT, signal.default_int_handler)
+os.execv(sys.argv[1], [sys.argv[1], "-c",
+    ". \"$1\" && _fsb_count_tee ki < \"$2\"", "ki", sys.argv[2], sys.argv[3]])' \
+    /bin/sh "$LIB" "$W23KIF" 2>"$W23KI/err" &
+W23KITEE=$!
+sleep 1
+# No "--" before the negative pid: dash's kill builtin rejects it
+# (rc 2, usage) while bash accepts it — the suite runs under dash, and
+# the group kill silently never happened until this was caught live
+# (bash-vs-dash trap: the debug session ran bash and looked green).
+kill -INT "-$W23KITEE" 2>/dev/null \
+    || /bin/kill -INT "-$W23KITEE" 2>/dev/null \
+    || kill -INT "$W23KITEE" 2>/dev/null \
+    || true
+wait "$W23KITEE" 2>/dev/null || true
+kill "$W23KIWR" 2>/dev/null || true
+wait "$W23KIWR" 2>/dev/null || true
+if grep -q 'Traceback' "$W23KI/err"; then
+    fail "#244 ctrl-c: no traceback on the KeyboardInterrupt arm"
+else
+    pass "#244 ctrl-c: no traceback on the KeyboardInterrupt arm"
+fi
+if grep -q '— done' "$W23KI/err"; then
+    fail "#244 ctrl-c: no completion line for an aborted pass"
+else
+    pass "#244 ctrl-c: no completion line for an aborted pass"
+fi
+rm -rf "$W23KI"
 
 # --- Summary ---------------------------------------------------------------------------
 echo ""
