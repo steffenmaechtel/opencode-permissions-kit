@@ -67,18 +67,18 @@ MED/HIGH) → fix wave 5 (the e rows below) → [review-f.md](review-f.md)
 | e W5 (INFO) | **implemented** | `f49dadd` | absence sentence now names oao:444's redirect+rc handling |
 | e Q1 (LOW) | **implemented** | `f49dadd` | cli.md sentence states the per-step truth |
 | e Q3 (LOW) | **implemented** | `f49dadd` | healthy-noop pin asserts an empty stderr stream |
-| f W1 (MED) | **implemented** | `<SHA>` | count grep `\|\| true`-guarded: zero-match FAIL observable, no set -e abort |
-| f W2 (MED) | **implemented** | `<SHA>` | guard inside the sudo context (sh -c, e-S1 pattern); 4 kit-cli pins |
-| f S1 (LOW) | **implemented** | `<SHA>` | comment states the true rc contract (no caller acts; set -e nuance) |
-| f W3 (LOW) | **implemented** | `<SHA>` | first-token-`+=` double documented; both collateral catches named |
-| f W4 (LOW) | **implemented** | `<SHA>` | dup span `[^#]*` cannot cross comments; `_p3old` comment-strip |
-| f W5 (LOW) | **implemented** | `<SHA>` | TPSWERR removed in-block like its sibling marker |
-| f Q1 (LOW) | **implemented** | `<SHA>` | record corrected by marker: self-append reds in composition, by design |
-| f Q2 (LOW) | **implemented** | `<SHA>` | "12 sites" trued by marker: class count, not total (15 executing lines) |
+| f W1 (MED) | **implemented** | `97b55b9` | count grep `\|\| true`-guarded: zero-match FAIL observable, no abort |
+| f W2 (MED) | **implemented** | `97b55b9` | guard inside the sudo context (sh -c, e-S1 pattern); 4 kit-cli pins |
+| f S1 (LOW) | **implemented** | `97b55b9` | comment states the true rc contract (no caller acts; set -e nuance) |
+| f W3 (LOW) | **implemented** | `97b55b9` | first-token-`+=` double documented; both collateral catches named |
+| f W4 (LOW) | **implemented** | `97b55b9` | dup span `[^#]*` cannot cross comments; `_p3old` comment-strip |
+| f W5 (LOW) | **implemented** | `97b55b9` | TPSWERR removed in-block like its sibling marker |
+| f Q1 (LOW) | **implemented** | `97b55b9` | record corrected by marker: self-append reds in composition, by design |
+| f Q2 (LOW) | **implemented** | `97b55b9` | "12 sites" trued by marker: class count, not total (15 executing lines) |
 | f S2 (INFO) | **deliberately not done** | — | already recorded backlog (the wave-4 record names uninstall:316) |
 | f S3 (INFO) | **deliberately not done** | — | exact-name lookup — the basename exclusion is precisely scoped |
-| f Q3 (INFO) | **implemented** | `<SHA>` | cli.md sentence ordered (advisory feed, first scan, leak scan) |
-| f Q4 (INFO) | **implemented** | `<SHA>` | count-pin label says assignment/append line |
+| f Q3 (INFO) | **implemented** | `97b55b9` | cli.md sentence ordered (advisory feed, first scan, leak scan) |
+| f Q4 (INFO) | **implemented** | `97b55b9` | count-pin label says assignment/append line |
 
 ## Evidence detail
 
@@ -1009,9 +1009,43 @@ line-length ratchet + reviews lint/parity green before the commit
 that carries this file. E2E (root-run script semantics change —
 opk's settings-edit guard moves into the sudo context): owed
 in-wave, runs on the committed tree, recorded in Follow-ups by the
-bookkeeping commit.
+bookkeeping commit. Process near-miss, recorded: the first
+bookkeeping commit briefly went in with the ratchet RED — the gate
+ran but its rc was masked by a `| tail` pipe in the check chain
+(the pr-00234 shape's sibling); caught within the minute, the
+over-120 row shortened (the f W1 row — the real SHA's 2 extra bytes
+tipped it, exactly the README's SHA-fill warning), the commit
+amended before any push; the amended HEAD is gate-green with the rc
+read directly.
 
 ## Follow-ups
+
+- Wave-6 e2e discharged in-wave on tree `97b55b9`: `make e2e`
+  **309 passed** (../logs/e2e-20261025-000326.log), `make
+  e2e-rootless` **47 passed**
+  (../logs/e2e-rootless-20261025-000326.log), both rc 0 — the first
+  suite ran alone after the day boundary and confirmed opencode
+  v2.1.4 resolves from the warm cache before the second ran
+  (root-run script semantics changed: opk's settings-edit guard
+  moved into the sudo context; the suites' openchamber-secure flow
+  exercised the new path end-to-end — the run.sh settings-pin-gone
+  assert).
+- Wave-6 sabotage on the committed tree (delete-the-construct,
+  observe red, restore, re-green): opk guard reverted to the
+  caller-side shape → all FOUR kit-cli pins red with the designed
+  mechanisms (arm A leaking `exec: python3: not found`, arm B
+  skipping the edit into the misleading ui_error, both static shape
+  pins); the `_py3_imports` assignment deleted → the count pin's
+  zero path FAILS LOUD ("found 0, want 1" recorded, suite tallies
+  "4 test(s) failed." rc 1 — the set -e abort the f W1 fix closes);
+  the `_p3old` gate line commented → suite red via the WRONG
+  mechanism (the function-extraction eval aborts on the orphaned
+  `fi`, rc 2, before the pin runs — the wave-4 confound shape), so
+  the pin's own discrimination was probe-verified in isolation on
+  the same mutated copy: the OLD bare `-cF` counts the commented
+  line (1 — the survivor trap), the NEW comment-strip counts 0, the
+  clean tree counts 1. Restores verified green (kit-cli +
+  install-args rc 0 on the restored tree).
 
 - Wave-5 e2e discharged in-wave on tree `f49dadd`: `make e2e`
   **309 passed** (../logs/e2e-20261024-231534.log), `make
