@@ -32,17 +32,17 @@ sub-claim retracted) → fix wave 3 (the c rows below). Birth PR
 | b W3 (LOW) | **implemented** | `25f96f1` | drain-marker arm proof; never-armed fails red; fixed sleep removed |
 | b W4 (INFO) | **implemented** | `25f96f1` | review README process: trailers qualify not-done IDs |
 | b Q2 (INFO) | **implemented** | `25f96f1` | dead `_p3d` parameter removed; `_py3case` is 2-arg |
-| c Q1/W2 (MED) | **implemented** | `<SHA>` | find over lib root (tui/templates incl.); fixture self-test pins shapes |
-| c S1 (LOW) | **implemented** | `<SHA>` | CPython's real wording restored; grep literals indirected (scanner-safe) |
-| c S2 (LOW) | **implemented** | `<SHA>` | .pth/site-packages residual named in all three shipped comments |
-| c S3 (LOW) | **implemented** | `<SHA>` | stderr passthrough at 5 sibling sites + probe rerun; pins in 4 suites |
-| c S4 (INFO) | **implemented** | `<SHA>` | promise scoped to extracted shapes; residual named in the test comment |
-| c W1 (LOW) | **implemented** | `<SHA>` | tr ',;' split; fixture self-test (zmod_a..d) red on extraction break |
-| c W3 (LOW) | **implemented** | `<SHA>` | assignment-count pin: exactly one `_py3_imports=` |
-| c W4/Q2 (LOW) | **implemented** | `<SHA>` | sweep record corrected: test-ui.sh hard-requires setsid |
-| c W5/Q4 (INFO) | **implemented** | `<SHA>` | pipe-buffer wording in §11e comments + this ledger |
-| c Q3 (LOW) | **implemented** | `<SHA>` | integer sleep poll (10 × 1 s), same 10 s bound |
-| c Q5 (INFO) | **implemented** | `<SHA>` | dead `_p3f=""` removed; loop lives inside `_p3collect` |
+| c Q1/W2 (MED) | **implemented** | `58c2019` | find over whole lib root; fixture self-test pins the shapes |
+| c S1 (LOW) | **implemented** | `58c2019` | CPython's real wording restored; grep literals indirected (scanner-safe) |
+| c S2 (LOW) | **implemented** | `58c2019` | .pth/site-packages residual named in all three shipped comments |
+| c S3 (LOW) | **implemented** | `58c2019` | stderr passthrough at 5 sibling sites + probe rerun; pins in 4 suites |
+| c S4 (INFO) | **implemented** | `58c2019` | promise scoped to extracted shapes; residual named in the test comment |
+| c W1 (LOW) | **implemented** | `58c2019` | tr ',;' split; fixture self-test (zmod_a..d) red on extraction break |
+| c W3 (LOW) | **implemented** | `58c2019` | assignment-count pin: exactly one `_py3_imports=` |
+| c W4/Q2 (LOW) | **implemented** | `58c2019` | sweep record corrected: test-ui.sh hard-requires setsid |
+| c W5/Q4 (INFO) | **implemented** | `58c2019` | pipe-buffer wording in §11e comments + this ledger |
+| c Q3 (LOW) | **implemented** | `58c2019` | integer sleep poll (10 × 1 s), same 10 s bound |
+| c Q5 (INFO) | **implemented** | `58c2019` | dead `_p3f=""` removed; loop lives inside `_p3collect` |
 
 ## Evidence detail
 
@@ -522,6 +522,39 @@ runs on the committed tree, recorded in Follow-ups by the
 bookkeeping commit.
 
 ## Follow-ups
+
+- Session bookkeeping (maintainer clarification, recorded per the
+  c-round handover): the maintainer counts sessions by the snapshot
+  letter they file — THIS session ("Session C" in that counting)
+  filed snapshot c and applies the c-fixes. Snapshot b's header
+  called the b-round session "session C of the rotation"
+  (rotation-count letters) — a label collision only. The load-bearing
+  fact holds under both counts: the b-round session was closed before
+  this fresh session started, so no rotation deviation occurred
+  (RM-0110 recovery not applicable); the c-pass ran with fresh
+  context over fixes authored by a different, closed session.
+- Wave-3 e2e discharged in-wave on tree `58c2019`: `make e2e`
+  **309 passed** (../logs/e2e-20261024-212945.log), `make
+  e2e-rootless` **47 passed**
+  (../logs/e2e-rootless-20261024-212945.log), both rc 0, parallel
+  run (root-run script semantics changed: the interpreter-stderr
+  passthroughs in fs-baseline/status/update/ddev-terminal).
+- Wave-3 sabotage on the committed tree (delete-the-construct,
+  observe red, restore, re-green): dropping the `;` from the drift
+  pin's `tr ',;'` → fixture self-test red (zmod_d missing); a second
+  `_py3_imports=` line → count pin red (found 2); deleting the
+  fs-baseline probe rerun → §11f red AND the four-pass count pin red
+  (1 = probe only, no rerun); re-adding the resolve pipe's
+  `2>/dev/null` → line-shape pin + behavioral passthrough pin red.
+  Restores verified green (fs-baseline, install-args, update-flags,
+  sandbox-policy all rc 0 on the restored tree).
+- Pre-commit accidental reds (observed, each fixed in the same
+  wave): the coverage pin caught the zero-space import-strip bug
+  (`importlib.util` → `lib.util`); the probe-count pin caught the
+  rerun's second execution; the sandbox scanner caught the
+  grep-line literal shape (5 violations → variable indirection) —
+  the falsification event that separated the scanner's two shapes
+  (c S1) and proved the wave-2 mechanism record true for grep lines.
 
 - E2E discharged in-wave on tree `5333a03` (bookkeeping commit after
   the runs): `make e2e` **309 passed**
