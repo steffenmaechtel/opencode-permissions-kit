@@ -35,17 +35,17 @@ adjustment, 3 LOW, 5 INFO; all 6 b-fixes audited landed) → fix wave 3
 | b Q2 (LOW) | **implemented** | `1d07e2a` | openchamber arm sets the flag; cfg WARN gated like the loop closing |
 | b Q3 (INFO) | **deliberately not done** | — | retracted as ghost in snapshot b — no defect exists |
 | b Q4 (INFO) | **implemented** | `1d07e2a` | renamed un_rc_q; sites, comments, extraction anchors, canaries swept |
-| c S1 (INFO) | **implemented** | `<SHA>` | extractor is a function; block-identity pin drives it (decoy fixture) |
-| c S2 (INFO) | **implemented** | `<SHA>` | family pin feeds every family through _unarm_show |
-| c X1 (MED) | **implemented** | `<SHA>` | one-trailing-slash strip after the dot gate; // stays the gate's catch |
+| c S1 (INFO) | **implemented** | `822e7a0` | extractor is a function; block-identity pin drives it (decoy fixture) |
+| c S2 (INFO) | **implemented** | `822e7a0` | family pin feeds every family through _unarm_show |
+| c X1 (MED) | **implemented** | `822e7a0` | one-trailing-slash strip after the dot gate; // stays the gate's catch |
 | c X2 (MED) | **deliberately not done** | — | #247 wave scope (writer-side, both validator copies, e2e owed there) |
 | c X3 (LOW) | **deliberately not done** | — | #245 owns it; snapshot c measured find + chmod tails |
 | c X4 (INFO) | **deliberately not done** | — | restates the recorded a X2 disposition (space arm ungated) |
-| c Q1 (MED) | **implemented** | `<SHA>` | lexical agent-home refusal before `[ -d ]`; arm host-independent |
-| c Q2 (LOW) | **implemented** | `<SHA>` | tail -6 window removed; every family surfaces on red |
-| c Q3 (LOW) | **implemented** | `<SHA>` | fed set built by host existence; assertions name only fed roots |
+| c Q1 (MED) | **implemented** | `822e7a0` | lexical agent-home refusal before `[ -d ]`; arm host-independent |
+| c Q2 (LOW) | **implemented** | `822e7a0` | tail -6 window removed; every family surfaces on red |
+| c Q3 (LOW) | **implemented** | `822e7a0` | fed set built by host existence; assertions name only fed roots |
 | c Q4 (INFO) | **deliberately not done** | — | intentional alignment with the loop closing order |
-| c Q5 (INFO) | **implemented** | `<SHA>` | comments name all three bounded ops incl. chmod g-s |
+| c Q5 (INFO) | **implemented** | `822e7a0` | comments name all three bounded ops incl. chmod g-s |
 
 ## Evidence detail
 
@@ -453,9 +453,32 @@ setgid-bit clear (`chmod g-s`) — instead of "only" two.
   ratchet green (this file ≤ 120 content columns); `make check-version`
   green.
 - E2E (RM-0113 — c X1/c Q1 change which roots a root-run script
-  processes): both suites run on the committed fix tree; counts and
-  the sabotage spot-checks are recorded in the chain's next commit
-  (the SHA fill).
+  processes): both suites run on the committed fix tree `822e7a0`,
+  in parallel (disjoint suites, warm cache):
+  `make e2e` green — 309 passed per container (baseline level; the
+  uninstall pass + 13a ownership revert exercise the gated loop over
+  the real project root `/var/www/vhosts`, allowed by design).
+  `make e2e-rootless` green — 47 passed per container (systemd-in-
+  container podman-rootless; baseline level).
+- Sabotage spot-checks (post-commit against `822e7a0`, in a scratch
+  worktree at /tmp/opencode/pr-00243-c/sabotage — the main tree
+  stayed clean for the parallel e2e runs; each: mutate → observe the
+  named pin RED → restore → suite green at the end):
+  1. c X1 normalization (strip lines deleted): the trailing-slash
+     arm RED — `/var/` leaks to the ops, the finding's hazard live.
+  2. c X1 placement (strip moved BEFORE the dot gate — the first
+     implementation draft's regression): the trailing-slash arm RED
+     via the `/var//` pin — `//` forms must stay the dot gate's
+     catch. This pin exists because the regression was real: the
+     draft sat here before the glob probe caught it.
+  3. c Q1 refusal (if-block deleted): the agent-home arm RED — the
+     fed `/home/untest-agent` reaches the ops.
+  4. c S1 extractor (function body reverted to shape-keyed): the
+     block-identity pin RED — the decoy arms splice in.
+  5. c S2 family (`^sudo ` dropped from the regex): the family pin
+     RED.
+  6. c Q2 window (`tail -6` reintroduced): the family pin RED — the
+     eighth family line falls out of the window.
 
 ## Follow-ups
 
