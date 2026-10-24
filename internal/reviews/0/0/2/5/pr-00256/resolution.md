@@ -7,16 +7,16 @@ This file is created with the first fix commit and grows per disposition.
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a W1 (MED) | **implemented** | `<SHA>` | `shopware6` restored (ddev-integration.md:108); sweep + pin, see detail |
-| a W2 (MED) | **implemented** | `<SHA>` | TOCTOU bullet restored (security-model.md:60-63); pin, see detail |
-| a W3 (LOW) | **implemented** | `<SHA>` | exception clause restored (cli.md:303-305); sweep + pin, see detail |
-| a W4 (LOW) | **implemented** | `<SHA>` | anchor restored (compatibility.md:57); link check validates it |
-| a W5 (LOW) | **implemented** | `<SHA>` | Enter-default note restored; pin tracks install.sh's menu letter |
-| a W6 (LOW) | **implemented** | `<SHA>` | conditional OpenChamber question named + linked in getting-started |
-| a W7 (LOW) | **implemented** | `<SHA>` | /mnt/c disclosure restored at the verify step, never-edits framing |
-| a W8 (INFO) | **implemented** | `<SHA>` | "--yes without the flag the pin stays off" restored (verified true) |
-| a W9 (INFO) | **implemented differently** | `<SHA>` | liveness clause restored; roadmap drop accepted (see detail) |
-| a W10 (INFO) | **implemented** | `<SHA>` | rotate-on-distrust clause restored (ddev-integration.md) |
+| a W1 (MED) | **implemented** | `d01c7eb` | `shopware6` restored (ddev-integration.md:108); sweep + pin, see detail |
+| a W2 (MED) | **implemented** | `d01c7eb` | TOCTOU bullet restored (security-model.md:60-63); pin, see detail |
+| a W3 (LOW) | **implemented** | `d01c7eb` | exception clause restored (cli.md:303-305); sweep + pin, see detail |
+| a W4 (LOW) | **implemented** | `d01c7eb` | anchor restored (compatibility.md:57); link check validates it |
+| a W5 (LOW) | **implemented** | `d01c7eb` | Enter-default note restored; pin tracks install.sh's menu letter |
+| a W6 (LOW) | **implemented** | `d01c7eb` | conditional OpenChamber question named + linked in getting-started |
+| a W7 (LOW) | **implemented** | `d01c7eb` | /mnt/c disclosure restored at the verify step, never-edits framing |
+| a W8 (INFO) | **implemented** | `d01c7eb` | "--yes without the flag the pin stays off" restored (verified true) |
+| a W9 (INFO) | **implemented differently** | `d01c7eb` | liveness clause restored; roadmap drop accepted (see detail) |
+| a W10 (INFO) | **implemented** | `d01c7eb` | rotate-on-distrust clause restored (ddev-integration.md) |
 | a W11 (INFO) | **deliberately not done** | — | pointer/history losses stay out of end-user docs, see detail |
 
 ## Evidence detail
@@ -147,9 +147,29 @@ cli.md:45+217.
 
 ## Gates and sabotage record
 
-Filled by the chain's next commit (SHA fill): suite results at the fix
-commit and the pin sabotage spot-checks (AGENTS.md: sabotage only on the
-committed tree).
+Gates at the fix commit d01c7eb (check-then-commit, all before the commit):
+`sh tests/unit/test-docs.sh` OK (with the four new pins),
+`sh tests/unit/test-line-length.sh` OK (ratchet baseline held; one
+resolution row rewrapped after a first red), `sh tests/unit/test-reviews-
+lint.sh` OK, `sh tests/unit/test-reviews-parity.sh` OK (after INDEX
+regen), `make lint` (ShellCheck) OK.
+
+Sabotage spot-checks on the committed tree (delete-never-comment;
+`git restore` back; final suite green):
+
+- Run A (four docs mutations at once): `shopware6`→`shopware`
+  (ddev-integration.md), `flag-write TOCTOU`→`flag-write race accepted`
+  (security-model.md), `skipped security checks instead`→`skipped checks
+  instead` (cli.md), `defaults to **skip**`→`defaults to **move**`
+  (getting-started.md) — suite RED with exactly the four pin FAIL lines
+  (#256 a W1, W2, W3, W5), each naming its finding.
+- Run B (code direction, W5): install.sh's ui_menu default letter "s"→"m"
+  — suite RED with the W5 FAIL line ("'m' => move"), proving the pin
+  tracks the code side, not only the docs side. Restored; suite green.
+- Live discrimination witnessed before commit: the W3 pin's first phrasing
+  ("advisories row names the skipped security checks") went RED on the
+  fix's own line wrap — the pin caught a real split-phrase regression
+  shape; rewrapped to the wrap-safe tail.
 
 ## Follow-ups
 
