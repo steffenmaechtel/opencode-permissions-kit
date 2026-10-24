@@ -66,14 +66,14 @@ branch `feature/218-uninstall-revert-log-honesty`.
 | d Q4 (INFO) | **implemented** | `09206ab` | find negatives anchored on the op line's ` !` continuation |
 | d Q5 (INFO) | **implemented** | `09206ab` | wiring pin: wired SCREEN_PATTERNS free of dot/double-slash |
 | d Q6 (INFO) | **deliberately not done** | — | writer-side; #247 owns (same shape family as d X3) |
-| e X1 (MED) | **implemented** | `<SHA>` | OPENCODE_USER shape gate: WARN + fallback; chain arm reds on deletion |
-| e X2 (LOW) | **implemented** | `<SHA>` | d Q1 precondition text corrected: writer literal/heredoc + e X1 gate |
-| e S1 (LOW) | **implemented** | `<SHA>` | `.` chmod negative landed; d Q3 sentence true as written since |
-| e S2 (INFO) | **implemented** | `<SHA>` | raw skip-echo assertion end-anchored — discriminates alone |
-| e S3 (INFO) | **implemented** | `<SHA>` | `/etc/` → `/home/` (bare arm); comment states the bare-arm rule |
-| e S4 (INFO) | **implemented** | `<SHA>` | d Q4 sweep invariant corrected (agent-home prefix pair is deliberate) |
-| e S5 (INFO) | **implemented** | `<SHA>` | ts setfacl/chmod negatives `$`-anchored per spelling incl. raw forms |
-| e X3 (INFO) | **implemented** | `<SHA>` | screen() dot gate before the strip; `/var//` static form pins it |
+| e X1 (MED) | **implemented** | `2632c36` | OPENCODE_USER shape gate: WARN + fallback; chain arm reds on deletion |
+| e X2 (LOW) | **implemented** | `2632c36` | d Q1 precondition text corrected: writer literal/heredoc + e X1 gate |
+| e S1 (LOW) | **implemented** | `2632c36` | `.` chmod negative landed; d Q3 sentence true as written since |
+| e S2 (INFO) | **implemented** | `2632c36` | raw skip-echo assertion end-anchored — discriminates alone |
+| e S3 (INFO) | **implemented** | `2632c36` | `/etc/` → `/home/` (bare arm); comment states the bare-arm rule |
+| e S4 (INFO) | **implemented** | `2632c36` | d Q4 sweep invariant corrected (agent-home prefix pair is deliberate) |
+| e S5 (INFO) | **implemented** | `2632c36` | ts setfacl/chmod negatives `$`-anchored per spelling incl. raw forms |
+| e X3 (INFO) | **implemented** | `2632c36` | screen() dot gate before the strip; `/var//` static form pins it |
 
 ## Evidence detail
 
@@ -789,22 +789,38 @@ exact scope gap review e recorded).
   line-length ratchet green (this file ≤ 120 content columns);
   `make check-version` green.
 - E2E (RM-0113 — uninstall.sh gains an input-validation gate: root-run
-  script semantics change): both suites run on the committed fix tree,
-  in parallel (disjoint suites, warm cache from wave 4's runs the same
-  day) — counts recorded in the follow-up commit.
-- Sabotage spot-checks (post-commit against the fix commit, in a
-  scratch worktree; each: mutate → observe the named pin RED →
-  `git checkout --` → suite green at the end) — results recorded in
-  the follow-up commit:
-  1. e X1 gate (case block deleted): chain arm RED — no WARN, no skip
-     echoes; the corrupted compare target misses both spellings.
-  2. e X1 fallback body (WARN + assignment deleted, case kept): chain
-     arm RED — value stays corrupted, echoes absent.
-  3. e X3/S3 dot gate + strip in screen(): static rejects `/var//`
-     (dot gate) resp. `/var/` + `/home/` (strip) RED per deletion.
+  script semantics change): both suites run on the committed fix tree
+  `2632c36`, in parallel (disjoint suites, warm cache from wave 4's
+  runs the same day, opencode 2.1.4): `make e2e` green — 309 passed
+  per container (baseline level; sections 12f/13/13a exercise the
+  modified uninstall incl. the revert loop over the real project
+  root); `make e2e-rootless` green — 47 passed per container
+  (baseline level; RL6 uninstall pass — the gate is a no-op on the
+  canonical conf, exactly the intended behavior).
+- Sabotage spot-checks (post-commit against `2632c36`, in a scratch
+  worktree /tmp/opencode/pr-00243-e/sab-wt, removed after; each:
+  mutate → observe the named pin RED → `git checkout --` → suite
+  green at the end):
+  1. e X1 gate (case block deleted): all three e X1 pins RED —
+     extraction (no 'falling back' marker), standalone gate arms,
+     and the chain arm (no WARN, no skip echoes; the corrupted
+     compare target misses both spellings — the finding's hazard
+     live at suite level).
+  2. e X1 fallback body (WARN + assignment deleted, case kept): the
+     same three pins RED — the value stays corrupted and the chain
+     arm's echo assertions catch it.
+  3. e X3/S3 helper arms: screen()'s dot gate deleted → exactly
+     `screening rejects /var//` RED; strip reverted to raw `$1`
+     (the pre-d-X4 shape) → exactly `screening rejects /home/` +
+     `screening rejects /var/` RED — the two bare-arm forms the
+     e S3 swap chose, each red for its own construct.
   4. e S1/S2/S5 pin discrimination (probe-level, synthetic op/echo
-     lines): each anchored/added negative matches exactly its own
-     spelling — the shapes the anchors were built to separate.
+     lines): S2 — old unanchored assertion GREEN on a
+     trailing-slash-only echo (the gap), new anchored RED; S5 — old
+     unanchored `/var` negative MATCHES a `/var//` op line (the
+     misattribution), anchored `/var$` does not, `/var//$` matches
+     its own spelling; S1 — `sudo chmod g-s .` matches only the
+     bare-dot op line (`/var/.` and the primary root do not match).
 
 ## Follow-ups
 
