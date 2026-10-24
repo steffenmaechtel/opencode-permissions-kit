@@ -561,6 +561,14 @@ full quoting (rc-observed → partial list + WARN); the X1-specific
 hazard — a shape-invalid value SILENTLY defanging a lexical guard —
 is unique to `OPENCODE_USER`. No further gate owed.
 
+**Correction (#243 f S1, fix wave 6):** the consumer anchors above
+(:214/:225-226, :326/:332, :664) are pre-gate tree coordinates — they
+resolve in `d8af4e0`, not in the tree this row ships; at `59e700a`
+they sit at :228/:239-240, :340/:346, :679 (review f S1, found
+independently by both axes). The construct names, not the line
+numbers, are the authoritative anchors (wave 6's comment extension
+shifts them again).
+
 ### e X2 (LOW) — d Q1's precondition text corrected
 
 The d Q1 evidence block's justification cited non-enforcing mechanisms
@@ -628,6 +636,73 @@ rejected-reps list feeds `/var//` to pin it: dot gate deleted →
 allowed → the static arm REDs. The helper comment now claims full
 gate-order parity (it previously claimed strip parity only — the
 exact scope gap review e recorded).
+
+## Findings (fix wave 6, f findings)
+
+Wave 6 implements f X1 (tightened charset, below) and rides f S1
+(anchor correction, above) and f S3 (screen() comment scoping, from
+"gate order IN FULL" to the screening-chain scope it actually pins).
+f X3 and f X4 are recorded as-is (dead defensive arm mirroring the
+writer's own; latent root-authored echo — no action owed); f S2 was
+retracted in snapshot f; f X2 merged into f S1.
+
+### f X1 (LOW) — pathological spellings refused
+
+Mechanism: the gate's arm gains `[.-]*` and `*[.]` — leading
+dot/hyphen and trailing dot join the refused set on top of the e X1
+charset. All five snapshot-f spellings (`.`, `..`, `opencode.`,
+`-x`, `--`) now WARN + fall back; refusing the leading-`-` class
+also closes the `id --` option-shape into the user-removal section
+as a side effect. Internal dot/hyphen stay legal — the boundary
+value `untest-x.9` passes untouched (pinned): a legit custom agent
+name keeps working.
+
+Deliberate divergence from the writer's DEFAULT_USER gate (which
+admits all five), named in the gate comment: the writer never
+produces an OPENCODE_USER other than the literal `opencode`
+(install.sh:349, heredoc :1339), so no writer-producible value is
+refused — the tightened set removes values that exist solely as
+hand-edit shapes.
+
+Accepted residual, by design (snapshot f, verification table): a
+merely DIFFERENT charset-valid name (e.g. `myagent`) still passes
+and then misses the refusal for the real agent home — the conf is
+the source of truth for a customized agent user, so the mismatch
+class is not fixable by shape validation alone. Closing it would
+mean deriving the agent name from the live system instead of the
+conf — its own semantic wave (Follow-ups 4), not owed here.
+
+Pins, each layer its own: the standalone corpus loop feeds the five
+pathological values and asserts output `opencode` each time plus
+exactly five WARN lines on stderr (the loudness is pinned separately
+from the fallback); the boundary arm feeds `untest-x.9` and asserts
+untouched passthrough with EMPTY stderr. Deletion-red
+host-independent (lexical only): the tightening reverted → the five
+values pass through ≠ `opencode` → corpus RED; each arm alone
+deleted still reds (`*[.]` → `opencode.` passes, `[.-]*` → `-x`/`--`
+pass — each arm carries its own spelling class). Over-refusal reds
+too: a future arm refusing ALL hyphens/dots would fall `untest-x.9`
+→ boundary RED.
+
+Class sweep (L2, `grep -n 'case "\$' uninstall.sh` + consumer walk):
+the only lexical guard on a conf-sourced name remains the same
+agent-home compare (now double-gated by the tightened set);
+DEFAULT_USER/OPENCODE_GROUP verified non-lexical by review f's sweep
+(rc-observed argv consumers); the SCREEN_PATTERNS wiring pin covers
+its own class. No sibling sites.
+
+### f S1 (INFO, ≡ X2) — e X1 row anchors corrected
+
+Bracketed correction appended to the e X1 row above (the house
+pattern): the consumer anchors were pre-gate coordinates; the
+construct names are authoritative.
+
+### f S3 (INFO) — screen() comment scoped to the screening chain
+
+The helper comment claims parity for exactly what the helper models
+(dot gate → strip → blocklist) and names the loop gates that are NOT
+mirrored (agent-home refusal, `[ ! -d ]`, absolute-path check).
+Comment-only deliverable, no pin claimed (d Q2 precedent).
 
 ## Gates (fix wave 1, a findings)
 
@@ -839,3 +914,12 @@ exact scope gap review e recorded).
    first two tails, review-c X axis; the measurement owes scratch work
    on a real filesystem). **GitHub: #245** (issue draft in
    ../opk-issues/, published 2026-10-24).
+4. uninstall.sh agent-name source of truth: the shape gate (e X1,
+   tightened f X1) validates the conf value's SHAPE, not its identity
+   — a merely different charset-valid name still misses the
+   agent-home refusal for the real home (accepted residual, snapshot
+   f verification). Deriving the name from the live system (getent/
+   passwd walk) instead of trusting the conf is a semantic change
+   with its own fixture + arms + both e2e suites. Not scheduled:
+   LOW, two-root-hand-edits trigger, and the conf is the declared
+   source of truth for a customized agent user.

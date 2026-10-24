@@ -273,12 +273,16 @@ esac
 # screen <path>: 0 = screened (skipped by the loop), 1 = allowed.
 # eval is required: `|` alternation in case patterns is parsed at parse
 # time, NOT re-parsed from a variable expansion — a literal $SCREEN_PATTERNS
-# would be one big never-matching pattern. The helper mirrors the loop's
-# gate order IN FULL (#243 c X1/d X4, dot gate #243 e X3): malformed
-# dot/empty-segment forms are screened exactly like the loop skips
-# them, THEN the one-trailing-slash normalization applies (strip once,
-# `/` stays `/` — the blocklist `/` arm), so a static slash-form
-# assertion pins the same semantics the shipped loop has.
+# would be one big never-matching pattern. The helper mirrors the
+# loop's SCREENING chain in full — dot gate, then strip, then
+# blocklist (#243 c X1/d X4, dot gate #243 e X3; scope sharpened per
+# review f S3): the loop's earlier gates (agent-home refusal,
+# [ ! -d ], absolute-path check) precede screening and are NOT
+# mirrored here. Malformed dot/empty-segment forms are screened
+# exactly like the loop skips them, THEN the one-trailing-slash
+# normalization applies (strip once, `/` stays `/` — the blocklist
+# `/` arm), so a static slash-form assertion pins the same screening
+# semantics the shipped loop has.
 screen() {
     case "$1" in
         *..*|/./|*/./*|./*|*/.|*//*) return 0 ;;
@@ -421,6 +425,38 @@ if [ "$_ou_new" = "untest-agent" ] && [ "$_ou_canon" = "opencode" ] \
     pass "OPENCODE_USER gate: valid/canonical pass through, corrupted falls back loudly (#243 e X1)"
 else
     fail "OPENCODE_USER gate arms (#243 e X1)"
+fi
+# Pathological corpus (#243 f X1): leading dot/hyphen and trailing
+# dot are legal in the writer's charset but not agent names — the
+# tightened arms must fall them back LOUDLY; internal dot/hyphen (a
+# legit custom-name shape) must pass through untouched. Each arm
+# carries its own spelling class: `*[.]` alone deleted → `opencode.`
+# passes; `[.-]*` alone deleted → `-x`/`--` pass; the whole tightening
+# reverted → all five pass (spot-checked). Over-refusal reds on the
+# boundary arm (a future arm refusing ALL hyphens/dots would fall
+# `untest-x.9`).
+_ou_path_ok=1
+: > "$WORK/un-ouc-path-err.log"
+for _ou_pv in . .. opencode. -x --; do
+    _ou_pv_out=$(
+        OPENCODE_USER="$_ou_pv"
+        eval "$UN_OCU_GATE" 2>>"$WORK/un-ouc-path-err.log"
+        printf '%s' "$OPENCODE_USER"
+    )
+    [ "$_ou_pv_out" = "opencode" ] || _ou_path_ok=0
+done
+_ou_keep=$(
+    OPENCODE_USER="untest-x.9"
+    eval "$UN_OCU_GATE" 2>"$WORK/un-ouc-err3.log"
+    printf '%s' "$OPENCODE_USER"
+)
+if [ "$_ou_path_ok" -eq 1 ] \
+   && [ "$(grep -c 'WARN: invalid OPENCODE_USER value' "$WORK/un-ouc-path-err.log")" -eq 5 ] \
+   && [ "$_ou_keep" = "untest-x.9" ] \
+   && [ ! -s "$WORK/un-ouc-err3.log" ]; then
+    pass "OPENCODE_USER gate: pathological spellings fall back, internal dot/hyphen stay legal (#243 f X1)"
+else
+    fail "OPENCODE_USER pathological corpus (#243 f X1)"
 fi
 # Loop driver (#218; channels + extra roots #243 a Q3/S3/X2): real
 # loop + real runner, per-command sudo stub (logs the call to the sudo

@@ -209,16 +209,24 @@ if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
-# Shape-gate the sourced value (#243 e X1): install.conf is root-owned
-# but hand-editable, and the writer stamps a literal here (install.sh
-# sets OPENCODE_USER="opencode" and its conf heredoc carries that
-# literal — the writer's charset gate covers DEFAULT_USER, not this
-# name). A shape-invalid value (e.g. a trailing slash) would silently
-# defang the agent-home refusal in the project loop and the
-# agents-backup walk below — fall back to the canonical literal,
-# loudly. Same conservative charset as the writer's DEFAULT_USER gate.
+# Shape-gate the sourced value (#243 e X1, tightened #243 f X1):
+# install.conf is root-owned but hand-editable, and the writer stamps
+# a literal here (install.sh sets OPENCODE_USER="opencode" and its
+# conf heredoc carries that literal — the writer's charset gate
+# covers DEFAULT_USER, not this name). A shape-invalid value (e.g. a
+# trailing slash) would silently defang the agent-home refusal in the
+# project loop and the agents-backup walk below — fall back to the
+# canonical literal, loudly. Charset: the writer's conservative set
+# MINUS leading dot/hyphen and trailing dot (deliberate divergence
+# from writer parity, #243 f X1): `.`, `..`, `opencode.`, `-x`, `--`
+# are not agent names, and a leading `-` is also an option-injection
+# shape into the id/userdel argv below; the writer never produces
+# any of them, so no legit value is refused. A merely DIFFERENT
+# valid name still passes by design (the conf is the source of truth
+# for a customized agent; the mismatch residual is recorded in the
+# review chain, snapshot f).
 case "$OPENCODE_USER" in
-    ''|*[!A-Za-z0-9_.-]*)
+    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
         echo "WARN: invalid OPENCODE_USER value in install.conf ('$OPENCODE_USER') — falling back to 'opencode'" >&2
         OPENCODE_USER=opencode
         ;;
