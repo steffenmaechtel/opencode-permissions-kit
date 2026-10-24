@@ -179,6 +179,24 @@ run_q() {
     fi
 }
 
+# rc-observing runner for the per-root revert loop (#218): run_q
+# ends in `|| true` by design, so the loop's closing log could claim
+# "reverted + removed" over ops that failed (find-chown, setfacl x2,
+# chmod g-s). Same [DRY] echo and same silence as run_q, but a
+# failure records the op label in the per-root partial list — the
+# closing log then says PARTIALLY with the failed ops named, plus a
+# stderr WARN and a FAILED log line (gpasswd/userdel arm pattern,
+# #211 b W1/c W1; f W2 naming form). Label first, command after.
+un_revert_q() { # <op label> <command...>
+    _un_rq_label="$1"; shift
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] $*"
+    elif ! "$@" >/dev/null 2>&1; then
+        _un_revert_failed=1
+        _un_partial="${_un_partial:+$_un_partial, }$_un_rq_label failed"
+    fi
+}
+
 # Source install.conf (canonical path since 0.0.10).
 INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
 if [ -f "$INSTALL_CONF" ]; then
@@ -551,6 +569,13 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
                 ;;
         esac
 
+        # Per-root partial causes (#218): failed ops (recorded by
+        # un_revert_q) and unknown-id skips both land in this ONE
+        # list — the closing log below reports them instead of
+        # claiming completion. The former second mechanism
+        # (_un_acl_skipped, 0.0.42h S1) is folded in here.
+        _un_partial=""
+        _un_revert_failed=0
         echo "  Reverting kit ownership in: $root"
         if [ -n "$UN_OC_UID" ] && [ -n "$UN_OC_GID" ]; then
             # No -xdev on purpose: project roots are often separate mounts
@@ -559,9 +584,10 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             # ! -type l (0.0.42e S1): chown on a symlink operand FOLLOWS
             # it — an agent-planted link in the project must not make the
             # root-run revert chown an arbitrary target outside it.
-            run_q sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
+            un_revert_q "find-chown" sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
                 -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
         else
+            _un_partial="${_un_partial:+$_un_partial, }opencode user unknown (chown skipped)"
             echo "    opencode user unknown — skipped (chown manually if files are locked)"
         fi
         echo "  Cleaning kit ACLs from: $root"
@@ -577,34 +603,36 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # parse time when the name does not resolve; the gids survive
         # the userdel above (captured before, orphan-proof). A principal
         # whose gid is UNKNOWN is skipped loudly with its manual hint —
-        # never silently (0.0.42h S1) — and the closing log line says
-        # "partial" when one was skipped.
-        _un_acl_skipped=""
+        # never silently (0.0.42h S1) — and lands in the partial list
+        # so the closing log says "partial" when one was skipped.
         for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"; do
             _un_acl_label="${_un_acl_pair%%:*}"
             _un_acl_gid="${_un_acl_pair#*:}"
             if [ -z "$_un_acl_gid" ]; then
-                _un_acl_skipped=1
+                _un_partial="${_un_partial:+$_un_partial, }${_un_acl_label} id unknown"
                 echo "    ${_un_acl_label} id unknown — its ACL entries left in place"\
 " (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
                 continue
             fi
-            run_q sudo setfacl -R -x "g:$_un_acl_gid" "$root"
-            run_q sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
+            un_revert_q "setfacl -x g:$_un_acl_gid" sudo setfacl -R -x "g:$_un_acl_gid" "$root"
+            un_revert_q "setfacl -d -x g:$_un_acl_gid" sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
         done
-        run_q sudo chmod g-s "$root"
-        # NB (#211 c W1 sweep): this closing log aggregates rc-blind
-        # run_q operations (find-chown, setfacl x2, chmod g-s) — the
-        # same lie class c W1 fixed at userdel/audit-log, on a root-run
-        # revert loop with its own partial semantics. Deliberately not
-        # changed in this wave: recorded as a follow-up candidate for
-        # its own wave (needs its fixture updated with it), the a F1
-        # ddev-handover precedent.
-        if [ -n "$_un_acl_skipped" ]; then
-            log "project ownership reverted + kit ACL entries PARTIALLY removed"\
-" (one or more group ids were unknown): $root"
-        else
+        un_revert_q "chmod g-s" sudo chmod g-s "$root"
+        # Closing log conditioned on what actually happened (#218, the
+        # deferred #211 c W1 class sweep): the four ops above report
+        # their rc now, and every skip cause is in the same list — so
+        # full success keeps the old line, anything else degrades to
+        # PARTIALLY naming the causes. A FAILED op additionally WARNs
+        # on stderr and leaves a FAILED log line; a pure skip (unknown
+        # id) keeps its own echo only — not attempted is not failed.
+        if [ -z "$_un_partial" ]; then
             log "project ownership reverted + kit ACL entries removed: $root"
+        else
+            log "project ownership reverted + kit ACL entries PARTIALLY removed ($_un_partial): $root"
+            if [ "$_un_revert_failed" -eq 1 ]; then
+                echo "WARN: could not fully revert $root ($_un_partial)" >&2
+                log "project revert FAILED for: $root ($_un_partial)"
+            fi
         fi
     done < "$UNINSTALL_PROJECTS_CONF"
 fi

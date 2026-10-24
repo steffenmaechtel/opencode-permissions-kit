@@ -36,6 +36,10 @@ Run it as your default user (it asks for `sudo` where needed). Options:
 - `/run/opencode-permissions-kit` and the router-port sysctl file
 
 **Project file contents are untouched** — only owner and group revert.
+If one of the revert operations cannot complete (a failed `chown`,
+`setfacl` or `chmod`), the report says **PARTIALLY removed** and names
+the failed operation instead of claiming success — unknown group ids
+are reported the same way, with the exact `setfacl` call to run by hand.
 
 On WSL, the uninstaller also **asks** whether to remove the kit's
 browser-bridge block from `/etc/wsl.conf` (kit-owned comment lines only;

@@ -250,21 +250,53 @@ if [ -n "$PROJECT_LOOP" ] && printf '%s' "$PROJECT_LOOP" | grep -q 'find'; then
 else
     fail "project loop with ownership revert extractable from uninstall.sh"
 fi
-LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && printf '%s\n/etc\n' "$WORK/fakeproj" | (
-    run() { echo "RUN: $*"; }
-    run_q() { echo "RUN: $*"; }
-    log() { :; }
-    # Distinct ids (0.0.42g Q2): UN_OC_GID and UN_DEV_GID must differ so
-    # the ACL pin below can prove BOTH principals are removed — the
-    # identical-ids fixture was the blindness that let the opencode-group
-    # entries survive the dev-gid-only removal (0.0.42g S1).
-    UN_OC_UID=60000
-    UN_OC_GID=60002
-    UN_DEV_GROUP=devgroup
-    UN_DEV_GID=60001
-    DEFAULT_USER=devuser
-    eval "$PROJECT_LOOP"
-) 2>&1 || true)
+# The rc-observing runner (#218) is extracted and driven REAL — the
+# loop's ops go through it, so the honesty pins below exercise the
+# shipped wiring, not a stub that fakes rc propagation.
+UN_REVERT_Q="$(sed -n '/^un_revert_q() {/,/^}$/p' "$UNINSTALL")"
+if [ -n "$UN_REVERT_Q" ] && printf '%s' "$UN_REVERT_Q" | grep -q 'failed'; then
+    pass "rc-observing revert runner extractable (#218)"
+else
+    fail "rc-observing revert runner extractable (#218)"
+fi
+# Loop driver (#218): real loop + real runner, per-command sudo stub
+# (logs the call, fails the ops named in <fail-ops>). Positional args
+# keep every arm hermetic — no knob vars leaking between arms:
+#   <fail-ops>  space-separated first args to fail (find/setfacl/chmod)
+#   <dry-run>   DRY_RUN for the run (true/false)
+#   <uid> <oc-gid> <dev-gid>   the id fixture (empty string = unknown;
+#               distinct gids by default — 0.0.42g Q2: UN_OC_GID and
+#               UN_DEV_GID must differ so the ACL pins can prove BOTH
+#               principals are removed)
+_un_loop_out() {
+    _unlo_fail="$1"; _unlo_dry="$2"; _unlo_uid="$3"; _unlo_ocg="$4"; _unlo_dg="$5"
+    : > "$WORK/unloop-sudo.log"
+    printf '%s\n/etc\n' "$WORK/fakeproj" | (
+        DRY_RUN="$_unlo_dry"
+        _un_partial=""
+        _un_revert_failed=0
+        UN_OC_UID="$_unlo_uid"
+        UN_OC_GID="$_unlo_ocg"
+        UN_DEV_GROUP=devgroup
+        UN_DEV_GID="$_unlo_dg"
+        DEFAULT_USER=devuser
+        eval "$UN_REVERT_Q"
+        # Logs to a FILE: the real runner silences its command's stdout
+        # and stderr (the shipped behavior), so an echoing stub would
+        # be swallowed with them.
+        sudo() {
+            printf 'sudo %s\n' "$*" >> "$WORK/unloop-sudo.log"
+            case " $_unlo_fail " in
+                *" $1 "*) return 1 ;;
+            esac
+            return 0
+        }
+        log() { echo "log: $*"; }
+        eval "$PROJECT_LOOP"
+    ) 2>&1
+    cat "$WORK/unloop-sudo.log"
+}
+LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && _un_loop_out "" false 60000 60002 60001 || true)
 if printf '%s' "$LOOP_OUT" | grep -qF "find $WORK/fakeproj" \
    && ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' \
    && printf '%s' "$LOOP_OUT" | grep -qF -- '-uid 60000' \
@@ -402,11 +434,95 @@ else
 fi
 if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$UNINSTALL" \
    && grep -qF 'for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"' "$UNINSTALL" \
-   && grep -qF '_un_acl_skipped=1' "$UNINSTALL" \
-   && grep -qF 'kit ACL entries PARTIALLY removed' "$UNINSTALL"; then
-    pass "ACL revert: both gids captured, principal loop, loud per-principal skip + partial log (0.0.42f C2 + 0.0.42g S1 + 0.0.42h S1)"
+   && grep -qF 'kit ACL entries PARTIALLY removed' "$UNINSTALL" \
+   && grep -qF 'id unknown — its ACL entries left in place' "$UNINSTALL"; then
+    pass "ACL revert: both gids captured, principal loop, loud per-principal skip + partial log (0.0.42f C2 + 0.0.42g S1 + 0.0.42h S1 + #218)"
 else
-    fail "ACL revert: principal loop + loud skip + partial-log branch required (0.0.42h S1)"
+    fail "ACL revert: principal loop + loud skip + partial-log branch required (0.0.42h S1, #218)"
+fi
+
+# --- 4c. revert-loop closing log honesty (#218) ----------------------------------
+# The closing log used to claim "project ownership reverted + kit ACL
+# entries removed" over rc-blind run_q ops — the deferred #211 c W1
+# class sweep. The real loop + runner are driven through the
+# per-command sudo stub above; every arm asserts the closing log
+# matches what happened, the way the user sees it (stdout log + stderr
+# WARN merged, as in the c W1 pins).
+if printf '%s' "$LOOP_OUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF 'PARTIALLY' \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF 'WARN:' \
+   && ! printf '%s' "$LOOP_OUT" | grep -qF 'revert FAILED'; then
+    pass "revert all ok: full-success closing log, no partial/WARN noise (#218)"
+else
+    fail "revert all ok: full-success closing log required (out=$(printf '%s' "$LOOP_OUT" | tail -3)) (#218)"
+fi
+FOUT=$(_un_loop_out "find" false 60000 60002 60001) || true
+if printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries PARTIALLY removed (find-chown failed): $WORK/fakeproj" \
+   && printf '%s' "$FOUT" | grep -qF "WARN: could not fully revert $WORK/fakeproj (find-chown failed)" \
+   && printf '%s' "$FOUT" | grep -qF "log: project revert FAILED for: $WORK/fakeproj (find-chown failed)" \
+   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+    pass "find-chown failure: partial closing log + WARN + FAILED log, no false completion (#218)"
+else
+    fail "find-chown failure arms (out=$(printf '%s' "$FOUT" | tail -4)) (#218)"
+fi
+FOUT=$(_un_loop_out "setfacl" false 60000 60002 60001) || true
+if printf '%s' "$FOUT" | grep -qF 'setfacl -x g:60002 failed' \
+   && printf '%s' "$FOUT" | grep -qF 'setfacl -d -x g:60001 failed' \
+   && ! printf '%s' "$FOUT" | grep -qF 'find-chown failed' \
+   && ! printf '%s' "$FOUT" | grep -qF 'chmod g-s failed' \
+   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+    pass "setfacl failure: both principals' ops named, other ops not (#218)"
+else
+    fail "setfacl failure arms — names must discriminate (out=$(printf '%s' "$FOUT" | tail -4)) (#218)"
+fi
+FOUT=$(_un_loop_out "chmod" false 60000 60002 60001) || true
+if printf '%s' "$FOUT" | grep -qF 'PARTIALLY removed (chmod g-s failed)' \
+   && printf '%s' "$FOUT" | grep -qF 'WARN: could not fully revert' \
+   && ! printf '%s' "$FOUT" | grep -qF 'find-chown failed' \
+   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+    pass "chmod g-s failure: named in partial closing + WARN (#218)"
+else
+    fail "chmod g-s failure arms (out=$(printf '%s' "$FOUT" | tail -4)) (#218)"
+fi
+# Unknown opencode gid (0.0.42h S1 semantics, now in the unified
+# partial mechanism): loud per-principal skip, dev-group removal still
+# runs, closing degrades to PARTIALLY — but a skip is not a failure:
+# no WARN, no FAILED log. The chown skip lands in the same list (uid
+# and gid are captured together — an unknown gid skips the chown too).
+FOUT=$(_un_loop_out "" false 60000 "" 60001) || true
+if printf '%s' "$FOUT" | grep -qF 'PARTIALLY removed (opencode user unknown (chown skipped), opencode group id unknown)' \
+   && printf '%s' "$FOUT" | grep -qF 'opencode group id unknown — its ACL entries left in place' \
+   && printf '%s' "$FOUT" | grep -qF -- 'setfacl -R -x g:60001' \
+   && ! printf '%s' "$FOUT" | grep -qF 'WARN:' \
+   && ! printf '%s' "$FOUT" | grep -qF 'revert FAILED' \
+   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+    pass "opencode gid unknown: loud skip + partial closing, no failure WARN (#218)"
+else
+    fail "opencode gid unknown arms (out=$(printf '%s' "$FOUT" | tail -4)) (#218)"
+fi
+# Unknown uid: chown skipped loudly, ACL ops still run, partial
+# closing names the skip — same not-attempted-is-not-failed rule.
+FOUT=$(_un_loop_out "" false "" 60002 60001) || true
+if printf '%s' "$FOUT" | grep -qF 'PARTIALLY removed (opencode user unknown (chown skipped))' \
+   && printf '%s' "$FOUT" | grep -qF 'chown manually if files are locked' \
+   && printf '%s' "$FOUT" | grep -qF -- 'setfacl -R -x g:60002' \
+   && ! printf '%s' "$FOUT" | grep -qF 'WARN:' \
+   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+    pass "uid unknown: chown skip lands in partial closing, ACL ops still run (#218)"
+else
+    fail "uid unknown arms (out=$(printf '%s' "$FOUT" | tail -4)) (#218)"
+fi
+# Dry run: [DRY] echoes and the success lines despite failing ops —
+# the run/run_q convention since #211 b W1 (dry reports the intended
+# outcome; nothing executes, so nothing can fail).
+FOUT=$(_un_loop_out "find setfacl chmod" true 60000 60002 60001) || true
+if printf '%s' "$FOUT" | grep -qF '[DRY] sudo find' \
+   && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
+   && ! printf '%s' "$FOUT" | grep -qF 'PARTIALLY' \
+   && ! printf '%s' "$FOUT" | grep -qF 'WARN:'; then
+    pass "dry run: [DRY] echo + full-success closing despite failing stub (#218)"
+else
+    fail "dry run arms (out=$(printf '%s' "$FOUT" | tail -4)) (#218)"
 fi
 
 # --- 5. cleanup hints match what install.sh leaves behind ----------------------
