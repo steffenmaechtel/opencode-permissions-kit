@@ -72,4 +72,7 @@ the operation with a per-pass warning instead of reporting success — a
 green "ACLs applied" always means the baseline actually landed. A missing
 or broken `python3` never blocks the baseline either: the passes then run
 without the live entry counters (one warning says so) — the data path of
-a mutating pass never depends on its progress display.
+a mutating pass never depends on its progress display. If `python3` is
+present but broken, the interpreter additionally names itself: its own
+diagnostic line appears above that warning (interpreter output, not a
+second kit warning); a missing one stays silent.

@@ -68,9 +68,13 @@ _opk_ddev_describe() {
 # depends on it for its jsonc parsing). Expected misses are silent
 # (except: pass, empty output); a broken interpreter's own stderr
 # passes through (#244 c S3) — the empty-on-miss contract is untouched.
+# An absent interpreter is guarded to the same silent empty output
+# (#244 d Q1): absence is a legitimate mid-lifecycle state, not a
+# diagnostic event.
 _opk_json_get() {
     _opk_gj="$1"
     shift
+    command -v python3 >/dev/null 2>&1 || return 0
     printf '%s' "$_opk_gj" | python3 -c '
 import json, sys
 try:

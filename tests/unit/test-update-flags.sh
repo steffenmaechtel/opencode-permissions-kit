@@ -163,10 +163,16 @@ _re=$(run_resolver "$WORK/bin3" "$WORK/stub-v2" 'resolve_latest_opencode_version
 # inline chain into the sandbox scanner's raw-line rm-suffix pattern
 # (#244 c S1).
 RLVDIAG='platform independent libraries'
-if grep -qF "' 2>/dev/null || true)" "$UPDATE"; then
+# Site-scoped needle (#244 d Q2): read only the resolve function — a
+# same-shape redirect elsewhere in update.sh must not red this pin with
+# a misleading "resolve:" message.
+RLVFN="$(sed -n '/^resolve_latest_opencode_version() {/,/^}/p' "$UPDATE")"
+if [ -z "$RLVFN" ]; then
+    fail "resolve: function extractable for the site-scoped redirect pin (#244 d Q2)"
+elif printf '%s\n' "$RLVFN" | grep -qF "' 2>/dev/null || true)"; then
     fail "resolve: pipe must not discard interpreter stderr (#244 c S3)"
 else
-    pass "resolve: pipe no longer discards interpreter stderr (#244 c S3)"
+    pass "resolve: pipe no longer discards interpreter stderr (#244 c S3; site-scoped, #244 d Q2)"
 fi
 mkdir -p "$WORK/noisy-py"
 printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$RLVDIAG" > "$WORK/noisy-py/python3"
@@ -190,6 +196,26 @@ if [ "$RLV_RC" -ne 0 ] && [ ! -s "$WORK/rlov2.err" ]; then
 else
     fail "resolve: expected parse failure must stay silent (rc=$RLV_RC err=$(cat "$WORK/rlov2.err"))"
 fi
+# 2c-3. (#244 d Q1) absent python3: the guard keeps absence silent — no
+# shell not-found noise on a legitimate mid-lifecycle state; resolve
+# still refuses rc 1 (empty result, same as any unresolvable body).
+RLVABS="$WORK/abs-bin"; mkdir -p "$RLVABS"
+for _rld in /usr/bin /bin; do
+    for _rlb in "$_rld"/*; do
+        [ -e "$_rlb" ] || continue
+        [ "${_rlb##*/}" = python3 ] && continue
+        ln -sfn "$_rlb" "$RLVABS/${_rlb##*/}"
+    done
+done
+RLV_RC=0
+PATH="$RLVABS" SYSTEM_BIN="$WORK/stub-v2" CONFDIR="$WORK/conf" \
+    sh -c ". '$FUNCS' && resolve_latest_opencode_version 2" >/dev/null 2>"$WORK/rlov3.err" || RLV_RC=$?
+if [ "$RLV_RC" -ne 0 ] && [ ! -s "$WORK/rlov3.err" ]; then
+    pass "resolve: absent python3 stays silent, resolve still refuses (#244 d Q1)"
+else
+    fail "resolve: absent python3 must stay silent (rc=$RLV_RC err=$(cat "$WORK/rlov3.err"))"
+fi
+rm -rf "$RLVABS"
 
 # 2d. exact-version download: npm layout (2.*) and GitHub layout (1.x)
 DL="$(mktemp -d)"

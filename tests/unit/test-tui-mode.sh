@@ -324,6 +324,61 @@ _tps_out=$( TR_SUDO="$TUIWORK/tps/bin2/sudo-stub"
 case "$_tps_out" in *rc=1*) check "hard failure: rc=1 (mapped to die/exit at callers)" true ;; *) check "hard failure: rc=1 (got [$_tps_out])" false ;; esac
 check "hard failure: no plugin dir left behind" test ! -e "$TPS4/plugins"
 
+# (#244 d W1) interpreter-stderr transparency at the unregister cleanup:
+# a present-but-broken python3 names itself above the best-effort
+# silence (stdout still discarded), an absent one is guarded to silence
+# (#244 d Q1), and the healthy no-op prints nothing (tui-register.py is
+# silent when there is nothing to clean). Diagnostic literal in a
+# variable — consuming grep lines quoting it inline chain into the
+# sandbox scanner's rm-suffix pattern (#244 c S1).
+TPSDIAG='platform independent libraries'
+TPSNZ="$TUIWORK/tps/nz"; mkdir -p "$TPSNZ"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$TPSDIAG" > "$TPSNZ/python3"
+chmod +x "$TPSNZ/python3"
+TPSW="$TUIWORK/tps/w"; mkdir -p "$TPSW"
+_tps_out=$( PATH="$TPSNZ:$PATH" _tps_run "noisy-unregister" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+case "$_tps_out" in
+    *"$TPSDIAG"*rc=0*) check "unregister cleanup: broken python3 names itself, sync still rc=0 (#244 d W1)" true ;;
+    *) check "unregister cleanup: broken python3 names itself, sync still rc=0 (#244 d W1) (got [$_tps_out])" false ;;
+esac
+rm -rf "$TPSW"
+# absent python3: PATH restricted to a farm of the usual binaries minus
+# python3 — the cleanup must stay silent (no shell not-found noise).
+TPSABS="$TUIWORK/tps/absbin"; mkdir -p "$TPSABS"
+for _tpd in /usr/bin /bin /usr/local/bin; do
+    for _tpb in "$_tpd"/*; do
+        [ -e "$_tpb" ] || continue
+        [ "${_tpb##*/}" = python3 ] && continue
+        ln -sfn "$_tpb" "$TPSABS/${_tpb##*/}"
+    done
+done
+TPSW="$TUIWORK/tps/w3"; mkdir -p "$TPSW"
+_tps_out=$( PATH="$TPSABS" _tps_run "absent-unregister" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+case "$_tps_out" in
+    *rc=0*) _tpcase=true ;;
+    *) _tpcase=false ;;
+esac
+case "$_tps_out" in
+    *"not found"*|*"Not found"*|*"$TPSDIAG"*) _tpcase=false ;;
+    *) ;;
+esac
+check "unregister cleanup: absent python3 stays silent, sync still rc=0 (#244 d Q1)" "$_tpcase"
+rm -rf "$TPSW" "$TPSABS" "$TPSNZ"
+# healthy no-op: the cleanup prints nothing of its own (no tui-register
+# error line, no traceback) — the claim the W1 comment makes.
+TPSW="$TUIWORK/tps/w4"; mkdir -p "$TPSW"
+_tps_out=$( _tps_run "healthy-noop" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+case "$_tps_out" in
+    *rc=0*) _tpcase=true ;;
+    *) _tpcase=false ;;
+esac
+case "$_tps_out" in
+    *"tui-register:"*|*"Traceback"*) _tpcase=false ;;
+    *) ;;
+esac
+check "unregister cleanup: healthy no-op prints nothing (#244 d W1)" "$_tpcase"
+rm -rf "$TPSW"
+
 # ONE merged trap (0.0.41f C4): a second EXIT trap would REPLACE the
 # suite's T2X cleanup — chain both scratch dirs.
 trap 'rm -rf "$T2X" "${TUIWORK:-}"' EXIT INT TERM

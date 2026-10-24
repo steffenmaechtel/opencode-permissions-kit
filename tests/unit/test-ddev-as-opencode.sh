@@ -353,6 +353,17 @@ if grep -qF "$GJDIAG" "$TMPDIR/gj-noisy.err"; then
 else
     fail "_opk_json_get must pass interpreter stderr through (#244 c S3)"
 fi
+# (#244 d Q1) absent python3: guarded to the miss contract — empty
+# output, no shell not-found noise (absence is legitimate mid-lifecycle,
+# not a diagnostic event). Source first, then restrict PATH.
+GJABS="$TMPDIR/gj-abs"; mkdir -p "$GJABS"
+GJ_OUT=$(sh -c ". '$FUNC'; PATH='$GJABS'; _opk_json_get '{\"raw\":{\"primary_url\":\"https://x.y\"}}' primary_url" 2>"$TMPDIR/gj-abs.err") || true
+assert_eq "_opk_json_get: absent python3 yields empty (miss contract)" "" "$GJ_OUT"
+if [ ! -s "$TMPDIR/gj-abs.err" ]; then
+    pass "_opk_json_get: absent python3 stays silent (#244 d Q1)"
+else
+    fail "_opk_json_get: absent python3 must stay silent (err=$(cat "$TMPDIR/gj-abs.err"))"
+fi
 
 check "function execs the kit's sudoers helper for the developer" \
     sh -c "grep -q 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"

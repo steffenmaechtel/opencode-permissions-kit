@@ -5,7 +5,9 @@ unique findings after 3 cross-axis duplicate pairs) → fix wave 1 →
 [review-b.md](review-b.md) (fix-wave snapshot 2026-10-24, 9 IDs, 8
 unique after 1 dup pair) → fix wave 2 → [review-c.md](review-c.md)
 (wave snapshot 2026-10-24, 14 IDs, 11 unique after 3 dup pairs, 1
-sub-claim retracted) → fix wave 3 (the c rows below). Birth PR
+sub-claim retracted) → fix wave 3 → [review-d.md](review-d.md)
+(wave snapshot 2026-10-24, 9 IDs, all unique — 3 LOW, 6 INFO, no
+MED/HIGH) → fix wave 4 (the d rows below). Birth PR
 #244, branch `feature/223-fsb-tee-health-gate`.
 
 ## Dispositions
@@ -43,6 +45,15 @@ sub-claim retracted) → fix wave 3 (the c rows below). Birth PR
 | c W5/Q4 (INFO) | **implemented** | `58c2019` | pipe-buffer wording in §11e comments + this ledger |
 | c Q3 (LOW) | **implemented** | `58c2019` | integer sleep poll (10 × 1 s), same 10 s bound |
 | c Q5 (INFO) | **implemented** | `58c2019` | dead `_p3f=""` removed; loop lives inside `_p3collect` |
+| d S1 (INFO) | **deliberately not done** | — | designed; repetition fires only on an already-broken python3 |
+| d S2 (INFO) | **deliberately not done** | — | warn never tty-gated (branch contract); gate would hide cron cause |
+| d W1 (LOW) | **implemented** | `<SHA>` | 2>&1 dropped, stdout kept, absence guarded; tui-mode pins |
+| d W2 (LOW) | **implemented** | `<SHA>` | same-line double-assignment pin; joined assignments go red |
+| d W3 (INFO) | **implemented** | `<SHA>` | sweep record re-anchored by content, not stale line number |
+| d W4 (INFO) | **implemented** | `<SHA>` | residual bullet rewritten to its grep's actual hits |
+| d Q1 (LOW) | **implemented** | `<SHA>` | command -v guards at resolve + _opk_json_get; absence pins |
+| d Q2 (INFO) | **implemented** | `<SHA>` | needle scoped to the resolve function |
+| d Q3 (INFO) | **implemented** | `<SHA>` | one sentence each on sharing-group.md + cli.md |
 
 ## Evidence detail
 
@@ -416,8 +427,13 @@ already lands in a loud ui_error). Deliberately not changed:
 opencode-as-opencode:444 (a W5's wrapper output contract, unchanged
 disposition). Every expected-failure path stays SILENT (the except
 arms swallow their failures by design) — the passthrough only
-carries interpreter-level stderr. Line-shape pins in test-status +
-test-update-flags re-red if a `2>/dev/null` returns on those sites.
+carries interpreter-level stderr. (Correction, #244 d Q1: "only
+carries interpreter-level stderr" overstated at the two then-unguarded
+sites — the SHELL's not-found notice passed too when python3 was
+absent; fix wave 4 guards absence at update resolve and
+`_opk_json_get`, making the sentence true as written.) Line-shape
+pins in test-status + test-update-flags re-red if a `2>/dev/null`
+returns on those sites.
 
 ### c S4 — promise scoped
 
@@ -468,15 +484,24 @@ tick; suites green.
   (a W5); fs-baseline tee's except-clause silence is the pinned
   #223 contract (no stderr redirect involved); update.sh 1.x
   branch uses sed (no interpreter).
-- `grep -rn "sleep 0\." tests/unit/` — the §11e poll fixed;
-  test-status.sh:2621 `sleep 0.05` is pre-existing (before this
-  wave, works on the supported coreutils baselines) — deliberately
-  not done: out of this wave's diff, loud-failing class only.
-- `grep -rn "2>/dev/null" files/` on python3 lines — residual hits
-  are the fixed-gate probes themselves (presence/probe rc still
-  discarded by design; only the failure-path rerun/drop shapes
-  changed) and curl noise guards (update.sh resolve keeps the curl
-  2>/dev/null — network noise, not interpreter stderr).
+- `grep -rn "sleep 0\." tests/unit/` — the §11e poll fixed; the
+  test-status.sh §3b sender-fixture poll `sleep 0.05` is pre-existing
+  (content-anchored; #244 d W3 correction: the stale `:2621` citation
+  described the pre-wave tree — the wave's own +75 lines had already
+  moved it to `:2690` when this record was committed; works on the
+  supported coreutils baselines) — deliberately not done: out of this
+  wave's diff, loud-failing class only.
+- `grep -rn "2>/dev/null" files/` on python3 lines — (#244 d W4
+  correction: this bullet misdescribed its own grep's output; the
+  gate probes' `>/dev/null 2>&1` shapes cannot match the literal
+  `2>/dev/null`.) The grep's actual hits: curl noise guards
+  (update.sh:230, the resolve pipe's curl at :1157,
+  setup-container-backend:283 — network noise, not interpreter
+  stderr) and one python3-line hit, opencode-as-opencode:444,
+  dispositioned in the S3 bullet above (a W5, deliberately not
+  changed). The fixed-gate probes keep their rc discards by design
+  (`>/dev/null 2>&1` shapes — presence/probe rc; only the
+  failure-path rerun/drop shapes changed).
 
 ### L1–L7 run (fix wave 3, before commit)
 
@@ -518,6 +543,115 @@ green; full `make test` rc 0 (log /tmp/opencode/maketest-pr244d.log
 on the session host); line-length ratchet + reviews lint/parity
 green before the commit that carries this file. E2E (root-run
 script semantics change — the stderr passthroughs): owed in-wave,
+runs on the committed tree, recorded in Follow-ups by the
+bookkeeping commit.
+
+## Evidence detail (fix wave 4 — d findings)
+
+Maintainer decision (recorded per the round's questioning): full
+implementation — W1/Q1 code-side (e2e owed in-wave), W2/Q2 test-side,
+W3/W4 ledger corrections, Q3 docs, S1/S2 deliberately not done.
+
+### d W1 — the unregister cleanup joins the S3 class
+
+tui-plugin.sh's best-effort cleanup drops `2>&1` (the stdout discard
+stays): tui-register.py is silent on the expected no-op (`if not
+changed: return 0` — verified against the shipped py) and prints
+clean `tui-register: …` error lines otherwise, so a present-but-broken
+python3 now names itself instead of degrading attributelessly. Pins in
+test-tui-mode: noisy shim → diagnostic + rc 0; absence (bin-farm PATH
+minus python3) → silence + rc 0; healthy run → no tui-register line,
+no traceback.
+
+### d S1 / d S2 — deliberately not done
+
+S1: the per-call repetition on `_opk_json_get` (up to ~5×/run) fires
+only on an already-broken interpreter; deduplicating would couple
+independent lookups for no behavioral gain. S2: the fs-baseline
+degradation warn was unconditional pre-wave (the branch's existing
+contract); tty-gating only the rerun would hide the cause exactly in
+cron mail — the one non-tty observer that cannot see a terminal.
+
+### d Q1 — absence guards at the two unguarded sites
+
+update.sh resolve wraps the pipe in a `command -v python3` guard (rc
+identical: absence → empty `_rlov_ver` → return 1); ddev
+`_opk_json_get` returns empty early. Both mirror fs-baseline's
+"no not-found noise for a legitimate absence". Pins: resolve absence
+(bin-farm PATH, rc 1 + empty stderr, test-update-flags 2c-3);
+`_opk_json_get` absence (empty output + empty stderr, test-ddev
+2b). The c-S3 evidence sentence is corrected in place above.
+
+### d W2 — same-line double-assignment pin
+
+`grep -nE "^[[:space:]]*_py3_imports=.*_py3_imports="` — any line
+naming the assignment token twice goes red (guarded empty-match
+grep); the line-count pin above stays for separate-line seconds.
+Sabotage post-commit (Follow-ups).
+
+### d W3 / d W4 — ledger corrections in place
+
+W3: the wave-3 sweep bullet's `:2621` citation is replaced by the
+content anchor (the §3b sender-fixture poll). W4: the residual bullet
+now names its grep's actual hits (curl guards + the one python3-line
+hit oao:444). Both corrected in the wave-3 record above with
+correction markers.
+
+### d Q2 — site-scoped needle
+
+The forbidden shape `' 2>/dev/null || true)` is grepped inside the
+sed-extracted resolve function only — the same extraction range the
+suite's FUNCS file uses. A same-shape line elsewhere in update.sh can
+no longer red this pin with a misleading "resolve:" message;
+extraction failure fails loud by itself.
+
+### d Q3 — docs
+
+One sentence each on the two pages that describe the degrade paths:
+sharing-group.md (a broken interpreter names itself above the warn;
+a missing one stays silent) and cli.md (the diagnostic appears once
+on the terminal when the scan starts; absence silent).
+
+### Class sweep record (L2, fix wave 4)
+
+- S3-class enumeration completed (#244 d W1): the python3 execution
+  sites under files/ are now — guarded + transparent:
+  tui-plugin.sh:68 (fixed this wave), fs-baseline probe + rerun,
+  status probe/advisory/leak-scan, update resolve, ddev
+  `_opk_json_get`, opk:300, install.sh gate (b-S2 discard + rerun);
+  deliberately not changed: oao:444 (a W5), update.sh 1.x (sed, no
+  interpreter); transparent, no redirect involved: uninstall:316 —
+  its absent-python3 not-found noise is pre-existing and outside
+  this wave's diff, named here as backlog.
+- Absence class (d Q1) swept with it: every site above guards
+  absence except uninstall:316 (pre-existing, named) and the
+  installer gate (absence is its loud "not installed" verdict by
+  design).
+
+### L1–L7 run (fix wave 4, before commit)
+
+- L1: every new silence claim pinned by executing the path (noisy
+  shim, absence farm, healthy no-op); the guards' skip paths are the
+  asserted surfaces.
+- L2: sweep above; patterns + sites recorded.
+- L3: the new comments' claims carry their pins (tui-plugin no-op
+  silence → healthy-noop pin; absence silence → absence pins;
+  resolve rc equivalence → the absence pin asserts rc 1).
+- L4: new pins sit before their suites' summary gates; sabotage
+  post-commit (Follow-ups).
+- L5: no new root operations — the guards are read-only lookups; the
+  tui-plugin call keeps its sudo wrapper and operands unchanged.
+- L6: fixes bring their own pins; the wave review of this fix diff
+  (snapshot e) is owed per the loop.
+- L7: no new shell files.
+
+### Gates (fix wave 4, pre-commit)
+
+make lint green; affected suites green (tui-mode, update-flags,
+ddev-as-opencode, install-args; status + fs-baseline as regression);
+full `make test` rc 0; line-length ratchet + reviews lint/parity
+green before the commit that carries this file. E2E (root-run script
+behavior changes — tui-plugin, update, ddev-terminal): owed in-wave,
 runs on the committed tree, recorded in Follow-ups by the
 bookkeeping commit.
 

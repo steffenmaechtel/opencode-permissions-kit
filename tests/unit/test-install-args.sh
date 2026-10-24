@@ -970,6 +970,17 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     else
         fail "gate: exactly one _py3_imports assignment (found $_p3asn, want 1)"
     fi
+    # Same-line double assignment (#244 d W2): the count pin above
+    # counts LINES — `_py3_imports='a'; _py3_imports='b'` joined on one
+    # line keeps it at 1 while the extraction sed reads the FIRST list
+    # and the runtime executes only the LAST. Any line naming the
+    # assignment token twice goes red (guarded empty-match grep).
+    _p3dup="$(grep -nE "^[[:space:]]*_py3_imports=.*_py3_imports=" "$INSTALL" || true)"
+    if [ -z "$_p3dup" ]; then
+        pass "gate: no same-line double _py3_imports assignment (#244 d W2)"
+    else
+        fail "gate: same-line double _py3_imports assignment ($_p3dup)"
+    fi
     _p3g="$(mktemp)"
     printf '%s\n' "$_p3gate" | sed 's/^[[:space:]]*import[[:space:]]*//' \
         | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
