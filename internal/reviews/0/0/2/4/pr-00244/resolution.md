@@ -56,15 +56,15 @@ MED/HIGH) → fix wave 5 (the e rows below). Birth PR
 | d Q1 (LOW) | **implemented** | `f198fb2` | command -v guards at resolve + _opk_json_get; absence pins |
 | d Q2 (INFO) | **implemented** | `f198fb2` | needle scoped to the resolve function |
 | d Q3 (INFO) | **implemented** | `f198fb2` | one sentence each on sharing-group.md + cli.md |
-| e S1 (LOW) | **implemented** | `<SHA>` | guard runs inside the sudo context (sh -c); asymmetry pins both arms |
-| e S2 (INFO) | **implemented** | `<SHA>` | rc 127→0 contract named at the guard; message correction recorded |
-| e W1 (LOW) | **implemented** | `<SHA>` | record completed: both tee sites + code-site anchor, correction marker |
-| e W2 (LOW) | **implemented** | `<SHA>` | count+dup pins extended to `+=` shapes; comment promise trued |
-| e W3 (LOW) | **implemented** | `<SHA>` | `:1157` replaced by a content anchor |
-| e W4 (INFO) | **implemented** | `<SHA>` | concealment residual named in the pin comment (promise scoped) |
-| e W5 (INFO) | **implemented** | `<SHA>` | absence sentence now names oao:444's redirect+rc handling |
-| e Q1 (LOW) | **implemented** | `<SHA>` | cli.md sentence states the per-step truth |
-| e Q3 (LOW) | **implemented** | `<SHA>` | healthy-noop pin asserts an empty stderr stream |
+| e S1 (LOW) | **implemented** | `f49dadd` | guard runs inside the sudo context (sh -c); asymmetry pins both arms |
+| e S2 (INFO) | **implemented** | `f49dadd` | rc 127→0 contract named at the guard; message correction recorded |
+| e W1 (LOW) | **implemented** | `f49dadd` | record completed: both tee sites + code-site anchor, correction marker |
+| e W2 (LOW) | **implemented** | `f49dadd` | count+dup pins extended to `+=` shapes; comment promise trued |
+| e W3 (LOW) | **implemented** | `f49dadd` | `:1157` replaced by a content anchor |
+| e W4 (INFO) | **implemented** | `f49dadd` | concealment residual named in the pin comment (promise scoped) |
+| e W5 (INFO) | **implemented** | `f49dadd` | absence sentence now names oao:444's redirect+rc handling |
+| e Q1 (LOW) | **implemented** | `f49dadd` | cli.md sentence states the per-step truth |
+| e Q3 (LOW) | **implemented** | `f49dadd` | healthy-noop pin asserts an empty stderr stream |
 
 ## Evidence detail
 
@@ -820,6 +820,23 @@ commit.
 
 ## Follow-ups
 
+- Wave-5 e2e discharged in-wave on tree `f49dadd`: `make e2e`
+  **309 passed** (../logs/e2e-20261024-231534.log), `make
+  e2e-rootless` **47 passed**
+  (../logs/e2e-rootless-20261024-231534.log), both rc 0, parallel
+  run (root-run script semantics changed: the tui-plugin guard
+  moved into the sudo context; opencode cache warm from the same
+  day's 22:34 run — no version gap).
+- Wave-5 sabotage on the committed tree (delete-the-construct,
+  observe red, restore, re-green): caller-side guard shape restored
+  (the sh -c wrapper deleted) → BOTH asymmetry pins red (arm A
+  noise back, arm B marker absent); `echo internal-noise >&2`
+  injected before the healthy exec → the stderr-empty pin red;
+  separate-line `_py3_imports+=` append → count pin red (found 2,
+  want 1; the healthy probe redded collaterally — the probe now
+  runs the doubled assignment); same-line joined append → dup pin
+  red quoting the offending line. Restores verified green
+  (test-tui-mode + test-install-args rc 0 on the restored tree).
 - Wave-4 e2e discharged in-wave on tree `f198fb2`: `make e2e`
   **309 passed** (../logs/e2e-20261024-223458.log), `make
   e2e-rootless` **47 passed**
