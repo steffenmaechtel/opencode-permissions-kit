@@ -1,7 +1,7 @@
 # The wrapper
 
-This page explains what happens on every `opencode` start and how the kit
-protects the wrapper from being bypassed.
+What happens on every `opencode` start, and how the kit protects the wrapper
+from being bypassed.
 
 ## The four steps
 
@@ -12,58 +12,49 @@ Every `opencode` invocation goes through the wrapper at
    path listed in `projects.conf`. Otherwise the interactive start is
    refused (headless invocations skip this — see
    [below](#headless-invocations-serve-run-queries)).
-2. **Detect container tools** — if the project's `opencode.jsonc` broadly
-   allows docker/ddev, the wrapper attaches the configured rootless
-   backend (no confirmation dialog — the state is visible in the TUI,
-   see [mode display](#mode-display-in-the-tui)).
+2. **Detect container tools** — if the project's final `opencode.jsonc` allows
+   docker/ddev broadly, the wrapper attaches the configured rootless backend.
 3. **Probe the backend** — docker-rootless: the per-user socket is verified
-   reachable (as the `opencode` user, via the kit's `socket-check`
-   sudoers rule); podman-rootless: the `podman` CLI must be installed (an
-   optional `OPENCODE_PODMAN_SOCKET` enables docker-CLI compat). An unknown
-   backend value produces a loud warning and **no** container
-   tools — never a silent fallback to a root-equivalent path.
+   reachable (as the `opencode` user, via the kit's `socket-check` sudoers
+   rule); podman-rootless: the `podman` CLI must be installed. An unknown
+   backend value produces a loud warning and **no** container tools — never
+   a silent fallback to a root-equivalent path.
 4. **Execute** — `sudo -u opencode` with `DOCKER_HOST`/`XDG_RUNTIME_DIR`
    exported for the rootless socket (preserved across sudo via the kit's
    `env_keep`).
 
-The wrapper prints its banner and starts opencode **immediately** — no
-`Press Enter` pause and no `[Y/n]` container question (both removed in
-0.0.21: the question was effectively always answered with yes, and the
-kit's state is now visible inside the TUI at all times).
+The wrapper prints its banner and starts opencode immediately — no `Press
+Enter` pause, no container question (the state is visible in the TUI, see
+[mode display](#mode-display-in-the-tui)).
 
-An exception runs before everything else: `opencode --version`, `-v`, `-h`
+One exception runs before everything else: `opencode --version`, `-v`, `-h`
 and `--help` exec straight to the real binary from **any** directory — no
-banner, no project-directory check, no container resolution. Scripts and
-the official opencode installer parse that output verbatim, and the
-installer probes it from `$HOME` mid-install (a refusal there broke
-installs).
+banner, no checks. Scripts and the official installer parse that output
+verbatim.
 
 ## Headless invocations (serve, run, queries)
 
-`opencode serve` and the other non-interactive subcommands do not go
-through the interactive path. Third-party tools spawn opencode
-non-interactively and parse its stdout:
+`opencode serve` and the other non-interactive subcommands do not go through
+the interactive path. Third-party tools spawn opencode non-interactively and
+parse its stdout:
 
 | Invocation | Who uses it | What is parsed |
 |---|---|---|
 | `opencode serve` | OpenChamber, cezar, CodeWalk, the VS Code extension | `opencode server listening on <url>` |
 | `opencode run` | CI runners, kanban orchestrators, eval harnesses | `--format json` / stream-json events |
 | `opencode acp` | IDE agents (Agent Client Protocol) | JSON-RPC over stdio |
-| `opencode models`, `agent`, `providers`, `export`, … | cezar (model discovery), scripts | JSON/plain listings |
+| `opencode models`, `agent`, `providers`, `export`, … | scripts, model discovery | JSON/plain listings |
 
-A banner or prompt on stdout would break those parsers (and `read` on a
-closed stdin would kill the wrapper under `set -e`), and the
-project-directory check would refuse tools running from git worktrees or
-temporary checkouts. Headless invocations therefore:
+A banner or prompt on stdout would break those parsers — headless
+invocations therefore:
 
 - skip the project-directory check — the soft permission layer (global +
   per-project `opencode.jsonc`) still applies to every session,
-- print nothing on stdout; diagnostics (shadow binary, backend warnings)
-  go to stderr,
-- resolve container tools silently — `serve` always attaches them (a
-  server serves many projects); `run`/queries attach them when the CWD's
-  project config opts in. Whether a session may actually use docker/ddev
-  stays decided by the `opencode.jsonc` rules.
+- print nothing on stdout; diagnostics go to stderr,
+- resolve container tools silently — `serve` always attaches them; `run` and
+  queries attach them when the CWD's project config opts in. Whether a
+  session may actually use docker/ddev stays decided by the `opencode.jsonc`
+  rules.
 
 What counts as headless: `serve`, `acp`, the query subcommands (`models`,
 `agent`, `providers`, `session`, `export`, `import`, `stats`, `account`,
@@ -72,124 +63,85 @@ What counts as headless: `serve`, `acp`, the query subcommands (`models`,
 `service`, `pair`, `update`), and `run` when a message argument is given or
 stdin is piped. `console login` (1.x) and `auth login` (2.x) are device
 logins — they carry no project context and must work from any directory.
-Interactive TUI starts (no subcommand, flags-only
-starts, `tui`, `attach`, or `opencode run` on a terminal without a
-message) keep the banner and the project-directory check.
+Interactive TUI starts keep the banner and the project-directory check.
 
 Device logins get the same working-directory treatment as `serve`: when the
 current directory is not readable by the `opencode` user (typically your
-`$HOME`, mode 750), Bun's `posix_spawn` for the browser-open fails with
-`EACCES` even though the spawned file is executable — so the wrapper moves
-`console`/`auth` to a readable directory (the opencode home) before
-starting the binary (issue #91).
+`$HOME`, mode 750), the wrapper moves the login to a readable directory (the
+opencode home) before starting the binary.
 
-`serve` additionally sanity-checks its working directory: UIs like
-OpenChamber default it to the developer's `$HOME`, which the `opencode`
-user cannot read (UID separation) — the server would boot but answer
-HTTP 500 on every config load for that directory. The wrapper probes
-readability from the `opencode` user's context (`cwd-check`, gated
-by its own sudoers rule), warns on stderr and starts the server from a
-readable fallback (the matching projects root, else the first readable
-configured root, else the `opencode` home) — see the
-[OpenChamber how-to](../how-to/openchamber.md#server-working-directory).
-Projectless chats have a separate directory quirk of their own, solved
-upstream with `OPENCHAMBER_CHATS_DIR` (OpenChamber ≥ 1.22.2) — see
-[Projectless chats](../how-to/openchamber.md#projectless-chats).
-
-Which ecosystem tools use which invocation — and the verified status of
-each — is tracked in the [compatibility
-matrix](../reference/compatibility.md) (issue #42 research). Tools that
-are opencode *plugins* (awesome-opencode) load inside the agent process
-and never touch the wrapper.
+`serve` additionally sanity-checks its working directory: UIs like OpenChamber
+default it to the developer's `$HOME`, which the `opencode` user cannot read.
+The wrapper probes readability from the opencode user's context (`cwd-check`),
+warns on stderr and starts the server from a readable fallback (see the
+[OpenChamber how-to](../how-to/openchamber.md#server-working-directory)).
 
 `OPENCODE_SERVER_PASSWORD` and `OPENCODE_SERVER_USERNAME` are preserved
-across the `sudo -u opencode` exec, so the Basic-auth credentials a UI
-passes to the server survive (see the
-[OpenChamber how-to](../how-to/openchamber.md)). No other `OPENCODE_*`
-variable crosses the sudo boundary: agent-side configuration
-(`OPENCODE_CONFIG*`, `OPENCODE_AUTH_CONTENT`, `OPENCODE_PERMISSION`,
-…) lives in the opencode user's own environment, and sudo's env reset
-is what keeps the calling shell from overriding it per invocation.
+across the `sudo -u opencode` exec, so the Basic-auth credentials a UI passes
+to the server survive. No other `OPENCODE_*` variable crosses the sudo
+boundary — agent-side configuration lives in the opencode user's own
+environment. Which tool uses which invocation is tracked in the
+[compatibility matrix](../reference/compatibility.md); tools that are
+opencode *plugins* load inside the agent process and never touch the wrapper.
 
 ## Self-update bypass protection (default-user deny-all)
 
 opencode's installer and self-updater can re-add `~/.opencode/bin` to your
-`PATH`. If that happens, typing `opencode` would run the real binary **as
-your user** instead of the wrapper.
+`PATH` — typing `opencode` would then run the real binary **as your user**,
+outside the kit.
 
 As a safety net, the kit installs a lockout config for the default user
 (`~/.config/opencode/opencode.jsonc`) that denies **everything** — even if
-the real binary takes over, it cannot read or modify anything. Template:
-`files/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc`.
+the real binary takes over, it cannot read or modify anything.
 
 - During `install.sh`, an existing file is renamed to
-  `opencode.jsonc_BAK_<timestamp>` before the deny-all config is installed.
+  `opencode.jsonc_BAK_<timestamp>` first.
 - `update.sh` only installs the lockout config when no config exists yet.
 - To use opencode normally as your own user, delete or rename that config.
 
 `install.sh` also removes a self-installed binary from `~/.opencode/bin`
-(after securing its copy under the kit), so the wrapper starts without the
-bypass warning.
+(after securing its copy under the kit). If the original binary ever runs as
+your user anyway, its TUI turns **red** and shows a warning row at the very
+bottom:
 
-The same HOME-keyed mechanism carries a visible marker for this case: the
-kit installs a **red `opencode-danger` theme** for the default user
-(`~/.config/opencode/tui.json` + `~/.config/opencode/themes/`). If the
-original binary ever runs as your user, its TUI is red **and** shows a
-warning row at the very bottom:
-
-```
+```text
 WARNING UNSECURE (bypass of opencode-permissions-kit detected)
 ```
 
-The plugin detects the case by comparing the process user against the
-kit's `OPENCODE_USER` stamp (the real uid — immune to environment
-spoofing). The deny-all config still does the actual guarding; the red
-look and the warning row are the visible amplifiers.
+The deny-all config does the actual guarding; the red look and the warning
+row are the visible amplifiers.
 
 ## Mode display in the TUI
 
-The kit registers a small TUI plugin for the `opencode` user. It renders
-one thin row at the very bottom of the TUI, on the home screen and
-inside sessions:
+The kit registers a small TUI plugin for the `opencode` user. It renders one
+thin row at the very bottom of the TUI:
 
-```
+```text
 opencode-permissions-kit (0.0.20) Mode: with ddev/docker
 ```
 
 `with ddev/docker` when a rootless container backend is provisioned,
-`no ddev/docker` otherwise — derived live from the kit's install.conf
-(backend state **and** the installed kit version), so backend switches
-show up without a restart. The text color follows
-**your** opencode theme; the plugin never sets or changes the theme.
+`no ddev/docker` otherwise — derived live from the kit's `install.conf`, so
+backend switches show up without a restart. The registration differs by
+opencode major (stamped as `OPENCODE_MAJOR`):
 
-The registration differs by opencode major (detected at install/update
-time and stamped as `OPENCODE_MAJOR` in install.conf):
-
-- **opencode 1.x**: `~/.config/opencode/tui.json` (marker key
-  `_opencode_permissions_kit`) loads
-  `/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx`. If you
-  manage your own `tui.json` for the `opencode` user, the kit leaves it
-  alone — the file is only written when absent or previously
-  kit-written.
-- **opencode 2.x**: v1 plugins do not run there; the kit deploys the
-  port `kit-mode-2x.tsx` and registers it as a discovered plugin dir —
-  `~/.config/opencode/plugins/opencode-permissions-kit/tui.tsx`,
-  symlinked into the kit's library. Remove that directory to opt out.
-
-Design background:
-[plan-ui-tui-opencode](../../internal/records/_archive/design/plan-ui-tui-opencode.md)
-(archived) and [opencode-2x](../../internal/records/opencode-2x.md) (current).
+- **opencode 1.x**: `~/.config/opencode/tui.json` loads
+  `/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx`. A user-managed
+  `tui.json` is left alone.
+- **opencode 2.x**: the kit deploys the port `kit-mode-2x.tsx` and registers
+  it as a discovered plugin dir —
+  `~/.config/opencode/plugins/opencode-permissions-kit/tui.tsx`, symlinked
+  into the kit's library. Remove that directory to opt out.
 
 ## Wrapper-bypass guard (detect, then warn loudly)
 
 1. **Binary exec restricted to root + the opencode usergroup.** The real
    binary at `/usr/local/lib/opencode-permissions-kit/bin/opencode` is owned
-   `root:opencode` with mode `750`. Note: the developer is a member of the
-   `opencode` group (file sharing), so the group bit grants them execution
-   too — running the real binary as your user is mitigated by the deny-all
-   config above, not by the mode bits.
-2. **Shell-start warning.** `shell-warn.sh` is hooked into `~/.bashrc`,
-   `~/.zshrc`, `~/.profile` and the profile.d script; every new shell prints
-   a loud warning when a real `~/.opencode/bin/opencode` exists or
-   `command -v opencode` resolves to anything but the wrapper.
+   `root:opencode` with mode `750`. The developer is a member of the group,
+   so the group bit grants them execution too — a run as your user is
+   mitigated by the deny-all config above, not by the mode bits.
+2. **Shell-start warning.** A hook in `~/.bashrc`, `~/.zshrc`, `~/.profile`
+   and the profile.d script prints a loud warning when a real
+   `~/.opencode/bin/opencode` exists or `command -v opencode` resolves to
+   anything but the wrapper.
 3. **Wrapper self-check.** Every wrapper start re-checks both conditions.

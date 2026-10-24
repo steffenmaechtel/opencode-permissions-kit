@@ -1,6 +1,6 @@
 # Update the kit and the binary
 
-This guide shows how to update the kit's scripts and the opencode binary.
+Update the kit's scripts and the opencode binary.
 
 ## Channels
 
@@ -14,14 +14,13 @@ The kit ships from two refs; which one you use is stamped into
 | `<branch>` / `x.y.z` | Any feature branch, or an exact version tag (e.g. `0.0.29`) | Testing a PR, pinning a version |
 
 `opk update` follows the stamped channel automatically. The easy switch is
-the `--channel` flag — updates from the given ref and re-stamps
-`KIT_CHANNEL` in one go, so subsequent plain `opk update` runs stay on the
-new channel:
+the `--channel` flag — it updates from the given ref and re-stamps
+`KIT_CHANNEL` in one go:
 
 ```bash
 sudo opk update --channel stable    # release mirror (recommended default)
 sudo opk update --channel master    # development channel
-sudo opk update --channel feature/wsl-conf-user-consent   # test a branch
+sudo opk update --channel feature/xyz   # test a branch
 sudo opk update --channel 0.0.29    # pin an exact version
 ```
 
@@ -40,45 +39,12 @@ curl -fsSL https://raw.githubusercontent.com/steffenmaechtel/opencode-permission
 sudo env KIT_BRANCH=0.0.29 opk update
 ```
 
-The Pages entry always serves the **stable** channel, so master/branch/
-tag installs address the raw refs directly (the ref is part of the URL —
-that self-pinning is exactly what a channel-fixed entry URL cannot
-provide).
+The Pages entry always serves the **stable** channel, so master/branch/tag
+installs address the raw refs directly (the ref is part of the URL).
 
-A switch re-stamps `KIT_CHANNEL` — subsequent plain `opk update` runs stay
-on the new channel. Background and rollout plan:
-[release-handling design record](../../internal/process/release-handling.md).
-
-## Supported upgrade paths
-
-Updates are supported from kit **0.0.14 onwards**. On older installs
-`update.sh` aborts with instructions — re-run the installer instead; it
-keeps your projects and deny list where possible:
-
-```bash
-curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/install.sh \
-  | sudo env KIT_BRANCH=stable bash
-```
-
-## Migrating to ≥ 0.0.29 (one-time, layout change)
-
-0.0.29 reorganized the deployed library (`bin/`, `sh/`, `py/`,
-`management/`, `templates/`) and renamed several files. The installed
-`update.sh` of an older kit still fetches the old file list and aborts
-with a curl 404 — **`opk update` cannot perform this particular hop**.
-Migrate once with the streamed one-liner (it deploys the new layout,
-removes the old files, and rewrites the kit-owned shell-hook lines in
-your `.bashrc`/`.zshrc`/`.profile` in place):
-
-```bash
-curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh | sudo env KIT_BRANCH=stable bash
-```
-
-Then open a new terminal (so the rewritten `ddev()` hook loads) and
-verify with `opk status`. From 0.0.29 onwards, `opk update` works again
-as usual. A fresh install via the `install.sh` one-liner works too —
-your `projects.conf` and opencode configs are preserved either way.
-Background: [streamline design record](../../internal/records/streamline.md).
+Updates are supported from kit **0.0.14 onwards**; on older installs
+`update.sh` aborts — re-run the installer instead (it keeps your projects
+and deny list where possible).
 
 ## Update the kit
 
@@ -88,33 +54,16 @@ From the stamped channel — for a stable install that is simply:
 opk update
 ```
 
-The curl one-liner (forces the `stable` channel regardless of the stamp):
-
-```bash
-curl -fsSL https://steffenmaechtel.github.io/opencode-permissions-kit/update.sh | sudo env KIT_BRANCH=stable bash
-```
-
-`update.sh` re-deploys the kit files and refreshes the `install.conf` version
-stamp (plus the `DDEV_VERSION` stamp — re-probed live, so a ddev upgrade
-does not leave a stale fallback behind). It does **not** touch `projects.conf` or
+`update.sh` re-deploys the kit files and refreshes the version stamps. It
+does **not** touch `projects.conf` or
 `/home/opencode/.config/opencode/opencode.jsonc` — your project list and
-deny-list customizations survive. Since kit 0.0.14 the
-`opk` command (see [CLI](../reference/cli.md)) exists —
-future updates work without the curl one-liner:
-
-```bash
-opk update
-```
+deny-list customizations survive.
 
 The ddev handover rescan over your project roots is skipped when nothing
-changed since the last pass (a root-owned stamp under
-`/etc/opencode-permissions-kit/handover/` records the last completed pass
-per root — user, group, dev-owned mode, scan revision, and default user;
-a matching
-stamp short-circuits the scan, [issue #112](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/112)).
-New or re-registered roots, a group re-base, or a dev-owned toggle
-re-scan automatically. To re-apply the group baseline (chgrp/setgid/
-default ACLs) **and** force the full handover rescan as well:
+changed since the last pass (a stamp under
+`/etc/opencode-permissions-kit/handover/` records it). New or re-registered
+roots, a group re-base, or a dev-owned toggle re-scan automatically. To
+re-apply the group baseline **and** force the full rescan:
 
 ```bash
 opk update --refresh
@@ -123,29 +72,30 @@ opk update --refresh
 ## Upgrade the opencode binary
 
 `opencode upgrade` and opencode's auto-updater cannot work behind the
-wrapper (the binary is root-owned, opencode runs as an unprivileged user) —
-the bundled config sets `autoupdate: false`, and `update.sh` is the upgrade
-entry point:
+wrapper (the binary is root-owned) — the bundled config sets
+`autoupdate: false`, and this is the upgrade entry point:
 
 ```bash
-opk upgrade-opencode                 # latest release of the current major
-opk upgrade-opencode --major 2       # switch to the latest opencode 2.x
+opk upgrade-opencode                   # latest release of the current major
+opk upgrade-opencode --major 2         # switch to the latest opencode 2.x
 opk upgrade-opencode --version 2.0.11  # pin an exact version
 opk upgrade-opencode --binary-path ./opencode  # specific file
 # equivalent long form:
 opk update --only-binary
 ```
 
-Binary upgrades are best-effort: a failure leaves the current binary in
-place, the previous one is kept in `/tmp/opencode-upgrade-backup-*`.
+Upgrades never cross majors silently: without `--major` / `--version` the
+latest release **of the installed major** is used (1.x resolves through
+GitHub releases, 2.x through npm). Binary upgrades are best-effort: a
+failure leaves the current binary in place, the previous one is kept in
+`/tmp/opencode-upgrade-backup-*`.
 
 ## Security advisories
 
-The kit ships a curated database of known opencode security advisories
-(`sh/advisories.sh` in the deployed library). On every start the wrapper
-checks your installed version against it — **locally, offline**; when
-your install is affected, the banner shows a red warning with the
-advisory and the fix:
+The kit ships a curated database of known opencode security advisories. On
+every start the wrapper checks your installed version against it — locally,
+offline; when your install is affected, the banner shows the advisory and
+the fix:
 
 ```text
   WARNING: the installed opencode 1.0.100 is affected by a known security advisory:
@@ -154,27 +104,15 @@ advisory and the fix:
   Please upgrade opencode with 'opk upgrade-opencode'.
 ```
 
-Fix it with:
-
 ```bash
 opk upgrade-opencode
 ```
 
-Two things to know:
-
-- **Only advisories that can affect your install warn.** The kit deploys
-  the opencode binary itself (never through a package manager), so
-  npm-only advisories — like GHSA-632h-h47v-g4x4 — do not match kit
-  installs.
-- **Fresh entries travel with kit releases.** New advisories upstream are
-  picked up by a scheduled scan in the kit repo and shipped through the
-  normal release channel — run `sudo opk update` to get them. `opk
-  status` shows the section **Security advisories**: your install's
-  verdict from the shipped database, plus a live upstream check that
-  flags advisories newer than your kit release.
-
-Background and design decisions:
-[security-advisories design record](../../internal/records/security-advisories.md).
+- Only advisories that can affect your install warn — the kit deploys the
+  binary itself, so npm-only advisories do not match kit installs.
+- Fresh advisory entries travel with kit releases: run `sudo opk update` to
+  get them. `opk status` shows your install's verdict plus a live upstream
+  check that flags advisories newer than your kit release.
 
 ## Verify
 
@@ -182,5 +120,4 @@ Background and design decisions:
 opk status
 ```
 
-`status.sh` shows the deployed version and the backend state after the
-update.
+Shows the deployed version and the backend state after the update.

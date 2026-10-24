@@ -1,12 +1,12 @@
 # Security model
 
-This page explains what the kit guarantees, what it deliberately does not,
-and which residual gaps remain.
+What the kit guarantees, what it deliberately does not, and which residual
+gaps remain.
 
 ## The three hard guarantees
 
-The kit's hard guarantees are UID-level — file permissions are opencode's
-own **soft** layer (see below):
+The kit's hard guarantees are UID-level — file permissions are opencode's own
+**soft** layer (see below):
 
 | Guarantee | Mechanism |
 |---|---|
@@ -18,24 +18,22 @@ Concretely:
 
 - the agent's processes run as `opencode`, never as the developer — no
   credentials, SSH keys, or dotfiles in `/home/<developer>` are reachable,
-- the agent-resources migration (`--migrate-agents`) moves `~/.agents`
-  whole but only `~/.claude/skills` — credentials such as
-  `~/.claude/.credentials.json` never cross into the agent's home,
+- the agent-resources migration moves `~/.agents` whole but only
+  `~/.claude/skills` — credentials such as `~/.claude/.credentials.json`
+  never cross into the agent's home,
 - containers run under the `opencode` host UID via a rootless backend — the
   agent can never reach a root-equivalent docker socket,
 - no code path executes as the developer (no RunAs-developer sudoers rule).
 
-## The soft permission layer (trade-off, deliberate)
+## The soft permission layer (deliberate trade-off)
 
 File denies (`.env`, keys, `settings.php`, …) live in `opencode.jsonc` and
-gate **opencode's own read/edit tools** plus lexical bash tripwires. They
-are the "ddev must work" decision:
+gate **opencode's own read/edit tools** plus lexical bash tripwires. They are
+the "ddev must work" decision:
 
 > Processes spawned outside opencode's tools (ddev, its containers, `cat` in
 > bash) can read every project file — including `settings.php`, which ddev's
 > web container needs to boot.
-
-The design record is [ddev-working](../../internal/records/ddev-working.md).
 
 | Guarantee | Mechanism |
 |---|---|
@@ -43,15 +41,12 @@ The design record is [ddev-working](../../internal/records/ddev-working.md).
 | Developer ↔ agent file sharing | the `opencode` usergroup: setgid + default group ACLs + umask 002 |
 | ddev runs as one user | the `ddev()` function + the sudoers helper exec ddev as `opencode` |
 
-The sole exception to the last row: **browser-opening commands**
-(`launch`, `mailpit`, `phpmyadmin`, …) compute the URL as `opencode`, but
-only the browser open runs as the developer — it needs the Windows
-interop the agent must not have. See
-[ddev integration](ddev-integration.md#browser-opening-commands-issue-20).
+One exception: **browser-opening commands** (`launch`, `mailpit`,
+`phpmyadmin`, …) compute the URL as `opencode`, but the browser open runs as
+the developer — it needs the Windows interop the agent must not have. See
+[ddev integration](ddev-integration.md#browser-opening-commands).
 
 ## Known residual gaps
-
-Documented rather than hidden:
 
 - **Bash-spawned reads** (`cat .env`) are only caught by the template's
   lexical ask-tripwires, never by the OS.
@@ -59,74 +54,41 @@ Documented rather than hidden:
   opencode host UID).
 - **Renamed copies** of secrets are invisible to the name-based
   [leak scan](../how-to/customize-deny-list.md).
-- **Scan→exec symlink swaps on handover trees (gated; a window
-  remains):** the root-run `.ddev` handover re-tests every path
-  component between the scan root and the operand immediately before
-  the iteration acts, on every branch — a directory swapped for a
-  symlink mid-scan makes the whole iteration skip with a warning
-  instead of chmod/chown-ing or writing through the link. Residual:
-  the gate is not atomic — a swap in the short window between the
-  gate and the recursive pair itself stays undetected (a leaf-only
-  mid-recheck covers just the chown half), and dev-owned mode's
-  flag-write TOCTOU stays accepted (opencode-privilege-capped; see
-  [ddev integration](ddev-integration.md)).
+- **Handover symlink swaps:** the root-run `.ddev` handover re-tests every
+  path component immediately before acting, but the gate is not atomic — a
+  swap in the short window before the recursive pair stays undetected.
 - The kit protects **locations, not information flows** — once content
   leaves the project roots, no scan recaptures it.
 - **mkcert CA key in the agent's home (deliberate):** ddev signs its
-  `*.ddev.site` certificates **on the host, as the user running ddev** —
-  and that user is `opencode`. The CA normally lives on the Windows side
-  (`/mnt/c/Users/<you>/AppData/Local/mkcert`), which the agent is
-  deliberately kept off of (see the /mnt/c exposure below), so install
-  copies the CA — **including the private key** — once into
-  `/home/opencode/.local/share/mkcert` (dir 0700, key 0600). The key is
-  functionally required: ddev's pre-flight treats a CAROOT without a
-  readable `rootCA-key.pem` as "no CA at all" and silently degrades to
-  HTTP-only URLs, and ddev itself copies both CA files into the shared
-  `ddev-global-cache` volume anyway. Residual risk: the semi-trusted
-  agent user can mint leaf certificates your browsers trust — a
-  TLS-MITM capability against hosts you visit. The keyless alternative
-  is ddev's `.ddev/custom_certs/` flow (you sign per-project certs),
-  at the cost of the `*.ddev.site` wildcard and per-project manual
-  provisioning.
-- **Supply chain (trust assumption):** the one-liner streams `install.sh`
-  from the tracked channel (default `stable` via the Pages mirror — see
-  [getting-started](../getting-started.md)) over HTTPS, `update.sh` re-fetches every kit file from the
-  tracked ref under the same TLS-only model (no checksums, signatures, or
-  commit pinning), and `update.sh --binary` downloads the opencode release
-  tarball — the "verification" is a liveness check (`opencode --version`
-  runs). Rootless backend provisioning runs get.docker.com, and the
-  fallback opencode install streams `https://opencode.ai/v2/install`
-  (the official v2 installer, npm-registry resolution) — both
-  as root. Installing means trusting GitHub, the opencode releases, and
-  get.docker.com at install time. A pinned-release checksum manifest
-  (published as a repo artifact per release) would close the gap without
-  breaking the streaming design. The `KIT_BASE_URL` env override replaces
-  the fetch target entirely — env-controlled fetch-and-execute-as-root,
-  by design a developer escape hatch, so treat the install environment as
-  trusted.
-- **OpenChamber serve password in the agent env:** when the serve feature
-  is configured, `OPENCODE_SERVER_PASSWORD` (and username) survive sudo's
-  `env_reset` into the agent's environment. Any process running as
-  `opencode` can read them — no privilege escalation (it is the same
-  secret the listener itself holds), but pick a strong password.
+  `*.ddev.site` certificates on the host, as the user running ddev — and
+  that user is `opencode`. Install copies the CA (including the private
+  key, mode `0600`) into `/home/opencode/.local/share/mkcert`; without a
+  readable key ddev silently degrades to HTTP-only URLs. Residual risk: the
+  agent user can mint leaf certificates your browsers trust (a TLS-MITM
+  capability). The keyless alternative is ddev's `.ddev/custom_certs/`
+  flow, at the cost of per-project manual provisioning.
+- **Supply chain (trust assumption):** install and update stream kit files
+  and the opencode binary over HTTPS without checksums or signatures, and
+  rootless backend provisioning runs get.docker.com as root. Installing
+  means trusting GitHub, the opencode releases, and get.docker.com at
+  install time. The `KIT_BASE_URL` env override replaces the fetch target
+  entirely — treat the install environment as trusted.
+- **OpenChamber serve password in the agent env:** when the serve feature is
+  configured, `OPENCODE_SERVER_PASSWORD` (and username) survive sudo's
+  `env_reset` into the agent's environment. Not a privilege escalation — but
+  pick a strong password.
 
 ## WSL2: the /mnt/c exposure
 
-`C:` is mounted through 9p/drvfs with the Windows session token — NTFS ACLs
-do not distinguish WSL users, so with the default world-readable mount
-**every WSL user (including the agent's) can read the whole Windows profile**
-(`.ssh/`, `NTUSER.DAT`, browser data). The kit's UID separation only covers
-the Linux side.
+`C:` is mounted with the Windows session token — NTFS ACLs do not
+distinguish WSL users, so with the default world-readable mount **every WSL
+user (including the agent's) can read the whole Windows profile** (`.ssh/`,
+`NTUSER.DAT`, browser data). The kit's UID separation only covers the Linux
+side.
 
-The kit surfaces this everywhere: `install.sh` prints the ready-to-run
-restriction snippet (the kit never edits `/etc/wsl.conf` itself — you
-apply it; takes effect after `wsl --shutdown` from Windows),
-`update.sh` prints a warning with the same snippet, `status.sh` reports
-the exposure, and the **wrapper warns on every `opencode` start** until
-the restriction is applied. Rationale for the no-write rule:
-[design: wsl.conf consent](../../internal/records/wsl-conf-consent.md).
-
-Manual fix via `/etc/wsl.conf`:
+The kit reports the exposure in `opk status` and warns on every `opencode`
+start until it is fixed. Manual fix via `/etc/wsl.conf` (the kit never edits
+that file itself):
 
 ```ini
 [automount]
@@ -134,97 +96,48 @@ enabled = true
 options = "uid=1000,gid=1000,dmask=027,fmask=037"
 ```
 
+Replace `uid`/`gid` with your default WSL user's values (check with
+`id -u` / `id -g`): the goal is that the agent user ends up as "other", with
+no bits.
+
 > **After editing, restart WSL completely:** run `wsl --shutdown` from
 > Windows, then reopen your WSL terminal — the mount options only take
 > effect on a fresh WSL start.
 
-`1000` is the default UID/GID of the first WSL user. Only if you deviate
-from that default (created additional users, changed the default user)
-adjust `uid`/`gid` to your default WSL user's values — the goal is always
-the same: the agent user must end up as "other", with no bits.
+## WSL2: the browser bridge
 
-Not sure what your values are? Check them with `id -u` / `id -g` in a fresh
-WSL terminal (logged in as the default user).
+Device logins (`opencode console login` on 1.x, `opencode auth login` on 2.x)
+open their verification URL through powershell.exe — which the `opencode`
+user may not execute on a restricted mount. The kit keeps the login alive
+without granting the agent anything:
 
-## WSL2: the browser bridge (login survival on a hardened /mnt/c)
+- `sudo opk wsl-add-opencode-1-fix` — the only kit command that ever writes
+  `/etc/wsl.conf` — places a kit-managed comment block at the top of the
+  file. Its carrier line (a `#` comment) wins the bundled `open` package's
+  scan, so the powershell lookup resolves into the kit library. Takes effect
+  immediately; WSL itself only ever sees comments.
+- There, `powershell.exe` is a harmless stand-in (`bin/browser-bridge`): it
+  forwards to the real powershell.exe whenever the caller may execute it
+  (you — the browser opens exactly as before) and exits 0 otherwise (the
+  agent — the login keeps polling; open the printed URL in any browser).
 
-The restriction above has a side effect on opencode's device logins
-(`opencode console login` on 1.x, `opencode auth login` on 2.x): opening
-the verification URL goes through the `open` package bundled with opencode,
-which spawns
-`<first "root =" match in /etc/wsl.conf>c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`.
-On the restricted mount the `opencode` user may not execute that binary —
-and opencode dies on the resulting spawn error (issue #91), right after
-printing URL and device code. (Upstream renewed the opener: opencode
-1.18.33+ / 2.0.18+ bundle `open` 11.x, which access-checks powershell and
-falls back to `xdg-open` — no bridge needed there, but that fallback
-crashes 2.x device logins when no `xdg-open` exists, so the kit also
-ships an **xdg-open fallback shim** at `/usr/local/bin/xdg-open`, see
-below.)
+Newer opencode versions (1.x ≥ 1.18.33, 2.x ≥ 2.0.18) bundle an opener that
+access-checks powershell and falls back to `xdg-open` — no bridge needed.
+Because WSL distros ship no `xdg-open` by default, the kit deploys a fallback
+shim at `/usr/local/bin/xdg-open` (only while no real one exists;
+`sudo apt install xdg-utils` works too).
 
-The kit solves this **without granting the agent anything**:
-
-- `sudo opk wsl-add-opencode-1-fix` — run by you, the only kit command
-  that ever writes `/etc/wsl.conf` (install/update deploy just the
-  stand-in tree; the kit never edits the file implicitly) — writes a
-  kit-managed **comment block** at the **top** of `/etc/wsl.conf`. Its
-  last line is a carrier for `open`'s scan: the line starts with `#`
-  (so WSL treats it as a comment) and contains a raw carriage return
-  before `root = <kit library>` — `open`'s regex cannot see the `#`
-  across that CR, so its first-match scan resolves into the kit library
-  and the computed powershell path lands there.
-- there, `wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` is
-  a harmless stand-in (`bin/browser-bridge`): it forwards to the **real**
-  powershell.exe whenever the calling user may execute it (you, the
-  developer — the browser opens exactly as before) and exits 0 otherwise
-  (the agent): the login flow keeps polling, and you open the printed URL
-  from any browser.
-
-Why not a normal INI section: WSL's `wsl.conf` parser only accepts section
-and key names made of letters and digits — the hyphenated section the kit
-shipped in 0.0.36 made WSL complain (`wsl: Expected ']' in
-/etc/wsl.conf:1`) and, on WSL ≤ 2.9.12, silently dropped **every** setting
-in the file, including the `[automount]` restriction and `[boot]`
-`systemd=true` (issue #100). A parser-valid section name would not help
-either: every unknown key makes WSL print
-`wsl: Unknown key '<section>.root'` on each start. Comments are the only
-carrier WSL never complains about. Newer `open` versions (wsl-utils
-based, bundled since opencode 1.18.33 / 2.0.18) parse line-based, ignore
-the carrier, and check powershell access themselves before spawning —
-they fall back to `xdg-open` and need no bridge.
-
-The **xdg-open fallback shim** covers exactly that fallback: WSL distros
-and minimal servers ship no `xdg-open`, and the failed spawn escapes
-opencode 2.x's error handling as an uncaught defect — `opencode auth
-login` (OpenCode Console account) dies right after printing URL and
-device code. The kit deploys `bin/xdg-open` as
-`/usr/local/bin/xdg-open` (only while no real xdg-open exists; update
-stands back once one appears, uninstall removes only the kit-owned
-symlink). The shim is pure delegation to `bin/browser-bridge` with
-powershell-style arguments: the developer gets a browser open, the agent
-gets the same designed no-op — no new capability on either side.
-
-The stand-in parses nothing and holds no privileges — the agent can run it
-with arbitrary arguments to no effect beyond a possible browser open *as
-the caller* (which it cannot reach on a hardened mount anyway). When the
-no-op path triggers, it prints a one-line hint to the terminal
-(`auto-open unavailable for the agent — open the printed URL manually`);
-`OPK_BROWSER_BRIDGE_DEBUG=1` traces the decision for direct invocations
-(self-test: [troubleshooting](../troubleshooting.md)).
-`opk status` reports the bridge state and names
-`opk wsl-add-opencode-1-fix` when the carrier is missing; the wrapper
-warns the same way on every start — both skip their warning for versions
-bundling `open` 11.x (1.x >= 1.18.33, 2.x >= 2.0.18; their opener
-survives a restricted `/mnt/c` on its own). Uninstall asks before
-removing the block (or assumes yes with `--yes`) and always removes the
-stand-in tree and the xdg-open fallback symlink.
+`opk status` reports the bridge state; the wrapper warns on every start while
+the carrier is missing. `OPK_BROWSER_BRIDGE_DEBUG=1` before a direct
+invocation traces the decision. Uninstall asks before removing the block and
+always removes the stand-in tree and the shim symlink.
 
 ## Other root-equivalent surfaces (audit)
 
-Docker is not the only tool whose daemon socket means root. `status.sh`
-ships a **report-only audit** ("Root-equivalent access" section) that
-checks the surfaces below for agent reachability — the kit never changes
-them, because removing access is an admin decision:
+Docker is not the only tool whose daemon socket means root. `opk status`
+ships a **report-only audit** ("Root-equivalent access" section) that checks
+these surfaces for agent reachability — the kit never changes them; removing
+access is an admin decision:
 
 | Surface | Why it matters | Default on WSL2 |
 |---|---|---|
@@ -232,30 +145,11 @@ them, because removing access is an admin decision:
 | Docker/Rancher Desktop sockets under `/mnt/wsl` | root-equivalent, world-usable | present when integration is on |
 | `containerd` socket | full root | root-only by default |
 | LXD/LXC, libvirt (`lxd`, `libvirt` groups + sockets) | full root (host VMs/mounts) | not installed by default |
-| `sudo`/`admin`/`wheel`/`disk`/`snap` groups for the agent user | full root | never granted (notes) |
+| `sudo`/`admin`/`wheel`/`disk`/`snap` groups for the agent user | full root | never granted by the kit |
 | `wireshark`/`adm`/`systemd-journal` groups | not root, but can leak credentials | not granted by the kit |
 | Windows interop (executing `.exe` via `/mnt/c`) | runs code as Windows user | blocked via the `/mnt/c` restriction |
 
-Surface notes (detail that does not fit the rows):
-
-- The rootful docker socket / `docker` group is installed by many devs —
-  fine while the agent user stays out of the group.
-- The Docker/Rancher Desktop **integration sockets** under `/mnt/wsl`
-  expose a root-equivalent daemon in the Windows VM, **world-usable** to
-  every WSL distro user whenever the WSL integration is enabled — remove
-  the agent's distro from it or restrict the socket.
-- The `sudo`/`admin`/`wheel`/`disk`/`snap` groups are never granted by
-  the kit — the audit catches later manual grants.
-- Windows interop is blocked by the `/mnt/c` restriction above; the
-  audit probes the exec bit explicitly.
-
-Deliberately **not** flagged:
-
-- `snapd`'s socket is mode 666 by design, but snapd gates write requests
-  by peer credentials (root only) — not root-equivalent for the agent.
-- `newuidmap`/`newgidmap` are setuid, but required by the rootless
-  backends and bounded to the ranges in `/etc/subuid`.
-
-The audit is stat math only — no privileged probes, no prompts. Override
-the socket list with `ROOT_EQUIV_SOCKS="…"` (same pattern as
-`LEAK_SCAN_DIRS`).
+Deliberately **not** flagged: `snapd`'s socket (gated by peer credentials)
+and `newuidmap`/`newgidmap` (setuid, but bounded to `/etc/subuid` ranges —
+required by the rootless backends). The audit is stat math only — no
+privileged probes. Override the socket list with `ROOT_EQUIV_SOCKS="…"`.
