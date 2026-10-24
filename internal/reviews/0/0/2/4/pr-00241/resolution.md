@@ -9,10 +9,10 @@ branch `feature/237-238-review-process-docs`.
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a Q1 (MED) | **implemented** | `<SHA>` | bullet separates the two incidents; meta log records the fix |
-| a Q2 (LOW) | **implemented** | `<SHA>` | README + RM-0118 Check: form binds from 2026-10-24, corpus stays |
-| a S1 (LOW) | **implemented** | `<SHA>` | fixture 1 prose carries "closed"; substring regression red (sabotaged) |
-| a Q4 (INFO) | **implemented** | `<SHA>` | README: parser takes the FIRST Status line, kept top vs prose shadow |
+| a Q1 (MED) | **implemented** | `400ff20` | bullet separates the two incidents; meta log records the fix |
+| a Q2 (LOW) | **implemented** | `400ff20` | README + RM-0118 Check: form binds from 2026-10-24, corpus stays |
+| a S1 (LOW) | **implemented** | `400ff20` | fixture 1 prose carries "closed"; substring regression red (sabotaged) |
+| a Q4 (INFO) | **implemented** | `400ff20` | README: parser takes the FIRST Status line, kept top vs prose shadow |
 | a Q3 (INFO) | **deliberately not done** | — | label matches 4 neighbor sites; rename splits forms; Follow-ups |
 | a S2 (INFO) | **deliberately not done** | — | nothing silent — both directions red; triage steer only (detail) |
 
