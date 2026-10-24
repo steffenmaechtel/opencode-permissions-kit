@@ -13,7 +13,7 @@ branch `feature/237-238-review-process-docs`.
 | a Q2 (LOW) | **implemented** | `400ff20` | README + RM-0118 Check: form binds from 2026-10-24, corpus stays |
 | a S1 (LOW) | **implemented** | `400ff20` | fixture 1 prose carries "closed"; substring regression red (sabotaged) |
 | a Q4 (INFO) | **implemented** | `400ff20` | README: parser takes the FIRST Status line, kept top vs prose shadow |
-| a Q3 (INFO) | **deliberately not done** | — | label matches 4 neighbor sites; rename splits forms; Follow-ups |
+| a Q3 (INFO) | **implemented** | `<SHA>` | maintainer override: all 4 label sites swept to reviews/README.md |
 | a S2 (INFO) | **deliberately not done** | — | nothing silent — both directions red; triage steer only (detail) |
 
 ## Evidence detail
@@ -63,13 +63,17 @@ file and the line stays at the top so later prose cannot shadow it —
 matching `gen-review-index.py` `status()` (whole-file `re.search`,
 first match wins) instead of implying a position guarantee.
 
-### a Q3 (INFO) — label consistency kept
+### a Q3 (INFO) — label sweep done on maintainer override
 
-`[review/README.md]` matches the four pre-existing labels in
-`agent/review-concept.md` (intro, loop, snapshot-seam, stop-rule
-sites); the target resolves correctly. Renaming only the new site
-would split the label forms inside one file; a full sweep is parked
-in Follow-ups.
+First dispositioned deliberately-not-done (single-site rename would
+have split the label forms inside the file); the maintainer overrode
+in-session ("hätten wir das nicht schnell fixen können") — the cheap
+class-correct move is the sweep, and it ran: all four
+`[review/README.md]` labels in `agent/review-concept.md` (the three
+pre-existing sites + this wave's bullet) now read `reviews/README.md`,
+matching the file they point at. Frozen corpus mentions of the old
+label (pr-00115/pr-00133 history) stay as written — snapshots are
+immutable.
 
 ### a S2 (INFO) — diagnostic steer accepted
 
@@ -102,9 +106,6 @@ documents).
 
 ## Follow-ups
 
-- **a Q3 (INFO):** label sweep `review/README.md` →
-  `reviews/README.md` across `agent/review-concept.md` (5 sites) —
-  cosmetic, ride the next wave that edits the file.
 - Round b owed: this wave touches test code (`test-reviews-parity.sh`
   fixture + comment) — review-relevant per the stop rule; the
   micro-wave review of this fix diff starts on the maintainer's go.
