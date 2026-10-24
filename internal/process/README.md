@@ -9,6 +9,6 @@ agents — ~85% agent reading) lives in
 
 | Page | Governs |
 |---|---|
-| [review.md](review.md) | the maintainer's side: birth-PR, full-review triggers, pause/go, stop call, release gate |
-| [release-handling.md](release-handling.md) | channels, the `stable` mirror, tagging, `make release` |
+| [review.md](review.md) | birth-PR, triggers, findings, external review machines, pause/go, stop call, release gate |
+| [release-handling.md](release-handling.md) | channels, the `stable` mirror, tagging, `make release`, cheat sheet |
 | [ci-review.md](ci-review.md) | automated AI reviews in GitHub Actions (issue #122, planning record) |
