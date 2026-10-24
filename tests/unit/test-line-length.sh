@@ -153,7 +153,9 @@ trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT
 # lines not counted, prose counted, non-markdown files never stripped
 # (a YAML --- document start is content there), an UNCLOSED leading
 # --- counted in full, and a pseudo-close span stripped with only
-# post-close prose counted.
+# post-close prose counted — the two probe4 long lines differ in
+# length (130 in-span, 131 post-close) so the asserted sum pins
+# WHICH line was counted, not just how many (#235 c S2).
 PROBE_DIR="$(mktemp -d)"
 trap 'rm -rf "${PROBE_DIR:?}" "$TMP_CUR" "$TMP_PROBE"' EXIT
 mkdir -p "$PROBE_DIR"
@@ -167,7 +169,7 @@ printf -- '---\nunclosed block, prose must count: %s\n' \
     "$(printf 'w%.0s' $(seq 1 130))" > "$PROBE_DIR/probe3.md"
 printf -- '---\n%s\n---\n%s\n' \
     "$(printf 'p%.0s' $(seq 1 130))" \
-    "$(printf 'q%.0s' $(seq 1 130))" > "$PROBE_DIR/probe4.md"
+    "$(printf 'q%.0s' $(seq 1 131))" > "$PROBE_DIR/probe4.md"
 _p1=$(measure_file "$PROBE_DIR/probe.md" "$LIMIT")   # frontmatter only
 _p2=$(measure_file "$PROBE_DIR/probe2.md" "$LIMIT")  # prose long line
 _p3=$(measure_file "$PROBE_DIR/probe.yml" "$LIMIT")  # non-md: not stripped
@@ -176,8 +178,8 @@ _p5=$(measure_file "$PROBE_DIR/probe4.md" "$LIMIT")  # pseudo-close span
 if [ -z "$_p1" ] && [ "${_p2#*probe2.md }" != "$_p2" ] \
    && [ "${_p3#*probe.yml }" != "$_p3" ] \
    && [ "${_p4#*probe3.md }" != "$_p4" ] \
-   && [ "${_p5#*probe4.md }" != "$_p5" ] && [ "${_p5##* }" = "1" ]; then
-    echo "  probe ok: closed fm stripped, prose and non-md counted, unclosed counts, pseudo-close span stripped"
+   && [ "${_p5#*probe4.md }" = "11 1" ]; then
+    echo "  probe ok: closed fm stripped, prose and non-md counted, unclosed counts, pseudo-close span stripped (sum pins the counted line)"
 else
     echo "  PROBE BROKEN: fm-only='$_p1' prose='$_p2' non-md='$_p3' unclosed='$_p4' pseudo='$_p5'" >> "$TMP_PROBE"
 fi

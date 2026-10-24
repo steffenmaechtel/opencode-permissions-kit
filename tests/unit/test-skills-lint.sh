@@ -34,13 +34,18 @@
 #     global): repo content must never point into the disposable
 #     workspace. Matched shapes: `local/…` and `../local/…` (relative
 #     from workspace root / repo), the dot-slash family `./local/…`
-#     (incl. `x/./local/`, `.././local/`), prose-prefixed occurrences,
-#     and this checkout's absolute workspace-local path (computed at
-#     runtime below). NOT matched, deliberately: `~/.local/` (XDG),
-#     `/usr/local/` (system prefix), identifier-embedded shapes
-#     (`opencode-local/`, `foo.local/`) and repo-internal segments
-#     (`x/local/`) — none of those resolve into the disposable dir
-#     (#235 a S3/X1, #235 b B1). A scan ERROR is a FAIL at BOTH
+#     (incl. `x/./local/`, `.././local/`) and its doubled-slash
+#     spellings `.//local/`, `..//local/`, `x/.//local/` (#235 c S1),
+#     prose-prefixed occurrences, and this checkout's absolute
+#     workspace-local path (computed at runtime below). NOT matched,
+#     deliberately: `~/.local/` (XDG), `/usr/local/` (system prefix),
+#     identifier-embedded shapes (`opencode-local/`, `foo.local/`),
+#     repo-internal segments (`x/local/` and their slash-runs
+#     `x//local/`, `x///local/` — redundant slashes collapse to the
+#     same internal dir) and root-level `//local/` (resolves to
+#     /local, not the workspace) — none of those resolve into the
+#     disposable dir (#235 a S3/X1, #235 b B1, #235 c S1). A scan
+#     ERROR is a FAIL at BOTH
 #     stages — grep rc 2 (dangling or unreadable operand) and find
 #     rc > 0 (unreadable subdir) — never a silent clean (#235 a X2,
 #     #235 b S4/B2). The hit:/err: sentinels are matched as path
@@ -64,10 +69,13 @@ cd "$REPO_ROOT" || exit 1
 # matched literally so absolute references into the disposable dir
 # are caught without flagging /usr/local (system prefix). Escaped for
 # ERE; the fixtures below generate their reference dynamically too,
-# so pattern and pins move together across checkouts (#235 b B1).
+# so pattern and pins move together across checkouts (#235 b B1). The dot alternative `\.{1,2}/+local/` covers
+# one-or-two dots and one-or-more slashes, so the doubled-slash
+# spellings of the caught families cannot slip through (#235 c S1);
+# dot-less slash-runs (`x//local/`) stay exempt (repo-internal).
 WS_LOCAL="$(cd "$REPO_ROOT/.." && pwd)/local"
 WS_LOCAL_ESC="$(printf '%s' "$WS_LOCAL" | sed 's/[.\^$()*+?[|\\]/\\&/g')"
-LOCAL_SHAPES="(^|[^.[:alnum:]_/-])local/|\.\./local/|\./local/|$WS_LOCAL_ESC"
+LOCAL_SHAPES="(^|[^.[:alnum:]_/-])local/|\.{1,2}/+local/|$WS_LOCAL_ESC"
 
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
@@ -155,6 +163,7 @@ mkdir -p "$WORK/skills/opk-good-skill" "$WORK/skills/opk-no-desc" \
          "$WORK/skills/opk-long-desc" "$WORK/skills/opk-legit-paths" \
          "$WORK/skills/opk-body-field" "$WORK/skills/opk-scan-err" \
          "$WORK/skills/opk-dot-local" "$WORK/skills/opk-abs-local" \
+         "$WORK/skills/opk-dblslash-local" \
          "$WORK/skills/opk-find-err/sub"
 cat > "$WORK/skills/opk-good-skill/SKILL.md" <<'EOF'
 ---
@@ -220,6 +229,9 @@ Deploys to /usr/local/lib/opencode-permissions-kit/ and reads
 ~/.local/share/opencode — neither is the disposable workspace.
 Repo-internal segments like tests/fixtures/local/demo resolve inside
 the repo, not into the workspace — unflagged by design (#235 b B1).
+Their slash-runs (cache//local/notes, cache///local/x) collapse to
+the same internal dir, and root-level //local/elsewhere resolves to
+/local — none reach the workspace; unflagged too (#235 c S1).
 EOF
 cat > "$WORK/skills/opk-body-field/SKILL.md" <<'EOF'
 ---
@@ -245,6 +257,15 @@ description: Fixture referencing the workspace via dot-slash shapes.
 ---
 See ./local/notes.md and .././local/scratch — both resolve into the
 disposable workspace (#235 b B1).
+EOF
+cat > "$WORK/skills/opk-dblslash-local/SKILL.md" <<'EOF'
+---
+name: opk-dblslash-local
+description: Fixture using doubled-slash spellings of workspace paths.
+---
+See .//local/notes.md, ..//local/scratch and sub/.//local/x — the
+redundant slashes collapse; all resolve into the disposable
+workspace (#235 c S1).
 EOF
 {
     printf -- '---\nname: opk-abs-local\ndescription: %s\n---\n' \
@@ -318,6 +339,10 @@ esac
 case "$_out" in
     *"FAIL opk-abs-local: references local/"*) echo "  pin ok: absolute workspace-local ref caught" ;;
     *) echo "  PIN BROKEN: absolute workspace-local reference not caught (b B1)" >> "$TMP" ;;
+esac
+case "$_out" in
+    *"FAIL opk-dblslash-local: references local/"*) echo "  pin ok: doubled-slash workspace refs caught" ;;
+    *) echo "  PIN BROKEN: .//local/ or ..//local/ reference not caught (c S1)" >> "$TMP" ;;
 esac
 if [ "$(id -u)" -eq 0 ]; then
     echo "  pin skipped: find-error needs a non-root uid (root reads through 000)"

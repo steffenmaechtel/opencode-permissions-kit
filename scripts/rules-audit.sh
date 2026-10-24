@@ -25,6 +25,7 @@
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):
 # 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
+#    audit run (python3 + gen-rules-index.py present)
 # The Phase-2 pending-unit parking valve (prefix-matched ref-less
 # units reported non-blocking) was retired 2026-10-17 when its five
 # occupants received metas -- a ref-less unit in an ACTIVE section
