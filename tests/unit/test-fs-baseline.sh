@@ -6,6 +6,10 @@
 #   - the chgrp pass never dereferences symlinks (targets outside the
 #     tree keep their group — xargs chgrp would follow them)
 #   - .git is included (issue #17 semantics carried over)
+#   - the python3 health gate (#223): a missing or broken interpreter
+#     degrades the passes to a silent-but-applied fallback instead of
+#     the old false green, probes once per run, and a dead consumer
+#     ends the tee silently (pr-00221 W2/W6 rider)
 # Runs against the repo lib as the CURRENT user (FS_SUDO="") — no root.
 # Run: sh tests/unit/test-fs-baseline.sh
 set -e
@@ -494,6 +498,129 @@ else
     fail "pass scratch registered with _tmp_track (#211 a F12)"
 fi
 rm -rf "$F12S"
+
+# --- 11. python3 health gate (#223, #221 a W3 shape) ----------------------------------
+# _fsb_count_tee sits in the DATA pipeline of a MUTATING pass: an
+# ungated missing-or-broken python3 killed the tee at startup, xargs -r
+# no-oped GREEN on the empty stream, and the baseline was silently not
+# applied (false-green at a root-run site — recorded as the W3 sibling
+# in the pr-00221 resolution). The gate probes health once per run and
+# degrades the tee to a plain passthrough. Marker FILE, not stderr: the
+# production probe discards its own stderr (L1 — observe the way
+# production does; the marker lesson of #221 pin 7).
+W23="$WORK/issue223"
+W23BIN="$WORK/issue223-bin"
+W23PROBE="$WORK/issue223-probe.log"
+mkdir -p "$W23BIN" "$W23/proj/sub"
+chmod 700 "$W23/proj" "$W23/proj/sub"
+printf 'gate\n' > "$W23/proj/f"
+chmod 600 "$W23/proj/f"
+printf '#!/bin/sh\necho probe >> "%s"\nexit 9\n' "$W23PROBE" > "$W23BIN/python3"
+chmod +x "$W23BIN/python3"
+rm -f "$W23PROBE"
+W23RC=0
+W23OUT="$(PATH="$W23BIN:$PATH" FS_SUDO="" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23/proj" "$(id -gn)" 2>&1)" \
+    || W23RC=$?
+assert_eq "#223 broken python3: baseline still applies (rc 0, no false green)" "0" "$W23RC"
+assert_eq "#223 broken python3: file got group rw (600 -> 660 — the gate fed xargs)" "660" \
+    "$(stat -c %a "$W23/proj/f")"
+assert_eq "#223 broken python3: probe ran exactly once (cache across the four passes)" "1" \
+    "$(wc -l < "$W23PROBE" 2>/dev/null || echo 0)"
+assert_eq "#223 broken python3: degradation warn exactly once per run" "1" \
+    "$(printf '%s\n' "$W23OUT" | grep -c 'live progress unavailable')"
+if printf '%s\n' "$W23OUT" | grep -q 'Traceback'; then
+    fail "#223 broken python3: no traceback on the fallback path"
+else
+    pass "#223 broken python3: no traceback on the fallback path"
+fi
+# ...and the healthy path through the SAME fixture still counts (the
+# gate must not eat the tee when python3 is fine — rc + done-line):
+W23RC2=0
+W23OUT2="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23/proj" "$(id -gn)" 2>&1)" \
+    || W23RC2=$?
+assert_eq "#223 healthy python3: baseline applies (control for the gate)" "0" "$W23RC2"
+if printf '%s\n' "$W23OUT2" | grep -q 'chgrp *[0-9]* entries — done'; then
+    pass "#223 healthy python3: live counter still runs (gate passes the tee through)"
+else
+    fail "#223 healthy python3: live counter still runs (gate ate the tee)"
+fi
+rm -rf "$W23" "$W23BIN"
+rm -f "$W23PROBE"
+
+# --- 11b. python3 absent entirely (restricted PATH, no shim) ---------------------------
+# "missing" and "broken" are different probe outcomes: a PATH without
+# any python3 must take the same bare fallback. Controlled PATH per the
+# sandbox rules (conventions "Test sandbox"): symlinks to the few
+# externals the baseline needs, python3 deliberately absent.
+W23NP="$WORK/issue223-nopy"
+W23NPBIN="$WORK/issue223-nopy-bin"
+mkdir -p "$W23NPBIN" "$W23NP/proj"
+chmod 700 "$W23NP/proj"
+printf 'nopy\n' > "$W23NP/proj/f"
+chmod 600 "$W23NP/proj/f"
+for _t in sh find cat chgrp chmod setfacl mktemp dirname stat getfacl grep rm xargs; do
+    ln -s "$(command -v "$_t")" "$W23NPBIN/$_t"
+done
+W23NPRC=0
+W23NPOUT="$(FS_SUDO="" PATH="$W23NPBIN" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23NP/proj" "$(id -gn)" 2>&1)" \
+    || W23NPRC=$?
+assert_eq "#223 python3 absent: baseline still applies (rc 0)" "0" "$W23NPRC"
+assert_eq "#223 python3 absent: file got group rw (600 -> 660)" "660" \
+    "$(stat -c %a "$W23NP/proj/f")"
+assert_eq "#223 python3 absent: degradation warn exactly once" "1" \
+    "$(printf '%s\n' "$W23NPOUT" | grep -c 'live progress unavailable')"
+
+# Missing cat is now loud TOO (the fallback pipes the pass through it —
+# a missing cat would rebuild the exact empty-stream false-green the
+# gate closes): same restricted bin minus cat, probed BEFORE walking.
+W23NPBIN2="$WORK/issue223-nopy-bin2"
+mkdir -p "$W23NPBIN2"
+# reset the fixture the 11b run already baselined: the loud abort must
+# leave the file at 600, proving no pass ran at all
+chmod 600 "$W23NP/proj/f"
+for _t in sh find chgrp chmod setfacl mktemp dirname stat getfacl grep rm xargs; do
+    ln -s "$(command -v "$_t")" "$W23NPBIN2/$_t"
+done
+W23CATRC=0
+W23CATOUT="$(FS_SUDO="" PATH="$W23NPBIN2" \
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23NP/proj" "$(id -gn)" 2>&1)" \
+    || W23CATRC=$?
+assert_eq "#223 missing cat: fails loud before any pass runs" "1" "$W23CATRC"
+if printf '%s\n' "$W23CATOUT" | grep -qF 'required tool missing for the group baseline: cat'; then
+    pass "#223 missing cat: the error names cat"
+else
+    fail "#223 missing cat: the error names cat (got: $W23CATOUT)"
+fi
+assert_eq "#223 missing cat: nothing applied (file keeps 600)" "600" \
+    "$(stat -c %a "$W23NP/proj/f")"
+rm -rf "$W23NP" "$W23NPBIN" "$W23NPBIN2"
+
+# --- 11c. dead consumer ends the tee silently (#223 rider, pr-00221 W2/W6) -------------
+# The tee had no except clause: a downstream xargs dying first ended it
+# in a BrokenPipeError traceback. 1 MiB input (beyond the pipe buffer)
+# against a reader that exits at once fires EPIPE deterministically —
+# the reader is gone before python finishes starting. stderr is
+# captured at the ENCLOSING sh -c: a redirect on the pipeline's last
+# member would capture only the reader's stderr and prove nothing.
+# Sabotage (drop the except clause) drops a Traceback into the asserted
+# file; the devnull dup2 in the clause keeps the interpreter's own
+# shutdown flush quiet too ("Exception ignored").
+W23BP="$WORK/issue223-bp"
+W23BPBIN="$WORK/issue223-bp-bin"
+mkdir -p "$W23BPBIN"
+python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' > "$W23BP"
+W23BPRC=0
+FS_SUDO="" sh -c '. "$1" && _fsb_count_tee bp < "$2" | sh -c "exit 0"' \
+    _ "$LIB" "$W23BP" 2>"$W23BP.err" || W23BPRC=$?
+assert_eq "#223 broken pipe: pipeline stays green (reader rc)" "0" "$W23BPRC"
+if grep -q 'Traceback\|Exception ignored' "$W23BP.err"; then
+    fail "#223 broken pipe: tee dies silently when xargs goes first"
+else
+    pass "#223 broken pipe: tee dies silently when xargs goes first"
+fi
+rm -rf "$W23BP" "$W23BPBIN"
 
 # --- Summary ---------------------------------------------------------------------------
 echo ""

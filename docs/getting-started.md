@@ -13,7 +13,9 @@ background are linked at the end.
 - `sudo` access on that machine
 - `curl`
 - `python3` (used for JSON parsing, the baseline progress pipe and version
-  resolution — default WSL2 images ship it; the installer probes for it)
+  resolution — default WSL2 images ship it; the installer probes for it; the
+  group baseline itself degrades to silent passes without it, see
+  [the sharing group](concepts/sharing-group.md#re-applying-the-baseline))
 - `git` ≥ 2.30 — what the oldest supported baseline distros ship (Debian 12 /
   Ubuntu 22.04); any newer git works (WSL Ubuntu 24.04 ships 2.43, the
   [git-core PPA](troubleshooting.md#git-is-below-the-tested-version-baseline)

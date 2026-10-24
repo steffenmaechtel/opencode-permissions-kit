@@ -69,4 +69,7 @@ opk update --refresh
 
 A pass that fails wholesale (missing tool, mass permission errors) aborts
 the operation with a per-pass warning instead of reporting success — a
-green "ACLs applied" always means the baseline actually landed.
+green "ACLs applied" always means the baseline actually landed. A missing
+or broken `python3` never blocks the baseline either: the passes then run
+without the live entry counters (one warning says so) — the data path of
+a mutating pass never depends on its progress display.
