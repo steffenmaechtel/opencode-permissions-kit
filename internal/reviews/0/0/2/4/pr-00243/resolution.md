@@ -897,6 +897,42 @@ Comment-only deliverable, no pin claimed (d Q2 precedent).
      its own spelling; S1 — `sudo chmod g-s .` matches only the
      bare-dot op line (`/var/.` and the primary root do not match).
 
+## Gates (fix wave 6, f findings)
+
+- Unit: `sh tests/unit/test-uninstall.sh` green — all arms incl. the
+  pathological corpus (five spellings → fallback, five WARN lines,
+  boundary `untest-x.9` untouched) and the wave-5 e X1 pins unchanged;
+  `make test` green.
+- `make lint` green (ShellCheck passed); `sh tests/unit/test-docs.sh`
+  green (no docs change owed — the files.md row's claim still holds:
+  more values count as shape-invalid, the message is unchanged);
+  line-length ratchet green (this file ≤ 120 content columns);
+  `make check-version` green.
+- E2E (RM-0113 — uninstall.sh input-validation gate tightened:
+  root-run script semantics change): both suites run on the committed
+  fix tree `db702ac`, in parallel (disjoint suites, warm cache from
+  wave 5's runs the same day, opencode 2.1.4): `make e2e` green — 309
+  passed per container (baseline level; sections 12f/13/13a exercise
+  the modified uninstall incl. the revert loop over the real project
+  root); `make e2e-rootless` green — 47 passed per container (baseline
+  level; RL6 uninstall pass — the tightened gate is a no-op on the
+  canonical conf, exactly the intended behavior).
+- Sabotage spot-checks (post-commit against `db702ac`, in a scratch
+  worktree /tmp/opencode/pr-00243-f/sab-wt, removed after; each:
+  mutate → observe the named pin RED → `git checkout --` → suite
+  green at the end):
+  1. tightening fully reverted (arm back to the e X1 charset): the
+     pathological corpus pin RED — all five spellings pass through
+     (the finding's hazard live at suite level).
+  2. `*[.]` arm alone deleted: corpus RED via `opencode.` (the
+     leading-dot spellings stay caught by `[.-]*` — each arm carries
+     its own class).
+  3. `[.-]*` arm alone deleted: corpus RED via `-x`/`--` (the
+     trailing-dot spellings stay caught by `*[.]`).
+  4. over-refusal direction (`*-*` added, refusing ALL hyphens): the
+     same pin RED via the boundary value `untest-x.9` falling back —
+     the corpus discriminates both directions, not only deletion.
+
 ## Follow-ups
 
 1. update.sh projects.conf loops (`--refresh` baseline, ddev-handover):
