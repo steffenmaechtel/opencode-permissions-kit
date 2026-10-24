@@ -3,7 +3,9 @@
 Chain: [review-a.md](review-a.md) (wave snapshot 2026-10-24, 16 IDs, 12
 unique findings after 3 cross-axis duplicate pairs) → fix wave 1 →
 [review-b.md](review-b.md) (fix-wave snapshot 2026-10-24, 9 IDs, 8
-unique after 1 dup pair) → fix wave 2 (the b rows below). Birth PR
+unique after 1 dup pair) → fix wave 2 → [review-c.md](review-c.md)
+(wave snapshot 2026-10-24, 14 IDs, 11 unique after 3 dup pairs, 1
+sub-claim retracted) → fix wave 3 (the c rows below). Birth PR
 #244, branch `feature/223-fsb-tee-health-gate`.
 
 ## Dispositions
@@ -30,6 +32,17 @@ unique after 1 dup pair) → fix wave 2 (the b rows below). Birth PR
 | b W3 (LOW) | **implemented** | `25f96f1` | drain-marker arm proof; never-armed fails red; fixed sleep removed |
 | b W4 (INFO) | **implemented** | `25f96f1` | review README process: trailers qualify not-done IDs |
 | b Q2 (INFO) | **implemented** | `25f96f1` | dead `_p3d` parameter removed; `_py3case` is 2-arg |
+| c Q1/W2 (MED) | **implemented** | `<SHA>` | find over lib root (tui/templates incl.); fixture self-test pins shapes |
+| c S1 (LOW) | **implemented** | `<SHA>` | CPython's real wording restored; grep literals indirected (scanner-safe) |
+| c S2 (LOW) | **implemented** | `<SHA>` | .pth/site-packages residual named in all three shipped comments |
+| c S3 (LOW) | **implemented** | `<SHA>` | stderr passthrough at 5 sibling sites + probe rerun; pins in 4 suites |
+| c S4 (INFO) | **implemented** | `<SHA>` | promise scoped to extracted shapes; residual named in the test comment |
+| c W1 (LOW) | **implemented** | `<SHA>` | tr ',;' split; fixture self-test (zmod_a..d) red on extraction break |
+| c W3 (LOW) | **implemented** | `<SHA>` | assignment-count pin: exactly one `_py3_imports=` |
+| c W4/Q2 (LOW) | **implemented** | `<SHA>` | sweep record corrected: test-ui.sh hard-requires setsid |
+| c W5/Q4 (INFO) | **implemented** | `<SHA>` | pipe-buffer wording in §11e comments + this ledger |
+| c Q3 (LOW) | **implemented** | `<SHA>` | integer sleep poll (10 × 1 s), same 10 s bound |
+| c Q5 (INFO) | **implemented** | `<SHA>` | dead `_p3f=""` removed; loop lives inside `_p3collect` |
 
 ## Evidence detail
 
@@ -202,6 +215,9 @@ every shipped python import (line-start imports minus comment lines,
 plus inline `-c 'import …'` strings; a `from X import y` line must
 carry the second keyword — a prose "from the …" line is not a
 dependency) and fails naming any module missing from the gate list.
+(Correction, #244 c W1/W2: the wave-2 globs covered only 4 of the
+lib's 6 subdirs and dropped semicolon `-c` chains — fix wave 3
+collects via find over the whole lib root and splits `;` like `,`.)
 Sabotage: drop `threading` → red naming threading (status.sh); drop
 `pathlib` → red naming pathlib (opk). The a-W1 evidence sentence
 above was wrong about "union" — corrected in place, cited here.
@@ -247,7 +263,14 @@ line instead of two vacuously green pins.
 The writer touches a ready marker after the 1 MiB stream write
 returns — a fifo write blocks until the reader drains it, so the
 marker proves the tee consumed the stream and sits blocked in read
-(interpreter initialized, KI handler installed); the poll replaces
+(interpreter initialized, KI handler installed).
+(Correction, #244 c W5/Q4: "consumed the stream" overstated by up to
+one pipe buffer (~64 KiB may still be buffered when the blocking
+write returns) — the load-bearing property (interpreter initialized,
+read loop live) holds either way; and the retracted second clause
+never applied: a dying writer python aborts the subshell under
+set -e BEFORE the marker, so a broken writer fails the arm pin red.)
+The poll replaces
 the fixed `sleep 1`, and "no marker within 10 s" fails red by
 itself instead of passing green with nothing executed. A wait-rc
 discriminator was considered and rejected: the setsid'd sh wrapper
@@ -272,15 +295,29 @@ its trailer is true full coverage.
 - The drift pin IS the enforced sweep for the import-union class —
   its extraction runs over py/, sh/, management/ and bin/ (glob), so
   a new consumer anywhere in the lib goes red without touching the
-  pin (patterns documented in the test).
+  pin (patterns documented in the test). (Correction, #244 c
+  Q1/W2: "anywhere in the lib" was false — tui/ and templates/ sat
+  outside the four globs. Fix wave 3 collects via find over the
+  whole lib root, making the sentence true as written.)
 - `grep -rn 'setsid' tests/unit/` — §11e is the only setsid user;
   the §11c bash rider was already guarded (the twin the finding
-  cited).
+  cited). (Correction, #244 c W4/Q2: false as written — test-ui.sh
+  hard-requires setsid at startup and uses it ~20 times, and
+  test-uninstall.sh references it; the substantive conclusion holds
+  (every tests/unit setsid use is guarded: §11e skip-with-note,
+  test-ui hard-require), the record misstated its own grep.)
 - `grep -nE 'rm( |$)' tests/unit/test-install-args.sh` — the new
   noisy-case operand rides the suite's guarded `:?` scratch pattern;
   one scanner false positive ("platform independent" chains into the
   raw-line rm-suffix grep) was fixed at the source by hyphenating
   the marker (comment at the shim), not by an allowlist entry.
+  (Correction, #244 c S1: two-shaped truth — the mechanism is REAL
+  for consuming grep lines quoting the literal before a quoted
+  $VAR operand (proven live by the sandbox suite during fix wave 3:
+  5 violations), and clean for the fixture-printf shape both
+  reviews probed. Hyphenating was a working source-fix for its
+  lines; fix wave 3 restores CPython's real wording and breaks the
+  chain by variable indirection — see the c S1 evidence.)
 
 ### L1–L7 run (fix wave 2, before commit)
 
@@ -311,6 +348,178 @@ allowlist entry); line-length ratchet + reviews lint/parity green
 /tmp/opencode/maketest-pr244c.log on the session host. E2E (install.sh
 behavior change → owed in-wave): runs on the committed tree, recorded
 in Follow-ups by the bookkeeping commit.
+
+## Evidence detail (fix wave 3 — c findings)
+
+Maintainer decisions taken before the wave (recorded per the round's
+questioning): S3 as a BEHAVIOR change (surface interpreter stderr at
+the sibling consumers — e2e owed in-wave), Q1/W2 via find over the
+lib root, Q3 via integer sleep.
+
+### c Q1/W2 — whole-lib extraction
+
+`_p3collect` runs `find <lib-root> -type f` — tui/ (tsx/json), 
+templates/ (jsonc/sudoers) and any future subdir or lib-root file
+included; tsx import lines fall through the module regex (not
+python). The "anywhere in the lib" sentence above is true again
+(corrected in place). Pin: the fixture self-test plants line-start
+comma imports, a from-import, a prose from-line and an inline
+`-c 'import zmod_d; zmod_d.run()'` one-liner in a scratch dir and
+asserts the SAME collector/splitter yields exactly the four planted
+modules — red on any extraction break, independent of the shipped
+surface (sabotage post-commit, see Follow-ups).
+
+### c S1 — wording fidelity + the scanner's two shapes
+
+The noisy fixtures now echo CPython's real unhyphenated
+"platform independent libraries"; every pin greps a per-suite
+variable carrying that literal. The scanner mechanism has TWO
+shapes, separated empirically during this wave (the sandbox suite
+itself was the probe — 5 violations, all consuming grep lines): a
+consuming line `grep -qF 'platform…' "$VAR/x"` chains into the
+raw-line rm-suffix pattern (rm⊂platform + bare words incl. `'` +
+the quoted $VAR operand), while the fixture-printf shape both
+reviews probed stays clean. So the wave-2 hyphenation WAS a
+working source-fix for its lines (its record's mechanism claim was
+true for the grep shape), and snapshot-c S1's "does not reproduce"
+held only for the fixture shape. The final fix keeps the real
+wording everywhere and breaks the chain by indirection: the
+definition line (`X='platform independent libraries'`) carries no
+quoted $VAR operand after the bare words and probes clean. Pins
+assert the mechanism (stderr passthrough), not the text.
+
+### c S2 — third residual route named
+
+install.sh's gate comment, fs-baseline.sh's probe header and the
+tee comment now all name the system site-packages/.pth startup
+route (-I implies -E -s -P, not -S) alongside the loader route and
+the PATH-resolved binary — conceding exactly what b-S1/review-c S2
+found, no more (user-site .pth stays closed by -s/-P).
+
+### c S3 — stderr transparency at the siblings (behavior change)
+
+Class sites and dispositions (sweep below): fs-baseline probe
+(rerun-for-stderr on failure, absent-interpreter guarded off — the
+installer gate's b-S2 shape; §11f pin), status progress probe
+(stderr passes on the tty path; pty pin via `script -qec`, scan
+bytes stay reference-identical), status advisory feed (redirect
+dropped; extracted-program pin: garbage in → rc 1 SILENT), status
+leak-scan parser (redirect dropped; pin: broken config prints the
+parser's clean "Error ..." line, no traceback — the parser itself
+prints diagnostics, not tracebacks), update.sh 2.x resolve (redirect
+dropped; pin: noisy shim → diagnostic + rc 1, unparseable body →
+silent rc 1), ddev-terminal `_opk_json_get` (redirect dropped;
+pins: happy/unparseable/noisy — the empty-on-miss stdout contract
+unchanged). Already transparent, no change: opk:300 settings edit
+(runs the heredoc python3 without any stderr redirect; failure
+already lands in a loud ui_error). Deliberately not changed:
+opencode-as-opencode:444 (a W5's wrapper output contract, unchanged
+disposition). Every expected-failure path stays SILENT (the except
+arms swallow their failures by design) — the passthrough only
+carries interpreter-level stderr. Line-shape pins in test-status +
+test-update-flags re-red if a `2>/dev/null` returns on those sites.
+
+### c S4 — promise scoped
+
+The drift-pin comment now names the shapes it collects (line-start,
+embedded python blocks, single-quoted inline `-c` including
+semicolon chains) and the residual it does not (double-quoted -c,
+mid-line imports, importlib/__import__, `as` aliases) — the promise
+matches the enforcement.
+
+### c W1 — semicolon chains
+
+`_p3split` splits on `;` like `,` (tr ',;'), plus a second
+import-prefix strip for `import a; import b` shapes the split
+re-exposes (requires whitespace — the first draft's zero-space
+strip turned `importlib.util` into `lib.util` and the pin caught it
+red pre-commit). Fixture self-test above is the pin.
+
+### c W3 — assignment count pinned
+
+`grep -c "^[[:space:]]*_py3_imports=" install.sh` == 1, asserted
+next to the extraction — a second assignment (union in the pin,
+last-wins at runtime) goes red.
+
+### c W4/Q2 + c W5/Q4 — ledger corrections
+
+Both sweep-record sentences corrected in place above (setsid users;
+pipe-buffer wording in the b-W3 evidence and the §11e comments).
+The W5 retraction context is recorded with the correction: the
+writer-death clause never applied (set -e aborts the subshell
+before the marker — the arm pin fails red on a dead writer).
+
+### c Q3 — integer poll
+
+10 × `sleep 1` replaces 40 × 0.25 s — same 10 s bound, no
+fractional-sleep portability assumption in the block the setsid
+guard made portable. Worst-case latency cost: ~0.75 s per poll
+tick; suites green.
+
+### c Q5 — dead pre-declaration removed
+
+`_p3f=""` is gone; the loop variable lives inside `_p3collect`.
+
+### Class sweep record (L2, fix wave 3)
+
+- `grep -rn "python3" files/` re-classified against stderr
+  redirects (the S3 class): 6 fixed sites listed above; opk:300
+  already transparent; opencode-as-opencode:444 stays not-done
+  (a W5); fs-baseline tee's except-clause silence is the pinned
+  #223 contract (no stderr redirect involved); update.sh 1.x
+  branch uses sed (no interpreter).
+- `grep -rn "sleep 0\." tests/unit/` — the §11e poll fixed;
+  test-status.sh:2621 `sleep 0.05` is pre-existing (before this
+  wave, works on the supported coreutils baselines) — deliberately
+  not done: out of this wave's diff, loud-failing class only.
+- `grep -rn "2>/dev/null" files/` on python3 lines — residual hits
+  are the fixed-gate probes themselves (presence/probe rc still
+  discarded by design; only the failure-path rerun/drop shapes
+  changed) and curl noise guards (update.sh resolve keeps the curl
+  2>/dev/null — network noise, not interpreter stderr).
+
+### L1–L7 run (fix wave 3, before commit)
+
+- L1: every dropped stderr redirect is pinned by executing the
+  failure path — noisy-shim cases assert the diagnostic (fs-baseline
+  §11f, status pty, ddev _opk_json_get, update resolve); expected-
+  failure silence pinned (advisory garbage, unparseable registry
+  body, _opk_json_get miss). The rerun's `|| true` is pinned by §11f
+  (the failure path executes and its stderr is the asserted
+  surface).
+- L2: sweep above; patterns + sites recorded.
+- L3: every rewritten comment claim carries its pin or was deleted
+  (drift-pin comment names shapes + residual; probe comments cite
+  the passthrough; §11e comments state the pipe-buffer truth).
+- L4: new pins sit before their suites' summary gates; the
+  probe-count pin updated to the new contract (2 = probe + rerun,
+  cache still pinned: 8 would be the no-cache number) — caught red
+  pre-commit and fixed with an explanatory comment; line-shape
+  pins discriminate re-added redirects; the sandbox suite caught
+  the grep-line scanner shape live (5 violations → variable
+  indirection) — the falsification event that separated the
+  scanner's two shapes (c S1). Sabotage post-commit (Follow-ups).
+- L5: no new root operations — the fs-baseline rerun is a second
+  read-only interpreter execution inside an already-root gate,
+  absent-interpreter guarded (no not-found noise).
+- L6: fixes bring their own pins (§11f, matrix/drift/status/ddev/
+  update-flags additions); the wave review of this fix diff
+  (snapshot d) is owed per the loop.
+- L7: no new shell files; edits follow the existing skeletons.
+
+### Gates (fix wave 3, pre-commit)
+
+make lint green (ShellCheck — caught the adv-line paren loss red
+before it could ship: the unit suites' extraction never parses that
+region, the e2e would have); sh tests/unit/test-fs-baseline.sh
+82/82; sh tests/unit/test-install-args.sh green; test-status.sh
+172 PASS rc 0; test-ddev-as-opencode.sh rc 0; test-update-flags.sh
+green; full `make test` rc 0 (log /tmp/opencode/maketest-pr244d.log
+on the session host); line-length ratchet + reviews lint/parity
+green before the commit that carries this file. E2E (root-run
+script semantics change — the stderr passthroughs): owed in-wave,
+runs on the committed tree, recorded in Follow-ups by the
+bookkeeping commit.
 
 ## Follow-ups
 

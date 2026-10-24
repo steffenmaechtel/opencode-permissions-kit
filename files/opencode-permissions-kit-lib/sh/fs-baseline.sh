@@ -106,7 +106,10 @@ fs_ensure_traversable() {
 # exactly the tee's. The -I scope is those env vars, not the whole
 # environment — the loader route (LD_PRELOAD/LD_LIBRARY_PATH) and the
 # PATH-resolved binary itself stay outside any python flag, root-owned
-# trust surface like every root python3 the kit runs (#244 b S1).
+# trust surface like every root python3 the kit runs (#244 b S1);
+# system site-packages stay processed too (-I implies -E -s -P, not
+# -S): a .pth there executes at startup — same root-owned residual
+# (#244 c S2).
 # Probed once per run (_fsb_py_checked caches, _fsb_py_ok
 # carries the verdict); on any doubt the pass degrades to a plain
 # passthrough — it loses its live counter, never its data. One warn
@@ -124,6 +127,14 @@ _fsb_py_probe() {
             && python3 -I -c 'import os, sys' >/dev/null 2>&1 \
             && _fsb_py_ok=1
         if [ "$_fsb_py_ok" != 1 ]; then
+            # The rerun exists for the interpreter's own diagnostic
+            # stderr, not its rc (this branch already failed; #244 c
+            # S3, the installer gate's #244 b S2 shape): a
+            # present-but-broken python3 names its real problem above
+            # the warn. An absent one is guarded off — no not-found
+            # noise for a legitimate absence.
+            command -v python3 >/dev/null 2>&1 \
+                && python3 -I -c 'import os, sys' >/dev/null || true
             printf '  warn: live progress unavailable (python3 missing or broken) — passes apply without entry counters\n' >&2
         fi
     fi
@@ -138,7 +149,9 @@ _fsb_py_probe() {
 # python3 the tee is a plain passthrough (cat) — the pass data never
 # depends on the progress display. Runs isolated (`-I`) like the probe:
 # PYTHON* env poison cannot shadow the tee's imports either (#244 a
-# S1; the -I scope is exactly those env vars, #244 b S1).
+# S1). The -I scope is those env vars plus the user-site isolation
+# -s/-P buy; system site-packages stay processed — the residual named
+# at the probe above (#244 b S1, c S2).
 _fsb_count_tee() {
     _fsb_py_probe
     if [ "${_fsb_py_ok:-0}" != 1 ]; then

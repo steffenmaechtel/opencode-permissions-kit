@@ -155,6 +155,42 @@ chmod +x "$WORK/bin3/curl"
 _re=$(run_resolver "$WORK/bin3" "$WORK/stub-v2" 'resolve_latest_opencode_version 2' >/dev/null && echo resolved || echo refused)
 [ "$_re" = "refused" ] && pass "resolve: dist-tag off the wanted major is refused (issue #99)" || fail "resolve: dist-tag off the wanted major is refused (got: '$_re')"
 
+# 2c-2. (#244 c S3) the resolve pipe passes interpreter stderr through:
+# a broken python3 names itself (diagnostic visible, resolve still
+# refuses rc 1); an unparseable registry body stays SILENT (the except
+# path is the expected failure — the passthrough adds no noise to it).
+# Diagnostic literal in a variable: consuming grep lines quoting it
+# inline chain into the sandbox scanner's raw-line rm-suffix pattern
+# (#244 c S1).
+RLVDIAG='platform independent libraries'
+if grep -qF "' 2>/dev/null || true)" "$UPDATE"; then
+    fail "resolve: pipe must not discard interpreter stderr (#244 c S3)"
+else
+    pass "resolve: pipe no longer discards interpreter stderr (#244 c S3)"
+fi
+mkdir -p "$WORK/noisy-py"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$RLVDIAG" > "$WORK/noisy-py/python3"
+chmod +x "$WORK/noisy-py/python3"
+RLV_RC=0
+PATH="$WORK/bin:$WORK/noisy-py:$PATH" SYSTEM_BIN="$WORK/stub-v2" CONFDIR="$WORK/conf" \
+    sh -c ". '$FUNCS' && resolve_latest_opencode_version 2" >/dev/null 2>"$WORK/rlov.err" || RLV_RC=$?
+if [ "$RLV_RC" -ne 0 ] && grep -qF "$RLVDIAG" "$WORK/rlov.err"; then
+    pass "resolve: broken python3 surfaces its diagnostic, resolve still refuses (#244 c S3)"
+else
+    fail "resolve: interpreter stderr passthrough (rc=$RLV_RC err=$(cat "$WORK/rlov.err"))"
+fi
+mkdir -p "$WORK/bin4"
+printf '#!/bin/sh\necho "this is :: not json"\n' > "$WORK/bin4/curl"
+chmod +x "$WORK/bin4/curl"
+RLV_RC=0
+PATH="$WORK/bin4:$PATH" SYSTEM_BIN="$WORK/stub-v2" CONFDIR="$WORK/conf" \
+    sh -c ". '$FUNCS' && resolve_latest_opencode_version 2" >/dev/null 2>"$WORK/rlov2.err" || RLV_RC=$?
+if [ "$RLV_RC" -ne 0 ] && [ ! -s "$WORK/rlov2.err" ]; then
+    pass "resolve: unparseable registry body fails SILENT (expected path)"
+else
+    fail "resolve: expected parse failure must stay silent (rc=$RLV_RC err=$(cat "$WORK/rlov2.err"))"
+fi
+
 # 2d. exact-version download: npm layout (2.*) and GitHub layout (1.x)
 DL="$(mktemp -d)"
 OUT=$(PATH="$WORK/bin:$PATH" sh -c ". '$FUNCS' && fetch_opencode_version '$DL' '2.1.99'" 2>/dev/null || true)

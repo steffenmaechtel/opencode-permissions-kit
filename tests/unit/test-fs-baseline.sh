@@ -526,7 +526,11 @@ W23OUT="$(PATH="$W23BIN:$PATH" FS_SUDO="" \
 assert_eq "#223 broken python3: baseline still applies (rc 0, no false green)" "0" "$W23RC"
 assert_eq "#223 broken python3: file got group rw (600 -> 660 — the gate fed xargs)" "660" \
     "$(stat -c %a "$W23/proj/f")"
-assert_eq "#223 broken python3: probe ran exactly once (cache across the four passes)" "1" \
+# Probe count: 2 = the cached probe + the diagnostic rerun (#244 c
+# S3, the installer gate's b-S2 shape) — the rerun is a deliberate
+# second interpreter EXECUTION on the failure path. The cache is still
+# pinned: without it this would read 8 (2 × four passes).
+assert_eq "#223 broken python3: probe+rerun ran exactly once per run (cache across the four passes)" "2" \
     "$(wc -l < "$W23PROBE" 2>/dev/null || echo 0)"
 assert_eq "#223 broken python3: degradation warn exactly once per run" "1" \
     "$(printf '%s\n' "$W23OUT" | grep -c 'live progress unavailable')"
@@ -682,11 +686,13 @@ rm -rf "$W23EP"
 # the tee would finish normally on EOF — a false pass). Asserts are on
 # stderr content only: the sh wrapper's rc after SIGINT is
 # shell-dependent. Arm proof before the signal (#244 b W3): the
-# writer's drain marker appears only once the tee consumed the whole
-# stream (a fifo write blocks until read), so the SIGINT always hits
-# an interpreter that already initialized — a fixed sleep instead
-# could race the startup chain and pass vacuously. Guarded on setsid
-# presence with a skip note (#244 b W2, the §11c bash-rider pattern).
+# writer's drain marker appears once the tee has drained the stream —
+# all but at most one pipe buffer (~64 KiB) may still be buffered
+# when the blocking write returns (#244 c W5: not the "whole"
+# stream), which is enough: the SIGINT always hits an interpreter
+# that already initialized. A fixed sleep instead could race the
+# startup chain and pass vacuously. Guarded on setsid presence with a
+# skip note (#244 b W2, the §11c bash-rider pattern).
 W23KI="$WORK/issue223-ki"
 if command -v setsid >/dev/null 2>&1; then
     mkdir -p "$W23KI"
@@ -698,8 +704,9 @@ if command -v setsid >/dev/null 2>&1; then
     # completion line before the signal ever arrives (fixture bug caught
     # by this very pin on first run). The ready marker after the write
     # is the arm proof (#244 b W3): a fifo write blocks until the
-    # reader drains it, so the marker appears only once the tee has
-    # consumed the whole stream and sits blocked in read.
+    # reader drains it, so the marker appears once the tee has
+    # consumed all but at most one pipe buffer of the stream and sits
+    # blocked in read (#244 c W5 wording fix).
     ( exec 3>"$W23KIF"
       python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >&3 2>/dev/null
       : > "$W23KI/ready"
@@ -721,10 +728,13 @@ os.execv(sys.argv[1], [sys.argv[1], "-c",
     # Readiness poll (#244 b W3): signal only an ARMED tee — the marker
     # proves the stream drained (interpreter initialized, read loop
     # live). No marker within 10 s goes red by itself instead of
-    # passing green with nothing executed.
+    # passing green with nothing executed. Integer sleep only (#244 c
+    # Q3): POSIX sleep need not accept a fractional operand, and a
+    # failing one aborts the whole suite under set -e — the very
+    # block the setsid guard made portable. 10 × 1 s keeps the bound.
     W23KIWAIT=0
-    while [ ! -e "$W23KI/ready" ] && [ "$W23KIWAIT" -lt 40 ]; do
-        sleep 0.25
+    while [ ! -e "$W23KI/ready" ] && [ "$W23KIWAIT" -lt 10 ]; do
+        sleep 1
         W23KIWAIT=$((W23KIWAIT + 1))
     done
     if [ -e "$W23KI/ready" ]; then
@@ -757,6 +767,33 @@ os.execv(sys.argv[1], [sys.argv[1], "-c",
 else
     echo "  note: setsid absent — ctrl-c pins skipped (#244 b W2)"
 fi
+
+# --- 11f. a broken python3 names its problem above the warn (#244 c S3) ---------------
+# The probe's rerun (the installer gate's b-S2 shape): a
+# present-but-broken interpreter surfaces its own diagnostic stderr
+# above the degradation warn — an attributeless degrade hides the
+# cause. An ABSENT python3 stays silent (command -v guard: no
+# not-found noise for a legitimate absence). Fixture wording is
+# CPython's real unhyphenated message.
+W23NZ="$WORK/issue223-noisy"
+# The diagnostic text lives in a variable: a consuming grep line
+# quoting the literal ('platform…' "$VAR/x") chains into the sandbox
+# scanner's raw-line rm-suffix pattern — the definition line does
+# not (#244 c S1: the wave-2 mechanism is real for grep lines, not
+# for the fixture printf shape both reviews probed).
+W23DIAG='platform independent libraries'
+mkdir -p "$W23NZ/bin"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$W23DIAG" > "$W23NZ/bin/python3"
+chmod +x "$W23NZ/bin/python3"
+FS_SUDO="" PATH="$W23NZ/bin:$PATH" \
+    sh -c '. "$1" && _fsb_py_probe' _ "$LIB" >"$W23NZ/out" 2>"$W23NZ/err"
+if grep -qF "$W23DIAG" "$W23NZ/err" \
+    && grep -qF 'live progress unavailable' "$W23NZ/err"; then
+    pass "#244 c S3: fs-baseline probe surfaces a broken interpreter's diagnostic"
+else
+    fail "#244 c S3: probe diagnostic passthrough (err=$(cat "$W23NZ/err"))"
+fi
+rm -rf "$W23NZ"
 
 # --- Summary ---------------------------------------------------------------------------
 echo ""

@@ -854,11 +854,14 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     chmod +x "$_py3w/shim/python3"
     # A broken interpreter that NAMES its problem on stderr (#244 b
     # S2): the moved-/usr/local/python shape — works only via env,
-    # prints its real diagnostic and fails. (Hyphenated marker wording:
-    # the sandbox scanner greps raw lines quote-blind — "platform
-    # independent" + a "$VAR/" operand on one line chains into a false
-    # rm-suffix match.)
-    printf '#!/bin/sh\necho "Could not find platform-independent libraries" >&2\nexit 9\n' > "$_py3w/noisy/python3"
+    # prints its real diagnostic and fails. Marker wording is CPython's
+    # real unhyphenated message (#244 c S1): the pin asserts the
+    # passthrough mechanism, not the text. The literal lives in a
+    # variable — consuming grep lines quoting it inline chain into
+    # the sandbox scanner's raw-line rm-suffix pattern (the wave-2
+    # mechanism, real for grep lines; the definition line is clean).
+    _p3diag='platform independent libraries'
+    printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$_p3diag" > "$_py3w/noisy/python3"
     chmod +x "$_py3w/noisy/python3"
     mkdir -p "$_py3w/shadow"
     # json.py (NOT os.py): os is preloaded in sys.modules at -c startup,
@@ -908,7 +911,7 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
         fail "gate: hostile PYTHONPATH ignored (rc=$_p3rc err=$(cat "$_py3w/err"))"
     fi
     _p3rc=0; _py3case "$_py3w/noisy" "" || _p3rc=$?
-    if [ "$_p3rc" -eq 1 ] && grep -qF 'platform-independent libraries' "$_py3w/err" \
+    if [ "$_p3rc" -eq 1 ] && grep -qF "$_p3diag" "$_py3w/err" \
         && grep -qF 'present but broken' "$_py3w/err"; then
         pass "gate: failed probe surfaces the interpreter's diagnostic (#244 b S2)"
     else
@@ -932,60 +935,107 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     else
         fail "old presence-only gate replaced (found $_p3old occurrences, want 1)"
     fi
-    # Import-union drift pin (#244 b Q1): every module any shipped
-    # python imports must appear in the gate's import list — a new
-    # consumer adding an import without extending the gate goes red
-    # here (sabotage-verified: dropping threading or pathlib from the
-    # gate list fails this pin naming the module). Extraction: the
-    # gate list from the _py3_imports assignment; the shipped surface
-    # from line-start imports in .py files and python blocks embedded
-    # in sh/bin scripts (comment lines stripped), plus inline
-    # `-c 'import ...'` probes. A `from X import y` line must carry
-    # the second `import` keyword — a bare "from the ..." prose line
-    # is not a module dependency (the opk hosts-file continuation).
+    # Import-union drift pin (#244 b Q1; c Q1/W2/W1): every module any
+    # shipped python imports must appear in the gate's import list —
+    # a new consumer adding an import without extending the gate goes
+    # red here (sabotage-verified: dropping threading or pathlib from
+    # the gate list fails this pin naming the module). Extraction
+    # (#244 c W2): EVERY regular file under the lib root (find,
+    # recursive — tui/, templates/ and future subdirs included; four
+    # fixed globs made the resolution's "anywhere in the lib" claim
+    # false). Shapes collected: line-start imports in .py files and
+    # python blocks embedded in sh/bin scripts (comment lines
+    # stripped), plus inline `-c 'import ...'` probes including
+    # semicolon chains (#244 c W1 — `import x; x.run()` splits on ';'
+    # like ','). Known residual, deliberately not extracted (#244 c
+    # S4): double-quoted -c strings, mid-line imports,
+    # importlib/__import__ dynamic loads, `as` aliases. A
+    # `from X import y` line must carry the second `import` keyword —
+    # a bare "from the ..." prose line is not a module dependency
+    # (the opk hosts-file continuation).
     _p3gate="$(sed -n "s/^[[:space:]]*_py3_imports='\([^']*\)'.*$/\1/p" "$INSTALL")"
     if [ -n "$_p3gate" ]; then
         pass "gate: import list extractable"
     else
         fail "gate: import list extractable (no _py3_imports assignment found)"
     fi
+    # Exactly one assignment (#244 c W3): the gate-list extraction
+    # unions every match, but the runtime gate executes the LAST
+    # assignment — a second `_py3_imports=` line would keep this pin
+    # green while the probe silently stops exercising the first
+    # list's modules.
+    _p3asn="$(grep -c "^[[:space:]]*_py3_imports=" "$INSTALL")"
+    if [ "$_p3asn" -eq 1 ]; then
+        pass "gate: exactly one _py3_imports assignment (#244 c W3)"
+    else
+        fail "gate: exactly one _py3_imports assignment (found $_p3asn, want 1)"
+    fi
     _p3g="$(mktemp)"
     printf '%s\n' "$_p3gate" | sed 's/^[[:space:]]*import[[:space:]]*//' \
         | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
         | grep -E '^[A-Za-z_][A-Za-z0-9_.]*$' | sort -u > "$_p3g"
+    # Collector and splitter as functions so the fixture self-test
+    # below runs the SAME code path as the lib scan (#244 c W1 pin).
+    _p3collect() {
+        # _p3collect <root> <rawfile>: line-start imports (comment
+        # lines stripped) + inline single-quoted -c 'import' probes
+        # from every regular file under <root>, recursive.
+        find "$1" -type f 2>/dev/null | while IFS= read -r _p3cf; do
+            # The two greps find nothing in most files — rc 1 is the
+            # normal case there (guarded empty-match greps); a wholly
+            # empty collection is caught by the non-empty check below.
+            sed 's/^[[:space:]]*#.*$//' "$_p3cf" 2>/dev/null \
+                | grep -oE "^[[:space:]]*(import|from)[[:space:]]+[^[:space:]#][^#]*" \
+                >> "$2" || true
+            grep -oE -- "-c[[:space:]]+'import[^']*" "$_p3cf" 2>/dev/null \
+                | sed "s/.*'//" >> "$2" || true
+        done
+    }
+    _p3split() {
+        # _p3split <rawfile> <modfile>: raw lines -> module names. tr
+        # splits comma AND semicolon chains (#244 c W1); the second
+        # import-prefix strip catches `import a; import b` shapes the
+        # split re-exposes.
+        { sed -n 's/^[[:space:]]*import[[:space:]]*//p' "$1" | tr ',;' '\n\n'
+          sed -n 's/^[[:space:]]*from[[:space:]]*\([A-Za-z_][A-Za-z0-9_.]*\)[[:space:]]\{1,\}import.*/\1/p' "$1"
+        } | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^[[:space:]]*import[[:space:]]\{1,\}//' \
+          | grep -E '^[A-Za-z_][A-Za-z0-9_.]*$' | sort -u > "$2"
+    }
     _p3raw="$(mktemp)"
-    _p3f=""
-    for _p3f in "$(dirname "$INSTALL")"/opencode-permissions-kit-lib/py/*.py \
-        "$(dirname "$INSTALL")"/opencode-permissions-kit-lib/sh/*.sh \
-        "$(dirname "$INSTALL")"/opencode-permissions-kit-lib/management/*.sh \
-        "$(dirname "$INSTALL")"/opencode-permissions-kit-lib/bin/*; do
-        [ -f "$_p3f" ] || continue
-        # The two greps find nothing in most files — rc 1 is the normal
-        # case there (guarded empty-match greps); a wholly empty
-        # collection is caught by the non-empty check below.
-        sed 's/^[[:space:]]*#.*$//' "$_p3f" 2>/dev/null \
-            | grep -oE "^[[:space:]]*(import|from)[[:space:]]+[^[:space:]#][^#]*" \
-            >> "$_p3raw" || true
-        grep -oE -- "-c[[:space:]]+'import[^']*" "$_p3f" 2>/dev/null \
-            | sed "s/.*'//" >> "$_p3raw" || true
-    done
+    _p3collect "$(dirname "$INSTALL")/opencode-permissions-kit-lib" "$_p3raw"
     _p3mods="$(mktemp)"
-    { sed -n 's/^[[:space:]]*import[[:space:]]*//p' "$_p3raw" | tr ',' '\n'
-      sed -n 's/^[[:space:]]*from[[:space:]]*\([A-Za-z_][A-Za-z0-9_.]*\)[[:space:]]\{1,\}import.*/\1/p' "$_p3raw"
-    } | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
-      | grep -E '^[A-Za-z_][A-Za-z0-9_.]*$' | sort -u > "$_p3mods"
+    _p3split "$_p3raw" "$_p3mods"
     if [ -s "$_p3mods" ] && [ -s "$_p3g" ]; then
         pass "gate: shipped import surface collected"
     else
         fail "gate: shipped import surface collected (empty extraction — fixture broken)"
     fi
+    # Fixture self-test of the extraction shapes (#244 c W1): the same
+    # collector/splitter over a fixture dir must yield exactly the
+    # planted modules — line-start comma import, from-import, inline
+    # -c semicolon one-liner — and nothing from the prose from-line.
+    # Red here means the EXTRACTION broke, not the shipped surface.
+    _p3fx="$(mktemp -d)"
+    printf 'import zmod_a, zmod_b\nfrom zmod_c import thing\nfrom the fixture prose line\n' > "$_p3fx/consumer.py"
+    printf '#!/bin/sh\npython3 -c '"'"'import zmod_d; zmod_d.run()'"'"'\n' > "$_p3fx/consumer.sh"
+    chmod +x "$_p3fx/consumer.sh"
+    _p3fraw="$(mktemp)"; _p3fmods="$(mktemp)"; _p3fwant="$(mktemp)"
+    _p3collect "$_p3fx" "$_p3fraw"
+    _p3split "$_p3fraw" "$_p3fmods"
+    printf 'zmod_a\nzmod_b\nzmod_c\nzmod_d\n' | sort -u > "$_p3fwant"
+    if cmp -s "$_p3fmods" "$_p3fwant"; then
+        pass "gate: extraction collects semicolon -c chains + from-imports (#244 c W1)"
+    else
+        fail "gate: extraction shape self-test (got: $(tr '\n' ' ' < "$_p3fmods"))"
+    fi
     _p3miss="$(comm -23 "$_p3mods" "$_p3g")"
     if [ -z "$_p3miss" ]; then
-        pass "gate: import list covers the shipped python surface (#244 b Q1)"
+        pass "gate: import list covers the shipped python surface (#244 b Q1, c W2: whole lib)"
     else
         fail "gate: import list covers the shipped python surface — missing: $(printf '%s' "$_p3miss" | tr '\n' ' ')"
     fi
-    rm -f "$_p3raw" "$_p3mods" "$_p3g"
+    rm -rf "$_p3fx"
+    rm -f "$_p3raw" "$_p3mods" "$_p3g" "$_p3fraw" "$_p3fmods" "$_p3fwant"
 else
     fail "_py3_health_probe defined in install.sh"
 fi

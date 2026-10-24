@@ -1150,6 +1150,10 @@ resolve_latest_opencode_version() {
     if [ "$_rlov_major" = 2 ]; then
         # python3 is the kit's canonical JSON parser (grep/sed on a
         # packument can match an earlier "latest": occurrence elsewhere).
+        # Interpreter stderr passes through on the failure path (#244 c
+        # S3): an unparseable registry body stays silent (the except
+        # path is the expected failure), a broken interpreter names
+        # itself before the caller's resolve warn.
         _rlov_ver=$(curl -fsSL --max-time 10 "https://registry.npmjs.org/@opencode/cli-$_rlov_target" 2>/dev/null \
             | python3 -c 'import json,sys
 try:
@@ -1157,7 +1161,7 @@ try:
     print(dist["latest"])
 except Exception:
     sys.exit(1)
-' 2>/dev/null || true)
+' || true)
         case "$_rlov_ver" in
             2.*) echo "$_rlov_ver"; return 0 ;;
             *)  return 1 ;;

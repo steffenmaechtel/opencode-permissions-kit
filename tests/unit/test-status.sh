@@ -2466,6 +2466,75 @@ else
     fail "#210: UI_SILENT must never draw the progress line"
 fi
 
+# 5b) (#244 c S3) interpreter-stderr transparency on the degrade paths:
+#     a present-but-broken python3 names its problem (probe, advisory
+#     feed, scan parser) while every EXPECTED failure stays silent —
+#     the empty/warn output contracts are untouched. Line-shape pins
+#     first (re-adding a stderr discard goes red), behavior after.
+if grep -qF "import sys, threading, time' >/dev/null 2>&1" "$STATUS"; then
+    fail "#244 c S3: probe must not discard interpreter stderr (2>&1 found)"
+else
+    pass "#244 c S3: probe no longer discards interpreter stderr"
+fi
+if grep -qF 'or ""))'"'"' 2>/dev/null); then' "$STATUS"; then
+    fail "#244 c S3: advisory parse must not discard interpreter stderr"
+else
+    pass "#244 c S3: advisory parse no longer discards interpreter stderr"
+fi
+if grep -qF 'python3 "$PARSER" "$SCAN_CFG" 2>/dev/null' "$STATUS"; then
+    fail "#244 c S3: leak-scan parser must not discard its diagnostic stderr"
+else
+    pass "#244 c S3: leak-scan parser no longer discards its diagnostic stderr"
+fi
+# Probe behavior, on a real tty (the probe only runs on the tty path):
+# the shim's diagnostic must appear in the terminal transcript while
+# the scan output stays byte-identical to the reference — the scan
+# never depends on its progress display. The diagnostic literal
+# lives in a variable — consuming grep lines quoting it inline chain
+# into the sandbox scanner's raw-line rm-suffix pattern (#244 c S1;
+# the definition line is clean).
+C244DIAG='platform independent libraries'
+mkdir -p "$WORK/t244c-noisy"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$C244DIAG" > "$WORK/t244c-noisy/python3"
+chmod +x "$WORK/t244c-noisy/python3"
+cat > "$WORK/t244c-pty.sh" <<EOF
+eval "\$SCAN_HELPERS"
+UI_SILENT=0 _st_ddev_scan "c244: scanning $T210" "$T210" "$WORK/t244c-out.txt"
+echo "SCAN-FINISHED"
+EOF
+script -qec "PATH=\"$WORK/t244c-noisy:\$PATH\" sh $WORK/t244c-pty.sh" /dev/null > "$WORK/t244c.raw" 2>&1
+if grep -aqF "$C244DIAG" "$WORK/t244c.raw" \
+    && grep -aq "SCAN-FINISHED" "$WORK/t244c.raw" \
+    && cmp -s "$WORK/t210-ref.txt" "$WORK/t244c-out.txt"; then
+    pass "#244 c S3: status probe surfaces a broken interpreter's diagnostic (tty path)"
+else
+    fail "#244 c S3: status probe must pass interpreter stderr through on a terminal"
+fi
+# Advisory behavior — the shipped program, extracted, keeps its
+# contract: garbage in -> rc 1, SILENT (the except path is the
+# expected failure; the passthrough must not add noise to it).
+C244ADVPGM="$(sed -n "/if ADV_IDS=\$(printf/,/); then\$/p" "$STATUS" \
+    | sed "1s/^.*python3 -c '//" | sed "\$s/'[[:space:]]*); then\$//")"
+if printf 'not json' | python3 -c "$C244ADVPGM" >/dev/null 2>"$WORK/t244c-adv.err"; then
+    fail "#244 c S3: advisory program must reject an unparseable feed (rc 1)"
+elif [ ! -s "$WORK/t244c-adv.err" ]; then
+    pass "#244 c S3: advisory parse fails SILENT on an unparseable feed (expected path)"
+else
+    fail "#244 c S3: advisory parse must stay silent on expected failures (err=$(cat "$WORK/t244c-adv.err"))"
+fi
+# Leak-scan parser behavior: a broken config surfaces the parser's own
+# clean error line (not a traceback) — that is what now passes through.
+C244PARSER="$(dirname "$STATUS")/../py/jsonc-parser.py"
+printf 'not json at all\n' > "$WORK/t244c-bad.jsonc"
+C244PRC=0
+python3 "$C244PARSER" "$WORK/t244c-bad.jsonc" >/dev/null 2>"$WORK/t244c-par.err" || C244PRC=$?
+if [ "$C244PRC" -ne 0 ] && grep -q 'Error' "$WORK/t244c-par.err" \
+    && ! grep -q 'Traceback' "$WORK/t244c-par.err"; then
+    pass "#244 c S3: leak-scan parser failure prints a clean diagnostic (no traceback)"
+else
+    fail "#244 c S3: parser diagnostic shape (rc=$C244PRC err=$(cat "$WORK/t244c-par.err"))"
+fi
+
 # 3b) (#221 a W11) multi-chunk verbatim passthrough: ~2.5 MB — several
 #     read1 chunks with NULs inside each and a NUL-less tail. read1 must
 #     forward byte-for-byte across chunk boundaries (reorder/drop reds

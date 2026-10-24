@@ -550,7 +550,9 @@ _distro_gate() {
 # (#244 a S1) — the -I scope is those env vars, not the whole
 # environment: the loader route (LD_PRELOAD/LD_LIBRARY_PATH) and the
 # PATH-resolved binary itself stay outside any python flag (#244 b
-# S1). Running it is the installer's first EXECUTION of python3 as
+# S1), and system site-packages stay processed (-I implies -E -s -P,
+# not -S): a .pth there executes at startup — root-owned trust, the
+# residual the b-S1 finding named (#244 c S2). Running it is the installer's first EXECUTION of python3 as
 # root (#244 b S3) — the same binary and trust as every root python3
 # the installed kit runs, one moment earlier. The import list is the
 # union of the kit's shipped python import surface (enumerated at the
