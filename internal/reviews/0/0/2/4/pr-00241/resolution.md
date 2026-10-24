@@ -13,7 +13,7 @@ branch `feature/237-238-review-process-docs`.
 | a Q2 (LOW) | **implemented** | `400ff20` | README + RM-0118 Check: form binds from 2026-10-24, corpus stays |
 | a S1 (LOW) | **implemented** | `400ff20` | fixture 1 prose carries "closed"; substring regression red (sabotaged) |
 | a Q4 (INFO) | **implemented** | `400ff20` | README: parser takes the FIRST Status line, kept top vs prose shadow |
-| a Q3 (INFO) | **implemented** | `<SHA>` | maintainer override: all 4 label sites swept to reviews/README.md |
+| a Q3 (INFO) | **implemented** | `793b8e2` | maintainer override: all 4 label sites swept to reviews/README.md |
 | a S2 (INFO) | **deliberately not done** | — | nothing silent — both directions red; triage steer only (detail) |
 
 ## Evidence detail
