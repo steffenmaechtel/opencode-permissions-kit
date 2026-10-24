@@ -1,24 +1,23 @@
 # Documentation
 
-This page explains what the kit's documentation covers and where to find it.
-The docs are written for developers who run opencode on a WSL2/Linux dev box
-with ddev — see the [README](../README.md) whether the kit fits your setup.
+The user documentation for the kit — written for developers who run opencode
+on a WSL2/Linux dev box with ddev. See the [README](../README.md) whether the
+kit fits your setup.
 
 ## Getting started
 
-- [Getting started](getting-started.md) — install the kit, answer the
-  installer questions, and verify your first agent session
+- [Getting started](getting-started.md) — install, answer the installer
+  questions, verify the first agent session
 
 ## Concepts (why it works this way)
 
-- [Security model](concepts/security-model.md) — what the kit guarantees,
-  the soft-only trade-off, and the known residual gaps
-- [The wrapper](concepts/wrapper.md) — what happens on every `opencode`
-  start, and how the bypass guards protect the wrapper
-- [The sharing group](concepts/sharing-group.md) — how you and the agent
-  edit the same files
+- [Security model](concepts/security-model.md) — guarantees, the soft-only
+  trade-off, residual gaps
+- [The wrapper](concepts/wrapper.md) — what happens on every `opencode` start
+- [The sharing group](concepts/sharing-group.md) — how you and the agent edit
+  the same files
 - [ddev integration](concepts/ddev-integration.md) — ddev as the opencode
-  user: handover, ports, mkcert, and the SSH-key trade-off
+  user: handover, ports, mkcert, SSH keys
 
 ## How-to guides (solve a task)
 
@@ -36,8 +35,7 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 
 - [CLI — scripts and flags](reference/cli.md)
 - [Files and paths](reference/files.md)
-- [Ecosystem compatibility](reference/compatibility.md) — which tools that
-  spawn opencode work with the kit, and how
+- [Ecosystem compatibility](reference/compatibility.md)
 - [Audit log](reference/audit-log.md)
 - [Glossary](reference/glossary.md)
 
@@ -50,8 +48,6 @@ with ddev — see the [README](../README.md) whether the kit fits your setup.
 Everything that is not user documentation lives outside this folder:
 
 - [`agent/`](../agent/README.md) — working rules for coding agents
-  (conventions, learnings checklist, test fidelity)
-- `.agents/skills/` — loadable agent procedures for on-demand
-  workflows, routed from `AGENTS.md`
-- [`internal/`](../internal/README.md) — project memory: maintainer
-  process, design records, review evidence, meta-analysis runs
+- `.agents/skills/` — loadable agent procedures
+- [`internal/`](../internal/README.md) — maintainer process, design records,
+  review evidence

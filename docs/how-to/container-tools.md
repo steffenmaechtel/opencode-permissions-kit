@@ -1,7 +1,7 @@
 # Allow docker and ddev in a project
 
-This guide shows how to give a project's agent access to docker and ddev
-against the kit's rootless backend — and which rule order matters.
+Give a project's agent access to docker and ddev against the kit's rootless
+backend — and keep the rule order that matters.
 
 ## The two states
 
@@ -11,7 +11,7 @@ way:
 
 | | **no ddev/docker** | **with ddev/docker** |
 |---|---|---|
-| Enabled by | final config has no docker/ddev allow | merged `permission.bash` allows `docker *` / `ddev *` (notes) |
+| Enabled by | final config has no docker/ddev allow | merged `permission.bash` allows `docker *` / `ddev *` |
 | opencode runs as | `opencode` user | `opencode` user; `DOCKER_HOST` → rootless socket, or daemonless podman |
 | ddev | denied | runs as `opencode` — always (terminal and agent) |
 
@@ -19,10 +19,7 @@ The wrapper asks opencode itself for that final config (`opencode debug
 config`, resolved as the `opencode` user from the project directory), so a
 broad allow counts no matter which file declares it. The allow must be
 broad — `docker *` / `ddev *`, not subcommand-only — and may live in the
-project's `opencode.json[c]` or in the opencode user's global config. If
-the probe is
-unavailable (opencode too old for `debug config`, sudo denied), it falls
-back to scanning the project config only.
+project's `opencode.json[c]` or in the opencode user's global config.
 
 ## Opt a project in
 
@@ -67,12 +64,9 @@ sudo sed -i 's/"docker \*": "deny"/"docker *": "allow"/; s/"ddev \*": "deny"/"dd
 
 Flip the values **where they are** — do not move or re-add rules: the
 credential gates `"ddev auth ssh*": "deny"` and `"sudo ddev auth ssh*":
-"deny"` sit **after** the allows in the bundled template and must stay
-there (same last-match-wins logic as below). The wrapper detects global
-allows because it evaluates the final merged config, and every session in
-every project directory then starts with the rootless backend connected.
-Treat this as a deliberate trust decision: it also enables container tools
-for projects you never opted in individually.
+"deny"` must stay **after** the allows. Treat this as a deliberate trust
+decision: it also enables container tools for projects you never opted in
+individually.
 
 ## Why the deny line comes AFTER the allow
 
@@ -80,7 +74,7 @@ Project rules merge **last** (last matching rule wins) — a broad
 `"ddev *": "allow"` overrides the global denies, including the credential
 gate. Keep a specific `"ddev auth ssh*": "deny"` **after** your allow rules
 (as in the example), or the agent can import — and then read — private keys
-(see the trade-off in [ddev integration](../concepts/ddev-integration.md)).
+(see the trade-off in [ddev integration](../concepts/ddev-integration.md#the-ssh-key-trade-off)).
 
 ## What to expect
 

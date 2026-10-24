@@ -1,80 +1,52 @@
 # Troubleshooting
 
-This page lists known failure modes — each entry follows
-symptom → cause → fix. If your case is missing, open an issue.
+Known failure modes — each entry follows symptom → cause → fix. If your case
+is missing, open an issue.
 
 ## The install refuses: "Ubuntu <version> is not supported by the kit"
 
-**Symptom:** the streamed install (or a run from a checkout) aborts
-before the first prompt with `Ubuntu <version> is not supported by the
-kit.`
+**Cause:** the kit supports Ubuntu 22.04, Ubuntu 24.04 and Debian 12+ (see
+the [support matrix](getting-started.md#supported-distros)). Ubuntu 26.04 is
+blocked by known upstream errors (its default sudo freezes streamed
+installs; its systemd sporadically refuses user managers).
 
-**Cause:** the kit supports Ubuntu 22.04, Ubuntu 24.04 and Debian 12+
-(see the [support matrix](getting-started.md#supported-distros)).
-Ubuntu 26.04 is blocked because of two known upstream errors: its
-default sudo (sudo-rs 0.2.13) permanently freezes the interactive
-prompts of a streamed install, and its systemd (259) sporadically
-refuses to start any user manager — once per boot, for every user. Both
-are tracked in
-[issue #145](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/145).
-
-**Fix:** use Ubuntu 24.04 — the only field-tested distro. If you know
-what you are doing, re-run the installer with
-`--force-unsupported-distro` (the known blockers may bite; there is no
-support for that path). Existing installs on any distro keep updating
-normally via `opk update` — the gate only guards new installs.
+**Fix:** use Ubuntu 24.04 — the only field-tested distro. If you know what
+you are doing, re-run the installer with `--force-unsupported-distro`.
+Existing installs on any distro keep updating normally via `opk update`.
 
 ## The install refuses: "The installer must run from your normal user account with sudo"
 
-**Symptom:** the installer aborts before the first prompt with
-`The installer must run from your normal user account with sudo, not
-from a root shell (DEFAULT_USER resolved to 'root')`.
-
 **Cause:** the installer was started from a root shell — typically
 `wsl -u root` on Windows, `su -`, or a root ssh session. Those have no
-`SUDO_USER`, so the installer would register `root` as the developer:
-the shell hooks land in `/root/.bashrc`, the sharing group gets `root`,
-and the real developer account gets nothing. `opk status` would then
-show `ddev() hook: install broken — developer 'root' has uid 0` forever,
-and no `opk update` can repair that
-([issue #192](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/192)).
+`SUDO_USER`, so the installer would register `root` as the developer: the
+shell hooks land in `/root/.bashrc` and the real developer account gets
+nothing — a state no `opk update` can repair.
 
-**Fix:** open a shell as your regular user and re-run the install
-command there (piped through `sudo`). If an earlier root-shell install
-already completed, uninstall it first — run `opk uninstall` from your
-regular user too (it refuses to start from a root shell) — then
-reinstall and re-register your project roots when the installer asks.
+**Fix:** open a shell as your regular user and re-run the install command
+there. If an earlier root-shell install already completed, run
+`opk uninstall` from your regular user too (it refuses root shells), then
+reinstall.
 
-If your distro has no regular user yet (some minimal WSL images start
-as root), create one first from the root shell — `useradd -m -G sudo
--s /bin/bash <name>` plus `passwd <name>` — switch into it (from
-Windows: `wsl -d <distro> -u <name>`; from inside the root shell:
-`su - <name>`) and run the install from there.
+If your distro has no regular user yet (some minimal WSL images start as
+root), create one first — `useradd -m -G sudo -s /bin/bash <name>` plus
+`passwd <name>` — switch into it (from Windows:
+`wsl -d <distro> -u <name>`) and run the install from there.
 
 ## ddev launch / mailpit / phpmyadmin fails with "WSL Interoperability is disabled" / "Permission denied"
 
-**Symptom:** `ddev start` works, but `ddev launch` (or `ddev launch -m`,
-`ddev mailpit`, `ddev phpmyadmin`, `ddev adminer`, `ddev xhgui`)
-spews `grep: /proc/sys/fs/binfmt_misc/WSLInterop: No such file or
-directory`, `wslview ... Permission denied` and exits non-zero.
-
 **Cause:** the command ran as the `opencode` user (the `ddev()` function
-routes everything there). Opening a browser on WSL2 needs Windows
-interop (`explorer.exe` / `xdg-open` → `wslview`), which the `opencode`
-user deliberately has not — `/mnt/c` is restricted to you, so every
-`.exe` is unreadable for the agent. The `grep ... WSLInterop` line is a
-cosmetic wslu quirk (with `systemd=true` the binfmt entry is named
-`WSLInterop-late`); the real blocker is the permission denied.
+routes everything there). Opening a browser on WSL2 needs Windows interop,
+which the `opencode` user deliberately has not. The
+`grep ... WSLInterop` line is cosmetic; the real blocker is the permission
+denied.
 
 **Fix:**
 
-- in your terminal: update the kit and open a new terminal — the
-  `ddev()` function routes the whole browser-command class
-  (`launch`, `mailpit`, `phpmyadmin`, `adminer`, `xhgui`) through the
-  split URL-computation-as-opencode + browser-open-as-developer, without
-  a "not running" restart detour (issue #20). A project-specific
-  browser command (a custom ddev host command that internally calls
-  `ddev launch`) joins the class via one line in
+- in your terminal: update the kit and open a new terminal — the `ddev()`
+  function routes browser commands (`launch`, `mailpit`, `phpmyadmin`,
+  `adminer`, `xhgui`) through the split URL-computation-as-opencode +
+  browser-open-as-developer. A project-specific browser command joins the
+  class via one line in
   `/etc/opencode-permissions-kit/ddev-browser-cmds.conf`;
 - in an agent session this stays blocked **by design**: the agent should
   not open windows on your Windows desktop. Ask it for the URL instead
@@ -82,23 +54,17 @@ cosmetic wslu quirk (with `systemd=true` the binfmt entry is named
 
 ## vendor script (runTests.sh) fails with "chmod .ddev/...: operation not permitted"
 
-**Symptom:** `vendor/bin/runTests.sh -s phpstan` (or similar vendor
-tooling) reports port conflicts, then ddev dies with
-`chmod .ddev/.webimageBuild: operation not permitted` — while the same
-ddev command typed directly in the terminal works.
-
 **Cause:** the script ran ddev as **you** (the developer), not as the
 `opencode` user the kit uses. The kit's `ddev()` shell function reaches
 bash child scripts (exported function + `BASH_ENV`, covering
-`vendor/bin/runTests.sh` including its `#!/bin/sh` wrapper), but not
-pure dash targets, cronjobs, IDE tasks, or shells that never loaded your
-RC files — there the real ddev binary runs as your user and collides
-with the opencode-owned `.ddev/`.
+`vendor/bin/runTests.sh` including its `#!/bin/sh` wrapper), but not pure
+dash targets, cronjobs, IDE tasks, or shells that never loaded your RC
+files.
 
 **Fix:**
 
-- update the kit and open a **new terminal** (both transports ship with
-  the hook), then run the script again;
+- update the kit and open a **new terminal** (both transports ship with the
+  hook), then run the script again;
 - force bash for pure `#!/bin/sh` vendor scripts:
   `bash vendor/bin/runTests.sh -s phpstan`;
 - or run the inner ddev command directly (it works in your terminal):
@@ -110,20 +76,13 @@ with the opencode-owned `.ddev/`.
 
 ## ddev fails with "all predefined address pools have been fully subnetted"
 
-**Symptom:** `ddev start` (or vendor tooling like `runTests.sh` wrapping it)
-aborts with `Error response from daemon: all predefined address pools
-have been fully subnetted` once enough projects exist.
-
-**Cause:** a stock Docker limit, not a kit one — and identical for rootless
-and rootful daemons. Docker carves one subnet per user-defined bridge
-network out of its two default address pools: 16 × `/16` from
-`172.17.0.0/12` plus 16 × `/20` from `192.168.0.0/16` — roughly 30
-networks, one of which the default bridge already occupies. ddev creates
-one network per project, and `ddev stop` keeps it (only `ddev delete`
-removes it), so stopped-but-not-deleted projects keep consuming subnets.
+**Cause:** a stock Docker limit, not a kit one — Docker carves one subnet
+per user-defined bridge network out of its default address pools (roughly
+30 networks). ddev creates one network per project, and `ddev stop` keeps
+it, so stopped-but-not-deleted projects keep consuming subnets.
 
 **Fix:** reclaim abandoned networks — this prunes every network no
-container uses anymore (`docker network ls` works the same way):
+container uses anymore:
 
 ```bash
 sudo -u opencode env HOME=/home/opencode \
@@ -131,10 +90,10 @@ sudo -u opencode env HOME=/home/opencode \
   docker network prune -f
 ```
 
-If you legitimately run that many projects in parallel, raise the pools.
-Rootless Docker reads the daemon config of the user running the daemon —
-`opencode` — and the kit never touches this file (it survives installs
-and updates):
+If you legitimately run that many projects in parallel, raise the pools
+(only networks created after the restart come from the enlarged pools; a
+`daemon.json` that already exists gets the key merged in — do not overwrite
+the file):
 
 ```bash
 sudo mkdir -p /home/opencode/.config/docker
@@ -151,21 +110,16 @@ sudo -u opencode XDG_RUNTIME_DIR=/run/user/$(id -u opencode) \
   systemctl --user restart docker.service
 ```
 
-- `size: 24` carves `/24` subnets instead: 4,000+ networks, each still
-  offering 254 container addresses (a ddev project needs a handful).
-- A `daemon.json` that already exists (for example pinning a storage
-  driver)? Merge the `default-address-pools` key in — do not overwrite
-  the file.
-- Existing networks keep their subnets; only networks created after the
-  restart come from the enlarged pools.
+`size: 24` carves `/24` subnets instead: 4,000+ networks, each still
+offering 254 container addresses.
 
 ## git: "detected dubious ownership in repository at ..."
 
 **Cause:** git refuses repositories owned by another user. The kit sets
-`safe.directory '*'` in the **opencode user's** global git config (install
-and update), so the agent side is covered. You only hit this as the
-**developer** when you run git in a repository the agent created (cloned
-as `opencode`, so it is `opencode`-owned).
+`safe.directory '*'` in the **opencode user's** global git config, so the
+agent side is covered. You only hit this as the **developer** when you run
+git in a repository the agent created (cloned as `opencode`, so it is
+`opencode`-owned).
 
 **Fix:** trust the agent's checkouts (developer side):
 
@@ -174,36 +128,23 @@ git config --global --add safe.directory '*'
 ```
 
 or add single paths instead of the wildcard. If the agent side ever
-regresses (e.g. a deleted `~opencode/.gitconfig`), re-run the kit's
-updater — it re-applies the setting.
+regresses (e.g. a deleted `~opencode/.gitconfig`), re-run the kit's updater
+— it re-applies the setting.
 
 ## git is below the tested version baseline
 
 **Cause:** your distro ships a git older than the kit's tested floor of
-2.30 — the version of the oldest supported baseline distros (Debian 12
-and Ubuntu 22.04 both the documentation and the installer's pre-flight
-refer to). Nothing breaks outright: the kit itself only uses ancient git
-plumbing (`git config --global`), so the installer **warns but does not
-abort**. But agent-side git workflows on older versions are untested,
-and a distro that old is usually ESM-only anyway.
+2.30. Nothing breaks outright — the installer **warns but does not abort**;
+agent-side git workflows on older versions are untested.
 
-**Fix (WSL Ubuntu):** track the current git via the official git-core
-PPA:
+**Fix (WSL Ubuntu):** track the current git via the official git-core PPA
+(the installer's pre-flight and `opk status` print the same hint):
 
 ```bash
 sudo add-apt-repository ppa:git-core/ppa
 sudo apt update
 sudo apt install git
 ```
-
-The installer's and updater's pre-flight prints the same hint when it
-detects an older git, and `opk status` shows the host git against the
-tested floor in its Core section. CI exercises both ends of the version
-range — the Ubuntu 24.04 distro git and the current PPA git — so
-newest-release behavior drift is caught by the daily burn-in (the
-unreadable-CWD fatal of
-[issue #116](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/116)
-existed only on git ≥ 2.55; the fix is version-independent).
 
 ## Wrapper prints a loud bypass warning on start
 
@@ -257,8 +198,8 @@ ls /var/backups/opencode-permissions-kit/ddev-migration-*/
 - Dumps there? Import them:
   `sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import`
   (or per project: `ddev start <name> && ddev import-db <name> --file=<dump>.sql.gz`).
-- No dumps (export skipped/declined) and `.ddev` is **still yours**?
-  Export now, before using ddev again:
+- No dumps (export skipped/declined) and `.ddev` is **still yours**? Export
+  now, before using ddev again:
   `sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export <your-user> <project-roots>`
 - `.ddev` already handed over to `opencode`? Temporarily give it back,
   export, hand it over again (replace `$USER` with your username):
@@ -270,46 +211,34 @@ ls /var/backups/opencode-permissions-kit/ddev-migration-*/
   sudo opk config refresh
   ```
 
-Details: [ddev integration](concepts/ddev-integration.md).
-
 **Only some of my databases were exported** — the install said
-`N ok, 0 failed` with N smaller than your project count and continued:
+`N ok, 0 failed` with N smaller than your project count:
 
-- Older kit versions had a loop bug where each `ddev-migrate export`
-  run dumped exactly ONE project (ddev reads stdin and consumed the
-  loop's project list, so the loop ended after the first entry; the
-  resume logic then took the next project on every re-run). Update the
-  kit, then simply re-run the export — already-dumped projects are
-  skipped, only the missing ones run:
+- Re-run the export — already-dumped projects are skipped, only the missing
+  ones run:
   `sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate export "$USER" <project-roots>`
 - See what the export would take today (read-only, as your user):
   `/usr/local/lib/opencode-permissions-kit/bin/ddev-migrate registry <your-user> <project-roots>`
   — projects listed as `outside:` fall outside the registered roots and
   are never exported.
-- A project whose export **fails on every run** (for example its
-  database was never pulled from staging, so there is nothing to dump)
-  does not block the remaining projects — it is recorded as `FAIL`, the
-  loop continues, and the summary lists it. To mark a project as
+- A project whose export **fails on every run** (for example its database
+  was never pulled from staging) does not block the remaining projects — it
+  is recorded as `FAIL` and the summary lists it. To mark a project as
   intentionally database-less, add `omit_containers: [db]` to its
   `.ddev/config.yaml`: the export then records a clean SKIP.
-- Registry entries can also have grown AFTER a (partial) export — for
-  example a pre-1.23-format install exported from a stale legacy block.
-  `opk status` reports `db dumps INCOMPLETE` in that case, and later
-  installs warn about it. Fix: follow the `.ddev already handed over`
-  runbook above once — `ddev-migrate export` skips projects that already
-  have a dump in the newest manifest (resume), so only the missing ones
-  run.
+- Registry entries can also have grown after a (partial) export — `opk
+  status` reports `db dumps INCOMPLETE` then. Fix: follow the `.ddev
+  already handed over` runbook above once; only the missing projects run.
+
+Details: [ddev integration](concepts/ddev-integration.md).
 
 ## The agent gets "Permission denied" on my project / ddev claims "a project cannot be created in the DDEV source code"
 
 **Cause:** a project root under your home directory (for example
-`/home/<you>/www/vhosts`) needs `+x` on EVERY path component above it —
-and Ubuntu 24.04 ships home directories as `0750 <you>:<you>`. The group
-baseline fixes the root itself, but with a non-traversable home the
-`opencode` user cannot resolve the path at all: `opencode` fails with
-`EACCES: permission denied, lstat '<project>'`, and ddev misreports the
-same EACCES as `a project cannot be created in the DDEV source code`
-(its file-exists check treats "permission denied" as "exists").
+`/home/<you>/www/vhosts`) needs `+x` on EVERY path component above it — and
+Ubuntu 24.04 ships home directories as `0750`. With a non-traversable home
+the `opencode` user cannot resolve the path at all, and ddev misreports the
+same EACCES as `a project cannot be created in the DDEV source code`.
 
 **Fix:** the installer and `opk config refresh` grant traverse-only ACLs
 (`g:<sharing-group>:--x` — no listing, no reading) on the blocking
@@ -330,9 +259,9 @@ Docker daemon; upstream fixed that in v1.25.3.
 
 **Fix:** the installer and the `opk config container-backend
 docker-rootless` switch set ddev's global `no-bind-mounts` flag
-automatically when they detect one of those versions — nothing to do.
-On an affected existing install, run it once yourself (or upgrade ddev
-to >= 1.25.3):
+automatically when they detect one of those versions — nothing to do. On an
+affected existing install, run it once yourself (or upgrade ddev to
+>= 1.25.3):
 
 ```bash
 sudo -u opencode env HOME=/home/opencode ddev config global --no-bind-mounts
@@ -368,51 +297,25 @@ sudo opk config handover /var/www/vhosts/<project>
 ```
 
 (or `update.sh` / `config.sh refresh` to re-run it over every registered
-root). The handover table lives in
+root). The `ddev` shell hook prints this exact command when it detects the
+case before a `ddev start`. The handover table lives in
 [ddev integration](concepts/ddev-integration.md).
 
-**EPERM on the project root itself** (`chmod /var/www/vhosts/<project>:
-operation not permitted` during `ddev start` on a fresh clone): same
-mechanism, different target — without `vendor/` ddev writes its settings
-file at the project root and chmods the root directory. The fix is the
-same `config handover` command above: it covers this bootstrap case
-(root inode → `opencode`, mode `2755`) and hands the root back to you
-once TYPO3 is detected; see the bootstrap paragraph in
-[ddev integration](concepts/ddev-integration.md). The `ddev` shell hook
-prints this exact command when it detects the case before a
-`ddev start`.
-
 **Tired of the ownership back-and-forth?** Switch the project to
-[dev-owned](how-to/dev-owned-projects.md): `config ddev-settings on`
-makes the kit write `disable_settings_management: true` into the
-project's `.ddev/config.yaml` — ddev then never touches paths outside
-`.ddev/`, everything stays permanently yours, and `git checkout` /
-`mv` / `rm` cannot hit ownership errors anymore.
+[dev-owned](how-to/dev-owned-projects.md): `config ddev-settings on` makes
+ddev never touch paths outside `.ddev/`, everything stays permanently yours,
+and `git checkout` / `mv` / `rm` cannot hit ownership errors anymore.
 
 ## ddev warns "Unable to open hosts file ... permission denied"
 
-**Cause:** two layers, and the second one is deliberate:
+**Cause:** ddev runs as `opencode` and can neither read the Windows hosts
+file nor run Windows binaries — the agent must not reach the Windows
+profile. ddev only **warns**; `ddev start` succeeds, but your Windows
+browser cannot resolve custom-`project_tld` domains yet.
 
-1. The kit's `/mnt/c` restriction: ddev runs as `opencode` and can
-   neither read the Windows hosts file nor run Windows binaries — the
-   agent must not reach the Windows profile. ddev only **warns**;
-   `ddev start` succeeds, but your Windows browser cannot resolve
-   custom-`project_tld` domains yet.
-2. (Only for the fix below) WSL interop must work as your user. On many
-   WSL2+systemd hosts the `WSLInterop` binfmt entry disappears — even
-   `cmd.exe` fails ("WSL Interoperability is disabled"). Re-register:
-
-   ```bash
-   sudo sh -c 'echo ":WSLInterop:M::MZ::/init:PF" > /proc/sys/fs/binfmt_misc/register'
-   ```
-
-   (verify with `cmd.exe /c echo hi`; persists until the next
-   `wsl --shutdown` — and check `/etc/wsl.conf` has no
-   `[interop] enabled=false`).
-
-**Fix (developer side):** add the missing hostnames via the kit's
-bridge — it runs ddev's own `ddev hostname` as your user and Windows
-shows its permission dialog:
+**Fix (developer side):** add the missing hostnames via the kit's bridge —
+it runs ddev's own `ddev hostname` as your user and Windows shows its
+permission dialog:
 
 ```bash
 cd /var/www/vhosts/<project>
@@ -420,14 +323,19 @@ opk ddev-hosts-add
 ```
 
 `ddev-hosts-check` lists what is missing (one ready-made
-`ddev-hosts-add <hostname>` command each — that form works from
-anywhere); `opk status` reports it per project
-root. Manual fallback: edit
-`C:\Windows\System32\drivers\etc\hosts` in an elevated editor and add
-`127.0.0.1 <project>.<tld>`. Hostnames under the default `*.ddev.site`
-TLD never need an entry (ddev's wildcard DNS) — and entries inside
-`vendor/`/`node_modules/` `.ddev` dirs are never your projects: the
-status scan skips them.
+`ddev-hosts-add <hostname>` command each — that form works from anywhere);
+`opk status` reports it per project root. Manual fallback: edit
+`C:\Windows\System32\drivers\etc\hosts` in an elevated editor. Hostnames
+under the default `*.ddev.site` TLD never need an entry (ddev's wildcard
+DNS). If WSL interop itself is broken (`cmd.exe` fails with "WSL
+Interoperability is disabled"), re-register it:
+
+```bash
+sudo sh -c 'echo ":WSLInterop:M::MZ::/init:PF" > /proc/sys/fs/binfmt_misc/register'
+```
+
+(persists until the next `wsl --shutdown` — and check `/etc/wsl.conf` has
+no `[interop] enabled=false`).
 
 ## `docker ps` in the agent session lists "wrong" containers
 
@@ -455,55 +363,39 @@ options = "uid=1000,gid=1000,dmask=027,fmask=037"
 
 (replace `uid`/`gid` with your default WSL user's), then from Windows run
 `wsl --shutdown` and restart WSL. The kit never edits `/etc/wsl.conf`
-itself — applying the snippet is yours ([why](../internal/records/wsl-conf-consent.md)).
-Details: [security model](concepts/security-model.md).
+itself — applying the snippet is yours. Details:
+[security model](concepts/security-model.md).
 
 ## `opencode console login` / `opencode auth login` crashes with EACCES on powershell.exe
 
 **Cause 1:** the device login opens its verification URL through the `open`
 package bundled with opencode, which spawns the Windows powershell.exe. On
 a restricted `/mnt/c` the `opencode` user may not execute it, and the login
-dies on that spawn error (issue #91). The kit's browser bridge redirects
-that lookup to a harmless stand-in — the crash means the bridge is not in
-place (broken deploy, hand-edited `/etc/wsl.conf`). Only applies to
-opencode bundling `open` 10.x — 1.x **< 1.18.33** and 2.x **< 2.0.18**:
-newer versions access-check powershell and fall back to xdg-open (see
-the next section), so the login survives without the bridge — a crash
-on a newer version is a different problem, please report it.
-
-**Cause 2:** the login ran from a directory the `opencode` user cannot read
-(typically your `$HOME`, mode 750). Bun's `posix_spawn` — used for the
-browser-open — fails with `EACCES` in that case even though the spawned
-file itself is executable; plain `execve` is unaffected. The wrapper moves
-`console`/`auth` logins to a readable directory (the opencode home) before
-starting the binary, so this is handled automatically; a crash means an
-old wrapper is deployed.
+dies on that spawn error. The kit's browser bridge redirects that lookup to
+a harmless stand-in — the crash means the bridge is not in place (broken
+deploy) or the login ran from a directory the `opencode` user cannot read
+(typically your `$HOME`, mode 750) — the wrapper normally moves those
+logins to a readable directory, so that variant means an old wrapper is
+deployed.
 
 **Fix:** run
 
 ```bash
+sudo opk update
 sudo opk wsl-add-opencode-1-fix
 ```
 
-It (re)deploys the stand-in under
-`/usr/local/lib/opencode-permissions-kit/wsl/` and writes the kit comment
-block into `/etc/wsl.conf` — the one kit command that touches the file,
-and only because you ran it ([why](../internal/records/wsl-conf-consent.md)). The
-block takes effect immediately (only `open` reads it; WSL sees comments
-— no `wsl --shutdown` needed). If the stand-in itself is missing, run
-`sudo opk update` first. Without a bridge, the login still works when you
-open the printed URL yourself: the crash happens *after* URL and device
-code are displayed. Details: [security
-model](concepts/security-model.md).
+The block takes effect immediately (no `wsl --shutdown` needed). Without a
+bridge, the login still works when you open the printed URL yourself: the
+crash happens *after* URL and device code are displayed. Details:
+[security model](concepts/security-model.md).
 
 **Diagnose — expected vs. broken:** when the login runs with the agent
 identity on a hardened mount, the stand-in prints
 `auto-open unavailable for the agent — open the printed URL manually`
 straight to your terminal and the login keeps polling. That line is the
-*designed* state (the agent must not gain Windows interop), not an error.
-`OPK_BROWSER_BRIDGE_DEBUG=1` before a direct invocation traces the full
-decision (caller identity, powershell scan, forward/no-op). Self-test as
-your own user — the browser must open `https://opencode.ai`:
+*designed* state, not an error. Self-test as your own user — the browser
+must open `https://opencode.ai`:
 
 ```bash
 STANDIN=/usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
@@ -511,53 +403,24 @@ OPK_BROWSER_BRIDGE_DEBUG=1 "$STANDIN" -NoProfile -NonInteractive -ExecutionPolic
     -EncodedCommand UwB0AGEAcgB0ACAAIgBoAHQAdABwAHMAOgAvAC8AbwBwAGUAbgBjAG8AZABlAC4AYQBpACIA
 ```
 
-Run as yourself the trace ends in `forwarding to /mnt/c/...` and the
-browser opens; if it does not, check the mount options (`stat -c %a
-/mnt/c`) — your user must be the mount owner.
-
 ## `opencode auth login` (2.x, OpenCode Console account) dies with `Executable not found in $PATH: "xdg-open"`
 
 **Cause:** opencode 1.18.33+/2.0.18+ open the verification URL through
-`open` 11.x, which ignores the wsl.conf carrier, access-checks
-powershell.exe and falls back to `xdg-open` — and WSL distros ship no
-xdg-open by default. On 2.x that failed spawn escapes the CLI's error
-handling as an uncaught defect: the login dies right after printing URL
-and device code (1.x survives it; 2.0.2–2.0.17 with the carrier never
-reach the fallback).
+`open` 11.x, which access-checks powershell.exe and falls back to
+`xdg-open` — and WSL distros ship no xdg-open by default. On 2.x that
+failed spawn escapes the CLI's error handling: the login dies right after
+printing URL and device code.
 
 **Fix:** update the kit (`sudo opk update`) — it deploys an xdg-open
 fallback shim to `/usr/local/bin/xdg-open`, but only while no real
 xdg-open exists (`sudo apt install xdg-utils` works too; the kit stands
-back once a real one appears). The login then degrades like on 1.x:
-URL and code stay on screen, open the URL in any browser. Self-test as
-your own user — the browser must open `https://opencode.ai`:
+back once a real one appears). The login then degrades gracefully: URL and
+code stay on screen, open the URL in any browser. Self-test as your own
+user — the browser must open `https://opencode.ai`:
 
 ```bash
 OPK_BROWSER_BRIDGE_DEBUG=1 xdg-open https://opencode.ai
 ```
-
-## WSL prints `wsl: Expected ']' in /etc/wsl.conf` after updating to kit 0.0.36
-
-**Cause:** kit 0.0.36 registered its browser bridge through an INI section
-whose name contains hyphens. WSL's `wsl.conf` parser only accepts section
-names made of letters and digits, complains about the line — and on WSL
-≤ 2.9.12 aborts parsing right there, so every setting below silently
-stops applying: the `[automount]` restriction stays pending, `[boot]`
-`systemd=true` (and with it the docker-rootless backend) disappears after
-the next `wsl --shutdown` (issue #100).
-
-**Fix:** update the kit (`sudo opk update`, ≥ 0.0.38) — it strips the
-broken section (restoring WSL's ability to parse the file) — then, on
-opencode < 1.18.33, opt in to the login-fix carrier yourself:
-
-```bash
-sudo opk wsl-add-opencode-1-fix
-```
-
-Finally run `wsl --shutdown` from Windows and reopen your distro so the
-dropped settings apply again. `opk status` should show the backend socket
-reachable, `/mnt/c` restricted, and the browser bridge deployed. Details:
-[security model](concepts/security-model.md).
 
 ## Group membership (opencode group) not applied
 

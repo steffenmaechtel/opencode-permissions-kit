@@ -1,7 +1,7 @@
 # Glossary
 
-Short definitions of the kit's terms — each entry links to the concept page
-with the full picture.
+Short definitions of the kit's terms — each entry links to the page with the
+full picture.
 
 **Backend (container backend)**
 The rootless container runtime configured at install time: `docker-rootless`
@@ -20,7 +20,7 @@ dirs) to `opencode:opencode` so ddev stops hitting EPERM. See
 
 **Leak scan**
 The name-based, report-only sweep of scratch directories (`/tmp`, ...) that
-`status.sh` runs — lists files matching the deny patterns. No remediation,
+`opk status` runs — lists files matching the deny patterns. No remediation,
 no guarantees. See [customize the deny list](../how-to/customize-deny-list.md).
 
 **Rootless**

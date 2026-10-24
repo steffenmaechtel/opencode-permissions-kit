@@ -1,7 +1,6 @@
 # Manage project directories
 
-This guide shows how to add, list, and remove the directories the agent may
-work in.
+Add, list, and remove the directories the agent may work in.
 
 Project roots are stored in `/etc/opencode-permissions-kit/projects.conf`
 (one absolute path per line). The wrapper only allows opencode to start
@@ -14,18 +13,15 @@ opk config projects add /var/www/vhosts/new-project
 ```
 
 Multiple paths at once are fine, and `~` works. System paths (`/`, `/usr`,
-`/home`, `/tmp`, …) are rejected — the group baseline (`chgrp -R`,
-`setfacl -R`) must never run over them; use a dedicated folder like
-`/var/www/vhosts` or `~/dev`. `config.sh` appends the path to
-`projects.conf` and applies the **group baseline** (group `opencode`, setgid,
-default ACLs `g:opencode:rwx`) in one step — no extra step needed.
+`/home`, `/tmp`, …) are rejected — use a dedicated folder like
+`/var/www/vhosts` or `~/dev`. Adding a root applies the **group baseline**
+(group `opencode`, setgid, default ACLs `g:opencode:rwx`) in one step.
 
 Roots below your home directory (like `~/dev`) work too: adding or
-refreshing a root also grants **traverse-only** ACLs (`g:opencode:--x`,
-no listing/reading) on ancestors that would otherwise block the agent —
-a home directory is `0750` on Ubuntu 24.04, and without `+x` on every
-component above the root, opencode cannot reach it at all. See
-[troubleshooting](../troubleshooting.md) for the failure picture.
+refreshing a root also grants **traverse-only** ACLs (`g:opencode:--x`, no
+listing/reading) on ancestors that would otherwise block the agent — a home
+directory is `0750` on Ubuntu 24.04, and without `+x` on every component
+above the root, opencode cannot reach it at all.
 
 ### Manual equivalent
 

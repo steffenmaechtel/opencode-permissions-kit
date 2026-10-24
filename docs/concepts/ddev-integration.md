@@ -1,13 +1,12 @@
 # ddev integration
 
-This page explains how ddev runs as the `opencode` user, which paths are
-handed over (and why), and the trade-offs around ports, certificates, and
-SSH keys.
+How ddev runs as the `opencode` user, which paths are handed over, and the
+trade-offs around ports, certificates, and SSH keys.
 
 ## One user, one daemon
 
-ddev runs **always as `opencode`** — no delegation shim, no transaction, and
-no two owners for `.ddev/`:
+ddev runs **always as `opencode`** — no delegation shim, no two owners for
+`.ddev/`:
 
 - **Agent (opencode session):** ddev runs natively as `opencode`.
 - **Your terminal (default user):** the kit hooks a `ddev()` shell function
@@ -18,66 +17,47 @@ no two owners for `.ddev/`:
   **real** ddev.
 
 Both sides share one ddev home (`/home/opencode/.ddev`) and one rootless
-daemon. Consequence: `docker ps` in your own terminal and in an agent
-session list the same containers — but a colleague's rootful docker daemon
-is a different world entirely.
+daemon: `docker ps` in your terminal and in an agent session list the same
+containers. A colleague's rootful docker daemon is a different world.
 
-### Browser-opening commands (issue #20)
+### Browser-opening commands
 
-Commands that open a browser — `ddev launch` itself and its wrappers
-(`mailpit`, the phpmyadmin/adminer add-ons, `xhgui`) — cannot run as
-`opencode`: opening the browser on WSL2 needs `explorer.exe` /
-`xdg-open` → `wslview`, i.e. **Windows interop**, exactly what the
-`opencode` user must not have (an `.exe` would run as your Windows
-user, outside every soft rule). The `ddev()` function routes the whole
-class through a split:
+Commands that open a browser — `ddev launch` and its wrappers (`mailpit`,
+the phpmyadmin/adminer add-ons, `xhgui`) — cannot open it as `opencode`:
+that needs Windows interop, exactly what the agent must not have. The
+`ddev()` function routes the whole class through a split:
 
-1. The URL is read from **`ddev describe -j`** run **as `opencode`**
-   via the sudoers helper — ddev maintains every URL in that document
-   from the project config, even while the project is stopped (the
-   upstream-recommended scripting interface,
-   [ddev/ddev#8771](https://github.com/ddev/ddev/issues/8771)).
-   `launch` maps to `raw.primary_url` (with `launch`'s argument forms:
-   path, `:<port>`, full URL), `mailpit` to `raw.mailpit_https_url`,
-   `xhgui` to `raw.xhgui_https_url` (when enabled), and add-on
-   commands like `phpmyadmin` to `raw.services.<name>.https_url`.
-   Running as `opencode` is what makes this correct — as *you*, ddev
-   cannot see the rootless daemon and would run its internal
-   `ddev start` on **every** call. The JSON is parsed with python3 (a
-   kit prerequisite). A stopped project is started first, exactly like
-   ddev's own launch script — but plainly, without the `DDEV_DEBUG`
-   log flooding the old URL transport needed.
-2. Commands whose URL describe does not carry — the built-in
-   `phpmyadmin` installer prompt (add-on not yet installed), custom
-   project commands without a matching service — **plain-run as
-   `opencode`**: output, prompts and exit code pass through
-   unchanged; only the browser open is skipped.
-3. The URL is printed and opened **as you** (`explorer.exe`, falling
-   back to `xdg-open`) — your interop, your browser.
+1. The URL is read from **`ddev describe -j`** run **as `opencode`** via the
+   sudoers helper (ddev maintains every URL in that document, even while the
+   project is stopped). `launch` maps to `raw.primary_url` (with `launch`'s
+   argument forms: path, `:<port>`, full URL), `mailpit` to
+   `raw.mailpit_https_url`, `xhgui` to `raw.xhgui_https_url` (when enabled),
+   add-on commands like `phpmyadmin` to `raw.services.<name>.https_url`.
+   A stopped project is started first.
+2. Commands whose URL describe does not carry (add-on not yet installed,
+   custom project commands without a matching service) **plain-run as
+   `opencode`**: output, prompts and exit code pass through; only the
+   browser open is skipped.
+3. The URL is printed and opened **as you** (`explorer.exe`, falling back to
+   `xdg-open`) — your interop, your browser.
 
 Project-specific browser commands can be added to
-`/etc/opencode-permissions-kit/ddev-browser-cmds.conf` (one command
-name per line, `#` comments) — they open their browser when
-`ddev describe` carries a service of the same name
-(`raw.services.<name>.https_url`); otherwise they plain-run as
-`opencode`.
+`/etc/opencode-permissions-kit/ddev-browser-cmds.conf` (one command name per
+line, `#` comments): they open their browser when `ddev describe` carries a
+service of the same name; otherwise they plain-run as `opencode`.
 
-Net effect: browser commands in your terminal open the browser without a
-restart detour; agent-side they still fail interop-blocked (by design —
-the agent should not pop windows on your Windows desktop; it can hand
-you the URL from `ddev describe` instead).
+Agent-side, browser commands stay interop-blocked **by design** — the agent
+should not pop windows on your Windows desktop. Ask it for the URL instead
+(`ddev describe`) and open it yourself.
 
 ### Scripts: bash children inherit the function
 
-The `ddev()` function lives in your shell RC files — and shell functions
-exist only in shells that loaded those files. To cover **vendor scripts**
-like TYPO3's `vendor/bin/runTests.sh`, which call `ddev` in a child bash
-process (issue #18), the hook uses two transports: it **exports** the
-function (bash children import it directly), and it sets **`BASH_ENV`**
-pointing at itself (non-interactive bash startups source that file — a
-plain variable, so it even survives `#!/bin/sh` wrapper scripts and
-Makefile/zsh spawn paths in between). A user-set `BASH_ENV` is never
-overridden.
+The `ddev()` function lives in your shell RC files — shell functions exist
+only in shells that loaded them. To cover **vendor scripts** like TYPO3's
+`vendor/bin/runTests.sh`, the hook exports the function (bash children
+import it) and sets `BASH_ENV` pointing at itself (non-interactive bash
+startups source that file — it even survives `#!/bin/sh` wrapper scripts).
+A user-set `BASH_ENV` is never overridden.
 
 | Who calls `ddev`? | What happens |
 |---|---|
@@ -85,292 +65,212 @@ overridden.
 | A bash script started from your terminal | Gets the function via `export -f` / `BASH_ENV` → runs as `opencode` ✔ |
 | Outside your shell (dash script, cronjob, IDE task) | **Real ddev binary** as your user — function never applies ✘ |
 
-In the last case ddev runs as your user instead of `opencode` — two
-owners for `.ddev/`, a different daemon: exactly the state the kit
-prevents. Ways out for those scripts:
+Ways out for the last row:
 
 1. Force bash for a dash script: `bash vendor/bin/runTests.sh -s phpstan`.
-2. Call the helper explicitly — this is exactly what the `ddev()` function
-   does internally, minus the shell function in between:
+2. Call the helper explicitly:
 
    ```bash
    sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode start
    ```
 
-### Unreadable working directories (issue #51)
+### Unreadable working directories
 
-`sudo` keeps your working directory, so ddev — running as `opencode` —
-inherits whatever directory you invoked it from, including ones the
-opencode user cannot read, like your `$HOME` (mode 0750 on Ubuntu 24.04).
-ddev resolves its embedded compose schema against the process working
-directory, so registry-driven runs from such a directory
-(`ddev poweroff`, `ddev stop <project>`) used to print one warning per
-project:
+`sudo` keeps your working directory, so ddev inherits whatever directory you
+invoked it from — including ones the opencode user cannot read, like your
+`$HOME`. The helper probes the inherited directory, prints a one-line note
+when it is unreadable, and runs ddev from the opencode home instead:
 
-```
-Failed to load compose project for down: validating …: error in parsing "compose-spec.json": stat .: permission denied
-```
-
-The stop itself still worked — noise, not breakage.
-
-The helper now probes the inherited working directory, prints a one-line
-note when the opencode user cannot read it, and runs ddev from the
-opencode home instead:
-
-```
+```text
 ddev-as-opencode: current directory is not accessible to the opencode user - continuing in /home/opencode
 ```
 
-Commands that address a project by name or walk the registry
-(`ddev poweroff`, `ddev stop <project>`, `ddev list`) are unaffected by
-the working directory. Commands without a project name (`ddev start`,
-`ddev describe`) need the project directory as their working directory —
-run them from inside the project (the [sharing group](sharing-group.md)
-keeps it readable for opencode) or pass the project name.
+Commands addressing a project by name or walking the registry (`ddev
+poweroff`, `ddev stop <project>`, `ddev list`) are unaffected. Commands
+without a project name (`ddev start`, `ddev describe`) need the project
+directory as their working directory — run them from inside the project or
+pass the project name.
 
 ## ddev-managed paths (the EPERM fixes)
 
 ddev chmods `.ddev/` and the app-type's **settings directories
 unconditionally**, and `chmod` is owner-only on Linux — so these paths must
 belong to `opencode:opencode` (with `g+w`). The kit hands them over, at
-**any depth** under each registered root (a root is usually a parent folder
-like `/var/www/vhosts` holding several projects):
+**any depth** under each registered root:
 
 | App type (`.ddev/config.yaml` `type:`) | Handed-over directories |
 |---|---|
-| `typo3` | `config/system`, `<docroot>/typo3conf`, bare `typo3conf` (legacy fallback — notes) |
+| `typo3` | `config/system`, `<docroot>/typo3conf`, bare `typo3conf` (repo-root fallback) |
 | `drupal*`, `backdrop` | `<docroot>/sites/default` |
-| `magento*`, `maho` | `app/etc` (maho is the magento fork, issue #149) |
+| `magento*`, `maho` | `app/etc` |
 | `modx` | `<docroot>/core/config` |
 
-Typo3 note: bare `typo3conf` is the repo-root fallback for legacy
-installs — composer v12+, legacy v12 `system/`, v11−.
+**Root-file types (`codeigniter`, `shopware6`, `symfony`).** Their settings
+file lives at the project root (`.env`, `.env.local`) and ddev chmods the
+**root directory** on every run. The kit hands the root *inode* to
+`opencode` with mode `2755` (ddev's `0755` chmod becomes a no-op); with the
+dev-owned flag the root is handed back to you permanently.
 
-**Root-file types (`codeigniter`, `shopware6`, `symfony`).** Their
-settings file lives at the project root (`.env`, `.env.local`) and
-ddev's generic settings machinery chmods the **root directory** on every
-run — the same mechanics as the typo3 bootstrap, but permanent (no
-detection switch ends it). For an unflagged project the kit hands the
-root *inode* to `opencode` with mode `2755` (ddev's `0755` chmod becomes
-a no-op); the moment the dev-owned flag appears, the root is handed back
-to you permanently and ddev never chmods it again.
+**The project root during bootstrap.** A freshly cloned `typo3` project has
+no `vendor/` yet — ddev cannot detect the installation, writes its settings
+file at the project root and chmods the root directory on every start. The
+kit hands the root *directory inode* (never its contents) to `opencode` with
+mode `2755`, so `ddev start` and `ddev composer install` work from the first
+run. Creating new top-level files is limited while the root is handed over
+(editing existing files is not). Once TYPO3 is installed (`vendor/` or
+`<docroot>/typo3` present), the kit hands the root **back to you** (`2775`)
+on the next install/`projects add`/`refresh`/`update --refresh`.
 
-**The project root during bootstrap.** A freshly cloned `typo3` project
-has no `vendor/` yet — ddev cannot detect the installation and falls back
-to writing its settings file at the **project root**, chmod-ing the root
-directory to `0755` on every start. Since `chmod` is owner-only, the kit
-hands the root *directory inode* (never its contents) to `opencode` with
-mode `2755`: the exact `0755` base bits make ddev's chmod a no-op, so
-`ddev start` and `ddev composer install` work from the first run. While
-the root is handed over, creating new top-level files is limited (editing
-existing files is not — they stay group-writable). Once TYPO3 is
-installed (`vendor/` or `<docroot>/typo3` present, the same markers
-ddev's detection uses), ddev targets `config/system` instead and the kit
-hands the root **back to you** (`2775`, group-writable) on the next
-install/`projects add`/`refresh`/`update --refresh`.
+The handover runs on install, `config.sh projects add`, `config.sh refresh`,
+`config.sh handover <path>` (one project, no group baseline — the fast
+repair after cloning), and on `update.sh`. The routine update skips the
+rescan when nothing changed (a stamp under
+`/etc/opencode-permissions-kit/handover/` records the last completed pass
+per root); `opk update --refresh` always re-scans.
 
-The handover runs on install, on `config.sh projects add`, on
-`config.sh refresh`, on `config.sh handover <path>` (one project, no
-group baseline — the fast repair after cloning a new project), and on
-`update.sh` — but the routine update skips the rescan when nothing
-changed: a root-owned stamp under `/etc/opencode-permissions-kit/handover/`
-records the last completed pass per root (user, group, dev-owned mode,
-scan revision, default user), and a matching stamp short-circuits the scan
-([issue #112](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/112) —
-the unconditional rescan cost minutes on large project trees). Anything
-doubtful falls back to the full scan; `opk update --refresh` always
-re-scans. The `ddev` shell hook covers the gap between cloning and the
-next handover run: before `ddev start` / `ddev restart` it detects the
-cases that would fail with ddev's cryptic `operation not permitted` —
-the typo3 bootstrap (fresh clone whose root still belongs to you) and,
-since issue #149, dev-owned settings dirs of `maho`/`modx` and the
-root-file types (`codeigniter`, `shopware6`, `symfony`) — and prints the
-ready-made `config handover` command instead. The scan never
-descends into `vendor/`, `node_modules/`, `testdata/` or `.git/` trees —
-a `.ddev` directory found in the first three is a shipped test fixture,
-not a project (a checkout of ddev's own repository carries dozens,
-issue #29), and inside `.git/` it is never a project either (ddev finds
-`.ddev` by walking up from the working directory — no ddev command runs
-inside `.git/`). Your `.git/` stays yours (ownership untouched; the
-group baseline makes it group-accessible — see
+The `ddev` shell hook covers the gap between cloning and the next handover
+run: before `ddev start` / `ddev restart` it detects the cases that would
+fail with ddev's cryptic `operation not permitted` — the typo3 bootstrap and
+dev-owned settings dirs of `maho`/`modx` and the root-file types — and
+prints the ready-made `config handover` command instead. The scan never
+descends into `vendor/`, `node_modules/`, `testdata/` or `.git/` trees: a
+`.ddev` directory there is a shipped test fixture, not a project. Your
+`.git/` stays yours (ownership untouched — see
 [the sharing group](sharing-group.md)).
 
-### Team git workflows: group-write on ddev-created content (issue #94)
+### Team git workflows: group-write on ddev-created content
 
-ddev hardcodes **explicit `0755`/`0644` modes** for everything it
-creates. Explicit modes bypass the umask, and they cap the inherited
-default ACL down to `r-x` for the group — so content ddev writes as
-`opencode` (a `ddev config` in a freshly cloned project, regenerated
-webserver configs on `ddev start`) starts out **without group write**.
-Without a countermeasure, `git pull` fails with *permission denied* the
-moment a teammate delivers a new or modified file under `.ddev/`
-(commands, `homeadditions`, …) — you, the sharing-group member, cannot
-write into those trees.
+ddev hardcodes explicit `0755`/`0644` modes for everything it creates —
+explicit modes bypass the umask and cap the inherited default ACL down to
+`r-x` for the group. Content ddev writes as `opencode` (a `ddev config` in a
+freshly cloned project, regenerated webserver configs on `ddev start`)
+therefore starts out **without group write**, and `git pull` fails with
+*permission denied* the moment a teammate delivers a new or modified file
+under `.ddev/`.
 
 The kit heals this at the source: after the tree-creating commands
-(`ddev config` / `get` / `start` / `restart`), your `ddev` shell function
-re-asserts group-write on the project's `.ddev` through the sudoers
-helper (`--opk-ensure-shared`, running as `opencode`: owner-only chmod on
-its own files, no new privilege). Heavy generated subtrees are pruned
-(`db_snapshots` is chmod `0777` by ddev itself, import dumps are
-transient). Trees that arrived via git itself never need the heal — git
-writes them as you, with your umask and the inherited ACLs.
+(`ddev config` / `get` / `start` / `restart`) your `ddev` shell function
+re-asserts group-write on the project's `.ddev` through the sudoers helper —
+an owner-only chmod as `opencode`, no new privilege. Heavy generated subtrees
+(`db_snapshots`, import dumps) are pruned. Trees that arrived via git never
+need the heal.
 
 After `ddev config` the same hook also writes the dev-owned flag into the
-fresh `.ddev/config.yaml` when dev-owned mode is on
-([below](#dev-owned-projects-the-alternative-to-handovers)) — new projects
-are dev-owned from birth instead of silently running the handover model
-until the next scan. When the write fails (a clone whose
-`.ddev/config.yaml` arrived without group write), the hook prints a
-WARNING naming the retry commands — the `ddev` command itself still
-succeeds.
+fresh `.ddev/config.yaml` when dev-owned mode is on — new projects are
+dev-owned from birth. When the write fails (a clone whose config arrived
+without group write), the hook prints a WARNING naming the retry commands;
+the `ddev` command itself still succeeds.
 
 Edge case: content written by the *agent's* ddev session (running as
-`opencode` directly, not through your shell function) lacks the automatic
-heal — run a tree-creating `ddev` command yourself (`config`, `get`,
-`start` or `restart`; other commands heal nothing) or use
-`opk update --refresh` / `opk handover opencode <project>` to re-normalize. `opk status` detects
-the state per project (a `ddev share … group-write missing` line) so a
-failing `git pull` on `.ddev/` content does not stay unexplained; the
-explicit one-command fix it prints is
+`opencode` directly) lacks the automatic heal — run a tree-creating `ddev`
+command yourself, use `opk update --refresh`, or fix it directly:
 
 ```bash
 opk ensure-shared <project>/.ddev
 ```
 
+`opk status` detects the state per project (a `ddev share … group-write
+missing` line) so a failing `git pull` on `.ddev/` content does not stay
+unexplained.
+
 ### Multiple checkouts of one repo (git worktrees)
 
-`ddev config` writes a `name:` key into `.ddev/config.yaml`. Committing
-it is fine — it gives the project a stable identity across the team. But
-ddev then derives the same project name for **every checkout** of the
-repo: one project registration, one set of containers. Starting a second
-checkout on the same host (classic with git worktrees) fails with
-*"a project (web container) in running state already exists for …
-created at \<other-path\>"*. Remove the `name:` key from the committed
-config and ddev derives the project name from the directory instead —
-every checkout becomes its own project with its own containers and
-database, which is exactly what parallel worktrees want.
+`ddev config` writes a `name:` key into `.ddev/config.yaml`. If you commit
+it, ddev derives the same project name for **every** checkout of the repo —
+starting a second checkout fails with *"a project (web container) in running
+state already exists for …"*. Remove the `name:` key from the committed
+config and ddev derives the project name from the directory instead: every
+checkout becomes its own project with its own containers and database.
 
 ## Dev-owned projects (the alternative to handovers)
 
 The handover model exists because ddev chmods settings paths outside
 `.ddev/` on every start. **Dev-owned mode removes that cause**: the kit
 writes `disable_settings_management: true` into each project's committed
-`.ddev/config.yaml` (installer default; `config.sh ddev-settings
-on|off|status`) — inserted directly below the head of the file (after
-`corepack_enable:`, `type:` as fallback), never appended at the end
-where ddev's default template hides it behind a wall of commented
-examples (issue #28). The flag is written by the scans (install,
-`projects add`, `refresh`, `handover`, `update --refresh`) **and directly
-after `ddev config`** — the `ddev()` shell function routes the fresh
-project through the sudoers helper, so a new project never starts its
-life unflagged. Fixture `.ddev` dirs under `vendor/`,
-`node_modules/` and `testdata/` are never flagged. ddev then never
-writes or chmods anything outside
-`.ddev/`. Settings dirs and project roots stay developer-owned
-permanently (2775/664 via the group baseline) — no handover, no
-handback, `git checkout` always free, fresh clones work from the first
-`ddev start`. The trade-off: your repo owns the CMS settings file (for
-TYPO3 a small committed `AdditionalConfiguration.php` — see the
-[how-to](../how-to/dev-owned-projects.md)). A project carrying the
-committed flag is dev-owned regardless of the kit mode; the mode only
-decides whether the kit writes the flag.
+`.ddev/config.yaml` (installer default; `opk config ddev-settings
+on|off|status`). ddev then never writes or chmods anything outside `.ddev/`:
 
-One handover remains in dev-owned mode: `.ddev/` itself stays with
-`opencode` — the flag only silences ddev outside `.ddev/`; inside it,
-ddev keeps writing and chmod-ing on every run (`config.yaml`,
-`.webimageBuild`, snapshots — `chmod` is owner-only and ddev runs as
-`opencode`), so handing `.ddev/` to the developer would break every
-`ddev start`.
+| Path | Owner | Mode |
+|---|---|---|
+| `.ddev/` | `opencode` | 2775 / 664 (ddev's internal churn stays contained) |
+| settings dirs, project root, everything else | **you** | 2775 / 664 (group baseline, permanent) |
+
+No handover, no handback, `git checkout` always free, fresh clones work from
+the first `ddev start`. The trade-off: **your repo owns the CMS settings
+file** (for TYPO3 a small committed `AdditionalConfiguration.php` — see the
+[how-to](../how-to/dev-owned-projects.md)). A project carrying the committed
+flag is dev-owned regardless of the kit mode.
+
+One handover remains: `.ddev/` itself stays with `opencode` — inside it,
+ddev keeps writing and chmod-ing on every run, so handing it to the
+developer would break every `ddev start`.
 
 Notes:
 
-- ddev resets a settings directory's mode to `0755` on each start — you
-  keep editing the **files** (group-writable), and `update.sh`/`refresh`
-  re-applies `g+w` to the directory.
-- **wordpress** manages `wp-config.php`, a *file* at the project root —
-  like the root-file types above, but deliberately excluded from the
-  root handover (documented exception). Keep the file user-managed
-  (remove the `#ddev-generated` marker) or set
-  `disable_settings_management: true` in `.ddev/config.yaml`.
-- Unknown app types (e.g. `php`, `generic`, `joomla`, `laravel`,
-  `silverstripe`, `wp-bedrock`) manage no settings outside `.ddev/` and
-  are skipped.
+- ddev resets a settings directory's mode to `0755` on each start — you keep
+  editing the **files** (group-writable); `update.sh`/`refresh` re-applies
+  `g+w` to the directory.
+- **wordpress** manages `wp-config.php`, a *file* at the project root — keep
+  it user-managed (remove the `#ddev-generated` marker) or set
+  `disable_settings_management: true`.
+- Unknown app types (`php`, `generic`, `joomla`, `laravel`, `silverstripe`,
+  `wp-bedrock`, …) manage no settings outside `.ddev/` and are skipped.
 
 ## Provisioned by the kit
 
 - `/home/opencode/.ddev` — the opencode user's global ddev home (project
   registry, mutagen binaries, `ddev auth ssh` key cache).
 - **Router ports** — rootless containers cannot bind <1024; either the
-  sysctl (`ip_unprivileged_port_start=80`, asked at install) or higher
+  sysctl (`ip_unprivileged_port_start=80`, offered at install) or higher
   ports:
 
   ```bash
   sudo -u opencode ddev config global --router-http-port 8080 --router-https-port 8443
   ```
 
-- **mkcert CA** — reused from the Windows user (WSL2: scanned from
-  `/mnt/c/Users/*/AppData/Local/mkcert`) or the developer's CAROOT so
-  browsers keep trusting ddev's HTTPS certs; a new CA is generated only as
-  a last resort. A symlink anywhere in the chain to the agent's CAROOT is
-  never followed — CA reuse/provisioning is skipped with a warning, so no
-  trusted CA exists in that case until you remove the link and re-run the
-  install. A fresh CA is created **as the `opencode` user** and is
-  therefore NOT installed into the system or Windows trust stores — the
-  install prints the import command (`sudo env CAROOT=… mkcert -install`)
-  for you to run yourself. The copy includes the CA **private key** — ddev
-  signs certificates host-side as the `opencode` user, which has no `/mnt/c`
-  access to the original; the accepted residual risk is documented in the
-  [security model](security-model.md#known-residual-gaps).
+- **mkcert CA** — reused from the Windows user or the developer's CAROOT so
+  browsers keep trusting ddev's HTTPS certs; a new CA is generated only as a
+  last resort (created as the `opencode` user — the install prints the
+  import command for you to run yourself). A symlink anywhere in the chain
+  to the agent's CAROOT is never followed — CA provisioning is skipped with
+  a warning until you remove the link. The copy includes the CA **private
+  key** (see the [security model](security-model.md#known-residual-gaps)).
 
 ## Hostnames and the Windows hosts file
 
-On WSL2, stock ddev manages the **Windows** hosts file (running
-`ddev-hostname.exe` via WSL interop). For the kit's ddev user that path
-is closed — `/mnt/c` is restricted to the developer, and interop is
-additionally broken on many WSL2+systemd hosts. ddev then only **warns**
-and continues (`ddev start` succeeds), but your Windows **browser**
-cannot resolve custom-`project_tld` domains until the hostnames are in
-the Windows hosts file.
-
-The kit deliberately gives the agent **no** hosts-file access. Instead
-the developer gets a one-command bridge that uses **ddev's own
-elevation path** (`ddev hostname <name> 127.0.0.1` as your user →
-`ddev-hostname.exe` → the Windows permission dialog):
+On WSL2, ddev cannot manage the **Windows** hosts file for the kit's ddev
+user — `/mnt/c` is restricted to the developer. ddev only **warns** and
+`ddev start` succeeds, but your Windows **browser** cannot resolve
+custom-`project_tld` domains until the hostnames are in the Windows hosts
+file. The kit deliberately gives the agent **no** hosts-file access; the
+developer gets a one-command bridge that uses ddev's own elevation path:
 
 ```bash
-opk ddev-hosts-add          # in the project dir
+opk ddev-hosts-check   # what is missing?
+opk ddev-hosts-add     # add it (Windows asks permission)
 ```
 
-It adds every hostname missing from
-`C:\Windows\System32\drivers\etc\hosts` — the project name + TLD,
-`additional_hostnames`, and non-wildcard `additional_fqdns`. Hostnames
-under the default `*.ddev.site` TLD are never touched: ddev's public
-wildcard DNS already resolves them, no hosts entry is needed. After
-`ddev start`/`restart` the kit's `ddev()` shell function prints the
-missing hostnames with one ready-made command each —
-`opk ddev-hosts-add <hostname>` also works
-standalone from anywhere, so you add exactly what was reported;
-`ddev-hosts-check` lists them on demand, and
-`opk status` reports them per project root (its
-scan skips `vendor/`, `node_modules/` and `testdata/` — packages and
-test fixtures ship their own `.ddev` dirs that are not your projects).
+`ddev-hosts-add` adds every hostname missing from
+`C:\Windows\System32\drivers\etc\hosts` — project name + TLD,
+`additional_hostnames`, non-wildcard `additional_fqdns`. After
+`ddev start`/`restart` the `ddev()` shell function prints the missing
+hostnames with one ready-made command each. Hostnames under the default
+`*.ddev.site` TLD never need an entry (ddev's public wildcard DNS). Manual
+fallback: edit the hosts file in an elevated editor.
 
 ## The SSH-key trade-off
 
 `ddev auth ssh` / composer private keys live in `/home/opencode/.ddev` and
-are **agent-readable** — ddev runs as one user, including in your terminal,
-so there is no safer place the import could put them: once a key is
-imported (by you or by an approved agent command), every opencode session
+are **agent-readable** — ddev runs as one user, so there is no safer place
+the import could put them: once a key is imported, every opencode session
 can read it from disk.
 
 The template denies the import command (`ddev auth ssh*`, incl. `sudo`) so
 the decision stays with you — run it in your terminal if you accept the
-trade-off. The read/edit denies (`*id_rsa*`, `*.pem`, …) and the bash
-tripwires keep gating opencode's tools. A project that broadly allows
-`ddev *` must re-add the specific deny **after** its allow (see
-[allow docker/ddev](../how-to/container-tools.md)). Prefer dedicated,
-rotatable deploy keys and rotate them if the machine is not trusted.
+trade-off. A project that broadly allows `ddev *` must re-add the specific
+deny **after** its allow (see [allow docker/ddev](../how-to/container-tools.md)).
+Prefer dedicated, rotatable deploy keys — and rotate them if the machine is
+not trusted.
 
 ## First start is slow
 
@@ -379,18 +279,15 @@ into the rootless daemon; everything afterwards reuses that state.
 
 ## Database migration from your old daemon
 
-Before the kit, ddev ran as **you** against your daemon. At install time
-the kit exports every registered project's database while your side still
-works — one project at a time (`ddev start` → `ddev export-db` →
-`ddev stop`, so dozens of projects never run simultaneously), then powers
-the old daemon off (volumes are kept). The dumps land in
-`/var/backups/opencode-permissions-kit/ddev-migration-<timestamp>/`;
-the kit never deletes them. Projects without a database
+Before the kit, ddev ran as **you** against your daemon. At install time the
+kit exports every registered project's database while your side still works
+(one project at a time), then powers the old daemon off (volumes are kept).
+The dumps land in
+`/var/backups/opencode-permissions-kit/ddev-migration-<timestamp>/`; the kit
+never deletes them. Projects without a database
 (`omit_containers: [db]`) are skipped automatically.
 
-The **import is deliberately your call**, not part of the install (the
-first opencode-side start pulls images and takes a while). After the
-install:
+The **import is deliberately your call**, not part of the install:
 
 ```bash
 # all at once:
@@ -399,20 +296,12 @@ sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import
 ddev start <project> && ddev import-db <project> --file=<dump>.sql.gz
 ```
 
-`opk status` lists dumps still waiting for import.
-Only each project's **default** database is exported; extra named
-databases need a manual `ddev export-db --database=<name>` on the old
-side — do that **before** the `.ddev` handover made your side
-inoperable (see [troubleshooting](../troubleshooting.md)).
+`opk status` lists dumps still waiting for import. Only each project's
+**default** database is exported; extra named databases need a manual
+`ddev export-db --database=<name>` on the old side — do that **before** the
+`.ddev` handover (see [troubleshooting](../troubleshooting.md)).
 
-A project that no longer **starts** (old production leftovers) does not
-block the others: the export continues, then the installer lists the
-failed projects and asks whether to continue anyway (their databases
-would become unreachable) or abort so you can fix them first — the
-`.ddev` handover has not happened yet at that point, so your side still
-works and a re-run retries cleanly. `--yes` installs print the list and
-continue.
-
-Re-running the installer after an abort **resumes** instead of repeating:
-projects whose dumps already exist are skipped, only missing or
-previously-failed ones are exported (into the same dump directory).
+A project that no longer **starts** does not block the others: the installer
+lists the failed projects and asks whether to continue anyway or abort so
+you can fix them first. Re-running the installer after an abort **resumes**
+instead of repeating — projects whose dumps already exist are skipped.

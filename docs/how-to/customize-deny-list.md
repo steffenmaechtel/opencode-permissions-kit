@@ -1,10 +1,9 @@
 # Customize the deny list
 
-This guide shows how to change which files the agent may read and edit —
-globally and per project.
+Change which files the agent may read and edit — globally and per project.
 
-All read/edit rules are **soft**: they gate opencode's own tools, not the OS.
-See the [security model](../concepts/security-model.md) for what that means.
+All read/edit rules are **soft**: they gate opencode's own tools, not the OS
+(see the [security model](../concepts/security-model.md)).
 
 ## Edit the global config
 
@@ -27,20 +26,16 @@ The bundled template additionally:
   in bash — so `cat settings.php | grep DB` still prompts. The tripwire is
   lexical: variables (`F=.env; cat $F`), globs, and indirection evade it.
 
-The template itself uses a carve-out: TYPO3's `ext_localconf.php` is
-re-allowed **after** the broad `*conf.php` deny (legacy projects) in both
-`read` and `edit` — the pattern would otherwise block that extension
-bootstrap file, which is code, not secrets. opencode applies the **last**
-matching rule, so a narrow `allow` placed after a broad `deny` is also how
-you exempt a file from an overmatching rule in your own config.
+opencode applies the **last** matching rule — a narrow `allow` placed after
+a broad `deny` exempts a file from an overmatching rule. The template uses
+that carve-out itself: TYPO3's `ext_localconf.php` is re-allowed after the
+broad `*conf.php` deny (it is code, not secrets).
 
 ## Add a per-project config
 
 Each project can have its own `opencode.jsonc` in its root. Project configs
 **extend** the global config (opencode merges them; last matching rule
-wins).
-
-Example `/var/www/vhosts/my-project/opencode.jsonc`:
+wins). Example `/var/www/vhosts/my-project/opencode.jsonc`:
 
 ```jsonc
 {
@@ -70,7 +65,7 @@ A project without its own config gets only the global protection.
 
 The kit protects **locations, not information flows**. Once content leaves
 the project roots (`cp .env /tmp/backup`), no scan recaptures it. As a
-visibility aid, `status.sh` ends with a **leak scan**: a name-based,
+visibility aid, `opk status` ends with a **leak scan**: a name-based,
 report-only sweep of the scratch directories (`/tmp`, `/var/tmp`,
 `/dev/shm`, overridable via `LEAK_SCAN_DIRS`) listing files matching the
 deny patterns. Renamed copies stay invisible; false positives are expected.
