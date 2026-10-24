@@ -14,6 +14,33 @@ how to work on the code. For what the kit does, see the
    release mirror, which is fast-forwarded to `master` only on release
    (`KIT_CHANNEL` in `install.conf` records what an install tracks).
 
+### Clean rule-ID search (VS Code)
+
+Frozen review evidence quotes RM keys verbatim, so a raw full-text
+search for a key hits dozens of snapshot lines. To search only the
+genuine sites, create a **local, uncommitted** `.vscode/settings.json`
+in the repo root (`.vscode/` is gitignored):
+
+```jsonc
+{
+    // Search-only excludes; Explorer and Quick Open stay unaffected.
+    "search.exclude": {
+        "**/internal/reviews": true,
+        "**/internal/reviews-meta": true,
+        "**/internal/records/_archive": true
+    }
+}
+```
+
+An active rule then reports four matches in three files — rule unit,
+meta file, INDEX row; the row names the key twice (link label and
+link target), so the count is matches, not sites. Escape hatch per
+search: toggle "Use Exclude Settings and Ignore Files" in the search
+panel's "files to exclude" field. VS Code loads the file only when
+the repo folder is the opened workspace; if you open a parent folder,
+put the same file in that folder's `.vscode/` — the `**/`-prefixed
+patterns match either way.
+
 ## Tests
 
 First make sure your host has everything installed (shellcheck is part of

@@ -1,4 +1,4 @@
-/opencode.jsonc
-tests/e2e/cache/
-
+.vscode/
 __pycache__/
+tests/e2e/cache/
+/opencode.jsonc
