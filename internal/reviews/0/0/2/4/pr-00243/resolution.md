@@ -1,6 +1,10 @@
 # Resolution — pr-00243 (#218 uninstall revert-loop closing-log honesty)
 
-Status: closed 2026-10-24 — confirmed by the maintainer in-session (round g report: "Dann close den Loop bitte"); stop-rule check: round g ([review-g.md](review-g.md), `226cfed`) reported 0 new findings and its disposition changed no review-relevant code (snapshot + INDEX bookkeeping only, RM-0064/RM-0066); all round-f findings dispositioned (f X1 implemented in `db702ac`, f S1/S3 landed in the resolution/comment scope, f X3/X4 deliberately not done — no action owed); carried follow-ups #245–#247 are own waves outside this loop, #244 accepted residual.
+Status: closed 2026-10-24 — confirmed by the maintainer in-session (round g report: "Dann close den Loop bitte");
+  stop-rule check: round g ([review-g.md](review-g.md), `226cfed`) reported 0 new findings and its disposition changed
+  no review-relevant code (snapshot + INDEX bookkeeping only, RM-0064/RM-0066); all round-f findings dispositioned
+  (f X1 implemented in `db702ac`, f S1/S3 landed in the resolution/comment scope, f X3/X4 deliberately not done —
+  no action owed); carried follow-ups #245–#247 are own waves outside this loop, #244 accepted residual.
 
 Chain: [review-a.md](review-a.md) (wave snapshot 2026-10-24, 11 findings,
 3 reviewer axes, all verified) → fix wave 1 (all 11 implemented) →
