@@ -571,9 +571,12 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # carries the agent's own config and state. Lexical on purpose
         # and before the [ -d ] gate — the refusal holds even on a
         # host where the user or its home does not exist. The compare
-        # takes the raw and the once-stripped form (a trailing slash
-        # must not dodge it); `//` forms are the dot gate's job below.
-        if [ "$root" = "/home/$OPENCODE_USER" ] || [ "${root%/}" = "/home/$OPENCODE_USER" ]; then
+        # takes the once-stripped form ONLY (#243 d Q1): it covers the
+        # raw spelling as its no-trailing-slash case, so a trailing
+        # slash cannot dodge it (#243 c Q1) while the predicate stays
+        # exactly the writer's strip-then-compare shape; `//` forms
+        # are the dot gate's job below.
+        if [ "${root%/}" = "/home/$OPENCODE_USER" ]; then
             echo "  Skipping agent home (never a project root): $root"
             continue
         fi
@@ -619,6 +622,13 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # here in the writer's arm order, and its agent-home refusal),
         # so a hand-edited conf cannot drive the root-run revert ops
         # over system trees the sanctioned writer would never store.
+        # Scope of "parity" (#243 d X1): the writer's whitespace
+        # refusal (config.sh `*[[:space:]]*` — a storage-format
+        # refusal, 0.0.39b C3) is deliberately NOT mirrored here
+        # (recorded a X2 disposition): a spaced path never lexically
+        # equals a system path, and [ ! -d ] plus full quoting defang
+        # it; the mirror-or-scope decision rides #247 with the other
+        # writer-side parity work.
         # Deliberate divergence, pinned in the unit suite: the scratch
         # prefixes /tmp and /var/tmp stay processable (the sandbox
         # policy pins unit-fixture roots there, and a temp-prefix

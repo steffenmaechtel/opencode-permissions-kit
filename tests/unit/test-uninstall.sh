@@ -253,19 +253,40 @@ if [ "$(_un_blocklist_tokens "$_un_s1_fixture")" = "/keep|/keep/*|/keep2" ]; the
 else
     fail "blocklist extraction is block-identity-keyed, decoy arms excluded (#243 c S1)"
 fi
+# Wiring pin (#243 d Q5): the pin above drives the FUNCTION; this one
+# guards the WIRED value. SCREEN_PATTERNS as extracted must carry no
+# dot-form or double-slash token — the form-gate arms a shape-keyed
+# reversion of the wiring assignment would splice in (the function pin
+# would stay green: it tests the intact function, not the wiring).
+# Legit system-path tokens contain neither shape; a future arm that
+# legitimately needs one reds this loudly and gets defanged
+# consciously.
+case "$SCREEN_PATTERNS" in
+    *.*|*//*)
+        fail "wired SCREEN_PATTERNS free of dot/double-slash tokens (#243 d Q5)"
+        ;;
+    *)
+        pass "wired SCREEN_PATTERNS free of dot/double-slash tokens (#243 d Q5)"
+        ;;
+esac
 
 # screen <path>: 0 = screened (system path, skipped), 1 = allowed.
 # eval is required: `|` alternation in case patterns is parsed at parse
 # time, NOT re-parsed from a variable expansion — a literal $SCREEN_PATTERNS
-# would be one big never-matching pattern.
+# would be one big never-matching pattern. The helper mirrors the loop's
+# one-trailing-slash normalization (#243 c X1; mirrored #243 d X4) so a
+# static slash-form assertion pins the same semantics the shipped loop
+# has: strip once, `/` stays `/` (blocklist `/` arm).
 screen() {
-    eval "case \"\$1\" in
+    _un_scr="${1%/}"
+    [ -n "$_un_scr" ] || _un_scr="/"
+    eval "case \"\$_un_scr\" in
         $SCREEN_PATTERNS) return 0 ;;
         *) return 1 ;;
     esac"
 }
 
-for syspath in / /etc /etc/nginx /usr /usr/share /bin /boot /root /root/x /proc /sys /dev /run /run/x /lib64; do
+for syspath in / /etc /etc/ /var/ /etc/nginx /usr /usr/share /bin /boot /root /root/x /proc /sys /dev /run /run/x /lib64; do
     if screen "$syspath"; then
         pass "screening rejects $syspath"
     else
@@ -372,9 +393,10 @@ fi
 #               the fixture after the primary root (storage format is
 #               space-free, so word-splitting is safe) — two-root
 #               isolation (#243 a S3) and malformed-form feeds (#243
-#               a X2). OPENCODE_USER is the one env pin: fixed to
-#               untest-agent (#243 c Q1) so the agent-home arm needs
-#               no host directory.
+#               a X2). Env pins in the driver (#243 c Q1, wording d
+#               Q2): OPENCODE_USER=untest-agent joins the two
+#               pre-existing literal pins (UN_DEV_GROUP, DEFAULT_USER)
+#               — the agent-home arm needs no host directory.
 _un_loop_out() {
     _unlo_fail="$1"; _unlo_dry="$2"; _unlo_uid="$3"; _unlo_ocg="$4"; _unlo_dg="$5"
     _unlo_extra="${6:-}"
@@ -597,7 +619,11 @@ _unarm_show() {
 # _unarm_show family pin (#243 c S2): the helper never executes on a
 # green run — it lives inside fail messages only — so without this
 # pin, a dropped family regresses red-arm diagnostics invisibly. Every
-# family line fed here must surface, in order, complete.
+# family line fed here must surface, in order, complete — and every
+# regex alternative is isolated by at least one line that matches it
+# ALONE (#243 d S1): dropping ANY alternative from the regex reds the
+# identity compare (before d S1, `skipped` had no line and `PARTIALLY`
+# was dominated by `log:` — both deletions kept the pin green).
 _un_s2_in="log: project ownership reverted
 WARN: could not fully remove
 log: config dirs PARTIALLY removed
@@ -605,7 +631,9 @@ Removed.
   [DRY] sudo rm /run/opencode-permissions-kit
   Skipping system path: /var
     opencode group id unknown — hint
-sudo chmod g-s /var"
+sudo chmod g-s /var
+revert PARTIALLY completed (chmod g-s failed)
+  skipped reverting ownership (not kit-owned)"
 if [ "$(_unarm_show "$_un_s2_in")" = "$_un_s2_in" ]; then
     pass "_unarm_show surfaces every asserted family, no window (#243 c S2/Q2)"
 else
@@ -716,16 +744,43 @@ fi
 # reader-side gate mirrors the writer's project_path_sane arms —
 # `//etc` (empty segment, bypasses the system-path blocklist
 # lexically), `/var/.` (dot segment) and `.` (relative) are skipped
-# loudly; the primary root is still processed normally.
+# loudly; the primary root is still processed normally. Op negatives
+# cover every op verb (#243 d Q3): find, both setfacl spellings and
+# chmod g-s.
 FOUT=$(_un_loop_out "" false 60000 60002 60001 "//etc /var/. .") || true
 if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): //etc' \
    && printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): /var/.' \
    && printf '%s' "$FOUT" | grep -qF 'Skipping non-absolute project path: .' \
    && ! printf '%s' "$FOUT" | grep -qF 'sudo find //etc' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 //etc' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -d -x g:60002 //etc' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s //etc' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo find /var/.' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /var/.' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo find . !' \
    && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
     pass "malformed roots (//etc, /var/., .) skipped loudly, no root ops on them (#243 a X2)"
 else
     fail "malformed-root screening arms (out=$(_unarm_show "$FOUT")) (#243 a X2)"
+fi
+# _un_exist_roots <root...> — host-existence-filtered feed set (#243
+# c Q3): each feed form passes when its once-stripped form is an
+# existing directory (the loop's [ ! -d ] gate would silently skip a
+# nonexistent root and defang the arm — so only dirs that can actually
+# be skipped are fed). One helper for both arms, and pinned below:
+# deleting the filter reds the pin HOST-INDEPENDENTLY (#243 d S2 —
+# before, the red condition existed only on hosts missing a fed dir).
+_un_exist_roots() {
+    _un_er_out=""
+    for _un_er in "$@"; do
+        [ -d "${_un_er%/}" ] && _un_er_out="${_un_er_out:+$_un_er_out }$_un_er"
+    done
+    printf '%s' "$_un_er_out"
+}
+if [ "$(_un_exist_roots "$WORK" /opk-243d-nonexistent-root)" = "$WORK" ]; then
+    pass "existence filter feeds only host dirs, deletion-red host-independent (#243 c Q3, d S2)"
+else
+    fail "existence filter feeds only host dirs, deletion-red host-independent (#243 c Q3, d S2)"
 fi
 # System-path blocklist, behaviorally (#243 b X1): extra roots the
 # writer refuses must be screened loudly and no root op may touch
@@ -736,16 +791,14 @@ fi
 # /srv, /media are not FHS-mandatory — so the fed set is built by
 # existence and every assertion names only fed roots (the pass line
 # discloses the fed set; a missing dir degrades coverage, never
-# truth).
-_un_sysroots=""
-for _un_sys in /var /home /opt /srv /media /mnt; do
-    [ -d "$_un_sys" ] && _un_sysroots="${_un_sysroots:+$_un_sysroots }$_un_sys"
-done
+# truth). Op negatives cover find, setfacl and chmod (#243 d Q3).
+_un_sysroots=$(_un_exist_roots /var /home /opt /srv /media /mnt)
 FOUT=$(_un_loop_out "" false 60000 60002 60001 "$_un_sysroots") || true
 _un_sys_ok=1
 for _un_sys in $_un_sysroots; do
     printf '%s' "$FOUT" | grep -qF "Skipping system path: $_un_sys" || _un_sys_ok=0
     printf '%s' "$FOUT" | grep -qF "sudo find $_un_sys " && _un_sys_ok=0
+    printf '%s' "$FOUT" | grep -qF "sudo setfacl -R -x g:60002 $_un_sys" && _un_sys_ok=0
     printf '%s' "$FOUT" | grep -qF "sudo chmod g-s $_un_sys" && _un_sys_ok=0
 done
 printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
@@ -764,22 +817,28 @@ fi
 # /var// must stay the DOT GATE's catch (a strip placed before the
 # gate would turn it into /var/ and open the blocklist hole back
 # up), and / must normalize onto the blocklist's `/` arm, never to
-# an empty operand.
-_un_tsroots=""
-for _un_ts in /var/ /home/; do
-    [ -d "${_un_ts%/}" ] && _un_tsroots="${_un_tsroots:+$_un_tsroots }$_un_ts"
-done
+# an empty operand. Find negatives are ANCHORED with the op line's
+# ` !` continuation (#243 d Q4: the old unanchored `sudo find /var/`
+# over-matched any longer /var-prefixed operand) and cover both the
+# normalized leak (`sudo find /var !`) and the raw one (strip
+# deleted, `sudo find /var/ !`); setfacl/chmod negatives per d Q3.
+_un_tsroots=$(_un_exist_roots /var/ /home/)
 FOUT=$(_un_loop_out "" false 60000 60002 60001 "$_un_tsroots / /var//") || true
 _un_ts_ok=1
 for _un_ts in $_un_tsroots; do
     printf '%s' "$FOUT" | grep -qF "Skipping system path: ${_un_ts%/}" || _un_ts_ok=0
-    printf '%s' "$FOUT" | grep -qF "sudo find $_un_ts" && _un_ts_ok=0
+    printf '%s' "$FOUT" | grep -qF "sudo find ${_un_ts%/} !" && _un_ts_ok=0
+    printf '%s' "$FOUT" | grep -qF "sudo find ${_un_ts%/}/ !" && _un_ts_ok=0
+    printf '%s' "$FOUT" | grep -qF "sudo setfacl -R -x g:60002 ${_un_ts%/}" && _un_ts_ok=0
+    printf '%s' "$FOUT" | grep -qF "sudo chmod g-s ${_un_ts%/}" && _un_ts_ok=0
 done
 printf '%s' "$FOUT" | grep -q 'Skipping system path: /$' || _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qE 'Reverting kit ownership in: *$' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qF 'sudo find / !' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): /var//' || _un_ts_ok=0
-printf '%s' "$FOUT" | grep -qF 'sudo find /var/' && _un_ts_ok=0
+printf '%s' "$FOUT" | grep -qF 'sudo find /var// !' && _un_ts_ok=0
+printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 /var//' && _un_ts_ok=0
+printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /var//' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
     || _un_ts_ok=0
 if [ "$_un_ts_ok" -eq 1 ]; then
@@ -787,18 +846,26 @@ if [ "$_un_ts_ok" -eq 1 ]; then
 else
     fail "trailing-slash normalization arms (out=$(_unarm_show "$FOUT")) (#243 c X1)"
 fi
-# Agent-home refusal, behaviorally (#243 c Q1): the driver pins
-# OPENCODE_USER=untest-agent, so the fed root /home/untest-agent hits
-# the mirrored writer refusal — the check is lexical and before the
-# [ -d ] gate, so no host dir is needed; no root op may touch it.
-FOUT=$(_un_loop_out "" false 60000 60002 60001 "/home/untest-agent") || true
+# Agent-home refusal, behaviorally (#243 c Q1, both spellings #243
+# d X2): the driver pins OPENCODE_USER=untest-agent, so the fed
+# roots /home/untest-agent (raw) AND /home/untest-agent/ (trailing
+# slash — the once-stripped comparator's case, unpinned before d
+# X2) hit the mirrored writer refusal — the check is lexical and
+# before the [ -d ] gate, so no host dir is needed; no root op may
+# touch either form (op negatives incl. both setfacl spellings, d
+# Q3). The skip echo prints the RAW root, so each form's echo is
+# asserted verbatim.
+FOUT=$(_un_loop_out "" false 60000 60002 60001 "/home/untest-agent /home/untest-agent/") || true
 if printf '%s' "$FOUT" | grep -qF 'Skipping agent home (never a project root): /home/untest-agent' \
+   && printf '%s' "$FOUT" | grep -qF 'Skipping agent home (never a project root): /home/untest-agent/' \
    && ! printf '%s' "$FOUT" | grep -qF 'sudo find /home/untest-agent' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 /home/untest-agent' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -d -x g:60002 /home/untest-agent' \
    && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /home/untest-agent' \
    && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
-    pass "agent home refused lexically before [ -d ], no root ops, primary root processes (#243 c Q1)"
+    pass "agent home refused lexically before [ -d ] (raw + trailing slash), no root ops, primary root processes (#243 c Q1, d X2)"
 else
-    fail "agent-home refusal arms (out=$(_unarm_show "$FOUT")) (#243 c Q1)"
+    fail "agent-home refusal arms (out=$(_unarm_show "$FOUT")) (#243 c Q1, d X2)"
 fi
 
 # --- 4d. config-dirs + openchamber closing-log honesty (#243 a S1/S2) -------------

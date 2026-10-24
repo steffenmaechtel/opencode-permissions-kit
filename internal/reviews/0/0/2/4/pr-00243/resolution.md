@@ -9,8 +9,12 @@ Follow-up 1; b Q3 retracted, no defect) → [review-c.md](review-c.md)
 (fix-wave snapshot 2026-10-24: 11 findings — 3 MED after the X1
 adjustment, 3 LOW, 5 INFO; all 6 b-fixes audited landed) → fix wave 3
 (c S1/S2/X1/Q1/Q2/Q3/Q5 implemented; c X2 held for #247, c X3 for
-#245, c X4/Q4 deliberately not done). Birth PR #243, branch
-`feature/218-uninstall-revert-log-honesty`.
+#245, c X4/Q4 deliberately not done) → [review-d.md](review-d.md)
+(fix-wave snapshot 2026-10-24: 13 findings — 1 MED, 3 LOW, 9 INFO; all
+7 c-fixes audited landed) → fix wave 4 (d X2/S1/S2/X4/Q1/Q2/Q3/Q4/Q5
+implemented; d X1 implemented differently — comment scoped, mirror
+decision rides #247; d S3/X3/Q6 deliberately not done). Birth PR #243,
+branch `feature/218-uninstall-revert-log-honesty`.
 
 ## Dispositions
 
@@ -46,6 +50,19 @@ adjustment, 3 LOW, 5 INFO; all 6 b-fixes audited landed) → fix wave 3
 | c Q3 (LOW) | **implemented** | `822e7a0` | fed set built by host existence; assertions name only fed roots |
 | c Q4 (INFO) | **deliberately not done** | — | intentional alignment with the loop closing order |
 | c Q5 (INFO) | **implemented** | `822e7a0` | comments name all three bounded ops incl. chmod g-s |
+| d S1 (LOW) | **implemented** | `<SHA>` | 2 isolating fixture lines; ANY regex-alternative drop reds |
+| d S2 (INFO) | **implemented** | `<SHA>` | `_un_exist_roots` helper; deletion-red pin, host-independent |
+| d S3 (INFO) | **deliberately not done** | — | comment-only construct; no pin without grepping comments |
+| d X1 (LOW) | **implemented differently** | `<SHA>` | parity comment scoped; space-arm mirror decision rides #247 |
+| d X2 (MED) | **implemented** | `<SHA>` | arm feeds raw + trailing-slash form; both echoes + op negatives |
+| d X3 (INFO) | **deliberately not done** | — | writer-side; #247 owns (both validator copies, e2e owed there) |
+| d X4 (INFO) | **implemented** | `<SHA>` | screen() mirrors the strip; `/etc/` + `/var/` static forms |
+| d Q1 (LOW) | **implemented** | `<SHA>` | dead raw arm dropped; single stripped compare = writer shape |
+| d Q2 (INFO) | **implemented** | `<SHA>` | driver comment names all three literal env pins |
+| d Q3 (INFO) | **implemented** | `<SHA>` | setfacl negatives; both spellings in agent-home/malformed arms |
+| d Q4 (INFO) | **implemented** | `<SHA>` | find negatives anchored on the op line's ` !` continuation |
+| d Q5 (INFO) | **implemented** | `<SHA>` | wiring pin: wired SCREEN_PATTERNS free of dot/double-slash |
+| d Q6 (INFO) | **deliberately not done** | — | writer-side; #247 owns (same shape family as d X3) |
 
 ## Evidence detail
 
@@ -370,6 +387,117 @@ arm (c X1) and the agent-home arm (c Q1) use the same discipline
 The divergence comments in uninstall.sh and the test now name all
 three bounded ops — uid/gid-matched chown, kit-gid ACL strip, and one
 setgid-bit clear (`chmod g-s`) — instead of "only" two.
+
+### d X2 (MED) — the trailing-slash agent-home form is pinned
+
+The agent-home arm now feeds BOTH spellings
+(`/home/untest-agent /home/untest-agent/`) and asserts each skip echo
+verbatim (the echo prints the RAW root, so the trailing-slash echo is
+distinct), the absence of every root-op verb on the prefix
+(find/setfacl both spellings/chmod — d Q3 below) and the primary root
+still processing. Deletion-red, host-independent: the refusal is
+lexical before `[ -d ]`, so reverting the comparator to raw-only (the
+exact d X2 hazard shape) leaves the trailing-slash echo absent → arm
+RED without needing the dir to exist (spot-check 1).
+
+### d S1 (LOW) — every regex alternative is isolated
+
+Two fixture lines added: `revert PARTIALLY completed (chmod g-s
+failed)` (matches `PARTIALLY` alone — the old PARTIALLY line carries
+`log:`) and `  skipped reverting ownership (not kit-owned)` (matches
+`skipped` alone — no old line matched it at all). The identity
+compare now reds when ANY of the 9 alternatives is dropped from the
+regex (spot-check 2); the pin comment states the isolation claim.
+
+### d S2 (INFO) — the existence filter is pinned host-independently
+
+Both feed-set builders (system-path, trailing-slash) moved into one
+helper `_un_exist_roots` (filter operand = feed operand
+once-stripped, matching both arms' prior inline logic exactly). New
+pin feeds `$WORK` (exists) plus `/opk-243d-nonexistent-root` (never
+exists) and asserts only `$WORK` comes out — deleting the helper's
+`[ -d ]` reds it on EVERY host (spot-check 3), where the old inline
+loops could only red on hosts missing a fed dir. Sweep (L2, `grep -n
+'\[ -d ' tests/unit/test-uninstall.sh`): line 776 (the helper) is the
+only feed-side existence probe left; the other `[ -d ]` hits are
+pre-existing pins about the agents-backup gate (505-524) and comments.
+
+### d X1 (LOW, implemented differently) — the parity claim is scoped
+
+The blocklist comment now carries an explicit scope paragraph: the
+writer's whitespace refusal (`*[[:space:]]*`, a storage-format
+refusal — 0.0.39b C3) is deliberately NOT mirrored, citing the
+recorded a X2 disposition (spaced path ≠ any system path lexically;
+`[ ! -d ]` + quoting defang), with the mirror-or-scope decision
+routed to #247 alongside the other writer-side parity work. The
+behavioral mirror was NOT added: it would overturn a disposition
+recorded across four snapshots (a X2, b verified-clean, c X4, d X1)
+without a maintainer decision — the defect fixed here is the
+comment's over-breadth, which was the finding's falsifiable claim.
+
+### d X4 (INFO) — the static helper mirrors the loop's strip
+
+`screen()` strips one trailing slash (`/` restored to `/`) before
+matching SCREEN_PATTERNS — the same normalization the shipped loop
+applies — so a future static slash-form assertion pins the real
+semantics. Pinned: the static rejected-reps loop now feeds `/etc/`
+(`/*`-family arm) and `/var/` (bare arm, the c X1 hole shape), both
+must stay screened (spot-check 5); the allowed reps are strip-identity
+forms, unchanged.
+
+### d Q1 (LOW) — one compare, exactly the writer's shape
+
+The dead raw arm (`[ "$root" = … ]`, subsumed by the stripped
+compare) is dropped; the predicate is provably equivalent (a raw
+match implies no trailing slash, so the strip is identity on it —
+precondition: `OPENCODE_USER` never ends in `/`, it feeds `id -u`
+lookups at uninstall.sh:225 and is defaulted at :211). The comment
+now describes the single stripped compare and why it covers both
+spellings. Equivalence pinned by the d X2 arm (both forms refused by
+the one compare). Sweep (L2, `grep -rn '] || \[ "\${[a-z_]*%/}" ='
+files/`): no other dual-compare subsumption site exists in files/.
+
+### d Q2 (INFO) — the env-pin comment is true
+
+The driver comment now names all three literal env pins (UN_DEV_GROUP,
+DEFAULT_USER pre-existing; OPENCODE_USER the c Q1 addition) instead of
+claiming "the one env pin".
+
+### d Q3 (INFO) — op negatives cover every op verb
+
+setfacl negatives added to all four screening arms: system-path loop
+and ts loop (`-x` spelling next to the existing chmod backstop),
+malformed-roots and agent-home arms (BOTH `-x` and `-d -x` spellings,
+plus find/chmod negatives for `/var/.` and `.` in the malformed arm
+that previously had none). Sweep (L2, `grep -n 'sudo find\|sudo
+setfacl\|sudo chmod' tests/unit/test-uninstall.sh`): every arm that
+asserts ops absent for refused roots now names find, setfacl and
+chmod; the two-roots arm's roots are processed (positive arm), not
+op-negation sites.
+
+### d Q4 (INFO) — find negatives are anchored
+
+The ts loop's unanchored `sudo find $_un_ts` (matched any longer
+/var-prefixed operand) is replaced by two ` !`-anchored forms —
+`sudo find /var !` (normalized leak) and `sudo find /var/ !` (raw
+leak, strip deleted) — and the `/var//` standalone check by
+`sudo find /var// !` plus its setfacl/chmod siblings. Anchors bind to
+the op line's literal ` ! -type l` continuation (uninstall.sh:663).
+Sweep: the remaining unanchored find negatives (`//etc`, `/var/.`,
+`/home/untest-agent`) are prefix-unique among their arms' fed
+operands (no fed operand is a string-prefix of another), documented
+here per L2.
+
+### d Q5 (INFO) — the wiring is pinned, not just the function
+
+New pin right after the c S1 fixture pin: the WIRED `SCREEN_PATTERNS`
+must contain no dot and no `//` (case glob `*.*|*//*`) — the exact
+tokens a shape-keyed wiring splice would leak (every form-gate arm
+carries a dot or double slash; no legit system-path token does).
+Reverting the wiring assignment to an inline shape-keyed extraction
+redes it (spot-check 6) even though the function pin stays green —
+that division of labor is now stated in both pin comments. A future
+legit arm needing a dot reds it loudly and gets defanged consciously.
 
 ## Gates (fix wave 1, a findings)
 
