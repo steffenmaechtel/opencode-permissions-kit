@@ -50,18 +50,18 @@ branch `feature/218-uninstall-revert-log-honesty`.
 | c Q3 (LOW) | **implemented** | `822e7a0` | fed set built by host existence; assertions name only fed roots |
 | c Q4 (INFO) | **deliberately not done** | — | intentional alignment with the loop closing order |
 | c Q5 (INFO) | **implemented** | `822e7a0` | comments name all three bounded ops incl. chmod g-s |
-| d S1 (LOW) | **implemented** | `<SHA>` | 2 isolating fixture lines; ANY regex-alternative drop reds |
-| d S2 (INFO) | **implemented** | `<SHA>` | `_un_exist_roots` helper; deletion-red pin, host-independent |
+| d S1 (LOW) | **implemented** | `09206ab` | 2 isolating fixture lines; ANY regex-alternative drop reds |
+| d S2 (INFO) | **implemented** | `09206ab` | `_un_exist_roots` helper; deletion-red pin, host-independent |
 | d S3 (INFO) | **deliberately not done** | — | comment-only construct; no pin without grepping comments |
-| d X1 (LOW) | **implemented differently** | `<SHA>` | parity comment scoped; space-arm mirror decision rides #247 |
-| d X2 (MED) | **implemented** | `<SHA>` | arm feeds raw + trailing-slash form; both echoes + op negatives |
+| d X1 (LOW) | **implemented differently** | `09206ab` | parity comment scoped; space-arm mirror decision rides #247 |
+| d X2 (MED) | **implemented** | `09206ab` | arm feeds raw + trailing-slash form; both echoes + op negatives |
 | d X3 (INFO) | **deliberately not done** | — | writer-side; #247 owns (both validator copies, e2e owed there) |
-| d X4 (INFO) | **implemented** | `<SHA>` | screen() mirrors the strip; `/etc/` + `/var/` static forms |
-| d Q1 (LOW) | **implemented** | `<SHA>` | dead raw arm dropped; single stripped compare = writer shape |
-| d Q2 (INFO) | **implemented** | `<SHA>` | driver comment names all three literal env pins |
-| d Q3 (INFO) | **implemented** | `<SHA>` | setfacl negatives; both spellings in agent-home/malformed arms |
-| d Q4 (INFO) | **implemented** | `<SHA>` | find negatives anchored on the op line's ` !` continuation |
-| d Q5 (INFO) | **implemented** | `<SHA>` | wiring pin: wired SCREEN_PATTERNS free of dot/double-slash |
+| d X4 (INFO) | **implemented** | `09206ab` | screen() mirrors the strip; `/etc/` + `/var/` static forms |
+| d Q1 (LOW) | **implemented** | `09206ab` | dead raw arm dropped; single stripped compare = writer shape |
+| d Q2 (INFO) | **implemented** | `09206ab` | driver comment names all three literal env pins |
+| d Q3 (INFO) | **implemented** | `09206ab` | setfacl negatives; both spellings in agent-home/malformed arms |
+| d Q4 (INFO) | **implemented** | `09206ab` | find negatives anchored on the op line's ` !` continuation |
+| d Q5 (INFO) | **implemented** | `09206ab` | wiring pin: wired SCREEN_PATTERNS free of dot/double-slash |
 | d Q6 (INFO) | **deliberately not done** | — | writer-side; #247 owns (same shape family as d X3) |
 
 ## Evidence detail
@@ -607,6 +607,45 @@ legit arm needing a dot reds it loudly and gets defanged consciously.
      RED.
   6. c Q2 window (`tail -6` reintroduced): the family pin RED — the
      eighth family line falls out of the window.
+
+## Gates (fix wave 4, d findings)
+
+- Unit: `sh tests/unit/test-uninstall.sh` green — all arms incl. the
+  extended agent-home arm (both spellings), the isolated family pin,
+  the existence-filter pin, the wiring pin, the anchored ts negatives
+  and the two new static slash forms; `make test` green.
+- `make lint` green (ShellCheck delta vs 3de7f94: IDENTICAL for both
+  changed files, code-for-code); `sh tests/unit/test-docs.sh` green;
+  line-length ratchet green (this file ≤ 120 content columns);
+  `make check-version` green.
+- E2E (RM-0113 — uninstall.sh touched: comparator drop is
+  equivalence-preserving, comments scoped; both suites run on the
+  committed fix tree `09206ab`, in parallel, warm cache, opencode
+  2.1.4): `make e2e` green — 309 passed per container (baseline
+  level); `make e2e-rootless` green — 47 passed per container
+  (baseline level).
+- Sabotage spot-checks (post-commit against `09206ab`, in a scratch
+  worktree at /tmp/opencode/pr-00243-d/sab-wt; each: mutate → observe
+  the named pin RED → `git checkout --` → suite green at the end):
+  1. d X2 comparator (reverted to raw-only, the finding's hazard
+     shape): the agent-home arm RED — the trailing-slash echo for
+     /home/untest-agent/ is absent.
+  2. d S1 family pin (`skipped` dropped from the regex): the family
+     pin RED — the isolating fixture line falls out (was green
+     pre-fix, the d S1 gap demonstrated at suite level in review d).
+  3. d S2 filter (helper `[ -d ]` deleted): the existence-filter pin
+     RED — host-independent, on this fully-equipped host.
+  4. d Q4 anchors (loop strip neutralized, raw leak): the ts arm RED
+     — `sudo find /var/ !` fires; the anchored negative discriminates
+     the exact regression the anchors were built for.
+  5. d X4 strip (screen() normalization deleted): the static arm RED
+     — `screening rejects /var/` (the new static form).
+  6. d Q5 wiring (dot-arm line reordered to lead with `/./` AND the
+     wiring reverted to the pre-b-S1 shape-keyed pipeline — the
+     realistic two-step regression): exactly ONE failure, the wiring
+     pin (`wired SCREEN_PATTERNS free of dot/double-slash tokens`);
+     every other arm green — the pin catches the splice the function
+     pin cannot see.
 
 ## Follow-ups
 
