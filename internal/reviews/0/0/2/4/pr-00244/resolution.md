@@ -47,13 +47,13 @@ MED/HIGH) → fix wave 4 (the d rows below). Birth PR
 | c Q5 (INFO) | **implemented** | `58c2019` | dead `_p3f=""` removed; loop lives inside `_p3collect` |
 | d S1 (INFO) | **deliberately not done** | — | designed; repetition fires only on an already-broken python3 |
 | d S2 (INFO) | **deliberately not done** | — | warn never tty-gated (branch contract); gate would hide cron cause |
-| d W1 (LOW) | **implemented** | `<SHA>` | 2>&1 dropped, stdout kept, absence guarded; tui-mode pins |
-| d W2 (LOW) | **implemented** | `<SHA>` | same-line double-assignment pin; joined assignments go red |
-| d W3 (INFO) | **implemented** | `<SHA>` | sweep record re-anchored by content, not stale line number |
-| d W4 (INFO) | **implemented** | `<SHA>` | residual bullet rewritten to its grep's actual hits |
-| d Q1 (LOW) | **implemented** | `<SHA>` | command -v guards at resolve + _opk_json_get; absence pins |
-| d Q2 (INFO) | **implemented** | `<SHA>` | needle scoped to the resolve function |
-| d Q3 (INFO) | **implemented** | `<SHA>` | one sentence each on sharing-group.md + cli.md |
+| d W1 (LOW) | **implemented** | `f198fb2` | 2>&1 dropped, stdout kept, absence guarded; tui-mode pins |
+| d W2 (LOW) | **implemented** | `f198fb2` | same-line double-assignment pin; joined assignments go red |
+| d W3 (INFO) | **implemented** | `f198fb2` | sweep record re-anchored by content, not stale line number |
+| d W4 (INFO) | **implemented** | `f198fb2` | residual bullet rewritten to its grep's actual hits |
+| d Q1 (LOW) | **implemented** | `f198fb2` | command -v guards at resolve + _opk_json_get; absence pins |
+| d Q2 (INFO) | **implemented** | `f198fb2` | needle scoped to the resolve function |
+| d Q3 (INFO) | **implemented** | `f198fb2` | one sentence each on sharing-group.md + cli.md |
 
 ## Evidence detail
 
@@ -657,6 +657,30 @@ bookkeeping commit.
 
 ## Follow-ups
 
+- Wave-4 e2e discharged in-wave on tree `f198fb2`: `make e2e`
+  **309 passed** (../logs/e2e-20261024-223458.log), `make
+  e2e-rootless` **47 passed**
+  (../logs/e2e-rootless-20261024-223458.log), both rc 0, run after a
+  version-gap check (the first suite ran alone and confirmed the
+  cached opencode v2.1.4 still resolves) — root-run script behavior
+  changed (tui-plugin/update/ddev-terminal absence guards + the W1
+  passthrough).
+- Wave-4 sabotage on the committed tree (delete-the-construct,
+  observe red, restore, re-green): a joined
+  `_py3_imports='a'; _py3_imports='b'` line → same-line pin red;
+  re-added resolve `2>/dev/null` → scoped needle + c-S3 behavioral
+  pin red; re-added tui `2>&1` → W1 pin red; deleted
+  resolve/`_opk_json_get` guards → both absence pins red ("python3:
+  not found" in the asserted stderr). Two runs: the first combined
+  the update-guard deletion with the redirect re-add — the redirect
+  suppresses exactly the not-found noise (a confounded observation),
+  so the Q1 guards were re-sabotaged alone. The first run also
+  exposed a bug in the new ddev absence pin itself (missing
+  `|| true` on the capture: rc 127 aborted the suite before its
+  fail() — the pr-00211 b W13 abort-vs-count shape); fixed in the
+  amended wave commit. Restores verified green (update-flags, ddev,
+  tui-mode, install-args, sandbox-policy all rc 0 on the restored
+  tree).
 - Session bookkeeping (maintainer clarification, recorded per the
   c-round handover): the maintainer counts sessions by the snapshot
   letter they file — THIS session ("Session C" in that counting)
