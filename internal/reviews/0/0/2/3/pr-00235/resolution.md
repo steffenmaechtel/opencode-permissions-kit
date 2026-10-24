@@ -3,10 +3,12 @@
 Chain: review-a (snapshot 2026-10-23, 21 findings) → fix wave
 2026-10-24 (`787c3b0` tests, `d77a446` rules, `b549a22` skill/docs)
 → review-b (snapshot 2026-10-24, 15 reported / 12 unique findings,
-1 retracted) → fix wave 2 (`9cb41b8` tests+rules, this ledger).
+1 retracted) → fix wave 2 (`9cb41b8` tests+rules) → review-c
+(snapshot 2026-10-24, 5 findings) → fix wave 3 (`9fcd197`
+tests+rules, this ledger).
 a-round: all 21 dispositioned **implemented**; none deliberately not
-done (maintainer go 2026-10-24: "implement all"). b-round: second
-dispositions table below.
+done (maintainer go 2026-10-24: "implement all"). b-round and c-round:
+one dispositions table each below.
 
 ## Dispositions
 
@@ -193,7 +195,10 @@ direction; both sabotage-red (alternative deleted → "PIN BROKEN").
 Deliberately out of scope, pinned as such via opk-legit-paths:
 repo-internal segments (`x/local/`, `x//local/`) and
 identifier-embedded shapes — none of them resolve into the disposable
-workspace dir; the suite header documents the full shape table. L1
+workspace dir; the suite header documents the full shape table.
+(#235 c S1 supersedes the two dot alternatives quoted above: they
+are collapsed into `\.{1,2}/+local/`, which also catches their
+doubled-slash spellings — see the c-round table.) L1
 note: if REPO_ROOT resolution ever degenerated, WS_LOCAL would
 collapse to "/local" and false-FAIL `/usr/local` paths — fail-loud,
 not silent.
@@ -213,14 +218,18 @@ clean".
 
 ### b B3 — pseudo-close semantics pinned
 
-probe4 (hr-opened prose with a second `---` before a >120 line)
-asserts the offending-line count is exactly 1: the span up to the
+probe4 (fixture: `---` / 130-char line / `---` / 131-char line —
+the >120 line BEFORE the close is load-bearing: without it the
+count is 1 with the strip on AND off, i.e. non-discriminating;
+description corrected #235 c Q1) asserts the offending-line count
+is exactly 1: the span up to the
 next `---` counts as frontmatter, post-close prose does not. That
 pins the documented semantics (closure = next `---` line anywhere;
 YAML validity not assessed) in place of the overstated "both
 directions" claim; measure_file's comment and the probe header state
 it. Sabotage (strip runs past the close) → PROBE BROKEN with
-prose=''/pseudo=''.
+prose=''/pseudo=''. (#235 c S2 strengthens the assertion to the
+exact tail `11 1` — the sum now pins WHICH line was counted.)
 
 ### b Q2/B4, b Q3 — RM-0116 Check text vs enforcement
 
@@ -285,7 +294,11 @@ claim, 17-pin growth), the a-Gates parenthetical (real file classes).
   suite header and this ledger — both updated.
 - Frontmatter parsers: skills-lint's awk takes the FIRST later `---`
   (frontmatter must be the leading block — no pseudo-close ambiguity
-  there); measure_file is the only span-parser, now probe4-pinned.
+  there — and so does `fm_get` in `scripts/rules-audit.sh`, which
+  reads line 2 to the first close, to EOF when unclosed); measure_file
+  is the only span parser with post-close prose still counted — the
+  pseudo-close surface — now probe4-pinned. (Wording corrected
+  #235 c S3: "the only span-parser" was false as written.)
 
 ## Gates (fix wave 2)
 
@@ -298,11 +311,88 @@ claim, 17-pin growth), the a-Gates parenthetical (real file classes).
 - e2e suites: not owed — tests, markdown and rule text only; no
   `files/`, no root-run script semantics.
 
+## Dispositions — review c (fix wave 3, 2026-10-24)
+
+| Finding | Disposition | Commit | Key evidence |
+|---|---|---|---|
+| c S1 (MED) | **implemented** | `9fcd197` | slash-runs caught via `\.{1,2}/+local/`; pin + negatives (detail: c S1) |
+| c S2 (LOW) | **implemented** | `9fcd197` | probe4 130/131; exact-tail `11 1` assertion (detail: c S2) |
+| c S3 (LOW) | **implemented** | this ledger | sweep record corrected with #235 c marker (detail: Class sweeps b) |
+| c Q1 (LOW) | **implemented** | this ledger | b B3 evidence corrected: the pre-close >120 line named as load-bearing |
+| c Q2 (INFO) | **implemented** | `9fcd197` | rules-audit.sh:27 sentence completed ("on every audit run") |
+
+### c S1 — slash-run shapes of the caught families
+
+The b-round dot alternatives `\.\./local/|\./local/` are collapsed
+into one, `\.{1,2}/+local/` (one-or-two dots, one-or-more slashes):
+`.//local/`, `..//local/`, `x/.//local/`, `.///local/` are now
+caught — POSIX collapses the redundant slashes, so these resolve to
+exactly the targets the canonical spellings resolve to. Dot-less
+slash-runs stay exempt (`x//local/`, `x///local/` ≡ repo-internal
+`x/local/`; `//local/` resolves at root) and the header's
+NOT-matched list now enumerates them (the c S1 table-completeness
+note). New fixture opk-dblslash-local pins the miss direction;
+opk-legit-paths grew the exempt slash-run shapes
+(cache//local/notes, cache///local/x, //local/elsewhere) as the
+negative. Both directions sabotage-red (Gates below); the full
+19-shape probe table is recorded under Class sweeps (c round).
+
+### c S2 — probe4 pins the counted line, not just the count
+
+The two probe4 long lines now differ (130 in-span, 131 post-close)
+and the assertion is the exact tail `11 1`: only the post-close
+line being counted yields that sum. The head-count value (`10 1`) —
+which the b-round count-only assertion accepted — is now rejected;
+the value was measured on the real measure_file during review-phase
+verification (tail-strip behavior → probe4 `10 1`, count 1, passing
+the old assertion). probe2 stays the family-level backstop for
+whole-direction strip mutants (tail-strip empties probe2 — measured).
+
+## Class sweeps (c round)
+
+- Slash-run shape sweep over the exact pattern (19 shapes, both
+  directions): caught — `./`, `.//`, `.///`, `../`, `..//`, `x/./`,
+  `x/.//`, `.././`, `.././/` (each + `local/`), the absolute
+  workspace path, space-prefixed; deliberately missed — `~/.local/`,
+  `/usr/local/`, `x/local/`, `x//local/`, `x///local/`, `//local/`,
+  `opencode-local/`, `foo.local/`. The header table matches the
+  probes shape-for-shape (claimed == observed).
+- `local/` pattern sites re-swept (`local/` over living `.sh/.py/
+  .yml`, case folders and archive excluded): still a single code
+  site — tests/unit/test-skills-lint.sh:78; every other hit is that
+  same file's header, fixtures and pins, i.e. documentation sites
+  updated in the same commit.
+- Pin inventory recounted: FAIL sites unchanged at 10; pin
+  case-blocks 17 → 18 (opk-dblslash-local; 17 `case "$_out"` + 1
+  `case "$_out2"`), all before the summary gate.
+
+## Gates (fix wave 3)
+
+- `make test` green (full unit suite, default TMPDIR; the
+  confined-TMPDIR test-status red re-confirmed environmental — red
+  under /tmp/opencode scratch, green under default /tmp, same
+  attribution as the b round), `make lint` green, `sh
+  scripts/rules-audit.sh` 0 blocking; reviews lint/parity green;
+  rules-meta 23 pins green; line-length green incl. probe4.
+- Sabotage runs: 3 mutation checks red, each restored and
+  re-verified green — (1) c S1 miss direction (collapsed alternative
+  reverted to the b-round two-alternative form → "PIN BROKEN: .//
+  local/ or ..//local/ reference not caught (c S1)"); (2) c S1
+  exemption boundary (`\{1,2\}` widened to `*`, catching x//local/ →
+  "PIN BROKEN: legit /usr/local or ~/.local path flagged"); (3) c S2
+  direction (strip-runs-past-the-close mutant → PROBE BROKEN with
+  prose=''/pseudo=''; the sum assertion additionally rejects the
+  measured head-count value `10 1` that the count-only form
+  accepted — see c S2 evidence).
+- e2e suites: not owed — test code, ledger text and one comment-only
+  script line (rules-audit.sh header); no `files/`, no root-run
+  script semantics.
+
 ## Follow-ups
 
-- review-b discharged the a-wave's owed review (snapshot committed
-  at `17a3092` over diff `ab0f771..a234763`); its fix wave 2
-  (`9cb41b8` + this ledger) touches test code, so the round owes the
+- review-c discharged the b-wave's owed review (snapshot committed
+  at `5e55225` over diff `17a3092..606cc26`); its fix wave 3
+  (`9fcd197` + this ledger) touches test code, so the round owes the
   next wave review on the maintainer's go — the loop cannot close
   this round (RM-0067).
 - The skills-lint workspace-absolute alternative is computed from
