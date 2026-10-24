@@ -34,11 +34,17 @@
 #     global): repo content must never point into the disposable
 #     workspace. Matched shapes: `local/…` and `../local/…` (relative
 #     from workspace root / repo), the dot-slash family `./local/…`
-#     (incl. `x/./local/`, `.././local/`) and its doubled-slash
-#     spellings `.//local/`, `..//local/`, `x/.//local/` (#235 c S1),
-#     prose-prefixed occurrences, and this checkout's absolute
-#     workspace-local path (computed at runtime below). NOT matched,
-#     deliberately: `~/.local/` (XDG), `/usr/local/` (system prefix),
+#     (incl. `x/./local/`, `.././local/`) and its slash-run spellings
+#     `.//local/`, `..//local/`, `x/.//local/`, `.///local/` (one or
+#     more slashes, #235 c S1), prose-prefixed occurrences, and this
+#     checkout's absolute workspace-local path (computed at runtime
+#     below). The dot alternative is unanchored on the left, so
+#     tokens ending in dots match as collateral too — dot-runs ≥ 3
+#     (`.../local/…`, already caught by the pre-c-round form) and
+#     dot-terminated segments (`y.//local/…`, newly caught by the
+#     c-round collapse) — repo-internal both, accepted lint-only
+#     false positives (#235 d W1 W2). NOT matched, deliberately:
+#     `~/.local/` (XDG), `/usr/local/` (system prefix),
 #     identifier-embedded shapes (`opencode-local/`, `foo.local/`),
 #     repo-internal segments (`x/local/` and their slash-runs
 #     `x//local/`, `x///local/` — redundant slashes collapse to the
