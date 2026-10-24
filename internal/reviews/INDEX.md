@@ -33,5 +33,5 @@ The parity test regenerates and compares. -->
 | [pr-00234](0/0/2/3/pr-00234) | issue-215 exec-time symlink gate on the .ddev handover pair (fix wave) | wave | v0.0.56 @ caeb9a8 | 2026-10-23 | a–b | closed |
 | [pr-00235](0/0/2/3/pr-00235) | agent-skills pilot — opk-review-pass skill + lint/test wiring, issue #178 (feature wave) | wave | master @ caeb9a8 (VERSION 0.0.56) | 2026-10-23 | a–d | closed |
 | [pr-00241](0/0/2/4/pr-00241) | review-process docs + parity pin, issues #237/#238 (micro-wave review of the feature wave's diff) | wave | master @ d179acb (VERSION 0.0.56) | 2026-10-24 | a–b | closed |
-| [pr-00243](0/0/2/4/pr-00243) | wave review of the #218 fix wave — uninstall revert-loop closing-log honesty | wave | 0.0.56 @ e4952dd | 2026-10-24 | a | no-resolution |
+| [pr-00243](0/0/2/4/pr-00243) | wave review of the #218 fix wave — uninstall revert-loop closing-log honesty | wave | 0.0.56 @ e4952dd | 2026-10-24 | a | open |
 
