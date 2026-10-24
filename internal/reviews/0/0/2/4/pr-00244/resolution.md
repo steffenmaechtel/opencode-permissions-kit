@@ -79,9 +79,9 @@ MED/HIGH) → fix wave 5 (the e rows below) → [review-f.md](review-f.md)
 | f S3 (INFO) | **deliberately not done** | — | exact-name lookup — the basename exclusion is precisely scoped |
 | f Q3 (INFO) | **implemented** | `97b55b9` | cli.md sentence ordered (advisory feed, first scan, leak scan) |
 | f Q4 (INFO) | **implemented** | `97b55b9` | count-pin label says assignment/append line |
-| g W1 (LOW) | **implemented** | `<SHA>` | regex pair retired — semantic pin: executed == extracted (detail below) |
-| g Q1 (INFO) | **implemented** | `<SHA>` | extraction failure and python3 hard-require now distinct FAIL labels |
-| g S1 (INFO) | **implemented** | `<SHA>` | heredoc else-exit kills the false success; 2 behavioral kit-cli pins |
+| g W1 (LOW) | **implemented** | `5fc14c6` | regex pair retired — semantic pin: executed == extracted (detail below) |
+| g Q1 (INFO) | **implemented** | `5fc14c6` | extraction failure and python3 hard-require now distinct FAIL labels |
+| g S1 (INFO) | **implemented** | `5fc14c6` | heredoc else-exit kills the false success; 2 behavioral kit-cli pins |
 
 ## Evidence detail
 
@@ -1060,7 +1060,15 @@ residual (deliberate concealment; most such shapes red anyway — the
 executed subshell value differs from the extracted literal).
 Class-sweep rider: the v2-URL `grep -c` (test-install-args.sh:824,
 the f-W4 sweep's bounded two-step false-green) now runs behind the
-same comment-strip sed.
+same comment-strip sed. Self-check hardening (`5ffefc2`, commissioned
+as a pre-review quick pass by the maintainer): the FAIL message now
+prints the diverging values (the first cut had literal `[{_p3rt}]`
+— the `$` prefixes were missing; caught in the first sabotage round),
+and `export`/`readonly`/`local`-prefixed assignments join the
+collection (an `export _py3_imports='…'` second line reds with
+values — a shape the retired regex pair also missed; probe + tree
+sabotage verified, restore green). A second assignment hidden behind
+a `;` on a USE line joins the documented concealment residuals.
 
 ### g Q1 — one label per failure surface
 
@@ -1109,8 +1117,8 @@ extraction (del line + sys.exit(1)).
   value-shape arm runs the real exit(1)).
 - L2: sweeps above; patterns + sites recorded.
 - L3: every claim in the new comments carries its probe (shape
-  matrix) or pin; "RETIRED" verified by grep — no `_p3asn`/`_p3dup`
-  references remain anywhere.
+  matrix) or pin; "retired" verified by grep — no `_p3asn`/`_p3dup`
+  references remain in the suite code.
 - L4: new pins sit before their suites' summary gates; the arms
   discriminate (probe matrix both directions; sabotage post-commit
   in Follow-ups).
@@ -1140,6 +1148,33 @@ the bookkeeping commit.
 
 ## Follow-ups
 
+- Wave-7 e2e discharged in-wave on tree `5fc14c6`: `make e2e`
+  **309 passed** (../logs/e2e-20261025-011708.log), `make
+  e2e-rootless` **47 passed**
+  (../logs/e2e-rootless-20261025-011708.log), both rc 0 (root-run
+  script semantics changed: opk's settings-edit script gained the
+  g-S1 else-exit; the suites' openchamber-secure flow exercised the
+  edit path — run.sh settings-pin-gone assert green). Launcher
+  process note: the parallel pair's `cd` scoping missed the rootless
+  log path — rootless never started in the pair and ran alone right
+  after (same TS; opencode cache warm from the same day's 00:03
+  run, no version gap). The post-e2e deltas (`5ffefc2` hardening)
+  are unit-test-only — a FAIL-message string, the collection regex,
+  and comments; no shipped file changed after the runs.
+- Wave-7 sabotage on the committed tree (delete-the-construct,
+  observe red, restore, re-green): second `_py3_imports` assignment
+  → semantic pin red with the diverging values; sole assignment
+  commented → red (lines=0); the g-W1 quoted-# double → red
+  (executed=[{c}] extracted=[{a#b}]); `export`-prefixed second
+  assignment → red with values (the self-check shape); opk's S1
+  else-exit deleted → the kit-cli value-shape pin red (rc=0 out=[]
+  — the false success back) while the key-shape pin stayed green.
+  The first round exposed the missing-`$` display bug in the FAIL
+  message (fixed in `5ffefc2`). Process miss, recorded: the fix
+  commit was amended after the maintainer had already pushed it —
+  resolved WITHOUT force by resetting onto the pushed `5fc14c6` and
+  committing the hardening (`5ffefc2`) on top; amend discipline
+  going forward: check the upstream state before any amend.
 - Wave-6 e2e discharged in-wave on tree `97b55b9`: `make e2e`
   **309 passed** (../logs/e2e-20261025-000326.log), `make
   e2e-rootless` **47 passed**
