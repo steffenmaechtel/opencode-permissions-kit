@@ -611,7 +611,7 @@ rm -rf "$W23NP" "$W23NPBIN" "$W23NPBIN2"
 W23BP="$WORK/issue223-bp"
 python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' > "$W23BP"
 FS_SUDO="" sh -c '. "$1" && _fsb_count_tee bp < "$2" | sh -c "exit 0"' \
-    _ "$LIB" "$W23BP" 2>"$W23BP.err"
+    _ "$LIB" "$W23BP" >/dev/null 2>"$W23BP.err"
 # rc assert dropped (#244 a Q5): under this suite's dash (no pipefail)
 # the reader rc is 0 regardless of tee behavior — dead weight that
 # could never fail. The stderr greps below are the discriminators.
@@ -634,7 +634,7 @@ fi
 if command -v bash >/dev/null 2>&1; then
     W23PFRC=0
     FS_SUDO="" bash -c 'set -o pipefail; . "$1" && _fsb_count_tee pf < "$2" | sh -c "exit 0"' \
-        _ "$LIB" "$W23BP" 2>/dev/null || W23PFRC=$?
+        _ "$LIB" "$W23BP" >/dev/null 2>&1 || W23PFRC=$?
     assert_eq "#244 pipefail rider: tee exits 0 on EPIPE under bash pipefail" "0" "$W23PFRC"
 else
     echo "  note: bash absent — pipefail rider skipped (#244 a Q1)"
@@ -706,7 +706,7 @@ setsid python3 -c 'import os, signal, sys
 signal.signal(signal.SIGINT, signal.default_int_handler)
 os.execv(sys.argv[1], [sys.argv[1], "-c",
     ". \"$1\" && _fsb_count_tee ki < \"$2\"", "ki", sys.argv[2], sys.argv[3]])' \
-    /bin/sh "$LIB" "$W23KIF" 2>"$W23KI/err" &
+    /bin/sh "$LIB" "$W23KIF" >/dev/null 2>"$W23KI/err" &
 W23KITEE=$!
 sleep 1
 # No "--" before the negative pid: dash's kill builtin rejects it

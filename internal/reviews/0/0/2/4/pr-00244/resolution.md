@@ -9,15 +9,15 @@ file, created with the fix commit). Birth PR #244, branch
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a Q1 (MED) | **implemented** | `<SHA>` | pipefail rc contract stated truly; §11c bash rider pins EPIPE-exit-0 |
-| a W1 (MED) | **implemented** | `<SHA>` | _py3_health_probe runs python3 isolated; matrix + wiring pins |
-| a W2 (LOW) | **implemented** | `<SHA>` | comment rewritten — baseline degrades (#223), not a hard-dep example |
-| a S1 (LOW) | **implemented** | `<SHA>` | -I on probe+tee; §11d pins hostile PYTHONPATH ignored (not fallback) |
-| a S2/W3/Q4 (LOW) | **implemented** | `<SHA>` | aborted flag; §11c+§11e assert no completion line |
-| a W4 (LOW) | **implemented** | `<SHA>` | §11e setsid+fifo+SIGINT executes the KI arm; no traceback |
-| a Q2/W6 (LOW) | **implemented** | `<SHA>` | docs + test header: still applies, one warn — not "silent" |
-| a Q3/S4 (LOW) | **implemented** | `<SHA>` | W23BPBIN removed; name grep: zero refs |
-| a Q5 (INFO) | **implemented** | `<SHA>` | dead rc assert removed; stderr greps discriminate |
+| a Q1 (MED) | **implemented** | `5333a03` | pipefail rc contract stated truly; §11c bash rider pins EPIPE-exit-0 |
+| a W1 (MED) | **implemented** | `5333a03` | _py3_health_probe runs python3 isolated; matrix + wiring pins |
+| a W2 (LOW) | **implemented** | `5333a03` | comment rewritten — baseline degrades (#223), not a hard-dep example |
+| a S1 (LOW) | **implemented** | `5333a03` | -I on probe+tee; §11d pins hostile PYTHONPATH ignored (not fallback) |
+| a S2/W3/Q4 (LOW) | **implemented** | `5333a03` | aborted flag; §11c+§11e assert no completion line |
+| a W4 (LOW) | **implemented** | `5333a03` | §11e setsid+fifo+SIGINT executes the KI arm; no traceback |
+| a Q2/W6 (LOW) | **implemented** | `5333a03` | docs + test header: still applies, one warn — not "silent" |
+| a Q3/S4 (LOW) | **implemented** | `5333a03` | W23BPBIN removed; name grep: zero refs |
+| a Q5 (INFO) | **implemented** | `5333a03` | dead rc assert removed; stderr greps discriminate |
 | a S3 (INFO) | **deliberately not done** | — | fail-closed by design, commented; setfacl implies coreutils |
 | a W5 (INFO) | **deliberately not done** | — | fail-closed; status.sh reports health; wrapper output contract |
 | a Q6 (INFO) | **deliberately not done** | — | pre-existing numbering cosmetics; renumber buys no behavior |
@@ -171,13 +171,20 @@ before any push; the amended HEAD is gate-green.
 
 ## Follow-ups
 
-- E2E: root-run semantics changes (fs-baseline tee rc contract,
-  installer gate) owe both suites in-wave — run on the committed tree,
-  discharge recorded in the bookkeeping commit (tree SHA + counts).
+- E2E discharged in-wave on tree `5333a03` (bookkeeping commit after
+  the runs): `make e2e` **309 passed**
+  (../logs/e2e-20261024-193644.log), `make e2e-rootless` **47 passed**
+  (../logs/e2e-rootless-20261024-193644.log), both rc 0, run in
+  parallel after the wave commit. Test-only follow-up in the
+  bookkeeping commit: the §11c/§11e fixtures' 1 MiB NUL streams
+  spilled onto the suite's stdout (spotted live by the maintainer's
+  terminal run) — silenced with `>/dev/null` redirects; no assertion
+  or shipped-code change.
+- External-terminal confirmation: the maintainer ran the fs-baseline
+  suite in a real developer terminal (the sandbox-vs-terminal axis the
+  dash/bash kill divergence made relevant): **Passed: 80, zero FAILs**,
+  including both §11e ctrl-c pins — log archived at
+  /tmp/opencode/.trash/20261024-194006/…/~log.txt on the session host.
 - Kit-wide `-I` hardening candidate: update.sh resolve, ddev-terminal,
   wrapper tools_from_config, status.sh remain env-sensitive but
   fail-loud/cosmetic — optional future wave, out of scope here.
-- §11e external-terminal confirmation: the agent sandbox is not a
-  developer terminal (the dash/bash kill divergence was found live);
-  maintainer invited to run the fs-baseline suite in a real terminal —
-  result to be noted here.
