@@ -22,14 +22,14 @@ unique after 1 dup pair) → fix wave 2 (the b rows below). Birth PR
 | a S3 (INFO) | **deliberately not done** | — | fail-closed by design, commented; setfacl implies coreutils |
 | a W5 (INFO) | **deliberately not done** | — | fail-closed; status.sh reports health; wrapper output contract |
 | a Q6 (INFO) | **deliberately not done** | — | pre-existing numbering cosmetics; renumber buys no behavior |
-| b Q1/W1 (MED) | **implemented** | `<SHA>` | probe imports the measured union; drift pin fails naming missing modules |
-| b S1 (LOW) | **implemented** | `<SHA>` | -I claims scoped to PYTHON* env; loader/binary residual named |
-| b S2 (LOW) | **implemented** | `<SHA>` | failed probe surfaces interpreter stderr; env class named; noisy pin |
-| b S3 (INFO) | **implemented** | `<SHA>` | first root-exec moment named in the gate comment |
-| b W2 (LOW) | **implemented** | `<SHA>` | §11e setsid guard + skip note (§11c bash-rider pattern) |
-| b W3 (LOW) | **implemented** | `<SHA>` | drain-marker arm proof; never-armed fails red; fixed sleep removed |
-| b W4 (INFO) | **implemented** | `<SHA>` | review README process: trailers qualify not-done IDs |
-| b Q2 (INFO) | **implemented** | `<SHA>` | dead `_p3d` parameter removed; `_py3case` is 2-arg |
+| b Q1/W1 (MED) | **implemented** | `25f96f1` | probe imports the measured union; drift-pinned, sabotage red |
+| b S1 (LOW) | **implemented** | `25f96f1` | -I claims scoped to PYTHON* env; loader/binary residual named |
+| b S2 (LOW) | **implemented** | `25f96f1` | failed probe surfaces interpreter stderr; env class named; noisy pin |
+| b S3 (INFO) | **implemented** | `25f96f1` | first root-exec moment named in the gate comment |
+| b W2 (LOW) | **implemented** | `25f96f1` | §11e setsid guard + skip note (§11c bash-rider pattern) |
+| b W3 (LOW) | **implemented** | `25f96f1` | drain-marker arm proof; never-armed fails red; fixed sleep removed |
+| b W4 (INFO) | **implemented** | `25f96f1` | review README process: trailers qualify not-done IDs |
+| b Q2 (INFO) | **implemented** | `25f96f1` | dead `_p3d` parameter removed; `_py3case` is 2-arg |
 
 ## Evidence detail
 
@@ -328,6 +328,20 @@ in Follow-ups by the bookkeeping commit.
   dash/bash kill divergence made relevant): **Passed: 80, zero FAILs**,
   including both §11e ctrl-c pins — log archived at
   /tmp/opencode/.trash/20261024-194006/…/~log.txt on the session host.
+- Wave-2 e2e discharged on tree `25f96f1`: `make e2e` **309 passed**
+  (../logs/e2e-20261024-202817.log), `make e2e-rootless` **47
+  passed** (../logs/e2e-rootless-20261024-202817.log), both rc 0,
+  parallel run after the wave commit (install.sh gate behavior
+  change — the union probe and the diagnostic passthrough). Sabotage
+  on the committed tree: dropping `threading` or `pathlib` from
+  `_py3_imports` turns the drift pin red naming the module;
+  restored, suites green.
+- Maintainer issues filed from this chain (refs recorded per the
+  a-wave handover note): #248 update.sh timeout presence probes,
+  #249 kit-wide `-I` hardening (a W5 scope), #250 install.sh's silent
+  `fs_baseline_root` stub on incomplete lib source (pre-existing,
+  snapshot-a coverage), #251 test-fs-baseline 7b/8 renumbering
+  (a Q6).
 - Kit-wide `-I` hardening candidate: update.sh resolve, ddev-terminal,
   wrapper tools_from_config, status.sh remain env-sensitive but
   fail-loud/cosmetic — optional future wave, out of scope here.
