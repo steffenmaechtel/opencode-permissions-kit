@@ -1,5 +1,10 @@
 # Resolution — pr-00235 (agent-skills pilot, issue #178)
 
+Status: closed (maintainer, 2026-10-24) — fix wave 4 (`2b71a69` +
+this ledger) stayed comment/ledger-only: no review-relevant code
+touched (RM-0065), loop closed per RM-0066; check cited in
+Gates (fix wave 4).
+
 Chain: review-a (snapshot 2026-10-23, 21 findings) → fix wave
 2026-10-24 (`787c3b0` tests, `d77a446` rules, `b549a22` skill/docs)
 → review-b (snapshot 2026-10-24, 15 reported / 12 unique findings,
