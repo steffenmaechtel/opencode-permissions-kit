@@ -51,5 +51,7 @@ Everything that is not user documentation lives outside this folder:
 
 - [`agent/`](../agent/README.md) — working rules for coding agents
   (conventions, learnings checklist, test fidelity)
+- `.agents/skills/` — loadable agent procedures for on-demand
+  workflows, routed from `AGENTS.md`
 - [`internal/`](../internal/README.md) — project memory: maintainer
   process, design records, review evidence, meta-analysis runs

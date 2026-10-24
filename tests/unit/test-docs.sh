@@ -1,9 +1,10 @@
 #!/bin/sh
 # test-docs.sh -- documentation link checker (no external dependencies)
 #
-# Fails when any Markdown file under docs/, plus README.md, CONTRIBUTING.md
-# and AGENTS.md, contains a broken relative link or a dangling in-page
-# anchor. HTTP(S)/mailto links are skipped (no network access).
+# Fails when any Markdown file under docs/, .agents/, plus README.md,
+# CONTRIBUTING.md and AGENTS.md, contains a broken relative link or a
+# dangling in-page anchor. HTTP(S)/mailto links are skipped (no network
+# access).
 #
 # Run: sh tests/unit/test-docs.sh
 
@@ -110,8 +111,9 @@ for f in README.md CONTRIBUTING.md AGENTS.md; do
     check_file "$f"
 done
 # Docs scope (structure wave 2026-10): user docs stay under docs/, internal
-# areas live at agent/ and internal/ (process/records/reviews/reviews-meta).
-for dir in docs agent internal; do
+# areas live at agent/ and internal/ (process/records/reviews/reviews-meta),
+# agent skills at .agents/skills/ (issue #178).
+for dir in docs agent internal .agents; do
     find "$dir" -name '*.md' -type f
 done | sort | while IFS= read -r f; do
     check_file "$f"

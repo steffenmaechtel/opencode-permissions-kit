@@ -13,6 +13,10 @@ this repository — the router. Detail lives next to its audience:
   and e2e suites but still hit real terminals
 - [agent/review-concept.md](agent/review-concept.md) — the review
   process: loop, stop rule, verification duty, reviewer mechanics
+- `.agents/skills/` — loadable procedures for on-demand workflows
+  (opencode loads them by description match): the session EXECUTING a
+  review pass loads the `opk-review-pass` skill first — rules stay in
+  agent/, the skill carries the choreography only (issue #178)
 - [internal/reviews/README.md](internal/reviews/README.md) — review
   mechanics: case folders (birth-PR key), snapshots/resolutions,
   citation format
@@ -54,6 +58,8 @@ expect the reported paths to exist locally.
   UX demos (`ux/`)
 - `docs/` — user documentation only (concepts / how-to / reference)
 - `agent/` — agent working rules: conventions, learnings, test fidelity
+- `.agents/skills/` — loadable agent procedures for on-demand
+  workflows (see the router entry above)
 - `internal/` — project memory: maintainer process (`process/`), design
   records (`records/`, archive under `records/_archive/` incl.
   evaluations), review evidence (`reviews/`, one case folder per
@@ -170,7 +176,8 @@ way). Exceptions, in order of precedence:
 1. The USER explicitly raises or lowers the limit for a task.
 2. A dedicated process defines its own cap for its fan-out — that cap
    applies within the process's scope only (today the review process
-   caps at 5 per tier, [review-concept.md](agent/review-concept.md);
+   caps at 5 concurrent reviewers on any tier — the provider's burst
+   limit is account-wide, [review-concept.md](agent/review-concept.md);
    no process defines a higher cap yet).
 
 ## Review learnings (recurring error classes)

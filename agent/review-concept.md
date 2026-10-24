@@ -193,6 +193,11 @@ CONTRIBUTING's "shrink the next one" rule):
 
 ## Parallel reviewer agents
 
+Execution choreography (fan-out staging, axis-prompt construction,
+checkpoint mechanics, snapshot writing): load the `opk-review-pass` skill
+(`.agents/skills/opk-review-pass/`) — the rules below stay authoritative
+here.
+
 - The main agent runs a strong default model and owns the
   verification duty; every reviewer subagent runs the provider's
   cheaper fast tier (house instance: GLM-5.3 + GLM-5.3-Flash —
@@ -207,8 +212,13 @@ CONTRIBUTING's "shrink the next one" rule):
   objects: enumerate the executed commands / on-disk files
   independently before repeating what they report. (RM-0082)
 - For release reviews, a second independent snapshot from a different
-  context — a different model family and/or a setup without the house
-  skills and their biases — is the strongest redundancy. Integration
+  context — a different model family and/or an operator setup that
+  keeps the house skills out — is the strongest redundancy. Repo-level
+  skills are visible to every session in the checkout, so that
+  independence is the commissioning operator's doing, not the loading
+  agent's self-restraint; a redundancy pass that loaded a house skill
+  anyway discloses it in its snapshot's `Skills:` provenance line.
+  Integration
   duties: full per-finding verification by the main agent, honest
   provenance in the snapshot header (model, tree, what ran on which
   host), findings recorded as reported with verification marks, and a
@@ -240,7 +250,9 @@ CONTRIBUTING's "shrink the next one" rule):
 - Checkpoint discipline: each reviewer agent appends findings to a
   side file after every completed section (empty sections get a
   `clean` line) — end-synthesis turns are the primary failure mode,
-  and checkpoints survive them. (RM-0086)
+  and checkpoints survive them. Side files live under session scratch
+  OUTSIDE the reviewed tree; the snapshot's run provenance absorbs
+  them. (RM-0086)
 - Checkpoint files timestamp every subagent (one line at launch, one
   at return) — the minute budgets are guidance without enforcement;
   the timestamps are the evidence base that will validate or

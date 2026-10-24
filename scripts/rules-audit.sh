@@ -25,6 +25,7 @@
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):
 # 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
+#    audit run (python3 + gen-rules-index.py present)
 # The Phase-2 pending-unit parking valve (prefix-matched ref-less
 # units reported non-blocking) was retired 2026-10-17 when its five
 # occupants received metas -- a ref-less unit in an ACTIVE section
@@ -57,6 +58,7 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#script-output-style"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#shell-security-untrusted-input"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#test-sandbox-unit-suites"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-review-findings"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-house-rules-rm-keys"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#the-main-rule"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#meta-format-v11"

@@ -28,3 +28,8 @@ details, verification duty, reviewer agents — lives in
   review-relevant code untouched. When only LOW/INFO findings remain,
   closing the chain is your call — the agent proposes, you decide.
 - **Release gate:** no release while a review chain is open.
+- **External redundancy pass:** the second snapshot of a release review
+  runs on a bias-reduced checkout — setup in
+  [CONTRIBUTING.md](../../CONTRIBUTING.md#external-review-machines-bias-reduced-checkout),
+  background and rejected alternatives in
+  [internal/records/review-independence.md](../records/review-independence.md).

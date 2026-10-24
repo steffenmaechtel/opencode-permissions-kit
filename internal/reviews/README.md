@@ -58,16 +58,28 @@ era's shape — both stay citable as history). House-owned parts:
   Diff: e26f379..24ad0d2
   Date: 2026-10-15
   Reviewer: GLM-5.3 (external /review session)
+  Skills: opk-review-pass        (optional — skills that ran the pass)
   -->
   ```
 
   The lint test pins ID↔folder and Snapshot↔file name. (Legacy cases
   predate the header; their stem + dates live in legacy-index.md.)
+  `Skills:` is part of the environment record (see
+  agent/review-concept.md, "Suites are the standing review") and makes
+  the skill usage auditable: it names every `.agents/skills/` procedure
+  that choreographed the pass. A redundancy pass that ran WITH a house
+  skill must record it — the line is what makes a collapsed redundancy
+  axis visible (see agent/review-concept.md, "Parallel reviewer
+  agents").
 - Catch-up and backup reviews (e.g. the successor after a rotation
   deviation) add no Scope value: Scope stays `wave`, the Subject
   names the catch-up ("rotation-deviation catch-up"), and the
   mandate's source of truth is the resolution's Follow-ups entry that
   commissioned it.
+- Micro-wave reviews (fix waves with ≤ ~50-line diffs) likewise record
+  `Scope: wave` and name the micro shape in the Subject ("micro-wave
+  review of …") — `micro` is a commissioning/budget keyword for the
+  executing skill, not a header value.
 - The **one pointer line**
 
 ```

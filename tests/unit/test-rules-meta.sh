@@ -149,6 +149,18 @@ cat >> "$SCRATCH/internal/records/rules-meta.md" <<'EOF'
 EOF
 expect_block "inv1 main-rule section enforced" "the-main-rule"
 
+# 1c. inv 1 -- the RM-keys conventions section is audit-active (#235
+#     a Q8: its ACTIVE_SECTIONS entry is load-bearing -- losing it
+#     would let future units in that section pass ref-less)
+new_scratch n1c
+cat >> "$SCRATCH/agent/conventions.md" <<'EOF'
+
+## Referencing house rules (RM keys)
+
+- Unreferenced demo rule.
+EOF
+expect_block "inv1 RM-keys section enforced" "referencing-house-rules"
+
 # 2. inv 2 -- dangling ref
 new_scratch n2
 sed -i 's/ (RM-9002)/(RM-9009)/' "$SCRATCH/agent/conventions.md"
@@ -282,31 +294,64 @@ else
     pass
 fi
 
+# lane c helper: greps <root> for real IDs with the frozen-corpus
+# exemptions; <scope> = the SCOPE_FILES list (space-separated). Shared
+# by the real-tree lane and the scratch pins below so the pins cannot
+# drift from the enforced shape (#235 a Q4). The reviews exemption is
+# NARROW: generated indexes and frozen case folders only -- living
+# files under internal/reviews/ are covered.
+p10_lane_c_hits() {  # $1 root, $2 scope
+    grep -rn "RM-[0-9][0-9][0-9][0-9]" \
+        --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
+        "$1" 2>/dev/null \
+        | grep -v "/internal/rules-meta/" \
+        | grep -v -E "/internal/reviews/(INDEX|legacy-index)\.md" \
+        | grep -v -E "/internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-[0-9]+/" \
+        | grep -v "/internal/records/_archive/" \
+        | while IFS= read -r _l; do
+              _rel=${_l%%:*}
+              _rel=${_rel#"$1"/}
+              case " $2 " in
+                  *" $_rel "*) continue ;;
+              esac
+              _l=$(printf '%s' "$_l" | sed 's/RM-9[0-9][0-9][0-9]//g')
+              case $_l in
+                  *RM-[0-9][0-9][0-9][0-9]*) printf '%s\n' "$_l" ;;
+              esac
+          done
+}
+
 # lane c: the rest of the living tree carries no real ID at all
 : > "$WORK/p10c"
-grep -rn "RM-[0-9][0-9][0-9][0-9]" \
-    --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
-    "$REPO_ROOT" 2>/dev/null \
-    | grep -v "/internal/rules-meta/" \
-    | grep -v "/internal/reviews/" \
-    | grep -v "/internal/records/_archive/" \
-    | while IFS= read -r _l; do
-        _rel=${_l%%:*}
-        _rel=${_rel#"$REPO_ROOT"/}
-        case " $SCOPE " in
-            *" $_rel "*) continue ;;
-        esac
-        _l=$(printf '%s' "$_l" | sed 's/RM-9[0-9][0-9][0-9]//g')
-        case $_l in
-            *RM-[0-9][0-9][0-9][0-9]*) printf '%s\n' "$_l" ;;
-        esac
-    done > "$WORK/p10c"
+p10_lane_c_hits "$REPO_ROOT" "$SCOPE" > "$WORK/p10c"
 if [ -s "$WORK/p10c" ]; then
     fail "pin10 lane c, real ID(s) outside refs and meta files:"
     sed 's/^/         /' "$WORK/p10c" >> "$FAILS"
 else
     pass
 fi
+
+# lane c scratch pins (#235 a Q4): a LIVING README.md under
+# internal/reviews/ citing an ID must be caught; a FROZEN snapshot in
+# a case folder quoting IDs as verbatim evidence must stay exempt.
+# The demo ID is concatenated at runtime so this test file's own
+# source never carries a literal real-ID token (lane c scans *.sh).
+_p10demo="RM-00""44"
+P10S="$WORK/p10scratch.$$"
+mkdir -p "$P10S/internal/reviews/0/0/0/1/pr-00001"
+printf 'Living file citing a rule by ID (%s) instead of file+section.\n' \
+    "$_p10demo" > "$P10S/internal/reviews/README.md"
+printf 'Frozen snapshot quoting %s as verbatim evidence.\n' \
+    "$_p10demo" > "$P10S/internal/reviews/0/0/0/1/pr-00001/review-a.md"
+_hits=$(p10_lane_c_hits "$P10S" "")
+case "$_hits" in
+    *internal/reviews/README.md*)
+        case "$_hits" in
+            *pr-00001*) fail "pin10 lane c scratch: frozen snapshot flagged" ;;
+            *) pass ;;
+        esac ;;
+    *) fail "pin10 lane c scratch: README citation not caught" ;;
+esac
 
 # ------------------------------------------------------------- summary
 if [ -s "$FAILS" ]; then
