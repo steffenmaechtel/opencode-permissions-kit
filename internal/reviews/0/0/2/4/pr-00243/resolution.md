@@ -23,14 +23,14 @@ Follow-up 1; b Q3 retracted, no defect). Birth PR #243, branch
 | a Q4 (LOW) | **implemented** | `a31e62b` | _unarm_show: red arms print log:/WARN:/skip lines, not the sudo-call tail |
 | a Q5 (INFO) | **implemented** | `a31e62b` | dry arm pins the sudo-log section empty |
 | a Q6 (INFO) | **implemented** | `a31e62b` | comment: 4 call sites vs 6 invocations with both gids |
-| b S1 (LOW) | **implemented** | `<SHA>` | block-identity awk extraction; parity pin is the second lock |
-| b S2 (LOW) | **implemented** | `<SHA>` | cfg driver plants a stale pre-state — every cfg arm reds on a deleted reset |
-| b X1 (INFO) | **implemented differently** | `<SHA>` | writer parity minus /tmp,/var/tmp; parity + behavioral pins |
+| b S1 (LOW) | **implemented** | `1d07e2a` | block-identity awk extraction; parity pin is the second lock |
+| b S2 (LOW) | **implemented** | `1d07e2a` | cfg driver plants a stale pre-state; all cfg arms red on deleted reset |
+| b X1 (INFO) | **implemented differently** | `1d07e2a` | writer parity minus /tmp,/var/tmp; parity + behavioral pins |
 | b X2 (INFO) | **deliberately not done** | — | Follow-up 1 owns the update.sh loops (verified TRUE in snapshot b) |
-| b Q1 (LOW) | **implemented** | `<SHA>` | _unarm_show families completed (Removed./[DRY]/sudo-log/skip echoes) |
-| b Q2 (LOW) | **implemented** | `<SHA>` | openchamber arm sets the flag; cfg WARN gated like the loop closing |
+| b Q1 (LOW) | **implemented** | `1d07e2a` | _unarm_show families completed (Removed./[DRY]/sudo-log/skip echoes) |
+| b Q2 (LOW) | **implemented** | `1d07e2a` | openchamber arm sets the flag; cfg WARN gated like the loop closing |
 | b Q3 (INFO) | **deliberately not done** | — | retracted as ghost in snapshot b — no defect exists |
-| b Q4 (INFO) | **implemented** | `<SHA>` | renamed un_rc_q; sites, comments, extraction anchors, canaries swept |
+| b Q4 (INFO) | **implemented** | `1d07e2a` | renamed un_rc_q; sites, comments, extraction anchors, canaries swept |
 
 ## Evidence detail
 
@@ -250,9 +250,15 @@ config-dirs closing gates its stderr WARN on the flag (mirroring the
 project loop's closing; the degraded log stays keyed on the partial
 list). Behavior is identical today — every cfg cause is a failed op —
 but the write-only trap is gone, and a future skip cause cannot
-false-WARN. The existing failure arms discriminate the wiring: drop
-the openchamber flag-set and its arm loses the channel-pinned stderr
-WARN (spot-check in Gates).
+false-WARN. The wiring is pinned from both sides: the two-rm arm
+redses when the RUNNER's flag-set is deleted (its gated section WARN
+disappears), and the openchamber arm — extended by the spot-check
+below — pins the section WARN
+`(openchamber policy pin rm failed)` on stderr, so deleting the
+openchamber-side flag-set reds it. The extension was the spot-check's
+own finding: the arm as shipped in the fix commit asserted only the
+ungated openchamber WARN, which survives a deleted flag-set — the
+gate's wiring was unpinned until the arm learned the section WARN.
 
 ### b Q4 (INFO) — runner renamed to un_rc_q
 
@@ -309,9 +315,31 @@ survives; docs never named the runner.
   gated loop over the real project root `/var/www/vhosts` (allowed by
   the new blocklist, as designed — no `/var/*` catch-all).
   `make e2e-rootless` green — 47 passed per container.
-- Sabotage spot-checks: executed post-commit (per AGENTS.md, secured
-  work first); the results are recorded by the chain's next commit
-  together with the `<SHA>` fill.
+- Sabotage spot-checks (post-commit against `1d07e2a`, each: mutate →
+  observe RED → `git checkout --` → suite green; the first run of
+  check 3 exposed a pin gap, closed in this commit's arm extension):
+  1. b X1 blocklist (`/home` token deleted, one line): three pins RED
+     — the static rep (`screening rejects /home`), the parity pin
+     (set inequality) and the behavioral arm, whose `_unarm_show`
+     diagnostics show `sudo find /home …` actually processed (the
+     finding's hazard, demonstrated — via the new `^sudo ` family).
+  2. b S2 section reset (both reset lines deleted): the cfg all-ok and
+     dry arms RED — the planted stale cause leaks into the closing.
+  3. b Q2 flag-set (openchamber `_un_revert_failed=1` deleted alone):
+     the openchamber arm RED via the section-WARN assertion added in
+     this commit — the arm as shipped stayed green (it pinned only the
+     UNGATED openchamber WARN), the gap the spot-check surfaced.
+     Runner-side twin (both flag-set lines deleted): the two-rm arm
+     RED (gated section WARN absent).
+  4. b S1 reorder (dot-arm line reordered to lead with `/./` — the
+     finding's scenario): suite stays GREEN — the block-identity
+     extraction ignores the line's shape.
+  5. Parity drift (writer blocklist in config.sh extended by
+     `/opt9|/opt9/*`): exactly the parity pin RED (1 test failed) —
+     writer-side drift cannot pass silently.
+  b Q1 (diagnostics-only, no pass/fail of its own): observed live
+  during 1–3 — red arms now print the asserted families (`sudo …`
+  lines, `log:`/`WARN:` records) that were invisible pre-fix.
 
 ## Follow-ups
 

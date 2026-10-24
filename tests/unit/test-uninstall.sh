@@ -769,11 +769,12 @@ COUT=$(_un_cfg_out "rm:/etc/openchamber/policy.json" false) || true
 if printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removal FAILED (rm)' \
    && printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts PARTIALLY removed (openchamber policy pin rm failed)' \
    && printf '%s' "$COUT" | sed -n '/^--- stderr ---$/,/^--- sudo log ---$/p' | grep -qF 'WARN: could not remove the openchamber policy pin (rm failed)' \
+   && printf '%s' "$COUT" | sed -n '/^--- stderr ---$/,/^--- sudo log ---$/p' | grep -qF 'WARN: could not fully remove config dirs + runtime artifacts (openchamber policy pin rm failed)' \
    && ! printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removed' \
    && ! printf '%s' "$COUT" | grep -qF 'artifacts removed ('; then
-    pass "openchamber rm failure: FAILED log + WARN on stderr, section closing degrades (#243 a S2)"
+    pass "openchamber rm failure: FAILED log + both WARNs on stderr, section closing degrades (#243 a S2, b Q2)"
 else
-    fail "openchamber rm failure arms (out=$(_unarm_show "$COUT")) (#243 a S2)"
+    fail "openchamber rm failure arms (out=$(_unarm_show "$COUT")) (#243 a S2, b Q2)"
 fi
 # Two section rms fail (S1): both named in the degraded closing, in
 # section order; the surviving openchamber pin still logs its success.
