@@ -189,14 +189,16 @@ run_q() {
 # PARTIALLY with the failed ops named, plus a stderr WARN and a
 # FAILED log line where the caller arms them (gpasswd/userdel arm
 # pattern, #211 b W1/c W1; f W2 naming form). Label first, command
-# after.
-un_revert_q() { # <op label> <command...>
-    _un_rq_label="$1"; shift
+# after. Renamed from un_revert_q (#243 b Q4): it observes rc for the
+# revert loop AND the config-dirs removal — the name must not claim
+# "revert" only.
+un_rc_q() { # <op label> <command...>
+    _un_rc_label="$1"; shift
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] $*"
     elif ! "$@" >/dev/null 2>&1; then
         _un_revert_failed=1
-        _un_partial="${_un_partial:+$_un_partial, }$_un_rq_label failed"
+        _un_partial="${_un_partial:+$_un_partial, }$_un_rc_label failed"
     fi
 }
 
@@ -581,17 +583,28 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
                 continue
                 ;;
         esac
+        # System-path blocklist — writer parity (#243 b X1): every
+        # system path project_path_sane refuses (config.sh), in the
+        # writer's arm order, so a hand-edited conf cannot drive the
+        # root-run revert ops over system trees the sanctioned writer
+        # would never store. Deliberate divergence, pinned in the unit
+        # suite: the scratch prefixes /tmp and /var/tmp stay
+        # processable (the sandbox policy pins unit-fixture roots
+        # there, and a temp-prefix entry is bounded — uid/gid-matched
+        # chown plus kit-gid ACL strip only).
         case "$root" in
-            /|/etc|/etc/*|/boot|/boot/*|/usr|/usr/*|/bin|/bin/*|/sbin|/sbin/*|\
-            /lib|/lib/*|/lib64|/lib64/*|/sys|/sys/*|/proc|/proc/*|/dev|/dev/*|\
-            /run|/run/*|/root|/root/*)
+            /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
+            /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
+            /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/usr|/usr/*|\
+            /var|/var/cache|/var/cache/*|/var/lib|/var/lib/*|/var/log|/var/log/*|\
+            /var/mail|/var/mail/*|/var/spool|/var/spool/*)
                 echo "  Skipping system path: $root"
                 continue
                 ;;
         esac
 
         # Per-root partial causes (#218): failed ops (recorded by
-        # un_revert_q) and unknown-id skips both land in this ONE
+        # un_rc_q) and unknown-id skips both land in this ONE
         # list — the closing log below reports them instead of
         # claiming completion. The former second mechanism
         # (_un_acl_skipped, 0.0.42h S1) is folded in here.
@@ -605,7 +618,7 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             # ! -type l (0.0.42e S1): chown on a symlink operand FOLLOWS
             # it — an agent-planted link in the project must not make the
             # root-run revert chown an arbitrary target outside it.
-            un_revert_q "find-chown" sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
+            un_rc_q "find-chown" sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
                 -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
         else
             _un_partial="${_un_partial:+$_un_partial, }opencode user unknown (chown skipped)"
@@ -635,10 +648,10 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
 " (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
                 continue
             fi
-            un_revert_q "setfacl -x g:$_un_acl_gid" sudo setfacl -R -x "g:$_un_acl_gid" "$root"
-            un_revert_q "setfacl -d -x g:$_un_acl_gid" sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
+            un_rc_q "setfacl -x g:$_un_acl_gid" sudo setfacl -R -x "g:$_un_acl_gid" "$root"
+            un_rc_q "setfacl -d -x g:$_un_acl_gid" sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
         done
-        un_revert_q "chmod g-s" sudo chmod g-s "$root"
+        un_rc_q "chmod g-s" sudo chmod g-s "$root"
         # Closing log conditioned on what actually happened (#218, the
         # deferred #211 c W1 class sweep; degraded wording #243 a X1):
         # every op site above reports its rc, and every skip cause is
@@ -665,14 +678,14 @@ echo ""
 echo "--- Removing kit config directories + runtime artifacts ---"
 # rc-observing removal (#243 a S1/S2 — the #211 c W1 class sweep this
 # wave owes): the former `run` ops fed an unconditional "Removed." +
-# success log even when an rm failed. Same ops through un_revert_q
+# success log even when an rm failed. Same ops through un_rc_q
 # now; a failure lands in the partial list and degrades the closing
 # claim. DRY_RUN keeps the [DRY] echoes and the success lines (the
 # run/run_q convention, #211 b W1).
 _un_partial=""
 _un_revert_failed=0
-un_revert_q "rm /run/opencode-permissions-kit" sudo rm -rf /run/opencode-permissions-kit
-un_revert_q "rm 99-ddev-rootless.conf" sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
+un_rc_q "rm /run/opencode-permissions-kit" sudo rm -rf /run/opencode-permissions-kit
+un_rc_q "rm 99-ddev-rootless.conf" sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
 # OpenChamber policy pin (issue #154): remove only what the kit wrote — a
 # policy.json pinning OUR wrapper. Any other content is admin-owned and
 # stays; /etc/openchamber itself only goes when empty (OpenChamber may own
@@ -694,18 +707,26 @@ if sudo test -f /etc/openchamber/policy.json \
         log "openchamber policy pin removed (kit-owned content only)"
     else
         _un_partial="${_un_partial:+$_un_partial, }openchamber policy pin rm failed"
+        _un_revert_failed=1
         echo "WARN: could not remove the openchamber policy pin (rm failed)" >&2
         log "openchamber policy pin removal FAILED (rm)"
     fi
 fi
-un_revert_q "rm /etc/opencode-permissions-kit" sudo rm -rf /etc/opencode-permissions-kit
+un_rc_q "rm /etc/opencode-permissions-kit" sudo rm -rf /etc/opencode-permissions-kit
 if [ -z "$_un_partial" ]; then
     echo "Removed."
     log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit"\
 ", /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
 else
-    echo "WARN: could not fully remove config dirs + runtime artifacts ($_un_partial)" >&2
     log "config dirs + runtime artifacts PARTIALLY removed ($_un_partial)"
+    # Every partial cause in this section is a FAILED op today (no
+    # skip causes exist here), so flag and list coincide — the gate
+    # mirrors the project loop's closing and keeps a future skip cause
+    # from false-WARNing; the openchamber arm sets the flag so the
+    # state is never write-only here (#243 b Q2).
+    if [ "$_un_revert_failed" -eq 1 ]; then
+        echo "WARN: could not fully remove config dirs + runtime artifacts ($_un_partial)" >&2
+    fi
 fi
 
 echo ""

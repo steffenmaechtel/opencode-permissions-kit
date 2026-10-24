@@ -1,8 +1,12 @@
 # Resolution — pr-00243 (#218 uninstall revert-loop closing-log honesty)
 
 Chain: [review-a.md](review-a.md) (wave snapshot 2026-10-24, 11 findings,
-3 reviewer axes, all verified) → fix wave 1 (all 11 implemented, this
-ledger). Birth PR #243, branch `feature/218-uninstall-revert-log-honesty`.
+3 reviewer axes, all verified) → fix wave 1 (all 11 implemented) →
+[review-b.md](review-b.md) (fix-wave snapshot 2026-10-24: 8 findings, 7
+verified + 1 ghost retracted; all 11 a-fixes audited landed) → fix wave 2
+(b S1/S2/X1/Q1/Q2/Q4 implemented — X1 differently, see row; b X2 held in
+Follow-up 1; b Q3 retracted, no defect). Birth PR #243, branch
+`feature/218-uninstall-revert-log-honesty`.
 
 ## Dispositions
 
@@ -19,6 +23,14 @@ ledger). Birth PR #243, branch `feature/218-uninstall-revert-log-honesty`.
 | a Q4 (LOW) | **implemented** | `a31e62b` | _unarm_show: red arms print log:/WARN:/skip lines, not the sudo-call tail |
 | a Q5 (INFO) | **implemented** | `a31e62b` | dry arm pins the sudo-log section empty |
 | a Q6 (INFO) | **implemented** | `a31e62b` | comment: 4 call sites vs 6 invocations with both gids |
+| b S1 (LOW) | **implemented** | `<SHA>` | block-identity awk extraction; parity pin is the second lock |
+| b S2 (LOW) | **implemented** | `<SHA>` | cfg driver plants a stale pre-state — every cfg arm reds on a deleted reset |
+| b X1 (INFO) | **implemented differently** | `<SHA>` | writer parity minus /tmp,/var/tmp; parity + behavioral pins |
+| b X2 (INFO) | **deliberately not done** | — | Follow-up 1 owns the update.sh loops (verified TRUE in snapshot b) |
+| b Q1 (LOW) | **implemented** | `<SHA>` | _unarm_show families completed (Removed./[DRY]/sudo-log/skip echoes) |
+| b Q2 (LOW) | **implemented** | `<SHA>` | openchamber arm sets the flag; cfg WARN gated like the loop closing |
+| b Q3 (INFO) | **deliberately not done** | — | retracted as ghost in snapshot b — no defect exists |
+| b Q4 (INFO) | **implemented** | `<SHA>` | renamed un_rc_q; sites, comments, extraction anchors, canaries swept |
 
 ## Evidence detail
 
@@ -163,7 +175,95 @@ The runner comment now says "four call sites, six invocations when both
 gids are known"; the closing-log comment says "every op site above"
 instead of "the four ops".
 
-## Gates
+### b S1 (LOW) — extraction keyed to block identity
+
+The SCREEN_PATTERNS extraction is no longer shape-keyed: an awk state
+machine keeps `/`-leading pattern lines only from the `case "$root"`
+block whose body echoes "Skipping system path" — the form-gate blocks
+(absolute `/*)`, dot/empty arms) are skipped whole, whatever their
+lines look like, so a `/`-leading reorder of the dot pattern line can
+no longer splice it in (the exact hazard the finding described). The
+shape-keyed `grep -v '/\*)'` filter is gone. Second lock: the b X1
+parity pin below compares the extracted set against the writer's — any
+extraction anomaly, reorder included, reds the suite instead of
+passing silently. Sweep (L2, pattern `grep -n 'SCREEN_PATTERNS'
+tests/unit/test-uninstall.sh`): one extraction site, one consumer
+(`screen()`); no other shape-keyed pattern filter exists in the suite.
+
+### b S2 (LOW) — the section reset is pinned by a stale pre-state
+
+`_un_cfg_out` no longer pre-initializes `_un_partial`/
+`_un_revert_failed` clean (the masking the finding proved) — it plants
+the dirty pre-state the real run leaves behind
+(`_un_partial="find-chown failed (stale from the project loop)"`,
+`_un_revert_failed=1`), which the shipped section reset must clear.
+Every cfg arm discriminates now: all-ok/dry assert `Removed.` + the
+success logs + no `PARTIALLY` + no `WARN:` + the stale string absent;
+the failure arms assert exact degraded closings a leaked stale cause
+would shift. Deleting the shipped reset reds the suite (spot-check
+recorded in Gates).
+
+### b X1 (INFO) — blocklist at writer parity, temp prefixes pinned out
+
+Mechanism: the reader blocklist is rebuilt in the writer's arm order
+from `project_path_sane` — adds `/home`, `/lib*` (replacing the
+`/lib`,`/lib64` enumeration), `/media(/…)`, `/mnt(/…)`, `/opt(/…)`,
+`/srv(/…)`, `/var` and the `/var/{cache,lib,log,mail,spool}(/*)`
+families. **Implemented differently** on one point: the scratch
+prefixes `/tmp` and `/var/tmp` stay processable — the sandbox policy
+(agent/conventions.md, "Test sandbox (unit suites") pins unit-fixture
+roots to exactly those prefixes (this suite's own primary root is a
+mktemp path), and a temp-prefix conf entry is bounded
+(uid/gid-matched chown + kit-gid ACL strip only). The divergence is a
+pinned decision, not drift: allowed-reps assert `/tmp/x`,
+`/var/tmp/x` processable, the parity pin excludes exactly those four
+tokens, and the script comment names the rationale.
+
+Pins: static rejected reps (/var /home /libexec/x /opt/x /srv/x
+/media/x /mnt/x /var/log/x /var/lib/x /var/spool/x) + allowed reps;
+set-equality parity pin (reader == writer minus the four temp tokens;
+the writer side is shape-extracted but fail-loud — a stray `/`-leading
+line in `project_path_sane` breaks equality, never silently passes);
+behavioral loop arm feeding `/var /home /opt /srv /media /mnt` as
+extra roots (skip echoes, no sudo op on them, primary root processes —
+only host-existent dirs, because `[ ! -d ]` runs before the blocklist
+and would skip a nonexistent path silently, defanging the arm).
+
+Sweep (L2): projects.conf consumers re-checked — update.sh `--refresh`
+and ddev-handover loops remain ungated (Follow-up 1, unchanged); e2e
+project root `/var/www/vhosts/extra-project` unaffected (no `/var/*`
+catch-all by design, writer and reader agree).
+
+### b Q1 (LOW) — red-arm diagnostics cover every asserted family
+
+`_unarm_show` now greps `log:|WARN:|PARTIALLY|Removed\.|\[DRY\]|
+Skipping|skipped|unknown|^sudo ` (tail 6): covers the `Removed.`
+closings (cfg all-ok/dry arms), `[DRY]` echoes (dry arms), sudo-log
+lines (two-root arm, Q5 emptiness family) and the lowercase skip
+echoes (gid/uid-unknown arms; the `<gid>` hint line contains
+"unknown"). The comment names the families it actually shows.
+
+### b Q2 (LOW) — the flag is read where it is written
+
+The openchamber failure branch sets `_un_revert_failed=1`; the
+config-dirs closing gates its stderr WARN on the flag (mirroring the
+project loop's closing; the degraded log stays keyed on the partial
+list). Behavior is identical today — every cfg cause is a failed op —
+but the write-only trap is gone, and a future skip cause cannot
+false-WARN. The existing failure arms discriminate the wiring: drop
+the openchamber flag-set and its arm loses the channel-pinned stderr
+WARN (spot-check in Gates).
+
+### b Q4 (INFO) — runner renamed to un_rc_q
+
+`un_revert_q` → `un_rc_q` (def, `_un_rc_label`, 7 call sites, 2
+comment mentions; test: extraction anchor, `UN_RC_Q` var, both evals,
+the cfg canary). One archaeology line keeps the old name ("Renamed
+from un_revert_q (#243 b Q4)"). Sweep (L2, `grep -rn 'un_revert_q\|
+UN_REVERT_Q' files/ tests/ docs/`): exactly the archaeology comment
+survives; docs never named the runner.
+
+## Gates (fix wave 1, a findings)
 
 - Unit: `sh tests/unit/test-uninstall.sh` green; `make test` green
   (all suites incl. sandbox policy, reviews lint/parity 29 cases).
@@ -194,6 +294,24 @@ instead of "the four ops".
      swallowed): the dry-run arm RED — and the pre-existing
      "--dry-run executed commands" pin caught it independently (two
      detectors).
+
+## Gates (fix wave 2, b findings)
+
+- Unit: `sh tests/unit/test-uninstall.sh` green; `make test` green
+  (all suites incl. sandbox policy — the new `/`-literals are screening
+  inputs, not operands of mutating verbs).
+- `make lint` green; `sh tests/unit/test-docs.sh` green; line-length
+  ratchet green; `make check-version` green.
+- E2E (RM-0113 — b X1 changes root-run screening semantics; both
+  suites run on this tree before the fix commit, files/ identical):
+  `make e2e` green — 309 passed per container, opencode 2.1.4 from the
+  warm cache; the uninstall pass + 13a ownership revert exercise the
+  gated loop over the real project root `/var/www/vhosts` (allowed by
+  the new blocklist, as designed — no `/var/*` catch-all).
+  `make e2e-rootless` green — 47 passed per container.
+- Sabotage spot-checks: executed post-commit (per AGENTS.md, secured
+  work first); the results are recorded by the chain's next commit
+  together with the `<SHA>` fill.
 
 ## Follow-ups
 

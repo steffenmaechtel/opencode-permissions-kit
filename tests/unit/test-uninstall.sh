@@ -193,13 +193,31 @@ fi
 # it against representative paths. The real patterns are tested, without
 # executing the script against the host's real projects.conf.
 # The form gate (#243 a X2) adds earlier `case "$root"` blocks (absolute
-# check, dot/empty segments) whose arms are NOT system-path patterns —
-# the `/*)` absolute-check arm would match everything, so it is filtered
-# out here; the form gate itself is pinned behaviorally in the loop
-# driver below (malformed-roots arm).
-SCREEN_PATTERNS="$(sed -n '/case "\$root" in/,/^        esac/p' "$UNINSTALL" \
-    | grep -E '^[[:space:]]*/' | grep -vE '^[[:space:]]*/\*\)' \
-    | sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/)$//' | tr '\n' ' ' | sed -e 's/ $//')"
+# check, dot/empty segments) whose arms are NOT system-path patterns.
+# Extraction is keyed to BLOCK IDENTITY, not line shape (#243 b S1: a
+# filter that only drops a leading `/*)` line admits the dot arms
+# silently the day their pattern line is reordered to start with `/`):
+# only the case block whose body echoes "Skipping system path"
+# contributes its `/`-leading pattern lines — the form-gate blocks (and
+# any future non-blocklist block) are skipped whole, whatever their
+# lines look like. The form gate itself is pinned behaviorally in the
+# loop driver below (malformed-roots arm).
+SCREEN_PATTERNS="$(awk '
+    /case "\$root" in[[:space:]]*$/ { inblk=1; keep=0; buf=""; next }
+    inblk && /^[[:space:]]*esac[[:space:]]*$/ {
+        if (keep && buf != "") printf "%s", buf
+        inblk=0; next
+    }
+    inblk {
+        if ($0 ~ /Skipping system path/) keep=1
+        line=$0
+        sub(/\\$/, "", line)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        sub(/\)$/, "", line)
+        sub(/\|$/, "", line)
+        if (line ~ /^\//) buf = buf line "|"
+    }
+' "$UNINSTALL" | sed -e 's/|$//')"
 if [ -n "$SCREEN_PATTERNS" ]; then
     pass "screening patterns extractable from uninstall.sh"
 else
@@ -224,18 +242,57 @@ for syspath in / /etc /etc/nginx /usr /usr/share /bin /boot /root /root/x /proc 
         fail "screening rejects $syspath"
     fi
 done
+# Writer-parity arms (#243 b X1): config.sh project_path_sane refuses
+# these system paths; the reader blocklist mirrors them now — pinned
+# here lexically, behaviorally in the 4c blocklist arm below, and as a
+# set-equality tripwire in the parity pin after the reps.
+for syspath in /var /home /libexec/x /opt/x /srv/x /media/x /mnt/x /var/log/x /var/lib/x /var/spool/x; do
+    if screen "$syspath"; then
+        pass "screening rejects $syspath"
+    else
+        fail "screening rejects $syspath"
+    fi
+done
 if printf '%s' "$SCREEN_PATTERNS" | grep -q '/var/www'; then
     fail "screening patterns must not contain /var/www (legit project area)"
 else
     pass "screening patterns must not contain /var/www (legit project area)"
 fi
-for projpath in /var/www/vhosts /var/www /home/dev/x; do
+# Pinned divergence (#243 b X1): the scratch prefixes stay processable
+# by design — the sandbox policy pins unit-fixture roots under /tmp and
+# /var/tmp (this suite's own primary root lives there), and a
+# temp-prefix conf entry is bounded (uid/gid-matched chown + kit-gid
+# ACL strip only). The writer refuses them for storage; the uninstaller
+# deliberately does not screen them.
+for projpath in /var/www/vhosts /var/www /home/dev/x /tmp/x /var/tmp/x; do
     if screen "$projpath"; then
         fail "screening allows $projpath"
     else
         pass "screening allows $projpath"
     fi
 done
+# Parity pin (#243 b X1): reader blocklist == writer blocklist minus
+# the pinned temp-prefix divergence — both sides extracted statically,
+# so writer/reader drift redds here instead of silently diverging (the
+# b S-axis coverage note: the a-X2 pins are form-enumerative; this is
+# the tripwire for the LIST). The writer-side extraction is shape-keyed
+# (/-leading lines minus a lone `/*)` arm) — fail-loud by construction:
+# any stray /-leading line in project_path_sane breaks the set
+# equality; it can never silently pass.
+CONFIG_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
+WRITER_PATTERNS="$(sed -n '/^project_path_sane()/,/^}/p' "$CONFIG_SH" \
+    | grep -E '^[[:space:]]*/' | grep -vE '^[[:space:]]*/\*\)' \
+    | sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/)$//' | tr '\n' '|')"
+_un_parity_tokens() {
+    printf '%s\n' "$1" | tr '|' '\n' | sed -e 's/[[:space:]]*$//' -e '/^$/d' | sort -u
+}
+READER_SET=$(_un_parity_tokens "$SCREEN_PATTERNS")
+WRITER_SET=$(_un_parity_tokens "$WRITER_PATTERNS" | grep -vxF -e '/tmp' -e '/tmp/*' -e '/var/tmp' -e '/var/tmp/*')
+if [ -n "$READER_SET" ] && [ "$READER_SET" = "$WRITER_SET" ]; then
+    pass "screening blocklist at writer parity, /tmp+/var/tmp pinned out (#243 b X1)"
+else
+    fail "screening blocklist at writer parity, /tmp+/var/tmp pinned out (#243 b X1)"
+fi
 
 # --- 4b. ownership revert (issue #74) ---------------------------------------------
 # The kit hands .ddev/ trees, settings dirs and typo3 bootstrap roots to
@@ -258,8 +315,8 @@ fi
 # The rc-observing runner (#218) is extracted and driven REAL — the
 # loop's ops go through it, so the honesty pins below exercise the
 # shipped wiring, not a stub that fakes rc propagation.
-UN_REVERT_Q="$(sed -n '/^un_revert_q() {/,/^}$/p' "$UNINSTALL")"
-if [ -n "$UN_REVERT_Q" ] && printf '%s' "$UN_REVERT_Q" | grep -q 'failed'; then
+UN_RC_Q="$(sed -n '/^un_rc_q() {/,/^}$/p' "$UNINSTALL")"
+if [ -n "$UN_RC_Q" ] && printf '%s' "$UN_RC_Q" | grep -q 'failed'; then
     pass "rc-observing revert runner extractable (#218)"
 else
     fail "rc-observing revert runner extractable (#218)"
@@ -305,7 +362,7 @@ $_unlo_x"
         UN_DEV_GROUP=devgroup
         UN_DEV_GID="$_unlo_dg"
         DEFAULT_USER=devuser
-        eval "$UN_REVERT_Q"
+        eval "$UN_RC_Q"
         # Logs to a FILE: the real runner silences its command's stdout
         # and stderr (the shipped behavior), so an echoing stub would
         # be swallowed with them.
@@ -489,10 +546,15 @@ fi
 # its CHANNEL: stderr is captured separately, so a WARN that migrates
 # to stdout is caught (#243 a Q3; degraded wording #243 a X1).
 _unarm_show() {
-    # Red-arm diagnostics (#243 a Q4): surface the ASSERTED line
-    # families (log wording / WARN / skips) — the old tail -N showed
-    # only the appended sudo-call log, never the lines an arm checks.
-    printf '%s' "$1" | grep -E 'log:|WARN:|PARTIALLY|Skipping' | tail -4
+    # Red-arm diagnostics (#243 a Q4, families completed #243 b Q1):
+    # surface the line families the arms actually assert — log:/WARN:
+    # records, PARTIALLY degradation, Removed. closings, [DRY] echoes,
+    # skip echoes in both spellings (Skipping gate / skipped/unknown
+    # id notes), and sudo-log lines. The old tail -N showed only the
+    # appended sudo-call log, never the lines an arm checks.
+    printf '%s' "$1" \
+        | grep -E 'log:|WARN:|PARTIALLY|Removed\.|\[DRY\]|Skipping|skipped|unknown|^sudo ' \
+        | tail -6
 }
 if printf '%s' "$LOOP_OUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
    && ! printf '%s' "$LOOP_OUT" | grep -qF 'PARTIALLY' \
@@ -610,12 +672,34 @@ if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty
 else
     fail "malformed-root screening arms (out=$(_unarm_show "$FOUT")) (#243 a X2)"
 fi
+# System-path blocklist, behaviorally (#243 b X1): extra roots the
+# writer refuses must be screened loudly and no root op may touch
+# them, while the primary root — under the sanctioned /tmp scratch —
+# still processes (the pinned divergence). Only host-existent dirs
+# feed the driver: [ ! -d ] runs BEFORE the blocklist and would skip
+# a nonexistent path silently, defanging the arm.
+FOUT=$(_un_loop_out "" false 60000 60002 60001 "/var /home /opt /srv /media /mnt") || true
+if printf '%s' "$FOUT" | grep -qF 'Skipping system path: /var' \
+   && printf '%s' "$FOUT" | grep -qF 'Skipping system path: /home' \
+   && printf '%s' "$FOUT" | grep -qF 'Skipping system path: /opt' \
+   && printf '%s' "$FOUT" | grep -qF 'Skipping system path: /srv' \
+   && printf '%s' "$FOUT" | grep -qF 'Skipping system path: /media' \
+   && printf '%s' "$FOUT" | grep -qF 'Skipping system path: /mnt' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo find /var' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo find /home' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /srv' \
+   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 /mnt' \
+   && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
+    pass "system-path roots (/var /home /opt /srv /media /mnt) screened, no root ops, primary root processes (#243 b X1)"
+else
+    fail "system-path blocklist arms (out=$(_unarm_show "$FOUT")) (#243 b X1)"
+fi
 
 # --- 4d. config-dirs + openchamber closing-log honesty (#243 a S1/S2) -------------
 # The config-dirs section used to run rc-blind `run` rm ops into an
 # unconditional "Removed." + success log — the same c W1 class, the
 # site the snapshot-a class sweep surfaced. The section is extracted
-# and driven REAL (real un_revert_q + real section text) through a
+# and driven REAL (real un_rc_q + real section text) through a
 # per-command sudo stub; <fail-spec> entries are "name:substring"
 # pairs — fail when the command's first word is <name> AND the full
 # command contains <substring> (space-free paths make word-splitting
@@ -623,7 +707,7 @@ fi
 # rm fails — exactly the discrimination S2 needs.
 CFG_SECTION="$(sed -n '/^echo "--- Removing kit config directories/,/^echo ""$/p' "$UNINSTALL")"
 if [ -n "$CFG_SECTION" ] \
-   && printf '%s' "$CFG_SECTION" | grep -qF 'un_revert_q "rm /etc/opencode-permissions-kit"' \
+   && printf '%s' "$CFG_SECTION" | grep -qF 'un_rc_q "rm /etc/opencode-permissions-kit"' \
    && printf '%s' "$CFG_SECTION" | grep -qF 'openchamber policy pin removal FAILED'; then
     pass "config-dirs section extractable + rc-observing (#243 a S1/S2)"
 else
@@ -636,9 +720,16 @@ _un_cfg_out() {
     : > "$WORK/uncfg-err.log"
     (
         DRY_RUN="$_unc_dry"
-        _un_partial=""
-        _un_revert_failed=0
-        eval "$UN_REVERT_Q"
+        # Stale pre-state (#243 b S2): on a real run the project loop
+        # executes BEFORE this section and leaves its partial state
+        # behind — the section's OWN reset must clear it. Planting a
+        # dirty pre-state (instead of the former clean pre-init, which
+        # masked a deleted reset) makes every cfg arm discriminate:
+        # without the shipped reset the stale cause leaks into the
+        # closing and the all-ok/dry arms go red.
+        _un_partial="find-chown failed (stale from the project loop)"
+        _un_revert_failed=1
+        eval "$UN_RC_Q"
         sudo() {
             printf 'sudo %s\n' "$*" >> "$WORK/uncfg-sudo.log"
             for _unc_s in $_unc_fail; do
@@ -665,10 +756,11 @@ if printf '%s' "$COUT" | grep -qF 'Removed.' \
    && printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)' \
    && printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removed (kit-owned content only)' \
    && ! printf '%s' "$COUT" | grep -qF 'WARN:' \
-   && ! printf '%s' "$COUT" | grep -qF 'PARTIALLY'; then
-    pass "config-dirs all ok: Removed. + success logs, no partial/WARN noise (#243 a S1/S2)"
+   && ! printf '%s' "$COUT" | grep -qF 'PARTIALLY' \
+   && ! printf '%s' "$COUT" | grep -qF 'stale from the project loop'; then
+    pass "config-dirs all ok: Removed. + success logs, stale pre-state cleared, no partial/WARN noise (#243 a S1/S2, b S2)"
 else
-    fail "config-dirs all-ok arms (out=$(_unarm_show "$COUT")) (#243 a S1/S2)"
+    fail "config-dirs all-ok arms (out=$(_unarm_show "$COUT")) (#243 a S1/S2, b S2)"
 fi
 # Openchamber pin rm fails (S2): its success log must NOT fire; the
 # failure WARNs on stderr (channel pinned) and lands in the section's
