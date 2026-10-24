@@ -5,10 +5,12 @@ Chain: review-a (snapshot 2026-10-23, 21 findings) → fix wave
 → review-b (snapshot 2026-10-24, 15 reported / 12 unique findings,
 1 retracted) → fix wave 2 (`9cb41b8` tests+rules) → review-c
 (snapshot 2026-10-24, 5 findings) → fix wave 3 (`9fcd197`
-tests+rules, this ledger).
+tests+rules) → review-d (snapshot 2026-10-24, 3 findings) → fix
+wave 4 (`2b71a69` comment-only + this ledger) — loop closed
+(RM-0066; check cited in Gates, fix wave 4).
 a-round: all 21 dispositioned **implemented**; none deliberately not
-done (maintainer go 2026-10-24: "implement all"). b-round and c-round:
-one dispositions table each below.
+done (maintainer go 2026-10-24: "implement all"). b-, c- and
+d-round: one dispositions table each below.
 
 ## Dispositions
 
@@ -376,8 +378,10 @@ whole-direction strip mutants (tail-strip empties probe2 — measured).
   rules-meta 23 pins green; line-length green incl. probe4.
 - Sabotage runs: 3 mutation checks red, each restored and
   re-verified green — (1) c S1 miss direction (collapsed alternative
-  reverted to the b-round two-alternative form → "PIN BROKEN: .//
-  local/ or ..//local/ reference not caught (c S1)"); (2) c S1
+  reverted to the b-round two-alternative form → "PIN BROKEN:
+  .//local/ or ..//local/ reference not caught (c S1)" — quote
+  rewrapped #235 d W3: the wrap had split the token `.//local/`);
+  (2) c S1
   exemption boundary (`\{1,2\}` widened to `*`, catching x//local/ →
   "PIN BROKEN: legit /usr/local or ~/.local path flagged"); (3) c S2
   direction (strip-runs-past-the-close mutant → PROBE BROKEN with
@@ -388,13 +392,88 @@ whole-direction strip mutants (tail-strip empties probe2 — measured).
   script line (rules-audit.sh header); no `files/`, no root-run
   script semantics.
 
+## Dispositions — review d (fix wave 4, 2026-10-24)
+
+| Finding | Disposition | Commit | Key evidence |
+|---|---|---|---|
+| d W1 (LOW) | **implemented** | `2b71a69` | slash-run spellings + collateral dot families enumerated (detail: d W1) |
+| d W2 (INFO) | **implemented** | `2b71a69` | same hunk — `y.//local/` named newly caught collateral (detail: d W1) |
+| d W3 (LOW) | **implemented** | this ledger | quote rewrapped; rendered text equals the code string (detail: d W3) |
+
+### d W1 / d W2 — shape-table completeness (comment-only)
+
+One comment hunk in the skills-lint header
+(tests/unit/test-skills-lint.sh:33-53) extends the matched-shapes
+list: the slash-run spellings now name `.///local/` and say "one or
+more slashes" (was: "doubled-slash" only), and a new sentence
+documents the collateral families of the left-unanchored dot
+alternative — dot-runs ≥ 3 (`.../local/…`) and dot-terminated
+segments (`y.//local/…`) — as accepted lint-only false positives,
+repo-internal both. History claims measured at their refs (L3):
+`.../local/x` CAUGHT at all three rounds (a `787c3b0` inline grep
+`(^|[^.[:alnum:]_/-])local/|\.\./local/`, b, c); `y.//local/x` and
+`.///local/x` missed at a and b, CAUGHT at c — "already caught
+pre-c" and "newly caught by the collapse" are measured, not
+narrated. No new pin (deliberate, L3 reasoning): the substring
+mechanism is pinned by opk-dblslash-local's `sub/.//local/x` line,
+the alternative is pinned in both directions (miss:
+opk-dblslash-local; over-catch: opk-legit-paths + the
+`\{1,2\}`→`\*` sabotage), and the documented shapes are consequences
+of that pinned alternative — recorded here as measured evidence
+instead, keeping the round comment-only for the stop rule (RM-0066).
+
+### d W3 — sabotage quote rewrap (ledger-only)
+
+The Gates (fix wave 3) quote broke the pin string mid-token
+(`.//` + newline + `local/`, rendering `.// local/`); the wrap now
+breaks after "PIN BROKEN:" — a whitespace position of the code
+string — so the rendered quote equals
+`PIN BROKEN: .//local/ or ..//local/ reference not caught (c S1)`
+(tests/unit/test-skills-lint.sh:345) char-for-char.
+
+## Class sweeps (d round)
+
+- Shape-table description sites: `grep -rn "doubled-slash"` over
+  living files → tests/unit/test-skills-lint.sh:79 (mechanics
+  comment: "one-or-more slashes … so the doubled-slash spellings …
+  cannot slip through" — true, under-enumerating only, and the same
+  sentence already states the one-or-more semantics), :270 and :350
+  (fixture description + pin text — describe the doubled-slash
+  fixture correctly, no drift). Frozen snapshots and this ledger's
+  history sections carry the older wording (10 sites) — immutable
+  evidence, not doc sites.
+- Boundary shapes re-probed against the exact LOCAL_SHAPES
+  construction at HEAD: `.../local/x`, `..../local/x`, `y.//local/x`,
+  `x/y.//local/x`, `.///local/x` CAUGHT; `v1.2/local/x` missed (dot
+  not slash-adjacent) — the new header text matches the probes
+  claim-for-claim.
+
+## Gates (fix wave 4)
+
+- test-skills-lint green (18 pins unchanged — the diff is
+  comment-only, 11+/5−, no code line touched); line-length ratchet
+  green (662 over 120, unchanged); reviews lint/parity green;
+  rules-audit 0 blocking; make lint green.
+- Sabotage runs: none owed — no pin, code path or assertion changed
+  (comment-only hunk; the pins' sabotage cover stands from waves b/c,
+  re-executed red during review d's pre-launch window).
+- e2e suites: not owed — comment-only test hunk + ledger text; no
+  `files/`, no root-run script semantics, no executable line changed.
+- Stop rule (RM-0115 expectation, check cited): this round's
+  dispositions touched tests/unit/test-skills-lint.sh as a
+  COMMENT-ONLY hunk (11 comment insertions, 5 comment deletions, no
+  code line) plus this ledger — no review-relevant code per RM-0065
+  (comments and resolution bookkeeping are not review-relevant), so
+  the loop closes under RM-0066; the maintainer commissioned the
+  closure with the go ("schleife schließen", 2026-10-24).
+
 ## Follow-ups
 
-- review-c discharged the b-wave's owed review (snapshot committed
-  at `5e55225` over diff `17a3092..606cc26`); its fix wave 3
-  (`9fcd197` + this ledger) touches test code, so the round owes the
-  next wave review on the maintainer's go — the loop cannot close
-  this round (RM-0067).
+- review-d (snapshot `fff6b14` over diff `5e55225..cb22965`)
+  discharged fix wave 3's owed review; its fix wave 4 (`2b71a69` +
+  this ledger) stayed comment/ledger-only, so the loop CLOSES with
+  this round (RM-0064/RM-0066; check cited in Gates, fix wave 4) —
+  maintainer go 2026-10-24 ("schleife schließen").
 - The skills-lint workspace-absolute alternative is computed from
   REPO_ROOT at runtime (`WS_LOCAL`); the opk-abs-local fixture
   derives its reference from the same variable, so pattern and pin
