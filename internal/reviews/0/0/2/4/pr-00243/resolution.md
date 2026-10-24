@@ -347,6 +347,14 @@ survives; docs never named the runner.
    add the form gate — and decide system-path-blocklist parity with the
    uninstaller (they have none at all). Own wave: fixture + arms + both
    e2e suites (a X2 sweep finding, recorded above).
+   **GitHub: #247** (issue draft in ../opk-issues/, published 2026-10-24).
 2. uninstall.sh single-op rm sites (S1 sweep list, 11 sites): convert
    to rc-observing closers. Own wave — each site needs its extraction +
    arms (a F1 ddev-handover precedent).
+   **GitHub: #246** (issue draft in ../opk-issues/, published 2026-10-24).
+3. projects.conf symlink roots: gate behavior investigation — `find`
+   operand is safe (`! -type l`), `chmod g-s` dereferences the operand,
+   `setfacl -R` operand semantics unmeasured (snapshot c verified the
+   first two tails, review-c X axis; the measurement owes scratch work
+   on a real filesystem). **GitHub: #245** (issue draft in
+   ../opk-issues/, published 2026-10-24).
