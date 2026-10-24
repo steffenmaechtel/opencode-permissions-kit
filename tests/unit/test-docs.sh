@@ -206,6 +206,22 @@ for _w1_t in codeigniter $_w1_types; do
     grep -qF "\`$_w1_t\`" "$_w1_doc" \
         || echo "FAIL ddev-integration.md: root-file type '$_w1_t' missing from the docs (#256 a W1)" >> "$TMP"
 done
+# #256 b B2: reverse direction — every type the docs paragraph lists must
+# exist in the code matcher (the addition direction of the a-W1 class, the
+# #211 b W30 shape). Wildcard forms count too: the matcher arms are literal,
+# so a `drupal*`-style token in the root-file paragraph is drift by
+# definition. Tripwire: a drifted paragraph anchor must not silently
+# iterate zero types.
+_w1_doctypes="$(grep -o '\*\*Root-file types ([^)]*' "$_w1_doc" | grep -oE '`[a-z0-9*]+`' | tr -d '`')"
+if [ -z "$_w1_doctypes" ]; then
+    echo "FAIL ddev-integration.md: docs root-file-type extraction empty — anchor drift? (#256 b B2)" >> "$TMP"
+fi
+for _w1_dt in $_w1_doctypes; do
+    case " codeigniter $_w1_types " in
+        *" $_w1_dt "*) ;;
+        *) echo "FAIL ddev-integration.md: docs root-file type '$_w1_dt' not in the code matcher (#256 b B2)" >> "$TMP" ;;
+    esac
+done
 
 # --- a W2 (pr-00256): security-model keeps the dev-owned flag-write TOCTOU ---
 # disclosure (residual-gaps honesty guard). Sabotage: delete the bullet —
@@ -223,7 +239,11 @@ grep -q 'skipped security checks instead' "$REPO_ROOT/docs/reference/cli.md" \
 # --- a W5 (pr-00256): getting-started's agent-resources Enter default -------
 # tracks the ui_menu default letter in install.sh (claim-drift guard, both
 # directions: flipping the menu default or the docs word goes red).
-_w5_def="$(sed -n 's/.*ui_menu "Bring the developer.s agent resources over?" "\([mcs]\)".*/\1/p' "$REPO_ROOT/files/install.sh" | head -n 1)"
+# #256 b B1: the capture is [a-z], NOT the mapped set — an out-of-vocabulary
+# default letter must land in the unmapped guard below with the right
+# message; with [mcs] the sed stopped matching and the guard was dead code
+# (the drift misfired the anchor-drift tripwire instead).
+_w5_def="$(sed -n 's/.*ui_menu "Bring the developer.s agent resources over?" "\([a-z]\)".*/\1/p' "$REPO_ROOT/files/install.sh" | head -n 1)"
 if [ -z "$_w5_def" ]; then
     echo "FAIL getting-started.md: agent-resources menu default extraction empty — anchor drift? (#256 a W5)" >> "$TMP"
 fi
