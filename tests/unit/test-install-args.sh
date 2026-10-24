@@ -824,7 +824,10 @@ fi
 # machines get the current 2.x through the npm registry. The v1 URL
 # must not come back (it resolves GitHub 1.x); the v2 installer keeps
 # the ~/.opencode/bin layout, so the pickup paths are version-agnostic.
-_v2hits=$(grep -c 'https://opencode.ai/v2/install' "$INSTALL" || true)
+# Comment lines stripped before the count (#244 g W1 class sweep, the
+# _p3old rider): a commented-out URL must not count as a surviving
+# call site — the two-step false-green the f-W4 sweep left bounded.
+_v2hits=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'https://opencode.ai/v2/install' || true)
 if [ "$_v2hits" -ge 2 ]; then
     pass "bootstrap streams the v2 installer (prompt + curl, $_v2hits sites)"
 else
@@ -964,46 +967,57 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     else
         fail "gate: import list extractable (no _py3_imports assignment found)"
     fi
-    # Exactly-one rationale (#244 c W3): the gate-list extraction
-    # unions every match, but the runtime gate executes the LAST
-    # assignment — a second assignment of any shape must go red.
-    # Second-assignment shapes (#244 c W3, #244 d W2, #244 e W2): the
-    # count pin counts LINES carrying an assignment or an append
-    # (`_py3_imports=` / `_py3_imports+=`) — separate-line seconds and
-    # standalone append lines go red there (the runtime gate executes
-    # first+append while the extraction sed reads the FIRST list
-    # only). The dup pin catches same-line doubles whose FIRST token
-    # is a plain assignment: `_py3_imports='a'; _py3_imports+='b'`
-    # keeps the count at 1 while extraction and runtime diverge the
-    # same way. A first-token-`+=` double
-    # (`_py3_imports+='a'; _py3_imports+='b'`) matches NEITHER pin —
-    # but cannot sail: as the sole line it starves the extraction
-    # (the extractability pin reds), next to the real assignment it
-    # counts 2 (#244 f W3).
-    # Both greps are guarded against the empty match (L7) — an
-    # unguarded `grep -c` exits 1 on zero matches and this set -e
-    # suite would ABORT instead of recording the FAIL (#244 f W1);
-    # grep -c still prints 0, so the `found 0, want 1` path stays
-    # observable.
-    _p3asn="$(grep -cE "^[[:space:]]*_py3_imports\+?=" "$INSTALL" || true)"
-    if [ "$_p3asn" -eq 1 ]; then
-        pass "gate: exactly one _py3_imports assignment/append line (#244 c W3, #244 e W2)"
+    # Executed-value drift pin (#244 c W3, d W2, e W2, f W1/W3/W4,
+    # g W1 — the count/dup regex pair is RETIRED): the invariant is
+    # now checked semantically, not by enumerating accident shapes
+    # in regex. The runtime gate executes the LAST value of
+    # _py3_imports; the extraction above reads the FIRST
+    # single-quoted list (the coverage pin below audits that list).
+    # This pin executes every assignment-shaped line (token at line
+    # start, full-line comments stripped first, in file order) under
+    # install.sh's own interpreter and requires: executed final
+    # value == extracted list. Every accident shape reds by
+    # construction — separate-line seconds, appends, same-line
+    # doubles, quoted-# doubles (g W1: invisible to the old dup
+    # regex, visible to the executed value), first-token-`+=`
+    # doubles (interpreter failure under sh — dash has no +=), and
+    # a deleted or commented-out sole assignment (empty extraction).
+    # A trailing backslash on an assignment line is DETECTED loudly
+    # (the e-W4 concealment residual #1 closed as a detector); the
+    # line-start filter keeps execution lines off the use sites at
+    # :578/:583 (python3 -c "$_py3_imports"). Every grep here is
+    # empty-match-guarded (L7, #244 f W1).
+    _p3she="$(sed -n '1{s/^#!//p;q;}' "$INSTALL")"
+    case "$_p3she" in
+        *bash*) _p3bin=bash ;;
+        *) _p3bin=sh ;;
+    esac
+    _p3lines="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" \
+        | grep -E '^[[:space:]]*_py3_imports[^_[:alnum:]]' || true)"
+    _p3n="$(printf '%s\n' "$_p3lines" \
+        | grep -cE '^[[:space:]]*_py3_imports[^_[:alnum:]]' || true)"
+    _p3cont="$(printf '%s\n' "$_p3lines" | grep -n '\\$' || true)"
+    if [ -z "$_p3lines" ] || [ -n "$_p3cont" ]; then
+        fail "gate: _py3_imports assignment present, no continuation (lines=$_p3n cont=[$_p3cont])"
     else
-        fail "gate: exactly one _py3_imports assignment/append line (found $_p3asn, want 1)"
+        _p3tmp="$(mktemp)"
+        { echo 'set -e'; printf '%s\n' "$_p3lines"; \
+            echo 'printf "%s" "$_py3_imports"'; } > "$_p3tmp"
+        _p3rc=0
+        _p3rt="$("$_p3bin" "$_p3tmp" 2>&1)" || _p3rc=$?
+        rm -f "$_p3tmp"
+        if [ "$_p3rc" -eq 0 ] && [ -n "$_p3gate" ] \
+            && [ "$_p3rt" = "$_p3gate" ]; then
+            pass "gate: executed _py3_imports equals the extracted list (#244 c W3, #244 g W1)"
+        else
+            fail "gate: executed _py3_imports equals the extracted list (rc=$_p3rc lines=$_p3n executed=[{_p3rt}] extracted=[{_p3gate}])"
+        fi
     fi
-    # The dup span [^#]* cannot cross a comment start (#244 f W4): a
-    # trailing comment naming the token after a legitimate assignment
-    # stays green, and no real double can carry # between its tokens.
-    _p3dup="$(grep -nE "^[[:space:]]*_py3_imports=[^#]*_py3_imports(\+=|=)" "$INSTALL" || true)"
-    if [ -z "$_p3dup" ]; then
-        pass "gate: no same-line double _py3_imports assignment (#244 d W2, #244 e W2)"
-    else
-        fail "gate: same-line double _py3_imports assignment ($_p3dup)"
-    fi
-    # Residual, deliberately not caught (#244 e W4): a backslash
-    # continuation whose second physical line is `;`-led, and
-    # eval-built assignments — deliberate concealment shapes, outside
-    # the maintenance-accident threat model this pin pair targets.
+    # Residual, deliberately not caught (#244 e W4): eval-built or
+    # command-substitution assignments (`_py3_imports="$(…)"`) —
+    # deliberate concealment shapes outside the maintenance-accident
+    # threat model; most such shapes red above anyway (the executed
+    # subshell value differs from the extracted literal list).
     _p3g="$(mktemp)"
     printf '%s\n' "$_p3gate" | sed 's/^[[:space:]]*import[[:space:]]*//' \
         | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \

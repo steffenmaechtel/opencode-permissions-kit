@@ -313,6 +313,10 @@ except ValueError:
 if isinstance(d, dict) and "opencodeBinary" in d:
     del d["opencodeBinary"]
     p.write_text(json.dumps(d, indent=2) + "\n")
+else:
+    # No key removed (#244 g S1): the caller's grep hit the literal
+    # as a VALUE — report failure instead of a false success.
+    sys.exit(1)
 PYEOF
             then
                 ui_success "settings pin removed from $_oc_settings"

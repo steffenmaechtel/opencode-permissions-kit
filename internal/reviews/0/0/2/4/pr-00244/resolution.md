@@ -79,6 +79,9 @@ MED/HIGH) → fix wave 5 (the e rows below) → [review-f.md](review-f.md)
 | f S3 (INFO) | **deliberately not done** | — | exact-name lookup — the basename exclusion is precisely scoped |
 | f Q3 (INFO) | **implemented** | `97b55b9` | cli.md sentence ordered (advisory feed, first scan, leak scan) |
 | f Q4 (INFO) | **implemented** | `97b55b9` | count-pin label says assignment/append line |
+| g W1 (LOW) | **implemented** | `<SHA>` | regex pair retired — semantic pin: executed == extracted (detail below) |
+| g Q1 (INFO) | **implemented** | `<SHA>` | extraction failure and python3 hard-require now distinct FAIL labels |
+| g S1 (INFO) | **implemented** | `<SHA>` | heredoc else-exit kills the false success; 2 behavioral kit-cli pins |
 
 ## Evidence detail
 
@@ -1017,6 +1020,123 @@ over-120 row shortened (the f W1 row — the real SHA's 2 extra bytes
 tipped it, exactly the README's SHA-fill warning), the commit
 amended before any push; the amended HEAD is gate-green with the rc
 read directly.
+
+## Evidence detail (fix wave 7 — g findings)
+
+Maintainer decision (recorded per the commission): full
+implementation, with explicit high focus on g W1 — "alle Cases": the
+spot has produced findings in five consecutive waves (c W3 → d W2 →
+e W2 → f W1/W3/W4/Q4 → g W1); the fix retires the mechanism that
+kept re-opening, not the next regex. Session G (the snapshot-g
+author) applies the fixes in the same session per the rotation.
+
+### g W1 — the executed-value semantic pin replaces the regex pair
+
+The count/dup regex pair (`_p3asn`/`_p3dup`) is deleted; the
+invariant is now checked semantically
+(tests/unit/test-install-args.sh, gate section): the test executes
+every assignment-shaped `_py3_imports` line (token at line start,
+full-line comments stripped first, file order) under install.sh's
+own interpreter (resolved from the shebang; `sh` today) in a
+`set -e` scratch file ending in a value printf, and requires
+executed final value == the extracted first list (and the
+extraction non-empty). Rationale: the runtime executes the LAST
+value, the coverage pin audits the FIRST list — any second
+assignment, append, or same-line double of ANY spelling changes the
+executed value, so shape enumeration is unnecessary; a line-start
+filter keeps execution lines off the use sites (install.sh:578/:583).
+A trailing backslash on an assignment line (the e-W4 concealment
+residual #1) is DETECTED loudly by the same block. Probe matrix
+(scratch copies, /tmp/opencode/pr-00244-g/probe/sem.sh — 9 accident
+shapes red with the diverging values in the FAIL text, 2 comment
+shapes green): second assignment, append line, same-line double,
+quoted-# double (the g-W1 shape — invisible to the old dup regex),
+first-token-`+=` double (interpreter rc 127, dash has no `+=`),
+commented sole assignment, deleted assignment, trailing
+continuation — all RED; trailing token-naming comment and full-line
+old-assignment comment — GREEN (the f-W4 false-red property
+preserved). Eval/command-substitution assignments stay a documented
+residual (deliberate concealment; most such shapes red anyway — the
+executed subshell value differs from the extracted literal).
+Class-sweep rider: the v2-URL `grep -c` (test-install-args.sh:824,
+the f-W4 sweep's bounded two-step false-green) now runs behind the
+same comment-strip sed.
+
+### g Q1 — one label per failure surface
+
+The kit-cli asymmetry-arms guard splits: empty extraction, missing
+python3 (check-host make-test contract), and the arms are three
+distinct branches with their own FAIL labels — a python3-less host
+no longer reds a pin claiming non-extractability.
+
+### g S1 — the false success dies
+
+opk's settings-edit heredoc gains an else branch: when the parsed
+JSON carries no top-level "opencodeBinary" key (the caller's grep
+hit the literal as a VALUE), the script exits 1 — the compound
+lands in the ui_error hand-edit branch instead of printing
+ui_success "settings pin removed" over an unchanged file. Two
+behavioral pins in test-kit-cli (before the tally) drive the
+extracted heredoc script directly: value-shaped fixture → rc != 0,
+SILENT (exit, not a traceback), file byte-identical; key-shaped
+fixture → rc 0, key gone, "port" preserved (the success path the
+S1 change must not break). A static shape check anchors the
+extraction (del line + sys.exit(1)).
+
+### Class sweep record (L2, fix wave 7)
+
+- Comment-blind source-counting greps in tests/unit/: `grep -rn
+  'grep -c' tests/unit/*.sh` — in this wave's files: install-args
+  v2-URL (rider added), `_p3old` (rider, wave 6), the retired count
+  pin (gone). Same-class out-of-diff sites, recorded as follow-up
+  candidates, deliberately not fixed here (not this wave's diff):
+  test-bypass-guard :125/:152/:180 count `copy_binary_atomic "` /
+  `copy_file_atomic "` literals in $INSTALL/$UPDATE — a
+  commented-out call would still count (the survivor trap); their
+  `sh -c '[ "$(grep -c …)" -eq N ]'` shape reads the rc through the
+  test comparison, so no set -e abort class. Sites counting fixture
+  OUTPUT (container-backend, ddev-as-opencode) are a different
+  class — not source-counting.
+- Executed-value invariants: `_py3_imports` is the only
+  extraction-vs-runtime pair in the suites (the F24/opk block
+  extractions are behavioral eval pins already); no sibling.
+
+### L1–L7 run (fix wave 7, before commit)
+
+- L1: every new `|| true` and rc capture EXECUTES its failure path
+  in the probe matrix (empty collection → recorded FAIL, shapes
+  7/8; interpreter failure → captured rc, shapes 3/6; the S1
+  value-shape arm runs the real exit(1)).
+- L2: sweeps above; patterns + sites recorded.
+- L3: every claim in the new comments carries its probe (shape
+  matrix) or pin; "RETIRED" verified by grep — no `_p3asn`/`_p3dup`
+  references remain anywhere.
+- L4: new pins sit before their suites' summary gates; the arms
+  discriminate (probe matrix both directions; sabotage post-commit
+  in Follow-ups).
+- L5: no new root operations — opk gains a python exit path only
+  (no path operands, no chmod/chown); the unit pins run entirely
+  unprivileged (mktemp scratch, $WORK fixtures).
+- L6: fixes bring their own pins (the semantic pin is self-pinning;
+  S1's two behavioral arms; Q1's labels). The wave review of this
+  fix diff (snapshot h) is owed per the loop — commissioned to a
+  FRESH session by the maintainer.
+- L7: no new shell files; the pin follows the suite's existing
+  mktemp/guarded-grep idioms; the S1 arms reuse the W2 scratch
+  pattern.
+
+### Gates (fix wave 7, pre-commit)
+
+make lint green (ShellCheck, the heredoc else included); sh
+tests/unit/test-install-args.sh green (semantic pin + rider); sh
+tests/unit/test-kit-cli.sh green (4 W2 pins + 2 S1 pins + split
+labels); full `make lint && make test` rc 0 (log
+/tmp/opencode/pr-00244-g/wave7-gates.log — all suites, parity 118
+rows); line-length ratchet + reviews lint/parity re-run green
+before the commit that carries this file. E2E (root-run script
+semantics change — opk's settings-edit script gains the else-exit):
+owed in-wave, runs on the committed tree, recorded in Follow-ups by
+the bookkeeping commit.
 
 ## Follow-ups
 
