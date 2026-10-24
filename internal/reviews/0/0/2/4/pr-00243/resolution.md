@@ -5,7 +5,11 @@ Chain: [review-a.md](review-a.md) (wave snapshot 2026-10-24, 11 findings,
 [review-b.md](review-b.md) (fix-wave snapshot 2026-10-24: 8 findings, 7
 verified + 1 ghost retracted; all 11 a-fixes audited landed) → fix wave 2
 (b S1/S2/X1/Q1/Q2/Q4 implemented — X1 differently, see row; b X2 held in
-Follow-up 1; b Q3 retracted, no defect). Birth PR #243, branch
+Follow-up 1; b Q3 retracted, no defect) → [review-c.md](review-c.md)
+(fix-wave snapshot 2026-10-24: 11 findings — 3 MED after the X1
+adjustment, 3 LOW, 5 INFO; all 6 b-fixes audited landed) → fix wave 3
+(c S1/S2/X1/Q1/Q2/Q3/Q5 implemented; c X2 held for #247, c X3 for
+#245, c X4/Q4 deliberately not done). Birth PR #243, branch
 `feature/218-uninstall-revert-log-honesty`.
 
 ## Dispositions
@@ -31,6 +35,17 @@ Follow-up 1; b Q3 retracted, no defect). Birth PR #243, branch
 | b Q2 (LOW) | **implemented** | `1d07e2a` | openchamber arm sets the flag; cfg WARN gated like the loop closing |
 | b Q3 (INFO) | **deliberately not done** | — | retracted as ghost in snapshot b — no defect exists |
 | b Q4 (INFO) | **implemented** | `1d07e2a` | renamed un_rc_q; sites, comments, extraction anchors, canaries swept |
+| c S1 (INFO) | **implemented** | `<SHA>` | extractor is a function; block-identity pin drives it (decoy fixture) |
+| c S2 (INFO) | **implemented** | `<SHA>` | family pin feeds every family through _unarm_show |
+| c X1 (MED) | **implemented** | `<SHA>` | one-trailing-slash strip after the dot gate; // stays the gate's catch |
+| c X2 (MED) | **deliberately not done** | — | #247 wave scope (writer-side, both validator copies, e2e owed there) |
+| c X3 (LOW) | **deliberately not done** | — | #245 owns it; snapshot c measured find + chmod tails |
+| c X4 (INFO) | **deliberately not done** | — | restates the recorded a X2 disposition (space arm ungated) |
+| c Q1 (MED) | **implemented** | `<SHA>` | lexical agent-home refusal before `[ -d ]`; arm host-independent |
+| c Q2 (LOW) | **implemented** | `<SHA>` | tail -6 window removed; every family surfaces on red |
+| c Q3 (LOW) | **implemented** | `<SHA>` | fed set built by host existence; assertions name only fed roots |
+| c Q4 (INFO) | **deliberately not done** | — | intentional alignment with the loop closing order |
+| c Q5 (INFO) | **implemented** | `<SHA>` | comments name all three bounded ops incl. chmod g-s |
 
 ## Evidence detail
 
@@ -269,6 +284,93 @@ from un_revert_q (#243 b Q4)"). Sweep (L2, `grep -rn 'un_revert_q\|
 UN_REVERT_Q' files/ tests/ docs/`): exactly the archaeology comment
 survives; docs never named the runner.
 
+### c S1 (INFO) — the extractor is a function, and the pin drives it
+
+The awk state machine moved into `_un_blocklist_tokens <file>`;
+`SCREEN_PATTERNS` and the new pin call the SAME function — a drifting
+second copy cannot exist. Pin: a fixture file with a decoy case block
+(`/*)` arm, `/`-leading dot-form arms — the b-S1 reorder hazard
+shape, backslash continuation) and one keep block echoing "Skipping
+system path"; the pin asserts the output is exactly the keep block's
+tokens (`/keep|/keep/*|/keep2`). A reversion to shape-keyed extraction
+pulls the decoy arms in and reds the pin (sabotage spot-check 4).
+
+### c S2 (INFO) — every diagnostic family is pinned
+
+`_unarm_show` never executes on a green run (it lives in fail
+messages) — the new pin feeds a fixture carrying one line per family
+(log:/WARN:/PARTIALLY/Removed./[DRY]/Skipping/unknown/^sudo) through
+the helper and asserts all of them surface, in order. Dropping a
+family from the regex reds the pin (sabotage spot-check 5).
+
+### c X1 (MED) — writer-parity trailing-slash normalization
+
+Mechanism: after the dot gate, the loop strips ONE trailing slash
+(`${root%/}`) and reassigns `root`, so `/var/` and `/home/` (the two
+bare arms without `/*` siblings) hit the blocklist; `/` strips to
+empty and is restored to `/` (the blocklist's `/` arm refuses it).
+Placement is the wave's own finding: the strip must sit AFTER the dot
+gate — `*//*` means "contains `//`", so every `//` form (incl.
+`/var//`) is the gate's catch, and an early strip would turn `/var//`
+into `/var/` and reopen the exact hole the fix closes (the first
+implementation draft had that regression; caught by the glob probe,
+pinned since — the arm feeds `/` and `/var//` explicitly).
+
+Pins (behavioral, same driver): the trailing-slash arm feeds
+`/var/ /home/` (existence-filtered) asserting the NORMALIZED skip
+echoes (`Skipping system path: /var`), no sudo op on any fed form,
+`/` skipping via the blocklist arm (anchored `: /$` echo, no empty
+`Reverting` operand, no `sudo find / !`), `/var//` staying the dot
+gate's malformed catch (echo pinned verbatim, no `sudo find /var/`),
+and the primary root still processing. Sweep (L2): the loop is the
+only projects.conf reader matching roots lexically against system
+paths — update.sh loops have no gate at all (#247), status.sh lists,
+projects_remove never ops on the root; the agent-home compare takes
+its own raw-or-stripped form (c Q1 below).
+
+### c Q1 (MED) — the agent home is refused lexically
+
+Mechanism: right after `[ -z ]`, before the `[ -d ]` gate, the loop
+refuses `/home/$OPENCODE_USER` comparing the raw AND the
+once-stripped form (`/home/opencode/` must not dodge it); `//` forms
+remain the dot gate's catch. Before `[ -d ]` on purpose: the refusal
+is lexical and holds on hosts where the user or its home does not
+exist — which is also what makes the pin host-independent: the driver
+pins `OPENCODE_USER=untest-agent` and feeds `/home/untest-agent` (a
+directory that never exists), asserting the skip echo, no root op,
+and the primary root still processing. The blocklist comment now
+names all three mirrored writer refusals (strip, case blocklist,
+agent home) — the parity claim it makes is true again, and each piece
+carries its own pin (c X1 arm, static reps + parity pin, c Q1 arm).
+
+Sweep (L2, `grep -rn '/home/\$OPENCODE_USER\|/home/\${OPENCODE_USER'\
+files/`): config.sh:351 refuses it (the origin, review 0.0.39a S4),
+install.sh's validator copy refuses it (install.sh:970-973) — the
+uninstall reader was the only missing mirror.
+
+### c Q2 (LOW) — no diagnostic window
+
+`_unarm_show` lost its `tail -6`: red arms with many sudo lines
+(system-path, two-roots) can no longer push the asserted
+discriminator out of the shown output. The S2 pin covers family
+completeness; the window removal is asserted by the same pin (all
+eight fixture lines surface).
+
+### c Q3 (LOW) — existence-filtered feeds
+
+The system-path arm builds its fed set by `[ -d ]` over
+`/var /home /opt /srv /media /mnt` (FHS-optional dirs no longer
+false-red the suite on minimal hosts); every assertion names only fed
+roots and the pass line discloses the fed set. The trailing-slash
+arm (c X1) and the agent-home arm (c Q1) use the same discipline
+(`/home/` filtered; `/home/untest-agent` needs no host dir at all).
+
+### c Q5 (INFO) — the bounded-ops list is complete
+
+The divergence comments in uninstall.sh and the test now name all
+three bounded ops — uid/gid-matched chown, kit-gid ACL strip, and one
+setgid-bit clear (`chmod g-s`) — instead of "only" two.
+
 ## Gates (fix wave 1, a findings)
 
 - Unit: `sh tests/unit/test-uninstall.sh` green; `make test` green
@@ -340,6 +442,20 @@ survives; docs never named the runner.
   b Q1 (diagnostics-only, no pass/fail of its own): observed live
   during 1–3 — red arms now print the asserted families (`sudo …`
   lines, `log:`/`WARN:` records) that were invisible pre-fix.
+
+## Gates (fix wave 3, c findings)
+
+- Unit: `sh tests/unit/test-uninstall.sh` green — all arms incl. the
+  five new/extended c arms (S1 fixture pin, S2 family pin, Q3-filtered
+  system-path arm, X1 trailing-slash arm with the // and / regression
+  pins, Q1 agent-home arm); `make test` green.
+- `make lint` green; `sh tests/unit/test-docs.sh` green; line-length
+  ratchet green (this file ≤ 120 content columns); `make check-version`
+  green.
+- E2E (RM-0113 — c X1/c Q1 change which roots a root-run script
+  processes): both suites run on the committed fix tree; counts and
+  the sabotage spot-checks are recorded in the chain's next commit
+  (the SHA fill).
 
 ## Follow-ups
 

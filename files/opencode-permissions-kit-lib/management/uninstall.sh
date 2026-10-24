@@ -563,6 +563,20 @@ UNINSTALL_PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
+        # The agent user's own home is never a project root — the
+        # writer's dedicated refusal OUTSIDE its case blocklist
+        # (config.sh project_path_sane and the install.sh validator
+        # copy, review 0.0.39a S4), mirrored here (#243 c Q1): the
+        # root-run revert ops must never run over the directory that
+        # carries the agent's own config and state. Lexical on purpose
+        # and before the [ -d ] gate — the refusal holds even on a
+        # host where the user or its home does not exist. The compare
+        # takes the raw and the once-stripped form (a trailing slash
+        # must not dodge it); `//` forms are the dot gate's job below.
+        if [ "$root" = "/home/$OPENCODE_USER" ] || [ "${root%/}" = "/home/$OPENCODE_USER" ]; then
+            echo "  Skipping agent home (never a project root): $root"
+            continue
+        fi
         [ ! -d "$root" ] && continue
 
         # Form gate (#243 a X2): the sanctioned writer validates these
@@ -583,15 +597,33 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
                 continue
                 ;;
         esac
-        # System-path blocklist — writer parity (#243 b X1): every
-        # system path project_path_sane refuses (config.sh), in the
-        # writer's arm order, so a hand-edited conf cannot drive the
-        # root-run revert ops over system trees the sanctioned writer
-        # would never store. Deliberate divergence, pinned in the unit
-        # suite: the scratch prefixes /tmp and /var/tmp stay
-        # processable (the sandbox policy pins unit-fixture roots
-        # there, and a temp-prefix entry is bounded — uid/gid-matched
-        # chown plus kit-gid ACL strip only).
+        # Writer-parity normalization (#243 c X1), after the dot gate:
+        # project_path_sane strips one trailing slash before its
+        # blocklist (config.sh `_pp="${1%/}"`) — the reader mirrors
+        # that so the bare arms without /* siblings (/home, /var) are
+        # not open to their trailing-slash spellings: /home/ and
+        # /var/ passed gate + blocklist lexically while the writer
+        # refuses the stripped form. Placed here, not earlier: every
+        # `//` form is already the dot gate's catch above, so at most
+        # ONE trailing slash can remain and one strip is exact.
+        # `/` strips to the empty string — keep it as `/` (the
+        # blocklist's `/` arm refuses it). The skip echo below prints
+        # the normalized path, still naming the conf entry.
+        _un_root="${root%/}"
+        [ -n "$_un_root" ] || _un_root="/"
+        root="$_un_root"
+        # System-path blocklist — writer parity (#243 b X1, completed
+        # by the normalization and agent-home refusal above, #243 c
+        # X1/Q1): every system path project_path_sane refuses
+        # (config.sh — its trailing-slash strip, its case blocklist
+        # here in the writer's arm order, and its agent-home refusal),
+        # so a hand-edited conf cannot drive the root-run revert ops
+        # over system trees the sanctioned writer would never store.
+        # Deliberate divergence, pinned in the unit suite: the scratch
+        # prefixes /tmp and /var/tmp stay processable (the sandbox
+        # policy pins unit-fixture roots there, and a temp-prefix
+        # entry is bounded — uid/gid-matched chown, kit-gid ACL strip
+        # and one setgid-bit clear (chmod g-s) only).
         case "$root" in
             /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
             /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
