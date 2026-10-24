@@ -87,7 +87,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0116](0/1/1/RM-0116.md) | Every RM key appears exactly twice | active | approved | 1m | 2026-11-23 |
+| [RM-0116](0/1/1/RM-0116.md) | Every RM key appears at exactly three sites | active | approved | 1m | 2026-11-24 |
 
 ## agent/review-concept.md
 

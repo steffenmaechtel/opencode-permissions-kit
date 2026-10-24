@@ -239,11 +239,13 @@ else
     pass
 fi
 
-# 10. no fake findings -- every real meta ID occurs exactly TWICE in
-#     the living tree: once as the trailing (RM-NNNN) ref at its rule
-#     unit, once as the id: line in its meta file. Every other
-#     occurrence is a bug (ID ranges, prose, comments, cross-refs):
-#     searching an ID must only ever hit genuine sites.
+# 10. no fake findings -- every real meta ID occurs at exactly THREE
+#     genuine sites: the trailing (RM-NNNN) ref at its rule unit, the
+#     id: line in its meta file, and its generated row in the
+#     rule-meta INDEX (machine-made and parity-pinned -- lanes a-c do
+#     not scan it). Every other occurrence is a bug (ID ranges,
+#     prose, comments, cross-refs): searching an ID must only ever
+#     hit genuine sites.
 #     Exempt: the generated INDEX.md, frozen history (internal/reviews,
 #     internal/records/_archive), and the 9xxx abstract test namespace.
 #     Lanes: (a) scope files -- only ref-form tokens; (b) meta files --
