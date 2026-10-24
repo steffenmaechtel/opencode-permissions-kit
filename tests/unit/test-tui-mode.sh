@@ -384,7 +384,7 @@ _tps_out=$( _tps_run "healthy-noop" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" openc
 unset _tps_errfile
 case "$_tps_out" in *rc=0*) check "unregister cleanup: healthy no-op rc=0 (#244 d W1)" true ;; *) check "unregister cleanup: healthy no-op rc=0 (got [$_tps_out])" false ;; esac
 check "unregister cleanup: healthy no-op, stderr empty (#244 e Q3)" test ! -s "$TPSWERR"
-rm -rf "$TPSW"
+rm -rf "$TPSW" "$TPSWERR"
 
 # (#244 e S1) guard/execution resolution asymmetry: the guard now
 # runs INSIDE the _tp_sudo context, so guard and exec share ONE PATH.

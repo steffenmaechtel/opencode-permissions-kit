@@ -71,9 +71,12 @@ _opk_ddev_describe() {
 # An absent interpreter is guarded to the same silent empty output
 # (#244 d Q1): absence is a legitimate mid-lifecycle state, not a
 # diagnostic event. Absence returns 0 — pre-guard, the failed
-# pipeline's rc 127 carried (#244 e S2); no caller observes the
-# function's rc (stdout-only $( ) consumers; this file never exits
-# the parent shell).
+# pipeline's rc 127 carried (#244 e S2). No caller acts on that rc
+# (#244 f S1): every consumer reads stdout via $( ) — the plain
+# assignments among them carry the substitution's rc, but only under
+# set -e, which the interactive rc-file context does not run; the
+# file never exits the parent shell, and the 127->0 delta is the
+# fail-safe direction anyway.
 _opk_json_get() {
     _opk_gj="$1"
     shift

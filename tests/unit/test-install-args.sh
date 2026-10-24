@@ -929,7 +929,12 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
         fail "pre-flight wires the health gate (verbatim call pin)"
     fi
     _p3old=0
-    _p3old=$(grep -cF 'if ! command -v python3 >/dev/null 2>&1; then' "$INSTALL") || true
+    # Comment lines are stripped before the count (#244 f W4 sibling
+    # sweep): -F counts substrings anywhere, so a commented-out gate
+    # would count as the surviving gate — the exact commented-sabotage
+    # pass-green trap.
+    _p3old=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" \
+        | grep -cF 'if ! command -v python3 >/dev/null 2>&1; then') || true
     if [ "$_p3old" -eq 1 ]; then
         pass "old presence-only gate replaced (check survives only inside the function)"
     else
@@ -967,17 +972,29 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     # (`_py3_imports=` / `_py3_imports+=`) — separate-line seconds and
     # standalone append lines go red there (the runtime gate executes
     # first+append while the extraction sed reads the FIRST list
-    # only). The dup pin catches same-line doubles including the
-    # `+=` form: `_py3_imports='a'; _py3_imports+='b'` keeps the
-    # count at 1 while extraction and runtime diverge the same way.
-    # Both greps are guarded against the empty match (L7).
-    _p3asn="$(grep -cE "^[[:space:]]*_py3_imports\+?=" "$INSTALL")"
+    # only). The dup pin catches same-line doubles whose FIRST token
+    # is a plain assignment: `_py3_imports='a'; _py3_imports+='b'`
+    # keeps the count at 1 while extraction and runtime diverge the
+    # same way. A first-token-`+=` double
+    # (`_py3_imports+='a'; _py3_imports+='b'`) matches NEITHER pin —
+    # but cannot sail: as the sole line it starves the extraction
+    # (the extractability pin reds), next to the real assignment it
+    # counts 2 (#244 f W3).
+    # Both greps are guarded against the empty match (L7) — an
+    # unguarded `grep -c` exits 1 on zero matches and this set -e
+    # suite would ABORT instead of recording the FAIL (#244 f W1);
+    # grep -c still prints 0, so the `found 0, want 1` path stays
+    # observable.
+    _p3asn="$(grep -cE "^[[:space:]]*_py3_imports\+?=" "$INSTALL" || true)"
     if [ "$_p3asn" -eq 1 ]; then
-        pass "gate: exactly one _py3_imports assignment (#244 c W3, #244 e W2)"
+        pass "gate: exactly one _py3_imports assignment/append line (#244 c W3, #244 e W2)"
     else
-        fail "gate: exactly one _py3_imports assignment (found $_p3asn, want 1)"
+        fail "gate: exactly one _py3_imports assignment/append line (found $_p3asn, want 1)"
     fi
-    _p3dup="$(grep -nE "^[[:space:]]*_py3_imports=.*_py3_imports(\+=|=)" "$INSTALL" || true)"
+    # The dup span [^#]* cannot cross a comment start (#244 f W4): a
+    # trailing comment naming the token after a legitimate assignment
+    # stays green, and no real double can carry # between its tokens.
+    _p3dup="$(grep -nE "^[[:space:]]*_py3_imports=[^#]*_py3_imports(\+=|=)" "$INSTALL" || true)"
     if [ -z "$_p3dup" ]; then
         pass "gate: no same-line double _py3_imports assignment (#244 d W2, #244 e W2)"
     else

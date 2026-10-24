@@ -9,7 +9,9 @@ sub-claim retracted) → fix wave 3 → [review-d.md](review-d.md)
 (wave snapshot 2026-10-24, 9 IDs, all unique — 3 LOW, 6 INFO, no
 MED/HIGH) → fix wave 4 → [review-e.md](review-e.md) (wave snapshot
 2026-10-24, 9 IDs unique after 2 dup pairs — 6 LOW, 3 INFO, no
-MED/HIGH) → fix wave 5 (the e rows below). Birth PR
+MED/HIGH) → fix wave 5 (the e rows below) → [review-f.md](review-f.md)
+(wave snapshot 2026-10-24, 13 IDs, 12 unique after 1 dup pair — 2 MED,
+6 LOW, 4 INFO, no HIGH) → fix wave 6 (the f rows below). Birth PR
 #244, branch `feature/223-fsb-tee-health-gate`.
 
 ## Dispositions
@@ -65,6 +67,18 @@ MED/HIGH) → fix wave 5 (the e rows below). Birth PR
 | e W5 (INFO) | **implemented** | `f49dadd` | absence sentence now names oao:444's redirect+rc handling |
 | e Q1 (LOW) | **implemented** | `f49dadd` | cli.md sentence states the per-step truth |
 | e Q3 (LOW) | **implemented** | `f49dadd` | healthy-noop pin asserts an empty stderr stream |
+| f W1 (MED) | **implemented** | `<SHA>` | count grep `\|\| true`-guarded: zero-match FAIL observable, no set -e abort |
+| f W2 (MED) | **implemented** | `<SHA>` | guard inside the sudo context (sh -c, e-S1 pattern); 4 kit-cli pins |
+| f S1 (LOW) | **implemented** | `<SHA>` | comment states the true rc contract (no caller acts; set -e nuance) |
+| f W3 (LOW) | **implemented** | `<SHA>` | first-token-`+=` double documented; both collateral catches named |
+| f W4 (LOW) | **implemented** | `<SHA>` | dup span `[^#]*` cannot cross comments; `_p3old` comment-strip |
+| f W5 (LOW) | **implemented** | `<SHA>` | TPSWERR removed in-block like its sibling marker |
+| f Q1 (LOW) | **implemented** | `<SHA>` | record corrected by marker: self-append reds in composition, by design |
+| f Q2 (LOW) | **implemented** | `<SHA>` | "12 sites" trued by marker: class count, not total (15 executing lines) |
+| f S2 (INFO) | **deliberately not done** | — | already recorded backlog (the wave-4 record names uninstall:316) |
+| f S3 (INFO) | **deliberately not done** | — | exact-name lookup — the basename exclusion is precisely scoped |
+| f Q3 (INFO) | **implemented** | `<SHA>` | cli.md sentence ordered (advisory feed, first scan, leak scan) |
+| f Q4 (INFO) | **implemented** | `<SHA>` | count-pin label says assignment/append line |
 
 ## Evidence detail
 
@@ -717,6 +731,11 @@ Both corrections in the wave-4 S3-class bullet above (tee consumers
 content-anchored). Sweep re-derived from
 `grep -rn python3 files/ -I --exclude-dir=__pycache__` — 12
 execution sites, every one now classified in the bullet.
+(Correction, #244 f Q2: 12 is the guarded+transparent CLASS count,
+not the total — the grep yields 15 executing lines / 13 site units;
+the bullet's later clauses classify the remaining sites (oao:444,
+update.sh 1.x sed route, uninstall:316). No site is unclassified;
+the sentence read as a total.)
 
 ### e W2 — the pin pair catches append shapes
 
@@ -728,8 +747,12 @@ reds the count), dup pin `^[[:space:]]*_py3_imports=.*_py3_imports(\+=|=)`
 empty), same-line append → dup RED, separate-line append → count 2
 RED, same-line double → dup RED (unchanged), legitimate self-append
 `_py3_imports="$_py3_imports, threading"` stays green (no false
-red). The comment's "any line naming the assignment token twice"
-promise is replaced by the trued enumeration.
+red). (Correction, #244 f Q1: "stays green" held only for the
+self-append probed in ISOLATION — next to the real assignment the
+count pin counts it (2) and reds, which IS the pair's designed
+drift catch for a separate-line append of any form; "no false red"
+as worded was false.) The comment's "any line naming the assignment
+token twice" promise is replaced by the trued enumeration.
 
 ### e W3 — content anchor
 
@@ -777,7 +800,9 @@ marker.
   the count/dup pair reds it first). Sites checked: the gate-pin
   block, tests/unit/test-install-args.sh:930-1000.
 - W1/W5 class (record enumerations): re-derived as above (12
-  sites); the corrected bullet is the complete list.
+  sites); the corrected bullet is the complete list. (Correction,
+  #244 f Q2: the 12 is the guarded+transparent class count — see the
+  e W1 marker above for the full-line total.)
 - W3 class (line-number cites): every numeric cite this record now
   carries was measured at this tree after the edits; the record
   prefers content anchors for anything this wave itself moved.
@@ -817,6 +842,174 @@ that carries this file. E2E (root-run script semantics change — the
 tui-plugin guard moves into the sudo context): owed in-wave, runs
 on the committed tree, recorded in Follow-ups by the bookkeeping
 commit.
+
+## Evidence detail (fix wave 6 — f findings)
+
+Maintainer decision (recorded per the commission): full
+implementation — W2 with the tui-plugin `sh -c` pattern (the
+maintainer's pick), W1/S1/W3/W4/W5/Q1/Q2/Q3/Q4 code-, test- or
+record-side; S2/S3 deliberately not done. Session F (the snapshot-f
+author) applies the fixes in the same session per the rotation.
+
+### f W2 — the opk settings edit joins the e-S1 class
+
+The openchamber-secure settings edit moves its guard INSIDE the
+sudo context, the identical shape tui-plugin.sh got in wave 5:
+`sudo -u "$_oc_duser" sh -c 'command -v python3 >/dev/null 2>&1 &&
+exec python3 "$@"' opk-settings-edit - "$_oc_settings"` with the
+PYEOF heredoc attached to the sudo command — sh passes its stdin
+through to the exec'd python3, so the `-` operand reads the same
+script and the argv is byte-identical to the pre-wave shape
+(`python3 - "$_oc_settings"`; `$0=opk-settings-edit` is cosmetic).
+Both asymmetry arms close: arm A (caller PATH has python3, sudo
+context lacks it) now skips silently instead of leaking sudo's
+not-found notice into the ui_error; arm B (caller lacks it, sudo
+has it) now runs the edit instead of falling to the ui_error that
+told the user to hand-edit the file. Pins (test-kit-cli, before the
+tally): two static shape pins (the guard-inside-sudo literal
+extractable; no caller-side `if command -v python3` line in the
+extracted block) and two functional arms on the F24 extraction
+idiom — the compound is eval'd under a whole-PATH binary farm
+(test-tui-mode's farm idiom) with PATH-fixing sudo shims as the
+secure_path stand-ins: arm A (noisy caller python3, empty exec
+farm) asserts the error path, NO "not found"/noisy marker, file
+unchanged; arm B (caller farm without python3, exec farm with the
+REAL interpreter symlinked in) asserts ui_success and the settings
+file itself edited (opencodeBinary gone, "port" preserved — the
+real heredoc script ran through the new path). E2E: the suites'
+openchamber-secure flow exercises the new path end-to-end (the e2e
+run.sh:1206 settings-pin-gone assert); owed in-wave, see Follow-ups.
+
+### f W1 — the count grep joins the guarded set
+
+`_p3asn="$(grep -cE … "$INSTALL" || true)"`: grep -c prints 0 AND
+exits 1 on zero matches — unguarded under the suite's `set -e`, a
+deleted/renamed `_py3_imports` assignment aborted the whole suite
+mid-run instead of recording the FAIL (the wave-5 sabotage ran the
+count=2 path, where grep exits 0 — the zero path never executed).
+With the guard, the failure path is observable as designed:
+"found 0, want 1" FAIL plus the suite tally. The comment now states
+the mechanism it used to overclaim ("Both greps are guarded" was
+false for this one). Sabotage post-commit: delete the assignment →
+FAIL recorded, suite tallies (Follow-ups).
+
+### f S1 / f Q3 — the two claim fixes
+
+ddev-terminal's guard comment states the true contract: no caller
+ACTS on the rc; the plain `$()` assignments among the consumers do
+carry the substitution's rc, but only under `set -e`, which the
+interactive rc-file context does not run — and the 127→0 delta is
+the fail-safe direction (the e-round's S2 verification nuance, now
+in the shipped comment instead of the overstated "no caller
+observes"). cli.md's sentence names the three sites in report
+order (advisory feed :542 runs before the first scan's probe :827,
+leak scan :1341 last) instead of implying scan-first chronology.
+
+### f W3 / f W4 / f Q4 — the pin pair's exactness
+
+W3: the comment's dup-pin promise is trued — it catches same-line
+doubles whose FIRST token is a plain assignment; a first-token-`+=`
+double (`_py3_imports+='a'; _py3_imports+='b'`) matches neither
+pin but cannot sail (sole line → extraction starves → the
+extractability pin reds; next to the real assignment → count 2),
+both collateral catches named at the site. W4: the dup span is
+`[^#]*` — it cannot cross a comment start, so a trailing comment
+naming the token stays green; probe: old regex false-red on the
+comment shape, new regex green, true same-line double still red,
+legitimate self-append still green. Sibling sweep of the
+comment-blind class: `_p3old`'s `-cF` counts substrings anywhere —
+a commented-out gate line counted as the surviving gate (the
+commented-sabotage pass-green trap) — it now strips comment lines
+before counting (sed 's/^[[:space:]]*#.*$//' upstream of the grep);
+the other `grep -c` in the file (:827, v2-install URL hits) is
+`|| true`-guarded and counts a URL literal whose comment-shadow
+cannot keep a deleted real call red (a maintainer deleting the
+call and leaving a commented URL would false-green — bounded to
+that deliberate two-step, named here rather than fixed: the URL
+also lives in docs and usage text, a comment-strip would need the
+same sed rider for no observed defect). Q4: the count pin's
+pass/fail labels say "assignment/append line", matching the
+`\+?=` semantics.
+
+### f W5 / f Q1 / f Q2 / not-done
+
+W5: `TPSWERR` joins the in-block `rm -rf` (the merged trap stays
+the backstop). Q1/Q2: the two wave-5 record claims carry correction
+markers in place (see the e W2 and e W1 bullets above) — the
+correction-of-record pattern; the immutable commit message stays as
+history. S2 (uninstall:316 unguarded sudo python3): deliberately
+not done — pre-existing, outside this chain's diffs, already named
+as backlog by the wave-4 record's S3-class bullet. S3 (farm
+basename-only python3 exclusion): deliberately not done —
+`command -v python3` is an exact-name lookup; excluding precisely
+the basename `python3` is the correctly scoped build, and the
+f-arm farms now document their purpose in the test.
+
+### Class sweep record (L2, fix wave 6)
+
+- W2 class (guard vs execution resolution context):
+  `grep -rn "command -v python3" files/` — 10 sites: fs-baseline
+  :126/:136, ddev-terminal :83, update :1161, status :217/:538/:1333,
+  install :574 all guard and execute python3 in ONE shell context;
+  tui-plugin :80 and opk :305 run the guard INSIDE the sudo context
+  (the sh -c pattern). No caller-guard + different-context-exec
+  site remains; uninstall:316 has no guard at all (S2, backlog).
+- Comment-blind count class (the W4 sibling shape): `grep -n
+  "grep -c" tests/unit/test-install-args.sh` — :827 (URL literal,
+  disposition above), :937 (`_p3old`, fixed with comment-strip),
+  :988 (the count pin itself, `^`-anchored — full-line comments
+  cannot match). Sites checked: all three.
+- In-block-cleanup class (W5): test-tui-mode scratch inventory —
+  every block removes what it creates (TPSW/TPSABS/TPSNZ,
+  TPSW/TPSWERR, TPSNZ2, TPSABS2/TPSFIXA/TPSFIXB/TPSMARK); the trap
+  remains the backstop. The new kit-cli ocw2 block removes its farm
+  dir in-block.
+
+### L1–L7 run (fix wave 6, before commit)
+
+- L1: the new `|| true` (W1) is pinned by executing the zero-match
+  path (sabotage post-commit: FAIL + tally observed); the W2 arms
+  execute both asymmetry paths with the failure surfaces asserted
+  (silence in A, marker-file edit in B).
+- L2: sweeps above; patterns + sites recorded.
+- L3: every rewritten claim carries its evidence — the W1 comment ↔
+  the zero-path sabotage; W3's collateral-catch claims ↔ the f-pass
+  probes (verified there); W4's comment ↔ the recorded probe
+  (old red/new green); S1's comment ↔ the f-pass caller
+  enumeration; cli.md ↔ the f-pass order verification; the record
+  corrections carry markers.
+- L4: the four new kit-cli pins sit before the tally; the arms
+  discriminate in both directions (sabotage: guard revert → arm A
+  noise back, arm B edit skipped — Follow-ups); the arms hard-require
+  python3 (FAIL else), consistent with check-host's make-test
+  contract; the block-extraction bound (≤ 32 lines) fails loud on
+  anchor drift (the F24 lesson).
+- L5: no new root operations — the W2 change alters the sudo argv
+  (sh -c wrapper), not the operands; no path operands, no
+  chmod/chown changes; the unit arms run entirely unprivileged
+  (sudo shimmed, farms under suite scratch).
+- L6: fixes bring their own pins (2 static + 2 functional W2 pins;
+  the W1 zero path via sabotage; `_p3old`'s comment-strip rides the
+  existing count pin — its sabotage shape is the commented gate).
+  The wave review of this fix diff (snapshot g) is owed per the
+  loop — commissioned to a FRESH session by the maintainer.
+- L7: no new shell files; the arms follow the F24-extraction and
+  tui-farm idioms; heredoc shims escape runtime vars.
+
+### Gates (fix wave 6, pre-commit)
+
+make lint green (ShellCheck, the opk heredoc shape included); sh
+tests/unit/test-kit-cli.sh green (4 new pins); sh
+tests/unit/test-install-args.sh green; sh tests/unit/test-tui-mode.sh
+green; full `make test` rc 0 (log
+/tmp/opencode/pr-00244-f6-maketest.log on the session host — the
+first run red on the line-length ratchet, five resolution rows;
+shortened before any commit, the ratchet's protection shape);
+line-length ratchet + reviews lint/parity green before the commit
+that carries this file. E2E (root-run script semantics change —
+opk's settings-edit guard moves into the sudo context): owed
+in-wave, runs on the committed tree, recorded in Follow-ups by the
+bookkeeping commit.
 
 ## Follow-ups
 
