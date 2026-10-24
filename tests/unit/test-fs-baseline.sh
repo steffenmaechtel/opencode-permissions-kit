@@ -681,56 +681,82 @@ rm -rf "$W23EP"
 # the python itself (a bare kill of the sh parent would orphan it and
 # the tee would finish normally on EOF — a false pass). Asserts are on
 # stderr content only: the sh wrapper's rc after SIGINT is
-# shell-dependent.
+# shell-dependent. Arm proof before the signal (#244 b W3): the
+# writer's drain marker appears only once the tee consumed the whole
+# stream (a fifo write blocks until read), so the SIGINT always hits
+# an interpreter that already initialized — a fixed sleep instead
+# could race the startup chain and pass vacuously. Guarded on setsid
+# presence with a skip note (#244 b W2, the §11c bash-rider pattern).
 W23KI="$WORK/issue223-ki"
-mkdir -p "$W23KI"
-W23KIF="$W23KI/in.fifo"
-mkfifo "$W23KIF"
-# fd 3 on the SUBSHELL (exec 3>): the write end must stay open through
-# the sleep — a redirect on the python command alone closes it when
-# python exits, the tee sees EOF, finishes normally and prints its
-# completion line before the signal ever arrives (fixture bug caught
-# by this very pin on first run).
-( exec 3>"$W23KIF"
-  python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >&3 2>/dev/null
-  sleep 10 ) &
-W23KIWR=$!
-# The async-list SIGINT rule (POSIX): a background command of a
-# non-interactive shell starts with SIGINT IGNORED — CPython then never
-# installs its KeyboardInterrupt handler and kill -INT would be a
-# silent no-op: the pin could not fire AT ALL (caught live — the
-# completion line still appeared and the no-traceback assert passed
-# vacuously). The wrapper RESTORES the disposition — a caught signal
-# resets to default across exec — then execs the real sh+tee.
-setsid python3 -c 'import os, signal, sys
+if command -v setsid >/dev/null 2>&1; then
+    mkdir -p "$W23KI"
+    W23KIF="$W23KI/in.fifo"
+    mkfifo "$W23KIF"
+    # fd 3 on the SUBSHELL (exec 3>): the write end must stay open through
+    # the sleep — a redirect on the python command alone closes it when
+    # python exits, the tee sees EOF, finishes normally and prints its
+    # completion line before the signal ever arrives (fixture bug caught
+    # by this very pin on first run). The ready marker after the write
+    # is the arm proof (#244 b W3): a fifo write blocks until the
+    # reader drains it, so the marker appears only once the tee has
+    # consumed the whole stream and sits blocked in read.
+    ( exec 3>"$W23KIF"
+      python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >&3 2>/dev/null
+      : > "$W23KI/ready"
+      sleep 10 ) &
+    W23KIWR=$!
+    # The async-list SIGINT rule (POSIX): a background command of a
+    # non-interactive shell starts with SIGINT IGNORED — CPython then never
+    # installs its KeyboardInterrupt handler and kill -INT would be a
+    # silent no-op: the pin could not fire AT ALL (caught live — the
+    # completion line still appeared and the no-traceback assert passed
+    # vacuously). The wrapper RESTORES the disposition — a caught signal
+    # resets to default across exec — then execs the real sh+tee.
+    setsid python3 -c 'import os, signal, sys
 signal.signal(signal.SIGINT, signal.default_int_handler)
 os.execv(sys.argv[1], [sys.argv[1], "-c",
     ". \"$1\" && _fsb_count_tee ki < \"$2\"", "ki", sys.argv[2], sys.argv[3]])' \
-    /bin/sh "$LIB" "$W23KIF" >/dev/null 2>"$W23KI/err" &
-W23KITEE=$!
-sleep 1
-# No "--" before the negative pid: dash's kill builtin rejects it
-# (rc 2, usage) while bash accepts it — the suite runs under dash, and
-# the group kill silently never happened until this was caught live
-# (bash-vs-dash trap: the debug session ran bash and looked green).
-kill -INT "-$W23KITEE" 2>/dev/null \
-    || /bin/kill -INT "-$W23KITEE" 2>/dev/null \
-    || kill -INT "$W23KITEE" 2>/dev/null \
-    || true
-wait "$W23KITEE" 2>/dev/null || true
-kill "$W23KIWR" 2>/dev/null || true
-wait "$W23KIWR" 2>/dev/null || true
-if grep -q 'Traceback' "$W23KI/err"; then
-    fail "#244 ctrl-c: no traceback on the KeyboardInterrupt arm"
+        /bin/sh "$LIB" "$W23KIF" >/dev/null 2>"$W23KI/err" &
+    W23KITEE=$!
+    # Readiness poll (#244 b W3): signal only an ARMED tee — the marker
+    # proves the stream drained (interpreter initialized, read loop
+    # live). No marker within 10 s goes red by itself instead of
+    # passing green with nothing executed.
+    W23KIWAIT=0
+    while [ ! -e "$W23KI/ready" ] && [ "$W23KIWAIT" -lt 40 ]; do
+        sleep 0.25
+        W23KIWAIT=$((W23KIWAIT + 1))
+    done
+    if [ -e "$W23KI/ready" ]; then
+        pass "#244 ctrl-c: tee armed before the signal (stream drained)"
+    else
+        fail "#244 ctrl-c: tee never armed — inspect $W23KI/err"
+    fi
+    # No "--" before the negative pid: dash's kill builtin rejects it
+    # (rc 2, usage) while bash accepts it — the suite runs under dash, and
+    # the group kill silently never happened until this was caught live
+    # (bash-vs-dash trap: the debug session ran bash and looked green).
+    kill -INT "-$W23KITEE" 2>/dev/null \
+        || /bin/kill -INT "-$W23KITEE" 2>/dev/null \
+        || kill -INT "$W23KITEE" 2>/dev/null \
+        || true
+    wait "$W23KITEE" 2>/dev/null || true
+    kill "$W23KIWR" 2>/dev/null || true
+    wait "$W23KIWR" 2>/dev/null || true
+    if grep -q 'Traceback' "$W23KI/err"; then
+        fail "#244 ctrl-c: no traceback on the KeyboardInterrupt arm"
+    else
+        pass "#244 ctrl-c: no traceback on the KeyboardInterrupt arm"
+    fi
+    if grep -q '— done' "$W23KI/err"; then
+        fail "#244 ctrl-c: no completion line for an aborted pass"
+    else
+        pass "#244 ctrl-c: no completion line for an aborted pass"
+    fi
+    rm -rf "$W23KI"
 else
-    pass "#244 ctrl-c: no traceback on the KeyboardInterrupt arm"
+    echo "  note: setsid absent — ctrl-c pins skipped (#244 b W2)"
 fi
-if grep -q '— done' "$W23KI/err"; then
-    fail "#244 ctrl-c: no completion line for an aborted pass"
-else
-    pass "#244 ctrl-c: no completion line for an aborted pass"
-fi
-rm -rf "$W23KI"
 
 # --- Summary ---------------------------------------------------------------------------
 echo ""

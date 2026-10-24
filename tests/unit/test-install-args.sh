@@ -17,10 +17,13 @@
 # Static extraction of parse_args() from install.sh, then table-driven
 # checks. No root required.
 #
-# Unit tests for the python3 health gate (#244 a W1/S1):
+# Unit tests for the python3 health gate (#244 a W1/S1, b Q1/Q2/S2):
 #   - extracted _py3_health_probe functional matrix: healthy passes,
 #     absent and broken-shim abort loud (two distinct error classes),
-#     hostile PYTHONPATH is ignored (-I isolation)
+#     hostile PYTHONPATH is ignored (-I isolation), and a noisy broken
+#     interpreter surfaces its own diagnostic (#244 b S2)
+#   - import-union drift pin: every shipped python import module must
+#     appear in the gate's import list (#244 b Q1)
 #   - verbatim call wiring pin + old inline-gate replacement count pin
 #
 # Run: sh tests/unit/test-install-args.sh
@@ -833,32 +836,44 @@ else
     pass "no v1 installer URL left in install.sh"
 fi
 
-# --- python3 health gate (#244 a W1/S1) ------------------------------------------------
+# --- python3 health gate (#244 a W1/S1, b Q1/Q2/S2) ------------------------------------
 # Presence-only was the findable-but-broken hole (a pyenv shim installs
 # green, every later consumer fails attributelessly): the gate must RUN
 # the interpreter — isolated (-I), so PYTHONHOME/PYTHONPATH poison can
 # neither break nor shadow it. Functional matrix on the extracted
 # function + verbatim call wiring pin (the _distro_gate pattern,
-# 0.0.45a C1).
+# 0.0.45a C1). Fix-wave-2 additions: the noisy-broken case (the gate
+# must surface the interpreter's own diagnostic, #244 b S2) and the
+# import-union drift pin (#244 b Q1).
 if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     eval "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")"
     pass "_py3_health_probe defined in install.sh"
     _py3w="$(mktemp -d)"
-    mkdir -p "$_py3w/empty" "$_py3w/shim"
+    mkdir -p "$_py3w/empty" "$_py3w/shim" "$_py3w/noisy"
     printf '#!/bin/sh\nexit 9\n' > "$_py3w/shim/python3"
     chmod +x "$_py3w/shim/python3"
+    # A broken interpreter that NAMES its problem on stderr (#244 b
+    # S2): the moved-/usr/local/python shape — works only via env,
+    # prints its real diagnostic and fails. (Hyphenated marker wording:
+    # the sandbox scanner greps raw lines quote-blind — "platform
+    # independent" + a "$VAR/" operand on one line chains into a false
+    # rm-suffix match.)
+    printf '#!/bin/sh\necho "Could not find platform-independent libraries" >&2\nexit 9\n' > "$_py3w/noisy/python3"
+    chmod +x "$_py3w/noisy/python3"
     mkdir -p "$_py3w/shadow"
     # json.py (NOT os.py): os is preloaded in sys.modules at -c startup,
     # an os.py shadow never loads and the pin would be vacuous — caught
     # by sabotage during the fix wave; json is imported by the probe and
     # a shadow FIRES without -I.
     printf 'import sys\nsys.exit(9)\n' > "$_py3w/shadow/json.py"
-    # _py3case <desc> <PATH> <PYTHONPATH-or-empty> — runs the extracted
+    # _py3case <PATH> <PYTHONPATH-or-empty> — runs the extracted
     # gate in a subshell (its exit must not kill the suite), ui_error
-    # stubbed onto a marker file: observe the message the way a real
+    # stubbed onto stderr: observe the message the way a real
     # terminal does, not via a 2>&1 that production never runs.
+    # (No dead desc parameter — #244 b Q2: the pass/fail messages
+    # name their case themselves.)
     _py3case() {
-        _p3d="$1" _p3p="$2" _p3e="$3"
+        _p3p="$1" _p3e="$2"
         rm -f "${_py3w:?}/err"
         (
             PATH="$_p3p"
@@ -868,29 +883,36 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
         ) 2>"$_py3w/err"
         return $?
     }
-    _p3rc=0; _py3case healthy "$PATH" "" || _p3rc=$?
+    _p3rc=0; _py3case "$PATH" "" || _p3rc=$?
     if [ "$_p3rc" -eq 0 ] && [ ! -s "$_py3w/err" ]; then
         pass "gate: healthy python3 passes silently"
     else
         fail "gate: healthy python3 passes silently (rc=$_p3rc)"
     fi
-    _p3rc=0; _py3case absent "$_py3w/empty" "" || _p3rc=$?
+    _p3rc=0; _py3case "$_py3w/empty" "" || _p3rc=$?
     if [ "$_p3rc" -eq 1 ] && grep -qF 'not installed' "$_py3w/err"; then
         pass "gate: absent python3 aborts loud, names the class"
     else
         fail "gate: absent python3 aborts loud (rc=$_p3rc err=$(cat "$_py3w/err"))"
     fi
-    _p3rc=0; _py3case broken "$_py3w/shim" "" || _p3rc=$?
+    _p3rc=0; _py3case "$_py3w/shim" "" || _p3rc=$?
     if [ "$_p3rc" -eq 1 ] && grep -qF 'present but broken' "$_py3w/err"; then
         pass "gate: broken shim aborts loud, names the OTHER class (#244 a W1)"
     else
         fail "gate: broken shim aborts loud (rc=$_p3rc err=$(cat "$_py3w/err"))"
     fi
-    _p3rc=0; _py3case poisoned "$PATH" "$_py3w/shadow" || _p3rc=$?
+    _p3rc=0; _py3case "$PATH" "$_py3w/shadow" || _p3rc=$?
     if [ "$_p3rc" -eq 0 ]; then
         pass "gate: hostile PYTHONPATH ignored (-I isolation, #244 a S1)"
     else
         fail "gate: hostile PYTHONPATH ignored (rc=$_p3rc err=$(cat "$_py3w/err"))"
+    fi
+    _p3rc=0; _py3case "$_py3w/noisy" "" || _p3rc=$?
+    if [ "$_p3rc" -eq 1 ] && grep -qF 'platform-independent libraries' "$_py3w/err" \
+        && grep -qF 'present but broken' "$_py3w/err"; then
+        pass "gate: failed probe surfaces the interpreter's diagnostic (#244 b S2)"
+    else
+        fail "gate: diagnostic passthrough (rc=$_p3rc err=$(cat "$_py3w/err"))"
     fi
     rm -rf "$_py3w"
     # Wiring pin: the matrix proves the function works — the verbatim
@@ -910,6 +932,60 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     else
         fail "old presence-only gate replaced (found $_p3old occurrences, want 1)"
     fi
+    # Import-union drift pin (#244 b Q1): every module any shipped
+    # python imports must appear in the gate's import list — a new
+    # consumer adding an import without extending the gate goes red
+    # here (sabotage-verified: dropping threading or pathlib from the
+    # gate list fails this pin naming the module). Extraction: the
+    # gate list from the _py3_imports assignment; the shipped surface
+    # from line-start imports in .py files and python blocks embedded
+    # in sh/bin scripts (comment lines stripped), plus inline
+    # `-c 'import ...'` probes. A `from X import y` line must carry
+    # the second `import` keyword — a bare "from the ..." prose line
+    # is not a module dependency (the opk hosts-file continuation).
+    _p3gate="$(sed -n "s/^[[:space:]]*_py3_imports='\([^']*\)'.*$/\1/p" "$INSTALL")"
+    if [ -n "$_p3gate" ]; then
+        pass "gate: import list extractable"
+    else
+        fail "gate: import list extractable (no _py3_imports assignment found)"
+    fi
+    _p3g="$(mktemp)"
+    printf '%s\n' "$_p3gate" | sed 's/^[[:space:]]*import[[:space:]]*//' \
+        | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+        | grep -E '^[A-Za-z_][A-Za-z0-9_.]*$' | sort -u > "$_p3g"
+    _p3raw="$(mktemp)"
+    _p3f=""
+    for _p3f in "$(dirname "$INSTALL")"/opencode-permissions-kit-lib/py/*.py \
+        "$(dirname "$INSTALL")"/opencode-permissions-kit-lib/sh/*.sh \
+        "$(dirname "$INSTALL")"/opencode-permissions-kit-lib/management/*.sh \
+        "$(dirname "$INSTALL")"/opencode-permissions-kit-lib/bin/*; do
+        [ -f "$_p3f" ] || continue
+        # The two greps find nothing in most files — rc 1 is the normal
+        # case there (guarded empty-match greps); a wholly empty
+        # collection is caught by the non-empty check below.
+        sed 's/^[[:space:]]*#.*$//' "$_p3f" 2>/dev/null \
+            | grep -oE "^[[:space:]]*(import|from)[[:space:]]+[^[:space:]#][^#]*" \
+            >> "$_p3raw" || true
+        grep -oE -- "-c[[:space:]]+'import[^']*" "$_p3f" 2>/dev/null \
+            | sed "s/.*'//" >> "$_p3raw" || true
+    done
+    _p3mods="$(mktemp)"
+    { sed -n 's/^[[:space:]]*import[[:space:]]*//p' "$_p3raw" | tr ',' '\n'
+      sed -n 's/^[[:space:]]*from[[:space:]]*\([A-Za-z_][A-Za-z0-9_.]*\)[[:space:]]\{1,\}import.*/\1/p' "$_p3raw"
+    } | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+      | grep -E '^[A-Za-z_][A-Za-z0-9_.]*$' | sort -u > "$_p3mods"
+    if [ -s "$_p3mods" ] && [ -s "$_p3g" ]; then
+        pass "gate: shipped import surface collected"
+    else
+        fail "gate: shipped import surface collected (empty extraction — fixture broken)"
+    fi
+    _p3miss="$(comm -23 "$_p3mods" "$_p3g")"
+    if [ -z "$_p3miss" ]; then
+        pass "gate: import list covers the shipped python surface (#244 b Q1)"
+    else
+        fail "gate: import list covers the shipped python surface — missing: $(printf '%s' "$_p3miss" | tr '\n' ' ')"
+    fi
+    rm -f "$_p3raw" "$_p3mods" "$_p3g"
 else
     fail "_py3_health_probe defined in install.sh"
 fi

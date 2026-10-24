@@ -102,8 +102,12 @@ fs_ensure_traversable() {
 # (a pyenv shim to a removed version, a corrupt install), so the probe
 # also RUNS it — isolated: `python3 -I` ignores PYTHONHOME/PYTHONPATH
 # (#244 a S1), so neither breaking nor functional (module-shadowing)
-# env poison can reach the probe or the tee; the imports are exactly
-# the tee's. Probed once per run (_fsb_py_checked caches, _fsb_py_ok
+# PYTHON* env poison can reach the probe or the tee; the imports are
+# exactly the tee's. The -I scope is those env vars, not the whole
+# environment — the loader route (LD_PRELOAD/LD_LIBRARY_PATH) and the
+# PATH-resolved binary itself stay outside any python flag, root-owned
+# trust surface like every root python3 the kit runs (#244 b S1).
+# Probed once per run (_fsb_py_checked caches, _fsb_py_ok
 # carries the verdict); on any doubt the pass degrades to a plain
 # passthrough — it loses its live counter, never its data. One warn
 # line names the degradation.
@@ -133,7 +137,8 @@ _fsb_py_probe() {
 # read nothing. Gated by _fsb_py_probe above (#223): without a healthy
 # python3 the tee is a plain passthrough (cat) — the pass data never
 # depends on the progress display. Runs isolated (`-I`) like the probe:
-# env poison cannot shadow the tee's imports either (#244 a S1).
+# PYTHON* env poison cannot shadow the tee's imports either (#244 a
+# S1; the -I scope is exactly those env vars, #244 b S1).
 _fsb_count_tee() {
     _fsb_py_probe
     if [ "${_fsb_py_ok:-0}" != 1 ]; then

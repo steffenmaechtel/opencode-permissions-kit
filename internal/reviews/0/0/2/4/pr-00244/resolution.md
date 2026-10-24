@@ -1,9 +1,10 @@
 # Resolution — pr-00244 (issue #223 fs-baseline python3 health gate)
 
 Chain: [review-a.md](review-a.md) (wave snapshot 2026-10-24, 16 IDs, 12
-unique findings after 3 cross-axis duplicate pairs) → fix wave 1 (this
-file, created with the fix commit). Birth PR #244, branch
-`feature/223-fsb-tee-health-gate`.
+unique findings after 3 cross-axis duplicate pairs) → fix wave 1 →
+[review-b.md](review-b.md) (fix-wave snapshot 2026-10-24, 9 IDs, 8
+unique after 1 dup pair) → fix wave 2 (the b rows below). Birth PR
+#244, branch `feature/223-fsb-tee-health-gate`.
 
 ## Dispositions
 
@@ -21,6 +22,14 @@ file, created with the fix commit). Birth PR #244, branch
 | a S3 (INFO) | **deliberately not done** | — | fail-closed by design, commented; setfacl implies coreutils |
 | a W5 (INFO) | **deliberately not done** | — | fail-closed; status.sh reports health; wrapper output contract |
 | a Q6 (INFO) | **deliberately not done** | — | pre-existing numbering cosmetics; renumber buys no behavior |
+| b Q1/W1 (MED) | **implemented** | `<SHA>` | probe imports the measured union; drift pin fails naming missing modules |
+| b S1 (LOW) | **implemented** | `<SHA>` | -I claims scoped to PYTHON* env; loader/binary residual named |
+| b S2 (LOW) | **implemented** | `<SHA>` | failed probe surfaces interpreter stderr; env class named; noisy pin |
+| b S3 (INFO) | **implemented** | `<SHA>` | first root-exec moment named in the gate comment |
+| b W2 (LOW) | **implemented** | `<SHA>` | §11e setsid guard + skip note (§11c bash-rider pattern) |
+| b W3 (LOW) | **implemented** | `<SHA>` | drain-marker arm proof; never-armed fails red; fixed sleep removed |
+| b W4 (INFO) | **implemented** | `<SHA>` | review README process: trailers qualify not-done IDs |
+| b Q2 (INFO) | **implemented** | `<SHA>` | dead `_p3d` parameter removed; `_py3case` is 2-arg |
 
 ## Evidence detail
 
@@ -50,7 +59,11 @@ the pre-flight): two branches, two distinct ui_error classes — absent
 ("not installed") vs broken ("present but broken"). The health branch
 RUNS `python3 -I -c 'import fnmatch, json, os, re, sys'` — the union of
 the kit's shipped import surface (jsonc parser: fnmatch/json/re/sys;
-fs-baseline tee: os/sys; ddev describe: json/sys). Pins in
+fs-baseline tee: os/sys; ddev describe: json/sys). (Correction, #244 b
+Q1: that list was a strict subset, not the union — threading/time
+(status.sh), pathlib (opk), importlib.util/stat/tempfile
+(tui-register.py) were missing; fix wave 2 probes the true union and
+pins it against drift.) Pins in
 tests/unit/test-install-args.sh (extraction + subshell pattern from
 _distro_gate, 0.0.45a C1): healthy passes silently; absent aborts rc 1
 naming the class; broken shim (exit 9) aborts rc 1 naming the OTHER
@@ -65,7 +78,11 @@ sys discussion) is a dead end — `signal` is a stdlib .py wrapper (as
 PYTHONPATH-shadowable as `os`; neither is a CPython builtin on the
 supported interpreters). `-I` closes the env route entirely: PYTHONHOME
 and PYTHONPATH are ignored by both probe and tee, so neither breaking
-nor functional (module-shadowing) poison reaches them. The `import os`
+nor functional (module-shadowing) poison reaches them. (Correction,
+#244 b S1: "entirely" overstated — the loader route
+(LD_PRELOAD/LD_LIBRARY_PATH), the PATH-resolved binary and system
+site-packages/.pth stay outside -I's scope; the shipped comments now
+claim only the PYTHON* scope.) The `import os`
 in the tee stays — it is load-bearing for the pr-00221 W2/W6
 no-traceback fix (devnull dup2). Residual after -I: an attacker who
 can write into the SYSTEM stdlib directory is root already.
@@ -168,6 +185,132 @@ recorded: the first wave commit briefly went in with the ratchet RED
 (the gate ran but was chained with `;`, not `&&` — the pr-00234
 shape); caught within the minute, rows shortened, commit amended
 before any push; the amended HEAD is gate-green.
+
+## Evidence detail (fix wave 2 — b findings)
+
+### b Q1/W1 — true import union, drift-pinned
+
+The gate's import list is now `_py3_imports` (assignment inside
+`_py3_health_probe`) carrying the measured union: fnmatch,
+importlib.util, json, os, pathlib, re, stat, sys, tempfile,
+threading, time — sources: jsonc-parser.py, the fs-baseline
+probe+tee, ddev describe + update resolve + status feed (json/sys),
+the status progress tee (sys/threading/time), the opk settings edit
+(json/sys/pathlib), tui-register.py. Enforcement is a pin, not a
+comment: the drift pin in tests/unit/test-install-args.sh extracts
+every shipped python import (line-start imports minus comment lines,
+plus inline `-c 'import …'` strings; a `from X import y` line must
+carry the second keyword — a prose "from the …" line is not a
+dependency) and fails naming any module missing from the gate list.
+Sabotage: drop `threading` → red naming threading (status.sh); drop
+`pathlib` → red naming pathlib (opk). The a-W1 evidence sentence
+above was wrong about "union" — corrected in place, cited here.
+
+### b S1 — claim scope
+
+fs-baseline.sh's probe header and tee comment now claim exactly the
+PYTHONHOME/PYTHONPATH scope and name the residual surface (loader
+route LD_PRELOAD/LD_LIBRARY_PATH, the PATH-resolved binary,
+root-owned trust) — install.sh's gate comment gains the same
+scoping sentence. The a-S1 "closes the env route entirely" sentence
+above overstated; corrected in place, cited here.
+
+### b S2 — diagnostic passthrough + the env class named
+
+On a failed probe the gate reruns the import once WITHOUT the stderr
+discard (rc guarded with `|| true` — the branch already failed; the
+rerun exists for stderr) so an interpreter that prints its real
+problem shows it above the verdict, and the ui_error names the third
+class ("needs PYTHONHOME/PYTHONPATH?"). Pin: the matrix's noisy case
+(a shim echoing "Could not find platform-independent libraries" to
+stderr, exit 9) asserts rc 1, the diagnostic line AND
+'present but broken' in the observed stderr. Acceptance cost named
+here per the finding: hosts whose python3 works only via env now
+fail the install gate — deliberate (a W1's hard-fail intent), with
+the diagnostic surfaced for self-diagnosis.
+
+### b S3 — root-exec moment recorded
+
+One comment sentence in the gate block: running the probe is the
+installer's first EXECUTION of python3 as root — same binary and
+trust as every root python3 the installed kit runs, one moment
+earlier.
+
+### b W2 — setsid guard
+
+§11e is wrapped in a `command -v setsid` guard with the §11c
+bash-rider skip-note shape; a setsid-less host now prints one note
+line instead of two vacuously green pins.
+
+### b W3 — arm proof
+
+The writer touches a ready marker after the 1 MiB stream write
+returns — a fifo write blocks until the reader drains it, so the
+marker proves the tee consumed the stream and sits blocked in read
+(interpreter initialized, KI handler installed); the poll replaces
+the fixed `sleep 1`, and "no marker within 10 s" fails red by
+itself instead of passing green with nothing executed. A wait-rc
+discriminator was considered and rejected: the setsid'd sh wrapper
+dies BY the group SIGINT (default disposition, rc 130) even on the
+healthy path, so its rc cannot separate "KI caught" from "signal
+won" — the drain marker is the only sound positive proof on a
+surface that is silent by contract.
+
+### b W4 — trailer qualification rule
+
+internal/reviews/README.md Process step 5 now requires fix-commit
+messages that enumerate finding IDs to qualify the
+deliberately-not-done ones. This wave has no not-done dispositions —
+its trailer is true full coverage.
+
+### b Q2 — dead parameter
+
+`_p3d` is gone; `_py3case` takes PATH and PYTHONPATH-or-empty.
+
+### Class sweep record (L2, fix wave 2)
+
+- The drift pin IS the enforced sweep for the import-union class —
+  its extraction runs over py/, sh/, management/ and bin/ (glob), so
+  a new consumer anywhere in the lib goes red without touching the
+  pin (patterns documented in the test).
+- `grep -rn 'setsid' tests/unit/` — §11e is the only setsid user;
+  the §11c bash rider was already guarded (the twin the finding
+  cited).
+- `grep -nE 'rm( |$)' tests/unit/test-install-args.sh` — the new
+  noisy-case operand rides the suite's guarded `:?` scratch pattern;
+  one scanner false positive ("platform independent" chains into the
+  raw-line rm-suffix grep) was fixed at the source by hyphenating
+  the marker (comment at the shim), not by an allowlist entry.
+
+### L1–L7 run (fix wave 2, before commit)
+
+- L1: the diagnostic rerun's `|| true` is pinned by the noisy case
+  (the failure path executes and its stderr is the asserted
+  surface); the drift pin's guarded greps are pinned by the
+  non-empty surface check.
+- L2: sweep above.
+- L3: every rewritten claim carries its pin (union → drift pin; -I
+  scope → §11d + matrix; error classes → matrix greps; arm proof →
+  the marker pass/fail pair).
+- L4: all new pins sit before their suite's summary gate; sabotage
+  run post-commit (recorded in Follow-ups).
+- L5: no new root operations — the rerun is a second read-only
+  interpreter execution inside an already-root gate.
+- L6: fixes bring their own pins; the wave review of this fix diff
+  (snapshot c) is owed per the loop.
+- L7: no new shell files.
+
+### Gates (fix wave 2, pre-commit)
+
+make lint green; sh tests/unit/test-fs-baseline.sh 81/81; sh
+tests/unit/test-install-args.sh green (4 new pins); full `make test`
+rc 0, all suites green — sandbox policy included after one scanner
+false positive was fixed at the source (hyphenated marker, not an
+allowlist entry); line-length ratchet + reviews lint/parity green
+(gates chained with `&&` this time). Log:
+/tmp/opencode/maketest-pr244c.log on the session host. E2E (install.sh
+behavior change → owed in-wave): runs on the committed tree, recorded
+in Follow-ups by the bookkeeping commit.
 
 ## Follow-ups
 
