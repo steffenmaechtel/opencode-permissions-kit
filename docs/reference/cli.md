@@ -300,8 +300,9 @@ privilege ("unknown — needs root to check") and optional-feature rows never
 count toward the verdict: `sudo opk status` resolves the privilege
 unknowns. Two exceptions always count: a managed binary that is missing,
 unexecutable or corrupt (no privilege can fix that), and a missing kit
-library file (a damaged deploy — the row names the file and the repair hint
-`fix: sudo opk update`).
+library file (a damaged deploy — the row names the missing kit file and
+the repair hint `fix: sudo opk update`; the advisories row names the
+skipped security checks instead).
 
 On a terminal, the two project-root scans (the ddev-share group-write check
 and the Windows-hosts check) show a live progress line while they walk your

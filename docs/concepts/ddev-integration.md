@@ -105,7 +105,7 @@ belong to `opencode:opencode` (with `g+w`). The kit hands them over, at
 | `magento*`, `maho` | `app/etc` |
 | `modx` | `<docroot>/core/config` |
 
-**Root-file types (`codeigniter`, `shopware`, `symfony`).** Their settings
+**Root-file types (`codeigniter`, `shopware6`, `symfony`).** Their settings
 file lives at the project root (`.env`, `.env.local`) and ddev chmods the
 **root directory** on every run. The kit hands the root *inode* to
 `opencode` with mode `2755` (ddev's `0755` chmod becomes a no-op); with the
@@ -269,7 +269,8 @@ The template denies the import command (`ddev auth ssh*`, incl. `sudo`) so
 the decision stays with you — run it in your terminal if you accept the
 trade-off. A project that broadly allows `ddev *` must re-add the specific
 deny **after** its allow (see [allow docker/ddev](../how-to/container-tools.md)).
-Prefer dedicated, rotatable deploy keys.
+Prefer dedicated, rotatable deploy keys — and rotate them if the machine is
+not trusted.
 
 ## First start is slow
 

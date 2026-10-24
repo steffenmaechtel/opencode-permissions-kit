@@ -10,6 +10,8 @@ Reviewer: GLM-5.3 house session (opk-review-pass skill) — 3 fast-tier reviewer
 Skills: opk-review-pass
 -->
 
+> Resolution: [resolution.md](resolution.md)
+
 # Review a — wave review of the docs end-user optimization pass (pr-00256)
 
 Round a over the diff 716b8c0..b69a336 (1 commit: b69a336 "docs(all): end-user

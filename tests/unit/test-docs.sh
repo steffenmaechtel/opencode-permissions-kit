@@ -192,6 +192,55 @@ for _f36_df in $_f36_docflags; do
     esac
 done
 
+# --- a W1 (pr-00256): ddev-integration root-file types track the code -------
+# matcher (claim-drift guard, the W1 rename class): every root-file type
+# ddev-handover.sh matches must appear backticked in the docs page.
+# Sabotage: rename `shopware6` to `shopware` in the docs — this goes red.
+_w1_doc="$REPO_ROOT/docs/concepts/ddev-integration.md"
+_w1_lib="$REPO_ROOT/files/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+_w1_types="$(sed -n 's/^[[:space:]]*codeigniter|\([a-z0-9|]*\)).*/\1/p' "$_w1_lib" | head -n 1 | tr '|' ' ')"
+if [ -z "$_w1_types" ]; then
+    echo "FAIL ddev-integration.md: root-file matcher extraction empty — anchor drift? (#256 a W1)" >> "$TMP"
+fi
+for _w1_t in codeigniter $_w1_types; do
+    grep -qF "\`$_w1_t\`" "$_w1_doc" \
+        || echo "FAIL ddev-integration.md: root-file type '$_w1_t' missing from the docs (#256 a W1)" >> "$TMP"
+done
+
+# --- a W2 (pr-00256): security-model keeps the dev-owned flag-write TOCTOU ---
+# disclosure (residual-gaps honesty guard). Sabotage: delete the bullet —
+# this goes red.
+grep -q 'flag-write TOCTOU' "$REPO_ROOT/docs/concepts/security-model.md" \
+    || echo "FAIL security-model.md: dev-owned flag-write TOCTOU disclosure missing (#256 a W2)" >> "$TMP"
+
+# --- a W3 (pr-00256): cli.md keeps the advisories exception ------------------
+# The missing-library claim must keep its exception clause (status.sh's
+# advisories row names the skipped checks, not the file). Sabotage: shorten
+# the sentence back to the blanket claim — this goes red.
+grep -q 'skipped security checks instead' "$REPO_ROOT/docs/reference/cli.md" \
+    || echo "FAIL cli.md: advisories exception clause missing from the missing-library claim (#256 a W3)" >> "$TMP"
+
+# --- a W5 (pr-00256): getting-started's agent-resources Enter default -------
+# tracks the ui_menu default letter in install.sh (claim-drift guard, both
+# directions: flipping the menu default or the docs word goes red).
+_w5_def="$(sed -n 's/.*ui_menu "Bring the developer.s agent resources over?" "\([mcs]\)".*/\1/p' "$REPO_ROOT/files/install.sh" | head -n 1)"
+if [ -z "$_w5_def" ]; then
+    echo "FAIL getting-started.md: agent-resources menu default extraction empty — anchor drift? (#256 a W5)" >> "$TMP"
+fi
+_w5_word=""
+case "$_w5_def" in
+    m) _w5_word="move" ;;
+    c) _w5_word="copy" ;;
+    s) _w5_word="skip" ;;
+esac
+if [ -n "$_w5_def" ] && [ -z "$_w5_word" ]; then
+    echo "FAIL getting-started.md: unmapped agent-resources menu default '$_w5_def' (#256 a W5)" >> "$TMP"
+fi
+if [ -n "$_w5_word" ]; then
+    grep -qF "defaults to **$_w5_word**" "$REPO_ROOT/docs/getting-started.md" \
+        || echo "FAIL getting-started.md: agent-resources Enter default does not track install.sh ('$_w5_def' => $_w5_word) (#256 a W5)" >> "$TMP"
+fi
+
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"
     cat "$TMP"

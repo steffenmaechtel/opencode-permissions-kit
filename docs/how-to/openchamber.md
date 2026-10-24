@@ -64,7 +64,7 @@ third-party app behavior:
 
 - **At install time**: answer *Yes* to "Protect OpenChamber sessions too?"
   (asked when OpenChamber is detected; `--openchamber-policy yes|no` for
-  unattended installs).
+  unattended installs — under `--yes` without the flag the pin stays off).
 - **Any time later**:
 
   ```bash

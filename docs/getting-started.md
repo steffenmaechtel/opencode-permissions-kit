@@ -53,10 +53,15 @@ The installer prints a pre-flight inventory of what it found, then asks:
    `.ddev/` stays permanently yours) or ddev-managed settings — see
    [dev-owned projects](how-to/dev-owned-projects.md).
 4. **Agent resources** (only when `~/.agents` or `~/.claude/skills` exist) —
-   move them into `/home/opencode` (recommended), copy, or skip.
+   move them into `/home/opencode` (recommended), copy, or skip. Enter
+   defaults to **skip** — move removes the developer-side sources after
+   the copy, so it never rides on an empty Enter.
 
-When podman is detected you also choose the backend (podman-rootless is the
-default); otherwise docker-rootless is used silently.
+A fifth, conditional question — "Protect OpenChamber sessions too?" —
+appears when OpenChamber is detected; see
+[Use OpenChamber with the kit](how-to/openchamber.md). When podman is
+detected you also choose the backend (podman-rootless is the default);
+otherwise docker-rootless is used silently.
 
 After the questions the installer shows a numbered plan — confirm with Enter.
 Advanced mode exposes granular prompts for the steps Standard decides
@@ -86,7 +91,12 @@ opk status
 ```
 
 It reports the protection mode, backend, ddev readiness, `/mnt/c` exposure
-and a leak scan. Everything green means the kit is active.
+and a leak scan. Everything green means the kit is active. On WSL, the
+`/mnt/c` exposure means your Windows profile (`.ssh`, `NTUSER.DAT`,
+browser data) stays readable by the agent until you restrict the
+automount — `opencode` warns on every start until it is fixed, and the
+manual `/etc/wsl.conf` snippet is yours to apply (the kit never edits
+that file; see [security model](concepts/security-model.md)).
 
 ## Start your first session
 

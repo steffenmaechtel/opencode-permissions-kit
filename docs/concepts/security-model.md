@@ -57,6 +57,10 @@ the developer — it needs the Windows interop the agent must not have. See
 - **Handover symlink swaps:** the root-run `.ddev` handover re-tests every
   path component immediately before acting, but the gate is not atomic — a
   swap in the short window before the recursive pair stays undetected.
+- **Dev-owned flag write (accepted race):** the root-run dev-owned flag
+  write into `.ddev/config.yaml` screens for symlinks but is not atomic —
+  dev-owned mode's flag-write TOCTOU stays accepted (opencode-privilege-
+  capped; see [ddev integration](ddev-integration.md)).
 - The kit protects **locations, not information flows** — once content
   leaves the project roots, no scan recaptures it.
 - **mkcert CA key in the agent's home (deliberate):** ddev signs its
@@ -68,11 +72,13 @@ the developer — it needs the Windows interop the agent must not have. See
   capability). The keyless alternative is ddev's `.ddev/custom_certs/`
   flow, at the cost of per-project manual provisioning.
 - **Supply chain (trust assumption):** install and update stream kit files
-  and the opencode binary over HTTPS without checksums or signatures, and
-  rootless backend provisioning runs get.docker.com as root. Installing
-  means trusting GitHub, the opencode releases, and get.docker.com at
-  install time. The `KIT_BASE_URL` env override replaces the fetch target
-  entirely — treat the install environment as trusted.
+  and the opencode binary over HTTPS without checksums or signatures (the
+  `--binary` "verification" is a liveness check — `opencode --version`
+  runs — not an integrity check), and rootless backend provisioning runs
+  get.docker.com as root. Installing means trusting GitHub, the opencode
+  releases, and get.docker.com at install time. The `KIT_BASE_URL` env
+  override replaces the fetch target entirely — treat the install
+  environment as trusted.
 - **OpenChamber serve password in the agent env:** when the serve feature is
   configured, `OPENCODE_SERVER_PASSWORD` (and username) survive sudo's
   `env_reset` into the agent's environment. Not a privilege escalation — but

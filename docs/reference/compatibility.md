@@ -54,7 +54,7 @@ kit.
   the server as the developer — outside the kit's UID separation. Keep the
   kit's opencode at ≥ 2.0.20 via `opk upgrade-opencode`; prevent or repair
   the bypass with `opk openchamber-secure` — see
-  [the how-to](../how-to/openchamber.md).
+  [the how-to](../how-to/openchamber.md#prevent-the-bypass-the-policy-pin).
 - **OpenChamber projectless chats.** The managed chats root defaults to a
   path under the developer's `$HOME` that the `opencode` user cannot reach.
   OpenChamber ≥ 1.22.2 relocates it via `OPENCHAMBER_CHATS_DIR` — see
