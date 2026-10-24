@@ -29,6 +29,9 @@ details, verification duty, reviewer agents — lives in
 - **Stop-rule call:** the loop closes when a round leaves
   review-relevant code untouched. When only LOW/INFO findings remain,
   closing the chain is your call — the agent proposes, you decide.
+  Your confirmation is also the signal to record the closure: the
+  agent sets `Status: closed …` in the resolution and regenerates the
+  INDEX ([review README](../reviews/README.md), "Resolution format").
 - **Release gate:** no release while a review chain is open.
 - **External redundancy pass:** the second snapshot of a release review
   runs on a bias-reduced checkout — setup in

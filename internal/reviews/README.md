@@ -148,6 +148,24 @@ class-sweep pattern and sites — the row above links to it by finding>
   `deliberately not done` — nothing else.
 - **Key evidence or a blocker reason, never a bare claim** — if the
   row cannot carry it, the Evidence detail block must (and does).
+- **The `Status:` line** near the top of the file is where the chain's
+  closure state lives: while rounds run the line is simply absent (the
+  INDEX reads a missing line as `open`); once the loop has closed it
+  says `Status: closed …` (the INDEX parser takes the FIRST `Status:`
+  line in the file — keep the line at the top so later prose cannot
+  shadow it). The closed line names who
+  confirmed closure (maintainer or next round — a fixing round never
+  closes its own loop; [review-concept.md](../../agent/review-concept.md),
+  "The loop and the stop rule") and cites the stop-rule check (the
+  last round's dispositions and the files it touched); this
+  confirmer + check form binds lines written from 2026-10-24 on —
+  post-legacy lines already in the corpus stay as written, like the
+  legacy rows. The INDEX's
+  Status column is generated FROM this line
+  (`scripts/gen-review-index.py`): an unset line leaves the case
+  reading `open`, and nothing fails — the closure is simply
+  unrecorded (issue #238). Setting the line and regenerating the
+  INDEX in the same commit is part of closing the loop.
 - **Dated anchors are measured, never restated:** dating a line anchor
   means looking it up at the named commit
   (`git show <ref>:<file> | grep -n …`) — line numbers quoted from an
@@ -160,6 +178,16 @@ class-sweep pattern and sites — the row above links to it by finding>
   grows one row (and, where needed, one detail block) per disposition
   as fixes land — never reconstructed afterwards. Referenced commits
   carry SHAs, not branch names.
+- **The `<SHA>` placeholder:** a fix wave whose disposition rows ride
+  the fix commit itself cannot know that commit's SHA at write time —
+  the Commit column carries `<SHA>` (in backticks, like every SHA),
+  and the chain's next commit replaces it with the real short SHA.
+  That replacement is a normal edit to an in-scope file and owes the
+  gates BEFORE the commit: a real SHA is 2 bytes longer per replaced
+  row than the placeholder (7 → 9 bytes), enough to tip a row at the
+  120-column bound. Check-then-commit, never commit-then-check — a
+  ratchet red found after the commit is detection, not protection
+  (issue #237; the ordering bit pr-00234's b-wave fill).
 - Legacy resolutions (pr-00109…pr-00171) predate the two-part form:
   their long rows are baseline-pinned and stay as written — the format
   binds everything written from here on.
@@ -198,7 +226,9 @@ Reviews run against a clean working tree of the version under review
 4. Pause for the maintainer — the fix wave starts on their go.
 5. Fix wave on the feature branch; the resolution is created with the
    first fix commit and grows per disposition; the loop closes per the
-   stop rule. Run the L1–L7 checklist
+   stop rule — and closure is recorded: `Status: closed …` in the
+   resolution plus INDEX regen, one commit (see Resolution format).
+   Run the L1–L7 checklist
    ([agent/learnings.md](../../agent/learnings.md)) before committing.
 6. The owed wave review of a round starts on the maintainer's go too:
    the agent reports round completion (naming owed-but-not-run

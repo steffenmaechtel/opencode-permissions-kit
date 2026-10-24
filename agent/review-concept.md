@@ -2,7 +2,7 @@
 
 Operative rules for the reviewing agent: triggers, scope, loop cadence,
 stop rule, reviewer mechanics. The file mechanics (snapshot immutability,
-resolution format, naming) live in [review/README.md](../internal/reviews/README.md);
+resolution format, naming) live in [reviews/README.md](../internal/reviews/README.md);
 the trigger list for full reviews also lives in the maintainer's
 [process/review.md](../internal/process/review.md). Finding-ID
 referencing: [conventions.md](conventions.md#referencing-review-findings).
@@ -33,11 +33,11 @@ review → fix → review the fixes (wave review) → fix → …
 - Before the loop starts, the maintainer opens the (draft) birth-PR and
   tells the reviewer its number — that number is the case key
   (`internal/reviews/A/B/C/D/pr-ABCDE/`; mechanics:
-  [review/README.md](../internal/reviews/README.md)). Opening the PR
+  [reviews/README.md](../internal/reviews/README.md)). Opening the PR
   first keeps parallel features safe: GitHub allocates the number, so
   two features can never claim the same case folder. (RM-0058)
 - The snapshot is written and committed BEFORE any fix starts (the hard
-  seam; see [review/README.md](../internal/reviews/README.md), Process).
+  seam; see [reviews/README.md](../internal/reviews/README.md), Process).
   Findings must be inspectable while nothing has been done about them
   yet, and a fix applied mid-verification would change the very tree
   the remaining findings are verified against. (RM-0059)
@@ -118,6 +118,14 @@ nothing to review.
   expectation only with the check cited ("this round's dispositions
   touched no review-relevant code: files touched = …"); a closure
   later retracted follows the rotation-deviation recovery above. (RM-0115)
+- Closure is a recorded step, not only a verdict: once the maintainer
+  or the next round confirms the stop rule, the resolution's `Status:`
+  line is set to closed — naming the confirmer, citing the check —
+  and the INDEX is regenerated in the same commit. The INDEX's Status
+  column is generated from that line, so an unrecorded closure leaves
+  the case reading open with nothing failing anywhere (mechanics:
+  [reviews/README.md](../internal/reviews/README.md), "Resolution
+  format"). (RM-0118)
 
 ## Fixes close classes, not sites
 
@@ -140,6 +148,17 @@ Four places carry review knowledge, each with exactly one job:
 
 - The resolution is the ledger the next review starts from — an index
   row that carries SHAs is a summary, not a substitute (README rule 4). (RM-0071)
+- Bookkeeping edits to in-scope files — resolution rows and their
+  `<SHA>` fills, snapshot pointer lines, the regenerated INDEX — owe
+  the gates BEFORE the commit that carries them (line-length ratchet,
+  reviews lint/parity), never after: a check that runs after the
+  commit only detects, it cannot protect, and its red then sits on a
+  committed HEAD. pr-00234 showed both shapes (#234 b W1): the a-wave
+  committed gate claims that were false at its own HEAD (rows
+  unwrapped past 120, pointer and INDEX red with them — the claims
+  predated the resolution file), and the b-wave ran its ratchet only
+  AFTER the `<SHA>`-fill commit (benign: the real SHA is 2 bytes
+  longer per row than the placeholder and stayed under the bound). (RM-0117)
 
 ## Finding provenance
 
