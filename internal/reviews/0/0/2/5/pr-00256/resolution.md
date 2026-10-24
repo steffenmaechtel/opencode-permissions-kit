@@ -1,6 +1,8 @@
 # Resolution — pr-00256 (docs end-user optimization pass)
 
-Chain: snapshot a (wave review of 716b8c0..b69a336, 11 effective findings).
+Chain: snapshot a (wave review of 716b8c0..b69a336, 11 effective findings)
+→ snapshot b (micro review of the a-wave fix's test-docs.sh pins,
+2 findings B1-B2, both fixed in the b fix wave).
 This file is created with the first fix commit and grows per disposition.
 
 ## Dispositions
@@ -18,6 +20,8 @@ This file is created with the first fix commit and grows per disposition.
 | a W9 (INFO) | **implemented differently** | `d01c7eb` | liveness clause restored; roadmap drop accepted (see detail) |
 | a W10 (INFO) | **implemented** | `d01c7eb` | rotate-on-distrust clause restored (ddev-integration.md) |
 | a W11 (INFO) | **deliberately not done** | — | pointer/history losses stay out of end-user docs, see detail |
+| b B1 (LOW) | **implemented** | `03fdbfe` | sed capture `[mcs]`→`[a-z]` — unmapped guard reachable; see detail |
+| b B2 (LOW) | **implemented** | `03fdbfe` | reverse-direction pin + docs-extraction tripwire; see detail |
 
 ## Evidence detail
 
@@ -145,6 +149,36 @@ shorthand drop the reviewer misattributed to uninstall.md was real in
 security-model.md/files.md only, and the behavior stays documented in
 cli.md:45+217.
 
+### b B1 (LOW) — W5 pin's unmapped-letter guard made reachable
+
+The sed capture class was exactly the mapped set (`[mcs]`), so the
+"unmapped default" branch (test-docs.sh, #256 a W5) was unsatisfiable
+dead code — a default letter outside the vocabulary broke the sed match
+instead and misfired the anchor-drift tripwire. Fix: capture widened to
+`[a-z]`; the case still maps m/c/s, anything else now lands in the
+unmapped guard with the correct message. This also makes the
+"unmapped-letter guard" claim in the a-W5 evidence detail (above) true
+as written. Class sweep (L2): the other extraction pins carry tripwires
+on the same shape (F36 #211 b W28 both directions, W1 both sides); no
+further dead guard exists — W1/W2/W3 pins have no unreachable branches
+(bare greps or tripwired extractions only).
+
+### b B2 (LOW) — W1 pin gains the reverse direction
+
+New block in test-docs.sh (#256 b B2): extracts the backticked types
+from the docs paragraph anchor `**Root-file types (…` (up to the first
+`)`, so the `.env` mentions later in the paragraph are out of scope),
+tripwires on empty extraction, and requires every docs type to appear
+in the code matcher set (`codeigniter` + the extracted handover arms).
+Membership is word-delimited, so `shopware` does not false-match
+`shopware6`. Wildcard tokens (`drupal*`) count as drift by definition —
+matcher arms are literal. Live discrimination witnessed before commit:
+the extraction's first phrasing (backslash-escaped backticks in the
+grep ERE) went RED on the clean tree via its own tripwire — GNU grep
+ERE does not match `\`` — the pin caught its author's regex bug; fixed
+to the plain-backtick form and green. The #211 b W30 precedent (reverse
+direction added to the F36 flag pin) is the sibling this closes for W1.
+
 ## Gates and sabotage record
 
 Gates at the fix commit d01c7eb (check-then-commit, all before the commit):
@@ -171,8 +205,36 @@ Sabotage spot-checks on the committed tree (delete-never-comment;
   fix's own line wrap — the pin caught a real split-phrase regression
   shape; rewrapped to the wrap-safe tail.
 
+### b-wave (fix commit 03fdbfe)
+
+Gates at 03fdbfe (check-then-commit, all before the commit):
+`sh tests/unit/test-docs.sh` OK (with both new pin directions),
+`sh tests/unit/test-line-length.sh` OK, `make lint` (ShellCheck) OK,
+`sh tests/unit/test-sandbox-policy.sh` OK, full unit sweep
+(`sh tests/unit/test-*.sh`) OK — no suite interference from the new
+`_w1_dt`/`_w1_doctypes` namespace.
+
+Sabotage spot-checks on the committed tree (delete-never-comment;
+`git restore` back; final suite green):
+
+- Run 1 (b B2 reverse): `laravel` added to the docs root-file paragraph —
+  suite RED with exactly `docs root-file type 'laravel' not in the code
+  matcher (#256 b B2)`.
+- Run 2 (b B2 tripwire): paragraph anchor `Root-file types`→`Root-file
+  kinds` — suite RED with `docs root-file-type extraction empty — anchor
+  drift? (#256 b B2)`.
+- Run 3 (b B1): install.sh's ui_menu default letter "s"→"x" — suite RED
+  with `unmapped agent-resources menu default 'x' (#256 a W5)`: the
+  previously dead guard fires with the correct attribution.
+- Run 4 (forward regression, a W1 shape): `shopware6`→`shopware` in the
+  docs — suite RED from BOTH directions (`missing from the docs` #256 a
+  W1 + `not in the code matcher` #256 b B2); restored, final suite green.
+- Live discrimination witnessed before commit: the b B2 extraction's
+  first phrasing went RED on the clean tree via its own tripwire (escaped
+  backticks match nothing in GNU grep ERE) — see the b B2 detail.
+
 ## Follow-ups
 
-- Round b (micro-wave review of this fix diff) is OWED: the wave touches
+- Round c (micro-wave review of the b fix diff) is OWED: the wave touches
   test code (test-docs.sh pins), which is review-relevant (RM-0105) — the
   review starts on the maintainer's go, not before.
