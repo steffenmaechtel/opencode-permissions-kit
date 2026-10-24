@@ -1,5 +1,7 @@
 # Resolution — pr-00243 (#218 uninstall revert-loop closing-log honesty)
 
+Status: closed 2026-10-24 — confirmed by the maintainer in-session (round g report: "Dann close den Loop bitte"); stop-rule check: round g ([review-g.md](review-g.md), `226cfed`) reported 0 new findings and its disposition changed no review-relevant code (snapshot + INDEX bookkeeping only, RM-0064/RM-0066); all round-f findings dispositioned (f X1 implemented in `db702ac`, f S1/S3 landed in the resolution/comment scope, f X3/X4 deliberately not done — no action owed); carried follow-ups #245–#247 are own waves outside this loop, #244 accepted residual.
+
 Chain: [review-a.md](review-a.md) (wave snapshot 2026-10-24, 11 findings,
 3 reviewer axes, all verified) → fix wave 1 (all 11 implemented) →
 [review-b.md](review-b.md) (fix-wave snapshot 2026-10-24: 8 findings, 7
@@ -16,8 +18,15 @@ implemented; d X1 implemented differently — comment scoped, mirror
 decision rides #247; d S3/X3/Q6 deliberately not done) →
 [review-e.md](review-e.md) (micro-wave snapshot 2026-10-24: 8 findings
 — 1 MED conditional, 2 LOW, 5 INFO; all 9 d-fixes audited landed) →
-fix wave 5 (e X1/X2/S1/S2/S3/S4/S5/X3 all implemented). Birth PR #243,
-branch `feature/218-uninstall-revert-log-honesty`.
+fix wave 5 (e X1/X2/S1/S2/S3/S4/S5/X3 all implemented) →
+[review-f.md](review-f.md) (micro-wave snapshot 2026-10-24: 7 reported →
+1 LOW conditional + 4 INFO effective; all 8 e-fixes audited landed) →
+fix wave 6 (f X1 implemented; f S1/S3 ridden — resolution anchor
+correction + screen() comment scoping; f X3/X4 deliberately not done,
+no action owed) → [review-g.md](review-g.md) (micro-wave snapshot
+2026-10-24: 0 findings — all 9 diff-touched claims verified). Birth
+PR #243, branch `feature/218-uninstall-revert-log-honesty`. Loop
+closed after round g (Status line above).
 
 ## Dispositions
 
