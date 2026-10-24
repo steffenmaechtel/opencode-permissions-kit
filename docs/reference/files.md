@@ -43,7 +43,7 @@ Uninstall asks before removing the kit block (or assumes yes with
 | Key | Meaning |
 |---|---|
 | `DEFAULT_USER` | The developer's user (kit admin) |
-| `OPENCODE_USER` | The agent user (always `opencode`) |
+| `OPENCODE_USER` | The agent user (always `opencode`); on uninstall a shape-invalid hand edit WARNs and falls back |
 | `CONTAINER_BACKEND` | `docker-rootless` \| `podman-rootless` |
 | `OPENCODE_DOCKER_HOST` | `docker-rootless` socket, e.g. `unix:///run/user/<opencode-uid>/docker.sock` |
 | `OPENCODE_PODMAN_SOCKET` | Optional podman docker-CLI-compat socket |

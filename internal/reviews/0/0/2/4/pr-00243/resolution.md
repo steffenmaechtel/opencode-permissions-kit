@@ -13,7 +13,10 @@ adjustment, 3 LOW, 5 INFO; all 6 b-fixes audited landed) → fix wave 3
 (fix-wave snapshot 2026-10-24: 13 findings — 1 MED, 3 LOW, 9 INFO; all
 7 c-fixes audited landed) → fix wave 4 (d X2/S1/S2/X4/Q1/Q2/Q3/Q4/Q5
 implemented; d X1 implemented differently — comment scoped, mirror
-decision rides #247; d S3/X3/Q6 deliberately not done). Birth PR #243,
+decision rides #247; d S3/X3/Q6 deliberately not done) →
+[review-e.md](review-e.md) (micro-wave snapshot 2026-10-24: 8 findings
+— 1 MED conditional, 2 LOW, 5 INFO; all 9 d-fixes audited landed) →
+fix wave 5 (e X1/X2/S1/S2/S3/S4/S5/X3 all implemented). Birth PR #243,
 branch `feature/218-uninstall-revert-log-honesty`.
 
 ## Dispositions
@@ -63,6 +66,14 @@ branch `feature/218-uninstall-revert-log-honesty`.
 | d Q4 (INFO) | **implemented** | `09206ab` | find negatives anchored on the op line's ` !` continuation |
 | d Q5 (INFO) | **implemented** | `09206ab` | wiring pin: wired SCREEN_PATTERNS free of dot/double-slash |
 | d Q6 (INFO) | **deliberately not done** | — | writer-side; #247 owns (same shape family as d X3) |
+| e X1 (MED) | **implemented** | `<SHA>` | OPENCODE_USER shape gate: WARN + fallback; chain arm reds on deletion |
+| e X2 (LOW) | **implemented** | `<SHA>` | d Q1 precondition text corrected: writer literal/heredoc + e X1 gate |
+| e S1 (LOW) | **implemented** | `<SHA>` | `.` chmod negative landed; d Q3 sentence true as written since |
+| e S2 (INFO) | **implemented** | `<SHA>` | raw skip-echo assertion end-anchored — discriminates alone |
+| e S3 (INFO) | **implemented** | `<SHA>` | `/etc/` → `/home/` (bare arm); comment states the bare-arm rule |
+| e S4 (INFO) | **implemented** | `<SHA>` | d Q4 sweep invariant corrected (agent-home prefix pair is deliberate) |
+| e S5 (INFO) | **implemented** | `<SHA>` | ts setfacl/chmod negatives `$`-anchored per spelling incl. raw forms |
+| e X3 (INFO) | **implemented** | `<SHA>` | screen() dot gate before the strip; `/var//` static form pins it |
 
 ## Evidence detail
 
@@ -456,6 +467,14 @@ now describes the single stripped compare and why it covers both
 spellings. Equivalence pinned by the d X2 arm (both forms refused by
 the one compare). Sweep (L2, `grep -rn '] || \[ "\${[a-z_]*%/}" ='
 files/`): no other dual-compare subsumption site exists in files/.
+**Correction (#243 e X2, fix wave 5):** the precondition citation was
+wrong — the `:211` `:-` default guards emptiness only and the `:225`
+lookups are `|| true`-swallowed; neither enforces slash-freeness
+(review e proved the drop non-equivalent under a corrupted conf,
+e X1). Real anchors: the writer-side literal (`install.sh:349`) and
+conf heredoc (`:1339`), the writer charset gate precedent
+(`:589-592`) — and, since fix wave 5, the reader-side shape gate
+(e X1 below).
 
 ### d Q2 (INFO) — the env-pin comment is true
 
@@ -475,6 +494,12 @@ asserts ops absent for refused roots now names find, setfacl and
 chmod; the two-roots arm's roots are processed (positive arm), not
 op-negation sites.
 
+**Correction (#243 e S1, fix wave 5):** as shipped in `09206ab` the
+malformed arm had find+chmod negatives for `/var/.` but only a find
+negative for `.` — the sentence overstated the landed set by one
+(review e S1). The `sudo chmod g-s .` negative landed in fix wave 5;
+the sentence is true as written since.
+
 ### d Q4 (INFO) — find negatives are anchored
 
 The ts loop's unanchored `sudo find $_un_ts` (matched any longer
@@ -487,6 +512,12 @@ Sweep: the remaining unanchored find negatives (`//etc`, `/var/.`,
 `/home/untest-agent`) are prefix-unique among their arms' fed
 operands (no fed operand is a string-prefix of another), documented
 here per L2.
+**Correction (#243 e S4, fix wave 5):** the invariant is false for
+the agent-home arm — its fed pair (`/home/untest-agent`,
+`/home/untest-agent/`) IS a strict prefix pair, deliberately so
+(over-match is the desired coverage there: both spellings must stay
+op-free); prefix-uniqueness holds for the other arms' operands only
+(review e S4).
 
 ### d Q5 (INFO) — the wiring is pinned, not just the function
 
@@ -498,6 +529,105 @@ Reverting the wiring assignment to an inline shape-keyed extraction
 redes it (spot-check 6) even though the function pin stays green —
 that division of labor is now stated in both pin comments. A future
 legit arm needing a dot reds it loudly and gets defanged consciously.
+
+### e X1 (MED) — the sourced OPENCODE_USER is shape-gated
+
+Mechanism (top level, immediately after the `${OPENCODE_USER:-opencode}`
+default): a `case` gate refuses every value outside the conservative
+Unix name charset (the writer's own `DEFAULT_USER` gate shape) and the
+empty string — WARN on stderr, fallback to the canonical literal
+`opencode`. Every downstream consumer then sees a valid name: the
+LIVE_GROUP/id lookups (:214/:225-226), the agents-backup walk
+(:326/:332 — the sweep's second guard consumer), the project-loop
+agent-home compare, and the later userdel. Pins, each layer its own:
+(1) fail-loud extraction pin (anchored `^case "$OPENCODE_USER" in$` →
+`^esac$`, asserts the WARN marker); (2) standalone gate pins — a valid
+custom name and the canonical literal pass through with EMPTY stderr,
+the corrupted trailing-slash spelling (the exact e X1 input) falls
+back to `opencode` with the WARN on stderr; (3) the chain arm drives
+the REAL loop driver with the gate eval'd first (mirroring shipped
+order — the driver's 7th parameter feeds `OPENCODE_USER="opencode/"`
+and roots `/home/opencode /home/opencode/`): asserts the WARN, both
+skip echoes (raw spelling end-anchored), every op verb absent on both
+spellings, primary root processing. Deletion-red host-independent:
+gate deleted → the compare target itself carries the slash → both
+spellings miss the refusal → no skip echoes → arm RED (spot-check 1).
+Class sweep (L2, conf-sourced values that reach a lexical guard or
+root-run argv — `grep -n 'OPENCODE_USER\|DEFAULT_USER\|OPENCODE_GROUP'
+uninstall.sh` + consumer walk): `DEFAULT_USER` (feeds the chown argv
+:664 and gpasswd) and `OPENCODE_GROUP` (gpasswd -d argv) are
+conf-sourced too, but a shape-invalid value there fails LOUDLY through
+full quoting (rc-observed → partial list + WARN); the X1-specific
+hazard — a shape-invalid value SILENTLY defanging a lexical guard —
+is unique to `OPENCODE_USER`. No further gate owed.
+
+### e X2 (LOW) — d Q1's precondition text corrected
+
+The d Q1 evidence block's justification cited non-enforcing mechanisms
+(`:-` default, `id -u` lookups). Corrected in place with a bracketed
+**Correction (#243 e X2, fix wave 5)** paragraph naming the real
+anchors (writer literal `install.sh:349`, heredoc `:1339`, charset
+gate precedent `:589-592`) plus the now-existing reader-side
+enforcement (e X1). The history stays readable as history; snapshots
+stay immutable.
+
+### e S1 (LOW) — the `.` chmod negative landed
+
+The malformed arm gained `! grep -qF 'sudo chmod g-s .'` right after
+its find negative — d Q3's "find/chmod negatives for `/var/.` and
+`.`" sentence is true as written since (correction paragraph appended
+to the d Q3 block). Prefix-unique in the arm: no other fed operand
+(`//etc`, `/var/.`, the `$WORK` primary) starts with a bare `.` after
+`sudo chmod g-s ` — the `/var/.` line's operand starts with `/`.
+
+### e S2 (INFO) — the raw skip-echo assertion discriminates alone
+
+The agent-home arm's raw assertion is now end-anchored
+(`grep -q 'Skipping agent home …: /home/untest-agent$'`): the raw
+pattern is a strict PREFIX of the trailing-slash echo line, so the
+unanchored form was satisfied by either line and could not red on a
+raw-echo-only omission. The anchored form matches exactly the raw
+line; the trailing-slash assertion stays exact-match `-qF`. Same
+anchoring applied to the e X1 chain arm's raw echo from birth. The
+arm comment states the prefix-subsumption reason.
+
+### e S3 (INFO) — a discriminating static slash form
+
+The static rejected-reps list feeds `/home/` instead of `/etc/`: the
+`/etc/` spelling hit the `/etc/*` sibling arm with or without the
+strip (belt only), while `/home/` hits the bare `/home` arm (no
+`/*` sibling exists) — strip deletion now reds on TWO forms
+(`/var/`, `/home/`). The list comment states the bare-arm rule so
+the next form is chosen consciously.
+
+### e S4 (INFO) — d Q4's sweep invariant corrected
+
+The d Q4 evidence block claimed "no fed operand is a string-prefix of
+another" across the unanchored negatives; the agent-home arm's fed
+pair falsifies it (deliberate prefix pair, over-match desired).
+Corrected in place with a bracketed **Correction (#243 e S4, fix
+wave 5)** paragraph scoping the invariant to the other arms.
+
+### e S5 (INFO) — per-spelling line-end anchors
+
+The ts-loop setfacl/chmod negatives are `$`-anchored (the root is
+their LAST operand on the op line) and now cover BOTH spellings like
+the d Q4 find pairs: normalized (`sudo setfacl -R -x g:60002 /var$`)
+and raw leak (strip deleted, `…/var/$`); the `/var//` standalone
+setfacl/chmod negatives got `$` too. Each negative now binds its own
+spelling — a dot-gate leak on `/var//` can no longer misattribute
+the arm failure to the trailing-slash spelling. BRE-safe: the
+patterns carry no regex metacharacters.
+
+### e X3 (INFO) — screen() mirrors the loop's dot gate
+
+The helper gained the loop's dot/empty-segment case BEFORE the strip
+(same arm set, same gate order as the shipped loop), and the static
+rejected-reps list feeds `/var//` to pin it: dot gate deleted →
+`/var//` strips to `/var/`, matches no blocklist arm, reports
+allowed → the static arm REDs. The helper comment now claims full
+gate-order parity (it previously claimed strip parity only — the
+exact scope gap review e recorded).
 
 ## Gates (fix wave 1, a findings)
 
@@ -646,6 +776,35 @@ legit arm needing a dot reds it loudly and gets defanged consciously.
      pin (`wired SCREEN_PATTERNS free of dot/double-slash tokens`);
      every other arm green — the pin catches the splice the function
      pin cannot see.
+
+## Gates (fix wave 5, e findings)
+
+- Unit: `sh tests/unit/test-uninstall.sh` green — all arms incl. the
+  three new e X1 pins (extraction, standalone gate passthrough/
+  fallback, corrupted-conf chain), the end-anchored raw echo, the
+  `/home/` and `/var//` static forms, the `$`-anchored ts negatives
+  and the `.` chmod negative; `make test` green.
+- `make lint` green (ShellCheck passed); `sh tests/unit/test-docs.sh`
+  green (docs/reference/files.md row extended, same table);
+  line-length ratchet green (this file ≤ 120 content columns);
+  `make check-version` green.
+- E2E (RM-0113 — uninstall.sh gains an input-validation gate: root-run
+  script semantics change): both suites run on the committed fix tree,
+  in parallel (disjoint suites, warm cache from wave 4's runs the same
+  day) — counts recorded in the follow-up commit.
+- Sabotage spot-checks (post-commit against the fix commit, in a
+  scratch worktree; each: mutate → observe the named pin RED →
+  `git checkout --` → suite green at the end) — results recorded in
+  the follow-up commit:
+  1. e X1 gate (case block deleted): chain arm RED — no WARN, no skip
+     echoes; the corrupted compare target misses both spellings.
+  2. e X1 fallback body (WARN + assignment deleted, case kept): chain
+     arm RED — value stays corrupted, echoes absent.
+  3. e X3/S3 dot gate + strip in screen(): static rejects `/var//`
+     (dot gate) resp. `/var/` + `/home/` (strip) RED per deletion.
+  4. e S1/S2/S5 pin discrimination (probe-level, synthetic op/echo
+     lines): each anchored/added negative matches exactly its own
+     spelling — the shapes the anchors were built to separate.
 
 ## Follow-ups
 

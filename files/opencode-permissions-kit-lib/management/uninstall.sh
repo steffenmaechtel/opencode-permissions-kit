@@ -209,6 +209,20 @@ if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# Shape-gate the sourced value (#243 e X1): install.conf is root-owned
+# but hand-editable, and the writer stamps a literal here (install.sh
+# sets OPENCODE_USER="opencode" and its conf heredoc carries that
+# literal — the writer's charset gate covers DEFAULT_USER, not this
+# name). A shape-invalid value (e.g. a trailing slash) would silently
+# defang the agent-home refusal in the project loop and the
+# agents-backup walk below — fall back to the canonical literal,
+# loudly. Same conservative charset as the writer's DEFAULT_USER gate.
+case "$OPENCODE_USER" in
+    ''|*[!A-Za-z0-9_.-]*)
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$OPENCODE_USER') — falling back to 'opencode'" >&2
+        OPENCODE_USER=opencode
+        ;;
+esac
 # Sharing group: the opencode user's own usergroup; prefer the live value.
 OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
@@ -575,7 +589,9 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # raw spelling as its no-trailing-slash case, so a trailing
         # slash cannot dodge it (#243 c Q1) while the predicate stays
         # exactly the writer's strip-then-compare shape; `//` forms
-        # are the dot gate's job below.
+        # are the dot gate's job below. The compared value itself is
+        # shape-gated right after install.conf is sourced (#243 e X1):
+        # a corrupted conf value cannot defang this refusal.
         if [ "${root%/}" = "/home/$OPENCODE_USER" ]; then
             echo "  Skipping agent home (never a project root): $root"
             continue
