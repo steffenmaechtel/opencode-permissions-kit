@@ -982,6 +982,10 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     # regex, visible to the executed value), first-token-`+=`
     # doubles (interpreter failure under sh — dash has no +=), and
     # a deleted or commented-out sole assignment (empty extraction).
+    # Assignment-prefixed shapes count too (#244 g W1 self-check):
+    # `export`/`readonly`/`local` before the token are collected —
+    # an `export _py3_imports=…` second line changes the executed
+    # value and reds (probe-verified; the old regex pair missed it).
     # A trailing backslash on an assignment line is DETECTED loudly
     # (the e-W4 concealment residual #1 closed as a detector); the
     # line-start filter keeps execution lines off the use sites at
@@ -993,9 +997,9 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
         *) _p3bin=sh ;;
     esac
     _p3lines="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" \
-        | grep -E '^[[:space:]]*_py3_imports[^_[:alnum:]]' || true)"
+        | grep -E '^[[:space:]]*(export[[:space:]]+|readonly[[:space:]]+|local[[:space:]]+)?_py3_imports[^_[:alnum:]]' || true)"
     _p3n="$(printf '%s\n' "$_p3lines" \
-        | grep -cE '^[[:space:]]*_py3_imports[^_[:alnum:]]' || true)"
+        | grep -cE '^[[:space:]]*(export[[:space:]]+|readonly[[:space:]]+|local[[:space:]]+)?_py3_imports[^_[:alnum:]]' || true)"
     _p3cont="$(printf '%s\n' "$_p3lines" | grep -n '\\$' || true)"
     if [ -z "$_p3lines" ] || [ -n "$_p3cont" ]; then
         fail "gate: _py3_imports assignment present, no continuation (lines=$_p3n cont=[$_p3cont])"
@@ -1010,14 +1014,17 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
             && [ "$_p3rt" = "$_p3gate" ]; then
             pass "gate: executed _py3_imports equals the extracted list (#244 c W3, #244 g W1)"
         else
-            fail "gate: executed _py3_imports equals the extracted list (rc=$_p3rc lines=$_p3n executed=[{_p3rt}] extracted=[{_p3gate}])"
+            fail "gate: executed _py3_imports equals the extracted list (rc=$_p3rc lines=$_p3n executed=[{$_p3rt}] extracted=[{$_p3gate}])"
         fi
     fi
     # Residual, deliberately not caught (#244 e W4): eval-built or
     # command-substitution assignments (`_py3_imports="$(…)"`) —
     # deliberate concealment shapes outside the maintenance-accident
     # threat model; most such shapes red above anyway (the executed
-    # subshell value differs from the extracted literal list).
+    # subshell value differs from the extracted literal list). Same
+    # class: a second assignment hidden behind a `;` on a USE line
+    # (`python3 -c "$_py3_imports"; _py3_imports=…`) — line-start
+    # collection cannot see it; concealment, not accident.
     _p3g="$(mktemp)"
     printf '%s\n' "$_p3gate" | sed 's/^[[:space:]]*import[[:space:]]*//' \
         | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
