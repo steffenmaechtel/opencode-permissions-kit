@@ -71,8 +71,14 @@ tui_plugin_sync_user() {
     # python3 names itself instead of degrading attributelessly (stdout
     # still discarded). An absent one is guarded off (#244 d Q1):
     # absence is legitimate mid-lifecycle, not a diagnostic event.
-    command -v python3 >/dev/null 2>&1 \
-        && _tp_sudo python3 "$_tp_libdir/py/tui-register.py" "$_tp_user_dir/cli.json" unregister \
-            "$_tp_libdir/tui/kit-mode-2x.tsx" --drop "$_tp_libdir/tui/kit-mode.tsx" >/dev/null || true
+    # Guard and execution share ONE resolution context (#244 e S1):
+    # the guard runs inside the sudo environment, so a sudo
+    # secure_path that differs from the caller's PATH cannot make the
+    # two disagree (silent skip in one arm, not-found noise in the
+    # other). Operands pass as argv to the inner sh — nothing is
+    # expanded inside the quoted script.
+    _tp_sudo sh -c 'command -v python3 >/dev/null 2>&1 && exec python3 "$@"' tui-unregister \
+        "$_tp_libdir/py/tui-register.py" "$_tp_user_dir/cli.json" unregister \
+        "$_tp_libdir/tui/kit-mode-2x.tsx" --drop "$_tp_libdir/tui/kit-mode.tsx" >/dev/null || true
     return 0
 }

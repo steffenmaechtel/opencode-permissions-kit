@@ -7,7 +7,9 @@ unique after 1 dup pair) → fix wave 2 → [review-c.md](review-c.md)
 (wave snapshot 2026-10-24, 14 IDs, 11 unique after 3 dup pairs, 1
 sub-claim retracted) → fix wave 3 → [review-d.md](review-d.md)
 (wave snapshot 2026-10-24, 9 IDs, all unique — 3 LOW, 6 INFO, no
-MED/HIGH) → fix wave 4 (the d rows below). Birth PR
+MED/HIGH) → fix wave 4 → [review-e.md](review-e.md) (wave snapshot
+2026-10-24, 9 IDs unique after 2 dup pairs — 6 LOW, 3 INFO, no
+MED/HIGH) → fix wave 5 (the e rows below). Birth PR
 #244, branch `feature/223-fsb-tee-health-gate`.
 
 ## Dispositions
@@ -54,6 +56,15 @@ MED/HIGH) → fix wave 4 (the d rows below). Birth PR
 | d Q1 (LOW) | **implemented** | `f198fb2` | command -v guards at resolve + _opk_json_get; absence pins |
 | d Q2 (INFO) | **implemented** | `f198fb2` | needle scoped to the resolve function |
 | d Q3 (INFO) | **implemented** | `f198fb2` | one sentence each on sharing-group.md + cli.md |
+| e S1 (LOW) | **implemented** | `<SHA>` | guard runs inside the sudo context (sh -c); asymmetry pins both arms |
+| e S2 (INFO) | **implemented** | `<SHA>` | rc 127→0 contract named at the guard; message correction recorded |
+| e W1 (LOW) | **implemented** | `<SHA>` | record completed: both tee sites + code-site anchor, correction marker |
+| e W2 (LOW) | **implemented** | `<SHA>` | count+dup pins extended to `+=` shapes; comment promise trued |
+| e W3 (LOW) | **implemented** | `<SHA>` | `:1157` replaced by a content anchor |
+| e W4 (INFO) | **implemented** | `<SHA>` | concealment residual named in the pin comment (promise scoped) |
+| e W5 (INFO) | **implemented** | `<SHA>` | absence sentence now names oao:444's redirect+rc handling |
+| e Q1 (LOW) | **implemented** | `<SHA>` | cli.md sentence states the per-step truth |
+| e Q3 (LOW) | **implemented** | `<SHA>` | healthy-noop pin asserts an empty stderr stream |
 
 ## Evidence detail
 
@@ -495,11 +506,14 @@ tick; suites green.
   correction: this bullet misdescribed its own grep's output; the
   gate probes' `>/dev/null 2>&1` shapes cannot match the literal
   `2>/dev/null`.) The grep's actual hits: curl noise guards
-  (update.sh:230, the resolve pipe's curl at :1157,
-  setup-container-backend:283 — network noise, not interpreter
-  stderr) and one python3-line hit, opencode-as-opencode:444,
-  dispositioned in the S3 bullet above (a W5, deliberately not
-  changed). The fixed-gate probes keep their rc discards by design
+  (update.sh:230, the resolve pipe's registry.npmjs.org curl
+  (#244 e W3 correction: the ":1157" cite was stale on this
+  record's own commit — the wave-4 guard lines moved the line;
+  content anchor now), setup-container-backend:283 — network
+  noise, not interpreter stderr) and one python3-line hit,
+  opencode-as-opencode:444, dispositioned in the S3 bullet above
+  (a W5, deliberately not changed). The fixed-gate probes keep
+  their rc discards by design
   (`>/dev/null 2>&1` shapes — presence/probe rc; only the
   failure-path rerun/drop shapes changed).
 
@@ -561,7 +575,9 @@ clean `tui-register: …` error lines otherwise, so a present-but-broken
 python3 now names itself instead of degrading attributelessly. Pins in
 test-tui-mode: noisy shim → diagnostic + rc 0; absence (bin-farm PATH
 minus python3) → silence + rc 0; healthy run → no tui-register line,
-no traceback.
+no traceback. (#244 e Q3 correction: the healthy-noop pin asserts an
+empty stderr STREAM since fix wave 5 — the two-literal enumeration
+sailed past any other stderr shape.)
 
 ### d S1 / d S2 — deliberately not done
 
@@ -615,18 +631,24 @@ on the terminal when the scan starts; absence silent).
 ### Class sweep record (L2, fix wave 4)
 
 - S3-class enumeration completed (#244 d W1): the python3 execution
-  sites under files/ are now — guarded + transparent:
-  tui-plugin.sh:68 (fixed this wave), fs-baseline probe + rerun,
-  status probe/advisory/leak-scan, update resolve, ddev
-  `_opk_json_get`, opk:300, install.sh gate (b-S2 discard + rerun);
-  deliberately not changed: oao:444 (a W5), update.sh 1.x (sed, no
-  interpreter); transparent, no redirect involved: uninstall:316 —
-  its absent-python3 not-found noise is pre-existing and outside
-  this wave's diff, named here as backlog.
+  sites under files/ are now — guarded + transparent: the
+  tui-plugin unregister cleanup (fixed this wave; #244 e W1
+  correction: the ":68" cite pointed into the comment block —
+  content-anchored now), fs-baseline probe + rerun + counter tee
+  `_fsb_count_tee` and status probe/advisory/leak-scan/progress
+  tee `_st_progress_tee` (#244 e W1 correction: the two probe-gated
+  tee consumers were missing from this list as written — guarded +
+  transparent, no behavior gap, enumeration only), update resolve,
+  ddev `_opk_json_get`, opk:300, install.sh gate (b-S2 discard +
+  rerun); deliberately not changed: oao:444 (a W5), update.sh 1.x
+  (sed, no interpreter); transparent, no redirect involved:
+  uninstall:316 — its absent-python3 not-found noise is
+  pre-existing and outside this wave's diff, named here as backlog.
 - Absence class (d Q1) swept with it: every site above guards
-  absence except uninstall:316 (pre-existing, named) and the
-  installer gate (absence is its loud "not installed" verdict by
-  design).
+  absence except oao:444 (#244 e W5 correction: unguarded — its
+  `2>/dev/null` + rc fallback silence absence instead of a guard),
+  uninstall:316 (pre-existing, named) and the installer gate
+  (absence is its loud "not installed" verdict by design).
 
 ### L1–L7 run (fix wave 4, before commit)
 
@@ -654,6 +676,147 @@ green before the commit that carries this file. E2E (root-run script
 behavior changes — tui-plugin, update, ddev-terminal): owed in-wave,
 runs on the committed tree, recorded in Follow-ups by the
 bookkeeping commit.
+
+## Evidence detail (fix wave 5 — e findings)
+
+Maintainer decision (recorded per the commission): full
+implementation of all 9 e-findings — S1/S2/Q1 code+docs, W2/W4/Q3
+test-side, W1/W3/W5 ledger corrections in the wave-4 record above.
+The wave review of this fix diff (snapshot f) runs in a FRESH
+session afterwards, per the maintainer's plan.
+
+### e S1 — the guard moves into the sudo context
+
+The unregister cleanup's `command -v python3` guard now runs INSIDE
+the `_tp_sudo` invocation: `_tp_sudo sh -c 'command -v python3
+>/dev/null 2>&1 && exec python3 "$@"' tui-unregister <operands>` —
+guard and execution resolve python3 in ONE PATH (sudo's
+secure_path in production), so the caller/sudo disagreement closes:
+arm A (caller has it, sudo doesn't) skips silently instead of
+leaking sudo's not-found notice; arm B (caller lacks it, sudo has
+it) runs the cleanup instead of skipping it. Operands pass as argv
+to the inner sh; nothing is expanded inside the quoted script (L5
+re-run below). Pins: both arms via `_tps_sudo` fixed-PATH stubs
+(secure_path stand-ins over binary farms, chown still stubbed off
+like the default): arm A asserts silence + rc 0 (no "not found", no
+diagnostic), arm B asserts the recorder marker (execution proof) +
+rc 0.
+
+### e S2 — rc contract named at the guard
+
+The ddev-terminal guard comment now states what f198fb2's message
+omitted: absence returns 0 (pre-guard, the failed pipeline's rc 127
+carried); no caller observes the function's rc (stdout-only `$( )`
+consumers). The message itself is immutable history — this row is
+the correction of record.
+
+### e W1 — the enumeration record completed
+
+Both corrections in the wave-4 S3-class bullet above (tee consumers
+`_fsb_count_tee`/`_st_progress_tee` added; the ":68" cite
+content-anchored). Sweep re-derived from
+`grep -rn python3 files/ -I --exclude-dir=__pycache__` — 12
+execution sites, every one now classified in the bullet.
+
+### e W2 — the pin pair catches append shapes
+
+Count pin regex is now `^[[:space:]]*_py3_imports\+?=` (lines
+carrying an assignment OR an append — a separate-line `_py3_imports+=`
+reds the count), dup pin `^[[:space:]]*_py3_imports=.*_py3_imports(\+=|=)`
+(a same-line `;`-joined append reds the dup). Probed in
+/tmp/opencode/pr-00244-e/fix-probe/: base green (count 1, dup
+empty), same-line append → dup RED, separate-line append → count 2
+RED, same-line double → dup RED (unchanged), legitimate self-append
+`_py3_imports="$_py3_imports, threading"` stays green (no false
+red). The comment's "any line naming the assignment token twice"
+promise is replaced by the trued enumeration.
+
+### e W3 — content anchor
+
+The wave-3 residual bullet's `:1157` cite is replaced by the
+registry.npmjs.org content anchor (correction marker in place); the
+other three cites verified current at this tree by the e-pass
+(round e W-verification) and re-checked after this wave's edits.
+
+### e W4 — residual scoped
+
+The pin comment names what the pair does NOT catch (backslash
+continuation with a `;`-led second line, eval-built assignments) —
+deliberate concealment shapes, outside the maintenance-accident
+threat model. The c-S4 promise-scoping pattern.
+
+### e W5 — sentence trued
+
+The wave-4 absence bullet names oao:444's redirect+rc handling for
+what it is (silencing without a guard) — correction marker in place.
+
+### e Q1 — docs sentence states the per-step truth
+
+cli.md no longer promises once-ness per run: "names itself on the
+terminal — once when the first scan starts, and again wherever a
+python-backed step parses input (advisory feed, leak scan); a
+missing one stays silent." sharing-group.md's order-only sentence
+needed no change (verified by the e-pass).
+
+### e Q3 — the healthy-noop pin asserts an empty stream
+
+The pin now asserts the whole stderr stream is empty on the healthy
+no-op (`_tps_errfile` knob on `_tps_run`, default path unchanged):
+any future warning shape — deprecation, loader notice, renamed
+prefix — reds the pin instead of sailing past the two fixed
+literals. The d-W1 evidence sentence above carries the correction
+marker.
+
+### Class sweep record (L2, fix wave 5)
+
+- W2 class (pin blind to a sibling form of its shape): the other
+  exactness pins in the same block swept — `_p3old` presence-gate
+  count (grep -cF on a full-line `if ! …` literal: no append form
+  exists for that shape) and the extraction sed (single-quote
+  anchored; an append after the closing quote no longer matters —
+  the count/dup pair reds it first). Sites checked: the gate-pin
+  block, tests/unit/test-install-args.sh:930-1000.
+- W1/W5 class (record enumerations): re-derived as above (12
+  sites); the corrected bullet is the complete list.
+- W3 class (line-number cites): every numeric cite this record now
+  carries was measured at this tree after the edits; the record
+  prefers content anchors for anything this wave itself moved.
+
+### L1–L7 run (fix wave 5, before commit)
+
+- L1: the S1 shape keeps `|| true` — pinned by EXECUTING both
+  asymmetry arms (silence arm + execution-marker arm); the
+  `_tps_errfile` knob's default path is unchanged (the noisy cases
+  still assert the merged stream).
+- L2: sweep above; patterns + sites recorded.
+- L3: every rewritten claim carries its pin or is trued (inner-guard
+  silence → arm A pin; execution → arm B marker; stderr-empty → Q3
+  pin; append reds → W2 pair, probe-verified; cli.md sentence →
+  matches the three-site behavior the e-pass verified).
+- L4: new pins sit before the suite's summary gate (the asymmetry
+  block ends before the merged trap + summary); sabotage
+  post-commit (Follow-ups).
+- L5: no new root operations — the sh -c wrapper changes the sudo
+  argv, not the operands; re-check done (no path-operand change,
+  no chmod/chown change, the `[ -L ]` gates untouched).
+- L6: fixes bring their own pins (2 asymmetry arms, stderr-empty,
+  extended count/dup pair); the wave review of this fix diff
+  (snapshot f) is owed per the loop — commissioned to a FRESH
+  session by the maintainer.
+- L7: no new shell files; the fixed-PATH stubs follow the suite's
+  existing heredoc + farm idioms.
+
+### Gates (fix wave 5, pre-commit)
+
+make lint green (ShellCheck); sh tests/unit/test-tui-mode.sh green
+(5 new/rebuilt pins); sh tests/unit/test-install-args.sh green
+(extended count/dup pair); full `make lint && make test` rc 0 (all
+suites, sandbox policy included, rules index parity OK 118 rows);
+line-length ratchet + reviews lint/parity green before the commit
+that carries this file. E2E (root-run script semantics change — the
+tui-plugin guard moves into the sudo context): owed in-wave, runs
+on the committed tree, recorded in Follow-ups by the bookkeeping
+commit.
 
 ## Follow-ups
 

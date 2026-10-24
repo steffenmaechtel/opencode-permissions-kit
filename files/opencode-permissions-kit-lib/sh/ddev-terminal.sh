@@ -70,7 +70,10 @@ _opk_ddev_describe() {
 # passes through (#244 c S3) — the empty-on-miss contract is untouched.
 # An absent interpreter is guarded to the same silent empty output
 # (#244 d Q1): absence is a legitimate mid-lifecycle state, not a
-# diagnostic event.
+# diagnostic event. Absence returns 0 — pre-guard, the failed
+# pipeline's rc 127 carried (#244 e S2); no caller observes the
+# function's rc (stdout-only $( ) consumers; this file never exits
+# the parent shell).
 _opk_json_get() {
     _opk_gj="$1"
     shift

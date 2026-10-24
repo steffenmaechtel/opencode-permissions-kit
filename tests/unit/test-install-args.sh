@@ -959,28 +959,34 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     else
         fail "gate: import list extractable (no _py3_imports assignment found)"
     fi
-    # Exactly one assignment (#244 c W3): the gate-list extraction
+    # Exactly-one rationale (#244 c W3): the gate-list extraction
     # unions every match, but the runtime gate executes the LAST
-    # assignment — a second `_py3_imports=` line would keep this pin
-    # green while the probe silently stops exercising the first
-    # list's modules.
-    _p3asn="$(grep -c "^[[:space:]]*_py3_imports=" "$INSTALL")"
+    # assignment — a second assignment of any shape must go red.
+    # Second-assignment shapes (#244 c W3, #244 d W2, #244 e W2): the
+    # count pin counts LINES carrying an assignment or an append
+    # (`_py3_imports=` / `_py3_imports+=`) — separate-line seconds and
+    # standalone append lines go red there (the runtime gate executes
+    # first+append while the extraction sed reads the FIRST list
+    # only). The dup pin catches same-line doubles including the
+    # `+=` form: `_py3_imports='a'; _py3_imports+='b'` keeps the
+    # count at 1 while extraction and runtime diverge the same way.
+    # Both greps are guarded against the empty match (L7).
+    _p3asn="$(grep -cE "^[[:space:]]*_py3_imports\+?=" "$INSTALL")"
     if [ "$_p3asn" -eq 1 ]; then
-        pass "gate: exactly one _py3_imports assignment (#244 c W3)"
+        pass "gate: exactly one _py3_imports assignment (#244 c W3, #244 e W2)"
     else
         fail "gate: exactly one _py3_imports assignment (found $_p3asn, want 1)"
     fi
-    # Same-line double assignment (#244 d W2): the count pin above
-    # counts LINES — `_py3_imports='a'; _py3_imports='b'` joined on one
-    # line keeps it at 1 while the extraction sed reads the FIRST list
-    # and the runtime executes only the LAST. Any line naming the
-    # assignment token twice goes red (guarded empty-match grep).
-    _p3dup="$(grep -nE "^[[:space:]]*_py3_imports=.*_py3_imports=" "$INSTALL" || true)"
+    _p3dup="$(grep -nE "^[[:space:]]*_py3_imports=.*_py3_imports(\+=|=)" "$INSTALL" || true)"
     if [ -z "$_p3dup" ]; then
-        pass "gate: no same-line double _py3_imports assignment (#244 d W2)"
+        pass "gate: no same-line double _py3_imports assignment (#244 d W2, #244 e W2)"
     else
         fail "gate: same-line double _py3_imports assignment ($_p3dup)"
     fi
+    # Residual, deliberately not caught (#244 e W4): a backslash
+    # continuation whose second physical line is `;`-led, and
+    # eval-built assignments — deliberate concealment shapes, outside
+    # the maintenance-accident threat model this pin pair targets.
     _p3g="$(mktemp)"
     printf '%s\n' "$_p3gate" | sed 's/^[[:space:]]*import[[:space:]]*//' \
         | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \

@@ -261,7 +261,7 @@ mkdir -p "$TPS"
 
 _tps_run() {
     _tps_desc="$1"; _tps_expect="$2"; shift 2
-    TR_SUDO="$TUIWORK/tps/bin/sudo-stub"
+    TR_SUDO="${_tps_sudo:-$TUIWORK/tps/bin/sudo-stub}"
     OPK_AGENT_HOME="${_tps_ah:-$TUIWORK/tps/home/oc}"
     export TR_SUDO OPK_AGENT_HOME
     log() { :; }
@@ -269,7 +269,14 @@ _tps_run() {
     . "$TUIPLUGIN"
     # shellcheck disable=SC2030,SC2031
     . "$STAGEDWRITE"
-    tui_plugin_sync_user "$@" 2>&1
+    if [ -n "${_tps_errfile:-}" ]; then
+        # (#244 e Q3) stderr separated for the emptiness pin; the
+        # default stays the merged 2>&1 contract the noisy cases
+        # assert against.
+        tui_plugin_sync_user "$@" 2>"$_tps_errfile"
+    else
+        tui_plugin_sync_user "$@" 2>&1
+    fi
     echo "rc=$?"
 }
 
@@ -364,20 +371,96 @@ case "$_tps_out" in
 esac
 check "unregister cleanup: absent python3 stays silent, sync still rc=0 (#244 d Q1)" "$_tpcase"
 rm -rf "$TPSW" "$TPSABS" "$TPSNZ"
-# healthy no-op: the cleanup prints nothing of its own (no tui-register
-# error line, no traceback) — the claim the W1 comment makes.
+# healthy no-op: the cleanup prints nothing of its own — asserted as
+# an EMPTY stderr stream (#244 e Q3), not two enumerated error shapes
+# (any future warning line — deprecation, loader notice, a renamed
+# prefix — reds the pin instead of sailing past fixed literals; the
+# claim the W1 comment makes). The cleanup's stdout is discarded by
+# the shipped >/dev/null either way.
 TPSW="$TUIWORK/tps/w4"; mkdir -p "$TPSW"
+TPSWERR="$TUIWORK/tps/w4.err"; : > "$TPSWERR"
+_tps_errfile="$TPSWERR"
 _tps_out=$( _tps_run "healthy-noop" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+unset _tps_errfile
+case "$_tps_out" in *rc=0*) check "unregister cleanup: healthy no-op rc=0 (#244 d W1)" true ;; *) check "unregister cleanup: healthy no-op rc=0 (got [$_tps_out])" false ;; esac
+check "unregister cleanup: healthy no-op, stderr empty (#244 e Q3)" test ! -s "$TPSWERR"
+rm -rf "$TPSW"
+
+# (#244 e S1) guard/execution resolution asymmetry: the guard now
+# runs INSIDE the _tp_sudo context, so guard and exec share ONE PATH.
+# The sudo stubs below force a FIXED PATH (the secure_path stand-in)
+# on top of the default stub's chown drop — the sync's major-2 branch
+# needs the usual binaries in the exec context too.
+# Arm A: caller PATH has python3 (noisy shim), exec context has none —
+# a caller-side guard leaks sudo's not-found notice here; the inner
+# guard must skip silently.
+TPSNZ2="$TUIWORK/tps/nz2"; mkdir -p "$TPSNZ2"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$TPSDIAG" > "$TPSNZ2/python3"
+chmod +x "$TPSNZ2/python3"
+TPSFIXA="$TUIWORK/tps/fixa"; mkdir -p "$TPSFIXA"
+for _tpd in /usr/bin /bin /usr/local/bin; do
+    for _tpb in "$_tpd"/*; do
+        [ -e "$_tpb" ] || continue
+        [ "${_tpb##*/}" = python3 ] && continue
+        ln -sfn "$_tpb" "$TPSFIXA/${_tpb##*/}"
+    done
+done
+cat > "$TUIWORK/tps/bin/sudo-fixa" <<EOF
+#!/bin/sh
+case "\$1" in chown) exit 0 ;; esac
+PATH="$TPSFIXA" exec "\$@"
+EOF
+chmod +x "$TUIWORK/tps/bin/sudo-fixa"
+TPSW="$TUIWORK/tps/w6"; mkdir -p "$TPSW"
+_tps_sudo="$TUIWORK/tps/bin/sudo-fixa"
+_tps_out=$( PATH="$TPSNZ2:$PATH" _tps_run "asym-a" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+unset _tps_sudo
 case "$_tps_out" in
     *rc=0*) _tpcase=true ;;
     *) _tpcase=false ;;
 esac
 case "$_tps_out" in
-    *"tui-register:"*|*"Traceback"*) _tpcase=false ;;
+    *"not found"*|*"Not found"*|*"$TPSDIAG"*) _tpcase=false ;;
     *) ;;
 esac
-check "unregister cleanup: healthy no-op prints nothing (#244 d W1)" "$_tpcase"
-rm -rf "$TPSW"
+check "unregister cleanup: exec context without python3 stays silent despite caller PATH (#244 e S1 arm A)" "$_tpcase"
+rm -rf "$TPSW" "$TPSNZ2"
+# Arm B: caller PATH has NO python3, exec context has one (recording
+# shim) — a caller-side guard skips the cleanup here; the inner guard
+# must run it (the marker proves execution).
+TPSFIXB="$TUIWORK/tps/fixb"; mkdir -p "$TPSFIXB"
+for _tpf in "$TPSFIXA"/*; do
+    [ -e "$_tpf" ] || continue
+    ln -sfn "$_tpf" "$TPSFIXB/${_tpf##*/}"
+done
+TPSMARK="$TUIWORK/tps/armb.marker"
+cat > "$TPSFIXB/python3" <<EOF
+#!/bin/sh
+echo "asym-b exec seen: \$*" >> "$TPSMARK"
+exit 0
+EOF
+chmod +x "$TPSFIXB/python3"
+cat > "$TUIWORK/tps/bin/sudo-fixb" <<EOF
+#!/bin/sh
+case "\$1" in chown) exit 0 ;; esac
+PATH="$TPSFIXB" exec "\$@"
+EOF
+chmod +x "$TUIWORK/tps/bin/sudo-fixb"
+TPSABS2="$TUIWORK/tps/absbin2"; mkdir -p "$TPSABS2"
+for _tpd in /usr/bin /bin /usr/local/bin; do
+    for _tpb in "$_tpd"/*; do
+        [ -e "$_tpb" ] || continue
+        [ "${_tpb##*/}" = python3 ] && continue
+        ln -sfn "$_tpb" "$TPSABS2/${_tpb##*/}"
+    done
+done
+TPSW="$TUIWORK/tps/w7"; mkdir -p "$TPSW"
+_tps_sudo="$TUIWORK/tps/bin/sudo-fixb"
+_tps_out=$( PATH="$TPSABS2" _tps_run "asym-b" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+unset _tps_sudo
+case "$_tps_out" in *rc=0*) check "unregister cleanup: caller PATH without python3, sync rc=0 (#244 e S1 arm B)" true ;; *) check "unregister cleanup: caller PATH without python3, sync rc=0 (got [$_tps_out])" false ;; esac
+check "unregister cleanup: exec-context python3 runs despite caller absence (#244 e S1 arm B)" test -f "$TPSMARK"
+rm -rf "$TPSW" "$TPSABS2" "$TPSFIXA" "$TPSFIXB" "$TPSMARK"
 
 # ONE merged trap (0.0.41f C4): a second EXIT trap would REPLACE the
 # suite's T2X cleanup — chain both scratch dirs.

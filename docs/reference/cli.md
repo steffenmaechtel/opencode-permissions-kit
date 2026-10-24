@@ -356,8 +356,9 @@ can take minutes per scan. The line is transient: it is erased when the scan fin
 appears in piped output, log files, cron mail or `--short` mode —
 captured output stays byte-identical, and the scans run identically
 without `python3` (they only lose the progress display). A
-present-but-broken `python3` prints its own diagnostic to the terminal
-once when the scan starts; a missing one stays silent.
+present-but-broken `python3` names itself on the terminal — once when
+the first scan starts, and again wherever a python-backed step parses
+input (advisory feed, leak scan); a missing one stays silent.
 
 Exit codes: `0` all green, `1` alert(s), `2` warning(s) only, `64` usage
 error. The full report uses the same exit codes (an installed-but-degraded kit
