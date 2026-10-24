@@ -30,5 +30,5 @@ The parity test regenerates and compares. -->
 | [pr-00221](0/0/2/2/pr-00221) | issue-210 live progress for the status project-root scans (feature wave) | wave | v0.0.55 @ 14050d8 | 2026-10-22 | a–c | closed |
 | [pr-00222](0/0/2/2/pr-00222) | rules-meta phases 4-5 — revisit workflow + RM-0001 (feature wave) | wave | master @ 14050d8 | 2026-10-22 | a–c | closed |
 | [pr-00224](0/0/2/2/pr-00224) | issue-197 e2e default flip to opencode 2.x, -1x lanes + v2 installer bootstrap (feature wave) | wave | master @ 9f9fd32 | 2026-10-22 | a–c | closed |
-| [pr-00235](0/0/2/3/pr-00235) | agent-skills pilot — opk-review-pass skill + lint/test wiring, issue #178 (feature wave) | wave | master @ caeb9a8 (VERSION 0.0.56) | 2026-10-23 | a–c | open |
+| [pr-00235](0/0/2/3/pr-00235) | agent-skills pilot — opk-review-pass skill + lint/test wiring, issue #178 (feature wave) | wave | master @ caeb9a8 (VERSION 0.0.56) | 2026-10-23 | a–d | open |
 
