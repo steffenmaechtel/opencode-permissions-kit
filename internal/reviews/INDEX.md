@@ -34,5 +34,5 @@ The parity test regenerates and compares. -->
 | [pr-00235](0/0/2/3/pr-00235) | agent-skills pilot — opk-review-pass skill + lint/test wiring, issue #178 (feature wave) | wave | master @ caeb9a8 (VERSION 0.0.56) | 2026-10-23 | a–d | closed |
 | [pr-00241](0/0/2/4/pr-00241) | review-process docs + parity pin, issues #237/#238 (micro-wave review of the feature wave's diff) | wave | master @ d179acb (VERSION 0.0.56) | 2026-10-24 | a–b | closed |
 | [pr-00243](0/0/2/4/pr-00243) | wave review of the #218 fix wave — uninstall revert-loop closing-log honesty | wave | 0.0.56 @ e4952dd | 2026-10-24 | a–g | closed |
-| [pr-00256](0/0/2/5/pr-00256) | docs end-user optimization pass — all 21 user-docs pages shortened to snippet-first prose (issue #252) | wave | 0.0.56 @ 716b8c0 | 2026-10-24 | a | open |
+| [pr-00256](0/0/2/5/pr-00256) | docs end-user optimization pass — all 21 user-docs pages shortened to snippet-first prose (issue #252) | wave | 0.0.56 @ 716b8c0 | 2026-10-24 | a–b | open |
 
