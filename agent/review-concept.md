@@ -153,9 +153,12 @@ Four places carry review knowledge, each with exactly one job:
   the gates BEFORE the commit that carries them (line-length ratchet,
   reviews lint/parity), never after: a check that runs after the
   commit only detects, it cannot protect, and its red then sits on a
-  committed HEAD. The recurring trap is the `<SHA>` fill — a real SHA
-  is 2 bytes longer per row than the placeholder; pr-00234's a-wave
-  gate claims went red exactly this way (#234 b W1). (RM-0117)
+  committed HEAD. pr-00234 showed both shapes (#234 b W1): the a-wave
+  committed gate claims that were false at its own HEAD (rows
+  unwrapped past 120, pointer and INDEX red with them — the claims
+  predated the resolution file), and the b-wave ran its ratchet only
+  AFTER the `<SHA>`-fill commit (benign: the real SHA is 2 bytes
+  longer per row than the placeholder and stayed under the bound). (RM-0117)
 
 ## Finding provenance
 

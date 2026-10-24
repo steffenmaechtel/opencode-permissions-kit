@@ -10,6 +10,8 @@ Reviewer: GLM-5.3 house session (opk-review-pass skill) + 2 fresh-context review
 Skills: opk-review-pass
 -->
 
+> Resolution: [resolution.md](resolution.md)
+
 # Review a — review-process docs + parity pin (issues #237/#238)
 
 Micro-wave review of the feature wave's whole diff (one commit,

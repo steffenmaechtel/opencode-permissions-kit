@@ -84,7 +84,10 @@ Date: 2026-10-24
 Reviewer: parity pin
 -->
 EOF
-printf '# Resolution — pr-00420\n\nchain still running.\n' > "$GENCASE/resolution.md"
+printf '# Resolution — pr-00420\n\nchain still running; nothing closed yet.\n' \
+    > "$GENCASE/resolution.md"
+# the word "closed" in fixture 1's prose is LOAD-BEARING: a status()
+# regression to substring search must fail the open direction (#241 a S1)
 (cd "$GENDIR" && python3 scripts/gen-review-index.py) > /dev/null 2>&1 \
     || echo "FAIL status pin: generator exited non-zero" >> "$TMP"
 row=$(grep 'pr-00420' "$GENDIR/internal/reviews/INDEX.md")

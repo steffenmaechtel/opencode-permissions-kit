@@ -151,11 +151,16 @@ class-sweep pattern and sites — the row above links to it by finding>
 - **The `Status:` line** near the top of the file is where the chain's
   closure state lives: while rounds run the line is simply absent (the
   INDEX reads a missing line as `open`); once the loop has closed it
-  says `Status: closed …`. The closed line names who
+  says `Status: closed …` (the INDEX parser takes the FIRST `Status:`
+  line in the file — keep the line at the top so later prose cannot
+  shadow it). The closed line names who
   confirmed closure (maintainer or next round — a fixing round never
   closes its own loop; [review-concept.md](../../agent/review-concept.md),
   "The loop and the stop rule") and cites the stop-rule check (the
-  last round's dispositions and the files it touched). The INDEX's
+  last round's dispositions and the files it touched); this
+  confirmer + check form binds lines written from 2026-10-24 on —
+  post-legacy lines already in the corpus stay as written, like the
+  legacy rows. The INDEX's
   Status column is generated FROM this line
   (`scripts/gen-review-index.py`): an unset line leaves the case
   reading `open`, and nothing fails — the closure is simply
