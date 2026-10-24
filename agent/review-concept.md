@@ -118,6 +118,14 @@ nothing to review.
   expectation only with the check cited ("this round's dispositions
   touched no review-relevant code: files touched = …"); a closure
   later retracted follows the rotation-deviation recovery above. (RM-0115)
+- Closure is a recorded step, not only a verdict: once the maintainer
+  or the next round confirms the stop rule, the resolution's `Status:`
+  line is set to closed — naming the confirmer, citing the check —
+  and the INDEX is regenerated in the same commit. The INDEX's Status
+  column is generated from that line, so an unrecorded closure leaves
+  the case reading open with nothing failing anywhere (mechanics:
+  [review/README.md](../internal/reviews/README.md), "Resolution
+  format"). (RM-0118)
 
 ## Fixes close classes, not sites
 
@@ -140,6 +148,14 @@ Four places carry review knowledge, each with exactly one job:
 
 - The resolution is the ledger the next review starts from — an index
   row that carries SHAs is a summary, not a substitute (README rule 4). (RM-0071)
+- Bookkeeping edits to in-scope files — resolution rows and their
+  `<SHA>` fills, snapshot pointer lines, the regenerated INDEX — owe
+  the gates BEFORE the commit that carries them (line-length ratchet,
+  reviews lint/parity), never after: a check that runs after the
+  commit only detects, it cannot protect, and its red then sits on a
+  committed HEAD. The recurring trap is the `<SHA>` fill — a real SHA
+  is 2 bytes longer per row than the placeholder; pr-00234's a-wave
+  gate claims went red exactly this way (#234 b W1). (RM-0117)
 
 ## Finding provenance
 

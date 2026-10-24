@@ -160,3 +160,10 @@ decides the next step; the loop's stop rule is checked against the
 round's dispositions by the NEXT round or the maintainer — this session
 never declares the loop closed in its own commits ("The loop and the
 stop rule").
+
+When the maintainer confirms the loop closes (in-session or for the
+successor), the closure is RECORDED before the work counts as done:
+`Status: closed …` in the resolution — confirmer named, stop-rule
+check cited — plus INDEX regeneration, one commit (review README,
+"Resolution format"). The INDEX reads the line, not the chat: without
+it the case stays `open` with nothing failing.

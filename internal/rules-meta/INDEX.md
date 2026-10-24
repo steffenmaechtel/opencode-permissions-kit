@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**116 metas · 114 active · 2 retired · 0 review-pending · next due 2026-11-14**
+**118 metas · 116 active · 2 retired · 2 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** none
+- **Review pending:** RM-0117, RM-0118
 - **Overdue:** none
 
 ## AGENTS.md
@@ -111,6 +111,7 @@
 | [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | approved | 1m | 2026-11-22 |
 | [RM-0107](0/1/0/RM-0107.md) | The wave review fires on | active | approved | 1m | 2026-11-22 |
 | [RM-0115](0/1/1/RM-0115.md) | A round's own commits never | active | approved | 1m | 2026-11-22 |
+| [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | **pending** | 1m | 2026-11-24 |
 
 ### Session rotation
 
@@ -135,6 +136,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0071](0/0/7/RM-0071.md) | The resolution is the ledger | active | approved | 1m | 2026-11-19 |
+| [RM-0117](0/1/1/RM-0117.md) | Bookkeeping edits to in-scope files | active | **pending** | 1m | 2026-11-24 |
 
 ### Finding provenance
 

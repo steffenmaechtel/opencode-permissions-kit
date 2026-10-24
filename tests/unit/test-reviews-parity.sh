@@ -9,6 +9,11 @@
 #      hand edit drifts and fails
 #   3. every snapshot carries exactly one "> Resolution:" pointer line
 #      iff its case has a resolution.md (README rule 1/2)
+#   4. status directions (issue #238): the generator derives the INDEX
+#      Status column from the resolution's "Status:" line — absent
+#      reads open (the silent direction: an unrecorded closure leaves
+#      the case open, nothing fails), "Status: closed ..." reads
+#      closed. Runs the REAL generator in a scratch tree.
 #
 # Run: sh tests/unit/test-reviews-parity.sh
 
@@ -16,7 +21,8 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP" "$TMP.gen"' EXIT
+GENDIR="$(mktemp -d)"
+trap 'rm -f "$TMP" "$TMP.gen"; rm -rf "$GENDIR"' EXIT
 
 INDEX=internal/reviews/INDEX.md
 
@@ -58,9 +64,47 @@ for f in internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-*/review-*.md; do
     fi
 done
 
+# 4. status directions (issue #238) -- the real generator in a scratch
+#    tree: one new-style case, resolution without a Status line must
+#    read open; with "Status: closed ..." must read closed. Pins the
+#    claim the closure rule stands on: the INDEX Status column comes
+#    from that one line, and its absence fails nothing.
+GENCASE="$GENDIR/internal/reviews/0/0/4/2/pr-00420"
+mkdir -p "$GENDIR/scripts" "$GENCASE"
+cp scripts/gen-review-index.py "$GENDIR/scripts/"
+cat > "$GENCASE/review-a.md" <<'EOF'
+<!-- review-meta
+ID: pr-00420
+Snapshot: a
+Subject: status-direction pin case
+Scope: wave
+Base: v0.0.55 @ 0000000
+Diff: 0000000..0000001
+Date: 2026-10-24
+Reviewer: parity pin
+-->
+EOF
+printf '# Resolution — pr-00420\n\nchain still running.\n' > "$GENCASE/resolution.md"
+(cd "$GENDIR" && python3 scripts/gen-review-index.py) > /dev/null 2>&1 \
+    || echo "FAIL status pin: generator exited non-zero" >> "$TMP"
+row=$(grep 'pr-00420' "$GENDIR/internal/reviews/INDEX.md")
+case "$row" in
+    *'| open |') ;;
+    *) echo "FAIL status pin: no Status line must read open, got: $row" >> "$TMP" ;;
+esac
+printf '# Resolution — pr-00420\n\nStatus: closed — stop rule met (pin).\n' \
+    > "$GENCASE/resolution.md"
+(cd "$GENDIR" && python3 scripts/gen-review-index.py) > /dev/null 2>&1 \
+    || echo "FAIL status pin: generator exited non-zero (closed)" >> "$TMP"
+row=$(grep 'pr-00420' "$GENDIR/internal/reviews/INDEX.md")
+case "$row" in
+    *'| closed |') ;;
+    *) echo "FAIL status pin: Status closed must read closed, got: $row" >> "$TMP" ;;
+esac
+
 if [ -s "$TMP" ]; then
     echo "reviews parity: FAILED"
     cat "$TMP"
     exit 1
 fi
-echo "reviews parity: OK ($(wc -l < "$TMP.rows" | tr -d ' ') index rows, pointers consistent)"
+echo "reviews parity: OK ($(wc -l < "$TMP.rows" | tr -d ' ') index rows, pointers consistent, status directions pinned)"
