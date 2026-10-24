@@ -142,40 +142,16 @@ Use a throwaway WSL2/dev box for branch testing — this runs unreleased
 development code, not the released `stable` channel (see the README
 status note).
 
-## Making a release
+## Maintainer process
 
-Releases are maintainer-only and fully scripted
-([`scripts/release.sh`](scripts/release.sh), issue #38; model:
-[release-handling](internal/process/release-handling.md) — a release is the
-tag `x.y.z` on `master` plus a fast-forward of the `stable` mirror, which
-must stay **byte-identical** to `master`).
-
-Cheat sheet — copy the block, search & replace `0.0.36` with the new
-version, run the lines one by one. The VERSION bump lands on `master`
-**via PR** (never commit on master directly); `make release` then verifies
-a clean tree, sync with origin, the VERSION stamp, a free tag and
-`stable` fast-forwardability, runs the suite, and tags, mirrors and
-pushes (never force-pushes):
-
-```bash
-git checkout -b release/0.0.36
-make version VERSION=0.0.36
-git commit -am "chore: bump VERSION to 0.0.36"
-git push origin release/0.0.36
-
-# On GitHub: open the PR for release/0.0.36 => merge => wait for green CI
-
-git checkout master
-git pull origin master
-make release VERSION=0.0.36
-gh release create 0.0.36 --generate-notes
-```
-
-`make release VERSION=0.0.36 ARGS=--dry-run` prints the steps without
-changing anything.
-
-Everything else (branch protection on `stable`, announcements) is set up
-once, not per release.
+Releases, full project reviews, and the external review machines are
+maintainer-only — their runbooks live in
+[`internal/process/`](internal/process/): release handling with the
+cheat sheet in
+[release-handling.md](internal/process/release-handling.md), triggers,
+gates and the external redundancy pass in
+[review.md](internal/process/review.md). This page stays focused on what
+a contributor needs (issue #236).
 
 ## Documentation
 
@@ -190,95 +166,6 @@ User-facing documentation lives in `docs/` and is organized by topic type
 Design records for larger decisions live in `internal/records/`, historical
 security analyses in `internal/records/_archive/security/` — both are historical
 records; where wording differs from the code, the code wins.
-
-## Project reviews
-
-Full reviews (security, bugs, quality, docs, CI) are **trigger-based**, not
-on a calendar. Run a review when any of these fires:
-
-- a **version bump** is planned (before the release),
-- roughly **500+ changed lines or 10+ merged PRs** have accumulated on
-  `master` since the last review, or
-- a PR touched a **high blast-radius area** (`sudoers.template`, the
-  wrapper, backend provisioning, the security model).
-
-Findings from a review become issues labeled `review` (actionable soon) or
-`tech-debt` (deliberately deferred, with a reason). A review starts by
-working the backlog, not by re-inventing itself: method, snapshot and
-resolution mechanics, and the snapshot-format rule (external verbatim
-embedding since 0.0.45d) live in
-[internal/reviews/README.md](internal/reviews/README.md).
-
-After each review, try to shrink the next one: every finding that could be
-turned into a lint rule, unit test, or consistency guard should be — the
-remaining manual surface is what the checklist cannot automate.
-
-Scope and cadence follow the [review concept](agent/review-concept.md):
-full reviews are this trigger-based gate; the fixes themselves get a
-**wave review** (diff scope) before their PR — mandatory when a wave
-changes the semantics of root-running scripts — and the review → fix →
-review loop stops only when a round's dispositions touch no
-production/test code: severity prioritizes, but any code-touching round
-— LOW fixes included — owes its wave review before the loop closes.
-
-## External review machines (bias-reduced checkout)
-
-The second, independent snapshot of a release review must come from a
-genuinely different context — a different model family on a checkout
-without the house's review memory. A normal clone carries that memory
-(`agent/`, `.agents/`, `internal/`), so the external machine carves it
-out with a sparse checkout; `git status` stays clean, no tracked-file
-deletion, stable across pulls:
-
-```bash
-cd <repo clone>
-git sparse-checkout set --no-cone '/*' '!/agent/' '!/.agents/' '!/internal/'
-git status --short   # must be empty (clean)
-```
-
-How a pass runs in practice (maintainer recipe):
-
-1. **Fresh second WSL installation** — no global skills, no opencode
-   configuration: nothing of the house context exists on that machine
-   by construction. Clone the repo and set up the sparse checkout as
-   above.
-2. **Commission the pass** with opencode's built-in `/review`, naming
-   the environment, the scope and where to write:
-
-   ```
-   /review You are reviewing a sparse checkout at <tag or SHA>: the
-   directories agent/, .agents/ and internal/ are deliberately
-   excluded (bias-reduced setup) — links into them dangle by design,
-   their absence is not a finding. Full project review of the shipped
-   code and docs; do not run the test suite (the house side runs it
-   on the full tree). Write the report and all findings to
-   /tmp/opencode/review-<topic>/ (create the directory).
-   ```
-
-   Use a different model family than the house pass when available —
-   the redundancy axis is "and/or", every added difference pays.
-   `/tmp` is volatile: hand the result over before a reboot.
-3. **Hand over to the house agent:** copy the result directory to the
-   house machine and let the house session integrate it — verbatim
-   embedding under the house snapshot header (run provenance names the
-   sparse shape), per-finding verification with verification marks,
-   and the calibration section naming what each side missed
-   ("Parallel reviewer agents" in
-   [agent/review-concept.md](agent/review-concept.md)).
-
-The reviewed tree is "HEAD minus house memory" — name the sparse shape
-in the snapshot's run provenance. The unit suite runs partially red on
-that machine BY DESIGN: the guards over `agent/`, `.agents/` and
-`internal/` correctly fail when their tracked inputs are absent
-(measured 2026-10-24: docs dangling links, line-length stale
-baselines, reviews lint/parity, reviews-meta-aggregate,
-rules-meta/index/revisit, skills lint — 9 of 42 suites). Do not weaken
-the guards for this — the suite is a full-tree instrument; that
-machine reviews, the house side runs it. What stays visible (AGENTS.md,
-`docs/`, `tests/`) is deliberate — the reviewer should understand the
-product without inheriting the house's conclusions. The full trade-off
-analysis (including the rejected alternatives) lives in
-[internal/records/review-independence.md](internal/records/review-independence.md).
 
 ## Version
 

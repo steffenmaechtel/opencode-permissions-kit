@@ -389,3 +389,37 @@ no-runtime philosophy regardless of scale.
    `releases/latest`-style semantics)? Leaning: no — `master` is the
    prerelease channel; adding a third one is complexity without a user
    asking for it.
+
+## 9. Release procedure — the cheat sheet
+
+Releases are maintainer-only and fully scripted
+([`scripts/release.sh`](../../scripts/release.sh), issue #38): a release
+is the tag `x.y.z` on `master` plus a fast-forward of the `stable`
+mirror, which must stay **byte-identical** to `master` (§3, Option B).
+
+Copy the block, search & replace `0.0.36` with the new version, run the
+lines one by one. The VERSION bump lands on `master` **via PR** (never
+commit on master directly); `make release` then verifies a clean tree,
+sync with origin, the VERSION stamp, a free tag and `stable`
+fast-forwardability, runs the suite, and tags, mirrors and pushes
+(never force-pushes):
+
+```bash
+git checkout -b release/0.0.36
+make version VERSION=0.0.36
+git commit -am "chore: bump VERSION to 0.0.36"
+git push origin release/0.0.36
+
+# On GitHub: open the PR for release/0.0.36 => merge => wait for green CI
+
+git checkout master
+git pull origin master
+make release VERSION=0.0.36
+gh release create 0.0.36 --generate-notes
+```
+
+`make release VERSION=0.0.36 ARGS=--dry-run` prints the steps without
+changing anything.
+
+Everything else (branch protection on `stable`, announcements) is set up
+once, not per release.

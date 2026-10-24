@@ -3,8 +3,8 @@
 Operative rules for the reviewing agent: triggers, scope, loop cadence,
 stop rule, reviewer mechanics. The file mechanics (snapshot immutability,
 resolution format, naming) live in [review/README.md](../internal/reviews/README.md);
-the trigger list for full reviews also lives in
-[CONTRIBUTING.md](../CONTRIBUTING.md#project-reviews). Finding-ID
+the trigger list for full reviews also lives in the maintainer's
+[process/review.md](../internal/process/review.md). Finding-ID
 referencing: [conventions.md](conventions.md#referencing-review-findings).
 The history, calibration data and incident evidence behind these rules
 live in
@@ -18,7 +18,7 @@ live in
 | Scope | whole working tree at a version | the fix-wave diff only |
 | Catches | docs-vs-code drift, dead code, naming, undocumented decisions, systemic issues | fix-induced regressions, commit-vs-claim gaps, missed sibling sites |
 | Cannot catch | (too broad to pin regressions on a change) | lateral drift outside the diff |
-| Cadence | trigger-based (see CONTRIBUTING: version bump planned, ~500+ changed lines / 10+ PRs, high blast-radius area touched) | **after every fix wave, before its PR** — mandatory when the wave changes semantics of root-running scripts (`set -e`/pipefail, traps, sudoers, wrapper) |
+| Cadence | trigger-based (see process/review.md: version bump planned, ~500+ changed lines / 10+ PRs, high blast-radius touched) | **after every fix wave, before its PR** — mandatory when the wave changes semantics of root-running scripts (`set -e`/pipefail, traps, sudoers, wrapper) |
 | Snapshot form | 1–2 independent snapshots of the same tree | one snapshot over the diff |
 
 - A wave diff of ~2.5k lines is the upper bound one review pass digests;
@@ -169,8 +169,9 @@ Four places carry review knowledge, each with exactly one job:
 
 ## Suites are the standing review
 
-Between reviews, the unit/e2e suites are the review (see also
-CONTRIBUTING's "shrink the next one" rule):
+Between reviews, the unit/e2e suites are the review (see also the
+"shrink the next one" rule in
+[process/review.md](../internal/process/review.md)):
 
 - Every finding class that can become a test, lint rule or consistency
   guard becomes one in the same wave that fixes it. (RM-0076)
