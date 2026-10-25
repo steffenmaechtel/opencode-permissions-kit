@@ -309,10 +309,8 @@ On a terminal, the two project-root scans (the ddev-share group-write check
 and the Windows-hosts check) show a live progress line while they walk your
 project roots. The line is transient: it never appears in piped output, log
 files, cron mail or `--short` mode. The scans run identically without
-`python3` (they only lose the progress display); a present-but-broken
-`python3` names itself on the terminal at each python-backed step, in
-report order (advisory feed, first scan, leak scan) — a missing one stays
-silent.
+`python3` (losing only the progress display); a broken `python3` names
+itself at each python-backed step — a missing one stays silent.
 
 `--short` is cron/timer friendly — alert yourself only when something is
 off:

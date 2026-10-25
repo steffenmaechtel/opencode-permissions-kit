@@ -7,9 +7,8 @@ Install the kit on your machine and verify that the agent runs separated.
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
 - a supported distro — see the [support matrix](#supported-distros)
 - `sudo` access, `curl`, `python3` — the installer probes `python3` missing
-  or broken; the group baseline still applies without it, minus the live
-  entry counters (one warning says so, see
-  [the sharing group](concepts/sharing-group.md#re-applying-the-baseline))
+  or broken; the baseline still applies without it, minus the live counters
+  ([the sharing group](concepts/sharing-group.md#re-applying-the-baseline))
 - `git` ≥ 2.30 — older versions warn, the installer never aborts over git
 - ddev ≥ 1.25, if ddev is installed (the installer aborts on older versions)
 

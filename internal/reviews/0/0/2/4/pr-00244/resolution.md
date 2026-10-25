@@ -1356,6 +1356,14 @@ discharges).
 
 ## Follow-ups
 
+- Post-closure docs condensation (maintainer directive, the #256 style
+  bar: no history narration, max 1-2 sentences per topic): the chain's
+  docs sentences were tightened once more after the master merge —
+  load-bearing claims kept (baseline runs without python3 with one
+  warning; a broken python3 names itself, a missing one stays silent;
+  the settings edit fails closed), the cli.md three-site enumeration
+  dropped as developer detail. All behavior claims remain true; no
+  pin greps docs prose (suites green on the condensed tree).
 - Wave-8 stop-rule expectation (RM-0115, check cited): this round's
   dispositions touched NO review-relevant code — opk (comment
   only), tests/unit/test-install-args.sh (comments only),
