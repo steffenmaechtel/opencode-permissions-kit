@@ -12,6 +12,7 @@ Skills: none for the external pass (sparse checkout without house skills — the
 
 # External redundancy pass — pr-00263 snapshot c — GPT 6 Luna (high)
 
+> Resolution: [resolution.md](resolution.md)
 
 Third snapshot of the release review (a: house pass; b: external
 GPT 6 Luna medium). Same bias-reduced setup as b — sparse checkout without

@@ -261,6 +261,22 @@ if [ -n "$_w5_word" ]; then
         || echo "FAIL getting-started.md: agent-resources Enter default does not track install.sh ('$_w5_def' => $_w5_word) (#256 a W5)" >> "$TMP"
 fi
 
+# --- pr-00263 a F5 (c C8): getting-started's python3 prerequisite must
+# state the installer's HARD gate — both _py3_health_probe arms exit 1 —
+# not install-time survival (claim-drift guard, both directions: the abort
+# claim disappearing reds, the old "still applies without it" survival
+# claim returning reds; code-side anchors trip on probe rewording).
+if ! grep -q 'installer aborts if `python3` is' "$REPO_ROOT/docs/getting-started.md"; then
+    echo "FAIL getting-started.md: python3 prerequisite lost the abort claim (#263 a F5)" >> "$TMP"
+fi
+if grep -q 'baseline still applies without it' "$REPO_ROOT/docs/getting-started.md"; then
+    echo "FAIL getting-started.md: python3 prerequisite claims install-time survival — the installer aborts (#263 a F5)" >> "$TMP"
+fi
+if ! grep -q 'python3 is required but not installed' "$REPO_ROOT/files/install.sh" \
+   || ! grep -q 'python3 is present but broken' "$REPO_ROOT/files/install.sh"; then
+    echo "FAIL install.sh: python3 probe abort messages drifted — docs claim and code disagree (#263 a F5)" >> "$TMP"
+fi
+
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"
     cat "$TMP"

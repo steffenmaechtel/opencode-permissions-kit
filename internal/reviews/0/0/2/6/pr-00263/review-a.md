@@ -12,6 +12,8 @@ Skills: opk-review-pass
 
 # Full-scope review — pr-00263 snapshot a — release 0.0.57
 
+> Resolution: [resolution.md](resolution.md)
+
 Release full pass ("what rotted sideways?") over the whole tree at 4eacabb
 (VERSION 0.0.57). The birth-PR #263 carries the VERSION bump; the reviewed
 object is the tree, with the 0.0.56..master delta as the round's material
