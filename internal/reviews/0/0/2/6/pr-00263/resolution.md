@@ -3,7 +3,9 @@
 Chain: a (house full pass) -> b, c (external redundancy passes, GPT 6 Luna
 medium/high) — 42 unique findings across the three snapshots — -> d
 (wave review of the fix round, 2026-10-25: 13 findings, 1 MED / 6 LOW /
-6 INFO; all dispositioned below as d Q1-Q4, d W1-W6, d S1-S3). This is
+6 INFO; all dispositioned below as d Q1-Q4, d W1-W6, d S1-S3) -> e
+(micro-wave review of the d round, 2026-10-25: 4 findings, 1 LOW /
+3 INFO, all dispositioned below as e W1-e W3, e Q1). This is
 the second fix-wave attempt: attempt 1 (backed up at
 `backup/pr-00263-fix-wave-1`, never pushed) was superseded when the
 maintainer surfaced issue #252 — the ticket behind the #256 docs
@@ -70,8 +72,10 @@ evidence block).
 | d S2 (INFO) | **deliberately not done** | — | in-file run/run_q convention + DRY banner; committed deliberate |
 | d S3 (INFO) | **deliberately not done** | — | pre-existing sub-second window, non-setuid; comment scoped true |
 | d Q4 (INFO) | **deliberately not done** | — | disambiguated in-string; F17 claimed 14 qualified, not zero-remain |
+| e W1 (LOW) | **implemented** | `<SHA>` | evidence sentence corrected: claim kept, 2/3 sites reworded, logs reshaped |
 | e W2 (INFO) | **implemented** | `<SHA>` | harness drives a production-shaped label (DEFAULT_USER=opencode) |
 | e W3 (INFO) | **implemented** | `<SHA>` | run() removed; run_q doc + 4 comments updated; def-count pin = 0 |
+| e Q1 (INFO) | **deliberately not done** | — | write-only store is the 12-site reset-pair idiom; removal deviates |
 
 ## Evidence detail
 
@@ -180,7 +184,12 @@ the closing summary row. Fix: all three observe the copy now
 (conditional), failure routes through `_bk_fail` (summary degrades to
 INCOMPLETE) and degrades the site announce ("binary backup FAILED —
 see Backup summary" / "config backup FAILED — see Backup summary"
-x2); success keeps the original wording. Class sweep record (pattern:
+x2); on success the claim content is kept, but the wording is
+restructured at two of the three sites (branch b reorders to
+"Copied to X. Backup saved.", the existing-config arm turns the
+parenthetical into a trailing sentence) and all three log lines now
+read "backup attempt: … — <verdict>" — corrected per snapshot e W1.
+Class sweep record (pattern:
 every line writing to `$BACKUP_DIR` in install.sh, checked 11 sites):
 gitconfig x2, sudoers, usr-local-bin, lib tree, remove_shadow_binary,
 getfacl x2 (all observed in the a-wave) + the three swept here —
@@ -232,13 +241,28 @@ pre-existing, sub-second, non-setuid, and the wave comment scopes it
 truthfully. Q4: the surviving citations are disambiguated in-string;
 F17's claim was "14 qualified", not "zero remain".
 
+### e round (snapshot-e dispositions) — W1 wording, W2 label, W3 removal
+
+W1: the d W1+W2 evidence sentence above now states the actual
+success-path delta (restructure at two sites, log reshaping at all
+three) instead of "keeps the original wording". W2: the harness
+assigns DEFAULT_USER=opencode before the extract-eval drive —
+production interpolates a real username (install.sh:630), never an
+empty string; the recorder body is pure string accumulation plus
+stderr/log writes, no sudo or filesystem reach, so the assignment is
+inert beyond the label shape. W3: run() removed — invocation-anchored
+grep found zero callers in any statement position (prose matches
+only); run_q's doc comment and four convention comments updated, and
+a def-count pin (= 0) sits in test-uninstall before its summary gate.
+Q1: recorded not-done — the reset pair is the file's 12-site idiom.
+
 ## Follow-ups
 
-- The d round touched review-relevant code (uninstall.sh, install.sh,
-  three test suites): the owed **micro-wave review** ran as snapshot e
-  (2026-10-25, `5171eb3..054a39a`: 4 findings, 1 LOW / 3 INFO, no
-  MED/HIGH) — dispositions owed; the loop's closure stays the
-  maintainer's / next round's call (RM-0106/RM-0107, RM-0115).
+- e-round dispositions landed (e W1 ledger wording, e W2 harness
+  label, e W3 run() removal, e Q1 recorded not-done): e W2/e W3
+  touched test and production code — a **micro-wave review** of the
+  e fixes (`6f9826e..` up from snapshot e) is owed before release;
+  this round does not self-declare the loop closed (RM-0106/RM-0107).
 - e2e debt discharged in the d wave (see d Q1): both suites green on
   the d-round tree, zero skips.
 
