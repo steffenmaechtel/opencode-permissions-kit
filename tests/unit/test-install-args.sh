@@ -1127,6 +1127,10 @@ fi
 # too. The recorder itself is DRIVEN below (extract-eval, both arms);
 # the site wirings are anchored statically (exact call count + announce
 # anchors); e2e drives install success paths, not failure arms.
+# pr-00263 e W2: drive a production-shaped label — the real call site
+# (install.sh:723) interpolates the invoking user (DEFAULT_USER from
+# SUDO_USER/whoami, :630), never an empty string.
+DEFAULT_USER=opencode
 _BKDEF="$(sed -n '/^    _BK_FAIL=""$/,/^    }$/p' "$INSTALL")"
 if [ -n "$_BKDEF" ] && (
         eval "$_BKDEF"

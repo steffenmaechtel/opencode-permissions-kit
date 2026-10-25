@@ -70,6 +70,7 @@ evidence block).
 | d S2 (INFO) | **deliberately not done** | — | in-file run/run_q convention + DRY banner; committed deliberate |
 | d S3 (INFO) | **deliberately not done** | — | pre-existing sub-second window, non-setuid; comment scoped true |
 | d Q4 (INFO) | **deliberately not done** | — | disambiguated in-string; F17 claimed 14 qualified, not zero-remain |
+| e W2 (INFO) | **implemented** | `<SHA>` | harness drives a production-shaped label (DEFAULT_USER=opencode) |
 
 ## Evidence detail
 
