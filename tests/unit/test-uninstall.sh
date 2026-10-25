@@ -1510,8 +1510,11 @@ else
 fi
 # pr-00263 e W3: run() lost its last callers to un_rc_q (#246 site 7) and
 # is removed — run_q (silenced best-effort) keeps its callers; a
-# resurrected def without callers must fail loud here.
-[ "$(grep -c '^run ()' "$UNINSTALL")" = 0 ] \
+# resurrected def without callers must fail loud here. pr-00263 f W1:
+# the pattern '^run *()' counts BOTH def spellings at line start
+# (run() { house style, run () { spaced) — the e-round draft '^run ()'
+# caught only the spaced form, which no def in this file ever used.
+[ "$(grep -c '^run *()' "$UNINSTALL")" = 0 ] \
     && pass "run() helper gone, no orphaned runner (pr-00263 e W3)" \
     || fail "run() def present without callers (pr-00263 e W3)"
 F3SEC="$(sed -n '/^echo "--- Removing sudoers ---"$/,/^fi$/p' "$UNINSTALL")"

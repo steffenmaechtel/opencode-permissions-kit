@@ -78,6 +78,7 @@ evidence block).
 | e W2 (INFO) | **implemented** | `1abc8d6` | harness drives a production-shaped label (DEFAULT_USER=opencode) |
 | e W3 (INFO) | **implemented** | `163da3a` | run() removed; run_q doc + 4 comments updated; def-count pin = 0 |
 | e Q1 (INFO) | **deliberately not done** | — | write-only store is the 12-site reset-pair idiom; removal deviates |
+| f W1 (MED) | **implemented** | `<SHA>` | pin greps '^run *()': both def spellings count; resurrected def -> red |
 
 ## Evidence detail
 
@@ -258,18 +259,36 @@ only); run_q's doc comment and four convention comments updated, and
 a def-count pin (= 0) sits in test-uninstall before its summary gate.
 Q1: recorded not-done — the reset pair is the file's 12-site idiom.
 
+### f round (snapshot-f dispositions) — W1 pin pattern
+
+f W1: the pin at test-uninstall.sh:1511-1519 greps `'^run *()'` now —
+both def spellings at line start count (`run() {` house style,
+`run () {` spaced); the comment states what the pattern catches and
+why the e-round draft never discriminated. Sabotage re-run against
+this committed tree (both shapes, logs in the session scratch): the
+historical `run() {` block re-inserted byte-exact -> suite rc 1,
+FAIL "run() def present without callers"; spaced `run () {` -> rc 1,
+same FAIL; `git checkout --` -> rc 0 green, porcelain-clean — the
+pin now fails loud on every def spelling it guards. The
+false "fails loud" carriers: the pin comment is true now, commit
+163da3a is immutable history (this row is the correction of record),
+the e W3 row's "def-count pin = 0" stays accurate as written.
+
 ## Follow-ups
 
 - e-round dispositions landed (e W1 ledger wording, e W2 harness
   label, e W3 run() removal, e Q1 recorded not-done): the owed
   **micro-wave review** of the e fixes ran as snapshot f
   (2026-10-25, `6f9826e..4959c4b`: 7 findings, 1 MED / 4 LOW /
-  2 INFO) — f dispositions owed (f W1 the priority: the pin pattern
-  plus its three "fails loud" claims; f W2/W3 comment sweeps, f Q2
-  sentence fix, f Q3/W4 record-or-drop; f Q4 discharged by the
-  snapshot-f commit's <SHA> fills + the e W1 row shortening); the
-  loop stays open on f W1 (MED, stop rule) — closure remains the
-  maintainer's / next round's call (RM-0106/RM-0107/RM-0115).
+  2 INFO) — f W1 implemented (pin pattern `'^run *()'` + pattern-
+  truth comment, this commit; the "fails loud" claim now true); f
+  W2/W3 comment sweeps, f Q2 sentence fix, f Q3/W4 record-or-drop
+  still owed; f Q4 discharged by the snapshot-f commit's `<SHA>`
+  fills + the e W1 row shortening; the f fix touched test code — a
+  **micro-wave review** of the f round is owed before release
+  (maintainer's go); the stop-rule check (f W1 was the only MED)
+  falls to the next round / maintainer — closure NOT declared here
+  (RM-0106/RM-0107/RM-0115).
 - e2e debt discharged in the d wave (see d Q1): both suites green on
   the d-round tree, zero skips.
 
