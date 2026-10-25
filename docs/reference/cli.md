@@ -293,9 +293,8 @@ sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh
 |---|---|
 | `--short`, `-s` | Print only the verdict line; the exit code carries the verdict |
 
-
-Exit codes: `0` all green, `1` alert(s), `2` warning(s) only, `64` usage
-error — the full report uses the same codes, so scripts can judge an
+Exit codes: `0` all green, `1` alert(s), `2` warning(s) only, `64` for a
+usage error — the full report uses the same codes, so scripts can judge an
 installed-but-degraded kit. Rows the caller cannot judge at their own
 privilege ("unknown — needs root to check") and optional-feature rows never
 count toward the verdict: `sudo opk status` resolves the privilege
