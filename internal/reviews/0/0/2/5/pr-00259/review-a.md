@@ -10,6 +10,8 @@ Reviewer: GLM-5.3 house session (opk-review-pass skill) — 2 reviewer subagents
 Skills: opk-review-pass
 -->
 
+> Resolution: [resolution.md](resolution.md)
+
 # Review a — micro pass on the pin-shape hardening wave (pr-00259)
 
 Round a over commit `886ada1` (branch `feature/231-rules-revisit-pin-shapes`,

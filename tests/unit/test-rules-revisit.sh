@@ -50,8 +50,8 @@ contains() {  # $1 haystack, $2 needle
     esac
 }
 
-line_is() {  # $1 file, $2 exact line -> pass/fail on first match
-    grep -qx -- "$2" "$1"
+line_is() {  # $1 file, $2 exact literal line (fixed-string needle, #259 a Q2)
+    grep -qxF -- "$2" "$1"
 }
 
 out_line_is() {  # $1 haystack string, $2 exact line -> anchored needle
@@ -224,7 +224,7 @@ else
 fi
 
 # R7-R10. corrupt metas die loud per meta, before any lane prints
-#      (a W3 pin: every per-meta die arm of the report executes)
+#      (#222 a W3 pin: every per-meta die arm of the report executes)
 CSCRATCH=$WORK/corrupt$$
 write_meta "$CSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
 CM=$(meta_path "$CSCRATCH" RM-9001)
@@ -519,7 +519,7 @@ run_revisit RM-9001 clean "rationale re-verified"
 AOUT=$(RM_AUDIT_ROOT="$GSCRATCH" FORCE_TODAY=2026-10-16 \
     sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
 ARC=$?
-if [ "$RC" -eq 0 ] && [ "$ARC" -eq 0 ] && contains "$AOUT" "0 blocking" \
+if [ "$RC" -eq 0 ] && [ "$ARC" -eq 0 ] && contains "$AOUT" "rules-audit: 0 blocking" \
     && line_is "$(meta_path "$GSCRATCH" RM-9001)" "next-revisit: 2027-04-22"; then
     pass
 else
@@ -527,7 +527,7 @@ else
 fi
 
 # V12. duplicated frontmatter field refuses loud BEFORE any write --
-#      the rewrite validates each field occurs exactly once (W1 pin:
+#      the rewrite validates each field occurs exactly once (#222 a W1 pin:
 #      without the count guard a duplicated field would be rewritten
 #      in place and swapped in silently)
 DSCRATCH=$WORK/dup$$
@@ -566,7 +566,7 @@ else
 fi
 
 # V13. a missing next-revisit field hits the same count guard -- the
-#      c2=0 direction on an otherwise clean meta (b W2: built from a
+#      c2=0 direction on an otherwise clean meta (#222 b W2: built from a
 #      single-interval fixture so a weakened guard cannot hide behind c1)
 MSCRATCH=$WORK/noNext$$
 write_meta "$MSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
@@ -635,7 +635,7 @@ fi
 
 # V18. a duplicated next-revisit field (c2=2) is the same violation in
 #      the other operand direction -- without the count guard both
-#      copies would be silently rewritten to the new value (b W2)
+#      copies would be silently rewritten to the new value (#222 b W2)
 NSCRATCH=$WORK/dupnr$$
 write_meta "$NSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
 NM=$(meta_path "$NSCRATCH" RM-9001)
@@ -652,7 +652,7 @@ else
 fi
 
 # V19. an unparsable revisit date dies loud inside the date math (the
-#      revisit counterpart of the report's R6) -- b W1: this die arm was
+#      revisit counterpart of the report's R6) -- #222 b W1: this die arm was
 #      the one the a-wave sweep table missed
 one_scratch 1m 2026-06-01 v19
 SCRATCH=$VSCRATCH
@@ -665,8 +665,8 @@ else
 fi
 
 # V20. a missing status field is the corrupt shape that motivated the
-#      W4 split -- it must die rc=2 (run the audit), never fall into a
-#      refusal branch (b W3: pinned shape, not just the paused variant)
+#      #222 a W4 split -- it must die rc=2 (run the audit), never fall into a
+#      refusal branch (#222 b W3: pinned shape, not just the paused variant)
 SSCRATCH=$WORK/nostatus$$
 write_meta "$SSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
 SM=$(meta_path "$SSCRATCH" RM-9001)
