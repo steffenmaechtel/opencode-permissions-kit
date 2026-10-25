@@ -35,7 +35,8 @@ _sb_sudo() { ${SB_SUDO-sudo} "$@"; }
 secure_binary() {
     _sb_bin="$1"
     _sb_group="$2"
-    _sb_sudo chown "root:$_sb_group" "$_sb_bin" 2>/dev/null || true
+    # pr-00263 a F25: chmod before chown — no cp-natural-755 window on
+    # the live name between the two (the atomic helpers' order).
     if ! _sb_sudo chmod 750 "$_sb_bin" 2>/dev/null; then
         echo "error: cannot chmod 750 $_sb_bin — aborting." >&2
         if command -v log >/dev/null 2>&1; then
@@ -43,6 +44,7 @@ secure_binary() {
         fi
         return 1
     fi
+    _sb_sudo chown "root:$_sb_group" "$_sb_bin" 2>/dev/null || true
     return 0
 }
 

@@ -236,6 +236,13 @@ else
     fail "config.sh gate arms (pr-00263 a F2b)"
 fi
 
+# --- pr-00263 a F10: agent-home refusals take getent alongside the literal
+# spelling — a relocated agent home refuses too (config.sh + uninstall.sh
+# twins; the opk/status.sh pattern).
+grep -q '_pp_agent_home' "$CONFIG" \
+    && pass "config.sh agent-home refusal getent-aware (pr-00263 a F10)" \
+    || fail "config.sh agent-home refusal literal-only (pr-00263 a F10)"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

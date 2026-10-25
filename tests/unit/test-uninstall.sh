@@ -426,6 +426,20 @@ if [ "$_ou_new" = "untest-agent" ] && [ "$_ou_canon" = "opencode" ] \
 else
     fail "OPENCODE_USER gate arms (#243 e X1)"
 fi
+# pr-00263 a F9: the WARN echo is sanitized — a newline-bearing value
+# stays exactly one WARN line (the raw echo forged transcript lines).
+_ou_nl=$(
+    OPENCODE_USER="$(printf 'oco\nd')"
+    eval "$UN_OCU_GATE" 2>"$WORK/un-ouc-nl.log"
+    printf '%s' "$OPENCODE_USER"
+)
+if [ "$_ou_nl" = "opencode" ] \
+   && [ "$(grep -c . "$WORK/un-ouc-nl.log")" = 1 ] \
+   && grep -q 'oco?d' "$WORK/un-ouc-nl.log"; then
+    pass "gate WARN sanitized: newline value = one line, no raw bytes (pr-00263 a F9)"
+else
+    fail "gate WARN sanitization (pr-00263 a F9)"
+fi
 # Pathological corpus (#243 f X1): leading dot/hyphen and trailing
 # dot are legal in the writer's charset but not agent names — the
 # tightened arms must fall them back LOUDLY; internal dot/hyphen (a
@@ -1463,6 +1477,11 @@ if [ -n "$_f2_bak_block" ]; then
 else
     fail "agents-backup loop extractable (#211 f W2)"
 fi
+
+# pr-00263 a F10: uninstall twin of the config.sh agent-home refusal.
+grep -q '_un_agent_home' "$UNINSTALL" \
+    && pass "uninstall agent-home refusal getent-aware (pr-00263 a F10)" \
+    || fail "uninstall agent-home refusal literal-only (pr-00263 a F10)"
 
 # --- pr-00263 a F3: the six early removal sections are rc-observing (#211 c W1) --
 # The #243 a S1/S2 sweep covered the config-dirs section only; six

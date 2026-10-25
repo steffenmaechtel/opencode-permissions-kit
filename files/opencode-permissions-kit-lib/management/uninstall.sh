@@ -227,7 +227,10 @@ OPENCODE_USER="${OPENCODE_USER:-opencode}"
 # review chain, snapshot f).
 case "$OPENCODE_USER" in
     ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
-        echo "WARN: invalid OPENCODE_USER value in install.conf ('$OPENCODE_USER') — falling back to 'opencode'" >&2
+        # pr-00263 a F9: sanitized echo — a corrupted value (newline/
+        # escape bytes) must not forge transcript lines.
+        _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
         OPENCODE_USER=opencode
         ;;
 esac
@@ -668,7 +671,11 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # are the dot gate's job below. The compared value itself is
         # shape-gated right after install.conf is sourced (#243 e X1):
         # a corrupted conf value cannot defang this refusal.
-        if [ "${root%/}" = "/home/$OPENCODE_USER" ]; then
+        # pr-00263 a F10: getent alongside the literal spelling — a
+        # relocated agent home refuses too (the config.sh twin).
+        _un_agent_home="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
+        if [ "${root%/}" = "/home/$OPENCODE_USER" ] \
+           || { [ -n "$_un_agent_home" ] && [ "${root%/}" = "$_un_agent_home" ]; }; then
             echo "  Skipping agent home (never a project root): $root"
             continue
         fi

@@ -35,9 +35,13 @@ wave; minimal corrections only when picked up, no bulk restores per
 | a F6 (LOW) | **implemented** | `c2cc5a0` | six backup copies loud; summary row degrades |
 | a F8 (LOW) | **implemented** | `c2cc5a0` | both getfacl sites observe; fail arms warn |
 | a F19 (INFO) | **implemented** | `c2cc5a0` | pipefail + kit error wrapper on the installer pipe |
-| a F7 (LOW) | **implemented** | `<SHA>` | both re-deploy skips terminal-loud; harness drives both arms |
-| a F13 (LOW) | **implemented** | `<SHA>` | daemon-start rc gates the ready message; socket var kept |
-| a F11 (LOW) | **implemented** | `<SHA>` | shape-invalid feed = silent unavailable; ids-only on lists |
+| a F7 (LOW) | **implemented** | `54758f2` | both re-deploy skips terminal-loud; harness drives both arms |
+| a F13 (LOW) | **implemented** | `54758f2` | daemon-start rc gates the ready message; socket var kept |
+| a F11 (LOW) | **implemented** | `54758f2` | shape-invalid feed = silent unavailable; ids-only on lists |
+| a F9 (LOW) | **implemented** | `<SHA>` | sanitized gate WARN; newline arm pinned (one line, no raw bytes) |
+| a F10 (LOW) | **implemented** | `<SHA>` | getent homes at both refusal twins + install.sh parity copy |
+| a F21 (INFO) | **implemented** | `<SHA>` | failure message names key-or-value |
+| a F25 (INFO) | **implemented** | `<SHA>` | chmod before chown; order pinned by line compare |
 | c C3 + c C4 (MED/LOW) | **deliberately not done** | — | deferred to #269 with the docs backlog (#252/#256 policy) |
 | c C5 (MED) | **deliberately not done** | — | deferred to #270 with the docs backlog (#252/#256 policy) |
 | c C6 (MED) | **deliberately not done** | — | deferred to #271 with the docs backlog (#252/#256 policy) |

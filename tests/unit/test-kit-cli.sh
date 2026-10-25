@@ -1054,6 +1054,13 @@ else
     rm -rf "$OCW2S1"
 fi
 
+# pr-00263 a F21: the settings-edit failure message names the entry as
+# key-or-value — the grep can match the literal as a VALUE, "remove the
+# line" was wrong for that arm.
+grep -qF 'entry (key or value) by hand' "$KIT" \
+    && echo "  ${GREEN}PASS${NC}  settings-edit failure names key-or-value (pr-00263 a F21)" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  settings-edit wording residue survives (pr-00263 a F21)"; failures=$((failures + 1)); }
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

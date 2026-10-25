@@ -328,7 +328,7 @@ PYEOF
                 # pr-00263 c C2: failing closed includes the rc — the
                 # branch used to fall through to exit 0.
                 ui_error "could not update $_oc_settings — remove the \"opencodeBinary\""
-                ui_error "line by hand (docs/how-to/openchamber.md)"
+                ui_error "entry (key or value) by hand — docs/how-to/openchamber.md"
                 exit 1
             fi
         fi

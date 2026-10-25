@@ -277,6 +277,12 @@ check "file atomic: capturing-mv run leaves the deployed mode correct" \
 check "file atomic: capturing-mv run leaves no temp behind" \
     sh -c '[ -z "$(find "$1" -maxdepth 1 -name "cfa-profile.tmp.*" -print)" ]' _ "$WORK"
 
+# pr-00263 a F25: chmod runs before chown in secure_binary — no
+# cp-natural-755 window on the live name between the two (the atomic
+# helpers' order; line-number compare discriminates a reorder).
+check "secure_binary: chmod before chown (pr-00263 a F25)" \
+    awk '/_sb_sudo chmod 750/{c=NR} /_sb_sudo chown/{h=NR} END{exit !(c>0 && h>0 && c<h)}' "$LIB"
+
 # --- summary ----------------------------------------------------------------
 
 echo ""

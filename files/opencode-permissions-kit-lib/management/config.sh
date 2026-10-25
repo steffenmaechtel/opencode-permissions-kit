@@ -361,7 +361,13 @@ project_path_sane() {
     # The agent user's own home is never a valid project root: the group
     # baseline (chgrp/setfacl -R) would run over the very directory that
     # carries the agent's config and state (review 0.0.39a S4).
-    [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] && return 1
+    # pr-00263 a F10: getent alongside the literal spelling — a relocated
+    # agent home must refuse too (the uninstall.sh twin, opk pattern).
+    _pp_agent_home="$(getent passwd "${OPENCODE_USER:-opencode}" 2>/dev/null | cut -d: -f6 || true)"
+    if [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] \
+       || { [ -n "$_pp_agent_home" ] && [ "$_pp" = "$_pp_agent_home" ]; }; then
+        return 1
+    fi
     # The developer's whole home as a root is allowed but deserves a
     # warning: the baseline gives the agent group-write over every file
     # in it.
