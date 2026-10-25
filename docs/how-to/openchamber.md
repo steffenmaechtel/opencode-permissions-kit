@@ -43,6 +43,9 @@ settings pin must go too. `sudo opk openchamber-secure` does both; manually:
    `~/.config/openchamber/settings.json` (or set it to `""`), then restart
    OpenChamber.
 
+If `opk openchamber-secure` cannot update the settings file, it fails
+closed — file untouched, error shown; step 2 is then yours by hand.
+
 Deleting the binaries alone is not enough: a pin pointing at a deleted
 binary aborts the managed server start — the UI hangs loading and its API
 answers `"OpenCode port is not available"`. The kit's wrapper warns on every

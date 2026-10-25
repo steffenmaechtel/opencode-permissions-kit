@@ -65,10 +65,22 @@ _opk_ddev_describe() {
 # of a `ddev describe -j` document (single line); empty when the path is
 # absent or not a string. Keys may be passed as separate arguments or
 # dot-joined. python3 is a kit prerequisite (the installer already
-# depends on it for its jsonc parsing).
+# depends on it for its jsonc parsing). Expected misses are silent
+# (except: pass, empty output); a broken interpreter's own stderr
+# passes through (#244 c S3) — the empty-on-miss contract is untouched.
+# An absent interpreter is guarded to the same silent empty output
+# (#244 d Q1): absence is a legitimate mid-lifecycle state, not a
+# diagnostic event. Absence returns 0 — pre-guard, the failed
+# pipeline's rc 127 carried (#244 e S2). No caller acts on that rc
+# (#244 f S1): every consumer reads stdout via $( ) — the plain
+# assignments among them carry the substitution's rc, but only under
+# set -e, which the interactive rc-file context does not run; the
+# file never exits the parent shell, and the 127->0 delta is the
+# fail-safe direction anyway.
 _opk_json_get() {
     _opk_gj="$1"
     shift
+    command -v python3 >/dev/null 2>&1 || return 0
     printf '%s' "$_opk_gj" | python3 -c '
 import json, sys
 try:
@@ -78,7 +90,7 @@ try:
     if isinstance(d, str):
         print(d)
 except Exception:
-    pass' "$@" 2>/dev/null
+    pass' "$@"
 }
 
 # _opk_scheme_url <json> <https-key> <http-key>: the URL variant matching

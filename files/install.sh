@@ -540,6 +540,52 @@ _distro_gate() {
     exit 1
 }
 
+# _py3_health_probe: loud abort when python3 is missing or broken.
+# Presence alone (`command -v`) accepts a findable-but-broken
+# interpreter — a pyenv shim to a removed version installs green and
+# every later consumer fails attributelessly (update's version
+# resolution degrades to "could not resolve", opk ddev URL opening
+# silently downgrades; #244 a W1). The health arm RUNS the interpreter
+# isolated (`-I`): PYTHONHOME/PYTHONPATH poison cannot reach it
+# (#244 a S1) — the -I scope is those env vars, not the whole
+# environment: the loader route (LD_PRELOAD/LD_LIBRARY_PATH) and the
+# PATH-resolved binary itself stay outside any python flag (#244 b
+# S1), and system site-packages stay processed (-I implies -E -s -P,
+# not -S): a .pth there executes at startup — root-owned trust, the
+# residual the b-S1 finding named (#244 c S2). Running it is the installer's first EXECUTION of python3 as
+# root (#244 b S3) — the same binary and trust as every root python3
+# the installed kit runs, one moment earlier. The import list is the
+# union of the kit's shipped python import surface (enumerated at the
+# assignment below; a drift pin asserts every shipped python import
+# appears there, #244 b Q1). Two distinct errors name the failure
+# classes, and a failed probe first surfaces the interpreter's own
+# stderr — a python3 that only works via PYTHONHOME/PYTHONPATH names
+# its real problem there (#244 b S2). Functional matrix + verbatim
+# wiring pin: tests/unit/test-install-args.sh.
+_py3_health_probe() {
+    # The union of the kit's shipped python import surface (#244 b Q1):
+    # jsonc parser fnmatch/json/re/sys — fs-baseline probe+tee os/sys
+    # — ddev describe, update resolve and status feed json/sys — the
+    # status progress tee sys/threading/time — the opk settings edit
+    # json/sys/pathlib — tui-register importlib.util/json/os/stat/sys/
+    # tempfile. Drift-pinned: every shipped python import must appear
+    # here (tests/unit/test-install-args.sh).
+    _py3_imports='import fnmatch, importlib.util, json, os, pathlib, re, stat, sys, tempfile, threading, time'
+    if ! command -v python3 >/dev/null 2>&1; then
+        ui_error "python3 is required but not installed (apt install python3)."
+        exit 1
+    fi
+    if ! python3 -I -c "$_py3_imports" >/dev/null 2>&1; then
+        # The rerun exists for the interpreter's own diagnostic stderr,
+        # not for its rc (this branch already failed) — the rc guard is
+        # deliberate; the noisy-shim matrix case pins the passthrough
+        # (#244 b S2).
+        python3 -I -c "$_py3_imports" >/dev/null || true
+        ui_error "python3 is present but broken (shim? corrupt install? needs PYTHONHOME/PYTHONPATH?) — fix it and re-run."
+        exit 1
+    fi
+}
+
 banner() {
     ui_banner "$VERSION" "installs opencode as its own user behind rootless containers"
 }
@@ -682,13 +728,13 @@ do_plan_phase() {
         exit 1
     fi
 
-    # python3 is a hard runtime dependency (fs-baseline progress pipe, ddev
-    # describe JSON parsing, 2.x version resolution, status checks) — probe
-    # it up front instead of failing mid-install (review 0.0.39a D8).
-    if ! command -v python3 >/dev/null 2>&1; then
-        ui_error "python3 is required but not installed (apt install python3)."
-        exit 1
-    fi
+    # python3 is a hard runtime dependency (ddev describe JSON parsing,
+    # 2.x version resolution, status checks, the jsonc parser — the
+    # group baseline itself degrades without it, #223) — probe presence
+    # AND health up front instead of failing mid-install (0.0.39a D8;
+    # the old presence-only gate was the findable-but-broken hole,
+    # #244 a W1/W2).
+    _py3_health_probe
 
     if ! command -v setfacl >/dev/null 2>&1; then
         if confirm "'acl' package not installed (setfacl/getfacl missing). Install it now?"; then

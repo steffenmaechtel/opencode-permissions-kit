@@ -207,13 +207,15 @@ _st_ddev_scan() {
     # startup and hand the consumer loop an EMPTY scan list, a silent
     # false-green over a dead scan. Probed once per run (_st_py_checked
     # caches, _st_py_ok carries the verdict), and only on the tty path —
-    # piped/--short runs never start python3.
+    # piped/--short runs never start python3. On failure the
+    # interpreter's own stderr passes through (#244 c S3): the silent
+    # progress degrade never hides the cause.
     _sts_progress=false
     if [ "${UI_SILENT:-0}" != 1 ] && [ -t 2 ] && [ "${_st_py_checked:-0}" != 1 ]; then
         _st_py_checked=1
         _st_py_ok=0
         command -v python3 >/dev/null 2>&1 \
-            && python3 -c 'import sys, threading, time' >/dev/null 2>&1 \
+            && python3 -c 'import sys, threading, time' >/dev/null \
             && _st_py_ok=1
     fi
     [ "${UI_SILENT:-0}" != 1 ] && [ -t 2 ] && [ "${_st_py_ok:-0}" = 1 ] && _sts_progress=true
@@ -546,7 +548,7 @@ for entry in feed or []:
     # str(... or ""): a JSON null defeats the .get default (the F7
     # class, 0.0.44a V19 — advisory-watch got the coercion in 0.0.43a;
     # this twin printed the literal string "None").
-    print(str(entry.get("ghsa_id") or ""))' 2>/dev/null); then
+    print(str(entry.get("ghsa_id") or ""))' ); then
                 ADV_PARSE_OK=true
                 ADV_KNOWN=$(advisories_ids opencode || true)
                 while IFS= read -r ADV_ID; do
@@ -1332,9 +1334,11 @@ if [ -f "$SCAN_CFG" ] && [ -x "$PARSER" ] && command -v python3 >/dev/null 2>&1;
     # The parser's rc matters (0.0.44a V8): a non-dict top level used to
     # crash into this `|| true`, and empty output then printed the GREEN
     # "no matches" — the F13 false-green class. rc != 0 now renders as
-    # "unscannable", never as clean.
+    # "unscannable", never as clean. The parser's own stderr passes
+    # through (#244 c S3): it prints clean "Error ..." lines, so a
+    # broken config names its cause above the unscannable verdict.
     scan_unscannable=false
-    if scan_patterns=$(python3 "$PARSER" "$SCAN_CFG" 2>/dev/null); then
+    if scan_patterns=$(python3 "$PARSER" "$SCAN_CFG"); then
         :
     else
         scan_patterns=""

@@ -225,7 +225,11 @@ Reviews run against a clean working tree of the version under review
    after the fact.
 4. Pause for the maintainer — the fix wave starts on their go.
 5. Fix wave on the feature branch; the resolution is created with the
-   first fix commit and grows per disposition; the loop closes per the
+   first fix commit and grows per disposition; fix-commit messages
+   that enumerate finding IDs qualify the deliberately-not-done ones
+   (`… (#176 a W1-W4; not done: W5)`) — an unqualified ID range reads
+   as full coverage from git log alone while the resolution rows
+   carry the truth (#244 b W4). The loop closes per the
    stop rule — and closure is recorded: `Status: closed …` in the
    resolution plus INDEX regen, one commit (see Resolution format).
    Run the L1–L7 checklist

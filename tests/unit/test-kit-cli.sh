@@ -884,6 +884,170 @@ else
     failures=$((failures + 1))
 fi
 
+# --- openchamber-secure settings edit: guard inside the sudo context (#244 f W2) --
+# The e-S1 class fix at opk's settings-edit compound: guard and exec
+# share ONE PATH (the sudo context). Static shape pins, then functional
+# asymmetry arms — the compound is extracted from opk (the F24 idiom)
+# and driven with PATH-fixing sudo shims over a binary farm (the
+# test-tui-mode arm idiom).
+OCW2_BLOCK="$(sed -n '/#244 f W2/,/^            fi$/p' "$KIT")"
+if [ -n "$OCW2_BLOCK" ] \
+    && [ "$(printf '%s\n' "$OCW2_BLOCK" | wc -l)" -le 32 ] \
+    && printf '%s\n' "$OCW2_BLOCK" \
+        | grep -qF 'sh -c ' \
+    && printf '%s\n' "$OCW2_BLOCK" \
+        | grep -qF 'command -v python3 >/dev/null 2>&1 && exec python3 "$@"'; then
+    echo "  ${GREEN}PASS${NC}  settings-edit guard runs inside the sudo context (#244 f W2)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  settings-edit guard inside the sudo context (#244 f W2)"
+    failures=$((failures + 1))
+fi
+if printf '%s\n' "$OCW2_BLOCK" | grep -qE '^ +if command -v python3'; then
+    echo "  ${RED}FAIL${NC}  settings-edit guard is caller-side again (#244 f W2)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  no caller-side guard shape in the settings edit (#244 f W2)"
+    passed=$((passed + 1))
+fi
+if [ -z "$OCW2_BLOCK" ]; then
+    echo "  ${RED}FAIL${NC}  settings-edit block extractable for asymmetry arms (#244 f W2)"
+    failures=$((failures + 1))
+elif ! command -v python3 >/dev/null 2>&1; then
+    # Distinct failure surface (#244 g Q1): extraction failure and
+    # the arms' python3 hard-require are different causes — one
+    # label each, per the check-host make-test contract.
+    echo "  ${RED}FAIL${NC}  settings-edit asymmetry arms need python3 (check-host contract) (#244 g Q1)"
+    failures=$((failures + 1))
+else
+    OCW2="$WORK/ocw2"; OCW2F="$OCW2/farms"; OCW2BASE="$OCW2F/base"
+    mkdir -p "$OCW2BASE"
+    for _ocd in /usr/bin /bin /usr/local/bin; do
+        for _ocb in "$_ocd"/*; do
+            [ -e "$_ocb" ] || continue
+            [ "${_ocb##*/}" = python3 ] && continue
+            ln -sfn "$_ocb" "$OCW2BASE/${_ocb##*/}"
+        done
+    done
+    # Exec contexts: arm A = base (no python3); arm B = base + the real
+    # interpreter. PATH-fixing sudo shims strip -u (the suite-fake
+    # idiom), then exec under the fixed PATH (the secure_path stand-in).
+    OCW2FIXB="$OCW2F/fixb"; mkdir -p "$OCW2FIXB"
+    for _ocf in "$OCW2BASE"/*; do ln -sfn "$_ocf" "$OCW2FIXB/${_ocf##*/}"; done
+    ln -s "$(command -v python3)" "$OCW2FIXB/python3"
+    mkdir -p "$OCW2F/sudo-a" "$OCW2F/sudo-b"
+    cat > "$OCW2F/sudo-a/sudo" <<EOF
+#!/bin/sh
+while [ "\$1" = -u ]; do shift; [ "\$#" -gt 0 ] && shift; done
+PATH="$OCW2BASE" exec "\$@"
+EOF
+    cat > "$OCW2F/sudo-b/sudo" <<EOF
+#!/bin/sh
+while [ "\$1" = -u ]; do shift; [ "\$#" -gt 0 ] && shift; done
+PATH="$OCW2FIXB" exec "\$@"
+EOF
+    chmod +x "$OCW2F/sudo-a/sudo" "$OCW2F/sudo-b/sudo"
+    # Caller PATHs (whole PATH, so command -v sees exactly these): arm A
+    # = base + a NOISY python3 (any execution of the caller's shim is a
+    # red); arm B = base only (no python3 anywhere for the caller).
+    OCW2NOISY="$OCW2F/noisybin"; mkdir -p "$OCW2NOISY"
+    for _ocf in "$OCW2BASE"/*; do ln -sfn "$_ocf" "$OCW2NOISY/${_ocf##*/}"; done
+    printf '#!/bin/sh\necho "ocw2-noisy-python3" >&2\nexit 9\n' > "$OCW2NOISY/python3"
+    chmod +x "$OCW2NOISY/python3"
+    ln -sfn "$OCW2F/sudo-a/sudo" "$OCW2NOISY/sudo"
+    OCW2ABSB="$OCW2F/absbin"; mkdir -p "$OCW2ABSB"
+    for _ocf in "$OCW2BASE"/*; do ln -sfn "$_ocf" "$OCW2ABSB/${_ocf##*/}"; done
+    ln -sfn "$OCW2F/sudo-b/sudo" "$OCW2ABSB/sudo"
+    _ocw2_run() { # <caller-PATH-dir> — fresh fixture, eval the compound
+        mkdir -p "$OCW2/case"
+        printf '{ "opencodeBinary": "/home/dev/.opencode/bin/opencode", "port": 3000 }\n' \
+            > "$OCW2/case/settings.json"
+        (
+            PATH="$1"
+            export PATH
+            _oc_settings="$OCW2/case/settings.json"
+            _oc_duser=devuser
+            ui_success() { echo "W2:success"; }
+            ui_error() { echo "W2:error:$1"; }
+            eval "$OCW2_BLOCK"
+        ) 2>&1
+    }
+    # Arm A: caller PATH has (noisy) python3, exec context none — the
+    # inner guard skips silently; a caller-side guard would leak sudo's
+    # not-found notice (or run the noisy shim).
+    _ocout="$(_ocw2_run "$OCW2NOISY")" || true
+    _ocok=0
+    case "$_ocout" in *W2:error:*) _ocok=$((_ocok + 1)) ;; esac
+    case "$_ocout" in *"not found"*|*"ocw2-noisy-python3"*) ;; *) _ocok=$((_ocok + 1)) ;; esac
+    if grep -q opencodeBinary "$OCW2/case/settings.json"; then _ocok=$((_ocok + 1)); fi
+    if [ "$_ocok" -eq 3 ]; then
+        echo "  ${GREEN}PASS${NC}  settings edit arm A: exec context without python3 stays silent (#244 f W2)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  settings edit arm A (#244 f W2, got: $_ocout)"
+        failures=$((failures + 1))
+    fi
+    # Arm B: caller PATH has NO python3, exec context the real one — a
+    # caller-side guard would skip the edit; the inner guard runs it
+    # (the settings file itself is the proof).
+    _ocout="$(_ocw2_run "$OCW2ABSB")" || true
+    if printf '%s' "$_ocout" | grep -q W2:success \
+        && ! grep -q opencodeBinary "$OCW2/case/settings.json" \
+        && grep -q '"port": 3000' "$OCW2/case/settings.json"; then
+        echo "  ${GREEN}PASS${NC}  settings edit arm B: exec-context python3 edits despite caller absence (#244 f W2)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  settings edit arm B (#244 f W2, got: $_ocout)"
+        failures=$((failures + 1))
+    fi
+    rm -rf "$OCW2"
+fi
+
+# --- openchamber-secure settings edit: value-shaped match fails loud (#244 g S1) --
+# The outer grep needle '"opencodeBinary"' can hit the literal as a
+# VALUE; the edit script must not report success then (#244 g S1
+# added the else-exit). Direct behavioral pins on the extracted
+# heredoc script — both directions, python3 hard-required (labels
+# say so; the check-host make-test contract).
+OPYSCR="$(sed -n '/opk-settings-edit/,/^PYEOF$/p' "$KIT" | sed '1d;$d')"
+if [ -z "$OPYSCR" ] || ! printf '%s\n' "$OPYSCR" | grep -qF 'del d["opencodeBinary"]' \
+    || ! printf '%s\n' "$OPYSCR" | grep -qF 'sys.exit(1)'; then
+    echo "  ${RED}FAIL${NC}  settings-edit python script extractable (anchors: del d[\"opencodeBinary\"], sys.exit(1)) (#244 g S1)"
+    failures=$((failures + 1))
+elif ! command -v python3 >/dev/null 2>&1; then
+    echo "  ${RED}FAIL${NC}  settings-edit S1 pins need python3 (check-host contract) (#244 g S1)"
+    failures=$((failures + 1))
+else
+    OCW2S1="$WORK/ocw2s1"; mkdir -p "$OCW2S1"
+    # Value-shaped match: rc != 0, SILENT (exit, not a traceback),
+    # file byte-identical — no destructive write on the failure path.
+    printf '{ "note": "opencodeBinary", "port": 3000 }\n' > "$OCW2S1/val.json"
+    cp "$OCW2S1/val.json" "$OCW2S1/val.exp"
+    _s1rc=0
+    _s1out="$(printf '%s\n' "$OPYSCR" | python3 - "$OCW2S1/val.json" 2>&1)" || _s1rc=$?
+    if [ "$_s1rc" -ne 0 ] && [ -z "$_s1out" ] \
+        && cmp -s "$OCW2S1/val.json" "$OCW2S1/val.exp"; then
+        echo "  ${GREEN}PASS${NC}  value-shaped opencodeBinary match fails silent, file untouched (#244 g S1)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  value-shaped opencodeBinary match fails silent, file untouched (#244 g S1, rc=$_s1rc out=[$_s1out])"
+        failures=$((failures + 1))
+    fi
+    # Key-shaped match: rc 0, key gone, other keys preserved — the
+    # S1 change must not break the success path.
+    printf '{ "opencodeBinary": "/x", "port": 3000 }\n' > "$OCW2S1/key.json"
+    if printf '%s\n' "$OPYSCR" | python3 - "$OCW2S1/key.json" >/dev/null 2>&1 \
+        && ! grep -q opencodeBinary "$OCW2S1/key.json" \
+        && grep -q '"port": 3000' "$OCW2S1/key.json"; then
+        echo "  ${GREEN}PASS${NC}  key-shaped opencodeBinary removed, other keys preserved (#244 g S1)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  key-shaped opencodeBinary removal (#244 g S1)"
+        failures=$((failures + 1))
+    fi
+    rm -rf "$OCW2S1"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

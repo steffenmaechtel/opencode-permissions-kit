@@ -64,8 +64,21 @@ tui_plugin_sync_user() {
         _tp_sudo rm -rf "${_tp_user_dir:?}/plugins/opencode-permissions-kit" || return 1
         log "tui mode 2.x registration removed: $_tp_user_dir/plugins/opencode-permissions-kit"
     fi
-    # best-effort cleanup of inert file-path entries (pre-0.0.35 kits)
-    _tp_sudo python3 "$_tp_libdir/py/tui-register.py" "$_tp_user_dir/cli.json" unregister \
-        "$_tp_libdir/tui/kit-mode-2x.tsx" --drop "$_tp_libdir/tui/kit-mode.tsx" >/dev/null 2>&1 || true
+    # best-effort cleanup of inert file-path entries (pre-0.0.35 kits).
+    # Interpreter stderr passes on the failure path (#244 c S3 class,
+    # #244 d W1): tui-register.py is silent on the expected no-op and
+    # prints clean error lines of its own, so a present-but-broken
+    # python3 names itself instead of degrading attributelessly (stdout
+    # still discarded). An absent one is guarded off (#244 d Q1):
+    # absence is legitimate mid-lifecycle, not a diagnostic event.
+    # Guard and execution share ONE resolution context (#244 e S1):
+    # the guard runs inside the sudo environment, so a sudo
+    # secure_path that differs from the caller's PATH cannot make the
+    # two disagree (silent skip in one arm, not-found noise in the
+    # other). Operands pass as argv to the inner sh — nothing is
+    # expanded inside the quoted script.
+    _tp_sudo sh -c 'command -v python3 >/dev/null 2>&1 && exec python3 "$@"' tui-unregister \
+        "$_tp_libdir/py/tui-register.py" "$_tp_user_dir/cli.json" unregister \
+        "$_tp_libdir/tui/kit-mode-2x.tsx" --drop "$_tp_libdir/tui/kit-mode.tsx" >/dev/null || true
     return 0
 }

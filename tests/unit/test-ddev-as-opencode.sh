@@ -320,6 +320,51 @@ RESULT=$(
 )
 assert_eq "already-opencode branch runs the real ddev (no sudo, no recursion)" \
     "REAL_DDEV_RAN:start web" "$RESULT"
+
+# --- 2b. _opk_json_get stderr contract (#244 c S3) -----------------------------
+# Expected misses are silent and empty (except: pass — the empty-on-miss
+# stdout contract is untouched); a broken interpreter's own diagnostic
+# passes through instead of being discarded.
+GJ_OUT=$(. "$FUNC" && _opk_json_get '{"raw":{"primary_url":"https://x.y"}}' primary_url 2>"$TMPDIR/gj.err")
+assert_eq "_opk_json_get returns the string at .raw.<key>" "https://x.y" "$GJ_OUT"
+if [ ! -s "$TMPDIR/gj.err" ]; then
+    pass "_opk_json_get is silent on the happy path"
+else
+    fail "_opk_json_get must be silent on the happy path (err=$(cat "$TMPDIR/gj.err"))"
+fi
+GJ_OUT=$(. "$FUNC" && _opk_json_get '{"broken' primary_url 2>>"$TMPDIR/gj.err")
+assert_eq "_opk_json_get: unparseable input yields empty (miss contract)" "" "$GJ_OUT"
+if [ ! -s "$TMPDIR/gj.err" ]; then
+    pass "_opk_json_get: expected miss stays silent (#244 c S3)"
+else
+    fail "_opk_json_get: expected miss must stay silent (err=$(cat "$TMPDIR/gj.err"))"
+fi
+# passes through instead of being discarded. Diagnostic literal in a
+# variable: consuming grep lines quoting it inline chain into the
+# sandbox scanner's raw-line rm-suffix pattern (#244 c S1).
+GJDIAG='platform independent libraries'
+mkdir -p "$TMPDIR/noisypy"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$GJDIAG" > "$TMPDIR/noisypy/python3"
+chmod +x "$TMPDIR/noisypy/python3"
+GJ_OUT=$(PATH="$TMPDIR/noisypy:$PATH" sh -c ". '$FUNC' && _opk_json_get '{}' primary_url" 2>"$TMPDIR/gj-noisy.err") || true
+assert_eq "_opk_json_get: broken interpreter still yields empty (contract holds)" "" "$GJ_OUT"
+if grep -qF "$GJDIAG" "$TMPDIR/gj-noisy.err"; then
+    pass "_opk_json_get surfaces a broken interpreter's diagnostic (#244 c S3)"
+else
+    fail "_opk_json_get must pass interpreter stderr through (#244 c S3)"
+fi
+# (#244 d Q1) absent python3: guarded to the miss contract — empty
+# output, no shell not-found noise (absence is legitimate mid-lifecycle,
+# not a diagnostic event). Source first, then restrict PATH.
+GJABS="$TMPDIR/gj-abs"; mkdir -p "$GJABS"
+GJ_OUT=$(sh -c ". '$FUNC'; PATH='$GJABS'; _opk_json_get '{\"raw\":{\"primary_url\":\"https://x.y\"}}' primary_url" 2>"$TMPDIR/gj-abs.err") || true
+assert_eq "_opk_json_get: absent python3 yields empty (miss contract)" "" "$GJ_OUT"
+if [ ! -s "$TMPDIR/gj-abs.err" ]; then
+    pass "_opk_json_get: absent python3 stays silent (#244 d Q1)"
+else
+    fail "_opk_json_get: absent python3 must stay silent (err=$(cat "$TMPDIR/gj-abs.err"))"
+fi
+
 check "function execs the kit's sudoers helper for the developer" \
     sh -c "grep -q 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode' \"\$1\"" _ "$FUNC"
 check "function uses 'command ddev' in the opencode branch" \

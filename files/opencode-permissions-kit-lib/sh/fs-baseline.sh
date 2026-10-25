@@ -9,9 +9,13 @@
 #
 #   sudo find <root> <expr> -print0 | _fsb_count_tee <label> | sudo xargs -0 -r <cmd>
 #
-# _fsb_count_tee (python3 — a kit hard dependency, same as the jsonc
-# parser) forwards the bytes untouched and only COUNTS the NUL bytes, so
-# the overhead per entry is a memcmp, not a process or a line parser.
+# _fsb_count_tee forwards the bytes untouched and only COUNTS the NUL
+# bytes, so the overhead per entry is a memcmp, not a process or a line
+# parser. It uses python3 when python3 is HEALTHY — probed once per run
+# (issue #223): an ungated tee in a MUTATING pass died with a missing
+# or broken interpreter, xargs -r no-oped green on the empty stream,
+# and the baseline was silently not applied. The gate degrades to a
+# plain passthrough — the pass never depends on its progress display.
 #
 # POSIX sh, SOURCED by install.sh, config.sh and update.sh (checkout
 # copy first, deployed LIBDIR fallback — same rules as ddev-handover.sh).
@@ -89,30 +93,109 @@ fs_ensure_traversable() {
     return 0
 }
 
+# _fsb_py_probe: the health gate for the counter tee (issue #223, the
+# _st_ddev_scan gate shape of #221 a W3). The tee sits in the DATA
+# pipeline of a MUTATING root pass — an ungated python3 that is missing
+# or broken dies at startup, xargs -r no-ops GREEN on the empty stream,
+# and the baseline is silently not applied (false-green at a root-run
+# site). `command -v` alone accepts a findable-but-broken interpreter
+# (a pyenv shim to a removed version, a corrupt install), so the probe
+# also RUNS it — isolated: `python3 -I` ignores PYTHONHOME/PYTHONPATH
+# (#244 a S1), so neither breaking nor functional (module-shadowing)
+# PYTHON* env poison can reach the probe or the tee; the imports are
+# exactly the tee's. The -I scope is those env vars, not the whole
+# environment — the loader route (LD_PRELOAD/LD_LIBRARY_PATH) and the
+# PATH-resolved binary itself stay outside any python flag, root-owned
+# trust surface like every root python3 the kit runs (#244 b S1);
+# system site-packages stay processed too (-I implies -E -s -P, not
+# -S): a .pth there executes at startup — same root-owned residual
+# (#244 c S2).
+# Probed once per run (_fsb_py_checked caches, _fsb_py_ok
+# carries the verdict); on any doubt the pass degrades to a plain
+# passthrough — it loses its live counter, never its data. One warn
+# line names the degradation.
+# Callers: _fsb_pass from the MAIN shell BEFORE the pipeline (a
+# pipeline member forks, and a cache written inside the fork dies with
+# it — the tee would re-probe and re-warn on every pass), plus
+# _fsb_count_tee itself so direct tee calls get the gate too; with the
+# cache set, the second call is a no-op.
+_fsb_py_probe() {
+    if [ "${_fsb_py_checked:-0}" != 1 ]; then
+        _fsb_py_checked=1
+        _fsb_py_ok=0
+        command -v python3 >/dev/null 2>&1 \
+            && python3 -I -c 'import os, sys' >/dev/null 2>&1 \
+            && _fsb_py_ok=1
+        if [ "$_fsb_py_ok" != 1 ]; then
+            # The rerun exists for the interpreter's own diagnostic
+            # stderr, not its rc (this branch already failed; #244 c
+            # S3, the installer gate's #244 b S2 shape): a
+            # present-but-broken python3 names its real problem above
+            # the warn. An absent one is guarded off — no not-found
+            # noise for a legitimate absence.
+            command -v python3 >/dev/null 2>&1 \
+                && python3 -I -c 'import os, sys' >/dev/null || true
+            printf '  warn: live progress unavailable (python3 missing or broken) — passes apply without entry counters\n' >&2
+        fi
+    fi
+}
+
 # _fsb_count_tee <label>: stdin NUL-separated stream -> stdout (verbatim)
 # + a "label: N entries" line on stderr, rewritten every 2000 entries
 # and finalized with "— done" (a plain line, not a carriage return, so
 # logs stay grep-able). Script via -c, NOT a heredoc: `python3 -` with a
 # heredoc would consume stdin for the script itself and the tee would
-# read nothing.
+# read nothing. Gated by _fsb_py_probe above (#223): without a healthy
+# python3 the tee is a plain passthrough (cat) — the pass data never
+# depends on the progress display. Runs isolated (`-I`) like the probe:
+# PYTHON* env poison cannot shadow the tee's imports either (#244 a
+# S1). The -I scope is those env vars plus the user-site isolation
+# -s/-P buy; system site-packages stay processed — the residual named
+# at the probe above (#244 b S1, c S2).
 _fsb_count_tee() {
-    python3 -c '
-import sys
+    _fsb_py_probe
+    if [ "${_fsb_py_ok:-0}" != 1 ]; then
+        cat
+        return 0
+    fi
+    python3 -I -c '
+import os, sys
 label = sys.argv[1]
 counted = 0
 shown = 0
-while True:
-    chunk = sys.stdin.buffer.read(1 << 20)
-    if not chunk:
-        break
-    counted += chunk.count(b"\0")
-    sys.stdout.buffer.write(chunk)
-    sys.stdout.buffer.flush()
-    if counted - shown >= 2000:
-        shown = counted
-        sys.stderr.write("\r    %-16s %d entries" % (label, counted))
-        sys.stderr.flush()
-if counted:
+aborted = False
+try:
+    while True:
+        chunk = sys.stdin.buffer.read(1 << 20)
+        if not chunk:
+            break
+        counted += chunk.count(b"\0")
+        sys.stdout.buffer.write(chunk)
+        sys.stdout.buffer.flush()
+        if counted - shown >= 2000:
+            shown = counted
+            sys.stderr.write("\r    %-16s %d entries" % (label, counted))
+            sys.stderr.flush()
+except (BrokenPipeError, KeyboardInterrupt):
+    # A dead consumer (xargs died first — the pr-00221 W2/W6 sweep
+    # recorded this missing clause — or Ctrl-C hit the whole pipeline,
+    # #221 a W6 shape) must not end the tee in a traceback, and an
+    # aborted pass must not print its completion line — counted is
+    # bytes READ, not entries applied (#244 a S2/W3/Q4). The
+    # interpreter shutdown flush over the broken pipe would print a
+    # traceback anyway, so point stdout at devnull before exiting (the
+    # CPython SIGPIPE idiom). rc contract, stated truly (#244 a Q1):
+    # the production callers run bash WITH pipefail (install.sh:47,
+    # config.sh:28, update.sh:39) and the rc of this pipeline lands
+    # in the _fsbp_rc capture of _fsb_pass — exiting 0 on EPIPE is
+    # deliberate: a consumer that closed early cannot fail the pass
+    # alone, while a consumer that DIED leaves its own rc in the
+    # pipeline and pipefail fails the pass through it. Unit tests
+    # observe dash (no pipefail); the 11c bash rider pins the
+    # production shape.
+    aborted = True
+    os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+if counted and not aborted:
     sys.stderr.write("\r    %-16s %d entries — done\n" % (label, counted))
     sys.stderr.flush()
 ' "$1"
@@ -167,6 +250,10 @@ _fsb_pass() {
     shift  # consume --
     [ $# -gt 0 ] || return 0
     _fsbp_rc=0
+    # Health probe from the MAIN shell (#223): _fsb_count_tee runs as a
+    # pipeline member (a fork) — only here does the once-per-run cache
+    # stick across the four passes.
+    _fsb_py_probe
     _fsbp_nul="$(mktemp "${TMPDIR:-/tmp}/opk-fsb-pass.XXXXXXXX")"
     # Scratch registered with the caller's cleanup trap (#211 a F12,
     # staged-write.sh:44 shape): an aborted pass (Ctrl-C on a large
@@ -267,8 +354,11 @@ fs_baseline_root() {
     # Wholesale-failure detection part 1 (0.0.43a F10): a missing tool
     # used to die silently inside the pipeline (find's stderr is
     # redirected, xargs -r succeeds on empty input) and the passes
-    # "completed" with nothing applied. Probe BEFORE walking.
-    for _fsb_tool in find chgrp chmod setfacl; do
+    # "completed" with nothing applied. Probe BEFORE walking. cat is
+    # probed with the rest since #223: the python3-less fallback of
+    # _fsb_count_tee pipes the pass through it — a missing cat would
+    # rebuild the exact empty-stream false-green the gate closes.
+    for _fsb_tool in find cat chgrp chmod setfacl; do
         if ! command -v "$_fsb_tool" >/dev/null 2>&1; then
             printf '  error: required tool missing for the group baseline: %s\n' "$_fsb_tool" >&2
             return 1

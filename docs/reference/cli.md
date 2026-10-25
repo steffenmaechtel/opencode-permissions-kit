@@ -293,8 +293,8 @@ sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh
 |---|---|
 | `--short`, `-s` | Print only the verdict line; the exit code carries the verdict |
 
-Exit codes: `0` all green, `1` alert(s), `2` warning(s) only, `64` usage
-error — the full report uses the same codes, so scripts can judge an
+Exit codes: `0` all green, `1` alert(s), `2` warning(s) only, `64` for a
+usage error — the full report uses the same codes, so scripts can judge an
 installed-but-degraded kit. Rows the caller cannot judge at their own
 privilege ("unknown — needs root to check") and optional-feature rows never
 count toward the verdict: `sudo opk status` resolves the privilege
@@ -307,7 +307,9 @@ skipped security checks instead).
 On a terminal, the two project-root scans (the ddev-share group-write check
 and the Windows-hosts check) show a live progress line while they walk your
 project roots. The line is transient: it never appears in piped output, log
-files, cron mail or `--short` mode.
+files, cron mail or `--short` mode. The scans run identically without
+`python3` (losing only the progress display); a broken `python3` names
+itself at each python-backed step — a missing one stays silent.
 
 `--short` is cron/timer friendly — alert yourself only when something is
 off:
