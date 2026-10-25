@@ -8,7 +8,10 @@ maintainer surfaced issue #252 — the ticket behind the #256 docs
 shortening — whose ultra-legacy policy deliberately removed two of the
 externals' findings' subjects; those are dispositioned deliberately not
 done and marked in the snapshots. Deferred to backlog issues: #264-#267
-new, #245/#246/#247 existing.
+new (code), #268-#273 new (docs: b B3; c C3+C4; c C5; c C6; b B5+B6;
+c C9+C10+C11 — maintainer decision 2026-10-25: no docs changes ride this
+wave; minimal corrections only when picked up, no bulk restores per
+#252/#256), #245/#246/#247 existing.
 
 ## Dispositions
 
