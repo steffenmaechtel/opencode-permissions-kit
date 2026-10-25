@@ -54,6 +54,10 @@ line_is() {  # $1 file, $2 exact line -> pass/fail on first match
     grep -qx -- "$2" "$1"
 }
 
+out_line_is() {  # $1 haystack string, $2 exact line -> anchored needle
+    printf '%s\n' "$1" | grep -qxF -- "$2"
+}
+
 run_report() {  # runs the report; env: SCRATCH T env-HORIZON; sets OUT/RC
     OUT=$(RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY="$T" \
         HORIZON="${HORIZON:-30}" sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
@@ -105,11 +109,15 @@ meta_path() {  # $1 dir  $2 id
 }
 
 # ----------------------------------------------------------- report pins
-# R0. the real tree must report green (living gate, read-only)
+# R0. the real tree must report green (living gate, read-only).
+#      The frozen FORCE_TODAY IS the gate: a meta whose next-revisit
+#      falls before 2026-10-16 (backdated, or a revisit left undone)
+#      reddens this pin on purpose -- that is the living gate firing,
+#      not a flake; maintain the tree, never the date.
 OUT=$(FORCE_TODAY=2026-10-16 sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
 if [ "$RC" -eq 0 ] && contains "$OUT" "rule-meta revisit report — 2026-10-16" \
-    && contains "$OUT" "overdue: 0"; then
+    && out_line_is "$OUT" "overdue: 0"; then
     pass
 else
     fail "R0 real tree: report must be green, got rc=$RC: $OUT"
@@ -127,13 +135,14 @@ SCRATCH=$RSCRATCH
 T=2026-06-15
 HORIZON=30
 run_report
-if [ "$RC" -eq 0 ] && contains "$OUT" "overdue: 1" \
+if [ "$RC" -eq 0 ] && out_line_is "$OUT" "overdue: 1" \
     && contains "$OUT" "RM-9001  due 2026-06-01  1m" \
-    && contains "$OUT" "due within the horizon (2026-06-15..2026-07-15): 3" \
+    && out_line_is "$OUT" \
+        "due within the horizon (2026-06-15..2026-07-15): 3" \
     && contains "$OUT" "RM-9002  due 2026-06-15  6m" \
     && contains "$OUT" "RM-9003  due 2026-06-20  1m" \
     && contains "$OUT" "RM-9006  due 2026-07-01  1m" \
-    && contains "$OUT" "review-pending (approval queue): 1" \
+    && out_line_is "$OUT" "review-pending (approval queue): 1" \
     && contains "$OUT" "next due after the horizon: 2026-12-01 (RM-9004)"; then
     pass
 else
@@ -144,8 +153,10 @@ if contains "$OUT" "RM-9005"; then
 else
     pass
 fi
-# due-TODAY is horizon, never overdue (audit lateness semantics)
-if contains "$OUT" "overdue: 1" && ! contains "$OUT" "overdue: 2"; then
+# due-TODAY is horizon, never overdue (audit lateness semantics);
+# both needles anchored -- a count of 12 would satisfy an unanchored
+# "overdue: 1" and dodge the unanchored negation in one move
+if out_line_is "$OUT" "overdue: 1" && ! out_line_is "$OUT" "overdue: 2"; then
     pass
 else
     fail "R1 boundary: due-today meta counted as overdue"
@@ -155,7 +166,8 @@ fi
 HORIZON=0
 run_report
 if [ "$RC" -eq 0 ] \
-    && contains "$OUT" "due within the horizon (2026-06-15..2026-06-15): 1" \
+    && out_line_is "$OUT" \
+        "due within the horizon (2026-06-15..2026-06-15): 1" \
     && contains "$OUT" "RM-9002  due 2026-06-15  6m" \
     && contains "$OUT" "next due after the horizon: 2026-06-20 (RM-9003)"; then
     pass
@@ -453,16 +465,17 @@ else
     fail "V9 clamp: expected 2027-02-28, rc=$RC: $OUT"
 fi
 
-# V10. missing interpreter fails loud before any write (L1)
+# V10. missing interpreter fails loud before any write (L1); the
+#      meta stays byte-identical (cp + cmp, not a field line count)
 one_scratch 1m 2026-06-01 v10
 M=$(meta_path "$WORK/one$$.v10" RM-9001)
-before=$(sed -n '2,/^---$/p' "$M" | grep -c '^revisit-interval:')
+cp "$M" "$WORK/v10.before"
 OUT=$(RM_AUDIT_ROOT="$WORK/one$$.v10" FORCE_TODAY=2026-06-15 \
     RULES_PYTHON=/nonexistent-rules-python \
     sh "$REPO_ROOT/scripts/rules-revisit.sh" RM-9001 clean 2>&1)
 RC=$?
 if [ "$RC" -eq 2 ] && contains "$OUT" "unavailable" \
-    && [ "$before" -eq "$(sed -n '2,/^---$/p' "$M" | grep -c '^revisit-interval:')" ]; then
+    && cmp -s "$WORK/v10.before" "$M"; then
     pass
 else
     fail "V10 missing python: rc=$RC, meta must stay untouched"
@@ -603,16 +616,21 @@ else
 fi
 
 # V17. a corrupt status is an env failure, not a domain refusal
-#      (W4: only a genuine retired meta is refused rc=1)
+#      (#222 a W4: only a genuine retired meta is refused rc=1); the
+#      meta stays byte-identical (cp + cmp, per-shape symmetry with
+#      V20 on the same die arm)
 PSCRATCH=$WORK/paused$$
 write_meta "$PSCRATCH" RM-9001 paused 1m 2026-06-01 2026-05-01
+PM=$(meta_path "$PSCRATCH" RM-9001)
+cp "$PM" "$WORK/v17.before"
 SCRATCH=$PSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
-if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'"; then
+if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'" \
+    && cmp -s "$WORK/v17.before" "$PM"; then
     pass
 else
-    fail "V17 corrupt status: expected rc=2 naming it, got rc=$RC: $OUT"
+    fail "V17 corrupt status: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
 
 # V18. a duplicated next-revisit field (c2=2) is the same violation in
