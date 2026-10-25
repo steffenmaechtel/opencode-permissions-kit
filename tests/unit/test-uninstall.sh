@@ -1,6 +1,6 @@
 #!/bin/sh
 # Unit tests for uninstall.sh (no root, no install needed):
-#   - the run() wrapper echoes in dry-run mode instead of executing
+#   - the dry-run arms echo [DRY] + the success lines, nothing executes
 #   - root / opencode invocations are refused
 #   - project-path screening: system paths from projects.conf are never
 #     passed to setfacl/chmod (protects against a tampered conf)
@@ -88,7 +88,7 @@ else
     # the agents-backup probes (0.0.45c C6 + 0.0.45d W2: sudo ls -A and
     # sudo test -d — read-only, the gate must fail safe in dry-run too),
     # the issue #164 openchamber presence/content probes (sudo test -f +
-    # sudo grep -q — read-only, and deliberately OUTSIDE run() so they
+    # sudo grep -q — read-only, and deliberately unwrapped so they
     # see the file at the rm's authority), and the #198 a W1 legacy
     # sudoers probes (sudo test -L + sudo readlink — same read-only
     # gate-at-the-write's-authority class); any OTHER sudo command in
@@ -368,7 +368,7 @@ fi
 # uid/gid, because the user removal above may already have orphaned the
 # ids. Functional: the project loop is extracted verbatim (it hardcodes
 # the conf path, so it is fed a fake root via stdin) and run with a
-# logging run() stub; the captured uid 60000 and the DISTINCT gids
+# logging sudo() stub; the captured uid 60000 and the DISTINCT gids
 # (oc 60002 / dev 60001) must land inside the find and the ACL removal,
 # with chown to DEFAULT_USER:<dev-group>. The loop
 # is extracted verbatim except for its stdin redirect (the conf path is
@@ -814,7 +814,7 @@ else
     fail "uid unknown arms (out=$(_unarm_show "$FOUT")) (#218)"
 fi
 # Dry run: [DRY] echoes and the success lines despite failing ops —
-# the run/run_q convention since #211 b W1 (dry reports the intended
+# the run_q convention since #211 b W1 (dry reports the intended
 # outcome; nothing executes, so nothing can fail). Nothing executes =
 # the sudo log stays EMPTY — pinned (#243 a Q5): a refactor that
 # executes in dry mode while dropping rc observation would otherwise
@@ -1097,7 +1097,7 @@ else
     fail "section rm failure arms (out=$(_unarm_show "$COUT")) (#243 a S1)"
 fi
 # Dry run: [DRY] echoes and the success lines despite the failing
-# stub — the run/run_q convention (#211 b W1). The guard probes
+# stub — the run_q convention (#211 b W1). The guard probes
 # (test/grep) legitimately execute as reads; no rm ever runs.
 COUT=$(_un_cfg_out "rm:/etc/opencode-permissions-kit" true) || true
 if printf '%s' "$COUT" | grep -qF '[DRY] sudo rm -rf /run/opencode-permissions-kit' \
@@ -1511,10 +1511,12 @@ fi
 # pr-00263 e W3: run() lost its last callers to un_rc_q (#246 site 7) and
 # is removed — run_q (silenced best-effort) keeps its callers; a
 # resurrected def without callers must fail loud here. pr-00263 f W1:
-# the pattern '^run *()' counts BOTH def spellings at line start
-# (run() { house style, run () { spaced) — the e-round draft '^run ()'
-# caught only the spaced form, which no def in this file ever used.
-[ "$(grep -c '^run *()' "$UNINSTALL")" = 0 ] \
+# the pattern counts every def spelling at line start with ANY leading
+# whitespace (run() { house style, run () { spaced, indented defs) —
+# the e-round draft '^run ()' caught only the spaced form, which no
+# def in this file ever used; comments cannot match (after the
+# indentation comes '#', never 'run').
+[ "$(grep -c '^[[:space:]]*run *()' "$UNINSTALL")" = 0 ] \
     && pass "run() helper gone, no orphaned runner (pr-00263 e W3)" \
     || fail "run() def present without callers (pr-00263 e W3)"
 F3SEC="$(sed -n '/^echo "--- Removing sudoers ---"$/,/^fi$/p' "$UNINSTALL")"

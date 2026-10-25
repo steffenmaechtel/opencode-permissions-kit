@@ -79,6 +79,11 @@ evidence block).
 | e W3 (INFO) | **implemented** | `163da3a` | run() removed; run_q doc + 4 comments updated; def-count pin = 0 |
 | e Q1 (INFO) | **deliberately not done** | — | write-only store is the 12-site reset-pair idiom; removal deviates |
 | f W1 (MED) | **implemented** | `ea4f133` | pin greps '^run *()': both def spellings count; resurrected def -> red |
+| f W2 (LOW) | **implemented** | `<SHA>` | both test-uninstall sibling comments now "run_q convention" |
+| f W3 (LOW) | **implemented** | `<SHA>` | header bullet rewritten: dry-run arms echo [DRY], nothing executes |
+| f W4 (INFO) | **implemented** | `<SHA>` | :371 run() stub -> sudo() stub; :91 comparator "unwrapped" |
+| f Q2 (LOW) | **implemented** | `<SHA>` | evidence sentence: TWO config log lines "backup attempt: …", not three |
+| f Q3 (LOW) | **implemented** | `<SHA>` | correction of record: 163da3a said "114", committed row is 110 bytes |
 
 ## Evidence detail
 
@@ -190,8 +195,10 @@ see Backup summary" / "config backup FAILED — see Backup summary"
 x2); on success the claim content is kept, but the wording is
 restructured at two of the three sites (branch b reorders to
 "Copied to X. Backup saved.", the existing-config arm turns the
-parenthetical into a trailing sentence) and all three log lines now
-read "backup attempt: … — <verdict>" — corrected per snapshot e W1.
+parenthetical into a trailing sentence) and the two config-site log
+lines now read "backup attempt: … — <verdict>" — the branch-b log
+keeps its parenthetical shape "(Backup saved.)" / "(binary backup
+FAILED — see Backup summary)" — corrected per snapshot e W1 + f Q2.
 Class sweep record (pattern:
 every line writing to `$BACKUP_DIR` in install.sh, checked 11 sites):
 gitconfig x2, sudoers, usr-local-bin, lib tree, remove_shadow_binary,
@@ -274,21 +281,41 @@ false "fails loud" carriers: the pin comment is true now, commit
 163da3a is immutable history (this row is the correction of record),
 the e W3 row's "def-count pin = 0" stays accurate as written.
 
+f W1 hardening (post-snapshot-f, maintainer-commissioned): the
+pattern is `'^[[:space:]]*run *()'` — indented defs count too
+("  run() {" is valid sh), closing the one blind variant the
+snapshot-f variant table recorded; comments still cannot match
+(after the indentation comes '#', never 'run'), and run_q's
+underscore keeps its def invisible to the pattern. Sabotage against
+this committed tree, all four shapes re-inserted one at a time:
+`run() {`, `run () {`, `  run() {`, `   run  () {` -> suite rc 1
+each, the pin itself FAILs ("run() def present without callers",
+suite line 139); `git checkout --` -> rc 0 green, porcelain-clean.
+
+W2/W3/W4 (comment sweep, same flight): the two sibling comments
+(:817, :1100) now read "run_q convention", the :3 header bullet
+states what the dry-run arms actually do ([DRY] echoes + success
+lines, nothing executes), :371 names the real stub (sudo()), and
+:91's comparator is "unwrapped" (the silenced runners are
+run_q/un_rc_q now). Q2: the d W1+W2 evidence sentence above names
+the two config-site log lines; branch-b's stays parenthetical. Q3:
+163da3a's "shortened to 114" vs the committed 110-byte e W3 row —
+this block is the correction of record (d Q3 precedent).
+
 ## Follow-ups
 
 - e-round dispositions landed (e W1 ledger wording, e W2 harness
   label, e W3 run() removal, e Q1 recorded not-done): the owed
   **micro-wave review** of the e fixes ran as snapshot f
   (2026-10-25, `6f9826e..4959c4b`: 7 findings, 1 MED / 4 LOW /
-  2 INFO) — f W1 implemented (pin pattern `'^run *()'` + pattern-
-  truth comment, this commit; the "fails loud" claim now true); f
-  W2/W3 comment sweeps, f Q2 sentence fix, f Q3/W4 record-or-drop
-  still owed; f Q4 discharged by the snapshot-f commit's `<SHA>`
-  fills + the e W1 row shortening; the f fix touched test code — a
-  **micro-wave review** of the f round is owed before release
-  (maintainer's go); the stop-rule check (f W1 was the only MED)
-  falls to the next round / maintainer — closure NOT declared here
-  (RM-0106/RM-0107/RM-0115).
+  2 INFO) — ALL f dispositions landed: f W1 implemented and hardened
+  (pattern `'^[[:space:]]*run *()'`, sabotage across all def shapes),
+  f W2/W3/W4 comment sweeps, f Q2 sentence fix, f Q3 record note,
+  f Q4 discharged by the snapshot-f commit's `<SHA>` fills; the f
+  round touched test code only — a **micro-wave review** of the f
+  round is owed before release (maintainer's go); no MED/HIGH
+  remains open — the stop-rule check falls to the next round /
+  maintainer, closure NOT declared here (RM-0106/RM-0107/RM-0115).
 - e2e debt discharged in the d wave (see d Q1): both suites green on
   the d-round tree, zero skips.
 
