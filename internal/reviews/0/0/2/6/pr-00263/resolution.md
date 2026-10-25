@@ -5,7 +5,9 @@ medium/high) — 42 unique findings across the three snapshots — -> d
 (wave review of the fix round, 2026-10-25: 13 findings, 1 MED / 6 LOW /
 6 INFO; all dispositioned below as d Q1-Q4, d W1-W6, d S1-S3) -> e
 (micro-wave review of the d round, 2026-10-25: 4 findings, 1 LOW /
-3 INFO, all dispositioned below as e W1-e W3, e Q1). This is
+3 INFO, all dispositioned below as e W1-e W3, e Q1) -> f
+(micro-wave review of the e round, 2026-10-25: 7 findings, 1 MED /
+4 LOW / 2 INFO — dispositions owed). This is
 the second fix-wave attempt: attempt 1 (backed up at
 `backup/pr-00263-fix-wave-1`, never pushed) was superseded when the
 maintainer surfaced issue #252 — the ticket behind the #256 docs
@@ -72,9 +74,9 @@ evidence block).
 | d S2 (INFO) | **deliberately not done** | — | in-file run/run_q convention + DRY banner; committed deliberate |
 | d S3 (INFO) | **deliberately not done** | — | pre-existing sub-second window, non-setuid; comment scoped true |
 | d Q4 (INFO) | **deliberately not done** | — | disambiguated in-string; F17 claimed 14 qualified, not zero-remain |
-| e W1 (LOW) | **implemented** | `<SHA>` | evidence sentence corrected: claim kept, 2/3 sites reworded, logs reshaped |
-| e W2 (INFO) | **implemented** | `<SHA>` | harness drives a production-shaped label (DEFAULT_USER=opencode) |
-| e W3 (INFO) | **implemented** | `<SHA>` | run() removed; run_q doc + 4 comments updated; def-count pin = 0 |
+| e W1 (LOW) | **implemented** | `4959c4b` | evidence sentence fixed: claim kept, 2/3 sites reworded, logs reshaped |
+| e W2 (INFO) | **implemented** | `1abc8d6` | harness drives a production-shaped label (DEFAULT_USER=opencode) |
+| e W3 (INFO) | **implemented** | `163da3a` | run() removed; run_q doc + 4 comments updated; def-count pin = 0 |
 | e Q1 (INFO) | **deliberately not done** | — | write-only store is the 12-site reset-pair idiom; removal deviates |
 
 ## Evidence detail
@@ -259,10 +261,15 @@ Q1: recorded not-done — the reset pair is the file's 12-site idiom.
 ## Follow-ups
 
 - e-round dispositions landed (e W1 ledger wording, e W2 harness
-  label, e W3 run() removal, e Q1 recorded not-done): e W2/e W3
-  touched test and production code — a **micro-wave review** of the
-  e fixes (`6f9826e..` up from snapshot e) is owed before release;
-  this round does not self-declare the loop closed (RM-0106/RM-0107).
+  label, e W3 run() removal, e Q1 recorded not-done): the owed
+  **micro-wave review** of the e fixes ran as snapshot f
+  (2026-10-25, `6f9826e..4959c4b`: 7 findings, 1 MED / 4 LOW /
+  2 INFO) — f dispositions owed (f W1 the priority: the pin pattern
+  plus its three "fails loud" claims; f W2/W3 comment sweeps, f Q2
+  sentence fix, f Q3/W4 record-or-drop; f Q4 discharged by the
+  snapshot-f commit's <SHA> fills + the e W1 row shortening); the
+  loop stays open on f W1 (MED, stop rule) — closure remains the
+  maintainer's / next round's call (RM-0106/RM-0107/RM-0115).
 - e2e debt discharged in the d wave (see d Q1): both suites green on
   the d-round tree, zero skips.
 
