@@ -288,10 +288,10 @@ fi
 # on|off subcommands) but spell out the effect with the same phrases
 # `opk status` uses (issue #158 wording) — no bare "ON  (...)"/"OFF  (...)"
 # rows may survive anywhere in config.sh (status AND apply sites), and the
-# phrases must match status.sh VERBATIM (a W1: the wave claimed equality
+# phrases must match status.sh VERBATIM (#208 a W1: the wave claimed equality
 # while config.sh and status.sh disagreed on the ON punctuation — the
 # agreement itself is pinned here, not just config.sh's internal
-# shape). The markers hint is pinned on BOTH sides too (b W3: after
+# shape). The markers hint is pinned on BOTH sides too (#208 b W3: after
 # the alignment, opk status shows it like git-config status does).
 _gc_on='ui_kv "git-config" "ON — protected (soft-only — agent tools blocked)"'
 _gc_off='ui_kv "git-config" "OFF — access allowed (agent tools may edit git config)"'

@@ -76,7 +76,7 @@ check "off-major offline degradation is named, never silent (#224 a W1)" \
     grep_q 'no cached 2x, using cached opencode'
 check "off-major warning names the E2E_OC_VERSION escape hatch (#224 a W1)" \
     grep_q "off the default lane's 2.x major"
-# Empty-cache hard fail (b W1 follow-up): both halves must exist AND sit
+# Empty-cache hard fail (#224 b W1 follow-up): both halves must exist AND sit
 # together — the FAIL message alone without the exit would print red and
 # keep going (OC_VERSION empty -> messy failure far downstream), the exit
 # without the message fails silently. Presence + adjacency pins the pair.

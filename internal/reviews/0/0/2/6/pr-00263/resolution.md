@@ -38,10 +38,14 @@ wave; minimal corrections only when picked up, no bulk restores per
 | a F7 (LOW) | **implemented** | `54758f2` | both re-deploy skips terminal-loud; harness drives both arms |
 | a F13 (LOW) | **implemented** | `54758f2` | daemon-start rc gates the ready message; socket var kept |
 | a F11 (LOW) | **implemented** | `54758f2` | shape-invalid feed = silent unavailable; ids-only on lists |
-| a F9 (LOW) | **implemented** | `<SHA>` | sanitized gate WARN; newline arm pinned (one line, no raw bytes) |
-| a F10 (LOW) | **implemented** | `<SHA>` | getent homes at both refusal twins + install.sh parity copy |
-| a F21 (INFO) | **implemented** | `<SHA>` | failure message names key-or-value |
-| a F25 (INFO) | **implemented** | `<SHA>` | chmod before chown; order pinned by line compare |
+| a F9 (LOW) | **implemented** | `6e406de` | sanitized gate WARN; newline arm pinned (one line, no raw bytes) |
+| a F10 (LOW) | **implemented** | `6e406de` | getent homes at both refusal twins + install.sh parity copy |
+| a F21 (INFO) | **implemented** | `6e406de` | failure message names key-or-value |
+| a F25 (INFO) | **implemented** | `6e406de` | chmod before chown; order pinned by line compare |
+| a F16 (LOW) | **implemented** | `<SHA>` | bare skills-root file FAILs; fixture pin executes the branch |
+| a F17 (LOW) | **implemented** | `<SHA>` | 14 bare citations qualified (#189/#208/#211/#224/#235/#243/#244/#256) |
+| a F18 (LOW) | **implemented** | `<SHA>` | extraction collects all case arms; comment matches reality |
+| a F26 (INFO) | **implemented** | `<SHA>` | seq in check-host required list |
 | c C3 + c C4 (MED/LOW) | **deliberately not done** | — | deferred to #269 with the docs backlog (#252/#256 policy) |
 | c C5 (MED) | **deliberately not done** | — | deferred to #270 with the docs backlog (#252/#256 policy) |
 | c C6 (MED) | **deliberately not done** | — | deferred to #271 with the docs backlog (#252/#256 policy) |

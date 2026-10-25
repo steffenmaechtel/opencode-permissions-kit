@@ -885,7 +885,7 @@ else
 fi
 
 # --- openchamber-secure settings edit: guard inside the sudo context (#244 f W2) --
-# The e-S1 class fix at opk's settings-edit compound: guard and exec
+# The #244 e-S1 class fix at opk's settings-edit compound: guard and exec
 # share ONE PATH (the sudo context). Static shape pins, then functional
 # asymmetry arms — the compound is extracted from opk (the F24 idiom)
 # and driven with PATH-fixing sudo shims over a binary farm (the

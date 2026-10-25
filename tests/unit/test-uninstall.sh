@@ -229,7 +229,7 @@ else
     fail "screening patterns extractable from uninstall.sh"
 fi
 # Block-identity pin (#243 c S1): a decoy case block with /-leading
-# arms — the b-S1 reorder hazard shape, plus a `/*)` arm and a
+# arms — the #243 b-S1 reorder hazard shape, plus a `/*)` arm and a
 # backslash continuation — must contribute nothing; only the block
 # whose body echoes "Skipping system path" yields tokens. A reversion
 # to a shape-keyed grep pulls the decoy arms in and reds this pin.

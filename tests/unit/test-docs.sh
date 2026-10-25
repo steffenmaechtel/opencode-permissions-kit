@@ -193,12 +193,20 @@ for _f36_df in $_f36_docflags; do
 done
 
 # --- a W1 (pr-00256): ddev-integration root-file types track the code -------
-# matcher (claim-drift guard, the W1 rename class): every root-file type
-# ddev-handover.sh matches must appear backticked in the docs page.
+# matcher (claim-drift guard, the W1 rename class): every arm of the
+# root-file case in ddev-handover.sh must appear backticked in the docs
+# page. pr-00263 a F18: the extraction collects ALL arms of that case
+# (the old head -n 1 let a future second arm escape direction A).
 # Sabotage: rename `shopware6` to `shopware` in the docs — this goes red.
 _w1_doc="$REPO_ROOT/docs/concepts/ddev-integration.md"
 _w1_lib="$REPO_ROOT/files/opencode-permissions-kit-lib/sh/ddev-handover.sh"
-_w1_types="$(sed -n 's/^[[:space:]]*codeigniter|\([a-z0-9|]*\)).*/\1/p' "$_w1_lib" | head -n 1 | tr '|' ' ')"
+_w1_types="$(awk '/^[[:space:]]*codeigniter\|/{f=1}
+f {
+    if ($0 ~ /^[[:space:]]*[a-z0-9|]+\)[[:space:]]*$/) {
+        line=$0; gsub(/[[:space:]]|\)/, "", line); printf "%s ", line
+    }
+    if ($0 ~ /;;/) exit
+}' "$_w1_lib" | tr '|' ' ')"
 if [ -z "$_w1_types" ]; then
     echo "FAIL ddev-integration.md: root-file matcher extraction empty — anchor drift? (#256 a W1)" >> "$TMP"
 fi
@@ -207,7 +215,7 @@ for _w1_t in codeigniter $_w1_types; do
         || echo "FAIL ddev-integration.md: root-file type '$_w1_t' missing from the docs (#256 a W1)" >> "$TMP"
 done
 # #256 b B2: reverse direction — every type the docs paragraph lists must
-# exist in the code matcher (the addition direction of the a-W1 class, the
+# exist in the code matcher (the addition direction of the #256 a W1 class, the
 # #211 b W30 shape). Wildcard forms count too: the matcher arms are literal,
 # so a `drupal*`-style token in the root-file paragraph is drift by
 # definition. Tripwire: a drifted paragraph anchor must not silently
