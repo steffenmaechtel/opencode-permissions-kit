@@ -1508,6 +1508,12 @@ if printf '%s' "$PLGSEC" | grep -qF 'un_rc_q "plugins rm"' \
 else
     fail "plugins loop not rc-observing (#246 site 7, pr-00263 d)"
 fi
+# pr-00263 e W3: run() lost its last callers to un_rc_q (#246 site 7) and
+# is removed — run_q (silenced best-effort) keeps its callers; a
+# resurrected def without callers must fail loud here.
+[ "$(grep -c '^run ()' "$UNINSTALL")" = 0 ] \
+    && pass "run() helper gone, no orphaned runner (pr-00263 e W3)" \
+    || fail "run() def present without callers (pr-00263 e W3)"
 F3SEC="$(sed -n '/^echo "--- Removing sudoers ---"$/,/^fi$/p' "$UNINSTALL")"
 if [ -n "$F3SEC" ] && printf '%s' "$F3SEC" | grep -qF 'un_rc_q "rm sudoers"'; then
     pass "sudoers section extractable + rc-observing (pr-00263 a F3)"

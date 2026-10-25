@@ -71,6 +71,7 @@ evidence block).
 | d S3 (INFO) | **deliberately not done** | — | pre-existing sub-second window, non-setuid; comment scoped true |
 | d Q4 (INFO) | **deliberately not done** | — | disambiguated in-string; F17 claimed 14 qualified, not zero-remain |
 | e W2 (INFO) | **implemented** | `<SHA>` | harness drives a production-shaped label (DEFAULT_USER=opencode) |
+| e W3 (INFO) | **implemented** | `<SHA>` | run() removed; run_q doc + 4 comments updated; def-count pin = 0 |
 
 ## Evidence detail
 

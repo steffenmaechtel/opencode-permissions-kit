@@ -160,17 +160,10 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 # Direct invocation only — no eval, no `sh -c` (agent/conventions.md).
-# Failures print their error and the uninstall continues (no set -e here).
-run() {
-    if [ "$DRY_RUN" = true ]; then
-        echo "  [DRY] $*"
-    else
-        "$@"
-    fi
-}
-
-# Like run, but output and failures are silenced (the former
-# "cmd 2>/dev/null || true" call sites — best-effort cleanup).
+# Output and failures are silenced (the former "cmd 2>/dev/null || true"
+# call sites — best-effort cleanup). pr-00263 e W3: the unsilenced run()
+# helper was removed here — its last two callers went to un_rc_q (#246
+# site 7); run_q keeps its callers.
 run_q() {
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] $*"
@@ -553,7 +546,7 @@ if id "$DEFAULT_USER" >/dev/null 2>&1 \
     # by design, so wiring a F28's honesty arms through it left the
     # else arm dead code — a failed gpasswd still printed "Removed".
     # DRY_RUN keeps the [DRY] echo and the success lines (the file's
-    # run/run_q convention: dry-run reports the intended outcome).
+    # run_q convention: dry-run reports the intended outcome).
     _grp_rc=0
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] sudo gpasswd -d $DEFAULT_USER $OPENCODE_GROUP"
@@ -630,7 +623,7 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
         # by design, so a failed userdel still printed "User … removed" —
         # userdel refuses while ANY process of the user runs (a straggler
         # the pkill above can miss). DRY_RUN keeps the [DRY] echo and the
-        # success lines (the file's run/run_q convention).
+        # success lines (the file's run_q convention).
         _udel_rc=0
         if [ "$DRY_RUN" = true ]; then
             echo "  [DRY] sudo userdel -r $OPENCODE_USER"
@@ -835,7 +828,7 @@ echo "--- Removing kit config directories + runtime artifacts ---"
 # unconditional "Removed." + success log even when an rm failed. Same
 # ops through un_rc_q now; a failure lands in the partial list and
 # degrades the closing claim. DRY_RUN keeps the [DRY] echoes and the
-# success lines (the run/run_q convention, #211 b W1).
+# success lines (the run_q convention, #211 b W1).
 _un_partial=""
 _un_revert_failed=0
 un_rc_q "rm /run/opencode-permissions-kit" sudo rm -rf /run/opencode-permissions-kit
@@ -889,7 +882,7 @@ if [ "$(prompt_yn "Delete audit log too? (recommended)" "y")" = "y" ]; then
     # Log the outcome, not the intent (#211 c W1): the log line used to
     # fire BEFORE the rm — a removal run_q silenced could fail with the
     # audit trail already claiming success. DRY_RUN keeps the [DRY] echo
-    # and the success lines (the run/run_q convention).
+    # and the success lines (the run_q convention).
     _al_rc=0
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] sudo rm -rf /var/log/opencode-permissions-kit"
