@@ -179,6 +179,29 @@ run_q() {
     fi
 }
 
+# rc-observing runner for the per-root revert loop (#218) and the
+# config-dirs removal (#243 a S1/S2): run_q ends in `|| true` by
+# design, so a closing log could claim "reverted + removed" over ops
+# that failed (revert loop: find-chown, setfacl x2, chmod g-s — four
+# call sites, six invocations when both gids are known). Same [DRY]
+# echo and same silence as run_q, but a failure records the op label
+# in the caller's partial list — the closing log then degrades to
+# PARTIALLY with the failed ops named, plus a stderr WARN and a
+# FAILED log line where the caller arms them (gpasswd/userdel arm
+# pattern, #211 b W1/c W1; f W2 naming form). Label first, command
+# after. Renamed from un_revert_q (#243 b Q4): it observes rc for the
+# revert loop AND the config-dirs removal — the name must not claim
+# "revert" only.
+un_rc_q() { # <op label> <command...>
+    _un_rc_label="$1"; shift
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] $*"
+    elif ! "$@" >/dev/null 2>&1; then
+        _un_revert_failed=1
+        _un_partial="${_un_partial:+$_un_partial, }$_un_rc_label failed"
+    fi
+}
+
 # Source install.conf (canonical path since 0.0.10).
 INSTALL_CONF="/etc/opencode-permissions-kit/install.conf"
 if [ -f "$INSTALL_CONF" ]; then
@@ -186,6 +209,28 @@ if [ -f "$INSTALL_CONF" ]; then
     . "$INSTALL_CONF"
 fi
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# Shape-gate the sourced value (#243 e X1, tightened #243 f X1):
+# install.conf is root-owned but hand-editable, and the writer stamps
+# a literal here (install.sh sets OPENCODE_USER="opencode" and its
+# conf heredoc carries that literal — the writer's charset gate
+# covers DEFAULT_USER, not this name). A shape-invalid value (e.g. a
+# trailing slash) would silently defang the agent-home refusal in the
+# project loop and the agents-backup walk below — fall back to the
+# canonical literal, loudly. Charset: the writer's conservative set
+# MINUS leading dot/hyphen and trailing dot (deliberate divergence
+# from writer parity, #243 f X1): `.`, `..`, `opencode.`, `-x`, `--`
+# are not agent names, and a leading `-` is also an option-injection
+# shape into the id/userdel argv below; the writer never produces
+# any of them, so no legit value is refused. A merely DIFFERENT
+# valid name still passes by design (the conf is the source of truth
+# for a customized agent; the mismatch residual is recorded in the
+# review chain, snapshot f).
+case "$OPENCODE_USER" in
+    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$OPENCODE_USER') — falling back to 'opencode'" >&2
+        OPENCODE_USER=opencode
+        ;;
+esac
 # Sharing group: the opencode user's own usergroup; prefer the live value.
 OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
@@ -540,17 +585,97 @@ UNINSTALL_PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
+        # The agent user's own home is never a project root — the
+        # writer's dedicated refusal OUTSIDE its case blocklist
+        # (config.sh project_path_sane and the install.sh validator
+        # copy, review 0.0.39a S4), mirrored here (#243 c Q1): the
+        # root-run revert ops must never run over the directory that
+        # carries the agent's own config and state. Lexical on purpose
+        # and before the [ -d ] gate — the refusal holds even on a
+        # host where the user or its home does not exist. The compare
+        # takes the once-stripped form ONLY (#243 d Q1): it covers the
+        # raw spelling as its no-trailing-slash case, so a trailing
+        # slash cannot dodge it (#243 c Q1) while the predicate stays
+        # exactly the writer's strip-then-compare shape; `//` forms
+        # are the dot gate's job below. The compared value itself is
+        # shape-gated right after install.conf is sourced (#243 e X1):
+        # a corrupted conf value cannot defang this refusal.
+        if [ "${root%/}" = "/home/$OPENCODE_USER" ]; then
+            echo "  Skipping agent home (never a project root): $root"
+            continue
+        fi
         [ ! -d "$root" ] && continue
 
+        # Form gate (#243 a X2): the sanctioned writer validates these
+        # forms (config.sh project_path_sane — absolute, no dot/empty
+        # segments); a hand-edited conf must not slip a `//etc` or
+        # `/var/.`-style entry past the system-path blocklist below.
+        # Same arm order as the writer: absolute first, then dots.
         case "$root" in
-            /|/etc|/etc/*|/boot|/boot/*|/usr|/usr/*|/bin|/bin/*|/sbin|/sbin/*|\
-            /lib|/lib/*|/lib64|/lib64/*|/sys|/sys/*|/proc|/proc/*|/dev|/dev/*|\
-            /run|/run/*|/root|/root/*)
+            /*) ;;
+            *)
+                echo "  Skipping non-absolute project path: $root"
+                continue
+                ;;
+        esac
+        case "$root" in
+            *..*|/./|*/./*|./*|*/.|*//*)
+                echo "  Skipping malformed project path (dot or empty segment): $root"
+                continue
+                ;;
+        esac
+        # Writer-parity normalization (#243 c X1), after the dot gate:
+        # project_path_sane strips one trailing slash before its
+        # blocklist (config.sh `_pp="${1%/}"`) — the reader mirrors
+        # that so the bare arms without /* siblings (/home, /var) are
+        # not open to their trailing-slash spellings: /home/ and
+        # /var/ passed gate + blocklist lexically while the writer
+        # refuses the stripped form. Placed here, not earlier: every
+        # `//` form is already the dot gate's catch above, so at most
+        # ONE trailing slash can remain and one strip is exact.
+        # `/` strips to the empty string — keep it as `/` (the
+        # blocklist's `/` arm refuses it). The skip echo below prints
+        # the normalized path, still naming the conf entry.
+        _un_root="${root%/}"
+        [ -n "$_un_root" ] || _un_root="/"
+        root="$_un_root"
+        # System-path blocklist — writer parity (#243 b X1, completed
+        # by the normalization and agent-home refusal above, #243 c
+        # X1/Q1): every system path project_path_sane refuses
+        # (config.sh — its trailing-slash strip, its case blocklist
+        # here in the writer's arm order, and its agent-home refusal),
+        # so a hand-edited conf cannot drive the root-run revert ops
+        # over system trees the sanctioned writer would never store.
+        # Scope of "parity" (#243 d X1): the writer's whitespace
+        # refusal (config.sh `*[[:space:]]*` — a storage-format
+        # refusal, 0.0.39b C3) is deliberately NOT mirrored here
+        # (recorded a X2 disposition): a spaced path never lexically
+        # equals a system path, and [ ! -d ] plus full quoting defang
+        # it; the mirror-or-scope decision rides #247 with the other
+        # writer-side parity work.
+        # Deliberate divergence, pinned in the unit suite: the scratch
+        # prefixes /tmp and /var/tmp stay processable (the sandbox
+        # policy pins unit-fixture roots there, and a temp-prefix
+        # entry is bounded — uid/gid-matched chown, kit-gid ACL strip
+        # and one setgid-bit clear (chmod g-s) only).
+        case "$root" in
+            /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
+            /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
+            /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/usr|/usr/*|\
+            /var|/var/cache|/var/cache/*|/var/lib|/var/lib/*|/var/log|/var/log/*|\
+            /var/mail|/var/mail/*|/var/spool|/var/spool/*)
                 echo "  Skipping system path: $root"
                 continue
                 ;;
         esac
 
+        # Per-root partial causes (#218): failed ops (recorded by
+        # un_rc_q) and unknown-id skips both land in this ONE
+        # list — the closing log below reports them instead of
+        # claiming completion. The former second mechanism
+        # (_un_acl_skipped, 0.0.42h S1) is folded in here.
+        _un_partial=""
+        _un_revert_failed=0
         echo "  Reverting kit ownership in: $root"
         if [ -n "$UN_OC_UID" ] && [ -n "$UN_OC_GID" ]; then
             # No -xdev on purpose: project roots are often separate mounts
@@ -559,9 +684,10 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             # ! -type l (0.0.42e S1): chown on a symlink operand FOLLOWS
             # it — an agent-planted link in the project must not make the
             # root-run revert chown an arbitrary target outside it.
-            run_q sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
+            un_rc_q "find-chown" sudo find "$root" ! -type l \( -uid "$UN_OC_UID" -o -gid "$UN_OC_GID" \) \
                 -exec chown "$DEFAULT_USER:$UN_DEV_GROUP" {} +
         else
+            _un_partial="${_un_partial:+$_un_partial, }opencode user unknown (chown skipped)"
             echo "    opencode user unknown — skipped (chown manually if files are locked)"
         fi
         echo "  Cleaning kit ACLs from: $root"
@@ -577,42 +703,55 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # parse time when the name does not resolve; the gids survive
         # the userdel above (captured before, orphan-proof). A principal
         # whose gid is UNKNOWN is skipped loudly with its manual hint —
-        # never silently (0.0.42h S1) — and the closing log line says
-        # "partial" when one was skipped.
-        _un_acl_skipped=""
+        # never silently (0.0.42h S1) — and lands in the partial list
+        # so the closing log says "partial" when one was skipped.
         for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"; do
             _un_acl_label="${_un_acl_pair%%:*}"
             _un_acl_gid="${_un_acl_pair#*:}"
             if [ -z "$_un_acl_gid" ]; then
-                _un_acl_skipped=1
+                _un_partial="${_un_partial:+$_un_partial, }${_un_acl_label} id unknown"
                 echo "    ${_un_acl_label} id unknown — its ACL entries left in place"\
 " (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
                 continue
             fi
-            run_q sudo setfacl -R -x "g:$_un_acl_gid" "$root"
-            run_q sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
+            un_rc_q "setfacl -x g:$_un_acl_gid" sudo setfacl -R -x "g:$_un_acl_gid" "$root"
+            un_rc_q "setfacl -d -x g:$_un_acl_gid" sudo setfacl -R -d -x "g:$_un_acl_gid" "$root"
         done
-        run_q sudo chmod g-s "$root"
-        # NB (#211 c W1 sweep): this closing log aggregates rc-blind
-        # run_q operations (find-chown, setfacl x2, chmod g-s) — the
-        # same lie class c W1 fixed at userdel/audit-log, on a root-run
-        # revert loop with its own partial semantics. Deliberately not
-        # changed in this wave: recorded as a follow-up candidate for
-        # its own wave (needs its fixture updated with it), the a F1
-        # ddev-handover precedent.
-        if [ -n "$_un_acl_skipped" ]; then
-            log "project ownership reverted + kit ACL entries PARTIALLY removed"\
-" (one or more group ids were unknown): $root"
-        else
+        un_rc_q "chmod g-s" sudo chmod g-s "$root"
+        # Closing log conditioned on what actually happened (#218, the
+        # deferred #211 c W1 class sweep; degraded wording #243 a X1):
+        # every op site above reports its rc, and every skip cause is
+        # in the same list — full success keeps the old line, anything
+        # else degrades to PARTIALLY completed naming the causes and
+        # never asserts the clause that failed (a failed find-chown
+        # must not read as "ownership reverted"). A FAILED op
+        # additionally WARNs on stderr and leaves a FAILED log line; a
+        # pure skip (unknown id) keeps its own echo only — not
+        # attempted is not failed.
+        if [ -z "$_un_partial" ]; then
             log "project ownership reverted + kit ACL entries removed: $root"
+        else
+            log "project revert PARTIALLY completed ($_un_partial): $root"
+            if [ "$_un_revert_failed" -eq 1 ]; then
+                echo "WARN: could not fully revert $root ($_un_partial)" >&2
+                log "project revert FAILED for: $root ($_un_partial)"
+            fi
         fi
     done < "$UNINSTALL_PROJECTS_CONF"
 fi
 
 echo ""
 echo "--- Removing kit config directories + runtime artifacts ---"
-run sudo rm -rf /run/opencode-permissions-kit
-run sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
+# rc-observing removal (#243 a S1/S2 — the #211 c W1 class sweep this
+# wave owes): the former `run` ops fed an unconditional "Removed." +
+# success log even when an rm failed. Same ops through un_rc_q
+# now; a failure lands in the partial list and degrades the closing
+# claim. DRY_RUN keeps the [DRY] echoes and the success lines (the
+# run/run_q convention, #211 b W1).
+_un_partial=""
+_un_revert_failed=0
+un_rc_q "rm /run/opencode-permissions-kit" sudo rm -rf /run/opencode-permissions-kit
+un_rc_q "rm 99-ddev-rootless.conf" sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
 # OpenChamber policy pin (issue #154): remove only what the kit wrote — a
 # policy.json pinning OUR wrapper. Any other content is admin-owned and
 # stays; /etc/openchamber itself only goes when empty (OpenChamber may own
@@ -620,17 +759,41 @@ run sudo rm -f /etc/sysctl.d/99-ddev-rootless.conf
 # Issue #164: uninstall.sh runs as the developer (root is refused), so the
 # presence probe and the content grep run at the write's authority (sudo) —
 # an admin 0700 /etc/openchamber must not hide a kit pin from removal.
+# Pin removal observes its rc too (#243 a S2): the success log fires only
+# when the rm actually succeeded — audit-log arm pattern (#211 c W1).
 if sudo test -f /etc/openchamber/policy.json \
     && sudo grep -q '"opencodeBinary"[[:space:]]*:[[:space:]]*"/usr/local/bin/opencode"' \
         /etc/openchamber/policy.json 2>/dev/null; then
-    run sudo rm -f /etc/openchamber/policy.json
-    run sudo rmdir /etc/openchamber 2>/dev/null || true
-    log "openchamber policy pin removed (kit-owned content only)"
+    if [ "$DRY_RUN" = true ]; then
+        echo "  [DRY] sudo rm -f /etc/openchamber/policy.json"
+        echo "  [DRY] sudo rmdir /etc/openchamber"
+        log "openchamber policy pin removed (kit-owned content only)"
+    elif sudo rm -f /etc/openchamber/policy.json >/dev/null 2>&1; then
+        sudo rmdir /etc/openchamber 2>/dev/null || true
+        log "openchamber policy pin removed (kit-owned content only)"
+    else
+        _un_partial="${_un_partial:+$_un_partial, }openchamber policy pin rm failed"
+        _un_revert_failed=1
+        echo "WARN: could not remove the openchamber policy pin (rm failed)" >&2
+        log "openchamber policy pin removal FAILED (rm)"
+    fi
 fi
-run sudo rm -rf /etc/opencode-permissions-kit
-echo "Removed."
-log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit"\
+un_rc_q "rm /etc/opencode-permissions-kit" sudo rm -rf /etc/opencode-permissions-kit
+if [ -z "$_un_partial" ]; then
+    echo "Removed."
+    log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit"\
 ", /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
+else
+    log "config dirs + runtime artifacts PARTIALLY removed ($_un_partial)"
+    # Every partial cause in this section is a FAILED op today (no
+    # skip causes exist here), so flag and list coincide — the gate
+    # mirrors the project loop's closing and keeps a future skip cause
+    # from false-WARNing; the openchamber arm sets the flag so the
+    # state is never write-only here (#243 b Q2).
+    if [ "$_un_revert_failed" -eq 1 ]; then
+        echo "WARN: could not fully remove config dirs + runtime artifacts ($_un_partial)" >&2
+    fi
+fi
 
 echo ""
 echo "--- Removing audit log ---"

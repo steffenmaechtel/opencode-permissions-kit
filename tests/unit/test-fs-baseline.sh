@@ -238,7 +238,7 @@ grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" \
     && pass "fs-baseline.sh is a sourced lib (git 100644, not executed by path)" \
     || fail "fs-baseline.sh is a sourced lib (git 100644, not executed by path)"
 
-# --- 8. exec-time symlink recheck (0.0.39e S1) ------------------------------------------
+# --- 8b. exec-time symlink recheck (0.0.39e S1) -----------------------------------------
 # The leaf race (swap between find's scan and xargs' exec) cannot be
 # scripted deterministically via stream interleaving — what CAN be
 # asserted is the guard: the consumer re-tests [ -L ] immediately before
@@ -269,7 +269,7 @@ else
 fi
 rm -rf "$SW"
 
-# --- 7b. pass failures propagate (0.0.43a F10) ----------------------------------------
+# --- 8c. pass failures propagate (0.0.43a F10) ----------------------------------------
 # A wholesale pass failure used to be invisible (pipeline status dropped,
 # unconditional return 0) while callers printed "applied" regardless. Now:
 # a failing per-path command warns per pass, the summary names the root,

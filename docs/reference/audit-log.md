@@ -1,6 +1,6 @@
 # Audit log
 
-This page documents what the kit logs, where, and who can read it.
+What the kit logs, where, and who can read it.
 
 ## Location and modes
 
@@ -13,11 +13,9 @@ Every kit **management** script that changes the system writes to
 - the `opencode` user **cannot** read it; the default user (the kit admin)
   can read it without `sudo`.
 
-Known unlogged operations (finding 0.0.42e D3 — recorded instead of
-silently over-promising): the `opk wsl-add-opencode-1-fix` carrier write
-itself and `opk handover`'s recursive pass run in the dispatcher and its
-helpers without audit-log calls; their outcomes are visible in the
-command output and the filesystem state.
+Known unlogged operations: the `opk wsl-add-opencode-1-fix` carrier write
+itself and `opk handover`'s recursive pass — their outcomes are visible in
+the command output and the filesystem state.
 
 ## Notable events
 
