@@ -147,6 +147,22 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
 
 - **Same-PR docs** (`docs-policy` 25 → 0 in 0.0.46; **6 returned** in
   0.0.47–0.0.55 — the rule holds, the vigilance never ends)
+- **Docs deltas may be deliberate policy** (`pr-00263 b B1`/`b B4`/
+  `c C7`, all retracted 2026-10-25): a removed or shortened docs
+  passage is not automatically a regression — read the issue and PR
+  that carried the removal before restoring anything (#252/#256 had
+  recorded the ultra-legacy removal as intended; the external
+  reviewers, on a sparse checkout without that history, flagged it).
+  One-sentence corrections of remaining falsehoods stay correct;
+  bulk restores of removed text are not.
+- **Gate runs: one unbroken `&&` chain ending in the commit**
+  (`wiring-gate` mechanics; two live 2026-10-25 instances: a piped
+  gate masked a red ratchet into a commit, a `;` after a gate did the
+  same) — no `| tail`, no `;`, `set -o pipefail` when wrapping; and
+  resolution rows checked ≤ 120 BEFORE the commit, with the
+  `<SHA>`-fill's +2 bytes per row budgeted (issue #237; the rule
+  itself lives in the review README — AGENTS.md Testing owns the
+  chain mechanics)
 - **Sabotage-verify per pin** (the ONLY reliable discriminator we have;
   `test-vacuous` reappeared at scale in run 2 — partly corpus composition,
   partly real: the fail-but-green shape (a) above)
@@ -180,7 +196,10 @@ there, not here.
   violations (1 finding, `pr-00211 a F21`) are covered by the all-English
   rule (AGENTS.md, ## Rules); the
   exec-bit/ratchet failures are `wiring-gate` (6, 2 MED — incl. the
-  line-length ratchet RED at a committed HEAD, `pr-00208 b W1`);
+  line-length ratchet RED at a committed HEAD, `pr-00208 b W1`); two
+  more ratchet-commission instances went live on 2026-10-25 outside
+  snapshots (piped gate, `;` separator — the chain-mechanics rule
+  lives in AGENTS.md Testing, the checklist pointer in "Keep doing");
   sabotage-vs-uncommitted-tree produced zero corpus findings (AGENTS.md
   Testing owns it).
 - Numbers the NEXT run should collect: a release full pass INSIDE the
