@@ -8,9 +8,9 @@ Chain: a.
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a W1 (INFO) | **implemented** | `<SHA>` | needle prefix-anchored `rules-audit: 0 blocking`; 10-violation probe reds |
-| a Q1 (LOW) | **implemented** | `<SHA>` | all 7 refs qualified to `#222 …`; zero unqualified W-refs remain (grep) |
-| a Q2 (INFO) | **implemented** | `<SHA>` | `line_is` gains `-F`; wildcard-dot probe flips match→no-match; suite green |
+| a W1 (INFO) | **implemented** | `370ccd8` | prefix-anchored `rules-audit: 0 blocking`; 10-violation probe reds |
+| a Q1 (LOW) | **implemented** | `370ccd8` | all 7 refs qualified to `#222 …`; zero unqualified W-refs remain (grep) |
+| a Q2 (INFO) | **implemented** | `370ccd8` | `line_is` gains `-F`; wildcard-dot probe flips; suite green |
 
 ## Evidence detail
 
