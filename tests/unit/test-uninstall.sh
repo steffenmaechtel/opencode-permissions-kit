@@ -1464,6 +1464,54 @@ else
     fail "agents-backup loop extractable (#211 f W2)"
 fi
 
+# --- pr-00263 a F3: the six early removal sections are rc-observing (#211 c W1) --
+# The #243 a S1/S2 sweep covered the config-dirs section only; six
+# earlier `run` rm ops (sudoers, wrapper, cli dispatcher, xdg-open
+# shim, library, umask x2) still fed unconditional success lines —
+# plus the legacy-shape siblings (legacy sudoers symlink, legacy conf
+# dir, legacy library, legacy helper symlink). Pins: (a) no rc-blind
+# `run sudo rm` remains anywhere (the plugins loop's two `run` ops
+# carry no success claim — different class, recorded in the
+# resolution); (b) the sudoers section driven REAL with a failing
+# sudo stub: WARN + FAILED log, no success echo; (c) a succeeding
+# stub keeps the success line. The stale pre-state proves the
+# section's own reset (the #243 b S2 discipline).
+if [ "$(grep -c 'run sudo rm' "$UNINSTALL")" = 1 ] \
+    && grep -q 'run sudo rm -rf "${_un_dir:?}/plugins/opencode-permissions-kit"' "$UNINSTALL"; then
+    pass "only the claim-less plugins rm remains on run (pr-00263 a F3)"
+else
+    fail "rc-blind 'run sudo rm' survived in uninstall.sh (pr-00263 a F3)"
+fi
+F3SEC="$(sed -n '/^echo "--- Removing sudoers ---"$/,/^fi$/p' "$UNINSTALL")"
+if [ -n "$F3SEC" ] && printf '%s' "$F3SEC" | grep -qF 'un_rc_q "rm sudoers"'; then
+    pass "sudoers section extractable + rc-observing (pr-00263 a F3)"
+else
+    fail "sudoers section extraction/rc observation (pr-00263 a F3)"
+fi
+_un_f3_out() { # <sudo-rc> — drive the section REAL with a stubbed sudo
+    (
+        DRY_RUN=false
+        _un_partial="stale"
+        _un_revert_failed=1
+        _un_f3_rc="$1"
+        log() { echo "LOG:$*"; }
+        eval "$UN_RC_Q"
+        sudo() { return "$_un_f3_rc"; }
+        eval "$F3SEC"
+    ) 2>&1
+}
+_f3fail="$(_un_f3_out 1)"
+_f3ok="$(_un_f3_out 0)"
+if printf '%s' "$_f3fail" | grep -q 'WARN: sudoers removal failed' \
+    && printf '%s' "$_f3fail" | grep -q 'LOG:sudoers removal FAILED' \
+    && ! printf '%s' "$_f3fail" | grep -q 'sudoers removed\.' \
+    && printf '%s' "$_f3ok" | grep -q 'sudoers removed\.' \
+    && printf '%s' "$_f3ok" | grep -q 'LOG:sudoers removed'; then
+    pass "sudoers section arms: failure WARNs, success echoes (pr-00263 a F3)"
+else
+    fail "sudoers section arms (pr-00263 a F3, fail-out: $_f3fail / ok-out: $_f3ok)"
+fi
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1

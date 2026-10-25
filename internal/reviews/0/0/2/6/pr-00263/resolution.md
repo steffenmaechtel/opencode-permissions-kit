@@ -29,7 +29,8 @@ wave; minimal corrections only when picked up, no bulk restores per
 | b B4 (MED) | **deliberately not done** | — | #252/PR #256 name the 0.0.36 entry removal as policy |
 | b B5 + b B6 (LOW) | **deliberately not done** | — | deferred to #272 with the docs backlog (#252/#256 policy) |
 | c C2 (MED) | **implemented** | `b404d0e` | rc 1 propagates; arm pins A=1/B=0; ui_error sweep clean |
-| a F2(b) (MED) | **implemented** | `<SHA>` | X1 mirror x3; sanitized WARN; sweep recorded below |
+| a F2(b) (MED) | **implemented** | `8ae6f22` | X1 mirror x3; sanitized WARN; sweep recorded below |
+| a F3 (MED) | **implemented** | `<SHA>` | six run sites + 4 legacy siblings on un_rc_q; arms pinned |
 | c C3 + c C4 (MED/LOW) | **deliberately not done** | — | deferred to #269 with the docs backlog (#252/#256 policy) |
 | c C5 (MED) | **deliberately not done** | — | deferred to #270 with the docs backlog (#252/#256 policy) |
 | c C6 (MED) | **deliberately not done** | — | deferred to #271 with the docs backlog (#252/#256 policy) |
@@ -50,6 +51,28 @@ installer abort messages serve as code-side anchors. Found independently
 by the house pass (a F5, E2 axis) and the external high pass (c C8, P3);
 the severity divergence (house MED vs external P3) is recorded in
 snapshot c's calibration.
+
+### a F3 (MED) — six rc-blind `run` ops with unconditional success claims
+
+The :745 comment claimed the #211 c W1 class sweep while six earlier
+sections still ran rc-blind `run` rm ops into unconditional success
+echoes/logs (sudoers, wrapper, cli dispatcher, xdg-open shim, library,
+umask x2 — "sudoers removed." over a failed rm). Fix: all six route
+through un_rc_q with per-section `_un_partial` reset and an immediate
+conditional verdict (the per-root loop resets the pair, so early
+failures must report at their own section, not defer to the closing
+claim); DRY_RUN keeps the [DRY] echoes and success lines. Class sweep
+(`grep 'run sudo rm'`): the legacy-shape siblings got the same
+treatment (legacy sudoers symlink, legacy conf dir — where the partial
+check now precedes the rmdir claim — legacy library, legacy helper
+symlink); remaining by design: the plugins loop's two `run` ops
+(:400-401) carry NO success claim (silent-failure class, not the
+claim class — adjacent to the L1 ledger, no lie told). Pins
+(test-uninstall): zero `run sudo rm` left in the file; the sudoers
+section extracted and driven REAL with stubbed sudo both directions —
+failure WARNs on stderr + FAILED log + no success echo, success keeps
+the line; stale pre-state proves the section's own reset. Closes the
+uninstall half of the #211 c W1 debt (issue #246's uninstall side).
 
 ### a F2(b) (MED) — OPENCODE_USER unshaped at the conf-reading consumers
 
