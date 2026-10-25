@@ -7,7 +7,9 @@ medium/high) — 42 unique findings across the three snapshots — -> d
 (micro-wave review of the d round, 2026-10-25: 4 findings, 1 LOW /
 3 INFO, all dispositioned below as e W1-e W3, e Q1) -> f
 (micro-wave review of the e round, 2026-10-25: 7 findings, 1 MED /
-4 LOW / 2 INFO — dispositions owed). This is
+4 LOW / 2 INFO — dispositions owed) -> g (micro-wave review of the
+f round, 2026-10-25, fast mode without subagents: 1 INFO,
+record-only). This is
 the second fix-wave attempt: attempt 1 (backed up at
 `backup/pr-00263-fix-wave-1`, never pushed) was superseded when the
 maintainer surfaced issue #252 — the ticket behind the #256 docs
@@ -84,6 +86,7 @@ evidence block).
 | f W4 (INFO) | **implemented** | `5cef284` | :371 run() stub -> sudo() stub; :91 comparator "unwrapped" |
 | f Q2 (LOW) | **implemented** | `5cef284` | evidence sentence: TWO config log lines "backup attempt: …", not three |
 | f Q3 (LOW) | **implemented** | `5cef284` | correction of record: 163da3a said "114", committed row is 110 bytes |
+| g W1 (INFO) | **deliberately not done** | — | rows are per-commit records; the hardening lives in the evidence block |
 
 ## Evidence detail
 
@@ -316,6 +319,17 @@ this block is the correction of record (d Q3 precedent).
   round is owed before release (maintainer's go); no MED/HIGH
   remains open — the stop-rule check falls to the next round /
   maintainer, closure NOT declared here (RM-0106/RM-0107/RM-0115).
+- The owed micro-wave of the f round ran as **snapshot g**
+  (2026-10-25, `111f9ed..f9d2012`, maintainer-commissioned fast
+  mode — no reviewer subagents, main-session single pass, deviation
+  disclosed in the snapshot's calibration): 1 finding (g W1 INFO,
+  record-only — the f W1 row names the pre-hardening pattern; the
+  evidence block carries the live one), everything else verified
+  clean (pin discrimination executed in the f round, sweep complete,
+  Q2 sentence exact, bookkeeping closed). No MED/HIGH open anywhere
+  in the chain's open items — the stop-rule condition is checkable;
+  closure is the maintainer's explicit call, not declared here
+  (RM-0106/RM-0107/RM-0115).
 - e2e debt discharged in the d wave (see d Q1): both suites green on
   the d-round tree, zero skips.
 
