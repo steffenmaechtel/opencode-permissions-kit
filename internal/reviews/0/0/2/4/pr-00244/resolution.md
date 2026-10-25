@@ -1,5 +1,12 @@
 # Resolution — pr-00244 (issue #223 fs-baseline python3 health gate)
 
+Status: closed 2026-10-25 — confirmed by the maintainer in-session
+(stop-rule check: the last round — fix wave 8, `48aabec` —
+dispositioned all 15 h findings via comments/docs/ledger only;
+files touched: opk comment, test-install-args.sh comments,
+openchamber.md one sentence, this ledger; no review-relevant code
+per RM-0065, no further wave review owed per RM-0066/0067).
+
 Chain: [review-a.md](review-a.md) (wave snapshot 2026-10-24, 16 IDs, 12
 unique findings after 3 cross-axis duplicate pairs) → fix wave 1 →
 [review-b.md](review-b.md) (fix-wave snapshot 2026-10-24, 9 IDs, 8
@@ -86,20 +93,20 @@ MED, 6 LOW, 5 INFO) → fix wave 8 (the h rows below). Birth PR
 | g W1 (LOW) | **implemented** | `5fc14c6` | regex pair retired — semantic pin: executed == extracted (detail below) |
 | g Q1 (INFO) | **implemented** | `5fc14c6` | extraction failure and python3 hard-require now distinct FAIL labels |
 | g S1 (INFO) | **implemented** | `5fc14c6` | heredoc else-exit kills the false success; 2 behavioral kit-cli pins |
-| h W1 (MED) | **implemented** | `<SHA>` | L2 record completed in place; sites deferred to #260/#261 |
+| h W1 (MED) | **implemented** | `48aabec` | L2 record completed in place; sites deferred to #260/#261 |
 | h W2 (MED) | **deliberately not done** | — | pre-existing abort class outside the chain's diffs; deferred to #260 |
-| h W3/Q1 (LOW) | **implemented** | `<SHA>` | union truth in comment + record; 5fc14c6's msg stays history |
+| h W3/Q1 (LOW) | **implemented** | `48aabec` | union truth in comment + record; 5fc14c6's msg stays history |
 | h W4 (LOW) | **deliberately not done** | — | same abort class as h W2 — #260 (generated-output site) |
-| h W5 (INFO) | **implemented** | `<SHA>` | boundary shape named in the pin comment (nothing ships; loud false-red) |
-| h W6 (INFO) | **implemented** | `<SHA>` | trailing-comment residual named at the v2 rider (the _p3old residual) |
-| h S1 (LOW) | **implemented** | `<SHA>` | claim scoped; continuation-steal residual named (prod fails loud) |
+| h W5 (INFO) | **implemented** | `48aabec` | boundary shape named in the pin comment (nothing ships; loud false-red) |
+| h W6 (INFO) | **implemented** | `48aabec` | trailing-comment residual named at the v2 rider (the _p3old residual) |
+| h S1 (LOW) | **implemented** | `48aabec` | claim scoped; continuation-steal residual named (prod fails loud) |
 | h S2 (LOW) | **deliberately not done** | — | fail-closed ms-window TOCTOU; old code false-successed the race |
-| h S3 (INFO) | **implemented** | `<SHA>` | ui_error comment names the four rc-1 causes (deliberate, fail-closed) |
-| h S4 (INFO) | **implemented** | `<SHA>` | interpreter comment: shebang vs curl-to-bash, false-red direction only |
+| h S3 (INFO) | **implemented** | `48aabec` | ui_error comment names the four rc-1 causes (deliberate, fail-closed) |
+| h S4 (INFO) | **implemented** | `48aabec` | interpreter comment: shebang vs curl-to-bash, false-red direction only |
 | h Q2 (LOW) | **deliberately not done** | — | label states both conjuncts + prints both values (house convention) |
-| h Q3 (LOW) | **implemented** | `<SHA>` | declare/typeset residual named (a real miss only under a bash shebang) |
-| h Q4 (MED) | **implemented** | `<SHA>` | record corrected: 8 reds (sem.sh 2–9); L1 indices = sem.sh numbering |
-| h Q5 (INFO) | **implemented** | `<SHA>` | openchamber.md: fails-closed sentence at the hand-edit step |
+| h Q3 (LOW) | **implemented** | `48aabec` | declare/typeset residual named (a real miss only under a bash shebang) |
+| h Q4 (MED) | **implemented** | `48aabec` | record corrected: 8 reds (sem.sh 2–9); L1 indices = sem.sh numbering |
+| h Q5 (INFO) | **implemented** | `48aabec` | openchamber.md: fails-closed sentence at the hand-edit step |
 
 ## Evidence detail
 
@@ -1353,9 +1360,9 @@ discharges).
   dispositions touched NO review-relevant code — opk (comment
   only), tests/unit/test-install-args.sh (comments only),
   docs/how-to/openchamber.md (one sentence), resolution.md
-  (ledger). Closure pending maintainer confirmation; the closure
-  commit sets `Status: closed …` at the top, regenerates the INDEX
-  and fills the h rows' `<SHA>` placeholders.
+  (ledger). Closure CONFIRMED by the maintainer in-session right
+  after the wave-8 commit — this closure commit records it: the
+  Status line at the top, INDEX regen, h-row SHA fills.
 - Maintainer backlog issues filed from this chain (refs recorded
   per the a-wave handover note): #260 unguarded `grep -c` abort
   class (h W2 project-paths :181, h W4 ddev-as-opencode :1491,
