@@ -25,9 +25,9 @@ release PR; brevity held, no bulk restores per #252/#256),
 | a F15 (LOW) | **deliberately not done** | — | deferred to #267 (revert-loop exec-time recheck) |
 | b B1 + c C7 (LOW) | **deliberately not done** | — | #252 names 0.0.x→0.0.y update paths as removable legacy |
 | b B2 + c C1 (LOW) | **deliberately not done** | — | deferred to #265 (tee stderr-EPIPE arm, #223/#244 shape) |
-| b B3 (MED) | **implemented** | `<SHA>` | tee-overwrite truth stated, merge-promise gone (#268) |
+| b B3 (MED) | **implemented** | `005590a` | tee-overwrite truth stated, merge-promise gone (#268) |
 | b B4 (MED) | **deliberately not done** | — | #252/PR #256 name the 0.0.36 entry removal as policy |
-| b B5 + b B6 (LOW) | **implemented** | `<SHA>` | probe-fallback caveat + hosts mapping x2 pages (#272) |
+| b B5 + b B6 (LOW) | **implemented** | `005590a` | probe-fallback caveat + hosts mapping x2 pages (#272) |
 | c C2 (MED) | **implemented** | `092bcd6` | rc 1 propagates; arm pins A=1/B=0; ui_error sweep clean |
 | a F2(b) (MED) | **implemented** | `ed372e2` | X1 mirror x3; sanitized WARN; sweep recorded below |
 | a F3 (MED) | **implemented** | `656350e` | six run sites + 4 legacy siblings on un_rc_q; arms pinned |
@@ -42,14 +42,18 @@ release PR; brevity held, no bulk restores per #252/#256),
 | a F10 (LOW) | **implemented** | `6e406de` | getent homes at both refusal twins + install.sh parity copy |
 | a F21 (INFO) | **implemented** | `6e406de` | failure message names key-or-value |
 | a F25 (INFO) | **implemented** | `6e406de` | chmod before chown; order pinned by line compare |
-| a F16 (LOW) | **implemented** | `<SHA>` | bare skills-root file FAILs; fixture pin executes the branch |
-| a F17 (LOW) | **implemented** | `<SHA>` | 14 bare citations qualified (#189/#208/#211/#224/#235/#243/#244/#256) |
-| a F18 (LOW) | **implemented** | `<SHA>` | extraction collects all case arms; comment matches reality |
-| a F26 (INFO) | **implemented** | `<SHA>` | seq in check-host required list |
-| c C3 + c C4 (MED/LOW) | **implemented** | `<SHA>` | per-component claim dropped, residual restored (#269) |
-| c C5 (MED) | **implemented** | `<SHA>` | npm + opencode.ai named in the trust sentence (#270) |
-| c C6 (MED) | **implemented** | `<SHA>` | export conditions + verify advice, pins both ways (#271) |
-| c C9 + c C10 + c C11 (LOW) | **implemented** | `<SHA>` | three scoping clauses on the reference pages (#273) |
+| a F16 (LOW) | **implemented** | `049dd04` | bare skills-root file FAILs; fixture pin executes the branch |
+| a F17 (LOW) | **implemented** | `049dd04` | 14 bare citations qualified (#189/#208/#211/#224/#235/#243/#244/#256) |
+| a F18 (LOW) | **implemented** | `049dd04` | extraction collects all case arms; comment matches reality |
+| a F26 (INFO) | **implemented** | `049dd04` | seq in check-host required list |
+| a F20 (INFO) | **deliberately not done** | — | fail-closed broadening; loud skip; writer parity |
+| a F22 (INFO) | **deliberately not done** | — | documented accepted residual (the .ddev shape) |
+| a F23 (INFO) | **deliberately not done** | — | trigger needs parent write — outside threat model |
+| a F24 (INFO) | **deliberately not done** | — | newline project name: pathological, bounded effect |
+| c C3 + c C4 (MED/LOW) | **implemented** | `005590a` | per-component claim dropped, residual restored (#269) |
+| c C5 (MED) | **implemented** | `005590a` | npm + opencode.ai named in the trust sentence (#270) |
+| c C6 (MED) | **implemented** | `005590a` | export conditions + verify advice, pins both ways (#271) |
+| c C9 + c C10 + c C11 (LOW) | **implemented** | `005590a` | three scoping clauses on the reference pages (#273) |
 
 ## Evidence detail
 
