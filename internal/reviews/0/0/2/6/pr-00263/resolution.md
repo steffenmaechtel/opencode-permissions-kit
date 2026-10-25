@@ -1,8 +1,10 @@
 # Resolution — pr-00263 (release 0.0.57 full-scope review)
 
 Chain: a (house full pass) -> b, c (external redundancy passes, GPT 6 Luna
-medium/high) — 42 unique findings across the three snapshots. This is the
-second fix-wave attempt: attempt 1 (backed up at
+medium/high) — 42 unique findings across the three snapshots — -> d
+(wave review of the fix round, 2026-10-25: 13 findings, 1 MED / 6 LOW /
+6 INFO; all dispositioned below as d Q1-Q4, d W1-W6, d S1-S3). This is
+the second fix-wave attempt: attempt 1 (backed up at
 `backup/pr-00263-fix-wave-1`, never pushed) was superseded when the
 maintainer surfaced issue #252 — the ticket behind the #256 docs
 shortening — whose ultra-legacy policy deliberately removed two of the
@@ -11,7 +13,8 @@ done and marked in the snapshots. Deferred to backlog issues: #264-#267
 new (code), #268-#273 new (docs — later implemented in-wave as one-line
 corrections per the maintainer's commission, closing #268-#273 via the
 release PR; brevity held, no bulk restores per #252/#256),
-#245/#246/#247 existing.
+#245/#247 existing (#246 closed in the d round — site 7, see the a F3
+evidence block).
 
 ## Dispositions
 
@@ -58,7 +61,15 @@ release PR; brevity held, no bulk restores per #252/#256),
 | d W1 (LOW) | **implemented** | `755de9a` | branch-b backup observes the cp; announce degrades; feeds _bk_fail |
 | d W2 (LOW) | **implemented** | `755de9a` | both existing-config sites observe; third sibling swept in (see detail) |
 | d W3 (LOW) | **implemented** | `755de9a` | recorder driven REAL (extract-eval); count exact = 10; comment honest |
-| d W4 (LOW) | **implemented** | `<SHA>` | count pin exact = 5; deleting the capture now fails the pin |
+| d W4 (LOW) | **implemented** | `a51874b` | count pin exact = 5; deleting the capture now fails the pin |
+| d Q1 (MED) | **implemented** | `<SHA>` | e2e discharge recorded: 701b867 309+47; this wave a51874b 309+47 (RM-0113) |
+| d Q3 (LOW) | **implemented** | `<SHA>` | ledger correction note added; commit messages are immutable history |
+| d W5 (INFO) | **deliberately not done** | — | deletion discriminates; static presence pins are house practice |
+| d W6 (INFO) | **deliberately not done** | — | tripwire fails loud on all three failure shapes; no hole |
+| d S1 (INFO) | **deliberately not done** | — | trailing hyphen has no downstream harm; leading hyphen rejected |
+| d S2 (INFO) | **deliberately not done** | — | in-file run/run_q convention + DRY banner; committed deliberate |
+| d S3 (INFO) | **deliberately not done** | — | pre-existing sub-second window, non-setuid; comment scoped true |
+| d Q4 (INFO) | **deliberately not done** | — | disambiguated in-string; F17 claimed 14 qualified, not zero-remain |
 
 ## Evidence detail
 
@@ -178,4 +189,54 @@ DRIVEN REAL (extract-eval: two failures accumulate to
 announce-degrade anchors (binary 1x, config 2x) — the d W3 lying
 comment ("the e2e suites drive the arms") replaced by what the pins
 actually do; e2e drives install success paths only.
+
+### d Q1 (MED) — the e2e discharge record (RM-0113)
+
+Both suites green on the final tree of each wave — the record the fix
+round left missing:
+
+- **Fix round** (maintainer-run, previously unrecorded): tree
+  `701b867`, 2026-10-25 21:14–21:17Z — e2e 309/309,
+  e2e-rootless 47/47 (../logs/e2e-20261025-221402.log and
+  e2e-rootless-20261025-221402.log; local-time names, logs rotate via
+  logs-cleanup.sh — hence this in-repo record).
+- **d round** (this wave, tree `a51874b` porcelain-clean, opencode
+  2.1.4 from the warm cache): e2e 309/309
+  (../logs/e2e-20261025-225430.log), e2e-rootless 47/47
+  (../logs/e2e-rootless-20261025-225900.log). install.sh changed in
+  the d wave (d W1/W2), so both suites were owed and run in-wave
+  (AGENTS.md Testing); zero skips observed in both tails.
+
+### d Q3 (LOW) — correction of record for 049dd04's suite count
+
+Commit 049dd04's message says "14 bare finding-ID references across
+nine suites"; the snapshot-d recount (verified against the diff) is 14
+sites across TEN suites — the 14th site is test-docs.sh's `a-W1` ->
+`#256 a W1` qualification. The count 14 is correct; commit messages
+are immutable, so this note is the correction of record (the pr-00259
+b Q1 precedent: the mutable ledger corrects immutable history). The
+a-F17 resolution row already carried the accurate claim.
+
+### d-round residuals (d W5/W6, d S1-S3, d Q4) — recorded, not done
+
+W5: the getent-twin pins discriminate full deletion; driving the
+comparison arm REAL would mirror the F2(b) harness — backlog-quality,
+not owed. W6: the 35-line bound is a documented tripwire that fails
+loud on every identified failure shape. S1: the trailing-hyphen
+admission has no downstream harm path (leading hyphen — the
+argv-injection shape — is rejected); S2: DRY success lines are the
+committed run/run_q convention; S3: the residual window is
+pre-existing, sub-second, non-setuid, and the wave comment scopes it
+truthfully. Q4: the surviving citations are disambiguated in-string;
+F17's claim was "14 qualified", not "zero remain".
+
+## Follow-ups
+
+- The d round touched review-relevant code (uninstall.sh, install.sh,
+  three test suites): a **micro-wave review** of the d fixes
+  (`5171eb3..` up from snapshot d) is owed before release — this
+  round does not self-declare the loop closed (RM-0106/RM-0107).
+- e2e debt discharged in the d wave (see d Q1): both suites green on
+  the d-round tree, zero skips.
+
 
