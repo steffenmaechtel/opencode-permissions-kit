@@ -35,5 +35,5 @@ The parity test regenerates and compares. -->
 | [pr-00241](0/0/2/4/pr-00241) | review-process docs + parity pin, issues #237/#238 (micro-wave review of the feature wave's diff) | wave | master @ d179acb (VERSION 0.0.56) | 2026-10-24 | a–b | closed |
 | [pr-00243](0/0/2/4/pr-00243) | wave review of the #218 fix wave — uninstall revert-loop closing-log honesty | wave | 0.0.56 @ e4952dd | 2026-10-24 | a–g | closed |
 | [pr-00256](0/0/2/5/pr-00256) | docs end-user optimization pass — all 21 user-docs pages shortened to snippet-first prose (issue #252) | wave | 0.0.56 @ 716b8c0 | 2026-10-24 | a–c | closed |
-| [pr-00259](0/0/2/5/pr-00259) | micro-shaped wave pass — pin-shape hardening in test-rules-revisit.sh (out_line_is anchoring, V10/V17 cp+cmp, R0 gate comment) | wave | 0.0.56 @ 02782b9 | 2026-10-25 | a–b | open |
+| [pr-00259](0/0/2/5/pr-00259) | micro-shaped wave pass — pin-shape hardening in test-rules-revisit.sh (out_line_is anchoring, V10/V17 cp+cmp, R0 gate comment) | wave | 0.0.56 @ 02782b9 | 2026-10-25 | a–b | closed |
 

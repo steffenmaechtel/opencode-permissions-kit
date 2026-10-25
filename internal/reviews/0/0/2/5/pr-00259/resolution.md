@@ -1,5 +1,11 @@
 # Resolution — pr-00259 (pin-shape hardening in test-rules-revisit.sh)
 
+Status: closed 2026-10-25 — confirmed by the maintainer in-session (round b report: "ok dann fixen und close
+  machen"); stop-rule check: round b ([review-b.md](review-b.md), `c93f202`) found 2 LOW evidence-accuracy
+  findings, both dispositioned implemented in `cc8e5d3` — files touched = resolution.md only (evidence prose +
+  bookkeeping, RM-0065, loop closed per RM-0066); round-a findings were already dispositioned in `370ccd8`;
+  no reviews owed-but-not-run (single-session pass per USER commission, disclosed in review-b's Calibration).
+
 Case born in PR #259 (branch `feature/231-rules-revisit-pin-shapes`);
 wave under review: 886ada1 (snapshot a, base 02782b9, VERSION 0.0.56).
 Chain: a, b.
@@ -11,8 +17,8 @@ Chain: a, b.
 | a W1 (INFO) | **implemented** | `370ccd8` | prefix-anchored `rules-audit: 0 blocking`; 10-violation probe reds |
 | a Q1 (LOW) | **implemented** | `370ccd8` | all 7 refs qualified to `#222 …`; zero unqualified W-refs remain (grep) |
 | a Q2 (INFO) | **implemented** | `370ccd8` | `line_is` gains `-F`; all 12 call sites literal; suite green |
-| b Q1 (LOW) | **implemented** | `<SHA>` | impossible probe replaced by the real trailing-dot delta (#259 b Q1) |
-| b Q2 (LOW) | **implemented** | `<SHA>` | call-site count corrected 15 -> 12 (grep-pinned enumeration) |
+| b Q1 (LOW) | **implemented** | `cc8e5d3` | impossible probe replaced by the real trailing-dot delta (#259 b Q1) |
+| b Q2 (LOW) | **implemented** | `cc8e5d3` | call-site count corrected 15 -> 12 (grep-pinned enumeration) |
 
 ## Evidence detail
 
@@ -97,12 +103,10 @@ load-bearing part ("none relies on BRE semantics") holds for all
   single-session micro pass per USER commission): 2 LOW findings,
   both disposed above — the round-b fixes touch only this file's
   evidence prose, not review-relevant code (RM-0065/RM-0066), so no
-  round c is auto-owed; closure is the maintainer's call (a fixing
-  round never closes its own loop). When confirmed, the closure edit
-  sets the `Status:` line, fills the two `<SHA>` placeholders below,
-  and regenerates the INDEX — one commit.
-- `<SHA>` placeholders above are filled by the chain's next commit
-  (check-then-commit on row width applies to that edit, issue #237).
+  round c is auto-owed; closure confirmed by the maintainer
+  in-session 2026-10-25 — Status line set, both Commit-column
+  placeholders filled, INDEX regenerated in the same commit (the
+  closure edit this bullet announced).
 - Gates run before this fix commit: affected suite (39 pins green),
   `make lint`, line-length ratchet, `gen-review-index.py`, reviews lint,
   reviews parity.
