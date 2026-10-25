@@ -37,5 +37,5 @@ The parity test regenerates and compares. -->
 | [pr-00244](0/0/2/4/pr-00244) | issue-223 fs-baseline python3 health gate (feature wave) | wave | 0.0.56+54 @ e4952dd (VERSION 0.0.56) | 2026-10-24 | a–h | closed |
 | [pr-00256](0/0/2/5/pr-00256) | docs end-user optimization pass — all 21 user-docs pages shortened to snippet-first prose (issue #252) | wave | 0.0.56 @ 716b8c0 | 2026-10-24 | a–c | closed |
 | [pr-00259](0/0/2/5/pr-00259) | micro-shaped wave pass — pin-shape hardening in test-rules-revisit.sh (out_line_is anchoring, V10/V17 cp+cmp, R0 gate comment) | wave | 0.0.56 @ 02782b9 | 2026-10-25 | a–b | closed |
-| [pr-00263](0/0/2/6/pr-00263) | release 0.0.57 full-scope review (pre-tag) | full | 0.0.57 @ 4eacabb | 2026-10-25 | a–g | open |
+| [pr-00263](0/0/2/6/pr-00263) | release 0.0.57 full-scope review (pre-tag) | full | 0.0.57 @ 4eacabb | 2026-10-25 | a–g | closed |
 

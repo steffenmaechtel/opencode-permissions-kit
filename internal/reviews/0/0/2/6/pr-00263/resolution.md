@@ -1,5 +1,14 @@
 # Resolution — pr-00263 (release 0.0.57 full-scope review)
 
+Status: closed — confirmed by the maintainer (in-session, right after
+snapshot g, 2026-10-26); stop-rule check: the last round (snapshot g,
+2026-10-25, fast mode) found 1 INFO record-only (g W1, deliberately
+not done) and NO MED/HIGH anywhere in the chain's open items — every
+finding from snapshots d/e/f/g is dispositioned or record-only; the
+f/g rounds touched tests/unit/test-uninstall.sh (one pin pattern +
+comments) and the internal/reviews ledger only, nothing shipped
+moved, e2e not owed per the AGENTS semantics rule.
+
 Chain: a (house full pass) -> b, c (external redundancy passes, GPT 6 Luna
 medium/high) — 42 unique findings across the three snapshots — -> d
 (wave review of the fix round, 2026-10-25: 13 findings, 1 MED / 6 LOW /
