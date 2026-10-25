@@ -67,6 +67,11 @@ see [below](#prevent-the-bypass-the-policy-pin)); manually:
    `~/.config/openchamber/settings.json` (or set it to `""`), then
    restart OpenChamber.
 
+If `opk openchamber-secure` cannot update the settings file, it says
+so and leaves the file untouched — the edit fails closed (for example
+when `opencodeBinary` shows up as a JSON value instead of the pin
+key); step 2 is then yours by hand.
+
 Deleting the binaries alone is not enough: OpenChamber starts its
 managed server with strict validation of the pinned path, and a pin
 pointing at a deleted binary aborts the start — the UI hangs loading

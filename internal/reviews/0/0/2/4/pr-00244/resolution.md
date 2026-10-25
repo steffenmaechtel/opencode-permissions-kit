@@ -11,7 +11,11 @@ MED/HIGH) → fix wave 4 → [review-e.md](review-e.md) (wave snapshot
 2026-10-24, 9 IDs unique after 2 dup pairs — 6 LOW, 3 INFO, no
 MED/HIGH) → fix wave 5 (the e rows below) → [review-f.md](review-f.md)
 (wave snapshot 2026-10-24, 13 IDs, 12 unique after 1 dup pair — 2 MED,
-6 LOW, 4 INFO, no HIGH) → fix wave 6 (the f rows below). Birth PR
+6 LOW, 4 INFO, no HIGH) → fix wave 6 (the f rows below) →
+[review-g.md](review-g.md) (wave snapshot 2026-10-25, 3 IDs — 1 LOW,
+2 INFO) → fix wave 7 (the g rows below) → [review-h.md](review-h.md)
+(wave snapshot 2026-10-25, 15 IDs, 14 unique after 1 dup pair — 4
+MED, 6 LOW, 5 INFO) → fix wave 8 (the h rows below). Birth PR
 #244, branch `feature/223-fsb-tee-health-gate`.
 
 ## Dispositions
@@ -82,6 +86,20 @@ MED/HIGH) → fix wave 5 (the e rows below) → [review-f.md](review-f.md)
 | g W1 (LOW) | **implemented** | `5fc14c6` | regex pair retired — semantic pin: executed == extracted (detail below) |
 | g Q1 (INFO) | **implemented** | `5fc14c6` | extraction failure and python3 hard-require now distinct FAIL labels |
 | g S1 (INFO) | **implemented** | `5fc14c6` | heredoc else-exit kills the false success; 2 behavioral kit-cli pins |
+| h W1 (MED) | **implemented** | `<SHA>` | L2 record completed in place; sites deferred to #260/#261 |
+| h W2 (MED) | **deliberately not done** | — | pre-existing abort class outside the chain's diffs; deferred to #260 |
+| h W3/Q1 (LOW) | **implemented** | `<SHA>` | union truth in comment + record; 5fc14c6's msg stays history |
+| h W4 (LOW) | **deliberately not done** | — | same abort class as h W2 — #260 (generated-output site) |
+| h W5 (INFO) | **implemented** | `<SHA>` | boundary shape named in the pin comment (nothing ships; loud false-red) |
+| h W6 (INFO) | **implemented** | `<SHA>` | trailing-comment residual named at the v2 rider (the _p3old residual) |
+| h S1 (LOW) | **implemented** | `<SHA>` | claim scoped; continuation-steal residual named (prod fails loud) |
+| h S2 (LOW) | **deliberately not done** | — | fail-closed ms-window TOCTOU; old code false-successed the race |
+| h S3 (INFO) | **implemented** | `<SHA>` | ui_error comment names the four rc-1 causes (deliberate, fail-closed) |
+| h S4 (INFO) | **implemented** | `<SHA>` | interpreter comment: shebang vs curl-to-bash, false-red direction only |
+| h Q2 (LOW) | **deliberately not done** | — | label states both conjuncts + prints both values (house convention) |
+| h Q3 (LOW) | **implemented** | `<SHA>` | declare/typeset residual named (a real miss only under a bash shebang) |
+| h Q4 (MED) | **implemented** | `<SHA>` | record corrected: 8 reds (sem.sh 2–9); L1 indices = sem.sh numbering |
+| h Q5 (INFO) | **implemented** | `<SHA>` | openchamber.md: fails-closed sentence at the hand-edit step |
 
 ## Evidence detail
 
@@ -1039,23 +1057,39 @@ every assignment-shaped `_py3_imports` line (token at line start,
 full-line comments stripped first, file order) under install.sh's
 own interpreter (resolved from the shebang; `sh` today) in a
 `set -e` scratch file ending in a value printf, and requires
-executed final value == the extracted first list (and the
-extraction non-empty). Rationale: the runtime executes the LAST
-value, the coverage pin audits the FIRST list — any second
+executed final value == the extracted list (and the extraction
+non-empty). (Correction, #244 h W3/Q1: this sentence and the
+rationale below said the extraction reads/audits the "FIRST" list —
+false: the sed /p prints EVERY match, the union; with any second
+assignment the union diverges from the executed LAST value and
+reds, so the pin's behavior was safe in every probed shape — the
+false model sat in this record, the suite comment and commit
+5fc14c6's message; both texts are trued, the commit message stays
+as immutable history.) Rationale: the runtime executes the LAST
+value, the coverage pin audits the union of every list — any second
 assignment, append, or same-line double of ANY spelling changes the
 executed value, so shape enumeration is unnecessary; a line-start
 filter keeps execution lines off the use sites (install.sh:578/:583).
 A trailing backslash on an assignment line (the e-W4 concealment
 residual #1) is DETECTED loudly by the same block. Probe matrix
-(scratch copies, /tmp/opencode/pr-00244-g/probe/sem.sh — 9 accident
-shapes red with the diverging values in the FAIL text, 2 comment
-shapes green): second assignment, append line, same-line double,
+(scratch copies, /tmp/opencode/pr-00244-g/probe/sem.sh — 8 accident
+shapes red, 2 comment shapes green): second assignment, append
+line, same-line double,
 quoted-# double (the g-W1 shape — invisible to the old dup regex),
 first-token-`+=` double (interpreter rc 127, dash has no `+=`),
 commented sole assignment, deleted assignment, trailing
 continuation — all RED; trailing token-naming comment and full-line
 old-assignment comment — GREEN (the f-W4 false-red property
-preserved). Eval/command-substitution assignments stay a documented
+preserved). (Correction, #244 h Q4: the count said 9 and credited
+"the diverging values in the FAIL text" to every red — sem.sh
+numbers 11 shapes (1 clean, 2–9 the eight accident reds, 10–11 the
+comment greens), so the L1 run below indexing "shapes 7/8" and
+"3/6" was sem.sh's numbering all along (empty collection = shapes
+7/8, interpreter failure = the two `+=` shapes 3/6) and never
+mapped to this paragraph's enumeration; and the values-scope held
+only for the value-diverging shapes — the `+=` shapes red with
+rc=127, the commented-sole/deleted shapes red via the presence arm
+printing lines/cont only.) Eval/command-substitution assignments stay a documented
 residual (deliberate concealment; most such shapes red anyway — the
 executed subshell value differs from the extracted literal).
 Class-sweep rider: the v2-URL `grep -c` (test-install-args.sh:824,
@@ -1103,8 +1137,23 @@ extraction (del line + sys.exit(1)).
   commented-out call would still count (the survivor trap); their
   `sh -c '[ "$(grep -c …)" -eq N ]'` shape reads the rc through the
   test comparison, so no set -e abort class. Sites counting fixture
-  OUTPUT (container-backend, ddev-as-opencode) are a different
-  class — not source-counting.
+  OUTPUT (container-backend, most ddev-as-opencode sites) are a
+  different class — not source-counting. (Correction, #244 h W1:
+  "ddev-as-opencode" had no place in that blanket sentence — the
+  file also counts shipped source at :1336
+  (`ddev_handover_stamp_write` in $CONFIG) and :1358 (the
+  settings-management notice in $INSTALL); and the site list above
+  was incomplete: the h-pass sweep re-derived it — kit-cli
+  :166/:173 ($KIT), project-paths :181 ($INSTALL; also the f-W1
+  abort class), e2e-sources :171/:200 (tests/e2e/lib.sh; bare
+  assignments), ddev-migrate :396/:839 ($MIG/$INSTALL), staged-write
+  :486/:488/:524/:529, status :1210/:1357 ($STATUS), update-flags
+  :141/:285/:421/:422 ($UPDATE), workflows :279/:280 — all
+  comment-blind, none with a rider; the compliant precedent missed:
+  test-git-config :133-138 (joins continuations AND strips comment
+  lines). Sites and abort shapes deferred to maintainer backlog
+  issues — #260 (abort class) and #261 (comment-blind survivor
+  sites).)
 - Executed-value invariants: `_py3_imports` is the only
   extraction-vs-runtime pair in the suites (the F24/opk block
   extractions are behavioral eval pins already); no sibling.
@@ -1146,7 +1195,175 @@ semantics change — opk's settings-edit script gains the else-exit):
 owed in-wave, runs on the committed tree, recorded in Follow-ups by
 the bookkeeping commit.
 
+## Evidence detail (fix wave 8 — h findings)
+
+Maintainer decision (recorded per the commission): the pre-existing
+code findings (h W2/W4) and the h-W1 sibling sites go to MAINTAINER
+BACKLOG ISSUES (#260 — unguarded `grep -c` abort class; #261 —
+comment-blind source-counting survivor sites); every other
+disposition is comment/docs/ledger only — the loop-closing shape
+(no review-relevant code touched). Session H (the snapshot-h
+author) applies the fixes in the same session per the rotation.
+
+### h W3/Q1 — the union truth restored
+
+The pin comment (tests/unit/test-install-args.sh, gate section) now
+states the extraction UNIONS every single-quoted list, names the
+h-W3/Q1 correction and the red mechanism (union diverges from the
+executed LAST value on any second assignment — probe-verified in
+snapshot h, run provenance); the record corrections sit in the g-W1
+evidence above with the marker; commit 5fc14c6's message stays as
+immutable history (the row is the correction of record — the e-S2
+pattern).
+
+### h S1/Q3/W5 — claim scoped, residuals named
+
+"Every accident shape reds by construction" is now "The COVERED
+accident shapes red by construction" with a pointer to the residual
+comment, which names the two accident-class misses honestly: the
+continuation-steal (backslash on the line ABOVE an assignment —
+pin green-passes, production fails loud under set -u; probe:
+snapshot h) and the declare/typeset prefix blindness (export/
+readonly/local only; loud under the current #!/bin/sh, a real miss
+only under a bash shebang), plus the W5 boundary note
+(`_py3_imports-foo=x` suffixed shapes — loud false-red, nothing
+ships). No detector added — deliberately: both misses fail LOUD in
+production, and a detector would be test code, extending the loop
+for no silent-failure gain.
+
+### h S4 — interpreter model scoped
+
+The comment now says the pin runs the file's SHEBANG interpreter
+(sh today) while the production pipe runs bash, and that the
+divergence can only fail LOUDER (bash-isms error under dash and
+red) — the honest scoping of "install.sh's own interpreter".
+
+### h S3 — the four rc-1 causes named at the site
+
+The ui_error else branch in opk carries a comment enumerating the
+four rc-1 causes that share it (value-shaped grep hit / g S1,
+unparseable JSON, python3 missing in the sudo context, write
+failure), states the conflation is deliberate and fail-closed, and
+names the unit pin's empty-stderr discriminator. Comment-only
+change to a root-run script — rides to the release gate per
+AGENTS (e2e), no in-wave e2e owed. (The 8-line first draft tripped
+the f-W2 block-length pin — the OCW2 extraction's ≤32-line bound,
+the F24 anchor-drift guard, firing on comment growth; compressed
+to 4 lines, block back in bound.)
+
+### h W6 — the rider's residual named
+
+The v2-URL rider comment now scopes its strip to FULL-LINE
+comments and names the trailing-comment residual (the same one
+_p3old carries).
+
+### h Q5 — docs sentence
+
+docs/how-to/openchamber.md gains one sentence after the manual
+recovery list: opk fails closed and leaves the file untouched when
+it cannot update it (value-shaped literal example), and the
+hand-edit step is then the user's. No earlier docs statement was
+false (h-pass verification); RM-0100 satisfied within the birth PR.
+
+### h W1 / h Q4 — record corrections in place
+
+Both corrections sit with markers where the wrong text lived: the
+wave-7 L2 sweep record (complete site list, blanket sentence
+trued to "most ddev-as-opencode sites", precedent cited) and the
+g-W1 evidence (union truth, sem.sh's 8 reds, L1 indices = sem.sh
+numbering, values-scope trued). sem.sh was re-read for the Q4
+correction (still at /tmp/opencode/pr-00244-g/probe/sem.sh — 11
+numbered shapes: 1 clean, 2–9 accident reds, 10–11 comment greens).
+
+### Not done: h W2/W4 (issues), h S2, h Q2
+
+W2/W4: pre-existing test-code defects outside this chain's diffs —
+deferred to #260 (abort class; any in-chain fix would be
+review-relevant test code and extend the loop the round is set up
+to close). S2: fail-closed millisecond TOCTOU whose pre-wave shape false-successed the same
+race — the fix direction would be worse than the defect. Q2: the
+FAIL label states both conjuncts of its assertion and prints both
+observed values (lines=, cont=) — the house label convention (the
+retired count pin's "(found N, want 1)" shape); the h-pass
+calibration note already records this reading.
+
+### Class sweep record (L2, fix wave 8)
+
+- Comment-claim class: `grep -n 'FIRST\|first list'
+  tests/unit/test-install-args.sh` — one hit (:977), the
+  correction's own reference to the retired wording; no
+  uncorrected claim remains. `grep -rn 'extracted first list\|
+  audits the FIRST' internal/reviews/0/0/2/4/pr-00244/` — two
+  hits, both legitimate: review-h.md's verbatim reviewer body (the
+  immutable snapshot quoting the false model it found) and this
+  record's own pattern literal in this bullet.
+  `grep -n 'red by construction' tests/unit/test-install-args.sh`
+  — one site, now scoped ("The COVERED accident shapes …"; the old
+  "reds by construction" spelling returns zero hits).
+  `grep -n '9 accident' …/resolution.md` — two hits: "2–9 accident
+  reds" inside the sem.sh marker and this record's own pattern
+  line; the false standalone count is gone.
+- Docs-claim class: `grep -rn 'opencodeBinary' docs/` — 10 hits
+  across openchamber/compatibility/cli/files; the how-to sentences
+  match the shipped behavior (fail-closed sentence added this
+  wave); no page claims the edit always succeeds.
+
+### L1–L7 run (fix wave 8, before commit)
+
+- L1: no new `|| true`, redirect or probe pipe — comment/docs/
+  ledger only; nothing new to fail-loud-pin.
+- L2: sweep above; patterns + sites recorded.
+- L3: every rewritten comment claim carries its evidence — union ↔
+  the sed /p mechanics + snapshot-h probes; S1/Q3 residuals ↔
+  snapshot-h probes (false green, dash rc 127); S4 ↔ dash/bash
+  error behavior; W5/W6 ↔ mechanism; S3 ↔ the four causes
+  enumerated in snapshot h S3; docs sentence ↔ the pinned opk
+  behavior (cmp -s byte-identical + silent exit).
+- L4: no new pins (no behavior change); full suite re-run green
+  (gates below) — the pin text changes live inside comments only.
+- L5: no root operations — the opk change is a comment; no path
+  operands, no chmod/chown, no `[ -L ]` change.
+- L6: no pins owed (nothing behavioral changed; the residual claims
+  cite snapshot h's probes as their evidence of record). This
+  round's dispositions touch NO review-relevant code (comments,
+  docs, ledger only) — per RM-0065/RM-0066 no further wave review
+  is owed; closure pending the maintainer's confirmation.
+- L7: no new shell files; comment style follows the block's.
+
+### Gates (fix wave 8, pre-commit)
+
+Process near-miss, recorded: the FIRST gate run caught two reds
+before any commit — the S3 comment's first draft (8 lines) tripped
+the f-W2 block-length pin (OCW2_BLOCK ≤ 32 lines, the F24
+anchor-drift bound firing on comment growth inside the extracted
+opk block), and 8 disposition rows exceeded the 120-column ratchet;
+the comment was compressed to 4 lines and the rows shortened, both
+pre-commit (check-then-commit, the pr-00234 lesson). After the
+fixes: make lint green (ShellCheck); full `make lint && make test`
+rc 0 (log /tmp/opencode/pr-00244-h/wave8-gates.log); line-length
+ratchet + reviews lint/parity + INDEX regen green before the commit
+that carries this file. E2E: the only files/ change is a COMMENT in
+opk — comment-only changes to root-run scripts ride to the release
+gate per AGENTS; no in-wave e2e owed (a later green double-run
+discharges).
+
 ## Follow-ups
+
+- Wave-8 stop-rule expectation (RM-0115, check cited): this round's
+  dispositions touched NO review-relevant code — opk (comment
+  only), tests/unit/test-install-args.sh (comments only),
+  docs/how-to/openchamber.md (one sentence), resolution.md
+  (ledger). Closure pending maintainer confirmation; the closure
+  commit sets `Status: closed …` at the top, regenerates the INDEX
+  and fills the h rows' `<SHA>` placeholders.
+- Maintainer backlog issues filed from this chain (refs recorded
+  per the a-wave handover note): #260 unguarded `grep -c` abort
+  class (h W2 project-paths :181, h W4 ddev-as-opencode :1491,
+  audit candidates e2e-sources :171/:200, container-backend
+  :436/:438, reviews-parity :59, sandbox-policy :307,
+  rules-revisit :459, fs-baseline :167); #261 comment-blind
+  source-counting survivor sites (the corrected h-W1 list plus the
+  test-git-config :133-138 precedent).
 
 - Wave-7 e2e discharged in-wave on tree `5fc14c6`: `make e2e`
   **309 passed** (../logs/e2e-20261025-011708.log), `make

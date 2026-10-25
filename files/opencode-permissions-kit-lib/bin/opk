@@ -321,6 +321,10 @@ PYEOF
             then
                 ui_success "settings pin removed from $_oc_settings"
             else
+                # Four rc-1 causes share this branch, deliberately
+                # (#244 h S3): no key removed (g S1), unparseable
+                # JSON, python3 missing, write failure — all fail
+                # closed; the unit pin separates via empty stderr.
                 ui_error "could not update $_oc_settings — remove the \"opencodeBinary\""
                 ui_error "line by hand (docs/how-to/openchamber.md)"
             fi

@@ -827,6 +827,8 @@ fi
 # Comment lines stripped before the count (#244 g W1 class sweep, the
 # _p3old rider): a commented-out URL must not count as a surviving
 # call site — the two-step false-green the f-W4 sweep left bounded.
+# Full-line comments only (#244 h W6): a trailing comment after a
+# live line would still count — the same residual _p3old carries.
 _v2hits=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'https://opencode.ai/v2/install' || true)
 if [ "$_v2hits" -ge 2 ]; then
     pass "bootstrap streams the v2 installer (prompt + curl, $_v2hits sites)"
@@ -971,17 +973,24 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     # g W1 — the count/dup regex pair is RETIRED): the invariant is
     # now checked semantically, not by enumerating accident shapes
     # in regex. The runtime gate executes the LAST value of
-    # _py3_imports; the extraction above reads the FIRST
-    # single-quoted list (the coverage pin below audits that list).
+    # _py3_imports; the extraction above UNIONS every single-quoted
+    # list (#244 h W3/Q1 — this said "FIRST", false: the sed /p
+    # prints every match; any second assignment makes the union
+    # diverge from the executed LAST value and reds — the coverage
+    # pin audits the union's modules, the one list when sole).
     # This pin executes every assignment-shaped line (token at line
     # start, full-line comments stripped first, in file order) under
-    # install.sh's own interpreter and requires: executed final
-    # value == extracted list. Every accident shape reds by
-    # construction — separate-line seconds, appends, same-line
-    # doubles, quoted-# doubles (g W1: invisible to the old dup
-    # regex, visible to the executed value), first-token-`+=`
-    # doubles (interpreter failure under sh — dash has no +=), and
-    # a deleted or commented-out sole assignment (empty extraction).
+    # install.sh's own interpreter — its SHEBANG; sh today, while
+    # the production pipe runs bash: a divergence that can only
+    # fail LOUDER (bash-isms error under dash and red), #244 h S4 —
+    # and requires: executed final value == extracted list. The
+    # COVERED accident shapes red by construction — separate-line
+    # seconds, appends, same-line doubles, quoted-# doubles (g W1:
+    # invisible to the old dup regex, visible to the executed
+    # value), first-token-`+=` doubles (interpreter failure under
+    # sh — dash has no +=), and a deleted or commented-out sole
+    # assignment (empty extraction); exceptions and residuals are
+    # named at the residual comment below (#244 h S1/Q3/W5).
     # Assignment-prefixed shapes count too (#244 g W1 self-check):
     # `export`/`readonly`/`local` before the token are collected —
     # an `export _py3_imports=…` second line changes the executed
@@ -1025,6 +1034,19 @@ if [ -n "$(sed -n '/^_py3_health_probe() {/,/^}/p' "$INSTALL")" ]; then
     # class: a second assignment hidden behind a `;` on a USE line
     # (`python3 -c "$_py3_imports"; _py3_imports=…`) — line-start
     # collection cannot see it; concealment, not accident.
+    # Accident-class residuals, named not detected (#244 h S1/Q3):
+    # a backslash ending the line ABOVE an assignment steals it
+    # into a continuation — collected standalone, the pin
+    # GREEN-PASSES it while production fails loud at the use site
+    # (set -u: parameter not set; probe: snapshot h) — the loud
+    # failure bounds it. And the prefix alternation is
+    # export/readonly/local only: a declare/typeset second line is
+    # invisible to the pin (under the current #!/bin/sh it errors
+    # loudly at runtime — a real miss only if the shebang becomes
+    # bash). Boundary note (#244 h W5): the token class
+    # `[^_[:alnum:]]` also collects suffixed names
+    # (`_py3_imports-foo=x`) — nothing like that ships and the
+    # failure is a loud false-red.
     _p3g="$(mktemp)"
     printf '%s\n' "$_p3gate" | sed 's/^[[:space:]]*import[[:space:]]*//' \
         | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
