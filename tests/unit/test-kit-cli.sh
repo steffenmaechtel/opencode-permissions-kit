@@ -891,8 +891,10 @@ fi
 # and driven with PATH-fixing sudo shims over a binary farm (the
 # test-tui-mode arm idiom).
 OCW2_BLOCK="$(sed -n '/#244 f W2/,/^            fi$/p' "$KIT")"
+# Bound is 35 lines: 33 (the #244 f W2 compound) + 2 for pr-00263 c C2
+# (the else branch exits 1 instead of falling through to exit 0).
 if [ -n "$OCW2_BLOCK" ] \
-    && [ "$(printf '%s\n' "$OCW2_BLOCK" | wc -l)" -le 32 ] \
+    && [ "$(printf '%s\n' "$OCW2_BLOCK" | wc -l)" -le 35 ] \
     && printf '%s\n' "$OCW2_BLOCK" \
         | grep -qF 'sh -c ' \
     && printf '%s\n' "$OCW2_BLOCK" \
@@ -974,30 +976,34 @@ EOF
     }
     # Arm A: caller PATH has (noisy) python3, exec context none — the
     # inner guard skips silently; a caller-side guard would leak sudo's
-    # not-found notice (or run the noisy shim).
-    _ocout="$(_ocw2_run "$OCW2NOISY")" || true
+    # not-found notice (or run the noisy shim). pr-00263 c C2: the
+    # compound must also FAIL (rc 1) — it used to fall through to 0.
+    _ocrc=0
+    _ocout="$(_ocw2_run "$OCW2NOISY")" || _ocrc=$?
     _ocok=0
     case "$_ocout" in *W2:error:*) _ocok=$((_ocok + 1)) ;; esac
     case "$_ocout" in *"not found"*|*"ocw2-noisy-python3"*) ;; *) _ocok=$((_ocok + 1)) ;; esac
     if grep -q opencodeBinary "$OCW2/case/settings.json"; then _ocok=$((_ocok + 1)); fi
-    if [ "$_ocok" -eq 3 ]; then
-        echo "  ${GREEN}PASS${NC}  settings edit arm A: exec context without python3 stays silent (#244 f W2)"
+    [ "$_ocrc" -eq 1 ] && _ocok=$((_ocok + 1))
+    if [ "$_ocok" -eq 4 ]; then
+        echo "  ${GREEN}PASS${NC}  settings edit arm A: exec context without python3 stays silent, rc 1 (pr-00263 c C2)"
         passed=$((passed + 1))
     else
-        echo "  ${RED}FAIL${NC}  settings edit arm A (#244 f W2, got: $_ocout)"
+        echo "  ${RED}FAIL${NC}  settings edit arm A (#244 f W2 + pr-00263 c C2, rc=$_ocrc, got: $_ocout)"
         failures=$((failures + 1))
     fi
     # Arm B: caller PATH has NO python3, exec context the real one — a
     # caller-side guard would skip the edit; the inner guard runs it
-    # (the settings file itself is the proof).
-    _ocout="$(_ocw2_run "$OCW2ABSB")" || true
-    if printf '%s' "$_ocout" | grep -q W2:success \
+    # (the settings file itself is the proof). Success stays rc 0.
+    _ocrc=0
+    _ocout="$(_ocw2_run "$OCW2ABSB")" || _ocrc=$?
+    if [ "$_ocrc" -eq 0 ] && printf '%s' "$_ocout" | grep -q W2:success \
         && ! grep -q opencodeBinary "$OCW2/case/settings.json" \
         && grep -q '"port": 3000' "$OCW2/case/settings.json"; then
         echo "  ${GREEN}PASS${NC}  settings edit arm B: exec-context python3 edits despite caller absence (#244 f W2)"
         passed=$((passed + 1))
     else
-        echo "  ${RED}FAIL${NC}  settings edit arm B (#244 f W2, got: $_ocout)"
+        echo "  ${RED}FAIL${NC}  settings edit arm B (#244 f W2, rc=$_ocrc, got: $_ocout)"
         failures=$((failures + 1))
     fi
     rm -rf "$OCW2"

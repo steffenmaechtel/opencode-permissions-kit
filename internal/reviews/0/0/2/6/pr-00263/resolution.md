@@ -17,9 +17,22 @@ wave; minimal corrections only when picked up, no bulk restores per
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a F5 + c C8 (MED) | **implemented** | `07ae002` | prerequisite states the abort; claim-drift pin in test-docs.sh |
+| a F5 + c C8 (MED) | **implemented** | `fbe11d8` | prerequisite states the abort; claim-drift pin in test-docs.sh |
+| a F1 (MED) | **deliberately not done** | — | deferred to #264 (code backlog: dump-operand symlink gate) |
+| a F2(a) (LOW) | **deliberately not done** | — | deferred to #247 (projects.conf reader parity) |
+| a F4 (MED) | **deliberately not done** | — | deferred to #266 (chown-R exec-time window) |
+| a F14 (LOW) | **deliberately not done** | — | deferred to #245 (symlinked-root no-op passes) |
+| a F15 (LOW) | **deliberately not done** | — | deferred to #267 (revert-loop exec-time recheck) |
 | b B1 + c C7 (LOW) | **deliberately not done** | — | #252 names 0.0.x→0.0.y update paths as removable legacy |
+| b B2 + c C1 (LOW) | **deliberately not done** | — | deferred to #265 (tee stderr-EPIPE arm, #223/#244 shape) |
+| b B3 (MED) | **deliberately not done** | — | deferred to #268 with the docs backlog (#252/#256 policy) |
 | b B4 (MED) | **deliberately not done** | — | #252/PR #256 name the 0.0.36 entry removal as policy |
+| b B5 + b B6 (LOW) | **deliberately not done** | — | deferred to #272 with the docs backlog (#252/#256 policy) |
+| c C2 (MED) | **implemented** | `<SHA>` | rc 1 propagates; arm pins A=1/B=0; ui_error sweep clean |
+| c C3 + c C4 (MED/LOW) | **deliberately not done** | — | deferred to #269 with the docs backlog (#252/#256 policy) |
+| c C5 (MED) | **deliberately not done** | — | deferred to #270 with the docs backlog (#252/#256 policy) |
+| c C6 (MED) | **deliberately not done** | — | deferred to #271 with the docs backlog (#252/#256 policy) |
+| c C9 + c C10 + c C11 (LOW) | **deliberately not done** | — | deferred to #273 with the docs backlog (#252/#256) |
 
 ## Evidence detail
 
@@ -36,6 +49,22 @@ installer abort messages serve as code-side anchors. Found independently
 by the house pass (a F5, E2 axis) and the external high pass (c C8, P3);
 the severity divergence (house MED vs external P3) is recorded in
 snapshot c's calibration.
+
+### c C2 (MED) — opk settings-edit failure branch exits 0
+
+The openchamber-secure settings-edit else branch printed two ui_error
+lines and fell through to exit 0 — four rc-1 causes share the branch
+(#244 h S3: no key removed, unparseable JSON, python3 missing, write
+failure) and all failed closed except the rc itself; the #244 g-wave
+(fd93fbe) had fixed only the python side. Fix: `exit 1` in the branch.
+Class sweep: every ui_error site in opk re-checked — inline `exit 1`,
+`_ho_rc` propagation, `exit "$_es_rc"` on the siblings; this was the
+only rc-blind site. No internal caller consumes the rc (status, update
+and install print advice text only); the e2e scenarios drive success,
+idempotent, symlink and getent-skip paths, none flips. Pins: the
+#244 f W2 asymmetry harness now asserts rc 1 on arm A (exec context
+without python3) and rc 0 on arm B (functional, extracted compound);
+extraction bound 33 -> 35 lines for the two added lines.
 
 ### b B1 + c C7 / b B4 — deliberately not done: deliberate removals per #252
 
