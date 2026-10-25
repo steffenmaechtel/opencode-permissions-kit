@@ -1117,6 +1117,24 @@ else
     fail "_py3_health_probe defined in install.sh"
 fi
 
+# --- pr-00263 a F6/F8/F19: fail-loud backups + installer wrapper (static) --------
+# F6: six backup copies record failures loudly (_bk_fail: definition +
+# six call sites) and degrade the closing Backup summary row; F8: both
+# getfacl backup sites observe the copy before announcing recovery
+# material; F19: the official-installer pipe carries its failure
+# (pipefail) into a kit error wrapper. Functional runs need root — the
+# e2e suites drive the arms.
+[ "$(grep -c '_bk_fail' "$INSTALL")" -ge 7 ] \
+    && grep -qF 'INCOMPLETE: $_BK_FAIL' "$INSTALL" \
+    && pass "backup failures record loudly + degrade the summary row (pr-00263 a F6)" \
+    || fail "backup failure silence survived somewhere (pr-00263 a F6)"
+[ "$(grep -cF 'no ACL recovery material' "$INSTALL")" = 2 ] \
+    && pass "both getfacl backups announce failure instead of success (pr-00263 a F8)" \
+    || fail "a getfacl success line still lies (pr-00263 a F8)"
+grep -qF 'the official opencode installer failed' "$INSTALL" \
+    && pass "official-installer pipe has the kit error wrapper (pr-00263 a F19)" \
+    || fail "official-installer failure still bare (pr-00263 a F19)"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

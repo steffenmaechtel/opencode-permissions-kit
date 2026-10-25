@@ -708,18 +708,33 @@ do_plan_phase() {
     BACKUP_DIR="$(mktemp -d /tmp/opencode-install-backup.XXXXXX)" || exit 1
     echo "Backup directory: $BACKUP_DIR"
     log "backup dir created: $BACKUP_DIR"
+    # pr-00263 a F6: the backup dir is announced as recovery material —
+    # a copy that failed must not be silent. Every failed copy records
+    # itself loudly and degrades the closing Backup summary row.
+    _BK_FAIL=""
+    _bk_fail() {
+        _BK_FAIL="${_BK_FAIL:+$_BK_FAIL, }$1"
+        echo "  warn     backup copy failed: $1 — the recovery material is incomplete" >&2
+        log "backup copy FAILED: $1"
+    }
     # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
     # -C /: same unreadable-CWD class as issue #116 (git >= 2.55).
     sudo -u "$DEFAULT_USER" git -C / config --global --list \
-        > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || true
+        > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$DEFAULT_USER"
     # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
     sudo -u "$OPENCODE_USER" git -C / config --global --list \
-        > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || true
-    [ -f /etc/opencode-permissions-kit/sudoers ] \
-        && cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || true
-    [ -f /usr/local/bin/opencode ] && cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null || true
-    [ -d /usr/local/lib/opencode-permissions-kit ] \
-        && cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null || true
+        > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$OPENCODE_USER"
+    if [ -f /etc/opencode-permissions-kit/sudoers ]; then
+        cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || _bk_fail "sudoers"
+    fi
+    if [ -f /usr/local/bin/opencode ]; then
+        cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null \
+            || _bk_fail "usr-local-bin-opencode"
+    fi
+    if [ -d /usr/local/lib/opencode-permissions-kit ]; then
+        cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null \
+            || _bk_fail "opencode-permissions-kit-lib"
+    fi
 
     ui_section "Pre-flight"
 
@@ -1368,8 +1383,14 @@ do_plan_phase() {
     # Backup project ACLs now that roots are known
     if [ -n "$PROJECTS_ROOTS" ]; then
         # shellcheck disable=SC2086,SC2024  # word splitting intended (root list); root redirects
-        sudo getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
-        echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
+        # pr-00263 a F8: the success line must observe the copy (getfacl
+        # absent or errored used to pass silently into recovery material).
+        if sudo getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt"; then
+            echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
+        else
+            echo "  warn     project ACL backup FAILED (getfacl absent or errored) — no ACL recovery material" >&2
+            log "getfacl project backup FAILED"
+        fi
     fi
 
     ui_info "Writing /etc/opencode-permissions-kit/install.conf ..."
@@ -1811,8 +1832,14 @@ do_deploy_phase() {
             b)
                 # shellcheck disable=SC2086  # word splitting intended (root list)
                 ui_detail "reading current ACLs with getfacl -R (large trees: this can take minutes) ..."
-                getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt" || true
-                echo "Backup saved." ;;
+                # pr-00263 a F8: success line observes the copy (sweep twin
+                # of the project-roots site above).
+                if getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt"; then
+                    echo "Backup saved."
+                else
+                    echo "  warn     ACL backup FAILED (getfacl absent or errored) — no ACL recovery material" >&2
+                    log "getfacl interactive backup FAILED"
+                fi ;;
             y) ;;
         esac
         if [ "$ans" != "n" ]; then
@@ -1911,10 +1938,15 @@ do_deploy_phase() {
             *) return 0 ;;   # never touch /usr/bin, /usr/local/bin, ...
         esac
         [ -e "$1" ] || return 0
-        cp "$1" "$BACKUP_DIR/opencode-binary" 2>/dev/null || true
-        sudo rm -f "$1"
-        echo "Removed user-local copy: $1 (backup: $BACKUP_DIR/opencode-binary)"
-        log "user-local opencode binary removed: $1 (backed up to $BACKUP_DIR/opencode-binary)"
+        # pr-00263 a F6 (class sweep): the removal claim names the backup —
+        # a failed copy must not be announced as one.
+        if cp "$1" "$BACKUP_DIR/opencode-binary" 2>/dev/null; then
+            sudo rm -f "$1"
+            echo "Removed user-local copy: $1 (backup: $BACKUP_DIR/opencode-binary)"
+            log "user-local opencode binary removed: $1 (backed up to $BACKUP_DIR/opencode-binary)"
+        else
+            _bk_fail "opencode-binary (kept in place)"
+        fi
     }
     opencode_found=false
 
@@ -1962,7 +1994,13 @@ do_deploy_phase() {
 
     if [ "$opencode_found" = false ]; then
         if confirm "opencode not found. Run official installer (curl -fsSL https://opencode.ai/v2/install | bash)?"; then
-            curl -fsSL https://opencode.ai/v2/install | bash
+            # pr-00263 a F19: pipefail (set at the top) carries a curl
+            # failure through the pipe — the wrapper fires on either a
+            # failed fetch or a failed installer run.
+            curl -fsSL https://opencode.ai/v2/install | bash \
+                || { echo "error: the official opencode installer failed — run it manually:" >&2
+                     echo "  curl -fsSL https://opencode.ai/v2/install | bash" >&2
+                     exit 1; }
             # The v2 installer (issue #197): resolves the current 2.x
             # through the npm registry and installs into ~/.opencode/bin —
             # the same layout the v1 installer used, so the pickup paths
@@ -2609,7 +2647,11 @@ fi
 if [ "$OPENCHAMBER_POLICY" = yes ]; then
     ui_kv "OpenChamber"   "policy pin active (sessions secured, self-update off)"
 fi
-ui_kv "Backup"   "$BACKUP_DIR"
+if [ -z "${_BK_FAIL:-}" ]; then
+    ui_kv "Backup"   "$BACKUP_DIR"
+else
+    ui_kv "Backup"   "$BACKUP_DIR (INCOMPLETE: $_BK_FAIL)"
+fi
 echo ""
 # WSL2 final exposure warning: a manually-applied wsl.conf restriction only
 # takes effect after 'wsl --shutdown' — until then /mnt/c stays

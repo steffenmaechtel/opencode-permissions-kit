@@ -31,7 +31,10 @@ wave; minimal corrections only when picked up, no bulk restores per
 | c C2 (MED) | **implemented** | `092bcd6` | rc 1 propagates; arm pins A=1/B=0; ui_error sweep clean |
 | a F2(b) (MED) | **implemented** | `ed372e2` | X1 mirror x3; sanitized WARN; sweep recorded below |
 | a F3 (MED) | **implemented** | `656350e` | six run sites + 4 legacy siblings on un_rc_q; arms pinned |
-| a F27 (INFO) | **implemented** | `<SHA>` | chat-German quote removed from pr-00259's Status line |
+| a F27 (INFO) | **implemented** | `65eac53` | chat-German quote removed from pr-00259's Status line |
+| a F6 (LOW) | **implemented** | `<SHA>` | six backup copies loud; summary row degrades |
+| a F8 (LOW) | **implemented** | `<SHA>` | both getfacl sites observe; fail arms warn |
+| a F19 (INFO) | **implemented** | `<SHA>` | pipefail + kit error wrapper on the installer pipe |
 | c C3 + c C4 (MED/LOW) | **deliberately not done** | — | deferred to #269 with the docs backlog (#252/#256 policy) |
 | c C5 (MED) | **deliberately not done** | — | deferred to #270 with the docs backlog (#252/#256 policy) |
 | c C6 (MED) | **deliberately not done** | — | deferred to #271 with the docs backlog (#252/#256 policy) |
