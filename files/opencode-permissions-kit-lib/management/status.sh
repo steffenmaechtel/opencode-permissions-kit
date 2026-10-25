@@ -554,7 +554,14 @@ try:
     feed = json.load(sys.stdin)
 except Exception:
     sys.exit(1)
-for entry in feed or []:
+# pr-00263 a F11: a non-array feed (dict envelope, scalar array) used
+# to raise a raw traceback on cron stderr — shape-invalid is
+# "unavailable" (exit 1), a non-dict entry is skipped.
+if not isinstance(feed, list):
+    sys.exit(1)
+for entry in feed:
+    if not isinstance(entry, dict):
+        continue
     # str(... or ""): a JSON null defeats the .get default (the F7
     # class, 0.0.44a V19 — advisory-watch got the coercion in 0.0.43a;
     # this twin printed the literal string "None").

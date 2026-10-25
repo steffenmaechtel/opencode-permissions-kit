@@ -1007,14 +1007,18 @@ if [ -n "$_f6_block" ]; then
             sudo() { return 0; }
             die() { echo "die: $*"; exit 1; }
             ui_success(){ echo "success: $*"; }
+            ui_detail() { echo "detail: $*"; }
             log()       { echo "log: $*"; }
             eval "$_f6_block"
         ) 2>&1
     }
     F6=$(mktemp -d)
     _out=$(_f6_run "$F6/missing-root") || true
-    if printf '%s' "$_out" | grep -q 'log: umask profile re-deploy skipped'; then
-        pass "missing umask.sh: skip is logged, not silent (#211 a F6)"
+    # pr-00263 a F7: log() alone degrades to the no-op stub when log.sh
+    # is missing from both roots — the skip needs the terminal line too.
+    if printf '%s' "$_out" | grep -q 'log: umask profile re-deploy skipped' \
+        && printf '%s' "$_out" | grep -q 'detail: umask profile re-deploy skipped'; then
+        pass "missing umask.sh: skip is terminal-loud, not log-only (pr-00263 a F7 over #211 a F6)"
     else
         fail "missing umask.sh: skip is logged, not silent (out=$_out)"
     fi
@@ -1200,6 +1204,14 @@ if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] \
 else
     fail "update.sh gate arms (pr-00263 a F2b)"
 fi
+
+# pr-00263 a F7: both conservative re-deploy skips carry a terminal
+# line — log() alone is the no-op stub when log.sh is missing from
+# both roots, and the in-code contract says the skip must not be silent.
+grep -qF 'ui_detail "sudoers re-deploy skipped' "$UPDATE" \
+    && grep -qF 'ui_detail "umask profile re-deploy skipped' "$UPDATE" \
+    && echo "  ${GREEN}PASS${NC}  both re-deploy skips are terminal-loud (pr-00263 a F7)" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  a re-deploy skip is log-only again (pr-00263 a F7)"; failures=$((failures + 1)); }
 
 # --- Summary ----------------------------------------------------------------------
 echo ""

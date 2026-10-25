@@ -458,6 +458,14 @@ else
     check "allocate_range extractable (#211 a F16)" false
 fi
 
+# pr-00263 a F13: the daemon-start rc decides the ready message — a
+# failed start must WARN, not read as ready; the socket var still
+# prints for the caller (the wrapper re-probes every session start).
+check "failed daemon start warns instead of ready (pr-00263 a F13)" \
+    grep -Fq 'daemon start FAILED (rc=$_dc_start_rc)' "$SETUP"
+check "daemon start rc observed at every site (pr-00263 a F13)" \
+    sh -c '[ "$(grep -c "_dc_start_rc" "$1")" -ge 3 ]' _ "$SETUP"
+
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
     exit 1

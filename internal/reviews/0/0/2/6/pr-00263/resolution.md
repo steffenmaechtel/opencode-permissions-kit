@@ -32,9 +32,12 @@ wave; minimal corrections only when picked up, no bulk restores per
 | a F2(b) (MED) | **implemented** | `ed372e2` | X1 mirror x3; sanitized WARN; sweep recorded below |
 | a F3 (MED) | **implemented** | `656350e` | six run sites + 4 legacy siblings on un_rc_q; arms pinned |
 | a F27 (INFO) | **implemented** | `65eac53` | chat-German quote removed from pr-00259's Status line |
-| a F6 (LOW) | **implemented** | `<SHA>` | six backup copies loud; summary row degrades |
-| a F8 (LOW) | **implemented** | `<SHA>` | both getfacl sites observe; fail arms warn |
-| a F19 (INFO) | **implemented** | `<SHA>` | pipefail + kit error wrapper on the installer pipe |
+| a F6 (LOW) | **implemented** | `c2cc5a0` | six backup copies loud; summary row degrades |
+| a F8 (LOW) | **implemented** | `c2cc5a0` | both getfacl sites observe; fail arms warn |
+| a F19 (INFO) | **implemented** | `c2cc5a0` | pipefail + kit error wrapper on the installer pipe |
+| a F7 (LOW) | **implemented** | `<SHA>` | both re-deploy skips terminal-loud; harness drives both arms |
+| a F13 (LOW) | **implemented** | `<SHA>` | daemon-start rc gates the ready message; socket var kept |
+| a F11 (LOW) | **implemented** | `<SHA>` | shape-invalid feed = silent unavailable; ids-only on lists |
 | c C3 + c C4 (MED/LOW) | **deliberately not done** | — | deferred to #269 with the docs backlog (#252/#256 policy) |
 | c C5 (MED) | **deliberately not done** | — | deferred to #270 with the docs backlog (#252/#256 policy) |
 | c C6 (MED) | **deliberately not done** | — | deferred to #271 with the docs backlog (#252/#256 policy) |

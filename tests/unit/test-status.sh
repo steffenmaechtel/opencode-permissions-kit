@@ -2757,6 +2757,30 @@ else
     fail "status.sh gate arms (pr-00263 a F2b)"
 fi
 
+# --- pr-00263 a F11: a shape-invalid advisory feed is "unavailable", never a traceback
+# The embedded python is extracted and driven REAL both directions: a
+# dict envelope exits 1 SILENT (the old shape raised a raw traceback on
+# cron stderr); a list with null and scalar entries yields exactly the
+# real ids.
+ADVPY="$(sed -n "/python3 -c 'import json,sys$/,/' ); then\$/p" "$STATUS" | sed -e "1s/^.*python3 -c '//" -e "\$s/' ); then\$//")"
+if [ -n "$ADVPY" ] && printf '%s' "$ADVPY" | grep -q 'isinstance(feed, list)'; then
+    pass "advisory feed parser extractable + shape gate present (pr-00263 a F11)"
+else
+    fail "advisory feed parser extraction/shape gate (pr-00263 a F11)"
+fi
+_adv_rc1=0
+_adv_rc2=0
+_adv_err="$(printf '{"envelope":1}' | python3 -c "$ADVPY" 2>&1 >/dev/null)" || _adv_rc1=$?
+_adv_out="$(printf '[{"ghsa_id":"GHSA-1"},{"ghsa_id":null},3]' | python3 -c "$ADVPY" 2>/dev/null)" || _adv_rc2=$?
+if [ "$_adv_rc1" -ne 0 ] && [ -z "$_adv_err" ] \
+    && [ "$_adv_rc2" -eq 0 ] \
+    && [ "$(printf '%s' "$_adv_out" | grep -c .)" = 1 ] \
+    && printf '%s' "$_adv_out" | grep -q 'GHSA-1'; then
+    pass "shape-invalid feed silent-unavailable; list feed yields ids only (pr-00263 a F11)"
+else
+    fail "advisory feed shape arms (pr-00263 a F11, rc1=$_adv_rc1 rc2=$_adv_rc2 err=$_adv_err out=$_adv_out)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

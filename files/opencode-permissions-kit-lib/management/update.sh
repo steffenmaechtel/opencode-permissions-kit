@@ -735,7 +735,10 @@ if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ];
 else
     # Conservative skip (0.0.41f S2): the existing validated sudoers stays
     # active — near-unreachable (fetch list + heal guarantee the file),
-    # but the skip must not be silent.
+    # but the skip must not be silent. pr-00263 a F7: log() alone is the
+    # no-op stub when log.sh is missing from both roots — the skip also
+    # needs a terminal line.
+    ui_detail "sudoers re-deploy skipped: template missing (existing sudoers kept)"
     log "sudoers re-deploy skipped: template missing from $FILES_ROOT (existing sudoers kept)"
 fi
 
@@ -759,6 +762,9 @@ else
     # shape, #211 a F6): near-unreachable (fetch list + heal guarantee
     # the file), but the skip must not be silent — an update that
     # quietly dropped a protection-layer deploy is undebuggable.
+    # pr-00263 a F7: terminal line too (log() alone degrades to the
+    # no-op stub when log.sh is missing from both roots).
+    ui_detail "umask profile re-deploy skipped: source file missing (existing profile kept)"
     log "umask profile re-deploy skipped: $FILES_ROOT/etc/umask.sh missing (existing profile kept)"
 fi
 
