@@ -17,7 +17,7 @@ wave; minimal corrections only when picked up, no bulk restores per
 
 | Finding | Disposition | Commit | Key evidence |
 |---|---|---|---|
-| a F5 + c C8 (MED) | **implemented** | `fbe11d8` | prerequisite states the abort; claim-drift pin in test-docs.sh |
+| a F5 + c C8 (MED) | **implemented** | `dd87146` | prerequisite states the abort; claim-drift pin in test-docs.sh |
 | a F1 (MED) | **deliberately not done** | — | deferred to #264 (code backlog: dump-operand symlink gate) |
 | a F2(a) (LOW) | **deliberately not done** | — | deferred to #247 (projects.conf reader parity) |
 | a F4 (MED) | **deliberately not done** | — | deferred to #266 (chown-R exec-time window) |
@@ -28,9 +28,9 @@ wave; minimal corrections only when picked up, no bulk restores per
 | b B3 (MED) | **deliberately not done** | — | deferred to #268 with the docs backlog (#252/#256 policy) |
 | b B4 (MED) | **deliberately not done** | — | #252/PR #256 name the 0.0.36 entry removal as policy |
 | b B5 + b B6 (LOW) | **deliberately not done** | — | deferred to #272 with the docs backlog (#252/#256 policy) |
-| c C2 (MED) | **implemented** | `b404d0e` | rc 1 propagates; arm pins A=1/B=0; ui_error sweep clean |
-| a F2(b) (MED) | **implemented** | `8ae6f22` | X1 mirror x3; sanitized WARN; sweep recorded below |
-| a F3 (MED) | **implemented** | `<SHA>` | six run sites + 4 legacy siblings on un_rc_q; arms pinned |
+| c C2 (MED) | **implemented** | `092bcd6` | rc 1 propagates; arm pins A=1/B=0; ui_error sweep clean |
+| a F2(b) (MED) | **implemented** | `ed372e2` | X1 mirror x3; sanitized WARN; sweep recorded below |
+| a F3 (MED) | **implemented** | `656350e` | six run sites + 4 legacy siblings on un_rc_q; arms pinned |
 | c C3 + c C4 (MED/LOW) | **deliberately not done** | — | deferred to #269 with the docs backlog (#252/#256 policy) |
 | c C5 (MED) | **deliberately not done** | — | deferred to #270 with the docs backlog (#252/#256 policy) |
 | c C6 (MED) | **deliberately not done** | — | deferred to #271 with the docs backlog (#252/#256 policy) |
