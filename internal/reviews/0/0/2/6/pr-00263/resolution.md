@@ -78,7 +78,7 @@ evidence block).
 | e W2 (INFO) | **implemented** | `1abc8d6` | harness drives a production-shaped label (DEFAULT_USER=opencode) |
 | e W3 (INFO) | **implemented** | `163da3a` | run() removed; run_q doc + 4 comments updated; def-count pin = 0 |
 | e Q1 (INFO) | **deliberately not done** | — | write-only store is the 12-site reset-pair idiom; removal deviates |
-| f W1 (MED) | **implemented** | `<SHA>` | pin greps '^run *()': both def spellings count; resurrected def -> red |
+| f W1 (MED) | **implemented** | `ea4f133` | pin greps '^run *()': both def spellings count; resurrected def -> red |
 
 ## Evidence detail
 
