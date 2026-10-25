@@ -54,10 +54,11 @@ release PR; brevity held, no bulk restores per #252/#256),
 | c C5 (MED) | **implemented** | `005590a` | npm + opencode.ai named in the trust sentence (#270) |
 | c C6 (MED) | **implemented** | `005590a` | export conditions + verify advice, pins both ways (#271) |
 | c C9 + c C10 + c C11 (LOW) | **implemented** | `005590a` | three scoping clauses on the reference pages (#273) |
-| d Q2 (LOW) | **implemented** | `<SHA>` | #246 site 7 conversion makes "zero" true; pin = 0; a-F3 evidence corrected |
-| d W1 (LOW) | **implemented** | `<SHA>` | branch-b backup observes the cp; announce degrades; feeds _bk_fail |
-| d W2 (LOW) | **implemented** | `<SHA>` | both existing-config sites observe; third sibling swept in (see detail) |
-| d W3 (LOW) | **implemented** | `<SHA>` | recorder driven REAL (extract-eval); count exact = 10; comment honest |
+| d Q2 (LOW) | **implemented** | `116339b` | #246 site 7 converted; "zero" now true; pin = 0; evidence fixed |
+| d W1 (LOW) | **implemented** | `755de9a` | branch-b backup observes the cp; announce degrades; feeds _bk_fail |
+| d W2 (LOW) | **implemented** | `755de9a` | both existing-config sites observe; third sibling swept in (see detail) |
+| d W3 (LOW) | **implemented** | `755de9a` | recorder driven REAL (extract-eval); count exact = 10; comment honest |
+| d W4 (LOW) | **implemented** | `<SHA>` | count pin exact = 5; deleting the capture now fails the pin |
 
 ## Evidence detail
 
