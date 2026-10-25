@@ -2,7 +2,7 @@
 
 Case born in PR #259 (branch `feature/231-rules-revisit-pin-shapes`);
 wave under review: 886ada1 (snapshot a, base 02782b9, VERSION 0.0.56).
-Chain: a.
+Chain: a, b.
 
 ## Dispositions
 
@@ -10,7 +10,9 @@ Chain: a.
 |---|---|---|---|
 | a W1 (INFO) | **implemented** | `370ccd8` | prefix-anchored `rules-audit: 0 blocking`; 10-violation probe reds |
 | a Q1 (LOW) | **implemented** | `370ccd8` | all 7 refs qualified to `#222 …`; zero unqualified W-refs remain (grep) |
-| a Q2 (INFO) | **implemented** | `370ccd8` | `line_is` gains `-F`; wildcard-dot probe flips; suite green |
+| a Q2 (INFO) | **implemented** | `370ccd8` | `line_is` gains `-F`; all 12 call sites literal; suite green |
+| b Q1 (LOW) | **implemented** | `<SHA>` | impossible probe replaced by the real trailing-dot delta (#259 b Q1) |
+| b Q2 (LOW) | **implemented** | `<SHA>` | call-site count corrected 15 -> 12 (grep-pinned enumeration) |
 
 ## Evidence detail
 
@@ -49,21 +51,56 @@ implemented in the same round as W1/Q2, which are.
 
 `line_is` (tests/unit/test-rules-revisit.sh:53-55): `grep -qx` →
 `grep -qxF`, inline comment updated to name the fixed-string needle
-(`#259 a Q2`). All 15 call sites use literal needles (dates, dashes,
-parens — enumerated at :309-:350, :462, :523); none relies on BRE
-metacharacters, so `-F` is strictly correct: the wildcard-dot probe
-(haystack `next-revisit: 2026X12Y15` vs needle `next-revisit: 2026-12-15`)
-matched under the old BRE (`.` as any-char) and no longer does.
-Suite green post-change (39 pins).
+(`#259 a Q2`). All 12 call sites use literal needles (dates, dashes,
+parens — enumerated :309-:350, ten sites with the :312/:350 needles on
+the following line, plus :462 and :523); none relies on BRE semantics,
+so `-F` is strictly correct. Suite green post-change (39 pins).
+Evidence corrected in round b (#259 b Q1/#259 b Q2, detail blocks
+below): this block originally claimed a "wildcard-dot probe" flip
+(`2026X12Y15` vs `2026-12-15`) that cannot exist — the needle's
+variable positions are hyphens, literal in BRE, so rc=1 under both
+old and new semantics. The real BRE→`-F` delta: the two log-line
+needles ending `).` (:313, :351) — under BRE the trailing `.` matched
+any final char; `-F` pins it literal.
+
+### b Q1 (LOW) — impossible wildcard-dot probe claim corrected
+
+The fix wave's evidence for a Q2 (370ccd8 commit message + this
+file's a-Q2 block) described a probe that cannot discriminate:
+haystack `next-revisit: 2026X12Y15` vs needle
+`next-revisit: 2026-12-15` puts hyphens — not regex metacharacters —
+at the wildcard positions. Reproduced on the review host: `grep -qx`
+rc=1 AND `grep -qxF` rc=1; sanity probe `grep -qx 'a.c'` matches
+`abc` (rc=0) proves BRE dots work there, so the mismatch is the
+needle's shape, not the host. The reproducible delta the probe meant
+to show: needle `ok).` matches haystack `ok)!` under BRE (rc=0),
+exits 1 under `-F` — exactly the trailing-dot shape of the log-line
+needles at :313/:351. Fix: a-Q2 row and block rewritten to the real
+delta (this commit); the 370ccd8 message is immutable — this block
+and review-b.md (b Q1) are the correction of record.
+
+### b Q2 (LOW) — call-site count corrected
+
+"All 15 call sites" (370ccd8 message + a-Q2 block) miscounts:
+`grep -cE '\bline_is\b'` on the file returns 13 including the
+definition at :53 → **12** call sites (:309, :310, :311, :312,
+:318, :335, :336, :348, :349, :350, :462, :523; the :312/:350
+needles sit on the line after their call). The claim's ranges
+(:309-:350, :462, :523) were right; only the total was off by
+three. Every needle re-verified literal in round b — the
+load-bearing part ("none relies on BRE semantics") holds for all
+12. Fix: count corrected in the a-Q2 row and block (this commit).
 
 ## Chain / follow-ups
 
-- Round b owed: this fix wave touches test code (one needle, one helper
-  flag — review-relevant, RM-0065), so one wave review of this diff is
-  owed on the maintainer's go (RM-0106/RM-0107). Expectation, check cited
-  (RM-0115): round b's own material is comment lines + the W1 needle +
-  the Q2 flag; a round whose dispositions stay comment-only from there
-  leaves review-relevant code untouched (RM-0066).
+- Round b done (snapshot `c93f202` reviewed fix `370ccd8`,
+  single-session micro pass per USER commission): 2 LOW findings,
+  both disposed above — the round-b fixes touch only this file's
+  evidence prose, not review-relevant code (RM-0065/RM-0066), so no
+  round c is auto-owed; closure is the maintainer's call (a fixing
+  round never closes its own loop). When confirmed, the closure edit
+  sets the `Status:` line, fills the two `<SHA>` placeholders below,
+  and regenerates the INDEX — one commit.
 - `<SHA>` placeholders above are filled by the chain's next commit
   (check-then-commit on row width applies to that edit, issue #237).
 - Gates run before this fix commit: affected suite (39 pins green),
