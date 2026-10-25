@@ -76,7 +76,9 @@ the developer — it needs the Windows interop the agent must not have. See
   `--binary` "verification" is a liveness check — `opencode --version`
   runs — not an integrity check), and rootless backend provisioning runs
   get.docker.com as root. Installing means trusting GitHub, the opencode
-  releases, and get.docker.com at install time. The `KIT_BASE_URL` env
+  releases, the npm registry and `opencode.ai/v2/install` (2.x binary
+  resolution and the optional root-run installer fallback), and
+  get.docker.com at install time. The `KIT_BASE_URL` env
   override replaces the fetch target entirely — treat the install
   environment as trusted.
 - **OpenChamber serve password in the agent env:** when the serve feature is

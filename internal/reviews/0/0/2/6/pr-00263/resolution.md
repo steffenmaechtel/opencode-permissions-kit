@@ -8,10 +8,10 @@ maintainer surfaced issue #252 — the ticket behind the #256 docs
 shortening — whose ultra-legacy policy deliberately removed two of the
 externals' findings' subjects; those are dispositioned deliberately not
 done and marked in the snapshots. Deferred to backlog issues: #264-#267
-new (code), #268-#273 new (docs: b B3; c C3+C4; c C5; c C6; b B5+B6;
-c C9+C10+C11 — maintainer decision 2026-10-25: no docs changes ride this
-wave; minimal corrections only when picked up, no bulk restores per
-#252/#256), #245/#246/#247 existing.
+new (code), #268-#273 new (docs — later implemented in-wave as one-line
+corrections per the maintainer's commission, closing #268-#273 via the
+release PR; brevity held, no bulk restores per #252/#256),
+#245/#246/#247 existing.
 
 ## Dispositions
 
@@ -25,9 +25,9 @@ wave; minimal corrections only when picked up, no bulk restores per
 | a F15 (LOW) | **deliberately not done** | — | deferred to #267 (revert-loop exec-time recheck) |
 | b B1 + c C7 (LOW) | **deliberately not done** | — | #252 names 0.0.x→0.0.y update paths as removable legacy |
 | b B2 + c C1 (LOW) | **deliberately not done** | — | deferred to #265 (tee stderr-EPIPE arm, #223/#244 shape) |
-| b B3 (MED) | **deliberately not done** | — | deferred to #268 with the docs backlog (#252/#256 policy) |
+| b B3 (MED) | **implemented** | `<SHA>` | tee-overwrite truth stated, merge-promise gone (#268) |
 | b B4 (MED) | **deliberately not done** | — | #252/PR #256 name the 0.0.36 entry removal as policy |
-| b B5 + b B6 (LOW) | **deliberately not done** | — | deferred to #272 with the docs backlog (#252/#256 policy) |
+| b B5 + b B6 (LOW) | **implemented** | `<SHA>` | probe-fallback caveat + hosts mapping x2 pages (#272) |
 | c C2 (MED) | **implemented** | `092bcd6` | rc 1 propagates; arm pins A=1/B=0; ui_error sweep clean |
 | a F2(b) (MED) | **implemented** | `ed372e2` | X1 mirror x3; sanitized WARN; sweep recorded below |
 | a F3 (MED) | **implemented** | `656350e` | six run sites + 4 legacy siblings on un_rc_q; arms pinned |
@@ -46,10 +46,10 @@ wave; minimal corrections only when picked up, no bulk restores per
 | a F17 (LOW) | **implemented** | `<SHA>` | 14 bare citations qualified (#189/#208/#211/#224/#235/#243/#244/#256) |
 | a F18 (LOW) | **implemented** | `<SHA>` | extraction collects all case arms; comment matches reality |
 | a F26 (INFO) | **implemented** | `<SHA>` | seq in check-host required list |
-| c C3 + c C4 (MED/LOW) | **deliberately not done** | — | deferred to #269 with the docs backlog (#252/#256 policy) |
-| c C5 (MED) | **deliberately not done** | — | deferred to #270 with the docs backlog (#252/#256 policy) |
-| c C6 (MED) | **deliberately not done** | — | deferred to #271 with the docs backlog (#252/#256 policy) |
-| c C9 + c C10 + c C11 (LOW) | **deliberately not done** | — | deferred to #273 with the docs backlog (#252/#256) |
+| c C3 + c C4 (MED/LOW) | **implemented** | `<SHA>` | per-component claim dropped, residual restored (#269) |
+| c C5 (MED) | **implemented** | `<SHA>` | npm + opencode.ai named in the trust sentence (#270) |
+| c C6 (MED) | **implemented** | `<SHA>` | export conditions + verify advice, pins both ways (#271) |
+| c C9 + c C10 + c C11 (LOW) | **implemented** | `<SHA>` | three scoping clauses on the reference pages (#273) |
 
 ## Evidence detail
 

@@ -285,6 +285,36 @@ if ! grep -q 'python3 is required but not installed' "$REPO_ROOT/files/install.s
     echo "FAIL install.sh: python3 probe abort messages drifted — docs claim and code disagree (#263 a F5)" >> "$TMP"
 fi
 
+# --- pr-00263 docs one-liners (#268-#273, maintainer-commissioned) ---------------
+# Each fix is one sentence (the #252 brevity policy holds); every new
+# anchor is pinned present, every removed lie pinned absent.
+grep -q 'an existing `daemon.json` is overwritten' "$REPO_ROOT/docs/troubleshooting.md" \
+    || echo "FAIL troubleshooting.md: daemon.json tee overwrite truth missing (#268 b B3)" >> "$TMP"
+grep -q 'gets the key merged in' "$REPO_ROOT/docs/troubleshooting.md" \
+    && echo "FAIL troubleshooting.md: the merge-promise lie is back (#268 b B3)" >> "$TMP"
+grep -q 'pre-arranged group/world-writable paths survive' "$REPO_ROOT/docs/reference/cli.md" \
+    || echo "FAIL cli.md: handover residual caveat missing (#269 c C4)" >> "$TMP"
+grep -q 'every path component is re-checked' "$REPO_ROOT/docs/reference/cli.md" \
+    && echo "FAIL cli.md: the per-component claim is back (#269 c C3)" >> "$TMP"
+grep -q 'opencode.ai/v2/install' "$REPO_ROOT/docs/concepts/security-model.md" \
+    || echo "FAIL security-model.md: trust list lost the root-run sources (#270 c C5)" >> "$TMP"
+grep -q -- '--skip-ddev-migration' "$REPO_ROOT/docs/getting-started.md" \
+    || echo "FAIL getting-started.md: export conditions missing (#271 c C6)" >> "$TMP"
+grep -q 'databases were exported' "$REPO_ROOT/docs/getting-started.md" \
+    && echo "FAIL getting-started.md: unconditional export claim is back (#271 c C6)" >> "$TMP"
+grep -q 'only the project config' "$REPO_ROOT/docs/how-to/container-tools.md" \
+    || echo "FAIL container-tools.md: probe-fallback caveat missing (#272 b B5)" >> "$TMP"
+for _d1p in docs/troubleshooting.md docs/concepts/ddev-integration.md; do
+    grep -q '127.0.0.1 <project>.<tld>' "$REPO_ROOT/$_d1p" \
+        || echo "FAIL $_d1p: hosts mapping form missing (#272 b B6)" >> "$TMP"
+done
+grep -q 'never overwritten by install or' "$REPO_ROOT/docs/reference/files.md" \
+    || echo "FAIL files.md: never-overwritten scope missing (#273 c C9)" >> "$TMP"
+grep -q 'checked helper families' "$REPO_ROOT/docs/reference/cli.md" \
+    || echo "FAIL cli.md: missing-library scope missing (#273 c C10)" >> "$TMP"
+grep -q 'pre-install exception: full mode exits 0' "$REPO_ROOT/docs/reference/cli.md" \
+    || echo "FAIL cli.md: pre-install exit-code exception missing (#273 c C11)" >> "$TMP"
+
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"
     cat "$TMP"

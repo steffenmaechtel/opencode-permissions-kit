@@ -75,7 +75,8 @@ Kit-owned when it pins `opencodeBinary` to `/usr/local/bin/opencode`
 [the how-to](../how-to/openchamber.md#prevent-the-bypass-the-policy-pin).
 Written by the install opt-in or `opk openchamber-secure`, re-applied by
 `opk update` only while the file still matches the kit one-liner — a file
-with other content is admin-owned and never overwritten. `opk uninstall`
+with other content is admin-owned and never overwritten by install or
+update (`opk openchamber-secure` announces and replaces it). `opk uninstall`
 removes it only when it pins the kit wrapper.
 
 ## /etc/sudoers.d/

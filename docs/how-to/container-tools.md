@@ -19,7 +19,9 @@ The wrapper asks opencode itself for that final config (`opencode debug
 config`, resolved as the `opencode` user from the project directory), so a
 broad allow counts no matter which file declares it. The allow must be
 broad — `docker *` / `ddev *`, not subcommand-only — and may live in the
-project's `opencode.json[c]` or in the opencode user's global config.
+project's `opencode.json[c]` or in the opencode user's global config. If
+the `opencode debug config` probe is unavailable, only the project config
+is scanned — a global-only allow is not detected then.
 
 ## Opt a project in
 

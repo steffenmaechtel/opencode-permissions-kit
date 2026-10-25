@@ -123,9 +123,10 @@ loud warning about `~/.opencode/bin` or a bypass, see
 The **first** `ddev start` is slow (mutagen download, image pulls); every
 later start reuses that state.
 
-If you had ddev projects before the kit, their databases were exported to
-`/var/backups/opencode-permissions-kit/ddev-migration-*/`. Re-import when
-ready:
+If the installer exported your ddev projects' databases (Standard mode, or
+Advanced after confirming — `--skip-ddev-migration` skips), they are in
+`/var/backups/opencode-permissions-kit/ddev-migration-*/` — verify the
+dumps before removing anything. Re-import when ready:
 
 ```bash
 sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import

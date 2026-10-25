@@ -108,8 +108,8 @@ whole home directories are refused — hand over project trees, not systems
 `.` or `..` components are refused too: the kit never hands a tree over
 through a link (`--dry-run` lists the refusals it would make). The
 chown/chmod passes are ordered per direction so a planted link cannot steer
-them, and every path component is re-checked immediately before the
-iteration acts.
+them; pre-arranged group/world-writable paths survive the passes in either
+order.
 
 ## ensure-shared
 
@@ -295,12 +295,14 @@ sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh
 
 Exit codes: `0` all green, `1` alert(s), `2` warning(s) only, `64` for a
 usage error — the full report uses the same codes, so scripts can judge an
-installed-but-degraded kit. Rows the caller cannot judge at their own
+installed-but-degraded kit (pre-install exception: full mode exits 0,
+`--short` exits 1 — use `--short` when absence must fail). Rows the caller cannot judge at their own
 privilege ("unknown — needs root to check") and optional-feature rows never
 count toward the verdict: `sudo opk status` resolves the privilege
 unknowns. Two exceptions always count: a managed binary that is missing,
 unexecutable or corrupt (no privilege can fix that), and a missing kit
-library file (a damaged deploy — the row names the missing kit file and
+library file from the checked helper families (a damaged deploy — the row
+names the missing kit file and
 the repair hint `fix: sudo opk update`; the advisories row names the
 skipped security checks instead).
 

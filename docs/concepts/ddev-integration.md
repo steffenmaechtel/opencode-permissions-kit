@@ -256,7 +256,8 @@ opk ddev-hosts-add     # add it (Windows asks permission)
 `ddev start`/`restart` the `ddev()` shell function prints the missing
 hostnames with one ready-made command each. Hostnames under the default
 `*.ddev.site` TLD never need an entry (ddev's public wildcard DNS). Manual
-fallback: edit the hosts file in an elevated editor.
+fallback: edit the hosts file in an elevated editor and add
+`127.0.0.1 <project>.<tld>` per hostname.
 
 ## The SSH-key trade-off
 
