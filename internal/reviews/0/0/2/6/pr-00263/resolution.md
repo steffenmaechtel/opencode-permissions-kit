@@ -62,8 +62,8 @@ evidence block).
 | d W2 (LOW) | **implemented** | `755de9a` | both existing-config sites observe; third sibling swept in (see detail) |
 | d W3 (LOW) | **implemented** | `755de9a` | recorder driven REAL (extract-eval); count exact = 10; comment honest |
 | d W4 (LOW) | **implemented** | `a51874b` | count pin exact = 5; deleting the capture now fails the pin |
-| d Q1 (MED) | **implemented** | `<SHA>` | e2e discharge recorded: 701b867 309+47; this wave a51874b 309+47 (RM-0113) |
-| d Q3 (LOW) | **implemented** | `<SHA>` | ledger correction note added; commit messages are immutable history |
+| d Q1 (MED) | **implemented** | `054a39a` | e2e discharge recorded (RM-0113) — trees + counts in the detail block |
+| d Q3 (LOW) | **implemented** | `054a39a` | ledger correction note added; commit messages are immutable history |
 | d W5 (INFO) | **deliberately not done** | — | deletion discriminates; static presence pins are house practice |
 | d W6 (INFO) | **deliberately not done** | — | tripwire fails loud on all three failure shapes; no hole |
 | d S1 (INFO) | **deliberately not done** | — | trailing hyphen has no downstream harm; leading hyphen rejected |
