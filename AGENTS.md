@@ -142,6 +142,17 @@ review fan-out the tree is a shared read substrate: sabotage only (a)
 before the reviewers launch, (b) after all returned, or (c) in a scratch
 worktree — the window and screening rules live in
 [review-concept.md](agent/review-concept.md#parallel-reviewer-agents).
+**Gate runs are one unbroken `&&` chain ending in the commit.** No
+`| tail` or any pipe on a gate command (the pipeline returns the last
+member's rc — a red gate goes green through it), no `;` separator after
+a gate (the chain breaks; whatever follows runs on red), `set -o
+pipefail` when wrapping is needed anyway; redirect gate output to a log
+file instead of piping it away. Two live instances on 2026-10-25, both
+in pr-00263: the fix wave committed through a red line-length ratchet
+behind a piped gate, and the d wave's `; echo` separator let a
+121-char resolution row slip past the gate (caught by amending the
+still-unpushed commit). Check-then-commit is only protection if the
+check can fail the chain.
 
 Both e2e suites are part of the definition of done for changes to
 `install.sh`, `update.sh`, the wrapper, or backend provisioning — and for
@@ -207,8 +218,11 @@ aid:
 When this repo is worked on through the kit itself (the agent runs as the
 `opencode` user), the checkout is owned by the human user with group write
 for `opencode`: file CONTENTS are editable, but `chmod`/`chown` are not —
-the agent is not the owner (`git update-index --chmod=…` still works; it
-only touches the index). When a mode change is needed:
+the agent is not the owner of the pre-existing tree
+(`git update-index --chmod=…` still works; it only touches the index).
+Files the agent itself creates are the exception: the agent IS their
+owner and may `chmod` them (verified 2026-10-25). When a mode change is
+needed:
 
 1. Stage the authoritative change yourself:
    `git update-index --chmod=+x <path>` (or `--chmod=-x`) — the index is

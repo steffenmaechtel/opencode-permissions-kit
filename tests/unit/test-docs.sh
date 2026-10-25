@@ -193,12 +193,20 @@ for _f36_df in $_f36_docflags; do
 done
 
 # --- a W1 (pr-00256): ddev-integration root-file types track the code -------
-# matcher (claim-drift guard, the W1 rename class): every root-file type
-# ddev-handover.sh matches must appear backticked in the docs page.
+# matcher (claim-drift guard, the W1 rename class): every arm of the
+# root-file case in ddev-handover.sh must appear backticked in the docs
+# page. pr-00263 a F18: the extraction collects ALL arms of that case
+# (the old head -n 1 let a future second arm escape direction A).
 # Sabotage: rename `shopware6` to `shopware` in the docs — this goes red.
 _w1_doc="$REPO_ROOT/docs/concepts/ddev-integration.md"
 _w1_lib="$REPO_ROOT/files/opencode-permissions-kit-lib/sh/ddev-handover.sh"
-_w1_types="$(sed -n 's/^[[:space:]]*codeigniter|\([a-z0-9|]*\)).*/\1/p' "$_w1_lib" | head -n 1 | tr '|' ' ')"
+_w1_types="$(awk '/^[[:space:]]*codeigniter\|/{f=1}
+f {
+    if ($0 ~ /^[[:space:]]*[a-z0-9|]+\)[[:space:]]*$/) {
+        line=$0; gsub(/[[:space:]]|\)/, "", line); printf "%s ", line
+    }
+    if ($0 ~ /;;/) exit
+}' "$_w1_lib" | tr '|' ' ')"
 if [ -z "$_w1_types" ]; then
     echo "FAIL ddev-integration.md: root-file matcher extraction empty — anchor drift? (#256 a W1)" >> "$TMP"
 fi
@@ -207,7 +215,7 @@ for _w1_t in codeigniter $_w1_types; do
         || echo "FAIL ddev-integration.md: root-file type '$_w1_t' missing from the docs (#256 a W1)" >> "$TMP"
 done
 # #256 b B2: reverse direction — every type the docs paragraph lists must
-# exist in the code matcher (the addition direction of the a-W1 class, the
+# exist in the code matcher (the addition direction of the #256 a W1 class, the
 # #211 b W30 shape). Wildcard forms count too: the matcher arms are literal,
 # so a `drupal*`-style token in the root-file paragraph is drift by
 # definition. Tripwire: a drifted paragraph anchor must not silently
@@ -260,6 +268,52 @@ if [ -n "$_w5_word" ]; then
     grep -qF "defaults to **$_w5_word**" "$REPO_ROOT/docs/getting-started.md" \
         || echo "FAIL getting-started.md: agent-resources Enter default does not track install.sh ('$_w5_def' => $_w5_word) (#256 a W5)" >> "$TMP"
 fi
+
+# --- pr-00263 a F5 (c C8): getting-started's python3 prerequisite must
+# state the installer's HARD gate — both _py3_health_probe arms exit 1 —
+# not install-time survival (claim-drift guard, both directions: the abort
+# claim disappearing reds, the old "still applies without it" survival
+# claim returning reds; code-side anchors trip on probe rewording).
+if ! grep -q 'installer aborts if `python3` is' "$REPO_ROOT/docs/getting-started.md"; then
+    echo "FAIL getting-started.md: python3 prerequisite lost the abort claim (#263 a F5)" >> "$TMP"
+fi
+if grep -q 'baseline still applies without it' "$REPO_ROOT/docs/getting-started.md"; then
+    echo "FAIL getting-started.md: python3 prerequisite claims install-time survival — the installer aborts (#263 a F5)" >> "$TMP"
+fi
+if ! grep -q 'python3 is required but not installed' "$REPO_ROOT/files/install.sh" \
+   || ! grep -q 'python3 is present but broken' "$REPO_ROOT/files/install.sh"; then
+    echo "FAIL install.sh: python3 probe abort messages drifted — docs claim and code disagree (#263 a F5)" >> "$TMP"
+fi
+
+# --- pr-00263 docs one-liners (#268-#273, maintainer-commissioned) ---------------
+# Each fix is one sentence (the #252 brevity policy holds); every new
+# anchor is pinned present, every removed lie pinned absent.
+grep -q 'an existing `daemon.json` is overwritten' "$REPO_ROOT/docs/troubleshooting.md" \
+    || echo "FAIL troubleshooting.md: daemon.json tee overwrite truth missing (#268 b B3)" >> "$TMP"
+grep -q 'gets the key merged in' "$REPO_ROOT/docs/troubleshooting.md" \
+    && echo "FAIL troubleshooting.md: the merge-promise lie is back (#268 b B3)" >> "$TMP"
+grep -q 'pre-arranged group/world-writable paths survive' "$REPO_ROOT/docs/reference/cli.md" \
+    || echo "FAIL cli.md: handover residual caveat missing (#269 c C4)" >> "$TMP"
+grep -q 'every path component is re-checked' "$REPO_ROOT/docs/reference/cli.md" \
+    && echo "FAIL cli.md: the per-component claim is back (#269 c C3)" >> "$TMP"
+grep -q 'opencode.ai/v2/install' "$REPO_ROOT/docs/concepts/security-model.md" \
+    || echo "FAIL security-model.md: trust list lost the root-run sources (#270 c C5)" >> "$TMP"
+grep -q -- '--skip-ddev-migration' "$REPO_ROOT/docs/getting-started.md" \
+    || echo "FAIL getting-started.md: export conditions missing (#271 c C6)" >> "$TMP"
+grep -q 'databases were exported' "$REPO_ROOT/docs/getting-started.md" \
+    && echo "FAIL getting-started.md: unconditional export claim is back (#271 c C6)" >> "$TMP"
+grep -q 'only the project config' "$REPO_ROOT/docs/how-to/container-tools.md" \
+    || echo "FAIL container-tools.md: probe-fallback caveat missing (#272 b B5)" >> "$TMP"
+for _d1p in docs/troubleshooting.md docs/concepts/ddev-integration.md; do
+    grep -q '127.0.0.1 <project>.<tld>' "$REPO_ROOT/$_d1p" \
+        || echo "FAIL $_d1p: hosts mapping form missing (#272 b B6)" >> "$TMP"
+done
+grep -q 'never overwritten by install or' "$REPO_ROOT/docs/reference/files.md" \
+    || echo "FAIL files.md: never-overwritten scope missing (#273 c C9)" >> "$TMP"
+grep -q 'checked helper families' "$REPO_ROOT/docs/reference/cli.md" \
+    || echo "FAIL cli.md: missing-library scope missing (#273 c C10)" >> "$TMP"
+grep -q 'pre-install exception: full mode exits 0' "$REPO_ROOT/docs/reference/cli.md" \
+    || echo "FAIL cli.md: pre-install exit-code exception missing (#273 c C11)" >> "$TMP"
 
 if [ -s "$TMP" ]; then
     echo "docs link check: FAILED"

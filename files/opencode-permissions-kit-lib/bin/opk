@@ -325,8 +325,11 @@ PYEOF
                 # (#244 h S3): no key removed (g S1), unparseable
                 # JSON, python3 missing, write failure — all fail
                 # closed; the unit pin separates via empty stderr.
+                # pr-00263 c C2: failing closed includes the rc — the
+                # branch used to fall through to exit 0.
                 ui_error "could not update $_oc_settings — remove the \"opencodeBinary\""
-                ui_error "line by hand (docs/how-to/openchamber.md)"
+                ui_error "entry (key or value) by hand — docs/how-to/openchamber.md"
+                exit 1
             fi
         fi
         ui_detail "restart OpenChamber if it is running (full stop + start)"

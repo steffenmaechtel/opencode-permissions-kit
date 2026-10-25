@@ -2713,6 +2713,74 @@ else
     fail "#221: KeyboardInterrupt must not print a traceback (b W1)"
 fi
 
+# --- pr-00263 a F2(b): OPENCODE_USER shape gate in status.sh (#243 e X1 mirror) --
+# Extract and drive REAL (the uninstall-suite idiom): valid custom name
+# and canonical literal pass through silently; the trailing-slash
+# spelling that feeds id -gn and the report rows falls back loudly; a
+# newline-bearing value cannot forge a second transcript line
+# (sanitized WARN — the a F9 class: one line, sanitized form).
+_f2bW="$(mktemp -d)"
+_f2bG="$(sed -n '/^case "$OPENCODE_USER" in$/,/^esac$/p' "$STATUS")"
+if [ -n "$_f2bG" ] && printf '%s' "$_f2bG" | grep -q 'falling back'; then
+    pass "status.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"
+else
+    fail "status.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"
+fi
+_f2b_new=$(
+    OPENCODE_USER=untest-agent
+    eval "$_f2bG" 2>"$_f2bW/ok.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_canon=$(
+    OPENCODE_USER=opencode
+    eval "$_f2bG" 2>>"$_f2bW/ok.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_bad=$(
+    OPENCODE_USER="untest-agent/"
+    eval "$_f2bG" 2>"$_f2bW/bad.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_nl=$(
+    OPENCODE_USER="$(printf 'oco\nd')"
+    eval "$_f2bG" 2>"$_f2bW/nl.log"
+    printf '%s' "$OPENCODE_USER"
+)
+if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] \
+    && [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] \
+    && grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" \
+    && [ "$_f2b_nl" = "opencode" ] \
+    && [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] \
+    && grep -q 'oco?d' "$_f2bW/nl.log"; then
+    pass "status.sh gate arms: passthrough silent, fallback loud, newline sanitized (pr-00263 a F2b)"
+else
+    fail "status.sh gate arms (pr-00263 a F2b)"
+fi
+
+# --- pr-00263 a F11: a shape-invalid advisory feed is "unavailable", never a traceback
+# The embedded python is extracted and driven REAL both directions: a
+# dict envelope exits 1 SILENT (the old shape raised a raw traceback on
+# cron stderr); a list with null and scalar entries yields exactly the
+# real ids.
+ADVPY="$(sed -n "/python3 -c 'import json,sys$/,/' ); then\$/p" "$STATUS" | sed -e "1s/^.*python3 -c '//" -e "\$s/' ); then\$//")"
+if [ -n "$ADVPY" ] && printf '%s' "$ADVPY" | grep -q 'isinstance(feed, list)'; then
+    pass "advisory feed parser extractable + shape gate present (pr-00263 a F11)"
+else
+    fail "advisory feed parser extraction/shape gate (pr-00263 a F11)"
+fi
+_adv_rc1=0
+_adv_rc2=0
+_adv_err="$(printf '{"envelope":1}' | python3 -c "$ADVPY" 2>&1 >/dev/null)" || _adv_rc1=$?
+_adv_out="$(printf '[{"ghsa_id":"GHSA-1"},{"ghsa_id":null},3]' | python3 -c "$ADVPY" 2>/dev/null)" || _adv_rc2=$?
+if [ "$_adv_rc1" -ne 0 ] && [ -z "$_adv_err" ] \
+    && [ "$_adv_rc2" -eq 0 ] \
+    && [ "$(printf '%s' "$_adv_out" | grep -c .)" = 1 ] \
+    && printf '%s' "$_adv_out" | grep -q 'GHSA-1'; then
+    pass "shape-invalid feed silent-unavailable; list feed yields ids only (pr-00263 a F11)"
+else
+    fail "advisory feed shape arms (pr-00263 a F11, rc1=$_adv_rc1 rc2=$_adv_rc2 err=$_adv_err out=$_adv_out)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

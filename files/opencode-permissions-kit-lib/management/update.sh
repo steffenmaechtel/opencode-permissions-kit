@@ -439,6 +439,18 @@ fi
 VERSION="$KIT_VERSION"
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# Shape-gate the sourced value (#243 e X1 mirror, pr-00263 a F2b): the
+# conf is root-owned but hand-editable; a shape-invalid value feeds the
+# id check, the sudo -u hop and the ddev-handover argv over the
+# projects.conf roots below — fall back to the canonical literal,
+# loudly; the WARN is sanitized (pr-00263 a F9 class).
+case "$OPENCODE_USER" in
+    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+        _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
+        OPENCODE_USER=opencode
+        ;;
+esac
 # Developer home via getent (issue #192, the 0.0.44a V14 class in the
 # sibling management scripts): /home/$DEFAULT_USER is a guess that misses
 # relocated homes — and on a root-shell install (DEFAULT_USER=root) it
@@ -723,7 +735,10 @@ if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ];
 else
     # Conservative skip (0.0.41f S2): the existing validated sudoers stays
     # active — near-unreachable (fetch list + heal guarantee the file),
-    # but the skip must not be silent.
+    # but the skip must not be silent. pr-00263 a F7: log() alone is the
+    # no-op stub when log.sh is missing from both roots — the skip also
+    # needs a terminal line.
+    ui_detail "sudoers re-deploy skipped: template missing (existing sudoers kept)"
     log "sudoers re-deploy skipped: template missing from $FILES_ROOT (existing sudoers kept)"
 fi
 
@@ -747,6 +762,9 @@ else
     # shape, #211 a F6): near-unreachable (fetch list + heal guarantee
     # the file), but the skip must not be silent — an update that
     # quietly dropped a protection-layer deploy is undebuggable.
+    # pr-00263 a F7: terminal line too (log() alone degrades to the
+    # no-op stub when log.sh is missing from both roots).
+    ui_detail "umask profile re-deploy skipped: source file missing (existing profile kept)"
     log "umask profile re-deploy skipped: $FILES_ROOT/etc/umask.sh missing (existing profile kept)"
 fi
 

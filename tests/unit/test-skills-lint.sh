@@ -90,6 +90,12 @@ trap 'rm -f "$TMP"' EXIT
 lint_skills() {
     _root="$1"
     [ -d "$_root" ] || { echo "FAIL skills root missing: $_root"; return; }
+    # pr-00263 a F16: a bare file at the skills root loads too — the
+    # house shape is one directory per skill, so it FAILs, never skips.
+    for _f in "$_root"/*; do
+        [ -f "$_f" ] || continue
+        echo "FAIL $(basename "$_f"): bare file at the skills root (house shape: one directory per skill)"
+    done
     for _d in "$_root"/*/; do
         [ -d "$_d" ] || continue
         _name=$(basename "$_d")
@@ -335,7 +341,7 @@ case "$_out" in
 esac
 case "$_out" in
     *"FAIL opk-scan-err: references local/"*)
-        echo "  PIN BROKEN: scan-err fixture also trips the hit branch (b S3)" >> "$TMP" ;;
+        echo "  PIN BROKEN: scan-err fixture also trips the hit branch (#235 b S3)" >> "$TMP" ;;
     *) echo "  pin ok: scan-err fixture exercises the err path alone" ;;
 esac
 case "$_out" in
@@ -348,14 +354,14 @@ case "$_out" in
 esac
 case "$_out" in
     *"FAIL opk-dblslash-local: references local/"*) echo "  pin ok: doubled-slash workspace refs caught" ;;
-    *) echo "  PIN BROKEN: .//local/ or ..//local/ reference not caught (c S1)" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: .//local/ or ..//local/ reference not caught (#235 c S1)" >> "$TMP" ;;
 esac
 if [ "$(id -u)" -eq 0 ]; then
     echo "  pin skipped: find-error needs a non-root uid (root reads through 000)"
 else
     case "$_out" in
         *"FAIL opk-find-err: local/ scan errored"*) echo "  pin ok: find-stage error is a FAIL, not a clean" ;;
-        *) echo "  PIN BROKEN: find error silently clean (b S4/B2)" >> "$TMP" ;;
+        *) echo "  PIN BROKEN: find error silently clean (#235 b S4/B2)" >> "$TMP" ;;
     esac
 fi
 case "$_out" in
@@ -375,6 +381,26 @@ esac
 # --- real tree ----------------------------------------------------------
 
 lint_skills .agents/skills >> "$TMP" 2>&1
+
+# pr-00263 a F16: a bare file at the skills root FAILs loudly — the
+# loop used to examine directories only, so a bare file (which the
+# loader picks up) was silently unexamined.
+F16W="$(mktemp -d)"
+mkdir -p "$F16W/skills/opk-ok"
+cat > "$F16W/skills/opk-ok/SKILL.md" <<'EOF'
+---
+name: opk-ok
+description: Fixture for the bare-file pin.
+---
+Body.
+EOF
+printf 'bare\n' > "$F16W/skills/bare-at-root.md"
+_out16="$(lint_skills "$F16W/skills")"
+case "$_out16" in
+    *"FAIL bare-at-root.md: bare file at the skills root"*) : ;;
+    *) echo "  PIN BROKEN: bare file at the skills root unexamined (pr-00263 a F16)" >> "$TMP" ;;
+esac
+rm -rf "${F16W:?}"
 
 if [ -s "$TMP" ]; then
     echo "FAIL skills lint:"

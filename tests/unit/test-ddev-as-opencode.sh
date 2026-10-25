@@ -1028,7 +1028,7 @@ rm -rf "${HWORK:?}/fastpath"
 # scan stream (the buffer is the barrier — a stream-through stub races
 # the consumer loop). The component walk must skip the WHOLE
 # iteration; a deleted or voided walk chmods through the link (victim
-# 620) and the pins go red. The slashed scan root (b W7 shape) rides in
+# 620) and the pins go red. The slashed scan root (#211 b W7 shape) rides in
 # the same drive: an unnormalized root voids the walk's prefix match
 # the same way. The victim carries config.yaml + a settings dir so the
 # drive also pins the iteration TAIL (ddev_handover_project) never

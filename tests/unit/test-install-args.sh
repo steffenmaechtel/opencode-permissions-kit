@@ -1117,6 +1117,46 @@ else
     fail "_py3_health_probe defined in install.sh"
 fi
 
+# --- pr-00263 a F6/F8/F19 + d W1/W2/W3: fail-loud backups + wrapper ---------------
+# F6: backup copies record failures loudly (_bk_fail) and degrade the
+# closing Backup summary row; F8: both getfacl backup sites observe the
+# copy before announcing recovery material; F19: the official-installer
+# pipe carries its failure (pipefail) into a kit error wrapper.
+# pr-00263 d W1/W2: the three sites the a-wave sweep missed (binary-menu
+# branch b, existing-config replace, re-render twin) observe their copy
+# too. The recorder itself is DRIVEN below (extract-eval, both arms);
+# the site wirings are anchored statically (exact call count + announce
+# anchors); e2e drives install success paths, not failure arms.
+# pr-00263 e W2: drive a production-shaped label — the real call site
+# (install.sh:723) interpolates the invoking user (DEFAULT_USER from
+# SUDO_USER/whoami, :630), never an empty string.
+DEFAULT_USER=opencode
+_BKDEF="$(sed -n '/^    _BK_FAIL=""$/,/^    }$/p' "$INSTALL")"
+if [ -n "$_BKDEF" ] && (
+        eval "$_BKDEF"
+        _bk_fail "gitconfig-$DEFAULT_USER"
+        _bk_fail "sudoers"
+        [ "$_BK_FAIL" = "gitconfig-$DEFAULT_USER, sudoers" ]
+    ) 2>/dev/null; then
+    pass "recorder accumulates failed labels (extract-eval, driven REAL) (pr-00263 a F6 + d W3)"
+else
+    fail "recorder broken — accumulation shape changed (pr-00263 a F6 + d W3)"
+fi
+[ "$(grep -c '_bk_fail' "$INSTALL")" = 10 ] \
+    && grep -qF 'INCOMPLETE: $_BK_FAIL' "$INSTALL" \
+    && pass "backup failures record loudly + degrade the summary row (pr-00263 a F6 + d W1/W2)" \
+    || fail "backup failure silence survived somewhere (pr-00263 a F6 + d W1/W2)"
+[ "$(grep -cF 'config backup FAILED — see Backup summary' "$INSTALL")" = 2 ] \
+    && grep -qF 'binary backup FAILED — see Backup summary' "$INSTALL" \
+    && pass "the three swept backup sites degrade their announce on failure (pr-00263 d W1/W2)" \
+    || fail "a backup announce still lies on failure (pr-00263 d W1/W2)"
+[ "$(grep -cF 'no ACL recovery material' "$INSTALL")" = 2 ] \
+    && pass "both getfacl backups announce failure instead of success (pr-00263 a F8)" \
+    || fail "a getfacl success line still lies (pr-00263 a F8)"
+grep -qF 'the official opencode installer failed' "$INSTALL" \
+    && pass "official-installer pipe has the kit error wrapper (pr-00263 a F19)" \
+    || fail "official-installer failure still bare (pr-00263 a F19)"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

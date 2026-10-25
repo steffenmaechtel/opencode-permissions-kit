@@ -6,9 +6,10 @@ Install the kit on your machine and verify that the agent runs separated.
 
 - WSL2 (or any Linux with ACL support and, for docker-rootless, systemd)
 - a supported distro — see the [support matrix](#supported-distros)
-- `sudo` access, `curl`, `python3` — the installer probes `python3` missing
-  or broken; the baseline still applies without it, minus the live counters
-  ([the sharing group](concepts/sharing-group.md#re-applying-the-baseline))
+- `sudo` access, `curl`, `python3` — the installer aborts if `python3` is
+  missing or broken. On an installed kit the group baseline degrades
+  without it (no live counters —
+  [the sharing group](concepts/sharing-group.md#re-applying-the-baseline))
 - `git` ≥ 2.30 — older versions warn, the installer never aborts over git
 - ddev ≥ 1.25, if ddev is installed (the installer aborts on older versions)
 
@@ -122,9 +123,10 @@ loud warning about `~/.opencode/bin` or a bypass, see
 The **first** `ddev start` is slow (mutagen download, image pulls); every
 later start reuses that state.
 
-If you had ddev projects before the kit, their databases were exported to
-`/var/backups/opencode-permissions-kit/ddev-migration-*/`. Re-import when
-ready:
+If the installer exported your ddev projects' databases (Standard mode, or
+Advanced after confirming — `--skip-ddev-migration` skips), they are in
+`/var/backups/opencode-permissions-kit/ddev-migration-*/` — verify the
+dumps before removing anything. Re-import when ready:
 
 ```bash
 sudo sh /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import

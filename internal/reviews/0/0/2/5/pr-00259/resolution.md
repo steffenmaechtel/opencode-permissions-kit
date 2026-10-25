@@ -1,7 +1,7 @@
 # Resolution — pr-00259 (pin-shape hardening in test-rules-revisit.sh)
 
-Status: closed 2026-10-25 — confirmed by the maintainer in-session (round b report: "ok dann fixen und close
-  machen"); stop-rule check: round b ([review-b.md](review-b.md), `c93f202`) found 2 LOW evidence-accuracy
+Status: closed 2026-10-25 — confirmed by the maintainer in-session;
+  stop-rule check: round b ([review-b.md](review-b.md), `c93f202`) found 2 LOW evidence-accuracy
   findings, both dispositioned implemented in `cc8e5d3` — files touched = resolution.md only (evidence prose +
   bookkeeping, RM-0065, loop closed per RM-0066); round-a findings were already dispositioned in `370ccd8`;
   no reviews owed-but-not-run (single-session pass per USER commission, disclosed in review-b's Calibration).

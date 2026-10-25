@@ -1,6 +1,6 @@
 #!/bin/sh
 # Unit tests for uninstall.sh (no root, no install needed):
-#   - the run() wrapper echoes in dry-run mode instead of executing
+#   - the dry-run arms echo [DRY] + the success lines, nothing executes
 #   - root / opencode invocations are refused
 #   - project-path screening: system paths from projects.conf are never
 #     passed to setfacl/chmod (protects against a tampered conf)
@@ -88,7 +88,7 @@ else
     # the agents-backup probes (0.0.45c C6 + 0.0.45d W2: sudo ls -A and
     # sudo test -d — read-only, the gate must fail safe in dry-run too),
     # the issue #164 openchamber presence/content probes (sudo test -f +
-    # sudo grep -q — read-only, and deliberately OUTSIDE run() so they
+    # sudo grep -q — read-only, and deliberately unwrapped so they
     # see the file at the rm's authority), and the #198 a W1 legacy
     # sudoers probes (sudo test -L + sudo readlink — same read-only
     # gate-at-the-write's-authority class); any OTHER sudo command in
@@ -229,7 +229,7 @@ else
     fail "screening patterns extractable from uninstall.sh"
 fi
 # Block-identity pin (#243 c S1): a decoy case block with /-leading
-# arms — the b-S1 reorder hazard shape, plus a `/*)` arm and a
+# arms — the #243 b-S1 reorder hazard shape, plus a `/*)` arm and a
 # backslash continuation — must contribute nothing; only the block
 # whose body echoes "Skipping system path" yields tokens. A reversion
 # to a shape-keyed grep pulls the decoy arms in and reds this pin.
@@ -368,7 +368,7 @@ fi
 # uid/gid, because the user removal above may already have orphaned the
 # ids. Functional: the project loop is extracted verbatim (it hardcodes
 # the conf path, so it is fed a fake root via stdin) and run with a
-# logging run() stub; the captured uid 60000 and the DISTINCT gids
+# logging sudo() stub; the captured uid 60000 and the DISTINCT gids
 # (oc 60002 / dev 60001) must land inside the find and the ACL removal,
 # with chown to DEFAULT_USER:<dev-group>. The loop
 # is extracted verbatim except for its stdin redirect (the conf path is
@@ -425,6 +425,20 @@ if [ "$_ou_new" = "untest-agent" ] && [ "$_ou_canon" = "opencode" ] \
     pass "OPENCODE_USER gate: valid/canonical pass through, corrupted falls back loudly (#243 e X1)"
 else
     fail "OPENCODE_USER gate arms (#243 e X1)"
+fi
+# pr-00263 a F9: the WARN echo is sanitized — a newline-bearing value
+# stays exactly one WARN line (the raw echo forged transcript lines).
+_ou_nl=$(
+    OPENCODE_USER="$(printf 'oco\nd')"
+    eval "$UN_OCU_GATE" 2>"$WORK/un-ouc-nl.log"
+    printf '%s' "$OPENCODE_USER"
+)
+if [ "$_ou_nl" = "opencode" ] \
+   && [ "$(grep -c . "$WORK/un-ouc-nl.log")" = 1 ] \
+   && grep -q 'oco?d' "$WORK/un-ouc-nl.log"; then
+    pass "gate WARN sanitized: newline value = one line, no raw bytes (pr-00263 a F9)"
+else
+    fail "gate WARN sanitization (pr-00263 a F9)"
 fi
 # Pathological corpus (#243 f X1): leading dot/hyphen and trailing
 # dot are legal in the writer's charset but not agent names — the
@@ -800,7 +814,7 @@ else
     fail "uid unknown arms (out=$(_unarm_show "$FOUT")) (#218)"
 fi
 # Dry run: [DRY] echoes and the success lines despite failing ops —
-# the run/run_q convention since #211 b W1 (dry reports the intended
+# the run_q convention since #211 b W1 (dry reports the intended
 # outcome; nothing executes, so nothing can fail). Nothing executes =
 # the sudo log stays EMPTY — pinned (#243 a Q5): a refactor that
 # executes in dry mode while dropping rc observation would otherwise
@@ -1083,7 +1097,7 @@ else
     fail "section rm failure arms (out=$(_unarm_show "$COUT")) (#243 a S1)"
 fi
 # Dry run: [DRY] echoes and the success lines despite the failing
-# stub — the run/run_q convention (#211 b W1). The guard probes
+# stub — the run_q convention (#211 b W1). The guard probes
 # (test/grep) legitimately execute as reads; no rm ever runs.
 COUT=$(_un_cfg_out "rm:/etc/opencode-permissions-kit" true) || true
 if printf '%s' "$COUT" | grep -qF '[DRY] sudo rm -rf /run/opencode-permissions-kit' \
@@ -1462,6 +1476,77 @@ if [ -n "$_f2_bak_block" ]; then
     fi
 else
     fail "agents-backup loop extractable (#211 f W2)"
+fi
+
+# pr-00263 a F10: uninstall twin of the config.sh agent-home refusal.
+grep -q '_un_agent_home' "$UNINSTALL" \
+    && pass "uninstall agent-home refusal getent-aware (pr-00263 a F10)" \
+    || fail "uninstall agent-home refusal literal-only (pr-00263 a F10)"
+
+# --- pr-00263 a F3: the six early removal sections are rc-observing (#211 c W1) --
+# The #243 a S1/S2 sweep covered the config-dirs section only; six
+# earlier `run` rm ops (sudoers, wrapper, cli dispatcher, xdg-open
+# shim, library, umask x2) still fed unconditional success lines —
+# plus the legacy-shape siblings (legacy sudoers symlink, legacy conf
+# dir, legacy library, legacy helper symlink). Pins: (a) no rc-blind
+# `run sudo rm` remains anywhere — the plugins loop (the last
+# claim-less pair, #246 site 7) converted in the pr-00263 d round;
+# (b) the sudoers section driven REAL with a failing
+# sudo stub: WARN + FAILED log, no success echo; (c) a succeeding
+# stub keeps the success line. The stale pre-state proves the
+# section's own reset (the #243 b S2 discipline).
+if [ "$(grep -c 'run sudo rm' "$UNINSTALL")" = 0 ]; then
+    pass "zero rc-blind 'run sudo rm' ops remain (#246 closed, pr-00263 a F3 + d)"
+else
+    fail "rc-blind 'run sudo rm' survived in uninstall.sh (pr-00263 a F3)"
+fi
+PLGSEC="$(sed -n '/for _un_dir in/,/^    done$/p' "$UNINSTALL" | head -40)"
+if printf '%s' "$PLGSEC" | grep -qF 'un_rc_q "plugins rm"' \
+    && printf '%s' "$PLGSEC" | grep -qF 'plugin removal failed' \
+    && [ "$(printf '%s' "$PLGSEC" | grep -cF 'un_rc_q "')" = 2 ]; then
+    pass "plugins loop rc-observing, failure WARNs, both ops converted (#246 site 7)"
+else
+    fail "plugins loop not rc-observing (#246 site 7, pr-00263 d)"
+fi
+# pr-00263 e W3: run() lost its last callers to un_rc_q (#246 site 7) and
+# is removed — run_q (silenced best-effort) keeps its callers; a
+# resurrected def without callers must fail loud here. pr-00263 f W1:
+# the pattern counts every def spelling at line start with ANY leading
+# whitespace (run() { house style, run () { spaced, indented defs) —
+# the e-round draft '^run ()' caught only the spaced form, which no
+# def in this file ever used; comments cannot match (after the
+# indentation comes '#', never 'run').
+[ "$(grep -c '^[[:space:]]*run *()' "$UNINSTALL")" = 0 ] \
+    && pass "run() helper gone, no orphaned runner (pr-00263 e W3)" \
+    || fail "run() def present without callers (pr-00263 e W3)"
+F3SEC="$(sed -n '/^echo "--- Removing sudoers ---"$/,/^fi$/p' "$UNINSTALL")"
+if [ -n "$F3SEC" ] && printf '%s' "$F3SEC" | grep -qF 'un_rc_q "rm sudoers"'; then
+    pass "sudoers section extractable + rc-observing (pr-00263 a F3)"
+else
+    fail "sudoers section extraction/rc observation (pr-00263 a F3)"
+fi
+_un_f3_out() { # <sudo-rc> — drive the section REAL with a stubbed sudo
+    (
+        DRY_RUN=false
+        _un_partial="stale"
+        _un_revert_failed=1
+        _un_f3_rc="$1"
+        log() { echo "LOG:$*"; }
+        eval "$UN_RC_Q"
+        sudo() { return "$_un_f3_rc"; }
+        eval "$F3SEC"
+    ) 2>&1
+}
+_f3fail="$(_un_f3_out 1)"
+_f3ok="$(_un_f3_out 0)"
+if printf '%s' "$_f3fail" | grep -q 'WARN: sudoers removal failed' \
+    && printf '%s' "$_f3fail" | grep -q 'LOG:sudoers removal FAILED' \
+    && ! printf '%s' "$_f3fail" | grep -q 'sudoers removed\.' \
+    && printf '%s' "$_f3ok" | grep -q 'sudoers removed\.' \
+    && printf '%s' "$_f3ok" | grep -q 'LOG:sudoers removed'; then
+    pass "sudoers section arms: failure WARNs, success echoes (pr-00263 a F3)"
+else
+    fail "sudoers section arms (pr-00263 a F3, fail-out: $_f3fail / ok-out: $_f3ok)"
 fi
 
 if [ "$failures" -gt 0 ]; then

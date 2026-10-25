@@ -447,7 +447,7 @@ if [ -n "$_f16_fn" ]; then
         check "malformed lines warn+skip, allocation correct (rc=${_f16_rc:-0} warns=$_f16_cnt alloc=$_f16_alloc out=$_out)" false
     fi
     # The warn's enumeration must name EVERY skip cause (#211 e W2):
-    # the value cap (c W9) added a third — an above-u32-max line is
+    # the value cap (#211 c W9) added a third — an above-u32-max line is
     # neither non-numeric nor leading-zero, and the fixture drives it.
     case "$_out" in
         *"above-u32-max"*) check "malformed warn names all skip causes incl. value cap (#211 e W2)" true ;;
@@ -457,6 +457,16 @@ if [ -n "$_f16_fn" ]; then
 else
     check "allocate_range extractable (#211 a F16)" false
 fi
+
+# pr-00263 a F13 + d W4: the daemon-start rc decides the ready message
+# — a failed start must WARN, not read as ready; the socket var still
+# prints for the caller (the wrapper re-probes every session start).
+# Exact count (d W4): capture + default + three gate/print sites = 5 —
+# a floor pin would survive deletion of the capture mechanism itself.
+check "failed daemon start warns instead of ready (pr-00263 a F13)" \
+    grep -Fq 'daemon start FAILED (rc=$_dc_start_rc)' "$SETUP"
+check "daemon start rc observed at every site, exactly 5 (pr-00263 a F13 + d W4)" \
+    sh -c '[ "$(grep -c "_dc_start_rc" "$1")" = 5 ]' _ "$SETUP"
 
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"

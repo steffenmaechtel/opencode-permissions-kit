@@ -1007,14 +1007,18 @@ if [ -n "$_f6_block" ]; then
             sudo() { return 0; }
             die() { echo "die: $*"; exit 1; }
             ui_success(){ echo "success: $*"; }
+            ui_detail() { echo "detail: $*"; }
             log()       { echo "log: $*"; }
             eval "$_f6_block"
         ) 2>&1
     }
     F6=$(mktemp -d)
     _out=$(_f6_run "$F6/missing-root") || true
-    if printf '%s' "$_out" | grep -q 'log: umask profile re-deploy skipped'; then
-        pass "missing umask.sh: skip is logged, not silent (#211 a F6)"
+    # pr-00263 a F7: log() alone degrades to the no-op stub when log.sh
+    # is missing from both roots — the skip needs the terminal line too.
+    if printf '%s' "$_out" | grep -q 'log: umask profile re-deploy skipped' \
+        && printf '%s' "$_out" | grep -q 'detail: umask profile re-deploy skipped'; then
+        pass "missing umask.sh: skip is terminal-loud, not log-only (pr-00263 a F7 over #211 a F6)"
     else
         fail "missing umask.sh: skip is logged, not silent (out=$_out)"
     fi
@@ -1156,6 +1160,58 @@ if [ -n "$_f17_opk_block" ]; then
 else
     fail "opk openchamber block extractable (#211 a F17)"
 fi
+
+# --- pr-00263 a F2(b): OPENCODE_USER shape gate in update.sh (#243 e X1 mirror) --
+# Extract and drive REAL (the uninstall-suite idiom): valid custom name
+# and canonical literal pass through silently; the trailing-slash
+# spelling that feeds the sudo -u hop and the ddev-handover argv falls
+# back loudly; a newline-bearing value cannot forge a second transcript
+# line (sanitized WARN — the a F9 class: one line, sanitized form).
+_f2bW="$(mktemp -d)"
+_f2bG="$(sed -n '/^case "$OPENCODE_USER" in$/,/^esac$/p' "$UPDATE")"
+if [ -n "$_f2bG" ] && printf '%s' "$_f2bG" | grep -q 'falling back'; then
+    pass "update.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"
+else
+    fail "update.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"
+fi
+_f2b_new=$(
+    OPENCODE_USER=untest-agent
+    eval "$_f2bG" 2>"$_f2bW/ok.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_canon=$(
+    OPENCODE_USER=opencode
+    eval "$_f2bG" 2>>"$_f2bW/ok.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_bad=$(
+    OPENCODE_USER="untest-agent/"
+    eval "$_f2bG" 2>"$_f2bW/bad.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_nl=$(
+    OPENCODE_USER="$(printf 'oco\nd')"
+    eval "$_f2bG" 2>"$_f2bW/nl.log"
+    printf '%s' "$OPENCODE_USER"
+)
+if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] \
+    && [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] \
+    && grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" \
+    && [ "$_f2b_nl" = "opencode" ] \
+    && [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] \
+    && grep -q 'oco?d' "$_f2bW/nl.log"; then
+    pass "update.sh gate arms: passthrough silent, fallback loud, newline sanitized (pr-00263 a F2b)"
+else
+    fail "update.sh gate arms (pr-00263 a F2b)"
+fi
+
+# pr-00263 a F7: both conservative re-deploy skips carry a terminal
+# line — log() alone is the no-op stub when log.sh is missing from
+# both roots, and the in-code contract says the skip must not be silent.
+grep -qF 'ui_detail "sudoers re-deploy skipped' "$UPDATE" \
+    && grep -qF 'ui_detail "umask profile re-deploy skipped' "$UPDATE" \
+    && echo "  ${GREEN}PASS${NC}  both re-deploy skips are terminal-loud (pr-00263 a F7)" && passed=$((passed + 1)) \
+    || { echo "  ${RED}FAIL${NC}  a re-deploy skip is log-only again (pr-00263 a F7)"; failures=$((failures + 1)); }
 
 # --- Summary ----------------------------------------------------------------------
 echo ""

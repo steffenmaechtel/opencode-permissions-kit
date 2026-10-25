@@ -75,6 +75,16 @@ if [ -f "$INSTALL_CONF" ]; then
     # shellcheck disable=SC1090
     . "$INSTALL_CONF"
 fi
+# Shape-gate the sourced value (#243 e X1 mirror, pr-00263 a F2b): a
+# shape-invalid value feeds id -gn and the report rows below — fall
+# back to the canonical literal, loudly; sanitized WARN (a F9 class).
+case "$OPENCODE_USER" in
+    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+        _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
+        OPENCODE_USER=opencode
+        ;;
+esac
 # Sharing group: the opencode user's own usergroup; prefer the live value.
 OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
@@ -544,7 +554,14 @@ try:
     feed = json.load(sys.stdin)
 except Exception:
     sys.exit(1)
-for entry in feed or []:
+# pr-00263 a F11: a non-array feed (dict envelope, scalar array) used
+# to raise a raw traceback on cron stderr — shape-invalid is
+# "unavailable" (exit 1), a non-dict entry is skipped.
+if not isinstance(feed, list):
+    sys.exit(1)
+for entry in feed:
+    if not isinstance(entry, dict):
+        continue
     # str(... or ""): a JSON null defeats the .get default (the F7
     # class, 0.0.44a V19 — advisory-watch got the coercion in 0.0.43a;
     # this twin printed the literal string "None").

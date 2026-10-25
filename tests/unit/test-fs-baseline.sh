@@ -527,7 +527,7 @@ assert_eq "#223 broken python3: baseline still applies (rc 0, no false green)" "
 assert_eq "#223 broken python3: file got group rw (600 -> 660 — the gate fed xargs)" "660" \
     "$(stat -c %a "$W23/proj/f")"
 # Probe count: 2 = the cached probe + the diagnostic rerun (#244 c
-# S3, the installer gate's b-S2 shape) — the rerun is a deliberate
+# S3, the installer gate's #244 b-S2 shape) — the rerun is a deliberate
 # second interpreter EXECUTION on the failure path. The cache is still
 # pinned: without it this would read 8 (2 × four passes).
 assert_eq "#223 broken python3: probe+rerun ran exactly once per run (cache across the four passes)" "2" \
@@ -769,7 +769,7 @@ else
 fi
 
 # --- 11f. a broken python3 names its problem above the warn (#244 c S3) ---------------
-# The probe's rerun (the installer gate's b-S2 shape): a
+# The probe's rerun (the installer gate's #244 b-S2 shape): a
 # present-but-broken interpreter surfaces its own diagnostic stderr
 # above the degradation warn — an attributeless degrade hides the
 # cause. An ABSENT python3 stays silent (command -v guard: no

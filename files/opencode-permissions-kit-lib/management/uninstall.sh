@@ -160,17 +160,10 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 # Direct invocation only — no eval, no `sh -c` (agent/conventions.md).
-# Failures print their error and the uninstall continues (no set -e here).
-run() {
-    if [ "$DRY_RUN" = true ]; then
-        echo "  [DRY] $*"
-    else
-        "$@"
-    fi
-}
-
-# Like run, but output and failures are silenced (the former
-# "cmd 2>/dev/null || true" call sites — best-effort cleanup).
+# Output and failures are silenced (the former "cmd 2>/dev/null || true"
+# call sites — best-effort cleanup). pr-00263 e W3: the unsilenced run()
+# helper was removed here — its last two callers went to un_rc_q (#246
+# site 7); run_q keeps its callers.
 run_q() {
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] $*"
@@ -227,7 +220,10 @@ OPENCODE_USER="${OPENCODE_USER:-opencode}"
 # review chain, snapshot f).
 case "$OPENCODE_USER" in
     ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
-        echo "WARN: invalid OPENCODE_USER value in install.conf ('$OPENCODE_USER') — falling back to 'opencode'" >&2
+        # pr-00263 a F9: sanitized echo — a corrupted value (newline/
+        # escape bytes) must not forge transcript lines.
+        _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
         OPENCODE_USER=opencode
         ;;
 esac
@@ -261,9 +257,16 @@ log "uninstall started (dry_run=$DRY_RUN)"
 
 echo ""
 echo "--- Removing sudoers ---"
-run sudo rm -f /etc/sudoers.d/opencode-permissions-kit
-echo "sudoers removed."
-log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit"
+_un_partial=""
+_un_revert_failed=0
+un_rc_q "rm sudoers" sudo rm -f /etc/sudoers.d/opencode-permissions-kit
+if [ -z "$_un_partial" ]; then
+    echo "sudoers removed."
+    log "sudoers removed: /etc/sudoers.d/opencode-permissions-kit"
+else
+    echo "WARN: sudoers removal failed ($_un_partial) — remove manually: /etc/sudoers.d/opencode-permissions-kit" >&2
+    log "sudoers removal FAILED ($_un_partial)"
+fi
 
 # Legacy pre-0.0.10 kit names (0.0.43a F5): kits before v0.0.10 wrote
 # /etc/sudoers.d/opencode -> /etc/opencode/sudoers and kept their conf
@@ -280,9 +283,16 @@ if sudo test -L /etc/sudoers.d/opencode; then
     _un_leg_link="$(sudo readlink /etc/sudoers.d/opencode 2>/dev/null || true)"
     case "$_un_leg_link" in
         /etc/opencode/*)
-            run sudo rm -f /etc/sudoers.d/opencode
-            echo "Legacy sudoers symlink removed (/etc/sudoers.d/opencode)."
-            log "legacy sudoers symlink removed: /etc/sudoers.d/opencode"
+            _un_partial=""
+            _un_revert_failed=0
+            un_rc_q "rm legacy sudoers symlink" sudo rm -f /etc/sudoers.d/opencode
+            if [ -z "$_un_partial" ]; then
+                echo "Legacy sudoers symlink removed (/etc/sudoers.d/opencode)."
+                log "legacy sudoers symlink removed: /etc/sudoers.d/opencode"
+            else
+                echo "WARN: legacy sudoers symlink removal failed ($_un_partial)" >&2
+                log "legacy sudoers symlink removal FAILED ($_un_partial)"
+            fi
             ;;
         *)
             echo "/etc/sudoers.d/opencode -> $_un_leg_link is not kit-owned — left untouched."
@@ -295,11 +305,16 @@ fi
 # then the dir itself only if that emptied it — foreign content under
 # /etc/opencode survives.
 if [ -d /etc/opencode ]; then
+    _un_partial=""
+    _un_revert_failed=0
     for _un_leg in sudoers install.conf projects.conf setup.conf; do
-        run sudo rm -f "/etc/opencode/$_un_leg"
+        un_rc_q "rm legacy conf: /etc/opencode/$_un_leg" sudo rm -f "/etc/opencode/$_un_leg"
     done
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] sudo rmdir /etc/opencode (only if empty)"
+    elif [ -n "$_un_partial" ]; then
+        echo "WARN: legacy conf removal failed ($_un_partial) — /etc/opencode kept, remove manually" >&2
+        log "legacy conf removal FAILED ($_un_partial): /etc/opencode"
     elif sudo rmdir /etc/opencode 2>/dev/null; then
         echo "Legacy conf dir removed (/etc/opencode)."
         log "legacy conf dir removed: /etc/opencode (kit files)"
@@ -311,15 +326,29 @@ fi
 
 echo ""
 echo "--- Removing wrapper ---"
-run sudo rm -f /usr/local/bin/opencode
-echo "Wrapper removed."
-log "wrapper removed: /usr/local/bin/opencode"
+_un_partial=""
+_un_revert_failed=0
+un_rc_q "rm wrapper" sudo rm -f /usr/local/bin/opencode
+if [ -z "$_un_partial" ]; then
+    echo "Wrapper removed."
+    log "wrapper removed: /usr/local/bin/opencode"
+else
+    echo "WARN: wrapper removal failed ($_un_partial) — remove manually: /usr/local/bin/opencode" >&2
+    log "wrapper removal FAILED ($_un_partial)"
+fi
 
 echo ""
 echo "--- Removing cli dispatcher ---"
-run sudo rm -f /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit
-echo "CLI dispatcher removed."
-log "cli removed: /usr/local/bin/opk"
+_un_partial=""
+_un_revert_failed=0
+un_rc_q "rm cli dispatcher" sudo rm -f /usr/local/bin/opk /usr/local/bin/opencode-permissions-kit
+if [ -z "$_un_partial" ]; then
+    echo "CLI dispatcher removed."
+    log "cli removed: /usr/local/bin/opk"
+else
+    echo "WARN: cli dispatcher removal failed ($_un_partial) — remove manually: /usr/local/bin/opk" >&2
+    log "cli dispatcher removal FAILED ($_un_partial)"
+fi
 
 # xdg-open fallback shim: remove ONLY the kit-owned symlink — a real
 # xdg-open (xdg-utils) or anything else at that path is not ours.
@@ -328,9 +357,16 @@ echo "--- Removing xdg-open fallback ---"
 if [ -L /usr/local/bin/xdg-open ] \
    && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" \
       = "/usr/local/lib/opencode-permissions-kit/bin/xdg-open" ]; then
-    run sudo rm -f /usr/local/bin/xdg-open
-    echo "xdg-open fallback removed."
-    log "xdg-open shim removed: /usr/local/bin/xdg-open"
+    _un_partial=""
+    _un_revert_failed=0
+    un_rc_q "rm xdg-open shim" sudo rm -f /usr/local/bin/xdg-open
+    if [ -z "$_un_partial" ]; then
+        echo "xdg-open fallback removed."
+        log "xdg-open shim removed: /usr/local/bin/xdg-open"
+    else
+        echo "WARN: xdg-open shim removal failed ($_un_partial) — remove manually: /usr/local/bin/xdg-open" >&2
+        log "xdg-open shim removal FAILED ($_un_partial)"
+    fi
 else
     echo "xdg-open at /usr/local/bin/xdg-open is not kit-owned — left untouched."
 fi
@@ -357,10 +393,21 @@ if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
             log "tui plugin removal skipped: symlink in the chain to $_un_dir"
             continue
         fi
-        run sudo rm -rf "${_un_dir:?}/plugins/opencode-permissions-kit"
-        run sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" \
+        # pr-00263 d (issue #246 site 7, the a F3 class): both ops were
+        # claim-less `run` — silent on failure. Through un_rc_q now:
+        # failure WARNs and feeds the partial list; success stays quiet
+        # (no success claim existed before — none is invented here).
+        _un_partial=""
+        _un_revert_failed=0
+        un_rc_q "plugins rm" sudo rm -rf "${_un_dir:?}/plugins/opencode-permissions-kit"
+        un_rc_q "tui unregister" sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" \
             unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
             --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
+        if [ -n "$_un_partial" ]; then
+            echo "WARN: plugin removal failed ($_un_partial) — remove manually:"\
+" ${_un_dir:?}/plugins/opencode-permissions-kit (tui-register.py unregister)" >&2
+            log "plugin removal FAILED ($_un_partial): $_un_dir"
+        fi
     done
 fi
 
@@ -418,9 +465,16 @@ fi
 
 echo ""
 echo "--- Removing opencode library ---"
-run sudo rm -rf /usr/local/lib/opencode-permissions-kit
-echo "opencode library removed."
-log "library removed: /usr/local/lib/opencode-permissions-kit"
+_un_partial=""
+_un_revert_failed=0
+un_rc_q "rm library" sudo rm -rf /usr/local/lib/opencode-permissions-kit
+if [ -z "$_un_partial" ]; then
+    echo "opencode library removed."
+    log "library removed: /usr/local/lib/opencode-permissions-kit"
+else
+    echo "WARN: library removal failed ($_un_partial) — remove manually: /usr/local/lib/opencode-permissions-kit" >&2
+    log "library removal FAILED ($_un_partial)"
+fi
 
 # Legacy pre-0.0.10 library (0.0.43a F5): /usr/local/lib/opencode — home
 # of the root-runnable protect-projects.sh the legacy sudoers rules
@@ -430,9 +484,16 @@ log "library removed: /usr/local/lib/opencode-permissions-kit"
 if [ -d /usr/local/lib/opencode ] \
    && { [ -e /usr/local/lib/opencode/wrapper ] \
         || [ -e /usr/local/lib/opencode/protect-projects.sh ]; }; then
-    run sudo rm -rf /usr/local/lib/opencode
-    echo "Legacy library removed (/usr/local/lib/opencode)."
-    log "legacy library removed: /usr/local/lib/opencode"
+    _un_partial=""
+    _un_revert_failed=0
+    un_rc_q "rm legacy library" sudo rm -rf /usr/local/lib/opencode
+    if [ -z "$_un_partial" ]; then
+        echo "Legacy library removed (/usr/local/lib/opencode)."
+        log "legacy library removed: /usr/local/lib/opencode"
+    else
+        echo "WARN: legacy library removal failed ($_un_partial) — remove manually: /usr/local/lib/opencode" >&2
+        log "legacy library removal FAILED ($_un_partial)"
+    fi
 elif [ -d /usr/local/lib/opencode ]; then
     echo "/usr/local/lib/opencode holds no kit markers — left untouched."
 fi
@@ -440,9 +501,16 @@ if [ -L /usr/local/sbin/protect-projects.sh ]; then
     _un_pp_link="$(readlink /usr/local/sbin/protect-projects.sh 2>/dev/null || true)"
     case "$_un_pp_link" in
         /usr/local/lib/opencode/*)
-            run sudo rm -f /usr/local/sbin/protect-projects.sh
-            echo "Legacy helper symlink removed (/usr/local/sbin/protect-projects.sh)."
-            log "legacy helper symlink removed: /usr/local/sbin/protect-projects.sh"
+            _un_partial=""
+            _un_revert_failed=0
+            un_rc_q "rm legacy helper symlink" sudo rm -f /usr/local/sbin/protect-projects.sh
+            if [ -z "$_un_partial" ]; then
+                echo "Legacy helper symlink removed (/usr/local/sbin/protect-projects.sh)."
+                log "legacy helper symlink removed: /usr/local/sbin/protect-projects.sh"
+            else
+                echo "WARN: legacy helper symlink removal failed ($_un_partial)" >&2
+                log "legacy helper symlink removal FAILED ($_un_partial)"
+            fi
             ;;
         *)
             echo "/usr/local/sbin/protect-projects.sh -> $_un_pp_link is not kit-owned — left untouched."
@@ -452,12 +520,19 @@ fi
 
 echo ""
 echo "--- Removing umask profile ---"
-run sudo rm -f /etc/profile.d/opencode-permissions-kit-umask.sh
+_un_partial=""
+_un_revert_failed=0
+un_rc_q "rm umask profile" sudo rm -f /etc/profile.d/opencode-permissions-kit-umask.sh
 # Legacy pre-0.0.10 name (0.0.43a F5) — the same cleanup update.sh and
 # sudoers-deploy.sh already perform on the install/update path.
-run sudo rm -f /etc/profile.d/opencode-umask.sh
-echo "Umask profile removed."
-log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ legacy opencode-umask.sh)"
+un_rc_q "rm legacy umask profile" sudo rm -f /etc/profile.d/opencode-umask.sh
+if [ -z "$_un_partial" ]; then
+    echo "Umask profile removed."
+    log "umask profile removed: /etc/profile.d/opencode-permissions-kit-umask.sh (+ legacy opencode-umask.sh)"
+else
+    echo "WARN: umask profile removal failed ($_un_partial) — remove manually: /etc/profile.d/opencode-*-umask.sh" >&2
+    log "umask profile removal FAILED ($_un_partial)"
+fi
 
 echo ""
 echo "--- Removing opencode user ---"
@@ -471,7 +546,7 @@ if id "$DEFAULT_USER" >/dev/null 2>&1 \
     # by design, so wiring a F28's honesty arms through it left the
     # else arm dead code — a failed gpasswd still printed "Removed".
     # DRY_RUN keeps the [DRY] echo and the success lines (the file's
-    # run/run_q convention: dry-run reports the intended outcome).
+    # run_q convention: dry-run reports the intended outcome).
     _grp_rc=0
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] sudo gpasswd -d $DEFAULT_USER $OPENCODE_GROUP"
@@ -548,7 +623,7 @@ if id "$OPENCODE_USER" >/dev/null 2>&1; then
         # by design, so a failed userdel still printed "User … removed" —
         # userdel refuses while ANY process of the user runs (a straggler
         # the pkill above can miss). DRY_RUN keeps the [DRY] echo and the
-        # success lines (the file's run/run_q convention).
+        # success lines (the file's run_q convention).
         _udel_rc=0
         if [ "$DRY_RUN" = true ]; then
             echo "  [DRY] sudo userdel -r $OPENCODE_USER"
@@ -600,7 +675,11 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # are the dot gate's job below. The compared value itself is
         # shape-gated right after install.conf is sourced (#243 e X1):
         # a corrupted conf value cannot defang this refusal.
-        if [ "${root%/}" = "/home/$OPENCODE_USER" ]; then
+        # pr-00263 a F10: getent alongside the literal spelling — a
+        # relocated agent home refuses too (the config.sh twin).
+        _un_agent_home="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
+        if [ "${root%/}" = "/home/$OPENCODE_USER" ] \
+           || { [ -n "$_un_agent_home" ] && [ "${root%/}" = "$_un_agent_home" ]; }; then
             echo "  Skipping agent home (never a project root): $root"
             continue
         fi
@@ -743,11 +822,13 @@ fi
 echo ""
 echo "--- Removing kit config directories + runtime artifacts ---"
 # rc-observing removal (#243 a S1/S2 — the #211 c W1 class sweep this
-# wave owes): the former `run` ops fed an unconditional "Removed." +
-# success log even when an rm failed. Same ops through un_rc_q
-# now; a failure lands in the partial list and degrades the closing
-# claim. DRY_RUN keeps the [DRY] echoes and the success lines (the
-# run/run_q convention, #211 b W1).
+# wave owes; the early removal sections above route through un_rc_q
+# since pr-00263 a F3 — the six `run` sites the #243 wave missed, plus
+# the legacy-shape siblings): the former `run` ops fed an
+# unconditional "Removed." + success log even when an rm failed. Same
+# ops through un_rc_q now; a failure lands in the partial list and
+# degrades the closing claim. DRY_RUN keeps the [DRY] echoes and the
+# success lines (the run_q convention, #211 b W1).
 _un_partial=""
 _un_revert_failed=0
 un_rc_q "rm /run/opencode-permissions-kit" sudo rm -rf /run/opencode-permissions-kit
@@ -801,7 +882,7 @@ if [ "$(prompt_yn "Delete audit log too? (recommended)" "y")" = "y" ]; then
     # Log the outcome, not the intent (#211 c W1): the log line used to
     # fire BEFORE the rm — a removal run_q silenced could fail with the
     # audit trail already claiming success. DRY_RUN keeps the [DRY] echo
-    # and the success lines (the run/run_q convention).
+    # and the success lines (the run_q convention).
     _al_rc=0
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] sudo rm -rf /var/log/opencode-permissions-kit"

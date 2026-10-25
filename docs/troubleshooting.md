@@ -91,9 +91,9 @@ sudo -u opencode env HOME=/home/opencode \
 ```
 
 If you legitimately run that many projects in parallel, raise the pools
-(only networks created after the restart come from the enlarged pools; a
-`daemon.json` that already exists gets the key merged in — do not overwrite
-the file):
+(only networks created after the restart come from the enlarged pools; the
+`tee` below creates the file — an existing `daemon.json` is overwritten,
+merge the key yourself before running it):
 
 ```bash
 sudo mkdir -p /home/opencode/.config/docker
@@ -325,7 +325,8 @@ opk ddev-hosts-add
 `ddev-hosts-check` lists what is missing (one ready-made
 `ddev-hosts-add <hostname>` command each — that form works from anywhere);
 `opk status` reports it per project root. Manual fallback: edit
-`C:\Windows\System32\drivers\etc\hosts` in an elevated editor. Hostnames
+`C:\Windows\System32\drivers\etc\hosts` in an elevated editor and add
+`127.0.0.1 <project>.<tld>` per hostname. Hostnames
 under the default `*.ddev.site` TLD never need an entry (ddev's wildcard
 DNS). If WSL interop itself is broken (`cmd.exe` fails with "WSL
 Interoperability is disabled"), re-register it:

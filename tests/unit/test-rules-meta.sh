@@ -261,7 +261,7 @@ fi
 # lane a: scope files -- only ref-form tokens. One verdict for the
 # whole lane (per-file detail lands in the failure output), so the
 # suite's printed pin count does not drift with SCOPE_FILES length
-# (a W2 fix; the shape mirrors lanes b and c).
+# (#189 a W2 fix; the shape mirrors lanes b and c).
 : > "$WORK/p10a"
 for f in $SCOPE; do
     if [ ! -f "$REPO_ROOT/$f" ]; then

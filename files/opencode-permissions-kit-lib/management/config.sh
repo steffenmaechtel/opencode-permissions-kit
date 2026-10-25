@@ -105,6 +105,19 @@ if [ -f "$INSTALL_CONF" ]; then
 fi
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# Shape-gate the sourced value (#243 e X1 mirror, pr-00263 a F2b): the
+# conf is root-owned but hand-editable; a shape-invalid value silently
+# defangs the agent-home refusal in project_path_sane and feeds the
+# fs-baseline/ddev-handover argv below — fall back to the canonical
+# literal, loudly. The WARN echoes a sanitized form (pr-00263 a F9
+# class: a raw corrupted value can forge transcript lines).
+case "$OPENCODE_USER" in
+    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+        _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
+        OPENCODE_USER=opencode
+        ;;
+esac
 # ~ in project paths must expand to the DEFAULT user's home, not $HOME:
 # config.sh usually runs via sudo, where $HOME is /root and "~/dev" would
 # be rejected as a "/root system path" with a confusing error.
@@ -348,7 +361,13 @@ project_path_sane() {
     # The agent user's own home is never a valid project root: the group
     # baseline (chgrp/setfacl -R) would run over the very directory that
     # carries the agent's config and state (review 0.0.39a S4).
-    [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] && return 1
+    # pr-00263 a F10: getent alongside the literal spelling — a relocated
+    # agent home must refuse too (the uninstall.sh twin, opk pattern).
+    _pp_agent_home="$(getent passwd "${OPENCODE_USER:-opencode}" 2>/dev/null | cut -d: -f6 || true)"
+    if [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] \
+       || { [ -n "$_pp_agent_home" ] && [ "$_pp" = "$_pp_agent_home" ]; }; then
+        return 1
+    fi
     # The developer's whole home as a root is allowed but deserves a
     # warning: the baseline gives the agent group-write over every file
     # in it.

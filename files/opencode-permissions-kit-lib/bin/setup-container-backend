@@ -325,15 +325,26 @@ setup_docker_rootless() {
         log "docker-rootless: net.ipv4.ip_unprivileged_port_start=80 applied before daemon start"
     fi
     sudo -u "$OPENCODE_USER" XDG_RUNTIME_DIR="/run/user/$OC_UID" \
-        systemctl --user start docker.service 2>/dev/null || true
+        systemctl --user start docker.service 2>/dev/null || _dc_start_rc=$?
+    _dc_start_rc="${_dc_start_rc:-0}"
 
     enable_linger
 
     # The socket path.
     SOCK="unix:///run/user/$OC_UID/docker.sock"
-    echo "  ${GREEN}docker-rootless is ready for $OPENCODE_USER.${NC}"
-    echo "  Socket: $SOCK"
-    log "docker-rootless provisioned for $OPENCODE_USER (socket=$SOCK)"
+    # pr-00263 a F13: the start's rc decides the message (the linger
+    # sibling got this shape in #211 a F13) — a failed start must not
+    # read as ready. The socket var still prints for the caller to
+    # record: the wrapper re-probes it at every session start.
+    if [ "$_dc_start_rc" -eq 0 ]; then
+        echo "  ${GREEN}docker-rootless is ready for $OPENCODE_USER.${NC}"
+        echo "  Socket: $SOCK"
+        log "docker-rootless provisioned for $OPENCODE_USER (socket=$SOCK)"
+    else
+        echo "  WARN: docker-rootless daemon start FAILED (rc=$_dc_start_rc) — not ready" >&2
+        echo "  Socket (recorded for the wrapper's re-probe): $SOCK" >&2
+        log "docker-rootless daemon start FAILED (rc=$_dc_start_rc, socket=$SOCK)"
+    fi
     # Print the socket for the caller to record.
     echo "OPENCODE_DOCKER_HOST=$SOCK"
 }
