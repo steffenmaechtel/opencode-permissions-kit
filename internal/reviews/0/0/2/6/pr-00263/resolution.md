@@ -79,11 +79,11 @@ evidence block).
 | e W3 (INFO) | **implemented** | `163da3a` | run() removed; run_q doc + 4 comments updated; def-count pin = 0 |
 | e Q1 (INFO) | **deliberately not done** | — | write-only store is the 12-site reset-pair idiom; removal deviates |
 | f W1 (MED) | **implemented** | `ea4f133` | pin greps '^run *()': both def spellings count; resurrected def -> red |
-| f W2 (LOW) | **implemented** | `<SHA>` | both test-uninstall sibling comments now "run_q convention" |
-| f W3 (LOW) | **implemented** | `<SHA>` | header bullet rewritten: dry-run arms echo [DRY], nothing executes |
-| f W4 (INFO) | **implemented** | `<SHA>` | :371 run() stub -> sudo() stub; :91 comparator "unwrapped" |
-| f Q2 (LOW) | **implemented** | `<SHA>` | evidence sentence: TWO config log lines "backup attempt: …", not three |
-| f Q3 (LOW) | **implemented** | `<SHA>` | correction of record: 163da3a said "114", committed row is 110 bytes |
+| f W2 (LOW) | **implemented** | `5cef284` | both test-uninstall sibling comments now "run_q convention" |
+| f W3 (LOW) | **implemented** | `5cef284` | header bullet rewritten: dry-run arms echo [DRY], nothing executes |
+| f W4 (INFO) | **implemented** | `5cef284` | :371 run() stub -> sudo() stub; :91 comparator "unwrapped" |
+| f Q2 (LOW) | **implemented** | `5cef284` | evidence sentence: TWO config log lines "backup attempt: …", not three |
+| f Q3 (LOW) | **implemented** | `5cef284` | correction of record: 163da3a said "114", committed row is 110 bytes |
 
 ## Evidence detail
 
