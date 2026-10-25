@@ -233,9 +233,10 @@ F17's claim was "14 qualified", not "zero remain".
 ## Follow-ups
 
 - The d round touched review-relevant code (uninstall.sh, install.sh,
-  three test suites): a **micro-wave review** of the d fixes
-  (`5171eb3..` up from snapshot d) is owed before release — this
-  round does not self-declare the loop closed (RM-0106/RM-0107).
+  three test suites): the owed **micro-wave review** ran as snapshot e
+  (2026-10-25, `5171eb3..054a39a`: 4 findings, 1 LOW / 3 INFO, no
+  MED/HIGH) — dispositions owed; the loop's closure stays the
+  maintainer's / next round's call (RM-0106/RM-0107, RM-0115).
 - e2e debt discharged in the d wave (see d Q1): both suites green on
   the d-round tree, zero skips.
 
