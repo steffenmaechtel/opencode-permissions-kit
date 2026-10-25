@@ -75,6 +75,16 @@ if [ -f "$INSTALL_CONF" ]; then
     # shellcheck disable=SC1090
     . "$INSTALL_CONF"
 fi
+# Shape-gate the sourced value (#243 e X1 mirror, pr-00263 a F2b): a
+# shape-invalid value feeds id -gn and the report rows below — fall
+# back to the canonical literal, loudly; sanitized WARN (a F9 class).
+case "$OPENCODE_USER" in
+    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+        _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
+        OPENCODE_USER=opencode
+        ;;
+esac
 # Sharing group: the opencode user's own usergroup; prefer the live value.
 OPENCODE_GROUP="${OPENCODE_GROUP:-opencode}"
 LIVE_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"

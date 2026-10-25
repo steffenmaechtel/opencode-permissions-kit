@@ -105,6 +105,19 @@ if [ -f "$INSTALL_CONF" ]; then
 fi
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# Shape-gate the sourced value (#243 e X1 mirror, pr-00263 a F2b): the
+# conf is root-owned but hand-editable; a shape-invalid value silently
+# defangs the agent-home refusal in project_path_sane and feeds the
+# fs-baseline/ddev-handover argv below — fall back to the canonical
+# literal, loudly. The WARN echoes a sanitized form (pr-00263 a F9
+# class: a raw corrupted value can forge transcript lines).
+case "$OPENCODE_USER" in
+    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+        _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
+        OPENCODE_USER=opencode
+        ;;
+esac
 # ~ in project paths must expand to the DEFAULT user's home, not $HOME:
 # config.sh usually runs via sudo, where $HOME is /root and "~/dev" would
 # be rejected as a "/root system path" with a confusing error.

@@ -439,6 +439,18 @@ fi
 VERSION="$KIT_VERSION"
 DEFAULT_USER="${DEFAULT_USER:-${SUDO_USER:-$(whoami)}}"
 OPENCODE_USER="${OPENCODE_USER:-opencode}"
+# Shape-gate the sourced value (#243 e X1 mirror, pr-00263 a F2b): the
+# conf is root-owned but hand-editable; a shape-invalid value feeds the
+# id check, the sudo -u hop and the ddev-handover argv over the
+# projects.conf roots below — fall back to the canonical literal,
+# loudly; the WARN is sanitized (pr-00263 a F9 class).
+case "$OPENCODE_USER" in
+    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+        _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
+        echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
+        OPENCODE_USER=opencode
+        ;;
+esac
 # Developer home via getent (issue #192, the 0.0.44a V14 class in the
 # sibling management scripts): /home/$DEFAULT_USER is a guess that misses
 # relocated homes — and on a root-shell install (DEFAULT_USER=root) it

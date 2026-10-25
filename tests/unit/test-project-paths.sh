@@ -191,6 +191,51 @@ else
     fail "install.sh: --projects and custom dialog store the expanded path"
 fi
 
+# --- pr-00263 a F2(b): OPENCODE_USER shape gate in config.sh (#243 e X1 mirror) -
+# Extract and drive REAL (the uninstall-suite idiom): valid custom name
+# and canonical literal pass through silently; the trailing-slash
+# spelling that defangs the agent-home refusal falls back loudly; a
+# newline-bearing value cannot forge a second transcript line (the WARN
+# echo is sanitized — the a F9 class: exactly one WARN line, sanitized
+# form present).
+_f2bW="$(mktemp -d)"
+_f2bG="$(sed -n '/^case "$OPENCODE_USER" in$/,/^esac$/p' "$CONFIG")"
+if [ -n "$_f2bG" ] && printf '%s' "$_f2bG" | grep -q 'falling back'; then
+    pass "config.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"
+else
+    fail "config.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"
+fi
+_f2b_new=$(
+    OPENCODE_USER=untest-agent
+    eval "$_f2bG" 2>"$_f2bW/ok.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_canon=$(
+    OPENCODE_USER=opencode
+    eval "$_f2bG" 2>>"$_f2bW/ok.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_bad=$(
+    OPENCODE_USER="untest-agent/"
+    eval "$_f2bG" 2>"$_f2bW/bad.log"
+    printf '%s' "$OPENCODE_USER"
+)
+_f2b_nl=$(
+    OPENCODE_USER="$(printf 'oco\nd')"
+    eval "$_f2bG" 2>"$_f2bW/nl.log"
+    printf '%s' "$OPENCODE_USER"
+)
+if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] \
+    && [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] \
+    && grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" \
+    && [ "$_f2b_nl" = "opencode" ] \
+    && [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] \
+    && grep -q 'oco?d' "$_f2bW/nl.log"; then
+    pass "config.sh gate arms: passthrough silent, fallback loud, newline sanitized (pr-00263 a F2b)"
+else
+    fail "config.sh gate arms (pr-00263 a F2b)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"
