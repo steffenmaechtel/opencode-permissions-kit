@@ -1983,14 +1983,22 @@ do_deploy_phase() {
                     break
                     ;;
                 b)
-                    cp "$loc" "$BACKUP_DIR/opencode-binary" 2>/dev/null || true
+                    # pr-00263 d W1 (the a F6 class sweep): the branch-b
+                    # backup observes the copy — a failed cp degrades the
+                    # announce and feeds the summary row, no false claim.
+                    if cp "$loc" "$BACKUP_DIR/opencode-binary" 2>/dev/null; then
+                        _ocb_bk="Backup saved."
+                    else
+                        _bk_fail "opencode-binary"
+                        _ocb_bk="binary backup FAILED — see Backup summary"
+                    fi
                     sudo mkdir -p "$(dirname "$SYSTEM_BIN")"
                     copy_binary_atomic "$loc" "$SYSTEM_BIN"
                     secure_binary "$SYSTEM_BIN" "$BINARY_GROUP"
                     remove_shadow_binary "$loc"
                     opencode_found=true
-                    echo "Backup saved. Copied to $SYSTEM_BIN."
-                    log "binary copied: $loc -> $SYSTEM_BIN (backup saved)"
+                    echo "Copied to $SYSTEM_BIN. $_ocb_bk"
+                    log "binary copied: $loc -> $SYSTEM_BIN ($_ocb_bk)"
                     break
                     ;;
                 n) echo "Aborted."; exit 1 ;;
@@ -2456,14 +2464,22 @@ do_deploy_phase() {
         log "opencode config installed: /home/opencode/.config/opencode/opencode.jsonc (secure_git=$SECURE_GIT_CONFIG)"
     elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] \
          && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
-        sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
+        # pr-00263 d W2 (the a F6 class sweep): both existing-config
+        # backup sites observe the copy — failure degrades the announce
+        # and the summary row (the re-render twin below shares this).
+        if sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null; then
+            _occ_bk="Backup saved."
+        else
+            _bk_fail "opencode.jsonc-existing"
+            _occ_bk="config backup FAILED — see Backup summary"
+        fi
         _oc_install_agent_config
         if [ "$SECURE_GIT_CONFIG" = true ]; then
-            echo "Default config installed (opencode.jsonc) — .git/config blocked (soft). Backup saved."
+            echo "Default config installed (opencode.jsonc) — .git/config blocked (soft). $_occ_bk"
         else
-            echo "Default config installed (opencode.jsonc — backup saved)."
+            echo "Default config installed (opencode.jsonc). $_occ_bk"
         fi
-        log "opencode config replaced (backup: $BACKUP_DIR/opencode.jsonc-existing)"
+        log "opencode config replaced (backup attempt: $BACKUP_DIR/opencode.jsonc-existing — $_occ_bk)"
     elif [ -f /home/opencode/.config/opencode/opencode.json ] \
          && [ ! -f /home/opencode/.config/opencode/opencode.jsonc ]; then
         ui_detail "opencode.json exists — left untouched (custom user config)"
@@ -2473,15 +2489,20 @@ do_deploy_phase() {
         # above must not be silently ignored: re-render from the template with
         # the chosen SECURE_GIT state — same semantics as `config.sh git-config
         # on|off` — with a backup of the previous file.
-        sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null || true
+        if sudo cp /home/opencode/.config/opencode/opencode.jsonc "$BACKUP_DIR/opencode.jsonc-existing" 2>/dev/null; then
+            _occ_bk="backup saved"
+        else
+            _bk_fail "opencode.jsonc-existing"
+            _occ_bk="config backup FAILED — see Backup summary"
+        fi
         _oc_install_agent_config
         if [ "$SECURE_GIT_CONFIG" = true ]; then
-            ui_success "agent config re-applied — .git/config blocked (soft, backup saved)"
+            ui_success "agent config re-applied — .git/config blocked (soft, $_occ_bk)"
         else
-            ui_success "agent config re-applied — git allowed (backup saved)"
+            ui_success "agent config re-applied — git allowed ($_occ_bk)"
         fi
         log "opencode config re-rendered with the chosen git setting"\
-" (secure_git=$SECURE_GIT_CONFIG, backup: $BACKUP_DIR/opencode.jsonc-existing)"
+" (secure_git=$SECURE_GIT_CONFIG, backup attempt: $BACKUP_DIR/opencode.jsonc-existing — $_occ_bk)"
     fi
 
     # === Step 8b: Default-user config (self-update bypass protection) ===

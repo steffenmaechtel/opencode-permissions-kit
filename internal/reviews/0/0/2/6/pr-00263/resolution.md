@@ -55,6 +55,9 @@ release PR; brevity held, no bulk restores per #252/#256),
 | c C6 (MED) | **implemented** | `005590a` | export conditions + verify advice, pins both ways (#271) |
 | c C9 + c C10 + c C11 (LOW) | **implemented** | `005590a` | three scoping clauses on the reference pages (#273) |
 | d Q2 (LOW) | **implemented** | `<SHA>` | #246 site 7 conversion makes "zero" true; pin = 0; a-F3 evidence corrected |
+| d W1 (LOW) | **implemented** | `<SHA>` | branch-b backup observes the cp; announce degrades; feeds _bk_fail |
+| d W2 (LOW) | **implemented** | `<SHA>` | both existing-config sites observe; third sibling swept in (see detail) |
+| d W3 (LOW) | **implemented** | `<SHA>` | recorder driven REAL (extract-eval); count exact = 10; comment honest |
 
 ## Evidence detail
 
@@ -151,3 +154,27 @@ the sparse external setup could not see the recorded intent, and the
 house verification initially restored them; attempt 1 is backed up at
 `backup/pr-00263-fix-wave-1`, never pushed). The current-accuracy fixes
 are unaffected: #252 wants brevity, not false claims.
+
+### d W1 + d W2 (LOW) — the three backup sites the a F6/F8 sweep missed
+
+Wave d found two same-shape siblings (W1 binary-menu branch `b`,
+W2 existing-config replace) and the class re-sweep found a THIRD
+(W2's re-render twin at the re-install branch) — all three the exact
+F6/F8 shape: `2>/dev/null || true`-swallowed copy under an
+unconditional "Backup saved." announce, invisible to `_bk_fail` and
+the closing summary row. Fix: all three observe the copy now
+(conditional), failure routes through `_bk_fail` (summary degrades to
+INCOMPLETE) and degrades the site announce ("binary backup FAILED —
+see Backup summary" / "config backup FAILED — see Backup summary"
+x2); success keeps the original wording. Class sweep record (pattern:
+every line writing to `$BACKUP_DIR` in install.sh, checked 11 sites):
+gitconfig x2, sudoers, usr-local-bin, lib tree, remove_shadow_binary,
+getfacl x2 (all observed in the a-wave) + the three swept here —
+`grep 'BACKUP_DIR' | grep '|| true'` over install.sh is now empty.
+Pins (test-install-args.sh, before the summary gate): the recorder
+DRIVEN REAL (extract-eval: two failures accumulate to
+"label-a, label-b"), exact call count `= 10` (was floor `>= 7`),
+announce-degrade anchors (binary 1x, config 2x) — the d W3 lying
+comment ("the e2e suites drive the arms") replaced by what the pins
+actually do; e2e drives install success paths only.
+
