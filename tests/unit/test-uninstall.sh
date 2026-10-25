@@ -1489,17 +1489,24 @@ grep -q '_un_agent_home' "$UNINSTALL" \
 # shim, library, umask x2) still fed unconditional success lines —
 # plus the legacy-shape siblings (legacy sudoers symlink, legacy conf
 # dir, legacy library, legacy helper symlink). Pins: (a) no rc-blind
-# `run sudo rm` remains anywhere (the plugins loop's two `run` ops
-# carry no success claim — different class, recorded in the
-# resolution); (b) the sudoers section driven REAL with a failing
+# `run sudo rm` remains anywhere — the plugins loop (the last
+# claim-less pair, #246 site 7) converted in the pr-00263 d round;
+# (b) the sudoers section driven REAL with a failing
 # sudo stub: WARN + FAILED log, no success echo; (c) a succeeding
 # stub keeps the success line. The stale pre-state proves the
 # section's own reset (the #243 b S2 discipline).
-if [ "$(grep -c 'run sudo rm' "$UNINSTALL")" = 1 ] \
-    && grep -q 'run sudo rm -rf "${_un_dir:?}/plugins/opencode-permissions-kit"' "$UNINSTALL"; then
-    pass "only the claim-less plugins rm remains on run (pr-00263 a F3)"
+if [ "$(grep -c 'run sudo rm' "$UNINSTALL")" = 0 ]; then
+    pass "zero rc-blind 'run sudo rm' ops remain (#246 closed, pr-00263 a F3 + d)"
 else
     fail "rc-blind 'run sudo rm' survived in uninstall.sh (pr-00263 a F3)"
+fi
+PLGSEC="$(sed -n '/for _un_dir in/,/^    done$/p' "$UNINSTALL" | head -40)"
+if printf '%s' "$PLGSEC" | grep -qF 'un_rc_q "plugins rm"' \
+    && printf '%s' "$PLGSEC" | grep -qF 'plugin removal failed' \
+    && [ "$(printf '%s' "$PLGSEC" | grep -cF 'un_rc_q "')" = 2 ]; then
+    pass "plugins loop rc-observing, failure WARNs, both ops converted (#246 site 7)"
+else
+    fail "plugins loop not rc-observing (#246 site 7, pr-00263 d)"
 fi
 F3SEC="$(sed -n '/^echo "--- Removing sudoers ---"$/,/^fi$/p' "$UNINSTALL")"
 if [ -n "$F3SEC" ] && printf '%s' "$F3SEC" | grep -qF 'un_rc_q "rm sudoers"'; then

@@ -54,6 +54,7 @@ release PR; brevity held, no bulk restores per #252/#256),
 | c C5 (MED) | **implemented** | `005590a` | npm + opencode.ai named in the trust sentence (#270) |
 | c C6 (MED) | **implemented** | `005590a` | export conditions + verify advice, pins both ways (#271) |
 | c C9 + c C10 + c C11 (LOW) | **implemented** | `005590a` | three scoping clauses on the reference pages (#273) |
+| d Q2 (LOW) | **implemented** | `<SHA>` | #246 site 7 conversion makes "zero" true; pin = 0; a-F3 evidence corrected |
 
 ## Evidence detail
 
@@ -84,14 +85,21 @@ claim); DRY_RUN keeps the [DRY] echoes and success lines. Class sweep
 (`grep 'run sudo rm'`): the legacy-shape siblings got the same
 treatment (legacy sudoers symlink, legacy conf dir — where the partial
 check now precedes the rmdir claim — legacy library, legacy helper
-symlink); remaining by design: the plugins loop's two `run` ops
-(:400-401) carry NO success claim (silent-failure class, not the
-claim class — adjacent to the L1 ledger, no lie told). Pins
-(test-uninstall): zero `run sudo rm` left in the file; the sudoers
-section extracted and driven REAL with stubbed sudo both directions —
-failure WARNs on stderr + FAILED log + no success echo, success keeps
-the line; stale pre-state proves the section's own reset. Closes the
-uninstall half of the #211 c W1 debt (issue #246's uninstall side).
+symlink). The plugins loop's two `run` ops stayed claim-less through
+the a-wave (recorded then as "remaining by design", the silent-failure
+class — no lie told); converted in the d round as issue **#246 site 7**
+(the last of #246's 11 rc-blind sites): both ops through un_rc_q with
+a per-iteration partial reset, failure WARNs + FAILED log, success
+stays quiet (no success claim invented). Pins (test-uninstall): zero
+`run sudo rm` left in the file — the count pin is exact `= 0` now (the
+a-wave's `= 1` anchored the plugins residual the d wave removed, per
+d Q2); the plugins loop extract-pinned (both ops un_rc_q, WARN anchor);
+the sudoers section extracted and driven REAL with stubbed sudo both
+directions — failure WARNs on stderr + FAILED log + no success echo,
+success keeps the line; stale pre-state proves the section's own
+reset. Closes the uninstall half of the #211 c W1 debt and, with site
+7 converted, **closes #246 outright** (10 sites in the a-wave, this
+one in the d round).
 
 ### a F2(b) (MED) — OPENCODE_USER unshaped at the conf-reading consumers
 

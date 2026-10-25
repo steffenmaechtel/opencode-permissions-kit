@@ -400,10 +400,21 @@ if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
             log "tui plugin removal skipped: symlink in the chain to $_un_dir"
             continue
         fi
-        run sudo rm -rf "${_un_dir:?}/plugins/opencode-permissions-kit"
-        run sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" \
+        # pr-00263 d (issue #246 site 7, the a F3 class): both ops were
+        # claim-less `run` — silent on failure. Through un_rc_q now:
+        # failure WARNs and feeds the partial list; success stays quiet
+        # (no success claim existed before — none is invented here).
+        _un_partial=""
+        _un_revert_failed=0
+        un_rc_q "plugins rm" sudo rm -rf "${_un_dir:?}/plugins/opencode-permissions-kit"
+        un_rc_q "tui unregister" sudo python3 /usr/local/lib/opencode-permissions-kit/py/tui-register.py "$_un_dir/cli.json" \
             unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
             --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
+        if [ -n "$_un_partial" ]; then
+            echo "WARN: plugin removal failed ($_un_partial) — remove manually:"\
+" ${_un_dir:?}/plugins/opencode-permissions-kit (tui-register.py unregister)" >&2
+            log "plugin removal FAILED ($_un_partial): $_un_dir"
+        fi
     done
 fi
 
