@@ -210,7 +210,7 @@ _pin_dir=$(mktemp -d)
 # so an abort inside the window below leaked the mktemp dir in /tmp;
 # sibling suites trap (test-fs-baseline.sh:42, test-ddev-migrate.sh:71).
 # Re-registered at the _f2bW block below to cover that dir too.
-trap 'rm -rf "$_pin_dir"' EXIT
+trap 'rm -rf "$_pin_dir"' EXIT INT TERM
 sed '/_PP_NORM/d' "$INSTALL" > "$_pin_dir/install-no-norm"
 _pin_bare=$(sh -c 'set -e; _pn=$(grep -c "$1" "$2"); echo reached' \
     _ '_PP_NORM' "$_pin_dir/install-no-norm") || true
@@ -231,9 +231,9 @@ rm -rf "$_pin_dir"
 # echo is sanitized — the a F9 class: exactly one WARN line, sanitized
 # form present).
 _f2bW="$(mktemp -d)"
-# widen the c C1 EXIT trap to this scratch dir (replaces the pin-block
-# registration — both variables are set from here on)
-trap 'rm -rf "$_pin_dir" "$_f2bW"' EXIT
+# widen the (#280 c C1) EXIT trap to this scratch dir (replaces the
+# pin-block registration — both variables are set from here on)
+trap 'rm -rf "$_pin_dir" "$_f2bW"' EXIT INT TERM
 _f2bG="$(sed -n '/^case "$OPENCODE_USER" in$/,/^esac$/p' "$CONFIG")"
 if [ -n "$_f2bG" ] && printf '%s' "$_f2bG" | grep -q 'falling back'; then
     pass "config.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"
