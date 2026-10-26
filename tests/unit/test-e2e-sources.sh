@@ -168,7 +168,11 @@ RUN_SH="$(cd "$(dirname "$0")/../e2e" && pwd)/run.sh"
 
 check "lib.sh reads the E2E_GIT_CHANNEL knob (default distro)" \
     grep_q 'E2E_GIT_CHANNEL="\${E2E_GIT_CHANNEL:-distro}"'
-_git_build_args=$(grep -c -- '--build-arg GIT_CHANNEL' "$LIB")
+# Guarded counts (#260, the #244 f W1 class): grep -c exits 1 on zero
+# matches. This suite runs set -u only — no -e — so the bare shape
+# records its FAIL rather than aborting today; the guard keeps the
+# swept count family uniform if set -e ever lands here.
+_git_build_args=$(grep -c -- '--build-arg GIT_CHANNEL' "$LIB" || true)
 if [ "$_git_build_args" -ge 2 ]; then
     pass "git channel forwarded on both builder paths (BuildKit + classic)"
 else
@@ -197,7 +201,7 @@ check "run.sh asserts the latest leg really runs PPA git" \
 # workflow files. ---
 check "lib.sh reads the E2E_BASE_IMAGE knob (default ubuntu:24.04)" \
     grep_q 'E2E_BASE_IMAGE="\${E2E_BASE_IMAGE:-ubuntu:24.04}"'
-_base_build_args=$(grep -c -- '--build-arg BASE_IMAGE' "$LIB")
+_base_build_args=$(grep -c -- '--build-arg BASE_IMAGE' "$LIB" || true)
 if [ "$_base_build_args" -ge 2 ]; then
     pass "base image forwarded on both builder paths (BuildKit + classic)"
 else

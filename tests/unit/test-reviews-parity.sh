@@ -56,7 +56,10 @@ fi
 for f in internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-*/review-*.md; do
     [ -e "$f" ] || continue
     d=$(dirname "$f")
-    ptr=$(grep -c '^> Resolution:' "$f")
+    # Guarded count (#260, the #244 f W1 class): grep -c exits 1 on
+    # zero matches. This suite runs without set -e, so nothing
+    # aborted today — guarded for uniformity with the swept family.
+    ptr=$(grep -c '^> Resolution:' "$f" || true)
     if [ -e "$d/resolution.md" ]; then
         [ "$ptr" -eq 1 ] || echo "FAIL $f: resolution exists but $ptr pointer line(s)" >> "$TMP"
     else

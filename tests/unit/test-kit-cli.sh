@@ -346,8 +346,12 @@ fi
 # to the old single unconditional executor removes the second match.
 _ho_chmod_lns=$(grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' "$KIT" | cut -d: -f1)
 _ho_chown_lns=$(grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' "$KIT" | cut -d: -f1)
-_ho_nchmod=$(printf '%s\n' "$_ho_chmod_lns" | grep -c .)
-_ho_nchown=$(printf '%s\n' "$_ho_chown_lns" | grep -c .)
+# Guarded counts (#260, the #244 f W1 class — sites beyond the issue's
+# list, found by this wave's sweep): an executor line vanishing from the
+# kit script leaves grep -c . counting zero non-empty lines, rc 1 —
+# under set -e the bare assignment aborted before the order FAIL.
+_ho_nchmod=$(printf '%s\n' "$_ho_chmod_lns" | grep -c . || true)
+_ho_nchown=$(printf '%s\n' "$_ho_chown_lns" | grep -c . || true)
 _ho_c1=$(printf '%s\n' "$_ho_chmod_lns" | head -1)
 _ho_c2=$(printf '%s\n' "$_ho_chmod_lns" | tail -1)
 _ho_h1=$(printf '%s\n' "$_ho_chown_lns" | head -1)

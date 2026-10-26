@@ -1488,7 +1488,10 @@ if [ -n "$_w9_block" ] && printf '%s' "$_w9_block" | grep -q 'project-root hando
 else
     fail "typo3-bootstrap pair block extractable (#211 b W9)"
 fi
-_n_w9=$(grep -c 'warn: project-root hand\(back\|over\) incomplete' "$HANDOVER")
+# Guarded count (#260, the #244 f W1 class; #244 h W4): zero matches
+# (a warn-wording change in the shipped script) aborted the suite under
+# set -e before the -ge 3 FAIL could record.
+_n_w9=$(grep -c 'warn: project-root hand\(back\|over\) incomplete' "$HANDOVER" || true)
 [ "$_n_w9" -ge 3 ] \
     && pass "all three project-root warn lines present (#211 b W9)" \
     || fail "all three project-root warn lines present (got $_n_w9) (#211 b W9)"

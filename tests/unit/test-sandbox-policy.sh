@@ -304,7 +304,11 @@ printf '#!/bin/sh\n# probe: unguarded rm suffix variants must be caught (check 3
     > "$PROBE_DIR/unit/test-probe-sfx.sh"
 : > "$VIOL"
 sfx_scan "$PROBE_DIR/unit" > "$VIOL" || true
-_sfx_rows=$(grep -c 'test-probe-sfx.sh' "$VIOL")
+# Guarded count (#260, the #244 f W1 class): grep -c exits 1 on zero
+# matches (the scanner regressing to no rows). This suite runs without
+# set -e, so the zero path records rather than aborts today — guarded
+# for uniformity with the swept family.
+_sfx_rows=$(grep -c 'test-probe-sfx.sh' "$VIOL" || true)
 if [ "$_sfx_rows" -eq 7 ] && grep -q 'PX/evil' "$VIOL" && grep -q 'PX/evil2' "$VIOL" \
     && grep -q 'PX/evil3' "$VIOL" && grep -q 'PX/evil4' "$VIOL" \
     && grep -q 'PX}/evil5' "$VIOL" && grep -q 'PX./evil6' "$VIOL" \

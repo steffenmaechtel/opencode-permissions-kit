@@ -178,7 +178,10 @@ done
 # by every consumer (review 0.0.39b C1). The standard prompt (line ~593)
 # always did; --projects and the custom-path dialog must match it.
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
-_norm_sites=$(grep -c '_PP_NORM' "$INSTALL")
+# Guarded count (#260, the #244 f W1 class): grep -c prints 0 AND exits
+# 1 on zero matches — under set -e the bare assignment aborted the suite
+# before the -ge 4 check could record its FAIL (#244 h W2).
+_norm_sites=$(grep -c '_PP_NORM' "$INSTALL" || true)
 if [ "$_norm_sites" -ge 4 ]; then
     pass "install.sh uses _PP_NORM in all project entry points ($_norm_sites sites)"
 else
@@ -190,6 +193,25 @@ if grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' "$INSTALL" \
 else
     fail "install.sh: --projects and custom dialog store the expanded path"
 fi
+
+# --- #260 class pin (representative for the count guards swept this wave):
+# the zero-match path must reach its comparison — a recorded FAIL carrying
+# the count — never abort the suite under set -e (#244 h W2 probe shape).
+# Fixture: a scratch copy of install.sh with every _PP_NORM line deleted
+# (the accident the count guards: the marker vanished from the source).
+# The bare leg must abort mid-subshell; the guarded leg must reach the
+# echo with count=0. Both legs run under an explicit set -e so the pin
+# does not depend on shell-specific errexit inheritance.
+_pin_dir=$(mktemp -d)
+sed '/_PP_NORM/d' "$INSTALL" > "$_pin_dir/install-no-norm"
+_pin_bare=$(set -e; _pn=$(grep -c '_PP_NORM' "$_pin_dir/install-no-norm"); echo reached) || true
+_pin_guarded=$(set -e; _pn=$(grep -c '_PP_NORM' "$_pin_dir/install-no-norm" || true); echo "reached count=$_pn") || true
+if [ -z "$_pin_bare" ] && [ "$_pin_guarded" = "reached count=0" ]; then
+    pass "zero-match count: bare assignment aborts, guarded records 0 for the FAIL (#260 pin)"
+else
+    fail "zero-match count pin: bare='$_pin_bare' guarded='$_pin_guarded' (#260 pin)"
+fi
+rm -rf "$_pin_dir"
 
 # --- pr-00263 a F2(b): OPENCODE_USER shape gate in config.sh (#243 e X1 mirror) -
 # Extract and drive REAL (the uninstall-suite idiom): valid custom name
