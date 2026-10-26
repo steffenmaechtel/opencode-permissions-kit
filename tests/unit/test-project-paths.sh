@@ -199,13 +199,18 @@ fi
 # the count — never abort the suite under set -e (#244 h W2 probe shape).
 # Fixture: a scratch copy of install.sh with every _PP_NORM line deleted
 # (the accident the count guards: the marker vanished from the source).
-# The bare leg must abort mid-subshell; the guarded leg must reach the
-# echo with count=0. Both legs run under an explicit set -e so the pin
-# does not depend on shell-specific errexit inheritance.
+# The bare leg must abort mid-run; the guarded leg must reach the echo
+# with count=0. Both legs run as `sh -c` child processes carrying their
+# own set -e: a child shell honors errexit regardless of the caller's ||
+# context — an in-substitution `set -e` is ignored under bash when the
+# substitution sits in an || list (#280 a Q1), so the pin must not rely
+# on it. Needle and file reach the child as arguments, never interpolated.
 _pin_dir=$(mktemp -d)
 sed '/_PP_NORM/d' "$INSTALL" > "$_pin_dir/install-no-norm"
-_pin_bare=$(set -e; _pn=$(grep -c '_PP_NORM' "$_pin_dir/install-no-norm"); echo reached) || true
-_pin_guarded=$(set -e; _pn=$(grep -c '_PP_NORM' "$_pin_dir/install-no-norm" || true); echo "reached count=$_pn") || true
+_pin_bare=$(sh -c 'set -e; _pn=$(grep -c "$1" "$2"); echo reached' \
+    _ '_PP_NORM' "$_pin_dir/install-no-norm") || true
+_pin_guarded=$(sh -c 'set -e; _pn=$(grep -c "$1" "$2" || true); echo "reached count=$_pn"' \
+    _ '_PP_NORM' "$_pin_dir/install-no-norm") || true
 if [ -z "$_pin_bare" ] && [ "$_pin_guarded" = "reached count=0" ]; then
     pass "zero-match count: bare assignment aborts, guarded records 0 for the FAIL (#260 pin)"
 else
