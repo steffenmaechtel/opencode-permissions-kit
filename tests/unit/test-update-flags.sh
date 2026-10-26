@@ -1044,7 +1044,10 @@ fi
 # rc 0 = "assume a real one might exist". Pin: the stub is extracted
 # from the real update.sh and executed — rc must be 0 (deleting the
 # stub yields 127 and the pin goes red).
-_f7_stub="$(grep -m1 '^command -v xdg_open_real_exists' "$UPDATE")"
+# Guarded extraction (#260, the #244 f W1 class; #280 a S1): grep -m1
+# exits 1 on zero matches exactly like grep -c — under set -e the bare
+# assignment aborted before the [ -n ] FAIL below could record.
+_f7_stub="$(grep -m1 '^command -v xdg_open_real_exists' "$UPDATE" || true)"
 if [ -n "$_f7_stub" ]; then
     pass "xdg_open_real_exists stub extractable from update.sh (#211 a F7)"
     _f7_rc=0

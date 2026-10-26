@@ -433,9 +433,12 @@ if [ -n "$_f16_fn" ]; then
         eval "$1"
         allocate_range "$F16FILE" f16user
     ' sh "$_f16_fn" 2>&1) || _f16_rc=$?
-    _f16_warn=$(printf '%s\n' "$_out" | grep -c 'malformed line(s) skipped')
+    # Guarded counts (#260, the #244 f W1 class): grep -c exits 1 on zero
+    # matches — under set -e the bare assignment aborted before the
+    # malformed-lines FAIL could record.
+    _f16_warn=$(printf '%s\n' "$_out" | grep -c 'malformed line(s) skipped' || true)
     _f16_cnt=$(printf '%s\n' "$_out" | sed -n 's/.*warn: \([0-9]*\) malformed.*/\1/p')
-    _f16_alloc=$(grep -c '^f16user:165536:65536$' "$F16/subuid" 2>/dev/null)
+    _f16_alloc=$(grep -c '^f16user:165536:65536$' "$F16/subuid" 2>/dev/null || true)
     # u32max (10 digits > 4294967295) is malformed on VALUE (#211 c W9)
     # — the length gate alone passed it. zerostart "0" is a GOOD line
     # (#211 c W10): accepted as an occupied empty range, so it must NOT

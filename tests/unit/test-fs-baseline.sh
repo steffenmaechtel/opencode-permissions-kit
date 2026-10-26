@@ -164,7 +164,10 @@ else
     pass "group-x ancestor (dir group == sharing group) stays untouched"
 fi
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$TR/gx/proj" "$GRP" >/dev/null 2>&1
-_n=$(getfacl -p "$TR" 2>/dev/null | grep -c "^group:$GRP:--x")
+# Guarded count (#260, the #244 f W1 class): zero entries (the
+# idempotence regression this pins) aborted under set -e before
+# assert_eq could record the FAIL.
+_n=$(getfacl -p "$TR" 2>/dev/null | grep -c "^group:$GRP:--x" || true)
 assert_eq "traverse grant is idempotent (single ACL entry)" "1" "$_n"
 rm -rf "$TR"
 

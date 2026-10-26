@@ -56,7 +56,10 @@ fi
 for f in internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-*/review-*.md; do
     [ -e "$f" ] || continue
     d=$(dirname "$f")
-    ptr=$(grep -c '^> Resolution:' "$f")
+    # Guarded count (#260, the #244 f W1 class): grep -c exits 1 on
+    # zero matches. This suite runs without set -e, so nothing
+    # aborted today — guarded for uniformity with the swept family.
+    ptr=$(grep -c '^> Resolution:' "$f" || true)
     if [ -e "$d/resolution.md" ]; then
         [ "$ptr" -eq 1 ] || echo "FAIL $f: resolution exists but $ptr pointer line(s)" >> "$TMP"
     else
@@ -90,7 +93,10 @@ printf '# Resolution — pr-00420\n\nchain still running; nothing closed yet.\n'
 # regression to substring search must fail the open direction (#241 a S1)
 (cd "$GENDIR" && python3 scripts/gen-review-index.py) > /dev/null 2>&1 \
     || echo "FAIL status pin: generator exited non-zero" >> "$TMP"
-row=$(grep 'pr-00420' "$GENDIR/internal/reviews/INDEX.md")
+# Guarded reads (#260, the #244 f W1 class; #280 a S2 — uniformity
+# riders, this suite runs without set -e): a missing row must land in
+# the case's FAIL arm below, never abort the suite.
+row=$(grep 'pr-00420' "$GENDIR/internal/reviews/INDEX.md" || true)
 case "$row" in
     *'| open |') ;;
     *) echo "FAIL status pin: no Status line must read open, got: $row" >> "$TMP" ;;
@@ -99,7 +105,7 @@ printf '# Resolution — pr-00420\n\nStatus: closed — stop rule met (pin).\n' 
     > "$GENCASE/resolution.md"
 (cd "$GENDIR" && python3 scripts/gen-review-index.py) > /dev/null 2>&1 \
     || echo "FAIL status pin: generator exited non-zero (closed)" >> "$TMP"
-row=$(grep 'pr-00420' "$GENDIR/internal/reviews/INDEX.md")
+row=$(grep 'pr-00420' "$GENDIR/internal/reviews/INDEX.md" || true)
 case "$row" in
     *'| closed |') ;;
     *) echo "FAIL status pin: Status closed must read closed, got: $row" >> "$TMP" ;;

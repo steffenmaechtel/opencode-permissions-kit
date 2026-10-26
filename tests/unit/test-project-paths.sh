@@ -178,7 +178,10 @@ done
 # by every consumer (review 0.0.39b C1). The standard prompt (line ~593)
 # always did; --projects and the custom-path dialog must match it.
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
-_norm_sites=$(grep -c '_PP_NORM' "$INSTALL")
+# Guarded count (#260, the #244 f W1 class): grep -c prints 0 AND exits
+# 1 on zero matches — under set -e the bare assignment aborted the suite
+# before the -ge 4 check could record its FAIL (#244 h W2).
+_norm_sites=$(grep -c '_PP_NORM' "$INSTALL" || true)
 if [ "$_norm_sites" -ge 4 ]; then
     pass "install.sh uses _PP_NORM in all project entry points ($_norm_sites sites)"
 else
@@ -191,14 +194,48 @@ else
     fail "install.sh: --projects and custom dialog store the expanded path"
 fi
 
+# --- #260 class pin (representative for the count guards swept this wave):
+# the zero-match path must reach its comparison — a recorded FAIL carrying
+# the count — never abort the suite under set -e (#244 h W2 probe shape).
+# Fixture: a scratch copy of install.sh with every _PP_NORM line deleted
+# (the accident the count guards: the marker vanished from the source).
+# The bare leg must abort mid-run; the guarded leg must reach the echo
+# with count=0. Both legs run as `sh -c` child processes carrying their
+# own set -e: a child shell honors errexit regardless of the caller's ||
+# context — an in-substitution `set -e` is ignored under bash when the
+# substitution sits in an || list (#280 a Q1), so the pin must not rely
+# on it. Needle and file reach the child as arguments, never interpolated.
+_pin_dir=$(mktemp -d)
+# Trap the scratch dir on EXIT/INT/TERM (#280 c C1 abort leak; #280 d S2
+# signal arms): the suite registered no trap, so an abort inside the
+# window below leaked the mktemp dir in /tmp; sibling suites use the
+# same idiom (test-fs-baseline.sh:42, test-ddev-migrate.sh:71).
+# Re-registered at the _f2bW block below to cover that dir too.
+trap 'rm -rf "$_pin_dir"' EXIT INT TERM
+sed '/_PP_NORM/d' "$INSTALL" > "$_pin_dir/install-no-norm"
+_pin_bare=$(sh -c 'set -e; _pn=$(grep -c "$1" "$2"); echo reached' \
+    _ '_PP_NORM' "$_pin_dir/install-no-norm") || true
+_pin_guarded=$(sh -c 'set -e; _pn=$(grep -c "$1" "$2" || true); echo "reached count=$_pn"' \
+    _ '_PP_NORM' "$_pin_dir/install-no-norm") || true
+if [ -z "$_pin_bare" ] && [ "$_pin_guarded" = "reached count=0" ]; then
+    pass "zero-match count: bare assignment aborts, guarded records 0 for the FAIL (#260 pin)"
+else
+    fail "zero-match count pin: bare='$_pin_bare' guarded='$_pin_guarded' (#260 pin)"
+fi
+rm -rf "$_pin_dir"
+
 # --- pr-00263 a F2(b): OPENCODE_USER shape gate in config.sh (#243 e X1 mirror) -
 # Extract and drive REAL (the uninstall-suite idiom): valid custom name
 # and canonical literal pass through silently; the trailing-slash
 # spelling that defangs the agent-home refusal falls back loudly; a
 # newline-bearing value cannot forge a second transcript line (the WARN
-# echo is sanitized — the a F9 class: exactly one WARN line, sanitized
+# echo is sanitized — the pr-00263 a F9 class: exactly one WARN line, sanitized
 # form present).
 _f2bW="$(mktemp -d)"
+# widen the (#280 c C1 / #280 d S2) EXIT/INT/TERM trap to this scratch
+# dir (replaces the pin-block registration — both variables are set
+# from here on)
+trap 'rm -rf "$_pin_dir" "$_f2bW"' EXIT INT TERM
 _f2bG="$(sed -n '/^case "$OPENCODE_USER" in$/,/^esac$/p' "$CONFIG")"
 if [ -n "$_f2bG" ] && printf '%s' "$_f2bG" | grep -q 'falling back'; then
     pass "config.sh OPENCODE_USER shape gate extractable (pr-00263 a F2b)"

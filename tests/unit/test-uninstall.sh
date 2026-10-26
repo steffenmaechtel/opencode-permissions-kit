@@ -354,7 +354,13 @@ _un_parity_tokens() {
     printf '%s\n' "$1" | tr '|' '\n' | sed -e 's/[[:space:]]*$//' -e '/^$/d' | sort -u
 }
 READER_SET=$(_un_parity_tokens "$SCREEN_PATTERNS")
-WRITER_SET=$(_un_parity_tokens "$WRITER_PATTERNS" | grep -vxF -e '/tmp' -e '/tmp/*' -e '/var/tmp' -e '/var/tmp/*')
+# Guarded count (#260, the #244 f W1 class; #280 c S1): grep -v exits 1
+# when it filters everything — zero surviving tokens (the writer-parity
+# regression this pin exists for) aborted the suite under set -e before
+# the set-equality FAIL could record. READER_SET above needs no guard:
+# _un_parity_tokens ends in sort -u, rc 0 even on empty input.
+WRITER_SET=$(_un_parity_tokens "$WRITER_PATTERNS" | grep -vxF \
+    -e '/tmp' -e '/tmp/*' -e '/var/tmp' -e '/var/tmp/*' || true)
 if [ -n "$READER_SET" ] && [ "$READER_SET" = "$WRITER_SET" ]; then
     pass "screening blocklist at writer parity, /tmp+/var/tmp pinned out (#243 b X1)"
 else
