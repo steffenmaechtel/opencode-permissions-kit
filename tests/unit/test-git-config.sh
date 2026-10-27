@@ -302,10 +302,12 @@ _gc_mark='(markers present, rules inactive)'
 # Comment-strip riders (#261, the #244 g W1 class — sweep finds beyond
 # the issue list): commented-out ui_kv rows stop counting; full-line
 # comments only (#244 h W6 residual).
+_gc_on_n=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_on" || true)
+_gc_off_n=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_off" || true)
 if grep -qF "$_gc_on" "$CONFIG" \
    && grep -qF "$_gc_off" "$CONFIG" \
-   && [ "$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_on" || true)" -ge 2 ] \
-   && [ "$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_off" || true)" -ge 3 ] \
+   && [ "$_gc_on_n" -ge 2 ] \
+   && [ "$_gc_off_n" -ge 3 ] \
    && grep -qF "$_gc_prot" "$STATUS" \
    && grep -qF "$_gc_allow" "$STATUS" \
    && grep -qF "$_gc_mark" "$CONFIG" \
@@ -314,7 +316,7 @@ if grep -qF "$_gc_on" "$CONFIG" \
    && ! grep -qF '"OFF  (' "$CONFIG"; then
     pass "issue #205: git-config rows read ON/OFF + protected/access allowed"
 else
-    fail "issue #205: git-config row wording regressed to bare ON/OFF"
+    fail "issue #205: git-config rows drifted (on=$_gc_on_n off=$_gc_off_n — below 2/3 = row drift, else wording/markers legs)"
 fi
 
 # Plan numbering must be dynamic (_plan helper) — a skipped optional step
