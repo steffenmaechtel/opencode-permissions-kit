@@ -99,6 +99,10 @@ fi
 # prints EMPTY (the caller's fallback premise) — never a partial value
 # or an abort under lib.sh's set -e. ---
 NPMWORK="$(mktemp -d)"
+# Trap the receiver on exit and signals (#283): this suite runs without
+# set -e (no abort leak), but a SIGINT/SIGTERM between creation and the
+# inline rm leaked the scratch — the suite had no trap at all.
+trap 'rm -rf "${NPMWORK:-}"' EXIT INT TERM
 mkdir -p "$NPMWORK/bin" 
 cat > "$NPMWORK/bin/curl" <<'CURLEOF'
 #!/bin/sh

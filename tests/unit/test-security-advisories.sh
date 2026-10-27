@@ -300,6 +300,13 @@ fi
 # single quotes hand the payload to the guard as TEXT, the marker file
 # proves nothing anywhere ever executed it
 PWNED_DIR="$(mktemp -d)"
+# Cover every mktemp receiver of this suite on abort and signals (#283):
+# the suite had no trap at all, so a set -e abort between creation and
+# the inline rm leaked the scratch in /tmp. Receivers created further
+# down (FEED_PY/FEED_JSON) sit in the same list unset-safe — an unset
+# operand expands empty and rm -rf skips it. Sibling idiom: the
+# EXIT INT TERM scratch traps in test-fs-baseline.sh / test-project-paths.sh.
+trap 'rm -rf "${PWNED_DIR:-}" "${FEED_PY:-}" "${FEED_JSON:-}"' EXIT INT TERM
 PWNED="$PWNED_DIR/pwned"
 if scan_advisory_valid 'GHSA-632h$(touch '"$PWNED"')' "high" "<1.0.216" "1.0.216"; then
     fail "scan guard: command-substitution payload rejected"

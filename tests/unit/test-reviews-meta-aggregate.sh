@@ -34,6 +34,9 @@ check() {
 }
 
 WORK="$(mktemp -d /tmp/opencode-test-meta-aggregate.XXXXXX)"
+# Trap the receiver on exit and signals (#283): the suite had no trap
+# and no inline rm — the scratch leaked on EVERY run, not just aborts.
+trap 'rm -rf "${WORK:-}"' EXIT INT TERM
 
 # --- compat: frozen 2026-10-10 data regenerates identically -------------------
 mkdir -p "$WORK/old"

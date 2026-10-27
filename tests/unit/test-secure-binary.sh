@@ -32,7 +32,7 @@ check() {
 }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'rm -rf "$WORK"' EXIT INT TERM
 BIN="$WORK/opencode"
 echo '#!/bin/sh' > "$BIN"
 chmod 755 "$BIN"

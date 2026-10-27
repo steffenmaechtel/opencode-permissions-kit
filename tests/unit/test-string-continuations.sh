@@ -38,7 +38,7 @@ management/update.sh|'),gid=
 "
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+trap 'rm -f "$TMP"' EXIT INT TERM
 
 # Paths in this repo contain no spaces (same assumption as the ratchet).
 {

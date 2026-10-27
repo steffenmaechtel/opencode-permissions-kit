@@ -37,7 +37,7 @@ mode_is() {
 }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'rm -rf "$WORK"' EXIT INT TERM
 LIBD="$WORK/libdir"
 
 # --- 1. happy path ----------------------------------------------------------

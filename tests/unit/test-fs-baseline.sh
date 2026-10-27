@@ -39,7 +39,20 @@ assert_eq() {
 }
 
 WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT INT TERM
+# Widen the trap to every bare receiver of the suite (#283): TR, V9ROOT,
+# STUBBIN, _bstub, SW, F1DIR, F1STUB, F1SP, F1SPD, F1SPS and F12S lived
+# outside $WORK with only inline rm on their normal paths — a set -e
+# abort inside the window leaked them. The list is a function (twelve
+# receivers do not fit one line); unset-safe operands skip cleanly.
+# This file's line-form trap was the wave's sibling idiom reference; the
+# long receiver list now needs the function form (install.sh's cleanup
+# precedent).
+_trap_cleanup() {
+    rm -rf "${WORK:-}" "${TR:-}" "${V9ROOT:-}" "${STUBBIN:-}" \
+        "${_bstub:-}" "${SW:-}" "${F1DIR:-}" "${F1STUB:-}" \
+        "${F1SP:-}" "${F1SPD:-}" "${F1SPS:-}" "${F12S:-}"
+}
+trap _trap_cleanup EXIT INT TERM
 
 echo ""
 echo "fs-baseline (group baseline progress, issue #14)"

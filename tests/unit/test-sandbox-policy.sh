@@ -12,8 +12,8 @@
 #
 # Two checks over the continuation-joined view of each line (full-comment
 # lines skipped): check 1 scans the quote-blanked operand view, check 2
-# the RAW line (quotes included — see its own header below). Check 3
-# runs its own grep (section 3):
+# the RAW line (quotes included — see its own header below). Checks 3-5
+# run their own greps (sections 3-5):
 #
 # 1. MUTATION: a mutating verb (rm, rmdir, mkdir, ln, cp, mv, chown,
 #    chmod, chgrp, setfacl, touch, truncate, tee, install, `sed -i`)
@@ -76,7 +76,7 @@ fail() { printf '  FAIL  %s\n' "$1"; failed=$((failed + 1)); }
 
 TMP="$(mktemp)"
 VIOL="$(mktemp)"
-trap 'rm -f "$TMP" "$VIOL"; [ -n "${PROBE_DIR:-}" ] && rm -rf "$PROBE_DIR"' EXIT
+trap 'rm -f "$TMP" "$VIOL"; [ -n "${PROBE_DIR:-}" ] && rm -rf "$PROBE_DIR"' EXIT INT TERM
 PROBE_DIR=""
 
 # scan <dir> -- writes "file|line|kind|token" violation rows to $VIOL.
@@ -317,6 +317,161 @@ if [ "$_sfx_rows" -eq 7 ] && grep -q 'PX/evil' "$VIOL" && grep -q 'PX/evil2' "$V
 else
     fail "self-probe: check 3 must catch the unguarded suffix variants only (rows=$_sfx_rows)"
     grep 'test-probe-sfx.sh' "$VIOL" || true
+fi
+
+# --- 4. trap coverage floor: receivers must sit under an armed trap ------------
+# (issue #283, the #260/#261 idiom): a suite with mktemp scratch must
+# register a trap on EXIT AND the signal arms INT TERM — a set -e abort
+# or a Ctrl-C between a receiver's creation and its inline rm leaked the
+# scratch in /tmp (the sibling standard: test-fs-baseline.sh /
+# test-project-paths.sh). This is the FLOOR check, a lint shape: it pins
+# that every receiver-carrying suite HAS a trap statement and that every
+# trap statement carries all three arms. Whether the trap's action LIST
+# every receiver (variable-level completeness) cannot be grepped — that
+# stays the review's job, pinned behaviorally by section 5's mechanism
+# cells. Receiver detection: a live assignment whose value starts with
+# an UNESCAPED $(mktemp (comment lines skipped); heredoc-embedded child
+# scripts carry \$ ( — escaped, excluded by design: child scripts own
+# their cleanup. The function form (trap _cleanup EXIT INT TERM) is
+# accepted: the arms live on the trap line, the rm lives in the
+# function. Line-based like check 3: a trap statement split across a
+# backslash continuation hides its arms from the scan — keep the arms
+# on the trap's physical line (the self-probes pin the shape). This
+# suite excludes itself like checks 1-2 (its own trap is pinned by
+# shipping the guard, not by scanning itself).
+trap_scan() {
+    find "$1" -name "${2:-test-*.sh}" ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
+        awk -v f="$f" '
+            /^[[:space:]]*#/ { next }
+            /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="?[$][(]mktemp/ { recv++ }
+            /^[[:space:]]*trap[[:space:]].*/ {
+                traps++
+                _ln = NR
+                if ($0 !~ /[^A-Za-z]EXIT([^A-Za-z]|$)/) arms = arms " " _ln ":no-EXIT"
+                if ($0 !~ /[^A-Za-z]INT([^A-Za-z]|$)/) arms = arms " " _ln ":no-INT"
+                if ($0 !~ /[^A-Za-z]TERM([^A-Za-z]|$)/) arms = arms " " _ln ":no-TERM"
+            }
+            END {
+                if (recv > 0 && traps == 0) print f "|notrap"
+                if (arms != "") print f "|arms" arms
+            }
+        ' "$f"
+    done
+}
+: > "$VIOL"
+trap_scan tests/unit > "$VIOL" || true
+if [ -s "$VIOL" ]; then
+    while IFS='|' read -r tf tk; do
+        case "$tk" in
+            notrap) fail "$tf has mktemp receiver(s) but no trap statement (#283: register one, arms EXIT INT TERM)" ;;
+            arms*)  fail "$tf trap statement missing arms:$tk (#283: every trap needs EXIT INT TERM)" ;;
+        esac
+    done < "$VIOL"
+else
+    pass "every receiver-carrying suite traps its scratch with EXIT INT TERM arms (trap-coverage floor)"
+fi
+# self-probe: the notrap and half-armed shapes must be caught, the full
+# line-form and function-form fixtures must pass
+printf '#!/bin/sh\n# probe: receiver without any trap must be caught (check 4)\nP4A="$(mktemp -d)"\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-none.sh"
+printf '#!/bin/sh\n# probe: EXIT-only trap must be caught (missing signal arms)\nP4B="$(mktemp -d)"\ntrap "rm -rf \"$P4B\"" EXIT\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-exit.sh"
+printf '#!/bin/sh\n# probe: full line form passes\nP4C="$(mktemp -d)"\ntrap "rm -rf \"${P4C:-}\"" EXIT INT TERM\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-line.sh"
+printf '#!/bin/sh\n# probe: function form passes (arms on the trap line, rm in the function)\nP4D="$(mktemp -d)"\n_p4clean() { rm -rf "${P4D:-}"; }\ntrap _p4clean EXIT INT TERM\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-func.sh"
+printf '#!/bin/sh\n# probe: heredoc-escaped receiver (child script) is not a suite receiver\n_cat > /dev/null <<EOF\n_h = \\$(mktemp -d)\nEOF\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-heredoc.sh"
+: > "$VIOL"
+trap_scan "$PROBE_DIR/unit" > "$VIOL" || true
+if grep -q 'test-probe-trap-none.sh|notrap' "$VIOL"; then
+    pass "self-probe: trapless receiver suite is caught"
+else
+    fail "self-probe: trapless receiver suite must be caught (check 4)"
+fi
+if grep -q 'test-probe-trap-exit.sh|arms.*no-INT' "$VIOL" && grep -q 'test-probe-trap-exit.sh|arms.*no-TERM' "$VIOL"; then
+    pass "self-probe: EXIT-only trap flagged for missing signal arms"
+else
+    fail "self-probe: EXIT-only trap must be flagged for missing INT/TERM arms (check 4)"
+fi
+if grep -qE 'test-probe-trap-(line|func|heredoc)\.sh\|' "$VIOL"; then
+    fail "self-probe: full line/function-form and heredoc fixtures must pass clean"
+    grep -E 'test-probe-trap-(line|func|heredoc)' "$VIOL" || true
+else
+    pass "self-probe: line form, function form and heredoc fixtures pass clean"
+fi
+
+# --- 5. behavioral: the trap idiom collects scratch on abort and signal --------
+# (#283 representative pin, the issue's fix sketch): a generated
+# mini-suite runs with an ISOLATED TMPDIR (its mktemp receiver can only
+# land there), a forced set -e abort inside the receiver window must
+# leave ZERO entries behind; the trap-gone control arm must leave the
+# scratch BEHIND — the cell pair proves the pin discriminates through
+# the trap, not through the abort. The signal cells drive SIGTERM into
+# the window via a session-group kill (setsid; the sleep must die with
+# the shell or the trap waits out the window), with an elapsed-time
+# guard: a kill that never landed would let the child finish normally
+# and green the cell through the EXIT arm — the wrong mechanism
+# (0.0.46a F2 vacuity class).
+_bh_cell() {
+    # $1 = armed|gone, $2 = abort|term -- prints "<leftovers> <elapsed>"
+    _bh_dir="$(mktemp -d)"
+    _bh_start=$(date +%s)
+    case "$1:$2" in
+        armed:abort|armed:term)
+            _bh_trap='trap '"'"'rm -rf "${BHW:-}"'"'"' EXIT INT TERM'
+            ;;
+        gone:abort|gone:term)
+            _bh_trap=':'
+            ;;
+    esac
+    _bh_rc=0
+    if [ "$2" = abort ]; then
+        TMPDIR="$_bh_dir" sh -c "
+            set -e
+            $_bh_trap
+            BHW=\"\$(mktemp -d)\"
+            exit 3
+        " _ >/dev/null 2>&1 || _bh_rc=$?
+    else
+        TMPDIR="$_bh_dir" setsid sh -c "
+            $_bh_trap
+            BHW=\"\$(mktemp -d)\"
+            sleep 30
+        " _ >/dev/null 2>&1 &
+        _bh_pid=$!
+        sleep 1
+        kill -TERM "-$_bh_pid" 2>/dev/null || _bh_rc=1
+        wait "$_bh_pid" 2>/dev/null || _bh_rc=$?
+    fi
+    _bh_left=$(find "$_bh_dir" -mindepth 1 | wc -l | tr -d ' ')
+    _bh_el=$(( $(date +%s) - _bh_start ))
+    command rm -rf "${_bh_dir:?}"
+    printf '%s %s' "$_bh_left" "$_bh_el"
+}
+_bh_abort_armed=$(_bh_cell armed abort)
+_bh_abort_gone=$(_bh_cell gone abort)
+_bh_term_armed=$(_bh_cell armed term)
+_bh_term_gone=$(_bh_cell gone term)
+if [ "${_bh_abort_armed%% *}" = 0 ]; then
+    pass "abort window: armed trap leaves zero leftovers"
+else
+    fail "abort window: armed trap must leave zero leftovers (got $_bh_abort_armed)"
+fi
+if [ "${_bh_abort_gone%% *}" -ge 1 ]; then
+    pass "abort window: trap-gone control leaks (pin discriminates)"
+else
+    fail "abort window: trap-gone control must leak — otherwise the abort cell is vacuous (got $_bh_abort_gone)"
+fi
+if [ "${_bh_term_armed%% *}" = 0 ] && [ "${_bh_term_armed##* }" -lt 10 ]; then
+    pass "signal window: armed trap leaves zero leftovers, TERM landed (<10s)"
+else
+    fail "signal window: armed trap must collect within the kill window (got $_bh_term_armed; elapsed must be <10)"
+fi
+if [ "${_bh_term_gone%% *}" -ge 1 ] && [ "${_bh_term_gone##* }" -lt 10 ]; then
+    pass "signal window: trap-gone control leaks, TERM landed (pin discriminates)"
+else
+    fail "signal window: trap-gone control must leak within the kill window (got $_bh_term_gone; elapsed must be <10)"
 fi
 
 echo ""

@@ -481,6 +481,21 @@ fi
 # HTTP-200-style success with an EMPTY body (captive portal / broken
 # mirror). fetch_kit must abort instead of deploying the empty file.
 FKWORK=$(mktemp -d)
+# Trap every mktemp receiver of this suite on abort and signals (#283):
+# the suite had no live trap (its only "trap" lines are grep pins over
+# install.sh), so a set -e abort between a receiver's creation and its
+# inline rm leaked the scratch in /tmp. The receiver list is a function
+# because twelve receivers do not fit one line; every operand is
+# unset-safe — receivers created in conditionals below (the _p3* block)
+# may not exist at fire time, and an unset operand expands empty, which
+# rm skips. Sibling idiom: the line-form scratch traps in
+# test-fs-baseline.sh / test-project-paths.sh.
+_trap_cleanup() {
+    rm -rf "${FKWORK:-}" "${_dg_w:-}" "${_pb_w:-}" "${_py3w:-}" \
+        "${_p3tmp:-}" "${_p3g:-}" "${_p3raw:-}" "${_p3mods:-}" \
+        "${_p3fx:-}" "${_p3fraw:-}" "${_p3fmods:-}" "${_p3fwant:-}"
+}
+trap _trap_cleanup EXIT INT TERM
 mkdir -p "$FKWORK/bin"
 cat > "$FKWORK/bin/curl" <<'FAKE'
 #!/bin/sh

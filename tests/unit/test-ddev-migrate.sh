@@ -68,7 +68,8 @@ assert_eq() {
 }
 
 WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT INT TERM
+# widen to the bare _w5dir/F3ROOT receivers + signal arms (#283)
+trap 'rm -rf "${WORK:-}" "${_w5dir:-}" "${F3ROOT:-}"' EXIT INT TERM
 
 echo ""
 echo "ddev database migration Tests (issue #15)"

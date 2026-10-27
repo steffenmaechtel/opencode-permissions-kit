@@ -211,7 +211,8 @@ _pin_dir=$(mktemp -d)
 # Trap the scratch dir on EXIT/INT/TERM (#280 c C1 abort leak; #280 d S2
 # signal arms): the suite registered no trap, so an abort inside the
 # window below leaked the mktemp dir in /tmp; sibling suites use the
-# same idiom (test-fs-baseline.sh:42, test-ddev-migrate.sh:71).
+# same idiom (the scratch traps in test-fs-baseline.sh and
+# test-ddev-migrate.sh; the house-wide sweep is #283).
 # Re-registered at the _f2bW block below to cover that dir too.
 trap 'rm -rf "$_pin_dir"' EXIT INT TERM
 sed '/_PP_NORM/d' "$INSTALL" > "$_pin_dir/install-no-norm"

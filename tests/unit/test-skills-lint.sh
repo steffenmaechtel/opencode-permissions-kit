@@ -84,7 +84,11 @@ WS_LOCAL_ESC="$(printf '%s' "$WS_LOCAL" | sed 's/[.\^$()*+?[|\\]/\\&/g')"
 LOCAL_SHAPES="(^|[^.[:alnum:]_/-])local/|\.{1,2}/+local/|$WS_LOCAL_ESC"
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+# One trap for every receiver of the suite, registered at the first
+# (#283): WORK and F16W are created further down and set unset-safe —
+# rm skips them until they exist. A re-registration at the WORK block
+# used to sit here (0.0.41f C4 merge); the full list makes it redundant.
+trap 'rm -f "${TMP:-}"; rm -rf "${WORK:-}" "${F16W:-}"' EXIT INT TERM
 
 # lint_skills <dir> -- prints FAIL lines, empty output = clean
 lint_skills() {
@@ -166,7 +170,7 @@ err:find-rc=$_frc $_d"
 # S2: four branches used to have none).
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "${WORK:?}" "$TMP"' EXIT
+# covered by the suite trap at the TMP block above (#283 widening).
 
 mkdir -p "$WORK/skills/opk-good-skill" "$WORK/skills/opk-no-desc" \
          "$WORK/skills/opk-wrong-name" "$WORK/skills/opk-local-ref" \

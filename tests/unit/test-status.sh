@@ -24,7 +24,18 @@ pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
 fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+# Widen the trap to every bare receiver of the suite (#283): W3,
+# _gap_work, _c1dir, _d1dir, F25P, F25 and _f2bW lived outside $WORK
+# with only inline rm on their normal paths — a set -e abort inside the
+# window leaked them. The receivers anchored under $WORK (the *165
+# dirs) are covered by $WORK itself. The list is a function (eight
+# receivers do not fit one line); unset-safe operands skip cleanly.
+# w2_run's _w2_dir is subshell-contained and cleaned inside w2_run.
+_trap_cleanup() {
+    rm -rf "${WORK:-}" "${W3:-}" "${_gap_work:-}" "${_c1dir:-}" \
+        "${_d1dir:-}" "${F25P:-}" "${F25:-}" "${_f2bW:-}"
+}
+trap _trap_cleanup EXIT INT TERM
 
 # --- 0. dev-owned mode line (internal/records/ddev-dev-owned-projects.md) -------------
 if grep -q 'ui_kv "ddev settings"' "$STATUS" && \
@@ -1063,6 +1074,10 @@ w2_run() {
     (
         if [ "$2" = true ]; then
             _w2_dir=$(command mktemp -d)
+            # abort/signal window inside the subshell (#283): the inline
+            # cleanup at the end of the subshell never ran on an abort —
+            # command rm because rm() is stubbed below at fire time
+            trap 'command rm -rf "${_w2_dir:-}"' EXIT INT TERM
             mktemp() { printf '%s/list\n' "$_w2_dir"; }
         else
             mktemp() { return 1; }
