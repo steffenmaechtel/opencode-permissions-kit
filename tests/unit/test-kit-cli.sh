@@ -163,14 +163,17 @@ grep -qF 'diverges from the kit pin — replacing it' "$KIT" \
     || { echo "  ${RED}FAIL${NC}  openchamber-secure announces replacing divergent content (F1)"; failures=$((failures + 1)); }
 # 0.0.47a F3: the kit-symlink exemption helper exists and is used at the
 # detection, listing and removal sites
-[ "$(grep -c 'oc_bypass_bin' "$KIT")" -ge 4 ] \
+# Comment-strip riders (#261, the #244 g W1 class): commented-out lines
+# must not count. Full-line comments only (#244 h W6 residual): a
+# trailing comment after a live line still counts.
+[ "$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'oc_bypass_bin' || true)" -ge 4 ] \
     && echo "  ${GREEN}PASS${NC}  openchamber-secure exempts kit-owned symlinks (F3)" && passed=$((passed + 1)) \
     || { echo "  ${RED}FAIL${NC}  openchamber-secure exempts kit-owned symlinks (F3)"; failures=$((failures + 1)); }
 # 0.0.47c C2: every completing path of openchamber-secure ends with the
 # restart hint (getent-skip, nothing-found, decline, full run — the
 # oc_bypass_bin count precedent; behavioral pinning of the decline path
 # would need an interactive ui_confirm, static count is the proxy)
-[ "$(grep -c 'restart OpenChamber if it is running' "$KIT")" -ge 4 ] \
+[ "$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'restart OpenChamber if it is running' || true)" -ge 4 ] \
     && echo "  ${GREEN}PASS${NC}  openchamber-secure prints the restart hint on every completing path (0.0.47c C2)" && passed=$((passed + 1)) \
     || { echo "  ${RED}FAIL${NC}  openchamber-secure restart hint missing from a completing path (0.0.47c C2)"; failures=$((failures + 1)); }
 
@@ -344,8 +347,11 @@ fi
 # Static line-number pins (the race itself is not unit-pinnable);
 # reverting an order inside a branch swaps its numbers, collapsing back
 # to the old single unconditional executor removes the second match.
-_ho_chmod_lns=$(grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' "$KIT" | cut -d: -f1)
-_ho_chown_lns=$(grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' "$KIT" | cut -d: -f1)
+# Comment-strip rider on the extraction legs too (#261): a commented-out
+# executor line must not be extracted — sed substitutes (never deletes),
+# so the grep -n numbers still match the real file.
+_ho_chmod_lns=$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -n 'find "\$_ho_a" ! -type l -exec chmod g+w' | cut -d: -f1)
+_ho_chown_lns=$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -n 'chown -R -h "\$_ho_user:\$_ho_group" "\$_ho_a"' | cut -d: -f1)
 # Guarded counts (#260, the #244 f W1 class — sites beyond the issue's
 # list, found by this wave's sweep): an executor line vanishing from the
 # kit script leaves grep -c . counting zero non-empty lines, rc 1 —
