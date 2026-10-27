@@ -299,10 +299,13 @@ STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.s
 _gc_prot='protected (soft-only — agent tools blocked)'
 _gc_allow='access allowed (agent tools may edit git config)'
 _gc_mark='(markers present, rules inactive)'
+# Comment-strip riders (#261, the #244 g W1 class — sweep finds beyond
+# the issue list): commented-out ui_kv rows stop counting; full-line
+# comments only (#244 h W6 residual).
 if grep -qF "$_gc_on" "$CONFIG" \
    && grep -qF "$_gc_off" "$CONFIG" \
-   && [ "$(grep -cF "$_gc_on" "$CONFIG")" -ge 2 ] \
-   && [ "$(grep -cF "$_gc_off" "$CONFIG")" -ge 3 ] \
+   && [ "$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_on" || true)" -ge 2 ] \
+   && [ "$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_off" || true)" -ge 3 ] \
    && grep -qF "$_gc_prot" "$STATUS" \
    && grep -qF "$_gc_allow" "$STATUS" \
    && grep -qF "$_gc_mark" "$CONFIG" \
