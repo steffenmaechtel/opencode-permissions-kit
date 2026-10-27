@@ -1332,6 +1332,8 @@ check "update.sh: --refresh pass re-stamps" \
     sh -c "awk '/^if \[ \"\\\$REFRESH\" = true \]/,/^fi/' \"\$1\" | grep -q 'ddev_handover_stamp_write'" _ "$UPDATE"
 check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
+# Comment-strip riders (#261, the #244 g W1 class): commented-out lines
+# stop counting; full-line comments only (#244 h W6 residual).
 check "config.sh: refresh + projects add + handover re-stamp" \
     sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "ddev_handover_stamp_write" || true)" -ge 3 ]' _ "$CONFIG"
 check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
