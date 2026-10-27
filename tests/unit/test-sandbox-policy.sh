@@ -376,12 +376,16 @@ trap_scan() {
                 # words must not satisfy the arms either); backslash-aware
                 # so an escaped \" never toggles the state (#287 c S1: an
                 # odd escaped-quote count cut at a shell-internal # and
-                # false-flagged all three arms)
+                # false-flagged all three arms) — but ONLY outside single
+                # quotes, where backslash is a literal, not an escape
+                # (#287 d D1: the unconditional skip ate an sq-closing
+                # quote after a trailing \ and let a trailing comment
+                # satisfy the arms — fail-open)
                 _ap = $0
                 _ins = 0; _ind = 0; _cut = 0
                 for (_i = 1; _i <= length(_ap); _i++) {
                     _ch = substr(_ap, _i, 1)
-                    if (_ch == "\\") { _i++; continue }
+                    if (!_ins && _ch == "\\") { _i++; continue }
                     if (_ch == sq && !_ind) _ins = !_ins
                     else if (_ch == dq && !_ins) _ind = !_ind
                     else if (_ch == "#" && !_ins && !_ind) { _cut = _i; break }
@@ -474,6 +478,8 @@ printf '#!/bin/sh\n# probe: a trailing comment NAMING the arms must not satisfy 
     > "$PROBE_DIR/unit/test-probe-trap-todo.sh"
 printf '#!/bin/sh\n# probe: escaped quotes around an in-action # must not cut the comment scan (#287 c S1)\nP4J="$(mktemp -d)"\ntrap "rm -rf \\"\\$P4J\\" # \\"a # b\\"" EXIT INT TERM\n' \
     > "$PROBE_DIR/unit/test-probe-trap-esc.sh"
+printf '#!/bin/sh\n# probe: sq action ending in a backslash — the skip must not eat the closing quote (#287 d D1)\nP4K="$(mktemp -d)"\ntrap '"'"'rm -rf "$P4K" \\'"'"' EXIT # add INT TERM arms\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-sqbs.sh"
 : > "$VIOL"
 trap_scan "$PROBE_DIR/unit" > "$VIOL" || true
 if grep -q 'test-probe-trap-cmd.sh|notrap' "$VIOL"; then
@@ -503,6 +509,11 @@ if grep -q 'test-probe-trap-esc.sh|' "$VIOL"; then
     grep 'test-probe-trap-esc' "$VIOL" || true
 else
     pass "self-probe: escaped-quote action with in-action # passes clean (#287 c S1)"
+fi
+if grep -q 'test-probe-trap-sqbs.sh|arms.*no-INT' "$VIOL" && grep -q 'test-probe-trap-sqbs.sh|arms.*no-TERM' "$VIOL"; then
+    pass "self-probe: sq-final-backslash action — trailing comment does not satisfy arms (#287 d D1)"
+else
+    fail "self-probe: sq-final-backslash + arm-naming comment must be flagged (#287 d D1)"
 fi
 # scan-target assert must fail loudly on a vanished directory (#287 a S3)
 _ts_probe=0
