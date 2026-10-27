@@ -164,11 +164,15 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   itself lives in the review README — AGENTS.md Testing owns the
   chain mechanics)
 - **Comment-strip riders on source-counting pins** (#261, PR #284: 34
-  sites across 14 suites, 10 of them sweep finds beyond the issue list;
-  the rider convention lives in
+  of 39 strip sites across 14 suites — the 5 pre-#261 strips are the
+  #244-era test-install-args riders plus the #261 pin's own fixture
+  leg; census note: 2 of the 39 live in escaped-dollar form
+  (`sed 's/^[[:space:]]*#.*\$//'`) and are invisible to the unescaped
+  literal; 10 of the 34 were sweep finds beyond the issue list; the
+  rider convention lives in
   [conventions.md](conventions.md) "Source-counting pins"; awk-pattern
   order pins and raw negative `grep -q` legs are the known residual,
-  follow-up issue carries the inventory) — a `grep -c` count pin over
+  issue #285 carries the inventory) — a `grep -c` count pin over
   shipped source without the rider is pass-green on commented-out code
 - **Sabotage-verify per pin** (the ONLY reliable discriminator we have;
   `test-vacuous` reappeared at scale in run 2 — partly corpus composition,
