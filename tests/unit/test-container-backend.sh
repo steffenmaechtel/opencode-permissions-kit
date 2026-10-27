@@ -468,8 +468,10 @@ fi
 # a floor pin would survive deletion of the capture mechanism itself.
 check "failed daemon start warns instead of ready (pr-00263 a F13)" \
     grep -Fq 'daemon start FAILED (rc=$_dc_start_rc)' "$SETUP"
+# Comment-strip rider (#261, the #244 g W1 class — sweep find beyond the
+# issue list): a commented-out observation site stops counting.
 check "daemon start rc observed at every site, exactly 5 (pr-00263 a F13 + d W4)" \
-    sh -c '[ "$(grep -c "_dc_start_rc" "$1")" = 5 ]' _ "$SETUP"
+    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "_dc_start_rc" || true)" = 5 ]' _ "$SETUP"
 
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"
