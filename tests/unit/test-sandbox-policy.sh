@@ -373,11 +373,15 @@ trap_scan() {
                 # last-quote strip alone ate the ARMS whenever the comment
                 # carried a quote — an apostrophe is ordinary comment text),
                 # quote-aware so an in-action # survives (#287 b C2: comment
-                # words must not satisfy the arms either)
+                # words must not satisfy the arms either); backslash-aware
+                # so an escaped \" never toggles the state (#287 c S1: an
+                # odd escaped-quote count cut at a shell-internal # and
+                # false-flagged all three arms)
                 _ap = $0
                 _ins = 0; _ind = 0; _cut = 0
                 for (_i = 1; _i <= length(_ap); _i++) {
                     _ch = substr(_ap, _i, 1)
+                    if (_ch == "\\") { _i++; continue }
                     if (_ch == sq && !_ind) _ins = !_ins
                     else if (_ch == dq && !_ins) _ind = !_ind
                     else if (_ch == "#" && !_ins && !_ind) { _cut = _i; break }
@@ -468,6 +472,8 @@ printf '#!/bin/sh\n# probe: a trailing comment carrying quotes must not eat the 
     > "$PROBE_DIR/unit/test-probe-trap-tcmt.sh"
 printf '#!/bin/sh\n# probe: a trailing comment NAMING the arms must not satisfy them (#287 b C2)\nP4I="$(mktemp -d)"\ntrap "rm -rf \\"\\$P4I\\"" EXIT # TODO: add INT TERM arms\n' \
     > "$PROBE_DIR/unit/test-probe-trap-todo.sh"
+printf '#!/bin/sh\n# probe: escaped quotes around an in-action # must not cut the comment scan (#287 c S1)\nP4J="$(mktemp -d)"\ntrap "rm -rf \\"\\$P4J\\" # \\"a # b\\"" EXIT INT TERM\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-esc.sh"
 : > "$VIOL"
 trap_scan "$PROBE_DIR/unit" > "$VIOL" || true
 if grep -q 'test-probe-trap-cmd.sh|notrap' "$VIOL"; then
@@ -491,6 +497,12 @@ if grep -q 'test-probe-trap-tcmt.sh|' "$VIOL"; then
     grep 'test-probe-trap-tcmt' "$VIOL" || true
 else
     pass "self-probe: quote-bearing trailing comment does not eat the arms (#287 b S1)"
+fi
+if grep -q 'test-probe-trap-esc.sh|' "$VIOL"; then
+    fail "self-probe: escaped quotes around an in-action # must not cut the scan (#287 c S1)"
+    grep 'test-probe-trap-esc' "$VIOL" || true
+else
+    pass "self-probe: escaped-quote action with in-action # passes clean (#287 c S1)"
 fi
 # scan-target assert must fail loudly on a vanished directory (#287 a S3)
 _ts_probe=0
