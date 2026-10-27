@@ -224,6 +224,20 @@ check "workflows export the mirror base image to the e2e steps" \
     sh -c "grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$1\" \
 && grep -q 'E2E_BASE_IMAGE: mirror.gcr.io/library/ubuntu:24.04' \"\$2\"" _ "$WF_E2E" "$WF_DDEV"
 
+# --- lib.sh cleanup traps (#287 a S2 / b S3) ------------------------------------
+# e2e lib.sh is outside trap_scan's unit-suite floor, so its signal
+# arms ride unpinned without this: the EXIT trap alone let an untrapped
+# fatal signal kill the runner and leak the host-side TMP_PROJECT.
+# Comment-strip rider on both counts (the source-counting convention):
+# a commented-out trap must not satisfy the pin.
+_LTRAP_EXIT=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c '^trap e2e_cleanup EXIT$' || true)
+_LTRAP_SIG=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -cF "trap 'trap - EXIT; e2e_cleanup; exit 1' INT TERM" || true)
+if [ "$_LTRAP_EXIT" = 1 ] && [ "$_LTRAP_SIG" = 1 ]; then
+    pass "lib.sh: cleanup on EXIT plus once-only signal arms (INT TERM, exit 1)"
+else
+    fail "lib.sh cleanup traps: EXIT=$_LTRAP_EXIT signal=$_LTRAP_SIG (expected 1/1)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

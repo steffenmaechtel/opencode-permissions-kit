@@ -22,7 +22,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT INT TERM
+# (#287 b S5) the derivatives ride the trap too: an INT between their
+# creation and the inline rm leaked them (base $TMP alone was listed).
+trap 'rm -f "$TMP" "${TMP:?}.letters" "${TMP:?}.expected"' EXIT INT TERM
 
 # expected letter sequence a, b, ..., z, aa, ab ... for n slots
 expected_letters() {
