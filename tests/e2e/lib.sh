@@ -506,15 +506,6 @@ e2e_cleanup() {
     fi
 }
 trap e2e_cleanup EXIT
-# (#287 a S2) signal arms, install.sh's idiom: an untrapped fatal
-# signal killed the runner WITHOUT running the EXIT trap (dash), so a
-# Ctrl-C mid-run leaked the HOST-side TMP_PROJECT. exit on the signal
-# arms — without it the runner would clean up and CONTINUE the suite.
-# The arms clear the EXIT trap before cleanup so the signal path runs
-# e2e_cleanup exactly ONCE (#287 b C4: a declined sudo prompt in a
-# double cleanup re-prompted); every operation is idempotent anyway
-# (docker rm -f, rm -rf with unset-safe fallbacks).
-trap 'trap - EXIT; e2e_cleanup; exit 1' INT TERM
 
 e2e_finish() {
     echo ""
