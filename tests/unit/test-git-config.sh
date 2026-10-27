@@ -316,7 +316,8 @@ if grep -qF "$_gc_on" "$CONFIG" \
    && ! grep -qF '"OFF  (' "$CONFIG"; then
     pass "issue #205: git-config rows read ON/OFF + protected/access allowed"
 else
-    fail "issue #205: git-config rows drifted (on=$_gc_on_n off=$_gc_off_n — below 2/3 = row drift, else wording/markers legs)"
+    fail "issue #205: git-config rows drifted (on=$_gc_on_n off=$_gc_off_n \
+— 0/0 or on<2/off<3 = row drift or wording wipeout; else wording/markers legs)"
 fi
 
 # Plan numbering must be dynamic (_plan helper) — a skipped optional step
