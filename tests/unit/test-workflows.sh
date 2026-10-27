@@ -278,7 +278,7 @@ check_job_lane "$WF_E2E" "test-e2e.yml: 'e2e-2x-git-distro' names the distro cha
     'E2E_GIT_CHANNEL: distro'
 # Comment-strip riders (#261, the #244 g W1 class): a commented-out
 # lane value stops counting; full-line comments only (#244 h W6
-# residual) — the rider preserves line count, so grep numbering is safe.
+# residual).
 _n_latest=$(sed 's/^[[:space:]]*#.*$//' "$WF_E2E" | grep -c 'E2E_GIT_CHANNEL: latest' || true)
 _n_distro=$(sed 's/^[[:space:]]*#.*$//' "$WF_E2E" | grep -c 'E2E_GIT_CHANNEL: distro' || true)
 if [ "$_n_latest" = 1 ] && [ "$_n_distro" = 1 ]; then
