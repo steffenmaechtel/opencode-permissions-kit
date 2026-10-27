@@ -1333,7 +1333,7 @@ check "update.sh: --refresh pass re-stamps" \
 check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
 check "config.sh: refresh + projects add + handover re-stamp" \
-    sh -c '[ "$(grep -c "ddev_handover_stamp_write" "$1")" -ge 3 ]' _ "$CONFIG"
+    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "ddev_handover_stamp_write" || true)" -ge 3 ]' _ "$CONFIG"
 check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
     sh -c "grep -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover' \"\$1\"" _ "$HANDOVER"
 check "handover.sh: stamp stubs fail open (valid=1) when the lib is missing" \
@@ -1355,7 +1355,7 @@ check "install.sh defaults to dev-owned (DDEV_DEV_OWNED=true)" \
 check "install.sh stamps DDEV_DEV_OWNED into install.conf" \
     sh -c "grep -qF 'DDEV_DEV_OWNED=\$DDEV_DEV_OWNED' \"\$1\"" _ "$INSTALL"
 check "install.sh asks the ddev-settings question (standard + advanced)" \
-    sh -c "[ \"\$(grep -c 'ddev settings management? (dev-owned projects)' \"\$1\")\" -ge 2 ]" _ "$INSTALL"
+    sh -c "[ \"\$(sed 's/^[[:space:]]*#.*\$//' \"\$1\" | grep -c 'ddev settings management? (dev-owned projects)' || true)\" -ge 2 ]" _ "$INSTALL"
 check "status.sh reports the ddev settings mode" \
     sh -c "grep -q 'ddev settings' \"\$1\"" _ "$STATUS"
 check "hook hint mentions the dev-owned effect" \
@@ -1491,7 +1491,9 @@ fi
 # Guarded count (#260, the #244 f W1 class; #244 h W4): zero matches
 # (a warn-wording change in the shipped script) aborted the suite under
 # set -e before the -ge 3 FAIL could record.
-_n_w9=$(grep -c 'warn: project-root hand\(back\|over\) incomplete' "$HANDOVER" || true)
+# Comment-strip rider (#261, the #244 g W1 class): commented-out warn
+# lines must not count; full-line comments only (#244 h W6 residual).
+_n_w9=$(sed 's/^[[:space:]]*#.*$//' "$HANDOVER" | grep -c 'warn: project-root hand\(back\|over\) incomplete' || true)
 [ "$_n_w9" -ge 3 ] \
     && pass "all three project-root warn lines present (#211 b W9)" \
     || fail "all three project-root warn lines present (got $_n_w9) (#211 b W9)"
