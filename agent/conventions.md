@@ -138,9 +138,12 @@ omit it too — the consumer takes the rc and the empty case is guarded
 downstream. Precedent: `test-install-args.sh` (v2 URL, the canonical
 shape) and the #261 rider pin in `test-project-paths.sh`;
 `test-git-config.sh`'s safe.directory counts strip by a DIFFERENT
-idiom (backslash-continuation join + `grep -v` drop) — required there
-because the pinned literal spans wrapped lines; do not copy it for
-per-line riders and do not refactor it into the canonical shape.
+idiom (backslash-continuation join + `grep -v` drop): the join is
+deliberate hardening so a wrapped call cannot escape the check (both
+pinned literals sit on single lines today), the drop keeps commented
+examples from counting; for a NEW pin whose literal spans a wrap, join
+continuations before stripping — otherwise do not copy the idiom, and
+do not refactor the site into the canonical shape.
 
 ## Test sandbox (unit suites)
 
