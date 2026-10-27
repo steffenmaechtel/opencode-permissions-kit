@@ -172,7 +172,10 @@ check "lib.sh reads the E2E_GIT_CHANNEL knob (default distro)" \
 # matches. This suite runs set -u only — no -e — so the bare shape
 # records its FAIL rather than aborting today; the guard keeps the
 # swept count family uniform if set -e ever lands here.
-_git_build_args=$(grep -c -- '--build-arg GIT_CHANNEL' "$LIB" || true)
+# Comment-strip rider (#261, the #244 g W1 class): a commented-out
+# builder line stops counting; full-line comments only (#244 h W6
+# residual). lib.sh is repo-internal source, same blindness class.
+_git_build_args=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c -- '--build-arg GIT_CHANNEL' || true)
 if [ "$_git_build_args" -ge 2 ]; then
     pass "git channel forwarded on both builder paths (BuildKit + classic)"
 else
@@ -201,7 +204,7 @@ check "run.sh asserts the latest leg really runs PPA git" \
 # workflow files. ---
 check "lib.sh reads the E2E_BASE_IMAGE knob (default ubuntu:24.04)" \
     grep_q 'E2E_BASE_IMAGE="\${E2E_BASE_IMAGE:-ubuntu:24.04}"'
-_base_build_args=$(grep -c -- '--build-arg BASE_IMAGE' "$LIB" || true)
+_base_build_args=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c -- '--build-arg BASE_IMAGE' || true)
 if [ "$_base_build_args" -ge 2 ]; then
     pass "base image forwarded on both builder paths (BuildKit + classic)"
 else
