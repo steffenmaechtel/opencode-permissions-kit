@@ -119,6 +119,32 @@ Patterns already in this repo:
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
 
+## Source-counting pins (unit suites)
+
+Any unit-test pin that COUNTS a literal in a shipped or repo-internal
+source file to assert its PRESENCE or a count floor (`grep -c …
+"$INSTALL"`, counts over extracted blocks or `grep -n` extraction
+legs) counts behind a comment-strip rider —
+`sed 's/^[[:space:]]*#.*$//' "$FILE" | grep -c … || true` — so a
+commented-out construct stops counting (the survivor trap, #261/#244 g
+W1). Absence pins (`= 0`) are out of scope — a commented-out forbidden
+line SHOULD keep counting there — and so are deliberate bare control
+arms (the #261 pin's own un-ridden leg). Full-line strip only (#244 h
+W6 residual: trailing comments after live lines still count). Piped
+shapes (`grep -c … | grep -q "^[N-M]$"`) carry the rider but no
+`|| true`: the rc must come from the final `grep -q` so the check can
+fail; extraction-leg pipelines ending in a consumer (`cut -d: -f1`)
+omit it too — the consumer takes the rc and the empty case is guarded
+downstream. Precedent: `test-install-args.sh` (v2 URL, the canonical
+shape) and the #261 rider pin in `test-project-paths.sh`;
+`test-git-config.sh`'s safe.directory counts strip by a DIFFERENT
+idiom (backslash-continuation join + `grep -v` drop): the join is
+deliberate hardening so a wrapped call cannot escape the check (both
+pinned literals sit on single lines today), the drop keeps commented
+examples from counting; for a NEW pin whose literal spans a wrap, join
+continuations before stripping — otherwise do not copy the idiom, and
+do not refactor the site into the canonical shape.
+
 ## Test sandbox (unit suites)
 
 Unit suites run on contributor and CI hosts, not in containers — they

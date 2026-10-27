@@ -1142,15 +1142,19 @@ if [ -n "$_BKDEF" ] && (
 else
     fail "recorder broken — accumulation shape changed (pr-00263 a F6 + d W3)"
 fi
-[ "$(grep -c '_bk_fail' "$INSTALL")" = 10 ] \
+# Comment-strip riders (#261, the #244 g W1 class — sweep finds beyond
+# the issue list): commented-out failure-recorder sites stop counting;
+# full-line comments only (#244 h W6 residual).
+[ "$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_bk_fail' || true)" = 10 ] \
     && grep -qF 'INCOMPLETE: $_BK_FAIL' "$INSTALL" \
     && pass "backup failures record loudly + degrade the summary row (pr-00263 a F6 + d W1/W2)" \
     || fail "backup failure silence survived somewhere (pr-00263 a F6 + d W1/W2)"
-[ "$(grep -cF 'config backup FAILED — see Backup summary' "$INSTALL")" = 2 ] \
+[ "$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" \
+    | grep -cF 'config backup FAILED — see Backup summary' || true)" = 2 ] \
     && grep -qF 'binary backup FAILED — see Backup summary' "$INSTALL" \
     && pass "the three swept backup sites degrade their announce on failure (pr-00263 d W1/W2)" \
     || fail "a backup announce still lies on failure (pr-00263 d W1/W2)"
-[ "$(grep -cF 'no ACL recovery material' "$INSTALL")" = 2 ] \
+[ "$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -cF 'no ACL recovery material' || true)" = 2 ] \
     && pass "both getfacl backups announce failure instead of success (pr-00263 a F8)" \
     || fail "a getfacl success line still lies (pr-00263 a F8)"
 grep -qF 'the official opencode installer failed' "$INSTALL" \

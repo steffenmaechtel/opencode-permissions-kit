@@ -180,8 +180,10 @@ done
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 # Guarded count (#260, the #244 f W1 class): grep -c prints 0 AND exits
 # 1 on zero matches — under set -e the bare assignment aborted the suite
-# before the -ge 4 check could record its FAIL (#244 h W2).
-_norm_sites=$(grep -c '_PP_NORM' "$INSTALL" || true)
+# before the -ge 4 check could record its FAIL (#244 h W2). Comment-strip
+# rider (#261, the #244 g W1 class): commented-out lines stop counting —
+# full-line comments only (#244 h W6 residual).
+_norm_sites=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_PP_NORM' || true)
 if [ "$_norm_sites" -ge 4 ]; then
     pass "install.sh uses _PP_NORM in all project entry points ($_norm_sites sites)"
 else
@@ -221,6 +223,22 @@ if [ -z "$_pin_bare" ] && [ "$_pin_guarded" = "reached count=0" ]; then
     pass "zero-match count: bare assignment aborts, guarded records 0 for the FAIL (#260 pin)"
 else
     fail "zero-match count pin: bare='$_pin_bare' guarded='$_pin_guarded' (#260 pin)"
+fi
+# --- #261 rider pin (representative for the comment-strip riders swept
+# this wave): comment out every _PP_NORM line in a scratch copy — the
+# ridden count must drop to zero (no commented survivor), while the
+# bare grep -c still sees the full total (the trap this class fixes:
+# commented-out lines keep counting, #244 g W1). The expectations are
+# derived from the real tree, not hard-coded, so legitimate _PP_NORM
+# growth cannot false-red the pin.
+sed '/_PP_NORM/s/^\([[:space:]]*\)/\1# /' "$INSTALL" > "$_pin_dir/install-norm-commented"
+_norm_ridden=$(sed 's/^[[:space:]]*#.*$//' "$_pin_dir/install-norm-commented" | grep -c '_PP_NORM' || true)
+_norm_total=$(grep -c '_PP_NORM' "$INSTALL" || true)
+_norm_bare=$(grep -c '_PP_NORM' "$_pin_dir/install-norm-commented" || true)
+if [ "$_norm_ridden" = 0 ] && [ "$_norm_bare" = "$_norm_total" ]; then
+    pass "comment-strip rider: commented-out _PP_NORM lines stop counting (#261 pin)"
+else
+    fail "comment-strip rider pin: ridden=$_norm_ridden bare=$_norm_bare total=$_norm_total (#261 pin)"
 fi
 rm -rf "$_pin_dir"
 

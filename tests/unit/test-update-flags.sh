@@ -137,8 +137,10 @@ _re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'current_opencode_major')
 # timeout-wrapped helper.
 check "update.sh: bounded --version helper exists (timeout 10 + head -1)" \
     sh -c "grep -q 'timeout 10 \"\$SYSTEM_BIN\" --version' \"\$1\" && grep -q 'opencode_version_line() {' \"\$1\"" _ "$UPDATE"
+# Comment-strip riders (#261, the #244 g W1 class): commented-out lines
+# stop counting; full-line comments only (#244 h W6 residual).
 check "update.sh: all --version probes route through the bounded helper" \
-    sh -c "[ \"\$(grep -c 'opencode_version_line' \"\$1\")\" -ge 4 ]" _ "$UPDATE"
+    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "opencode_version_line" || true)" -ge 4 ]' _ "$UPDATE"
 check "update.sh: post-copy failure message never names a backup that was never taken (W6)" \
     sh -c "grep -qF 'no previous binary was backed up' \"\$1\" && grep -qF '[ -f \"\$BACKUP_DIR/opencode.current\" ]' \"\$1\"" _ "$UPDATE"
 
@@ -282,7 +284,8 @@ check "flag: --only-binary parsed, implies BINARY_UPDATE" \
 check "flag: help text documents --only-binary" \
     sh -c "grep -q -- '--only-binary    skip every kit step' \"\$1\"" _ "$UPDATE"
 check "gating: kit re-deploy sections are wrapped (2 skip zones)" \
-    sh -c "[ \"\$(grep -c 'if \[ \"\$ONLY_BINARY\" != true \]; then' \"\$1\")\" -ge 2 ]" _ "$UPDATE"
+    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "if \[ \"\$ONLY_BINARY\" != true \]; then" \
+        || true)" -ge 2 ]' _ "$UPDATE"
 check "no kit self-fetch in binary-only mode (library runs stay offline for kit files)" \
     sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" && grep -qF '[ \"\$_opk_binonly\" != true ] && [ ! -f \"\$SCRIPT_DIR/../../../VERSION\" ]' \"\$1\"" _ "$UPDATE"
 check "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)" \
@@ -418,8 +421,10 @@ check "tui: a major flip re-anchors the registration even in --only-binary runs"
 # documented `--major 1` downgrade). Only an empty probe (unknown) keeps
 # the previous stamp; both stamp writes fail loud (rc 2 = post-copy).
 _restamp_block=$(sed -n '/^    if \[ "\$new" != "unknown" \]; then/,/^    fi$/p' "$UPDATE")
-_restamp_writes=$(printf '%s\n' "$_restamp_block" | grep -c 'OPENCODE_MAJOR=$_new_major' || true)
-_restamp_guards=$(printf '%s\n' "$_restamp_block" | grep -c 'return 2' || true)
+_restamp_writes=$(printf '%s\n' "$_restamp_block" | sed 's/^[[:space:]]*#.*$//' \
+    | grep -c 'OPENCODE_MAJOR=$_new_major' || true)
+_restamp_guards=$(printf '%s\n' "$_restamp_block" | sed 's/^[[:space:]]*#.*$//' \
+    | grep -c 'return 2' || true)
 if grep -qF 'OPENCODE_MAJOR stamp left unchanged' "$UPDATE" \
    && [ "$_restamp_writes" -eq 2 ] && [ "$_restamp_guards" -ge 2 ]; then
     pass "re-stamp only on a probed line, writes fail loud (V5/V20, W4 shape)"

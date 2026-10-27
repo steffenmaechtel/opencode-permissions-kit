@@ -134,8 +134,9 @@ to prove a pin fails (mutation verification), commit the finished work or
 `git stash` it first — an in-place `sed` sabotage followed by a
 `git restore` on a dirty tree resets to HEAD and silently wipes every
 uncommitted change (learned the hard way, 2026-10). And sabotage by
-*deleting* the construct, not commenting it out: grep-count pins still
-count commented lines, so a commented-out sabotage can pass green. After
+*deleting* the construct, not commenting it out: un-ridden grep-count
+pins (absence pins, bare control arms) still count commented lines, so
+a commented-out sabotage can pass green. After
 the sabotage run, restore the good state from the commit/stash (or a copy
 kept outside the tree) and re-run the suite to confirm green. During a
 review fan-out the tree is a shared read substrate: sabotage only (a)

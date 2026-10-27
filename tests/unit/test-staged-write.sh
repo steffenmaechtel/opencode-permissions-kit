@@ -482,10 +482,16 @@ check "wiring: config.sh sources staged-write.sh" \
     grep -qF 'for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"' "$CONFIG"
 check "wiring: update.sh tui.json write goes through staged_write" \
     grep -qF 'staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json"' "$UPDATE"
+# Comment-strip riders (#261, the #244 g W1 class) on the range counts:
+# commented-out lines stop counting; full-line comments only (#244 h W6
+# residual). No || true here — the pipeline rc must come from the final
+# grep -q so the check can fail.
 check "wiring: install.sh config writes go through staged_write (0.0.39h F8: offline-rendered, ONE write per branch)" \
-    sh -c 'grep -c "_oc_install_agent_config" "$1" | grep -q "^[4-9]$" && ! grep -q "sed -i .*opencode\.jsonc" "$1"' _ "$INSTALL"
+    sh -c 'sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "_oc_install_agent_config" \
+        | grep -q "^[4-9]$" && ! grep -q "sed -i .*opencode\.jsonc" "$1"' _ "$INSTALL"
 check "wiring: config.sh git_config_apply renders offline, ONE staged_write (0.0.39h F8)" \
-    sh -c 'grep -qF "_gca_tmp" "$1" && grep -c "staged_write 664" "$1" | grep -q "^2$" && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG"
+    sh -c 'grep -qF "_gca_tmp" "$1" && sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "staged_write 664" \
+        | grep -q "^2$" && ! grep -qF "sed -i '"'"'s|" "$1"' _ "$CONFIG"
 OPK="$REPO/files/opencode-permissions-kit-lib/bin/opk"
 check "0.0.39h F10: opk handover refuses symlinked operands + rechecks between the ops" \
     sh -c 'grep -qF "[ -L \"\$_ho_a\" ]" "$1" && grep -qF "[ ! -L \"\$_ho_a\" ]" "$1"' _ "$OPK"
@@ -521,12 +527,15 @@ UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 check "gates: install.sh ~/.ddev operand gate" \
     sh -c 'grep -qF "agent_home_sane \"\$OPENCODE_USER\" \"/home/\$OPENCODE_USER/.ddev\"" "$1"' _ "$INSTALL"
 check "gates: install.sh Step 8 operand gates (.config/.config/opencode/.agents)" \
-    sh -c 'grep -c "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/" "$1" | grep -q "^[3-9]$"' _ "$INSTALL"
+    sh -c 'sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "agent_home_sane \"\$OPENCODE_USER\" /home/opencode/" \
+        | grep -q "^[3-9]$"' _ "$INSTALL"
 # 0.0.39i F1: the combined top-level mkdir is gone — every Step 8 mkdir
 # runs INSIDE its operand gate (three per-operand mkdirs), so no root
 # mkdir passes through a linked parent.
 check "gates: install.sh Step 8 mkdir sits inside the operand gates (0.0.39i F1)" \
-    sh -c '! grep -qF "mkdir -p /home/opencode/.config/opencode /home/opencode/.agents" "$1" && grep -c "sudo mkdir -p /home/opencode/" "$1" | grep -q "^[3-9]$"' _ "$INSTALL"
+    sh -c '! grep -qF "mkdir -p /home/opencode/.config/opencode /home/opencode/.agents" "$1" \
+        && sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "sudo mkdir -p /home/opencode/" \
+        | grep -q "^[3-9]$"' _ "$INSTALL"
 # 0.0.39j F1: every Step 8 operand carries its own chown — gate 2's mkdir
 # runs after gate 1's chown -R, so without its own chown the fresh-install
 # leaf ends root-owned.

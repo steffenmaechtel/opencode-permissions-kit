@@ -121,8 +121,11 @@ check "install.sh never uses world-executable binary mode" \
 # fifth site must be a conscious pin update, not a silent pass.
 check "install.sh defines the atomic-copy fallback for a missing lib (#163)" \
     sh -c 'grep -Fq "copy_binary_atomic() { echo \"error: copy_binary_atomic unavailable" "$1"' _ "$INSTALL"
+# Comment-strip rider (#261, the #244 g W1 class): commented-out call
+# sites must not count. Full-line comments only (#244 h W6 residual):
+# a trailing comment after a live line still counts.
 check "install.sh deploys the binary through the atomic helper at exactly four call sites (#163, 0.0.49a W6)" \
-    sh -c '[ "$(grep -cF "copy_binary_atomic \"" "$1")" -eq 4 ]' _ "$INSTALL"
+    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -cF "copy_binary_atomic \"" || true)" -eq 4 ]' _ "$INSTALL"
 check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
     sh -c '! grep -Fq "sudo cp \"\$loc\" \"\$SYSTEM_BIN\"" "$1" \
         && ! grep -Fq "sudo cp \"/root/.opencode/bin/opencode\" \"\$SYSTEM_BIN\"" "$1" \
@@ -149,7 +152,7 @@ check "install.sh deploys the umask profile through the atomic file helper at mo
 # -eq, not -ge: a second copy_file_atomic deploy must be a conscious
 # pin update, not a silent pass.
 check "install.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3)" \
-    sh -c '[ "$(grep -cF "copy_file_atomic \"" "$1")" -eq 1 ]' _ "$INSTALL"
+    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -cF "copy_file_atomic \"" || true)" -eq 1 ]' _ "$INSTALL"
 check "install.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
     sh -c '! grep -Fq "sudo cp \"\$SCRIPT_DIR/etc/umask.sh\" /etc/profile.d" "$1"' _ "$INSTALL"
 
@@ -177,7 +180,7 @@ check "update.sh re-deploys the umask profile through the atomic file helper at 
     sh -c 'grep -Fq "copy_file_atomic \"\$FILES_ROOT/etc/umask.sh\"" "$1" \
         && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$UPDATE"
 check "update.sh routes exactly one deploy through copy_file_atomic (0.0.49c F3)" \
-    sh -c '[ "$(grep -cF "copy_file_atomic \"" "$1")" -eq 1 ]' _ "$UPDATE"
+    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -cF "copy_file_atomic \"" || true)" -eq 1 ]' _ "$UPDATE"
 check "update.sh no longer sudo-cps the umask profile in place (0.0.49b C1)" \
     sh -c '! grep -Fq "sudo cp \"\$FILES_ROOT/etc/umask.sh\" /etc/profile.d" "$1"' _ "$UPDATE"
 check "update.sh re-asserts binary 750 (shared helper)" \

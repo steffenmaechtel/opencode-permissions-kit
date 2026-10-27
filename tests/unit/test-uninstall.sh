@@ -1507,9 +1507,13 @@ else
     fail "rc-blind 'run sudo rm' survived in uninstall.sh (pr-00263 a F3)"
 fi
 PLGSEC="$(sed -n '/for _un_dir in/,/^    done$/p' "$UNINSTALL" | head -40)"
+# Comment-strip rider (#261, the #244 g W1 class — sweep find beyond the
+# issue list): the extracted block is stripped before counting, so a
+# commented-out un_rc_q call stops counting; full-line comments only
+# (#244 h W6 residual).
 if printf '%s' "$PLGSEC" | grep -qF 'un_rc_q "plugins rm"' \
     && printf '%s' "$PLGSEC" | grep -qF 'plugin removal failed' \
-    && [ "$(printf '%s' "$PLGSEC" | grep -cF 'un_rc_q "')" = 2 ]; then
+    && [ "$(printf '%s' "$PLGSEC" | sed 's/^[[:space:]]*#.*$//' | grep -cF 'un_rc_q "' || true)" = 2 ]; then
     pass "plugins loop rc-observing, failure WARNs, both ops converted (#246 site 7)"
 else
     fail "plugins loop not rc-observing (#246 site 7, pr-00263 d)"

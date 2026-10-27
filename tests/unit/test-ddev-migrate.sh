@@ -392,8 +392,9 @@ check "manifest stays a regular file through the run" \
     sh -c "test -f \"\$1\" && test ! -L \"\$1\"" _ "$DUMP_DIR/manifest.conf"
 # Sticky + stage mode act DURING the run (finalize re-modes the dir to
 # 750) — pinned statically on the mechanisms (W1): chmod 3770 at setup
-# AND on resume, mkdir -m 700 for the stage.
-_grep_n=$(grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' "$MIG" || true)
+# AND on resume, mkdir -m 700 for the stage. Comment-strip rider (#261,
+# the #244 g W1 class): a commented-out chmod stops counting.
+_grep_n=$(sed 's/^[[:space:]]*#.*$//' "$MIG" | grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' || true)
 [ "$_grep_n" -ge 1 ] \
     && check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" true \
     || check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" false
@@ -836,7 +837,7 @@ assert_eq "registry cmd: narrow root -> 1 export, 11 outside" "1 11" \
 check "export warns about registry projects outside the roots" \
     sh -c "grep -q 'OUTSIDE the given roots' \"\$1\"" _ "$MIG"
 check "install.sh warns on skip branches when the registry outgrew the manifest" \
-    sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$(grep -c '_ddev_mig_gap_warn' \"\$1\")\" -ge 3 ]" _ "$INSTALL"
+    sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$(sed 's/^[[:space:]]*#.*\$//' \"\$1\" | grep -c '_ddev_mig_gap_warn' || true)\" -ge 3 ]" _ "$INSTALL"
 check "status.sh reports INCOMPLETE dumps vs the dev registry" \
     sh -c "grep -q 'INCOMPLETE — registry lists' \"\$1\" && grep -q 'ddev-migrate registry' \"\$1\"" _ "$STATUS"
 check "bin dispatcher has the registry subcommand" \
