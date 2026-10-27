@@ -29,7 +29,10 @@ assert() {
 }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# widen the trap to every receiver of the suite + signal arms (#283):
+# _ho_pin_dir/_stubs were bare (trap covered $WORK only, EXIT only), so
+# an abort between creation and their inline rm leaked the scratch.
+trap 'rm -rf "${WORK:-}" "${_ho_pin_dir:-}" "${_stubs:-}"' EXIT INT TERM
 
 # Fake library with stub scripts recording how they were invoked.
 LIB="$WORK/lib"

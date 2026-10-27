@@ -12,7 +12,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+trap 'rm -f "$TMP"' EXIT INT TERM
 
 # GitHub anchor normalization: lowercase; remove anything that is not a
 # letter, number, space, or hyphen; spaces -> hyphens; trim edge hyphens.

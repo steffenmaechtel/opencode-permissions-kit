@@ -81,7 +81,21 @@ assert_eq() {
 }
 
 TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+# widen to every bare receiver of the suite + signal arms (#283): the
+# WF/SH/DF/CONF/VCHAIN/HWORK/BH/DFH/RN/DWORK/RACE/_112_dir families
+# lived outside $TMPDIR with only inline rm on their normal paths — a
+# set -e abort inside the window leaked them. Function form: the
+# receiver list is far too long for one line; unset-safe operands skip
+# cleanly (several receivers are created inside conditionals).
+_trap_cleanup() {
+    rm -rf "${TMPDIR:-}" "${WF:-}" "${SH_STUB:-}" "${SH:-}" \
+        "${DF_STUB:-}" "${DF:-}" "${DFW:-}" "${CONF:-}" "${VCHAIN:-}" \
+        "${HWORK:-}" "${BH:-}" "${DFH:-}" "${DFH2:-}" "${RN:-}" \
+        "${DWORK:-}" "${RACE:-}" "${RACESTUB:-}" "${RACESP:-}" \
+        "${RACESPS:-}" "${RACEC:-}" "${RACECT:-}" "${RACEF:-}" \
+        "${RACEFT:-}" "${_112_dir:-}"
+}
+trap _trap_cleanup EXIT INT TERM
 
 echo ""
 echo "ddev-as-opencode Tests (DDEV-WORKING §7)"

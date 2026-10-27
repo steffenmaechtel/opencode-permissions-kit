@@ -31,7 +31,17 @@ check() {
 }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+# Widen the trap to every bare receiver of the suite (#283): DL, F5,
+# F6, F17 and _f2bW lived outside $WORK with only inline rm on their
+# normal paths — a set -e abort inside the window leaked them (DL is
+# rm'd and recreated inside its block; the trap reads the current
+# value at fire time). The list is a function (six receivers do not
+# fit one line); unset-safe operands skip cleanly.
+_trap_cleanup() {
+    rm -rf "${WORK:-}" "${DL:-}" "${F5:-}" "${F6:-}" \
+        "${F17:-}" "${_f2bW:-}"
+}
+trap _trap_cleanup EXIT INT TERM
 
 # --- 0.0.45d W4: update.sh's ui.sh-less fallback covers its one prompt ----------
 # The body's confirm() calls ui_confirm; the old fallback defined only

@@ -59,7 +59,8 @@ assert_eq() {
 }
 
 WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT INT TERM
+# widen to the bare HOSTS_WORK receiver (#283; arms were already complete)
+trap 'rm -rf "${WORK:-}" "${HOSTS_WORK:-}"' EXIT INT TERM
 
 echo ""
 echo "Windows hosts bridge Tests (ddev-hosts)"

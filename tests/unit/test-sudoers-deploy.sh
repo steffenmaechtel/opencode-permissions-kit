@@ -37,7 +37,7 @@ check() {
 }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'rm -rf "$WORK"' EXIT INT TERM
 CONF="$WORK/conf"
 SDD="$WORK/sudoers.d"
 mkdir -p "$SDD"

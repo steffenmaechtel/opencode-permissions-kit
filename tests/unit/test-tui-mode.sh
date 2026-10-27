@@ -192,6 +192,12 @@ check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
 # tui-register.py functional behavior (cli.json is user-owned state)
 check "tui-register.py exists" test -f "$REGISTER"
 T2X=$(mktemp -d)
+# ONE merged trap (0.0.41f C4): a second EXIT trap would REPLACE the
+# cleanup — chain both scratch dirs in one action. Registered here, at
+# the first receiver, so the abort window up to the old registration
+# point is covered too (#283); TUIWORK is pre-initialized empty below
+# and set unset-safe — rm skips it until it exists.
+trap 'rm -rf "${T2X:-}" "${TUIWORK:-}"' EXIT INT TERM
 TUIWORK=""
 check "register: creates minimal cli.json" \
     python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
@@ -461,10 +467,6 @@ unset _tps_sudo
 case "$_tps_out" in *rc=0*) check "unregister cleanup: caller PATH without python3, sync rc=0 (#244 e S1 arm B)" true ;; *) check "unregister cleanup: caller PATH without python3, sync rc=0 (got [$_tps_out])" false ;; esac
 check "unregister cleanup: exec-context python3 runs despite caller absence (#244 e S1 arm B)" test -f "$TPSMARK"
 rm -rf "$TPSW" "$TPSABS2" "$TPSFIXA" "$TPSFIXB" "$TPSMARK"
-
-# ONE merged trap (0.0.41f C4): a second EXIT trap would REPLACE the
-# suite's T2X cleanup — chain both scratch dirs.
-trap 'rm -rf "$T2X" "${TUIWORK:-}"' EXIT INT TERM
 
 # --- summary ------------------------------------------------------------------
 echo ""

@@ -91,7 +91,8 @@ resolve_backend() {
 }
 
 TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+# widen to the bare F10/F13/F16 receivers + signal arms (#283)
+trap 'rm -rf "${TMPDIR:-}" "${F10:-}" "${F13:-}" "${F16:-}"' EXIT INT TERM
 
 echo ""
 echo "Container Backend Tests (DDEV-WORKING)"

@@ -19,7 +19,7 @@ failures=0
 passed=0
 
 TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+trap 'rm -rf "$TMPDIR"' EXIT INT TERM
 
 pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
 fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }

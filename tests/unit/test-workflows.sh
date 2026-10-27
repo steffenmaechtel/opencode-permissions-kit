@@ -34,7 +34,10 @@ fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 TMP_REQ="$(mktemp)"
 TMP_755="$(mktemp)"
 TMP_RUNS="$(mktemp)"
-trap 'rm -f "$TMP_REQ" "$TMP_755" "$TMP_RUNS"' EXIT INT TERM
+# widen to the late _FAKEWF/TMP_FAKE receivers (#283) — created far
+# below inside the command-position pin; unset-safe until then. Arms on
+# this physical line: the trap-coverage guard reads line-based.
+trap 'rm -f "${TMP_REQ:-}" "${TMP_755:-}" "${TMP_RUNS:-}" "${_FAKEWF:-}" "${TMP_FAKE:-}"' EXIT INT TERM
 
 # --- 1. exec bits in the git index ---------------------------------------------
 

@@ -11,7 +11,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP" "$TMP.gen"' EXIT
+trap 'rm -f "$TMP" "${TMP:?}.gen"' EXIT INT TERM
 
 INDEX=internal/rules-meta/INDEX.md
 

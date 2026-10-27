@@ -172,7 +172,7 @@ mode_allows_other() {
 }
 mode_is_restricted() { ! mode_allows_other "$1"; }
 TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+trap 'rm -rf "$TMPDIR"' EXIT INT TERM
 mkdir -p "$TMPDIR/open" "$TMPDIR/locked"
 chmod 777 "$TMPDIR/open"
 chmod 770 "$TMPDIR/locked"

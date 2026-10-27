@@ -22,7 +22,7 @@ cd "$REPO_ROOT" || exit 1
 
 TMP="$(mktemp)"
 GENDIR="$(mktemp -d)"
-trap 'rm -f "$TMP" "$TMP.gen"; rm -rf "$GENDIR"' EXIT
+trap 'rm -f "$TMP" "${TMP:?}.gen"; rm -rf "$GENDIR"' EXIT INT TERM
 
 INDEX=internal/reviews/INDEX.md
 

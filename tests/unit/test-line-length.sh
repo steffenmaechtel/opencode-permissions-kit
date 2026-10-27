@@ -138,7 +138,7 @@ fi
 
 TMP_CUR="$(mktemp)"
 TMP_PROBE="$(mktemp)"
-trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT
+trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT INT TERM
 
 [ -f "$BASELINE" ] || { echo "line length ratchet: FAILED (baseline missing)"; exit 1; }
 
@@ -157,7 +157,7 @@ trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT
 # length (130 in-span, 131 post-close) so the asserted sum pins
 # WHICH line was counted, not just how many (#235 c S2).
 PROBE_DIR="$(mktemp -d)"
-trap 'rm -rf "${PROBE_DIR:?}" "$TMP_CUR" "$TMP_PROBE"' EXIT
+trap 'rm -rf "${PROBE_DIR:?}" "$TMP_CUR" "$TMP_PROBE"' EXIT INT TERM
 mkdir -p "$PROBE_DIR"
 printf -- '---\nname: probe\ndescription: %s\n---\nshort prose line\n' \
     "$(printf 'x%.0s' $(seq 1 130))" > "$PROBE_DIR/probe.md"

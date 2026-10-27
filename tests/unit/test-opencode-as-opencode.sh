@@ -67,7 +67,7 @@ banner_line() {
 
 # --- Setup temp directories ---
 TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+trap 'rm -rf "$TMPDIR"' EXIT INT TERM
 
 mkdir -p "$TMPDIR/project-a"
 mkdir -p "$TMPDIR/project-a/sub"

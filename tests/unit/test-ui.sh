@@ -188,6 +188,10 @@ _uc_rc=0
 printf 'No\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"y\"" _ "$UI" >/dev/null 2>&1 || _uc_rc=$?
 check "ui_confirm: mixed-case No declines under a y default (issue #187 C class)" [ "$_uc_rc" -ne 0 ]
 _uc_err=$(mktemp)
+# Trap the receiver on exit and signals (#283): no set -e here, but the
+# suite had no trap at all — a signal between creation and the inline
+# rm -f leaked the scratch file.
+trap 'rm -f "${_uc_err:-}"' EXIT INT TERM
 printf 'n\n' | setsid sh -c ". \"\$1\"; ui_confirm \"Proceed?\" \"n\"" _ "$UI" 2>"$_uc_err" >/dev/null || :
 if grep -qF '  Proceed? [y/N] ' "$_uc_err" && ! grep -qF '[?]' "$_uc_err"; then
     pass "ui_confirm prompt shape: '  <question> [y/N] ' — no marker (issue #187 B)"

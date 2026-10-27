@@ -36,7 +36,7 @@ NC=''
 [ -t 1 ] && RED='\033[31m' && NC='\033[0m'
 
 WORK=$(mktemp -d /tmp/test-rules-revisit.XXXXXX) || exit 1
-trap 'rm -rf "$WORK"' EXIT
+trap 'rm -rf "$WORK"' EXIT INT TERM
 FAILS=$WORK/fails; : > "$FAILS"
 passed=0
 

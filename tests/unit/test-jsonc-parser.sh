@@ -158,7 +158,7 @@ OUT=$(python3 "$PARSER" --tools "$FIXTURES/block-comments.jsonc" 2>/dev/null || 
 assert_empty "tools: no bash section → no tools" "$OUT"
 
 TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"' EXIT INT TERM
 
 # --- 15. --tools: catch-all allow → docker AND ddev ---
 printf '%s\n' '{ "permission": { "bash": { "*": "allow" } } }' > "$TMP/catchall.jsonc"

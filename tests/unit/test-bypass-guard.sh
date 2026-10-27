@@ -47,7 +47,7 @@ run_warn() {
 }
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"' EXIT INT TERM
 
 echo ""
 echo "Wrapper-Bypass Guard Tests"

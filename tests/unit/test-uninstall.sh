@@ -25,7 +25,8 @@ pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
 fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+# widen to the bare _un_w2 receiver + signal arms (#283)
+trap 'rm -rf "${WORK:-}" "${_un_w2:-}"' EXIT INT TERM
 
 # Fake sudo: logs the command line, always succeeds. Keeps the test
 # unprivileged while letting uninstall.sh build its full command list.
