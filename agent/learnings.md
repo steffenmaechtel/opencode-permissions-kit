@@ -163,6 +163,13 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   `<SHA>`-fill's +2 bytes per row budgeted (issue #237; the rule
   itself lives in the review README — AGENTS.md Testing owns the
   chain mechanics)
+- **Comment-strip riders on source-counting pins** (#261, PR #284: 34
+  sites across 14 suites, 10 of them sweep finds beyond the issue list;
+  the rider convention lives in
+  [conventions.md](conventions.md) "Source-counting pins"; awk-pattern
+  order pins and raw negative `grep -q` legs are the known residual,
+  follow-up issue carries the inventory) — a `grep -c` count pin over
+  shipped source without the rider is pass-green on commented-out code
 - **Sabotage-verify per pin** (the ONLY reliable discriminator we have;
   `test-vacuous` reappeared at scale in run 2 — partly corpus composition,
   partly real: the fail-but-green shape (a) above)

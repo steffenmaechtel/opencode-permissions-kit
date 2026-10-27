@@ -119,6 +119,20 @@ Patterns already in this repo:
 | version probes | strict `grep -oE` extract; empty means unknown, never a guess | wrapper, `management/status.sh` |
 | exact id comparison | `grep -qxF` (fixed string, whole line) | `sh/advisories.sh` callers, scan dedup |
 
+## Source-counting pins (unit suites)
+
+Any unit-test pin that COUNTS a literal in a shipped or repo-internal
+source file (`grep -c … "$INSTALL"`, counts over extracted blocks or
+`grep -n` extraction legs) counts behind a comment-strip rider —
+`sed 's/^[[:space:]]*#.*$//' "$FILE" | grep -c … || true` — so a
+commented-out construct stops counting (the survivor trap, #261/#244 g
+W1). Full-line strip only (#244 h W6 residual: trailing comments after
+live lines still count). Piped shapes (`grep -c … | grep -q "^[N-M]$"`)
+carry the rider but no `|| true`: the rc must come from the final
+`grep -q` so the check can fail. Precedent: `test-install-args.sh` (v2
+URL), `test-git-config.sh` (safe.directory), the #261 rider pin in
+`test-project-paths.sh`.
+
 ## Test sandbox (unit suites)
 
 Unit suites run on contributor and CI hosts, not in containers — they
