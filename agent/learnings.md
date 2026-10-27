@@ -163,17 +163,19 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   `<SHA>`-fill's +2 bytes per row budgeted (issue #237; the rule
   itself lives in the review README — AGENTS.md Testing owns the
   chain mechanics)
-- **Comment-strip riders on source-counting pins** (#261, PR #284: 34
-  of 39 strip sites across 14 suites — the 5 pre-#261 strips are the
-  #244-era test-install-args riders plus the #261 pin's own fixture
-  leg; census note: 2 of the 39 live in escaped-dollar form
-  (`sed 's/^[[:space:]]*#.*\$//'`) and are invisible to the unescaped
-  literal; 10 of the 34 were sweep finds beyond the issue list; the
-  rider convention lives in
-  [conventions.md](conventions.md) "Source-counting pins"; awk-pattern
-  order pins and raw negative `grep -q` legs are the known residual,
-  issue #285 carries the inventory) — a `grep -c` count pin over
-  shipped source without the rider is pass-green on commented-out code
+- **Comment-strip riders on source-counting pins** (#261, PR #284) —
+  a `grep -c` count pin over shipped source without the rider is
+  pass-green on commented-out code. Census: 39 strip sites across 14
+  suites; 34 are this wave's (10 of those were sweep finds beyond the
+  issue list), the other 5 are non-sweep strips — the 4 #244-era
+  test-install-args riders plus the wave-created #261 pin's sed-bearing
+  leg (that pin's BARE leg stays un-ridden by design, per the
+  conventions carve-out). Census-grep note: 2 of the 39 sites live in
+  escaped-dollar form (`sed 's/^[[:space:]]*#.*\$//'`), invisible to
+  the unescaped literal. The rider convention lives in
+  [conventions.md](conventions.md) "Source-counting pins"; known
+  residual classes: awk-pattern order pins, raw negative `grep -q`
+  legs — issue #285 carries the inventory
 - **Sabotage-verify per pin** (the ONLY reliable discriminator we have;
   `test-vacuous` reappeared at scale in run 2 — partly corpus composition,
   partly real: the fail-but-green shape (a) above)
