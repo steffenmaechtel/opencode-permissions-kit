@@ -1074,9 +1074,10 @@ w2_run() {
     (
         if [ "$2" = true ]; then
             _w2_dir=$(command mktemp -d)
-            # abort/signal window inside the subshell (#283): the inline
-            # cleanup at the end of the subshell never ran on an abort —
-            # command rm because rm() is stubbed below at fire time
+            # the subshell trap owns _w2_dir on every path: abort and
+            # signal included (#283; the pre-wave end-of-body cleanup ran
+            # on the normal path only). command rm because rm() is
+            # stubbed below at fire time.
             trap 'command rm -rf "${_w2_dir:-}"' EXIT INT TERM
             mktemp() { printf '%s/list\n' "$_w2_dir"; }
         else
@@ -1099,7 +1100,9 @@ w2_run() {
         done <<EOF
 /var/www/w2-proj
 EOF
-        if [ "$2" = true ] && [ -n "${_w2_dir:-}" ]; then command rm -rf "$_w2_dir"; fi
+        # no inline tail rm: the subshell trap above owns _w2_dir on
+        # every path now (normal, abort, signal — #287 a Q6 removed the
+        # redundant double cleanup)
     )
 }
 

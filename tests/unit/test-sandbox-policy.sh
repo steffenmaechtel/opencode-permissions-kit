@@ -13,7 +13,8 @@
 # Two checks over the continuation-joined view of each line (full-comment
 # lines skipped): check 1 scans the quote-blanked operand view, check 2
 # the RAW line (quotes included — see its own header below). Checks 3-5
-# run their own greps (sections 3-5):
+# each run their own scan (sections 3-5: grep, find+awk, behavioral
+# cells):
 #
 # 1. MUTATION: a mutating verb (rm, rmdir, mkdir, ln, cp, mv, chown,
 #    chmod, chgrp, setfacl, touch, truncate, tee, install, `sed -i`)
@@ -76,7 +77,9 @@ fail() { printf '  FAIL  %s\n' "$1"; failed=$((failed + 1)); }
 
 TMP="$(mktemp)"
 VIOL="$(mktemp)"
-trap 'rm -f "$TMP" "$VIOL"; [ -n "${PROBE_DIR:-}" ] && rm -rf "$PROBE_DIR"' EXIT INT TERM
+# _bh_dir rides the suite trap too (#287 a S1): the behavioral cells
+# create it in a ~2-4 s signal window — INT/TERM there leaked it.
+trap 'rm -f "$TMP" "$VIOL"; [ -n "${PROBE_DIR:-}" ] && rm -rf "$PROBE_DIR" "${_bh_dir:-}"' EXIT INT TERM
 PROBE_DIR=""
 
 # scan <dir> -- writes "file|line|kind|token" violation rows to $VIOL.
@@ -270,7 +273,11 @@ fi
 # flagged (0.0.45c C3): quoted unbraced ("$V/x"), quoted braced
 # ("${V}/x"), slash OUTSIDE the quotes ("$V"/x) and unquoted ($V/x)
 # degenerate identically; the guarded "${V:?}" carries the colon and
-# cannot match. Pure-variable operands (`rm -rf "$VAR"`) are exempt —
+# cannot match. The DOT-suffix forms ("$V.name", "${V}.name" —
+# #287 a C4) degenerate to a relative path in the CWD instead of a
+# fixed absolute one, but both suites cd to the repo root, so the
+# empty-var operand still names a real location — guarded the same way.
+# Pure-variable operands (`rm -rf "$VAR"`) are exempt —
 # an empty operand is a verified rm no-op; the dangerous shape is the
 # suffix. The pattern chains rm + flags + complete arguments (quoted or
 # unquoted) only — an unquoted `;`/redirect boundary breaks the chain,
@@ -284,7 +291,7 @@ fi
 # (/var/www/vhosts fixtures) that the real-tree ratchet would flag.
 sfx_scan() {
     find "$1" -name "${2:-test-*.sh}" ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
-        grep -HnE 'rm( -[A-Za-z]+| "[^"]*"| [^";&| ]+)*( "\$[A-Za-z_][A-Za-z0-9_]*/| "\$\{[A-Za-z_][A-Za-z0-9_]*\}/| "\$[A-Za-z_][A-Za-z0-9_]*"/| \$[A-Za-z_][A-Za-z0-9_]*/)' "$f" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
+        grep -HnE 'rm( -[A-Za-z]+| "[^"]*"| [^";&| ]+)*( "\$[A-Za-z_][A-Za-z0-9_]*/| "\$\{[A-Za-z_][A-Za-z0-9_]*\}/| "\$[A-Za-z_][A-Za-z0-9_]*"/| \$[A-Za-z_][A-Za-z0-9_]*/| "\$[A-Za-z_][A-Za-z0-9_]*\.| "\$\{[A-Za-z_][A-Za-z0-9_]*\}\.)' "$f" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
     done
 }
 : > "$VIOL"
@@ -300,7 +307,7 @@ fi
 # self-probe: the unguarded shapes must be caught (flag orders, bare rm,
 # multi-operand, and the 0.0.45c C3 forms — braced, slash-outside-quotes,
 # unquoted), the guarded and pure-variable ones pass
-printf '#!/bin/sh\n# probe: unguarded rm suffix variants must be caught (check 3)\nrm -rf "$PX/evil"\nrm -fr "$PX/evil2"\nrm "$PX/evil3"\nrm -rf "$PX/ok" "$PX/evil4"\nrm "${PX:?}/fine"\nrm -f "${PX:?}/fine2"\nrm -rf "${PX}/evil5"\nrm -rf "$PX"/evil6\nrm -rf $PX/evil7\nrm -rf "${PX:?}/sub/fine3"\nrm -f "$PX"\n' \
+printf '#!/bin/sh\n# probe: unguarded rm suffix variants must be caught (check 3)\nrm -rf "$PX/evil"\nrm -fr "$PX/evil2"\nrm "$PX/evil3"\nrm -rf "$PX/ok" "$PX/evil4"\nrm "${PX:?}/fine"\nrm -f "${PX:?}/fine2"\nrm -rf "${PX}/evil5"\nrm -rf "$PX"/evil6\nrm -rf $PX/evil7\nrm -rf "${PX:?}/sub/fine3"\nrm -f "$PX"\nrm -f "$PX.evil8"\nrm -f "${PX:?}.fine8"\n' \
     > "$PROBE_DIR/unit/test-probe-sfx.sh"
 : > "$VIOL"
 sfx_scan "$PROBE_DIR/unit" > "$VIOL" || true
@@ -309,47 +316,57 @@ sfx_scan "$PROBE_DIR/unit" > "$VIOL" || true
 # set -e, so the zero path records rather than aborts today — guarded
 # for uniformity with the swept family.
 _sfx_rows=$(grep -c 'test-probe-sfx.sh' "$VIOL" || true)
-if [ "$_sfx_rows" -eq 7 ] && grep -q 'PX/evil' "$VIOL" && grep -q 'PX/evil2' "$VIOL" \
+if [ "$_sfx_rows" -eq 8 ] && grep -q 'PX/evil' "$VIOL" && grep -q 'PX/evil2' "$VIOL" \
     && grep -q 'PX/evil3' "$VIOL" && grep -q 'PX/evil4' "$VIOL" \
     && grep -q 'PX}/evil5' "$VIOL" && grep -q 'PX./evil6' "$VIOL" \
-    && grep -q 'PX/evil7' "$VIOL"; then
-    pass "self-probe: unguarded suffix forms caught (rf, fr, bare rm, multi-operand, braced, slash-outside, unquoted), guarded/pure pass"
+    && grep -q 'PX/evil7' "$VIOL" && grep -q 'PX.evil8' "$VIOL"; then
+    pass "self-probe: unguarded suffix forms caught (rf, fr, bare rm, multi-operand, braced, slash-outside, unquoted, dot), guarded/pure pass"
 else
     fail "self-probe: check 3 must catch the unguarded suffix variants only (rows=$_sfx_rows)"
     grep 'test-probe-sfx.sh' "$VIOL" || true
 fi
 
 # --- 4. trap coverage floor: receivers must sit under an armed trap ------------
-# (issue #283, the #260/#261 idiom): a suite with mktemp scratch must
-# register a trap on EXIT AND the signal arms INT TERM — a set -e abort
+# (issue #283; the sibling idiom — test-project-paths.sh #280 c C1 /
+# #280 d S2, test-fs-baseline.sh issue #14): a suite with mktemp scratch
+# must register a trap on EXIT AND the signal arms INT TERM — a set -e abort
 # or a Ctrl-C between a receiver's creation and its inline rm leaked the
-# scratch in /tmp (the sibling standard: test-fs-baseline.sh /
-# test-project-paths.sh). This is the FLOOR check, a lint shape: it pins
+# scratch in /tmp. This is the FLOOR check, a lint shape: it pins
 # that every receiver-carrying suite HAS a trap statement and that every
 # trap statement carries all three arms. Whether the trap's action LIST
 # every receiver (variable-level completeness) cannot be grepped — that
 # stays the review's job, pinned behaviorally by section 5's mechanism
 # cells. Receiver detection: a live assignment whose value starts with
-# an UNESCAPED $(mktemp (comment lines skipped); heredoc-embedded child
+# an UNESCAPED $(mktemp (comment lines skipped), an optional `command `
+# prefix included ($(command mktemp …)); heredoc-embedded child
 # scripts carry \$ ( — escaped, excluded by design: child scripts own
 # their cleanup. The function form (trap _cleanup EXIT INT TERM) is
 # accepted: the arms live on the trap line, the rm lives in the
 # function. Line-based like check 3: a trap statement split across a
 # backslash continuation hides its arms from the scan — keep the arms
-# on the trap's physical line (the self-probes pin the shape). This
-# suite excludes itself like checks 1-2 (its own trap is pinned by
+# on the trap's physical line (the self-probes pin the shape). Arms are
+# read AFTER the action's closing quote, so action text (kill -TERM, an
+# in-action comment naming the arms) cannot satisfy the arm check.
+# Known latent shape gaps, documented not scanned (no live instance;
+# heredoc-aware scanning needs a parser the floor deliberately avoids):
+# prefixed receivers (local/readonly/export V=…), trap lines inside
+# heredocs counting as the suite's trap, and unescaped line-start
+# receivers inside quoted heredocs.
+# This suite excludes itself like checks 1-2 (its own trap is pinned by
 # shipping the guard, not by scanning itself).
 trap_scan() {
     find "$1" -name "${2:-test-*.sh}" ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
-        awk -v f="$f" '
+        awk -v f="$f" -v dq='"' -v sq="'" '
             /^[[:space:]]*#/ { next }
-            /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="?[$][(]mktemp/ { recv++ }
+            /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="?[$][(](command[[:space:]]+)?mktemp/ { recv++ }
             /^[[:space:]]*trap[[:space:]].*/ {
                 traps++
                 _ln = NR
-                if ($0 !~ /[^A-Za-z]EXIT([^A-Za-z]|$)/) arms = arms " " _ln ":no-EXIT"
-                if ($0 !~ /[^A-Za-z]INT([^A-Za-z]|$)/) arms = arms " " _ln ":no-INT"
-                if ($0 !~ /[^A-Za-z]TERM([^A-Za-z]|$)/) arms = arms " " _ln ":no-TERM"
+                _ap = $0
+                sub(".*[" dq sq "]", "", _ap)
+                if (_ap !~ /[^A-Za-z]EXIT([^A-Za-z]|$)/) arms = arms " " _ln ":no-EXIT"
+                if (_ap !~ /[^A-Za-z]INT([^A-Za-z]|$)/) arms = arms " " _ln ":no-INT"
+                if (_ap !~ /[^A-Za-z]TERM([^A-Za-z]|$)/) arms = arms " " _ln ":no-TERM"
             }
             END {
                 if (recv > 0 && traps == 0) print f "|notrap"
@@ -358,13 +375,27 @@ trap_scan() {
         ' "$f"
     done
 }
+# The scan target must exist and hold at least one suite — an absent or
+# emptied tests/unit would leave $VIOL empty and green the floor
+# vacuously (#287 a S3: the scan is fail-open by shape, like checks 1-3;
+# this assert closes the realistic drift path and is self-probed below).
+_ts_assert_dir() {
+    [ -d "$1" ] && [ -n "$(find "$1" -name 'test-*.sh' -print -quit 2>/dev/null)" ]
+}
+_ts_bad=0
+_ts_assert_dir tests/unit || _ts_bad=1
+if [ "$_ts_bad" -eq 0 ]; then
+    pass "scan target present: tests/unit holds unit suites"
+else
+    fail "scan target missing: tests/unit must exist and hold test-*.sh (floor cannot run)"
+fi
 : > "$VIOL"
 trap_scan tests/unit > "$VIOL" || true
 if [ -s "$VIOL" ]; then
     while IFS='|' read -r tf tk; do
         case "$tk" in
             notrap) fail "$tf has mktemp receiver(s) but no trap statement (#283: register one, arms EXIT INT TERM)" ;;
-            arms*)  fail "$tf trap statement missing arms:$tk (#283: every trap needs EXIT INT TERM)" ;;
+            arms*)  fail "$tf trap statement missing arms:${tk#arms } (#283: every trap needs EXIT INT TERM)" ;;
         esac
     done < "$VIOL"
 else
@@ -400,6 +431,37 @@ if grep -qE 'test-probe-trap-(line|func|heredoc)\.sh\|' "$VIOL"; then
 else
     pass "self-probe: line form, function form and heredoc fixtures pass clean"
 fi
+# $(command mktemp …) receivers count too (#287 a C1); action text must
+# NOT satisfy the arm check (#287 a C2): the kill -TERM action and the
+# in-action comment would arm an EXIT-only trap if arms were read from
+# the whole line.
+printf '#!/bin/sh\n# probe: command-prefixed receiver without a trap must be caught\nP4E="$(command mktemp -d)"\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-cmd.sh"
+printf '#!/bin/sh\n# probe: action text must not satisfy the arm check\nP4F="$(mktemp -d)"\ntrap "kill -TERM \\"\\$P4F.child\\"" EXIT\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-act.sh"
+printf '#!/bin/sh\n# probe: arms named inside an in-action comment must not count\nP4G="$(mktemp -d)"\ntrap "rm -rf \\"\\$P4G\\" # EXIT INT TERM" EXIT\n' \
+    > "$PROBE_DIR/unit/test-probe-trap-cmt.sh"
+: > "$VIOL"
+trap_scan "$PROBE_DIR/unit" > "$VIOL" || true
+if grep -q 'test-probe-trap-cmd.sh|notrap' "$VIOL"; then
+    pass "self-probe: command-prefixed receiver caught"
+else
+    fail "self-probe: command-prefixed receiver must be caught (#287 a C1)"
+fi
+if grep -q 'test-probe-trap-act.sh|arms.*no-INT' "$VIOL" && grep -q 'test-probe-trap-act.sh|arms.*no-TERM' "$VIOL" \
+    && grep -q 'test-probe-trap-cmt.sh|arms.*no-INT' "$VIOL" && grep -q 'test-probe-trap-cmt.sh|arms.*no-TERM' "$VIOL"; then
+    pass "self-probe: action text does not satisfy the arm check (TERM/INT named in action flagged)"
+else
+    fail "self-probe: action-text traps must be flagged for the arms they only name (#287 a C2)"
+fi
+# scan-target assert must fail loudly on a vanished directory (#287 a S3)
+_ts_probe=0
+_ts_assert_dir "$PROBE_DIR/unit/no-such-dir-$$" || _ts_probe=1
+if [ "$_ts_probe" -eq 1 ]; then
+    pass "self-probe: absent scan target fails the assert (no vacuous floor pass)"
+else
+    fail "self-probe: absent scan target must fail the assert (#287 a S3)"
+fi
 
 # --- 5. behavioral: the trap idiom collects scratch on abort and signal --------
 # (#283 representative pin, the issue's fix sketch): a generated
@@ -425,14 +487,13 @@ _bh_cell() {
             _bh_trap=':'
             ;;
     esac
-    _bh_rc=0
     if [ "$2" = abort ]; then
         TMPDIR="$_bh_dir" sh -c "
             set -e
             $_bh_trap
             BHW=\"\$(mktemp -d)\"
             exit 3
-        " _ >/dev/null 2>&1 || _bh_rc=$?
+        " _ >/dev/null 2>&1 || :
     else
         TMPDIR="$_bh_dir" setsid sh -c "
             $_bh_trap
@@ -441,8 +502,8 @@ _bh_cell() {
         " _ >/dev/null 2>&1 &
         _bh_pid=$!
         sleep 1
-        kill -TERM "-$_bh_pid" 2>/dev/null || _bh_rc=1
-        wait "$_bh_pid" 2>/dev/null || _bh_rc=$?
+        kill -TERM "-$_bh_pid" 2>/dev/null || :
+        wait "$_bh_pid" 2>/dev/null || :
     fi
     _bh_left=$(find "$_bh_dir" -mindepth 1 | wc -l | tr -d ' ')
     _bh_el=$(( $(date +%s) - _bh_start ))

@@ -103,7 +103,7 @@ for d in internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-*; do
         fi
     done
 done
-rm -f "$TMP.letters" "$TMP.expected"
+rm -f "${TMP:?}.letters" "${TMP:?}.expected"
 
 if [ -s "$TMP" ]; then
     echo "reviews lint: FAILED"

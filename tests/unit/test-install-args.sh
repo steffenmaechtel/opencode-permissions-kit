@@ -488,8 +488,8 @@ FKWORK=$(mktemp -d)
 # because twelve receivers do not fit one line; every operand is
 # unset-safe — receivers created in conditionals below (the _p3* block)
 # may not exist at fire time, and an unset operand expands empty, which
-# rm skips. Sibling idiom: the line-form scratch traps in
-# test-fs-baseline.sh / test-project-paths.sh.
+# rm skips. Sibling idiom: the scratch traps in test-project-paths.sh
+# (line form) and test-fs-baseline.sh (function form).
 _trap_cleanup() {
     rm -rf "${FKWORK:-}" "${_dg_w:-}" "${_pb_w:-}" "${_py3w:-}" \
         "${_p3tmp:-}" "${_p3g:-}" "${_p3raw:-}" "${_p3mods:-}" \
