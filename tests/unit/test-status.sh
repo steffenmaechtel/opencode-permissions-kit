@@ -1206,8 +1206,12 @@ fi
 # unprivileged or HTTPS-less host would be permanently non-green and the
 # cron alert worthless. Pins the five converted rows incl. both socket
 # twins, plus the negative sweep (no unknown/optional row via ui_kv_warn).
+# Comment-strip rider (#261, the #244 g W1 class) on the socket-twin
+# count: commented-out rows stop counting; full-line comments only
+# (#244 h W6 residual).
 if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS" \
-    && [ "$(grep -cF 'ui_kv "socket" "unknown — needs root to check' "$STATUS")" = "2" ] \
+    && [ "$(sed 's/^[[:space:]]*#.*$//' "$STATUS" \
+        | grep -cF 'ui_kv "socket" "unknown — needs root to check' || true)" = "2" ] \
     && grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$STATUS" \
     && grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS" \
     && ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" \
@@ -1354,7 +1358,8 @@ fi
 # Issue #201: the dead-end advice lives ONLY in the #166 cell now —
 # exactly one literal (a second occurrence would mean a healthy-direct
 # or unparsable cell advising sudo again).
-if [ "$(grep -cF 'unknown — probe failed (run: sudo opk status)' "$STATUS")" = "1" ]; then
+if [ "$(sed 's/^[[:space:]]*#.*$//' "$STATUS" | grep -cF 'unknown — probe failed (run: sudo opk status)' \
+    || true)" = "1" ]; then
     pass "#201: the sudo-opk-status advice is #166-cell only (one literal)"
 else
     fail "#201: the sudo-advice literal count drifted (expected exactly 1)"
