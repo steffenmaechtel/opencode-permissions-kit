@@ -23,13 +23,19 @@
 #                     modified (git unlink/rename inside opencode-owned .ddev/)
 set -eu
 
-usage() { sed -n 's/^# \{0,1\}//p' "$0" | sed -n '/^Usage:/,$p'; exit 2; }
+usage() {
+    sed -n 's/^# \{0,1\}//p' "$0" | sed -n '/^Usage:/,$p'
+    exit 2
+}
 
 [ "$#" -eq 2 ] || usage
 BARE_TARGET=$1
 SITE_DIR=$2
 
-[ -f "$SITE_DIR/composer.json" ] || { echo "error: $SITE_DIR is not the camino site fixture" >&2; exit 1; }
+[ -f "$SITE_DIR/composer.json" ] || {
+    echo "error: $SITE_DIR is not the camino site fixture" >&2
+    exit 1
+}
 [ ! -e "$BARE_TARGET/.git" ] && [ ! -e "$BARE_TARGET/config" ] || {
     echo "error: $BARE_TARGET already looks like a git repo" >&2
     exit 1
@@ -41,7 +47,7 @@ trap 'rm -rf "$WORK"' EXIT INT TERM
 cp -a "$SITE_DIR/." "$WORK/"
 mkdir -p "$WORK/.ddev/commands/host"
 printf '#!/bin/sh\necho "hello from a custom ddev host command"\n' \
-    > "$WORK/.ddev/commands/host/hello"
+    >"$WORK/.ddev/commands/host/hello"
 chmod +x "$WORK/.ddev/commands/host/hello"
 
 git -C "$WORK" init -q -b main
@@ -51,13 +57,13 @@ git -C "$WORK" add -A
 git -C "$WORK" commit -q -m "site master (camino fixture, DD12 baseline)"
 
 git -C "$WORK" checkout -q -b feature/top-level
-printf "# camino e2e — top-level file replaced on feature/top-level\n" > "$WORK/README.md"
+printf "# camino e2e — top-level file replaced on feature/top-level\n" >"$WORK/README.md"
 rm "${WORK:?}/LICENSE"
 git -C "$WORK" add -A
 git -C "$WORK" commit -q -m "replace README.md, drop LICENSE (top-level unlink/recreate)"
 
 git -C "$WORK" checkout -q -b feature/settings main
-printf '\n// feature/settings: appended marker line\n' >> "$WORK/config/system/settings.php"
+printf '\n// feature/settings: appended marker line\n' >>"$WORK/config/system/settings.php"
 sed -i 's/websiteTitle: Camino/websiteTitle: Camino (feature-settings)/' \
     "$WORK/config/sites/camino/config.yaml"
 git -C "$WORK" add -A

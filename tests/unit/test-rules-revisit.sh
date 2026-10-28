@@ -37,50 +37,51 @@ NC=''
 
 WORK=$(mktemp -d /tmp/test-rules-revisit.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT INT TERM
-FAILS=$WORK/fails; : > "$FAILS"
+FAILS=$WORK/fails
+: >"$FAILS"
 passed=0
 
-fail() { printf '  %sFAIL%s  %s\n' "${RED:-}" "${NC:-}" "$1" >> "$FAILS"; }
+fail() { printf '  %sFAIL%s  %s\n' "${RED:-}" "${NC:-}" "$1" >>"$FAILS"; }
 pass() { passed=$((passed + 1)); }
 
-contains() {  # $1 haystack, $2 needle
+contains() { # $1 haystack, $2 needle
     case $1 in
         *"$2"*) return 0 ;;
         *) return 1 ;;
     esac
 }
 
-line_is() {  # $1 file, $2 exact literal line (fixed-string needle, #259 a Q2)
+line_is() { # $1 file, $2 exact literal line (fixed-string needle, #259 a Q2)
     grep -qxF -- "$2" "$1"
 }
 
-out_line_is() {  # $1 haystack string, $2 exact line -> anchored needle
+out_line_is() { # $1 haystack string, $2 exact line -> anchored needle
     printf '%s\n' "$1" | grep -qxF -- "$2"
 }
 
-run_report() {  # runs the report; env: SCRATCH T env-HORIZON; sets OUT/RC
+run_report() { # runs the report; env: SCRATCH T env-HORIZON; sets OUT/RC
     OUT=$(RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY="$T" \
         HORIZON="${HORIZON:-30}" sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
     RC=$?
 }
 
-run_revisit() {  # $@ script args; env: SCRATCH T; sets OUT/RC
+run_revisit() { # $@ script args; env: SCRATCH T; sets OUT/RC
     OUT=$(RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY="$T" \
         sh "$REPO_ROOT/scripts/rules-revisit.sh" "$@" 2>&1)
     RC=$?
 }
 
-write_meta() {  # $1 dir  $2 id  $3 status  $4 interval  $5 next  $6 reviewed|-  [$7 rule]
+write_meta() { # $1 dir  $2 id  $3 status  $4 interval  $5 next  $6 reviewed|-  [$7 rule]
     digs=${2#RM-}
-    b="$1/internal/rules-meta/$(printf '%s' "$digs" | cut -c1)"\
-"/$(printf '%s' "$digs" | cut -c2)/$(printf '%s' "$digs" | cut -c3)"
+    b="$1/internal/rules-meta/$(printf '%s' "$digs" | cut -c1)""\
+/$(printf '%s' "$digs" | cut -c2)/$(printf '%s' "$digs" | cut -c3)"
     mkdir -p "$b"
     if [ "$6" = - ]; then
         reviewed=""
     else
         reviewed="reviewed: $6"
     fi
-    cat > "$b/$2.md" <<EOF
+    cat >"$b/$2.md" <<EOF
 ---
 id: $2
 rule: ${7:-agent/conventions.md#interactive-prompts-yn}
@@ -101,7 +102,7 @@ Body of $2.
 EOF
 }
 
-meta_path() {  # $1 dir  $2 id
+meta_path() { # $1 dir  $2 id
     digs=${2#RM-}
     printf '%s/internal/rules-meta/%s/%s/%s/%s.md' "$1" \
         "$(printf '%s' "$digs" | cut -c1)" "$(printf '%s' "$digs" | cut -c2)" \
@@ -116,8 +117,8 @@ meta_path() {  # $1 dir  $2 id
 #      not a flake; maintain the tree, never the date.
 OUT=$(FORCE_TODAY=2026-10-16 sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
 RC=$?
-if [ "$RC" -eq 0 ] && contains "$OUT" "rule-meta revisit report — 2026-10-16" \
-    && out_line_is "$OUT" "overdue: 0"; then
+if [ "$RC" -eq 0 ] && contains "$OUT" "rule-meta revisit report — 2026-10-16" &&
+    out_line_is "$OUT" "overdue: 0"; then
     pass
 else
     fail "R0 real tree: report must be green, got rc=$RC: $OUT"
@@ -135,15 +136,15 @@ SCRATCH=$RSCRATCH
 T=2026-06-15
 HORIZON=30
 run_report
-if [ "$RC" -eq 0 ] && out_line_is "$OUT" "overdue: 1" \
-    && contains "$OUT" "RM-9001  due 2026-06-01  1m" \
-    && out_line_is "$OUT" \
-        "due within the horizon (2026-06-15..2026-07-15): 3" \
-    && contains "$OUT" "RM-9002  due 2026-06-15  6m" \
-    && contains "$OUT" "RM-9003  due 2026-06-20  1m" \
-    && contains "$OUT" "RM-9006  due 2026-07-01  1m" \
-    && out_line_is "$OUT" "review-pending (approval queue): 1" \
-    && contains "$OUT" "next due after the horizon: 2026-12-01 (RM-9004)"; then
+if [ "$RC" -eq 0 ] && out_line_is "$OUT" "overdue: 1" &&
+    contains "$OUT" "RM-9001  due 2026-06-01  1m" &&
+    out_line_is "$OUT" \
+        "due within the horizon (2026-06-15..2026-07-15): 3" &&
+    contains "$OUT" "RM-9002  due 2026-06-15  6m" &&
+    contains "$OUT" "RM-9003  due 2026-06-20  1m" &&
+    contains "$OUT" "RM-9006  due 2026-07-01  1m" &&
+    out_line_is "$OUT" "review-pending (approval queue): 1" &&
+    contains "$OUT" "next due after the horizon: 2026-12-01 (RM-9004)"; then
     pass
 else
     fail "R1 lanes: wrong worklist, rc=$RC: $OUT"
@@ -165,11 +166,11 @@ fi
 # R2. HORIZON override discriminates the window boundary
 HORIZON=0
 run_report
-if [ "$RC" -eq 0 ] \
-    && out_line_is "$OUT" \
-        "due within the horizon (2026-06-15..2026-06-15): 1" \
-    && contains "$OUT" "RM-9002  due 2026-06-15  6m" \
-    && contains "$OUT" "next due after the horizon: 2026-06-20 (RM-9003)"; then
+if [ "$RC" -eq 0 ] &&
+    out_line_is "$OUT" \
+        "due within the horizon (2026-06-15..2026-06-15): 1" &&
+    contains "$OUT" "RM-9002  due 2026-06-15  6m" &&
+    contains "$OUT" "next due after the horizon: 2026-06-20 (RM-9003)"; then
     pass
 else
     fail "R2 horizon override: wrong window, rc=$RC: $OUT"
@@ -292,7 +293,7 @@ else
 fi
 
 # ---------------------------------------------------------- revisit pins
-one_scratch() {  # $1 interval  $2 next  -> fresh tree with RM-9001 active
+one_scratch() { # $1 interval  $2 next  -> fresh tree with RM-9001 active
     VSCRATCH=$WORK/one$$.$3
     write_meta "$VSCRATCH" RM-9001 active "$1" "$2" 2026-05-01
 }
@@ -304,12 +305,12 @@ SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean "still pinned upstream"
 M=$(meta_path "$VSCRATCH" RM-9001)
-if [ "$RC" -eq 0 ] && contains "$OUT" "RM-9001: clean" \
-    && contains "$OUT" "1m -> 6m" && contains "$OUT" "next-revisit 2026-12-15" \
-    && line_is "$M" "revisit-interval: 6m" \
-    && line_is "$M" "next-revisit: 2026-12-15" \
-    && line_is "$M" "reviewed: 2026-05-01" \
-    && line_is "$M" \
+if [ "$RC" -eq 0 ] && contains "$OUT" "RM-9001: clean" &&
+    contains "$OUT" "1m -> 6m" && contains "$OUT" "next-revisit 2026-12-15" &&
+    line_is "$M" "revisit-interval: 6m" &&
+    line_is "$M" "next-revisit: 2026-12-15" &&
+    line_is "$M" "reviewed: 2026-05-01" &&
+    line_is "$M" \
         "- 2026-06-15 revisit clean — still pinned upstream (interval 1m -> 6m, next 2026-12-15)."; then
     pass
 else
@@ -331,9 +332,9 @@ one_scratch 2y 2026-06-01 v2
 SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
-if [ "$RC" -eq 0 ] \
-    && line_is "$(meta_path "$VSCRATCH" RM-9001)" "revisit-interval: 2y" \
-    && line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2028-06-15"; then
+if [ "$RC" -eq 0 ] &&
+    line_is "$(meta_path "$VSCRATCH" RM-9001)" "revisit-interval: 2y" &&
+    line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2028-06-15"; then
     pass
 else
     fail "V2 2y max: expected 2y -> 2y, next 2028-06-15, rc=$RC: $OUT"
@@ -344,10 +345,10 @@ one_scratch 6m 2026-06-01 v3
 SCRATCH=$VSCRATCH
 T=2026-06-15
 run_revisit RM-9001 findings "upstream dropped the flag"
-if [ "$RC" -eq 0 ] \
-    && line_is "$(meta_path "$VSCRATCH" RM-9001)" "revisit-interval: 1m" \
-    && line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2026-07-15" \
-    && line_is "$(meta_path "$VSCRATCH" RM-9001)" \
+if [ "$RC" -eq 0 ] &&
+    line_is "$(meta_path "$VSCRATCH" RM-9001)" "revisit-interval: 1m" &&
+    line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2026-07-15" &&
+    line_is "$(meta_path "$VSCRATCH" RM-9001)" \
         "- 2026-06-15 revisit findings — upstream dropped the flag (interval reset to 1m from 6m, next 2026-07-15)."; then
     pass
 else
@@ -430,7 +431,7 @@ LSCRATCH=$WORK/nolog$$
 digs=9001
 lb="$LSCRATCH/internal/rules-meta/9/0/0"
 mkdir -p "$lb"
-cat > "$lb/RM-9001.md" <<'EOF'
+cat >"$lb/RM-9001.md" <<'EOF'
 ---
 id: RM-9001
 rule: agent/conventions.md#interactive-prompts-yn
@@ -458,8 +459,8 @@ one_scratch 6m 2026-06-01 v9
 SCRATCH=$VSCRATCH
 T=2027-01-31
 run_revisit RM-9001 findings "rationale rotted"
-if [ "$RC" -eq 0 ] \
-    && line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2027-02-28"; then
+if [ "$RC" -eq 0 ] &&
+    line_is "$(meta_path "$VSCRATCH" RM-9001)" "next-revisit: 2027-02-28"; then
     pass
 else
     fail "V9 clamp: expected 2027-02-28, rc=$RC: $OUT"
@@ -474,8 +475,8 @@ OUT=$(RM_AUDIT_ROOT="$WORK/one$$.v10" FORCE_TODAY=2026-06-15 \
     RULES_PYTHON=/nonexistent-rules-python \
     sh "$REPO_ROOT/scripts/rules-revisit.sh" RM-9001 clean 2>&1)
 RC=$?
-if [ "$RC" -eq 2 ] && contains "$OUT" "unavailable" \
-    && cmp -s "$WORK/v10.before" "$M"; then
+if [ "$RC" -eq 2 ] && contains "$OUT" "unavailable" &&
+    cmp -s "$WORK/v10.before" "$M"; then
     pass
 else
     fail "V10 missing python: rc=$RC, meta must stay untouched"
@@ -487,23 +488,23 @@ GSCRATCH=$WORK/green$$
 mkdir -p "$GSCRATCH/scripts" "$GSCRATCH/agent" "$GSCRATCH/internal/records" \
     "$GSCRATCH/internal/rules-meta"
 cp "$REPO_ROOT/scripts/gen-rules-index.py" "$GSCRATCH/scripts/"
-cat > "$GSCRATCH/agent/conventions.md" <<'EOF'
+cat >"$GSCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 
 ## Interactive prompts (y/n)
 
 - Demo rule RM-9001 body text. (RM-9001)
 EOF
-cat > "$GSCRATCH/AGENTS.md" <<'EOF'
+cat >"$GSCRATCH/AGENTS.md" <<'EOF'
 # AGENTS
 EOF
-cat > "$GSCRATCH/agent/test-fidelity.md" <<'EOF'
+cat >"$GSCRATCH/agent/test-fidelity.md" <<'EOF'
 # Fidelity
 EOF
-cat > "$GSCRATCH/agent/review-concept.md" <<'EOF'
+cat >"$GSCRATCH/agent/review-concept.md" <<'EOF'
 # Review
 EOF
-cat > "$GSCRATCH/internal/records/rules-meta.md" <<'EOF'
+cat >"$GSCRATCH/internal/records/rules-meta.md" <<'EOF'
 # Record
 
 ## Revisit ladder
@@ -519,8 +520,8 @@ run_revisit RM-9001 clean "rationale re-verified"
 AOUT=$(RM_AUDIT_ROOT="$GSCRATCH" FORCE_TODAY=2026-10-16 \
     sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
 ARC=$?
-if [ "$RC" -eq 0 ] && [ "$ARC" -eq 0 ] && contains "$AOUT" "rules-audit: 0 blocking" \
-    && line_is "$(meta_path "$GSCRATCH" RM-9001)" "next-revisit: 2027-04-22"; then
+if [ "$RC" -eq 0 ] && [ "$ARC" -eq 0 ] && contains "$AOUT" "rules-audit: 0 blocking" &&
+    line_is "$(meta_path "$GSCRATCH" RM-9001)" "next-revisit: 2027-04-22"; then
     pass
 else
     fail "V11 audit interplay: revisit rc=$RC, audit rc=$ARC: $AOUT"
@@ -533,7 +534,7 @@ fi
 DSCRATCH=$WORK/dup$$
 db="$DSCRATCH/internal/rules-meta/9/0/0"
 mkdir -p "$db"
-cat > "$db/RM-9001.md" <<'EOF'
+cat >"$db/RM-9001.md" <<'EOF'
 ---
 id: RM-9001
 rule: agent/conventions.md#interactive-prompts-yn
@@ -558,8 +559,8 @@ T=2026-06-15
 DM="$db/RM-9001.md"
 cp "$DM" "$WORK/v12.before"
 run_revisit RM-9001 clean
-if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" \
-    && cmp -s "$WORK/v12.before" "$DM"; then
+if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" &&
+    cmp -s "$WORK/v12.before" "$DM"; then
     pass
 else
     fail "V12 duplicated field: expected rc=2 + untouched meta, got rc=$RC: $OUT"
@@ -576,8 +577,8 @@ cp "$MN" "$WORK/v13.before"
 SCRATCH=$MSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
-if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" \
-    && cmp -s "$WORK/v13.before" "$MN"; then
+if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" &&
+    cmp -s "$WORK/v13.before" "$MN"; then
     pass
 else
     fail "V13 missing next-revisit: expected rc=2 + untouched meta, got rc=$RC: $OUT"
@@ -626,8 +627,8 @@ cp "$PM" "$WORK/v17.before"
 SCRATCH=$PSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
-if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'" \
-    && cmp -s "$WORK/v17.before" "$PM"; then
+if [ "$RC" -eq 2 ] && contains "$OUT" "bad status 'paused'" &&
+    cmp -s "$WORK/v17.before" "$PM"; then
     pass
 else
     fail "V17 corrupt status: expected rc=2 + untouched meta, got rc=$RC: $OUT"
@@ -644,8 +645,8 @@ cp "$NM" "$WORK/v18.before"
 SCRATCH=$NSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
-if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" \
-    && cmp -s "$WORK/v18.before" "$NM"; then
+if [ "$RC" -eq 2 ] && contains "$OUT" "not found exactly once" &&
+    cmp -s "$WORK/v18.before" "$NM"; then
     pass
 else
     fail "V18 duplicated next-revisit: expected rc=2 + untouched meta, got rc=$RC: $OUT"
@@ -675,8 +676,8 @@ cp "$SM" "$WORK/v20.before"
 SCRATCH=$SSCRATCH
 T=2026-06-15
 run_revisit RM-9001 clean
-if [ "$RC" -eq 2 ] && contains "$OUT" "bad status ''" \
-    && cmp -s "$WORK/v20.before" "$SM"; then
+if [ "$RC" -eq 2 ] && contains "$OUT" "bad status ''" &&
+    cmp -s "$WORK/v20.before" "$SM"; then
     pass
 else
     fail "V20 missing status: expected rc=2 + untouched meta, got rc=$RC: $OUT"

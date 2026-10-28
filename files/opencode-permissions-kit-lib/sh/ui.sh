@@ -29,21 +29,41 @@
 
 # --- colors ---------------------------------------------------------------------
 if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
-    UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''
-    UI_DIM=''; UI_BOLD=''; UI_NC=''
+    UI_GREEN=''
+    UI_RED=''
+    UI_YELLOW=''
+    UI_CYAN=''
+    UI_BLUE=''
+    UI_DIM=''
+    UI_BOLD=''
+    UI_NC=''
 else
-    UI_GREEN=$(printf '\033[0;32m'); UI_RED=$(printf '\033[0;31m')
-    UI_YELLOW=$(printf '\033[0;33m'); UI_CYAN=$(printf '\033[0;36m')
+    UI_GREEN=$(printf '\033[0;32m')
+    UI_RED=$(printf '\033[0;31m')
+    UI_YELLOW=$(printf '\033[0;33m')
+    UI_CYAN=$(printf '\033[0;36m')
     UI_BLUE=$(printf '\033[0;34m')
-    UI_DIM=$(printf '\033[2m'); UI_BOLD=$(printf '\033[1m'); UI_NC=$(printf '\033[0m')
+    UI_DIM=$(printf '\033[2m')
+    UI_BOLD=$(printf '\033[1m')
+    UI_NC=$(printf '\033[0m')
 fi
 
 if [ -n "${UI_ASCII:-}" ]; then
-    UI_SYM_OK='ok'; UI_SYM_BAD='x'; UI_SYM_WARN='!'; UI_SYM_INFO='-'
-    UI_SYM_ADD='+'; UI_SYM_ARROW='->'; UI_SYM_RULE='-'
+    UI_SYM_OK='ok'
+    UI_SYM_BAD='x'
+    UI_SYM_WARN='!'
+    UI_SYM_INFO='-'
+    UI_SYM_ADD='+'
+    UI_SYM_ARROW='->'
+    UI_SYM_RULE='-'
 else
-    UI_SYM_OK='✔'; UI_SYM_BAD='✖'; UI_SYM_WARN='⚠'; UI_SYM_INFO='ℹ'
-    UI_SYM_ADD='+'; UI_SYM_ARROW='→'; UI_SYM_RULE='─'
+    UI_SYM_OK='✔'
+    UI_SYM_BAD='✖'
+    UI_SYM_WARN='⚠'
+    UI_SYM_INFO='ℹ'
+    UI_SYM_ADD='+'
+    UI_SYM_ARROW='→'
+    UI_SYM_RULE='─'
 fi
 
 # --- severity tallies (issue #158) ---------------------------------------------
@@ -69,14 +89,22 @@ _ui_label() {
 
 # Counting: warn/error are severity rows (issue #158); info/success are
 # progress lines, not findings — they stay uncounted.
-ui_info()    { _ui_label "$UI_BLUE"   'info   ' "$1"; }
-ui_success() { _ui_label "$UI_GREEN"  'success' "$1"; }
-ui_warn()    { UI_ROWS_WARN=$((UI_ROWS_WARN + 1)); _ui_label "$UI_YELLOW" 'warn   ' "$1"; }
-ui_error()   { UI_ROWS_BAD=$((UI_ROWS_BAD + 1));  _ui_label "$UI_RED"   'error  ' "$1"; }
+ui_info() { _ui_label "$UI_BLUE" 'info   ' "$1"; }
+ui_success() { _ui_label "$UI_GREEN" 'success' "$1"; }
+ui_warn() {
+    UI_ROWS_WARN=$((UI_ROWS_WARN + 1))
+    _ui_label "$UI_YELLOW" 'warn   ' "$1"
+}
+ui_error() {
+    UI_ROWS_BAD=$((UI_ROWS_BAD + 1))
+    _ui_label "$UI_RED" 'error  ' "$1"
+}
 
 # Indented, dimmed detail line (belongs to the previous ui_* line).
-ui_detail()  { if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
-    printf '     %s%s%s\n' "$UI_DIM" "$1" "$UI_NC"; }
+ui_detail() {
+    if [ "${UI_SILENT:-0}" = 1 ]; then return 0; fi
+    printf '     %s%s%s\n' "$UI_DIM" "$1" "$UI_NC"
+}
 
 # --- sections & banner --------------------------------------------------------------
 
@@ -85,8 +113,11 @@ ui_section() {
     # Section rule:  ── Pre-flight ─────────────────
     _t="$1"
     printf '\n  %s%s── %s ──' "$UI_BOLD" "$UI_CYAN" "$_t"
-    _i=$(( 40 - ${#_t} ))
-    while [ "$_i" -gt 0 ]; do printf '%s' "$UI_SYM_RULE"; _i=$((_i - 1)); done
+    _i=$((40 - ${#_t}))
+    while [ "$_i" -gt 0 ]; do
+        printf '%s' "$UI_SYM_RULE"
+        _i=$((_i - 1))
+    done
     printf '%s\n\n' "$UI_NC"
 }
 
@@ -108,10 +139,19 @@ _ui_item() {
 
 # Counting: the checklist verdicts are severity rows (issue #158);
 # ui_add is a plan line, not a finding — uncounted.
-ui_have()  { UI_ROWS_OK=$((UI_ROWS_OK + 1));     _ui_item "$UI_GREEN"  "$UI_SYM_OK"   "$1" "$2"; }  # present/ready
-ui_add()   { _ui_item "$UI_CYAN"   "$UI_SYM_ADD"  "$1" "$2"; }  # will be added
-ui_atten() { UI_ROWS_WARN=$((UI_ROWS_WARN + 1)); _ui_item "$UI_YELLOW" "$UI_SYM_WARN" "$1" "$2"; }  # needs attention
-ui_miss()  { UI_ROWS_BAD=$((UI_ROWS_BAD + 1));   _ui_item "$UI_RED"    "$UI_SYM_BAD"  "$1" "$2"; }  # missing/blocked
+ui_have() {
+    UI_ROWS_OK=$((UI_ROWS_OK + 1))
+    _ui_item "$UI_GREEN" "$UI_SYM_OK" "$1" "$2"
+}                                                         # present/ready
+ui_add() { _ui_item "$UI_CYAN" "$UI_SYM_ADD" "$1" "$2"; } # will be added
+ui_atten() {
+    UI_ROWS_WARN=$((UI_ROWS_WARN + 1))
+    _ui_item "$UI_YELLOW" "$UI_SYM_WARN" "$1" "$2"
+} # needs attention
+ui_miss() {
+    UI_ROWS_BAD=$((UI_ROWS_BAD + 1))
+    _ui_item "$UI_RED" "$UI_SYM_BAD" "$1" "$2"
+} # missing/blocked
 
 # --- aligned key/value panels (status, summaries) --------------------------------------
 
@@ -182,7 +222,8 @@ ui_ask() {
     # ui_ask "Question?" "default"  -> prints the answer on stdout.
     # Prompt on stderr (clean $(...) capture). Reads /dev/tty when possible;
     # EOF/empty -> default.
-    _q="$1"; _d="${2:-}"
+    _q="$1"
+    _d="${2:-}"
     if [ -n "$_d" ]; then
         printf '  %s [%s] > ' "$_q" "$_d" >&2
     else
@@ -203,16 +244,17 @@ ui_confirm() {
     # prompt's own default promised).
     # (#189 a W2: edge whitespace is trimmed in _ui_read — a padded
     # answer is explicit input, not unknown input.)
-    _q="$1"; _d="${2:-n}"
+    _q="$1"
+    _d="${2:-n}"
     [ "$_d" = "y" ] && _hint="[Y/n]" || _hint="[y/N]"
     printf '  %s %s ' "$_q" "$_hint" >&2
     _ui_read _ans
     _ans="$(printf '%s' "$_ans" | tr '[:upper:]' '[:lower:]')"
     [ -z "$_ans" ] && _ans="$_d"
     case "$_ans" in
-        y|yes) return 0 ;;
-        n|no)  return 1 ;;
-        *)     [ "$_d" = "y" ] && return 0 || return 1 ;;
+        y | yes) return 0 ;;
+        n | no) return 1 ;;
+        *) [ "$_d" = "y" ] && return 0 || return 1 ;;
     esac
 }
 
@@ -220,10 +262,13 @@ ui_menu() {
     # ui_menu "Question?" <default-key> <"key|description"...> -> prints the chosen KEY.
     # Menu on stderr (clean $(...) capture). Reads /dev/tty when possible;
     # EOF/empty/unknown -> default key.
-    _q="$1"; _d="$2"; shift 2
+    _q="$1"
+    _d="$2"
+    shift 2
     printf '  %s\n' "$_q" >&2
     for _opt in "$@"; do
-        _k=${_opt%%|*}; _desc=${_opt#*|}
+        _k=${_opt%%|*}
+        _desc=${_opt#*|}
         if [ "$_k" = "$_d" ]; then
             printf '    %s[%s]%s  %s\n' "$UI_CYAN" "$_k" "$UI_NC" "$_desc" >&2
         else

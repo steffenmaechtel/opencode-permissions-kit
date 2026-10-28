@@ -15,8 +15,14 @@ UI="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
     local desc="$1"
@@ -100,10 +106,10 @@ check "detail line is indented under the label column" \
 
 # --- inventory/checklist ------------------------------------------------------------------
 out=$(run_ui 'ui_have "curl" "present"; ui_add "user" "will be created"; ui_atten "/mnt/c" "world-readable"; ui_miss "ddev" "not installed"')
-check "inventory: have line"  sh -c "printf %s \"\$1\" | grep -q '  ✔  curl'" _ "$out"
-check "inventory: add line"   sh -c "printf %s \"\$1\" | grep -q '  +  user'" _ "$out"
-check "inventory: warn line"  sh -c "printf %s \"\$1\" | grep -q '  ⚠  /mnt/c'" _ "$out"
-check "inventory: miss line"  sh -c "printf %s \"\$1\" | grep -q '  ✖  ddev'" _ "$out"
+check "inventory: have line" sh -c "printf %s \"\$1\" | grep -q '  ✔  curl'" _ "$out"
+check "inventory: add line" sh -c "printf %s \"\$1\" | grep -q '  +  user'" _ "$out"
+check "inventory: warn line" sh -c "printf %s \"\$1\" | grep -q '  ⚠  /mnt/c'" _ "$out"
+check "inventory: miss line" sh -c "printf %s \"\$1\" | grep -q '  ✖  ddev'" _ "$out"
 
 # --- key/value alignment -----------------------------------------------------------------------
 # ASCII mode makes byte position == display column (the warn symbol is

@@ -82,7 +82,10 @@ trap 'cleanup; exit 1' INT TERM
 _prev_arg=""
 for _arg in "$@"; do
     if [ "$_prev_arg" = "--channel" ]; then
-        [ -n "$_arg" ] || { echo "error: --channel requires a ref (stable, master, a branch, or a tag)" >&2; exit 1; }
+        [ -n "$_arg" ] || {
+            echo "error: --channel requires a ref (stable, master, a branch, or a tag)" >&2
+            exit 1
+        }
         KIT_BRANCH="$_arg"
     fi
     _prev_arg="$_arg"
@@ -97,9 +100,9 @@ KIT_BRANCH="${KIT_BRANCH:-${_kit_stamped_channel:-master}}"
 # charset, whatever its source (--channel flag, env, or a stale stamp)
 # (review 0.0.39b S1).
 case "$KIT_BRANCH" in
-    *[!A-Za-z0-9._/-]*|*..*)
-        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits, "\
-"'.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
+    *[!A-Za-z0-9._/-]* | *..*)
+        echo "error: channel ref '$KIT_BRANCH' is invalid — a ref is letters, digits, ""\
+'.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
         exit 1
         ;;
 esac
@@ -246,7 +249,10 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 _opk_binonly=false
 for _opk_a in "$@"; do
     case "$_opk_a" in
-        --only-binary) _opk_binonly=true; break ;;
+        --only-binary)
+            _opk_binonly=true
+            break
+            ;;
     esac
 done
 if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
@@ -254,7 +260,10 @@ if [ "$_opk_binonly" != true ] && [ ! -f "$SCRIPT_DIR/../../../VERSION" ]; then
     # Direct call, NOT SCRIPT_DIR="$(fetch_kit)" — a subshell's variable
     # writes (incl. the _FETCH_TREE export below and the trap
     # registrations) never reach this shell (wave-f review).
-    fetch_kit || { echo "error: Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    fetch_kit || {
+        echo "error: Failed to fetch kit files from $KIT_BASE_URL" >&2
+        exit 1
+    }
     SCRIPT_DIR="$_FK_DIR"
     # A streamed update's stdin IS the script body (curl | sudo bash):
     # the prompt helpers must never fall back to reading it — they would
@@ -296,9 +305,9 @@ fi
 # The empty-output case is closed explicitly: sed "succeeding" with no
 # match would otherwise leave VERSION empty instead of "0.0.0"
 # (review 0.0.39b Q3).
-VERSION=$(cat "$FILES_ROOT/../VERSION" 2>/dev/null \
-    || sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 \
-    || echo "0.0.0")
+VERSION=$(cat "$FILES_ROOT/../VERSION" 2>/dev/null ||
+    sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null | tail -1 ||
+    echo "0.0.0")
 [ -n "$VERSION" ] || VERSION="0.0.0"
 LIBDIR="/usr/local/lib/opencode-permissions-kit"
 CONFDIR="/etc/opencode-permissions-kit"
@@ -309,19 +318,30 @@ PROJECTS_CONF="$CONFDIR/projects.conf"
 # update.sh working on an install whose library predates ui.sh.
 UI_LIB=""
 for _cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/ui.sh" "$LIBDIR/sh/ui.sh"; do
-    if [ -f "$_cand" ]; then UI_LIB="$_cand"; break; fi
+    if [ -f "$_cand" ]; then
+        UI_LIB="$_cand"
+        break
+    fi
 done
 if [ -n "$UI_LIB" ]; then
     . "$UI_LIB"
 else
-    ui_info()    { echo "  info     $1"; }
+    ui_info() { echo "  info     $1"; }
     ui_success() { echo "  success  $1"; }
-    ui_warn()    { echo "  warn     $1"; }
-    ui_error()   { echo "  error    $1" >&2; }
-    ui_detail()  { echo "     $1"; }
-    ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
-    ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
-    ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
+    ui_warn() { echo "  warn     $1"; }
+    ui_error() { echo "  error    $1" >&2; }
+    ui_detail() { echo "     $1"; }
+    ui_section() {
+        echo ""
+        echo "  --- $1 ---"
+        echo ""
+    }
+    ui_banner() {
+        echo ""
+        echo "  opencode permissions kit  v${1:-}"
+        echo ""
+    }
+    ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
     ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
     # 0.0.45d W4: the body's confirm() calls ui_confirm — without a
     # stub a ui.sh-less update died rc 127 at the confirm prompt
@@ -334,7 +354,12 @@ else
         return 1
     }
     ui_confirm() { _ui_no_prompt; }
-    UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
+    UI_GREEN=''
+    UI_RED=''
+    UI_YELLOW=''
+    UI_CYAN=''
+    UI_BLUE=''
+    UI_NC=''
 fi
 
 # === Audit log ===
@@ -361,9 +386,16 @@ INSTALL_CONF="$CONFDIR/install.conf"
 # section above that old point. Same lookup order as ui.sh.
 _swl=""
 for _swl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
-    if [ -f "$_swl_cand" ]; then . "$_swl_cand"; _swl="$_swl_cand"; break; fi
+    if [ -f "$_swl_cand" ]; then
+        . "$_swl_cand"
+        _swl="$_swl_cand"
+        break
+    fi
 done
-[ -n "$_swl" ] || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+[ -n "$_swl" ] || staged_write() {
+    echo "error: staged_write unavailable (staged-write.sh missing)" >&2
+    return 1
+}
 # Old-library fallback (pre-0.0.39h deployed copy): no walker yet — fail
 # open like the pre-gate behavior, the writes above still refuse via
 # staged_write itself.
@@ -374,44 +406,78 @@ command -v agent_home_sane >/dev/null 2>&1 || agent_home_sane() { return 0; }
 # order as staged-write.sh.
 _sdl=""
 for _sdl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"; do
-    if [ -f "$_sdl_cand" ]; then . "$_sdl_cand"; _sdl="$_sdl_cand"; break; fi
+    if [ -f "$_sdl_cand" ]; then
+        . "$_sdl_cand"
+        _sdl="$_sdl_cand"
+        break
+    fi
 done
-[ -n "$_sdl" ] \
-    || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
+[ -n "$_sdl" ] ||
+    sudoers_deploy() {
+        echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2
+        return 1
+    }
 
 # Shared binary hardening (chown root:<group> best-effort + the
 # load-bearing chmod 750, fail-loud): one implementation for
 # install.sh and update.sh. Same lookup order as staged-write.sh.
 _sbl=""
 for _sbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/secure-binary.sh" "$LIBDIR/sh/secure-binary.sh"; do
-    if [ -f "$_sbl_cand" ]; then . "$_sbl_cand"; _sbl="$_sbl_cand"; break; fi
+    if [ -f "$_sbl_cand" ]; then
+        . "$_sbl_cand"
+        _sbl="$_sbl_cand"
+        break
+    fi
 done
-[ -n "$_sbl" ] \
-    || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
-[ -n "$_sbl" ] \
-    || copy_binary_atomic() { echo "error: copy_binary_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
-[ -n "$_sbl" ] \
-    || copy_file_atomic() { echo "error: copy_file_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
+[ -n "$_sbl" ] ||
+    secure_binary() {
+        echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2
+        return 1
+    }
+[ -n "$_sbl" ] ||
+    copy_binary_atomic() {
+        echo "error: copy_binary_atomic unavailable (secure-binary.sh missing)" >&2
+        return 1
+    }
+[ -n "$_sbl" ] ||
+    copy_file_atomic() {
+        echo "error: copy_file_atomic unavailable (secure-binary.sh missing)" >&2
+        return 1
+    }
 
 # Shared library deployment manifest (what ships into $LIBDIR, from
 # ONE list — install.sh deploys through it too). Same lookup order as
 # staged-write.sh.
 _dll=""
 for _dll_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/deploy-lib.sh" "$LIBDIR/sh/deploy-lib.sh"; do
-    if [ -f "$_dll_cand" ]; then . "$_dll_cand"; _dll="$_dll_cand"; break; fi
+    if [ -f "$_dll_cand" ]; then
+        . "$_dll_cand"
+        _dll="$_dll_cand"
+        break
+    fi
 done
-[ -n "$_dll" ] \
-    || lib_deploy() { echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2; return 1; }
+[ -n "$_dll" ] ||
+    lib_deploy() {
+        echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2
+        return 1
+    }
 
 # Shared TUI 2.x plugin registration (per-user plugin-dir sync): one
 # implementation for update.sh's sync_tui_registration and install.sh
 # Step 8c. Same lookup order as staged-write.sh.
 _tpl=""
 for _tpl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/tui-plugin.sh" "$LIBDIR/sh/tui-plugin.sh"; do
-    if [ -f "$_tpl_cand" ]; then . "$_tpl_cand"; _tpl="$_tpl_cand"; break; fi
+    if [ -f "$_tpl_cand" ]; then
+        . "$_tpl_cand"
+        _tpl="$_tpl_cand"
+        break
+    fi
 done
-[ -n "$_tpl" ] \
-    || tui_plugin_sync_user() { echo "error: tui_plugin_sync_user unavailable (tui-plugin.sh missing)" >&2; return 1; }
+[ -n "$_tpl" ] ||
+    tui_plugin_sync_user() {
+        echo "error: tui_plugin_sync_user unavailable (tui-plugin.sh missing)" >&2
+        return 1
+    }
 
 # Shared git presence/version check (soft floor, issue #118): same
 # advisory as install.sh's pre-flight — #116 surfaced during `opk
@@ -421,7 +487,11 @@ done
 # staged-write.sh.
 _tgc=""
 for _tgc_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/git-check.sh" "$LIBDIR/sh/git-check.sh"; do
-    if [ -f "$_tgc_cand" ]; then . "$_tgc_cand"; _tgc="$_tgc_cand"; break; fi
+    if [ -f "$_tgc_cand" ]; then
+        . "$_tgc_cand"
+        _tgc="$_tgc_cand"
+        break
+    fi
 done
 [ -n "$_tgc" ] || git_check_report() { :; }
 
@@ -445,7 +515,7 @@ OPENCODE_USER="${OPENCODE_USER:-opencode}"
 # projects.conf roots below — fall back to the canonical literal,
 # loudly; the WARN is sanitized (pr-00263 a F9 class).
 case "$OPENCODE_USER" in
-    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+    '' | *[!A-Za-z0-9_.-]* | [.-]* | *[.])
         _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
         echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
         OPENCODE_USER=opencode
@@ -464,10 +534,20 @@ DEFAULT_HOME="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)
 # removed). Compare numerically: major*1000000 + minor*1000 + patch.
 floor_check() {
     _fv="${1%%-*}" _av="${2%%-*}"
-    _f1=${_fv%%.*}; _rest=${_fv#*.}; _f2=${_rest%%.*}; _f3=${_rest#*.}
-    _a1=${_av%%.*}; _rest=${_av#*.}; _a2=${_rest%%.*}; _a3=${_rest#*.}
-    _f1=${_f1:-0}; _f2=${_f2:-0}; _f3=${_f3:-0}
-    _a1=${_a1:-0}; _a2=${_a2:-0}; _a3=${_a3:-0}
+    _f1=${_fv%%.*}
+    _rest=${_fv#*.}
+    _f2=${_rest%%.*}
+    _f3=${_rest#*.}
+    _a1=${_av%%.*}
+    _rest=${_av#*.}
+    _a2=${_rest%%.*}
+    _a3=${_rest#*.}
+    _f1=${_f1:-0}
+    _f2=${_f2:-0}
+    _f3=${_f3:-0}
+    _a1=${_a1:-0}
+    _a2=${_a2:-0}
+    _a3=${_a3:-0}
     [ $((_a1 * 1000000 + _a2 * 1000 + _a3)) -ge $((_f1 * 1000000 + _f2 * 1000 + _f3)) ]
 }
 if [ -f "$INSTALL_CONF" ]; then
@@ -476,8 +556,8 @@ if [ -f "$INSTALL_CONF" ]; then
         echo ""
         echo "  Updates are only supported from kit 0.0.14 onwards (older"
         echo "  migrations have been removed). Re-run install.sh instead:"
-        echo "    curl -fsSL https://raw.githubusercontent.com/steffenmaechtel"\
-"/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
+        echo "    curl -fsSL https://raw.githubusercontent.com/steffenmaechtel""\
+/opencode-permissions-kit/stable/files/install.sh | sudo env KIT_BRANCH=stable bash"
         echo ""
         exit 1
     fi
@@ -492,7 +572,7 @@ UPGRADE_MAJOR=""
 UPGRADE_VERSION=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --yes|-y) YES=true ;;
+        --yes | -y) YES=true ;;
         --refresh) REFRESH=true ;;
         --binary) BINARY_UPDATE=true ;;
         --only-binary)
@@ -501,7 +581,10 @@ while [ "$#" -gt 0 ]; do
             BINARY_UPDATE=true
             ;;
         --binary-path)
-            [ "$#" -ge 2 ] || { echo "error: --binary-path requires a file path" >&2; exit 1; }
+            [ "$#" -ge 2 ] || {
+                echo "error: --binary-path requires a file path" >&2
+                exit 1
+            }
             BINARY_UPDATE=true
             BINARY_PATH="$2"
             shift
@@ -509,28 +592,40 @@ while [ "$#" -gt 0 ]; do
         --channel)
             # consumed by the pre-scan above (before the self-fetch);
             # accepted here so it never reaches the unknown-option trap
-            [ "$#" -ge 2 ] \
-                || { echo "error: --channel requires a ref (stable, master, a feature branch, or a tag)" >&2; exit 1; }
+            [ "$#" -ge 2 ] ||
+                {
+                    echo "error: --channel requires a ref (stable, master, a feature branch, or a tag)" >&2
+                    exit 1
+                }
             shift
             ;;
         --major)
             # issue #99: switch the opencode major (1 <-> 2); without it
             # upgrades stay within the current major
-            [ "$#" -ge 2 ] || { echo "error: --major requires a number (1 or 2)" >&2; exit 1; }
+            [ "$#" -ge 2 ] || {
+                echo "error: --major requires a number (1 or 2)" >&2
+                exit 1
+            }
             case "$2" in
-                1|2) UPGRADE_MAJOR="$2" ;;
-                *) echo "error: --major must be 1 or 2" >&2; exit 1 ;;
+                1 | 2) UPGRADE_MAJOR="$2" ;;
+                *)
+                    echo "error: --major must be 1 or 2" >&2
+                    exit 1
+                    ;;
             esac
             shift
             ;;
         --version)
             # issue #99: pin an exact opencode version; the download
             # channel follows the version prefix (2.* npm, 1.x GitHub)
-            [ "$#" -ge 2 ] || { echo "error: --version requires an opencode version (e.g. 2.0.11)" >&2; exit 1; }
+            [ "$#" -ge 2 ] || {
+                echo "error: --version requires an opencode version (e.g. 2.0.11)" >&2
+                exit 1
+            }
             UPGRADE_VERSION="$2"
             shift
             ;;
-        -h|--help)
+        -h | --help)
             cat <<EOF
 opencode permissions kit -- update.sh  v$VERSION
 Re-deploys the kit on an already-installed system. Asks one confirmation
@@ -553,7 +648,10 @@ Usage: ./update.sh [--yes] [--refresh] [--binary] [--only-binary] [--binary-path
 EOF
             exit 0
             ;;
-        *) echo "error: unknown option: $1" >&2; exit 1 ;;
+        *)
+            echo "error: unknown option: $1" >&2
+            exit 1
+            ;;
     esac
     shift
 done
@@ -562,7 +660,10 @@ banner() {
     ui_banner "$VERSION" "update — channel '$KIT_BRANCH' — re-deploys the kit, keeps your configuration"
 }
 
-die() { ui_error "$*"; exit 1; }
+die() {
+    ui_error "$*"
+    exit 1
+}
 
 confirm() {
     # Convention: agent/conventions.md — [Y/n] default capital,
@@ -599,7 +700,8 @@ else
     _uc_msg="Re-deploy kit files (existing configs will NOT be touched)?"
 fi
 if ! confirm "$_uc_msg"; then
-    echo "Aborted."; exit 0
+    echo "Aborted."
+    exit 0
 fi
 
 # #211 a F33: the group-baseline refresh lives in the kit (non-
@@ -612,380 +714,374 @@ fi
 
 if [ "$ONLY_BINARY" != true ]; then
 
-# --- re-deploy library files (skipped by --only-binary) ------------------------
+    # --- re-deploy library files (skipped by --only-binary) ------------------------
 
-ui_section "Re-deploying library files"
+    ui_section "Re-deploying library files"
 
-# Deploy via the shared manifest (sh/deploy-lib.sh): the single source
-# of truth for what ships into $LIBDIR — layout, file set and modes
-# live there, enforced against the fetch lists by test-kit-files. The
-# browser-bridge stand-in tree + wsl.conf carrier are re-applied below,
-# after the library is in place.
-lib_deploy "$FILES_ROOT" "$LIBDIR"
+    # Deploy via the shared manifest (sh/deploy-lib.sh): the single source
+    # of truth for what ships into $LIBDIR — layout, file set and modes
+    # live there, enforced against the fetch lists by test-kit-files. The
+    # browser-bridge stand-in tree + wsl.conf carrier are re-applied below,
+    # after the library is in place.
+    lib_deploy "$FILES_ROOT" "$LIBDIR"
 
-# --- old-layout cleanup (0.0.29 streamline, internal/records/streamline.md §5) --------
-# Remove the union of pre-0.0.29 deployed paths after the new layout is in
-# place. Idempotent rm -f — covers every historical location since 0.0.14.
-for _opk_old in \
-    "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
-    "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/cwd-check.sh" \
-    "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" \
-    "$LIBDIR/setup-container-backend.sh" "$LIBDIR/ddev-as-opencode.sh" \
-    "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" \
-    "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh" \
-    "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
-    "$LIBDIR/sudoers.template" "$LIBDIR/opencode.jsonc" "$LIBDIR/opencode-deny-all.jsonc" \
-    "$LIBDIR/migrate-denies.sh"; do
-    [ -e "$_opk_old" ] && sudo rm -f "$_opk_old" && ui_detail "removed old file: $_opk_old"
-done
-ui_success "library re-deployed: $LIBDIR"
-log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
+    # --- old-layout cleanup (0.0.29 streamline, internal/records/streamline.md §5) --------
+    # Remove the union of pre-0.0.29 deployed paths after the new layout is in
+    # place. Idempotent rm -f — covers every historical location since 0.0.14.
+    for _opk_old in \
+        "$LIBDIR/wrapper" "$LIBDIR/kit" "$LIBDIR/jsonc-parser.py" \
+        "$LIBDIR/bin/socket-check.sh" "$LIBDIR/bin/cwd-check.sh" \
+        "$LIBDIR/log.sh" "$LIBDIR/ui.sh" "$LIBDIR/shell-warn.sh" \
+        "$LIBDIR/setup-container-backend.sh" "$LIBDIR/ddev-as-opencode.sh" \
+        "$LIBDIR/ddev-handover.sh" "$LIBDIR/ddev-migrate.sh" \
+        "$LIBDIR/ddev-hosts.sh" "$LIBDIR/fs-baseline.sh" \
+        "$LIBDIR/config.sh" "$LIBDIR/update.sh" "$LIBDIR/status.sh" "$LIBDIR/uninstall.sh" \
+        "$LIBDIR/sudoers.template" "$LIBDIR/opencode.jsonc" "$LIBDIR/opencode-deny-all.jsonc" \
+        "$LIBDIR/migrate-denies.sh"; do
+        [ -e "$_opk_old" ] && sudo rm -f "$_opk_old" && ui_detail "removed old file: $_opk_old"
+    done
+    ui_success "library re-deployed: $LIBDIR"
+    log "library re-deployed: $LIBDIR (old-layout cleanup applied)"
 
-# --- WSL browser bridge (issues #91, #100) -------------------------------------
-# (Re)apply the stand-in tree and strip the legacy 0.0.36 section (kit-owned
-# regression cleanup). The /etc/wsl.conf carrier is NEVER written here —
-# the kit does not edit wsl.conf implicitly (internal/records/wsl-conf-consent.md);
-# the user opts in via 'sudo opk wsl-add-opencode-1-fix'. An existing
-# carrier stays untouched and keeps working.
-# First-wins lookup (#211 a F5, wsl-browser-bridge site): the old
-# back-to-back sourcing let the deployed LIBDIR copy override the
-# checkout copy — the documented "prefer the checkout vintage" was
-# inverted in code. Sibling shape: config.sh's helper lookups.
-for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"; do
-    if [ -f "$cand" ]; then
-        . "$cand"
-        break
-    fi
-done
-command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
-# Guard, not a mutator path (#211 b W22): unreachable in silence — the
-# is_wsl stub above keeps the re-apply block below closed when the lib
-# is missing from both lookup sites.
-command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
-# Fail-safe stub (#211 a F7): if the never-shadow probe itself is
-# unavailable (wsl-browser-bridge.sh missing from both lookup sites),
-# both call sites below must err on the never-shadow side — rc 0
-# ("a real one might exist") removes/withholds the shim instead of
-# shadowing one. Sibling guard: status.sh wraps its call in
-# command -v (0.0.46a F4); update.sh was the unswept twin.
-command -v xdg_open_real_exists >/dev/null 2>&1 || xdg_open_real_exists() { return 0; }
-if browser_bridge_is_wsl; then
-    # Failure-honest since 0.0.45c C4: browser_bridge_install propagates a
-    # failed stand-in deploy or legacy strip — the old unconditional
-    # success line reported "re-applied" even when nothing was written.
-    if browser_bridge_install "$FILES_ROOT" "$LIBDIR"; then
-        if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
-            ui_success "WSL browser bridge re-applied (carrier present — fully active)"
-            log "wsl browser bridge re-applied: $LIBDIR/wsl (carrier present)"
-        else
-            ui_success "WSL browser bridge stand-in re-applied (no wsl.conf carrier)"
-            ui_detail "enable the opencode 1.x login fix yourself (the kit does not edit /etc/wsl.conf):"
-            ui_detail "  sudo opk wsl-add-opencode-1-fix"
-            log "wsl browser bridge stand-in re-applied: $LIBDIR/wsl (carrier left to 'opk wsl-add-opencode-1-fix')"
-        fi
-    else
-        ui_warn "WSL browser bridge: stand-in deploy or legacy wsl.conf strip FAILED"
-        ui_detail "see the errors above; re-run the update or fix /etc/wsl.conf manually"
-        log "wsl browser bridge re-apply FAILED (deploy/strip)"
-    fi
-fi
-
-# --- re-link wrapper + cli dispatcher ------------------------------------------
-
-sudo ln -sf "$LIBDIR/bin/opencode-as-opencode" /usr/local/bin/opencode
-ui_success "wrapper symlink refreshed: /usr/local/bin/opencode -> $LIBDIR/bin/opencode-as-opencode"
-sudo rm -f /usr/local/bin/opencode-permissions-kit
-sudo ln -sf "$LIBDIR/bin/opk" /usr/local/bin/opk
-ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy name removed)"
-
-# --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) -------------
-
-# Deploy only while no real xdg-open exists; heal the shadow case (a real
-# one appeared since install -> the kit stands back). Guards share the
-# never-shadow probe with install.sh (0.0.42d S1/C1): xdg_open_real_exists
-# scans the whole PATH except /usr/local/bin (our shim's slot) — a real
-# xdg-open under /usr/sbin or /snap/bin no longer gets shadowed.
-if [ -L /usr/local/bin/xdg-open ] \
-   && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
-    if xdg_open_real_exists; then
-        sudo rm -f /usr/local/bin/xdg-open
-        ui_detail "xdg-open fallback removed: a real xdg-open on PATH took over"
-        log "xdg-open shim removed: real xdg-open present on PATH"
-    else
-        ui_detail "xdg-open fallback active: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
-        log "xdg-open shim active: /usr/local/bin/xdg-open"
-    fi
-elif ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ] \
-   && ! xdg_open_real_exists; then
-    sudo ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open
-    ui_success "xdg-open fallback installed: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
-    log "xdg-open shim symlink: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
-fi
-
-# --- re-deploy sudoers -------------------------------------------------------
-
-# Shared pipeline (sh/sudoers-deploy.sh): charset gate, render, visudo
-# validation BEFORE anything is deployed, install mode 440, sudoers.d
-# link, legacy-name cleanup.
-if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ]; then
-    sudoers_deploy "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" "$DEFAULT_USER" \
-        || die "sudoers re-deploy failed — nothing was re-deployed (user '$DEFAULT_USER')."
-    ui_success "sudoers re-deployed + validated (DEFAULT_USER=$DEFAULT_USER)"
-    log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
-else
-    # Conservative skip (0.0.41f S2): the existing validated sudoers stays
-    # active — near-unreachable (fetch list + heal guarantee the file),
-    # but the skip must not be silent. pr-00263 a F7: log() alone is the
-    # no-op stub when log.sh is missing from both roots — the skip also
-    # needs a terminal line.
-    ui_detail "sudoers re-deploy skipped: template missing (existing sudoers kept)"
-    log "sudoers re-deploy skipped: template missing from $FILES_ROOT (existing sudoers kept)"
-fi
-
-# --- re-deploy umask profile -------------------------------------------------
-
-if [ -f "$FILES_ROOT/etc/umask.sh" ]; then
-    # 0.0.49b C1: atomic re-deploy — a plain in-place cp killed
-    # mid-write leaves a truncated profile with intact mode bits,
-    # sourced at every login (the #163 class on a protection layer).
-    # Same shape as the lib deploys (0.0.49a W2): sibling temp in the
-    # target dir, mode 644 before the mv.
-    copy_file_atomic "$FILES_ROOT/etc/umask.sh" \
-        /etc/profile.d/opencode-permissions-kit-umask.sh 644 \
-        || die "umask profile re-deploy failed (atomic deploy)"
-    # Remove the pre-0.0.10 umask profile so only the new name is loaded.
-    sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
-    ui_success "umask profile re-deployed"
-    log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
-else
-    # Conservative skip, loud like the sudoers twin above (0.0.41f S2
-    # shape, #211 a F6): near-unreachable (fetch list + heal guarantee
-    # the file), but the skip must not be silent — an update that
-    # quietly dropped a protection-layer deploy is undebuggable.
-    # pr-00263 a F7: terminal line too (log() alone degrades to the
-    # no-op stub when log.sh is missing from both roots).
-    ui_detail "umask profile re-deploy skipped: source file missing (existing profile kept)"
-    log "umask profile re-deploy skipped: $FILES_ROOT/etc/umask.sh missing (existing profile kept)"
-fi
-
-# --- OpenChamber policy pin (issue #154) ---------------------------------------
-# Re-apply only when the install opted in (install.conf
-# OPENCHAMBER_POLICY=yes — sourced above). A policy.json without the opt-in
-# is admin-owned and never touched here; without the opt-in the file is
-# also never created (opt-in only, see the design record).
-# 0.0.47a F1: the re-apply is additionally gated on the file still being
-# kit-shaped (byte-identical to the one-liner the kit writes) — a file the
-# admin extended or replaced is NEVER overwritten; the skip is loud.
-# Issue #164: the presence probe runs at the write's authority (sudo) —
-# an admin 0700 /etc/openchamber must not read as "absent" to a direct
-# non-root run and slip the branch into the sudo write.
-if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
-    _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
-    if sudo test -f /etc/openchamber/policy.json \
-        && [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
-        ui_warn "openchamber policy pin NOT re-applied: /etc/openchamber/policy.json"
-        ui_warn "diverges from the kit pin (admin-owned content) — left untouched"
-        ui_detail "force it with: sudo opk openchamber-secure (replaces the file)"
-        log "openchamber policy pin NOT re-applied: existing file diverges (admin-owned)"
-    else
-        sudo mkdir -p /etc/openchamber
-        # Atomic stage+mv (#211 a F17, opk twin): the live policy.json
-        # flips via rename only — a kill mid-tee used to leave a
-        # truncated file and a silently inactive pin.
-        _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
-        # Registered BEFORE staging (#211 b W8, order per #211 c W3):
-        # the trap's rm -f tolerates an absent path, so an abort DURING
-        # the tee (temp created, write fails — ENOSPC under set -e) is
-        # covered too, not just aborts between staging and the flip.
-        _tmp_track "$_ocp_tmp"
-        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
-            | sudo tee "$_ocp_tmp" > /dev/null
-        sudo chown root:root "$_ocp_tmp" 2>/dev/null || true
-        sudo chmod 644 "$_ocp_tmp"
-        # mv replaces a symlink at policy.json rather than writing
-        # through it (#211 b W19) — the announced replace is this
-        # block's documented job.
-        sudo mv -f "$_ocp_tmp" /etc/openchamber/policy.json
-        ui_success "openchamber policy pin re-applied: /etc/openchamber/policy.json"
-        log "openchamber policy pin re-applied: /etc/openchamber/policy.json"
-    fi
-fi
-
-# --- shell-startup hooks (rewrite old paths, append when missing) ---------------
-# Older installs lack the interactive-shell hooks — append them idempotently
-# so a self-installed opencode binary is reported and `ddev()` stays wrapped.
-# 0.0.29 moved the hooked files (shell-warn.sh, ddev-as-opencode.sh ->
-# sh/ddev-terminal.sh): the rc lines reference them by absolute path, and
-# their [ -f ... ] guard would silently disable the hook after the move.
-# The kit-owned line is therefore REWRITTEN in place (exact path match —
-# user lines are never touched, the guard keeps the line harmless after
-# uninstall); the hook is only appended when no kit hook line exists at all.
-# Root-shell installs (issue #192) registered root as the developer:
-# update must not paper over that by provisioning root's rc files — the
-# real developer still gets nothing. Warn loudly and skip; a missing
-# home gets the same loud skip instead of the old silent one (the row in
-# status.sh told users "run opk update", which this very section then
-# skipped without a word).
-if [ -n "$DEFAULT_USER" ]; then
-    _du_uid="$(id -u "$DEFAULT_USER" 2>/dev/null || echo 1)"
-    if [ "$_du_uid" = "0" ]; then
-        ui_warn "shell-startup hooks skipped: the install recorded '$DEFAULT_USER' (uid 0)"
-        ui_warn "as the developer — a root-shell install cannot be updated into shape"
-        ui_detail "reinstall from your normal user (issue #192): opk update cannot fix this"
-        log "shell-startup hooks skipped: DEFAULT_USER=$DEFAULT_USER is uid 0 (issue #192)"
-    elif [ -d "$DEFAULT_HOME" ]; then
-        for cf in "$DEFAULT_HOME/.bashrc" "$DEFAULT_HOME/.zshrc" "$DEFAULT_HOME/.profile"; do
-            [ -f "$cf" ] || continue
-            if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' \
-                "$cf" 2>/dev/null; then
-                sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh'\
-'|/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh|g' "$cf"
-            else
-                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . '\
-'/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'\
-' (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
-                ui_success "wrapper-bypass warning hooked into $cf"
-                log "shell-startup warning hook appended: $cf"
-            fi
-            # ddev always runs as the opencode user: hook the `ddev()` shell
-            # function (sudoers helper). Only the DEFAULT user — the opencode
-            # session must never be wrapped (the function's id check is the guard).
-            if sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh\|opencode-permissions-kit/ddev-as-opencode.sh' \
-                "$cf" 2>/dev/null; then
-                sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh'\
-'|/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh|g' "$cf"
-            else
-                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . '\
-'/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'\
-' (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
-                ui_success "ddev terminal hook installed into $cf"
-                log "ddev-terminal hook appended: $cf"
-            fi
-        done
-    else
-        ui_warn "shell-startup hooks skipped: home '$DEFAULT_HOME' of '$DEFAULT_USER' does not exist"
-        log "shell-startup hooks skipped: missing developer home $DEFAULT_HOME"
-    fi
-fi
-
-# --- .ddev + settings-dir handover (ddev always runs as the opencode user) -----
-# ddev chmods .ddev and the app-type's settings directories unconditionally,
-# and chmod is owner-only — they must belong to the opencode user or
-# `ddev start` fails with "operation not permitted". Searched at ANY depth
-# under each registered root (a root is often a parent of several projects).
-# Unconditional (not just inside the migration) so installs that already
-# migrated — the common upgrade path — are healed too. .git dirs are
-# never chowned — they stay developer-owned (the group baseline makes
-# them group-accessible).
-# Issue #112: the ROUTINE update skips roots whose scan-skip stamp still
-# matches (ddev_handover_stamp_valid — user/group/dev user/dev-owned
-# mode/scan rev), because re-scanning every large tree on every update cost
-# minutes while nothing had changed. Anything doubtful falls back to the
-# full scan; --refresh and every explicit config path (projects add,
-# refresh, handover) always scan and re-stamp.
-if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
-    # Shared helper: prefer the copy next to this script (checkout — same
-    # vintage as the running update.sh), fall back to the deployed library.
-    # First-wins lookup (#211 a F5, ddev-handover site): same fix as the
-    # wsl-browser-bridge site above — LIBDIR must never shadow a checkout
-    # copy that is present.
-    for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; do
+    # --- WSL browser bridge (issues #91, #100) -------------------------------------
+    # (Re)apply the stand-in tree and strip the legacy 0.0.36 section (kit-owned
+    # regression cleanup). The /etc/wsl.conf carrier is NEVER written here —
+    # the kit does not edit wsl.conf implicitly (internal/records/wsl-conf-consent.md);
+    # the user opts in via 'sudo opk wsl-add-opencode-1-fix'. An existing
+    # carrier stays untouched and keeps working.
+    # First-wins lookup (#211 a F5, wsl-browser-bridge site): the old
+    # back-to-back sourcing let the deployed LIBDIR copy override the
+    # checkout copy — the documented "prefer the checkout vintage" was
+    # inverted in code. Sibling shape: config.sh's helper lookups.
+    for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh" "$LIBDIR/sh/wsl-browser-bridge.sh"; do
         if [ -f "$cand" ]; then
             . "$cand"
             break
         fi
     done
-    command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
-        # Loud like config.sh's stubs (#211 a F2 sweep): a silent no-op
-        # let the loop below log "ddev handover pass completed" over a
-        # pass that never ran. Near-unreachable (lib_deploy refreshed
-        # the library above) — the contract is what matters: fail loud,
-        # let set -e stop the update instead of lying in the audit log.
-        echo "error: ddev_handover_root unavailable (ddev-handover.sh missing)" >&2
-        return 1
-    }
-    command -v ddev_handover_stamp_valid >/dev/null 2>&1 || ddev_handover_stamp_valid() { return 1; }
-    command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
-    _ho_skip=0
-    _ho_announced=false
-    while IFS= read -r root; do
-        [ -z "$root" ] && continue
-        [ -d "$root" ] || continue
-        if [ "$REFRESH" != true ] \
-            && ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"; then
-            _ho_skip=$((_ho_skip + 1))
-            continue
-        fi
-        if [ "$_ho_announced" = false ]; then
-            ui_detail "scanning project roots for ddev directories (large trees: this can take a while) ..."
-            _ho_announced=true
-        fi
-        ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-        ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-        log "ddev handover pass completed under $root"
-    done < "$PROJECTS_CONF"
-    if [ "$_ho_skip" -gt 0 ]; then
-        ui_detail "skipped the ddev handover rescan for $_ho_skip root(s) — nothing changed since the last pass"
-        ui_detail "force it with 'sudo opk update --refresh' or 'sudo opk config handover <path>'"
-        log "ddev handover rescan skipped for $_ho_skip root(s) (issue #112 stamps)"
-    fi
-fi
-
-# git "dubious ownership" exception for the opencode user (issue #17) —
-# every registered project root is developer-owned, the agent's git needs
-# safe.directory to run there. Unconditional so existing installs get it
-# on the first update; the get guard keeps it idempotent.
-# -C / (issue #116): sudo keeps the invoking user's CWD — run from an
-# unreadable developer home (mode 750), git >= 2.55 dies with
-# "fatal: error reading '<cwd>/.git'" before touching the global config,
-# and safe.directory is never ensured. chdir to / first; --global ignores
-# the worktree anyway.
-# The audit line must match reality (#211 a F4): a failed --add used to
-# print nothing while the log claimed "ensured" — agent git then failed
-# with 'dubious ownership' long after, with nothing in the audit trail
-# pointing at the cause.
-if command -v git >/dev/null 2>&1; then
-    if sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
-        2>/dev/null | grep -qFx '*'; then
-        log "git safe.directory ensured for $OPENCODE_USER (already set)"
-    elif sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*'; then
-        ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
-        log "git safe.directory ensured for $OPENCODE_USER"
-    else
-        ui_warn "could not set git safe.directory '*' for $OPENCODE_USER — agent git may fail"\
-" with 'dubious ownership' (git config --global --add failed)"
-        log "git safe.directory NOT ensured for $OPENCODE_USER (git config --add failed)"
-    fi
-fi
-
-# --- WSL2 /mnt/c restriction (report-only — update.sh stays prompt-free) -------
-# The drvfs mount runs with the Windows session token; NTFS ACLs do not
-# distinguish WSL users, so a world-readable /mnt/c exposes the whole
-# Windows profile to every WSL user incl. the agent's. Hint when open,
-# remind about the pending 'wsl --shutdown' when the restriction is
-# configured but not applied yet.
-if [ -d /mnt/c ]; then
-    mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
-    if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
-        if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
-            ui_warn "/mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)"
-            ui_warn "the mount stays world-readable (mode $mnt_mode)"\
-" and opencode warns on every start until the distro is reopened."
+    command -v browser_bridge_is_wsl >/dev/null 2>&1 || browser_bridge_is_wsl() { return 1; }
+    # Guard, not a mutator path (#211 b W22): unreachable in silence — the
+    # is_wsl stub above keeps the re-apply block below closed when the lib
+    # is missing from both lookup sites.
+    command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
+    # Fail-safe stub (#211 a F7): if the never-shadow probe itself is
+    # unavailable (wsl-browser-bridge.sh missing from both lookup sites),
+    # both call sites below must err on the never-shadow side — rc 0
+    # ("a real one might exist") removes/withholds the shim instead of
+    # shadowing one. Sibling guard: status.sh wraps its call in
+    # command -v (0.0.46a F4); update.sh was the unswept twin.
+    command -v xdg_open_real_exists >/dev/null 2>&1 || xdg_open_real_exists() { return 0; }
+    if browser_bridge_is_wsl; then
+        # Failure-honest since 0.0.45c C4: browser_bridge_install propagates a
+        # failed stand-in deploy or legacy strip — the old unconditional
+        # success line reported "re-applied" even when nothing was written.
+        if browser_bridge_install "$FILES_ROOT" "$LIBDIR"; then
+            if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
+                ui_success "WSL browser bridge re-applied (carrier present — fully active)"
+                log "wsl browser bridge re-applied: $LIBDIR/wsl (carrier present)"
+            else
+                ui_success "WSL browser bridge stand-in re-applied (no wsl.conf carrier)"
+                ui_detail "enable the opencode 1.x login fix yourself (the kit does not edit /etc/wsl.conf):"
+                ui_detail "  sudo opk wsl-add-opencode-1-fix"
+                log "wsl browser bridge stand-in re-applied: $LIBDIR/wsl (carrier left to 'opk wsl-add-opencode-1-fix')"
+            fi
         else
-            ui_warn "/mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent"\
-" can read the Windows profile."
-            ui_warn "opencode warns on every start until fixed. Recommended fix in /etc/wsl.conf:"
-            ui_detail "[automount]"
-            ui_detail "enabled = true"
-            ui_detail "options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),"\
-"gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
-            ui_warn "then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf"\
-" — apply the snippet yourself."
+            ui_warn "WSL browser bridge: stand-in deploy or legacy wsl.conf strip FAILED"
+            ui_detail "see the errors above; re-run the update or fix /etc/wsl.conf manually"
+            log "wsl browser bridge re-apply FAILED (deploy/strip)"
         fi
     fi
-fi
 
-fi   # ONLY_BINARY skip: kit re-deploy ... pre-binary sections
+    # --- re-link wrapper + cli dispatcher ------------------------------------------
+
+    sudo ln -sf "$LIBDIR/bin/opencode-as-opencode" /usr/local/bin/opencode
+    ui_success "wrapper symlink refreshed: /usr/local/bin/opencode -> $LIBDIR/bin/opencode-as-opencode"
+    sudo rm -f /usr/local/bin/opencode-permissions-kit
+    sudo ln -sf "$LIBDIR/bin/opk" /usr/local/bin/opk
+    ui_success "cli symlink refreshed: /usr/local/bin/opk -> $LIBDIR/bin/opk (legacy name removed)"
+
+    # --- xdg-open fallback shim (opencode 1.18.33+ / 2.0.18+ login fix) -------------
+
+    # Deploy only while no real xdg-open exists; heal the shadow case (a real
+    # one appeared since install -> the kit stands back). Guards share the
+    # never-shadow probe with install.sh (0.0.42d S1/C1): xdg_open_real_exists
+    # scans the whole PATH except /usr/local/bin (our shim's slot) — a real
+    # xdg-open under /usr/sbin or /snap/bin no longer gets shadowed.
+    if [ -L /usr/local/bin/xdg-open ] &&
+        [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" = "$LIBDIR/bin/xdg-open" ]; then
+        if xdg_open_real_exists; then
+            sudo rm -f /usr/local/bin/xdg-open
+            ui_detail "xdg-open fallback removed: a real xdg-open on PATH took over"
+            log "xdg-open shim removed: real xdg-open present on PATH"
+        else
+            ui_detail "xdg-open fallback active: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
+            log "xdg-open shim active: /usr/local/bin/xdg-open"
+        fi
+    elif ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ] &&
+        ! xdg_open_real_exists; then
+        sudo ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open
+        ui_success "xdg-open fallback installed: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
+        log "xdg-open shim symlink: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
+    fi
+
+    # --- re-deploy sudoers -------------------------------------------------------
+
+    # Shared pipeline (sh/sudoers-deploy.sh): charset gate, render, visudo
+    # validation BEFORE anything is deployed, install mode 440, sudoers.d
+    # link, legacy-name cleanup.
+    if [ -f "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" ]; then
+        sudoers_deploy "$FILES_ROOT/opencode-permissions-kit-lib/templates/sudoers.template" "$DEFAULT_USER" ||
+            die "sudoers re-deploy failed — nothing was re-deployed (user '$DEFAULT_USER')."
+        ui_success "sudoers re-deployed + validated (DEFAULT_USER=$DEFAULT_USER)"
+        log "sudoers re-deployed (DEFAULT_USER=$DEFAULT_USER)"
+    else
+        # Conservative skip (0.0.41f S2): the existing validated sudoers stays
+        # active — near-unreachable (fetch list + heal guarantee the file),
+        # but the skip must not be silent. pr-00263 a F7: log() alone is the
+        # no-op stub when log.sh is missing from both roots — the skip also
+        # needs a terminal line.
+        ui_detail "sudoers re-deploy skipped: template missing (existing sudoers kept)"
+        log "sudoers re-deploy skipped: template missing from $FILES_ROOT (existing sudoers kept)"
+    fi
+
+    # --- re-deploy umask profile -------------------------------------------------
+
+    if [ -f "$FILES_ROOT/etc/umask.sh" ]; then
+        # 0.0.49b C1: atomic re-deploy — a plain in-place cp killed
+        # mid-write leaves a truncated profile with intact mode bits,
+        # sourced at every login (the #163 class on a protection layer).
+        # Same shape as the lib deploys (0.0.49a W2): sibling temp in the
+        # target dir, mode 644 before the mv.
+        copy_file_atomic "$FILES_ROOT/etc/umask.sh" \
+            /etc/profile.d/opencode-permissions-kit-umask.sh 644 ||
+            die "umask profile re-deploy failed (atomic deploy)"
+        # Remove the pre-0.0.10 umask profile so only the new name is loaded.
+        sudo rm -f /etc/profile.d/opencode-umask.sh 2>/dev/null || true
+        ui_success "umask profile re-deployed"
+        log "umask profile re-deployed: /etc/profile.d/opencode-permissions-kit-umask.sh"
+    else
+        # Conservative skip, loud like the sudoers twin above (0.0.41f S2
+        # shape, #211 a F6): near-unreachable (fetch list + heal guarantee
+        # the file), but the skip must not be silent — an update that
+        # quietly dropped a protection-layer deploy is undebuggable.
+        # pr-00263 a F7: terminal line too (log() alone degrades to the
+        # no-op stub when log.sh is missing from both roots).
+        ui_detail "umask profile re-deploy skipped: source file missing (existing profile kept)"
+        log "umask profile re-deploy skipped: $FILES_ROOT/etc/umask.sh missing (existing profile kept)"
+    fi
+
+    # --- OpenChamber policy pin (issue #154) ---------------------------------------
+    # Re-apply only when the install opted in (install.conf
+    # OPENCHAMBER_POLICY=yes — sourced above). A policy.json without the opt-in
+    # is admin-owned and never touched here; without the opt-in the file is
+    # also never created (opt-in only, see the design record).
+    # 0.0.47a F1: the re-apply is additionally gated on the file still being
+    # kit-shaped (byte-identical to the one-liner the kit writes) — a file the
+    # admin extended or replaced is NEVER overwritten; the skip is loud.
+    # Issue #164: the presence probe runs at the write's authority (sudo) —
+    # an admin 0700 /etc/openchamber must not read as "absent" to a direct
+    # non-root run and slip the branch into the sudo write.
+    if [ "${OPENCHAMBER_POLICY:-}" = "yes" ]; then
+        _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
+        if sudo test -f /etc/openchamber/policy.json &&
+            [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
+            ui_warn "openchamber policy pin NOT re-applied: /etc/openchamber/policy.json"
+            ui_warn "diverges from the kit pin (admin-owned content) — left untouched"
+            ui_detail "force it with: sudo opk openchamber-secure (replaces the file)"
+            log "openchamber policy pin NOT re-applied: existing file diverges (admin-owned)"
+        else
+            sudo mkdir -p /etc/openchamber
+            # Atomic stage+mv (#211 a F17, opk twin): the live policy.json
+            # flips via rename only — a kill mid-tee used to leave a
+            # truncated file and a silently inactive pin.
+            _ocp_tmp="/etc/openchamber/policy.json.opk-new.$$"
+            # Registered BEFORE staging (#211 b W8, order per #211 c W3):
+            # the trap's rm -f tolerates an absent path, so an abort DURING
+            # the tee (temp created, write fails — ENOSPC under set -e) is
+            # covered too, not just aborts between staging and the flip.
+            _tmp_track "$_ocp_tmp"
+            printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' |
+                sudo tee "$_ocp_tmp" >/dev/null
+            sudo chown root:root "$_ocp_tmp" 2>/dev/null || true
+            sudo chmod 644 "$_ocp_tmp"
+            # mv replaces a symlink at policy.json rather than writing
+            # through it (#211 b W19) — the announced replace is this
+            # block's documented job.
+            sudo mv -f "$_ocp_tmp" /etc/openchamber/policy.json
+            ui_success "openchamber policy pin re-applied: /etc/openchamber/policy.json"
+            log "openchamber policy pin re-applied: /etc/openchamber/policy.json"
+        fi
+    fi
+
+    # --- shell-startup hooks (rewrite old paths, append when missing) ---------------
+    # Older installs lack the interactive-shell hooks — append them idempotently
+    # so a self-installed opencode binary is reported and `ddev()` stays wrapped.
+    # 0.0.29 moved the hooked files (shell-warn.sh, ddev-as-opencode.sh ->
+    # sh/ddev-terminal.sh): the rc lines reference them by absolute path, and
+    # their [ -f ... ] guard would silently disable the hook after the move.
+    # The kit-owned line is therefore REWRITTEN in place (exact path match —
+    # user lines are never touched, the guard keeps the line harmless after
+    # uninstall); the hook is only appended when no kit hook line exists at all.
+    # Root-shell installs (issue #192) registered root as the developer:
+    # update must not paper over that by provisioning root's rc files — the
+    # real developer still gets nothing. Warn loudly and skip; a missing
+    # home gets the same loud skip instead of the old silent one (the row in
+    # status.sh told users "run opk update", which this very section then
+    # skipped without a word).
+    if [ -n "$DEFAULT_USER" ]; then
+        _du_uid="$(id -u "$DEFAULT_USER" 2>/dev/null || echo 1)"
+        if [ "$_du_uid" = "0" ]; then
+            ui_warn "shell-startup hooks skipped: the install recorded '$DEFAULT_USER' (uid 0)"
+            ui_warn "as the developer — a root-shell install cannot be updated into shape"
+            ui_detail "reinstall from your normal user (issue #192): opk update cannot fix this"
+            log "shell-startup hooks skipped: DEFAULT_USER=$DEFAULT_USER is uid 0 (issue #192)"
+        elif [ -d "$DEFAULT_HOME" ]; then
+            for cf in "$DEFAULT_HOME/.bashrc" "$DEFAULT_HOME/.zshrc" "$DEFAULT_HOME/.profile"; do
+                [ -f "$cf" ] || continue
+                if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' \
+                    "$cf" 2>/dev/null; then
+                    sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh''|/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh|g' "$cf"
+                else
+                    echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . ''/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'' (wrapper bypass warning)' | sudo tee -a "$cf" >/dev/null
+                    ui_success "wrapper-bypass warning hooked into $cf"
+                    log "shell-startup warning hook appended: $cf"
+                fi
+                # ddev always runs as the opencode user: hook the `ddev()` shell
+                # function (sudoers helper). Only the DEFAULT user — the opencode
+                # session must never be wrapped (the function's id check is the guard).
+                if sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh\|opencode-permissions-kit/ddev-as-opencode.sh' \
+                    "$cf" 2>/dev/null; then
+                    sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh''|/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh|g' "$cf"
+                else
+                    echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . ''/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'' (ddev always runs as opencode)' | sudo tee -a "$cf" >/dev/null
+                    ui_success "ddev terminal hook installed into $cf"
+                    log "ddev-terminal hook appended: $cf"
+                fi
+            done
+        else
+            ui_warn "shell-startup hooks skipped: home '$DEFAULT_HOME' of '$DEFAULT_USER' does not exist"
+            log "shell-startup hooks skipped: missing developer home $DEFAULT_HOME"
+        fi
+    fi
+
+    # --- .ddev + settings-dir handover (ddev always runs as the opencode user) -----
+    # ddev chmods .ddev and the app-type's settings directories unconditionally,
+    # and chmod is owner-only — they must belong to the opencode user or
+    # `ddev start` fails with "operation not permitted". Searched at ANY depth
+    # under each registered root (a root is often a parent of several projects).
+    # Unconditional (not just inside the migration) so installs that already
+    # migrated — the common upgrade path — are healed too. .git dirs are
+    # never chowned — they stay developer-owned (the group baseline makes
+    # them group-accessible).
+    # Issue #112: the ROUTINE update skips roots whose scan-skip stamp still
+    # matches (ddev_handover_stamp_valid — user/group/dev user/dev-owned
+    # mode/scan rev), because re-scanning every large tree on every update cost
+    # minutes while nothing had changed. Anything doubtful falls back to the
+    # full scan; --refresh and every explicit config path (projects add,
+    # refresh, handover) always scan and re-stamp.
+    if [ -f "$PROJECTS_CONF" ] && [ -n "$NEW_OPENCODE_GROUP" ]; then
+        # Shared helper: prefer the copy next to this script (checkout — same
+        # vintage as the running update.sh), fall back to the deployed library.
+        # First-wins lookup (#211 a F5, ddev-handover site): same fix as the
+        # wsl-browser-bridge site above — LIBDIR must never shadow a checkout
+        # copy that is present.
+        for cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/ddev-handover.sh" "$LIBDIR/sh/ddev-handover.sh"; do
+            if [ -f "$cand" ]; then
+                . "$cand"
+                break
+            fi
+        done
+        command -v ddev_handover_root >/dev/null 2>&1 || ddev_handover_root() {
+            # Loud like config.sh's stubs (#211 a F2 sweep): a silent no-op
+            # let the loop below log "ddev handover pass completed" over a
+            # pass that never ran. Near-unreachable (lib_deploy refreshed
+            # the library above) — the contract is what matters: fail loud,
+            # let set -e stop the update instead of lying in the audit log.
+            echo "error: ddev_handover_root unavailable (ddev-handover.sh missing)" >&2
+            return 1
+        }
+        command -v ddev_handover_stamp_valid >/dev/null 2>&1 || ddev_handover_stamp_valid() { return 1; }
+        command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
+        _ho_skip=0
+        _ho_announced=false
+        while IFS= read -r root; do
+            [ -z "$root" ] && continue
+            [ -d "$root" ] || continue
+            if [ "$REFRESH" != true ] &&
+                ddev_handover_stamp_valid "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"; then
+                _ho_skip=$((_ho_skip + 1))
+                continue
+            fi
+            if [ "$_ho_announced" = false ]; then
+                ui_detail "scanning project roots for ddev directories (large trees: this can take a while) ..."
+                _ho_announced=true
+            fi
+            ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
+            ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
+            log "ddev handover pass completed under $root"
+        done <"$PROJECTS_CONF"
+        if [ "$_ho_skip" -gt 0 ]; then
+            ui_detail "skipped the ddev handover rescan for $_ho_skip root(s) — nothing changed since the last pass"
+            ui_detail "force it with 'sudo opk update --refresh' or 'sudo opk config handover <path>'"
+            log "ddev handover rescan skipped for $_ho_skip root(s) (issue #112 stamps)"
+        fi
+    fi
+
+    # git "dubious ownership" exception for the opencode user (issue #17) —
+    # every registered project root is developer-owned, the agent's git needs
+    # safe.directory to run there. Unconditional so existing installs get it
+    # on the first update; the get guard keeps it idempotent.
+    # -C / (issue #116): sudo keeps the invoking user's CWD — run from an
+    # unreadable developer home (mode 750), git >= 2.55 dies with
+    # "fatal: error reading '<cwd>/.git'" before touching the global config,
+    # and safe.directory is never ensured. chdir to / first; --global ignores
+    # the worktree anyway.
+    # The audit line must match reality (#211 a F4): a failed --add used to
+    # print nothing while the log claimed "ensured" — agent git then failed
+    # with 'dubious ownership' long after, with nothing in the audit trail
+    # pointing at the cause.
+    if command -v git >/dev/null 2>&1; then
+        if sudo -u "$OPENCODE_USER" -H git -C / config --global --get-all safe.directory \
+            2>/dev/null | grep -qFx '*'; then
+            log "git safe.directory ensured for $OPENCODE_USER (already set)"
+        elif sudo -u "$OPENCODE_USER" -H git -C / config --global --add safe.directory '*'; then
+            ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
+            log "git safe.directory ensured for $OPENCODE_USER"
+        else
+            ui_warn "could not set git safe.directory '*' for $OPENCODE_USER — agent git may fail""\
+ with 'dubious ownership' (git config --global --add failed)"
+            log "git safe.directory NOT ensured for $OPENCODE_USER (git config --add failed)"
+        fi
+    fi
+
+    # --- WSL2 /mnt/c restriction (report-only — update.sh stays prompt-free) -------
+    # The drvfs mount runs with the Windows session token; NTFS ACLs do not
+    # distinguish WSL users, so a world-readable /mnt/c exposes the whole
+    # Windows profile to every WSL user incl. the agent's. Hint when open,
+    # remind about the pending 'wsl --shutdown' when the restriction is
+    # configured but not applied yet.
+    if [ -d /mnt/c ]; then
+        mnt_mode=$(stat -c %a /mnt/c 2>/dev/null || echo "")
+        if [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -ne 0 ]; then
+            if grep -q '^options *=.*dmask' /etc/wsl.conf 2>/dev/null; then
+                ui_warn "/mnt/c restriction configured but still pending 'wsl --shutdown' (Windows)"
+                ui_warn "the mount stays world-readable (mode $mnt_mode)""\
+ and opencode warns on every start until the distro is reopened."
+            else
+                ui_warn "/mnt/c is world-readable (mode $mnt_mode) — every WSL user incl. the agent""\
+ can read the Windows profile."
+                ui_warn "opencode warns on every start until fixed. Recommended fix in /etc/wsl.conf:"
+                ui_detail "[automount]"
+                ui_detail "enabled = true"
+                ui_detail "options = \"uid=$(id -u "$DEFAULT_USER" 2>/dev/null || echo '<uid>'),""\
+gid=$(id -g "$DEFAULT_USER" 2>/dev/null || echo '<gid>'),dmask=027,fmask=037\""
+                ui_warn "then 'wsl --shutdown' from Windows. The kit never edits /etc/wsl.conf""\
+ — apply the snippet yourself."
+            fi
+        fi
+    fi
+
+fi # ONLY_BINARY skip: kit re-deploy ... pre-binary sections
 
 # --- opencode binary upgrade (--binary / --binary-path) ----------------------
 
@@ -1001,8 +1097,8 @@ SYSTEM_BIN="/usr/local/lib/opencode-permissions-kit/bin/opencode"
 # binary, the exact 0.0.39e C4 shape).
 BINARY_GROUP="$(id -gn "$OPENCODE_USER" 2>/dev/null || echo "$OPENCODE_USER")"
 if [ -x "$SYSTEM_BIN" ]; then
-    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" \
-        || die "cannot re-secure $SYSTEM_BIN — update aborted."
+    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" ||
+        die "cannot re-secure $SYSTEM_BIN — update aborted."
 fi
 
 # Detect the opencode release target for this host (mirrors the official
@@ -1023,8 +1119,8 @@ detect_target() {
     if [ "$arch" = "x64" ] && [ "$os" = "linux" ] && ! grep -qwi avx2 /proc/cpuinfo 2>/dev/null; then
         target="$target-baseline"
     fi
-    if [ "$os" = "linux" ] && { [ -f /etc/alpine-release ] \
-        || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; }; then
+    if [ "$os" = "linux" ] && { [ -f /etc/alpine-release ] ||
+        { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; }; then
         target="$target-musl"
     fi
     echo "$target"
@@ -1088,12 +1184,12 @@ install_binary() {
     if [ "$new" != "unknown" ]; then
         _new_major=$(printf '%s' "$new" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
         if [ -n "$_new_major" ]; then
-            :   # "opencode v2..." — the 2.x shape
+            : # "opencode v2..." — the 2.x shape
         elif printf '%s' "$new" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
-            _new_major=1   # bare version line = 1.x (current_opencode_major
-                           # parity; FULL-LINE anchored, 0.0.44d F3: "2.0.11-
-                           # dev" and digit-leading noise like "404 not
-                           # found" are unparseable, not major 1)
+            _new_major=1 # bare version line = 1.x (current_opencode_major
+            # parity; FULL-LINE anchored, 0.0.44d F3: "2.0.11-
+            # dev" and digit-leading noise like "404 not
+            # found" are unparseable, not major 1)
         else
             # Neither shape (0.0.44c C6): a stdout warning line grabbed by
             # head -1, an exotic prefix — unparseable. Treat like an empty
@@ -1103,11 +1199,17 @@ install_binary() {
         fi
         if [ -n "$_new_major" ]; then
             if [ -f "$CONFDIR/install.conf" ] && grep -q '^OPENCODE_MAJOR=' "$CONFDIR/install.conf" 2>/dev/null; then
-                sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf" \
-                    || { echo "  error: OPENCODE_MAJOR stamp write failed" >&2; return 2; }
+                sudo sed -i "s/^OPENCODE_MAJOR=.*/OPENCODE_MAJOR=$_new_major/" "$CONFDIR/install.conf" ||
+                    {
+                        echo "  error: OPENCODE_MAJOR stamp write failed" >&2
+                        return 2
+                    }
             elif [ -f "$CONFDIR/install.conf" ]; then
-                echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null \
-                    || { echo "  error: OPENCODE_MAJOR stamp write failed" >&2; return 2; }
+                echo "OPENCODE_MAJOR=$_new_major" | sudo tee -a "$CONFDIR/install.conf" >/dev/null ||
+                    {
+                        echo "  error: OPENCODE_MAJOR stamp write failed" >&2
+                        return 2
+                    }
             fi
         else
             echo "  warn: new binary's version line is unparseable — OPENCODE_MAJOR stamp left unchanged" >&2
@@ -1134,13 +1236,13 @@ current_opencode_major() {
     if [ -n "$_com_ver" ]; then
         _com_maj=$(version_major "$_com_ver")
         if [ -n "$_com_maj" ]; then
-            :   # "opencode v2..." — the 2.x shape
+            : # "opencode v2..." — the 2.x shape
         elif printf '%s' "$_com_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
-            _com_maj=1   # bare version line = 1.x, full-line anchored —
-                         # parity with install_binary's re-stamp (0.0.44e
-                         # E2: this value picks the UPGRADE CHANNEL, a
-                         # misparsed probe on a 2.x host must not resolve
-                         # the 1.x channel)
+            _com_maj=1 # bare version line = 1.x, full-line anchored —
+            # parity with install_binary's re-stamp (0.0.44e
+            # E2: this value picks the UPGRADE CHANNEL, a
+            # misparsed probe on a 2.x host must not resolve
+            # the 1.x channel)
         else
             # unparseable probe line: fall through to the install.conf
             # stamp instead of guessing major 1 (the old mapping would
@@ -1177,8 +1279,8 @@ resolve_latest_opencode_version() {
         # refuses rc 1 either way.
         _rlov_ver=""
         if command -v python3 >/dev/null 2>&1; then
-            _rlov_ver=$(curl -fsSL --max-time 10 "https://registry.npmjs.org/@opencode/cli-$_rlov_target" 2>/dev/null \
-                | python3 -c 'import json,sys
+            _rlov_ver=$(curl -fsSL --max-time 10 "https://registry.npmjs.org/@opencode/cli-$_rlov_target" 2>/dev/null |
+                python3 -c 'import json,sys
 try:
     dist = json.load(sys.stdin)["dist-tags"]
     print(dist["latest"])
@@ -1187,16 +1289,22 @@ except Exception:
 ' || true)
         fi
         case "$_rlov_ver" in
-            2.*) echo "$_rlov_ver"; return 0 ;;
-            *)  return 1 ;;
+            2.*)
+                echo "$_rlov_ver"
+                return 0
+                ;;
+            *) return 1 ;;
         esac
     else
         _rlov_ver=$(curl -fsSL --max-time 10 \
-            https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null \
-            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+            https://api.github.com/repos/anomalyco/opencode/releases/latest 2>/dev/null |
+            sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
         case "$_rlov_ver" in
-            1.*) echo "$_rlov_ver"; return 0 ;;
-            *)  return 1 ;;
+            1.*)
+                echo "$_rlov_ver"
+                return 0
+                ;;
+            *) return 1 ;;
         esac
     fi
 }
@@ -1216,7 +1324,7 @@ fetch_opencode_version() {
         2.*)
             if ! curl -fsSL --max-time 240 \
                 "https://registry.npmjs.org/@opencode/cli-$_fov_target/-/cli-$_fov_target-$_fov_ver.tgz" \
-                    -o "$_fov_dst/opencode.tar.gz" 2>/dev/null; then
+                -o "$_fov_dst/opencode.tar.gz" 2>/dev/null; then
                 curl -fsSL --max-time 240 \
                     "https://registry.npmjs.org/@opencode-ai/cli-$_fov_target/-/cli-$_fov_target-$_fov_ver.tgz" \
                     -o "$_fov_dst/opencode.tar.gz" || return 1
@@ -1249,7 +1357,7 @@ fetch_opencode_version() {
 sync_tui_registration() {
     _str_major="$1"
     for _str_dir_user in "/home/$OPENCODE_USER/.config/opencode:$OPENCODE_USER" \
-                         "$DEFAULT_HOME/.config/opencode:$DEFAULT_USER"; do
+        "$DEFAULT_HOME/.config/opencode:$DEFAULT_USER"; do
         _str_user_dir="${_str_dir_user%%:*}"
         _str_dir_owner="${_str_dir_user#*:}"
         # Shared per-user sync (sh/tui-plugin.sh): chain gate, plugins
@@ -1340,9 +1448,9 @@ if [ "$BINARY_UPDATE" = true ]; then
                 # again; only when that is impossible keep the backup
                 # and report the partial state honestly — the backup is
                 # the recovery material, it must survive this path.
-                if [ -f "$BACKUP_DIR/opencode.current" ] \
-                   && copy_binary_atomic "$BACKUP_DIR/opencode.current" "$SYSTEM_BIN" 2>/dev/null \
-                   && secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" >/dev/null 2>&1; then
+                if [ -f "$BACKUP_DIR/opencode.current" ] &&
+                    copy_binary_atomic "$BACKUP_DIR/opencode.current" "$SYSTEM_BIN" 2>/dev/null &&
+                    secure_binary "$SYSTEM_BIN" "$BINARY_GROUP" >/dev/null 2>&1; then
                     ui_warn "candidate installed but a post-install step failed — previous binary restored"
                     ui_warn "(the step's own error line above names it: hardening or the OPENCODE_MAJOR stamp)"
                     log "opencode binary upgrade failed post-copy; previous binary restored from $BACKUP_DIR"
@@ -1381,190 +1489,197 @@ fi
 
 if [ "$ONLY_BINARY" != true ]; then
 
-# --- ensure default user can access the opencode home -------------------------
-# The home belongs to the opencode user's own usergroup; older installs had it
-# in www-data with mode 750. Apply the current ownership/mode.
-if [ -d "/home/$OPENCODE_USER" ]; then
-    sudo chown "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "/home/$OPENCODE_USER"
-    sudo chmod 2750 "/home/$OPENCODE_USER"
-    ui_success "/home/$OPENCODE_USER re-based to group $NEW_OPENCODE_GROUP (mode 2750)"
-fi
+    # --- ensure default user can access the opencode home -------------------------
+    # The home belongs to the opencode user's own usergroup; older installs had it
+    # in www-data with mode 750. Apply the current ownership/mode.
+    if [ -d "/home/$OPENCODE_USER" ]; then
+        sudo chown "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "/home/$OPENCODE_USER"
+        sudo chmod 2750 "/home/$OPENCODE_USER"
+        ui_success "/home/$OPENCODE_USER re-based to group $NEW_OPENCODE_GROUP (mode 2750)"
+    fi
 
-# --- ensure default-user deny-all config (self-update bypass protection) ------
-# Older installs predate this config. Deploy it only if the default user has
-# no config yet — update.sh must not silently clobber an existing one.
-if [ -n "$DEFAULT_USER" ] && [ -d "$DEFAULT_HOME" ]; then
-    DEFAULT_OC_CONF="$DEFAULT_HOME/.config/opencode/opencode.jsonc"
-    if [ ! -f "$DEFAULT_OC_CONF" ]; then
-        sudo mkdir -p "$(dirname "$DEFAULT_OC_CONF")"
-        sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
-        sudo chown "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_OC_CONF"
-        sudo chmod 664 "$DEFAULT_OC_CONF"
-        ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
-        log "deny-all config installed for default user: $DEFAULT_OC_CONF"
+    # --- ensure default-user deny-all config (self-update bypass protection) ------
+    # Older installs predate this config. Deploy it only if the default user has
+    # no config yet — update.sh must not silently clobber an existing one.
+    if [ -n "$DEFAULT_USER" ] && [ -d "$DEFAULT_HOME" ]; then
+        DEFAULT_OC_CONF="$DEFAULT_HOME/.config/opencode/opencode.jsonc"
+        if [ ! -f "$DEFAULT_OC_CONF" ]; then
+            sudo mkdir -p "$(dirname "$DEFAULT_OC_CONF")"
+            sudo cp "$FILES_ROOT/opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc" "$DEFAULT_OC_CONF"
+            sudo chown "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_OC_CONF"
+            sudo chmod 664 "$DEFAULT_OC_CONF"
+            ui_success "deny-all config installed for default user: $DEFAULT_OC_CONF"
+            log "deny-all config installed for default user: $DEFAULT_OC_CONF"
+        else
+            ui_detail "default-user config exists — left untouched (re-run install.sh to back it up)"
+        fi
+    fi
+
+    # --- live ddev version for the install.conf refresh (issue #72) ------------------
+    # DDEV_VERSION is an install-time stamp; a ddev upgrade leaves it behind.
+    # Re-probe on every update so the stamp fallback stays honest. Ask the
+    # kit's own helper first: ddev >= 1.25.4 refuses to run as root ("DDEV is
+    # not designed to be run with root privileges", exit 1 before any output)
+    # and updates run as root — the helper runs ddev exactly the way the kit
+    # does (as the opencode user, HOME/DOCKER_HOST re-set). The direct binary
+    # (PATH, then the two standard locations) is the fallback; when neither
+    # answers, the old stamp survives.
+    NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)"
+    _ddev_probe=""
+    if [ -x "$LIBDIR/bin/ddev-as-opencode" ] && id "$OPENCODE_USER" >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+        _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null |
+            grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
+    fi
+    if [ -z "$_ddev_probe" ]; then
+        _ddev_bin=""
+        for _ddev_cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
+            [ -n "$_ddev_cand" ] && [ -x "$_ddev_cand" ] && {
+                _ddev_bin="$_ddev_cand"
+                break
+            }
+        done
+        if [ -n "$_ddev_bin" ]; then
+            _ddev_probe=$("$_ddev_bin" --version 2>/dev/null |
+                grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
+        fi
+    fi
+    if [ -n "$_ddev_probe" ]; then
+        NEW_DDEV_VERSION="$_ddev_probe"
+    fi
+
+    # --- refresh install.conf (version stamp + group key) --------------------------
+    # Atomic re-stamp (review 0.0.39h F6 — the C5 twin site: install.sh's stamp
+    # got temp+mv in 0.0.39g, this rewrite still deployed via truncate-in-place
+    # `sudo cp`): render the new content BESIDE the target, then mv it in — a
+    # mid-write crash never leaves a partial install.conf. The sibling temp is
+    # registered in the scratch registry. The grep guard is narrowed (0.0.39h
+    # F4): rc 1 (empty result) stays benign, rc 2 (real read error) now dies
+    # BEFORE any write — the old `|| true` masked it into a rewrite keeping
+    # only the 4 re-stamped keys. The rc is captured OUTSIDE the write
+    # pipeline: dash has no pipefail, `|| rc=$?` on the pipeline would only
+    # ever see tee's 0.
+    # Keys this update owns: VERSION (re-stamped), OPENCODE_GROUP (re-based to
+    # the opencode usergroup), KIT_CHANNEL (re-stamped to the ref just updated
+    # from), DDEV_VERSION (re-probed above — the fallback stays fresh).
+    # Per-process suffix (0.0.42f C1): the fixed name let concurrent runs
+    # clobber each other's staging file (root-created by the tee below —
+    # mktemp cannot create in the root-only conf dir).
+    _INSTALL_CONF_TMP="$CONFDIR/install.conf.opk-new.$$"
+    _tmp_track "$_INSTALL_CONF_TMP"
+    _ic_rc=0
+    _ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' \
+        -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null) || _ic_rc=$?
+    [ "$_ic_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ic_rc) — install.conf left untouched"
+    {
+        if [ -n "$_ic_keep" ]; then printf '%s\n' "$_ic_keep"; fi
+        echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
+        echo "KIT_CHANNEL=$KIT_BRANCH"
+        echo "VERSION=$VERSION"
+        echo "DDEV_VERSION=$NEW_DDEV_VERSION"
+    } | sort -u | sudo tee "$_INSTALL_CONF_TMP" >/dev/null
+    sudo chmod 644 "$_INSTALL_CONF_TMP"
+    sudo mv -f "$_INSTALL_CONF_TMP" "$CONFDIR/install.conf"
+    ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH""\
+ OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
+    log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH""\
+ OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
+
+    # --- TUI mode display user files (internal/records/_archive/design/plan-ui-tui-opencode.md) ---------
+    # Same only-if-absent-or-kit-written policy as install.sh (marker key
+    # _opencode_permissions_kit): user edits survive updates. The write goes
+    # through the shared staged_write helper (review 0.0.39g S1 — sourced
+    # early, see the top of this script): the target dir is agent-owned, root
+    # cp/chown must never follow a planted symlink; a user-managed symlink at
+    # the destination is skipped, never written through.
+    OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"
+    OC_TUI_CONF="$OC_TUI_DIR/tui.json"
+    # Chain gate BEFORE mkdir -p (review 0.0.39h F2): a linked PARENT
+    # (~/.config, ~/.config/opencode) or a linked .config/opencode leaf
+    # passes `sudo mkdir -p` silently and would redirect the staged_write mv
+    # into the link target. Skip loudly (user-managed).
+    if ! agent_home_sane "$OPENCODE_USER" "$OC_TUI_DIR"; then
+        ui_detail "the chain to $OC_TUI_CONF contains a symlink — TUI mode display NOT refreshed (user-managed)"
+        log "tui mode display skipped: symlink in the chain to $OC_TUI_CONF"
     else
-        ui_detail "default-user config exists — left untouched (re-run install.sh to back it up)"
+        sudo mkdir -p "$OC_TUI_DIR"
+        if [ -L "$OC_TUI_CONF" ]; then
+            log "tui mode display skipped: $OC_TUI_CONF is a symlink (user-managed)"
+        elif [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
+            staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
+            log "tui mode display refreshed: $OC_TUI_CONF"
+        fi
     fi
-fi
-
-# --- live ddev version for the install.conf refresh (issue #72) ------------------
-# DDEV_VERSION is an install-time stamp; a ddev upgrade leaves it behind.
-# Re-probe on every update so the stamp fallback stays honest. Ask the
-# kit's own helper first: ddev >= 1.25.4 refuses to run as root ("DDEV is
-# not designed to be run with root privileges", exit 1 before any output)
-# and updates run as root — the helper runs ddev exactly the way the kit
-# does (as the opencode user, HOME/DOCKER_HOST re-set). The direct binary
-# (PATH, then the two standard locations) is the fallback; when neither
-# answers, the old stamp survives.
-NEW_DDEV_VERSION="$(sed -n 's/^DDEV_VERSION=//p' "$INSTALL_CONF" 2>/dev/null | tail -1 || true)"
-_ddev_probe=""
-if [ -x "$LIBDIR/bin/ddev-as-opencode" ] && id "$OPENCODE_USER" >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-    _ddev_probe=$(sudo -n -u "$OPENCODE_USER" "$LIBDIR/bin/ddev-as-opencode" --version 2>/dev/null \
-        | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
-fi
-if [ -z "$_ddev_probe" ]; then
-    _ddev_bin=""
-    for _ddev_cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
-        [ -n "$_ddev_cand" ] && [ -x "$_ddev_cand" ] && { _ddev_bin="$_ddev_cand"; break; }
-    done
-    if [ -n "$_ddev_bin" ]; then
-        _ddev_probe=$("$_ddev_bin" --version 2>/dev/null \
-            | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
+    DEFAULT_TUI_CONF="$DEFAULT_HOME/.config/opencode/tui.json"
+    DEFAULT_THEME_DIR="$DEFAULT_HOME/.config/opencode/themes"
+    if [ ! -f "$DEFAULT_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$DEFAULT_TUI_CONF" 2>/dev/null; then
+        sudo mkdir -p "$DEFAULT_THEME_DIR"
+        sudo cp "$LIBDIR/tui/opencode-danger.theme.json" "$DEFAULT_THEME_DIR/opencode-danger.json"
+        sudo cp "$LIBDIR/tui/tui-danger.json" "$DEFAULT_TUI_CONF"
+        sudo chown -R "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_THEME_DIR"
+        sudo chown "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_TUI_CONF"
+        sudo chmod 664 "$DEFAULT_TUI_CONF" "$DEFAULT_THEME_DIR/opencode-danger.json"
+        log "tui danger theme refreshed: $DEFAULT_TUI_CONF"
     fi
-fi
-if [ -n "$_ddev_probe" ]; then
-    NEW_DDEV_VERSION="$_ddev_probe"
-fi
 
-# --- refresh install.conf (version stamp + group key) --------------------------
-# Atomic re-stamp (review 0.0.39h F6 — the C5 twin site: install.sh's stamp
-# got temp+mv in 0.0.39g, this rewrite still deployed via truncate-in-place
-# `sudo cp`): render the new content BESIDE the target, then mv it in — a
-# mid-write crash never leaves a partial install.conf. The sibling temp is
-# registered in the scratch registry. The grep guard is narrowed (0.0.39h
-# F4): rc 1 (empty result) stays benign, rc 2 (real read error) now dies
-# BEFORE any write — the old `|| true` masked it into a rewrite keeping
-# only the 4 re-stamped keys. The rc is captured OUTSIDE the write
-# pipeline: dash has no pipefail, `|| rc=$?` on the pipeline would only
-# ever see tee's 0.
-# Keys this update owns: VERSION (re-stamped), OPENCODE_GROUP (re-based to
-# the opencode usergroup), KIT_CHANNEL (re-stamped to the ref just updated
-# from), DDEV_VERSION (re-probed above — the fallback stays fresh).
-# Per-process suffix (0.0.42f C1): the fixed name let concurrent runs
-# clobber each other's staging file (root-created by the tee below —
-# mktemp cannot create in the root-only conf dir).
-_INSTALL_CONF_TMP="$CONFDIR/install.conf.opk-new.$$"
-_tmp_track "$_INSTALL_CONF_TMP"
-_ic_rc=0
-_ic_keep=$(grep -v -e '^VERSION=' -e '^OPENCODE_GROUP=' -e '^KIT_CHANNEL=' \
-    -e '^DDEV_VERSION=' "$INSTALL_CONF" 2>/dev/null) || _ic_rc=$?
-[ "$_ic_rc" -le 1 ] || die "cannot read $INSTALL_CONF (grep rc $_ic_rc) — install.conf left untouched"
-{
-    if [ -n "$_ic_keep" ]; then printf '%s\n' "$_ic_keep"; fi
-    echo "OPENCODE_GROUP=$NEW_OPENCODE_GROUP"
-    echo "KIT_CHANNEL=$KIT_BRANCH"
-    echo "VERSION=$VERSION"
-    echo "DDEV_VERSION=$NEW_DDEV_VERSION"
-} | sort -u | sudo tee "$_INSTALL_CONF_TMP" > /dev/null
-sudo chmod 644 "$_INSTALL_CONF_TMP"
-sudo mv -f "$_INSTALL_CONF_TMP" "$CONFDIR/install.conf"
-ui_success "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH"\
-" OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
-log "install.conf updated: VERSION=$VERSION CHANNEL=$KIT_BRANCH"\
-" OPENCODE_GROUP=$NEW_OPENCODE_GROUP DDEV_VERSION=$NEW_DDEV_VERSION"
+    # opencode 2.x (issue #80, #99): keep the TUI mode registration anchored
+    # to the installed major — register the kit-mode-2x.tsx plugin dir on 2.x,
+    # remove it on 1.x (the 1.x tui.json/danger theme are major-agnostic and
+    # stay). The major comes from the install.conf stamp, freshly re-stamped
+    # by any binary upgrade above.
+    _oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
+    [ -n "$_oc_major" ] || _oc_major=1
+    sync_tui_registration "$_oc_major"
 
-# --- TUI mode display user files (internal/records/_archive/design/plan-ui-tui-opencode.md) ---------
-# Same only-if-absent-or-kit-written policy as install.sh (marker key
-# _opencode_permissions_kit): user edits survive updates. The write goes
-# through the shared staged_write helper (review 0.0.39g S1 — sourced
-# early, see the top of this script): the target dir is agent-owned, root
-# cp/chown must never follow a planted symlink; a user-managed symlink at
-# the destination is skipped, never written through.
-OC_TUI_DIR="/home/$OPENCODE_USER/.config/opencode"
-OC_TUI_CONF="$OC_TUI_DIR/tui.json"
-# Chain gate BEFORE mkdir -p (review 0.0.39h F2): a linked PARENT
-# (~/.config, ~/.config/opencode) or a linked .config/opencode leaf
-# passes `sudo mkdir -p` silently and would redirect the staged_write mv
-# into the link target. Skip loudly (user-managed).
-if ! agent_home_sane "$OPENCODE_USER" "$OC_TUI_DIR"; then
-    ui_detail "the chain to $OC_TUI_CONF contains a symlink — TUI mode display NOT refreshed (user-managed)"
-    log "tui mode display skipped: symlink in the chain to $OC_TUI_CONF"
-else
-    sudo mkdir -p "$OC_TUI_DIR"
-    if [ -L "$OC_TUI_CONF" ]; then
-        log "tui mode display skipped: $OC_TUI_CONF is a symlink (user-managed)"
-    elif [ ! -f "$OC_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$OC_TUI_CONF" 2>/dev/null; then
-        staged_write 664 "$OPENCODE_USER:$NEW_OPENCODE_GROUP" "$LIBDIR/tui/tui.json" "$OC_TUI_CONF"
-        log "tui mode display refreshed: $OC_TUI_CONF"
+    # --- optional group-baseline refresh ------------------------------------------
+
+    if [ "$REFRESH" = true ]; then
+        ui_section "Refreshing group baseline"
+        # Shared helper with live per-pass progress (issue #14 — large trees
+        # used to run minutes in silence during --refresh).
+        _fsbl=""
+        for _fsbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
+            if [ -f "$_fsbl_cand" ]; then
+                . "$_fsbl_cand"
+                _fsbl="$_fsbl_cand"
+                break
+            fi
+        done
+        # Loud like the config.sh twin and the ddev_handover_root stub above
+        # (#211 b W3 — the a F2 sweep stopped at this file's handover stub):
+        # a silent no-op let --refresh log "group baseline refreshed" over a
+        # pass that never ran. Fail loud, let set -e stop the update.
+        command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
+            echo "error: fs_baseline_root unavailable (fs-baseline.sh missing)" >&2
+            return 1
+        }
+        if [ -f "$PROJECTS_CONF" ]; then
+            while IFS= read -r root; do
+                [ -z "$root" ] && continue
+                [ -d "$root" ] || continue
+                fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"
+                ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
+                ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
+            done <"$PROJECTS_CONF"
+        fi
+        ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"
+        log "group baseline refresh requested (--refresh)"
+    else
+        ui_detail "skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)"
     fi
-fi
-DEFAULT_TUI_CONF="$DEFAULT_HOME/.config/opencode/tui.json"
-DEFAULT_THEME_DIR="$DEFAULT_HOME/.config/opencode/themes"
-if [ ! -f "$DEFAULT_TUI_CONF" ] || grep -q '"_opencode_permissions_kit"' "$DEFAULT_TUI_CONF" 2>/dev/null; then
-    sudo mkdir -p "$DEFAULT_THEME_DIR"
-    sudo cp "$LIBDIR/tui/opencode-danger.theme.json" "$DEFAULT_THEME_DIR/opencode-danger.json"
-    sudo cp "$LIBDIR/tui/tui-danger.json" "$DEFAULT_TUI_CONF"
-    sudo chown -R "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_THEME_DIR"
-    sudo chown "$DEFAULT_USER:$NEW_OPENCODE_GROUP" "$DEFAULT_TUI_CONF"
-    sudo chmod 664 "$DEFAULT_TUI_CONF" "$DEFAULT_THEME_DIR/opencode-danger.json"
-    log "tui danger theme refreshed: $DEFAULT_TUI_CONF"
-fi
 
-# opencode 2.x (issue #80, #99): keep the TUI mode registration anchored
-# to the installed major — register the kit-mode-2x.tsx plugin dir on 2.x,
-# remove it on 1.x (the 1.x tui.json/danger theme are major-agnostic and
-# stay). The major comes from the install.conf stamp, freshly re-stamped
-# by any binary upgrade above.
-_oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
-[ -n "$_oc_major" ] || _oc_major=1
-sync_tui_registration "$_oc_major"
-
-# --- optional group-baseline refresh ------------------------------------------
-
-if [ "$REFRESH" = true ]; then
-    ui_section "Refreshing group baseline"
-    # Shared helper with live per-pass progress (issue #14 — large trees
-    # used to run minutes in silence during --refresh).
-    _fsbl=""
-    for _fsbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
-        if [ -f "$_fsbl_cand" ]; then . "$_fsbl_cand"; _fsbl="$_fsbl_cand"; break; fi
-    done
-    # Loud like the config.sh twin and the ddev_handover_root stub above
-    # (#211 b W3 — the a F2 sweep stopped at this file's handover stub):
-    # a silent no-op let --refresh log "group baseline refreshed" over a
-    # pass that never ran. Fail loud, let set -e stop the update.
-    command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
-        echo "error: fs_baseline_root unavailable (fs-baseline.sh missing)" >&2
-        return 1
-    }
-    if [ -f "$PROJECTS_CONF" ]; then
-        while IFS= read -r root; do
-            [ -z "$root" ] && continue
-            [ -d "$root" ] || continue
-            fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"
-            ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-            ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-        done < "$PROJECTS_CONF"
-    fi
-    ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"
-    log "group baseline refresh requested (--refresh)"
-else
-    ui_detail "skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)"
-fi
-
-fi   # ONLY_BINARY skip: post-binary sections
+fi # ONLY_BINARY skip: post-binary sections
 
 # --- done --------------------------------------------------------------------
 
 ui_section "Update complete"
 
 if [ "$ONLY_BINARY" = true ]; then
-    ui_kv "Mode"     "binary-only (kit files untouched)"
+    ui_kv "Mode" "binary-only (kit files untouched)"
 else
-    ui_kv "Kit"      "v$VERSION"
-    ui_kv "Configs"  "projects.conf and opencode.jsonc untouched"
+    ui_kv "Kit" "v$VERSION"
+    ui_kv "Configs" "projects.conf and opencode.jsonc untouched"
 fi
-[ "$BINARY_UPDATE" = true ] || ui_kv "Binary"   "untouched (use --binary to upgrade)"
+[ "$BINARY_UPDATE" = true ] || ui_kv "Binary" "untouched (use --binary to upgrade)"
 ui_info "Next:"
 ui_detail "opk status   verify the protection"
 ui_detail "opk upgrade-opencode    upgrade the opencode binary"

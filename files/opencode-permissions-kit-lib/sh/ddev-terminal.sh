@@ -125,11 +125,14 @@ _opk_browser_url() {
             _opk_bl_base="$(_opk_json_get "$_opk_bj" primary_url)"
             while :; do
                 case "${1:-}" in
-                    -m|--mailpit|--mailhog)
+                    -m | --mailpit | --mailhog)
                         _opk_bl_base="$(_opk_scheme_url "$_opk_bj" mailpit_https_url mailpit_url)"
                         ;;
-                    -p|--phpmyadmin) return 0 ;;
-                    --) shift; break ;;
+                    -p | --phpmyadmin) return 0 ;;
+                    --)
+                        shift
+                        break
+                        ;;
                     -*) ;;
                     *) break ;;
                 esac
@@ -137,7 +140,7 @@ _opk_browser_url() {
             done
             case "${1:-}" in
                 "") printf '%s\n' "$_opk_bl_base" ;;
-                http://*|https://*) printf '%s\n' "$1" ;;
+                http://* | https://*) printf '%s\n' "$1" ;;
                 :*) printf '%s\n' "${_opk_bl_base%:[0-9]*}$1" ;;
                 *) printf '%s\n' "${_opk_bl_base%/}/${1#/}" ;;
             esac
@@ -221,7 +224,7 @@ _opk_browser_cmds() {
 _opk_is_browser_cmd() {
     if [ "$1" = "xhgui" ]; then
         case "${2:-}" in
-            ""|launch) return 0 ;;
+            "" | launch) return 0 ;;
             *) return 1 ;;
         esac
     fi
@@ -240,7 +243,7 @@ ddev() {
         # root while TYPO3 is undetected — owner-only operation). The
         # hint names the one-command fix while the error is still ahead.
         case "${1:-}" in
-            start|restart) _opk_bootstrap_hint 2>/dev/null || true ;;
+            start | restart) _opk_bootstrap_hint 2>/dev/null || true ;;
         esac
         if _opk_is_browser_cmd "${1:-}" "${2:-}"; then
             # Browser commands (issue #20): URL computed as opencode —
@@ -257,7 +260,7 @@ ddev() {
     # group-write (ddev's explicit 0755/0644 cap the inherited ACL mask) —
     # heal before git ever needs to write there.
     case "${1:-}" in
-        config|get|start|restart) _opk_ddev_reshare ;;
+        config | get | start | restart) _opk_ddev_reshare ;;
     esac
     # issue #149 finding 1: dev-owned mode flags the project the moment
     # `ddev config` creates it (silent when off or already flagged).
@@ -265,7 +268,7 @@ ddev() {
         config) _opk_devowned_flag ;;
     esac
     case "${1:-}" in
-        start|restart) _opk_hosts_hint 2>/dev/null || true ;;
+        start | restart) _opk_hosts_hint 2>/dev/null || true ;;
     esac
     return "$_opk_rc"
 }
@@ -366,7 +369,7 @@ _opk_bootstrap_hint() {
     [ -f "$PWD/.ddev/config.yaml" ] || return 0
     _opk_type=$(sed -n 's/^type:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
     case "$_opk_type" in
-        typo3|maho|modx|codeigniter|shopware6|symfony) ;;
+        typo3 | maho | modx | codeigniter | shopware6 | symfony) ;;
         *) return 0 ;;
     esac
     _opk_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$PWD/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
@@ -376,7 +379,7 @@ _opk_bootstrap_hint() {
     # config.yaml value must stay a contained relative path (0.0.39e S2,
     # wave-f review — read-only consumer, gated for consistency).
     case "$_opk_docroot" in
-        /*|*..*|*[!A-Za-z0-9._/-]*) _opk_docroot="." ;;
+        /* | *..* | *[!A-Za-z0-9._/-]*) _opk_docroot="." ;;
     esac
     # shellcheck disable=SC1090  # test override / deployed kit path, checked above
     . "$_opk_dhl"
@@ -395,10 +398,10 @@ _opk_bootstrap_hint() {
             echo ""
             echo "    sudo opk config handover \"$PWD\""
             ;;
-        maho|modx)
+        maho | modx)
             case "$_opk_type" in
                 maho) _opk_tgt="$PWD/app/etc" ;;
-                *)    _opk_tgt="$PWD/$_opk_docroot/core/config" ;;
+                *) _opk_tgt="$PWD/$_opk_docroot/core/config" ;;
             esac
             [ -d "$_opk_tgt" ] || return 0
             [ "$(stat -c %U "$_opk_tgt" 2>/dev/null)" = "opencode" ] && return 0
@@ -409,7 +412,7 @@ _opk_bootstrap_hint() {
             echo ""
             echo "    sudo opk config handover \"$PWD\""
             ;;
-        codeigniter|shopware6|symfony)
+        codeigniter | shopware6 | symfony)
             [ "$(stat -c %U "$PWD" 2>/dev/null)" = "opencode" ] && return 0
             echo ""
             echo "  hint: this $_opk_type project's settings file lives at the"

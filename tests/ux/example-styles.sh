@@ -33,10 +33,10 @@ printf '  %s[3/8]%s apply ACLs...\n' "$UI_DIM" "$UI_NC"
 # --- D: checklist inventory --------------------------------------------------------------
 ui_section "D — inventory checklist"
 
-ui_have  "curl"                    "present"
-ui_add   "user 'opencode'"         "will be created"
-ui_atten "/mnt/c"                  "world-readable"
-ui_miss  "ddev"                    "not installed"
+ui_have "curl" "present"
+ui_add "user 'opencode'" "will be created"
+ui_atten "/mnt/c" "world-readable"
+ui_miss "ddev" "not installed"
 
 # --- E: banner variants --------------------------------------------------------------------
 ui_section "E — banner variants"
@@ -47,9 +47,9 @@ ui_banner_box "0.0.11" "boxed banner (variant B)"
 # --- F: key/value panel -----------------------------------------------------------------------
 ui_section "F — key/value panel (status, summaries)"
 
-ui_kv "Mode"    "dedicated user + rootless containers" "$UI_GREEN"
+ui_kv "Mode" "dedicated user + rootless containers" "$UI_GREEN"
 ui_kv "Backend" "docker-rootless" "$UI_GREEN"
-ui_kv "WSL2"    "pending wsl --shutdown" "$UI_YELLOW"
+ui_kv "WSL2" "pending wsl --shutdown" "$UI_YELLOW"
 
 # --- G: density comparison ----------------------------------------------------------------------
 ui_section "G — density (airy vs compact)"

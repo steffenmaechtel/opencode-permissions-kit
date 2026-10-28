@@ -20,10 +20,16 @@ set -e
 # NO_COLOR / non-tty, same rule as sh/ui.sh and uninstall.sh
 # (0.0.39e C10/C12; guard added per 0.0.39m C1).
 if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
-    RED=''; GREEN=''; CYAN=''; YELLOW=''; NC=''
+    RED=''
+    GREEN=''
+    CYAN=''
+    YELLOW=''
+    NC=''
 else
-    RED=$(printf '\033[0;31m'); GREEN=$(printf '\033[0;32m')
-    CYAN=$(printf '\033[0;36m'); YELLOW=$(printf '\033[0;33m')
+    RED=$(printf '\033[0;31m')
+    GREEN=$(printf '\033[0;32m')
+    CYAN=$(printf '\033[0;36m')
+    YELLOW=$(printf '\033[0;33m')
     NC=$(printf '\033[0m')
 fi
 
@@ -40,7 +46,7 @@ fi
 # back to a root-equivalent path.
 CONTAINER_BACKEND="${CONTAINER_BACKEND:-}"
 case "$CONTAINER_BACKEND" in
-    docker-rootless|podman-rootless) ;;
+    docker-rootless | podman-rootless) ;;
     *) CONTAINER_BACKEND="" ;;
 esac
 
@@ -73,7 +79,10 @@ for _hr_a in "$@"; do
     fi
     case "$_hr_a" in
         -*) ;;
-        *) _hr_msg=true; break ;;
+        *)
+            _hr_msg=true
+            break
+            ;;
     esac
 done
 # Subcommand union for headless classification: opencode 1.x names (agent,
@@ -84,8 +93,8 @@ done
 # work from any directory. 2.x `mini` is an interactive UI and stays
 # bannered like `tui`/`attach`.
 case "${1:-}" in
-    serve|acp|models|agent|providers|session|export|import|stats|account|console|github|\
-    pr|mcp|plug|db|generate|web|debug|uninstall|upgrade|api|auth|plugin|service|pair|update)
+    serve | acp | models | agent | providers | session | export | import | stats | account | console | github | \
+        pr | mcp | plug | db | generate | web | debug | uninstall | upgrade | api | auth | plugin | service | pair | update)
         HEADLESS=true
         ;;
     run)
@@ -128,7 +137,7 @@ if [ -f "$PROJECTS_CONF" ]; then
             VALID=true
             break
         fi
-    done < "$PROJECTS_CONF"
+    done <"$PROJECTS_CONF"
 fi
 
 # Version/help queries carry no project context and no kit state — answer
@@ -140,7 +149,7 @@ fi
 # be started here"). Same exec path as below — no banner, no project-dir
 # check, no container resolution.
 case "${1:-}" in
-    --version|-v|-h|--help)
+    --version | -v | -h | --help)
         exec /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode "$@"
         ;;
 esac
@@ -161,7 +170,7 @@ if [ "$VALID" != true ] && [ "$HEADLESS" != true ]; then
                 break
             fi
             printf "  - %s\n" "$root"
-        done < "$PROJECTS_CONF"
+        done <"$PROJECTS_CONF"
     else
         echo "  (none configured — run install.sh first)"
     fi
@@ -241,7 +250,7 @@ openchamber_guard() {
         if [ -e "$_oc_path" ]; then
             if [ -L "$_oc_path" ] && [ "$(readlink -f "$_oc_path" 2>/dev/null || echo "$_oc_path")" \
                 = "/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode" ]; then
-                :   # kit-owned symlink — not a shadow
+                : # kit-owned symlink — not a shadow
             else
                 _oc_bins="$_oc_bins $_oc_path"
             fi
@@ -268,8 +277,8 @@ openchamber_guard() {
     # (openchamber: policy wins, never falls back). Leftovers are inert —
     # name BOTH kinds (0.0.47a F2: a pin-only leftover must not dangle
     # behind an empty binaries list).
-    if [ -f /etc/openchamber/policy.json ] \
-        && [ "$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    if [ -f /etc/openchamber/policy.json ] &&
+        [ "$(sed -n 's/.*"opencodeBinary"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
             /etc/openchamber/policy.json 2>/dev/null | tail -n 1)" = "/usr/local/bin/opencode" ]; then
         note "${CYAN}NOTE: OpenChamber is pinned to the kit wrapper via /etc/openchamber/policy.json;${NC}"
         if [ -n "$_oc_bins" ]; then
@@ -358,9 +367,8 @@ if [ -d /mnt/c ]; then
         esac
     fi
     if [ "$_bridge_needed" -eq 1 ] && [ -n "$mnt_mode" ] && [ $((0$mnt_mode & 0004)) -eq 0 ]; then
-        if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/\
-WindowsPowerShell/v1.0/powershell.exe ] \
-           || ! grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
+        if ! [ -x /usr/local/lib/opencode-permissions-kit/wsl/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ] ||
+            ! grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null; then
             note "${YELLOW}WARNING: browser bridge missing — 'console login'/'auth login' would fail${NC}"
             note "${YELLOW}on this restricted /mnt/c. Enable it: sudo opk wsl-add-opencode-1-fix${NC}"
             note ""
@@ -403,7 +411,7 @@ if [ -z "${OPENCODE_MAJOR:-}" ]; then
     fi
     case "$_MAJOR_SRC" in
         "opencode v2"*) OPENCODE_MAJOR=2 ;;
-        *)              OPENCODE_MAJOR=1 ;;
+        *) OPENCODE_MAJOR=1 ;;
     esac
 fi
 
@@ -470,7 +478,8 @@ if [ -n "$MERGED_CONFIG" ] && PROJECT_TOOLS=$(printf '%s' "$MERGED_CONFIG" | too
 else
     PROJECT_TOOLS=""
     PROJECT_CONFIG=""
-    if [ -f "./opencode.jsonc" ]; then PROJECT_CONFIG="./opencode.jsonc"
+    if [ -f "./opencode.jsonc" ]; then
+        PROJECT_CONFIG="./opencode.jsonc"
     elif [ -f "./opencode.json" ]; then PROJECT_CONFIG="./opencode.json"; fi
     if [ -n "$PROJECT_CONFIG" ]; then
         PROJECT_TOOLS=$(tools_from_config "$PROJECT_CONFIG") || PROJECT_TOOLS=""
@@ -518,7 +527,7 @@ fi
 sock_reachable() {
     [ -n "$1" ] || return 1
     sock="$1"
-    case "$sock" in unix://*) sock="${sock#unix://}";; esac
+    case "$sock" in unix://*) sock="${sock#unix://}" ;; esac
     [ -S "$sock" ] 2>/dev/null && return 0
     # -n like every sibling probe (0.0.43a F17): without it a missing
     # sudoers rule makes sudo try to authenticate (password prompt
@@ -568,8 +577,8 @@ if [ "$CONTAINER_REQUESTED" = true ]; then
                         CONTAINER_XDG="/run/user/$(id -u opencode 2>/dev/null || echo 0)"
                     else
                         note "${RED}WARNING: podman-rootless socket not reachable ($sock_host).${NC}"
-                        note "${YELLOW}Running WITHOUT container tools"\
-" — not downgrading to a root-equivalent path.${NC}"
+                        note "${YELLOW}Running WITHOUT container tools""\
+ — not downgrading to a root-equivalent path.${NC}"
                         note ""
                         CONTAINER_REQUESTED=false
                         CONTAINER_AUTO=false
@@ -632,7 +641,7 @@ if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
                     break
                 fi
             fi
-        done < "$PROJECTS_CONF"
+        done <"$PROJECTS_CONF"
         # pass 2: first readable configured root (the OpenChamber case:
         # cwd is $HOME, no root contains it)
         if [ -z "$SERVE_FALLBACK" ]; then
@@ -644,7 +653,7 @@ if [ "${1:-}" = "serve" ] && [ "$(cwd_probe "$CWD")" = "unreadable" ]; then
                     SERVE_FALLBACK="$root_clean"
                     break
                 fi
-            done < "$PROJECTS_CONF"
+            done <"$PROJECTS_CONF"
         fi
     fi
     if [ -z "$SERVE_FALLBACK" ]; then
@@ -706,13 +715,20 @@ fi
 # `mini`; an explicit --server or --standalone in the user's args always
 # wins.
 standalone_mode() {
-    [ "${OPENCODE_MAJOR:-}" = 2 ] || { echo none; return 0; }
+    [ "${OPENCODE_MAJOR:-}" = 2 ] || {
+        echo none
+        return 0
+    }
     for _sa in "$@"; do
-        case "$_sa" in --server|--server=*|--standalone) echo none; return 0 ;; esac
+        case "$_sa" in --server | --server=* | --standalone)
+            echo none
+            return 0
+            ;;
+        esac
     done
     case "${1:-}" in
-        run|mini) echo after-first ;;
-        ""|-*) echo append ;;
+        run | mini) echo after-first ;;
+        "" | -*) echo append ;;
         *) echo none ;;
     esac
 }

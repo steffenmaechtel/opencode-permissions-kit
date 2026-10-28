@@ -25,62 +25,68 @@ STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.s
 
 failures=0
 passed=0
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 # shellcheck disable=SC1090  # the shipped database, checked below
 [ -f "$LIB" ] && . "$LIB"
 
 # --- 1. version parsing ----------------------------------------------------------
 
-[ "$(advisories_version_of "1.18.31")" = "1.18.31" ] \
-    && pass "version_of: 1.x bare line (1.18.31)" \
-    || fail "version_of: 1.x bare line (got '$(advisories_version_of "1.18.31")')"
-[ "$(advisories_version_of "opencode v2.0.11")" = "2.0.11" ] \
-    && pass "version_of: 2.x prefixed line (opencode v2.0.11 -> 2.0.11)" \
-    || fail "version_of: 2.x prefixed line (got '$(advisories_version_of "opencode v2.0.11")')"
-[ -z "$(advisories_version_of "unknown")" ] \
-    && pass "version_of: garbage yields empty" \
-    || fail "version_of: garbage yields empty (got '$(advisories_version_of "unknown")')"
-[ -z "$(advisories_version_of "")" ] \
-    && pass "version_of: empty yields empty" \
-    || fail "version_of: empty yields empty"
+[ "$(advisories_version_of "1.18.31")" = "1.18.31" ] &&
+    pass "version_of: 1.x bare line (1.18.31)" ||
+    fail "version_of: 1.x bare line (got '$(advisories_version_of "1.18.31")')"
+[ "$(advisories_version_of "opencode v2.0.11")" = "2.0.11" ] &&
+    pass "version_of: 2.x prefixed line (opencode v2.0.11 -> 2.0.11)" ||
+    fail "version_of: 2.x prefixed line (got '$(advisories_version_of "opencode v2.0.11")')"
+[ -z "$(advisories_version_of "unknown")" ] &&
+    pass "version_of: garbage yields empty" ||
+    fail "version_of: garbage yields empty (got '$(advisories_version_of "unknown")')"
+[ -z "$(advisories_version_of "")" ] &&
+    pass "version_of: empty yields empty" ||
+    fail "version_of: empty yields empty"
 
 # --- 2. comparisons ---------------------------------------------------------------
 
-[ "$(advisories_version_cmp 1.18.31 1.18.22)" = "gt" ] \
-    && pass "version_cmp: 1.18.31 > 1.18.22" \
-    || fail "version_cmp: 1.18.31 > 1.18.22"
-[ "$(advisories_version_cmp 2.0.11 2.0.11)" = "eq" ] \
-    && pass "version_cmp: 2.0.11 = 2.0.11" \
-    || fail "version_cmp: 2.0.11 = 2.0.11"
-[ "$(advisories_version_cmp 1.0.216 1.1.10)" = "lt" ] \
-    && pass "version_cmp: 1.0.216 < 1.1.10" \
-    || fail "version_cmp: 1.0.216 < 1.1.10"
+[ "$(advisories_version_cmp 1.18.31 1.18.22)" = "gt" ] &&
+    pass "version_cmp: 1.18.31 > 1.18.22" ||
+    fail "version_cmp: 1.18.31 > 1.18.22"
+[ "$(advisories_version_cmp 2.0.11 2.0.11)" = "eq" ] &&
+    pass "version_cmp: 2.0.11 = 2.0.11" ||
+    fail "version_cmp: 2.0.11 = 2.0.11"
+[ "$(advisories_version_cmp 1.0.216 1.1.10)" = "lt" ] &&
+    pass "version_cmp: 1.0.216 < 1.1.10" ||
+    fail "version_cmp: 1.0.216 < 1.1.10"
 # Gate boundaries the wrapper/status routing depends on (0.0.42d Q2):
 # 1.x < 1.18.33 and 2.x < 2.0.18 keep the carrier warning; the
 # thresholds themselves and the unknown-version fail-safe are pinned
 # here so the case routing in bin/opencode-as-opencode and status.sh
 # cannot drift silently.
-[ "$(advisories_version_cmp 1.18.32 1.18.33)" = "lt" ] \
-    && pass "gate boundary: 1.18.32 needs the carrier (< 1.18.33)" \
-    || fail "gate boundary: 1.18.32 needs the carrier (< 1.18.33)"
-[ "$(advisories_version_cmp 1.18.33 1.18.33)" = "eq" ] \
-    && pass "gate boundary: 1.18.33 itself needs no carrier" \
-    || fail "gate boundary: 1.18.33 itself needs no carrier"
-[ "$(advisories_version_cmp 2.0.17 2.0.18)" = "lt" ] \
-    && pass "gate boundary: 2.0.17 needs the carrier (< 2.0.18)" \
-    || fail "gate boundary: 2.0.17 needs the carrier (< 2.0.18)"
-[ "$(advisories_version_cmp 2.0.18 2.0.18)" = "eq" ] \
-    && pass "gate boundary: 2.0.18 itself needs no carrier" \
-    || fail "gate boundary: 2.0.18 itself needs no carrier"
-[ "$(advisories_version_cmp "" 1.18.33)" = "lt" ] \
-    && pass "gate fail-safe: unknown/empty version keeps the warning" \
-    || fail "gate fail-safe: unknown/empty version keeps the warning"
+[ "$(advisories_version_cmp 1.18.32 1.18.33)" = "lt" ] &&
+    pass "gate boundary: 1.18.32 needs the carrier (< 1.18.33)" ||
+    fail "gate boundary: 1.18.32 needs the carrier (< 1.18.33)"
+[ "$(advisories_version_cmp 1.18.33 1.18.33)" = "eq" ] &&
+    pass "gate boundary: 1.18.33 itself needs no carrier" ||
+    fail "gate boundary: 1.18.33 itself needs no carrier"
+[ "$(advisories_version_cmp 2.0.17 2.0.18)" = "lt" ] &&
+    pass "gate boundary: 2.0.17 needs the carrier (< 2.0.18)" ||
+    fail "gate boundary: 2.0.17 needs the carrier (< 2.0.18)"
+[ "$(advisories_version_cmp 2.0.18 2.0.18)" = "eq" ] &&
+    pass "gate boundary: 2.0.18 itself needs no carrier" ||
+    fail "gate boundary: 2.0.18 itself needs no carrier"
+[ "$(advisories_version_cmp "" 1.18.33)" = "lt" ] &&
+    pass "gate fail-safe: unknown/empty version keeps the warning" ||
+    fail "gate fail-safe: unknown/empty version keeps the warning"
 # segment order, not lexicographic: 1.10.0 > 1.9.0
-[ "$(advisories_version_cmp 1.10.0 1.9.0)" = "gt" ] \
-    && pass "version_cmp: 1.10.0 > 1.9.0 (segment order, not lexicographic)" \
-    || fail "version_cmp: 1.10.0 > 1.9.0 (segment order, not lexicographic)"
+[ "$(advisories_version_cmp 1.10.0 1.9.0)" = "gt" ] &&
+    pass "version_cmp: 1.10.0 > 1.9.0 (segment order, not lexicographic)" ||
+    fail "version_cmp: 1.10.0 > 1.9.0 (segment order, not lexicographic)"
 
 # --- 3. ranges ---------------------------------------------------------------------
 
@@ -140,24 +146,41 @@ shape_ok=true
 shape_msg=""
 while IFS= read -r rec; do
     case "$rec" in
-        ''|'#'*) continue ;;
+        '' | '#'*) continue ;;
     esac
     IFS='|' read -r R_PKG R_RANGES R_PATCHED R_CHANNEL R_SEV R_ID R_SUMMARY R_EXTRA <<EOF
 $rec
 EOF
-    [ -z "$R_EXTRA" ] || { shape_ok=false; shape_msg="$shape_msg [$R_ID: more than 7 fields]"; continue; }
-    [ -n "$R_PKG" ] && [ -n "$R_RANGES" ] && [ -n "$R_PATCHED" ] && [ -n "$R_ID" ] && [ -n "$R_SUMMARY" ] \
-        || { shape_ok=false; shape_msg="$shape_msg [$R_ID: empty required field]"; continue; }
+    [ -z "$R_EXTRA" ] || {
+        shape_ok=false
+        shape_msg="$shape_msg [$R_ID: more than 7 fields]"
+        continue
+    }
+    [ -n "$R_PKG" ] && [ -n "$R_RANGES" ] && [ -n "$R_PATCHED" ] && [ -n "$R_ID" ] && [ -n "$R_SUMMARY" ] ||
+        {
+            shape_ok=false
+            shape_msg="$shape_msg [$R_ID: empty required field]"
+            continue
+        }
     case "$R_CHANNEL" in
-        ''|npm|standalone) ;;
-        *) shape_ok=false; shape_msg="$shape_msg [$R_ID: unknown channel '$R_CHANNEL']" ;;
+        '' | npm | standalone) ;;
+        *)
+            shape_ok=false
+            shape_msg="$shape_msg [$R_ID: unknown channel '$R_CHANNEL']"
+            ;;
     esac
     case "$R_SEV" in
-        low|moderate|high|critical) ;;
-        *) shape_ok=false; shape_msg="$shape_msg [$R_ID: unknown severity '$R_SEV']" ;;
+        low | moderate | high | critical) ;;
+        *)
+            shape_ok=false
+            shape_msg="$shape_msg [$R_ID: unknown severity '$R_SEV']"
+            ;;
     esac
-    printf '%s' "$R_ID" | grep -q '^GHSA-[0-9a-z-]*$' \
-        || { shape_ok=false; shape_msg="$shape_msg [$R_ID: not a GHSA id]"; }
+    printf '%s' "$R_ID" | grep -q '^GHSA-[0-9a-z-]*$' ||
+        {
+            shape_ok=false
+            shape_msg="$shape_msg [$R_ID: not a GHSA id]"
+        }
     # every comparator of every range must parse
     _rest="$R_RANGES,"
     while [ -n "$_rest" ]; do
@@ -165,8 +188,11 @@ EOF
         _rest="${_rest#*,}"
         _c=$(printf '%s' "$_c" | tr -d ' ')
         [ -n "$_c" ] || continue
-        printf '%s' "$_c" | grep -qE '^(>=|<=|<|>|=)?[0-9]+(\.[0-9]+)*$' \
-            || { shape_ok=false; shape_msg="$shape_msg [$R_ID: bad comparator '$_c']"; }
+        printf '%s' "$_c" | grep -qE '^(>=|<=|<|>|=)?[0-9]+(\.[0-9]+)*$' ||
+            {
+                shape_ok=false
+                shape_msg="$shape_msg [$R_ID: bad comparator '$_c']"
+            }
     done
 done <<EOF
 $ADVISORY_RECORDS
@@ -230,16 +256,16 @@ done
 
 # --- 7. wiring -----------------------------------------------------------------------------
 
-if grep -q '/sh/advisories.sh' "$WRAPPER" \
-   && grep -q "WARNING: the installed opencode .* is affected by a known security advisory" "$WRAPPER" \
-   && grep -q "Please upgrade opencode with 'opk upgrade-opencode'" "$WRAPPER"; then
+if grep -q '/sh/advisories.sh' "$WRAPPER" &&
+    grep -q "WARNING: the installed opencode .* is affected by a known security advisory" "$WRAPPER" &&
+    grep -q "Please upgrade opencode with 'opk upgrade-opencode'" "$WRAPPER"; then
     pass "wrapper: sources the database, warns, hints the upgrade command"
 else
     fail "wrapper: sources the database, warns, hints the upgrade command"
 fi
 # the --version early-exec must stay ahead of the advisory block: scripts and
 # the official installer parse that output, the warning must never pollute it
-_verline=$(grep -n -m1 -- '--version|-v|-h|--help)' "$WRAPPER" | cut -d: -f1)
+_verline=$(grep -n -m1 -- '--version | -v | -h | --help)' "$WRAPPER" | cut -d: -f1)
 _advline=$(grep -n -m1 '/sh/advisories.sh' "$WRAPPER" | cut -d: -f1)
 if [ -n "$_verline" ] && [ -n "$_advline" ] && [ "$_verline" -lt "$_advline" ]; then
     pass "wrapper: --version early-exec stays ahead of the advisory check"
@@ -251,9 +277,9 @@ if grep -q 'timeout 5 /usr/bin/sudo -n -u opencode' "$WRAPPER" && grep -q 'bin/o
 else
     fail "wrapper: the --version probe is timeout-bounded (wedged 2.x service, issue #80)"
 fi
-if grep -q 'ui_section "Security advisories"' "$STATUS" \
-   && grep -q 'https://api.github.com/repos/anomalyco/opencode/security-advisories' "$STATUS" \
-   && grep -q 'opk upgrade-opencode' "$STATUS"; then
+if grep -q 'ui_section "Security advisories"' "$STATUS" &&
+    grep -q 'https://api.github.com/repos/anomalyco/opencode/security-advisories' "$STATUS" &&
+    grep -q 'opk upgrade-opencode' "$STATUS"; then
     pass "status.sh: advisory section, upstream live check, upgrade hint"
 else
     fail "status.sh: advisory section, upstream live check, upgrade hint"
@@ -343,9 +369,9 @@ else
 fi
 # quoting discipline stays in place: the id only ever reaches argv inside
 # double quotes, free text only the body file
-if grep -q -- '--search "\$ID in:title"' "$SCAN" \
-   && grep -q -- '--title "New upstream advisory \$ID affects opencode"' "$SCAN" \
-   && ! grep -q 'eval ' "$SCAN"; then
+if grep -q -- '--search "\$ID in:title"' "$SCAN" &&
+    grep -q -- '--title "New upstream advisory \$ID affects opencode"' "$SCAN" &&
+    ! grep -q 'eval ' "$SCAN"; then
     pass "advisory-watch.sh: quoted argv only, no eval"
 else
     fail "advisory-watch.sh: quoted argv only, no eval"
@@ -357,15 +383,15 @@ fi
 # JSON null fields coerce to "" instead of killing the parse, and the
 # shell boundary maps GitHub's "medium" onto the kit's "moderate".
 FEED_PY="$(mktemp)"
-sed -n "/python3 -c '/,/2>\\/dev\\/null); then/p" "$SCAN" \
-    | sed -e "1s/^.*python3 -c '//" -e '$d' > "$FEED_PY"
+sed -n "/python3 -c '/,/2>\\/dev\\/null); then/p" "$SCAN" |
+    sed -e "1s/^.*python3 -c '//" -e '$d' >"$FEED_PY"
 if [ -s "$FEED_PY" ] && grep -q '^import json,sys' "$FEED_PY"; then
     pass "advisory-watch.sh: feed parser extractable"
 else
     fail "advisory-watch.sh: feed parser extractable"
 fi
 FEED_JSON="$(mktemp)"
-cat > "$FEED_JSON" <<'EOF'
+cat >"$FEED_JSON" <<'EOF'
 [
  {"ghsa_id":"GHSA-1111-1111-1111","severity":"medium","html_url":"https://example/1",
   "summary":"medium advisory",
@@ -376,9 +402,9 @@ cat > "$FEED_JSON" <<'EOF'
  {"ghsa_id":null,"severity":null,"html_url":null,"summary":null,"vulnerabilities":[]}
 ]
 EOF
-FEED_OUT="$(python3 "$FEED_PY" < "$FEED_JSON" 2>/dev/null)" \
-    && pass "feed parser: null fields do not kill the parse (F7)" \
-    || fail "feed parser: null fields do not kill the parse (F7)"
+FEED_OUT="$(python3 "$FEED_PY" <"$FEED_JSON" 2>/dev/null)" &&
+    pass "feed parser: null fields do not kill the parse (F7)" ||
+    fail "feed parser: null fields do not kill the parse (F7)"
 EXPECT1='GHSA-1111-1111-1111|medium|>=1.0.0||medium advisory|https://example/1'
 EXPECT2='GHSA-2222-2222-2222||<2.0.0||null severity|https://example/2'
 EXPECT3='|||||'
@@ -423,8 +449,8 @@ fi
 # charset gate must precede BOTH dedups (the gh search embeds the id).
 _tracked_ln="$(grep -n 'TRACKED=\$(gh issue list' "$SCAN" | head -1 | cut -d: -f1)"
 _idclean_ln="$(grep -n 'scan_id_clean "\$ID"' "$SCAN" | head -1 | cut -d: -f1)"
-if [ -n "$_idclean_ln" ] && [ -n "$_tracked_ln" ] && [ "$_idclean_ln" -lt "$_tracked_ln" ] \
-   && [ -n "$_valid_ln" ] && [ "$_tracked_ln" -lt "$_valid_ln" ]; then
+if [ -n "$_idclean_ln" ] && [ -n "$_tracked_ln" ] && [ "$_idclean_ln" -lt "$_tracked_ln" ] &&
+    [ -n "$_valid_ln" ] && [ "$_tracked_ln" -lt "$_valid_ln" ]; then
     pass "advisory-watch.sh: id gate -> both dedups -> validation (V12)"
 else
     fail "advisory-watch.sh: id gate -> both dedups -> validation (V12)"

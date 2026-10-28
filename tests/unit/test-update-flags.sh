@@ -23,10 +23,17 @@ CLI_MD="$SCRIPT_DIR/../../docs/reference/cli.md"
 
 failures=0
 passed=0
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 check() {
-    _d="$1"; shift
+    _d="$1"
+    shift
     if "$@"; then pass "$_d"; else fail "$_d"; fi
 }
 
@@ -49,10 +56,10 @@ trap _trap_cleanup EXIT INT TERM
 # library) died rc 127 at the confirm instead of failing with the
 # re-deploy hint — the exact class 0.0.45c C9 fixed in config.sh (the
 # C9 sweep missed this fallback). The fallback must fail loudly.
-_updfb="$(sed -n '/^    ui_info()    { echo "  info     $1"; }$/,/^    UI_GREEN=/p' "$UPDATE")"
+_updfb="$(sed -n '/^    ui_info() { echo "  info     $1"; }$/,/^    UI_GREEN=/p' "$UPDATE")"
 if [ -n "$_updfb" ]; then
-    if printf '%s\n' "$_updfb" | grep -q '_ui_no_prompt()' \
-       && printf '%s\n' "$_updfb" | grep -q 'ui_confirm()'; then
+    if printf '%s\n' "$_updfb" | grep -q '_ui_no_prompt()' &&
+        printf '%s\n' "$_updfb" | grep -q 'ui_confirm()'; then
         pass "update.sh ui.sh fallback fails loudly at its one prompt (W4)"
     else
         fail "update.sh ui.sh fallback must define the ui_confirm loud-fail stub (W4)"
@@ -79,13 +86,13 @@ fi
 # or "downloads" an npm-layout tarball (-o); api.github.com answers the
 # releases/latest tag (no -o) or a GitHub-layout tarball (-o).
 mkdir -p "$WORK/bin" "$WORK/fixture" "$WORK/fixture-npm/package/bin"
-printf '#!/bin/sh\necho "opencode version 9.9.9"\n' > "$WORK/fixture/opencode"
+printf '#!/bin/sh\necho "opencode version 9.9.9"\n' >"$WORK/fixture/opencode"
 chmod +x "$WORK/fixture/opencode"
 tar -czf "$WORK/fixture/release.tar.gz" -C "$WORK/fixture" opencode
-printf '#!/bin/sh\necho "opencode v2.1.99"\n' > "$WORK/fixture-npm/package/bin/opencode"
+printf '#!/bin/sh\necho "opencode v2.1.99"\n' >"$WORK/fixture-npm/package/bin/opencode"
 chmod +x "$WORK/fixture-npm/package/bin/opencode"
 tar -czf "$WORK/fixture/release-npm.tgz" -C "$WORK/fixture-npm" package
-cat > "$WORK/bin/curl" <<FAKE
+cat >"$WORK/bin/curl" <<FAKE
 #!/bin/sh
 _args="\$*"
 case " \$_args " in
@@ -123,11 +130,13 @@ FUNCS="$WORK/funcs.sh"
     sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE"
     sed -n '/^resolve_latest_opencode_version() {/,/^}/p' "$UPDATE"
     sed -n '/^fetch_opencode_version() {/,/^}/p' "$UPDATE"
-} > "$FUNCS"
+} >"$FUNCS"
 
 # Stubs for current_opencode_major (2.x and 1.x --version shapes).
-printf '#!/bin/sh\necho "opencode v2.0.11"\n' > "$WORK/stub-v2"; chmod +x "$WORK/stub-v2"
-printf '#!/bin/sh\necho "1.18.31"\n'        > "$WORK/stub-v1"; chmod +x "$WORK/stub-v1"
+printf '#!/bin/sh\necho "opencode v2.0.11"\n' >"$WORK/stub-v2"
+chmod +x "$WORK/stub-v2"
+printf '#!/bin/sh\necho "1.18.31"\n' >"$WORK/stub-v1"
+chmod +x "$WORK/stub-v1"
 mkdir -p "$WORK/conf"
 
 # 2a. major detection from the binary's --version shape
@@ -162,7 +171,7 @@ _re=$(run_resolver "$WORK/bin" "$WORK/stub-v1" 'resolve_latest_opencode_version 
 
 # 2c. a dist-tag outside the wanted major fails loudly (no silent crossing)
 mkdir -p "$WORK/bin3"
-sed 's/"latest":"2.1.99"/"latest":"3.0.0"/' "$WORK/bin/curl" > "$WORK/bin3/curl"
+sed 's/"latest":"2.1.99"/"latest":"3.0.0"/' "$WORK/bin/curl" >"$WORK/bin3/curl"
 chmod +x "$WORK/bin3/curl"
 _re=$(run_resolver "$WORK/bin3" "$WORK/stub-v2" 'resolve_latest_opencode_version 2' >/dev/null && echo resolved || echo refused)
 [ "$_re" = "refused" ] && pass "resolve: dist-tag off the wanted major is refused (issue #99)" || fail "resolve: dist-tag off the wanted major is refused (got: '$_re')"
@@ -187,7 +196,7 @@ else
     pass "resolve: pipe no longer discards interpreter stderr (#244 c S3; site-scoped, #244 d Q2)"
 fi
 mkdir -p "$WORK/noisy-py"
-printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$RLVDIAG" > "$WORK/noisy-py/python3"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$RLVDIAG" >"$WORK/noisy-py/python3"
 chmod +x "$WORK/noisy-py/python3"
 RLV_RC=0
 PATH="$WORK/bin:$WORK/noisy-py:$PATH" SYSTEM_BIN="$WORK/stub-v2" CONFDIR="$WORK/conf" \
@@ -198,7 +207,7 @@ else
     fail "resolve: interpreter stderr passthrough (rc=$RLV_RC err=$(cat "$WORK/rlov.err"))"
 fi
 mkdir -p "$WORK/bin4"
-printf '#!/bin/sh\necho "this is :: not json"\n' > "$WORK/bin4/curl"
+printf '#!/bin/sh\necho "this is :: not json"\n' >"$WORK/bin4/curl"
 chmod +x "$WORK/bin4/curl"
 RLV_RC=0
 PATH="$WORK/bin4:$PATH" SYSTEM_BIN="$WORK/stub-v2" CONFDIR="$WORK/conf" \
@@ -211,7 +220,8 @@ fi
 # 2c-3. (#244 d Q1) absent python3: the guard keeps absence silent — no
 # shell not-found noise on a legitimate mid-lifecycle state; resolve
 # still refuses rc 1 (empty result, same as any unresolvable body).
-RLVABS="$WORK/abs-bin"; mkdir -p "$RLVABS"
+RLVABS="$WORK/abs-bin"
+mkdir -p "$RLVABS"
 for _rld in /usr/bin /bin; do
     for _rlb in "$_rld"/*; do
         [ -e "$_rlb" ] || continue
@@ -235,7 +245,8 @@ OUT=$(PATH="$WORK/bin:$PATH" sh -c ". '$FUNCS' && fetch_opencode_version '$DL' '
 check "fetch: 2.* downloads through npm (package/bin/opencode)" [ "$OUT" = "$DL/opencode" ]
 check "fetch: 2.* candidate runs and reports the 2.x version" \
     sh -c "\"\$1\" --version 2>/dev/null | grep -q '^opencode v2\.1\.99\$'" _ "$DL/opencode"
-rm -rf "$DL"; DL="$(mktemp -d)"
+rm -rf "$DL"
+DL="$(mktemp -d)"
 OUT=$(PATH="$WORK/bin:$PATH" sh -c ". '$FUNCS' && fetch_opencode_version '$DL' '1.18.99'" 2>/dev/null || true)
 check "fetch: 1.x downloads through GitHub (tarball-root opencode)" [ "$OUT" = "$DL/opencode" ]
 check "fetch: 1.x candidate runs (--version works for install_binary)" \
@@ -251,7 +262,8 @@ OUT=$(PATH="$WORK/bin:$PATH" SYSTEM_BIN="$WORK/stub-v2" CONFDIR="$WORK/conf" \
     sh -c ". '$FUNCS' && _fl_ver=\$(resolve_latest_opencode_version \"\$(current_opencode_major)\") && fetch_opencode_version '$DL' \"\$_fl_ver\"" 2>/dev/null || true)
 check "fetch: current major 2 -> npm candidate (issue #99: no downgrade)" \
     sh -c "[ \"\$1\" = \"\$2/opencode\" ] && \"\$1\" --version 2>/dev/null | grep -q '^opencode v2'" _ "$OUT" "$DL"
-rm -rf "$DL"; DL="$(mktemp -d)"
+rm -rf "$DL"
+DL="$(mktemp -d)"
 OUT=$(PATH="$WORK/bin:$PATH" SYSTEM_BIN="$WORK/stub-v1" CONFDIR="$WORK/conf" \
     sh -c ". '$FUNCS' && _fl_ver=\$(resolve_latest_opencode_version \"\$(current_opencode_major)\") && fetch_opencode_version '$DL' \"\$_fl_ver\"" 2>/dev/null || true)
 check "fetch: current major 1 -> GitHub candidate" \
@@ -284,7 +296,7 @@ check "#163: no direct sudo-cp onto/from SYSTEM_BIN remains" \
         && ! grep -qF 'sudo cp \"\$SYSTEM_BIN\" \"\$BACKUP_DIR/opencode.current\"' \"\$1\" \
         && ! grep -qF 'sudo cp \"\$BACKUP_DIR/opencode.current\" \"\$SYSTEM_BIN\"' \"\$1\"" _ "$UPDATE"
 check "#163: the missing-lib fallback fails loud for the helper too" \
-    sh -c "grep -qF 'copy_binary_atomic() { echo \"error: copy_binary_atomic unavailable' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -A1 -F 'copy_binary_atomic() {' \"\$1\" | grep -qF 'echo \"error: copy_binary_atomic unavailable'" _ "$UPDATE"
 check "#163: the manual-restore advice teaches the atomic shape" \
     sh -c "grep -qF 'sudo mv \${SYSTEM_BIN}.tmp \$SYSTEM_BIN' \"\$1\"" _ "$UPDATE"
 
@@ -299,7 +311,7 @@ check "gating: kit re-deploy sections are wrapped (2 skip zones)" \
 check "no kit self-fetch in binary-only mode (library runs stay offline for kit files)" \
     sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" && grep -qF '[ \"\$_opk_binonly\" != true ] && [ ! -f \"\$SCRIPT_DIR/../../../VERSION\" ]' \"\$1\"" _ "$UPDATE"
 check "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)" \
-    sh -c "grep -qF -- '--only-binary) _opk_binonly=true; break ;;' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -A2 -F -- '--only-binary)' \"\$1\" | tr -s '[:space:]' ' ' | grep -qF '_opk_binonly=true break' " _ "$UPDATE"
 check "library runs fall back to the installed version stamp" \
     sh -c "grep -q 's/^VERSION=//p' \"\$1\"" _ "$UPDATE"
 check "gating: confirm prompt reflects binary-only mode" \
@@ -329,7 +341,7 @@ fi
 mkdir -p "$WORK/chanbin"
 chan_case() {
     # $1 = what the fake sed answers (the stamp), $2 = KIT_BRANCH env (or "")
-    printf '#!/bin/sh\n[ -n "%s" ] && echo "%s"\nexit 0\n' "$1" "$1" > "$WORK/chanbin/sed"
+    printf '#!/bin/sh\n[ -n "%s" ] && echo "%s"\nexit 0\n' "$1" "$1" >"$WORK/chanbin/sed"
     chmod +x "$WORK/chanbin/sed"
     (
         PATH="$WORK/chanbin:$PATH"
@@ -341,17 +353,17 @@ chan_case() {
     )
 }
 out=$(chan_case "stable" "")
-[ "$out" = "stable" ] && pass "channel: stamp wins when no env is set" \
-    || fail "channel: stamp wins when no env is set (out=$out)"
+[ "$out" = "stable" ] && pass "channel: stamp wins when no env is set" ||
+    fail "channel: stamp wins when no env is set (out=$out)"
 out=$(chan_case "stable" "master")
-[ "$out" = "master" ] && pass "channel: explicit env overrides the stamp" \
-    || fail "channel: explicit env overrides the stamp (out=$out)"
+[ "$out" = "master" ] && pass "channel: explicit env overrides the stamp" ||
+    fail "channel: explicit env overrides the stamp (out=$out)"
 out=$(chan_case "" "")
-[ "$out" = "master" ] && pass "channel: master fallback when nothing is stamped" \
-    || fail "channel: master fallback when nothing is stamped (out=$out)"
+[ "$out" = "master" ] && pass "channel: master fallback when nothing is stamped" ||
+    fail "channel: master fallback when nothing is stamped (out=$out)"
 out=$(chan_case "" "feature/x")
-[ "$out" = "feature/x" ] && pass "channel: any branch env passes through" \
-    || fail "channel: any branch env passes through (out=$out)"
+[ "$out" = "feature/x" ] && pass "channel: any branch env passes through" ||
+    fail "channel: any branch env passes through (out=$out)"
 check "channel: KIT_BASE_URL builds from the resolved ref" \
     sh -c "grep -F 'KIT_BASE_URL=\"\${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit/\$KIT_BRANCH}\"' \"\$1\"" _ "$UPDATE"
 check "channel: install.conf refresh strips and re-stamps KIT_CHANNEL" \
@@ -416,7 +428,7 @@ check "flag: --version without a value is rejected" \
 check "flag: help text documents --major and --version" \
     sh -c "grep -q -- '--major 1|2' \"\$1\" && grep -q -- '--version <ver>' \"\$1\"" _ "$UPDATE"
 check "resolve: latest-version resolution guards the requested major" \
-    sh -c "grep -q '2\.\*) echo \"\$_rlov_ver\"' \"\$1\" && grep -q '1\.\*) echo \"\$_rlov_ver\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -A1 -F '2.*)' \"\$1\" | grep -qF 'echo \"\$_rlov_ver\"' && grep -A1 -F '1.*)' \"\$1\" | grep -qF 'echo \"\$_rlov_ver\"'" _ "$UPDATE"
 check "resolve: 2.x channel is the npm registry (with scope fallback)" \
     sh -c "grep -q 'registry.npmjs.org/@opencode/cli-' \"\$1\" && grep -q 'registry.npmjs.org/@opencode-ai/cli-' \"\$1\"" _ "$UPDATE"
 check "tui: registration flips with the major (sync function, both directions)" \
@@ -431,12 +443,12 @@ check "tui: a major flip re-anchors the registration even in --only-binary runs"
 # documented `--major 1` downgrade). Only an empty probe (unknown) keeps
 # the previous stamp; both stamp writes fail loud (rc 2 = post-copy).
 _restamp_block=$(sed -n '/^    if \[ "\$new" != "unknown" \]; then/,/^    fi$/p' "$UPDATE")
-_restamp_writes=$(printf '%s\n' "$_restamp_block" | sed 's/^[[:space:]]*#.*$//' \
-    | grep -c 'OPENCODE_MAJOR=$_new_major' || true)
-_restamp_guards=$(printf '%s\n' "$_restamp_block" | sed 's/^[[:space:]]*#.*$//' \
-    | grep -c 'return 2' || true)
-if grep -qF 'OPENCODE_MAJOR stamp left unchanged' "$UPDATE" \
-   && [ "$_restamp_writes" -eq 2 ] && [ "$_restamp_guards" -ge 2 ]; then
+_restamp_writes=$(printf '%s\n' "$_restamp_block" | sed 's/^[[:space:]]*#.*$//' |
+    grep -c 'OPENCODE_MAJOR=$_new_major' || true)
+_restamp_guards=$(printf '%s\n' "$_restamp_block" | sed 's/^[[:space:]]*#.*$//' |
+    grep -c 'return 2' || true)
+if grep -qF 'OPENCODE_MAJOR stamp left unchanged' "$UPDATE" &&
+    [ "$_restamp_writes" -eq 2 ] && [ "$_restamp_guards" -ge 2 ]; then
     pass "re-stamp only on a probed line, writes fail loud (V5/V20, W4 shape)"
 else
     fail "re-stamp only on a probed line, writes fail loud (V5/V20, W4 shape, writes=$_restamp_writes guards=$_restamp_guards)"
@@ -448,7 +460,7 @@ fi
 if [ -n "$_restamp_block" ]; then
     _rst_conf="$WORK/install.conf"
     _rst_run() {
-        printf 'OPENCODE_MAJOR=2\n' > "$_rst_conf"
+        printf 'OPENCODE_MAJOR=2\n' >"$_rst_conf"
         (
             CONFDIR="$WORK"
             sudo() { "$@"; }
@@ -459,73 +471,74 @@ if [ -n "$_restamp_block" ]; then
         sed -n 's/^OPENCODE_MAJOR=//p' "$_rst_conf" | tail -1
     }
     _rst_line="opencode v2.0.11"
-    [ "$(_rst_run)" = "2" ] \
-        && pass "re-stamp: 2.x line stamps 2 (W4)" \
-        || fail "re-stamp: 2.x line stamps 2 (W4)"
+    [ "$(_rst_run)" = "2" ] &&
+        pass "re-stamp: 2.x line stamps 2 (W4)" ||
+        fail "re-stamp: 2.x line stamps 2 (W4)"
     _rst_line="1.18.31"
-    [ "$(_rst_run)" = "1" ] \
-        && pass "re-stamp: bare 1.x line stamps 1 over a stale 2 (W4)" \
-        || fail "re-stamp: bare 1.x line stamps 1 over a stale 2 (W4)"
+    [ "$(_rst_run)" = "1" ] &&
+        pass "re-stamp: bare 1.x line stamps 1 over a stale 2 (W4)" ||
+        fail "re-stamp: bare 1.x line stamps 1 over a stale 2 (W4)"
     _rst_line="unknown"
-    [ "$(_rst_run)" = "2" ] \
-        && pass "re-stamp: unknown probe keeps the previous stamp (V5)" \
-        || fail "re-stamp: unknown probe keeps the previous stamp (V5)"
+    [ "$(_rst_run)" = "2" ] &&
+        pass "re-stamp: unknown probe keeps the previous stamp (V5)" ||
+        fail "re-stamp: unknown probe keeps the previous stamp (V5)"
     # a NON-matching non-empty line (a warning grabbed by head -1) is
     # unparseable, not major 1 — it must keep the stamp too (0.0.44c C6)
     _rst_line="warn: something odd on stdout"
-    [ "$(_rst_run)" = "2" ] \
-        && pass "re-stamp: unparseable line keeps the previous stamp (C6)" \
-        || fail "re-stamp: unparseable line keeps the previous stamp (C6)"
+    [ "$(_rst_run)" = "2" ] &&
+        pass "re-stamp: unparseable line keeps the previous stamp (C6)" ||
+        fail "re-stamp: unparseable line keeps the previous stamp (C6)"
     # dev-suffixed and digit-leading noise are unparseable too (0.0.44d
     # F3: the bare-version arm is full-line anchored)
     _rst_line="2.0.11-dev"
-    [ "$(_rst_run)" = "2" ] \
-        && pass "re-stamp: dev-suffixed line keeps the previous stamp (F3)" \
-        || fail "re-stamp: dev-suffixed line keeps the previous stamp (F3)"
+    [ "$(_rst_run)" = "2" ] &&
+        pass "re-stamp: dev-suffixed line keeps the previous stamp (F3)" ||
+        fail "re-stamp: dev-suffixed line keeps the previous stamp (F3)"
     _rst_line="404 not found"
-    [ "$(_rst_run)" = "2" ] \
-        && pass "re-stamp: digit-leading noise keeps the previous stamp (F3)" \
-        || fail "re-stamp: digit-leading noise keeps the previous stamp (F3)"
+    [ "$(_rst_run)" = "2" ] &&
+        pass "re-stamp: digit-leading noise keeps the previous stamp (F3)" ||
+        fail "re-stamp: digit-leading noise keeps the previous stamp (F3)"
 
-# current_opencode_major anchors the same way (0.0.44e E2): this value
-# picks the UPGRADE CHANNEL — a misparsed probe on a 2.x host must fall
-# through to the install.conf stamp, not resolve the 1.x channel.
-_com_fns=$(sed -n '/^version_major() {/,/^}/p' "$UPDATE")
-_com_c=$(sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE")
-# literal newline in quotes: $(printf '\n') strips it and glues the
-# function bodies together (Syntax error: Bad function name)
-_com_fns="$_com_fns
+    # current_opencode_major anchors the same way (0.0.44e E2): this value
+    # picks the UPGRADE CHANNEL — a misparsed probe on a 2.x host must fall
+    # through to the install.conf stamp, not resolve the 1.x channel.
+    _com_fns=$(sed -n '/^version_major() {/,/^}/p' "$UPDATE")
+    _com_c=$(sed -n '/^current_opencode_major() {/,/^}/p' "$UPDATE")
+    # literal newline in quotes: $(printf '\n') strips it and glues the
+    # function bodies together (Syntax error: Bad function name)
+    _com_fns="$_com_fns
 $_com_c"
-if [ -n "$_com_fns" ]; then
-    _com_dir="$WORK/comconf"; mkdir -p "$_com_dir"
-    printf 'OPENCODE_MAJOR=2\n' > "$_com_dir/install.conf"
-    _com_run() {
-        (
-            CONFDIR="$_com_dir"
-            opencode_version_line() { printf '%s\n' "$_probe"; }
-            eval "$_com_fns"
-            current_opencode_major
-        )
-    }
-    _probe="opencode v2.0.11"
-    [ "$(_com_run)" = "2" ] \
-        && pass "major probe: 2.x line -> 2 (E2)" \
-        || fail "major probe: 2.x line -> 2 (E2)"
-    _probe="1.18.31"
-    [ "$(_com_run)" = "1" ] \
-        && pass "major probe: bare 1.x line -> 1 (E2)" \
-        || fail "major probe: bare 1.x line -> 1 (E2)"
-    _probe="404 not found"
-    [ "$(_com_run)" = "2" ] \
-        && pass "major probe: noise falls through to the stamp, not 1 (E2)" \
-        || fail "major probe: noise falls through to the stamp, not 1 (E2)"
-    _probe="2.0.11-dev"
-    [ "$(_com_run)" = "2" ] \
-        && pass "major probe: dev-suffixed line falls through to the stamp (E2)" \
-        || fail "major probe: dev-suffixed line falls through to the stamp (E2)"
-else
-    fail "current_opencode_major extractable (E2)"
-fi
+    if [ -n "$_com_fns" ]; then
+        _com_dir="$WORK/comconf"
+        mkdir -p "$_com_dir"
+        printf 'OPENCODE_MAJOR=2\n' >"$_com_dir/install.conf"
+        _com_run() {
+            (
+                CONFDIR="$_com_dir"
+                opencode_version_line() { printf '%s\n' "$_probe"; }
+                eval "$_com_fns"
+                current_opencode_major
+            )
+        }
+        _probe="opencode v2.0.11"
+        [ "$(_com_run)" = "2" ] &&
+            pass "major probe: 2.x line -> 2 (E2)" ||
+            fail "major probe: 2.x line -> 2 (E2)"
+        _probe="1.18.31"
+        [ "$(_com_run)" = "1" ] &&
+            pass "major probe: bare 1.x line -> 1 (E2)" ||
+            fail "major probe: bare 1.x line -> 1 (E2)"
+        _probe="404 not found"
+        [ "$(_com_run)" = "2" ] &&
+            pass "major probe: noise falls through to the stamp, not 1 (E2)" ||
+            fail "major probe: noise falls through to the stamp, not 1 (E2)"
+        _probe="2.0.11-dev"
+        [ "$(_com_run)" = "2" ] &&
+            pass "major probe: dev-suffixed line falls through to the stamp (E2)" ||
+            fail "major probe: dev-suffixed line falls through to the stamp (E2)"
+    else
+        fail "current_opencode_major extractable (E2)"
+    fi
 else
     fail "re-stamp block extractable (W4)"
 fi
@@ -539,8 +552,9 @@ fi
 # Behavioral pins for the anchored semantics live above (E2 probes);
 # e2e covers the parseable paths with real binaries.
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
-_f1_dir="$WORK/f1stamp"; mkdir -p "$_f1_dir"
-sed -n '/_stamp_ver=/,/major stamp skipped/p' "$INSTALL" > "$_f1_dir/stampblock"
+_f1_dir="$WORK/f1stamp"
+mkdir -p "$_f1_dir"
+sed -n '/_stamp_ver=/,/major stamp skipped/p' "$INSTALL" >"$_f1_dir/stampblock"
 if [ -s "$_f1_dir/stampblock" ]; then
     # Scoping tripwires (0.0.44g G1): the end anchor above is PROSE (the
     # log line) — a rewording would silently run the range to EOF and
@@ -645,15 +659,15 @@ check "uninstall twin probes at the same authority (issue #164)" \
 # Control (readable dir, kit-shaped file) -> the write branch still flows.
 # In-vitro sabotage (plain [ -f ] re-planted) -> the bug fires: the same
 # blind state slips into the sudo write, proving the pin discriminates.
-OC164_BLOCK="$(sed -n '/^    _oc_expected=/,/^    fi$/p' "$UPDATE")"
+OC164_BLOCK="$(sed -n '/^        _oc_expected=/,/^        fi$/p' "$UPDATE")"
 # #198 a W5: a drifted end anchor over-captures to EOF — bound the block
 # so anchor drift fails HERE, loudly, instead of surfacing later as a
 # confusing S1/S2 'got:' dump (the block is 28 lines: 21 after #211 a
 # F17's atomic stage+mv, +7 from #211 b W8's trap registration and mv
 # -semantics comments).
-if [ -n "$OC164_BLOCK" ] \
-    && [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 30 ] \
-    && printf '%s' "$OC164_BLOCK" | grep -qF 'sudo test -f /etc/openchamber/policy.json'; then
+if [ -n "$OC164_BLOCK" ] &&
+    [ "$(printf '%s\n' "$OC164_BLOCK" | wc -l)" -le 30 ] &&
+    printf '%s' "$OC164_BLOCK" | grep -qF 'sudo test -f /etc/openchamber/policy.json'; then
     pass "openchamber gate block extractable from update.sh (issue #164)"
 else
     fail "openchamber gate block not extractable (anchor drift?)"
@@ -673,19 +687,25 @@ oc164_run() {
         log() { :; }
         sudo() {
             case "$1" in
-                test|cat)
-                    _oc_cmd="$1"; shift
+                test | cat)
+                    _oc_cmd="$1"
+                    shift
                     chmod 700 "$_oc_dir"
                     if [ "$_oc_cmd" = test ]; then
-                        [ "-f" = "$1" ] && [ -f "$2" ]; _oc_rc=$?
+                        [ "-f" = "$1" ] && [ -f "$2" ]
+                        _oc_rc=$?
                     else
-                        command cat "$1" 2>/dev/null; _oc_rc=$?
+                        command cat "$1" 2>/dev/null
+                        _oc_rc=$?
                     fi
                     chmod "$OC164_MODE" "$_oc_dir"
-                    return "$_oc_rc" ;;
+                    return "$_oc_rc"
+                    ;;
                 tee)
-                    command cat > /dev/null; echo "SUDO-WRITE tee" ;;
-                *)  echo "SUDO-WRITE $*" ;;
+                    command cat >/dev/null
+                    echo "SUDO-WRITE tee"
+                    ;;
+                *) echo "SUDO-WRITE $*" ;;
             esac
         }
         eval "$1"
@@ -693,15 +713,16 @@ oc164_run() {
 }
 if [ -n "$OC164_BLOCK" ]; then
     OC164_FIXED="$(printf '%s' "$OC164_BLOCK" | sed "s|/etc/openchamber|$OC164_ETC|g")"
-    OC164_SABOTAGE="$(printf '%s' "$OC164_FIXED" \
-        | sed 's|sudo test -f \([^ ]*\) |[ -f \1 ] |')"
+    OC164_SABOTAGE="$(printf '%s' "$OC164_FIXED" |
+        sed 's|sudo test -f \([^ ]*\) |[ -f \1 ] |')"
     # S1: admin 0700 dir (mode 000 = caller-blind), divergent content.
     printf '{ "opencodeBinary": "/usr/local/bin/somewhere-else" }\n' \
-        > "$OC164_ETC/policy.json"
-    chmod 000 "$OC164_ETC"; OC164_MODE=000
+        >"$OC164_ETC/policy.json"
+    chmod 000 "$OC164_ETC"
+    OC164_MODE=000
     _out="$(oc164_run "$OC164_FIXED" || true)"
-    if printf '%s' "$_out" | grep -q '^WARN|openchamber policy pin NOT re-applied' \
-        && ! printf '%s' "$_out" | grep -q 'SUDO-WRITE'; then
+    if printf '%s' "$_out" | grep -q '^WARN|openchamber policy pin NOT re-applied' &&
+        ! printf '%s' "$_out" | grep -q 'SUDO-WRITE'; then
         pass "#164 S1: blind admin dir + divergent file -> warn, no write"
     else
         fail "#164 S1: gate must warn and not write (got: $_out)"
@@ -709,11 +730,12 @@ if [ -n "$OC164_BLOCK" ]; then
     # S2 control: readable dir, kit-shaped content -> write branch flows.
     chmod 755 "$OC164_ETC"
     printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
-        > "$OC164_ETC/policy.json"
-    chmod 755 "$OC164_ETC"; OC164_MODE=755
+        >"$OC164_ETC/policy.json"
+    chmod 755 "$OC164_ETC"
+    OC164_MODE=755
     _out="$(oc164_run "$OC164_FIXED" || true)"
-    if printf '%s' "$_out" | grep -q '^OK|openchamber policy pin re-applied' \
-        && printf '%s' "$_out" | grep -q 'SUDO-WRITE'; then
+    if printf '%s' "$_out" | grep -q '^OK|openchamber policy pin re-applied' &&
+        printf '%s' "$_out" | grep -q 'SUDO-WRITE'; then
         pass "#164 S2: readable dir + kit shape -> write branch (control)"
     else
         fail "#164 S2: control must reach the write branch (got: $_out)"
@@ -728,7 +750,8 @@ if [ -n "$OC164_BLOCK" ]; then
     if [ "$(id -u)" = 0 ]; then
         echo "  SKIP  #164 S3 sabotage discrimination (uid 0: no caller-blind state; needs non-root)"
     else
-        chmod 000 "$OC164_ETC"; OC164_MODE=000
+        chmod 000 "$OC164_ETC"
+        OC164_MODE=000
         _out="$(oc164_run "$OC164_SABOTAGE" || true)"
         if printf '%s' "$_out" | grep -q 'SUDO-WRITE'; then
             pass "#164 S3: plain [ -f ] sabotage slips into the write (discriminates)"
@@ -746,7 +769,7 @@ fi
 # and this whole section SKIPPED SILENTLY — while status.sh kept telling
 # users "run opk update". Pins: uid-0 developer -> loud skip, no writes;
 # missing home -> loud skip; healthy home -> the hook line is appended.
-_hk_block="$(sed -n '/^# Root-shell installs (issue #192)/,/^fi$/p' "$UPDATE")"
+_hk_block="$(sed -n '/^    # Root-shell installs (issue #192)/,/^    fi$/p' "$UPDATE")"
 if [ -n "$_hk_block" ]; then
     pass "shell-startup hook block extractable from update.sh (issue #192)"
     _hk_run() {
@@ -755,41 +778,48 @@ if [ -n "$_hk_block" ]; then
         # output. An EMPTY uid makes id fail, executing the probe's
         # `|| echo 1` fallback arm (#196 a T2).
         (
-            DEFAULT_USER="$1"; DEFAULT_HOME="$3"
+            DEFAULT_USER="$1"
+            DEFAULT_HOME="$3"
             export DEFAULT_USER DEFAULT_HOME
             HK_UID="$2"
             export HK_UID
-            id() { [ "${1:-}" = "-u" ] || return 1; [ -n "$HK_UID" ] \
-                && printf '%s\n' "$HK_UID" || return 1; }
+            id() {
+                [ "${1:-}" = "-u" ] || return 1
+                [ -n "$HK_UID" ] &&
+                    printf '%s\n' "$HK_UID" || return 1
+            }
             sudo() { "$@"; }
-            ui_warn()   { echo "warn: $*"; }
+            ui_warn() { echo "warn: $*"; }
             ui_detail() { echo "detail: $*"; }
-            ui_success(){ echo "success: $*"; }
-            log()       { echo "log: $*"; }
+            ui_success() { echo "success: $*"; }
+            log() { echo "log: $*"; }
             eval "$_hk_block"
         ) 2>&1
     }
-    _rc=0; _out=$(_hk_run root 0 "$WORK/hku-root") || _rc=$?
-    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'shell-startup hooks skipped' \
-       && printf '%s' "$_out" | grep -q 'uid 0' \
-       && ! printf '%s' "$_out" | grep -q 'ddev terminal hook installed'; then
+    _rc=0
+    _out=$(_hk_run root 0 "$WORK/hku-root") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'shell-startup hooks skipped' &&
+        printf '%s' "$_out" | grep -q 'uid 0' &&
+        ! printf '%s' "$_out" | grep -q 'ddev terminal hook installed'; then
         pass "uid-0 developer: loud skip, no hook provisioning for root"
     else
         fail "uid-0 developer: loud skip, no hook provisioning for root (rc=$_rc out=$_out)"
     fi
-    _rc=0; _out=$(_hk_run hku-dev 1000 "$WORK/hku-missing") || _rc=$?
-    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'does not exist' \
-       && ! printf '%s' "$_out" | grep -q 'ddev terminal hook installed'; then
+    _rc=0
+    _out=$(_hk_run hku-dev 1000 "$WORK/hku-missing") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'does not exist' &&
+        ! printf '%s' "$_out" | grep -q 'ddev terminal hook installed'; then
         pass "missing home: loud skip instead of the old silent one"
     else
         fail "missing home: loud skip instead of the old silent one (rc=$_rc out=$_out)"
     fi
     mkdir -p "$WORK/hku-home"
-    printf '# plain rc\n' > "$WORK/hku-home/.bashrc"
-    _rc=0; _out=$(_hk_run hku-dev 1000 "$WORK/hku-home") || _rc=$?
-    if [ "$_rc" -eq 0 ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$WORK/hku-home/.bashrc" \
-       && grep -q 'opencode-permissions-kit/sh/shell-warn.sh' "$WORK/hku-home/.bashrc" \
-       && printf '%s' "$_out" | grep -qF "ddev terminal hook installed into $WORK/hku-home/.bashrc"; then
+    printf '# plain rc\n' >"$WORK/hku-home/.bashrc"
+    _rc=0
+    _out=$(_hk_run hku-dev 1000 "$WORK/hku-home") || _rc=$?
+    if [ "$_rc" -eq 0 ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$WORK/hku-home/.bashrc" &&
+        grep -q 'opencode-permissions-kit/sh/shell-warn.sh' "$WORK/hku-home/.bashrc" &&
+        printf '%s' "$_out" | grep -qF "ddev terminal hook installed into $WORK/hku-home/.bashrc"; then
         pass "healthy home: shell-warn + ddev hook lines appended to the real rc"
     else
         fail "healthy home: shell-warn + ddev hook lines appended to the real rc (rc=$_rc out=$_out rcfile=$(cat "$WORK/hku-home/.bashrc" 2>/dev/null))"
@@ -799,10 +829,11 @@ if [ -n "$_hk_block" ]; then
     # still provisions. Fresh rc file — hku-home above is already hooked,
     # a re-run would take the sed branch and stay silent.
     mkdir -p "$WORK/hku-idfail"
-    printf '# plain rc\n' > "$WORK/hku-idfail/.bashrc"
-    _rc=0; _out=$(_hk_run hku-dev2 "" "$WORK/hku-idfail") || _rc=$?
-    if [ "$_rc" -eq 0 ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$WORK/hku-idfail/.bashrc" \
-       && ! printf '%s' "$_out" | grep -q 'uid 0'; then
+    printf '# plain rc\n' >"$WORK/hku-idfail/.bashrc"
+    _rc=0
+    _out=$(_hk_run hku-dev2 "" "$WORK/hku-idfail") || _rc=$?
+    if [ "$_rc" -eq 0 ] && grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$WORK/hku-idfail/.bashrc" &&
+        ! printf '%s' "$_out" | grep -q 'uid 0'; then
         pass "id-probe failure: sentinel uid provisions, no false uid-0 skip (executed)"
     else
         fail "id-probe failure: sentinel uid provisions, no false uid-0 skip (rc=$_rc out=$_out)"
@@ -821,12 +852,12 @@ fi
 # the braced self-default fallback
 # (`var="${var:-/home/${DEFAULT_USER:-$USER}}"` — sanctioned shape,
 # status.sh's openchamber home).
-_up_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UPDATE" 2>/dev/null \
-    | grep -v '^[[:space:]]*#' \
-    | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
-    | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
-if grep -q 'DEFAULT_HOME="$(getent passwd "$DEFAULT_USER"' "$UPDATE" \
-   && [ -z "$_up_bad" ]; then
+_up_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UPDATE" 2>/dev/null |
+    grep -v '^[[:space:]]*#' |
+    grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' |
+    grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
+if grep -q 'DEFAULT_HOME="$(getent passwd "$DEFAULT_USER"' "$UPDATE" &&
+    [ -z "$_up_bad" ]; then
     pass "update.sh resolves DEFAULT_HOME via getent, no hardcoded usage site"
 else
     fail "update.sh resolves DEFAULT_HOME via getent, no hardcoded usage site (${_up_bad:-no getent})"
@@ -837,26 +868,31 @@ fi
 # land on the /home/<name> fallback, the hit arm MUST keep the passwd
 # home. Value pins — a deleted fallback or a broken getent line fails on
 # the VALUE, not just on a missing branch.
-_dh_lines="$(sed -n '/^DEFAULT_HOME="\$(getent passwd/p' "$UPDATE"; \
-    sed -n '/^\[ -n "\$DEFAULT_HOME" \] || DEFAULT_HOME="\/home/p' "$UPDATE")"
+_dh_lines="$(
+    sed -n '/^DEFAULT_HOME="\$(getent passwd/p' "$UPDATE"
+    sed -n '/^\[ -n "\$DEFAULT_HOME" \] || DEFAULT_HOME="\/home/p' "$UPDATE"
+)"
 if [ "$(printf '%s\n' "$_dh_lines" | wc -l | tr -d ' ')" = "2" ]; then
     pass "DEFAULT_HOME resolution lines extractable from update.sh"
     _dh_arm() {
         (
-            DEFAULT_USER="hku-dh"; DH_HOME="$1"
+            DEFAULT_USER="hku-dh"
+            DH_HOME="$1"
             export DEFAULT_USER DH_HOME
             getent() { [ -n "$DH_HOME" ] && printf 'x:x:1000:1000::%s:/bin/sh\n' "$DH_HOME"; }
             eval "$_dh_lines"
             printf '%s\n' "$DEFAULT_HOME"
         )
     }
-    _rc=0; _out=$(_dh_arm "") || _rc=$?
+    _rc=0
+    _out=$(_dh_arm "") || _rc=$?
     if [ "$_rc" -eq 0 ] && [ "$_out" = "/home/hku-dh" ]; then
         pass "DEFAULT_HOME getent miss falls back to /home/<name> (executed)"
     else
         fail "DEFAULT_HOME getent miss falls back to /home/<name> (rc=$_rc out=$_out)"
     fi
-    _rc=0; _out=$(_dh_arm "/relocated/home") || _rc=$?
+    _rc=0
+    _out=$(_dh_arm "/relocated/home") || _rc=$?
     if [ "$_rc" -eq 0 ] && [ "$_out" = "/relocated/home" ]; then
         pass "DEFAULT_HOME getent hit keeps the passwd home (executed)"
     else
@@ -871,7 +907,8 @@ fi
 # pin above green while silently re-arming the uid-0 loud skip for ghosts.
 _du_line="$(grep '^ *_du_uid=' "$UPDATE" | head -1)"
 if [ -n "$_du_line" ]; then
-    _rc=0; _out=$(
+    _rc=0
+    _out=$(
         (
             DEFAULT_USER="hku-duval"
             export DEFAULT_USER
@@ -896,7 +933,7 @@ fi
 # trail pointing at the cause. Extract the real block and drive all
 # three arms with stubbed sudo/git (hermetic: the test user's real
 # ~/.gitconfig never matters — environment-dependence class 0.0.46a F2).
-_f4_block="$(sed -n '/^# The audit line must match reality/,/^fi$/p' "$UPDATE")"
+_f4_block="$(sed -n '/^    # The audit line must match reality/,/^    fi$/p' "$UPDATE")"
 if [ -n "$_f4_block" ]; then
     pass "safe.directory block extractable from update.sh (#211 a F4)"
     _f4_run() {
@@ -909,38 +946,43 @@ if [ -n "$_f4_block" ]; then
                 case " $* " in
                     *" --add "*)
                         [ "$F4_MODE" = fail ] && return 1
-                        return 0 ;;
+                        return 0
+                        ;;
                     *" --get-all "*)
-                        [ "$F4_MODE" = alreadysel ] && { echo '*'; return 0; }
-                        return 0 ;;
+                        [ "$F4_MODE" = alreadysel ] && {
+                            echo '*'
+                            return 0
+                        }
+                        return 0
+                        ;;
                 esac
                 return 0
             }
-            ui_success(){ echo "success: $*"; }
-            ui_warn()   { echo "warn: $*"; }
-            log()       { echo "log: $*"; }
+            ui_success() { echo "success: $*"; }
+            ui_warn() { echo "warn: $*"; }
+            log() { echo "log: $*"; }
             eval "$_f4_block"
         ) 2>&1
     }
     _out=$(_f4_run fail) || true
-    if printf '%s' "$_out" | grep -q "warn: could not set git safe.directory" \
-       && printf '%s' "$_out" | grep -q 'log: git safe.directory NOT ensured' \
-       && ! printf '%s' "$_out" | grep -q 'success:'; then
+    if printf '%s' "$_out" | grep -q "warn: could not set git safe.directory" &&
+        printf '%s' "$_out" | grep -q 'log: git safe.directory NOT ensured' &&
+        ! printf '%s' "$_out" | grep -q 'success:'; then
         pass "failed --add: warn + NOT-ensured log, no success line (#211 a F4)"
     else
         fail "failed --add: warn + NOT-ensured log, no success line (out=$_out)"
     fi
     _out=$(_f4_run ok) || true
-    if printf '%s' "$_out" | grep -q 'success: git safe.directory' \
-       && printf '%s' "$_out" | grep -q 'log: git safe.directory ensured for ocuser' \
-       && ! printf '%s' "$_out" | grep -q 'NOT ensured'; then
+    if printf '%s' "$_out" | grep -q 'success: git safe.directory' &&
+        printf '%s' "$_out" | grep -q 'log: git safe.directory ensured for ocuser' &&
+        ! printf '%s' "$_out" | grep -q 'NOT ensured'; then
         pass "successful --add: success line + ensured log (#211 a F4)"
     else
         fail "successful --add: success line + ensured log (out=$_out)"
     fi
     _out=$(_f4_run alreadysel) || true
-    if printf '%s' "$_out" | grep -q 'log: git safe.directory ensured for ocuser (already set)' \
-       && ! printf '%s' "$_out" | grep -q 'success:'; then
+    if printf '%s' "$_out" | grep -q 'log: git safe.directory ensured for ocuser (already set)' &&
+        ! printf '%s' "$_out" | grep -q 'success:'; then
         pass "already set: audit notes it, no redundant add (#211 a F4)"
     else
         fail "already set: audit notes it, no redundant add (out=$_out)"
@@ -964,12 +1006,12 @@ fi
 # LIBDIR is the fallback only.
 F5=$(mktemp -d)
 mkdir -p "$F5/froot/opencode-permissions-kit-lib/sh" "$F5/ldir/sh"
-printf 'wbb_marker() { echo CHECKOUT; }\n' > "$F5/froot/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
-printf 'wbb_marker() { echo LIBDIR; }\n'   > "$F5/ldir/sh/wsl-browser-bridge.sh"
-printf 'dh_marker() { echo CHECKOUT; }\n'  > "$F5/froot/opencode-permissions-kit-lib/sh/ddev-handover.sh"
-printf 'dh_marker() { echo LIBDIR; }\n'    > "$F5/ldir/sh/ddev-handover.sh"
-_f5_loop_wbb="$(sed -n '/#211 a F5, wsl-browser-bridge site/,/^done$/p' "$UPDATE")"
-_f5_loop_dh="$(sed -n '/#211 a F5, ddev-handover site/,/^    done$/p' "$UPDATE")"
+printf 'wbb_marker() { echo CHECKOUT; }\n' >"$F5/froot/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
+printf 'wbb_marker() { echo LIBDIR; }\n' >"$F5/ldir/sh/wsl-browser-bridge.sh"
+printf 'dh_marker() { echo CHECKOUT; }\n' >"$F5/froot/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+printf 'dh_marker() { echo LIBDIR; }\n' >"$F5/ldir/sh/ddev-handover.sh"
+_f5_loop_wbb="$(sed -n '/#211 a F5, wsl-browser-bridge site/,/^    done$/p' "$UPDATE")"
+_f5_loop_dh="$(sed -n '/#211 a F5, ddev-handover site/,/^        done$/p' "$UPDATE")"
 if [ -n "$_f5_loop_wbb" ] && [ -n "$_f5_loop_dh" ]; then
     pass "both first-wins loops extractable from update.sh (#211 a F5)"
     _f5_eval() {
@@ -1011,7 +1053,7 @@ rm -rf "$F5"
 # with zero output while the sudoers twin above logs its identical
 # conservative skip (0.0.41f S2: "the skip must not be silent").
 # Extract the real block and drive both arms.
-_f6_block="$(sed -n '/^if \[ -f "\$FILES_ROOT\/etc\/umask.sh" \]; then$/,/^fi$/p' "$UPDATE")"
+_f6_block="$(sed -n '/^    if \[ -f "\$FILES_ROOT\/etc\/umask.sh" \]; then$/,/^    fi$/p' "$UPDATE")"
 if [ -n "$_f6_block" ]; then
     pass "umask block extractable from update.sh (#211 a F6)"
     _f6_run() {
@@ -1020,10 +1062,13 @@ if [ -n "$_f6_block" ]; then
             FILES_ROOT="$1"
             copy_file_atomic() { return 0; }
             sudo() { return 0; }
-            die() { echo "die: $*"; exit 1; }
-            ui_success(){ echo "success: $*"; }
+            die() {
+                echo "die: $*"
+                exit 1
+            }
+            ui_success() { echo "success: $*"; }
             ui_detail() { echo "detail: $*"; }
-            log()       { echo "log: $*"; }
+            log() { echo "log: $*"; }
             eval "$_f6_block"
         ) 2>&1
     }
@@ -1031,17 +1076,17 @@ if [ -n "$_f6_block" ]; then
     _out=$(_f6_run "$F6/missing-root") || true
     # pr-00263 a F7: log() alone degrades to the no-op stub when log.sh
     # is missing from both roots — the skip needs the terminal line too.
-    if printf '%s' "$_out" | grep -q 'log: umask profile re-deploy skipped' \
-        && printf '%s' "$_out" | grep -q 'detail: umask profile re-deploy skipped'; then
+    if printf '%s' "$_out" | grep -q 'log: umask profile re-deploy skipped' &&
+        printf '%s' "$_out" | grep -q 'detail: umask profile re-deploy skipped'; then
         pass "missing umask.sh: skip is terminal-loud, not log-only (pr-00263 a F7 over #211 a F6)"
     else
         fail "missing umask.sh: skip is logged, not silent (out=$_out)"
     fi
     mkdir -p "$F6/root/etc"
-    printf 'umask 027\n' > "$F6/root/etc/umask.sh"
+    printf 'umask 027\n' >"$F6/root/etc/umask.sh"
     _out=$(_f6_run "$F6/root") || true
-    if printf '%s' "$_out" | grep -q 'log: umask profile re-deployed' \
-       && ! printf '%s' "$_out" | grep -q 'skipped'; then
+    if printf '%s' "$_out" | grep -q 'log: umask profile re-deployed' &&
+        ! printf '%s' "$_out" | grep -q 'skipped'; then
         pass "present umask.sh: deploy path unchanged (#211 a F6)"
     else
         fail "present umask.sh: deploy path unchanged (out=$_out)"
@@ -1062,11 +1107,14 @@ fi
 # Guarded extraction (#260, the #244 f W1 class; #280 a S1): grep -m1
 # exits 1 on zero matches exactly like grep -c — under set -e the bare
 # assignment aborted before the [ -n ] FAIL below could record.
-_f7_stub="$(grep -m1 '^command -v xdg_open_real_exists' "$UPDATE" || true)"
+_f7_stub="$(grep -m1 '^ *command -v xdg_open_real_exists' "$UPDATE" || true)"
 if [ -n "$_f7_stub" ]; then
     pass "xdg_open_real_exists stub extractable from update.sh (#211 a F7)"
     _f7_rc=0
-    _f7_out=$(eval "$_f7_stub" >/dev/null 2>&1; xdg_open_real_exists) || _f7_rc=$?
+    _f7_out=$(
+        eval "$_f7_stub" >/dev/null 2>&1
+        xdg_open_real_exists
+    ) || _f7_rc=$?
     if [ "$_f7_rc" -eq 0 ]; then
         pass "stub answers rc 0 — never-shadow direction when probe missing (#211 a F7)"
     else
@@ -1098,10 +1146,10 @@ if [ -n "$_f17_block" ]; then
         }
         eval "$1"
     ' sh "$_f17_block" 2>&1) || true
-    if printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json.opk-new\.' \
-       && printf '%s' "$_out" | grep -q 'MV /etc/openchamber/policy.json.opk-new\.[0-9]* -> /etc/openchamber/policy.json' \
-       && printf '%s' "$_out" | grep -q 'TRACK /etc/openchamber/policy.json.opk-new\.' \
-       && ! printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json$'; then
+    if printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json.opk-new\.' &&
+        printf '%s' "$_out" | grep -q 'MV /etc/openchamber/policy.json.opk-new\.[0-9]* -> /etc/openchamber/policy.json' &&
+        printf '%s' "$_out" | grep -q 'TRACK /etc/openchamber/policy.json.opk-new\.' &&
+        ! printf '%s' "$_out" | grep -q 'TEE /etc/openchamber/policy.json$'; then
         pass "update.sh: content staged on temp, live file flips via mv (#211 a F17)"
     else
         fail "update.sh: staged write + mv (out=$_out)"
@@ -1154,8 +1202,8 @@ if [ -n "$_f17_opk_block" ]; then
     _out=$(sh -c 'chmod() { return 1; }; mv() { return 0; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
         sh "$_f17_opk_block" 2>&1) || _f17_rc=$?
     _f17_residue=$(find "$F17/oc" -name 'policy.json.opk-new.*' 2>/dev/null | wc -l)
-    if [ "$_f17_rc" -eq 1 ] && [ "$_f17_residue" -eq 0 ] \
-       && printf '%s' "$_out" | grep -q 'UIERR'; then
+    if [ "$_f17_rc" -eq 1 ] && [ "$_f17_residue" -eq 0 ] &&
+        printf '%s' "$_out" | grep -q 'UIERR'; then
         pass "opk twin: chmod failure cleans the temp, dies loud (#211 b W8)"
     else
         fail "opk twin: chmod failure cleanup (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 b W8)"
@@ -1168,8 +1216,8 @@ if [ -n "$_f17_opk_block" ]; then
     _out=$(sh -c 'printf() { return 1; }; chmod() { return 0; }; mv() { return 0; }; ui_error() { echo "UIERR" >&2; }; eval "$1"' \
         sh "$_f17_opk_block" 2>&1) || _f17_rc=$?
     _f17_residue=$(find "$F17/oc" -name 'policy.json.opk-new.*' 2>/dev/null | wc -l)
-    if [ "$_f17_rc" -eq 1 ] && [ "$_f17_residue" -eq 0 ] \
-       && printf '%s' "$_out" | grep -q 'UIERR'; then
+    if [ "$_f17_rc" -eq 1 ] && [ "$_f17_residue" -eq 0 ] &&
+        printf '%s' "$_out" | grep -q 'UIERR'; then
         pass "opk twin: staging write failure dies loud, no flip (#211 c W7)"
     else
         fail "opk twin: staging write gate (rc=$_f17_rc residue=$_f17_residue out=$_out) (#211 c W7)"
@@ -1212,12 +1260,12 @@ _f2b_nl=$(
     eval "$_f2bG" 2>"$_f2bW/nl.log"
     printf '%s' "$OPENCODE_USER"
 )
-if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] \
-    && [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] \
-    && grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" \
-    && [ "$_f2b_nl" = "opencode" ] \
-    && [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] \
-    && grep -q 'oco?d' "$_f2bW/nl.log"; then
+if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] &&
+    [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] &&
+    grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" &&
+    [ "$_f2b_nl" = "opencode" ] &&
+    [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] &&
+    grep -q 'oco?d' "$_f2bW/nl.log"; then
     pass "update.sh gate arms: passthrough silent, fallback loud, newline sanitized (pr-00263 a F2b)"
 else
     fail "update.sh gate arms (pr-00263 a F2b)"
@@ -1226,10 +1274,13 @@ fi
 # pr-00263 a F7: both conservative re-deploy skips carry a terminal
 # line — log() alone is the no-op stub when log.sh is missing from
 # both roots, and the in-code contract says the skip must not be silent.
-grep -qF 'ui_detail "sudoers re-deploy skipped' "$UPDATE" \
-    && grep -qF 'ui_detail "umask profile re-deploy skipped' "$UPDATE" \
-    && echo "  ${GREEN}PASS${NC}  both re-deploy skips are terminal-loud (pr-00263 a F7)" && passed=$((passed + 1)) \
-    || { echo "  ${RED}FAIL${NC}  a re-deploy skip is log-only again (pr-00263 a F7)"; failures=$((failures + 1)); }
+grep -qF 'ui_detail "sudoers re-deploy skipped' "$UPDATE" &&
+    grep -qF 'ui_detail "umask profile re-deploy skipped' "$UPDATE" &&
+    echo "  ${GREEN}PASS${NC}  both re-deploy skips are terminal-loud (pr-00263 a F7)" && passed=$((passed + 1)) ||
+    {
+        echo "  ${RED}FAIL${NC}  a re-deploy skip is log-only again (pr-00263 a F7)"
+        failures=$((failures + 1))
+    }
 
 # --- Summary ----------------------------------------------------------------------
 echo ""

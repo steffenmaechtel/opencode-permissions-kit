@@ -27,13 +27,13 @@ agent_config_render() {
     _acr_mode="$3"
     case "$_acr_mode" in
         on)
-            if ! sed 's|//SECURE_GIT: ||' "$_acr_template" > "$_acr_out"; then
+            if ! sed 's|//SECURE_GIT: ||' "$_acr_template" >"$_acr_out"; then
                 echo "error: cannot render agent config (on) from $_acr_template" >&2
                 return 1
             fi
             ;;
         off)
-            if ! sed '/\/\/SECURE_GIT:/d' "$_acr_template" > "$_acr_out"; then
+            if ! sed '/\/\/SECURE_GIT:/d' "$_acr_template" >"$_acr_out"; then
                 echo "error: cannot render agent config (off) from $_acr_template" >&2
                 return 1
             fi

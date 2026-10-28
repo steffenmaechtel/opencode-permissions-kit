@@ -28,8 +28,14 @@ WF_ADVISORY="$REPO/.github/workflows/advisory-watch.yml"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 TMP_REQ="$(mktemp)"
 TMP_755="$(mktemp)"
@@ -50,20 +56,20 @@ trap 'rm -f "${TMP_REQ:-}" "${TMP_755:-}" "${TMP_RUNS:-}" "${_FAKEWF:-}" "${TMP_
 # check below: a tracked file may only be 100755 if it is in this set.
 collect_required_755() {
     for f in "$REPO"/tests/unit/test-*.sh \
-             "$REPO"/tests/check-host.sh \
-             "$REPO"/tests/tsx-syntax-gate.sh \
-             "$REPO"/tests/e2e/run.sh \
-             "$REPO"/tests/e2e/run-docker-rootless.sh \
-             "$REPO"/tests/e2e/run-ddev.sh \
-             "$REPO"/scripts/*.sh \
-             "$REPO"/files/install.sh \
-             "$REPO"/files/opencode-permissions-kit-lib/bin/* \
-             "$REPO"/files/opencode-permissions-kit-lib/management/*.sh; do
+        "$REPO"/tests/check-host.sh \
+        "$REPO"/tests/tsx-syntax-gate.sh \
+        "$REPO"/tests/e2e/run.sh \
+        "$REPO"/tests/e2e/run-docker-rootless.sh \
+        "$REPO"/tests/e2e/run-ddev.sh \
+        "$REPO"/scripts/*.sh \
+        "$REPO"/files/install.sh \
+        "$REPO"/files/opencode-permissions-kit-lib/bin/* \
+        "$REPO"/files/opencode-permissions-kit-lib/management/*.sh; do
         [ -f "$f" ] || continue
         printf '%s\n' "${f#"$REPO"/}"
     done | sort -u
 }
-collect_required_755 > "$TMP_REQ"
+collect_required_755 >"$TMP_REQ"
 
 _missing=""
 while IFS= read -r rel; do
@@ -73,7 +79,7 @@ while IFS= read -r rel; do
     elif [ "$mode" != "100755" ]; then
         _missing="$_missing $rel($mode)"
     fi
-done < "$TMP_REQ"
+done <"$TMP_REQ"
 if [ -z "$_missing" ]; then
     pass "every executed-by-path file is 100755 in the git index"
 else
@@ -81,7 +87,7 @@ else
 fi
 
 # Inverse: no tracked file may be 100755 unless it is executed by path.
-git -C "$REPO" ls-files -s | awk '$1 == "100755" { print $4 }' | sort -u > "$TMP_755"
+git -C "$REPO" ls-files -s | awk '$1 == "100755" { print $4 }' | sort -u >"$TMP_755"
 _stray="$(comm -13 "$TMP_REQ" "$TMP_755")"
 if [ -z "$_stray" ]; then
     pass "no sourced/data file carries the exec bit (755 <=> executed by path)"
@@ -128,7 +134,7 @@ run_tokens() {
     ' | grep -E '^\./[A-Za-z0-9_./-]+\.sh$' | sort -u
 }
 
-run_tokens "$WF_TEST" > "$TMP_RUNS"
+run_tokens "$WF_TEST" >"$TMP_RUNS"
 _orphans=""
 for _t in "$REPO"/tests/unit/test-*.sh; do
     _rel="./${_t#"$REPO"/}"
@@ -148,11 +154,11 @@ printf '%s\n' \
     '      - name: one' \
     '        run: ./tests/unit/test-a.sh ./tests/unit/test-arg-only.sh' \
     '      - name: two' \
-    '        run: cd x && ./tests/unit/test-b.sh' > "$_FAKEWF"
-run_tokens "$_FAKEWF" > "$TMP_FAKE"
-if grep -qxF './tests/unit/test-a.sh' "$TMP_FAKE" \
-    && grep -qxF './tests/unit/test-b.sh' "$TMP_FAKE" \
-    && ! grep -qxF './tests/unit/test-arg-only.sh' "$TMP_FAKE"; then
+    '        run: cd x && ./tests/unit/test-b.sh' >"$_FAKEWF"
+run_tokens "$_FAKEWF" >"$TMP_FAKE"
+if grep -qxF './tests/unit/test-a.sh' "$TMP_FAKE" &&
+    grep -qxF './tests/unit/test-b.sh' "$TMP_FAKE" &&
+    ! grep -qxF './tests/unit/test-arg-only.sh' "$TMP_FAKE"; then
     pass "run_tokens: argument-position .sh paths do not count as executed"
 else
     fail "run_tokens: command-position extraction is broken (argument counted or command missed)"
@@ -182,8 +188,8 @@ else
     # Invocation signature (not prose): ci-ness AND the install-scripts
     # hardening in one literal — header comments quoting "npm ci" must
     # not satisfy this check.
-    grep -qF 'npm ci --ignore-scripts' "$GATE_SCRIPT" \
-        || _gmissing="$_gmissing no-npm-ci"
+    grep -qF 'npm ci --ignore-scripts' "$GATE_SCRIPT" ||
+        _gmissing="$_gmissing no-npm-ci"
     # Lockfile (lockfileVersion 3): the typescript block is the only
     # place a "version" key follows the "node_modules/typescript" key
     # inside one object; the range stops at its closing brace.
@@ -226,7 +232,7 @@ fi
 # checks. File-level greps cannot tell WHICH job carries which
 # resolution — the checks run against the per-job block instead.
 
-job_block() {  # $1 = workflow file, $2 = job id -> the job's lines on stdout
+job_block() { # $1 = workflow file, $2 = job id -> the job's lines on stdout
     awk -v hdr="  $2:" '
         index($0, hdr) == 1 { p = 1; next }
         p && /^  [A-Za-z0-9_-]+:/ { exit }
@@ -234,8 +240,11 @@ job_block() {  # $1 = workflow file, $2 = job id -> the job's lines on stdout
     ' "$1"
 }
 
-check_job_lane() {  # wf label job ere-pattern...
-    _wf="$1"; _label="$2"; _job="$3"; shift 3
+check_job_lane() { # wf label job ere-pattern...
+    _wf="$1"
+    _label="$2"
+    _job="$3"
+    shift 3
     _blk="$(job_block "$_wf" "$_job")"
     if [ -z "$_blk" ]; then
         fail "$_label (job '$_job' not found)"
@@ -334,7 +343,10 @@ for _wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
     _out=$(awk '/^      - /{ if (c>1) { print FILENAME ": " prev " (" c " env blocks)" }; c=0; prev=$0 }
                 /^        env:/{c++}
                 END{ if (c>1) { print FILENAME ": " prev " (" c " env blocks)" } }' "$_wf")
-    [ -n "$_out" ] && { echo "$_out"; _dups=1; }
+    [ -n "$_out" ] && {
+        echo "$_out"
+        _dups=1
+    }
 done
 if [ "$_dups" = 0 ]; then
     pass "no workflow step carries more than one env block"
@@ -350,7 +362,10 @@ fi
 _plain=0
 for _wf in "$WF_TEST" "$WF_E2E" "$WF_DDEV_E2E"; do
     _out=$(grep -nE '^[[:space:]]+run: [^|>].*\\$' "$_wf")
-    [ -n "$_out" ] && { echo "$_wf:$_out"; _plain=1; }
+    [ -n "$_out" ] && {
+        echo "$_wf:$_out"
+        _plain=1
+    }
 done
 if [ "$_plain" = 0 ]; then
     pass "no plain multi-line run: scalars (block literals only)"
@@ -370,12 +385,13 @@ fi
 # workflow (and necessarily touches tests/e2e/** or the Makefile, which
 # trigger the suites anyway).
 
-filter_block() {  # print the dorny/paths-filter entry list of a workflow
+filter_block() { # print the dorny/paths-filter entry list of a workflow
     awk '/filters: \|/{f=1; next} f && /^[^[:space:]]/ {f=0} f' "$1"
 }
 
 check_e2e_filter() {
-    _wf="$1"; _name="${_wf##*/}"
+    _wf="$1"
+    _name="${_wf##*/}"
     _blk="$(filter_block "$_wf")"
     _missing=""
     for _pat in "- 'files/**'" "- 'tests/e2e/**'" "- '.github/**'" "- 'Makefile'" "- 'VERSION'"; do
@@ -399,8 +415,8 @@ check_e2e_filter "$WF_DDEV_E2E"
 # scripts/release.sh's CI gate on exactly the release sha.
 for _wf in test-unit test-e2e test-e2e-ddev; do
     if grep -qF "(github.event_name == 'push' || github.event_name == 'pull_request') && github.ref" \
-        "$REPO/.github/workflows/$_wf.yml" \
-       && grep -qF "|| 'manual' }}" "$REPO/.github/workflows/$_wf.yml"; then
+        "$REPO/.github/workflows/$_wf.yml" &&
+        grep -qF "|| 'manual' }}" "$REPO/.github/workflows/$_wf.yml"; then
         pass "$_wf.yml: dispatch gets its own concurrency group (V13)"
     else
         fail "$_wf.yml: dispatch gets its own concurrency group (V13)"

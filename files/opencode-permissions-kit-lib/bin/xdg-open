@@ -33,7 +33,10 @@ _target=""
 for _arg in "$@"; do
     case "$_arg" in
         -*) ;;
-        *) _target="$_arg"; break ;;
+        *)
+            _target="$_arg"
+            break
+            ;;
     esac
 done
 [ -n "$_target" ] || exit 0

@@ -21,8 +21,14 @@ UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/unins
 
 failures=0
 passed=0
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 WORK="$(mktemp -d)"
 # widen to the bare _un_w2 receiver + signal arms (#283)
@@ -30,7 +36,7 @@ trap 'rm -rf "${WORK:-}" "${_un_w2:-}"' EXIT INT TERM
 
 # Fake sudo: logs the command line, always succeeds. Keeps the test
 # unprivileged while letting uninstall.sh build its full command list.
-cat > "$WORK/sudo" <<'EOF'
+cat >"$WORK/sudo" <<'EOF'
 #!/bin/sh
 echo "sudo $*" >> "${FAKE_SUDO_LOG:?}"
 exit 0
@@ -44,7 +50,7 @@ chmod +x "$WORK/sudo"
 # capture (issue #74): uid 60000 must flow into the find; the gids stay
 # DISTINCT per user (opencode 60002, dev 60001 — 0.0.42h C2) so
 # full-script runs never reshape UN_OC_GID == UN_DEV_GID.
-cat > "$WORK/id" <<'EOF'
+cat >"$WORK/id" <<'EOF'
 #!/bin/sh
 case "$1" in
     -u)  echo 60000 ;;
@@ -58,10 +64,11 @@ chmod +x "$WORK/id"
 # --- 1. guards: refuses root / opencode --------------------------------------
 
 run_uninstall_as() {
-    _user="$1"; shift
+    _user="$1"
+    shift
     # whoami is hardcoded via a PATH shim; the script reads no other
     # user context before the guard.
-    printf '#!/bin/sh\necho %s\n' "$_user" > "$WORK/whoami"
+    printf '#!/bin/sh\necho %s\n' "$_user" >"$WORK/whoami"
     chmod +x "$WORK/whoami"
     PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes "$@" >/dev/null 2>&1
 }
@@ -79,10 +86,11 @@ fi
 
 # --- 2. dry-run executes nothing ----------------------------------------------
 
-printf '#!/bin/sh\necho devuser\n' > "$WORK/whoami"; chmod +x "$WORK/whoami"
+printf '#!/bin/sh\necho devuser\n' >"$WORK/whoami"
+chmod +x "$WORK/whoami"
 rm -f "${WORK:?}/log"
-if PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry-run >/dev/null 2>&1 \
-   && [ ! -e "$WORK/log" ]; then
+if PATH="$WORK:$PATH" FAKE_SUDO_LOG="$WORK/log" sh "$UNINSTALL" --yes --dry-run >/dev/null 2>&1 &&
+    [ ! -e "$WORK/log" ]; then
     pass "--dry-run executes no sudo command (log stayed empty)"
 else
     # The credential probe (sudo -n true) is expected and harmless; so are
@@ -106,8 +114,8 @@ fi
 # refused above), so the openchamber gate MUST probe through sudo — an
 # admin 0700 /etc/openchamber would otherwise hide a kit pin from
 # removal. The fake sudo logs the probe in the real call sequence.
-if grep -q '^sudo test -f /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/null \
-    && grep -q '^sudo grep -q .* /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/null; then
+if grep -q '^sudo test -f /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/null &&
+    grep -q '^sudo grep -q .* /etc/openchamber/policy\.json$' "$WORK/log" 2>/dev/null; then
     pass "openchamber gate probes via sudo in the real call sequence (issue #164)"
 else
     fail "openchamber gate must probe via sudo, not at developer authority (issue #164)"
@@ -118,8 +126,8 @@ fi
 # developer-blind dir would hide an ACTIVE kit grant from removal. The
 # fake sudo exits 0, so both the -L probe and the readlink fire in the
 # real call sequence (a plain [ -L ] re-plant drops them from the log).
-if grep -q '^sudo test -L /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null \
-    && grep -q '^sudo readlink /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null; then
+if grep -q '^sudo test -L /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null &&
+    grep -q '^sudo readlink /etc/sudoers\.d/opencode$' "$WORK/log" 2>/dev/null; then
     pass "legacy sudoers gate probes via sudo in the real call sequence (#198 a W1)"
 else
     fail "legacy sudoers gate must probe via sudo, not at developer authority (#198 a W1)"
@@ -180,8 +188,8 @@ done
 # The generic legacy names must stay MARKER-GATED, never blanket-removed:
 # anything else living at /etc/sudoers.d/opencode or /usr/local/lib/opencode
 # is not kit-owned.
-if grep -qF 'not kit-owned — left untouched' "$UNINSTALL" \
-   && ! grep -Eq 'rm -rf /etc/opencode($|[^-])' "$UNINSTALL"; then
+if grep -qF 'not kit-owned — left untouched' "$UNINSTALL" &&
+    ! grep -Eq 'rm -rf /etc/opencode($|[^-])' "$UNINSTALL"; then
     pass "legacy names are marker-gated (foreign content survives)"
 else
     fail "legacy names are marker-gated (foreign content survives)"
@@ -235,7 +243,7 @@ fi
 # whose body echoes "Skipping system path" yields tokens. A reversion
 # to a shape-keyed grep pulls the decoy arms in and reds this pin.
 _un_s1_fixture="$WORK/un-s1-fixture.sh"
-cat > "$_un_s1_fixture" <<'EOF'
+cat >"$_un_s1_fixture" <<'EOF'
 case "$root" in
     /*) ;;
     /decoy|/decoy/*|/./|*..*|*/./*)
@@ -263,7 +271,7 @@ fi
 # legitimately needs one reds this loudly and gets defanged
 # consciously.
 case "$SCREEN_PATTERNS" in
-    *.*|*//*)
+    *.* | *//*)
         fail "wired SCREEN_PATTERNS free of dot/double-slash tokens (#243 d Q5)"
         ;;
     *)
@@ -286,7 +294,7 @@ esac
 # semantics the shipped loop has.
 screen() {
     case "$1" in
-        *..*|/./|*/./*|./*|*/.|*//*) return 0 ;;
+        *..* | /./ | */./* | ./* | */. | *//*) return 0 ;;
     esac
     _un_scr="${1%/}"
     [ -n "$_un_scr" ] || _un_scr="/"
@@ -348,11 +356,15 @@ done
 # any stray /-leading line in project_path_sane breaks the set
 # equality; it can never silently pass.
 CONFIG_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
-WRITER_PATTERNS="$(sed -n '/^project_path_sane()/,/^}/p' "$CONFIG_SH" \
-    | grep -E '^[[:space:]]*/' | grep -vE '^[[:space:]]*/\*\)' \
-    | sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/)$//' | tr '\n' '|')"
+WRITER_PATTERNS="$(sed -n '/^project_path_sane()/,/^}/p' "$CONFIG_SH" |
+    grep -E '^[[:space:]]*/' | grep -vE '^[[:space:]]*/\*\)' |
+    sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/)$//' | tr '\n' '|')"
 _un_parity_tokens() {
-    printf '%s\n' "$1" | tr '|' '\n' | sed -e 's/[[:space:]]*$//' -e '/^$/d' | sort -u
+    # Leading AND trailing whitespace stripped: shfmt (#255 stage 0a)
+    # re-breaks the blocklists' multi-line case arms per file (indent
+    # context), so a token's leading space depends on the break
+    # position — the token is the path pattern, wherever the line ends.
+    printf '%s\n' "$1" | tr '|' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' | sort -u
 }
 READER_SET=$(_un_parity_tokens "$SCREEN_PATTERNS")
 # Guarded count (#260, the #244 f W1 class; #280 c S1): grep -v exits 1
@@ -380,7 +392,7 @@ fi
 # with chown to DEFAULT_USER:<dev-group>. The loop
 # is extracted verbatim except for its stdin redirect (the conf path is
 # hardcoded) — the fake roots are piped in instead.
-PROJECT_LOOP="$(sed -n '/while IFS= read -r root; do/,/done < /p' "$UNINSTALL" | sed 's|done < "$UNINSTALL_PROJECTS_CONF"|done|')"
+PROJECT_LOOP="$(sed -n '/while IFS= read -r root; do/,/done </p' "$UNINSTALL" | sed 's|done <"$UNINSTALL_PROJECTS_CONF"|done|')"
 if [ -n "$PROJECT_LOOP" ] && printf '%s' "$PROJECT_LOOP" | grep -q 'find'; then
     pass "project loop with ownership revert extractable from uninstall.sh"
 else
@@ -425,10 +437,10 @@ _ou_canon=$(
     eval "$UN_OCU_GATE" 2>>"$WORK/un-ouc-err.log"
     printf '%s' "$OPENCODE_USER"
 )
-if [ "$_ou_new" = "untest-agent" ] && [ "$_ou_canon" = "opencode" ] \
-   && [ ! -s "$WORK/un-ouc-err.log" ] \
-   && [ "$_ou_bad" = "opencode" ] \
-   && grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$WORK/un-ouc-err2.log"; then
+if [ "$_ou_new" = "untest-agent" ] && [ "$_ou_canon" = "opencode" ] &&
+    [ ! -s "$WORK/un-ouc-err.log" ] &&
+    [ "$_ou_bad" = "opencode" ] &&
+    grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$WORK/un-ouc-err2.log"; then
     pass "OPENCODE_USER gate: valid/canonical pass through, corrupted falls back loudly (#243 e X1)"
 else
     fail "OPENCODE_USER gate arms (#243 e X1)"
@@ -440,9 +452,9 @@ _ou_nl=$(
     eval "$UN_OCU_GATE" 2>"$WORK/un-ouc-nl.log"
     printf '%s' "$OPENCODE_USER"
 )
-if [ "$_ou_nl" = "opencode" ] \
-   && [ "$(grep -c . "$WORK/un-ouc-nl.log")" = 1 ] \
-   && grep -q 'oco?d' "$WORK/un-ouc-nl.log"; then
+if [ "$_ou_nl" = "opencode" ] &&
+    [ "$(grep -c . "$WORK/un-ouc-nl.log")" = 1 ] &&
+    grep -q 'oco?d' "$WORK/un-ouc-nl.log"; then
     pass "gate WARN sanitized: newline value = one line, no raw bytes (pr-00263 a F9)"
 else
     fail "gate WARN sanitization (pr-00263 a F9)"
@@ -457,7 +469,7 @@ fi
 # boundary arm (a future arm refusing ALL hyphens/dots would fall
 # `untest-x.9`).
 _ou_path_ok=1
-: > "$WORK/un-ouc-path-err.log"
+: >"$WORK/un-ouc-path-err.log"
 for _ou_pv in . .. opencode. -x --; do
     _ou_pv_out=$(
         OPENCODE_USER="$_ou_pv"
@@ -471,10 +483,10 @@ _ou_keep=$(
     eval "$UN_OCU_GATE" 2>"$WORK/un-ouc-err3.log"
     printf '%s' "$OPENCODE_USER"
 )
-if [ "$_ou_path_ok" -eq 1 ] \
-   && [ "$(grep -c 'WARN: invalid OPENCODE_USER value' "$WORK/un-ouc-path-err.log")" -eq 5 ] \
-   && [ "$_ou_keep" = "untest-x.9" ] \
-   && [ ! -s "$WORK/un-ouc-err3.log" ]; then
+if [ "$_ou_path_ok" -eq 1 ] &&
+    [ "$(grep -c 'WARN: invalid OPENCODE_USER value' "$WORK/un-ouc-path-err.log")" -eq 5 ] &&
+    [ "$_ou_keep" = "untest-x.9" ] &&
+    [ ! -s "$WORK/un-ouc-err3.log" ]; then
     pass "OPENCODE_USER gate: pathological spellings fall back, internal dot/hyphen stay legal (#243 f X1)"
 else
     fail "OPENCODE_USER pathological corpus (#243 f X1)"
@@ -506,12 +518,16 @@ fi
 #               corrupted trailing-slash spelling — the agent-home
 #               refusal is lexical, so no arm needs a host directory.
 _un_loop_out() {
-    _unlo_fail="$1"; _unlo_dry="$2"; _unlo_uid="$3"; _unlo_ocg="$4"; _unlo_dg="$5"
+    _unlo_fail="$1"
+    _unlo_dry="$2"
+    _unlo_uid="$3"
+    _unlo_ocg="$4"
+    _unlo_dg="$5"
     _unlo_extra="${6:-}"
     _unlo_ocu="${7:-untest-agent}"
-    : > "$WORK/unloop-sudo.log"
-    : > "$WORK/unloop-out.log"
-    : > "$WORK/unloop-err.log"
+    : >"$WORK/unloop-sudo.log"
+    : >"$WORK/unloop-out.log"
+    : >"$WORK/unloop-err.log"
     _unlo_fixture="$WORK/fakeproj"
     for _unlo_x in $_unlo_extra; do
         _unlo_fixture="$_unlo_fixture
@@ -537,7 +553,7 @@ $_unlo_x"
         # and stderr (the shipped behavior), so an echoing stub would
         # be swallowed with them.
         sudo() {
-            printf 'sudo %s\n' "$*" >> "$WORK/unloop-sudo.log"
+            printf 'sudo %s\n' "$*" >>"$WORK/unloop-sudo.log"
             case " $_unlo_fail " in
                 *" $1 "*)
                     # Primary root only, boundary-matched: every op
@@ -545,7 +561,7 @@ $_unlo_x"
                     # or precede a space, chmod ends it) — fakeproj2
                     # must not match (#243 a S3).
                     case "$*" in
-                        *"$WORK/fakeproj "*|*"$WORK/fakeproj") return 1 ;;
+                        *"$WORK/fakeproj "* | *"$WORK/fakeproj") return 1 ;;
                     esac
                     ;;
             esac
@@ -553,7 +569,7 @@ $_unlo_x"
         }
         log() { echo "log: $*"; }
         eval "$PROJECT_LOOP"
-    ) > "$WORK/unloop-out.log" 2> "$WORK/unloop-err.log"
+    ) >"$WORK/unloop-out.log" 2>"$WORK/unloop-err.log"
     echo "--- stdout ---"
     cat "$WORK/unloop-out.log"
     echo "--- stderr ---"
@@ -562,12 +578,12 @@ $_unlo_x"
     cat "$WORK/unloop-sudo.log"
 }
 LOOP_OUT=$(mkdir -p "$WORK/fakeproj" && _un_loop_out "" false 60000 60002 60001 || true)
-if printf '%s' "$LOOP_OUT" | grep -qF "find $WORK/fakeproj" \
-   && ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-uid 60000' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60002' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
+if printf '%s' "$LOOP_OUT" | grep -qF "find $WORK/fakeproj" &&
+    ! printf '%s' "$LOOP_OUT" | grep -qF ' -xdev ' &&
+    printf '%s' "$LOOP_OUT" | grep -qF -- '-uid 60000' &&
+    printf '%s' "$LOOP_OUT" | grep -qF -- '-gid 60002' &&
+    printf '%s' "$LOOP_OUT" | grep -qF -- '-exec chown devuser:devgroup {} +' &&
+    printf '%s' "$LOOP_OUT" | grep -qF -- '! -type l'; then
     pass "ownership revert: uid/gid-matched chown to the developer per root (issue #74)"
 else
     fail "ownership revert loop (out=$(printf '%s' "$LOOP_OUT" | head -5))"
@@ -605,8 +621,8 @@ fi
 # when the invoking user could not read the agent home (group dropped,
 # different DEFAULT_USER), and userdel -r then deleted .agents/.claude
 # without the warning. An unreadable dir counts as NON-EMPTY now.
-if grep -qF 'sudo ls -A "$_un_ag_src"' "$UNINSTALL" \
-   && grep -qF '_un_ag_ls="probe-failed"' "$UNINSTALL"; then
+if grep -qF 'sudo ls -A "$_un_ag_src"' "$UNINSTALL" &&
+    grep -qF '_un_ag_ls="probe-failed"' "$UNINSTALL"; then
     pass "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
 else
     fail "agents-backup gate: privileged probe + fail-safe on unreadable (C6)"
@@ -620,8 +636,8 @@ fi
 # block was skipped silently and userdel -r deleted the resources with
 # no backup and no warning. Static pin: the privileged existence gate
 # is in, the unprivileged one is gone.
-if grep -qF 'if sudo test -d "$_un_ag_src"; then' "$UNINSTALL" \
-   && ! grep -qF 'if [ -d "$_un_ag_src" ]; then' "$UNINSTALL"; then
+if grep -qF 'if sudo test -d "$_un_ag_src"; then' "$UNINSTALL" &&
+    ! grep -qF 'if [ -d "$_un_ag_src" ]; then' "$UNINSTALL"; then
     pass "agents-backup gate: existence probe rides sudo (W2)"
 else
     fail "agents-backup gate: existence probe must be privileged, not [ -d ] (W2)"
@@ -638,17 +654,17 @@ fi
 # home enters none of them (no WARNING noise for what does not exist).
 _un_w2="$(mktemp -d)"
 mkdir -p "$_un_w2/fake-home/opencodeux/.agents" "$_un_w2/fake-home/opencodeux2" "$_un_w2/backups"
-echo skills > "$_un_w2/fake-home/opencodeux/.agents/agents.md"
-printf '#!/bin/sh\necho "sudo $*" >> "%s/log"\nexec "$@"\n' "$_un_w2" > "$_un_w2/sudo"
+echo skills >"$_un_w2/fake-home/opencodeux/.agents/agents.md"
+printf '#!/bin/sh\necho "sudo $*" >> "%s/log"\nexec "$@"\n' "$_un_w2" >"$_un_w2/sudo"
 chmod +x "$_un_w2/sudo"
 _un_w2_gate() {
     {
         printf 'DRY_RUN=false\nlog() { :; }\nDEFAULT_USER=%s\nOPENCODE_USER=%s\nPATH="%s:$PATH"\n' \
             "$2" "$1" "$_un_w2"
-        sed -n '/^        for _un_ag_dirname in \.agents \.claude; do$/,/^        done$/p' "$UNINSTALL" \
-            | sed -e "s#/home/#$_un_w2/fake-home/#g" -e "s#/var/backups/opencode-permissions-kit#$_un_w2/backups#"
-    } > "$_un_w2/run.sh"
-    : > "$_un_w2/log"
+        sed -n '/^        for _un_ag_dirname in \.agents \.claude; do$/,/^        done$/p' "$UNINSTALL" |
+            sed -e "s#/home/#$_un_w2/fake-home/#g" -e "s#/var/backups/opencode-permissions-kit#$_un_w2/backups#"
+    } >"$_un_w2/run.sh"
+    : >"$_un_w2/log"
     sh "$_un_w2/run.sh" >/dev/null 2>&1 || true
     cat "$_un_w2/log" 2>/dev/null || true
 }
@@ -660,17 +676,17 @@ else
     fail "agents-backup gate: no privileged probe against the unreadable home (W2 log: $_un_w2_log)"
 fi
 _un_w2_log="$(_un_w2_gate opencodeux devuser)"
-if printf '%s\n' "$_un_w2_log" | grep -q '^sudo test -d .*agents$' \
-   && printf '%s\n' "$_un_w2_log" | grep -q '^sudo ls -A .*agents$' \
-   && printf '%s\n' "$_un_w2_log" | grep -q '^sudo mkdir -p .*agents-backup-' \
-   && printf '%s\n' "$_un_w2_log" | grep -q '^sudo cp -a .*agents'; then
+if printf '%s\n' "$_un_w2_log" | grep -q '^sudo test -d .*agents$' &&
+    printf '%s\n' "$_un_w2_log" | grep -q '^sudo ls -A .*agents$' &&
+    printf '%s\n' "$_un_w2_log" | grep -q '^sudo mkdir -p .*agents-backup-' &&
+    printf '%s\n' "$_un_w2_log" | grep -q '^sudo cp -a .*agents'; then
     pass "agents-backup gate: readable .agents arms the backup branch (W2)"
 else
     fail "agents-backup gate: readable .agents must issue test-d/ls-A/mkdir/cp (W2 log: $_un_w2_log)"
 fi
 _un_w2_log="$(_un_w2_gate opencodeux-missing devuser)"
-if ! printf '%s\n' "$_un_w2_log" | grep -q 'mkdir -p' \
-   && ! printf '%s\n' "$_un_w2_log" | grep -q 'cp -a'; then
+if ! printf '%s\n' "$_un_w2_log" | grep -q 'mkdir -p' &&
+    ! printf '%s\n' "$_un_w2_log" | grep -q 'cp -a'; then
     pass "agents-backup gate: nonexistent home enters no backup call (W2)"
 else
     fail "agents-backup gate: nonexistent home must skip the backup branch (W2 log: $_un_w2_log)"
@@ -686,21 +702,21 @@ rm -rf "${_un_w2:?}"
 # setfacl parse time when the name does not resolve, silently disabling
 # the cleanup; the capture feeds a fallback branch when even the gid is
 # unknown.
-if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60002' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60002' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60001' \
-   && printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60001' \
-   && ! printf '%s' "$LOOP_OUT" | grep -qF 'unknown' \
-   && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -b' \
-   && ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -k'; then
+if printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60002' &&
+    printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60002' &&
+    printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -x g:60001' &&
+    printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -d -x g:60001' &&
+    ! printf '%s' "$LOOP_OUT" | grep -qF 'unknown' &&
+    ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -b' &&
+    ! printf '%s' "$LOOP_OUT" | grep -qF -- 'setfacl -R -k'; then
     pass "ACL revert: both kit principals removed via numeric gids, no skip hints (0.0.42g S1 + 0.0.42i Q3)"
 else
     fail "ACL revert must remove BOTH principals (opencode group + dev group) via numeric gids (0.0.42g S1)"
 fi
-if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$UNINSTALL" \
-   && grep -qF 'for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"' "$UNINSTALL" \
-   && grep -qF 'project revert PARTIALLY completed' "$UNINSTALL" \
-   && grep -qF 'id unknown — its ACL entries left in place' "$UNINSTALL"; then
+if grep -qF 'UN_DEV_GID=$(id -g "$DEFAULT_USER"' "$UNINSTALL" &&
+    grep -qF 'for _un_acl_pair in "opencode group:$UN_OC_GID" "dev group:$UN_DEV_GID"' "$UNINSTALL" &&
+    grep -qF 'project revert PARTIALLY completed' "$UNINSTALL" &&
+    grep -qF 'id unknown — its ACL entries left in place' "$UNINSTALL"; then
     pass "ACL revert: both gids captured, principal loop, loud per-principal skip + partial log (0.0.42f C2 + 0.0.42g S1 + 0.0.42h S1 + #218)"
 else
     fail "ACL revert: principal loop + loud skip + partial-log branch required (0.0.42h S1, #218)"
@@ -724,8 +740,8 @@ _unarm_show() {
     # No tail window: red arms with many sudo lines (system-path,
     # two-roots) must not push the asserted discriminator out of the
     # shown output. Pinned family-by-family below (#243 c S2).
-    printf '%s' "$1" \
-        | grep -E 'log:|WARN:|PARTIALLY|Removed\.|\[DRY\]|Skipping|skipped|unknown|^sudo '
+    printf '%s' "$1" |
+        grep -E 'log:|WARN:|PARTIALLY|Removed\.|\[DRY\]|Skipping|skipped|unknown|^sudo '
 }
 # _unarm_show family pin (#243 c S2): the helper never executes on a
 # green run — it lives inside fail messages only — so without this
@@ -750,41 +766,41 @@ if [ "$(_unarm_show "$_un_s2_in")" = "$_un_s2_in" ]; then
 else
     fail "_unarm_show surfaces every asserted family, no window (#243 c S2/Q2)"
 fi
-if printf '%s' "$LOOP_OUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
-   && ! printf '%s' "$LOOP_OUT" | grep -qF 'PARTIALLY' \
-   && ! printf '%s' "$LOOP_OUT" | grep -qF 'WARN:' \
-   && ! printf '%s' "$LOOP_OUT" | grep -qF 'revert FAILED'; then
+if printf '%s' "$LOOP_OUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" &&
+    ! printf '%s' "$LOOP_OUT" | grep -qF 'PARTIALLY' &&
+    ! printf '%s' "$LOOP_OUT" | grep -qF 'WARN:' &&
+    ! printf '%s' "$LOOP_OUT" | grep -qF 'revert FAILED'; then
     pass "revert all ok: full-success closing log, no partial/WARN noise (#218)"
 else
     fail "revert all ok: full-success closing log required (out=$(_unarm_show "$LOOP_OUT")) (#218)"
 fi
 FOUT=$(_un_loop_out "find" false 60000 60002 60001) || true
-if printf '%s' "$FOUT" | grep -qF "log: project revert PARTIALLY completed (find-chown failed): $WORK/fakeproj" \
-   && printf '%s' "$FOUT" | grep -qF "WARN: could not fully revert $WORK/fakeproj (find-chown failed)" \
-   && printf '%s' "$FOUT" | grep -qF "log: project revert FAILED for: $WORK/fakeproj (find-chown failed)" \
-   && printf '%s' "$FOUT" | sed -n '/^--- stderr ---$/,/^--- sudo log ---$/p' | grep -qF 'WARN: could not fully revert' \
-   && ! printf '%s' "$FOUT" | sed -n '1,/^--- stderr ---$/p' | grep -qF 'WARN:' \
-   && ! printf '%s' "$FOUT" | grep -qF 'ownership reverted' \
-   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+if printf '%s' "$FOUT" | grep -qF "log: project revert PARTIALLY completed (find-chown failed): $WORK/fakeproj" &&
+    printf '%s' "$FOUT" | grep -qF "WARN: could not fully revert $WORK/fakeproj (find-chown failed)" &&
+    printf '%s' "$FOUT" | grep -qF "log: project revert FAILED for: $WORK/fakeproj (find-chown failed)" &&
+    printf '%s' "$FOUT" | sed -n '/^--- stderr ---$/,/^--- sudo log ---$/p' | grep -qF 'WARN: could not fully revert' &&
+    ! printf '%s' "$FOUT" | sed -n '1,/^--- stderr ---$/p' | grep -qF 'WARN:' &&
+    ! printf '%s' "$FOUT" | grep -qF 'ownership reverted' &&
+    ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
     pass "find-chown failure: degraded closing names the failed op, WARN stays on stderr, no false completion (#218, #243 a X1/Q3)"
 else
     fail "find-chown failure arms (out=$(_unarm_show "$FOUT")) (#218, #243 a X1/Q3)"
 fi
 FOUT=$(_un_loop_out "setfacl" false 60000 60002 60001) || true
-if printf '%s' "$FOUT" | grep -qF 'setfacl -x g:60002 failed' \
-   && printf '%s' "$FOUT" | grep -qF 'setfacl -d -x g:60001 failed' \
-   && ! printf '%s' "$FOUT" | grep -qF 'find-chown failed' \
-   && ! printf '%s' "$FOUT" | grep -qF 'chmod g-s failed' \
-   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+if printf '%s' "$FOUT" | grep -qF 'setfacl -x g:60002 failed' &&
+    printf '%s' "$FOUT" | grep -qF 'setfacl -d -x g:60001 failed' &&
+    ! printf '%s' "$FOUT" | grep -qF 'find-chown failed' &&
+    ! printf '%s' "$FOUT" | grep -qF 'chmod g-s failed' &&
+    ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
     pass "setfacl failure: both principals' ops named, other ops not (#218)"
 else
     fail "setfacl failure arms — names must discriminate (out=$(_unarm_show "$FOUT")) (#218)"
 fi
 FOUT=$(_un_loop_out "chmod" false 60000 60002 60001) || true
-if printf '%s' "$FOUT" | grep -qF 'PARTIALLY completed (chmod g-s failed)' \
-   && printf '%s' "$FOUT" | grep -qF 'WARN: could not fully revert' \
-   && ! printf '%s' "$FOUT" | grep -qF 'find-chown failed' \
-   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+if printf '%s' "$FOUT" | grep -qF 'PARTIALLY completed (chmod g-s failed)' &&
+    printf '%s' "$FOUT" | grep -qF 'WARN: could not fully revert' &&
+    ! printf '%s' "$FOUT" | grep -qF 'find-chown failed' &&
+    ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
     pass "chmod g-s failure: named in degraded closing + WARN (#218)"
 else
     fail "chmod g-s failure arms (out=$(_unarm_show "$FOUT")) (#218)"
@@ -797,13 +813,13 @@ fi
 # The manual-hint template is pinned too (#243 a Q1: docs describe it
 # as a template with a <gid> placeholder — never as an exact call).
 FOUT=$(_un_loop_out "" false 60000 "" 60001) || true
-if printf '%s' "$FOUT" | grep -qF 'PARTIALLY completed (opencode user unknown (chown skipped), opencode group id unknown)' \
-   && printf '%s' "$FOUT" | grep -qF 'opencode group id unknown — its ACL entries left in place' \
-   && printf '%s' "$FOUT" | grep -qF 'remove manually: setfacl -R -x g:<gid> -d -x g:<gid>' \
-   && printf '%s' "$FOUT" | grep -qF -- 'setfacl -R -x g:60001' \
-   && ! printf '%s' "$FOUT" | grep -qF 'WARN:' \
-   && ! printf '%s' "$FOUT" | grep -qF 'revert FAILED' \
-   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+if printf '%s' "$FOUT" | grep -qF 'PARTIALLY completed (opencode user unknown (chown skipped), opencode group id unknown)' &&
+    printf '%s' "$FOUT" | grep -qF 'opencode group id unknown — its ACL entries left in place' &&
+    printf '%s' "$FOUT" | grep -qF 'remove manually: setfacl -R -x g:<gid> -d -x g:<gid>' &&
+    printf '%s' "$FOUT" | grep -qF -- 'setfacl -R -x g:60001' &&
+    ! printf '%s' "$FOUT" | grep -qF 'WARN:' &&
+    ! printf '%s' "$FOUT" | grep -qF 'revert FAILED' &&
+    ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
     pass "opencode gid unknown: loud skip + template hint + degraded closing, no failure WARN (#218, #243 a Q1)"
 else
     fail "opencode gid unknown arms (out=$(_unarm_show "$FOUT")) (#218, #243 a Q1)"
@@ -811,11 +827,11 @@ fi
 # Unknown uid: chown skipped loudly, ACL ops still run, degraded
 # closing names the skip — same not-attempted-is-not-failed rule.
 FOUT=$(_un_loop_out "" false "" 60002 60001) || true
-if printf '%s' "$FOUT" | grep -qF 'PARTIALLY completed (opencode user unknown (chown skipped))' \
-   && printf '%s' "$FOUT" | grep -qF 'chown manually if files are locked' \
-   && printf '%s' "$FOUT" | grep -qF -- 'setfacl -R -x g:60002' \
-   && ! printf '%s' "$FOUT" | grep -qF 'WARN:' \
-   && ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
+if printf '%s' "$FOUT" | grep -qF 'PARTIALLY completed (opencode user unknown (chown skipped))' &&
+    printf '%s' "$FOUT" | grep -qF 'chown manually if files are locked' &&
+    printf '%s' "$FOUT" | grep -qF -- 'setfacl -R -x g:60002' &&
+    ! printf '%s' "$FOUT" | grep -qF 'WARN:' &&
+    ! printf '%s' "$FOUT" | grep -qF 'kit ACL entries removed:'; then
     pass "uid unknown: chown skip lands in degraded closing, ACL ops still run (#218)"
 else
     fail "uid unknown arms (out=$(_unarm_show "$FOUT")) (#218)"
@@ -827,11 +843,11 @@ fi
 # executes in dry mode while dropping rc observation would otherwise
 # stay green.
 FOUT=$(_un_loop_out "find setfacl chmod" true 60000 60002 60001) || true
-if printf '%s' "$FOUT" | grep -qF '[DRY] sudo find' \
-   && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
-   && ! printf '%s' "$FOUT" | grep -qF 'PARTIALLY' \
-   && ! printf '%s' "$FOUT" | grep -qF 'WARN:' \
-   && ! printf '%s' "$FOUT" | sed -n '/^--- sudo log ---$/,$p' | grep -q '^sudo '; then
+if printf '%s' "$FOUT" | grep -qF '[DRY] sudo find' &&
+    printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" &&
+    ! printf '%s' "$FOUT" | grep -qF 'PARTIALLY' &&
+    ! printf '%s' "$FOUT" | grep -qF 'WARN:' &&
+    ! printf '%s' "$FOUT" | sed -n '/^--- sudo log ---$/,$p' | grep -q '^sudo '; then
     pass "dry run: [DRY] echo + full-success closing, sudo log empty despite failing stub (#218, #243 a Q5)"
 else
     fail "dry run arms (out=$(_unarm_show "$FOUT")) (#218, #243 a Q5)"
@@ -843,10 +859,10 @@ fi
 # turns root 2's line degraded → red.
 mkdir -p "$WORK/fakeproj2"
 FOUT=$(_un_loop_out "find" false 60000 60002 60001 "$WORK/fakeproj2") || true
-if printf '%s' "$FOUT" | grep -qF "log: project revert PARTIALLY completed (find-chown failed): $WORK/fakeproj" \
-   && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj2" \
-   && ! printf '%s' "$FOUT" | grep -qF "PARTIALLY completed (find-chown failed): $WORK/fakeproj2" \
-   && printf '%s' "$FOUT" | grep -qF "sudo chmod g-s $WORK/fakeproj2"; then
+if printf '%s' "$FOUT" | grep -qF "log: project revert PARTIALLY completed (find-chown failed): $WORK/fakeproj" &&
+    printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj2" &&
+    ! printf '%s' "$FOUT" | grep -qF "PARTIALLY completed (find-chown failed): $WORK/fakeproj2" &&
+    printf '%s' "$FOUT" | grep -qF "sudo chmod g-s $WORK/fakeproj2"; then
     pass "two roots: root 1 degraded, root 2 closes clean — reset is per-root (#243 a S3)"
 else
     fail "two-roots isolation arms (out=$(_unarm_show "$FOUT")) (#243 a S3)"
@@ -859,18 +875,18 @@ fi
 # cover every op verb (#243 d Q3): find, both setfacl spellings and
 # chmod g-s.
 FOUT=$(_un_loop_out "" false 60000 60002 60001 "//etc /var/. .") || true
-if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): //etc' \
-   && printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): /var/.' \
-   && printf '%s' "$FOUT" | grep -qF 'Skipping non-absolute project path: .' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo find //etc' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 //etc' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -d -x g:60002 //etc' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s //etc' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo find /var/.' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /var/.' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo find . !' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s .' \
-   && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
+if printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): //etc' &&
+    printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty segment): /var/.' &&
+    printf '%s' "$FOUT" | grep -qF 'Skipping non-absolute project path: .' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo find //etc' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 //etc' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -d -x g:60002 //etc' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s //etc' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo find /var/.' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /var/.' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo find . !' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s .' &&
+    printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
     pass "malformed roots (//etc, /var/., .) skipped loudly, no root ops on them (#243 a X2)"
 else
     fail "malformed-root screening arms (out=$(_unarm_show "$FOUT")) (#243 a X2)"
@@ -913,8 +929,8 @@ for _un_sys in $_un_sysroots; do
     printf '%s' "$FOUT" | grep -qF "sudo setfacl -R -x g:60002 $_un_sys" && _un_sys_ok=0
     printf '%s' "$FOUT" | grep -qF "sudo chmod g-s $_un_sys" && _un_sys_ok=0
 done
-printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
-    || _un_sys_ok=0
+printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" ||
+    _un_sys_ok=0
 if [ "$_un_sys_ok" -eq 1 ]; then
     pass "system-path roots (${_un_sysroots:-none fed}) screened, no root ops, primary root processes (#243 b X1, c Q3)"
 else
@@ -957,8 +973,8 @@ printf '%s' "$FOUT" | grep -qF 'Skipping malformed project path (dot or empty se
 printf '%s' "$FOUT" | grep -qF 'sudo find /var// !' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -q 'sudo setfacl -R -x g:60002 /var//$' && _un_ts_ok=0
 printf '%s' "$FOUT" | grep -q 'sudo chmod g-s /var//$' && _un_ts_ok=0
-printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" \
-    || _un_ts_ok=0
+printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj" ||
+    _un_ts_ok=0
 if [ "$_un_ts_ok" -eq 1 ]; then
     pass "trailing-slash spellings (${_un_tsroots:-none fed} / //) screened; // stays the dot gate's catch (#243 c X1)"
 else
@@ -977,13 +993,13 @@ fi
 # an unanchored grep is satisfied by either line and cannot red on a
 # raw-echo-only omission.
 FOUT=$(_un_loop_out "" false 60000 60002 60001 "/home/untest-agent /home/untest-agent/") || true
-if printf '%s' "$FOUT" | grep -q 'Skipping agent home (never a project root): /home/untest-agent$' \
-   && printf '%s' "$FOUT" | grep -qF 'Skipping agent home (never a project root): /home/untest-agent/' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo find /home/untest-agent' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 /home/untest-agent' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -d -x g:60002 /home/untest-agent' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /home/untest-agent' \
-   && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
+if printf '%s' "$FOUT" | grep -q 'Skipping agent home (never a project root): /home/untest-agent$' &&
+    printf '%s' "$FOUT" | grep -qF 'Skipping agent home (never a project root): /home/untest-agent/' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo find /home/untest-agent' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 /home/untest-agent' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -d -x g:60002 /home/untest-agent' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /home/untest-agent' &&
+    printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
     pass "agent home refused lexically before [ -d ] (raw + trailing slash), no root ops, primary root processes (#243 c Q1, d X2)"
 else
     fail "agent-home refusal arms (out=$(_unarm_show "$FOUT")) (#243 c Q1, d X2)"
@@ -998,14 +1014,14 @@ fi
 # review e probed old-vs-new. Host-independent: the refusal is
 # lexical, before the [ -d ] gate.
 FOUT=$(_un_loop_out "" false 60000 60002 60001 "/home/opencode /home/opencode/" "opencode/") || true
-if printf '%s' "$FOUT" | grep -qF 'WARN: invalid OPENCODE_USER value in install.conf' \
-   && printf '%s' "$FOUT" | grep -q 'Skipping agent home (never a project root): /home/opencode$' \
-   && printf '%s' "$FOUT" | grep -qF 'Skipping agent home (never a project root): /home/opencode/' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo find /home/opencode' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 /home/opencode' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -d -x g:60002 /home/opencode' \
-   && ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /home/opencode' \
-   && printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
+if printf '%s' "$FOUT" | grep -qF 'WARN: invalid OPENCODE_USER value in install.conf' &&
+    printf '%s' "$FOUT" | grep -q 'Skipping agent home (never a project root): /home/opencode$' &&
+    printf '%s' "$FOUT" | grep -qF 'Skipping agent home (never a project root): /home/opencode/' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo find /home/opencode' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -x g:60002 /home/opencode' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo setfacl -R -d -x g:60002 /home/opencode' &&
+    ! printf '%s' "$FOUT" | grep -qF 'sudo chmod g-s /home/opencode' &&
+    printf '%s' "$FOUT" | grep -qF "log: project ownership reverted + kit ACL entries removed: $WORK/fakeproj"; then
     pass "corrupted OPENCODE_USER gated back to canonical, agent home refused, no root ops (#243 e X1)"
 else
     fail "corrupted-conf agent-home arms (out=$(_unarm_show "$FOUT")) (#243 e X1)"
@@ -1022,18 +1038,19 @@ fi
 # safe). The openchamber guard probes (test/grep) can pass while the
 # rm fails — exactly the discrimination S2 needs.
 CFG_SECTION="$(sed -n '/^echo "--- Removing kit config directories/,/^echo ""$/p' "$UNINSTALL")"
-if [ -n "$CFG_SECTION" ] \
-   && printf '%s' "$CFG_SECTION" | grep -qF 'un_rc_q "rm /etc/opencode-permissions-kit"' \
-   && printf '%s' "$CFG_SECTION" | grep -qF 'openchamber policy pin removal FAILED'; then
+if [ -n "$CFG_SECTION" ] &&
+    printf '%s' "$CFG_SECTION" | grep -qF 'un_rc_q "rm /etc/opencode-permissions-kit"' &&
+    printf '%s' "$CFG_SECTION" | grep -qF 'openchamber policy pin removal FAILED'; then
     pass "config-dirs section extractable + rc-observing (#243 a S1/S2)"
 else
     fail "config-dirs section extraction/rc observation (#243 a S1/S2)"
 fi
 _un_cfg_out() {
-    _unc_fail="$1"; _unc_dry="$2"
-    : > "$WORK/uncfg-sudo.log"
-    : > "$WORK/uncfg-out.log"
-    : > "$WORK/uncfg-err.log"
+    _unc_fail="$1"
+    _unc_dry="$2"
+    : >"$WORK/uncfg-sudo.log"
+    : >"$WORK/uncfg-out.log"
+    : >"$WORK/uncfg-err.log"
     (
         DRY_RUN="$_unc_dry"
         # Stale pre-state (#243 b S2): on a real run the project loop
@@ -1047,7 +1064,7 @@ _un_cfg_out() {
         _un_revert_failed=1
         eval "$UN_RC_Q"
         sudo() {
-            printf 'sudo %s\n' "$*" >> "$WORK/uncfg-sudo.log"
+            printf 'sudo %s\n' "$*" >>"$WORK/uncfg-sudo.log"
             for _unc_s in $_unc_fail; do
                 if [ "$1" = "${_unc_s%%:*}" ]; then
                     case "$*" in
@@ -1059,7 +1076,7 @@ _un_cfg_out() {
         }
         log() { echo "log: $*"; }
         eval "$CFG_SECTION"
-    ) > "$WORK/uncfg-out.log" 2> "$WORK/uncfg-err.log"
+    ) >"$WORK/uncfg-out.log" 2>"$WORK/uncfg-err.log"
     echo "--- stdout ---"
     cat "$WORK/uncfg-out.log"
     echo "--- stderr ---"
@@ -1068,12 +1085,12 @@ _un_cfg_out() {
     cat "$WORK/uncfg-sudo.log"
 }
 COUT=$(_un_cfg_out "" false) || true
-if printf '%s' "$COUT" | grep -qF 'Removed.' \
-   && printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)' \
-   && printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removed (kit-owned content only)' \
-   && ! printf '%s' "$COUT" | grep -qF 'WARN:' \
-   && ! printf '%s' "$COUT" | grep -qF 'PARTIALLY' \
-   && ! printf '%s' "$COUT" | grep -qF 'stale from the project loop'; then
+if printf '%s' "$COUT" | grep -qF 'Removed.' &&
+    printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts removed (/etc/opencode-permissions-kit, /run/opencode-permissions-kit, 99-ddev-rootless.conf)' &&
+    printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removed (kit-owned content only)' &&
+    ! printf '%s' "$COUT" | grep -qF 'WARN:' &&
+    ! printf '%s' "$COUT" | grep -qF 'PARTIALLY' &&
+    ! printf '%s' "$COUT" | grep -qF 'stale from the project loop'; then
     pass "config-dirs all ok: Removed. + success logs, stale pre-state cleared, no partial/WARN noise (#243 a S1/S2, b S2)"
 else
     fail "config-dirs all-ok arms (out=$(_unarm_show "$COUT")) (#243 a S1/S2, b S2)"
@@ -1082,12 +1099,12 @@ fi
 # failure WARNs on stderr (channel pinned) and lands in the section's
 # partial list, degrading the section closing.
 COUT=$(_un_cfg_out "rm:/etc/openchamber/policy.json" false) || true
-if printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removal FAILED (rm)' \
-   && printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts PARTIALLY removed (openchamber policy pin rm failed)' \
-   && printf '%s' "$COUT" | sed -n '/^--- stderr ---$/,/^--- sudo log ---$/p' | grep -qF 'WARN: could not remove the openchamber policy pin (rm failed)' \
-   && printf '%s' "$COUT" | sed -n '/^--- stderr ---$/,/^--- sudo log ---$/p' | grep -qF 'WARN: could not fully remove config dirs + runtime artifacts (openchamber policy pin rm failed)' \
-   && ! printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removed' \
-   && ! printf '%s' "$COUT" | grep -qF 'artifacts removed ('; then
+if printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removal FAILED (rm)' &&
+    printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts PARTIALLY removed (openchamber policy pin rm failed)' &&
+    printf '%s' "$COUT" | sed -n '/^--- stderr ---$/,/^--- sudo log ---$/p' | grep -qF 'WARN: could not remove the openchamber policy pin (rm failed)' &&
+    printf '%s' "$COUT" | sed -n '/^--- stderr ---$/,/^--- sudo log ---$/p' | grep -qF 'WARN: could not fully remove config dirs + runtime artifacts (openchamber policy pin rm failed)' &&
+    ! printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removed' &&
+    ! printf '%s' "$COUT" | grep -qF 'artifacts removed ('; then
     pass "openchamber rm failure: FAILED log + both WARNs on stderr, section closing degrades (#243 a S2, b Q2)"
 else
     fail "openchamber rm failure arms (out=$(_unarm_show "$COUT")) (#243 a S2, b Q2)"
@@ -1095,10 +1112,10 @@ fi
 # Two section rms fail (S1): both named in the degraded closing, in
 # section order; the surviving openchamber pin still logs its success.
 COUT=$(_un_cfg_out "rm:99-ddev-rootless.conf rm:/etc/opencode-permissions-kit" false) || true
-if printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts PARTIALLY removed (rm 99-ddev-rootless.conf failed, rm /etc/opencode-permissions-kit failed)' \
-   && printf '%s' "$COUT" | grep -qF 'WARN: could not fully remove config dirs + runtime artifacts' \
-   && printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removed (kit-owned content only)' \
-   && ! printf '%s' "$COUT" | grep -qF 'Removed.'; then
+if printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts PARTIALLY removed (rm 99-ddev-rootless.conf failed, rm /etc/opencode-permissions-kit failed)' &&
+    printf '%s' "$COUT" | grep -qF 'WARN: could not fully remove config dirs + runtime artifacts' &&
+    printf '%s' "$COUT" | grep -qF 'log: openchamber policy pin removed (kit-owned content only)' &&
+    ! printf '%s' "$COUT" | grep -qF 'Removed.'; then
     pass "section rm failures: both named in degraded closing + WARN, no false Removed. (#243 a S1)"
 else
     fail "section rm failure arms (out=$(_unarm_show "$COUT")) (#243 a S1)"
@@ -1107,11 +1124,11 @@ fi
 # stub — the run_q convention (#211 b W1). The guard probes
 # (test/grep) legitimately execute as reads; no rm ever runs.
 COUT=$(_un_cfg_out "rm:/etc/opencode-permissions-kit" true) || true
-if printf '%s' "$COUT" | grep -qF '[DRY] sudo rm -rf /run/opencode-permissions-kit' \
-   && printf '%s' "$COUT" | grep -qF '[DRY] sudo rm -f /etc/openchamber/policy.json' \
-   && printf '%s' "$COUT" | grep -qF 'Removed.' \
-   && printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts removed' \
-   && ! printf '%s' "$COUT" | grep -qF 'PARTIALLY'; then
+if printf '%s' "$COUT" | grep -qF '[DRY] sudo rm -rf /run/opencode-permissions-kit' &&
+    printf '%s' "$COUT" | grep -qF '[DRY] sudo rm -f /etc/openchamber/policy.json' &&
+    printf '%s' "$COUT" | grep -qF 'Removed.' &&
+    printf '%s' "$COUT" | grep -qF 'log: config dirs + runtime artifacts removed' &&
+    ! printf '%s' "$COUT" | grep -qF 'PARTIALLY'; then
     pass "config-dirs dry: [DRY] echoes + success lines, no partial noise (#243 a S1)"
 else
     fail "config-dirs dry arms (out=$(_unarm_show "$COUT")) (#243 a S1)"
@@ -1130,8 +1147,8 @@ else
     fail "manual-cleanup section mentions the default-user config"
 fi
 # The backup path hint must match install.sh's mktemp shape
-if grep -qF '/tmp/opencode-install-backup' "$UNINSTALL" \
-   && ! grep -qF 'opencode-install-backup-<timestamp>' "$UNINSTALL"; then
+if grep -qF '/tmp/opencode-install-backup' "$UNINSTALL" &&
+    ! grep -qF 'opencode-install-backup-<timestamp>' "$UNINSTALL"; then
     pass "backup hint matches the mktemp path shape"
 else
     fail "backup hint matches the mktemp path shape"
@@ -1157,9 +1174,9 @@ else
 fi
 
 # uninstall side of the conf-user homes (0.0.44b W16)
-grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL" \
-    && pass "uninstall plugin-unregister rides the conf user (V16)" \
-    || fail "uninstall plugin-unregister rides the conf user (V16)"
+grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL" &&
+    pass "uninstall plugin-unregister rides the conf user (V16)" ||
+    fail "uninstall plugin-unregister rides the conf user (V16)"
 
 # OpenChamber policy pin removal (issue #154, Tier 2): kit-owned content
 # only — the policy.json goes when (and only when) it pins OUR wrapper;
@@ -1167,11 +1184,11 @@ grep -q '"/home/$OPENCODE_USER/.config/opencode"' "$UNINSTALL" \
 # Issue #164: presence + content run at the rm's authority (sudo) — the
 # script runs as the developer, an admin 0700 /etc/openchamber must not
 # hide a kit pin from removal.
-if grep -q 'grep -q .\"opencodeBinary\".*\"/usr/local/bin/opencode\"' "$UNINSTALL" \
-    && grep -q 'rm -f /etc/openchamber/policy.json' "$UNINSTALL" \
-    && grep -q 'rmdir /etc/openchamber' "$UNINSTALL" \
-    && grep -qF 'sudo test -f /etc/openchamber/policy.json' "$UNINSTALL" \
-    && grep -qF 'sudo grep -q ' "$UNINSTALL"; then
+if grep -q 'grep -q .\"opencodeBinary\".*\"/usr/local/bin/opencode\"' "$UNINSTALL" &&
+    grep -q 'rm -f /etc/openchamber/policy.json' "$UNINSTALL" &&
+    grep -q 'rmdir /etc/openchamber' "$UNINSTALL" &&
+    grep -qF 'sudo test -f /etc/openchamber/policy.json' "$UNINSTALL" &&
+    grep -qF 'sudo grep -q ' "$UNINSTALL"; then
     pass "openchamber policy removed marker-gated (kit content only)"
 else
     fail "openchamber policy removal lost its marker gate"
@@ -1185,13 +1202,13 @@ fi
 # missed this standalone sibling; mixed-case answers are honored; the
 # prompt renders the shared marker-less shape.
 PROMPT_YN="$(sed -n '/^prompt_yn() {/,/^}/p' "$UNINSTALL")"
-if [ -n "$PROMPT_YN" ] && printf '%s' "$PROMPT_YN" | grep -qF 'n|no)'; then
+if [ -n "$PROMPT_YN" ] && printf '%s' "$PROMPT_YN" | grep -qF 'n | no)'; then
     pass "prompt_yn extractable from uninstall.sh (n|no arm present)"
 else
     fail "prompt_yn extractable from uninstall.sh (n|no arm present)"
 fi
-printf '%s\n' "$PROMPT_YN" > "$WORK/prompt-yn.sh"
-cat > "$WORK/py-driver.sh" <<'PYEOF'
+printf '%s\n' "$PROMPT_YN" >"$WORK/prompt-yn.sh"
+cat >"$WORK/py-driver.sh" <<'PYEOF'
 #!/bin/sh
 # $1 = default; prints prompt_yn's answer on stdout
 RED='' NC='' YES=false
@@ -1201,8 +1218,8 @@ prompt_yn "Delete audit log too?" "${1:?}"
 PYEOF
 py_ask() { # <typed-line> <default> -> last pty line (prompt + answer)
     printf '%s\n' "$1" | PY_SRC="$WORK/prompt-yn.sh" \
-        script -qec "sh '$WORK/py-driver.sh' '$2'" /dev/null 2>/dev/null \
-        | tr -d '\r' | tail -1
+        script -qec "sh '$WORK/py-driver.sh' '$2'" /dev/null 2>/dev/null |
+        tr -d '\r' | tail -1
 }
 py_pin() { # <desc> <typed> <default> <expected answer y|n>
     _pyline=$(py_ask "$2" "$3")
@@ -1220,8 +1237,8 @@ py_pin "prompt_yn: trailing-space 'no ' declines under a y default (#189 a W2)" 
 py_pin "prompt_yn: Enter accepts the y default (regression guard)" "" y y
 # Shape (issue #187 B): two-space indent, no [?] marker, capital default.
 _pyline=$(py_ask "" n)
-if printf '%s' "$_pyline" | grep -qF '  Delete audit log too? [y/N] ' \
-    && ! printf '%s' "$_pyline" | grep -qF '[?]'; then
+if printf '%s' "$_pyline" | grep -qF '  Delete audit log too? [y/N] ' &&
+    ! printf '%s' "$_pyline" | grep -qF '[?]'; then
     pass "prompt_yn shape: '  <question> [y/N] ' — no marker (issue #187 B)"
 else
     fail "prompt_yn shape: '  <question> [y/N] ' — no marker (got: $_pyline)"
@@ -1246,13 +1263,13 @@ fi
 # getent-failure fallback (`|| var="/home/$DEFAULT_USER"`), and the
 # braced self-default fallback (`var="${var:-/home/${DEFAULT_USER:-$USER}}"`
 # — sanctioned shape, status.sh's openchamber home).
-_un_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UNINSTALL" 2>/dev/null \
-    | grep -v '^[[:space:]]*#' \
-    | grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' \
-    | grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
-if grep -qF '_un_dev_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"' "$UNINSTALL" \
-   && grep -qF '"$_un_dev_home/.config/opencode"' "$UNINSTALL" \
-   && [ -z "$_un_bad" ]; then
+_un_bad="$(grep -e '/home/\$DEFAULT_USER' -e '/home/\${DEFAULT_USER' "$UNINSTALL" 2>/dev/null |
+    grep -v '^[[:space:]]*#' |
+    grep -v '|| [[:alnum:]_]\{1,\}="/home/\$DEFAULT_USER"$' |
+    grep -v '[[:alnum:]_]\{1,\}="\${[[:alnum:]_]\{1,\}:-/home/\${DEFAULT_USER:-\$USER}}"$' || true)"
+if grep -qF '_un_dev_home="$(getent passwd "$DEFAULT_USER" 2>/dev/null | cut -d: -f6 || true)"' "$UNINSTALL" &&
+    grep -qF '"$_un_dev_home/.config/opencode"' "$UNINSTALL" &&
+    [ -z "$_un_bad" ]; then
     pass "uninstall.sh resolves the developer home via getent for the cleanup loop"
 else
     fail "uninstall.sh resolves the developer home via getent for the cleanup loop (${_un_bad:-no getent})"
@@ -1274,7 +1291,10 @@ if [ -n "$_f27_block" ] && printf '%s' "$_f27_block" | grep -q 'browser_bridge_r
             # #211 b W14: the extract spans the declined-consent arm's
             # live `sudo rm -rf` — stub sudo so no future drive can
             # execute it for real on a kit-managed host.
-            sudo() { echo "sudo: $*"; return 0; }
+            sudo() {
+                echo "sudo: $*"
+                return 0
+            }
             browser_bridge_remove() {
                 [ "$F27MODE" = ok ] && return 0
                 return 1
@@ -1300,7 +1320,7 @@ fi
 # The membership probe was a substring grep (a group 'opencode2' matched
 # 'opencode') and the success echo printed over a silenced gpasswd
 # failure. Extract the real block; stub id/run_q/log; drive all arms.
-_f28_block="$(sed -n '/^if id "\$DEFAULT_USER" >\/dev\/null 2>&1 \\/,/^fi$/p' \
+_f28_block="$(sed -n '/^if id "\$DEFAULT_USER" >\/dev\/null 2>&1 &&/,/^fi$/p' \
     "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh")"
 if [ -n "$_f28_block" ]; then
     pass "group removal block extractable (#211 a F28)"
@@ -1313,7 +1333,10 @@ if [ -n "$_f28_block" ]; then
             DEFAULT_USER=dev
             OPENCODE_GROUP=opencode
             DRY_RUN="${DRY_RUN:-false}"
-            id() { printf '%s\n' "uid=1(dev) gid=1(dev) groups=1(dev),$F28GRPS"; return 0; }
+            id() {
+                printf '%s\n' "uid=1(dev) gid=1(dev) groups=1(dev),$F28GRPS"
+                return 0
+            }
             sudo() { return "$F28GP"; }
             log() { echo "log: $*"; }
             eval "$_f28_block"
@@ -1337,7 +1360,8 @@ if [ -n "$_f28_block" ]; then
     _out=$(F28GP=1 F28GRPS="50(opencode)" DRY_RUN=true _f28_run 2>&1) || true
     case "$_out" in
         *"[DRY] sudo gpasswd"*"Removed dev from group opencode."*)
-            pass "dry run: [DRY] echo + success lines despite rc (#211 b W1)" ;;
+            pass "dry run: [DRY] echo + success lines despite rc (#211 b W1)"
+            ;;
         *) fail "dry run: [DRY] echo + success lines (got: $_out)" ;;
     esac
 else
@@ -1350,8 +1374,8 @@ fi
 # success log. Wiring pin (F14's sites-2/3 precedent: the arm is the
 # near-unreachable stub path): the call is if-wrapped and the FAILED
 # log line exists.
-if grep -q 'if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then' "$UNINSTALL" \
-   && grep -q 'wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)' "$UNINSTALL"; then
+if grep -q 'if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then' "$UNINSTALL" &&
+    grep -q 'wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)' "$UNINSTALL"; then
     pass "no-markers bridge arm conditions its log on the rc (#211 b W11)"
 else
     fail "no-markers bridge arm conditions its log on the rc (#211 b W11)"
@@ -1372,10 +1396,16 @@ if [ -n "$_cw1_udel_block" ]; then
             OPENCODE_USER=oc
             DEFAULT_USER=dev
             DRY_RUN="${CW1DRY:-false}"
-            id() { [ "$1" = "-u" ] && printf '900\n'; return 0; }
+            id() {
+                [ "$1" = "-u" ] && printf '900\n'
+                return 0
+            }
             prompt_yn() { printf 'y\n'; }
             sleep() { :; }
-            sudo() { case "$1" in userdel) return "$CW1UDEL";; esac; return 0; }
+            sudo() {
+                case "$1" in userdel) return "$CW1UDEL" ;; esac
+                return 0
+            }
             run_q() {
                 if [ "$DRY_RUN" = true ]; then echo "  [DRY] $*"; else "$@" >/dev/null 2>&1 || true; fi
             }
@@ -1386,7 +1416,8 @@ if [ -n "$_cw1_udel_block" ]; then
     _out=$(CW1UDEL=0 _cw1_udel_run) || true
     case "$_out" in
         *"User 'oc' removed."*"log: user removed: oc"*)
-            pass "userdel ok: removal reported (#211 c W1)" ;;
+            pass "userdel ok: removal reported (#211 c W1)"
+            ;;
         *) fail "userdel ok: removal reported (got: $_out) (#211 c W1)" ;;
     esac
     _out=$(CW1UDEL=1 _cw1_udel_run 2>&1) || true
@@ -1402,7 +1433,8 @@ if [ -n "$_cw1_udel_block" ]; then
     _out=$(CW1UDEL=1 CW1DRY=true _cw1_udel_run 2>&1) || true
     case "$_out" in
         *"[DRY] sudo userdel -r oc"*"User 'oc' removed."*)
-            pass "userdel dry run: [DRY] echo + success lines despite rc (#211 c W1)" ;;
+            pass "userdel dry run: [DRY] echo + success lines despite rc (#211 c W1)"
+            ;;
         *) fail "userdel dry run: [DRY] echo + success lines (got: $_out) (#211 c W1)" ;;
     esac
 else
@@ -1423,7 +1455,8 @@ if [ -n "$_cw1_al_block" ]; then
     _out=$(CW1AL=0 _cw1_al_run) || true
     case "$_out" in
         *"Audit log removed."*"log: audit log removed: /var/log/opencode-permissions-kit"*)
-            pass "audit rm ok: removal reported after the act (#211 c W1)" ;;
+            pass "audit rm ok: removal reported after the act (#211 c W1)"
+            ;;
         *) fail "audit rm ok: removal reported (got: $_out) (#211 c W1)" ;;
     esac
     _out=$(CW1AL=1 _cw1_al_run 2>&1) || true
@@ -1443,7 +1476,8 @@ if [ -n "$_cw1_al_block" ]; then
     _out=$(CW1AL=1 CW1DRY=true _cw1_al_run 2>&1) || true
     case "$_out" in
         *"[DRY] sudo rm -rf /var/log/opencode-permissions-kit"*"Audit log removed."*)
-            pass "audit rm dry run: [DRY] echo + success lines despite rc (#211 c W1)" ;;
+            pass "audit rm dry run: [DRY] echo + success lines despite rc (#211 c W1)"
+            ;;
         *) fail "audit rm dry run: [DRY] echo + success lines (got: $_out) (#211 c W1)" ;;
     esac
 else
@@ -1461,8 +1495,11 @@ if [ -n "$_f2_bak_block" ]; then
             sudo() {
                 case "$1" in
                     test) return 0 ;;
-                    ls) echo "agent-resource"; return 0 ;;
-                    mkdir|cp) return "${F2BAKRC:-1}" ;;
+                    ls)
+                        echo "agent-resource"
+                        return 0
+                        ;;
+                    mkdir | cp) return "${F2BAKRC:-1}" ;;
                     *) return 0 ;;
                 esac
             }
@@ -1486,9 +1523,9 @@ else
 fi
 
 # pr-00263 a F10: uninstall twin of the config.sh agent-home refusal.
-grep -q '_un_agent_home' "$UNINSTALL" \
-    && pass "uninstall agent-home refusal getent-aware (pr-00263 a F10)" \
-    || fail "uninstall agent-home refusal literal-only (pr-00263 a F10)"
+grep -q '_un_agent_home' "$UNINSTALL" &&
+    pass "uninstall agent-home refusal getent-aware (pr-00263 a F10)" ||
+    fail "uninstall agent-home refusal literal-only (pr-00263 a F10)"
 
 # --- pr-00263 a F3: the six early removal sections are rc-observing (#211 c W1) --
 # The #243 a S1/S2 sweep covered the config-dirs section only; six
@@ -1512,9 +1549,9 @@ PLGSEC="$(sed -n '/for _un_dir in/,/^    done$/p' "$UNINSTALL" | head -40)"
 # issue list): the extracted block is stripped before counting, so a
 # commented-out un_rc_q call stops counting; full-line comments only
 # (#244 h W6 residual).
-if printf '%s' "$PLGSEC" | grep -qF 'un_rc_q "plugins rm"' \
-    && printf '%s' "$PLGSEC" | grep -qF 'plugin removal failed' \
-    && [ "$(printf '%s' "$PLGSEC" | sed 's/^[[:space:]]*#.*$//' | grep -cF 'un_rc_q "' || true)" = 2 ]; then
+if printf '%s' "$PLGSEC" | grep -qF 'un_rc_q "plugins rm"' &&
+    printf '%s' "$PLGSEC" | grep -qF 'plugin removal failed' &&
+    [ "$(printf '%s' "$PLGSEC" | sed 's/^[[:space:]]*#.*$//' | grep -cF 'un_rc_q "' || true)" = 2 ]; then
     pass "plugins loop rc-observing, failure WARNs, both ops converted (#246 site 7)"
 else
     fail "plugins loop not rc-observing (#246 site 7, pr-00263 d)"
@@ -1527,9 +1564,9 @@ fi
 # the e-round draft '^run ()' caught only the spaced form, which no
 # def in this file ever used; comments cannot match (after the
 # indentation comes '#', never 'run').
-[ "$(grep -c '^[[:space:]]*run *()' "$UNINSTALL")" = 0 ] \
-    && pass "run() helper gone, no orphaned runner (pr-00263 e W3)" \
-    || fail "run() def present without callers (pr-00263 e W3)"
+[ "$(grep -c '^[[:space:]]*run *()' "$UNINSTALL")" = 0 ] &&
+    pass "run() helper gone, no orphaned runner (pr-00263 e W3)" ||
+    fail "run() def present without callers (pr-00263 e W3)"
 F3SEC="$(sed -n '/^echo "--- Removing sudoers ---"$/,/^fi$/p' "$UNINSTALL")"
 if [ -n "$F3SEC" ] && printf '%s' "$F3SEC" | grep -qF 'un_rc_q "rm sudoers"'; then
     pass "sudoers section extractable + rc-observing (pr-00263 a F3)"
@@ -1550,11 +1587,11 @@ _un_f3_out() { # <sudo-rc> — drive the section REAL with a stubbed sudo
 }
 _f3fail="$(_un_f3_out 1)"
 _f3ok="$(_un_f3_out 0)"
-if printf '%s' "$_f3fail" | grep -q 'WARN: sudoers removal failed' \
-    && printf '%s' "$_f3fail" | grep -q 'LOG:sudoers removal FAILED' \
-    && ! printf '%s' "$_f3fail" | grep -q 'sudoers removed\.' \
-    && printf '%s' "$_f3ok" | grep -q 'sudoers removed\.' \
-    && printf '%s' "$_f3ok" | grep -q 'LOG:sudoers removed'; then
+if printf '%s' "$_f3fail" | grep -q 'WARN: sudoers removal failed' &&
+    printf '%s' "$_f3fail" | grep -q 'LOG:sudoers removal FAILED' &&
+    ! printf '%s' "$_f3fail" | grep -q 'sudoers removed\.' &&
+    printf '%s' "$_f3ok" | grep -q 'sudoers removed\.' &&
+    printf '%s' "$_f3ok" | grep -q 'LOG:sudoers removed'; then
     pass "sudoers section arms: failure WARNs, success echoes (pr-00263 a F3)"
 else
     fail "sudoers section arms (pr-00263 a F3, fail-out: $_f3fail / ok-out: $_f3ok)"

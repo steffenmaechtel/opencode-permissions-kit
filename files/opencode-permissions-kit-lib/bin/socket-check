@@ -13,5 +13,5 @@
 # non-zero otherwise. Deliberately does nothing but `test -S` — it is gated to
 # this exact script in sudoers and must never gain extra power.
 sock="${1:-}"
-case "$sock" in unix://*) sock="${sock#unix://}";; esac
+case "$sock" in unix://*) sock="${sock#unix://}" ;; esac
 [ -n "$sock" ] && [ -S "$sock" ]

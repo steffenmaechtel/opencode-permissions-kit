@@ -4,7 +4,8 @@
 set -u
 . "$(dirname "$0")/lib/ux.sh"
 
-OLD="0.0.10"; NEW="0.0.11"
+OLD="0.0.10"
+NEW="0.0.11"
 
 ui_demo_notice
 ui_banner "$NEW" "update — re-deploys the kit, keeps your configuration"
@@ -34,9 +35,9 @@ ui_warn "/mnt/c restriction configured but still pending 'wsl --shutdown'"
 
 ui_section "Update complete"
 
-ui_kv "Kit"      "v$OLD -> $NEW"
-ui_kv "Backup"   "/tmp/opencode-install-backup.XXXXXX"
-ui_kv "Config"   "unchanged"
+ui_kv "Kit" "v$OLD -> $NEW"
+ui_kv "Backup" "/tmp/opencode-install-backup.XXXXXX"
+ui_kv "Config" "unchanged"
 echo ""
 ui_kv_warn "WSL2" "run 'wsl --shutdown' from Windows to apply the /mnt/c fix"
 echo ""

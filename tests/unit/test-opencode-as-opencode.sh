@@ -42,7 +42,7 @@ validate_dir() {
                 VALID=true
                 break
             fi
-        done < "$PROJECTS_CONF"
+        done <"$PROJECTS_CONF"
     fi
 
     if [ "$VALID" = true ]; then
@@ -73,7 +73,7 @@ mkdir -p "$TMPDIR/project-a"
 mkdir -p "$TMPDIR/project-a/sub"
 mkdir -p "$TMPDIR/project-a/deep/nested"
 mkdir -p "$TMPDIR/project-b"
-mkdir -p "$TMPDIR/project-ab"          # partial name match trap
+mkdir -p "$TMPDIR/project-ab" # partial name match trap
 mkdir -p "$TMPDIR/other"
 
 echo ""
@@ -83,7 +83,7 @@ echo ""
 
 # --- Test 1: Exact match ---
 echo "--- Exact match ---"
-printf '%s\n' "$TMPDIR/project-a" > "$TMPDIR/projects.conf"
+printf '%s\n' "$TMPDIR/project-a" >"$TMPDIR/projects.conf"
 result=$(validate_dir "$TMPDIR/project-a" "$TMPDIR/projects.conf")
 assert_valid "exact match on root" "valid" "$result"
 
@@ -108,7 +108,7 @@ result=$(validate_dir "$HOME" "$TMPDIR/projects.conf")
 assert_valid "home directory (not in projects.conf)" "invalid" "$result"
 
 # --- Test 7: Multiple roots ---
-printf '%s\n' "$TMPDIR/project-a" "$TMPDIR/project-b" > "$TMPDIR/projects.conf"
+printf '%s\n' "$TMPDIR/project-a" "$TMPDIR/project-b" >"$TMPDIR/projects.conf"
 result=$(validate_dir "$TMPDIR/project-b" "$TMPDIR/projects.conf")
 assert_valid "second root in multi-root config" "valid" "$result"
 
@@ -119,7 +119,7 @@ result=$(validate_dir "$TMPDIR/other" "$TMPDIR/projects.conf")
 assert_valid "unrelated dir in multi-root config" "invalid" "$result"
 
 # --- Test 8: Root with trailing slash in config ---
-printf '%s\n' "$TMPDIR/project-a/" > "$TMPDIR/projects.conf"
+printf '%s\n' "$TMPDIR/project-a/" >"$TMPDIR/projects.conf"
 result=$(validate_dir "$TMPDIR/project-a" "$TMPDIR/projects.conf")
 assert_valid "trailing-slash root: exact CWD" "valid" "$result"
 
@@ -127,12 +127,12 @@ result=$(validate_dir "$TMPDIR/project-a/sub" "$TMPDIR/projects.conf")
 assert_valid "trailing-slash root: subdirectory" "valid" "$result"
 
 # --- Test 9: CWD with trailing slash ---
-printf '%s\n' "$TMPDIR/project-a" > "$TMPDIR/projects.conf"
+printf '%s\n' "$TMPDIR/project-a" >"$TMPDIR/projects.conf"
 result=$(validate_dir "$TMPDIR/project-a/" "$TMPDIR/projects.conf")
 assert_valid "CWD with trailing slash" "valid" "$result"
 
 # --- Test 10: Empty projects.conf ---
-true > "$TMPDIR/projects.conf"
+true >"$TMPDIR/projects.conf"
 result=$(validate_dir "$TMPDIR/project-a" "$TMPDIR/projects.conf")
 assert_valid "empty projects.conf" "invalid" "$result"
 
@@ -141,7 +141,7 @@ result=$(validate_dir "$TMPDIR/project-a" "$TMPDIR/no-such-file.conf")
 assert_valid "missing projects.conf" "invalid" "$result"
 
 # --- Test 12: Line with whitespace / blank lines ---
-printf '\n%s\n\n%s\n\n' "$TMPDIR/project-a" "$TMPDIR/project-b" > "$TMPDIR/projects.conf"
+printf '\n%s\n\n%s\n\n' "$TMPDIR/project-a" "$TMPDIR/project-b" >"$TMPDIR/projects.conf"
 result=$(validate_dir "$TMPDIR/project-a" "$TMPDIR/projects.conf")
 assert_valid "blank lines in projects.conf: valid" "valid" "$result"
 
@@ -149,7 +149,7 @@ result=$(validate_dir "$TMPDIR/other" "$TMPDIR/projects.conf")
 assert_valid "blank lines in projects.conf: invalid" "invalid" "$result"
 
 # --- Test 13: Non-existent directory in projects.conf (should skip) ---
-printf '%s\n%s\n' "$TMPDIR/project-a" "$TMPDIR/project-nonexistent" > "$TMPDIR/projects.conf"
+printf '%s\n%s\n' "$TMPDIR/project-a" "$TMPDIR/project-nonexistent" >"$TMPDIR/projects.conf"
 result=$(validate_dir "$TMPDIR/project-a" "$TMPDIR/projects.conf")
 assert_valid "skips non-existent entry, matches valid one" "valid" "$result"
 
@@ -157,7 +157,7 @@ assert_valid "skips non-existent entry, matches valid one" "valid" "$result"
 echo ""
 echo "--- Version banner ---"
 
-printf 'DEFAULT_USER=dev\nVERSION=1.2.3\n' > "$TMPDIR/install.conf"
+printf 'DEFAULT_USER=dev\nVERSION=1.2.3\n' >"$TMPDIR/install.conf"
 result=$(banner_line "$TMPDIR/install.conf")
 assert_valid "banner shows version from install.conf" \
     "$(printf '%b' "  ${GREEN}SECURED BY opencode permissions kit (1.2.3)${NC}")" "$result"
@@ -166,7 +166,7 @@ result=$(banner_line "$TMPDIR/no-such-install.conf")
 assert_valid "banner defaults to 0.0.0 when no conf exists" \
     "$(printf '%b' "  ${GREEN}SECURED BY opencode permissions kit (0.0.0)${NC}")" "$result"
 
-printf 'DEFAULT_USER=dev\n' > "$TMPDIR/no-version.conf"
+printf 'DEFAULT_USER=dev\n' >"$TMPDIR/no-version.conf"
 result=$(banner_line "$TMPDIR/no-version.conf")
 assert_valid "banner defaults to 0.0.0 when conf has no VERSION line" \
     "$(printf '%b' "  ${GREEN}SECURED BY opencode permissions kit (0.0.0)${NC}")" "$result"
@@ -241,7 +241,7 @@ fi
 # "ERROR: opencode cannot be started here" confused users). Since issue
 # #91 the passthrough is its own case BEFORE the project-dir check —
 # version/help must stay banner-free from valid directories too.
-if sed -n '/--version|-v|-h|--help)/,/^esac/p' "$WRAPPER_FILE" | grep -q -- '--version'; then
+if sed -n '/--version | -v | -h | --help)/,/^esac/p' "$WRAPPER_FILE" | grep -q -- '--version'; then
     echo "  ${GREEN}PASS${NC}  wrapper answers --version from any directory (installer probe)"
     passed=$((passed + 1))
 else
@@ -249,7 +249,7 @@ else
     failures=$((failures + 1))
 fi
 
-if sed -n '/--version|-v|-h|--help)/,/^esac/p' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
+if sed -n '/--version | -v | -h | --help)/,/^esac/p' "$WRAPPER_FILE" | grep -q 'bin/opencode "\$@"'; then
     echo "  ${GREEN}PASS${NC}  version passthrough execs the secured binary"
     passed=$((passed + 1))
 else
@@ -277,7 +277,7 @@ fi
 echo ""
 echo "--- Headless mode (third-party tools) ---"
 
-if grep -q '^HEADLESS=false' "$WRAPPER_FILE" && grep -q 'serve|acp|models|agent|providers' "$WRAPPER_FILE"; then
+if grep -q '^HEADLESS=false' "$WRAPPER_FILE" && grep -q 'serve | acp | models | agent | providers' "$WRAPPER_FILE"; then
     echo "  ${GREEN}PASS${NC}  wrapper classifies headless subcommands (serve/acp/queries)"
     passed=$((passed + 1))
 else
@@ -330,10 +330,19 @@ fi
 # stdin check — an interactive terminal would keep it bannered; that
 # branch is covered by the `-t 0` grep below.
 HL_BLOCK="$(sed -n '/^HEADLESS=false/,/^esac/p' "$WRAPPER_FILE")"
-[ -n "$HL_BLOCK" ] || { echo "  ${RED}FAIL${NC}  headless block not extractable"; failures=$((failures + 1)); }
+[ -n "$HL_BLOCK" ] || {
+    echo "  ${RED}FAIL${NC}  headless block not extractable"
+    failures=$((failures + 1))
+}
 hl_case() { # <desc> <expected> <args...>
-    _desc="$1"; _want="$2"; shift 2
-    _got=$(set -- "$@"; eval "$HL_BLOCK"; echo "$HEADLESS")
+    _desc="$1"
+    _want="$2"
+    shift 2
+    _got=$(
+        set -- "$@"
+        eval "$HL_BLOCK"
+        echo "$HEADLESS"
+    )
     if [ "$_got" = "$_want" ]; then
         echo "  ${GREEN}PASS${NC}  headless: $_desc"
         passed=$((passed + 1))
@@ -342,23 +351,23 @@ hl_case() { # <desc> <expected> <args...>
         failures=$((failures + 1))
     fi
 }
-hl_case "serve is headless"             true  serve
-hl_case "run with message is headless"  true  run "fix the bug"
-hl_case "run --format json is headless" true  run --format json "hi"
-hl_case "acp is headless"               true  acp
-hl_case "models is headless"            true  models
-hl_case "export is headless"            true  export sess-123
-hl_case "2x api is headless"            true  api GET /config
-hl_case "2x auth is headless"           true  auth login
-hl_case "1x console login is headless"  true  console login
-hl_case "2x plugin is headless"         true  plugin list
-hl_case "2x service is headless"        true  service status
-hl_case "2x pair is headless"           true  pair
-hl_case "2x update is headless"         true  update
-hl_case "tui stays interactive"         false  tui
-hl_case "attach stays interactive"      false  attach
-hl_case "2x mini stays interactive"     false  mini
-hl_case "no args stays interactive"     false
+hl_case "serve is headless" true serve
+hl_case "run with message is headless" true run "fix the bug"
+hl_case "run --format json is headless" true run --format json "hi"
+hl_case "acp is headless" true acp
+hl_case "models is headless" true models
+hl_case "export is headless" true export sess-123
+hl_case "2x api is headless" true api GET /config
+hl_case "2x auth is headless" true auth login
+hl_case "1x console login is headless" true console login
+hl_case "2x plugin is headless" true plugin list
+hl_case "2x service is headless" true service status
+hl_case "2x pair is headless" true pair
+hl_case "2x update is headless" true update
+hl_case "tui stays interactive" false tui
+hl_case "attach stays interactive" false attach
+hl_case "2x mini stays interactive" false mini
+hl_case "no args stays interactive" false
 hl_case "flags-only start stays interactive" false --debug
 
 if grep -q '\-t 0' "$WRAPPER_FILE"; then
@@ -437,10 +446,10 @@ for marker in '#@docker-group-begin' '#@ddev-delegated-begin' '#@ddev-sandbox-be
     fi
 done
 
-if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' "$SUDOERS_FILE" \
-   && ! grep -q 'DDEV_DEBUG' "$SUDOERS_FILE" \
-   && grep -q '(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode' "$SUDOERS_FILE" \
-   && grep -q 'socket-check \*' "$SUDOERS_FILE"; then
+if grep -q 'env_keep += "DOCKER_HOST XDG_RUNTIME_DIR OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME"' "$SUDOERS_FILE" &&
+    ! grep -q 'DDEV_DEBUG' "$SUDOERS_FILE" &&
+    grep -q '(opencode) NOPASSWD: /usr/local/lib/opencode-permissions-kit/bin/opencode' "$SUDOERS_FILE" &&
+    grep -q 'socket-check \*' "$SUDOERS_FILE"; then
     echo "  ${GREEN}PASS${NC}  sudoers.template keeps base RunAs + socket-check + env_keep (no DDEV_DEBUG)"
     passed=$((passed + 1))
 else
@@ -487,7 +496,8 @@ fi
 # block with $1=serve, a stubbed cwd_probe and a silent note(); prints
 # "fallback=<dir|none> pwd=<dir> warn=<0|1>"
 sc_serve() {
-    _cwd="$1"; _readable="$2"
+    _cwd="$1"
+    _readable="$2"
     (
         set -- serve
         CWD="$_cwd"
@@ -505,7 +515,7 @@ sc_serve() {
 }
 
 mkdir -p "$TMPDIR/sc-root-a" "$TMPDIR/sc-root-b" "$TMPDIR/sc-root-b/sub"
-printf '%s\n' "$TMPDIR/sc-root-a" "$TMPDIR/sc-root-b" > "$TMPDIR/sc-projects.conf"
+printf '%s\n' "$TMPDIR/sc-root-a" "$TMPDIR/sc-root-b" >"$TMPDIR/sc-projects.conf"
 
 # OpenChamber case: cwd unrelated to any root (like $HOME), both roots
 # readable -> first configured readable root wins, warning printed, cd done
@@ -549,8 +559,8 @@ assert_valid "serve cwd: unavailable probe (empty output) changes nothing" \
     "fallback=none warn=0" "$result"
 
 # static: wrapper wiring + sudoers rule
-if grep -q 'cwd-check "\$1" 2>/dev/null || true' "$WRAPPER_FILE" \
-   && grep -q 'sudo -n -u opencode.*cwd-check' "$WRAPPER_FILE"; then
+if grep -q 'cwd-check "\$1" 2>/dev/null || true' "$WRAPPER_FILE" &&
+    grep -q 'sudo -n -u opencode.*cwd-check' "$WRAPPER_FILE"; then
     echo "  ${GREEN}PASS${NC}  wrapper probes the serve cwd via cwd-check (sudo -n, fault-tolerant)"
     passed=$((passed + 1))
 else
@@ -610,8 +620,8 @@ fi
 OC_KIT_WRAPPER="$TMPDIR/oc-kit-wrapper"
 OC_KIT_BIN="$TMPDIR/oc-kit-bin"
 OC_POLICY="$TMPDIR/oc-policy.json"
-: > "$OC_KIT_WRAPPER"
-: > "$OC_KIT_BIN"
+: >"$OC_KIT_WRAPPER"
+: >"$OC_KIT_BIN"
 OC_BLOCK="$(printf '%s\n' "$OC_BLOCK" | sed \
     -e "s|/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode|$OC_KIT_WRAPPER|g" \
     -e "s|/usr/local/bin/opencode|$OC_KIT_BIN|g" \
@@ -636,9 +646,10 @@ $1"; fi; }
 
 # fixture helper
 oc_mkbin() { # <home> [names...] — real shadow binaries
-    _h="$1"; shift
+    _h="$1"
+    shift
     mkdir -p "$_h/.opencode/bin"
-    for _n in "$@"; do echo "fake" > "$_h/.opencode/bin/$_n"; done
+    for _n in "$@"; do echo "fake" >"$_h/.opencode/bin/$_n"; done
 }
 
 # clean home -> quiet
@@ -660,7 +671,7 @@ assert_valid "openchamber guard: bins only -> rm -f fix, no rm -rf" "1" \
 # pin only -> hang warning + settings line fix
 mkdir -p "$TMPDIR/oc-pin/.config/openchamber"
 printf '{ "opencodeBinary": "%s/.opencode/bin/opencode" }\n' "$TMPDIR/oc-pin" \
-    > "$TMPDIR/oc-pin/.config/openchamber/settings.json"
+    >"$TMPDIR/oc-pin/.config/openchamber/settings.json"
 out=$(oc_run "$TMPDIR/oc-pin")
 assert_valid "openchamber guard: pin only -> hang warning" "1" \
     "$(printf '%s' "$out" | grep -c 'will hang')"
@@ -671,7 +682,7 @@ assert_valid "openchamber guard: pin only -> fix removes the settings line" "1" 
 mkdir -p "$TMPDIR/oc-both/.config/openchamber"
 oc_mkbin "$TMPDIR/oc-both" opencode opencode2
 printf '{ "opencodeBinary": "/home/dev/.opencode/bin/opencode" }\n' \
-    > "$TMPDIR/oc-both/.config/openchamber/settings.json"
+    >"$TMPDIR/oc-both/.config/openchamber/settings.json"
 out=$(oc_run "$TMPDIR/oc-both")
 assert_valid "openchamber guard: bins+pin -> bypass wording" "1" \
     "$(printf '%s' "$out" | grep -c 'OUTSIDE the kit')"
@@ -683,20 +694,20 @@ assert_valid "openchamber guard: bins+pin -> fix names binaries AND settings lin
 # pin on the kit wrapper -> secured, quiet
 mkdir -p "$TMPDIR/oc-wrapped/.config/openchamber"
 printf '{ "opencodeBinary": "%s" }\n' "$OC_KIT_BIN" \
-    > "$TMPDIR/oc-wrapped/.config/openchamber/settings.json"
+    >"$TMPDIR/oc-wrapped/.config/openchamber/settings.json"
 out=$(oc_run "$TMPDIR/oc-wrapped")
 assert_valid "openchamber guard: pin on the kit wrapper -> quiet" "" "$out"
 
 # empty-string pin -> unset (openchamber optionalText semantics), quiet
 mkdir -p "$TMPDIR/oc-empty/.config/openchamber"
-printf '{ "opencodeBinary": "" }\n' > "$TMPDIR/oc-empty/.config/openchamber/settings.json"
+printf '{ "opencodeBinary": "" }\n' >"$TMPDIR/oc-empty/.config/openchamber/settings.json"
 out=$(oc_run "$TMPDIR/oc-empty")
 assert_valid "openchamber guard: empty pin counts as unset" "" "$out"
 
 # kit-owned symlink -> not a shadow; the plain opencode2 shim still is
 mkdir -p "$TMPDIR/oc-link/.opencode/bin"
 ln -s "$OC_KIT_WRAPPER" "$TMPDIR/oc-link/.opencode/bin/opencode"
-echo "sh shim" > "$TMPDIR/oc-link/.opencode/bin/opencode2"
+echo "sh shim" >"$TMPDIR/oc-link/.opencode/bin/opencode2"
 out=$(oc_run "$TMPDIR/oc-link")
 assert_valid "openchamber guard: kit symlink not listed, shim still is (2 lines)" "2" \
     "$(printf '%s' "$out" | grep -c 'bin/opencode2')"
@@ -705,7 +716,7 @@ assert_valid "openchamber guard: kit symlink ignored (no pair listing)" "0" \
 
 # kit policy pins the wrapper -> secured NOTE (cyan), not a bypass warning,
 # even with bins + settings pin present
-printf '{ "opencodeBinary": "%s" }\n' "$OC_KIT_BIN" > "$OC_POLICY"
+printf '{ "opencodeBinary": "%s" }\n' "$OC_KIT_BIN" >"$OC_POLICY"
 out=$(oc_run "$TMPDIR/oc-both")
 assert_valid "openchamber guard: policy secures -> NOTE not WARNING" "1" \
     "$(printf '%s' "$out" | grep -c '^C:NOTE')"
@@ -724,12 +735,12 @@ assert_valid "openchamber guard: policy + pin-only -> stale pin named" "1" \
     "$(printf '%s' "$out" | grep -c 'settings.json is')"
 assert_valid "openchamber guard: policy + pin-only -> no dangling remove list" "0" \
     "$(printf '%s' "$out" | grep -c 'safe to remove:')"
-: > "$OC_POLICY"
+: >"$OC_POLICY"
 
 # settings.json without the key -> quiet
 mkdir -p "$TMPDIR/oc-otherkey/.config/openchamber"
 printf '{ "theme": "dark", "port": 3000 }\n' \
-    > "$TMPDIR/oc-otherkey/.config/openchamber/settings.json"
+    >"$TMPDIR/oc-otherkey/.config/openchamber/settings.json"
 out=$(oc_run "$TMPDIR/oc-otherkey")
 assert_valid "openchamber guard: foreign settings keys -> quiet" "" "$out"
 
@@ -737,7 +748,7 @@ assert_valid "openchamber guard: foreign settings keys -> quiet" "" "$out"
 # $(...) smuggling — only file and key are named)
 mkdir -p "$TMPDIR/oc-evil/.config/openchamber"
 printf '{ "opencodeBinary": "/tmp/x\\n\\033[31mFAKE $(touch %s/pwned)" }\n' "$TMPDIR" \
-    > "$TMPDIR/oc-evil/.config/openchamber/settings.json"
+    >"$TMPDIR/oc-evil/.config/openchamber/settings.json"
 out=$(oc_run "$TMPDIR/oc-evil")
 assert_valid "openchamber guard: pin VALUE never printed" "0" \
     "$(printf '%s' "$out" | grep -c 'FAKE')"
@@ -748,8 +759,8 @@ else
 fi
 
 # static wiring: the wrapper calls the guard and links the how-to
-if grep -q '^openchamber_guard$' "$WRAPPER_FILE" \
-    && grep -q 'docs/how-to/openchamber.md' "$WRAPPER_FILE"; then
+if grep -q '^openchamber_guard$' "$WRAPPER_FILE" &&
+    grep -q 'docs/how-to/openchamber.md' "$WRAPPER_FILE"; then
     echo "  ${GREEN}PASS${NC}  wrapper calls openchamber_guard and links the how-to"
     passed=$((passed + 1))
 else
@@ -801,11 +812,13 @@ REAL_PARSER="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/py/jsonc-parse
 # Prints "tools=[...] requested=.. auto=.. banner=.." (banner counts the
 # non-empty note() calls the block makes).
 dt_run() {
-    _merged="$1"; _proj="$2"; _content="$3"
+    _merged="$1"
+    _proj="$2"
+    _content="$3"
     (
         cd "$TMPDIR/dt-project" || exit 1
         rm -f opencode.jsonc opencode.json
-        if [ "$_proj" != "-" ]; then printf '%s\n' "$_content" > "$_proj"; fi
+        if [ "$_proj" != "-" ]; then printf '%s\n' "$_content" >"$_proj"; fi
         CONTAINER_REQUESTED=false
         CONTAINER_AUTO=false
         PROJECT_TOOLS=""
@@ -885,9 +898,9 @@ fi
 # bounded --version first line — a second serial probe only added fail-
 # open delay); the direct fallback stays bounded for advisories-less
 # stamps and covers the pre-advisories cohort.
-if grep -qF '_MAJOR_SRC="${ADV_LINE:-}"' "$WRAPPER_FILE" \
-   && grep -qF 'case "$_MAJOR_SRC" in' "$WRAPPER_FILE" \
-   && grep -q '_MAJOR_SRC=$(timeout 10' "$WRAPPER_FILE"; then
+if grep -qF '_MAJOR_SRC="${ADV_LINE:-}"' "$WRAPPER_FILE" &&
+    grep -qF 'case "$_MAJOR_SRC" in' "$WRAPPER_FILE" &&
+    grep -q '_MAJOR_SRC=$(timeout 10' "$WRAPPER_FILE"; then
     echo "  ${GREEN}PASS${NC}  OPENCODE_MAJOR fallback probe reuses ADV_LINE, direct fallback bounded (0.0.43a F3, 0.0.44a V21)"
     passed=$((passed + 1))
 else
@@ -929,8 +942,13 @@ else
 fi
 
 sm_case() { # <expected: none|append|after-first> <OPENCODE_MAJOR> <args...>
-    _want="$1"; OPENCODE_MAJOR="$2"; shift 2
-    _got=$(eval "$SM_BLOCK"; standalone_mode "$@")
+    _want="$1"
+    OPENCODE_MAJOR="$2"
+    shift 2
+    _got=$(
+        eval "$SM_BLOCK"
+        standalone_mode "$@"
+    )
     if [ "$_got" = "$_want" ]; then
         echo "  ${GREEN}PASS${NC}  standalone: $3${*:+ }-> $_want"
         passed=$((passed + 1))
@@ -979,8 +997,8 @@ fi
 _f29_fn="$(sed -n '/^note() {/,/^}$/p' "$WRAPPER_FILE")"
 if [ -n "$_f29_fn" ]; then
     _out=$(HEADLESS=false sh -c 'eval "$1"; note "$2"' sh "$_f29_fn" '\tdangerous-name') || true
-    if printf '%s' "$_out" | grep -qF '\tdangerous-name' \
-       && ! printf '%s' "$_out" | grep -q "$(printf '\t')dangerous"; then
+    if printf '%s' "$_out" | grep -qF '\tdangerous-name' &&
+        ! printf '%s' "$_out" | grep -q "$(printf '\t')dangerous"; then
         echo "  ${GREEN}PASS${NC}  note() prints escape-looking names literally (#211 a F29)"
         passed=$((passed + 1))
     else

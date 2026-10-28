@@ -99,7 +99,7 @@ E2E_HOST_LAYOUT="unknown"
 # evicting each other on every switch. Distro stays on the unsuffixed tag
 # (CI cache/golden-image references keep their meaning).
 case "$E2E_GIT_CHANNEL" in
-    distro|"") : ;;
+    distro | "") : ;;
     *) E2E_IMAGE="$E2E_IMAGE-git-$E2E_GIT_CHANNEL" ;;
 esac
 
@@ -174,16 +174,25 @@ e2e_fetch_opencode() {
                 -o "$tmp" 2>/dev/null; then
                 curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
                     "https://registry.npmjs.org/@opencode-ai/cli-$target/-/cli-$target-$ver.tgz" \
-                    -o "$tmp" \
-                    || { echo "  ${RED}FAIL${NC}  opencode $ver download failed (npm: @opencode/cli-$target, @opencode-ai/cli-$target)"; exit 1; }
+                    -o "$tmp" ||
+                    {
+                        echo "  ${RED}FAIL${NC}  opencode $ver download failed (npm: @opencode/cli-$target, @opencode-ai/cli-$target)"
+                        exit 1
+                    }
             fi
             xdir="$tmp.x"
             rm -rf "$xdir"
             mkdir -p "$xdir"
-            tar -xzf "$tmp" -C "$xdir" \
-                || { echo "  ${RED}FAIL${NC}  cannot extract opencode $ver npm tarball"; exit 1; }
-            mv "$xdir/package/bin/opencode" "$dest" \
-                || { echo "  ${RED}FAIL${NC}  opencode $ver npm tarball has no package/bin/opencode"; exit 1; }
+            tar -xzf "$tmp" -C "$xdir" ||
+                {
+                    echo "  ${RED}FAIL${NC}  cannot extract opencode $ver npm tarball"
+                    exit 1
+                }
+            mv "$xdir/package/bin/opencode" "$dest" ||
+                {
+                    echo "  ${RED}FAIL${NC}  opencode $ver npm tarball has no package/bin/opencode"
+                    exit 1
+                }
             rm -rf "$xdir" "$tmp"
             ;;
         *)
@@ -192,10 +201,16 @@ e2e_fetch_opencode() {
             # (outage or rate-limit), which must not fail the whole e2e suite.
             curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 240 \
                 "https://github.com/anomalyco/opencode/releases/download/v$ver/opencode-$target.tar.gz" \
-                -o "$tmp" \
-                || { echo "  ${RED}FAIL${NC}  opencode $ver download failed (GitHub)"; exit 1; }
-            tar -xzf "$tmp" -C "$(dirname "$dest")" \
-                || { echo "  ${RED}FAIL${NC}  cannot extract opencode $ver tarball"; exit 1; }
+                -o "$tmp" ||
+                {
+                    echo "  ${RED}FAIL${NC}  opencode $ver download failed (GitHub)"
+                    exit 1
+                }
+            tar -xzf "$tmp" -C "$(dirname "$dest")" ||
+                {
+                    echo "  ${RED}FAIL${NC}  cannot extract opencode $ver tarball"
+                    exit 1
+                }
             rm -f "$tmp"
             ;;
     esac
@@ -215,24 +230,26 @@ gh_latest_tag() {
     local repo="$1" tag _auth
     repo="${repo#https://github.com/}"
     _auth=""
-    if [ -n "${OPK_GH_TOKEN:-}" ]; then _auth="Authorization: Bearer $OPK_GH_TOKEN"
-    elif [ -n "${GITHUB_TOKEN:-}" ]; then _auth="Authorization: Bearer $GITHUB_TOKEN"
+    if [ -n "${OPK_GH_TOKEN:-}" ]; then
+        _auth="Authorization: Bearer $OPK_GH_TOKEN"
+    elif [ -n "${GITHUB_TOKEN:-}" ]; then
+        _auth="Authorization: Bearer $GITHUB_TOKEN"
     fi
     if [ -n "$_auth" ]; then
         tag=$(curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 \
-            -H "$_auth" "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null \
-            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+            -H "$_auth" "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null |
+            sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
     else
         tag=$(curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 \
-            "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null \
-            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
+            "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null |
+            sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' || true)
     fi
     if [ -z "$tag" ]; then
         # No API fallback: releases/latest 302s to releases/tag/v<ver> —
         # plain HTML endpoints carry no per-IP API rate limit.
         tag=$(curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 \
-            -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest" 2>/dev/null \
-            | sed -n 's|.*/tag/v\([^/?#]*\).*|\1|p' || true)
+            -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest" 2>/dev/null |
+            sed -n 's|.*/tag/v\([^/?#]*\).*|\1|p' || true)
     fi
     printf '%s\n' "$tag"
 }
@@ -249,8 +266,8 @@ gh_latest_tag() {
 npm_dist_latest() {
     local tgt="$1" ver
     ver=$(curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 \
-        "https://registry.npmjs.org/@opencode/cli-$tgt" 2>/dev/null \
-        | python3 -c 'import json,sys
+        "https://registry.npmjs.org/@opencode/cli-$tgt" 2>/dev/null |
+        python3 -c 'import json,sys
 try:
     dist = json.load(sys.stdin)["dist-tags"]
     print(dist["latest"])
@@ -272,7 +289,10 @@ e2e_resolve_cache() {
     case "$os" in
         darwin*) os="darwin" ;;
         linux*) os="linux" ;;
-        *) echo "  ${RED}FAIL${NC}  unsupported OS: $os"; exit 1 ;;
+        *)
+            echo "  ${RED}FAIL${NC}  unsupported OS: $os"
+            exit 1
+            ;;
     esac
     arch=$(uname -m)
     if [ "$arch" = "aarch64" ]; then arch="arm64"; fi
@@ -304,8 +324,8 @@ e2e_resolve_cache() {
     OC_VERSION="$E2E_OC_VERSION"
     if [ -z "$OC_VERSION" ]; then
         OC_VERSION=$(npm_dist_latest "$target")
-        if [ -n "$OC_VERSION" ] \
-            && ! printf '%s' "$OC_VERSION" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
+        if [ -n "$OC_VERSION" ] &&
+            ! printf '%s' "$OC_VERSION" | grep -qE '^2\.[0-9]+(\.[0-9]+)*$'; then
             echo "  ${RED}FAIL${NC}  npm dist-tag latest is '$OC_VERSION', expected a 2.x semver"
             echo "         (upstream flip? internal/records/opencode-2x.md; pin E2E_OC_VERSION=<ver> to test another major)"
             exit 1
@@ -338,7 +358,8 @@ e2e_resolve_cache() {
         _OC_FRESH=true
     fi
     if [ ! -s "$OC_BIN" ]; then
-        echo "  ${RED}FAIL${NC}  cached opencode binary is empty"; exit 1
+        echo "  ${RED}FAIL${NC}  cached opencode binary is empty"
+        exit 1
     fi
 
     # Cache the installer script too, so the container needs no network for it.
@@ -351,8 +372,11 @@ e2e_resolve_cache() {
     OC_INSTALLER="$OC_CACHE_DIR/install.sh"
     if [ ! -f "$OC_INSTALLER" ]; then
         curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 60 \
-            https://opencode.ai/install -o "$OC_INSTALLER" \
-            || { echo "  ${RED}FAIL${NC}  cannot fetch opencode installer"; exit 1; }
+            https://opencode.ai/install -o "$OC_INSTALLER" ||
+            {
+                echo "  ${RED}FAIL${NC}  cannot fetch opencode installer"
+                exit 1
+            }
     fi
 
     echo "  Using opencode $OC_VERSION (cache: $OC_BIN)"
@@ -376,7 +400,8 @@ e2e_fetch_old() {
         e2e_fetch_opencode "$OLD_VERSION" "$OLD_BIN" "$OC_CACHE_DIR/opencode-old.tar.gz"
     fi
     if [ ! -s "$OLD_BIN" ]; then
-        echo "  ${RED}FAIL${NC}  cached opencode $OLD_VERSION binary is empty"; exit 1
+        echo "  ${RED}FAIL${NC}  cached opencode $OLD_VERSION binary is empty"
+        exit 1
     fi
     echo "  Using opencode $OLD_VERSION for the upgrade test (cache: $OLD_BIN)"
 }
@@ -385,12 +410,12 @@ e2e_fetch_old() {
 e2e_prepare_project() {
     TMP_PROJECT=$(mktemp -d)
     mkdir -p "$TMP_PROJECT/test-project/subdir"
-    echo "DB_PASS=secret123"    > "$TMP_PROJECT/test-project/.env"
-    echo "API_KEY=hunter2"       > "$TMP_PROJECT/test-project/settings.php"
-    echo '{"token":"abc"}'       > "$TMP_PROJECT/test-project/auth.json"
-    echo "# README"               > "$TMP_PROJECT/test-project/README.md"
-    echo "# command docs"          > "$TMP_PROJECT/test-project/README.txt"
-    echo "normal source code"    > "$TMP_PROJECT/test-project/index.php"
+    echo "DB_PASS=secret123" >"$TMP_PROJECT/test-project/.env"
+    echo "API_KEY=hunter2" >"$TMP_PROJECT/test-project/settings.php"
+    echo '{"token":"abc"}' >"$TMP_PROJECT/test-project/auth.json"
+    echo "# README" >"$TMP_PROJECT/test-project/README.md"
+    echo "# command docs" >"$TMP_PROJECT/test-project/README.txt"
+    echo "normal source code" >"$TMP_PROJECT/test-project/index.php"
 }
 
 # --- container lifecycle -----------------------------------------------------
@@ -527,7 +552,7 @@ e2e_finish() {
             [ "$skipped" -gt 0 ] && echo "- **Skipped: $skipped**"
             [ "$skipped" -eq 0 ] && echo "- Skipped: 0"
             [ "$failures" -gt 0 ] && echo "- **Failed: $failures**"
-        } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        } >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || true
     fi
     [ "$failures" -eq 0 ]
 }

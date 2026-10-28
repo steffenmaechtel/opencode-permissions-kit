@@ -35,7 +35,10 @@ set -u
 
 PY=${RULES_PYTHON:-python3}
 
-die() { echo "rules-report: $*" >&2; exit 2; }
+die() {
+    echo "rules-report: $*" >&2
+    exit 2
+}
 
 if [ -n "${RM_AUDIT_ROOT:-}" ]; then
     ROOT=$(cd -- "$RM_AUDIT_ROOT" && pwd) || die "cannot enter RM_AUDIT_ROOT"
@@ -54,7 +57,8 @@ command -v "$PY" >/dev/null 2>&1 || die \
     "$PY unavailable -- python3 is a required contributor tool" \
     "(sh tests/check-host.sh); override via RULES_PYTHON"
 
-UNTIL=$("$PY" - "$TODAY" "$HORIZON" <<'PYEOF'
+UNTIL=$(
+    "$PY" - "$TODAY" "$HORIZON" <<'PYEOF'
 import datetime
 import sys
 day = datetime.date.fromisoformat(sys.argv[1])
@@ -64,25 +68,28 @@ PYEOF
 
 WORK=$(mktemp -d /tmp/rules-report.XXXXXX) || die "mktemp failed"
 trap 'rm -rf "$WORK"' EXIT
-ACT=$WORK/active; : > "$ACT"
-PEND=$WORK/pending; : > "$PEND"
+ACT=$WORK/active
+: >"$ACT"
+PEND=$WORK/pending
+: >"$PEND"
 
 find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort \
-    > "$WORK/files"
+    >"$WORK/files"
 [ -s "$WORK/files" ] || die "no metas found under $METAS"
 
-date_ok() {  # ISO + plausible ranges (same shape as rules-audit.sh)
+date_ok() { # ISO + plausible ranges (same shape as rules-audit.sh)
     case $1 in
         [0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]) ;;
         *) return 1 ;;
     esac
-    _m=${1#*-}; _m=${_m%%-*}
+    _m=${1#*-}
+    _m=${_m%%-*}
     _d=${1##*-}
     [ "$_m" -ge 1 ] && [ "$_m" -le 12 ] && [ "$_d" -ge 1 ] && [ "$_d" -le 31 ]
 }
 
 while IFS= read -r m; do
-    fm() {  # frontmatter value of $1 ('' when absent)
+    fm() { # frontmatter value of $1 ('' when absent)
         sed -n '2,/^---$/p' "$m" | sed -n "s/^$1:[[:space:]]*//p" | head -1
     }
     id=$(fm id)
@@ -93,7 +100,7 @@ while IFS= read -r m; do
         *) die "$m: bad status '$st' (run the audit)" ;;
     esac
     # approval queue: same membership rule as INDEX.md (no reviewed:)
-    [ -z "$(fm reviewed)" ] && printf '%s\n' "$id" >> "$PEND"
+    [ -z "$(fm reviewed)" ] && printf '%s\n' "$id" >>"$PEND"
     [ "$st" = active ] || continue
     iv=$(fm revisit-interval)
     nr=$(fm next-revisit)
@@ -102,19 +109,19 @@ while IFS= read -r m; do
         *) die "$m: bad revisit-interval '$iv' (run the audit)" ;;
     esac
     date_ok "$nr" || die "$m: active meta without ISO next-revisit '$nr'"
-    printf '%s\t%s\t%s\t%s\n' "$nr" "$id" "$iv" "$(fm rule)" >> "$ACT"
-done < "$WORK/files"
+    printf '%s\t%s\t%s\t%s\n' "$nr" "$id" "$iv" "$(fm rule)" >>"$ACT"
+done <"$WORK/files"
 
-LC_ALL=C sort "$ACT" > "$WORK/act.s" && mv "$WORK/act.s" "$ACT"
-n_all=$(wc -l < "$WORK/files" | tr -d ' ')
-n_act=$(wc -l < "$ACT" | tr -d ' ')
-n_pend=$(wc -l < "$PEND" | tr -d ' ')
+LC_ALL=C sort "$ACT" >"$WORK/act.s" && mv "$WORK/act.s" "$ACT"
+n_all=$(wc -l <"$WORK/files" | tr -d ' ')
+n_act=$(wc -l <"$ACT" | tr -d ' ')
+n_pend=$(wc -l <"$PEND" | tr -d ' ')
 
-awk -F'\t' -v t="$TODAY" '$1 < t' "$ACT" > "$WORK/od"
+awk -F'\t' -v t="$TODAY" '$1 < t' "$ACT" >"$WORK/od"
 awk -F'\t' -v t="$TODAY" -v u="$UNTIL" '$1 >= t && $1 <= u' "$ACT" \
-    > "$WORK/hz"
-n_od=$(wc -l < "$WORK/od" | tr -d ' ')
-n_hz=$(wc -l < "$WORK/hz" | tr -d ' ')
+    >"$WORK/hz"
+n_od=$(wc -l <"$WORK/od" | tr -d ' ')
+n_hz=$(wc -l <"$WORK/hz" | tr -d ' ')
 
 echo "rule-meta revisit report — $TODAY · horizon ${HORIZON}d" \
     "(until $UNTIL) · $n_all metas ($n_act active," \

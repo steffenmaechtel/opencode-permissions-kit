@@ -67,12 +67,32 @@ trap 'rm -f "$TMP"' EXIT INT TERM
                             printf "%s\t%d\t%s\n", f, NR - 1, seam
                         }
                     }
+                    # shfmt splice shape (#255 stage 0a): the canonical
+                    # reformat of the wrap idiom puts the frag2 OPENING
+                    # quote at EOL — "tail"...\<newline>content — so the
+                    # line below starts with frag2 CONTENT at column 0
+                    # (no indent, no quote). A deliberate join space may
+                    # live at the START of frag2; the head must be read
+                    # from the RAW line, never leading-space-stripped.
+                    if (plen >= 3 && substr(prev, plen - 2, 1) == q) {
+                        tail = substr(prev, plen - 3, 1)
+                        head = substr($0, 1, 1)
+                        if (tail != " " && head != " " &&
+                            tail ~ "[" tails "]" && head ~ "[" heads "]") {
+                            start = plen - 18
+                            if (start < 1) start = 1
+                            seam = substr(prev, start)
+                            sub(/""\\$/, "", seam)
+                            seam = seam substr($0, 1, 16)
+                            printf "%s\t%d\t%s\n", f, NR - 1, seam
+                        }
+                    }
                 }
             }
         }
     { prev = $0 }
         ' "$f" || printf 'AWK-ERROR\t0\t%s\n' "$f"
-done > "$TMP"
+done >"$TMP"
 
 fails=0
 allowed=0
@@ -81,7 +101,7 @@ while IFS="$TAB" read -r path line seam; do
     [ -n "$path" ] || continue
     ok=""
     while IFS='|' read -r suffix want; do
-        case "$suffix" in ''|'#'*) continue ;; esac
+        case "$suffix" in '' | '#'*) continue ;; esac
         case "$path" in
             *"$suffix")
                 case "$seam" in
@@ -98,7 +118,7 @@ EOF
         echo "FAIL $path:$line: adjacent-string join lost its space: ...$seam"
         fails=$((fails + 1))
     fi
-done < "$TMP"
+done <"$TMP"
 
 if [ "$fails" -ne 0 ]; then
     echo "string-continuation guard: FAILED ($fails join(s) without a space)"

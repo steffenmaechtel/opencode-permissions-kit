@@ -15,21 +15,41 @@
 # (printf only interprets \033 in the format string, never in %s arguments),
 # otherwise terminals print a literal "\033[0;33m".
 if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
-    UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''
-    UI_DIM=''; UI_BOLD=''; UI_NC=''
+    UI_GREEN=''
+    UI_RED=''
+    UI_YELLOW=''
+    UI_CYAN=''
+    UI_BLUE=''
+    UI_DIM=''
+    UI_BOLD=''
+    UI_NC=''
 else
-    UI_GREEN=$(printf '\033[0;32m'); UI_RED=$(printf '\033[0;31m')
-    UI_YELLOW=$(printf '\033[0;33m'); UI_CYAN=$(printf '\033[0;36m')
+    UI_GREEN=$(printf '\033[0;32m')
+    UI_RED=$(printf '\033[0;31m')
+    UI_YELLOW=$(printf '\033[0;33m')
+    UI_CYAN=$(printf '\033[0;36m')
     UI_BLUE=$(printf '\033[0;34m')
-    UI_DIM=$(printf '\033[2m'); UI_BOLD=$(printf '\033[1m'); UI_NC=$(printf '\033[0m')
+    UI_DIM=$(printf '\033[2m')
+    UI_BOLD=$(printf '\033[1m')
+    UI_NC=$(printf '\033[0m')
 fi
 
 if [ -n "${UI_ASCII:-}" ]; then
-    UI_SYM_OK='ok'; UI_SYM_BAD='x'; UI_SYM_WARN='!'; UI_SYM_INFO='-'
-    UI_SYM_ADD='+'; UI_SYM_ARROW='->'; UI_SYM_RULE='-'
+    UI_SYM_OK='ok'
+    UI_SYM_BAD='x'
+    UI_SYM_WARN='!'
+    UI_SYM_INFO='-'
+    UI_SYM_ADD='+'
+    UI_SYM_ARROW='->'
+    UI_SYM_RULE='-'
 else
-    UI_SYM_OK='✔'; UI_SYM_BAD='✖'; UI_SYM_WARN='⚠'; UI_SYM_INFO='ℹ'
-    UI_SYM_ADD='+'; UI_SYM_ARROW='→'; UI_SYM_RULE='─'
+    UI_SYM_OK='✔'
+    UI_SYM_BAD='✖'
+    UI_SYM_WARN='⚠'
+    UI_SYM_INFO='ℹ'
+    UI_SYM_ADD='+'
+    UI_SYM_ARROW='→'
+    UI_SYM_RULE='─'
 fi
 
 # --- process log lines (openchamber-style labels) ------------------------------
@@ -39,16 +59,16 @@ _ui_label() {
     printf '  %s%s%s  %s\n' "$1" "$2" "${UI_NC}" "$3"
 }
 
-ui_info()    { _ui_label "$UI_BLUE"  'info   ' "$1"; }
+ui_info() { _ui_label "$UI_BLUE" 'info   ' "$1"; }
 ui_success() { _ui_label "$UI_GREEN" 'success' "$1"; }
-ui_warn()    { _ui_label "$UI_YELLOW" 'warn   ' "$1"; }
-ui_error()   { _ui_label "$UI_RED"   'error  ' "$1"; }
+ui_warn() { _ui_label "$UI_YELLOW" 'warn   ' "$1"; }
+ui_error() { _ui_label "$UI_RED" 'error  ' "$1"; }
 
 # Indented, dimmed detail line (belongs to the previous ui_* line).
-ui_detail()  { printf '     %s%s%s\n' "$UI_DIM" "$1" "$UI_NC"; }
+ui_detail() { printf '     %s%s%s\n' "$UI_DIM" "$1" "$UI_NC"; }
 
 # Shows a command that would run (dimmed, prefixed with $).
-ui_cmd()     { printf '  %s\$ %s%s\n' "$UI_DIM" "$1" "$UI_NC"; }
+ui_cmd() { printf '  %s\$ %s%s\n' "$UI_DIM" "$1" "$UI_NC"; }
 
 # --- sections & banners ---------------------------------------------------------
 
@@ -56,8 +76,11 @@ ui_section() {
     # Section rule:  ── Pre-flight ─────────────────
     _t="$1"
     printf '\n  %s%s── %s ──' "$UI_BOLD" "$UI_CYAN" "$_t"
-    _i=$(( 40 - ${#_t} ))
-    while [ "$_i" -gt 0 ]; do printf '%s' "$UI_SYM_RULE"; _i=$((_i - 1)); done
+    _i=$((40 - ${#_t}))
+    while [ "$_i" -gt 0 ]; do
+        printf '%s' "$UI_SYM_RULE"
+        _i=$((_i - 1))
+    done
     printf '%s\n\n' "$UI_NC"
 }
 
@@ -85,10 +108,10 @@ _ui_item() {
     printf '  %s%s%s  %-30s %s\n' "$1" "$2" "$UI_NC" "$3" "$4"
 }
 
-ui_have()  { _ui_item "$UI_GREEN"  "$UI_SYM_OK"   "$1" "$2"; }  # present/ready
-ui_add()   { _ui_item "$UI_CYAN"   "$UI_SYM_ADD"  "$1" "$2"; }  # will be added
-ui_atten() { _ui_item "$UI_YELLOW" "$UI_SYM_WARN" "$1" "$2"; }  # needs attention
-ui_miss()  { _ui_item "$UI_RED"    "$UI_SYM_BAD"  "$1" "$2"; }  # missing/blocked
+ui_have() { _ui_item "$UI_GREEN" "$UI_SYM_OK" "$1" "$2"; }     # present/ready
+ui_add() { _ui_item "$UI_CYAN" "$UI_SYM_ADD" "$1" "$2"; }      # will be added
+ui_atten() { _ui_item "$UI_YELLOW" "$UI_SYM_WARN" "$1" "$2"; } # needs attention
+ui_miss() { _ui_item "$UI_RED" "$UI_SYM_BAD" "$1" "$2"; }      # missing/blocked
 
 # --- aligned key/value panels (status, summaries) -------------------------------
 
@@ -117,7 +140,8 @@ ui_ask() {
     # ui_ask "Question?" "default"  -> prints the answer on stdout.
     # The prompt goes to stderr so $(...) capture stays clean.
     # Reads stdin; EOF/empty -> default. Demo-safe (never blocks on pipes).
-    _q="$1"; _d="${2:-}"
+    _q="$1"
+    _d="${2:-}"
     if [ -n "$_d" ]; then
         printf '  %s [%s] > ' "$_q" "$_d" >&2
     else
@@ -132,10 +156,13 @@ ui_menu() {
     # ui_menu "Question?" <default-key> <"key|description"...> -> prints the chosen KEY.
     # The menu goes to stderr so $(...) capture stays clean.
     # Reads stdin; EOF/empty/unknown -> default. Demo-safe (never blocks on pipes).
-    _q="$1"; _d="$2"; shift 2
+    _q="$1"
+    _d="$2"
+    shift 2
     printf '  %s\n' "$_q" >&2
     for _opt in "$@"; do
-        _k=${_opt%%|*}; _desc=${_opt#*|}
+        _k=${_opt%%|*}
+        _desc=${_opt#*|}
         if [ "$_k" = "$_d" ]; then
             printf '    %s[%s]%s  %s\n' "$UI_CYAN" "$_k" "$UI_NC" "$_desc" >&2
         else
@@ -160,4 +187,4 @@ ui_demo_notice() {
         "$UI_YELLOW" "$UI_SYM_WARN" "$UI_NC"
 }
 
-sim() { sleep "${1:-0.3}"; }   # pretend to work
+sim() { sleep "${1:-0.3}"; } # pretend to work

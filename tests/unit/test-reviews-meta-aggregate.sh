@@ -20,8 +20,14 @@ OLD_DATA="$REPO/internal/reviews-meta/2026-10-10/data"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
     desc="$1"
@@ -50,7 +56,7 @@ fi
 
 # --- PR-stem era: synthetic two-era corpus ------------------------------------
 mkdir -p "$WORK/new"
-cat > "$WORK/new/b1.json" <<'EOF'
+cat >"$WORK/new/b1.json" <<'EOF'
 {
   "batch": "b1",
   "snapshots": [

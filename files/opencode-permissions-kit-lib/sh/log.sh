@@ -54,7 +54,7 @@ log_init() {
 
 log_rotate() {
     [ -f "$LOG_FILE" ] || return 0
-    size=$(wc -c < "$LOG_FILE" 2>/dev/null || echo "0")
+    size=$(wc -c <"$LOG_FILE" 2>/dev/null || echo "0")
     [ "${size:-0}" -lt "$LOG_MAX_BYTES" ] && return 0
     i=$LOG_KEEP
     while [ "$i" -gt 1 ]; do
@@ -70,5 +70,5 @@ log() {
     log_rotate
     ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%Y-%m-%dT%H:%M:%S)
     tag=${0##*/}
-    printf '%s [%s] %s\n' "$ts" "$tag" "$*" >> "$LOG_FILE" 2>/dev/null || true
+    printf '%s [%s] %s\n' "$ts" "$tag" "$*" >>"$LOG_FILE" 2>/dev/null || true
 }

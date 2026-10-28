@@ -28,8 +28,14 @@ OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
     local desc="$1"
@@ -47,9 +53,9 @@ echo "=========================="
 echo ""
 
 # --- syntax -------------------------------------------------------------------
-check "status.sh passes sh -n"  sh -n "$STATUS"
+check "status.sh passes sh -n" sh -n "$STATUS"
 check "install.sh passes sh -n" sh -n "$INSTALL"
-check "update.sh passes sh -n"  sh -n "$UPDATE"
+check "update.sh passes sh -n" sh -n "$UPDATE"
 
 # --- warning wiring -------------------------------------------------------------
 check "status.sh gates the section on /mnt/c existing" \

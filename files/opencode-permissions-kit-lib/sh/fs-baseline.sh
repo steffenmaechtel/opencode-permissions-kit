@@ -37,10 +37,10 @@ _fsb_ancestor_traversable() {
     # other x: the literal x OR the sticky-bit form t (/tmp); group x:
     # the literal x OR the setgid form s (the kit's own 2775 dirs).
     case "$_fsba_mode" in
-        ?????????x|?????????t) return 0 ;;
+        ?????????x | ?????????t) return 0 ;;
     esac
     if [ "$(stat -c %G "$1" 2>/dev/null)" = "$2" ]; then
-        case "$_fsba_mode" in ??????x???|??????s???) return 0 ;; esac
+        case "$_fsba_mode" in ??????x??? | ??????s???) return 0 ;; esac
     fi
     getfacl -p "$1" 2>/dev/null | grep -q "^group:$2:..x"
 }
@@ -63,7 +63,9 @@ _fsb_ancestor_traversable() {
 # bit-level heuristic above applies. Best-effort: ancestors on ACL-less
 # filesystems only warn and never abort the baseline.
 fs_ensure_traversable() {
-    fsb_root="$1"; fsb_group="$2"; fsb_probe="${3:-}"
+    fsb_root="$1"
+    fsb_group="$2"
+    fsb_probe="${3:-}"
     [ -n "$fsb_root" ] && [ -d "$fsb_root" ] || return 0
     fsb_d=$(dirname "$fsb_root")
     while [ -n "$fsb_d" ] && [ "$fsb_d" != "/" ]; do
@@ -78,8 +80,8 @@ fs_ensure_traversable() {
             if _fsb_sudo setfacl -m "g:$fsb_group:X" "$fsb_d" 2>/dev/null; then
                 printf '%s\n' "  traverse ACL g:$fsb_group on $fsb_d (x only — dir stays non-listable)" >&2
             else
-                printf '%s\n' "  WARNING: could not grant traversal on $fsb_d (setfacl failed — ACL support?)"\
-" — the agent may not reach $fsb_root" >&2
+                printf '%s\n' "  WARNING: could not grant traversal on $fsb_d (setfacl failed — ACL support?)""\
+ — the agent may not reach $fsb_root" >&2
             fi
         fi
         # Fixed-point guard: a relative root would make dirname spin on
@@ -123,9 +125,9 @@ _fsb_py_probe() {
     if [ "${_fsb_py_checked:-0}" != 1 ]; then
         _fsb_py_checked=1
         _fsb_py_ok=0
-        command -v python3 >/dev/null 2>&1 \
-            && python3 -I -c 'import os, sys' >/dev/null 2>&1 \
-            && _fsb_py_ok=1
+        command -v python3 >/dev/null 2>&1 &&
+            python3 -I -c 'import os, sys' >/dev/null 2>&1 &&
+            _fsb_py_ok=1
         if [ "$_fsb_py_ok" != 1 ]; then
             # The rerun exists for the interpreter's own diagnostic
             # stderr, not its rc (this branch already failed; #244 c
@@ -133,8 +135,8 @@ _fsb_py_probe() {
             # present-but-broken python3 names its real problem above
             # the warn. An absent one is guarded off — no not-found
             # noise for a legitimate absence.
-            command -v python3 >/dev/null 2>&1 \
-                && python3 -I -c 'import os, sys' >/dev/null || true
+            command -v python3 >/dev/null 2>&1 &&
+                python3 -I -c 'import os, sys' >/dev/null || true
             printf '  warn: live progress unavailable (python3 missing or broken) — passes apply without entry counters\n' >&2
         fi
     fi
@@ -223,7 +225,10 @@ if counted and not aborted:
 # the operand (chain-walker shape of agent_home_sane, staged-write.sh)
 # and skips the operand when any of them is a symlink.
 _fsb_pass() {
-    _fsbp_label="$1"; _fsbp_root="$2"; _fsbp_orig_root="$2"; shift 2
+    _fsbp_label="$1"
+    _fsbp_root="$2"
+    _fsbp_orig_root="$2"
+    shift 2
     # Normalize the root's form (#211 b W7): find emits children without
     # the root's trailing slash, so a slashed root never matched the
     # worker's "$_root"/* walk pattern — the component walk silently
@@ -247,7 +252,7 @@ _fsb_pass() {
         _fsbp_expr="$_fsbp_expr $1"
         shift
     done
-    shift  # consume --
+    shift # consume --
     [ $# -gt 0 ] || return 0
     _fsbp_rc=0
     # Health probe from the MAIN shell (#223): _fsb_count_tee runs as a
@@ -272,8 +277,8 @@ _fsb_pass() {
     # shellcheck disable=SC2086  # find expression built word-wise above
     _fsb_sudo find "$_fsbp_root" $_fsbp_expr -print0 >"$_fsbp_nul" || _fsbp_rc=$?
     if [ "$_fsbp_rc" -eq 0 ]; then
-        _fsb_count_tee "$_fsbp_label" <"$_fsbp_nul" \
-            | _fsb_sudo xargs -0 -r sh -c '
+        _fsb_count_tee "$_fsbp_label" <"$_fsbp_nul" |
+            _fsb_sudo xargs -0 -r sh -c '
                 # $1 = arity of the fixed command, $2 = the scan root (for
                 # the component walk below), then the kit-fixed command
                 # words, then the batch of NUL-separated paths xargs
@@ -366,12 +371,12 @@ fs_baseline_root() {
     done
     _FSB_ERRORS=0
     fs_ensure_traversable "$fsb_root" "$fsb_group" "${3:-}"
-    printf '%s\n' "  group baseline on $fsb_root (group $fsb_group) — large trees can take several minutes;"\
-" progress per pass:" >&2
-    _fsb_pass "chgrp"        "$fsb_root" ! -type l          -- chgrp "$fsb_group"
-    _fsb_pass "dirs g+rwxs"  "$fsb_root" -type d            -- chmod g+rwxs
-    _fsb_pass "files g+rw"   "$fsb_root" -type f            -- chmod g+rw
-    _fsb_pass "default ACLs" "$fsb_root" -type d            -- setfacl -d -m "g:$fsb_group:rwx"
+    printf '%s\n' "  group baseline on $fsb_root (group $fsb_group) — large trees can take several minutes;""\
+ progress per pass:" >&2
+    _fsb_pass "chgrp" "$fsb_root" ! -type l -- chgrp "$fsb_group"
+    _fsb_pass "dirs g+rwxs" "$fsb_root" -type d -- chmod g+rwxs
+    _fsb_pass "files g+rw" "$fsb_root" -type f -- chmod g+rw
+    _fsb_pass "default ACLs" "$fsb_root" -type d -- setfacl -d -m "g:$fsb_group:rwx"
     # Wholesale-failure detection part 2: propagate the per-pass error
     # count (0.0.43a F10). Fail-loud on purpose — the callers' success
     # lines ("group + setgid + default ACLs applied") must not print

@@ -50,11 +50,14 @@ E2E_DEBUG=0
 for _arg in "$@"; do
     case "$_arg" in
         --debug) E2E_DEBUG=1 ;;
-        --help|-h)
+        --help | -h)
             sed -n 's/^# \{0,1\}//p' "$0" | sed -n '/^Usage:/,$p'
             exit 0
             ;;
-        *) echo "unknown argument: $_arg (see --help)" >&2; exit 1 ;;
+        *)
+            echo "unknown argument: $_arg (see --help)" >&2
+            exit 1
+            ;;
     esac
 done
 
@@ -213,10 +216,10 @@ if [ "$_rootless_ok" = true ]; then
 fi
 
 if [ "$_rootless_ok" = true ]; then
-check "RL2: install.conf records CONTAINER_BACKEND=docker-rootless" \
-    E 'grep -q "^CONTAINER_BACKEND=docker-rootless" /etc/opencode-permissions-kit/install.conf'
-check "RL2: install.conf stamps the opencode major (issue #80)" \
-    E 'grep -qE "^OPENCODE_MAJOR=[12]$" /etc/opencode-permissions-kit/install.conf'
+    check "RL2: install.conf records CONTAINER_BACKEND=docker-rootless" \
+        E 'grep -q "^CONTAINER_BACKEND=docker-rootless" /etc/opencode-permissions-kit/install.conf'
+    check "RL2: install.conf stamps the opencode major (issue #80)" \
+        E 'grep -qE "^OPENCODE_MAJOR=[12]$" /etc/opencode-permissions-kit/install.conf'
     check "RL2: install.conf records the rootless socket" \
         E 'grep -q "^OPENCODE_DOCKER_HOST=unix:///run/user/'"$OC_UID"'/docker.sock" /etc/opencode-permissions-kit/install.conf'
     check "RL2: sudoers strips (opencode:docker) for docker-rootless" \
@@ -264,13 +267,13 @@ if [ "$_rootless_ok" = true ]; then
     }
 }
 EOF'
-# Probe note: the banner checks drive the REAL interactive start (no args,
-# stdin closed) under `timeout 20` — what a user runs in a project directory.
-# --version/--help exec banner-free since issue #91 and are no probes. The
-# trailing grep -q ends the probe when the expected line has flushed
-# (SIGPIPE) — opencode 2.x may cold-start its background session service
-# inside the wrapper's container probe, which the early exit absorbs.
-    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-drl.txt | { grep -q "will run with" || true; }' && \
+    # Probe note: the banner checks drive the REAL interactive start (no args,
+    # stdin closed) under `timeout 20` — what a user runs in a project directory.
+    # --version/--help exec banner-free since issue #91 and are no probes. The
+    # trailing grep -q ends the probe when the expected line has flushed
+    # (SIGPIPE) — opencode 2.x may cold-start its background session service
+    # inside the wrapper's container probe, which the early exit absorbs.
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-drl.txt | { grep -q "will run with" || true; }' &&
         echo "  ${GREEN}OK${NC}  wrapper docker-rootless auto-detection ran"
     check "RL3: wrapper auto-detect: container tools advisory" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-drl.txt'
@@ -297,7 +300,7 @@ if [ "$_rootless_ok" = true ]; then
     E 'sudo cp /home/opencode/.config/opencode/opencode.jsonc /tmp/global-jsonc.bak'
     E 'sudo sed -i "s/\"docker \*\": \"deny\"/\"docker *\": \"allow\"/; s/\"ddev \*\": \"deny\"/\"ddev *\": \"allow\"/" /home/opencode/.config/opencode/opencode.jsonc'
     E 'sudo rm -f /var/www/vhosts/test-project/opencode.jsonc'
-    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-drl-global.txt | { grep -q "will run with" || true; }' && \
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-drl-global.txt | { grep -q "will run with" || true; }' &&
         echo "  ${GREEN}OK${NC}  wrapper global-config detection ran"
     check "RL3b: global-config allow detected (banner)" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-drl-global.txt'
@@ -361,13 +364,13 @@ echo "--- RL6. Uninstall (rootless runtime teardown built in) ---"
 # userdel -r can remove the opencode user.
 OC_UID2=$(E 'id -u opencode')
 E 'cd /tmp && sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID2"' docker system prune -af >/dev/null 2>&1" || true'
-E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' && \
+E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' &&
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
-check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'
-check_fail "Library removed"          E 'test -e /usr/local/lib/opencode-permissions-kit'
-check_fail "Sudoers removed"          E 'test -e /etc/sudoers.d/opencode-permissions-kit'
-check_fail "/etc/opencode-permissions-kit removed"    E 'test -e /etc/opencode-permissions-kit'
-check_fail "opencode user removed"    E 'id opencode'
-check_fail "Audit log removed"        E 'test -e /var/log/opencode-permissions-kit'
+check_fail "Wrapper removed" E 'test -e /usr/local/bin/opencode'
+check_fail "Library removed" E 'test -e /usr/local/lib/opencode-permissions-kit'
+check_fail "Sudoers removed" E 'test -e /etc/sudoers.d/opencode-permissions-kit'
+check_fail "/etc/opencode-permissions-kit removed" E 'test -e /etc/opencode-permissions-kit'
+check_fail "opencode user removed" E 'id opencode'
+check_fail "Audit log removed" E 'test -e /var/log/opencode-permissions-kit'
 
 e2e_finish

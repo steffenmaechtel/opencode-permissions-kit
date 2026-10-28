@@ -56,7 +56,11 @@ assert_empty() {
 assert_exitcode() {
     local desc="$1" expected="$2"
     shift 2
-    if "$@" >/dev/null 2>&1; ec=$?; [ "$ec" = "$expected" ]; then
+    if
+        "$@" >/dev/null 2>&1
+        ec=$?
+        [ "$ec" = "$expected" ]
+    then
         echo "  ${GREEN}PASS${NC}  $desc"
         passed=$((passed + 1))
     else
@@ -161,51 +165,51 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
 # --- 15. --tools: catch-all allow → docker AND ddev ---
-printf '%s\n' '{ "permission": { "bash": { "*": "allow" } } }' > "$TMP/catchall.jsonc"
+printf '%s\n' '{ "permission": { "bash": { "*": "allow" } } }' >"$TMP/catchall.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/catchall.jsonc" 2>/dev/null || true)
 assert_contains "tools: catch-all allow → docker" "docker" "$OUT"
 assert_contains "tools: catch-all allow → ddev" "ddev" "$OUT"
 
 # --- 16. --tools: "docker *": "allow" → docker only ---
-printf '%s\n' '{ "permission": { "bash": { "docker *": "allow" } } }' > "$TMP/docker.jsonc"
+printf '%s\n' '{ "permission": { "bash": { "docker *": "allow" } } }' >"$TMP/docker.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/docker.jsonc" 2>/dev/null || true)
 assert_contains "tools: docker * allow → docker" "docker" "$OUT"
 assert_not_contains "tools: docker * allow → no ddev" "ddev" "$OUT"
 
 # --- 17. --tools: subcommand-only allow does NOT trigger ---
-printf '%s\n' '{ "permission": { "bash": { "ddev composer *": "allow" } } }' > "$TMP/subcmd.jsonc"
+printf '%s\n' '{ "permission": { "bash": { "ddev composer *": "allow" } } }' >"$TMP/subcmd.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/subcmd.jsonc" 2>/dev/null || true)
 assert_empty "tools: ddev composer * does NOT trigger ddev" "$OUT"
 
 # --- 18. --tools: bare "docker": "allow" counts ---
-printf '%s\n' '{ "permission": { "bash": { "docker": "allow" } } }' > "$TMP/bare.jsonc"
+printf '%s\n' '{ "permission": { "bash": { "docker": "allow" } } }' >"$TMP/bare.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/bare.jsonc" 2>/dev/null || true)
 assert_contains "tools: bare docker allow → docker" "docker" "$OUT"
 
 # --- 19. --tools: last match wins — "docker ps" allow then "docker *" deny ---
-printf '%s\n' '{ "permission": { "bash": { "docker ps": "allow", "docker *": "deny" } } }' > "$TMP/deny-last.jsonc"
+printf '%s\n' '{ "permission": { "bash": { "docker ps": "allow", "docker *": "deny" } } }' >"$TMP/deny-last.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/deny-last.jsonc" 2>/dev/null || true)
 assert_not_contains "tools: later docker * deny wins over docker ps allow" "docker" "$OUT"
 
 # --- 20. --tools: shorthand "permission.bash": "allow" and "permission": "allow" ---
-printf '%s\n' '{ "permission": { "bash": "allow" } }' > "$TMP/shorthand.jsonc"
+printf '%s\n' '{ "permission": { "bash": "allow" } }' >"$TMP/shorthand.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/shorthand.jsonc" 2>/dev/null || true)
 assert_contains "tools: shorthand bash allow → docker" "docker" "$OUT"
-printf '%s\n' '{ "permission": "allow" }' > "$TMP/toplevel.jsonc"
+printf '%s\n' '{ "permission": "allow" }' >"$TMP/toplevel.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/toplevel.jsonc" 2>/dev/null || true)
 assert_contains "tools: top-level allow → ddev" "ddev" "$OUT"
 
 # --- 21. --tools: "sudo docker *" and "docker compose *" do NOT trigger ---
-printf '%s\n' '{ "permission": { "bash": { "sudo docker *": "allow" } } }' > "$TMP/sudo.jsonc"
+printf '%s\n' '{ "permission": { "bash": { "sudo docker *": "allow" } } }' >"$TMP/sudo.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/sudo.jsonc" 2>/dev/null || true)
 assert_empty "tools: sudo docker * does NOT trigger" "$OUT"
-printf '%s\n' '{ "permission": { "bash": { "docker compose *": "allow" } } }' > "$TMP/compose.jsonc"
+printf '%s\n' '{ "permission": { "bash": { "docker compose *": "allow" } } }' >"$TMP/compose.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/compose.jsonc" 2>/dev/null || true)
 assert_empty "tools: docker compose * does NOT trigger" "$OUT"
 
 # --- 22. --tools: catch-all allow + "docker *" deny → docker granted via
 #     docker-compose (matches only "*", like opencode itself) ---
-printf '%s\n' '{ "permission": { "bash": { "*": "allow", "docker *": "deny" } } }' > "$TMP/slip.jsonc"
+printf '%s\n' '{ "permission": { "bash": { "*": "allow", "docker *": "deny" } } }' >"$TMP/slip.jsonc"
 OUT=$(python3 "$PARSER" --tools "$TMP/slip.jsonc" 2>/dev/null || true)
 assert_contains "tools: catch-all allow + docker * deny → docker (compose slips through)" "docker" "$OUT"
 
@@ -286,12 +290,12 @@ assert_empty "tools-stdin: dict WITH permission key stays valid (empty tools)" "
 
 # --- 0.0.43a F13: string shorthand "permission": "deny" must not crash
 # extract_patterns (the default mode status.sh uses for the leak scan) ---
-printf '%s\n' '{ "permission": "deny" }' > "$TMP/strdeny.jsonc"
+printf '%s\n' '{ "permission": "deny" }' >"$TMP/strdeny.jsonc"
 assert_exitcode "patterns: string shorthand exits cleanly (no AttributeError)" 0 \
     sh -c 'python3 "$0" "$1" >/dev/null 2>&1' "$PARSER" "$TMP/strdeny.jsonc"
 OUT=$(python3 "$PARSER" "$TMP/strdeny.jsonc" 2>/dev/null || true)
 assert_empty "patterns: string shorthand carries no per-path deny patterns" "$OUT"
-printf '%s\n' '{ "permission": "allow" }' > "$TMP/strallow.jsonc"
+printf '%s\n' '{ "permission": "allow" }' >"$TMP/strallow.jsonc"
 assert_exitcode "patterns: string allow shorthand exits cleanly" 0 \
     sh -c 'python3 "$0" "$1" >/dev/null 2>&1' "$PARSER" "$TMP/strallow.jsonc"
 
@@ -306,20 +310,20 @@ assert_empty "tools-2x: permissions:null document -> no tools, no crash" "$OUT"
 # A hand-mangled/truncated config ([..]/42/"x") used to raise inside
 # extract_patterns and the status.sh caller's `|| true` printed a green
 # "no matches" — the F13 false-green class's uncovered shape.
-printf '%s\n' '[1, 2, 3]' > "$TMP/nondict.jsonc"
+printf '%s\n' '[1, 2, 3]' >"$TMP/nondict.jsonc"
 assert_exitcode "patterns: top-level list exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
 OUT=$(python3 "$PARSER" "$TMP/nondict.jsonc" 2>/dev/null || true)
 assert_empty "patterns: top-level list prints no patterns (V8)" "$OUT"
-printf '42\n' > "$TMP/nondict.jsonc"
+printf '42\n' >"$TMP/nondict.jsonc"
 assert_exitcode "patterns: top-level number exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
-printf '"denied"\n' > "$TMP/nondict.jsonc"
+printf '"denied"\n' >"$TMP/nondict.jsonc"
 assert_exitcode "patterns: top-level string exits 1 (V8)" 1 python3 "$PARSER" "$TMP/nondict.jsonc"
 
 # --- 2y. the stderr NOTE discriminates the fix from the old traceback (0.0.44b W12) ----
 # The rc-1/empty-stdout pins above also hold for the old uncaught
 # AttributeError (traceback, stdout empty) — the pins that discriminate
 # are the clean stderr note and the absent traceback.
-printf '%s\n' '[1, 2, 3]' > "$TMP/nondict.jsonc"
+printf '%s\n' '[1, 2, 3]' >"$TMP/nondict.jsonc"
 _nd_err=$(python3 "$PARSER" "$TMP/nondict.jsonc" 2>&1 >/dev/null || true)
 assert_contains "non-dict stderr carries the clean note (W12)" "top-level config is not an object" "$_nd_err"
 assert_not_contains "non-dict stderr carries no traceback (W12)" "Traceback" "$_nd_err"

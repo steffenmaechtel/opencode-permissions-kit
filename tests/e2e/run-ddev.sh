@@ -34,17 +34,20 @@ for _arg in "$@"; do
     case "$_arg" in
         --debug) E2E_DEBUG=1 ;;
         --fresh) FRESH=1 ;;
-        --help|-h)
+        --help | -h)
             sed -n 's/^# \{0,1\}//p' "$0" | sed -n '/^Usage:/,$p'
             exit 0
             ;;
-        *) echo "unknown argument: $_arg (see --help)" >&2; exit 1 ;;
+        *)
+            echo "unknown argument: $_arg (see --help)" >&2
+            exit 1
+            ;;
     esac
 done
 
 GOLDEN_IMAGE="${E2E_DDEV_IMAGE:-opencode-e2e-ddev:cached}"
 BASE_IMAGE="opencode-e2e-ddev-base"
-E2E_IMAGE="$BASE_IMAGE"          # the build path starts from the base image
+E2E_IMAGE="$BASE_IMAGE" # the build path starts from the base image
 E2E_CONTAINER="opencode-e2e-ddev-test"
 E2E_DOCKERFILE="Dockerfile.rootless"
 E2E_SYSTEMD=1
@@ -63,7 +66,7 @@ unset E2E_GIT_CHANNEL
 # changes so cached images rebuild.
 GOLDEN_FORMAT=1
 GOLDEN_TTL_DAYS="${E2E_DDEV_TTL:-14}"
-SITE_TIER="${E2E_DDEV_SITE:-}"           # camino | (empty)
+SITE_TIER="${E2E_DDEV_SITE:-}" # camino | (empty)
 
 echo ""
 echo "${CYAN}========================================================${NC}"
@@ -87,14 +90,24 @@ if [ -z "$DD_WANT" ]; then
     DD_WANT=$(docker image inspect -f '{{ index .Config.Labels "kit.e2e.ddev.version" }}' "$GOLDEN_IMAGE" 2>/dev/null || true)
     [ -n "$DD_WANT" ] && echo "  ${YELLOW}WARNING: ddev version endpoint unreachable - using cached ddev $DD_WANT${NC}"
 fi
-[ -n "$DD_WANT" ] || { echo "  ${RED}FAIL${NC}  cannot resolve a ddev version"; exit 1; }
-case "$DD_WANT" in v*) DD_VER="${DD_WANT#v}" ;; *) DD_VER="$DD_WANT"; DD_WANT="v$DD_WANT" ;; esac
+[ -n "$DD_WANT" ] || {
+    echo "  ${RED}FAIL${NC}  cannot resolve a ddev version"
+    exit 1
+}
+case "$DD_WANT" in v*) DD_VER="${DD_WANT#v}" ;; *)
+    DD_VER="$DD_WANT"
+    DD_WANT="v$DD_WANT"
+    ;;
+esac
 
 DD_ARCH=$(uname -m)
 case "$DD_ARCH" in
     x86_64) DD_ARCH="amd64" ;;
-    aarch64|arm64) DD_ARCH="arm64" ;;
-    *) echo "  ${RED}FAIL${NC} unsupported arch: $DD_ARCH"; exit 1 ;;
+    aarch64 | arm64) DD_ARCH="arm64" ;;
+    *)
+        echo "  ${RED}FAIL${NC} unsupported arch: $DD_ARCH"
+        exit 1
+        ;;
 esac
 DD_CACHE="$SCRIPT_DIR/cache/ddev-$DD_VER"
 DD_BIN="$DD_CACHE/ddev"
@@ -103,14 +116,23 @@ if [ ! -x "$DD_BIN" ]; then
     mkdir -p "$DD_CACHE"
     curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 300 \
         "https://github.com/ddev/ddev/releases/download/$DD_WANT/ddev_linux-$DD_ARCH.$DD_WANT.tar.gz" \
-        -o "$DD_CACHE/ddev.tar.gz" \
-        || { echo "  ${RED}FAIL${NC}  ddev $DD_WANT download failed"; exit 1; }
-    tar -xzf "$DD_CACHE/ddev.tar.gz" -C "$DD_CACHE" \
-        || { echo "  ${RED}FAIL${NC}  cannot extract ddev tarball"; exit 1; }
+        -o "$DD_CACHE/ddev.tar.gz" ||
+        {
+            echo "  ${RED}FAIL${NC}  ddev $DD_WANT download failed"
+            exit 1
+        }
+    tar -xzf "$DD_CACHE/ddev.tar.gz" -C "$DD_CACHE" ||
+        {
+            echo "  ${RED}FAIL${NC}  cannot extract ddev tarball"
+            exit 1
+        }
     rm -f "${DD_CACHE:?}/ddev.tar.gz"
     chmod +x "$DD_BIN" 2>/dev/null || true
 fi
-[ -s "$DD_BIN" ] || { echo "  ${RED}FAIL${NC}  cached ddev binary is empty"; exit 1; }
+[ -s "$DD_BIN" ] || {
+    echo "  ${RED}FAIL${NC}  cached ddev binary is empty"
+    exit 1
+}
 echo "  Using ddev $DD_WANT (cache: $DD_BIN)"
 
 # Golden-image v2 (2026-08-22 pivot): the golden image contains NO inner
@@ -197,7 +219,10 @@ else
     # RL0: systemd must be up (same gate as run-docker-rootless.sh).
     _boot_ok=false
     for _i in $(seq 1 15); do
-        E 'test -e /run/systemd/private' 2>/dev/null && { _boot_ok=true; break; }
+        E 'test -e /run/systemd/private' 2>/dev/null && {
+            _boot_ok=true
+            break
+        }
         sleep 1
     done
     if [ "$_boot_ok" != true ]; then
@@ -229,23 +254,35 @@ else
     E 'printf "{\"storage-driver\":\"fuse-overlayfs\"}\n" | sudo -u opencode tee /home/opencode/.config/docker/daemon.json >/dev/null'
 
     if ! E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/bin/setup-container-backend docker-rootless --yes >/tmp/dd-setup.log 2>&1'; then
-        echo "  ${RED}FAIL${NC}  backend provisioning failed — /tmp/dd-setup.log:";         failures=$((failures + 1))
+        echo "  ${RED}FAIL${NC}  backend provisioning failed — /tmp/dd-setup.log:"
+        failures=$((failures + 1))
         E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-setup.log | tail -30' || true
         exit 1
     fi
     _sock_ok=false
     for _i in $(seq 1 30); do
-        E "sudo test -S /run/user/$(dd_oc_uid)/docker.sock" 2>/dev/null && { _sock_ok=true; break; }
+        E "sudo test -S /run/user/$(dd_oc_uid)/docker.sock" 2>/dev/null && {
+            _sock_ok=true
+            break
+        }
         sleep 1
     done
-    [ "$_sock_ok" = true ] || { echo "  ${RED}FAIL${NC}  inner rootless daemon socket never appeared"; failures=$((failures + 1)); exit 1; }
+    [ "$_sock_ok" = true ] || {
+        echo "  ${RED}FAIL${NC}  inner rootless daemon socket never appeared"
+        failures=$((failures + 1))
+        exit 1
+    }
 
     # Real ddev from the host-side cache (bind-mounted read-only), then the
     # rootless router ports (§6 R7 — the documented rootless answer instead
     # of the host-wide sysctl). ddev instrumentation is opt-in: stays off.
     E 'sudo install -m 755 /opencode-cache/ddev-'"$DD_VER"'/ddev /usr/local/bin/ddev'
-    dd_build_oc /tmp 'ddev config global --router-http-port 8080 --router-https-port 8443' \
-        || { echo "  ${RED}FAIL${NC}  ddev global config failed"; failures=$((failures + 1)); exit 1; }
+    dd_build_oc /tmp 'ddev config global --router-http-port 8080 --router-https-port 8443' ||
+        {
+            echo "  ${RED}FAIL${NC}  ddev global config failed"
+            failures=$((failures + 1))
+            exit 1
+        }
 
     # Warm-up (§4.2.6): pull images + mutagen (+ camino master, §7.1).
     if [ "$SITE_TIER" = "camino" ] && [ -f "$SCRIPT_DIR/fixtures/camino/site/composer.json" ]; then
@@ -256,16 +293,40 @@ else
         # bootstrap-phase root chmod AND the post-install settings writes
         # both run unimpeded.
         E 'sudo chown -R opencode:opencode /var/www/vhosts/dd-warmup'
-        dd_build_oc /var/www/vhosts/dd-warmup 'ddev start >/tmp/dd-warm.log 2>&1' \
-            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up ddev start failed"; failures=$((failures + 1)); exit 1; }
-        dd_build_oc /var/www/vhosts/dd-warmup 'ddev composer install >/tmp/dd-warm.log 2>&1' \
-            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up composer install failed"; failures=$((failures + 1)); exit 1; }
-        dd_build_oc /var/www/vhosts/dd-warmup 'ddev import-db --file=/e2e-fixtures/camino/db.sql.gz >/tmp/dd-warm.log 2>&1' \
-            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up db import failed"; failures=$((failures + 1)); exit 1; }
-        E 'curl --resolve dd-warmup.local:8080:127.0.0.1 -fsS http://dd-warmup.local:8080/camino/ -o /tmp/dd-warm-front.html' \
-            || { echo "  ${RED}FAIL${NC}  warm-up frontend not reachable"; failures=$((failures + 1)); E 'head -5 /tmp/dd-warm-front.html 2>/dev/null' || true; exit 1; }
-        E 'grep -qiE "camino|typo3|permission kit" /tmp/dd-warm-front.html' \
-            || { echo "  ${RED}FAIL${NC}  warm-up frontend has no marker content"; failures=$((failures + 1)); exit 1; }
+        dd_build_oc /var/www/vhosts/dd-warmup 'ddev start >/tmp/dd-warm.log 2>&1' ||
+            {
+                E 'tail -20 /tmp/dd-warm.log' || true
+                echo "  ${RED}FAIL${NC}  warm-up ddev start failed"
+                failures=$((failures + 1))
+                exit 1
+            }
+        dd_build_oc /var/www/vhosts/dd-warmup 'ddev composer install >/tmp/dd-warm.log 2>&1' ||
+            {
+                E 'tail -20 /tmp/dd-warm.log' || true
+                echo "  ${RED}FAIL${NC}  warm-up composer install failed"
+                failures=$((failures + 1))
+                exit 1
+            }
+        dd_build_oc /var/www/vhosts/dd-warmup 'ddev import-db --file=/e2e-fixtures/camino/db.sql.gz >/tmp/dd-warm.log 2>&1' ||
+            {
+                E 'tail -20 /tmp/dd-warm.log' || true
+                echo "  ${RED}FAIL${NC}  warm-up db import failed"
+                failures=$((failures + 1))
+                exit 1
+            }
+        E 'curl --resolve dd-warmup.local:8080:127.0.0.1 -fsS http://dd-warmup.local:8080/camino/ -o /tmp/dd-warm-front.html' ||
+            {
+                echo "  ${RED}FAIL${NC}  warm-up frontend not reachable"
+                failures=$((failures + 1))
+                E 'head -5 /tmp/dd-warm-front.html 2>/dev/null' || true
+                exit 1
+            }
+        E 'grep -qiE "camino|typo3|permission kit" /tmp/dd-warm-front.html' ||
+            {
+                echo "  ${RED}FAIL${NC}  warm-up frontend has no marker content"
+                failures=$((failures + 1))
+                exit 1
+            }
         # Pristine master WITH vendor/ (§7.1): per-run copies are page-cached
         # cp -a, no per-run composer install needed.
         E 'sudo mkdir -p /opt/e2e/fixtures && sudo cp -a /var/www/vhosts/dd-warmup /opt/e2e/fixtures/camino'
@@ -274,8 +335,13 @@ else
         echo ""
         echo "  warm-up: skeleton php project (image pulls + mutagen) ..."
         E 'sudo mkdir -p /var/www/vhosts/dd-warmup && sudo chown opencode:opencode /var/www/vhosts/dd-warmup'
-        dd_build_oc /var/www/vhosts/dd-warmup 'ddev config --project-type=php --webserver-type=apache-fpm --docroot=public --auto >/dev/null 2>&1 && ddev start >/tmp/dd-warm.log 2>&1' \
-            || { E 'tail -20 /tmp/dd-warm.log' || true; echo "  ${RED}FAIL${NC}  warm-up ddev start failed"; failures=$((failures + 1)); exit 1; }
+        dd_build_oc /var/www/vhosts/dd-warmup 'ddev config --project-type=php --webserver-type=apache-fpm --docroot=public --auto >/dev/null 2>&1 && ddev start >/tmp/dd-warm.log 2>&1' ||
+            {
+                E 'tail -20 /tmp/dd-warm.log' || true
+                echo "  ${RED}FAIL${NC}  warm-up ddev start failed"
+                failures=$((failures + 1))
+                exit 1
+            }
         dd_build_oc /var/www/vhosts/dd-warmup 'ddev delete -Oy >/dev/null 2>&1 || true'
     fi
 
@@ -289,13 +355,21 @@ else
     echo "  exporting inner images to $DD_IMG_TAR ..."
     _ocu=$(dd_oc_uid)
     _imgs=$(E 'sudo -u opencode env HOME=/home/opencode XDG_RUNTIME_DIR=/run/user/'"$_ocu"' DOCKER_HOST=unix:///run/user/'"$_ocu"'/docker.sock docker images --format "{{.Repository}}:{{.Tag}}" | grep -v "<none>"')
-    [ -n "$_imgs" ] || { echo "  ${RED}FAIL${NC}  no inner images to export"; failures=$((failures + 1)); exit 1; }
+    [ -n "$_imgs" ] || {
+        echo "  ${RED}FAIL${NC}  no inner images to export"
+        failures=$((failures + 1))
+        exit 1
+    }
     # shellcheck disable=SC2086  # word splitting is the image list
     docker exec -u dev "$E2E_CONTAINER" \
         sudo -u opencode env HOME=/home/opencode XDG_RUNTIME_DIR="/run/user/$_ocu" \
         DOCKER_HOST="unix:///run/user/$_ocu/docker.sock" \
-        docker save $_imgs > "$DD_IMG_TAR" \
-        || { echo "  ${RED}FAIL${NC}  docker save failed"; failures=$((failures + 1)); exit 1; }
+        docker save $_imgs >"$DD_IMG_TAR" ||
+        {
+            echo "  ${RED}FAIL${NC}  docker save failed"
+            failures=$((failures + 1))
+            exit 1
+        }
     dd_build_oc /tmp 'systemctl --user stop docker.service' || true
     E 'sudo rm -rf /home/opencode/.local/share/docker'
     echo "  committing golden image $GOLDEN_IMAGE (ddev $DD_VER, format $GOLDEN_FORMAT, site: ${SITE_TIER:-none}) ..."
@@ -319,7 +393,10 @@ echo ""
 echo "--- DD0. cache-integrity gates ---"
 _boot_ok=false
 for _i in $(seq 1 20); do
-    E 'test -e /run/systemd/private' 2>/dev/null && { _boot_ok=true; break; }
+    E 'test -e /run/systemd/private' 2>/dev/null && {
+        _boot_ok=true
+        break
+    }
     sleep 1
 done
 if [ "$_boot_ok" != true ]; then
@@ -338,7 +415,10 @@ echo "  opencode uid: $OC_UID (socket: $SOCK)"
 
 _sock_ok=false
 for _i in $(seq 1 30); do
-    E "sudo test -S $SOCKPATH" 2>/dev/null && { _sock_ok=true; break; }
+    E "sudo test -S $SOCKPATH" 2>/dev/null && {
+        _sock_ok=true
+        break
+    }
     sleep 1
 done
 if [ "$_sock_ok" != true ]; then
@@ -362,18 +442,21 @@ OC() {
 # assignment when written LITERALLY — passed through check()'s "$@" the
 # word becomes a command ("OC_CWD=...: not found" in dash). The wrappers
 # put the assignment in their own body, safe everywhere.
-OC_DD2()   { OC_CWD=/var/www/vhosts/dd2        OC "$1"; }
-OC_DD13()  { OC_CWD=/var/www/vhosts/dd13-proj  OC "$1"; }
-OC_CAM()   { OC_CWD=/var/www/vhosts/camino-e2e OC "$1"; }
-OC_DD12()  { OC_CWD=/var/www/vhosts/dd12-proj  OC "$1"; }
-OC_DD16M() { OC_CWD=/var/www/vhosts/dd16-maho   OC "$1"; }
+OC_DD2() { OC_CWD=/var/www/vhosts/dd2 OC "$1"; }
+OC_DD13() { OC_CWD=/var/www/vhosts/dd13-proj OC "$1"; }
+OC_CAM() { OC_CWD=/var/www/vhosts/camino-e2e OC "$1"; }
+OC_DD12() { OC_CWD=/var/www/vhosts/dd12-proj OC "$1"; }
+OC_DD16M() { OC_CWD=/var/www/vhosts/dd16-maho OC "$1"; }
 OC_DD16S() { OC_CWD=/var/www/vhosts/dd16-symfony OC "$1"; }
 DEVSH() { docker exec -u dev "$E2E_CONTAINER" bash -ic "$1" 2>&1; }
 
 _act_ok=false
 for _i in $(seq 1 30); do
-    E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' systemctl --user is-active docker" 2>/dev/null | grep -qx active' \
-        && { _act_ok=true; break; }
+    E 'sudo -u opencode sh -c "XDG_RUNTIME_DIR=/run/user/'"$OC_UID"' systemctl --user is-active docker" 2>/dev/null | grep -qx active' &&
+        {
+            _act_ok=true
+            break
+        }
     sleep 1
 done
 check "DD0: inner rootless daemon is active (linger auto-start)" \
@@ -390,10 +473,11 @@ if [ ! -f "$DD_IMG_TAR" ]; then
 fi
 echo "  loading cached ddev images ($(du -h "$DD_IMG_TAR" | cut -f1)) ..."
 if ! docker exec -i -u dev "$E2E_CONTAINER" \
-        sudo -u opencode env HOME=/home/opencode \
-        XDG_RUNTIME_DIR="/run/user/$OC_UID" DOCKER_HOST="$SOCK" \
-        docker load < "$DD_IMG_TAR" >/tmp/dd-load.log 2>&1; then
-    echo "  ${RED}FAIL${NC}  docker load failed:"; failures=$((failures + 1))
+    sudo -u opencode env HOME=/home/opencode \
+    XDG_RUNTIME_DIR="/run/user/$OC_UID" DOCKER_HOST="$SOCK" \
+    docker load <"$DD_IMG_TAR" >/tmp/dd-load.log 2>&1; then
+    echo "  ${RED}FAIL${NC}  docker load failed:"
+    failures=$((failures + 1))
     docker exec -u dev "$E2E_CONTAINER" sh -c 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-load.log | tail -10' || true
     exit 1
 fi
@@ -417,12 +501,17 @@ check "DD0: sudo setuid bit intact" \
 echo ""
 echo "--- DD1. kit install on the warm image (upgrade-style) ---"
 E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSION"'/opencode' || {
-    E 'test -x /home/dev/.opencode/bin/opencode' || { echo "  ${RED}E2E aborted — cannot install opencode.${NC}"; failures=$((failures + 1)); exit 1; }
+    E 'test -x /home/dev/.opencode/bin/opencode' || {
+        echo "  ${RED}E2E aborted — cannot install opencode.${NC}"
+        failures=$((failures + 1))
+        exit 1
+    }
 }
 # Ancestor-traversal fixture: second root UNDER the 0750 dev home.
 E 'mkdir -p /home/dev/vhosts/hometest && chmod 750 /home/dev'
 if ! E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend docker-rootless --projects "/var/www/vhosts /home/dev/vhosts" --skip-ddev-migration >/tmp/dd-install.log 2>&1'; then
-    echo "  ${RED}FAIL${NC}  kit install failed:"; failures=$((failures + 1))
+    echo "  ${RED}FAIL${NC}  kit install failed:"
+    failures=$((failures + 1))
     E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd-install.log | tail -30' || true
     exit 1
 fi
@@ -503,7 +592,8 @@ if [ "$_daemon_ok" = true ]; then
         check "DD4: dev-owned restart succeeds" \
             E 'grep -qE "Successfully started|Restarted" /tmp/dd2-restart.log'
     else
-        echo "  ${RED}FAIL${NC}  DD4: dev-owned restart failed:";         failures=$((failures + 1))
+        echo "  ${RED}FAIL${NC}  DD4: dev-owned restart failed:"
+        failures=$((failures + 1))
         E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd2-restart.log 2>/dev/null | tail -10' || true
         failures=$((failures + 1))
     fi
@@ -526,8 +616,8 @@ if [ "$_daemon_ok" = true ]; then
     check "DD6: ddev exec works (agent side)" \
         OC_DD2 'ddev exec true'
     _dd6_uidmap() {
-        OC_DD2 'ddev exec cat /proc/self/uid_map' 2>/dev/null \
-            | grep -qE "0[[:space:]]+${OC_UID}[[:space:]]"
+        OC_DD2 'ddev exec cat /proc/self/uid_map' 2>/dev/null |
+            grep -qE "0[[:space:]]+${OC_UID}[[:space:]]"
     }
     check "DD6: web container userns maps root to the opencode host UID (§9.1)" \
         _dd6_uidmap
@@ -698,8 +788,8 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
                 E 'grep -q "Successfully started" /tmp/dd10-start.log'
             check "DD10: settings dir keeps g+w through start (dev-owned mode, #25)" \
                 E 'test "$(stat -c %a /var/www/vhosts/camino-e2e/config/system)" = "2775"'
-            OC_CAM 'ddev import-db --file=/e2e-fixtures/camino/db.sql.gz >/tmp/dd10-imp.log 2>&1' \
-                || echo "  ${YELLOW}NOTE${NC}  DD10: db import failed — site may show the install tool"
+            OC_CAM 'ddev import-db --file=/e2e-fixtures/camino/db.sql.gz >/tmp/dd10-imp.log 2>&1' ||
+                echo "  ${YELLOW}NOTE${NC}  DD10: db import failed — site may show the install tool"
             E 'curl --resolve camino-e2e.local:8080:127.0.0.1 -fsS http://camino-e2e.local:8080/camino/ -o /tmp/dd10-front.html'
             check "DD10: frontend answers 200 (first real 'site works' assert)" \
                 E 'test -s /tmp/dd10-front.html'
@@ -714,7 +804,8 @@ if [ "$SITE_TIER" = "camino" ] && E 'test -d /opt/e2e/fixtures/camino' 2>/dev/nu
                 check "DD11: developer-side restart through ddev() works while running" \
                     E 'grep -qE "Successfully started|Restarted" /tmp/dd11-restart.log'
             else
-                echo "  ${RED}FAIL${NC}  DD11: developer-side restart failed:";                 failures=$((failures + 1))
+                echo "  ${RED}FAIL${NC}  DD11: developer-side restart failed:"
+                failures=$((failures + 1))
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd11-restart.log 2>/dev/null | tail -10' || true
                 failures=$((failures + 1))
             fi
@@ -787,15 +878,16 @@ if [ "$SITE_TIER" = "camino" ]; then
         # (e) pull-while-running: git replaces tracked .ddev content, ddev
         #     must survive it (restart, not a broken tree).
         if OC_DD12 'ddev start >/tmp/dd12-start.log 2>&1'; then
-            DEVSH 'cd /var/www/vhosts/dd12-proj && git checkout -q feature/ddev-tree && git checkout -q main' \
-                && _dd12_sw=0 || _dd12_sw=1
+            DEVSH 'cd /var/www/vhosts/dd12-proj && git checkout -q feature/ddev-tree && git checkout -q main' &&
+                _dd12_sw=0 || _dd12_sw=1
             check "DD12: checkout inside the running project's .ddev works" \
                 test "$_dd12_sw" = 0
             if DEVSH 'cd /var/www/vhosts/dd12-proj && ddev restart >/tmp/dd12-restart.log 2>&1'; then
                 check "DD12: ddev survives git's .ddev file replacement (restart)" \
                     E 'grep -qE "Successfully started|Restarted" /tmp/dd12-restart.log'
             else
-                echo "  ${RED}FAIL${NC}  DD12: restart after .ddev checkout failed:";                 failures=$((failures + 1))
+                echo "  ${RED}FAIL${NC}  DD12: restart after .ddev checkout failed:"
+                failures=$((failures + 1))
                 E 'sed "s/\x1b\[[0-9;]*m//g" /tmp/dd12-restart.log 2>/dev/null | tail -10' || true
                 failures=$((failures + 1))
             fi

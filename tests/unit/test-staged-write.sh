@@ -45,8 +45,14 @@ passed=0
 # load-bearing the moment a call does.
 umask 022
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 assert_eq() {
     _d="$1" _e="$2" _a="$3"
@@ -54,7 +60,8 @@ assert_eq() {
 }
 
 check() {
-    _d="$1"; shift
+    _d="$1"
+    shift
     if "$@"; then pass "$_d"; else fail "$_d"; fi
 }
 
@@ -74,8 +81,8 @@ SW_SUDO=""
 SW_STAGE_DIR="$WORK/stage"
 mkdir -p "$WORK/stage" "$WORK/src" "$WORK/dst"
 OWNER="$(id -un):$(id -gn)"
-printf 'KIT-CONTENT-A\n' > "$WORK/src/a"
-printf 'KIT-CONTENT-B\n' > "$WORK/src/b"
+printf 'KIT-CONTENT-A\n' >"$WORK/src/a"
+printf 'KIT-CONTENT-B\n' >"$WORK/src/b"
 
 # 1a. fresh destination
 if staged_write 664 "$OWNER" "$WORK/src/a" "$WORK/dst/conf.json"; then
@@ -89,7 +96,7 @@ assert_eq "fresh write: no staging leftovers" "" "$(ls -A "$WORK/stage" 2>/dev/n
 
 # 1b. destination is a symlink to an existing VICTIM file — the overwrite
 # variant of S1: cp/chown would follow the link and clobber the victim.
-printf 'VICTIM-SECRET\n' > "$WORK/victim"
+printf 'VICTIM-SECRET\n' >"$WORK/victim"
 ln -s "$WORK/victim" "$WORK/dst/linked.json"
 if staged_write 664 "$OWNER" "$WORK/src/b" "$WORK/dst/linked.json"; then
     pass "linked dst: write succeeds"
@@ -113,7 +120,7 @@ check "dangling dst: link itself replaced" test ! -L "$WORK/dst/dangling.json"
 assert_eq "dangling dst: no staging leftovers" "" "$(ls -A "$WORK/stage" 2>/dev/null)"
 
 # 1d. failure leaves the destination and the staging dir clean
-printf 'PRE-EXISTING\n' > "$WORK/dst/keep.json"
+printf 'PRE-EXISTING\n' >"$WORK/dst/keep.json"
 if staged_write 664 "$OWNER" "$WORK/src/missing" "$WORK/dst/keep.json" 2>/dev/null; then
     fail "failed src: staged_write reports failure"
 else
@@ -152,12 +159,12 @@ assert_eq "dir-link dst: nothing landed inside the link target" "" "$(ls -A "$WO
 STUB="$WORK/stub"
 OPS="$WORK/ops.log"
 mkdir -p "$STUB"
-printf '#!/bin/sh\necho "chown $*" >> "$OPS_LOG"\n' > "$STUB/chown"
-printf '#!/bin/sh\necho "chmod $*" >> "$OPS_LOG"\n' > "$STUB/chmod"
+printf '#!/bin/sh\necho "chown $*" >> "$OPS_LOG"\n' >"$STUB/chown"
+printf '#!/bin/sh\necho "chmod $*" >> "$OPS_LOG"\n' >"$STUB/chmod"
 chmod +x "$STUB/chown" "$STUB/chmod"
 
 mkdir -p "$WORK/proj/.ddev" "$WORK/proj/web/typo3conf" "$WORK/proj/config/system" "$WORK/victim-tree/typo3conf"
-printf 'type: typo3\ndocroot: web\n' > "$WORK/proj/.ddev/config.yaml"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/proj/.ddev/config.yaml"
 ln -s "$WORK/victim-tree/typo3conf" "$WORK/proj/typo3conf"
 
 OPS_LOG="$OPS"
@@ -170,8 +177,8 @@ check "handover: real settings dir reaches chmod -R" \
     grep -qxF "chmod -R g+w $WORK/proj/web/typo3conf" "$OPS"
 check "handover: config/system reaches chown -R" \
     grep -qxF "chown -R ocuser:ocgroup $WORK/proj/config/system" "$OPS"
-if grep -qxF "chown -R ocuser:ocgroup $WORK/proj/typo3conf" "$OPS" \
-   || grep -qxF "chmod -R g+w $WORK/proj/typo3conf" "$OPS"; then
+if grep -qxF "chown -R ocuser:ocgroup $WORK/proj/typo3conf" "$OPS" ||
+    grep -qxF "chmod -R g+w $WORK/proj/typo3conf" "$OPS"; then
     fail "handover: planted settings-dir symlink never reaches chown -R/chmod -R"
 else
     pass "handover: planted settings-dir symlink never reaches chown -R/chmod -R"
@@ -200,12 +207,12 @@ fi
 # gates pass it. The resolved containment check must skip it before the
 # recursive pair; the victim tree outside the project stays untouched.
 mkdir -p "$WORK/symproj/.ddev" "$WORK/symproj/config/system" "$WORK/symvictim/typo3conf"
-printf 'type: typo3\ndocroot: websym\n' > "$WORK/symproj/.ddev/config.yaml"
+printf 'type: typo3\ndocroot: websym\n' >"$WORK/symproj/.ddev/config.yaml"
 ln -s "$WORK/symvictim" "$WORK/symproj/websym"
 SYM_OUT="$(PATH="$STUB:$PATH" sh -c '. "$1" && ddev_handover_project "$2" ocuser ocgroup' _ "$HANDOVER" "$WORK/symproj" 2>&1)"
-if grep -qF "chown -R ocuser:ocgroup $WORK/symproj/websym/typo3conf" "$OPS" \
-   || grep -qF "chmod -R g+w $WORK/symproj/websym/typo3conf" "$OPS" \
-   || grep -qF "chown -R ocuser:ocgroup $WORK/symvictim/typo3conf" "$OPS"; then
+if grep -qF "chown -R ocuser:ocgroup $WORK/symproj/websym/typo3conf" "$OPS" ||
+    grep -qF "chmod -R g+w $WORK/symproj/websym/typo3conf" "$OPS" ||
+    grep -qF "chown -R ocuser:ocgroup $WORK/symvictim/typo3conf" "$OPS"; then
     fail "handover: settings dir through an intermediate symlink is skipped (0.0.42e S2)"
 else
     pass "handover: settings dir through an intermediate symlink is skipped (0.0.42e S2)"
@@ -225,12 +232,12 @@ fi
 # same intermediate-symlinked docroot, root-run chown -R back to the
 # developer must stay inside the resolved project root.
 mkdir -p "$WORK/backproj/.ddev" "$WORK/backproj/config/system" "$WORK/backvictim/typo3conf"
-printf 'type: typo3\ndocroot: websym\n' > "$WORK/backproj/.ddev/config.yaml"
+printf 'type: typo3\ndocroot: websym\n' >"$WORK/backproj/.ddev/config.yaml"
 ln -s "$WORK/backvictim" "$WORK/backproj/websym"
 BACK_OUT="$(PATH="$STUB:$PATH" sh -c '. "$1" && ddev_handover_project_back "$2" devuser devgroup dev' _ "$HANDOVER" "$WORK/backproj" 2>&1)"
-if grep -qF "chown -R dev:devgroup $WORK/backproj/websym/typo3conf" "$OPS" \
-   || grep -qF "chmod -R g+w $WORK/backproj/websym/typo3conf" "$OPS" \
-   || grep -qF "chown -R dev:devgroup $WORK/backvictim/typo3conf" "$OPS"; then
+if grep -qF "chown -R dev:devgroup $WORK/backproj/websym/typo3conf" "$OPS" ||
+    grep -qF "chmod -R g+w $WORK/backproj/websym/typo3conf" "$OPS" ||
+    grep -qF "chown -R dev:devgroup $WORK/backvictim/typo3conf" "$OPS"; then
     fail "handover back: settings dir through an intermediate symlink is skipped (0.0.42f S1)"
 else
     pass "handover back: settings dir through an intermediate symlink is skipped (0.0.42f S1)"
@@ -249,7 +256,7 @@ fi
 # 2b. dev-owned flag: a symlinked config.yaml is skipped, never written
 # through as root (the cat-rewrite follows the link).
 mkdir -p "$WORK/flagproj/.ddev" "$WORK/flagsrc"
-printf 'type: typo3\n' > "$WORK/flagsrc/config.yaml"
+printf 'type: typo3\n' >"$WORK/flagsrc/config.yaml"
 ln -s "$WORK/flagsrc/config.yaml" "$WORK/flagproj/.ddev/config.yaml"
 FLAGOUT="$(PATH="$STUB:$PATH" sh -c '. "$1" && ddev_devowned_flag "$2"' _ "$HANDOVER" "$WORK/flagproj" 2>&1)"
 if grep -q 'disable_settings_management' "$WORK/flagsrc/config.yaml"; then
@@ -261,7 +268,7 @@ check "dev-owned flag: skip is announced" \
     echo "$FLAGOUT" | grep -qF "is a symlink"
 # ... and a REAL config.yaml gets the flag (the function keeps working).
 mkdir -p "$WORK/flagproj2/.ddev"
-printf 'type: typo3\n' > "$WORK/flagproj2/.ddev/config.yaml"
+printf 'type: typo3\n' >"$WORK/flagproj2/.ddev/config.yaml"
 PATH="$STUB:$PATH" sh -c '. "$1" && ddev_devowned_flag "$2"' _ "$HANDOVER" "$WORK/flagproj2" >/dev/null 2>&1
 check "dev-owned flag: real config.yaml gets the flag" \
     grep -q 'disable_settings_management: true' "$WORK/flagproj2/.ddev/config.yaml"
@@ -278,11 +285,12 @@ check "dev-owned flag: exec-time recheck skip is announced" \
 # .ddev for a symlink WHEN the walk runs (the race, deterministically);
 # the recheck then skips the chown hand-over.
 mkdir -p "$WORK/hr/proj/.ddev" "$WORK/hr/proj/web/typo3conf" "$WORK/hr-victim" "$WORK/stubhr"
-printf 'type: typo3\ndocroot: web\n' > "$WORK/hr/proj/.ddev/config.yaml"
-printf '#!/bin/sh\necho "chown $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr/chown"
-printf '#!/bin/sh\necho "chmod $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr/chmod"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/hr/proj/.ddev/config.yaml"
+printf '#!/bin/sh\necho "chown $*" >> "$OPS_HR_LOG"\n' >"$WORK/stubhr/chown"
+printf '#!/bin/sh\necho "chmod $*" >> "$OPS_HR_LOG"\n' >"$WORK/stubhr/chmod"
 chmod +x "$WORK/stubhr/chown" "$WORK/stubhr/chmod"
-OPS_HR_LOG="$WORK/ops-hr.log"; export OPS_HR_LOG
+OPS_HR_LOG="$WORK/ops-hr.log"
+export OPS_HR_LOG
 OUT_HR="$(PATH="$WORK/stubhr:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/hr")"
 check "handover_root: .ddev reaches chown -R" \
     grep -qxF "chown -R ocuser:ocgroup $WORK/hr/proj/.ddev" "$OPS_HR_LOG"
@@ -302,11 +310,13 @@ else
 fi
 # racing variant: the stub swaps .ddev for a symlink at chmod (walk) time
 mkdir -p "$WORK/hr2/proj/.ddev" "$WORK/hr2/proj/web/typo3conf" "$WORK/hr2-victim" "$WORK/stubhr2"
-printf 'type: typo3\ndocroot: web\n' > "$WORK/hr2/proj/.ddev/config.yaml"
-printf '#!/bin/sh\necho "chown $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr2/chown"
-printf '#!/bin/sh\ncase " $* " in *" $RACE_D "*) rm -rf "$RACE_D"; ln -s "$RACE_V" "$RACE_D";; esac\necho "chmod $*" >> "$OPS_HR_LOG"\n' > "$WORK/stubhr2/chmod"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/hr2/proj/.ddev/config.yaml"
+printf '#!/bin/sh\necho "chown $*" >> "$OPS_HR_LOG"\n' >"$WORK/stubhr2/chown"
+printf '#!/bin/sh\ncase " $* " in *" $RACE_D "*) rm -rf "$RACE_D"; ln -s "$RACE_V" "$RACE_D";; esac\necho "chmod $*" >> "$OPS_HR_LOG"\n' >"$WORK/stubhr2/chmod"
 chmod +x "$WORK/stubhr2/chown" "$WORK/stubhr2/chmod"
-RACE_D="$WORK/hr2/proj/.ddev"; RACE_V="$WORK/hr2-victim"; export RACE_D RACE_V
+RACE_D="$WORK/hr2/proj/.ddev"
+RACE_V="$WORK/hr2-victim"
+export RACE_D RACE_V
 OUT_HR2="$(PATH="$WORK/stubhr2:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_root "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/hr2")"
 check "handover_root recheck: swapped .ddev still hit the chmod walk (the stub ran first)" \
     grep -qxF "chmod -R g+w $WORK/hr2/proj/.ddev" "$OPS_HR_LOG"
@@ -325,14 +335,16 @@ fi
 # links never reach the recursive ops; the root-inode handback fires only
 # for a kit-owned root (stubbed stat).
 mkdir -p "$WORK/bk/proj/.ddev" "$WORK/bk/proj/web/typo3conf" "$WORK/bk/proj/config/system" "$WORK/bk-victim/typo3conf" "$WORK/stubbk"
-printf 'type: typo3\ndocroot: web\n' > "$WORK/bk/proj/.ddev/config.yaml"
+printf 'type: typo3\ndocroot: web\n' >"$WORK/bk/proj/.ddev/config.yaml"
 ln -s "$WORK/bk-victim/typo3conf" "$WORK/bk/proj/typo3conf"
-printf '#!/bin/sh\necho "chown $*" >> "$OPS_BK_LOG"\n' > "$WORK/stubbk/chown"
-printf '#!/bin/sh\necho "chmod $*" >> "$OPS_BK_LOG"\n' > "$WORK/stubbk/chmod"
-printf '#!/bin/sh\nprintf "%%s\\n" "$STAT_OWNER"\n' > "$WORK/stubbk/stat"
+printf '#!/bin/sh\necho "chown $*" >> "$OPS_BK_LOG"\n' >"$WORK/stubbk/chown"
+printf '#!/bin/sh\necho "chmod $*" >> "$OPS_BK_LOG"\n' >"$WORK/stubbk/chmod"
+printf '#!/bin/sh\nprintf "%%s\\n" "$STAT_OWNER"\n' >"$WORK/stubbk/stat"
 chmod +x "$WORK/stubbk/chown" "$WORK/stubbk/chmod" "$WORK/stubbk/stat"
-OPS_BK_LOG="$WORK/ops-bk.log"; export OPS_BK_LOG
-STAT_OWNER=ocuser; export STAT_OWNER
+OPS_BK_LOG="$WORK/ops-bk.log"
+export OPS_BK_LOG
+STAT_OWNER=ocuser
+export STAT_OWNER
 PATH="$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_project_back "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/bk/proj" >/dev/null 2>&1
 check "project_back: real settings dirs reach chown -R (dev handback)" \
     sh -c 'grep -qxF "chown -R devuser:ocgroup '"$WORK"'/bk/proj/web/typo3conf" "$1" && grep -qxF "chown -R devuser:ocgroup '"$WORK"'/bk/proj/config/system" "$1"' _ "$OPS_BK_LOG"
@@ -353,7 +365,7 @@ if [ -n "$_or_chown" ] && [ -n "$_or_chmod" ] && [ "$_or_chown" -lt "$_or_chmod"
 else
     fail "project_back: settings pair order violated (W1: chown=$_or_chown chmod=$_or_chmod)"
 fi
-: > "$OPS_BK_LOG"
+: >"$OPS_BK_LOG"
 STAT_OWNER=devuser
 PATH="$WORK/stubbk:$PATH" OPK_INSTALL_CONF=/nonexistent sh -c '. "$1" && ddev_handover_project_back "$2" ocuser ocgroup devuser' _ "$HANDOVER" "$WORK/bk/proj" >/dev/null 2>&1
 if grep -qxF "chown devuser:ocgroup $WORK/bk/proj" "$OPS_BK_LOG"; then
@@ -392,7 +404,7 @@ check "W1 static order: ddev_handover_project_back chowns before chmodding (agen
 # guard masked rc 2 into an empty rewrite that clobbered the file.
 
 PCONF="$WORK/projects.conf"
-printf '/var/www/only-project\n' > "$PCONF"
+printf '/var/www/only-project\n' >"$PCONF"
 if sh -c 'rc=0; out=$(grep -vxF "$1" "$2" 2>/dev/null) || rc=$?; [ "$rc" -le 1 ]' _ "/var/www/only-project" "$PCONF"; then
     pass "C3 (0.0.39g) / F4 (0.0.39h): last-project removal (rc 1) stays benign"
 else
@@ -426,16 +438,16 @@ check "0.0.39h F4/F6: config.sh conf rewrites are narrowed + atomic (class sweep
 
 BIN="$WORK/bin"
 mkdir -p "$BIN"
-printf '#!/bin/sh\nout=""\nprev=""\nfor a in "$@"; do\n  [ "$prev" = "-o" ] && out="$a"\n  prev="$a"\ndone\ncase "$CURL_STUB" in\n  fail) exit 1 ;;\n  empty) : > "$out" ;;\n  *) printf "KIT FILE CONTENT\\n" > "$out" ;;\nesac\n' > "$BIN/curl"
+printf '#!/bin/sh\nout=""\nprev=""\nfor a in "$@"; do\n  [ "$prev" = "-o" ] && out="$a"\n  prev="$a"\ndone\ncase "$CURL_STUB" in\n  fail) exit 1 ;;\n  empty) : > "$out" ;;\n  *) printf "KIT FILE CONTENT\\n" > "$out" ;;\nesac\n' >"$BIN/curl"
 chmod +x "$BIN/curl"
 
 eval "$(sed -n '/^ensure_local_file() {/,/^}/p' "$UPDATE")"
 FILES_ROOT="$WORK/fr"
 KIT_BASE_URL="https://example.invalid"
-_tmp_track() { :; }   # scratch-registry stub (update.sh's real one is a no-op here)
+_tmp_track() { :; } # scratch-registry stub (update.sh's real one is a no-op here)
 
 mkdir -p "$FILES_ROOT"
-printf 'PRESENT\n' > "$WORK/fr/present.txt"
+printf 'PRESENT\n' >"$WORK/fr/present.txt"
 if (PATH="$BIN:$PATH" ensure_local_file "present.txt"); then
     pass "ensure_local_file: present file is a no-op"
 else
@@ -503,7 +515,8 @@ check "0.0.39h F12: no 1;33 color definition remains repo-wide (files/)" \
 # --- 6. agent_home_sane (0.0.39h F1/F2) ---------------------------------------------
 # The walker asserts every component of a path below the agent home
 # (OPK_AGENT_HOME overrides the base for this unprivileged run).
-AH="$WORK/ah"; mkdir -p "$AH/oc/.config/opencode" "$AH/other"
+AH="$WORK/ah"
+mkdir -p "$AH/oc/.config/opencode" "$AH/other"
 ln -s "$AH/other" "$AH/oc/linked"
 check "walker: clean chain passes silently" \
     sh -c '. "$1" && OPK_AGENT_HOME="$2/oc" agent_home_sane oc "$2/oc/.config/opencode"' _ "$STAGEDWRITE" "$AH"

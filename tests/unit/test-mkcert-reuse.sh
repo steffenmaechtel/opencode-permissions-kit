@@ -27,8 +27,14 @@ STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.s
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
     local desc="$1"
@@ -53,9 +59,9 @@ echo "====================="
 echo ""
 
 # --- syntax ----------------------------------------------------------------
-check "install.sh passes sh -n"  sh -n "$INSTALL"
-check "update.sh passes sh -n"   sh -n "$UPDATE"
-check "status.sh passes sh -n"   sh -n "$STATUS"
+check "install.sh passes sh -n" sh -n "$INSTALL"
+check "update.sh passes sh -n" sh -n "$UPDATE"
+check "status.sh passes sh -n" sh -n "$STATUS"
 
 # --- install.sh detection ----------------------------------------------------
 check "install.sh scans /mnt/c/Users profiles directly (glob)" \
@@ -94,10 +100,10 @@ check "status.sh names the fix (clear traefik certs + restart)" \
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT INT TERM
 mkdir -p "$TMPDIR/Users/Public/AppData/Local/mkcert" \
-         "$TMPDIR/Users/mail/AppData/Local/mkcert"
-touch "$TMPDIR/Users/Public/AppData/Local/mkcert/rootCA.pem"          # no key -> skipped
+    "$TMPDIR/Users/mail/AppData/Local/mkcert"
+touch "$TMPDIR/Users/Public/AppData/Local/mkcert/rootCA.pem" # no key -> skipped
 touch "$TMPDIR/Users/mail/AppData/Local/mkcert/rootCA.pem" \
-      "$TMPDIR/Users/mail/AppData/Local/mkcert/rootCA-key.pem"
+    "$TMPDIR/Users/mail/AppData/Local/mkcert/rootCA-key.pem"
 src=""
 src_label=""
 for wca in "$TMPDIR"/Users/*/AppData/Local/mkcert; do
