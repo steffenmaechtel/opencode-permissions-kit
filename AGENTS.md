@@ -72,7 +72,10 @@ expect the reported paths to exist locally.
 
 - **Never commit on `master`.** Work on `feature/<name>` branches, merged via
   pull request with green CI. The agent commits its finished work on the
-  feature branch; push/pull and PRs are the maintainer's job. (RM-0097)
+  feature branch; pushes, PR creation and merges are the maintainer's job
+  unless the commission delegates them (variant c: ask-gated pushes and
+  PR creation — the merge and the loop closure stay with the maintainer).
+  (RM-0097)
 - **All shipped content is English** — scripts, docs, prompts, messages. (RM-0098)
 - **Follow `agent/conventions.md`** for interactive prompts, output
   style, shell security (untrusted input), and other shipped-code

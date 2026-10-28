@@ -19,7 +19,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0097](0/0/9/RM-0097.md) | Never commit on master | active | approved | 1m | 2026-11-20 |
+| [RM-0097](0/0/9/RM-0097.md) | Never commit on master | active | approved | 1m | 2026-11-28 |
 | [RM-0098](0/0/9/RM-0098.md) | All shipped content is English | active | approved | 1m | 2026-11-20 |
 | [RM-0099](0/0/9/RM-0099.md) | Follow agent/conventions.md for interactive… | active | approved | 1m | 2026-11-20 |
 | [RM-0100](0/1/0/RM-0100.md) | Docs change with the code | active | approved | 1m | 2026-11-20 |
@@ -80,7 +80,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0018](0/0/1/RM-0018.md) | New cases (birth-PR key, since the 2026-10… | active | approved | 1m | 2026-11-16 |
+| [RM-0018](0/0/1/RM-0018.md) | Live cases (PR-native process, since | active | approved | 1m | 2026-11-28 |
 | [RM-0019](0/0/1/RM-0019.md) | Legacy corpus (stems 0.0.38–0.0.49) | active | approved | 1m | 2026-11-16 |
 
 ### Referencing house rules (RM keys)
