@@ -1,4 +1,4 @@
-.PHONY: help test lint fmt install-shfmt check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity rules-report e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint fmt fmt-scope install-shfmt check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity rules-report e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` — DERIVED FROM DISK (0.0.42d C4 /
 # 0.0.42e C10): every file under files/ and scripts/ whose first line is
@@ -34,8 +34,20 @@ SHFMT_VERSION = 3.14.1
 SHFMT_FLAGS = -ln dash -i 4 -ci
 # Tests' own scripts: every TRACKED .sh under tests/. Tracked-only on
 # purpose: warm checkouts carry untracked foreign shell (e2e camino
-# share-providers, cache dumps -- bash, not ours to format).
+# share-providers, cache dumps -- bash, not ours to format). Asymmetry,
+# deliberate (review a B5, #301): the shipped half (SHELLCHECK_FILES)
+# derives from DISK, so an untracked shebang-first scratch file under
+# files/ or scripts/ reddens both gates -- nothing foreign lives there
+# today (verified review a B5), and a stray scratch file failing loud
+# under files/ is the safer direction.
 SHFMT_TEST_FILES = $(shell git ls-files -- 'tests/*.sh' | sort)
+
+# Single-source derivation link (review a B3, #301):
+# tests/unit/test-format-gate.sh reads the gate scope from HERE, never
+# re-derives it -- a drift between the suite's copy and the gate's
+# actual scope is impossible by construction.
+fmt-scope:
+	@echo $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES)
 
 help:
 	@echo "opencode permissions kit — dev makefile"
@@ -44,6 +56,7 @@ help:
 	@echo "  make check-host    Verify the host has all tools needed to contribute"
 	@echo "  make lint          ShellCheck + shfmt format gate over the kit shell (needs both)"
 	@echo "  make fmt           One-shot shfmt -w over the whole gate scope"
+	@echo "  make fmt-scope     Print the gate's file scope (single source, used by the format-gate suite)"
 	@echo "  make install-shfmt Download the pinned shfmt to ~/.local/bin (no root)"
 	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
@@ -160,7 +173,12 @@ fmt:
 
 # Download the pinned shfmt into ~/.local/bin (single static binary,
 # no root). CI uses this too -- the Makefile is the one source of the
-# version pin.
+# version pin. Fail-loud + atomic (review a B1/B2, #301): every failure
+# edge exits 1 explicitly (the trailing PATH-note case must never zero a
+# failed run), and the download lands on a temp name -- a broken
+# transfer never truncates an existing install in place. SHFMT_BIN_DIR
+# (env) redirects the destination so the unit suite can pin this target
+# inside its scratch sandbox.
 install-shfmt:
 	@case "$$(uname -s)/$$(uname -m)" in \
 		Linux/x86_64) plat=linux_amd64 ;; \
@@ -169,11 +187,16 @@ install-shfmt:
 		Darwin/arm64) plat=darwin_arm64 ;; \
 		*) echo "error: unsupported platform for the shfmt download -- install v$(SHFMT_VERSION) manually"; exit 1 ;; \
 	esac; \
-	bin="$${HOME}/.local/bin"; mkdir -p "$$bin"; \
+	bin="$${SHFMT_BIN_DIR:-$${HOME}/.local/bin}"; \
+	mkdir -p "$$bin" || exit 1; \
+	tmp="$$bin/.shfmt.tmp.$$"; \
 	echo "downloading shfmt v$(SHFMT_VERSION) ($$plat) -> $$bin/shfmt"; \
-	curl -fsSL -o "$$bin/shfmt" \
-		"https://github.com/mvdan/sh/releases/download/v$(SHFMT_VERSION)/shfmt_v$(SHFMT_VERSION)_$$plat" && \
-	chmod +x "$$bin/shfmt"; \
+	curl -fsSL -o "$$tmp" \
+		"https://github.com/mvdan/sh/releases/download/v$(SHFMT_VERSION)/shfmt_v$(SHFMT_VERSION)_$$plat" \
+		|| { rm -f "$$tmp"; exit 1; }; \
+	chmod +x "$$tmp" || { rm -f "$$tmp"; exit 1; }; \
+	"$$tmp" --version >/dev/null || { rm -f "$$tmp"; echo "error: downloaded shfmt failed its --version probe"; exit 1; }; \
+	mv -f "$$tmp" "$$bin/shfmt" || { rm -f "$$tmp"; exit 1; }; \
 	"$$bin/shfmt" --version; \
 	case ":$${PATH}:" in \
 		*":$$bin:"*) ;; \

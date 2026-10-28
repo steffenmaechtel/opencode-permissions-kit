@@ -41,19 +41,22 @@ if ! command -v shfmt >/dev/null 2>&1; then
     exit 1
 fi
 
-SHFMT_FLAGS="-ln dash -i 4 -ci"
-
-# Same scope the Makefile gate uses: shipped shell (shebang/directive
-# first line under files/ + scripts/) plus every TRACKED .sh under
-# tests/ -- tracked-only, because warm checkouts carry untracked
-# foreign shell (e2e camino share-providers, cache dumps).
-GATE_SCOPE="$(
-    {
-        find files scripts -type f -exec \
-            awk 'FNR == 1 && (/^[#]!\/bin\/sh/ || /^[#] shellcheck shell=/) {print FILENAME}' {} +
-        git ls-files -- 'tests/*.sh'
-    } | sort -u
-)"
+# Derived, never duplicated (review a B3/C8, #301): the flags and the
+# scope come from the Makefile -- the single source the gate itself
+# uses. A literal copy here would drift silently.
+SHFMT_FLAGS="$(sed -n 's/^SHFMT_FLAGS = //p' Makefile | head -1)"
+if [ -n "$SHFMT_FLAGS" ]; then
+    pass "gate flags derived from the Makefile (SHFMT_FLAGS)"
+else
+    fail "SHFMT_FLAGS literal not extractable from Makefile"
+    SHFMT_FLAGS="-ln dash -i 4 -ci"
+fi
+GATE_SCOPE="$(make -s fmt-scope)"
+if [ -n "$GATE_SCOPE" ]; then
+    pass "gate scope derived from the Makefile (make fmt-scope)"
+else
+    fail "make fmt-scope returned an empty scope"
+fi
 
 # --- 1. version pin consistency ------------------------------------------------
 _ver_make="$(sed -n 's/^SHFMT_VERSION = //p' Makefile | head -1)"
@@ -76,9 +79,12 @@ fi
 _scratch="$(mktemp -d)"
 trap 'rm -rf "$_scratch"' EXIT INT TERM
 
-# The probe violates every gate dimension: tab indent, unindented
-# case arms, compact case-pattern pipes, semicolon-joined statements.
-printf '#!/bin/sh\ncase "$1" in\na|b) echo one; echo two ;;\nesac\nif [ -n "$1" ]; then X=1; Y=2; fi\n' >"$_scratch/probe.sh"
+# The probe violates every gate dimension (review a C8, #301 — carry
+# the axes a flags/editorconfig drift would change): tab indent,
+# unindented case arms, compact case-pattern pipes, semicolon-joined
+# statements, and a spaced redirect (`> f` — sensitive to
+# space_redirects).
+printf '#!/bin/sh\ncase "$1" in\na|b) echo one; echo two ;;\nesac\nif [ -n "$1" ]; then X=1; Y=2; fi\necho hi > probe.out\n' >"$_scratch/probe.sh"
 
 # the repo .editorconfig must reach the probe: a copy sits next to it
 # (root=true keeps parent lookups out of the scratch dir)
@@ -152,6 +158,38 @@ if [ -z "$_dirty_bare" ]; then
 else
     fail "bare shfmt lists files (.editorconfig vs flags drift):"
     printf '%s\n' "$_dirty_bare" | sed 's/^/        /'
+fi
+
+# --- 5. install-shfmt fails loud and never truncates in place (B1/B2, #301) ------
+# The recipe's failure edges must exit non-zero (the trailing PATH-note
+# case once zeroed every failure), and the download must be atomic: a
+# broken transfer may not touch an existing install. Fully sandboxed:
+# a failing curl stub on PATH (no network) and SHFMT_BIN_DIR pointing
+# into the scratch dir.
+_isf="$(mktemp -d)"
+mkdir -p "$_isf/bin"
+printf '#!/bin/sh\nexit 22\n' >"$_isf/curl"
+chmod +x "$_isf/curl"
+# a pre-existing "install" for the B2 rider -- it must survive untouched
+printf '#!/bin/sh\necho v3.14.1\n' >"$_isf/bin/shfmt"
+chmod +x "$_isf/bin/shfmt"
+PATH="$_isf:$PATH" SHFMT_BIN_DIR="$_isf/bin" make install-shfmt >/dev/null 2>&1
+_isf_rc=$?
+if [ "$_isf_rc" -ne 0 ]; then
+    pass "install-shfmt exits non-zero when the download fails (fail-loud)"
+else
+    fail "install-shfmt swallowed the download failure (rc 0)"
+fi
+_isf_tmp="$(find "$_isf/bin" -name '.shfmt.tmp.*' 2>/dev/null || true)"
+if [ -z "$_isf_tmp" ]; then
+    pass "failed install leaves no temp garbage behind"
+else
+    fail "failed install left temp file(s): $_isf_tmp"
+fi
+if [ "$("$_isf/bin/shfmt" 2>/dev/null)" = "v3.14.1" ]; then
+    pass "existing install survives a failed re-download (atomic, B2)"
+else
+    fail "failed re-download damaged the existing shfmt"
 fi
 
 echo ""
