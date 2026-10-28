@@ -28,8 +28,8 @@ and nothing is committed here. The process rules stay in
 - **PR mirrors are readability copies:** each case's full chain is
   mirrored as one consolidated comment (split into parts where it
   exceeds the comment size limit) on its birth-PR timeline, marked
-  `opk-review-legacy` — posted 2026-10-28, issue #290. They are for
-  reading, not citing; timestamps and states inside are historical.
+  `opk-review-legacy` (issue #290). They are for reading, not citing;
+  timestamps and states inside are historical.
 
 ## Snapshot format
 

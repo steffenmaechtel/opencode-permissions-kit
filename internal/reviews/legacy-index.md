@@ -32,11 +32,17 @@ Take the stem from the old citation, find the key above, then:
 - old stem without letter (`0.0.38`) → `internal/reviews/<key>/review-a.md`
 - old `*-resolution.md` (`0.0.39-resolution`) → `internal/reviews/<key>/resolution.md`
 
+Every `internal/reviews/…` path below and in the map above lives at
+the tag since the corpus archive (issue #290) — read it as
+`review-corpus:<path>`, e.g.
+`git show review-corpus:internal/reviews/0/0/1/7/pr-00171/review-b.md`.
+
 Examples:
 
 - `0.0.49b C1` → `internal/reviews/0/0/1/7/pr-00171/review-b.md` (finding C1)
 - `0.0.38 S1` → `internal/reviews/0/0/1/0/pr-00109/review-a.md` (finding S1)
 - `2026-09-28-v0.0.39-resolution.md` → `internal/reviews/0/0/1/1/pr-00115/resolution.md`
 
-`grep -r "0.0.49b" internal/reviews/` works too — stems and qualified
-finding IDs appear inside the snapshots and resolutions.
+`git grep "0.0.49b" review-corpus -- internal/reviews/` finds the
+citing snapshots and resolutions — stems and qualified finding IDs
+appear inside them.

@@ -10,5 +10,7 @@ root) is the router; these pages are the rules themselves.
 | [test-fidelity.md](test-fidelity.md) | why bugs pass unit/e2e but still hit real terminals; the patterns that close the gap |
 | [review-concept.md](review-concept.md) | the review process: loop, stop rule, verification, reviewer mechanics |
 
-Review mechanics (snapshot/resolution rules, index discipline) live in
-[internal/reviews/README.md](../internal/reviews/README.md).
+The review corpus archive lives in
+[internal/reviews/README.md](../internal/reviews/README.md) (tag
+`review-corpus`); current reviews run PR-native — see
+[review-concept.md](review-concept.md).

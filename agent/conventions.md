@@ -260,10 +260,10 @@ Citations in new text name the file and section, never the bare ID:
   fourth site breaks the rules audit's invariant that searching an ID
   only ever hits genuine sites. The closed world is what the no-fake
   findings pin measures (tests/unit/test-rules-meta.sh, pin 10): the
-  generated review indexes and the frozen reviews corpus sit outside
-  the count; living files under `internal/reviews/` —
-  `internal/reviews/README.md` and its living peers — do not.
-  (RM-0116)
+  frozen reviews corpus (archived at tag `review-corpus`) and its
+  generated indexes sit outside the count; of the living files under
+  `internal/reviews/`, the README is covered while the
+  machine-generated legacy-index is exempt. (RM-0116)
 
 ## Language
 
