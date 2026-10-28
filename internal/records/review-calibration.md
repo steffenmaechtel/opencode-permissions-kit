@@ -12,12 +12,9 @@
 ## Origin
 
 The review concept was written after three review rounds on
-0.0.38/0.0.39 (snapshots
-[0.0.38](../reviews/0/0/1/0/pr-00109/review-a.md),
-[a](../reviews/0/0/1/1/pr-00115/review-a.md)/
-[b](../reviews/0/0/1/1/pr-00115/review-b.md)/
-[c](../reviews/0/0/1/1/pr-00115/review-c.md)/
-[d](../reviews/0/0/1/1/pr-00115/review-d.md))
+0.0.38/0.0.39 (snapshots `0.0.38` and `0.0.39a`–`0.0.39d`, cases
+pr-00109 and pr-00115 — read them at tag `review-corpus`, resolved
+via [legacy-index.md](../reviews/legacy-index.md))
 — the numbers throughout this record are that history, not theory.
 
 ## Stop-rule evolution
@@ -50,7 +47,8 @@ changed.
 ## Convergence data
 
 Why a stop rule instead of a fixed number of rounds: the process
-converges — every chain recorded in internal/reviews/ converged
+converges — every chain recorded in the review corpus (archived at
+tag `review-corpus`) converged
 within 2–7 snapshots; a longer tail is taste ping-pong, not defect
 removal. The project's own history:
 

@@ -236,12 +236,17 @@ across cases. Always qualify the ID — two citation eras:
   parallel features can never collide. (RM-0018)
 - **Legacy corpus (stems 0.0.38–0.0.49):** `(0.0.38 S1)`,
   `(0.0.39a C1)` — the stem stays the qualifier. Resolve via
-  [legacy-index.md](../internal/reviews/legacy-index.md) or grep. (RM-0019)
+  [legacy-index.md](../internal/reviews/legacy-index.md), then read the
+  file at the tag. (RM-0019)
 
-Grep-able by design: `grep -rn "#176 a W1"`, `grep -rn "0.0.38 S1"`.
-The case map is the generated
-[INDEX](../internal/reviews/INDEX.md); naming, formats, and the
-mechanics live in the [review README](../internal/reviews/README.md).
+Grep-able by design — the corpus is archived at tag `review-corpus`
+(issue #290), so citation greps run against the tag:
+`git grep "#176 a W1" review-corpus -- internal/reviews/`,
+`git grep "0.0.38 S1" review-corpus -- internal/reviews/`. The case
+map is the INDEX at the tag
+(`git show review-corpus:internal/reviews/INDEX.md`); naming,
+formats, and the archive mechanics live in the
+[review README](../internal/reviews/README.md).
 
 ## Referencing house rules (RM keys)
 
@@ -255,10 +260,10 @@ Citations in new text name the file and section, never the bare ID:
   fourth site breaks the rules audit's invariant that searching an ID
   only ever hits genuine sites. The closed world is what the no-fake
   findings pin measures (tests/unit/test-rules-meta.sh, pin 10): the
-  generated review indexes and the frozen reviews corpus sit outside
-  the count; living files under `internal/reviews/` —
-  `internal/reviews/README.md` and its living peers — do not.
-  (RM-0116)
+  frozen reviews corpus (archived at tag `review-corpus`) and its
+  generated indexes sit outside the count; of the living files under
+  `internal/reviews/`, the README is covered while the
+  machine-generated legacy-index is exempt. (RM-0116)
 
 ## Language
 

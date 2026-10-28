@@ -1,256 +1,57 @@
-# Code reviews (internal/reviews/)
+# Code reviews — archive (tag `review-corpus`)
 
-Model-generated code reviews of the kit live here: one folder per
-case, keyed by the pull request that carried the review into the repo.
-Reviews are **evidence** — for the agent (pins, learnings corpus) and the
-maintainer (release gates). When to review at all, which scope (full vs
-diff), and the loop's stop rule:
-[review-concept.md](../../agent/review-concept.md).
+The repo-file review process era (releases 0.0.38–0.0.57) is archived.
+Its corpus — 33 cases (`pr-00109`…`pr-00263`), 141 snapshots and 33
+resolutions — lives at the annotated tag `review-corpus`, which points
+at the last master commit that carried `internal/reviews/` in full.
+The tag is the **authoritative record**; nothing under this directory
+is edited anymore.
 
-## Layout and naming
+Reviews of current cases (PR-native process, issue #278) live as
+comments on the pull request they review — no case folders are created
+and nothing is committed here. The process rules stay in
+[agent/review-concept.md](../../agent/review-concept.md).
 
-```
-internal/reviews/
-├── README.md        # this file — mechanics only (the index is generated)
-├── INDEX.md         # GENERATED — never hand-edit (parity test pins it)
-├── legacy-index.md  # frozen map: old file names → new locations
-└── A/B/C/D/         # digit shard — the first four digits of the PR number
-    └── pr-ABCDE/    # one case; ABCDE = 5-digit birth-PR number
-        ├── review-a.md  # first snapshot; chain letters a, b, c … (aa after z)
-        ├── review-b.md  # micro-wave review of the a-wave's fixes
-        └── resolution.md
-```
+## How to read and cite the corpus
 
-- **Shard rule:** case `pr-ABCDE` lives at `internal/reviews/A/B/C/D/`
-  — four one-digit levels, at most 10 entries per node, the path
-  computable from the key alone: A B C D are the FIRST FOUR digits of
-  the PR number, in order. Examples: PR 199 → `ABCDE` = `00199` →
-  `internal/reviews/0/0/1/9/pr-00199/`; PR 200 → `ABCDE` = `00200` →
-  `internal/reviews/0/0/2/0/pr-00200/`. Enforced by
-  `tests/unit/test-reviews-lint.sh`.
-
-- **Birth-PR rule:** the case key is the PR that carries the FIRST
-  snapshot into the repo. One birth-PR = one case. Later snapshots of
-  the chain may ride other PRs. Open the (draft) PR before the review
-  runs — GitHub allocates the number, so parallel features can never
-  collide.
-- **Snapshot letters** are uniform from `a` — no special case for the
-  first file. Beyond `z`: `review-aa.md`.
-- Exactly **one `resolution.md`** per case.
-- Legacy corpus (snapshots 0.0.38–0.0.49, cases pr-00109…pr-00171):
-  pre-restructure citation format stays valid — see legacy-index.md.
+- **Cite the tag, not the comments.** A legacy citation such as
+  `0.0.38 S1` resolves against the tag:
+  `git grep "0.0.38 S1" review-corpus -- internal/reviews/`
+  New-era citations (`(#176 a W1)`) resolve the same way:
+  `git grep "#176 a W1" review-corpus -- internal/reviews/`
+- **Case lookup:** the generated case map (INDEX) and every snapshot
+  and resolution are readable at the tag, e.g.
+  `git show review-corpus:internal/reviews/INDEX.md`, then
+  `git show review-corpus:internal/reviews/<shard>/<case>/review-<l>.md`.
+  Pre-restructure stems (`0.0.49b`) map to case folders via
+  [legacy-index.md](legacy-index.md).
+- **PR mirrors are readability copies:** each case's full chain is
+  mirrored as one consolidated comment (split into parts where it
+  exceeds the comment size limit) on its birth-PR timeline, marked
+  `opk-review-legacy` (issue #290). They are for reading, not citing;
+  timestamps and states inside are historical.
 
 ## Snapshot format
 
-The snapshot body is the reviewer's output **verbatim** (external
-machine format since 0.0.45d; older house-format snapshots keep their
-era's shape — both stay citable as history). House-owned parts:
+Historical: the format the archived snapshots follow (the review-meta
+header contract, verbatim reviewer output, severity vocabulary) is
+documented by the README as it was at the tag:
 
-- The **mandatory header** (new cases, first lines of the file):
+    git show review-corpus:internal/reviews/README.md
 
-  ```
-  <!-- review-meta
-  ID: pr-0176
-  Snapshot: b
-  Subject: issue-175 schnellsuche (feature wave)
-  Scope: wave            (full | wave | gate | analysis)
-  Base: v0.0.50 @ 1a2b3c4
-  Diff: e26f379..24ad0d2
-  Date: 2026-10-15
-  Reviewer: GLM-5.3 (external /review session)
-  Skills: opk-review-pass        (optional — skills that ran the pass)
-  -->
-  ```
+New reviews follow the PR-native comment format instead (issue #278).
 
-  The lint test pins ID↔folder and Snapshot↔file name. (Legacy cases
-  predate the header; their stem + dates live in legacy-index.md.)
-  `Skills:` is part of the environment record (see
-  agent/review-concept.md, "Suites are the standing review") and makes
-  the skill usage auditable: it names every `.agents/skills/` procedure
-  that choreographed the pass. A redundancy pass that ran WITH a house
-  skill must record it — the line is what makes a collapsed redundancy
-  axis visible (see agent/review-concept.md, "Parallel reviewer
-  agents").
-- Catch-up and backup reviews (e.g. the successor after a rotation
-  deviation) add no Scope value: Scope stays `wave`, the Subject
-  names the catch-up ("rotation-deviation catch-up"), and the
-  mandate's source of truth is the resolution's Follow-ups entry that
-  commissioned it.
-- Micro-wave reviews (fix waves with ≤ ~50-line diffs) likewise record
-  `Scope: wave` and name the micro shape in the Subject ("micro-wave
-  review of …") — `micro` is a commissioning/budget keyword for the
-  executing skill, not a header value.
-- The **one pointer line**
+## What retired with the corpus (issue #290)
 
-```
-> Resolution: [resolution.md](resolution.md)
-```
+The generated `INDEX.md`, its generator `scripts/gen-review-index.py`,
+and the corpus-guarding suites (`test-reviews-lint.sh`,
+`test-reviews-parity.sh`) were removed together with the corpus — they
+guarded in-tree state that no longer exists. The frozen corpus itself
+is untouched history at the tag.
 
-  once a resolution exists — the only edit ever allowed on a snapshot.
-- The **reviewer output contract**: the body stays verbatim, but it is
-  an interface the house reads — every snapshot must deliver:
+## What still lives here
 
-  1. **stable, unique finding IDs** (scheme free — W1, F3, Q7 … — one
-     scheme per snapshot; citations and dispositions use them),
-  2. **a severity per finding** on the house scale
-     `HIGH / MED / LOW / INFO` (the stop rule reads MED/HIGH; a
-     foreign scale is mapped during verification),
-  3. **a findings index early** in the document (table), and
-  4. **provenance, gates, and a recommendation** at the end (model,
-     tree, gates run).
-
-  A review that cannot deliver these four is reshaped by the embedding
-  agent before commit — a snapshot without citable IDs or severities
-  breaks disposition, citation, and the stop rule at once.
-  Renumbering into the snapshot's own scheme is the standard move:
-  predecessor axis IDs (P1/T2/L1 …) map into the snapshot's W-scheme
-  with the original IDs preserved in a "Reported by" column —
-  citations always resolve through the snapshot that owns the scheme.
-- The **finding-provenance classification** (fifth deliverable): every
-  finding is classified where the defect comes from, using the
-  meta-analysis vocabulary so extraction stays comparable —
-  `wave-introduced` (the reviewed wave itself) · `fix-induced` (an
-  earlier fix wave's output) · `delta-introduced` (this delta over the
-  last reviewed state) · `pre-existing` (older backlog) · `unstated`
-  only when the reviewer genuinely cannot tell. Cheap for the reviewer
-  (the diff is in scope); the split feeds regression-rate vs detection
-  yield and the meta runs' `prov` dimension. This is finding-level
-  provenance — distinct from point 4's run provenance (model, tree,
-  gates); the deep release-dating method for full scopes lives in
-  [review-concept: Finding provenance](../../agent/review-concept.md).
-
-## Resolution format
-
-The resolution's core is a **dispositions table** — one row per finding
-ID, in ID order, qualified with the snapshot letter for findings from an
-earlier snapshot of the chain (`a W1` = W1 from review-a.md). Rows stay
-**≤ 120 columns** (the line-length ratchet pins this): the table is the
-control panel, not the narrative. Evidence that does not fit a row goes
-into the **Evidence detail** prose section below — nothing is dropped.
-
-```markdown
-## Dispositions
-
-| Finding | Disposition | Commit | Key evidence |
-|---|---|---|---|
-| a W1 (MED) | **implemented** | `abc1234` | DD13 decoupled; 4 e2e pins; sabotage red→green |
-| a W2 (LOW) | **deliberately not done** | — | never-fails contract; riders disclose |
-
-## Evidence detail
-
-### a W1 (MED) — <topic>
-
-<full narrative as wrapped prose: mechanism, pins, sabotage counts,
-class-sweep pattern and sites — the row above links to it by finding>
-```
-
-- Dispositions: `implemented` / `implemented differently` /
-  `deliberately not done` — nothing else.
-- **Key evidence or a blocker reason, never a bare claim** — if the
-  row cannot carry it, the Evidence detail block must (and does).
-- **The `Status:` line** near the top of the file is where the chain's
-  closure state lives: while rounds run the line is simply absent (the
-  INDEX reads a missing line as `open`); once the loop has closed it
-  says `Status: closed …` (the INDEX parser takes the FIRST `Status:`
-  line in the file — keep the line at the top so later prose cannot
-  shadow it). The closed line names who
-  confirmed closure (maintainer or next round — a fixing round never
-  closes its own loop; [review-concept.md](../../agent/review-concept.md),
-  "The loop and the stop rule") and cites the stop-rule check (the
-  last round's dispositions and the files it touched); this
-  confirmer + check form binds lines written from 2026-10-24 on —
-  post-legacy lines already in the corpus stay as written, like the
-  legacy rows. The INDEX's
-  Status column is generated FROM this line
-  (`scripts/gen-review-index.py`): an unset line leaves the case
-  reading `open`, and nothing fails — the closure is simply
-  unrecorded (issue #238). Setting the line and regenerating the
-  INDEX in the same commit is part of closing the loop.
-- **Dated anchors are measured, never restated:** dating a line anchor
-  means looking it up at the named commit
-  (`git show <ref>:<file> | grep -n …`) — line numbers quoted from an
-  earlier review describe a different tree by definition. Prefer
-  content anchors (grep-able strings); a line number only with its
-  dated ref next to it. A prose narrative about history (what shifted
-  what) is a claim like a SHA citation: verify each hop at its ref
-  before writing it.
-- The resolution is created with the FIRST fix commit of the chain and
-  grows one row (and, where needed, one detail block) per disposition
-  as fixes land — never reconstructed afterwards. Referenced commits
-  carry SHAs, not branch names.
-- **The `<SHA>` placeholder:** a fix wave whose disposition rows ride
-  the fix commit itself cannot know that commit's SHA at write time —
-  the Commit column carries `<SHA>` (in backticks, like every SHA),
-  and the chain's next commit replaces it with the real short SHA.
-  That replacement is a normal edit to an in-scope file and owes the
-  gates BEFORE the commit: a real SHA is 2 bytes longer per replaced
-  row than the placeholder (7 → 9 bytes), enough to tip a row at the
-  120-column bound. Check-then-commit, never commit-then-check — a
-  ratchet red found after the commit is detection, not protection
-  (issue #237; the ordering bit pr-00234's b-wave fill).
-- Legacy resolutions (pr-00109…pr-00171) predate the two-part form:
-  their long rows are baseline-pinned and stay as written — the format
-  binds everything written from here on.
-
-## Rules
-
-1. **Snapshots are immutable.** Findings are cited by ID; corrections
-   happen in the resolution, not by rewriting history. The one
-   `> Resolution:` pointer line is the only allowed post-hoc edit.
-2. **Every finding gets dispositioned** in the resolution (three verbs
-   above).
-3. **Citations:** `#176 a W1` (PR number, snapshot letter, finding ID)
-   in commit messages, in-code comments, and resolutions. Legacy
-   citations `0.0.49b C1` stay valid — resolve them via
-   [legacy-index.md](legacy-index.md) or `grep`.
-4. **First the snapshot, then the fix.** The snapshot is committed
-   before any fix wave starts; the maintainer gives the go.
-5. **Fix waves get their micro-wave review** (the chain grows: b, c, …)
-   until the stop rule is met.
-6. Follow-ups the implementation itself required are recorded in the
-   resolution — expected reading for the next review.
-
-## Process
-
-Reviews run against a clean working tree of the version under review
-(each snapshot's header carries model, scope, and verification state).
-
-1. Maintainer opens the (draft) birth-PR; the agent runs the reviewer
-   (parallel subagents per review-concept.md).
-2. Verify every finding against the code — **no fixing while
-   verifying**.
-3. Write the snapshot and commit it — regenerating the INDEX
-   (`scripts/gen-review-index.py`) as part of every snapshot and
-   resolution commit; the parity test catches a stale INDEX only
-   after the fact.
-4. Pause for the maintainer — the fix wave starts on their go.
-5. Fix wave on the feature branch; the resolution is created with the
-   first fix commit and grows per disposition; fix-commit messages
-   that enumerate finding IDs qualify the deliberately-not-done ones
-   (`… (#176 a W1-W4; not done: W5)`) — an unqualified ID range reads
-   as full coverage from git log alone while the resolution rows
-   carry the truth (#244 b W4). The loop closes per the
-   stop rule — and closure is recorded: `Status: closed …` in the
-   resolution plus INDEX regen, one commit (see Resolution format).
-   Run the L1–L7 checklist
-   ([agent/learnings.md](../../agent/learnings.md)) before committing.
-6. The owed wave review of a round starts on the maintainer's go too:
-   the agent reports round completion (naming owed-but-not-run
-   reviews) and waits — never self-advances into the next pass.
-
-A round that ran in the authoring session (rotation deviation) is
-recovered, not improvised: its findings stay `open` in the resolution,
-a Follow-ups entry names the deviation and instructs the successor,
-and the successor re-verifies the prior snapshot's clean verdicts
-before its own pass (full rule: agent/review-concept.md, "Session
-rotation").
-
-## Index
-
-[INDEX.md](INDEX.md) is **generated** by
-`scripts/gen-review-index.py` — one row per case (key, linked to its
-case folder like the rules-meta index, stem/subject, scope, base, date,
-snapshots, status). The parity test pins index ↔
-folders in both directions. The frozen
-[legacy-index.md](legacy-index.md) maps every pre-restructure file name
-(`0.0.39a`) to its new home.
+| File | Role |
+|---|---|
+| `README.md` | this archive pointer |
+| `legacy-index.md` | frozen map: pre-restructure stems → case folders (read them at the tag) |
