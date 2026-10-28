@@ -193,9 +193,12 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   `0.0.45c`); and run 2's only HIGH (`pr-00211 a F1`, an L5 core shape)
   came from the staged 10-subagent full pass that the wave passes had
   missed
-- **Snapshot with the first fix commit** — chain convergence: feature/fix
-  waves close in 1–3 snapshots; release full passes pay more (pr-00211:
-  7)
+- **Round comment posted before the first fix commit** — the PR-native
+  hard seam (review-concept, "The PR-native loop": the comment posts
+  BEFORE any fix starts; it replaced the retired snapshot-with-first-
+  fix mechanic, #296) — chain convergence: feature/fix waves close in
+  1–3 rounds; release full passes pay more (pr-00211: 7 snapshots,
+  corpus era)
 
 ## When a rule fails
 
@@ -206,8 +209,8 @@ Both escalations have live examples: L2's wording was sharpened twice after
 the class returned (#214 5 above), and L1/L4's pin-placement shape became a
 suite-mechanics rule (pins before the summary gate). The sabotage-vs-
 uncommitted-tree incident (2026-10) never entered a review snapshot — it
-lives as an AGENTS.md Testing rule; incidents outside snapshots belong
-there, not here.
+lives as an AGENTS.md Testing rule; incidents outside the round comments
+belong there, not here.
 
 ## Era & next-run notes (issue #175 pre-pass, closed 2026-10-22)
 
