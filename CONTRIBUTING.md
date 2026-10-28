@@ -16,8 +16,9 @@ how to work on the code. For what the kit does, see the
 
 ## Tests
 
-First make sure your host has everything installed (shellcheck is part of
-`make test` via `make lint`):
+First make sure your host has everything installed (shellcheck and
+shfmt are part of `make test` via `make lint` — shfmt is version-
+pinned exactly, `make install-shfmt` fetches the right one):
 
 ```bash
 sh tests/check-host.sh  # prints install commands for anything missing

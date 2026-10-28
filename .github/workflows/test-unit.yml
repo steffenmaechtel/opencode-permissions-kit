@@ -54,9 +54,14 @@ jobs:
         run: make check-version
       - name: Install shellcheck
         run: sudo apt-get update -qq && sudo apt-get install -y shellcheck
+      - name: Install shfmt (pinned, format gate)
+        # make install-shfmt is the one source of the version pin
+        # (Makefile SHFMT_VERSION); the PATH export makes it visible
+        # to the lint step below.
+        run: make install-shfmt && echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Check contributor host tools
         run: sh tests/check-host.sh
-      - name: Run ShellCheck lint
+      - name: Run lint (ShellCheck + shfmt format gate)
         run: make lint
       - name: Python syntax check
         run: make check-py
@@ -147,5 +152,7 @@ jobs:
         run: ./tests/unit/test-line-length.sh
       - name: Run string-continuation guard
         run: ./tests/unit/test-string-continuations.sh
+      - name: Run shfmt format-gate pins (issue #255 stage 0a)
+        run: ./tests/unit/test-format-gate.sh
       - name: Run unit-suite sandbox policy guard
         run: ./tests/unit/test-sandbox-policy.sh

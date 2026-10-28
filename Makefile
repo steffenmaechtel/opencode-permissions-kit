@@ -1,4 +1,4 @@
-.PHONY: help test lint check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity rules-report e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint fmt install-shfmt check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity rules-report e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` — DERIVED FROM DISK (0.0.42d C4 /
 # 0.0.42e C10): every file under files/ and scripts/ whose first line is
@@ -22,12 +22,29 @@ SHELLCHECK_FILES = $(shell find files scripts -type f -exec \
 # "part two") -- byte-identical output, flagged by SC2140 on every split.
 SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040,SC2140
 
+# shfmt -- canonical formatter for every kit shell script (issue #255
+# stage 0a). Pinned EXACTLY: formatting output differs between shfmt
+# versions (measured 2026-10-28: 3.7.0 and 3.12.0 each reformat lines
+# that 3.14.1 leaves alone -- a mixed-version gate flaps between
+# contributor hosts and CI), and the dash language variant first ships
+# in 3.14.x (3.13.0 still rejects -ln dash). Same settings live in
+# .editorconfig for editors; the equivalence is pinned by
+# tests/unit/test-format-gate.sh.
+SHFMT_VERSION = 3.14.1
+SHFMT_FLAGS = -ln dash -i 4 -ci
+# Tests' own scripts: every TRACKED .sh under tests/. Tracked-only on
+# purpose: warm checkouts carry untracked foreign shell (e2e camino
+# share-providers, cache dumps -- bash, not ours to format).
+SHFMT_TEST_FILES = $(shell git ls-files -- 'tests/*.sh' | sort)
+
 help:
 	@echo "opencode permissions kit — dev makefile"
 	@echo ""
 	@echo "  make test          Run all self-contained tests (shell) + lint"
 	@echo "  make check-host    Verify the host has all tools needed to contribute"
-	@echo "  make lint          ShellCheck over the shipped scripts (needs shellcheck)"
+	@echo "  make lint          ShellCheck + shfmt format gate over the kit shell (needs both)"
+	@echo "  make fmt           One-shot shfmt -w over the whole gate scope"
+	@echo "  make install-shfmt Download the pinned shfmt to ~/.local/bin (no root)"
 	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
 	@echo "  make test-staged-write  Run symlink-safe write / handover gate tests (0.0.39g)"
@@ -74,7 +91,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-install-args test-kit-files test-tui-mode test-uninstall test-status test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -90,6 +107,78 @@ lint:
 	fi
 	@shellcheck --severity=warning --exclude=$(SHELLCHECK_EXCLUDES) $(SHELLCHECK_FILES)
 	@echo "ShellCheck passed."
+	@echo "=== shfmt (format gate, pinned v$(SHFMT_VERSION)) ==="
+	@if ! command -v shfmt >/dev/null 2>&1; then \
+		echo "error:  shfmt is required for 'make lint' (part of 'make test')."; \
+		echo "        install with:  make install-shfmt"; \
+		exit 1; \
+	fi
+	@if [ "$$(shfmt --version)" != "v$(SHFMT_VERSION)" ]; then \
+		echo "error:  shfmt $$(shfmt --version) found, v$(SHFMT_VERSION) required -- the pin is"; \
+		echo "        exact on purpose: formatting output drifts between shfmt versions."; \
+		echo "        fix with:       make install-shfmt"; \
+		exit 1; \
+	fi
+	@_err="$$(shfmt -l $(SHFMT_FLAGS) $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES) 2>&1 >/dev/null)"; \
+	if [ -n "$$_err" ]; then \
+		echo "error:  shfmt cannot parse file(s) in the gate scope:"; \
+		printf '%s\n' "$$_err" | sed 's/^/        /'; \
+		echo "        a parse error must fail the gate, not pass it silently."; \
+		exit 1; \
+	fi
+	@if [ -n "$$(shfmt -l $(SHFMT_FLAGS) $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES))" ]; then \
+		echo "error:  files differ from shfmt's canonical format:"; \
+		shfmt -l $(SHFMT_FLAGS) $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES) | sed 's/^/        /'; \
+		echo "        fix with:       make fmt"; \
+		exit 1; \
+	fi
+	@_err="$$(shfmt -l $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES) 2>&1 >/dev/null)"; \
+	if [ -n "$$_err" ]; then \
+		echo "error:  bare shfmt cannot parse file(s) in the gate scope:"; \
+		printf '%s\n' "$$_err" | sed 's/^/        /'; \
+		exit 1; \
+	fi
+	@if [ -n "$$(shfmt -l $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES))" ]; then \
+		echo "error:  .editorconfig disagrees with the gate flags (bare shfmt lists files):"; \
+		shfmt -l $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES) | sed 's/^/        /'; \
+		echo "        keep .editorconfig equivalent to $(SHFMT_FLAGS); an extensionless"; \
+		echo "        shell script outside files/**/bin/ needs its own section there."; \
+		exit 1; \
+	fi
+	@echo "shfmt gate passed."
+
+# One-shot canonical format over the whole gate scope (issue #255
+# stage 0a). Run before committing when shfmt -l flags your edits.
+fmt:
+	@if ! command -v shfmt >/dev/null 2>&1 || \
+		[ "$$(shfmt --version)" != "v$(SHFMT_VERSION)" ]; then \
+		echo "error:  shfmt v$(SHFMT_VERSION) required first:  make install-shfmt"; \
+		exit 1; \
+	fi
+	@shfmt -w $(SHFMT_FLAGS) $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES)
+	@echo "formatted (gate scope): $$(echo $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES) | wc -w) files"
+
+# Download the pinned shfmt into ~/.local/bin (single static binary,
+# no root). CI uses this too -- the Makefile is the one source of the
+# version pin.
+install-shfmt:
+	@case "$$(uname -s)/$$(uname -m)" in \
+		Linux/x86_64) plat=linux_amd64 ;; \
+		Linux/aarch64) plat=linux_arm64 ;; \
+		Darwin/x86_64) plat=darwin_amd64 ;; \
+		Darwin/arm64) plat=darwin_arm64 ;; \
+		*) echo "error: unsupported platform for the shfmt download -- install v$(SHFMT_VERSION) manually"; exit 1 ;; \
+	esac; \
+	bin="$${HOME}/.local/bin"; mkdir -p "$$bin"; \
+	echo "downloading shfmt v$(SHFMT_VERSION) ($$plat) -> $$bin/shfmt"; \
+	curl -fsSL -o "$$bin/shfmt" \
+		"https://github.com/mvdan/sh/releases/download/v$(SHFMT_VERSION)/shfmt_v$(SHFMT_VERSION)_$$plat" && \
+	chmod +x "$$bin/shfmt"; \
+	"$$bin/shfmt" --version; \
+	case ":$${PATH}:" in \
+		*":$$bin:"*) ;; \
+		*) echo "note: $$bin is not on your PATH -- add it, then re-run: make check-host" ;; \
+	esac
 
 check-host:
 	@echo "=== Contributor host check ==="
@@ -226,6 +315,10 @@ test-line-length:
 test-string-continuations:
 	@echo "=== String-Continuation Guard ==="
 	@./tests/unit/test-string-continuations.sh
+
+test-format-gate:
+	@echo "=== shfmt Format-Gate Pins (issue #255 stage 0a) ==="
+	@./tests/unit/test-format-gate.sh
 
 test-install-args:
 	@echo "=== install.sh Arg-Parsing Tests ==="

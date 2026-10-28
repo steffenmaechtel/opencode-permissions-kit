@@ -75,6 +75,29 @@ Additional script output style rules:
   consumers and tests compare word-wise, so the layout is pure
   convention — keep it when adding entries. (RM-0039)
 
+## Formatting (shfmt)
+
+All kit shell is formatted canonically by **shfmt** (issue #255
+stage 0a) — the style authority for `files/`, `scripts/` and the
+kit's own test scripts. Style is not a review topic: the gate
+(`make lint`) rejects anything `shfmt -l` lists.
+
+- Settings: `-ln dash -i 4 -ci` (mirror: `.editorconfig`, pinned
+  equivalent by `tests/unit/test-format-gate.sh`). Deliberately NOT
+  set: `simplify`, `keep_padding`, `space_redirects`,
+  `binary_next_line`, `func_next_line`.
+- The version pin is **exact** (`SHFMT_VERSION` in the Makefile,
+  today v3.14.1): formatting output drifts between shfmt versions
+  (3.7.0/3.12.0 reformat lines 3.14.1 leaves alone), and the dash
+  variant needs 3.14.x. Install via `make install-shfmt`.
+- Run `make fmt` before committing when the gate flags your edits;
+  hand-formatting against the canon does not stick.
+- Still human rules, NOT shfmt's business: the 120-column ratchet
+  (`tests/unit/test-line-length.sh` — shfmt never wraps lines), the
+  string-continuation join guard (`test-string-continuations.sh`,
+  aware of both the classic and the shfmt splice wrap shape), and
+  the one-file-per-line file-list rule earlier in this section.
+
 ## Shell security (untrusted input)
 
 External data — HTTP feeds, files someone else wrote, anything parsed
