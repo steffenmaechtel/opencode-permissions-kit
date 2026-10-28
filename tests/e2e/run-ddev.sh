@@ -1035,8 +1035,9 @@ OC_DD16M 'ddev delete -Oy >/dev/null 2>&1' || true
 # ddev v1.25.5 (upstream PR #8828) injects a type-specific Symfony CLI
 # install into the web image build; its apt-get update dies inside the
 # suite's nested-userns inner daemon (apt's sandbox setgroups(65534)
-# hits an unmapped gid — EINVAL) before the container stage this leg
-# greps for. The fixture disables apt's build-time sandbox via a user
+# hits an unmapped gid — EINVAL; log signature: "E: setgroups 65534
+# failed - setgroups (22: Invalid argument)") before the container
+# stage this leg greps for. The fixture disables apt's build-time sandbox via a user
 # pre.Dockerfile: user pre.* content is emitted BEFORE ddev's injected
 # extra content (WriteBuildDockerfile ordering), while a plain web-build
 # Dockerfile would land AFTER it — too late. Not a kit regression;
