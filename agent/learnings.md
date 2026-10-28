@@ -44,6 +44,12 @@ missing-lib fallbacks printing success) — the mktemp-fallback chain
 (`0.0.48b W2` root `rm -f /dev/null` → `pr-00221 a W3` false-green over a
 dead scan) is this class at its most expensive.
 
+The pin demand is cost-bounded, not absolute: a fixture that would
+exceed ~30 lines for a LOW/INFO finding is not shipped — the finding
+is dispositioned as an accepted residual with the breach named
+(rule: [conventions.md](conventions.md) "Pin-cost budget"; origin
+#262 P4 / §11e).
+
 ### L2 — Class sweep before "implemented"
 *Class: `sibling-sweep` — run 1: 46 findings, 13 MED/HIGH, zero in 0.0.46;
 run 2: **returned** — 25 findings, 6 MED/HIGH, 9 of 15 groups. The
