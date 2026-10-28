@@ -100,9 +100,25 @@ the micro diff plus the finding.
 
 ## 4. Fan-out
 
-- Reviewer subagents run the provider's fast tier; the main session
-  (this one) runs the strong tier and owns the audit duty
-  (review-concept, "Parallel reviewer agents").
+- The abstract rule: reviewer subagents run the provider's fast tier;
+  the main session (this one) runs the strong tier and owns the audit
+  duty (review-concept, "Parallel reviewer agents"). The CONCRETE map
+  for the house instance — commissions used to name it per case;
+  commission-less sessions read it HERE (substitute your provider's
+  strong/fast pair on a foreign setup):
+
+  | Role | House model |
+  |---|---|
+  | Main session (owns the verification/audit duty) | GLM-5.3 — strong tier |
+  | Reviewer subagents | GLM-5.3-Flash — fast tier |
+  | Curator subagent (x, section 5) | GLM-5.3-Flash — fast tier |
+  | Verifier subagents (V3, section 6) | GLM-5.3 — strong tier, fresh-context verification |
+
+  Both directions are load-bearing: reviewers on the strong model
+  burn the budget the fast tier exists to save, and verifiers on
+  Flash break the calibrated verification policy (strong owns
+  verification) just as quietly. The loop status (section 8) names
+  the models that actually ran.
 - Build each reviewer prompt from
   [axis-prompt.md](axis-prompt.md) — role, axis, material, budget,
   checkpoint discipline, output contract. The OUTPUT CONTRACT block
