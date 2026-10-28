@@ -7,10 +7,12 @@
 # "fragment one.fragment two". The wrap idiom itself is fine (SC2140 is
 # excluded for it, Makefile); the JOIN must stay deliberate. This test
 # fails on joins of either quote style where prose meets without a
-# space: first fragment ending in [.,;:!?, em-dash] or alnum, second
-# starting with alnum, quote, '(' or em-dash (review a C2, #301: the
-# kit's prose uses spaced em-dashes daily -- an ASCII-only alphabet was
-# blind exactly at that border).
+# space: first fragment ending in [.,;:!?] or alnum, second starting
+# with alnum, quote, '(' or em-dash. The em-dash border matches as a
+# BYTE SEQUENCE, never as a bracket-class member (review b D10, #301:
+# the em-dash bytes in a class would match the first byte of ANY
+# U+2xxx punctuation in byte-mode awks -- mawk is Debian's default --
+# and false-positive on legitimate prose).
 #
 # Two wrap shapes are detected (review a C3, #301 -- the header used to
 # describe only the first):
@@ -63,8 +65,9 @@ trap 'rm -f "$TMP"' EXIT INT TERM
     find files -name '*.sh' -type f
     find files/opencode-permissions-kit-lib/bin -type f
 } | sort -u | while IFS= read -r f; do
-    awk -v f="$f" -v tails='.,;:!?—A-Za-z0-9' -v heads="—A-Za-z0-9'(" \
+    awk -v f="$f" -v tails='.,;:!?A-Za-z0-9' -v heads="A-Za-z0-9'(" \
         -v sq="'" -v dq='"' '
+        BEGIN { ed = "\342\200\224" }
         NR > 1 {
             plen = length(prev)
             if (plen >= 2 && substr(prev, plen) == "\\") {
@@ -78,7 +81,8 @@ trap 'rm -f "$TMP"' EXIT INT TERM
                         tail = substr(content, length(content), 1)
                         head = substr(l, 2, 1)
                         if (tail != " " && head != " " &&
-                            tail ~ "[" tails "]" && head ~ "[" heads "]") {
+                            (tail ~ "[" tails "]" || content ~ (ed "$")) &&
+                            (head ~ "[" heads "]" || l ~ ("^" dq ed))) {
                             start = length(content) - 15
                             if (start < 1) start = 1
                             seam = substr(content, start) substr(l, 2, 16)
@@ -102,7 +106,8 @@ trap 'rm -f "$TMP"' EXIT INT TERM
                         tail = substr(prev, plen - 3, 1)
                         head = substr($0, 1, 1)
                         if (tail != " " && head != " " &&
-                            tail ~ "[" tails "]" && head ~ "[" heads "]") {
+                            (tail ~ "[" tails "]" || prev ~ (ed q "\\\\")) &&
+                            (head ~ "[" heads "]" || $0 ~ ("^" ed))) {
                             start = plen - 18
                             if (start < 1) start = 1
                             # drop the closer+opener+backslash suffix
@@ -154,12 +159,26 @@ if [ "$fails" -ne 0 ]; then
     exit 1
 fi
 
+# Depth guard (review b D3, #301): the probe section below runs a COPY
+# of this suite on a scratch mini-repo; that copy must never descend
+# into probes of its own -- without this guard, a total detection
+# regression (the probes' own subject) would recurse one level per
+# copy, unbounded. Nested copies exit here after their tree scan.
+if [ "${OPK_SC_PROBE_DEPTH:-0}" -ge 1 ]; then
+    echo "string-continuation guard: OK (nested copy -- probes skipped, depth guard)"
+    exit 0
+fi
+
 # --- probes (review a C1/C2, #301): the shapes the alphabet + seam
 # normalization fixes cover, executed the way production observes the
 # guard -- a full suite run on a scratch mini-repo (the suite resolves
 # REPO_ROOT from its own location; the copy in the scratch dir scans
 # the probe files). Both probes MUST fail with the expected seams.
 _pdir="$(mktemp -d)"
+if [ ! -d "$_pdir" ]; then
+    echo "  FAIL  scratch setup failed (mktemp) -- probes not run (D4 guard)"
+    exit 1
+fi
 mkdir -p "$_pdir/files/etc" "$_pdir/files/opencode-permissions-kit-lib/bin" \
     "$_pdir/tests/unit"
 cp "$0" "$_pdir/tests/unit/test-string-continuations.sh"
@@ -167,11 +186,11 @@ cp "$0" "$_pdir/tests/unit/test-string-continuations.sh"
 # normalized (no quote bytes between the fragments).
 printf '#!/bin/sh\nui_warn %sfragment one.end.%s%s\\\nnext fragment here%s\n' \
     "'" "'" "'" "'" >"$_pdir/files/install.sh"
-# C2: em-dash border in the classic shape -- invisible to an
-# ASCII-only alphabet, caught since review a.
+# C2: em-dash border in the classic shape -- blindness found by review
+# a (C2), fixed in round b (sequence match, not class member).
 printf '#!/bin/sh\nui_warn "failed %s"\\\n"retry now"\n' \
     "$(printf '\342\200\224')" >"$_pdir/files/etc/umask.sh"
-if sh "$_pdir/tests/unit/test-string-continuations.sh" >"$_pdir/out" 2>&1; then
+if OPK_SC_PROBE_DEPTH=1 sh "$_pdir/tests/unit/test-string-continuations.sh" >"$_pdir/out" 2>&1; then
     echo "  FAIL  probe: sq-splice / em-dash joins went undetected"
     rm -rf "$_pdir"
     exit 1

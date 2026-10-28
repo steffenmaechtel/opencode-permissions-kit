@@ -178,7 +178,9 @@ fmt:
 # failed run), and the download lands on a temp name -- a broken
 # transfer never truncates an existing install in place. SHFMT_BIN_DIR
 # (env) redirects the destination so the unit suite can pin this target
-# inside its scratch sandbox.
+# inside its scratch sandbox; set-but-EMPTY fails loud (the `-` form
+# keeps the empty value, mkdir errors -- review b D6) and a stale-temp
+# sweep at the start clears orphans from interrupted runs (review b D7).
 install-shfmt:
 	@case "$$(uname -s)/$$(uname -m)" in \
 		Linux/x86_64) plat=linux_amd64 ;; \
@@ -187,8 +189,9 @@ install-shfmt:
 		Darwin/arm64) plat=darwin_arm64 ;; \
 		*) echo "error: unsupported platform for the shfmt download -- install v$(SHFMT_VERSION) manually"; exit 1 ;; \
 	esac; \
-	bin="$${SHFMT_BIN_DIR:-$${HOME}/.local/bin}"; \
+	bin="$${SHFMT_BIN_DIR-$${HOME}/.local/bin}"; \
 	mkdir -p "$$bin" || exit 1; \
+	rm -f "$$bin"/.shfmt.tmp.* 2>/dev/null || true; \
 	tmp="$$bin/.shfmt.tmp.$$"; \
 	echo "downloading shfmt v$(SHFMT_VERSION) ($$plat) -> $$bin/shfmt"; \
 	curl -fsSL -o "$$tmp" \

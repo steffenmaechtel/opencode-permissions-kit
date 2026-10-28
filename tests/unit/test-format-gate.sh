@@ -22,6 +22,12 @@
 #      flags -l over the gate scope list are empty) -- the same
 #      assertion `make lint` makes, executed the way the suite
 #      observes it.
+#   5. install-shfmt (B1/B2 + review b D1/D2/D5/D7): fails loud on a
+#      modeled broken transfer (partial bytes written, then rc 22),
+#      downloads atomically (an existing install survives), lands in
+#      SHFMT_BIN_DIR positively (a succeeding stub install reaches the
+#      override dir, version-probed, stale temp swept), and the
+#      scratch dir joins the trap.
 #
 # Run: sh tests/unit/test-format-gate.sh
 
@@ -41,9 +47,11 @@ if ! command -v shfmt >/dev/null 2>&1; then
     exit 1
 fi
 
-# Derived, never duplicated (review a B3/C8, #301): the flags and the
-# scope come from the Makefile -- the single source the gate itself
-# uses. A literal copy here would drift silently.
+# Derived at run time (review a B3/C8 + b E1, #301): flags and scope
+# come from the Makefile, the single source the gate itself uses. An
+# extraction failure reddens below; the documented fallback keeps the
+# remaining pins runnable (the drift itself is the recorded failure,
+# never a silent pass).
 SHFMT_FLAGS="$(sed -n 's/^SHFMT_FLAGS = //p' Makefile | head -1)"
 if [ -n "$SHFMT_FLAGS" ]; then
     pass "gate flags derived from the Makefile (SHFMT_FLAGS)"
@@ -51,11 +59,20 @@ else
     fail "SHFMT_FLAGS literal not extractable from Makefile"
     SHFMT_FLAGS="-ln dash -i 4 -ci"
 fi
-GATE_SCOPE="$(make -s fmt-scope)"
-if [ -n "$GATE_SCOPE" ]; then
+_gs_rc=0
+GATE_SCOPE="$(make -s fmt-scope)" || _gs_rc=$?
+if [ "$_gs_rc" -eq 0 ] && [ -n "$GATE_SCOPE" ]; then
     pass "gate scope derived from the Makefile (make fmt-scope)"
 else
-    fail "make fmt-scope returned an empty scope"
+    fail "make fmt-scope failed (rc=$_gs_rc) or returned an empty scope"
+fi
+# git-less halving (review b D9): a checkout without .git makes
+# git ls-files return empty inside the Makefile -- the scope must
+# still carry its tests half.
+if printf '%s\n' "$GATE_SCOPE" | grep -q 'tests/'; then
+    pass "gate scope carries the tests half (not git-less-halved)"
+else
+    fail "gate scope lost its tests half (git-less checkout shape?)"
 fi
 
 # --- 1. version pin consistency ------------------------------------------------
@@ -77,14 +94,18 @@ fi
 
 # --- 2+3. editorconfig equivalence + discrimination (scratch probe) -------------
 _scratch="$(mktemp -d)"
-trap 'rm -rf "$_scratch"' EXIT INT TERM
+if [ ! -d "$_scratch" ]; then
+    echo "  error  scratch setup failed (mktemp) -- aborting (D4 guard)"
+    exit 1
+fi
+trap 'rm -rf "${_scratch:-}" "${_isf:-}"' EXIT INT TERM
 
 # The probe violates every gate dimension (review a C8, #301 — carry
 # the axes a flags/editorconfig drift would change): tab indent,
 # unindented case arms, compact case-pattern pipes, semicolon-joined
 # statements, and a spaced redirect (`> f` — sensitive to
 # space_redirects).
-printf '#!/bin/sh\ncase "$1" in\na|b) echo one; echo two ;;\nesac\nif [ -n "$1" ]; then X=1; Y=2; fi\necho hi > probe.out\n' >"$_scratch/probe.sh"
+printf '#!/bin/sh\ncase "$1" in\na|b) echo one; echo two ;;\nesac\n\tif [ -n "$1" ]; then X=1; Y=2; fi\necho hi > probe.out\n' >"$_scratch/probe.sh"
 
 # the repo .editorconfig must reach the probe: a copy sits next to it
 # (root=true keeps parent lookups out of the scratch dir)
@@ -160,36 +181,66 @@ else
     printf '%s\n' "$_dirty_bare" | sed 's/^/        /'
 fi
 
-# --- 5. install-shfmt fails loud and never truncates in place (B1/B2, #301) ------
-# The recipe's failure edges must exit non-zero (the trailing PATH-note
-# case once zeroed every failure), and the download must be atomic: a
-# broken transfer may not touch an existing install. Fully sandboxed:
-# a failing curl stub on PATH (no network) and SHFMT_BIN_DIR pointing
-# into the scratch dir.
+# --- 5. install-shfmt fails loud, atomically, and into the override dir
+# (B1/B2 + review b D1/D2/D5/D7, #301) -------------------------------------------
+# The failure stub MODELS the broken transfer (review b D1: writing
+# garbage to the -o target before failing -- a non-atomic recipe that
+# writes the destination directly must break the survival rider), the
+# success stub proves the SHFMT_BIN_DIR destination redirect positively
+# (review b D2: failure-path assertions alone cannot), a stale
+# .shfmt.tmp.* orphan is swept by a successful run (review b D7), and
+# the scratch dir joins the trap (review b D5). No network anywhere.
 _isf="$(mktemp -d)"
-mkdir -p "$_isf/bin"
-printf '#!/bin/sh\nexit 22\n' >"$_isf/curl"
-chmod +x "$_isf/curl"
-# a pre-existing "install" for the B2 rider -- it must survive untouched
-printf '#!/bin/sh\necho v3.14.1\n' >"$_isf/bin/shfmt"
-chmod +x "$_isf/bin/shfmt"
-PATH="$_isf:$PATH" SHFMT_BIN_DIR="$_isf/bin" make install-shfmt >/dev/null 2>&1
-_isf_rc=$?
-if [ "$_isf_rc" -ne 0 ]; then
-    pass "install-shfmt exits non-zero when the download fails (fail-loud)"
+if [ -d "$_isf" ]; then
+    mkdir -p "$_isf/bin"
+    # failing curl: `curl -fsSL -o <path> <url>` -> $3 is the -o target
+    printf '#!/bin/sh\nprintf garbage >"$3"\nexit 22\n' >"$_isf/curl"
+    chmod +x "$_isf/curl"
+    # a pre-existing "install" for the B2 rider -- it must survive untouched
+    printf '#!/bin/sh\necho v3.14.1\n' >"$_isf/bin/shfmt"
+    chmod +x "$_isf/bin/shfmt"
+    PATH="$_isf:$PATH" SHFMT_BIN_DIR="$_isf/bin" make install-shfmt >/dev/null 2>&1
+    _isf_rc=$?
+    if [ "$_isf_rc" -ne 0 ]; then
+        pass "install-shfmt exits non-zero when the download fails (fail-loud)"
+    else
+        fail "install-shfmt swallowed the download failure (rc 0)"
+    fi
+    _isf_tmp="$(find "$_isf/bin" -name '.shfmt.tmp.*' 2>/dev/null || true)"
+    if [ -z "$_isf_tmp" ]; then
+        pass "failed install leaves no temp garbage behind"
+    else
+        fail "failed install left temp file(s): $_isf_tmp"
+    fi
+    if [ "$("$_isf/bin/shfmt" 2>/dev/null)" = "v3.14.1" ]; then
+        pass "existing install survives a failed re-download (atomic, B2)"
+    else
+        fail "failed re-download damaged the existing shfmt (non-atomic recipe?)"
+    fi
+    # positive arm (review b D2): a succeeding stub (its own PATH dir --
+    # the recipe resolves plain `curl`) downloads a working "shfmt"; the
+    # recipe must run it through the --version probe and install it INTO
+    # the override dir; a stale .shfmt.tmp.* orphan there must be swept
+    # (review b D7).
+    mkdir -p "$_isf/okstub" "$_isf/okbin"
+    cat >"$_isf/okstub/curl" <<'OKSTUB'
+#!/bin/sh
+printf '#!/bin/sh\necho v9.9.9-stub\n' >"$3"
+exit 0
+OKSTUB
+    chmod +x "$_isf/okstub/curl"
+    printf 'orphan\n' >"$_isf/okbin/.shfmt.tmp.99999"
+    PATH="$_isf/okstub:$PATH" SHFMT_BIN_DIR="$_isf/okbin" make install-shfmt >/dev/null 2>&1
+    _ok_rc=$?
+    if [ "$_ok_rc" -eq 0 ] &&
+        [ "$("$_isf/okbin/shfmt" 2>/dev/null)" = "v9.9.9-stub" ] &&
+        [ ! -e "$_isf/okbin/.shfmt.tmp.99999" ]; then
+        pass "successful install lands in SHFMT_BIN_DIR, version-probed, orphan swept"
+    else
+        fail "destination redirect/probe/sweep broken (rc=$_ok_rc bin=$("$_isf/okbin/shfmt" 2>/dev/null))"
+    fi
 else
-    fail "install-shfmt swallowed the download failure (rc 0)"
-fi
-_isf_tmp="$(find "$_isf/bin" -name '.shfmt.tmp.*' 2>/dev/null || true)"
-if [ -z "$_isf_tmp" ]; then
-    pass "failed install leaves no temp garbage behind"
-else
-    fail "failed install left temp file(s): $_isf_tmp"
-fi
-if [ "$("$_isf/bin/shfmt" 2>/dev/null)" = "v3.14.1" ]; then
-    pass "existing install survives a failed re-download (atomic, B2)"
-else
-    fail "failed re-download damaged the existing shfmt"
+    fail "scratch setup failed (mktemp) -- install-shfmt pins not run (D4 guard)"
 fi
 
 echo ""
