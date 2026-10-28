@@ -251,7 +251,7 @@ Review-relevant code touched this round: yes/no → …
 
 <!-- opk-review {"case":"<pr>","wave":"<letter>","raw":N,"curated":N,"posted":N,
      "retracted":N,"dropped":N,"med":N,"high":N,"state":"…","mode":"…",
-     "tier":"…","reviewers":N,"curated":"…","verifiers":N} -->
+     "tier":"…","reviewers":N,"curator":"<flash|main>","verifiers":N} -->
 ```
 
 - One comment per review round, format v2: visible at level 0 ONLY the

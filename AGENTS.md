@@ -19,11 +19,12 @@ this repository — the router. Detail lives next to its audience:
   agent/, the skill carries the choreography only (issue #178)
 - [internal/reviews/README.md](internal/reviews/README.md) — review
   corpus archive: tag `review-corpus` is the authoritative record
-  (citation resolution), the birth-PR timelines carry readability
-  mirrors
+  (citation resolution); the archived corpus's birth-PR timelines carry
+  readability mirrors (era-marked — for live cases the birth-PR timeline
+  IS the primary record)
 - [internal/process/](internal/process/) — maintainer process: review
   triggers & gates (review.md), release handling
-- [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, PR checklist, e2e
+- [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, tests, e2e
   invocation patterns; user docs: [docs index](docs/README.md)
 
 ## What this repo is

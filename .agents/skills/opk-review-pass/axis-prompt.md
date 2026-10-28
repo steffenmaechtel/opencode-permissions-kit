@@ -90,11 +90,12 @@ message. Your reported findings must:
 
 Do not reason from sandbox assumptions ("this is only a test path, not
 a finding") — the curator and verifiers verify and dispose; report what
-the code says (the skill-bias lesson in agent/review-concept.md,
-"Parallel reviewer agents").
+the code says (the skill-bias lesson:
+[review-calibration.md](../../../internal/records/review-calibration.md),
+"Skill-bias origin").
 
 OUTPUT CONTRACT: your final response is EXACTLY one status line plus
 the file path(s) — no findings, no excerpts, no file content.
-Example: "done — 7 findings (1 MED/6 LOW) → /tmp/opencode/<case>/<wave>/sweep.md".
+Example: "done — 7 findings (1 MED/6 LOW) → /tmp/opencode/<case>/<letter>/sweep.md".
 The file is the deliverable. Anything beyond the status line in your
 response enters the lead's context and will be IGNORED.

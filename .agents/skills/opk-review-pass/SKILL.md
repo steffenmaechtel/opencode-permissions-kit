@@ -121,11 +121,12 @@ the micro diff plus the finding.
 
 ## 5. Curation (x)
 
-- Macro rounds: launch a fast-tier CURATOR subagent once the reviewer
-  checkpoints are complete. Its input: the checkpoint files. Its
-  deliverable: ONE digest file — findings table (ID, severity,
-  provenance, summary), merges named, drops with reasons, raw→curated
-  counts. The main session reads the digest, never the raw files.
+- Wave (and larger) rounds: launch a fast-tier CURATOR subagent once
+  the reviewer checkpoints are complete. Its input: the checkpoint
+  files. Its deliverable: ONE digest file — findings table (ID,
+  severity, provenance, summary), merges named, drops with reasons,
+  raw→curated counts. The main session reads the digest, never the
+  raw files.
 - Micro rounds below the curator threshold may be main-curated —
   disclosed in the comment's provenance (review-concept,
   "Curation and verification").

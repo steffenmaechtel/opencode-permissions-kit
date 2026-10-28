@@ -14,7 +14,7 @@ how to work on the code. For what the kit does, see the
    release mirror, which is fast-forwarded to `master` only on release
    (`KIT_CHANNEL` in `install.conf` records what an install tracks).
 
-## Workflow
+## Tests
 
 First make sure your host has everything installed (shellcheck is part of
 `make test` via `make lint`):
