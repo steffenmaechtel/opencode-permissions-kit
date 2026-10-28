@@ -58,7 +58,7 @@ management/update.sh|'),gid=
 "
 
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT INT TERM
+trap 'rm -f "$TMP"; rm -rf "${_pdir:-}"' EXIT INT TERM
 
 # Paths in this repo contain no spaces (same assumption as the ratchet).
 {
@@ -82,7 +82,7 @@ trap 'rm -f "$TMP"' EXIT INT TERM
                         head = substr(l, 2, 1)
                         if (tail != " " && head != " " &&
                             (tail ~ "[" tails "]" || content ~ (ed "$")) &&
-                            (head ~ "[" heads "]" || l ~ ("^" dq ed))) {
+                            (head ~ "[" heads "]" || l ~ ("^" c1 ed))) {
                             start = length(content) - 15
                             if (start < 1) start = 1
                             seam = substr(content, start) substr(l, 2, 16)
@@ -164,6 +164,10 @@ fi
 # into probes of its own -- without this guard, a total detection
 # regression (the probes' own subject) would recurse one level per
 # copy, unbounded. Nested copies exit here after their tree scan.
+# OPK_SC_PROBE_DEPTH is INTERNAL to this probe mechanism (round c
+# F4/F5): a user-exported value >= 1 skips the top-level probes (the
+# OK line then says "nested copy" -- visible, never a red); a
+# non-numeric inherited value fails the -ge test safely (probes run).
 if [ "${OPK_SC_PROBE_DEPTH:-0}" -ge 1 ]; then
     echo "string-continuation guard: OK (nested copy -- probes skipped, depth guard)"
     exit 0
@@ -186,10 +190,14 @@ cp "$0" "$_pdir/tests/unit/test-string-continuations.sh"
 # normalized (no quote bytes between the fragments).
 printf '#!/bin/sh\nui_warn %sfragment one.end.%s%s\\\nnext fragment here%s\n' \
     "'" "'" "'" "'" >"$_pdir/files/install.sh"
-# C2: em-dash border in the classic shape -- blindness found by review
-# a (C2), fixed in round b (sequence match, not class member).
-printf '#!/bin/sh\nui_warn "failed %s"\\\n"retry now"\n' \
-    "$(printf '\342\200\224')" >"$_pdir/files/etc/umask.sh"
+# C2: em-dash border in the classic shape -- blindness found by
+# review a (C2); the round b dispositions commit fixed it (sequence
+# match, not class member). Both quote styles carry the head-side
+# fallback (round c G2): the third pair is the sq-classic case the
+# dq-only draft missed.
+printf '#!/bin/sh\nui_warn "failed %s"\\\n"retry now"\nui_warn %scount exceeded.%s\\\n%s%sgiving up%s\n' \
+    "$(printf '\342\200\224')" \
+    "'" "'" "'" "$(printf '\342\200\224')" "'" >"$_pdir/files/etc/umask.sh"
 if OPK_SC_PROBE_DEPTH=1 sh "$_pdir/tests/unit/test-string-continuations.sh" >"$_pdir/out" 2>&1; then
     echo "  FAIL  probe: sq-splice / em-dash joins went undetected"
     rm -rf "$_pdir"
@@ -197,7 +205,8 @@ if OPK_SC_PROBE_DEPTH=1 sh "$_pdir/tests/unit/test-string-continuations.sh" >"$_
 fi
 if grep -q 'one.end.next fragment' "$_pdir/out" &&
     ! grep -qF "end.''next" "$_pdir/out" &&
-    grep -q 'retry now' "$_pdir/out"; then
+    grep -q 'retry now' "$_pdir/out" &&
+    grep -q 'giving up' "$_pdir/out"; then
     echo "  PASS  probes: sq-splice seam normalized; em-dash border detected"
 else
     echo "  FAIL  probe seams wrong (normalization or alphabet regressed):"

@@ -180,7 +180,9 @@ fmt:
 # (env) redirects the destination so the unit suite can pin this target
 # inside its scratch sandbox; set-but-EMPTY fails loud (the `-` form
 # keeps the empty value, mkdir errors -- review b D6) and a stale-temp
-# sweep at the start clears orphans from interrupted runs (review b D7).
+# sweep at the start clears orphans from interrupted runs, age-guarded
+# (review b D7 + c F3): only temps older than 30 minutes match, so a
+# concurrent run's in-flight temp (seconds old) is never swept.
 install-shfmt:
 	@case "$$(uname -s)/$$(uname -m)" in \
 		Linux/x86_64) plat=linux_amd64 ;; \
@@ -191,7 +193,7 @@ install-shfmt:
 	esac; \
 	bin="$${SHFMT_BIN_DIR-$${HOME}/.local/bin}"; \
 	mkdir -p "$$bin" || exit 1; \
-	rm -f "$$bin"/.shfmt.tmp.* 2>/dev/null || true; \
+	find "$$bin" -name '.shfmt.tmp.*' -mmin +30 -delete 2>/dev/null || true; \
 	tmp="$$bin/.shfmt.tmp.$$"; \
 	echo "downloading shfmt v$(SHFMT_VERSION) ($$plat) -> $$bin/shfmt"; \
 	curl -fsSL -o "$$tmp" \

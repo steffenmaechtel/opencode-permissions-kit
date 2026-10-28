@@ -47,11 +47,13 @@ if ! command -v shfmt >/dev/null 2>&1; then
     exit 1
 fi
 
-# Derived at run time (review a B3/C8 + b E1, #301): flags and scope
-# come from the Makefile, the single source the gate itself uses. An
-# extraction failure reddens below; the documented fallback keeps the
-# remaining pins runnable (the drift itself is the recorded failure,
-# never a silent pass).
+# Derived at run time (review a B3/C8 + b E1 + c G1, #301): flags and
+# scope come from the Makefile, the single source the gate itself
+# uses. The FLAGS extraction carries a documented fallback (keeps the
+# discrimination/equivalence pins runnable; the drift itself is the
+# recorded failure). A SCOPE failure ABORTS below -- the tree checks
+# are meaningless without a scope, and a path-less `shfmt -l` reads
+# stdin (a hang in interactive runs).
 SHFMT_FLAGS="$(sed -n 's/^SHFMT_FLAGS = //p' Makefile | head -1)"
 if [ -n "$SHFMT_FLAGS" ]; then
     pass "gate flags derived from the Makefile (SHFMT_FLAGS)"
@@ -65,6 +67,8 @@ if [ "$_gs_rc" -eq 0 ] && [ -n "$GATE_SCOPE" ]; then
     pass "gate scope derived from the Makefile (make fmt-scope)"
 else
     fail "make fmt-scope failed (rc=$_gs_rc) or returned an empty scope"
+    echo "  error  aborting: the sections below need the scope (G1)"
+    exit 1
 fi
 # git-less halving (review b D9): a checkout without .git makes
 # git ls-files return empty inside the Makefile -- the scope must
@@ -193,8 +197,10 @@ fi
 _isf="$(mktemp -d)"
 if [ -d "$_isf" ]; then
     mkdir -p "$_isf/bin"
-    # failing curl: `curl -fsSL -o <path> <url>` -> $3 is the -o target
-    printf '#!/bin/sh\nprintf garbage >"$3"\nexit 22\n' >"$_isf/curl"
+    # failing curl: `curl -fsSL -o <path> <url>` -> $3 is the -o
+    # target; records its own invocation (F2 discriminates WHERE a
+    # run failed)
+    printf '#!/bin/sh\nprintf garbage >"$3"\ntouch "$0.ran"\nexit 22\n' >"$_isf/curl"
     chmod +x "$_isf/curl"
     # a pre-existing "install" for the B2 rider -- it must survive untouched
     printf '#!/bin/sh\necho v3.14.1\n' >"$_isf/bin/shfmt"
@@ -229,15 +235,43 @@ printf '#!/bin/sh\necho v9.9.9-stub\n' >"$3"
 exit 0
 OKSTUB
     chmod +x "$_isf/okstub/curl"
+    # the orphan is planted OLD (round c F3 made the sweep age-guarded:
+    # only 30min+ temps match) -- and a FRESH in-flight temp must
+    # survive it (concurrent-run safety).
     printf 'orphan\n' >"$_isf/okbin/.shfmt.tmp.99999"
+    touch -t 197001010000 "$_isf/okbin/.shfmt.tmp.99999"
+    printf 'in-flight\n' >"$_isf/okbin/.shfmt.tmp.$$"
     PATH="$_isf/okstub:$PATH" SHFMT_BIN_DIR="$_isf/okbin" make install-shfmt >/dev/null 2>&1
     _ok_rc=$?
     if [ "$_ok_rc" -eq 0 ] &&
         [ "$("$_isf/okbin/shfmt" 2>/dev/null)" = "v9.9.9-stub" ] &&
-        [ ! -e "$_isf/okbin/.shfmt.tmp.99999" ]; then
-        pass "successful install lands in SHFMT_BIN_DIR, version-probed, orphan swept"
+        [ ! -e "$_isf/okbin/.shfmt.tmp.99999" ] &&
+        [ -e "$_isf/okbin/.shfmt.tmp.$$" ]; then
+        pass "install lands in SHFMT_BIN_DIR, version-probed; stale orphan swept, fresh temp kept (F3)"
     else
         fail "destination redirect/probe/sweep broken (rc=$_ok_rc bin=$("$_isf/okbin/shfmt" 2>/dev/null))"
+    fi
+    rm -f "${_isf:?}/okbin/.shfmt.tmp.$$"
+    # F1 (round c): the fail-stub models argv position $3 -- valid only
+    # while the recipe keeps `curl -fsSL -o "$$tmp"`; a reorder must be
+    # LOUD, not a silently vacuous atomicity pin.
+    if grep -qF 'curl -fsSL -o "$$tmp"' Makefile; then
+        pass "install-shfmt curl shape pinned (fail-stub argv model valid)"
+    else
+        fail "install-shfmt curl invocation shape changed -- the fail-stub \$3 model is stale (F1)"
+    fi
+    # F2 (round c): set-but-EMPTY SHFMT_BIN_DIR must fail loud AT THE
+    # MKDIR EDGE (the `-` form keeps the empty value; mkdir -p ""
+    # errors). rc!=0 alone cannot discriminate -- the curl stub fails
+    # too -- so the run must fail BEFORE curl is ever invoked: the
+    # stub records its invocation, the marker must stay absent.
+    rm -f "${_isf:?}/curl.ran"
+    SHFMT_BIN_DIR="" PATH="$_isf:$PATH" make install-shfmt >/dev/null 2>&1
+    _efb_rc=$?
+    if [ "$_efb_rc" -ne 0 ] && [ ! -e "$_isf/curl.ran" ]; then
+        pass "set-but-empty SHFMT_BIN_DIR fails loud at mkdir (D6/F2)"
+    else
+        fail "empty SHFMT_BIN_DIR passed or failed too late (rc=$_efb_rc curl-ran=$([ -e "$_isf/curl.ran" ] && echo yes))"
     fi
 else
     fail "scratch setup failed (mktemp) -- install-shfmt pins not run (D4 guard)"
