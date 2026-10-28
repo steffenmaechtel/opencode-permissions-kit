@@ -3,6 +3,10 @@
 > Status: **IMPLEMENTED** — landed 2026-10-14 on
 > `feature/issue-170-restructure-docs` (commits `1e1fdc3`…
 > `d8ba19e`). Where wording differs from the tree, the tree wins.
+> The review-mechanics references below (`reviews/INDEX.md`, its
+> generator, the lint/parity suites) describe the pre-archive tree;
+> the corpus has lived at tag `review-corpus` since issue #290 —
+> read those artifacts there, not in the working tree (#294).
 
 ## 1. Problem & goal
 

@@ -300,14 +300,17 @@ fi
 # exemptions; <scope> = the SCOPE_FILES list (space-separated). Shared
 # by the real-tree lane and the scratch pins below so the pins cannot
 # drift from the enforced shape (#235 a Q4). The reviews exemption is
-# NARROW: generated indexes and frozen case folders only -- living
-# files under internal/reviews/ are covered.
+# NARROW: the generated, frozen legacy-index and frozen case folders
+# only -- living files under internal/reviews/ are covered. The
+# corpus INDEX alternative was dropped post-archive (#294): the
+# generated INDEX lives at tag review-corpus, so an INDEX.md under
+# internal/reviews/ would be a LIVING recreated file and is caught.
 p10_lane_c_hits() {  # $1 root, $2 scope
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
         "$1" 2>/dev/null \
         | grep -v "/internal/rules-meta/" \
-        | grep -v -E "/internal/reviews/(INDEX|legacy-index)\.md" \
+        | grep -v -E "/internal/reviews/legacy-index\.md" \
         | grep -v -E "/internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-[0-9]+/" \
         | grep -v "/internal/records/_archive/" \
         | while IFS= read -r _l; do
@@ -336,6 +339,9 @@ fi
 # lane c scratch pins (#235 a Q4): a LIVING README.md under
 # internal/reviews/ citing an ID must be caught; a FROZEN snapshot in
 # a case folder quoting IDs as verbatim evidence must stay exempt.
+# Post-archive (#294): a recreated in-tree INDEX.md is a LIVING file
+# (the generated corpus INDEX lives at the tag) -- it must be caught;
+# the generated, frozen legacy-index stays exempt by the narrow rule.
 # The demo ID is concatenated at runtime so this test file's own
 # source never carries a literal real-ID token (lane c scans *.sh).
 _p10demo="RM-00""44"
@@ -343,14 +349,23 @@ P10S="$WORK/p10scratch.$$"
 mkdir -p "$P10S/internal/reviews/0/0/0/1/pr-00001"
 printf 'Living file citing a rule by ID (%s) instead of file+section.\n' \
     "$_p10demo" > "$P10S/internal/reviews/README.md"
+printf 'Recreated generated index still citing %s.\n' \
+    "$_p10demo" > "$P10S/internal/reviews/INDEX.md"
+printf 'Generated frozen map file citing %s.\n' \
+    "$_p10demo" > "$P10S/internal/reviews/legacy-index.md"
 printf 'Frozen snapshot quoting %s as verbatim evidence.\n' \
     "$_p10demo" > "$P10S/internal/reviews/0/0/0/1/pr-00001/review-a.md"
 _hits=$(p10_lane_c_hits "$P10S" "")
 case "$_hits" in
     *internal/reviews/README.md*)
         case "$_hits" in
-            *pr-00001*) fail "pin10 lane c scratch: frozen snapshot flagged" ;;
-            *) pass ;;
+            *internal/reviews/INDEX.md*)
+                case "$_hits" in
+                    *pr-00001*) fail "pin10 lane c scratch: frozen snapshot flagged" ;;
+                    *internal/reviews/legacy-index.md*) fail "pin10 lane c scratch: frozen legacy-index flagged" ;;
+                    *) pass ;;
+                esac ;;
+            *) fail "pin10 lane c scratch: recreated INDEX citation not caught (post-archive: living file)" ;;
         esac ;;
     *) fail "pin10 lane c scratch: README citation not caught" ;;
 esac
