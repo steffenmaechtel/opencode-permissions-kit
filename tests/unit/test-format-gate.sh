@@ -22,12 +22,15 @@
 #      flags -l over the gate scope list are empty) -- the same
 #      assertion `make lint` makes, executed the way the suite
 #      observes it.
-#   5. install-shfmt (B1/B2 + review b D1/D2/D5/D7): fails loud on a
-#      modeled broken transfer (partial bytes written, then rc 22),
-#      downloads atomically (an existing install survives), lands in
-#      SHFMT_BIN_DIR positively (a succeeding stub install reaches the
-#      override dir, version-probed, stale temp swept), and the
-#      scratch dir joins the trap.
+#   5. install-shfmt (B1/B2 + review b D1/D2/D5/D7 + review c
+#      F1/F2/F3): fails loud on a modeled broken transfer (partial
+#      bytes + invocation marker, rc 22), downloads atomically (an
+#      existing install survives), lands in SHFMT_BIN_DIR positively
+#      (succeeding stub: redirect + version probe + age-guarded sweep
+#      -- stale orphan gone, fresh temp kept), the recipe's curl
+#      invocation shape is pinned (fail-stub argv model), and
+#      set-but-empty SHFMT_BIN_DIR fails at the mkdir edge (marker
+#      absent). Scratch joins the trap.
 #
 # Run: sh tests/unit/test-format-gate.sh
 

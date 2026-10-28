@@ -24,12 +24,16 @@ SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040,SC2140
 
 # make install-shfmt puts the pinned binary in ~/.local/bin -- make
 # every make-driven shfmt call find it there, whatever the invoking
-# shell's PATH (agent sessions, non-login shells, fresh tabs). The
-# version pin still guards: a wrong binary in ~/.local/bin reddens
-# the gate exactly like a wrong system one. Direct `shfmt` calls
-# outside make keep needing the PATH (new login shells get it via the
-# standard ~/.profile snippet once the dir exists).
-export PATH := $(HOME)/.local/bin:$(PATH)
+# shell's PATH (agent sessions, non-login shells, fresh tabs). APPEND,
+# not prepend (round d H2): a stray binary in ~/.local/bin (a curl,
+# say) must never shadow system tools or the suite's PATH-injected
+# stubs inside nested make calls -- the resolver only needs the
+# FALLBACK position. The version pin still guards: whatever resolves
+# first must be exactly v3.14.1. Direct `shfmt` calls outside make
+# keep needing the PATH (new login shells usually get it from the
+# ~/.profile snippet once the dir exists -- where that snippet and a
+# profile-reading login shell exist; round d I3).
+export PATH := $(PATH):$(HOME)/.local/bin
 
 # shfmt -- canonical formatter for every kit shell script (issue #255
 # stage 0a). Pinned EXACTLY: formatting output differs between shfmt
@@ -211,11 +215,13 @@ install-shfmt:
 	chmod +x "$$tmp" || { rm -f "$$tmp"; exit 1; }; \
 	"$$tmp" --version >/dev/null || { rm -f "$$tmp"; echo "error: downloaded shfmt failed its --version probe"; exit 1; }; \
 	mv -f "$$tmp" "$$bin/shfmt" || { rm -f "$$tmp"; exit 1; }; \
-	"$$bin/shfmt" --version; \
-	case ":$${PATH}:" in \
-		*":$$bin:"*) ;; \
-		*) echo "note: $$bin is not on your PATH -- add it, then re-run: make check-host" ;; \
-	esac
+	"$$bin/shfmt" --version
+# No trailing PATH-note case (round d H1): the resolver export above
+# puts the bin dir on every recipe PATH, so "not on your PATH" could
+# never fire in make context -- dead guard, removed. The final
+# --version print is now the recipe's rc-relevant last command (a
+# failed probe reddens the target directly; every download edge still
+# exits 1 explicitly above).
 
 check-host:
 	@echo "=== Contributor host check ==="
