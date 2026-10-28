@@ -168,6 +168,32 @@ examples from counting; for a NEW pin whose literal spans a wrap, join
 continuations before stripping — otherwise do not copy the idiom, and
 do not refactor the site into the canonical shape.
 
+## Pin-cost budget (unit suites)
+
+A pin whose fixture would exceed ~30 lines for a LOW/INFO-severity
+behavior is NOT shipped: the behavior is dispositioned **deliberately
+not done (accepted residual)** in the round comment's dispositions
+table instead, with the budget breach named. Adopted from issue #303;
+origin: #262 P4 / §11e (the PR #244 retrospective). §11e is the
+canonical breach: ~80 lines of FIFO + setsid + drain-marker +
+SIGINT-disposition-across-exec engineering to pin one cosmetic
+except-arm of a progress counter — whose own comments record that the
+pin initially "could not fire AT ALL" and that a dash-vs-bash `kill`
+difference broke it silently. In that PR the fixture choreography for
+LOW-severity behavior was ~450 of 955 net-new test lines at a
+lines-per-assertion ratio of ~21, where historical baseline pins in
+the same suite are one-liners — pin hardening had become its own
+defect surface, reviewed by waves f/g over the PR's own pins.
+
+- Scope: severities LOW and INFO only. MED/HIGH findings are never
+  budget-exempted — their pins cost what the defect deserves.
+- The budget declines the PIN, not the finding: the finding is still
+  reported and dispositioned; only the fixture is declined.
+- The bound applies wherever pins are proposed — feature waves and
+  reviewer rounds alike: a reviewer proposing an over-budget LOW/INFO
+  pin gets the accepted-residual disposition with this rule cited,
+  not the fixture.
+
 ## Test sandbox (unit suites)
 
 Unit suites run on contributor and CI hosts, not in containers — they

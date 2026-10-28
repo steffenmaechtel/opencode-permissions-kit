@@ -22,6 +22,19 @@ SHELLCHECK_FILES = $(shell find files scripts -type f -exec \
 # "part two") -- byte-identical output, flagged by SC2140 on every split.
 SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040,SC2140
 
+# make install-shfmt puts the pinned binary in ~/.local/bin -- make
+# every make-driven shfmt call find it there, whatever the invoking
+# shell's PATH (agent sessions, non-login shells, fresh tabs). APPEND,
+# not prepend (round d H2): a stray binary in ~/.local/bin (a curl,
+# say) must never shadow system tools or the suite's PATH-injected
+# stubs inside nested make calls -- the resolver only needs the
+# FALLBACK position. The version pin still guards: whatever resolves
+# first must be exactly v3.14.1. Direct `shfmt` calls outside make
+# keep needing the PATH (new login shells usually get it from the
+# ~/.profile snippet once the dir exists -- where that snippet and a
+# profile-reading login shell exist; round d I3).
+export PATH := $(PATH):$(HOME)/.local/bin
+
 # shfmt -- canonical formatter for every kit shell script (issue #255
 # stage 0a). Pinned EXACTLY: formatting output differs between shfmt
 # versions (measured 2026-10-28: 3.7.0 and 3.12.0 each reformat lines
@@ -180,7 +193,9 @@ fmt:
 # (env) redirects the destination so the unit suite can pin this target
 # inside its scratch sandbox; set-but-EMPTY fails loud (the `-` form
 # keeps the empty value, mkdir errors -- review b D6) and a stale-temp
-# sweep at the start clears orphans from interrupted runs (review b D7).
+# sweep at the start clears orphans from interrupted runs, age-guarded
+# (review b D7 + c F3): only temps older than 30 minutes match, so a
+# concurrent run's in-flight temp (seconds old) is never swept.
 install-shfmt:
 	@case "$$(uname -s)/$$(uname -m)" in \
 		Linux/x86_64) plat=linux_amd64 ;; \
@@ -191,7 +206,7 @@ install-shfmt:
 	esac; \
 	bin="$${SHFMT_BIN_DIR-$${HOME}/.local/bin}"; \
 	mkdir -p "$$bin" || exit 1; \
-	rm -f "$$bin"/.shfmt.tmp.* 2>/dev/null || true; \
+	find "$$bin" -name '.shfmt.tmp.*' -mmin +30 -delete 2>/dev/null || true; \
 	tmp="$$bin/.shfmt.tmp.$$"; \
 	echo "downloading shfmt v$(SHFMT_VERSION) ($$plat) -> $$bin/shfmt"; \
 	curl -fsSL -o "$$tmp" \
@@ -200,11 +215,13 @@ install-shfmt:
 	chmod +x "$$tmp" || { rm -f "$$tmp"; exit 1; }; \
 	"$$tmp" --version >/dev/null || { rm -f "$$tmp"; echo "error: downloaded shfmt failed its --version probe"; exit 1; }; \
 	mv -f "$$tmp" "$$bin/shfmt" || { rm -f "$$tmp"; exit 1; }; \
-	"$$bin/shfmt" --version; \
-	case ":$${PATH}:" in \
-		*":$$bin:"*) ;; \
-		*) echo "note: $$bin is not on your PATH -- add it, then re-run: make check-host" ;; \
-	esac
+	"$$bin/shfmt" --version
+# No trailing PATH-note case (round d H1): the resolver export above
+# puts the bin dir on every recipe PATH, so "not on your PATH" could
+# never fire in make context -- dead guard, removed. The final
+# --version print is now the recipe's rc-relevant last command (a
+# failed probe reddens the target directly; every download edge still
+# exits 1 explicitly above).
 
 check-host:
 	@echo "=== Contributor host check ==="
