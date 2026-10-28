@@ -236,12 +236,17 @@ across cases. Always qualify the ID — two citation eras:
   parallel features can never collide. (RM-0018)
 - **Legacy corpus (stems 0.0.38–0.0.49):** `(0.0.38 S1)`,
   `(0.0.39a C1)` — the stem stays the qualifier. Resolve via
-  [legacy-index.md](../internal/reviews/legacy-index.md) or grep. (RM-0019)
+  [legacy-index.md](../internal/reviews/legacy-index.md), then read the
+  file at the tag. (RM-0019)
 
-Grep-able by design: `grep -rn "#176 a W1"`, `grep -rn "0.0.38 S1"`.
-The case map is the generated
-[INDEX](../internal/reviews/INDEX.md); naming, formats, and the
-mechanics live in the [review README](../internal/reviews/README.md).
+Grep-able by design — the corpus is archived at tag `review-corpus`
+(issue #290), so citation greps run against the tag:
+`git grep "#176 a W1" review-corpus -- internal/reviews/`,
+`git grep "0.0.38 S1" review-corpus -- internal/reviews/`. The case
+map is the INDEX at the tag
+(`git show review-corpus:internal/reviews/INDEX.md`); naming,
+formats, and the archive mechanics live in the
+[review README](../internal/reviews/README.md).
 
 ## Referencing house rules (RM keys)
 

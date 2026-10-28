@@ -18,8 +18,9 @@ this repository — the router. Detail lives next to its audience:
   review pass loads the `opk-review-pass` skill first — rules stay in
   agent/, the skill carries the choreography only (issue #178)
 - [internal/reviews/README.md](internal/reviews/README.md) — review
-  mechanics: case folders (birth-PR key), snapshots/resolutions,
-  citation format
+  corpus archive: tag `review-corpus` is the authoritative record
+  (citation resolution), the birth-PR timelines carry readability
+  mirrors
 - [internal/process/](internal/process/) — maintainer process: review
   triggers & gates (review.md), release handling
 - [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, PR checklist, e2e
@@ -62,8 +63,9 @@ expect the reported paths to exist locally.
   workflows (see the router entry above)
 - `internal/` — project memory: maintainer process (`process/`), design
   records (`records/`, archive under `records/_archive/` incl.
-  evaluations), review evidence (`reviews/`, one case folder per
-  birth-PR + generated INDEX), review meta-analysis runs
+  evaluations), review evidence (`reviews/` — corpus archived at tag
+  `review-corpus`; the archive pointer and legacy citation map remain
+  in-tree), review meta-analysis runs
   (`reviews-meta/`)
 
 ## Rules
