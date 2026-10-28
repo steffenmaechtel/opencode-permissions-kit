@@ -22,6 +22,15 @@ SHELLCHECK_FILES = $(shell find files scripts -type f -exec \
 # "part two") -- byte-identical output, flagged by SC2140 on every split.
 SHELLCHECK_EXCLUDES = SC1090,SC1091,SC2034,SC3043,SC3040,SC2140
 
+# make install-shfmt puts the pinned binary in ~/.local/bin -- make
+# every make-driven shfmt call find it there, whatever the invoking
+# shell's PATH (agent sessions, non-login shells, fresh tabs). The
+# version pin still guards: a wrong binary in ~/.local/bin reddens
+# the gate exactly like a wrong system one. Direct `shfmt` calls
+# outside make keep needing the PATH (new login shells get it via the
+# standard ~/.profile snippet once the dir exists).
+export PATH := $(HOME)/.local/bin:$(PATH)
+
 # shfmt -- canonical formatter for every kit shell script (issue #255
 # stage 0a). Pinned EXACTLY: formatting output differs between shfmt
 # versions (measured 2026-10-28: 3.7.0 and 3.12.0 each reformat lines
