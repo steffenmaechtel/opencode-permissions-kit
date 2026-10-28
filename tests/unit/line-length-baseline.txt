@@ -5,8 +5,7 @@ agent/conventions.md 49 2
 agent/review-concept.md 397 5
 agent/test-fidelity.md 181 6
 docs/how-to/update.md 139 2
-internal/README.md 11 2
-internal/process/ci-review.md 2083 18
+internal/README.md 9 1
 internal/records/README.md 49 5
 internal/records/ddev-dev-owned-projects.md 152 3
 internal/records/ddev-e2e-test.md 3891 37
