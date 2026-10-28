@@ -9,5 +9,5 @@ agents — ~85% agent reading) lives in
 
 | Page | Governs |
 |---|---|
-| [review.md](review.md) | birth-PR, triggers, findings, external review machines, pause/go, stop call, release gate |
+| [review.md](review.md) | commissioning, ask-gates, merge gate = closure, full-review triggers, external machines |
 | [release-handling.md](release-handling.md) | channels, the `stable` mirror, tagging, `make release`, cheat sheet |

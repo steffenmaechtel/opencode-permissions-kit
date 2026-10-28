@@ -227,20 +227,24 @@ sandboxed control) so the guard itself cannot rot silently.
 
 ## Referencing review findings
 
-Every review restarts its finding IDs at S1/C1, so a bare ID is ambiguous
-across cases. Always qualify the ID — two citation eras:
+Every review restarts its finding IDs at S1/C1 (per case), so a bare
+ID is ambiguous across cases. Always qualify the ID — two citation
+eras, one resolution rule per era:
 
-- **New cases (birth-PR key, since the 2026-10 restructure):**
-  `(#176 a W1)` — PR number, snapshot letter, finding ID. The PR number
-  is allocated by GitHub when the maintainer opens the birth-PR, so
-  parallel features can never collide. (RM-0018)
+- **Live cases (PR-native process, since 2026-10-26):** `(#291 a S1)`
+  — PR number, round letter, finding ID. The PR timeline is the
+  record: the citation resolves to the round comment on the birth-PR
+  (comment permalink, or `gh api repos/<org>/<repo>/issues/<PR>/comments`
+  — the `opk-review` markers make the rounds grep-able). Fix commits
+  qualify their citations the same way. (RM-0018)
 - **Legacy corpus (stems 0.0.38–0.0.49):** `(0.0.38 S1)`,
   `(0.0.39a C1)` — the stem stays the qualifier. Resolve via
-  [legacy-index.md](../internal/reviews/legacy-index.md), then read the
-  file at the tag. (RM-0019)
+  [legacy-index.md](../internal/reviews/legacy-index.md), then read
+  the file at the tag. (RM-0019)
 
-Grep-able by design — the corpus is archived at tag `review-corpus`
-(issue #290), so citation greps run against the tag:
+Grep-able by design. Corpus-era citations of both shapes (new-key
+`(#176 a W1)` from the 2026-10 restructure era included) resolve
+against the tag `review-corpus` (issue #290):
 `git grep "#176 a W1" review-corpus -- internal/reviews/`,
 `git grep "0.0.38 S1" review-corpus -- internal/reviews/`. The case
 map is the INDEX at the tag

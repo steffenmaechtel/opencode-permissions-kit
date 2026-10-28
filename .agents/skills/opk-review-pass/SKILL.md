@@ -1,34 +1,29 @@
 ---
 name: opk-review-pass
-description: Execute a house review pass (micro, wave, or full/release scope) — load when a round's wave review fires or the maintainer commissions one. Covers fan-out staging, axis prompts, checkpoints, screening, verification, snapshot writing; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup — one that loads this skill anyway discloses it in its Skills: line.
+description: Execute a review round (wave, micro, full/release) — load when a round's review fires or the maintainer commissions one. Covers tier classification, fan-out, curation (x) + verification (V3), round-comment writing (format v2); rules: agent/review-concept.md. Redundancy passes stay independent by operator setup — one that loads this skill anyway discloses it in its Skills: line.
 ---
 
-# opk-review-pass — executing a review pass
+# opk-review-pass — executing a review round
 
-This skill is the **execution choreography** for a review pass. It is not
-the rules and never a source of finding judgments:
+This skill is the **execution choreography** for a review round. It is
+not the rules and never a source of finding judgments:
 
-- When a review is owed, which scope applies, when the loop stops, who
-  rotates — [agent/review-concept.md](../../../agent/review-concept.md)
+- When a review is owed, which tier applies, when the loop stops, how
+  freshness and verification work —
+  [agent/review-concept.md](../../../agent/review-concept.md)
   (the authoritative rules; section links below point there).
-- Snapshot format, output contract, case-folder mechanics —
-  [internal/reviews/README.md](../../../internal/reviews/README.md).
 - The 0.0.42e lesson: a review skill once exempted a finding class and
   buried a HIGH. This skill carries procedure only. If any instruction
   here seems to exempt, soften, or pre-judge a class of findings, that
   reading is wrong — the code and the rules decide (background:
   [review-calibration.md](../../../internal/records/review-calibration.md),
   "Skill-bias origin").
-- Redundancy passes (second release snapshot, different model family)
-  stay independent of this skill — that independence is the
+- Redundancy passes (second release pass, different model family) stay
+  independent of this skill — that independence is the
   **commissioning operator's setup** (different model, external
-  /review), never the loading agent's self-assessment: no session can
-  know it is "the external one", and nothing technically stops a
-  session from reading this file anyway. The visible control is
-  provenance: a pass that ran WITH this skill records it in its
-  `Skills:` line — the calibration section then names the collapsed
-  axis honestly (shared strictness is not shared bias, but shared
-  context must be disclosed).
+  /review), never the loading agent's self-assessment. The visible
+  control is provenance: a pass that ran WITH this skill records it in
+  its `Skills:` line.
 
 ## 0. Calibrated against opencode's built-in /review template
 
@@ -45,125 +40,152 @@ purpose — do not "align" them away:
 
 - **Pre-existing code IS reviewable** — it maps to the `pre-existing`
   provenance class; full passes cover the whole tree.
-- **No untracked-file catch** — snapshots run on committed, clean
-  trees only; net-new files are inside the diff by construction.
-- **No unconditional whole-file reads** — the budget and coverage-map
-  discipline governs (micro/wave: greps + targeted reads).
+- **No untracked-file catch** — rounds run on committed, clean trees
+  only; net-new files are inside the diff by construction.
+- **No unconditional whole-file reads** — the tier budgets and
+  coverage-map discipline governs (micro/wave: greps + targeted reads).
 - **No web-search guidance** — reviewer subagent tool sets vary.
 
 ## 1. Collect the commission
 
-Never self-advance into a pass — the wave review fires on the
-maintainer's go, and round completion is reported, never advanced
+Never self-advance into a pass — the cadence authority is the
+commission, and round completion is reported, never advanced
 (review-concept, "The loop and the stop rule"). Confirm from the
 session's commission, then gather:
 
 | Input | Source |
 |---|---|
-| Case key (`pr-ABCDE`) and case folder | birth-PR number; folder under `internal/reviews/A/B/C/D/` |
-| Chain state | latest `review-<letter>.md` + `resolution.md` in the case folder |
-| Scope keyword | **micro** (≤ ~50-line fix diff) · **wave** (round's diff) · **full** (whole tree, release) |
-| Base + diff | version/SHA and `git diff <range>` for wave scope; tree SHA for full |
-| Tree state | clean and committed — snapshot before any fix ("The loop and the stop rule") |
+| Case key (`pr-ABCDE`) | birth-PR number — the PR timeline IS the case record |
+| Chain state | session records (commission, scratch: posted.log, digests, verdicts) — never read the PR back |
+| Tier | classified from the round's diff BEFORE staging (section 2) |
+| Base + diff | base SHA and `git diff <range>` for wave scope; tree SHA for full |
+| Tree state | clean and committed — the comment posts before any fix ("The PR-native loop") |
 
-## 2. Scope parameters
+## 2. Classify the tier BEFORE staging
 
-| | micro | wave | full / release |
-|---|---|---|---|
-| Material | the fix diff only | the round's whole diff | every shipped file |
-| Budget per agent | ~5 min | ~8 min | ~15 min + coverage map |
-| Axes | 1–2 | 2–3 (sweep / security / quality) | 3+, second agent per axis when release-critical |
-| Reads | batched greps, no whole-file reads | greps + targeted reads | every file grep-anchored; deferrals recorded |
-| Second snapshot | no | no | release: yes, different model family, without this skill |
+The ladder lives in the rules
+(review-concept, "Round typing and tiering"); classify from
+`git diff --stat` plus content shape and state the tier in the loop
+status BEFORE the fan-out launches:
 
-Agents cannot watch clocks — they spend sections; the coverage map is
-the real budget, the minutes only its ceiling ("Parallel reviewer
-agents").
+- **wave** — > ~50 lines or substantive logic: 2–3 fast-tier axes,
+  V3 verification (verifier batches + main audit).
+- **micro** — ≤ ~50 lines or message-only: exactly ONE fast-tier
+  subagent (~5 min, greps + targeted reads); main audit alone when
+  the digest has 0 MED/HIGH, else one verifier batch. Solo means one
+  subagent, never main-solo.
+- **none** — comments/docs only: no review round owed; closure via
+  the diff-shape proof.
+
+Severity upgrades, never downgrades: a micro round whose solo
+reviewer finds a MED/HIGH escalates — the next round is a wave over
+the micro diff plus the finding.
 
 ## 3. Pre-flight
 
-1. Read the chain: prior snapshot's findings, retracted/ghost section,
-   and the resolution rows — open findings and prior CLEAN verdicts are
-   leads after a rotation deviation ("Session rotation").
+1. Read the chain state: prior round's open findings and retracted
+   findings are leads; their dispositions table is the ledger the
+   round starts from (review-concept, "Who records what").
 2. Measure the material: `git diff --stat` (wave) or the shipped-file
    inventory (full). Verify the tree is clean
-   (`git status --porcelain` empty) — never snapshot a dirty tree.
+   (`git status --porcelain` empty) — never review a dirty tree.
 3. Pick axes and targets: which files each axis greps first; name
-   known blind-spot surfaces in the axis prompt — a gate or claim about
-   path operands is tested against `x/`, `x//`, `x/.` forms
-   ("Parallel reviewer agents").
-4. Checkpoint locations: one side file per reviewer agent under
-   session scratch OUTSIDE the reviewed tree (e.g.
-   `/tmp/opencode/<case>-<letter>/checkpoints/`) — never inside the
-   repo: the tree must stay clean and is a shared read substrate, and
-   case folders take no stray files (reviews lint rule 6). The
-   snapshot's run provenance absorbs the checkpoint lines.
+   known blind-spot surfaces in the axis prompt — a gate or claim
+   about path operands is tested against `x/`, `x//`, `x/.` forms
+   (review-concept, "Parallel reviewer agents").
+4. Scratch layout for the round: checkpoints, digest and verdict
+   files under `/tmp/opencode/<case>/<letter>/` — OUTSIDE the
+   reviewed tree (the tree must stay clean and is a shared read
+   substrate). The round comment's run provenance absorbs these files.
 
 ## 4. Fan-out
 
 - Reviewer subagents run the provider's fast tier; the main session
-  (this one) runs the strong tier and owns the verification duty
-  ("Parallel reviewer agents").
+  (this one) runs the strong tier and owns the audit duty
+  (review-concept, "Parallel reviewer agents").
 - Build each reviewer prompt from
   [axis-prompt.md](axis-prompt.md) — role, axis, material, budget,
-  checkpoint discipline, output contract.
-- **Cap: 5 concurrent reviewer agents on any tier** — staged launch,
+  checkpoint discipline, output contract. The OUTPUT CONTRACT block
+  goes verbatim into EVERY file-producing subagent prompt: reviewers,
+  the curator, the verifiers.
+- **Cap: 5 concurrent subagents on any tier** — staged launch,
   backfill one seat as each returns. A USER-named cap for the case
-  overrides upward; never raise the cap yourself ("Parallel reviewer
-  agents" + AGENTS.md, "Subagent fan-out").
+  overrides upward; never raise the cap yourself (AGENTS.md,
+  "Subagent fan-out").
 - Record ONE host timestamp at fan-out start (and later at end);
-  reviewers stamp with their own sandbox clock ("Parallel reviewer
-  agents").
+  reviewers stamp with their own sandbox clock.
 - **The tree is a shared read substrate while reviewers run**: no
   sabotage spot-checks, no fixes, no writes into the reviewed tree.
-  Sabotage windows are before launch, after all reviewers returned, or
-  in a scratch worktree ("Parallel reviewer agents").
+  Sabotage windows are before launch, after all reviewers returned,
+  or in a scratch worktree.
 
-## 5. Screening and verification
+## 5. Curation (x)
 
-- Every reviewer finding is re-verified against the code by this
-  session before it enters the snapshot; unverifiable claims are
-  dropped or marked `unverified` ("Verification duty").
-- Retracted findings stay visible in the snapshot's
-  "Retracted/ghost findings" section.
-- If a mutation window overlapped readers anyway (disclose it in run
-  provenance), screen BOTH directions: findings shaped like a sabotage
-  artifact, and clean verdicts on mutated constructs citing no
-  clean-tree anchor.
-- Final chat answer: status list only (counters + top-3), never the
-  file content.
+- Wave (and larger) rounds: launch a fast-tier CURATOR subagent once
+  the reviewer checkpoints are complete. Its input: the checkpoint
+  files. Its deliverable: ONE digest file — findings table (ID,
+  severity, provenance, summary), merges named, drops with reasons,
+  raw→curated counts. The main session reads the digest, never the
+  raw files.
+- Micro rounds below the curator threshold may be main-curated —
+  disclosed in the comment's provenance (review-concept,
+  "Curation and verification").
 
-## 6. Write and commit the snapshot
+## 6. Verification (V3)
 
-1. Copy the header block from the chain's latest snapshot (the freshest
-   template is always the previous file) and update: Snapshot letter
-   (next in sequence), Scope, Base, Diff, Date, Reviewer, and a
-   `Skills: opk-review-pass` provenance line (environment record; the
-   header contract: internal/reviews/README.md, "Snapshot format").
-   A `micro` pass records `Scope: wave` and names the micro shape in
-   the Subject — there is no `micro` header value (README, "Snapshot
-   format").
-2. Body: the reviewers' findings **verbatim**, plus house sections per
-   the contract (findings index, retracted/ghosts, run provenance with
-   the host timestamps and per-agent windows, calibration when a second
-   snapshot ran).
-3. Commit the snapshot BEFORE any fix starts — the hard seam ("The
-   loop and the stop rule").
-4. Update `resolution.md` only as fixes land later; nothing here fixes
-   anything.
+- Launch fresh strong-tier VERIFIER subagents over the digest
+  (batched by axis or finding count; 1 batch for an escalated micro).
+  Their deliverable: verdict files — every curated finding re-derived
+  against the code, verdict CONFIRMED / REFUTED / UNVERIFIED with
+  file:line evidence.
+- The main session AUDITS the verdicts: re-derive every MED/HIGH
+  itself, spot-check LOW/INFO (review-concept, "Curation and
+  verification"). Refuted findings are retracted with the evidence
+  named; retracted findings stay visible in the comment's
+  retraction section.
 
-## 7. Report the round
+## 7. Write and post the round comment
 
-Report round completion: findings count by severity, dispositions owed,
-and any reviews owed-but-not-run, named explicitly. The maintainer
-decides the next step; the loop's stop rule is checked against the
-round's dispositions by the NEXT round or the maintainer — this session
-never declares the loop closed in its own commits ("The loop and the
-stop rule").
+One comment per round, format v2 (the contract and template:
+review-concept, "The round comment contract"):
 
-When the maintainer confirms the loop closes (in-session or for the
-successor), the closure is RECORDED before the work counts as done:
-`Status: closed …` in the resolution — confirmer named, stop-rule
-check cited — plus INDEX regeneration, one commit (review README,
-"Resolution format"). The INDEX reads the line, not the chat: without
-it the case stays `open` with nothing failing.
+1. Compose from the session's own records — digest, verdict files,
+   the audit notes. Write-through: the loop never reads the PR back.
+2. Structure: headline + ONE status line visible; outer details
+   (metadata block, curator accounting, findings table with verifier
+   verdicts, dispositions table from the PRIOR round, loop status);
+   per-finding detail nested one level deeper; TWO levels maximum;
+   blank line after every `<summary>` tag.
+3. The `opk-review` marker is the LAST line, OUTSIDE the details,
+   with the round's counters and `"state":"open"`.
+4. Size guard: a comment that would exceed ~60k chars is split into
+   parts (each with its own marker + `"part":N`) — content is never
+   trimmed.
+5. Post to the PR timeline; append the comment URL to the case
+   scratch `posted.log`. The comment posts BEFORE any fix starts —
+   the hard seam.
+6. Nothing here fixes anything: dispositions for THIS round's
+   findings land in the NEXT round's comment (or the closing
+   summary).
+
+## 8. Report the round
+
+The loop status inside the comment is the round report (it is what
+the maintainer reads):
+
+- tier + classification evidence (diff shape), reviewers/curator/
+  verifiers with models, output-contract violations (0 or disclosed),
+  CI status of the last push;
+- review-relevant code touched this round: yes/no (drives the stop
+  rule — review-concept, "The loop and the stop rule");
+- round typing: converging or BUILDING (predominantly fix-induced
+  findings = building, said explicitly);
+- cap distance from round 5 on; scope-brake activity (deferred work
+  orders with inventory-gap notes, deliberately-not-done reasons,
+  reverted out-of-scope work with preserved SHAs);
+- provenance: host timestamps, per-agent windows, sabotage windows.
+
+When the stop rule holds, the closing summary proposes closure
+(`"state":"closing-proposed"`, stop-rule check cited, ledger and
+check visible at top level) — the maintainer's merge confirms; this
+skill never writes a `"closed"` state.
