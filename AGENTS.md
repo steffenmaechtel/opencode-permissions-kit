@@ -21,7 +21,7 @@ this repository — the router. Detail lives next to its audience:
   mechanics: case folders (birth-PR key), snapshots/resolutions,
   citation format
 - [internal/process/](internal/process/) — maintainer process: review
-  triggers & gates (review.md), release handling, CI-review planning
+  triggers & gates (review.md), release handling
 - [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, PR checklist, e2e
   invocation patterns; user docs: [docs index](docs/README.md)
 
