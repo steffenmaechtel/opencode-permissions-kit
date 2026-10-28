@@ -73,15 +73,15 @@ BASELINE="$(dirname "$0")/line-length-baseline.txt"
 # Docs scope (structure wave 2026-10, E4 = 120): house-written markdown —
 # agent/, internal/ (living parts), docs/, root README/AGENTS/CONTRIBUTING,
 # and .agents/skills/ (house-written living text — issue #178).
-# Exempt: frozen history (archived records, immutable review snapshots —
-# verbatim > wrap) and machine-generated files (INDEX, legacy-index).
+# Exempt: frozen history (archived records) and machine-generated files
+# (INDEX, legacy-index — the immutable review snapshots moved to tag
+# review-corpus with the corpus archive, issue #290).
 docs_scope() {
     for f in README.md CONTRIBUTING.md AGENTS.md; do
         [ -e "$f" ] && printf '%s\n' "$f"
     done
     find agent internal docs .agents -name '*.md' -type f \
         ! -path 'internal/records/_archive/*' \
-        ! -path 'internal/reviews/*/pr-*/review-*' \
         ! -name 'INDEX.md' \
         ! -name 'legacy-index.md'
 }

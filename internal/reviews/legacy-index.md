@@ -4,7 +4,8 @@
 > pre-restructure citation format (`0.0.49b C1`) and file names
 > (`2026-10-12-v0.0.49-b.md`) onto the case folders. The corpus
 > covers snapshots 0.0.38–0.0.49; new cases (with review-meta
-> headers) never appear here — see [INDEX.md](INDEX.md).
+> headers) never appear here — the generated INDEX lives at the tag:
+> `git show review-corpus:internal/reviews/INDEX.md`.
 
 ## Stem → case map
 

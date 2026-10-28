@@ -10,5 +10,5 @@ differs from the code, the code wins.
 |---|---|---|
 | [process/](process/) | how the project is run: review triggers & gates, release handling | CURRENT |
 | [records/](records/) | design + decision records ("why is it built this way?") | frozen after implementation |
-| [reviews/](reviews/) | review evidence: one case folder per birth-PR, generated index | snapshots frozen, resolutions CURRENT |
+| [reviews/](reviews/) | corpus archive: pointer + legacy map; the corpus lives at tag `review-corpus` | frozen (tag) |
 | [reviews-meta/](reviews-meta/) | recurring meta-analysis runs over the review corpus | one frozen folder per run |

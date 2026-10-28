@@ -33,13 +33,14 @@ file_anchors() {
     strip_fences < "$1" | grep -E '^#{1,6} ' | sed -E 's/^#{1,6} //'
 }
 
-# Frozen-history exemption (structure wave 2026-10): immutable review
-# snapshots and archived records may reference paths that later moved —
-# history is not rewritten for link hygiene. Living docs (resolutions,
-# READMEs, records, user docs) must stay fully linked.
+# Frozen-history exemption (structure wave 2026-10): archived records
+# may reference paths that later moved — history is not rewritten for
+# link hygiene. Living docs (READMEs, records, user docs) must stay
+# fully linked. (The immutable review snapshots joined the frozen
+# archive at tag review-corpus, issue #290 — they no longer live in
+# the tree.)
 is_frozen() {
     case "$1" in
-        internal/reviews/*/pr-*/review-*.md) return 0 ;;
         internal/records/_archive/*) return 0 ;;
     esac
     return 1
@@ -73,12 +74,6 @@ check_file() {
                 continue
             fi
             if [ -d "$base" ]; then
-                # review case folders link to the listing itself: lint
-                # forbids any extra file inside a case (no README.md can
-                # ever exist there)
-                case "$base" in
-                    internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-[0-9][0-9][0-9][0-9][0-9]) continue ;;
-                esac
                 # directory link: GitHub renders its README.md
                 if [ ! -e "$base/README.md" ]; then
                     echo "FAIL $f -> $target (directory has no README.md)" >> "$TMP"
