@@ -18,8 +18,11 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DB="$REPO/files/opencode-permissions-kit-lib/sh/advisories.sh"
 UPSTREAM_API="https://api.github.com/repos/anomalyco/opencode/security-advisories"
 
-say()  { printf '  %s\n' "$*"; }
-die()  { printf 'error:  %s\n' "$*" >&2; exit 1; }
+say() { printf '  %s\n' "$*"; }
+die() {
+    printf 'error:  %s\n' "$*" >&2
+    exit 1
+}
 
 [ -f "$DB" ] || die "advisory database missing: $DB"
 [ -n "${GITHUB_REPOSITORY:-}" ] || die "GITHUB_REPOSITORY is not set (CI provides it; locally: export GITHUB_REPOSITORY=owner/repo)"
@@ -38,8 +41,8 @@ command -v curl >/dev/null 2>&1 || die "curl is required"
 # IFS='|' for exactly this reason. JSON null fields coerce to "" (one
 # null must not kill the whole feed parse with a TypeError, 0.0.43a F7);
 # a null severity then fails the per-line vocabulary check loudly.
-FEED=$(curl -fsSL --max-time 30 "$UPSTREAM_API" 2>/dev/null) \
-    || die "upstream feed unreachable (offline, blocked, or rate-limited): $UPSTREAM_API"
+FEED=$(curl -fsSL --max-time 30 "$UPSTREAM_API" 2>/dev/null) ||
+    die "upstream feed unreachable (offline, blocked, or rate-limited): $UPSTREAM_API"
 if ! UPSTREAM=$(printf '%s' "$FEED" | python3 -c 'import json,sys
 try:
     feed = json.load(sys.stdin)
@@ -54,7 +57,10 @@ for adv in feed or []:
 ' 2>/dev/null); then
     die "failed to parse the upstream feed (expected a JSON advisory list)"
 fi
-[ -n "$UPSTREAM" ] || { say "upstream feed is empty — nothing to do"; exit 0; }
+[ -n "$UPSTREAM" ] || {
+    say "upstream feed is empty — nothing to do"
+    exit 0
+}
 
 # --- ids the shipped database knows --------------------------------------------
 # shellcheck disable=SC1090  # the shipped database, checked above
@@ -86,7 +92,7 @@ scan_advisory_valid() {
         *[!A-Za-z0-9-]*) return 1 ;;
     esac
     case "$2" in
-        low|moderate|high|critical) ;;
+        low | moderate | high | critical) ;;
         *) return 1 ;;
     esac
     # patched: the builder joins one entry per vulnerabilities[] package
@@ -204,7 +210,7 @@ while IFS='|' read -r ID SEVERITY RANGES PATCHED SUMMARY URL; do
         printf '  - [ ] Cut a release (make release VERSION=x.y.z) so opk update ships it\n'
         printf '  - [ ] Close this issue\n\n'
         printf 'Auto-created by scripts/advisory-watch.sh (.github/workflows/advisory-watch.yml).\n'
-    } > "$BODY"
+    } >"$BODY"
     if [ -n "${OPK_SCAN_DRY_RUN:-}" ]; then
         say "$ID NOT in the shipped database — dry run, would open:"
         sed 's/^/      /' "$BODY"

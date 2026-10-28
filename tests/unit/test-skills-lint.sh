@@ -93,7 +93,10 @@ trap 'rm -f "${TMP:-}"; rm -rf "${WORK:-}" "${F16W:-}"' EXIT INT TERM
 # lint_skills <dir> -- prints FAIL lines, empty output = clean
 lint_skills() {
     _root="$1"
-    [ -d "$_root" ] || { echo "FAIL skills root missing: $_root"; return; }
+    [ -d "$_root" ] || {
+        echo "FAIL skills root missing: $_root"
+        return
+    }
     # pr-00263 a F16: a bare file at the skills root loads too — the
     # house shape is one directory per skill, so it FAILs, never skips.
     for _f in "$_root"/*; do
@@ -115,7 +118,7 @@ lint_skills() {
         # frontmatter block: first line ---, closes somewhere later in
         # the file (no head window); fields are read only inside the
         # block, so body text cannot satisfy them (#235 a S4/X4)
-        head -n 1 "$_f" | grep -qxF -- '---' || \
+        head -n 1 "$_f" | grep -qxF -- '---' ||
             echo "FAIL $_name: frontmatter must open with ---"
         _close=$(awk 'NR > 1 && $0 == "---" { print NR; exit }' "$_f")
         [ -n "$_close" ] || echo "FAIL $_name: frontmatter never closes"
@@ -131,7 +134,7 @@ lint_skills() {
             [ -n "$_desc" ] || echo "FAIL $_name: empty or missing description"
             if [ -n "$_desc" ]; then
                 _dlen=$(printf '%s' "$_desc" | wc -c | tr -d ' ')
-                [ "$_dlen" -gt 400 ] && \
+                [ "$_dlen" -gt 400 ] &&
                     echo "FAIL $_name: description $_dlen bytes > 400"
             fi
         fi
@@ -145,12 +148,12 @@ lint_skills() {
         _flist=$(find "$_d" \( -type f -o -type l \) -print 2>/dev/null)
         _frc=$?
         _scan=$(printf '%s\n' "$_flist" | while IFS= read -r _p; do
-                  [ -n "$_p" ] || continue
-                  grep -qE "$LOCAL_SHAPES" "$_p" 2>/dev/null
-                  _rc=$?
-                  [ "$_rc" -eq 0 ] && printf 'hit:%s\n' "$_p"
-                  [ "$_rc" -gt 1 ] && printf 'err:%s\n' "$_p"
-              done)
+            [ -n "$_p" ] || continue
+            grep -qE "$LOCAL_SHAPES" "$_p" 2>/dev/null
+            _rc=$?
+            [ "$_rc" -eq 0 ] && printf 'hit:%s\n' "$_p"
+            [ "$_rc" -gt 1 ] && printf 'err:%s\n' "$_p"
+        done)
         [ "$_frc" -eq 0 ] || _scan="$_scan
 err:find-rc=$_frc $_d"
         case "$_scan" in
@@ -173,70 +176,70 @@ WORK="$(mktemp -d)"
 # covered by the suite trap at the TMP block above (#283 widening).
 
 mkdir -p "$WORK/skills/opk-good-skill" "$WORK/skills/opk-no-desc" \
-         "$WORK/skills/opk-wrong-name" "$WORK/skills/opk-local-ref" \
-         "$WORK/skills/opk-no-skill-md" "$WORK/skills/no-prefix" \
-         "$WORK/skills/opk-broken-open" "$WORK/skills/opk-unclosed" \
-         "$WORK/skills/opk-long-desc" "$WORK/skills/opk-legit-paths" \
-         "$WORK/skills/opk-body-field" "$WORK/skills/opk-scan-err" \
-         "$WORK/skills/opk-dot-local" "$WORK/skills/opk-abs-local" \
-         "$WORK/skills/opk-dblslash-local" \
-         "$WORK/skills/opk-find-err/sub"
-cat > "$WORK/skills/opk-good-skill/SKILL.md" <<'EOF'
+    "$WORK/skills/opk-wrong-name" "$WORK/skills/opk-local-ref" \
+    "$WORK/skills/opk-no-skill-md" "$WORK/skills/no-prefix" \
+    "$WORK/skills/opk-broken-open" "$WORK/skills/opk-unclosed" \
+    "$WORK/skills/opk-long-desc" "$WORK/skills/opk-legit-paths" \
+    "$WORK/skills/opk-body-field" "$WORK/skills/opk-scan-err" \
+    "$WORK/skills/opk-dot-local" "$WORK/skills/opk-abs-local" \
+    "$WORK/skills/opk-dblslash-local" \
+    "$WORK/skills/opk-find-err/sub"
+cat >"$WORK/skills/opk-good-skill/SKILL.md" <<'EOF'
 ---
 name: opk-good-skill
 description: Valid fixture skill used only by the skills lint self-test.
 ---
 Body.
 EOF
-cat > "$WORK/skills/opk-no-desc/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-no-desc/SKILL.md" <<'EOF'
 ---
 name: opk-no-desc
 ---
 Body.
 EOF
-cat > "$WORK/skills/opk-wrong-name/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-wrong-name/SKILL.md" <<'EOF'
 ---
 name: something-else
 description: Fixture whose name diverges from its directory.
 ---
 Body.
 EOF
-cat > "$WORK/skills/opk-local-ref/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-local-ref/SKILL.md" <<'EOF'
 ---
 name: opk-local-ref
 description: Fixture that references the disposable workspace.
 ---
 See local/legacy-2026-10/restructure-docs and ../local/notes.md.
 EOF
-echo "not a skill" > "$WORK/skills/opk-no-skill-md/note.txt"
-cat > "$WORK/skills/no-prefix/SKILL.md" <<'EOF'
+echo "not a skill" >"$WORK/skills/opk-no-skill-md/note.txt"
+cat >"$WORK/skills/no-prefix/SKILL.md" <<'EOF'
 ---
 name: no-prefix
 description: Fixture that lacks the house namespace prefix.
 ---
 Body.
 EOF
-cat > "$WORK/skills/opk-broken-open/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-broken-open/SKILL.md" <<'EOF'
 name: opk-broken-open
 description: Fixture whose frontmatter does not open with ---.
 ---
 Body.
 EOF
-cat > "$WORK/skills/opk-unclosed/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-unclosed/SKILL.md" <<'EOF'
 ---
 name: opk-unclosed
 description: Fixture whose frontmatter never closes.
 Body.
 EOF
 LONG_DESC="$(printf 'd%.0s' $(seq 1 401))"
-cat > "$WORK/skills/opk-long-desc/SKILL.md" <<EOF
+cat >"$WORK/skills/opk-long-desc/SKILL.md" <<EOF
 ---
 name: opk-long-desc
 description: $LONG_DESC
 ---
 Body.
 EOF
-cat > "$WORK/skills/opk-legit-paths/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-legit-paths/SKILL.md" <<'EOF'
 ---
 name: opk-legit-paths
 description: Fixture naming system and XDG local paths that stay legal.
@@ -249,7 +252,7 @@ Their slash-runs (cache//local/notes, cache///local/x) collapse to
 the same internal dir, and root-level //local/elsewhere resolves to
 /local — none reach the workspace; unflagged too (#235 c S1).
 EOF
-cat > "$WORK/skills/opk-body-field/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-body-field/SKILL.md" <<'EOF'
 ---
 name: opk-body-field
 ---
@@ -258,7 +261,7 @@ The shape this file must have, documented in the body:
 name: anything
 description: max 400 bytes
 EOF
-cat > "$WORK/skills/opk-scan-err/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-scan-err/SKILL.md" <<'EOF'
 ---
 name: opk-scan-err
 description: Fixture with an unreadable path in its file scan.
@@ -266,7 +269,7 @@ description: Fixture with an unreadable path in its file scan.
 Body.
 EOF
 ln -s /nonexistent-target-for-skills-lint "$WORK/skills/opk-scan-err/dangling"
-cat > "$WORK/skills/opk-dot-local/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-dot-local/SKILL.md" <<'EOF'
 ---
 name: opk-dot-local
 description: Fixture referencing the workspace via dot-slash shapes.
@@ -274,7 +277,7 @@ description: Fixture referencing the workspace via dot-slash shapes.
 See ./local/notes.md and .././local/scratch — both resolve into the
 disposable workspace (#235 b B1).
 EOF
-cat > "$WORK/skills/opk-dblslash-local/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-dblslash-local/SKILL.md" <<'EOF'
 ---
 name: opk-dblslash-local
 description: Fixture using doubled-slash spellings of workspace paths.
@@ -287,13 +290,13 @@ EOF
     printf -- '---\nname: opk-abs-local\ndescription: %s\n---\n' \
         "Fixture using the checkout-absolute workspace-local path."
     printf 'Archive at %s/scratch — the disposable workspace.\n' "$WS_LOCAL"
-} > "$WORK/skills/opk-abs-local/SKILL.md"
+} >"$WORK/skills/opk-abs-local/SKILL.md"
 # find-stage error: valid frontmatter, but the unreadable subdir makes
 # find itself fail (rc > 0) with its entries invisible to the scan --
 # only the err sentinel may report that (#235 b S4/B2). Root reads
 # through mode 000, so the pin below is uid-guarded (L4:
 # environment-dependent pins are marked).
-cat > "$WORK/skills/opk-find-err/SKILL.md" <<'EOF'
+cat >"$WORK/skills/opk-find-err/SKILL.md" <<'EOF'
 ---
 name: opk-find-err
 description: Fixture whose scan dies inside an unreadable subdir.
@@ -305,104 +308,105 @@ chmod 000 "$WORK/skills/opk-find-err/sub"
 _out=$(lint_skills "$WORK/skills")
 case "$_out" in
     *"FAIL no-prefix"*) echo "  pin ok: missing opk- prefix caught" ;;
-    *) echo "  PIN BROKEN: missing opk- prefix not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: missing opk- prefix not caught" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-no-desc"*) echo "  pin ok: missing description caught" ;;
-    *) echo "  PIN BROKEN: missing description not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: missing description not caught" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-body-field: empty or missing description"*) echo "  pin ok: body description: line does not satisfy the check" ;;
-    *) echo "  PIN BROKEN: body-field extraction leak (X4)" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: body-field extraction leak (X4)" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-wrong-name"*) echo "  pin ok: name mismatch caught" ;;
-    *) echo "  PIN BROKEN: name mismatch not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: name mismatch not caught" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-local-ref"*) echo "  pin ok: workspace local/ reference caught" ;;
-    *) echo "  PIN BROKEN: workspace local/ reference not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: workspace local/ reference not caught" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-no-skill-md"*) echo "  pin ok: missing SKILL.md caught" ;;
-    *) echo "  PIN BROKEN: missing SKILL.md not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: missing SKILL.md not caught" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-broken-open: frontmatter must open"*) echo "  pin ok: missing opening --- caught" ;;
-    *) echo "  PIN BROKEN: missing opening --- not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: missing opening --- not caught" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-unclosed: frontmatter never closes"*) echo "  pin ok: unclosed frontmatter caught" ;;
-    *) echo "  PIN BROKEN: unclosed frontmatter not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: unclosed frontmatter not caught" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-long-desc: description 401 bytes > 400"*) echo "  pin ok: oversized description caught (bytes)" ;;
-    *) echo "  PIN BROKEN: oversized description not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: oversized description not caught" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-scan-err: local/ scan errored"*) echo "  pin ok: scan error is a FAIL, not a clean" ;;
-    *) echo "  PIN BROKEN: scan error silently clean" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: scan error silently clean" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-scan-err: references local/"*)
-        echo "  PIN BROKEN: scan-err fixture also trips the hit branch (#235 b S3)" >> "$TMP" ;;
+        echo "  PIN BROKEN: scan-err fixture also trips the hit branch (#235 b S3)" >>"$TMP"
+        ;;
     *) echo "  pin ok: scan-err fixture exercises the err path alone" ;;
 esac
 case "$_out" in
     *"FAIL opk-dot-local: references local/"*) echo "  pin ok: dot-slash workspace refs caught" ;;
-    *) echo "  PIN BROKEN: ./local/ reference not caught (b B1)" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: ./local/ reference not caught (b B1)" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-abs-local: references local/"*) echo "  pin ok: absolute workspace-local ref caught" ;;
-    *) echo "  PIN BROKEN: absolute workspace-local reference not caught (b B1)" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: absolute workspace-local reference not caught (b B1)" >>"$TMP" ;;
 esac
 case "$_out" in
     *"FAIL opk-dblslash-local: references local/"*) echo "  pin ok: doubled-slash workspace refs caught" ;;
-    *) echo "  PIN BROKEN: .//local/ or ..//local/ reference not caught (#235 c S1)" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: .//local/ or ..//local/ reference not caught (#235 c S1)" >>"$TMP" ;;
 esac
 if [ "$(id -u)" -eq 0 ]; then
     echo "  pin skipped: find-error needs a non-root uid (root reads through 000)"
 else
     case "$_out" in
         *"FAIL opk-find-err: local/ scan errored"*) echo "  pin ok: find-stage error is a FAIL, not a clean" ;;
-        *) echo "  PIN BROKEN: find error silently clean (#235 b S4/B2)" >> "$TMP" ;;
+        *) echo "  PIN BROKEN: find error silently clean (#235 b S4/B2)" >>"$TMP" ;;
     esac
 fi
 case "$_out" in
-    *"FAIL opk-legit-paths"*) echo "  PIN BROKEN: legit /usr/local or ~/.local path flagged" >> "$TMP" ;;
+    *"FAIL opk-legit-paths"*) echo "  PIN BROKEN: legit /usr/local or ~/.local path flagged" >>"$TMP" ;;
     *) echo "  pin ok: system/XDG local paths not flagged" ;;
 esac
 case "$_out" in
-    *"opk-good-skill"*) echo "  PIN BROKEN: valid fixture flagged" >> "$TMP" ;;
+    *"opk-good-skill"*) echo "  PIN BROKEN: valid fixture flagged" >>"$TMP" ;;
     *) echo "  pin ok: valid fixture passes clean" ;;
 esac
 _out2=$(lint_skills "$WORK/skills-root-absent")
 case "$_out2" in
     *"FAIL skills root missing"*) echo "  pin ok: missing skills root caught" ;;
-    *) echo "  PIN BROKEN: missing skills root not caught" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: missing skills root not caught" >>"$TMP" ;;
 esac
 
 # --- real tree ----------------------------------------------------------
 
-lint_skills .agents/skills >> "$TMP" 2>&1
+lint_skills .agents/skills >>"$TMP" 2>&1
 
 # pr-00263 a F16: a bare file at the skills root FAILs loudly — the
 # loop used to examine directories only, so a bare file (which the
 # loader picks up) was silently unexamined.
 F16W="$(mktemp -d)"
 mkdir -p "$F16W/skills/opk-ok"
-cat > "$F16W/skills/opk-ok/SKILL.md" <<'EOF'
+cat >"$F16W/skills/opk-ok/SKILL.md" <<'EOF'
 ---
 name: opk-ok
 description: Fixture for the bare-file pin.
 ---
 Body.
 EOF
-printf 'bare\n' > "$F16W/skills/bare-at-root.md"
+printf 'bare\n' >"$F16W/skills/bare-at-root.md"
 _out16="$(lint_skills "$F16W/skills")"
 case "$_out16" in
     *"FAIL bare-at-root.md: bare file at the skills root"*) : ;;
-    *) echo "  PIN BROKEN: bare file at the skills root unexamined (pr-00263 a F16)" >> "$TMP" ;;
+    *) echo "  PIN BROKEN: bare file at the skills root unexamined (pr-00263 a F16)" >>"$TMP" ;;
 esac
 rm -rf "${F16W:?}"
 

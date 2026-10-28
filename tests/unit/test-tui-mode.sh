@@ -37,24 +37,32 @@ UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
-    desc="$1"; shift
+    desc="$1"
+    shift
     if "$@" >/dev/null 2>&1; then pass "$desc"; else fail "$desc"; fi
 }
 
 echo "== TUI mode display payload =="
 
 # --- payload files ------------------------------------------------------------
-check "plugin exists (kit-mode.tsx)"            test -f "$PLUGIN"
-check "danger theme exists"                     test -f "$THEME"
-check "opencode-user template exists (tui.json)"        test -f "$TUIJSON"
-check "default-user template exists (tui-danger.json)"  test -f "$TUIDANGER"
+check "plugin exists (kit-mode.tsx)" test -f "$PLUGIN"
+check "danger theme exists" test -f "$THEME"
+check "opencode-user template exists (tui.json)" test -f "$TUIJSON"
+check "default-user template exists (tui-danger.json)" test -f "$TUIDANGER"
 
 check_no() {
-    desc="$1"; shift
+    desc="$1"
+    shift
     if "$@" >/dev/null 2>&1; then fail "$desc"; else pass "$desc"; fi
 }
 
@@ -184,8 +192,8 @@ check "install.sh unregisters inert cli.json path entries (2x cleanup, via sh/tu
 check "update.sh fetch list includes the 2x plugin" \
     grep -q 'opencode-permissions-kit-lib/tui/kit-mode-2x.tsx' "$UPDATE"
 check "update.sh re-registers the 2x plugin dir (major-gated, sync function)" \
-    sh -c 'grep -qF "tui_plugin_sync_user \"\$_str_major\"" "$1" && grep -q "sync_tui_registration \"\$_oc_major\"" "$1" && grep -qF "sh/tui-plugin.sh" "$1"' _ "$UPDATE" \
-    && grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE"
+    sh -c 'grep -qF "tui_plugin_sync_user \"\$_str_major\"" "$1" && grep -q "sync_tui_registration \"\$_oc_major\"" "$1" && grep -qF "sh/tui-plugin.sh" "$1"' _ "$UPDATE" &&
+    grep -q 'sync_tui_registration "$_maj_after"' "$UPDATE"
 check "uninstall.sh removes the 2x plugin dir and cli.json entries" \
     grep -q 'plugins/opencode-permissions-kit' "$UNINSTALL" && grep -q 'kit-mode-2x.tsx' "$UNINSTALL"
 
@@ -200,23 +208,23 @@ T2X=$(mktemp -d)
 trap 'rm -rf "${T2X:-}" "${TUIWORK:-}"' EXIT INT TERM
 TUIWORK=""
 check "register: creates minimal cli.json" \
-    python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
-    && grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"' "$T2X/cli.json"
+    python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx &&
+    grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx"' "$T2X/cli.json"
 check "register: idempotent (second run, still exactly one entry)" \
-    python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
-    && [ "$(grep -c kit-mode-2x.tsx "$T2X/cli.json")" = "1" ]
-printf '{\n  // user comment survives\n  "theme": {"name": "gruvbox"},\n  "plugins": ["user-pkg", {"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"}]\n}\n' > "$T2X/cli2.json"
+    python3 "$REGISTER" "$T2X/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx &&
+    [ "$(grep -c kit-mode-2x.tsx "$T2X/cli.json")" = "1" ]
+printf '{\n  // user comment survives\n  "theme": {"name": "gruvbox"},\n  "plugins": ["user-pkg", {"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"}]\n}\n' >"$T2X/cli2.json"
 check "register: JSONC input, user keys survive, legacy v1 entry dropped" \
-    python3 "$REGISTER" "$T2X/cli2.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx \
-    && grep -q '"user-pkg"' "$T2X/cli2.json" && grep -q 'gruvbox' "$T2X/cli2.json" \
-    && grep -q kit-mode-2x.tsx "$T2X/cli2.json" && ! grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"' "$T2X/cli2.json"
+    python3 "$REGISTER" "$T2X/cli2.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx &&
+    grep -q '"user-pkg"' "$T2X/cli2.json" && grep -q 'gruvbox' "$T2X/cli2.json" &&
+    grep -q kit-mode-2x.tsx "$T2X/cli2.json" && ! grep -q '"package": "/usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx"' "$T2X/cli2.json"
 check "unregister: removes the kit entry, keeps the rest" \
-    python3 "$REGISTER" "$T2X/cli2.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
-    && ! grep -q kit-mode-2x.tsx "$T2X/cli2.json" && grep -q '"user-pkg"' "$T2X/cli2.json"
-echo "garbage" > "$T2X/bad.json"
+    python3 "$REGISTER" "$T2X/cli2.json" unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx &&
+    ! grep -q kit-mode-2x.tsx "$T2X/cli2.json" && grep -q '"user-pkg"' "$T2X/cli2.json"
+echo "garbage" >"$T2X/bad.json"
 check_no "register: refuses to touch unparseable cli.json" \
     python3 "$REGISTER" "$T2X/bad.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
-printf '{"plugins": "not-a-list"}' > "$T2X/bad2.json"
+printf '{"plugins": "not-a-list"}' >"$T2X/bad2.json"
 check_no "register: refuses non-list plugins key" \
     python3 "$REGISTER" "$T2X/bad2.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
 
@@ -224,7 +232,7 @@ check_no "register: refuses non-list plugins key" \
 # the TARGET's owner/mode and os.replace would destroy the link; the
 # register must refuse, leaving link and target untouched.
 mkdir -p "$T2X/symhome" "$T2X/dotfiles"
-printf '{"existing": true}\n' > "$T2X/dotfiles/cli.json"
+printf '{"existing": true}\n' >"$T2X/dotfiles/cli.json"
 ln -s "$T2X/dotfiles/cli.json" "$T2X/symhome/cli.json"
 check_no "register: refuses a symlinked cli.json (C2)" \
     python3 "$REGISTER" "$T2X/symhome/cli.json" register /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx
@@ -255,7 +263,7 @@ check "first-run cli.json parses and carries the plugin entry" \
 # non-root chown always fails; ownership is asserted by the e2e suites).
 TUIWORK=$(mktemp -d)
 mkdir -p "$TUIWORK/tps/bin"
-cat > "$TUIWORK/tps/bin/sudo-stub" <<'EOF'
+cat >"$TUIWORK/tps/bin/sudo-stub" <<'EOF'
 #!/bin/sh
 # test sudo stub: execute everything except chown (unownable as non-root)
 case "$1" in chown) exit 0 ;; esac
@@ -266,7 +274,9 @@ TPS="$TUIWORK/tps/home/oc/.config/opencode"
 mkdir -p "$TPS"
 
 _tps_run() {
-    _tps_desc="$1"; _tps_expect="$2"; shift 2
+    _tps_desc="$1"
+    _tps_expect="$2"
+    shift 2
     TR_SUDO="${_tps_sudo:-$TUIWORK/tps/bin/sudo-stub}"
     OPK_AGENT_HOME="${_tps_ah:-$TUIWORK/tps/home/oc}"
     export TR_SUDO OPK_AGENT_HOME
@@ -317,7 +327,7 @@ case "$_tps_out" in *rc=3*) check "plugins gate: rc=3 (user-managed skip)" true 
 # hard failure (0.0.41f C5): a failing privileged op returns rc 1 — the
 # path both callers map to die/exit 1. Stub fails mkdir only.
 mkdir -p "$TUIWORK/tps/bin2"
-cat > "$TUIWORK/tps/bin2/sudo-stub" <<'EOF'
+cat >"$TUIWORK/tps/bin2/sudo-stub" <<'EOF'
 #!/bin/sh
 case "$1" in mkdir) exit 1 ;; esac
 exec "$@"
@@ -325,7 +335,8 @@ EOF
 chmod +x "$TUIWORK/tps/bin2/sudo-stub"
 TPS4="$TUIWORK/tps/home4/oc/.config/opencode"
 mkdir -p "$TPS4"
-_tps_out=$( TR_SUDO="$TUIWORK/tps/bin2/sudo-stub"
+_tps_out=$(
+    TR_SUDO="$TUIWORK/tps/bin2/sudo-stub"
     OPK_AGENT_HOME="$TUIWORK/tps/home4/oc"
     export TR_SUDO OPK_AGENT_HOME
     log() { :; }
@@ -333,7 +344,9 @@ _tps_out=$( TR_SUDO="$TUIWORK/tps/bin2/sudo-stub"
     . "$TUIPLUGIN"
     # shellcheck disable=SC2030,SC2031
     . "$STAGEDWRITE"
-    tui_plugin_sync_user 2 "$TPS4" ocuser ocgroup "$_LIBROOT" opencode 2>&1; echo "rc=$?" )
+    tui_plugin_sync_user 2 "$TPS4" ocuser ocgroup "$_LIBROOT" opencode 2>&1
+    echo "rc=$?"
+)
 case "$_tps_out" in *rc=1*) check "hard failure: rc=1 (mapped to die/exit at callers)" true ;; *) check "hard failure: rc=1 (got [$_tps_out])" false ;; esac
 check "hard failure: no plugin dir left behind" test ! -e "$TPS4/plugins"
 
@@ -345,11 +358,13 @@ check "hard failure: no plugin dir left behind" test ! -e "$TPS4/plugins"
 # variable — consuming grep lines quoting it inline chain into the
 # sandbox scanner's rm-suffix pattern (#244 c S1).
 TPSDIAG='platform independent libraries'
-TPSNZ="$TUIWORK/tps/nz"; mkdir -p "$TPSNZ"
-printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$TPSDIAG" > "$TPSNZ/python3"
+TPSNZ="$TUIWORK/tps/nz"
+mkdir -p "$TPSNZ"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$TPSDIAG" >"$TPSNZ/python3"
 chmod +x "$TPSNZ/python3"
-TPSW="$TUIWORK/tps/w"; mkdir -p "$TPSW"
-_tps_out=$( PATH="$TPSNZ:$PATH" _tps_run "noisy-unregister" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+TPSW="$TUIWORK/tps/w"
+mkdir -p "$TPSW"
+_tps_out=$(PATH="$TPSNZ:$PATH" _tps_run "noisy-unregister" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode)
 case "$_tps_out" in
     *"$TPSDIAG"*rc=0*) check "unregister cleanup: broken python3 names itself, sync still rc=0 (#244 d W1)" true ;;
     *) check "unregister cleanup: broken python3 names itself, sync still rc=0 (#244 d W1) (got [$_tps_out])" false ;;
@@ -357,7 +372,8 @@ esac
 rm -rf "$TPSW"
 # absent python3: PATH restricted to a farm of the usual binaries minus
 # python3 — the cleanup must stay silent (no shell not-found noise).
-TPSABS="$TUIWORK/tps/absbin"; mkdir -p "$TPSABS"
+TPSABS="$TUIWORK/tps/absbin"
+mkdir -p "$TPSABS"
 for _tpd in /usr/bin /bin /usr/local/bin; do
     for _tpb in "$_tpd"/*; do
         [ -e "$_tpb" ] || continue
@@ -365,14 +381,15 @@ for _tpd in /usr/bin /bin /usr/local/bin; do
         ln -sfn "$_tpb" "$TPSABS/${_tpb##*/}"
     done
 done
-TPSW="$TUIWORK/tps/w3"; mkdir -p "$TPSW"
-_tps_out=$( PATH="$TPSABS" _tps_run "absent-unregister" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+TPSW="$TUIWORK/tps/w3"
+mkdir -p "$TPSW"
+_tps_out=$(PATH="$TPSABS" _tps_run "absent-unregister" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode)
 case "$_tps_out" in
     *rc=0*) _tpcase=true ;;
     *) _tpcase=false ;;
 esac
 case "$_tps_out" in
-    *"not found"*|*"Not found"*|*"$TPSDIAG"*) _tpcase=false ;;
+    *"not found"* | *"Not found"* | *"$TPSDIAG"*) _tpcase=false ;;
     *) ;;
 esac
 check "unregister cleanup: absent python3 stays silent, sync still rc=0 (#244 d Q1)" "$_tpcase"
@@ -383,10 +400,12 @@ rm -rf "$TPSW" "$TPSABS" "$TPSNZ"
 # prefix — reds the pin instead of sailing past fixed literals; the
 # claim the W1 comment makes). The cleanup's stdout is discarded by
 # the shipped >/dev/null either way.
-TPSW="$TUIWORK/tps/w4"; mkdir -p "$TPSW"
-TPSWERR="$TUIWORK/tps/w4.err"; : > "$TPSWERR"
+TPSW="$TUIWORK/tps/w4"
+mkdir -p "$TPSW"
+TPSWERR="$TUIWORK/tps/w4.err"
+: >"$TPSWERR"
 _tps_errfile="$TPSWERR"
-_tps_out=$( _tps_run "healthy-noop" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+_tps_out=$(_tps_run "healthy-noop" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode)
 unset _tps_errfile
 case "$_tps_out" in *rc=0*) check "unregister cleanup: healthy no-op rc=0 (#244 d W1)" true ;; *) check "unregister cleanup: healthy no-op rc=0 (got [$_tps_out])" false ;; esac
 check "unregister cleanup: healthy no-op, stderr empty (#244 e Q3)" test ! -s "$TPSWERR"
@@ -400,10 +419,12 @@ rm -rf "$TPSW" "$TPSWERR"
 # Arm A: caller PATH has python3 (noisy shim), exec context has none —
 # a caller-side guard leaks sudo's not-found notice here; the inner
 # guard must skip silently.
-TPSNZ2="$TUIWORK/tps/nz2"; mkdir -p "$TPSNZ2"
-printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$TPSDIAG" > "$TPSNZ2/python3"
+TPSNZ2="$TUIWORK/tps/nz2"
+mkdir -p "$TPSNZ2"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$TPSDIAG" >"$TPSNZ2/python3"
 chmod +x "$TPSNZ2/python3"
-TPSFIXA="$TUIWORK/tps/fixa"; mkdir -p "$TPSFIXA"
+TPSFIXA="$TUIWORK/tps/fixa"
+mkdir -p "$TPSFIXA"
 for _tpd in /usr/bin /bin /usr/local/bin; do
     for _tpb in "$_tpd"/*; do
         [ -e "$_tpb" ] || continue
@@ -411,22 +432,23 @@ for _tpd in /usr/bin /bin /usr/local/bin; do
         ln -sfn "$_tpb" "$TPSFIXA/${_tpb##*/}"
     done
 done
-cat > "$TUIWORK/tps/bin/sudo-fixa" <<EOF
+cat >"$TUIWORK/tps/bin/sudo-fixa" <<EOF
 #!/bin/sh
 case "\$1" in chown) exit 0 ;; esac
 PATH="$TPSFIXA" exec "\$@"
 EOF
 chmod +x "$TUIWORK/tps/bin/sudo-fixa"
-TPSW="$TUIWORK/tps/w6"; mkdir -p "$TPSW"
+TPSW="$TUIWORK/tps/w6"
+mkdir -p "$TPSW"
 _tps_sudo="$TUIWORK/tps/bin/sudo-fixa"
-_tps_out=$( PATH="$TPSNZ2:$PATH" _tps_run "asym-a" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+_tps_out=$(PATH="$TPSNZ2:$PATH" _tps_run "asym-a" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode)
 unset _tps_sudo
 case "$_tps_out" in
     *rc=0*) _tpcase=true ;;
     *) _tpcase=false ;;
 esac
 case "$_tps_out" in
-    *"not found"*|*"Not found"*|*"$TPSDIAG"*) _tpcase=false ;;
+    *"not found"* | *"Not found"* | *"$TPSDIAG"*) _tpcase=false ;;
     *) ;;
 esac
 check "unregister cleanup: exec context without python3 stays silent despite caller PATH (#244 e S1 arm A)" "$_tpcase"
@@ -434,25 +456,27 @@ rm -rf "$TPSW" "$TPSNZ2"
 # Arm B: caller PATH has NO python3, exec context has one (recording
 # shim) — a caller-side guard skips the cleanup here; the inner guard
 # must run it (the marker proves execution).
-TPSFIXB="$TUIWORK/tps/fixb"; mkdir -p "$TPSFIXB"
+TPSFIXB="$TUIWORK/tps/fixb"
+mkdir -p "$TPSFIXB"
 for _tpf in "$TPSFIXA"/*; do
     [ -e "$_tpf" ] || continue
     ln -sfn "$_tpf" "$TPSFIXB/${_tpf##*/}"
 done
 TPSMARK="$TUIWORK/tps/armb.marker"
-cat > "$TPSFIXB/python3" <<EOF
+cat >"$TPSFIXB/python3" <<EOF
 #!/bin/sh
 echo "asym-b exec seen: \$*" >> "$TPSMARK"
 exit 0
 EOF
 chmod +x "$TPSFIXB/python3"
-cat > "$TUIWORK/tps/bin/sudo-fixb" <<EOF
+cat >"$TUIWORK/tps/bin/sudo-fixb" <<EOF
 #!/bin/sh
 case "\$1" in chown) exit 0 ;; esac
 PATH="$TPSFIXB" exec "\$@"
 EOF
 chmod +x "$TUIWORK/tps/bin/sudo-fixb"
-TPSABS2="$TUIWORK/tps/absbin2"; mkdir -p "$TPSABS2"
+TPSABS2="$TUIWORK/tps/absbin2"
+mkdir -p "$TPSABS2"
 for _tpd in /usr/bin /bin /usr/local/bin; do
     for _tpb in "$_tpd"/*; do
         [ -e "$_tpb" ] || continue
@@ -460,9 +484,10 @@ for _tpd in /usr/bin /bin /usr/local/bin; do
         ln -sfn "$_tpb" "$TPSABS2/${_tpb##*/}"
     done
 done
-TPSW="$TUIWORK/tps/w7"; mkdir -p "$TPSW"
+TPSW="$TUIWORK/tps/w7"
+mkdir -p "$TPSW"
 _tps_sudo="$TUIWORK/tps/bin/sudo-fixb"
-_tps_out=$( PATH="$TPSABS2" _tps_run "asym-b" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode )
+_tps_out=$(PATH="$TPSABS2" _tps_run "asym-b" 0 2 "$TPSW" ocuser ocgroup "$_LIBROOT" opencode)
 unset _tps_sudo
 case "$_tps_out" in *rc=0*) check "unregister cleanup: caller PATH without python3, sync rc=0 (#244 e S1 arm B)" true ;; *) check "unregister cleanup: caller PATH without python3, sync rc=0 (got [$_tps_out])" false ;; esac
 check "unregister cleanup: exec-context python3 runs despite caller absence (#244 e S1 arm B)" test -f "$TPSMARK"

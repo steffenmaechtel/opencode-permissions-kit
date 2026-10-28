@@ -44,10 +44,10 @@ UI_LIB="$REPO_ROOT/files/opencode-permissions-kit-lib/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     . "$UI_LIB"
 else
-    ui_info()    { echo "  info     $1"; }
+    ui_info() { echo "  info     $1"; }
     ui_success() { echo "  success  $1"; }
-    ui_error()   { echo "  error    $1" >&2; }
-    ui_detail()  { echo "     $1"; }
+    ui_error() { echo "  error    $1" >&2; }
+    ui_detail() { echo "     $1"; }
 fi
 
 for tool in node npm; do
@@ -101,9 +101,9 @@ SHIM="$REPO_ROOT/tests/fixtures/tsx-parse-shim.d.ts"
 # hand-maintained file list to drift.
 ui_info "parse-checking files/opencode-permissions-kit-lib/tui/*.tsx"
 if "$TSC" --noEmit --jsx preserve --noResolve --target esnext --lib esnext \
-        --skipLibCheck \
-        "$SHIM" \
-        "$REPO_ROOT"/files/opencode-permissions-kit-lib/tui/*.tsx; then
+    --skipLibCheck \
+    "$SHIM" \
+    "$REPO_ROOT"/files/opencode-permissions-kit-lib/tui/*.tsx; then
     ui_success "tsx syntax OK."
     exit 0
 fi

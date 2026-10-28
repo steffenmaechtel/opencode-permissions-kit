@@ -36,7 +36,10 @@ _sw_sudo() { ${SW_SUDO-sudo} "$@"; }
 # the POLICY for a symlinked destination (skip as user-managed vs.
 # replace the link) BEFORE calling — this function always replaces.
 staged_write() {
-    _sw_mode="$1"; _sw_owner="$2"; _sw_src="$3"; _sw_dst="$4"
+    _sw_mode="$1"
+    _sw_owner="$2"
+    _sw_src="$3"
+    _sw_dst="$4"
     _sw_stage="${SW_STAGE_DIR:-/etc/opencode-permissions-kit}"
     _sw_tmp=$(_sw_sudo mktemp "$_sw_stage/.opk-stage.XXXXXX") || return 1
     # Register for the caller's scratch-cleanup trap (0.0.39e C3): the
@@ -47,9 +50,9 @@ staged_write() {
     # cp (not a redirect): the staged file is root-owned inside a
     # root-owned dir — no unprivileged shell ever opens it, and no
     # planted name can appear between mktemp and now.
-    if ! _sw_sudo cp "$_sw_src" "$_sw_tmp" \
-       || ! _sw_sudo chown "$_sw_owner" "$_sw_tmp" \
-       || ! _sw_sudo chmod "$_sw_mode" "$_sw_tmp"; then
+    if ! _sw_sudo cp "$_sw_src" "$_sw_tmp" ||
+        ! _sw_sudo chown "$_sw_owner" "$_sw_tmp" ||
+        ! _sw_sudo chmod "$_sw_mode" "$_sw_tmp"; then
         _sw_sudo rm -f "$_sw_tmp"
         return 1
     fi
@@ -61,12 +64,15 @@ staged_write() {
     # that variant is refused too; a link to a FILE is still replaced
     # (the S1 contract).
     if _sw_sudo [ -d "$_sw_dst" ]; then
-        echo "error: staged_write: destination '$_sw_dst' is a directory"\
-" — refusing (mv would move the staged file inside it)" >&2
+        echo "error: staged_write: destination '$_sw_dst' is a directory""\
+ — refusing (mv would move the staged file inside it)" >&2
         _sw_sudo rm -f "$_sw_tmp"
         return 1
     fi
-    _sw_sudo mv -f "$_sw_tmp" "$_sw_dst" || { _sw_sudo rm -f "$_sw_tmp"; return 1; }
+    _sw_sudo mv -f "$_sw_tmp" "$_sw_dst" || {
+        _sw_sudo rm -f "$_sw_tmp"
+        return 1
+    }
     return 0
 }
 
@@ -96,7 +102,7 @@ agent_home_sane() {
     _ahs_path="$2"
     _ahs_base="${OPK_AGENT_HOME:-/home/$_ahs_user}"
     case "$_ahs_path" in
-        "$_ahs_base"|"$_ahs_base"/*) ;;
+        "$_ahs_base" | "$_ahs_base"/*) ;;
         *) return 0 ;;
     esac
     [ "$_ahs_path" = "$_ahs_base" ] && return 0
@@ -108,15 +114,15 @@ agent_home_sane() {
                 _ahs_rest="${_ahs_rest#*/}"
                 _ahs_base="$_ahs_base/$_ahs_seg"
                 if [ -L "$_ahs_base" ]; then
-                    printf '%s\n' "  WARNING: $_ahs_base is a symlink inside the agent home — the kit never follows it"\
-" (user-managed); the affected write is skipped." >&2
+                    printf '%s\n' "  WARNING: $_ahs_base is a symlink inside the agent home — the kit never follows it""\
+ (user-managed); the affected write is skipped." >&2
                     return 1
                 fi
                 ;;
             *)
                 if [ -L "$_ahs_path" ]; then
-                    printf '%s\n' "  WARNING: $_ahs_path is a symlink inside the agent home — the kit never follows it"\
-" (user-managed); the affected write is skipped." >&2
+                    printf '%s\n' "  WARNING: $_ahs_path is a symlink inside the agent home — the kit never follows it""\
+ (user-managed); the affected write is skipped." >&2
                     return 1
                 fi
                 return 0

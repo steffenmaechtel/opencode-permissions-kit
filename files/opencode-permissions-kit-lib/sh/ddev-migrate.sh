@@ -93,7 +93,7 @@ ddev_migrate_under_roots() {
     dmur_p="${1%/}"
     shift
     for dmur_r in "$@"; do
-        case "$dmur_p" in "${dmur_r%/}"|"${dmur_r%/}"/*) return 0 ;; esac
+        case "$dmur_p" in "${dmur_r%/}" | "${dmur_r%/}"/*) return 0 ;; esac
     done
     return 1
 }
@@ -112,7 +112,8 @@ ddev_migrate_home() {
 # one of the registered roots (those are the projects the kit takes over)
 # and whose directory still exists.
 ddev_migrate_projects() {
-    dm_ph="${1:-}"; shift
+    dm_ph="${1:-}"
+    shift
     [ -n "$dm_ph" ] || return 0
     ddev_migrate_registry "$dm_ph" | while IFS='|' read -r dm_n dm_ar; do
         [ -n "$dm_ar" ] || continue
@@ -130,7 +131,8 @@ ddev_migrate_projects() {
 # the root filter silently drops (production finding: one of twelve
 # projects exported, no hint why).
 ddev_migrate_outside() {
-    dmo_ph="${1:-}"; shift
+    dmo_ph="${1:-}"
+    shift
     [ -n "$dmo_ph" ] || return 0
     ddev_migrate_registry "$dmo_ph" | while IFS='|' read -r dmo_n dmo_ar; do
         [ -n "$dmo_ar" ] || continue
@@ -150,7 +152,8 @@ ddev_migrate_outside() {
 # DDEV_EXPORTED=1, and every retry silently skipped while eleven
 # databases stayed behind in the old daemon.
 ddev_migrate_gap() {
-    dmg_dev="$1"; shift
+    dmg_dev="$1"
+    shift
     dmg_dir=$(ddev_migrate_latest_dir)
     [ -n "$dmg_dir" ] || return 1
     # Root never opens a path inside the agent-replaceable dump dir (the
@@ -167,7 +170,7 @@ ddev_migrate_gap() {
     dmg_stage=$(mktemp) || return 1
     command -v _tmp_track >/dev/null 2>&1 && _tmp_track "$dmg_stage"
     dmg_found=$(find "$dmg_dir" -maxdepth 1 -type f -name manifest.conf -print -quit 2>/dev/null)
-    if [ -z "$dmg_found" ] || ! timeout 5 cat "$dmg_found" > "$dmg_stage" 2>/dev/null; then
+    if [ -z "$dmg_found" ] || ! timeout 5 cat "$dmg_found" >"$dmg_stage" 2>/dev/null; then
         rm -f "$dmg_stage" 2>/dev/null || true
         return 1
     fi
@@ -199,7 +202,8 @@ ddev_migrate_done() {
 # drops them; ddev needs HOME for its registry and XDG_RUNTIME_DIR for
 # a rootless socket). Callers are root (install.sh / sudo standalone).
 _ddev_migrate_run_as() {
-    dm_u="$1"; shift
+    dm_u="$1"
+    shift
     dm_h=$(getent passwd "$dm_u" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$dm_h" ] || return 1
     dm_i=$(id -u "$dm_u" 2>/dev/null)
@@ -234,7 +238,10 @@ _ddev_migrate_bin() {
     for dm_c in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev \
         "${dmb_h:+$dmb_h/.local/bin/ddev}" "${dmb_h:+$dmb_h/bin/ddev}" "${dmb_h:+$dmb_h/.ddev/bin/ddev}"; do
         # -f besides -x: a traversable directory must never qualify.
-        [ -n "$dm_c" ] && [ -f "$dm_c" ] && [ -x "$dm_c" ] && { echo "$dm_c"; return 0; }
+        [ -n "$dm_c" ] && [ -f "$dm_c" ] && [ -x "$dm_c" ] && {
+            echo "$dm_c"
+            return 0
+        }
     done
     return 1
 }
@@ -245,7 +252,10 @@ _ddev_migrate_bin() {
 # ddev-written forms — inline ("[db, ddev-ssh-agent]") and block
 # ("- db" items on following lines). A missing file is "no".
 _ddev_migrate_list_has_db() {
-    [ -f "$1" ] || { echo no; return 0; }
+    [ -f "$1" ] || {
+        echo no
+        return 0
+    }
     # NOTE: awk `exit` still runs the END block — decide there, once.
     awk -v key="$2" '
         # CRLF guard (issue #46): Windows-edited config.yaml — block-list
@@ -286,7 +296,8 @@ _ddev_migrate_list_has_db() {
 # `omit_containers_global: [db]` (global config) omits it — ddev only
 # ever allows "db" and "ddev-ssh-agent" there (pkg/nodeps/values.go).
 ddev_migrate_has_db() {
-    dm_root="${1:-}"; dm_home="${2:-}"
+    dm_root="${1:-}"
+    dm_home="${2:-}"
     [ -n "$dm_root" ] || return 1
     [ "$(_ddev_migrate_list_has_db "$dm_root/.ddev/config.yaml" omit_containers)" = "yes" ] && return 1
     [ "$(_ddev_migrate_list_has_db "$dm_home/global_config.yaml" omit_containers_global)" = "yes" ] && return 1
@@ -307,8 +318,14 @@ ddev_migrate_has_db() {
 # installer stamped DDEV_EXPORTED=1 over it. Returns 0 when at least
 # one dump was written.
 ddev_migrate_export() {
-    dm_dev="$1"; dm_oc="$2"; dm_ocg="$3"; shift 3
-    DD_MIG_DUMP_DIR=""; DD_MIG_OK=""; DD_MIG_FAIL=""; DD_MIG_FAILLIST=""
+    dm_dev="$1"
+    dm_oc="$2"
+    dm_ocg="$3"
+    shift 3
+    DD_MIG_DUMP_DIR=""
+    DD_MIG_OK=""
+    DD_MIG_FAIL=""
+    DD_MIG_FAILLIST=""
     dm_bin=$(_ddev_migrate_bin "$dm_dev") || {
         echo "  ddev not found — cannot export databases."
         return 1
@@ -317,14 +334,17 @@ ddev_migrate_export() {
     # unit tests hermetic — never read a real user's registry there).
     dm_home=$(ddev_migrate_home "$dm_dev")
     dm_list=$(ddev_migrate_projects "$dm_home/.ddev" "$@")
-    [ -n "$dm_list" ] || { echo "  no ddev projects under the registered roots."; return 1; }
+    [ -n "$dm_list" ] || {
+        echo "  no ddev projects under the registered roots."
+        return 1
+    }
     # Registry entries outside the given roots are legal by design (the
     # kit only takes over registered roots) — but a silently shrinking
     # dump set is the #1 migration surprise. Say it loudly, with names.
     dm_outside=$(ddev_migrate_outside "$dm_home/.ddev" "$@")
     if [ -n "$dm_outside" ]; then
-        echo "  WARNING: $(printf '%s\n' "$dm_outside" | grep -c .) registered ddev project(s)"\
-" are OUTSIDE the given roots — NOT exported:"
+        echo "  WARNING: $(printf '%s\n' "$dm_outside" | grep -c .) registered ddev project(s)""\
+ are OUTSIDE the given roots — NOT exported:"
         printf '%s\n' "$dm_outside" | sed 's/^/    /'
     fi
 
@@ -375,7 +395,7 @@ ddev_migrate_export() {
     # The stage is removed before finalize so chown -R never hands it
     # to the agent.
     DM_STAGE="$DD_MIG_DUMP_DIR/.root-stage"
-    rm -rf "$DM_STAGE" 2>/dev/null || true   # stale stage from an aborted run
+    rm -rf "$DM_STAGE" 2>/dev/null || true # stale stage from an aborted run
     mkdir -m 700 "$DM_STAGE" || return 1
     # Seed (0.0.44b W2, hardened 0.0.44c C3): trust only a REGULAR file
     # owned by root or the dev — an agent-owned entry (regular or link)
@@ -384,21 +404,21 @@ ddev_migrate_export() {
     # the whole inter-run gap, so planting needs no race there.
     if [ -e "$DD_MIG_DUMP_DIR/manifest.conf" ]; then
         _seed_owner=$(stat -c %U "$DD_MIG_DUMP_DIR/manifest.conf" 2>/dev/null || true)
-        if [ -L "$DD_MIG_DUMP_DIR/manifest.conf" ] \
-           || { [ "$_seed_owner" != root ] && [ "$_seed_owner" != "$dm_dev" ]; }; then
+        if [ -L "$DD_MIG_DUMP_DIR/manifest.conf" ] ||
+            { [ "$_seed_owner" != root ] && [ "$_seed_owner" != "$dm_dev" ]; }; then
             echo "  REFUSED: $DD_MIG_DUMP_DIR/manifest.conf is a symlink or not root/dev-owned — tampering?" >&2
             rm -rf "$DM_STAGE"
             return 1
         fi
-        cat "$DD_MIG_DUMP_DIR/manifest.conf" > "$DM_STAGE/manifest.auth" 2>/dev/null || true
+        cat "$DD_MIG_DUMP_DIR/manifest.conf" >"$DM_STAGE/manifest.auth" 2>/dev/null || true
     fi
-    [ -f "$DM_STAGE/manifest.auth" ] || : > "$DM_STAGE/manifest.auth"
+    [ -f "$DM_STAGE/manifest.auth" ] || : >"$DM_STAGE/manifest.auth"
     # _dm_manifest_add <line>: append to the AUTHORITATIVE copy inside
     # the root-only stage, then publish a fresh copy via atomic rename.
     _dm_manifest_add() {
-        printf '%s\n' "$1" >> "$DM_STAGE/manifest.auth"
+        printf '%s\n' "$1" >>"$DM_STAGE/manifest.auth"
         _dma_pub="$DM_STAGE/manifest.$$"
-        cat "$DM_STAGE/manifest.auth" > "$_dma_pub"
+        cat "$DM_STAGE/manifest.auth" >"$_dma_pub"
         mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
     }
 
@@ -415,8 +435,8 @@ ddev_migrate_export() {
         # AUTHORITATIVE stage copy (0.0.44b W2), never the dump-dir file.
         # (Fixed-string match, 0.0.44a V23: a project name must never be
         # interpolated as a BRE/ERE — "sh.p" cross-matched "shop".)
-        if [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] \
-           && grep -qF "OK|$dm_n|" "$DM_STAGE/manifest.auth" 2>/dev/null; then
+        if [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ] &&
+            grep -qF "OK|$dm_n|" "$DM_STAGE/manifest.auth" 2>/dev/null; then
             echo "    already exported — skipping (resume)"
             continue
         fi
@@ -426,11 +446,11 @@ ddev_migrate_export() {
         # Same authoritative-copy discipline (0.0.44b W2) and fixed
         # strings (V23): rewrite auth, publish via rename.
         grep -v -F -e "OK|$dm_n|" -e "FAIL|$dm_n|" -e "SKIP|$dm_n|" \
-            "$DM_STAGE/manifest.auth" > "$DM_STAGE/manifest.next" || true
+            "$DM_STAGE/manifest.auth" >"$DM_STAGE/manifest.next" || true
         mv -f "$DM_STAGE/manifest.next" "$DM_STAGE/manifest.auth"
         # publish the rewrite (same build-new + rename as _dm_manifest_add)
         _dma_pub="$DM_STAGE/manifest.$$"
-        cat "$DM_STAGE/manifest.auth" > "$_dma_pub"
+        cat "$DM_STAGE/manifest.auth" >"$_dma_pub"
         mv -f "$_dma_pub" "$DD_MIG_DUMP_DIR/manifest.conf"
         # Already handed over? dev-side ddev cannot start it anymore.
         if [ -d "$dm_ar/.ddev" ] && [ "$(stat -c %U "$dm_ar/.ddev" 2>/dev/null)" = "$dm_oc" ]; then
@@ -456,8 +476,8 @@ ddev_migrate_export() {
         # there would be truncated THROUGH by this very redirect.
         dm_err="$DM_STAGE/export-$dm_n.err"
         if _ddev_migrate_run_as "$dm_dev" "$dm_bin" export-db "$dm_n" \
-           --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" </dev/null >"$dm_err" 2>&1 \
-           && [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
+            --file="$DD_MIG_DUMP_DIR/$dm_n.sql.gz" </dev/null >"$dm_err" 2>&1 &&
+            [ -s "$DD_MIG_DUMP_DIR/$dm_n.sql.gz" ]; then
             echo "    dump: $DD_MIG_DUMP_DIR/$dm_n.sql.gz"
             _dm_manifest_add "OK|$dm_n|$dm_ar|$dm_n.sql.gz"
         elif grep -q "service db does not exist" "$dm_err" 2>/dev/null; then
@@ -475,16 +495,16 @@ ddev_migrate_export() {
         # Stop this project before the next one starts: a production
         # machine may hold dozens of ddev projects — running them all at
         # once would exhaust RAM. Volumes are kept by plain `ddev stop`.
-        _ddev_migrate_run_as "$dm_dev" "$dm_bin" stop "$dm_n" </dev/null >/dev/null 2>&1 \
-            || echo "    NOTE: ddev stop failed — stop $dm_n manually to free its resources"
+        _ddev_migrate_run_as "$dm_dev" "$dm_bin" stop "$dm_n" </dev/null >/dev/null 2>&1 ||
+            echo "    NOTE: ddev stop failed — stop $dm_n manually to free its resources"
     done
 
     # One poweroff stops every project AND the old ddev-router: the ports
     # are free for the opencode-side router later. Containers are removed
     # but database volumes stay — nothing is destroyed.
-    _ddev_migrate_run_as "$dm_dev" "$dm_bin" poweroff </dev/null >/dev/null 2>&1 \
-        && echo "  old ddev powered off (database volumes kept)" \
-        || echo "  NOTE: ddev poweroff failed — stop the old projects manually before the first opencode-side start"
+    _ddev_migrate_run_as "$dm_dev" "$dm_bin" poweroff </dev/null >/dev/null 2>&1 &&
+        echo "  old ddev powered off (database volumes kept)" ||
+        echo "  NOTE: ddev poweroff failed — stop the old projects manually before the first opencode-side start"
 
     # Accounting reads the AUTHORITATIVE stage copy (0.0.44c C2): the old
     # finalize grep -c opened the dump-dir manifest AFTER chown -R handed
@@ -558,7 +578,10 @@ ddev_migrate_latest_dir() {
 # registers it in the opencode registry and pulls images on first run.
 ddev_migrate_import() {
     _mig_entry='/usr/local/lib/opencode-permissions-kit/bin/ddev-migrate'
-    [ "$(id -u)" = 0 ] || { echo "ddev-migrate: import must run as root (sudo $_mig_entry import)"; return 1; }
+    [ "$(id -u)" = 0 ] || {
+        echo "ddev-migrate: import must run as root (sudo $_mig_entry import)"
+        return 1
+    }
     dm_dir="${1:-$(ddev_migrate_latest_dir)}"
     # Same S6 discipline as ddev_migrate_gap (0.0.45c): the dump dir is
     # agent-owned after finalize, so root never READS its manifest.conf
@@ -587,21 +610,30 @@ ddev_migrate_import() {
         echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
         return 1
     fi
-    if ! timeout 5 cat "$dm_found" > "$dm_manifest" 2>/dev/null; then
+    if ! timeout 5 cat "$dm_found" >"$dm_manifest" 2>/dev/null; then
         rm -f "$dm_manifest" 2>/dev/null || true
         echo "ddev-migrate: manifest found but unreadable (timeout or permissions) — refusing to import from $dm_dir"
         return 1
     fi
 
     dm_conf="/etc/opencode-permissions-kit/install.conf"
-    dm_oc="opencode"; dm_be=""; dm_dh=""; dm_ps=""
+    dm_oc="opencode"
+    dm_be=""
+    dm_dh=""
+    dm_ps=""
     [ -f "$dm_conf" ] && . "$dm_conf"
     dm_oc="${OPENCODE_USER:-$dm_oc}"
     dm_be="${CONTAINER_BACKEND:-$dm_be}"
     dm_dh="${OPENCODE_DOCKER_HOST:-$dm_dh}"
     dm_ps="${OPENCODE_PODMAN_SOCKET:-$dm_ps}"
-    id "$dm_oc" >/dev/null 2>&1 || { echo "ddev-migrate: user '$dm_oc' does not exist"; return 1; }
-    dm_bin=$(_ddev_migrate_bin "$dm_oc") || { echo "ddev-migrate: ddev is not installed"; return 1; }
+    id "$dm_oc" >/dev/null 2>&1 || {
+        echo "ddev-migrate: user '$dm_oc' does not exist"
+        return 1
+    }
+    dm_bin=$(_ddev_migrate_bin "$dm_oc") || {
+        echo "ddev-migrate: ddev is not installed"
+        return 1
+    }
 
     # Home via getent, not /home/<user> (0.0.43a F12); every env assignment
     # is ONE quoted argument — a spaced HOME or DOCKER_HOST must not split
@@ -616,27 +648,32 @@ ddev_migrate_import() {
         podman-rootless) [ -n "$dm_ps" ] && dm_extra="DOCKER_HOST=$dm_ps" ;;
     esac
 
-    dm_ok=0; dm_failed=""
+    dm_ok=0
+    dm_failed=""
     while IFS='|' read -r dm_st dm_n dm_ar dm_f; do
         [ "$dm_st" = "OK" ] && [ -n "$dm_n" ] && [ -n "$dm_ar" ] && [ -n "$dm_f" ] || continue
-        [ -f "$dm_dir/$dm_f" ] \
-           || { echo "  $dm_n: dump missing ($dm_dir/$dm_f)"; dm_failed="$dm_failed $dm_n"; continue; }
+        [ -f "$dm_dir/$dm_f" ] ||
+            {
+                echo "  $dm_n: dump missing ($dm_dir/$dm_f)"
+                dm_failed="$dm_failed $dm_n"
+                continue
+            }
         echo "  importing $dm_n ($dm_ar) ..."
         # </dev/null: this loop's stdin IS manifest.conf — ddev reads
         # stdin and would consume the manifest mid-iteration (same class
         # as the export-loop finding).
         if sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
-               ${dm_extra:+"$dm_extra"} "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 \
-           && sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
-               ${dm_extra:+"$dm_extra"} "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
-              </dev/null >/dev/null 2>&1; then
+            ${dm_extra:+"$dm_extra"} "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 &&
+            sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
+                ${dm_extra:+"$dm_extra"} "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
+                </dev/null >/dev/null 2>&1; then
             echo "    imported: $dm_f"
             dm_ok=$((dm_ok + 1))
         else
             echo "    FAILED — import manually: ddev start $dm_n && ddev import-db $dm_n --file=$dm_dir/$dm_f"
             dm_failed="$dm_failed $dm_n"
         fi
-    done < "$dm_manifest"
+    done <"$dm_manifest"
     rm -f "$dm_manifest" 2>/dev/null || true
 
     echo ""

@@ -35,19 +35,27 @@ SKIP_TESTS=false
 SKIP_CI=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        -h|--help)
+        -h | --help)
             # Print the header comment, stopping at the first non-comment
             # line (0.0.44a V26): the old fixed `2,31p` range rotted every
             # time the header shrank or grew, and printed code lines.
             awk 'NR > 1 && $0 !~ /^#/ {exit} NR > 1' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
-        --dry-run)     DRY_RUN=true ;;
-        --skip-tests)  SKIP_TESTS=true ;;
-        --skip-ci)     SKIP_CI=true ;;
-        -*)            echo "error:  unknown option: $1" >&2; exit 1 ;;
-        *)             [ -z "$VERSION" ] || { echo "error:  only one version argument allowed" >&2; exit 1; }
-                       VERSION="$1" ;;
+        --dry-run) DRY_RUN=true ;;
+        --skip-tests) SKIP_TESTS=true ;;
+        --skip-ci) SKIP_CI=true ;;
+        -*)
+            echo "error:  unknown option: $1" >&2
+            exit 1
+            ;;
+        *)
+            [ -z "$VERSION" ] || {
+                echo "error:  only one version argument allowed" >&2
+                exit 1
+            }
+            VERSION="$1"
+            ;;
     esac
     shift
 done
@@ -60,8 +68,8 @@ if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
     exit 1
 fi
 
-say()  { printf '  %s\n' "$*"; }
-err()  { printf 'error:  %s\n' "$*" >&2; }
+say() { printf '  %s\n' "$*"; }
+err() { printf 'error:  %s\n' "$*" >&2; }
 step() { printf '\n== %s ==\n' "$*"; }
 
 # run <cmd...>: execute, or just announce in dry-run mode.
@@ -161,19 +169,19 @@ else
     _ci_tsv=""
     if command -v gh >/dev/null 2>&1; then
         if _ci_tsv="$(gh run list --branch master -L 10 \
-                --json headSha,status,conclusion \
-                --jq ".[] | select(.headSha == \"$HEAD_REV\") | [.status, .conclusion] | @tsv" \
-                2>/dev/null)"; then
+            --json headSha,status,conclusion \
+            --jq ".[] | select(.headSha == \"$HEAD_REV\") | [.status, .conclusion] | @tsv" \
+            2>/dev/null)"; then
             _ci_answered=true
         fi
     fi
     if [ "$_ci_answered" != true ] && command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
-        _repo_slug="$(git -C "$REPO" remote get-url origin 2>/dev/null \
-            | sed -n 's#.*github\.com[:/]##p' | sed 's#\.git$##')"
+        _repo_slug="$(git -C "$REPO" remote get-url origin 2>/dev/null |
+            sed -n 's#.*github\.com[:/]##p' | sed 's#\.git$##')"
         if [ -n "$_repo_slug" ]; then
             if _ci_tsv="$(curl -fsSL --max-time 20 \
-                    "https://api.github.com/repos/$_repo_slug/actions/runs?branch=master&per_page=20" 2>/dev/null \
-                    | HEAD_SHA="$HEAD_REV" python3 -c '
+                "https://api.github.com/repos/$_repo_slug/actions/runs?branch=master&per_page=20" 2>/dev/null |
+                HEAD_SHA="$HEAD_REV" python3 -c '
 import json, os, sys
 try:
     data = json.load(sys.stdin)

@@ -64,8 +64,8 @@ if [ "${1:-}" = "--opk-ensure-shared" ]; then
     if [ -n "$_opk_dir" ] && [ -d "$_opk_dir" ]; then
         find "$_opk_dir" \
             -type d \( -name db_snapshots -o -name import-db -o -name import-files \) -prune -o \
-            -print0 2>/dev/null \
-            | xargs -0 -r chmod g+w 2>/dev/null || true
+            -print0 2>/dev/null |
+            xargs -0 -r chmod g+w 2>/dev/null || true
     fi
     exit 0
 fi
@@ -101,7 +101,7 @@ if [ "${1:-}" = "--opk-devowned-flag" ]; then
     # kit alike); the fixed deployed path when invoked without a slash.
     case "$0" in
         */*) _opk_lib="$(dirname "$0")/../sh/ddev-handover.sh" ;;
-        *)   _opk_lib="/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh" ;;
+        *) _opk_lib="/usr/local/lib/opencode-permissions-kit/sh/ddev-handover.sh" ;;
     esac
     if [ -n "$_opk_proj" ] && [ -f "$_opk_proj/.ddev/config.yaml" ] && [ -f "$_opk_lib" ]; then
         # shellcheck disable=SC1091  # sibling lib, checked above

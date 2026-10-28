@@ -56,14 +56,14 @@ echo ""
 
 echo "-- shell-warn.sh functional --"
 mkdir -p "$TMP/bin"
-printf '#!/bin/sh\nexit 0\n' > "$TMP/bin/opencode"
+printf '#!/bin/sh\nexit 0\n' >"$TMP/bin/opencode"
 chmod +x "$TMP/bin/opencode"
 
 out=$(run_warn "$TMP/clean-home" "/usr/bin:/bin")
 check "clean home, no opencode on PATH: quiet" [ -z "$out" ]
 
 mkdir -p "$TMP/home-shadow/.opencode/bin"
-echo "not-the-wrapper" > "$TMP/home-shadow/.opencode/bin/opencode"
+echo "not-the-wrapper" >"$TMP/home-shadow/.opencode/bin/opencode"
 out=$(run_warn "$TMP/home-shadow" "/usr/bin:/bin")
 check "shadow real binary: warns" sh -c 'echo "$1" | grep -q "wrapper bypass"' _ "$out"
 check "shadow real binary: suggests fix" sh -c 'echo "$1" | grep -q "rm -rf"' _ "$out"
@@ -120,7 +120,7 @@ check "install.sh never uses world-executable binary mode" \
 # and the fallback definition don't match) — and -eq, not -ge: adding a
 # fifth site must be a conscious pin update, not a silent pass.
 check "install.sh defines the atomic-copy fallback for a missing lib (#163)" \
-    sh -c 'grep -Fq "copy_binary_atomic() { echo \"error: copy_binary_atomic unavailable" "$1"' _ "$INSTALL"
+    sh -c 'grep -A1 -F "copy_binary_atomic() {" "$1" | grep -Fq "echo \"error: copy_binary_atomic unavailable"' _ "$INSTALL"
 # Comment-strip rider (#261, the #244 g W1 class): commented-out call
 # sites must not count. Full-line comments only (#244 h W6 residual):
 # a trailing comment after a live line still counts.
@@ -142,7 +142,7 @@ check "install.sh no longer sudo-cps directly onto SYSTEM_BIN (#163)" \
 # in-place shape matches neither grep (its chmod orders 644 BEFORE
 # the path), so the combined pin discriminates both axes.
 check "install.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
-    sh -c 'grep -Fq "copy_file_atomic() { echo \"error: copy_file_atomic unavailable" "$1"' _ "$INSTALL"
+    sh -c 'grep -A1 -F "copy_file_atomic() {" "$1" | grep -Fq "echo \"error: copy_file_atomic unavailable"' _ "$INSTALL"
 check "install.sh deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
     sh -c 'grep -Fq "copy_file_atomic \"\$SCRIPT_DIR/etc/umask.sh\"" "$1" \
         && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$INSTALL"
@@ -175,7 +175,7 @@ check "update.sh hooks shell-warn.sh into rc files" \
 # sudo cp over the sourced profile. 0.0.49c F2/F3: mode-carrying
 # deploy pin + call-site count, twin-for-twin with the install pins.
 check "update.sh defines the atomic-file fallback for a missing lib (0.0.49b C1)" \
-    sh -c 'grep -Fq "copy_file_atomic() { echo \"error: copy_file_atomic unavailable" "$1"' _ "$UPDATE"
+    sh -c 'grep -A1 -F "copy_file_atomic() {" "$1" | grep -Fq "echo \"error: copy_file_atomic unavailable"' _ "$UPDATE"
 check "update.sh re-deploys the umask profile through the atomic file helper at mode 644 (0.0.49b C1, 0.0.49c F2)" \
     sh -c 'grep -Fq "copy_file_atomic \"\$FILES_ROOT/etc/umask.sh\"" "$1" \
         && grep -Fq "opencode-permissions-kit-umask.sh 644" "$1"' _ "$UPDATE"

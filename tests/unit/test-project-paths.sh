@@ -21,14 +21,20 @@ CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.s
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 extract_fn() {
     # print project_path_sane() { ... } from a script — indent-tolerant
     # since 0.0.41g (install.sh's copy is nested in do_plan_phase at +4)
-    sed -n '/^[[:space:]]*project_path_sane() {/,/^[[:space:]]*}/p' "$1" \
-        | sed 's/^[[:space:]]*//'
+    sed -n '/^[[:space:]]*project_path_sane() {/,/^[[:space:]]*}/p' "$1" |
+        sed 's/^[[:space:]]*//'
 }
 
 # Sanity: the function exists in BOTH scripts (policy drift = test failure)
@@ -189,8 +195,8 @@ if [ "$_norm_sites" -ge 4 ]; then
 else
     fail "install.sh uses _PP_NORM in all project entry points (only $_norm_sites sites)"
 fi
-if grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' "$INSTALL" \
-   && grep -q '_custom="$_custom \$_PP_NORM"' "$INSTALL"; then
+if grep -q '_fp_norm="$_fp_norm \$_PP_NORM"' "$INSTALL" &&
+    grep -q '_custom="$_custom \$_PP_NORM"' "$INSTALL"; then
     pass "install.sh: --projects and custom dialog store the expanded path"
 else
     fail "install.sh: --projects and custom dialog store the expanded path"
@@ -215,7 +221,7 @@ _pin_dir=$(mktemp -d)
 # test-ddev-migrate.sh; the house-wide sweep is #283).
 # Re-registered at the _f2bW block below to cover that dir too.
 trap 'rm -rf "$_pin_dir"' EXIT INT TERM
-sed '/_PP_NORM/d' "$INSTALL" > "$_pin_dir/install-no-norm"
+sed '/_PP_NORM/d' "$INSTALL" >"$_pin_dir/install-no-norm"
 _pin_bare=$(sh -c 'set -e; _pn=$(grep -c "$1" "$2"); echo reached' \
     _ '_PP_NORM' "$_pin_dir/install-no-norm") || true
 _pin_guarded=$(sh -c 'set -e; _pn=$(grep -c "$1" "$2" || true); echo "reached count=$_pn"' \
@@ -232,7 +238,7 @@ fi
 # commented-out lines keep counting, #244 g W1). The expectations are
 # derived from the real tree, not hard-coded, so legitimate _PP_NORM
 # growth cannot false-red the pin.
-sed '/_PP_NORM/s/^\([[:space:]]*\)/\1# /' "$INSTALL" > "$_pin_dir/install-norm-commented"
+sed '/_PP_NORM/s/^\([[:space:]]*\)/\1# /' "$INSTALL" >"$_pin_dir/install-norm-commented"
 _norm_ridden=$(sed 's/^[[:space:]]*#.*$//' "$_pin_dir/install-norm-commented" | grep -c '_PP_NORM' || true)
 _norm_total=$(grep -c '_PP_NORM' "$INSTALL" || true)
 _norm_bare=$(grep -c '_PP_NORM' "$_pin_dir/install-norm-commented" || true)
@@ -281,12 +287,12 @@ _f2b_nl=$(
     eval "$_f2bG" 2>"$_f2bW/nl.log"
     printf '%s' "$OPENCODE_USER"
 )
-if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] \
-    && [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] \
-    && grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" \
-    && [ "$_f2b_nl" = "opencode" ] \
-    && [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] \
-    && grep -q 'oco?d' "$_f2bW/nl.log"; then
+if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] &&
+    [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] &&
+    grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" &&
+    [ "$_f2b_nl" = "opencode" ] &&
+    [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] &&
+    grep -q 'oco?d' "$_f2bW/nl.log"; then
     pass "config.sh gate arms: passthrough silent, fallback loud, newline sanitized (pr-00263 a F2b)"
 else
     fail "config.sh gate arms (pr-00263 a F2b)"
@@ -295,9 +301,9 @@ fi
 # --- pr-00263 a F10: agent-home refusals take getent alongside the literal
 # spelling — a relocated agent home refuses too (config.sh + uninstall.sh
 # twins; the opk/status.sh pattern).
-grep -q '_pp_agent_home' "$CONFIG" \
-    && pass "config.sh agent-home refusal getent-aware (pr-00263 a F10)" \
-    || fail "config.sh agent-home refusal literal-only (pr-00263 a F10)"
+grep -q '_pp_agent_home' "$CONFIG" &&
+    pass "config.sh agent-home refusal getent-aware (pr-00263 a F10)" ||
+    fail "config.sh agent-home refusal literal-only (pr-00263 a F10)"
 
 echo ""
 if [ "$failures" -gt 0 ]; then

@@ -106,7 +106,8 @@ scope_files() {
 # "<file> <sum-beyond-limit> <offending-line-count>" when there is
 # excess, nothing when clean.
 measure_file() {
-    _mf="$1"; _ml="$2"
+    _mf="$1"
+    _ml="$2"
     case "$_mf" in
         *.md) _mfm=1 ;;
         *) _mfm=0 ;;
@@ -131,8 +132,8 @@ measure_file() {
 if [ "${1:-}" = "--regen" ]; then
     scope_files | sort -u | while IFS= read -r f; do
         measure_file "$f" "$LIMIT"
-    done > "$BASELINE"
-    echo "baseline regenerated: $(wc -l < "$BASELINE" | tr -d ' ') entries -> $BASELINE"
+    done >"$BASELINE"
+    echo "baseline regenerated: $(wc -l <"$BASELINE" | tr -d ' ') entries -> $BASELINE"
     exit 0
 fi
 
@@ -140,7 +141,10 @@ TMP_CUR="$(mktemp)"
 TMP_PROBE="$(mktemp)"
 trap 'rm -f "$TMP_CUR" "$TMP_PROBE"' EXIT INT TERM
 
-[ -f "$BASELINE" ] || { echo "line length ratchet: FAILED (baseline missing)"; exit 1; }
+[ -f "$BASELINE" ] || {
+    echo "line length ratchet: FAILED (baseline missing)"
+    exit 1
+}
 
 # --- metric self-probe (the strip must discriminate, L4) ----------------
 # The frontmatter strip is a fail-soft spot in these directions:
@@ -160,35 +164,35 @@ PROBE_DIR="$(mktemp -d)"
 trap 'rm -rf "${PROBE_DIR:?}" "$TMP_CUR" "$TMP_PROBE"' EXIT INT TERM
 mkdir -p "$PROBE_DIR"
 printf -- '---\nname: probe\ndescription: %s\n---\nshort prose line\n' \
-    "$(printf 'x%.0s' $(seq 1 130))" > "$PROBE_DIR/probe.md"
+    "$(printf 'x%.0s' $(seq 1 130))" >"$PROBE_DIR/probe.md"
 printf -- '---\nshort frontmatter line\n---\n%s\n' \
-    "$(printf 'y%.0s' $(seq 1 130))" > "$PROBE_DIR/probe2.md"
+    "$(printf 'y%.0s' $(seq 1 130))" >"$PROBE_DIR/probe2.md"
 printf -- '---\n%s\n' \
-    "$(printf 'z%.0s' $(seq 1 130))" > "$PROBE_DIR/probe.yml"
+    "$(printf 'z%.0s' $(seq 1 130))" >"$PROBE_DIR/probe.yml"
 printf -- '---\nunclosed block, prose must count: %s\n' \
-    "$(printf 'w%.0s' $(seq 1 130))" > "$PROBE_DIR/probe3.md"
+    "$(printf 'w%.0s' $(seq 1 130))" >"$PROBE_DIR/probe3.md"
 printf -- '---\n%s\n---\n%s\n' \
     "$(printf 'p%.0s' $(seq 1 130))" \
-    "$(printf 'q%.0s' $(seq 1 131))" > "$PROBE_DIR/probe4.md"
-_p1=$(measure_file "$PROBE_DIR/probe.md" "$LIMIT")   # frontmatter only
-_p2=$(measure_file "$PROBE_DIR/probe2.md" "$LIMIT")  # prose long line
-_p3=$(measure_file "$PROBE_DIR/probe.yml" "$LIMIT")  # non-md: not stripped
-_p4=$(measure_file "$PROBE_DIR/probe3.md" "$LIMIT")  # unclosed md: counts
-_p5=$(measure_file "$PROBE_DIR/probe4.md" "$LIMIT")  # pseudo-close span
-if [ -z "$_p1" ] && [ "${_p2#*probe2.md }" != "$_p2" ] \
-   && [ "${_p3#*probe.yml }" != "$_p3" ] \
-   && [ "${_p4#*probe3.md }" != "$_p4" ] \
-   && [ "${_p5#*probe4.md }" = "11 1" ]; then
+    "$(printf 'q%.0s' $(seq 1 131))" >"$PROBE_DIR/probe4.md"
+_p1=$(measure_file "$PROBE_DIR/probe.md" "$LIMIT")  # frontmatter only
+_p2=$(measure_file "$PROBE_DIR/probe2.md" "$LIMIT") # prose long line
+_p3=$(measure_file "$PROBE_DIR/probe.yml" "$LIMIT") # non-md: not stripped
+_p4=$(measure_file "$PROBE_DIR/probe3.md" "$LIMIT") # unclosed md: counts
+_p5=$(measure_file "$PROBE_DIR/probe4.md" "$LIMIT") # pseudo-close span
+if [ -z "$_p1" ] && [ "${_p2#*probe2.md }" != "$_p2" ] &&
+    [ "${_p3#*probe.yml }" != "$_p3" ] &&
+    [ "${_p4#*probe3.md }" != "$_p4" ] &&
+    [ "${_p5#*probe4.md }" = "11 1" ]; then
     echo "  probe ok: closed fm stripped, prose and non-md counted, unclosed counts, pseudo-close span stripped (sum pins the counted line)"
 else
-    echo "  PROBE BROKEN: fm-only='$_p1' prose='$_p2' non-md='$_p3' unclosed='$_p4' pseudo='$_p5'" >> "$TMP_PROBE"
+    echo "  PROBE BROKEN: fm-only='$_p1' prose='$_p2' non-md='$_p3' unclosed='$_p4' pseudo='$_p5'" >>"$TMP_PROBE"
 fi
 
 # Current state: "path sum count" for every scope file with excess > 0.
 # Paths in this repo contain no spaces (word-splitting over find is safe).
 scope_files | sort -u | while IFS= read -r f; do
     measure_file "$f" "$LIMIT"
-done > "$TMP_CUR"
+done >"$TMP_CUR"
 
 rc=0
 
@@ -206,7 +210,7 @@ while read -r path cur_sum cur_cnt; do
     elif [ "$cur_sum" -lt "$base_sum" ]; then
         hints="$hints $path"
     fi
-done < "$TMP_CUR"
+done <"$TMP_CUR"
 
 # 2. stale-baseline check: entries whose file vanished or got clean must
 #    be regenerated (a stale baseline hides growth behind wrong sums).
@@ -215,7 +219,7 @@ while read -r b_path b_sum b_cnt; do
         echo "FAIL $b_path: stale baseline entry (file gone or now clean) -- regenerate"
         rc=1
     fi
-done < "$BASELINE"
+done <"$BASELINE"
 
 # 3. trend: lines over the warning threshold, never fatal.
 _trend_files="$(scope_files | sort -u)"

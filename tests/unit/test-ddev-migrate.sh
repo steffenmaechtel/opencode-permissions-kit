@@ -35,8 +35,14 @@ TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
     local desc="$1"
@@ -79,7 +85,7 @@ echo ""
 # --- 1. registry parser --------------------------------------------------------
 
 mkdir -p "$WORK/devhome/.ddev"
-cat > "$WORK/devhome/.ddev/global_config.yaml" <<'YML'
+cat >"$WORK/devhome/.ddev/global_config.yaml" <<'YML'
 last_used_version: v1.24.1
 project_info:
   alpha:
@@ -119,7 +125,7 @@ assert_eq "root filter with no matching dirs yields nothing" "" "$RESULT"
 # ddev's yaml.Marshal — and clears the legacy project_info: block in
 # global_config.yaml on first run. The parser must read BOTH layouts.
 mkdir -p "$WORK/devhome123/.ddev"
-cat > "$WORK/devhome123/.ddev/project_list.yaml" <<'YML'
+cat >"$WORK/devhome123/.ddev/project_list.yaml" <<'YML'
 client07-test-260605:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
     used_host_ports: []
@@ -128,7 +134,7 @@ beta:
 outside:
     approot: /var/tmp/opencode-ddev-mig-roots/srv/other/outside
 YML
-printf 'last_started_version: v1.25.2\nwebimage: ddev/ddev-webserver\n' > "$WORK/devhome123/.ddev/global_config.yaml"
+printf 'last_started_version: v1.25.2\nwebimage: ddev/ddev-webserver\n' >"$WORK/devhome123/.ddev/global_config.yaml"
 
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev")
 assert_eq "registry parser reads the ddev >= 1.23 project_list.yaml (quoted + unquoted)" \
@@ -145,7 +151,7 @@ beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
 # files are emitted — duplicates are tolerated downstream (the export
 # resume logic skips projects already in the manifest).
 mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/gamma
-cat > "$WORK/devhome123/.ddev/global_config.yaml" <<'YML'
+cat >"$WORK/devhome123/.ddev/global_config.yaml" <<'YML'
 project_info:
   legacy-only:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/gamma
@@ -157,8 +163,8 @@ beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
 legacy-only|/var/tmp/opencode-ddev-mig-roots/vhosts/gamma" "$RESULT"
 
 # ddev creates an EMPTY project_list.yaml on fresh homes — no projects.
-printf 'last_started_version: v1.25.2\n' > "$WORK/devhome123/.ddev/global_config.yaml"
-: > "$WORK/devhome123/.ddev/project_list.yaml"
+printf 'last_started_version: v1.25.2\n' >"$WORK/devhome123/.ddev/global_config.yaml"
+: >"$WORK/devhome123/.ddev/project_list.yaml"
 RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev")
 assert_eq "empty project_list.yaml + bare global config yields nothing" "" "$RESULT"
 
@@ -168,15 +174,15 @@ assert_eq "empty project_list.yaml + bare global config yields nothing" "" "$RES
 done_check() { sh -c ". \"\$1\" && if DDEV_MIG_OC_HOME=\"\$2\" ddev_migrate_done oc; then echo yes; else echo no; fi" _ "$MIG" "$1"; }
 mkdir -p "$WORK/ochome/.ddev"
 
-printf 'last_started_version: v1.25.2\n' > "$WORK/ochome/.ddev/global_config.yaml"
-: > "$WORK/ochome/.ddev/project_list.yaml"
+printf 'last_started_version: v1.25.2\n' >"$WORK/ochome/.ddev/global_config.yaml"
+: >"$WORK/ochome/.ddev/project_list.yaml"
 assert_eq "done: bare modern home (empty list) is NOT done" "no" "$(done_check "$WORK/ochome")"
 
-printf 'shopware:\n    approot: /tmp/shopware\n' > "$WORK/ochome/.ddev/project_list.yaml"
+printf 'shopware:\n    approot: /tmp/shopware\n' >"$WORK/ochome/.ddev/project_list.yaml"
 assert_eq "done: project_list.yaml entries count" "yes" "$(done_check "$WORK/ochome")"
 
 rm -f "${WORK:?}/ochome/.ddev/project_list.yaml"
-printf 'project_info:\n  p:\n    approot: /tmp/p\n' > "$WORK/ochome/.ddev/global_config.yaml"
+printf 'project_info:\n  p:\n    approot: /tmp/p\n' >"$WORK/ochome/.ddev/global_config.yaml"
 assert_eq "done: legacy project_info block counts" "yes" "$(done_check "$WORK/ochome")"
 
 rm -rf "${WORK:?}/devhome123" "${WORK:?}/ochome"
@@ -187,7 +193,7 @@ has_db() { sh -c ". \"\$1\" && if ddev_migrate_has_db \"\$2\" \"\$3\"; then echo
 
 mkproj() {
     mkdir -p "$WORK/$1/.ddev"
-    printf '%s\n' "$2" > "$WORK/$1/.ddev/config.yaml"
+    printf '%s\n' "$2" >"$WORK/$1/.ddev/config.yaml"
 }
 
 mkproj p1 'name: p1
@@ -213,9 +219,9 @@ mkproj p6 'omit_containers:
   - ddev-ssh-agent'
 assert_eq "block list without db keeps the db" "yes" "$(has_db "$WORK/p6")"
 
-printf 'omit_containers_global: [db]\n' > "$WORK/devhome/.ddev/global_config.yaml"
+printf 'omit_containers_global: [db]\n' >"$WORK/devhome/.ddev/global_config.yaml"
 assert_eq "global omit_containers_global [db] has NO db" "no" "$(has_db "$WORK/p1")"
-printf 'omit_containers_global:\n  - db\n' > "$WORK/devhome/.ddev/global_config.yaml"
+printf 'omit_containers_global:\n  - db\n' >"$WORK/devhome/.ddev/global_config.yaml"
 assert_eq "global block omit has NO db" "no" "$(has_db "$WORK/p1")"
 rm -f "${WORK:?}/devhome/.ddev/global_config.yaml"
 assert_eq "missing global config keeps the db" "yes" "$(has_db "$WORK/p1")"
@@ -225,7 +231,7 @@ assert_eq "missing global config keeps the db" "yes" "$(has_db "$WORK/p1")"
 # --file= path it receives. ddev commands must address projects by NAME
 # (registry key), never by path.
 mkdir -p "$WORK/bin"
-cat > "$WORK/bin/ddev" <<'FAKE'
+cat >"$WORK/bin/ddev" <<'FAKE'
 #!/bin/sh
 # Stdin eater (regression: real ddev reads stdin — prompt/TUI probing —
 # and silently consumed the export loop's project list: ONE dump per
@@ -266,7 +272,7 @@ for _p in alpha gamma nodb broken nodbrt; do
     mkdir -p "/var/tmp/opencode-ddev-mig-roots/vhosts/$_p/.ddev"
 done
 mkdir -p "$WORK/devhome/.ddev"
-cat > "$WORK/devhome/.ddev/global_config.yaml" <<'YML'
+cat >"$WORK/devhome/.ddev/global_config.yaml" <<'YML'
 project_info:
   alpha:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
@@ -279,11 +285,11 @@ project_info:
   nodbrt:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/nodbrt
 YML
-printf 'name: alpha\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/alpha/.ddev/config.yaml
-printf 'name: gamma\ntype: php\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/gamma/.ddev/config.yaml
-printf 'omit_containers: [db]\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/nodb/.ddev/config.yaml
-printf 'name: broken\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/broken/.ddev/config.yaml
-printf 'name: nodbrt\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/nodbrt/.ddev/config.yaml
+printf 'name: alpha\ntype: typo3\n' >/var/tmp/opencode-ddev-mig-roots/vhosts/alpha/.ddev/config.yaml
+printf 'name: gamma\ntype: php\n' >/var/tmp/opencode-ddev-mig-roots/vhosts/gamma/.ddev/config.yaml
+printf 'omit_containers: [db]\n' >/var/tmp/opencode-ddev-mig-roots/vhosts/nodb/.ddev/config.yaml
+printf 'name: broken\ntype: typo3\n' >/var/tmp/opencode-ddev-mig-roots/vhosts/broken/.ddev/config.yaml
+printf 'name: nodbrt\ntype: typo3\n' >/var/tmp/opencode-ddev-mig-roots/vhosts/nodbrt/.ddev/config.yaml
 
 # Run the library export directly with a controlled backup root; the sudo
 # detour is shimmed (CI runs unprivileged) by overriding the run-as helper
@@ -291,7 +297,7 @@ printf 'name: nodbrt\ntype: typo3\n' > /var/tmp/opencode-ddev-mig-roots/vhosts/n
 # current user may BE "opencode" with a real registry on kit workspaces).
 # The "opencode user" argument is root so the handed-over guard (stat
 # owner == oc user) never fires for the current-user fixtures.
-cat > "$WORK/run-export.sh" <<'WRAP'
+cat >"$WORK/run-export.sh" <<'WRAP'
 #!/bin/sh
 . "$1"
 _ddev_migrate_run_as() {
@@ -376,8 +382,8 @@ check_fail "no leftover .export-*.err capture files in the dump directory" \
 # rename (a link at manifest.conf at export START is now REFUSED — the
 # seed never reads through it, 0.0.44b W2), err captures live in the
 # root-owned .root-stage, and the chmod pass rides find ! -type l.
-echo "VICTIM-ERR-CONTENT" > "$WORK/victim-err.conf"
-echo "VICTIM-DUMP-CONTENT" > "$WORK/victim-dump.conf"
+echo "VICTIM-ERR-CONTENT" >"$WORK/victim-err.conf"
+echo "VICTIM-DUMP-CONTENT" >"$WORK/victim-dump.conf"
 chmod 755 "$WORK/victim-dump.conf"
 ln -s "$WORK/victim-err.conf" "$DUMP_DIR/.export-alpha.err"
 ln -s "$WORK/victim-dump.conf" "$DUMP_DIR/evil.sql.gz"
@@ -396,12 +402,12 @@ check "manifest stays a regular file through the run" \
 # AND on resume, mkdir -m 700 for the stage. Comment-strip rider (#261,
 # the #244 g W1 class): a commented-out chmod stops counting.
 _grep_n=$(sed 's/^[[:space:]]*#.*$//' "$MIG" | grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' || true)
-[ "$_grep_n" -ge 1 ] \
-    && check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" true \
-    || check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" false
-grep -q 'mkdir -m 700 "\$DM_STAGE"' "$MIG" \
-    && check "stage is created mode 700 in one step (no default-mode window, W1)" true \
-    || check "stage is created mode 700 in one step (no default-mode window, W1)" false
+[ "$_grep_n" -ge 1 ] &&
+    check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" true ||
+    check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" false
+grep -q 'mkdir -m 700 "\$DM_STAGE"' "$MIG" &&
+    check "stage is created mode 700 in one step (no default-mode window, W1)" true ||
+    check "stage is created mode 700 in one step (no default-mode window, W1)" false
 check_fail "the root staging dir is removed before finalize hands the tree over" \
     test -e "$DUMP_DIR/.root-stage"
 
@@ -409,7 +415,7 @@ check_fail "the root staging dir is removed before finalize hands the tree over"
 # The authoritative copy seeds from the dump-dir manifest only when it is
 # not a symlink — a planted link there means tampering: loud refuse, the
 # link's target is never opened (no read-through disclosure).
-echo "VICTIM-MANIFEST-CONTENT" > "$WORK/victim-manifest.conf"
+echo "VICTIM-MANIFEST-CONTENT" >"$WORK/victim-manifest.conf"
 rm -f "${DUMP_DIR:?}/manifest.conf"
 ln -s "$WORK/victim-manifest.conf" "$DUMP_DIR/manifest.conf"
 OUT4=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run4.log" \
@@ -424,7 +430,7 @@ check_fail "the refused run leaves no staging dir behind" \
     test -e "$DUMP_DIR/.root-stage"
 # restore a regular manifest for the suites below
 rm -f "${DUMP_DIR:?}/manifest.conf"
-printf 'OK|alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|alpha.sql.gz\n' > "$DUMP_DIR/manifest.conf"
+printf 'OK|alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|alpha.sql.gz\n' >"$DUMP_DIR/manifest.conf"
 
 # --- 4e. fixed-string resume: sh.p must not cross-match shop (0.0.44b W13) -------------
 # The resume check and the stale-rewrite are grep -F since 0.0.44a V23 —
@@ -432,15 +438,15 @@ printf 'OK|alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|alpha.sql.gz\n' >
 # BRE ("sh.p" cross-matches "shop") was indistinguishable. A hand-edited
 # registry (ddev itself enforces [a-z0-9-]) carries both names; the OK
 # line for shop must NOT satisfy sh.p's resume check.
-cat >> "$WORK/devhome/.ddev/project_list.yaml" <<YML
+cat >>"$WORK/devhome/.ddev/project_list.yaml" <<YML
   shop:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
   sh.p:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 YML
-printf 'dump\n' > "$DUMP_DIR/shop.sql.gz"
-printf 'dump\n' > "$DUMP_DIR/sh.p.sql.gz"
-printf 'OK|shop|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|shop.sql.gz\n' >> "$DUMP_DIR/manifest.conf"
+printf 'dump\n' >"$DUMP_DIR/shop.sql.gz"
+printf 'dump\n' >"$DUMP_DIR/sh.p.sql.gz"
+printf 'OK|shop|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha|shop.sql.gz\n' >>"$DUMP_DIR/manifest.conf"
 OUT5=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev-run5.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" \
     PATH="$WORK/bin:$PATH" \
@@ -477,10 +483,10 @@ check "finalize keeps the manifest root-owned for the resume seed (F2)" \
 check "install.sh prints the FAIL list from the function state, never a re-grep (F1)" \
     sh -c "grep -q 'DD_MIG_FAILLIST' \"\$1\" && ! grep -q \"grep -c '^OK|' \\\"\\\$DD_MIG_DUMP_DIR/manifest.conf\\\"\" \"\$1\"" _ "$INSTALL"
 check "export return state starts EMPTY — counters signal completion (E1)" \
-    sh -c "grep -qF 'DD_MIG_DUMP_DIR=\"\"; DD_MIG_OK=\"\"; DD_MIG_FAIL=\"\"; DD_MIG_FAILLIST=\"\"' \"\$1\"" _ "$MIG"
+    sh -c "grep -A3 -F 'DD_MIG_DUMP_DIR=\"\"' \"\$1\" | tr -s '[:space:]' ' ' | grep -qF 'DD_MIG_DUMP_DIR=\"\" DD_MIG_OK=\"\" DD_MIG_FAIL=\"\" DD_MIG_FAILLIST=\"\"' " _ "$MIG"
 
 # --- 4h. refused vs completed: only the accounting fills the counters (0.0.44e E1) -------
-cat > "$WORK/run-export-state.sh" <<'WRAP'
+cat >"$WORK/run-export-state.sh" <<'WRAP'
 #!/bin/sh
 . "$1"
 _ddev_migrate_run_as() {
@@ -525,7 +531,7 @@ check "a COMPLETED export returns numeric counts (E1)" \
 # dump dir, the bare `chown root:… manifest.conf` operand, or an operand
 # op after the hand-over chown fails these pins (sabotage duty).
 sed -n '/^    rm -rf "\$DM_STAGE" 2>\/dev\/null || true$/,/^    \[ "\${DD_MIG_OK:-0}" -gt 0 \]$/p' \
-    "$MIG" > "$WORK/finblock"
+    "$MIG" >"$WORK/finblock"
 if [ -s "$WORK/finblock" ]; then
     check "finalize block scoping: compact, no EOF over-run (4i)" \
         sh -c "[ \"\$(wc -l < \"\$1\")\" -le 45 ]" _ "$WORK/finblock"
@@ -543,11 +549,15 @@ if [ -s "$WORK/finblock" ]; then
     # manifest end 640, the dir 750, the stage is gone (unprivileged:
     # chowns fail EPERM into || true — the end STATE is still exactly
     # the contract; the order statics above are the discriminators).
-    _fbd="$WORK/fin-fixture"; mkdir -p "$_fbd/.root-stage"
-    : > "$_fbd/.root-stage/stale"
-    printf 'dump\n' > "$_fbd/alpha.sql.gz"; chmod 644 "$_fbd/alpha.sql.gz"
-    printf 'manifest\n' > "$_fbd/manifest.conf"; chmod 644 "$_fbd/manifest.conf"
-    printf 'VICTIM-DUMP\n' > "$WORK/fin-victim"; chmod 755 "$WORK/fin-victim"
+    _fbd="$WORK/fin-fixture"
+    mkdir -p "$_fbd/.root-stage"
+    : >"$_fbd/.root-stage/stale"
+    printf 'dump\n' >"$_fbd/alpha.sql.gz"
+    chmod 644 "$_fbd/alpha.sql.gz"
+    printf 'manifest\n' >"$_fbd/manifest.conf"
+    chmod 644 "$_fbd/manifest.conf"
+    printf 'VICTIM-DUMP\n' >"$WORK/fin-victim"
+    chmod 755 "$WORK/fin-victim"
     ln -s "$WORK/fin-victim" "$_fbd/evil.sql.gz"
     DD_MIG_DUMP_DIR="$_fbd" DM_STAGE="$_fbd/.root-stage" DD_MIG_OK=1 \
         dm_oc="$(id -un)" dm_ocg="$(id -gn)" \
@@ -673,14 +683,14 @@ bm_run() {
         ddev_rootless_bindmounts oc "$2" "$3" "$4"
         echo "rc=$?"' _ "$HAND" "$1" "$2" "$3"
 }
-: > "$WORK/ddev-bm.log"
+: >"$WORK/ddev-bm.log"
 OUT=$(DDEV_LOG="$WORK/ddev-bm.log" PATH="$WORK/bin:$PATH" bm_run docker-rootless 1.25.2 "$WORK/bin/ddev")
 check "ddev 1.25.2 on docker-rootless sets the switch" \
     sh -c "printf '%s' \"\$2\" | grep -q 'rc=0' && grep -q 'ddev:config global --no-bind-mounts' \"\$1\"" _ "$WORK/ddev-bm.log" "$OUT"
 OUT=$(DDEV_LOG="$WORK/ddev-bm.log" PATH="$WORK/bin:$PATH" bm_run docker-rootless 1.25.0 "$WORK/bin/ddev")
 check "ddev 1.25.0 on docker-rootless sets the switch" \
     sh -c "printf '%s' \"\$2\" | grep -q 'rc=0'" _ "$WORK/ddev-bm.log" "$OUT"
-_n=$(wc -l < "$WORK/ddev-bm.log" | tr -d ' ')
+_n=$(wc -l <"$WORK/ddev-bm.log" | tr -d ' ')
 assert_eq "modern ddev (1.25.3+) keeps bind mounts (no third call)" "2" "$_n"
 OUT=$(DDEV_LOG="$WORK/ddev-bm.log" PATH="$WORK/bin:$PATH" bm_run docker-rootless 1.25.3 "$WORK/bin/ddev")
 check "ddev 1.25.3 on docker-rootless is a no-op (rc=1)" \
@@ -715,7 +725,7 @@ check "config.sh wires the bind-mounts switch on backend changes" \
 # all approots under one root) with fully synthetic names — no real
 # client identifiers in the repo (maintainer directive 2026-10-04).
 mkdir -p "$WORK/maxmustermann/.ddev"
-cat > "$WORK/maxmustermann/.ddev/project_list.yaml" <<'YML'
+cat >"$WORK/maxmustermann/.ddev/project_list.yaml" <<'YML'
 shopone:
     approot: /var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts/shopone
 client24-SW6:
@@ -752,21 +762,21 @@ assert_eq "narrow root: the other 11 are reported outside" "11" \
 # drops stale entries) — mirror the registry into the fixture tree.
 mkdir -p "$WORK/maxmustermann2/.ddev"
 sed "s|/var/tmp/opencode-ddev-mig-roots/home/maxmustermann/www/vhosts|$WORK/maxmustermann-vhosts|g" "$WORK/maxmustermann/.ddev/project_list.yaml" \
-    > "$WORK/maxmustermann2/.ddev/project_list.yaml"
-sh -c '. "$1" && ddev_migrate_registry "$2"' _ "$MIG" "$WORK/maxmustermann2/.ddev" \
-    | while IFS='|' read -r _gn _ga; do mkdir -p "$_ga"; done
+    >"$WORK/maxmustermann2/.ddev/project_list.yaml"
+sh -c '. "$1" && ddev_migrate_registry "$2"' _ "$MIG" "$WORK/maxmustermann2/.ddev" |
+    while IFS='|' read -r _gn _ga; do mkdir -p "$_ga"; done
 mkdir -p "$WORK/gapbackups/ddev-migration-20260909-232704"
 printf 'OK|shopone|%s/maxmustermann-vhosts/shopone|shopone.sql.gz\n' "$WORK" \
-    > "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
+    >"$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
 GAP=$(DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
     sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2"' _ "$MIG" "$WORK/maxmustermann-vhosts")
 assert_eq "gap: 1 dump recorded vs 12 registered -> have/now reported" \
     "1 12 $WORK/gapbackups/ddev-migration-20260909-232704" "$GAP"
 for _gn in client24-SW6 client03-shopware-sw6 client04-sap client05-multi-store \
-           client06-advent-calendar client07-test-260605 client08-6-7-0-1 client09-hub \
-           client10-vinum client11-xmas www.client12-example.test; do
+    client06-advent-calendar client07-test-260605 client08-6-7-0-1 client09-hub \
+    client10-vinum client11-xmas www.client12-example.test; do
     printf 'OK|%s|%s/maxmustermann-vhosts/x|%s.sql.gz\n' "$_gn" "$WORK" "$_gn" \
-        >> "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
+        >>"$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
 done
 if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
     sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2" >/dev/null' _ "$MIG" "$WORK/maxmustermann-vhosts"; then
@@ -779,7 +789,7 @@ fi
 # = 12 attempted vs 12 registered: no gap (OK-only counting would warn).
 sed -i '/^OK|client09-hub|/d' "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
 printf 'FAIL|client09-hub|%s/maxmustermann-vhosts/x|client09-hub.sql.gz\n' "$WORK" \
-    >> "$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
+    >>"$WORK/gapbackups/ddev-migration-20260909-232704/manifest.conf"
 if DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
     sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2" >/dev/null' _ "$MIG" "$WORK/maxmustermann-vhosts"; then
     fail "gap: FAIL entries count as attempted (no gap)"
@@ -795,7 +805,7 @@ fi
 # links and FIFOs are skipped, never opened; the COPY is parsed.
 _GDIR="$WORK/gapbackups/ddev-migration-20260909-232704"
 mv "$_GDIR/manifest.conf" "$_GDIR/manifest.conf.keep"
-printf 'no manifest lines here\n' > "$WORK/gap-victim.conf"
+printf 'no manifest lines here\n' >"$WORK/gap-victim.conf"
 ln -s "$WORK/gap-victim.conf" "$_GDIR/manifest.conf"
 GAP2=$(DDEV_MIG_BACKUP_ROOT="$WORK/gapbackups" DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" \
     timeout 10 sh -c '. "$1" && ddev_migrate_gap maxmustermann "$2"' _ "$MIG" "$WORK/maxmustermann-vhosts" 2>/dev/null || true)
@@ -820,9 +830,9 @@ mv "$_GDIR/manifest.conf.keep" "$_GDIR/manifest.conf"
 check "gap: manifest delivery is find -type f into a root-owned temp (S6)" \
     sh -c 'grep -qF "dmg_found=\$(find \"\$dmg_dir\" -maxdepth 1 -type f -name manifest.conf" "$1" && ! grep -q "dmg_dir/manifest.conf" "$1"' _ "$MIG"
 check "import: the read loop parses the staged copy, never the dump-dir manifest (S6)" \
-    sh -c 'grep -qF "done < \"\$dm_manifest\"" "$1" && ! grep -qF "done < \"\$dm_dir/manifest.conf\"" "$1"' _ "$MIG"
+    sh -c 'grep -qF "done <\"\$dm_manifest\"" "$1" && ! grep -qF "done <\"\$dm_dir/manifest.conf\"" "$1"' _ "$MIG"
 check "import: manifest delivery is find -type f with a bounded cat (S6)" \
-    sh -c 'grep -qF "dm_found=\$(find \"\$dm_dir\" -maxdepth 1 -type f -name manifest.conf" "$1" && grep -qF "timeout 5 cat \"\$dm_found\" > \"\$dm_manifest\"" "$1"' _ "$MIG"
+    sh -c 'grep -qF "dm_found=\$(find \"\$dm_dir\" -maxdepth 1 -type f -name manifest.conf" "$1" && grep -qF "timeout 5 cat \"\$dm_found\" >\"\$dm_manifest\"" "$1"' _ "$MIG"
 
 # registry subcommand (read-only, no root gate): export/outside view
 OUT=$(DDEV_MIG_DEV_HOME="$WORK/maxmustermann2" sh "$BIN_MIG" registry maxmustermann "$WORK/maxmustermann-vhosts")
@@ -853,11 +863,11 @@ check "bin dispatcher has the registry subcommand" \
 # is skipped on hosts with a system ddev (its absolute-path candidates
 # would win by design).
 mkdir -p "$WORK/spaced home/.local/bin" "$WORK/spaced"
-printf '#!/bin/sh\necho real-ddev\n' > "$WORK/spaced home/.local/bin/ddev"
+printf '#!/bin/sh\necho real-ddev\n' >"$WORK/spaced home/.local/bin/ddev"
 chmod +x "$WORK/spaced home/.local/bin/ddev"
-printf '#!/bin/sh\n' > "$WORK/spaced/ddev"
+printf '#!/bin/sh\n' >"$WORK/spaced/ddev"
 # non-executable `ddev` on PATH: command -v must not find it
-cat > "$WORK/getent" <<EOF
+cat >"$WORK/getent" <<EOF
 #!/bin/sh
 [ "\$1" = passwd ] && { printf '%s\n' "spaced:x:\$(id -u):\$(id -g)::$WORK/spaced home:/bin/sh"; exit 0; }
 exec $(command -v getent) "\$@"
@@ -866,7 +876,7 @@ chmod +x "$WORK/getent"
 if [ -x /usr/local/bin/ddev ] || [ -x /usr/bin/ddev ]; then
     echo "  SKIP  spaced-home bin resolution (host has a system ddev — absolute-path candidates would win)"
 else
-    cat > "$WORK/binres.sh" <<'WRAP'
+    cat >"$WORK/binres.sh" <<'WRAP'
 #!/bin/sh
 . "$1"
 _ddev_migrate_bin spaced
@@ -880,12 +890,12 @@ fi
 
 # run-as: each env assignment is ONE argument — a sudo shim prints argv
 # one word per line, so a split HOME would show as separate lines.
-cat > "$WORK/sudo" <<'EOF'
+cat >"$WORK/sudo" <<'EOF'
 #!/bin/sh
 for _a in "$@"; do printf '%s\n' "$_a"; done
 EOF
 chmod +x "$WORK/sudo"
-cat > "$WORK/runas.sh" <<'WRAP'
+cat >"$WORK/runas.sh" <<'WRAP'
 #!/bin/sh
 . "$1"
 _ddev_migrate_run_as spaced /bin/true
@@ -909,40 +919,47 @@ check "run-as never runs a command-less env" \
 # every path under test exits before the first sudo call.
 _w5dir="$(mktemp -d)"
 mkdir -p "$_w5dir/bin" "$_w5dir/bin-mk" "$_w5dir/dump"
-printf '#!/bin/sh\necho 0\n' > "$_w5dir/bin/id"
+printf '#!/bin/sh\necho 0\n' >"$_w5dir/bin/id"
 cp "$_w5dir/bin/id" "$_w5dir/bin-mk/id"
-printf '#!/bin/sh\nexit 1\n' > "$_w5dir/bin-mk/mktemp"
+printf '#!/bin/sh\nexit 1\n' >"$_w5dir/bin-mk/mktemp"
 chmod +x "$_w5dir/bin/id" "$_w5dir/bin-mk/id" "$_w5dir/bin-mk/mktemp"
 _w5_import() {
     PATH="$_w5dir/$1:$PATH" sh -c '. "$1" && ddev_migrate_import "$2"' \
         _ "$MIG" "$_w5dir/dump" 2>&1 || true
 
 }
-printf 'OK|alpha|/roots/alpha|alpha.sql.gz\n' > "$_w5dir/dump/manifest.conf"
+printf 'OK|alpha|/roots/alpha|alpha.sql.gz\n' >"$_w5dir/dump/manifest.conf"
 chmod 000 "$_w5dir/dump/manifest.conf"
 _w5_out="$(_w5_import bin)"
 case "$_w5_out" in
     *"manifest found but unreadable"*)
-        pass "import: unreadable manifest reports its cause, not 'no manifest' (W5)" ;;
+        pass "import: unreadable manifest reports its cause, not 'no manifest' (W5)"
+        ;;
     *"no dump directory"*)
-        fail "import: unreadable manifest must not claim 'no dump directory' (W5)" ;;
+        fail "import: unreadable manifest must not claim 'no dump directory' (W5)"
+        ;;
     *)
-        fail "import: unreadable manifest must report the unreadable cause (W5, got: $_w5_out)" ;;
+        fail "import: unreadable manifest must report the unreadable cause (W5, got: $_w5_out)"
+        ;;
 esac
 rm -f "${_w5dir:?}/dump/manifest.conf"
 _w5_out="$(_w5_import bin)"
 case "$_w5_out" in
     *"no dump directory with a manifest found"*)
-        pass "import: the genuine no-manifest case keeps its message (W5)" ;;
+        pass "import: the genuine no-manifest case keeps its message (W5)"
+        ;;
     *)
-        fail "import: the genuine no-manifest case must keep its message (W5, got: $_w5_out)" ;;
+        fail "import: the genuine no-manifest case must keep its message (W5, got: $_w5_out)"
+        ;;
 esac
 _w5_out="$(_w5_import bin-mk)"
 case "$_w5_out" in
     *"cannot create a staging temp"*)
-        pass "import: mktemp failure reports instead of exiting silently (W5)" ;;
+        pass "import: mktemp failure reports instead of exiting silently (W5)"
+        ;;
     *)
-        fail "import: mktemp failure must report its cause (W5, got: $_w5_out)" ;;
+        fail "import: mktemp failure must report its cause (W5, got: $_w5_out)"
+        ;;
 esac
 rm -rf "${_w5dir:?}"
 
@@ -961,7 +978,7 @@ check_fail "import no longer word-splits an env string" \
 # Drive the real binary against a scratch backup root both ways.
 F3ROOT=$(mktemp -d)
 mkdir -p "$F3ROOT/ddev-migration-20261020-1200"
-printf 'db.sql\n' > "$F3ROOT/ddev-migration-20261020-1200/db.sql"
+printf 'db.sql\n' >"$F3ROOT/ddev-migration-20261020-1200/db.sql"
 F3RC=0
 F3OUT="$(DDEV_MIG_BACKUP_ROOT="$F3ROOT" "$BIN_MIG" list 2>&1)" || F3RC=$?
 if [ "${F3RC:-0}" -eq 0 ] && printf '%s' "$F3OUT" | grep -q 'ddev-migration-20261020-1200'; then

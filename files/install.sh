@@ -87,9 +87,9 @@ KIT_BRANCH="${KIT_BRANCH:-master}"
 # scripts source wholesale — refuse anything outside a git-ref charset
 # instead of persisting shell metacharacters as root (review 0.0.39b S1).
 case "$KIT_BRANCH" in
-    *[!A-Za-z0-9._/-]*|*..*)
-        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits, "\
-"'.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
+    *[!A-Za-z0-9._/-]* | *..*)
+        echo "error: KIT_BRANCH '$KIT_BRANCH' is invalid — a ref is letters, digits, ""\
+'.', '_', '/', '-' (no '..'; git refnames cannot carry it)" >&2
         exit 1
         ;;
 esac
@@ -117,48 +117,48 @@ fetch_kit() {
     # compares word-wise and does not care about layout; this format is
     # convention). Keep it when adding files.
     for f in install.sh \
-             VERSION \
-             opencode-permissions-kit-lib/management/config.sh \
-             opencode-permissions-kit-lib/management/update.sh \
-             opencode-permissions-kit-lib/management/status.sh \
-             opencode-permissions-kit-lib/management/uninstall.sh \
-             opencode-permissions-kit-lib/templates/opencode.jsonc \
-             opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
-             opencode-permissions-kit-lib/templates/sudoers.template \
-             etc/umask.sh \
-             opencode-permissions-kit-lib/bin/opencode-as-opencode \
-             opencode-permissions-kit-lib/bin/opk \
-             opencode-permissions-kit-lib/py/jsonc-parser.py \
-             opencode-permissions-kit-lib/py/tui-register.py \
-             opencode-permissions-kit-lib/sh/log.sh \
-             opencode-permissions-kit-lib/sh/render-agent-config.sh \
-             opencode-permissions-kit-lib/sh/tui-plugin.sh \
-             opencode-permissions-kit-lib/sh/ui.sh \
-             opencode-permissions-kit-lib/sh/advisories.sh \
-             opencode-permissions-kit-lib/sh/shell-warn.sh \
-             opencode-permissions-kit-lib/bin/setup-container-backend \
-             opencode-permissions-kit-lib/bin/socket-check \
-             opencode-permissions-kit-lib/bin/cwd-check \
-             opencode-permissions-kit-lib/sh/ddev-terminal.sh \
-             opencode-permissions-kit-lib/bin/ddev-as-opencode \
-             opencode-permissions-kit-lib/sh/ddev-handover.sh \
-             opencode-permissions-kit-lib/sh/ddev-migrate.sh \
-             opencode-permissions-kit-lib/bin/ddev-migrate \
-             opencode-permissions-kit-lib/sh/ddev-hosts.sh \
-             opencode-permissions-kit-lib/sh/fs-baseline.sh \
-             opencode-permissions-kit-lib/sh/git-check.sh \
-             opencode-permissions-kit-lib/sh/staged-write.sh \
-             opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
-             opencode-permissions-kit-lib/sh/secure-binary.sh \
-             opencode-permissions-kit-lib/sh/deploy-lib.sh \
-             opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
-             opencode-permissions-kit-lib/bin/browser-bridge \
-             opencode-permissions-kit-lib/bin/xdg-open \
-             opencode-permissions-kit-lib/tui/kit-mode.tsx \
-             opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
-             opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
-             opencode-permissions-kit-lib/tui/tui.json \
-             opencode-permissions-kit-lib/tui/tui-danger.json; do
+        VERSION \
+        opencode-permissions-kit-lib/management/config.sh \
+        opencode-permissions-kit-lib/management/update.sh \
+        opencode-permissions-kit-lib/management/status.sh \
+        opencode-permissions-kit-lib/management/uninstall.sh \
+        opencode-permissions-kit-lib/templates/opencode.jsonc \
+        opencode-permissions-kit-lib/templates/opencode-deny-all.jsonc \
+        opencode-permissions-kit-lib/templates/sudoers.template \
+        etc/umask.sh \
+        opencode-permissions-kit-lib/bin/opencode-as-opencode \
+        opencode-permissions-kit-lib/bin/opk \
+        opencode-permissions-kit-lib/py/jsonc-parser.py \
+        opencode-permissions-kit-lib/py/tui-register.py \
+        opencode-permissions-kit-lib/sh/log.sh \
+        opencode-permissions-kit-lib/sh/render-agent-config.sh \
+        opencode-permissions-kit-lib/sh/tui-plugin.sh \
+        opencode-permissions-kit-lib/sh/ui.sh \
+        opencode-permissions-kit-lib/sh/advisories.sh \
+        opencode-permissions-kit-lib/sh/shell-warn.sh \
+        opencode-permissions-kit-lib/bin/setup-container-backend \
+        opencode-permissions-kit-lib/bin/socket-check \
+        opencode-permissions-kit-lib/bin/cwd-check \
+        opencode-permissions-kit-lib/sh/ddev-terminal.sh \
+        opencode-permissions-kit-lib/bin/ddev-as-opencode \
+        opencode-permissions-kit-lib/sh/ddev-handover.sh \
+        opencode-permissions-kit-lib/sh/ddev-migrate.sh \
+        opencode-permissions-kit-lib/bin/ddev-migrate \
+        opencode-permissions-kit-lib/sh/ddev-hosts.sh \
+        opencode-permissions-kit-lib/sh/fs-baseline.sh \
+        opencode-permissions-kit-lib/sh/git-check.sh \
+        opencode-permissions-kit-lib/sh/staged-write.sh \
+        opencode-permissions-kit-lib/sh/sudoers-deploy.sh \
+        opencode-permissions-kit-lib/sh/secure-binary.sh \
+        opencode-permissions-kit-lib/sh/deploy-lib.sh \
+        opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh \
+        opencode-permissions-kit-lib/bin/browser-bridge \
+        opencode-permissions-kit-lib/bin/xdg-open \
+        opencode-permissions-kit-lib/tui/kit-mode.tsx \
+        opencode-permissions-kit-lib/tui/kit-mode-2x.tsx \
+        opencode-permissions-kit-lib/tui/opencode-danger.theme.json \
+        opencode-permissions-kit-lib/tui/tui.json \
+        opencode-permissions-kit-lib/tui/tui-danger.json; do
         echo "  fetching $f ..." >&2
         # Fetch to a temp file and refuse anything unsound (0.0.39e C1):
         # an empty-but-200 body (captive portal, broken mirror) previously
@@ -196,7 +196,10 @@ if [ ! -f "$SCRIPT_DIR/../VERSION" ]; then
     # Direct call, NOT SCRIPT_DIR="$(fetch_kit)": command substitution runs
     # in a subshell, where _FETCH_TREE/_TMP_REGISTRY registrations would be
     # lost and the cleanup trap silently void (wave-f review).
-    fetch_kit || { echo "error: Failed to fetch kit files from $KIT_BASE_URL" >&2; exit 1; }
+    fetch_kit || {
+        echo "error: Failed to fetch kit files from $KIT_BASE_URL" >&2
+        exit 1
+    }
     SCRIPT_DIR="$_FK_DIR"
     STREAMED=true
 fi
@@ -241,7 +244,9 @@ command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_writ
 # issue #15). Same sourcing rules as ddev-handover.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
 command -v ddev_migrate_registry >/dev/null 2>&1 || {
-    ddev_migrate_registry() { :; }; ddev_migrate_projects() { :; }; ddev_migrate_done() { return 1; };
+    ddev_migrate_registry() { :; }
+    ddev_migrate_projects() { :; }
+    ddev_migrate_done() { return 1; }
 }
 
 # Shared group-baseline helper with live progress (issue #14). Same
@@ -263,40 +268,58 @@ command -v git_check_report >/dev/null 2>&1 || git_check_report() { :; }
 # in CONFDIR, chown/chmod there, mv onto the destination (rename replaces
 # a planted link instead of following it). Same sourcing rules as above.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/staged-write.sh"
-command -v staged_write >/dev/null 2>&1 \
-    || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+command -v staged_write >/dev/null 2>&1 ||
+    staged_write() {
+        echo "error: staged_write unavailable (staged-write.sh missing)" >&2
+        return 1
+    }
 
 # Shared sudoers pipeline (charset gate, render, visudo validation,
 # install, sudoers.d link, legacy cleanup): one implementation for
 # install.sh, config.sh and update.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/sudoers-deploy.sh"
-command -v sudoers_deploy >/dev/null 2>&1 \
-    || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
+command -v sudoers_deploy >/dev/null 2>&1 ||
+    sudoers_deploy() {
+        echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2
+        return 1
+    }
 
 # Shared binary hardening + atomic deploys (chown root:<group>
 # best-effort + the load-bearing chmod 750, fail-loud; the temp+mv
 # binary replacement, issue #163): one implementation for
 # install.sh and update.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/secure-binary.sh"
-command -v secure_binary >/dev/null 2>&1 \
-    || secure_binary() { echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2; return 1; }
-command -v copy_binary_atomic >/dev/null 2>&1 \
-    || copy_binary_atomic() { echo "error: copy_binary_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
-command -v copy_file_atomic >/dev/null 2>&1 \
-    || copy_file_atomic() { echo "error: copy_file_atomic unavailable (secure-binary.sh missing)" >&2; return 1; }
+command -v secure_binary >/dev/null 2>&1 ||
+    secure_binary() {
+        echo "error: secure_binary unavailable (secure-binary.sh missing)" >&2
+        return 1
+    }
+command -v copy_binary_atomic >/dev/null 2>&1 ||
+    copy_binary_atomic() {
+        echo "error: copy_binary_atomic unavailable (secure-binary.sh missing)" >&2
+        return 1
+    }
+command -v copy_file_atomic >/dev/null 2>&1 ||
+    copy_file_atomic() {
+        echo "error: copy_file_atomic unavailable (secure-binary.sh missing)" >&2
+        return 1
+    }
 
 # Shared library deployment manifest: what ships into
 # /usr/local/lib/opencode-permissions-kit, from ONE list (install.sh
 # and update.sh deploy through it).
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/deploy-lib.sh"
-command -v lib_deploy >/dev/null 2>&1 \
-    || lib_deploy() { echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2; return 1; }
+command -v lib_deploy >/dev/null 2>&1 ||
+    lib_deploy() {
+        echo "error: lib_deploy unavailable (deploy-lib.sh missing)" >&2
+        return 1
+    }
 
 # Shared agent-config template render (the SECURE_GIT sed pair): one
 # implementation for install.sh and config.sh's git-config toggle.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/render-agent-config.sh"
-command -v agent_config_render >/dev/null 2>&1 \
-    || agent_config_render() {
+command -v agent_config_render >/dev/null 2>&1 ||
+    agent_config_render() {
         echo "error: agent_config_render unavailable (render-agent-config.sh missing)" >&2
         return 1
     }
@@ -305,15 +328,18 @@ command -v agent_config_render >/dev/null 2>&1 \
 # implementation for install.sh Step 8c and update.sh's
 # sync_tui_registration.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/tui-plugin.sh"
-command -v tui_plugin_sync_user >/dev/null 2>&1 \
-    || tui_plugin_sync_user() { echo "error: tui_plugin_sync_user unavailable (tui-plugin.sh missing)" >&2; return 1; }
+command -v tui_plugin_sync_user >/dev/null 2>&1 ||
+    tui_plugin_sync_user() {
+        echo "error: tui_plugin_sync_user unavailable (tui-plugin.sh missing)" >&2
+        return 1
+    }
 
 # Shared WSL browser bridge helper (issues #91, #100): deploys the
 # powershell.exe stand-in + /etc/wsl.conf comment block that keep opencode's
 # device logins alive on a hardened /mnt/c. Same sourcing rules as
 # ddev-handover.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh"
-command -v browser_bridge_is_wsl  >/dev/null 2>&1 || browser_bridge_is_wsl()  { return 1; }
+command -v browser_bridge_is_wsl >/dev/null 2>&1 || browser_bridge_is_wsl() { return 1; }
 command -v browser_bridge_install >/dev/null 2>&1 || browser_bridge_install() { :; }
 
 # === Shared UI helpers ===
@@ -329,21 +355,34 @@ UI_LIB="$SCRIPT_DIR/opencode-permissions-kit-lib/sh/ui.sh"
 if [ -f "$UI_LIB" ]; then
     . "$UI_LIB"
 else
-    ui_info()    { echo "  info     $1"; }
+    ui_info() { echo "  info     $1"; }
     ui_success() { echo "  success  $1"; }
-    ui_warn()    { echo "  warn     $1"; }
-    ui_error()   { echo "  error    $1" >&2; }
-    ui_detail()  { echo "     $1"; }
-    ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
-    ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
-    ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
+    ui_warn() { echo "  warn     $1"; }
+    ui_error() { echo "  error    $1" >&2; }
+    ui_detail() { echo "     $1"; }
+    ui_section() {
+        echo ""
+        echo "  --- $1 ---"
+        echo ""
+    }
+    ui_banner() {
+        echo ""
+        echo "  opencode permissions kit  v${1:-}"
+        echo ""
+    }
+    ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
     ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
-    ui_plan()    { printf '    %s  %s\n' "$1" "$2"; }
-    ui_have()    { echo "  ok        $1  ${2:-}"; }
-    ui_atten()   { echo "  warn      $1  ${2:-}"; }
-    ui_add()     { echo "  add       $1  ${2:-}"; }
-    ui_miss()    { echo "  miss      $1  ${2:-}"; }
-    UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
+    ui_plan() { printf '    %s  %s\n' "$1" "$2"; }
+    ui_have() { echo "  ok        $1  ${2:-}"; }
+    ui_atten() { echo "  warn      $1  ${2:-}"; }
+    ui_add() { echo "  add       $1  ${2:-}"; }
+    ui_miss() { echo "  miss      $1  ${2:-}"; }
+    UI_GREEN=''
+    UI_RED=''
+    UI_YELLOW=''
+    UI_CYAN=''
+    UI_BLUE=''
+    UI_NC=''
 fi
 
 OPENCODE_USER="opencode"
@@ -391,8 +430,11 @@ parse_args() {
             # -y alias (#211 b W2): update/config/uninstall accept it;
             # cli.md documents it for install too — the family stays
             # uniform.
-            --yes|-y) SKIP_PROMPTS=true ;;
-            --secure-git-config) SECURE_GIT_CONFIG=true; GIT_FLAG_GIVEN=true ;;
+            --yes | -y) SKIP_PROMPTS=true ;;
+            --secure-git-config)
+                SECURE_GIT_CONFIG=true
+                GIT_FLAG_GIVEN=true
+                ;;
             --skip-ddev-migration) SKIP_DDEV_MIGRATION=true ;;
             --force-unsupported-distro) FORCE_UNSUPPORTED_DISTRO=true ;;
             --openchamber-policy)
@@ -401,7 +443,10 @@ parse_args() {
                     exit 1
                 fi
                 case "$2" in
-                    yes|no) OPENCHAMBER_POLICY_OPT="$2"; OPENCHAMBER_POLICY_GIVEN=true ;;
+                    yes | no)
+                        OPENCHAMBER_POLICY_OPT="$2"
+                        OPENCHAMBER_POLICY_GIVEN=true
+                        ;;
                     *)
                         echo "error: --openchamber-policy must be yes or no (got: $2)" >&2
                         exit 1
@@ -415,7 +460,7 @@ parse_args() {
                     exit 1
                 fi
                 case "$2" in
-                    move|copy|skip) MIGRATE_AGENTS_OPT="$2" ;;
+                    move | copy | skip) MIGRATE_AGENTS_OPT="$2" ;;
                     *)
                         echo "error: --migrate-agents must be move, copy or skip (got: $2)" >&2
                         exit 1
@@ -438,7 +483,7 @@ parse_args() {
                 fi
                 case "$2" in
                     dev-owned) DDEV_DEV_OWNED=true ;;
-                    ddev)      DDEV_DEV_OWNED=false ;;
+                    ddev) DDEV_DEV_OWNED=false ;;
                     *)
                         echo "error: --ddev-settings must be dev-owned or ddev (got: $2)" >&2
                         exit 1
@@ -514,7 +559,7 @@ _distro_gate() {
     case "$1" in
         ubuntu)
             case "$2" in
-                22.04|24.04) return 0 ;;
+                22.04 | 24.04) return 0 ;;
             esac
             ;;
         *)
@@ -524,8 +569,8 @@ _distro_gate() {
     _dg_v="$2"
     [ -n "$_dg_v" ] || _dg_v="(unknown version)"
     if [ "${FORCE_UNSUPPORTED_DISTRO:-false}" = true ]; then
-        ui_warn "unsupported distro: Ubuntu $_dg_v — continuing (--force-unsupported-distro,"\
-" at your own risk)"
+        ui_warn "unsupported distro: Ubuntu $_dg_v — continuing (--force-unsupported-distro,""\
+ at your own risk)"
         ui_detail "known blockers: sudo-rs freezes streamed installs, systemd fails user"
         ui_detail "managers per boot — issue #145; there is no support for this combination"
         log "distro gate OVERRIDDEN (--force-unsupported-distro): Ubuntu $_dg_v"
@@ -633,7 +678,7 @@ do_plan_phase() {
     # install.conf — reject anything outside the conservative Unix name
     # charset (letters, digits, _, ., -) before it can corrupt either.
     case "$DEFAULT_USER" in
-        ''|*[!A-Za-z0-9_.-]*)
+        '' | *[!A-Za-z0-9_.-]*)
             echo "error: Invalid user name '$DEFAULT_USER' (allowed: letters, digits, '_', '.', '-')" >&2
             exit 1
             ;;
@@ -690,7 +735,10 @@ do_plan_phase() {
             "2|Advanced (control every step)" \
             "x|Abort")
         case "$_mode" in
-            x) ui_info "Aborted."; exit 0 ;;
+            x)
+                ui_info "Aborted."
+                exit 0
+                ;;
             2) MODE="advanced" ;;
         esac
     fi
@@ -720,20 +768,20 @@ do_plan_phase() {
     # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
     # -C /: same unreadable-CWD class as issue #116 (git >= 2.55).
     sudo -u "$DEFAULT_USER" git -C / config --global --list \
-        > "$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$DEFAULT_USER"
+        >"$BACKUP_DIR/gitconfig-$DEFAULT_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$DEFAULT_USER"
     # shellcheck disable=SC2024  # install.sh runs as root; the redirect is root's job
     sudo -u "$OPENCODE_USER" git -C / config --global --list \
-        > "$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$OPENCODE_USER"
+        >"$BACKUP_DIR/gitconfig-$OPENCODE_USER.txt" 2>/dev/null || _bk_fail "gitconfig-$OPENCODE_USER"
     if [ -f /etc/opencode-permissions-kit/sudoers ]; then
         cp /etc/opencode-permissions-kit/sudoers "$BACKUP_DIR/sudoers" 2>/dev/null || _bk_fail "sudoers"
     fi
     if [ -f /usr/local/bin/opencode ]; then
-        cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null \
-            || _bk_fail "usr-local-bin-opencode"
+        cp /usr/local/bin/opencode "$BACKUP_DIR/usr-local-bin-opencode" 2>/dev/null ||
+            _bk_fail "usr-local-bin-opencode"
     fi
     if [ -d /usr/local/lib/opencode-permissions-kit ]; then
-        cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null \
-            || _bk_fail "opencode-permissions-kit-lib"
+        cp -r /usr/local/lib/opencode-permissions-kit "$BACKUP_DIR/opencode-permissions-kit-lib" 2>/dev/null ||
+            _bk_fail "opencode-permissions-kit-lib"
     fi
 
     ui_section "Pre-flight"
@@ -775,15 +823,15 @@ do_plan_phase() {
     DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
     DDEV_VERSION=""
     if [ -n "$DDEV_BIN" ] && [ -x "$DDEV_BIN" ]; then
-        DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null \
-            | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
+        DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null |
+            grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
     fi
     DDEV_BIN_DEV=""
     if [ -z "$DDEV_VERSION" ] && id "$DEFAULT_USER" >/dev/null 2>&1; then
         DDEV_BIN_DEV="$(sudo -u "$DEFAULT_USER" env HOME="$DEV_HOME" sh -c 'command -v ddev 2>/dev/null || true')"
         if [ -n "$DDEV_BIN_DEV" ] && [ -x "$DDEV_BIN_DEV" ]; then
-            DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="$DEV_HOME" "$DDEV_BIN_DEV" version 2>/dev/null \
-                | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
+            DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="$DEV_HOME" "$DDEV_BIN_DEV" version 2>/dev/null |
+                grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
             [ -z "$DDEV_BIN" ] && DDEV_BIN="$DDEV_BIN_DEV"
         fi
     fi
@@ -798,8 +846,8 @@ do_plan_phase() {
                 exit 1
             fi
         else
-            ui_warn "ddev found but the version could not be read (as root nor as '$DEFAULT_USER')"\
-" — continuing anyway (ddev >= 1.25 required)."
+            ui_warn "ddev found but the version could not be read (as root nor as '$DEFAULT_USER')""\
+ — continuing anyway (ddev >= 1.25 required)."
         fi
     else
         ui_warn "ddev not found — continuing anyway (install it later with ddev >= 1.25)."
@@ -850,7 +898,7 @@ do_plan_phase() {
         _dh=$(sed -n 's/^OPENCODE_DOCKER_HOST=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
         _ps=$(sed -n 's/^OPENCODE_PODMAN_SOCKET=//p' /etc/opencode-permissions-kit/install.conf 2>/dev/null)
         case "$_be" in
-            docker-rootless|podman-rootless)
+            docker-rootless | podman-rootless)
                 CONTAINER_BACKEND="$_be"
                 [ -n "$_dh" ] && OPENCODE_DOCKER_HOST="$_dh"
                 [ -n "$_ps" ] && OPENCODE_PODMAN_SOCKET="$_ps"
@@ -861,7 +909,7 @@ do_plan_phase() {
     # --container-backend flag overrides (for non-interactive scripting).
     if [ -n "$CONTAINER_BACKEND_OPT" ]; then
         case "$CONTAINER_BACKEND_OPT" in
-            docker-rootless|podman-rootless)
+            docker-rootless | podman-rootless)
                 CONTAINER_BACKEND="$CONTAINER_BACKEND_OPT"
                 ;;
             *)
@@ -895,7 +943,7 @@ do_plan_phase() {
                 "docker|docker-rootless (provisioned for the opencode user)")
             case "$_be_sel" in
                 podman) CONTAINER_BACKEND="podman-rootless" ;;
-                *)      CONTAINER_BACKEND="docker-rootless" ;;
+                *) CONTAINER_BACKEND="docker-rootless" ;;
             esac
         fi
     fi
@@ -929,9 +977,10 @@ do_plan_phase() {
     else
         ui_have "ddev projects" "none registered (nothing to migrate)"
     fi
-    HAVE_DOCKER=false; HAVE_PODMAN=false
-    command -v docker  >/dev/null 2>&1 && HAVE_DOCKER=true
-    command -v podman  >/dev/null 2>&1 && HAVE_PODMAN=true
+    HAVE_DOCKER=false
+    HAVE_PODMAN=false
+    command -v docker >/dev/null 2>&1 && HAVE_DOCKER=true
+    command -v podman >/dev/null 2>&1 && HAVE_PODMAN=true
     if [ "$HAVE_DOCKER" = true ]; then
         ui_have "docker CLI" "present — rootless backend will be provisioned for 'opencode'"
     elif [ "$HAVE_PODMAN" = true ]; then
@@ -941,11 +990,11 @@ do_plan_phase() {
     fi
 
     # Existing kit detection: user 'opencode', install.conf, or a wrapper symlink.
-    if id "$OPENCODE_USER" >/dev/null 2>&1 || [ -f /etc/opencode-permissions-kit/install.conf ] \
-        || [ -L /usr/local/bin/opencode ]; then
+    if id "$OPENCODE_USER" >/dev/null 2>&1 || [ -f /etc/opencode-permissions-kit/install.conf ] ||
+        [ -L /usr/local/bin/opencode ]; then
         _ekv="unknown"
-        [ -f /etc/opencode-permissions-kit/install.conf ] \
-            && _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
+        [ -f /etc/opencode-permissions-kit/install.conf ] &&
+            _ekv=$(sed -n 's/^VERSION=//p' /etc/opencode-permissions-kit/install.conf)
         ui_atten "existing kit" "detected (v${_ekv:-?}) — update.sh is the usual upgrade path"
         if [ "$INTERACTIVE" = true ]; then
             # Convention: agent/conventions.md — [Y/n] via ui_confirm.
@@ -1002,11 +1051,11 @@ do_plan_phase() {
         if [ "$_pp" = "~" ]; then _pp="${PROJECT_TILDE_HOME:-$HOME}"; else case "$_pp" in
             "~/"*) _pp="${PROJECT_TILDE_HOME:-$HOME}${_pp#\~}" ;;
             "~"*) return 1 ;;
-        esac; fi
+        esac fi
         _PP_NORM="$_pp"
         case "$_pp" in
             /*) ;;
-            *)  return 1 ;;   # relative paths are error-prone in projects.conf
+            *) return 1 ;; # relative paths are error-prone in projects.conf
         esac
         case "$_pp" in
             # Dot/empty-segment forms, complete (0.0.45c S1): the old arms
@@ -1015,16 +1064,16 @@ do_plan_phase() {
             # design) sent the root-side recursive group baseline over /,
             # /var or every home; a leading "//" resolved outside the
             # blocklist too. Same arms as bin/opk's handover form filter.
-            *..*|/./|*/./*|./*|*/.|*//*) return 1 ;;   # traversal / dot / empty segments
-            *[[:space:]]*) return 1 ;;        # storage format is line-based and
-                                             # space-free (0.0.39b C3)
+            *..* | /./ | */./* | ./* | */. | *//*) return 1 ;; # traversal / dot / empty segments
+            *[[:space:]]*) return 1 ;;                         # storage format is line-based and
+                # space-free (0.0.39b C3)
         esac
         case "$_pp" in
-            /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
-    /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
-    /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/tmp/*|/var/tmp/*|\
-    /usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
-    /var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
+            / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
+                /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
+                /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
+                /usr | /usr/* | /var | /var/tmp | /var/cache | /var/cache/* | /var/lib | /var/lib/* | \
+                /var/log | /var/log/* | /var/mail | /var/mail/* | /var/spool | /var/spool/*)
                 return 1
                 ;;
         esac
@@ -1034,8 +1083,8 @@ do_plan_phase() {
         # pr-00263 a F10: getent alongside the literal spelling — a relocated
         # agent home must refuse too (the uninstall.sh twin, opk pattern).
         _pp_agent_home="$(getent passwd "${OPENCODE_USER:-opencode}" 2>/dev/null | cut -d: -f6 || true)"
-        if [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] \
-           || { [ -n "$_pp_agent_home" ] && [ "$_pp" = "$_pp_agent_home" ]; }; then
+        if [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] ||
+            { [ -n "$_pp_agent_home" ] && [ "$_pp" = "$_pp_agent_home" ]; }; then
             return 1
         fi
         # The developer's whole home as a root is allowed but deserves a
@@ -1093,7 +1142,7 @@ do_plan_phase() {
                         ui_info "Use a dedicated folder like /var/www/vhosts, ~/dev or ~/projects."
                         continue
                     fi
-                    _p="$_PP_NORM"   # ~ expanded to $HOME
+                    _p="$_PP_NORM" # ~ expanded to $HOME
                 fi
                 break
             done
@@ -1140,7 +1189,7 @@ do_plan_phase() {
                 OPENCHAMBER_POLICY=no
             fi
         elif [ "$_oc_prev" = "yes" ]; then
-            OPENCHAMBER_POLICY=yes   # keep an earlier opt-in (non-interactive)
+            OPENCHAMBER_POLICY=yes # keep an earlier opt-in (non-interactive)
         fi
     else
         OPENCHAMBER_POLICY="$OPENCHAMBER_POLICY_OPT"
@@ -1156,7 +1205,10 @@ do_plan_phase() {
     # Numbered dynamically: optional steps (mnt/c, port sysctl) are omitted
     # when not applicable — no gaps in the list the user confirms.
     _plan_n=0
-    _plan() { _plan_n=$((_plan_n + 1)); ui_plan "$_plan_n" "$1" "$2"; }
+    _plan() {
+        _plan_n=$((_plan_n + 1))
+        ui_plan "$_plan_n" "$1" "$2"
+    }
 
     _plan "create user 'opencode' + sharing group" "(developer '$DEFAULT_USER' added)"
     _plan "provision $CONTAINER_BACKEND for 'opencode'" "(mandatory — aborts on failure)"
@@ -1193,9 +1245,14 @@ do_plan_phase() {
         echo ""
         _go=$(ui_menu "Proceed?" "C" "C|Confirm" "A|Switch to Advanced" "X|Abort")
         case "$_go" in
-            X)  ui_info "Aborted — nothing was changed."; exit 0 ;;
-            A)  MODE="advanced"
-                ui_info "Advanced mode — the remaining steps ask for your decisions." ;;
+            X)
+                ui_info "Aborted — nothing was changed."
+                exit 0
+                ;;
+            A)
+                MODE="advanced"
+                ui_info "Advanced mode — the remaining steps ask for your decisions."
+                ;;
         esac
     fi
 
@@ -1208,7 +1265,10 @@ do_plan_phase() {
 
     ui_info "Creating user + sharing group ..."
     if id "$OPENCODE_USER" >/dev/null 2>&1; then
-        confirm "User '$OPENCODE_USER' already exists. Reuse it?" || { ui_info "Aborted."; exit 1; }
+        confirm "User '$OPENCODE_USER' already exists. Reuse it?" || {
+            ui_info "Aborted."
+            exit 1
+        }
         # reuse-guard-home (0.0.44a V15, maintainer decision: fail-loud):
         # every agent-side provision writes /home/<agent>, and the runtime
         # (sudo env_reset, the wrapper) reads the user's REAL passwd home —
@@ -1217,8 +1277,8 @@ do_plan_phase() {
         # success banner. Rejected with remediation instead.
         _oc_home="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
         if [ "$_oc_home" != "/home/$OPENCODE_USER" ]; then
-            ui_error "user '$OPENCODE_USER' exists with home '$_oc_home',"\
-" but the kit provisions /home/$OPENCODE_USER — the runtime reads the passwd home,"
+            ui_error "user '$OPENCODE_USER' exists with home '$_oc_home',""\
+ but the kit provisions /home/$OPENCODE_USER — the runtime reads the passwd home,"
             ui_error "so config, TUI registration and the mkcert CA would land in a shadow home."
             ui_error "Move the user's home or remove the user, then re-run."
             log "reuse refused: home deviation ($OPENCODE_USER -> $_oc_home)"
@@ -1229,8 +1289,8 @@ do_plan_phase() {
         # primary group widens the kit onto users it was never meant for.
         _oc_pgrp="$(id -gn "$OPENCODE_USER" 2>/dev/null || true)"
         if [ "$_oc_pgrp" != "$OPENCODE_USER" ]; then
-            ui_error "user '$OPENCODE_USER' exists with primary group '$_oc_pgrp', but the kit's"\
-" sharing group IS the user's own primary usergroup (useradd -m default)"
+            ui_error "user '$OPENCODE_USER' exists with primary group '$_oc_pgrp', but the kit's""\
+ sharing group IS the user's own primary usergroup (useradd -m default)"
             ui_error "— a foreign primary group would widen the group baseline onto it."
             ui_error "Point the user's primary group at a group of its own name, or remove the user, then re-run."
             log "reuse refused: primary group deviation ($OPENCODE_USER -> $_oc_pgrp)"
@@ -1367,8 +1427,8 @@ do_plan_phase() {
                     if [ -n "$PROJECTS_ROOTS" ]; then
                         _sel_done=1
                     else
-                        ui_error "invalid selection '$selection' — pick numbers from the list, "\
-"'c' for custom, or 's' to skip."
+                        ui_error "invalid selection '$selection' — pick numbers from the list, ""\
+'c' for custom, or 's' to skip."
                     fi
                     ;;
             esac
@@ -1377,7 +1437,7 @@ do_plan_phase() {
 
     sudo mkdir -p /etc/opencode-permissions-kit
     if [ -n "$PROJECTS_ROOTS" ]; then
-        echo "$PROJECTS_ROOTS" | tr ' ' '\n' | sudo tee /etc/opencode-permissions-kit/projects.conf > /dev/null
+        echo "$PROJECTS_ROOTS" | tr ' ' '\n' | sudo tee /etc/opencode-permissions-kit/projects.conf >/dev/null
         echo "Project roots: $PROJECTS_ROOTS"
         log "projects.conf written: $PROJECTS_ROOTS"
     else
@@ -1391,7 +1451,7 @@ do_plan_phase() {
         # shellcheck disable=SC2086,SC2024  # word splitting intended (root list); root redirects
         # pr-00263 a F8: the success line must observe the copy (getfacl
         # absent or errored used to pass silently into recovery material).
-        if sudo getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt"; then
+        if sudo getfacl -R $PROJECTS_ROOTS 2>/dev/null >"$BACKUP_DIR/getfacl-R-projects.txt"; then
             echo "Project ACLs backed up to $BACKUP_DIR/getfacl-R-projects.txt"
         else
             echo "  warn     project ACL backup FAILED (getfacl absent or errored) — no ACL recovery material" >&2
@@ -1407,7 +1467,7 @@ do_plan_phase() {
     # mktemp cannot create in the root-only conf dir).
     _INSTALL_CONF_TMP="/etc/opencode-permissions-kit/install.conf.opk-new.$$"
     _tmp_track "$_INSTALL_CONF_TMP"
-    sudo tee "$_INSTALL_CONF_TMP" > /dev/null <<EOF
+    sudo tee "$_INSTALL_CONF_TMP" >/dev/null <<EOF
 DEFAULT_USER=$DEFAULT_USER
 OPENCODE_USER=$OPENCODE_USER
 OPENCODE_GROUP=$OPENCODE_GROUP
@@ -1491,20 +1551,22 @@ do_ddev_phase() {
             log "ddev no-bind-mounts set (backend=docker-rootless, ddev=$DDEV_VERSION)"
         else
             case $? in
-                2) ui_warn "could not set ddev's no-bind-mounts global — ddev $DDEV_VERSION on docker-rootless"
-                   ui_warn "may fail with 'bind mounts can't be used with Docker Rootless'. Fix manually:"
-                   ui_detail "sudo -u $OPENCODE_USER env HOME=/home/$OPENCODE_USER ddev config global --no-bind-mounts"
-                   log "ddev no-bind-mounts setup failed (backend=docker-rootless, ddev=$DDEV_VERSION)" ;;
+                2)
+                    ui_warn "could not set ddev's no-bind-mounts global — ddev $DDEV_VERSION on docker-rootless"
+                    ui_warn "may fail with 'bind mounts can't be used with Docker Rootless'. Fix manually:"
+                    ui_detail "sudo -u $OPENCODE_USER env HOME=/home/$OPENCODE_USER ddev config global --no-bind-mounts"
+                    log "ddev no-bind-mounts setup failed (backend=docker-rootless, ddev=$DDEV_VERSION)"
+                    ;;
             esac
         fi
     fi
 
     port_start=$(cat /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || echo 1024)
     if [ "${port_start:-1024}" -gt 80 ] 2>/dev/null; then
-        if confirm "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443?"\
-" (host-wide sysctl)"; then
-            if echo 'net.ipv4.ip_unprivileged_port_start=80' \
-                | sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
+        if confirm "Lower net.ipv4.ip_unprivileged_port_start to 80 so ddev-router can bind 80/443?""\
+ (host-wide sysctl)"; then
+            if echo 'net.ipv4.ip_unprivileged_port_start=80' |
+                sudo tee /etc/sysctl.d/99-ddev-rootless.conf >/dev/null 2>&1; then
                 if sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 >/dev/null 2>&1; then
                     ui_success "unprivileged port start lowered to 80 (persisted: /etc/sysctl.d/99-ddev-rootless.conf)"
                     log "net.ipv4.ip_unprivileged_port_start=80 applied"
@@ -1519,8 +1581,8 @@ do_ddev_phase() {
                             log "rootless docker daemon restarted for port-start 80"
                         else
                             ui_warn "could not restart the rootless daemon — run it manually:"
-                            echo "  sudo -u $OPENCODE_USER XDG_RUNTIME_DIR=/run/user/$oc_uid"\
-" systemctl --user restart docker.service"
+                            echo "  sudo -u $OPENCODE_USER XDG_RUNTIME_DIR=/run/user/$oc_uid""\
+ systemctl --user restart docker.service"
                             log "rootless daemon restart failed (admin must restart manually)"
                         fi
                     fi
@@ -1530,8 +1592,8 @@ do_ddev_phase() {
                     log "sysctl persisted but not activated live"
                 fi
             else
-                ui_warn "could not write /etc/sysctl.d/99-ddev-rootless.conf"\
-" — apply the sysctl manually or use higher router ports."
+                ui_warn "could not write /etc/sysctl.d/99-ddev-rootless.conf""\
+ — apply the sysctl manually or use higher router ports."
             fi
         else
             ui_detail "skipped — either set the sysctl manually or use higher router ports:"
@@ -1588,10 +1650,10 @@ do_ddev_phase() {
         # below into the link target. Skip loudly (user-managed); no CA will
         # exist, so warn like the other no-CA ends (0.0.39h F5).
         if ! agent_home_sane "$OPENCODE_USER" "$caroot"; then
-            ui_warn "mkcert: the chain to $caroot contains a symlink — CA provisioning skipped"\
-" (the kit never follows links in the agent home)."
-            ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate. "\
-"Remove the link or place your CA at $caroot and re-run."
+            ui_warn "mkcert: the chain to $caroot contains a symlink — CA provisioning skipped""\
+ (the kit never follows links in the agent home)."
+            ui_warn "no mkcert CA exists at $caroot — ddev HTTPS will use an untrusted or no certificate. ""\
+Remove the link or place your CA at $caroot and re-run."
             log "mkcert CA provisioning skipped: symlink in the chain to $caroot (no CA provisioned)"
         else
             sudo mkdir -p "$caroot"
@@ -1612,7 +1674,8 @@ do_ddev_phase() {
                 done
             fi
             if [ -z "$src" ] && [ -n "$DEFAULT_USER" ] && [ -f "$DEV_HOME/.local/share/mkcert/rootCA.pem" ]; then
-                src="$DEV_HOME/.local/share/mkcert"; src_label="developer '$DEFAULT_USER'"
+                src="$DEV_HOME/.local/share/mkcert"
+                src_label="developer '$DEFAULT_USER'"
             fi
             if [ -n "$src" ]; then
                 # No && chain: a mid-chain failure silently skipped the chmod 600
@@ -1622,11 +1685,11 @@ do_ddev_phase() {
                 # staged_write (mode + owner applied on the staged file); the
                 # directory inode handover rechecks [ -L ] immediately before
                 # chown/chmod touch it (0.0.39g S1).
-                if staged_write 644 "$OPENCODE_USER:$OPENCODE_GROUP" "$src/rootCA.pem" "$caroot/rootCA.pem" \
-                   && staged_write 600 "$OPENCODE_USER:$OPENCODE_GROUP" "$src/rootCA-key.pem" "$caroot/rootCA-key.pem" \
-                   && [ ! -L "$caroot" ] \
-                   && sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" \
-                   && sudo chmod 700 "$caroot"; then
+                if staged_write 644 "$OPENCODE_USER:$OPENCODE_GROUP" "$src/rootCA.pem" "$caroot/rootCA.pem" &&
+                    staged_write 600 "$OPENCODE_USER:$OPENCODE_GROUP" "$src/rootCA-key.pem" "$caroot/rootCA-key.pem" &&
+                    [ ! -L "$caroot" ] &&
+                    sudo chown "$OPENCODE_USER:$OPENCODE_GROUP" "$caroot" &&
+                    sudo chmod 700 "$caroot"; then
                     echo "  mkcert CA reused from $src_label -> $caroot (Windows browsers already trust it)"
                     log "mkcert CA reused from $src_label for $OPENCODE_USER"
                 else
@@ -1645,8 +1708,8 @@ do_ddev_phase() {
                         sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
                     fi
                     if [ ! -f "$caroot/rootCA.pem" ]; then
-                        ui_warn "no mkcert CA exists at $caroot after the fallback"\
-" — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
+                        ui_warn "no mkcert CA exists at $caroot after the fallback""\
+ — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
                         log "mkcert CA fallback produced no CA at $caroot"
                     fi
                 fi
@@ -1665,14 +1728,14 @@ do_ddev_phase() {
                 sudo -u "$OPENCODE_USER" env CAROOT="$caroot" mkcert -install >/dev/null 2>&1 || true
                 if [ -f "$caroot/rootCA.pem" ]; then
                     ui_warn "mkcert: no existing CA found — a new one was created at $caroot."
-                    ui_warn "It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER')"\
-": browsers will warn."
-                    ui_detail "Import $caroot/rootCA.pem into your browser, "\
-"or run 'sudo env CAROOT=$caroot mkcert -install' yourself."
+                    ui_warn "It is NOT trusted by the system or Windows stores (mkcert ran as '$OPENCODE_USER')""\
+: browsers will warn."
+                    ui_detail "Import $caroot/rootCA.pem into your browser, ""\
+or run 'sudo env CAROOT=$caroot mkcert -install' yourself."
                     log "mkcert: no existing CA — new one created for $OPENCODE_USER (system trust store not updated)"
                 else
-                    ui_warn "no mkcert CA exists at $caroot after the install attempt"\
-" — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
+                    ui_warn "no mkcert CA exists at $caroot after the install attempt""\
+ — ddev HTTPS will use an untrusted or no certificate. Install mkcert or copy your CA to $caroot and re-run."
                     log "mkcert: fresh-install attempt produced no CA at $caroot"
                 fi
             else
@@ -1705,12 +1768,12 @@ do_ddev_phase() {
         _g_have=${_g%% *}
         _g_rest=${_g#* }
         _g_now=${_g_rest%% *}
-        ui_warn "partial ddev export detected: the registry lists $_g_now project(s)"\
-" under the roots, only $_g_have dump(s) recorded"
-        ui_warn "the missing databases stay in the old daemon — bridge them "\
-"(docs/troubleshooting.md, 'My databases are gone after the install')"
-        ui_detail "see what is missing: /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
-" registry $DEFAULT_USER $PROJECTS_ROOTS"
+        ui_warn "partial ddev export detected: the registry lists $_g_now project(s)""\
+ under the roots, only $_g_have dump(s) recorded"
+        ui_warn "the missing databases stay in the old daemon — bridge them ""\
+(docs/troubleshooting.md, 'My databases are gone after the install')"
+        ui_detail "see what is missing: /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate""\
+ registry $DEFAULT_USER $PROJECTS_ROOTS"
         log "ddev migration gap detected: registry=$_g_now dumps=$_g_have"
     }
     if [ "${DD_MIG_COUNT:-0}" -gt 0 ]; then
@@ -1718,8 +1781,8 @@ do_ddev_phase() {
         if [ "$SKIP_DDEV_MIGRATION" = true ]; then
             ui_detail "skipped (--skip-ddev-migration) — the databases become unreachable"
             ui_detail "with the old daemon; export manually BEFORE using ddev again:"
-            ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
-" export $DEFAULT_USER ${PROJECTS_ROOTS:-<roots>}"
+            ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate""\
+ export $DEFAULT_USER ${PROJECTS_ROOTS:-<roots>}"
             log "ddev database export skipped (--skip-ddev-migration)"
         elif [ "$DDEV_EXPORTED_PRE" = "1" ]; then
             _ddev_mig_gap_warn
@@ -1735,8 +1798,8 @@ do_ddev_phase() {
             log "ddev database export skipped (no project roots)"
         else
             if [ "$MODE" = "advanced" ] && [ "$INTERACTIVE" = true ]; then
-                confirm "Export the dev user's ddev databases before the handover?"\
-" (recommended — dumps under /var/backups/opencode-permissions-kit)" || SKIP_DDEV_MIGRATION=true
+                confirm "Export the dev user's ddev databases before the handover?""\
+ (recommended — dumps under /var/backups/opencode-permissions-kit)" || SKIP_DDEV_MIGRATION=true
             fi
             if [ "$SKIP_DDEV_MIGRATION" != true ]; then
                 # shellcheck disable=SC2086  # word splitting intended (root list)
@@ -1759,7 +1822,7 @@ do_ddev_phase() {
                     fi
                     if [ "$DD_MIG_FAIL" -eq 0 ]; then
                         if ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
-                            echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
+                            echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
                         fi
                         log "ddev databases exported: ok=$DD_MIG_OK fail=0 dir=$DD_MIG_DUMP_DIR"
                     else
@@ -1775,11 +1838,11 @@ do_ddev_phase() {
                         if [ "$INTERACTIVE" = true ]; then
                             # Convention: agent/conventions.md — default "n":
                             # continuing is the destructive choice here.
-                            if ! ui_confirm "Continue the install anyway?"\
-" (the listed databases become unreachable)" "n"; then
+                            if ! ui_confirm "Continue the install anyway?""\
+ (the listed databases become unreachable)" "n"; then
                                 ui_info "Aborted — the .ddev handover did NOT run, your dev-side ddev still works."
-                                ui_detail "fix the failed projects (ddev start <name> as $DEFAULT_USER),"\
-" then re-run install.sh"
+                                ui_detail "fix the failed projects (ddev start <name> as $DEFAULT_USER),""\
+ then re-run install.sh"
                                 ui_detail "dumps already written stay in $DD_MIG_DUMP_DIR"
                                 log "install aborted: $DD_MIG_FAIL ddev export(s) failed (user decision) — no handover ran"
                                 exit 1
@@ -1787,8 +1850,8 @@ do_ddev_phase() {
                         else
                             ui_warn "continuing (--yes): the listed databases become unreachable"
                         fi
-                        log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL"\
-" dir=$DD_MIG_DUMP_DIR (failures accepted)"
+                        log "ddev databases exported: ok=$DD_MIG_OK fail=$DD_MIG_FAIL""\
+ dir=$DD_MIG_DUMP_DIR (failures accepted)"
                     fi
                 elif [ -n "${DD_MIG_DUMP_DIR:-}" ]; then
                     # dump dir exists but no counts: the export refused
@@ -1799,15 +1862,15 @@ do_ddev_phase() {
                     log "ddev export incomplete: no counts returned for $DD_MIG_DUMP_DIR"
                 else
                     ui_warn "ddev database export produced no dumps — import manually later if needed"
-                    ui_detail "retry after install: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
-" export $DEFAULT_USER $PROJECTS_ROOTS"
+                    ui_detail "retry after install: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate""\
+ export $DEFAULT_USER $PROJECTS_ROOTS"
                     log "ddev database export produced no dumps"
                 fi
             else
                 ui_detail "declined — the dev databases become unreachable with the old daemon"
                 ui_detail "export manually BEFORE using ddev again:"
-                ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate"\
-" export $DEFAULT_USER $PROJECTS_ROOTS"
+                ui_detail "  sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate""\
+ export $DEFAULT_USER $PROJECTS_ROOTS"
                 log "ddev database export declined (advanced prompt)"
             fi
         fi
@@ -1815,9 +1878,9 @@ do_ddev_phase() {
     # Carry a pre-existing stamp over the install.conf rewrite in Step 2 —
     # without this, every second re-install would re-attempt (and fail) the
     # dev-side export.
-    if [ "$DDEV_EXPORTED_PRE" = "1" ] \
-        && ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
-        echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf > /dev/null
+    if [ "$DDEV_EXPORTED_PRE" = "1" ] &&
+        ! grep -q '^DDEV_EXPORTED=' /etc/opencode-permissions-kit/install.conf 2>/dev/null; then
+        echo "DDEV_EXPORTED=1" | sudo tee -a /etc/opencode-permissions-kit/install.conf >/dev/null
     fi
 }
 
@@ -1831,8 +1894,8 @@ do_deploy_phase() {
 
     if [ -n "$PROJECTS_ROOTS" ]; then
         ui_section "Filesystem (group baseline)"
-        ans=$(_yes_no_backup_menu "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots?"\
-" (changes metadata on ALL files)")
+        ans=$(_yes_no_backup_menu "Apply group-$OPENCODE_GROUP, setgid, and default ACLs to project roots?""\
+ (changes metadata on ALL files)")
         case "$ans" in
             n) ui_detail "skipping filesystem setup." ;;
             b)
@@ -1840,12 +1903,13 @@ do_deploy_phase() {
                 ui_detail "reading current ACLs with getfacl -R (large trees: this can take minutes) ..."
                 # pr-00263 a F8: success line observes the copy (sweep twin
                 # of the project-roots site above).
-                if getfacl -R $PROJECTS_ROOTS 2>/dev/null > "$BACKUP_DIR/getfacl-R-projects.txt"; then
+                if getfacl -R $PROJECTS_ROOTS 2>/dev/null >"$BACKUP_DIR/getfacl-R-projects.txt"; then
                     echo "Backup saved."
                 else
                     echo "  warn     ACL backup FAILED (getfacl absent or errored) — no ACL recovery material" >&2
                     log "getfacl interactive backup FAILED"
-                fi ;;
+                fi
+                ;;
             y) ;;
         esac
         if [ "$ans" != "n" ]; then
@@ -1905,8 +1969,8 @@ do_deploy_phase() {
             ui_success "git safe.directory '*' set for $OPENCODE_USER (agent git access)"
             log "git safe.directory ensured for $OPENCODE_USER"
         else
-            ui_warn "could not set git safe.directory '*' for $OPENCODE_USER — agent git may fail"\
-" with 'dubious ownership' (git config --global --add failed)"
+            ui_warn "could not set git safe.directory '*' for $OPENCODE_USER — agent git may fail""\
+ with 'dubious ownership' (git config --global --add failed)"
             log "git safe.directory NOT ensured for $OPENCODE_USER (git config --add failed)"
         fi
     fi
@@ -1918,8 +1982,11 @@ do_deploy_phase() {
     # target dir, mode 644 before the mv (every user's shell must be
     # able to read the profile).
     copy_file_atomic "$SCRIPT_DIR/etc/umask.sh" \
-        /etc/profile.d/opencode-permissions-kit-umask.sh 644 \
-        || { echo "error: umask profile deploy failed" >&2; exit 1; }
+        /etc/profile.d/opencode-permissions-kit-umask.sh 644 ||
+        {
+            echo "error: umask profile deploy failed" >&2
+            exit 1
+        }
     log "umask profile installed: /etc/profile.d/opencode-permissions-kit-umask.sh"
 
     # === Step 6: opencode binary ===
@@ -1941,7 +2008,7 @@ do_deploy_phase() {
     remove_shadow_binary() {
         case "$1" in
             */.opencode/bin/opencode) ;;
-            *) return 0 ;;   # never touch /usr/bin, /usr/local/bin, ...
+            *) return 0 ;; # never touch /usr/bin, /usr/local/bin, ...
         esac
         [ -e "$1" ] || return 0
         # pr-00263 a F6 (class sweep): the removal claim names the backup —
@@ -2001,7 +2068,10 @@ do_deploy_phase() {
                     log "binary copied: $loc -> $SYSTEM_BIN ($_ocb_bk)"
                     break
                     ;;
-                n) echo "Aborted."; exit 1 ;;
+                n)
+                    echo "Aborted."
+                    exit 1
+                    ;;
             esac
         fi
     done
@@ -2011,10 +2081,12 @@ do_deploy_phase() {
             # pr-00263 a F19: pipefail (set at the top) carries a curl
             # failure through the pipe — the wrapper fires on either a
             # failed fetch or a failed installer run.
-            curl -fsSL https://opencode.ai/v2/install | bash \
-                || { echo "error: the official opencode installer failed — run it manually:" >&2
-                     echo "  curl -fsSL https://opencode.ai/v2/install | bash" >&2
-                     exit 1; }
+            curl -fsSL https://opencode.ai/v2/install | bash ||
+                {
+                    echo "error: the official opencode installer failed — run it manually:" >&2
+                    echo "  curl -fsSL https://opencode.ai/v2/install | bash" >&2
+                    exit 1
+                }
             # The v2 installer (issue #197): resolves the current 2.x
             # through the npm registry and installs into ~/.opencode/bin —
             # the same layout the v1 installer used, so the pickup paths
@@ -2065,11 +2137,11 @@ do_deploy_phase() {
     _stamp_ver=$(timeout 10 "$SYSTEM_BIN" --version 2>/dev/null | head -1 || true)
     _stamp_maj=$(printf '%s' "$_stamp_ver" | sed -n 's/^opencode v\([0-9][0-9]*\).*/\1/p')
     if [ -n "$_stamp_maj" ]; then
-        :   # "opencode v2..." — the 2.x shape
+        : # "opencode v2..." — the 2.x shape
     elif printf '%s' "$_stamp_ver" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
-        _stamp_maj=1   # bare version line = 1.x, full-line anchored
+        _stamp_maj=1 # bare version line = 1.x, full-line anchored
     else
-        _stamp_maj=""   # unparseable/empty — keep the previous stamp
+        _stamp_maj="" # unparseable/empty — keep the previous stamp
     fi
     if [ -n "$_stamp_maj" ]; then
         OPENCODE_MAJOR="$_stamp_maj"
@@ -2095,16 +2167,14 @@ do_deploy_phase() {
         if [ -f "$cf" ]; then
             sudo sed -i '\|\.opencode/bin|d' "$cf" 2>/dev/null || true
             if ! sudo grep -q 'export PATH="/usr/local/bin:$PATH"' "$cf" 2>/dev/null; then
-                echo "" | sudo tee -a "$cf" > /dev/null
-                echo 'export PATH="/usr/local/bin:$PATH"' | sudo tee -a "$cf" > /dev/null
+                echo "" | sudo tee -a "$cf" >/dev/null
+                echo 'export PATH="/usr/local/bin:$PATH"' | sudo tee -a "$cf" >/dev/null
             fi
             # Interactive-shell bypass warning: sources shell-warn.sh so a
             # self-installed opencode binary is reported in non-login shells too.
             # The [ -f ... ] guard keeps the line harmless after uninstall.
             if ! sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh' "$cf" 2>/dev/null; then
-                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . '\
-'/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'\
-' (wrapper bypass warning)' | sudo tee -a "$cf" > /dev/null
+                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . ''/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'' (wrapper bypass warning)' | sudo tee -a "$cf" >/dev/null
             fi
             # Interactive-shell ddev function: `ddev` always runs as the opencode
             # user (sudoers helper), so the developer terminal and the agent share
@@ -2112,9 +2182,7 @@ do_deploy_phase() {
             # uninstall. Only the DEFAULT user gets it — the opencode session must
             # never be wrapped (the function's id check would be recursive).
             if ! sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null; then
-                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . '\
-'/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'\
-' (ddev always runs as opencode)' | sudo tee -a "$cf" > /dev/null
+                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . ''/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'' (ddev always runs as opencode)' | sudo tee -a "$cf" >/dev/null
             fi
         fi
     done
@@ -2157,8 +2225,8 @@ do_deploy_phase() {
     # keeping the gate honest if install.sh is ever run outside root.
     if [ "$OPENCHAMBER_POLICY" = yes ]; then
         _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
-        if sudo test -f /etc/openchamber/policy.json \
-            && [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
+        if sudo test -f /etc/openchamber/policy.json &&
+            [ "$(sudo cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
             ui_warn "existing /etc/openchamber/policy.json diverges from the kit pin"
             ui_warn "(admin-owned content) — left untouched"
             ui_detail "force it with: sudo opk openchamber-secure (replaces the file)"
@@ -2166,8 +2234,8 @@ do_deploy_phase() {
         else
             ui_info "Pinning OpenChamber to the kit wrapper ..."
             sudo mkdir -p /etc/openchamber
-            printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' \
-                | sudo tee /etc/openchamber/policy.json > /dev/null
+            printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' |
+                sudo tee /etc/openchamber/policy.json >/dev/null
             sudo chown root:root /etc/openchamber/policy.json
             sudo chmod 644 /etc/openchamber/policy.json
             ui_success "openchamber policy pin: /etc/openchamber/policy.json"
@@ -2180,8 +2248,8 @@ do_deploy_phase() {
     # is not executable for the caller — without any xdg-open the device
     # login dies (2.x: uncaught crash). Deploy the kit shim ONLY while no
     # real xdg-open exists (never shadow one).
-    if ! command -v xdg-open >/dev/null 2>&1 \
-       && ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ]; then
+    if ! command -v xdg-open >/dev/null 2>&1 &&
+        ! [ -e /usr/local/bin/xdg-open ] && ! [ -L /usr/local/bin/xdg-open ]; then
         sudo ln -s "$LIBDIR/bin/xdg-open" /usr/local/bin/xdg-open
         ui_success "xdg-open fallback installed: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
         log "xdg-open shim symlink: /usr/local/bin/xdg-open -> $LIBDIR/bin/xdg-open"
@@ -2238,16 +2306,16 @@ do_deploy_phase() {
     # Advanced mode asks here (Standard already asked in its question section;
     # --yes runs skip everything).
     if [ "$GIT_FLAG_GIVEN" != true ] && [ "$INTERACTIVE" = true ] && [ "$MODE" = "advanced" ]; then
-        if confirm "Block .git/config for opencode? (SOFT-only: opencode tools respect it,"\
-" bash-spawned reads are not OS-blocked)"; then
+        if confirm "Block .git/config for opencode? (SOFT-only: opencode tools respect it,""\
+ bash-spawned reads are not OS-blocked)"; then
             SECURE_GIT_CONFIG=true
         else
             SECURE_GIT_CONFIG=false
         fi
     fi
     if [ "$SECURE_GIT_CONFIG" = true ]; then
-        ui_info "git for the agent: BLOCKED (.git/config deny active, soft-only"\
-" — enforced by opencode's permission layer, not the OS)"
+        ui_info "git for the agent: BLOCKED (.git/config deny active, soft-only""\
+ — enforced by opencode's permission layer, not the OS)"
     fi
 
     # === Step 8: opencode Home ===
@@ -2321,8 +2389,8 @@ do_deploy_phase() {
         # developer content THROUGH a linked destination, chown -R would hand
         # the pointed tree to the agent. Skip loudly (user-managed).
         if ! agent_home_sane "$OPENCODE_USER" "$_opk_dst"; then
-            ui_warn "agent resources not migrated: the chain to $_opk_dst contains a symlink"\
-" (user-managed) — $_opk_src left untouched"
+            ui_warn "agent resources not migrated: the chain to $_opk_dst contains a symlink""\
+ (user-managed) — $_opk_src left untouched"
             log "agents migration skipped: symlink in the chain to $_opk_dst"
             return 0
         fi
@@ -2372,8 +2440,8 @@ do_deploy_phase() {
     }
     _opk_have_agent_dirs=false
     for _opk_d in $MIGRATE_AGENT_DIRS; do
-        [ -d "$DEV_HOME/$_opk_d" ] && [ -n "$(ls -A "$DEV_HOME/$_opk_d" 2>/dev/null)" ] \
-            && _opk_have_agent_dirs=true
+        [ -d "$DEV_HOME/$_opk_d" ] && [ -n "$(ls -A "$DEV_HOME/$_opk_d" 2>/dev/null)" ] &&
+            _opk_have_agent_dirs=true
     done
     if [ "$DEFAULT_USER" != "$OPENCODE_USER" ] && [ "$_opk_have_agent_dirs" = true ]; then
         _opk_ag="${MIGRATE_AGENTS_OPT:-}"
@@ -2405,13 +2473,13 @@ do_deploy_phase() {
         # silently degraded to a copy. Normalize once, before any
         # consumer; the dispatch below keeps both forms as belt.
         case "$_opk_ag" in
-            m|move) _opk_ag=m ;;
-            c|copy) _opk_ag=c ;;
-            s|skip) _opk_ag=s ;;
+            m | move) _opk_ag=m ;;
+            c | copy) _opk_ag=c ;;
+            s | skip) _opk_ag=s ;;
         esac
         case "$_opk_ag" in
-            m|move|c|copy) for _opk_d in $MIGRATE_AGENT_DIRS; do _opk_migrate_one "$_opk_d"; done ;;
-            s|skip)
+            m | move | c | copy) for _opk_d in $MIGRATE_AGENT_DIRS; do _opk_migrate_one "$_opk_d"; done ;;
+            s | skip)
                 ui_detail "skipped: ~/.agents and ~/.claude/skills stay in your home — the agent cannot use them"
                 log "agents migration: skipped by choice"
                 ;;
@@ -2450,11 +2518,11 @@ do_deploy_phase() {
         rm -f "$_oic_tmp"
     }
     if ! agent_home_sane "$OPENCODE_USER" /home/opencode/.config/opencode; then
-        ui_warn "the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed"\
-" (user-managed; the kit never follows links in the agent home)."
+        ui_warn "the chain to /home/opencode/.config/opencode contains a symlink — agent config NOT (re)installed""\
+ (user-managed; the kit never follows links in the agent home)."
         log "agent config skipped: symlink in the parent chain of /home/opencode/.config/opencode"
-    elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] \
-         && [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
+    elif [ ! -f /home/opencode/.config/opencode/opencode.jsonc ] &&
+        [ ! -f /home/opencode/.config/opencode/opencode.json ]; then
         _oc_install_agent_config
         if [ "$SECURE_GIT_CONFIG" = true ]; then
             echo "Default config installed (opencode.jsonc) — .git/config blocked (soft)."
@@ -2462,8 +2530,8 @@ do_deploy_phase() {
             echo "Default config installed (opencode.jsonc)."
         fi
         log "opencode config installed: /home/opencode/.config/opencode/opencode.jsonc (secure_git=$SECURE_GIT_CONFIG)"
-    elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] \
-         && ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
+    elif [ -f /home/opencode/.config/opencode/opencode.jsonc ] &&
+        ! grep -q '"permission"' /home/opencode/.config/opencode/opencode.jsonc; then
         # pr-00263 d W2 (the a F6 class sweep): both existing-config
         # backup sites observe the copy — failure degrades the announce
         # and the summary row (the re-render twin below shares this).
@@ -2480,8 +2548,8 @@ do_deploy_phase() {
             echo "Default config installed (opencode.jsonc). $_occ_bk"
         fi
         log "opencode config replaced (backup attempt: $BACKUP_DIR/opencode.jsonc-existing — $_occ_bk)"
-    elif [ -f /home/opencode/.config/opencode/opencode.json ] \
-         && [ ! -f /home/opencode/.config/opencode/opencode.jsonc ]; then
+    elif [ -f /home/opencode/.config/opencode/opencode.json ] &&
+        [ ! -f /home/opencode/.config/opencode/opencode.jsonc ]; then
         ui_detail "opencode.json exists — left untouched (custom user config)"
         log "opencode config kept: custom opencode.json (not overwritten)"
     else
@@ -2501,8 +2569,8 @@ do_deploy_phase() {
         else
             ui_success "agent config re-applied — git allowed ($_occ_bk)"
         fi
-        log "opencode config re-rendered with the chosen git setting"\
-" (secure_git=$SECURE_GIT_CONFIG, backup attempt: $BACKUP_DIR/opencode.jsonc-existing — $_occ_bk)"
+        log "opencode config re-rendered with the chosen git setting""\
+ (secure_git=$SECURE_GIT_CONFIG, backup attempt: $BACKUP_DIR/opencode.jsonc-existing — $_occ_bk)"
     fi
 
     # === Step 8b: Default-user config (self-update bypass protection) ===
@@ -2522,9 +2590,9 @@ do_deploy_phase() {
         # is reversible (the previous config is kept as
         # opencode.jsonc_BAK_<timestamp>); declining stays the explicit
         # opt-out it always was.
-        if [ "$SKIP_PROMPTS" = true ] \
-           || ui_confirm "Default-user config $DEFAULT_OC_CONF already exists."\
-" Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?" "y"; then
+        if [ "$SKIP_PROMPTS" = true ] ||
+            ui_confirm "Default-user config $DEFAULT_OC_CONF already exists.""\
+ Back it up as opencode.jsonc_BAK_<timestamp> and install the deny-all config?" "y"; then
             BAK_STAMP=$(date +%Y%m%d-%H%M%S)
             sudo mv "$DEFAULT_OC_CONF" "$DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
             ui_success "default-user config backed up: $DEFAULT_OC_DIR/opencode.jsonc_BAK_$BAK_STAMP"
@@ -2629,11 +2697,11 @@ do_deploy_phase() {
                     ui_error "TUI plugin registration failed for $_oc_user_dir — aborting."
                     exit 1
                 elif [ "$_oc_tps_rc" -eq 2 ]; then
-                    ui_detail "the chain to $_oc_user_dir contains a symlink"\
-" — TUI plugin registration skipped (user-managed)"
+                    ui_detail "the chain to $_oc_user_dir contains a symlink""\
+ — TUI plugin registration skipped (user-managed)"
                 elif [ "$_oc_tps_rc" -eq 3 ]; then
-                    ui_detail "existing $_oc_user_dir/plugins is a symlink"\
-" — TUI plugin registration skipped (user-managed link)"
+                    ui_detail "existing $_oc_user_dir/plugins is a symlink""\
+ — TUI plugin registration skipped (user-managed link)"
                 fi
             fi
         done
@@ -2658,26 +2726,26 @@ do_deploy_phase
 # === Done ===
 
 ui_section "Installation complete"
-ui_kv "Kit"      "v$VERSION"
-ui_kv "Channel"  "$KIT_BRANCH (updates track it: opk update)"
-ui_kv "Backend"  "$CONTAINER_BACKEND (owned by 'opencode')"
+ui_kv "Kit" "v$VERSION"
+ui_kv "Channel" "$KIT_BRANCH (updates track it: opk update)"
+ui_kv "Backend" "$CONTAINER_BACKEND (owned by 'opencode')"
 [ -n "$PROJECTS_ROOTS" ] && ui_kv "Projects" "$PROJECTS_ROOTS"
 if [ -n "$DD_MIG_DUMP_DIR" ]; then
     ui_kv_warn "Ddev dumps" \
         "$DD_MIG_DUMP_DIR — import: sudo /usr/local/lib/opencode-permissions-kit/bin/ddev-migrate import"
 fi
 if [ "$SECURE_GIT_CONFIG" = true ]; then
-    ui_kv "Git"   "blocked for the agent (.git/config deny active)"
+    ui_kv "Git" "blocked for the agent (.git/config deny active)"
 else
-    ui_kv "Git"   "allowed"
+    ui_kv "Git" "allowed"
 fi
 if [ "$OPENCHAMBER_POLICY" = yes ]; then
-    ui_kv "OpenChamber"   "policy pin active (sessions secured, self-update off)"
+    ui_kv "OpenChamber" "policy pin active (sessions secured, self-update off)"
 fi
 if [ -z "${_BK_FAIL:-}" ]; then
-    ui_kv "Backup"   "$BACKUP_DIR"
+    ui_kv "Backup" "$BACKUP_DIR"
 else
-    ui_kv "Backup"   "$BACKUP_DIR (INCOMPLETE: $_BK_FAIL)"
+    ui_kv "Backup" "$BACKUP_DIR (INCOMPLETE: $_BK_FAIL)"
 fi
 echo ""
 # WSL2 final exposure warning: a manually-applied wsl.conf restriction only

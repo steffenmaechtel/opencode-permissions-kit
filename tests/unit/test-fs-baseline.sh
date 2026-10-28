@@ -30,8 +30,14 @@ TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 assert_eq() {
     _d="$1" _e="$2" _a="$3"
@@ -63,8 +69,8 @@ echo ""
 # pointing OUT of the tree, and a foreign group on the root.
 GRP="$(id -gn)"
 mkdir -p "$WORK/proj/sub" "$WORK/proj/.git"
-printf 'a\n' > "$WORK/proj/file.txt"
-printf 'g\n' > "$WORK/proj/.git/config"
+printf 'a\n' >"$WORK/proj/file.txt"
+printf 'g\n' >"$WORK/proj/.git/config"
 ln -s /etc/hostname "$WORK/proj/link-out"
 chmod 700 "$WORK/proj" "$WORK/proj/sub" "$WORK/proj/.git"
 chmod 600 "$WORK/proj/file.txt" "$WORK/proj/.git/config"
@@ -97,21 +103,21 @@ else
 fi
 
 # --- 3. progress output (issue #14) ----------------------------------------------
-echo "$OUT" | grep -q "large trees can take several minutes" \
-    && pass "heads-up line for large trees present" \
-    || fail "heads-up line for large trees present"
-echo "$OUT" | grep -q "chgrp *[0-9]* entries — done" \
-    && pass "chgrp pass reports a done-counter" \
-    || fail "chgrp pass reports a done-counter"
-echo "$OUT" | grep -q "dirs g+rwxs *[0-9]* entries — done" \
-    && pass "dirs pass reports a done-counter" \
-    || fail "dirs pass reports a done-counter"
-echo "$OUT" | grep -q "files g+rw *[0-9]* entries — done" \
-    && pass "files pass reports a done-counter" \
-    || fail "files pass reports a done-counter"
-echo "$OUT" | grep -q "default ACLs *[0-9]* entries — done" \
-    && pass "ACL pass reports a done-counter" \
-    || fail "ACL pass reports a done-counter"
+echo "$OUT" | grep -q "large trees can take several minutes" &&
+    pass "heads-up line for large trees present" ||
+    fail "heads-up line for large trees present"
+echo "$OUT" | grep -q "chgrp *[0-9]* entries — done" &&
+    pass "chgrp pass reports a done-counter" ||
+    fail "chgrp pass reports a done-counter"
+echo "$OUT" | grep -q "dirs g+rwxs *[0-9]* entries — done" &&
+    pass "dirs pass reports a done-counter" ||
+    fail "dirs pass reports a done-counter"
+echo "$OUT" | grep -q "files g+rw *[0-9]* entries — done" &&
+    pass "files pass reports a done-counter" ||
+    fail "files pass reports a done-counter"
+echo "$OUT" | grep -q "default ACLs *[0-9]* entries — done" &&
+    pass "ACL pass reports a done-counter" ||
+    fail "ACL pass reports a done-counter"
 
 # --- 4. idempotence ---------------------------------------------------------------
 FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" >/dev/null 2>&1
@@ -131,18 +137,18 @@ for f in "$INSTALL" "$UPDATE" "$CONFIG"; do
         fail "$(basename "$f") runs the baseline through fs_baseline_root"
     fi
 done
-grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$INSTALL" \
-    && pass "install.sh fetch list includes fs-baseline.sh" \
-    || fail "install.sh fetch list includes fs-baseline.sh"
-grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$UPDATE" \
-    && pass "update.sh KIT_FILES includes fs-baseline.sh" \
-    || fail "update.sh KIT_FILES includes fs-baseline.sh"
-grep -q 'large trees: this can take a while' "$UPDATE" \
-    && pass "update.sh hints before the ddev handover scan (issue #14)" \
-    || fail "update.sh hints before the ddev handover scan (issue #14)"
-grep -q 'large trees: this can take minutes' "$INSTALL" \
-    && pass "install.sh hints before the getfacl backup (issue #14)" \
-    || fail "install.sh hints before the getfacl backup (issue #14)"
+grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$INSTALL" &&
+    pass "install.sh fetch list includes fs-baseline.sh" ||
+    fail "install.sh fetch list includes fs-baseline.sh"
+grep -q 'opencode-permissions-kit-lib/sh/fs-baseline.sh' "$UPDATE" &&
+    pass "update.sh KIT_FILES includes fs-baseline.sh" ||
+    fail "update.sh KIT_FILES includes fs-baseline.sh"
+grep -q 'large trees: this can take a while' "$UPDATE" &&
+    pass "update.sh hints before the ddev handover scan (issue #14)" ||
+    fail "update.sh hints before the ddev handover scan (issue #14)"
+grep -q 'large trees: this can take minutes' "$INSTALL" &&
+    pass "install.sh hints before the getfacl backup (issue #14)" ||
+    fail "install.sh hints before the getfacl backup (issue #14)"
 
 # --- 7. ancestor traversal (fs_ensure_traversable) ------------------------------------
 # Fresh chain outside $WORK (which already carries the traverse entry
@@ -195,7 +201,7 @@ mkdir -p "$V9ROOT/d1" "$V9ROOT/d2" "$V9ROOT/d3"
 chmod 700 "$V9ROOT" "$V9ROOT/d1" "$V9ROOT/d2" "$V9ROOT/d3"
 STUBBIN=$(mktemp -d)
 REAL_SETFACL="$(command -v setfacl)"
-cat > "$STUBBIN/setfacl" <<EOF
+cat >"$STUBBIN/setfacl" <<EOF
 #!/bin/sh
 case "\$*" in *"/d2"*) exit 1 ;; esac
 exec "$REAL_SETFACL" "\$@"
@@ -203,8 +209,8 @@ EOF
 chmod +x "$STUBBIN/setfacl"
 _mb_rc=0
 FS_SUDO="" PATH="$STUBBIN:$PATH" \
-    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$V9ROOT" "$GRP" >/dev/null 2>&1 \
-    || _mb_rc=$?
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$V9ROOT" "$GRP" >/dev/null 2>&1 ||
+    _mb_rc=$?
 assert_eq "mid-batch ACL failure fails the baseline (V9)" "1" "$_mb_rc"
 rm -rf "$V9ROOT" "$STUBBIN"
 
@@ -217,7 +223,7 @@ _batch_body=$(sed -n '/^                _n=\$1; shift$/,/^                \[ "\$
 if [ -n "$_batch_body" ]; then
     pass "fs-baseline: batch loop body extractable (W11)"
     _bstub=$(mktemp -d)
-    cat > "$_bstub/failmid" <<'EOS'
+    cat >"$_bstub/failmid" <<'EOS'
 #!/bin/sh
 case "$1" in *midfail*) exit 1 ;; esac
 exit 0
@@ -242,17 +248,17 @@ else
 fi
 
 # --- 8. Makefile + CI wiring -----------------------------------------------------------
-grep -q 'test-fs-baseline' "$MAKEFILE" \
-    && pass "Makefile test target includes test-fs-baseline" \
-    || fail "Makefile test target includes test-fs-baseline"
-grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" \
-    && pass "test-unit.yml run step includes the new test" \
-    || fail "test-unit.yml run step includes the new test"
+grep -q 'test-fs-baseline' "$MAKEFILE" &&
+    pass "Makefile test target includes test-fs-baseline" ||
+    fail "Makefile test target includes test-fs-baseline"
+grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" &&
+    pass "test-unit.yml run step includes the new test" ||
+    fail "test-unit.yml run step includes the new test"
 # fs-baseline.sh is a sourced lib (install.sh, config.sh, update.sh) —
 # per the repo invariant (755 <=> executed by path) it must be 100644.
-[ "$(git -C "$SCRIPT_DIR/../.." ls-files -s -- files/opencode-permissions-kit-lib/sh/fs-baseline.sh | cut -d' ' -f1)" = "100644" ] \
-    && pass "fs-baseline.sh is a sourced lib (git 100644, not executed by path)" \
-    || fail "fs-baseline.sh is a sourced lib (git 100644, not executed by path)"
+[ "$(git -C "$SCRIPT_DIR/../.." ls-files -s -- files/opencode-permissions-kit-lib/sh/fs-baseline.sh | cut -d' ' -f1)" = "100644" ] &&
+    pass "fs-baseline.sh is a sourced lib (git 100644, not executed by path)" ||
+    fail "fs-baseline.sh is a sourced lib (git 100644, not executed by path)"
 
 # --- 8b. exec-time symlink recheck (0.0.39e S1) -----------------------------------------
 # The leaf race (swap between find's scan and xargs' exec) cannot be
@@ -267,11 +273,11 @@ grep -q 'tests/unit/test-fs-baseline.sh' "$TEST_CI" \
 # must not.
 SW=$(mktemp -d)
 mkdir -p "$SW/root"
-printf 'inside\n' > "$SW/root/in-file"
+printf 'inside\n' >"$SW/root/in-file"
 chmod 600 "$SW/root/in-file"
-printf 'target\n' > "$SW/target"       # outside the pass root below
+printf 'target\n' >"$SW/target" # outside the pass root below
 chmod 600 "$SW/target"
-ln -s "$SW/target" "$SW/root/link"     # symlink INSIDE the pass root
+ln -s "$SW/target" "$SW/root/link" # symlink INSIDE the pass root
 FS_SUDO="" sh -c '. "$1" && _fsb_pass "test" "$2" -true -- chmod g+rw' _ "$LIB" "$SW/root" >/dev/null 2>&1
 if [ "$(stat -c %a "$SW/target")" = "600" ]; then
     pass "exec-time recheck: symlink operands are skipped — target outside the root untouched"
@@ -293,10 +299,10 @@ rm -rf "$SW"
 # under set -e instead of lying green).
 FB="$WORK/failroot"
 mkdir -p "$FB/root"
-printf 'x\n' > "$FB/root/f"
+printf 'x\n' >"$FB/root/f"
 STUBS="$WORK/failstubs"
 mkdir -p "$STUBS"
-cat > "$STUBS/setfacl" <<'EOF'
+cat >"$STUBS/setfacl" <<'EOF'
 #!/bin/sh
 echo "setfacl stub: deliberate failure" >&2
 exit 1
@@ -342,7 +348,7 @@ rm -rf "$EMPTY"
 # The temp-file restructure tracks find's own rc.
 DEAD="$WORK/deadfind"
 mkdir -p "$DEAD"
-cat > "$DEAD/find" <<'EOF'
+cat >"$DEAD/find" <<'EOF'
 #!/bin/sh
 echo "find stub: simulated wholesale failure" >&2
 exit 1
@@ -382,10 +388,10 @@ F1DIR=$(mktemp -d)
 F1STUB=$(mktemp -d)
 F1REAL="$(command -v find)"
 mkdir -p "$F1DIR/proj/x/y" "$F1DIR/victim"
-printf 'secret\n' > "$F1DIR/proj/x/y/secret"
-printf 'victim\n' > "$F1DIR/victim/secret"
+printf 'secret\n' >"$F1DIR/proj/x/y/secret"
+printf 'victim\n' >"$F1DIR/victim/secret"
 chmod 600 "$F1DIR/proj/x/y/secret" "$F1DIR/victim/secret"
-cat > "$F1STUB/find" <<EOF
+cat >"$F1STUB/find" <<EOF
 #!/bin/sh
 "$F1REAL" "\$@"
 _rc=\$?
@@ -446,7 +452,7 @@ esac
 # regression instead of recording a FAIL.
 F1SP=$(mktemp -d)
 mkdir -p "$F1SP/proj/a/dir two"
-printf 's\n' > "$F1SP/proj/a/dir two/has space.txt"
+printf 's\n' >"$F1SP/proj/a/dir two/has space.txt"
 chmod 600 "$F1SP/proj/a/dir two/has space.txt"
 F1SPRC=0
 FS_SUDO="" sh -c '. "$1" && _fsb_pass "spaces" "$2" -type f -- chmod g+w' \
@@ -468,10 +474,10 @@ rm -rf "$F1SP"
 F1SPD=$(mktemp -d)
 F1SPS=$(mktemp -d)
 mkdir -p "$F1SPD/proj/a/dir two" "$F1SPD/victim dir"
-printf 'secret\n' > "$F1SPD/proj/a/dir two/has space.txt"
-printf 'victim\n' > "$F1SPD/victim dir/has space.txt"
+printf 'secret\n' >"$F1SPD/proj/a/dir two/has space.txt"
+printf 'victim\n' >"$F1SPD/victim dir/has space.txt"
 chmod 600 "$F1SPD/proj/a/dir two/has space.txt" "$F1SPD/victim dir/has space.txt"
-cat > "$F1SPS/find" <<EOF
+cat >"$F1SPS/find" <<EOF
 #!/bin/sh
 "$(command -v find)" "\$@"
 _rc=\$?
@@ -504,7 +510,7 @@ rm -rf "$F1SPD" "$F1SPS"
 # assert the opk-fsb-pass temp was registered.
 F12S=$(mktemp -d)
 mkdir -p "$F12S/root"
-printf 'x\n' > "$F12S/root/f"
+printf 'x\n' >"$F12S/root/f"
 F12_TRACK="$F12S/tracked" FS_SUDO="" \
     sh -c '. "$1" && _tmp_track() { printf "%s\n" "$1" >> "$F12_TRACK"; } \
     && _fsb_pass "f12" "$2" -type f -- chmod g+w' \
@@ -530,15 +536,15 @@ W23BIN="$WORK/issue223-bin"
 W23PROBE="$WORK/issue223-probe.log"
 mkdir -p "$W23BIN" "$W23/proj/sub"
 chmod 700 "$W23/proj" "$W23/proj/sub"
-printf 'gate\n' > "$W23/proj/f"
+printf 'gate\n' >"$W23/proj/f"
 chmod 600 "$W23/proj/f"
-printf '#!/bin/sh\necho probe >> "%s"\nexit 9\n' "$W23PROBE" > "$W23BIN/python3"
+printf '#!/bin/sh\necho probe >> "%s"\nexit 9\n' "$W23PROBE" >"$W23BIN/python3"
 chmod +x "$W23BIN/python3"
 rm -f "$W23PROBE"
 W23RC=0
 W23OUT="$(PATH="$W23BIN:$PATH" FS_SUDO="" \
-    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23/proj" "$(id -gn)" 2>&1)" \
-    || W23RC=$?
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23/proj" "$(id -gn)" 2>&1)" ||
+    W23RC=$?
 assert_eq "#223 broken python3: baseline still applies (rc 0, no false green)" "0" "$W23RC"
 assert_eq "#223 broken python3: file got group rw (600 -> 660 — the gate fed xargs)" "660" \
     "$(stat -c %a "$W23/proj/f")"
@@ -547,7 +553,7 @@ assert_eq "#223 broken python3: file got group rw (600 -> 660 — the gate fed x
 # second interpreter EXECUTION on the failure path. The cache is still
 # pinned: without it this would read 8 (2 × four passes).
 assert_eq "#223 broken python3: probe+rerun ran exactly once per run (cache across the four passes)" "2" \
-    "$(wc -l < "$W23PROBE" 2>/dev/null || echo 0)"
+    "$(wc -l <"$W23PROBE" 2>/dev/null || echo 0)"
 assert_eq "#223 broken python3: degradation warn exactly once per run" "1" \
     "$(printf '%s\n' "$W23OUT" | grep -c 'live progress unavailable')"
 if printf '%s\n' "$W23OUT" | grep -q 'Traceback'; then
@@ -558,8 +564,8 @@ fi
 # ...and the healthy path through the SAME fixture still counts (the
 # gate must not eat the tee when python3 is fine — rc + done-line):
 W23RC2=0
-W23OUT2="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23/proj" "$(id -gn)" 2>&1)" \
-    || W23RC2=$?
+W23OUT2="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23/proj" "$(id -gn)" 2>&1)" ||
+    W23RC2=$?
 assert_eq "#223 healthy python3: baseline applies (control for the gate)" "0" "$W23RC2"
 if printf '%s\n' "$W23OUT2" | grep -q 'chgrp *[0-9]* entries — done'; then
     pass "#223 healthy python3: live counter still runs (gate passes the tee through)"
@@ -578,15 +584,15 @@ W23NP="$WORK/issue223-nopy"
 W23NPBIN="$WORK/issue223-nopy-bin"
 mkdir -p "$W23NPBIN" "$W23NP/proj"
 chmod 700 "$W23NP/proj"
-printf 'nopy\n' > "$W23NP/proj/f"
+printf 'nopy\n' >"$W23NP/proj/f"
 chmod 600 "$W23NP/proj/f"
 for _t in sh find cat chgrp chmod setfacl mktemp dirname stat getfacl grep rm xargs; do
     ln -s "$(command -v "$_t")" "$W23NPBIN/$_t"
 done
 W23NPRC=0
 W23NPOUT="$(FS_SUDO="" PATH="$W23NPBIN" \
-    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23NP/proj" "$(id -gn)" 2>&1)" \
-    || W23NPRC=$?
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23NP/proj" "$(id -gn)" 2>&1)" ||
+    W23NPRC=$?
 assert_eq "#223 python3 absent: baseline still applies (rc 0)" "0" "$W23NPRC"
 assert_eq "#223 python3 absent: file got group rw (600 -> 660)" "660" \
     "$(stat -c %a "$W23NP/proj/f")"
@@ -606,8 +612,8 @@ for _t in sh find chgrp chmod setfacl mktemp dirname stat getfacl grep rm xargs;
 done
 W23CATRC=0
 W23CATOUT="$(FS_SUDO="" PATH="$W23NPBIN2" \
-    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23NP/proj" "$(id -gn)" 2>&1)" \
-    || W23CATRC=$?
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23NP/proj" "$(id -gn)" 2>&1)" ||
+    W23CATRC=$?
 assert_eq "#223 missing cat: fails loud before any pass runs" "1" "$W23CATRC"
 if printf '%s\n' "$W23CATOUT" | grep -qF 'required tool missing for the group baseline: cat'; then
     pass "#223 missing cat: the error names cat"
@@ -629,7 +635,7 @@ rm -rf "$W23NP" "$W23NPBIN" "$W23NPBIN2"
 # file; the devnull dup2 in the clause keeps the interpreter's own
 # shutdown flush quiet too ("Exception ignored").
 W23BP="$WORK/issue223-bp"
-python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' > "$W23BP"
+python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >"$W23BP"
 FS_SUDO="" sh -c '. "$1" && _fsb_count_tee bp < "$2" | sh -c "exit 0"' \
     _ "$LIB" "$W23BP" >/dev/null 2>"$W23BP.err"
 # rc assert dropped (#244 a Q5): under this suite's dash (no pipefail)
@@ -672,12 +678,12 @@ rm -rf "$W23BP"
 W23EP="$WORK/issue223-envpoison"
 mkdir -p "$W23EP/proj"
 chmod 700 "$W23EP/proj"
-printf 'env\n' > "$W23EP/proj/f"
+printf 'env\n' >"$W23EP/proj/f"
 chmod 600 "$W23EP/proj/f"
 W23EPRC=0
 W23EPOUT="$(FS_SUDO="" PYTHONHOME=/nonexistent-opk \
-    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23EP/proj" "$(id -gn)" 2>&1)" \
-    || W23EPRC=$?
+    sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$W23EP/proj" "$(id -gn)" 2>&1)" ||
+    W23EPRC=$?
 assert_eq "#244 env poison: baseline applies despite hostile PYTHONHOME (rc 0)" "0" "$W23EPRC"
 assert_eq "#244 env poison: file got group rw (600 -> 660)" "660" \
     "$(stat -c %a "$W23EP/proj/f")"
@@ -723,10 +729,12 @@ if command -v setsid >/dev/null 2>&1; then
     # reader drains it, so the marker appears once the tee has
     # consumed all but at most one pipe buffer of the stream and sits
     # blocked in read (#244 c W5 wording fix).
-    ( exec 3>"$W23KIF"
-      python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >&3 2>/dev/null
-      : > "$W23KI/ready"
-      sleep 10 ) &
+    (
+        exec 3>"$W23KIF"
+        python3 -c 'import sys; sys.stdout.buffer.write(b"e\0" * 524288)' >&3 2>/dev/null
+        : >"$W23KI/ready"
+        sleep 10
+    ) &
     W23KIWR=$!
     # The async-list SIGINT rule (POSIX): a background command of a
     # non-interactive shell starts with SIGINT IGNORED — CPython then never
@@ -762,10 +770,10 @@ os.execv(sys.argv[1], [sys.argv[1], "-c",
     # (rc 2, usage) while bash accepts it — the suite runs under dash, and
     # the group kill silently never happened until this was caught live
     # (bash-vs-dash trap: the debug session ran bash and looked green).
-    kill -INT "-$W23KITEE" 2>/dev/null \
-        || /bin/kill -INT "-$W23KITEE" 2>/dev/null \
-        || kill -INT "$W23KITEE" 2>/dev/null \
-        || true
+    kill -INT "-$W23KITEE" 2>/dev/null ||
+        /bin/kill -INT "-$W23KITEE" 2>/dev/null ||
+        kill -INT "$W23KITEE" 2>/dev/null ||
+        true
     wait "$W23KITEE" 2>/dev/null || true
     kill "$W23KIWR" 2>/dev/null || true
     wait "$W23KIWR" 2>/dev/null || true
@@ -799,12 +807,12 @@ W23NZ="$WORK/issue223-noisy"
 # for the fixture printf shape both reviews probed).
 W23DIAG='platform independent libraries'
 mkdir -p "$W23NZ/bin"
-printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$W23DIAG" > "$W23NZ/bin/python3"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$W23DIAG" >"$W23NZ/bin/python3"
 chmod +x "$W23NZ/bin/python3"
 FS_SUDO="" PATH="$W23NZ/bin:$PATH" \
     sh -c '. "$1" && _fsb_py_probe' _ "$LIB" >"$W23NZ/out" 2>"$W23NZ/err"
-if grep -qF "$W23DIAG" "$W23NZ/err" \
-    && grep -qF 'live progress unavailable' "$W23NZ/err"; then
+if grep -qF "$W23DIAG" "$W23NZ/err" &&
+    grep -qF 'live progress unavailable' "$W23NZ/err"; then
     pass "#244 c S3: fs-baseline probe surfaces a broken interpreter's diagnostic"
 else
     fail "#244 c S3: probe diagnostic passthrough (err=$(cat "$W23NZ/err"))"

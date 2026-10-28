@@ -19,19 +19,20 @@ NC=''
 
 WORK=$(mktemp -d /tmp/test-rules-meta.XXXXXX) || exit 1
 trap 'rm -rf "$WORK"' EXIT INT TERM
-FAILS=$WORK/fails; : > "$FAILS"
+FAILS=$WORK/fails
+: >"$FAILS"
 passed=0
 
-fail() { printf '  %sFAIL%s  %s\n' "${RED:-}" "${NC:-}" "$1" >> "$FAILS"; }
+fail() { printf '  %sFAIL%s  %s\n' "${RED:-}" "${NC:-}" "$1" >>"$FAILS"; }
 pass() { passed=$((passed + 1)); }
 
-run_audit() {  # runs the real audit against $SCRATCH; sets OUT/RC
+run_audit() { # runs the real audit against $SCRATCH; sets OUT/RC
     OUT=$(cd "$SCRATCH" && RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY=2026-10-16 \
         sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
     RC=$?
 }
 
-expect_block() {  # $1 label, $2 required output snippet
+expect_block() { # $1 label, $2 required output snippet
     run_audit
     if [ "$RC" -eq 0 ]; then
         fail "$1: audit exited 0, expected blocking"
@@ -43,7 +44,7 @@ expect_block() {  # $1 label, $2 required output snippet
     esac
 }
 
-expect_ok() {  # $1 label, $2 required output snippet
+expect_ok() { # $1 label, $2 required output snippet
     run_audit
     if [ "$RC" -ne 0 ]; then
         fail "$1: audit exited $RC, expected pass"
@@ -55,14 +56,15 @@ expect_ok() {  # $1 label, $2 required output snippet
     esac
 }
 
-write_meta() {  # $1 id  $2 quote  $3 rule-anchor-file  $4 anchor  $5 extra
+write_meta() { # $1 id  $2 quote  $3 rule-anchor-file  $4 anchor  $5 extra
     mkdir -p "$SCRATCH/internal/rules-meta/9/0/0" 2>/dev/null
     # bucket digits from the id: 9001 -> 9/0/0
     digs=${1#RM-}
-    b1=$(printf '%s' "$digs" | cut -c1); b2=$(printf '%s' "$digs" | cut -c2)
+    b1=$(printf '%s' "$digs" | cut -c1)
+    b2=$(printf '%s' "$digs" | cut -c2)
     b3=$(printf '%s' "$digs" | cut -c3)
     mkdir -p "$SCRATCH/internal/rules-meta/$b1/$b2/$b3"
-    cat > "$SCRATCH/internal/rules-meta/$b1/$b2/$b3/$1.md" <<EOF
+    cat >"$SCRATCH/internal/rules-meta/$b1/$b2/$b3/$1.md" <<EOF
 ---
 id: $1
 rule: $3#$4
@@ -82,15 +84,15 @@ Body of $1.
 EOF
 }
 
-new_scratch() {  # green baseline tree
+new_scratch() { # green baseline tree
     SCRATCH=$WORK/s$$.$1
     mkdir -p "$SCRATCH/scripts" "$SCRATCH/agent" "$SCRATCH/internal/records" \
         "$SCRATCH/internal/rules-meta"
     cp scripts/gen-rules-index.py "$SCRATCH/scripts/"
-    : > "$SCRATCH/agent/test-fidelity.md"   # in SCOPE_FILES; empty = no units
-    : > "$SCRATCH/agent/review-concept.md"  # in SCOPE_FILES; empty = no units
-    : > "$SCRATCH/AGENTS.md"                # in SCOPE_FILES; empty = no units
-    cat > "$SCRATCH/agent/conventions.md" <<'EOF'
+    : >"$SCRATCH/agent/test-fidelity.md"  # in SCOPE_FILES; empty = no units
+    : >"$SCRATCH/agent/review-concept.md" # in SCOPE_FILES; empty = no units
+    : >"$SCRATCH/AGENTS.md"               # in SCOPE_FILES; empty = no units
+    cat >"$SCRATCH/agent/conventions.md" <<'EOF'
 # Conventions
 
 ## Interactive prompts (y/n)
@@ -102,7 +104,7 @@ new_scratch() {  # green baseline tree
 
 - Output demo rule. (RM-9003)
 EOF
-    cat > "$SCRATCH/internal/records/rules-meta.md" <<'EOF'
+    cat >"$SCRATCH/internal/records/rules-meta.md" <<'EOF'
 # Record
 
 ## Revisit ladder
@@ -115,7 +117,7 @@ EOF
     write_meta RM-9004 "Ladder demo rule" internal/records/rules-meta.md revisit-ladder ""
 }
 
-meta_file() {  # $1 id -> path in the CURRENT scratch
+meta_file() { # $1 id -> path in the CURRENT scratch
     digs=${1#RM-}
     printf '%s/internal/rules-meta/%s/%s/%s/%s.md' "$SCRATCH" \
         "$(printf '%s' "$digs" | cut -c1)" "$(printf '%s' "$digs" | cut -c2)" \
@@ -141,7 +143,7 @@ expect_block "inv1 ref-less unit" "[inv1]"
 #     wiring: its ACTIVE_SECTIONS entry is load-bearing -- losing it
 #     would silently stop enforcing the self-application unit)
 new_scratch n1b
-cat >> "$SCRATCH/internal/records/rules-meta.md" <<'EOF'
+cat >>"$SCRATCH/internal/records/rules-meta.md" <<'EOF'
 
 ## The main rule
 
@@ -153,7 +155,7 @@ expect_block "inv1 main-rule section enforced" "the-main-rule"
 #     a Q8: its ACTIVE_SECTIONS entry is load-bearing -- losing it
 #     would let future units in that section pass ref-less)
 new_scratch n1c
-cat >> "$SCRATCH/agent/conventions.md" <<'EOF'
+cat >>"$SCRATCH/agent/conventions.md" <<'EOF'
 
 ## Referencing house rules (RM keys)
 
@@ -218,7 +220,7 @@ expect_block "inv9 field without line" "[inv9]"
 
 # 9b. inv 9 -- approval log line without reviewed field
 new_scratch n9b
-cat >> "$(meta_file RM-9001)" <<'EOF'
+cat >>"$(meta_file RM-9001)" <<'EOF'
 - 2026-10-16 approved by maintainer (scratch probe).
 EOF
 expect_block "inv9 line without field" "[inv9]"
@@ -230,8 +232,8 @@ expect_ok "inv7 overdue non-blocking" "overdue metas"
 
 # 8. stale INDEX regenerates without blocking
 new_scratch n8
-run_audit   # first run regenerates the scratch INDEX
-printf 'hand edit\n' >> "$SCRATCH/internal/rules-meta/INDEX.md"
+run_audit # first run regenerates the scratch INDEX
+printf 'hand edit\n' >>"$SCRATCH/internal/rules-meta/INDEX.md"
 expect_ok "inv8 stale INDEX non-blocking" "INDEX regenerated"
 if grep -q '^hand edit$' "$SCRATCH/internal/rules-meta/INDEX.md"; then
     fail "inv8: INDEX was not rewritten to the generated state"
@@ -262,36 +264,36 @@ fi
 # whole lane (per-file detail lands in the failure output), so the
 # suite's printed pin count does not drift with SCOPE_FILES length
 # (#189 a W2 fix; the shape mirrors lanes b and c).
-: > "$WORK/p10a"
+: >"$WORK/p10a"
 for f in $SCOPE; do
     if [ ! -f "$REPO_ROOT/$f" ]; then
         fail "pin10 setup: scope file missing: $f"
         continue
     fi
-    sed 's/(RM-[0-9][0-9][0-9][0-9])//g' "$REPO_ROOT/$f" \
-        | grep -n 'RM-[0-9][0-9][0-9][0-9]' \
-        | sed "s|^|$f:|" >> "$WORK/p10a" || true
+    sed 's/(RM-[0-9][0-9][0-9][0-9])//g' "$REPO_ROOT/$f" |
+        grep -n 'RM-[0-9][0-9][0-9][0-9]' |
+        sed "s|^|$f:|" >>"$WORK/p10a" || true
 done
 if [ -s "$WORK/p10a" ]; then
     fail "pin10 lane a, fake ID mention(s) in scope files:"
-    sed 's/^/         /' "$WORK/p10a" >> "$FAILS"
+    sed 's/^/         /' "$WORK/p10a" >>"$FAILS"
 else
     pass
 fi
 
 # lane b: meta files carry only their own id -- cross-references in
 # meta bodies name the rule text, never an ID
-: > "$WORK/p10b"
-find "$REPO_ROOT/internal/rules-meta" -type f -name 'RM-*.md' 2>/dev/null \
-    | LC_ALL=C sort | while IFS= read -r m; do
+: >"$WORK/p10b"
+find "$REPO_ROOT/internal/rules-meta" -type f -name 'RM-*.md' 2>/dev/null |
+    LC_ALL=C sort | while IFS= read -r m; do
     own=$(basename "$m" .md)
-    sed "s/^id: $own\$//" "$m" \
-        | grep -n 'RM-[0-9][0-9][0-9][0-9]' \
-        | sed "s|^|${m#"$REPO_ROOT"/}:|" >> "$WORK/p10b"
+    sed "s/^id: $own\$//" "$m" |
+        grep -n 'RM-[0-9][0-9][0-9][0-9]' |
+        sed "s|^|${m#"$REPO_ROOT"/}:|" >>"$WORK/p10b"
 done
 if [ -s "$WORK/p10b" ]; then
     fail "pin10 lane b, foreign ID mention(s) inside meta files:"
-    sed 's/^/         /' "$WORK/p10b" >> "$FAILS"
+    sed 's/^/         /' "$WORK/p10b" >>"$FAILS"
 else
     pass
 fi
@@ -305,33 +307,33 @@ fi
 # corpus INDEX alternative was dropped post-archive (#294): the
 # generated INDEX lives at tag review-corpus, so an INDEX.md under
 # internal/reviews/ would be a LIVING recreated file and is caught.
-p10_lane_c_hits() {  # $1 root, $2 scope
+p10_lane_c_hits() { # $1 root, $2 scope
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
-        "$1" 2>/dev/null \
-        | grep -v "/internal/rules-meta/" \
-        | grep -v -E "/internal/reviews/legacy-index\.md" \
-        | grep -v -E "/internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-[0-9]+/" \
-        | grep -v "/internal/records/_archive/" \
-        | while IFS= read -r _l; do
-              _rel=${_l%%:*}
-              _rel=${_rel#"$1"/}
-              case " $2 " in
-                  *" $_rel "*) continue ;;
-              esac
-              _l=$(printf '%s' "$_l" | sed 's/RM-9[0-9][0-9][0-9]//g')
-              case $_l in
-                  *RM-[0-9][0-9][0-9][0-9]*) printf '%s\n' "$_l" ;;
-              esac
-          done
+        "$1" 2>/dev/null |
+        grep -v "/internal/rules-meta/" |
+        grep -v -E "/internal/reviews/legacy-index\.md" |
+        grep -v -E "/internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-[0-9]+/" |
+        grep -v "/internal/records/_archive/" |
+        while IFS= read -r _l; do
+            _rel=${_l%%:*}
+            _rel=${_rel#"$1"/}
+            case " $2 " in
+                *" $_rel "*) continue ;;
+            esac
+            _l=$(printf '%s' "$_l" | sed 's/RM-9[0-9][0-9][0-9]//g')
+            case $_l in
+                *RM-[0-9][0-9][0-9][0-9]*) printf '%s\n' "$_l" ;;
+            esac
+        done
 }
 
 # lane c: the rest of the living tree carries no real ID at all
-: > "$WORK/p10c"
-p10_lane_c_hits "$REPO_ROOT" "$SCOPE" > "$WORK/p10c"
+: >"$WORK/p10c"
+p10_lane_c_hits "$REPO_ROOT" "$SCOPE" >"$WORK/p10c"
 if [ -s "$WORK/p10c" ]; then
     fail "pin10 lane c, real ID(s) outside refs and meta files:"
-    sed 's/^/         /' "$WORK/p10c" >> "$FAILS"
+    sed 's/^/         /' "$WORK/p10c" >>"$FAILS"
 else
     pass
 fi
@@ -348,13 +350,13 @@ _p10demo="RM-00""44"
 P10S="$WORK/p10scratch.$$"
 mkdir -p "$P10S/internal/reviews/0/0/0/1/pr-00001"
 printf 'Living file citing a rule by ID (%s) instead of file+section.\n' \
-    "$_p10demo" > "$P10S/internal/reviews/README.md"
+    "$_p10demo" >"$P10S/internal/reviews/README.md"
 printf 'Recreated generated index still citing %s.\n' \
-    "$_p10demo" > "$P10S/internal/reviews/INDEX.md"
+    "$_p10demo" >"$P10S/internal/reviews/INDEX.md"
 printf 'Generated frozen map file citing %s.\n' \
-    "$_p10demo" > "$P10S/internal/reviews/legacy-index.md"
+    "$_p10demo" >"$P10S/internal/reviews/legacy-index.md"
 printf 'Frozen snapshot quoting %s as verbatim evidence.\n' \
-    "$_p10demo" > "$P10S/internal/reviews/0/0/0/1/pr-00001/review-a.md"
+    "$_p10demo" >"$P10S/internal/reviews/0/0/0/1/pr-00001/review-a.md"
 _hits=$(p10_lane_c_hits "$P10S" "")
 case "$_hits" in
     *internal/reviews/README.md*)
@@ -364,9 +366,11 @@ case "$_hits" in
                     *pr-00001*) fail "pin10 lane c scratch: frozen snapshot flagged" ;;
                     *internal/reviews/legacy-index.md*) fail "pin10 lane c scratch: frozen legacy-index flagged" ;;
                     *) pass ;;
-                esac ;;
+                esac
+                ;;
             *) fail "pin10 lane c scratch: recreated INDEX citation not caught (post-archive: living file)" ;;
-        esac ;;
+        esac
+        ;;
     *) fail "pin10 lane c scratch: README citation not caught" ;;
 esac
 

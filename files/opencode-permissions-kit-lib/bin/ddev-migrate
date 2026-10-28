@@ -37,19 +37,26 @@ case "${1:-}" in
         fi
         ;;
     export)
-        [ "$(id -u)" = 0 ] || { echo "ddev-migrate: export must run as root"; exit 1; }
-        [ $# -ge 3 ] || { _ddev_migrate_usage; exit 1; }
+        [ "$(id -u)" = 0 ] || {
+            echo "ddev-migrate: export must run as root"
+            exit 1
+        }
+        [ $# -ge 3 ] || {
+            _ddev_migrate_usage
+            exit 1
+        }
         # Agent user/group from install.conf, like the import path
         # (0.0.43a F15): a hand-edited conf with a custom OPENCODE_USER
         # must not leave the export's finalize chowns silently root-owned
         # (they are || true-guarded) — install.sh passes the configured
         # values too.
         dm_oc="opencode"
-        [ -f /etc/opencode-permissions-kit/install.conf ] \
-            && . /etc/opencode-permissions-kit/install.conf
+        [ -f /etc/opencode-permissions-kit/install.conf ] &&
+            . /etc/opencode-permissions-kit/install.conf
         dm_oc="${OPENCODE_USER:-$dm_oc}"
         dm_ocg=$(id -gn "$dm_oc" 2>/dev/null || echo "$dm_oc")
-        dm_dev="$2"; shift 2
+        dm_dev="$2"
+        shift 2
         ddev_migrate_export "$dm_dev" "$dm_oc" "$dm_ocg" "$@"
         ;;
     import)
@@ -59,8 +66,12 @@ case "${1:-}" in
         # Read-only diagnostics (runs as any user who can read the
         # registry): what an export WOULD take under the given roots —
         # and what silently falls outside (partial-export finding).
-        [ $# -ge 2 ] || { _ddev_migrate_usage; exit 1; }
-        dm_user="$2"; shift 2
+        [ $# -ge 2 ] || {
+            _ddev_migrate_usage
+            exit 1
+        }
+        dm_user="$2"
+        shift 2
         dm_home=$(ddev_migrate_home "$dm_user")
         if [ $# -gt 0 ]; then
             echo "ddev registry of $dm_user — roots: $*"

@@ -24,8 +24,14 @@ UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 # Normalize a multi-line shell list (backslash continuations, leading
 # prefixes) into one space-separated line.
@@ -35,15 +41,15 @@ normalize() {
 
 # extract_update_list <update.sh> — the KIT_FILES="..." assignment
 extract_update_list() {
-    sed -n '/^KIT_FILES="/,/"$/p' "$1" \
-        | sed -e 's/^KIT_FILES="//' -e 's/"$//' | normalize
+    sed -n '/^KIT_FILES="/,/"$/p' "$1" |
+        sed -e 's/^KIT_FILES="//' -e 's/"$//' | normalize
 }
 
 # extract_install_list <install.sh> — the `for f in ... ; do` inside fetch_kit()
 extract_install_list() {
-    sed -n '/^fetch_kit() {/,/^}/p' "$1" \
-        | sed -n '/for f in /,/; do/p' \
-        | sed -e 's/^[[:space:]]*for f in //' -e 's/; do$//' | normalize
+    sed -n '/^fetch_kit() {/,/^}/p' "$1" |
+        sed -n '/for f in /,/; do/p' |
+        sed -e 's/^[[:space:]]*for f in //' -e 's/; do$//' | normalize
 }
 
 # --- 1. extract both lists from the repo files -----------------------------------
@@ -137,7 +143,7 @@ trap 'rm -rf "$WORK"' EXIT INT TERM
 
 # Shared mutation for 4a/4c: update.sh without opencode-deny-all.jsonc in
 # KIT_FILES (a file install.sh both fetches and cp-deploys).
-sed 's/opencode-deny-all\.jsonc //' "$UPDATE" > "$WORK/update-mutated.sh"
+sed 's/opencode-deny-all\.jsonc //' "$UPDATE" >"$WORK/update-mutated.sh"
 mutated_update_list=$(extract_update_list "$WORK/update-mutated.sh")
 
 # 4a. list drift: the equality check (section 1) must detect the mismatch.
@@ -193,8 +199,8 @@ esac
 #                     on every update (the 0.0.38 C19 class)
 
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
-manifest_list=$(sed -n "/<<'DL_MANIFEST'/,/^DL_MANIFEST\$/p" "$DEPLOYLIB" \
-    | sed -e '1d' -e '$d' | grep -v '^#' | awk 'NF { print $1 }' | sort -u)
+manifest_list=$(sed -n "/<<'DL_MANIFEST'/,/^DL_MANIFEST\$/p" "$DEPLOYLIB" |
+    sed -e '1d' -e '$d' | grep -v '^#' | awk 'NF { print $1 }' | sort -u)
 lib_fetch_list=$(printf '%s\n' $update_list | grep '^opencode-permissions-kit-lib/' | sort -u)
 
 if [ -z "$manifest_list" ]; then
@@ -203,8 +209,8 @@ else
     pass "lib_deploy manifest extracted from deploy-lib.sh ($(printf '%s\n' "$manifest_list" | wc -l) entries)"
 fi
 
-printf '%s\n' "$manifest_list" > "$WORK/manifest.txt"
-printf '%s\n' "$lib_fetch_list" > "$WORK/fetchlib.txt"
+printf '%s\n' "$manifest_list" >"$WORK/manifest.txt"
+printf '%s\n' "$lib_fetch_list" >"$WORK/fetchlib.txt"
 if diff -q "$WORK/manifest.txt" "$WORK/fetchlib.txt" >/dev/null; then
     pass "lib_deploy manifest == fetch-list lib subset (deploy set has ONE source)"
 else
@@ -214,9 +220,9 @@ fi
 
 # 5b. canary: drop one manifest line from a COPY — the equality check
 # must see the drift.
-sed '/sh\/staged-write\.sh 644/d' "$DEPLOYLIB" > "$WORK/deploy-lib-mutated.sh"
-mutated_manifest=$(sed -n "/<<'DL_MANIFEST'/,/^DL_MANIFEST\$/p" "$WORK/deploy-lib-mutated.sh" \
-    | sed -e '1d' -e '$d' | grep -v '^#' | awk 'NF { print $1 }' | sort -u)
+sed '/sh\/staged-write\.sh 644/d' "$DEPLOYLIB" >"$WORK/deploy-lib-mutated.sh"
+mutated_manifest=$(sed -n "/<<'DL_MANIFEST'/,/^DL_MANIFEST\$/p" "$WORK/deploy-lib-mutated.sh" |
+    sed -e '1d' -e '$d' | grep -v '^#' | awk 'NF { print $1 }' | sort -u)
 if [ "$mutated_manifest" != "$lib_fetch_list" ]; then
     pass "canary: manifest mutation is detected (equality check works)"
 else
@@ -232,7 +238,7 @@ fetch_body() {
 }
 
 # unique subdirectory prefixes referenced by the (verified-identical) lists
-subdirs=$(for f in $update_list; do case "$f" in */*) echo "${f%/*}" ;; esac; done | sort -u)
+subdirs=$(for f in $update_list; do case "$f" in */*) echo "${f%/*}" ;; esac done | sort -u)
 
 mkdir_missing=""
 for script in "$INSTALL" "$UPDATE"; do
@@ -241,9 +247,9 @@ for script in "$INSTALL" "$UPDATE"; do
     for d in $subdirs; do
         # a literal "$dir/$d" or any deeper "$dir/$d/..." mkdir covers $d
         # (mkdir -p creates the parents)
-        echo "$body" | grep -qF "\"\$dir/$d\"" \
-            || echo "$body" | grep -qF "\"\$dir/$d/" \
-            || mkdir_missing="$mkdir_missing $name:$d"
+        echo "$body" | grep -qF "\"\$dir/$d\"" ||
+            echo "$body" | grep -qF "\"\$dir/$d/" ||
+            mkdir_missing="$mkdir_missing $name:$d"
     done
 done
 if [ -z "$mkdir_missing" ]; then
@@ -254,13 +260,13 @@ fi
 
 # 5a. canary: without the tui/ mkdir the guard above must trip. Mutate a
 #     COPY of update.sh exactly like the original regression.
-sed 's| "\$dir/opencode-permissions-kit-lib/tui"||' "$UPDATE" > "$WORK/update-notui.sh"
+sed 's| "\$dir/opencode-permissions-kit-lib/tui"||' "$UPDATE" >"$WORK/update-notui.sh"
 _canary=""
 _body="$(fetch_body "$WORK/update-notui.sh")"
 for d in $subdirs; do
-    echo "$_body" | grep -qF "\"\$dir/$d\"" \
-        || echo "$_body" | grep -qF "\"\$dir/$d/" \
-        || _canary="$_canary $d"
+    echo "$_body" | grep -qF "\"\$dir/$d\"" ||
+        echo "$_body" | grep -qF "\"\$dir/$d/" ||
+        _canary="$_canary $d"
 done
 case "$_canary" in
     *opencode-permissions-kit-lib/tui*)
@@ -275,7 +281,7 @@ esac
 #     -o target directly (NO directory creation, like real curl — a missing
 #     parent dir must fail, reproducing curl error 23).
 mkdir -p "$WORK/fakebin"
-cat > "$WORK/fakebin/curl" <<'FAKE'
+cat >"$WORK/fakebin/curl" <<'FAKE'
 #!/bin/sh
 _out=""
 while [ $# -gt 0 ]; do
@@ -286,8 +292,8 @@ printf 'stub\n' > "$_out"
 FAKE
 chmod +x "$WORK/fakebin/curl"
 
-sed -n '/^KIT_FILES="/,/"$/p' "$UPDATE" > "$WORK/kitfiles.env"
-sed -n '/^fetch_kit() {/,/^}/p' "$UPDATE" > "$WORK/fetchkit.fn"
+sed -n '/^KIT_FILES="/,/"$/p' "$UPDATE" >"$WORK/kitfiles.env"
+sed -n '/^fetch_kit() {/,/^}/p' "$UPDATE" >"$WORK/fetchkit.fn"
 # fetch_kit reports the tree via the _FK_DIR global (no stdout — a
 # command-substitution call would void the trap registrations); the inner
 # shell echoes it deliberately for this test.

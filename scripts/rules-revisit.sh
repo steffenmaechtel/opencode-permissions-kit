@@ -41,8 +41,14 @@ set -u
 
 PY=${RULES_PYTHON:-python3}
 
-die() { echo "rules-revisit: $*" >&2; exit 2; }
-refuse() { echo "rules-revisit: $*" >&2; exit 1; }
+die() {
+    echo "rules-revisit: $*" >&2
+    exit 2
+}
+refuse() {
+    echo "rules-revisit: $*" >&2
+    exit 1
+}
 
 if [ -n "${RM_AUDIT_ROOT:-}" ]; then
     ROOT=$(cd -- "$RM_AUDIT_ROOT" && pwd) || die "cannot enter RM_AUDIT_ROOT"
@@ -87,7 +93,7 @@ b3=$(printf '%s' "$digs" | cut -c3)
 META=$ROOT/$METAS/$b1/$b2/$b3/$ID.md
 [ -f "$META" ] || refuse "no meta $ID at $METAS/$b1/$b2/$b3/$ID.md"
 
-fm() {  # frontmatter value of $1 ('' when absent)
+fm() { # frontmatter value of $1 ('' when absent)
     sed -n '2,/^---$/p' "$META" | sed -n "s/^$1:[[:space:]]*//p" | head -1
 }
 st=$(fm status)
@@ -103,15 +109,36 @@ case $iv in
 esac
 
 case "$VERDICT-$iv" in
-    clean-1m) NEW=6m; N=6; U=m ;;
-    clean-6m) NEW=1y; N=1; U=y ;;
-    clean-1y) NEW=2y; N=2; U=y ;;
-    clean-2y) NEW=2y; N=2; U=y ;;
-    findings-*) NEW=1m; N=1; U=m ;;
+    clean-1m)
+        NEW=6m
+        N=6
+        U=m
+        ;;
+    clean-6m)
+        NEW=1y
+        N=1
+        U=y
+        ;;
+    clean-1y)
+        NEW=2y
+        N=2
+        U=y
+        ;;
+    clean-2y)
+        NEW=2y
+        N=2
+        U=y
+        ;;
+    findings-*)
+        NEW=1m
+        N=1
+        U=m
+        ;;
 esac
 
 # from the REVISIT date, calendar-correct, month-end clamped
-NEXT=$("$PY" - "$TODAY" "$N" "$U" <<'PYEOF'
+NEXT=$(
+    "$PY" - "$TODAY" "$N" "$U" <<'PYEOF'
 import sys
 from datetime import date
 
@@ -151,15 +178,27 @@ awk -v iv="revisit-interval: $NEW" -v nr="next-revisit: $NEXT" '
     fm && /^next-revisit:/ { print nr; c2++; next }
     { print }
     END { if (c1 != 1 || c2 != 1) exit 3 }
-' "$META" > "$TMP" || { rm -f "$TMP"; die "$ID: frontmatter fields not found exactly once"; }
-printf '%s\n' "- $LOG" >> "$TMP"
+' "$META" >"$TMP" || {
+    rm -f "$TMP"
+    die "$ID: frontmatter fields not found exactly once"
+}
+printf '%s\n' "- $LOG" >>"$TMP"
 
-sed -n '2,/^---$/p' "$TMP" | grep -qx "revisit-interval: $NEW" \
-    || { rm -f "$TMP"; die "$ID: rewrite check failed (revisit-interval)"; }
-sed -n '2,/^---$/p' "$TMP" | grep -qx "next-revisit: $NEXT" \
-    || { rm -f "$TMP"; die "$ID: rewrite check failed (next-revisit)"; }
-[ "$(tail -n 1 "$TMP")" = "- $LOG" ] \
-    || { rm -f "$TMP"; die "$ID: rewrite check failed (log line)"; }
+sed -n '2,/^---$/p' "$TMP" | grep -qx "revisit-interval: $NEW" ||
+    {
+        rm -f "$TMP"
+        die "$ID: rewrite check failed (revisit-interval)"
+    }
+sed -n '2,/^---$/p' "$TMP" | grep -qx "next-revisit: $NEXT" ||
+    {
+        rm -f "$TMP"
+        die "$ID: rewrite check failed (next-revisit)"
+    }
+[ "$(tail -n 1 "$TMP")" = "- $LOG" ] ||
+    {
+        rm -f "$TMP"
+        die "$ID: rewrite check failed (log line)"
+    }
 
 mv -f "$TMP" "$META" || die "cannot update $META"
 

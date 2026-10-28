@@ -122,7 +122,7 @@ working around a missing tool.
 ```bash
 sh tests/check-host.sh   # host pre-flight (required tools + install hints)
 sh tests/unit/test-*.sh # unit suite — always via sh, never rely on exec bits
-make lint                # ShellCheck over the shipped scripts
+make lint                # ShellCheck + shfmt format gate over the kit shell
 make check-version       # VERSION + KIT_BRANCH consistency
 make e2e                 # e2e (Docker needed)
 make e2e-rootless        # docker-rootless e2e (skips without systemd-in-container)

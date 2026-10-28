@@ -48,8 +48,14 @@ passed=0
 # conform immediately and flip the first-run assertions below.
 umask 022
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
     local desc="$1"
@@ -166,8 +172,8 @@ check "helper notes the fallback on stderr and never aborts the run" \
 
 WF=$(mktemp -d)
 mkdir -p "$WF/stub"
-printf '#!/bin/sh\necho 4242\n' > "$WF/stub/id"
-printf '#!/bin/sh\necho "FAKE_DDEV_ARGS:$*"\necho "FAKE_DDEV_CWD:$(pwd)"\n' > "$WF/stub/ddev"
+printf '#!/bin/sh\necho 4242\n' >"$WF/stub/id"
+printf '#!/bin/sh\necho "FAKE_DDEV_ARGS:$*"\necho "FAKE_DDEV_CWD:$(pwd)"\n' >"$WF/stub/ddev"
 chmod +x "$WF/stub/id" "$WF/stub/ddev"
 mkdir "$WF/locked"
 
@@ -198,15 +204,15 @@ rm -rf "$WF"
 # with the heavy generated subtrees pruned. The uid guard is satisfied the
 # same way as above: a stubbed id(1) on PATH.
 SH_STUB=$(mktemp -d)
-printf '#!/bin/sh\necho 4242\n' > "$SH_STUB/id"
+printf '#!/bin/sh\necho 4242\n' >"$SH_STUB/id"
 chmod 755 "$SH_STUB/id"
 
 SH=$(mktemp -d)
 mkdir -p "$SH/.ddev/commands/web" "$SH/.ddev/db_snapshots" "$SH/.ddev/import-db"
-printf '#!/bin/sh\n' > "$SH/.ddev/config.yaml"
-printf '#!/bin/sh\n' > "$SH/.ddev/commands/web/hostcmd"
-printf 'SNAP\n'      > "$SH/.ddev/db_snapshots/db.sql.gz"
-printf 'DUMP\n'      > "$SH/.ddev/import-db/dump.sql.gz"
+printf '#!/bin/sh\n' >"$SH/.ddev/config.yaml"
+printf '#!/bin/sh\n' >"$SH/.ddev/commands/web/hostcmd"
+printf 'SNAP\n' >"$SH/.ddev/db_snapshots/db.sql.gz"
+printf 'DUMP\n' >"$SH/.ddev/import-db/dump.sql.gz"
 chmod 755 "$SH/.ddev" "$SH/.ddev/commands" "$SH/.ddev/commands/web" "$SH/.ddev/db_snapshots" "$SH/.ddev/import-db"
 chmod 644 "$SH/.ddev/config.yaml" "$SH/.ddev/commands/web/hostcmd" "$SH/.ddev/db_snapshots/db.sql.gz" "$SH/.ddev/import-db/dump.sql.gz"
 
@@ -240,13 +246,13 @@ rm -rf "$SH" "$SH_STUB"
 # hermetic via DDEV_DEV_OWNED / the exported OPK_INSTALL_CONF override
 # (the helper must respect it — checked below).
 DF_STUB=$(mktemp -d)
-printf '#!/bin/sh\necho 4242\n' > "$DF_STUB/id"
+printf '#!/bin/sh\necho 4242\n' >"$DF_STUB/id"
 chmod 755 "$DF_STUB/id"
 
 DF=$(mktemp -d)
 mkdir -p "$DF/on/.ddev" "$DF/off/.ddev" "$DF/none"
-printf 'name: flagon\ntype: typo3\ndocroot: public\n' > "$DF/on/.ddev/config.yaml"
-printf 'name: flagoff\ntype: typo3\ndocroot: public\n' > "$DF/off/.ddev/config.yaml"
+printf 'name: flagon\ntype: typo3\ndocroot: public\n' >"$DF/on/.ddev/config.yaml"
+printf 'name: flagoff\ntype: typo3\ndocroot: public\n' >"$DF/off/.ddev/config.yaml"
 
 DF_ON_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/on" 2>&1)
 DF_ON_RC=$?
@@ -290,9 +296,9 @@ check "devowned-flag: helper respects the OPK_INSTALL_CONF override" \
 # cover the class).
 DFW=$(mktemp -d)
 mkdir -p "$DFW/cat/.ddev" "$DFW/tmp/.ddev" "$DFW/lnk/.ddev"
-printf 'name: fwc\ntype: typo3\n' > "$DFW/cat/.ddev/config.yaml"
-printf 'name: fwt\ntype: typo3\n' > "$DFW/tmp/.ddev/config.yaml"
-printf 'target\n' > "$DFW/lnk/real-config.yaml"
+printf 'name: fwc\ntype: typo3\n' >"$DFW/cat/.ddev/config.yaml"
+printf 'name: fwt\ntype: typo3\n' >"$DFW/tmp/.ddev/config.yaml"
+printf 'target\n' >"$DFW/lnk/real-config.yaml"
 ln -s "$DFW/lnk/real-config.yaml" "$DFW/lnk/.ddev/config.yaml"
 chmod 444 "$DFW/cat/.ddev/config.yaml"
 chmod 555 "$DFW/tmp/.ddev"
@@ -316,7 +322,7 @@ rm -rf "$DF" "$DF_STUB"
 # Fixture: a fake ddev on PATH so the already-opencode branch runs something
 # observable instead of the (absent) real ddev.
 mkdir -p "$TMPDIR/bin"
-cat > "$TMPDIR/bin/ddev" <<'FAKE'
+cat >"$TMPDIR/bin/ddev" <<'FAKE'
 #!/bin/sh
 echo "REAL_DDEV_RAN:$*"
 FAKE
@@ -358,7 +364,7 @@ fi
 # sandbox scanner's raw-line rm-suffix pattern (#244 c S1).
 GJDIAG='platform independent libraries'
 mkdir -p "$TMPDIR/noisypy"
-printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$GJDIAG" > "$TMPDIR/noisypy/python3"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$GJDIAG" >"$TMPDIR/noisypy/python3"
 chmod +x "$TMPDIR/noisypy/python3"
 GJ_OUT=$(PATH="$TMPDIR/noisypy:$PATH" sh -c ". '$FUNC' && _opk_json_get '{}' primary_url" 2>"$TMPDIR/gj-noisy.err") || true
 assert_eq "_opk_json_get: broken interpreter still yields empty (contract holds)" "" "$GJ_OUT"
@@ -370,7 +376,8 @@ fi
 # (#244 d Q1) absent python3: guarded to the miss contract — empty
 # output, no shell not-found noise (absence is legitimate mid-lifecycle,
 # not a diagnostic event). Source first, then restrict PATH.
-GJABS="$TMPDIR/gj-abs"; mkdir -p "$GJABS"
+GJABS="$TMPDIR/gj-abs"
+mkdir -p "$GJABS"
 GJ_OUT=$(sh -c ". '$FUNC'; PATH='$GJABS'; _opk_json_get '{\"raw\":{\"primary_url\":\"https://x.y\"}}' primary_url" 2>"$TMPDIR/gj-abs.err") || true
 assert_eq "_opk_json_get: absent python3 yields empty (miss contract)" "" "$GJ_OUT"
 if [ ! -s "$TMPDIR/gj-abs.err" ]; then
@@ -462,17 +469,17 @@ assert_eq "url: json field extraction of a missing path is empty" \
 # Functional against _opk_is_browser_cmd: the default list, the xhgui
 # arg-awareness, and the extensible conf file (OPK_BROWSER_CMDS_CONF).
 BC() { env OPK_BROWSER_CMDS_CONF="${3:-/nonexistent}" sh -c '. "$1" && if _opk_is_browser_cmd "$2" "${4:-}"; then echo yes; else echo no; fi' _ "$FUNC" "$1" "" "$2"; }
-assert_eq "routing: launch is a browser command"        "yes" "$(BC launch)"
-assert_eq "routing: mailpit is a browser command"       "yes" "$(BC mailpit)"
-assert_eq "routing: phpmyadmin is a browser command"    "yes" "$(BC phpmyadmin)"
-assert_eq "routing: adminer is a browser command"       "yes" "$(BC adminer)"
-assert_eq "routing: bare xhgui is a browser command"    "yes" "$(BC xhgui)"
-assert_eq "routing: xhgui launch is a browser command"  "yes" "$(BC xhgui launch)"
-assert_eq "routing: xhgui status is NOT"                "no"  "$(BC xhgui status)"
-assert_eq "routing: start is NOT"                       "no"  "$(BC start)"
-assert_eq "routing: exec is NOT"                        "no"  "$(BC exec)"
+assert_eq "routing: launch is a browser command" "yes" "$(BC launch)"
+assert_eq "routing: mailpit is a browser command" "yes" "$(BC mailpit)"
+assert_eq "routing: phpmyadmin is a browser command" "yes" "$(BC phpmyadmin)"
+assert_eq "routing: adminer is a browser command" "yes" "$(BC adminer)"
+assert_eq "routing: bare xhgui is a browser command" "yes" "$(BC xhgui)"
+assert_eq "routing: xhgui launch is a browser command" "yes" "$(BC xhgui launch)"
+assert_eq "routing: xhgui status is NOT" "no" "$(BC xhgui status)"
+assert_eq "routing: start is NOT" "no" "$(BC start)"
+assert_eq "routing: exec is NOT" "no" "$(BC exec)"
 CONF=$(mktemp)
-printf '# custom browser commands\nmy-custom-tool\n\n# another\n  spaced-tool  \n' > "$CONF"
+printf '# custom browser commands\nmy-custom-tool\n\n# another\n  spaced-tool  \n' >"$CONF"
 assert_eq "routing: conf file adds custom browser commands (issue #20 follow-up)" "yes" \
     "$(env OPK_BROWSER_CMDS_CONF="$CONF" sh -c '. "$1" && if _opk_is_browser_cmd my-custom-tool; then echo yes; else echo no; fi' _ "$FUNC")"
 assert_eq "routing: conf entries are whitespace/comment tolerant" "yes" \
@@ -507,8 +514,8 @@ check "exported ddev() is what command -v resolves to in a child bash script" \
 # clobbering a user-set value) gets the function through the chain:
 # sh -> bash (source hook) -> sh wrapper (exec) -> bash target.
 VCHAIN=$(mktemp -d)
-printf '#!/usr/bin/env sh\nexec "%s/target.sh" "$@"\n' "$VCHAIN" > "$VCHAIN/wrapper.sh"
-printf '#!/usr/bin/env bash\ntype -t ddev\n' > "$VCHAIN/target.sh"
+printf '#!/usr/bin/env sh\nexec "%s/target.sh" "$@"\n' "$VCHAIN" >"$VCHAIN/wrapper.sh"
+printf '#!/usr/bin/env bash\ntype -t ddev\n' >"$VCHAIN/target.sh"
 chmod +x "$VCHAIN/wrapper.sh" "$VCHAIN/target.sh"
 check "hook sets BASH_ENV (self-referential, empty-guarded)" \
     sh -c "grep -qF '[ -z \"\${BASH_ENV:-}\" ]' \"\$1\" && grep -q 'export BASH_ENV=' \"\$1\"" _ "$FUNC"
@@ -589,7 +596,7 @@ check "update.sh refresh uses the handover helper" \
 # the MODE changes are real).
 HWORK=$(mktemp -d)
 mkdir -p "$HWORK/proj/.ddev"
-printf 'type: typo3\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$HWORK/proj/.ddev/config.yaml"
 chmod 2775 "$HWORK/proj"
 
 check "typo3 detection: no vendor, no typo3 dir => undetected" \
@@ -616,16 +623,16 @@ check "detected typo3: root handed back with 2775 (g+w restored)" \
 # docroot comes from the group-writable .ddev/config.yaml and feeds
 # root-run chown -R paths — traversal or absolute values must fall back
 # to "." (with a warning), never escape the project root.
-printf 'name: d1\ntype: typo3\ndocroot: public\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'name: d1\ntype: typo3\ndocroot: public\n' >"$HWORK/proj/.ddev/config.yaml"
 check "docroot containment: sane docroot passes through" \
     sh -c ". \"\$1\" 2>/dev/null && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = 'config/system public/typo3conf typo3conf' ]" _ "$HANDOVER" "$HWORK/proj"
-printf 'name: d2\ntype: typo3\ndocroot: ../../..\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'name: d2\ntype: typo3\ndocroot: ../../..\n' >"$HWORK/proj/.ddev/config.yaml"
 check "docroot containment: traversal falls back to '.' and warns" \
     sh -c ". \"\$1\" && out=\$(ddev_type_settings_dirs \"\$2\" 2>&1); case \"\$out\" in *WARNING*) ;; *) exit 1 ;; esac; [ \"\$(printf '%s\n' \"\$out\" | grep -v WARNING)\" = 'config/system ./typo3conf typo3conf' ]" _ "$HANDOVER" "$HWORK/proj"
-printf 'name: d3\ntype: drupal\ndocroot: /etc\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'name: d3\ntype: drupal\ndocroot: /etc\n' >"$HWORK/proj/.ddev/config.yaml"
 check "docroot containment: absolute docroot falls back to '.'" \
     sh -c ". \"\$1\" && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = './sites/default' ]" _ "$HANDOVER" "$HWORK/proj"
-printf 'type: typo3\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$HWORK/proj/.ddev/config.yaml"
 
 check "non-typo3 type: root untouched by the project-root handover" \
     sh -c "printf 'type: php\n' > \"\$2/.ddev/config.yaml\" && chmod 2770 \"\$2\" && . \"\$1\" && ddev_handover_project_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\" >/dev/null && test \"\$(stat -c %a \"\$2\")\" = 2770" _ "$HANDOVER" "$HWORK/proj"
@@ -636,13 +643,13 @@ check "non-typo3 type: root untouched by the project-root handover" \
 # are dir types like magento/drupal; codeigniter/shopware6/symfony are
 # root-file types (.env/.env.local at the root) handled via the project-root
 # inode (permanent while unflagged, handed back once flagged).
-printf 'type: maho\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'type: maho\n' >"$HWORK/proj/.ddev/config.yaml"
 check "type map: maho -> app/etc (magento fork)" \
     sh -c ". \"\$1\" && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = 'app/etc' ]" _ "$HANDOVER" "$HWORK/proj"
-printf 'type: modx\ndocroot: html\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'type: modx\ndocroot: html\n' >"$HWORK/proj/.ddev/config.yaml"
 check "type map: modx -> <docroot>/core/config" \
     sh -c ". \"\$1\" && [ \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" = 'html/core/config' ]" _ "$HANDOVER" "$HWORK/proj"
-printf 'type: codeigniter\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'type: codeigniter\n' >"$HWORK/proj/.ddev/config.yaml"
 check "type map: root-file types have no settings dirs (root inode instead)" \
     sh -c ". \"\$1\" && [ -z \"\$(ddev_type_settings_dirs \"\$2\" 2>/dev/null)\" ]" _ "$HANDOVER" "$HWORK/proj"
 
@@ -658,12 +665,12 @@ check "root-file types: flagged project gets the root back (handback)" \
 
 # hint coverage (static): the bootstrap hint names the new type classes
 check "hint: covers maho/modx settings dirs (issue #149 finding 5)" \
-    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'maho|modx'" _ "$FUNC"
+    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'maho | modx'" _ "$FUNC"
 check "hint: covers the root-file types (codeigniter/shopware6/symfony)" \
-    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'codeigniter|shopware6|symfony'" _ "$FUNC"
+    sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'codeigniter | shopware6 | symfony'" _ "$FUNC"
 check "hint: typo3 wording unchanged (e2e greps it)" \
     sh -c "awk '/^_opk_bootstrap_hint\(\)/,/^}/' \"\$1\" | grep -q 'hint: fresh typo3 clone'" _ "$FUNC"
-printf 'type: typo3\n' > "$HWORK/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$HWORK/proj/.ddev/config.yaml"
 
 check "handover_root signature carries the dev user (handback target)" \
     sh -c "grep -qF 'dhr_dev=\"\${4:-}\"' \"\$1\"" _ "$HANDOVER"
@@ -722,11 +729,11 @@ check "hook exports the bootstrap hint for bash children" \
 # these pins verify.
 BH=$(mktemp -d)
 mkdir -p "$BH/bin" "$BH/m/.ddev" "$BH/m/app/etc" "$BH/x/.ddev" "$BH/x/html/core/config"
-printf 'name: bm\ntype: maho\n' > "$BH/m/.ddev/config.yaml"
-printf 'name: bx\ntype: modx\ndocroot: html\n' > "$BH/x/.ddev/config.yaml"
-printf '#!/bin/sh\necho some-developer\n' > "$BH/bin/stat"
+printf 'name: bm\ntype: maho\n' >"$BH/m/.ddev/config.yaml"
+printf 'name: bx\ntype: modx\ndocroot: html\n' >"$BH/x/.ddev/config.yaml"
+printf '#!/bin/sh\necho some-developer\n' >"$BH/bin/stat"
 chmod 755 "$BH/bin/stat"
-printf 'ddev_devowned_flagged() { return 1; }\nddev_devowned_enabled() { return 1; }\n' > "$BH/lib.sh"
+printf 'ddev_devowned_flagged() { return 1; }\nddev_devowned_enabled() { return 1; }\n' >"$BH/lib.sh"
 BH_M=$(cd "$BH/m" && PATH="$BH/bin:$PATH" OPK_DDEV_HANDOVER_LIB="$BH/lib.sh" sh -c '. "$1" && _opk_bootstrap_hint' _ "$FUNC")
 check "hint arm: maho prints the app/etc settings-dir hint (functional, 0.0.46a F6)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q \"hint: this maho project's settings dir\"" _ "$BH_M"
@@ -734,7 +741,7 @@ BH_X=$(cd "$BH/x" && PATH="$BH/bin:$PATH" OPK_DDEV_HANDOVER_LIB="$BH/lib.sh" sh 
 check "hint arm: modx builds <docroot>/core/config (functional, 0.0.46a F6)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q \"hint: this modx project's settings dir\"" _ "$BH_X"
 # owner gate: an opencode-owned target must stay silent
-printf '#!/bin/sh\necho opencode\n' > "$BH/bin/stat"
+printf '#!/bin/sh\necho opencode\n' >"$BH/bin/stat"
 BH_S=$(cd "$BH/x" && PATH="$BH/bin:$PATH" OPK_DDEV_HANDOVER_LIB="$BH/lib.sh" sh -c '. "$1" && _opk_bootstrap_hint' _ "$FUNC")
 check "hint arm: opencode-owned target stays silent (functional)" \
     sh -c "[ -z \"\$1\" ]" _ "$BH_S"
@@ -747,7 +754,7 @@ rm -rf "$BH"
 check "reshare: _opk_ddev_reshare calls the helper's heal mode" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-ensure-shared' " _ "$FUNC"
 check "reshare: heal runs after config/get/start/restart" \
-    sh -c "grep -q 'config|get|start|restart) _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
+    sh -c "grep -q 'config | get | start | restart) _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
 check "reshare: heal is silent and never changes the ddev exit code" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '|| true' && awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF 'return 0'" _ "$FUNC"
 check "reshare: no heal without a project in the cwd" \
@@ -763,7 +770,7 @@ check "reshare: browser-command path heals after its internal start too" \
 # sudo password (-n), never failing the ddev command.
 DFH=$(mktemp -d)
 mkdir -p "$DFH/proj/.ddev"
-printf 'name: dfh\ntype: typo3\ndocroot: public\n' > "$DFH/proj/.ddev/config.yaml"
+printf 'name: dfh\ntype: typo3\ndocroot: public\n' >"$DFH/proj/.ddev/config.yaml"
 check "devowned hook: _opk_devowned_flag calls the helper's flag mode" \
     sh -c "awk '/^_opk_devowned_flag\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-devowned-flag'" _ "$FUNC"
 check "devowned hook: flag write runs after ddev config" \
@@ -788,15 +795,15 @@ check "devowned hook: exported for bash children (issue #18)" \
 # PATH-interceptable (see section 3a) — and stays static-pinned above.
 DFH2=$(mktemp -d)
 mkdir -p "$DFH2/on/.ddev" "$DFH2/off/.ddev"
-printf 'name: fh1\ntype: typo3\n' > "$DFH2/on/.ddev/config.yaml"
-printf 'name: fh2\ntype: typo3\n' > "$DFH2/off/.ddev/config.yaml"
-cat > "$DFH2/on-lib.sh" <<'STUB'
+printf 'name: fh1\ntype: typo3\n' >"$DFH2/on/.ddev/config.yaml"
+printf 'name: fh2\ntype: typo3\n' >"$DFH2/off/.ddev/config.yaml"
+cat >"$DFH2/on-lib.sh" <<'STUB'
 # 0.0.46a F2 stub: mode ON, unflagged — the flagged probe records that
 # execution passed the mode gate (reached the pre-sudo gating).
 ddev_devowned_enabled() { return 0; }
 ddev_devowned_flagged() { : >> "$1/.opk-f2-flaggate"; return 1; }
 STUB
-cat > "$DFH2/off-lib.sh" <<'STUB'
+cat >"$DFH2/off-lib.sh" <<'STUB'
 # 0.0.46a F2 stub: mode OFF — the flagged probe must NEVER run (its
 # marker file appearing means the mode gate was skipped or reordered).
 ddev_devowned_enabled() { return 1; }
@@ -817,9 +824,9 @@ rm -rf "$DFH" "$DFH2"
 # group-write (pruned like the heal itself); status.sh surfaces it.
 RN=$(mktemp -d)
 mkdir -p "$RN/proj/.ddev/commands" "$RN/proj/.ddev/db_snapshots"
-printf 'cfg\n' > "$RN/proj/.ddev/config.yaml"
-printf 'cmd\n' > "$RN/proj/.ddev/commands/hostcmd"
-printf 'snap\n' > "$RN/proj/.ddev/db_snapshots/db.sql.gz"
+printf 'cfg\n' >"$RN/proj/.ddev/config.yaml"
+printf 'cmd\n' >"$RN/proj/.ddev/commands/hostcmd"
+printf 'snap\n' >"$RN/proj/.ddev/db_snapshots/db.sql.gz"
 chmod 2775 "$RN/proj/.ddev" "$RN/proj/.ddev/commands"
 chmod 664 "$RN/proj/.ddev/config.yaml" "$RN/proj/.ddev/commands/hostcmd"
 chmod 755 "$RN/proj/.ddev/db_snapshots"
@@ -868,14 +875,14 @@ DWORK=$(mktemp -d)
 
 # flag writer: inserts iff absent, idempotent, comment on its own lines
 mkdir -p "$DWORK/fw/.ddev"
-printf 'name: fw\ntype: typo3\n' > "$DWORK/fw/.ddev/config.yaml"
+printf 'name: fw\ntype: typo3\n' >"$DWORK/fw/.ddev/config.yaml"
 check "flag writer: writes the key when absent" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null && grep -qx 'disable_settings_management: true' \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw"
 check "flag writer: idempotent (no duplicate key)" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; [ \"\$(grep -c '^disable_settings_management:' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw"
 # pre-existing explicit false stays untouched (repo decided otherwise)
 mkdir -p "$DWORK/fw2/.ddev"
-printf 'name: fw2\ndisable_settings_management: false\n' > "$DWORK/fw2/.ddev/config.yaml"
+printf 'name: fw2\ndisable_settings_management: false\n' >"$DWORK/fw2/.ddev/config.yaml"
 check "flag writer: pre-existing key (false) left untouched" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; grep -qx 'disable_settings_management: false' \"\$2/.ddev/config.yaml\" && [ \"\$(grep -c '^disable_settings_management:' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw2"
 # missing config.yaml: silent no-op
@@ -884,7 +891,7 @@ check "flag writer: missing config.yaml is a no-op" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" && test ! -f \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw3"
 # no trailing newline: the inserted key must still land on its own line
 mkdir -p "$DWORK/fw4/.ddev"
-printf 'name: fw4' > "$DWORK/fw4/.ddev/config.yaml"
+printf 'name: fw4' >"$DWORK/fw4/.ddev/config.yaml"
 check "flag writer: survives a file without trailing newline" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null && grep -qx 'disable_settings_management: true' \"\$2/.ddev/config.yaml\"" _ "$HANDOVER" "$DWORK/fw4"
 
@@ -892,17 +899,17 @@ check "flag writer: survives a file without trailing newline" \
 # fallback, at the top as last resort — never appended after ddev's
 # trailing comment block. Blank line before and after, never doubled.
 mkdir -p "$DWORK/fw5/.ddev"
-printf 'name: fw5\ntype: typo3\ncorepack_enable: false\n\n# Key features of DDEV config.yaml:\n# name: <projectname>\n' > "$DWORK/fw5/.ddev/config.yaml"
+printf 'name: fw5\ntype: typo3\ncorepack_enable: false\n\n# Key features of DDEV config.yaml:\n# name: <projectname>\n' >"$DWORK/fw5/.ddev/config.yaml"
 check "flag writer: inserts after corepack_enable (issue #28)" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; _a=\$(grep -n '^corepack_enable:' \"\$2/.ddev/config.yaml\" | cut -d: -f1); _b=\$(grep -n '^disable_settings_management: true' \"\$2/.ddev/config.yaml\" | cut -d: -f1); [ \"\$((_b - _a))\" = 4 ]" _ "$HANDOVER" "$DWORK/fw5"
 check "flag writer: blank line after the inserted block (no doubling)" \
     sh -c "[ \"\$(grep -c '^\$' \"\$1/.ddev/config.yaml\")\" = 2 ]" _ "$DWORK/fw5"
 mkdir -p "$DWORK/fw6/.ddev"
-printf 'name: fw6\ntype: typo3\ndocroot: public\n' > "$DWORK/fw6/.ddev/config.yaml"
+printf 'name: fw6\ntype: typo3\ndocroot: public\n' >"$DWORK/fw6/.ddev/config.yaml"
 check "flag writer: type fallback when corepack_enable is absent (issue #28)" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; _a=\$(grep -n '^type:' \"\$2/.ddev/config.yaml\" | cut -d: -f1); _b=\$(grep -n '^disable_settings_management: true' \"\$2/.ddev/config.yaml\" | cut -d: -f1); [ \"\$((_b - _a))\" = 4 ]" _ "$HANDOVER" "$DWORK/fw6"
 mkdir -p "$DWORK/fw7/.ddev"
-printf 'webimage: config.yaml\nhooks:\n  post-start:\n    - exec: \"ls\"\n' > "$DWORK/fw7/.ddev/config.yaml"
+printf 'webimage: config.yaml\nhooks:\n  post-start:\n    - exec: \"ls\"\n' >"$DWORK/fw7/.ddev/config.yaml"
 check "flag writer: no anchor key at all -> top of the file (issue #28)" \
     sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\" >/dev/null; [ \"\$(grep -n '^disable_settings_management: true' \"\$2/.ddev/config.yaml\" | cut -d: -f1)\" = 3 ] && [ \"\$(grep -c '^\$' \"\$2/.ddev/config.yaml\")\" = 1 ]" _ "$HANDOVER" "$DWORK/fw7"
 
@@ -913,7 +920,7 @@ check "flag writer: no anchor key at all -> top of the file (issue #28)" \
 # silence). Owner-mode bits block the CURRENT non-root user — the same
 # self-blocking fixture shape as the chmod 007 cwd in section 2b.
 mkdir -p "$DWORK/f1a/.ddev"
-printf 'name: f1a\ntype: typo3\n' > "$DWORK/f1a/.ddev/config.yaml"
+printf 'name: f1a\ntype: typo3\n' >"$DWORK/f1a/.ddev/config.yaml"
 chmod 444 "$DWORK/f1a/.ddev/config.yaml"
 F1A_RC=0
 F1A_OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/f1a" 2>&1) || F1A_RC=$?
@@ -928,7 +935,7 @@ check "flag writer: retry hint is verbatim-runnable — prints the root's path (
     sh -c "printf '%s\n' \"\$1\" | grep -F \"\$2\"" _ "$F1A_OUT" "$F1A_RETRY"
 chmod 644 "$DWORK/f1a/.ddev/config.yaml"
 mkdir -p "$DWORK/f1b/.ddev"
-printf 'name: f1b\ntype: typo3\n' > "$DWORK/f1b/.ddev/config.yaml"
+printf 'name: f1b\ntype: typo3\n' >"$DWORK/f1b/.ddev/config.yaml"
 chmod 555 "$DWORK/f1b/.ddev"
 F1B_RC=0
 F1B_OUT=$(sh -c ". \"\$1\" && ddev_devowned_flag \"\$2\"" _ "$HANDOVER" "$DWORK/f1b" 2>&1) || F1B_RC=$?
@@ -944,14 +951,14 @@ check "flagged detection: false" \
 
 # scan: mode ON + unflagged typo3 -> flag written + handback (2775)
 mkdir -p "$DWORK/on/proj/.ddev" "$DWORK/on/proj/config/system"
-printf 'type: typo3\n' > "$DWORK/on/proj/.ddev/config.yaml"
-echo "db" > "$DWORK/on/proj/config/system/settings.php"
+printf 'type: typo3\n' >"$DWORK/on/proj/.ddev/config.yaml"
+echo "db" >"$DWORK/on/proj/config/system/settings.php"
 chmod 2770 "$DWORK/on/proj"
 # testdata pruning (issue #29): a checkout of ddev's own repository ships
 # .ddev dirs under cmd/pkg testdata — fixtures, not projects. The scan
 # must neither chown them nor write dev-owned flags into their configs.
 mkdir -p "$DWORK/on/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev"
-printf 'name: p\ntype: php\n' > "$DWORK/on/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev/config.yaml"
+printf 'name: p\ntype: php\n' >"$DWORK/on/ddev-checkout/pkg/ddevapp/testdata/TestHooksMerge/proj/.ddev/config.yaml"
 DON_OUT=$(DDEV_DEV_OWNED=true sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/on" 2>/dev/null || true)
 check "scan mode on: writes the dev-owned flag" \
     sh -c "grep -qx 'disable_settings_management: true' \"\$1/.ddev/config.yaml\"" _ "$DWORK/on/proj"
@@ -966,7 +973,7 @@ check "scan mode on: .ddev still handed over" \
 
 # scan: mode OFF + repo-committed flag -> handback anyway, no flag write
 mkdir -p "$DWORK/off/proj/.ddev" "$DWORK/off/proj/config/system"
-printf 'type: typo3\ndisable_settings_management: true\n' > "$DWORK/off/proj/.ddev/config.yaml"
+printf 'type: typo3\ndisable_settings_management: true\n' >"$DWORK/off/proj/.ddev/config.yaml"
 chmod 2755 "$DWORK/off/proj"
 DOFF_OUT=$(DDEV_DEV_OWNED=false sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/off" 2>/dev/null || true)
 check "scan mode off: committed flag honored (handback, not handover)" \
@@ -976,7 +983,7 @@ check "scan mode off: flagged root handed back to 2775" \
 
 # scan: mode OFF + unflagged -> today's handover (root 2755)
 mkdir -p "$DWORK/old/proj/.ddev"
-printf 'type: typo3\n' > "$DWORK/old/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$DWORK/old/proj/.ddev/config.yaml"
 chmod 2775 "$DWORK/old/proj"
 DDEV_DEV_OWNED=false sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\" \"\$(id -un)\"" _ "$HANDOVER" "$DWORK/old" >/dev/null 2>&1 || true
 check "scan mode off + unflagged: bootstrap root still handed over (2755)" \
@@ -1008,7 +1015,7 @@ rm -rf "${HWORK:?}/gitprune"
 rm -rf "${HWORK:?}/fastpath"
 mkdir -p "$HWORK/fastpath/proj/.ddev" "$HWORK/fastpath/proj/config/system" \
     "$HWORK/fastpath/proj/vendor/typo3/cms-core/Classes/Information"
-printf 'type: typo3\n' > "$HWORK/fastpath/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$HWORK/fastpath/proj/.ddev/config.yaml"
 touch "$HWORK/fastpath/proj/vendor/typo3/cms-core/Classes/Information/Typo3Version.php"
 FP1=$(sh -c ". \"\$1\" && ddev_handover_root \"\$2\" \"\$(id -un)\" \"\$(id -gn)\"" _ "$HANDOVER" "$HWORK/fastpath" 2>/dev/null || true)
 check "fast path: first pass hands .ddev over" \
@@ -1051,10 +1058,10 @@ RACE=$(mktemp -d)
 RACESTUB=$(mktemp -d)
 mkdir -p "$RACE/scan/proj/.ddev" "$RACE/scan/proj/config/system" \
     "$RACE/victim/.ddev" "$RACE/victim/config/system"
-printf 'type: typo3\n' > "$RACE/scan/proj/.ddev/config.yaml"
-printf 'type: typo3\n' > "$RACE/victim/.ddev/config.yaml"
-printf 'victim-secret\n' > "$RACE/victim/.ddev/secret"
-printf 'victim-settings\n' > "$RACE/victim/config/system/settings.php"
+printf 'type: typo3\n' >"$RACE/scan/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$RACE/victim/.ddev/config.yaml"
+printf 'victim-secret\n' >"$RACE/victim/.ddev/secret"
+printf 'victim-settings\n' >"$RACE/victim/config/system/settings.php"
 chmod 600 "$RACE/victim/.ddev/secret" "$RACE/victim/config/system/settings.php"
 # No g+w on the victim .ddev top inode: this drive pins the PAIR half —
 # a conforming top inode would take the fast path and skip the pair
@@ -1062,7 +1069,7 @@ chmod 600 "$RACE/victim/.ddev/secret" "$RACE/victim/config/system/settings.php"
 # reason, the b W6 class). The conforming-victim drives below cover the
 # fast-path branch (pr-00234 a W1).
 chmod 755 "$RACE/victim/.ddev"
-cat > "$RACESTUB/find" <<EOF
+cat >"$RACESTUB/find" <<EOF
 #!/bin/sh
 # Buffer the real find's output, perform the swap, THEN release the
 # scan stream — a stream-through stub races the consumer loop (the
@@ -1098,12 +1105,14 @@ assert_eq "parent-swap: victim settings dir untouched — iteration tail skipped
 assert_eq "parent-swap: skip is not a failure (rc 0, #215)" "0" "$RACE_RC"
 case "$RACE_OUT" in
     *"warn: skipping .ddev handover"*)
-        pass "parent-swap: the skip announces itself with the reason (#215)" ;;
+        pass "parent-swap: the skip announces itself with the reason (#215)"
+        ;;
     *) fail "parent-swap: the skip must announce itself (got: $RACE_OUT) (#215)" ;;
 esac
 case "$RACE_OUT" in
-    *".ddev handover:"*|*"ddev settings handover:"*)
-        fail "parent-swap: no success echo over a skipped operand (#215)" ;;
+    *".ddev handover:"* | *"ddev settings handover:"*)
+        fail "parent-swap: no success echo over a skipped operand (#215)"
+        ;;
     *) pass "parent-swap: no success echo over a skipped operand (#215)" ;;
 esac
 rm -rf "${RACE:?}" "${RACESTUB:?}"
@@ -1116,11 +1125,11 @@ rm -rf "${RACE:?}" "${RACESTUB:?}"
 RACESP=$(mktemp -d)
 RACESPS=$(mktemp -d)
 mkdir -p "$RACESP/scan/pro j/.ddev" "$RACESP/vic tim/.ddev"
-printf 'type: typo3\n' > "$RACESP/scan/pro j/.ddev/config.yaml"
-printf 'spaced-victim\n' > "$RACESP/vic tim/.ddev/has space.txt"
+printf 'type: typo3\n' >"$RACESP/scan/pro j/.ddev/config.yaml"
+printf 'spaced-victim\n' >"$RACESP/vic tim/.ddev/has space.txt"
 chmod 600 "$RACESP/vic tim/.ddev/has space.txt"
 chmod 755 "$RACESP/vic tim/.ddev"
-cat > "$RACESPS/find" <<EOF
+cat >"$RACESPS/find" <<EOF
 #!/bin/sh
 # Same buffered seam as the plain drive: swap first, then release the
 # scan stream — never let the consumer loop lap the swap.
@@ -1166,14 +1175,14 @@ RACEC=$(mktemp -d)
 RACECT=$(mktemp -d)
 mkdir -p "$RACEC/scan/proj/.ddev" "$RACEC/victim/.ddev" \
     "$RACEC/victim/config/system"
-printf 'type: typo3\n' > "$RACEC/scan/proj/.ddev/config.yaml"
-printf 'type: typo3\n' > "$RACEC/victim/.ddev/config.yaml"
-printf 'victim-secret\n' > "$RACEC/victim/.ddev/secret"
-printf 'victim-settings\n' > "$RACEC/victim/config/system/settings.php"
+printf 'type: typo3\n' >"$RACEC/scan/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$RACEC/victim/.ddev/config.yaml"
+printf 'victim-secret\n' >"$RACEC/victim/.ddev/secret"
+printf 'victim-settings\n' >"$RACEC/victim/config/system/settings.php"
 chmod 600 "$RACEC/victim/.ddev/secret" "$RACEC/victim/config/system/settings.php"
 chmod 775 "$RACEC/victim/.ddev"
 chmod 755 "$RACEC/victim/config/system"
-cat > "$RACECT/find" <<EOF
+cat >"$RACECT/find" <<EOF
 #!/bin/sh
 # Same buffered seam as the plain drive: swap the parent AFTER the
 # real find classified it, BEFORE the stream reaches the consumer.
@@ -1203,12 +1212,14 @@ assert_eq "conforming race: victim settings untouched — tail skipped on the fa
 assert_eq "conforming race: skip is not a failure (rc 0)" "0" "$RACEC_RC"
 case "$RACEC_OUT" in
     *"warn: skipping .ddev handover"*)
-        pass "conforming race: the skip announces itself (#234 a W1)" ;;
+        pass "conforming race: the skip announces itself (#234 a W1)"
+        ;;
     *) fail "conforming race: the skip must announce itself (got: $RACEC_OUT) (#234 a W1)" ;;
 esac
 case "$RACEC_OUT" in
     *"ddev settings handover:"*)
-        fail "conforming race: no settings echo over a skipped operand (#234 a W1)" ;;
+        fail "conforming race: no settings echo over a skipped operand (#234 a W1)"
+        ;;
     *) pass "conforming race: no settings echo over a skipped operand (#234 a W1)" ;;
 esac
 rm -rf "${RACEC:?}" "${RACECT:?}"
@@ -1223,13 +1234,13 @@ RACEF=$(mktemp -d)
 RACEFT=$(mktemp -d)
 mkdir -p "$RACEF/scan/proj/.ddev" "$RACEF/victim/.ddev" \
     "$RACEF/victim/config/system"
-printf 'type: typo3\n' > "$RACEF/scan/proj/.ddev/config.yaml"
-printf 'type: typo3\n' > "$RACEF/victim/.ddev/config.yaml"
-printf 'victim-settings\n' > "$RACEF/victim/config/system/settings.php"
+printf 'type: typo3\n' >"$RACEF/scan/proj/.ddev/config.yaml"
+printf 'type: typo3\n' >"$RACEF/victim/.ddev/config.yaml"
+printf 'victim-settings\n' >"$RACEF/victim/config/system/settings.php"
 chmod 600 "$RACEF/victim/config/system/settings.php"
 chmod 775 "$RACEF/victim/.ddev"
 chmod 755 "$RACEF/victim/config/system"
-cat > "$RACEFT/find" <<EOF
+cat >"$RACEFT/find" <<EOF
 #!/bin/sh
 _out=\$(mktemp)
 "$(command -v find)" "\$@" > "\$_out"
@@ -1259,7 +1270,8 @@ else
 fi
 case "$RACEF_OUT" in
     *"dev-owned flag written:"*)
-        fail "flag race: no flag-written echo over a skipped operand (#234 a W1)" ;;
+        fail "flag race: no flag-written echo over a skipped operand (#234 a W1)"
+        ;;
     *) pass "flag race: no flag-written echo over a skipped operand (#234 a W1)" ;;
 esac
 assert_eq "flag race: victim settings untouched too (whole iteration skipped)" "600" \
@@ -1277,7 +1289,8 @@ DCS_OUT=$(sh -c '. "$1" && _ddev_components_sane "/" "/tmp"' _ "$HANDOVER" 2>&1)
 assert_eq "walk: root '/' refuses loud — rc 1 (#234 a W4)" "1" "$DCS_RC"
 case "$DCS_OUT" in
     *"refusing scan root '/'"*)
-        pass "walk: the '/' refusal announces itself (#234 a W4)" ;;
+        pass "walk: the '/' refusal announces itself (#234 a W4)"
+        ;;
     *) fail "walk: the '/' refusal must announce itself (got: $DCS_OUT) (#234 a W4)" ;;
 esac
 DCS2_RC=0
@@ -1323,8 +1336,8 @@ if [ -n "$_112_stampfile" ]; then
     # exported OPK_HANDOVER_STAMP_DIR and the temp dir into later
     # sections. A failed tamper just weakens the rev check below (the
     # written-stamp checks above still gate the feature).
-    sed 's/|1|/|99|/' "$_112_stampfile" > "$_112_stampfile.new" \
-        && mv "$_112_stampfile.new" "$_112_stampfile" || true
+    sed 's/|1|/|99|/' "$_112_stampfile" >"$_112_stampfile.new" &&
+        mv "$_112_stampfile.new" "$_112_stampfile" || true
 fi
 check "stamp: a scan-rev mismatch invalidates" \
     sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup devuser; then exit 1; fi" _ "$HANDOVER"
@@ -1335,7 +1348,7 @@ unset OPK_HANDOVER_STAMP_DIR
 # forces), re-stamps after every full pass, and says how to force;
 # install.sh + config.sh stamp their explicit passes too.
 check "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid" \
-    sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF '&& ddev_handover_stamp_valid \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"' \"\$1\"" _ "$UPDATE"
+    sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF 'ddev_handover_stamp_valid \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"; then' \"\$1\"" _ "$UPDATE"
 check "update.sh: stamps the root after the handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\"' \"\$1\"" _ "$UPDATE"
 check "update.sh: the scanning detail is printed only for roots actually scanned" \
@@ -1343,7 +1356,7 @@ check "update.sh: the scanning detail is printed only for roots actually scanned
 check "update.sh: skip message names both force paths" \
     sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE"
 check "update.sh: --refresh pass re-stamps" \
-    sh -c "awk '/^if \[ \"\\\$REFRESH\" = true \]/,/^fi/' \"\$1\" | grep -q 'ddev_handover_stamp_write'" _ "$UPDATE"
+    sh -c "awk '/^    if \[ \"\\\$REFRESH\" = true \]/,/^    fi\$/' \"\$1\" | grep -q 'ddev_handover_stamp_write'" _ "$UPDATE"
 check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
@@ -1396,13 +1409,13 @@ check "status.sh reports ddev-as-opencode state" \
 # the old block died rc 127 ("ui_have: not found") at the first list on
 # an install whose library predates ui.sh, contradicting its own
 # "keeps config.sh working" comment.
-_cfgfb=$(sed -n '/^    ui_info()    { echo "  info     $1"; }$/,/^    UI_GREEN=/p' "$CONFIG")
+_cfgfb=$(sed -n '/^    ui_info() { echo "  info     $1"; }$/,/^    UI_GREEN=/p' "$CONFIG")
 if [ -n "$_cfgfb" ]; then
-    if printf '%s\n' "$_cfgfb" | grep -q 'ui_have()' \
-       && printf '%s\n' "$_cfgfb" | grep -q 'ui_atten()' \
-       && printf '%s\n' "$_cfgfb" | grep -q 'ui_confirm()' \
-       && printf '%s\n' "$_cfgfb" | grep -q 'ui_menu()' \
-       && printf '%s\n' "$_cfgfb" | grep -q 'ui_ask()'; then
+    if printf '%s\n' "$_cfgfb" | grep -q 'ui_have()' &&
+        printf '%s\n' "$_cfgfb" | grep -q 'ui_atten()' &&
+        printf '%s\n' "$_cfgfb" | grep -q 'ui_confirm()' &&
+        printf '%s\n' "$_cfgfb" | grep -q 'ui_menu()' &&
+        printf '%s\n' "$_cfgfb" | grep -q 'ui_ask()'; then
         pass "config.sh ui.sh fallback defines every helper the body calls (C9)"
     else
         fail "config.sh ui.sh fallback defines every helper the body calls (C9)"
@@ -1425,9 +1438,9 @@ echo "========================================"
 echo "  ${GREEN}Passed: $passed${NC}"
 # describe probe rides sudo -n like every probe (0.0.44b W16/V22)
 grep -q -- 'sudo -n -u opencode' \
-    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-terminal.sh" \
-    && pass "describe probe uses sudo -n (V22)" \
-    || fail "describe probe uses sudo -n (V22)"
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-terminal.sh" &&
+    pass "describe probe uses sudo -n (V22)" ||
+    fail "describe probe uses sudo -n (V22)"
 # --- #211 a F14: handover lines honest about pair failures -----------------------
 # The root-run handover pairs were `|| true`-silent with unconditional
 # success echoes — a partial handover (EPERM, immutable flag) reported
@@ -1463,12 +1476,12 @@ if [ -n "$_f14_block" ]; then
 else
     fail "dhr handover pair block extractable (#211 a F14)"
 fi
-grep -q 'warn: dev-owned handback incomplete' "$HANDOVER" \
-    && pass "dhb site honest too (#211 a F14 sweep)" \
-    || fail "dhb site honest too (#211 a F14 sweep)"
-grep -q 'warn: ddev settings handover incomplete' "$HANDOVER" \
-    && pass "dhp site honest too (#211 a F14 sweep)" \
-    || fail "dhp site honest too (#211 a F14 sweep)"
+grep -q 'warn: dev-owned handback incomplete' "$HANDOVER" &&
+    pass "dhb site honest too (#211 a F14 sweep)" ||
+    fail "dhb site honest too (#211 a F14 sweep)"
+grep -q 'warn: ddev settings handover incomplete' "$HANDOVER" &&
+    pass "dhp site honest too (#211 a F14 sweep)" ||
+    fail "dhp site honest too (#211 a F14 sweep)"
 
 # --- #211 b W9: the four single-inode pairs the a F14 sweep missed ----------------
 # Same shape, one inode: chown+chmod || true with an unconditional
@@ -1510,12 +1523,12 @@ fi
 # Comment-strip rider (#261, the #244 g W1 class): commented-out warn
 # lines must not count; full-line comments only (#244 h W6 residual).
 _n_w9=$(sed 's/^[[:space:]]*#.*$//' "$HANDOVER" | grep -c 'warn: project-root hand\(back\|over\) incomplete' || true)
-[ "$_n_w9" -ge 3 ] \
-    && pass "all three project-root warn lines present (#211 b W9)" \
-    || fail "all three project-root warn lines present (got $_n_w9) (#211 b W9)"
-grep -q 'warn: dev-owned handback incomplete for $dhb_proj (root inode' "$HANDOVER" \
-    && pass "root-inode handback warn line present (#211 b W9)" \
-    || fail "root-inode handback warn line present (#211 b W9)"
+[ "$_n_w9" -ge 3 ] &&
+    pass "all three project-root warn lines present (#211 b W9)" ||
+    fail "all three project-root warn lines present (got $_n_w9) (#211 b W9)"
+grep -q 'warn: dev-owned handback incomplete for $dhb_proj (root inode' "$HANDOVER" &&
+    pass "root-inode handback warn line present (#211 b W9)" ||
+    fail "root-inode handback warn line present (#211 b W9)"
 
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"

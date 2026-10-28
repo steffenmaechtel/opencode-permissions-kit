@@ -21,8 +21,14 @@ passed=0
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT INT TERM
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 echo ""
 echo "Git-Config Toggle (SECURE_GIT) Tests"
@@ -38,7 +44,7 @@ fi
 
 # --- 2. git-config ON: sed 's|//SECURE_GIT: ||' ---
 ON_FILE="$TMPDIR/on.jsonc"
-sed 's|//SECURE_GIT: ||' "$TEMPLATE" > "$ON_FILE"
+sed 's|//SECURE_GIT: ||' "$TEMPLATE" >"$ON_FILE"
 
 if grep -q '"\.git/config"' "$ON_FILE" && ! grep -q '//SECURE_GIT' "$ON_FILE"; then
     pass "git-config ON: .git/config deny rules uncommented"
@@ -63,7 +69,7 @@ fi
 
 # --- 3. git-config OFF: sed '/\/\/SECURE_GIT:/d' ---
 OFF_FILE="$TMPDIR/off.jsonc"
-sed '/\/\/SECURE_GIT:/d' "$TEMPLATE" > "$OFF_FILE"
+sed '/\/\/SECURE_GIT:/d' "$TEMPLATE" >"$OFF_FILE"
 
 if ! grep -q 'SECURE_GIT' "$OFF_FILE"; then
     pass "git-config OFF: all SECURE_GIT lines removed"
@@ -102,7 +108,7 @@ fi
 # --- 5. Round-trip: ON -> OFF removes the now-active rules ---
 # Apply OFF sed to the ON file
 ROUNDTRIP="$TMPDIR/roundtrip.jsonc"
-sed '/\/\/SECURE_GIT:/d' "$ON_FILE" > "$ROUNDTRIP"
+sed '/\/\/SECURE_GIT:/d' "$ON_FILE" >"$ROUNDTRIP"
 # ON file has no //SECURE_GIT comments (they were uncommented), so OFF sed
 # should be a no-op — .git/config rules should survive
 if grep -q '"\.git/config"' "$ROUNDTRIP"; then
@@ -141,8 +147,8 @@ if [ "$_git_sd_install" -ge 2 ] && [ "$_git_sd_update" -ge 2 ]; then
 else
     fail "issue #116: safe.directory git calls are CWD-safe (git -C /): install=$_git_sd_install update=$_git_sd_update"
 fi
-if ! printf '%s\n' "$_opk_install_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' \
-    && ! printf '%s\n' "$_opk_update_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global'; then
+if ! printf '%s\n' "$_opk_install_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global' &&
+    ! printf '%s\n' "$_opk_update_j" | grep -qE '(sudo -u "[^"]+"|sudo -u [A-Za-z_$]+) (-H )?git config --global'; then
     pass "issue #116: no bare (CWD-inheriting) git config --global calls remain"
 else
     fail "issue #116: bare git config --global call remains (CWD-inheriting)"
@@ -164,15 +170,19 @@ DEPLOYLIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/deploy-lib.sh
 # Behavioral: source the helper with stubbed ui/log helpers and drive
 # the pure floor compare at (and around) the boundary.
 if (
-    ui_warn() { :; }; ui_detail() { :; }; ui_kv() { :; }; log() { :; }
-    UI_GREEN=""; UI_YELLOW=""
+    ui_warn() { :; }
+    ui_detail() { :; }
+    ui_kv() { :; }
+    log() { :; }
+    UI_GREEN=""
+    UI_YELLOW=""
     # shellcheck disable=SC1090
     . "$GITCHECK"
-    [ "$GIT_TESTED_FLOOR" = "2.30" ] \
-        && git_floor_ok "2.30" && git_floor_ok "2.30.0" && git_floor_ok "2.43.0" \
-        && git_floor_ok "2.55.0" && git_floor_ok "3.0.0" \
-        && ! git_floor_ok "2.29.9" && ! git_floor_ok "2.25.1" \
-        && ! git_floor_ok "garbage" && ! git_floor_ok ""
+    [ "$GIT_TESTED_FLOOR" = "2.30" ] &&
+        git_floor_ok "2.30" && git_floor_ok "2.30.0" && git_floor_ok "2.43.0" &&
+        git_floor_ok "2.55.0" && git_floor_ok "3.0.0" &&
+        ! git_floor_ok "2.29.9" && ! git_floor_ok "2.25.1" &&
+        ! git_floor_ok "garbage" && ! git_floor_ok ""
 ); then
     pass "issue #118: git_floor_ok boundary behavior (floor 2.30, major bump, garbage)"
 else
@@ -185,20 +195,33 @@ fi
 # (A structural "no exit" grep cannot work here: the awk floor compare
 # legitimately contains awk-internal exit statements.)
 mkdir -p "$TMPDIR/fakebin"
-printf '%s\n' '#!/bin/sh' 'echo "git version 2.25.1"' > "$TMPDIR/fakebin/git"
+printf '%s\n' '#!/bin/sh' 'echo "git version 2.25.1"' >"$TMPDIR/fakebin/git"
 chmod +x "$TMPDIR/fakebin/git"
 if (
-    _warns=0; _details=""; _kv=""; _kvc=""
-    ui_warn()   { _warns=$((_warns+1)); }
+    _warns=0
+    _details=""
+    _kv=""
+    _kvc=""
+    ui_warn() { _warns=$((_warns + 1)); }
     ui_detail() { _details="$_details|$1"; }
     # Row observation via the semantic helpers (issue #158 sweep):
     # git_status_row renders ui_kv_warn/ui_kv_ok — the stubs record the
     # severity by NAME, the way the summary counts it in production.
-    ui_kv()     { _kv="$_kv|$2"; _kvc="$_kvc|$3"; }
-    ui_kv_warn() { _kv="$_kv|$2"; _kvc="$_kvc|warn"; }
-    ui_kv_ok()  { _kv="$_kv|$2"; _kvc="$_kvc|ok"; }
+    ui_kv() {
+        _kv="$_kv|$2"
+        _kvc="$_kvc|$3"
+    }
+    ui_kv_warn() {
+        _kv="$_kv|$2"
+        _kvc="$_kvc|warn"
+    }
+    ui_kv_ok() {
+        _kv="$_kv|$2"
+        _kvc="$_kvc|ok"
+    }
     log() { :; }
-    UI_GREEN=""; UI_YELLOW="yellow"
+    UI_GREEN=""
+    UI_YELLOW="yellow"
     # shellcheck disable=SC1090
     . "$GITCHECK"
     _oldpath="$PATH"
@@ -210,10 +233,10 @@ if (
     _rc2=$?
     # restore BEFORE the assertions below — they need grep back
     PATH="$_oldpath"
-    [ "$_rc1" = "0" ] && [ "$_rc2" = "0" ] && [ "$_warns" = "2" ] \
-        && printf '%s' "$_details" | grep -q 'ppa:git-core/ppa' \
-        && printf '%s' "$_kv" | grep -q '2.25.1 — below the 2.30 tested floor' \
-        && printf '%s' "$_kvc" | grep -q 'warn'
+    [ "$_rc1" = "0" ] && [ "$_rc2" = "0" ] && [ "$_warns" = "2" ] &&
+        printf '%s' "$_details" | grep -q 'ppa:git-core/ppa' &&
+        printf '%s' "$_kv" | grep -q '2.25.1 — below the 2.30 tested floor' &&
+        printf '%s' "$_kvc" | grep -q 'warn'
 ); then
     pass "issue #118: git-check is warn-only — old git (2.25.1) + missing git both rc 0 and warn once"
 else
@@ -221,20 +244,20 @@ else
 fi
 
 # Wiring: all three call sites must use the shared helper.
-if grep -q 'kit_source.*sh/git-check.sh' "$INSTALL" \
-    && grep -q '^[[:space:]]*git_check_report$' "$INSTALL"; then
+if grep -q 'kit_source.*sh/git-check.sh' "$INSTALL" &&
+    grep -q '^[[:space:]]*git_check_report$' "$INSTALL"; then
     pass "issue #118: install.sh sources + calls git_check_report (pre-flight)"
 else
     fail "issue #118: install.sh git-check wiring missing"
 fi
-if grep -q 'sh/git-check.sh' "$UPDATE" \
-    && grep -q '^[[:space:]]*git_check_report$' "$UPDATE"; then
+if grep -q 'sh/git-check.sh' "$UPDATE" &&
+    grep -q '^[[:space:]]*git_check_report$' "$UPDATE"; then
     pass "issue #118: update.sh sources + calls git_check_report (banner phase)"
 else
     fail "issue #118: update.sh git-check wiring missing"
 fi
-if grep -q 'sh/git-check.sh' "$STATUS" \
-    && grep -q '^[[:space:]]*git_status_row$' "$STATUS"; then
+if grep -q 'sh/git-check.sh' "$STATUS" &&
+    grep -q '^[[:space:]]*git_status_row$' "$STATUS"; then
     pass "issue #118: status.sh sources + calls git_status_row (Core row)"
 else
     fail "issue #118: status.sh git-check wiring missing"
@@ -251,15 +274,15 @@ else
     fail "install.sh: default is git BLOCKED (SECURE_GIT_CONFIG=true)"
 fi
 
-if grep -q 'yes" \]; then SECURE_GIT_CONFIG=false' "$INSTALL" \
-   || grep -Eq '=\s*"yes"\s*\]\s*&&\s*SECURE_GIT_CONFIG=false' "$INSTALL"; then
+if grep -q 'yes" \]; then SECURE_GIT_CONFIG=false' "$INSTALL" ||
+    grep -Eq '=\s*"yes"\s*\]\s*&&\s*SECURE_GIT_CONFIG=false' "$INSTALL"; then
     pass "install.sh: Standard 'allow git' maps to SECURE_GIT_CONFIG=false"
 else
     fail "install.sh: Standard 'allow git' maps to SECURE_GIT_CONFIG=false"
 fi
 
-if grep -q 'ui_kv "Git".*blocked for the agent' "$INSTALL" \
-   && ! grep -q 'ui_kv "Git".*allowed (soft-only' "$INSTALL"; then
+if grep -q 'ui_kv "Git".*blocked for the agent' "$INSTALL" &&
+    ! grep -q 'ui_kv "Git".*allowed (soft-only' "$INSTALL"; then
     pass "install.sh: completion panel maps true=blocked / false=allowed"
 else
     fail "install.sh: completion panel maps true=blocked / false=allowed"
@@ -267,8 +290,8 @@ fi
 
 # The re-install path must back up + re-render the agent config with the
 # chosen git setting (never silently keep a stale one).
-if grep -q 'opencode.jsonc-existing' "$INSTALL" \
-   && grep -q 'config re-applied' "$INSTALL"; then
+if grep -q 'opencode.jsonc-existing' "$INSTALL" &&
+    grep -q 'config re-applied' "$INSTALL"; then
     pass "install.sh: re-install re-renders the agent config (backup kept)"
 else
     fail "install.sh: re-install re-renders the agent config (backup kept)"
@@ -277,8 +300,8 @@ fi
 # The config.sh toggle must have the same data-safety: back up an existing
 # agent config before the template overwrite (review 0.0.39a D1 / 0.0.39b D3).
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
-if grep -q '\.bak-' "$CONFIG" \
-   && grep -q 'previous config backed up' "$CONFIG"; then
+if grep -q '\.bak-' "$CONFIG" &&
+    grep -q 'previous config backed up' "$CONFIG"; then
     pass "config.sh: git-config toggle backs up the existing agent config"
 else
     fail "config.sh: git-config toggle backs up the existing agent config"
@@ -304,16 +327,16 @@ _gc_mark='(markers present, rules inactive)'
 # comments only (#244 h W6 residual).
 _gc_on_n=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_on" || true)
 _gc_off_n=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -cF "$_gc_off" || true)
-if grep -qF "$_gc_on" "$CONFIG" \
-   && grep -qF "$_gc_off" "$CONFIG" \
-   && [ "$_gc_on_n" -ge 2 ] \
-   && [ "$_gc_off_n" -ge 3 ] \
-   && grep -qF "$_gc_prot" "$STATUS" \
-   && grep -qF "$_gc_allow" "$STATUS" \
-   && grep -qF "$_gc_mark" "$CONFIG" \
-   && grep -qF "$_gc_mark" "$STATUS" \
-   && ! grep -qF '"ON  (' "$CONFIG" \
-   && ! grep -qF '"OFF  (' "$CONFIG"; then
+if grep -qF "$_gc_on" "$CONFIG" &&
+    grep -qF "$_gc_off" "$CONFIG" &&
+    [ "$_gc_on_n" -ge 2 ] &&
+    [ "$_gc_off_n" -ge 3 ] &&
+    grep -qF "$_gc_prot" "$STATUS" &&
+    grep -qF "$_gc_allow" "$STATUS" &&
+    grep -qF "$_gc_mark" "$CONFIG" &&
+    grep -qF "$_gc_mark" "$STATUS" &&
+    ! grep -qF '"ON  (' "$CONFIG" &&
+    ! grep -qF '"OFF  (' "$CONFIG"; then
     pass "issue #205: git-config rows read ON/OFF + protected/access allowed"
 else
     fail "issue #205: git-config rows drifted (on=$_gc_on_n off=$_gc_off_n \
@@ -338,28 +361,34 @@ fi
 ACRWORK="$TMPDIR/acr"
 mkdir -p "$ACRWORK"
 
-acr_out=$( . "$RENDER"
+acr_out=$(
+    . "$RENDER"
     if agent_config_render "$TEMPLATE" "$ACRWORK/on.jsonc" on 2>&1; then _acr_rc=0; else _acr_rc=$?; fi
-    echo "rc=$_acr_rc" )
+    echo "rc=$_acr_rc"
+)
 case "$acr_out" in *rc=0*) pass "render on: rc=0" ;; *) fail "render on: rc (got [$acr_out])" ;; esac
-grep -qE '^[[:space:]]*"\.git/config"' "$ACRWORK/on.jsonc" \
-    && pass "render on: .git/config deny rule active (uncommented)" \
-    || fail "render on: deny rule not active"
-grep -q '//SECURE_GIT' "$ACRWORK/on.jsonc" \
-    && fail "render on: leftover SECURE_GIT markers" \
-    || pass "render on: no leftover markers"
+grep -qE '^[[:space:]]*"\.git/config"' "$ACRWORK/on.jsonc" &&
+    pass "render on: .git/config deny rule active (uncommented)" ||
+    fail "render on: deny rule not active"
+grep -q '//SECURE_GIT' "$ACRWORK/on.jsonc" &&
+    fail "render on: leftover SECURE_GIT markers" ||
+    pass "render on: no leftover markers"
 
-acr_out=$( . "$RENDER"
+acr_out=$(
+    . "$RENDER"
     if agent_config_render "$TEMPLATE" "$ACRWORK/off.jsonc" off 2>&1; then _acr_rc=0; else _acr_rc=$?; fi
-    echo "rc=$_acr_rc" )
+    echo "rc=$_acr_rc"
+)
 case "$acr_out" in *rc=0*) pass "render off: rc=0" ;; *) fail "render off: rc (got [$acr_out])" ;; esac
-grep -qE '^[[:space:]]*"\.git/config"' "$ACRWORK/off.jsonc" \
-    && fail "render off: deny rule must be gone" \
-    || pass "render off: deny rule gone"
+grep -qE '^[[:space:]]*"\.git/config"' "$ACRWORK/off.jsonc" &&
+    fail "render off: deny rule must be gone" ||
+    pass "render off: deny rule gone"
 
-acr_out=$( . "$RENDER"
+acr_out=$(
+    . "$RENDER"
     if agent_config_render "$TEMPLATE" "$ACRWORK/bad.jsonc" maybe 2>&1; then _acr_rc=0; else _acr_rc=$?; fi
-    echo "rc=$_acr_rc" )
+    echo "rc=$_acr_rc"
+)
 case "$acr_out" in *rc=1*) pass "render: unknown mode rejected (rc=1)" ;; *) fail "render: unknown mode (got [$acr_out])" ;; esac
 [ ! -e "$ACRWORK/bad.jsonc" ] && pass "render: nothing written on rejection" || fail "render: file written on rejection"
 
@@ -367,9 +396,9 @@ case "$acr_out" in *rc=1*) pass "render: unknown mode rejected (rc=1)" ;; *) fai
 echo ""
 echo "===================================="
 # conf-user homes (0.0.44b W16): the git-config paths ride the conf user
-grep -q '"/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.jsonc"' "$CONFIG" \
-    && pass "git-config paths ride the conf user (V16)" \
-    || fail "git-config paths ride the conf user (V16)"
+grep -q '"/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.jsonc"' "$CONFIG" &&
+    pass "git-config paths ride the conf user (V16)" ||
+    fail "git-config paths ride the conf user (V16)"
 if grep -q '/home/opencode/' "$CONFIG"; then
     fail "config.sh carries no literal /home/opencode path (V16)"
 else

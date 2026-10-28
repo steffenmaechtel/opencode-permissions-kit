@@ -15,8 +15,14 @@ ans=$(ui_menu "How do you want to install?" "1" \
     "2|Advanced (control every step)" \
     "x|Abort")
 case "$ans" in
-    x*) ui_info "Aborted."; exit 0 ;;
-    2*) ui_info "Switching to Advanced — see tests/ux/example-install-advanced.sh for that flow."; exit 0 ;;
+    x*)
+        ui_info "Aborted."
+        exit 0
+        ;;
+    2*)
+        ui_info "Switching to Advanced — see tests/ux/example-install-advanced.sh for that flow."
+        exit 0
+        ;;
 esac
 
 # --- pre-flight inventory --------------------------------------------------------
@@ -46,13 +52,13 @@ ui_warn "/mnt/c is world-readable (mode 777)"
 
 ui_section "Inventory"
 
-ui_have  "WSL2 (Ubuntu 24.04)"              "present"
-ui_have  "curl / acl / ddev v1.25.2"        "present"
-ui_add   "user 'opencode' + sharing group"  "will be created"
-ui_add   "docker-rootless backend"          "will be provisioned"
-ui_add   "wrapper /usr/local/bin/opencode"  "will be installed"
-ui_add   "/mnt/c hardening snippet"         "printed (manual, applies after wsl --shutdown)"
-ui_atten "~/.opencode/bin/opencode"         "will be moved into the kit (backup kept)"
+ui_have "WSL2 (Ubuntu 24.04)" "present"
+ui_have "curl / acl / ddev v1.25.2" "present"
+ui_add "user 'opencode' + sharing group" "will be created"
+ui_add "docker-rootless backend" "will be provisioned"
+ui_add "wrapper /usr/local/bin/opencode" "will be installed"
+ui_add "/mnt/c hardening snippet" "printed (manual, applies after wsl --shutdown)"
+ui_atten "~/.opencode/bin/opencode" "will be moved into the kit (backup kept)"
 
 # --- the two Standard questions ---------------------------------------------------
 ui_section "Standard setup — 2 questions"
@@ -66,20 +72,26 @@ GIT=$(ui_menu "Allow opencode access to git commands?" "no" \
 # --- plan + confirm -----------------------------------------------------------------
 ui_section "Plan"
 
-ui_plan 1 "Create user 'opencode' + sharing group"      "(dev user 'dev' added)"
-ui_plan 2 "Provision docker-rootless for 'opencode'"    "(mandatory — aborts on failure)"
-ui_plan 3 "Group + setgid + default ACLs"               "on $PROJECT"
-ui_plan 4 "Secure the opencode binary + wrapper"        "root:opencode 750"
-ui_plan 5 "Print /mnt/c hardening snippet"             "manual — the kit never writes wsl.conf"
-ui_plan 6 "Lower ip_unprivileged_port_start to 80"      "ddev-router 80/443"
-ui_plan 7 "Deny-all config for your user"               "self-update bypass guard"
-ui_plan 8 "Deploy library, sudoers, audit log"          "/usr/local/lib/opencode-permissions-kit"
+ui_plan 1 "Create user 'opencode' + sharing group" "(dev user 'dev' added)"
+ui_plan 2 "Provision docker-rootless for 'opencode'" "(mandatory — aborts on failure)"
+ui_plan 3 "Group + setgid + default ACLs" "on $PROJECT"
+ui_plan 4 "Secure the opencode binary + wrapper" "root:opencode 750"
+ui_plan 5 "Print /mnt/c hardening snippet" "manual — the kit never writes wsl.conf"
+ui_plan 6 "Lower ip_unprivileged_port_start to 80" "ddev-router 80/443"
+ui_plan 7 "Deny-all config for your user" "self-update bypass guard"
+ui_plan 8 "Deploy library, sudoers, audit log" "/usr/local/lib/opencode-permissions-kit"
 
 echo ""
 ans=$(ui_menu "Proceed?" "C" "C|Confirm" "A|Switch to Advanced" "X|Abort")
 case "$ans" in
-    X*) ui_info "Aborted — nothing was changed."; exit 0 ;;
-    A*) ui_info "Switching to Advanced — see tests/ux/example-install-advanced.sh"; exit 0 ;;
+    X*)
+        ui_info "Aborted — nothing was changed."
+        exit 0
+        ;;
+    A*)
+        ui_info "Switching to Advanced — see tests/ux/example-install-advanced.sh"
+        exit 0
+        ;;
 esac
 
 # --- simulated run --------------------------------------------------------------------
@@ -108,19 +120,23 @@ ui_success "sysctl applied + persisted (/etc/sysctl.d/99-ddev-rootless.conf)"
 ui_info "Deploying library, sudoers, audit log..."
 sim 0.4
 ui_success "kit deployed to /usr/local/lib/opencode-permissions-kit"
-[ "$GIT" = "yes" ] && { ui_info "Enabling git access..."; sim 0.2; ui_success "git allowed ($GIT_NOTE)"; }
+[ "$GIT" = "yes" ] && {
+    ui_info "Enabling git access..."
+    sim 0.2
+    ui_success "git allowed ($GIT_NOTE)"
+}
 
 # --- completion panel -------------------------------------------------------------------
 ui_section "Installation complete"
 
-ui_kv "Version"   "v$VERSION"
-ui_kv "Backend"   "docker-rootless (rootless, owned by 'opencode')"
-ui_kv "Projects"  "$PROJECT"
-ui_kv "Git"       "$GIT_NOTE"
-ui_kv "Backup"    "/tmp/opencode-install-backup.XXXXXX"
+ui_kv "Version" "v$VERSION"
+ui_kv "Backend" "docker-rootless (rootless, owned by 'opencode')"
+ui_kv "Projects" "$PROJECT"
+ui_kv "Git" "$GIT_NOTE"
+ui_kv "Backup" "/tmp/opencode-install-backup.XXXXXX"
 echo ""
 ui_kv_warn "Terminal" "open a NEW terminal before running 'opencode'"
-ui_kv_warn "WSL2"     "run 'wsl --shutdown' from Windows to apply the /mnt/c fix"
+ui_kv_warn "WSL2" "run 'wsl --shutdown' from Windows to apply the /mnt/c fix"
 echo ""
 ui_info "Next:"
 ui_detail "opencode                      # start the agent (new terminal!)"

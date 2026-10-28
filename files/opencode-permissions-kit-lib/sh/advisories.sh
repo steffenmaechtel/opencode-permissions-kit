@@ -71,18 +71,33 @@ advisory_range_holds() {
         [ -n "$_arh_cmp" ] || continue
         _arh_op=eq
         case "$_arh_cmp" in
-            '>='*) _arh_op=ge; _arh_cmp=${_arh_cmp#>=} ;;
-            '<='*) _arh_op=le; _arh_cmp=${_arh_cmp#<=} ;;
-            '>'*)  _arh_op=gt; _arh_cmp=${_arh_cmp#>} ;;
-            '<'*)  _arh_op=lt; _arh_cmp=${_arh_cmp#<} ;;
-            '='*)  _arh_op=eq; _arh_cmp=${_arh_cmp#=} ;;
+            '>='*)
+                _arh_op=ge
+                _arh_cmp=${_arh_cmp#>=}
+                ;;
+            '<='*)
+                _arh_op=le
+                _arh_cmp=${_arh_cmp#<=}
+                ;;
+            '>'*)
+                _arh_op=gt
+                _arh_cmp=${_arh_cmp#>}
+                ;;
+            '<'*)
+                _arh_op=lt
+                _arh_cmp=${_arh_cmp#<}
+                ;;
+            '='*)
+                _arh_op=eq
+                _arh_cmp=${_arh_cmp#=}
+                ;;
         esac
         case "$_arh_cmp" in
-            ''|.*|*.|*[!0-9.]*) return 1 ;;
+            '' | .* | *. | *[!0-9.]*) return 1 ;;
         esac
         _arh_rel=$(advisories_version_cmp "$_arh_version" "$_arh_cmp")
         case "${_arh_op}_${_arh_rel}" in
-            ge_eq|ge_gt|le_eq|le_lt|gt_gt|lt_lt|eq_eq) ;;
+            ge_eq | ge_gt | le_eq | le_lt | gt_gt | lt_lt | eq_eq) ;;
             *) return 1 ;;
         esac
     done
@@ -98,7 +113,7 @@ advisories_matching() {
     _adv_pkg_want="$1" _adv_version="$2" _adv_channel_want="$3"
     while IFS= read -r _adv_line; do
         case "$_adv_line" in
-            ''|'#'*) continue ;;
+            '' | '#'*) continue ;;
         esac
         _adv_line=$(printf '%s' "$_adv_line" | sed 's/[[:space:]]*$//')
         [ -n "$_adv_line" ] || continue
@@ -122,7 +137,7 @@ advisories_ids() {
     _adv_ids_pkg="$1"
     while IFS= read -r _adv_line; do
         case "$_adv_line" in
-            ''|'#'*) continue ;;
+            '' | '#'*) continue ;;
         esac
         _adv_pkg=$(printf '%s' "$_adv_line" | cut -d'|' -f1)
         [ "$_adv_pkg" = "$_adv_ids_pkg" ] || continue

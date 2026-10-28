@@ -35,8 +35,8 @@ GIT_TESTED_FLOOR="2.30"
 # Never fails: every stage is || true-guarded, so callers running under
 # set -e (install/update) cannot trip over a missing git.
 git_probe_version() {
-    GIT_CHECK_VERSION="$(git --version 2>/dev/null \
-        | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+    GIT_CHECK_VERSION="$(git --version 2>/dev/null |
+        grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
 }
 
 # git_floor_ok <version> — rc 0 when <version> >= GIT_TESTED_FLOOR.
@@ -57,16 +57,16 @@ git_floor_ok() {
 # Never aborts — see the header for why there is no hard gate.
 git_check_report() {
     git_probe_version
-    command -v log >/dev/null 2>&1 \
-        && log "git check: version=${GIT_CHECK_VERSION:-none} floor=$GIT_TESTED_FLOOR"
+    command -v log >/dev/null 2>&1 &&
+        log "git check: version=${GIT_CHECK_VERSION:-none} floor=$GIT_TESTED_FLOOR"
     if [ -z "$GIT_CHECK_VERSION" ]; then
         ui_warn "git not found — the agent will not be able to work in repositories."
         ui_detail "install it: sudo apt install git"
         return 0
     fi
     if ! git_floor_ok "$GIT_CHECK_VERSION"; then
-        ui_warn "git $GIT_CHECK_VERSION found — the kit is tested with git >= $GIT_TESTED_FLOOR "\
-"(Debian 12 / Ubuntu 22.04 baseline)."
+        ui_warn "git $GIT_CHECK_VERSION found — the kit is tested with git >= $GIT_TESTED_FLOOR ""\
+(Debian 12 / Ubuntu 22.04 baseline)."
         ui_detail "newer git on Ubuntu: sudo add-apt-repository ppa:git-core/ppa && sudo apt update && sudo apt install git"
     fi
     return 0

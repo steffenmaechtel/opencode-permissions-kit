@@ -26,8 +26,14 @@ MAKEFILE="$SCRIPT_DIR/../../Makefile"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
     local desc="$1"
@@ -70,9 +76,9 @@ echo ""
 # --- 1. hostname list from config.yaml ---------------------------------------
 
 mkdir -p "$WORK/proj1/.ddev" "$WORK/proj2/.ddev" "$WORK/proj3/.ddev"
-printf 'name: base-typo3-modulset\nproject_tld: local\ntype: typo3\n' > "$WORK/proj1/.ddev/config.yaml"
-printf 'type: php\nadditional_hostnames:\n  - shop\n  - api\nadditional_fqdns:\n  - full.example.com\n  - "*.wild.io"\n' > "$WORK/proj2/.ddev/config.yaml"
-printf 'name: With_Upper_Case\ntype: php\n' > "$WORK/proj3/.ddev/config.yaml"
+printf 'name: base-typo3-modulset\nproject_tld: local\ntype: typo3\n' >"$WORK/proj1/.ddev/config.yaml"
+printf 'type: php\nadditional_hostnames:\n  - shop\n  - api\nadditional_fqdns:\n  - full.example.com\n  - "*.wild.io"\n' >"$WORK/proj2/.ddev/config.yaml"
+printf 'name: With_Upper_Case\ntype: php\n' >"$WORK/proj3/.ddev/config.yaml"
 
 assert_eq "list: name + custom project_tld" \
     "base-typo3-modulset.local" \
@@ -95,7 +101,7 @@ assert_eq "list: name lowercased (ddev uses ToLower)" \
 # renders the tail at column 0 (".localosts (win)", ".localdd:") and the
 # hosts-file grep never matches, so an added hostname stays "missing".
 mkdir -p "$WORK/projcrlf/.ddev"
-printf 'name: crlf-proj\r\nproject_tld: local\r\nadditional_hostnames:\r\n  - extra\r\nadditional_fqdns:\r\n  - full.example.com\r\n' > "$WORK/projcrlf/.ddev/config.yaml"
+printf 'name: crlf-proj\r\nproject_tld: local\r\nadditional_hostnames:\r\n  - extra\r\nadditional_fqdns:\r\n  - full.example.com\r\n' >"$WORK/projcrlf/.ddev/config.yaml"
 assert_eq "list: CRLF config.yaml yields clean hostnames (issue #46)" \
     "crlf-proj.local
 extra.local
@@ -109,7 +115,7 @@ fi
 
 # --- 2. missing check against the Windows hosts file --------------------------
 
-printf '127.0.0.1 localhost\n127.0.0.1 base-typo3-modulset.local other.local\n' > "$WORK/winhosts"
+printf '127.0.0.1 localhost\n127.0.0.1 base-typo3-modulset.local other.local\n' >"$WORK/winhosts"
 
 assert_eq "missing: present hostname not reported" "" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/proj1")"
@@ -127,7 +133,7 @@ assert_eq "missing: default-tld project fully silent (wildcard DNS)" "" \
 
 # Word-boundary safety: a longer hostname containing the checked one must
 # NOT count as present.
-printf '127.0.0.1 localhost\n127.0.0.1 xbase-typo3-modulset.localy\n' > "$WORK/winhosts2"
+printf '127.0.0.1 localhost\n127.0.0.1 xbase-typo3-modulset.localy\n' >"$WORK/winhosts2"
 assert_eq "missing: substring hosts do not satisfy the check" \
     "base-typo3-modulset.local" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts2" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/proj1")"
@@ -136,18 +142,18 @@ assert_eq "missing: substring hosts do not satisfy the check" \
 # LITERAL fields — the old grep -E interpolation never matched "[y]" (the
 # hostname was re-added forever) and let "+" false-match other names.
 mkdir -p "$WORK/projmeta/.ddev"
-printf 'type: php\nname: meta-proj\nproject_tld: test\nadditional_fqdns:\n  - weird[y]name.test\n  - plus+name.test\n' > "$WORK/projmeta/.ddev/config.yaml"
-printf '127.0.0.1 localhost meta-proj.test weird[y]name.test plus+name.test\n' > "$WORK/winhosts3"
+printf 'type: php\nname: meta-proj\nproject_tld: test\nadditional_fqdns:\n  - weird[y]name.test\n  - plus+name.test\n' >"$WORK/projmeta/.ddev/config.yaml"
+printf '127.0.0.1 localhost meta-proj.test weird[y]name.test plus+name.test\n' >"$WORK/winhosts3"
 assert_eq "missing: metacharacter hostnames match literally (0.0.38 C22)" "" \
     "$(DDEV_WIN_HOSTS="$WORK/winhosts3" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/projmeta")"
 
 # issue #46 follow-up: a hostname parsed from a CRLF config.yaml must
 # match a cleanly added hosts entry (and a CRLF hosts file) — otherwise
 # status reports it missing forever no matter how often the user adds it.
-printf '127.0.0.1 crlf-proj.local extra.local full.example.com\n' > "$WORK/winhostscrlf"
+printf '127.0.0.1 crlf-proj.local extra.local full.example.com\n' >"$WORK/winhostscrlf"
 assert_eq "missing: CRLF-parsed hostnames match clean hosts entries (issue #46)" "" \
     "$(DDEV_WIN_HOSTS="$WORK/winhostscrlf" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/projcrlf")"
-printf '127.0.0.1 crlf-proj.local extra.local full.example.com\r\n' > "$WORK/winhostscrlf"
+printf '127.0.0.1 crlf-proj.local extra.local full.example.com\r\n' >"$WORK/winhostscrlf"
 assert_eq "missing: CRLF hosts entries still count as present (issue #46)" "" \
     "$(DDEV_WIN_HOSTS="$WORK/winhostscrlf" sh -c '. "$1" && ddev_hosts_missing "$2"' _ "$HOSTS" "$WORK/projcrlf")"
 
@@ -175,7 +181,7 @@ check_fail "add never writes the hosts file itself (no shell redirection)" \
 
 # Functional: ddev-hosts-add against a fake ddev on PATH records the calls.
 mkdir -p "$WORK/bin"
-cat > "$WORK/bin/ddev" <<'FAKE'
+cat >"$WORK/bin/ddev" <<'FAKE'
 #!/bin/sh
 echo "ddev:$*" >> "$DDEV_FAKE_LOG"
 exit 0
@@ -215,7 +221,7 @@ check "kit CLI refuses to run the bridge as root without a resolvable user" \
 # --- 5. ddev() hook: hint after start/restart -----------------------------------
 
 check "hook prints the missing-hostnames hint after start/restart" \
-    sh -c "grep -qE 'start\\|restart\\) _opk_hosts_hint' \"\$1\"" _ "$FUNC"
+    sh -c "grep -qF 'start | restart) _opk_hosts_hint' \"\$1\"" _ "$FUNC"
 check "hook hint shows the ready-made add command" \
     sh -c "grep -q 'ddev-hosts-add' \"\$1\"" _ "$FUNC"
 check "hook stays silent without a project in the cwd" \
@@ -262,7 +268,7 @@ check "ddev-hosts.sh is a sourced lib (git 100644, not executed by path)" \
 HOSTS_WORK=$(mktemp -d)
 HOSTS_STUB="$HOSTS_WORK/bin"
 mkdir -p "$HOSTS_STUB"
-printf '#!/bin/sh\necho "ddev $*" >> "$DDEV_CALLS"\n' > "$HOSTS_STUB/ddev"
+printf '#!/bin/sh\necho "ddev $*" >> "$DDEV_CALLS"\n' >"$HOSTS_STUB/ddev"
 chmod +x "$HOSTS_STUB/ddev"
 DDEV_CALLS="$HOSTS_WORK/calls"
 export DDEV_CALLS

@@ -63,7 +63,7 @@
 # OPK_INSTALL_CONF overrides the stamp path for tests.
 ddev_devowned_enabled() {
     case "${DDEV_DEV_OWNED:-}" in
-        true|TRUE|1|yes) return 0 ;;
+        true | TRUE | 1 | yes) return 0 ;;
     esac
     _dve_conf="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
     [ -f "$_dve_conf" ] && grep -qE '^DDEV_DEV_OWNED=(true|TRUE|1|yes)$' "$_dve_conf"
@@ -76,8 +76,8 @@ ddev_devowned_flagged() {
     [ -f "${1:-}/.ddev/config.yaml" ] || return 1
     # tr also strips \r: a Windows-edited config.yaml carries CRLF line
     # endings and "true\r" would miss the grep (issue #46 class of bugs).
-    sed -n 's/^disable_settings_management:[[:space:]]*//p' "$1/.ddev/config.yaml" \
-        | head -1 | tr -d ' \t\r"'"'" | grep -qx true
+    sed -n 's/^disable_settings_management:[[:space:]]*//p' "$1/.ddev/config.yaml" |
+        head -1 | tr -d ' \t\r"'"'" | grep -qx true
 }
 
 # ddev_devowned_flag <project-dir>: insert the top-level key into
@@ -95,8 +95,8 @@ ddev_devowned_flag() {
     # symlink at config.yaml must never be written through by the root
     # cat-rewrite below. A linked config is user structure: skip loudly.
     if [ -L "${1:-}/.ddev/config.yaml" ]; then
-        printf '%s\n' "  WARNING: ${1:-}/.ddev/config.yaml is a symlink — dev-owned flag NOT written"\
-" (links are never followed)" >&2
+        printf '%s\n' "  WARNING: ${1:-}/.ddev/config.yaml is a symlink — dev-owned flag NOT written""\
+ (links are never followed)" >&2
         return 0
     fi
     ddf_cfg="${1:-}/.ddev/config.yaml"
@@ -122,8 +122,8 @@ ddev_devowned_flag() {
     # but never lie and never go silent: each failed write announces
     # itself like the symlink gates above.
     ddf_tmp=$(mktemp "${ddf_cfg}.opk.XXXXXX") || {
-        printf '%s\n' "  WARNING: ${1:-}/.ddev not writable (mktemp failed) —"\
-" dev-owned flag NOT written" >&2
+        printf '%s\n' "  WARNING: ${1:-}/.ddev not writable (mktemp failed) —""\
+ dev-owned flag NOT written" >&2
         return 0
     }
     if awk -v opk_anchor="$ddf_anchor" '
@@ -157,9 +157,9 @@ ddev_devowned_flag() {
                 print "disable_settings_management: true"
             }
         }
-    ' "$ddf_cfg" > "$ddf_tmp"; then
+    ' "$ddf_cfg" >"$ddf_tmp"; then
         if [ ! -L "$ddf_tmp" ] && [ ! -L "$ddf_cfg" ]; then
-            if cat "$ddf_tmp" > "$ddf_cfg" 2>/dev/null; then
+            if cat "$ddf_tmp" >"$ddf_cfg" 2>/dev/null; then
                 if [ ! -L "$ddf_cfg" ]; then
                     chmod g+w "$ddf_cfg" 2>/dev/null || true
                 fi
@@ -177,16 +177,16 @@ ddev_devowned_flag() {
                 # and the fresh clone is typically unregistered —
                 # there the path-ful form is the only retry that
                 # reaches the project.
-                printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed"\
-" (config.yaml may be truncated; retry: sudo opk config handover \"${1:-}\" or"\
-" opk update --refresh)" >&2
+                printf '%s\n' "  WARNING: dev-owned flag write to $ddf_cfg failed""\
+ (config.yaml may be truncated; retry: sudo opk config handover \"${1:-}\" or""\
+ opk update --refresh)" >&2
             fi
         else
             # 0.0.39h F13: the exec-time recheck tripped (the config or its
             # temp turned into a symlink mid-write) — announce the skip like
             # the entry gate above does, instead of ending silently.
-            printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write"\
-" — dev-owned flag NOT written (links are never followed)" >&2
+            printf '%s\n' "  WARNING: $ddf_cfg (or its temp) changed to a symlink mid-write""\
+ — dev-owned flag NOT written (links are never followed)" >&2
         fi
     fi
     rm -f "$ddf_tmp"
@@ -232,7 +232,6 @@ ddev_reshare_needed() {
         ! -perm -g+w -user "$_drn_user" -print -quit 2>/dev/null)" ]
 }
 
-
 # Bump when the scan's semantics change (new prune rules, new targets) —
 # every install then re-scans once on the next update.
 DDEV_HANDOVER_STAMP_REV=1
@@ -248,7 +247,10 @@ ddev_handover_stamp_dir() {
 # handback target) is part of the shape too (0.0.40a F1): a DEFAULT_USER
 # re-base must invalidate, or pending handbacks would wait for --refresh.
 ddev_handover_stamp_valid() {
-    dhv_root="${1:-}"; dhv_user="${2:-}"; dhv_group="${3:-}"; dhv_dev="${4:-}"
+    dhv_root="${1:-}"
+    dhv_user="${2:-}"
+    dhv_group="${3:-}"
+    dhv_dev="${4:-}"
     [ -n "$dhv_root" ] || return 1
     dhv_file="$(ddev_handover_stamp_dir)/$(printf '%s' "$dhv_root" | cksum | cut -d' ' -f1).stamp"
     [ -f "$dhv_file" ] || return 1
@@ -261,13 +263,16 @@ ddev_handover_stamp_valid() {
 # completed full pass. Best-effort — callers run as root (plain writes
 # work); a failed write only costs one extra scan on the next update.
 ddev_handover_stamp_write() {
-    dhw_root="${1:-}"; dhw_user="${2:-}"; dhw_group="${3:-}"; dhw_dev="${4:-}"
+    dhw_root="${1:-}"
+    dhw_user="${2:-}"
+    dhw_group="${3:-}"
+    dhw_dev="${4:-}"
     [ -n "$dhw_root" ] || return 0
     if ddev_devowned_enabled; then dhw_mode=on; else dhw_mode=off; fi
     dhw_dir="$(ddev_handover_stamp_dir)"
     mkdir -p "$dhw_dir" 2>/dev/null || return 0
     printf '%s\n' "$dhw_root|$dhw_user|$dhw_group|$DDEV_HANDOVER_STAMP_REV|$dhw_mode|$dhw_dev" \
-        > "$dhw_dir/$(printf '%s' "$dhw_root" | cksum | cut -d' ' -f1).stamp" 2>/dev/null || true
+        >"$dhw_dir/$(printf '%s' "$dhw_root" | cksum | cut -d' ' -f1).stamp" 2>/dev/null || true
     return 0
 }
 
@@ -302,8 +307,8 @@ _ddev_tree_conforms() {
 # Fails (warns to stderr) on anything not a contained relative path.
 _ddev_docroot_sane() {
     case "$1" in
-        ""|".") return 0 ;;
-        /*|*..*|*[!A-Za-z0-9._/-]*)
+        "" | ".") return 0 ;;
+        /* | *..* | *[!A-Za-z0-9._/-]*)
             printf '%s\n' "  WARNING: ignoring docroot '$1' from .ddev/config.yaml — not a contained relative path" >&2
             return 1
             ;;
@@ -318,18 +323,18 @@ ddev_type_settings_dirs() {
     [ -n "$dts_proj" ] && [ -d "$dts_proj/.ddev" ] || return 0
     [ -f "$dts_proj/.ddev/config.yaml" ] || return 0
     dts_type=$(sed -n 's/^type:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
-    dts_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null \
-        | head -1 | tr -d " \t\r\"'")
+    dts_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dts_proj/.ddev/config.yaml" 2>/dev/null |
+        head -1 | tr -d " \t\r\"'")
     [ -n "$dts_docroot" ] || dts_docroot="."
     _ddev_docroot_sane "$dts_docroot" || dts_docroot="."
     case "$dts_type" in
         typo3)
             echo "config/system $dts_docroot/typo3conf typo3conf"
             ;;
-        drupal*|backdrop)
+        drupal* | backdrop)
             echo "$dts_docroot/sites/default"
             ;;
-        magento*|maho)
+        magento* | maho)
             echo "app/etc"
             ;;
         modx)
@@ -345,7 +350,8 @@ ddev_type_settings_dirs() {
 # this after sourcing (same pattern as ddev-migrate's
 # _ddev_migrate_run_as).
 _ddev_handover_run_as() {
-    _dhr_u="$1"; shift
+    _dhr_u="$1"
+    shift
     _dhr_h=$(getent passwd "$_dhr_u" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$_dhr_h" ] || return 1
     sudo -u "$_dhr_u" env HOME="$_dhr_h" "$@"
@@ -361,7 +367,10 @@ _ddev_handover_run_as() {
 # 1 = not needed (modern ddev or non-docker backend), 2 = wanted but
 # not possible (binary/version unknown or the call failed).
 ddev_rootless_bindmounts() {
-    drb_user="$1"; drb_backend="$2"; drb_ver="$3"; drb_bin="$4"
+    drb_user="$1"
+    drb_backend="$2"
+    drb_ver="$3"
+    drb_bin="$4"
     [ "$drb_backend" = "docker-rootless" ] || return 1
     [ -n "$drb_bin" ] && [ -x "$drb_bin" ] || return 2
     [ -n "$drb_ver" ] || return 2
@@ -429,8 +438,8 @@ ddev_handover_project_root() {
     [ -L "$dhq_proj" ] && return 0
     [ -f "$dhq_proj/.ddev/config.yaml" ] || return 0
     dhq_type=$(sed -n 's/^type:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null | head -1 | tr -d " \t\r\"'")
-    dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null \
-        | head -1 | tr -d " \t\r\"'")
+    dhq_docroot=$(sed -n 's/^docroot:[[:space:]]*//p' "$dhq_proj/.ddev/config.yaml" 2>/dev/null |
+        head -1 | tr -d " \t\r\"'")
     [ -n "$dhq_docroot" ] || dhq_docroot="."
     _ddev_docroot_sane "$dhq_docroot" || dhq_docroot="."
     case "$dhq_type" in
@@ -447,8 +456,8 @@ ddev_handover_project_root() {
                     if [ "$_dhq_ok" = true ]; then
                         echo "  project-root handback: $dhq_proj -> $dhq_dev (TYPO3 detected, ddev no longer targets the root)"
                     else
-                        echo "  warn: project-root handback incomplete for $dhq_proj"\
-" (chown/chmod errors — the next update rescans and heals)" >&2
+                        echo "  warn: project-root handback incomplete for $dhq_proj""\
+ (chown/chmod errors — the next update rescans and heals)" >&2
                     fi
                 fi
             else
@@ -458,12 +467,12 @@ ddev_handover_project_root() {
                 if [ "$_dhq_ok" = true ]; then
                     echo "  project-root handover: $dhq_proj -> $dhq_user (TYPO3 not yet installed, bootstrap needs root ownership)"
                 else
-                    echo "  warn: project-root handover incomplete for $dhq_proj"\
-" (chown/chmod errors — the next update rescans and heals)" >&2
+                    echo "  warn: project-root handover incomplete for $dhq_proj""\
+ (chown/chmod errors — the next update rescans and heals)" >&2
                 fi
             fi
             ;;
-        codeigniter|shopware6|symfony)
+        codeigniter | shopware6 | symfony)
             # Root-file types: the root IS the permanent chmod target
             # while unflagged (see function header). 2755 for the same
             # Perm() == 0755 no-op reason as the typo3 bootstrap.
@@ -474,8 +483,8 @@ ddev_handover_project_root() {
                 echo "  project-root handover: $dhq_proj -> $dhq_user ($dhq_type settings"
                 echo "  file lives at the root; the dev-owned flag hands it back)"
             else
-                echo "  warn: project-root handover incomplete for $dhq_proj"\
-" (chown/chmod errors — the next update rescans and heals)" >&2
+                echo "  warn: project-root handover incomplete for $dhq_proj""\
+ (chown/chmod errors — the next update rescans and heals)" >&2
             fi
             ;;
     esac
@@ -533,8 +542,8 @@ _ddev_components_sane() {
     if [ -z "$_dcs_root" ]; then
         # '/' normalized away (pr-00234 a W4): refuse loud like
         # _fsb_pass — never walk the whole filesystem silently.
-        printf '%s\n' "  warn: refusing scan root '$1' in the component walk —"\
-" the whole filesystem is never a scan root" >&2
+        printf '%s\n' "  warn: refusing scan root '$1' in the component walk —""\
+ the whole filesystem is never a scan root" >&2
         return 1
     fi
     case "$2" in
@@ -543,9 +552,14 @@ _ddev_components_sane() {
             _dcs_rest="${2#"${_dcs_root}"/}"
             while [ -n "$_dcs_rest" ]; do
                 case "$_dcs_rest" in
-                    */*) _dcs_pre="$_dcs_pre/${_dcs_rest%%/*}"
-                         _dcs_rest="${_dcs_rest#*/}" ;;
-                    *)   _dcs_pre="$2"; _dcs_rest="" ;;
+                    */*)
+                        _dcs_pre="$_dcs_pre/${_dcs_rest%%/*}"
+                        _dcs_rest="${_dcs_rest#*/}"
+                        ;;
+                    *)
+                        _dcs_pre="$2"
+                        _dcs_rest=""
+                        ;;
                 esac
                 [ -L "$_dcs_pre" ] && return 1
             done
@@ -607,8 +621,8 @@ ddev_handover_root() {
         # effect capped at opencode privilege) stays out of this gate's
         # scope.
         if ! _ddev_components_sane "$dhr_root" "$dhr_d"; then
-            printf '%s\n' "  warn: skipping .ddev handover for $dhr_d — a path"\
-" component (parent or operand) is a symlink (swapped mid-scan?)" >&2
+            printf '%s\n' "  warn: skipping .ddev handover for $dhr_d — a path""\
+ component (parent or operand) is a symlink (swapped mid-scan?)" >&2
             continue
         fi
         # Top-inode fast path (issue #112): skip the recursive pair when
@@ -647,8 +661,8 @@ ddev_handover_root() {
                 # Best-effort stays (root context, self-heals on the next
                 # rescan) but the line must not claim a completed
                 # handover (#211 a F14).
-                echo "  warn: .ddev handover incomplete for $dhr_d (chmod/chown errors —"\
-" the next update rescans and heals)" >&2
+                echo "  warn: .ddev handover incomplete for $dhr_d (chmod/chown errors —""\
+ the next update rescans and heals)" >&2
             fi
         fi
         dhr_p="$(dirname "$dhr_d")"
@@ -698,7 +712,7 @@ ddev_handover_project_back() {
         dhb_real_root="$(readlink -f "$dhb_proj" 2>/dev/null || printf '%s' "$dhb_proj")"
         dhb_real_dir="$(readlink -f "$dhb_proj/$dhb_d" 2>/dev/null || printf '%s' "$dhb_proj/$dhb_d")"
         case "$dhb_real_dir" in
-            "$dhb_real_root"|"$dhb_real_root"/*) ;;
+            "$dhb_real_root" | "$dhb_real_root"/*) ;;
             *)
                 echo "  WARNING: skipping settings dir '$dhb_d' — resolves outside the project (symlinked component?)" >&2
                 continue
@@ -723,8 +737,8 @@ ddev_handover_project_back() {
             if [ "$_dhb_ok" = true ]; then
                 echo "  dev-owned handback: $dhb_proj/$dhb_d -> $dhb_dev"
             else
-                echo "  warn: dev-owned handback incomplete for $dhb_proj/$dhb_d"\
-" (chown/chmod errors — the next update rescans and heals)" >&2
+                echo "  warn: dev-owned handback incomplete for $dhb_proj/$dhb_d""\
+ (chown/chmod errors — the next update rescans and heals)" >&2
             fi
         fi
     done
@@ -740,8 +754,8 @@ ddev_handover_project_back() {
         if [ "$_dhb_ok" = true ]; then
             echo "  dev-owned handback: $dhb_proj (root) -> $dhb_dev (2775)"
         else
-            echo "  warn: dev-owned handback incomplete for $dhb_proj (root inode"\
-" — chown/chmod errors, the next update rescans and heals)" >&2
+            echo "  warn: dev-owned handback incomplete for $dhb_proj (root inode""\
+ — chown/chmod errors, the next update rescans and heals)" >&2
         fi
     fi
     return 0
@@ -779,7 +793,7 @@ ddev_handover_project() {
         dhp_real_root="$(readlink -f "$dhp_proj" 2>/dev/null || printf '%s' "$dhp_proj")"
         dhp_real_dir="$(readlink -f "$dhp_proj/$dhp_d" 2>/dev/null || printf '%s' "$dhp_proj/$dhp_d")"
         case "$dhp_real_dir" in
-            "$dhp_real_root"|"$dhp_real_root"/*) ;;
+            "$dhp_real_root" | "$dhp_real_root"/*) ;;
             *)
                 echo "  WARNING: skipping settings dir '$dhp_d' — resolves outside the project (symlinked component?)" >&2
                 continue
@@ -802,8 +816,8 @@ ddev_handover_project() {
             if [ "$_dhp_ok" = true ]; then
                 echo "  ddev settings handover: $dhp_proj/$dhp_d -> $dhp_user"
             else
-                echo "  warn: ddev settings handover incomplete for $dhp_proj/$dhp_d"\
-" (chmod/chown errors — the next update rescans and heals)" >&2
+                echo "  warn: ddev settings handover incomplete for $dhp_proj/$dhp_d""\
+ (chmod/chown errors — the next update rescans and heals)" >&2
             fi
         fi
     done

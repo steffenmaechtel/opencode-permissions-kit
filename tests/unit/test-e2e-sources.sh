@@ -18,8 +18,14 @@ LIB="$(cd "$(dirname "$0")/../e2e" && pwd)/lib.sh"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
     local desc="$1"
@@ -103,8 +109,8 @@ NPMWORK="$(mktemp -d)"
 # set -e (no abort leak), but a SIGINT/SIGTERM between creation and the
 # inline rm leaked the scratch — the suite had no trap at all.
 trap 'rm -rf "${NPMWORK:-}"' EXIT INT TERM
-mkdir -p "$NPMWORK/bin" 
-cat > "$NPMWORK/bin/curl" <<'CURLEOF'
+mkdir -p "$NPMWORK/bin"
+cat >"$NPMWORK/bin/curl" <<'CURLEOF'
 #!/bin/sh
 # fake registry endpoint, switched by FAKE_CURL_MODE:
 #   ok   -> packument whose dist-tags.latest is 2.1.7
@@ -117,21 +123,21 @@ case "${FAKE_CURL_MODE:-ok}" in
 esac
 CURLEOF
 chmod +x "$NPMWORK/bin/curl"
-sed -n '/^npm_dist_latest() {/,/^}/p' "$LIB" > "$NPMWORK/fn.sh"
+sed -n '/^npm_dist_latest() {/,/^}/p' "$LIB" >"$NPMWORK/fn.sh"
 
 _npmres() {
     FAKE_CURL_MODE="$1" PATH="$NPMWORK/bin:$PATH" \
         sh -c '. "$1"; npm_dist_latest linux-x64' _ "$NPMWORK/fn.sh" 2>/dev/null
 }
 _npmout=$(_npmres ok)
-[ "$_npmout" = "2.1.7" ] && pass "npm_dist_latest: dist-tag latest resolves (2.1.7)" \
-    || fail "npm_dist_latest: dist-tag latest resolves (got: '$_npmout')"
+[ "$_npmout" = "2.1.7" ] && pass "npm_dist_latest: dist-tag latest resolves (2.1.7)" ||
+    fail "npm_dist_latest: dist-tag latest resolves (got: '$_npmout')"
 _npmout=$(_npmres junk)
-[ -z "$_npmout" ] && pass "npm_dist_latest: unparseable registry output -> empty (fallback premise)" \
-    || fail "npm_dist_latest: unparseable registry output -> empty (got: '$_npmout')"
+[ -z "$_npmout" ] && pass "npm_dist_latest: unparseable registry output -> empty (fallback premise)" ||
+    fail "npm_dist_latest: unparseable registry output -> empty (got: '$_npmout')"
 _npmout=$(_npmres down)
-[ -z "$_npmout" ] && pass "npm_dist_latest: unreachable registry -> empty (fallback premise)" \
-    || fail "npm_dist_latest: unreachable registry -> empty (got: '$_npmout')"
+[ -z "$_npmout" ] && pass "npm_dist_latest: unreachable registry -> empty (fallback premise)" ||
+    fail "npm_dist_latest: unreachable registry -> empty (got: '$_npmout')"
 rm -rf "$NPMWORK"
 
 # --- both fetch paths route through the shared helper -------------------------

@@ -79,9 +79,9 @@ command -v _tmp_track >/dev/null 2>&1 || _tmp_track() { :; }
 _bb_install_conf() {
     _bb_stage="$(dirname "$_bb_conf")/.wsl.conf.opk.$$"
     _tmp_track "$_bb_stage"
-    if ${OPK_WSL_SUDO-sudo} cp "$1" "$_bb_stage" \
-       && ${OPK_WSL_SUDO-sudo} chmod 644 "$_bb_stage" \
-       && ${OPK_WSL_SUDO-sudo} mv -f "$_bb_stage" "$_bb_conf"; then
+    if ${OPK_WSL_SUDO-sudo} cp "$1" "$_bb_stage" &&
+        ${OPK_WSL_SUDO-sudo} chmod 644 "$_bb_stage" &&
+        ${OPK_WSL_SUDO-sudo} mv -f "$_bb_stage" "$_bb_conf"; then
         return 0
     fi
     ${OPK_WSL_SUDO-sudo} rm -f "$_bb_stage" 2>/dev/null || true
@@ -123,7 +123,7 @@ browser_bridge_write_conf() {
             '# hardened /mnt/c. Do not edit -- `opk uninstall` removes this block.'
         printf '# ----------------------------------------------------------------------\rroot = %s/wsl\n' "$_bb_libdir"
         printf '# opencode permissions kit browser bridge -- end\n\n'
-    } > "$_bb_tmp"
+    } >"$_bb_tmp"
     if [ -f "$_bb_conf" ]; then
         # Strip a previous kit block (including its trailing blank line)
         # and the legacy 0.0.36 section (header through next header,
@@ -158,7 +158,7 @@ browser_bridge_write_conf() {
             }
             /^\[opencode-permissions-kit\]$/ { in_legacy = 1; next }
             { print }
-        ' "$_bb_conf" >> "$_bb_tmp"
+        ' "$_bb_conf" >>"$_bb_tmp"
     fi
     _bb_install_conf "$_bb_tmp"
     _bb_rc=$?
@@ -229,11 +229,11 @@ browser_bridge_strip_legacy() {
         }
         /^\[opencode-permissions-kit\]$/ { in_legacy = 1; next }
         { print }
-    ' "$_bb_conf" > "$_bb_tmp"
+    ' "$_bb_conf" >"$_bb_tmp"
     _bb_install_conf "$_bb_tmp"
     _bb_rc=$?
     rm -f "$_bb_tmp" 2>/dev/null || true
-    return "$_bb_rc"   # rc 1 = strip failed, not stripped (0.0.45c C4)
+    return "$_bb_rc" # rc 1 = strip failed, not stripped (0.0.45c C4)
 }
 
 # Deploy the stand-in tree and clean up kit-owned legacy wsl.conf content
@@ -247,8 +247,8 @@ browser_bridge_install() {
     _bb_files_root="$1"
     _bb_libdir="$2"
     browser_bridge_is_wsl || return 0
-    browser_bridge_deploy_tree "$_bb_files_root/opencode-permissions-kit-lib/bin/browser-bridge" "$_bb_libdir" \
-        || return 1
+    browser_bridge_deploy_tree "$_bb_files_root/opencode-permissions-kit-lib/bin/browser-bridge" "$_bb_libdir" ||
+        return 1
     browser_bridge_strip_legacy
 }
 
@@ -257,8 +257,8 @@ browser_bridge_install() {
 browser_bridge_remove() {
     _bb_libdir="$1"
     _bb_conf="${OPK_WSL_CONF-/etc/wsl.conf}"
-    if [ -f "$_bb_conf" ] && { grep -q '^# opencode permissions kit browser bridge -- begin$' "$_bb_conf" \
-            || grep -q '^\[opencode-permissions-kit\]$' "$_bb_conf"; }; then
+    if [ -f "$_bb_conf" ] && { grep -q '^# opencode permissions kit browser bridge -- begin$' "$_bb_conf" ||
+        grep -q '^\[opencode-permissions-kit\]$' "$_bb_conf"; }; then
         _bb_tmp="$(mktemp)"
         _tmp_track "$_bb_tmp"
         awk '
@@ -289,7 +289,7 @@ browser_bridge_remove() {
             }
             /^\[opencode-permissions-kit\]$/ { in_legacy = 1; next }
             { print }
-        ' "$_bb_conf" > "$_bb_tmp"
+        ' "$_bb_conf" >"$_bb_tmp"
         _bb_install_conf "$_bb_tmp"
         _bb_rc=$?
         rm -f "$_bb_tmp" 2>/dev/null || true

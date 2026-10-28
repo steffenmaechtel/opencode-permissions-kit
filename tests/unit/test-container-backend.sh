@@ -61,7 +61,7 @@ grep_absent() { ! grep "$@"; }
 # Mirror of the install.sh/update.sh sudoers render: substitute DEFAULT_USER.
 render_sudoers() {
     local template="$1" default_user="$2" out="$3"
-    sed -e "s/DEFAULT_USER/$default_user/g" "$template" > "$out"
+    sed -e "s/DEFAULT_USER/$default_user/g" "$template" >"$out"
 }
 
 # Mirror of the wrapper's container resolution. Given the backend, whether
@@ -72,7 +72,10 @@ render_sudoers() {
 #   none   -> no container tools this session
 resolve_backend() {
     local backend="$1" requested="$2" sock_host="$3" sock_exists="$4" podman_installed="$5"
-    [ "$requested" = true ] || { echo none; return; }
+    [ "$requested" = true ] || {
+        echo none
+        return
+    }
     case "$backend" in
         docker-rootless)
             if [ "$sock_exists" = yes ] && [ -n "$sock_host" ]; then echo host; else echo none; fi
@@ -123,9 +126,9 @@ echo ""
 echo "-- sudoers render --"
 OUT="$TMPDIR/sudoers"
 render_sudoers "$SUDOERS" dev "$OUT"
-check "render: substitutes DEFAULT_USER"       grep -Fq 'dev ALL=(opencode) NOPASSWD' "$OUT"
-check "render: no placeholder remains"         grep_absent -Fq 'DEFAULT_USER' "$OUT"
-check "render: keeps socket-check rule"        grep -Fq "socket-check *" "$OUT"
+check "render: substitutes DEFAULT_USER" grep -Fq 'dev ALL=(opencode) NOPASSWD' "$OUT"
+check "render: no placeholder remains" grep_absent -Fq 'DEFAULT_USER' "$OUT"
+check "render: keeps socket-check rule" grep -Fq "socket-check *" "$OUT"
 
 echo ""
 echo "-- wrapper dispatch (mirrored logic) --"
@@ -146,7 +149,7 @@ echo "-- wrapper static wiring --"
 check "wrapper normalizes backends to rootless-or-empty (no docker-group default)" \
     grep -Fq 'CONTAINER_BACKEND="${CONTAINER_BACKEND:-}"' "$WRAPPER"
 check "wrapper accepts docker-rootless/podman-rootless backends" \
-    grep -Fq 'docker-rootless|podman-rootless' "$WRAPPER"
+    grep -Fq 'docker-rootless | podman-rootless' "$WRAPPER"
 check "wrapper exports DOCKER_HOST for rootless" \
     grep -Fq 'export DOCKER_HOST="$CONTAINER_DOCKER_HOST"' "$WRAPPER"
 check "wrapper warns about unknown/missing backend instead of downgrading" \
@@ -161,8 +164,8 @@ check "wrapper warns when podman-rootless but podman not installed" \
 echo ""
 echo "-- wrapper rootless socket probe (socket-check.sh) --"
 SOCKCHECK="$REPO/files/opencode-permissions-kit-lib/bin/socket-check"
-check "socket-check exists"  [ -f "$SOCKCHECK" ]
-check "socket-check has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SOCKCHECK"
+check "socket-check exists" [ -f "$SOCKCHECK" ]
+check "socket-check has shebang" sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SOCKCHECK"
 check "socket-check only does test -S (no command execution)" \
     grep -Fq '[ -n "$sock" ] && [ -S "$sock" ]' "$SOCKCHECK"
 check "socket-check strips a unix:// prefix" \
@@ -191,7 +194,7 @@ check "install.sh records DDEV_VERSION in install.conf" \
 check "install.sh preserves an existing backend on re-install" \
     grep -Eq 'sed -n '"'"'s/\^CONTAINER_BACKEND=//p'"'"' /etc/opencode-permissions-kit/install.conf' "$INSTALL"
 check "install.sh validates --container-backend (rootless only)" \
-    grep -Fq 'docker-rootless|podman-rootless' "$INSTALL"
+    grep -Fq 'docker-rootless | podman-rootless' "$INSTALL"
 check "install.sh aborts on provisioning failure (no docker-group fallback)" \
     grep -Fq 'Container backend provisioning failed' "$INSTALL"
 check "install.sh fetches socket-check.sh" \
@@ -259,7 +262,7 @@ check "config.sh has container_backend_status" \
 check "config.sh has container_backend_apply" \
     grep -Fq 'container_backend_apply()' "$CONFIG"
 check "config.sh accepts only rootless backends" \
-    grep -Fq 'docker-rootless|podman-rootless' "$CONFIG"
+    grep -Fq 'docker-rootless | podman-rootless' "$CONFIG"
 check "config.sh has NO ddev-mode action" \
     grep_absent -Fq 'ddev-mode)' "$CONFIG"
 check "config.sh has NO ddev_mode_apply" \
@@ -281,7 +284,7 @@ check "status.sh has no migration-stamp section (legacy cleanup)" \
 echo ""
 echo "-- CI wiring (issue #123: exec bits live in the git index) --"
 git_mode() { git -C "$REPO" ls-files -s -- "$1" | cut -d' ' -f1; }
-check "test-unit.yml runs this test"   grep -Fq 'Run container backend tests' "$TEST_YML"
+check "test-unit.yml runs this test" grep -Fq 'Run container backend tests' "$TEST_YML"
 check "setup-container-backend is executed by path (git 100755)" \
     [ "$(git_mode files/opencode-permissions-kit-lib/bin/setup-container-backend)" = "100755" ]
 check "socket-check is executed by path (git 100755)" \
@@ -292,11 +295,11 @@ check "test-unit.yml has no test-migration.sh (removed)" \
 echo ""
 echo "-- setup-container-backend structure --"
 SETUP="$REPO/files/opencode-permissions-kit-lib/bin/setup-container-backend"
-check "setup-container-backend exists"  [ -f "$SETUP" ]
-check "setup has shebang"  sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SETUP"
-check "setup accepts rootless backends"        grep -Fq 'docker-rootless|podman-rootless' "$SETUP"
-check "setup installs uidmap + dbus"         grep -Fq 'apt_install uidmap' "$SETUP"
-check "setup auto-allocates subuid/subgid"   grep -Fq 'allocate_subuid_subgid' "$SETUP"
+check "setup-container-backend exists" [ -f "$SETUP" ]
+check "setup has shebang" sh -c 'test "$(head -1 "$1")" = "#!/bin/sh"' _ "$SETUP"
+check "setup accepts rootless backends" grep -Fq 'docker-rootless | podman-rootless' "$SETUP"
+check "setup installs uidmap + dbus" grep -Fq 'apt_install uidmap' "$SETUP"
+check "setup auto-allocates subuid/subgid" grep -Fq 'allocate_subuid_subgid' "$SETUP"
 check "setup allocates non-overlapping range" grep -Fq 'allocate_range' "$SETUP"
 check "setup enables linger for docker-rootless" grep -Fq 'enable_linger' "$SETUP"
 check "setup runs dockerd-rootless-setuptool.sh as opencode" grep -Fq 'dockerd-rootless-setuptool.sh' "$SETUP"
@@ -331,18 +334,24 @@ if [ -n "$_f10_fn" ]; then
     check "update_install_conf_backend extractable (#211 a F10)" true
     F10=$(mktemp -d)
     printf 'DEFAULT_USER=dev\nOPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock\nCONTAINER_BACKEND=docker-rootless\n' \
-        > "$F10/install.conf"
+        >"$F10/install.conf"
     _f10_run() {
         # $1..$3 = backend, docker_host, podman_socket — runs the REAL
         # function against $F10/install.conf with stubbed sudo/_tmp_track.
         (
             INSTALL_CONF="$F10/install.conf"
             _tmp_track() { :; }
-            die() { echo "die: $*"; exit 1; }
+            die() {
+                echo "die: $*"
+                exit 1
+            }
             sudo() {
                 case "$1" in
-                    tee) shift; tee "$@" ;;
-                    *)   "$@" ;;
+                    tee)
+                        shift
+                        tee "$@"
+                        ;;
+                    *) "$@" ;;
                 esac
             }
             eval "$_f10_fn"
@@ -350,8 +359,8 @@ if [ -n "$_f10_fn" ]; then
         )
     }
     _f10_run podman-rootless "" "unix:///run/user/1000/podman/podman.sock" >/dev/null 2>&1 || true
-    if grep -q '^OPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock$' "$F10/install.conf" \
-       && grep -q '^CONTAINER_BACKEND=podman-rootless$' "$F10/install.conf"; then
+    if grep -q '^OPENCODE_PODMAN_SOCKET=unix:///run/user/1000/podman/podman.sock$' "$F10/install.conf" &&
+        grep -q '^CONTAINER_BACKEND=podman-rootless$' "$F10/install.conf"; then
         check "hand-set podman socket survives the switch TO podman (#211 a F10)" true
     else
         check "hand-set podman socket survives the switch TO podman (#211 a F10)" false
@@ -385,19 +394,21 @@ if [ -n "$_f13_fn" ]; then
     check "enable_linger extractable (#211 a F13)" true
     F13=$(mktemp -d)
     mkdir -p "$F13/bin"
-    printf '#!/bin/sh\nexit 0\n' > "$F13/bin/loginctl"; chmod +x "$F13/bin/loginctl"
+    printf '#!/bin/sh\nexit 0\n' >"$F13/bin/loginctl"
+    chmod +x "$F13/bin/loginctl"
     _out=$(OPENCODE_USER=oc F13LOG="$F13/log" PATH="$F13/bin:$PATH" \
         sh -c 'log() { echo "$*" >> "$F13LOG"; }; eval "$1"; enable_linger' sh "$_f13_fn" 2>&1) || true
     case "$_out" in
         *"Linger enabled for oc"*) check "ok rc: success line (#211 a F13)" true ;;
         *) check "ok rc: success line (#211 a F13, got: $_out)" false ;;
     esac
-    printf '#!/bin/sh\nexit 1\n' > "$F13/bin/loginctl"
+    printf '#!/bin/sh\nexit 1\n' >"$F13/bin/loginctl"
     _out=$(OPENCODE_USER=oc F13LOG="$F13/log" PATH="$F13/bin:$PATH" \
         sh -c 'log() { echo "$*" >> "$F13LOG"; }; eval "$1"; enable_linger' sh "$_f13_fn" 2>&1) || true
     case "$_out" in
         *"WARN: could not enable linger"*"retry: loginctl enable-linger oc"*)
-            check "failed rc: warn + retry hint, no success line (#211 a F13)" true ;;
+            check "failed rc: warn + retry hint, no success line (#211 a F13)" true
+            ;;
         *) check "failed rc: warn + retry hint (got: $_out)" false ;;
     esac
     mkdir -p "$F13/emptybin"
@@ -408,9 +419,9 @@ if [ -n "$_f13_fn" ]; then
         "") check "no loginctl: block silent (#211 a F13)" true ;;
         *) check "no loginctl: block silent (got: $_out)" false ;;
     esac
-    grep -q 'linger enable FAILED for oc' "$F13/log" \
-        && check "failed rc logged (#211 a F13)" true \
-        || check "failed rc logged (#211 a F13)" false
+    grep -q 'linger enable FAILED for oc' "$F13/log" &&
+        check "failed rc logged (#211 a F13)" true ||
+        check "failed rc logged (#211 a F13)" false
     rm -rf "$F13"
 else
     check "enable_linger extractable (#211 a F13)" false
@@ -428,7 +439,7 @@ _f16_fn="$(sed -n '/^allocate_range() {/,/^}$/p' \
 if [ -n "$_f16_fn" ]; then
     check "allocate_range extractable (#211 a F16)" true
     F16=$(mktemp -d)
-    printf 'gooduser:100000:65536\njunk:12abc:100\nzeros:010:100\nalpha:abc:100\nzerocount:1000:09\noverflow:99999999999999999999:1\nu32max:9999999999:100\nzerostart:0:1000\n' > "$F16/subuid"
+    printf 'gooduser:100000:65536\njunk:12abc:100\nzeros:010:100\nalpha:abc:100\nzerocount:1000:09\noverflow:99999999999999999999:1\nu32max:9999999999:100\nzerostart:0:1000\n' >"$F16/subuid"
     _out=$(F16FILE="$F16/subuid" sh -c '
         log() { :; }
         eval "$1"
@@ -444,8 +455,8 @@ if [ -n "$_f16_fn" ]; then
     # — the length gate alone passed it. zerostart "0" is a GOOD line
     # (#211 c W10): accepted as an occupied empty range, so it must NOT
     # bump the malformed count — both sit in the fixture above.
-    if [ "${_f16_rc:-0}" -eq 0 ] && [ "$_f16_warn" = "1" ] && [ "$_f16_cnt" = "6" ] \
-       && [ "$_f16_alloc" = "1" ]; then
+    if [ "${_f16_rc:-0}" -eq 0 ] && [ "$_f16_warn" = "1" ] && [ "$_f16_cnt" = "6" ] &&
+        [ "$_f16_alloc" = "1" ]; then
         check "malformed lines warn+skip, allocation correct (#211 a F16; b W10: zero-count + overflow; c W9: u32 value cap; c W10: zero-start accepted)" true
     else
         check "malformed lines warn+skip, allocation correct (rc=${_f16_rc:-0} warns=$_f16_cnt alloc=$_f16_alloc out=$_out)" false

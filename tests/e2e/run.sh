@@ -53,7 +53,8 @@ E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSI
     if E 'test -x /home/dev/.opencode/bin/opencode'; then
         echo "  ${GREEN}OK${NC}  opencode binary already present"
     else
-        failures=1; passed=0
+        failures=1
+        passed=0
         echo ""
         echo "${RED}E2E aborted — cannot install opencode.${NC}"
         sudo rm -rf "$TMP_PROJECT"
@@ -380,7 +381,7 @@ echo "--- 4c. .ddev handover to the opencode user (ddev-working) ---"
 E 'mkdir -p /var/www/vhosts/test-project/.ddev /var/www/vhosts/test-project/config/system && touch /var/www/vhosts/test-project/.ddev/.webimageBuild && printf "type: typo3\n" > /var/www/vhosts/test-project/.ddev/config.yaml && echo "db_default" > /var/www/vhosts/test-project/config/system/settings.php'
 check "4c: planted .ddev is dev-owned before the handover" \
     E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "dev"'
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes refresh' && \
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes refresh' &&
     echo "  ${GREEN}OK${NC}  config.sh refresh completed"
 check "4c: .ddev handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/test-project/.ddev)" = "opencode"'
@@ -437,7 +438,7 @@ check "4c-2: the teammate-file git pull delivers lands for the developer" \
     E 'sudo -u dev sh -c "printf \"#!/bin/sh\\n\" > /var/www/vhosts/git94/.ddev/commands/web/arrived-command" && test -f /var/www/vhosts/git94/.ddev/commands/web/arrived-command'
 # No project in the cwd (ddev config global from $HOME): the heal must be
 # a silent no-op, not an error.
-E 'sudo -u dev -H bash -c "cd /home/dev && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev config global --no-bind-mounts" >/dev/null 2>&1' && \
+E 'sudo -u dev -H bash -c "cd /home/dev && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev config global --no-bind-mounts" >/dev/null 2>&1' &&
     echo "  ${GREEN}OK${NC}  heal is a silent no-op without a project in the cwd"
 E 'sudo rm -rf /var/www/vhosts/git94 /usr/local/bin/ddev'
 
@@ -453,7 +454,7 @@ check "4d: fresh clone root is dev-owned before the handover" \
     E 'test "$(stat -c %U /var/www/vhosts/fresh-clone)" = "dev"'
 check "4d: ddev() hook prints the bootstrap hint naming the handover command" \
     E 'sudo -u dev -H sh -c "cd /var/www/vhosts/fresh-clone && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev start" 2>&1 | grep -q "config handover \"/var/www/vhosts/fresh-clone\""'
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes handover /var/www/vhosts/fresh-clone' && \
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes handover /var/www/vhosts/fresh-clone' &&
     echo "  ${GREEN}OK${NC}  config.sh handover completed"
 check "4d: handover gives the bootstrap root to opencode (2755, chmod no-op)" \
     E 'test "$(stat -c %U /var/www/vhosts/fresh-clone)" = "opencode" && test "$(stat -c %a /var/www/vhosts/fresh-clone)" = "2755"'
@@ -488,7 +489,7 @@ check "4e: install.conf carries the mode stamp" \
 E 'sudo mkdir -p /var/www/vhosts/devowned-proj/.ddev /var/www/vhosts/devowned-proj/config/system && sudo chown -R dev:dev /var/www/vhosts/devowned-proj && printf "type: typo3\n" > /var/www/vhosts/devowned-proj/.ddev/config.yaml && chmod 2775 /var/www/vhosts/devowned-proj'
 check "4e: fresh clone root is dev-owned before the scan" \
     E 'test "$(stat -c %U /var/www/vhosts/devowned-proj)" = "dev"'
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes handover /var/www/vhosts/devowned-proj' && \
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes handover /var/www/vhosts/devowned-proj' &&
     echo "  ${GREEN}OK${NC}  config.sh handover (dev-owned) completed"
 check "4e: scan wrote disable_settings_management into .ddev/config.yaml" \
     E 'grep -qx "disable_settings_management: true" /var/www/vhosts/devowned-proj/.ddev/config.yaml'
@@ -647,13 +648,13 @@ E 'cat /etc/opencode-permissions-kit/projects.conf > /tmp/projects.conf.before'
 # We can't overwrite the bind-mounted VERSION reliably, so we copy update.sh + a
 # sentinel VERSION into a temp dir and run it from there.
 E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "9.9.9-sentinel" > /tmp/update-test/VERSION'
-E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes' && \
+E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes' &&
     echo "  ${GREEN}OK${NC}  update.sh completed without prompts"
 check "Wrapper still present after update" E 'test -x /usr/local/bin/opencode'
-check "config.sh still present"            E 'test -x /usr/local/lib/opencode-permissions-kit/management/config.sh'
-check "update.sh still present"            E 'test -x /usr/local/lib/opencode-permissions-kit/management/update.sh'
-check "install.conf still present"         E 'test -f /etc/opencode-permissions-kit/install.conf'
-check "projects.conf untouched"           E 'test -f /etc/opencode-permissions-kit/projects.conf'
+check "config.sh still present" E 'test -x /usr/local/lib/opencode-permissions-kit/management/config.sh'
+check "update.sh still present" E 'test -x /usr/local/lib/opencode-permissions-kit/management/update.sh'
+check "install.conf still present" E 'test -f /etc/opencode-permissions-kit/install.conf'
+check "projects.conf untouched" E 'test -f /etc/opencode-permissions-kit/projects.conf'
 check ".env still readable after update (soft-only)" \
     E 'sudo -u opencode test -r /var/www/vhosts/test-project/.env'
 check "opencode.jsonc byte-identical (sha256 unchanged)" \
@@ -682,7 +683,7 @@ E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service
 E 'rm -rf /tmp/update-test && mkdir -p /tmp/update-test/files && cp -r /home/dev/repo/files/* /tmp/update-test/files/ && echo "8.8.8-onlybinary" > /tmp/update-test/VERSION'
 E 'sudo sh -c "echo marker > /usr/local/lib/opencode-permissions-kit/.only-binary-marker"'
 E 'printf "#!/bin/sh\necho \"opencode version 9.9.9-onlybinary\"\n" > /tmp/stub-opencode && chmod +x /tmp/stub-opencode'
-E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes --only-binary --binary-path /tmp/stub-opencode' && \
+E 'sudo bash /tmp/update-test/files/opencode-permissions-kit-lib/management/update.sh --yes --only-binary --binary-path /tmp/stub-opencode' &&
     echo "  ${GREEN}OK${NC}  update.sh --only-binary completed"
 check "11b: binary replaced by the stub (--only-binary)" \
     E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 9.9.9-onlybinary"'
@@ -693,7 +694,7 @@ check "11b: install.conf version NOT re-stamped (still section 11's sentinel)" \
 # top-level shorthand (issue #24): kit CLI maps upgrade-opencode onto
 # update.sh --yes --only-binary, flags pass through
 E 'printf "#!/bin/sh\necho \"opencode version 7.7.7-shorthand\"\n" > /tmp/stub-opencode2 && chmod +x /tmp/stub-opencode2'
-E 'opk upgrade-opencode --binary-path /tmp/stub-opencode2' && \
+E 'opk upgrade-opencode --binary-path /tmp/stub-opencode2' &&
     echo "  ${GREEN}OK${NC}  kit CLI upgrade-opencode completed"
 check "11b: upgrade-opencode replaced the binary (shorthand works)" \
     E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1)" = "opencode version 7.7.7-shorthand"'
@@ -719,7 +720,7 @@ check "floor: abort names the re-install way out" \
 check "floor: library not re-deployed by the aborted run" \
     E 'test -x /usr/local/lib/opencode-permissions-kit/management/config.sh'
 E 'sudo mv /tmp/install.conf.floor-bak /etc/opencode-permissions-kit/install.conf'
-E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/update.sh --yes >/dev/null 2>&1' && \
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/update.sh --yes >/dev/null 2>&1' &&
     echo "  ${GREEN}OK${NC}  update succeeds again with a supported version"
 
 echo ""
@@ -728,11 +729,11 @@ echo "--- 11c. opencode binary upgrade (old -> new via update.sh --binary-path) 
 # the (cached) latest with update.sh --binary-path. This is the kit's upgrade
 # entry point — `opencode upgrade` cannot work behind the wrapper.
 E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true; sudo pkill -u opencode -f "serve --servic[e]" >/dev/null 2>&1 || true'
-E 'sudo cp /opencode-cache/opencode-'"$OLD_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode' && \
+E 'sudo cp /opencode-cache/opencode-'"$OLD_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode' &&
     echo "  ${GREEN}OK${NC}  system binary downgraded to $OLD_VERSION"
 check "downgrade: system binary is $OLD_VERSION" \
     E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version | sed "s/^opencode v//")" = "'"$OLD_VERSION"'"'
-E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/update.sh --yes --binary-path /opencode-cache/opencode-'"$OC_VERSION"'/opencode' && \
+E 'sudo bash /home/dev/repo/files/opencode-permissions-kit-lib/management/update.sh --yes --binary-path /opencode-cache/opencode-'"$OC_VERSION"'/opencode' &&
     echo "  ${GREEN}OK${NC}  update.sh --binary-path completed"
 check "upgrade: system binary is latest ($OC_VERSION)" \
     E 'test "$(sudo /usr/local/lib/opencode-permissions-kit/bin/opencode --version | sed "s/^opencode v//")" = "'"$OC_VERSION"'"'
@@ -756,7 +757,7 @@ case "$OC_VERSION" in
         echo "--- 11d. upgrade-opencode stays on the 2.x major (issue #99) ---"
         # --only-binary skips the kit self-fetch; the only download is the
         # binary itself (npm @opencode/cli-<target>, dist-tag latest).
-        E 'opk upgrade-opencode' && \
+        E 'opk upgrade-opencode' &&
             echo "  ${GREEN}OK${NC}  opk upgrade-opencode (live npm resolution) completed"
         check "11d: binary is still opencode 2.x after the upgrade" \
             E 'test "$(/usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 | sed "s/^opencode v//; s/\..*//")" = 2'
@@ -766,7 +767,7 @@ case "$OC_VERSION" in
             E 'test -L /home/opencode/.config/opencode/plugins/opencode-permissions-kit/tui.tsx'
         # restore the pinned binary so later sections stay deterministic
         E 'sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/opencode service stop >/dev/null 2>&1 || true; sudo pkill -u opencode -f "serve --servic[e]" >/dev/null 2>&1 || true'
-        E 'sudo cp /opencode-cache/opencode-'"$OC_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chown root:opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chmod 750 /usr/local/lib/opencode-permissions-kit/bin/opencode' && \
+        E 'sudo cp /opencode-cache/opencode-'"$OC_VERSION"'/opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chown root:opencode /usr/local/lib/opencode-permissions-kit/bin/opencode && sudo chmod 750 /usr/local/lib/opencode-permissions-kit/bin/opencode' &&
             echo "  ${GREEN}OK${NC}  pinned binary $OC_VERSION restored"
         ;;
 esac
@@ -775,11 +776,11 @@ echo ""
 echo "--- 12. config.sh adds a project non-interactively ---"
 # extra-project carries a dev-owned .ddev to prove the projects-add handover
 # (ddev always runs as the opencode user).
-E 'sudo mkdir -p /var/www/vhosts/extra-project' && \
-    E 'sudo touch /var/www/vhosts/extra-project/.env' && \
-    E 'sudo mkdir -p /var/www/vhosts/extra-project/.ddev /var/www/vhosts/extra-project/config/system && sudo touch /var/www/vhosts/extra-project/.ddev/.webimageBuild && sudo sh -c "printf \"type: typo3\\n\" > /var/www/vhosts/extra-project/.ddev/config.yaml" && sudo sh -c "echo db > /var/www/vhosts/extra-project/config/system/settings.php"' && \
+E 'sudo mkdir -p /var/www/vhosts/extra-project' &&
+    E 'sudo touch /var/www/vhosts/extra-project/.env' &&
+    E 'sudo mkdir -p /var/www/vhosts/extra-project/.ddev /var/www/vhosts/extra-project/config/system && sudo touch /var/www/vhosts/extra-project/.ddev/.webimageBuild && sudo sh -c "printf \"type: typo3\\n\" > /var/www/vhosts/extra-project/.ddev/config.yaml" && sudo sh -c "echo db > /var/www/vhosts/extra-project/config/system/settings.php"' &&
     E 'sudo chown -R dev:dev /var/www/vhosts/extra-project'
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes projects add /var/www/vhosts/extra-project' && \
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes projects add /var/www/vhosts/extra-project' &&
     echo "  ${GREEN}OK${NC}  config.sh add completed"
 check "extra-project in projects.conf" \
     E 'grep -q /var/www/vhosts/extra-project /etc/opencode-permissions-kit/projects.conf'
@@ -796,20 +797,20 @@ check "extra-project typo3 settings dir handed over" \
 
 echo ""
 echo "--- 12b. config.sh projects remove ---"
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes projects remove /var/www/vhosts/extra-project' && \
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes projects remove /var/www/vhosts/extra-project' &&
     echo "  ${GREEN}OK${NC}  config.sh remove completed"
 check "extra-project removed from projects.conf" \
     E '! grep -q /var/www/vhosts/extra-project /etc/opencode-permissions-kit/projects.conf'
 
 echo ""
 echo "--- 12c. config.sh git-config toggle (soft-only) ---"
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes git-config on' && \
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes git-config on' &&
     echo "  ${GREEN}OK${NC}  git-config on completed"
 check "git-config ON: .git/config deny rule active" \
     E 'sudo grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'
 check "git-config ON: status reports ON" \
     E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh git-config status 2>&1 | grep -q "ON"'
-E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes git-config off' && \
+E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/config.sh --yes git-config off' &&
     echo "  ${GREEN}OK${NC}  git-config off completed"
 check "git-config OFF: no active .git/config rule" \
     E '! sudo grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'
@@ -822,7 +823,7 @@ echo "--- 12c-2. install.sh re-run re-applies the git choice (re-install) ---"
 # that stale agent config: the default (git blocked) is re-rendered from the
 # template with the previous file backed up. Regression for the 2026-08-16
 # live-test bug where the choice was ignored on re-install.
-E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev' && \
+E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts --ddev-settings ddev' &&
     echo "  ${GREEN}OK${NC}  re-install completed"
 check "re-install: default git-block re-applied to the existing agent config" \
     E 'sudo grep -qE "^[[:space:]]*\"\.git/config\"" /home/opencode/.config/opencode/opencode.jsonc'
@@ -845,7 +846,7 @@ check "kit still operational after rejected installs" \
 
 echo ""
 echo "--- 12d. config.sh interactive menu (displays) ---"
-E 'sudo mkdir -p /var/www/vhosts/menu-project' && \
+E 'sudo mkdir -p /var/www/vhosts/menu-project' &&
     E 'sudo touch /var/www/vhosts/menu-project/.env'
 # The interactive menu uses read </dev/tty which blocks in a non-TTY
 # environment. We capture whatever output appears within 3 seconds before
@@ -867,25 +868,25 @@ echo ""
 echo "--- 12e. wrapper directory validation ---"
 # Valid CWD: the real interactive start prints the banner (issue #91 note:
 # --version/--help exec banner-free — see the 6c probe note).
-E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-valid.txt | { grep -q "SECURED BY opencode permissions kit" || true; }' && \
+E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-valid.txt | { grep -q "SECURED BY opencode permissions kit" || true; }' &&
     echo "  ${GREEN}OK${NC}  wrapper ran from valid CWD"
 check "wrapper: SECURED banner from valid CWD" \
     E 'grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-valid.txt'
 # Invalid CWD: wrapper should refuse
-E 'cd /tmp && /usr/local/bin/opencode 2>&1 | tee /tmp/wrapper-invalid.txt; test $? -ne 0' && \
+E 'cd /tmp && /usr/local/bin/opencode 2>&1 | tee /tmp/wrapper-invalid.txt; test $? -ne 0' &&
     echo "  ${GREEN}OK${NC}  wrapper refused from invalid CWD"
 check "wrapper: ERROR banner from invalid CWD" \
     E 'grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-invalid.txt'
 # issue #91: version/help answer from the real binary, banner-free, from ANY
 # directory (the official installer parses `opencode --version` verbatim and
 # probes it from $HOME mid-install).
-E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --version 2>&1 | tee /tmp/wrapper-version.txt' && \
+E 'cd /var/www/vhosts/test-project && /usr/local/bin/opencode --version 2>&1 | tee /tmp/wrapper-version.txt' &&
     echo "  ${GREEN}OK${NC}  wrapper answered --version from valid CWD"
 check "wrapper: --version banner-free from valid CWD (issue #91)" \
     E '! grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-version.txt'
 check "wrapper: --version output is non-empty" \
     E 'test -s /tmp/wrapper-version.txt'
-E 'cd /tmp && /usr/local/bin/opencode --version 2>&1 | tee /tmp/wrapper-version-invalid.txt' && \
+E 'cd /tmp && /usr/local/bin/opencode --version 2>&1 | tee /tmp/wrapper-version-invalid.txt' &&
     echo "  ${GREEN}OK${NC}  wrapper answered --version from invalid CWD"
 check "wrapper: --version works from invalid CWD without refusal (issue #91)" \
     E '! grep -q "ERROR: opencode cannot be started here" /tmp/wrapper-version-invalid.txt'
@@ -922,7 +923,7 @@ echo "--- 12e.2 wrapper serve mode (headless, third-party UIs like OpenChamber) 
 # project-dir refusal must not fire (OpenChamber often launches from $HOME).
 # timeout(1) kills the server after it came up; exit 124 = it ran headless
 # until then.
-E 'cd /tmp && timeout 20 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4199 > /tmp/wrapper-serve.out 2> /tmp/wrapper-serve.err; test $? -eq 124' && \
+E 'cd /tmp && timeout 20 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4199 > /tmp/wrapper-serve.out 2> /tmp/wrapper-serve.err; test $? -eq 124' &&
     echo "  ${GREEN}OK${NC}  wrapper serve ran headless from a non-project dir"
 check "wrapper serve: opencode server listening line on stdout" \
     E 'grep -q "server listening" /tmp/wrapper-serve.out'
@@ -930,7 +931,7 @@ check_fail "wrapper serve: no SECURED banner on stdout" \
     E 'grep -q "SECURED BY" /tmp/wrapper-serve.out'
 check_fail "wrapper serve: no Press-Enter prompt on stdout" \
     E 'grep -q "Press Enter" /tmp/wrapper-serve.out'
-E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4198 > /tmp/wrapper-serve2.out 2>/dev/null; test $? -eq 124' && \
+E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode serve --hostname 127.0.0.1 --port 4198 > /tmp/wrapper-serve2.out 2>/dev/null; test $? -eq 124' &&
     echo "  ${GREEN}OK${NC}  wrapper serve ran headless from a project dir"
 check "wrapper serve: listening line also from project dir" \
     E 'grep -q "server listening" /tmp/wrapper-serve2.out'
@@ -951,12 +952,12 @@ check_fail "wrapper run: no SECURED banner on stdout" \
 
 echo ""
 echo "--- 12f. uninstall.sh --dry-run (no-op) ---"
-E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes --dry-run' && \
+E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes --dry-run' &&
     echo "  ${GREEN}OK${NC}  uninstall --dry-run completed"
-check "dry-run: wrapper still exists"   E 'test -e /usr/local/bin/opencode'
-check "dry-run: library still exists"   E 'test -e /usr/local/lib/opencode-permissions-kit'
-check "dry-run: /etc/opencode-permissions-kit intact"  E 'test -e /etc/opencode-permissions-kit'
-check "dry-run: user still exists"      E 'id opencode'
+check "dry-run: wrapper still exists" E 'test -e /usr/local/bin/opencode'
+check "dry-run: library still exists" E 'test -e /usr/local/lib/opencode-permissions-kit'
+check "dry-run: /etc/opencode-permissions-kit intact" E 'test -e /etc/opencode-permissions-kit'
+check "dry-run: user still exists" E 'id opencode'
 
 echo ""
 echo "--- 12g. Audit log ---"
@@ -1089,7 +1090,7 @@ if [ "$_rootless_ok" = true ]; then
     }
 }
 EOF'
-    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-podman.txt | { grep -q "will run with" || true; }' && \
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-podman.txt | { grep -q "will run with" || true; }' &&
         echo "  ${GREEN}OK${NC}  wrapper podman auto-detection ran"
     check "12i: wrapper podman auto-detect: container tools advisory" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-podman.txt'
@@ -1112,7 +1113,7 @@ if [ "$_rootless_ok" = true ]; then
     E 'sudo cp /home/opencode/.config/opencode/opencode.jsonc /tmp/global-jsonc.bak'
     E 'sudo sed -i "s/\"docker \*\": \"deny\"/\"docker *\": \"allow\"/; s/\"ddev \*\": \"deny\"/\"ddev *\": \"allow\"/" /home/opencode/.config/opencode/opencode.jsonc'
     E 'sudo rm -f /var/www/vhosts/test-project/opencode.jsonc'
-    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-global.txt | { grep -q "will run with" || true; }' && \
+    E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-global.txt | { grep -q "will run with" || true; }' &&
         echo "  ${GREEN}OK${NC}  wrapper global-config detection ran"
     check "12i: global-config allow detected (banner)" \
         E 'grep -q "Container tools enabled by this project" /tmp/wrapper-global.txt'
@@ -1194,7 +1195,7 @@ check "12k: full report carries the alert verdict in its exit code (issue #158)"
     E 'opk status >/dev/null 2>&1; test $? -eq 1'
 check "12k: --short is exactly one line and exits 1 on alerts (issue #158)" \
     E 'opk status --short >/tmp/st-12k-short.log 2>&1; test $? -eq 1 && test "$(grep -c . /tmp/st-12k-short.log)" = 1'
-E 'sudo opk openchamber-secure --yes' && \
+E 'sudo opk openchamber-secure --yes' &&
     echo "  ${GREEN}OK${NC}  opk openchamber-secure completed"
 check "12k: policy pin written, pinning the kit wrapper" \
     E 'grep -q "\"opencodeBinary\": \"/usr/local/bin/opencode\"" /etc/openchamber/policy.json'
@@ -1289,21 +1290,21 @@ check "12l: restored binary renders no corrupt warn (#163)" \
 
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
-E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' && \
+E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' &&
     echo "  ${GREEN}OK${NC}  uninstall.sh completed"
-check_fail "Wrapper removed"          E 'test -e /usr/local/bin/opencode'
-check_fail "Library removed"          E 'test -e /usr/local/lib/opencode-permissions-kit'
-check_fail "Sudoers removed"          E 'test -e /etc/sudoers.d/opencode-permissions-kit'
-check_fail "/etc/opencode-permissions-kit removed"    E 'test -e /etc/opencode-permissions-kit'
-check_fail "Umask removed"            E 'test -e /etc/profile.d/opencode-permissions-kit-umask.sh'
-check_fail "opencode user removed"    E 'id opencode'
+check_fail "Wrapper removed" E 'test -e /usr/local/bin/opencode'
+check_fail "Library removed" E 'test -e /usr/local/lib/opencode-permissions-kit'
+check_fail "Sudoers removed" E 'test -e /etc/sudoers.d/opencode-permissions-kit'
+check_fail "/etc/opencode-permissions-kit removed" E 'test -e /etc/opencode-permissions-kit'
+check_fail "Umask removed" E 'test -e /etc/profile.d/opencode-permissions-kit-umask.sh'
+check_fail "opencode user removed" E 'id opencode'
 check_fail "opencode usergroup removed (died with the user)" E 'getent group opencode'
 check_fail "developer no longer in the opencode group" E 'id dev | grep -q opencode'
-check_fail "/run/opencode-permissions-kit removed"    E 'test -e /run/opencode-permissions-kit'
-check_fail "router-port sysctl file removed"          E 'test -e /etc/sysctl.d/99-ddev-rootless.conf'
+check_fail "/run/opencode-permissions-kit removed" E 'test -e /run/opencode-permissions-kit'
+check_fail "router-port sysctl file removed" E 'test -e /etc/sysctl.d/99-ddev-rootless.conf'
 check_fail "openchamber policy pin removed (issue #154)" E 'test -e /etc/openchamber/policy.json'
-check_fail "Project ACLs cleaned"     E 'getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode"'
-check_fail "Audit log removed"        E 'test -e /var/log/opencode-permissions-kit'
+check_fail "Project ACLs cleaned" E 'getfacl -p /var/www/vhosts/test-project/.env 2>/dev/null | grep -q "user:opencode"'
+check_fail "Audit log removed" E 'test -e /var/log/opencode-permissions-kit'
 
 # Issue #74: the kit handed .ddev/, the typo3 settings dir (and for
 # bootstrap projects the root) to the opencode user, and agent/ddev runs

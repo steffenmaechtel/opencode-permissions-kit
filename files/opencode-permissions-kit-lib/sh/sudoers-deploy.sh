@@ -43,7 +43,7 @@ sudoers_deploy() {
     _sd_template="$1"
     _sd_user="$2"
     case "$_sd_user" in
-        ''|*[!A-Za-z0-9_.-]*|ALL)
+        '' | *[!A-Za-z0-9_.-]* | ALL)
             # ALL (0.0.41f S3): renders VALID sudoers ("ALL ALL=(opencode)
             # NOPASSWD: …") that widens the grant to every local user —
             # no Unix account can carry that name, so reject it outright.
@@ -64,7 +64,7 @@ sudoers_deploy() {
     if command -v _tmp_track >/dev/null 2>&1; then
         _tmp_track "$_sd_tmp"
     fi
-    if ! sed -e "s/DEFAULT_USER/$_sd_user/g" "$_sd_template" > "$_sd_tmp"; then
+    if ! sed -e "s/DEFAULT_USER/$_sd_user/g" "$_sd_template" >"$_sd_tmp"; then
         rm -f "$_sd_tmp"
         echo "error: cannot render sudoers template: $_sd_template" >&2
         return 1
@@ -89,9 +89,9 @@ sudoers_deploy() {
         echo "error: cannot stage sudoers in $_sd_conf (user '$_sd_user')." >&2
         return 1
     fi
-    if ! _sd_sudo cp "$_sd_tmp" "$_sd_stage" \
-       || ! _sd_sudo chmod 440 "$_sd_stage" \
-       || ! _sd_sudo mv -f "$_sd_stage" "$_sd_conf/sudoers"; then
+    if ! _sd_sudo cp "$_sd_tmp" "$_sd_stage" ||
+        ! _sd_sudo chmod 440 "$_sd_stage" ||
+        ! _sd_sudo mv -f "$_sd_stage" "$_sd_conf/sudoers"; then
         rm -f "$_sd_tmp"
         _sd_sudo rm -f "$_sd_stage" 2>/dev/null || true
         echo "error: cannot install sudoers to $_sd_conf (user '$_sd_user')." >&2

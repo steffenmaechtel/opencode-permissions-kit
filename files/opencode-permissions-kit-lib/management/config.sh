@@ -50,19 +50,30 @@ LIBDIR="/usr/local/lib/opencode-permissions-kit"
 # config.sh working on an install whose library predates ui.sh.
 UI_LIB=""
 for _cand in "$SCRIPT_DIR/../sh/ui.sh" "$LIBDIR/sh/ui.sh"; do
-    if [ -f "$_cand" ]; then UI_LIB="$_cand"; break; fi
+    if [ -f "$_cand" ]; then
+        UI_LIB="$_cand"
+        break
+    fi
 done
 if [ -n "$UI_LIB" ]; then
     . "$UI_LIB"
 else
-    ui_info()    { echo "  info     $1"; }
+    ui_info() { echo "  info     $1"; }
     ui_success() { echo "  success  $1"; }
-    ui_warn()    { echo "  warn     $1"; }
-    ui_error()   { echo "  error     $1" >&2; }
-    ui_detail()  { echo "     $1"; }
-    ui_section() { echo ""; echo "  --- $1 ---"; echo ""; }
-    ui_banner()  { echo ""; echo "  opencode permissions kit  v${1:-}"; echo ""; }
-    ui_kv()      { printf '  %-14s %s\n' "$1" "$2"; }
+    ui_warn() { echo "  warn     $1"; }
+    ui_error() { echo "  error     $1" >&2; }
+    ui_detail() { echo "     $1"; }
+    ui_section() {
+        echo ""
+        echo "  --- $1 ---"
+        echo ""
+    }
+    ui_banner() {
+        echo ""
+        echo "  opencode permissions kit  v${1:-}"
+        echo ""
+    }
+    ui_kv() { printf '  %-14s %s\n' "$1" "$2"; }
     ui_kv_warn() { printf '  %-14s %s\n' "$1" "$2"; }
     # 0.0.45c C9: the body also calls ui_have/ui_atten (projects list)
     # and ui_confirm/ui_menu/ui_ask (interactive flows) — without these
@@ -70,16 +81,21 @@ else
     # at the first list. Output stubs print plain; the prompt stubs
     # fail loudly with a hint instead (a library this old cannot read
     # a tty) — non-interactive paths keep working.
-    ui_have()    { echo "  ok       $1  $2"; }
-    ui_atten()   { echo "  warn     $1  $2"; }
+    ui_have() { echo "  ok       $1  $2"; }
+    ui_atten() { echo "  warn     $1  $2"; }
     _ui_no_prompt() {
         echo "error: this prompt needs sh/ui.sh — library too old, re-deploy with 'sudo opk update'" >&2
         return 1
     }
     ui_confirm() { _ui_no_prompt; }
-    ui_menu()    { _ui_no_prompt; }
-    ui_ask()     { _ui_no_prompt; }
-    UI_GREEN=''; UI_RED=''; UI_YELLOW=''; UI_CYAN=''; UI_BLUE=''; UI_NC=''
+    ui_menu() { _ui_no_prompt; }
+    ui_ask() { _ui_no_prompt; }
+    UI_GREEN=''
+    UI_RED=''
+    UI_YELLOW=''
+    UI_CYAN=''
+    UI_BLUE=''
+    UI_NC=''
 fi
 PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
 
@@ -112,7 +128,7 @@ OPENCODE_USER="${OPENCODE_USER:-opencode}"
 # literal, loudly. The WARN echoes a sanitized form (pr-00263 a F9
 # class: a raw corrupted value can forge transcript lines).
 case "$OPENCODE_USER" in
-    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+    '' | *[!A-Za-z0-9_.-]* | [.-]* | *[.])
         _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
         echo "WARN: invalid OPENCODE_USER value in install.conf ('$_ou_bad') — falling back to 'opencode'" >&2
         OPENCODE_USER=opencode
@@ -139,10 +155,10 @@ ACTION=""
 SUB=""
 TARGETS=""
 
-for arg do
+for arg; do
     case "$arg" in
-        --yes|-y) YES=true ;;
-        projects|git-config|refresh|status|container-backend|handover|ddev-settings)
+        --yes | -y) YES=true ;;
+        projects | git-config | refresh | status | container-backend | handover | ddev-settings)
             [ -z "$ACTION" ] && ACTION="$arg" && continue
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             # `status` doubles as a read-only SUB once an action is set
@@ -156,14 +172,17 @@ for arg do
             [ "$arg" = "status" ] && [ -z "$SUB" ] && SUB="status" && continue
             TARGETS="$TARGETS $arg"
             ;;
-        on|off)  [ "$ACTION" = "git-config" ] && SUB="$arg"
-                 [ "$ACTION" = "ddev-settings" ] && SUB="$arg" ;;
-        docker-rootless|podman-rootless)
-            [ "$ACTION" = "container-backend" ] && SUB="$arg" ;;
-        list|add|remove)
+        on | off)
+            [ "$ACTION" = "git-config" ] && SUB="$arg"
+            [ "$ACTION" = "ddev-settings" ] && SUB="$arg"
+            ;;
+        docker-rootless | podman-rootless)
+            [ "$ACTION" = "container-backend" ] && SUB="$arg"
+            ;;
+        list | add | remove)
             [ "$ACTION" = "projects" ] && SUB="$arg" && continue
             ;;
-        *)  TARGETS="$TARGETS $arg" ;;
+        *) TARGETS="$TARGETS $arg" ;;
     esac
 done
 TARGETS="${TARGETS# }"
@@ -177,13 +196,14 @@ TARGETS="${TARGETS# }"
 case "$ACTION" in
     # projects add/remove and handover carry path targets (the header
     # documents `config.sh handover <path>`).
-    projects|handover) ;;
-    *)  # if/fi, not a bare `&& die` tail (0.0.41f C1): the empty-TARGETS
+    projects | handover) ;;
+    *) # if/fi, not a bare `&& die` tail (0.0.41f C1): the empty-TARGETS
         # case would exit 1 under set -e and abort config for every
         # legitimate no-argument invocation.
         if [ -n "$TARGETS" ]; then
             die "unknown or misplaced argument(s):$TARGETS — run 'opk config' for the menu"
-        fi ;;
+        fi
+        ;;
 esac
 # --- #211 a F11 gate end ---
 
@@ -191,7 +211,10 @@ banner() {
     ui_banner "${VERSION:-}" "config — change settings"
 }
 
-die() { ui_error "$*"; exit 1; }
+die() {
+    ui_error "$*"
+    exit 1
+}
 
 confirm() {
     # Convention: agent/conventions.md — default capital in the hint,
@@ -239,7 +262,10 @@ done
     # success.
     return 2
 }
-[ -n "$_handover" ] || { ddev_handover_stamp_valid() { return 1; }; ddev_handover_stamp_write() { :; }; }
+[ -n "$_handover" ] || {
+    ddev_handover_stamp_valid() { return 1; }
+    ddev_handover_stamp_write() { :; }
+}
 
 # Shared group-baseline helper with live progress (issue #14). Same
 # lookup order as ddev-handover.sh above.
@@ -264,8 +290,11 @@ for cand in "$SCRIPT_DIR/../sh/staged-write.sh" "$LIBDIR/sh/staged-write.sh"; do
         break
     fi
 done
-command -v staged_write >/dev/null 2>&1 \
-    || staged_write() { echo "error: staged_write unavailable (staged-write.sh missing)" >&2; return 1; }
+command -v staged_write >/dev/null 2>&1 ||
+    staged_write() {
+        echo "error: staged_write unavailable (staged-write.sh missing)" >&2
+        return 1
+    }
 
 # Shared sudoers pipeline (render + visudo validation + install): one
 # implementation for install.sh, config.sh and update.sh. Same lookup
@@ -276,8 +305,11 @@ for cand in "$SCRIPT_DIR/../sh/sudoers-deploy.sh" "$LIBDIR/sh/sudoers-deploy.sh"
         break
     fi
 done
-command -v sudoers_deploy >/dev/null 2>&1 \
-    || sudoers_deploy() { echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2; return 1; }
+command -v sudoers_deploy >/dev/null 2>&1 ||
+    sudoers_deploy() {
+        echo "error: sudoers_deploy unavailable (sudoers-deploy.sh missing)" >&2
+        return 1
+    }
 
 # Shared agent-config template render (the SECURE_GIT sed pair): one
 # implementation for config.sh's git-config toggle and install.sh's
@@ -288,8 +320,8 @@ for cand in "$SCRIPT_DIR/../sh/render-agent-config.sh" "$LIBDIR/sh/render-agent-
         break
     fi
 done
-command -v agent_config_render >/dev/null 2>&1 \
-    || agent_config_render() {
+command -v agent_config_render >/dev/null 2>&1 ||
+    agent_config_render() {
         echo "error: agent_config_render unavailable (render-agent-config.sh missing)" >&2
         return 1
     }
@@ -309,7 +341,7 @@ projects_list() {
         else
             ui_atten "[$num] $line" "missing"
         fi
-    done < "$PROJECTS_CONF"
+    done <"$PROJECTS_CONF"
     # if (not [ ] &&): a false short-circuit as the function's LAST
     # statement would make projects_list return 1 and kill the script
     # under set -e whenever roots ARE configured (fix-wave review).
@@ -332,11 +364,11 @@ project_path_sane() {
     if [ "$_pp" = "~" ]; then _pp="${PROJECT_TILDE_HOME:-$HOME}"; else case "$_pp" in
         "~/"*) _pp="${PROJECT_TILDE_HOME:-$HOME}${_pp#\~}" ;;
         "~"*) return 1 ;;
-    esac; fi
+    esac fi
     _PP_NORM="$_pp"
     case "$_pp" in
         /*) ;;
-        *)  return 1 ;;   # relative paths are error-prone in projects.conf
+        *) return 1 ;; # relative paths are error-prone in projects.conf
     esac
     case "$_pp" in
         # Dot/empty-segment forms, complete (0.0.45c S1): the old arms
@@ -345,16 +377,16 @@ project_path_sane() {
         # design) sent the root-side recursive group baseline over /,
         # /var or every home; a leading "//" resolved outside the
         # blocklist too. Same arms as bin/opk's handover form filter.
-        *..*|/./|*/./*|./*|*/.|*//*) return 1 ;;   # traversal / dot / empty segments
-        *[[:space:]]*) return 1 ;;        # storage format is line-based and
-                                         # space-free (0.0.39b C3)
+        *..* | /./ | */./* | ./* | */. | *//*) return 1 ;; # traversal / dot / empty segments
+        *[[:space:]]*) return 1 ;;                         # storage format is line-based and
+            # space-free (0.0.39b C3)
     esac
     case "$_pp" in
-        /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
-/media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
-/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/tmp/*|/var/tmp/*|\
-/usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
-/var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
+        / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
+            /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
+            /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
+            /usr | /usr/* | /var | /var/tmp | /var/cache | /var/cache/* | /var/lib | /var/lib/* | \
+            /var/log | /var/log/* | /var/mail | /var/mail/* | /var/spool | /var/spool/*)
             return 1
             ;;
     esac
@@ -364,8 +396,8 @@ project_path_sane() {
     # pr-00263 a F10: getent alongside the literal spelling — a relocated
     # agent home must refuse too (the uninstall.sh twin, opk pattern).
     _pp_agent_home="$(getent passwd "${OPENCODE_USER:-opencode}" 2>/dev/null | cut -d: -f6 || true)"
-    if [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] \
-       || { [ -n "$_pp_agent_home" ] && [ "$_pp" = "$_pp_agent_home" ]; }; then
+    if [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] ||
+        { [ -n "$_pp_agent_home" ] && [ "$_pp" = "$_pp_agent_home" ]; }; then
         return 1
     fi
     # The developer's whole home as a root is allowed but deserves a
@@ -395,7 +427,7 @@ projects_add() {
             ui_detail "exists: $p"
             continue
         fi
-        echo "$p" | sudo tee -a "$PROJECTS_CONF" > /dev/null
+        echo "$p" | sudo tee -a "$PROJECTS_CONF" >/dev/null
         # Apply the group baseline so the developer/agent share files
         # immediately — shared helper with live per-pass progress
         # (issue #14), .git included (issue #17). The agent user enables
@@ -415,7 +447,10 @@ projects_add() {
 
 projects_remove() {
     [ -z "$TARGETS" ] && die "Usage: config.sh projects remove <path...>"
-    [ -f "$PROJECTS_CONF" ] || { echo "No projects.conf — nothing to remove."; return; }
+    [ -f "$PROJECTS_CONF" ] || {
+        echo "No projects.conf — nothing to remove."
+        return
+    }
     for p in $TARGETS; do
         if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
         if ! grep -qxF "$p" "$PROJECTS_CONF"; then
@@ -444,9 +479,9 @@ projects_remove() {
         _pr_tmp="$PROJECTS_CONF.tmp.$$"
         _tmp_track "$_pr_tmp"
         if [ -n "$_pr_out" ]; then
-            printf '%s\n' "$_pr_out" | sudo tee "$_pr_tmp" > /dev/null
+            printf '%s\n' "$_pr_out" | sudo tee "$_pr_tmp" >/dev/null
         else
-            sudo tee "$_pr_tmp" > /dev/null < /dev/null
+            sudo tee "$_pr_tmp" >/dev/null </dev/null
         fi
         sudo mv "$_pr_tmp" "$PROJECTS_CONF"
         ui_success "removed $p"
@@ -461,15 +496,21 @@ git_config_file() {
     # a hand-edited conf with a custom agent user must find the real
     # config — same class the sibling sites fixed (F15/W2).
     for f in "/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.jsonc" \
-             "/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.json"; do
-        [ -f "$f" ] && { echo "$f"; return; }
+        "/home/${OPENCODE_USER:-opencode}/.config/opencode/opencode.json"; do
+        [ -f "$f" ] && {
+            echo "$f"
+            return
+        }
     done
     echo ""
 }
 
 git_config_status() {
     f="$(git_config_file)"
-    [ -z "$f" ] && { echo "No opencode config installed for $OPENCODE_USER."; return; }
+    [ -z "$f" ] && {
+        echo "No opencode config installed for $OPENCODE_USER."
+        return
+    }
     # ON  = .git/config deny rule is active (uncommented) in the config
     # OFF = rule absent or still a //SECURE_GIT comment
     # Wording (issue #205): the ON/OFF prefix stays — it mirrors the
@@ -500,8 +541,8 @@ git_config_apply() {
             break
         fi
     done
-    [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/../templates/opencode.jsonc"\
-", $LIBDIR/templates/opencode.jsonc"
+    [ -n "$template" ] || die "Template missing: tried $SCRIPT_DIR/../templates/opencode.jsonc""\
+, $LIBDIR/templates/opencode.jsonc"
 
     # Chain gate (review 0.0.39h F2): staged_write secures the destination
     # NAME only — a replaced PARENT (~/.config or ~/.config/opencode,
@@ -613,11 +654,14 @@ container_backend_status() {
 render_sudoers() {
     local template=""
     for cand in "$LIBDIR/templates/sudoers.template" "$SCRIPT_DIR/../templates/sudoers.template"; do
-        if [ -f "$cand" ]; then template="$cand"; break; fi
+        if [ -f "$cand" ]; then
+            template="$cand"
+            break
+        fi
     done
     [ -n "$template" ] || die "sudoers.template not found."
-    sudoers_deploy "$template" "$DEFAULT_USER" \
-        || die "sudoers re-deploy failed — nothing was re-deployed (user '$DEFAULT_USER')."
+    sudoers_deploy "$template" "$DEFAULT_USER" ||
+        die "sudoers re-deploy failed — nothing was re-deployed (user '$DEFAULT_USER')."
     ui_success "sudoers re-rendered + validated"
     log "sudoers re-rendered"
 }
@@ -650,7 +694,7 @@ update_install_conf_backend() {
         # the script mid-rewrite (docker_host is empty on podman backends)
         if [ -n "$docker_host" ]; then echo "OPENCODE_DOCKER_HOST=$docker_host"; fi
         if [ -n "$podman_socket" ]; then echo "OPENCODE_PODMAN_SOCKET=$podman_socket"; fi
-    } | sort -u | sudo tee "$_ucb_tmp" > /dev/null
+    } | sort -u | sudo tee "$_ucb_tmp" >/dev/null
     sudo chmod 644 "$_ucb_tmp"
     sudo mv -f "$_ucb_tmp" "$INSTALL_CONF"
 }
@@ -662,7 +706,10 @@ container_backend_apply() {
     # when running from a checkout — important during development / testing.
     local setup_script=""
     for cand in "$SCRIPT_DIR/../bin/setup-container-backend" "$LIBDIR/bin/setup-container-backend"; do
-        if [ -f "$cand" ]; then setup_script="$cand"; break; fi
+        if [ -f "$cand" ]; then
+            setup_script="$cand"
+            break
+        fi
     done
     [ -n "$setup_script" ] || die "setup-container-backend not found."
 
@@ -708,11 +755,14 @@ container_backend_apply() {
     if [ "$new_backend" = "docker-rootless" ]; then
         _cand_bin=""
         for _cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /usr/bin/ddev; do
-            [ -n "$_cand" ] && [ -x "$_cand" ] && { _cand_bin="$_cand"; break; }
+            [ -n "$_cand" ] && [ -x "$_cand" ] && {
+                _cand_bin="$_cand"
+                break
+            }
         done
         if [ -n "$_cand_bin" ]; then
-            _cand_ver=$("$_cand_bin" version 2>/dev/null \
-                | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)
+            _cand_ver=$("$_cand_bin" version 2>/dev/null |
+                grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)
             # if/else, not `case $?` after a bare call — config.sh runs
             # under set -e and "not needed" is rc=1.
             if ddev_rootless_bindmounts "$OPENCODE_USER" "$new_backend" "$_cand_ver" "$_cand_bin"; then
@@ -720,11 +770,13 @@ container_backend_apply() {
                 log "ddev no-bind-mounts set (backend switch, ddev=$_cand_ver)"
             else
                 case $? in
-                    2) ui_warn "could not set ddev's no-bind-mounts global — an old ddev (1.25.0-1.25.2) on"
-                       ui_warn "docker-rootless fails with 'bind mounts can't be used with Docker Rootless'. Fix:"
-                       ui_detail "sudo -u $OPENCODE_USER env HOME=/home/$OPENCODE_USER "\
-"ddev config global --no-bind-mounts"
-                       log "ddev no-bind-mounts setup failed (backend switch)" ;;
+                    2)
+                        ui_warn "could not set ddev's no-bind-mounts global — an old ddev (1.25.0-1.25.2) on"
+                        ui_warn "docker-rootless fails with 'bind mounts can't be used with Docker Rootless'. Fix:"
+                        ui_detail "sudo -u $OPENCODE_USER env HOME=/home/$OPENCODE_USER ""\
+ddev config global --no-bind-mounts"
+                        log "ddev no-bind-mounts setup failed (backend switch)"
+                        ;;
                 esac
             fi
         fi
@@ -748,7 +800,7 @@ refresh() {
             fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
             ddev_handover_stamp_write "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
-        done < "$PROJECTS_CONF"
+        done <"$PROJECTS_CONF"
     fi
     ui_success "group baseline refreshed."
     log "group baseline refresh requested"
@@ -814,7 +866,7 @@ update_install_conf_ddev_owned() {
     {
         if [ -n "$_udd_keep" ]; then printf '%s\n' "$_udd_keep"; fi
         echo "DDEV_DEV_OWNED=$value"
-    } | sort -u | sudo tee "$_udd_tmp" > /dev/null
+    } | sort -u | sudo tee "$_udd_tmp" >/dev/null
     sudo chmod 644 "$_udd_tmp"
     sudo mv -f "$_udd_tmp" "$INSTALL_CONF"
 }
@@ -862,12 +914,18 @@ menu() {
             1)
                 paths=$(ui_ask "Paths to add (space-separated)" "")
                 [ -z "$paths" ] && continue
-                ACTION=projects; SUB=add; TARGETS="$paths"; projects_add
+                ACTION=projects
+                SUB=add
+                TARGETS="$paths"
+                projects_add
                 ;;
             2)
                 paths=$(ui_ask "Path to remove" "")
                 [ -z "$paths" ] && continue
-                ACTION=projects; SUB=remove; TARGETS="$paths"; projects_remove
+                ACTION=projects
+                SUB=remove
+                TARGETS="$paths"
+                projects_remove
                 ;;
             3)
                 f="$(git_config_file)"
@@ -876,8 +934,8 @@ menu() {
                         git_config_apply off
                     fi
                 else
-                    if confirm "Enable .git/config hardening (soft-only)? "\
-"opencode tools will not touch .git/config."; then
+                    if confirm "Enable .git/config hardening (soft-only)? ""\
+opencode tools will not touch .git/config."; then
                         git_config_apply on
                     fi
                 fi
@@ -911,7 +969,10 @@ menu() {
                     *) ui_detail "cancelled." ;;
                 esac
                 ;;
-            q) ui_info "Bye."; exit 0 ;;
+            q)
+                ui_info "Bye."
+                exit 0
+                ;;
             *) ui_warn "Unknown selection." ;;
         esac
         echo ""
@@ -928,40 +989,78 @@ if [ -z "$ACTION" ]; then
 fi
 
 case "$ACTION" in
-    status)     banner; git_config_status; container_backend_status 2>/dev/null || true; echo ""; projects_list ;;
+    status)
+        banner
+        git_config_status
+        container_backend_status 2>/dev/null || true
+        echo ""
+        projects_list
+        ;;
     projects)
         case "$SUB" in
-            list)   banner; projects_list ;;
-            add)    banner; projects_add ;;
-            remove) banner; projects_remove ;;
-            *)      die "Usage: config.sh projects list|add|remove <path...>" ;;
+            list)
+                banner
+                projects_list
+                ;;
+            add)
+                banner
+                projects_add
+                ;;
+            remove)
+                banner
+                projects_remove
+                ;;
+            *) die "Usage: config.sh projects list|add|remove <path...>" ;;
         esac
         ;;
     git-config)
         case "$SUB" in
-            on|off) banner; git_config_apply "$SUB" ;;
-            status|"") banner; git_config_status ;;
-            *)      die "Usage: config.sh git-config on|off|status" ;;
+            on | off)
+                banner
+                git_config_apply "$SUB"
+                ;;
+            status | "")
+                banner
+                git_config_status
+                ;;
+            *) die "Usage: config.sh git-config on|off|status" ;;
         esac
         ;;
     container-backend)
         case "$SUB" in
-            docker-rootless|podman-rootless)
-                banner; container_backend_apply "$SUB" ;;
-            status|"") banner; container_backend_status ;;
-            *)      die "Usage: config.sh container-backend docker-rootless|podman-rootless|status" ;;
+            docker-rootless | podman-rootless)
+                banner
+                container_backend_apply "$SUB"
+                ;;
+            status | "")
+                banner
+                container_backend_status
+                ;;
+            *) die "Usage: config.sh container-backend docker-rootless|podman-rootless|status" ;;
         esac
         ;;
-    refresh)    banner; refresh ;;
-    handover)   banner; handover ;;
+    refresh)
+        banner
+        refresh
+        ;;
+    handover)
+        banner
+        handover
+        ;;
     ddev-settings)
         case "$SUB" in
-            on|off) banner; ddev_settings_apply "$SUB" ;;
-            status|"") banner; ddev_settings_status ;;
-            *)      die "Usage: config.sh ddev-settings on|off|status" ;;
+            on | off)
+                banner
+                ddev_settings_apply "$SUB"
+                ;;
+            status | "")
+                banner
+                ddev_settings_status
+                ;;
+            *) die "Usage: config.sh ddev-settings on|off|status" ;;
         esac
         ;;
-    *)          die "Unknown action: $ACTION" ;;
+    *) die "Unknown action: $ACTION" ;;
 esac
 
 ui_success "Done."

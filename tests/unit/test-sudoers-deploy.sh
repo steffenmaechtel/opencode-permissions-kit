@@ -28,11 +28,18 @@ TEMPLATE_SRC="$REPO/files/opencode-permissions-kit-lib/templates/sudoers.templat
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
-    _d="$1"; shift
+    _d="$1"
+    shift
     if "$@" >/dev/null 2>&1; then pass "$_d"; else fail "$_d"; fi
 }
 
@@ -46,7 +53,7 @@ mkdir -p "$SDD"
 # individual tests force the validation failure), accepts everything
 # else. Counts invocations so the tests can assert it RAN.
 VISUDO="$WORK/visudo"
-cat > "$VISUDO" <<'EOF'
+cat >"$VISUDO" <<'EOF'
 #!/bin/sh
 # test stub: visudo -c -f <file>
 [ "$1" = "-c" ] && [ "$2" = "-f" ] && [ $# -eq 3 ] || exit 2
@@ -55,8 +62,9 @@ if grep -q '^REJECT' "$3"; then exit 1; fi
 exit 0
 EOF
 chmod +x "$VISUDO"
-VISUDO_RUNS="$WORK/visudo-runs"; export VISUDO_RUNS
-: > "$VISUDO_RUNS"
+VISUDO_RUNS="$WORK/visudo-runs"
+export VISUDO_RUNS
+: >"$VISUDO_RUNS"
 
 # The template under test: same shape as the shipped one (DEFAULT_USER
 # placeholders). The shipped template is used as-is; a reject variant
@@ -77,7 +85,8 @@ _sd_out=$(
     export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
     # shellcheck disable=SC2030
     . "$LIB"
-    sudoers_deploy "$TPL" alice; echo "rc=$?"
+    sudoers_deploy "$TPL" alice
+    echo "rc=$?"
 )
 case "$_sd_out" in *rc=0*) pass "happy path: rc=0" ;; *) fail "happy path: rc (got [$_sd_out])" ;; esac
 check "happy path: CONFDIR/sudoers installed" test -f "$CONF/sudoers"
@@ -100,7 +109,8 @@ _sd_out=$(
     export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
     # shellcheck disable=SC2030
     . "$LIB"
-    sudoers_deploy "$TPL" alice; echo "rc=$?"
+    sudoers_deploy "$TPL" alice
+    echo "rc=$?"
 )
 check "legacy: pre-0.0.10 sudoers.d/opencode removed" test ! -e "$SDD/opencode"
 
@@ -112,7 +122,8 @@ _sd_out=$(
     export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
     # shellcheck disable=SC2030
     . "$LIB"
-    sudoers_deploy "$TPL" 'bad;name' ; echo "rc=$?"
+    sudoers_deploy "$TPL" 'bad;name'
+    echo "rc=$?"
 )
 case "$_sd_out" in *rc=1*) pass "charset: rc=1" ;; *) fail "charset: rc (got [$_sd_out])" ;; esac
 check "charset: nothing deployed" test ! -e "$CONF/sudoers"
@@ -121,7 +132,8 @@ _sd_out=$(
     export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
     # shellcheck disable=SC2030
     . "$LIB"
-    sudoers_deploy "$TPL" ""; echo "rc=$?"
+    sudoers_deploy "$TPL" ""
+    echo "rc=$?"
 )
 case "$_sd_out" in *rc=1*) pass "charset: empty user rejected" ;; *) fail "charset: empty user (got [$_sd_out])" ;; esac
 _sd_out=$(
@@ -129,7 +141,8 @@ _sd_out=$(
     export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
     # shellcheck disable=SC2030
     . "$LIB"
-    sudoers_deploy "$TPL" ALL; echo "rc=$?"
+    sudoers_deploy "$TPL" ALL
+    echo "rc=$?"
 )
 case "$_sd_out" in *rc=1*) pass "charset: ALL rejected (0.0.41f S3 — renders valid sudoers)" ;; *) fail "charset: ALL (got [$_sd_out])" ;; esac
 check "charset: ALL deploys nothing" test ! -e "$CONF/sudoers"
@@ -141,7 +154,8 @@ _sd_out=$(
     export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
     # shellcheck disable=SC2030
     . "$LIB"
-    sudoers_deploy "$WORK/does-not-exist" alice; echo "rc=$?"
+    sudoers_deploy "$WORK/does-not-exist" alice
+    echo "rc=$?"
 )
 case "$_sd_out" in *rc=1*) pass "missing template: rc=1" ;; *) fail "missing template: rc (got [$_sd_out])" ;; esac
 
@@ -150,13 +164,17 @@ case "$_sd_out" in *rc=1*) pass "missing template: rc=1" ;; *) fail "missing tem
 rm -rf "$CONF"
 rm -f "${SDD:?}/opencode-permissions-kit"
 TPL_BAD="$WORK/sudoers-bad.template"
-{ echo "REJECT"; cat "$TPL"; } > "$TPL_BAD"
+{
+    echo "REJECT"
+    cat "$TPL"
+} >"$TPL_BAD"
 _sd_out=$(
     sd_env
     export SD_SUDO SD_VISUDO SD_CONF_DIR SD_SUDOERS_D
     # shellcheck disable=SC2030
     . "$LIB"
-    sudoers_deploy "$TPL_BAD" alice 2>&1; echo "rc=$?"
+    sudoers_deploy "$TPL_BAD" alice 2>&1
+    echo "rc=$?"
 )
 case "$_sd_out" in *rc=1*) pass "visudo reject: rc=1" ;; *) fail "visudo reject: rc (got [$_sd_out])" ;; esac
 case "$_sd_out" in *"nothing was deployed"*) pass "visudo reject: loud message" ;; *) fail "visudo reject: message" ;; esac

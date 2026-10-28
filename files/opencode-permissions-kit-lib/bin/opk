@@ -34,14 +34,14 @@ if [ -f "$LIBDIR/sh/ui.sh" ]; then
 else
     # Minimal fallbacks: plain, colorless, same argument shapes — every
     # ui_* helper opk uses must exist even when the library is damaged.
-    ui_error()   { echo "  error    $1" >&2; }
-    ui_info()    { echo "  info     $1"; }
+    ui_error() { echo "  error    $1" >&2; }
+    ui_info() { echo "  info     $1"; }
     ui_success() { echo "  ok       $1"; }
-    ui_detail()  { echo "           $1"; }
+    ui_detail() { echo "           $1"; }
     ui_confirm() { # <question> <y|n default> — reads /dev/tty, fails closed
         printf '  %s ' "$1" >&2
-        case "$2" in y|Y) printf '[Y/n] ' >&2 ;; *) printf '[y/N] ' >&2 ;; esac
-        read -r _uic < /dev/tty 2>/dev/null || _uic=""
+        case "$2" in y | Y) printf '[Y/n] ' >&2 ;; *) printf '[y/N] ' >&2 ;; esac
+        read -r _uic </dev/tty 2>/dev/null || _uic=""
         # Lowercase BEFORE matching (issue #187 C): mixed-case answers
         # (Yes/No/yEs) used to miss the arms and silently become the
         # DEFAULT — an explicit No under a y default answered yes.
@@ -50,9 +50,9 @@ else
         # W2), anything else (EOF, garbage) falls back to the default.
         _uic="$(printf '%s' "$_uic" | tr '[:upper:]' '[:lower:]')"
         case "$_uic" in
-            y|yes) return 0 ;;
-            n|no)  return 1 ;;
-            *)     case "$2" in y|Y) return 0 ;; *) return 1 ;; esac ;;
+            y | yes) return 0 ;;
+            n | no) return 1 ;;
+            *) case "$2" in y | Y) return 0 ;; *) return 1 ;; esac ;;
         esac
     }
 fi
@@ -161,7 +161,7 @@ case "$cmd" in
     status)
         exec sh "$LIBDIR/management/status.sh" "$@"
         ;;
-    config|update)
+    config | update)
         if [ ! -f "$LIBDIR/management/$cmd.sh" ]; then
             ui_error "$LIBDIR/management/$cmd.sh not found — is the kit installed?"
             exit 1
@@ -195,7 +195,10 @@ case "$cmd" in
         for _oca in "$@"; do
             case "$_oca" in
                 --yes) OC_YES=true ;;
-                *) ui_error "unknown flag for openchamber-secure: $_oca (only --yes)"; exit 1 ;;
+                *)
+                    ui_error "unknown flag for openchamber-secure: $_oca (only --yes)"
+                    exit 1
+                    ;;
             esac
         done
         if [ "$(id -u)" -ne 0 ]; then
@@ -211,8 +214,8 @@ case "$cmd" in
         # 0.0.47a F1: this explicit command DOES replace divergent content
         # (that is its job) — but never silently: announce the replacement.
         _oc_expected='{ "opencodeBinary": "/usr/local/bin/opencode" }'
-        if [ -f /etc/openchamber/policy.json ] \
-            && [ "$(cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
+        if [ -f /etc/openchamber/policy.json ] &&
+            [ "$(cat /etc/openchamber/policy.json 2>/dev/null)" != "$_oc_expected" ]; then
             ui_info "existing /etc/openchamber/policy.json diverges from the kit pin — replacing it"
         fi
         mkdir -p /etc/openchamber
@@ -229,8 +232,12 @@ case "$cmd" in
         # (Deliberately an `|| { …; }` one-liner: the F17 pin's extract
         # ends at this block's first 8-space `fi` — a second one would
         # truncate it.)
-        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' > "$_ocp_tmp" \
-            || { rm -f "$_ocp_tmp"; ui_error "could not stage the policy pin (write to the temp failed)"; exit 1; }
+        printf '{ "opencodeBinary": "/usr/local/bin/opencode" }\n' >"$_ocp_tmp" ||
+            {
+                rm -f "$_ocp_tmp"
+                ui_error "could not stage the policy pin (write to the temp failed)"
+                exit 1
+            }
         chown root:root "$_ocp_tmp" 2>/dev/null || true
         # Failure path cleans the staged temp (#211 b W8): opk carries
         # no cleanup trap, and the pid suffix means a stranded
@@ -248,7 +255,7 @@ case "$cmd" in
         if grep -q '^OPENCHAMBER_POLICY=' "$INSTALL_CONF" 2>/dev/null; then
             sed -i 's/^OPENCHAMBER_POLICY=.*/OPENCHAMBER_POLICY=yes/' "$INSTALL_CONF"
         else
-            printf '\nOPENCHAMBER_POLICY=yes\n' >> "$INSTALL_CONF"
+            printf '\nOPENCHAMBER_POLICY=yes\n' >>"$INSTALL_CONF"
         fi
         # Leftover bypass files: inert under the policy, but removing them
         # now avoids the startup hang if the policy ever disappears.
@@ -278,11 +285,11 @@ case "$cmd" in
         echo ""
         ui_info "Leftover bypass files found (inert under the policy):"
         for _ocn in opencode opencode2; do
-            oc_bypass_bin "$_oc_home/.opencode/bin/$_ocn" \
-                && ui_detail "  $_oc_home/.opencode/bin/$_ocn"
+            oc_bypass_bin "$_oc_home/.opencode/bin/$_ocn" &&
+                ui_detail "  $_oc_home/.opencode/bin/$_ocn"
         done
-        grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null \
-            && ui_detail "  settings pin: \"opencodeBinary\" in $_oc_settings"
+        grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null &&
+            ui_detail "  settings pin: \"opencodeBinary\" in $_oc_settings"
         if [ "$OC_YES" != true ]; then
             if ! ui_confirm "Remove them now?" "y"; then
                 ui_detail "kept — 'sudo opk openchamber-secure' removes them later"
@@ -291,8 +298,8 @@ case "$cmd" in
             fi
         fi
         for _ocn in opencode opencode2; do
-            oc_bypass_bin "$_oc_home/.opencode/bin/$_ocn" \
-                && rm -f "$_oc_home/.opencode/bin/$_ocn"
+            oc_bypass_bin "$_oc_home/.opencode/bin/$_ocn" &&
+                rm -f "$_oc_home/.opencode/bin/$_ocn"
         done
         ui_success "bypass binaries removed (if present)"
         if grep -q '"opencodeBinary"' "$_oc_settings" 2>/dev/null; then
@@ -343,18 +350,21 @@ PYEOF
         # for sudo itself via sudo -v.
         exec sh "$LIBDIR/management/uninstall.sh" "$@"
         ;;
-    ddev-hosts-add|ddev-hosts-check)
+    ddev-hosts-add | ddev-hosts-check)
         # Windows hosts bridge: must run AS THE DEVELOPER (interop + the
         # Windows user's drvfs access), never as root/opencode. Sourced
         # lib, functions called inline — argument passing stays simple.
-        [ -f "$LIBDIR/sh/ddev-hosts.sh" ] \
-            || { ui_error "$LIBDIR/sh/ddev-hosts.sh not found — is the kit installed?"; exit 1; }
+        [ -f "$LIBDIR/sh/ddev-hosts.sh" ] ||
+            {
+                ui_error "$LIBDIR/sh/ddev-hosts.sh not found — is the kit installed?"
+                exit 1
+            }
         # shellcheck disable=SC1090
         . "$LIBDIR/sh/ddev-hosts.sh"
         if [ "$(id -u)" -eq 0 ]; then
             _kitsu=""
-            [ -f /etc/opencode-permissions-kit/install.conf ] \
-                && _kitsu=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode-permissions-kit/install.conf | tail -1)
+            [ -f /etc/opencode-permissions-kit/install.conf ] &&
+                _kitsu=$(sed -n 's/^DEFAULT_USER=//p' /etc/opencode-permissions-kit/install.conf | tail -1)
             [ -n "$_kitsu" ] || _kitsu="${SUDO_USER:-}"
             if [ -z "$_kitsu" ] || [ "$(id -u "$_kitsu" 2>/dev/null || echo 0)" = "0" ]; then
                 ui_error "cannot resolve the developer user — run as your user, not as root"
@@ -365,8 +375,11 @@ PYEOF
             # kit-owned, and the project path travels as an argument.
             case "$cmd" in
                 ddev-hosts-check) _kitfn=ddev_hosts_missing ;;
-                ddev-hosts-add)   _kitfn=ddev_hosts_add ;;
-                *)                ui_error "unknown command: $cmd"; exit 1 ;;
+                ddev-hosts-add) _kitfn=ddev_hosts_add ;;
+                *)
+                    ui_error "unknown command: $cmd"
+                    exit 1
+                    ;;
             esac
             # HOME via getent, not /home/<user> (0.0.43b W1): after this
             # re-exec ddev_hosts_add runs AS the developer, so its own
@@ -403,8 +416,11 @@ PYEOF
         # block (pure comments for WSL, issue #100); a legacy 0.0.36
         # section is cleaned up on the way, and only kit content is ever
         # removed or added. Auto-sudo like config/update.
-        [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] \
-            || { ui_error "$LIBDIR/sh/wsl-browser-bridge.sh not found — is the kit installed?"; exit 1; }
+        [ -f "$LIBDIR/sh/wsl-browser-bridge.sh" ] ||
+            {
+                ui_error "$LIBDIR/sh/wsl-browser-bridge.sh not found — is the kit installed?"
+                exit 1
+            }
         if [ "$(id -u)" -ne 0 ]; then
             exec sudo sh "$LIBDIR/bin/opk" "$cmd"
         fi
@@ -413,7 +429,10 @@ PYEOF
         export OPK_WSL_SUDO
         # shellcheck disable=SC1090
         . "$LIBDIR/sh/wsl-browser-bridge.sh"
-        browser_bridge_is_wsl || { ui_error "not WSL — the browser bridge is WSL-only"; exit 1; }
+        browser_bridge_is_wsl || {
+            ui_error "not WSL — the browser bridge is WSL-only"
+            exit 1
+        }
         # Redeploy the stand-in when the source is in the library; older
         # deploys (update before browser-bridge joined the library) may only
         # have the tree — fine, the carrier is the missing piece then.
@@ -466,15 +485,15 @@ PYEOF
         # Usage errors first: a wrong target must not be masked by a
         # missing install.conf (e.g. dev checkouts without an install).
         case "$_ho_target" in
-            me|opencode) ;;
-            *)        _ho_err "handover: unknown target '$_ho_target' (me or opencode)" ;;
+            me | opencode) ;;
+            *) _ho_err "handover: unknown target '$_ho_target' (me or opencode)" ;;
         esac
         [ -f "$INSTALL_CONF" ] || _ho_err "handover: $INSTALL_CONF not found — is the kit installed?"
         _ho_getconf() { sed -n "s/^$1=//p" "$INSTALL_CONF" 2>/dev/null | tail -1; }
         _ho_group=$(_ho_getconf OPENCODE_GROUP)
         [ -n "$_ho_group" ] || _ho_err "handover: install.conf has no OPENCODE_GROUP"
         case "$_ho_target" in
-            me)       _ho_user=$(_ho_getconf DEFAULT_USER) ;;
+            me) _ho_user=$(_ho_getconf DEFAULT_USER) ;;
             opencode) _ho_user=$(_ho_getconf OPENCODE_USER) ;;
         esac
         [ -n "$_ho_user" ] || _ho_err "handover: install.conf has no user for '$_ho_target'"
@@ -490,17 +509,18 @@ PYEOF
             # a legitimate ops action, and the baseline's reason to
             # refuse /tmp/* (project roots) does not apply here.
             case "$_ho_np" in
-                /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
-/media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
-/run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/tmp|/var/tmp/*|\
-/usr|/usr/*|/var|/var/tmp|/var/cache|/var/cache/*|/var/lib|/var/lib/*|\
-/var/log|/var/log/*|/var/mail|/var/mail/*|/var/spool|/var/spool/*)
-                    _ho_err "handover: refusing system path '$_ho_np'"\
-" — hand over project trees, not system (sub)paths" ;;
+                / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
+                    /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
+                    /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /var/tmp/* | \
+                    /usr | /usr/* | /var | /var/tmp | /var/cache | /var/cache/* | /var/lib | /var/lib/* | \
+                    /var/log | /var/log/* | /var/mail | /var/mail/* | /var/spool | /var/spool/*)
+                    _ho_err "handover: refusing system path '$_ho_np'""\
+ — hand over project trees, not system (sub)paths"
+                    ;;
             esac
             case "$_ho_np" in
-                /home/*) [ "$(dirname "$_ho_np")" = "/home" ] \
-                    && _ho_err "handover: refusing whole home directory '$_ho_np' — hand over subpaths" ;;
+                /home/*) [ "$(dirname "$_ho_np")" = "/home" ] &&
+                    _ho_err "handover: refusing whole home directory '$_ho_np' — hand over subpaths" ;;
             esac
             # Slash-terminated operands are symlink-gate-blind (0.0.44a
             # V2; dotdot final/mid components added 0.0.44b W3 — same
@@ -515,9 +535,10 @@ PYEOF
             # a form error, but "x/", "x/..", "a/../b" and "x/./y" into
             # a project tree are exactly the bypasses.
             case "$_ho_a" in
-                */|*/.|*//*|*/./*|*/..|*/../*)
-                    _ho_err "handover: '$_ho_a' carries a slash/dotdot path form — pass the path itself"\
-" (symlink gates cannot see through trailing slashes or .. components)" ;;
+                */ | */. | *//* | */./* | */.. | */../*)
+                    _ho_err "handover: '$_ho_a' carries a slash/dotdot path form — pass the path itself""\
+ (symlink gates cannot see through trailing slashes or .. components)"
+                    ;;
             esac
             [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
         done
@@ -592,9 +613,9 @@ PYEOF
             fi
             if [ "$_ho_target" = opencode ]; then
                 # dev->agent: group write while dev-owned, hand over last
-                if [ ! -L "$_ho_a" ] \
-                   && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null \
-                   && chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null; then
+                if [ ! -L "$_ho_a" ] &&
+                    find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null &&
+                    chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null; then
                     echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
                 else
                     ui_error "handover failed: $_ho_a"
@@ -603,9 +624,9 @@ PYEOF
             else
                 # agent->dev: re-own FIRST (no agent write path once
                 # every entry is dev's), then grant group write
-                if [ ! -L "$_ho_a" ] \
-                   && chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null \
-                   && find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null; then
+                if [ ! -L "$_ho_a" ] &&
+                    chown -R -h "$_ho_user:$_ho_group" "$_ho_a" 2>/dev/null &&
+                    find "$_ho_a" ! -type l -exec chmod g+w {} + 2>/dev/null; then
                     echo "  handover: $_ho_a -> $_ho_user:$_ho_group"
                 else
                     ui_error "handover failed: $_ho_a"
@@ -669,7 +690,7 @@ PYEOF
         # install.conf stamp as the usage header and status.sh report.
         echo "opk $VERSION"
         ;;
-    help|--help|-h)
+    help | --help | -h)
         usage
         ;;
     "")

@@ -85,23 +85,24 @@ _ddev_hosts_yaml_list() {
 ddev_hosts_list() {
     dhl_proj="${1:-}"
     [ -n "$dhl_proj" ] && [ -f "$dhl_proj/.ddev/config.yaml" ] || return 0
-    dhl_name=$(sed -n 's/^name:[[:space:]]*//p' "$dhl_proj/.ddev/config.yaml" 2>/dev/null \
-        | head -1 | tr -d '[:space:]"' | tr '[:upper:]' '[:lower:]')
+    dhl_name=$(sed -n 's/^name:[[:space:]]*//p' "$dhl_proj/.ddev/config.yaml" 2>/dev/null |
+        head -1 | tr -d '[:space:]"' | tr '[:upper:]' '[:lower:]')
     [ -n "$dhl_name" ] || dhl_name=$(basename "$dhl_proj" | tr '[:upper:]' '[:lower:]')
-    dhl_tld=$(sed -n 's/^project_tld:[[:space:]]*//p' "$dhl_proj/.ddev/config.yaml" 2>/dev/null \
-        | head -1 | tr -d '[:space:]"')
+    dhl_tld=$(sed -n 's/^project_tld:[[:space:]]*//p' "$dhl_proj/.ddev/config.yaml" 2>/dev/null |
+        head -1 | tr -d '[:space:]"')
     [ -n "$dhl_tld" ] || dhl_tld="ddev.site"
     # Collect via command substitution (single stream): nested
     # pipe-while subshells write interleaved and can RACE a downstream
     # `read` — the aggregate keeps the output deterministic.
     dhl_extra=$(
-        { _ddev_hosts_yaml_list "$dhl_proj/.ddev/config.yaml" additional_hostnames \
-            | while IFS= read -r dhl_h; do printf '%s.%s\n' "$dhl_h" "$dhl_tld"; done
-          _ddev_hosts_yaml_list "$dhl_proj/.ddev/config.yaml" additional_fqdns \
-            | while IFS= read -r dhl_f; do
-                case "$dhl_f" in *\**) continue ;; esac
-                printf '%s\n' "$dhl_f"
-              done
+        {
+            _ddev_hosts_yaml_list "$dhl_proj/.ddev/config.yaml" additional_hostnames |
+                while IFS= read -r dhl_h; do printf '%s.%s\n' "$dhl_h" "$dhl_tld"; done
+            _ddev_hosts_yaml_list "$dhl_proj/.ddev/config.yaml" additional_fqdns |
+                while IFS= read -r dhl_f; do
+                    case "$dhl_f" in *\**) continue ;; esac
+                    printf '%s\n' "$dhl_f"
+                done
         } | sort
     )
     printf '%s.%s\n' "$dhl_name" "$dhl_tld"
@@ -132,7 +133,7 @@ ddev_hosts_missing() {
         # being trusted on the way into argv and printed hints
         # (review 0.0.39a S5, fix-wave review).
         case "$dhmi_h" in
-            [!A-Za-z0-9]*|*[!A-Za-z0-9.-]*) continue ;;
+            [!A-Za-z0-9]* | *[!A-Za-z0-9.-]*) continue ;;
         esac
         case "$dhmi_h" in
             *.ddev.site) continue ;;
@@ -191,22 +192,34 @@ ddev_hosts_add() {
     dha_bin="$(command -v ddev 2>/dev/null || true)"
     [ -n "$dha_bin" ] || { [ -x /usr/local/bin/ddev ] && dha_bin=/usr/local/bin/ddev; }
     [ -n "$dha_bin" ] || { [ -x /usr/bin/ddev ] && dha_bin=/usr/bin/ddev; }
-    [ -n "$dha_bin" ] || { echo "ddev-hosts: ddev is not installed"; return 1; }
+    [ -n "$dha_bin" ] || {
+        echo "ddev-hosts: ddev is not installed"
+        return 1
+    }
 
     # Hostname mode: not an existing directory and no path separator; a
     # leading dash would reach `ddev hostname` as a flag (argv-passed and
     # quoted, runs as the dev user — 0.0.39g Q6, below the action bar).
     if [ ! -d "$dha_arg" ]; then
         case "$dha_arg" in
-            */*) echo "ddev-hosts: no ddev project in $dha_arg"; return 1 ;;
-            -*) echo "ddev-hosts: '$dha_arg' is not a hostname (leading dash)"; return 1 ;;
+            */*)
+                echo "ddev-hosts: no ddev project in $dha_arg"
+                return 1
+                ;;
+            -*)
+                echo "ddev-hosts: '$dha_arg' is not a hostname (leading dash)"
+                return 1
+                ;;
         esac
         echo "adding $dha_arg (Windows may ask for permission) ..."
         if [ -n "$dha_dev" ]; then
             sudo -u "$dha_dev" env HOME="$dha_dev_h" "$dha_bin" hostname "$dha_arg" 127.0.0.1
         else
             "$dha_bin" hostname "$dha_arg" 127.0.0.1
-        fi || { echo "  FAILED: $dha_arg — add it manually (see below)"; return 1; }
+        fi || {
+            echo "  FAILED: $dha_arg — add it manually (see below)"
+            return 1
+        }
         echo ""
         echo "  Windows hosts file: $DDEV_WIN_HOSTS"
         echo "  manual fallback (Windows PowerShell as admin):"
@@ -219,7 +232,10 @@ ddev_hosts_add() {
     fi
 
     dha_proj="$dha_arg"
-    [ -f "$dha_proj/.ddev/config.yaml" ] || { echo "ddev-hosts: no ddev project in $dha_proj"; return 1; }
+    [ -f "$dha_proj/.ddev/config.yaml" ] || {
+        echo "ddev-hosts: no ddev project in $dha_proj"
+        return 1
+    }
 
     dha_missing=$(ddev_hosts_missing "$dha_proj")
     if [ -z "$dha_missing" ]; then
@@ -238,11 +254,17 @@ ddev_hosts_add() {
         [ -n "$dha_h" ] || continue
         echo "adding $dha_h (Windows may ask for permission) ..."
         if [ -n "$dha_dev" ]; then
-            sudo -u "$dha_dev" env HOME="$dha_dev_h" "$dha_bin" hostname "$dha_h" 127.0.0.1 \
-                || { echo "  FAILED: $dha_h — add it manually (see below)"; dha_rc=1; }
+            sudo -u "$dha_dev" env HOME="$dha_dev_h" "$dha_bin" hostname "$dha_h" 127.0.0.1 ||
+                {
+                    echo "  FAILED: $dha_h — add it manually (see below)"
+                    dha_rc=1
+                }
         else
-            "$dha_bin" hostname "$dha_h" 127.0.0.1 \
-                || { echo "  FAILED: $dha_h — add it manually (see below)"; dha_rc=1; }
+            "$dha_bin" hostname "$dha_h" 127.0.0.1 ||
+                {
+                    echo "  FAILED: $dha_h — add it manually (see below)"
+                    dha_rc=1
+                }
         fi
     done <<DHA_LIST
 $dha_missing

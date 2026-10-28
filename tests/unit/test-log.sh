@@ -17,8 +17,14 @@ LOG_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/log.sh"
 
 failures=0
 passed=0
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 WORK="$(mktemp -d)"
 # widen to the WORK2 receiver + signal arms (#283)
@@ -33,7 +39,7 @@ run_lib() {
     _d="$1/log" _f="$1/log/kit.log" _k=5
     if [ "$#" -ge 3 ]; then _m="$2" _c="$3"; else _m=1048576 _c="$2"; fi
     LOG_DIR="$_d" LOG_FILE="$_f" LOG_MAX_BYTES="$_m" LOG_KEEP="$_k" \
-    sh -c '_d="$LOG_DIR" _f="$LOG_FILE" _m="$LOG_MAX_BYTES" _k="$LOG_KEEP"
+        sh -c '_d="$LOG_DIR" _f="$LOG_FILE" _m="$LOG_MAX_BYTES" _k="$LOG_KEEP"
         . "$1"
         LOG_DIR="$_d"; LOG_FILE="$_f"; LOG_MAX_BYTES="$_m"; LOG_KEEP="$_k"
         eval "$2"' x "$LOG_SH" "$_c"
@@ -61,10 +67,10 @@ else
 fi
 
 run_lib "$WORK" 'log "second"'
-if [ "$(wc -l < "$WORK/log/kit.log")" = "2" ]; then
+if [ "$(wc -l <"$WORK/log/kit.log")" = "2" ]; then
     pass "log() appends one line per event (idempotent init)"
 else
-    fail "log() appends one line per event (got $(wc -l < "$WORK/log/kit.log" 2>/dev/null || echo none) lines)"
+    fail "log() appends one line per event (got $(wc -l <"$WORK/log/kit.log" 2>/dev/null || echo none) lines)"
 fi
 
 # --- 2. line format: <ISO-timestamp> [<script>] <message> -----------------------
@@ -83,10 +89,10 @@ fi
 
 # --- 3. rotation: size threshold creates .1, chain capped at LOG_KEEP -----------
 
-run_lib "$WORK" 10 >/dev/null 2>&1 'log "big one"'
+run_lib "$WORK" 10 'log "big one"' >/dev/null 2>&1
 # the FIRST write creates a file already >= the tiny threshold (LOG_MAX_BYTES=10);
 # the SECOND write's log_rotate sees size >= 10 and moves the old content to .1
-run_lib "$WORK" 10 >/dev/null 2>&1 'log "overflow"'
+run_lib "$WORK" 10 'log "overflow"' >/dev/null 2>&1
 if [ -f "$WORK/log/kit.log.1" ] && grep -q "big one" "$WORK/log/kit.log.1"; then
     pass "rotation: oversized file moves to .1 with content intact"
 else
@@ -101,9 +107,9 @@ fi
 # Seed .1 .. .4, force one more rotation: the chain must reach .5 (keep
 # bound) and the freshest generation must be the previous .1.
 for i in 1 2 3 4; do
-    printf 'gen%s\n' "$i" > "$WORK/log/kit.log.$i"
+    printf 'gen%s\n' "$i" >"$WORK/log/kit.log.$i"
 done
-run_lib "$WORK" 10 >/dev/null 2>&1 'log "chain"'
+run_lib "$WORK" 10 'log "chain"' >/dev/null 2>&1
 if [ -f "$WORK/log/kit.log.5" ] && [ ! -f "$WORK/log/kit.log.6" ]; then
     pass "rotation: chain capped at LOG_KEEP=5 (no .6 escapes)"
 else
@@ -117,7 +123,7 @@ fi
 
 # Below the threshold: no rotation artifacts at all.
 WORK2="$(mktemp -d)"
-run_lib "$WORK2" 1048576 >/dev/null 2>&1 'log "small"'
+run_lib "$WORK2" 1048576 'log "small"' >/dev/null 2>&1
 if [ -f "$WORK2/log/kit.log" ] && [ ! -f "$WORK2/log/kit.log.1" ]; then
     pass "no rotation below the size threshold"
 else

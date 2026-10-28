@@ -1,0 +1,24 @@
+# Root editorconfig — no parent directory rules apply beyond the repo.
+root = true
+
+# Shell scripts: shfmt is the formatting authority (issue #255 stage 0a).
+# The gate (make lint) passes the same settings as explicit flags
+# (-ln dash -i 4 -ci); this file makes editors agree with the gate.
+# The dash variant first ships in 3.14.x (3.13.0 still rejects it) --
+# one reason the gate pins the exact shfmt version (Makefile
+# SHFMT_VERSION; formatting output also drifts between versions).
+# Deliberately NOT set: simplify, keep_padding, space_redirects,
+# binary_next_line, func_next_line. NOTE: brace alternation in section
+# patterns ([*.{sh}]) does NOT match under shfmt -- use plain globs.
+[*.sh]
+indent_style = space
+indent_size = 4
+shell_variant = dash
+switch_case_indent = true
+
+# Extensionless shipped scripts (bin/* carry #!/bin/sh, no .sh suffix).
+[files/opencode-permissions-kit-lib/bin/*]
+indent_style = space
+indent_size = 4
+shell_variant = dash
+switch_case_indent = true

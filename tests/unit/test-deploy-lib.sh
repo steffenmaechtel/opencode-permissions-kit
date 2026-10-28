@@ -24,11 +24,18 @@ LIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 failures=0
 passed=0
 
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 check() {
-    _d="$1"; shift
+    _d="$1"
+    shift
     if "$@" >/dev/null 2>&1; then pass "$_d"; else fail "$_d"; fi
 }
 
@@ -47,12 +54,13 @@ _dl_out=$(
     export DL_SUDO
     # shellcheck disable=SC2030
     . "$LIB"
-    lib_deploy "$REPO/files" "$LIBD" 2>&1; echo "rc=$?"
+    lib_deploy "$REPO/files" "$LIBD" 2>&1
+    echo "rc=$?"
 )
 case "$_dl_out" in *rc=0*) pass "happy: rc=0" ;; *) fail "happy: rc (got [$_dl_out])" ;; esac
 
-_manifest_n=$(sed -n "/<<'DL_MANIFEST'/,/^DL_MANIFEST\$/p" "$LIB" \
-    | sed -e '1d' -e '$d' | grep -v '^#' | awk 'NF' | wc -l)
+_manifest_n=$(sed -n "/<<'DL_MANIFEST'/,/^DL_MANIFEST\$/p" "$LIB" |
+    sed -e '1d' -e '$d' | grep -v '^#' | awk 'NF' | wc -l)
 _deployed_n=$(find "$LIBD" -type f | wc -l)
 if [ "$_deployed_n" = "$_manifest_n" ]; then
     pass "happy: all $_manifest_n manifest entries deployed"
@@ -80,7 +88,8 @@ _dl_out=$(
     export DL_SUDO
     # shellcheck disable=SC2030
     . "$LIB"
-    lib_deploy "$WORK" "$WORK/lib2" 2>&1; echo "rc=$?"
+    lib_deploy "$WORK" "$WORK/lib2" 2>&1
+    echo "rc=$?"
 )
 case "$_dl_out" in *rc=1*) pass "bad root: rc=1" ;; *) fail "bad root: rc (got [$_dl_out])" ;; esac
 case "$_dl_out" in *"does not contain opencode-permissions-kit-lib"*) pass "bad root: loud message" ;; *) fail "bad root: message" ;; esac
@@ -96,7 +105,8 @@ _dl_out=$(
     export DL_SUDO
     # shellcheck disable=SC2030
     . "$LIB"
-    lib_deploy "$PART" "$WORK/lib3" 2>&1; echo "rc=$?"
+    lib_deploy "$PART" "$WORK/lib3" 2>&1
+    echo "rc=$?"
 )
 case "$_dl_out" in *rc=1*) pass "partial tree: rc=1" ;; *) fail "partial tree: rc (got [$_dl_out])" ;; esac
 case "$_dl_out" in *"missing source"*) pass "partial tree: names the missing source" ;; *) fail "partial tree: message" ;; esac
@@ -111,12 +121,12 @@ case "$_dl_out" in *"missing source"*) pass "partial tree: names the missing sou
 
 ATD="$WORK/atomic"
 mkdir -p "$ATD/lib/management"
-printf 'OLD-ENTRY-BYTES\n' > "$ATD/lib/management/config.sh"
+printf 'OLD-ENTRY-BYTES\n' >"$ATD/lib/management/config.sh"
 
 # 4a. killed cp: partial bytes into the temp, then die — old entry
 # survives, temp cleaned.
 mkdir -p "$WORK/killing-cp-bin"
-cat > "$WORK/killing-cp-bin/cp" <<'KILLCP'
+cat >"$WORK/killing-cp-bin/cp" <<'KILLCP'
 #!/bin/sh
 [ "$#" -ge 2 ] || exit 1
 head -c 4 "$1" > "$2" || exit 1
@@ -130,7 +140,8 @@ _dl_out=$(
     export DL_SUDO PATH
     # shellcheck disable=SC2031
     . "$LIB"
-    lib_deploy "$REPO/files" "$ATD/lib" 2>&1; echo "rc=$?"
+    lib_deploy "$REPO/files" "$ATD/lib" 2>&1
+    echo "rc=$?"
 )
 case "$_dl_out" in *rc=1*) pass "atomic: killed cp fails the deploy rc=1" ;; *) fail "atomic: killed cp rc (got [$_dl_out])" ;; esac
 check "atomic: killed cp leaves the OLD entry byte-identical (W2)" \
@@ -141,7 +152,7 @@ check "atomic: killed cp leaves no temp behind" \
 # 4b. failing mv: the copy+chmod landed in the temp, the rename dies —
 # old entry survives, temp cleaned.
 mkdir -p "$WORK/failing-mv-bin"
-printf '#!/bin/sh\nexit 1\n' > "$WORK/failing-mv-bin/mv"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/failing-mv-bin/mv"
 chmod +x "$WORK/failing-mv-bin/mv"
 _dl_out=$(
     DL_SUDO=""
@@ -150,7 +161,8 @@ _dl_out=$(
     export DL_SUDO PATH
     # shellcheck disable=SC2031
     . "$LIB"
-    lib_deploy "$REPO/files" "$ATD/lib" 2>&1; echo "rc=$?"
+    lib_deploy "$REPO/files" "$ATD/lib" 2>&1
+    echo "rc=$?"
 )
 case "$_dl_out" in *rc=1*) pass "atomic: failing mv fails the deploy rc=1" ;; *) fail "atomic: failing mv rc (got [$_dl_out])" ;; esac
 check "atomic: failing mv leaves the OLD entry byte-identical" \
@@ -166,7 +178,7 @@ mkdir -p "$WORK/capture-mv-bin"
 MV_REAL="$(command -v mv)"
 MODE_CAPT="$WORK/mv-modes.txt"
 export MV_REAL MODE_CAPT
-cat > "$WORK/capture-mv-bin/mv" <<'CAPMV'
+cat >"$WORK/capture-mv-bin/mv" <<'CAPMV'
 #!/bin/sh
 # capture the staged temp's mode at rename time — the SOURCE is the
 # last-but-one argument (`mv -f src dst` puts -f first)
@@ -188,7 +200,8 @@ _dl_out=$(
     export DL_SUDO PATH
     # shellcheck disable=SC2031
     . "$LIB"
-    lib_deploy "$REPO/files" "$ATD2" 2>&1; echo "rc=$?"
+    lib_deploy "$REPO/files" "$ATD2" 2>&1
+    echo "rc=$?"
 )
 case "$_dl_out" in *rc=0*) pass "atomic: capturing-mv deploy rc=0" ;; *) fail "atomic: capturing-mv rc (got [$_dl_out])" ;; esac
 check "atomic: sudoers.template is 440 at mv time (mode rides before the rename)" \

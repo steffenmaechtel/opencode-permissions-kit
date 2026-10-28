@@ -12,18 +12,23 @@
 # prints the literal). Off for NO_COLOR / non-tty, same rule as sh/ui.sh
 # (0.0.39e C10/C12).
 if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
-    RED=''; GREEN=''; YELLOW=''; NC=''
+    RED=''
+    GREEN=''
+    YELLOW=''
+    NC=''
 else
-    RED=$(printf '\033[0;31m'); GREEN=$(printf '\033[0;32m')
-    YELLOW=$(printf '\033[0;33m'); NC=$(printf '\033[0m')
+    RED=$(printf '\033[0;31m')
+    GREEN=$(printf '\033[0;32m')
+    YELLOW=$(printf '\033[0;33m')
+    NC=$(printf '\033[0m')
 fi
 
 YES=false
 DRY_RUN=false
 DEBUG=false
-for arg do
+for arg; do
     case "$arg" in
-        --yes|-y) YES=true ;;
+        --yes | -y) YES=true ;;
         --dry-run) DRY_RUN=true ;;
         --debug) DEBUG=true ;;
         # Unknown options die loudly (0.0.44a V7): a silent drop turned
@@ -33,7 +38,8 @@ for arg do
         *)
             echo "error: unknown option: $arg" >&2
             echo "usage: opk uninstall [--yes|-y] [--dry-run] [--debug]" >&2
-            exit 1 ;;
+            exit 1
+            ;;
     esac
 done
 
@@ -96,15 +102,15 @@ echo ""
 
 trace "DEFAULT_USER=$DEFAULT_USER"
 trace "stdin is tty: $([ -t 0 ] && echo yes || echo no)"
-if (exec < /dev/tty) 2>/dev/null; then
+if (exec </dev/tty) 2>/dev/null; then
     trace "/dev/tty: readable"
 else
     trace "/dev/tty: NOT readable"
 fi
 
 if [ "$DEFAULT_USER" = "root" ] || [ "$DEFAULT_USER" = "opencode" ]; then
-    echo "${RED}Do not run as root or opencode. "\
-"Run as your normal user WITHOUT the 'sudo' prefix (./uninstall.sh).${NC}"
+    echo "${RED}Do not run as root or opencode. ""\
+Run as your normal user WITHOUT the 'sudo' prefix (./uninstall.sh).${NC}"
     exit 1
 fi
 
@@ -112,8 +118,8 @@ trace "checking sudo (-n true) ..."
 if ! sudo -n true 2>/dev/null; then
     trace "no cached/passwordless sudo -> sudo -v"
     if ! sudo -v 2>&1; then
-        echo "This script requires sudo. Run it as your normal user (no 'sudo' prefix);"\
-" you will be asked for your password."
+        echo "This script requires sudo. Run it as your normal user (no 'sudo' prefix);""\
+ you will be asked for your password."
         exit 1
     fi
 fi
@@ -137,7 +143,7 @@ prompt_yn() {
         echo "y"
         return
     fi
-    if ! [ -t 0 ] && ! (exec < /dev/tty) 2>/dev/null; then
+    if ! [ -t 0 ] && ! (exec </dev/tty) 2>/dev/null; then
         echo "${RED}No terminal available. Run interactively or use --yes to skip prompts.${NC}" >&2
         exit 1
     fi
@@ -148,9 +154,9 @@ prompt_yn() {
     answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]')
     [ -z "$answer" ] && answer="$default"
     case "$answer" in
-        y|yes) echo "y" ;;
-        n|no)  echo "n" ;;
-        *)     [ "$default" = "y" ] && echo "y" || echo "n" ;;
+        y | yes) echo "y" ;;
+        n | no) echo "n" ;;
+        *) [ "$default" = "y" ] && echo "y" || echo "n" ;;
     esac
 }
 
@@ -186,7 +192,8 @@ run_q() {
 # revert loop AND the config-dirs removal — the name must not claim
 # "revert" only.
 un_rc_q() { # <op label> <command...>
-    _un_rc_label="$1"; shift
+    _un_rc_label="$1"
+    shift
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] $*"
     elif ! "$@" >/dev/null 2>&1; then
@@ -219,7 +226,7 @@ OPENCODE_USER="${OPENCODE_USER:-opencode}"
 # for a customized agent; the mismatch residual is recorded in the
 # review chain, snapshot f).
 case "$OPENCODE_USER" in
-    ''|*[!A-Za-z0-9_.-]*|[.-]*|*[.])
+    '' | *[!A-Za-z0-9_.-]* | [.-]* | *[.])
         # pr-00263 a F9: sanitized echo — a corrupted value (newline/
         # escape bytes) must not forge transcript lines.
         _ou_bad="$(printf '%s' "$OPENCODE_USER" | tr -c 'A-Za-z0-9_.-' '?')"
@@ -247,12 +254,15 @@ UN_DEV_GROUP=$(id -gn "$DEFAULT_USER" 2>/dev/null || true)
 # `g:<name>` at parse time and dies wholesale (rc 2) on an empty or
 # unresolvable name — a numeric gid never needs resolution.
 UN_DEV_GID=$(id -g "$DEFAULT_USER" 2>/dev/null || true)
-trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP uid=$UN_OC_UID gid=$UN_OC_GID"\
-" devgroup=$UN_DEV_GROUP devgid=$UN_DEV_GID"
+trace "OPENCODE_USER=$OPENCODE_USER OPENCODE_GROUP=$OPENCODE_GROUP uid=$UN_OC_UID gid=$UN_OC_GID""\
+ devgroup=$UN_DEV_GROUP devgid=$UN_DEV_GID"
 
 trace "first prompt ..."
 ans=$(prompt_yn "Proceed with uninstall?" "n")
-[ "$ans" != "y" ] && { echo "Aborted."; exit 0; }
+[ "$ans" != "y" ] && {
+    echo "Aborted."
+    exit 0
+}
 log "uninstall started (dry_run=$DRY_RUN)"
 
 echo ""
@@ -354,9 +364,9 @@ fi
 # xdg-open (xdg-utils) or anything else at that path is not ours.
 echo ""
 echo "--- Removing xdg-open fallback ---"
-if [ -L /usr/local/bin/xdg-open ] \
-   && [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" \
-      = "/usr/local/lib/opencode-permissions-kit/bin/xdg-open" ]; then
+if [ -L /usr/local/bin/xdg-open ] &&
+    [ "$(readlink /usr/local/bin/xdg-open 2>/dev/null || true)" \
+        = "/usr/local/lib/opencode-permissions-kit/bin/xdg-open" ]; then
     _un_partial=""
     _un_revert_failed=0
     un_rc_q "rm xdg-open shim" sudo rm -f /usr/local/bin/xdg-open
@@ -388,8 +398,8 @@ if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
         # into the link target. The walker no-ops outside the agent home (the
         # developer side is trusted). Skip loudly (user-managed).
         if ! agent_home_sane "$OPENCODE_USER" "$_un_dir"; then
-            echo "  ${YELLOW}WARNING: the chain to $_un_dir contains a symlink"\
-" — plugin registration left in place (user-managed).${NC}"
+            echo "  ${YELLOW}WARNING: the chain to $_un_dir contains a symlink""\
+ — plugin registration left in place (user-managed).${NC}"
             log "tui plugin removal skipped: symlink in the chain to $_un_dir"
             continue
         fi
@@ -404,8 +414,8 @@ if [ -x /usr/local/lib/opencode-permissions-kit/py/tui-register.py ]; then
             unregister /usr/local/lib/opencode-permissions-kit/tui/kit-mode-2x.tsx \
             --drop /usr/local/lib/opencode-permissions-kit/tui/kit-mode.tsx
         if [ -n "$_un_partial" ]; then
-            echo "WARN: plugin removal failed ($_un_partial) — remove manually:"\
-" ${_un_dir:?}/plugins/opencode-permissions-kit (tui-register.py unregister)" >&2
+            echo "WARN: plugin removal failed ($_un_partial) — remove manually:""\
+ ${_un_dir:?}/plugins/opencode-permissions-kit (tui-register.py unregister)" >&2
             log "plugin removal FAILED ($_un_partial): $_un_dir"
         fi
     done
@@ -424,10 +434,10 @@ if [ "$DRY_RUN" = true ]; then
     echo "  [DRY] ask: remove the kit-owned wsl.conf bridge block? (default: yes)"
     echo "  [DRY] sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl"
 else
-    if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null \
-       || grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null; then
-        if [ "$(prompt_yn "Remove the kit's wsl.conf bridge block? ("\
-"kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
+    if grep -q '^# opencode permissions kit browser bridge -- begin$' /etc/wsl.conf 2>/dev/null ||
+        grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null; then
+        if [ "$(prompt_yn "Remove the kit's wsl.conf bridge block? (""\
+kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
             if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
                 echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
                 log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
@@ -443,11 +453,10 @@ else
             sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl
             echo "wsl.conf left untouched — remove the kit block yourself (WSL never"
             echo "warns about it; no 'wsl --shutdown' needed). It spans these lines:"
-            grep -n '^# opencode permissions kit browser bridge -- begin$'\
-'|^# opencode permissions kit browser bridge -- end$' \
+            grep -n '^# opencode permissions kit browser bridge -- begin$''|^# opencode permissions kit browser bridge -- end$' \
                 /etc/wsl.conf 2>/dev/null | sed 's/^/    /'
-            grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null \
-                && echo "    plus the legacy [opencode-permissions-kit] section (through its root = line)"
+            grep -q '^\[opencode-permissions-kit\]$' /etc/wsl.conf 2>/dev/null &&
+                echo "    plus the legacy [opencode-permissions-kit] section (through its root = line)"
             log "wsl browser bridge: wsl.conf block left in place (user declined)"
         fi
     else
@@ -481,9 +490,9 @@ fi
 # reference — plus its /usr/local/sbin convenience symlink (0.0.9
 # install.sh:438). Marker-gated on the kit files (wrapper /
 # protect-projects.sh): a foreign directory of that name stays.
-if [ -d /usr/local/lib/opencode ] \
-   && { [ -e /usr/local/lib/opencode/wrapper ] \
-        || [ -e /usr/local/lib/opencode/protect-projects.sh ]; }; then
+if [ -d /usr/local/lib/opencode ] &&
+    { [ -e /usr/local/lib/opencode/wrapper ] ||
+        [ -e /usr/local/lib/opencode/protect-projects.sh ]; }; then
     _un_partial=""
     _un_revert_failed=0
     un_rc_q "rm legacy library" sudo rm -rf /usr/local/lib/opencode
@@ -540,8 +549,8 @@ echo "--- Removing opencode user ---"
 # the opencode usergroup (its primary group) automatically. Exact-name
 # match (#211 a F28): a bare substring grep matched opencode2 too, and the
 # success echo printed over a silenced gpasswd failure.
-if id "$DEFAULT_USER" >/dev/null 2>&1 \
-    && id "$DEFAULT_USER" | grep -qF "($OPENCODE_GROUP)"; then
+if id "$DEFAULT_USER" >/dev/null 2>&1 &&
+    id "$DEFAULT_USER" | grep -qF "($OPENCODE_GROUP)"; then
     # The rc must reach the arms (#211 b W1): run_q ends in `|| true`
     # by design, so wiring a F28's honesty arms through it left the
     # else arm dead code — a failed gpasswd still printed "Removed".
@@ -678,8 +687,8 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # pr-00263 a F10: getent alongside the literal spelling — a
         # relocated agent home refuses too (the config.sh twin).
         _un_agent_home="$(getent passwd "$OPENCODE_USER" 2>/dev/null | cut -d: -f6 || true)"
-        if [ "${root%/}" = "/home/$OPENCODE_USER" ] \
-           || { [ -n "$_un_agent_home" ] && [ "${root%/}" = "$_un_agent_home" ]; }; then
+        if [ "${root%/}" = "/home/$OPENCODE_USER" ] ||
+            { [ -n "$_un_agent_home" ] && [ "${root%/}" = "$_un_agent_home" ]; }; then
             echo "  Skipping agent home (never a project root): $root"
             continue
         fi
@@ -698,7 +707,7 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
                 ;;
         esac
         case "$root" in
-            *..*|/./|*/./*|./*|*/.|*//*)
+            *..* | /./ | */./* | ./* | */. | *//*)
                 echo "  Skipping malformed project path (dot or empty segment): $root"
                 continue
                 ;;
@@ -738,11 +747,11 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # entry is bounded — uid/gid-matched chown, kit-gid ACL strip
         # and one setgid-bit clear (chmod g-s) only).
         case "$root" in
-            /|/bin|/bin/*|/boot|/boot/*|/dev|/dev/*|/etc|/etc/*|/home|/lib*|\
-            /media|/media/*|/mnt|/mnt/*|/opt|/opt/*|/proc|/proc/*|/root|/root/*|\
-            /run|/run/*|/sbin|/sbin/*|/srv|/srv/*|/sys|/sys/*|/usr|/usr/*|\
-            /var|/var/cache|/var/cache/*|/var/lib|/var/lib/*|/var/log|/var/log/*|\
-            /var/mail|/var/mail/*|/var/spool|/var/spool/*)
+            / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
+                /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
+                /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /usr | /usr/* | \
+                /var | /var/cache | /var/cache/* | /var/lib | /var/lib/* | /var/log | /var/log/* | \
+                /var/mail | /var/mail/* | /var/spool | /var/spool/*)
                 echo "  Skipping system path: $root"
                 continue
                 ;;
@@ -789,8 +798,8 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
             _un_acl_gid="${_un_acl_pair#*:}"
             if [ -z "$_un_acl_gid" ]; then
                 _un_partial="${_un_partial:+$_un_partial, }${_un_acl_label} id unknown"
-                echo "    ${_un_acl_label} id unknown — its ACL entries left in place"\
-" (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
+                echo "    ${_un_acl_label} id unknown — its ACL entries left in place""\
+ (remove manually: setfacl -R -x g:<gid> -d -x g:<gid>)"
                 continue
             fi
             un_rc_q "setfacl -x g:$_un_acl_gid" sudo setfacl -R -x "g:$_un_acl_gid" "$root"
@@ -816,7 +825,7 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
                 log "project revert FAILED for: $root ($_un_partial)"
             fi
         fi
-    done < "$UNINSTALL_PROJECTS_CONF"
+    done <"$UNINSTALL_PROJECTS_CONF"
 fi
 
 echo ""
@@ -842,8 +851,8 @@ un_rc_q "rm 99-ddev-rootless.conf" sudo rm -f /etc/sysctl.d/99-ddev-rootless.con
 # an admin 0700 /etc/openchamber must not hide a kit pin from removal.
 # Pin removal observes its rc too (#243 a S2): the success log fires only
 # when the rm actually succeeded — audit-log arm pattern (#211 c W1).
-if sudo test -f /etc/openchamber/policy.json \
-    && sudo grep -q '"opencodeBinary"[[:space:]]*:[[:space:]]*"/usr/local/bin/opencode"' \
+if sudo test -f /etc/openchamber/policy.json &&
+    sudo grep -q '"opencodeBinary"[[:space:]]*:[[:space:]]*"/usr/local/bin/opencode"' \
         /etc/openchamber/policy.json 2>/dev/null; then
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY] sudo rm -f /etc/openchamber/policy.json"
@@ -862,8 +871,8 @@ fi
 un_rc_q "rm /etc/opencode-permissions-kit" sudo rm -rf /etc/opencode-permissions-kit
 if [ -z "$_un_partial" ]; then
     echo "Removed."
-    log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit"\
-", /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
+    log "config dirs + runtime artifacts removed (/etc/opencode-permissions-kit""\
+, /run/opencode-permissions-kit, 99-ddev-rootless.conf)"
 else
     log "config dirs + runtime artifacts PARTIALLY removed ($_un_partial)"
     # Every partial cause in this section is a FAILED op today (no

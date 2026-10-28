@@ -16,8 +16,13 @@ how to work on the code. For what the kit does, see the
 
 ## Tests
 
-First make sure your host has everything installed (shellcheck is part of
-`make test` via `make lint`):
+First make sure your host has everything installed (shellcheck and
+shfmt are part of `make test` via `make lint` — shfmt is version-
+pinned exactly, `make install-shfmt` fetches the right one). The make
+targets find the installed shfmt in `~/.local/bin` regardless of your
+shell's PATH; only direct `shfmt` calls need the dir on PATH (new
+login shells usually pick it up from `~/.profile` once the dir
+exists):
 
 ```bash
 sh tests/check-host.sh  # prints install commands for anything missing

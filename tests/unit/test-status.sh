@@ -20,8 +20,14 @@ STATUS="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.s
 
 failures=0
 passed=0
-pass() { echo "  ${GREEN}PASS${NC}  $1"; passed=$((passed + 1)); }
-fail() { echo "  ${RED}FAIL${NC}  $1"; failures=$((failures + 1)); }
+pass() {
+    echo "  ${GREEN}PASS${NC}  $1"
+    passed=$((passed + 1))
+}
+fail() {
+    echo "  ${RED}FAIL${NC}  $1"
+    failures=$((failures + 1))
+}
 
 WORK="$(mktemp -d)"
 # Widen the trap to every bare receiver of the suite (#283): W3,
@@ -38,9 +44,9 @@ _trap_cleanup() {
 trap _trap_cleanup EXIT INT TERM
 
 # --- 0. dev-owned mode line (internal/records/ddev-dev-owned-projects.md) -------------
-if grep -q 'ui_kv "ddev settings"' "$STATUS" && \
-   grep -q 'dev-owned — kit writes disable_settings_management' "$STATUS" && \
-   grep -qF 'DDEV_DEV_OWNED=' "$STATUS"; then
+if grep -q 'ui_kv "ddev settings"' "$STATUS" &&
+    grep -q 'dev-owned — kit writes disable_settings_management' "$STATUS" &&
+    grep -qF 'DDEV_DEV_OWNED=' "$STATUS"; then
     pass "status.sh reports the ddev settings mode (stamp-driven)"
 else
     fail "status.sh reports the ddev settings mode (stamp-driven)"
@@ -51,9 +57,9 @@ fi
 # #199 a W3: a missing or outdated helper renders the counted warn row at
 # the call site (section g2 pins it); the old fail-soft contract
 # ("a missing helper just drops the row") is retired.
-if grep -q 'git_status_row' "$STATUS" && \
-   grep -q 'sh/git-check.sh' "$STATUS" && \
-   grep -q 'command -v git_status_row' "$STATUS"; then
+if grep -q 'git_status_row' "$STATUS" &&
+    grep -q 'sh/git-check.sh' "$STATUS" &&
+    grep -q 'command -v git_status_row' "$STATUS"; then
     pass "status.sh reports the host git via the shared git-check helper"
 else
     fail "status.sh reports the host git via the shared git-check helper"
@@ -132,8 +138,8 @@ run_case() {
 # own set -e would kill the TEST instead of reporting FAIL. The output is
 # what the assertions judge; the status is discarded by design.
 out=$(run_case "kubernetes" "" "" || true)
-if printf '%s' "$out" | grep -q "unknown ('kubernetes')" \
-   && ! printf '%s' "$out" | grep -q "parameter not set"; then
+if printf '%s' "$out" | grep -q "unknown ('kubernetes')" &&
+    ! printf '%s' "$out" | grep -q "parameter not set"; then
     pass "unknown backend reports unknown('kubernetes') without crashing (set -u)"
 else
     fail "unknown backend reports unknown('kubernetes') without crashing (out=$out)"
@@ -141,8 +147,8 @@ fi
 
 # b) empty backend: reports unknown('none')
 out=$(run_case "" "" "" || true)
-if printf '%s' "$out" | grep -q "unknown ('none')" \
-   && ! printf '%s' "$out" | grep -q "parameter not set"; then
+if printf '%s' "$out" | grep -q "unknown ('none')" &&
+    ! printf '%s' "$out" | grep -q "parameter not set"; then
     pass "empty backend reports unknown('none') without crashing (set -u)"
 else
     fail "empty backend reports unknown('none') without crashing (out=$out)"
@@ -153,7 +159,7 @@ fi
 #    shim fails the test. NOTE: the shim must actually be IN the PATH of
 #    run_case's subshell (see run_case) — a `PATH=... cmd; f` prefix would
 #    apply the assignment only to `cmd`, never to f.
-cat > "$WORK/sudo" <<'EOF'
+cat >"$WORK/sudo" <<'EOF'
 #!/bin/sh
 # fail on any interactive sudo attempt: -n must already be in the args
 case " $* " in
@@ -163,8 +169,8 @@ esac
 EOF
 chmod +x "$WORK/sudo"
 out=$(run_case "docker-rootless" "unix:///run/user/99999/docker.sock" "" || true)
-if printf '%s' "$out" | grep -q "NOT reachable" \
-   && ! printf '%s' "$out" | grep -qE 'PROMPT-ATTEMPT|parameter not set'; then
+if printf '%s' "$out" | grep -q "NOT reachable" &&
+    ! printf '%s' "$out" | grep -qE 'PROMPT-ATTEMPT|parameter not set'; then
     pass "docker-rootless: unreachable socket reported without sudo prompt"
 else
     fail "docker-rootless: unreachable socket reported without sudo prompt (out=$out)"
@@ -176,12 +182,12 @@ fi
 #    the old output said red "NOT reachable" and users thought the daemon
 #    was down). Must report "unknown — needs root", never red.
 mkdir -p "$WORK/locked-runtime"
-chmod 700 "$WORK/locked-runtime"   # 700 of a nonexistent other user is untestable; 000 works for everyone
+chmod 700 "$WORK/locked-runtime" # 700 of a nonexistent other user is untestable; 000 works for everyone
 chmod 000 "$WORK/locked-runtime"
 out=$(run_case "docker-rootless" "unix://$WORK/locked-runtime/docker.sock" "" || true)
-if printf '%s' "$out" | grep -q "unknown — needs root to check" \
-   && ! printf '%s' "$out" | grep -q "NOT reachable" \
-   && ! printf '%s' "$out" | grep -qE 'PROMPT-ATTEMPT|parameter not set'; then
+if printf '%s' "$out" | grep -q "unknown — needs root to check" &&
+    ! printf '%s' "$out" | grep -q "NOT reachable" &&
+    ! printf '%s' "$out" | grep -qE 'PROMPT-ATTEMPT|parameter not set'; then
     pass "docker-rootless: socket in inaccessible runtime dir reports unknown (needs root)"
 else
     fail "docker-rootless: socket in inaccessible runtime dir reports unknown (needs root) (out=$out)"
@@ -191,9 +197,9 @@ chmod 755 "$WORK/locked-runtime" 2>/dev/null || true
 # --- 1b. root-equivalent access audit (issue #37) --------------------------------
 # The audit ships two pure helpers (stat math only); they are extracted and
 # unit-tested directly, plus static assertions on the section wiring.
-if grep -q 'ui_section "Root-equivalent access' "$STATUS" \
-   && grep -q 'ROOT_EQUIV_SOCKS' "$STATUS" \
-   && grep -q '/mnt/wsl' "$STATUS"; then
+if grep -q 'ui_section "Root-equivalent access' "$STATUS" &&
+    grep -q 'ROOT_EQUIV_SOCKS' "$STATUS" &&
+    grep -q '/mnt/wsl' "$STATUS"; then
     pass "status.sh carries the root-equivalent access section (issue #37)"
 else
     fail "status.sh carries the root-equivalent access section (issue #37)"
@@ -220,14 +226,16 @@ s.listen(1)
 PYEOF
     _grp=$(id -gn)
     chmod 666 "$_sock"
-    status_sock_agent_reachable "$_sock" ""          && echo SOCK-WORLDW-OK
-    chmod 660 "$_sock"; chgrp "$_grp" "$_sock"
-    status_sock_agent_reachable "$_sock" "$_grp"     && echo SOCK-GROUPW-OK
-    status_sock_agent_reachable "$_sock" "othergrp"  || echo SOCK-GROUPW-DENY-OK
-    chmod 660 "$_sock"; chgrp "$_grp" "$_sock"
-    status_sock_agent_reachable "$_sock" ""          || echo SOCK-NOOTHER-OK
+    status_sock_agent_reachable "$_sock" "" && echo SOCK-WORLDW-OK
+    chmod 660 "$_sock"
+    chgrp "$_grp" "$_sock"
+    status_sock_agent_reachable "$_sock" "$_grp" && echo SOCK-GROUPW-OK
+    status_sock_agent_reachable "$_sock" "othergrp" || echo SOCK-GROUPW-DENY-OK
+    chmod 660 "$_sock"
+    chgrp "$_grp" "$_sock"
+    status_sock_agent_reachable "$_sock" "" || echo SOCK-NOOTHER-OK
     status_sock_agent_reachable "$WORK/absent.sock" "" || echo SOCK-ABSENT-OK
-) > "$WORK/audit.out" 2>&1
+) >"$WORK/audit.out" 2>&1
 _audit_ok=0
 for _want in GROUPS-CLEAN-OK GROUPS-HIT-OK SOCK-WORLDW-OK SOCK-GROUPW-OK SOCK-GROUPW-DENY-OK SOCK-NOOTHER-OK SOCK-ABSENT-OK; do
     if grep -q "$_want" "$WORK/audit.out"; then
@@ -246,7 +254,10 @@ done
 # || true on the captures: the subshell deliberately runs under set -u and
 # its exit status must not kill this script (same pattern as run_case).
 AUDIT_SECTION="$(sed -n '/^# === Root-equivalent access audit/,/^# === Sensitive-file leak scan/p' "$STATUS" | sed '$d')"
-[ -n "$AUDIT_SECTION" ] || { echo "  ${RED}audit section not extractable${NC}"; exit 1; }
+[ -n "$AUDIT_SECTION" ] || {
+    echo "  ${RED}audit section not extractable${NC}"
+    exit 1
+}
 _sock2="$WORK/fake-agent-sock"
 python3 - "$_sock2" <<'PYEOF'
 import socket, sys
@@ -256,18 +267,19 @@ s.listen(1)
 PYEOF
 audit_out=$(
     (
-        set -u; set +e
+        set -u
+        set +e
         . "$UI_LIB"
-        OPENCODE_USER="root"                 # exists everywhere; id -nG works
-        ROOT_EQUIV_SOCKS="$_sock2"           # the fake socket, world-writable
-        chmod 666 "$_sock2" 2>/dev/null      # bind honors umask: force 666
+        OPENCODE_USER="root"            # exists everywhere; id -nG works
+        ROOT_EQUIV_SOCKS="$_sock2"      # the fake socket, world-writable
+        chmod 666 "$_sock2" 2>/dev/null # bind honors umask: force 666
         eval "$AUDIT_SECTION"
         exit 0
     ) 2>&1
 ) || true
-if printf '%s' "$audit_out" | grep -q "Root-equivalent access" \
-   && printf '%s' "$audit_out" | grep -q "AGENT-REACHABLE" \
-   && ! printf '%s' "$audit_out" | grep -q "parameter not set"; then
+if printf '%s' "$audit_out" | grep -q "Root-equivalent access" &&
+    printf '%s' "$audit_out" | grep -q "AGENT-REACHABLE" &&
+    ! printf '%s' "$audit_out" | grep -q "parameter not set"; then
     pass "audit section body runs (fake world-writable socket flagged red)"
 else
     fail "audit section body runs (out=$(printf '%s' "$audit_out" | head -3))"
@@ -276,7 +288,8 @@ fi
 # flagged reachable (perm-math negative inside the section body).
 audit_out2=$(
     (
-        set -u; set +e
+        set -u
+        set +e
         . "$UI_LIB"
         OPENCODE_USER="root"
         ROOT_EQUIV_SOCKS="$_sock2"
@@ -305,7 +318,7 @@ else
     echo "  ${RED}$failures test(s) failed.${NC}"
     exit 1
 fi
-printf '#!/bin/sh\necho "ddev version v1.25.4"\n' > "$WORK/ddev"
+printf '#!/bin/sh\necho "ddev version v1.25.4"\n' >"$WORK/ddev"
 chmod +x "$WORK/ddev"
 probe_out=$(
     (
@@ -319,15 +332,15 @@ probe_out=$(
         exit 0
     ) 2>&1
 ) || true
-if printf '%s' "$probe_out" | grep -q "1.25.4" \
-   && ! printf '%s' "$probe_out" | grep -q "1.25.3"; then
+if printf '%s' "$probe_out" | grep -q "1.25.4" &&
+    ! printf '%s' "$probe_out" | grep -q "1.25.3"; then
     pass "ddev version: live probe wins over the install-time stamp (issue #56)"
 else
     fail "ddev version: live probe wins over the stamp (out=$probe_out)"
 fi
 
 # the < 1.25 gate must judge the LIVE version too
-printf '#!/bin/sh\necho "ddev version v1.24.2"\n' > "$WORK/ddev"
+printf '#!/bin/sh\necho "ddev version v1.24.2"\n' >"$WORK/ddev"
 probe_low=$(
     (
         PATH="$WORK:$PATH"
@@ -367,11 +380,11 @@ fi
 # (binary found, no version), the fake sudo answers the helper call, and
 # LIBDIR points at a stub kit with an executable helper.
 mkdir -p "$WORK/fakekit/bin" "$WORK/quiet"
-printf '#!/bin/sh\nexit 1\n' > "$WORK/fakekit/bin/ddev-as-opencode"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/fakekit/bin/ddev-as-opencode"
 chmod +x "$WORK/fakekit/bin/ddev-as-opencode"
-printf '#!/bin/sh\necho "ddev version v1.26.0"\n' > "$WORK/sudo"
+printf '#!/bin/sh\necho "ddev version v1.26.0"\n' >"$WORK/sudo"
 chmod +x "$WORK/sudo"
-printf '#!/bin/sh\nexit 1\n' > "$WORK/quiet/ddev"
+printf '#!/bin/sh\nexit 1\n' >"$WORK/quiet/ddev"
 chmod +x "$WORK/quiet/ddev"
 probe_helper=$(
     (
@@ -387,8 +400,8 @@ probe_helper=$(
         exit 0
     ) 2>&1
 ) || true
-if printf '%s' "$probe_helper" | grep -q "1.26.0" \
-   && ! printf '%s' "$probe_helper" | grep -q "1.25.3"; then
+if printf '%s' "$probe_helper" | grep -q "1.26.0" &&
+    ! printf '%s' "$probe_helper" | grep -q "1.25.3"; then
     pass "ddev version: helper probe answers when root-run ddev stays silent (issue #72)"
 else
     fail "ddev version: helper probe tier (out=$(printf '%s' "$probe_helper" | head -3))"
@@ -406,30 +419,32 @@ fi
 # (pre-beta) installs must say so instead of crashing under set -u.
 channel_out=$(
     (
-        set -u; set +e
+        set -u
+        set +e
         . "$UI_LIB"
         KIT_CHANNEL="stable"
         eval "$(sed -n '/^# Channel stamp (issue #38)/,/^fi$/p' "$STATUS")"
         exit 0
     ) 2>&1
 ) || true
-if printf '%s' "$channel_out" | grep -q "stable" \
-   && ! printf '%s' "$channel_out" | grep -q "unstamped"; then
+if printf '%s' "$channel_out" | grep -q "stable" &&
+    ! printf '%s' "$channel_out" | grep -q "unstamped"; then
     pass "channel: stamped value shown"
 else
     fail "channel: stamped value shown (out=$channel_out)"
 fi
 channel_out=$(
     (
-        set -u; set +e
+        set -u
+        set +e
         . "$UI_LIB"
         unset KIT_CHANNEL
         eval "$(sed -n '/^# Channel stamp (issue #38)/,/^fi$/p' "$STATUS")"
         exit 0
     ) 2>&1
 ) || true
-if printf '%s' "$channel_out" | grep -q "unstamped" \
-   && ! printf '%s' "$channel_out" | grep -q "parameter not set"; then
+if printf '%s' "$channel_out" | grep -q "unstamped" &&
+    ! printf '%s' "$channel_out" | grep -q "parameter not set"; then
     pass "channel: unstamped install reports master (unstamped) without crashing"
 else
     fail "channel: unstamped install reports master (unstamped) without crashing (out=$channel_out)"
@@ -438,12 +453,12 @@ fi
 # --- 1f. management footer uses the opk shorthand (issue #62) ---------------------
 # The footer is the hint users copy-paste; it must print the short CLI
 # commands, not the library paths behind them.
-if grep -qF 'ui_detail "sudo opk config' "$STATUS" && \
-   grep -qF 'ui_detail "sudo opk update' "$STATUS" && \
-   grep -qF 'ui_detail "opk uninstall' "$STATUS" && \
-   ! grep -q 'management/config\.sh.*change settings' "$STATUS" && \
-   ! grep -q 'management/update\.sh.*re-deploy' "$STATUS" && \
-   ! grep -q 'management/uninstall\.sh.*remove the kit' "$STATUS"; then
+if grep -qF 'ui_detail "sudo opk config' "$STATUS" &&
+    grep -qF 'ui_detail "sudo opk update' "$STATUS" &&
+    grep -qF 'ui_detail "opk uninstall' "$STATUS" &&
+    ! grep -q 'management/config\.sh.*change settings' "$STATUS" &&
+    ! grep -q 'management/update\.sh.*re-deploy' "$STATUS" &&
+    ! grep -q 'management/uninstall\.sh.*remove the kit' "$STATUS"; then
     pass "management footer prints opk shorthand, not library paths (issue #62)"
 else
     fail "management footer prints opk shorthand, not library paths (issue #62)"
@@ -452,7 +467,8 @@ fi
 # --- 2. not-installed state: exit 0 + install hint ------------------------------
 
 if ! id opencode >/dev/null 2>&1; then
-    out=$(sh "$STATUS" 2>&1); rc=$?
+    out=$(sh "$STATUS" 2>&1)
+    rc=$?
     if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q "Hardening NOT active"; then
         pass "not-installed host: hint shown, exit 0"
     else
@@ -493,13 +509,13 @@ rm -rf "$W3"
 # appended a second 0 and the captured "0<newline>0" broke the "Projects"
 # header across lines. The shipped counting block is extracted and run
 # with a stubbed ui_section against an empty and a missing projects.conf.
-sed -n '/^_st_pc=/,/^ui_section "Projects/p' "$STATUS" > "$WORK/pc-block.sh"
+sed -n '/^_st_pc=/,/^ui_section "Projects/p' "$STATUS" >"$WORK/pc-block.sh"
 if [ -s "$WORK/pc-block.sh" ] && grep -q 'ui_section "Projects' "$WORK/pc-block.sh"; then
     pass "the projects-count block is extractable from status.sh"
 else
     fail "the projects-count block is extractable from status.sh"
 fi
-: > "$WORK/empty-projects.conf"
+: >"$WORK/empty-projects.conf"
 _pc_empty="$(PROJECTS_CONF="$WORK/empty-projects.conf" sh -c '
     ui_section() { printf "%s" "$1"; }
     . "$1"
@@ -518,7 +534,7 @@ if [ "$_pc_missing" = "Projects (0)" ]; then
 else
     fail "missing projects.conf renders 'Projects (0)' too (got '$_pc_missing')"
 fi
-printf '/var/tmp/one\n/var/tmp/two\n' > "$WORK/two-projects.conf"
+printf '/var/tmp/one\n/var/tmp/two\n' >"$WORK/two-projects.conf"
 _pc_two="$(PROJECTS_CONF="$WORK/two-projects.conf" sh -c '
     ui_section() { printf "%s" "$1"; }
     . "$1"
@@ -560,7 +576,7 @@ _gap_fn=$(sed -n '/^    _st_dbdump_gap() {/,/^    }$/p' "$STATUS")
 if [ -n "$_gap_fn" ]; then
     pass "status.sh: gap function extractable (W15)"
     _gap_work=$(mktemp -d)
-    printf '/var/tmp/root-one\n/var/tmp/my projects\n' > "$_gap_work/projects.conf"
+    printf '/var/tmp/root-one\n/var/tmp/my projects\n' >"$_gap_work/projects.conf"
     _gap_args=""
     _gap_rc=0
     (
@@ -569,14 +585,19 @@ if [ -n "$_gap_fn" ]; then
         _mig_dir=""
         # the stubs write to files: _st_dbdump_gap runs inside the pipe's
         # subshell, variables would not propagate out
-        ddev_migrate_gap() { shift; printf '%s\n' "$#" > "$_gap_work/argc"; printf '%s\n' "$*" > "$_gap_work/args"; return 1; }
-        ddev_migrate_projects() { printf '' ; }
+        ddev_migrate_gap() {
+            shift
+            printf '%s\n' "$#" >"$_gap_work/argc"
+            printf '%s\n' "$*" >"$_gap_work/args"
+            return 1
+        }
+        ddev_migrate_projects() { printf ''; }
         ddev_migrate_home() { printf '/home/x'; }
         ui_kv_warn() { :; }
-        ui_detail()  { :; }
+        ui_detail() { :; }
         eval "$_gap_fn"
         grep -v '^[[:space:]]*$' "$PROJECTS_CONF" | _st_dbdump_gap devuser || true
-    ) > "$_gap_work/out" 2>/dev/null || _gap_rc=$?
+    ) >"$_gap_work/out" 2>/dev/null || _gap_rc=$?
     _got_n=$(sed -n '1p' "$_gap_work/argc")
     _got_roots=$(sed -n '1p' "$_gap_work/args")
     if [ "$_got_n" = "2" ] && [ "$_got_roots" = "/var/tmp/root-one /var/tmp/my projects" ]; then
@@ -606,8 +627,8 @@ if printf '%s\n' "$_sudo_grep" | grep -q 'grep -Eq'; then
 else
     fail "sudo-rules audit must pin the listing locale with LC_ALL=C (W3)"
 fi
-if printf '%s\n' "$_sra_pat" | grep -qF 'may run the following commands' \
-   && printf '%s\n' "$_sra_pat" | grep -qF '\([^)]+\)'; then
+if printf '%s\n' "$_sra_pat" | grep -qF 'may run the following commands' &&
+    printf '%s\n' "$_sra_pat" | grep -qF '\([^)]+\)'; then
     pass "audit pattern: listing header + structural runas disjunct (W3)"
 else
     fail "audit pattern must keep the header and add the runas disjunct (W3)"
@@ -655,17 +676,17 @@ fi
 # advice when OpenChamber is present but unpinned, shadow note when only
 # self-installed binaries exist without OpenChamber (0.0.47a F4). Static
 # pins below; the verdict matrix itself runs functionally further down.
-if grep -q 'secured via policy pin' "$STATUS" \
-    && grep -q 'BYPASSED' "$STATUS" \
-    && grep -q "sudo opk openchamber-secure" "$STATUS"; then
+if grep -q 'secured via policy pin' "$STATUS" &&
+    grep -q 'BYPASSED' "$STATUS" &&
+    grep -q "sudo opk openchamber-secure" "$STATUS"; then
     pass "status shows the OpenChamber state (secured/bypassed/advice)"
 else
     fail "status lost the OpenChamber state line"
 fi
 # detection reuses the wrapper's semantics: a pin on the kit wrapper itself
 # is not a bypass, an empty pin counts as unset
-if grep -q '_oc_secured=true' "$STATUS" \
-    && grep -qF '[ "$_oc_pin" = "/usr/local/bin/opencode" ]' "$STATUS"; then
+if grep -q '_oc_secured=true' "$STATUS" &&
+    grep -qF '[ "$_oc_pin" = "/usr/local/bin/opencode" ]' "$STATUS"; then
     pass "status pin detection matches the wrapper semantics"
 else
     fail "status pin detection diverges from the wrapper"
@@ -675,8 +696,8 @@ fi
 # Literals updated for #211 a F9: the default chain deepened to
 # ${USER:-} so set -u survives both-unset (cron env) — same getent
 # resolution, same fallback shape, one level deeper.
-if grep -q 'getent passwd "${DEFAULT_USER:-${USER:-}}"' "$STATUS" \
-    && grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"' "$STATUS"; then
+if grep -q 'getent passwd "${DEFAULT_USER:-${USER:-}}"' "$STATUS" &&
+    grep -qF '_oc_home="${_oc_home:-/home/${DEFAULT_USER:-${USER:-}}}"' "$STATUS"; then
     pass "openchamber verdicts resolve the home via getent (0.0.47b W2)"
 else
     fail "openchamber home resolution regressed to /home hardcode (0.0.47b W2)"
@@ -691,8 +712,8 @@ fi
 # Environment-dependent (0.0.46a F2 class): needs getent + root's home
 # at /root — true on every Linux host the suite runs on; without getent,
 # status.sh itself degrades to the fallback everywhere.
-OCV_HOME_SRC="$(awk '/^_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^f="\/home/) exit; print }' "$STATUS" \
-    | grep '^_oc_home=' || true)"
+OCV_HOME_SRC="$(awk '/^_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^f="\/home/) exit; print }' "$STATUS" |
+    grep '^_oc_home=' || true)"
 if [ -n "$OCV_HOME_SRC" ]; then
     pass "openchamber home-resolution lines extractable (0.0.47c C1)"
 else
@@ -733,8 +754,8 @@ OCV_WRAPPER="$OCV_ROOT/kit-wrapper"
 OCV_KITBIN="$OCV_ROOT/kit-bin"
 OCV_BINDIR="$OCV_ROOT/bin"
 mkdir -p "$OCV_HOME" "$OCV_BINDIR"
-: > "$OCV_WRAPPER"
-: > "$OCV_KITBIN"
+: >"$OCV_WRAPPER"
+: >"$OCV_KITBIN"
 # Hermetic PATH for the eval below (0.0.48 release blocker, the 0.0.46a
 # F2 environment-dependence class): the block probes `command -v
 # openchamber`, so the host PATH must never be inherited — the
@@ -761,8 +782,8 @@ fi
 # Extract from `_oc_policy=` up to (excluding) the `f="/home/...` line that
 # follows the block — the block contains col-0 `fi` lines of its inner ifs,
 # so a sed range on `^fi$` would stop early.
-OCV_BLOCK="$(awk '/^_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^f="\/home/) exit; print }' "$STATUS" \
-    | sed -e "s|/etc/openchamber/policy.json|$OCV_POLICY|g" \
+OCV_BLOCK="$(awk '/^_oc_policy=/{_ocv=1} _ocv{ if ($0 ~ /^f="\/home/) exit; print }' "$STATUS" |
+    sed -e "s|/etc/openchamber/policy.json|$OCV_POLICY|g" \
         -e "s|/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode|$OCV_WRAPPER|g" \
         -e "s|/usr/local/bin/opencode|$OCV_KITBIN|g" \
         -e "s|^_oc_home=.*|_oc_home=\"$OCV_HOME\"|")"
@@ -809,10 +830,10 @@ fi
 # 3. F4: plain shadow binary, OpenChamber not installed -> shadow note,
 #    never the red BYPASSED verdict
 rm -f "${OCV_HOME:?}/.opencode/bin/opencode"
-echo fake > "$OCV_HOME/.opencode/bin/opencode"
+echo fake >"$OCV_HOME/.opencode/bin/opencode"
 out="$(ocv_run without)"
-if printf '%s' "$out" | grep -q 'not installed' \
-    && ! printf '%s' "$out" | grep -q 'BYPASSED'; then
+if printf '%s' "$out" | grep -q 'not installed' &&
+    ! printf '%s' "$out" | grep -q 'BYPASSED'; then
     pass "verdict matrix: shadow binary without OpenChamber is not BYPASSED (0.0.47a F4)"
 else
     fail "verdict matrix: shadow binary without OpenChamber is not BYPASSED (0.0.47a F4) (got: $out)"
@@ -821,7 +842,7 @@ fi
 # 4. settings pin (config dir present) -> BYPASSED
 mkdir -p "$OCV_HOME/.config/openchamber"
 printf '{ "opencodeBinary": "/tmp/evil-opencode" }\n' \
-    > "$OCV_HOME/.config/openchamber/settings.json"
+    >"$OCV_HOME/.config/openchamber/settings.json"
 out="$(ocv_run without)"
 if printf '%s' "$out" | grep -q 'BYPASSED'; then
     pass "verdict matrix: settings pin without policy -> BYPASSED"
@@ -830,10 +851,10 @@ else
 fi
 
 # 5. policy pins the kit bin -> secured, leftovers noted as inert
-printf '{ "opencodeBinary": "%s" }\n' "$OCV_KITBIN" > "$OCV_POLICY"
+printf '{ "opencodeBinary": "%s" }\n' "$OCV_KITBIN" >"$OCV_POLICY"
 out="$(ocv_run without)"
-if printf '%s' "$out" | grep -q 'secured via policy pin' \
-    && printf '%s' "$out" | grep -q 'leftover bypass files present'; then
+if printf '%s' "$out" | grep -q 'secured via policy pin' &&
+    printf '%s' "$out" | grep -q 'leftover bypass files present'; then
     pass "verdict matrix: policy secures, leftovers called inert"
 else
     fail "verdict matrix: policy secures, leftovers called inert (got: $out)"
@@ -844,8 +865,8 @@ fi
 rm -f "${OCV_HOME:?}/.opencode/bin/opencode" "${OCV_HOME:?}/.config/openchamber/settings.json"
 ln -s "$OCV_WRAPPER" "$OCV_HOME/.opencode/bin/opencode"
 out="$(ocv_run without)"
-if printf '%s' "$out" | grep -q 'secured via policy pin' \
-    && ! printf '%s' "$out" | grep -q 'leftover'; then
+if printf '%s' "$out" | grep -q 'secured via policy pin' &&
+    ! printf '%s' "$out" | grep -q 'leftover'; then
     pass "verdict matrix: kit symlink under policy is not a leftover (0.0.47a F3)"
 else
     fail "verdict matrix: kit symlink under policy is not a leftover (0.0.47a F3) (got: $out)"
@@ -854,7 +875,7 @@ fi
 # 7. advice state via the command marker (no files, fake openchamber on PATH)
 rm -f "${OCV_HOME:?}/.opencode/bin/opencode" "${OCV_POLICY:?}" \
     "${OCV_HOME:?}/.config/openchamber/settings.json"
-printf '#!/bin/sh\n' > "$OCV_BINDIR/openchamber"
+printf '#!/bin/sh\n' >"$OCV_BINDIR/openchamber"
 chmod +x "$OCV_BINDIR/openchamber"
 out="$(ocv_run with)"
 if printf '%s' "$out" | grep -q 'policy pin missing'; then
@@ -884,10 +905,10 @@ fi
 # .git/config wording: "protected"/"access allowed" instead of ON/OFF;
 # OFF deliberately NEUTRAL (a conscious config choice is a hint, not a
 # warning — maintainer decision on the ticket).
-if grep -qF 'ui_kv_ok ".git/config" "protected (soft-only — agent tools blocked)"' "$STATUS" \
-   && grep -qF 'ui_kv ".git/config" "access allowed (agent tools may edit git config)"' "$STATUS" \
-   && ! grep -qF '"ON (soft-only' "$STATUS" \
-   && ! grep -qF 'ui_kv ".git/config" "OFF"' "$STATUS"; then
+if grep -qF 'ui_kv_ok ".git/config" "protected (soft-only — agent tools blocked)"' "$STATUS" &&
+    grep -qF 'ui_kv ".git/config" "access allowed (agent tools may edit git config)"' "$STATUS" &&
+    ! grep -qF '"ON (soft-only' "$STATUS" &&
+    ! grep -qF 'ui_kv ".git/config" "OFF"' "$STATUS"; then
     pass ".git/config row reads protected / access allowed (issue #158)"
 else
     fail ".git/config row wording regressed to ON/OFF"
@@ -896,8 +917,8 @@ fi
 # Sweep invariant: status.sh carries NO raw color-argument ui_kv rows
 # anymore — every verdict row goes through the semantic helpers, so the
 # summary cannot miss one (class sweep of the 62 sites, 0.0.46a F2 style).
-if ! grep -qE '"\$UI_(GREEN|YELLOW|RED)"' "$STATUS" \
-   && grep -q 'ui_kv_ok ' "$STATUS" && grep -q 'ui_kv_bad ' "$STATUS"; then
+if ! grep -qE '"\$UI_(GREEN|YELLOW|RED)"' "$STATUS" &&
+    grep -q 'ui_kv_ok ' "$STATUS" && grep -q 'ui_kv_bad ' "$STATUS"; then
     pass "status.sh: all colored rows use semantic helpers (countable)"
 else
     fail "status.sh: raw colored ui_kv row survived the sweep"
@@ -912,9 +933,9 @@ fi
 # Severity tallies only see MAIN-shell rows: the three scanning loops
 # feed from temp files via redirect, never from a `cmd | while` pipe
 # (counter bumps inside a pipe subshell die there). Shape pins per site.
-if grep -qF 'done < "$_st_share_list"' "$STATUS" \
-   && grep -qF 'done < "$_st_hosts_list"' "$STATUS" \
-   && grep -qF '_st_dbdump_gap "$DEFAULT_USER" < "$_st_gap_roots"' "$STATUS"; then
+if grep -qF 'done <"$_st_share_list"' "$STATUS" &&
+    grep -qF 'done <"$_st_hosts_list"' "$STATUS" &&
+    grep -qF '_st_dbdump_gap "$DEFAULT_USER" <"$_st_gap_roots"' "$STATUS"; then
     pass "scan loops run in the main shell (redirect, not pipe)"
 else
     fail "a scan loop prints its findings from a pipe subshell again"
@@ -923,8 +944,8 @@ fi
 # One-line mode must be exactly one line: no raw echo/printf leaks past
 # UI_SILENT (the hosts-scan add-lines and the leak-scan hit list are the
 # two raw-print sites; both are guarded/converted).
-if grep -qF 'ui_detail "add: opk ddev-hosts-add' "$STATUS" \
-   && ! grep -qF 'echo "     add' "$STATUS"; then
+if grep -qF 'ui_detail "add: opk ddev-hosts-add' "$STATUS" &&
+    ! grep -qF 'echo "     add' "$STATUS"; then
     pass "--short: raw-print sites converted/guarded (one-line discipline)"
 else
     fail "a raw print site can leak past UI_SILENT"
@@ -933,8 +954,8 @@ fi
 # Checkout-first lib resolution (0.0.46a F4 pattern): a checkout run must
 # source ITS OWN ui.sh/git-check.sh — a deployed pre-#158 copy would drop
 # every ui_kv_ok/ui_kv_bad row (command not found) and the verdict.
-if grep -qF 'UI_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/ui.sh"' "$STATUS" \
-   && grep -qF 'GIT_CHECK_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/git-check.sh"' "$STATUS"; then
+if grep -qF 'UI_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/ui.sh"' "$STATUS" &&
+    grep -qF 'GIT_CHECK_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/git-check.sh"' "$STATUS"; then
     pass "status.sh resolves ui.sh/git-check.sh checkout-first"
 else
     fail "status.sh resolves ui.sh/git-check.sh deployed-first (pre-#158 skew)"
@@ -975,9 +996,12 @@ if [ -n "$SUMMARY_BLOCK" ]; then
         _rs_rc=0
         _rs_out=$(
             (
-                set -u; set +e
+                set -u
+                set +e
                 . "$UI_LIB"
-                UI_ROWS_BAD=$1; UI_ROWS_WARN=$2; UI_ROWS_OK=$3
+                UI_ROWS_BAD=$1
+                UI_ROWS_WARN=$2
+                UI_ROWS_OK=$3
                 STATUS_SHORT=$4
                 if [ "$STATUS_SHORT" = true ]; then UI_SILENT=1; else UI_SILENT=0; fi
                 ui_section() { printf 'SECTION:%s\n' "$1"; }
@@ -987,10 +1011,10 @@ if [ -n "$SUMMARY_BLOCK" ]; then
         printf '%s\nrc=%s\n' "$_rs_out" "$_rs_rc"
     }
     _sum=$(run_summary 1 2 5 false)
-    if printf '%s' "$_sum" | grep -q '1 alert(s), 2 warning(s)' \
-       && printf '%s' "$_sum" | grep -q 'see the sections above' \
-       && printf '%s' "$_sum" | grep -q 'SECTION:Summary' \
-       && printf '%s' "$_sum" | grep -q 'rc=1'; then
+    if printf '%s' "$_sum" | grep -q '1 alert(s), 2 warning(s)' &&
+        printf '%s' "$_sum" | grep -q 'see the sections above' &&
+        printf '%s' "$_sum" | grep -q 'SECTION:Summary' &&
+        printf '%s' "$_sum" | grep -q 'rc=1'; then
         pass "verdict: alerts+warnings rendered, exit 1, full mode"
     else
         fail "verdict alert case broken (got: $_sum)"
@@ -1004,24 +1028,24 @@ if [ -n "$SUMMARY_BLOCK" ]; then
         fail "verdict row counts itself (snapshot sits too late)"
     fi
     _sum=$(run_summary 0 1 5 false)
-    if printf '%s' "$_sum" | grep -q '1 warning(s)' \
-       && printf '%s' "$_sum" | grep -q 'rc=2'; then
+    if printf '%s' "$_sum" | grep -q '1 warning(s)' &&
+        printf '%s' "$_sum" | grep -q 'rc=2'; then
         pass "verdict: warnings only, exit 2"
     else
         fail "verdict warning case broken (got: $_sum)"
     fi
     _sum=$(run_summary 0 0 7 false)
-    if printf '%s' "$_sum" | grep -q 'All green' \
-       && printf '%s' "$_sum" | grep -q '7 checks passed' \
-       && printf '%s' "$_sum" | grep -q 'rc=0'; then
+    if printf '%s' "$_sum" | grep -q 'All green' &&
+        printf '%s' "$_sum" | grep -q '7 checks passed' &&
+        printf '%s' "$_sum" | grep -q 'rc=0'; then
         pass "verdict: all green with the pass count, exit 0"
     else
         fail "verdict green case broken (got: $_sum)"
     fi
     _sum=$(run_summary 1 2 5 true)
-    if printf '%s' "$_sum" | grep -q "run 'opk status' for the full report" \
-       && ! printf '%s' "$_sum" | grep -q 'SECTION:Summary' \
-       && printf '%s' "$_sum" | grep -q 'rc=1'; then
+    if printf '%s' "$_sum" | grep -q "run 'opk status' for the full report" &&
+        ! printf '%s' "$_sum" | grep -q 'SECTION:Summary' &&
+        printf '%s' "$_sum" | grep -q 'rc=1'; then
         pass "verdict --short: one line, no section header, exit 1"
     else
         fail "verdict --short case broken (got: $_sum)"
@@ -1033,8 +1057,8 @@ fi
 if ! id opencode >/dev/null 2>&1; then
     ni_rc=0
     ni_out=$(sh "$STATUS" --short 2>&1) || ni_rc=$?
-    if [ "$ni_rc" = "1" ] && printf '%s' "$ni_out" | grep -q 'not installed — hardening NOT active' \
-       && [ "$(printf '%s\n' "$ni_out" | grep -c .)" = "1" ]; then
+    if [ "$ni_rc" = "1" ] && printf '%s' "$ni_out" | grep -q 'not installed — hardening NOT active' &&
+        [ "$(printf '%s\n' "$ni_out" | grep -c .)" = "1" ]; then
         pass "not-installed + --short: exactly one line, exit 1"
     else
         fail "not-installed + --short broken (rc=$ni_rc out=$ni_out)"
@@ -1108,16 +1132,16 @@ EOF
 
 if [ -n "$W2_BLOCK_SHARE" ]; then
     _w2out=$(w2_run "$W2_BLOCK_SHARE" false || true)
-    if printf '%s' "$_w2out" | grep -q '^WARN|ddev share|scan skipped for /var/www/w2-proj' \
-        && ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' \
-        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+    if printf '%s' "$_w2out" | grep -q '^WARN|ddev share|scan skipped for /var/www/w2-proj' &&
+        ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' &&
+        ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
         pass "W2 share scan: mktemp failure warns loudly, no find, no rm"
     else
         fail "W2 share scan: mktemp failure must warn and skip (got: $_w2out)"
     fi
     _w2out=$(w2_run "$W2_BLOCK_SHARE" true || true)
-    if ! printf '%s' "$_w2out" | grep -q 'scan skipped' \
-        && printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+    if ! printf '%s' "$_w2out" | grep -q 'scan skipped' &&
+        printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
         pass "W2 share scan: working mktemp flows find→report→cleanup (control)"
     else
         fail "W2 share scan control broken (got: $_w2out)"
@@ -1125,9 +1149,9 @@ if [ -n "$W2_BLOCK_SHARE" ]; then
 fi
 if [ -n "$W2_BLOCK_HOSTS" ]; then
     _w2out=$(w2_run "$W2_BLOCK_HOSTS" false || true)
-    if printf '%s' "$_w2out" | grep -q '^WARN|hosts (win)|scan skipped for /var/www/w2-proj' \
-        && ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' \
-        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+    if printf '%s' "$_w2out" | grep -q '^WARN|hosts (win)|scan skipped for /var/www/w2-proj' &&
+        ! printf '%s' "$_w2out" | grep -q 'FIND-CALLED' &&
+        ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
         pass "W2 hosts scan: mktemp failure warns loudly, no find, no rm"
     else
         fail "W2 hosts scan: mktemp failure must warn and skip (got: $_w2out)"
@@ -1135,9 +1159,9 @@ if [ -n "$W2_BLOCK_HOSTS" ]; then
 fi
 if [ -n "$W2_BLOCK_GAP" ]; then
     _w2out=$(w2_run "$W2_BLOCK_GAP" false || true)
-    if printf '%s' "$_w2out" | grep -q '^WARN|db dumps|gap scan skipped' \
-        && ! printf '%s' "$_w2out" | grep -q 'GAP-CALLED' \
-        && ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
+    if printf '%s' "$_w2out" | grep -q '^WARN|db dumps|gap scan skipped' &&
+        ! printf '%s' "$_w2out" | grep -q 'GAP-CALLED' &&
+        ! printf '%s' "$_w2out" | grep -q 'RM-CALLED'; then
         pass "W2 dbdump gap: mktemp failure warns loudly, scan skipped"
     else
         fail "W2 dbdump gap: mktemp failure must warn and skip (got: $_w2out)"
@@ -1197,22 +1221,22 @@ _w2_can_file="$WORK/w2-canary.sh"
     echo '_w2_can_g=$(mktemp) || {'
     echo '    _w2_can_g=/dev/null'
     echo '}'
-} > "$_w2_can_file"
+} >"$_w2_can_file"
 _w2_can_hits="$(grep -nE "$W2_FIXPATH_A|$W2_FIXPATH_B" "$_w2_can_file" || true)"
-if printf '%s' "$_w2_can_hits" | grep -q '^1:' \
-   && printf '%s' "$_w2_can_hits" | grep -q '^2:' \
-   && printf '%s' "$_w2_can_hits" | grep -q '^3:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^4:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^5:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^6:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^7:' \
-   && printf '%s' "$_w2_can_hits" | grep -q '^8:' \
-   && printf '%s' "$_w2_can_hits" | grep -q '^9:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^10:' \
-   && printf '%s' "$_w2_can_hits" | grep -q '^11:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^12:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^13:' \
-   && ! printf '%s' "$_w2_can_hits" | grep -q '^14:'; then
+if printf '%s' "$_w2_can_hits" | grep -q '^1:' &&
+    printf '%s' "$_w2_can_hits" | grep -q '^2:' &&
+    printf '%s' "$_w2_can_hits" | grep -q '^3:' &&
+    ! printf '%s' "$_w2_can_hits" | grep -q '^4:' &&
+    ! printf '%s' "$_w2_can_hits" | grep -q '^5:' &&
+    ! printf '%s' "$_w2_can_hits" | grep -q '^6:' &&
+    ! printf '%s' "$_w2_can_hits" | grep -q '^7:' &&
+    printf '%s' "$_w2_can_hits" | grep -q '^8:' &&
+    printf '%s' "$_w2_can_hits" | grep -q '^9:' &&
+    ! printf '%s' "$_w2_can_hits" | grep -q '^10:' &&
+    printf '%s' "$_w2_can_hits" | grep -q '^11:' &&
+    ! printf '%s' "$_w2_can_hits" | grep -q '^12:' &&
+    ! printf '%s' "$_w2_can_hits" | grep -q '^13:' &&
+    ! printf '%s' "$_w2_can_hits" | grep -q '^14:'; then
     pass "W2 sweep canary: catches all six offending lines (incl. quoted, prefixed, un-muffled), spares all eight non-match lines"
 else
     fail "W2 sweep canary: pattern is blind or over-broad (got: $_w2_can_hits)"
@@ -1227,13 +1251,13 @@ fi
 # Comment-strip rider (#261, the #244 g W1 class) on the socket-twin
 # count: commented-out rows stop counting; full-line comments only
 # (#244 h W6 residual).
-if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS" \
-    && [ "$(sed 's/^[[:space:]]*#.*$//' "$STATUS" \
-        | grep -cF 'ui_kv "socket" "unknown — needs root to check' || true)" = "2" ] \
-    && grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$STATUS" \
-    && grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS" \
-    && ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" \
-    && ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS"; then
+if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS" &&
+    [ "$(sed 's/^[[:space:]]*#.*$//' "$STATUS" |
+        grep -cF 'ui_kv "socket" "unknown — needs root to check' || true)" = "2" ] &&
+    grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$STATUS" &&
+    grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS" &&
+    ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" &&
+    ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS"; then
     pass "W3: unknown/optional rows are uncounted (plain ui_kv, both socket twins)"
 else
     fail "W3: an unknown/optional row still counts (or the conversion drifted)"
@@ -1298,8 +1322,8 @@ fi
 # the probe; with a working binary, the probe path runs and no warn
 # fires. Behavioral: the extracted gate block against fixture LIBDIRs.
 W48C_BLOCK_ADV="$(sed -n '/^    ADV_VER=""$/,/^    fi$/p' "$STATUS")"
-if printf '%s' "$W48C_BLOCK_ADV" | grep -q 'ui_kv_warn "opencode binary"' \
-    && printf '%s' "$W48C_BLOCK_ADV" | grep -q 'elif command -v sudo'; then
+if printf '%s' "$W48C_BLOCK_ADV" | grep -q 'ui_kv_warn "opencode binary"' &&
+    printf '%s' "$W48C_BLOCK_ADV" | grep -q 'elif command -v sudo'; then
     pass "C1 gate block extractable (warn + elif shape)"
 else
     fail "C1 gate block not extractable (anchor drift?)"
@@ -1310,8 +1334,14 @@ w48c_run() {
         ui_kv() { echo "KV|$1|$2"; }
         # timeout is external — it would exec the REAL sudo, invisible to
         # the stub below; drop the duration and exec in-shell instead.
-        timeout() { shift 1; "$@"; }
-        sudo() { shift 3; "$@"; }
+        timeout() {
+            shift 1
+            "$@"
+        }
+        sudo() {
+            shift 3
+            "$@"
+        }
         LIBDIR="$1"
         OPENCODE_USER=opencode
         eval "$2"
@@ -1322,19 +1352,19 @@ if [ -n "$W48C_BLOCK_ADV" ]; then
     # broken kit: no bin/opencode under LIBDIR
     _c1dir=$(mktemp -d)
     _c1out=$(w48c_run "$_c1dir" "$W48C_BLOCK_ADV" || true)
-    if printf '%s' "$_c1out" | grep -q '^WARN|opencode binary|missing or not executable' \
-        && printf '%s' "$_c1out" | grep -q '^ADV_VER=unset$'; then
+    if printf '%s' "$_c1out" | grep -q '^WARN|opencode binary|missing or not executable' &&
+        printf '%s' "$_c1out" | grep -q '^ADV_VER=unset$'; then
         pass "C1: missing binary warns (counted), probe never runs"
     else
         fail "C1: missing binary must warn loudly (got: $_c1out)"
     fi
     # control: executable fake binary -> probe path runs, no warn
     mkdir -p "$_c1dir/bin"
-    printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_c1dir/bin/opencode"
+    printf '#!/bin/sh\necho "opencode 9.9.9"\n' >"$_c1dir/bin/opencode"
     chmod +x "$_c1dir/bin/opencode"
     _c1out=$(w48c_run "$_c1dir" "$W48C_BLOCK_ADV" || true)
-    if ! printf '%s' "$_c1out" | grep -q '^WARN|' \
-        && printf '%s' "$_c1out" | grep -q '^ADV_VER=9.9.9$'; then
+    if ! printf '%s' "$_c1out" | grep -q '^WARN|' &&
+        printf '%s' "$_c1out" | grep -q '^ADV_VER=9.9.9$'; then
         pass "C1: working binary probes (control), no warn"
     else
         fail "C1 control broken (got: $_c1out)"
@@ -1357,18 +1387,18 @@ W48D_BLOCK_RENDER="$(sed -n '/^    if \[ -n "\$ADV_VER" \]; then$/,/^    fi$/p' 
 # harness below evals gate + capture + render; a construct placed
 # outside all three would be untested here and drift silently.
 W201_BLOCK_CAPTURE="$(sed -n '/^    ADV_DIRECT_OUT=""$/,/^    fi$/p' "$STATUS")"
-if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'elif [ -n "${ADV_DIRECT_RC:-}" ]' \
-    && printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ui_kv "opencode version" "unknown — probe failed'; then
+if printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'elif [ -n "${ADV_DIRECT_RC:-}" ]' &&
+    printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'ui_kv "opencode version" "unknown — probe failed'; then
     pass "D1 render block extractable (elif-gated unknown row)"
 else
     fail "D1 render block not extractable (anchor drift?)"
 fi
 # Issue #163/#201: the classifier now lives in the capture block and
 # feeds ADV_VER/ADV_DIRECT_RC into the render — pin both halves.
-if [ -n "$W201_BLOCK_CAPTURE" ] \
-    && printf '%s' "$W201_BLOCK_CAPTURE" | grep -qF 'ADV_DIRECT_RC=$?' \
-    && printf '%s' "$W201_BLOCK_CAPTURE" | grep -qF 'grep -m1 -oE' \
-    && printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'present but broken'; then
+if [ -n "$W201_BLOCK_CAPTURE" ] &&
+    printf '%s' "$W201_BLOCK_CAPTURE" | grep -qF 'ADV_DIRECT_RC=$?' &&
+    printf '%s' "$W201_BLOCK_CAPTURE" | grep -qF 'grep -m1 -oE' &&
+    printf '%s' "$W48D_BLOCK_RENDER" | grep -qF 'present but broken'; then
     pass "#201/#163: capture block extractable (rc + version extract), render keeps the broken arm"
 else
     fail "#201/#163: capture block not extractable (anchor drift?)"
@@ -1376,8 +1406,8 @@ fi
 # Issue #201: the dead-end advice lives ONLY in the #166 cell now —
 # exactly one literal (a second occurrence would mean a healthy-direct
 # or unparsable cell advising sudo again).
-if [ "$(sed 's/^[[:space:]]*#.*$//' "$STATUS" | grep -cF 'unknown — probe failed (run: sudo opk status)' \
-    || true)" = "1" ]; then
+if [ "$(sed 's/^[[:space:]]*#.*$//' "$STATUS" | grep -cF 'unknown — probe failed (run: sudo opk status)' ||
+    true)" = "1" ]; then
     pass "#201: the sudo-opk-status advice is #166-cell only (one literal)"
 else
     fail "#201: the sudo-advice literal count drifted (expected exactly 1)"
@@ -1409,10 +1439,10 @@ if [ -f "$ADV_SRC" ] && [ -n "$W201_BLOCK_BRIDGE" ]; then
             printf '%s\n' "$_st_bridge_unneeded"
         )
     }
-    if [ "$(w201_bridge 1.19.0)" = 1 ] && [ "$(w201_bridge 1.18.33)" = 1 ] \
-        && [ "$(w201_bridge 2.0.19)" = 1 ] && [ "$(w201_bridge 2.0.18)" = 1 ] \
-        && [ "$(w201_bridge 2.0.17)" = 0 ] && [ "$(w201_bridge 1.18.32)" = 0 ] \
-        && [ "$(w201_bridge "")" = 0 ]; then
+    if [ "$(w201_bridge 1.19.0)" = 1 ] && [ "$(w201_bridge 1.18.33)" = 1 ] &&
+        [ "$(w201_bridge 2.0.19)" = 1 ] && [ "$(w201_bridge 2.0.18)" = 1 ] &&
+        [ "$(w201_bridge 2.0.17)" = 0 ] && [ "$(w201_bridge 1.18.32)" = 0 ] &&
+        [ "$(w201_bridge "")" = 0 ]; then
         pass "#201: bridge verdict keys on ADV_VER (1.18.33+/2.0.18+ unneeded, older/unknown keep the carrier)"
     else
         fail "#201: bridge ADV_VER keying drifted (extract: $W201_BLOCK_BRIDGE)"
@@ -1434,8 +1464,8 @@ if [ -f "$ADV_SRC" ] && [ -n "$W201_BLOCK_BRIDGE" ]; then
             printf '%s\n' "$_st_bridge_unneeded"
         )
     }
-    if [ "$(w201_bridge_nocmp 1.19.0)" = 0 ] && [ "$(w201_bridge_nocmp 2.0.18)" = 0 ] \
-        && [ "$(w201_bridge_nocmp "")" = 0 ]; then
+    if [ "$(w201_bridge_nocmp 1.19.0)" = 0 ] && [ "$(w201_bridge_nocmp 2.0.18)" = 0 ] &&
+        [ "$(w201_bridge_nocmp "")" = 0 ]; then
         pass "#201: missing comparator keeps the carrier (guard fails safe)"
     else
         fail "#201: bridge guard lost its fail-safe (extract: $W201_BLOCK_BRIDGE)"
@@ -1453,14 +1483,20 @@ w48d_run() {
         # render-only stub: no advisories database in the fixture — the
         # OK branch is the one under test, not the matching logic.
         advisories_matching() { return 1; }
-        timeout() { shift 1; "$@"; }
+        timeout() {
+            shift 1
+            "$@"
+        }
         # "refuse-sudo": mirror sudo -n's password refusal (rc 1, empty
         # output) — the W3 privilege shape. Otherwise the working-sudo
         # stub (strip the -n -u <user> prefix, exec as-is).
         if [ "$2" = "refuse-sudo" ]; then
             sudo() { return 1; }
         else
-            sudo() { shift 3; "$@"; }
+            sudo() {
+                shift 3
+                "$@"
+            }
         fi
         LIBDIR="$1"
         OPENCODE_USER=opencode
@@ -1477,21 +1513,21 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
     # advice must name the working repair — upgrade-opencode, not plain
     # update (0.0.49a W1: a plain update never touches the binary).
     _d1out=$(w48d_run "$_d1dir" || true)
-    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|' \
-        && printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|.*fix: sudo opk upgrade-opencode' \
-        && ! printf '%s' "$_d1out" | grep -q 'fix: sudo opk update)' \
-        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|' &&
+        printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|.*fix: sudo opk upgrade-opencode' &&
+        ! printf '%s' "$_d1out" | grep -q 'fix: sudo opk update)' &&
+        ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
         pass "D1: missing binary warns, naming the working repair (0.0.49a W1)"
     else
         fail "D1: missing binary warn must name upgrade-opencode, not plain update (got: $_d1out)"
     fi
     # working binary: probe renders the OK row, no unknown row
     mkdir -p "$_d1dir/bin"
-    printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_d1dir/bin/opencode"
+    printf '#!/bin/sh\necho "opencode 9.9.9"\n' >"$_d1dir/bin/opencode"
     chmod +x "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" || true)
-    if printf '%s' "$_d1out" | grep -q '^OK|opencode 9.9.9|' \
-        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+    if printf '%s' "$_d1out" | grep -q '^OK|opencode 9.9.9|' &&
+        ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
         pass "D1: working binary renders the OK row, no unknown row"
     else
         fail "D1: working binary must render via ADV_VER (got: $_d1out)"
@@ -1501,12 +1537,12 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
     # bits. The direct probe classifies it (rc != 0, caller-independent)
     # into a COUNTED warn; the "sudo opk status" advice must not print
     # because no privilege resolves this shape.
-    printf '\177ELFbroken-fixture' > "$_d1dir/bin/opencode"
+    printf '\177ELFbroken-fixture' >"$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" || true)
-    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|present but broken' \
-        && printf '%s' "$_d1out" | grep -q 'fix: sudo opk upgrade-opencode' \
-        && ! printf '%s' "$_d1out" | grep -q 'fix: sudo opk update)' \
-        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|present but broken' &&
+        printf '%s' "$_d1out" | grep -q 'fix: sudo opk upgrade-opencode' &&
+        ! printf '%s' "$_d1out" | grep -q 'fix: sudo opk update)' &&
+        ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
         pass "D1/#163: corrupt binary counts a warn with the working repair (0.0.49a W1)"
     else
         fail "D1/#163: corrupt binary must warn (counted) naming upgrade-opencode, not plain update (got: $_d1out)"
@@ -1517,13 +1553,13 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
     # at their own privilege, never the dead-end "sudo opk status"
     # advice they cannot act on. The 007 pins below keep the genuinely
     # privilege-bound shapes uncounted (W3 survives there).
-    printf '#!/bin/sh\necho "opencode 9.9.9"\n' > "$_d1dir/bin/opencode"
+    printf '#!/bin/sh\necho "opencode 9.9.9"\n' >"$_d1dir/bin/opencode"
     chmod +x "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
-    if printf '%s' "$_d1out" | grep -q '^OK|opencode 9.9.9|' \
-        && ! printf '%s' "$_d1out" | grep -q '^WARN|' \
-        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed' \
-        && ! printf '%s' "$_d1out" | grep -q 'sudo opk status'; then
+    if printf '%s' "$_d1out" | grep -q '^OK|opencode 9.9.9|' &&
+        ! printf '%s' "$_d1out" | grep -q '^WARN|' &&
+        ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed' &&
+        ! printf '%s' "$_d1out" | grep -q 'sudo opk status'; then
         pass "#201: sudo-refused + healthy binary renders the real verdict, no dead-end advice"
     else
         fail "#201: healthy binary at a sudo-less caller must answer, not advise (got: $_d1out)"
@@ -1532,12 +1568,12 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
     # semver (a dev build) — informational unknown WITHOUT the sudo
     # advice: this caller may hold no sudo rights, and sudo would exec
     # the same binary to the same unparsable answer.
-    printf '#!/bin/sh\necho "opencode dev-custom-build"\n' > "$_d1dir/bin/opencode"
+    printf '#!/bin/sh\necho "opencode dev-custom-build"\n' >"$_d1dir/bin/opencode"
     chmod +x "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
-    if printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — binary runs for this caller' \
-        && ! printf '%s' "$_d1out" | grep -q '^WARN|' \
-        && ! printf '%s' "$_d1out" | grep -q 'sudo opk status'; then
+    if printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — binary runs for this caller' &&
+        ! printf '%s' "$_d1out" | grep -q '^WARN|' &&
+        ! printf '%s' "$_d1out" | grep -q 'sudo opk status'; then
         pass "#201: rc 0 without a parsable version stays informational, no dead-end advice"
     else
         fail "#201: unparsable --version must not advise sudo (got: $_d1out)"
@@ -1556,8 +1592,8 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
         echo "  info   suite runs as root — 007 fixture cannot simulate a caller outside the audience (issue #166)"
     else
         _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
-        if ! printf '%s' "$_d1out" | grep -q '^WARN|' \
-            && printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
+        if ! printf '%s' "$_d1out" | grep -q '^WARN|' &&
+            printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
             pass "#166: binary executable only by its audience (007, caller denied) renders the unknown row, no warn"
         else
             fail "#166: caller-denied binary must not count a warn over a healthy kit (got: $_d1out)"
@@ -1568,11 +1604,11 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
         # arm's verdict (the corrupt-vs-healthy split stays root's to
         # judge, the elif's documented contract).
         chmod 700 "$_d1dir/bin/opencode"
-        printf '\177ELFbroken-fixture' > "$_d1dir/bin/opencode"
+        printf '\177ELFbroken-fixture' >"$_d1dir/bin/opencode"
         chmod 007 "$_d1dir/bin/opencode"
         _d1out=$(w48d_run "$_d1dir" refuse-sudo || true)
-        if ! printf '%s' "$_d1out" | grep -q '^WARN|' \
-            && printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
+        if ! printf '%s' "$_d1out" | grep -q '^WARN|' &&
+            printf '%s' "$_d1out" | grep -q '^KV|opencode version|unknown — probe failed'; then
             pass "#200 a W2: corrupt content behind a caller-denied mode keeps the unknown row (content-independent)"
         else
             fail "#200 a W2: caller-denied arm must not observe content (got: $_d1out)"
@@ -1583,8 +1619,8 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
     # this pin holds under a root-run suite too.
     chmod 644 "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" || true)
-    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' \
-        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' &&
+        ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
         pass "#166: no-execute-bit binary keeps the counted warn (broken kit)"
     else
         fail "#166: no-execute-bit binary must stay a counted warn (got: $_d1out)"
@@ -1594,8 +1630,8 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
     # pinned; caller-independent, so root-run suites hold too).
     chmod 4400 "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" || true)
-    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' \
-        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' &&
+        ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
         pass "#200 a W2: setuid with no x bit (4400) keeps the counted warn"
     else
         fail "#200 a W2: special digit must not fake any-x (got: $_d1out)"
@@ -1608,18 +1644,18 @@ if [ -n "$W48C_BLOCK_ADV" ] && [ -n "$W48D_BLOCK_RENDER" ] && [ -n "$W201_BLOCK_
     # a root-run suite too.
     ln -sf /nonexistent-opk-166 "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" || true)
-    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' \
-        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' &&
+        ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
         pass "#200 a W1: dangling symlink counts the warn (broken kit)"
     else
         fail "#200 a W1: dangling symlink must stay a counted warn (got: $_d1out)"
     fi
-    printf 'x' > "$_d1dir/nox-target"
+    printf 'x' >"$_d1dir/nox-target"
     chmod 644 "$_d1dir/nox-target"
     ln -sf "$_d1dir/nox-target" "$_d1dir/bin/opencode"
     _d1out=$(w48d_run "$_d1dir" || true)
-    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' \
-        && ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
+    if printf '%s' "$_d1out" | grep -q '^WARN|opencode binary|missing or not executable' &&
+        ! printf '%s' "$_d1out" | grep -q 'unknown — probe failed'; then
         pass "#200 a W1: symlink judged by its TARGET's bits (no-x target counts the warn)"
     else
         fail "#200 a W1: symlink must be judged by its target, not the link's 777 (got: $_d1out)"
@@ -1639,34 +1675,40 @@ _hk_block="$(sed -n '/^# ddev() hook row (issue #192)/,/^fi$/p' "$STATUS")"
 if [ -n "$_hk_block" ]; then
     pass "ddev() hook row block extractable from status.sh (issue #192)"
     mkdir -p "$WORK/libkit/sh"
-    : > "$WORK/libkit/sh/ddev-terminal.sh"
+    : >"$WORK/libkit/sh/ddev-terminal.sh"
     # _hk_run <user> <uid|empty=id-fails> <home|empty-for-getent-miss>:
     # prints the row output; stubs decide id/getent so no arm depends on
     # host users. An EMPTY uid makes id fail, executing the probe's
     # `|| echo 1` fallback arm (#196 a T2).
     _hk_run() {
         (
-            HK_USER="$1"; HK_UID="$2"; HK_HOME="$3"
+            HK_USER="$1"
+            HK_UID="$2"
+            HK_HOME="$3"
             export HK_USER HK_UID HK_HOME DEFAULT_USER LIBDIR
             DEFAULT_USER="$HK_USER"
             LIBDIR="$WORK/libkit"
-            id() { [ "${1:-}" = "-u" ] || return 1; [ -n "$HK_UID" ] \
-                && printf '%s\n' "$HK_UID" || return 1; }
-            getent() {
-                [ "${1:-}" = passwd ] && [ "${2:-}" = "$HK_USER" ] && [ -n "$HK_HOME" ] \
-                    && printf 'x:x:1000:1000::%s:/bin/sh\n' "$HK_HOME"
+            id() {
+                [ "${1:-}" = "-u" ] || return 1
+                [ -n "$HK_UID" ] &&
+                    printf '%s\n' "$HK_UID" || return 1
             }
-            ui_kv_ok()   { echo "OK|$1|$2"; }
+            getent() {
+                [ "${1:-}" = passwd ] && [ "${2:-}" = "$HK_USER" ] && [ -n "$HK_HOME" ] &&
+                    printf 'x:x:1000:1000::%s:/bin/sh\n' "$HK_HOME"
+            }
+            ui_kv_ok() { echo "OK|$1|$2"; }
             ui_kv_warn() { echo "WARN|$1|$2"; }
-            ui_detail()  { echo "DETAIL|$1"; }
+            ui_detail() { echo "DETAIL|$1"; }
             eval "$_hk_block"
         ) 2>&1
     }
     # root developer: the loud install-defect row, never "not hooked"
-    _rc=0; _out=$(_hk_run root 0 "$WORK/anywhere") || _rc=$?
-    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q "WARN|ddev() hook|install broken — developer 'root' has uid 0" \
-       && printf '%s' "$_out" | grep -q 'opk update cannot fix this' \
-       && ! printf '%s' "$_out" | grep -q 'not hooked'; then
+    _rc=0
+    _out=$(_hk_run root 0 "$WORK/anywhere") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q "WARN|ddev() hook|install broken — developer 'root' has uid 0" &&
+        printf '%s' "$_out" | grep -q 'opk update cannot fix this' &&
+        ! printf '%s' "$_out" | grep -q 'not hooked'; then
         pass "uid-0 developer reports the broken install + reinstall fix"
     else
         fail "uid-0 developer reports the broken install + reinstall fix (rc=$_rc out=$_out)"
@@ -1674,8 +1716,9 @@ if [ -n "$_hk_block" ]; then
     # relocated home with the hook line: active, via the getent home
     mkdir -p "$WORK/hk-homeA"
     printf '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh\n' \
-        > "$WORK/hk-homeA/.bashrc"
-    _rc=0; _out=$(_hk_run hk-dev 1000 "$WORK/hk-homeA") || _rc=$?
+        >"$WORK/hk-homeA/.bashrc"
+    _rc=0
+    _out=$(_hk_run hk-dev 1000 "$WORK/hk-homeA") || _rc=$?
     if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF "OK|ddev() hook|active — $WORK/hk-homeA/.bashrc"; then
         pass "relocated home: hook found active via getent home"
     else
@@ -1683,24 +1726,27 @@ if [ -n "$_hk_block" ]; then
     fi
     # home exists, no hook line: the classic repairable warning stays
     mkdir -p "$WORK/hk-homeB"
-    printf '# plain rc without kit hooks\n' > "$WORK/hk-homeB/.bashrc"
-    _rc=0; _out=$(_hk_run hk-dev 1000 "$WORK/hk-homeB") || _rc=$?
+    printf '# plain rc without kit hooks\n' >"$WORK/hk-homeB/.bashrc"
+    _rc=0
+    _out=$(_hk_run hk-dev 1000 "$WORK/hk-homeB") || _rc=$?
     if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'WARN|ddev() hook|not hooked — run opk update'; then
         pass "existing home without hook keeps the repairable warning"
     else
         fail "existing home without hook keeps the repairable warning (rc=$_rc out=$_out)"
     fi
     # home missing: honest "cannot check" instead of unfulfillable advice
-    _rc=0; _out=$(_hk_run hk-dev 1000 "$WORK/hk-missing") || _rc=$?
-    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'WARN|ddev() hook|cannot check — home' \
-       && ! printf '%s' "$_out" | grep -q 'run opk update'; then
+    _rc=0
+    _out=$(_hk_run hk-dev 1000 "$WORK/hk-missing") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'WARN|ddev() hook|cannot check — home' &&
+        ! printf '%s' "$_out" | grep -q 'run opk update'; then
         pass "missing home: cannot-check row, no unfulfillable update advice"
     else
         fail "missing home: cannot-check row, no unfulfillable update advice (rc=$_rc out=$_out)"
     fi
     # getent miss: falls back to /home/<name> (never exists here — the
     # user name is suite-unique) — same honest cannot-check row
-    _rc=0; _out=$(_hk_run rug-nouser-x 1000 "") || _rc=$?
+    _rc=0
+    _out=$(_hk_run rug-nouser-x 1000 "") || _rc=$?
     if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -q 'cannot check — home'; then
         pass "getent miss: fallback path still reports cannot-check"
     else
@@ -1710,10 +1756,11 @@ if [ -n "$_hk_block" ]; then
     # NOT the uid-0 defect row; the hook is still read via the real home.
     mkdir -p "$WORK/hk-idfail"
     printf '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh\n' \
-        > "$WORK/hk-idfail/.bashrc"
-    _rc=0; _out=$(_hk_run hk-idfail "" "$WORK/hk-idfail") || _rc=$?
-    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF "OK|ddev() hook|active — $WORK/hk-idfail/.bashrc" \
-       && ! printf '%s' "$_out" | grep -q 'install broken'; then
+        >"$WORK/hk-idfail/.bashrc"
+    _rc=0
+    _out=$(_hk_run hk-idfail "" "$WORK/hk-idfail") || _rc=$?
+    if [ "$_rc" -eq 0 ] && printf '%s' "$_out" | grep -qF "OK|ddev() hook|active — $WORK/hk-idfail/.bashrc" &&
+        ! printf '%s' "$_out" | grep -q 'install broken'; then
         pass "id-probe failure: sentinel uid reads the hook, no false uid-0 row (executed)"
     else
         fail "id-probe failure: sentinel uid reads the hook, no false uid-0 row (rc=$_rc out=$_out)"
@@ -1738,24 +1785,24 @@ fi
 
 # a) advisories: negated-guard fallback, complete block
 _a165="$(sed -n '/^# Missing-lib fallback (issue #165):/,/^fi$/p' "$STATUS")"
-if printf '%s' "$_a165" | grep -qF 'if [ ! -f "$LIBDIR/sh/advisories.sh" ]' \
-    && printf '%s' "$_a165" | grep -qF 'ui_kv_warn "advisories database" "missing — security checks skipped (fix: sudo opk update)"'; then
+if printf '%s' "$_a165" | grep -qF 'if [ ! -f "$LIBDIR/sh/advisories.sh" ]' &&
+    printf '%s' "$_a165" | grep -qF 'ui_kv_warn "advisories database" "missing — security checks skipped (fix: sudo opk update)"'; then
     pass "#165: advisories fallback block extractable (negated guard + counted row)"
 else
     fail "#165: advisories fallback block not extractable (anchor drift?)"
 fi
 _a165_run() {
     (
-        ui_section()  { printf 'SECTION|%s\n' "$1"; }
-        ui_kv_warn()  { printf 'WARN|%s|%s\n' "$1" "$2"; }
+        ui_section() { printf 'SECTION|%s\n' "$1"; }
+        ui_kv_warn() { printf 'WARN|%s|%s\n' "$1" "$2"; }
         LIBDIR="$1"
         eval "$_a165"
     )
 }
 _a165_dir=$(mktemp -d "$WORK/a165.XXXXXX")
 _a165_out=$(_a165_run "$_a165_dir" || true)
-if printf '%s' "$_a165_out" | grep -q '^SECTION|Security advisories$' \
-    && printf '%s' "$_a165_out" | grep -q '^WARN|advisories database|missing — security checks skipped'; then
+if printf '%s' "$_a165_out" | grep -q '^SECTION|Security advisories$' &&
+    printf '%s' "$_a165_out" | grep -q '^WARN|advisories database|missing — security checks skipped'; then
     pass "#165: missing advisories lib renders the counted row, section named"
 else
     fail "#165: missing advisories lib must warn loudly (got: $_a165_out)"
@@ -1764,7 +1811,7 @@ fi
 # head (shipped guard + shipped sourcing + shipped section header; the
 # harness appends only the closing fi) the section still renders.
 mkdir -p "$_a165_dir/sh"
-: > "$_a165_dir/sh/advisories.sh"
+: >"$_a165_dir/sh/advisories.sh"
 _a165_out=$(_a165_run "$_a165_dir" || true)
 if [ -z "$_a165_out" ]; then
     pass "#165: present advisories lib keeps the fallback silent (control)"
@@ -1775,14 +1822,14 @@ _a165_head="$(sed -n '/^if \[ -f "\$LIBDIR\/sh\/advisories.sh" \]; then$/,/ui_se
 if [ -n "$_a165_head" ]; then
     _a165_out=$(
         (
-            ui_section()  { printf 'SECTION|%s\n' "$1"; }
-            ui_kv_warn()  { printf 'WARN|%s|%s\n' "$1" "$2"; }
+            ui_section() { printf 'SECTION|%s\n' "$1"; }
+            ui_kv_warn() { printf 'WARN|%s|%s\n' "$1" "$2"; }
             LIBDIR="$_a165_dir"
             eval "$(printf '%s\nfi\n' "$_a165_head")"
         ) 2>&1
     ) || true
-    if printf '%s' "$_a165_out" | grep -q '^SECTION|Security advisories$' \
-        && ! printf '%s' "$_a165_out" | grep -q '^WARN|'; then
+    if printf '%s' "$_a165_out" | grep -q '^SECTION|Security advisories$' &&
+        ! printf '%s' "$_a165_out" | grep -q '^WARN|'; then
         pass "#165: present advisories lib renders the section via the real guard (control)"
     else
         fail "#165: advisories real-guard control broken (got: $_a165_out)"
@@ -1793,32 +1840,37 @@ fi
 
 # b) ddev-terminal: compound guard + elif — complete block
 _t165="$(sed -n '/^if \[ -n "\$DEFAULT_USER" \] && \[ -f "\$LIBDIR\/sh\/ddev-terminal.sh" \]; then$/,/^fi$/p' "$STATUS")"
-if printf '%s' "$_t165" | grep -qF 'elif [ -n "$DEFAULT_USER" ]; then' \
-    && printf '%s' "$_t165" | grep -qF 'ui_kv_warn "ddev() hook" "not checked — kit file sh/ddev-terminal.sh missing (fix: sudo opk update)"'; then
+if printf '%s' "$_t165" | grep -qF 'elif [ -n "$DEFAULT_USER" ]; then' &&
+    printf '%s' "$_t165" | grep -qF 'ui_kv_warn "ddev() hook" "not checked — kit file sh/ddev-terminal.sh missing (fix: sudo opk update)"'; then
     pass "#165: ddev-terminal block extractable (compound guard + elif row)"
 else
     fail "#165: ddev-terminal block not extractable (anchor drift?)"
 fi
 _t165_run() {
     (
-        _t165_user="$1"; _t165_lib="$2"; _t165_home="$3"
+        _t165_user="$1"
+        _t165_lib="$2"
+        _t165_home="$3"
         DEFAULT_USER="$_t165_user"
         LIBDIR="$_t165_lib"
-        id() { [ "${1:-}" = "-u" ] || return 1; printf '%s\n' 1000; }
-        getent() {
-            [ "${1:-}" = passwd ] && [ "${2:-}" = "$_t165_user" ] && [ -n "$_t165_home" ] \
-                && printf 'x:x:1000:1000::%s:/bin/sh\n' "$_t165_home"
+        id() {
+            [ "${1:-}" = "-u" ] || return 1
+            printf '%s\n' 1000
         }
-        ui_kv_ok()   { echo "OK|$1|$2"; }
+        getent() {
+            [ "${1:-}" = passwd ] && [ "${2:-}" = "$_t165_user" ] && [ -n "$_t165_home" ] &&
+                printf 'x:x:1000:1000::%s:/bin/sh\n' "$_t165_home"
+        }
+        ui_kv_ok() { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
-        ui_detail()  { echo "DETAIL|$1"; }
+        ui_detail() { echo "DETAIL|$1"; }
         eval "$_t165"
         exit 0
     ) 2>&1
 }
 _t165_dir=$(mktemp -d "$WORK/t165.XXXXXX")
 mkdir -p "$_t165_dir/hooked"
-printf '# kit hook line: opencode-permissions-kit/sh/ddev-terminal.sh\n' > "$_t165_dir/hooked/.bashrc"
+printf '# kit hook line: opencode-permissions-kit/sh/ddev-terminal.sh\n' >"$_t165_dir/hooked/.bashrc"
 if [ -n "$_t165" ]; then
     _t165_out=$(_t165_run dev "$_t165_dir" "" || true)
     if printf '%s' "$_t165_out" | grep -q '^WARN|ddev() hook|not checked — kit file sh/ddev-terminal.sh missing'; then
@@ -1834,10 +1886,10 @@ if [ -n "$_t165" ]; then
     fi
     # control: lib present -> the hook row renders through the real body
     mkdir -p "$_t165_dir/sh"
-    : > "$_t165_dir/sh/ddev-terminal.sh"
+    : >"$_t165_dir/sh/ddev-terminal.sh"
     _t165_out=$(_t165_run dev "$_t165_dir" "$_t165_dir/hooked" || true)
-    if printf '%s' "$_t165_out" | grep -qF "OK|ddev() hook|active — $_t165_dir/hooked/.bashrc" \
-        && ! printf '%s' "$_t165_out" | grep -q '^WARN|'; then
+    if printf '%s' "$_t165_out" | grep -qF "OK|ddev() hook|active — $_t165_dir/hooked/.bashrc" &&
+        ! printf '%s' "$_t165_out" | grep -q '^WARN|'; then
         pass "#165: present ddev-terminal lib renders the hook row (control)"
     else
         fail "#165: ddev-terminal control broken (got: $_t165_out)"
@@ -1854,15 +1906,19 @@ fi
 _m165_dir=$(mktemp -d "$WORK/m165.XXXXXX")
 _m165_run() {
     (
-        _m165_user="$1"; _m165_lib="$2"; _m165_conf="$3"
-        set -u; set +e
+        _m165_user="$1"
+        _m165_lib="$2"
+        _m165_conf="$3"
+        set -u
+        set +e
         DEFAULT_USER="$_m165_user"
         LIBDIR="$_m165_lib"
         PROJECTS_CONF="$_m165_conf"
-        _mig_root="$_m165_dir"; _mig_dir="$_m165_dir"
-        ui_kv_ok()   { echo "OK|$1|$2"; }
+        _mig_root="$_m165_dir"
+        _mig_dir="$_m165_dir"
+        ui_kv_ok() { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
-        ui_detail()  { echo "DETAIL|$1"; }
+        ui_detail() { echo "DETAIL|$1"; }
         eval "$_m165"
         exit 0
     ) 2>&1
@@ -1883,11 +1939,11 @@ if [ -n "$_m165" ]; then
     # control: lib present, its gap stub answers -> the guarded body
     # renders the real INCOMPLETE row (proves the check family ran)
     mkdir -p "$_m165_dir/sh"
-    printf 'ddev_migrate_gap() { echo "1 2"; }\nddev_migrate_projects() { echo p1; echo p2; }\nddev_migrate_home() { echo "$1"; }\n' > "$_m165_dir/sh/ddev-migrate.sh"
-    printf '%s/root-a\n' "$_m165_dir" > "$_m165_dir/projects.conf"
+    printf 'ddev_migrate_gap() { echo "1 2"; }\nddev_migrate_projects() { echo p1; echo p2; }\nddev_migrate_home() { echo "$1"; }\n' >"$_m165_dir/sh/ddev-migrate.sh"
+    printf '%s/root-a\n' "$_m165_dir" >"$_m165_dir/projects.conf"
     _m165_out=$(_m165_run dev "$_m165_dir" "$_m165_dir/projects.conf" || true)
-    if printf '%s' "$_m165_out" | grep -q '^WARN|db dumps|INCOMPLETE — registry lists 2 project(s), only 1 dump(s) recorded$' \
-        && ! printf '%s' "$_m165_out" | grep -q 'not checked'; then
+    if printf '%s' "$_m165_out" | grep -q '^WARN|db dumps|INCOMPLETE — registry lists 2 project(s), only 1 dump(s) recorded$' &&
+        ! printf '%s' "$_m165_out" | grep -q 'not checked'; then
         pass "#165: present ddev-migrate lib renders the gap check (control)"
     else
         fail "#165: ddev-migrate control broken (got: $_m165_out)"
@@ -1896,10 +1952,10 @@ fi
 
 # d) ddev-hosts: readiness flag split + lib guard + elif
 _h165pre="$(sed -n '/^# Readiness split (issue #165):/,/^fi$/p' "$STATUS")"
-if printf '%s' "$_h165pre" | grep -qF '[ -d /mnt/c ]' \
-    && printf '%s' "$_h165pre" | grep -qF '[ -f /mnt/c/Windows/System32/drivers/etc/hosts ]' \
-    && printf '%s' "$_h165pre" | grep -qF '[ -n "${DEFAULT_USER:-}" ]' \
-    && printf '%s' "$_h165pre" | grep -qF 'id -u "$OPENCODE_USER"'; then
+if printf '%s' "$_h165pre" | grep -qF '[ -d /mnt/c ]' &&
+    printf '%s' "$_h165pre" | grep -qF '[ -f /mnt/c/Windows/System32/drivers/etc/hosts ]' &&
+    printf '%s' "$_h165pre" | grep -qF '[ -n "${DEFAULT_USER:-}" ]' &&
+    printf '%s' "$_h165pre" | grep -qF 'id -u "$OPENCODE_USER"'; then
     pass "#165: hosts readiness block extractable, preconditions preserved verbatim"
 else
     fail "#165: hosts readiness block not extractable (anchor drift?)"
@@ -1913,14 +1969,17 @@ fi
 _h165_dir=$(mktemp -d "$WORK/h165.XXXXXX")
 _h165_run() {
     (
-        _h165_ready="$1"; _h165_lib="$2"; _h165_conf="$3"
-        set -u; set +e
+        _h165_ready="$1"
+        _h165_lib="$2"
+        _h165_conf="$3"
+        set -u
+        set +e
         _st_hosts_ready="$_h165_ready"
         LIBDIR="$_h165_lib"
         PROJECTS_CONF="$_h165_conf"
-        ui_kv_ok()   { echo "OK|$1|$2"; }
+        ui_kv_ok() { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
-        ui_detail()  { echo "DETAIL|$1"; }
+        ui_detail() { echo "DETAIL|$1"; }
         eval "$SCAN_HELPERS"
         eval "$_h165"
         exit 0
@@ -1942,12 +2001,12 @@ if [ -n "$_h165" ]; then
     # control: lib present, project root with .ddev, stub answers ->
     # the guarded body renders its real missing-hosts row
     mkdir -p "$_h165_dir/sh" "$_h165_dir/root/p1/.ddev"
-    printf 'ddev_hosts_missing() { echo "tld.example"; }\n' > "$_h165_dir/sh/ddev-hosts.sh"
-    printf '%s/root\n' "$_h165_dir" > "$_h165_dir/projects.conf"
+    printf 'ddev_hosts_missing() { echo "tld.example"; }\n' >"$_h165_dir/sh/ddev-hosts.sh"
+    printf '%s/root\n' "$_h165_dir" >"$_h165_dir/projects.conf"
     _h165_out=$(_h165_run true "$_h165_dir" "$_h165_dir/projects.conf" || true)
-    if printf '%s' "$_h165_out" | grep -qF "WARN|hosts (win)|$_h165_dir/root/p1: missing tld.example" \
-        && printf '%s' "$_h165_out" | grep -q '^DETAIL|add: opk ddev-hosts-add tld.example$' \
-        && ! printf '%s' "$_h165_out" | grep -q 'not checked'; then
+    if printf '%s' "$_h165_out" | grep -qF "WARN|hosts (win)|$_h165_dir/root/p1: missing tld.example" &&
+        printf '%s' "$_h165_out" | grep -q '^DETAIL|add: opk ddev-hosts-add tld.example$' &&
+        ! printf '%s' "$_h165_out" | grep -q 'not checked'; then
         pass "#165: present ddev-hosts lib renders the hosts check (control)"
     else
         fail "#165: ddev-hosts control broken (got: $_h165_out)"
@@ -1962,21 +2021,26 @@ fi
 # to = or dropping the || echo 1 sentinel turns arms red. The full
 # chain is additionally executed once (any host): it must yield a
 # boolean, never an error.
-_h165r_cond="$(sed -n 's/^   && \[ -n "${DEFAULT_USER:-}" \] && \(.*\); then$/\1/p' "$STATUS")"
-if [ -n "$_h165r_cond" ] \
-    && printf '%s' "$_h165r_cond" | grep -qF '[ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]'; then
+_h165r_cond="$(sed -n 's/^    \[ -n "${DEFAULT_USER:-}" \] && \(.*\); then$/\1/p' "$STATUS")"
+if [ -n "$_h165r_cond" ] &&
+    printf '%s' "$_h165r_cond" | grep -qF '[ "$(id -u)" != "$(id -u "$OPENCODE_USER" 2>/dev/null || echo 1)" ]'; then
     pass "#165: readiness uid condition extractable from the real chain line"
 else
     fail "#165: readiness uid condition not extractable (anchor drift?)"
 fi
 _h165r_run() {
     (
-        _h165r_myuid="$1"; _h165r_ocuid="$2"
-        set -u; set +e
+        _h165r_myuid="$1"
+        _h165r_ocuid="$2"
+        set -u
+        set +e
         OPENCODE_USER=opencode
         id() {
             [ "${1:-}" = "-u" ] || return 1
-            if [ "$#" -eq 1 ]; then printf '%s\n' "$_h165r_myuid"; return 0; fi
+            if [ "$#" -eq 1 ]; then
+                printf '%s\n' "$_h165r_myuid"
+                return 0
+            fi
             if [ "${2:-}" = "$OPENCODE_USER" ] && [ -n "$_h165r_ocuid" ]; then
                 printf '%s\n' "$_h165r_ocuid"
                 return 0
@@ -2016,7 +2080,8 @@ fi
 # the chain still executes to a boolean under set -u.
 _h165r_chain=$(
     (
-        set -u; set +e
+        set -u
+        set +e
         DEFAULT_USER=dev
         OPENCODE_USER=opencode
         eval "$_h165pre"
@@ -2024,7 +2089,7 @@ _h165r_chain=$(
     ) 2>&1
 ) || true
 case "$_h165r_chain" in
-    true|false) pass "#165: readiness chain executes to a boolean (real block, set -u)" ;;
+    true | false) pass "#165: readiness chain executes to a boolean (real block, set -u)" ;;
     *) fail "#165: readiness chain no longer executes cleanly (got: $_h165r_chain)" ;;
 esac
 
@@ -2042,23 +2107,30 @@ fi
 _s165_dir=$(mktemp -d "$WORK/s165.XXXXXX")
 _s165_run() {
     (
-        _s165_myuid="$1"; _s165_ocuid="$2"; _s165_lib="$3"; _s165_conf="$4"
-        set -u; set +e
+        _s165_myuid="$1"
+        _s165_ocuid="$2"
+        _s165_lib="$3"
+        _s165_conf="$4"
+        set -u
+        set +e
         OPENCODE_USER=opencode
         LIBDIR="$_s165_lib"
         PROJECTS_CONF="$_s165_conf"
         id() {
             [ "${1:-}" = "-u" ] || return 1
-            if [ "$#" -eq 1 ]; then printf '%s\n' "$_s165_myuid"; return 0; fi
+            if [ "$#" -eq 1 ]; then
+                printf '%s\n' "$_s165_myuid"
+                return 0
+            fi
             if [ "${2:-}" = "$OPENCODE_USER" ] && [ -n "$_s165_ocuid" ]; then
                 printf '%s\n' "$_s165_ocuid"
                 return 0
             fi
             return 1
         }
-        ui_kv_ok()   { echo "OK|$1|$2"; }
+        ui_kv_ok() { echo "OK|$1|$2"; }
         ui_kv_warn() { echo "WARN|$1|$2"; }
-        ui_detail()  { echo "DETAIL|$1"; }
+        ui_detail() { echo "DETAIL|$1"; }
         eval "$SCAN_HELPERS"
         eval "$_s165"
         exit 0
@@ -2080,11 +2152,11 @@ if [ -n "$_s165" ]; then
     # control: lib present + a project root with .ddev, stub flags a gap
     # -> the guarded body renders the real share row (family ran)
     mkdir -p "$_s165_dir/sh" "$_s165_dir/root/proj/.ddev"
-    printf 'ddev_reshare_needed() { return 0; }\n' > "$_s165_dir/sh/ddev-handover.sh"
-    printf '%s/root\n' "$_s165_dir" > "$_s165_dir/projects.conf"
+    printf 'ddev_reshare_needed() { return 0; }\n' >"$_s165_dir/sh/ddev-handover.sh"
+    printf '%s/root\n' "$_s165_dir" >"$_s165_dir/projects.conf"
     _s165_out=$(_s165_run 1000 1500 "$_s165_dir" "$_s165_dir/projects.conf" || true)
-    if printf '%s' "$_s165_out" | grep -qF "WARN|ddev share|$_s165_dir/root/proj/.ddev: group-write missing" \
-        && ! printf '%s' "$_s165_out" | grep -q 'not checked'; then
+    if printf '%s' "$_s165_out" | grep -qF "WARN|ddev share|$_s165_dir/root/proj/.ddev: group-write missing" &&
+        ! printf '%s' "$_s165_out" | grep -q 'not checked'; then
         pass "#165: present ddev-handover lib renders the share scan (control)"
     else
         fail "#165: ddev-handover control broken (got: $_s165_out)"
@@ -2104,9 +2176,10 @@ fi
 if [ -n "$_g165" ]; then
     _g165_out=$(
         (
-            set -u; set +e
+            set -u
+            set +e
             ui_kv_warn() { echo "WARN|$1|$2"; }
-            ui_kv_ok()   { echo "OK|$1|$2"; }
+            ui_kv_ok() { echo "OK|$1|$2"; }
             eval "$_g165"
             exit 0
         ) 2>&1
@@ -2118,16 +2191,17 @@ if [ -n "$_g165" ]; then
     fi
     _g165_out=$(
         (
-            set -u; set +e
+            set -u
+            set +e
             git_status_row() { echo "OK|git|2.39.0 — ok (>= 2.30 tested floor)"; }
             ui_kv_warn() { echo "WARN|$1|$2"; }
-            ui_kv_ok()   { echo "OK|$1|$2"; }
+            ui_kv_ok() { echo "OK|$1|$2"; }
             eval "$_g165"
             exit 0
         ) 2>&1
     ) || true
-    if printf '%s' "$_g165_out" | grep -q '^OK|git|' \
-        && ! printf '%s' "$_g165_out" | grep -q '^WARN|'; then
+    if printf '%s' "$_g165_out" | grep -q '^OK|git|' &&
+        ! printf '%s' "$_g165_out" | grep -q '^WARN|'; then
         pass "#165: defined git_status_row renders its row, no fallback (control)"
     else
         fail "#165: git-floor control broken (got: $_g165_out)"
@@ -2142,7 +2216,8 @@ _a165v_dir=$(mktemp -d "$WORK/a165v.XXXXXX")
 _a165v_rc=0
 _a165v_out=$(
     (
-        set -u; set +e
+        set -u
+        set +e
         . "$UI_LIB"
         STATUS_SHORT=false
         LIBDIR="$_a165v_dir"
@@ -2150,9 +2225,9 @@ _a165v_out=$(
         eval "$SUMMARY_BLOCK"
     ) 2>&1
 ) || _a165v_rc=$?
-if [ "$_a165v_rc" = "2" ] \
-    && printf '%s' "$_a165v_out" | grep -q 'advisories database' \
-    && printf '%s' "$_a165v_out" | grep -q '1 warning(s)'; then
+if [ "$_a165v_rc" = "2" ] &&
+    printf '%s' "$_a165v_out" | grep -q 'advisories database' &&
+    printf '%s' "$_a165v_out" | grep -q '1 warning(s)'; then
     pass "#165: full mode counts the row (warning verdict, exit 2)"
 else
     fail "#165: full mode must count the row into exit 2 (rc=$_a165v_rc out=$_a165v_out)"
@@ -2160,7 +2235,8 @@ fi
 _a165v_rc=0
 _a165v_out=$(
     (
-        set -u; set +e
+        set -u
+        set +e
         . "$UI_LIB"
         UI_SILENT=1
         STATUS_SHORT=true
@@ -2169,9 +2245,9 @@ _a165v_out=$(
         eval "$SUMMARY_BLOCK"
     ) 2>&1
 ) || _a165v_rc=$?
-if [ "$_a165v_rc" = "2" ] \
-    && printf '%s' "$_a165v_out" | grep -q "1 warning(s) — run 'opk status' for the full report" \
-    && ! printf '%s' "$_a165v_out" | grep -q 'advisories database'; then
+if [ "$_a165v_rc" = "2" ] &&
+    printf '%s' "$_a165v_out" | grep -q "1 warning(s) — run 'opk status' for the full report" &&
+    ! printf '%s' "$_a165v_out" | grep -q 'advisories database'; then
     pass "#165: --short mutes the row but counts it (one verdict line, exit 2)"
 else
     fail "#165: --short must count silently and exit 2 (rc=$_a165v_rc out=$_a165v_out)"
@@ -2203,7 +2279,8 @@ fi
 # pin above green while silently re-arming the uid-0 defect row for ghosts.
 _st_line="$(grep '^ *_st_dev_uid=' "$STATUS" | head -1)"
 if [ -n "$_st_line" ]; then
-    _rc=0; _out=$(
+    _rc=0
+    _out=$(
         (
             DEFAULT_USER="hk-stval"
             export DEFAULT_USER
@@ -2235,16 +2312,16 @@ if [ -n "$_f8_block" ]; then
         (
             ADV_NEW="$1"
             ADV_PARSE_OK=false
-            ui_kv()      { echo "kv: $*"; }
-            ui_kv_ok()   { echo "kvok: $*"; }
+            ui_kv() { echo "kv: $*"; }
+            ui_kv_ok() { echo "kvok: $*"; }
             ui_kv_warn() { echo "kvwarn: $*"; }
-            ui_detail()  { :; }
+            ui_detail() { :; }
             eval "$_f8_block"
         ) 2>&1
     }
     _out=$(_f8_run "") || true
-    if printf '%s' "$_out" | grep -q 'kv: upstream unknown' \
-       && ! printf '%s' "$_out" | grep -q 'kvwarn:'; then
+    if printf '%s' "$_out" | grep -q 'kv: upstream unknown' &&
+        ! printf '%s' "$_out" | grep -q 'kvwarn:'; then
         pass "unavailable arm: plain uncounted row, no warn bump (#211 a F8)"
     else
         fail "unavailable arm: plain uncounted row, no warn bump (out=$_out)"
@@ -2290,7 +2367,8 @@ _f25_ports="$(sed -n '/^port_start=\$(cat \/proc\/sys\/net\/ipv4\/ip_unprivilege
 if [ -n "$_f25_ports" ]; then
     F25P=$(mktemp -d)
     mkdir -p "$F25P/bin"
-    printf '#!/bin/sh\nexit 1\n' > "$F25P/bin/cat"; chmod +x "$F25P/bin/cat"
+    printf '#!/bin/sh\nexit 1\n' >"$F25P/bin/cat"
+    chmod +x "$F25P/bin/cat"
     _f25_sh="$(command -v sh)"
     _out=$(PATH="$F25P/bin" "$_f25_sh" -c '
         ui_kv()     { echo "kv: $*"; }
@@ -2300,8 +2378,8 @@ if [ -n "$_f25_ports" ]; then
         eval "$1"
     ' sh "$_f25_ports" 2>&1) || true
     rm -rf "$F25P"
-    if printf '%s' "$_out" | grep -q 'kv: router ports unknown' \
-       && ! printf '%s' "$_out" | grep -q 'kvbad:'; then
+    if printf '%s' "$_out" | grep -q 'kv: router ports unknown' &&
+        ! printf '%s' "$_out" | grep -q 'kvbad:'; then
         echo "  ${GREEN}PASS${NC}  unreadable port_start: uncounted unknown, no false alarm (#211 a F25)"
         passed=$((passed + 1))
     else
@@ -2316,7 +2394,8 @@ _f25_mnt="$(sed -n '/^    mnt_mode=\$(stat -c %a \/mnt\/c/,/^    fi$/p' "$STATUS
 if [ -n "$_f25_mnt" ]; then
     F25=$(mktemp -d)
     mkdir -p "$F25/bin"
-    printf '#!/bin/sh\nexit 1\n' > "$F25/bin/stat"; chmod +x "$F25/bin/stat"
+    printf '#!/bin/sh\nexit 1\n' >"$F25/bin/stat"
+    chmod +x "$F25/bin/stat"
     _f25_sh="$(command -v sh)"
     _out=$(PATH="$F25/bin" "$_f25_sh" -c '
         ui_kv()     { echo "kv: $*"; }
@@ -2326,8 +2405,8 @@ if [ -n "$_f25_mnt" ]; then
         ui_detail() { :; }
         eval "$1"
     ' sh "$_f25_mnt" 2>&1) || true
-    if printf '%s' "$_out" | grep -q 'kv: /mnt/c unknown' \
-       && ! printf '%s' "$_out" | grep -q 'kvok:.*mode ?'; then
+    if printf '%s' "$_out" | grep -q 'kv: /mnt/c unknown' &&
+        ! printf '%s' "$_out" | grep -q 'kvok:.*mode ?'; then
         echo "  ${GREEN}PASS${NC}  failing /mnt/c stat: uncounted unknown, no false green (#211 a F25)"
         passed=$((passed + 1))
     else
@@ -2355,16 +2434,16 @@ fi
 # NOT pinned (documented): a killed find mid-walk truncates the scan
 # list silently — unchecked rc is the pre-#210 behavior of the bare
 # find (parity, not a new fail-soft spot).
-if [ -n "$SCAN_HELPERS" ] \
-    && printf '%s\n' "$SCAN_HELPERS" | grep -q '^_st_progress_tee() {' \
-    && printf '%s\n' "$SCAN_HELPERS" | grep -q '^_st_ddev_scan() {'; then
+if [ -n "$SCAN_HELPERS" ] &&
+    printf '%s\n' "$SCAN_HELPERS" | grep -q '^_st_progress_tee() {' &&
+    printf '%s\n' "$SCAN_HELPERS" | grep -q '^_st_ddev_scan() {'; then
     pass "#210: scan helpers extractable from status.sh"
 else
     fail "#210: scan helpers not extractable (anchor drift?)"
 fi
-if grep -qF '_st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"' "$STATUS" \
-    && grep -qF '_st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"' "$STATUS" \
-    && ! grep -qE 'find "\$_st_root" .* -name \.ddev' "$STATUS"; then
+if grep -qF '_st_ddev_scan "ddev share: scanning $_st_root" "$_st_root" "$_st_share_list"' "$STATUS" &&
+    grep -qF '_st_ddev_scan "win hosts: scanning $_st_root" "$_st_root" "$_st_hosts_list"' "$STATUS" &&
+    ! grep -qE 'find "\$_st_root" .* -name \.ddev' "$STATUS"; then
     pass "#210: both scan sites run through the shared helper (emitter sweep)"
 else
     fail "#210: a scan site bypasses _st_ddev_scan (sweep incomplete)"
@@ -2378,7 +2457,7 @@ mkdir -p "$T210/p1/.ddev" "$T210/p1/vendor/pkg/.ddev" "$T210/p1/node_modules/x/.
     "$T210/p2/deep/nested/.ddev"
 find "$T210" \( -type d \( -name vendor -o -name node_modules -o -name testdata \
     -o -name .git \) \) -prune \
-    -o -type d -name .ddev -prune -print 2>/dev/null > "$WORK/t210-ref.txt"
+    -o -type d -name .ddev -prune -print 2>/dev/null >"$WORK/t210-ref.txt"
 if [ "$(grep -c . "$WORK/t210-ref.txt")" = "3" ]; then
     pass "#210: fixture has exactly the 3 unpruned .ddev trees"
 else
@@ -2418,10 +2497,10 @@ fi
 
 # 3) tee contract: the NUL stream passes through VERBATIM — a progress
 #    display must never corrupt the scan it reports on
-printf 'a\0b\0c\0d' > "$WORK/t210-in.bin"
+printf 'a\0b\0c\0d' >"$WORK/t210-in.bin"
 (
     eval "$SCAN_HELPERS"
-    _st_progress_tee "label-t210" < "$WORK/t210-in.bin" > "$WORK/t210-out.bin"
+    _st_progress_tee "label-t210" <"$WORK/t210-in.bin" >"$WORK/t210-out.bin"
 ) 2>"$T210_ERR"
 if cmp -s "$WORK/t210-in.bin" "$WORK/t210-out.bin" && [ ! -s "$T210_ERR" ]; then
     pass "#210: progress tee passes scan bytes through verbatim"
@@ -2437,17 +2516,17 @@ fi
 #    instant scan; later frames may carry a live count (race, not
 #    asserted).
 export SCAN_HELPERS
-cat > "$WORK/t210-pty.sh" <<EOF
+cat >"$WORK/t210-pty.sh" <<EOF
 eval "\$SCAN_HELPERS"
 _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-pty.txt"
 echo "SCAN-FINISHED"
 EOF
-script -qec "sh $WORK/t210-pty.sh" /dev/null > "$WORK/t210-pty.raw" 2>&1
-if grep -aq "found," "$WORK/t210-pty.raw" \
-    && grep -aq "scanning" "$WORK/t210-pty.raw" \
-    && grep -aq "SCAN-FINISHED" "$WORK/t210-pty.raw" \
-    && grep -aqE ' {70,}' "$WORK/t210-pty.raw" \
-    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-pty.txt"; then
+script -qec "sh $WORK/t210-pty.sh" /dev/null >"$WORK/t210-pty.raw" 2>&1
+if grep -aq "found," "$WORK/t210-pty.raw" &&
+    grep -aq "scanning" "$WORK/t210-pty.raw" &&
+    grep -aq "SCAN-FINISHED" "$WORK/t210-pty.raw" &&
+    grep -aqE ' {70,}' "$WORK/t210-pty.raw" &&
+    cmp -s "$WORK/t210-ref.txt" "$WORK/t210-pty.txt"; then
     pass "#210: terminal run: live line + erase, scan bytes identical"
 else
     fail "#210: terminal run must show the live line and stay byte-identical"
@@ -2456,17 +2535,17 @@ fi
 #     tty line (the tail carries — the path end matters more than the
 #     prefix). Separate driver: truncation drops "scanning" from the
 #     drawn line, so the label assertions above cannot run against it.
-cat > "$WORK/t210-trunc.sh" <<EOF
+cat >"$WORK/t210-trunc.sh" <<EOF
 eval "\$SCAN_HELPERS"
 _st_ddev_scan "ddev share: scanning $T210/p2/very/deep/nested/path/to/a/long/root" \
     "$T210" "$WORK/t210-trunc.txt"
 echo "SCAN-FINISHED"
 EOF
-script -qec "sh $WORK/t210-trunc.sh" /dev/null > "$WORK/t210-trunc.raw" 2>&1
-if grep -aq "found," "$WORK/t210-trunc.raw" \
-    && grep -aq "long/root" "$WORK/t210-trunc.raw" \
-    && grep -aq "$(printf '\342\200\246')" "$WORK/t210-trunc.raw" \
-    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-trunc.txt"; then
+script -qec "sh $WORK/t210-trunc.sh" /dev/null >"$WORK/t210-trunc.raw" 2>&1
+if grep -aq "found," "$WORK/t210-trunc.raw" &&
+    grep -aq "long/root" "$WORK/t210-trunc.raw" &&
+    grep -aq "$(printf '\342\200\246')" "$WORK/t210-trunc.raw" &&
+    cmp -s "$WORK/t210-ref.txt" "$WORK/t210-trunc.txt"; then
     pass "#210: over-long labels truncate with a leader, keep the path tail"
 else
     fail "#210: label truncation broken (>76-char label)"
@@ -2474,16 +2553,16 @@ fi
 
 # 5) --short (UI_SILENT) on a terminal: no live line at all — the
 #    one-line discipline holds even where drawing would be possible
-cat > "$WORK/t210-silent.sh" <<EOF
+cat >"$WORK/t210-silent.sh" <<EOF
 eval "\$SCAN_HELPERS"
 UI_SILENT=1 _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-sil.txt"
 echo "SCAN-FINISHED"
 EOF
-script -qec "sh $WORK/t210-silent.sh" /dev/null > "$WORK/t210-sil.raw" 2>&1
-if ! grep -aq "found," "$WORK/t210-sil.raw" \
-    && ! grep -aq "scanning" "$WORK/t210-sil.raw" \
-    && grep -aq "SCAN-FINISHED" "$WORK/t210-sil.raw" \
-    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-sil.txt"; then
+script -qec "sh $WORK/t210-silent.sh" /dev/null >"$WORK/t210-sil.raw" 2>&1
+if ! grep -aq "found," "$WORK/t210-sil.raw" &&
+    ! grep -aq "scanning" "$WORK/t210-sil.raw" &&
+    grep -aq "SCAN-FINISHED" "$WORK/t210-sil.raw" &&
+    cmp -s "$WORK/t210-ref.txt" "$WORK/t210-sil.txt"; then
     pass "#210: UI_SILENT (--short) draws nothing on a terminal either"
 else
     fail "#210: UI_SILENT must never draw the progress line"
@@ -2518,17 +2597,17 @@ fi
 # the definition line is clean).
 C244DIAG='platform independent libraries'
 mkdir -p "$WORK/t244c-noisy"
-printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$C244DIAG" > "$WORK/t244c-noisy/python3"
+printf '#!/bin/sh\necho "%s" >&2\nexit 9\n' "$C244DIAG" >"$WORK/t244c-noisy/python3"
 chmod +x "$WORK/t244c-noisy/python3"
-cat > "$WORK/t244c-pty.sh" <<EOF
+cat >"$WORK/t244c-pty.sh" <<EOF
 eval "\$SCAN_HELPERS"
 UI_SILENT=0 _st_ddev_scan "c244: scanning $T210" "$T210" "$WORK/t244c-out.txt"
 echo "SCAN-FINISHED"
 EOF
-script -qec "PATH=\"$WORK/t244c-noisy:\$PATH\" sh $WORK/t244c-pty.sh" /dev/null > "$WORK/t244c.raw" 2>&1
-if grep -aqF "$C244DIAG" "$WORK/t244c.raw" \
-    && grep -aq "SCAN-FINISHED" "$WORK/t244c.raw" \
-    && cmp -s "$WORK/t210-ref.txt" "$WORK/t244c-out.txt"; then
+script -qec "PATH=\"$WORK/t244c-noisy:\$PATH\" sh $WORK/t244c-pty.sh" /dev/null >"$WORK/t244c.raw" 2>&1
+if grep -aqF "$C244DIAG" "$WORK/t244c.raw" &&
+    grep -aq "SCAN-FINISHED" "$WORK/t244c.raw" &&
+    cmp -s "$WORK/t210-ref.txt" "$WORK/t244c-out.txt"; then
     pass "#244 c S3: status probe surfaces a broken interpreter's diagnostic (tty path)"
 else
     fail "#244 c S3: status probe must pass interpreter stderr through on a terminal"
@@ -2536,8 +2615,8 @@ fi
 # Advisory behavior — the shipped program, extracted, keeps its
 # contract: garbage in -> rc 1, SILENT (the except path is the
 # expected failure; the passthrough must not add noise to it).
-C244ADVPGM="$(sed -n "/if ADV_IDS=\$(printf/,/); then\$/p" "$STATUS" \
-    | sed "1s/^.*python3 -c '//" | sed "\$s/'[[:space:]]*); then\$//")"
+C244ADVPGM="$(sed -n "/if ADV_IDS=\$(printf/,/); then\$/p" "$STATUS" |
+    sed "1s/^.*python3 -c '//" | sed "\$s/'[[:space:]]*); then\$//")"
 if printf 'not json' | python3 -c "$C244ADVPGM" >/dev/null 2>"$WORK/t244c-adv.err"; then
     fail "#244 c S3: advisory program must reject an unparseable feed (rc 1)"
 elif [ ! -s "$WORK/t244c-adv.err" ]; then
@@ -2548,11 +2627,11 @@ fi
 # Leak-scan parser behavior: a broken config surfaces the parser's own
 # clean error line (not a traceback) — that is what now passes through.
 C244PARSER="$(dirname "$STATUS")/../py/jsonc-parser.py"
-printf 'not json at all\n' > "$WORK/t244c-bad.jsonc"
+printf 'not json at all\n' >"$WORK/t244c-bad.jsonc"
 C244PRC=0
 python3 "$C244PARSER" "$WORK/t244c-bad.jsonc" >/dev/null 2>"$WORK/t244c-par.err" || C244PRC=$?
-if [ "$C244PRC" -ne 0 ] && grep -q 'Error' "$WORK/t244c-par.err" \
-    && ! grep -q 'Traceback' "$WORK/t244c-par.err"; then
+if [ "$C244PRC" -ne 0 ] && grep -q 'Error' "$WORK/t244c-par.err" &&
+    ! grep -q 'Traceback' "$WORK/t244c-par.err"; then
     pass "#244 c S3: leak-scan parser failure prints a clean diagnostic (no traceback)"
 else
     fail "#244 c S3: parser diagnostic shape (rc=$C244PRC err=$(cat "$WORK/t244c-par.err"))"
@@ -2565,10 +2644,10 @@ fi
 T210_BIG="$WORK/t210-big.bin"
 python3 -c 'import sys
 buf = b"".join((b"chunk%d" % i) * 70000 + b"\0" for i in range(5)) + b"tail-no-nul"
-sys.stdout.buffer.write(buf)' > "$T210_BIG"
+sys.stdout.buffer.write(buf)' >"$T210_BIG"
 (
     eval "$SCAN_HELPERS"
-    _st_progress_tee "label-big" < "$T210_BIG" > "$WORK/t210-big-out.bin"
+    _st_progress_tee "label-big" <"$T210_BIG" >"$WORK/t210-big-out.bin"
 ) 2>"$T210_ERR"
 if cmp -s "$T210_BIG" "$WORK/t210-big-out.bin" && [ ! -s "$T210_ERR" ]; then
     pass "#221: multi-chunk (2.5 MB) stream passes through verbatim"
@@ -2581,11 +2660,11 @@ fi
 #     read starves the counter (every frame "0 found" until EOF); read1
 #     returns available bytes at once. 1 s of margin on both sides of
 #     the 0:01 draw makes this deterministic, not a race.
-cat > "$WORK/t210-w1.sh" <<EOF
+cat >"$WORK/t210-w1.sh" <<EOF
 eval "\$SCAN_HELPERS"
 ( printf 'a\0b\0c\0'; sleep 2 ) | _st_progress_tee "w1pin" > /dev/null
 EOF
-script -qec "sh $WORK/t210-w1.sh" /dev/null > "$WORK/t210-w1.raw" 2>&1
+script -qec "sh $WORK/t210-w1.sh" /dev/null >"$WORK/t210-w1.raw" 2>&1
 if grep -aq 'w1pin — 3 found, 0:01' "$WORK/t210-w1.raw"; then
     pass "#221: found-counter engages mid-stream (read1, not buffered read)"
 else
@@ -2601,14 +2680,14 @@ fi
 #     sleep — the broken floor scales with the tick period, not load.
 T210_MIN=999999
 for _t210_i in 1 2 3; do
-    cat > "$WORK/t210-w2.sh" <<EOF
+    cat >"$WORK/t210-w2.sh" <<EOF
 eval "\$SCAN_HELPERS"
 _s=\$(date +%s%N)
 _st_ddev_scan "w2pin" "$T210" "$WORK/t210-w2.txt"
 _e=\$(date +%s%N)
 echo "W2-ELAPSED-MS=\$(( (_e - _s) / 1000000 ))"
 EOF
-    script -qec "sh $WORK/t210-w2.sh" /dev/null > "$WORK/t210-w2.raw" 2>&1
+    script -qec "sh $WORK/t210-w2.sh" /dev/null >"$WORK/t210-w2.raw" 2>&1
     _t210_ms=$(grep -ao 'W2-ELAPSED-MS=[0-9]*' "$WORK/t210-w2.raw" | tail -1 | cut -d= -f2)
     [ -n "$_t210_ms" ] || _t210_ms=999999
     [ "$_t210_ms" -lt "$T210_MIN" ] && T210_MIN=$_t210_ms
@@ -2629,7 +2708,7 @@ fi
 T210_PYBIN="$WORK/t210-pybin"
 T210_PROBE="$WORK/t210-probe.log"
 mkdir -p "$T210_PYBIN"
-printf '#!/bin/sh\necho x >> "%s"\nexit 9\n' "$T210_PROBE" > "$T210_PYBIN/python3"
+printf '#!/bin/sh\necho x >> "%s"\nexit 9\n' "$T210_PROBE" >"$T210_PYBIN/python3"
 chmod +x "$T210_PYBIN/python3"
 rm -f "$T210_PROBE"
 (
@@ -2649,7 +2728,7 @@ fi
 #    both scans to the bare-find branch — full lists, no live line, no
 #    traceback, run proceeds. Pre-fix shape: tee branch taken, tee dies
 #    at startup, EMPTY list (the false-green), marker written twice.
-cat > "$WORK/t210-broken.sh" <<EOF
+cat >"$WORK/t210-broken.sh" <<EOF
 PATH="$T210_PYBIN:\$PATH"
 export PATH
 eval "\$SCAN_HELPERS"
@@ -2657,14 +2736,14 @@ _st_ddev_scan "ddev share: scanning $T210" "$T210" "$WORK/t210-brk1.txt"
 _st_ddev_scan "win hosts: scanning $T210" "$T210" "$WORK/t210-brk2.txt"
 echo "SCAN-FINISHED"
 EOF
-rm -f "$T210_PROBE"   # pin isolation: pin 6's gate-drift probe must not seed this count
-script -qec "sh $WORK/t210-broken.sh" /dev/null > "$WORK/t210-brk.raw" 2>&1
-if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk1.txt" \
-    && cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk2.txt" \
-    && grep -aq "SCAN-FINISHED" "$WORK/t210-brk.raw" \
-    && ! grep -aq "found," "$WORK/t210-brk.raw" \
-    && [ -f "$T210_PROBE" ] \
-    && [ "$(wc -l < "$T210_PROBE" 2>/dev/null || echo 0)" = 1 ]; then
+rm -f "$T210_PROBE" # pin isolation: pin 6's gate-drift probe must not seed this count
+script -qec "sh $WORK/t210-broken.sh" /dev/null >"$WORK/t210-brk.raw" 2>&1
+if cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk1.txt" &&
+    cmp -s "$WORK/t210-ref.txt" "$WORK/t210-brk2.txt" &&
+    grep -aq "SCAN-FINISHED" "$WORK/t210-brk.raw" &&
+    ! grep -aq "found," "$WORK/t210-brk.raw" &&
+    [ -f "$T210_PROBE" ] &&
+    [ "$(wc -l <"$T210_PROBE" 2>/dev/null || echo 0)" = 1 ]; then
     pass "#221: broken python3 on a tty: probe once, bare-find fallback, full scans"
 else
     fail "#221: broken python3 must fall back to complete scans (probe cached)"
@@ -2674,10 +2753,10 @@ fi
 #    helpers must PARSE (sh -n) and carry the tee's full body — an
 #    early col-0 brace truncating the range leaves def ticker/draw
 #    behind; unterminated quoting fails sh -n outright.
-if printf '%s\n' "$SCAN_HELPERS" | sh -n 2>/dev/null \
-    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'def draw' \
-    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'def ticker' \
-    && printf '%s\n' "$SCAN_HELPERS" | grep -q 'read1'; then
+if printf '%s\n' "$SCAN_HELPERS" | sh -n 2>/dev/null &&
+    printf '%s\n' "$SCAN_HELPERS" | grep -q 'def draw' &&
+    printf '%s\n' "$SCAN_HELPERS" | grep -q 'def ticker' &&
+    printf '%s\n' "$SCAN_HELPERS" | grep -q 'read1'; then
     pass "#221: extracted scan helpers parse and carry the full tee body"
 else
     fail "#221: SCAN_HELPERS extraction truncated or unparsable"
@@ -2703,10 +2782,10 @@ T210_SIGPID="$WORK/t210-sigpid"
 mkdir -p "$T210_SIGBIN"
 _t210_realpy="$(command -v python3)"
 printf '#!/bin/sh\necho $$ > "%s"\nexec "%s" "$@"\n' \
-    "$T210_SIGPID" "$_t210_realpy" > "$T210_SIGBIN/python3"
+    "$T210_SIGPID" "$_t210_realpy" >"$T210_SIGBIN/python3"
 chmod +x "$T210_SIGBIN/python3"
 # async sender: poll for the forwarded byte, then INT the tee's pid
-cat > "$WORK/t210-sig-send.sh" <<EOF
+cat >"$WORK/t210-sig-send.sh" <<EOF
 _n=0
 while [ ! -s "$WORK/t210-sig.out" ] && [ "\$_n" -lt 100 ]; do
     _n=\$((_n + 1))
@@ -2721,16 +2800,19 @@ _t210_wrc=0
     eval "$SCAN_HELPERS"
     PATH="$T210_SIGBIN:$PATH"
     export PATH
-    ( printf 'a\0'; sleep 2 ) | _st_progress_tee "sigpin" \
-        > "$WORK/t210-sig.out" 2> "$WORK/t210-sig.err"
+    (
+        printf 'a\0'
+        sleep 2
+    ) | _st_progress_tee "sigpin" \
+        >"$WORK/t210-sig.out" 2>"$WORK/t210-sig.err"
 ) || _t210_wrc=$?
 _t210_krc=0
 wait "$_t210_sender" || _t210_krc=$?
-printf 'a\0' > "$WORK/t210-sig.exp"
-if [ "$_t210_krc" -eq 0 ] \
-    && [ "$_t210_wrc" -eq 0 ] \
-    && cmp -s "$WORK/t210-sig.exp" "$WORK/t210-sig.out" \
-    && [ ! -s "$WORK/t210-sig.err" ]; then
+printf 'a\0' >"$WORK/t210-sig.exp"
+if [ "$_t210_krc" -eq 0 ] &&
+    [ "$_t210_wrc" -eq 0 ] &&
+    cmp -s "$WORK/t210-sig.exp" "$WORK/t210-sig.out" &&
+    [ ! -s "$WORK/t210-sig.err" ]; then
     pass "#221: SIGINT mid-stream: tee silent, bytes intact, exit 0 (b W1)"
 else
     fail "#221: KeyboardInterrupt must not print a traceback (b W1)"
@@ -2769,12 +2851,12 @@ _f2b_nl=$(
     eval "$_f2bG" 2>"$_f2bW/nl.log"
     printf '%s' "$OPENCODE_USER"
 )
-if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] \
-    && [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] \
-    && grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" \
-    && [ "$_f2b_nl" = "opencode" ] \
-    && [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] \
-    && grep -q 'oco?d' "$_f2bW/nl.log"; then
+if [ "$_f2b_new" = "untest-agent" ] && [ "$_f2b_canon" = "opencode" ] &&
+    [ ! -s "$_f2bW/ok.log" ] && [ "$_f2b_bad" = "opencode" ] &&
+    grep -q 'WARN: invalid OPENCODE_USER value in install.conf' "$_f2bW/bad.log" &&
+    [ "$_f2b_nl" = "opencode" ] &&
+    [ "$(grep -c . "$_f2bW/nl.log")" = 1 ] &&
+    grep -q 'oco?d' "$_f2bW/nl.log"; then
     pass "status.sh gate arms: passthrough silent, fallback loud, newline sanitized (pr-00263 a F2b)"
 else
     fail "status.sh gate arms (pr-00263 a F2b)"
@@ -2785,7 +2867,7 @@ fi
 # dict envelope exits 1 SILENT (the old shape raised a raw traceback on
 # cron stderr); a list with null and scalar entries yields exactly the
 # real ids.
-ADVPY="$(sed -n "/python3 -c 'import json,sys$/,/' ); then\$/p" "$STATUS" | sed -e "1s/^.*python3 -c '//" -e "\$s/' ); then\$//")"
+ADVPY="$(sed -n "/python3 -c 'import json,sys$/,/'); then\$/p" "$STATUS" | sed -e "1s/^.*python3 -c '//" -e "\$s/'); then\$//")"
 if [ -n "$ADVPY" ] && printf '%s' "$ADVPY" | grep -q 'isinstance(feed, list)'; then
     pass "advisory feed parser extractable + shape gate present (pr-00263 a F11)"
 else
@@ -2795,10 +2877,10 @@ _adv_rc1=0
 _adv_rc2=0
 _adv_err="$(printf '{"envelope":1}' | python3 -c "$ADVPY" 2>&1 >/dev/null)" || _adv_rc1=$?
 _adv_out="$(printf '[{"ghsa_id":"GHSA-1"},{"ghsa_id":null},3]' | python3 -c "$ADVPY" 2>/dev/null)" || _adv_rc2=$?
-if [ "$_adv_rc1" -ne 0 ] && [ -z "$_adv_err" ] \
-    && [ "$_adv_rc2" -eq 0 ] \
-    && [ "$(printf '%s' "$_adv_out" | grep -c .)" = 1 ] \
-    && printf '%s' "$_adv_out" | grep -q 'GHSA-1'; then
+if [ "$_adv_rc1" -ne 0 ] && [ -z "$_adv_err" ] &&
+    [ "$_adv_rc2" -eq 0 ] &&
+    [ "$(printf '%s' "$_adv_out" | grep -c .)" = 1 ] &&
+    printf '%s' "$_adv_out" | grep -q 'GHSA-1'; then
     pass "shape-invalid feed silent-unavailable; list feed yields ids only (pr-00263 a F11)"
 else
     fail "advisory feed shape arms (pr-00263 a F11, rc1=$_adv_rc1 rc2=$_adv_rc2 err=$_adv_err out=$_adv_out)"
