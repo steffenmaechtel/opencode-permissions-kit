@@ -755,7 +755,7 @@ rm -rf "$BH"
 check "reshare: _opk_ddev_reshare calls the helper's heal mode" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-ensure-shared' " _ "$FUNC"
 check "reshare: heal follows EVERY ddev command — no command gate (issue #279)" \
-    sh -c "awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -qE '^[[:space:]]*_opk_ddev_reshare[[:space:]]*$' && ! awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -q 'config | get | start | restart) _opk_ddev_reshare'" _ "$FUNC"
+    sh -c "awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -qE '^[[:space:]]*_opk_ddev_reshare[[:space:]]*$' && ! awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -q 'config | get | start | restart'" _ "$FUNC"
 check "reshare: heal is silent and never changes the ddev exit code" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '|| true' && awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF 'return 0'" _ "$FUNC"
 check "reshare: no heal without a project in the cwd" \
@@ -900,6 +900,26 @@ check "version probe: --version execs ddev from the agent home, not the project 
 check "version probe: the neutral cd is gated on --version alone (other args keep the cwd)" \
     sh -c "grep -qF '[ \"\$#\" -eq 1 ] && [ \"\$1\" = \"--version\" ]' \"\$1\"" _ "$HELPER"
 rm -rf "$VN"
+
+# --- 7d-5. round-a fix-wave pins (pr-309 a: M1+S1+Q1, M2, Q3, M3, M4, S3) ---------
+# The a(review) findings, fixed in the a(fix) wave — each fix carries its
+# pin; the deliberate not-dones (M3 suggestion texts, S2, Q2) carry their
+# dispositions in round b's comment instead.
+E2ELIB="$SCRIPT_DIR/../e2e/lib.sh"
+check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
+    sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$1"' _ "$STATUS"
+check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finish" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container && ! awk '/^e2e_finish\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container" _ "$E2ELIB"
+check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$E2ELIB"
+check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
+    sh -c "awk '/^e2e_dump_container\(\)/,/^}/' \"\$1\" | grep -q -- '-type l -delete'" _ "$E2ELIB"
+check "fix a Q3: install.sh probes the ddev version subcommand from /" \
+    sh -c 'grep -q "env HOME=\"\$DEV_HOME\" sh -c .cd / && exec" "$1" && ! grep -q "\"\$DDEV_BIN_DEV\" version" "$1"' _ "$INSTALL"
+check "fix a M3: config.sh probes the ddev version from /" \
+    sh -c 'grep -qF "(cd / && \"\$_cand_bin\" version)" "$1" && ! grep -qF "\"\$_cand_bin\" version 2>/dev/null" "$1"' _ "$CONFIG"
+check "fix a M4: opk usage tells the generalized story, not 'agent-side'" \
+    sh -c "grep -q 'a .ddev tree a' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\"" _ "$KIT"
 
 # --- 7e. dev-owned mode (internal/records/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED

@@ -520,6 +520,14 @@ e2e_cleanup() {
         echo "    (remove it afterwards with: docker rm -f $E2E_CONTAINER)"
         return
     fi
+    # pr-309 a M2: dump failure evidence BEFORE the rm — the cleanup runs
+    # via the EXIT trap on EVERY exit path (set -e deaths and explicit
+    # abort arms included), which e2e_finish never sees; the keep branches
+    # above return early, so this only fires when the container really
+    # goes away.
+    if [ "${failures:-0}" -gt 0 ]; then
+        e2e_dump_container "$(basename "$0" .sh)"
+    fi
     docker rm -f "$E2E_CONTAINER" 2>/dev/null || true
     # The e2e container runs as root, so the bind mount can hold root-owned
     # files (e.g. `sudo tee opencode.jsonc`, the chgrp/chmod group baseline).
@@ -545,7 +553,12 @@ e2e_dump_container() {
     _edc_dest="$(dirname "$0")/dumps/${1:-evidence}-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$_edc_dest" 2>/dev/null || return 0
     if [ -n "${E2E_CONTAINER:-}" ] && docker cp "$E2E_CONTAINER:/tmp" "$_edc_dest/tmp" >/dev/null 2>&1; then
-        echo "  ${YELLOW}failure evidence: container /tmp dumped to $_edc_dest/tmp${NC}"
+        # pr-309 a S3: docker cp preserves symlinks AS symlinks — a
+        # poisoned image could plant host-pointing links into the dump.
+        # Strip them: the dump is read-only evidence, a link carries
+        # nothing a note about it could not.
+        find "$_edc_dest/tmp" -type l -delete 2>/dev/null || true
+        echo "  ${YELLOW}failure evidence: container /tmp dumped to $_edc_dest/tmp (symlinks stripped)${NC}"
     fi
     return 0
 }
@@ -561,13 +574,6 @@ e2e_finish() {
         echo "  ${RED}Failed: $failures${NC}"
     fi
     echo ""
-    # Issue #279 wave: dump the container's /tmp evidence BEFORE the EXIT
-    # trap's cleanup rm removes it — wired centrally here, so every suite
-    # (run.sh, run-docker-rootless.sh, run-ddev.sh) gets it; suppressed
-    # under E2E_KEEP=1 (the whole container stays for live inspection).
-    if [ "$failures" -gt 0 ] && [ "${E2E_KEEP:-0}" != "1" ]; then
-        e2e_dump_container "$(basename "$0" .sh)"
-    fi
     # CI visibility: a green run with many skips is a hollow verdict —
     # surface the skip count on the GitHub summary page too.
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

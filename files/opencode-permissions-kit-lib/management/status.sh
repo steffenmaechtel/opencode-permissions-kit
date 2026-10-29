@@ -1032,8 +1032,12 @@ fi
 # the real binary instead, in two tiers:
 #   1. the binary resolved the SAME way bin/ddev-as-opencode does (PATH,
 #      then the two standard locations), run as the current user —
-#      `--version` is a local-only flag (no daemon, no HOME writes), so
-#      this is safe and covers plain `opk status` and checkout runs.
+#      covers plain `opk status` and checkout runs. Probed from / (pr-309
+#      a M1+S1+Q1): version output never depends on the cwd, but ddev's
+#      command walk chmods .ddev/commands/** on every in-project
+#      non-root invocation (issue #279) — with the caller's cwd, a plain
+#      `opk status` run from a project directory re-broke the tree it
+#      had just scanned.
 #   2. ddev >= 1.25.4 refuses root outright ("DDEV is not designed to be
 #      run with root privileges", exit 1 before printing anything), so
 #      under `sudo opk status` tier 1 is silent even though the binary
@@ -1051,8 +1055,10 @@ for _st_cand in "$(command -v ddev 2>/dev/null || true)" /usr/local/bin/ddev /us
     }
 done
 _st_ver=""
-[ -n "$_st_bin" ] && _st_ver=$("$_st_bin" --version 2>/dev/null |
-    grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+if [ -n "$_st_bin" ]; then
+    _st_ver=$( (cd / && "$_st_bin" --version) 2>/dev/null |
+        grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+fi
 _st_helper="${LIBDIR:-/usr/local/lib/opencode-permissions-kit}/bin/ddev-as-opencode"
 if [ -z "$_st_ver" ] && [ -x "$_st_helper" ] && command -v sudo >/dev/null 2>&1; then
     _st_ver=$(sudo -n -u "${OPENCODE_USER:-opencode}" "$_st_helper" --version 2>/dev/null |

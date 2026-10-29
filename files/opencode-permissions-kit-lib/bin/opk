@@ -129,8 +129,8 @@ Commands:
                                      group stays, so both sides keep access. For
                                      mixed-owner trees, e.g. after builds by
                                      both users. --dry-run shows the plan
-  ensure-shared [<dir>]             Re-assert group-write on a .ddev tree an
-                                     agent-side ddev run left without it — the
+  ensure-shared [<dir>]             Re-assert group-write on a .ddev tree a
+                                     ddev run left without it — the
                                      'ddev share' fix opk status prints.
                                      <dir> defaults to ./.ddev; runs as the
                                      agent user (sudo -u) and changes modes
