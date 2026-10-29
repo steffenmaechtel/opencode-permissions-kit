@@ -962,14 +962,21 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
     # an agent-side describe re-caps a freshly healed command file,
     # status flags it again, and a dev-side describe (NON-tree command,
     # pre-#279 hooks did not heal those) must heal it via the per-command
-    # tail heal.
-    E 'sudo mkdir -p /var/www/vhosts/dd13-proj/.ddev/commands/web && sudo chown opencode:opencode /var/www/vhosts/dd13-proj/.ddev/commands/web && printf "#!/bin/sh\necho dd13cmd\n" | sudo tee /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd >/dev/null && sudo chown opencode:opencode /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd && sudo chmod 775 /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd'
-    OC_DD13 'ddev describe >/tmp/dd13-describe1.log 2>&1'
+    # tail heal. The planted DIR gets g+w too, so a status flag can only
+    # come from the FILE (the first run had the dir 0755 — a false flag
+    # source). Fixture-landed check + mode probes diagnose a plant or
+    # invocation failure loudly; E2E_KEEP=1 keeps the container.
+    E 'sudo mkdir -p /var/www/vhosts/dd13-proj/.ddev/commands/web && sudo chown opencode:opencode /var/www/vhosts/dd13-proj/.ddev/commands/web && sudo chmod 775 /var/www/vhosts/dd13-proj/.ddev/commands/web && printf "#!/bin/sh\necho dd13cmd\n" | sudo tee /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd >/dev/null && sudo chown opencode:opencode /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd && sudo chmod 775 /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd'
+    check "DD13: fixture landed — command file is opencode-owned 775 (issue #279)" \
+        E 'test "$(stat -c %U /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd)" = opencode && test "$(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd)" = 775'
+    OC_DD13 'ddev describe >/tmp/dd13-describe1.log 2>&1; echo "describe-rc=$?" >>/tmp/dd13-describe1.log'
+    E 'stat -c "diag after agent describe: %a %U %n" /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd 2>&1; tail -2 /tmp/dd13-describe1.log 2>&1'
     check "DD13: agent-side describe re-caps the command file (real ddev, issue #279)" \
         E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd) & 0020 )) -eq 0'
     check "DD13: opk status flags the re-capped tree again (issue #279)" \
         E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status3.log 2>&1; grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status3.log'
-    DEVSH 'cd /var/www/vhosts/dd13-proj && ddev describe >/tmp/dd13-describe2.log 2>&1'
+    DEVSH 'cd /var/www/vhosts/dd13-proj && type ddev >/tmp/dd13-type.log 2>&1; ddev describe >/tmp/dd13-describe2.log 2>&1; echo "describe-rc=$?" >>/tmp/dd13-describe2.log; stat -c "diag after dev describe: %a %U %n" .ddev/commands/web/dd13cmd >>/tmp/dd13-describe2.log 2>&1'
+    E 'cat /tmp/dd13-type.log /tmp/dd13-describe2.log 2>/dev/null | tail -6'
     check "DD13: dev-side describe (non-tree command) heals — the hook follows every command (issue #279)" \
         E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd) & 0020 )) -ne 0'
 
