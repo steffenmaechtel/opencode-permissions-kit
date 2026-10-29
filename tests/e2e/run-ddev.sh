@@ -913,7 +913,7 @@ check "DD13: config completes despite the settings chmod warning" \
 check "DD13: .ddev opencode-owned (ddev-created)" \
     E 'test "$(stat -c %U /var/www/vhosts/dd13-proj/.ddev)" = opencode'
 check "DD13: .ddev/config.yaml group-writable right after config (Finding 1 fixed — issue #94 heal)" \
-    E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/config.yaml) & 0020 )) -ne 0'
+    E 'test -n "$(find /var/www/vhosts/dd13-proj/.ddev/config.yaml -maxdepth 0 -perm -g+w)"'
 check "DD13: dev can edit .ddev/config.yaml right after config (Finding 1 fixed — issue #94 heal)" \
     DEVSH 'cd /var/www/vhosts/dd13-proj && printf "\n" >> .ddev/config.yaml'
 # issue #149 finding 1: dev-owned mode (on since DD12) flags the project
@@ -972,13 +972,13 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
     OC_DD13 'ddev describe >/tmp/dd13-describe1.log 2>&1; echo "describe-rc=$?" >>/tmp/dd13-describe1.log'
     E 'stat -c "diag after agent describe: %a %U %n" /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd 2>&1; tail -2 /tmp/dd13-describe1.log 2>&1'
     check "DD13: agent-side describe re-caps the command file (real ddev, issue #279)" \
-        E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd) & 0020 )) -eq 0'
+        E 'test -z "$(find /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd -maxdepth 0 -perm -g+w)"'
     check "DD13: opk status flags the re-capped tree again (issue #279)" \
         E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status3.log 2>&1; grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status3.log'
     DEVSH 'cd /var/www/vhosts/dd13-proj && type ddev >/tmp/dd13-type.log 2>&1; ddev describe >/tmp/dd13-describe2.log 2>&1; echo "describe-rc=$?" >>/tmp/dd13-describe2.log; stat -c "diag after dev describe: %a %U %n" .ddev/commands/web/dd13cmd >>/tmp/dd13-describe2.log 2>&1'
     E 'cat /tmp/dd13-type.log /tmp/dd13-describe2.log 2>/dev/null | tail -6'
     check "DD13: dev-side describe (non-tree command) heals — the hook follows every command (issue #279)" \
-        E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd) & 0020 )) -ne 0'
+        E 'test -n "$(find /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd -maxdepth 0 -perm -g+w)"'
 
     echo ""
     echo "--- DD14. ddev composer create-project (exit-23 burn-in finding) ---"
