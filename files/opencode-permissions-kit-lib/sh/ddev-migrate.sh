@@ -590,6 +590,13 @@ ddev_migrate_import() {
         return 1
     }
     dm_dir="${1:-$(ddev_migrate_latest_dir)}"
+    # d-M1 (pr-309 d): the empty-dir refusal comes BEFORE the
+    # absolutization — the c-S1 case turned "" into "$PWD/", defeating
+    # this guard and pointing root's manifest find at the caller's cwd.
+    [ -n "$dm_dir" ] || {
+        echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
+        return 1
+    }
     # pr-309 c S1: absolutize — the import hop runs ddev from / (pr-309 b
     # M3), so a RELATIVE dump-dir would resolve its --file arguments
     # against / inside the hop while every pre-flight check ran in the
@@ -605,10 +612,8 @@ ddev_migrate_import() {
     # Delivery into a root-owned temp via find -type f (only a REGULAR
     # manifest qualifies; links/FIFOs are refused, never opened) with a
     # bounded cat; the loop below parses the COPY.
-    [ -n "$dm_dir" ] || {
-        echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
-        return 1
-    }
+    # (The empty-dir refusal itself moved ABOVE the absolutization —
+    # d-M1, pr-309 d.)
     # 0.0.45d W5: the three failure causes report distinctly — the old
     # conflation printed "no dump directory with a manifest found" for
     # all of them: a mktemp failure returned 1 SILENTLY, and a cat
