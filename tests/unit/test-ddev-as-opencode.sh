@@ -950,22 +950,44 @@ check "fix b S1: strip notice is conditional — success and failure arms both n
 # Functional L1 pin for the strip failure path (find untraversable subdir):
 # extract _e2e_dump_strip, run it against a scratch dump with a 000-dir and
 # a surviving symlink — the WARNING arm must fire and the link must survive.
-BS1=$(mktemp -d)
-mkdir -p "$BS1/tmp/locked" "$BS1/bin"
-ln -s /etc/passwd "$BS1/tmp/locked/planted-link"
-ln -s /etc/passwd "$BS1/tmp/top-link"
-printf 'x\n' >"$BS1/tmp/file.txt"
-chmod 000 "$BS1/tmp/locked"
-ln -s /usr/bin/find "$BS1/bin/find"
-ln -s /usr/bin/echo "$BS1/bin/echo"
-BS1_OUT=$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" >"$BS1/fn.sh" && cd "$BS1" && PATH="$BS1/bin:$PATH" sh -c '. ./fn.sh 2>/dev/null; _e2e_dump_strip "$1"' sh "$BS1/tmp" 2>/dev/null)
-# find -delete still removes the top-level links it can reach (order is
-# directory-dependent) — the honest survival assertion is the link INSIDE
-# the untraversable dir; re-chmod first so test -L can see it again.
-chmod 755 "$BS1/tmp/locked"
-check "fix b S1: partial strip warns and never claims clean (functional, L1)" \
-    sh -c "printf '%s\n' \"\$1\" | grep -q 'strip failed' && ! printf '%s\n' \"\$1\" | grep -q 'symlinks stripped)' && test -L \"\$2/tmp/locked/planted-link\"" _ "$BS1_OUT" "$BS1"
-rm -rf "$BS1"
+# c-L3 (pr-309 c): root-guarded fixture — root traverses chmod-000 via
+# CAP_DAC_OVERRIDE, the strip would succeed and the pin red spuriously.
+# Unit suites are user-run by policy; the skip is disclosed, never hidden.
+if [ "$(id -u)" = "0" ]; then
+    echo "  note: fix-b-S1 functional pin skipped under root (find traverses chmod-000)"
+else
+    BS1=$(mktemp -d)
+    mkdir -p "$BS1/tmp/locked" "$BS1/bin"
+    ln -s /etc/passwd "$BS1/tmp/locked/planted-link"
+    ln -s /etc/passwd "$BS1/tmp/top-link"
+    printf 'x\n' >"$BS1/tmp/file.txt"
+    chmod 000 "$BS1/tmp/locked"
+    ln -s /usr/bin/find "$BS1/bin/find"
+    ln -s /usr/bin/echo "$BS1/bin/echo"
+    BS1_OUT=$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" >"$BS1/fn.sh" && cd "$BS1" && PATH="$BS1/bin:$PATH" sh -c '. ./fn.sh 2>/dev/null; _e2e_dump_strip "$1"' sh "$BS1/tmp" 2>/dev/null)
+    # find -delete still removes the top-level links it can reach (order is
+    # directory-dependent) — the honest survival assertion is the link INSIDE
+    # the untraversable dir; re-chmod first so test -L can see it again.
+    chmod 755 "$BS1/tmp/locked"
+    check "fix b S1: partial strip warns and never claims clean (functional, L1)" \
+        sh -c "printf '%s\n' \"\$1\" | grep -q 'strip failed' && ! printf '%s\n' \"\$1\" | grep -q 'symlinks stripped)' && test -L \"\$2/tmp/locked/planted-link\"" _ "$BS1_OUT" "$BS1"
+    rm -rf "$BS1"
+fi
+
+# --- 7d-7. round-c fix-wave pins (pr-309 c: M1, S1, L1, L2) ------------------------
+# The c(review) findings, fixed in the c(fix) wave; the class sweep with
+# variable-indirection resolution is recorded in the c(fix) commit message.
+HOSTSSH="$FILES/opencode-permissions-kit-lib/sh/ddev-hosts.sh"
+check "fix c M1: ddev-hosts helper hops through a neutral cwd (sudo + direct arms)" \
+    sh -c "awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\" && awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF '(cd / && \"\$dha_bin\" hostname'" _ "$HOSTSSH"
+check "fix c M1: no bare ddev-hosts invocation remains outside the helper" \
+    sh -c 'test "$(grep -c "\"\$dha_bin\" hostname" "$1")" = 2' _ "$HOSTSSH"
+check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
+    sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
+check "fix c L1: container guard precedes the dumps mkdir" \
+    sh -c "awk '/^e2e_dump_container\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | awk '/E2E_CONTAINER/{if (g == 0) g = NR} /mkdir -p/{if (m == 0) m = NR} END{exit !(g > 0 && m > 0 && g < m)}'" _ "$E2ELIB"
+check "fix c L2: the rc capture is the FIRST statement of the trap handler" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | grep -n . | sed -n '2p' | grep -qF '_ecc_rc=\$?'" _ "$E2ELIB"
 
 # --- 7e. dev-owned mode (internal/records/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED

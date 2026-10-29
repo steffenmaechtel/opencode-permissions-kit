@@ -590,6 +590,14 @@ ddev_migrate_import() {
         return 1
     }
     dm_dir="${1:-$(ddev_migrate_latest_dir)}"
+    # pr-309 c S1: absolutize — the import hop runs ddev from / (pr-309 b
+    # M3), so a RELATIVE dump-dir would resolve its --file arguments
+    # against / inside the hop while every pre-flight check ran in the
+    # caller's cwd. The default and absolute callers are unaffected.
+    case "$dm_dir" in
+        /*) ;;
+        *) dm_dir="$PWD/$dm_dir" ;;
+    esac
     # Same S6 discipline as ddev_migrate_gap (0.0.45c): the dump dir is
     # agent-owned after finalize, so root never READS its manifest.conf
     # directly — the old `[ -f ]` + `while read <` followed a planted

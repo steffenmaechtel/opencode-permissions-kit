@@ -555,9 +555,17 @@ trap e2e_cleanup EXIT
 # silent (the failure count is the verdict, the dump is a bonus), so no
 # pin rides on it (L1 pin-cost budget, INFO-severity diagnostic).
 e2e_dump_container() {
+    # pr-309 c L1: the container guard comes FIRST — pre-container aborts
+    # (E2E_CONTAINER unset, e.g. the version-resolve deaths in the runners)
+    # must not leave an empty dumps/<suite>-<ts>/ dir behind. The
+    # stale-container facet (a kept run's container still holding the name)
+    # is dispositioned: post-hoc, the cleanup cannot distinguish its own
+    # container from a leftover — per-suite names bound the confusion to
+    # sequential same-suite runs.
+    [ -n "${E2E_CONTAINER:-}" ] || return 0
     _edc_dest="$(dirname "$0")/dumps/${1:-evidence}-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$_edc_dest" 2>/dev/null || return 0
-    if [ -n "${E2E_CONTAINER:-}" ] && docker cp "$E2E_CONTAINER:/tmp" "$_edc_dest/tmp" >/dev/null 2>&1; then
+    if docker cp "$E2E_CONTAINER:/tmp" "$_edc_dest/tmp" >/dev/null 2>&1; then
         _e2e_dump_strip "$_edc_dest/tmp"
     fi
     return 0
