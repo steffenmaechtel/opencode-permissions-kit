@@ -218,7 +218,14 @@ _ddev_migrate_run_as() {
     else
         set -- env "HOME=$dm_h" "$@"
     fi
-    sudo -u "$dm_u" "$@"
+    # pr-309 b M3: the hop runs ddev from / — sudo preserves the caller's
+    # cwd, the migrate loops address projects BY NAME while ddev's command
+    # walk derives from os.Getwd() (issue #279): from a project directory
+    # the walk re-caps THAT (possibly unrelated) project — as the dev user
+    # even on dev-owned trees, where the 0755 chmod succeeds. Every command
+    # through this runner is name-addressed or global; the neutral cwd
+    # closes the vector.
+    sudo -u "$dm_u" sh -c 'cd / && exec "$@"' migrate-run "$@"
 }
 
 # _ddev_migrate_bin [user]
@@ -583,6 +590,21 @@ ddev_migrate_import() {
         return 1
     }
     dm_dir="${1:-$(ddev_migrate_latest_dir)}"
+    # d-M1 (pr-309 d): the empty-dir refusal comes BEFORE the
+    # absolutization — the c-S1 case turned "" into "$PWD/", defeating
+    # this guard and pointing root's manifest find at the caller's cwd.
+    [ -n "$dm_dir" ] || {
+        echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
+        return 1
+    }
+    # pr-309 c S1: absolutize — the import hop runs ddev from / (pr-309 b
+    # M3), so a RELATIVE dump-dir would resolve its --file arguments
+    # against / inside the hop while every pre-flight check ran in the
+    # caller's cwd. The default and absolute callers are unaffected.
+    case "$dm_dir" in
+        /*) ;;
+        *) dm_dir="$PWD/$dm_dir" ;;
+    esac
     # Same S6 discipline as ddev_migrate_gap (0.0.45c): the dump dir is
     # agent-owned after finalize, so root never READS its manifest.conf
     # directly — the old `[ -f ]` + `while read <` followed a planted
@@ -590,10 +612,8 @@ ddev_migrate_import() {
     # Delivery into a root-owned temp via find -type f (only a REGULAR
     # manifest qualifies; links/FIFOs are refused, never opened) with a
     # bounded cat; the loop below parses the COPY.
-    [ -n "$dm_dir" ] || {
-        echo "ddev-migrate: no dump directory with a manifest found under $DDEV_MIG_BACKUP_ROOT"
-        return 1
-    }
+    # (The empty-dir refusal itself moved ABOVE the absolutization —
+    # d-M1, pr-309 d.)
     # 0.0.45d W5: the three failure causes report distinctly — the old
     # conflation printed "no dump directory with a manifest found" for
     # all of them: a mktemp failure returned 1 SILENTLY, and a cat
@@ -663,9 +683,9 @@ ddev_migrate_import() {
         # stdin and would consume the manifest mid-iteration (same class
         # as the export-loop finding).
         if sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
-            ${dm_extra:+"$dm_extra"} "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 &&
+            ${dm_extra:+"$dm_extra"} sh -c 'cd / && exec "$@"' migrate-import "$dm_bin" start "$dm_n" </dev/null >/dev/null 2>&1 &&
             sudo -u "$dm_oc" env "HOME=$dm_oc_h" "XDG_RUNTIME_DIR=/run/user/$dm_oc_i" \
-                ${dm_extra:+"$dm_extra"} "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
+                ${dm_extra:+"$dm_extra"} sh -c 'cd / && exec "$@"' migrate-import "$dm_bin" import-db "$dm_n" --file="$dm_dir/$dm_f" \
                 </dev/null >/dev/null 2>&1; then
             echo "    imported: $dm_f"
             dm_ok=$((dm_ok + 1))

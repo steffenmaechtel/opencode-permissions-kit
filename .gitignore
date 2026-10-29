@@ -1,4 +1,5 @@
 .vscode/
 __pycache__/
 tests/e2e/cache/
+tests/e2e/dumps/
 /opencode.jsonc

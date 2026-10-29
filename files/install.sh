@@ -823,14 +823,23 @@ do_plan_phase() {
     DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
     DDEV_VERSION=""
     if [ -n "$DDEV_BIN" ] && [ -x "$DDEV_BIN" ]; then
-        DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null |
+        # pr-309 b M1 (consistency): root-run probe — root never performs
+        # ddev's commands walk on any 1.25.x (verified round b), but the
+        # neutral cwd keeps every ddev invocation in the kit uniform and
+        # future-proof against a root-permissive ddev.
+        DDEV_VERSION="$( (cd / && "$DDEV_BIN" version) 2>/dev/null |
             grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
     fi
     DDEV_BIN_DEV=""
     if [ -z "$DDEV_VERSION" ] && id "$DEFAULT_USER" >/dev/null 2>&1; then
         DDEV_BIN_DEV="$(sudo -u "$DEFAULT_USER" env HOME="$DEV_HOME" sh -c 'command -v ddev 2>/dev/null || true')"
         if [ -n "$DDEV_BIN_DEV" ] && [ -x "$DDEV_BIN_DEV" ]; then
-            DDEV_VERSION="$(sudo -u "$DEFAULT_USER" env HOME="$DEV_HOME" "$DDEV_BIN_DEV" version 2>/dev/null |
+            # issue #279 (pr-309 a Q3): probed from / via sh -c — sudo
+            # preserves the caller's cwd, and the installer runs wherever
+            # the user invoked it (project directories included); ddev's
+            # command walk would chmod the cwd project's .ddev/commands.
+            DDEV_VERSION="$(sudo -u "$DEFAULT_USER" \
+                env HOME="$DEV_HOME" sh -c 'cd / && exec "$0" version' "$DDEV_BIN_DEV" 2>/dev/null |
                 grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
             [ -z "$DDEV_BIN" ] && DDEV_BIN="$DDEV_BIN_DEV"
         fi

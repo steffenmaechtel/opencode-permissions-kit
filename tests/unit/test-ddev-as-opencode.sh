@@ -747,22 +747,23 @@ check "hint arm: opencode-owned target stays silent (functional)" \
     sh -c "[ -z \"\$1\" ]" _ "$BH_S"
 rm -rf "$BH"
 
-# --- 7d. reshare wiring (issue #94) ----------------------------------------------
-# The ddev() function must re-assert group-write after the tree-creating
-# commands (ddev's explicit 0755/0644 modes otherwise keep the developer
-# out of .ddev/ — git pulls fail), through the sudoers helper's heal mode.
+# --- 7d. reshare wiring (issue #94, widened to every command in #279) --------------
+# The ddev() function must re-assert group-write after EVERY ddev command
+# (ddev's explicit 0755/0644 modes cap the inherited ACL mask, AND its
+# command-list walk re-chmods .ddev/commands/** on every invocation —
+# describe/--version included), through the sudoers helper's heal mode.
 check "reshare: _opk_ddev_reshare calls the helper's heal mode" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-ensure-shared' " _ "$FUNC"
-check "reshare: heal runs after config/get/start/restart" \
-    sh -c "grep -q 'config | get | start | restart) _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
+check "reshare: heal follows EVERY ddev command — no command gate (issue #279)" \
+    sh -c "awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -qE '^[[:space:]]*_opk_ddev_reshare[[:space:]]*$' && ! awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -q 'config | get | start | restart'" _ "$FUNC"
 check "reshare: heal is silent and never changes the ddev exit code" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '|| true' && awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF 'return 0'" _ "$FUNC"
 check "reshare: no heal without a project in the cwd" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '[ -d \"\$PWD/.ddev\" ]'" _ "$FUNC"
 check "reshare: exported for bash children (issue #18)" \
     sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
-check "reshare: browser-command path heals after its internal start too" \
-    sh -c "awk '/_opk_ddev_browser\(\)/,/^}/' \"\$1\" | grep -A5 'ddev-as-opencode start' | grep -q _opk_ddev_reshare" _ "$FUNC"
+check "reshare: browser arm has no separate heal — the ddev() tail covers it (issue #279)" \
+    sh -c "! awk '/_opk_ddev_browser\(\)/,/^}/' \"\$1\" | grep -q _opk_ddev_reshare" _ "$FUNC"
 
 # --- 7d-2. dev-owned flag wiring (issue #149, finding 1) --------------------------
 # The ddev() function must flag a fresh project right after `ddev config`
@@ -860,9 +861,135 @@ check "reshare detect: status.sh fix line is the short form only (no raw helper 
     sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\"" _ "$STATUS"
 check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4)" \
     sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS"
-check "reshare detect: status fix names the healing command set, not 'any' (0.0.46a F7)" \
-    sh -c "grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'any ddev command' \"\$1\"" _ "$STATUS"
+check "reshare detect: status fix names 'any ddev command' — every invocation heals (0.0.46a F7 wording inverted by issue #279)" \
+    sh -c "grep -q 'any ddev command in this project' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\"" _ "$STATUS"
+check "reshare detect: warn line names the general cause, not only agent runs (issue #279)" \
+    sh -c "grep -q 'group-write missing (a ddev run without the following heal)' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\"" _ "$STATUS"
 rm -rf "$RN"
+
+# --- 7d-4. version-probe neutrality (issue #279) ----------------------------------
+# ddev chmods .ddev/commands/** to 0755 on every IN-PROJECT invocation
+# (--version included — the command-list walk runs in init()). The kit's
+# version probes (status.sh, update.sh) call bin/ddev-as-opencode
+# --version with the CALLER's cwd; from a project directory that re-broke
+# the tree a heal had just fixed. The helper therefore execs --version
+# from the agent home — pinned functionally: a PATH-stub ddev records
+# the cwd it was exec'd with, the pin asserts it is the agent home
+# (getent-derived, exactly how the helper computes it), not the project
+# dir. The cd is best-effort by design (a failed cd keeps the inherited
+# cwd so the probe still runs); that arm stays comment-level — forcing
+# it would need a home-less passwd entry, outside the unit sandbox
+# (pin-cost budget).
+VN=$(mktemp -d)
+mkdir -p "$VN/proj/.ddev/commands/host" "$VN/bin"
+printf 'cmd\n' >"$VN/proj/.ddev/commands/host/hostcmd"
+printf 'OPENCODE_USER=%s\n' "$(id -un)" >"$VN/install.conf"
+cat >"$VN/bin/ddev" <<'STUB'
+#!/bin/sh
+# 279 stub: record the process cwd the real ddev would run with — that
+# cwd decides whether ddev's command walk chmods the project's files.
+printf 'cwd=%s args=%s\n' "$PWD" "$*" >>"$VN_MARKER"
+echo "ddev version v9.9.9"
+STUB
+chmod 755 "$VN/bin/ddev"
+VN_MARKER="$VN/marker" OPK_INSTALL_CONF="$VN/install.conf" PATH="$VN/bin:$PATH" \
+    sh -c 'cd "$1/proj" && "$2" --version >/dev/null 2>&1' _ "$VN" "$HELPER"
+VN_CWD=$(sed -n 's/^cwd=\(.*\) args=--version$/\1/p' "$VN/marker" 2>/dev/null)
+check "version probe: --version execs ddev from the agent home, not the project (issue #279)" \
+    sh -c "[ -n \"\$1\" ] && [ \"\$1\" = \"\$2\" ]" _ "$VN_CWD" "$(getent passwd "$(id -un)" | cut -d: -f6)"
+check "version probe: the neutral cd is gated on --version alone (other args keep the cwd)" \
+    sh -c "grep -qF '[ \"\$#\" -eq 1 ] && [ \"\$1\" = \"--version\" ]' \"\$1\"" _ "$HELPER"
+rm -rf "$VN"
+
+# --- 7d-5. round-a fix-wave pins (pr-309 a: M1+S1+Q1, M2, Q3, M3, M4, S3) ---------
+# The a(review) findings, fixed in the a(fix) wave — each fix carries its
+# pin; the deliberate not-dones (M3 suggestion texts, S2, Q2) carry their
+# dispositions in round b's comment instead.
+E2ELIB="$SCRIPT_DIR/../e2e/lib.sh"
+check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
+    sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$1"' _ "$STATUS"
+check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finish" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container && ! awk '/^e2e_finish\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container" _ "$E2ELIB"
+check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$E2ELIB"
+check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
+    sh -c "awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q -- '-type l -delete'" _ "$E2ELIB"
+check "fix a Q3: install.sh probes the ddev version subcommand from /" \
+    sh -c 'grep -q "env HOME=\"\$DEV_HOME\" sh -c .cd / && exec" "$1" && ! grep -q "\"\$DDEV_BIN_DEV\" version" "$1"' _ "$INSTALL"
+check "fix a M3: config.sh probes the ddev version from /" \
+    sh -c 'grep -qF "(cd / && \"\$_cand_bin\" version)" "$1" && ! grep -qF "\"\$_cand_bin\" version 2>/dev/null" "$1"' _ "$CONFIG"
+check "fix a M4: opk usage tells the generalized story, not 'agent-side'" \
+    sh -c "grep -q 'a .ddev tree a' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\"" _ "$KIT"
+
+# --- 7d-6. round-b fix-wave pins (pr-309 b: M2, M3, M4, S3, S1, M1-rider) ---------
+# The b(review) findings, fixed in the b(fix) wave. Class sweep evidence
+# lives in the b(fix) commit message: every non-root `sudo -u ... ddev`
+# shape in files/ now runs through a neutral-cwd choke point (helper,
+# handover runner, migrate runner/imports) or is root-only and inert
+# (verified round b: root never walks on any 1.25.x).
+HANDOVERSH="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+MIGRATESH="$FILES/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
+check "fix b M2: handover runner hops through a neutral cwd" \
+    sh -c "awk '/^_ddev_handover_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$HANDOVERSH"
+check "fix b M3: migrate runner hops through a neutral cwd" \
+    sh -c "awk '/^_ddev_migrate_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$MIGRATESH"
+check "fix b M3: both inline import invocations hop through a neutral cwd" \
+    sh -c "grep 'cd / && exec' \"\$1\" | grep -c migrate-import | grep -qx 2" _ "$MIGRATESH"
+check "fix b M1: install.sh root probe from / (consistency)" \
+    sh -c 'grep -qF "(cd / && \"\$DDEV_BIN\" version)" "$1" && ! grep -qF "\"\$DDEV_BIN\" version 2>/dev/null" "$1"' _ "$INSTALL"
+check "fix b M1: update.sh root fallback probe from / (consistency)" \
+    sh -c 'grep -qF "(cd / && \"\$_ddev_bin\" --version)" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$1"' _ "$UPDATE"
+check "fix b M4/S3: dump gate sees the exit status, not only counted failures" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '_ecc_rc=\$?' && awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '\"\$_ecc_rc\" -ne 0'" _ "$E2ELIB"
+check "fix b M4: dump fires before the keep branches (red --debug runs get evidence)" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'" _ "$E2ELIB"
+check "fix b M4: E2E_KEEP stays dump-free by design" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '[ \"\${E2E_KEEP:-0}\" != \"1\" ]'" _ "$E2ELIB"
+check "fix b S1: strip notice is conditional — success and failure arms both named" \
+    sh -c "awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q 'symlinks stripped' && awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q 'strip failed'" _ "$E2ELIB"
+# Functional L1 pin for the strip failure path (find untraversable subdir):
+# extract _e2e_dump_strip, run it against a scratch dump with a 000-dir and
+# a surviving symlink — the WARNING arm must fire and the link must survive.
+# c-L3 (pr-309 c): root-guarded fixture — root traverses chmod-000 via
+# CAP_DAC_OVERRIDE, the strip would succeed and the pin red spuriously.
+# Unit suites are user-run by policy; the skip is disclosed, never hidden.
+if [ "$(id -u)" = "0" ]; then
+    echo "  note: fix-b-S1 functional pin skipped under root (find traverses chmod-000)"
+else
+    BS1=$(mktemp -d)
+    mkdir -p "$BS1/tmp/locked" "$BS1/bin"
+    ln -s /etc/passwd "$BS1/tmp/locked/planted-link"
+    ln -s /etc/passwd "$BS1/tmp/top-link"
+    printf 'x\n' >"$BS1/tmp/file.txt"
+    chmod 000 "$BS1/tmp/locked"
+    ln -s /usr/bin/find "$BS1/bin/find"
+    ln -s /usr/bin/echo "$BS1/bin/echo"
+    BS1_OUT=$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" >"$BS1/fn.sh" && cd "$BS1" && PATH="$BS1/bin:$PATH" sh -c '. ./fn.sh 2>/dev/null; _e2e_dump_strip "$1"' sh "$BS1/tmp" 2>/dev/null)
+    # find -delete still removes the top-level links it can reach (order is
+    # directory-dependent) — the honest survival assertion is the link INSIDE
+    # the untraversable dir; re-chmod first so test -L can see it again.
+    chmod 755 "$BS1/tmp/locked"
+    check "fix b S1: partial strip warns and never claims clean (functional, L1)" \
+        sh -c "printf '%s\n' \"\$1\" | grep -q 'strip failed' && ! printf '%s\n' \"\$1\" | grep -q 'symlinks stripped)' && test -L \"\$2/tmp/locked/planted-link\"" _ "$BS1_OUT" "$BS1"
+    rm -rf "$BS1"
+fi
+
+# --- 7d-7. round-c fix-wave pins (pr-309 c: M1, S1, L1, L2) ------------------------
+# The c(review) findings, fixed in the c(fix) wave; the class sweep with
+# variable-indirection resolution is recorded in the c(fix) commit message.
+HOSTSSH="$FILES/opencode-permissions-kit-lib/sh/ddev-hosts.sh"
+check "fix c M1: ddev-hosts helper hops through a neutral cwd (sudo + direct arms)" \
+    sh -c "awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\" && awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF '(cd / && \"\$dha_bin\" hostname'" _ "$HOSTSSH"
+check "fix c M1: no bare ddev-hosts invocation remains outside the helper" \
+    sh -c 'test "$(grep -c "\"\$dha_bin\" hostname" "$1")" = 2' _ "$HOSTSSH"
+check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
+    sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
+check "fix d M1: empty-dir refusal precedes the absolutization (guard hoisted)" \
+    sh -c 'g=$(grep -nF "[ -n \"\$dm_dir\" ] ||" "$1" | head -1 | cut -d: -f1); c=$(grep -nF "case \"\$dm_dir\" in" "$1" | head -1 | cut -d: -f1); test -n "$g" && test -n "$c" && test "$g" -lt "$c"' _ "$MIGRATESH"
+check "fix c L1: container guard precedes the dumps mkdir" \
+    sh -c "awk '/^e2e_dump_container\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | awk '/E2E_CONTAINER/{if (g == 0) g = NR} /mkdir -p/{if (m == 0) m = NR} END{exit !(g > 0 && m > 0 && g < m)}'" _ "$E2ELIB"
+check "fix c L2: the rc capture is the FIRST statement of the trap handler" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | grep -n . | sed -n '2p' | grep -qF '_ecc_rc=\$?'" _ "$E2ELIB"
 
 # --- 7e. dev-owned mode (internal/records/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED

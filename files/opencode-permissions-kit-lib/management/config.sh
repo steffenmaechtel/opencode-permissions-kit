@@ -761,7 +761,10 @@ container_backend_apply() {
             }
         done
         if [ -n "$_cand_bin" ]; then
-            _cand_ver=$("$_cand_bin" version 2>/dev/null |
+            # issue #279 (pr-309 a M3): neutral cwd — same walk, same
+            # re-cap as the status/install probes; config.sh's direct
+            # (non-root) mode runs from wherever the user stands.
+            _cand_ver=$( (cd / && "$_cand_bin" version) 2>/dev/null |
                 grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)
             # if/else, not `case $?` after a bare call — config.sh runs
             # under set -e and "not needed" is rc=1.

@@ -183,9 +183,9 @@ _opk_ddev_browser() {
         _opk_bootstrap_hint 2>/dev/null || true
         /usr/bin/sudo -u opencode /usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode start
         _opk_brc=$?
-        # issue #94: this internal start regenerates .ddev content too —
-        # same group-write heal as the plain path below.
-        _opk_ddev_reshare
+        # issue #94/#279: this internal start regenerates .ddev content —
+        # the ddev() tail's per-command heal covers it (same function,
+        # once per invocation; no separate reshare here).
         _opk_hosts_hint 2>/dev/null || true
         if [ "$_opk_brc" -ne 0 ]; then
             return "$_opk_brc"
@@ -256,12 +256,13 @@ ddev() {
     _opk_rc=$?
     # ${1:-}: the exported function may land in child scripts running
     # `set -u` that call ddev without arguments (issue #18).
-    # issue #94: tree-creating commands leave ddev-written content without
-    # group-write (ddev's explicit 0755/0644 cap the inherited ACL mask) —
-    # heal before git ever needs to write there.
-    case "${1:-}" in
-        config | get | start | restart) _opk_ddev_reshare ;;
-    esac
+    # issues #94 + #279: EVERY ddev invocation re-caps group-write on the
+    # project's command files (ddev walks .ddev/commands in its process
+    # init and chmods each file to 0755, capping the inherited ACL mask
+    # below g+w — describe/--version/IDE describe-polls included, not
+    # just the tree-creating four), so the heal follows every command
+    # now. Still cheap, still never changes ddev's own exit code.
+    _opk_ddev_reshare
     # issue #149 finding 1: dev-owned mode flags the project the moment
     # `ddev config` creates it (silent when off or already flagged).
     case "${1:-}" in
@@ -273,11 +274,15 @@ ddev() {
     return "$_opk_rc"
 }
 
-# _opk_ddev_reshare (issue #94): after tree-creating ddev commands, re-run
-# the group-write heal on the project's .ddev through the sudoers helper
-# (bin/ddev-as-opencode --opk-ensure-shared — runs as opencode, owner-only
-# chmod on its own files, zero new privilege). Without it, ddev's explicit
-# 0755/0644 modes keep the developer out of the tree: `git pull` on
+# _opk_ddev_reshare (issue #94, widened to every invocation by #279):
+# after EVERY ddev command, re-run the group-write heal on the project's
+# .ddev through the sudoers helper (bin/ddev-as-opencode --opk-ensure-shared
+# — runs as opencode, owner-only chmod on its own files, zero new
+# privilege). #94 covered the tree-creating commands (ddev's explicit
+# 0755/0644 cap the inherited ACL mask); #279 showed ddev ALSO chmods
+# .ddev/commands/** to 0755 during its process init on every invocation
+# (command-list walk), so describe/--version/IDE polls re-cap the tree
+# seconds after any heal — without the per-command heal, `git pull` on
 # teammate-delivered .ddev/ files fails with "permission denied". Cheap,
 # silent, never changes the ddev command's own exit code.
 _opk_ddev_reshare() {

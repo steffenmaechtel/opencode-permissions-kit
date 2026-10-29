@@ -354,7 +354,13 @@ _ddev_handover_run_as() {
     shift
     _dhr_h=$(getent passwd "$_dhr_u" 2>/dev/null | cut -d: -f6 || true)
     [ -n "$_dhr_h" ] || return 1
-    sudo -u "$_dhr_u" env HOME="$_dhr_h" "$@"
+    # pr-309 b M2: the hop runs ddev from / — sudo preserves the caller's
+    # cwd, and ddev's command walk chmods .ddev/commands/** on every
+    # in-project non-root invocation (issue #279), re-capping whatever
+    # project the operator stands in. Every call through this runner is
+    # cwd-independent (global config, name-addressed commands), so the
+    # neutral cwd costs nothing and closes the vector for every caller.
+    sudo -u "$_dhr_u" env HOME="$_dhr_h" sh -c 'cd / && exec "$@"' handover-run "$@"
 }
 
 # ddev_rootless_bindmounts <oc-user> <backend> <ddev-version> <ddev-bin>

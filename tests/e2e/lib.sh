@@ -507,13 +507,26 @@ e2e_start_container() {
 E() { docker exec -u dev "$E2E_CONTAINER" sh -c "$@"; }
 
 e2e_cleanup() {
+    # Capture the exit status FIRST — every command below overwrites $?
+    # (pr-309 b S3: a set -e death before the first counted check exits
+    # red with failures=0; the dump gate below must see that red).
+    _ecc_rc=$?
+    # pr-309 a M2 + b M4/S3: dump failure evidence on EVERY red exit —
+    # counted failures OR nonzero exit status — BEFORE any keep branch or
+    # rm; set -e deaths, explicit abort arms and --debug red runs all
+    # leave host-side evidence now. E2E_KEEP stays dump-free by design:
+    # the operator asked to keep the whole container, the live tree beats
+    # a copy.
+    if [ "${E2E_KEEP:-0}" != "1" ] && { [ "${failures:-0}" -gt 0 ] || [ "$_ecc_rc" -ne 0 ]; }; then
+        e2e_dump_container "$(basename "$0" .sh)"
+    fi
     if [ "${E2E_KEEP:-0}" = "1" ]; then
         echo ""
         echo "  ${YELLOW}E2E_KEEP=1: keeping container '$E2E_CONTAINER' (fast iteration)${NC}"
         echo "    docker exec -it $E2E_CONTAINER bash   (removed automatically by the next run)"
         return
     fi
-    if [ "$E2E_DEBUG" = "1" ] && [ "$failures" -gt 0 ]; then
+    if [ "$E2E_DEBUG" = "1" ] && [ "${failures:-0}" -gt 0 ]; then
         echo ""
         echo "  ${YELLOW}--debug: keeping container '$E2E_CONTAINER' for inspection${NC}"
         echo "    docker exec -it $E2E_CONTAINER bash"
@@ -531,6 +544,46 @@ e2e_cleanup() {
     fi
 }
 trap e2e_cleanup EXIT
+
+# e2e_dump_container <label>: copy the suite container's /tmp out as
+# failure evidence (issue #279 wave). The container's internal logs —
+# /tmp/dd*.log outputs, the deployed kit's state — are otherwise lost to
+# the EXIT trap's `docker rm`; E2E_KEEP=1 preserves the whole container
+# but leaves it RUNNING too (resources, name collisions on the re-run).
+# The dump is the middle ground: automatic, failure-only, host-side.
+# Best-effort by design — a missing container or failed docker cp stays
+# silent (the failure count is the verdict, the dump is a bonus), so no
+# pin rides on it (L1 pin-cost budget, INFO-severity diagnostic).
+e2e_dump_container() {
+    # pr-309 c L1: the container guard comes FIRST — pre-container aborts
+    # (E2E_CONTAINER unset, e.g. the version-resolve deaths in the runners)
+    # must not leave an empty dumps/<suite>-<ts>/ dir behind. The
+    # stale-container facet (a kept run's container still holding the name)
+    # is dispositioned: post-hoc, the cleanup cannot distinguish its own
+    # container from a leftover — per-suite names bound the confusion to
+    # sequential same-suite runs.
+    [ -n "${E2E_CONTAINER:-}" ] || return 0
+    _edc_dest="$(dirname "$0")/dumps/${1:-evidence}-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$_edc_dest" 2>/dev/null || return 0
+    if docker cp "$E2E_CONTAINER:/tmp" "$_edc_dest/tmp" >/dev/null 2>&1; then
+        _e2e_dump_strip "$_edc_dest/tmp"
+    fi
+    return 0
+}
+
+# _e2e_dump_strip <dir>: strip symlinks from a dumped tree and report the
+# outcome honestly (pr-309 b S1): docker cp preserves symlinks AS symlinks
+# (a poisoned image could plant host-pointing links into the dump), and a
+# partial strip — find failing on an untraversable subdir — must not print
+# an unconditional "stripped" claim over surviving links.
+_e2e_dump_strip() {
+    if find "$1" -type l -delete 2>/dev/null; then
+        echo "  ${YELLOW}failure evidence: container /tmp dumped to $1 (symlinks stripped)${NC}"
+    else
+        echo "  ${YELLOW}failure evidence: container /tmp dumped to $1 — WARNING: symlink strip failed, treat contents with care${NC}"
+    fi
+    return 0
+}
 
 e2e_finish() {
     echo ""

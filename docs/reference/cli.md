@@ -113,8 +113,9 @@ order.
 
 ## ensure-shared
 
-Re-assert group-write on a `.ddev` tree an agent-side ddev run left without
-it — the short form of the fix `opk status` prints for its
+Re-assert group-write on a `.ddev` tree a ddev run left without it (every
+ddev invocation re-caps the modes, and agent sessions run without the
+healing hook) — the short form of the fix `opk status` prints for its
 `ddev share … group-write missing` line:
 
 ```bash

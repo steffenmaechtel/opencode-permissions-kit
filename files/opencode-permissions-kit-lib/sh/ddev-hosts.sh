@@ -165,6 +165,22 @@ ddev_hosts_missing() {
 # hostnames; a HOSTNAME adds exactly that one name — the per-hostname
 # commands the status/hints print, so the user sees and adds exactly what
 # was reported.
+# _dha_hostname <name> (pr-309 c M1): run `ddev hostname <name> 127.0.0.1`
+# from / — ddev's command walk chmods .ddev/commands/** on every in-project
+# non-root invocation (issue #279), and the opk dispatcher preserves the
+# operator's cwd through its sudo hop; as the dev user the 0755 chmod even
+# succeeds on dev-owned trees. The hostname subcommand is name-addressed
+# and cwd-independent, so the neutral cwd costs nothing (the same
+# choke-point pattern as the handover/migrate runners, pr-309 b).
+_dha_hostname() {
+    if [ -n "$dha_dev" ]; then
+        sudo -u "$dha_dev" env HOME="$dha_dev_h" sh -c 'cd / && exec "$@"' hosts-run \
+            "$dha_bin" hostname "$1" 127.0.0.1
+    else
+        (cd / && "$dha_bin" hostname "$1" 127.0.0.1)
+    fi
+}
+
 ddev_hosts_add() {
     dha_arg="${1:-}"
     [ -n "$dha_arg" ] || dha_arg="$PWD"
@@ -212,11 +228,7 @@ ddev_hosts_add() {
                 ;;
         esac
         echo "adding $dha_arg (Windows may ask for permission) ..."
-        if [ -n "$dha_dev" ]; then
-            sudo -u "$dha_dev" env HOME="$dha_dev_h" "$dha_bin" hostname "$dha_arg" 127.0.0.1
-        else
-            "$dha_bin" hostname "$dha_arg" 127.0.0.1
-        fi || {
+        _dha_hostname "$dha_arg" || {
             echo "  FAILED: $dha_arg — add it manually (see below)"
             return 1
         }
@@ -253,19 +265,11 @@ ddev_hosts_add() {
     while IFS= read -r dha_h; do
         [ -n "$dha_h" ] || continue
         echo "adding $dha_h (Windows may ask for permission) ..."
-        if [ -n "$dha_dev" ]; then
-            sudo -u "$dha_dev" env HOME="$dha_dev_h" "$dha_bin" hostname "$dha_h" 127.0.0.1 ||
-                {
-                    echo "  FAILED: $dha_h — add it manually (see below)"
-                    dha_rc=1
-                }
-        else
-            "$dha_bin" hostname "$dha_h" 127.0.0.1 ||
-                {
-                    echo "  FAILED: $dha_h — add it manually (see below)"
-                    dha_rc=1
-                }
-        fi
+        _dha_hostname "$dha_h" ||
+            {
+                echo "  FAILED: $dha_h — add it manually (see below)"
+                dha_rc=1
+            }
     done <<DHA_LIST
 $dha_missing
 DHA_LIST
