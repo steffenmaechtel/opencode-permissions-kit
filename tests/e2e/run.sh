@@ -413,12 +413,15 @@ check "4c: detected typo3 settings dir still handed over to opencode" \
     E 'test "$(stat -c %U /var/www/vhosts/detected-project/config/system)" = "opencode"'
 
 echo ""
-echo "--- 4c-2. ddev() reshare: .ddev stays dev-writable (issue #94) ---"
+echo "--- 4c-2. ddev() reshare: .ddev stays dev-writable (issue #94, widened in #279) ---"
 # ddev hardcodes explicit 0755/0644 modes, which cap the inherited ACL mask
 # to r-x: content ddev creates as opencode keeps the developer (sharing
 # group) out — `git pull` delivering teammate .ddev/ files fails with
-# "permission denied" (reproduced live on a kit machine). The ddev()
-# function must heal group-write after the tree-creating commands.
+# "permission denied" (reproduced live on a kit machine). Issue #279
+# widened the shape: ddev re-chmods .ddev/commands/** on EVERY in-project
+# invocation, so the ddev() function must heal after every command, not
+# just the tree-creating four — a describe right after a start otherwise
+# re-breaks the tree the start's heal had just fixed.
 # Fixture: a project whose .ddev was created by "ddev" (= opencode) with
 # restrictive modes; a planted fake ddev answers the config call.
 E 'sudo mkdir -p /var/www/vhosts/git94/.ddev/commands/web /var/www/vhosts/git94/.ddev/db_snapshots && sudo chown dev:dev /var/www/vhosts/git94 && sudo chown -R opencode:opencode /var/www/vhosts/git94/.ddev'
@@ -436,6 +439,16 @@ check "4c-2: db_snapshots stays pruned from the heal" \
     E '! sudo -u dev test -w /var/www/vhosts/git94/.ddev/db_snapshots'
 check "4c-2: the teammate-file git pull delivers lands for the developer" \
     E 'sudo -u dev sh -c "printf \"#!/bin/sh\\n\" > /var/www/vhosts/git94/.ddev/commands/web/arrived-command" && test -f /var/www/vhosts/git94/.ddev/commands/web/arrived-command'
+# issue #279: the heal must follow EVERY command — re-cap the tree and run
+# a NON-tree command (describe) through the hook: the tail heal must
+# restore group-write (the pre-#279 hook healed config/get/start/restart
+# only, and real ddev's describe re-caps the command files).
+E 'sudo -u opencode chmod 755 /var/www/vhosts/git94/.ddev/commands/web'
+check "4c-2: fixture re-capped — tree is NOT dev-writable again (the re-break shape)" \
+    E '! sudo -u dev test -w /var/www/vhosts/git94/.ddev/commands/web'
+E 'sudo -u dev -H bash -c "cd /var/www/vhosts/git94 && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev describe" >/dev/null 2>&1 || true'
+check "4c-2: ddev() heals after EVERY command — describe too (issue #279)" \
+    E 'sudo -u dev test -w /var/www/vhosts/git94/.ddev/commands/web'
 # No project in the cwd (ddev config global from $HOME): the heal must be
 # a silent no-op, not an error.
 E 'sudo -u dev -H bash -c "cd /home/dev && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh; ddev config global --no-bind-mounts" >/dev/null 2>&1' &&

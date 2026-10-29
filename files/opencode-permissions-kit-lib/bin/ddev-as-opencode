@@ -169,5 +169,19 @@ if ! [ -x . ]; then
     cd "$HOME" 2>/dev/null || true
 fi
 
+# Version probes run from the agent home (issue #279): ddev's command-list
+# walk in init() chmods .ddev/commands/** to 0755 on EVERY in-project
+# invocation (--version included), capping the inherited ACL mask below
+# g+w. status.sh and update.sh probe the ddev version with the CALLER's
+# cwd — run from a project directory, the probe used to re-break the very
+# tree a heal had just fixed (the "green right after the heal, warning
+# half a minute later" report). --version output never depends on the
+# cwd, so the neutral home makes the probe side-effect-free. Best-effort
+# like the fallback above: a failed cd keeps the inherited cwd (the
+# probe must not die on an unusable HOME).
+if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
+    cd "$HOME" 2>/dev/null || true
+fi
+
 umask 002
 exec "$DDEV" "$@"

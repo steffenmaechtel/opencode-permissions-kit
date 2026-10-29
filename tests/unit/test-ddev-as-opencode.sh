@@ -747,22 +747,23 @@ check "hint arm: opencode-owned target stays silent (functional)" \
     sh -c "[ -z \"\$1\" ]" _ "$BH_S"
 rm -rf "$BH"
 
-# --- 7d. reshare wiring (issue #94) ----------------------------------------------
-# The ddev() function must re-assert group-write after the tree-creating
-# commands (ddev's explicit 0755/0644 modes otherwise keep the developer
-# out of .ddev/ — git pulls fail), through the sudoers helper's heal mode.
+# --- 7d. reshare wiring (issue #94, widened to every command in #279) --------------
+# The ddev() function must re-assert group-write after EVERY ddev command
+# (ddev's explicit 0755/0644 modes cap the inherited ACL mask, AND its
+# command-list walk re-chmods .ddev/commands/** on every invocation —
+# describe/--version included), through the sudoers helper's heal mode.
 check "reshare: _opk_ddev_reshare calls the helper's heal mode" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -q -- '--opk-ensure-shared' " _ "$FUNC"
-check "reshare: heal runs after config/get/start/restart" \
-    sh -c "grep -q 'config | get | start | restart) _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
+check "reshare: heal follows EVERY ddev command — no command gate (issue #279)" \
+    sh -c "awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -qE '^[[:space:]]*_opk_ddev_reshare[[:space:]]*$' && ! awk '/^ddev\(\)/,/^}/' \"\$1\" | grep -q 'config | get | start | restart) _opk_ddev_reshare'" _ "$FUNC"
 check "reshare: heal is silent and never changes the ddev exit code" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '|| true' && awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF 'return 0'" _ "$FUNC"
 check "reshare: no heal without a project in the cwd" \
     sh -c "awk '/^_opk_ddev_reshare\(\)/,/^}/' \"\$1\" | grep -qF '[ -d \"\$PWD/.ddev\" ]'" _ "$FUNC"
 check "reshare: exported for bash children (issue #18)" \
     sh -c "grep -q 'export -f ddev _opk_hosts_hint _opk_bootstrap_hint _opk_ddev_reshare' \"\$1\"" _ "$FUNC"
-check "reshare: browser-command path heals after its internal start too" \
-    sh -c "awk '/_opk_ddev_browser\(\)/,/^}/' \"\$1\" | grep -A5 'ddev-as-opencode start' | grep -q _opk_ddev_reshare" _ "$FUNC"
+check "reshare: browser arm has no separate heal — the ddev() tail covers it (issue #279)" \
+    sh -c "! awk '/_opk_ddev_browser\(\)/,/^}/' \"\$1\" | grep -q _opk_ddev_reshare" _ "$FUNC"
 
 # --- 7d-2. dev-owned flag wiring (issue #149, finding 1) --------------------------
 # The ddev() function must flag a fresh project right after `ddev config`
@@ -860,9 +861,45 @@ check "reshare detect: status.sh fix line is the short form only (no raw helper 
     sh -c "! grep -q -- '--opk-ensure-shared' \"\$1\"" _ "$STATUS"
 check "reshare detect: status.sh resolves the lib checkout-first (0.0.46a F4)" \
     sh -c "grep -qF '_st_dhl=\"\$(cd \"\$(dirname \"\$0\")\" && pwd)/../sh/ddev-handover.sh\"' \"\$1\" && grep -qF '[ -f \"\$_st_dhl\" ] || _st_dhl=\"\$LIBDIR/sh/ddev-handover.sh\"' \"\$1\"" _ "$STATUS"
-check "reshare detect: status fix names the healing command set, not 'any' (0.0.46a F7)" \
-    sh -c "grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\" && ! grep -q 'any ddev command' \"\$1\"" _ "$STATUS"
+check "reshare detect: status fix names 'any ddev command' — every invocation heals (0.0.46a F7 wording inverted by issue #279)" \
+    sh -c "grep -q 'any ddev command in this project' \"\$1\" && ! grep -q 'tree-creating ddev command (config/get/start/restart' \"\$1\"" _ "$STATUS"
+check "reshare detect: warn line names the general cause, not only agent runs (issue #279)" \
+    sh -c "grep -q 'group-write missing (a ddev run without the following heal)' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\"" _ "$STATUS"
 rm -rf "$RN"
+
+# --- 7d-4. version-probe neutrality (issue #279) ----------------------------------
+# ddev chmods .ddev/commands/** to 0755 on every IN-PROJECT invocation
+# (--version included — the command-list walk runs in init()). The kit's
+# version probes (status.sh, update.sh) call bin/ddev-as-opencode
+# --version with the CALLER's cwd; from a project directory that re-broke
+# the tree a heal had just fixed. The helper therefore execs --version
+# from the agent home — pinned functionally: a PATH-stub ddev records
+# the cwd it was exec'd with, the pin asserts it is the agent home
+# (getent-derived, exactly how the helper computes it), not the project
+# dir. The cd is best-effort by design (a failed cd keeps the inherited
+# cwd so the probe still runs); that arm stays comment-level — forcing
+# it would need a home-less passwd entry, outside the unit sandbox
+# (pin-cost budget).
+VN=$(mktemp -d)
+mkdir -p "$VN/proj/.ddev/commands/host" "$VN/bin"
+printf 'cmd\n' >"$VN/proj/.ddev/commands/host/hostcmd"
+printf 'OPENCODE_USER=%s\n' "$(id -un)" >"$VN/install.conf"
+cat >"$VN/bin/ddev" <<'STUB'
+#!/bin/sh
+# 279 stub: record the process cwd the real ddev would run with — that
+# cwd decides whether ddev's command walk chmods the project's files.
+printf 'cwd=%s args=%s\n' "$PWD" "$*" >>"$VN_MARKER"
+echo "ddev version v9.9.9"
+STUB
+chmod 755 "$VN/bin/ddev"
+VN_MARKER="$VN/marker" OPK_INSTALL_CONF="$VN/install.conf" PATH="$VN/bin:$PATH" \
+    sh -c 'cd "$1/proj" && "$2" --version >/dev/null 2>&1' _ "$VN" "$HELPER"
+VN_CWD=$(sed -n 's/^cwd=\(.*\) args=--version$/\1/p' "$VN/marker" 2>/dev/null)
+check "version probe: --version execs ddev from the agent home, not the project (issue #279)" \
+    sh -c "[ -n \"\$1\" ] && [ \"\$1\" = \"\$2\" ]" _ "$VN_CWD" "$(getent passwd "$(id -un)" | cut -d: -f6)"
+check "version probe: the neutral cd is gated on --version alone (other args keep the cwd)" \
+    sh -c "grep -qF '[ \"\$#\" -eq 1 ] && [ \"\$1\" = \"--version\" ]' \"\$1\"" _ "$HELPER"
+rm -rf "$VN"
 
 # --- 7e. dev-owned mode (internal/records/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED

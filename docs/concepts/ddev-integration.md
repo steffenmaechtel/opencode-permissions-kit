@@ -148,12 +148,21 @@ therefore starts out **without group write**, and `git pull` fails with
 *permission denied* the moment a teammate delivers a new or modified file
 under `.ddev/`.
 
-The kit heals this at the source: after the tree-creating commands
-(`ddev config` / `get` / `start` / `restart`) your `ddev` shell function
-re-asserts group-write on the project's `.ddev` through the sudoers helper —
-an owner-only chmod as `opencode`, no new privilege. Heavy generated subtrees
-(`db_snapshots`, import dumps) are pruned. Trees that arrived via git never
-need the heal.
+The kit heals this at the source: after **every** `ddev` command your `ddev`
+shell function re-asserts group-write on the project's `.ddev` through the
+sudoers helper — an owner-only chmod as `opencode`, no new privilege. Heavy
+generated subtrees (`db_snapshots`, import dumps) are pruned. Trees that
+arrived via git never need the heal.
+
+That the heal runs after *every* command (not just the tree-creating
+`config`/`get`/`start`/`restart`) is deliberate: ddev re-caps group-write
+on **every invocation** — during its startup it walks the project's
+`.ddev/commands/` and chmods every command file to `0755`, from any
+subcommand (`ddev describe`, `ddev --version` and the describe-polls IDE
+integrations run in the background all qualify). A tree healed once does
+not stay healed: the next describe re-breaks it seconds later (issue #279).
+The kit's own version probes run ddev outside the project context, so
+`opk status` cannot re-break the tree it just scanned.
 
 After `ddev config` the same hook also writes the dev-owned flag into the
 fresh `.ddev/config.yaml` when dev-owned mode is on — new projects are
@@ -162,8 +171,8 @@ without group write), the hook prints a WARNING naming the retry commands;
 the `ddev` command itself still succeeds.
 
 Edge case: content written by the *agent's* ddev session (running as
-`opencode` directly) lacks the automatic heal — run a tree-creating `ddev`
-command yourself, use `opk update --refresh`, or fix it directly:
+`opencode` directly) lacks the automatic heal — run any `ddev` command in
+the project yourself, use `opk update --refresh`, or fix it directly:
 
 ```bash
 opk ensure-shared <project>/.ddev

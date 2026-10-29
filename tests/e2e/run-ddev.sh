@@ -956,6 +956,22 @@ if OC_DD13 'ddev start >/tmp/dd13-start2.log 2>&1'; then
     DEVSH 'cd /var/www/vhosts/dd13-proj && ddev restart >/tmp/dd13-restart.log 2>&1'
     check "DD13: dev-side ddev command heals the gap (hook reshare)" \
         E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status2.log 2>&1; test -s /tmp/dd13-status2.log && ! grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status2.log'
+    # issue #279: the re-cap is not limited to tree-creating commands —
+    # real ddev chmods .ddev/commands/** during EVERY in-project
+    # invocation (describe included). The #279 circle with real ddev:
+    # an agent-side describe re-caps a freshly healed command file,
+    # status flags it again, and a dev-side describe (NON-tree command,
+    # pre-#279 hooks did not heal those) must heal it via the per-command
+    # tail heal.
+    E 'sudo mkdir -p /var/www/vhosts/dd13-proj/.ddev/commands/web && sudo chown opencode:opencode /var/www/vhosts/dd13-proj/.ddev/commands/web && printf "#!/bin/sh\necho dd13cmd\n" | sudo tee /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd >/dev/null && sudo chown opencode:opencode /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd && sudo chmod 775 /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd'
+    OC_DD13 'ddev describe >/tmp/dd13-describe1.log 2>&1'
+    check "DD13: agent-side describe re-caps the command file (real ddev, issue #279)" \
+        E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd) & 0020 )) -eq 0'
+    check "DD13: opk status flags the re-capped tree again (issue #279)" \
+        E 'sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh >/tmp/dd13-status3.log 2>&1; grep -q "dd13-proj/.ddev: group-write missing" /tmp/dd13-status3.log'
+    DEVSH 'cd /var/www/vhosts/dd13-proj && ddev describe >/tmp/dd13-describe2.log 2>&1'
+    check "DD13: dev-side describe (non-tree command) heals — the hook follows every command (issue #279)" \
+        E 'test $(( $(stat -c %a /var/www/vhosts/dd13-proj/.ddev/commands/web/dd13cmd) & 0020 )) -ne 0'
 
     echo ""
     echo "--- DD14. ddev composer create-project (exit-23 burn-in finding) ---"
