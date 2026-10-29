@@ -73,10 +73,17 @@ expect the reported paths to exist locally.
 
 - **Never commit on `master`.** Work on `feature/<name>` branches, merged via
   pull request with green CI. The agent commits its finished work on the
-  feature branch; pushes, PR creation and merges are the maintainer's job
-  unless the commission delegates them (variant c: ask-gated pushes and
-  PR creation — the merge and the loop closure stay with the maintainer).
-  (RM-0097)
+  feature branch, pushes it and creates the PR — the agent is the PR author
+  and makes the PR's last push: a GitHub approval only counts from someone
+  who is neither, so a maintainer push would invalidate the maintainer's
+  own review approval (the review process's merge gate). The opencode
+  permission prompt on `git push` / `gh pr create` is the runtime gate.
+  One exception: a push touching `.github/workflows/` can be rejected by
+  GitHub with permission denied (workflow files need elevated rights) —
+  then the agent hands the maintainer the exact initial push command and
+  re-pushes follow-ups itself, so the last push is the agent's again
+  before approvals. Merging the PR and closing the review loop stay with
+  the maintainer. (RM-0097)
 - **All shipped content is English** — scripts, docs, prompts, messages. (RM-0098)
 - **Follow `agent/conventions.md`** for interactive prompts, output
   style, shell security (untrusted input), and other shipped-code

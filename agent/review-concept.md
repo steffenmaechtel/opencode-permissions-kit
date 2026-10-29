@@ -44,10 +44,11 @@ round b: review (comment) → fixes → … → closing summary → merge
 
 - Before the first review round runs, the birth-PR exists — its number
   is the case key (citations, comment markers, the PR timeline itself).
-  In autonomous variants the agent creates the PR on the maintainer's
-  ask-gated approval; in every variant the PR is open before review
-  rounds run, keeping parallel features safe (GitHub allocates the
-  number at creation). (RM-0058)
+  The agent creates the PR itself in every variant (AGENTS.md Rules (the never-commit-on-master rule) —
+  approval validity needs the agent as author and last pusher; the
+  opencode permission prompt is the runtime gate), and in every variant
+  the PR is open before review rounds run, keeping parallel features
+  safe (GitHub allocates the number at creation). (RM-0058)
 - The round comment is posted BEFORE any fix starts (the hard seam).
   Findings must be inspectable on the PR timeline while nothing has
   been done about them yet, and a fix applied mid-verification would
@@ -103,8 +104,12 @@ review → fix → review the fixes (wave review) → fix → …
   finding or per ad-hoc slice. (RM-0106)
 - The cadence authority is the commission: maintainer-gated variants
   fire each round on the maintainer's go; autonomous commissions run
-  rounds back to back inside the loop cap, with pushes and PR creation
-  ask-gated. In both shapes round completion is reported (naming
+  rounds back to back inside the loop cap. Pushes and PR creation are
+  the agent's job in every variant (AGENTS.md Rules (the never-commit-on-master rule): approvals only
+  count when the agent is the PR author and last pusher — the opencode
+  permission prompts stay the runtime gate), with the
+  `.github/workflows/` permission-denied exception handed to the
+  maintainer. In both shapes round completion is reported (naming
   owed-but-not-run reviews), never self-advanced past a gate. (RM-0107)
 
 **Stop rule.** A round is a review plus the disposition of its

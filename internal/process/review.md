@@ -15,9 +15,13 @@ archived corpus of the repo-file era lives at tag `review-corpus`
   tiers, reviewers), and the metrics owed. Keep the file unchanged —
   it is the commission record.
 - **Variants:** maintainer-gated variants fire each round on your go;
-  **variant c** runs autonomous dispositions — the agent pushes every
-  round and creates the PR itself, each behind an ask-gate prompt you
-  approve; loop closure (the merge) stays with you in every variant.
+  **variant c** runs autonomous dispositions. In BOTH variants the
+  agent pushes and creates the PR itself (AGENTS.md Rules (the never-commit-on-master rule): approvals
+  only count when the agent is the author and last pusher — the
+  opencode permission prompt you approve is the runtime gate; hand the
+  initial push to the maintainer only on a `.github/workflows/`
+  permission denial, and re-push follow-ups yourself). Loop closure
+  (the merge) stays with you in every variant.
 - **The birth-PR is the case key.** In variant c the agent opens it
   on your prompt approval (body: `Closes #<issue>` references); the
   PR timeline is the case's whole review record — round comments,
@@ -29,7 +33,13 @@ archived corpus of the repo-file era lives at tag `review-corpus`
 - The opencode config gates the authority operations — `git push`,
   `gh pr create`, `make release`, `gh api` — each fires a prompt to
   you. Approving a per-round push is also your CI checkpoint: CI runs
-  on every push, so a red check surfaces at the next gate.
+  on every push, so a red check surfaces at the next gate. Approving
+  the prompt lets the AGENT run the command — do not push into the PR
+  yourself: a GitHub approval only counts from someone who is neither
+  the PR author nor its last pusher, and your push would invalidate
+  your own approval (AGENTS.md Rules (the never-commit-on-master rule); the one exception is a
+  `.github/workflows/` permission denial, where you run the initial
+  push and the agent re-pushes follow-ups).
 - **Required approvals = 1 on master** is the hard merge gate: the
   machine account cannot approve its own PRs, so only your approval
   unlocks a merge. Bot-authored PRs are safe by construction.
