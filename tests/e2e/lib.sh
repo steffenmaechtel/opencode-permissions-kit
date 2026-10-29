@@ -532,6 +532,24 @@ e2e_cleanup() {
 }
 trap e2e_cleanup EXIT
 
+# e2e_dump_container <label>: copy the suite container's /tmp out as
+# failure evidence (issue #279 wave). The container's internal logs —
+# /tmp/dd*.log outputs, the deployed kit's state — are otherwise lost to
+# the EXIT trap's `docker rm`; E2E_KEEP=1 preserves the whole container
+# but leaves it RUNNING too (resources, name collisions on the re-run).
+# The dump is the middle ground: automatic, failure-only, host-side.
+# Best-effort by design — a missing container or failed docker cp stays
+# silent (the failure count is the verdict, the dump is a bonus), so no
+# pin rides on it (L1 pin-cost budget, INFO-severity diagnostic).
+e2e_dump_container() {
+    _edc_dest="$(dirname "$0")/dumps/${1:-evidence}-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$_edc_dest" 2>/dev/null || return 0
+    if [ -n "${E2E_CONTAINER:-}" ] && docker cp "$E2E_CONTAINER:/tmp" "$_edc_dest/tmp" >/dev/null 2>&1; then
+        echo "  ${YELLOW}failure evidence: container /tmp dumped to $_edc_dest/tmp${NC}"
+    fi
+    return 0
+}
+
 e2e_finish() {
     echo ""
     echo "=============================================="
@@ -543,6 +561,13 @@ e2e_finish() {
         echo "  ${RED}Failed: $failures${NC}"
     fi
     echo ""
+    # Issue #279 wave: dump the container's /tmp evidence BEFORE the EXIT
+    # trap's cleanup rm removes it — wired centrally here, so every suite
+    # (run.sh, run-docker-rootless.sh, run-ddev.sh) gets it; suppressed
+    # under E2E_KEEP=1 (the whole container stays for live inspection).
+    if [ "$failures" -gt 0 ] && [ "${E2E_KEEP:-0}" != "1" ]; then
+        e2e_dump_container "$(basename "$0" .sh)"
+    fi
     # CI visibility: a green run with many skips is a hollow verdict —
     # surface the skip count on the GitHub summary page too.
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
