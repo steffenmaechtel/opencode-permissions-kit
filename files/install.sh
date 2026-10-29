@@ -823,7 +823,11 @@ do_plan_phase() {
     DDEV_BIN="$(command -v ddev 2>/dev/null || true)"
     DDEV_VERSION=""
     if [ -n "$DDEV_BIN" ] && [ -x "$DDEV_BIN" ]; then
-        DDEV_VERSION="$("$DDEV_BIN" version 2>/dev/null |
+        # pr-309 b M1 (consistency): root-run probe — root never performs
+        # ddev's commands walk on any 1.25.x (verified round b), but the
+        # neutral cwd keeps every ddev invocation in the kit uniform and
+        # future-proof against a root-permissive ddev.
+        DDEV_VERSION="$( (cd / && "$DDEV_BIN" version) 2>/dev/null |
             grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || true)"
     fi
     DDEV_BIN_DEV=""

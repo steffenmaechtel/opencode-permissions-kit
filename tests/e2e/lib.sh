@@ -507,26 +507,31 @@ e2e_start_container() {
 E() { docker exec -u dev "$E2E_CONTAINER" sh -c "$@"; }
 
 e2e_cleanup() {
+    # Capture the exit status FIRST — every command below overwrites $?
+    # (pr-309 b S3: a set -e death before the first counted check exits
+    # red with failures=0; the dump gate below must see that red).
+    _ecc_rc=$?
+    # pr-309 a M2 + b M4/S3: dump failure evidence on EVERY red exit —
+    # counted failures OR nonzero exit status — BEFORE any keep branch or
+    # rm; set -e deaths, explicit abort arms and --debug red runs all
+    # leave host-side evidence now. E2E_KEEP stays dump-free by design:
+    # the operator asked to keep the whole container, the live tree beats
+    # a copy.
+    if [ "${E2E_KEEP:-0}" != "1" ] && { [ "${failures:-0}" -gt 0 ] || [ "$_ecc_rc" -ne 0 ]; }; then
+        e2e_dump_container "$(basename "$0" .sh)"
+    fi
     if [ "${E2E_KEEP:-0}" = "1" ]; then
         echo ""
         echo "  ${YELLOW}E2E_KEEP=1: keeping container '$E2E_CONTAINER' (fast iteration)${NC}"
         echo "    docker exec -it $E2E_CONTAINER bash   (removed automatically by the next run)"
         return
     fi
-    if [ "$E2E_DEBUG" = "1" ] && [ "$failures" -gt 0 ]; then
+    if [ "$E2E_DEBUG" = "1" ] && [ "${failures:-0}" -gt 0 ]; then
         echo ""
         echo "  ${YELLOW}--debug: keeping container '$E2E_CONTAINER' for inspection${NC}"
         echo "    docker exec -it $E2E_CONTAINER bash"
         echo "    (remove it afterwards with: docker rm -f $E2E_CONTAINER)"
         return
-    fi
-    # pr-309 a M2: dump failure evidence BEFORE the rm — the cleanup runs
-    # via the EXIT trap on EVERY exit path (set -e deaths and explicit
-    # abort arms included), which e2e_finish never sees; the keep branches
-    # above return early, so this only fires when the container really
-    # goes away.
-    if [ "${failures:-0}" -gt 0 ]; then
-        e2e_dump_container "$(basename "$0" .sh)"
     fi
     docker rm -f "$E2E_CONTAINER" 2>/dev/null || true
     # The e2e container runs as root, so the bind mount can hold root-owned
@@ -553,12 +558,21 @@ e2e_dump_container() {
     _edc_dest="$(dirname "$0")/dumps/${1:-evidence}-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$_edc_dest" 2>/dev/null || return 0
     if [ -n "${E2E_CONTAINER:-}" ] && docker cp "$E2E_CONTAINER:/tmp" "$_edc_dest/tmp" >/dev/null 2>&1; then
-        # pr-309 a S3: docker cp preserves symlinks AS symlinks — a
-        # poisoned image could plant host-pointing links into the dump.
-        # Strip them: the dump is read-only evidence, a link carries
-        # nothing a note about it could not.
-        find "$_edc_dest/tmp" -type l -delete 2>/dev/null || true
-        echo "  ${YELLOW}failure evidence: container /tmp dumped to $_edc_dest/tmp (symlinks stripped)${NC}"
+        _e2e_dump_strip "$_edc_dest/tmp"
+    fi
+    return 0
+}
+
+# _e2e_dump_strip <dir>: strip symlinks from a dumped tree and report the
+# outcome honestly (pr-309 b S1): docker cp preserves symlinks AS symlinks
+# (a poisoned image could plant host-pointing links into the dump), and a
+# partial strip — find failing on an untraversable subdir — must not print
+# an unconditional "stripped" claim over surviving links.
+_e2e_dump_strip() {
+    if find "$1" -type l -delete 2>/dev/null; then
+        echo "  ${YELLOW}failure evidence: container /tmp dumped to $1 (symlinks stripped)${NC}"
+    else
+        echo "  ${YELLOW}failure evidence: container /tmp dumped to $1 — WARNING: symlink strip failed, treat contents with care${NC}"
     fi
     return 0
 }

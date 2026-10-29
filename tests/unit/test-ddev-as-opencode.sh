@@ -913,13 +913,59 @@ check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finis
 check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
     sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$E2ELIB"
 check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
-    sh -c "awk '/^e2e_dump_container\(\)/,/^}/' \"\$1\" | grep -q -- '-type l -delete'" _ "$E2ELIB"
+    sh -c "awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q -- '-type l -delete'" _ "$E2ELIB"
 check "fix a Q3: install.sh probes the ddev version subcommand from /" \
     sh -c 'grep -q "env HOME=\"\$DEV_HOME\" sh -c .cd / && exec" "$1" && ! grep -q "\"\$DDEV_BIN_DEV\" version" "$1"' _ "$INSTALL"
 check "fix a M3: config.sh probes the ddev version from /" \
     sh -c 'grep -qF "(cd / && \"\$_cand_bin\" version)" "$1" && ! grep -qF "\"\$_cand_bin\" version 2>/dev/null" "$1"' _ "$CONFIG"
 check "fix a M4: opk usage tells the generalized story, not 'agent-side'" \
     sh -c "grep -q 'a .ddev tree a' \"\$1\" && ! grep -q 'agent-side ddev run' \"\$1\"" _ "$KIT"
+
+# --- 7d-6. round-b fix-wave pins (pr-309 b: M2, M3, M4, S3, S1, M1-rider) ---------
+# The b(review) findings, fixed in the b(fix) wave. Class sweep evidence
+# lives in the b(fix) commit message: every non-root `sudo -u ... ddev`
+# shape in files/ now runs through a neutral-cwd choke point (helper,
+# handover runner, migrate runner/imports) or is root-only and inert
+# (verified round b: root never walks on any 1.25.x).
+HANDOVERSH="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+MIGRATESH="$FILES/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
+check "fix b M2: handover runner hops through a neutral cwd" \
+    sh -c "awk '/^_ddev_handover_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$HANDOVERSH"
+check "fix b M3: migrate runner hops through a neutral cwd" \
+    sh -c "awk '/^_ddev_migrate_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$MIGRATESH"
+check "fix b M3: both inline import invocations hop through a neutral cwd" \
+    sh -c "grep 'cd / && exec' \"\$1\" | grep -c migrate-import | grep -qx 2" _ "$MIGRATESH"
+check "fix b M1: install.sh root probe from / (consistency)" \
+    sh -c 'grep -qF "(cd / && \"\$DDEV_BIN\" version)" "$1" && ! grep -qF "\"\$DDEV_BIN\" version 2>/dev/null" "$1"' _ "$INSTALL"
+check "fix b M1: update.sh root fallback probe from / (consistency)" \
+    sh -c 'grep -qF "(cd / && \"\$_ddev_bin\" --version)" "$1" && ! grep -qF "\"\$_ddev_bin\" --version 2>/dev/null" "$1"' _ "$UPDATE"
+check "fix b M4/S3: dump gate sees the exit status, not only counted failures" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '_ecc_rc=\$?' && awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '\"\$_ecc_rc\" -ne 0'" _ "$E2ELIB"
+check "fix b M4: dump fires before the keep branches (red --debug runs get evidence)" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'" _ "$E2ELIB"
+check "fix b M4: E2E_KEEP stays dump-free by design" \
+    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '[ \"\${E2E_KEEP:-0}\" != \"1\" ]'" _ "$E2ELIB"
+check "fix b S1: strip notice is conditional — success and failure arms both named" \
+    sh -c "awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q 'symlinks stripped' && awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q 'strip failed'" _ "$E2ELIB"
+# Functional L1 pin for the strip failure path (find untraversable subdir):
+# extract _e2e_dump_strip, run it against a scratch dump with a 000-dir and
+# a surviving symlink — the WARNING arm must fire and the link must survive.
+BS1=$(mktemp -d)
+mkdir -p "$BS1/tmp/locked" "$BS1/bin"
+ln -s /etc/passwd "$BS1/tmp/locked/planted-link"
+ln -s /etc/passwd "$BS1/tmp/top-link"
+printf 'x\n' >"$BS1/tmp/file.txt"
+chmod 000 "$BS1/tmp/locked"
+ln -s /usr/bin/find "$BS1/bin/find"
+ln -s /usr/bin/echo "$BS1/bin/echo"
+BS1_OUT=$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" >"$BS1/fn.sh" && cd "$BS1" && PATH="$BS1/bin:$PATH" sh -c '. ./fn.sh 2>/dev/null; _e2e_dump_strip "$1"' sh "$BS1/tmp" 2>/dev/null)
+# find -delete still removes the top-level links it can reach (order is
+# directory-dependent) — the honest survival assertion is the link INSIDE
+# the untraversable dir; re-chmod first so test -L can see it again.
+chmod 755 "$BS1/tmp/locked"
+check "fix b S1: partial strip warns and never claims clean (functional, L1)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q 'strip failed' && ! printf '%s\n' \"\$1\" | grep -q 'symlinks stripped)' && test -L \"\$2/tmp/locked/planted-link\"" _ "$BS1_OUT" "$BS1"
+rm -rf "$BS1"
 
 # --- 7e. dev-owned mode (internal/records/ddev-dev-owned-projects.md) ------------------
 # Mode on: the scan writes disable_settings_management: true; a FLAGGED

@@ -161,8 +161,9 @@ on **every invocation** — during its startup it walks the project's
 subcommand (`ddev describe`, `ddev --version` and the describe-polls IDE
 integrations run in the background all qualify). A tree healed once does
 not stay healed: the next describe re-breaks it seconds later (issue #279).
-The kit's own version probes run ddev outside the project context, so
-`opk status` cannot re-break the tree it just scanned.
+The kit's own ddev invocations — version probes and the handover/migrate
+runners — run ddev outside the project context, so no kit command re-breaks
+the project you stand in.
 
 After `ddev config` the same hook also writes the dev-owned flag into the
 fresh `.ddev/config.yaml` when dev-owned mode is on — new projects are

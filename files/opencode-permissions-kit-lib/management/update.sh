@@ -1539,7 +1539,9 @@ if [ "$ONLY_BINARY" != true ]; then
             }
         done
         if [ -n "$_ddev_bin" ]; then
-            _ddev_probe=$("$_ddev_bin" --version 2>/dev/null |
+            # pr-309 b M1 (consistency): root-run fallback probe — root never
+            # walks (verified round b), the neutral cwd is uniformity only.
+            _ddev_probe=$( (cd / && "$_ddev_bin" --version) 2>/dev/null |
                 grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed "s/^v//" || true)
         fi
     fi
