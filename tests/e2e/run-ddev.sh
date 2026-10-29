@@ -1032,7 +1032,17 @@ check "DD16: maho start reaches the container stage (settings chmod behind us)" 
     E 'grep -qE "Waiting for containers to become ready|Successfully started" /tmp/dd16-maho2.log'
 OC_DD16M 'ddev delete -Oy >/dev/null 2>&1' || true
 
-E 'sudo mkdir -p /var/www/vhosts/dd16-symfony/.ddev && sudo chown -R dev:dev /var/www/vhosts/dd16-symfony && printf "type: symfony\n" > /var/www/vhosts/dd16-symfony/.ddev/config.yaml && chmod 2775 /var/www/vhosts/dd16-symfony'
+# ddev v1.25.5 (upstream PR #8828) injects a type-specific Symfony CLI
+# install into the web image build; its apt-get update dies inside the
+# suite's nested-userns inner daemon (apt's sandbox setgroups(65534)
+# hits an unmapped gid — EINVAL; log signature: "E: setgroups 65534
+# failed - setgroups (22: Invalid argument)") before the container
+# stage this leg greps for. The fixture disables apt's build-time sandbox via a user
+# pre.Dockerfile: user pre.* content is emitted BEFORE ddev's injected
+# extra content (WriteBuildDockerfile ordering), while a plain web-build
+# Dockerfile would land AFTER it — too late. Not a kit regression;
+# single-layer rootless hosts build the same project fine (#288).
+E 'sudo mkdir -p /var/www/vhosts/dd16-symfony/.ddev/web-build && sudo chown -R dev:dev /var/www/vhosts/dd16-symfony && printf "type: symfony\n" > /var/www/vhosts/dd16-symfony/.ddev/config.yaml && printf "RUN echo \047APT::Sandbox::User \042root\042;\047 > /etc/apt/apt.conf.d/99-no-sandbox\n" > /var/www/vhosts/dd16-symfony/.ddev/web-build/pre.Dockerfile && chmod 2775 /var/www/vhosts/dd16-symfony'
 DEVSH 'cd /var/www/vhosts/dd16-symfony && ddev start >/tmp/dd16-symfony1.log 2>&1' && _dd16_sym=0 || _dd16_sym=1
 check "DD16: TRIPWIRE unflagged symfony clone start fails EPERM (root chmod)" \
     test "$_dd16_sym" = 1
