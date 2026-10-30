@@ -361,6 +361,29 @@ Between reviews, the unit/e2e suites are the review (see also the
   comment or code comment names its pinning test in the same wave —
   otherwise it is not a claim, it is a hope. (RM-0079)
 
+## Review focus: shipped code first, pins at a floor
+
+- **Shipped code is the primary scrutiny target; a pin's quality bar is
+  a floor, not a ceiling.** The code that runs on user machines —
+  `files/` including the sudoers/config templates, the Makefile,
+  workflows, `scripts/` — must be very good, and review waves spend
+  their attention there first. A pin's full quality bar is what
+  [learnings.md](learnings.md) L4 names: it discriminates
+  (sabotage-verified — it fails when its behavior breaks) and it sits
+  before the suite's summary gate. A clunky pin that fails loudly is
+  DONE. Fixture elegance, wording polish and structural beauty beyond
+  the floor are foreign-topic taste findings — the scope brake's
+  channel applies: deliberately-not-done with the reason recorded, or a
+  deferred issue, never a fix wave. Polishing a WORKING pin inside a
+  round (reviewer finding or fix-wave "improvement" alike) is exactly
+  that in-passing improvement, and the process is the safety net that
+  makes stopping early safe: rounds re-review every fix wave, sabotage
+  spot-checks execute failure paths, the standing suites re-run every
+  wave — a pin that works today can still be improved later, when a
+  real defect shows the need. Sibling rule on the writing side:
+  [conventions.md](conventions.md#pin-cost-budget-unit-suites).
+  (RM-0130)
+
 ## Parallel reviewer agents
 
 Execution choreography (fan-out staging, axis-prompt construction,
