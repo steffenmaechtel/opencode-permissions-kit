@@ -699,6 +699,41 @@ check "config.sh header documents the handover usage" \
 check "kit CLI usage documents the handover command" \
     sh -c "grep -q 'handover <path...>' \"\$1\"" _ "$KIT"
 
+# --- 7c-2. config.sh handover tail note: rootless metadata ownership (#312) -------
+# Functional (7b extraction pattern): the note must fire for BOTH rootless
+# backends and stay silent for unknown/empty/legacy values — a non-rootless
+# daemon has no unmapped-uid class, and the note would be wrong there.
+# ui_detail is stubbed to pass text through; OPENCODE_USER is pinned to
+# config.sh's install.conf default. CONTAINER_BACKEND feeds the case arm
+# via the environment, so no INSTALL_CONF fixture is needed.
+HRH=$(mktemp -d)
+awk '/^_handover_rootless_hint\(\)/,/^}/' "$CONFIG" >"$HRH/fn.sh"
+_hrh() {
+    CONTAINER_BACKEND="$1" OPENCODE_USER=opencode sh -c '
+        ui_detail() { printf "%s\n" "$1"; }
+        . "$1/fn.sh" && _handover_rootless_hint
+    ' _ "$HRH"
+}
+HRH_DR=$(_hrh docker-rootless)
+HRH_PR=$(_hrh podman-rootless)
+HRH_DOCKER=$(_hrh docker)
+HRH_EMPTY=$(_hrh "")
+check "tail note fires on docker-rootless and names the EPERM symptom" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF \"EPERM ... futime\"" _ "$HRH_DR"
+check "tail note fires on podman-rootless too (both rootless backends)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF \"EPERM ... futime\"" _ "$HRH_PR"
+check "tail note names the ready-made fix command" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'sudo opk handover opencode'" _ "$HRH_DR"
+check "tail note points at the troubleshooting entry" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'docs/troubleshooting.md'" _ "$HRH_DR"
+check "tail note stays silent for a non-rootless backend value" \
+    sh -c "! printf '%s\n' \"\$1\" | grep -qF 'EPERM ... futime'" _ "$HRH_DOCKER"
+check "tail note stays silent for an empty backend value" \
+    sh -c "! printf '%s\n' \"\$1\" | grep -qF 'EPERM ... futime'" _ "$HRH_EMPTY"
+check "config.sh handover wires the tail note after the repair loop" \
+    sh -c "awk '/^handover\(\)/,/^}/' \"\$1\" | grep -q '_handover_rootless_hint'" _ "$CONFIG"
+rm -rf "${HRH:?}"
+
 # --- 7d. ddev() hook: typo3 bootstrap hint ----------------------------------------
 # Fresh clone + type typo3 + undetected + root not opencode-owned => ddev
 # start fails with EPERM. The hook must name the one-command fix BEFORE

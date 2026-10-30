@@ -306,6 +306,55 @@ case before a `ddev start`. The handover table lives in
 ddev never touch paths outside `.ddev/`, everything stays permanently yours,
 and `git checkout` / `mv` / `rm` cannot hit ownership errors anymore.
 
+## A container build fails with `EPERM: operation not permitted, futime` (or EPERM on `chmod`/`chown`)
+
+**Cause:** your files' contents are fine — the failure is one step later,
+and only visible under the kit's rootless container backend. The
+container's root *is* the `opencode` user uid-wise, but your own user id
+is **not mapped into the container's user namespace**: your files appear
+inside the container as `nobody`. The sharing group covers **data** writes,
+so the build can overwrite the contents of your files. Operations that set
+or restore file **metadata** — explicit timestamps (`futime`/`utimensat`),
+`chmod`, `chown` — additionally need the file **owner**, and no group bit
+changes that. The classic trigger is build tooling in the container that
+copies metadata from inputs to outputs: gulp/vinyl-fs aborts with
+`Error: EPERM: operation not permitted, futime` right after writing the
+output's contents correctly. The same class hits `rsync -t`, `cp -p`,
+`tar -xpf` and package-manager updates into existing trees.
+
+**Fix:** hand the affected tree — the one the container *writes into*,
+sources included — to the agent user (the container's root maps to it):
+
+```bash
+sudo opk handover opencode packages/ext/<ext>/Resources/Public
+ddev initial-build-frontend   # must be green again
+```
+
+The owner flips, the sharing group never changes — you keep full group
+write access (see [`opk handover`](reference/cli.md#handover)). Notes:
+
+- Outputs only, sources kept yours? Builds stay green, but gulp/vinyl-fs
+  also copies the input's owner onto fresh outputs — the outputs converge
+  to odd `nobody`-twin subuid owners instead of staying `opencode`-owned.
+  Hand over the tree the build writes, not just the output files.
+- Zero-sudo alternative when the outputs are gitignored and regenerable:
+  delete them and rebuild — the container recreates them under mapped
+  uids.
+- Sibling case: the settings-directory EPERM entry above is the same
+  kernel rule with a different writer (ddev chmods settings dirs) — hence
+  the different command (`opk config handover` vs `opk handover
+  opencode`).
+- Durable project-side fix: make generated assets *content-only* (drop the
+  input file's `stat` before `gulp.dest()`) — builds stop requesting
+  metadata operations at all, whatever the ownership. See
+  [what group access does not cover](concepts/sharing-group.md#what-group-access-does-not-cover).
+
+**Avoid re-poisoning:** `opk handover me <whole project>` re-owns
+container-written output trees to you, and the next container build that
+restores metadata on the existing outputs fails with EPERM again. Hand
+over trees, not systems — after a `handover me` on such a project, expect
+a clean rebuild of the affected outputs.
+
 ## ddev warns "Unable to open hosts file ... permission denied"
 
 **Cause:** ddev runs as `opencode` and can neither read the Windows hosts
