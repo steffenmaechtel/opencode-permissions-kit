@@ -111,6 +111,33 @@ chown/chmod passes are ordered per direction so a planted link cannot steer
 them; pre-arranged group/world-writable paths survive the passes in either
 order.
 
+Direction — **ownership follows the writer**: `handover me` is for trees
+*you* write (source code you take back, your checkouts);
+`handover opencode` is for trees *container processes or the agent* write
+into — ddev caches, build output trees, generated assets. The group never
+changes, so either direction keeps full data-write access on both sides;
+only metadata rights (explicit timestamps, `chmod`, `chown`) move with the
+owner — hand a source tree over and it is *your* `chmod` and exec-bit
+`git checkout` on it that fail next. Under the
+rootless container backend that direction matters for
+builds: container tooling that restores file metadata (gulp/vinyl-fs
+`dest`, `rsync -t`, `cp -p`, `tar -xpf`) needs the owner to be the agent
+user and aborts with `EPERM: ... futime`/`chmod` on developer-owned
+outputs — after the data write already went through. If a container build
+fails that way, hand its tree over:
+
+```bash
+opk handover opencode /var/www/vhosts/some-project/packages/ext/<ext>/Resources/Public
+```
+
+Careful with `opk handover me <whole project>` on projects with
+container-written output trees: it re-owns those outputs to you, and the
+next container build that restores their metadata fails with EPERM again —
+expect a clean rebuild of container-written outputs afterwards. The
+sibling command `opk config handover <project-root>` covers ddev's own
+settings directories (a different writer); both failure modes live in
+[troubleshooting](../troubleshooting.md).
+
 ## ensure-shared
 
 Re-assert group-write on a `.ddev` tree a ddev run left without it (every
