@@ -56,7 +56,9 @@ fi
 # discrimination/equivalence pins runnable; the drift itself is the
 # recorded failure). A SCOPE failure ABORTS below -- the tree checks
 # are meaningless without a scope, and a path-less `shfmt -l` reads
-# stdin (a hang in interactive runs).
+# stdin (a hang in interactive runs). --no-print-directory is capture
+# armor: a -w-carrying parent make (release.sh runs `make -C`, the pin
+# below) must not leak directory lines into the scope list.
 SHFMT_FLAGS="$(sed -n 's/^SHFMT_FLAGS = //p' Makefile | head -1)"
 if [ -n "$SHFMT_FLAGS" ]; then
     pass "gate flags derived from the Makefile (SHFMT_FLAGS)"
@@ -65,7 +67,7 @@ else
     SHFMT_FLAGS="-ln dash -i 4 -ci"
 fi
 _gs_rc=0
-GATE_SCOPE="$(make -s fmt-scope)" || _gs_rc=$?
+GATE_SCOPE="$(make -s --no-print-directory fmt-scope)" || _gs_rc=$?
 if [ "$_gs_rc" -eq 0 ] && [ -n "$GATE_SCOPE" ]; then
     pass "gate scope derived from the Makefile (make fmt-scope)"
 else
@@ -80,6 +82,31 @@ if printf '%s\n' "$GATE_SCOPE" | grep -q 'tests/'; then
     pass "gate scope carries the tests half (not git-less-halved)"
 else
     fail "gate scope lost its tests half (git-less checkout shape?)"
+fi
+
+# The -w shape that reddened `make release` (2026-10): release.sh runs
+# `make -C "$REPO" test`; -C implies -w/--print-directory and the flag
+# rides MAKEFLAGS into every sub-make -- the capture above then swallowed
+# the "Entering/Leaving directory" lines into GATE_SCOPE and shfmt
+# lstat'ed the words as file paths. The armor lives ON the capture line
+# (--no-print-directory there): a Makefile-side MAKEFLAGS armor does NOT
+# beat an env-delivered -w (measured on make 4.3 -- this pin went red
+# against exactly that reverted shape). Two load-bearing legs:
+# (1) env -w plus the capture's explicit flag must yield the
+# byte-identical clean scope -- the flag must WIN on the running make;
+# (2) the capture LINE keeps its flag literal -- leg 1 alone stays green
+# if the flag is dropped from the capture (F1 shape: the pin's own
+# model must stay valid). Leg 2 reads the derivation LINE only: a
+# whole-file grep matches the pin's own argument text and proved
+# vacuous under sabotage (measured 2026-10-30).
+_scope_w="$(MAKEFLAGS=-w make -s --no-print-directory fmt-scope)"
+if [ "$_scope_w" = "$GATE_SCOPE" ] &&
+    sed -n '/^GATE_SCOPE=/p' tests/unit/test-format-gate.sh |
+    grep -q -- '--no-print-directory'; then
+    pass "gate scope capture survives a -w-carrying make (no print-directory leak)"
+else
+    fail "print-directory leak: capture armor broken (flag dropped or no longer wins over env -w)"
+    printf '%s\n' "${_scope_w:-<empty scope>}" | head -4 | sed 's/^/        /'
 fi
 
 # --- 1. version pin consistency ------------------------------------------------
