@@ -131,9 +131,10 @@ first5() { # quote -> first five words (or fewer)
     printf '%s' "$_n"
 }
 
-fm_get() { # file key -> value ('' when absent)
+fm_get() { # file key -> value ('' when absent; paired quotes
+    # stripped -- same normalization as gen-rules-index.py, #317 a F2)
     sed -n '2,/^---$/p' "$1" | sed -n "s/^$2:[[:space:]]*//p" | head -1 |
-        sed 's/^"//; s/"$//'
+        sed "s/^\"\(.*\)\"$/\1/; s/^'\(.*\)'$/\1/"
 }
 
 # ------------------------------------------- pass 1: scope files (1, 2, 3)
@@ -302,7 +303,7 @@ find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort | while 
     elif sed -n '2,/^---$/p' "$m" | grep -qE '^reviewed:[[:space:]]*$'; then
         # #233: membership is key-presence-with-value -- a bare
         # 'reviewed:' line is a malformed hand edit, not an approval.
-        block 9 "$rel -- bare 'reviewed:' line (no date): membership is key-presence-with-value"
+        block 9 "$rel -- bare 'reviewed:' line (key without a value): membership is key-presence-with-value"
     else
         logdate=$(sed -n '/^## Review log/,$p' "$m" |
             grep -oE "^- [0-9]{4}-[0-9]{2}-[0-9]{2} approved by maintainer" |

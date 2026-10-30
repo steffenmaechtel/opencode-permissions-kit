@@ -6,7 +6,7 @@
 # due for a revisit now (overdue, most overdue first), which come due
 # within the planning horizon (HORIZON days, default 30, earliest
 # first), and which metas still sit in the maintainer approval queue
-# (approved iff reviewed: carries a non-empty date -- a bare
+# (approved iff reviewed: carries a non-empty value -- a bare
 # 'reviewed:' line counts as pending; same definition as INDEX.md and
 # the audit's invariant 9, #233).
 #
@@ -91,8 +91,10 @@ date_ok() { # ISO + plausible ranges (same shape as rules-audit.sh)
 }
 
 while IFS= read -r m; do
-    fm() { # frontmatter value of $1 ('' when absent)
-        sed -n '2,/^---$/p' "$m" | sed -n "s/^$1:[[:space:]]*//p" | head -1
+    fm() { # frontmatter value of $1 ('' when absent; paired quotes
+        # stripped -- same normalization as gen-rules-index.py, #317 a F2)
+        sed -n '2,/^---$/p' "$m" | sed -n "s/^$1:[[:space:]]*//p" | head -1 |
+            sed "s/^\"\(.*\)\"$/\1/; s/^'\(.*\)'$/\1/"
     }
     id=$(fm id)
     st=$(fm status)
@@ -101,7 +103,7 @@ while IFS= read -r m; do
         active | retired) ;;
         *) die "$m: bad status '$st' (run the audit)" ;;
     esac
-    # approval queue: approved iff reviewed: carries a non-empty date
+    # approval queue: approved iff reviewed: carries a non-empty value
     # -- a bare 'reviewed:' line counts as pending; same membership
     # rule as INDEX.md and the audit's invariant 9 (#233).
     [ -z "$(fm reviewed)" ] && printf '%s\n' "$id" >>"$PEND"

@@ -122,10 +122,12 @@ def main():
 
     active = [fm for _, fm in metas if fm['status'] == 'active']
     retired = [fm for _, fm in metas if fm['status'] == 'retired']
-    # approval-queue membership (#233): approved iff reviewed: carries a
-    # non-empty date -- a bare 'reviewed:' line (key without value)
-    # counts as PENDING, the same key-presence-with-value rule as
-    # rules-report.sh and rules-audit.sh invariant 9.
+    # approval-queue membership (#233): approved iff reviewed: carries
+    # a non-empty value (any value; date-ness is the audit's inv-9
+    # log-line pairing, not membership) -- a bare 'reviewed:' line
+    # (key without value) counts as PENDING, the same
+    # key-presence-with-value rule as rules-report.sh and
+    # rules-audit.sh invariant 9.
     pending = sorted(fm['id'] for _, fm in metas if not fm.get('reviewed'))
     dates = sorted(fm['next-revisit'] for _, fm in metas
                    if fm['status'] == 'active' and fm['next-revisit'])

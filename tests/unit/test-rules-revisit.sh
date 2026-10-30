@@ -724,15 +724,82 @@ BAOUT=$(RM_AUDIT_ROOT="$BSCRATCH" FORCE_TODAY=2026-10-22 \
 BARC=$?
 BROW=$(grep '| \[RM-9003\]' "$BSCRATCH/internal/rules-meta/INDEX.md" | head -1)
 BROW4=$(grep '| \[RM-9004\]' "$BSCRATCH/internal/rules-meta/INDEX.md" | head -1)
+BHEAD=$(grep '· [0-9]* review-pending' "$BSCRATCH/internal/rules-meta/INDEX.md" |
+    head -1)
+BBUL=$(grep '^- \*\*Review pending:\*\*' \
+    "$BSCRATCH/internal/rules-meta/INDEX.md" | head -1)
 BQ=$(printf '%s\n' "$OUT" | sed -n 's/^review-pending (approval queue): //p')
 case "$BROW" in *'**pending**'*) _b3_ok=1 ;; *) _b3_ok=0 ;; esac
 case "$BROW4" in *'| approved |'*) _b4_ok=1 ;; *) _b4_ok=0 ;; esac
+# #317 a F1: the pending LIST feeds the header count and the bullet --
+# a regression confined to that list site must redden here too.
+case "$BHEAD" in *'· 1 review-pending ·'*) _bh_ok=1 ;; *) _bh_ok=0 ;; esac
+case "$BBUL" in *RM-9003*) _bb_ok=1 ;; *) _bb_ok=0 ;; esac
 if [ "$RC" -eq 0 ] && [ "$BQ" = "1" ] && contains "$OUT" "RM-9003" &&
     [ "$BARC" -eq 1 ] && contains "$BAOUT" "bare 'reviewed:'" &&
-    [ "$_b3_ok" = 1 ] && [ "$_b4_ok" = 1 ]; then
+    [ "$_b3_ok" = 1 ] && [ "$_b4_ok" = 1 ] && [ "$_bh_ok" = 1 ] &&
+    [ "$_bb_ok" = 1 ]; then
     pass
 else
-    fail "V21 bare reviewed agreement: report rc=$RC queue=$BQ audit rc=$BARC index3=$_b3_ok index4=$_b4_ok: $BAOUT"
+    fail "V21 bare reviewed agreement: report rc=$RC queue=$BQ audit rc=$BARC index3=$_b3_ok index4=$_b4_ok hdr=$_bh_ok bul=$_bb_ok: $BAOUT"
+fi
+
+# V22. #317 a F2: paired quotes normalize in ALL three extractors --
+#      a quoted-empty reviewed: ("") is pending everywhere (report
+#      queue, INDEX; the audit reads it as absent and blocks on the
+#      template log line), and a quoted date ('2026-05-01') strips to
+#      the bare date and stays approved everywhere.
+QSCRATCH=$WORK/quoted$$
+mkdir -p "$QSCRATCH/scripts" "$QSCRATCH/agent" "$QSCRATCH/internal/records" \
+    "$QSCRATCH/internal/rules-meta"
+cp "$REPO_ROOT/scripts/gen-rules-index.py" "$QSCRATCH/scripts/"
+cat >"$QSCRATCH/agent/conventions.md" <<'EOF'
+# Conventions
+
+## Interactive prompts (y/n)
+
+- Demo rule RM-9005 body text. (RM-9005)
+EOF
+: >"$QSCRATCH/agent/test-fidelity.md"
+: >"$QSCRATCH/agent/review-concept.md"
+: >"$QSCRATCH/AGENTS.md"
+cat >"$QSCRATCH/internal/records/rules-meta.md" <<'EOF'
+# Record
+
+## Revisit ladder
+
+- Demo rule RM-9006 body text. (RM-9006)
+EOF
+write_meta "$QSCRATCH" RM-9005 active 1m 2026-11-16 ""
+write_meta "$QSCRATCH" RM-9006 active 1m 2026-11-16 2026-05-01 \
+    internal/records/rules-meta.md#revisit-ladder
+sed -i 's/^reviewed: $/reviewed: ""/' "$(meta_path "$QSCRATCH" RM-9005)"
+sed -i "s/^reviewed: 2026-05-01\$/reviewed: '2026-05-01'/" \
+    "$(meta_path "$QSCRATCH" RM-9006)"
+SCRATCH=$QSCRATCH
+T=2026-10-22
+run_report
+QAOUT=$(RM_AUDIT_ROOT="$QSCRATCH" FORCE_TODAY=2026-10-22 \
+    sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+QARC=$?
+QIDX=$QSCRATCH/internal/rules-meta/INDEX.md
+QROW5=$(grep '| \[RM-9005\]' "$QIDX" | head -1)
+QROW6=$(grep '| \[RM-9006\]' "$QIDX" | head -1)
+QHEAD=$(grep '· [0-9]* review-pending' "$QIDX" | head -1)
+QBUL=$(grep '^- \*\*Review pending:\*\*' "$QIDX" | head -1)
+QQ=$(printf '%s\n' "$OUT" | sed -n 's/^review-pending (approval queue): //p')
+case "$QROW5" in *'**pending**'*) _q5_ok=1 ;; *) _q5_ok=0 ;; esac
+case "$QROW6" in *'| approved |'*) _q6_ok=1 ;; *) _q6_ok=0 ;; esac
+case "$QHEAD" in *'· 1 review-pending ·'*) _qh_ok=1 ;; *) _qh_ok=0 ;; esac
+case "$QBUL" in *RM-9005*) _qb_ok=1 ;; *) _qb_ok=0 ;; esac
+if [ "$RC" -eq 0 ] && [ "$QQ" = "1" ] && contains "$OUT" "RM-9005" &&
+    [ "$QARC" -eq 1 ] &&
+    contains "$QAOUT" "no reviewed field" && ! contains "$QAOUT" "RM-9006" &&
+    [ "$_q5_ok" = 1 ] && [ "$_q6_ok" = 1 ] && [ "$_qh_ok" = 1 ] &&
+    [ "$_qb_ok" = 1 ]; then
+    pass
+else
+    fail "V22 quoted reviewed agreement: report rc=$RC queue=$QQ audit rc=$QARC row5=$_q5_ok row6=$_q6_ok hdr=$_qh_ok bul=$_qb_ok: $QAOUT"
 fi
 
 # ------------------------------------------------------------- summary
