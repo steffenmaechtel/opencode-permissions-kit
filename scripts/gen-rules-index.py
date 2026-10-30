@@ -122,7 +122,11 @@ def main():
 
     active = [fm for _, fm in metas if fm['status'] == 'active']
     retired = [fm for _, fm in metas if fm['status'] == 'retired']
-    pending = sorted(fm['id'] for _, fm in metas if 'reviewed' not in fm)
+    # approval-queue membership (#233): approved iff reviewed: carries a
+    # non-empty date -- a bare 'reviewed:' line (key without value)
+    # counts as PENDING, the same key-presence-with-value rule as
+    # rules-report.sh and rules-audit.sh invariant 9.
+    pending = sorted(fm['id'] for _, fm in metas if not fm.get('reviewed'))
     dates = sorted(fm['next-revisit'] for _, fm in metas
                    if fm['status'] == 'active' and fm['next-revisit'])
     overdue = sorted((d, fm['id']) for _, fm in metas
@@ -161,7 +165,7 @@ def main():
             for rel, fm in groups[src][(unres, order, title)]:
                 lines.append('| [%s](%s) | %s | %s | %s | %s | %s |' % (
                     fm['id'], rel, desc(fm['quote']), fm['status'],
-                    'approved' if 'reviewed' in fm else '**pending**',
+                    'approved' if fm.get('reviewed') else '**pending**',
                     fm['revisit-interval'], fm['next-revisit']))
             lines.append('')
     out = os.path.join(RMROOT, 'INDEX.md')

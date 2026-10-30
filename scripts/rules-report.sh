@@ -6,7 +6,9 @@
 # due for a revisit now (overdue, most overdue first), which come due
 # within the planning horizon (HORIZON days, default 30, earliest
 # first), and which metas still sit in the maintainer approval queue
-# (no reviewed: field -- same definition as INDEX.md).
+# (approved iff reviewed: carries a non-empty date -- a bare
+# 'reviewed:' line counts as pending; same definition as INDEX.md and
+# the audit's invariant 9, #233).
 #
 # Rows carry the meta id, the due date, the current interval and the
 # rule back-reference -- enough to pick the next revisit without
@@ -99,7 +101,9 @@ while IFS= read -r m; do
         active | retired) ;;
         *) die "$m: bad status '$st' (run the audit)" ;;
     esac
-    # approval queue: same membership rule as INDEX.md (no reviewed:)
+    # approval queue: approved iff reviewed: carries a non-empty date
+    # -- a bare 'reviewed:' line counts as pending; same membership
+    # rule as INDEX.md and the audit's invariant 9 (#233).
     [ -z "$(fm reviewed)" ] && printf '%s\n' "$id" >>"$PEND"
     [ "$st" = active ] || continue
     iv=$(fm revisit-interval)

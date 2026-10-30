@@ -683,6 +683,58 @@ else
     fail "V20 missing status: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
 
+# V21. #233 cross-artifact agreement on a bare 'reviewed:' line (key
+#      present, no date -- the hand-edit slip): the meta counts as
+#      PENDING everywhere -- the report's approval queue lists it, the
+#      regenerated INDEX renders it **pending** (never 'approved'),
+#      and the audit blocks the malformed line (inv 9).
+BSCRATCH=$WORK/bare$$
+mkdir -p "$BSCRATCH/scripts" "$BSCRATCH/agent" "$BSCRATCH/internal/records" \
+    "$BSCRATCH/internal/rules-meta"
+cp "$REPO_ROOT/scripts/gen-rules-index.py" "$BSCRATCH/scripts/"
+cat >"$BSCRATCH/agent/conventions.md" <<'EOF'
+# Conventions
+
+## Interactive prompts (y/n)
+
+- Demo rule RM-9003 body text. (RM-9003)
+EOF
+: >"$BSCRATCH/agent/test-fidelity.md"
+: >"$BSCRATCH/agent/review-concept.md"
+: >"$BSCRATCH/AGENTS.md"
+cat >"$BSCRATCH/internal/records/rules-meta.md" <<'EOF'
+# Record
+
+## Revisit ladder
+
+- Demo rule RM-9004 body text. (RM-9004)
+EOF
+# RM-9003: the bare line (write_meta '' emits 'reviewed: ' with a
+# trailing space; normalized to the exact bare form). RM-9004: a
+# regular approved meta -- the contrast that makes the pin discriminate.
+write_meta "$BSCRATCH" RM-9003 active 1m 2026-11-16 ""
+write_meta "$BSCRATCH" RM-9004 active 1m 2026-11-16 2026-05-01 \
+    internal/records/rules-meta.md#revisit-ladder
+sed -i 's/^reviewed: $/reviewed:/' "$(meta_path "$BSCRATCH" RM-9003)"
+SCRATCH=$BSCRATCH
+T=2026-10-22
+run_report
+BAOUT=$(RM_AUDIT_ROOT="$BSCRATCH" FORCE_TODAY=2026-10-22 \
+    sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+BARC=$?
+BROW=$(grep '| \[RM-9003\]' "$BSCRATCH/internal/rules-meta/INDEX.md" | head -1)
+BROW4=$(grep '| \[RM-9004\]' "$BSCRATCH/internal/rules-meta/INDEX.md" | head -1)
+BQ=$(printf '%s\n' "$OUT" | sed -n 's/^review-pending (approval queue): //p')
+case "$BROW" in *'**pending**'*) _b3_ok=1 ;; *) _b3_ok=0 ;; esac
+case "$BROW4" in *'| approved |'*) _b4_ok=1 ;; *) _b4_ok=0 ;; esac
+if [ "$RC" -eq 0 ] && [ "$BQ" = "1" ] && contains "$OUT" "RM-9003" &&
+    [ "$BARC" -eq 1 ] && contains "$BAOUT" "bare 'reviewed:'" &&
+    [ "$_b3_ok" = 1 ] && [ "$_b4_ok" = 1 ]; then
+    pass
+else
+    fail "V21 bare reviewed agreement: report rc=$RC queue=$BQ audit rc=$BARC index3=$_b3_ok index4=$_b4_ok: $BAOUT"
+fi
+
 # ------------------------------------------------------------- summary
 if [ -s "$FAILS" ]; then
     printf 'rules-revisit pins: FAILED\n'

@@ -21,7 +21,9 @@
 #   6. frontmatter complete, ISO dates, next-revisit >= created,
 #      status/interval vocabulary
 #   9. approval consistency: reviewed: is set exactly when the review
-#      log carries an "approved by maintainer" line of the same date
+#      log carries an "approved by maintainer" line of the same date;
+#      a bare "reviewed:" line (key without a date) blocks -- approval
+#      membership is key-presence-with-value (#233)
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):
 # 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
@@ -297,6 +299,10 @@ find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort | while 
         sed -n '/^## Review log/,$p' "$m" |
             grep -qE "^- $reviewed approved by maintainer" ||
             block 9 "$rel -- reviewed '$reviewed' but no approval log line of that date"
+    elif sed -n '2,/^---$/p' "$m" | grep -qE '^reviewed:[[:space:]]*$'; then
+        # #233: membership is key-presence-with-value -- a bare
+        # 'reviewed:' line is a malformed hand edit, not an approval.
+        block 9 "$rel -- bare 'reviewed:' line (no date): membership is key-presence-with-value"
     else
         logdate=$(sed -n '/^## Review log/,$p' "$m" |
             grep -oE "^- [0-9]{4}-[0-9]{2}-[0-9]{2} approved by maintainer" |
