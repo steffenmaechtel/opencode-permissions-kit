@@ -117,7 +117,9 @@ Direction — **ownership follows the writer**: `handover me` is for trees
 into — ddev caches, build output trees, generated assets. The group never
 changes, so either direction keeps full data-write access on both sides;
 only metadata rights (explicit timestamps, `chmod`, `chown`) move with the
-owner. Under the rootless container backend that direction matters for
+owner — hand a source tree over and it is *your* `chmod` and exec-bit
+`git checkout` on it that fail next. Under the
+rootless container backend that direction matters for
 builds: container tooling that restores file metadata (gulp/vinyl-fs
 `dest`, `rsync -t`, `cp -p`, `tar -xpf`) needs the owner to be the agent
 user and aborts with `EPERM: ... futime`/`chmod` on developer-owned

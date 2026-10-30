@@ -327,11 +327,19 @@ sources included — to the agent user (the container's root maps to it):
 
 ```bash
 sudo opk handover opencode packages/ext/<ext>/Resources/Public
-ddev initial-build-frontend   # must be green again
+# then re-run the project's frontend build via ddev — whatever the
+# project's own build command is (a ddev host command of the project):
+ddev <the-projects-frontend-build-command>   # must be green again
 ```
 
 The owner flips, the sharing group never changes — you keep full group
-write access (see [`opk handover`](reference/cli.md#handover)). Notes:
+write access (see [`opk handover`](reference/cli.md#handover)). The
+flip side: with the sources agent-owned, *your* metadata operations on
+that tree fail the same way — host-side `chmod`, exec-bit-preserving
+`git checkout` and explicit `touch -d` as your user now hit the EPERM
+side of the same owner-only rule. Per tree, exactly one side holds
+metadata rights: hand over what the container actually writes, not your
+whole checkout. Notes:
 
 - Outputs only, sources kept yours? Builds stay green, but gulp/vinyl-fs
   also copies the input's owner onto fresh outputs — the outputs converge

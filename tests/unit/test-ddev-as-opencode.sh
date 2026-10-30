@@ -93,15 +93,41 @@ TMPDIR=$(mktemp -d)
 # set -e abort inside the window leaked them. Function form: the
 # receiver list is far too long for one line; unset-safe operands skip
 # cleanly (several receivers are created inside conditionals).
+# HRH joined with the sweep finds VN + BS1 (same shape, pre-existing —
+# #314 a F4's class sweep); the receiver-completeness probe below keeps
+# the list honest from here on.
 _trap_cleanup() {
     rm -rf "${TMPDIR:-}" "${WF:-}" "${SH_STUB:-}" "${SH:-}" \
         "${DF_STUB:-}" "${DF:-}" "${DFW:-}" "${CONF:-}" "${VCHAIN:-}" \
-        "${HWORK:-}" "${BH:-}" "${DFH:-}" "${DFH2:-}" "${RN:-}" \
-        "${DWORK:-}" "${RACE:-}" "${RACESTUB:-}" "${RACESP:-}" \
-        "${RACESPS:-}" "${RACEC:-}" "${RACECT:-}" "${RACEF:-}" \
-        "${RACEFT:-}" "${_112_dir:-}"
+        "${HWORK:-}" "${HRH:-}" "${BH:-}" "${DFH:-}" "${DFH2:-}" \
+        "${RN:-}" "${VN:-}" "${BS1:-}" "${DWORK:-}" "${RACE:-}" \
+        "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
+        "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}"
 }
 trap _trap_cleanup EXIT INT TERM
+
+# --- receiver completeness (#314 a F4): every mktemp receiver of this
+# suite file must appear in _trap_cleanup's rm -rf list in the unset-safe
+# "${VAR:-}" form — an unlisted receiver leaks its scratch dir on every
+# abort (the #283 leak class). Self-referential: the probe greps THIS
+# file, so a future mktemp whose receiver never reaches the list goes red
+# right here, before any test section runs. Indented receivers (BS1's
+# conditional-creation shape) are covered by the leading-space-tolerant
+# pattern — that shape is exactly the sibling the manual sweeps missed.
+_opk_recv_check() {
+    _orc_list=$(awk '/^_trap_cleanup\(\)/,/^}/' "$1")
+    _orc_rc=0
+    for _orc_v in $(grep -oE '^[[:space:]]*[A-Za-z_0-9]+=\$\(mktemp' "$1" | cut -d= -f1 | sort -u); do
+        _orc_pat=$(printf '"${%s:-}"' "$_orc_v")
+        printf '%s' "$_orc_list" | grep -qF "$_orc_pat" || {
+            echo "  receiver completeness: $_orc_v is a mktemp receiver but missing from _trap_cleanup (add it to the rm -rf list)" >&2
+            _orc_rc=1
+        }
+    done
+    return "$_orc_rc"
+}
+check "trap cleanup lists every mktemp receiver (receiver completeness)" \
+    _opk_recv_check "$(readlink -f "$0")"
 
 echo ""
 echo "ddev-as-opencode Tests (DDEV-WORKING §7)"
