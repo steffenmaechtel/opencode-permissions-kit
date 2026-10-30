@@ -1549,12 +1549,13 @@ PLGSEC="$(sed -n '/for _un_dir in/,/^    done$/p' "$UNINSTALL" | head -40)"
 # issue list): the extracted block is stripped before counting, so a
 # commented-out un_rc_q call stops counting; full-line comments only
 # (#244 h W6 residual).
+_unq_n="$(printf '%s' "$PLGSEC" | sed 's/^[[:space:]]*#.*$//' | grep -cF 'un_rc_q "' || true)"
 if printf '%s' "$PLGSEC" | grep -qF 'un_rc_q "plugins rm"' &&
     printf '%s' "$PLGSEC" | grep -qF 'plugin removal failed' &&
-    [ "$(printf '%s' "$PLGSEC" | sed 's/^[[:space:]]*#.*$//' | grep -cF 'un_rc_q "' || true)" = 2 ]; then
+    [ "$_unq_n" = 2 ]; then
     pass "plugins loop rc-observing, failure WARNs, both ops converted (#246 site 7)"
 else
-    fail "plugins loop not rc-observing (#246 site 7, pr-00263 d)"
+    fail "plugins loop not rc-observing (#246 site 7, pr-00263 d; un_rc_q calls: $_unq_n of 2)"
 fi
 # pr-00263 e W3: run() lost its last callers to un_rc_q (#246 site 7) and
 # is removed — run_q (silenced best-effort) keeps its callers; a

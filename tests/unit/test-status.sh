@@ -1251,16 +1251,17 @@ fi
 # Comment-strip rider (#261, the #244 g W1 class) on the socket-twin
 # count: commented-out rows stop counting; full-line comments only
 # (#244 h W6 residual).
+_sock_n="$(sed 's/^[[:space:]]*#.*$//' "$STATUS" |
+    grep -cF 'ui_kv "socket" "unknown — needs root to check' || true)"
 if grep -qF 'ui_kv "opencode version" "unknown — probe failed' "$STATUS" &&
-    [ "$(sed 's/^[[:space:]]*#.*$//' "$STATUS" |
-        grep -cF 'ui_kv "socket" "unknown — needs root to check' || true)" = "2" ] &&
+    [ "$_sock_n" = "2" ] &&
     grep -qF 'ui_kv "mkcert CA" "unknown — needs root to check' "$STATUS" &&
     grep -qF 'ui_kv "mkcert CA" "missing (optional' "$STATUS" &&
     ! grep -qE 'ui_kv_warn "[^"]*" "unknown — (needs root|probe failed)' "$STATUS" &&
     ! grep -qF 'ui_kv_warn "mkcert CA" "missing (optional' "$STATUS"; then
     pass "W3: unknown/optional rows are uncounted (plain ui_kv, both socket twins)"
 else
-    fail "W3: an unknown/optional row still counts (or the conversion drifted)"
+    fail "W3: an unknown/optional row still counts (or the conversion drifted; socket-twin rows: $_sock_n of 2)"
 fi
 
 # --- 0.0.48b W4: the --short output guards are pinned behaviorally ------------
@@ -1406,11 +1407,12 @@ fi
 # Issue #201: the dead-end advice lives ONLY in the #166 cell now —
 # exactly one literal (a second occurrence would mean a healthy-direct
 # or unparsable cell advising sudo again).
-if [ "$(sed 's/^[[:space:]]*#.*$//' "$STATUS" | grep -cF 'unknown — probe failed (run: sudo opk status)' ||
-    true)" = "1" ]; then
+_sudo_n="$(sed 's/^[[:space:]]*#.*$//' "$STATUS" | grep -cF 'unknown — probe failed (run: sudo opk status)' ||
+    true)"
+if [ "$_sudo_n" = "1" ]; then
     pass "#201: the sudo-opk-status advice is #166-cell only (one literal)"
 else
-    fail "#201: the sudo-advice literal count drifted (expected exactly 1)"
+    fail "#201: the sudo-advice literal count drifted (got $_sudo_n, expected exactly 1)"
 fi
 # Issue #201 claim audit: the direct capture stays timeout-bounded
 # (issue #80) like the sudo probe it complements.

@@ -196,20 +196,22 @@ grep -qF 'diverges from the kit pin — replacing it' "$KIT" &&
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # must not count. Full-line comments only (#244 h W6 residual): a
 # trailing comment after a live line still counts.
-[ "$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'oc_bypass_bin' || true)" -ge 4 ] &&
+_ocb_n="$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'oc_bypass_bin' || true)"
+[ "$_ocb_n" -ge 4 ] &&
     echo "  ${GREEN}PASS${NC}  openchamber-secure exempts kit-owned symlinks (F3)" && passed=$((passed + 1)) ||
     {
-        echo "  ${RED}FAIL${NC}  openchamber-secure exempts kit-owned symlinks (F3)"
+        echo "  ${RED}FAIL${NC}  openchamber-secure exempts kit-owned symlinks (F3; oc_bypass_bin sites: $_ocb_n, need >=4)"
         failures=$((failures + 1))
     }
 # 0.0.47c C2: every completing path of openchamber-secure ends with the
 # restart hint (getent-skip, nothing-found, decline, full run — the
 # oc_bypass_bin count precedent; behavioral pinning of the decline path
 # would need an interactive ui_confirm, static count is the proxy)
-[ "$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'restart OpenChamber if it is running' || true)" -ge 4 ] &&
+_rh_n="$(sed 's/^[[:space:]]*#.*$//' "$KIT" | grep -c 'restart OpenChamber if it is running' || true)"
+[ "$_rh_n" -ge 4 ] &&
     echo "  ${GREEN}PASS${NC}  openchamber-secure prints the restart hint on every completing path (0.0.47c C2)" && passed=$((passed + 1)) ||
     {
-        echo "  ${RED}FAIL${NC}  openchamber-secure restart hint missing from a completing path (0.0.47c C2)"
+        echo "  ${RED}FAIL${NC}  openchamber-secure restart hint missing from a completing path (0.0.47c C2; hint sites: $_rh_n, need >=4)"
         failures=$((failures + 1))
     }
 

@@ -1488,8 +1488,9 @@ check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # stop counting; full-line comments only (#244 h W6 residual).
-check "config.sh: refresh + projects add + handover re-stamp" \
-    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "ddev_handover_stamp_write" || true)" -ge 3 ]' _ "$CONFIG"
+_stampw_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c "ddev_handover_stamp_write" || true)"
+check "config.sh: refresh + projects add + handover re-stamp (stamp sites: $_stampw_n, need >=3)" \
+    [ "$_stampw_n" -ge 3 ]
 check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
     sh -c "grep -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover' \"\$1\"" _ "$HANDOVER"
 check "handover.sh: stamp stubs fail open (valid=1) when the lib is missing" \
@@ -1510,8 +1511,9 @@ check "install.sh defaults to dev-owned (DDEV_DEV_OWNED=true)" \
     sh -c "grep -qF 'DDEV_DEV_OWNED=true' \"\$1\"" _ "$INSTALL"
 check "install.sh stamps DDEV_DEV_OWNED into install.conf" \
     sh -c "grep -qF 'DDEV_DEV_OWNED=\$DDEV_DEV_OWNED' \"\$1\"" _ "$INSTALL"
-check "install.sh asks the ddev-settings question (standard + advanced)" \
-    sh -c "[ \"\$(sed 's/^[[:space:]]*#.*\$//' \"\$1\" | grep -c 'ddev settings management? (dev-owned projects)' || true)\" -ge 2 ]" _ "$INSTALL"
+_dsetq_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'ddev settings management? (dev-owned projects)' || true)"
+check "install.sh asks the ddev-settings question (standard + advanced; question sites: $_dsetq_n, need >=2)" \
+    [ "$_dsetq_n" -ge 2 ]
 check "status.sh reports the ddev settings mode" \
     sh -c "grep -q 'ddev settings' \"\$1\"" _ "$STATUS"
 check "hook hint mentions the dev-owned effect" \

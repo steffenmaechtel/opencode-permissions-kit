@@ -404,7 +404,7 @@ check "manifest stays a regular file through the run" \
 _grep_n=$(sed 's/^[[:space:]]*#.*$//' "$MIG" | grep -c 'chmod 3770 "\$DD_MIG_DUMP_DIR"' || true)
 [ "$_grep_n" -ge 1 ] &&
     check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" true ||
-    check "dump dir is set sticky (3770) — group rename of root entries blocked (W1)" false
+    check "dump dir is set sticky (3770) — group rename of root entries blocked (W1; chmod 3770 sites: $_grep_n, need >=1)" false
 grep -q 'mkdir -m 700 "\$DM_STAGE"' "$MIG" &&
     check "stage is created mode 700 in one step (no default-mode window, W1)" true ||
     check "stage is created mode 700 in one step (no default-mode window, W1)" false
