@@ -237,9 +237,9 @@ check "workflows export the mirror base image to the e2e steps" \
 # Comment-strip rider on both counts (the source-counting convention):
 # a commented-out trap must not satisfy the pin.
 _LTRAP_EXIT=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -c '^trap e2e_cleanup EXIT$' || true)
-_LTRAP_SIG=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -cF "trap 'trap - EXIT; e2e_cleanup; exit 1' INT TERM" || true)
+_LTRAP_SIG=$(sed 's/^[[:space:]]*#.*$//' "$LIB" | grep -cF "trap 'trap - EXIT INT TERM; e2e_cleanup; exit 1' INT TERM" || true)
 if [ "$_LTRAP_EXIT" = 1 ] && [ "$_LTRAP_SIG" = 1 ]; then
-    pass "lib.sh: cleanup on EXIT plus once-only signal arms (INT TERM, exit 1)"
+    pass "lib.sh: cleanup on EXIT plus self-disarming signal arms (INT TERM, exit 1)"
 else
     fail "lib.sh cleanup traps: EXIT=$_LTRAP_EXIT signal=$_LTRAP_SIG (expected 1/1)"
 fi
