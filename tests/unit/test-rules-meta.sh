@@ -225,6 +225,15 @@ cat >>"$(meta_file RM-9001)" <<'EOF'
 EOF
 expect_block "inv9 line without field" "[inv9]"
 
+# meta-tree. #232: find errors block -- an unreadable meta subdir must
+# not silently shrink the audit's worklist (the metas inside would be
+# invisible to every invariant). Probe runs as the non-root suite user
+# (chmod 000 cannot block a root reader; a root run reddens honestly).
+new_scratch ntree
+write_meta RM-9011 "Unreadable demo rule" agent/conventions.md interactive-prompts-yn ""
+chmod 000 "$SCRATCH/internal/rules-meta/9/0/1"
+expect_block "meta-tree unreadable subdir blocks" "[meta-tree]"
+
 # 7. overdue is report-only
 new_scratch n7
 sed -i 's/^created: 2026-10-16/created: 2026-09-01/; s/^next-revisit: 2026-11-16/next-revisit: 2026-10-01/' "$(meta_file RM-9001)"

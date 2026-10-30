@@ -683,6 +683,24 @@ else
     fail "V20 missing status: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
 
+# V22. #232: an unreadable meta subtree kills the report rc=2 BEFORE
+#      any lane prints -- the worklist is never partial (the readable
+#      sibling meta must not soften that). Probe runs as the non-root
+#      suite user (chmod 000 cannot block a root reader).
+XSCRATCH=$WORK/unread$$
+write_meta "$XSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
+write_meta "$XSCRATCH" RM-9011 active 1m 2026-06-01 2026-05-01
+chmod 000 "$(dirname "$(meta_path "$XSCRATCH" RM-9011)")"
+SCRATCH=$XSCRATCH
+T=2026-06-15
+run_report
+if [ "$RC" -eq 2 ] && contains "$OUT" "find reported errors" &&
+    ! contains "$OUT" "review-pending"; then
+    pass
+else
+    fail "V22 unreadable subtree: expected rc=2 + no partial lanes, got rc=$RC: $OUT"
+fi
+
 # ------------------------------------------------------------- summary
 if [ -s "$FAILS" ]; then
     printf 'rules-revisit pins: FAILED\n'
