@@ -84,21 +84,11 @@ else
     fail "gate scope lost its tests half (git-less checkout shape?)"
 fi
 
-# The -w shape that reddened `make release` (2026-10): release.sh runs
-# `make -C "$REPO" test`; -C implies -w/--print-directory and the flag
-# rides MAKEFLAGS into every sub-make -- the capture above then swallowed
-# the "Entering/Leaving directory" lines into GATE_SCOPE and shfmt
-# lstat'ed the words as file paths. The armor lives ON the capture line
-# (--no-print-directory there): a Makefile-side MAKEFLAGS armor does NOT
-# beat an env-delivered -w (measured on make 4.3 -- this pin went red
-# against exactly that reverted shape). Two load-bearing legs:
-# (1) env -w plus the capture's explicit flag must yield the
-# byte-identical clean scope -- the flag must WIN on the running make;
-# (2) the capture LINE keeps its flag literal -- leg 1 alone stays green
-# if the flag is dropped from the capture (F1 shape: the pin's own
-# model must stay valid). Leg 2 reads the derivation LINE only: a
-# whole-file grep matches the pin's own argument text and proved
-# vacuous under sabotage (measured 2026-10-30).
+# release.sh:236 runs `make -C "$REPO" test check-version`; -C implies
+# -w and the flag rides MAKEFLAGS into every sub-make -- an unarmored
+# capture swallows the Entering/Leaving lines (the 2026-10 release red).
+# Leg 1: the capture's flag must WIN over env -w. Leg 2: the flag stays
+# on the capture line (a dropped flag is invisible in the CI shape).
 _scope_w="$(MAKEFLAGS=-w make -s --no-print-directory fmt-scope)"
 if [ "$_scope_w" = "$GATE_SCOPE" ] &&
     sed -n '/^GATE_SCOPE=/p' tests/unit/test-format-gate.sh |
