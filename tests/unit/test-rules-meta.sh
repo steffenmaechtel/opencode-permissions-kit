@@ -301,19 +301,28 @@ fi
 # lane c helper: greps <root> for real IDs with the frozen-corpus
 # exemptions; <scope> = the SCOPE_FILES list (space-separated). Shared
 # by the real-tree lane and the scratch pins below so the pins cannot
-# drift from the enforced shape (#235 a Q4). The reviews exemption is
-# NARROW: the generated, frozen legacy-index and frozen case folders
-# only -- living files under internal/reviews/ are covered. The
-# corpus INDEX alternative was dropped post-archive (#294): the
-# generated INDEX lives at tag review-corpus, so an INDEX.md under
-# internal/reviews/ would be a LIVING recreated file and is caught.
+# drift from the enforced shape (#235 a Q4). Two NARROW exemption
+# classes, both frozen evidence quoting IDs verbatim:
+# (1) internal/reviews/: the generated, frozen legacy-index and frozen
+#     case folders only -- living files under internal/reviews/ are
+#     covered. The corpus INDEX alternative was dropped post-archive
+#     (#294): the generated INDEX lives at tag review-corpus, so an
+#     INDEX.md under internal/reviews/ would be a LIVING recreated
+#     file and is caught.
+# (2) internal/reviews-meta/<date>/: frozen per-run analysis data
+#     (#297) -- the dated run folders' data/ files quote findings
+#     verbatim; living files there (README.md at the root) stay
+#     covered. *.json is in the include list BECAUSE of this class:
+#     without it the whole .json world was invisible to the guard.
 p10_lane_c_hits() { # $1 root, $2 scope
     grep -rn "RM-[0-9][0-9][0-9][0-9]" \
         --include="*.md" --include="*.sh" --include="*.py" --include="*.yml" \
+        --include="*.json" \
         "$1" 2>/dev/null |
         grep -v "/internal/rules-meta/" |
         grep -v -E "/internal/reviews/legacy-index\.md" |
         grep -v -E "/internal/reviews/[0-9]/[0-9]/[0-9]/[0-9]/pr-[0-9]+/" |
+        grep -v -E "/internal/reviews-meta/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/" |
         grep -v "/internal/records/_archive/" |
         while IFS= read -r _l; do
             _rel=${_l%%:*}
@@ -344,11 +353,16 @@ fi
 # Post-archive (#294): a recreated in-tree INDEX.md is a LIVING file
 # (the generated corpus INDEX lives at the tag) -- it must be caught;
 # the generated, frozen legacy-index stays exempt by the narrow rule.
+# #297: a LIVING .json citing an ID must be caught too (the include
+# list was .json-blind); frozen per-run data under a dated
+# reviews-meta folder stays exempt (verbatim evidence, same class as
+# the frozen corpus folders).
 # The demo ID is concatenated at runtime so this test file's own
 # source never carries a literal real-ID token (lane c scans *.sh).
 _p10demo="RM-00""44"
 P10S="$WORK/p10scratch.$$"
 mkdir -p "$P10S/internal/reviews/0/0/0/1/pr-00001"
+mkdir -p "$P10S/internal/reviews-meta/2026-01-01/data"
 printf 'Living file citing a rule by ID (%s) instead of file+section.\n' \
     "$_p10demo" >"$P10S/internal/reviews/README.md"
 printf 'Recreated generated index still citing %s.\n' \
@@ -357,15 +371,25 @@ printf 'Generated frozen map file citing %s.\n' \
     "$_p10demo" >"$P10S/internal/reviews/legacy-index.md"
 printf 'Frozen snapshot quoting %s as verbatim evidence.\n' \
     "$_p10demo" >"$P10S/internal/reviews/0/0/0/1/pr-00001/review-a.md"
+printf '{"living": "citing %s in a living json file"}\n' \
+    "$_p10demo" >"$P10S/living-data.json"
+printf '{"frozen": "run data quoting %s as verbatim evidence"}\n' \
+    "$_p10demo" >"$P10S/internal/reviews-meta/2026-01-01/data/run.json"
 _hits=$(p10_lane_c_hits "$P10S" "")
 case "$_hits" in
     *internal/reviews/README.md*)
         case "$_hits" in
             *internal/reviews/INDEX.md*)
                 case "$_hits" in
-                    *pr-00001*) fail "pin10 lane c scratch: frozen snapshot flagged" ;;
-                    *internal/reviews/legacy-index.md*) fail "pin10 lane c scratch: frozen legacy-index flagged" ;;
-                    *) pass ;;
+                    */living-data.json*)
+                        case "$_hits" in
+                            *pr-00001*) fail "pin10 lane c scratch: frozen snapshot flagged" ;;
+                            *internal/reviews/legacy-index.md*) fail "pin10 lane c scratch: frozen legacy-index flagged" ;;
+                            *internal/reviews-meta/2026-01-01/*) fail "pin10 lane c scratch: frozen run data flagged" ;;
+                            *) pass ;;
+                        esac
+                        ;;
+                    *) fail "pin10 lane c scratch: living .json citation not caught" ;;
                 esac
                 ;;
             *) fail "pin10 lane c scratch: recreated INDEX citation not caught (post-archive: living file)" ;;
