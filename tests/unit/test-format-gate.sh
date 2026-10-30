@@ -56,7 +56,9 @@ fi
 # discrimination/equivalence pins runnable; the drift itself is the
 # recorded failure). A SCOPE failure ABORTS below -- the tree checks
 # are meaningless without a scope, and a path-less `shfmt -l` reads
-# stdin (a hang in interactive runs).
+# stdin (a hang in interactive runs). --no-print-directory is capture
+# armor: a -w-carrying parent make (release.sh runs `make -C`, the pin
+# below) must not leak directory lines into the scope list.
 SHFMT_FLAGS="$(sed -n 's/^SHFMT_FLAGS = //p' Makefile | head -1)"
 if [ -n "$SHFMT_FLAGS" ]; then
     pass "gate flags derived from the Makefile (SHFMT_FLAGS)"
@@ -65,7 +67,7 @@ else
     SHFMT_FLAGS="-ln dash -i 4 -ci"
 fi
 _gs_rc=0
-GATE_SCOPE="$(make -s fmt-scope)" || _gs_rc=$?
+GATE_SCOPE="$(make -s --no-print-directory fmt-scope)" || _gs_rc=$?
 if [ "$_gs_rc" -eq 0 ] && [ -n "$GATE_SCOPE" ]; then
     pass "gate scope derived from the Makefile (make fmt-scope)"
 else
@@ -80,6 +82,21 @@ if printf '%s\n' "$GATE_SCOPE" | grep -q 'tests/'; then
     pass "gate scope carries the tests half (not git-less-halved)"
 else
     fail "gate scope lost its tests half (git-less checkout shape?)"
+fi
+
+# release.sh:236 runs `make -C "$REPO" test check-version`; -C implies
+# -w and the flag rides MAKEFLAGS into every sub-make -- an unarmored
+# capture swallows the Entering/Leaving lines (the 2026-10 release red).
+# Leg 1: the capture's flag must WIN over env -w. Leg 2: the flag stays
+# on the capture line (a dropped flag is invisible in the CI shape).
+_scope_w="$(MAKEFLAGS=-w make -s --no-print-directory fmt-scope)"
+if [ "$_scope_w" = "$GATE_SCOPE" ] &&
+    sed -n '/^GATE_SCOPE=/p' tests/unit/test-format-gate.sh |
+    grep -q -- '--no-print-directory'; then
+    pass "gate scope capture survives a -w-carrying make (no print-directory leak)"
+else
+    fail "print-directory leak: capture armor broken (flag dropped or no longer wins over env -w)"
+    printf '%s\n' "${_scope_w:-<empty scope>}" | head -4 | sed 's/^/        /'
 fi
 
 # --- 1. version pin consistency ------------------------------------------------
