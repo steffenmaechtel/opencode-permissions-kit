@@ -137,8 +137,10 @@ a bulk session, not one-off touches).
    absent field with approval line, or field without line, both fail
    (provenance must never overstate; maintainer decision 2026-10-16).
 
-CI blocks on 1–6 and 9; an overdue meta is a maintenance signal, not a
-broken build. (RM-0030) The Phase-2 pending-unit parking valve
+CI blocks on 1–6 and 9, and on `[meta-tree]` scope errors (find
+failures under the meta tree — #232); an overdue meta is a maintenance
+signal, not a broken build. (RM-0030) The Phase-2 pending-unit parking
+valve
 (prefix-matched ref-less units reported non-blocking) was retired
 2026-10-17 when its five occupants received metas — a ref-less unit
 in an active section now always blocks.

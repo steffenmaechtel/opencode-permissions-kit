@@ -685,20 +685,30 @@ fi
 
 # V22. #232: an unreadable meta subtree kills the report rc=2 BEFORE
 #      any lane prints -- the worklist is never partial (the readable
-#      sibling meta must not soften that). Probe runs as the non-root
-#      suite user (chmod 000 cannot block a root reader).
-XSCRATCH=$WORK/unread$$
-write_meta "$XSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
-write_meta "$XSCRATCH" RM-9011 active 1m 2026-06-01 2026-05-01
-chmod 000 "$(dirname "$(meta_path "$XSCRATCH" RM-9011)")"
-SCRATCH=$XSCRATCH
-T=2026-06-15
-run_report
-if [ "$RC" -eq 2 ] && contains "$OUT" "find reported errors" &&
-    ! contains "$OUT" "review-pending"; then
-    pass
+#      sibling meta must not soften that). (#318 a B1): "overdue:" is
+#      the FIRST lane -- its absence pins no-partial output; (#318
+#      a B7): find's per-path stderr must be relayed ("find error:"
+#      lines). Probe runs as the non-root suite user; root skips
+#      disclosed, like the peers (#318 a B3) -- the red would be
+#      spurious (root reads through chmod 000).
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  pin skipped: V22 needs a non-root uid (root reads through 000)"
 else
-    fail "V22 unreadable subtree: expected rc=2 + no partial lanes, got rc=$RC: $OUT"
+    XSCRATCH=$WORK/unread$$
+    write_meta "$XSCRATCH" RM-9001 active 1m 2026-06-01 2026-05-01
+    write_meta "$XSCRATCH" RM-9011 active 1m 2026-06-01 2026-05-01
+    chmod 000 "$(dirname "$(meta_path "$XSCRATCH" RM-9011)")"
+    SCRATCH=$XSCRATCH
+    T=2026-06-15
+    run_report
+    if [ "$RC" -eq 2 ] && contains "$OUT" "find reported errors" &&
+        contains "$OUT" "rules-report: find error:" &&
+        ! contains "$OUT" "overdue:" && ! contains "$OUT" "review-pending"; then
+        pass
+    else
+        fail "V22 unreadable subtree: expected rc=2 + find stderr relay + no lanes, got rc=$RC: $OUT"
+    fi
+    chmod 755 "$(dirname "$(meta_path "$XSCRATCH" RM-9011)")" # (#318 a B4)
 fi
 
 # ------------------------------------------------------------- summary

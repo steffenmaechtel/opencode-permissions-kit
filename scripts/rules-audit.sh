@@ -37,7 +37,8 @@
 # complete: the agent/ files and AGENTS.md ## Rules are in scope;
 # learnings.md stays out (record decision 10).
 #
-# Exit: 1 on blocking violations (1-6, 9), 0 otherwise.
+# Exit: 1 on blocking violations (1-6, 9) and [meta-tree] scope
+#      errors, 0 otherwise.
 # Env: RM_AUDIT_ROOT (run against another tree -- tests),
 #      FORCE_TODAY (pin the date for overdue/report checks).
 
@@ -331,7 +332,11 @@ while IFS= read -r m; do
 done <"$METALIST"
 
 # ------------------------------------------------ 8: INDEX regeneration
-if [ -x "$(command -v python3)" ] && [ -f "$ROOT/scripts/gen-rules-index.py" ]; then
+# (#318 a A1): never regenerate from a partial walk -- a blocked run
+# must not leave a truncated INDEX behind (find errors above).
+if [ -s "$WORK/finderr" ]; then
+    echo "INDEX not regenerated (meta-tree walk reported errors)"
+elif [ -x "$(command -v python3)" ] && [ -f "$ROOT/scripts/gen-rules-index.py" ]; then
     cp "$ROOT/$METAS/INDEX.md" "$WORK/index.before" 2>/dev/null || : >"$WORK/index.before"
     FORCE_TODAY=$TODAY python3 "$ROOT/scripts/gen-rules-index.py" >/dev/null 2>&1 ||
         echo "warning: INDEX regeneration failed (structural meta errors above)" >&2
