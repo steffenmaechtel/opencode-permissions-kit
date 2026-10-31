@@ -449,6 +449,57 @@ printf '%s\n' \
     >>"$(meta_file RM-9001)"
 expect_ok "inv9 never-approved amendment stays pending" "0 blocking"
 
+# 9m-9q. #337 a A1 vocabulary pins: an amendment event is a dated log
+#     line carrying the STANDALONE word "amended" -- subject-prefixed
+#     corpus phrasings count, glued near-miss tokens do not, and lines
+#     opening with another event keyword are never amendment events.
+# 9m. post-approval "rationale amended" phrasing, fieldless: the #333
+#     gap must fire (round-a verifier probe P1's shape)
+new_scratch n9m
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 rationale amended from maintainer input — scratch.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 subject-prefixed amendment re-queues" \
+    "amended after approval"
+
+# 9n. the same phrasing pairs with the field: green
+new_scratch n9n
+approve_probe '\nreviewed: 2026-10-16\namended: 2026-10-31'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 rationale amended from maintainer input — scratch.' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 subject-prefixed amendment pairs" "0 blocking"
+
+# 9o. glued near-miss tokens are NOT events: field + only an
+#     "amendedness" line of that date blocks unpaired (word-exact)
+new_scratch n9o
+approve_probe '\nreviewed: 2026-10-16\namended: 2026-10-31'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 amendedness check ran on the corpus; nothing changed.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 glued amended-token is not an event" \
+    "no amendment log line of that date"
+
+# 9p. approval free text mentioning "amended" stays an approval event
+#     (the keyword guard; without it this meta would re-queue)
+new_scratch n9p
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' \
+    '- 2026-10-16 approved by maintainer (wording amended in chat).' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 approval free text is not an amendment event" \
+    "0 blocking"
+
+# 9q. a revisit note mentioning "amended" is not an amendment event
+#     either (revisits run after approvals; findings notes name edits)
+new_scratch n9q
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-11-05 revisit findings — rationale amended upstream (interval reset to 1m from 1m, next 2026-12-05).' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 revisit note is not an amendment event" "0 blocking"
+
 # 6d. inv 6 -- amended is a date when present
 new_scratch n6d
 approve_probe '\nreviewed: 2026-10-16\namended: soon'

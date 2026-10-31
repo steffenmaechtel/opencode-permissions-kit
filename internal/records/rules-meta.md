@@ -62,6 +62,7 @@ Source: <one line finding/directive/issue — only if one exists.>
 
 ## Review log
 - 2026-10-14 created — agent draft; maintainer review pending.
+- 2026-10-20 amended — wording fix; maintainer review pending.
 ```
 
 Body rules:
@@ -155,9 +156,16 @@ a bulk session, not one-off touches).
    amendment log line of that date. The field blocks when orphaned
    (no approval before it — never-approved metas are pending via the
    absent `reviewed:`), unpaired (no amendment line of that date), or
-   stale (a later approval exists — drop it). Log ORDER decides
-   same-day ties: approve-then-amend re-queues, amend-then-approve is
-   the fresh approval.
+   stale (a newer state event supersedes it: a later approval — drop
+   the field; a newer amendment — bump it to that date). An amendment
+   line is a dated log line carrying the standalone word `amended` —
+   canonical `- <date> amended — <note>`; a subject prefix (`rationale
+   amended`, the corpus precedent) counts, glued prefixes
+   (`amendedness`) do not, and lines opening with another event
+   keyword (`approved by maintainer`, `revisit`, `created`) are never
+   amendment events. Log ORDER decides same-day ties:
+   approve-then-amend re-queues, amend-then-approve is the fresh
+   approval.
 
 CI blocks on 1–6 and 9, and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
