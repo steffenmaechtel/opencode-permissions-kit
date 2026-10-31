@@ -261,9 +261,12 @@ expect_block "meta-tree absent meta tree blocks" "[meta-tree]"
 # meta-tree rc. #323: the worklist pipeline rc (sort's) blocks even
 # with an EMPTY finderr -- a sort write failure (ENOSPC on the
 # worklist target) would otherwise leave a silently partial worklist
-# (#318 a A2). Executed via a PATH-injected sort stub that fails
-# exactly the no-argument worklist shape with sort's write-failure rc
-# (2); argument-carrying sort calls pass through to the real binary.
+# (#318 a A2). Executed via a PATH-injected sort stub that fails the
+# no-argument sort shape with sort's write-failure rc (2); in
+# rules-audit.sh that shape is the worklist build AND the inv-3a
+# duplicate scan -- both fire the stub (inert here: the fixture
+# carries no duplicate refs, pr-325 a A2). Argument-carrying sort
+# calls pass through to the real binary.
 # Control arm first: the same shape of tree, unstubbed, stays green --
 # the stub fires the gate, not the fixture.
 new_scratch n323ctl
@@ -293,6 +296,45 @@ if [ "$RC" -eq 1 ]; then
     esac
 else
     fail "#323 sort rc: expected rc=1 with the block, got rc=$RC: $OUT"
+fi
+
+# meta-tree refids rc. pr-325 a A1 (#323 class): the refids pipeline
+# rc (sort's) blocks even with an EMPTY finderr -- a write failure
+# shrinking $WORK/refids would false-flag every active meta as an
+# orphan (grep -qxF cannot tell an empty file from "no refs"), so the
+# orphan check is skipped and the run blocks. Executed via a
+# PATH-injected sort stub failing the 'sort -u' shape with sort's
+# write-failure rc (2); that shape is the refids build AND the inv-2
+# resolver scan -- both fire the stub (inert here: the fixture is
+# green); all other sort calls pass through to the real binary.
+# Control arm first: unstubbed stays green.
+new_scratch n341ctl
+run_audit
+if [ "$RC" -eq 0 ]; then
+    pass
+else
+    fail "#341 control: unstubbed scratch tree must stay green, got rc=$RC: $OUT"
+fi
+new_scratch n341
+SORTSTUB=$WORK/sortstub.$$
+mkdir -p "$SORTSTUB"
+REAL_SORT=$(command -v sort) || REAL_SORT=/usr/bin/sort
+cat >"$SORTSTUB/sort" <<EOF
+#!/bin/sh
+[ \$# -eq 1 ] && [ "\$1" = "-u" ] && exit 2
+exec $REAL_SORT "\$@"
+EOF
+chmod +x "$SORTSTUB/sort"
+OUT=$(cd "$SCRATCH" && RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY=2026-10-16 \
+    PATH="$SORTSTUB:$PATH" sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+RC=$?
+if [ "$RC" -eq 1 ]; then
+    case "$OUT" in
+        *'[meta-tree] refids pipeline failed'*) pass ;;
+        *) fail "#341 refids rc: rc=1 but no refids pipeline block: $OUT" ;;
+    esac
+else
+    fail "#341 refids rc: expected rc=1 with the block, got rc=$RC: $OUT"
 fi
 
 # 9c. inv 9 -- a bare 'reviewed:' line (key present, no date) blocks:
