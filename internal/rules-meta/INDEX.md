@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**130 metas · 127 active · 3 retired · 14 review-pending · next due 2026-11-14**
+**134 metas · 131 active · 3 retired · 18 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130
+- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0131, RM-0132, RM-0133, RM-0134
 - **Overdue:** none
 
 ## AGENTS.md
@@ -122,13 +122,22 @@
 | [RM-0107](0/1/0/RM-0107.md) | The cadence authority is | active | approved | 1m | 2026-11-28 |
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | **pending** | 1m | 2026-11-28 |
+| [RM-0134](0/1/3/RM-0134.md) | On Track MED, a | active | **pending** | 1m | 2026-11-30 |
 
 ### Round typing and tiering
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0124](0/1/2/RM-0124.md) | Classify the tier before | active | **pending** | 1m | 2026-11-28 |
+| [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | **pending** | 1m | 2026-11-28 |
 | [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | **pending** | 1m | 2026-11-28 |
+
+### Review tracks: HIGH and MED
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0131](0/1/3/RM-0131.md) | Track MED staffing: 1–2 | active | **pending** | 1m | 2026-11-30 |
+| [RM-0132](0/1/3/RM-0132.md) | New-session entry: a FRESH | active | **pending** | 1m | 2026-11-30 |
+| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on non-shipped | active | **pending** | 1m | 2026-11-30 |
 
 ### Curation and verification
 

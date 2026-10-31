@@ -1,6 +1,6 @@
 ---
 name: opk-review-pass
-description: Execute a review round (wave, micro, full/release) — load when a round's review fires or the maintainer commissions one. Covers tier classification, fan-out, curation (x) + verification (V3), round-comment writing (format v2); rules: agent/review-concept.md. Redundancy passes stay independent by operator setup — one that loads this skill anyway discloses it in its Skills: line.
+description: Execute a review round (wave, micro, med, new-session, full/release) — load when a round's review fires or the maintainer commissions one. Covers track/tier classification, fan-out, curation (x) + verification (V3), round comments (format v2); rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads this skill anyway discloses it in its Skills: line.
 ---
 
 # opk-review-pass — executing a review round
@@ -57,17 +57,30 @@ session's commission, then gather:
 |---|---|
 | Case key (`pr-ABCDE`) | birth-PR number — the PR timeline IS the case record |
 | Chain state | session records (commission, scratch: posted.log, digests, verdicts) — never read the PR back |
+| Track | PR body (`Track: high|med (paths)`) — re-derive from the diff paths: any `files/**` ⇒ high (section 2) |
 | Tier | classified from the round's diff BEFORE staging (section 2) |
 | Base + diff | base SHA and `git diff <range>` for wave scope; tree SHA for full |
 | Tree state | clean and committed — the comment posts before any fix ("The PR-native loop") |
 
-## 2. Classify the tier BEFORE staging
+## 2. Classify the track and tier BEFORE staging
 
-The ladder lives in the rules
-(review-concept, "Round typing and tiering"); classify from
-`git diff --stat` plus content shape and state the tier in the loop
+The track (blast radius) and the ladder live in the rules
+(review-concept, "Round typing and tiering" and "Review tracks");
+classify the track from the PR's diff paths, the tier from
+`git diff --stat` plus content shape, and state both in the loop
 status BEFORE the fan-out launches:
 
+- **track high** — any shipped file (`files/**`) in the PR's diff,
+  mixed diffs included: full ladder (the wave/micro rows below).
+- **track med** — non-shipped only: 1–2 fast-tier axes (2 when the
+  diff exceeds ~150 lines, touches CI-gating semantics in
+  `.github/`/`Makefile`, or ships root-running `scripts/` code);
+  curation and verify sizing per sections 5–6; the MED disposition
+  policy applies (review-concept, "Review tracks").
+- **new-session entry** — a fresh session runs the whole loop for
+  ONE PR it did not implement; the review pass stays a subagent
+  (≥ 1 axis; the staffing rules above decide 1 vs 2); marker mode
+  `new-session-review` (review-concept, "Review tracks").
 - **wave** — > ~50 lines or substantive logic: 2–3 fast-tier axes,
   V3 verification (verifier batches + main audit).
 - **micro** — ≤ ~50 lines or message-only: exactly ONE fast-tier
@@ -77,9 +90,9 @@ status BEFORE the fan-out launches:
 - **none** — comments/docs only: no review round owed; closure via
   the diff-shape proof.
 
-Severity upgrades, never downgrades: a micro round whose solo
-reviewer finds a MED/HIGH escalates — the next round is a wave over
-the micro diff plus the finding.
+Severity escalates, never downgrades: fix waves re-review at 1-axis
+micro; full wave staffing returns only when a NEW MED/HIGH finding
+escalates scope.
 
 ## 3. Pre-flight
 
@@ -130,6 +143,11 @@ the micro diff plus the finding.
   "Subagent fan-out").
 - Record ONE host timestamp at fan-out start (and later at end);
   reviewers stamp with their own sandbox clock.
+- Budgets: the axis prompt carries ~5/~8 minutes as the
+  scope-limiter and that number stays as written; PLANNING (round
+  pipelines, targets) uses the observed 8–10 minutes per axis,
+  host-measured only — sandbox clocks drift (review-concept,
+  "Parallel reviewer agents").
 - **The tree is a shared read substrate while reviewers run**: no
   sabotage spot-checks, no fixes, no writes into the reviewed tree.
   Sabotage windows are before launch, after all reviewers returned,
@@ -137,23 +155,27 @@ the micro diff plus the finding.
 
 ## 5. Curation (x)
 
-- Wave (and larger) rounds: launch a fast-tier CURATOR subagent once
-  the reviewer checkpoints are complete. Its input: the checkpoint
-  files. Its deliverable: ONE digest file — findings table (ID,
-  severity, provenance, summary), merges named, drops with reasons,
-  raw→curated counts. The main session reads the digest, never the
-  raw files.
-- Micro rounds below the curator threshold may be main-curated —
-  disclosed in the comment's provenance (review-concept,
-  "Curation and verification").
+- The main session curates by default (review-concept, "Curation and
+  verification"): merge and de-duplicate the checkpoint files into
+  ONE digest — findings table (ID, severity, provenance, summary),
+  merges named, drops with reasons, raw→curated counts. The main
+  session reads the digest, never the raw files. Main curation is
+  disclosed in the comment's provenance.
+- Launch a fast-tier CURATOR subagent only when the round ran
+  ≥ 3 reviewers AND produced > 10 raw findings — its input and
+  deliverable are the same digest shape as above.
 
 ## 6. Verification (V3)
 
-- Launch fresh strong-tier VERIFIER subagents over the digest
-  (batched by axis or finding count; 1 batch for an escalated micro).
-  Their deliverable: verdict files — every curated finding re-derived
-  against the code, verdict CONFIRMED / REFUTED / UNVERIFIED with
-  file:line evidence.
+- Sizing is a HARD GATE (review-concept, "Curation and
+  verification"): at ≤ 3 curated findings, all LOW/INFO, the main
+  session verifies inline (no verifier subagents); above that, or at
+  any MED/HIGH, exactly ONE fresh strong-tier verifier batch runs —
+  skipping an owed batch needs maintainer disclosure, never a
+  time-pressure call.
+- The verifier deliverable: verdict files — every curated finding
+  re-derived against the code, verdict CONFIRMED / REFUTED /
+  UNVERIFIED with file:line evidence.
 - The main session AUDITS the verdicts: re-derive every MED/HIGH
   itself, spot-check LOW/INFO (review-concept, "Curation and
   verification"). Refuted findings are retracted with the evidence
@@ -173,7 +195,10 @@ review-concept, "The round comment contract"):
    per-finding detail nested one level deeper; TWO levels maximum;
    blank line after every `<summary>` tag.
 3. The `opk-review` marker is the LAST line, OUTSIDE the details,
-   with the round's counters and `"state":"open"`.
+   with the round's counters, `"state":"open"`, the permanent
+   `"track":"high|med"` field and the round's mode
+   (`variant-c-med`, `new-session-review`, …) alongside tier,
+   reviewers, curator, verifiers.
 4. Size guard: a comment that would exceed ~60k chars is split into
    parts (each with its own marker + `"part":N`) — content is never
    trimmed.

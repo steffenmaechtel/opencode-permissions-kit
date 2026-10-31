@@ -75,6 +75,7 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#two-review-types-two-j
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#the-pr-native-loop"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#the-loop-and-the-stop-rule"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#round-typing-and-tiering"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#review-tracks-high-and-med"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#curation-and-verification"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#reviewer-freshness"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/review-concept.md#the-round-comment-contract"

@@ -28,6 +28,52 @@ archived corpus of the repo-file era lives at tag `review-corpus`
   pushes, CI runs. No case folders are created, nothing is committed
   under `internal/reviews/`.
 
+## Commissioning the review tracks
+
+Track selection is mechanical (the blast-radius axis,
+[agent/review-concept.md](../../agent/review-concept.md), "Round
+typing and tiering" and "Review tracks"): any shipped file
+(`files/**`) in the PR's diff means track high; a non-shipped-only
+diff means track med. The implementing session states the track in
+the PR body (`Track: high|med (paths)`); the review session
+re-derives it from the diff before staging round a.
+
+- **Track high (shipped code in the diff)** — full weight,
+  unchanged: the implementing session runs the loop as commissioned
+  (maintainer-gated or variant c); tier ladder, curation threshold
+  and verify sizing per the review concept.
+- **Track med (non-shipped-only diff)** — variant c is the DEFAULT:
+  autonomous dispositions, you approve PR create and merge only.
+  1–2 fast-tier axes, main curation and verify sizing per the review
+  concept; the MED disposition policy applies (LOW/INFO code
+  findings deliberately-not-done, recorded). In a batch, commission
+  the implementing session to run each case's MED loop immediately
+  after opening its PR — the hot build context makes precise axis
+  prompts cheap.
+- **New-session entry (fresh review of an open PR)** — commission a
+  FRESH session (git worktree) per PR: it did not implement the code
+  and runs the whole loop (curation, verification, dispositions,
+  fixes, comments, closing summary). **One review session per PR —
+  never two**: reviews land in fix work almost always, and the first
+  case's fix waves would load and anchor the second, spending the
+  freshness the entry exists to buy; session startup amortizes
+  through parallelism, not stacked PRs. Commission rolling as PRs
+  open, **max 2 parallel review sessions** (their subagents stay
+  within the 5-seat cap). The review pass itself stays subagent-only
+  in this entry too — the staffing rules of the PR's track decide
+  1 vs 2 axes.
+
+### Batch triage (at commissioning)
+
+- Only **full-scope non-shipped issues** go to a Track-MED batch.
+- An issue with a **tiny shipped remainder** goes to track high as a
+  WHOLE — splitting off the non-shipped part costs more review
+  overhead per PR than the full ladder costs on a small diff (the
+  #300 lesson).
+- An issue with a **dominant non-shipped** part and a real shipped
+  part is split EXPLICITLY at commissioning (the #322 pattern): name
+  both cases, their tracks and their inventories in the commission.
+
 ## Prompt approvals (the ask-gates) and the merge gate
 
 - The opencode config gates the authority operations — `git push`,
