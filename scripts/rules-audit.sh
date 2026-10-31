@@ -236,9 +236,16 @@ IDS=$WORK/ids
 # #232: the meta worklist is built ONCE with find's stderr captured --
 # a partially unreadable meta tree BLOCKS (a silently shorter worklist
 # would audit a scope nobody chose); both loops below read $METALIST.
+# #323: the pipeline rc (sort's) is observed too -- a sort write
+# failure (e.g. ENOSPC on the worklist target) leaves a partial or
+# empty worklist with an EMPTY finderr; the finderr gate alone is
+# blind to it.
 METALIST=$WORK/metas
-find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>"$WORK/finderr" |
-    LC_ALL=C sort >"$METALIST"
+if ! find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>"$WORK/finderr" |
+    LC_ALL=C sort >"$METALIST"; then
+    printf '[meta-tree] worklist pipeline failed (find/sort rc) -- audit scope may be partial\n' \
+        >>"$V"
+fi
 if [ -s "$WORK/finderr" ]; then
     sed 's/^/[meta-tree] /' "$WORK/finderr" >>"$V"
     printf '[meta-tree] find reported errors under %s -- audit scope may be partial\n' \
@@ -331,23 +338,36 @@ LC_ALL=C sort "$IDS" | uniq -d | while IFS= read -r r; do
 done
 
 # 3 (b): orphans -- active metas never referenced in the scope files
-cut -f1 "$REFS" | sort -u >"$WORK/refids"
-while IFS= read -r m; do
-    base=$(basename "$m" .md)
-    st=$(fm_get "$m" status)
-    [ "$st" = active ] || continue
-    grep -qxF "$base" "$WORK/refids" || block 3 "$base -- active meta without a ref (orphan)"
-done <"$METALIST"
+# (#325 a A1, #323 class): a sort write failure here shrinks refids
+# with an EMPTY finderr and false-flags every active meta as an
+# orphan (grep -qxF cannot tell an empty file from "no refs") -- the
+# orphan check is skipped on failure (untrustworthy input) and the
+# run blocks through $V, same channel as the worklist gate above.
+if ! cut -f1 "$REFS" | sort -u >"$WORK/refids"; then
+    printf '[meta-tree] refids pipeline failed (cut/sort rc) -- orphan check skipped, audit scope may be partial\n' \
+        >>"$V"
+else
+    while IFS= read -r m; do
+        base=$(basename "$m" .md)
+        st=$(fm_get "$m" status)
+        [ "$st" = active ] || continue
+        grep -qxF "$base" "$WORK/refids" || block 3 "$base -- active meta without a ref (orphan)"
+    done <"$METALIST"
+fi
 
 # ------------------------------------------------ 8: INDEX regeneration
-# (#318 a A1): never regenerate from a partial walk -- a blocked run
-# must not leave a truncated INDEX behind (find errors above).
+# (#318 a A1): never regenerate from a partial walk -- a run whose
+# walk was partial (find errors above) must not refresh the INDEX.
+# (#323, pr-325 a A3): regen still runs on other blocked runs (sort
+# rc, inv blocks) -- the INDEX walk is independent of the worklist;
+# a regen WRITE failure (e.g. ENOSPC) is warned about but restores
+# nothing, so a truncated INDEX can remain (pre-existing shape).
 if [ -s "$WORK/finderr" ]; then
     echo "INDEX not regenerated (meta-tree walk reported errors)"
 elif [ -x "$(command -v python3)" ] && [ -f "$ROOT/scripts/gen-rules-index.py" ]; then
     cp "$ROOT/$METAS/INDEX.md" "$WORK/index.before" 2>/dev/null || : >"$WORK/index.before"
     FORCE_TODAY=$TODAY python3 "$ROOT/scripts/gen-rules-index.py" >/dev/null 2>&1 ||
-        echo "warning: INDEX regeneration failed (structural meta errors above)" >&2
+        echo "warning: INDEX regeneration failed (structural meta errors or write failure)" >&2
     if ! cmp -s "$ROOT/$METAS/INDEX.md" "$WORK/index.before"; then
         echo "INDEX regenerated (was stale)"
     fi

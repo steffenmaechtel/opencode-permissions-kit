@@ -292,6 +292,41 @@ else
     fail "R12 bad root: expected rc=2 naming it, got rc=$RC: $OUT"
 fi
 
+# R13. #323: the worklist pipeline rc (sort's) dies rc=2 even with an
+#      EMPTY finderr -- a sort write failure would otherwise shrink the
+#      worklist silently (#318 a A2). Executed via a PATH-injected sort
+#      stub failing exactly the no-argument worklist shape (rc 2,
+#      sort's write-failure code; the worklist call is the only
+#      no-argument sort in the report). Control arm: the same tree
+#      unstubbed stays green -- the stub fires the gate, not the
+#      fixture.
+SCRATCH=$RSCRATCH
+T=2026-06-15
+run_report
+if [ "$RC" -eq 0 ]; then
+    pass
+else
+    fail "R13 control: unstubbed tree must stay green, got rc=$RC: $OUT"
+fi
+SORTSTUB=$WORK/sortstub.$$
+mkdir -p "$SORTSTUB"
+REAL_SORT=$(command -v sort) || REAL_SORT=/usr/bin/sort
+cat >"$SORTSTUB/sort" <<EOF
+#!/bin/sh
+[ \$# -eq 0 ] && exit 2
+exec $REAL_SORT "\$@"
+EOF
+chmod +x "$SORTSTUB/sort"
+OUT=$(RM_AUDIT_ROOT="$RSCRATCH" FORCE_TODAY=2026-06-15 \
+    PATH="$SORTSTUB:$PATH" sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
+RC=$?
+if [ "$RC" -eq 2 ] && contains "$OUT" "worklist pipeline failed" &&
+    ! contains "$OUT" "overdue:" && ! contains "$OUT" "review-pending"; then
+    pass
+else
+    fail "R13 sort rc: expected rc=2 + die message + no lanes, got rc=$RC: $OUT"
+fi
+
 # ---------------------------------------------------------- revisit pins
 one_scratch() { # $1 interval  $2 next  -> fresh tree with RM-9001 active
     VSCRATCH=$WORK/one$$.$3

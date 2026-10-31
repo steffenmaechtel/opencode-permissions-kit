@@ -79,8 +79,16 @@ PEND=$WORK/pending
 # #232: find errors are loud -- a partially unreadable meta tree dies
 # BEFORE any lane prints (the report never prints a partial worklist);
 # find's own stderr names the unreadable path.
-find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>"$WORK/finderr" |
-    LC_ALL=C sort >"$WORK/files"
+# #323: the pipeline rc (sort's) is observed too -- a sort write
+# failure (e.g. ENOSPC on the worklist target) leaves a partial or
+# empty worklist with an EMPTY finderr; the finderr gate below alone
+# is blind to it (a concurrent find failure keeps its stderr relay).
+if ! find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>"$WORK/finderr" |
+    LC_ALL=C sort >"$WORK/files"; then
+    [ -s "$WORK/finderr" ] &&
+        sed 's/^/rules-report: find error: /' "$WORK/finderr" >&2
+    die "worklist pipeline failed (find/sort rc) -- the worklist would be partial, no report printed"
+fi
 if [ -s "$WORK/finderr" ]; then
     sed 's/^/rules-report: find error: /' "$WORK/finderr" >&2
     die "find reported errors under $METAS -- the worklist would be partial, no report printed"
