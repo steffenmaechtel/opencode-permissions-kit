@@ -77,12 +77,12 @@ status BEFORE the fan-out launches:
   `.github/`/`Makefile`, or ships root-running `scripts/` code);
   curation and verify sizing per sections 5–6; the MED disposition
   policy applies (review-concept, "Review tracks").
-- **new-session entry** — the STANDING shape: the implementing
-  session only implements; a fresh session (this one, if
-  commissioned for review) runs the whole loop for ONE PR it did
-  not implement; the review pass stays a subagent (≥ 1 axis; the
-  staffing rules above decide 1 vs 2); marker mode
-  `new-session-review` (review-concept, "Review tracks").
+- **new-session entry** — batch shape: the implementing session
+  only implements; a fresh session (this one, if commissioned for
+  review) runs the whole loop for ONE PR it did not implement;
+  the review pass stays a subagent (≥ 1 axis; the staffing rules
+  above decide 1 vs 2); marker mode `new-session-review`
+  (review-concept, "Review tracks").
 - **wave** — > ~50 lines or substantive logic: 2–3 fast-tier axes,
   V3 verification (verifier batches + main audit).
 - **micro** — ≤ ~50 lines or message-only: exactly ONE fast-tier

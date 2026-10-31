@@ -38,9 +38,10 @@ The loop runs in the pull request's timeline — there is no case folder
 and nothing is committed to `internal/reviews/`:
 
 ```
-commission → Session MAIN implements → birth-PR → handover →
-review session: round a (comment) → fixes →
-round b (comment) → fixes → … → closing summary → merge
+commission → Session MAIN implements → birth-PR →
+loop owner (single case: MAIN · batch: handover to a fresh review session) →
+round a: review (comment) → fixes →
+round b: review (comment) → fixes → … → closing summary → merge
 ```
 
 - Before the first review round runs, the birth-PR exists — its number
@@ -212,25 +213,26 @@ pass works.
   findings — a MED/HIGH chain scales with its findings instead (the
   budgets describe the common case, not a cap on fixing).
   (RM-0131)
-- New-session entry — the STANDING shape (decision 1, the v2 shape:
-  the implementing session ONLY implements): a FRESH session —
-  commissioned per PR, not the implementing one — runs the whole
-  loop (curation, verification, dispositions, fixes, comments,
-  closing summary) for a PR it did not implement. The implementing
-  session never runs the review loop of its own PR: it implements,
-  opens the birth-PR and hands over — its loaded context is the
-  bias the fresh session exists without, and it compounds across
-  cases (303k after six cases versus 83–110k flat for fresh review
-  sessions). One review session per PR, never two: reviews land in
-  fix work almost always, and the first case's fix waves would
-  load and anchor the second — the freshness the entry buys is spent
-  on case two; session startup amortizes through PARALLEL sessions,
-  not stacked PRs. The review pass itself is ALWAYS a subagent,
-  exactly like every track: round a runs ≥ 1 fast-tier axis (2 under
-  the Track-MED triggers; any shipped file runs Track HIGH staffing
-  from the start), so the contamination rule holds automatically —
-  every round reads the tree through fresh subagent eyes that never
-  saw the session's reasoning, and a session that fixed something in
+- New-session entry (the batch shape): a BATCH commission splits
+  the roles — the implementing session ONLY implements and opens one
+  birth-PR per case; it never runs the review loop of its batch's
+  PRs (its context compounds across cases — 303k after six, versus
+  83–110k flat for fresh review sessions). Each PR's loop
+  (curation, verification, dispositions, fixes, comments, closing
+  summary) runs in ONE fresh review session commissioned per PR —
+  never two: reviews land in fix work almost always, and the first
+  case's fix waves would load and anchor the second, spending the
+  freshness the entry exists to buy; session startup amortizes
+  through PARALLEL sessions, not stacked PRs (rolling, max 2
+  parallel review sessions under the 5-seat subagent cap). A
+  single-case commission keeps the single-session shape: Session
+  MAIN implements and runs the loop itself, the review pass staying
+  a subagent as everywhere. In EVERY shape the review pass is
+  ALWAYS a subagent — round a runs ≥ 1 fast-tier axis (2 under the
+  Track-MED triggers; any shipped file runs Track HIGH staffing from
+  the start), so the contamination rule holds automatically: every
+  round reads the tree through fresh subagent eyes that never saw
+  the session's reasoning, and a session that fixed something in
   round X still gets an unbiased round X+1 with no freshness
   bookkeeping. Marker mode `"new-session-review"`; a main-direct
   review pass (a `reviewers:0` marker) stays a disclosed deviation,
@@ -272,11 +274,12 @@ pass works.
 
 ## Reviewer freshness
 
-The PR-native process splits a case across two sessions by role:
-Session MAIN implements and opens the birth-PR; the review loop runs
-in a fresh single-PR review session (the new-session entry,
-"Review tracks" — the standing shape, not an option). The freshness
-the old session rotation bought comes from subagents instead:
+The PR-native process runs a single-case loop in ONE session
+(Session MAIN implements and runs the loop — the review pass stays a
+subagent); a batch commission splits the roles: Session MAIN
+implements, and each PR's loop runs in a fresh single-PR review
+session ("Review tracks"). The freshness the old session rotation
+bought comes from subagents instead:
 
 - The session that runs the case also applies the fixes — no handoff
   back; what the substitution preserves is the rotation's core: a

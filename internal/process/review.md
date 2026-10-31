@@ -38,26 +38,31 @@ diff means track med. The implementing session states the track in
 the PR body (`Track: high|med (paths)`); the review session
 re-derives it from the diff before staging round a.
 
-**Who runs the loop (the v2 shape, hard):** the implementing session
-ONLY implements — it never runs the review loop of its own PR. Every
-PR's loop runs in ONE fresh review session (the new-session entry):
-commission it per PR as the PR opens, rolling, **max 2 parallel
-review sessions** (their subagents stay within the 5-seat cap). The
-implementing session may hand axis-prompt hints from its hot build
-context into the PR body or the review commission — that is where
-its context ends.
+**Who runs the loop (the commission's scope decides):** a
+**single-case commission** keeps the single-session shape — the
+implementing session runs the loop itself, as before (the review
+pass stays a subagent in every shape). A **batch commission**
+splits the roles: the implementing session ONLY implements and
+opens one birth-PR per case, and every PR of the batch is reviewed
+by ONE fresh review session (the new-session entry) — commission
+per PR as its PR opens, rolling, **max 2 parallel review
+sessions** (their subagents stay within the 5-seat cap). In a batch
+the implementing session may hand axis-prompt hints from its hot
+build context into the PR body or the review commission — that is
+where its review role ends.
 
 - **Track high (shipped code in the diff)** — full weight,
-  unchanged: the fresh review session runs the loop at the full
-  tier ladder (maintainer-gated or variant c, per the commission);
-  curation threshold and verify sizing per the review concept.
+  unchanged: the tier ladder, curation threshold and verify sizing
+  per the review concept; who runs the loop per the paragraph
+  above (single case: the implementing session; batch: the fresh
+  review session).
 - **Track med (non-shipped-only diff)** — variant c is the DEFAULT:
   autonomous dispositions, you approve PR create and merge only.
-  The fresh review session staffs 1–2 fast-tier axes, main curation
-  and verify sizing per the review concept; the MED disposition
-  policy applies (LOW/INFO code findings deliberately-not-done,
-  recorded).
-- **New-session entry (the standing shape)** — commission a FRESH
+  1–2 fast-tier axes, main curation and verify sizing per the
+  review concept; the MED disposition policy applies (LOW/INFO code
+  findings deliberately-not-done, recorded); who runs the loop per
+  the paragraph above.
+- **New-session entry (the batch shape)** — commission a FRESH
   session (git worktree) per PR: it did not implement the code and
   runs the whole loop (curation, verification, dispositions, fixes,
   comments, closing summary). **One review session per PR — never
