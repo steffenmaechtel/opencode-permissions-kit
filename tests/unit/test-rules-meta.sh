@@ -344,6 +344,38 @@ new_scratch n9c
 sed -i 's/^status: active/status: active\nreviewed:/' "$(meta_file RM-9001)"
 expect_block "inv9 bare reviewed line blocks" "bare 'reviewed:' line (key without a value)"
 
+# 322 (#322 scripts part): gen-rules-index dies loud on an unlistable
+#     bucket directory -- glob.glob silently swallowed PermissionError
+#     and wrote a short INDEX with rc 0 (the docstring promise
+#     violated). Control first: the readable tree generates rc 0. Probe
+#     runs as the non-root suite user; root skips disclosed, like the
+#     peers (#318 a B3) -- chmod 000 cannot block a root reader.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  pin skipped: #322 gen bucket probe needs a non-root uid (root reads through 000)"
+else
+    new_scratch n322
+    write_meta RM-9011 "Unreadable demo rule" agent/conventions.md interactive-prompts-yn ""
+    if (cd "$SCRATCH" && python3 scripts/gen-rules-index.py) >/dev/null 2>&1; then
+        pass
+    else
+        fail "#322 control: readable tree must generate rc 0"
+    fi
+    chmod 000 "$SCRATCH/internal/rules-meta/9/0/1"
+    OUT=$(cd "$SCRATCH" && python3 scripts/gen-rules-index.py 2>&1)
+    RC=$?
+    case "$OUT" in
+        *'cannot list bucket directory'*)
+            if [ "$RC" -ne 0 ]; then
+                pass
+            else
+                fail "#322 gen die: message but rc=0"
+            fi
+            ;;
+        *) fail "#322 gen die: lacks the bucket message: $OUT" ;;
+    esac
+    chmod 755 "$SCRATCH/internal/rules-meta/9/0/1" # teardown
+fi
+
 # 6c. inv 6 -- duplicate frontmatter keys block (#321): a malformed
 #     hand edit (the #233 slip class) used to split the three
 #     extractors (shell first-wins, gen last-wins). Both orders block;
