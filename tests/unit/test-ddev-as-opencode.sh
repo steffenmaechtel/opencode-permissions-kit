@@ -933,8 +933,13 @@ check "fix b M2: handover runner hops through a neutral cwd" \
     sh -c "awk '/^_ddev_handover_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$HANDOVERSH"
 check "fix b M3: migrate runner hops through a neutral cwd" \
     sh -c "awk '/^_ddev_migrate_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$MIGRATESH"
-check "fix b M3: both inline import invocations hop through a neutral cwd" \
-    sh -c "grep 'cd / && exec' \"\$1\" | grep -c migrate-import | grep -qx 2" _ "$MIGRATESH"
+# Comment-strip rider (#261, the #244 g W1 class — pr-00320 b F1):
+# commented-out invocations stop counting; full-line comments only
+# (#244 h W6 residual). The combined pattern is the old pipeline's
+# accept set (both terms on one line): the two live imports.
+_m3i_n="$(sed 's/^[[:space:]]*#.*$//' "$MIGRATESH" | grep -c 'cd / && exec.*migrate-import' || true)"
+check "fix b M3: both inline import invocations hop through a neutral cwd (import sites: $_m3i_n of 2)" \
+    [ "$_m3i_n" = 2 ]
 check "fix b M1: install.sh root probe from / (consistency)" \
     sh -c 'grep -qF "(cd / && \"\$DDEV_BIN\" version)" "$1" && ! grep -qF "\"\$DDEV_BIN\" version 2>/dev/null" "$1"' _ "$INSTALL"
 check "fix b M1: update.sh root fallback probe from / (consistency)" \
