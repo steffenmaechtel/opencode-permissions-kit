@@ -8,15 +8,15 @@ Actionable section (review-pending, overdue). Stdlib only.
 
 Structural sanity is fail-loud: a meta with missing frontmatter
 fields, duplicate frontmatter keys (#321), a filename that disagrees
-with its `id:`, or a file outside its ID-derived shard bucket aborts
-generation — the INDEX is never built from a broken tree.
+with its `id:`, a file outside its ID-derived shard bucket, or an
+unlistable bucket directory (#322) aborts generation — the INDEX is
+never built from a broken tree.
 
 Usage: python3 scripts/gen-rules-index.py   (from the repo root)
 Writes internal/rules-meta/INDEX.md. Hand edits are pointless — the
 parity test (tests/unit/test-rules-index-parity.sh) regenerates and
 compares.
 """
-import glob
 import os
 import re
 import sys
@@ -99,11 +99,48 @@ def desc(quote):
     return cut + '…'
 
 
+def _listdir_loud(path):
+    """sorted listdir that dies loud on an unlistable directory.
+
+    glob.glob silently suppresses PermissionError/OSError under the
+    hood (python 3.12 scandir behavior): a permission-broken bucket
+    dir produced a short INDEX with rc 0 (#322). The explicit walk
+    closes the docstring promise — the INDEX is never built from a
+    broken tree.
+    """
+    try:
+        return sorted(os.listdir(path))
+    except OSError as exc:
+        die('%s: cannot list bucket directory (%s) -- the INDEX '
+            'would be partial, no INDEX written' % (path, exc.strerror))
+
+
+def iter_metas():
+    """RM-*.md paths under the digit buckets, replacing the silent
+    glob walk: every directory level is listed explicitly and dies
+    loud when unreadable (#322). Readable trees yield exactly the
+    glob's set ([0-9] = one ASCII digit per level)."""
+    for d1 in _listdir_loud(RMROOT):
+        if len(d1) != 1 or d1 not in '0123456789':
+            continue
+        l1 = os.path.join(RMROOT, d1)
+        for d2 in _listdir_loud(l1):
+            if len(d2) != 1 or d2 not in '0123456789':
+                continue
+            l2 = os.path.join(l1, d2)
+            for d3 in _listdir_loud(l2):
+                if len(d3) != 1 or d3 not in '0123456789':
+                    continue
+                l3 = os.path.join(l2, d3)
+                for name in _listdir_loud(l3):
+                    if name.startswith('RM-') and name.endswith('.md'):
+                        yield os.path.join(l3, name)
+
+
 def main():
     today = TODAY
     metas = []
-    for path in sorted(glob.glob(
-            os.path.join(RMROOT, '[0-9]', '[0-9]', '[0-9]', 'RM-*.md'))):
+    for path in sorted(iter_metas()):
         fm = parse_meta(path)
         base = os.path.basename(path)[:-3]
         if base != fm['id']:
