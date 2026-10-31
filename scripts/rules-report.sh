@@ -8,7 +8,9 @@
 # first), and which metas still sit in the maintainer approval queue
 # (approved iff reviewed: carries a non-empty value -- a bare
 # 'reviewed:' line counts as pending; same definition as INDEX.md and
-# the audit's invariant 9, #233).
+# the audit's invariant 9, #233). An approved-then-amended meta
+# re-joins that queue (#333): it lists with its amended: date, marked
+# as a re-approval rather than a first review.
 #
 # Rows carry the meta id, the due date, the current interval and the
 # rule back-reference -- enough to pick the next revisit without
@@ -124,8 +126,15 @@ while IFS= read -r m; do
     esac
     # approval queue: approved iff reviewed: carries a non-empty value
     # -- a bare 'reviewed:' line counts as pending; same membership
-    # rule as INDEX.md and the audit's invariant 9 (#233).
-    [ -z "$(fm reviewed)" ] && printf '%s\n' "$id" >>"$PEND"
+    # rule as INDEX.md and the audit's invariant 9 (#233). #333: an
+    # approved meta with amended: set re-joins the queue -- the row
+    # carries the amendment date so the maintainer sees a re-approval.
+    amd=$(fm amended)
+    if [ -z "$(fm reviewed)" ]; then
+        printf '%s\n' "$id" >>"$PEND"
+    elif [ -n "$amd" ]; then
+        printf '%s\t%s\n' "$id" "$amd" >>"$PEND"
+    fi
     [ "$st" = active ] || continue
     iv=$(fm revisit-interval)
     nr=$(fm next-revisit)
@@ -159,7 +168,10 @@ echo "due within the horizon ($TODAY..$UNTIL): $n_hz"
 awk -F'\t' '{ printf "  %s  due %s  %s  %s\n", $2, $1, $3, $4 }' "$WORK/hz"
 
 echo "review-pending (approval queue): $n_pend"
-sed 's/^/  /' "$PEND"
+awk -F'\t' '{
+    if ($2 == "") print "  " $1
+    else print "  " $1 " (amended " $2 " -- re-approval)"
+}' "$PEND"
 
 next_after=$(awk -F'\t' -v u="$UNTIL" '$1 > u { print $1 " (" $2 ")"; exit }' \
     "$ACT")

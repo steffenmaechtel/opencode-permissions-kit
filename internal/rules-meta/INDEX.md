@@ -6,11 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**134 metas · 131 active · 3 retired · 18 review-pending · next due 2026-11-14**
+**135 metas · 132 active · 3 retired · 34 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0131, RM-0132, RM-0133, RM-0134
+- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0131, RM-0132, RM-0133, RM-0134, RM-0135
+- **Amended — pending:** RM-0057 (2026-10-31), RM-0058 (2026-10-31), RM-0063 (2026-10-31), RM-0067 (2026-10-31), RM-0072 (2026-10-31), RM-0073 (2026-10-31), RM-0074 (2026-10-31), RM-0083 (2026-10-31), RM-0084 (2026-10-31), RM-0087 (2026-10-31), RM-0088 (2026-10-31), RM-0089 (2026-10-31), RM-0106 (2026-10-31), RM-0107 (2026-10-31), RM-0109 (2026-10-31)
 - **Overdue:** none
 
 ## AGENTS.md
@@ -95,13 +96,13 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
+| [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | **amended — pending** | 1m | 2026-11-19 |
 
 ### The PR-native loop
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0058](0/0/5/RM-0058.md) | Before the first review round | active | approved | 1m | 2026-11-28 |
+| [RM-0058](0/0/5/RM-0058.md) | Before the first review round | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0059](0/0/5/RM-0059.md) | The round comment is posted | active | approved | 1m | 2026-11-28 |
 | [RM-0119](0/1/1/RM-0119.md) | Lettering: one letter per | active | **pending** | 1m | 2026-11-28 |
 | [RM-0120](0/1/2/RM-0120.md) | The loop cap (default 6) | active | **pending** | 1m | 2026-11-28 |
@@ -116,10 +117,10 @@
 | [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 1m | 2026-11-19 |
 | [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-11-19 |
 | [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-11-19 |
-| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-11-19 |
+| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | **amended — pending** | 1m | 2026-11-19 |
 | [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | approved | 1m | 2026-11-19 |
-| [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | approved | 1m | 2026-11-22 |
-| [RM-0107](0/1/0/RM-0107.md) | The cadence authority is | active | approved | 1m | 2026-11-28 |
+| [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | **amended — pending** | 1m | 2026-11-22 |
+| [RM-0107](0/1/0/RM-0107.md) | The cadence authority is | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | **pending** | 1m | 2026-11-28 |
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | **pending** | 1m | 2026-11-30 |
@@ -152,8 +153,8 @@
 |---|---|---|---|---|---|
 | [RM-0060](0/0/6/RM-0060.md) | The session that runs | active | approved | 1m | 2026-11-28 |
 | [RM-0061](0/0/6/RM-0061.md) | Rounds chain inside Session | active | approved | 1m | 2026-11-28 |
-| [RM-0063](0/0/6/RM-0063.md) | The round comment's metadata records | active | approved | 1m | 2026-11-28 |
-| [RM-0109](0/1/0/RM-0109.md) | Freshness is measured in | active | approved | 1m | 2026-11-28 |
+| [RM-0063](0/0/6/RM-0063.md) | The round comment's metadata records | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0109](0/1/0/RM-0109.md) | Freshness is measured in | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0110](0/1/1/RM-0110.md) | A freshness violation anyway | active | approved | 1m | 2026-11-28 |
 
 ### The round comment contract
@@ -181,14 +182,14 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0072](0/0/7/RM-0072.md) | Every snapshot-scope review records | active | approved | 1m | 2026-11-28 |
-| [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | approved | 1m | 2026-11-19 |
+| [RM-0072](0/0/7/RM-0072.md) | Every snapshot-scope review records | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | **amended — pending** | 1m | 2026-11-19 |
 
 ### Verification duty
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | approved | 1m | 2026-11-28 |
+| [RM-0074](0/0/7/RM-0074.md) | Every reviewer-agent finding is | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0075](0/0/7/RM-0075.md) | Retractions stay visible in | active | approved | 1m | 2026-11-19 |
 | [RM-0112](0/1/1/RM-0112.md) | A review round MAY run | active | approved | 1m | 2026-11-22 |
 
@@ -215,13 +216,13 @@
 | [RM-0080](0/0/8/RM-0080.md) | The main agent runs a strong | active | approved | 1m | 2026-11-19 |
 | [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | approved | 1m | 2026-11-19 |
 | [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | approved | 1m | 2026-11-19 |
-| [RM-0083](0/0/8/RM-0083.md) | For snapshot-scope reviews (the | active | approved | 1m | 2026-11-19 |
-| [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-11-19 |
+| [RM-0083](0/0/8/RM-0083.md) | For snapshot-scope reviews (the | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | **amended — pending** | 1m | 2026-11-19 |
 | [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | approved | 1m | 2026-11-19 |
 | [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | approved | 1m | 2026-11-19 |
-| [RM-0087](0/0/8/RM-0087.md) | Med-tier diff-scope rounds: ~8 | active | approved | 1m | 2026-11-19 |
-| [RM-0088](0/0/8/RM-0088.md) | High-tier snapshot-scope passes: ~15 | active | approved | 1m | 2026-11-19 |
-| [RM-0089](0/0/8/RM-0089.md) | Release-critical high-tier passes: | active | approved | 1m | 2026-11-19 |
+| [RM-0087](0/0/8/RM-0087.md) | Med-tier diff-scope rounds: ~8 | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0088](0/0/8/RM-0088.md) | High-tier snapshot-scope passes: ~15 | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0089](0/0/8/RM-0089.md) | Release-critical high-tier passes: | active | **amended — pending** | 1m | 2026-11-19 |
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | approved | 1m | 2026-11-28 |
 | [RM-0092](0/0/9/RM-0092.md) | Checkpoint files timestamp every subagent | active | approved | 1m | 2026-11-19 |
 | [RM-0108](0/1/0/RM-0108.md) | Fan-out is staged, never launched | active | approved | 1m | 2026-11-22 |
@@ -289,7 +290,7 @@
 | [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 1m | 2026-11-17 |
 | [RM-0056](0/0/5/RM-0056.md) | the rule plus a one-line why; | active | approved | 1m | 2026-11-18 |
 
-### Meta format v1.1
+### Meta format v1.2
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
@@ -297,6 +298,7 @@
 | [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 1m | 2026-11-15 |
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
+| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | **pending** | 1m | 2026-11-30 |
 
 ### Quality bar for rationales
 

@@ -372,6 +372,159 @@ new_scratch n9c
 sed -i 's/^status: active/status: active\nreviewed:/' "$(meta_file RM-9001)"
 expect_block "inv9 bare reviewed line blocks" "bare 'reviewed:' line (key without a value)"
 
+# 9d-9l. inv 9 amendment state (#333): approved-then-amended metas must
+#     carry amended: <date> -- without the field the meta renders
+#     approved while its log declares re-approval pending (the exact
+#     #333 gap: two amended metas sat in no queue at all). The state
+#     machine is order-aware on the log; every arm executes its edge.
+approve_probe() { # $1 extra frontmatter lines (sed replacement tail)
+    sed -i "s/^status: active/status: active$1/" "$(meta_file RM-9001)"
+}
+
+# 9d. THE #333 shape: approved, amended after approval, NO field
+new_scratch n9d
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 amended — scratch amendment; maintainer review pending.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 amended after approval without field" \
+    "amended after approval"
+
+# 9e. control: the same tree WITH the field stays green
+new_scratch n9e
+approve_probe '\nreviewed: 2026-10-16\namended: 2026-10-31'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 amended — scratch amendment; maintainer review pending.' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 amended field green" "0 blocking"
+
+# 9f. amended without any approval before it (never-approved metas
+#     are pending via the absent reviewed:, the field is redundant)
+new_scratch n9f
+approve_probe '\namended: 2026-10-31'
+printf '%s\n' \
+    '- 2026-10-31 amended — scratch amendment; maintainer review pending.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 amended without prior approval" \
+    "amendment-after-approval only"
+
+# 9g. amended date with no amendment log line of that date (pairing,
+#     the #233 class: field and log must agree)
+new_scratch n9g
+approve_probe '\nreviewed: 2026-10-16\namended: 2026-10-30'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 amended — scratch amendment; maintainer review pending.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 amended pairing" \
+    "no amendment log line of that date"
+
+# 9h. stale field: a later approval exists (re-approval landed, the
+#     field must be dropped -- reviewed: already carries the new date)
+new_scratch n9h
+approve_probe '\nreviewed: 2026-11-05\namended: 2026-10-31'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 amended — scratch amendment; maintainer review pending.' \
+    '- 2026-11-05 approved by maintainer (re-approval scratch probe).' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 stale amended field" "stale amended"
+
+# 9i. same-day approve-then-amend re-queues: log ORDER decides what
+#     dates cannot (the #333 design decision)
+new_scratch n9i
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-16 amended — same-day scratch amendment; maintainer review pending.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 same-day approve-then-amend re-queues" \
+    "amended after approval"
+
+# 9j. same-day amend-then-approve is the fresh approval: green, no
+#     field required (the order-aware control for 9i)
+new_scratch n9j
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' '- 2026-10-16 amended — same-day scratch amendment; maintainer review pending.' \
+    '- 2026-10-16 approved by maintainer (scratch probe).' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 same-day amend-then-approve approved" "0 blocking"
+
+# 9k. an amendment BEFORE the approval does not re-queue (pre-approval
+#     tweaks ride the approval; only post-approval changes count)
+new_scratch n9k
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' '- 2026-10-10 amended — pre-approval scratch tweak.' \
+    '- 2026-10-16 approved by maintainer (scratch probe).' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 pre-approval amendment stays approved" "0 blocking"
+
+# 9l. never-approved + amendment log line: pending via absent
+#     reviewed:, no field needed (the pending-amendment shape that
+#     predates the field -- amendment lines alone must stay legal)
+new_scratch n9l
+printf '%s\n' \
+    '- 2026-10-31 amended — scratch amendment; maintainer review pending.' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 never-approved amendment stays pending" "0 blocking"
+
+# 9m-9q. #337 a A1 vocabulary pins: an amendment event is a dated log
+#     line carrying the STANDALONE word "amended" -- subject-prefixed
+#     corpus phrasings count, glued near-miss tokens do not, and lines
+#     opening with another event keyword are never amendment events.
+# 9m. post-approval "rationale amended" phrasing, fieldless: the #333
+#     gap must fire (round-a verifier probe P1's shape)
+new_scratch n9m
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 rationale amended from maintainer input — scratch.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 subject-prefixed amendment re-queues" \
+    "amended after approval"
+
+# 9n. the same phrasing pairs with the field: green
+new_scratch n9n
+approve_probe '\nreviewed: 2026-10-16\namended: 2026-10-31'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 rationale amended from maintainer input — scratch.' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 subject-prefixed amendment pairs" "0 blocking"
+
+# 9o. glued near-miss tokens are NOT events: field + only an
+#     "amendedness" line of that date blocks unpaired (word-exact)
+new_scratch n9o
+approve_probe '\nreviewed: 2026-10-16\namended: 2026-10-31'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 amendedness check ran on the corpus; nothing changed.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv9 glued amended-token is not an event" \
+    "no amendment log line of that date"
+
+# 9p. approval free text mentioning "amended" stays an approval event
+#     (the call-site dispatch classifies approved-by-maintainer lines
+#     before the amendment scan ever runs on them)
+new_scratch n9p
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' \
+    '- 2026-10-16 approved by maintainer (wording amended in chat).' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 approval free text is not an amendment event" \
+    "0 blocking"
+
+# 9q. a revisit note mentioning "amended" is not an amendment event
+#     either (revisits run after approvals; findings notes name edits)
+new_scratch n9q
+approve_probe '\nreviewed: 2026-10-16'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-11-05 revisit findings — rationale amended upstream (interval reset to 1m from 1m, next 2026-12-05).' \
+    >>"$(meta_file RM-9001)"
+expect_ok "inv9 revisit note is not an amendment event" "0 blocking"
+
+# 6d. inv 6 -- amended is a date when present
+new_scratch n6d
+approve_probe '\nreviewed: 2026-10-16\namended: soon'
+printf '%s\n' '- 2026-10-16 approved by maintainer (scratch probe).' \
+    '- 2026-10-31 amended — scratch amendment; maintainer review pending.' \
+    >>"$(meta_file RM-9001)"
+expect_block "inv6 bad amended date" "amended not an ISO date"
+
 # 322 (#322 scripts part): gen-rules-index dies loud on an unlistable
 #     bucket directory -- glob.glob silently swallowed PermissionError
 #     and wrote a short INDEX with rc 0 (the docstring promise

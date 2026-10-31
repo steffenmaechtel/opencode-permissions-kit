@@ -39,7 +39,7 @@ holds.
 | 10 | learnings.md | out of meta scope: rationale = inline corpus stats, lifecycle = meta-analysis runs (RM-0046) |
 | 11 | Rule-text detail | the rule plus a one-line why; detailed provenance lives in the meta rationale (RM-0056) |
 
-## Meta format v1.1
+## Meta format v1.2
 
 ```markdown
 ---
@@ -49,6 +49,9 @@ quote: "first words of the bullet"
 created: 2026-10-14
 status: active            # active | retired
 reviewed: 2026-10-15      # maintainer approval date; absent = review pending
+amended: 2026-10-31       # optional: APPROVED meta changed after that
+                          # approval -- re-queues as amended -- pending;
+                          # the next approval drops the field
 revisit-interval: 1m      # ladder: 1m 6m 1y 2y — always starts at 1m
 next-revisit: 2026-11-14
 ---
@@ -59,6 +62,7 @@ Source: <one line finding/directive/issue — only if one exists.>
 
 ## Review log
 - 2026-10-14 created — agent draft; maintainer review pending.
+- 2026-10-20 amended — wording fix; maintainer review pending.
 ```
 
 Body rules:
@@ -76,6 +80,10 @@ Body rules:
 - **Examples use the abstract token `RM-NNNN`**, never a real meta's
   number — a real number inside an example is indistinguishable from
   a reference in IDE searches. (RM-0035)
+- **Post-approval changes set `amended:`** — any change to an approved
+  meta appends an amendment log line and sets `amended:` to its date;
+  the meta re-joins the approval queue (rendered *amended — pending*)
+  until a fresh maintainer approval drops the field. (RM-0135)
 
 ## Quality bar for rationales
 
@@ -98,8 +106,9 @@ The ladder defines the intervals; this is how a revisit runs (phase
 4). `make rules-report` (`scripts/rules-report.sh`) is the worklist:
 overdue metas first (most overdue first), then everything due within
 a 30-day horizon (`HORIZON=<days>` overrides), then the approval
-queue (metas without maintainer approval — the same membership the
-INDEX reports). It is a report, not a gate: overdue work never
+queue (metas without maintainer approval — never approved, or
+approved-then-amended and re-queued via `amended:`, #333 — the same
+membership the INDEX reports). It is a report, not a gate: overdue work never
 reddens CI (the audit's overdue lane is non-blocking by design), and
 the report's exit code only signals usage or environment failures.
 
@@ -142,6 +151,21 @@ a bulk session, not one-off touches).
    log carries an `approved by maintainer` entry of the same date —
    absent field with approval line, or field without line, both fail
    (provenance must never overstate; maintainer decision 2026-10-16).
+   Amendment state (#333): an approved meta whose newest state event
+   is an amendment must carry `amended: <date>` paired with an
+   amendment log line of that date. The field blocks when orphaned
+   (no approval before it — never-approved metas are pending via the
+   absent `reviewed:`), unpaired (no amendment line of that date), or
+   stale (a newer state event supersedes it: a later approval — drop
+   the field; a newer amendment — bump it to that date). An amendment
+   line is a dated log line carrying the standalone word `amended` —
+   canonical `- <date> amended — <note>`; a subject prefix (`rationale
+   amended`, the corpus precedent) counts, glued prefixes
+   (`amendedness`) do not, and lines opening with another event
+   keyword (`approved by maintainer`, `revisit`, `created`) are never
+   amendment events. Log ORDER decides same-day ties:
+   approve-then-amend re-queues, amend-then-approve is the fresh
+   approval.
 
 CI blocks on 1–6 and 9, and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance

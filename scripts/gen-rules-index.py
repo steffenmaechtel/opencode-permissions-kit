@@ -4,7 +4,9 @@
 One table row per meta (RM-NNNN), grouped by source file + section —
 both derived from each meta's `rule:` back-reference; the section
 title is resolved from the target file's heading. Leads with an
-Actionable section (review-pending, overdue). Stdlib only.
+Actionable section (review-pending, amended-pending, overdue). An
+approved meta carrying `amended:` renders **amended — pending** and
+counts toward review-pending (#333). Stdlib only.
 
 Structural sanity is fail-loud: a meta with missing frontmatter
 fields, duplicate frontmatter keys (#321), a filename that disagrees
@@ -176,8 +178,15 @@ def main():
     # log-line pairing, not membership) -- a bare 'reviewed:' line
     # (key without value) counts as PENDING, the same
     # key-presence-with-value rule as rules-report.sh and
-    # rules-audit.sh invariant 9.
+    # rules-audit.sh invariant 9. Amendment state (#333): an approved
+    # meta with amended: set re-joins the queue -- rendered
+    # amended -- pending until a fresh approval drops the field (the
+    # audit blocks reviewed-less amended keys, so both-truthy is the
+    # only reachable shape on unblocked trees; the belt keeps the
+    # generator total anyway).
     pending = sorted(fm['id'] for _, fm in metas if not fm.get('reviewed'))
+    amended = sorted((fm['amended'], fm['id']) for _, fm in metas
+                     if fm.get('reviewed') and fm.get('amended'))
     dates = sorted(fm['next-revisit'] for _, fm in metas
                    if fm['status'] == 'active' and fm['next-revisit'])
     overdue = sorted((d, fm['id']) for _, fm in metas
@@ -194,12 +203,15 @@ def main():
         "> each meta's `rule:` back-reference.",
         '',
         '**%d metas · %d active · %d retired · %d review-pending · next due %s**'
-        % (len(metas), len(active), len(retired), len(pending),
+        % (len(metas), len(active), len(retired), len(pending) + len(amended),
            dates[0] if dates else '—'),
         '',
         '## Actionable',
         '',
         '- **Review pending:** %s' % (', '.join(pending) if pending else 'none'),
+        '- **Amended — pending:** %s'
+        % (', '.join('%s (%s)' % (rid, d) for d, rid in amended) if amended
+           else 'none'),
         '- **Overdue:** %s'
         % (', '.join('%s (%s)' % (rid, d) for d, rid in overdue) if overdue
            else 'none'),
@@ -214,9 +226,13 @@ def main():
             lines.append('| Meta | Rule | Status | Review | Cycle | Next revisit |')
             lines.append('|---|---|---|---|---|---|')
             for rel, fm in groups[src][(unres, order, title)]:
+                if fm.get('reviewed'):
+                    review = ('**amended — pending**' if fm.get('amended')
+                              else 'approved')
+                else:
+                    review = '**pending**'
                 lines.append('| [%s](%s) | %s | %s | %s | %s | %s |' % (
-                    fm['id'], rel, desc(fm['quote']), fm['status'],
-                    'approved' if fm.get('reviewed') else '**pending**',
+                    fm['id'], rel, desc(fm['quote']), fm['status'], review,
                     fm['revisit-interval'], fm['next-revisit']))
             lines.append('')
     out = os.path.join(RMROOT, 'INDEX.md')
