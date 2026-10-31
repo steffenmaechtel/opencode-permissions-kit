@@ -925,6 +925,37 @@ else
     chmod 755 "$(dirname "$(meta_path "$XSCRATCH" RM-9011)")" # (#318 a B4)
 fi
 
+# R14. #321: duplicate frontmatter keys in the report -- FIRST wins
+#      (head -1, the canonical rule; the audit blocks duplicates, the
+#      report stays deterministic on ungated trees). Both orders from
+#      the issue's evidence matrix: bare-first reviewed -> pending
+#      (queue 1), dated-first -> approved (queue 0).
+D1S=$WORK/dup321a$$
+write_meta "$D1S" RM-9001 active 1m 2026-06-01 2026-05-01
+sed -i 's/^reviewed: 2026-05-01$/reviewed:\nreviewed: 2026-05-01/' \
+    "$(meta_path "$D1S" RM-9001)"
+OUT=$(RM_AUDIT_ROOT="$D1S" FORCE_TODAY=2026-06-15 \
+    sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
+RC=$?
+if [ "$RC" -eq 0 ] && contains "$OUT" "review-pending (approval queue): 1" &&
+    contains "$OUT" "RM-9001"; then
+    pass
+else
+    fail "R14 bare-first duplicate: expected queue=1, got rc=$RC: $OUT"
+fi
+D2S=$WORK/dup321b$$
+write_meta "$D2S" RM-9001 active 1m 2026-06-01 2026-05-01
+sed -i 's/^reviewed: 2026-05-01$/reviewed: 2026-05-01\nreviewed:/' \
+    "$(meta_path "$D2S" RM-9001)"
+OUT=$(RM_AUDIT_ROOT="$D2S" FORCE_TODAY=2026-06-15 \
+    sh "$REPO_ROOT/scripts/rules-report.sh" 2>&1)
+RC=$?
+if [ "$RC" -eq 0 ] && contains "$OUT" "review-pending (approval queue): 0"; then
+    pass
+else
+    fail "R14 dated-first duplicate: expected queue=0, got rc=$RC: $OUT"
+fi
+
 if [ -s "$FAILS" ]; then
     printf 'rules-revisit pins: FAILED\n'
     cat "$FAILS"

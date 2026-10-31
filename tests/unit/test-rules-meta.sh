@@ -344,6 +344,46 @@ new_scratch n9c
 sed -i 's/^status: active/status: active\nreviewed:/' "$(meta_file RM-9001)"
 expect_block "inv9 bare reviewed line blocks" "bare 'reviewed:' line (key without a value)"
 
+# 6c. inv 6 -- duplicate frontmatter keys block (#321): a malformed
+#     hand edit (the #233 slip class) used to split the three
+#     extractors (shell first-wins, gen last-wins). Both orders block;
+#     the standalone INDEX generator dies on the same tree (fail-loud
+#     structural promise -- order-independent, one arm pinned), so a
+#     duplicate-key-blocked run never rewrites INDEX.md: gen dies on
+#     the same tree before any write. (Other blocked causes do regen
+#     when gen accepts the tree; the finderr gate is the separate,
+#     stronger skip -- audit inv 8.)
+new_scratch n6c
+printf 'sentinel INDEX -- must survive a blocked run\n' \
+    >"$SCRATCH/internal/rules-meta/INDEX.md"
+sed -i 's/^status: active$/status: active\nstatus: retired/' \
+    "$(meta_file RM-9001)"
+expect_block "inv6 duplicate key blocks (dup status)" \
+    "duplicate frontmatter key: status"
+if grep -qxF 'sentinel INDEX -- must survive a blocked run' \
+    "$SCRATCH/internal/rules-meta/INDEX.md"; then
+    pass
+else
+    fail "inv6 duplicate key: INDEX rewritten on a blocked run"
+fi
+OUT=$(cd "$SCRATCH" && python3 scripts/gen-rules-index.py 2>&1)
+RC=$?
+case "$OUT" in
+    *'duplicate frontmatter key'*)
+        if [ "$RC" -ne 0 ]; then
+            pass
+        else
+            fail "inv6 gen die: message but rc=0"
+        fi
+        ;;
+    *) fail "inv6 gen die: lacks the duplicate-key message: $OUT" ;;
+esac
+new_scratch n6c2
+sed -i 's/^status: active$/status: active\nreviewed: 2026-05-01\nreviewed:/' \
+    "$(meta_file RM-9001)"
+expect_block "inv6 duplicate key blocks (dated-first reviewed)" \
+    "duplicate frontmatter key: reviewed"
+
 # 7. overdue is report-only
 new_scratch n7
 sed -i 's/^created: 2026-10-16/created: 2026-09-01/; s/^next-revisit: 2026-11-16/next-revisit: 2026-10-01/' "$(meta_file RM-9001)"

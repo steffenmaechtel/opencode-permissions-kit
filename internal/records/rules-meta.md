@@ -129,7 +129,10 @@ a bulk session, not one-off touches).
 5. The `rule:` back-ref exists; the `quote:` prefix is findable in the
    target file (normalized: code backticks/bold stripped, wrapped
    lines joined; needle = the quote's first five words).
-6. Frontmatter complete, ISO dates, `next-revisit` ≥ `created`.
+6. Frontmatter complete, ISO dates, `next-revisit` ≥ `created`;
+   no duplicate keys — FIRST wins canonically where extraction runs
+   ungated (report, INDEX generator on unblocked trees); duplicates
+   block (#321, the malformed-hand-edit class of #233).
 7. Report (non-blocking): overdue list, sorted by lateness.
 8. `INDEX.md` is regenerated on every run, except when the meta walk
    reported `[meta-tree]` errors (skip, so a blocked run never writes
