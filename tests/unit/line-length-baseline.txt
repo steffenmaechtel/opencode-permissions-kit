@@ -1,5 +1,4 @@
 CONTRIBUTING.md 72 3
-README.md 197 5
 agent/README.md 41 3
 agent/conventions.md 49 2
 agent/review-concept.md 384 5
@@ -17,7 +16,5 @@ internal/records/opencode-2x.md 632 7
 internal/records/rootless-backend.md 186 4
 internal/records/security-advisories.md 70 5
 internal/records/streamline.md 1330 19
-internal/reviews-meta/2026-10-10/data/README.md 299 4
-internal/reviews-meta/2026-10-10/data/extraction-spec.md 364 9
 internal/reviews-meta/2026-10-10/further-analyses.md 112 2
 internal/reviews-meta/2026-10-10/statistics.md 23 3

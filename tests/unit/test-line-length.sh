@@ -76,12 +76,20 @@ BASELINE="$(dirname "$0")/line-length-baseline.txt"
 # Exempt: frozen history (archived records) and machine-generated files
 # (INDEX, legacy-index — the immutable review snapshots moved to tag
 # review-corpus with the corpus archive, issue #290).
+# Exempt: internal/reviews-meta/*/data/ — MACHINE-MADE run artifacts
+# (#300, option B): future meta runs regenerate these files with
+# machine-width lines nobody wraps by hand, which would redden the
+# ratchet as "new offending files" for content no human edit touches.
+# Narrowest fix that removes the churn: exclude the data/ folders only;
+# the human-written statistics/further-analyses stay pinned (exclusion
+# means those files can grow unbounded — accepted for machine output).
 docs_scope() {
     for f in README.md CONTRIBUTING.md AGENTS.md; do
         [ -e "$f" ] && printf '%s\n' "$f"
     done
     find agent internal docs .agents -name '*.md' -type f \
         ! -path 'internal/records/_archive/*' \
+        ! -path 'internal/reviews-meta/*/data/*' \
         ! -name 'INDEX.md' \
         ! -name 'legacy-index.md'
 }
