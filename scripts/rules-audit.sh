@@ -19,7 +19,9 @@
 #      rule bullet, so neither anchor-quote pairing nor quote
 #      findability can hold.
 #   6. frontmatter complete, ISO dates, next-revisit >= created,
-#      status/interval vocabulary
+#      status/interval vocabulary, no duplicate keys (#321: malformed
+#      hand edit, the #233 slip class -- FIRST wins canonically where
+#      extraction runs ungated; duplicates block)
 #   9. approval consistency: reviewed: is set exactly when the review
 #      log carries an "approved by maintainer" line of the same date;
 #      a bare "reviewed:" line (key without a value) blocks -- approval
@@ -134,7 +136,8 @@ first5() { # quote -> first five words (or fewer)
 
 fm_get() { # file key -> value ('' when absent; ONE paired quote
     # layer stripped, same normalization as gen-rules-index.py and the
-    # other shell extractors, #317 d D1)
+    # other shell extractors, #317 d D1). Duplicate keys: FIRST wins
+    # here (head -1, the canonical rule); the audit blocks them (#321).
     sed -n '2,/^---$/p' "$1" | sed -n "s/^$2:[[:space:]]*//p" | head -1 |
         sed "s/^\([\"']\)\(.*\)\1$/\2/"
 }
@@ -265,6 +268,17 @@ while IFS= read -r m; do
         v=$(fm_get "$m" "$k")
         [ -n "$v" ] || block 6 "$rel -- missing frontmatter field: $k"
     done
+    # 6 (#321): duplicate frontmatter keys are malformed hand edits --
+    # they used to split the three extractors (shell head -1 = first
+    # wins, gen-rules-index overwrite = last wins); they block now.
+    dups=$(sed -n '2,/^---$/p' "$m" |
+        sed -n 's/^\([A-Za-z-][A-Za-z-]*\):.*/\1/p' |
+        LC_ALL=C sort | uniq -d)
+    if [ -n "$dups" ]; then
+        printf '%s\n' "$dups" | while IFS= read -r k; do
+            block 6 "$rel -- duplicate frontmatter key: $k"
+        done
+    fi
     created=$(fm_get "$m" created)
     nrev=$(fm_get "$m" next-revisit)
     date_ok "$created" || block 6 "$rel -- created not an ISO date: '$created'"

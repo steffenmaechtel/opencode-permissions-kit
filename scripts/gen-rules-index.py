@@ -7,9 +7,9 @@ title is resolved from the target file's heading. Leads with an
 Actionable section (review-pending, overdue). Stdlib only.
 
 Structural sanity is fail-loud: a meta with missing frontmatter
-fields, a filename that disagrees with its `id:`, or a file outside
-its ID-derived shard bucket aborts generation — the INDEX is never
-built from a broken tree.
+fields, duplicate frontmatter keys (#321), a filename that disagrees
+with its `id:`, or a file outside its ID-derived shard bucket aborts
+generation — the INDEX is never built from a broken tree.
 
 Usage: python3 scripts/gen-rules-index.py   (from the repo root)
 Writes internal/rules-meta/INDEX.md. Hand edits are pointless — the
@@ -44,15 +44,24 @@ def parse_meta(path):
     if not lines or lines[0].strip() != '---':
         die('%s: no frontmatter' % path)
     fm = {}
+    dupes = []
     for ln in lines[1:]:
         if ln.strip() == '---':
             break
         m = re.match(r'^([A-Za-z-]+):\s*(.*)$', ln)
         if m:
+            key = m.group(1)
+            if key in fm and key not in dupes:
+                dupes.append(key)
             val = m.group(2).strip()
             if len(val) >= 2 and val[0] == val[-1] and val[0] in '"\'':
                 val = val[1:-1]
-            fm[m.group(1)] = val
+            # #321: FIRST wins, the canonical rule shared with the shell
+            # extractors (head -1); duplicate keys die below.
+            fm.setdefault(key, val)
+    if dupes:
+        die('%s: duplicate frontmatter key(s): %s'
+            % (path, ', '.join(dupes)))
     missing = [f for f in REQUIRED if f not in fm]
     if missing:
         die('%s: missing frontmatter field(s): %s' % (path, ', '.join(missing)))
