@@ -39,7 +39,8 @@
 # complete: the agent/ files and AGENTS.md ## Rules are in scope;
 # learnings.md stays out (record decision 10).
 #
-# Exit: 1 on blocking violations (1-6, 9), 0 otherwise.
+# Exit: 1 on blocking violations (1-6, 9) and [meta-tree] scope
+#      errors, 0 otherwise.
 # Env: RM_AUDIT_ROOT (run against another tree -- tests),
 #      FORCE_TODAY (pin the date for overdue/report checks).
 
@@ -232,7 +233,18 @@ done
 # (invariants 3b, 4, 5, 6, 7, 9 -- single loop over the tree)
 IDS=$WORK/ids
 : >"$IDS"
-find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort | while IFS= read -r m; do
+# #232: the meta worklist is built ONCE with find's stderr captured --
+# a partially unreadable meta tree BLOCKS (a silently shorter worklist
+# would audit a scope nobody chose); both loops below read $METALIST.
+METALIST=$WORK/metas
+find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>"$WORK/finderr" |
+    LC_ALL=C sort >"$METALIST"
+if [ -s "$WORK/finderr" ]; then
+    sed 's/^/[meta-tree] /' "$WORK/finderr" >>"$V"
+    printf '[meta-tree] find reported errors under %s -- audit scope may be partial\n' \
+        "$METAS" >>"$V"
+fi
+while IFS= read -r m; do
     rel=${m#"$ROOT"/}
     base=$(basename "$m" .md)
 
@@ -311,7 +323,7 @@ find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort | while 
             head -1 | sed 's/^- //; s/ .*//')
         [ -n "$logdate" ] && block 9 "$rel -- approval log line '$logdate' but no reviewed field"
     fi
-done
+done <"$METALIST"
 
 # 4: IDs unique
 LC_ALL=C sort "$IDS" | uniq -d | while IFS= read -r r; do
@@ -320,15 +332,19 @@ done
 
 # 3 (b): orphans -- active metas never referenced in the scope files
 cut -f1 "$REFS" | sort -u >"$WORK/refids"
-find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort | while IFS= read -r m; do
+while IFS= read -r m; do
     base=$(basename "$m" .md)
     st=$(fm_get "$m" status)
     [ "$st" = active ] || continue
     grep -qxF "$base" "$WORK/refids" || block 3 "$base -- active meta without a ref (orphan)"
-done
+done <"$METALIST"
 
 # ------------------------------------------------ 8: INDEX regeneration
-if [ -x "$(command -v python3)" ] && [ -f "$ROOT/scripts/gen-rules-index.py" ]; then
+# (#318 a A1): never regenerate from a partial walk -- a blocked run
+# must not leave a truncated INDEX behind (find errors above).
+if [ -s "$WORK/finderr" ]; then
+    echo "INDEX not regenerated (meta-tree walk reported errors)"
+elif [ -x "$(command -v python3)" ] && [ -f "$ROOT/scripts/gen-rules-index.py" ]; then
     cp "$ROOT/$METAS/INDEX.md" "$WORK/index.before" 2>/dev/null || : >"$WORK/index.before"
     FORCE_TODAY=$TODAY python3 "$ROOT/scripts/gen-rules-index.py" >/dev/null 2>&1 ||
         echo "warning: INDEX regeneration failed (structural meta errors above)" >&2

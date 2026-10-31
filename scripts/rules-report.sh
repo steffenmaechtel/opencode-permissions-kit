@@ -17,8 +17,9 @@
 # Exit codes: 0 -- report produced. Overdue work does NOT change the
 # exit code: an overdue meta is a maintenance signal, not a broken
 # build; CI stays governed by the audit alone. 2 -- usage
-# or environment error (bad HORIZON, missing meta tree, missing
-# python3); the report never prints a partial worklist.
+# or environment error (bad HORIZON, missing meta tree, unreadable
+# meta subtree, missing python3); the report never prints a partial
+# worklist.
 #
 # Retired metas are outside the revisit cycle and never appear in the
 # overdue/horizon lanes; they may still appear in the
@@ -75,8 +76,15 @@ ACT=$WORK/active
 PEND=$WORK/pending
 : >"$PEND"
 
-find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>/dev/null | LC_ALL=C sort \
-    >"$WORK/files"
+# #232: find errors are loud -- a partially unreadable meta tree dies
+# BEFORE any lane prints (the report never prints a partial worklist);
+# find's own stderr names the unreadable path.
+find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>"$WORK/finderr" |
+    LC_ALL=C sort >"$WORK/files"
+if [ -s "$WORK/finderr" ]; then
+    sed 's/^/rules-report: find error: /' "$WORK/finderr" >&2
+    die "find reported errors under $METAS -- the worklist would be partial, no report printed"
+fi
 [ -s "$WORK/files" ] || die "no metas found under $METAS"
 
 date_ok() { # ISO + plausible ranges (same shape as rules-audit.sh)

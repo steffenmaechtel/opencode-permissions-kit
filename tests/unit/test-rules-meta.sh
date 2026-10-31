@@ -225,6 +225,38 @@ cat >>"$(meta_file RM-9001)" <<'EOF'
 EOF
 expect_block "inv9 line without field" "[inv9]"
 
+# meta-tree. #232: find errors block -- an unreadable meta subdir must
+# not silently shrink the audit's worklist (the metas inside would be
+# invisible to every invariant). Probe runs as the non-root suite
+# user; root skips disclosed, like the peers (#318 a B3) -- chmod 000
+# cannot block a root reader, the red would be spurious.
+# (#318 a A1): a blocked run must NOT regenerate INDEX.md from the
+# readable subset -- the sentinel survives, regen is skipped loudly.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  pin skipped: meta-tree needs a non-root uid (root reads through 000)"
+else
+    new_scratch ntree
+    write_meta RM-9011 "Unreadable demo rule" agent/conventions.md interactive-prompts-yn ""
+    printf 'sentinel INDEX -- must survive a blocked run\n' \
+        >"$SCRATCH/internal/rules-meta/INDEX.md"
+    chmod 000 "$SCRATCH/internal/rules-meta/9/0/1"
+    expect_block "meta-tree unreadable subdir blocks" "[meta-tree]"
+    expect_block "meta-tree skips INDEX regeneration" \
+        "INDEX not regenerated (meta-tree walk reported errors)"
+    if grep -qxF 'sentinel INDEX -- must survive a blocked run' \
+        "$SCRATCH/internal/rules-meta/INDEX.md"; then
+        pass
+    else
+        fail "meta-tree INDEX rewritten on a blocked run"
+    fi
+    chmod 755 "$SCRATCH/internal/rules-meta/9/0/1" # (#318 a B4) teardown
+fi
+
+# meta-tree missing. (#318 a B2): a missing meta tree blocks loudly
+# (find ENOENT feeds [meta-tree]) -- it is not a silent empty audit.
+new_scratch nmtree
+rm -rf "${SCRATCH:?}/internal/rules-meta"
+expect_block "meta-tree absent meta tree blocks" "[meta-tree]"
 # 9c. inv 9 -- a bare 'reviewed:' line (key present, no date) blocks:
 #     approval membership is key-presence-with-value (#233) -- a bare
 #     line must not count as approved anywhere (report queue, INDEX)
