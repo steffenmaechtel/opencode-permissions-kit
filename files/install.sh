@@ -2183,7 +2183,9 @@ do_deploy_phase() {
             # self-installed opencode binary is reported in non-login shells too.
             # The [ -f ... ] guard keeps the line harmless after uninstall.
             if ! sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh' "$cf" 2>/dev/null; then
-                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . ''/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'' (wrapper bypass warning)' | sudo tee -a "$cf" >/dev/null
+                echo "[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . ""\
+/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit""\
+ (wrapper bypass warning)" | sudo tee -a "$cf" >/dev/null
             fi
             # Interactive-shell ddev function: `ddev` always runs as the opencode
             # user (sudoers helper), so the developer terminal and the agent share
@@ -2191,7 +2193,9 @@ do_deploy_phase() {
             # uninstall. Only the DEFAULT user gets it — the opencode session must
             # never be wrapped (the function's id check would be recursive).
             if ! sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' "$cf" 2>/dev/null; then
-                echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . ''/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'' (ddev always runs as opencode)' | sudo tee -a "$cf" >/dev/null
+                echo "[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . ""\
+/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit""\
+ (ddev always runs as opencode)" | sudo tee -a "$cf" >/dev/null
             fi
         fi
     done

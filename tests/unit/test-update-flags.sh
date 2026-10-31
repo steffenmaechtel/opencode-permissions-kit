@@ -825,6 +825,39 @@ if [ -n "$_hk_block" ]; then
     else
         fail "healthy home: shell-warn + ddev hook lines appended to the real rc (rc=$_rc out=$_out rcfile=$(cat "$WORK/hku-home/.bashrc" 2>/dev/null))"
     fi
+    # Exact rendered hook lines (#331 a a-1): the splice-seam
+    # discriminator. The wraps in install.sh/update.sh emit these lines
+    # through dq-splice continuations; every substring-shaped pin (and
+    # every gate -- lint, ratchet, join guard) stays green on a seam
+    # mutation, while grep -qxF on the full rendered line fails on any
+    # seam-space or word-split regression. Expected bytes regenerated
+    # from the committed emissions.
+    if grep -qxF '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' "$WORK/hku-home/.bashrc" &&
+        grep -qxF '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit (ddev always runs as opencode)' "$WORK/hku-home/.bashrc"; then
+        pass "healthy home: hook lines rendered byte-exactly (splice-seam pin)"
+    else
+        fail "healthy home: hook lines rendered byte-exactly (splice-seam pin; rcfile=$(cat "$WORK/hku-home/.bashrc" 2>/dev/null))"
+    fi
+    # Heal arms (#331 b b-1): a legacy rc (pre-/sh/ paths) takes the sed
+    # REWRITE branch -- until this fixture no test executed it. The
+    # healed lines must land byte-exactly on the current hook lines; a
+    # seam mutation in the sed splices changes the BRE or the healed
+    # bytes and fails these -qxF pins while every substring-shaped
+    # check stays green.
+    mkdir -p "$WORK/hku-heal"
+    {
+        printf '# plain rc\n'
+        printf '%s\n' '[ -f /usr/local/lib/opencode-permissions-kit/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)'
+        printf '%s\n' '[ -f /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh ] && . /usr/local/lib/opencode-permissions-kit/ddev-as-opencode.sh  # opencode permissions kit (ddev always runs as opencode)'
+    } >"$WORK/hku-heal/.bashrc"
+    _rc=0
+    _out=$(_hk_run hku-dev 1000 "$WORK/hku-heal") || _rc=$?
+    if [ "$_rc" -eq 0 ] && grep -qxF '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit (wrapper bypass warning)' "$WORK/hku-heal/.bashrc" &&
+        grep -qxF '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit (ddev always runs as opencode)' "$WORK/hku-heal/.bashrc"; then
+        pass "legacy rc healed byte-exactly (sed rewrite arms executed + pinned)"
+    else
+        fail "legacy rc healed byte-exactly (sed rewrite arms executed + pinned; rc=$_rc out=$_out rcfile=$(cat "$WORK/hku-heal/.bashrc" 2>/dev/null))"
+    fi
     # id-probe failure arm (#196 a T2): unresolvable developer → id fails
     # → `|| echo 1` sentinel → NOT the uid-0 loud skip; the healthy home
     # still provisions. Fresh rc file — hku-home above is already hooked,

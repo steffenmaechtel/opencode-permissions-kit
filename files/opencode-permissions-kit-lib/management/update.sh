@@ -940,9 +940,12 @@ if [ "$ONLY_BINARY" != true ]; then
                 [ -f "$cf" ] || continue
                 if sudo grep -q 'opencode-permissions-kit/sh/shell-warn.sh\|opencode-permissions-kit/shell-warn.sh' \
                     "$cf" 2>/dev/null; then
-                    sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh''|/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh|g' "$cf"
+                    sudo sed -i "s|/usr/local/lib/opencode-permissions-kit/shell-warn\.sh""\
+|/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh|g" "$cf"
                 else
-                    echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . ''/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit'' (wrapper bypass warning)' | sudo tee -a "$cf" >/dev/null
+                    echo "[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . ""\
+/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit""\
+ (wrapper bypass warning)" | sudo tee -a "$cf" >/dev/null
                     ui_success "wrapper-bypass warning hooked into $cf"
                     log "shell-startup warning hook appended: $cf"
                 fi
@@ -951,9 +954,12 @@ if [ "$ONLY_BINARY" != true ]; then
                 # session must never be wrapped (the function's id check is the guard).
                 if sudo grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh\|opencode-permissions-kit/ddev-as-opencode.sh' \
                     "$cf" 2>/dev/null; then
-                    sudo sed -i 's|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh''|/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh|g' "$cf"
+                    sudo sed -i "s|/usr/local/lib/opencode-permissions-kit/ddev-as-opencode\.sh""\
+|/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh|g" "$cf"
                 else
-                    echo '[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . ''/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit'' (ddev always runs as opencode)' | sudo tee -a "$cf" >/dev/null
+                    echo "[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . ""\
+/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit""\
+ (ddev always runs as opencode)" | sudo tee -a "$cf" >/dev/null
                     ui_success "ddev terminal hook installed into $cf"
                     log "ddev-terminal hook appended: $cf"
                 fi

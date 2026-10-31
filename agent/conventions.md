@@ -92,6 +92,24 @@ kit's own test scripts. Style is not a review topic: the gate
   variant needs 3.14.x. Install via `make install-shfmt`.
 - Run `make fmt` before committing when the gate flags your edits;
   hand-formatting against the canon does not stick.
+- Wrapping a long line is a measured decision, not a guess: under the
+  pinned shfmt the **dq splice** (frag2's opener at EOL, the
+  backslash-newline INSIDE the double quotes — the form shfmt itself
+  produces from a classic wrap) is the only byte-identical AND
+  fmt-stable shape. A single-quoted literal has none: the classic wrap
+  at column 0 is joined back into the long line; the indented classic
+  is normalized to spaced fragments — separate WORDS, so `echo`
+  inserts seam spaces and a split sed script becomes two arguments —
+  and an sq "splice" is no continuation at all (backslash-newline is
+  literal inside single quotes). Wrapping an sq literal therefore
+  converts it to dq first, after checking for `$`, backtick and `"`
+  hazards — and the wrap's byte-identity is proven by EXECUTING old
+  vs new and comparing the output: the ratchet and the join guard
+  stay green on every broken sq form, and fmt red-lists only the two
+  classic spellings — its canonical output for the indented classic
+  IS the broken spaced-words shape, and the sq splice never trips
+  fmt at all; post-fmt, only execution discriminates (#300 tier 1,
+  sharpened by review #331 a a-2, measured 2026-10-31).
 - Still human rules, NOT shfmt's business: the 120-column ratchet
   (`tests/unit/test-line-length.sh` — shfmt never wraps lines), the
   string-continuation join guard (`test-string-continuations.sh`,
