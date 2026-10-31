@@ -255,8 +255,10 @@ check "heal: db_snapshots stays pruned (ddev chmods it 0777 itself)" \
 check "heal: import-db stays pruned (transient, gitignored)" \
     [ "$(stat -c %a "$SH/.ddev/import-db")" = "755" ]
 
-PATH="$SH_STUB:$PATH" sh "$HELPER" --opk-ensure-shared "$SH/does-not-exist" >/dev/null 2>&1
-check "heal: missing target is a clean no-op (exit 0)" [ "$?" = 0 ]
+_hmt_rc=0
+PATH="$SH_STUB:$PATH" sh "$HELPER" --opk-ensure-shared "$SH/does-not-exist" >/dev/null 2>&1 ||
+    _hmt_rc=$?
+check "heal: missing target is a clean no-op (exit 0)" [ "$_hmt_rc" = 0 ]
 
 # The heal must sit BEFORE the ddev resolution/exec: it never needs ddev,
 # and the resolve block must not run for it.
@@ -280,8 +282,9 @@ mkdir -p "$DF/on/.ddev" "$DF/off/.ddev" "$DF/none"
 printf 'name: flagon\ntype: typo3\ndocroot: public\n' >"$DF/on/.ddev/config.yaml"
 printf 'name: flagoff\ntype: typo3\ndocroot: public\n' >"$DF/off/.ddev/config.yaml"
 
-DF_ON_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/on" 2>&1)
-DF_ON_RC=$?
+DF_ON_RC=0
+DF_ON_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/on" 2>&1) ||
+    DF_ON_RC=$?
 check "devowned-flag: exits 0 (mode on)" [ "$DF_ON_RC" = 0 ]
 check "devowned-flag: writes disable_settings_management: true" \
     sh -c "grep -qx 'disable_settings_management: true' \"\$1/.ddev/config.yaml\"" _ "$DF/on"
@@ -289,18 +292,21 @@ check "devowned-flag: flag sits below the head (issue #28 shape, after type:)" \
     [ "$(grep -n '^disable_settings_management: true' "$DF/on/.ddev/config.yaml" | cut -d: -f1)" = 6 ]
 check "devowned-flag: prints the commit-it note (dev-visible hint)" \
     sh -c "printf '%s' \"\$1\" | grep -q 'commit it'" _ "$DF_ON_OUT"
-DF_ON2_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/on" 2>&1)
+DF_ON2_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/on" 2>&1) || true
 check "devowned-flag: idempotent — one flag, second run silent" \
     [ "$(grep -c '^disable_settings_management:' "$DF/on/.ddev/config.yaml")" = 1 ] && [ -z "$DF_ON2_OUT" ]
 
-DF_OFF_OUT=$(env -u DDEV_DEV_OWNED PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/off" 2>&1)
-DF_OFF_RC=$?
+DF_OFF_RC=0
+DF_OFF_OUT=$(env -u DDEV_DEV_OWNED PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/off" 2>&1) ||
+    DF_OFF_RC=$?
 check "devowned-flag: mode off writes nothing and stays silent" \
     [ "$DF_OFF_RC" = 0 ] && [ -z "$DF_OFF_OUT" ] && ! grep -q '^disable_settings_management:' "$DF/off/.ddev/config.yaml"
 
-DF_NONE_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/none" 2>&1)
+DF_NONE_RC=0
+DF_NONE_OUT=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-flag "$DF/none" 2>&1) ||
+    DF_NONE_RC=$?
 check "devowned-flag: project without .ddev/config.yaml is a clean no-op" \
-    [ "$?" = 0 ] && [ -z "$DF_NONE_OUT" ]
+    [ "$DF_NONE_RC" = 0 ] && [ -z "$DF_NONE_OUT" ]
 
 check "devowned-flag: helper sources the sibling ddev-handover.sh lib" \
     sh -c "grep -q 'sh/ddev-handover.sh' \"\$1\"" _ "$HELPER"
