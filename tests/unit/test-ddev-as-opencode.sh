@@ -994,8 +994,13 @@ check "fix b M2: handover runner hops through a neutral cwd" \
     sh -c "awk '/^_ddev_handover_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$HANDOVERSH"
 check "fix b M3: migrate runner hops through a neutral cwd" \
     sh -c "awk '/^_ddev_migrate_run_as\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\"" _ "$MIGRATESH"
-check "fix b M3: both inline import invocations hop through a neutral cwd" \
-    sh -c "grep 'cd / && exec' \"\$1\" | grep -c migrate-import | grep -qx 2" _ "$MIGRATESH"
+# Comment-strip rider (#261, the #244 g W1 class — pr-00320 b F1):
+# commented-out invocations stop counting; full-line comments only
+# (#244 h W6 residual). The combined pattern is the old pipeline's
+# accept set (both terms on one line): the two live imports.
+_m3i_n="$(sed 's/^[[:space:]]*#.*$//' "$MIGRATESH" | grep -c 'cd / && exec.*migrate-import' || true)"
+check "fix b M3: both inline import invocations hop through a neutral cwd (import sites: $_m3i_n of 2)" \
+    [ "$_m3i_n" = 2 ]
 check "fix b M1: install.sh root probe from / (consistency)" \
     sh -c 'grep -qF "(cd / && \"\$DDEV_BIN\" version)" "$1" && ! grep -qF "\"\$DDEV_BIN\" version 2>/dev/null" "$1"' _ "$INSTALL"
 check "fix b M1: update.sh root fallback probe from / (consistency)" \
@@ -1041,8 +1046,12 @@ fi
 HOSTSSH="$FILES/opencode-permissions-kit-lib/sh/ddev-hosts.sh"
 check "fix c M1: ddev-hosts helper hops through a neutral cwd (sudo + direct arms)" \
     sh -c "awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\" && awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF '(cd / && \"\$dha_bin\" hostname'" _ "$HOSTSSH"
-check "fix c M1: no bare ddev-hosts invocation remains outside the helper" \
-    sh -c 'test "$(grep -c "\"\$dha_bin\" hostname" "$1")" = 2' _ "$HOSTSSH"
+# Comment-strip rider (#261, the #244 g W1 class — pr-00320 c F1):
+# a commented-out twin invocation stops counting; full-line comments
+# only (#244 h W6 residual).
+_dha_n="$(sed 's/^[[:space:]]*#.*$//' "$HOSTSSH" | grep -cF '"$dha_bin" hostname' || true)"
+check "fix c M1: no bare ddev-hosts invocation remains outside the helper (invocation sites: $_dha_n of 2)" \
+    [ "$_dha_n" = 2 ]
 check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
     sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
 check "fix d M1: empty-dir refusal precedes the absolutization (guard hoisted)" \
@@ -1549,8 +1558,9 @@ check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # stop counting; full-line comments only (#244 h W6 residual).
-check "config.sh: refresh + projects add + handover re-stamp" \
-    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "ddev_handover_stamp_write" || true)" -ge 3 ]' _ "$CONFIG"
+_stampw_n="$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" | grep -c "ddev_handover_stamp_write" || true)"
+check "config.sh: refresh + projects add + handover re-stamp (stamp sites: $_stampw_n, need >=3)" \
+    [ "$_stampw_n" -ge 3 ]
 check "handover.sh: stamp dir defaults to /etc/opencode-permissions-kit/handover" \
     sh -c "grep -qF 'OPK_HANDOVER_STAMP_DIR:-/etc/opencode-permissions-kit/handover' \"\$1\"" _ "$HANDOVER"
 check "handover.sh: stamp stubs fail open (valid=1) when the lib is missing" \
@@ -1571,8 +1581,9 @@ check "install.sh defaults to dev-owned (DDEV_DEV_OWNED=true)" \
     sh -c "grep -qF 'DDEV_DEV_OWNED=true' \"\$1\"" _ "$INSTALL"
 check "install.sh stamps DDEV_DEV_OWNED into install.conf" \
     sh -c "grep -qF 'DDEV_DEV_OWNED=\$DDEV_DEV_OWNED' \"\$1\"" _ "$INSTALL"
-check "install.sh asks the ddev-settings question (standard + advanced)" \
-    sh -c "[ \"\$(sed 's/^[[:space:]]*#.*\$//' \"\$1\" | grep -c 'ddev settings management? (dev-owned projects)' || true)\" -ge 2 ]" _ "$INSTALL"
+_dsetq_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c 'ddev settings management? (dev-owned projects)' || true)"
+check "install.sh asks the ddev-settings question (standard + advanced; question sites: $_dsetq_n, need >=2)" \
+    [ "$_dsetq_n" -ge 2 ]
 check "status.sh reports the ddev settings mode" \
     sh -c "grep -q 'ddev settings' \"\$1\"" _ "$STATUS"
 check "hook hint mentions the dev-owned effect" \
