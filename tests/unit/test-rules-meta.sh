@@ -482,7 +482,8 @@ expect_block "inv9 glued amended-token is not an event" \
     "no amendment log line of that date"
 
 # 9p. approval free text mentioning "amended" stays an approval event
-#     (the keyword guard; without it this meta would re-queue)
+#     (the call-site dispatch classifies approved-by-maintainer lines
+#     before the amendment scan ever runs on them)
 new_scratch n9p
 approve_probe '\nreviewed: 2026-10-16'
 printf '%s\n' \
