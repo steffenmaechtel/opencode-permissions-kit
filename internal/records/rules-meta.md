@@ -32,7 +32,7 @@ holds.
 | 3 | ID format | `RM-NNNN` — 4 digits zero-padded, globally sequential, never recycled or renumbered (RM-0022) |
 | 4 | Reference syntax | `(RM-NNNN)` at the bullet's end; no dates or history inline in rule files (RM-0023) |
 | 5 | Storage | `internal/rules-meta/N/N/N/` — three one-digit levels, 10 entries max per node (RM-0024) |
-| 6 | Index & report | **both**: committed `INDEX.md` regenerated per audit run + the audit's stdout report (RM-0025) |
+| 6 | Index & report | **both**: `INDEX.md` regenerated per audit run (inv 8 skips) + audit stdout report (RM-0025) |
 | 7 | Pilot scope | `agent/` (4 files) + `AGENTS.md ## Rules` from the start |
 | 8 | Language | English — repo rule: all content is English (RM-0026) |
 | 9 | Rule prose | rule-bearing paragraphs are rewritten as list items — paragraphs stay narrative/lookup (RM-0045) |
@@ -132,8 +132,9 @@ a bulk session, not one-off touches).
 6. Frontmatter complete, ISO dates, `next-revisit` ≥ `created`.
 7. Report (non-blocking): overdue list, sorted by lateness.
 8. `INDEX.md` is regenerated on every run, except when the meta walk
-   reported `[meta-tree]` errors — regeneration is skipped so a
-   blocked run never writes a truncated INDEX (#232).
+   reported `[meta-tree]` errors (skip, so a blocked run never writes
+   a truncated INDEX, #232) or python3/gen-rules-index.py is
+   unavailable (skip with a warning, non-blocking).
 9. Approval consistency: `reviewed:` is set exactly when the review
    log carries an `approved by maintainer` entry of the same date —
    absent field with approval line, or field without line, both fail
