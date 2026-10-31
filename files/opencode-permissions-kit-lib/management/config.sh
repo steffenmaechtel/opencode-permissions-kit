@@ -817,6 +817,33 @@ refresh() {
 # "operation not permitted" on a freshly cloned project; the ddev()
 # shell hook (ddev-terminal.sh) prints this exact command when it
 # detects the bootstrap case.
+#
+# Tail note for the repair itself (issue #312): both supported backends
+# are rootless — container root maps to the opencode user, and the
+# developer's uid is NOT mapped into the container's user namespace. The
+# sharing group covers data writes; explicit metadata operations (futime/
+# utimensat, chmod, chown) additionally need the file OWNER. Container
+# tooling that restores metadata (gulp/vinyl-fs dest, rsync -t, cp -p,
+# tar -xpf) aborts with EPERM on developer-owned outputs after the data
+# write already succeeded — the next thing `opk config handover` users hit
+# (the #312 sequence: handover me + config handover, then the frontend
+# build failed). One pointer after the repair; the full entry and the
+# direction rule live in docs/troubleshooting.md and the handover section
+# of docs/reference/cli.md. Silent for unknown/empty/legacy backend values
+# — a non-rootless daemon has no unmapped-uid class and the note would be
+# wrong there.
+_handover_rootless_hint() {
+    case "${CONTAINER_BACKEND:-}" in
+        docker-rootless | podman-rootless)
+            ui_detail "rootless backend ($CONTAINER_BACKEND): container tooling that restores file"
+            ui_detail "metadata (gulp dest, rsync -t, cp -p, tar -xpf) needs the file owner to be"
+            ui_detail "$OPENCODE_USER — on developer-owned outputs it fails with 'EPERM ... futime'"
+            ui_detail "or EPERM on chmod/chown AFTER the data write already went through."
+            ui_detail "affected tree? sudo opk handover opencode <container-written tree>"
+            ui_detail "details: docs/troubleshooting.md ('EPERM ... futime' entry)"
+            ;;
+    esac
+}
 handover() {
     [ -z "$TARGETS" ] && die "Usage: config.sh handover <path...>"
     for p in $TARGETS; do
@@ -836,6 +863,7 @@ handover() {
         ui_success "handover applied to $p"
         log "ddev handover: $p"
     done
+    _handover_rootless_hint
 }
 
 # --- ddev-settings (dev-owned mode) ----------------------------------------------

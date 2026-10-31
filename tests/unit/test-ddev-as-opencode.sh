@@ -93,15 +93,41 @@ TMPDIR=$(mktemp -d)
 # set -e abort inside the window leaked them. Function form: the
 # receiver list is far too long for one line; unset-safe operands skip
 # cleanly (several receivers are created inside conditionals).
+# HRH joined with the sweep finds VN + BS1 (same shape, pre-existing —
+# #314 a F4's class sweep); the receiver-completeness probe below keeps
+# the list honest from here on.
 _trap_cleanup() {
     rm -rf "${TMPDIR:-}" "${WF:-}" "${SH_STUB:-}" "${SH:-}" \
         "${DF_STUB:-}" "${DF:-}" "${DFW:-}" "${CONF:-}" "${VCHAIN:-}" \
-        "${HWORK:-}" "${BH:-}" "${DFH:-}" "${DFH2:-}" "${RN:-}" \
-        "${DWORK:-}" "${RACE:-}" "${RACESTUB:-}" "${RACESP:-}" \
-        "${RACESPS:-}" "${RACEC:-}" "${RACECT:-}" "${RACEF:-}" \
-        "${RACEFT:-}" "${_112_dir:-}"
+        "${HWORK:-}" "${HRH:-}" "${BH:-}" "${DFH:-}" "${DFH2:-}" \
+        "${RN:-}" "${VN:-}" "${BS1:-}" "${DWORK:-}" "${RACE:-}" \
+        "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
+        "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}"
 }
 trap _trap_cleanup EXIT INT TERM
+
+# --- receiver completeness (#314 a F4): every mktemp receiver of this
+# suite file must appear in _trap_cleanup's rm -rf list in the unset-safe
+# "${VAR:-}" form — an unlisted receiver leaks its scratch dir on every
+# abort (the #283 leak class). Self-referential: the probe greps THIS
+# file, so a future mktemp whose receiver never reaches the list goes red
+# right here, before any test section runs. Indented receivers (BS1's
+# conditional-creation shape) are covered by the leading-space-tolerant
+# pattern — that shape is exactly the sibling the manual sweeps missed.
+_opk_recv_check() {
+    _orc_list=$(awk '/^_trap_cleanup\(\)/,/^}/' "$1")
+    _orc_rc=0
+    for _orc_v in $(grep -oE '^[[:space:]]*[A-Za-z_0-9]+=\$\(mktemp' "$1" | cut -d= -f1 | sort -u); do
+        _orc_pat=$(printf '"${%s:-}"' "$_orc_v")
+        printf '%s' "$_orc_list" | grep -qF "$_orc_pat" || {
+            echo "  receiver completeness: $_orc_v is a mktemp receiver but missing from _trap_cleanup (add it to the rm -rf list)" >&2
+            _orc_rc=1
+        }
+    done
+    return "$_orc_rc"
+}
+check "trap cleanup lists every mktemp receiver (receiver completeness)" \
+    _opk_recv_check "$(readlink -f "$0")"
 
 echo ""
 echo "ddev-as-opencode Tests (DDEV-WORKING §7)"
@@ -698,6 +724,41 @@ check "config.sh header documents the handover usage" \
     sh -c "grep -q 'config.sh handover' \"\$1\"" _ "$CONFIG"
 check "kit CLI usage documents the handover command" \
     sh -c "grep -q 'handover <path...>' \"\$1\"" _ "$KIT"
+
+# --- 7c-2. config.sh handover tail note: rootless metadata ownership (#312) -------
+# Functional (7b extraction pattern): the note must fire for BOTH rootless
+# backends and stay silent for unknown/empty/legacy values — a non-rootless
+# daemon has no unmapped-uid class, and the note would be wrong there.
+# ui_detail is stubbed to pass text through; OPENCODE_USER is pinned to
+# config.sh's install.conf default. CONTAINER_BACKEND feeds the case arm
+# via the environment, so no INSTALL_CONF fixture is needed.
+HRH=$(mktemp -d)
+awk '/^_handover_rootless_hint\(\)/,/^}/' "$CONFIG" >"$HRH/fn.sh"
+_hrh() {
+    CONTAINER_BACKEND="$1" OPENCODE_USER=opencode sh -c '
+        ui_detail() { printf "%s\n" "$1"; }
+        . "$1/fn.sh" && _handover_rootless_hint
+    ' _ "$HRH"
+}
+HRH_DR=$(_hrh docker-rootless)
+HRH_PR=$(_hrh podman-rootless)
+HRH_DOCKER=$(_hrh docker)
+HRH_EMPTY=$(_hrh "")
+check "tail note fires on docker-rootless and names the EPERM symptom" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF \"EPERM ... futime\"" _ "$HRH_DR"
+check "tail note fires on podman-rootless too (both rootless backends)" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF \"EPERM ... futime\"" _ "$HRH_PR"
+check "tail note names the ready-made fix command" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'sudo opk handover opencode'" _ "$HRH_DR"
+check "tail note points at the troubleshooting entry" \
+    sh -c "printf '%s\n' \"\$1\" | grep -qF 'docs/troubleshooting.md'" _ "$HRH_DR"
+check "tail note stays silent for a non-rootless backend value" \
+    sh -c "! printf '%s\n' \"\$1\" | grep -qF 'EPERM ... futime'" _ "$HRH_DOCKER"
+check "tail note stays silent for an empty backend value" \
+    sh -c "! printf '%s\n' \"\$1\" | grep -qF 'EPERM ... futime'" _ "$HRH_EMPTY"
+check "config.sh handover wires the tail note after the repair loop" \
+    sh -c "awk '/^handover\(\)/,/^}/' \"\$1\" | grep -q '_handover_rootless_hint'" _ "$CONFIG"
+rm -rf "${HRH:?}"
 
 # --- 7d. ddev() hook: typo3 bootstrap hint ----------------------------------------
 # Fresh clone + type typo3 + undetected + root not opencode-owned => ddev

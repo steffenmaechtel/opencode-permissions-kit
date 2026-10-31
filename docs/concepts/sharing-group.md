@@ -52,6 +52,26 @@ credentials) remains guarded by the soft deny — see
   [the wrapper](wrapper.md#wrapper-bypass-guard-detect-then-warn-loudly)
   for why that is acceptable.
 
+## What group access does not cover
+
+Group-write makes **data** edits possible in both directions: the agent
+can overwrite the contents of your files, and you can overwrite the
+agent's. Operations that change file **metadata** — explicit timestamps
+(`touch -d`, `rsync -t`), `chmod`, `chown` — are owner-only on Linux, and
+no group bit changes that.
+
+Under the rootless container backend the boundary becomes visible: the
+container's root *is* the `opencode` user uid-wise, while your files'
+owner (you) is not mapped into the container's user namespace at all.
+Container tooling that preserves or restores metadata (gulp/vinyl-fs
+`dest`, `cp -p`, `rsync -t`, `tar -xpf`) therefore fails with `EPERM` on
+developer-owned outputs even though the data write just succeeded. The
+rule of thumb: **ownership follows the writer** — a tree container
+processes write into belongs to the agent user (`sudo opk handover
+opencode <tree>`), a tree you write belongs to you (`opk handover me
+<tree>`). Failure modes and fixes:
+[troubleshooting](../troubleshooting.md).
+
 ## Re-applying the baseline
 
 If group bits drift (e.g. after unpacking an archive as root), re-apply:

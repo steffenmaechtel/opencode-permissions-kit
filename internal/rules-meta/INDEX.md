@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**129 metas · 126 active · 3 retired · 13 review-pending · next due 2026-11-14**
+**130 metas · 127 active · 3 retired · 14 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129
+- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130
 - **Overdue:** none
 
 ## AGENTS.md
@@ -192,6 +192,12 @@
 | [RM-0078](0/0/7/RM-0078.md) | Record the environment in | active | approved | 1m | 2026-11-19 |
 | [RM-0079](0/0/7/RM-0079.md) | A disposition claim | active | approved | 1m | 2026-11-19 |
 | [RM-0113](0/1/1/RM-0113.md) | The debt's due date splits | active | approved | 1m | 2026-11-22 |
+
+### Review focus: shipped code first, pins at a floor
+
+| Meta | Rule | Status | Review | Cycle | Next revisit |
+|---|---|---|---|---|---|
+| [RM-0130](0/1/3/RM-0130.md) | Shipped code is the primary scrutiny target | active | **pending** | 1m | 2026-11-30 |
 
 ### Parallel reviewer agents
 
