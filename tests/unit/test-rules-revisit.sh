@@ -956,6 +956,86 @@ else
     fail "R14 dated-first duplicate: expected queue=0, got rc=$RC: $OUT"
 fi
 
+# R15. #333 amendment re-queue agreement: an approved-then-amended meta
+#      is pending EVERYWHERE and legal in the audit -- the report's
+#      approval queue lists it with its amendment date (marked as a
+#      re-approval, distinct from a first review), the regenerated
+#      INDEX renders the row **amended — pending** (never 'approved'),
+#      the header count and both Actionable bullets carry it, and the
+#      audit stays green (the field pairs with the amendment log
+#      line). Contrast arms: a plain approved meta stays out of the
+#      queue; a never-approved meta lists unmarked.
+ASCRATCH=$WORK/amended$$
+mkdir -p "$ASCRATCH/scripts" "$ASCRATCH/agent" "$ASCRATCH/internal/records" \
+    "$ASCRATCH/internal/rules-meta"
+cp "$REPO_ROOT/scripts/gen-rules-index.py" "$ASCRATCH/scripts/"
+cat >"$ASCRATCH/agent/conventions.md" <<'EOF'
+# Conventions
+
+## Interactive prompts (y/n)
+
+- Demo rule RM-9007 body text. (RM-9007)
+- Demo rule RM-9009 body text. (RM-9009)
+EOF
+: >"$ASCRATCH/agent/test-fidelity.md"
+: >"$ASCRATCH/agent/review-concept.md"
+: >"$ASCRATCH/AGENTS.md"
+cat >"$ASCRATCH/internal/records/rules-meta.md" <<'EOF'
+# Record
+
+## Revisit ladder
+
+- Demo rule RM-9008 body text. (RM-9008)
+EOF
+write_meta "$ASCRATCH" RM-9007 active 1m 2026-11-16 2026-05-01
+write_meta "$ASCRATCH" RM-9008 active 1m 2026-11-16 - \
+    internal/records/rules-meta.md#revisit-ladder
+write_meta "$ASCRATCH" RM-9009 active 1m 2026-11-16 2026-05-01
+# write_meta always appends an approval log line; the never-approved
+# contrast meta must not carry one (the audit's inv 9 would block it)
+sed -i '/^- 2026-05-01 approved by maintainer (direct chat review)\.$/d' \
+    "$(meta_path "$ASCRATCH" RM-9008)"
+AM9=$(meta_path "$ASCRATCH" RM-9009)
+sed -i 's/^reviewed: 2026-05-01$/reviewed: 2026-05-01\namended: 2026-06-01/' "$AM9"
+printf '%s\n' \
+    '- 2026-06-01 amended — scratch amendment; maintainer review pending.' \
+    >>"$AM9"
+SCRATCH=$ASCRATCH
+T=2026-10-22
+run_report
+AAOUT=$(RM_AUDIT_ROOT="$ASCRATCH" FORCE_TODAY=2026-10-22 \
+    sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+AARC=$?
+AIDX=$ASCRATCH/internal/rules-meta/INDEX.md
+AROW7=$(grep '| \[RM-9007\]' "$AIDX" | head -1)
+AROW8=$(grep '| \[RM-9008\]' "$AIDX" | head -1)
+AROW9=$(grep '| \[RM-9009\]' "$AIDX" | head -1)
+AHEAD=$(grep '· [0-9]* review-pending' "$AIDX" | head -1)
+ABULP=$(grep '^- \*\*Review pending:\*\*' "$AIDX" | head -1)
+ABULA=$(grep '^- \*\*Amended — pending:\*\*' "$AIDX" | head -1)
+AQUEUE=$(printf '%s\n' "$OUT" | sed -n '/^review-pending/,/^next due/p')
+case "$AROW9" in *'| **amended — pending** |'*) _r9_ok=1 ;; *) _r9_ok=0 ;; esac
+case "$AROW7" in *'| approved |'*) _r7_ok=1 ;; *) _r7_ok=0 ;; esac
+case "$AROW8" in *'| **pending** |'*) _r8_ok=1 ;; *) _r8_ok=0 ;; esac
+case "$AHEAD" in *'· 2 review-pending ·'*) _ah_ok=1 ;; *) _ah_ok=0 ;; esac
+case "$ABULP" in *RM-9008*) case "$ABULP" in *RM-9009*) _bp_ok=0 ;; *) _bp_ok=1 ;; esac ;;
+*) _bp_ok=0 ;;
+esac
+case "$ABULA" in *'RM-9009 (2026-06-01)'*) _ba_ok=1 ;; *) _ba_ok=0 ;; esac
+if [ "$RC" -eq 0 ] &&
+    out_line_is "$OUT" "review-pending (approval queue): 2" &&
+    out_line_is "$OUT" "  RM-9009 (amended 2026-06-01 -- re-approval)" &&
+    out_line_is "$OUT" "  RM-9008" &&
+    ! out_line_is "$OUT" "  RM-9007" &&
+    ! contains "$AQUEUE" "RM-9007" &&
+    [ "$AARC" -eq 0 ] && contains "$AAOUT" "0 blocking" &&
+    [ "$_r9_ok" = 1 ] && [ "$_r7_ok" = 1 ] && [ "$_r8_ok" = 1 ] &&
+    [ "$_ah_ok" = 1 ] && [ "$_bp_ok" = 1 ] && [ "$_ba_ok" = 1 ]; then
+    pass
+else
+    fail "R15 amended agreement: report rc=$RC audit rc=$AARC row9=$_r9_ok row7=$_r7_ok row8=$_r8_ok hdr=$_ah_ok bulp=$_bp_ok bula=$_ba_ok: $AAOUT"
+fi
+
 if [ -s "$FAILS" ]; then
     printf 'rules-revisit pins: FAILED\n'
     cat "$FAILS"

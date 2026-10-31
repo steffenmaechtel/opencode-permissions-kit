@@ -25,7 +25,12 @@
 #   9. approval consistency: reviewed: is set exactly when the review
 #      log carries an "approved by maintainer" line of the same date;
 #      a bare "reviewed:" line (key without a value) blocks -- approval
-#      membership is key-presence-with-value (#233)
+#      membership is key-presence-with-value (#233). Amendment state
+#      (#333): an approved meta whose newest state event is an
+#      amendment must carry amended: <date> paired with an amendment
+#      log line of that date -- the order-aware last event decides
+#      same-day ties (approve-then-amend re-queues, amend-then-approve
+#      is the fresh approval). Never-approved metas carry no amended:.
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):
 # 7. overdue list sorted by lateness; 8. INDEX.md regenerated on every
@@ -66,7 +71,7 @@ ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-review-findin
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/conventions.md#referencing-house-rules-rm-keys"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#revisit-ladder"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#the-main-rule"
-ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#meta-format-v11"
+ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#meta-format-v12"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS internal/records/rules-meta.md#open-defaults-the-pilot-validates-them"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#3-terminology-test-doubles-and-fidelity"
 ACTIVE_SECTIONS="$ACTIVE_SECTIONS agent/test-fidelity.md#4-patterns-that-close-the-gaps"
@@ -289,8 +294,13 @@ while IFS= read -r m; do
     fi
     created=$(fm_get "$m" created)
     nrev=$(fm_get "$m" next-revisit)
+    amended=$(fm_get "$m" amended)
     date_ok "$created" || block 6 "$rel -- created not an ISO date: '$created'"
     date_ok "$nrev" || block 6 "$rel -- next-revisit not an ISO date: '$nrev'"
+    if [ -n "$amended" ]; then
+        date_ok "$amended" ||
+            block 6 "$rel -- amended not an ISO date: '$amended'"
+    fi
     if date_ok "$created" && date_ok "$nrev"; then
         iso_lt "$nrev" "$created" && block 6 "$rel -- next-revisit $nrev before created $created"
     fi
@@ -344,6 +354,36 @@ while IFS= read -r m; do
             grep -oE "^- [0-9]{4}-[0-9]{2}-[0-9]{2} approved by maintainer" |
             head -1 | sed 's/^- //; s/ .*//')
         [ -n "$logdate" ] && block 9 "$rel -- approval log line '$logdate' but no reviewed field"
+    fi
+
+    # 9 (#333): the amendment state machine -- order-aware on the log,
+    # because dates cannot decide same-day ties. The last state event
+    # (approval or amendment line) is what the frontmatter must express:
+    # an amendment in that spot on an approved meta requires an amended:
+    # field of that date; any later approval makes the field stale.
+    lastev=$(sed -n '/^## Review log/,$p' "$m" | awk '
+        /^- [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] (approved by maintainer|amended)/ {
+            last = ($3 == "approved" ? "approved " $2 : "amended " $2)
+        }
+        END { if (last != "") print last }
+    ')
+    if [ -n "$amended" ]; then
+        if date_ok "$amended"; then
+            if [ -z "$reviewed" ]; then
+                block 9 "$rel -- amended '$amended' but no approval before it (amended: is amendment-after-approval only)"
+            elif ! sed -n '/^## Review log/,$p' "$m" |
+                grep -qE "^- $amended amended"; then
+                block 9 "$rel -- amended '$amended' but no amendment log line of that date"
+            elif [ "$lastev" != "amended $amended" ]; then
+                block 9 "$rel -- stale amended '$amended': newest state event is ${lastev:-none}"
+            fi
+        fi
+    elif [ -n "$reviewed" ]; then
+        case $lastev in
+            amended*)
+                block 9 "$rel -- amended after approval (${lastev#amended }) but no amended: field (renders approved while re-approval is pending, #333)"
+                ;;
+        esac
     fi
 done <"$METALIST"
 

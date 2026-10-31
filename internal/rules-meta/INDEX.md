@@ -6,11 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**134 metas · 131 active · 3 retired · 18 review-pending · next due 2026-11-14**
+**135 metas · 132 active · 3 retired · 21 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0131, RM-0132, RM-0133, RM-0134
+- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0131, RM-0132, RM-0133, RM-0134, RM-0135
+- **Amended — pending:** RM-0067 (2026-10-31), RM-0087 (2026-10-31)
 - **Overdue:** none
 
 ## AGENTS.md
@@ -116,7 +117,7 @@
 | [RM-0064](0/0/6/RM-0064.md) | Stop when a round leaves | active | approved | 1m | 2026-11-19 |
 | [RM-0065](0/0/6/RM-0065.md) | Review-relevant is everything that has | active | approved | 1m | 2026-11-19 |
 | [RM-0066](0/0/6/RM-0066.md) | A round whose fixes stay | active | approved | 1m | 2026-11-19 |
-| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | approved | 1m | 2026-11-19 |
+| [RM-0067](0/0/6/RM-0067.md) | Any round whose fixes touch | active | **amended — pending** | 1m | 2026-11-19 |
 | [RM-0068](0/0/6/RM-0068.md) | If a chain has not converged | retired | approved | 1m | 2026-11-19 |
 | [RM-0106](0/1/0/RM-0106.md) | A round's disposition covers ALL | active | approved | 1m | 2026-11-22 |
 | [RM-0107](0/1/0/RM-0107.md) | The cadence authority is | active | approved | 1m | 2026-11-28 |
@@ -219,7 +220,7 @@
 | [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-11-19 |
 | [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | approved | 1m | 2026-11-19 |
 | [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | approved | 1m | 2026-11-19 |
-| [RM-0087](0/0/8/RM-0087.md) | Wave reviews (diff scope): | active | approved | 1m | 2026-11-19 |
+| [RM-0087](0/0/8/RM-0087.md) | Wave reviews (diff scope): | active | **amended — pending** | 1m | 2026-11-19 |
 | [RM-0088](0/0/8/RM-0088.md) | Full-scope passes: ~15 minutes | active | approved | 1m | 2026-11-19 |
 | [RM-0089](0/0/8/RM-0089.md) | Release-critical full passes: prefer | active | approved | 1m | 2026-11-19 |
 | [RM-0090](0/0/9/RM-0090.md) | Final chat answers are | active | approved | 1m | 2026-11-28 |
@@ -289,7 +290,7 @@
 | [RM-0046](0/0/4/RM-0046.md) | out of meta scope: rationale = | active | approved | 1m | 2026-11-17 |
 | [RM-0056](0/0/5/RM-0056.md) | the rule plus a one-line why; | active | approved | 1m | 2026-11-18 |
 
-### Meta format v1.1
+### Meta format v1.2
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
@@ -297,6 +298,7 @@
 | [RM-0035](0/0/3/RM-0035.md) | Examples use the abstract token | active | approved | 1m | 2026-11-15 |
 | [RM-0093](0/0/9/RM-0093.md) | In meta bodies, cross-references | active | approved | 1m | 2026-11-19 |
 | [RM-0094](0/0/9/RM-0094.md) | The review log names the | active | approved | 1m | 2026-11-19 |
+| [RM-0135](0/1/3/RM-0135.md) | Post-approval changes set | active | **pending** | 1m | 2026-11-30 |
 
 ### Quality bar for rationales
 
