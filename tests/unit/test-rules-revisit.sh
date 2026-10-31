@@ -736,7 +736,7 @@ case "$BROW4" in *'| approved |'*) _b4_ok=1 ;; *) _b4_ok=0 ;; esac
 case "$BHEAD" in *'· 1 review-pending ·'*) _bh_ok=1 ;; *) _bh_ok=0 ;; esac
 case "$BBUL" in *RM-9003*) _bb_ok=1 ;; *) _bb_ok=0 ;; esac
 if [ "$RC" -eq 0 ] && [ "$BQ" = "1" ] && contains "$OUT" "RM-9003" &&
-    [ "$BARC" -eq 1 ] && contains "$BAOUT" "bare 'reviewed:'" &&
+    [ "$BARC" -eq 1 ] && contains "$BAOUT" "bare 'reviewed:' line (key without a value)" &&
     [ "$_b3_ok" = 1 ] && [ "$_b4_ok" = 1 ] && [ "$_bh_ok" = 1 ] &&
     [ "$_bb_ok" = 1 ]; then
     pass
@@ -744,7 +744,7 @@ else
     fail "V21 bare reviewed agreement: report rc=$RC queue=$BQ audit rc=$BARC index3=$_b3_ok index4=$_b4_ok hdr=$_bh_ok bul=$_bb_ok: $BAOUT"
 fi
 
-# V22. #317 a F2: paired quotes normalize in ALL three extractors --
+# V22. #317 a F2: paired quotes normalize in ALL FOUR extractors --
 #      a quoted-empty reviewed: ("") is pending everywhere (report
 #      queue, INDEX; the audit reads it as absent and blocks on the
 #      template log line), and a quoted date ('2026-05-01') strips to
@@ -776,6 +776,12 @@ write_meta "$QSCRATCH" RM-9006 active 1m 2026-11-16 2026-05-01 \
 sed -i 's/^reviewed: $/reviewed: ""/' "$(meta_path "$QSCRATCH" RM-9005)"
 sed -i "s/^reviewed: 2026-05-01\$/reviewed: '2026-05-01'/" \
     "$(meta_path "$QSCRATCH" RM-9006)"
+# #317 b B4: assert the quoted-date rewrite actually applied -- a
+# write_meta shape drift turns the sed into a silent no-op and drops
+# the audit single-quote arm's only coverage.
+case "$(sed -n "s/^reviewed: //p" "$(meta_path "$QSCRATCH" RM-9006)")" in
+    "'2026-05-01'") _qfix_ok=1 ;; *) _qfix_ok=0 ;;
+esac
 SCRATCH=$QSCRATCH
 T=2026-10-22
 run_report
@@ -795,11 +801,33 @@ case "$QBUL" in *RM-9005*) _qb_ok=1 ;; *) _qb_ok=0 ;; esac
 if [ "$RC" -eq 0 ] && [ "$QQ" = "1" ] && contains "$OUT" "RM-9005" &&
     [ "$QARC" -eq 1 ] &&
     contains "$QAOUT" "no reviewed field" && ! contains "$QAOUT" "RM-9006" &&
+    [ "$_qfix_ok" = 1 ] &&
     [ "$_q5_ok" = 1 ] && [ "$_q6_ok" = 1 ] && [ "$_qh_ok" = 1 ] &&
     [ "$_qb_ok" = 1 ]; then
     pass
 else
-    fail "V22 quoted reviewed agreement: report rc=$RC queue=$QQ audit rc=$QARC row5=$_q5_ok row6=$_q6_ok hdr=$_qh_ok bul=$_qb_ok: $QAOUT"
+    fail "V22 quoted reviewed agreement: report rc=$RC queue=$QQ audit rc=$QARC fix=$_qfix_ok row5=$_q5_ok row6=$_q6_ok hdr=$_qh_ok bul=$_qb_ok: $QAOUT"
+fi
+
+# V23. #317 b B1: paired quotes normalize in the fourth extractor too
+#      (rules-revisit.sh fm) -- a quoted status/revisit-interval hand
+#      edit reaches the ladder like its bare twin instead of dying as
+#      "bad status '\"active\"' (run the audit)" while the audit, the
+#      report and the INDEX all accept the same meta.
+one_scratch 1m 2026-06-01 v23
+QFM=$(meta_path "$VSCRATCH" RM-9001)
+sed -i 's/^status: active$/status: "active"/' "$QFM"
+sed -i "s/^revisit-interval: 1m\$/revisit-interval: '1m'/" "$QFM"
+SCRATCH=$VSCRATCH
+T=2026-06-15
+run_revisit RM-9001 clean "quoted values normalize"
+if [ "$RC" -eq 0 ] && contains "$OUT" "RM-9001: clean" &&
+    contains "$OUT" "1m -> 6m" && contains "$OUT" "next-revisit 2026-12-15" &&
+    line_is "$QFM" "revisit-interval: 6m" &&
+    line_is "$QFM" "next-revisit: 2026-12-15"; then
+    pass
+else
+    fail "V23 quoted frontmatter: expected clean ladder despite quoted values, rc=$RC: $OUT"
 fi
 
 # ------------------------------------------------------------- summary

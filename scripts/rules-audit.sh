@@ -22,7 +22,7 @@
 #      status/interval vocabulary
 #   9. approval consistency: reviewed: is set exactly when the review
 #      log carries an "approved by maintainer" line of the same date;
-#      a bare "reviewed:" line (key without a date) blocks -- approval
+#      a bare "reviewed:" line (key without a value) blocks -- approval
 #      membership is key-presence-with-value (#233)
 #
 # Report-only (non-blocking -- overdue is a maintenance signal):

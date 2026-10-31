@@ -230,7 +230,7 @@ expect_block "inv9 line without field" "[inv9]"
 #     line must not count as approved anywhere (report queue, INDEX)
 new_scratch n9c
 sed -i 's/^status: active/status: active\nreviewed:/' "$(meta_file RM-9001)"
-expect_block "inv9 bare reviewed line blocks" "bare 'reviewed:'"
+expect_block "inv9 bare reviewed line blocks" "bare 'reviewed:' line (key without a value)"
 
 # 7. overdue is report-only
 new_scratch n7
