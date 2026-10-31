@@ -93,8 +93,11 @@ b3=$(printf '%s' "$digs" | cut -c3)
 META=$ROOT/$METAS/$b1/$b2/$b3/$ID.md
 [ -f "$META" ] || refuse "no meta $ID at $METAS/$b1/$b2/$b3/$ID.md"
 
-fm() { # frontmatter value of $1 ('' when absent)
-    sed -n '2,/^---$/p' "$META" | sed -n "s/^$1:[[:space:]]*//p" | head -1
+fm() { # frontmatter value of $1 ('' when absent; ONE paired quote
+    # layer stripped, same normalization as the other three
+    # extractors, #317 d D1)
+    sed -n '2,/^---$/p' "$META" | sed -n "s/^$1:[[:space:]]*//p" | head -1 |
+        sed "s/^\([\"']\)\(.*\)\1$/\2/"
 }
 st=$(fm status)
 iv=$(fm revisit-interval)

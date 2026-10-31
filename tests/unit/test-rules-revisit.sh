@@ -683,6 +683,182 @@ else
     fail "V20 missing status: expected rc=2 + untouched meta, got rc=$RC: $OUT"
 fi
 
+# V21. #233 cross-artifact agreement on a bare 'reviewed:' line (key
+#      present, no date -- the hand-edit slip): the meta counts as
+#      PENDING everywhere -- the report's approval queue lists it, the
+#      regenerated INDEX renders it **pending** (never 'approved'),
+#      and the audit blocks the malformed line (inv 9).
+BSCRATCH=$WORK/bare$$
+mkdir -p "$BSCRATCH/scripts" "$BSCRATCH/agent" "$BSCRATCH/internal/records" \
+    "$BSCRATCH/internal/rules-meta"
+cp "$REPO_ROOT/scripts/gen-rules-index.py" "$BSCRATCH/scripts/"
+cat >"$BSCRATCH/agent/conventions.md" <<'EOF'
+# Conventions
+
+## Interactive prompts (y/n)
+
+- Demo rule RM-9003 body text. (RM-9003)
+EOF
+: >"$BSCRATCH/agent/test-fidelity.md"
+: >"$BSCRATCH/agent/review-concept.md"
+: >"$BSCRATCH/AGENTS.md"
+cat >"$BSCRATCH/internal/records/rules-meta.md" <<'EOF'
+# Record
+
+## Revisit ladder
+
+- Demo rule RM-9004 body text. (RM-9004)
+EOF
+# RM-9003: the bare line (write_meta '' emits 'reviewed: ' with a
+# trailing space; normalized to the exact bare form). RM-9004: a
+# regular approved meta -- the contrast that makes the pin discriminate.
+write_meta "$BSCRATCH" RM-9003 active 1m 2026-11-16 ""
+write_meta "$BSCRATCH" RM-9004 active 1m 2026-11-16 2026-05-01 \
+    internal/records/rules-meta.md#revisit-ladder
+sed -i 's/^reviewed: $/reviewed:/' "$(meta_path "$BSCRATCH" RM-9003)"
+SCRATCH=$BSCRATCH
+T=2026-10-22
+run_report
+BAOUT=$(RM_AUDIT_ROOT="$BSCRATCH" FORCE_TODAY=2026-10-22 \
+    sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+BARC=$?
+BROW=$(grep '| \[RM-9003\]' "$BSCRATCH/internal/rules-meta/INDEX.md" | head -1)
+BROW4=$(grep '| \[RM-9004\]' "$BSCRATCH/internal/rules-meta/INDEX.md" | head -1)
+BHEAD=$(grep '· [0-9]* review-pending' "$BSCRATCH/internal/rules-meta/INDEX.md" |
+    head -1)
+BBUL=$(grep '^- \*\*Review pending:\*\*' \
+    "$BSCRATCH/internal/rules-meta/INDEX.md" | head -1)
+BQ=$(printf '%s\n' "$OUT" | sed -n 's/^review-pending (approval queue): //p')
+case "$BROW" in *'**pending**'*) _b3_ok=1 ;; *) _b3_ok=0 ;; esac
+case "$BROW4" in *'| approved |'*) _b4_ok=1 ;; *) _b4_ok=0 ;; esac
+# #317 a F1: the pending LIST feeds the header count and the bullet --
+# a regression confined to that list site must redden here too.
+case "$BHEAD" in *'· 1 review-pending ·'*) _bh_ok=1 ;; *) _bh_ok=0 ;; esac
+case "$BBUL" in *RM-9003*) _bb_ok=1 ;; *) _bb_ok=0 ;; esac
+if [ "$RC" -eq 0 ] && [ "$BQ" = "1" ] && contains "$OUT" "RM-9003" &&
+    [ "$BARC" -eq 1 ] && contains "$BAOUT" "bare 'reviewed:' line (key without a value)" &&
+    [ "$_b3_ok" = 1 ] && [ "$_b4_ok" = 1 ] && [ "$_bh_ok" = 1 ] &&
+    [ "$_bb_ok" = 1 ]; then
+    pass
+else
+    fail "V21 bare reviewed agreement: report rc=$RC queue=$BQ audit rc=$BARC index3=$_b3_ok index4=$_b4_ok hdr=$_bh_ok bul=$_bb_ok: $BAOUT"
+fi
+
+# V22. #317 a F2: paired quotes normalize in ALL FOUR extractors --
+#      a quoted-empty reviewed: ("") is pending everywhere (report
+#      queue, INDEX; the audit reads it as absent and blocks on the
+#      template log line), and a quoted date ('2026-05-01') strips to
+#      the bare date and stays approved everywhere.
+QSCRATCH=$WORK/quoted$$
+mkdir -p "$QSCRATCH/scripts" "$QSCRATCH/agent" "$QSCRATCH/internal/records" \
+    "$QSCRATCH/internal/rules-meta"
+cp "$REPO_ROOT/scripts/gen-rules-index.py" "$QSCRATCH/scripts/"
+cat >"$QSCRATCH/agent/conventions.md" <<'EOF'
+# Conventions
+
+## Interactive prompts (y/n)
+
+- Demo rule RM-9005 body text. (RM-9005)
+EOF
+: >"$QSCRATCH/agent/test-fidelity.md"
+: >"$QSCRATCH/agent/review-concept.md"
+: >"$QSCRATCH/AGENTS.md"
+cat >"$QSCRATCH/internal/records/rules-meta.md" <<'EOF'
+# Record
+
+## Revisit ladder
+
+- Demo rule RM-9006 body text. (RM-9006)
+EOF
+write_meta "$QSCRATCH" RM-9005 active 1m 2026-11-16 ""
+write_meta "$QSCRATCH" RM-9006 active 1m 2026-11-16 2026-05-01 \
+    internal/records/rules-meta.md#revisit-ladder
+sed -i 's/^reviewed: $/reviewed: ""/' "$(meta_path "$QSCRATCH" RM-9005)"
+sed -i "s/^reviewed: 2026-05-01\$/reviewed: '2026-05-01'/" \
+    "$(meta_path "$QSCRATCH" RM-9006)"
+# #317 b B4: assert the quoted-date rewrite actually applied -- a
+# write_meta shape drift turns the sed into a silent no-op and drops
+# the audit single-quote arm's only coverage.
+case "$(sed -n "s/^reviewed: //p" "$(meta_path "$QSCRATCH" RM-9006)")" in
+    "'2026-05-01'") _qfix_ok=1 ;; *) _qfix_ok=0 ;;
+esac
+SCRATCH=$QSCRATCH
+T=2026-10-22
+run_report
+QAOUT=$(RM_AUDIT_ROOT="$QSCRATCH" FORCE_TODAY=2026-10-22 \
+    sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+QARC=$?
+QIDX=$QSCRATCH/internal/rules-meta/INDEX.md
+QROW5=$(grep '| \[RM-9005\]' "$QIDX" | head -1)
+QROW6=$(grep '| \[RM-9006\]' "$QIDX" | head -1)
+QHEAD=$(grep '· [0-9]* review-pending' "$QIDX" | head -1)
+QBUL=$(grep '^- \*\*Review pending:\*\*' "$QIDX" | head -1)
+QQ=$(printf '%s\n' "$OUT" | sed -n 's/^review-pending (approval queue): //p')
+case "$QROW5" in *'**pending**'*) _q5_ok=1 ;; *) _q5_ok=0 ;; esac
+case "$QROW6" in *'| approved |'*) _q6_ok=1 ;; *) _q6_ok=0 ;; esac
+case "$QHEAD" in *'· 1 review-pending ·'*) _qh_ok=1 ;; *) _qh_ok=0 ;; esac
+case "$QBUL" in *RM-9005*) _qb_ok=1 ;; *) _qb_ok=0 ;; esac
+if [ "$RC" -eq 0 ] && [ "$QQ" = "1" ] && contains "$OUT" "RM-9005" &&
+    [ "$QARC" -eq 1 ] &&
+    contains "$QAOUT" "no reviewed field" && ! contains "$QAOUT" "RM-9006" &&
+    [ "$_qfix_ok" = 1 ] &&
+    [ "$_q5_ok" = 1 ] && [ "$_q6_ok" = 1 ] && [ "$_qh_ok" = 1 ] &&
+    [ "$_qb_ok" = 1 ]; then
+    pass
+else
+    fail "V22 quoted reviewed agreement: report rc=$RC queue=$QQ audit rc=$QARC fix=$_qfix_ok row5=$_q5_ok row6=$_q6_ok hdr=$_qh_ok bul=$_qb_ok: $QAOUT"
+fi
+
+# V23. #317 b B1: paired quotes normalize in the fourth extractor too
+#      (rules-revisit.sh fm) -- a quoted status/revisit-interval hand
+#      edit reaches the ladder like its bare twin instead of dying as
+#      "bad status '\"active\"' (run the audit)" while the audit, the
+#      report and the INDEX all accept the same meta.
+one_scratch 1m 2026-06-01 v23
+QFM=$(meta_path "$VSCRATCH" RM-9001)
+sed -i 's/^status: active$/status: "active"/' "$QFM"
+sed -i "s/^revisit-interval: 1m\$/revisit-interval: '1m'/" "$QFM"
+SCRATCH=$VSCRATCH
+T=2026-06-15
+run_revisit RM-9001 clean "quoted values normalize"
+if [ "$RC" -eq 0 ] && contains "$OUT" "RM-9001: clean" &&
+    contains "$OUT" "1m -> 6m" && contains "$OUT" "next-revisit 2026-12-15" &&
+    line_is "$QFM" "revisit-interval: 6m" &&
+    line_is "$QFM" "next-revisit: 2026-12-15"; then
+    pass
+else
+    fail "V23 quoted frontmatter: expected clean ladder despite quoted values, rc=$RC: $OUT"
+fi
+
+# V24. #317 d D1: the strip peels exactly ONE quote layer, matching
+#      gen-rules-index.py's parser -- a double-wrapped value
+#      (status: "'active'") stays 'active' for every extractor, so
+#      all three shell tools fail loud on it instead of blessing a
+#      value the INDEX silently drops from its active/retired
+#      buckets (two-layer sed stripped it to active everywhere).
+one_scratch 1m 2026-06-01 v24
+DWFM=$(meta_path "$VSCRATCH" RM-9001)
+sed -i "s/^status: active\$/status: \"'active'\"/" "$DWFM"
+SCRATCH=$VSCRATCH
+T=2026-06-15
+run_revisit RM-9001 clean
+DWREV=$RC
+DWOUT=$OUT
+run_report
+DWREP=$RC
+DWAOUT=$(RM_AUDIT_ROOT="$VSCRATCH" FORCE_TODAY=2026-06-15 \
+    sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+DWARC=$?
+case "$DWOUT" in *"bad status ''active''"*) _dwr_ok=1 ;; *) _dwr_ok=0 ;; esac
+case "$OUT" in *"bad status ''active''"*) _dwp_ok=1 ;; *) _dwp_ok=0 ;; esac
+case "$DWAOUT" in *"bad status: ''active''"*) _dwa_ok=1 ;; *) _dwa_ok=0 ;; esac
+if [ "$DWREV" -eq 2 ] && [ "$_dwr_ok" = 1 ] && [ "$DWREP" -eq 2 ] &&
+    [ "$_dwp_ok" = 1 ] && [ "$DWARC" -eq 1 ] && [ "$_dwa_ok" = 1 ]; then
+    pass
+else
+    fail "V24 double-wrap one-layer: revisit rc=$DWREV/$_dwr_ok report rc=$DWREP/$_dwp_ok audit rc=$DWARC/$_dwa_ok: $DWAOUT"
+fi
+
 # ------------------------------------------------------------- summary
 if [ -s "$FAILS" ]; then
     printf 'rules-revisit pins: FAILED\n'

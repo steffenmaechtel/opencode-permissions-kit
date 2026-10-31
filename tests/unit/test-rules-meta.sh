@@ -225,6 +225,13 @@ cat >>"$(meta_file RM-9001)" <<'EOF'
 EOF
 expect_block "inv9 line without field" "[inv9]"
 
+# 9c. inv 9 -- a bare 'reviewed:' line (key present, no date) blocks:
+#     approval membership is key-presence-with-value (#233) -- a bare
+#     line must not count as approved anywhere (report queue, INDEX)
+new_scratch n9c
+sed -i 's/^status: active/status: active\nreviewed:/' "$(meta_file RM-9001)"
+expect_block "inv9 bare reviewed line blocks" "bare 'reviewed:' line (key without a value)"
+
 # 7. overdue is report-only
 new_scratch n7
 sed -i 's/^created: 2026-10-16/created: 2026-09-01/; s/^next-revisit: 2026-11-16/next-revisit: 2026-10-01/' "$(meta_file RM-9001)"
