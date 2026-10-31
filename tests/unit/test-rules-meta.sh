@@ -269,7 +269,10 @@ expect_block "inv9 bare reviewed line blocks" "bare 'reviewed:' line (key withou
 #     extractors (shell first-wins, gen last-wins). Both orders block;
 #     the standalone INDEX generator dies on the same tree (fail-loud
 #     structural promise -- order-independent, one arm pinned), so a
-#     blocked audit run never rewrites INDEX.md (sentinel survives).
+#     duplicate-key-blocked run never rewrites INDEX.md: gen dies on
+#     the same tree before any write. (Other blocked causes do regen
+#     when gen accepts the tree; the finderr gate is the separate,
+#     stronger skip -- audit inv 8.)
 new_scratch n6c
 printf 'sentinel INDEX -- must survive a blocked run\n' \
     >"$SCRATCH/internal/rules-meta/INDEX.md"
