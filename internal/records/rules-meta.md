@@ -131,7 +131,9 @@ a bulk session, not one-off touches).
    lines joined; needle = the quote's first five words).
 6. Frontmatter complete, ISO dates, `next-revisit` ≥ `created`.
 7. Report (non-blocking): overdue list, sorted by lateness.
-8. `INDEX.md` is regenerated on every run.
+8. `INDEX.md` is regenerated on every run, except when the meta walk
+   reported `[meta-tree]` errors — regeneration is skipped so a
+   blocked run never writes a truncated INDEX (#232).
 9. Approval consistency: `reviewed:` is set exactly when the review
    log carries an `approved by maintainer` entry of the same date —
    absent field with approval line, or field without line, both fail
@@ -139,11 +141,10 @@ a bulk session, not one-off touches).
 
 CI blocks on 1–6 and 9, and on `[meta-tree]` scope errors (find
 failures under the meta tree — #232); an overdue meta is a maintenance
-signal, not a broken build. (RM-0030) The Phase-2 pending-unit parking
-valve
-(prefix-matched ref-less units reported non-blocking) was retired
-2026-10-17 when its five occupants received metas — a ref-less unit
-in an active section now always blocks.
+signal, not a broken build. (RM-0030) The Phase-2 pending-unit
+parking valve (prefix-matched ref-less units reported non-blocking)
+was retired 2026-10-17 when its five occupants received metas — a
+ref-less unit in an active section now always blocks.
 
 ## Retire
 

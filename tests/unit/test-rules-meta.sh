@@ -241,7 +241,8 @@ else
         >"$SCRATCH/internal/rules-meta/INDEX.md"
     chmod 000 "$SCRATCH/internal/rules-meta/9/0/1"
     expect_block "meta-tree unreadable subdir blocks" "[meta-tree]"
-    expect_block "meta-tree skips INDEX regeneration" "INDEX not regenerated"
+    expect_block "meta-tree skips INDEX regeneration" \
+        "INDEX not regenerated (meta-tree walk reported errors)"
     if grep -qxF 'sentinel INDEX -- must survive a blocked run' \
         "$SCRATCH/internal/rules-meta/INDEX.md"; then
         pass
@@ -254,7 +255,7 @@ fi
 # meta-tree missing. (#318 a B2): a missing meta tree blocks loudly
 # (find ENOENT feeds [meta-tree]) -- it is not a silent empty audit.
 new_scratch nmtree
-rm -rf "$SCRATCH/internal/rules-meta"
+rm -rf "${SCRATCH:?}/internal/rules-meta"
 expect_block "meta-tree absent meta tree blocks" "[meta-tree]"
 
 # 7. overdue is report-only
