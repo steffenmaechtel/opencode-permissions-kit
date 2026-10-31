@@ -104,9 +104,12 @@ kit's own test scripts. Style is not a review topic: the gate
   literal inside single quotes). Wrapping an sq literal therefore
   converts it to dq first, after checking for `$`, backtick and `"`
   hazards — and the wrap's byte-identity is proven by EXECUTING old
-  vs new and comparing the output: fmt, the ratchet and the join
-  guard all stay green on the broken sq forms (#300 tier 1, measured
-  2026-10-31).
+  vs new and comparing the output: the ratchet and the join guard
+  stay green on every broken sq form, and fmt red-lists only the two
+  classic spellings — its canonical output for the indented classic
+  IS the broken spaced-words shape, and the sq splice never trips
+  fmt at all; post-fmt, only execution discriminates (#300 tier 1,
+  sharpened by review #331 a a-2, measured 2026-10-31).
 - Still human rules, NOT shfmt's business: the 120-column ratchet
   (`tests/unit/test-line-length.sh` — shfmt never wraps lines), the
   string-continuation join guard (`test-string-continuations.sh`,
