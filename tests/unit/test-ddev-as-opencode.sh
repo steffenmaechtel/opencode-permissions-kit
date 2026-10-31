@@ -583,8 +583,13 @@ check "install.sh deploys the helper (mode 755, lib_deploy manifest)" \
     sh -c "grep -q 'opencode-permissions-kit-lib/bin/ddev-as-opencode 755' \"\$2\" && grep -q 'lib_deploy \"\$SCRIPT_DIR\" \"\$LIBDIR\"' \"\$1\"" _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh hooks the function into the developer rc files" \
     sh -c "grep -q 'opencode-permissions-kit/sh/ddev-terminal.sh' \"\$1\"" _ "$INSTALL"
+# The hook line is splice-wrapped in the canonical dq form (#300 tier 1,
+# #255 stage 0a idiom): frag2's opening quote sits at EOL, so both pinned
+# literals are raw-matched per line -- the guard prefix with its quote
+# boundary on the head line, the sourced path + kit marker on the
+# continuation line.
 check "install.sh hooks use the [ -f ] uninstall-safe guard" \
-    sh -c "grep -qF \"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . '\" \"\$1\" && grep -qF \"'/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh\" \"\$1\"" _ "$INSTALL"
+    sh -c "grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"' \"\$1\" && grep -qF '/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit' \"\$1\"" _ "$INSTALL"
 check "install.sh hands over ddev paths in the filesystem step" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$INSTALL"
 
