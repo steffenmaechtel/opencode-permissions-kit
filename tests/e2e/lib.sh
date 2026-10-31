@@ -544,6 +544,23 @@ e2e_cleanup() {
     fi
 }
 trap e2e_cleanup EXIT
+# (#287 a S2, reapplied per #289) signal arms, install.sh's idiom: an
+# untrapped fatal signal killed the runner WITHOUT running the EXIT trap
+# (dash), so a Ctrl-C mid-run leaked the HOST-side TMP_PROJECT. exit on
+# the signal arms — without it the runner would clean up and CONTINUE
+# the suite. The arms clear EXIT INT TERM before cleanup, so on the
+# SIGNAL path a further Ctrl-C/TERM mid-cleanup takes the default kill
+# instead of re-running e2e_cleanup (pr-316 a F2: the re-run repeated
+# the timestamped dump and could re-prompt; #287 b C4: the EXIT re-fire
+# path stays closed — a declined sudo prompt in a double cleanup
+# re-prompted). Residual, named (pr-316 b B1): the EXIT trap runs
+# e2e_cleanup with INT/TERM still armed, so a signal in that normally
+# sub-second suite-end window (indefinite while the sudo fallback
+# prompts) fires the arms and runs a second cleanup. The once-only
+# shape is load-bearing: docker rm -f and the rm -rf fallbacks are
+# idempotent, but e2e_dump_container mkdir -p's a fresh
+# dumps/<label>-<timestamp> dir per call (pr-316 a F3).
+trap 'trap - EXIT INT TERM; e2e_cleanup; exit 1' INT TERM
 
 # e2e_dump_container <label>: copy the suite container's /tmp out as
 # failure evidence (issue #279 wave). The container's internal logs —
