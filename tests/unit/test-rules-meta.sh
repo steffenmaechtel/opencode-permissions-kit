@@ -165,15 +165,31 @@ expect_block "inv1 RM-keys section enforced" "referencing-house-rules"
 
 # 1d. inv 1 -- the review-tracks section is audit-active (#324: its
 #     ACTIVE_SECTIONS entry is load-bearing -- losing it would let
-#     the track/staffing/disposition units pass ref-less)
+#     the track/staffing/disposition units pass ref-less). Section
+#     renamed by #334 (track values shipped|non-shipped) -- the
+#     fixture heading and the audit's ACTIVE_SECTIONS entry moved
+#     together in the same commit.
 new_scratch n1d
 cat >>"$SCRATCH/agent/review-concept.md" <<'EOF'
 
-## Review tracks: HIGH and MED
+## Review tracks: shipped and non-shipped
 
 - Unreferenced demo rule.
 EOF
 expect_block "inv1 review-tracks section enforced" "review-tracks"
+
+# 1e. inv 1 -- the scope section (the former two-types table, renamed
+#     by #334) is audit-active: its ACTIVE_SECTIONS entry is
+#     load-bearing -- losing it would let scope-table-section units
+#     pass ref-less. Mirrors n1b/n1c/n1d.
+new_scratch n1e
+cat >>"$SCRATCH/agent/review-concept.md" <<'EOF'
+
+## Review scope: snapshot and diff
+
+- Unreferenced demo rule.
+EOF
+expect_block "inv1 scope section enforced" "review-scope"
 
 # 2. inv 2 -- dangling ref
 new_scratch n2

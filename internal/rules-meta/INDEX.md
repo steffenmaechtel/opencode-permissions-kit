@@ -92,11 +92,11 @@
 
 ## agent/review-concept.md
 
-### Two review types, two jobs
+### Review scope: snapshot and diff
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0057](0/0/5/RM-0057.md) | A wave diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
+| [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
 
 ### The PR-native loop
 
@@ -123,7 +123,7 @@
 | [RM-0107](0/1/0/RM-0107.md) | The cadence authority is | active | approved | 1m | 2026-11-28 |
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | **pending** | 1m | 2026-11-28 |
-| [RM-0134](0/1/3/RM-0134.md) | On Track MED, a | active | **pending** | 1m | 2026-11-30 |
+| [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | **pending** | 1m | 2026-11-30 |
 
 ### Round typing and tiering
 
@@ -132,20 +132,20 @@
 | [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | **pending** | 1m | 2026-11-28 |
 | [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | **pending** | 1m | 2026-11-28 |
 
-### Review tracks: HIGH and MED
+### Review tracks: shipped and non-shipped
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0131](0/1/3/RM-0131.md) | Track MED staffing: 1–2 | active | **pending** | 1m | 2026-11-30 |
-| [RM-0132](0/1/3/RM-0132.md) | New-session entry (the batch | active | **pending** | 1m | 2026-11-30 |
-| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on non-shipped | active | **pending** | 1m | 2026-11-30 |
+| [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | **pending** | 1m | 2026-11-30 |
+| [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | **pending** | 1m | 2026-11-30 |
+| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | **pending** | 1m | 2026-11-30 |
 
 ### Curation and verification
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0126](0/1/2/RM-0126.md) | Curation (x): a fast-tier | active | **pending** | 1m | 2026-11-28 |
-| [RM-0127](0/1/2/RM-0127.md) | Verification (V3): every curated | active | **pending** | 1m | 2026-11-28 |
+| [RM-0126](0/1/2/RM-0126.md) | Curation: a fast-tier | active | **pending** | 1m | 2026-11-28 |
+| [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | **pending** | 1m | 2026-11-28 |
 
 ### Reviewer freshness
 
@@ -182,7 +182,7 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0072](0/0/7/RM-0072.md) | Every release review records | active | approved | 1m | 2026-11-28 |
+| [RM-0072](0/0/7/RM-0072.md) | Every snapshot-scope review records | active | approved | 1m | 2026-11-28 |
 | [RM-0073](0/0/7/RM-0073.md) | Distinguish two dates in | active | approved | 1m | 2026-11-19 |
 
 ### Verification duty
@@ -216,7 +216,7 @@
 | [RM-0080](0/0/8/RM-0080.md) | The main agent runs a strong | active | approved | 1m | 2026-11-19 |
 | [RM-0081](0/0/8/RM-0081.md) | Reviewer subagents get ad-hoc | active | approved | 1m | 2026-11-19 |
 | [RM-0082](0/0/8/RM-0082.md) | A coverage claim is NEVER | active | approved | 1m | 2026-11-19 |
-| [RM-0083](0/0/8/RM-0083.md) | For release reviews, a second | active | approved | 1m | 2026-11-19 |
+| [RM-0083](0/0/8/RM-0083.md) | For snapshot-scope reviews (the | active | approved | 1m | 2026-11-19 |
 | [RM-0084](0/0/8/RM-0084.md) | Invocation shape governs orchestration | active | approved | 1m | 2026-11-19 |
 | [RM-0085](0/0/8/RM-0085.md) | Reviewer prompts for recurring blind-spot | active | approved | 1m | 2026-11-19 |
 | [RM-0086](0/0/8/RM-0086.md) | Checkpoint discipline: each reviewer agent | active | approved | 1m | 2026-11-19 |

@@ -21,7 +21,8 @@ not a new kind of mistake (`silent-failure` appeared in 8 of 15 groups of
 the current corpus after all 9 groups of the first; `sibling-sweep`
 returned at 25 findings after a one-version dip to zero; 20 % of the first
 corpus's findings were fix-induced — the enforced micro-wave-review
-discipline cut that to 9.3 % in the second). Classes collapsed only after
+discipline (today's low-tier re-review) cut that to 9.3 % in the second).
+Classes collapsed only after
 an **enforced process step** existed — naming a class alone never stopped
 it, and two "collapsed" trends did not survive contact with the next
 corpus (see "Keep doing" below). Each rule below is that step for its
@@ -74,7 +75,7 @@ itself had just added).
 
 Every behavior claim the wave touches — comment blocks, hint/message
 strings, doc sentences — either **carries a pin** or is **deleted/weakened**.
-Claims age outside diffs, so wave reviews never catch their drift ("never
+Claims age outside diffs, so diff-scope reviews never catch their drift ("never
 abort" `0.0.45c C1`, "race-free" `0.0.45d W1`, "31 suites" for 27
 `0.0.39d D1`, "swept ×4" unproven by the wave's own matrix `pr-00196 c C10`,
 gate lines that do not reproduce `pr-00202 d W1`). History narratives are
@@ -121,22 +122,23 @@ passes:
    can plant what — `0.0.45e W1`).
 
 The run-2 HIGH was found by the staged release full pass, not by the wave
-or micro passes over the same code — wave scope does not surface this
-class's ceiling (keep the full-pass rule below).
+or micro passes over the same code — diff scope does not surface this
+class's ceiling (keep the snapshot-scope-pass rule below).
 
 ### L6 — Fix waves are first-class code
 *Class: `fix-regression` — run 1: 19 findings, 11 MED/HIGH, 20 % of all
 findings fix-induced; run 2: 9 findings, 2 MED/HIGH, fix-induced share
 halved to 9.3 %. The discipline measurably works; the class remains.*
 
-Every fix wave gets its micro-wave review before the PR (binding since 0.0.42
-— keep it), and fixes bring **their own pins**: "the wave's own mechanisms
+Every fix wave gets its low-tier re-review before the PR (binding
+since 0.0.42 — keep it), and fixes bring **their own pins**: "the
+wave's own mechanisms
 unpinned" was repeatedly its own finding (`0.0.44d F4`). A fix to a
 root/symlink class also re-runs the L5 inventory check. The stop rule
 agrees since 2026-10-11 ([review-concept.md](review-concept.md),
 revised from the 0.0.46a→0.0.46b chain): a round whose fixes touch code —
 LOW fixes included, the 0.0.46b W1 MED arrived through exactly those —
-owes its micro-wave review; only comment/docs/disposition-only rounds
+owes its low-tier re-review; only comment/docs/disposition-only rounds
 close the loop without one.
 
 ### L7 — New scripts start from the skeleton
@@ -185,7 +187,8 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
 - **Sabotage-verify per pin** (the ONLY reliable discriminator we have;
   `test-vacuous` reappeared at scale in run 2 — partly corpus composition,
   partly real: the fail-but-green shape (a) above)
-- **Pre-release full pass via opencode v2's built-in `/review`** (fresh
+- **Pre-release snapshot-scope pass via opencode v2's built-in
+  `/review`** (fresh
   external session, staged fan-out) — still the only reliable source of
   `perm-model`/`race-toctou` HIGHs: internal v1 2 MED vs external 2 HIGH +
   6 MED on the same tree (`0.0.42d`/`0.0.42e`); opencode 1.18.34 zero
@@ -234,7 +237,7 @@ belong there, not here.
   lives in AGENTS.md Testing, the checklist pointer in "Keep doing");
   sabotage-vs-uncommitted-tree produced zero corpus findings (AGENTS.md
   Testing owns it).
-- Numbers the NEXT run should collect: a release full pass INSIDE the
+- Numbers the NEXT run should collect: a snapshot-scope pass INSIDE the
   corpus (perm-model HIGH detection is pass-scope-bound); the `internal`
   area trend (59 findings — project memory became a review surface);
   `wiring-gate` recurrence (ratchet-red-at-HEAD shape); whether the

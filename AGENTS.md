@@ -225,7 +225,7 @@ aid:
   component, re-check the operand immediately before acting, chmod
   before chown.
 - **Fix waves are first-class code** — every fix wave gets its
-  micro-wave review; fixes bring their own pins.
+  low-tier re-review; fixes bring their own pins.
 
 ## Checkout ownership on kit-managed installs
 
