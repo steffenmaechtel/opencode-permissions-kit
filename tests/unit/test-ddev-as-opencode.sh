@@ -102,7 +102,8 @@ _trap_cleanup() {
         "${HWORK:-}" "${HRH:-}" "${BH:-}" "${DFH:-}" "${DFH2:-}" \
         "${RN:-}" "${VN:-}" "${BS1:-}" "${DWORK:-}" "${RACE:-}" \
         "${RACESTUB:-}" "${RACESP:-}" "${RACESPS:-}" "${RACEC:-}" \
-        "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}"
+        "${RACECT:-}" "${RACEF:-}" "${RACEFT:-}" "${_112_dir:-}" \
+        "${CB285:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -114,10 +115,14 @@ trap _trap_cleanup EXIT INT TERM
 # right here, before any test section runs. Indented receivers (BS1's
 # conditional-creation shape) are covered by the leading-space-tolerant
 # pattern — that shape is exactly the sibling the manual sweeps missed.
+# (#328 a A1): quoted receivers (VAR="$(mktemp …)") are matched too —
+# the original ERE required =( adjacent and a quoted receiver slipped
+# past; quoting style must not blind the guard (pinned below by the
+# planted-receiver probe pin).
 _opk_recv_check() {
     _orc_list=$(awk '/^_trap_cleanup\(\)/,/^}/' "$1")
     _orc_rc=0
-    for _orc_v in $(grep -oE '^[[:space:]]*[A-Za-z_0-9]+=\$\(mktemp' "$1" | cut -d= -f1 | sort -u); do
+    for _orc_v in $(grep -oE '^[[:space:]]*[A-Za-z_0-9]+="?[[:space:]]*\$\(mktemp' "$1" | cut -d= -f1 | sort -u); do
         _orc_pat=$(printf '"${%s:-}"' "$_orc_v")
         printf '%s' "$_orc_list" | grep -qF "$_orc_pat" || {
             echo "  receiver completeness: $_orc_v is a mktemp receiver but missing from _trap_cleanup (add it to the rm -rf list)" >&2
@@ -1736,7 +1741,7 @@ grep -q 'warn: dev-owned handback incomplete for $dhb_proj (root inode' "$HANDOV
 # (disable-by-edit: doc comment through its fi) must flip the pin RED.
 # Executed on scratch copies; the unsabotaged controls are the order
 # pins above (green every suite run).
-CB285="$(mktemp -d)"
+CB285=$(mktemp -d)
 for _h in --opk-ensure-shared --opk-devowned-flag; do
     sed "/${_h}/,/^fi\$/ s/^/#/" "$HELPER" >"$CB285/helper-$_h"
     if sed 's/^[[:space:]]*#.*$//' "$CB285/helper-$_h" |
@@ -1746,7 +1751,26 @@ for _h in --opk-ensure-shared --opk-devowned-flag; do
         pass "#285: order pin reds with the $_h handler commented out"
     fi
 done
-rm -rf "$CB285"
+rm -rf "${CB285:?}"
+
+# (#328 a A1) probe-hardening pin: a QUOTED mktemp receiver must not
+# dodge the completeness probe -- the original ERE required =( adjacent
+# and CB285="$(mktemp -d)" slipped past it (executed failure path: a
+# planted quoted receiver in a scratch copy of this file must redden
+# the probe, with the message naming the plant).
+_orc_plant="$TMPDIR/recv-probe-copy.$$.sh"
+cp -- "$(readlink -f "$0")" "$_orc_plant"
+printf '%s\n' 'QUOTEDPLANT="$(mktemp -d)"' >>"$_orc_plant"
+if _opk_recv_check "$_orc_plant" 2>"$TMPDIR/recv-probe-err.$$"; then
+    fail "receiver completeness: quoted mktemp receiver invisible to the probe (#328 a A1)"
+else
+    if grep -qF 'QUOTEDPLANT' "$TMPDIR/recv-probe-err.$$"; then
+        pass "receiver completeness: quoted mktemp receiver caught and named (#328 a A1)"
+    else
+        fail "receiver completeness reds but does not name the quoted plant (#328 a A1)"
+    fi
+fi
+rm -f -- "$_orc_plant" "${TMPDIR:?}/recv-probe-err.$$"
 
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"

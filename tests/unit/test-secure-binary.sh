@@ -299,8 +299,10 @@ check "file atomic: capturing-mv run leaves no temp behind" \
 # cp-natural-755 window on the live name between the two (the atomic
 # helpers' order; line-number compare discriminates a reorder).
 # (#285: the walk runs over a comment-stripped copy -- substitute, not
-# delete, so NR bookkeeping stays true; the check is an explicit
-# pass/fail pipeline because check() would take sed's rc, not awk's.)
+# delete, so NR bookkeeping stays true. Explicit pass/fail pipeline:
+# the asserted rc is the pipeline's last member's (awk's, POSIX) --
+# functionally equivalent to a check ... sh -c 'sed | awk' wrapper;
+# this form reads locally for a two-command pin.)
 if sed 's/^[[:space:]]*#.*$//' "$LIB" |
     awk '/_sb_sudo chmod 750/{c=NR} /_sb_sudo chown/{h=NR} END{exit !(c>0 && h>0 && c<h)}'; then
     pass "secure_binary: chmod before chown (pr-00263 a F25, #285 comment-stripped)"
