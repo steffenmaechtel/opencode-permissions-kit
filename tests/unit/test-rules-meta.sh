@@ -163,6 +163,18 @@ cat >>"$SCRATCH/agent/conventions.md" <<'EOF'
 EOF
 expect_block "inv1 RM-keys section enforced" "referencing-house-rules"
 
+# 1d. inv 1 -- the review-tracks section is audit-active (#324: its
+#     ACTIVE_SECTIONS entry is load-bearing -- losing it would let
+#     the track/staffing/disposition units pass ref-less)
+new_scratch n1d
+cat >>"$SCRATCH/agent/review-concept.md" <<'EOF'
+
+## Review tracks: HIGH and MED
+
+- Unreferenced demo rule.
+EOF
+expect_block "inv1 review-tracks section enforced" "review-tracks"
+
 # 2. inv 2 -- dangling ref
 new_scratch n2
 sed -i 's/ (RM-9002)/(RM-9009)/' "$SCRATCH/agent/conventions.md"

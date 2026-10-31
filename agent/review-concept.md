@@ -1,7 +1,8 @@
 # Review concept — when, what scope, and when to stop
 
 Operative rules for the reviewing agent: the PR-native loop, lettering,
-tiering, curation and verification, stop rule, reviewer mechanics.
+review tracks and tiering, curation and verification, stop rule,
+reviewer mechanics.
 **Process operational since 2026-10-26 (Pilot 1); these rules codify
 what the cases ran** (#260→PR #280, #261→PR #284, #283→PR #287,
 #290→PR #293) — the pilot directives they formalize (comment format v2,
@@ -38,6 +39,7 @@ and nothing is committed to `internal/reviews/`:
 
 ```
 commission → Session MAIN implements → birth-PR →
+loop owner (single case: MAIN · batch: handover to a fresh review session) →
 round a: review (comment) → fixes →
 round b: review (comment) → fixes → … → closing summary → merge
 ```
@@ -94,14 +96,14 @@ round b: review (comment) → fixes → … → closing summary → merge
 ## The loop and the stop rule
 
 ```
-review → fix → review the fixes (wave review) → fix → …
+review → fix → review the fixes (diff-scope, 1-axis micro) → fix → …
 ```
 
 - A round's disposition covers ALL findings of its review — fixed or
   deliberately-not-done, each one. An instruction like "fix F1 first"
-  sequences work INSIDE the round; it does not end the round. One wave
-  review per round, batching all of the round's fixes — never one per
-  finding or per ad-hoc slice. (RM-0106)
+  sequences work INSIDE the round; it does not end the round. One
+  diff-scope review per round, batching all of the round's fixes —
+  never one per finding or per ad-hoc slice. (RM-0106)
 - The cadence authority is the commission: maintainer-gated variants
   fire each round on the maintainer's go; autonomous commissions run
   rounds back to back inside the loop cap. Pushes and PR creation are
@@ -126,10 +128,15 @@ nothing to review.
   (RM-0065)
 - A round whose fixes stay in comments/docs/bookkeeping closes the
   loop. (RM-0066)
+- On Track MED, a deliberate-not-done disposition of a LOW/INFO code
+  finding opens no follow-on round: the disposition changes no code,
+  so the loop closes on it like any no-code round — stated
+  explicitly for the MED disposition policy, where the recording IS
+  the whole disposition. (RM-0134)
 - Any round whose fixes touch production or test code — regardless of
-  the findings' severity — owes one more review: a wave review of the
-  fix diff, not a full pass. Severity prioritizes; only code change
-  extends the loop. (RM-0067)
+  the findings' severity — owes one more review: a diff-scope review
+  of the fix diff at 1-axis micro staffing, not a full pass. Severity
+  prioritizes; only code change extends the loop. (RM-0067)
 - A round never declares the loop closed: the closing summary PROPOSES
   closure (the marker's `"state":"closing-proposed"`) with the
   stop-rule check cited ("this round's dispositions touched no
@@ -145,25 +152,41 @@ nothing to review.
 
 ## Round typing and tiering
 
-Classify the tier BEFORE staging a round — from the round's diff
-(`git diff --stat` plus content shape) — and state it in the loop
-status before the fan-out launches:
+Classify the round's TRACK, then its TIER — both BEFORE staging a
+round (never after the fan-out ran) — and state both in the loop
+status before the fan-out launches. The tier comes from the round's
+diff (`git diff --stat` plus content shape); the track from the PR's
+diff PATHS — the blast-radius axis. Shipped means any file under
+`files/**` (a mixed diff is track high); non-shipped means `tests/`,
+`scripts/`, `.github/`, `Makefile`, `docs/`, `agent/`, `.agents/`,
+`internal/`.
 
-| Round's diff | Tier | Review staffing | Verification |
-|---|---|---|---|
-| > ~50 lines or substantive logic | **wave** | 2–3 fast-tier axes | V3 (verifier batches + main audit) |
-| ≤ ~50 lines or message-only | **micro** | **exactly 1** fast-tier axis, ~5 min, greps + targeted reads | main audit alone at 0 MED/HIGH; else 1 verifier batch |
-| comments / docs only | **none** | no review round owed | closure via the diff-shape proof (comment-only round) |
+| Track | Round's diff | Tier | Review staffing | Verification |
+|---|---|---|---|---|
+| high | > ~50 lines or substantive logic | **wave** | 2–3 fast-tier axes | V3 (1 verifier batch + main audit) |
+| high | ≤ ~50 lines, message-only | **micro** | exactly 1 fast-tier axis (~5 min) | main audit alone; else 1 batch |
+| med | any (non-shipped only) | **med** | 1–2 fast-tier axes (triggers below) | main curation + verify sizing |
+| either | comments / docs only | **none** | no review round owed | closure via the diff-shape proof |
 
-- Classify the tier before staging (never after the fan-out ran), and
-  let the ladder overrule predictions: it measures diff shape, not
-  intent — a deletion-only round carrying +84 prose lines IS a wave.
-  Solo means ONE subagent, never a main-solo review — the no-solo rule
-  survives every tier. Severity can upgrade a tier, never downgrade
-  it: a micro round whose solo reviewer finds a MED/HIGH escalates —
-  the next round is a wave over the micro diff plus the finding. The
-  tier travels in the marker (`"tier":"wave"|"micro"`) and in the loop
-  status prose. (RM-0124)
+- Track selection is mechanical and checked, not taken on trust: the
+  implementing session states it in the PR body (`Track: high|med
+  (paths)`), the review session re-derives it from the diff — a
+  shipped path anywhere means track high, mixed diffs included (the
+  full ladder is the price of touching shipped code) — and the
+  marker records it (`"track":"high"|"med"`, a permanent field in
+  every round's marker). A shipped diff misclassified as med is a
+  process finding. CI-visible but non-shipped surfaces (`.github/`,
+  `Makefile`, `scripts/`) run MED at full MED staffing, never
+  lighter — CI breakage is still breakage. Let the ladder overrule
+  predictions: it measures diff shape, not intent — a deletion-only
+  round carrying +84 prose lines IS a wave. Solo means ONE subagent,
+  never a main-solo review — the no-solo rule survives every tier
+  and track. Severity can upgrade staffing, never downgrade it, and
+  the escalation is precise: fix waves re-review at 1-axis micro;
+  full wave staffing returns only when a NEW MED/HIGH finding
+  escalates scope beyond the fix. Tier and track travel in the
+  marker (`"tier":"wave"|"micro"|"med"`) and in the loop status
+  prose. (RM-0124)
 - Round typing names what a round's findings say about the loop: a
   round whose findings are predominantly fix-induced is BUILDING, not
   converging — new defects in the case's own fixes mean the built
@@ -172,26 +195,95 @@ status before the fan-out launches:
   findings shrink in count and severity; rounds must shrink with the
   diff, and review weight shrinks with them. (RM-0125)
 
+## Review tracks: HIGH and MED
+
+Track HIGH (shipped code in the diff) keeps the full ladder — the
+weight is justified where defects reach user machines via
+`curl | sudo bash`. Track MED covers everything else. The
+new-session entry changes WHO runs the loop, never how the review
+pass works.
+
+- Track MED staffing: 1–2 fast-tier axes in round a — a single axis
+  for small diffs, 2 when the diff exceeds ~150 lines, touches
+  CI-gating semantics (`.github/`, `Makefile`) or ships root-running
+  `scripts/` code. Wave staffing (3 axes, curator, verifier batches)
+  is an ESCALATION, never a starting point: it returns when round
+  a's own findings produce a MED/HIGH. Round budgets for Track MED:
+  ≤ 2 round comments and ≤ 1 fix push for chains without MED/HIGH
+  findings — a MED/HIGH chain scales with its findings instead (the
+  budgets describe the common case, not a cap on fixing).
+  (RM-0131)
+- New-session entry (the batch shape): a BATCH commission splits
+  the roles — the implementing session ONLY implements and opens one
+  birth-PR per case; it never runs the review loop of its batch's
+  PRs (its context compounds across cases — 303k after six, versus
+  83–110k flat for fresh review sessions). Each PR's loop
+  (curation, verification, dispositions, fixes, comments, closing
+  summary) runs in ONE fresh review session commissioned per PR —
+  never two: reviews land in fix work almost always, and the first
+  case's fix waves would load and anchor the second, spending the
+  freshness the entry exists to buy; session startup amortizes
+  through PARALLEL sessions, not stacked PRs (rolling, max 2
+  parallel review sessions under the 5-seat subagent cap). A
+  single-case commission keeps the single-session shape: Session
+  MAIN implements and runs the loop itself, the review pass staying
+  a subagent as everywhere. In EVERY shape the review pass is
+  ALWAYS a subagent — round a runs ≥ 1 fast-tier axis (2 under the
+  Track-MED triggers; any shipped file runs Track HIGH staffing from
+  the start), so the contamination rule holds automatically: every
+  round reads the tree through fresh subagent eyes that never saw
+  the session's reasoning, and a session that fixed something in
+  round X still gets an unbiased round X+1 with no freshness
+  bookkeeping. Marker mode `"new-session-review"`; a main-direct
+  review pass (a `reviewers:0` marker) stays a disclosed deviation,
+  never a template. (RM-0132)
+- Disposition policy on non-shipped (MED) diffs: MED/HIGH code
+  findings are fixed with their class sweep, like every track.
+  LOW/INFO code findings are deliberately not done, RECORDED in the
+  round comment — no fix, no follow-on round, and no new LOW issue
+  from a non-shipped diff (deferred issues remain a MED/HIGH
+  channel). Two in-round exceptions close claims without opening NEW
+  rounds of their own: LOW/INFO findings on comments/docs-only
+  content may be fixed in the same round — such fixes touch no code,
+  so the round closes on them (the comments-only rule); and a pin
+  completion of ≤ ~3 lines that closes a behavioral claim of the
+  case's own wave may be fixed in-round — the FIX is in-round, the
+  re-review is not waived: a pin completion touches test code, so
+  the round still owes its 1-axis micro re-review of the pin diff
+  before closing. A true-but-unpinned claim is a claim-audit gap,
+  not polish. (RM-0133)
+
 ## Curation and verification
 
 - Curation (x): a fast-tier curator subagent merges and de-duplicates
   the raw reviewer checkpoint files into ONE digest file — findings
-  table, merges named, drops with reasons — and the main session reads
-  only the digest, never the raw files. Below the curator threshold
-  (micro rounds with a handful of findings) the main session may
-  curate directly, disclosed in the comment's provenance. (RM-0126)
+  table, merges named, drops with reasons — and the main session
+  reads only the digest, never the raw files. The curator deploys
+  only when the round ran ≥ 3 reviewers AND produced > 10 raw
+  findings; at lower volumes the digest is one screen and the main
+  session curates directly, disclosed in the comment's provenance.
+  (RM-0126)
 - Verification (V3): every curated finding is re-verified against the
-  code by fresh strong-tier verifier subagents (verdict files per
-  batch or axis), and the main session audits the verdicts —
-  re-deriving every MED/HIGH itself, spot-checking LOW/INFO; refuted
-  findings are retracted with the refuting evidence named. Subagent
-  freshness replaces session rotation as the bias-reduction mechanism:
-  the author's loaded context never verifies its own claims. (RM-0127)
+  code — and the verification is SIZED: at ≤ 3 curated findings, all
+  LOW/INFO, the main session verifies inline (no verifier
+  subagents); above that, or at any MED/HIGH finding, exactly ONE
+  fresh strong-tier verifier batch runs (verdict files per batch) —
+  a hard gate: skipping an owed batch is a process deviation only a
+  maintainer disclosure can carry, never a time-pressure call. The
+  main session audits the verdicts — re-deriving every MED/HIGH
+  itself, spot-checking LOW/INFO; refuted findings are retracted with
+  the refuting evidence named. Subagent freshness replaces session
+  rotation as the bias-reduction mechanism: the author's loaded
+  context never verifies its own claims. (RM-0127)
 
 ## Reviewer freshness
 
-The PR-native process runs a case in ONE session (Session MAIN); the
-freshness the old session rotation bought comes from subagents instead:
+The PR-native process runs a single-case loop in ONE session
+(Session MAIN implements and runs the loop — the review pass stays a
+subagent); a batch commission splits the roles: Session MAIN
+implements, and each PR's loop runs in a fresh single-PR review
+session ("Review tracks"). The freshness the old session rotation
+bought comes from subagents instead:
 
 - The session that runs the case also applies the fixes — no handoff
   back; what the substitution preserves is the rotation's core: a
@@ -205,7 +297,7 @@ freshness the old session rotation bought comes from subagents instead:
   dispositions, owed-but-not-run reviews) in the round comment on the
   PR timeline. (RM-0061)
 - The round comment's metadata records who ran the pass — reviewers
-  (model + axes), curator, verifiers, tier — so freshness stays
+  (model + axes), curator, verifiers, tier, track — so freshness stays
   auditable from the PR timeline after the fact, not from memory.
   (RM-0063)
 - Freshness is measured in subagent contexts, not sessions: every
@@ -256,7 +348,8 @@ Review-relevant code touched this round: yes/no → …
 
 <!-- opk-review {"case":"<pr>","wave":"<letter>","raw":N,"curated":N,"posted":N,
      "retracted":N,"dropped":N,"med":N,"high":N,"state":"…","mode":"…",
-     "tier":"…","reviewers":N,"curator":"<flash|main>","verifiers":N} -->
+     "track":"high|med","tier":"wave|micro|med","reviewers":N,
+     "curator":"<flash|main>","verifiers":N} -->
 ```
 
 - One comment per review round, format v2: visible at level 0 ONLY the
@@ -458,7 +551,12 @@ here.
   (≤ ~50-line diffs) run ~5 — batched greps, targeted reads, no
   whole-file reads of the big scripts; unclear after one follow-up
   read → mark `unverified`, move on. The tier ladder above fixes the
-  budgets. (RM-0087)
+  budgets. The numbers in the axis PROMPT are scope-limiters and
+  stay there as written; PLANNING (round pipelines, targets) uses
+  the observed 8–10 minutes per axis, measured by host timestamps
+  only — sandbox clocks drift, so budgets and overrun targets are
+  never enforced against them (the percentage-overrun target was
+  dropped 2026-10-31, issue #324). (RM-0087)
 - Full-scope passes: ~15 minutes per agent PLUS a coverage map — every
   shipped file gets at least one grep-anchored look, every deferral is
   recorded as one in the checkpoint; the coverage map is the real
