@@ -118,8 +118,11 @@ def _listdir_loud(path):
 def iter_metas():
     """RM-*.md paths under the digit buckets, replacing the silent
     glob walk: every directory level is listed explicitly and dies
-    loud when unreadable (#322). Readable trees yield exactly the
-    glob's set ([0-9] = one ASCII digit per level)."""
+    loud when unreadable (#322). Trees that are readable AND free of
+    digit-named non-directories yield exactly the glob's set
+    ([0-9] = one ASCII digit per level); a digit-named stray FILE
+    dies loud too -- fail-loud on a structurally broken tree, same
+    spirit as the shard-bucket rule."""
     for d1 in _listdir_loud(RMROOT):
         if len(d1) != 1 or d1 not in '0123456789':
             continue
