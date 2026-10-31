@@ -10,59 +10,63 @@ archived corpus of the repo-file era lives at tag `review-corpus`
 
 - **The commission is the scope authority.** Paste the commission
   file as the FIRST prompt into a fresh session (Session MAIN); it
-  names the case (issue), the variant, the deliverables/inventory
+  names the case (issue), the mode, the deliverables/inventory
   (the scope brake's fixed inventory), the loop mechanics (cap,
   tiers, reviewers), and the metrics owed. Keep the file unchanged —
   it is the commission record.
-- **Variants:** maintainer-gated variants fire each round on your go;
-  **variant c** runs autonomous dispositions. In BOTH variants the
-  agent pushes and creates the PR itself (AGENTS.md Rules (the never-commit-on-master rule): approvals
+- **Modes:** gated commissions fire each round on your go;
+  **autonomous** commissions run dispositions autonomously. In BOTH
+  modes the agent pushes and creates the PR itself (AGENTS.md Rules (the never-commit-on-master rule): approvals
   only count when the agent is the author and last pusher — the
   opencode permission prompt you approve is the runtime gate; hand the
   initial push to the maintainer only on a `.github/workflows/`
   permission denial, and re-push follow-ups yourself). Loop closure
-  (the merge) stays with you in every variant.
-- **The birth-PR is the case key.** In variant c the agent opens it
-  on your prompt approval (body: `Closes #<issue>` references); the
-  PR timeline is the case's whole review record — round comments,
-  pushes, CI runs. No case folders are created, nothing is committed
-  under `internal/reviews/`.
+  (the merge) stays with you in every mode.
+- **The birth-PR is the case key.** In autonomous mode the agent
+  opens it on your prompt approval (body: `Closes #<issue>`
+  references); the PR timeline is the case's whole review record —
+  round comments, pushes, CI runs. No case folders are created,
+  nothing is committed under `internal/reviews/`.
 
 ## Commissioning the review tracks
 
 Track selection is mechanical (the blast-radius axis,
 [agent/review-concept.md](../../agent/review-concept.md), "Round
-typing and tiering" and "Review tracks"): any shipped file
-(`files/**`) in the PR's diff means track high; a non-shipped-only
-diff means track med. The implementing session states the track in
-the PR body (`Track: high|med (paths)`); the review session
-re-derives it from the diff before staging round a.
+typing and tiering" and "Review tracks: shipped and non-shipped"):
+any shipped file (`files/**`) in the PR's diff means shipped track;
+a non-shipped-only diff means non-shipped track. The implementing
+session states the track in the PR body (`Track:
+shipped|non-shipped (paths)`); the review session re-derives it
+from the diff before staging round a.
 
 **Who runs the loop (the commission's scope decides):** a
 **single-case commission** keeps the single-session shape — the
-implementing session runs the loop itself, as before (the review
-pass stays a subagent in every shape). A **batch commission**
-splits the roles: the implementing session ONLY implements and
-opens one birth-PR per case, and every PR of the batch is reviewed
-by ONE fresh review session (the new-session entry) — commission
+implementer session (session: implementer) runs the loop itself, as
+before (the review pass stays a subagent in every shape). A **batch
+commission** splits the roles: the implementing session ONLY
+implements and opens one birth-PR per case, and every PR of the
+batch is reviewed by ONE fresh review session (session: fresh) —
+commission
 per PR as its PR opens, rolling, **max 2 parallel review
 sessions** (their subagents stay within the 5-seat cap). In a batch
 the implementing session may hand axis-prompt hints from its hot
 build context into the PR body or the review commission — that is
 where its review role ends.
 
-- **Track high (shipped code in the diff)** — full weight,
+- **Shipped track (shipped code in the diff)** — full weight,
   unchanged: the tier ladder, curation threshold and verify sizing
   per the review concept; who runs the loop per the paragraph
-  above (single case: the implementing session; batch: the fresh
+  above (single case: the implementer session; batch: the fresh
   review session).
-- **Track med (non-shipped-only diff)** — variant c is the DEFAULT:
-  autonomous dispositions, you approve PR create and merge only.
-  1–2 fast-tier axes, main curation and verify sizing per the
-  review concept; the MED disposition policy applies (LOW/INFO code
-  findings deliberately-not-done, recorded); who runs the loop per
-  the paragraph above.
-- **New-session entry (the batch shape)** — commission a FRESH
+- **Non-shipped track (non-shipped-only diff)** — autonomous mode
+  is the DEFAULT: dispositions run autonomously, you approve PR
+  create and merge only. Staffing per the tier ladder (med tier
+  from ~150 lines, CI-gating semantics or root-running `scripts/`
+  code; low tier below), main curation and verify sizing per the
+  review concept; the non-shipped disposition policy applies
+  (LOW/INFO code findings deliberately-not-done, recorded); who
+  runs the loop per the paragraph above.
+- **Fresh-session entry (the batch shape)** — commission a FRESH
   session (git worktree) per PR: it did not implement the code and
   runs the whole loop (curation, verification, dispositions, fixes,
   comments, closing summary). **One review session per PR — never
@@ -75,8 +79,10 @@ where its review role ends.
 
 ### Batch triage (at commissioning)
 
-- Only **full-scope non-shipped issues** go to a Track-MED batch.
-- An issue with a **tiny shipped remainder** goes to track high as a
+- Only **entirely non-shipped issues** go to a non-shipped-track
+  batch.
+- An issue with a **tiny shipped remainder** goes to the shipped
+  track as a
   WHOLE — splitting off the non-shipped part costs more review
   overhead per PR than the full ladder costs on a small diff (the
   #300 lesson).
@@ -129,15 +135,15 @@ gate sees — the Pilot 3 glue catch) and **scope authority** (steering
 and freezing scope mid-case; the Pilot 3 scope freeze). Steering
 lands in the case's next round comment as a standing disclosure.
 
-## Full reviews — triggers, findings, aftermath
+## Snapshot-scope reviews — triggers, findings, aftermath
 
-Full reviews (security, bugs, quality, docs, CI) are **trigger-based**,
-not on a calendar — the trigger bullet above is the gate (moved here
-from CONTRIBUTING, issue #236):
+Snapshot-scope reviews (security, bugs, quality, docs, CI) are
+**trigger-based**, not on a calendar — the trigger bullet above is
+the gate (moved here from CONTRIBUTING, issue #236):
 
-- **Trigger a full review** when a version bump is planned (before
-  the release), ~500+ changed lines or 10+ merged PRs have
-  accumulated on `master` since the last review, or a high
+- **Trigger a snapshot-scope review** when a version bump is
+  planned (before the release), ~500+ changed lines or 10+ merged
+  PRs have accumulated on `master` since the last review, or a high
   blast-radius area changed (`sudoers.template`, the wrapper, backend
   provisioning, the security model, `set -e`/pipefail semantics,
   traps).
@@ -151,19 +157,21 @@ should be — the remaining manual surface is what the checklist
 cannot automate.
 
 Scope and cadence follow the
-[review concept](../../agent/review-concept.md): full reviews are
-this trigger-based gate; the fixes themselves get a **diff-scope
-review** (1-axis micro staffing) as rounds of their case's loop —
-mandatory when a wave changes the semantics of root-running scripts
-— and the review → fix → review loop stops only when a round's
+[review concept](../../agent/review-concept.md): snapshot-scope
+reviews are this trigger-based gate; the fixes themselves get a
+**diff-scope review** (low-tier staffing, one axis) as rounds of
+their case's loop — mandatory when a fix wave changes the semantics
+of root-running scripts — and the review → fix → review loop stops
+only when a round's
 dispositions touch no review-relevant code: severity prioritizes,
 but any code-touching round — LOW fixes included — owes its
 diff-scope re-review before the loop closes.
 
 ## External review machines (bias-reduced checkout)
 
-The second, independent pass of a release review must come from a
-genuinely different context — a different model family on a checkout
+The second, independent pass of a snapshot-scope review must come
+from a genuinely different context — a different model family on a
+checkout
 without the house's review memory. A normal clone carries that memory
 (`agent/`, `.agents/`, `internal/`), so the external machine carves it
 out with a sparse checkout; `git status` stays clean, no tracked-file
