@@ -21,7 +21,8 @@ not a new kind of mistake (`silent-failure` appeared in 8 of 15 groups of
 the current corpus after all 9 groups of the first; `sibling-sweep`
 returned at 25 findings after a one-version dip to zero; 20 % of the first
 corpus's findings were fix-induced — the enforced micro-wave-review
-discipline cut that to 9.3 % in the second). Classes collapsed only after
+discipline (today's low-tier re-review) cut that to 9.3 % in the second).
+Classes collapsed only after
 an **enforced process step** existed — naming a class alone never stopped
 it, and two "collapsed" trends did not survive contact with the next
 corpus (see "Keep doing" below). Each rule below is that step for its
