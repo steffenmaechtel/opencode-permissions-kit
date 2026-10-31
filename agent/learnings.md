@@ -201,8 +201,9 @@ empty-match greps (`grep … || true` where empty output is rc 1), `IFS= read
   corpus era)
 - **Wrapped-string byte-identity is execution-proven, never
   gate-inferred** (#300 tier 1, 2026-10-31): the broken single-quote
-  wrap forms — 4-indent spaced-word continuations (the fmt-stable
-  shape; the col-0 spelling is fmt-red), sq splices with literal
+  wrap forms — 4-indent spaced-word continuations (fmt-stable at top
+  level — the stable continuation indent follows the command's
+  nesting; the col-0 spelling is fmt-red), sq splices with literal
   backslashes — pass `make lint`, the line-length ratchet AND the join
   guard while changing the executed bytes; the e2e rc greps survive
   too (the path substrings stay intact). Only executing old vs new and

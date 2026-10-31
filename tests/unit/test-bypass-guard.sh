@@ -106,6 +106,22 @@ check "install.sh deploys ui.sh to LIBDIR (lib_deploy manifest, 755)" \
     sh -c 'grep -qF "opencode-permissions-kit-lib/sh/ui.sh 755" "$2"' _ "$INSTALL" "$DEPLOYLIB"
 check "install.sh hooks shell-warn.sh into rc files" \
     grep -Fq 'opencode-permissions-kit/sh/shell-warn.sh' "$INSTALL"
+# #331 b b-1: install.sh's hook emissions have no functional unit
+# renderer (root/sudo deploy phase; e2e covers them with substring
+# greps only). Pin the exact wrap construct on the JOINED source --
+# empty-replacement continuation join, the conventions-sanctioned
+# view for literals spanning a wrap: the seam quotes stay visible in
+# it, and a seam mutation (inserted space, lost quote) survives the
+# join as a byte change that fails the -qF match. Source-joined equals
+# the emitted bytes here: the fragments carry no expansions (the
+# functional counterpart pins the rendered lines in test-update-flags).
+# The join runs as a PIPE into grep -- the joined view of a ~150 KB
+# script must not travel through argv (the 128 KiB single-argument
+# limit makes the whole check E2BIG, a fail-loud trap).
+check "install.sh shell-warn wrap byte-exact on joined source (splice-seam pin)" \
+    sh -c "sed -e ':a' -e '/\\\\$/N; s/\\\\\\n//; ta' \"\$1\" | grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh ] && . \"\"/usr/local/lib/opencode-permissions-kit/sh/shell-warn.sh  # opencode permissions kit\"\" (wrapper bypass warning)\"'" _ "$INSTALL"
+check "install.sh ddev wrap byte-exact on joined source (splice-seam pin)" \
+    sh -c "sed -e ':a' -e '/\\\\$/N; s/\\\\\\n//; ta' \"\$1\" | grep -qF '\"[ -f /usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh ] && . \"\"/usr/local/lib/opencode-permissions-kit/sh/ddev-terminal.sh  # opencode permissions kit\"\" (ddev always runs as opencode)\"'" _ "$INSTALL"
 check "install.sh restricts binary to root:group 750 (shared helper)" \
     sh -c 'grep -Fq "chmod 750 \"\$_sb_bin\"" "$2" && grep -Fq "secure_binary \"\$SYSTEM_BIN\" \"\$BINARY_GROUP\"" "$1"' _ "$INSTALL" "$SECUREBIN"
 check "install.sh never uses world-executable binary mode" \
