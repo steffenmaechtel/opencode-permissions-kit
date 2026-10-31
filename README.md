@@ -7,13 +7,19 @@
 > breaks, [open an issue](https://github.com/steffenmaechtel/opencode-permissions-kit/issues)
 > so it gets fixed.
 
-Runs [opencode](https://opencode.ai) as its own Linux user against a **rootless container backend**, so the agent is UID-separated from you while ddev keeps working. File permissions are opencode's own **soft** permission layer (`opencode.jsonc`).
+Runs [opencode](https://opencode.ai) as its own Linux user against a
+**rootless container backend**, so the agent is UID-separated from you
+while ddev keeps working. File permissions are opencode's own **soft**
+permission layer (`opencode.jsonc`).
 
 ## What It Does
 
-- **Dedicated user** — the wrapper at `/usr/local/bin/opencode` validates the project directory, then execs opencode as `opencode` (never as you)
-- **Rootless containers only** — docker-rootless or podman-rootless, owned by the `opencode` user; no root-equivalent docker socket is ever granted
-- **ddev keeps working** — ddev runs as the `opencode` user in the agent and in your terminal; the kit hands over the paths ddev chmods
+- **Dedicated user** — the wrapper at `/usr/local/bin/opencode` validates
+  the project directory, then execs opencode as `opencode` (never as you)
+- **Rootless containers only** — docker-rootless or podman-rootless, owned
+  by the `opencode` user; no root-equivalent docker socket is ever granted
+- **ddev keeps working** — ddev runs as the `opencode` user in the agent
+  and in your terminal; the kit hands over the paths ddev chmods
 
 Read how the security model works (and its deliberate trade-offs) in
 [Security Model](docs/concepts/security-model.md).
@@ -58,7 +64,8 @@ The full walkthrough (including verification) lives in
 The docs are structured by need — start at the [documentation index](docs/README.md):
 
 - [Getting started](docs/getting-started.md) — install, configure, verify
-- [Security model](docs/concepts/security-model.md) and the other [concepts](docs/README.md#concepts-why-it-works-this-way)
+- [Security model](docs/concepts/security-model.md) and the other
+  [concepts](docs/README.md#concepts-why-it-works-this-way)
 - [How-to guides](docs/README.md#how-to-guides-solve-a-task) — manage projects, allow ddev, update, uninstall
 - [Reference](docs/README.md#reference-look-it-up) — CLI, files, audit log, glossary
 - [Troubleshooting](docs/troubleshooting.md) — symptom → cause → fix
