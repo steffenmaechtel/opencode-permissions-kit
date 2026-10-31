@@ -298,8 +298,30 @@ check "file atomic: capturing-mv run leaves no temp behind" \
 # pr-00263 a F25: chmod runs before chown in secure_binary — no
 # cp-natural-755 window on the live name between the two (the atomic
 # helpers' order; line-number compare discriminates a reorder).
-check "secure_binary: chmod before chown (pr-00263 a F25)" \
-    awk '/_sb_sudo chmod 750/{c=NR} /_sb_sudo chown/{h=NR} END{exit !(c>0 && h>0 && c<h)}' "$LIB"
+# (#285: the walk runs over a comment-stripped copy -- substitute, not
+# delete, so NR bookkeeping stays true. Explicit pass/fail pipeline:
+# the asserted rc is the pipeline's last member's (awk's, POSIX) --
+# functionally equivalent to a check ... sh -c 'sed | awk' wrapper;
+# this form reads locally for a two-command pin.)
+if sed 's/^[[:space:]]*#.*$//' "$LIB" |
+    awk '/_sb_sudo chmod 750/{c=NR} /_sb_sudo chown/{h=NR} END{exit !(c>0 && h>0 && c<h)}'; then
+    pass "secure_binary: chmod before chown (pr-00263 a F25, #285 comment-stripped)"
+else
+    fail "secure_binary: chmod before chown (pr-00263 a F25, #285 comment-stripped)"
+fi
+
+# #285 pin-of-the-pin: the order pin must discriminate -- commenting
+# out the live chmod call (disable-by-edit) flips it RED through the
+# stripped walk. Executed on a scratch copy; the unsabotaged control
+# is the pin above (green every suite run).
+CB285="$WORK/cb285-lib"
+sed '/_sb_sudo chmod 750/ s/^/#/' "$LIB" >"$CB285"
+if sed 's/^[[:space:]]*#.*$//' "$CB285" |
+    awk '/_sb_sudo chmod 750/{c=NR} /_sb_sudo chown/{h=NR} END{exit !(c>0 && h>0 && c<h)}'; then
+    fail "#285: order pin green with the chmod call commented out (comment-blind)"
+else
+    pass "#285: order pin reds with the chmod call commented out"
+fi
 
 # --- summary ----------------------------------------------------------------
 
