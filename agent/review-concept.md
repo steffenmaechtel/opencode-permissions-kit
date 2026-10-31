@@ -285,7 +285,7 @@ works.
 
 ## Curation and verification
 
-- Curation (x): a fast-tier curator subagent merges and de-duplicates
+- Curation: a fast-tier curator subagent merges and de-duplicates
   the raw reviewer checkpoint files into ONE digest file — findings
   table, merges named, drops with reasons — and the main session
   reads only the digest, never the raw files. The curator deploys
@@ -293,7 +293,7 @@ works.
   findings; at lower volumes the digest is one screen and the main
   session curates directly, disclosed in the comment's provenance.
   (RM-0126)
-- Verification (V3): every curated finding is re-verified against the
+- Verification: every curated finding is re-verified against the
   code — and the verification is SIZED: at ≤ 3 curated findings, all
   LOW/INFO, the main session verifies inline (no verifier
   subagents); above that, or at any MED/HIGH finding, exactly ONE
@@ -320,7 +320,7 @@ bought comes from subagents instead:
   back; what the substitution preserves is the rotation's core: a
   round's author never reviews their own fixes. Review passes run
   fresh-context reviewer subagents, verification runs fresh verifier
-  subagents (V3 above). (RM-0060)
+  subagents (see "Curation and verification"). (RM-0060)
 - Rounds chain inside Session MAIN — the pauses that remain are the
   ask-gates (push, PR creation), the maintainer steerings, and the
   loop cap. An autonomous round never consumes the maintainer's
@@ -358,7 +358,7 @@ One comment per review round, format v2 (nested details):
 
 Base: <tag> @ <sha> · Diff: <range>
 Reviewers: N × <fast-tier model> (axes) · Curated by: <flash|main>
-Verified by: N × <strong-tier model> (V3) + main audit (MED/HIGH all, LOW/INFO spot)
+Verified by: N × <strong-tier model> + main audit (MED/HIGH all, LOW/INFO spot)
 CI on last push: <status + check names>
 Curator accounting: raw N → curated N (merges named) · dropped 0
 
@@ -449,7 +449,8 @@ Four places carry review knowledge, each with exactly one job:
 
 - Every reviewer-agent finding is re-verified against the code before
   it enters the round comment — by the fresh verifier subagents, with
-  the main session auditing (V3 above); unverifiable claims are
+  the main session auditing (see "Curation and verification");
+  unverifiable claims are
   dropped or marked `unverified`. (RM-0074)
 - Retractions stay visible in the round comment's "Retracted/ghost
   findings" section — they calibrate how much to trust the next

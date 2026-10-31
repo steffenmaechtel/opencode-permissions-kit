@@ -1,6 +1,6 @@
 ---
 name: opk-review-pass
-description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Covers track/tier classification, fan-out, curation (x) + verification (V3), round comments v2; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads this skill anyway discloses it in its Skills: line.
+description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Covers track/tier classification, fan-out, curation + verification, round comments v2; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads this skill anyway discloses it in its Skills: line.
 ---
 
 # opk-review-pass — executing a review round
@@ -91,8 +91,8 @@ both in the loop status BEFORE the fan-out launches:
   non-shipped").
 - **tier med** — diff-scope round: shipped > ~50 lines /
   substantive logic, non-shipped from ~150 lines, CI-gating or
-  root-run `scripts/`: 2–3 fast-tier axes, V3 (verify sizing per
-  section 6).
+  root-run `scripts/`: 2–3 fast-tier axes, verification per the
+  sizing gate (section 6).
 - **tier low** — shipped ≤ ~50 lines or message-only,
   non-shipped standard, EVERY fix-wave re-review: exactly ONE
   fast-tier subagent (~5 min, greps + targeted reads);
@@ -139,8 +139,8 @@ finding escalates scope.
   |---|---|
   | Main session (owns the verification/audit duty) | GLM-5.3 — strong tier |
   | Reviewer subagents | GLM-5.3-Flash — fast tier |
-  | Curator subagent (x, section 5) | GLM-5.3-Flash — fast tier |
-  | Verifier subagents (V3, section 6) | GLM-5.3 — strong tier, fresh-context verification |
+  | Curator subagent (section 5) | GLM-5.3-Flash — fast tier |
+  | Verifier subagents (section 6) | GLM-5.3 — strong tier, fresh-context verification |
 
   Both directions are load-bearing: reviewers on the strong model
   burn the budget the fast tier exists to save, and verifiers on
@@ -168,7 +168,7 @@ finding escalates scope.
   Sabotage windows are before launch, after all reviewers returned,
   or in a scratch worktree.
 
-## 5. Curation (x)
+## 5. Curation
 
 - The main session curates by default (review-concept, "Curation and
   verification"): merge and de-duplicate the checkpoint files into
@@ -180,7 +180,7 @@ finding escalates scope.
   ≥ 3 reviewers AND produced > 10 raw findings — its input and
   deliverable are the same digest shape as above.
 
-## 6. Verification (V3)
+## 6. Verification
 
 - Sizing is a HARD GATE (review-concept, "Curation and
   verification"): at ≤ 3 curated findings, all LOW/INFO, the main

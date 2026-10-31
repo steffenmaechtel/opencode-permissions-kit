@@ -143,8 +143,8 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0126](0/1/2/RM-0126.md) | Curation (x): a fast-tier | active | **pending** | 1m | 2026-11-28 |
-| [RM-0127](0/1/2/RM-0127.md) | Verification (V3): every curated | active | **pending** | 1m | 2026-11-28 |
+| [RM-0126](0/1/2/RM-0126.md) | Curation: a fast-tier | active | **pending** | 1m | 2026-11-28 |
+| [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | **pending** | 1m | 2026-11-28 |
 
 ### Reviewer freshness
 
