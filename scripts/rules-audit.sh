@@ -236,9 +236,16 @@ IDS=$WORK/ids
 # #232: the meta worklist is built ONCE with find's stderr captured --
 # a partially unreadable meta tree BLOCKS (a silently shorter worklist
 # would audit a scope nobody chose); both loops below read $METALIST.
+# #323: the pipeline rc (sort's) is observed too -- a sort write
+# failure (e.g. ENOSPC on the worklist target) leaves a partial or
+# empty worklist with an EMPTY finderr; the finderr gate alone is
+# blind to it.
 METALIST=$WORK/metas
-find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>"$WORK/finderr" |
-    LC_ALL=C sort >"$METALIST"
+if ! find "$ROOT/$METAS" -type f -name 'RM-*.md' 2>"$WORK/finderr" |
+    LC_ALL=C sort >"$METALIST"; then
+    printf '[meta-tree] worklist pipeline failed (find/sort rc) -- audit scope may be partial\n' \
+        >>"$V"
+fi
 if [ -s "$WORK/finderr" ]; then
     sed 's/^/[meta-tree] /' "$WORK/finderr" >>"$V"
     printf '[meta-tree] find reported errors under %s -- audit scope may be partial\n' \

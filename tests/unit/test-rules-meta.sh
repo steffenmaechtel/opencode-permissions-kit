@@ -257,6 +257,44 @@ fi
 new_scratch nmtree
 rm -rf "${SCRATCH:?}/internal/rules-meta"
 expect_block "meta-tree absent meta tree blocks" "[meta-tree]"
+
+# meta-tree rc. #323: the worklist pipeline rc (sort's) blocks even
+# with an EMPTY finderr -- a sort write failure (ENOSPC on the
+# worklist target) would otherwise leave a silently partial worklist
+# (#318 a A2). Executed via a PATH-injected sort stub that fails
+# exactly the no-argument worklist shape with sort's write-failure rc
+# (2); argument-carrying sort calls pass through to the real binary.
+# Control arm first: the same shape of tree, unstubbed, stays green --
+# the stub fires the gate, not the fixture.
+new_scratch n323ctl
+run_audit
+if [ "$RC" -eq 0 ]; then
+    pass
+else
+    fail "#323 control: unstubbed scratch tree must stay green, got rc=$RC: $OUT"
+fi
+new_scratch n323
+SORTSTUB=$WORK/sortstub.$$
+mkdir -p "$SORTSTUB"
+REAL_SORT=$(command -v sort) || REAL_SORT=/usr/bin/sort
+cat >"$SORTSTUB/sort" <<EOF
+#!/bin/sh
+[ \$# -eq 0 ] && exit 2
+exec $REAL_SORT "\$@"
+EOF
+chmod +x "$SORTSTUB/sort"
+OUT=$(cd "$SCRATCH" && RM_AUDIT_ROOT="$SCRATCH" FORCE_TODAY=2026-10-16 \
+    PATH="$SORTSTUB:$PATH" sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+RC=$?
+if [ "$RC" -eq 1 ]; then
+    case "$OUT" in
+        *'[meta-tree] worklist pipeline failed'*) pass ;;
+        *) fail "#323 sort rc: rc=1 but no worklist pipeline block: $OUT" ;;
+    esac
+else
+    fail "#323 sort rc: expected rc=1 with the block, got rc=$RC: $OUT"
+fi
+
 # 9c. inv 9 -- a bare 'reviewed:' line (key present, no date) blocks:
 #     approval membership is key-presence-with-value (#233) -- a bare
 #     line must not count as approved anywhere (report queue, INDEX)
