@@ -118,6 +118,7 @@ fetch_kit() {
     # convention). Keep it when adding files.
     for f in install.sh \
         VERSION \
+        opencode-permissions-kit-lib/sh/path-sane.sh \
         opencode-permissions-kit-lib/management/config.sh \
         opencode-permissions-kit-lib/management/update.sh \
         opencode-permissions-kit-lib/management/status.sh \
@@ -253,6 +254,20 @@ command -v ddev_migrate_registry >/dev/null 2>&1 || {
 # sourcing rules as ddev-handover.sh.
 kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() { :; }
+
+# Shared project-root policy gate (issue #216): bounds the group
+# baseline above — one implementation with config.sh (the old verbatim
+# duplicate; see sh/path-sane.sh for the deploy-order evaluation).
+# kit_source aborts when the lib is missing outright; the stub covers a
+# present-but-incomplete copy and fails CLOSED — every caller of this
+# gate treats rc 1 as "refuse", so a damaged library must never widen
+# into "allow".
+kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/path-sane.sh"
+command -v project_path_sane >/dev/null 2>&1 ||
+    project_path_sane() {
+        echo "error: project_path_sane unavailable (path-sane.sh missing) — refusing every project path" >&2
+        return 1
+    }
 
 # Shared git presence/version check (soft floor, issue #118): one
 # implementation for the pre-flight here, update.sh and status.sh.
@@ -1043,67 +1058,6 @@ do_plan_phase() {
     else
         ui_add "router ports" "sysctl to 80 offered (ddev-router 80/443)"
     fi
-
-    # A project root must never be (or live directly under) a system path:
-    # the group baseline runs chgrp -R + setfacl -R over it. Allowed below
-    # /home/ and /var/www...; everything else system-ish is rejected. Also
-    # rejects relative paths and ../. traversal games. "~" is expanded to
-    # $HOME; the normalized path is returned in _PP_NORM for the caller.
-    project_path_sane() {
-        _pp="${1%/}"
-        [ -n "$_pp" ] || return 1
-        # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
-        # the pattern must be escaped (\~) or it tilde-expands and never matches.
-        # ~ resolves against PROJECT_TILDE_HOME (the DEFAULT user's home when
-        # running under sudo — $HOME would be /root).
-        # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input
-        if [ "$_pp" = "~" ]; then _pp="${PROJECT_TILDE_HOME:-$HOME}"; else case "$_pp" in
-            "~/"*) _pp="${PROJECT_TILDE_HOME:-$HOME}${_pp#\~}" ;;
-            "~"*) return 1 ;;
-        esac fi
-        _PP_NORM="$_pp"
-        case "$_pp" in
-            /*) ;;
-            *) return 1 ;; # relative paths are error-prone in projects.conf
-        esac
-        case "$_pp" in
-            # Dot/empty-segment forms, complete (0.0.45c S1): the old arms
-            # caught only INTERIOR dots — a trailing "/." passed and (with
-            # no /var/*, /home/* catch-all in the blocklist below, by
-            # design) sent the root-side recursive group baseline over /,
-            # /var or every home; a leading "//" resolved outside the
-            # blocklist too. Same arms as bin/opk's handover form filter.
-            *..* | /./ | */./* | ./* | */. | *//*) return 1 ;; # traversal / dot / empty segments
-            *[[:space:]]*) return 1 ;;                         # storage format is line-based and
-                # space-free (0.0.39b C3)
-        esac
-        case "$_pp" in
-            / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
-                /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
-                /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
-                /usr | /usr/* | /var | /var/tmp | /var/cache | /var/cache/* | /var/lib | /var/lib/* | \
-                /var/log | /var/log/* | /var/mail | /var/mail/* | /var/spool | /var/spool/*)
-                return 1
-                ;;
-        esac
-        # The agent user's own home is never a valid project root: the group
-        # baseline (chgrp/setfacl -R) would run over the very directory that
-        # carries the agent's config and state (review 0.0.39a S4).
-        # pr-00263 a F10: getent alongside the literal spelling — a relocated
-        # agent home must refuse too (the uninstall.sh twin, opk pattern).
-        _pp_agent_home="$(getent passwd "${OPENCODE_USER:-opencode}" 2>/dev/null | cut -d: -f6 || true)"
-        if [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] ||
-            { [ -n "$_pp_agent_home" ] && [ "$_pp" = "$_pp_agent_home" ]; }; then
-            return 1
-        fi
-        # The developer's whole home as a root is allowed but deserves a
-        # warning: the baseline gives the agent group-write over every file
-        # in it.
-        if [ -n "${PROJECT_TILDE_HOME:-}" ] && [ "$_pp" = "$PROJECT_TILDE_HOME" ]; then
-            echo "  warn     '$PROJECT_TILDE_HOME' is your whole home — the agent gains group-write over it" >&2
-        fi
-        return 0
-    }
 
     # Validate --projects values against the same policy (fail fast, before
     # anything is touched). The list is rebuilt from _PP_NORM so a tilde path

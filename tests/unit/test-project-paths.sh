@@ -1,12 +1,15 @@
 #!/bin/sh
-# Unit tests for the project-path policy (install.sh + config.sh):
-# system paths must be rejected as project roots — the group baseline
-# runs chgrp -R + setfacl -R over every root, so "/", "/usr", ... must
-# never be accepted (interactive prompt, --projects flag, custom input,
+# Unit tests for the project-path policy (sh/path-sane.sh, sourced by
+# install.sh and config.sh since issue #216): system paths must be
+# rejected as project roots — the group baseline runs chgrp -R +
+# setfacl -R over every root, so "/", "/usr", ... must never be
+# accepted (interactive prompt, --projects flag, custom input,
 # config.sh projects add all share the policy).
 #
-# Static extraction of project_path_sane() from the shipped scripts, then
-# table-driven checks. No root required.
+# Static extraction of project_path_sane() from the shipped lib, then
+# table-driven checks; structural pins keep the policy in exactly ONE
+# copy (the old verbatim install.sh+config.sh duplication, #216). No
+# root required.
 # Run: sh tests/unit/test-project-paths.sh
 set -e
 
@@ -17,6 +20,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
+PATH_SANE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/path-sane.sh"
 
 failures=0
 passed=0
@@ -31,33 +35,91 @@ fail() {
 }
 
 extract_fn() {
-    # print project_path_sane() { ... } from a script — indent-tolerant
-    # since 0.0.41g (install.sh's copy is nested in do_plan_phase at +4)
+    # print a project_path_sane() { ... } block from a script or lib —
+    # indent-tolerant: the lib's real definition sits at indent 0, the
+    # callers' fail-closed stubs (issue #216) at +4
     sed -n '/^[[:space:]]*project_path_sane() {/,/^[[:space:]]*}/p' "$1" |
         sed 's/^[[:space:]]*//'
 }
 
-# Sanity: the function exists in BOTH scripts (policy drift = test failure)
+# --- issue #216: exactly ONE policy copy, in sh/path-sane.sh ---------------------
+# Structure before behavior: the old test compared two verbatim copies
+# for identity; the wave moved the policy into a leaf lib, so the pins
+# flip — the copy must exist in the lib, the callers must source it and
+# must NOT carry their own (only their fail-closed stub).
+
+if [ -n "$(extract_fn "$PATH_SANE")" ]; then
+    pass "project_path_sane defined in sh/path-sane.sh (the single copy)"
+else
+    fail "project_path_sane defined in sh/path-sane.sh (the single copy)"
+fi
+
+# Exactly ONE project_path_sane() { block per caller — the fail-closed
+# stub. A re-added second (full) copy and a deleted stub both redden.
+# Exact count, deliberately NO comment-strip rider: a commented-out
+# stub line SHOULD keep counting — the stub must be live (the rider
+# convention covers presence pins and count floors, not exact counts).
 for f in "$INSTALL" "$CONFIG"; do
-    if [ -n "$(extract_fn "$f")" ]; then
-        pass "project_path_sane defined in $f"
+    _stub_n=$(grep -c 'project_path_sane() {' "$f" || true)
+    if [ "$_stub_n" -eq 1 ]; then
+        pass "only the fail-closed stub defines project_path_sane in ${f##*/} (issue #216)"
     else
-        fail "project_path_sane defined in $f"
+        fail "${f##*/} must define project_path_sane exactly once (the fail-closed stub; got $_stub_n) (issue #216)"
     fi
 done
 
-# The two copies must stay content-identical (compared indent-normalized
-# since 0.0.41g): the duplication is deliberate (install.sh cannot source
-# config.sh's copy — streamed installs have no siblings yet), so drift
-# must be caught here, not on a user's machine.
-if [ "$(extract_fn "$INSTALL")" = "$(extract_fn "$CONFIG")" ]; then
-    pass "project_path_sane identical in install.sh and config.sh"
+# Wiring: install.sh kit_source's the lib (aborts loud when missing);
+# config.sh carries both lookup legs (checkout copy first, deployed
+# LIBDIR fallback).
+grep -q 'kit_source "$SCRIPT_DIR/opencode-permissions-kit-lib/sh/path-sane.sh"' "$INSTALL" &&
+    pass "install.sh sources sh/path-sane.sh via kit_source (issue #216)" ||
+    fail "install.sh sources sh/path-sane.sh via kit_source (issue #216)"
+if grep -q '"$SCRIPT_DIR/../sh/path-sane.sh"' "$CONFIG" &&
+    grep -q '"$LIBDIR/sh/path-sane.sh"' "$CONFIG"; then
+    pass "config.sh sources sh/path-sane.sh (checkout first, LIBDIR fallback) (issue #216)"
 else
-    fail "project_path_sane drifted between install.sh and config.sh (keep the copies content-identical)"
+    fail "config.sh sources sh/path-sane.sh (checkout first, LIBDIR fallback) (issue #216)"
 fi
 
-# Load the policy from install.sh
-eval "$(extract_fn "$INSTALL")"
+# The two stubs must stay identical — the drift guard the old two-copy
+# comparison provided, narrowed to the stubs.
+_stub_i="$(extract_fn "$INSTALL")"
+_stub_c="$(extract_fn "$CONFIG")"
+if [ -n "$_stub_i" ] && [ "$_stub_i" = "$_stub_c" ]; then
+    pass "install.sh and config.sh fail-closed stubs identical (issue #216)"
+else
+    fail "install.sh and config.sh fail-closed stubs drifted or missing (issue #216)"
+fi
+
+# And the stub fails CLOSED, executed (L1: the failure path runs, not
+# just greps): a missing gate must REFUSE every path loudly (rc 1 +
+# stderr), never allow and never be silent. Subshell-isolated so the
+# real policy below stays loaded; /var/tmp input = sanctioned prefix.
+# The group redirect must sit INSIDE the substitution — a `) 2>&1"`
+# spelling makes the redirect literal string content and stderr escapes
+# the capture (the bug this pin's first version shipped).
+_stub_out="$(
+    {
+        eval "$_stub_c"
+        if project_path_sane "/var/tmp/any"; then
+            echo "ALLOWED"
+        else
+            echo "refused rc=$?"
+        fi
+        echo "cell-done"
+    } 2>&1
+)"
+case "$_stub_out" in
+    *"project_path_sane unavailable"*"refused rc=1"*"cell-done"*)
+        pass "stub refuses loudly: rc 1 + stderr error, never silent (fail closed, issue #216)"
+        ;;
+    *)
+        fail "stub must refuse loudly with rc 1 (fail closed, issue #216; got: $_stub_out)"
+        ;;
+esac
+
+# Load the policy from the lib (the single copy)
+eval "$(extract_fn "$PATH_SANE")"
 
 # must REJECT (system paths and direct children of them)
 REJECT="/ /usr /etc /home /root /var /tmp /tmp/build-dir /bin /sbin /lib /lib64 /libx32 /opt /srv \
@@ -180,9 +242,13 @@ for p in "/var/./" "//x/" "/./"; do
 done
 
 # install.sh must store the NORMALIZED path, not the raw tilde input, in
-# both entry points — a literal ~/dev in projects.conf is silently skipped
-# by every consumer (review 0.0.39b C1). The standard prompt (line ~593)
-# always did; --projects and the custom-path dialog must match it.
+# all entry points — a literal ~/dev in projects.conf is silently skipped
+# by every consumer (review 0.0.39b C1). The standard prompt always did;
+# --projects and the custom-path dialog must match it. Floor 3 = the
+# three entry-point sites; the fourth _PP_NORM site the old floor of 4
+# counted was the policy DEFINITION, which moved to sh/path-sane.sh with
+# issue #216 (its normalization is pinned behaviorally by the ~ arms
+# above) — count install.sh's own sites only.
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
 # Guarded count (#260, the #244 f W1 class): grep -c prints 0 AND exits
 # 1 on zero matches — under set -e the bare assignment aborted the suite
@@ -190,7 +256,7 @@ INSTALL="$SCRIPT_DIR/../../files/install.sh"
 # rider (#261, the #244 g W1 class): commented-out lines stop counting —
 # full-line comments only (#244 h W6 residual).
 _norm_sites=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_PP_NORM' || true)
-if [ "$_norm_sites" -ge 4 ]; then
+if [ "$_norm_sites" -ge 3 ]; then
     pass "install.sh uses _PP_NORM in all project entry points ($_norm_sites sites)"
 else
     fail "install.sh uses _PP_NORM in all project entry points (only $_norm_sites sites)"
@@ -299,11 +365,12 @@ else
 fi
 
 # --- pr-00263 a F10: agent-home refusals take getent alongside the literal
-# spelling — a relocated agent home refuses too (config.sh + uninstall.sh
-# twins; the opk/status.sh pattern).
-grep -q '_pp_agent_home' "$CONFIG" &&
-    pass "config.sh agent-home refusal getent-aware (pr-00263 a F10)" ||
-    fail "config.sh agent-home refusal literal-only (pr-00263 a F10)"
+# spelling — a relocated agent home refuses too (the path policy lives in
+# sh/path-sane.sh since issue #216; uninstall.sh twin; the opk/status.sh
+# pattern).
+grep -q '_pp_agent_home' "$PATH_SANE" &&
+    pass "path policy agent-home refusal getent-aware (pr-00263 a F10)" ||
+    fail "path policy agent-home refusal literal-only (pr-00263 a F10)"
 
 echo ""
 if [ "$failures" -gt 0 ]; then
