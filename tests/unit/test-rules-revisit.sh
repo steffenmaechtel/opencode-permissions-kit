@@ -830,6 +830,35 @@ else
     fail "V23 quoted frontmatter: expected clean ladder despite quoted values, rc=$RC: $OUT"
 fi
 
+# V24. #317 d D1: the strip peels exactly ONE quote layer, matching
+#      gen-rules-index.py's parser -- a double-wrapped value
+#      (status: "'active'") stays 'active' for every extractor, so
+#      all three shell tools fail loud on it instead of blessing a
+#      value the INDEX silently drops from its active/retired
+#      buckets (two-layer sed stripped it to active everywhere).
+one_scratch 1m 2026-06-01 v24
+DWFM=$(meta_path "$VSCRATCH" RM-9001)
+sed -i "s/^status: active\$/status: \"'active'\"/" "$DWFM"
+SCRATCH=$VSCRATCH
+T=2026-06-15
+run_revisit RM-9001 clean
+DWREV=$RC
+DWOUT=$OUT
+run_report
+DWREP=$RC
+DWAOUT=$(RM_AUDIT_ROOT="$VSCRATCH" FORCE_TODAY=2026-06-15 \
+    sh "$REPO_ROOT/scripts/rules-audit.sh" 2>&1)
+DWARC=$?
+case "$DWOUT" in *"bad status ''active''"*) _dwr_ok=1 ;; *) _dwr_ok=0 ;; esac
+case "$OUT" in *"bad status ''active''"*) _dwp_ok=1 ;; *) _dwp_ok=0 ;; esac
+case "$DWAOUT" in *"bad status: ''active''"*) _dwa_ok=1 ;; *) _dwa_ok=0 ;; esac
+if [ "$DWREV" -eq 2 ] && [ "$_dwr_ok" = 1 ] && [ "$DWREP" -eq 2 ] &&
+    [ "$_dwp_ok" = 1 ] && [ "$DWARC" -eq 1 ] && [ "$_dwa_ok" = 1 ]; then
+    pass
+else
+    fail "V24 double-wrap one-layer: revisit rc=$DWREV/$_dwr_ok report rc=$DWREP/$_dwp_ok audit rc=$DWARC/$_dwa_ok: $DWAOUT"
+fi
+
 # ------------------------------------------------------------- summary
 if [ -s "$FAILS" ]; then
     printf 'rules-revisit pins: FAILED\n'

@@ -91,10 +91,11 @@ date_ok() { # ISO + plausible ranges (same shape as rules-audit.sh)
 }
 
 while IFS= read -r m; do
-    fm() { # frontmatter value of $1 ('' when absent; paired quotes
-        # stripped -- same normalization as gen-rules-index.py, #317 a F2)
+    fm() { # frontmatter value of $1 ('' when absent; ONE paired quote
+        # layer stripped, same normalization as gen-rules-index.py
+        # and the other shell extractors, #317 d D1)
         sed -n '2,/^---$/p' "$m" | sed -n "s/^$1:[[:space:]]*//p" | head -1 |
-            sed "s/^\"\(.*\)\"$/\1/; s/^'\(.*\)'$/\1/"
+            sed "s/^\([\"']\)\(.*\)\1$/\2/"
     }
     id=$(fm id)
     st=$(fm status)

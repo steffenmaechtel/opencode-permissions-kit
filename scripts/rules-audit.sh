@@ -131,10 +131,11 @@ first5() { # quote -> first five words (or fewer)
     printf '%s' "$_n"
 }
 
-fm_get() { # file key -> value ('' when absent; paired quotes
-    # stripped -- same normalization as gen-rules-index.py, #317 a F2)
+fm_get() { # file key -> value ('' when absent; ONE paired quote
+    # layer stripped, same normalization as gen-rules-index.py and the
+    # other shell extractors, #317 d D1)
     sed -n '2,/^---$/p' "$1" | sed -n "s/^$2:[[:space:]]*//p" | head -1 |
-        sed "s/^\"\(.*\)\"$/\1/; s/^'\(.*\)'$/\1/"
+        sed "s/^\([\"']\)\(.*\)\1$/\2/"
 }
 
 # ------------------------------------------- pass 1: scope files (1, 2, 3)
