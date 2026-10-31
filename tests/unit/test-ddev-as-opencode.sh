@@ -259,9 +259,11 @@ PATH="$SH_STUB:$PATH" sh "$HELPER" --opk-ensure-shared "$SH/does-not-exist" >/de
 check "heal: missing target is a clean no-op (exit 0)" [ "$?" = 0 ]
 
 # The heal must sit BEFORE the ddev resolution/exec: it never needs ddev,
-# and the resolve block must not run for it.
+# and the resolve block must not run for it. (#285: the walk runs over a
+# comment-stripped copy -- substitute, not delete, so the NR bookkeeping
+# stays true; a commented-out handler can no longer satisfy the anchor.)
 check "heal: handled before the ddev binary resolution" \
-    sh -c "awk '/--opk-ensure-shared/{h=NR} /DDEV=\"\"/{d=NR} END{exit !(h>0 && d>0 && h<d)}' \"\$1\"" _ "$HELPER"
+    sh -c "sed 's/^[[:space:]]*#.*\$//' \"\$1\" | awk '/--opk-ensure-shared/{h=NR} /DDEV=\"\"/{d=NR} END{exit !(h>0 && d>0 && h<d)}'" _ "$HELPER"
 
 rm -rf "$SH" "$SH_STUB"
 
@@ -305,7 +307,7 @@ check "devowned-flag: project without .ddev/config.yaml is a clean no-op" \
 check "devowned-flag: helper sources the sibling ddev-handover.sh lib" \
     sh -c "grep -q 'sh/ddev-handover.sh' \"\$1\"" _ "$HELPER"
 check "devowned-flag: handled before the ddev binary resolution" \
-    sh -c "awk '/--opk-devowned-flag/{h=NR} /DDEV=\"\"/{d=NR} END{exit !(h>0 && d>0 && h<d)}' \"\$1\"" _ "$HELPER"
+    sh -c "sed 's/^[[:space:]]*#.*\$//' \"\$1\" | awk '/--opk-devowned-flag/{h=NR} /DDEV=\"\"/{d=NR} END{exit !(h>0 && d>0 && h<d)}'" _ "$HELPER"
 check "devowned-flag: helper respects the OPK_INSTALL_CONF override" \
     sh -c "grep -qF 'INSTALL_CONF=\"\${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}\"' \"\$1\"" _ "$HELPER"
 
@@ -338,7 +340,7 @@ DFW_LNK=$(DDEV_DEV_OWNED=true PATH="$DF_STUB:$PATH" sh "$HELPER" --opk-devowned-
 check "W1 delivery: symlink-gate warning arrives on stdout (pre-existing 0.0.39g S2 class, 0.0.46b W1)" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'config.yaml is a symlink'" _ "$DFW_LNK"
 check "W1 delivery: the flag mode carries the stdout merge (exec 2>&1 inside the branch, 0.0.46b W1)" \
-    sh -c "awk 'b&&/^[[:space:]]*exec 2>&1\$/{e=NR} /--opk-devowned-flag/{if(!b)b=NR} b&&/^fi\$/{f=NR} END{exit !(e>0 && e>b && e<f)}' \"\$1\"" _ "$HELPER"
+    sh -c "sed 's/^[[:space:]]*#.*\$//' \"\$1\" | awk 'b&&/^[[:space:]]*exec 2>&1\$/{e=NR} /--opk-devowned-flag/{if(!b)b=NR} b&&/^fi\$/{f=NR} END{exit !(e>0 && e>b && e<f)}'" _ "$HELPER"
 chmod 755 "$DFW/tmp/.ddev"
 rm -rf "$DFW"
 
@@ -1728,6 +1730,23 @@ _n_w9=$(sed 's/^[[:space:]]*#.*$//' "$HANDOVER" | grep -c 'warn: project-root ha
 grep -q 'warn: dev-owned handback incomplete for $dhb_proj (root inode' "$HANDOVER" &&
     pass "root-inode handback warn line present (#211 b W9)" ||
     fail "root-inode handback warn line present (#211 b W9)"
+
+# #285 pin-of-the-pin: the handler-before-resolution order pins walk
+# comment-stripped copies -- commenting out a whole handler block
+# (disable-by-edit: doc comment through its fi) must flip the pin RED.
+# Executed on scratch copies; the unsabotaged controls are the order
+# pins above (green every suite run).
+CB285="$(mktemp -d)"
+for _h in --opk-ensure-shared --opk-devowned-flag; do
+    sed "/${_h}/,/^fi\$/ s/^/#/" "$HELPER" >"$CB285/helper-$_h"
+    if sed 's/^[[:space:]]*#.*$//' "$CB285/helper-$_h" |
+        awk -v pat="$_h" '$0 ~ pat {h=NR} /DDEV=""/{d=NR} END{exit !(h>0 && d>0 && h<d)}'; then
+        fail "#285: order pin green with the $_h handler commented out (comment-blind)"
+    else
+        pass "#285: order pin reds with the $_h handler commented out"
+    fi
+done
+rm -rf "$CB285"
 
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}Failed: $failures${NC}"

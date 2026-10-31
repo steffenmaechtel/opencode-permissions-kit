@@ -499,6 +499,9 @@ check "wiring: update.sh tui.json write goes through staged_write" \
 # residual). Guarded counts (#260): the || true sits INSIDE the
 # substitution so a zero-match grep -c cannot abort under set -e; the
 # comparison legs carry the failure.
+# (#285: the ! grep -q absence legs below stay RAW on purpose -- a
+# commented forbidden construct SHOULD keep tripping; the absence
+# carve-out in conventions.md "Source-counting pins".)
 _iac_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_oc_install_agent_config' || true)"
 check "wiring: install.sh config writes go through staged_write (0.0.39h F8: offline-rendered, ONE write per branch; render sites: $_iac_n, need 4-9)" \
     sh -c '[ "$2" -ge 4 ] && [ "$2" -le 9 ] && ! grep -q "sed -i .*opencode\.jsonc" "$1"' _ "$INSTALL" "$_iac_n"

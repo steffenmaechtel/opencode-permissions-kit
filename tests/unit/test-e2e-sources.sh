@@ -202,6 +202,9 @@ check "both Dockerfiles upgrade via the git-core PPA on channel latest" \
 # protection, and a job-level skip can no longer collapse the legs.
 # The per-leg channel assignment is pinned by test-workflows.sh
 # (per-job blocks); this is the presence + no-matrix pin.
+# (#285: the absence leg in the check below stays raw on purpose -- a
+# commented forbidden construct SHOULD keep tripping; the absence
+# carve-out in conventions.md "Source-counting pins".)
 check "CI covers the git pair as explicit jobs (distro + latest legs, issue #118)" \
     sh -c "grep -q 'e2e-2x-git-distro:' \"\$1\" && grep -q 'e2e-2x-git-latest:' \"\$1\" && ! grep -qE 'matrix\.git|git: \[distro' \"\$1\"" _ "$WF_E2E"
 check "run.sh asserts the latest leg really runs PPA git" \
