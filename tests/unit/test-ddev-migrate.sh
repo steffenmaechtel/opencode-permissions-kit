@@ -310,7 +310,7 @@ WRAP
 OUT=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" DDEV_FAKE_BROKEN=1 DDEV_EAT_STDIN=1 \
     PATH="$WORK/bin:$PATH" \
-    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null)
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null) || true
 DUMP_DIR=$(ls -1d "$WORK/backups"/ddev-migration-* 2>/dev/null | tail -1)
 
 check "export produced a dump directory" test -n "$DUMP_DIR"
@@ -351,7 +351,7 @@ mv "$WORK/ddev.log" "$WORK/ddev-run1.log"
 OUT2=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" \
     PATH="$WORK/bin:$PATH" \
-    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts)
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts) || true
 
 assert_eq "resume reuses the SAME dump directory (no second wave)" \
     "1" "$(ls -1d "$WORK/backups"/ddev-migration-* 2>/dev/null | wc -l | tr -d ' ')"
@@ -390,7 +390,7 @@ ln -s "$WORK/victim-dump.conf" "$DUMP_DIR/evil.sql.gz"
 OUT3=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" \
     PATH="$WORK/bin:$PATH" \
-    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null)
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null) || true
 check "planted .export-*.err link is never touched (captures live in .root-stage)" \
     sh -c "test \"\$(cat \"\$1\")\" = VICTIM-ERR-CONTENT" _ "$WORK/victim-err.conf"
 check "chmod pass skips symlink operands (victim keeps its mode)" \

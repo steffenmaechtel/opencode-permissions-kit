@@ -203,7 +203,7 @@ printf '#!/bin/sh\necho "FAKE_DDEV_ARGS:$*"\necho "FAKE_DDEV_CWD:$(pwd)"\n' >"$W
 chmod +x "$WF/stub/id" "$WF/stub/ddev"
 mkdir "$WF/locked"
 
-WF_OUT=$(cd "$WF" && PATH="$WF/stub:$PATH" sh "$HELPER" poweroff 2>&1)
+WF_OUT=$(cd "$WF" && PATH="$WF/stub:$PATH" sh "$HELPER" poweroff 2>&1) || true
 check "fallback: readable cwd keeps the directory (ddev runs right there)" \
     sh -c "printf '%s\n' \"\$1\" | grep -qF 'FAKE_DDEV_CWD:$WF'" _ "$WF_OUT"
 check "fallback: readable cwd stays silent (no note)" \
@@ -363,7 +363,7 @@ RESULT=$(
     id() { echo 4242; }
     . "$FUNC"
     ddev start web
-)
+) || true
 assert_eq "already-opencode branch runs the real ddev (no sudo, no recursion)" \
     "REAL_DDEV_RAN:start web" "$RESULT"
 

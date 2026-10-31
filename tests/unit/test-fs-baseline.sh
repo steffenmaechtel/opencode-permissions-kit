@@ -126,7 +126,7 @@ assert_eq "re-run is idempotent (modes stable)" \
     "$(stat -c %a "$WORK/proj") $(stat -c %a "$WORK/proj/sub") $(stat -c %a "$WORK/proj/file.txt")"
 
 # --- 5. empty/missing root is a silent no-op ----------------------------------------
-OUT3="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2-nope" "$3"' _ "$LIB" "$WORK/proj" "$GRP" 2>&1)"
+OUT3="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2-nope" "$3"' _ "$LIB" "$WORK/proj" "$GRP" 2>&1)" || true
 assert_eq "missing root: no output, no error" "" "$OUT3"
 
 # --- 6. wiring: all three callers use the helper -------------------------------------

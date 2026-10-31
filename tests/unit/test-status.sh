@@ -727,13 +727,13 @@ _oc_home_probe() {
         printf '%s\n' "$_oc_home"
     )
 }
-_oc_probe_root="$(_oc_home_probe root)"
+_oc_probe_root="$(_oc_home_probe root)" || true
 if [ "$_oc_probe_root" = "/root" ]; then
     pass "openchamber home resolution: getent wins over the /home fallback (0.0.47c C1)"
 else
     fail "openchamber home resolution discards getent — expected /root, got '$_oc_probe_root' (0.0.47c C1)"
 fi
-_oc_probe_none="$(_oc_home_probe oc-no-such-user-0.0.47c)"
+_oc_probe_none="$(_oc_home_probe oc-no-such-user-0.0.47c)" || true
 if [ "$_oc_probe_none" = "/home/oc-no-such-user-0.0.47c" ]; then
     pass "openchamber home resolution: fallback taken on unresolvable user (0.0.47c C1)"
 else
@@ -810,7 +810,7 @@ ocv_run() {
 }
 
 # 1. clean home, no OpenChamber -> no line at all
-out="$(ocv_run without)"
+out="$(ocv_run without)" || true
 if [ -z "$out" ]; then
     pass "verdict matrix: clean state prints no OpenChamber line"
 else
@@ -820,7 +820,7 @@ fi
 # 2. F3: a symlink to the kit wrapper is NOT a bypass binary -> still quiet
 mkdir -p "$OCV_HOME/.opencode/bin"
 ln -s "$OCV_WRAPPER" "$OCV_HOME/.opencode/bin/opencode"
-out="$(ocv_run without)"
+out="$(ocv_run without)" || true
 if [ -z "$out" ]; then
     pass "verdict matrix: kit-owned symlink ignored (0.0.47a F3)"
 else
@@ -831,7 +831,7 @@ fi
 #    never the red BYPASSED verdict
 rm -f "${OCV_HOME:?}/.opencode/bin/opencode"
 echo fake >"$OCV_HOME/.opencode/bin/opencode"
-out="$(ocv_run without)"
+out="$(ocv_run without)" || true
 if printf '%s' "$out" | grep -q 'not installed' &&
     ! printf '%s' "$out" | grep -q 'BYPASSED'; then
     pass "verdict matrix: shadow binary without OpenChamber is not BYPASSED (0.0.47a F4)"
@@ -843,7 +843,7 @@ fi
 mkdir -p "$OCV_HOME/.config/openchamber"
 printf '{ "opencodeBinary": "/tmp/evil-opencode" }\n' \
     >"$OCV_HOME/.config/openchamber/settings.json"
-out="$(ocv_run without)"
+out="$(ocv_run without)" || true
 if printf '%s' "$out" | grep -q 'BYPASSED'; then
     pass "verdict matrix: settings pin without policy -> BYPASSED"
 else
@@ -852,7 +852,7 @@ fi
 
 # 5. policy pins the kit bin -> secured, leftovers noted as inert
 printf '{ "opencodeBinary": "%s" }\n' "$OCV_KITBIN" >"$OCV_POLICY"
-out="$(ocv_run without)"
+out="$(ocv_run without)" || true
 if printf '%s' "$out" | grep -q 'secured via policy pin' &&
     printf '%s' "$out" | grep -q 'leftover bypass files present'; then
     pass "verdict matrix: policy secures, leftovers called inert"
@@ -864,7 +864,7 @@ fi
 #    settings pin removed) -> secured without a leftover note
 rm -f "${OCV_HOME:?}/.opencode/bin/opencode" "${OCV_HOME:?}/.config/openchamber/settings.json"
 ln -s "$OCV_WRAPPER" "$OCV_HOME/.opencode/bin/opencode"
-out="$(ocv_run without)"
+out="$(ocv_run without)" || true
 if printf '%s' "$out" | grep -q 'secured via policy pin' &&
     ! printf '%s' "$out" | grep -q 'leftover'; then
     pass "verdict matrix: kit symlink under policy is not a leftover (0.0.47a F3)"
@@ -877,7 +877,7 @@ rm -f "${OCV_HOME:?}/.opencode/bin/opencode" "${OCV_POLICY:?}" \
     "${OCV_HOME:?}/.config/openchamber/settings.json"
 printf '#!/bin/sh\n' >"$OCV_BINDIR/openchamber"
 chmod +x "$OCV_BINDIR/openchamber"
-out="$(ocv_run with)"
+out="$(ocv_run with)" || true
 if printf '%s' "$out" | grep -q 'policy pin missing'; then
     pass "verdict matrix: command marker alone -> advice line"
 else
@@ -897,6 +897,30 @@ if [ -z "$out" ]; then
 else
     fail "verdict matrix leaks the host PATH into the verdicts (got: $out)"
 fi
+
+# (#282) capture-guard pin, representative for the guarded capture
+# family (run_kit / ocv_run / run_summary / probe and export
+# captures): a probe regression (non-zero exit) must NEVER abort this
+# set -e suite mid-run -- the guard records the rc, the neighboring
+# assert fails as a tally line, everything after still runs. Executed
+# with a planted failing block through the family's own helper; the
+# bare (unguarded) form aborts at the assignment -- the failure path
+# this pin executes and observes (#260's sibling zero-path pin shape).
+_282_saved_block=$OCV_BLOCK
+OCV_BLOCK='exit 3'
+_c282=0
+_p282="$(ocv_run without)" || _c282=$?
+if [ "$_c282" = 3 ]; then
+    pass "#282: guarded capture records the probe rc (3), no set -e abort"
+else
+    fail "#282: guard must record the probe rc (got ${_c282:-unset}) instead of aborting"
+fi
+if [ -z "$_p282" ]; then
+    pass "#282: failed probe leaves the captured output empty for the assert"
+else
+    fail "#282: failed probe output leaked into the capture: '$_p282'"
+fi
+OCV_BLOCK=$_282_saved_block
 
 # --- issue #158: verdict summary, --short, .git/config wording --------------------
 # Static pins first (wording + sweep invariants), then the extracted
@@ -1010,7 +1034,7 @@ if [ -n "$SUMMARY_BLOCK" ]; then
         ) || _rs_rc=$?
         printf '%s\nrc=%s\n' "$_rs_out" "$_rs_rc"
     }
-    _sum=$(run_summary 1 2 5 false)
+    _sum=$(run_summary 1 2 5 false) || true
     if printf '%s' "$_sum" | grep -q '1 alert(s), 2 warning(s)' &&
         printf '%s' "$_sum" | grep -q 'see the sections above' &&
         printf '%s' "$_sum" | grep -q 'SECTION:Summary' &&
@@ -1021,20 +1045,20 @@ if [ -n "$SUMMARY_BLOCK" ]; then
     fi
     # counts snapshot BEFORE the verdict row: the alert row itself bumps
     # UI_ROWS_BAD — a snapshot after it would print 2 alert(s)
-    _sum=$(run_summary 1 2 5 false)
+    _sum=$(run_summary 1 2 5 false) || true
     if ! printf '%s' "$_sum" | grep -q '2 alert(s)'; then
         pass "verdict row excluded from its own tally (snapshot first)"
     else
         fail "verdict row counts itself (snapshot sits too late)"
     fi
-    _sum=$(run_summary 0 1 5 false)
+    _sum=$(run_summary 0 1 5 false) || true
     if printf '%s' "$_sum" | grep -q '1 warning(s)' &&
         printf '%s' "$_sum" | grep -q 'rc=2'; then
         pass "verdict: warnings only, exit 2"
     else
         fail "verdict warning case broken (got: $_sum)"
     fi
-    _sum=$(run_summary 0 0 7 false)
+    _sum=$(run_summary 0 0 7 false) || true
     if printf '%s' "$_sum" | grep -q 'All green' &&
         printf '%s' "$_sum" | grep -q '7 checks passed' &&
         printf '%s' "$_sum" | grep -q 'rc=0'; then
@@ -1042,7 +1066,7 @@ if [ -n "$SUMMARY_BLOCK" ]; then
     else
         fail "verdict green case broken (got: $_sum)"
     fi
-    _sum=$(run_summary 1 2 5 true)
+    _sum=$(run_summary 1 2 5 true) || true
     if printf '%s' "$_sum" | grep -q "run 'opk status' for the full report" &&
         ! printf '%s' "$_sum" | grep -q 'SECTION:Summary' &&
         printf '%s' "$_sum" | grep -q 'rc=1'; then
