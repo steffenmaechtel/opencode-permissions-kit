@@ -120,13 +120,16 @@ echo "$OUT" | grep -q "default ACLs *[0-9]* entries — done" &&
     fail "ACL pass reports a done-counter"
 
 # --- 4. idempotence ---------------------------------------------------------------
-FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" >/dev/null 2>&1
+_idem_rc=0
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$WORK/proj" "$GRP" >/dev/null 2>&1 ||
+    _idem_rc=$?
+assert_eq "idempotent re-run exits 0" "0" "$_idem_rc"
 assert_eq "re-run is idempotent (modes stable)" \
     "2770 2770 660" \
     "$(stat -c %a "$WORK/proj") $(stat -c %a "$WORK/proj/sub") $(stat -c %a "$WORK/proj/file.txt")"
 
 # --- 5. empty/missing root is a silent no-op ----------------------------------------
-OUT3="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2-nope" "$3"' _ "$LIB" "$WORK/proj" "$GRP" 2>&1)"
+OUT3="$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2-nope" "$3"' _ "$LIB" "$WORK/proj" "$GRP" 2>&1)" || true
 assert_eq "missing root: no output, no error" "" "$OUT3"
 
 # --- 6. wiring: all three callers use the helper -------------------------------------
@@ -160,8 +163,10 @@ mkdir -p "$TR/pub/proj" "$TR/gx/proj"
 chmod 700 "$TR"
 chmod 755 "$TR/pub"
 chmod 750 "$TR/gx"
-FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$TR/pub/proj" "$GRP" >/dev/null 2>&1
-if getfacl -p "$TR" 2>/dev/null | grep -q "^group:$GRP:--x"; then
+_anc_rc=0
+FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$TR/pub/proj" "$GRP" >/dev/null 2>&1 ||
+    _anc_rc=$?
+if [ "$_anc_rc" = 0 ] && getfacl -p "$TR" 2>/dev/null | grep -q "^group:$GRP:--x"; then
     pass "blocking ancestor gets a traverse-only ACL (x, no read/list)"
 else
     fail "blocking ancestor gets a traverse-only ACL (got: $(getfacl -p "$TR" 2>/dev/null | grep "^group:$GRP" | tr '\n' ' '))"

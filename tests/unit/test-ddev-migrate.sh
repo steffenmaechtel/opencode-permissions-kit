@@ -97,7 +97,7 @@ project_info:
 webimage: ddev/ddev-webserver
 YML
 
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome/.ddev")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome/.ddev") || true
 assert_eq "registry parser reads name|approot pairs (quoted + unquoted)" \
     "alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
@@ -110,13 +110,13 @@ outside|/var/tmp/opencode-ddev-mig-roots/srv/other/outside" "$RESULT"
 # not even inert ones an earlier sed would have rewritten.
 mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/alpha /var/tmp/opencode-ddev-mig-roots/vhosts/client/beta /var/tmp/opencode-ddev-mig-roots/srv/other/outside 2>/dev/null || true
 
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts") || true
 assert_eq "root filter keeps only projects under the registered roots" \
     "alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
 
 # Nonexistent approots are dropped (stale registry entries).
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/does/not/exist")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/does/not/exist") || true
 assert_eq "root filter with no matching dirs yields nothing" "" "$RESULT"
 
 # --- 2b. ddev >= 1.23 registry: standalone project_list.yaml -----------------------
@@ -136,13 +136,13 @@ outside:
 YML
 printf 'last_started_version: v1.25.2\nwebimage: ddev/ddev-webserver\n' >"$WORK/devhome123/.ddev/global_config.yaml"
 
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev") || true
 assert_eq "registry parser reads the ddev >= 1.23 project_list.yaml (quoted + unquoted)" \
     "client07-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
 outside|/var/tmp/opencode-ddev-mig-roots/srv/other/outside" "$RESULT"
 
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome123/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome123/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts") || true
 assert_eq "root filter applies to project_list.yaml projects too" \
     "client07-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
@@ -156,7 +156,7 @@ project_info:
   legacy-only:
     approot: /var/tmp/opencode-ddev-mig-roots/vhosts/gamma
 YML
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome123/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome123/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts") || true
 assert_eq "legacy and modern registry files are BOTH scanned" \
     "client07-test-260605|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
@@ -165,7 +165,7 @@ legacy-only|/var/tmp/opencode-ddev-mig-roots/vhosts/gamma" "$RESULT"
 # ddev creates an EMPTY project_list.yaml on fresh homes — no projects.
 printf 'last_started_version: v1.25.2\n' >"$WORK/devhome123/.ddev/global_config.yaml"
 : >"$WORK/devhome123/.ddev/project_list.yaml"
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome123/.ddev") || true
 assert_eq "empty project_list.yaml + bare global config yields nothing" "" "$RESULT"
 
 # --- 2c. ddev_migrate_done: both registry layouts count ----------------------------
@@ -310,7 +310,7 @@ WRAP
 OUT=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" DDEV_FAKE_BROKEN=1 DDEV_EAT_STDIN=1 \
     PATH="$WORK/bin:$PATH" \
-    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null)
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null) || true
 DUMP_DIR=$(ls -1d "$WORK/backups"/ddev-migration-* 2>/dev/null | tail -1)
 
 check "export produced a dump directory" test -n "$DUMP_DIR"
@@ -351,7 +351,7 @@ mv "$WORK/ddev.log" "$WORK/ddev-run1.log"
 OUT2=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" \
     PATH="$WORK/bin:$PATH" \
-    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts)
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts) || true
 
 assert_eq "resume reuses the SAME dump directory (no second wave)" \
     "1" "$(ls -1d "$WORK/backups"/ddev-migration-* 2>/dev/null | wc -l | tr -d ' ')"
@@ -390,7 +390,7 @@ ln -s "$WORK/victim-dump.conf" "$DUMP_DIR/evil.sql.gz"
 OUT3=$(DDEV_MIG_BACKUP_ROOT="$WORK/backups" DDEV_LOG="$WORK/ddev.log" \
     DDEV_MIG_DEV_HOME="$WORK/devhome" \
     PATH="$WORK/bin:$PATH" \
-    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null)
+    sh "$WORK/run-export.sh" "$MIG" "$(id -un)" root "$(id -gn)" /var/tmp/opencode-ddev-mig-roots/vhosts </dev/null) || true
 check "planted .export-*.err link is never touched (captures live in .root-stage)" \
     sh -c "test \"\$(cat \"\$1\")\" = VICTIM-ERR-CONTENT" _ "$WORK/victim-err.conf"
 check "chmod pass skips symlink operands (victim keeps its mode)" \

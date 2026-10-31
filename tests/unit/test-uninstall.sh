@@ -1586,8 +1586,8 @@ _un_f3_out() { # <sudo-rc> — drive the section REAL with a stubbed sudo
         eval "$F3SEC"
     ) 2>&1
 }
-_f3fail="$(_un_f3_out 1)"
-_f3ok="$(_un_f3_out 0)"
+_f3fail="$(_un_f3_out 1)" || true
+_f3ok="$(_un_f3_out 0)" || true
 if printf '%s' "$_f3fail" | grep -q 'WARN: sudoers removal failed' &&
     printf '%s' "$_f3fail" | grep -q 'LOG:sudoers removal FAILED' &&
     ! printf '%s' "$_f3fail" | grep -q 'sudoers removed\.' &&
