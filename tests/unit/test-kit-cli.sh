@@ -123,11 +123,12 @@ case "$out" in
 esac
 
 # --version prints just the version, one line (issue #130)
-out="$(run_kit --version)" || true
-assert "--version exits 0" "0" "$?"
+_vk_rc=0
+out="$(run_kit --version)" || _vk_rc=$?
+assert "--version exits 0" "0" "$_vk_rc"
 assert "--version prints 'opk <stamp>'" "opk 9.9.9" "$out"
 # No install.conf: fallback stamp, never an error (dev checkouts)
-out="$(OPK_INSTALL_CONF="$WORK/no-such.conf" "$BIN/opk" --version 2>/dev/null)"
+out="$(OPK_INSTALL_CONF="$WORK/no-such.conf" "$BIN/opk" --version 2>/dev/null)" || true
 assert "--version without install.conf falls back" "opk 0.0.0" "$out"
 
 # status dispatches without sudo (root test envs: euid matches current)
@@ -396,8 +397,9 @@ esac
 
 # --dry-run: plan only, no changes, no sudo, exit 0
 rm -f "${WORK:?}/sudo-marker"
-out="$(run_kit handover me "$WORK/ho-tree" --dry-run)" || true
-assert "handover --dry-run exits 0" "0" "$?"
+_hd_rc=0
+out="$(run_kit handover me "$WORK/ho-tree" --dry-run)" || _hd_rc=$?
+assert "handover --dry-run exits 0" "0" "$_hd_rc"
 case "$out" in
     *"would hand over: $WORK/ho-tree -> $(id -un):$(id -gn)"*)
         echo "  ${GREEN}PASS${NC}  handover --dry-run prints the plan (user:group)"
@@ -554,8 +556,9 @@ printf 'DEFAULT_USER=%s\nOPENCODE_USER=nobody\nOPENCODE_GROUP=%s\nVERSION=9.9.9\
 # explicit dir, agent user == current user (fake conf): direct call, no sudo
 rm -f "${WORK:?}/sudo-marker"
 : >"$WORK/es-marker"
-out="$(run_kit ensure-shared "$WORK/es-proj/.ddev" 2>&1)" || true
-assert "ensure-shared exits 0" "0" "$?"
+_es_rc=0
+out="$(run_kit ensure-shared "$WORK/es-proj/.ddev" 2>&1)" || _es_rc=$?
+assert "ensure-shared exits 0" "0" "$_es_rc"
 case "$out" in
     *"group-write re-asserted on $WORK/es-proj/.ddev"*)
         echo "  ${GREEN}PASS${NC}  ensure-shared reports success"
@@ -661,8 +664,9 @@ chmod +x "$LIB/bin/ddev-as-opencode"
 # different agent user (nobody): hops through sudo -u, args intact
 rm -f "${WORK:?}/sudo-marker"
 : >"$WORK/es-marker"
-out="$(OPK_INSTALL_CONF="$WORK/install-nobody.conf" "$BIN/opk" ensure-shared "$WORK/es-proj/.ddev" 2>&1)"
-assert "ensure-shared (sudo path) exits 0" "0" "$?"
+_esn_rc=0
+out="$(OPK_INSTALL_CONF="$WORK/install-nobody.conf" "$BIN/opk" ensure-shared "$WORK/es-proj/.ddev" 2>&1)" || _esn_rc=$?
+assert "ensure-shared (sudo path) exits 0" "0" "$_esn_rc"
 assert "ensure-shared (sudo path) passes the dir to the helper" \
     "args=--opk-ensure-shared $WORK/es-proj/.ddev" "$(tail -1 "$WORK/es-marker")"
 if [ -f "$WORK/sudo-marker" ]; then

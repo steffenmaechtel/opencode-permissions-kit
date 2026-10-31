@@ -242,8 +242,8 @@ printf 'DUMP\n' >"$SH/.ddev/import-db/dump.sql.gz"
 chmod 755 "$SH/.ddev" "$SH/.ddev/commands" "$SH/.ddev/commands/web" "$SH/.ddev/db_snapshots" "$SH/.ddev/import-db"
 chmod 644 "$SH/.ddev/config.yaml" "$SH/.ddev/commands/web/hostcmd" "$SH/.ddev/db_snapshots/db.sql.gz" "$SH/.ddev/import-db/dump.sql.gz"
 
-HEAL_OUT=$(PATH="$SH_STUB:$PATH" sh "$HELPER" --opk-ensure-shared "$SH/.ddev" 2>&1)
-HEAL_RC=$?
+HEAL_RC=0
+HEAL_OUT=$(PATH="$SH_STUB:$PATH" sh "$HELPER" --opk-ensure-shared "$SH/.ddev" 2>&1) || HEAL_RC=$?
 
 check "heal: exits 0 and stays silent" [ "$HEAL_RC" = 0 ] && [ -z "$HEAL_OUT" ]
 check "heal: directories get group-write (git can deliver files there)" \

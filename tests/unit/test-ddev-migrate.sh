@@ -97,7 +97,7 @@ project_info:
 webimage: ddev/ddev-webserver
 YML
 
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome/.ddev")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_registry \"\$2\"" _ "$MIG" "$WORK/devhome/.ddev") || true
 assert_eq "registry parser reads name|approot pairs (quoted + unquoted)" \
     "alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta
@@ -110,13 +110,13 @@ outside|/var/tmp/opencode-ddev-mig-roots/srv/other/outside" "$RESULT"
 # not even inert ones an earlier sed would have rewritten.
 mkdir -p /var/tmp/opencode-ddev-mig-roots/vhosts/alpha /var/tmp/opencode-ddev-mig-roots/vhosts/client/beta /var/tmp/opencode-ddev-mig-roots/srv/other/outside 2>/dev/null || true
 
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/var/tmp/opencode-ddev-mig-roots/vhosts") || true
 assert_eq "root filter keeps only projects under the registered roots" \
     "alpha|/var/tmp/opencode-ddev-mig-roots/vhosts/alpha
 beta|/var/tmp/opencode-ddev-mig-roots/vhosts/client/beta" "$RESULT"
 
 # Nonexistent approots are dropped (stale registry entries).
-RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/does/not/exist")
+RESULT=$(sh -c ". \"\$1\" && ddev_migrate_projects \"\$2\" \"\$3\"" _ "$MIG" "$WORK/devhome/.ddev" "/does/not/exist") || true
 assert_eq "root filter with no matching dirs yields nothing" "" "$RESULT"
 
 # --- 2b. ddev >= 1.23 registry: standalone project_list.yaml -----------------------

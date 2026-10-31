@@ -891,7 +891,7 @@ fi
 #    old bug's exact channel: ocv_run used to inherit the host PATH on
 #    "without" runs; under the hermetic PATH the prefix dies with it.
 rm -rf "${OCV_HOME:?}/.config" "${OCV_HOME:?}/.opencode"
-out="$(PATH="$OCV_BINDIR:$PATH" ocv_run without)"
+out="$(PATH="$OCV_BINDIR:$PATH" ocv_run without)" || true
 if [ -z "$out" ]; then
     pass "verdict matrix ignores a host openchamber on PATH (0.0.48 leak)"
 else
