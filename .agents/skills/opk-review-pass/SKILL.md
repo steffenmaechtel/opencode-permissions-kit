@@ -81,14 +81,15 @@ status BEFORE the fan-out launches:
   only implements; a fresh session (this one, if commissioned for
   review) runs the whole loop for ONE PR it did not implement;
   the review pass stays a subagent (≥ 1 axis; the staffing rules
-  above decide 1 vs 2); marker mode `new-session-review`
+  above decide the axes); marker mode `new-session-review`
   (review-concept, "Review tracks").
 - **wave** — > ~50 lines or substantive logic: 2–3 fast-tier axes,
-  V3 verification (verifier batches + main audit).
+  V3 (1 verifier batch + main audit).
 - **micro** — ≤ ~50 lines or message-only: exactly ONE fast-tier
-  subagent (~5 min, greps + targeted reads); main audit alone when
-  the digest has 0 MED/HIGH, else one verifier batch. Solo means one
-  subagent, never main-solo.
+  subagent (~5 min, greps + targeted reads); verification per the
+  sizing gate (section 6): ≤ 3 findings all LOW/INFO → main audit
+  alone; else exactly one verifier batch. Solo means one subagent,
+  never main-solo.
 - **none** — comments/docs only: no review round owed; closure via
   the diff-shape proof.
 
@@ -216,9 +217,9 @@ review-concept, "The round comment contract"):
 The loop status inside the comment is the round report (it is what
 the maintainer reads):
 
-- tier + classification evidence (diff shape), reviewers/curator/
-  verifiers with models, output-contract violations (0 or disclosed),
-  CI status of the last push;
+- track + tier + classification evidence (diff shape),
+  reviewers/curator/verifiers with models, output-contract
+  violations (0 or disclosed), CI status of the last push;
 - review-relevant code touched this round: yes/no (drives the stop
   rule — review-concept, "The loop and the stop rule");
 - round typing: converging or BUILDING (predominantly fix-induced

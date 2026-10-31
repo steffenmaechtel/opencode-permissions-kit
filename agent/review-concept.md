@@ -96,14 +96,14 @@ round b: review (comment) → fixes → … → closing summary → merge
 ## The loop and the stop rule
 
 ```
-review → fix → review the fixes (wave review) → fix → …
+review → fix → review the fixes (diff-scope, 1-axis micro) → fix → …
 ```
 
 - A round's disposition covers ALL findings of its review — fixed or
   deliberately-not-done, each one. An instruction like "fix F1 first"
-  sequences work INSIDE the round; it does not end the round. One wave
-  review per round, batching all of the round's fixes — never one per
-  finding or per ad-hoc slice. (RM-0106)
+  sequences work INSIDE the round; it does not end the round. One
+  diff-scope review per round, batching all of the round's fixes —
+  never one per finding or per ad-hoc slice. (RM-0106)
 - The cadence authority is the commission: maintainer-gated variants
   fire each round on the maintainer's go; autonomous commissions run
   rounds back to back inside the loop cap. Pushes and PR creation are
@@ -163,7 +163,7 @@ diff PATHS — the blast-radius axis. Shipped means any file under
 
 | Track | Round's diff | Tier | Review staffing | Verification |
 |---|---|---|---|---|
-| high | > ~50 lines or substantive logic | **wave** | 2–3 fast-tier axes | V3 (verifier batches + main audit) |
+| high | > ~50 lines or substantive logic | **wave** | 2–3 fast-tier axes | V3 (1 verifier batch + main audit) |
 | high | ≤ ~50 lines, message-only | **micro** | exactly 1 fast-tier axis (~5 min) | main audit alone; else 1 batch |
 | med | any (non-shipped only) | **med** | 1–2 fast-tier axes (triggers below) | main curation + verify sizing |
 | either | comments / docs only | **none** | no review round owed | closure via the diff-shape proof |
@@ -242,12 +242,16 @@ pass works.
   LOW/INFO code findings are deliberately not done, RECORDED in the
   round comment — no fix, no follow-on round, and no new LOW issue
   from a non-shipped diff (deferred issues remain a MED/HIGH
-  channel). Two in-round exceptions close claims without opening fix
-  rounds: LOW/INFO findings on comments/docs-only content may be
-  fixed in the same round, and a pin completion of ≤ ~3 lines that
-  closes a behavioral claim of the case's own wave may be fixed
-  in-round — a true-but-unpinned claim is a claim-audit gap, not
-  polish. (RM-0133)
+  channel). Two in-round exceptions close claims without opening NEW
+  rounds of their own: LOW/INFO findings on comments/docs-only
+  content may be fixed in the same round — such fixes touch no code,
+  so the round closes on them (the comments-only rule); and a pin
+  completion of ≤ ~3 lines that closes a behavioral claim of the
+  case's own wave may be fixed in-round — the FIX is in-round, the
+  re-review is not waived: a pin completion touches test code, so
+  the round still owes its 1-axis micro re-review of the pin diff
+  before closing. A true-but-unpinned claim is a claim-audit gap,
+  not polish. (RM-0133)
 
 ## Curation and verification
 
@@ -293,7 +297,7 @@ bought comes from subagents instead:
   dispositions, owed-but-not-run reviews) in the round comment on the
   PR timeline. (RM-0061)
 - The round comment's metadata records who ran the pass — reviewers
-  (model + axes), curator, verifiers, tier — so freshness stays
+  (model + axes), curator, verifiers, tier, track — so freshness stays
   auditable from the PR timeline after the fact, not from memory.
   (RM-0063)
 - Freshness is measured in subagent contexts, not sessions: every

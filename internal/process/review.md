@@ -71,7 +71,7 @@ where its review role ends.
   freshness the entry exists to buy; session startup amortizes
   through parallelism, not stacked PRs. The review pass itself
   stays subagent-only in this entry too — the staffing rules of the
-  PR's track decide 1 vs 2 axes.
+  PR's track decide the axes.
 
 ### Batch triage (at commissioning)
 
@@ -152,13 +152,13 @@ cannot automate.
 
 Scope and cadence follow the
 [review concept](../../agent/review-concept.md): full reviews are
-this trigger-based gate; the fixes themselves get a **wave review**
-(diff scope) as rounds of their case's loop — mandatory when a wave
-changes the semantics of root-running scripts — and the review → fix
-→ review loop stops only when a round's dispositions touch no
-review-relevant code: severity prioritizes, but any code-touching
-round — LOW fixes included — owes its wave review before the loop
-closes.
+this trigger-based gate; the fixes themselves get a **diff-scope
+review** (1-axis micro staffing) as rounds of their case's loop —
+mandatory when a wave changes the semantics of root-running scripts
+— and the review → fix → review loop stops only when a round's
+dispositions touch no review-relevant code: severity prioritizes,
+but any code-touching round — LOW fixes included — owes its
+diff-scope re-review before the loop closes.
 
 ## External review machines (bias-reduced checkout)
 
