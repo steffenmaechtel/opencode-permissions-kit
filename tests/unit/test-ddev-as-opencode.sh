@@ -985,8 +985,12 @@ fi
 HOSTSSH="$FILES/opencode-permissions-kit-lib/sh/ddev-hosts.sh"
 check "fix c M1: ddev-hosts helper hops through a neutral cwd (sudo + direct arms)" \
     sh -c "awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF \"sh -c 'cd / && exec\" && awk '/^_dha_hostname\(\)/,/^}/' \"\$1\" | grep -qF '(cd / && \"\$dha_bin\" hostname'" _ "$HOSTSSH"
-check "fix c M1: no bare ddev-hosts invocation remains outside the helper" \
-    sh -c 'test "$(grep -c "\"\$dha_bin\" hostname" "$1")" = 2' _ "$HOSTSSH"
+# Comment-strip rider (#261, the #244 g W1 class — pr-00320 c F1):
+# a commented-out twin invocation stops counting; full-line comments
+# only (#244 h W6 residual).
+_dha_n="$(sed 's/^[[:space:]]*#.*$//' "$HOSTSSH" | grep -cF '"$dha_bin" hostname' || true)"
+check "fix c M1: no bare ddev-hosts invocation remains outside the helper (invocation sites: $_dha_n of 2)" \
+    [ "$_dha_n" = 2 ]
 check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
     sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
 check "fix d M1: empty-dir refusal precedes the absolutization (guard hoisted)" \
