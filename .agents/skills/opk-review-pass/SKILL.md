@@ -1,6 +1,6 @@
 ---
 name: opk-review-pass
-description: Execute a review round (wave, micro, med, new-session, full/release) — load when a round's review fires or the maintainer commissions one. Covers track/tier classification, fan-out, curation (x) + verification (V3), round comments (format v2); rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads this skill anyway discloses it in its Skills: line.
+description: Execute a review round (low/med/high tier, snapshot-scope pass, fresh session) — load when a review is owed or the maintainer commissions one. Covers track/tier classification, fan-out, curation (x) + verification (V3), round comments v2; rules: agent/review-concept.md. Redundancy passes stay independent by operator setup; one that loads this skill anyway discloses it in its Skills: line.
 ---
 
 # opk-review-pass — executing a review round
@@ -18,7 +18,8 @@ not the rules and never a source of finding judgments:
   reading is wrong — the code and the rules decide (background:
   [review-calibration.md](../../../internal/records/review-calibration.md),
   "Skill-bias origin").
-- Redundancy passes (second release pass, different model family) stay
+- Redundancy passes (second snapshot-scope pass, different model
+  family) stay
   independent of this skill — that independence is the
   **commissioning operator's setup** (different model, external
   /review), never the loading agent's self-assessment. The visible
@@ -39,11 +40,12 @@ shared strictness is not shared bias. Deliberate divergences, kept on
 purpose — do not "align" them away:
 
 - **Pre-existing code IS reviewable** — it maps to the `pre-existing`
-  provenance class; full passes cover the whole tree.
+  provenance class; snapshot-scope passes cover the whole tree.
 - **No untracked-file catch** — rounds run on committed, clean trees
   only; net-new files are inside the diff by construction.
 - **No unconditional whole-file reads** — the tier budgets and
-  coverage-map discipline governs (micro/wave: greps + targeted reads).
+  coverage-map discipline governs (low/med tier: greps + targeted
+  reads).
 - **No web-search guidance** — reviewer subagent tool sets vary.
 
 ## 1. Collect the commission
@@ -57,53 +59,63 @@ session's commission, then gather:
 |---|---|
 | Case key (`pr-ABCDE`) | birth-PR number — the PR timeline IS the case record |
 | Chain state | session records (commission, scratch: posted.log, digests, verdicts) — never read the PR back |
-| Track | PR body (`Track: high|med (paths)`) — re-derive from the diff paths: any `files/**` ⇒ high (section 2) |
+| Track | PR body (`Track: shipped\|non-shipped (paths)`); any `files/**` path ⇒ shipped (re-derive, section 2) |
+| Mode + session | commission — mode `gated\|autonomous`, session `implementer\|fresh` (provenance) |
 | Tier | classified from the round's diff BEFORE staging (section 2) |
-| Base + diff | base SHA and `git diff <range>` for wave scope; tree SHA for full |
+| Base + diff | base SHA and `git diff <range>` for diff scope; tree SHA for snapshot scope |
 | Tree state | clean and committed — the comment posts before any fix ("The PR-native loop") |
 
 ## 2. Classify the track and tier BEFORE staging
 
 The track (blast radius) and the ladder live in the rules
-(review-concept, "Round typing and tiering" and "Review tracks");
-classify the track from the PR's diff paths, the tier from
-`git diff --stat` plus content shape, and state both in the loop
-status BEFORE the fan-out launches:
+(review-concept, "Round typing and tiering" and "Review tracks:
+shipped and non-shipped"); classify the track from the PR's diff
+paths, the tier from `git diff --stat` plus content shape, and state
+both in the loop status BEFORE the fan-out launches:
 
-- **track high** — any shipped file (`files/**`) in the PR's diff,
-  mixed diffs included: full ladder (the wave/micro rows below).
-- **track med** — non-shipped only: 1–2 fast-tier axes (2 when the
-  diff exceeds ~150 lines, touches CI-gating semantics in
-  `.github/`/`Makefile`, or ships root-running `scripts/` code);
-  curation and verify sizing per sections 5–6; the MED disposition
-  policy applies (review-concept, "Review tracks").
-- **new-session entry** — batch shape: the implementing session
-  only implements; a fresh session (this one, if commissioned for
-  review) runs the whole loop for ONE PR it did not implement;
-  the review pass stays a subagent (≥ 1 axis; the staffing rules
-  above decide the axes); marker mode `new-session-review`
-  (review-concept, "Review tracks").
-- **wave** — > ~50 lines or substantive logic: 2–3 fast-tier axes,
-  V3 (1 verifier batch + main audit).
-- **micro** — ≤ ~50 lines or message-only: exactly ONE fast-tier
-  subagent (~5 min, greps + targeted reads); verification per the
-  sizing gate (section 6): ≤ 3 findings all LOW/INFO → main audit
-  alone; else exactly one verifier batch. Solo means one subagent,
-  never main-solo.
-- **none** — comments/docs only: no review round owed; closure via
-  the diff-shape proof.
+- **track shipped** — any shipped file (`files/**`) in the PR's
+  diff, mixed diffs included: the ladder's heavier rows (med tier
+  from > ~50 lines or substantive logic, low tier below).
+- **track non-shipped** — non-shipped only: low tier standard;
+  med tier from ~150 lines, CI-gating semantics in
+  `.github/`/`Makefile`, or root-running `scripts/` code;
+  curation and verify sizing per sections 5–6; the non-shipped
+  disposition policy applies (review-concept, "Review tracks:
+  shipped and non-shipped").
+- **fresh-session entry** — batch shape: the implementing session
+  (session: implementer) only implements; a fresh session (this
+  one, if commissioned for review; session: fresh) runs the whole
+  loop for ONE PR it did not implement; the review pass stays a
+  subagent (≥ 1 axis; the ladder decides the axes); marker
+  `"session":"fresh"` (review-concept, "Review tracks: shipped and
+  non-shipped").
+- **tier med** — diff-scope round: shipped > ~50 lines /
+  substantive logic, non-shipped from ~150 lines, CI-gating or
+  root-run `scripts/`: 2–3 fast-tier axes, V3 (1 verifier batch +
+  main audit).
+- **tier low** — shipped ≤ ~50 lines or message-only,
+  non-shipped standard, EVERY fix-wave re-review: exactly ONE
+  fast-tier subagent (~5 min, greps + targeted reads);
+  verification per the sizing gate (section 6): ≤ 3 findings all
+  LOW/INFO → main audit alone; else exactly one verifier batch.
+  Solo means one subagent, never main-solo.
+- **tier none** — comments/docs only: no review round owed; closure
+  via the diff-shape proof.
+- **tier high** — snapshot-scope only (the release-critical
+  option), never a loop round: 5–10 axes staged, 2 independent
+  agents per axis, ~15 min + coverage map per axis.
 
-Severity escalates, never downgrades: fix waves re-review at 1-axis
-micro; full wave staffing returns only when a NEW MED/HIGH finding
-escalates scope.
+Severity escalates, never downgrades: fix waves re-review at low
+tier (one axis); med-tier staffing returns only when a NEW MED/HIGH
+finding escalates scope.
 
 ## 3. Pre-flight
 
 1. Read the chain state: prior round's open findings and retracted
    findings are leads; their dispositions table is the ledger the
    round starts from (review-concept, "Who records what").
-2. Measure the material: `git diff --stat` (wave) or the shipped-file
-   inventory (full). Verify the tree is clean
+2. Measure the material: `git diff --stat` (diff-scope) or the
+   shipped-file inventory (snapshot-scope). Verify the tree is clean
    (`git status --porcelain` empty) — never review a dirty tree.
 3. Pick axes and targets: which files each axis greps first; name
    known blind-spot surfaces in the axis prompt — a gate or claim
@@ -199,9 +211,9 @@ review-concept, "The round comment contract"):
    blank line after every `<summary>` tag.
 3. The `opk-review` marker is the LAST line, OUTSIDE the details,
    with the round's counters, `"state":"open"`, the permanent
-   `"track":"high|med"` field and the round's mode
-   (`variant-c-med`, `new-session-review`, …) alongside tier,
-   reviewers, curator, verifiers.
+   `"track":"shipped|non-shipped"` field, the round's mode
+   (`gated`, `autonomous`) and session (`implementer`, `fresh`)
+   alongside tier (`high|med|low`), reviewers, curator, verifiers.
 4. Size guard: a comment that would exceed ~60k chars is split into
    parts (each with its own marker + `"part":N`) — content is never
    trimmed.
@@ -217,8 +229,9 @@ review-concept, "The round comment contract"):
 The loop status inside the comment is the round report (it is what
 the maintainer reads):
 
-- track + tier + classification evidence (diff shape),
-  reviewers/curator/verifiers with models, output-contract
+- track + tier + mode/session + classification evidence (diff
+  shape), reviewers/curator/verifiers with models,
+  output-contract
   violations (0 or disclosed), CI status of the last push;
 - review-relevant code touched this round: yes/no (drives the stop
   rule — review-concept, "The loop and the stop rule");

@@ -39,7 +39,8 @@ Diffs alone are not enough: read the surrounding function or section
 of every hunk before flagging it — code that looks wrong in isolation
 may be correct given the surrounding logic, and vice versa (budget
 discipline unchanged: no whole-file reads of the big scripts in
-micro/wave scope). Style/convention findings only when a house file
+low/med-tier diff scope). Style/convention findings only when a house
+file
 actually forbids the pattern — NAME the file (AGENTS.md,
 agent/conventions.md); a violation you cannot source to a house rule
 is a suggestion, not a finding.
@@ -48,8 +49,9 @@ is a suggestion, not a finding.
 
 Spend ~<BUDGET — 5 | 8 | 15> minutes of sections (you cannot watch
 clocks — spend sections, not time): <SECTION LIST — ordered areas to
-cover; for full scope: the coverage map, every shipped file gets at
-least one grep-anchored look, deferrals are recorded as deferrals>.
+cover; for snapshot scope (high tier): the coverage map, every
+shipped file gets at least one grep-anchored look, deferrals are
+recorded as deferrals>.
 
 ## Checkpoints (mandatory)
 
