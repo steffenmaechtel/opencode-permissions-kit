@@ -158,8 +158,9 @@ check "update.sh: bounded --version helper exists (timeout 10 + head -1)" \
     sh -c "grep -q 'timeout 10 \"\$SYSTEM_BIN\" --version' \"\$1\" && grep -q 'opencode_version_line() {' \"\$1\"" _ "$UPDATE"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
 # stop counting; full-line comments only (#244 h W6 residual).
-check "update.sh: all --version probes route through the bounded helper" \
-    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "opencode_version_line" || true)" -ge 4 ]' _ "$UPDATE"
+_ova_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -c 'opencode_version_line' || true)"
+check "update.sh: all --version probes route through the bounded helper (probe sites: $_ova_n, need >=4)" \
+    [ "$_ova_n" -ge 4 ]
 check "update.sh: post-copy failure message never names a backup that was never taken (W6)" \
     sh -c "grep -qF 'no previous binary was backed up' \"\$1\" && grep -qF '[ -f \"\$BACKUP_DIR/opencode.current\" ]' \"\$1\"" _ "$UPDATE"
 
@@ -305,9 +306,9 @@ check "flag: --only-binary parsed, implies BINARY_UPDATE" \
     sh -c "grep -q -- '--only-binary)' \"\$1\" && grep -A4 -- '--only-binary)' \"\$1\" | grep -q 'BINARY_UPDATE=true'" _ "$UPDATE"
 check "flag: help text documents --only-binary" \
     sh -c "grep -q -- '--only-binary    skip every kit step' \"\$1\"" _ "$UPDATE"
-check "gating: kit re-deploy sections are wrapped (2 skip zones)" \
-    sh -c '[ "$(sed "s/^[[:space:]]*#.*$//" "$1" | grep -c "if \[ \"\$ONLY_BINARY\" != true \]; then" \
-        || true)" -ge 2 ]' _ "$UPDATE"
+_obw_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -cF 'if [ "$ONLY_BINARY" != true ]; then' || true)"
+check "gating: kit re-deploy sections are wrapped (2 skip zones; wrap sites: $_obw_n, need >=2)" \
+    [ "$_obw_n" -ge 2 ]
 check "no kit self-fetch in binary-only mode (library runs stay offline for kit files)" \
     sh -c "grep -qF 'for _opk_a in \"\$@\"' \"\$1\" && grep -qF '[ \"\$_opk_binonly\" != true ] && [ ! -f \"\$SCRIPT_DIR/../../../VERSION\" ]' \"\$1\"" _ "$UPDATE"
 check "--binary-path alone does NOT skip the self-fetch (full update + binary swap, review 0.0.29)" \

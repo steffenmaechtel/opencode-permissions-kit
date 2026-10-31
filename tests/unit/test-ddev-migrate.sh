@@ -847,8 +847,9 @@ assert_eq "registry cmd: narrow root -> 1 export, 11 outside" "1 11" \
 # wiring: the outside warning + the install/status gap detectors exist
 check "export warns about registry projects outside the roots" \
     sh -c "grep -q 'OUTSIDE the given roots' \"\$1\"" _ "$MIG"
-check "install.sh warns on skip branches when the registry outgrew the manifest" \
-    sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$(sed 's/^[[:space:]]*#.*\$//' \"\$1\" | grep -c '_ddev_mig_gap_warn' || true)\" -ge 3 ]" _ "$INSTALL"
+_mig_gap_n="$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" | grep -c '_ddev_mig_gap_warn' || true)"
+check "install.sh warns on skip branches when the registry outgrew the manifest (warn sites: $_mig_gap_n, need >=3)" \
+    sh -c "grep -q '_ddev_mig_gap_warn' \"\$1\" && [ \"\$2\" -ge 3 ]" _ "$INSTALL" "$_mig_gap_n"
 check "status.sh reports INCOMPLETE dumps vs the dev registry" \
     sh -c "grep -q 'INCOMPLETE — registry lists' \"\$1\" && grep -q 'ddev-migrate registry' \"\$1\"" _ "$STATUS"
 check "bin dispatcher has the registry subcommand" \
