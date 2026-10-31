@@ -74,7 +74,7 @@ itself had just added).
 
 Every behavior claim the wave touches — comment blocks, hint/message
 strings, doc sentences — either **carries a pin** or is **deleted/weakened**.
-Claims age outside diffs, so wave reviews never catch their drift ("never
+Claims age outside diffs, so diff-scope reviews never catch their drift ("never
 abort" `0.0.45c C1`, "race-free" `0.0.45d W1`, "31 suites" for 27
 `0.0.39d D1`, "swept ×4" unproven by the wave's own matrix `pr-00196 c C10`,
 gate lines that do not reproduce `pr-00202 d W1`). History narratives are
@@ -121,8 +121,8 @@ passes:
    can plant what — `0.0.45e W1`).
 
 The run-2 HIGH was found by the staged release full pass, not by the wave
-or micro passes over the same code — wave scope does not surface this
-class's ceiling (keep the full-pass rule below).
+or micro passes over the same code — diff scope does not surface this
+class's ceiling (keep the snapshot-scope-pass rule below).
 
 ### L6 — Fix waves are first-class code
 *Class: `fix-regression` — run 1: 19 findings, 11 MED/HIGH, 20 % of all
@@ -236,7 +236,7 @@ belong there, not here.
   lives in AGENTS.md Testing, the checklist pointer in "Keep doing");
   sabotage-vs-uncommitted-tree produced zero corpus findings (AGENTS.md
   Testing owns it).
-- Numbers the NEXT run should collect: a release full pass INSIDE the
+- Numbers the NEXT run should collect: a snapshot-scope pass INSIDE the
   corpus (perm-model HIGH detection is pass-scope-bound); the `internal`
   area trend (59 findings — project memory became a review surface);
   `wiring-gate` recurrence (ratchet-red-at-HEAD shape); whether the

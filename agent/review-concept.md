@@ -582,7 +582,8 @@ here.
   be normalized against it, and notes observed skew in run
   provenance. (RM-0114)
 - Med-tier diff-scope rounds: ~8 minutes per agent; low-tier rounds
-  (≤ ~50-line diffs, one axis) run ~5 — batched greps, targeted
+  (one axis — shipped ≤ ~50 lines, standard non-shipped, fix-wave
+  re-reviews) run ~5 — batched greps, targeted
   reads, no whole-file reads of the big scripts; unclear after one
   follow-up
   read → mark `unverified`, move on. The tier ladder above fixes the

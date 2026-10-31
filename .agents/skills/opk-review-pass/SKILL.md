@@ -91,8 +91,8 @@ both in the loop status BEFORE the fan-out launches:
   non-shipped").
 - **tier med** — diff-scope round: shipped > ~50 lines /
   substantive logic, non-shipped from ~150 lines, CI-gating or
-  root-run `scripts/`: 2–3 fast-tier axes, V3 (1 verifier batch +
-  main audit).
+  root-run `scripts/`: 2–3 fast-tier axes, V3 (verify sizing per
+  section 6).
 - **tier low** — shipped ≤ ~50 lines or message-only,
   non-shipped standard, EVERY fix-wave re-review: exactly ONE
   fast-tier subagent (~5 min, greps + targeted reads);
