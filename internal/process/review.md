@@ -38,30 +38,35 @@ diff means track med. The implementing session states the track in
 the PR body (`Track: high|med (paths)`); the review session
 re-derives it from the diff before staging round a.
 
+**Who runs the loop (the v2 shape, hard):** the implementing session
+ONLY implements — it never runs the review loop of its own PR. Every
+PR's loop runs in ONE fresh review session (the new-session entry):
+commission it per PR as the PR opens, rolling, **max 2 parallel
+review sessions** (their subagents stay within the 5-seat cap). The
+implementing session may hand axis-prompt hints from its hot build
+context into the PR body or the review commission — that is where
+its context ends.
+
 - **Track high (shipped code in the diff)** — full weight,
-  unchanged: the implementing session runs the loop as commissioned
-  (maintainer-gated or variant c); tier ladder, curation threshold
-  and verify sizing per the review concept.
+  unchanged: the fresh review session runs the loop at the full
+  tier ladder (maintainer-gated or variant c, per the commission);
+  curation threshold and verify sizing per the review concept.
 - **Track med (non-shipped-only diff)** — variant c is the DEFAULT:
   autonomous dispositions, you approve PR create and merge only.
-  1–2 fast-tier axes, main curation and verify sizing per the review
-  concept; the MED disposition policy applies (LOW/INFO code
-  findings deliberately-not-done, recorded). In a batch, commission
-  the implementing session to run each case's MED loop immediately
-  after opening its PR — the hot build context makes precise axis
-  prompts cheap.
-- **New-session entry (fresh review of an open PR)** — commission a
-  FRESH session (git worktree) per PR: it did not implement the code
-  and runs the whole loop (curation, verification, dispositions,
-  fixes, comments, closing summary). **One review session per PR —
-  never two**: reviews land in fix work almost always, and the first
+  The fresh review session staffs 1–2 fast-tier axes, main curation
+  and verify sizing per the review concept; the MED disposition
+  policy applies (LOW/INFO code findings deliberately-not-done,
+  recorded).
+- **New-session entry (the standing shape)** — commission a FRESH
+  session (git worktree) per PR: it did not implement the code and
+  runs the whole loop (curation, verification, dispositions, fixes,
+  comments, closing summary). **One review session per PR — never
+  two**: reviews land in fix work almost always, and the first
   case's fix waves would load and anchor the second, spending the
   freshness the entry exists to buy; session startup amortizes
-  through parallelism, not stacked PRs. Commission rolling as PRs
-  open, **max 2 parallel review sessions** (their subagents stay
-  within the 5-seat cap). The review pass itself stays subagent-only
-  in this entry too — the staffing rules of the PR's track decide
-  1 vs 2 axes.
+  through parallelism, not stacked PRs. The review pass itself
+  stays subagent-only in this entry too — the staffing rules of the
+  PR's track decide 1 vs 2 axes.
 
 ### Batch triage (at commissioning)
 

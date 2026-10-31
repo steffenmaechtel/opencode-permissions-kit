@@ -136,7 +136,7 @@
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
 | [RM-0131](0/1/3/RM-0131.md) | Track MED staffing: 1–2 | active | **pending** | 1m | 2026-11-30 |
-| [RM-0132](0/1/3/RM-0132.md) | New-session entry: a FRESH | active | **pending** | 1m | 2026-11-30 |
+| [RM-0132](0/1/3/RM-0132.md) | New-session entry — the STANDING | active | **pending** | 1m | 2026-11-30 |
 | [RM-0133](0/1/3/RM-0133.md) | Disposition policy on non-shipped | active | **pending** | 1m | 2026-11-30 |
 
 ### Curation and verification

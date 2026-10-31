@@ -38,9 +38,9 @@ The loop runs in the pull request's timeline — there is no case folder
 and nothing is committed to `internal/reviews/`:
 
 ```
-commission → Session MAIN implements → birth-PR →
-round a: review (comment) → fixes →
-round b: review (comment) → fixes → … → closing summary → merge
+commission → Session MAIN implements → birth-PR → handover →
+review session: round a (comment) → fixes →
+round b (comment) → fixes → … → closing summary → merge
 ```
 
 - Before the first review round runs, the birth-PR exists — its number
@@ -212,11 +212,17 @@ pass works.
   findings — a MED/HIGH chain scales with its findings instead (the
   budgets describe the common case, not a cap on fixing).
   (RM-0131)
-- New-session entry: a FRESH session — commissioned per PR, not the
-  implementing one — runs the whole loop (curation, verification,
-  dispositions, fixes, comments, closing summary) for a PR it did
-  not implement. One review session per PR, never two: reviews land
-  in fix work almost always, and the first case's fix waves would
+- New-session entry — the STANDING shape (decision 1, the v2 shape:
+  the implementing session ONLY implements): a FRESH session —
+  commissioned per PR, not the implementing one — runs the whole
+  loop (curation, verification, dispositions, fixes, comments,
+  closing summary) for a PR it did not implement. The implementing
+  session never runs the review loop of its own PR: it implements,
+  opens the birth-PR and hands over — its loaded context is the
+  bias the fresh session exists without, and it compounds across
+  cases (303k after six cases versus 83–110k flat for fresh review
+  sessions). One review session per PR, never two: reviews land in
+  fix work almost always, and the first case's fix waves would
   load and anchor the second — the freshness the entry buys is spent
   on case two; session startup amortizes through PARALLEL sessions,
   not stacked PRs. The review pass itself is ALWAYS a subagent,
@@ -266,10 +272,11 @@ pass works.
 
 ## Reviewer freshness
 
-The PR-native process runs a case in one session per phase (Session
-MAIN implements; a new-session review session may take the loop —
-"Review tracks"); the freshness the old session rotation bought comes
-from subagents instead:
+The PR-native process splits a case across two sessions by role:
+Session MAIN implements and opens the birth-PR; the review loop runs
+in a fresh single-PR review session (the new-session entry,
+"Review tracks" — the standing shape, not an option). The freshness
+the old session rotation bought comes from subagents instead:
 
 - The session that runs the case also applies the fixes — no handoff
   back; what the substitution preserves is the rotation's core: a
