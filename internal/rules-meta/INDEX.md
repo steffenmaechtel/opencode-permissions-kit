@@ -6,12 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**136 metas · 133 active · 3 retired · 35 review-pending · next due 2026-11-14**
+**136 metas · 133 active · 3 retired · 28 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0117, RM-0118, RM-0119, RM-0120, RM-0121, RM-0122, RM-0123, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0131, RM-0132, RM-0133, RM-0134, RM-0135, RM-0136
-- **Amended — pending:** RM-0057 (2026-10-31), RM-0058 (2026-10-31), RM-0063 (2026-10-31), RM-0067 (2026-10-31), RM-0072 (2026-10-31), RM-0073 (2026-10-31), RM-0074 (2026-10-31), RM-0083 (2026-10-31), RM-0084 (2026-10-31), RM-0087 (2026-10-31), RM-0088 (2026-10-31), RM-0089 (2026-10-31), RM-0106 (2026-10-31), RM-0107 (2026-10-31), RM-0109 (2026-10-31)
+- **Review pending:** RM-0117, RM-0118, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0131, RM-0132, RM-0133, RM-0134, RM-0135, RM-0136
+- **Amended — pending:** RM-0063 (2026-10-31), RM-0067 (2026-10-31), RM-0072 (2026-10-31), RM-0073 (2026-10-31), RM-0074 (2026-10-31), RM-0083 (2026-10-31), RM-0084 (2026-10-31), RM-0087 (2026-10-31), RM-0088 (2026-10-31), RM-0089 (2026-10-31), RM-0106 (2026-10-31), RM-0107 (2026-10-31), RM-0109 (2026-10-31)
 - **Overdue:** none
 
 ## AGENTS.md
@@ -96,19 +96,19 @@
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | **amended — pending** | 1m | 2026-11-19 |
+| [RM-0057](0/0/5/RM-0057.md) | A diff of ~2.5k lines | active | approved | 1m | 2026-11-19 |
 
 ### The PR-native loop
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0058](0/0/5/RM-0058.md) | Before the first review round | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0058](0/0/5/RM-0058.md) | Before the first review round | active | approved | 1m | 2026-11-28 |
 | [RM-0059](0/0/5/RM-0059.md) | The round comment is posted | active | approved | 1m | 2026-11-28 |
-| [RM-0119](0/1/1/RM-0119.md) | Lettering: one letter per | active | **pending** | 1m | 2026-11-28 |
-| [RM-0120](0/1/2/RM-0120.md) | The loop cap (default 6) | active | **pending** | 1m | 2026-11-28 |
-| [RM-0121](0/1/2/RM-0121.md) | Write-through: the loop never | active | **pending** | 1m | 2026-11-28 |
-| [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | **pending** | 1m | 2026-11-28 |
-| [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | **pending** | 1m | 2026-11-28 |
+| [RM-0119](0/1/1/RM-0119.md) | Lettering: one letter per | active | approved | 1m | 2026-11-28 |
+| [RM-0120](0/1/2/RM-0120.md) | The loop cap (default 6) | active | approved | 1m | 2026-11-28 |
+| [RM-0121](0/1/2/RM-0121.md) | Write-through: the loop never | active | approved | 1m | 2026-11-28 |
+| [RM-0122](0/1/2/RM-0122.md) | Scope brake (binding in | active | approved | 1m | 2026-11-28 |
+| [RM-0123](0/1/2/RM-0123.md) | Scope budget (autonomous commissions): the | active | approved | 1m | 2026-11-28 |
 
 ### The loop and the stop rule
 
