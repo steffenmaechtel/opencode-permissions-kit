@@ -160,6 +160,22 @@ nothing to review.
   expresses. A closure proposal later retracted (a finding reopened the
   loop) is disclosed in the reopening round's comment; the proposed
   marker stays as history on the timeline. (RM-0118)
+- Deferred work orders collected during the loop become issues through
+  ONE bundled maintainer gate at loop end: after the last fix wave and
+  BEFORE the closing summary, the loop owner duplicate-checks every
+  collected work order against the tracker (open list + search),
+  proposes the bundling (same-topic orders share one issue) with
+  title, the `prio:` label derived from the finding's severity
+  (LOW→prio:low, MED→prio:med, HIGH→prio:high; no label without a
+  severity), and source pointers — and asks the maintainer ONE binary
+  question (create the issues: yes/no) placed at the very END of its
+  report, prominent enough that a maintainer reading only the closing
+  lines cannot miss it. Only on YES does the agent file the issues
+  itself (`gh issue create` — the opencode permission prompt stays the
+  runtime gate), post a one-line pointer comment per created issue on
+  the birth-PR, and list the created issues in the closing summary; a
+  NO is recorded in the closing summary. Either way the round
+  comments' work-order records remain the ledger. (RM-0136)
 
 ## Round typing and tiering
 

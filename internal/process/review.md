@@ -102,6 +102,14 @@ where its review role ends.
   your own approval (AGENTS.md Rules (the never-commit-on-master rule); the one exception is a
   `.github/workflows/` permission denial, where you run the initial
   push and the agent re-pushes follow-ups).
+- The loop's deferred work orders end in ONE bundled ask, not a
+  scatter of mid-loop requests: after the last fix wave the agent
+  proposes the issues (tracker duplicate-checked, same-topic orders
+  bundled, `prio:` label derived from the finding severity) and asks a
+  single binary CREATE-ISSUES question at the very end of its report —
+  your YES rides the normal `gh` permission prompt, and the closing
+  summary lists what was filed (or records your NO). The mechanics
+  live in the review concept's stop-rule section.
 - **Required approvals = 1 on master** is the hard merge gate: the
   machine account cannot approve its own PRs, so only your approval
   unlocks a merge. Bot-authored PRs are safe by construction.
