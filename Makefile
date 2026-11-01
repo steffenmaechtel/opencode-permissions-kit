@@ -1,4 +1,4 @@
-.PHONY: help test lint fmt fmt-scope install-shfmt check-host check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-install-args test-kit-files test-tui-mode test-uninstall test-status test-doctor test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity rules-report e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
+.PHONY: help test lint fmt fmt-scope install-shfmt check-host check-py coverage test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-status test-doctor test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity rules-report e2e e2e-rootless e2e-ddev e2e-ddev-fresh e2e-all install-dev clean version check-version release
 
 # Scripts checked by `make lint` — DERIVED FROM DISK (0.0.42d C4 /
 # 0.0.42e C10): every file under files/ and scripts/ whose first line is
@@ -71,6 +71,7 @@ help:
 	@echo "  make fmt           One-shot shfmt -w over the whole gate scope"
 	@echo "  make fmt-scope     Print the gate's file scope (single source, used by the format-gate suite)"
 	@echo "  make install-shfmt Download the pinned shfmt to ~/.local/bin (no root)"
+	@echo "  make coverage      kcov line-coverage report over the unit suites (report only, docker once; SUITE=name filters)"
 	@echo "  make test-opencode-as-opencode  Run wrapper (opencode-as-opencode) validation tests"
 	@echo "  make test-fs-baseline  Run group-baseline progress tests (issue #14)"
 	@echo "  make test-staged-write  Run symlink-safe write / handover gate tests (0.0.39g)"
@@ -117,7 +118,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-install-args test-kit-files test-tui-mode test-uninstall test-status test-doctor test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-status test-doctor test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -183,6 +184,13 @@ fmt:
 	fi
 	@shfmt -w $(SHFMT_FLAGS) $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES)
 	@echo "formatted (gate scope): $$(echo $(SHELLCHECK_FILES) $(SHFMT_TEST_FILES) | wc -w) files"
+
+# kcov coverage report over the unit suites (issue #255 stage 0b). Report
+# only — never part of `make test` and never a percentage gate. Needs
+# docker once (kcov binary extraction); see scripts/coverage.sh and
+# internal/records/kcov-coverage.md.
+coverage:
+	@./scripts/coverage.sh $(if $(SUITE),$(SUITE))
 
 # Download the pinned shfmt into ~/.local/bin (single static binary,
 # no root). CI uses this too -- the Makefile is the one source of the
@@ -366,6 +374,10 @@ test-check-host:
 test-format-gate:
 	@echo "=== shfmt Format-Gate Pins (issue #255 stage 0a) ==="
 	@./tests/unit/test-format-gate.sh
+
+test-coverage:
+	@echo "=== Coverage-Runner Pins (issue #255 stage 0b) ==="
+	@./tests/unit/test-coverage.sh
 
 test-install-args:
 	@echo "=== install.sh Arg-Parsing Tests ==="
