@@ -156,3 +156,5 @@ jobs:
         run: ./tests/unit/test-format-gate.sh
       - name: Run unit-suite sandbox policy guard
         run: ./tests/unit/test-sandbox-policy.sh
+      - name: Run host pre-flight gh-version warning pins (issue #335)
+        run: ./tests/unit/test-check-host.sh
