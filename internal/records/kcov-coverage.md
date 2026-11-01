@@ -24,14 +24,18 @@ percentage (stage 0b explicitly; a ratchet would need its own decision).
 DEBUG method had reported 11 files / 41.8% — see "method" below for why
 that number was an illusion. Numbers are environment-dependent per line:
 `log.sh`'s install.conf branch is 100% on a kit-managed host (the file
-exists), 93.75% in a container/CI (it does not). CI is the honest baseline.
+exists), 93.75% in a container/CI (it does not). CI is the honest baseline
+— and it is on file: the first green CI coverage run (ubuntu-24.04
+runner, 2026-11-01) reported **25 files, 1651/3321 = 49.7%**, with
+`log.sh` at 93% (no installed kit on the runner). That CI number is the
+comparator for future runs.
 
 Post-commit validation of the finished runner (same day, tree of d458095
 plus the new pin suite in scope): full pass rc=0, 42 OK + 1 SKIP (#342),
 non-empty merged summary — the report includes the runner's own pin
 suite like any other.
 
-## What was measured (all on the digest-pinned image, bash 5.2)
+## What was measured (kcov binary from the digest-pinned image, bash 5.2; item 3 is a host run without kcov)
 
 1. **Numbers are real and discriminate.** test-log.sh full suite: 93.75%
    (30/32 lines; red = exactly the two install.conf-gated lines). A
@@ -90,6 +94,12 @@ suite like any other.
 - kcov is extracted ONCE from the digest-pinned image via
   `docker create` + `docker cp` into `~/.cache/opk-kcov/` — no sudo, no
   host installs. Fail loud if docker or the binary probe is missing.
+- `COVERAGE_OUT` is normalized to an absolute path against the caller's
+  cwd before anything runs, refused inside the repo tree, and scratch
+  cleanup is stamp-guarded: a non-empty OUT without the runner's
+  `.opk-kcov-out` stamp is refused loud instead of cleaned (#343 a
+  A1/A2 — a relative OUT used to write into the repo, and an aliased OUT
+  would have deleted its runs/logs/merged/shim children).
 - Exclusions need an open issue each; today exactly one (#342).
 - Report surface: `--include-pattern=<repo>/files/,<repo>/scripts/`.
 - Fail-loud: suite failures under the run redden the runner; an empty

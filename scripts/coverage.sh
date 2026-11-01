@@ -39,7 +39,28 @@
 set -u
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+
+die() {
+    echo "error: $*" >&2
+    exit 1
+}
+
+# COVERAGE_OUT is resolved to an ABSOLUTE path against the CALLER's cwd
+# before anything else happens (#343 a A1): a relative value used to be
+# interpreted once for the scratch setup and again — now relative to the
+# repo — for every later use, either littering the repo (violating the
+# contract below) or misdiagnosing every suite as failed. The runner's
+# contract is "nothing written in the repo", so an OUT inside it is
+# refused outright (#343 a A1 shape a).
 OUT="${COVERAGE_OUT:-/tmp/opk-kcov-coverage}"
+case "$OUT" in
+    /*) ;;
+    *) OUT="$(pwd)/$OUT" ;;
+esac
+case "$OUT/" in
+    "$REPO"/*) die "COVERAGE_OUT must live outside the repo ($REPO) — got $OUT" ;;
+esac
+
 # Digest-pinned (the last versioned tag, v42, is Debian 11 with archived
 # apt repos and cannot even install git anymore — see the record). To bump:
 # pull a newer kcov/kcov image, re-run this script end to end, re-read the
@@ -51,11 +72,6 @@ KCOV_DIR="$HOME/.cache/opk-kcov/kcov-${KCOV_IMAGE##*:}"
 # that names the delta and tracks the fix; lift the entry when it closes.
 #   test-ddev-as-opencode.sh — one stamp pin is dash-only under bash (#342)
 EXCLUDED="test-ddev-as-opencode.sh"
-
-die() {
-    echo "error: $*" >&2
-    exit 1
-}
 
 # --- 1. kcov binary: extract once from the digest-pinned image -------------
 if [ ! -x "$KCOV_DIR/bin/kcov" ]; then
@@ -74,6 +90,17 @@ KCOV="$KCOV_DIR/bin/kcov"
     die "$KCOV does not run on this host (missing shared libs?) — internal/records/kcov-coverage.md"
 
 # --- 2. scratch: out dirs + the sh->bash PATH shim --------------------------
+# Scratch cleanup is stamp-guarded (#343 a A2): rm -rf on the four child
+# names must never run under an OUT the runner does not own — a
+# COVERAGE_OUT pointing at a live directory (say $HOME) would otherwise
+# delete its runs/logs/merged/shim children. A fresh or empty OUT is
+# adopted and stamped; a non-empty dir WITHOUT our stamp is refused loud
+# (an out dir from a pre-stamp run counts as foreign — pick a fresh one).
+if [ -d "$OUT" ] && [ -n "$(ls -A "$OUT" 2>/dev/null)" ] && [ ! -f "$OUT/.opk-kcov-out" ]; then
+    die "refusing to clean $OUT: non-empty and not opk-kcov stamped — use an empty or fresh COVERAGE_OUT"
+fi
+mkdir -p "$OUT" || die "cannot create $OUT"
+: >"$OUT/.opk-kcov-out" || die "cannot stamp $OUT"
 rm -rf "${OUT:?}/runs" "${OUT:?}/logs" "${OUT:?}/merged" "${OUT:?}/shim"
 mkdir -p "$OUT/runs" "$OUT/logs" "$OUT/shim" || die "cannot set up $OUT"
 # Quoted heredoc on purpose: the wrapper must survive every shell layer

@@ -163,9 +163,11 @@ jobs:
 
   coverage:
     # kcov line-coverage report over the unit suites (issue #255 stage
-    # 0b): a review ARTIFACT, not a gate -- nothing here can redden a PR
-    # except a suite actually failing under the coverage run. The report
-    # lands as a downloadable artifact (HTML + cobertura.xml).
+    # 0b): a review ARTIFACT, not a gate -- no coverage PERCENTAGE can
+    # redden anything. The job can still go red on the runner's own
+    # fail-loud paths: a suite failing under the run, an empty or
+    # unmergeable report, missing host tools, a failed artifact upload.
+    # Those reds are the report staying honest -- not coverage verdicts.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -185,7 +187,7 @@ jobs:
           docker --version
           make coverage
       - name: Upload the coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kcov-coverage
           path: ${{ runner.temp }}/opk-kcov-coverage/merged

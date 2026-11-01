@@ -43,19 +43,19 @@ failures=0
 _strip() { sed 's/^[[:space:]]*#.*$//' "$1"; }
 
 # --- 1. wiring ----------------------------------------------------------------
-if [ -f "$RUNNER" ] && grep -qE '^coverage:' Makefile &&
-    grep -qF './scripts/coverage.sh' Makefile; then
+if [ -f "$RUNNER" ] && _strip Makefile | grep -qE '^coverage:' &&
+    _strip Makefile | grep -qF './scripts/coverage.sh'; then
     pass "runner exists and is wired as \`make coverage\`"
 else
     fail "runner or Makefile coverage target missing"
 fi
-if grep -qE '^  coverage:' "$WF" &&
-    grep -qF 'actions/upload-artifact@' "$WF"; then
+if _strip "$WF" | grep -qE '^  coverage:' &&
+    _strip "$WF" | grep -qF 'actions/upload-artifact@'; then
     pass "CI: coverage job present and uploads an artifact"
 else
     fail "test-unit.yml lost the coverage job or its artifact upload"
 fi
-if grep -qF './tests/unit/test-coverage.sh' "$WF"; then
+if _strip "$WF" | grep -qF './tests/unit/test-coverage.sh'; then
     pass "CI: this pin suite has its own run step"
 else
     fail "test-unit.yml has no run step for test-coverage.sh"
@@ -77,7 +77,7 @@ case "$_img" in
 esac
 
 # --- 3. method contract (absence pin: a commented override still counts) -------
-if ! _strip "$RUNNER" | grep -q -- '--bash-method'; then
+if ! grep -q -- '--bash-method' "$RUNNER"; then
     pass "runner uses kcov's default PS4 method (children traced)"
 else
     fail "runner overrides --bash-method -- DEBUG leaves child shells untraced (see the record)"
@@ -93,11 +93,16 @@ else
 fi
 
 # --- 5. exclusion discipline ----------------------------------------------------
-if _strip "$RUNNER" | grep -qF 'EXCLUDED="test-ddev-as-opencode.sh"' &&
+# Presence proves the entry; the assignment count proves EXCLUSIVITY (a
+# second EXCLUDED= line would drift the list while the literal pin stayed
+# green — #343 a C3).
+_excl_n=$(_strip "$RUNNER" | grep -c 'EXCLUDED=' || true)
+if [ "$_excl_n" = 1 ] &&
+    _strip "$RUNNER" | grep -qF 'EXCLUDED="test-ddev-as-opencode.sh"' &&
     grep -qF '#342' "$RUNNER"; then
     pass "exclusion list = test-ddev-as-opencode.sh only, tracking #342"
 else
-    fail "exclusion list drifted (expected exactly test-ddev-as-opencode.sh, issue #342)"
+    fail "exclusion list drifted (assignments=$_excl_n, expected exactly test-ddev-as-opencode.sh, issue #342)"
 fi
 
 # --- 6. runner mechanics ---------------------------------------------------------
@@ -106,8 +111,8 @@ if _strip "$RUNNER" | grep -qF 'for suite in tests/unit/test-*.sh; do'; then
 else
     fail "relative-path contract gone (absolute argv yields an empty report)"
 fi
-if grep -qF "cat >\"\$OUT/shim/sh\" <<'EOF'" "$RUNNER" &&
-    grep -qF 'exec /usr/bin/bash "$@"' "$RUNNER"; then
+if _strip "$RUNNER" | grep -qF "cat >\"\$OUT/shim/sh\" <<'EOF'" &&
+    _strip "$RUNNER" | grep -qF 'exec /usr/bin/bash "$@"'; then
     pass "sh->bash shim written via quoted heredoc (survives shell layers)"
 else
     fail "shim construction drifted off the quoted-heredoc form"
@@ -117,10 +122,20 @@ if _strip "$RUNNER" | grep -qF -- '--include-pattern="$REPO/files/,$REPO/scripts
 else
     fail "include-pattern no longer covers files/ + scripts/"
 fi
-if grep -qF 'rm -rf "${OUT:?}' "$RUNNER"; then
+if _strip "$RUNNER" | grep -qF 'rm -rf "${OUT:?}'; then
     pass "scratch cleanup carries :? empty-variable guards"
 else
     fail "rm on \$OUT lost its :? guard"
+fi
+# Stamp-guard + absolute-OUT contract (#343 a A1/A2): the cleanup must be
+# refused under a foreign non-empty OUT, and OUT must never resolve inside
+# the repo.
+if _strip "$RUNNER" | grep -qF 'refusing to clean' &&
+    _strip "$RUNNER" | grep -qF '.opk-kcov-out' &&
+    _strip "$RUNNER" | grep -qF 'must live outside the repo'; then
+    pass "scratch cleanup is stamp-guarded; OUT refuses the repo tree"
+else
+    fail "OUT/cleanup guards drifted (absolute OUT, stamp, repo refusal)"
 fi
 if _strip "$RUNNER" | grep -qF '[ "$count" -eq 1 ]'; then
     pass "single-suite runs skip the merge (single-source merge emits nothing)"
