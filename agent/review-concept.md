@@ -167,16 +167,21 @@ nothing to review.
   proposes the bundling (same-topic orders share one issue) with
   title, the `prio:` label derived from the finding's severity
   (LOW→prio:low, MED→prio:med, HIGH→prio:high; no label without a
-  severity), and source pointers — and asks the maintainer ONE binary
-  question (create the issues: yes/no) placed at the very END of its
-  report, prominent enough that a maintainer reading only the closing
-  lines cannot miss it. Only on YES does the agent file the issues
-  itself (`gh issue create` — the opencode permission prompt stays the
-  runtime gate), each issue body citing the birth-PR as its source
-  (GitHub cross-references the PR timeline automatically — no manual
-  pointer comment), and list the created issues in the closing
-  summary; a NO is recorded in the closing summary. Either way the
-  round comments' work-order records remain the ledger. (RM-0136)
+  severity), and source pointers — and agrees EVERY work order with
+  the maintainer in ONE ask placed at the very END of its report,
+  prominent enough that a maintainer reading only the closing lines
+  cannot miss it: plain markdown set off by horizontal rules, caps
+  headline, the affected IDs — nothing after it (the skill carries
+  the canonical shape). The answer is free-form, decided per work
+  order or per proposed bundle ("A and B yes, C no") — never a single
+  rigid yes/no over the whole set: for every YES the agent files the issue
+  itself (`gh issue create` — the opencode permission prompt stays
+  the runtime gate), each issue body citing the birth-PR as its
+  source (GitHub cross-references the PR timeline automatically — no
+  manual pointer comment); every NO is recorded as deliberately not
+  done, and the closing summary lists the created issues alongside
+  the recorded declines. Either way the round comments' work-order
+  records remain the ledger. (RM-0136)
 
 ## Round typing and tiering
 
