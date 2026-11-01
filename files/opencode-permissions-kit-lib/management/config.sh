@@ -800,6 +800,7 @@ _handover_rootless_hint() {
             ui_detail "$OPENCODE_USER — on developer-owned outputs it fails with 'EPERM ... futime'"
             ui_detail "or EPERM on chmod/chown AFTER the data write already went through."
             ui_detail "affected tree? sudo opk handover opencode <container-written tree>"
+            ui_detail "guided, for trees declared in the project's opk.json: opk doctor fix"
             ui_detail "details: docs/troubleshooting.md ('EPERM ... futime' entry)"
             ;;
     esac

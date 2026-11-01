@@ -52,6 +52,7 @@ After installation, one command manages everything (works from anywhere):
 opk status
 opk config projects add /var/www/vhosts/new-project
 opk doctor            # in a project dir: ownership diagnosis (read-only)
+opk doctor fix        # ... and offer the handover fix per at-risk tree
 opk update --binary
 opk upgrade-opencode   # just the opencode binary
 opk ddev-hosts-add     # in a ddev project dir
@@ -67,7 +68,8 @@ opk --version   # the deployed kit version
 Everything after the subcommand goes to the underlying script unchanged, so
 all flags below work with both forms. `config`, `update` and `handover`
 elevate via sudo automatically; `ensure-shared` hops to the agent user
-automatically; `status` and `doctor` need no sudo; `uninstall` runs as your
+automatically; `status` and `doctor` need no sudo (`doctor fix` runs
+`opk handover`, which elevates itself); `uninstall` runs as your
 user and asks for sudo itself; `ddev-hosts-*` run as your user (they drive
 Windows-side elevation through ddev itself).
 
@@ -95,8 +97,9 @@ are exactly where container builds die with
 `EPERM: operation not permitted, futime` after writing the output
 correctly (the "container build fails with EPERM ... futime" entry in
 [Troubleshooting](../troubleshooting.md)). Every finding carries its
-fix command (`sudo opk handover opencode <tree>`); doctor itself never
-changes anything.
+fix command (`sudo opk handover opencode <tree>`); the scan itself never
+changes anything — the guided remedy is [`doctor fix`](#doctor-fix)
+below.
 
 The mapped-uid set is resolved from the **live user namespaces**: every
 process carries its `uid_map` in `/proc`, world-readable, so no docker
@@ -107,8 +110,47 @@ to matching the daemon uid only and says so in a warning — re-run it
 with the containers up before trusting a clean verdict.
 
 Exit codes like `opk status`: `0` all declared trees healthy, `1`
-at-risk finding(s) or a rejected `opk.json`, `2` warning(s) only, `64`
-usage error.
+at-risk finding(s), a rejected `opk.json`, or a degraded-install error
+(missing kit config), `2` warning(s) only, `64` usage error.
+
+### doctor fix
+
+The guided remedy for the at-risk findings of the same scan:
+
+```bash
+opk doctor fix                 # in the project dir (or: opk doctor fix <path>)
+opk doctor fix --dry-run       # show what would run, change nothing
+```
+
+`doctor fix` prints the full scan report first, then offers exactly one
+remedy per finding that has one — a declared, existing container tree with
+at-risk entries: handing that tree to the agent user via the existing
+[`opk handover opencode <tree>`](#handover). Findings without an
+unambiguous remedy (missing, symlinked or non-directory trees, rejected
+path forms) are reported by the scan but never offered. The offer follows
+handover's own path policy: a tree under a system prefix (`/srv`, `/opt`,
+`/mnt`, …) is still offered, but a confirmed answer ends in handover's
+loud "refusing system path" error — doctor does not duplicate the refusal
+list.
+
+- One `[y/N]` prompt per tree, **default `n`** — Enter skips that tree and
+  its scan row keeps the copy-paste command. Answers are read from the
+  terminal; a piped stdin works only where no terminal exists (scripts,
+  CI) — the same rule as every kit prompt.
+- `--dry-run` passes through to `opk handover ... --dry-run`: no prompts,
+  no sudo, nothing changed — handover prints what it would do.
+- `doctor fix` itself never elevates: every confirmed answer runs
+  `opk handover`, which does its own sudo hop. No new sudoers surface —
+  the command is the one `opk doctor` has been printing all along.
+- After any executed handover the declared trees are re-checked, and the
+  final verdict row and exit code describe the **post-fix** state.
+
+Exit codes like `opk doctor`: `0` all declared trees healthy (post-fix),
+`1` at-risk findings remain — declined, `--dry-run`, a failed handover, or
+a succeeded handover whose tree was re-written before the re-check — or a
+rejected `opk.json` or a degraded-install error (missing kit config, no
+dispatcher: exit `1` in both modes, like the scan), `2` warning(s) only,
+`64` usage error.
 
 ### opk.json — the project's container-tree policy
 

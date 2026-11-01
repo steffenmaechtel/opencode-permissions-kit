@@ -26,10 +26,21 @@
 # explicit "range unverified" warn -- subuid-owned files may then read
 # as at-risk until the backend runs again.
 #
-# Read-only. No sudo: stat, /proc/<pid>/uid_map and install.conf are
-# world-readable. Fix rows point at existing commands only
-# (sudo opk handover opencode <tree>); doctor itself never changes a
-# thing.
+# The scan is read-only. No sudo: stat, /proc/<pid>/uid_map and
+# install.conf are world-readable. Fix rows point at existing commands
+# only (sudo opk handover opencode <tree>); the scan itself never
+# changes a thing.
+#
+# 'doctor fix' (issue #313, increment b) orchestrates exactly those
+# existing remedies: it runs the scan, then offers ONE interactive
+# [y/N] prompt (default n) per finding that has an unambiguous remedy --
+# a declared, existing, non-symlink directory tree with at-risk entries
+# (warnings like missing or symlinked trees have no fix and are never
+# offered). A confirmed answer runs 'opk handover opencode <tree>'
+# (--dry-run passes through, no prompts, nothing changed). doctor never
+# wields sudo itself: the elevation happens inside handover, so no new
+# sudoers surface exists. After any executed handover the trees are
+# re-checked and the fresh verdict decides the summary.
 #
 # opk.json -- strict JSON (JSONC was rejected deliberately: jq and
 # other tooling must keep reading it, and strict editor validation
@@ -37,10 +48,13 @@
 # fields, not comments). Tolerant read: unknown keys are ignored,
 # "version" is reserved for migrations (only 1 exists today).
 #
-# CLI:  opk doctor [project-root]      (default: the current directory)
-# Exit codes (the status.sh contract): 0 all declared trees healthy,
-# 1 at-risk finding(s) or a rejected policy, 2 warning(s) only,
-# 64 usage error.
+# CLI:  opk doctor [project-root]                 scan (default: cwd)
+#       opk doctor fix [project-root] [--dry-run]  orchestrate the fixes
+# Exit codes (the status.sh contract): 0 all declared trees healthy
+#      (post-fix, for 'fix'), 1 at-risk finding(s) remain -- declined,
+#      dry-run, failed handover, or re-written-before-recheck -- or a
+#      rejected policy / degraded-install error (both modes), 2
+#      warning(s) only, 64 usage error.
 #
 # Run directly:
 #   /usr/local/lib/opencode-permissions-kit/management/doctor.sh [path]
@@ -63,21 +77,82 @@ else
 fi
 
 # --- CLI --------------------------------------------------------------------------
-if [ "$#" -gt 1 ]; then
-    echo "usage: opk doctor [project-root]   (default: the current directory)" >&2
-    exit 64
+# Strict grammar (#313 increment b): 'fix' as the FIRST token switches to
+# fix mode; then at most one positional (the project root) plus --dry-run
+# (fix-only -- the scan is read-only already, a dry run of it is a usage
+# error, not a no-op). Everything else is rejected with 64.
+_doctor_usage() {
+    echo "usage: opk doctor [project-root]                   (read-only scan; default root: .)" >&2
+    echo "       opk doctor fix [project-root] [--dry-run]   (offer the handover fix per at-risk tree)" >&2
+}
+DOCTOR_MODE=scan
+if [ "${1:-}" = "fix" ]; then
+    DOCTOR_MODE=fix
+    shift
 fi
-DOCTOR_ROOT="${1:-.}"
-case "$DOCTOR_ROOT" in
-    -*)
-        echo "usage: opk doctor [project-root]   (default: the current directory)" >&2
-        exit 64
-        ;;
-esac
+DOCTOR_ROOT=""
+DOCTOR_FIX_DRY=0
+for _do_arg in "$@"; do
+    case "$_do_arg" in
+        --dry-run)
+            if [ "$DOCTOR_MODE" != "fix" ]; then
+                _doctor_usage
+                echo "error: doctor: --dry-run needs 'fix' (the scan is read-only already)" >&2
+                exit 64
+            fi
+            DOCTOR_FIX_DRY=1
+            ;;
+        -*)
+            _doctor_usage
+            echo "error: doctor: unknown flag '$_do_arg'" >&2
+            exit 64
+            ;;
+        *)
+            if [ -n "$DOCTOR_ROOT" ]; then
+                _doctor_usage
+                echo "error: doctor: only one project root allowed" >&2
+                exit 64
+            fi
+            DOCTOR_ROOT="$_do_arg"
+            ;;
+    esac
+done
+DOCTOR_ROOT="${DOCTOR_ROOT:-.}"
 DOCTOR_ROOT="$(realpath -m "$DOCTOR_ROOT" 2>/dev/null || printf '%s' "$DOCTOR_ROOT")"
 if [ ! -d "$DOCTOR_ROOT" ]; then
     ui_error "doctor: no such directory: $DOCTOR_ROOT"
     exit 64
+fi
+# Fix-mode only (#348 a C3): the candidate round-trip ($WORK/fixcand) is
+# TAB/LF-separated TSV, and $DOCTOR_TREE embeds DOCTOR_ROOT -- a control
+# byte in the root would truncate the handover operand away from the
+# tree the [y/N] prompt named. The opk.json fields are gated by the
+# python validator; the root comes from the CLI/cwd and is gated here.
+# Scan mode needs no OPERAND round-trip: the counts pass feeds find's
+# uid-only output, and the examples pass (a TAB TSV) degrades display
+# rows only -- verdict and rc stay intact (#344 a S1/S2 class).
+if [ "$DOCTOR_MODE" = "fix" ] &&
+    printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    ui_error "doctor: project root contains control characters -- unusable for 'fix' (candidate round-trip)"
+    exit 64
+fi
+
+# --- the opk dispatcher for fix mode ----------------------------------------------
+# doctor fix orchestrates the EXISTING remedy and never elevates itself:
+# each confirmed fix runs 'opk handover opencode <tree>' and handover
+# does its own sudo hop -- no new sudoers surface (#313 increment b).
+# Resolved like ui.sh: checkout-first, then the deployed library.
+# OPK_DOCTOR_OPK overrides for tests only (same seam pattern as
+# OPK_INSTALL_CONF / OPK_DOCTOR_PROC_ROOT).
+DOCTOR_OPK="${OPK_DOCTOR_OPK:-}"
+if [ "$DOCTOR_MODE" = "fix" ] && [ -z "$DOCTOR_OPK" ]; then
+    DOCTOR_OPK="$(cd "$(dirname "$0")" && pwd)/../bin/opk"
+    [ -f "$DOCTOR_OPK" ] || DOCTOR_OPK="/usr/local/lib/opencode-permissions-kit/bin/opk"
+fi
+if [ "$DOCTOR_MODE" = "fix" ] && [ ! -f "$DOCTOR_OPK" ]; then
+    ui_error "doctor: cannot find the opk dispatcher (needed for 'fix')"
+    ui_detail "expected it next to doctor.sh in a checkout, or in the kit library; set OPK_DOCTOR_OPK to override"
+    exit 1
 fi
 
 # --- the daemon user (the rootless backend runs as this user) --------------------
@@ -184,6 +259,13 @@ DOCTOR_RANGES="$(awk -F: '{ printf "%s %s ", $1, $2 }' "$WORK/ranges")"
 # --- report header ----------------------------------------------------------------
 ui_section "Doctor -- container-tree ownership (#312 class)"
 ui_kv "project root" "$DOCTOR_ROOT"
+if [ "$DOCTOR_MODE" = "fix" ]; then
+    if [ "$DOCTOR_FIX_DRY" = 1 ]; then
+        ui_kv "mode" "fix --dry-run (show the handover plan, change nothing)"
+    else
+        ui_kv "mode" "fix (offer handover per at-risk tree, [y/N] each)"
+    fi
+fi
 ui_kv "daemon user" "$DOCTOR_USER (uid $DOCTOR_DAEMON_UID)"
 if [ "$DOCTOR_RANGE_VERIFIED" = 1 ]; then
     ui_kv "mapped range" "$(awk -F: '
@@ -354,101 +436,185 @@ doctor_examples() {
 }
 
 DOCTOR_TAB="$(printf '\t')"
-while IFS="$DOCTOR_TAB" read -r DOCTOR_PATH DOCTOR_NOTE; do
-    # Belt over the python allowlist: the forms that must never reach
-    # find as an operand (absolute, trailing slash, dot/dotdot
-    # components in every position, interior empty components,
-    # backslash) are re-checked in shell -- defense in depth, not the
-    # primary gate (#344 a S5, b R3).
-    case "$DOCTOR_PATH" in
-        /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*)
-            ui_kv_warn "container tree" "$DOCTOR_PATH -- rejected path form, skipped"
-            continue
-            ;;
-    esac
-    DOCTOR_TREE="$DOCTOR_ROOT/$DOCTOR_PATH"
-    if [ ! -e "$DOCTOR_TREE" ]; then
-        ui_kv_warn "container tree" "$DOCTOR_PATH -- declared but missing (fresh clone? build or create it first)"
-        continue
-    fi
-    if [ -L "$DOCTOR_TREE" ]; then
-        ui_kv_warn "container tree" "$DOCTOR_PATH -- a symlink, skipped (declare the real tree)"
-        continue
-    fi
-    if [ ! -d "$DOCTOR_TREE" ]; then
-        ui_kv_warn "container tree" "$DOCTOR_PATH -- not a directory, skipped"
-        continue
-    fi
 
-    # Pass 1 (authoritative counts): the uid-only stream is newline-safe
-    # by construction -- a filename containing a newline cannot split a
-    # numeric uid line (#344 a S1).
-    find "$DOCTOR_TREE" -printf '%U\n' >"$WORK/uids" 2>"$WORK/scan.err"
-    if [ -s "$WORK/scan.err" ]; then
-        # fail loud, not fail absent: unreadable entries would silently
-        # shrink the tree and could turn a red verdict green (#312 class
-        # feeds on exactly such partial views)
-        ui_kv_warn "container tree" "$DOCTOR_PATH -- scan incomplete: $(wc -l <"$WORK/scan.err") unreadable entries"
-        ui_detail "run doctor as the tree owner (or with sudo) to get a complete verdict"
-    fi
-    doctor_classify "$WORK/uids" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >"$WORK/cls"
-
-    _cl_safe=0
-    _cl_risk=0
-    _cl_uids=""
-    _cl_uidn=0
-    while IFS="$DOCTOR_TAB" read -r _cl_tag _cl_a _cl_b; do
-        case "$_cl_tag" in
-            SUM)
-                _cl_safe="$_cl_a"
-                _cl_risk="$_cl_b"
-                ;;
-            UID)
-                _cl_uidn=$((_cl_uidn + 1))
-                [ "$_cl_uidn" -le 4 ] && _cl_uids="$_cl_uids$_cl_a ($_cl_b), "
+# doctor_scan_trees
+# One report pass over "$WORK/trees": prints the verdict rows (identical
+# in scan and fix mode -- fix mode is the scan plus orchestration) and,
+# in fix mode, collects the actionable findings as
+# "rel<TAB>abs<TAB>risk<TAB>total" lines in "$WORK/fixcand": declared,
+# existing, non-symlink DIRECTORY trees with at-risk entries -- the one
+# finding class with an unambiguous remedy (#313: handover opencode).
+# Warning classes (rejected path form, missing, symlink, not a directory)
+# have no fix and are never collected. Callers that re-run this function
+# (fix mode's re-check) reset UI_ROWS_* first: the counters accumulate
+# across passes otherwise.
+doctor_scan_trees() {
+    : >"$WORK/fixcand"
+    while IFS="$DOCTOR_TAB" read -r DOCTOR_PATH DOCTOR_NOTE; do
+        # Belt over the python allowlist: the forms that must never reach
+        # find as an operand (absolute, trailing slash, dot/dotdot
+        # components in every position, interior empty components,
+        # backslash) are re-checked in shell -- defense in depth, not the
+        # primary gate (#344 a S5, b R3).
+        case "$DOCTOR_PATH" in
+            /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*)
+                ui_kv_warn "container tree" "$DOCTOR_PATH -- rejected path form, skipped"
+                continue
                 ;;
         esac
-    done <"$WORK/cls"
-    _cl_total=$((_cl_safe + _cl_risk))
+        DOCTOR_TREE="$DOCTOR_ROOT/$DOCTOR_PATH"
+        if [ ! -e "$DOCTOR_TREE" ]; then
+            ui_kv_warn "container tree" "$DOCTOR_PATH -- declared but missing (fresh clone? build or create it first)"
+            continue
+        fi
+        if [ -L "$DOCTOR_TREE" ]; then
+            ui_kv_warn "container tree" "$DOCTOR_PATH -- a symlink, skipped (declare the real tree)"
+            continue
+        fi
+        if [ ! -d "$DOCTOR_TREE" ]; then
+            ui_kv_warn "container tree" "$DOCTOR_PATH -- not a directory, skipped"
+            continue
+        fi
 
-    # Pass 2 (examples): display-only, run just when there is something
-    # to show -- see doctor_examples for the truncation contract.
-    # stderr deliberately NOT suppressed (#344 b R4): a tree that turns
-    # unreadable between the passes degrades the examples, and the raw
-    # find error on the terminal is that degradation's visibility (the
-    # counts stay authoritative -- pass 1 warns loudly). A deterministic
-    # failure-path pin would need mid-scan timing injection (~30+ lines
-    # for a LOW) -- declined per the pin-cost budget, recorded as an
-    # accepted residual in round b.
-    _cl_ex=""
-    if [ "$_cl_risk" -gt 0 ]; then
-        find "$DOCTOR_TREE" -printf '%U\t%p\n' >"$WORK/extsv"
-        : >"$WORK/ex"
-        doctor_examples "$WORK/extsv" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >>"$WORK/ex"
-        while IFS= read -r _ex_p; do
-            [ -n "$_ex_p" ] || continue
-            [ -n "$_cl_ex" ] && _cl_ex="$_cl_ex, "
-            _cl_ex="$_cl_ex${_ex_p#"$DOCTOR_ROOT"/}"
-        done <"$WORK/ex"
-    fi
+        # Pass 1 (authoritative counts): the uid-only stream is newline-safe
+        # by construction -- a filename containing a newline cannot split a
+        # numeric uid line (#344 a S1).
+        find "$DOCTOR_TREE" -printf '%U\n' >"$WORK/uids" 2>"$WORK/scan.err"
+        if [ -s "$WORK/scan.err" ]; then
+            # fail loud, not fail absent: unreadable entries would silently
+            # shrink the tree and could turn a red verdict green (#312 class
+            # feeds on exactly such partial views)
+            ui_kv_warn "container tree" "$DOCTOR_PATH -- scan incomplete: $(wc -l <"$WORK/scan.err") unreadable entries"
+            ui_detail "run doctor as the tree owner (or with sudo) to get a complete verdict"
+        fi
+        doctor_classify "$WORK/uids" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >"$WORK/cls"
 
-    if [ "$_cl_risk" -gt 0 ]; then
-        ui_kv_bad "container tree" "$DOCTOR_PATH -- $_cl_risk of $_cl_total entries at-risk (unmapped owners)"
-        [ -n "$_cl_uids" ] && ui_detail "at-risk owners: uid ${_cl_uids%, }"
-        [ -n "$_cl_ex" ] && ui_detail "examples: $_cl_ex"
-        ui_detail "container metadata ops (futimes/chmod/chown) EPERM on these -- the #312 build-breaker class"
-        ui_detail "fix: sudo opk handover opencode '$DOCTOR_TREE'"
-        ui_detail "or rebuild the affected outputs clean (docs/troubleshooting.md, EPERM entry)"
-    elif [ "$_cl_total" -gt 0 ]; then
-        ui_kv_ok "container tree" "$DOCTOR_PATH -- $_cl_total entries mapped-safe"
+        _cl_safe=0
+        _cl_risk=0
+        _cl_uids=""
+        _cl_uidn=0
+        while IFS="$DOCTOR_TAB" read -r _cl_tag _cl_a _cl_b; do
+            case "$_cl_tag" in
+                SUM)
+                    _cl_safe="$_cl_a"
+                    _cl_risk="$_cl_b"
+                    ;;
+                UID)
+                    _cl_uidn=$((_cl_uidn + 1))
+                    [ "$_cl_uidn" -le 4 ] && _cl_uids="$_cl_uids$_cl_a ($_cl_b), "
+                    ;;
+            esac
+        done <"$WORK/cls"
+        _cl_total=$((_cl_safe + _cl_risk))
+
+        # Pass 2 (examples): display-only, run just when there is something
+        # to show -- see doctor_examples for the truncation contract.
+        # stderr deliberately NOT suppressed (#344 b R4): a tree that turns
+        # unreadable between the passes degrades the examples, and the raw
+        # find error on the terminal is that degradation's visibility (the
+        # counts stay authoritative -- pass 1 warns loudly). A deterministic
+        # failure-path pin would need mid-scan timing injection (~30+ lines
+        # for a LOW) -- declined per the pin-cost budget, recorded as an
+        # accepted residual in round b.
+        _cl_ex=""
+        if [ "$_cl_risk" -gt 0 ]; then
+            find "$DOCTOR_TREE" -printf '%U\t%p\n' >"$WORK/extsv"
+            : >"$WORK/ex"
+            doctor_examples "$WORK/extsv" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >>"$WORK/ex"
+            while IFS= read -r _ex_p; do
+                [ -n "$_ex_p" ] || continue
+                [ -n "$_cl_ex" ] && _cl_ex="$_cl_ex, "
+                _cl_ex="$_cl_ex${_ex_p#"$DOCTOR_ROOT"/}"
+            done <"$WORK/ex"
+        fi
+
+        if [ "$_cl_risk" -gt 0 ]; then
+            ui_kv_bad "container tree" "$DOCTOR_PATH -- $_cl_risk of $_cl_total entries at-risk (unmapped owners)"
+            [ -n "$_cl_uids" ] && ui_detail "at-risk owners: uid ${_cl_uids%, }"
+            [ -n "$_cl_ex" ] && ui_detail "examples: $_cl_ex"
+            ui_detail "container metadata ops (futimes/chmod/chown) EPERM on these -- the #312 build-breaker class"
+            ui_detail "fix: sudo opk handover opencode '$DOCTOR_TREE'"
+            ui_detail "or rebuild the affected outputs clean (docs/troubleshooting.md, EPERM entry)"
+            if [ "$DOCTOR_MODE" = "fix" ]; then
+                printf '%s\t%s\t%s\t%s\n' "$DOCTOR_PATH" "$DOCTOR_TREE" "$_cl_risk" "$_cl_total" \
+                    >>"$WORK/fixcand"
+            fi
+        elif [ "$_cl_total" -gt 0 ]; then
+            ui_kv_ok "container tree" "$DOCTOR_PATH -- $_cl_total entries mapped-safe"
+        else
+            ui_kv "container tree" "$DOCTOR_PATH -- empty (nothing classified)"
+        fi
+        # the policy note is the tree's own documentation -- surface it so
+        # the verdict row carries its context (SC2034 drove the decision to
+        # display rather than drop it)
+        [ -n "$DOCTOR_NOTE" ] && ui_detail "declared: $DOCTOR_NOTE"
+    done <"$WORK/trees"
+}
+
+doctor_scan_trees
+
+# --- fix orchestration (issue #313, increment b) ------------------------------------
+# Offers the handover per collected candidate. Reads the candidates via
+# fd 3 on purpose: the loop body calls ui_confirm, whose answer stream is
+# stdin (or /dev/tty) -- a plain '< file' redirect on the loop would feed
+# candidate lines to the prompt as answers in the stdin-fallback case
+# (tests, CI). DOCTOR_FIX_RAN marks that a handover EXECUTED (success or
+# failure): the first scan's counts are stale then and the re-check below
+# decides the summary. Note the loop is redirect-fed, not pipeline-fed --
+# DOCTOR_FIX_RAN survives it in the main shell (ui.sh counter rule).
+DOCTOR_FIX_RAN=0
+if [ "$DOCTOR_MODE" = "fix" ] && [ -s "$WORK/fixcand" ]; then
+    if [ "$DOCTOR_FIX_DRY" = 1 ]; then
+        ui_section "Doctor fix -- dry run (nothing is changed)"
+        while IFS="$DOCTOR_TAB" read -r _fx_rel _fx_abs _fx_risk _fx_total <&3; do
+            ui_kv "candidate" "$_fx_rel -- $_fx_risk of $_fx_total entries at-risk (unmapped owners)"
+            ui_detail "would run: opk handover opencode '$_fx_abs' --dry-run"
+            # handover's own dry run prints the plan (and previews its
+            # refuses); its rc is observed, not assumed (fail loud)
+            if ! sh "$DOCTOR_OPK" handover opencode "$_fx_abs" --dry-run; then
+                ui_error "fix: dry run failed for '$_fx_rel' (handover exited non-zero)"
+            fi
+        done 3<"$WORK/fixcand"
     else
-        ui_kv "container tree" "$DOCTOR_PATH -- empty (nothing classified)"
+        ui_section "Doctor fix -- hand at-risk trees over to opencode"
+        while IFS="$DOCTOR_TAB" read -r _fx_rel _fx_abs _fx_risk _fx_total <&3; do
+            ui_kv "candidate" "$_fx_rel -- $_fx_risk of $_fx_total entries at-risk (unmapped owners)"
+            # [y/N] default n (conventions: a system-changing step defaults
+            # to no); ui_confirm reads /dev/tty when one exists, stdin
+            # otherwise (the loop itself reads fd 3 -- see above)
+            if ui_confirm "Hand over '$_fx_rel' to opencode (recursive, g+w)?" n; then
+                ui_detail "running: opk handover opencode '$_fx_abs'"
+                if sh "$DOCTOR_OPK" handover opencode "$_fx_abs"; then
+                    DOCTOR_FIX_RAN=1
+                else
+                    ui_error "fix: handover failed for '$_fx_rel' -- see the errors above"
+                    DOCTOR_FIX_RAN=1
+                fi
+            else
+                ui_detail "skipped '$_fx_rel' -- the scan rows above carry the copy-paste command"
+            fi
+        done 3<"$WORK/fixcand"
     fi
-    # the policy note is the tree's own documentation -- surface it so
-    # the verdict row carries its context (SC2034 drove the decision to
-    # display rather than drop it)
-    [ -n "$DOCTOR_NOTE" ] && ui_detail "declared: $DOCTOR_NOTE"
-done <"$WORK/trees"
+    if [ "$DOCTOR_FIX_RAN" = 1 ]; then
+        ui_section "Doctor fix -- re-check after handover"
+        # Counter reset (ui.sh issue #158): the first pass's rows must not
+        # survive into the post-fix verdict. The mapped-uid set is
+        # deliberately NOT re-resolved: a handover changes ownership, not
+        # the daemon's user namespace -- re-reading /proc would only race
+        # a backend restart mid-session and smear the header's range row.
+        UI_ROWS_OK=0
+        UI_ROWS_WARN=0
+        UI_ROWS_BAD=0
+        doctor_scan_trees
+    fi
+fi
+if [ "$DOCTOR_MODE" = "fix" ] && [ "$DOCTOR_FIX_RAN" = 0 ] && [ ! -s "$WORK/fixcand" ]; then
+    # no actionable finding at all (healthy trees, or warnings without a
+    # remedy). After executed fixes (DOCTOR_FIX_RAN=1) the re-check's own
+    # verdict rows above speak instead -- "nothing to fix" would read as
+    # if there never had been anything to do.
+    ui_info "nothing to fix -- no at-risk finding with a known remedy (handover opencode)"
+fi
 
 # --- summary (status.sh contract) ---------------------------------------------------
 # Counts snapshot BEFORE the verdict row prints, so the row itself

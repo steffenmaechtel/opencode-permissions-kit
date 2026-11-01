@@ -107,6 +107,18 @@ for c in status doctor config update uninstall handover help openchamber-secure 
             ;;
     esac
 done
+# doctor fix is part of the doctor surface (#313 increment b): the
+# two-word phrase must appear (the bare token 'fix' already did)
+case "$out" in
+    *"doctor fix"*)
+        echo "  ${GREEN}PASS${NC}  --help mentions 'doctor fix' (#313 increment b)"
+        passed=$((passed + 1))
+        ;;
+    *)
+        echo "  ${RED}FAIL${NC}  --help mentions 'doctor fix' (#313 increment b)"
+        failures=$((failures + 1))
+        ;;
+esac
 out_help="$(run_kit help)" || true
 assert "help == --help" "$(run_kit --help)" "$out_help"
 
