@@ -330,8 +330,10 @@ command -v agent_config_render >/dev/null 2>&1 ||
 # baseline that projects add/remove and handover run below — one
 # implementation with install.sh (the old verbatim duplicate; see
 # sh/path-sane.sh for the deploy-order evaluation). Same lookup order
-# as staged-write.sh above, but the stub fails CLOSED: a damaged
-# library must refuse every project path, never allow them.
+# as staged-write.sh above; the fallback stub is the same stderr+rc-1
+# shape, but for THIS gate rc 1 is the safe direction — callers read
+# it as "refuse", so a damaged library can never widen into allow
+# (#338 a Q2).
 for cand in "$SCRIPT_DIR/../sh/path-sane.sh" "$LIBDIR/sh/path-sane.sh"; do
     if [ -f "$cand" ]; then
         . "$cand"

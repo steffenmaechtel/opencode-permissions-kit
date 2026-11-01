@@ -48,12 +48,14 @@ deployed". Three facts dissolve it:
    bootstrap (trap, KIT_BRANCH gate, fetch_kit definition) needs no
    kit file; at the "not a local checkout" branch `fetch_kit()`
    downloads the COMPLETE file list before any `kit_source` call runs,
-   and the first `project_path_sane` call sits ~900 lines later, deep
-   inside the interactive `do_plan_phase`. Both streamed and checkout
-   runs hold the full library long before the first call. (The old
-   argument was true only for sourcing **config.sh itself** — a
-   management script with side effects. A leaf lib is the established
-   pattern; install.sh sources a dozen of them.)
+   and the first `project_path_sane` call sits over 800 lines later
+   (measured 807–872 depending on anchor: the gate's own kit_source
+   at :265 / the first kit_source at :240 → the first call at :1072),
+   deep inside the interactive `do_plan_phase`. Both streamed and
+   checkout runs hold the full library long before the first call.
+   (The old argument was true only for sourcing **config.sh itself** —
+   a management script with side effects. A leaf lib is the
+   established pattern; install.sh sources a dozen of them.)
 2. **`opk update` from an older install heals.** The old installed
    update.sh fetches with its OLD list (without path-sane.sh), re-execs
    the freshly fetched copy (update.sh line ~287), and that copy's
@@ -86,9 +88,13 @@ aborts first.
 
 ## Consequences
 
-- One copy of the security gate; changes to the policy reason about
-  one site (plus the two stubs, which are 4 lines each and pinned
-  identical).
+- One copy of the security gate; changes to the policy reason about one
+  definition site (plus the two stubs, which are 4 lines each and pinned
+  identical). Blocklist changes carry two parity mirrors by design: the
+  uninstall.sh reader blocklist (set-equality-pinned by
+  `tests/unit/test-uninstall.sh`) and bin/opk's handover form filter
+  (form arms, self-declared parity — `path-sane.sh`'s own comment
+  asserts it back).
 - The unit suite's drift pin became structural: the lib must define
   the gate, the callers must not (exactly one `project_path_sane() {`
   block each — the stub), wiring and stub behavior are pinned

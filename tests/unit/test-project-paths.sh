@@ -56,9 +56,13 @@ fi
 
 # Exactly ONE project_path_sane() { block per caller — the fail-closed
 # stub. A re-added second (full) copy and a deleted stub both redden.
-# Exact count, deliberately NO comment-strip rider: a commented-out
-# stub line SHOULD keep counting — the stub must be live (the rider
-# convention covers presence pins and count floors, not exact counts).
+# Exact count, deliberately NO comment-strip rider (agent/conventions.md
+# "Source-counting pins" rides presence pins and count floors, not
+# exact counts). What this pin does NOT guard is stub LIVENESS: a
+# commented-out stub still counts 1 here — liveness is the extraction
+# pins' job just below (extract_fn cannot match a `#` line, so the
+# identity pin and the executed stub cell go red on a dead stub)
+# (#338 a M1, execution-verified).
 for f in "$INSTALL" "$CONFIG"; do
     _stub_n=$(grep -c 'project_path_sane() {' "$f" || true)
     if [ "$_stub_n" -eq 1 ]; then
@@ -93,8 +97,10 @@ fi
 
 # And the stub fails CLOSED, executed (L1: the failure path runs, not
 # just greps): a missing gate must REFUSE every path loudly (rc 1 +
-# stderr), never allow and never be silent. Subshell-isolated so the
-# real policy below stays loaded; /var/tmp input = sanctioned prefix.
+# stderr), never allow and never be silent. The subshell keeps the
+# eval'd stub from leaking into the suite shell — the real policy is
+# only loaded further down, AFTER this cell (#338 a Q3). /var/tmp
+# input = sanctioned prefix.
 # The group redirect must sit INSIDE the substitution — a `) 2>&1"`
 # spelling makes the redirect literal string content and stderr escapes
 # the capture (the bug this pin's first version shipped).
