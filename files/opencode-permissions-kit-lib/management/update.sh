@@ -128,6 +128,7 @@ KIT_BASE_URL="${KIT_BASE_URL:-https://raw.githubusercontent.com/steffenmaechtel/
 # adding files. install.sh's fetch_kit list follows the same rule.
 KIT_FILES="install.sh \
 VERSION \
+opencode-permissions-kit-lib/sh/path-sane.sh \
 opencode-permissions-kit-lib/management/config.sh \
 opencode-permissions-kit-lib/management/update.sh \
 opencode-permissions-kit-lib/management/status.sh \

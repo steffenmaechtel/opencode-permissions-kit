@@ -326,6 +326,26 @@ command -v agent_config_render >/dev/null 2>&1 ||
         return 1
     }
 
+# Shared project-root policy gate (issue #216): bounds the group
+# baseline that projects add/remove and handover run below — one
+# implementation with install.sh (the old verbatim duplicate; see
+# sh/path-sane.sh for the deploy-order evaluation). Same lookup order
+# as staged-write.sh above; the fallback stub is the same stderr+rc-1
+# shape, but for THIS gate rc 1 is the safe direction — callers read
+# it as "refuse", so a damaged library can never widen into allow
+# (#338 a Q2).
+for cand in "$SCRIPT_DIR/../sh/path-sane.sh" "$LIBDIR/sh/path-sane.sh"; do
+    if [ -f "$cand" ]; then
+        . "$cand"
+        break
+    fi
+done
+command -v project_path_sane >/dev/null 2>&1 ||
+    project_path_sane() {
+        echo "error: project_path_sane unavailable (path-sane.sh missing) — refusing every project path" >&2
+        return 1
+    }
+
 projects_list() {
     ui_info "Project roots ($PROJECTS_CONF):"
     if [ ! -f "$PROJECTS_CONF" ] || [ ! -s "$PROJECTS_CONF" ]; then
@@ -346,66 +366,6 @@ projects_list() {
     # statement would make projects_list return 1 and kill the script
     # under set -e whenever roots ARE configured (fix-wave review).
     if [ "$num" -eq 0 ]; then ui_detail "(none configured)"; fi
-    return 0
-}
-
-# Same policy as install.sh: never run the group baseline (chgrp -R +
-# setfacl -R) over a system path. Allowed: dedicated project folders
-# (/var/www/..., /home/<user>/..., ~/...). "~" is expanded; the normalized
-# path is returned in _PP_NORM for the caller.
-project_path_sane() {
-    _pp="${1%/}"
-    [ -n "$_pp" ] || return 1
-    # expand ~ / ~/... / ~name is rejected (no user lookup). Note: the ~ in
-    # the pattern must be escaped (\~) or it tilde-expands and never matches.
-    # ~ resolves against PROJECT_TILDE_HOME (the DEFAULT user's home when
-    # running under sudo — $HOME would be /root).
-    # shellcheck disable=SC2088  # tilde deliberately literal: matching ~ input
-    if [ "$_pp" = "~" ]; then _pp="${PROJECT_TILDE_HOME:-$HOME}"; else case "$_pp" in
-        "~/"*) _pp="${PROJECT_TILDE_HOME:-$HOME}${_pp#\~}" ;;
-        "~"*) return 1 ;;
-    esac fi
-    _PP_NORM="$_pp"
-    case "$_pp" in
-        /*) ;;
-        *) return 1 ;; # relative paths are error-prone in projects.conf
-    esac
-    case "$_pp" in
-        # Dot/empty-segment forms, complete (0.0.45c S1): the old arms
-        # caught only INTERIOR dots — a trailing "/." passed and (with
-        # no /var/*, /home/* catch-all in the blocklist below, by
-        # design) sent the root-side recursive group baseline over /,
-        # /var or every home; a leading "//" resolved outside the
-        # blocklist too. Same arms as bin/opk's handover form filter.
-        *..* | /./ | */./* | ./* | */. | *//*) return 1 ;; # traversal / dot / empty segments
-        *[[:space:]]*) return 1 ;;                         # storage format is line-based and
-            # space-free (0.0.39b C3)
-    esac
-    case "$_pp" in
-        / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
-            /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \
-            /run | /run/* | /sbin | /sbin/* | /srv | /srv/* | /sys | /sys/* | /tmp | /tmp/* | /var/tmp/* | \
-            /usr | /usr/* | /var | /var/tmp | /var/cache | /var/cache/* | /var/lib | /var/lib/* | \
-            /var/log | /var/log/* | /var/mail | /var/mail/* | /var/spool | /var/spool/*)
-            return 1
-            ;;
-    esac
-    # The agent user's own home is never a valid project root: the group
-    # baseline (chgrp/setfacl -R) would run over the very directory that
-    # carries the agent's config and state (review 0.0.39a S4).
-    # pr-00263 a F10: getent alongside the literal spelling — a relocated
-    # agent home must refuse too (the uninstall.sh twin, opk pattern).
-    _pp_agent_home="$(getent passwd "${OPENCODE_USER:-opencode}" 2>/dev/null | cut -d: -f6 || true)"
-    if [ "$_pp" = "/home/${OPENCODE_USER:-opencode}" ] ||
-        { [ -n "$_pp_agent_home" ] && [ "$_pp" = "$_pp_agent_home" ]; }; then
-        return 1
-    fi
-    # The developer's whole home as a root is allowed but deserves a
-    # warning: the baseline gives the agent group-write over every file
-    # in it.
-    if [ -n "${PROJECT_TILDE_HOME:-}" ] && [ "$_pp" = "$PROJECT_TILDE_HOME" ]; then
-        echo "  warn     '$PROJECT_TILDE_HOME' is your whole home — the agent gains group-write over it" >&2
-    fi
     return 0
 }
 

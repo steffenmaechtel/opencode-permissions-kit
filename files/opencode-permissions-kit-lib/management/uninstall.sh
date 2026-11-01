@@ -671,8 +671,10 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         [ -z "$root" ] && continue
         # The agent user's own home is never a project root — the
         # writer's dedicated refusal OUTSIDE its case blocklist
-        # (config.sh project_path_sane and the install.sh validator
-        # copy, review 0.0.39a S4), mirrored here (#243 c Q1): the
+        # (sh/path-sane.sh project_path_sane, config.sh's and
+        # install.sh's shared gate since issue #216 — two verbatim
+        # copies at the time of review 0.0.39a S4), mirrored here
+        # (#243 c Q1): the
         # root-run revert ops must never run over the directory that
         # carries the agent's own config and state. Lexical on purpose
         # and before the [ -d ] gate — the refusal holds even on a
@@ -695,8 +697,8 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         [ ! -d "$root" ] && continue
 
         # Form gate (#243 a X2): the sanctioned writer validates these
-        # forms (config.sh project_path_sane — absolute, no dot/empty
-        # segments); a hand-edited conf must not slip a `//etc` or
+        # forms (sh/path-sane.sh project_path_sane — absolute, no
+        # dot/empty segments); a hand-edited conf must not slip a `//etc` or
         # `/var/.`-style entry past the system-path blocklist below.
         # Same arm order as the writer: absolute first, then dots.
         case "$root" in
@@ -714,7 +716,7 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         esac
         # Writer-parity normalization (#243 c X1), after the dot gate:
         # project_path_sane strips one trailing slash before its
-        # blocklist (config.sh `_pp="${1%/}"`) — the reader mirrors
+        # blocklist (sh/path-sane.sh `_pp="${1%/}"`) — the reader mirrors
         # that so the bare arms without /* siblings (/home, /var) are
         # not open to their trailing-slash spellings: /home/ and
         # /var/ passed gate + blocklist lexically while the writer
@@ -730,12 +732,13 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
         # System-path blocklist — writer parity (#243 b X1, completed
         # by the normalization and agent-home refusal above, #243 c
         # X1/Q1): every system path project_path_sane refuses
-        # (config.sh — its trailing-slash strip, its case blocklist
-        # here in the writer's arm order, and its agent-home refusal),
-        # so a hand-edited conf cannot drive the root-run revert ops
-        # over system trees the sanctioned writer would never store.
+        # (sh/path-sane.sh — its trailing-slash strip, its case
+        # blocklist here in the writer's arm order, and its agent-home
+        # refusal), so a hand-edited conf cannot drive the root-run
+        # revert ops over system trees the sanctioned writer would
+        # never store.
         # Scope of "parity" (#243 d X1): the writer's whitespace
-        # refusal (config.sh `*[[:space:]]*` — a storage-format
+        # refusal (sh/path-sane.sh `*[[:space:]]*` — a storage-format
         # refusal, 0.0.39b C3) is deliberately NOT mirrored here
         # (recorded a X2 disposition): a spaced path never lexically
         # equals a system path, and [ ! -d ] plus full quoting defang

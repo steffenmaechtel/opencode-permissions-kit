@@ -317,7 +317,8 @@ for syspath in / /etc /home/ /var/ /var// /etc/nginx /usr /usr/share /bin /boot 
         fail "screening rejects $syspath"
     fi
 done
-# Writer-parity arms (#243 b X1): config.sh project_path_sane refuses
+# Writer-parity arms (#243 b X1): sh/path-sane.sh project_path_sane
+# (config.sh's and install.sh's shared gate since issue #216) refuses
 # these system paths; the reader blocklist mirrors them now — pinned
 # here lexically, behaviorally in the 4c blocklist arm below, and as a
 # set-equality tripwire in the parity pin after the reps.
@@ -355,8 +356,12 @@ done
 # (/-leading lines minus a lone `/*)` arm) — fail-loud by construction:
 # any stray /-leading line in project_path_sane breaks the set
 # equality; it can never silently pass.
-CONFIG_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.sh"
-WRITER_PATTERNS="$(sed -n '/^project_path_sane()/,/^}/p' "$CONFIG_SH" |
+# The writer-side policy lives in sh/path-sane.sh since issue #216
+# (sourced by config.sh and install.sh) — extract the blocklist from
+# the single copy. Top-level anchored (the lib's definition, like
+# config.sh's former one, sits at indent 0).
+PATH_SANE_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/path-sane.sh"
+WRITER_PATTERNS="$(sed -n '/^project_path_sane()/,/^}/p' "$PATH_SANE_SH" |
     grep -E '^[[:space:]]*/' | grep -vE '^[[:space:]]*/\*\)' |
     sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/)$//' | tr '\n' '|')"
 _un_parity_tokens() {
@@ -940,7 +945,7 @@ fi
 # arms' /-suffix spellings must be screened after the writer-parity
 # strip — /var/ and /home/ normalize onto the bare arms the case
 # refuses (pre-fix they passed gate + blocklist lexically while the
-# writer refuses the stripped form, config.sh `_pp="${1%/}"`). The
+# writer refuses the stripped form, sh/path-sane.sh `_pp="${1%/}"`). The
 # same arm pins the two hazards the strip could itself create:
 # /var// must stay the DOT GATE's catch (a strip placed before the
 # gate would turn it into /var/ and open the blocklist hole back
