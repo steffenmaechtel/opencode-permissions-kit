@@ -26,6 +26,11 @@ that number was an illusion. Numbers are environment-dependent per line:
 `log.sh`'s install.conf branch is 100% on a kit-managed host (the file
 exists), 93.75% in a container/CI (it does not). CI is the honest baseline.
 
+Post-commit validation of the finished runner (same day, tree of d458095
+plus the new pin suite in scope): full pass rc=0, 42 OK + 1 SKIP (#342),
+non-empty merged summary — the report includes the runner's own pin
+suite like any other.
+
 ## What was measured (all on the digest-pinned image, bash 5.2)
 
 1. **Numbers are real and discriminate.** test-log.sh full suite: 93.75%
