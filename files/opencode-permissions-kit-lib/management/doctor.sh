@@ -254,7 +254,7 @@ def path_error(p):
     # the path into a copy-paste sudo command — a committed opk.json must
     # never be able to steer that command
     if any(c in p for c in "'\"`$;"):
-        return "tree path %r must not contain shell-significant characters ('\"`$;)" % p
+        return "tree path %r must not contain shell-significant characters: quotes, backtick, dollar, semicolon" % p
     for comp in p.split("/"):
         if comp in ("", ".", ".."):
             return "tree path %r must not contain empty, '.' or '..' components" % p
@@ -356,11 +356,12 @@ doctor_examples() {
 DOCTOR_TAB="$(printf '\t')"
 while IFS="$DOCTOR_TAB" read -r DOCTOR_PATH DOCTOR_NOTE; do
     # Belt over the python allowlist: the forms that must never reach
-    # find as an operand (absolute, dot/dotdot components in every
-    # position, empty components, backslash) are re-checked in shell --
-    # defense in depth, not the primary gate.
+    # find as an operand (absolute, trailing slash, dot/dotdot
+    # components in every position, interior empty components,
+    # backslash) are re-checked in shell -- defense in depth, not the
+    # primary gate (#344 a S5, b R3).
     case "$DOCTOR_PATH" in
-        /* | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*)
+        /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*)
             ui_kv_warn "container tree" "$DOCTOR_PATH -- rejected path form, skipped"
             continue
             ;;
@@ -412,9 +413,16 @@ while IFS="$DOCTOR_TAB" read -r DOCTOR_PATH DOCTOR_NOTE; do
 
     # Pass 2 (examples): display-only, run just when there is something
     # to show -- see doctor_examples for the truncation contract.
+    # stderr deliberately NOT suppressed (#344 b R4): a tree that turns
+    # unreadable between the passes degrades the examples, and the raw
+    # find error on the terminal is that degradation's visibility (the
+    # counts stay authoritative -- pass 1 warns loudly). A deterministic
+    # failure-path pin would need mid-scan timing injection (~30+ lines
+    # for a LOW) -- declined per the pin-cost budget, recorded as an
+    # accepted residual in round b.
     _cl_ex=""
     if [ "$_cl_risk" -gt 0 ]; then
-        find "$DOCTOR_TREE" -printf '%U\t%p\n' 2>/dev/null >"$WORK/extsv"
+        find "$DOCTOR_TREE" -printf '%U\t%p\n' >"$WORK/extsv"
         : >"$WORK/ex"
         doctor_examples "$WORK/extsv" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >>"$WORK/ex"
         while IFS= read -r _ex_p; do

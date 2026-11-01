@@ -404,7 +404,8 @@ rc_doctor "two args -> rc 64" 64 "$PROJ" "$PROJ"
 rc_doctor "flag arg -> rc 64" 64 --short
 rc_doctor "nonexistent dir -> rc 64" 64 "$WORK/no-such-project"
 
-# --- 5. kit-state failure paths ----------------------------------------------------_rd_rc=0
+# --- 5. kit-state failure paths ----------------------------------------------------
+_rd_rc=0
 _rd_out="$(OPK_INSTALL_CONF="$WORK/nope.conf" NO_COLOR=1 sh "$DOCTOR" "$PROJ" 2>&1)" || _rd_rc=$?
 [ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "not found -- is the kit installed?" &&
     pass "missing install.conf -> rc 1 with hint" ||
@@ -469,16 +470,20 @@ fi
 # shapes whose failure paths a unit fixture cannot reach cheaply (the
 # python gate fires first; a deterministic mid-scan SIGINT fixture is
 # the pin-cost-budget class) — pinned stripped so commented-out
-# constructs cannot satisfy them
+# constructs cannot satisfy them. The belt conjuncts pin DISTINCTIVE
+# fragments of the case line (#344 b R1: the former `grep -qF '.'` was
+# vacuous — any period matched, the whole dot/dotdot coverage could be
+# deleted with the pin staying green; mutation-verified in round b)
 sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF "trap '_doctor_cleanup; exit 1' INT TERM" &&
     sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'trap _doctor_cleanup EXIT' &&
     pass "signal handlers exit (#344 a C1 house shape, stripped source)" ||
     fail "signal handlers exit (#344 a C1 house shape, stripped source)"
-sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*/./*' &&
+sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '| . | ./* | .. | ../* | ' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*/. | */./* | */.. | */../* | ' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*/ | ' &&
     sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*//*' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '.' &&
-    pass "belt case covers dot/dotdot/empty components (#344 a S5, stripped source)" ||
-    fail "belt case covers dot/dotdot/empty components (#344 a S5, stripped source)"
+    pass "belt case covers bare/leading/trailing dot forms + slash forms (#344 a S5 + b R1/R3, stripped source)" ||
+    fail "belt case covers bare/leading/trailing dot forms + slash forms (#344 a S5 + b R1/R3, stripped source)"
 
 # --- summary gate -----------------------------------------------------------------
 echo ""
