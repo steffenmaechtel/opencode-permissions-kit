@@ -107,8 +107,9 @@ where its review role ends.
   proposes the issues (tracker duplicate-checked, same-topic orders
   bundled, `prio:` label derived from the finding severity) and asks a
   single binary CREATE-ISSUES question at the very end of its report —
-  your YES rides the normal `gh` permission prompt, and the closing
-  summary lists what was filed (or records your NO). The mechanics
+  your YES rides the normal `gh` permission prompt, the agent posts a
+  one-line pointer comment per created issue on the birth-PR, and the
+  closing summary lists what was filed (or records your NO). The mechanics
   live in the review concept's stop-rule section.
 - **Required approvals = 1 on master** is the hard merge gate: the
   machine account cannot approve its own PRs, so only your approval
