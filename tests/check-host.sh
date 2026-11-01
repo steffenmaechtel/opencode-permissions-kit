@@ -77,7 +77,7 @@ check_opt() {
 }
 
 # gh_version_ge <have> <min> — rc 0 when have >= min (dotted numbers,
-# compared numerically per component — "2.10" < "2.87", a string compare
+# compared numerically per component — "2.9" < "2.87", a string compare
 # would say otherwise)
 gh_version_ge() {
     awk -v have="$1" -v min="$2" 'BEGIN {
@@ -135,7 +135,8 @@ fi
 ui_section "Agent workflow (optional)"
 # gh — below GH_MIN plain `gh issue view` / `gh pr view` FAIL hard: their
 # templates query the deprecated GraphQL projectCards field, GitHub rejects
-# the query and gh exits 1 with no output (issue #335, cli/cli#11992).
+# the query and gh exits 1 printing the deprecation error instead of the
+# issue content (issue #335, cli/cli#11992).
 # Warning only, never blocking: the suite does not need gh, and the CI
 # image may not carry it. The output names GH_MIN as INFORMATION (plain
 # view recovers from GH_MIN) but carries no install instructions — the host

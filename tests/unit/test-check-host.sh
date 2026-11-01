@@ -29,10 +29,11 @@ arm() { # <fake-gh-version> <want: warn|ok>
     fi
 }
 
-arm 2.45.0 warn # the Ubuntu-ESM version on this host
-arm 2.10.0 warn # numeric compare: 10 < 87 (string compare would pass it)
-arm devel warn  # unparseable version -> the 2>/dev/null probe's failure path
-arm 2.87 ok     # the minimum itself
+arm 2.45.0 warn # the Ubuntu-ESM-pinned distro version
+arm 2.9 warn    # numeric compare: 9 < 87 — a string compare reads "2.9" as
+#            >= "2.87" and would report ok (the discriminating arm, #339 a F1)
+arm devel warn # unparseable version -> sed extraction non-match (empty capture)
+arm 2.87 ok    # the minimum itself
 arm 2.87.3 ok
 
 [ "$fails" -eq 0 ] && echo "test-check-host: passed" || exit 1

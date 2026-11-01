@@ -138,7 +138,7 @@ make e2e-rootless        # docker-rootless e2e (skips without systemd-in-contain
 **Line-length ratchet:** a red `test-line-length.sh` means a scoped line
 grew past 120 content columns. Shorten it; a deliberate exception goes
 through `sh tests/unit/test-line-length.sh --regen` with the baseline
-diff reviewed in the same commit.
+diff reviewed.
 
 **gh auth:** where the context may lack gh auth (e2e containers, foreign
 hosts), probe `gh auth status` before gh-dependent steps; for read-only
