@@ -365,7 +365,7 @@ a clean rebuild of the affected outputs. To find at-risk trees *before*
 they break a build, declare the container-written trees in the project's
 `opk.json` and run [`opk doctor`](reference/cli.md#doctor) — it
 classifies every entry as mapped-safe or at-risk and prints the fix
-command per tree.
+command for every at-risk tree.
 
 ## ddev warns "Unable to open hosts file ... permission denied"
 

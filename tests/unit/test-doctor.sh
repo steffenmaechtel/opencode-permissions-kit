@@ -157,12 +157,13 @@ else
     pass "voided files leak no partial rows (buffer discipline)"
 fi
 
-# --- 2. doctor_classify: uid classification against the mapped set ----------------
+# --- 2. doctor_classify / doctor_examples: uid classification ---------------------
 CLS_FN="$WORK/cls-fn.sh"
 extract_fn doctor_classify >"$CLS_FN"
+extract_fn doctor_examples >>"$CLS_FN"
 [ -s "$CLS_FN" ] &&
-    pass "doctor_classify extractable" ||
-    fail "doctor_classify extractable"
+    pass "doctor_classify/doctor_examples extractable" ||
+    fail "doctor_classify/doctor_examples extractable"
 
 # controlled PATH with the block's one external (awk) — the test-sandbox
 # rule in agent/conventions.md (extracted code, controlled PATH)
@@ -170,9 +171,9 @@ SCRATCHBIN="$WORK/bin"
 mkdir -p "$SCRATCHBIN"
 ln -s "$(command -v awk)" "$SCRATCHBIN/awk"
 
-# synthetic find stream: daemon uid, range boundaries, unmapped uids
-printf '1000\ta\n1001\tb\n165536\tc\n231071\td\n231072\te\n0\tf\n1000\tg\n' \
-    >"$WORK/stream"
+# synthetic uid stream (one numeric line per find entry): daemon uid,
+# range boundaries, unmapped uids (#344 a S1: uid-only, newline-safe)
+printf '1000\n1001\n165536\n231071\n231072\n0\n1000\n' >"$WORK/uids"
 _cls_run() {
     (
         PATH="$SCRATCHBIN"
@@ -181,7 +182,15 @@ _cls_run() {
         doctor_classify "$1" "$2" "$3" 2>/dev/null
     )
 }
-_out="$(_cls_run "$WORK/stream" 1001 "1001 1 165536 65536" | grep '^SUM' | cut -f2,3)"
+_ex_run() {
+    (
+        PATH="$SCRATCHBIN"
+        export PATH
+        . "$CLS_FN"
+        doctor_examples "$1" "$2" "$3" 2>/dev/null
+    )
+}
+_out="$(_cls_run "$WORK/uids" 1001 "1001 1 165536 65536" | grep '^SUM' | cut -f2,3)"
 [ "$_out" = "$(printf '3\t4')" ] &&
     pass "classify counts safe/risk (daemon + range boundaries)" ||
     {
@@ -190,7 +199,7 @@ _out="$(_cls_run "$WORK/stream" 1001 "1001 1 165536 65536" | grep '^SUM' | cut -
     }
 # boundary discrimination: start and last of a range are safe, +1 is not
 # (daemon 99999 is absent from the stream — only the range can match)
-_out="$(_cls_run "$WORK/stream" 99999 "165536 65536" | grep '^SUM' | cut -f2,3)"
+_out="$(_cls_run "$WORK/uids" 99999 "165536 65536" | grep '^SUM' | cut -f2,3)"
 [ "$_out" = "$(printf '2\t5')" ] &&
     pass "range boundaries discriminate (165536..231071 in, 231072 out)" ||
     {
@@ -198,25 +207,31 @@ _out="$(_cls_run "$WORK/stream" 99999 "165536 65536" | grep '^SUM' | cut -f2,3)"
         echo "        SUM got: $_out (want 2/5)"
     }
 # unmapped uids tallied per uid (daemon 1001 is safe; 231072 falls out)
-_out="$(_cls_run "$WORK/stream" 1001 "165536 65536" | grep '^UID' | sort | tr '\n' ' ')"
+_out="$(_cls_run "$WORK/uids" 1001 "165536 65536" | grep '^UID' | sort | tr '\n' ' ')"
 [ "$_out" = "$(printf 'UID\t0\t1 UID\t1000\t2 UID\t231072\t1 ')" ] &&
     pass "unmapped uids tallied per uid" ||
     {
         fail "unmapped uids tallied per uid"
         echo "        got: $_out"
     }
-# examples capped at three
-_exn="$(_cls_run "$WORK/stream" 1001 "165536 65536" | grep -c '^EX' || true)"
-[ "$_exn" = "3" ] &&
-    pass "examples capped at three" ||
-    fail "examples capped at three (got $_exn)"
 # empty ranges string: only the daemon uid is safe (the fallback floor)
-_out="$(_cls_run "$WORK/stream" 1001 "" | grep '^SUM' | cut -f2,3)"
+_out="$(_cls_run "$WORK/uids" 1001 "" | grep '^SUM' | cut -f2,3)"
 [ "$_out" = "$(printf '1\t6')" ] &&
     pass "empty range list -> daemon-uid-only matching" ||
     {
         fail "empty range list -> daemon-uid-only matching"
         echo "        SUM got: $_out (want 1/6)"
+    }
+# examples pass (TSV stream): capped at three, display-only truncation
+# at the first whitespace run (#344 a S1/S2 — the documented contract)
+printf '1000\tweb assets/x\n1000\tsecond\n165536\tsafe\n0\tthird\n1000\tfourth\n' \
+    >"$WORK/extsv"
+_out="$(_ex_run "$WORK/extsv" 1001 "165536 65536" | tr '\n' ' ')"
+[ "$_out" = "$(printf 'web second third ')" ] &&
+    pass "examples: three max, truncated at whitespace (documented)" ||
+    {
+        fail "examples: three max, truncated at whitespace (documented)"
+        echo "        got: $_out"
     }
 
 # --- 3. doctor_load_policy: opk.json validation (strict JSON) ---------------------
@@ -258,15 +273,28 @@ _out="$(pol '{"version":1,"futureKey":true,"containerTrees":[{"path":"a","role":
 for _bad in \
     '{bad json' \
     '{"version":2,"containerTrees":[]}' \
+    '{"version":true,"containerTrees":[]}' \
+    '{"version":1.0,"containerTrees":[]}' \
     '[]' \
     '{"containerTrees":{"path":"a"}}' \
     '{"containerTrees":[42]}' \
     '{"containerTrees":[{"note":"no path"}]}' \
+    '{"containerTrees":[{"path":42}]}' \
+    '{"containerTrees":[{"path":""}]}' \
+    '{"containerTrees":["."]}' \
+    '{"containerTrees":["a//b"]}' \
     '{"containerTrees":[{"path":"/etc/passwd"}]}' \
     '{"containerTrees":[{"path":"a/../../etc"}]}' \
+    '{"containerTrees":[{"path":"a\u0001b"}]}' \
     '{"containerTrees":[{"path":"pkgs/*/Public"}]}' \
     '{"containerTrees":[{"path":"a\\b"}]}' \
-    '{"containerTrees":[{"path":"a","note":7}]}'; do
+    '{"containerTrees":[{"path":"a;whoami"}]}' \
+    '{"containerTrees":[{"path":"a$b"}]}' \
+    '{"containerTrees":[{"path":"a`id`b"}]}' \
+    '{"containerTrees":[{"path":"a\"b"}]}' \
+    '{"containerTrees":[{"path":"a\u0027b"}]}' \
+    '{"containerTrees":[{"path":"a","note":7}]}' \
+    '{"containerTrees":[{"path":"a","note":"x\u001by"}]}'; do
     _pol_rc=0
     pol "$_bad" >/dev/null || _pol_rc=$?
     _pol_msg="$(cat "$WORK/pol.err" 2>/dev/null || true)"
@@ -376,8 +404,7 @@ rc_doctor "two args -> rc 64" 64 "$PROJ" "$PROJ"
 rc_doctor "flag arg -> rc 64" 64 --short
 rc_doctor "nonexistent dir -> rc 64" 64 "$WORK/no-such-project"
 
-# --- 5. kit-state failure paths ----------------------------------------------------
-_rd_rc=0
+# --- 5. kit-state failure paths ----------------------------------------------------_rd_rc=0
 _rd_out="$(OPK_INSTALL_CONF="$WORK/nope.conf" NO_COLOR=1 sh "$DOCTOR" "$PROJ" 2>&1)" || _rd_rc=$?
 [ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "not found -- is the kit installed?" &&
     pass "missing install.conf -> rc 1 with hint" ||
@@ -406,6 +433,52 @@ chmod 000 "$PROJ/tree/secret"
 rc_doctor "unreadable subtree -> rc 2 (warn, not silent)" 2 "$PROJ"
 grep_last_out "incomplete-scan warn shown" grep -qF "scan incomplete"
 chmod 755 "$PROJ/tree/secret"
+
+# newline in a FILENAME must not corrupt the verdict (#344 a S1): the
+# count stream is uid-only, so a healthy tree stays healthy
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+mkproj
+_nl_name="$(printf 'weird\nname')"
+echo n >"$PROJ/tree/$_nl_name"
+policy '{"containerTrees":["tree"]}'
+rc_doctor "newline filename -> counts intact, rc 0" 0 "$PROJ"
+grep_last_out "newline file counted once" grep -qF "tree -- 4 entries mapped-safe"
+if printf '%s' "$_rd_out" | grep -q "at-risk"; then
+    fail "newline filename invents no at-risk rows"
+else
+    pass "newline filename invents no at-risk rows"
+fi
+
+# daemon namespace mapping count>1 at the daemon uid: no duplicate floor
+# row in the display (#344 a C5)
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 65536"
+mkproj
+policy '{"containerTrees":["tree"]}'
+rc_doctor "count>1 zero row covers the tree -> rc 0" 0 "$PROJ"
+grep_last_out "daemon uid listed once" grep -qF "0-65535 -- live uid_map"
+if printf '%s' "$_rd_out" | grep -qF "0, 0-"; then
+    fail "no duplicate floor row in the display"
+else
+    pass "no duplicate floor row in the display"
+fi
+
+# source-shape pins (comment-strip rider per conventions.md, "Source-
+# counting pins"): the C1 trap and the S5 belt are defense-in-depth
+# shapes whose failure paths a unit fixture cannot reach cheaply (the
+# python gate fires first; a deterministic mid-scan SIGINT fixture is
+# the pin-cost-budget class) — pinned stripped so commented-out
+# constructs cannot satisfy them
+sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF "trap '_doctor_cleanup; exit 1' INT TERM" &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'trap _doctor_cleanup EXIT' &&
+    pass "signal handlers exit (#344 a C1 house shape, stripped source)" ||
+    fail "signal handlers exit (#344 a C1 house shape, stripped source)"
+sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*/./*' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*//*' &&
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '.' &&
+    pass "belt case covers dot/dotdot/empty components (#344 a S5, stripped source)" ||
+    fail "belt case covers dot/dotdot/empty components (#344 a S5, stripped source)"
 
 # --- summary gate -----------------------------------------------------------------
 echo ""

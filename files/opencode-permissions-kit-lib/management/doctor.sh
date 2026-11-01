@@ -106,7 +106,15 @@ fi
 DOCTOR_PROC="${OPK_DOCTOR_PROC_ROOT:-/proc}"
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+# Signal handlers EXIT (#344 a C1): a non-exiting INT/TERM handler runs the
+# cleanup and dash RESUMES the script — with $WORK already deleted, every
+# later redirect fails and the remaining trees render cascade garbage. The
+# house shape (install.sh, update.sh, config.sh): cleanup on EXIT, cleanup
+# PLUS exit on the signals.
+# shellcheck disable=SC2317  # invoked via trap only
+_doctor_cleanup() { rm -rf "$WORK"; }
+trap _doctor_cleanup EXIT
+trap '_doctor_cleanup; exit 1' INT TERM
 
 # doctor_userns_ranges <proc_root> <daemon_uid>
 # Prints one "start:count" line per mapped host-uid range found in any
@@ -163,7 +171,12 @@ DOCTOR_RANGE_VERIFIED=0
 [ -s "$WORK/ranges.raw" ] && DOCTOR_RANGE_VERIFIED=1
 # The daemon uid itself is always mapped (container root is the daemon
 # user host-side) -- the fallback floor when no namespace was found.
-printf '%s:1\n' "$DOCTOR_DAEMON_UID" >>"$WORK/ranges.raw"
+# Appended only when no live range already starts at the daemon uid
+# (#344 a C5): a daemon namespace mapping count>1 there would otherwise
+# survive sort -u next to the floor row and display the uid twice.
+if ! awk -F: -v u="$DOCTOR_DAEMON_UID" '$1 == u { found = 1 } END { exit !found }' "$WORK/ranges.raw"; then
+    printf '%s:1\n' "$DOCTOR_DAEMON_UID" >>"$WORK/ranges.raw"
+fi
 sort -u "$WORK/ranges.raw" >"$WORK/ranges"
 # one "start count" pair list for awk ("1001 1 165536 65536")
 DOCTOR_RANGES="$(awk -F: '{ printf "%s %s ", $1, $2 }' "$WORK/ranges")"
@@ -218,8 +231,11 @@ def bad(msg):
 
 if not isinstance(doc, dict):
     bad("top level must be a JSON object")
-if doc.get("version", 1) != 1:
-    bad("unsupported version %r -- this kit reads version 1" % (doc.get("version"),))
+# Strict version typing (#344 a C4): Python coerces True == 1 and 1.0 == 1,
+# so a bare != would accept JSON true/1.0 as "version 1"
+version = doc.get("version", 1)
+if isinstance(version, bool) or not isinstance(version, int) or version != 1:
+    bad("unsupported version %r -- this kit reads version 1" % (version,))
 trees = doc.get("containerTrees", [])
 if not isinstance(trees, list):
     bad("containerTrees must be an array")
@@ -234,6 +250,11 @@ def path_error(p):
     for ch in p:
         if ord(ch) < 32:
             return "tree path %r must not contain control characters" % p
+    # Shell-significant characters (#344 a S3): the fix hints interpolate
+    # the path into a copy-paste sudo command — a committed opk.json must
+    # never be able to steer that command
+    if any(c in p for c in "'\"`$;"):
+        return "tree path %r must not contain shell-significant characters ('\"`$;)" % p
     for comp in p.split("/"):
         if comp in ("", ".", ".."):
             return "tree path %r must not contain empty, '.' or '..' components" % p
@@ -255,8 +276,15 @@ for i, entry in enumerate(trees):
         bad("containerTrees[%d]: %s" % (i, err))
     if not isinstance(note, str):
         bad('containerTrees[%d]: "note" must be a string' % i)
-    # tabs or newlines would break the TSV round-trip into shell
-    sys.stdout.write("%s\t%s\n" % (rel, " ".join(note.split())))
+    # Collapse first (tabs/newlines would break the TSV round-trip), then
+    # gate control characters (#344 a S4): the surviving non-whitespace
+    # control chars (ESC, BEL, ...) reach the terminal via ui_detail —
+    # the same gate the path has, now on both fields
+    note = " ".join(note.split())
+    for ch in note:
+        if ord(ch) < 32:
+            bad('containerTrees[%d]: "note" must not contain control characters' % i)
+    sys.stdout.write("%s\t%s\n" % (rel, note))
 PYEOF
 }
 
@@ -266,12 +294,11 @@ if ! doctor_load_policy "$DOCTOR_ROOT" >"$WORK/trees"; then
 fi
 
 # --- scan each declared tree --------------------------------------------------------
-# doctor_classify <stream-file> <daemon-uid> <ranges>
-# Classifies "uid<TAB>path" lines (find -printf '%U\t%p') against the
-# mapped set; emits "SUM<TAB>safe<TAB>risk", one "UID<TAB>uid<TAB>count"
-# per unmapped uid and "EX<TAB>path" for the first three at-risk
-# entries. $2 (the path column) is display-only: a filename containing
-# a literal tab truncates the example, never the counts.
+# doctor_classify <uids-file> <daemon-uid> <ranges>
+# Counts owners from a UID-ONLY stream (find -printf '%U\n'): exactly one
+# numeric line per entry, so a filename containing a newline cannot
+# corrupt the counts or invent uids (#344 a S1). Emits
+# "SUM<TAB>safe<TAB>risk" and one "UID<TAB>uid<TAB>count" per unmapped uid.
 doctor_classify() {
     awk -v daemon="$2" -v ranges="$3" '
         BEGIN {
@@ -290,7 +317,6 @@ doctor_classify() {
             if (ok) { safe++; next }
             risk++
             uids[uid]++
-            if (exn < 3) { exn++; print "EX\t" $2 }
         }
         END {
             print "SUM\t" safe + 0 "\t" risk + 0
@@ -299,13 +325,42 @@ doctor_classify() {
     ' "$1"
 }
 
+# doctor_examples <tsv-file> <daemon-uid> <ranges>
+# Display-only companion pass over "uid<TAB>path" lines: prints the
+# paths of the first three at-risk entries. Paths render truncated at
+# the first whitespace run (awk default FS) -- deliberate and harmless:
+# examples point a human at the tree; the counts come from the
+# newline-safe uid stream (#344 a S1/S2).
+doctor_examples() {
+    awk -v daemon="$2" -v ranges="$3" '
+        BEGIN {
+            n = split(ranges, r, " ")
+            for (i = 1; i + 1 <= n; i += 2) {
+                rs[++m] = r[i] + 0
+                rc[m] = r[i + 1] + 0
+            }
+        }
+        {
+            uid = $1 + 0
+            if (uid == daemon + 0) next
+            ok = 0
+            for (j = 1; j <= m; j++)
+                if (uid >= rs[j] && uid < rs[j] + rc[j]) { ok = 1; break }
+            if (ok) next
+            if (exn < 3) { exn++; print $2 }
+            if (exn >= 3) exit
+        }
+    ' "$1"
+}
+
 DOCTOR_TAB="$(printf '\t')"
 while IFS="$DOCTOR_TAB" read -r DOCTOR_PATH DOCTOR_NOTE; do
     # Belt over the python allowlist: the forms that must never reach
-    # find as an operand (absolute, dotdot, backslash) are re-checked
-    # in shell -- defense in depth, not the primary gate.
+    # find as an operand (absolute, dot/dotdot components in every
+    # position, empty components, backslash) are re-checked in shell --
+    # defense in depth, not the primary gate.
     case "$DOCTOR_PATH" in
-        /* | ../* | */../* | */.. | *\\*)
+        /* | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*)
             ui_kv_warn "container tree" "$DOCTOR_PATH -- rejected path form, skipped"
             continue
             ;;
@@ -324,7 +379,10 @@ while IFS="$DOCTOR_TAB" read -r DOCTOR_PATH DOCTOR_NOTE; do
         continue
     fi
 
-    find "$DOCTOR_TREE" -printf '%U\t%p\n' >"$WORK/scan" 2>"$WORK/scan.err"
+    # Pass 1 (authoritative counts): the uid-only stream is newline-safe
+    # by construction -- a filename containing a newline cannot split a
+    # numeric uid line (#344 a S1).
+    find "$DOCTOR_TREE" -printf '%U\n' >"$WORK/uids" 2>"$WORK/scan.err"
     if [ -s "$WORK/scan.err" ]; then
         # fail loud, not fail absent: unreadable entries would silently
         # shrink the tree and could turn a red verdict green (#312 class
@@ -332,13 +390,12 @@ while IFS="$DOCTOR_TAB" read -r DOCTOR_PATH DOCTOR_NOTE; do
         ui_kv_warn "container tree" "$DOCTOR_PATH -- scan incomplete: $(wc -l <"$WORK/scan.err") unreadable entries"
         ui_detail "run doctor as the tree owner (or with sudo) to get a complete verdict"
     fi
-    doctor_classify "$WORK/scan" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >"$WORK/cls"
+    doctor_classify "$WORK/uids" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >"$WORK/cls"
 
     _cl_safe=0
     _cl_risk=0
     _cl_uids=""
     _cl_uidn=0
-    _cl_ex=""
     while IFS="$DOCTOR_TAB" read -r _cl_tag _cl_a _cl_b; do
         case "$_cl_tag" in
             SUM)
@@ -349,13 +406,23 @@ while IFS="$DOCTOR_TAB" read -r DOCTOR_PATH DOCTOR_NOTE; do
                 _cl_uidn=$((_cl_uidn + 1))
                 [ "$_cl_uidn" -le 4 ] && _cl_uids="$_cl_uids$_cl_a ($_cl_b), "
                 ;;
-            EX)
-                [ "$_cl_ex" ] && _cl_ex="$_cl_ex, "
-                _cl_ex="$_cl_ex${_cl_a#"$DOCTOR_ROOT"/}"
-                ;;
         esac
     done <"$WORK/cls"
     _cl_total=$((_cl_safe + _cl_risk))
+
+    # Pass 2 (examples): display-only, run just when there is something
+    # to show -- see doctor_examples for the truncation contract.
+    _cl_ex=""
+    if [ "$_cl_risk" -gt 0 ]; then
+        find "$DOCTOR_TREE" -printf '%U\t%p\n' 2>/dev/null >"$WORK/extsv"
+        : >"$WORK/ex"
+        doctor_examples "$WORK/extsv" "$DOCTOR_DAEMON_UID" "$DOCTOR_RANGES" >>"$WORK/ex"
+        while IFS= read -r _ex_p; do
+            [ -n "$_ex_p" ] || continue
+            [ -n "$_cl_ex" ] && _cl_ex="$_cl_ex, "
+            _cl_ex="$_cl_ex${_ex_p#"$DOCTOR_ROOT"/}"
+        done <"$WORK/ex"
+    fi
 
     if [ "$_cl_risk" -gt 0 ]; then
         ui_kv_bad "container tree" "$DOCTOR_PATH -- $_cl_risk of $_cl_total entries at-risk (unmapped owners)"

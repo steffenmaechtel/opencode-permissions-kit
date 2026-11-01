@@ -138,8 +138,10 @@ usage error.
   both the build's inputs and its outputs, otherwise outputs drift to
   odd subuid owners (the troubleshooting entry above explains why).
 - Paths are relative to the project root: no absolute paths, no `..`,
-  no globs. A bare string entry (`"some/path"`) works too when a tree
-  needs no note.
+  no globs, and no shell-significant characters (`'` `"` `` ` `` `$` `;`)
+  — the fix hints interpolate paths into copy-paste commands, so the
+  policy gate keeps them out entirely. A bare string entry
+  (`"some/path"`) works too when a tree needs no note.
 
 ## handover
 
