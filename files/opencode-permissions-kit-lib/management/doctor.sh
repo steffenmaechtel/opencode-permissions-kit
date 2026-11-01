@@ -128,8 +128,9 @@ fi
 # byte in the root would truncate the handover operand away from the
 # tree the [y/N] prompt named. The opk.json fields are gated by the
 # python validator; the root comes from the CLI/cwd and is gated here.
-# Scan mode needs no gate: it passes the root to find as one argv, no
-# round-trip exists.
+# Scan mode needs no OPERAND round-trip: the counts pass feeds find's
+# uid-only output, and the examples pass (a TAB TSV) degrades display
+# rows only -- verdict and rc stay intact (#344 a S1/S2 class).
 if [ "$DOCTOR_MODE" = "fix" ] &&
     printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]]'; then
     ui_error "doctor: project root contains control characters -- unusable for 'fix' (candidate round-trip)"

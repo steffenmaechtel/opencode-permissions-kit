@@ -553,11 +553,15 @@ echo x >"$CTRL_PROJ/tree/one"
 printf '%s\n' '{"containerTrees":["tree"]}' >"$CTRL_PROJ/opk.json"
 RD_OPK="$STUB"
 : >"$CALLS"
-rc_doctor "fix on a root with a control byte -> rc 64" 64 fix "$CTRL_PROJ"
+printf 'y\n' >"$WORK/ans"
+# answer file on purpose (#348 b B2): under gate deletion the prompt
+# would read this y and invoke the stub -- the CALLS pin can only
+# discriminate when a yes is actually on offer
+rc_doctor_ans "fix on a root with a control byte -> rc 64" 64 "$WORK/ans" fix "$CTRL_PROJ"
 grep_last_out "control-char rejection row" grep -qF "contains control characters"
 [ ! -s "$CALLS" ] &&
-    pass "control-byte root: handover never invoked" ||
-    fail "control-byte root: handover never invoked"
+    pass "control-byte root: gate rejects before the prompt (y on offer)" ||
+    fail "control-byte root: gate rejects before the prompt (y on offer)"
 rc_doctor "scan on the same root still runs (no fix gate there)" 1 "$CTRL_PROJ"
 grep_last_out "scan on ctrl root still classifies" grep -qF "entries at-risk"
 
