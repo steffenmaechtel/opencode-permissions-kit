@@ -12,6 +12,15 @@
 #   scripts/shellmetrics.sh            # pretty report (per function)
 #   scripts/shellmetrics.sh --csv      # one CSV row per function
 #
+# The tool sorts only per-file (functions ascending by CCN, files in
+# argument order). Cross-file rankings come from --csv + sort (the
+# recipes also live in #346):
+#   scripts/shellmetrics.sh --csv | tail -n +2 \
+#     | grep -v '"<begin>"\|"<end>"' | sort -t, -k5 -rn | head -15
+#   ... | sort -t, -k4 -rn ...   # same shape, ranked by LLOC instead
+#   bash ~/.cache/opk-shellmetrics/shellmetrics-*/shellmetrics --csv <one-file>
+#     # single-file drilldown (note the <begin>/<end> bookend rows)
+#
 # Any arguments are passed through to the tool (--csv, --no-color, ...).
 set -u
 
