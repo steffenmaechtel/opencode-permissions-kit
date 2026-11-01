@@ -100,7 +100,7 @@ fi
 # (a second EXCLUDED= line would drift the list while the literal pin
 # stayed green — #343 a C3 — and the count leg matches the EXCLUDED+=
 # append idiom too, which contains no EXCLUDED= substring and would
-# otherwise slip past both legs — pr-00349 round a Q1); the literal
+# otherwise slip past both legs — #349 a Q1); the literal
 # proves emptiness.
 _excl_n=$(_strip "$RUNNER" | grep -cE 'EXCLUDED[+]?=' || true)
 if [ "$_excl_n" = 1 ] &&
