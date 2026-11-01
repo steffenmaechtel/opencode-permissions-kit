@@ -33,7 +33,17 @@ sh tests/unit/test-*.sh   # unit suite — always invoke via sh, never rely on e
 make check-version     # VERSION stamp + KIT_BRANCH consistency
 make e2e               # Docker-based end-to-end suite (podman-rootless install)
 make e2e-rootless      # docker-rootless daemon suite (needs systemd-in-container, skips otherwise)
+make coverage          # kcov line-coverage report over the unit suites (report only; docker once)
 ```
+
+- **`make coverage`** (issue #255 stage 0b) is a review artifact, never a
+  gate: it runs every unit suite under kcov (binary extracted once from a
+  digest-pinned docker image into `~/.cache/opk-kcov/`, no sudo), merges
+  the per-suite reports, and prints a per-file table over `files/` +
+  `scripts/`. `make coverage SUITE=test-log` narrows it to matching
+  suites. Design rules, measured dead ends, and the digest-bump checklist
+  live in `internal/records/kcov-coverage.md`; CI publishes the report as
+  an artifact on every PR (`coverage` job).
 
 - **Call test and helper scripts with `sh <script>`.** Executable bits are
   tracked in git, so a fresh Linux/macOS clone runs `make test` directly —
