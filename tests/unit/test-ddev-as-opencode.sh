@@ -1534,8 +1534,14 @@ check "stamp: invalid for a different root" \
     sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/other\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
 check "stamp: invalid when missing entirely" \
     sh -c ". \"\$1\" && if ddev_handover_stamp_valid \"/srv/never-scanned\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+# The toggle is a STANDALONE assignment, never a prefix before the dot
+# (issue #342): bash's default mode DROPS a prefix assignment once the
+# `.` special builtin completes (dash keeps it, POSIX), and the
+# stamp_valid call runs AFTER the dot — under bash the mode silently
+# stayed "off" and the stamp kept validating. Standalone assignments
+# persist in both shells.
 check "stamp: dev-owned toggle invalidates (mode is part of the shape)" \
-    sh -c "DDEV_DEV_OWNED=true . \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
+    sh -c "DDEV_DEV_OWNED=true; . \"\$1\" && if ddev_handover_stamp_valid \"/srv/projects\" ocuser ocgroup; then exit 1; fi" _ "$HANDOVER"
 # 0.0.40a F1: the dev user (handback target) is part of the shape — a
 # DEFAULT_USER re-base must invalidate, not wait for --refresh.
 # (0.0.40b: guarded — same set -e cleanup rationale as above.)

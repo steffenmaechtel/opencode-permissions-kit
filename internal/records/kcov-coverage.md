@@ -48,7 +48,9 @@ suite like any other.
 3. **The kit is bash-stable.** 41/42 suites pass with `sh` resolved to
    bash (no kcov involved). The one exception is dash-only test semantics,
    not kit code: #342 (prefix assignment before the `.` special builtin in
-   the stamp-toggle pin).
+   the stamp-toggle pin). Update (#342 closed, 2026-11-01): the pin uses a
+   standalone assignment now — 42/42 under bash, the coverage exclusion
+   is lifted.
 4. **PS4-vs-`set -eu` collision.** kcov's default PS4 is
    `kcov@${BASH_SOURCE}@${LINENO}@`; under `set -u` inside a `bash -c`
    block the prompt expansion aborts with "unbound variable" (repro:
@@ -103,7 +105,8 @@ suite like any other.
   of cleaned (#343 a A1/A2 — a relative OUT used to write into the repo,
   and an aliased OUT would have deleted its runs/logs/merged/shim
   children).
-- Exclusions need an open issue each; today exactly one (#342).
+- Exclusions need an open issue each; none today (the #342 dash-only
+  stamp pin became portable and its entry was lifted).
 - Report surface: `--include-pattern=<repo>/files/,<repo>/scripts/`.
 - Fail-loud: suite failures under the run redden the runner; an empty
   report (trace never attached) reddens the summary; percentages never do.

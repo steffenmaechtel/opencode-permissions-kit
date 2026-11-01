@@ -12,7 +12,7 @@
 #   - A PATH shim resolves `sh` to bash for the run: dash does not expand
 #     kcov's PS4 marker, so child shells must be bash. The kit is strict
 #     POSIX and runs under bash unchanged (validated over the whole suite
-#     family; one dash-only test delta tracks in issue #342).
+#     family — the one historical dash-only test delta, #342, is fixed).
 #   - The one known method conflict is the kit's `set -eu` idiom inside
 #     `bash -c` blocks: kcov's PS4 expands ${BASH_SOURCE}, which aborts
 #     under `set -u` (unbound variable). Affected test blocks carry a
@@ -72,8 +72,8 @@ KCOV_DIR="$HOME/.cache/opk-kcov/kcov-${KCOV_IMAGE##*:}"
 
 # Suites excluded from the coverage run. Every entry needs an open issue
 # that names the delta and tracks the fix; lift the entry when it closes.
-#   test-ddev-as-opencode.sh — one stamp pin is dash-only under bash (#342)
-EXCLUDED="test-ddev-as-opencode.sh"
+# Empty since #342 closed (the dash-only stamp pin is portable now).
+EXCLUDED=""
 
 # --- 1. kcov binary: extract once from the digest-pinned image -------------
 if [ ! -x "$KCOV_DIR/bin/kcov" ]; then
