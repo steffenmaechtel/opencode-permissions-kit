@@ -166,7 +166,9 @@ fi
 # abort is rc 2 WITHOUT the die line. Injection: an unwritable stamp
 # FILE (the incident's dev-owned 644 stamp seen by the opencode user);
 # needs a non-root uid (CI's ubuntu runners are non-root), root gets a
-# loud skip.
+# loud skip. On FAIL the log CONTENT is inlined — the EXIT trap deletes
+# $WORK at exit, so a cited path would be gone before triage (round a
+# A2).
 if [ "$(id -u)" -eq 0 ]; then
     echo "  SKIP  foreign-OUT behavioral pin (root cannot inject EACCES)"
 else
@@ -184,7 +186,7 @@ else
     if [ "$_rc" -eq 1 ] && grep -qF 'cannot stamp' "$_w/log"; then
         pass "foreign-owned OUT dies 'cannot stamp' with rc 1"
     else
-        fail "foreign-owned OUT did not die with the runner's message (rc=$_rc, log: $_w/log)"
+        fail "foreign-owned OUT did not die with the runner's message (rc=$_rc, log: $(cat "$_w/log"))"
     fi
 fi
 

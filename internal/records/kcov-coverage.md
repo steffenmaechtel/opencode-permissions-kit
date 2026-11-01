@@ -146,8 +146,11 @@ The guard failure paths were EXECUTED, not reasoned (PR #343 rounds a/b):
 
 - `COVERAGE_OUT="$PWD/anything"` → dies "must live outside the repo"
 - `COVERAGE_OUT="$HOME"` → dies "refusing to clean … not opk-kcov stamped"
-- foreign-owned stamped OUT (chmod 555, non-root) → dies "cannot stamp …
-  (foreign-owned?)" with rc 1, not dash's raw rc-2 abort (#350 — the
+- foreign-owned stamped OUT → dies "cannot stamp … (foreign-owned?)" with
+  rc 1, not dash's raw rc-2 abort. The injection is an unwritable stamp
+  FILE (chmod 444 on $OUT/.opk-kcov-out, non-root) — chmod on the OUT DIR
+  does NOT reproduce (truncating an existing file needs only file-write
+  permission; the run then dies at the mkdir instead). (#350 — the
   behavioral pin in test-coverage.sh executes this; root runs skip it,
   EACCES injection needs a non-root uid)
 - relative `COVERAGE_OUT=x` from a foreign cwd → scratch lands at the
