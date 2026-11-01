@@ -135,6 +135,15 @@ make e2e                 # e2e (Docker needed)
 make e2e-rootless        # docker-rootless e2e (skips without systemd-in-container)
 ```
 
+**Line-length ratchet:** a red `test-line-length.sh` means a scoped line
+grew past 120 content columns. Shorten it; a deliberate exception goes
+through `sh tests/unit/test-line-length.sh --regen` with the baseline
+diff reviewed in the same commit.
+
+**gh auth:** where the context may lack gh auth (e2e containers, foreign
+hosts), probe `gh auth status` before gh-dependent steps; for read-only
+lookups, `curl` against api.github.com replaces failing gh calls.
+
 **Unit suites are sandboxed by policy** (0.0.42e C1): they create/delete
 only inside their own scratch and `/tmp`, `/var/tmp` — never in real
 project or system trees (`/var/www/vhosts`, `/home`, `/srv`, `/etc`, …),
