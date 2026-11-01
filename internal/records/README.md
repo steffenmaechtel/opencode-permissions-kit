@@ -27,6 +27,7 @@ archive).
 | [review-independence.md](review-independence.md) | redundancy context: external reviewer checkout | CURRENT |
 | [rules-meta.md](rules-meta.md) | rule-rationale system: metas, revisit ladder, audit invariants | CURRENT |
 | [review-calibration.md](review-calibration.md) | review-process history: calibration + incident evidence | CURRENT |
+| [kcov-coverage.md](kcov-coverage.md) | line-coverage report: runner rules, spike dead ends | CURRENT |
 
 Superseded and purely historical records live in
 [_archive/](_archive/) — `design/` (pre-streamline records),

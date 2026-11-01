@@ -158,3 +158,38 @@ jobs:
         run: ./tests/unit/test-sandbox-policy.sh
       - name: Run host pre-flight gh-version warning pins (issue #335)
         run: ./tests/unit/test-check-host.sh
+      - name: Run coverage-runner pins (issue #255 stage 0b)
+        run: ./tests/unit/test-coverage.sh
+
+  coverage:
+    # kcov line-coverage report over the unit suites (issue #255 stage
+    # 0b): a review ARTIFACT, not a gate -- no coverage PERCENTAGE can
+    # redden anything. The job can still go red on the runner's own
+    # fail-loud paths: a suite failing under the run, an empty or
+    # unmergeable report, missing host tools, a failed artifact upload.
+    # Those reds are the report staying honest -- not coverage verdicts.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install suite host tools (same prep as the unit job)
+        # The coverage run executes the SAME suites as the unit job, so it
+        # needs the same host tools: test-format-gate.sh pins shfmt exactly
+        # (first CI run reddened on its absence) and shellcheck keeps every
+        # lint-referencing suite honest.
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          make install-shfmt && echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Run the unit suites under kcov (docker extracts the pinned binary once)
+        env:
+          COVERAGE_OUT: ${{ runner.temp }}/opk-kcov-coverage
+        run: |
+          docker --version
+          make coverage
+      - name: Upload the coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: kcov-coverage
+          path: ${{ runner.temp }}/opk-kcov-coverage/merged
+          if-no-files-found: error
+          retention-days: 14
