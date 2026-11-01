@@ -98,8 +98,11 @@ fi
 # delta and tracking the fix — the last entry (#342, the dash-only stamp
 # pin) was lifted when it closed. The assignment count proves EXCLUSIVITY
 # (a second EXCLUDED= line would drift the list while the literal pin
-# stayed green — #343 a C3); the literal proves emptiness.
-_excl_n=$(_strip "$RUNNER" | grep -c 'EXCLUDED=' || true)
+# stayed green — #343 a C3 — and the count leg matches the EXCLUDED+=
+# append idiom too, which contains no EXCLUDED= substring and would
+# otherwise slip past both legs — pr-00349 round a Q1); the literal
+# proves emptiness.
+_excl_n=$(_strip "$RUNNER" | grep -cE 'EXCLUDED[+]?=' || true)
 if [ "$_excl_n" = 1 ] &&
     _strip "$RUNNER" | grep -qF 'EXCLUDED=""'; then
     pass "exclusion list is empty (no open-issue deltas left)"

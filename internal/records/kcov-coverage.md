@@ -36,6 +36,11 @@ plus the new pin suite in scope): full pass rc=0, 42 OK + 1 SKIP (#342),
 non-empty merged summary — the report includes the runner's own pin
 suite like any other.
 
+Post-lift validation (#342 closed, pr-00349): filtered run
+`scripts/coverage.sh test-ddev-as-opencode` → OK under kcov+bash
+(`sh/ddev-handover.sh` 208/269 = 77%), and CI's coverage job went green
+with the suite included on the lifting PR's own push.
+
 ## What was measured (kcov binary from the digest-pinned image, bash 5.2; item 3 is a host run without kcov)
 
 1. **Numbers are real and discriminate.** test-log.sh full suite: 93.75%
