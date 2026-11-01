@@ -125,3 +125,16 @@ check: (a) the PS4 collision still shields (test-install-args green),
 log.sh with line counts in the low 30s, (d) single-suite and full runs
 both produce non-empty summaries. Then pin the new digest in
 scripts/coverage.sh (KCOV_IMAGE) and update the baseline numbers above.
+
+## Validation probes (executed, review rounds a/b — re-run after bumps)
+
+The guard failure paths were EXECUTED, not reasoned (PR #343 rounds a/b):
+
+- `COVERAGE_OUT="$PWD/anything"` → dies "must live outside the repo"
+- `COVERAGE_OUT="$HOME"` → dies "refusing to clean … not opk-kcov stamped"
+- relative `COVERAGE_OUT=x` from a foreign cwd → scratch lands at the
+  caller's absolute cwd (no dual rooting), then the filter die
+- rerun over a stamped out dir → green (stamp honored)
+- pin sabotages: a commented `# --bash-method=DEBUG` line in the runner
+  REDDENS the method pin (absence pins count commented lines); commenting
+  out the stamp-guard die REDDENS the guards pin; restore green
