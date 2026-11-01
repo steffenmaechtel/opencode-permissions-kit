@@ -470,20 +470,21 @@ fi
 # shapes whose failure paths a unit fixture cannot reach cheaply (the
 # python gate fires first; a deterministic mid-scan SIGINT fixture is
 # the pin-cost-budget class) — pinned stripped so commented-out
-# constructs cannot satisfy them. The belt conjuncts pin DISTINCTIVE
-# fragments of the case line (#344 b R1: the former `grep -qF '.'` was
-# vacuous — any period matched, the whole dot/dotdot coverage could be
-# deleted with the pin staying green; mutation-verified in round b)
+# constructs cannot satisfy them. The belt conjuncts pin three
+# distinctive fragments spanning the case line START-to-END, so every
+# arm is covered (#344 b R1: the former `grep -qF '.'` was vacuous —
+# any period matched; #344 c Q1: the b-wave fragments left the
+# absolute and backslash arms unpinned — mutation-verified in the
+# round-b/c reviews, records on this PR's timeline)
 sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF "trap '_doctor_cleanup; exit 1' INT TERM" &&
     sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF 'trap _doctor_cleanup EXIT' &&
     pass "signal handlers exit (#344 a C1 house shape, stripped source)" ||
     fail "signal handlers exit (#344 a C1 house shape, stripped source)"
-sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '| . | ./* | .. | ../* | ' &&
+sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '/* | */ | . | ./* | .. | ../* | ' &&
     sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*/. | */./* | */.. | */../* | ' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*/ | ' &&
-    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*//*' &&
-    pass "belt case covers bare/leading/trailing dot forms + slash forms (#344 a S5 + b R1/R3, stripped source)" ||
-    fail "belt case covers bare/leading/trailing dot forms + slash forms (#344 a S5 + b R1/R3, stripped source)"
+    sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*//* | *\\*)' &&
+    pass "belt case pinned end-to-end: absolute, trailing/dot/dotdot/empty forms, backslash (#344 a S5 + b R1 + c Q1)" ||
+    fail "belt case pinned end-to-end: absolute, trailing/dot/dotdot/empty forms, backslash (#344 a S5 + b R1 + c Q1)"
 
 # --- summary gate -----------------------------------------------------------------
 echo ""
