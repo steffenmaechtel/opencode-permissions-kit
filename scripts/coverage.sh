@@ -51,7 +51,9 @@ die() {
 # repo — for every later use, either littering the repo (violating the
 # contract below) or misdiagnosing every suite as failed. The runner's
 # contract is "nothing written in the repo", so an OUT inside it is
-# refused outright (#343 a A1 shape a).
+# refused — by TEXTUAL PREFIX on the unresolved path (#343 b D1): every
+# accidental shape (relative, `..`, OUT=$REPO, OUT=$REPO/.) is caught; a
+# symlink deliberately aliased into the repo is out of scope.
 OUT="${COVERAGE_OUT:-/tmp/opk-kcov-coverage}"
 case "$OUT" in
     /*) ;;
