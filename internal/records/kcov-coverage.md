@@ -111,7 +111,11 @@ files, 1979/3732 = 53.0% (the post-lift CI comparator, superseding the
   OUT without the runner's `.opk-kcov-out` stamp is refused loud instead
   of cleaned (#343 a A1/A2 — a relative OUT used to write into the repo,
   and an aliased OUT would have deleted its runs/logs/merged/shim
-  children).
+  children). The stamp rewrite itself is a regular-builtin write
+  (`printf "" >`, not `: >`): `:` is a POSIX special builtin, so under
+  dash a failed write aborted the shell before `|| die` could run — a
+  foreign-owned OUT died with a raw "cannot create" error instead of the
+  runner's message until #350.
 - Exclusions need an open issue each; none today (the #342 dash-only
   stamp pin became portable and its entry was lifted).
 - Report surface: `--include-pattern=<repo>/files/,<repo>/scripts/`.
@@ -142,6 +146,13 @@ The guard failure paths were EXECUTED, not reasoned (PR #343 rounds a/b):
 
 - `COVERAGE_OUT="$PWD/anything"` → dies "must live outside the repo"
 - `COVERAGE_OUT="$HOME"` → dies "refusing to clean … not opk-kcov stamped"
+- foreign-owned stamped OUT → dies "cannot stamp … (foreign-owned?)" with
+  rc 1, not dash's raw rc-2 abort. The injection is an unwritable stamp
+  FILE (chmod 444 on $OUT/.opk-kcov-out, non-root) — chmod on the OUT DIR
+  does NOT reproduce (truncating an existing file needs only file-write
+  permission; the run then dies at the mkdir instead). (#350 — the
+  behavioral pin in test-coverage.sh executes this; root runs skip it,
+  EACCES injection needs a non-root uid)
 - relative `COVERAGE_OUT=x` from a foreign cwd → scratch lands at the
   caller's absolute cwd (no dual rooting), then the filter die
 - rerun over a stamped out dir → green (stamp honored)

@@ -102,7 +102,13 @@ if [ -d "$OUT" ] && [ -n "$(ls -A "$OUT" 2>/dev/null)" ] && [ ! -f "$OUT/.opk-kc
     die "refusing to clean $OUT: non-empty and not opk-kcov stamped — use an empty or fresh COVERAGE_OUT"
 fi
 mkdir -p "$OUT" || die "cannot create $OUT"
-: >"$OUT/.opk-kcov-out" || die "cannot stamp $OUT"
+# The stamp rewrite is deliberately NOT `: >file`: `:` is a POSIX special
+# builtin, and under dash (sh) a failed redirection on one aborts the
+# shell BEFORE `|| die` can run — a foreign-owned OUT ended in a raw
+# "cannot create" error instead of the runner's message (#350). A
+# regular-builtin write keeps the failure catchable in every shell.
+printf "" >"$OUT/.opk-kcov-out" ||
+    die "cannot stamp $OUT (foreign-owned?) — pick a fresh COVERAGE_OUT"
 rm -rf "${OUT:?}/runs" "${OUT:?}/logs" "${OUT:?}/merged" "${OUT:?}/shim"
 mkdir -p "$OUT/runs" "$OUT/logs" "$OUT/shim" || die "cannot set up $OUT"
 # Quoted heredoc on purpose: the wrapper must survive every shell layer
