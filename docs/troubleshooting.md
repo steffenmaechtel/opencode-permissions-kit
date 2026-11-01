@@ -332,6 +332,12 @@ sudo opk handover opencode packages/ext/<ext>/Resources/Public
 ddev <the-projects-frontend-build-command>   # must be green again
 ```
 
+Prefer guided per-tree prompts instead of copy-paste? With the trees
+declared in the project's `opk.json`, `opk doctor fix` runs the scan and
+offers exactly this handover per at-risk tree — one `[y/N]` each, default
+`n`, `--dry-run` for the plan only
+([doctor fix](reference/cli.md#doctor-fix)).
+
 The owner flips, the sharing group never changes — you keep full group
 write access (see [`opk handover`](reference/cli.md#handover)). The
 flip side: with the sources agent-owned, *your* metadata operations on
@@ -365,7 +371,9 @@ a clean rebuild of the affected outputs. To find at-risk trees *before*
 they break a build, declare the container-written trees in the project's
 `opk.json` and run [`opk doctor`](reference/cli.md#doctor) — it
 classifies every entry as mapped-safe or at-risk and prints the fix
-command for every at-risk tree.
+command for every at-risk tree; [`opk doctor
+fix`](reference/cli.md#doctor-fix) offers to run those handovers for
+you, one confirmed tree at a time.
 
 ## ddev warns "Unable to open hosts file ... permission denied"
 

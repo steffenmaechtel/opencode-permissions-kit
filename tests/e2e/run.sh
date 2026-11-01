@@ -1301,6 +1301,27 @@ E 'sudo rm -f /tmp/opencode-good.bin'
 check "12l: restored binary renders no corrupt warn (#163)" \
     E '! opk status 2>&1 | grep -q "present but broken"'
 
+echo "--- 12m. opk doctor fix (issue #313, increment b) ---"
+# A dev-owned declared tree is at-risk under the daemon-uid floor (no
+# live daemon userns in this container); doctor fix must offer exactly
+# the handover remedy per tree, the piped y executes it through dev's
+# sudo, and the re-check converges the tree to opencode ownership. The
+# unit suite pins orchestration with stubs only -- a real ownership
+# transition to the daemon uid needs root (sandbox limit, see
+# test-doctor.sh section 6), so the heal path is pinned HERE.
+E 'mkdir -p /var/www/vhosts/doctor-fix/pkg/res/public && echo out >/var/www/vhosts/doctor-fix/pkg/res/public/app.min.js && printf "%s\n" "{\"version\":1,\"containerTrees\":[{\"path\":\"pkg/res/public\",\"note\":\"build outputs\"}]}" >/var/www/vhosts/doctor-fix/opk.json'
+check "12m: scan flags the dev-owned declared tree (rc 1)" \
+    E 'cd /var/www/vhosts/doctor-fix && opk doctor >/tmp/dfix-scan.log 2>&1; test $? -eq 1 && grep -q "entries at-risk" /tmp/dfix-scan.log'
+check "12m: fix --dry-run shows the handover plan, changes nothing" \
+    E 'cd /var/www/vhosts/doctor-fix && opk doctor fix --dry-run >/tmp/dfix-dry.log 2>&1; test $? -eq 1 && grep -q "would hand over" /tmp/dfix-dry.log && test "$(stat -c %U /var/www/vhosts/doctor-fix/pkg/res/public/app.min.js)" = "dev"'
+check "12m: declined prompt (Enter = default n) hands nothing over" \
+    E 'cd /var/www/vhosts/doctor-fix && printf "\n" | opk doctor fix >/tmp/dfix-no.log 2>&1; test $? -eq 1 && test "$(stat -c %U /var/www/vhosts/doctor-fix/pkg/res/public/app.min.js)" = "dev"'
+check "12m: confirmed prompt runs the handover (tree -> opencode)" \
+    E 'cd /var/www/vhosts/doctor-fix && printf "y\n" | opk doctor fix >/tmp/dfix-yes.log 2>&1; test "$(stat -c %U /var/www/vhosts/doctor-fix/pkg/res/public/app.min.js)" = "opencode" && grep -q "re-check after handover" /tmp/dfix-yes.log'
+check "12m: post-fix scan has no at-risk rows (rc 0 or 2)" \
+    E 'cd /var/www/vhosts/doctor-fix && opk doctor >/tmp/dfix-after.log 2>&1; test $? -le 2 && ! grep -q "entries at-risk" /tmp/dfix-after.log'
+E 'rm -rf /var/www/vhosts/doctor-fix /tmp/dfix-*.log'
+
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' &&

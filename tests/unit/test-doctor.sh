@@ -55,9 +55,24 @@ mkmap() {
 }
 
 # run_doctor <project-root> [args...] — output on stdout, rc in $?
+# setsid + </dev/null on purpose: doctor must never hang on a controlling
+# tty (an accidental prompt EOFs to its default instead), and fix-mode
+# tests below drive prompts through stdin (run_doctor_ans). RD_OPK wires
+# the OPK_DOCTOR_OPK test seam — every fix-mode call MUST set it (the
+# default would resolve the REAL dispatcher next to doctor.sh).
 run_doctor() {
-    OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" NO_COLOR=1 \
-        sh "$DOCTOR" "$@" 2>&1
+    OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="${RD_OPK:-}" \
+        NO_COLOR=1 setsid sh "$DOCTOR" "$@" </dev/null 2>&1
+}
+
+# run_doctor_ans <answers-file> [args...] — like run_doctor, stdin fed
+# from a prepared answer file (one line per [y/N] prompt; no tty exists
+# under setsid, so ui_confirm falls back to stdin)
+run_doctor_ans() {
+    _ra_ans="$1"
+    shift
+    OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="${RD_OPK:-}" \
+        NO_COLOR=1 setsid sh "$DOCTOR" "$@" <"$_ra_ans" 2>&1
 }
 
 # rc_doctor <desc> <expected-rc> <args...> — runs doctor, asserts rc,
@@ -67,6 +82,21 @@ rc_doctor() {
     shift 2
     _rd_rc=0
     _rd_out="$(run_doctor "$@")" || _rd_rc=$?
+    if [ "$_rd_rc" = "$_rd_want" ]; then
+        pass "$_rd_desc (rc $_rd_want)"
+    else
+        fail "$_rd_desc (rc $_rd_want, got $_rd_rc)"
+        echo "        output: $_rd_out"
+    fi
+}
+
+# rc_doctor_ans <desc> <expected-rc> <answers-file> <args...> — the
+# rc_doctor shape for prompt-driven runs
+rc_doctor_ans() {
+    _rd_desc="$1" _rd_want="$2" _ra_file="$3"
+    shift 3
+    _rd_rc=0
+    _rd_out="$(run_doctor_ans "$_ra_file" "$@")" || _rd_rc=$?
     if [ "$_rd_rc" = "$_rd_want" ]; then
         pass "$_rd_desc (rc $_rd_want)"
     else
@@ -464,6 +494,176 @@ if printf '%s' "$_rd_out" | grep -qF "0, 0-"; then
 else
     pass "no duplicate floor row in the display"
 fi
+
+# --- 6. fix mode (issue #313, increment b) ------------------------------------------
+# Orchestration pins against a stub dispatcher (OPK_DOCTOR_OPK seam).
+# Sandbox limit, deliberate: a "fix healed the tree -> rc 0" pin needs a
+# REAL ownership transition to the daemon uid -- non-root cannot chown
+# to it, and re-mapping the fixture uid_map does not reach doctor (the
+# mapped-range set is resolved once, before the scan). The heal path is
+# therefore e2e-pinned (privileged container, real handover); here the
+# stub-rm variant pins the re-check itself via the rc 1 -> 2 flip.
+STUB="$WORK/stub-opk"
+STUB_RM="$WORK/stub-opk-rm"
+STUB_FAIL="$WORK/stub-opk-fail"
+CALLS="$WORK/handover-calls"
+{
+    echo '#!/bin/sh'
+    echo "printf '%s\\n' \"\$*\" >>'$CALLS'"
+    echo 'echo "stub handover ran: $*"'
+    echo 'exit 0'
+} >"$STUB"
+{
+    echo '#!/bin/sh'
+    echo "printf '%s\\n' \"\$*\" >>'$CALLS'"
+    echo 'rm -rf "$3"'
+    echo 'echo "stub handover ran: $*"'
+    echo 'exit 0'
+} >"$STUB_RM"
+{
+    echo '#!/bin/sh'
+    echo "printf '%s\\n' \"\$*\" >>'$CALLS'"
+    echo 'echo "stub handover: simulated failure" >&2'
+    echo 'exit 1'
+} >"$STUB_FAIL"
+
+atrisk_setup() { # daemon-only namespace: the test uid is unmapped
+    rm -rf "$PROCFIX"
+    mkmap 42 "0 0 1"
+    mkproj
+    policy '{"containerTrees":["tree"]}'
+}
+
+# grammar: --dry-run is fix-only; unknown flags and extra positionals 64
+rc_doctor "--dry-run without fix -> rc 64" 64 --dry-run
+rc_doctor "unknown flag in fix mode -> rc 64" 64 fix --bogus
+rc_doctor "two positionals in fix mode -> rc 64" 64 fix "$PROJ" extra
+
+# --dry-run passthrough: handover receives the flag, no prompt, rc stays
+# the scan verdict (findings remain)
+atrisk_setup
+RD_OPK="$STUB"
+: >"$CALLS"
+rc_doctor "fix --dry-run: findings keep rc 1" 1 fix "$PROJ" --dry-run
+grep_last_out "dry-run section shown" grep -qF "dry run (nothing is changed)"
+grep_last_out "would-run row names the command" grep -qF "would run: opk handover opencode"
+grep_last_out "handover dry plan passed through" grep -qF "stub handover ran: handover opencode $PROJ/tree --dry-run"
+if printf '%s' "$_rd_out" | grep -qF "? [y/N]"; then
+    fail "dry run prompts nothing"
+else
+    pass "dry run prompts nothing"
+fi
+grep -qxF "handover opencode $PROJ/tree --dry-run" "$CALLS" &&
+    pass "stub argv carries --dry-run" ||
+    fail "stub argv carries --dry-run ($(cat "$CALLS" 2>/dev/null))"
+
+# fail-loud pin (L1): a handover whose dry run fails must be SEEN
+RD_OPK="$STUB_FAIL"
+rc_doctor "fix --dry-run, failing handover -> rc 1 with error row" 1 fix "$PROJ" --dry-run
+grep_last_out "dry-run failure row" grep -qF "dry run failed for 'tree'"
+
+# interactive: answer y -> stub runs, re-check happens, honest rc (the
+# noop stub heals nothing, so the tree stays at-risk)
+atrisk_setup
+RD_OPK="$STUB"
+: >"$CALLS"
+printf 'y\n' >"$WORK/ans"
+rc_doctor_ans "fix, answer y, noop stub: honest rc 1" 1 "$WORK/ans" fix "$PROJ"
+grep_last_out "prompt shape [y/N] (default n)" grep -qF "? [y/N]"
+grep_last_out "running row" grep -qF "running: opk handover opencode"
+grep_last_out "re-check section after executed fix" grep -qF "re-check after handover"
+grep -qxF "handover opencode $PROJ/tree" "$CALLS" &&
+    pass "confirmed answer runs handover (no --dry-run)" ||
+    fail "confirmed answer runs handover (no --dry-run) ($(cat "$CALLS" 2>/dev/null))"
+
+# interactive: Enter declines (default n) -- nothing runs
+: >"$CALLS"
+printf '\n' >"$WORK/ans"
+rc_doctor_ans "fix, Enter (default n): rc 1, nothing runs" 1 "$WORK/ans" fix "$PROJ"
+grep_last_out "skipped row" grep -qF "skipped 'tree'"
+[ ! -s "$CALLS" ] &&
+    pass "declined: handover never invoked" ||
+    fail "declined: handover never invoked ($(cat "$CALLS" 2>/dev/null))"
+
+# interactive: padded ' y' is an explicit yes (ui_confirm trims)
+: >"$CALLS"
+printf ' y\n' >"$WORK/ans"
+rc_doctor_ans "fix, padded ' y': explicit yes" 1 "$WORK/ans" fix "$PROJ"
+grep -qxF "handover opencode $PROJ/tree" "$CALLS" &&
+    pass "padded y runs the handover" ||
+    fail "padded y runs the handover"
+
+# re-check + counter reset: the stub REMOVES the tree (the one heal a
+# non-root sandbox can perform) -> the re-check reports it missing and
+# the verdict flips rc 1 -> 2. Without the reset the first pass's alert
+# would survive and keep rc 1 -- this pin discriminates both.
+: >"$CALLS"
+printf 'y\n' >"$WORK/ans"
+RD_OPK="$STUB_RM"
+rc_doctor_ans "fix, answer y, healing stub: re-check flips rc 1 -> 2" 2 "$WORK/ans" fix "$PROJ"
+grep_last_out "re-check reports the removed tree" grep -qF "declared but missing"
+if printf '%s' "$_rd_out" | grep -qF "nothing to fix"; then
+    fail "post-fix run does not claim 'nothing to fix'"
+else
+    pass "post-fix run does not claim 'nothing to fix'"
+fi
+
+# failing handover: error row + re-check + rc 1
+atrisk_setup
+RD_OPK="$STUB_FAIL"
+printf 'y\n' >"$WORK/ans"
+rc_doctor_ans "fix, answer y, failing handover -> rc 1" 1 "$WORK/ans" fix "$PROJ"
+grep_last_out "handover failure row" grep -qF "handover failed for 'tree'"
+grep_last_out "re-check runs after failure too" grep -qF "re-check after handover"
+
+# two candidates, y then n: fd-3 loop discipline (a loop reading stdin
+# would eat the answer lines as candidates) and per-tree prompts
+atrisk_setup
+mkdir -p "$PROJ/second"
+echo z >"$PROJ/second/file"
+policy '{"containerTrees":["tree","second"]}'
+RD_OPK="$STUB"
+: >"$CALLS"
+printf 'y\nn\n' >"$WORK/ans"
+rc_doctor_ans "two candidates, y then n: rc 1" 1 "$WORK/ans" fix "$PROJ"
+grep -qxF "handover opencode $PROJ/tree" "$CALLS" &&
+    pass "first candidate handed over" ||
+    fail "first candidate handed over ($(cat "$CALLS" 2>/dev/null))"
+if grep -qF "$PROJ/second" "$CALLS"; then
+    fail "declined candidate not handed over"
+else
+    pass "declined candidate not handed over"
+fi
+grep_last_out "second candidate's skip row" grep -qF "skipped 'second'"
+
+# healthy project: nothing to fix, rc 0, stub never called
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+mkproj
+policy '{"containerTrees":["tree"]}'
+RD_OPK="$STUB"
+: >"$CALLS"
+rc_doctor "healthy project, fix: rc 0" 0 fix "$PROJ"
+grep_last_out "nothing-to-fix row" grep -qF "nothing to fix"
+[ ! -s "$CALLS" ] &&
+    pass "healthy: handover never invoked" ||
+    fail "healthy: handover never invoked"
+
+# warnings-only finding (missing tree): no unambiguous remedy, no offer
+policy '{"containerTrees":["not/cloned/yet"]}'
+rc_doctor "missing tree, fix: rc 2, nothing offered" 2 fix "$PROJ"
+grep_last_out "nothing-to-fix row (warn class has no remedy)" grep -qF "nothing to fix"
+if printf '%s' "$_rd_out" | grep -qF "? [y/N]"; then
+    fail "warn class never prompts"
+else
+    pass "warn class never prompts"
+fi
+
+# dispatcher resolution failure: loud, rc 1 (L1 probe pin)
+RD_OPK="$WORK/no-such-opk"
+rc_doctor "fix without a dispatcher -> rc 1" 1 fix "$PROJ"
+grep_last_out "dispatcher error row" grep -qF "cannot find the opk dispatcher"
+RD_OPK=""
 
 # source-shape pins (comment-strip rider per conventions.md, "Source-
 # counting pins"): the C1 trap and the S5 belt are defense-in-depth
