@@ -33,6 +33,8 @@ cd "$REPO_ROOT" || exit 1
 RUNNER="scripts/coverage.sh"
 IA="tests/unit/test-install-args.sh"
 WF=".github/workflows/test-unit.yml"
+WORK="$(mktemp -d)"
+trap 'rm -rf "${WORK:?}"' EXIT INT TERM
 
 pass() { echo "  PASS  $1"; }
 fail() {
@@ -146,6 +148,44 @@ if _strip "$RUNNER" | grep -qF '[ "$count" -eq 1 ]'; then
     pass "single-suite runs skip the merge (single-source merge emits nothing)"
 else
     fail "single-source merge guard gone (filtered runs would report empty)"
+fi
+
+# --- 7. stamp write dies with the runner's own message (#350) -------------------
+# `: >file` is a POSIX special-builtin redirection: under dash (sh) a
+# failed write aborts the shell BEFORE `|| die` can run, so a
+# foreign-owned OUT ended in a raw "cannot create" error. The stamp
+# rewrite must use a catchable, non-special-builtin form (#350).
+if _strip "$RUNNER" | grep -qF 'printf "" >"$OUT/.opk-kcov-out" ||' &&
+    _strip "$RUNNER" | grep -qF 'cannot stamp $OUT (foreign-owned?)'; then
+    pass "stamp write is a catchable redirection carrying its own die"
+else
+    fail "stamp write drifted back to the dash-uncatchable ': >' form (#350)"
+fi
+# Behavioral, observed like production (terminal = both streams): a
+# foreign-owned stamped OUT dies rc 1 with "cannot stamp" — dash's raw
+# abort is rc 2 WITHOUT the die line. Injection: an unwritable stamp
+# FILE (the incident's dev-owned 644 stamp seen by the opencode user);
+# needs a non-root uid (CI's ubuntu runners are non-root), root gets a
+# loud skip.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  SKIP  foreign-OUT behavioral pin (root cannot inject EACCES)"
+else
+    _w="$WORK/guard"
+    _img="$(sed -n 's/^KCOV_IMAGE="\(.*\)"$/\1/p' "$RUNNER" | head -1)"
+    _kd="$_w/home/.cache/opk-kcov/kcov-${_img##*:}"
+    mkdir -p "$_kd/bin"
+    printf '#!/bin/sh\nexit 0\n' >"$_kd/bin/kcov"
+    chmod +x "$_kd/bin/kcov"
+    mkdir -p "$_w/out"
+    : >"$_w/out/.opk-kcov-out"
+    chmod 444 "$_w/out/.opk-kcov-out"
+    env HOME="$_w/home" COVERAGE_OUT="$_w/out" sh "$RUNNER" >"$_w/log" 2>&1
+    _rc=$?
+    if [ "$_rc" -eq 1 ] && grep -qF 'cannot stamp' "$_w/log"; then
+        pass "foreign-owned OUT dies 'cannot stamp' with rc 1"
+    else
+        fail "foreign-owned OUT did not die with the runner's message (rc=$_rc, log: $_w/log)"
+    fi
 fi
 
 # Summary gate LAST (agent/conventions.md L4)
