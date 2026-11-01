@@ -541,8 +541,9 @@ rc_doctor "two positionals in fix mode -> rc 64" 64 fix "$PROJ" extra
 
 # control bytes in the project root: fix mode rejects loudly (the
 # candidate TSV round-trip would truncate the handover operand away
-# from the tree the prompt named, #348 a C3); scan mode has no
-# round-trip and must keep working on such a root. Own fixture state:
+# from the tree the prompt named, #348 a C3); scan mode has no OPERAND
+# round-trip (its examples pass is display-only) and must keep working
+# on such a root. Own fixture state:
 # the daemon-only map makes the scratch tree at-risk deterministically
 # (the preceding section leaves the 0-65535 map in place).
 rm -rf "$PROCFIX"
