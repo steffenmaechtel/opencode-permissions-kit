@@ -182,6 +182,17 @@ Deployment notes:
 |---|---|
 | `opencode-permissions-kit.log` | Audit log (mode 750/640, self-rotating) — see [audit log](audit-log.md) |
 
+## Project-side: opk.json
+
+Not kit-managed — yours, committed with the project. The `opk doctor`
+command reads it to know which directory trees your container builds
+**write** (build outputs, their `node_modules`); each declared tree is
+checked for owners unmapped in the rootless backend's user namespace
+(the EPERM build-breaker class). The full format — strict JSON,
+project-root-relative paths, one entry per container tree — is documented
+with the command: [opk doctor](cli.md#doctor). Keep it out of your
+deployment like `.ddev/`.
+
 ## ddev-managed directories
 
 Which project directories the kit hands over to the `opencode` user is

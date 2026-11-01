@@ -51,6 +51,7 @@ After installation, one command manages everything (works from anywhere):
 ```bash
 opk status
 opk config projects add /var/www/vhosts/new-project
+opk doctor            # in a project dir: ownership diagnosis (read-only)
 opk update --binary
 opk upgrade-opencode   # just the opencode binary
 opk ddev-hosts-add     # in a ddev project dir
@@ -66,13 +67,79 @@ opk --version   # the deployed kit version
 Everything after the subcommand goes to the underlying script unchanged, so
 all flags below work with both forms. `config`, `update` and `handover`
 elevate via sudo automatically; `ensure-shared` hops to the agent user
-automatically; `status` needs no sudo; `uninstall` runs as your user and
-asks for sudo itself; `ddev-hosts-*` run as your user (they drive
+automatically; `status` and `doctor` need no sudo; `uninstall` runs as your
+user and asks for sudo itself; `ddev-hosts-*` run as your user (they drive
 Windows-side elevation through ddev itself).
 
 `opk --version` prints the deployed kit version in one line (`opk <x.y.z>`)
 — the same value `opk status` reports. Without an install it answers
 `opk 0.0.0` instead of failing.
+
+## doctor
+
+Per-project deep diagnosis for the rootless ownership failure class
+(read-only, no sudo — run it in the project root):
+
+```bash
+opk doctor                       # the current directory
+opk doctor /var/www/vhosts/<project>
+```
+
+Classifies every entry in the **container trees** the project declares in
+its `opk.json` (format below) as **mapped-safe** or **at-risk**: under the
+kit's rootless backend a container process can write file *contents*
+through the sharing group, but setting *metadata* — timestamps
+(`futime`/`utimensat`), `chmod`, `chown` — only works for owners mapped
+into the daemon's user namespace, and your own uid is not. At-risk files
+are exactly where container builds die with
+`EPERM: operation not permitted, futime` after writing the output
+correctly (the "container build fails with EPERM ... futime" entry in
+[Troubleshooting](../troubleshooting.md)). Every finding carries its
+fix command (`sudo opk handover opencode <tree>`); doctor itself never
+changes anything.
+
+The mapped-uid set is resolved from the **live user namespaces**: every
+process carries its `uid_map` in `/proc`, world-readable, so no docker
+socket access is involved. `/etc/subuid` is deliberately not consulted —
+it can be empty even when the mapping demonstrably exists. When no user
+namespace of the daemon user is found (backend down), doctor falls back
+to matching the daemon uid only and says so in a warning — re-run it
+with the containers up before trusting a clean verdict.
+
+Exit codes like `opk status`: `0` all declared trees healthy, `1`
+at-risk finding(s) or a rejected `opk.json`, `2` warning(s) only, `64`
+usage error.
+
+### opk.json — the project's container-tree policy
+
+```json
+{
+    "version": 1,
+    "containerTrees": [
+        {
+            "path": "packages/ext/<ext>/Resources/Public",
+            "note": "frontend build tree — inputs and outputs share one owner"
+        }
+    ]
+}
+```
+
+- **Committed to the project's git**: every developer with the kit gets
+  the policy on clone — nothing is configured per machine. Dev-only like
+  `.ddev/`: add it to your deployment excludes.
+- **Strict JSON** (no comments — documentation lives in `note` fields),
+  pretty-printed with one entry per line so diffs stay readable, and
+  readable by `jq` and other tooling.
+- `version` is reserved for future format migrations (only `1` exists);
+  unknown keys are ignored.
+- Each entry declares a tree the container **writes** (build outputs,
+  the `node_modules` it installs into), not one it only reads —
+  ownership follows the writer. Declare the smallest tree that contains
+  both the build's inputs and its outputs, otherwise outputs drift to
+  odd subuid owners (the troubleshooting entry above explains why).
+- Paths are relative to the project root: no absolute paths, no `..`,
+  no globs. A bare string entry (`"some/path"`) works too when a tree
+  needs no note.
 
 ## handover
 

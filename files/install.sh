@@ -120,6 +120,7 @@ fetch_kit() {
         VERSION \
         opencode-permissions-kit-lib/sh/path-sane.sh \
         opencode-permissions-kit-lib/management/config.sh \
+        opencode-permissions-kit-lib/management/doctor.sh \
         opencode-permissions-kit-lib/management/update.sh \
         opencode-permissions-kit-lib/management/status.sh \
         opencode-permissions-kit-lib/management/uninstall.sh \

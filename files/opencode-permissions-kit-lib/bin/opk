@@ -5,6 +5,8 @@
 #
 # One command for all management scripts, usable from anywhere in WSL:
 #   opk status     -> management/status.sh   (no sudo needed)
+#   opk doctor     -> management/doctor.sh   (no sudo needed; per-project
+#                  read-only ownership diagnosis, issue #313)
 #   opk config ... -> management/config.sh   (auto sudo)
 #   opk update ... -> management/update.sh   (auto sudo)
 #   opk uninstall  -> management/uninstall.sh (runs as your user,
@@ -89,6 +91,13 @@ Commands:
   status [--short]                 Show the protection status (no sudo needed);
                                    --short: only the final verdict line, with it
                                    in the exit code (0 green, 1 alerts, 2 warnings)
+  doctor [path]                    Deep diagnosis for the current project (read-only,
+                                   no sudo): classifies file ownership in the
+                                   container trees the project declares in its
+                                   opk.json as mapped-safe or at-risk for the
+                                   rootless backend (the EPERM build-breaker
+                                   class) and prints the fix commands. <path>
+                                   defaults to the cwd; exit codes like status
   config <args...>                Change settings: status (git-config +
                                   projects overview), projects
                                   list|add|remove,
@@ -160,6 +169,13 @@ cmd="${1:-}"
 case "$cmd" in
     status)
         exec sh "$LIBDIR/management/status.sh" "$@"
+        ;;
+    doctor)
+        # Per-project deep diagnosis (issue #313): read-only ownership
+        # scan of the container trees the project declares in opk.json --
+        # mapped-safe vs at-risk for container metadata ops (the #312
+        # EPERM class). No sudo, like status.
+        exec sh "$LIBDIR/management/doctor.sh" "$@"
         ;;
     config | update)
         if [ ! -f "$LIBDIR/management/$cmd.sh" ]; then
