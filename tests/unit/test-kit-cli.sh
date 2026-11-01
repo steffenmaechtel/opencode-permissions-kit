@@ -44,7 +44,7 @@ mkdir -p "$LIB"
 printf 'DEFAULT_USER=%s\nOPENCODE_USER=%s\nOPENCODE_GROUP=%s\nVERSION=9.9.9\n' \
     "$(id -un)" "$(id -un)" "$(id -gn)" >"$WORK/install.conf"
 mkdir -p "$LIB/management"
-for s in status config update uninstall; do
+for s in status doctor config update uninstall; do
     cat >"$LIB/management/$s.sh" <<EOF
 #!/bin/sh
 echo "$s:euid=\$(id -u):args=\$*"
@@ -95,7 +95,7 @@ echo "=== CLI dispatcher tests ==="
 _rk_rc=0
 out="$(run_kit --help)" || _rk_rc=$?
 assert "--help exits 0" "0" "$_rk_rc"
-for c in status config update uninstall handover help openchamber-secure ensure-shared; do
+for c in status doctor config update uninstall handover help openchamber-secure ensure-shared; do
     case "$out" in
         *"$c"*)
             echo "  ${GREEN}PASS${NC}  --help mentions '$c'"
@@ -134,6 +134,16 @@ assert "--version without install.conf falls back" "opk 0.0.0" "$out"
 # status dispatches without sudo (root test envs: euid matches current)
 out="$(run_kit status)" || true
 assert "status dispatches" "status:euid=$(id -u):args=" "$out"
+
+# doctor dispatches like status: no sudo, path passed through (#313)
+out="$(run_kit doctor /tmp)" || true
+assert "doctor dispatches with the path" "doctor:euid=$(id -u):args=/tmp" "$out"
+grep -qF 'exec sh "$LIBDIR/management/doctor.sh" "$@"' "$KIT" &&
+    echo "  ${GREEN}PASS${NC}  doctor dispatches to management/doctor.sh (no sudo hop)" && passed=$((passed + 1)) ||
+    {
+        echo "  ${RED}FAIL${NC}  doctor dispatches to management/doctor.sh (no sudo hop)"
+        failures=$((failures + 1))
+    }
 
 # config/update dispatch with args passed through (fake sudo passes them on;
 # stubs run as the current user either way)

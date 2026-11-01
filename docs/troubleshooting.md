@@ -361,7 +361,11 @@ whole checkout. Notes:
 container-written output trees to you, and the next container build that
 restores metadata on the existing outputs fails with EPERM again. Hand
 over trees, not systems — after a `handover me` on such a project, expect
-a clean rebuild of the affected outputs.
+a clean rebuild of the affected outputs. To find at-risk trees *before*
+they break a build, declare the container-written trees in the project's
+`opk.json` and run [`opk doctor`](reference/cli.md#doctor) — it
+classifies every entry as mapped-safe or at-risk and prints the fix
+command for every at-risk tree.
 
 ## ddev warns "Unable to open hosts file ... permission denied"
 

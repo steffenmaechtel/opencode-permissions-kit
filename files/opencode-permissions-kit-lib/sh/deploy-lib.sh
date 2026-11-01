@@ -83,6 +83,7 @@ lib_deploy() {
     done <<'DL_MANIFEST'
 # management entry scripts
 opencode-permissions-kit-lib/management/config.sh 755
+opencode-permissions-kit-lib/management/doctor.sh 755
 opencode-permissions-kit-lib/management/status.sh 755
 opencode-permissions-kit-lib/management/uninstall.sh 755
 opencode-permissions-kit-lib/management/update.sh 755

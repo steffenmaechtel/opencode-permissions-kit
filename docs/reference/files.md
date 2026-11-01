@@ -126,7 +126,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/bin/xdg-open` | xdg-open fallback shim symlink → `bin/xdg-open` |
 | `/usr/local/lib/opencode-permissions-kit/bin/opencode` | The actual opencode binary (`root:opencode` 750) |
 | `/usr/local/lib/opencode-permissions-kit/bin/opencode-as-opencode` | The wrapper: validation, opt-in, rootless exec |
-| `/usr/local/lib/opencode-permissions-kit/bin/opk` | CLI dispatcher (status/config/update/uninstall routing) |
+| `/usr/local/lib/opencode-permissions-kit/bin/opk` | CLI dispatcher (status/doctor/config/update/uninstall routing) |
 | `/usr/local/lib/opencode-permissions-kit/bin/ddev-as-opencode` | Sudoers helper: runs ddev as `opencode` |
 | `/usr/local/lib/opencode-permissions-kit/bin/ddev-migrate` | Database bridge CLI for the daemon switch |
 | `/usr/local/lib/opencode-permissions-kit/bin/setup-container-backend` | Rootless backend provisioning |
@@ -154,6 +154,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/tui-plugin.sh` | Shared helper: TUI 2.x plugin registration |
 | `/usr/local/lib/opencode-permissions-kit/sh/ui.sh` | Shared helper: labeled output |
 | `/usr/local/lib/opencode-permissions-kit/management/config.sh` | Management: projects, git-config, backend, refresh |
+| `/usr/local/lib/opencode-permissions-kit/management/doctor.sh` | Management: container-tree ownership diagnosis |
 | `/usr/local/lib/opencode-permissions-kit/management/update.sh` | Management: re-deploy, binary upgrades |
 | `/usr/local/lib/opencode-permissions-kit/management/status.sh` | Management: status + leak scan |
 | `/usr/local/lib/opencode-permissions-kit/management/uninstall.sh` | Management: uninstall |
@@ -181,6 +182,17 @@ Deployment notes:
 | Path | Purpose |
 |---|---|
 | `opencode-permissions-kit.log` | Audit log (mode 750/640, self-rotating) — see [audit log](audit-log.md) |
+
+## Project-side: opk.json
+
+Not kit-managed — yours, committed with the project. The `opk doctor`
+command reads it to know which directory trees your container builds
+**write** (build outputs, their `node_modules`); each declared tree is
+checked for owners unmapped in the rootless backend's user namespace
+(the EPERM build-breaker class). The full format — strict JSON,
+project-root-relative paths, one entry per container tree — is documented
+with the command: [opk doctor](cli.md#doctor). Keep it out of your
+deployment like `.ddev/`.
 
 ## ddev-managed directories
 
