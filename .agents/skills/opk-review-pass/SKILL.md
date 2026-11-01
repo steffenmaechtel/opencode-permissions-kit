@@ -249,9 +249,10 @@ against the tracker (open list + search), propose the bundling with
 title + `prio:` label derived from severity + source pointers, and ask
 the maintainer ONE binary create-the-issues question at the very END
 of the report. On YES: file the issues (`gh issue create`, permission
-prompt = runtime gate), post one pointer comment per issue on the
-birth-PR, and LIST the created issues in the closing summary; on NO:
-record the decline in the closing summary.
+prompt = runtime gate) with each issue body citing the birth-PR as
+its source (GitHub cross-references the PR timeline automatically —
+no manual pointer comment), and LIST the created issues in the
+closing summary; on NO: record the decline in the closing summary.
 
 When the stop rule holds, the closing summary proposes closure
 (`"state":"closing-proposed"`, stop-rule check cited, ledger and

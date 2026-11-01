@@ -172,10 +172,11 @@ nothing to review.
   report, prominent enough that a maintainer reading only the closing
   lines cannot miss it. Only on YES does the agent file the issues
   itself (`gh issue create` — the opencode permission prompt stays the
-  runtime gate), post a one-line pointer comment per created issue on
-  the birth-PR, and list the created issues in the closing summary; a
-  NO is recorded in the closing summary. Either way the round
-  comments' work-order records remain the ledger. (RM-0136)
+  runtime gate), each issue body citing the birth-PR as its source
+  (GitHub cross-references the PR timeline automatically — no manual
+  pointer comment), and list the created issues in the closing
+  summary; a NO is recorded in the closing summary. Either way the
+  round comments' work-order records remain the ledger. (RM-0136)
 
 ## Round typing and tiering
 
