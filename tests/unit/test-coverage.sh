@@ -16,8 +16,9 @@
 #      `bash -c 'set -eu'` block carries `PS4="+ "` as its first line --
 #      without it, coverage runs abort those blocks on PS4's
 #      ${BASH_SOURCE} expansion under set -u (issue #255 stage 0b).
-#   5. Exclusion discipline: the runner's exclusion list is exactly the
-#      one documented suite, with the tracking issue named.
+#   5. Exclusion discipline: the runner's exclusion list is empty —
+#      every entry needs an open issue naming the delta (#342, the last
+#      entry, closed).
 #   6. Runner mechanics: relative suite paths (absolute argv = empty
 #      report), the quoted-heredoc sh->bash shim, the include surface
 #      (files/ + scripts/), and the :? guards on scratch cleanup.
@@ -93,16 +94,20 @@ else
 fi
 
 # --- 5. exclusion discipline ----------------------------------------------------
-# Presence proves the entry; the assignment count proves EXCLUSIVITY (a
-# second EXCLUDED= line would drift the list while the literal pin stayed
-# green — #343 a C3).
-_excl_n=$(_strip "$RUNNER" | grep -c 'EXCLUDED=' || true)
+# The list must be EMPTY: every entry needs an open issue naming the
+# delta and tracking the fix — the last entry (#342, the dash-only stamp
+# pin) was lifted when it closed. The assignment count proves EXCLUSIVITY
+# (a second EXCLUDED= line would drift the list while the literal pin
+# stayed green — #343 a C3 — and the count leg matches the EXCLUDED+=
+# append idiom too, which contains no EXCLUDED= substring and would
+# otherwise slip past both legs — #349 a Q1); the literal
+# proves emptiness.
+_excl_n=$(_strip "$RUNNER" | grep -cE 'EXCLUDED[+]?=' || true)
 if [ "$_excl_n" = 1 ] &&
-    _strip "$RUNNER" | grep -qF 'EXCLUDED="test-ddev-as-opencode.sh"' &&
-    grep -qF '#342' "$RUNNER"; then
-    pass "exclusion list = test-ddev-as-opencode.sh only, tracking #342"
+    _strip "$RUNNER" | grep -qF 'EXCLUDED=""'; then
+    pass "exclusion list is empty (no open-issue deltas left)"
 else
-    fail "exclusion list drifted (assignments=$_excl_n, expected exactly test-ddev-as-opencode.sh, issue #342)"
+    fail "exclusion list drifted (assignments=$_excl_n, expected exactly one empty list)"
 fi
 
 # --- 6. runner mechanics ---------------------------------------------------------

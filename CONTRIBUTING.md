@@ -39,7 +39,7 @@ make coverage          # kcov line-coverage report over the unit suites (report 
 - **`make coverage`** (issue #255 stage 0b) is a review artifact, never a
   gate: it runs every eligible unit suite under kcov (binary extracted
   once from a digest-pinned docker image into `~/.cache/opk-kcov/`, no
-  sudo) — one documented exclusion tracks in #342 — and merges the
+  sudo) and merges the
   per-suite reports into a per-file table over `files/` + `scripts/`.
   `make coverage SUITE=test-log` narrows it to matching suites. Design
   rules, measured dead ends, and the digest-bump checklist live in
