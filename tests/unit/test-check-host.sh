@@ -7,6 +7,10 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK:?}"' EXIT INT TERM
 fails=0
+# the threshold under test comes from the script itself, so a GH_MIN bump
+# cannot leave the pin asserting a stale number (col-0 anchor: a commented
+# GH_MIN line does not match)
+GHMIN="$(sed -n 's/^GH_MIN="//p' "$REPO_ROOT/tests/check-host.sh" | sed 's/"$//')"
 
 arm() { # <fake-gh-version> <want: warn|ok>
     printf '#!/bin/sh\necho "gh version %s (2026-02-23)"\n' "$1" >"$WORK/gh"
@@ -14,9 +18,9 @@ arm() { # <fake-gh-version> <want: warn|ok>
     out="$(PATH="$WORK:$PATH" sh "$REPO_ROOT/tests/check-host.sh" 2>&1)"
     hits() { printf '%s\n' "$out" | grep -qF -- "$1"; }
     if [ "$2" = warn ]; then
-        if ! hits "issue #335" || ! hits "--json" ||
+        if ! hits "issue #335" || ! hits "--json" || ! hits "below gh $GHMIN" ||
             printf '%s\n' "$out" | grep -q "missing:.*gh"; then rc=1; else rc=0; fi
-    elif hits "agent issue/PR workflow ($1 >= 2.87)"; then rc=0; else rc=1; fi
+    elif hits "agent issue/PR workflow ($1 >= $GHMIN)"; then rc=0; else rc=1; fi
     if [ "$rc" -eq 0 ]; then
         echo "ok:   gh $1 -> $2"
     else

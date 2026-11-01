@@ -20,8 +20,9 @@
 #   docker, curl, tar + xz  — e2e suites only (make e2e / e2e-rootless)
 #   / make e2e-ddev; the ddev suite additionally needs a real ddev binary
 #   and builds a cached golden image
-#   gh — agent issue/PR workflow only; versions below 2.87 get a warning
-#   with the --json workaround (plain view is broken, issue #335)
+#   gh — agent issue/PR workflow only; versions below the pinned minimum
+#   (GH_MIN) get a warning with the --json workaround (plain view is
+#   broken, issue #335)
 
 set -u
 
@@ -136,7 +137,12 @@ ui_section "Agent workflow (optional)"
 # templates query the deprecated GraphQL projectCards field, GitHub rejects
 # the query and gh exits 1 with no output (issue #335, cli/cli#11992).
 # Warning only, never blocking: the suite does not need gh, and the CI
-# image may not carry it.
+# image may not carry it. The output names GH_MIN as INFORMATION (plain
+# view recovers from GH_MIN) but carries no install instructions — the host
+# upgrade belongs to the maintainer, a session must not grow a second gh
+# next to the maintainer's old one. Maintainer fix (comment only, never
+# printed): official cli.github.com apt repo + an /etc/apt/preferences.d
+# pin (Priority 1001) to outrank Ubuntu ESM's gh 2.45.0.
 GH_MIN="2.87"
 if command -v gh >/dev/null 2>&1; then
     _gh_v="$(gh --version 2>/dev/null | sed -n '1s/^gh version \([0-9][0-9.]*\).*/\1/p')"
@@ -145,9 +151,9 @@ if command -v gh >/dev/null 2>&1; then
     else
         ui_atten "gh" "old version ${_gh_v:-unknown} — plain 'gh issue/pr view' fails (issue #335)"
         ui_detail "agents: use gh issue view N --json number,title,body,comments"
-        ui_detail "        or gh api repos/OWNER/REPO/issues/N — plain view stays broken"
-        ui_detail "fix: upgrade gh >= $GH_MIN — Ubuntu pins 2.45.0; needs the"
-        ui_detail "     cli.github.com apt repo + pin Priority 1001 to outrank it"
+        ui_detail "        or gh api repos/OWNER/REPO/issues/N — plain view stays"
+        ui_detail "        broken below gh $GH_MIN; upgrading gh is the maintainer's"
+        ui_detail "        task, not the session's (no self-install)"
     fi
 else
     ui_atten "gh" "not installed — agent issue/PR workflow (optional)"
