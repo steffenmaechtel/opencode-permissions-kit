@@ -110,8 +110,8 @@ to matching the daemon uid only and says so in a warning — re-run it
 with the containers up before trusting a clean verdict.
 
 Exit codes like `opk status`: `0` all declared trees healthy, `1`
-at-risk finding(s) or a rejected `opk.json`, `2` warning(s) only, `64`
-usage error.
+at-risk finding(s), a rejected `opk.json`, or a degraded-install error
+(missing kit config), `2` warning(s) only, `64` usage error.
 
 ### doctor fix
 
@@ -127,7 +127,11 @@ remedy per finding that has one — a declared, existing container tree with
 at-risk entries: handing that tree to the agent user via the existing
 [`opk handover opencode <tree>`](#handover). Findings without an
 unambiguous remedy (missing, symlinked or non-directory trees, rejected
-path forms) are reported by the scan but never offered.
+path forms) are reported by the scan but never offered. The offer follows
+handover's own path policy: a tree under a system prefix (`/srv`, `/opt`,
+`/mnt`, …) is still offered, but a confirmed answer ends in handover's
+loud "refusing system path" error — doctor does not duplicate the refusal
+list.
 
 - One `[y/N]` prompt per tree, **default `n`** — Enter skips that tree and
   its scan row keeps the copy-paste command. Answers are read from the
@@ -142,9 +146,11 @@ path forms) are reported by the scan but never offered.
   final verdict row and exit code describe the **post-fix** state.
 
 Exit codes like `opk doctor`: `0` all declared trees healthy (post-fix),
-`1` at-risk findings remain — declined, `--dry-run`, or a failed
-handover — or a rejected `opk.json`, `2` warning(s) only, `64` usage
-error.
+`1` at-risk findings remain — declined, `--dry-run`, a failed handover, or
+a succeeded handover whose tree was re-written before the re-check — or a
+rejected `opk.json` or a degraded-install error (missing kit config, no
+dispatcher: exit `1` in both modes, like the scan), `2` warning(s) only,
+`64` usage error.
 
 ### opk.json — the project's container-tree policy
 

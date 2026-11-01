@@ -180,10 +180,12 @@ case "$cmd" in
         exec sh "$LIBDIR/management/status.sh" "$@"
         ;;
     doctor)
-        # Per-project deep diagnosis (issue #313): read-only ownership
-        # scan of the container trees the project declares in opk.json --
-        # mapped-safe vs at-risk for container metadata ops (the #312
-        # EPERM class). No sudo, like status.
+        # Per-project deep diagnosis (issue #313): the scan is a
+        # read-only ownership classification of the container trees the
+        # project declares in opk.json -- mapped-safe vs at-risk for
+        # container metadata ops (the #312 EPERM class). 'doctor fix'
+        # additionally orchestrates the handover remedy; no sudo here
+        # either -- the elevation happens inside handover.
         exec sh "$LIBDIR/management/doctor.sh" "$@"
         ;;
     config | update)

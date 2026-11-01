@@ -52,8 +52,9 @@
 #       opk doctor fix [project-root] [--dry-run]  orchestrate the fixes
 # Exit codes (the status.sh contract): 0 all declared trees healthy
 #      (post-fix, for 'fix'), 1 at-risk finding(s) remain -- declined,
-#      dry-run, failed handover -- or a rejected policy, 2 warning(s)
-#      only, 64 usage error.
+#      dry-run, failed handover, or re-written-before-recheck -- or a
+#      rejected policy / degraded-install error (both modes), 2
+#      warning(s) only, 64 usage error.
 #
 # Run directly:
 #   /usr/local/lib/opencode-permissions-kit/management/doctor.sh [path]
@@ -120,6 +121,18 @@ DOCTOR_ROOT="${DOCTOR_ROOT:-.}"
 DOCTOR_ROOT="$(realpath -m "$DOCTOR_ROOT" 2>/dev/null || printf '%s' "$DOCTOR_ROOT")"
 if [ ! -d "$DOCTOR_ROOT" ]; then
     ui_error "doctor: no such directory: $DOCTOR_ROOT"
+    exit 64
+fi
+# Fix-mode only (#348 a C3): the candidate round-trip ($WORK/fixcand) is
+# TAB/LF-separated TSV, and $DOCTOR_TREE embeds DOCTOR_ROOT -- a control
+# byte in the root would truncate the handover operand away from the
+# tree the [y/N] prompt named. The opk.json fields are gated by the
+# python validator; the root comes from the CLI/cwd and is gated here.
+# Scan mode needs no gate: it passes the root to find as one argv, no
+# round-trip exists.
+if [ "$DOCTOR_MODE" = "fix" ] &&
+    printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    ui_error "doctor: project root contains control characters -- unusable for 'fix' (candidate round-trip)"
     exit 64
 fi
 

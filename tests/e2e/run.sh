@@ -1316,10 +1316,10 @@ check "12m: fix --dry-run shows the handover plan, changes nothing" \
     E 'cd /var/www/vhosts/doctor-fix && opk doctor fix --dry-run >/tmp/dfix-dry.log 2>&1; test $? -eq 1 && grep -q "would hand over" /tmp/dfix-dry.log && test "$(stat -c %U /var/www/vhosts/doctor-fix/pkg/res/public/app.min.js)" = "dev"'
 check "12m: declined prompt (Enter = default n) hands nothing over" \
     E 'cd /var/www/vhosts/doctor-fix && printf "\n" | opk doctor fix >/tmp/dfix-no.log 2>&1; test $? -eq 1 && test "$(stat -c %U /var/www/vhosts/doctor-fix/pkg/res/public/app.min.js)" = "dev"'
-check "12m: confirmed prompt runs the handover (tree -> opencode)" \
-    E 'cd /var/www/vhosts/doctor-fix && printf "y\n" | opk doctor fix >/tmp/dfix-yes.log 2>&1; test "$(stat -c %U /var/www/vhosts/doctor-fix/pkg/res/public/app.min.js)" = "opencode" && grep -q "re-check after handover" /tmp/dfix-yes.log'
+check "12m: confirmed prompt runs the handover (tree -> opencode, fix run rc 0)" \
+    E 'cd /var/www/vhosts/doctor-fix && printf "y\n" | opk doctor fix >/tmp/dfix-yes.log 2>&1; _rc=$?; test $_rc -eq 0 && test "$(stat -c %U /var/www/vhosts/doctor-fix/pkg/res/public/app.min.js)" = "opencode" && grep -q "re-check after handover" /tmp/dfix-yes.log'
 check "12m: post-fix scan has no at-risk rows (rc 0 or 2)" \
-    E 'cd /var/www/vhosts/doctor-fix && opk doctor >/tmp/dfix-after.log 2>&1; test $? -le 2 && ! grep -q "entries at-risk" /tmp/dfix-after.log'
+    E 'cd /var/www/vhosts/doctor-fix && opk doctor >/tmp/dfix-after.log 2>&1; _rc=$?; test $_rc -eq 0 -o $_rc -eq 2 && ! grep -q "entries at-risk" /tmp/dfix-after.log'
 E 'rm -rf /var/www/vhosts/doctor-fix /tmp/dfix-*.log'
 
 echo ""

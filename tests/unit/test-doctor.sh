@@ -539,6 +539,28 @@ rc_doctor "--dry-run without fix -> rc 64" 64 --dry-run
 rc_doctor "unknown flag in fix mode -> rc 64" 64 fix --bogus
 rc_doctor "two positionals in fix mode -> rc 64" 64 fix "$PROJ" extra
 
+# control bytes in the project root: fix mode rejects loudly (the
+# candidate TSV round-trip would truncate the handover operand away
+# from the tree the prompt named, #348 a C3); scan mode has no
+# round-trip and must keep working on such a root. Own fixture state:
+# the daemon-only map makes the scratch tree at-risk deterministically
+# (the preceding section leaves the 0-65535 map in place).
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1"
+CTRL_PROJ="$WORK/ta$(printf '\t')b"
+mkdir -p "$CTRL_PROJ/tree"
+echo x >"$CTRL_PROJ/tree/one"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$CTRL_PROJ/opk.json"
+RD_OPK="$STUB"
+: >"$CALLS"
+rc_doctor "fix on a root with a control byte -> rc 64" 64 fix "$CTRL_PROJ"
+grep_last_out "control-char rejection row" grep -qF "contains control characters"
+[ ! -s "$CALLS" ] &&
+    pass "control-byte root: handover never invoked" ||
+    fail "control-byte root: handover never invoked"
+rc_doctor "scan on the same root still runs (no fix gate there)" 1 "$CTRL_PROJ"
+grep_last_out "scan on ctrl root still classifies" grep -qF "entries at-risk"
+
 # --dry-run passthrough: handover receives the flag, no prompt, rc stays
 # the scan verdict (findings remain)
 atrisk_setup
