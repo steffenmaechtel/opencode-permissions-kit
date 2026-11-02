@@ -595,9 +595,13 @@ PYEOF
             _ho_policy_dir="$(realpath -m . 2>/dev/null || printf '%s' "$PWD")"
             if [ -f "$_ho_policy_dir/opk.json" ]; then
                 # tolerant advisory read (doctor's strict validation is
-                # deliberately not duplicated): a broken policy skips
-                # the warning with a warn row -- observed via the exit
-                # code, never silently (L1)
+                # deliberately not duplicated -- but a policy shape
+                # doctor's validator REJECTS takes the same arm as
+                # broken JSON: exit 1 -> the warn row below, the
+                # takeover proceeds. Covers top level not an object,
+                # containerTrees not an array, and control characters
+                # inside a declared path (#356 a A3/B3) -- newline-split
+                # fragments can never reach the matching loop this way.
                 _ho_trc=0
                 _ho_trees="$(
                     python3 - "$_ho_policy_dir/opk.json" 2>/dev/null <<'PYEOF'
@@ -609,13 +613,16 @@ try:
         doc = json.load(f)
 except Exception:
     sys.exit(1)
-trees = doc.get("containerTrees", []) if isinstance(doc, dict) else []
+if not isinstance(doc, dict):
+    sys.exit(1)
+trees = doc.get("containerTrees", [])
 if not isinstance(trees, list):
     sys.exit(1)
 for e in trees:
     p = e.get("path") if isinstance(e, dict) else e
-    if isinstance(p, str) and p:
-        sys.stdout.write(p + "\n")
+    if not isinstance(p, str) or not p or any(ord(c) < 32 for c in p):
+        sys.exit(1)
+    sys.stdout.write(p + "\n")
 PYEOF
                 )" || _ho_trc=$?
                 if [ "$_ho_trc" -ne 0 ]; then
@@ -624,12 +631,25 @@ PYEOF
                     printf '%s\n' "$_ho_trees" | while IFS= read -r _ho_decl; do
                         [ -n "$_ho_decl" ] || continue
                         # belt: only comparable relative path forms can
-                        # be matched (the same shapes doctor allows)
+                        # be matched -- a STRICTER structural+shell set
+                        # than doctor's path_error (which also rejects
+                        # globs and non-ASCII; this belt additionally
+                        # drops |&<> so fragments of a mangled policy
+                        # cannot even reach the warning TEXT, #356 a
+                        # A8/B3). A skip is never silent: the detail row
+                        # names the declaration that forfeits the
+                        # warning (#356 a C7).
+                        _ho_badform=0
                         case "$_ho_decl" in
-                            /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\* | *"'"* | *'"'* | *'`'* | *'$'* | *';'*)
-                                continue
-                                ;;
+                            /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*) _ho_badform=1 ;;
                         esac
+                        case "$_ho_decl" in
+                            *"'"* | *'"'* | *'`'* | *'$'* | *';'* | *"|"* | *"&"* | *"<"* | *">"*) _ho_badform=1 ;;
+                        esac
+                        if [ "$_ho_badform" = 1 ]; then
+                            ui_detail "declared path '$_ho_decl' skipped -- unusable form (doctor rejects it too)"
+                            continue
+                        fi
                         _ho_tree="$(realpath -m "$_ho_policy_dir/$_ho_decl" 2>/dev/null ||
                             printf '%s' "$_ho_policy_dir/$_ho_decl")"
                         for _ho_a in "$@"; do

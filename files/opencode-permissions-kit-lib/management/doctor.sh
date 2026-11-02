@@ -145,6 +145,18 @@ if [ "$DOCTOR_MODE" = "detect" ] && [ "$DOCTOR_ROOT" = "/" ]; then
     ui_error "doctor: refusing to walk the whole filesystem (detect on '/')"
     exit 64
 fi
+# (#356 a B4): a detect root carrying control characters or a backslash
+# classifies NOTHING -- the boundary awk's root-prefix match never hits
+# (a TAB root splits find rows, a backslash root is mangled by awk -v
+# escape processing) -- and the run reads "no evidence found", the
+# fail-absent shape this block refuses loudly everywhere else. The fix
+# gate above (#348 a C3) covers the same class for the TSV round-trip;
+# detect needs it for the walk itself.
+if [ "$DOCTOR_MODE" = "detect" ] &&
+    printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
+    ui_error "doctor: project root contains control characters or backslashes -- unusable for 'detect'"
+    exit 64
+fi
 # Fix-mode only (#348 a C3): the candidate round-trip ($WORK/fixcand) is
 # TAB/LF-separated TSV, and $DOCTOR_TREE embeds DOCTOR_ROOT -- a control
 # byte in the root would truncate the handover operand away from the
@@ -369,9 +381,10 @@ def path_error(p):
     for ch in p:
         if ord(ch) < 32:
             return "tree path %r must not contain control characters" % p
-    # Shell-significant characters (#344 a S3): the fix hints interpolate
-    # the path into a copy-paste sudo command — a committed opk.json must
-    # never be able to steer that command
+    # Shell-significant characters (#344 a S3; rationale updated #356 a
+    # A5 -- the copy-paste sudo hint is gone, but policy paths still
+    # flow into fix-mode prompts and the 'would run:'/'running:' rows):
+    # a committed opk.json must never be able to steer those
     if any(c in p for c in "'\"`$;"):
         return "tree path %r must not contain shell-significant characters: quotes, backtick, dollar, semicolon" % p
     for comp in p.split("/"):
@@ -615,9 +628,13 @@ doctor_scan_trees() {
 # explicit [y/N] consent per finding (default n); declined findings
 # print the snippet to paste and leave rc 1.
 _doctor_detect_path_ok() {
-    # shell belt over the python allowlist (same character gates as
-    # doctor_load_policy's path_error, same shape as doctor_scan_trees'
-    # belt): evidence paths come from find output and can carry anything.
+    # shell belt over the classify-time gate (the writer re-checks a
+    # third time): evidence paths come from find output and can carry
+    # anything. DELIBERATELY STRICTER than doctor_load_policy's
+    # path_error (#356 a A8): an ASCII whitelist keeps every proposal,
+    # prompt and snippet byte-predictable; path_error's blacklist
+    # tolerates non-ASCII and |<> that this belt rejects (non-ASCII
+    # evidence is dropped with a warn row, see the classify block).
     # The character half runs through grep, not a case pattern -- `(`/`&`
     # in a bracket class are unparseable as a dash case pattern.
     case "$1" in
@@ -639,16 +656,23 @@ if [ "$DOCTOR_MODE" = "detect" ]; then
     fi
 
     # classify every walked entry through the map (never through the
-    # displayed numbers -- the #312 nobody(65534) collision). Corrupt
-    # rows (a filename with a newline/tab shifted the TSV -- the #344 a
-    # S1 class) and unusable path forms are counted and dropped, never
-    # guessed at; the character belt mirrors doctor_load_policy's gates
-    # so nothing weird can reach a proposal or the snippet printf. A
-    # filename containing a TAB truncates at it (FS is tab) -- the same
-    # deliberate display-only degradation as the scan's examples pass:
-    # counts and classes stay exact, the mangled path never survives the
-    # belt unless its prefix happens to be clean (a wrong-but-plausible
-    # PROPOSAL at worst, consent-gated and writer-validated).
+    # displayed numbers -- the #312 nobody(65534) collision). The
+    # character gate is a STRICTER ASCII WHITELIST than
+    # doctor_load_policy's blacklist (path_error tolerates non-ASCII
+    # and |<>) -- proposals, prompts and the snippet printf stay
+    # ASCII-safe; the price is that non-ASCII filenames (umlauts) are
+    # not usable as evidence and land in the drop count below --
+    # declare such trees manually (#356 a A1/A8).
+    # TSV split shapes (#344 a S1 class; #356 a A2, truth-fixed): a
+    # filename with a NEWLINE splits into rows -- the FIRST fragment
+    # (numeric uid, three fields) is classified under a truncated path,
+    # only the tail lands in the drop count; a TAB truncates the path
+    # in-row and drops nothing at all. Truncated paths can name entries
+    # that do not exist (directory evidence proposes its own truncated
+    # prefix) -- a consented dead declaration at worst: consent-gated,
+    # charset-belted, and the next 'opk doctor' scan surfaces it as
+    # "declared but missing". Hostile bytes beyond the whitelist never
+    # reach a row, a prompt or the snippet printf.
     awk -F'\t' -v daemon="$DOCTOR_DAEMON_UID" -v ranges="$DOCTOR_RANGES" \
         -v root="$DOCTOR_ROOT" -v dropf="$WORK/ddrop" '
         BEGIN {
@@ -674,7 +698,8 @@ if [ "$DOCTOR_MODE" = "detect" ]; then
         END { if (drop + 0 > 0) printf "%d\n", drop >dropf }
     ' "$WORK/dwalk" >"$WORK/dcls"
     if [ -f "$WORK/ddrop" ]; then
-        ui_kv_warn "scan" "$(cat "$WORK/ddrop") entries dropped -- unusable path forms (control/shell characters)"
+        ui_kv_warn "scan" "$(cat "$WORK/ddrop") entries dropped -- unusable path forms"
+        ui_detail "non-ASCII, control or shell-significant characters -- declare such trees manually (#356 a A1)"
         rm -f "${WORK:?}/ddrop"
     fi
 
@@ -711,6 +736,15 @@ if [ "$DOCTOR_MODE" = "detect" ]; then
         ui_detail "only subuid-owner evidence is used; run detect inside the repo for full evidence"
     fi
     [ "$DOCTOR_IG" = 1 ] || : >"$WORK/ign"
+    # (#356 a D1): the two-file FNR==NR idiom below mis-consumes the
+    # ENTIRE dcls stream when the first file is EMPTY -- NR stays in
+    # lockstep with FNR through a single file, so every classified row
+    # took the ign[$0] branch and detect read "no evidence" in every
+    # repo without ignored paths and in every no-git fallback run. A
+    # sentinel line carrying a TAB can never equal a classify-surviving
+    # path (the charset gate drops tabs at classify time): an empty
+    # ignore set is represented by an unmatchable key, not an empty file.
+    [ -s "$WORK/ign" ] || printf '.\t.\n' >"$WORK/ign"
 
     # --- boundaries: compute, merge, aggregate --------------------------------------
     # output per boundary: rel<TAB>count<TAB>owners<TAB>mixed<TAB>examples
@@ -839,7 +873,8 @@ if [ "$DOCTOR_MODE" = "detect" ]; then
         fi
     done 3<"$WORK/dcand"
     if [ "$DET_SKIPPED" -gt 0 ]; then
-        ui_kv_warn "detect" "$DET_SKIPPED candidate(s) skipped -- unusable path forms (control/shell characters)"
+        ui_kv_warn "detect" "$DET_SKIPPED candidate(s) skipped -- unusable path forms"
+        ui_detail "non-ASCII, control or shell-significant characters (see the drop rows above)"
     fi
 
     DET_LEFT=$((DET_N - DET_DECLARED))
@@ -916,9 +951,26 @@ PYEOF
             ui_error "detect: writing opk.json failed (rejected content -- see the errors above)"
             exit 1
         fi
+        # (#356 a B1): chmod resolves the NAME and follows a swapped
+        # symlink, and the project dir is agent-group-writable -- the
+        # temp name can be swapped for a link during the python run
+        # (mktemp->chmod spans the whole interpreter startup). Re-check
+        # immediately before acting (the learnings root-ops order) and
+        # refuse loudly: the mode change on an arbitrary dev-owned file
+        # must never happen. rm removes the LINK only (rm never
+        # follows); the remaining window is gate->op, the house shape.
+        if [ -L "$_dt_tmp" ]; then
+            rm -f "${_dt_tmp:?}"
+            ui_error "detect: the temp changed to a symlink mid-write -- not writing (chmod refused)"
+            exit 1
+        fi
         chmod "$_dt_mode" "$_dt_tmp" ||
             ui_kv_warn "detect" "could not set mode $_dt_mode on opk.json (mktemp default remains)"
-        if [ ! -L "$_dt_tmp" ] && [ ! -L "$DOCTOR_ROOT/opk.json" ]; then
+        # (#356 a B2): a DIRECTORY swapped onto the opk.json name makes
+        # mv succeed by moving the temp INSIDE it (POSIX rename) -- the
+        # -d conjunct refuses that loudly instead of letting the success
+        # row claim a declaration that never happened
+        if [ ! -L "$_dt_tmp" ] && [ ! -L "$DOCTOR_ROOT/opk.json" ] && [ ! -d "$DOCTOR_ROOT/opk.json" ]; then
             if mv "$_dt_tmp" "$DOCTOR_ROOT/opk.json"; then
                 DET_WROTE=1
             else
@@ -928,7 +980,7 @@ PYEOF
             fi
         else
             rm -f "${_dt_tmp:?}"
-            ui_error "detect: opk.json (or its temp) changed to a symlink mid-write -- not writing"
+            ui_error "detect: opk.json (or its temp) changed to a symlink or directory mid-write -- not writing"
             exit 1
         fi
     fi

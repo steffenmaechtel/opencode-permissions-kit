@@ -920,26 +920,86 @@ _rd_out="$(PATH="$NOGIT:$PATH" OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT=
     }
 
 # unusable path forms are dropped at classify time (charset belt): a
-# single-quote directory is evidence-class S (fixture A) but never a
-# candidate; the drop count warns. An unreadable subtree makes the walk
-# itself incomplete -- the warn row must fire, never silence (L1: the
-# find stderr redirect is a fail-soft spot)
+# single-quote directory and a non-ASCII directory are evidence-class S
+# (fixture A) but never a candidate; the drop count warns under the
+# honest label (#356 a A1: non-ASCII is not "control/shell")
 rm -rf "$PROCFIX"
 mkmap 42 "0 0 1" "1 $CURUID 65536"
 detproj
 mkdir -p "$PROJ/qu'ote" "$PROJ/locked"
 echo q >"$PROJ/qu'ote/file"
 echo l >"$PROJ/locked/file"
+mkdir -p "$PROJ/$(printf '\303\234ber')" # non-ASCII (UTF-8 umlaut) dir
+echo u >"$PROJ/$(printf '\303\234ber')/file"
 chmod 000 "$PROJ/locked"
 rc_doctor "detect drops unusable paths, keeps working ones (rc 1)" 1 detect "$PROJ"
 grep_last_out "drop-count warn row" grep -qF "entries dropped -- unusable path forms"
+grep_last_out "drop label names non-ASCII honestly (#356 a A1)" grep -qF "non-ASCII, control or shell-significant characters"
 grep_last_out "incomplete-walk warn row" grep -qF "unreadable entries -- evidence may be incomplete"
 if printf '%s' "$_rd_out" | grep -qF "qu'ote"; then
     fail "quoted dir never reaches a row"
 else
     pass "quoted dir never reaches a row"
 fi
+if printf '%s' "$_rd_out" | grep -q "$(printf '\303\234ber')"; then
+    fail "non-ASCII dir never reaches a row"
+else
+    pass "non-ASCII dir never reaches a row"
+fi
 chmod 755 "$PROJ/locked"
+
+# --- 7a. fix-wave pins (#356 a) ------------------------------------------------------
+# D1: an EMPTY ignore-answer file voided the whole classification (the
+# FNR==NR idiom mis-consumes dcls when file 1 is empty) -- every repo
+# without ignored paths and every no-git fallback run read "no evidence"
+# while S evidence existed. Two arms: nothing-ignored and broken git.
+detproj
+rm -f "${PROJ:?}/.gitignore" # a repo with NO ignore rules: check-ignore rc 1
+rc_doctor "D1: nothing ignored, S evidence -> candidates (rc 1)" 1 detect "$PROJ"
+grep_last_out "D1: candidate appears with an empty ignore set" grep -qF "candidate      build --"
+grep_last_out "D1: second candidate appears too" grep -qF "candidate      src --"
+# broken git + S evidence: the fallback warn row fires AND the
+# subuid-evidence candidates still appear
+_rd_rc=0
+_rd_out="$(PATH="$NOGIT:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+    OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" </dev/null 2>&1)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF "git ignore answers unavailable" &&
+    printf '%s' "$_rd_out" | grep -qF "candidate      build --"; then
+    pass "D1: no-git fallback keeps S-evidence candidates + warn row"
+else
+    fail "D1: no-git fallback keeps S-evidence candidates + warn row (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+
+# B4: a detect root carrying control characters classifies nothing --
+# refuse it loudly (64) like fix mode does for its TSV round-trip
+TAB_PROJ="$WORK/ta$(printf '\t')b2"
+mkdir -p "$TAB_PROJ/tree"
+echo x >"$TAB_PROJ/tree/one"
+rc_doctor "B4: control-char root refused for detect (rc 64)" 64 detect "$TAB_PROJ"
+grep_last_out "B4: refusal row names the class" grep -qF "control characters or backslashes"
+BS_PROJ="$WORK/bs\\root"
+mkdir -p "$BS_PROJ/tree"
+echo x >"$BS_PROJ/tree/one"
+rc_doctor "B4: backslash root refused for detect (rc 64)" 64 detect "$BS_PROJ"
+
+# B1/B2 order pin: the [ -L ] gate must sit IMMEDIATELY before the
+# chmod (the swapped-symlink window spans the python run), the mv gate
+# (with the -d conjunct for the directory swap) after it -- line-order
+# statics on comment-stripped source, the W1 precedent in
+# test-kit-cli.sh. The mid-run swap itself is not fixture-able without
+# window injection; the mechanism was mechanically verified in round a
+# (verdicts-v1, reproduced by main on the verbatim awk).
+_b1_gate=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF 'if [ -L "$_dt_tmp" ]; then' | head -1 | cut -d: -f1)
+_b1_chmod=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF 'chmod "$_dt_mode" "$_dt_tmp"' | head -1 | cut -d: -f1)
+_b1_mv=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF '[ ! -L "$_dt_tmp" ] && [ ! -L "$DOCTOR_ROOT/opk.json" ] && [ ! -d' | head -1 | cut -d: -f1)
+if [ -n "$_b1_gate" ] && [ -n "$_b1_chmod" ] && [ -n "$_b1_mv" ] &&
+    [ "$_b1_gate" -lt "$_b1_chmod" ] && [ "$_b1_chmod" -lt "$_b1_mv" ]; then
+    pass "B1/B2: [ -L ] gate before chmod before the mv gate (with -d conjunct)"
+else
+    fail "B1/B2: [ -L ] gate before chmod before the mv gate (gate=$_b1_gate chmod=$_b1_chmod mv=$_b1_mv)"
+fi
 
 # --- summary gate -----------------------------------------------------------------
 echo ""

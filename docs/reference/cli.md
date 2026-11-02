@@ -153,7 +153,7 @@ Exit codes like `opk doctor`: `0` all declared trees healthy (post-fix),
 `1` at-risk findings remain — declined, `--dry-run`, a failed handover, or
 a succeeded handover whose tree was re-written before the re-check — or a
 rejected `opk.json` or a degraded-install error (missing kit config, no
-dispatcher: exit `1` in both modes, like the scan), `2` warning(s) only,
+dispatcher: exit `1` in all modes, like the scan), `2` warning(s) only,
 `64` usage error.
 
 ### doctor detect
@@ -188,10 +188,15 @@ says so.
 - `opk.json` is a **committed project file**: every candidate needs an
   explicit `[y/N]` consent (default `n`) before it is written. A declined
   candidate prints its entry snippet to paste instead.
-- The write is atomic and appends to an existing policy (version, unknown
-  keys and existing entries survive); a symlinked `opk.json` is refused.
+- The write is atomic and appends to an existing policy (unknown keys
+  and existing entries survive; a missing `version` key is added); a
+  symlinked `opk.json` is refused.
 - Without git (no repository, unreadable, git absent) only subuid-twin
-  evidence works — a warn row says so.
+  evidence works — a warn row says so whenever there is evidence to
+  qualify.
+- Evidence paths are ASCII-only: filenames with non-ASCII characters
+  (umlauts) cannot be proposed and land in the drop-count warn row —
+  declare such trees manually.
 - Purely human-owned trees carry no evidence at all. The state after a
   `handover me` over the whole project is invisible to detect by design —
   that blind spot is closed by the [handover warning](#handover) below,
@@ -232,9 +237,10 @@ nothing except the consented `opk.json` writes.
   odd subuid owners (the troubleshooting entry above explains why).
 - Paths are relative to the project root: no absolute paths, no `..`,
   no globs, and no shell-significant characters (`'` `"` `` ` `` `$` `;`)
-  — the fix hints interpolate paths into copy-paste commands, so the
-  policy gate keeps them out entirely. A bare string entry
-  (`"some/path"`) works too when a tree needs no note.
+  — policy paths flow into fix-mode prompts and command rows
+  (`would run:` / `running:`), so the policy gate keeps them out
+  entirely. A bare string entry (`"some/path"`) works too when a tree
+  needs no note.
 
 ## handover
 
@@ -300,9 +306,15 @@ expect a clean rebuild of container-written outputs afterwards.
 When the takeover covers — or sits inside — a tree the project declares in
 its `opk.json`, `handover me` warns before acting:
 
+```bash
+# from the project root:
+opk handover me . --dry-run
+```
+
 ```text
-warn     handover me: '.' takes back the declared container tree 'packages/ext/nb/Resources/Public'
-         you are taking back a declared container tree — expect a clean rebuild of its outputs
+  warn     handover me: '.' takes back the declared container tree 'packages/ext/nb/Resources/Public'
+     you are taking back a declared container tree -- expect a clean rebuild of its outputs
+     'opk doctor' reports the state after; re-declare nothing, rebuild the outputs (#312)
 ```
 
 The warning is advisory (the handover proceeds), fires before any sudo hop

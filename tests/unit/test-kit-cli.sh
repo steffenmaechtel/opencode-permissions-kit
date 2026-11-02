@@ -659,20 +659,77 @@ else
     failures=$((failures + 1))
 fi
 
-# unusable declared paths (forms doctor's strict gate rejects) are
-# skipped by the belt without crashing the warning
-printf '{"containerTrees":["../escape","tree"]}\n' >"$HO_PROJ/opk.json"
-out="$(_ho_warn_run "$HO_PROJ" me tree/sub --dry-run)" || true
+# belt discrimination (#356 a A4, V1's recipe): a declared path that
+# would MATCH the operand when unbelted. Policy "../tree" read from cwd
+# $HO_PROJ/tree resolves (unbelted) to $HO_PROJ/tree, which CONTAINS the
+# operand tree/sub -- with the belt it is skipped and announced; delete
+# the belt and this pin goes red through the appearing warn row (the
+# old ../escape pin was byte-identical with the belt deleted).
+printf '{"containerTrees":["../tree"]}\n' >"$HO_PROJ/tree/opk.json"
+out="$(_ho_warn_run "$HO_PROJ/tree" me sub --dry-run)" || true
+if printf '%s' "$out" | grep -qF "takes back the declared container tree"; then
+    echo "  ${RED}FAIL${NC}  belt skips the unbelted-match path ../tree (no warn)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  belt skips the unbelted-match path ../tree (no warn)"
+    passed=$((passed + 1))
+fi
 case "$out" in
-    *"takes back the declared container tree 'tree'"*)
-        echo "  ${GREEN}PASS${NC}  belt skips unusable declared paths, live ones still warn"
+    *"declared path '../tree' skipped -- unusable form"*)
+        echo "  ${GREEN}PASS${NC}  belt skip is announced, never silent (#356 a C7)"
         passed=$((passed + 1))
         ;;
     *)
-        echo "  ${RED}FAIL${NC}  belt skips unusable declared paths, live ones still warn (got: $out)"
+        echo "  ${RED}FAIL${NC}  belt skip is announced, never silent (#356 a C7, got: $out)"
         failures=$((failures + 1))
         ;;
 esac
+
+# a top-level non-dict opk.json (the natural "paste a list" mistake)
+# takes the same warn row as broken JSON (#356 a A3) -- never a silent
+# skip
+printf '["tree","other"]\n' >"$HO_PROJ/opk.json"
+out="$(_ho_warn_run "$HO_PROJ" me tree/sub --dry-run)" || true
+if printf '%s' "$out" | grep -qF "is unreadable -- declared-tree warning skipped" &&
+    printf '%s' "$out" | grep -qF "would hand over"; then
+    echo "  ${GREEN}PASS${NC}  non-dict opk.json: warn row + handover proceeds (#356 a A3)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  non-dict opk.json: warn row + handover proceeds (got: $out)"
+    failures=$((failures + 1))
+fi
+
+# a control character inside a declared path (JSON \n) is a shape
+# doctor's validator rejects -- the advisory reader refuses the policy
+# instead of letting newline-split fragments reach the matching loop
+# (#356 a B3)
+printf '{"containerTrees":["tr\\nnee"]}\n' >"$HO_PROJ/opk.json"
+out="$(_ho_warn_run "$HO_PROJ" me tree/sub --dry-run)" || true
+if printf '%s' "$out" | grep -qF "is unreadable -- declared-tree warning skipped" &&
+    printf '%s' "$out" | grep -qF "would hand over"; then
+    echo "  ${GREEN}PASS${NC}  newline-in-path policy: warn row, no fragment matching (#356 a B3)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  newline-in-path policy: warn row, no fragment matching (got: $out)"
+    failures=$((failures + 1))
+fi
+
+# the OPK_HANDOVER_ROOT=1 re-entry skip arm (#356 a A9): the root pass
+# must not repeat the unprivileged warning -- same covering scenario,
+# env-armed, no warn row
+printf '{"containerTrees":["tree"]}\n' >"$HO_PROJ/opk.json"
+out="$(
+    cd "$HO_PROJ" &&
+        OPK_HANDOVER_ROOT=1 OPK_INSTALL_CONF="$WORK/install.conf" NO_COLOR=1 \
+            "$BIN/opk" handover me . --dry-run 2>&1
+)" || true
+if printf '%s' "$out" | grep -qF "takes back the declared container tree"; then
+    echo "  ${RED}FAIL${NC}  root re-entry does not repeat the warning (#356 a A9)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  root re-entry does not repeat the warning (#356 a A9)"
+    passed=$((passed + 1))
+fi
 
 # --- ensure-shared: short heal wrapper (issue #159) ----------------------------
 # The real helper (bin/ddev-as-opencode) is stubbed with an argument
