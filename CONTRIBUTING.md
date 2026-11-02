@@ -14,6 +14,24 @@ how to work on the code. For what the kit does, see the
    release mirror, which is fast-forwarded to `master` only on release
    (`KIT_CHANNEL` in `install.conf` records what an install tracks).
 
+### Re-wrapping prose blocks
+
+Markdown prose wraps at roughly 78 columns; edits across several waves
+often leave ragged line breaks. To re-flow a single block, run it
+through coreutils `fmt` via a scratch file:
+
+```bash
+fmt -w 78 block.txt > result.txt
+```
+
+Paste the block (one paragraph or one bullet — `fmt` keeps the
+continuation indent) into `block.txt`, then paste `result.txt` back
+into the document. Never run `fmt` over a whole markdown file: it
+joins everything between blank lines and destroys tables and fenced
+code blocks. A clipboard round-trip (`wl-paste | fmt -w 78 |
+wl-copy`) mangles indentation on WSL hosts whose IDE runs on
+Windows — use the scratch-file route there.
+
 ## Tests
 
 First make sure your host has everything installed (shellcheck and

@@ -262,33 +262,27 @@ works.
   fixing). (RM-0131)
 - Fresh-session entry (the batch shape): a BATCH commission splits
   the roles — the implementing session (session: implementer) ONLY
-  implements and opens one
-  birth-PR per case; it never runs the review loop of its batch's
-  PRs (its context compounds across cases — 303k after six, versus
-  83–110k flat for fresh review sessions). Each PR's loop
-  (curation, verification, dispositions, fixes, comments, closing
-  summary) runs in ONE fresh review session commissioned per PR —
-  never two: reviews land in fix work almost always, and the first
-  case's fix waves would load and anchor the second, spending the
-  freshness the entry exists to buy; session startup amortizes
-  through PARALLEL sessions, not stacked PRs (rolling, max 2
-  parallel review sessions under the 5-seat subagent cap). A
-  single-case commission keeps the single-session shape: the
-  implementer session implements and runs the loop itself, the
-  review pass staying
-  a subagent as everywhere. In EVERY shape the review pass is
-  ALWAYS a subagent — round a runs ≥ 1 axis (2–3 under the
-  med-tier triggers; any shipped file runs shipped-track
-  staffing from
-  the start), so the contamination rule holds automatically: every
-  round reads the tree through fresh subagent eyes that never saw
-  the session's reasoning, and a session that fixed something in
-  round X still gets an unbiased round X+1 with no freshness
-  bookkeeping. Session is pure provenance in the marker (a permanent
-  `"session":"implementer"|"fresh"` field — batch loops carry the
-  fresh value); a main-direct
-  review pass (a `reviewers:0` marker) stays a disclosed deviation,
-  never a template. (RM-0132)
+  implements and opens one birth-PR per case; it never runs the review
+  loop of its batch's PRs (its context compounds across cases — 303k
+  after six, versus 83–110k flat for fresh review sessions). Each PR's
+  loop (curation, verification, dispositions, fixes, comments, closing
+  summary) runs in ONE fresh review session commissioned per PR — never
+  two: reviews land in fix work almost always, and the first case's fix
+  waves would load and anchor the second, spending the freshness the entry
+  exists to buy; session startup amortizes through PARALLEL sessions, not
+  stacked PRs (rolling, max 2 parallel review sessions under the 5-seat
+  subagent cap). A single-case commission keeps the single-session shape:
+  the implementer session implements and runs the loop itself, the review
+  pass staying a subagent as everywhere. In EVERY shape the review pass is
+  ALWAYS a subagent — round a runs ≥ 1 axis (2–3 under the med-tier
+  triggers; any shipped file runs shipped-track staffing from the start),
+  so the contamination rule holds automatically: every round reads the
+  tree through fresh subagent eyes that never saw the session's reasoning,
+  and a session that fixed something in round X still gets an unbiased
+  round X+1 with no freshness bookkeeping. Session is pure provenance in
+  the marker (a permanent `"session":"implementer"|"fresh"` field — batch
+  loops carry the fresh value); a main-direct review pass (a `reviewers:0`
+  marker) stays a disclosed deviation, never a template. (RM-0132)
 - Disposition policy on the non-shipped track: MED/HIGH code
   findings are fixed with their class sweep, like every track.
   LOW/INFO code findings are deliberately not done, RECORDED in the
@@ -316,7 +310,7 @@ works.
   session curates directly, disclosed in the comment's provenance.
   (RM-0126)
 - Verification: every curated finding is re-verified against the
-  code — and the verification is SIZED: at ≤ 3 curated findings, all
+  code — and the verification is SIZED: at ≤ 5 curated findings, all
   LOW/INFO, the main session verifies inline (no verifier
   subagents); above that, or at any MED/HIGH finding, exactly ONE
   fresh strong-tier verifier batch runs (verdict files per batch) —
