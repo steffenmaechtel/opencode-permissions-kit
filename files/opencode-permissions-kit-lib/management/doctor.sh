@@ -58,9 +58,15 @@
 # explicit per-finding [y/N] consent (default n); without consent the
 # snippet is printed to paste. Declined findings leave rc 1.
 #
-# CLI:  opk doctor [project-root]                 scan (default: cwd)
+# CLI:  opk doctor [project-root]                 scan (default: cwd, walked
+#                                                  up to the nearest opk.json)
 #       opk doctor fix [project-root] [--dry-run]  orchestrate the fixes
 #       opk doctor detect [project-root]           propose opk.json entries
+# Root resolution (#353 / #313 phase 4): without a positional (a plain
+# '.' or './' counts as none -- other dot-spellings like './.' are
+# explicit roots, #357 a A2) the root is DISCOVERED upward from the cwd
+# like git locates .git -- nearest opk.json wins, the used root is
+# reported; an explicit positional is authoritative, no discovery.
 # Exit codes (the status.sh contract): 0 all declared trees healthy
 #      (post-fix, for 'fix'), or detect found nothing / wrote every
 #      proposed entry, 1 at-risk finding(s) remain -- declined,
@@ -89,6 +95,21 @@ else
     exit 1
 fi
 
+# Walk-up opk.json discovery (#353 / #313 phase 4) lives in the shared
+# leaf lib (the same resolution site bin/opk's handover-me warning
+# uses — one implementation, not per-command copies; see path-sane.sh).
+# Hard fail like ui.sh: a missing sibling means the deployment is
+# broken, and the default root needs the walker.
+PS_LIB="$(cd "$(dirname "$0")" && pwd)/../sh/path-sane.sh"
+[ -f "$PS_LIB" ] || PS_LIB="/usr/local/lib/opencode-permissions-kit/sh/path-sane.sh"
+if [ -f "$PS_LIB" ]; then
+    # shellcheck disable=SC1090
+    . "$PS_LIB"
+else
+    ui_error "doctor: path-sane.sh not found (expected it next to doctor.sh in a checkout, or in the kit library)"
+    exit 1
+fi
+
 # --- CLI --------------------------------------------------------------------------
 # Strict grammar (#313 increment b): 'fix' or 'detect' as the FIRST token
 # switches the mode; then at most one positional (the project root) plus
@@ -96,7 +117,7 @@ fi
 # only on explicit consent, so a dry run of either is a usage error, not
 # a no-op). Everything else is rejected with 64.
 _doctor_usage() {
-    echo "usage: opk doctor [project-root]                   (read-only scan; default root: .)" >&2
+    echo "usage: opk doctor [project-root]                   (read-only scan; root: cwd or the nearest opk.json above)" >&2
     echo "       opk doctor fix [project-root] [--dry-run]   (offer the handover fix per at-risk tree)" >&2
     echo "       opk doctor detect [project-root]            (propose opk.json entries from evidence)" >&2
 }
@@ -106,6 +127,7 @@ if [ "${1:-}" = "fix" ] || [ "${1:-}" = "detect" ]; then
     shift
 fi
 DOCTOR_ROOT=""
+DOCTOR_ROOT_ARG=""
 DOCTOR_FIX_DRY=0
 for _do_arg in "$@"; do
     case "$_do_arg" in
@@ -129,15 +151,66 @@ for _do_arg in "$@"; do
                 exit 64
             fi
             DOCTOR_ROOT="$_do_arg"
+            DOCTOR_ROOT_ARG="$_do_arg"
             ;;
     esac
 done
 DOCTOR_ROOT="${DOCTOR_ROOT:-.}"
 DOCTOR_ROOT="$(realpath -m "$DOCTOR_ROOT" 2>/dev/null || printf '%s' "$DOCTOR_ROOT")"
+# (#357 a A1): the fallback arm re-feeds the RAW argument -- with
+# realpath absent or failing (deleted cwd) that is a relative path, and
+# the walk-up below must never receive one: the walker refuses
+# slash-less input (its belt), but a relative path with slashes would
+# silently walk the wrong chain. cd+pwd is the shell-native
+# normalization for an existing directory (the -d gate below has not
+# run yet -- a cd failure leaves the raw value to that gate; when even
+# cd fails, the walker's belt ends the attempt without a hang).
+case "$DOCTOR_ROOT" in
+    /*) ;;
+    *)
+        _dr_norm="$(cd "$DOCTOR_ROOT" 2>/dev/null && pwd)" &&
+            DOCTOR_ROOT="$_dr_norm"
+        ;;
+esac
 if [ ! -d "$DOCTOR_ROOT" ]; then
     ui_error "doctor: no such directory: $DOCTOR_ROOT"
     exit 64
 fi
+
+# --- walk-up opk.json discovery (#353 / #313 phase 4) ------------------------------
+# Without a root argument (a plain '.' counts as none), doctor works
+# from anywhere INSIDE the project: search upward from the invocation
+# dir for the nearest opk.json -- like git locates .git, first hit
+# wins, filesystem root is the stop (opk.json is the project marker,
+# #313 phase 5; no .git boundary -- the policy is deliberately
+# git-independent). The discovered root governs EVERYTHING below
+# (policy read, tree paths, detect's write) and is reported: the
+# header names it plus the dir the walk started from, so the used root
+# stays visible in every mode's output. An EXPLICIT positional stays
+# authoritative -- no discovery: a named root with no opk.json keeps
+# the v1 warning (scripting predictability; the tree paths you
+# declared resolve against exactly the root you named).
+# DOCTOR_WALKED marks that a walk was ATTEMPTED -- set before the walk
+# runs and regardless of its outcome (#357 a C2 comment truth); its
+# only consumer sits inside the no-policy branch below, so it matters
+# exactly when the walk found nothing, and the warning then says what
+# was searched.
+DOCTOR_START_DIR=""
+DOCTOR_DISCOVERED=0
+DOCTOR_WALKED=0
+case "$DOCTOR_ROOT_ARG" in
+    "" | . | ./)
+        DOCTOR_START_DIR="$DOCTOR_ROOT"
+        DOCTOR_WALKED=1
+        if _dr_root="$(opk_policy_root "$DOCTOR_ROOT")"; then
+            if [ "$_dr_root" != "$DOCTOR_ROOT" ]; then
+                DOCTOR_ROOT="$_dr_root"
+                DOCTOR_DISCOVERED=1
+            fi
+        fi
+        ;;
+esac
+
 # detect walks the WHOLE project from the root (scan/fix walk declared
 # trees only, bounded by the policy) -- the filesystem root is never a
 # project; refuse it loudly like the ddev handover walks do
@@ -293,6 +366,9 @@ DOCTOR_RANGES="$(awk -F: '{ printf "%s %s ", $1, $2 }' "$WORK/ranges")"
 # --- report header ----------------------------------------------------------------
 ui_section "Doctor -- container-tree ownership (#312 class)"
 ui_kv "project root" "$DOCTOR_ROOT"
+if [ "$DOCTOR_DISCOVERED" = 1 ]; then
+    ui_kv "root via" "walk-up from $DOCTOR_START_DIR (nearest opk.json)"
+fi
 if [ "$DOCTOR_MODE" = "fix" ]; then
     if [ "$DOCTOR_FIX_DRY" = 1 ]; then
         ui_kv "mode" "fix --dry-run (show the handover plan, change nothing)"
@@ -323,7 +399,14 @@ DOCTOR_POLICY_PRESENT=1
 if [ ! -f "$DOCTOR_ROOT/opk.json" ]; then
     DOCTOR_POLICY_PRESENT=0
     if [ "$DOCTOR_MODE" != "detect" ]; then
-        ui_warn "no opk.json found in $DOCTOR_ROOT -- nothing to check"
+        # A walk ran and found nothing (default invocation): say what was
+        # searched -- "strict-cwd" would be a lie since phase 4. Explicit
+        # roots keep the plain v1 text (nothing was searched above them).
+        if [ "$DOCTOR_WALKED" = 1 ]; then
+            ui_warn "no opk.json found in $DOCTOR_ROOT (searched upward to /) -- nothing to check"
+        else
+            ui_warn "no opk.json found in $DOCTOR_ROOT -- nothing to check"
+        fi
         ui_detail "declare the trees your container builds write to (docs/reference/cli.md, 'doctor')"
         ui_detail "or run 'opk doctor detect' to propose entries from ownership evidence"
         exit 2

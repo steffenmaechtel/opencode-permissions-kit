@@ -105,6 +105,33 @@ rc_doctor_ans() {
     fi
 }
 
+# run_doctor_in <dir> [args...] — run_doctor, but invoked from inside
+# <dir>: walk-up discovery (#353) starts at the INVOCATION dir, so the
+# cd must happen before exec (a subshell keeps the suite's own cwd)
+run_doctor_in() {
+    _rin_dir="$1"
+    shift
+    (
+        cd "$_rin_dir" || exit 99
+        OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="${RD_OPK:-}" \
+            NO_COLOR=1 setsid sh "$DOCTOR" "$@" </dev/null 2>&1
+    )
+}
+
+# rc_doctor_in <desc> <expected-rc> <dir> [args...] — rc_doctor from a dir
+rc_doctor_in() {
+    _rdi_desc="$1" _rdi_want="$2" _rdi_dir="$3"
+    shift 3
+    _rd_rc=0
+    _rd_out="$(run_doctor_in "$_rdi_dir" "$@")" || _rd_rc=$?
+    if [ "$_rd_rc" = "$_rdi_want" ]; then
+        pass "$_rdi_desc (rc $_rdi_want)"
+    else
+        fail "$_rdi_desc (rc $_rdi_want, got $_rd_rc)"
+        echo "        output: $_rd_out"
+    fi
+}
+
 # grep_last_out <desc> <grep-args...> — asserts the last _rd_out matches
 grep_last_out() {
     _gd_desc="$1"
@@ -425,6 +452,142 @@ rc_doctor "no opk.json -> rc 2" 2 "$PROJ"
 grep_last_out "no-policy warn" grep -qF "no opk.json found"
 grep_last_out "no-policy row suggests detect" grep -qF "or run 'opk doctor detect'"
 
+# --- 4b. walk-up opk.json discovery (#353 / #313 phase 4) ---------------------------
+# Without a positional (a plain '.' counts as none) the root is
+# discovered upward from the invocation dir, nearest opk.json wins,
+# and the used root is REPORTED. An explicit positional stays strict.
+# Environment assumption (marked, L4): the no-hit pins walk through the
+# mktemp ancestor chain and assert no opk.json lives there — the suite
+# scratch sits under /tmp, and an opk.json at /tmp or / would flip them.
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+mkproj
+mkdir -p "$PROJ/sub/deep"
+policy '{"containerTrees":["tree"]}'
+rc_doctor_in "walk-up from deep inside -> rc 0" 0 "$PROJ/sub/deep"
+grep_last_out "discovered root named in header" grep -qF "project root   $PROJ"
+grep_last_out "root via row names the start dir" \
+    grep -qF "root via       walk-up from $PROJ/sub/deep (nearest opk.json)"
+grep_last_out "trees resolve against the discovered root" \
+    grep -qF "tree -- 3 entries mapped-safe"
+
+# invocation AT the root: found at depth 0 -- no discovery row (v1
+# output unchanged for the workspace-root workflow, #313's primary UX)
+rc_doctor_in "invocation at the root -> rc 0" 0 "$PROJ"
+if printf '%s' "$_rd_out" | grep -q "root via"; then
+    fail "no root-via row when the invocation dir IS the root"
+else
+    pass "no root-via row when the invocation dir IS the root"
+fi
+
+# nearest wins: a nested opk.json shadows the parent's (like nested
+# git repos) -- the discrimination pin (delete the walker's stop at
+# first hit and the parent's 'tree' declaration reappears in the rows).
+# The NESTED policy declares 'deep', the parent's 'tree': from deep/
+# the verdict must answer the nested one only.
+printf '{"containerTrees":["deep"]}\n' >"$PROJ/sub/opk.json"
+rc_doctor_in "nearest opk.json wins -> rc 0" 0 "$PROJ/sub/deep"
+grep_last_out "nested root named in header" grep -qF "project root   $PROJ/sub"
+grep_last_out "nested policy governs the verdict" grep -qF "deep -- 1 entries mapped-safe"
+if printf '%s' "$_rd_out" | grep -qF "tree --"; then
+    fail "parent policy is not read when a nearer opk.json exists"
+else
+    pass "parent policy is not read when a nearer opk.json exists"
+fi
+
+# no hit anywhere: the root stays the invocation dir (v1 strict shape)
+# and the warning says what was searched -- 'strict-cwd' would be a lie.
+# Own scratch OUTSIDE the suite's $WORK on purpose: section 3's pol()
+# helper leaves a stale $WORK/opk.json behind, and this pin asserts a
+# chain with NO opk.json at all (env assumption: none at /tmp or /)
+rm -f "${PROJ:?}/sub/opk.json"
+WALKNONE="$(mktemp -d)"
+mkdir -p "$WALKNONE/inner"
+rc_doctor_in "no hit anywhere -> rc 2" 2 "$WALKNONE/inner"
+grep_last_out "root stays the invocation dir" grep -qF "project root   $WALKNONE/inner"
+grep_last_out "warning names the searched scope" \
+    grep -qF "no opk.json found in $WALKNONE/inner (searched upward to /) -- nothing to check"
+rm -rf "${WALKNONE:?}"
+
+# explicit positional stays authoritative: no discovery, no scope note
+policy '{"containerTrees":["tree"]}'
+rc_doctor "explicit root without policy: v1 warn, rc 2" 2 "$PROJ/sub"
+grep_last_out "plain v1 warn text" grep -qF "no opk.json found in $PROJ/sub -- nothing to check"
+if printf '%s' "$_rd_out" | grep -qF "searched upward"; then
+    fail "explicit root claims a search it never ran"
+else
+    pass "explicit root claims no search"
+fi
+
+# a plain '.' counts as no positional (walk-up applies to it)
+rc_doctor_in "plain '.' walks up -> rc 0" 0 "$PROJ/sub/deep" .
+grep_last_out "dot invocation discovers the root" grep -qF "root via       walk-up from $PROJ/sub/deep"
+
+# the spelling contract (#357 a A2): './' shares the default arm;
+# './.' does NOT -- it is an explicit root and gets strict v1 behavior.
+# Pinned so the split is contract, not accident
+rc_doctor_in "'./' walks up like the bare dot -> rc 0" 0 "$PROJ/sub/deep" ./
+grep_last_out "slash-dot invocation discovers the root" grep -qF "root via       walk-up from $PROJ/sub/deep"
+rc_doctor_in "'./.' is an explicit root: strict, rc 2" 2 "$PROJ/sub/deep" ./.
+grep_last_out "dot-dot-slash keeps the plain v1 warn" \
+    grep -qF "no opk.json found in $PROJ/sub/deep -- nothing to check"
+
+# realpath absent (#357 a A1, the fallback arm's class): the fallback
+# re-feeds the raw arg -- the cd+pwd normalization must turn "." into
+# the absolute invocation dir so the walk still finds the project root.
+# A failing realpath stub shadows the real binary via PATH; timeout is
+# the discriminator (pre-fix this HUNG: the walker looped on the
+# slash-less input)
+A1BIN="$WORK/a1-bin"
+mkdir -p "$A1BIN"
+for _a1t in dirname sed tail id mktemp awk sort find python3 grep wc; do
+    ln -s "$(command -v "$_a1t")" "$A1BIN/$_a1t"
+done
+printf '#!/bin/sh\nexit 1\n' >"$A1BIN/realpath"
+chmod +x "$A1BIN/realpath"
+_rd_rc=0
+_rd_out="$(
+    cd "$PROJ/sub/deep" &&
+        PATH="$A1BIN:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+            OPK_DOCTOR_OPK="" NO_COLOR=1 timeout 30 sh "$DOCTOR" </dev/null 2>&1
+)" || _rd_rc=$?
+[ "$_rd_rc" = 0 ] &&
+    pass "realpath absent: cd+pwd normalizes, walk-up still finds the root (A1)" ||
+    {
+        fail "realpath absent: cd+pwd normalizes, walk-up still finds the root (A1, rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+printf '%s' "$_rd_out" | grep -qF "root via       walk-up from $PROJ/sub/deep" &&
+    pass "A1 arm: header still reports the discovered root" ||
+    fail "A1 arm: header still reports the discovered root"
+rm -rf "${A1BIN:?}"
+
+# static order pin (stripped source, the B1 precedent): the walk-up
+# must sit BEFORE the detect gates -- a discovered root of '/' must hit
+# the detect refusal, not slip past a gate that ran on the start dir
+_wu_block=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF 'case "$DOCTOR_ROOT_ARG" in' | head -1 | cut -d: -f1)
+_wu_gate=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -nF "refusing to walk the whole filesystem" | head -1 | cut -d: -f1)
+if [ -n "$_wu_block" ] && [ -n "$_wu_gate" ] && [ "$_wu_block" -lt "$_wu_gate" ]; then
+    pass "walk-up resolves before the detect '/' gate (static order)"
+else
+    fail "walk-up resolves before the detect '/' gate (static order, walk=$_wu_block gate=$_wu_gate)"
+fi
+
+# missing leaf lib: behavioral pin not fixture-able cheaply -- the
+# checkout-first resolution falls back to the DEPLOYED lib, which
+# exists on every kit-managed host (the same class as the unpinned
+# ui.sh hard-fail; accepted residual, pin-cost budget). Structural pin
+# instead: the PS_LIB block must sit AFTER the ui.sh sourcing -- the
+# error path needs ui_error, which only exists once ui.sh loaded
+_nl_src=$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR")
+_nl_uilib=$(printf '%s\n' "$_nl_src" | grep -nF 'UI_LIB=' | head -1 | cut -d: -f1)
+_nl_pslib=$(printf '%s\n' "$_nl_src" | grep -nF 'PS_LIB=' | head -1 | cut -d: -f1)
+if [ -n "$_nl_uilib" ] && [ -n "$_nl_pslib" ] && [ "$_nl_uilib" -lt "$_nl_pslib" ]; then
+    pass "path-sane sourcing sits after ui.sh (its error row needs ui_error)"
+else
+    fail "path-sane sourcing sits after ui.sh (ui=$_nl_uilib ps=$_nl_pslib)"
+fi
+
 # invalid opk.json end-to-end (python stderr passes through, rc 1)
 policy '{"containerTrees":[]}extra'
 rc_doctor "invalid JSON -> rc 1" 1 "$PROJ"
@@ -585,6 +748,34 @@ fi
 grep -qxF "handover opencode $PROJ/tree --dry-run" "$CALLS" &&
     pass "stub argv carries --dry-run" ||
     fail "stub argv carries --dry-run ($(cat "$CALLS" 2>/dev/null))"
+
+# walk-up in fix mode (#353): candidate row, prompt and the handover
+# OPERAND must all answer the DISCOVERED root -- invoked from a subdir,
+# the stub argv carries the project root's absolute tree path, never an
+# invocation-dir-relative one (the discrimination: $PROJ/sub/tree would
+# mean the tree paths resolved against the wrong root)
+atrisk_setup
+mkdir -p "$PROJ/sub"
+: >"$CALLS"
+printf 'y\n' >"$WORK/ans"
+_rd_rc=0
+_rd_out="$(
+    cd "$PROJ/sub" &&
+        OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="$STUB" \
+            NO_COLOR=1 setsid sh "$DOCTOR" fix <"$WORK/ans" 2>&1
+)" || _rd_rc=$?
+[ "$_rd_rc" = 1 ] &&
+    pass "fix via walk-up runs the stub (rc 1: tree stays at-risk)" ||
+    fail "fix via walk-up runs the stub (rc 1: tree stays at-risk, rc $_rd_rc)"
+printf '%s' "$_rd_out" | grep -qF "root via       walk-up from $PROJ/sub" &&
+    pass "fix header reports the discovered root" ||
+    fail "fix header reports the discovered root"
+printf '%s' "$_rd_out" | grep -qF "running: opk handover opencode '$PROJ/tree'" &&
+    pass "running row names the discovered-root tree" ||
+    fail "running row names the discovered-root tree"
+grep -qxF "handover opencode $PROJ/tree" "$CALLS" &&
+    pass "handover operand built from the discovered root" ||
+    fail "handover operand built from the discovered root ($(cat "$CALLS" 2>/dev/null))"
 
 # fail-loud pin (L1): a handover whose dry run fails must be SEEN
 RD_OPK="$STUB_FAIL"
@@ -834,6 +1025,65 @@ _rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTO
 printf '%s' "$_rd_out" | grep -qF "already declared (via build)" &&
     pass "covered boundary shows as already declared" ||
     fail "covered boundary shows as already declared"
+
+# walk-up in detect mode (#353): invoked from a SUBDIR, detect answers
+# the discovered root -- the parent policy's declaration covers the
+# evidence boundary. Without the walk-up the run would scan src/ alone
+# and read "no container-write evidence found" (v1 shape) -- the
+# already-declared row is the discrimination
+rm -rf "$PROCFIX"
+mkmap 42 "0 $CURUID 1"
+detproj
+printf '{"version":1,"containerTrees":[{"path":"build","note":"outputs"}]}\n' \
+    >"$PROJ/opk.json"
+_rd_rc=0
+_rd_out="$(
+    cd "$PROJ/src" &&
+        OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+            NO_COLOR=1 setsid sh "$DOCTOR" detect </dev/null 2>&1
+)" || _rd_rc=$?
+[ "$_rd_rc" = 0 ] &&
+    pass "detect via walk-up: covered evidence, rc 0" ||
+    {
+        fail "detect via walk-up: covered evidence, rc 0 (rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+printf '%s' "$_rd_out" | grep -qF "root via       walk-up from $PROJ/src" &&
+    pass "detect header reports the discovered root" ||
+    fail "detect header reports the discovered root"
+printf '%s' "$_rd_out" | grep -qF "already declared (via build)" &&
+    pass "parent declarations cover the boundary from a subdir" ||
+    fail "parent declarations cover the boundary from a subdir"
+
+# detect's WRITE answers the discovered root too (#353): a candidate
+# consented from a subdir lands in the PARENT's opk.json -- and never
+# creates one in the invocation dir (the discrimination: v1 strict-cwd
+# would write src/opk.json)
+rm -rf "$PROCFIX"
+mkmap 42 "0 $CURUID 1"
+detproj
+printf '{"version":1,"containerTrees":[{"path":"src","note":"human"}]}\n' \
+    >"$PROJ/opk.json"
+printf 'y\n' >"$WORK/ans"
+_rd_rc=0
+_rd_out="$(
+    cd "$PROJ/src" &&
+        OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+            NO_COLOR=1 setsid sh "$DOCTOR" detect <"$WORK/ans" 2>&1
+)" || _rd_rc=$?
+[ "$_rd_rc" = 0 ] &&
+    pass "detect write via walk-up: rc 0" ||
+    {
+        fail "detect write via walk-up: rc 0 (rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+grep -qF '"path": "build"' "$PROJ/opk.json" &&
+    grep -qF '"path": "src"' "$PROJ/opk.json" &&
+    pass "consented entry lands in the PARENT's opk.json" ||
+    fail "consented entry lands in the PARENT's opk.json ($(cat "$PROJ/opk.json" 2>/dev/null))"
+[ ! -e "$PROJ/src/opk.json" ] &&
+    pass "no opk.json appears in the invocation dir" ||
+    fail "no opk.json appears in the invocation dir"
 
 # no evidence at all (fixture B, no ignored paths): rc 0
 rm -rf "$PROJ"

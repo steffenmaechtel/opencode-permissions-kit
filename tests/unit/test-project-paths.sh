@@ -378,6 +378,176 @@ grep -q '_pp_agent_home' "$PATH_SANE" &&
     pass "path policy agent-home refusal getent-aware (pr-00263 a F10)" ||
     fail "path policy agent-home refusal literal-only (pr-00263 a F10)"
 
+# --- #353 / #313 phase 4: opk_policy_root — walk-up opk.json discovery ----------
+# Behavioral pins on the real shipped function (sourced, not extracted:
+# the walker must run exactly as doctor.sh and bin/opk load it). The
+# #216 structural rule extends: exactly ONE definition, and the callers
+# CALL it, never re-implement it. The count runs comment-stripped per
+# conventions.md "Source-counting pins" (#357 a C5 — the ^-anchored
+# pattern makes the rider a no-op in effect, the letter is kept).
+DOCTOR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.sh"
+OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
+_opr_defs=$(sed 's/^[[:space:]]*#.*$//' "$PATH_SANE" "$DOCTOR" "$OPK" |
+    grep -c '^opk_policy_root() {' || true)
+if [ "$_opr_defs" = 1 ] &&
+    grep -q 'opk_policy_root "$DOCTOR_ROOT"' "$DOCTOR" &&
+    grep -q 'opk_policy_root "$_ho_policy_dir"' "$OPK" &&
+    grep -q '\. "$PS_LIB"' "$DOCTOR" &&
+    grep -q 'sh/path-sane.sh' "$OPK"; then
+    pass "opk_policy_root defined once in the lib, called (not copied) by both consumers"
+else
+    fail "opk_policy_root defined once in the lib, called (not copied) by both consumers (defs=$_opr_defs)"
+fi
+
+OPRW="$(mktemp -d)"
+# widen the registration (#357 a C1): a fresh trap on the same signals
+# REPLACES the action -- registering only OPRW here dropped $_f2bW
+# (created above) from its only cleanup path, one leaked /tmp dir per
+# green run. The idiom the file documents: every scratch joins the trap
+trap 'rm -rf "$_pin_dir" "$_f2bW" "$OPRW"' EXIT INT TERM
+# shellcheck disable=SC1090
+. "$PATH_SANE"
+mkdir -p "$OPRW/proj/sub/deep" "$OPRW/other/mid"
+: >"$OPRW/proj/opk.json"
+
+# hit from depth: the project root is found upward
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/proj/sub/deep")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/proj" ]; then
+    pass "walk-up finds the root from deep inside"
+else
+    fail "walk-up finds the root from deep inside (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# hit at depth 0: the start dir itself carries the policy
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/proj")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/proj" ]; then
+    pass "start dir carrying opk.json is its own root"
+else
+    fail "start dir carrying opk.json is its own root (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# nearest wins: a nested opk.json shadows the parent's
+: >"$OPRW/proj/sub/opk.json"
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/proj/sub/deep")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/proj/sub" ]; then
+    pass "nearest opk.json wins over a parent's"
+else
+    fail "nearest opk.json wins over a parent's (rc=$_opr_rc out=$_opr_out)"
+fi
+rm -f "${OPRW:?}/proj/sub/opk.json"
+
+# no hit: rc 1, no output (the caller keeps its start dir). Environment
+# assumption (marked, L4): no opk.json exists at the mktemp ancestors
+# (/tmp, /) — the walker runs the full chain to / here
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/other/mid")" || _opr_rc=$?
+if [ "$_opr_rc" = 1 ] && [ -z "$_opr_out" ]; then
+    pass "no hit anywhere: rc 1, no output"
+else
+    fail "no hit anywhere: rc 1, no output (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# trailing slash and the root dir input stay usable (${1%/} normalizes;
+# "/" walks to its own check then stops -- no opk.json at / assumed)
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/proj/sub/")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/proj" ]; then
+    pass "trailing-slash start dir normalizes"
+else
+    fail "trailing-slash start dir normalizes (rc=$_opr_rc out=$_opr_out)"
+fi
+_opr_rc=0
+_opr_out="$(opk_policy_root /)" || _opr_rc=$?
+if [ "$_opr_rc" = 1 ] && [ -z "$_opr_out" ]; then
+    pass "'/' input: walks its own check, stops (env: no /opk.json)"
+else
+    fail "'/' input: walks its own check, stops (env: no /opk.json, rc=$_opr_rc out=$_opr_out)"
+fi
+
+# a symlinked opk.json counts ([ -f ] follows — the documented contract)
+mkdir -p "$OPRW/slink"
+printf '{"containerTrees":[]}\n' >"$OPRW/target.json"
+ln -s ../target.json "$OPRW/slink/opk.json"
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/slink")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/slink" ]; then
+    pass "symlinked opk.json counts as a hit"
+else
+    fail "symlinked opk.json counts as a hit (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# broken markers are NOT markers (#357 a B3): a dangling opk.json
+# symlink and a symlink-to-directory both fail [ -f ] — the walk
+# continues to the next ancestor, whose policy then governs (the
+# reported root is the one whose policy was read)
+mkdir -p "$OPRW/brok/sub" "$OPRW/brok2/sub"
+ln -s no-such-target "$OPRW/brok/sub/opk.json"
+: >"$OPRW/brok/opk.json"
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/brok/sub")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/brok" ]; then
+    pass "dangling opk.json symlink is no marker -- ancestor wins"
+else
+    fail "dangling opk.json symlink is no marker -- ancestor wins (rc=$_opr_rc out=$_opr_out)"
+fi
+mkdir -p "$OPRW/dirmarker"
+ln -s "$OPRW/dirmarker" "$OPRW/brok2/sub/opk.json"
+: >"$OPRW/brok2/opk.json"
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/brok2/sub")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/brok2" ]; then
+    pass "symlink-to-dir opk.json is no marker -- ancestor wins"
+else
+    fail "symlink-to-dir opk.json is no marker -- ancestor wins (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# out-of-contract input refuses, never hangs (#357 a A1): a slash-less
+# argument cannot progress through ${var%/*} -- pre-fix that looped
+# forever (timeout rc 124); the guard must answer rc 1 fast. timeout
+# needs an EXECUTABLE, so the call re-sources the lib in a child shell;
+# it is the discriminator: without it a regression would hang the suite
+# instead of reddening it. cd into scratch first: the "." pin's first
+# check reads ./opk.json at the CURRENT cwd -- an opk.json there (a kit
+# dev running the suite from a project root) would flip it
+_opr_rc=0
+_opr_out="$(
+    cd "$OPRW/other/mid" &&
+        timeout 10 sh -c '. "$1"; opk_policy_root "$2"' x "$PATH_SANE" .
+)" || _opr_rc=$?
+if [ "$_opr_rc" = 1 ] && [ -z "$_opr_out" ]; then
+    pass "slash-less input: rc 1, no output, no hang (A1)"
+else
+    fail "slash-less input: rc 1, no output, no hang (A1, rc=$_opr_rc out=$_opr_out)"
+fi
+_opr_rc=0
+_opr_out="$(
+    cd "$OPRW/other/mid" &&
+        timeout 10 sh -c '. "$1"; opk_policy_root "$2"' x "$PATH_SANE" rel/deep
+)" || _opr_rc=$?
+if [ "$_opr_rc" = 1 ] && [ -z "$_opr_out" ]; then
+    pass "relative input with slashes: refuses too, no hang (A1)"
+else
+    fail "relative input with slashes: refuses too, no hang (A1, rc=$_opr_rc out=$_opr_out)"
+fi
+
+# the widened trap survives (#357 a C1): a later trap registration
+# REPLACES the action -- the LAST rm -rf trap in this file must still
+# name every scratch dir created above it. Static on purpose: a
+# behavioral leak pin over /tmp would race foreign processes
+_opr_traps=$(grep -n "^trap 'rm -rf" "$0" | tail -1 | cut -d: -f2-)
+case "$_opr_traps" in
+    *'$_pin_dir'*'$_f2bW'*'$OPRW'*)
+        pass "final trap registration still covers every scratch dir (C1)"
+        ;;
+    *)
+        fail "final trap registration still covers every scratch dir (C1, got: $_opr_traps)"
+        ;;
+esac
+rm -rf "${OPRW:?}"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

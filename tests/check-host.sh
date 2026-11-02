@@ -104,6 +104,7 @@ check shellcheck "static analysis of the shipped scripts (make lint)" "$APT shel
 check setsid "hermetic ui tests (detach the controlling tty)" "$APT util-linux"
 check script "pty capture for prompt pins — test-ui, test-kit-cli, test-uninstall, test-browser-bridge (util-linux -qec)" "$APT util-linux"
 check seq "probes in test-skills-lint + test-line-length (pr-00263 a F26 — load-bearing counters)" "$APT coreutils"
+check timeout "no-hang discriminators in test-doctor + test-project-paths (#357 a A1 pins — rc 124 vs rc 1)" "$APT coreutils"
 
 # shfmt — the canonical format gate (make lint, issue #255 stage 0a).
 # The version pin is EXACT on purpose: 3.7.0 and 3.12.0 each reformat

@@ -560,17 +560,22 @@ rm -rf "${_ho_pin_dir:?}"
 # --- handover me: declared container-tree warning (#352 / #313 phase 3) ---------
 # Advisory warning when the takeover covers -- or sits inside -- a tree
 # the project declares in its opk.json. Fires in the UNPRIVILEGED phase
-# (so --dry-run previews it, and the sudo re-entry does not repeat it)
-# and resolves the policy STRICT-CWD: <cwd>/opk.json, the same root
-# doctor's default uses. That interplay decision is pinned here: a
-# policy in a PARENT directory does not warn (v1; phase 4's walk-up
-# discovery moves doctor and this warning at their one shared
-# resolution site, not per-command).
+# (so --dry-run previews it, and the sudo re-entry does not repeat it).
+# Policy resolution is WALK-UP discovery since phase 4 (#353): from the
+# cwd upward, the NEAREST opk.json wins — the same shared resolution
+# site doctor's default uses (sh/path-sane.sh's opk_policy_root, one
+# implementation for both commands, not per-command copies).
 HO_PROJ="$WORK/ho-proj"
 mkdir -p "$HO_PROJ/tree/sub" "$HO_PROJ/other"
 : >"$HO_PROJ/tree/sub/file"
 printf '{"version":1,"containerTrees":[{"path":"tree","note":"build outputs"}]}\n' \
     >"$HO_PROJ/opk.json"
+# The warning's policy resolution lives in sh/path-sane.sh since #353 —
+# the fake lib above ships only bin/opk + management stubs, so the leaf
+# lib must be present or every pin below exercises the degraded
+# strict-cwd fallback instead of the walk-up
+mkdir -p "$LIB/sh"
+cp "$(dirname "$(dirname "$KIT")")/sh/path-sane.sh" "$LIB/sh/path-sane.sh"
 _ho_warn_run() { # <cwd> <args...> — opk handover from <cwd>, output+rc
     _hw_dir="$1"
     shift
@@ -632,19 +637,70 @@ case "$out" in
         ;;
 esac
 
-# strict-cwd (the pinned phase-4 interplay): a policy in the PARENT of
-# the cwd is not read -- run from tree/, the project policy sits above
+# walk-up (#353): a policy in a PARENT of the cwd IS read -- run from
+# tree/, the project policy sits one level above and the operand sub is
+# inside its declared tree. v1 stayed strict-cwd here; phase 4 flipped
+# the pin (the flipped direction is the discrimination: strict-cwd
+# again and this goes red)
 out="$(_ho_warn_run "$HO_PROJ/tree" me sub --dry-run)" || true
-case "$out" in
-    *"takes back the declared container tree"*)
-        echo "  ${RED}FAIL${NC}  v1 strict-cwd: parent-dir policy does not warn"
-        failures=$((failures + 1))
-        ;;
-    *)
-        echo "  ${GREEN}PASS${NC}  v1 strict-cwd: parent-dir policy does not warn"
-        passed=$((passed + 1))
-        ;;
-esac
+if printf '%s' "$out" | grep -qF "takes back the declared container tree 'tree'"; then
+    echo "  ${GREEN}PASS${NC}  walk-up: parent-dir policy warns (phase 4 discovery)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  walk-up: parent-dir policy warns (phase 4 discovery, got: $out)"
+    failures=$((failures + 1))
+fi
+
+# nearest wins (#353): a NESTED opk.json shadows the parent's — from
+# tree/sub/ with its own (non-overlapping) policy, the parent's 'tree'
+# declaration must NOT warn; delete the nested file and the same run
+# warns through the parent (the pair discriminates in both directions).
+# Operand 'file' overlaps NEITHER 'elsewhere' (the nested declaration)
+# nor anything else -- a 'me .' here would cover every nested tree by
+# definition and warn through both policies
+printf '{"containerTrees":["elsewhere"]}\n' >"$HO_PROJ/tree/sub/opk.json"
+out="$(_ho_warn_run "$HO_PROJ/tree/sub" me file --dry-run)" || true
+if printf '%s' "$out" | grep -qF "takes back the declared container tree"; then
+    echo "  ${RED}FAIL${NC}  nearest wins: nested policy shadows the parent (no warn)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  nearest wins: nested policy shadows the parent (no warn)"
+    passed=$((passed + 1))
+fi
+rm -f "${HO_PROJ:?}/tree/sub/opk.json"
+out="$(_ho_warn_run "$HO_PROJ/tree/sub" me file --dry-run)" || true
+if printf '%s' "$out" | grep -qF "takes back the declared container tree 'tree'"; then
+    echo "  ${GREEN}PASS${NC}  nearest gone: the parent policy warns again"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  nearest gone: the parent policy warns again (got: $out)"
+    failures=$((failures + 1))
+fi
+
+# degraded lib (L1 pin for the #353 fallback): path-sane.sh missing —
+# the dispatcher must keep working and the warning falls back to v1
+# strict-cwd (a SUBSET: it then only sees a policy in the cwd itself;
+# the parent policy here must NOT warn). A missing leaf lib may never
+# crash a takeover preview
+HO_DEG="$WORK/ho-degraded-lib"
+mkdir -p "$HO_DEG/bin" "$HO_DEG/sh"
+cp "$BIN/opk" "$HO_DEG/bin/opk"
+cp "$(dirname "$(dirname "$KIT")")/sh/ui.sh" "$HO_DEG/sh/ui.sh"
+(
+    cd "$HO_PROJ/tree" &&
+        OPK_INSTALL_CONF="$WORK/install.conf" NO_COLOR=1 \
+            "$HO_DEG/bin/opk" handover me sub --dry-run 2>&1
+) >"$WORK/ho-deg.log" || true
+deg_out="$(cat "$WORK/ho-deg.log")"
+if printf '%s' "$deg_out" | grep -qF "would hand over" &&
+    ! printf '%s' "$deg_out" | grep -qF "takes back the declared container tree"; then
+    echo "  ${GREEN}PASS${NC}  degraded lib: strict-cwd fallback, handover preview intact"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  degraded lib: strict-cwd fallback, handover preview intact (got: $deg_out)"
+    failures=$((failures + 1))
+fi
+rm -rf "${HO_DEG:?}" "${WORK:?}/ho-deg.log"
 
 # broken opk.json: the advisory read fails loudly (warn row), the
 # handover itself proceeds -- a broken policy file never blocks a takeover
