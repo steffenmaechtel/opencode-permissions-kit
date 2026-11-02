@@ -1,14 +1,22 @@
 # shellcheck shell=sh
 # opencode permissions kit -- path-sane.sh
 #
-# Shared project-root policy gate — ONE implementation for install.sh
-# (do_plan_phase: --projects validation, the standard prompt, the custom
-# dialog) and config.sh (projects add/remove, handover): the function
-# existed verbatim in both, kept only because sourcing config.sh itself
-# from install.sh is impossible — a management script with side effects
+# Shared project-root policy — TWO leaf functions:
+#   project_path_sane  the system-path gate (below)
+#   opk_policy_root    walk-up opk.json discovery (#353 / #313 phase 4)
+# project_path_sane has ONE implementation for install.sh (do_plan_phase:
+# --projects validation, the standard prompt, the custom dialog) and
+# config.sh (projects add/remove, handover): the function existed
+# verbatim in both, kept only because sourcing config.sh itself from
+# install.sh is impossible — a management script with side effects
 # (arg parsing, install.conf, die). A leaf lib is not: install.sh
 # already sources a dozen of them (issue #216; the earlier keep-duplication
 # dispositions were PR #109 C15 and PR #211 a F32).
+# opk_policy_root exists for the same reason: doctor.sh and the bin/opk
+# handover-me warning must resolve the policy root through ONE shared
+# site (#353: the phase-3 comment pinned "moves doctor and this warning
+# at their one shared resolution site, not per-command" — a per-command
+# copy would be the #216 duplication class reborn).
 #
 # WHY THIS IS LOAD-BEARING: project_path_sane bounds the recursive group
 # baseline (chgrp -R + setfacl -R, run as root over every project root)
@@ -97,4 +105,43 @@ project_path_sane() {
         echo "  warn     '$PROJECT_TILDE_HOME' is your whole home — the agent gains group-write over it" >&2
     fi
     return 0
+}
+
+# opk_policy_root <start-dir>                                    (#353)
+# Walk-up opk.json discovery, like git locates .git: from <start-dir>
+# upward to /, the FIRST directory carrying an opk.json wins — the
+# NEAREST policy governs (a nested project with its own opk.json
+# shadows any parent's, exactly like nested git repos). The opk.json
+# marker IS the project registration (#313 phase 5), so no other stop
+# condition exists: no .git boundary (the policy is deliberately
+# git-independent — detect works without git), no depth limit.
+#
+# Contract:
+#   - <start-dir> must be ABSOLUTE and normalized (no "..", no trailing
+#     slash beyond one, no symlinks needing resolution) — both callers
+#     realpath'd before calling; the function is pure parameter
+#     expansion + test, no cd, no external command.
+#   - prints the discovered root and returns 0 when an opk.json was
+#     found (start dir included — a hit at depth 0 prints <start-dir>);
+#     prints nothing and returns 1 when no opk.json exists anywhere on
+#     the chain (the caller keeps its start dir, the v1 strict shape).
+#   - a SYMLINKED opk.json counts ([ -f ] follows): reading through a
+#     link is accepted v1 behavior at the project root; only detect's
+#     WRITER refuses links.
+#   - set -e safe: no bare `cmd && act` chains (a failed test would
+#     abort the sourcing shell mid-walk).
+opk_policy_root() {
+    _opr_dir="${1%/}"
+    if [ -z "$_opr_dir" ]; then _opr_dir="/"; fi
+    while :; do
+        if [ -f "$_opr_dir/opk.json" ]; then
+            printf '%s\n' "$_opr_dir"
+            return 0
+        fi
+        if [ "$_opr_dir" = "/" ]; then
+            return 1
+        fi
+        _opr_dir="${_opr_dir%/*}"
+        if [ -z "$_opr_dir" ]; then _opr_dir="/"; fi
+    done
 }

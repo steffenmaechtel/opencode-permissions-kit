@@ -63,6 +63,20 @@ else
     }
 fi
 
+# Walk-up opk.json discovery (#353 / #313 phase 4) — the SAME leaf lib
+# doctor.sh resolves through (one shared resolution site, not a
+# per-command copy; see sh/path-sane.sh). Used by the 'handover me'
+# declared-tree warning. A damaged library degrades that warning to v1
+# strict-cwd (a SUBSET: it then only sees a policy in the cwd itself)
+# — advisory-only, so the dispatcher keeps working; every other
+# subcommand is unaffected.
+_OPK_POLICY_ROOT=0
+if [ -f "$LIBDIR/sh/path-sane.sh" ]; then
+    # shellcheck disable=SC1090
+    . "$LIBDIR/sh/path-sane.sh"
+    _OPK_POLICY_ROOT=1
+fi
+
 # OpenChamber bypass-binary probe (0.0.47a F3): shared semantics with the
 # wrapper's guard — a file at ~/.opencode/bin/<name> that symlinks to the
 # kit wrapper is NOT a bypass binary (never listed, never removed).
@@ -584,15 +598,22 @@ PYEOF
         # ownership state doctor classifies (#312: 'handover me' over
         # the whole project re-poisons container-written outputs; a
         # partial takeover inside a declared tree does the same).
-        # Resolution is STRICT-CWD by v1 design: the policy is read at
-        # <cwd>/opk.json, the same root doctor's default uses -- phase
-        # 4's walk-up discovery moves doctor and this warning at their
-        # one shared resolution site, not per-command. Advisory only:
-        # it never blocks, and fires in --dry-run too (the dry run
+        # Resolution is walk-up discovery since phase 4 (#353): the
+        # policy is found the way doctor finds it by default -- from
+        # the cwd upward, the NEAREST opk.json wins (a nested project
+        # shadows any parent's) -- through the ONE shared leaf lib
+        # (sh/path-sane.sh), not a per-command copy. No hit anywhere:
+        # nothing to compare, no row (v1 shape). Advisory only: it
+        # never blocks, and fires in --dry-run too (the dry run
         # previews what the real run does, 0.0.39i F4 class). The root
         # re-entry skips it -- the unprivileged pass showed it already.
         if [ "$_ho_target" = me ] && [ "${OPK_HANDOVER_ROOT:-}" != 1 ]; then
             _ho_policy_dir="$(realpath -m . 2>/dev/null || printf '%s' "$PWD")"
+            if [ "$_OPK_POLICY_ROOT" = 1 ]; then
+                if _ho_found="$(opk_policy_root "$_ho_policy_dir")"; then
+                    _ho_policy_dir="$_ho_found"
+                fi
+            fi
             if [ -f "$_ho_policy_dir/opk.json" ]; then
                 # tolerant advisory read (doctor's strict validation is
                 # deliberately not duplicated -- but the policy shapes

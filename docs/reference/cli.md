@@ -81,12 +81,22 @@ Windows-side elevation through ddev itself).
 ## doctor
 
 Per-project deep diagnosis for the rootless ownership failure class
-(read-only, no sudo — run it in the project root):
+(read-only, no sudo — run it anywhere inside the project):
 
 ```bash
-opk doctor                       # the current directory
+opk doctor                       # anywhere inside the project
 opk doctor /var/www/vhosts/<project>
 ```
+
+Without a path argument, doctor searches **upward** from the current
+directory for the project's `opk.json` — like git locates `.git`: the
+nearest one wins, a nested `opk.json` shadows any parent's, and the
+filesystem root is the stop. The header reports the root it used
+(`project root` plus a `root via` row naming the directory the walk
+started from), and every declared tree path resolves against exactly
+that root. With an explicit path argument that path **is** the project
+root — no discovery runs, so scripts get predictable behavior (a named
+directory without an `opk.json` says so, naming nothing above it).
 
 Classifies every entry in the **container trees** the project declares in
 its `opk.json` (format below) as **mapped-safe** or **at-risk**: under the
@@ -100,8 +110,8 @@ correctly (the "container build fails with EPERM ... futime" entry in
 [Troubleshooting](../troubleshooting.md)). Every finding names the guided
 remedy (`opk doctor fix`); the scan itself never changes anything — the
 guided remedy is [`doctor fix`](#doctor-fix) below, and for a project
-without an `opk.json` yet the scan says so and points at
-[`doctor detect`](#doctor-detect).
+without an `opk.json` yet the scan says so — including how far up it
+searched — and points at [`doctor detect`](#doctor-detect).
 
 The mapped-uid set is resolved from the **live user namespaces**: every
 process carries its `uid_map` in `/proc`, world-readable, so no docker
@@ -120,7 +130,7 @@ at-risk finding(s), a rejected `opk.json`, or a degraded-install error
 The guided remedy for the at-risk findings of the same scan:
 
 ```bash
-opk doctor fix                 # in the project dir (or: opk doctor fix <path>)
+opk doctor fix                 # anywhere inside the project (or: fix <path>)
 opk doctor fix --dry-run       # show what would run, change nothing
 ```
 
@@ -162,7 +172,7 @@ Proposes `opk.json` entries from **ownership evidence** — for the fresh
 project that has no policy yet, or one that grew a new build tree:
 
 ```bash
-opk doctor detect              # in the project dir (or: opk doctor detect <path>)
+opk doctor detect              # anywhere inside the project (or: detect <path>)
 ```
 
 Detect walks the project (skipping `.git`) and classifies every entry's
@@ -240,7 +250,9 @@ nothing except the consented `opk.json` writes.
   — policy paths flow into fix-mode prompts and command rows
   (`would run:` / `running:`), so the policy gate keeps them out
   entirely. A bare string entry (`"some/path"`) works too when a tree
-  needs no note.
+  needs no note. The project root is the directory whose `opk.json`
+  was read — with walk-up discovery that is the discovered root, never
+  the directory you invoked doctor from.
 
 ## handover
 
@@ -318,12 +330,14 @@ opk handover me . --dry-run
 ```
 
 The warning is advisory (the handover proceeds), fires before any sudo hop
-— so `--dry-run` previews it too — and reads the policy at `<cwd>/opk.json`
-exactly where [`opk doctor`](#doctor) reads it by default. A broken
-`opk.json` skips the warning with a warn row instead of blocking the
-takeover. After such a takeover, re-run `opk doctor`: the at-risk rows it
-reports are precisely the re-poisoned state, and `opk doctor fix` offers
-the remedy per tree.
+— so `--dry-run` previews it too — and finds the policy exactly the way
+[`opk doctor`](#doctor) does by default: searching upward from the
+current directory, the nearest `opk.json` wins, and the declared paths
+anchor at that root — not at the cwd. A broken `opk.json` skips the
+warning with a warn row instead of blocking the takeover. After such a
+takeover, re-run `opk doctor`: the at-risk rows it reports are
+precisely the re-poisoned state, and `opk doctor fix` offers the
+remedy per tree.
 
 The
 sibling command `opk config handover <project-root>` covers ddev's own

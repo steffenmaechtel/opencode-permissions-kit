@@ -378,6 +378,102 @@ grep -q '_pp_agent_home' "$PATH_SANE" &&
     pass "path policy agent-home refusal getent-aware (pr-00263 a F10)" ||
     fail "path policy agent-home refusal literal-only (pr-00263 a F10)"
 
+# --- #353 / #313 phase 4: opk_policy_root — walk-up opk.json discovery ----------
+# Behavioral pins on the real shipped function (sourced, not extracted:
+# the walker must run exactly as doctor.sh and bin/opk load it). The
+# #216 structural rule extends: exactly ONE definition, and the callers
+# CALL it, never re-implement it.
+DOCTOR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.sh"
+OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
+_opr_defs=$(grep -c '^opk_policy_root() {' "$PATH_SANE" "$DOCTOR" "$OPK" |
+    awk -F: '{ s += $2 } END { print s }')
+if [ "$_opr_defs" = 1 ] &&
+    grep -q 'opk_policy_root "$DOCTOR_ROOT"' "$DOCTOR" &&
+    grep -q 'opk_policy_root "$_ho_policy_dir"' "$OPK" &&
+    grep -q '\. "$PS_LIB"' "$DOCTOR" &&
+    grep -q 'sh/path-sane.sh' "$OPK"; then
+    pass "opk_policy_root defined once in the lib, called (not copied) by both consumers"
+else
+    fail "opk_policy_root defined once in the lib, called (not copied) by both consumers (defs=$_opr_defs)"
+fi
+
+OPRW="$(mktemp -d)"
+trap 'rm -rf "${OPRW:-}"' EXIT INT TERM
+# shellcheck disable=SC1090
+. "$PATH_SANE"
+mkdir -p "$OPRW/proj/sub/deep" "$OPRW/other/mid"
+: >"$OPRW/proj/opk.json"
+
+# hit from depth: the project root is found upward
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/proj/sub/deep")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/proj" ]; then
+    pass "walk-up finds the root from deep inside"
+else
+    fail "walk-up finds the root from deep inside (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# hit at depth 0: the start dir itself carries the policy
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/proj")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/proj" ]; then
+    pass "start dir carrying opk.json is its own root"
+else
+    fail "start dir carrying opk.json is its own root (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# nearest wins: a nested opk.json shadows the parent's
+: >"$OPRW/proj/sub/opk.json"
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/proj/sub/deep")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/proj/sub" ]; then
+    pass "nearest opk.json wins over a parent's"
+else
+    fail "nearest opk.json wins over a parent's (rc=$_opr_rc out=$_opr_out)"
+fi
+rm -f "${OPRW:?}/proj/sub/opk.json"
+
+# no hit: rc 1, no output (the caller keeps its start dir). Environment
+# assumption (marked, L4): no opk.json exists at the mktemp ancestors
+# (/tmp, /) — the walker runs the full chain to / here
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/other/mid")" || _opr_rc=$?
+if [ "$_opr_rc" = 1 ] && [ -z "$_opr_out" ]; then
+    pass "no hit anywhere: rc 1, no output"
+else
+    fail "no hit anywhere: rc 1, no output (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# trailing slash and the root dir input stay usable (${1%/} normalizes;
+# "/" walks to its own check then stops -- no opk.json at / assumed)
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/proj/sub/")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/proj" ]; then
+    pass "trailing-slash start dir normalizes"
+else
+    fail "trailing-slash start dir normalizes (rc=$_opr_rc out=$_opr_out)"
+fi
+_opr_rc=0
+_opr_out="$(opk_policy_root /)" || _opr_rc=$?
+if [ "$_opr_rc" = 1 ] && [ -z "$_opr_out" ]; then
+    pass "'/' input: walks its own check, stops (env: no /opk.json)"
+else
+    fail "'/' input: walks its own check, stops (env: no /opk.json, rc=$_opr_rc out=$_opr_out)"
+fi
+
+# a symlinked opk.json counts ([ -f ] follows — the documented contract)
+mkdir -p "$OPRW/slink"
+printf '{"containerTrees":[]}\n' >"$OPRW/target.json"
+ln -s ../target.json "$OPRW/slink/opk.json"
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/slink")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/slink" ]; then
+    pass "symlinked opk.json counts as a hit"
+else
+    fail "symlinked opk.json counts as a hit (rc=$_opr_rc out=$_opr_out)"
+fi
+rm -rf "${OPRW:?}"
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "${RED}$failures test(s) failed${NC}"

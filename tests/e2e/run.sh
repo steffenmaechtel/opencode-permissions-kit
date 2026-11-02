@@ -1352,6 +1352,23 @@ check "12n: the at-risk hint stays the guided remedy, not the raw handover comma
     E 'grep -qF "fix: opk doctor fix" /tmp/ddet-poison.log && ! grep -qF "fix: sudo opk handover opencode" /tmp/ddet-poison.log'
 E 'rm -rf /var/www/vhosts/doctor-det /tmp/ddet-*.log'
 
+echo "--- 12o. opk doctor walk-up discovery (issue #353 / #313 phase 4) ---"
+# Deployed-layout proof of the walk-up at depth > 0: invoked from a
+# subdir, both doctor and the handover-me warning resolve the policy
+# root upward (nearest opk.json). The unit pins cover the path logic;
+# this proves the DEPLOYED library carries the shared leaf lib
+# (sh/path-sane.sh) through install/update.
+E 'mkdir -p /var/www/vhosts/doctor-walk/tree/deep'
+E 'printf "%s\n" "{\"version\":1,\"containerTrees\":[{\"path\":\"tree\",\"note\":\"outputs\"}]}" >/var/www/vhosts/doctor-walk/opk.json'
+E 'echo out >/var/www/vhosts/doctor-walk/tree/app.min.js'
+check "12o: scan from a subdir discovers the root and reports it" \
+    E 'cd /var/www/vhosts/doctor-walk/tree/deep && opk doctor >/tmp/dwalk-scan.log 2>&1; test $? -eq 1 && grep -qF "project root   /var/www/vhosts/doctor-walk" /tmp/dwalk-scan.log && grep -qF "root via       walk-up from /var/www/vhosts/doctor-walk/tree/deep" /tmp/dwalk-scan.log'
+check "12o: the declared tree verdict resolves against the discovered root" \
+    E 'grep -q "tree -- .* entries at-risk" /tmp/dwalk-scan.log'
+check "12o: handover me from inside the declared tree warns via walk-up" \
+    E 'cd /var/www/vhosts/doctor-walk/tree/deep && opk handover me . --dry-run >/tmp/dwalk-ho.log 2>&1; test $? -eq 0 && grep -q "takes back the declared container tree .tree." /tmp/dwalk-ho.log'
+E 'rm -rf /var/www/vhosts/doctor-walk /tmp/dwalk-*.log'
+
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' &&
