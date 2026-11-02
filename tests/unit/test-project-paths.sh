@@ -382,11 +382,13 @@ grep -q '_pp_agent_home' "$PATH_SANE" &&
 # Behavioral pins on the real shipped function (sourced, not extracted:
 # the walker must run exactly as doctor.sh and bin/opk load it). The
 # #216 structural rule extends: exactly ONE definition, and the callers
-# CALL it, never re-implement it.
+# CALL it, never re-implement it. The count runs comment-stripped per
+# conventions.md "Source-counting pins" (#357 a C5 — the ^-anchored
+# pattern makes the rider a no-op in effect, the letter is kept).
 DOCTOR="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/doctor.sh"
 OPK="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
-_opr_defs=$(grep -c '^opk_policy_root() {' "$PATH_SANE" "$DOCTOR" "$OPK" |
-    awk -F: '{ s += $2 } END { print s }')
+_opr_defs=$(sed 's/^[[:space:]]*#.*$//' "$PATH_SANE" "$DOCTOR" "$OPK" |
+    grep -c '^opk_policy_root() {' || true)
 if [ "$_opr_defs" = 1 ] &&
     grep -q 'opk_policy_root "$DOCTOR_ROOT"' "$DOCTOR" &&
     grep -q 'opk_policy_root "$_ho_policy_dir"' "$OPK" &&
@@ -398,7 +400,11 @@ else
 fi
 
 OPRW="$(mktemp -d)"
-trap 'rm -rf "${OPRW:-}"' EXIT INT TERM
+# widen the registration (#357 a C1): a fresh trap on the same signals
+# REPLACES the action -- registering only OPRW here dropped $_f2bW
+# (created above) from its only cleanup path, one leaked /tmp dir per
+# green run. The idiom the file documents: every scratch joins the trap
+trap 'rm -rf "$_pin_dir" "$_f2bW" "$OPRW"' EXIT INT TERM
 # shellcheck disable=SC1090
 . "$PATH_SANE"
 mkdir -p "$OPRW/proj/sub/deep" "$OPRW/other/mid"
@@ -472,6 +478,74 @@ if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/slink" ]; then
 else
     fail "symlinked opk.json counts as a hit (rc=$_opr_rc out=$_opr_out)"
 fi
+
+# broken markers are NOT markers (#357 a B3): a dangling opk.json
+# symlink and a symlink-to-directory both fail [ -f ] — the walk
+# continues to the next ancestor, whose policy then governs (the
+# reported root is the one whose policy was read)
+mkdir -p "$OPRW/brok/sub" "$OPRW/brok2/sub"
+ln -s no-such-target "$OPRW/brok/sub/opk.json"
+: >"$OPRW/brok/opk.json"
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/brok/sub")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/brok" ]; then
+    pass "dangling opk.json symlink is no marker -- ancestor wins"
+else
+    fail "dangling opk.json symlink is no marker -- ancestor wins (rc=$_opr_rc out=$_opr_out)"
+fi
+mkdir -p "$OPRW/dirmarker"
+ln -s "$OPRW/dirmarker" "$OPRW/brok2/sub/opk.json"
+: >"$OPRW/brok2/opk.json"
+_opr_rc=0
+_opr_out="$(opk_policy_root "$OPRW/brok2/sub")" || _opr_rc=$?
+if [ "$_opr_rc" = 0 ] && [ "$_opr_out" = "$OPRW/brok2" ]; then
+    pass "symlink-to-dir opk.json is no marker -- ancestor wins"
+else
+    fail "symlink-to-dir opk.json is no marker -- ancestor wins (rc=$_opr_rc out=$_opr_out)"
+fi
+
+# out-of-contract input refuses, never hangs (#357 a A1): a slash-less
+# argument cannot progress through ${var%/*} -- pre-fix that looped
+# forever (timeout rc 124); the guard must answer rc 1 fast. timeout
+# needs an EXECUTABLE, so the call re-sources the lib in a child shell;
+# it is the discriminator: without it a regression would hang the suite
+# instead of reddening it. cd into scratch first: the "." pin's first
+# check reads ./opk.json at the CURRENT cwd -- an opk.json there (a kit
+# dev running the suite from a project root) would flip it
+_opr_rc=0
+_opr_out="$(
+    cd "$OPRW/other/mid" &&
+        timeout 10 sh -c '. "$1"; opk_policy_root "$2"' x "$PATH_SANE" .
+)" || _opr_rc=$?
+if [ "$_opr_rc" = 1 ] && [ -z "$_opr_out" ]; then
+    pass "slash-less input: rc 1, no output, no hang (A1)"
+else
+    fail "slash-less input: rc 1, no output, no hang (A1, rc=$_opr_rc out=$_opr_out)"
+fi
+_opr_rc=0
+_opr_out="$(
+    cd "$OPRW/other/mid" &&
+        timeout 10 sh -c '. "$1"; opk_policy_root "$2"' x "$PATH_SANE" rel/deep
+)" || _opr_rc=$?
+if [ "$_opr_rc" = 1 ] && [ -z "$_opr_out" ]; then
+    pass "relative input with slashes: refuses too, no hang (A1)"
+else
+    fail "relative input with slashes: refuses too, no hang (A1, rc=$_opr_rc out=$_opr_out)"
+fi
+
+# the widened trap survives (#357 a C1): a later trap registration
+# REPLACES the action -- the LAST rm -rf trap in this file must still
+# name every scratch dir created above it. Static on purpose: a
+# behavioral leak pin over /tmp would race foreign processes
+_opr_traps=$(grep -n "^trap 'rm -rf" "$0" | tail -1 | cut -d: -f2-)
+case "$_opr_traps" in
+    *'$_pin_dir'*'$_f2bW'*'$OPRW'*)
+        pass "final trap registration still covers every scratch dir (C1)"
+        ;;
+    *)
+        fail "final trap registration still covers every scratch dir (C1, got: $_opr_traps)"
+        ;;
+esac
 rm -rf "${OPRW:?}"
 
 echo ""

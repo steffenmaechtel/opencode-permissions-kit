@@ -91,12 +91,19 @@ opk doctor /var/www/vhosts/<project>
 Without a path argument, doctor searches **upward** from the current
 directory for the project's `opk.json` — like git locates `.git`: the
 nearest one wins, a nested `opk.json` shadows any parent's, and the
-filesystem root is the stop. The header reports the root it used
-(`project root` plus a `root via` row naming the directory the walk
-started from), and every declared tree path resolves against exactly
-that root. With an explicit path argument that path **is** the project
-root — no discovery runs, so scripts get predictable behavior (a named
-directory without an `opk.json` says so, naming nothing above it).
+filesystem root is the stop. A marker is a readable regular file (a
+symlink to one counts; a dangling symlink or a directory named
+`opk.json` does not — discovery continues to the next ancestor, and
+that ancestor's policy governs). The header reports the root it used:
+the `project root` row, plus — when the discovered root differs from
+the directory you invoked from — a `root via` row naming that
+directory (invoking the project root itself prints no extra row).
+Every declared tree path resolves against exactly that root. With an
+explicit path argument that path **is** the project root — no
+discovery runs, so scripts get predictable behavior (a named directory
+without an `opk.json` says so, naming nothing above it). The spellings
+`.` and `./` count as "no argument" and walk up; any other form —
+`./.` included — is an explicit root.
 
 Classifies every entry in the **container trees** the project declares in
 its `opk.json` (format below) as **mapped-safe** or **at-risk**: under the

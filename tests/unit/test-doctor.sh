@@ -523,6 +523,45 @@ fi
 rc_doctor_in "plain '.' walks up -> rc 0" 0 "$PROJ/sub/deep" .
 grep_last_out "dot invocation discovers the root" grep -qF "root via       walk-up from $PROJ/sub/deep"
 
+# the spelling contract (#357 a A2): './' shares the default arm;
+# './.' does NOT -- it is an explicit root and gets strict v1 behavior.
+# Pinned so the split is contract, not accident
+rc_doctor_in "'./' walks up like the bare dot -> rc 0" 0 "$PROJ/sub/deep" ./
+grep_last_out "slash-dot invocation discovers the root" grep -qF "root via       walk-up from $PROJ/sub/deep"
+rc_doctor_in "'./.' is an explicit root: strict, rc 2" 2 "$PROJ/sub/deep" ./.
+grep_last_out "dot-dot-slash keeps the plain v1 warn" \
+    grep -qF "no opk.json found in $PROJ/sub/deep -- nothing to check"
+
+# realpath absent (#357 a A1, the fallback arm's class): the fallback
+# re-feeds the raw arg -- the cd+pwd normalization must turn "." into
+# the absolute invocation dir so the walk still finds the project root.
+# A failing realpath stub shadows the real binary via PATH; timeout is
+# the discriminator (pre-fix this HUNG: the walker looped on the
+# slash-less input)
+A1BIN="$WORK/a1-bin"
+mkdir -p "$A1BIN"
+for _a1t in dirname sed tail id mktemp awk sort find python3 grep wc; do
+    ln -s "$(command -v "$_a1t")" "$A1BIN/$_a1t"
+done
+printf '#!/bin/sh\nexit 1\n' >"$A1BIN/realpath"
+chmod +x "$A1BIN/realpath"
+_rd_rc=0
+_rd_out="$(
+    cd "$PROJ/sub/deep" &&
+        PATH="$A1BIN:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+            OPK_DOCTOR_OPK="" NO_COLOR=1 timeout 30 sh "$DOCTOR" </dev/null 2>&1
+)" || _rd_rc=$?
+[ "$_rd_rc" = 0 ] &&
+    pass "realpath absent: cd+pwd normalizes, walk-up still finds the root (A1)" ||
+    {
+        fail "realpath absent: cd+pwd normalizes, walk-up still finds the root (A1, rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+printf '%s' "$_rd_out" | grep -qF "root via       walk-up from $PROJ/sub/deep" &&
+    pass "A1 arm: header still reports the discovered root" ||
+    fail "A1 arm: header still reports the discovered root"
+rm -rf "${A1BIN:?}"
+
 # static order pin (stripped source, the B1 precedent): the walk-up
 # must sit BEFORE the detect gates -- a discovered root of '/' must hit
 # the detect refusal, not slip past a gate that ran on the start dir
@@ -717,7 +756,6 @@ grep -qxF "handover opencode $PROJ/tree --dry-run" "$CALLS" &&
 # mean the tree paths resolved against the wrong root)
 atrisk_setup
 mkdir -p "$PROJ/sub"
-RD_OPK="$STUB"
 : >"$CALLS"
 printf 'y\n' >"$WORK/ans"
 _rd_rc=0

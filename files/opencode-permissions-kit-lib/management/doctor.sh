@@ -63,9 +63,10 @@
 #       opk doctor fix [project-root] [--dry-run]  orchestrate the fixes
 #       opk doctor detect [project-root]           propose opk.json entries
 # Root resolution (#353 / #313 phase 4): without a positional (a plain
-# '.' counts as none) the root is DISCOVERED upward from the cwd like
-# git locates .git -- nearest opk.json wins, the used root is reported;
-# an explicit positional is authoritative, no discovery.
+# '.' or './' counts as none -- other dot-spellings like './.' are
+# explicit roots, #357 a A2) the root is DISCOVERED upward from the cwd
+# like git locates .git -- nearest opk.json wins, the used root is
+# reported; an explicit positional is authoritative, no discovery.
 # Exit codes (the status.sh contract): 0 all declared trees healthy
 #      (post-fix, for 'fix'), or detect found nothing / wrote every
 #      proposed entry, 1 at-risk finding(s) remain -- declined,
@@ -156,6 +157,21 @@ for _do_arg in "$@"; do
 done
 DOCTOR_ROOT="${DOCTOR_ROOT:-.}"
 DOCTOR_ROOT="$(realpath -m "$DOCTOR_ROOT" 2>/dev/null || printf '%s' "$DOCTOR_ROOT")"
+# (#357 a A1): the fallback arm re-feeds the RAW argument -- with
+# realpath absent or failing (deleted cwd) that is a relative path, and
+# the walk-up below must never receive one: the walker refuses
+# slash-less input (its belt), but a relative path with slashes would
+# silently walk the wrong chain. cd+pwd is the shell-native
+# normalization for an existing directory (the -d gate below has not
+# run yet -- a cd failure leaves the raw value to that gate; when even
+# cd fails, the walker's belt ends the attempt without a hang).
+case "$DOCTOR_ROOT" in
+    /*) ;;
+    *)
+        _dr_norm="$(cd "$DOCTOR_ROOT" 2>/dev/null && pwd)" &&
+            DOCTOR_ROOT="$_dr_norm"
+        ;;
+esac
 if [ ! -d "$DOCTOR_ROOT" ]; then
     ui_error "doctor: no such directory: $DOCTOR_ROOT"
     exit 64
@@ -174,8 +190,11 @@ fi
 # authoritative -- no discovery: a named root with no opk.json keeps
 # the v1 warning (scripting predictability; the tree paths you
 # declared resolve against exactly the root you named).
-# DOCTOR_WALKED marks that a walk was attempted and found nothing --
-# the no-policy warning below then says what was searched.
+# DOCTOR_WALKED marks that a walk was ATTEMPTED -- set before the walk
+# runs and regardless of its outcome (#357 a C2 comment truth); its
+# only consumer sits inside the no-policy branch below, so it matters
+# exactly when the walk found nothing, and the warning then says what
+# was searched.
 DOCTOR_START_DIR=""
 DOCTOR_DISCOVERED=0
 DOCTOR_WALKED=0

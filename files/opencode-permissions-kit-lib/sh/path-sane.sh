@@ -121,13 +121,23 @@ project_path_sane() {
 #     slash beyond one, no symlinks needing resolution) — both callers
 #     realpath'd before calling; the function is pure parameter
 #     expansion + test, no cd, no external command.
+#   - OUT-OF-CONTRACT INPUT never hangs (#357 a A1): a slash-less
+#     string ("." or any relative name) cannot progress through
+#     ${var%/*} — the walk refuses with rc 1 instead of looping
+#     forever (the belt behind the callers' normalization; output
+#     normalization stays the caller's job, a hit echoes the input
+#     verbatim, #357 a A4).
 #   - prints the discovered root and returns 0 when an opk.json was
 #     found (start dir included — a hit at depth 0 prints <start-dir>);
 #     prints nothing and returns 1 when no opk.json exists anywhere on
 #     the chain (the caller keeps its start dir, the v1 strict shape).
-#   - a SYMLINKED opk.json counts ([ -f ] follows): reading through a
-#     link is accepted v1 behavior at the project root; only detect's
-#     WRITER refuses links.
+#   - a marker is a READABLE REGULAR FILE through symlinks ([ -f ]):
+#     a dangling opk.json symlink, or a symlink to a directory, is NOT
+#     a marker — the walk continues to the next ancestor and that
+#     ancestor's policy governs (#357 a B3: deliberately; the reported
+#     root is the one whose policy was read). Reading through a
+#     symlink to a regular file is accepted v1 behavior at the project
+#     root; only detect's WRITER refuses links.
 #   - set -e safe: no bare `cmd && act` chains (a failed test would
 #     abort the sourcing shell mid-walk).
 opk_policy_root() {
@@ -141,7 +151,13 @@ opk_policy_root() {
         if [ "$_opr_dir" = "/" ]; then
             return 1
         fi
+        _opr_prev="$_opr_dir"
         _opr_dir="${_opr_dir%/*}"
+        if [ "$_opr_dir" = "$_opr_prev" ]; then
+            # nothing stripped: no slash left — relative/degenerate
+            # input the contract excludes. Refuse, never loop (#357 a A1)
+            return 1
+        fi
         if [ -z "$_opr_dir" ]; then _opr_dir="/"; fi
     done
 }

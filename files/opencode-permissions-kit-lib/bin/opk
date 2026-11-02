@@ -609,6 +609,21 @@ PYEOF
         # re-entry skips it -- the unprivileged pass showed it already.
         if [ "$_ho_target" = me ] && [ "${OPK_HANDOVER_ROOT:-}" != 1 ]; then
             _ho_policy_dir="$(realpath -m . 2>/dev/null || printf '%s' "$PWD")"
+            # (#357 a A1, same class as doctor.sh's arm): the fallback
+            # re-feeds raw input -- normalize a non-absolute result with
+            # cd+pwd so the walker never receives a relative path (its
+            # own belt refuses those; when even cd fails the attempt
+            # ends without a hang). A logical $PWD with ".." components
+            # can still walk ancestors in non-physical order when
+            # realpath is absent -- accepted residual, recorded in the
+            # round-a comment.
+            case "$_ho_policy_dir" in
+                /*) ;;
+                *)
+                    _ho_norm="$(cd . 2>/dev/null && pwd)" &&
+                        _ho_policy_dir="$_ho_norm"
+                    ;;
+            esac
             if [ "$_OPK_POLICY_ROOT" = 1 ]; then
                 if _ho_found="$(opk_policy_root "$_ho_policy_dir")"; then
                     _ho_policy_dir="$_ho_found"
