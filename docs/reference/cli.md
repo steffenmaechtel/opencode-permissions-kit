@@ -53,6 +53,7 @@ opk status
 opk config projects add /var/www/vhosts/new-project
 opk doctor            # in a project dir: ownership diagnosis (read-only)
 opk doctor fix        # ... and offer the handover fix per at-risk tree
+opk doctor detect     # ... and propose opk.json entries from evidence
 opk update --binary
 opk upgrade-opencode   # just the opencode binary
 opk ddev-hosts-add     # in a ddev project dir
@@ -96,10 +97,11 @@ into the daemon's user namespace, and your own uid is not. At-risk files
 are exactly where container builds die with
 `EPERM: operation not permitted, futime` after writing the output
 correctly (the "container build fails with EPERM ... futime" entry in
-[Troubleshooting](../troubleshooting.md)). Every finding carries its
-fix command (`sudo opk handover opencode <tree>`); the scan itself never
-changes anything — the guided remedy is [`doctor fix`](#doctor-fix)
-below.
+[Troubleshooting](../troubleshooting.md)). Every finding names the guided
+remedy (`opk doctor fix`); the scan itself never changes anything — the
+guided remedy is [`doctor fix`](#doctor-fix) below, and for a project
+without an `opk.json` yet the scan says so and points at
+[`doctor detect`](#doctor-detect).
 
 The mapped-uid set is resolved from the **live user namespaces**: every
 process carries its `uid_map` in `/proc`, world-readable, so no docker
@@ -134,14 +136,16 @@ loud "refusing system path" error — doctor does not duplicate the refusal
 list.
 
 - One `[y/N]` prompt per tree, **default `n`** — Enter skips that tree and
-  its scan row keeps the copy-paste command. Answers are read from the
-  terminal; a piped stdin works only where no terminal exists (scripts,
-  CI) — the same rule as every kit prompt.
+  its scan row keeps the remedy hint (`opk doctor fix` re-offers it any
+  time). Answers are read from the terminal; a piped stdin works only
+  where no terminal exists (scripts, CI) — the same rule as every kit
+  prompt.
 - `--dry-run` passes through to `opk handover ... --dry-run`: no prompts,
   no sudo, nothing changed — handover prints what it would do.
 - `doctor fix` itself never elevates: every confirmed answer runs
   `opk handover`, which does its own sudo hop. No new sudoers surface —
-  the command is the one `opk doctor` has been printing all along.
+  the remedy is the same handover the scan's hint has pointed at all
+  along.
 - After any executed handover the declared trees are re-checked, and the
   final verdict row and exit code describe the **post-fix** state.
 
@@ -149,8 +153,60 @@ Exit codes like `opk doctor`: `0` all declared trees healthy (post-fix),
 `1` at-risk findings remain — declined, `--dry-run`, a failed handover, or
 a succeeded handover whose tree was re-written before the re-check — or a
 rejected `opk.json` or a degraded-install error (missing kit config, no
-dispatcher: exit `1` in both modes, like the scan), `2` warning(s) only,
+dispatcher: exit `1` in all modes, like the scan), `2` warning(s) only,
 `64` usage error.
+
+### doctor detect
+
+Proposes `opk.json` entries from **ownership evidence** — for the fresh
+project that has no policy yet, or one that grew a new build tree:
+
+```bash
+opk doctor detect              # in the project dir (or: opk doctor detect <path>)
+```
+
+Detect walks the project (skipping `.git`) and classifies every entry's
+owner through the same live user-namespace map the scan uses. Evidence of
+a container-written tree, never a path-name heuristic:
+
+- **Subuid twins** — entries owned by a mapped uid that is neither you nor
+  the daemon user (the `UNKNOWN(231069)`-style owners builds converge to).
+  No host process creates those, wherever they sit.
+- **Daemon-owned entries on git-ignored paths** — regenerable content the
+  agent's container wrote. Tracked, committed files never count: agent
+  session edits are normal project life, not container evidence.
+
+A candidate's boundary is the evidence entry's directory, extended up
+through the ignored chain — gitignore already defines the regenerable
+region; an ignored single file proposes its containing directory (the
+[#312](https://github.com/steffenmaechtel/opencode-permissions-kit/issues/312)
+rule: inputs and outputs share one tree). Nested candidates merge into
+the outermost. When the boundary also contains human-owned files it is
+**mixed** — exactly the build-breaker class — and the proposed `note`
+says so.
+
+- `opk.json` is a **committed project file**: every candidate needs an
+  explicit `[y/N]` consent (default `n`) before it is written. A declined
+  candidate prints its entry snippet to paste instead.
+- The write is atomic and appends to an existing policy (unknown keys
+  and existing entries survive; a missing `version` key is added); a
+  symlinked `opk.json` is refused.
+- Without git (no repository, unreadable, git absent) only subuid-twin
+  evidence works — a warn row says so whenever there is evidence to
+  qualify.
+- Evidence paths are ASCII-only: filenames with non-ASCII characters
+  (umlauts) cannot be proposed and land in the drop-count warn row —
+  declare such trees manually.
+- Purely human-owned trees carry no evidence at all. The state after a
+  `handover me` over the whole project is invisible to detect by design —
+  that blind spot is closed by the [handover warning](#handover) below,
+  at exactly the moment the evidence is destroyed.
+
+Exit codes: `0` nothing to declare (no evidence, everything already
+declared, or every candidate consented and written), `1` candidates left
+undeclared, a failed write, a rejected `opk.json`, or a degraded install,
+`2` warnings only, `64` usage error. Detect never needs sudo and changes
+nothing except the consented `opk.json` writes.
 
 ### opk.json — the project's container-tree policy
 
@@ -181,9 +237,10 @@ dispatcher: exit `1` in both modes, like the scan), `2` warning(s) only,
   odd subuid owners (the troubleshooting entry above explains why).
 - Paths are relative to the project root: no absolute paths, no `..`,
   no globs, and no shell-significant characters (`'` `"` `` ` `` `$` `;`)
-  — the fix hints interpolate paths into copy-paste commands, so the
-  policy gate keeps them out entirely. A bare string entry
-  (`"some/path"`) works too when a tree needs no note.
+  — policy paths flow into fix-mode prompts and command rows
+  (`would run:` / `running:`), so the policy gate keeps them out
+  entirely. A bare string entry (`"some/path"`) works too when a tree
+  needs no note.
 
 ## handover
 
@@ -244,7 +301,31 @@ opk handover opencode /var/www/vhosts/some-project/packages/ext/<ext>/Resources/
 Careful with `opk handover me <whole project>` on projects with
 container-written output trees: it re-owns those outputs to you, and the
 next container build that restores their metadata fails with EPERM again —
-expect a clean rebuild of container-written outputs afterwards. The
+expect a clean rebuild of container-written outputs afterwards.
+
+When the takeover covers — or sits inside — a tree the project declares in
+its `opk.json`, `handover me` warns before acting:
+
+```bash
+# from the project root:
+opk handover me . --dry-run
+```
+
+```text
+  warn     handover me: '.' takes back the declared container tree 'packages/ext/nb/Resources/Public'
+     you are taking back a declared container tree -- expect a clean rebuild of its outputs
+     'opk doctor' reports the state after; re-declare nothing, rebuild the outputs (#312)
+```
+
+The warning is advisory (the handover proceeds), fires before any sudo hop
+— so `--dry-run` previews it too — and reads the policy at `<cwd>/opk.json`
+exactly where [`opk doctor`](#doctor) reads it by default. A broken
+`opk.json` skips the warning with a warn row instead of blocking the
+takeover. After such a takeover, re-run `opk doctor`: the at-risk rows it
+reports are precisely the re-poisoned state, and `opk doctor fix` offers
+the remedy per tree.
+
+The
 sibling command `opk config handover <project-root>` covers ddev's own
 settings directories (a different writer); both failure modes live in
 [troubleshooting](../troubleshooting.md).

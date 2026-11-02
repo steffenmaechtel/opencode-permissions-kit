@@ -367,13 +367,20 @@ whole checkout. Notes:
 container-written output trees to you, and the next container build that
 restores metadata on the existing outputs fails with EPERM again. Hand
 over trees, not systems — after a `handover me` on such a project, expect
-a clean rebuild of the affected outputs. To find at-risk trees *before*
-they break a build, declare the container-written trees in the project's
-`opk.json` and run [`opk doctor`](reference/cli.md#doctor) — it
+a clean rebuild of the affected outputs. When the takeover covers — or
+sits inside — a tree declared in the project's `opk.json`, `handover me`
+warns before acting ("you are taking back a declared container tree"),
+so the moment the evidence is destroyed is never silent. To find at-risk
+trees *before* they break a build, declare the container-written trees
+in the project's `opk.json` and run
+[`opk doctor`](reference/cli.md#doctor) — it
 classifies every entry as mapped-safe or at-risk and prints the fix
 command for every at-risk tree; [`opk doctor
 fix`](reference/cli.md#doctor-fix) offers to run those handovers for
-you, one confirmed tree at a time.
+you, one confirmed tree at a time. No `opk.json` yet? [`opk doctor
+detect`](reference/cli.md#doctor-detect) proposes entries from ownership
+evidence (subuid twins, daemon-owned gitignored paths), one consent per
+candidate.
 
 ## ddev warns "Unable to open hosts file ... permission denied"
 

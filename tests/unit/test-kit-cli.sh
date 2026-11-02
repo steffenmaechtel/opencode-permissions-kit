@@ -557,6 +557,180 @@ for _ho_tgt in opencode me; do
 done
 rm -rf "${_ho_pin_dir:?}"
 
+# --- handover me: declared container-tree warning (#352 / #313 phase 3) ---------
+# Advisory warning when the takeover covers -- or sits inside -- a tree
+# the project declares in its opk.json. Fires in the UNPRIVILEGED phase
+# (so --dry-run previews it, and the sudo re-entry does not repeat it)
+# and resolves the policy STRICT-CWD: <cwd>/opk.json, the same root
+# doctor's default uses. That interplay decision is pinned here: a
+# policy in a PARENT directory does not warn (v1; phase 4's walk-up
+# discovery moves doctor and this warning at their one shared
+# resolution site, not per-command).
+HO_PROJ="$WORK/ho-proj"
+mkdir -p "$HO_PROJ/tree/sub" "$HO_PROJ/other"
+: >"$HO_PROJ/tree/sub/file"
+printf '{"version":1,"containerTrees":[{"path":"tree","note":"build outputs"}]}\n' \
+    >"$HO_PROJ/opk.json"
+_ho_warn_run() { # <cwd> <args...> — opk handover from <cwd>, output+rc
+    _hw_dir="$1"
+    shift
+    (
+        cd "$_hw_dir" &&
+            OPK_INSTALL_CONF="$WORK/install.conf" NO_COLOR=1 "$BIN/opk" handover "$@" 2>&1
+    )
+}
+
+# operand COVERS the declared tree (the #312 `handover me .` re-poison)
+_hw_rc=0
+out="$(_ho_warn_run "$HO_PROJ" me . --dry-run)" || _hw_rc=$?
+assert "warning run: dry-run still exits 0" "0" "$_hw_rc"
+if printf '%s' "$out" | grep -qF "takes back the declared container tree 'tree'" &&
+    printf '%s' "$out" | grep -qF "expect a clean rebuild of its outputs"; then
+    echo "  ${GREEN}PASS${NC}  handover me . warns about the declared tree it covers"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  handover me . warns about the declared tree it covers (got: $out)"
+    failures=$((failures + 1))
+fi
+
+# operand INSIDE the declared tree (partial takeover re-poisons too)
+out="$(_ho_warn_run "$HO_PROJ" me tree/sub --dry-run)" || true
+case "$out" in
+    *"takes back the declared container tree 'tree'"*)
+        echo "  ${GREEN}PASS${NC}  handover me inside a declared tree warns too"
+        passed=$((passed + 1))
+        ;;
+    *)
+        echo "  ${RED}FAIL${NC}  handover me inside a declared tree warns too (got: $out)"
+        failures=$((failures + 1))
+        ;;
+esac
+
+# sibling operand: no overlap, no warning
+out="$(_ho_warn_run "$HO_PROJ" me other --dry-run)" || true
+case "$out" in
+    *"takes back the declared container tree"*)
+        echo "  ${RED}FAIL${NC}  sibling takeover does not warn"
+        failures=$((failures + 1))
+        ;;
+    *)
+        echo "  ${GREEN}PASS${NC}  sibling takeover does not warn"
+        passed=$((passed + 1))
+        ;;
+esac
+
+# the remedy direction never warns (handover opencode IS the fix)
+out="$(_ho_warn_run "$HO_PROJ" opencode tree --dry-run)" || true
+case "$out" in
+    *"takes back the declared container tree"*)
+        echo "  ${RED}FAIL${NC}  handover opencode does not warn (it is the remedy)"
+        failures=$((failures + 1))
+        ;;
+    *)
+        echo "  ${GREEN}PASS${NC}  handover opencode does not warn (it is the remedy)"
+        passed=$((passed + 1))
+        ;;
+esac
+
+# strict-cwd (the pinned phase-4 interplay): a policy in the PARENT of
+# the cwd is not read -- run from tree/, the project policy sits above
+out="$(_ho_warn_run "$HO_PROJ/tree" me sub --dry-run)" || true
+case "$out" in
+    *"takes back the declared container tree"*)
+        echo "  ${RED}FAIL${NC}  v1 strict-cwd: parent-dir policy does not warn"
+        failures=$((failures + 1))
+        ;;
+    *)
+        echo "  ${GREEN}PASS${NC}  v1 strict-cwd: parent-dir policy does not warn"
+        passed=$((passed + 1))
+        ;;
+esac
+
+# broken opk.json: the advisory read fails loudly (warn row), the
+# handover itself proceeds -- a broken policy file never blocks a takeover
+printf '{oops\n' >"$HO_PROJ/opk.json"
+out="$(_ho_warn_run "$HO_PROJ" me . --dry-run)" || true
+if printf '%s' "$out" | grep -qF "is unreadable -- declared-tree warning skipped" &&
+    printf '%s' "$out" | grep -qF "would hand over"; then
+    echo "  ${GREEN}PASS${NC}  broken opk.json: warn-skip row, handover proceeds"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  broken opk.json: warn-skip row, handover proceeds (got: $out)"
+    failures=$((failures + 1))
+fi
+
+# belt discrimination (#356 a A4, V1's recipe): a declared path that
+# would MATCH the operand when unbelted. Policy "../tree" read from cwd
+# $HO_PROJ/tree resolves (unbelted) to $HO_PROJ/tree, which CONTAINS the
+# operand tree/sub -- with the belt it is skipped and announced; delete
+# the belt and this pin goes red through the appearing warn row (the
+# old ../escape pin was byte-identical with the belt deleted).
+printf '{"containerTrees":["../tree"]}\n' >"$HO_PROJ/tree/opk.json"
+out="$(_ho_warn_run "$HO_PROJ/tree" me sub --dry-run)" || true
+if printf '%s' "$out" | grep -qF "takes back the declared container tree"; then
+    echo "  ${RED}FAIL${NC}  belt skips the unbelted-match path ../tree (no warn)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  belt skips the unbelted-match path ../tree (no warn)"
+    passed=$((passed + 1))
+fi
+case "$out" in
+    *"declared path '../tree' skipped -- unusable form"*)
+        echo "  ${GREEN}PASS${NC}  belt skip is announced, never silent (#356 a C7)"
+        passed=$((passed + 1))
+        ;;
+    *)
+        echo "  ${RED}FAIL${NC}  belt skip is announced, never silent (#356 a C7, got: $out)"
+        failures=$((failures + 1))
+        ;;
+esac
+
+# a top-level non-dict opk.json (the natural "paste a list" mistake)
+# takes the same warn row as broken JSON (#356 a A3) -- never a silent
+# skip
+printf '["tree","other"]\n' >"$HO_PROJ/opk.json"
+out="$(_ho_warn_run "$HO_PROJ" me tree/sub --dry-run)" || true
+if printf '%s' "$out" | grep -qF "is unreadable -- declared-tree warning skipped" &&
+    printf '%s' "$out" | grep -qF "would hand over"; then
+    echo "  ${GREEN}PASS${NC}  non-dict opk.json: warn row + handover proceeds (#356 a A3)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  non-dict opk.json: warn row + handover proceeds (got: $out)"
+    failures=$((failures + 1))
+fi
+
+# a control character inside a declared path (JSON \n) is a shape
+# doctor's validator rejects -- the advisory reader refuses the policy
+# instead of letting newline-split fragments reach the matching loop
+# (#356 a B3)
+printf '{"containerTrees":["tr\\nnee"]}\n' >"$HO_PROJ/opk.json"
+out="$(_ho_warn_run "$HO_PROJ" me tree/sub --dry-run)" || true
+if printf '%s' "$out" | grep -qF "is unreadable -- declared-tree warning skipped" &&
+    printf '%s' "$out" | grep -qF "would hand over"; then
+    echo "  ${GREEN}PASS${NC}  newline-in-path policy: warn row, no fragment matching (#356 a B3)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  newline-in-path policy: warn row, no fragment matching (got: $out)"
+    failures=$((failures + 1))
+fi
+
+# the OPK_HANDOVER_ROOT=1 re-entry skip arm (#356 a A9): the root pass
+# must not repeat the unprivileged warning -- same covering scenario,
+# env-armed, no warn row
+printf '{"containerTrees":["tree"]}\n' >"$HO_PROJ/opk.json"
+out="$(
+    cd "$HO_PROJ" &&
+        OPK_HANDOVER_ROOT=1 OPK_INSTALL_CONF="$WORK/install.conf" NO_COLOR=1 \
+            "$BIN/opk" handover me . --dry-run 2>&1
+)" || true
+if printf '%s' "$out" | grep -qF "takes back the declared container tree"; then
+    echo "  ${RED}FAIL${NC}  root re-entry does not repeat the warning (#356 a A9)"
+    failures=$((failures + 1))
+else
+    echo "  ${GREEN}PASS${NC}  root re-entry does not repeat the warning (#356 a A9)"
+    passed=$((passed + 1))
+fi
+
 # --- ensure-shared: short heal wrapper (issue #159) ----------------------------
 # The real helper (bin/ddev-as-opencode) is stubbed with an argument
 # recorder — this suite pins dispatch, validation and the sudo hop; the

@@ -27,9 +27,8 @@
 # as at-risk until the backend runs again.
 #
 # The scan is read-only. No sudo: stat, /proc/<pid>/uid_map and
-# install.conf are world-readable. Fix rows point at existing commands
-# only (sudo opk handover opencode <tree>); the scan itself never
-# changes a thing.
+# install.conf are world-readable. Fix rows name the guided remedy
+# ('opk doctor fix'); the scan itself never changes a thing.
 #
 # 'doctor fix' (issue #313, increment b) orchestrates exactly those
 # existing remedies: it runs the scan, then offers ONE interactive
@@ -48,13 +47,27 @@
 # fields, not comments). Tolerant read: unknown keys are ignored,
 # "version" is reserved for migrations (only 1 exists today).
 #
+# 'doctor detect' (issue #352 / #313 phase 3) proposes opk.json entries
+# from OWNERSHIP EVIDENCE, never from name heuristics: container-written
+# entries are the ones whose host uid only a container process can have
+# -- mapped subuid twins (the #312 "nobody twin", case C/E) anywhere, and
+# daemon-uid entries inside git-ignored (regenerable) paths. Purely
+# human-owned trees carry no evidence (the #312 case-A blind spot is
+# closed by the handover-me warning instead, not by detect). opk.json is
+# a COMMITTED project file: every entry is written only after an
+# explicit per-finding [y/N] consent (default n); without consent the
+# snippet is printed to paste. Declined findings leave rc 1.
+#
 # CLI:  opk doctor [project-root]                 scan (default: cwd)
 #       opk doctor fix [project-root] [--dry-run]  orchestrate the fixes
+#       opk doctor detect [project-root]           propose opk.json entries
 # Exit codes (the status.sh contract): 0 all declared trees healthy
-#      (post-fix, for 'fix'), 1 at-risk finding(s) remain -- declined,
+#      (post-fix, for 'fix'), or detect found nothing / wrote every
+#      proposed entry, 1 at-risk finding(s) remain -- declined,
 #      dry-run, failed handover, or re-written-before-recheck -- or a
-#      rejected policy / degraded-install error (both modes), 2
-#      warning(s) only, 64 usage error.
+#      rejected policy / degraded-install error (all modes), or detect
+#      candidates left undeclared (snippet printed), 2 warning(s) only,
+#      64 usage error.
 #
 # Run directly:
 #   /usr/local/lib/opencode-permissions-kit/management/doctor.sh [path]
@@ -77,17 +90,19 @@ else
 fi
 
 # --- CLI --------------------------------------------------------------------------
-# Strict grammar (#313 increment b): 'fix' as the FIRST token switches to
-# fix mode; then at most one positional (the project root) plus --dry-run
-# (fix-only -- the scan is read-only already, a dry run of it is a usage
-# error, not a no-op). Everything else is rejected with 64.
+# Strict grammar (#313 increment b): 'fix' or 'detect' as the FIRST token
+# switches the mode; then at most one positional (the project root) plus
+# --dry-run (fix-only -- the scan is read-only already and detect writes
+# only on explicit consent, so a dry run of either is a usage error, not
+# a no-op). Everything else is rejected with 64.
 _doctor_usage() {
     echo "usage: opk doctor [project-root]                   (read-only scan; default root: .)" >&2
     echo "       opk doctor fix [project-root] [--dry-run]   (offer the handover fix per at-risk tree)" >&2
+    echo "       opk doctor detect [project-root]            (propose opk.json entries from evidence)" >&2
 }
 DOCTOR_MODE=scan
-if [ "${1:-}" = "fix" ]; then
-    DOCTOR_MODE=fix
+if [ "${1:-}" = "fix" ] || [ "${1:-}" = "detect" ]; then
+    DOCTOR_MODE="$1"
     shift
 fi
 DOCTOR_ROOT=""
@@ -97,7 +112,7 @@ for _do_arg in "$@"; do
         --dry-run)
             if [ "$DOCTOR_MODE" != "fix" ]; then
                 _doctor_usage
-                echo "error: doctor: --dry-run needs 'fix' (the scan is read-only already)" >&2
+                echo "error: doctor: --dry-run needs 'fix' (the scan is read-only; detect writes only on consent)" >&2
                 exit 64
             fi
             DOCTOR_FIX_DRY=1
@@ -121,6 +136,25 @@ DOCTOR_ROOT="${DOCTOR_ROOT:-.}"
 DOCTOR_ROOT="$(realpath -m "$DOCTOR_ROOT" 2>/dev/null || printf '%s' "$DOCTOR_ROOT")"
 if [ ! -d "$DOCTOR_ROOT" ]; then
     ui_error "doctor: no such directory: $DOCTOR_ROOT"
+    exit 64
+fi
+# detect walks the WHOLE project from the root (scan/fix walk declared
+# trees only, bounded by the policy) -- the filesystem root is never a
+# project; refuse it loudly like the ddev handover walks do
+if [ "$DOCTOR_MODE" = "detect" ] && [ "$DOCTOR_ROOT" = "/" ]; then
+    ui_error "doctor: refusing to walk the whole filesystem (detect on '/')"
+    exit 64
+fi
+# (#356 a B4): a detect root carrying control characters or a backslash
+# classifies NOTHING -- the boundary awk's root-prefix match never hits
+# (a TAB root splits find rows, a backslash root is mangled by awk -v
+# escape processing) -- and the run reads "no evidence found", the
+# fail-absent shape this block refuses loudly everywhere else. The fix
+# gate above (#348 a C3) covers the same class for the TSV round-trip;
+# detect needs it for the walk itself.
+if [ "$DOCTOR_MODE" = "detect" ] &&
+    printf '%s' "$DOCTOR_ROOT" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
+    ui_error "doctor: project root contains control characters or backslashes -- unusable for 'detect'"
     exit 64
 fi
 # Fix-mode only (#348 a C3): the candidate round-trip ($WORK/fixcand) is
@@ -265,6 +299,8 @@ if [ "$DOCTOR_MODE" = "fix" ]; then
     else
         ui_kv "mode" "fix (offer handover per at-risk tree, [y/N] each)"
     fi
+elif [ "$DOCTOR_MODE" = "detect" ]; then
+    ui_kv "mode" "detect (propose opk.json entries from ownership evidence)"
 fi
 ui_kv "daemon user" "$DOCTOR_USER (uid $DOCTOR_DAEMON_UID)"
 if [ "$DOCTOR_RANGE_VERIFIED" = 1 ]; then
@@ -279,12 +315,25 @@ else
 fi
 
 # --- load the policy ---------------------------------------------------------------
+# Scan/fix REQUIRE a policy (nothing to check without one -- exit 2 with
+# the detect hint, #352 maintainer comment). Detect works WITHOUT one (a
+# fresh project is its use case): an absent file is normal there and the
+# declared set is simply empty.
+DOCTOR_POLICY_PRESENT=1
 if [ ! -f "$DOCTOR_ROOT/opk.json" ]; then
-    ui_warn "no opk.json found in $DOCTOR_ROOT -- nothing to check"
-    ui_detail "declare the trees your container builds write to (docs/reference/cli.md, 'doctor')"
-    exit 2
+    DOCTOR_POLICY_PRESENT=0
+    if [ "$DOCTOR_MODE" != "detect" ]; then
+        ui_warn "no opk.json found in $DOCTOR_ROOT -- nothing to check"
+        ui_detail "declare the trees your container builds write to (docs/reference/cli.md, 'doctor')"
+        ui_detail "or run 'opk doctor detect' to propose entries from ownership evidence"
+        exit 2
+    fi
+    # detect without a policy is normal (fresh project): the declared
+    # set is simply empty and every finding is new
+    ui_kv "policy" "none yet -- detect will propose one (entries are written only on consent)"
+else
+    ui_kv "policy" "$DOCTOR_ROOT/opk.json"
 fi
-ui_kv "policy" "$DOCTOR_ROOT/opk.json"
 
 # doctor_load_policy <root>
 # Validates opk.json (strict JSON) and prints one "path<TAB>note" line
@@ -332,9 +381,10 @@ def path_error(p):
     for ch in p:
         if ord(ch) < 32:
             return "tree path %r must not contain control characters" % p
-    # Shell-significant characters (#344 a S3): the fix hints interpolate
-    # the path into a copy-paste sudo command — a committed opk.json must
-    # never be able to steer that command
+    # Shell-significant characters (#344 a S3; rationale updated #356 a
+    # A5 -- the copy-paste sudo hint is gone, but policy paths still
+    # flow into fix-mode prompts and the 'would run:'/'running:' rows):
+    # a committed opk.json must never be able to steer those
     if any(c in p for c in "'\"`$;"):
         return "tree path %r must not contain shell-significant characters: quotes, backtick, dollar, semicolon" % p
     for comp in p.split("/"):
@@ -370,9 +420,13 @@ for i, entry in enumerate(trees):
 PYEOF
 }
 
-if ! doctor_load_policy "$DOCTOR_ROOT" >"$WORK/trees"; then
-    ui_error "doctor: the policy file was rejected -- fix opk.json (format: docs/reference/cli.md)"
-    exit 1
+if [ "$DOCTOR_POLICY_PRESENT" = 1 ]; then
+    if ! doctor_load_policy "$DOCTOR_ROOT" >"$WORK/trees"; then
+        ui_error "doctor: the policy file was rejected -- fix opk.json (format: docs/reference/cli.md)"
+        exit 1
+    fi
+else
+    : >"$WORK/trees"
 fi
 
 # --- scan each declared tree --------------------------------------------------------
@@ -533,7 +587,7 @@ doctor_scan_trees() {
             [ -n "$_cl_uids" ] && ui_detail "at-risk owners: uid ${_cl_uids%, }"
             [ -n "$_cl_ex" ] && ui_detail "examples: $_cl_ex"
             ui_detail "container metadata ops (futimes/chmod/chown) EPERM on these -- the #312 build-breaker class"
-            ui_detail "fix: sudo opk handover opencode '$DOCTOR_TREE'"
+            ui_detail "fix: opk doctor fix"
             ui_detail "or rebuild the affected outputs clean (docs/troubleshooting.md, EPERM entry)"
             if [ "$DOCTOR_MODE" = "fix" ]; then
                 printf '%s\t%s\t%s\t%s\n' "$DOCTOR_PATH" "$DOCTOR_TREE" "$_cl_risk" "$_cl_total" \
@@ -550,6 +604,407 @@ doctor_scan_trees() {
         [ -n "$DOCTOR_NOTE" ] && ui_detail "declared: $DOCTOR_NOTE"
     done <"$WORK/trees"
 }
+
+# --- detect (issue #352 / #313 phase 3) --------------------------------------------
+# Evidence-based candidate discovery. Proposes opk.json entries from
+# ownership evidence ONLY -- never from path-name heuristics (#312
+# section 6: which trees a container writes is project knowledge, and
+# Resources/Public also holds hand-maintained files):
+#   S evidence   entries owned by a mapped uid != daemon (subuid twins,
+#                #312 cases C/E) -- no host process creates those; the
+#                container wrote them, wherever they sit
+#   D evidence   daemon-uid entries on git-ignored (regenerable) paths
+#                -- agent session edits are TRACKED content and never
+#                count; only ignored paths are build outputs
+# The proposed boundary per evidence entry is its directory, extended up
+# through the ignored chain (gitignore already defines the regenerable
+# region; an ignored FILE in a tracked dir proposes its parent -- the
+# #312 rule: inputs and outputs share one tree). Nested boundaries merge
+# into the outermost. A boundary that also contains unmapped entries is
+# MIXED (the build-breaker class: both worlds write one tree) and the
+# proposed note says so. Without git (no repo, dubious ownership, git
+# absent) only S evidence works -- a warn row says so.
+# opk.json is a COMMITTED project file: nothing is written without an
+# explicit [y/N] consent per finding (default n); declined findings
+# print the snippet to paste and leave rc 1.
+_doctor_detect_path_ok() {
+    # shell belt over the classify-time gate (the writer re-checks a
+    # third time): evidence paths come from find output and can carry
+    # anything. DELIBERATELY STRICTER than doctor_load_policy's
+    # path_error (#356 a A8): an ASCII whitelist keeps every proposal,
+    # prompt and snippet byte-predictable; path_error's blacklist
+    # tolerates non-ASCII and |<> that this belt rejects (non-ASCII
+    # evidence is dropped with a warn row, see the classify block).
+    # The character half runs through grep, not a case pattern -- `(`/`&`
+    # in a bracket class are unparseable as a dash case pattern.
+    case "$1" in
+        "" | /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*) return 1 ;;
+    esac
+    if printf '%s' "$1" | LC_ALL=C grep -q '[^A-Za-z0-9._/,+@=:&%~ ^!(){}#-]'; then
+        return 1
+    fi
+    return 0
+}
+
+if [ "$DOCTOR_MODE" = "detect" ]; then
+    find "$DOCTOR_ROOT" -name .git -prune -o -printf '%U\t%y\t%p\n' >"$WORK/dwalk" 2>"$WORK/dwalk.err"
+    if [ -s "$WORK/dwalk.err" ]; then
+        # fail loud, not fail absent (same class as the scan's unreadable
+        # subtree warn): missing evidence must not read as "no evidence"
+        ui_kv_warn "scan" "$(wc -l <"$WORK/dwalk.err") unreadable entries -- evidence may be incomplete"
+        ui_detail "run detect as the tree owner (or with sudo) for a complete picture"
+    fi
+
+    # classify every walked entry through the map (never through the
+    # displayed numbers -- the #312 nobody(65534) collision). The
+    # character gate is a STRICTER ASCII WHITELIST than
+    # doctor_load_policy's blacklist (path_error tolerates non-ASCII
+    # and |<>) -- proposals, prompts and the snippet printf stay
+    # ASCII-safe; the price is that non-ASCII filenames (umlauts) are
+    # not usable as evidence and land in the drop count below --
+    # declare such trees manually (#356 a A1/A8).
+    # TSV split shapes (#344 a S1 class; #356 a A2, truth-fixed): a
+    # filename with a NEWLINE splits into rows -- the FIRST fragment
+    # (numeric uid, three fields) is classified under a truncated path,
+    # only the tail lands in the drop count; a TAB truncates the path
+    # in-row and drops nothing at all. Truncated paths can name entries
+    # that do not exist (directory evidence proposes its own truncated
+    # prefix) -- a consented dead declaration at worst: consent-gated,
+    # charset-belted, and the next 'opk doctor' scan surfaces it as
+    # "declared but missing". Hostile bytes beyond the whitelist never
+    # reach a row, a prompt or the snippet printf.
+    awk -F'\t' -v daemon="$DOCTOR_DAEMON_UID" -v ranges="$DOCTOR_RANGES" \
+        -v root="$DOCTOR_ROOT" -v dropf="$WORK/ddrop" '
+        BEGIN {
+            n = split(ranges, r, " ")
+            for (i = 1; i + 1 <= n; i += 2) { rs[++m] = r[i] + 0; rc[m] = r[i + 1] + 0 }
+        }
+        {
+            if ($1 !~ /^[0-9]+$/ || NF < 3) { drop++; next }
+            p = $3
+            if (index(p, root "/") != 1) next
+            p = substr(p, length(root) + 2)
+            if (p == "") next
+            if (p ~ /[^A-Za-z0-9._\/,+@=:&%~ ^!(){}#-]/) { drop++; next }
+            uid = $1 + 0
+            cls = "H"
+            if (uid == daemon + 0) cls = "D"
+            else {
+                for (j = 1; j <= m; j++)
+                    if (uid >= rs[j] && uid < rs[j] + rc[j]) { cls = "S"; break }
+            }
+            print cls "\t" uid "\t" $2 "\t" p
+        }
+        END { if (drop + 0 > 0) printf "%d\n", drop >dropf }
+    ' "$WORK/dwalk" >"$WORK/dcls"
+    if [ -f "$WORK/ddrop" ]; then
+        ui_kv_warn "scan" "$(cat "$WORK/ddrop") entries dropped -- unusable path forms"
+        ui_detail "non-ASCII, control or shell-significant characters -- declare such trees manually (#356 a A1)"
+        rm -f "${WORK:?}/ddrop"
+    fi
+
+    # --- evidence + the git-ignore probe -------------------------------------------
+    # probe list: every D-owned path (its own ignore answer decides CE)
+    # plus every ancestor directory of every D/S path (the boundary
+    # chains need to know where the ignored region starts)
+    awk -F'\t' '
+        $1 == "D" { print $4 }
+        $1 == "D" || $1 == "S" {
+            p = $4
+            while ((i = match(p, /\/[^\/]+$/)) > 1) {
+                p = substr(p, 1, i - 1)
+                print p
+            }
+        }
+    ' "$WORK/dcls" | sort -u >"$WORK/ignprobe"
+    DOCTOR_IG=0
+    if [ -s "$WORK/ignprobe" ] && command -v git >/dev/null 2>&1; then
+        _dt_grc=0
+        git -C "$DOCTOR_ROOT" check-ignore --stdin <"$WORK/ignprobe" >"$WORK/ign" 2>"$WORK/ign.err" ||
+            _dt_grc=$?
+        if [ "$_dt_grc" -eq 0 ] || [ "$_dt_grc" -eq 1 ]; then
+            # rc 1 is a VALID answer: none of the probed paths is ignored
+            DOCTOR_IG=1
+        fi
+    fi
+    if [ -s "$WORK/ignprobe" ] && [ "$DOCTOR_IG" != 1 ]; then
+        # not a repository / dubious ownership / broken or absent git:
+        # the ignore answers are unavailable, D evidence cannot be
+        # verified as regenerable -- S evidence still works (L1: the
+        # fallback is a warn row in EVERY arm of it, never silence)
+        ui_kv_warn "detect" "git ignore answers unavailable -- daemon-owned entries need them and do not count"
+        ui_detail "only subuid-owner evidence is used; run detect inside the repo for full evidence"
+    fi
+    [ "$DOCTOR_IG" = 1 ] || : >"$WORK/ign"
+    # (#356 a D1): the two-file FNR==NR idiom below mis-consumes the
+    # ENTIRE dcls stream when the first file is EMPTY -- NR stays in
+    # lockstep with FNR through a single file, so every classified row
+    # took the ign[$0] branch and detect read "no evidence" in every
+    # repo without ignored paths and in every no-git fallback run. A
+    # sentinel line carrying a TAB can never equal a classify-surviving
+    # path (the charset gate drops tabs at classify time): an empty
+    # ignore set is represented by an unmatchable key, not an empty file.
+    [ -s "$WORK/ign" ] || printf '.\t.\n' >"$WORK/ign"
+
+    # --- boundaries: compute, merge, aggregate --------------------------------------
+    # output per boundary: rel<TAB>count<TAB>owners<TAB>mixed<TAB>examples
+    # (owners "uid N (c)" capped at 4, examples capped at 3, like the
+    # scan rows). Pure awk over the two prepared streams.
+    awk -F'\t' -v rootf="$WORK/droot" '
+        FNR == NR { ign[$0] = 1; next }
+        {
+            cls = $1; uid = $2; typ = $3; p = $4
+            if (cls == "H") { hn[++nh] = p; next }
+            isce = (cls == "S") || ign[p]
+            if (!isce) next
+            b = (typ == "d") ? p : dirname(p)
+            while ((pp = dirname(b)) != "" && ign[pp]) b = pp
+            if (b == "") { rootskip++; next }
+            bnd[b] = 1
+            evn[++ne] = p; evu[ne] = uid
+        }
+        function dirname(x) { i = match(x, /\/[^\/]+$/); return (i > 1) ? substr(x, 1, i - 1) : "" }
+        END {
+            # merge: drop every boundary that sits under another -- the
+            # outer boundary keeps ALL evidence (the reassignment below
+            # counts every CE entry into its outermost survivor, so
+            # nothing is lost by dropping the inner row)
+            for (b in bnd) {
+                for (b2 in bnd) {
+                    if (b != b2 && index(b, b2 "/") == 1) { delete bnd[b]; break }
+                }
+            }
+            for (i = 1; i <= ne; i++) {
+                b = ""
+                for (c in bnd)
+                    if (evn[i] == c || index(evn[i], c "/") == 1) { b = c; break }
+                if (b == "") continue
+                cnt[b]++
+                key = b ":" evu[i]
+                if (!(key in useen)) { uids[b] = uids[b] evu[i] ","; useen[key] = 1 }
+                oc[key]++
+                if (exn[b] < 3) { exn[b]++; ex[b] = (ex[b] == "" ? "" : ex[b] ", ") evn[i] }
+            }
+            for (i = 1; i <= nh; i++)
+                for (c in bnd)
+                    if (hn[i] == c || index(hn[i], c "/") == 1) { mixed[c] = 1; break }
+            for (b in bnd) {
+                o = ""
+                split(uids[b], ua, ",")
+                for (j = 1; j in ua; j++) {
+                    if (ua[j] == "") continue
+                    if (++un > 4) { o = o "..., "; break }
+                    o = o "uid " ua[j] " (" oc[b ":" ua[j]] "), "
+                }
+                un = 0
+                sub(/, $/, "", o)
+                printf "%s\t%d\t%s\t%d\t%s\n", b, cnt[b] + 0, o, (b in mixed) ? 1 : 0, ex[b]
+            }
+            if (rootskip + 0 > 0) printf "%d\n", rootskip >rootf
+        }
+    ' "$WORK/ign" "$WORK/dcls" >"$WORK/dcand" || {
+        ui_error "detect: the candidate aggregation failed"
+        exit 1
+    }
+    LC_ALL=C sort -t"$DOCTOR_TAB" -k1,1 -o "$WORK/dcand" "$WORK/dcand"
+    if [ -s "$WORK/droot" ]; then
+        ui_kv_warn "detect" "$(cat "$WORK/droot") evidence entries sit directly in the project root"
+        ui_detail "detect never proposes the project root itself -- declare such subtrees manually"
+        rm -f "${WORK:?}/droot"
+    fi
+
+    DET_N=0
+    DET_DECLARED=0
+    DET_SKIPPED=0
+    DET_NCOVERED=0
+    : >"$WORK/dnew"
+    ui_section "Doctor detect -- container-tree candidates (ownership evidence)"
+    while IFS="$DOCTOR_TAB" read -r DET_B DET_CNT DET_OWN DET_MIXED DET_EX _det_extra <&3; do
+        [ -n "$DET_B" ] || continue
+        # belt over the classify-time character gate (the writer re-checks
+        # a third time): nothing unusable ever reaches a row, a prompt or
+        # the snippet printf
+        if ! _doctor_detect_path_ok "$DET_B"; then
+            DET_SKIPPED=$((DET_SKIPPED + 1))
+            continue
+        fi
+        # already declared (this boundary or an ancestor of it): the
+        # policy already covers the tree -- visible, but not a candidate
+        DET_COVERED=""
+        while IFS="$DOCTOR_TAB" read -r DET_DECL _det_dnote; do
+            [ -n "$DET_DECL" ] || continue
+            case "$DET_B" in
+                "$DET_DECL" | "$DET_DECL"/*)
+                    DET_COVERED="$DET_DECL"
+                    break
+                    ;;
+            esac
+        done <"$WORK/trees"
+        if [ -n "$DET_COVERED" ]; then
+            DET_NCOVERED=$((DET_NCOVERED + 1))
+            ui_kv "candidate" "$DET_B -- already declared (via $DET_COVERED)"
+            continue
+        fi
+        DET_N=$((DET_N + 1))
+        if [ "$DET_MIXED" = 1 ]; then
+            _det_mixrow="mixed with human-owned files"
+            DET_NOTE="detect: container-written entries mixed with human-owned files -- one owner for both (#312)"
+        else
+            _det_mixrow="container-written only"
+            DET_NOTE="detect: $DET_CNT container-written entries ($DET_OWN) -- declare the whole build tree (#312)"
+        fi
+        ui_kv "candidate" "$DET_B -- $DET_CNT container-written entries ($DET_OWN), $_det_mixrow"
+        [ -n "$DET_EX" ] && ui_detail "examples: $DET_EX"
+        ui_detail "evidence: mapped owners only containers create (subuid twins) / daemon-owned on gitignored paths"
+        # consent per finding: opk.json is a COMMITTED project file --
+        # default n (conventions: writing a committed file changes the
+        # project), the loop reads fd 3 so the prompt keeps stdin (the
+        # fix-mode discipline)
+        if ui_confirm "Declare '$DET_B' in $DOCTOR_ROOT/opk.json (a committed project file)?" n; then
+            printf '%s\t%s\n' "$DET_B" "$DET_NOTE" >>"$WORK/dnew"
+            DET_DECLARED=$((DET_DECLARED + 1))
+            ui_detail "queued -- opk.json is written after the last candidate"
+        else
+            # declined: the snippet to paste (L1: never a silent decline)
+            ui_detail "declined -- paste this into $DOCTOR_ROOT/opk.json (containerTrees):"
+            printf '    {"path": "%s", "note": "%s"}\n' "$DET_B" "$DET_NOTE" | while IFS= read -r _det_line; do
+                ui_detail "$_det_line"
+            done
+        fi
+    done 3<"$WORK/dcand"
+    if [ "$DET_SKIPPED" -gt 0 ]; then
+        ui_kv_warn "detect" "$DET_SKIPPED candidate(s) skipped -- unusable path forms"
+        ui_detail "non-ASCII, control or shell-significant characters (see the drop rows above)"
+    fi
+
+    DET_LEFT=$((DET_N - DET_DECLARED))
+
+    # --- the write (only with consented entries) ------------------------------------
+    DET_WROTE=0
+    if [ -s "$WORK/dnew" ]; then
+        if [ -L "$DOCTOR_ROOT/opk.json" ]; then
+            # the 0.0.39g S2 class: never write at/through a linked
+            # policy file -- the mv below would replace the link, and
+            # the committed file the project carries is not what we saw
+            ui_error "detect: $DOCTOR_ROOT/opk.json is a symlink -- not writing; edit the real file"
+            exit 1
+        fi
+        # atomic: temp in the same dir (same fs), then rename. The temp
+        # re-checks [ -L ] at exec time (fs-baseline pattern); an
+        # existing file keeps its mode, a new one takes the kit's 664
+        # group baseline
+        _dt_mode=664
+        [ -f "$DOCTOR_ROOT/opk.json" ] && _dt_mode="$(stat -c %a "$DOCTOR_ROOT/opk.json")"
+        _dt_tmp=$(mktemp "$DOCTOR_ROOT/opk.json.opk.XXXXXX") || {
+            ui_error "detect: cannot create a temp file in $DOCTOR_ROOT (not writable?)"
+            ui_detail "the candidates above stay valid -- paste the snippets, or re-run with permissions fixed"
+            exit 1
+        }
+        if python3 - "$DOCTOR_ROOT" "$WORK/dnew" <<'PYEOF' >"$_dt_tmp"
+import json
+import sys
+
+root, newfile = sys.argv[1], sys.argv[2]
+path = root + "/opk.json"
+doc = {}
+try:
+    with open(path, "r", encoding="utf-8") as f:
+        doc = json.load(f)
+except FileNotFoundError:
+    pass
+except OSError as e:
+    sys.stderr.write("opk.json: unreadable: %s\n" % e)
+    sys.exit(1)
+except ValueError as e:
+    sys.stderr.write("opk.json: not valid JSON: %s\n" % e)
+    sys.exit(1)
+
+if "version" not in doc:
+    # version leads the file (the documented layout) without disturbing
+    # the insertion order of the surviving keys
+    old = doc
+    doc = {"version": 1}
+    doc.update(old)
+trees = doc.get("containerTrees", [])
+if not isinstance(trees, list):
+    sys.stderr.write("opk.json: containerTrees must be an array\n")
+    sys.exit(1)
+
+with open(newfile, "r", encoding="utf-8") as f:
+    for line in f:
+        line = line.rstrip("\n")
+        if not line:
+            continue
+        rel, _, note = line.partition("\t")
+        if not rel or any(c in rel for c in "'\"`$;\\") or any(ord(c) < 32 for c in rel):
+            sys.stderr.write("opk.json: refusing to write an unvalidated path\n")
+            sys.exit(1)
+        trees.append({"path": rel, "note": note})
+
+doc["containerTrees"] = trees
+sys.stdout.write(json.dumps(doc, indent=2) + "\n")
+PYEOF
+        then
+            :
+        else
+            rm -f "${_dt_tmp:?}"
+            ui_error "detect: writing opk.json failed (rejected content -- see the errors above)"
+            exit 1
+        fi
+        # (#356 a B1): chmod resolves the NAME and follows a swapped
+        # symlink, and the project dir is agent-group-writable -- the
+        # temp name can be swapped for a link during the python run
+        # (mktemp->chmod spans the whole interpreter startup). Re-check
+        # immediately before acting (the learnings root-ops order) and
+        # refuse loudly: the mode change on an arbitrary dev-owned file
+        # must never happen. rm removes the LINK only (rm never
+        # follows); the remaining window is gate->op, the house shape.
+        if [ -L "$_dt_tmp" ]; then
+            rm -f "${_dt_tmp:?}"
+            ui_error "detect: the temp changed to a symlink mid-write -- not writing (chmod refused)"
+            exit 1
+        fi
+        chmod "$_dt_mode" "$_dt_tmp" ||
+            ui_kv_warn "detect" "could not set mode $_dt_mode on opk.json (mktemp default remains)"
+        # (#356 a B2): a DIRECTORY swapped onto the opk.json name makes
+        # mv succeed by moving the temp INSIDE it (POSIX rename) -- the
+        # -d conjunct refuses that loudly instead of letting the success
+        # row claim a declaration that never happened
+        if [ ! -L "$_dt_tmp" ] && [ ! -L "$DOCTOR_ROOT/opk.json" ] && [ ! -d "$DOCTOR_ROOT/opk.json" ]; then
+            if mv "$_dt_tmp" "$DOCTOR_ROOT/opk.json"; then
+                DET_WROTE=1
+            else
+                rm -f "${_dt_tmp:?}"
+                ui_error "detect: renaming opk.json into place failed"
+                exit 1
+            fi
+        else
+            rm -f "${_dt_tmp:?}"
+            ui_error "detect: opk.json (or its temp) changed to a symlink or directory mid-write -- not writing"
+            exit 1
+        fi
+    fi
+
+    # --- detect summary (own rc contract, documented in cli.md) ----------------------
+    if [ "$DET_WROTE" = 1 ]; then
+        ui_kv_ok "result" "$DET_DECLARED of $DET_N candidate(s) declared in opk.json -- commit it (team policy)"
+        ui_detail "next: 'opk doctor' classifies the declared trees, 'opk doctor fix' offers the handover remedy"
+    elif [ "$DET_N" -gt 0 ]; then
+        ui_kv_ok "result" "$DET_DECLARED of $DET_N candidate(s) declared"
+    elif [ "$DET_NCOVERED" -gt 0 ]; then
+        ui_kv_ok "result" "all evidence already declared ($DET_NCOVERED tree(s) covered) -- nothing new to propose"
+    else
+        ui_kv_ok "result" "no container-write evidence found -- nothing to declare"
+    fi
+    if [ "$DET_LEFT" -gt 0 ]; then
+        ui_kv_bad "result" "$DET_LEFT candidate(s) left undeclared -- snippets above; re-run detect any time"
+        exit 1
+    fi
+    if [ "$UI_ROWS_WARN" -gt 0 ]; then
+        exit 2
+    fi
+    exit 0
+fi
 
 doctor_scan_trees
 
@@ -591,7 +1046,7 @@ if [ "$DOCTOR_MODE" = "fix" ] && [ -s "$WORK/fixcand" ]; then
                     DOCTOR_FIX_RAN=1
                 fi
             else
-                ui_detail "skipped '$_fx_rel' -- the scan rows above carry the copy-paste command"
+                ui_detail "skipped '$_fx_rel' -- 'opk doctor fix' re-offers it any time"
             fi
         done 3<"$WORK/fixcand"
     fi
@@ -620,7 +1075,7 @@ fi
 # Counts snapshot BEFORE the verdict row prints, so the row itself
 # never counts. Exit code: 0 all green, 1 alert(s), 2 warning(s) only.
 if [ "$UI_ROWS_BAD" -gt 0 ]; then
-    ui_kv_bad "result" "$UI_ROWS_BAD alert(s), $UI_ROWS_WARN warning(s) -- fix with the handover commands above"
+    ui_kv_bad "result" "$UI_ROWS_BAD alert(s), $UI_ROWS_WARN warning(s) -- fix with 'opk doctor fix'"
     exit 1
 fi
 if [ "$UI_ROWS_WARN" -gt 0 ]; then

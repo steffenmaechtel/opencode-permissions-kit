@@ -8,7 +8,8 @@
 #   opk doctor     -> management/doctor.sh   (no sudo needed; per-project
 #                  read-only ownership diagnosis, issue #313; 'doctor fix'
 #                  orchestrates the handover remedy, elevation stays
-#                  inside handover)
+#                  inside handover; 'doctor detect' proposes opk.json
+#                  entries, #352)
 #   opk config ... -> management/config.sh   (auto sudo)
 #   opk update ... -> management/update.sh   (auto sudo)
 #   opk uninstall  -> management/uninstall.sh (runs as your user,
@@ -41,6 +42,7 @@ else
     ui_error() { echo "  error    $1" >&2; }
     ui_info() { echo "  info     $1"; }
     ui_success() { echo "  ok       $1"; }
+    ui_warn() { echo "  warn     $1" >&2; }
     ui_detail() { echo "           $1"; }
     ui_confirm() { # <question> <y|n default> — reads /dev/tty, fails closed
         printf '  %s ' "$1" >&2
@@ -107,6 +109,12 @@ Commands:
                                    nothing. doctor never elevates itself — the
                                    sudo hop happens inside handover (no new
                                    sudoers surface); exit codes like status
+  doctor detect [path]             Propose opk.json entries from ownership
+                                   evidence (subuid twins, daemon-owned
+                                   gitignored paths): one [y/N] consent per
+                                   candidate (default n), the snippet to paste
+                                   on decline; read-only unless consented;
+                                   exit codes like status
   config <args...>                Change settings: status (git-config +
                                   projects overview), projects
                                   list|add|remove,
@@ -184,8 +192,9 @@ case "$cmd" in
         # read-only ownership classification of the container trees the
         # project declares in opk.json -- mapped-safe vs at-risk for
         # container metadata ops (the #312 EPERM class). 'doctor fix'
-        # additionally orchestrates the handover remedy; no sudo here
-        # either -- the elevation happens inside handover.
+        # additionally orchestrates the handover remedy; 'doctor detect'
+        # (#352) proposes opk.json entries from ownership evidence; no
+        # sudo here either -- the elevation happens inside handover.
         exec sh "$LIBDIR/management/doctor.sh" "$@"
         ;;
     config | update)
@@ -569,6 +578,103 @@ PYEOF
             esac
             [ -e "$_ho_np" ] || _ho_err "handover: no such path: $_ho_a"
         done
+        # Declared container-tree warning (#352 / #313 phase 3): when a
+        # 'me' takeover covers -- or sits inside -- a tree the project
+        # declares in its opk.json, the re-own destroys exactly the
+        # ownership state doctor classifies (#312: 'handover me' over
+        # the whole project re-poisons container-written outputs; a
+        # partial takeover inside a declared tree does the same).
+        # Resolution is STRICT-CWD by v1 design: the policy is read at
+        # <cwd>/opk.json, the same root doctor's default uses -- phase
+        # 4's walk-up discovery moves doctor and this warning at their
+        # one shared resolution site, not per-command. Advisory only:
+        # it never blocks, and fires in --dry-run too (the dry run
+        # previews what the real run does, 0.0.39i F4 class). The root
+        # re-entry skips it -- the unprivileged pass showed it already.
+        if [ "$_ho_target" = me ] && [ "${OPK_HANDOVER_ROOT:-}" != 1 ]; then
+            _ho_policy_dir="$(realpath -m . 2>/dev/null || printf '%s' "$PWD")"
+            if [ -f "$_ho_policy_dir/opk.json" ]; then
+                # tolerant advisory read (doctor's strict validation is
+                # deliberately not duplicated -- but the policy shapes
+                # this reader CHECKS that doctor's validator rejects
+                # take the same arm as broken JSON: exit 1 -> the warn
+                # row below, the takeover proceeds. Covers top level
+                # not an object, containerTrees not an array, and
+                # control characters inside a declared path (#356 a
+                # A3/B3) -- newline-split fragments can never reach the
+                # matching loop this way. Note-field shapes are
+                # deliberately tolerated (notes never affect matching).
+                _ho_trc=0
+                _ho_trees="$(
+                    python3 - "$_ho_policy_dir/opk.json" 2>/dev/null <<'PYEOF'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as f:
+        doc = json.load(f)
+except Exception:
+    sys.exit(1)
+if not isinstance(doc, dict):
+    sys.exit(1)
+trees = doc.get("containerTrees", [])
+if not isinstance(trees, list):
+    sys.exit(1)
+for e in trees:
+    p = e.get("path") if isinstance(e, dict) else e
+    if not isinstance(p, str) or not p or any(ord(c) < 32 for c in p):
+        sys.exit(1)
+    sys.stdout.write(p + "\n")
+PYEOF
+                )" || _ho_trc=$?
+                if [ "$_ho_trc" -ne 0 ]; then
+                    ui_warn "opk.json at $_ho_policy_dir is unreadable -- declared-tree warning skipped"
+                else
+                    printf '%s\n' "$_ho_trees" | while IFS= read -r _ho_decl; do
+                        [ -n "$_ho_decl" ] || continue
+                        # belt: only comparable relative path forms can
+                        # be matched -- a STRICTER structural+shell set
+                        # than doctor's path_error (which also rejects
+                        # globs but TOLERATES non-ASCII; this belt
+                        # additionally drops |&<> so fragments of a
+                        # mangled policy cannot even reach the warning
+                        # TEXT, #356 a A8/B3). A skip is never silent:
+                        # the detail row names the declaration that
+                        # forfeits the warning (#356 a C7).
+                        _ho_badform=0
+                        case "$_ho_decl" in
+                            /* | */ | . | ./* | .. | ../* | */. | */./* | */.. | */../* | *//* | *\\*) _ho_badform=1 ;;
+                        esac
+                        case "$_ho_decl" in
+                            *"'"* | *'"'* | *'`'* | *'$'* | *';'* | *"|"* | *"&"* | *"<"* | *">"*) _ho_badform=1 ;;
+                        esac
+                        if [ "$_ho_badform" = 1 ]; then
+                            ui_detail "declared path '$_ho_decl' skipped -- unusable form (doctor rejects it too)"
+                            continue
+                        fi
+                        _ho_tree="$(realpath -m "$_ho_policy_dir/$_ho_decl" 2>/dev/null ||
+                            printf '%s' "$_ho_policy_dir/$_ho_decl")"
+                        for _ho_a in "$@"; do
+                            [ "$_ho_a" = "--dry-run" ] && continue
+                            _ho_op="$(realpath -m "$_ho_a" 2>/dev/null || printf '%s' "$_ho_a")"
+                            case "$_ho_op" in
+                                "$_ho_tree" | "$_ho_tree"/*) ;; # operand covers/equals the tree
+                                *)
+                                    case "$_ho_tree" in
+                                        "$_ho_op"/*) ;; # operand inside the tree
+                                        *) continue ;;
+                                    esac
+                                    ;;
+                            esac
+                            ui_warn "handover me: '$_ho_a' takes back the declared container tree '$_ho_decl'"
+                            ui_detail "you are taking back a declared container tree -- expect a clean rebuild of its outputs"
+                            ui_detail "'opk doctor' reports the state after; re-declare nothing, rebuild the outputs (#312)"
+                            break
+                        done
+                    done
+                fi
+            fi
+        fi
         if [ "$_ho_dry" = 1 ]; then
             for _ho_a in "$@"; do
                 [ "$_ho_a" = "--dry-run" ] && continue
