@@ -1322,6 +1322,36 @@ check "12m: post-fix scan has no at-risk rows (rc 0 or 2)" \
     E 'cd /var/www/vhosts/doctor-fix && opk doctor >/tmp/dfix-after.log 2>&1; _rc=$?; test $_rc -eq 0 -o $_rc -eq 2 && ! grep -q "entries at-risk" /tmp/dfix-after.log'
 E 'rm -rf /var/www/vhosts/doctor-fix /tmp/dfix-*.log'
 
+echo "--- 12n. opk doctor detect + handover-me warning (issue #352 / #313 phase 3) ---"
+# Real ownership evidence, only buildable with root: an opencode-owned
+# artifact on a git-ignored path (D-on-ignored) inside a tracked dir the
+# developer also owns -> the MIXED boundary (public/) is proposed with
+# the #312 note. The unit suite pins the S arm and orchestration with
+# fixture uid_maps; the mixed class needs real second-owner files.
+E 'mkdir -p /var/www/vhosts/doctor-det/public/scss /var/www/vhosts/doctor-det/src && cd /var/www/vhosts/doctor-det && git init -q . && printf "public/deps.js\n" >.gitignore && echo body >public/scss/main.scss && echo app >public/deps.js && echo idx >src/index.php'
+E 'sudo chown opencode /var/www/vhosts/doctor-det/public/deps.js'
+check "12n: detect proposes the mixed boundary (ignored artifact + human sources)" \
+    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-eof.log 2>&1; test $? -eq 1 && grep -q "candidate      public --" /tmp/ddet-eof.log && grep -q "mixed with human-owned files" /tmp/ddet-eof.log && grep -q "one owner for both (#312)" /tmp/ddet-eof.log'
+check "12n: declined detect prints the paste snippet, writes nothing" \
+    E 'test ! -e /var/www/vhosts/doctor-det/opk.json && grep -qF "{\"path\": \"public\"," /tmp/ddet-eof.log'
+check "12n: tracked dev-only dirs are no candidates" \
+    E '! grep -q "candidate      src --" /tmp/ddet-eof.log'
+check "12n: consented detect writes a valid opk.json (rc 0)" \
+    E 'cd /var/www/vhosts/doctor-det && printf "y\n" | opk doctor detect >/tmp/ddet-y.log 2>&1; test $? -eq 0 && python3 -m json.tool /var/www/vhosts/doctor-det/opk.json >/dev/null && grep -qF "\"path\": \"public\"" /var/www/vhosts/doctor-det/opk.json'
+check "12n: re-detect sees the tree declared, proposes nothing new (rc 0)" \
+    E 'cd /var/www/vhosts/doctor-det && opk doctor detect </dev/null >/tmp/ddet-again.log 2>&1; test $? -eq 0 && grep -q "already declared (via public)" /tmp/ddet-again.log'
+check "12n: the scan now reports the declared tree at-risk with the guided remedy hint" \
+    E 'cd /var/www/vhosts/doctor-det && opk doctor >/tmp/ddet-scan.log 2>&1; test $? -eq 1 && grep -q "entries at-risk" /tmp/ddet-scan.log && grep -qF "fix: opk doctor fix" /tmp/ddet-scan.log'
+check "12n: handover me on the declared tree warns before acting (dry run previews it)" \
+    E 'cd /var/www/vhosts/doctor-det && opk handover me public --dry-run >/tmp/ddet-ho.log 2>&1; test $? -eq 0 && grep -q "takes back the declared container tree .public." /tmp/ddet-ho.log && grep -q "expect a clean rebuild of its outputs" /tmp/ddet-ho.log && grep -q "would hand over" /tmp/ddet-ho.log'
+check "12n: the real handover me takes the tree back, warning and all" \
+    E 'cd /var/www/vhosts/doctor-det && opk handover me public >/tmp/ddet-horeal.log 2>&1; test $? -eq 0 && grep -q "takes back the declared container tree .public." /tmp/ddet-horeal.log && test "$(stat -c %U /var/www/vhosts/doctor-det/public/deps.js)" = "dev"'
+check "12n: after the takeover the declared tree is at-risk again (the closed loop)" \
+    E 'cd /var/www/vhosts/doctor-det && opk doctor >/tmp/ddet-poison.log 2>&1; test $? -eq 1 && grep -q "entries at-risk" /tmp/ddet-poison.log'
+check "12n: the at-risk hint stays the guided remedy, not the raw handover command" \
+    E 'grep -qF "fix: opk doctor fix" /tmp/ddet-poison.log && ! grep -qF "fix: sudo opk handover opencode" /tmp/ddet-poison.log'
+E 'rm -rf /var/www/vhosts/doctor-det /tmp/ddet-*.log'
+
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' &&

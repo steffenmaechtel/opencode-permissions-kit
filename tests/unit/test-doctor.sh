@@ -367,7 +367,8 @@ policy '{"containerTrees":["tree"]}'
 rc_doctor "at-risk tree -> rc 1" 1 "$PROJ"
 grep_last_out "at-risk verdict row" grep -qF "entries at-risk (unmapped owners)"
 grep_last_out "at-risk owner tallied" grep -qF "uid $CURUID (3)"
-grep_last_out "fix hint names handover" grep -qF "fix: sudo opk handover opencode"
+grep_last_out "fix hint names the guided remedy" grep -qF "fix: opk doctor fix"
+grep_last_out "result row names the guided remedy" grep -qF "fix with 'opk doctor fix'"
 grep_last_out "examples listed" grep -qF "examples:"
 
 # multi-tree project: every declared tree gets its own verdict row
@@ -422,6 +423,7 @@ mkproj
 rm -f "${PROJ:?}/opk.json"
 rc_doctor "no opk.json -> rc 2" 2 "$PROJ"
 grep_last_out "no-policy warn" grep -qF "no opk.json found"
+grep_last_out "no-policy row suggests detect" grep -qF "or run 'opk doctor detect'"
 
 # invalid opk.json end-to-end (python stderr passes through, rc 1)
 policy '{"containerTrees":[]}extra'
@@ -712,6 +714,232 @@ sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '/* | */ | . | ./* | .. | ../* 
     sed 's/^[[:space:]]*#.*$//' "$DOCTOR" | grep -qF '*//* | *\\*)' &&
     pass "belt case pinned end-to-end: absolute, trailing/dot/dotdot/empty forms, backslash (#344 a S5 + b R1 + c Q1)" ||
     fail "belt case pinned end-to-end: absolute, trailing/dot/dotdot/empty forms, backslash (#344 a S5 + b R1 + c Q1)"
+
+# --- 7. detect mode (issue #352 / #313 phase 3) -------------------------------------
+# Two fixture classes cover both evidence arms without root:
+#   A  daemon=root, the test uid mapped as subuid -> every test-owned
+#      entry is S-class (subuid twin) evidence, wherever it sits
+#   B  daemon=the test user -> test-owned entries are D-class and count
+#      ONLY on git-ignored paths (git repo fixture, check-ignore live);
+#      the S arm is empty (nothing else can own files in the sandbox)
+# The mixed-owner class needs unmapped owners next to evidence -- only
+# the privileged e2e lane can build that (same sandbox limit as the fix
+# heal path, section 6).
+CONF_ME="$WORK/install-me.conf"
+printf 'OPENCODE_USER=%s\nVERSION=9.9.9\n' "$(id -un)" >"$CONF_ME"
+
+detproj() { # git repo: ignored build/ with outputs, tracked src/
+    rm -rf "$PROJ"
+    mkdir -p "$PROJ"
+    git init -q "$PROJ"
+    printf 'build/\n' >"$PROJ/.gitignore"
+    mkdir -p "$PROJ/build/out" "$PROJ/src"
+    echo out >"$PROJ/build/out/app.min.css"
+    echo s >"$PROJ/src/a.php"
+}
+
+# grammar: detect is a first-token subcommand; --dry-run is fix-only;
+# the filesystem root is never a detect scan root
+rc_doctor "detect --dry-run -> rc 64" 64 detect --dry-run
+rc_doctor "detect with a flag -> rc 64" 64 detect --bogus
+rc_doctor "detect with two roots -> rc 64" 64 detect "$PROJ" extra
+rc_doctor "detect on / refused -> rc 64" 64 detect /
+
+# fixture A: S evidence everywhere -> candidates build + src, root-level
+# evidence (.gitignore) warns, EOF declines everything -> snippets, rc 1
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+detproj
+rc_doctor "detect, S evidence, EOF: snippets + rc 1" 1 detect "$PROJ"
+grep_last_out "candidate row (build)" grep -qF "candidate      build --"
+grep_last_out "candidate row (src)" grep -qF "candidate      src --"
+grep_last_out "consent prompt shape [y/N]" grep -qF "? [y/N]"
+grep_last_out "declined snippet prints the entry" grep -qF '{"path": "build",'
+grep_last_out "undeclared result row" grep -qF "left undeclared -- snippets above"
+grep_last_out "root-level evidence warns" grep -qF "sit directly in the project root"
+if [ -e "$PROJ/opk.json" ]; then
+    fail "declined detect writes no opk.json"
+else
+    pass "declined detect writes no opk.json"
+fi
+
+# fixture A, consent y for both candidates -> opk.json written, valid,
+# pretty-printed; the root-level evidence warn keeps rc at 2 (family
+# contract: warnings never vanish because everything was declared)
+detproj
+printf 'y\ny\n' >"$WORK/ans"
+rc_doctor_ans "detect, S evidence, y/y: written, rc 2 (root warn)" 2 "$WORK/ans" detect "$PROJ"
+grep_last_out "declared result row" grep -qF "declared in opk.json -- commit it"
+grep -qF '"path": "build"' "$PROJ/opk.json" &&
+    grep -qF '"path": "src"' "$PROJ/opk.json" &&
+    pass "both consented candidates land in opk.json" ||
+    fail "both consented candidates land in opk.json ($(cat "$PROJ/opk.json" 2>/dev/null))"
+python3 -m json.tool "$PROJ/opk.json" >/dev/null 2>&1 &&
+    pass "written opk.json is valid strict JSON" ||
+    fail "written opk.json is valid strict JSON"
+[ "$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])), indent=2))' "$PROJ/opk.json" 2>/dev/null)" \
+    = "$(cat "$PROJ/opk.json")" ] &&
+    pass "written opk.json is pretty-printed (indent 2)" ||
+    fail "written opk.json is pretty-printed (indent 2)"
+
+# fixture B: only D-on-ignored counts -- build is a candidate, the
+# tracked src/ is NOT (the discrimination pin for the gitignore arm);
+# the map's zero row must point at the DAEMON (the test user) or the
+# unverified-range warn would color every rc in this fixture
+rm -rf "$PROCFIX"
+mkmap 42 "0 $CURUID 1"
+detproj
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+    NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" </dev/null 2>&1)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ]; then
+    pass "detect, D evidence, EOF: rc 1 (build undeclared)"
+else
+    fail "detect, D evidence, EOF: rc 1 (build undeclared) (rc $_rd_rc)"
+fi
+printf '%s' "$_rd_out" | grep -qF "candidate      build --" &&
+    pass "ignored build/ is a candidate" ||
+    fail "ignored build/ is a candidate"
+if printf '%s' "$_rd_out" | grep -qF "candidate      src --"; then
+    fail "tracked src/ is no candidate (D evidence needs the ignore answer)"
+else
+    pass "tracked src/ is no candidate (D evidence needs the ignore answer)"
+fi
+
+# fixture B, consent -> written; re-run: the covered boundary is already
+# declared, no candidate remains, rc 0 (no warns in this fixture)
+detproj
+printf 'y\n' >"$WORK/ans"
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+    NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" <"$WORK/ans" 2>&1)" || _rd_rc=$?
+[ "$_rd_rc" = 0 ] &&
+    pass "detect, D evidence, y: written, rc 0" ||
+    {
+        fail "detect, D evidence, y: written, rc 0 (rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+printf '%s' "$_rd_out" | grep -qF "no container-write evidence found" &&
+    fail "consented run reports its declaration" ||
+    pass "consented run reports its declaration"
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+    NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" </dev/null 2>&1)" || _rd_rc=$?
+[ "$_rd_rc" = 0 ] &&
+    pass "re-detect after declaring: rc 0" ||
+    {
+        fail "re-detect after declaring: rc 0 (rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+printf '%s' "$_rd_out" | grep -qF "already declared (via build)" &&
+    pass "covered boundary shows as already declared" ||
+    fail "covered boundary shows as already declared"
+
+# no evidence at all (fixture B, no ignored paths): rc 0
+rm -rf "$PROJ"
+mkdir -p "$PROJ/src"
+echo s >"$PROJ/src/a.php"
+git init -q "$PROJ"
+rd2() { # detect run with the daemon=me fixture
+    _rd_rc=0
+    _rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+        NO_COLOR=1 setsid sh "$DOCTOR" "$@" </dev/null 2>&1)" || _rd_rc=$?
+}
+rd2 detect "$PROJ"
+[ "$_rd_rc" = 0 ] && printf '%s' "$_rd_out" | grep -qF "no container-write evidence found" &&
+    pass "no evidence -> rc 0, honest empty result" ||
+    fail "no evidence -> rc 0, honest empty result (rc $_rd_rc)"
+
+# append to an EXISTING policy: version, unknown keys and the existing
+# entry survive, the new entry joins the array
+detproj
+printf '{"version":1,"futureKey":true,"containerTrees":[{"path":"legacy","note":"kept"}]}\n' \
+    >"$PROJ/opk.json"
+mkdir -p "$PROJ/legacy"
+printf 'y\n' >"$WORK/ans"
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+    NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" <"$WORK/ans" 2>&1)" || _rd_rc=$?
+python3 - "$PROJ/opk.json" <<'PYEOF' && pass "existing policy survives an append (version, keys, entry)" ||
+import json, sys
+doc = json.load(open(sys.argv[1]))
+assert doc["version"] == 1
+assert doc["futureKey"] is True
+paths = [e["path"] for e in doc["containerTrees"]]
+assert paths == ["legacy", "build"], paths
+PYEOF
+    fail "existing policy survives an append (version, keys, entry) ($(cat "$PROJ/opk.json"))"
+
+# symlinked opk.json: the writer refuses loudly (the 0.0.39g S2 class)
+detproj
+printf '{"containerTrees":[]}\n' >"$WORK/real-pol.json"
+ln -s "$WORK/real-pol.json" "$PROJ/opk.json"
+printf 'y\n' >"$WORK/ans"
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+    NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" <"$WORK/ans" 2>&1)" || _rd_rc=$?
+[ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "is a symlink -- not writing" &&
+    pass "symlinked opk.json -> refuse write, rc 1" ||
+    {
+        fail "symlinked opk.json -> refuse write, rc 1 (rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+
+# unwritable project root: the temp file cannot be created -- loud, rc 1
+detproj
+chmod 555 "$PROJ"
+printf 'y\n' >"$WORK/ans"
+_rd_rc=0
+_rd_out="$(OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="" \
+    NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" <"$WORK/ans" 2>&1)" || _rd_rc=$?
+chmod 755 "$PROJ"
+[ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "cannot create a temp file" &&
+    pass "unwritable root -> loud failure, rc 1" ||
+    {
+        fail "unwritable root -> loud failure, rc 1 (rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+
+# git unavailable (broken stub): the ignore answers are gone, D evidence
+# cannot be verified -- warn row, not silence; S evidence would still
+# work (fixture A would find its candidates without any ignore answers)
+NOGIT="$WORK/nogit-bin"
+mkdir -p "$NOGIT"
+printf '#!/bin/sh\nexit 128\n' >"$NOGIT/git"
+chmod +x "$NOGIT/git"
+detproj
+_rd_rc=0
+_rd_out="$(PATH="$NOGIT:$PATH" OPK_INSTALL_CONF="$CONF_ME" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+    OPK_DOCTOR_OPK="" NO_COLOR=1 setsid sh "$DOCTOR" detect "$PROJ" </dev/null 2>&1)" || _rd_rc=$?
+[ "$_rd_rc" = 2 ] && printf '%s' "$_rd_out" | grep -qF "git ignore answers unavailable" &&
+    printf '%s' "$_rd_out" | grep -qF "only subuid-owner evidence is used" &&
+    pass "git unavailable -> warn row + consequence, rc 2" ||
+    {
+        fail "git unavailable -> warn row + consequence, rc 2 (rc $_rd_rc)"
+        echo "        output: $_rd_out"
+    }
+
+# unusable path forms are dropped at classify time (charset belt): a
+# single-quote directory is evidence-class S (fixture A) but never a
+# candidate; the drop count warns. An unreadable subtree makes the walk
+# itself incomplete -- the warn row must fire, never silence (L1: the
+# find stderr redirect is a fail-soft spot)
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+detproj
+mkdir -p "$PROJ/qu'ote" "$PROJ/locked"
+echo q >"$PROJ/qu'ote/file"
+echo l >"$PROJ/locked/file"
+chmod 000 "$PROJ/locked"
+rc_doctor "detect drops unusable paths, keeps working ones (rc 1)" 1 detect "$PROJ"
+grep_last_out "drop-count warn row" grep -qF "entries dropped -- unusable path forms"
+grep_last_out "incomplete-walk warn row" grep -qF "unreadable entries -- evidence may be incomplete"
+if printf '%s' "$_rd_out" | grep -qF "qu'ote"; then
+    fail "quoted dir never reaches a row"
+else
+    pass "quoted dir never reaches a row"
+fi
+chmod 755 "$PROJ/locked"
 
 # --- summary gate -----------------------------------------------------------------
 echo ""
