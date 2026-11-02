@@ -6,12 +6,12 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**136 metas · 133 active · 3 retired · 18 review-pending · next due 2026-11-14**
+**136 metas · 133 active · 3 retired · 14 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0117, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0133, RM-0135
-- **Amended — pending:** RM-0063 (2026-10-31), RM-0072 (2026-10-31), RM-0073 (2026-10-31), RM-0074 (2026-10-31), RM-0083 (2026-10-31), RM-0084 (2026-10-31), RM-0087 (2026-10-31), RM-0088 (2026-10-31), RM-0089 (2026-10-31), RM-0109 (2026-10-31)
+- **Review pending:** RM-0117, RM-0128, RM-0129, RM-0130, RM-0135
+- **Amended — pending:** RM-0072 (2026-10-31), RM-0073 (2026-10-31), RM-0074 (2026-10-31), RM-0083 (2026-10-31), RM-0084 (2026-10-31), RM-0087 (2026-10-31), RM-0088 (2026-10-31), RM-0089 (2026-10-31), RM-0109 (2026-10-31)
 - **Overdue:** none
 
 ## AGENTS.md
@@ -139,14 +139,14 @@
 |---|---|---|---|---|---|
 | [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | approved | 1m | 2026-11-30 |
 | [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | approved | 1m | 2026-11-30 |
-| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | **pending** | 1m | 2026-11-30 |
+| [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | approved | 1m | 2026-11-30 |
 
 ### Curation and verification
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0126](0/1/2/RM-0126.md) | Curation: a fast-tier | active | **pending** | 1m | 2026-11-28 |
-| [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | **pending** | 1m | 2026-11-28 |
+| [RM-0126](0/1/2/RM-0126.md) | Curation: a fast-tier | active | approved | 1m | 2026-11-28 |
+| [RM-0127](0/1/2/RM-0127.md) | Verification: every curated | active | approved | 1m | 2026-11-28 |
 
 ### Reviewer freshness
 
@@ -154,7 +154,7 @@
 |---|---|---|---|---|---|
 | [RM-0060](0/0/6/RM-0060.md) | The session that runs | active | approved | 1m | 2026-11-28 |
 | [RM-0061](0/0/6/RM-0061.md) | Rounds chain inside Session | active | approved | 1m | 2026-11-28 |
-| [RM-0063](0/0/6/RM-0063.md) | The round comment's metadata records | active | **amended — pending** | 1m | 2026-11-28 |
+| [RM-0063](0/0/6/RM-0063.md) | The round comment's metadata records | active | approved | 1m | 2026-11-28 |
 | [RM-0109](0/1/0/RM-0109.md) | Freshness is measured in | active | **amended — pending** | 1m | 2026-11-28 |
 | [RM-0110](0/1/1/RM-0110.md) | A freshness violation anyway | active | approved | 1m | 2026-11-28 |
 

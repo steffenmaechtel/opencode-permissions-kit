@@ -310,7 +310,7 @@ works.
   session curates directly, disclosed in the comment's provenance.
   (RM-0126)
 - Verification: every curated finding is re-verified against the
-  code — and the verification is SIZED: at ≤ 3 curated findings, all
+  code — and the verification is SIZED: at ≤ 5 curated findings, all
   LOW/INFO, the main session verifies inline (no verifier
   subagents); above that, or at any MED/HIGH finding, exactly ONE
   fresh strong-tier verifier batch runs (verdict files per batch) —
