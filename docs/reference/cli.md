@@ -91,7 +91,7 @@ opk doctor /var/www/vhosts/<project>
 Without a path argument, doctor searches **upward** from the current
 directory for the project's `opk.json` — like git locates `.git`: the
 nearest one wins, a nested `opk.json` shadows any parent's, and the
-filesystem root is the stop. A marker is a readable regular file (a
+filesystem root is the stop. A marker is an existing regular file (a
 symlink to one counts; a dangling symlink or a directory named
 `opk.json` does not — discovery continues to the next ancestor, and
 that ancestor's policy governs). The header reports the root it used:

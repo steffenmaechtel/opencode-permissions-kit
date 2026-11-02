@@ -131,13 +131,16 @@ project_path_sane() {
 #     found (start dir included — a hit at depth 0 prints <start-dir>);
 #     prints nothing and returns 1 when no opk.json exists anywhere on
 #     the chain (the caller keeps its start dir, the v1 strict shape).
-#   - a marker is a READABLE REGULAR FILE through symlinks ([ -f ]):
-#     a dangling opk.json symlink, or a symlink to a directory, is NOT
-#     a marker — the walk continues to the next ancestor and that
-#     ancestor's policy governs (#357 a B3: deliberately; the reported
-#     root is the one whose policy was read). Reading through a
-#     symlink to a regular file is accepted v1 behavior at the project
-#     root; only detect's WRITER refuses links.
+#   - a marker is a REGULAR FILE through symlinks ([ -f ] — existence
+#     and file type, NOT readability: an unreadable opk.json IS a
+#     marker, discovery stops there, and the later policy read fails
+#     loudly): a dangling opk.json symlink, or a symlink to a
+#     directory, is NOT a marker — the walk continues to the next
+#     ancestor and that ancestor's policy governs (#357 a B3:
+#     deliberately; the reported root is the one whose policy was
+#     read). Reading through a symlink to a regular file is accepted
+#     v1 behavior at the project root; only detect's WRITER refuses
+#     links.
 #   - set -e safe: no bare `cmd && act` chains (a failed test would
 #     abort the sourcing shell mid-walk).
 opk_policy_root() {
