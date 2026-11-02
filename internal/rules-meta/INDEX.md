@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**136 metas · 133 active · 3 retired · 23 review-pending · next due 2026-11-14**
+**136 metas · 133 active · 3 retired · 18 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0117, RM-0124, RM-0125, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0131, RM-0132, RM-0133, RM-0135, RM-0136
+- **Review pending:** RM-0117, RM-0126, RM-0127, RM-0128, RM-0129, RM-0130, RM-0133, RM-0135
 - **Amended — pending:** RM-0063 (2026-10-31), RM-0072 (2026-10-31), RM-0073 (2026-10-31), RM-0074 (2026-10-31), RM-0083 (2026-10-31), RM-0084 (2026-10-31), RM-0087 (2026-10-31), RM-0088 (2026-10-31), RM-0089 (2026-10-31), RM-0109 (2026-10-31)
 - **Overdue:** none
 
@@ -124,21 +124,21 @@
 | [RM-0115](0/1/1/RM-0115.md) | A round never declares the | active | approved | 1m | 2026-11-28 |
 | [RM-0118](0/1/1/RM-0118.md) | Closure is a recorded step | active | approved | 1m | 2026-11-28 |
 | [RM-0134](0/1/3/RM-0134.md) | On the non-shipped track, a | active | approved | 1m | 2026-11-30 |
-| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | **pending** | 1m | 2026-12-01 |
+| [RM-0136](0/1/3/RM-0136.md) | Deferred work orders collected during | active | approved | 1m | 2026-12-01 |
 
 ### Round typing and tiering
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | **pending** | 1m | 2026-11-28 |
-| [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | **pending** | 1m | 2026-11-28 |
+| [RM-0124](0/1/2/RM-0124.md) | Track selection is mechanical | active | approved | 1m | 2026-11-28 |
+| [RM-0125](0/1/2/RM-0125.md) | Round typing names what | active | approved | 1m | 2026-11-28 |
 
 ### Review tracks: shipped and non-shipped
 
 | Meta | Rule | Status | Review | Cycle | Next revisit |
 |---|---|---|---|---|---|
-| [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | **pending** | 1m | 2026-11-30 |
-| [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | **pending** | 1m | 2026-11-30 |
+| [RM-0131](0/1/3/RM-0131.md) | Non-shipped staffing: standard | active | approved | 1m | 2026-11-30 |
+| [RM-0132](0/1/3/RM-0132.md) | Fresh-session entry (the batch | active | approved | 1m | 2026-11-30 |
 | [RM-0133](0/1/3/RM-0133.md) | Disposition policy on the non-shipped | active | **pending** | 1m | 2026-11-30 |
 
 ### Curation and verification
