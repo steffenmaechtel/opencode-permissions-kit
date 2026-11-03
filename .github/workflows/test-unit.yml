@@ -142,6 +142,8 @@ jobs:
         run: ./tests/unit/test-secure-binary.sh
       - name: Run lib deploy manifest tests
         run: ./tests/unit/test-deploy-lib.sh
+      - name: Run kit update check tests (issue #358)
+        run: ./tests/unit/test-update-check.sh
       - name: Run e2e binary source tests
         run: ./tests/unit/test-e2e-sources.sh
       - name: Run security advisory tests

@@ -567,7 +567,9 @@ Never touches `projects.conf` or the agent's `opencode.jsonc`. See
 
 Show the protection status: mode, backend + socket reachability, project
 roots, ddev runtime readiness, migration state, the security-advisory check,
-the WSL2 `/mnt/c` exposure (including the browser-bridge state), the
+the kit-update check (issue #358: installed version vs the tracking channel;
+an available update counts as a warning, offline stays an uncounted
+"unknown"), the WSL2 `/mnt/c` exposure (including the browser-bridge state), the
 root-equivalent-access audit, and the leak scan — followed by management
 hints and the one-line verdict (the **Summary** row: *All green* or the
 alert/warning tally).

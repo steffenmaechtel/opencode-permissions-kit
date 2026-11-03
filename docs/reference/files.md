@@ -153,6 +153,7 @@ The deployed library mirrors the repository layout
 | `/usr/local/lib/opencode-permissions-kit/sh/render-agent-config.sh` | Shared helper: opencode.jsonc render |
 | `/usr/local/lib/opencode-permissions-kit/sh/tui-plugin.sh` | Shared helper: TUI 2.x plugin registration |
 | `/usr/local/lib/opencode-permissions-kit/sh/ui.sh` | Shared helper: labeled output |
+| `/usr/local/lib/opencode-permissions-kit/sh/update-check.sh` | Shared helper: kit update probes + daily banner cache |
 | `/usr/local/lib/opencode-permissions-kit/management/config.sh` | Management: projects, git-config, backend, refresh |
 | `/usr/local/lib/opencode-permissions-kit/management/doctor.sh` | Management: ownership diagnosis + guided fix |
 | `/usr/local/lib/opencode-permissions-kit/management/update.sh` | Management: re-deploy, binary upgrades |
@@ -175,6 +176,9 @@ Deployment notes:
   (see [security model](../concepts/security-model.md)).
 - `sh/advisories.sh` — the kit's static advisory database; checked by the
   wrapper on every start, diffed against the upstream feed by `opk status`.
+- `sh/update-check.sh` — compares the installed version against the tracking
+  channel: live row in `opk status`, once-per-day note in the wrapper banner
+  (cached per user in `~/.cache/opencode-permissions-kit/`).
 - `sh/ddev-terminal.sh` is hooked into the default user's rc files.
 
 ## /var/log/opencode-permissions-kit/

@@ -125,6 +125,11 @@ E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSI
 E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts'
 echo "  Install complete."
 
+# Hermetic wrapper banner (issue #358): stamp today's kit-update verdict
+# as "current" so the interactive wrapper starts below replay the cache
+# instead of asking the live mirror from inside the e2e container.
+E 'mkdir -p /home/dev/.cache/opencode-permissions-kit && printf "DATE=%s\nSTATE=current\nVER=\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
+
 check "install.conf records CONTAINER_BACKEND=podman-rootless" \
     E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
 check "wrapper at /usr/local/bin/opencode" \
