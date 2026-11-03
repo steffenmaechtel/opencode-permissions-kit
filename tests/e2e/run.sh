@@ -126,11 +126,13 @@ E 'mkdir -p /home/dev/vhosts/hometest && chmod 750 /home/dev'
 E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects \"/var/www/vhosts /home/dev/vhosts\" --ddev-settings ddev 2>&1 | tee /tmp/install-out.log'"
 echo "  Install complete."
 
-# Hermetic wrapper banner (issue #358): the kit-update note replays from
-# the invoking user's daily cache — stamp today's verdict as "current" so
-# every later interactive wrapper start in this suite is deterministic
-# (no live mirror request from the e2e container). The positive note arm
-# is pinned in section 12e below.
+# Hermetic wrapper banner AND status rows (issue #358): the kit-update
+# note replays from the invoking user's daily cache (stamped "current"
+# for today below), and every container command via E() exports
+# OPK_UPDATE_CHECK=0 — the opt-out the lib names for exactly this — so
+# neither the wrapper nor status.sh's live row ever asks the mirror
+# from inside the e2e container. The positive note arm is pinned in
+# section 12e below.
 E 'mkdir -p /home/dev/.cache/opencode-permissions-kit && printf "DATE=%s\nSTATE=current\nVER=\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
 
 echo ""

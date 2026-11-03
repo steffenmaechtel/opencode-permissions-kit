@@ -55,8 +55,8 @@ Two places tell you a newer kit exists — no extra command needed:
   worst case with a dead network) and caches the verdict per user in
   `~/.cache/opencode-permissions-kit/update-check`; every later start that
   day replays the cache. An available update prints a `NOTE:` line under
-  the banner with the update command. Headless invocations (`serve`, `run`,
-  queries) never run the check.
+  the banner with the update command. Headless invocations (`serve`, `run`
+  with a message argument or piped stdin, queries) never run the check.
 - **`opk status`**: the `kit update` row in the Core section compares live
   on every run. An available update counts as a warning (`opk status
   --short` exits 2 — cron sees an outdated security kit); offline or

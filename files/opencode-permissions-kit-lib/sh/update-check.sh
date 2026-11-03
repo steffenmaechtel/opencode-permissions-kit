@@ -21,11 +21,16 @@
 # "disabled" shape instead.
 
 # Mirror base the channel ref resolves against. Overridable for tests —
-# file:// fixtures work, curl reads them like any URL.
+# file:// fixtures work, curl reads them like any URL. Deliberate test
+# seam, honored wherever the lib is sourced: a stale export in a user
+# environment overrides the documented default (accepted residual,
+# review #365 a S2 — no privilege boundary: the wrapper runs as the
+# invoking user).
 KIT_UPDATE_HOST="${KIT_UPDATE_HOST:-https://raw.githubusercontent.com/steffenmaechtel/opencode-permissions-kit}"
 # One bounded request per day (wrapper) or per run (status): 3 s covers
 # DNS + TLS + a ~10-byte body generously; offline the bound caps the
-# cost of the silence (precedent: the advisory probes' bounds).
+# cost of the silence (precedent: the advisory probes' bounds). Same
+# seam status as KIT_UPDATE_HOST above.
 KIT_UPDATE_TIMEOUT="${KIT_UPDATE_TIMEOUT:-3}"
 
 # kit_update_version_cmp <a> <b>: gt | lt | eq. Own copy of the sort -V
@@ -60,10 +65,20 @@ kit_update_is_tag() {
 # — charset-gated first (update.sh validates the stamp on write; this
 # covers a hand-edited install.conf).
 kit_update_fetch_version() {
+    # Self-gated (review #365 a Q10): the header promises the opt-out
+    # disables every network probe IN THIS LIB — it must hold per
+    # function, not per call site, or a future direct caller bypasses
+    # it silently.
+    [ "${OPK_UPDATE_CHECK:-1}" = 0 ] && return 1
     _kufv_channel="$1"
     printf '%s' "$_kufv_channel" | grep -qxE '[A-Za-z0-9][A-Za-z0-9._/-]*' || return 1
     case "$_kufv_channel" in *..*) return 1 ;; esac
-    _kufv_ver=$(curl -fsSL --max-time "$KIT_UPDATE_TIMEOUT" \
+    # --max-filesize bounds the body BEFORE it is buffered into the
+    # shell variable (review #365 a S1): the shape gates below reject
+    # oversized content, but without the bound a hostile mirror's huge
+    # body is paid in memory first (a VERSION file is ~10 bytes; 64 KiB
+    # is generous).
+    _kufv_ver=$(curl -fsSL --max-time "$KIT_UPDATE_TIMEOUT" --max-filesize 65536 \
         "$KIT_UPDATE_HOST/$_kufv_channel/VERSION" 2>/dev/null || true)
     _kufv_nl='
 '
@@ -134,8 +149,11 @@ kit_update_daily_note() {
             else
                 # Offline or blocked today: keep yesterday's verdict (a
                 # known-available note stays visible), else unknown;
-                # never retry within the day — an offline host must not
-                # pay the bound on every start.
+                # never retry within the day when the cache is writable
+                # — an offline host must not pay the bound on every
+                # start. (An UNWRITABLE cache cannot be stamped and
+                # degrades to a re-check on every start — still no
+                # note, never a blocked start; review #365 a M1/Q6.)
                 if [ "$_kudn_state" != available ]; then
                     _kudn_state=unknown
                     _kudn_ver=""
@@ -146,14 +164,25 @@ kit_update_daily_note() {
         # (the presence probe is free — retry on the next start).
         if [ -n "$_kudn_path" ] && command -v curl >/dev/null 2>&1; then
             if mkdir -p "${_kudn_path%/*}" 2>/dev/null; then
+                # 2>/dev/null BEFORE the target redirect: dash processes
+                # redirections left to right, so with the old order the
+                # open error of >"$path" escaped to the terminal
+                # ("cannot create ...") — a stray line on the banner of
+                # a degraded host (review #365 a M1, verifier-evidenced).
                 printf 'DATE=%s\nSTATE=%s\nVER=%s\n' "$_kudn_today" "$_kudn_state" "$_kudn_ver" \
-                    >"$_kudn_path" 2>/dev/null || true
+                    2>/dev/null >"$_kudn_path" || true
             fi
         fi
     fi
     if [ "$_kudn_state" = available ] && [ -n "$_kudn_ver" ]; then
-        printf 'kit %s is available (installed: %s) — update with: sudo opk update\n' \
-            "$_kudn_ver" "$_kudn_local"
+        # Replay guard (review #365 a S3): a cached verdict from BEFORE
+        # a same-day `opk update` must not advertise a version the
+        # install no longer lacks — compare the cached remote against
+        # the CURRENT local version (equal or older = nothing to show).
+        if [ "$(kit_update_version_cmp "$_kudn_ver" "$_kudn_local")" = gt ]; then
+            printf 'kit %s is available (installed: %s) — update with: sudo opk update\n' \
+                "$_kudn_ver" "$_kudn_local"
+        fi
     fi
     return 0
 }
