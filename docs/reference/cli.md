@@ -149,22 +149,23 @@ project — the `/var/www/vhosts/<org>/<project>` layout resolves itself:
 no `opk.json`, no project. No central registry and no project-name
 heuristics; a marker nested deeper is not a project for this scan, and a
 nested marker inside a project is simply its own project. A marker is an
-**existing regular file through symlinks** (the walk-up rule: a symlink
-to a regular file counts; a dangling symlink or a directory named
-`opk.json` does not — such entries are reported and skipped). A project
-directory that is itself a **symlink** is not descended (the scan root
-operand is followed, nested symlinks are not) — doctor reports the link;
-pass the real directory. Each project gets **one full doctor scan in a
-fresh process**, preceded by a `project` row naming its root — findings
-stay aggregated per project.
+**existing regular file through symlinks** (the walk-up rule: anything
+but a regular file through symlinks — a dangling link, a directory, a
+link to a directory — does not count; such entries are reported and
+skipped). A project directory that is itself a **symlink** is not
+descended (the scan root operand is followed, nested symlinks are not)
+— doctor reports such links within the scanned levels; pass the real
+directory. Each project gets **one full doctor scan in a fresh
+process**, preceded by a `project` row naming its root — findings stay
+aggregated per project.
 
 Default scan roots: `/var/www/vhosts` when it exists, plus every root
 registered via `opk config projects` (reading the kit's existing
 registry — not building a new one; its entries are often parents of
-several projects). A positional scans exactly that tree instead. A root
-that has gone missing or carries control characters is reported and
-skipped; a partially unreadable root warns that its marker list may be
-incomplete.
+several projects). A positional scans exactly that tree instead. List
+roots are normalized; a root that has gone missing, is not absolute, or
+carries control characters or backslashes is reported and skipped; a
+partially unreadable root warns that its marker list may be incomplete.
 
 The exit code aggregates **worst-of** in the usual severity order: `1`
 when any project has at-risk findings — or a per-project scan fails

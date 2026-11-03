@@ -218,10 +218,12 @@ fi
 # project found under several roots spawns ONE child, #360 a F2) --
 # doctor.sh is single-process-per-root by design (mktemp $WORK, EXIT
 # trap, ui counters are per-run state), so 'all' never re-enters this
-# process and never reaches that machinery below. The finds run -H: the
-# named root operand IS followed (a symlinked scan root walks its real
-# tree), nested symlinks are not descended -- a project directory that
-# is itself a symlink gets a warn row instead (#360 a F11).
+# process and never reaches that machinery below. Scan roots are
+# NORMALIZED (the positional above via realpath, list roots in the loop
+# below), which already resolves a symlinked root to its real tree; the
+# finds run -H as the BELT for the realpath-absent fallback (#360 b S3).
+# Nested symlinks are not descended -- a project directory that is
+# itself a symlink gets a warn row instead (#360 a F11).
 # fix/detect deliberately do not combine with 'all' (their per-finding
 # prompts assume one project in focus): 'all' joins 'fix'/'detect' as a
 # reserved first token, and the arg loop above keeps everything else
@@ -294,12 +296,6 @@ if [ "$DOCTOR_MODE" = "all" ]; then
     while IFS= read -r _da_root; do
         [ -n "$_da_root" ] || continue
         ALL_ROOTS_N=$((ALL_ROOTS_N + 1))
-        # belt for list-sourced roots (the positional '/' is refused with
-        # 64 above): one heavy misconfigured root must not kill the fleet
-        if [ "$_da_root" = "/" ]; then
-            ui_kv_warn "scan root" "'/' refused -- doctor all does not walk the whole filesystem"
-            continue
-        fi
         # root-line gate (#360 a F8): list lines (seam, projects.conf) are
         # external data; a control byte or backslash makes the root unusable
         # as a find operand AND clobbers the rows -- warn sanitized, skip
@@ -308,6 +304,29 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
             continue
         fi
+        # normalization (#360 b S1/S2): list roots enter RAW -- realpath
+        # them like the positional above, so '//' and '/./' spellings hit
+        # the '/' belt below instead of walking the whole filesystem, and
+        # the fragment gate's absolute-prefix assumption holds. The
+        # fallback (realpath absent) keeps the raw spelling: the absolute
+        # check refuses relative lines anyway, and the belt's explicit
+        # spelling list is the residual cover for '/'-aliases.
+        _da_root="$(realpath -m "$_da_root" 2>/dev/null || printf '%s' "$_da_root")"
+        case "$_da_root" in
+            /*) ;;
+            *)
+                ui_kv_warn "scan root" "'$_da_root' is not an absolute path -- skipped (list roots must be absolute)"
+                continue
+                ;;
+        esac
+        # belt for list-sourced roots (the positional '/' is refused with
+        # 64 above): one heavy misconfigured root must not kill the fleet
+        case "$_da_root" in
+            / | // | /// | /. | /./ | /.. | /../)
+                ui_kv_warn "scan root" "'$_da_root' refused -- doctor all does not walk the whole filesystem"
+                continue
+                ;;
+        esac
         if [ ! -d "$_da_root" ]; then
             ui_kv_warn "scan root" "'$_da_root' is missing -- skipped"
             continue
@@ -350,10 +369,10 @@ if [ "$DOCTOR_MODE" = "all" ]; then
                 continue
             fi
             # marker-type gate (#360 a F12): the walk-up rule -- a regular
-            # file through symlinks; a directory or a dangling symlink
-            # named opk.json is not a marker
+            # file through symlinks; anything else (a directory, a
+            # dangling symlink, a link to a directory) is not a marker
             if [ ! -f "$_da_hit" ]; then
-                ui_kv_warn "scan root" "'$_da_hit' is not a regular file -- not a marker (directory or dangling symlink named opk.json)"
+                ui_kv_warn "scan root" "'$_da_hit' is not a regular file through symlinks -- not a marker (the walk-up rule)"
                 ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
             fi

@@ -816,7 +816,7 @@ printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLDT/real/opk.json"
 echo f >"$ALLDT/real/tree/f"
 rc_doctor "a F12: dir/dangling opk.json no markers -> rc 0" 0 all "$ALLDT"
 grep_last_out "a F12: non-regular marker warned" \
-    grep -qF "is not a regular file -- not a marker (directory or dangling symlink named opk.json)"
+    grep -qF "is not a regular file through symlinks -- not a marker (the walk-up rule)"
 _n_proj="$(printf '%s' "$_rd_out" | grep -cF 'project        ')"
 if [ "$_n_proj" = 1 ]; then
     pass "a F12: only the real project ran (2 non-markers skipped)"
@@ -920,6 +920,66 @@ fi
 
 # usage: a scan root of '/' is refused like detect's whole-fs walk
 rc_doctor "all: scan root '/' -> rc 64" 64 all /
+
+# --- 4e. round-b fix-wave pins (#360 b) ----------------------------------------------
+# S1: '//' and '/./' list lines normalize onto the '/' belt; S2: a
+# relative list line is refused (keeps the fragment gate's absolute-
+# prefix assumption airtight); S3: with realpath absent, -H follows a
+# symlinked list root (the belt the b-comment documents).
+
+# S1: seam lines spelling the filesystem root variants
+ALLFS="$WORK/all-fs.txt"
+printf '//\n/./\n' >"$ALLFS"
+rc_doctor_roots "b S1: '//' and '/./' refused via normalization -> rc 2" 2 "$ALLFS" all
+grep_last_out "b S1: refusal row names the belt" \
+    grep -qF "refused -- doctor all does not walk the whole filesystem"
+
+# S2: a relative seam line is NORMALIZED against the cwd (realpath) --
+# it lands absolute, so the fragment gate's absolute-prefix assumption
+# holds; the absolute-only warn is the realpath-absent fallback (below)
+ALLREL="$WORK/all-rel.txt"
+printf '%s\n' "relative-root" >"$ALLREL"
+rc_doctor_roots "b S2: relative root line normalized -> rc 2" 2 "$ALLREL" all
+grep_last_out "b S2: the warn names the RESOLVED absolute path" \
+    grep -qF "'$PWD/relative-root' is missing -- skipped"
+
+# S3: symlinked seam root + failing realpath (the A1 stub pattern) --
+# -H is what follows the link then; the marker must be found. The same
+# stub pins S2's fallback arm: relative stays relative -> absolute warn
+S3BIN="$WORK/b3-bin"
+mkdir -p "$S3BIN"
+for _b3t in dirname sed tail id mktemp awk sort find python3 grep wc tr; do
+    ln -s "$(command -v "$_b3t")" "$S3BIN/$_b3t"
+done
+printf '#!/bin/sh\nexit 1\n' >"$S3BIN/realpath"
+chmod +x "$S3BIN/realpath"
+_rd_rc=0
+_rd_out="$(
+    PATH="$S3BIN:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+        OPK_DOCTOR_SCAN_ROOTS="$ALLREL" NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 2 ] &&
+    printf '%s' "$_rd_out" | grep -qF "is not an absolute path -- skipped"; then
+    pass "b S2 fallback: realpath absent -- relative line refused loudly"
+else
+    fail "b S2 fallback: realpath absent -- relative line refused loudly (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+ALLLINK="$WORK/all-rootlink.txt"
+ln -s "$ALLGREEN" "$WORK/all-green-link"
+printf '%s\n' "$WORK/all-green-link" >"$ALLLINK"
+_rd_rc=0
+_rd_out="$(
+    PATH="$S3BIN:$PATH" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+        OPK_DOCTOR_SCAN_ROOTS="$ALLLINK" NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 0 ] && printf '%s' "$_rd_out" | grep -qF "tree -- 2 entries mapped-safe"; then
+    pass "b S3: realpath absent -- -H follows the symlinked list root"
+else
+    fail "b S3: realpath absent -- -H follows the symlinked list root (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+rm -rf "${S3BIN:?}"
 
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at
