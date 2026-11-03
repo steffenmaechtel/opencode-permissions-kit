@@ -981,6 +981,18 @@ else
 fi
 rm -rf "${S3BIN:?}"
 
+# S1: the cntrl gate must see the NORMALIZED root -- a clean seam line
+# resolving through a symlink to a control-char target is caught too
+# (pre-reorder the gate screened only the raw line)
+ALLCTGT="$WORK/all-cn-target"
+mkdir -p "$ALLCTGT/we$(printf '\t')ird"
+ln -s "$ALLCTGT/we$(printf '\t')ird" "$WORK/all-clean-link"
+ALLCLN="$WORK/all-clean.txt"
+printf '%s\n' "$WORK/all-clean-link" >"$ALLCLN"
+rc_doctor_roots "c S1: cntrl target behind a clean symlink skipped -> rc 2" 2 "$ALLCLN" all
+grep_last_out "c S1: the normalized value is gated" \
+    grep -qF "carries control characters or backslashes -- skipped"
+
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at
 # the design's depth -- hermetic execution of the DEFAULT arm would scan

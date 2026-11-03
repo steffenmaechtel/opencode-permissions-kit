@@ -296,21 +296,14 @@ if [ "$DOCTOR_MODE" = "all" ]; then
     while IFS= read -r _da_root; do
         [ -n "$_da_root" ] || continue
         ALL_ROOTS_N=$((ALL_ROOTS_N + 1))
-        # root-line gate (#360 a F8): list lines (seam, projects.conf) are
-        # external data; a control byte or backslash makes the root unusable
-        # as a find operand AND clobbers the rows -- warn sanitized, skip
-        if printf '%s' "$_da_root" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
-            _da_show="$(printf '%s' "$_da_root" | tr -d '[:cntrl:]\\')"
-            ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
-            continue
-        fi
-        # normalization (#360 b S1/S2): list roots enter RAW -- realpath
-        # them like the positional above, so '//' and '/./' spellings hit
-        # the '/' belt below instead of walking the whole filesystem, and
-        # the fragment gate's absolute-prefix assumption holds. The
-        # fallback (realpath absent) keeps the raw spelling: the absolute
-        # check refuses relative lines anyway, and the belt's explicit
-        # spelling list is the residual cover for '/'-aliases.
+        # normalization FIRST (#360 b S1/S2, c S1): list roots enter RAW --
+        # realpath them like the positional above, so '//' and '/./'
+        # spellings hit the '/' belt below instead of walking the whole
+        # filesystem, and the fragment gate's absolute-prefix assumption
+        # holds. Every gate below then sees the FINAL value: a clean line
+        # resolving through a symlink to a cntrl/backslash-carrying target
+        # is caught AFTER normalization too (#360 c S1 -- the raw-line
+        # gate alone screened the line, not what it resolves to).
         _da_root="$(realpath -m "$_da_root" 2>/dev/null || printf '%s' "$_da_root")"
         case "$_da_root" in
             /*) ;;
@@ -319,8 +312,20 @@ if [ "$DOCTOR_MODE" = "all" ]; then
                 continue
                 ;;
         esac
+        # root gate (#360 a F8): control bytes or a backslash make the
+        # root unusable as a find operand AND clobber the rows -- warn
+        # sanitized, skip
+        if printf '%s' "$_da_root" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
+            _da_show="$(printf '%s' "$_da_root" | tr -d '[:cntrl:]\\')"
+            ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
+            continue
+        fi
         # belt for list-sourced roots (the positional '/' is refused with
-        # 64 above): one heavy misconfigured root must not kill the fleet
+        # 64 above): one heavy misconfigured root must not kill the fleet.
+        # The explicit spellings cover the direct '/'-aliases for the
+        # realpath-absent fallback; deeper aliases ('/a/..') remain a
+        # fallback-arm residual -- realpath-present hosts normalize them
+        # onto the '/' arm (#360 c S3).
         case "$_da_root" in
             / | // | /// | /. | /./ | /.. | /../)
                 ui_kv_warn "scan root" "'$_da_root' refused -- doctor all does not walk the whole filesystem"
