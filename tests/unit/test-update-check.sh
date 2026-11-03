@@ -148,18 +148,34 @@ if KIT_UPDATE_HOST="$KIT_HOST" kit_update_fetch_version twolines >/dev/null 2>&1
 else
     pass "fetch: multi-line body rejected"
 fi
-# Oversized body rejected at the curl layer (--max-filesize, review
-# #365 a S1): the bound must fire BEFORE the body is buffered into a
-# shell variable — a VERSION file is ~10 bytes, 64 KiB is the ceiling.
+# Oversized body is rejected — honest scope (round b R2): this pin
+# observes the OUTCOME (rejection), not the buffering bound itself; a
+# body that is both oversized AND shape-valid cannot exist (a valid
+# VERSION is one short line), so the mechanism is pinned by the
+# wiring grep below instead. The shape gate would reject this
+# two-line body with or without --max-filesize.
 mkdir -p "$WORK/kit/huge"
 {
     printf '0.0.59\n'
     head -c 70000 /dev/zero | tr '\0' 'x'
 } >"$WORK/kit/huge/VERSION"
 if KIT_UPDATE_HOST="$KIT_HOST" kit_update_fetch_version huge >/dev/null 2>&1; then
-    fail "fetch: oversized body must be rejected before buffering"
+    fail "fetch: oversized body must be rejected"
 else
-    pass "fetch: oversized body rejected before buffering"
+    pass "fetch: oversized body rejected"
+fi
+grep -q -- '--max-filesize 65536' "$LIB" &&
+    pass "fetch: curl invocation carries the --max-filesize bound (wiring)" ||
+    fail "fetch: --max-filesize bound missing from the curl invocation"
+# The opt-out self-gates INSIDE the fetch function (round a Q10, pin
+# per round b R3): with OPK_UPDATE_CHECK=0 the fetch must refuse even
+# against a live, well-formed fixture (a shape-invalid one would fail
+# either way and mask the gate).
+fixture_channel selfgate 1.2.3
+if OPK_UPDATE_CHECK=0 KIT_UPDATE_HOST="$KIT_HOST" kit_update_fetch_version selfgate >/dev/null 2>&1; then
+    fail "fetch: OPK_UPDATE_CHECK=0 must refuse the probe (self-gate)"
+else
+    pass "fetch: OPK_UPDATE_CHECK=0 refuses the probe (self-gate)"
 fi
 if KIT_UPDATE_HOST="$KIT_HOST" kit_update_fetch_version no-such-channel >/dev/null 2>&1; then
     fail "fetch: missing channel file must fail"
