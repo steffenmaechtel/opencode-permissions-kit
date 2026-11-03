@@ -1660,7 +1660,7 @@ fi
 
 # --- 7b. fix-wave pins (#361) --------------------------------------------------------
 # W1: the SINGLE-root workspace (scan/fix/detect) gets the same dead-
-# workspace guard as the all block (4d F5): doctor is set -u only (no
+# workspace guard as the all block (#360 a F5): doctor is set -u only (no
 # -e -- one failing tree must not kill the remaining verdicts), so an
 # unchecked mktemp left WORK empty and every later path collapsed to a
 # root-level literal (/ranges, /trees, /uids ...) instead of failing.
