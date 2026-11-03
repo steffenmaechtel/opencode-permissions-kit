@@ -58,10 +58,19 @@
 # explicit per-finding [y/N] consent (default n); without consent the
 # snippet is printed to paste. Declined findings leave rc 1.
 #
+# 'doctor all' (#354 / #313 phase 5) runs the scan over EVERY project at
+# once: opk.json doubles as the project registration marker -- every
+# opk.json found (max 3 levels below a scan root) is one project, one
+# FRESH doctor process per hit. No central registry, no project-name
+# heuristics; 'opk status' integration is deliberately deferred (#313
+# Q3). The full contract lives in the all block below.
+#
 # CLI:  opk doctor [project-root]                 scan (default: cwd, walked
 #                                                  up to the nearest opk.json)
 #       opk doctor fix [project-root] [--dry-run]  orchestrate the fixes
 #       opk doctor detect [project-root]           propose opk.json entries
+#       opk doctor all [scan-root]                 one scan per project (the
+#                                                  opk.json markers decide)
 # Root resolution (#353 / #313 phase 4): without a positional (a plain
 # '.' or './' counts as none -- other dot-spellings like './.' are
 # explicit roots, #357 a A2) the root is DISCOVERED upward from the cwd
@@ -73,7 +82,9 @@
 #      dry-run, failed handover, or re-written-before-recheck -- or a
 #      rejected policy / degraded-install error (all modes), or detect
 #      candidates left undeclared (snippet printed), 2 warning(s) only,
-#      64 usage error.
+#      64 usage error. 'doctor all' aggregates worst-of across the
+#      scanned roots (any alert -> 1, else any warning or nothing
+#      scanned -> 2, else 0; the all block owns the details).
 #
 # Run directly:
 #   /usr/local/lib/opencode-permissions-kit/management/doctor.sh [path]
@@ -118,11 +129,12 @@ fi
 # a no-op). Everything else is rejected with 64.
 _doctor_usage() {
     echo "usage: opk doctor [project-root]                   (read-only scan; root: cwd or the nearest opk.json above)" >&2
+    echo "       opk doctor all [scan-root]                  (one scan per project: every opk.json below the root(s))" >&2
     echo "       opk doctor fix [project-root] [--dry-run]   (offer the handover fix per at-risk tree)" >&2
     echo "       opk doctor detect [project-root]            (propose opk.json entries from evidence)" >&2
 }
 DOCTOR_MODE=scan
-if [ "${1:-}" = "fix" ] || [ "${1:-}" = "detect" ]; then
+if [ "${1:-}" = "fix" ] || [ "${1:-}" = "detect" ] || [ "${1:-}" = "all" ]; then
     DOCTOR_MODE="$1"
     shift
 fi
@@ -134,7 +146,7 @@ for _do_arg in "$@"; do
         --dry-run)
             if [ "$DOCTOR_MODE" != "fix" ]; then
                 _doctor_usage
-                echo "error: doctor: --dry-run needs 'fix' (the scan is read-only; detect writes only on consent)" >&2
+                echo "error: doctor: --dry-run needs 'fix' (the scan and 'all' are read-only; detect writes only on consent)" >&2
                 exit 64
             fi
             DOCTOR_FIX_DRY=1
@@ -175,6 +187,163 @@ esac
 if [ ! -d "$DOCTOR_ROOT" ]; then
     ui_error "doctor: no such directory: $DOCTOR_ROOT"
     exit 64
+fi
+
+# --- multi-project marker scan (#354 / #313 phase 5) ---------------------------------
+# 'doctor all' scans EVERY project at once: opk.json doubles as the
+# project registration marker, so projects are DISCOVERED, never
+# configured --
+#   find <scan-root> -maxdepth 3 -name opk.json   ->  one doctor per root
+# (the /var/www/vhosts/<org>/<project> layout resolves itself: no
+# opk.json, no project -- no central registry, no name heuristics; a
+# marker nested deeper than 3 levels below a scan root is not a project
+# here). Scan roots, first arm that applies:
+#   - an explicit positional: exactly that tree (defaults stay out)
+#   - $OPK_DOCTOR_SCAN_ROOTS (test seam, the OPK_INSTALL_CONF pattern):
+#     a file with one root per line, replacing the whole default list
+#   - /var/www/vhosts when it exists, plus every root registered in the
+#     kit's own projects.conf (reading the EXISTING registry is not
+#     building a new one; its entries are often parents of several
+#     projects and get the same maxdepth walk)
+# ORCHESTRATION: a thin loop here spawning a FRESH process per root
+# (sh "$0" <root>) -- doctor.sh is single-process-per-root by design
+# (mktemp $WORK, EXIT trap, ui counters are per-run state), so 'all'
+# never re-enters this process and never reaches that machinery below.
+# fix/detect deliberately do not combine with 'all' (their per-finding
+# prompts assume one project in focus): 'all' joins 'fix'/'detect' as a
+# reserved first token, and the arg loop above keeps everything else
+# away. Exit-code aggregation, worst-of in the status.sh severity
+# order: any root alerting (rc 1) or failing outright (a child rc
+# outside 0/1/2 -- counted as an alert with its own warn row) -> 1;
+# otherwise any root warning-only, or nothing scanned at all (no scan
+# roots, or no markers under them) -> 2; otherwise 0.
+INSTALL_CONF="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
+if [ "$DOCTOR_MODE" = "all" ]; then
+    # kit pre-flight (one loud error instead of one per child): children
+    # re-check everything themselves -- this only keeps a degraded
+    # install from printing its error once per discovered project.
+    if [ ! -f "$INSTALL_CONF" ]; then
+        ui_error "doctor: $INSTALL_CONF not found -- is the kit installed?"
+        exit 1
+    fi
+    PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
+    # shellcheck disable=SC2317  # invoked via trap only
+    _doctor_all_cleanup() { rm -rf "$WORK_ALL"; }
+    WORK_ALL="$(mktemp -d)"
+    trap _doctor_all_cleanup EXIT
+    trap '_doctor_all_cleanup; exit 1' INT TERM
+
+    # --- the scan-root list (positional > seam > defaults) ---------------------------
+    : >"$WORK_ALL/roots"
+    if [ -n "$DOCTOR_ROOT_ARG" ]; then
+        printf '%s\n' "$DOCTOR_ROOT" >>"$WORK_ALL/roots"
+    elif [ -n "${OPK_DOCTOR_SCAN_ROOTS:-}" ]; then
+        # fail loud, never a silent fallback: dropping to the real
+        # /var/www/vhosts here would scan the host's live tree
+        if [ ! -r "$OPK_DOCTOR_SCAN_ROOTS" ]; then
+            ui_error "doctor: OPK_DOCTOR_SCAN_ROOTS is set but not readable: $OPK_DOCTOR_SCAN_ROOTS"
+            exit 1
+        fi
+        grep -v '^[[:space:]]*$' "$OPK_DOCTOR_SCAN_ROOTS" >>"$WORK_ALL/roots" || true
+    else
+        [ -d /var/www/vhosts ] && printf '%s\n' /var/www/vhosts >>"$WORK_ALL/roots"
+        if [ -f "$PROJECTS_CONF" ]; then
+            if [ -r "$PROJECTS_CONF" ]; then
+                grep -v '^[[:space:]]*$' "$PROJECTS_CONF" >>"$WORK_ALL/roots" || true
+            else
+                ui_kv_warn "scan root" "$PROJECTS_CONF unreadable -- its roots are not scanned"
+            fi
+        fi
+    fi
+    LC_ALL=C sort -u "$WORK_ALL/roots" >"$WORK_ALL/roots.s" && mv "$WORK_ALL/roots.s" "$WORK_ALL/roots"
+
+    # --- marker discovery: one project root per opk.json found ----------------------
+    ALL_ROOTS_N=0
+    : >"$WORK_ALL/projects"
+    while IFS= read -r _da_root; do
+        [ -n "$_da_root" ] || continue
+        ALL_ROOTS_N=$((ALL_ROOTS_N + 1))
+        if [ ! -d "$_da_root" ]; then
+            ui_kv_warn "scan root" "'$_da_root' is missing -- skipped"
+            continue
+        fi
+        # stderr is loud, not lost (the unreadable-subtree class): a
+        # partially walked root must not read as "no markers here"
+        find "$_da_root" -maxdepth 3 -name opk.json -print \
+            >"$WORK_ALL/hits" 2>"$WORK_ALL/ferr"
+        if [ -s "$WORK_ALL/ferr" ]; then
+            _da_n="$(wc -l <"$WORK_ALL/ferr")"
+            ui_kv_warn "scan root" "$_da_n unreadable entries under $_da_root -- marker list may be incomplete"
+            ui_detail "run 'doctor all' as the tree owner (or with sudo) for a complete picture"
+        fi
+        while IFS= read -r _da_hit; do
+            [ -n "$_da_hit" ] || continue
+            _da_proj="$(dirname "$_da_hit")"
+            # marker gate (detect's charset class): control characters or
+            # backslashes cannot round-trip child argv, rows and prompts
+            # cleanly -- warn and skip, never a silent drop
+            if printf '%s' "$_da_proj" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
+                ui_kv_warn "scan root" "marker at '$_da_proj' skipped -- control characters or backslashes in the path"
+                continue
+            fi
+            printf '%s\n' "$_da_proj" >>"$WORK_ALL/projects"
+        done <"$WORK_ALL/hits"
+    done <"$WORK_ALL/roots"
+    LC_ALL=C sort -u "$WORK_ALL/projects" >"$WORK_ALL/projects.s" &&
+        mv "$WORK_ALL/projects.s" "$WORK_ALL/projects"
+
+    # --- one fresh doctor per project -----------------------------------------------
+    ALL_N=0
+    ALL_GREEN=0
+    ALL_WARN=0
+    ALL_ALERT=0
+    ALL_ERR=0
+    if [ -s "$WORK_ALL/projects" ]; then
+        ui_section "Doctor all -- one scan per project"
+        while IFS= read -r _da_proj; do
+            [ -n "$_da_proj" ] || continue
+            ALL_N=$((ALL_N + 1))
+            ui_kv "project" "$_da_proj"
+            _da_rc=0
+            sh "$0" "$_da_proj" || _da_rc=$?
+            case "$_da_rc" in
+                0) ALL_GREEN=$((ALL_GREEN + 1)) ;;
+                1) ALL_ALERT=$((ALL_ALERT + 1)) ;;
+                2) ALL_WARN=$((ALL_WARN + 1)) ;;
+                *)
+                    ALL_ERR=$((ALL_ERR + 1))
+                    ui_kv_warn "project" "doctor exited $_da_rc -- counted as an alert"
+                    ;;
+            esac
+        done <"$WORK_ALL/projects"
+    fi
+
+    # --- aggregate summary (worst-of, the contract in the block comment) -------------
+    ui_section "Doctor all -- summary"
+    if [ "$ALL_N" -eq 0 ]; then
+        if [ "$ALL_ROOTS_N" -eq 0 ]; then
+            ui_kv_warn "result" "no scan roots available -- pass one, or use the /var/www/vhosts layout or projects.conf"
+        else
+            ui_kv_warn "result" "no opk.json markers found under the scanned root(s) -- nothing to check"
+        fi
+        exit 2
+    fi
+    ui_kv "projects" "$ALL_N scanned under $ALL_ROOTS_N scan root(s)"
+    [ "$ALL_ERR" -gt 0 ] &&
+        ui_kv_bad "failed" "$ALL_ERR scan(s) exited unexpectedly (counted as alerts)"
+    [ "$ALL_ALERT" -gt 0 ] &&
+        ui_kv_bad "findings" "$ALL_ALERT project(s) with at-risk findings or errors"
+    [ "$ALL_WARN" -gt 0 ] &&
+        ui_kv_warn "warnings" "$ALL_WARN project(s) warnings only"
+    [ "$ALL_GREEN" -gt 0 ] &&
+        ui_kv_ok "healthy" "$ALL_GREEN project(s) all green"
+    if [ $((ALL_ALERT + ALL_ERR)) -gt 0 ]; then
+        exit 1
+    fi
+    if [ "$ALL_WARN" -gt 0 ]; then
+        exit 2
+    fi
+    exit 0
 fi
 
 # --- walk-up opk.json discovery (#353 / #313 phase 4) ------------------------------
@@ -263,7 +432,7 @@ if [ "$DOCTOR_MODE" = "fix" ] && [ ! -f "$DOCTOR_OPK" ]; then
 fi
 
 # --- the daemon user (the rootless backend runs as this user) --------------------
-INSTALL_CONF="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
+# INSTALL_CONF resolves above (the 'all' block shares it)
 if [ ! -f "$INSTALL_CONF" ]; then
     ui_error "doctor: $INSTALL_CONF not found -- is the kit installed?"
     exit 1

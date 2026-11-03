@@ -599,6 +599,192 @@ rc_doctor "two args -> rc 64" 64 "$PROJ" "$PROJ"
 rc_doctor "flag arg -> rc 64" 64 --short
 rc_doctor "nonexistent dir -> rc 64" 64 "$WORK/no-such-project"
 
+# --- 4c. multi-project marker scan (#354 / #313 phase 5) -----------------------------
+# 'doctor all': opk.json markers DISCOVER the projects (find -maxdepth 3
+# below a scan root), one FRESH doctor child per project (each prints its
+# own section header -- the count is the re-entrance discriminator), and
+# the aggregate rc is worst-of (alert 1 > warning 2 > green 0; nothing
+# scanned = 2). Every no-positional arm wires the OPK_DOCTOR_SCAN_ROOTS
+# seam: no pin ever scans the real /var/www/vhosts or projects.conf
+# (sandbox policy + determinism). The chmod-000 arms assume a non-root
+# suite user (CI), the same sensitivity the §4 unreadable-subtree pins
+# carry.
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+ALLSCAN="$WORK/allscan"
+mkdir -p "$ALLSCAN/org/good/tree" "$ALLSCAN/org/broke" "$ALLSCAN/org/warn" \
+    "$ALLSCAN/toodeep/a/b"
+echo g >"$ALLSCAN/org/good/tree/file"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLSCAN/org/good/opk.json"
+printf '%s\n' '{ broken json' >"$ALLSCAN/org/broke/opk.json"
+printf '%s\n' '{"containerTrees":["not/cloned/yet"]}' >"$ALLSCAN/org/warn/opk.json"
+# depth 4 below the scan root: NOT a project for the marker scan
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLSCAN/toodeep/a/b/opk.json"
+ALLROOTS="$WORK/all-roots.txt"
+printf '%s\n' "$ALLSCAN" >"$ALLROOTS"
+
+# run_doctor_roots <roots-file> [args...] / rc_doctor_roots -- the
+# run_doctor/rc_doctor shapes plus the scan-roots seam (always set here;
+# set-but-empty would fall back to the REAL default roots, which no pin
+# may touch)
+run_doctor_roots() {
+    _rrr_roots="$1"
+    shift
+    OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_OPK="${RD_OPK:-}" \
+        OPK_DOCTOR_SCAN_ROOTS="$_rrr_roots" NO_COLOR=1 setsid sh "$DOCTOR" "$@" </dev/null 2>&1
+}
+rc_doctor_roots() {
+    _rrd_desc="$1" _rrd_want="$2" _rrd_roots="$3"
+    shift 3
+    _rd_rc=0
+    _rd_out="$(run_doctor_roots "$_rrd_roots" "$@")" || _rd_rc=$?
+    if [ "$_rd_rc" = "$_rrd_want" ]; then
+        pass "$_rrd_desc (rc $_rrd_want)"
+    else
+        fail "$_rrd_desc (rc $_rrd_want, got $_rd_rc)"
+        echo "        output: $_rd_out"
+    fi
+}
+
+# mixed fleet via the seam: green + error + warning -> worst-of rc 1
+rc_doctor_roots "all: mixed fleet -> rc 1" 1 "$ALLROOTS" all
+grep_last_out "project row names the green root" grep -qF "project        $ALLSCAN/org/good"
+grep_last_out "child verdict row from the green project" grep -qF "tree -- 2 entries mapped-safe"
+grep_last_out "broken policy reported by its own child" grep -qF "policy file was rejected"
+grep_last_out "summary projects row" grep -qF "projects       3 scanned under 1 scan root(s)"
+grep_last_out "summary findings row" grep -qF "findings       1 project(s) with at-risk findings or errors"
+grep_last_out "summary warnings row" grep -qF "warnings    1 project(s) warnings only"
+grep_last_out "summary healthy row" grep -qF "healthy        1 project(s) all green"
+if printf '%s' "$_rd_out" | grep -q toodeep; then
+    fail "a marker 4 levels deep is no project"
+else
+    pass "a marker 4 levels deep is no project"
+fi
+_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership')"
+if [ "$_n_child" = 3 ]; then
+    pass "one fresh doctor section per project (3 children)"
+else
+    fail "one fresh doctor section per project (got $_n_child)"
+fi
+
+# warnings-only fleet (positional arm): no alert -> rc 2
+ALLWARN="$WORK/allwarn"
+mkdir -p "$ALLWARN/proj"
+printf '%s\n' '{"containerTrees":["not/cloned/yet"]}' >"$ALLWARN/proj/opk.json"
+rc_doctor "all: warnings-only fleet -> rc 2" 2 all "$ALLWARN"
+grep_last_out "warnings row present" grep -qF "warnings    1 project(s) warnings only"
+if printf '%s' "$_rd_out" | grep -qF "findings       1"; then
+    fail "no findings row in a warnings-only fleet"
+else
+    pass "no findings row in a warnings-only fleet"
+fi
+
+# all-green fleet (positional): rc 0, and the positional scans EXACTLY
+# that tree -- markers outside it never run
+ALLGREEN="$WORK/allgreen"
+mkdir -p "$ALLGREEN/proj/tree"
+echo g >"$ALLGREEN/proj/tree/file"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLGREEN/proj/opk.json"
+rc_doctor "all: all-green fleet -> rc 0" 0 all "$ALLGREEN"
+grep_last_out "healthy row present" grep -qF "healthy        1 project(s) all green"
+if printf '%s' "$_rd_out" | grep -qF "$ALLSCAN"; then
+    fail "a positional stays inside its own tree"
+else
+    pass "a positional stays inside its own tree"
+fi
+
+# at-risk fleet: no range maps the test user -> children really classify
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1"
+rc_doctor "all: at-risk fleet -> rc 1" 1 all "$ALLGREEN"
+grep_last_out "at-risk verdict row from the child" grep -qF "entries at-risk (unmapped owners)"
+grep_last_out "guided remedy hint from the child" grep -qF "fix: opk doctor fix"
+rm -rf "$PROCFIX"
+mkmap 42 "0 0 1" "1 $CURUID 65536"
+
+# zero markers under an existing root -> rc 2 (the nothing-to-check class)
+ALLEMPTY="$WORK/allempty"
+mkdir -p "$ALLEMPTY"
+rc_doctor "all: no markers -> rc 2" 2 all "$ALLEMPTY"
+grep_last_out "zero-marker warn" \
+    grep -qF "no opk.json markers found under the scanned root(s) -- nothing to check"
+
+# no scan roots at all (seam file without a single line) -> rc 2
+ALLNONE="$WORK/all-none.txt"
+: >"$ALLNONE"
+rc_doctor_roots "all: no scan roots -> rc 2" 2 "$ALLNONE" all
+grep_last_out "no-roots warn" grep -qF "no scan roots available"
+
+# seam set but unreadable -> loud rc 1, never a silent real-tree fallback
+chmod 000 "$ALLROOTS"
+rc_doctor_roots "all: unreadable seam -> rc 1" 1 "$ALLROOTS" all
+grep_last_out "seam error row" grep -qF "OPK_DOCTOR_SCAN_ROOTS is set but not readable"
+chmod 644 "$ALLROOTS"
+
+# missing scan root in the seam: warn + skip, zero markers -> rc 2
+ALLGONE="$WORK/all-gone.txt"
+printf '%s\n' "$WORK/all-gone-dir" >"$ALLGONE"
+rc_doctor_roots "all: missing scan root skipped -> rc 2" 2 "$ALLGONE" all
+grep_last_out "missing-root warn row" grep -qF "is missing -- skipped"
+grep_last_out "falls through to the zero-marker warn" \
+    grep -qF "no opk.json markers found under the scanned root(s)"
+
+# control-char marker: skipped loudly; the siblings' children unaffected
+ALLCT="$ALLSCAN/we$(printf '\t')ird"
+mkdir -p "$ALLCT"
+printf '%s\n' '{"containerTrees":[]}' >"$ALLCT/opk.json"
+rc_doctor_roots "all: control-char marker skipped, fleet rc 1" 1 "$ALLROOTS" all
+grep_last_out "charset skip warn" \
+    grep -qF "skipped -- control characters or backslashes in the path"
+_n_child="$(printf '%s' "$_rd_out" | grep -c 'Doctor -- container-tree ownership')"
+if [ "$_n_child" = 3 ]; then
+    pass "the skipped marker runs no child"
+else
+    fail "the skipped marker runs no child (got $_n_child children)"
+fi
+rm -rf "${ALLCT:?}"
+
+# unreadable subtree under a scan root: the marker list warns incomplete
+mkdir -p "$ALLSCAN/locked/sub"
+chmod 000 "$ALLSCAN/locked"
+rc_doctor_roots "all: unreadable subtree -> warn, fleet rc 1" 1 "$ALLROOTS" all
+grep_last_out "incomplete-walk warn row" grep -qF "marker list may be incomplete"
+chmod 755 "$ALLSCAN/locked"
+
+# usage errors: --dry-run is fix-only, grammar stays strict
+rc_doctor "all: --dry-run rejected -> rc 64" 64 all --dry-run
+grep_last_out "dry-run error names 'all'" grep -qF "the scan and 'all' are read-only"
+rc_doctor "all: two positionals -> rc 64" 64 all "$ALLSCAN" "$ALLSCAN"
+rc_doctor "all: unknown flag -> rc 64" 64 all --foo
+
+# degraded install: ONE loud pre-flight error before any scanning
+_rd_rc=0
+_rd_out="$(
+    OPK_INSTALL_CONF="$WORK/all-nope.conf" OPK_DOCTOR_SCAN_ROOTS="$ALLROOTS" \
+        NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF "not found -- is the kit installed?" &&
+    ! printf '%s' "$_rd_out" | grep -q "Doctor all"; then
+    pass "degraded install: one pre-flight error, no scanning"
+else
+    fail "degraded install: one pre-flight error, no scanning (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+
+# static source pins (comment-strip rider, the canonical shape): the
+# default roots are the vhosts layout plus the kit's own registry, at
+# the design's depth -- hermetic execution of the DEFAULT arm would scan
+# the host's real tree, so the claim is source-pinned instead
+_nl_src="$(sed 's/^[[:space:]]*#.*$//' "$DOCTOR")"
+if printf '%s' "$_nl_src" | grep -qF '[ -d /var/www/vhosts ]' &&
+    printf '%s' "$_nl_src" | grep -qF 'projects.conf' &&
+    printf '%s' "$_nl_src" | grep -qF -- '-maxdepth 3'; then
+    pass "source pin: default roots /var/www/vhosts + projects.conf, maxdepth 3"
+else
+    fail "source pin: default roots /var/www/vhosts + projects.conf, maxdepth 3"
+fi
+
 # --- 5. kit-state failure paths ----------------------------------------------------
 _rd_rc=0
 _rd_out="$(OPK_INSTALL_CONF="$WORK/nope.conf" NO_COLOR=1 sh "$DOCTOR" "$PROJ" 2>&1)" || _rd_rc=$?

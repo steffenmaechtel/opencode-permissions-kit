@@ -1369,6 +1369,29 @@ check "12o: handover me from inside the declared tree warns via walk-up" \
     E 'cd /var/www/vhosts/doctor-walk/tree/deep && opk handover me . --dry-run >/tmp/dwalk-ho.log 2>&1; test $? -eq 0 && grep -q "takes back the declared container tree .tree." /tmp/dwalk-ho.log'
 E 'rm -rf /var/www/vhosts/doctor-walk /tmp/dwalk-*.log'
 
+echo "--- 12p. opk doctor all: multi-project marker scan (issue #354 / #313 phase 5) ---"
+# Deployed-layout proof of the fleet scan: two marker projects under one
+# scratch tree -- one healthy (its tree handed to the agent user, daemon
+# uid = always mapped), one at-risk (dev-owned entries) -- 'doctor all'
+# discovers BOTH via their opk.json markers, runs one full scan each and
+# aggregates worst-of.
+E 'mkdir -p /var/www/vhosts/doctor-all/good/tree /var/www/vhosts/doctor-all/risk/tree'
+E 'printf "%s\n" "{\"version\":1,\"containerTrees\":[{\"path\":\"tree\"}]}" >/var/www/vhosts/doctor-all/good/opk.json'
+E 'printf "%s\n" "{\"containerTrees\":[\"tree\"]}" >/var/www/vhosts/doctor-all/risk/opk.json'
+E 'echo g >/var/www/vhosts/doctor-all/good/tree/out.js'
+E 'echo r >/var/www/vhosts/doctor-all/risk/tree/out.js'
+E 'mkdir -p /var/www/vhosts/doctor-all/nomark/inner'
+E 'opk handover opencode /var/www/vhosts/doctor-all/good/tree >/tmp/dall-ho.log 2>&1'
+check "12p: the healthy project's tree is handed over first" \
+    E 'grep -q "handover complete" /tmp/dall-ho.log'
+check "12p: doctor all scans every marker project, worst-of rc 1" \
+    E 'opk doctor all /var/www/vhosts/doctor-all >/tmp/dall.log 2>&1; test $? -eq 1 && grep -q "tree -- .* entries at-risk" /tmp/dall.log && grep -q "mapped-safe" /tmp/dall.log && grep -qF "findings       1 project(s) with at-risk findings or errors" /tmp/dall.log'
+check "12p: one fresh scan section per project" \
+    E 'test "$(grep -c "Doctor -- container-tree ownership" /tmp/dall.log)" = 2'
+check "12p: a marker-free subtree contributes no project" \
+    E 'grep -qF "projects       2 scanned under 1 scan root(s)" /tmp/dall.log'
+E 'rm -rf /var/www/vhosts/doctor-all /tmp/dall*.log'
+
 echo ""
 echo "--- 13. Uninstall & cleanup verification ---"
 E 'bash /usr/local/lib/opencode-permissions-kit/management/uninstall.sh --yes' &&

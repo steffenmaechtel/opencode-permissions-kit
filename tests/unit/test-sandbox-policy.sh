@@ -68,6 +68,10 @@ tests/unit/test-project-paths.sh|/var/www/vhosts/client
 tests/unit/test-project-paths.sh|/var/www/vhosts/client1
 # screening-pattern loop values fed to greps against uninstall.sh
 tests/unit/test-uninstall.sh|/var/www/vhosts
+# default-scan-root source pin over doctor.sh (#354): the literal is a
+# grep PATTERN against stripped source (policy-INPUT), never executed
+# as a path
+tests/unit/test-doctor.sh|/var/www/vhosts
 "
 
 passed=0
