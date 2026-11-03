@@ -9,7 +9,8 @@
 #                  read-only ownership diagnosis, issue #313; 'doctor fix'
 #                  orchestrates the handover remedy, elevation stays
 #                  inside handover; 'doctor detect' proposes opk.json
-#                  entries, #352)
+#                  entries, #352; 'doctor all' scans every opk.json
+#                  marker project, #354)
 #   opk config ... -> management/config.sh   (auto sudo)
 #   opk update ... -> management/update.sh   (auto sudo)
 #   opk uninstall  -> management/uninstall.sh (runs as your user,
@@ -129,6 +130,15 @@ Commands:
                                    candidate (default n), the snippet to paste
                                    on decline; read-only unless consented;
                                    exit codes like status
+  doctor all [scan-root]           Run the doctor scan for EVERY project at
+                                   once: every opk.json found (up to 3 levels
+                                   below a scan root) is one project, one full
+                                   scan each, findings aggregated per project.
+                                   Default scan roots: /var/www/vhosts plus
+                                   the registered projects.conf roots; a
+                                   positional scans exactly that tree. Exit
+                                   codes worst-of: 0 all green, 1 any alert,
+                                   2 warnings only or nothing scanned
   config <args...>                Change settings: status (git-config +
                                   projects overview), projects
                                   list|add|remove,
@@ -207,8 +217,11 @@ case "$cmd" in
         # project declares in opk.json -- mapped-safe vs at-risk for
         # container metadata ops (the #312 EPERM class). 'doctor fix'
         # additionally orchestrates the handover remedy; 'doctor detect'
-        # (#352) proposes opk.json entries from ownership evidence; no
-        # sudo here either -- the elevation happens inside handover.
+        # (#352) proposes opk.json entries from ownership evidence;
+        # 'doctor all' (#354 / #313 phase 5) runs the scan for every
+        # project at once -- one fresh doctor process per discovered
+        # opk.json-marker project (the deduped list spawns the children);
+        # no sudo here either -- the elevation happens inside handover.
         exec sh "$LIBDIR/management/doctor.sh" "$@"
         ;;
     config | update)
