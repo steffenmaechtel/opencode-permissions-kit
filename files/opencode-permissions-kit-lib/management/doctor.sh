@@ -579,7 +579,15 @@ fi
 # the live /proc -- same override pattern as OPK_INSTALL_CONF).
 DOCTOR_PROC="${OPK_DOCTOR_PROC_ROOT:-/proc}"
 
-WORK="$(mktemp -d)"
+# fail loud on a dead workspace (#361): this script is set -u ONLY (no
+# -e -- one failing tree must not kill the remaining verdicts), so an
+# empty WORK from a failed mktemp would NOT abort here but collapse
+# every path below to a root-level literal (/ranges, /trees, /uids ...)
+# -- the #360 a F5 class, sibling of the all-block guard above
+WORK="$(mktemp -d)" || {
+    ui_error "doctor: cannot create a temp dir (mktemp failed) -- is \$TMPDIR writable?"
+    exit 1
+}
 # Signal handlers EXIT (#344 a C1): a non-exiting INT/TERM handler runs the
 # cleanup and dash RESUMES the script — with $WORK already deleted, every
 # later redirect fails and the remaining trees render cascade garbage. The

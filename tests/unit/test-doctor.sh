@@ -1658,6 +1658,24 @@ else
     fail "B1/B2: [ -L ] gate before chmod before the mv gate (gate=$_b1_gate chmod=$_b1_chmod mv=$_b1_mv)"
 fi
 
+# --- 7b. fix-wave pins (#361) --------------------------------------------------------
+# W1: the SINGLE-root workspace (scan/fix/detect) gets the same dead-
+# workspace guard as the all block (4d F5): doctor is set -u only (no
+# -e -- one failing tree must not kill the remaining verdicts), so an
+# unchecked mktemp left WORK empty and every later path collapsed to a
+# root-level literal (/ranges, /trees, /uids ...) instead of failing.
+_rd_rc=0
+_rd_out="$(
+    TMPDIR="$WORK/single-no-tmpdir" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+        NO_COLOR=1 setsid sh "$DOCTOR" "$PROJ" </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "cannot create a temp dir"; then
+    pass "#361: single-root mktemp failure -> loud rc 1"
+else
+    fail "#361: single-root mktemp failure -> loud rc 1 (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+
 # --- summary gate -----------------------------------------------------------------
 echo ""
 if [ "$failures" -gt 0 ]; then
