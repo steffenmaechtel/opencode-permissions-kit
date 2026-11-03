@@ -383,7 +383,10 @@ DEAD_TMP="$WORK/no-such-tmpdir"
 printf '[boot]\nsystemd=true\n' >"$WORK/td-plain.conf"
 cp "$WORK/td-plain.conf" "$WORK/td-plain.expect"
 _out="$(TMPDIR="$DEAD_TMP" OPK_WSL_CONF="$WORK/td-plain.conf" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
-    sh -c 'set -u; . "$1" && browser_bridge_write_conf "$2"' _ "$BRIDGE_SH" "$LIBDIR" 2>&1)"
+    sh -c '
+        PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
+        set -u; . "$1" && browser_bridge_write_conf "$2"
+    ' _ "$BRIDGE_SH" "$LIBDIR" 2>&1)"
 _rc=$?
 if [ "$_rc" -ne 0 ] &&
     printf '%s' "$_out" | grep -qF 'mktemp failed (is $TMPDIR writable?)' &&
@@ -405,8 +408,10 @@ fi
 printf '[opencode-permissions-kit]\nroot = /old/wsl\n\n[boot]\nsystemd=true\n' >"$WORK/td-legacy.conf"
 cp "$WORK/td-legacy.conf" "$WORK/td-legacy.expect"
 _out="$(TMPDIR="$DEAD_TMP" OPK_WSL_CONF="$WORK/td-legacy.conf" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
-    sh -c 'set -eu; . "$1"; if browser_bridge_install "$2" "$3"; then exit 0; fi; exit 1' \
-    _ "$BRIDGE_SH" "$FILES_ROOT" "$LIBDIR" 2>&1)"
+    sh -c '
+        PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
+        set -eu; . "$1"; if browser_bridge_install "$2" "$3"; then exit 0; fi; exit 1
+    ' _ "$BRIDGE_SH" "$FILES_ROOT" "$LIBDIR" 2>&1)"
 _rc=$?
 if [ "$_rc" -ne 0 ] &&
     printf '%s' "$_out" | grep -qF 'mktemp failed (is $TMPDIR writable?)' &&

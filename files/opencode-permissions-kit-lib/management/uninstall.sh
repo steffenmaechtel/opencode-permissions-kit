@@ -442,12 +442,14 @@ kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
                 echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
                 log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
             else
-                # #211 a F27: near-unreachable (the block writer ships in
-                # the same lib) — but a missing helper must not read as a
-                # completed removal.
-                echo "WARN: could not remove the wsl.conf bridge block (kit helper unavailable)" >&2
+                # #211 a F27: a missing helper must not read as a
+                # completed removal. Since #364 the arm is also reachable
+                # with the helper present — its staging mktemp fails on a
+                # dead TMPDIR, the lib's WARNING above stderr-inherits
+                # through here and names the real cause.
+                echo "WARN: could not remove the wsl.conf bridge block (helper failed — see the WARNING above)" >&2
                 echo "      remove the marked lines yourself — the kit block is comment-only" >&2
-                log "wsl browser bridge removal FAILED (helper unavailable)"
+                log "wsl browser bridge removal FAILED (helper or staging mktemp failed)"
             fi
         else
             sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl
