@@ -1380,7 +1380,7 @@ fi
 # near-unreachable stub path): the call is if-wrapped and the FAILED
 # log line exists.
 if grep -q 'if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then' "$UNINSTALL" &&
-    grep -q 'wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)' "$UNINSTALL"; then
+    grep -q 'wsl browser bridge removal FAILED (no wsl.conf content found; helper or tree drop)' "$UNINSTALL"; then
     pass "no-markers bridge arm conditions its log on the rc (#211 b W11)"
 else
     fail "no-markers bridge arm conditions its log on the rc (#211 b W11)"

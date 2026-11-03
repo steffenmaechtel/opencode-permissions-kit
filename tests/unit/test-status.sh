@@ -2373,7 +2373,9 @@ _f9_lines="$(sed -n '/^_oc_home=\$(getent passwd/,+1p' "$STATUS")"
 if [ -n "$_f9_lines" ]; then
     pass "_oc_home probe lines extractable from status.sh (#211 a F9)"
     _f9_rc=0
-    _f9_out=$(env -u USER sh -c 'set -u; unset DEFAULT_USER 2>/dev/null || true
+    _f9_out=$(env -u USER sh -c '
+        PS4="+ " # kcov shield: PS4 ${BASH_SOURCE} vs set -u (internal/records/kcov-coverage.md)
+        set -u; unset DEFAULT_USER 2>/dev/null || true
         eval "$1"; printf "home=[%s]" "$_oc_home"' sh "$_f9_lines" 2>&1) || _f9_rc=$?
     if [ "$_f9_rc" -eq 0 ] && printf '%s' "$_f9_out" | grep -q 'home=\[/home/\]*\]'; then
         pass "both unset: no set -u abort, degraded /home/ fallback (#211 a F9)"

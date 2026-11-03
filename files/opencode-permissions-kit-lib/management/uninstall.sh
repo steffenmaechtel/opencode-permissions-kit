@@ -447,7 +447,7 @@ kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
                 # with the helper present — its staging mktemp fails on a
                 # dead TMPDIR, the lib's WARNING above stderr-inherits
                 # through here and names the real cause.
-                echo "WARN: could not remove the wsl.conf bridge block (helper failed — see the WARNING above)" >&2
+                echo "WARN: could not remove the wsl.conf bridge block (helper failed)" >&2
                 echo "      remove the marked lines yourself — the kit block is comment-only" >&2
                 log "wsl browser bridge removal FAILED (helper or staging mktemp failed)"
             fi
@@ -468,8 +468,8 @@ kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
         if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
             log "wsl browser bridge removed (no wsl.conf content found; library wsl/ tree dropped)"
         else
-            echo "WARN: could not remove the wsl browser bridge (kit helper unavailable)" >&2
-            log "wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)"
+            echo "WARN: could not remove the wsl browser bridge (helper or tree drop failed)" >&2
+            log "wsl browser bridge removal FAILED (no wsl.conf content found; helper or tree drop)"
         fi
     fi
 fi
