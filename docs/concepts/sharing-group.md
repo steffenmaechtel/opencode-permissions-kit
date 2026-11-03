@@ -47,6 +47,11 @@ credentials) remains guarded by the soft deny — see
 - ddev does not care about the sharing group — the web server runs in the
   container. If you serve files with a **host-side** webserver (not ddev),
   add its user to the `opencode` group.
+- **JetBrains IDEs on Windows need their Remote Development mode.** In the
+  local and Native opening modes their read-only check ignores supplementary
+  groups (upstream WI-82942), so agent-created folders look read-only
+  although they are not. See
+  [use JetBrains IDEs](../how-to/jetbrains-ides.md).
 - Your group membership also grants execute on the kit's real binary
   (`root:opencode`, mode `750`) — see
   [the wrapper](wrapper.md#wrapper-bypass-guard-detect-then-warn-loudly)
