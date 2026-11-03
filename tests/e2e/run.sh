@@ -894,9 +894,12 @@ check "wrapper: SECURED banner from valid CWD" \
     E 'grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-valid.txt'
 # Kit-update note replays from the daily cache (issue #358): seed an
 # available verdict for today and the banner must carry the note — the
-# cached arm, no network involved.
+# cached arm, no network involved. Probe shape: plain tee, NO trailing
+# `grep -q` — the 12e probes above exit their pipeline on the banner
+# line on purpose (SIGPIPE stops the wrapper); the note prints AFTER
+# the banner and would be lost to that same SIGPIPE.
 E 'printf "DATE=%s\nSTATE=available\nVER=99.0.1\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
-E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-update.txt | { grep -q "SECURED BY opencode permissions kit" || true; }'
+E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-update.txt'
 check "wrapper: kit-update note renders from the daily cache (issue #358)" \
     E 'grep -q "kit 99.0.1 is available" /tmp/wrapper-update.txt'
 check "wrapper: kit-update note names the update command" \
