@@ -252,6 +252,21 @@ sudo setfacl -m g:opencode:X /home/<you> /home/<you>/www
 
 `opk status` shows a warning per affected root.
 
+## PhpStorm: "Cannot modify a read-only directory" on agent-created folders
+
+**Cause:** an upstream bug in the JetBrains writability check, not a kit
+misconfiguration — the IDEs decide "read-only" from the file's owner,
+primary group and "other" bits and ignore supplementary groups and ACLs
+([WI-82942](https://youtrack.jetbrains.com/issue/WI-82942)). The kit grants
+your write access to agent-created paths through your supplementary
+`opencode` group membership, which is invisible to that check. The folders
+are not actually read-only: writes from inside WSL and from PowerShell over
+`\\wsl.localhost` succeed on the same path.
+
+**Fix:** open the project via Remote Development → WSL so the IDE backend
+runs inside WSL — see [use JetBrains IDEs](how-to/jetbrains-ides.md). The
+local and Native opening modes stay affected until WI-82942 is fixed.
+
 ## ddev start fails with "bind mounts can't be used with Docker Rootless"
 
 **Cause:** ddev 1.25.0–1.25.2 cannot use bind mounts against a rootless
