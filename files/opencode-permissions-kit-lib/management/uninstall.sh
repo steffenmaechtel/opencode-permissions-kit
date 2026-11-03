@@ -442,12 +442,16 @@ kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
                 echo "WSL browser bridge removed (wsl.conf block + stand-in tree)."
                 log "wsl browser bridge removed (/etc/wsl.conf bridge block + library wsl/ tree, consented)"
             else
-                # #211 a F27: near-unreachable (the block writer ships in
-                # the same lib) — but a missing helper must not read as a
-                # completed removal.
-                echo "WARN: could not remove the wsl.conf bridge block (kit helper unavailable)" >&2
+                # #211 a F27: a missing helper must not read as a
+                # completed removal. Since #364 the arm is also reachable
+                # with the helper present — its staging mktemp fails on a
+                # dead TMPDIR, the lib's WARNING above stderr-inherits
+                # through here and names the real cause. A silent
+                # _bb_install_conf failure (no WARNING of its own) also
+                # lands here — the WARN below is then the only diagnostic.
+                echo "WARN: could not remove the wsl.conf bridge block (helper failed)" >&2
                 echo "      remove the marked lines yourself — the kit block is comment-only" >&2
-                log "wsl browser bridge removal FAILED (helper unavailable)"
+                log "wsl browser bridge removal FAILED (helper or staging mktemp failed)"
             fi
         else
             sudo rm -rf /usr/local/lib/opencode-permissions-kit/wsl
@@ -461,13 +465,14 @@ kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
         fi
     else
         # Same honesty as the consent arm above (#211 b W11): with the
-        # helper missing (F27's failing stub) the log must not claim a
-        # removal that never ran.
+        # helper missing (F27's failing stub) OR a failed tree drop
+        # (#367 b B2 — the bare rm -rf at the helper's tail is this
+        # arm's rc), the log must not claim a removal that never ran.
         if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
             log "wsl browser bridge removed (no wsl.conf content found; library wsl/ tree dropped)"
         else
-            echo "WARN: could not remove the wsl browser bridge (kit helper unavailable)" >&2
-            log "wsl browser bridge removal FAILED (helper unavailable, no wsl.conf content found)"
+            echo "WARN: could not remove the wsl browser bridge (helper or tree drop failed)" >&2
+            log "wsl browser bridge removal FAILED (no wsl.conf content found; helper or tree drop)"
         fi
     fi
 fi

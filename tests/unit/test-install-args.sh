@@ -534,6 +534,92 @@ if grep -q '\[ ! -s "\$_fk_tmp" \]' "$UPDATE" && grep -q '_fk_url="\$KIT_BASE_UR
 else
     fail "update.sh fetch_kit carries the same empty-body guard"
 fi
+
+# --- dead-TMPDIR staging guards (#364 sweep sibling) ------------------------
+# fetch_kit's base mktemp ran unguarded where set -e cannot reach it:
+# both hosts call `fetch_kit || {...}` (a suppressed callee), so a dead
+# TMPDIR left base="" and the pre-create ran mkdir -p /files/... AS ROOT
+# (the #360 a F5 class) before the fetch errors blamed curl; a dead
+# per-file _fk_tmp surfaced as "could not fetch". Two scenarios per
+# host, executing the EXTRACTED function (the twin-grep above proves
+# shape only): (a) real mktemp + dead TMPDIR -> the base guard fires
+# BEFORE any mkdir runs (the stub records every call — zero records is
+# the no-root-garbage pin); (b) stubbed mktemp (ok for base, fails on
+# the per-file call) -> the _fk_tmp guard names mktemp, not curl.
+_fkg_i=0
+for _fkg_host in "$INSTALL" "$UPDATE"; do
+    _fkg_i=$((_fkg_i + 1))
+    _fkg_w="$FKWORK/g-$_fkg_i"
+    mkdir -p "$_fkg_w/a-bin" "$_fkg_w/b-bin"
+    _fkg_name="$(basename "$_fkg_host")"
+    eval "$(sed -n '/^fetch_kit() {/,/^}/p' "$_fkg_host")"
+    _tmp_track() { :; }
+
+    # shared: fake curl (never reached in green; sabotage must not hit
+    # the network) + recording mkdir stub (proves what mkdir WOULD run)
+    for _fkg_bin in a b; do
+        cat >"$_fkg_w/$_fkg_bin-bin/curl" <<FAKE
+#!/bin/sh
+_last=
+for _a in "\$@"; do _last="\$_a"; done
+printf 'content\n' >"\$_last"
+FAKE
+        cat >"$_fkg_w/$_fkg_bin-bin/mkdir" <<FAKE
+#!/bin/sh
+printf '%s\n' "\$*" >>"$_fkg_w/$_fkg_bin-mkdir.log"
+exit 0
+FAKE
+        chmod 755 "$_fkg_w/$_fkg_bin-bin/curl" "$_fkg_w/$_fkg_bin-bin/mkdir"
+    done
+
+    # (a) real mktemp, dead TMPDIR -> base guard, no mkdir call at all.
+    # KIT_FILES: update.sh's copy iterates the global list (install.sh's
+    # is inline) — an empty one would run zero iterations and pass
+    # vacuously through a green rc 0.
+    _fkg_out=""
+    _fkg_rc=0
+    _fkg_out=$(TMPDIR="$_fkg_w/dead" PATH="$_fkg_w/a-bin:$PATH" \
+        KIT_BASE_URL="https://example.test" KIT_FILES="opencode-permissions-kit-lib/sh/ui.sh" \
+        fetch_kit 2>&1) || _fkg_rc=$?
+    if [ "$_fkg_rc" -ne 0 ] &&
+        printf '%s' "$_fkg_out" | grep -qF 'mktemp failed (is $TMPDIR writable?)' &&
+        printf '%s' "$_fkg_out" | grep -q 'cannot stage the kit fetch' &&
+        ! printf '%s' "$_fkg_out" | grep -q 'could not fetch' &&
+        [ ! -e "$_fkg_w/a-mkdir.log" ]; then
+        pass "$_fkg_name: dead TMPDIR stops fetch_kit before any mkdir (#364)"
+    else
+        fail "$_fkg_name: dead TMPDIR staging diagnostics (rc=$_fkg_rc out=$_fkg_out)"
+    fi
+
+    # (b) mktemp stub: call 1 (base -d) answers a scratch path, call 2+
+    # (per-file) fails -> the _fk_tmp guard names mktemp, not curl, and
+    # the pre-create mkdirs landed under the scratch base, never /files
+    cat >"$_fkg_w/b-bin/mktemp" <<FAKE
+#!/bin/sh
+_n=\$(( \$(cat "$_fkg_w/cnt" 2>/dev/null || echo 0) + 1 ))
+echo "\$_n" >"$_fkg_w/cnt"
+if [ "\$_n" -gt 1 ]; then
+    echo "mktemp: stubbed per-file failure" >&2
+    exit 1
+fi
+printf '%s\n' "$_fkg_w/stub-base"
+FAKE
+    chmod 755 "$_fkg_w/b-bin/mktemp"
+    _fkg_out=""
+    _fkg_rc=0
+    _fkg_out=$(PATH="$_fkg_w/b-bin:$PATH" \
+        KIT_BASE_URL="https://example.test" KIT_FILES="opencode-permissions-kit-lib/sh/ui.sh" \
+        fetch_kit 2>&1) || _fkg_rc=$?
+    if [ "$_fkg_rc" -ne 0 ] &&
+        printf '%s' "$_fkg_out" | grep -qF 'mktemp failed (is $TMPDIR writable?)' &&
+        ! printf '%s' "$_fkg_out" | grep -q 'could not fetch' &&
+        ! grep -q '^/files' "$_fkg_w/b-mkdir.log"; then
+        pass "$_fkg_name: dead per-file mktemp names mktemp, not curl (#364)"
+    else
+        fail "$_fkg_name: per-file mktemp diagnostics (rc=$_fkg_rc out=$_fkg_out)"
+    fi
+done
+unset _fkg_host _fkg_w _fkg_bin _fkg_name _fkg_out _fkg_rc _fkg_i
 # Direct call, never a command substitution: a subshell's _FETCH_TREE /
 # registry writes never reach the parent and void the cleanup trap
 # (wave-f review). Anchored — the comments reference the old form, the
