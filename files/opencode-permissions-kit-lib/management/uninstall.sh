@@ -446,7 +446,9 @@ kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
                 # completed removal. Since #364 the arm is also reachable
                 # with the helper present — its staging mktemp fails on a
                 # dead TMPDIR, the lib's WARNING above stderr-inherits
-                # through here and names the real cause.
+                # through here and names the real cause. A silent
+                # _bb_install_conf failure (no WARNING of its own) also
+                # lands here — the WARN below is then the only diagnostic.
                 echo "WARN: could not remove the wsl.conf bridge block (helper failed)" >&2
                 echo "      remove the marked lines yourself — the kit block is comment-only" >&2
                 log "wsl browser bridge removal FAILED (helper or staging mktemp failed)"
@@ -463,8 +465,9 @@ kit-owned comments only; your own entries stay)" "y")" = "y" ]; then
         fi
     else
         # Same honesty as the consent arm above (#211 b W11): with the
-        # helper missing (F27's failing stub) the log must not claim a
-        # removal that never ran.
+        # helper missing (F27's failing stub) OR a failed tree drop
+        # (#367 b B2 — the bare rm -rf at the helper's tail is this
+        # arm's rc), the log must not claim a removal that never ran.
         if browser_bridge_remove "/usr/local/lib/opencode-permissions-kit"; then
             log "wsl browser bridge removed (no wsl.conf content found; library wsl/ tree dropped)"
         else
