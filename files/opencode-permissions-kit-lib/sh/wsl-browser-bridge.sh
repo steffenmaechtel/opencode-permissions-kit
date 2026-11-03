@@ -69,6 +69,15 @@
 # trap there — the normal code paths still remove their own temps).
 command -v _tmp_track >/dev/null 2>&1 || _tmp_track() { :; }
 
+# Every staging mktemp below is guarded (#364, PR #363 a A2): set -e
+# never reaches them at their real callers — bin/opk is set -u ONLY,
+# install.sh/update.sh call browser_bridge_install inside an if-arm
+# (set -e is suppressed in the callee), uninstall.sh sets no flags at
+# all. A dead TMPDIR must fail loud by itself: a stderr WARNING naming
+# mktemp/TMPDIR plus rc 1 through the caller's rc contract, instead of
+# an empty-path redirect/cp cascade blaming the wrong step (stderr is
+# inherited at every caller — none of them redirects it away).
+
 # _bb_install_conf <src>: atomically replace the wsl.conf carrier
 # (0.0.44a V10). Plain `cp` onto /etc/wsl.conf is O_TRUNC+write — a kill
 # mid-window truncates the carrier AND the user's foreign settings the
@@ -101,7 +110,13 @@ browser_bridge_is_wsl() {
 browser_bridge_write_conf() {
     _bb_libdir="$1"
     _bb_conf="${OPK_WSL_CONF-/etc/wsl.conf}"
-    _bb_tmp="$(mktemp)"
+    # Guarded (#364): the opk caller is set -u ONLY — nothing aborts
+    # here on its own, an empty _bb_tmp would cascade below.
+    _bb_tmp="$(mktemp)" || {
+        printf '%s\n' "  WARNING: wsl browser bridge: mktemp failed (is \$TMPDIR writable?) —""\
+ carrier NOT written, wsl.conf untouched" >&2
+        return 1
+    }
     _tmp_track "$_bb_tmp"
     # The block below is byte-frozen: the unit tests assert the carrier
     # line's position (line 9 of the file), the block length, and
@@ -220,7 +235,14 @@ browser_bridge_strip_legacy() {
     _bb_conf="${OPK_WSL_CONF-/etc/wsl.conf}"
     [ -f "$_bb_conf" ] || return 0
     grep -q '^\[opencode-permissions-kit\]$' "$_bb_conf" || return 0
-    _bb_tmp="$(mktemp)"
+    # Guarded (#364): install.sh/update.sh call this inside an if-arm —
+    # set -e is suppressed in this callee, an empty _bb_tmp would
+    # cascade into the awk redirect and the cp below.
+    _bb_tmp="$(mktemp)" || {
+        printf '%s\n' "  WARNING: wsl browser bridge: mktemp failed (is \$TMPDIR writable?) —""\
+ legacy section NOT stripped, wsl.conf untouched" >&2
+        return 1
+    }
     _tmp_track "$_bb_tmp"
     awk '
         in_legacy {
@@ -259,7 +281,17 @@ browser_bridge_remove() {
     _bb_conf="${OPK_WSL_CONF-/etc/wsl.conf}"
     if [ -f "$_bb_conf" ] && { grep -q '^# opencode permissions kit browser bridge -- begin$' "$_bb_conf" ||
         grep -q '^\[opencode-permissions-kit\]$' "$_bb_conf"; }; then
-        _bb_tmp="$(mktemp)"
+        # Guarded (#364): the uninstall caller sets no flags at all —
+        # nothing aborts here on its own. The tree drop stays
+        # best-effort on this failure too (same shape as the
+        # _bb_install_conf arm below): the wsl.conf rewrite is the part
+        # that failed; uninstall continues and reports it.
+        _bb_tmp="$(mktemp)" || {
+            printf '%s\n' "  WARNING: wsl browser bridge: mktemp failed (is \$TMPDIR writable?) —""\
+ kit block NOT removed, wsl.conf untouched" >&2
+            ${OPK_WSL_SUDO-sudo} rm -rf "${_bb_libdir:?}/wsl" 2>/dev/null || true
+            return 1
+        }
         _tmp_track "$_bb_tmp"
         awk '
             in_block {

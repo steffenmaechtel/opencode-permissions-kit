@@ -367,6 +367,90 @@ else
     fail "opk wsl-add-opencode-1-fix reports failure instead of lying (C4)"
 fi
 
+# 18c. dead-TMPDIR mktemp guards (#364, PR #363 a A2): set -e never
+# reaches the three staging mktemps at their real callers — opk is
+# set -u ONLY (write_conf), install.sh/update.sh call
+# browser_bridge_install inside an if-arm (set -e suppressed in the
+# callee -> strip_legacy's mktemp), uninstall.sh sets no flags at all
+# (remove). Each guard must fail loud and early: rc 1 through the
+# existing rc contract, a stderr WARNING naming mktemp/TMPDIR (every
+# caller inherits stderr — none redirects it away), the conf
+# byte-untouched, and no empty-path redirect/cp cascade blaming the
+# wrong step.
+DEAD_TMP="$WORK/no-such-tmpdir"
+
+# (a) write_conf — the opk wsl-add-opencode-1-fix class (set -u host)
+printf '[boot]\nsystemd=true\n' >"$WORK/td-plain.conf"
+cp "$WORK/td-plain.conf" "$WORK/td-plain.expect"
+_out="$(TMPDIR="$DEAD_TMP" OPK_WSL_CONF="$WORK/td-plain.conf" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
+    sh -c 'set -u; . "$1" && browser_bridge_write_conf "$2"' _ "$BRIDGE_SH" "$LIBDIR" 2>&1)"
+_rc=$?
+if [ "$_rc" -ne 0 ] &&
+    printf '%s' "$_out" | grep -qF 'mktemp failed (is $TMPDIR writable?)' &&
+    printf '%s' "$_out" | grep -q 'carrier NOT written' &&
+    ! printf '%s' "$_out" | grep -q 'cannot create '; then
+    pass "write_conf: dead TMPDIR fails loud — mktemp/TMPDIR named, rc 1, no cascade (#364)"
+else
+    fail "write_conf: dead TMPDIR diagnostics misleading (rc=$_rc out=$_out)"
+fi
+if diff -q "$WORK/td-plain.conf" "$WORK/td-plain.expect" >/dev/null 2>&1; then
+    pass "write_conf: dead TMPDIR leaves wsl.conf untouched (#364)"
+else
+    fail "write_conf: dead TMPDIR damaged wsl.conf (#364)"
+fi
+
+# (b) browser_bridge_install — the install.sh/update.sh class (set -eu
+# host, call inside an if-arm: set -e is suppressed in the callee; the
+# deploy_tree half succeeds, the strip_legacy mktemp fails)
+printf '[opencode-permissions-kit]\nroot = /old/wsl\n\n[boot]\nsystemd=true\n' >"$WORK/td-legacy.conf"
+cp "$WORK/td-legacy.conf" "$WORK/td-legacy.expect"
+_out="$(TMPDIR="$DEAD_TMP" OPK_WSL_CONF="$WORK/td-legacy.conf" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
+    sh -c 'set -eu; . "$1"; if browser_bridge_install "$2" "$3"; then exit 0; fi; exit 1' \
+    _ "$BRIDGE_SH" "$FILES_ROOT" "$LIBDIR" 2>&1)"
+_rc=$?
+if [ "$_rc" -ne 0 ] &&
+    printf '%s' "$_out" | grep -qF 'mktemp failed (is $TMPDIR writable?)' &&
+    printf '%s' "$_out" | grep -q 'legacy section NOT stripped' &&
+    ! printf '%s' "$_out" | grep -q 'cannot create '; then
+    pass "install: dead TMPDIR fails loud through the if-arm, set -e suppressed (#364)"
+else
+    fail "install: dead TMPDIR diagnostics misleading (rc=$_rc out=$_out)"
+fi
+if diff -q "$WORK/td-legacy.conf" "$WORK/td-legacy.expect" >/dev/null 2>&1; then
+    pass "install: dead TMPDIR leaves wsl.conf untouched (#364)"
+else
+    fail "install: dead TMPDIR damaged wsl.conf (#364)"
+fi
+
+# (c) browser_bridge_remove — the uninstall.sh class (host sets no
+# flags at all); the tree drop stays best-effort (mirrors the
+# _bb_install_conf failure arm), wsl.conf is what must not change
+printf '# opencode permissions kit browser bridge -- begin\n# x\n# opencode permissions kit browser bridge -- end\n\n[boot]\nsystemd=true\n' \
+    >"$WORK/td-block.conf"
+cp "$WORK/td-block.conf" "$WORK/td-block.expect"
+mkdir -p "$LIBDIR/wsl/c"
+_out="$(TMPDIR="$DEAD_TMP" OPK_WSL_CONF="$WORK/td-block.conf" OPK_WSL_SUDO="" OPK_WSL_FORCE=1 \
+    sh -c '. "$1"; browser_bridge_remove "$2"' _ "$BRIDGE_SH" "$LIBDIR" 2>&1)"
+_rc=$?
+if [ "$_rc" -ne 0 ] &&
+    printf '%s' "$_out" | grep -qF 'mktemp failed (is $TMPDIR writable?)' &&
+    printf '%s' "$_out" | grep -q 'kit block NOT removed' &&
+    ! printf '%s' "$_out" | grep -q 'cannot create '; then
+    pass "remove: dead TMPDIR fails loud, tree drop stays best-effort (#364)"
+else
+    fail "remove: dead TMPDIR diagnostics misleading (rc=$_rc out=$_out)"
+fi
+if diff -q "$WORK/td-block.conf" "$WORK/td-block.expect" >/dev/null 2>&1; then
+    pass "remove: dead TMPDIR leaves wsl.conf untouched (#364)"
+else
+    fail "remove: dead TMPDIR damaged wsl.conf (#364)"
+fi
+if [ ! -e "$LIBDIR/wsl" ]; then
+    pass "remove: dead TMPDIR still drops the stand-in tree (best-effort arm) (#364)"
+else
+    fail "remove: dead TMPDIR left the stand-in tree behind (#364)"
+fi
+
 # 19. remove restores the original conf byte-for-byte and drops the tree
 cat >"$CONF" <<'CONF'
 [boot]

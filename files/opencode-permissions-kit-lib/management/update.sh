@@ -178,7 +178,15 @@ opencode-permissions-kit-lib/tui/tui-danger.json"
 # (which only holds the previously deployed, possibly older, files).
 fetch_kit() {
     local base dir f
-    base="$(mktemp -d)"
+    # Guarded (#364 sweep sibling): the caller runs `fetch_kit || {...}`
+    # — set -e is suppressed in this callee, and an empty base from a
+    # dead TMPDIR collapsed every path below onto root-level literals
+    # (the pre-create ran mkdir -p /files/... as root, the #360 a F5
+    # class) before the fetch errors blamed curl.
+    base="$(mktemp -d)" || {
+        echo "error: mktemp failed (is \$TMPDIR writable?) — cannot stage the kit fetch" >&2
+        return 1
+    }
     # Registered for the EXIT/INT/TERM cleanup (survives the re-exec via
     # the export below): a failed fetch must not leave the partial tree.
     _FETCH_TREE="$base"
@@ -202,7 +210,13 @@ fetch_kit() {
             _fk_dst="$dir/$f"
             _fk_url="$KIT_BASE_URL/files/$f"
         fi
-        _fk_tmp=$(mktemp)
+        # Same class as the base guard above (#364 sweep sibling): a
+        # dead per-file mktemp surfaced as a curl "could not fetch" —
+        # name the cause instead.
+        _fk_tmp=$(mktemp) || {
+            echo "error: mktemp failed (is \$TMPDIR writable?) — aborting" >&2
+            return 1
+        }
         _tmp_track "$_fk_tmp"
         if ! curl -fsSL "$_fk_url" -o "$_fk_tmp" || [ ! -s "$_fk_tmp" ]; then
             rm -f "$_fk_tmp"
