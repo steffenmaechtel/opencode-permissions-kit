@@ -900,12 +900,14 @@ check "wrapper: SECURED banner from valid CWD" \
 # `grep -q` — the 12e probes above exit their pipeline on the banner
 # line on purpose (SIGPIPE stops the wrapper); the note prints AFTER
 # the banner and would be lost to that same SIGPIPE. OPK_UPDATE_CHECK=1
-# overrides E()'s hermeticity flag for THIS start only: the daily gate
-# is closed by today's seed (pure cache replay), so the opt-out's
-# network arm is not reached — without the override the lib's opt-out
-# would suppress even the replay and kill this pin (round b R1).
+# overrides E()'s hermeticity flag for THIS start only (round b R1);
+# the dead KIT_UPDATE_HOST makes the probe clock-immune (round c C1):
+# even if the container day flips between seed and start and re-opens
+# the daily gate, the fetch fails against the closed port and the
+# offline arm keeps yesterday's available verdict — the note still
+# renders, and no live mirror request ever leaves the container.
 E 'printf "DATE=%s\nSTATE=available\nVER=99.0.1\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
-E 'export OPK_UPDATE_CHECK=1; cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-update.txt'
+E 'export OPK_UPDATE_CHECK=1 KIT_UPDATE_HOST=https://127.0.0.1:1; cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-update.txt'
 check "wrapper: kit-update note renders from the daily cache (issue #358)" \
     E 'grep -q "kit 99.0.1 is available" /tmp/wrapper-update.txt'
 check "wrapper: kit-update note names the update command" \
