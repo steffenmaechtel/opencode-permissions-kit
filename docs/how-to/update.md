@@ -46,6 +46,26 @@ Updates are supported from kit **0.0.14 onwards**; on older installs
 `update.sh` aborts — re-run the installer instead (it keeps your projects
 and deny list where possible).
 
+## Know when an update is available
+
+Two places tell you a newer kit exists — no extra command needed:
+
+- **The wrapper banner**: the first interactive `opencode` start of the day
+  checks the tracking channel's `VERSION` file (one bounded request — 3 s
+  worst case with a dead network) and caches the verdict per user in
+  `~/.cache/opencode-permissions-kit/update-check`; every later start that
+  day replays the cache. An available update prints a `NOTE:` line under
+  the banner with the update command. Headless invocations (`serve`, `run`
+  with a message argument or piped stdin, queries) never run the check.
+- **`opk status`**: the `kit update` row in the Core section compares live
+  on every run. An available update counts as a warning (`opk status
+  --short` exits 2 — cron sees an outdated security kit); offline or
+  blocked stays an uncounted "unknown".
+
+Pinned installs (`KIT_CHANNEL=x.y.z`) skip the check — a pin is deliberate
+and the tag never moves. Set `OPK_UPDATE_CHECK=0` in the environment to
+disable every update probe (air-gapped hosts, scripted runs).
+
 ## Update the kit
 
 From the stamped channel — for a stable install that is simply:

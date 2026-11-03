@@ -144,6 +144,7 @@ fetch_kit() {
         opencode-permissions-kit-lib/sh/render-agent-config.sh \
         opencode-permissions-kit-lib/sh/tui-plugin.sh \
         opencode-permissions-kit-lib/sh/ui.sh \
+        opencode-permissions-kit-lib/sh/update-check.sh \
         opencode-permissions-kit-lib/sh/advisories.sh \
         opencode-permissions-kit-lib/sh/shell-warn.sh \
         opencode-permissions-kit-lib/bin/setup-container-backend \

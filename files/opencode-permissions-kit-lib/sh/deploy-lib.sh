@@ -132,6 +132,9 @@ opencode-permissions-kit-lib/sh/staged-write.sh 644
 opencode-permissions-kit-lib/sh/sudoers-deploy.sh 644
 opencode-permissions-kit-lib/sh/tui-plugin.sh 644
 opencode-permissions-kit-lib/sh/ui.sh 755
+# update-check.sh: kit update probes (issue #358), sourced by the
+# wrapper (daily banner note) and status.sh (live Core row)
+opencode-permissions-kit-lib/sh/update-check.sh 644
 opencode-permissions-kit-lib/sh/wsl-browser-bridge.sh 644
 # tui/ mode display (internal/records/_archive/design/plan-ui-tui-opencode.md)
 opencode-permissions-kit-lib/tui/kit-mode-2x.tsx 644

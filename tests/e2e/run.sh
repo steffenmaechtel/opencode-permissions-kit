@@ -126,6 +126,15 @@ E 'mkdir -p /home/dev/vhosts/hometest && chmod 750 /home/dev'
 E "bash -c 'set -o pipefail; sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects \"/var/www/vhosts /home/dev/vhosts\" --ddev-settings ddev 2>&1 | tee /tmp/install-out.log'"
 echo "  Install complete."
 
+# Hermetic wrapper banner AND status rows (issue #358): the kit-update
+# note replays from the invoking user's daily cache (stamped "current"
+# for today below), and every container command via E() exports
+# OPK_UPDATE_CHECK=0 — the opt-out the lib names for exactly this — so
+# neither the wrapper nor status.sh's live row ever asks the mirror
+# from inside the e2e container. The positive note arm is pinned in
+# section 12e below.
+E 'mkdir -p /home/dev/.cache/opencode-permissions-kit && printf "DATE=%s\nSTATE=current\nVER=\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
+
 echo ""
 echo "--- 2a. root-shell install refused (issue #192) ---"
 # A root login (wsl -u root, su -) has no SUDO_USER, so the developer
@@ -885,6 +894,26 @@ E 'cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/n
     echo "  ${GREEN}OK${NC}  wrapper ran from valid CWD"
 check "wrapper: SECURED banner from valid CWD" \
     E 'grep -q "SECURED BY opencode permissions kit" /tmp/wrapper-valid.txt'
+# Kit-update note replays from the daily cache (issue #358): seed an
+# available verdict for today and the banner must carry the note — the
+# cached arm, no network involved. Probe shape: plain tee, NO trailing
+# `grep -q` — the 12e probes above exit their pipeline on the banner
+# line on purpose (SIGPIPE stops the wrapper); the note prints AFTER
+# the banner and would be lost to that same SIGPIPE. OPK_UPDATE_CHECK=1
+# overrides E()'s hermeticity flag for THIS start only (round b R1);
+# the dead KIT_UPDATE_HOST makes the probe clock-immune (round c C1):
+# even if the container day flips between seed and start and re-opens
+# the daily gate, the fetch fails against the closed port and the
+# offline arm keeps yesterday's available verdict — the note still
+# renders, and no live mirror request ever leaves the container.
+E 'printf "DATE=%s\nSTATE=available\nVER=99.0.1\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
+E 'export OPK_UPDATE_CHECK=1 KIT_UPDATE_HOST=https://127.0.0.1:1; cd /var/www/vhosts/test-project && timeout 20 /usr/local/bin/opencode </dev/null 2>&1 | tee /tmp/wrapper-update.txt'
+check "wrapper: kit-update note renders from the daily cache (issue #358)" \
+    E 'grep -q "kit 99.0.1 is available" /tmp/wrapper-update.txt'
+check "wrapper: kit-update note names the update command" \
+    E 'grep -q "sudo opk update" /tmp/wrapper-update.txt'
+# restore the quiet verdict so later starts stay deterministic
+E 'printf "DATE=%s\nSTATE=current\nVER=\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
 # Invalid CWD: wrapper should refuse
 E 'cd /tmp && /usr/local/bin/opencode 2>&1 | tee /tmp/wrapper-invalid.txt; test $? -ne 0' &&
     echo "  ${GREEN}OK${NC}  wrapper refused from invalid CWD"

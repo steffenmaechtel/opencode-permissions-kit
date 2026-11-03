@@ -185,6 +185,32 @@ if [ "$HEADLESS" != true ]; then
     echo ""
 fi
 
+# Kit update notice (issue #358): the first interactive start of the day
+# checks the tracking channel (install.conf's KIT_CHANNEL) for a newer
+# kit and caches the verdict in the invoking user's
+# ~/.cache/opencode-permissions-kit/ — every later start replays it from
+# there, so the network cost is one bounded curl per day (3 s worst
+# case, offline included). Headless starts skip the check entirely: no
+# network on the hot path, stdout stays machine-clean. Fail-open (the
+# wrapper's contract for every probe): a missing lib, missing curl, an
+# unwritable cache, or a dead network means no note — never a blocked
+# or delayed start. OPK_UPDATE_CHECK=0 disables it (e2e, air-gapped).
+KIT_UPDATE_NOTE=""
+if [ "$HEADLESS" != true ] && [ -f /usr/local/lib/opencode-permissions-kit/sh/update-check.sh ]; then
+    # shellcheck disable=SC1091  # deployed lib, guarded above
+    . /usr/local/lib/opencode-permissions-kit/sh/update-check.sh
+    # The || true is deliberate defense-in-depth (review #365 a Q4):
+    # kit_update_daily_note's contract returns 0 on every path today,
+    # but the guard also suspends set -e INSIDE the substitution — a
+    # future unguarded failing command there would otherwise kill the
+    # wrapper before the exec (verifier-evidenced, dash micro-tests).
+    KIT_UPDATE_NOTE=$(kit_update_daily_note "$VERSION" "${KIT_CHANNEL:-master}" || true)
+fi
+if [ -n "$KIT_UPDATE_NOTE" ]; then
+    note "${YELLOW}NOTE: $KIT_UPDATE_NOTE${NC}"
+    note ""
+fi
+
 # Known security advisories for the installed binary (issue #107): the
 # curated database ships with the kit (sh/advisories.sh) and is checked
 # LOCALLY — no network on the hot path, fresh entries arrive through the

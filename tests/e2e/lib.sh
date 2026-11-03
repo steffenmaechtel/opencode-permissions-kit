@@ -504,7 +504,7 @@ e2e_start_container() {
         "$E2E_IMAGE" $E2E_CMD
 }
 
-E() { docker exec -u dev "$E2E_CONTAINER" sh -c "$@"; }
+E() { docker exec -u dev -e OPK_UPDATE_CHECK=0 "$E2E_CONTAINER" sh -c "$@"; }
 
 e2e_cleanup() {
     # Capture the exit status FIRST — every command below overwrites $?

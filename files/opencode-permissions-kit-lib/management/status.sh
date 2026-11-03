@@ -257,6 +257,47 @@ if [ -n "${KIT_CHANNEL:-}" ]; then
 else
     ui_kv "Channel" "master (unstamped — pre-beta install, opk update re-stamps it)"
 fi
+
+# Kit update row (issue #358): installed VERSION vs the tracking
+# channel's VERSION file — live on every run (status is on-demand; the
+# once-per-day cache in the developer's ~/.cache belongs to the
+# wrapper's banner, and a root run here must not write the developer's
+# cache). An available update is a counted warning: `opk status
+# --short` exits 2 so cron sees an outdated security kit. Offline or
+# blocked stays an UNCOUNTED unknown (the 0.0.48b W3 rule — a caller
+# who cannot reach the mirror must not read yellow forever). Checkout-
+# first resolution like ui.sh above: a checkout status.sh needs its own
+# lib. A missing lib is the broken-kit class (issue #165): counted
+# warn, never a silently dropped row.
+_ku_lib="$(cd "$(dirname "$0")" && pwd)/../sh/update-check.sh"
+[ -f "$_ku_lib" ] || _ku_lib="$LIBDIR/sh/update-check.sh"
+if [ ! -f "$_ku_lib" ]; then
+    ui_kv_warn "kit update" "not checked — kit file sh/update-check.sh missing (fix: sudo opk update)"
+elif [ "${OPK_UPDATE_CHECK:-1}" = 0 ]; then
+    ui_kv "kit update" "checks disabled (OPK_UPDATE_CHECK=0)"
+else
+    # shellcheck disable=SC1090  # checkout or deployed lib, resolved above
+    . "$_ku_lib"
+    _ku_channel="${KIT_CHANNEL:-master}"
+    if kit_update_is_tag "$_ku_channel"; then
+        # A pin is deliberate: no fetch, no finding — neutral row like
+        # the ".git/config access allowed" choice.
+        ui_kv "kit update" "pinned to $_ku_channel — pinned installs skip update checks"
+    elif ! command -v curl >/dev/null 2>&1; then
+        ui_kv "kit update" "unknown — live check unavailable (curl missing)"
+    else
+        _ku_remote=""
+        _ku_remote=$(kit_update_fetch_version "$_ku_channel" || true)
+        if [ -z "$_ku_remote" ]; then
+            ui_kv "kit update" "unknown — live check unavailable (offline or blocked)"
+        elif [ "$(kit_update_version_cmp "$_ku_remote" "$VERSION")" = gt ]; then
+            ui_kv_warn "kit update" "new kit $_ku_remote available (installed: $VERSION)"
+            ui_detail "update with: sudo opk update"
+        else
+            ui_kv_ok "kit update" "current — $VERSION on $_ku_channel"
+        fi
+    fi
+fi
 if id "$OPENCODE_USER" >/dev/null 2>&1; then
     ui_kv "User" "$OPENCODE_USER — exists"
 else

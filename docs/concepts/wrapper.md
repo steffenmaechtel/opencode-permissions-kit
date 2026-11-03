@@ -27,6 +27,13 @@ The wrapper prints its banner and starts opencode immediately — no `Press
 Enter` pause, no container question (the state is visible in the TUI, see
 [mode display](#mode-display-in-the-tui)).
 
+Once per day, the first interactive start also checks whether the tracking
+channel ships a newer kit (`sh/update-check.sh`, issue #358) and, if so,
+prints a `NOTE:` line under the banner with the update command. The verdict
+is cached for the day in `~/.cache/opencode-permissions-kit/` — later starts
+replay it without a request, and headless starts never run the check at all
+(see [update](../how-to/update.md)).
+
 One exception runs before everything else: `opencode --version`, `-v`, `-h`
 and `--help` exec straight to the real binary from **any** directory — no
 banner, no checks. Scripts and the official installer parse that output

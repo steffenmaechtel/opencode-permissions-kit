@@ -125,6 +125,12 @@ E 'bash /opencode-cache/install.sh --binary /opencode-cache/opencode-'"$OC_VERSI
 E 'sudo bash /home/dev/repo/files/install.sh --yes --container-backend podman-rootless --projects /var/www/vhosts'
 echo "  Install complete."
 
+# Hermetic wrapper banner AND status rows (issue #358): today's verdict
+# is stamped "current" so the wrapper starts below replay the cache, and
+# every container command via E() exports OPK_UPDATE_CHECK=0 — so the
+# status.sh live row never asks the mirror from inside the container.
+E 'mkdir -p /home/dev/.cache/opencode-permissions-kit && printf "DATE=%s\nSTATE=current\nVER=\n" "$(date +%F)" > /home/dev/.cache/opencode-permissions-kit/update-check'
+
 check "install.conf records CONTAINER_BACKEND=podman-rootless" \
     E 'grep -q "^CONTAINER_BACKEND=podman-rootless" /etc/opencode-permissions-kit/install.conf'
 check "wrapper at /usr/local/bin/opencode" \
