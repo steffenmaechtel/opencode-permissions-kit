@@ -148,22 +148,30 @@ Every `opk.json` found up to **3 levels below** a scan root is one
 project — the `/var/www/vhosts/<org>/<project>` layout resolves itself:
 no `opk.json`, no project. No central registry and no project-name
 heuristics; a marker nested deeper is not a project for this scan, and a
-nested marker inside a project is simply its own project. Each project
-gets **one full doctor scan in a fresh process**, preceded by a
-`project` row naming its root — findings stay aggregated per project.
+nested marker inside a project is simply its own project. A marker is an
+**existing regular file through symlinks** (the walk-up rule: a symlink
+to a regular file counts; a dangling symlink or a directory named
+`opk.json` does not — such entries are reported and skipped). A project
+directory that is itself a **symlink** is not descended (the scan root
+operand is followed, nested symlinks are not) — doctor reports the link;
+pass the real directory. Each project gets **one full doctor scan in a
+fresh process**, preceded by a `project` row naming its root — findings
+stay aggregated per project.
 
 Default scan roots: `/var/www/vhosts` when it exists, plus every root
 registered via `opk config projects` (reading the kit's existing
 registry — not building a new one; its entries are often parents of
 several projects). A positional scans exactly that tree instead. A root
-that has gone missing is reported and skipped; a partially unreadable
-root warns that its marker list may be incomplete.
+that has gone missing or carries control characters is reported and
+skipped; a partially unreadable root warns that its marker list may be
+incomplete.
 
 The exit code aggregates **worst-of** in the usual severity order: `1`
 when any project has at-risk findings — or a per-project scan fails
 outright, counted as an alert with its own warn row — `2` when every
-project is warnings-only **or nothing was scanned** (no scan roots
-exist, or no `opk.json` markers were found under them), `0` when every
+project is warnings-only **or nothing was scanned** (no usable scan root
+— none listed, or every listed one missing/unusable — or no `opk.json`
+markers found under them, all of them skipped included), `0` when every
 project is green. `fix` and `detect` do not combine with `all` (their
 per-finding prompts assume one project in focus): `all` joins `fix` and
 `detect` as a reserved first word.

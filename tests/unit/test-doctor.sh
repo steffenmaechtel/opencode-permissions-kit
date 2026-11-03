@@ -652,7 +652,7 @@ grep_last_out "project row names the green root" grep -qF "project        $ALLSC
 grep_last_out "child verdict row from the green project" grep -qF "tree -- 2 entries mapped-safe"
 grep_last_out "broken policy reported by its own child" grep -qF "policy file was rejected"
 grep_last_out "summary projects row" grep -qF "projects       3 scanned under 1 scan root(s)"
-grep_last_out "summary findings row" grep -qF "findings       1 project(s) with at-risk findings or errors"
+grep_last_out "summary findings row" grep -qF "findings       1 project(s) with at-risk findings"
 grep_last_out "summary warnings row" grep -qF "warnings    1 project(s) warnings only"
 grep_last_out "summary healthy row" grep -qF "healthy        1 project(s) all green"
 if printf '%s' "$_rd_out" | grep -q toodeep; then
@@ -718,16 +718,17 @@ grep_last_out "no-roots warn" grep -qF "no scan roots available"
 # seam set but unreadable -> loud rc 1, never a silent real-tree fallback
 chmod 000 "$ALLROOTS"
 rc_doctor_roots "all: unreadable seam -> rc 1" 1 "$ALLROOTS" all
-grep_last_out "seam error row" grep -qF "OPK_DOCTOR_SCAN_ROOTS is set but not readable"
+grep_last_out "seam error row" grep -qF "OPK_DOCTOR_SCAN_ROOTS is set but not a readable file"
 chmod 644 "$ALLROOTS"
 
-# missing scan root in the seam: warn + skip, zero markers -> rc 2
+# missing scan root in the seam: warn + skip; nothing was scanned, so
+# the summary names THAT state (#360 a F10 -- not a markers message)
 ALLGONE="$WORK/all-gone.txt"
 printf '%s\n' "$WORK/all-gone-dir" >"$ALLGONE"
 rc_doctor_roots "all: missing scan root skipped -> rc 2" 2 "$ALLGONE" all
 grep_last_out "missing-root warn row" grep -qF "is missing -- skipped"
-grep_last_out "falls through to the zero-marker warn" \
-    grep -qF "no opk.json markers found under the scanned root(s)"
+grep_last_out "names the nothing-scanned state" \
+    grep -qF "no scan root could be scanned -- every listed root is missing or unusable"
 
 # control-char marker: skipped loudly; the siblings' children unaffected
 ALLCT="$ALLSCAN/we$(printf '\t')ird"
@@ -771,6 +772,154 @@ else
     fail "degraded install: one pre-flight error, no scanning (rc $_rd_rc)"
     echo "        output: $_rd_out"
 fi
+
+# --- 4d. round-a fix-wave pins (#360 a) ----------------------------------------------
+# One pin per fixed finding: F1 fragment integrity, F4 error-arm seam,
+# F5 mktemp guard, F6 set-but-empty seam, F7 directory-valued seam,
+# F8 root-line charset gate, F10 used-root count + messages, F11 symlink
+# pass + -H root, F12 marker type, F13 wording, F16 all-skipped message.
+
+# F1: a newline inside a name splits the find output -- the fragments
+# must never become children (this reproduced phantom + cwd-relative
+# scans before the fix)
+ALLNL="$WORK/all-nl"
+NLDIR="$(printf 'we\nird')"
+mkdir -p "$ALLNL/$NLDIR" "$ALLNL/real/tree"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLNL/$NLDIR/opk.json"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLNL/real/opk.json"
+echo f >"$ALLNL/real/tree/f"
+rc_doctor "a F1: newline-named marker dir -> real fleet stays rc 0" 0 all "$ALLNL"
+_n_child="$(printf '%s' "$_rd_out" | grep -c 'corrupted marker path')"
+if [ "$_n_child" = 2 ]; then
+    pass "a F1: both split fragments warned as corrupt"
+else
+    fail "a F1: both split fragments warned as corrupt (got $_n_child)"
+fi
+_n_proj="$(printf '%s' "$_rd_out" | grep -cF 'project        ')"
+if [ "$_n_proj" = 1 ]; then
+    pass "a F1: no phantom project row -- only the real project ran"
+else
+    fail "a F1: no phantom project row (got $_n_proj rows)"
+fi
+if printf '%s' "$_rd_out" | grep -qF 'counted as an alert'; then
+    fail "a F1: no false fleet alert from a fragment"
+else
+    pass "a F1: no false fleet alert from a fragment"
+fi
+
+# F12: a directory and a dangling symlink named opk.json are not markers
+# (the walk-up rule); the healthy fleet stays rc 0
+ALLDT="$WORK/all-dirmark"
+mkdir -p "$ALLDT/dirp/opk.json" "$ALLDT/dangp" "$ALLDT/real/tree"
+ln -s /nonexistent-opk-target "$ALLDT/dangp/opk.json"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLDT/real/opk.json"
+echo f >"$ALLDT/real/tree/f"
+rc_doctor "a F12: dir/dangling opk.json no markers -> rc 0" 0 all "$ALLDT"
+grep_last_out "a F12: non-regular marker warned" \
+    grep -qF "is not a regular file -- not a marker (directory or dangling symlink named opk.json)"
+_n_proj="$(printf '%s' "$_rd_out" | grep -cF 'project        ')"
+if [ "$_n_proj" = 1 ]; then
+    pass "a F12: only the real project ran (2 non-markers skipped)"
+else
+    fail "a F12: only the real project ran (got $_n_proj rows)"
+fi
+
+# F6: set-but-EMPTY seam owns the list -- an empty value is an empty
+# list, never a fall-back to the real default roots
+_rd_rc=0
+_rd_out="$(
+    OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" OPK_DOCTOR_SCAN_ROOTS="" \
+        NO_COLOR=1 setsid sh "$DOCTOR" all </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 2 ] &&
+    printf '%s' "$_rd_out" | grep -qF "no scan roots available" &&
+    ! printf '%s' "$_rd_out" | grep -qF "no opk.json markers found"; then
+    pass "a F6: set-but-empty seam -> empty list, no real-tree fallback"
+else
+    fail "a F6: set-but-empty seam -> empty list, no real-tree fallback (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+
+# F7: a directory-valued seam is refused loudly before any grep
+SEAMDIR="$WORK/all-seam-dir"
+mkdir -p "$SEAMDIR"
+rc_doctor_roots "a F7: directory-valued seam -> rc 1" 1 "$SEAMDIR" all
+grep_last_out "a F7: not-a-readable-file error" grep -qF "not a readable file"
+
+# F5: a dead workspace (mktemp fails) exits loud with rc 1
+_rd_rc=0
+_rd_out="$(
+    TMPDIR="$WORK/all-no-tmpdir" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+        NO_COLOR=1 setsid sh "$DOCTOR" all "$ALLGREEN" </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] && printf '%s' "$_rd_out" | grep -qF "cannot create a temp dir"; then
+    pass "a F5: mktemp failure -> loud rc 1"
+else
+    fail "a F5: mktemp failure -> loud rc 1 (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+
+# F4: a child rc outside 0/1/2 counts as an alert (OPK_DOCTOR_SELF stub)
+STUB="$WORK/all-stub.sh"
+printf '#!/bin/sh\nexit 3\n' >"$STUB"
+chmod +x "$STUB"
+_rd_rc=0
+_rd_out="$(
+    OPK_DOCTOR_SELF="$STUB" OPK_INSTALL_CONF="$CONF" OPK_DOCTOR_PROC_ROOT="$PROCFIX" \
+        NO_COLOR=1 setsid sh "$DOCTOR" all "$ALLGREEN" </dev/null 2>&1
+)" || _rd_rc=$?
+if [ "$_rd_rc" = 1 ] &&
+    printf '%s' "$_rd_out" | grep -qF "doctor exited 3 -- counted as an alert" &&
+    printf '%s' "$_rd_out" | grep -qF "failed         1 scan(s) exited unexpectedly (counted as alerts)"; then
+    pass "a F4: child rc 3 -> alert row, failed row, fleet rc 1"
+else
+    fail "a F4: child rc 3 -> alert row, failed row, fleet rc 1 (rc $_rd_rc)"
+    echo "        output: $_rd_out"
+fi
+
+# F10: skipped roots leave the USED count (M counts walked roots only)
+ALLMIX="$WORK/all-mix-roots.txt"
+printf '%s\n' "$ALLGREEN" "$WORK/all-gone-dir2" >"$ALLMIX"
+rc_doctor_roots "a F10: used+missing roots -> green fleet rc 0" 0 "$ALLMIX" all
+grep_last_out "a F10: count row names USED roots only" \
+    grep -qF "projects       1 scanned under 1 scan root(s)"
+
+# F16: markers found but every one skipped -> its own message
+ALLSK="$WORK/all-skip"
+mkdir -p "$ALLSK/we$(printf '\t')ird"
+printf '%s\n' '{"containerTrees":[]}' >"$ALLSK/we$(printf '\t')ird/opk.json"
+rc_doctor "a F16: all markers skipped -> rc 2 with the skip message" 2 all "$ALLSK"
+grep_last_out "a F16: all-skipped message" grep -qF "all 1 marker(s) skipped -- nothing to check"
+
+# F11: a symlinked project dir is warned (not silently dropped); a
+# symlinked SCAN ROOT is followed (-H) and works
+ALLSYM="$WORK/all-sym"
+mkdir -p "$ALLSYM/realproj/tree"
+printf '%s\n' '{"containerTrees":["tree"]}' >"$ALLSYM/realproj/opk.json"
+echo f >"$ALLSYM/realproj/tree/f"
+ln -s "$ALLSYM/realproj" "$ALLSYM/linkproj"
+rc_doctor "a F11: symlinked project warned, real scanned -> rc 0" 0 all "$ALLSYM"
+grep_last_out "a F11: symlink warn row" grep -qF "symlinked project"
+grep_last_out "a F11: the real project still ran" grep -qF "tree -- 2 entries mapped-safe"
+ln -s "$ALLGREEN" "$ALLSYM/rootlink"
+rc_doctor "a F11: symlinked scan root followed (-H) -> rc 0" 0 all "$ALLSYM/rootlink"
+grep_last_out "a F11: marker found through the root link" grep -qF "tree -- 2 entries mapped-safe"
+
+# F8: a control-character root line (CRLF-edited seam) is skipped with a
+# sanitized warn row
+ALLCRLF="$WORK/all-crlf.txt"
+printf '%s\r\n' "$ALLGREEN" >"$ALLCRLF"
+rc_doctor_roots "a F8: CRLF root line skipped -> rc 2" 2 "$ALLCRLF" all
+grep_last_out "a F8: charset skip warn names the sanitized root" \
+    grep -qF "carries control characters or backslashes -- skipped"
+if printf '%s' "$_rd_out" | LC_ALL=C grep -q "$(printf '\r')"; then
+    fail "a F8: the warn row carries no raw CR"
+else
+    pass "a F8: the warn row carries no raw CR"
+fi
+
+# usage: a scan root of '/' is refused like detect's whole-fs walk
+rc_doctor "all: scan root '/' -> rc 64" 64 all /
 
 # static source pins (comment-strip rider, the canonical shape): the
 # default roots are the vhosts layout plus the kit's own registry, at

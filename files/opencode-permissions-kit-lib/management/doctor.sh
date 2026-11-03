@@ -61,9 +61,11 @@
 # 'doctor all' (#354 / #313 phase 5) runs the scan over EVERY project at
 # once: opk.json doubles as the project registration marker -- every
 # opk.json found (max 3 levels below a scan root) is one project, one
-# FRESH doctor process per hit. No central registry, no project-name
-# heuristics; 'opk status' integration is deliberately deferred (#313
-# Q3). The full contract lives in the all block below.
+# FRESH doctor process per DISCOVERED PROJECT (duplicate hits -- a
+# project under several scan roots -- spawn one child, the project list
+# is deduped). No central registry, no project-name heuristics; 'opk
+# status' integration is deliberately deferred (#313 Q3). The full
+# contract lives in the all block below.
 #
 # CLI:  opk doctor [project-root]                 scan (default: cwd, walked
 #                                                  up to the nearest opk.json)
@@ -122,11 +124,12 @@ else
 fi
 
 # --- CLI --------------------------------------------------------------------------
-# Strict grammar (#313 increment b): 'fix' or 'detect' as the FIRST token
-# switches the mode; then at most one positional (the project root) plus
-# --dry-run (fix-only -- the scan is read-only already and detect writes
-# only on explicit consent, so a dry run of either is a usage error, not
-# a no-op). Everything else is rejected with 64.
+# Strict grammar (#313 increment b): 'fix', 'detect' or 'all' as the FIRST
+# token switches the mode; then at most one positional (the project root,
+# or the scan root for 'all') plus --dry-run (fix-only -- the scan and
+# 'all' are read-only, detect writes only on explicit consent, so a dry
+# run of any other mode is a usage error, not a no-op). Everything else
+# is rejected with 64.
 _doctor_usage() {
     echo "usage: opk doctor [project-root]                   (read-only scan; root: cwd or the nearest opk.json above)" >&2
     echo "       opk doctor all [scan-root]                  (one scan per project: every opk.json below the root(s))" >&2
@@ -197,26 +200,36 @@ fi
 # (the /var/www/vhosts/<org>/<project> layout resolves itself: no
 # opk.json, no project -- no central registry, no name heuristics; a
 # marker nested deeper than 3 levels below a scan root is not a project
-# here). Scan roots, first arm that applies:
+# here). A marker is a REGULAR FILE THROUGH SYMLINKS ([ -f ], the
+# walk-up rule, #353): a directory or a dangling symlink named opk.json
+# is not a marker (#360 a F12). Scan roots, first arm that applies:
 #   - an explicit positional: exactly that tree (defaults stay out)
 #   - $OPK_DOCTOR_SCAN_ROOTS (test seam, the OPK_INSTALL_CONF pattern):
-#     a file with one root per line, replacing the whole default list
+#     a file with one root per line, replacing the whole default list;
+#     SET (even to an empty value) selects this arm -- an empty value is
+#     an empty root list, never a fall-back to the real default roots
+#     (#360 a F6)
 #   - /var/www/vhosts when it exists, plus every root registered in the
 #     kit's own projects.conf (reading the EXISTING registry is not
 #     building a new one; its entries are often parents of several
 #     projects and get the same maxdepth walk)
-# ORCHESTRATION: a thin loop here spawning a FRESH process per root
-# (sh "$0" <root>) -- doctor.sh is single-process-per-root by design
-# (mktemp $WORK, EXIT trap, ui counters are per-run state), so 'all'
-# never re-enters this process and never reaches that machinery below.
+# ORCHESTRATION: a thin loop here spawning a FRESH process per
+# DISCOVERED PROJECT (sh "$0" <root>; the project list is deduped, so a
+# project found under several roots spawns ONE child, #360 a F2) --
+# doctor.sh is single-process-per-root by design (mktemp $WORK, EXIT
+# trap, ui counters are per-run state), so 'all' never re-enters this
+# process and never reaches that machinery below. The finds run -H: the
+# named root operand IS followed (a symlinked scan root walks its real
+# tree), nested symlinks are not descended -- a project directory that
+# is itself a symlink gets a warn row instead (#360 a F11).
 # fix/detect deliberately do not combine with 'all' (their per-finding
 # prompts assume one project in focus): 'all' joins 'fix'/'detect' as a
 # reserved first token, and the arg loop above keeps everything else
 # away. Exit-code aggregation, worst-of in the status.sh severity
 # order: any root alerting (rc 1) or failing outright (a child rc
 # outside 0/1/2 -- counted as an alert with its own warn row) -> 1;
-# otherwise any root warning-only, or nothing scanned at all (no scan
-# roots, or no markers under them) -> 2; otherwise 0.
+# otherwise any root warning-only, or nothing scanned at all (no usable
+# scan root, or no markers under them) -> 2; otherwise 0.
 INSTALL_CONF="${OPK_INSTALL_CONF:-/etc/opencode-permissions-kit/install.conf}"
 if [ "$DOCTOR_MODE" = "all" ]; then
     # kit pre-flight (one loud error instead of one per child): children
@@ -226,10 +239,21 @@ if [ "$DOCTOR_MODE" = "all" ]; then
         ui_error "doctor: $INSTALL_CONF not found -- is the kit installed?"
         exit 1
     fi
+    # a scan root of '/' would walk the whole filesystem's top levels --
+    # refuse it like 'detect' does for its walk
+    if [ "$DOCTOR_ROOT" = "/" ] && [ -n "$DOCTOR_ROOT_ARG" ]; then
+        ui_error "doctor: refusing to scan the whole filesystem (scan root '/')"
+        exit 64
+    fi
     PROJECTS_CONF="/etc/opencode-permissions-kit/projects.conf"
     # shellcheck disable=SC2317  # invoked via trap only
     _doctor_all_cleanup() { rm -rf "$WORK_ALL"; }
-    WORK_ALL="$(mktemp -d)"
+    # fail loud on a dead workspace (#360 a F5): an empty WORK_ALL would
+    # collapse every path below to root-level literals (/roots, /hits ...)
+    WORK_ALL="$(mktemp -d)" || {
+        ui_error "doctor: cannot create a temp dir (mktemp failed) -- is \$TMPDIR writable?"
+        exit 1
+    }
     trap _doctor_all_cleanup EXIT
     trap '_doctor_all_cleanup; exit 1' INT TERM
 
@@ -237,14 +261,19 @@ if [ "$DOCTOR_MODE" = "all" ]; then
     : >"$WORK_ALL/roots"
     if [ -n "$DOCTOR_ROOT_ARG" ]; then
         printf '%s\n' "$DOCTOR_ROOT" >>"$WORK_ALL/roots"
-    elif [ -n "${OPK_DOCTOR_SCAN_ROOTS:-}" ]; then
-        # fail loud, never a silent fallback: dropping to the real
-        # /var/www/vhosts here would scan the host's live tree
-        if [ ! -r "$OPK_DOCTOR_SCAN_ROOTS" ]; then
-            ui_error "doctor: OPK_DOCTOR_SCAN_ROOTS is set but not readable: $OPK_DOCTOR_SCAN_ROOTS"
+    elif [ "${OPK_DOCTOR_SCAN_ROOTS+set}" = set ]; then
+        # set (even empty) OWNS the list: never a silent fall-back to the
+        # real /var/www/vhosts -- an empty value is an empty list (#360 a F6)
+        if [ -z "$OPK_DOCTOR_SCAN_ROOTS" ]; then
+            :
+        elif [ ! -f "$OPK_DOCTOR_SCAN_ROOTS" ] || [ ! -r "$OPK_DOCTOR_SCAN_ROOTS" ]; then
+            # -f, not just -r: a directory would pass -r and die later in
+            # the grep (#360 a F7)
+            ui_error "doctor: OPK_DOCTOR_SCAN_ROOTS is set but not a readable file: $OPK_DOCTOR_SCAN_ROOTS"
             exit 1
+        else
+            grep -v '^[[:space:]]*$' "$OPK_DOCTOR_SCAN_ROOTS" >>"$WORK_ALL/roots" || true
         fi
-        grep -v '^[[:space:]]*$' "$OPK_DOCTOR_SCAN_ROOTS" >>"$WORK_ALL/roots" || true
     else
         [ -d /var/www/vhosts ] && printf '%s\n' /var/www/vhosts >>"$WORK_ALL/roots"
         if [ -f "$PROJECTS_CONF" ]; then
@@ -259,40 +288,104 @@ if [ "$DOCTOR_MODE" = "all" ]; then
 
     # --- marker discovery: one project root per opk.json found ----------------------
     ALL_ROOTS_N=0
+    ALL_ROOTS_USED=0
+    ALL_MARK_SKIP=0
     : >"$WORK_ALL/projects"
     while IFS= read -r _da_root; do
         [ -n "$_da_root" ] || continue
         ALL_ROOTS_N=$((ALL_ROOTS_N + 1))
+        # belt for list-sourced roots (the positional '/' is refused with
+        # 64 above): one heavy misconfigured root must not kill the fleet
+        if [ "$_da_root" = "/" ]; then
+            ui_kv_warn "scan root" "'/' refused -- doctor all does not walk the whole filesystem"
+            continue
+        fi
+        # root-line gate (#360 a F8): list lines (seam, projects.conf) are
+        # external data; a control byte or backslash makes the root unusable
+        # as a find operand AND clobbers the rows -- warn sanitized, skip
+        if printf '%s' "$_da_root" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
+            _da_show="$(printf '%s' "$_da_root" | tr -d '[:cntrl:]\\')"
+            ui_kv_warn "scan root" "'$_da_show' carries control characters or backslashes -- skipped"
+            continue
+        fi
         if [ ! -d "$_da_root" ]; then
             ui_kv_warn "scan root" "'$_da_root' is missing -- skipped"
             continue
         fi
+        ALL_ROOTS_USED=$((ALL_ROOTS_USED + 1))
         # stderr is loud, not lost (the unreadable-subtree class): a
-        # partially walked root must not read as "no markers here"
-        find "$_da_root" -maxdepth 3 -name opk.json -print \
+        # partially walked root must not read as "no markers here". Both
+        # finds (markers + the symlink pass) feed the same error file.
+        find -H "$_da_root" -maxdepth 3 -name opk.json -print \
             >"$WORK_ALL/hits" 2>"$WORK_ALL/ferr"
+        find -H "$_da_root" -maxdepth 2 -type l -print >"$WORK_ALL/links" 2>>"$WORK_ALL/ferr"
         if [ -s "$WORK_ALL/ferr" ]; then
             _da_n="$(wc -l <"$WORK_ALL/ferr")"
             ui_kv_warn "scan root" "$_da_n unreadable entries under $_da_root -- marker list may be incomplete"
             ui_detail "run 'doctor all' as the tree owner (or with sudo) for a complete picture"
         fi
+        # fragment integrity (#360 a F1): find -print and read share the
+        # NEWLINE as their separator -- a newline inside a name splits the
+        # hit BEFORE any gate, and the fragments would spawn phantom or
+        # cwd-relative children. A genuine hit always carries the root
+        # prefix and the /opk.json suffix; a fragment can never carry
+        # both (the prefix lives at the path start, the suffix at its
+        # end -- a split puts them on different fragments)
+        _da_pfx="${_da_root%/}/"
         while IFS= read -r _da_hit; do
             [ -n "$_da_hit" ] || continue
+            _da_corrupt=0
+            case "$_da_hit" in
+                "$_da_pfx"*) ;;
+                *) _da_corrupt=1 ;;
+            esac
+            case "$_da_hit" in
+                */opk.json) ;;
+                *) _da_corrupt=1 ;;
+            esac
+            if [ "$_da_corrupt" = 1 ]; then
+                _da_show="$(printf '%s' "$_da_hit" | tr -d '[:cntrl:]')"
+                ui_kv_warn "scan root" "corrupted marker path '$_da_show' skipped (a newline in a name under $_da_root?)"
+                ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
+                continue
+            fi
+            # marker-type gate (#360 a F12): the walk-up rule -- a regular
+            # file through symlinks; a directory or a dangling symlink
+            # named opk.json is not a marker
+            if [ ! -f "$_da_hit" ]; then
+                ui_kv_warn "scan root" "'$_da_hit' is not a regular file -- not a marker (directory or dangling symlink named opk.json)"
+                ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
+                continue
+            fi
             _da_proj="$(dirname "$_da_hit")"
             # marker gate (detect's charset class): control characters or
             # backslashes cannot round-trip child argv, rows and prompts
             # cleanly -- warn and skip, never a silent drop
             if printf '%s' "$_da_proj" | LC_ALL=C grep -q '[[:cntrl:]\\]'; then
                 ui_kv_warn "scan root" "marker at '$_da_proj' skipped -- control characters or backslashes in the path"
+                ALL_MARK_SKIP=$((ALL_MARK_SKIP + 1))
                 continue
             fi
             printf '%s\n' "$_da_proj" >>"$WORK_ALL/projects"
         done <"$WORK_ALL/hits"
+        # symlink pass (#360 a F11): -H follows only the ROOT operand, so
+        # a project directory that is itself a symlink is never descended
+        # -- find produced no hit and no error for it. Warn precisely: only
+        # links that DO carry a marker ([ -f ] resolves through the link)
+        while IFS= read -r _da_link; do
+            [ -n "$_da_link" ] || continue
+            [ -f "$_da_link/opk.json" ] || continue
+            ui_kv_warn "scan root" "symlinked project '$_da_link' is not descended -- pass the real directory"
+        done <"$WORK_ALL/links"
     done <"$WORK_ALL/roots"
     LC_ALL=C sort -u "$WORK_ALL/projects" >"$WORK_ALL/projects.s" &&
         mv "$WORK_ALL/projects.s" "$WORK_ALL/projects"
 
     # --- one fresh doctor per project -----------------------------------------------
+    # Test seam (OPK_DOCTOR_SELF): production spawns THIS script ($0);
+    # tests stub a failing child to pin the aggregation's error arm
+    # (#360 a F4, the OPK_DOCTOR_OPK pattern)
+    DOCTOR_ALL_SELF="${OPK_DOCTOR_SELF:-$0}"
     ALL_N=0
     ALL_GREEN=0
     ALL_WARN=0
@@ -305,7 +398,7 @@ if [ "$DOCTOR_MODE" = "all" ]; then
             ALL_N=$((ALL_N + 1))
             ui_kv "project" "$_da_proj"
             _da_rc=0
-            sh "$0" "$_da_proj" || _da_rc=$?
+            sh "$DOCTOR_ALL_SELF" "$_da_proj" || _da_rc=$?
             case "$_da_rc" in
                 0) ALL_GREEN=$((ALL_GREEN + 1)) ;;
                 1) ALL_ALERT=$((ALL_ALERT + 1)) ;;
@@ -321,18 +414,24 @@ if [ "$DOCTOR_MODE" = "all" ]; then
     # --- aggregate summary (worst-of, the contract in the block comment) -------------
     ui_section "Doctor all -- summary"
     if [ "$ALL_N" -eq 0 ]; then
-        if [ "$ALL_ROOTS_N" -eq 0 ]; then
-            ui_kv_warn "result" "no scan roots available -- pass one, or use the /var/www/vhosts layout or projects.conf"
+        if [ "$ALL_ROOTS_USED" -eq 0 ]; then
+            if [ "$ALL_ROOTS_N" -eq 0 ]; then
+                ui_kv_warn "result" "no scan roots available -- pass one, or use the /var/www/vhosts layout or projects.conf"
+            else
+                ui_kv_warn "result" "no scan root could be scanned -- every listed root is missing or unusable"
+            fi
+        elif [ "$ALL_MARK_SKIP" -gt 0 ]; then
+            ui_kv_warn "result" "all $ALL_MARK_SKIP marker(s) skipped -- nothing to check"
         else
             ui_kv_warn "result" "no opk.json markers found under the scanned root(s) -- nothing to check"
         fi
         exit 2
     fi
-    ui_kv "projects" "$ALL_N scanned under $ALL_ROOTS_N scan root(s)"
+    ui_kv "projects" "$ALL_N scanned under $ALL_ROOTS_USED scan root(s)"
     [ "$ALL_ERR" -gt 0 ] &&
         ui_kv_bad "failed" "$ALL_ERR scan(s) exited unexpectedly (counted as alerts)"
     [ "$ALL_ALERT" -gt 0 ] &&
-        ui_kv_bad "findings" "$ALL_ALERT project(s) with at-risk findings or errors"
+        ui_kv_bad "findings" "$ALL_ALERT project(s) with at-risk findings"
     [ "$ALL_WARN" -gt 0 ] &&
         ui_kv_warn "warnings" "$ALL_WARN project(s) warnings only"
     [ "$ALL_GREEN" -gt 0 ] &&

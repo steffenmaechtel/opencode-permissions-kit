@@ -219,9 +219,9 @@ case "$cmd" in
         # additionally orchestrates the handover remedy; 'doctor detect'
         # (#352) proposes opk.json entries from ownership evidence;
         # 'doctor all' (#354 / #313 phase 5) runs the scan for every
-        # project at once -- one fresh doctor process per opk.json
-        # marker found under the scan root(s); no sudo here either --
-        # the elevation happens inside handover.
+        # project at once -- one fresh doctor process per discovered
+        # opk.json-marker project (the deduped list spawns the children);
+        # no sudo here either -- the elevation happens inside handover.
         exec sh "$LIBDIR/management/doctor.sh" "$@"
         ;;
     config | update)

@@ -1385,7 +1385,7 @@ E 'opk handover opencode /var/www/vhosts/doctor-all/good/tree >/tmp/dall-ho.log 
 check "12p: the healthy project's tree is handed over first" \
     E 'grep -q "handover complete" /tmp/dall-ho.log'
 check "12p: doctor all scans every marker project, worst-of rc 1" \
-    E 'opk doctor all /var/www/vhosts/doctor-all >/tmp/dall.log 2>&1; test $? -eq 1 && grep -q "tree -- .* entries at-risk" /tmp/dall.log && grep -q "mapped-safe" /tmp/dall.log && grep -qF "findings       1 project(s) with at-risk findings or errors" /tmp/dall.log'
+    E 'opk doctor all /var/www/vhosts/doctor-all >/tmp/dall.log 2>&1; test $? -eq 1 && grep -q "tree -- .* entries at-risk" /tmp/dall.log && grep -q "mapped-safe" /tmp/dall.log && grep -qF "findings       1 project(s) with at-risk findings" /tmp/dall.log'
 check "12p: one fresh scan section per project" \
     E 'test "$(grep -c "Doctor -- container-tree ownership" /tmp/dall.log)" = 2'
 check "12p: a marker-free subtree contributes no project" \
