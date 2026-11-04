@@ -52,8 +52,6 @@ line_of() { sed 's/^[[:space:]]*#.*$//' "$1" | grep -nF "$2" | head -1 | cut -d:
 
 inst_win=$(line_of "$INSTALL" '/mnt/c/Users/*/AppData/Local/mkcert')
 inst_linux=$(line_of "$INSTALL" '$DEV_HOME/.local/share/mkcert/rootCA.pem')
-upd_win=$(line_of "$UPDATE" '/mnt/c/Users/*/AppData/Local/mkcert')
-upd_linux=$(line_of "$UPDATE" '/home/$DEFAULT_USER/.local/share/mkcert/rootCA.pem')
 
 echo ""
 echo "mkcert CA reuse Tests"

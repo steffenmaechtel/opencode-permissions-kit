@@ -987,8 +987,13 @@ check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
     sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$1"' _ "$STATUS"
 check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finish" \
     sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container && ! awk '/^e2e_finish\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container" _ "$E2ELIB"
+# e2e_cleanup body, comment-stripped once (#387 a a1): the NR anchors
+# below must not ride comment lines — the body carries a ~10-line
+# comment block around the dump gate, one comment naming
+# e2e_dump_container would anchor d and hide motion of the live call.
+_ecl_str="$(awk '/^e2e_cleanup\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
 check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$_ecl_str"
 check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
     sh -c "awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q -- '-type l -delete'" _ "$E2ELIB"
 check "fix a Q3: install.sh probes the ddev version subcommand from /" \
@@ -1024,7 +1029,7 @@ check "fix b M1: update.sh root fallback probe from / (consistency)" \
 check "fix b M4/S3: dump gate sees the exit status, not only counted failures" \
     sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '_ecc_rc=\$?' && awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '\"\$_ecc_rc\" -ne 0'" _ "$E2ELIB"
 check "fix b M4: dump fires before the keep branches (red --debug runs get evidence)" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'" _ "$_ecl_str"
 check "fix b M4: E2E_KEEP stays dump-free by design" \
     sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -qF '[ \"\${E2E_KEEP:-0}\" != \"1\" ]'" _ "$E2ELIB"
 check "fix b S1: strip notice is conditional — success and failure arms both named" \
