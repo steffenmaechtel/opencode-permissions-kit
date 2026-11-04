@@ -5,8 +5,9 @@
 # deploy-lib.sh manifest (~40 files — layout and modes live there),
 # sudoers, the umask profile and the agent/binary state. Does NOT touch:
 #   - existing /etc/opencode-permissions-kit/projects.conf
-#   - existing /etc/opencode-permissions-kit/install.conf (except the
-#     VERSION stamp and the OPENCODE_GROUP re-base)
+#   - existing /etc/opencode-permissions-kit/install.conf (except the four
+#     keys the rewrite owns: the VERSION stamp, the OPENCODE_GROUP re-base,
+#     KIT_CHANNEL and DDEV_VERSION — see the conf-write block)
 #   - existing /home/opencode/.config/opencode/opencode.json[c]
 #   - the DEFAULT user's existing opencode config (a deny-all config is only
 #     deployed when that user has no opencode.jsonc yet)

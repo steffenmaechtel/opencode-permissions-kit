@@ -3,8 +3,10 @@
 opencode permissions kit — JSONC Pattern Extractor
 
 Parses opencode.json[c] and extracts deny patterns from permission.read and
-permission.edit sections (used by status.sh's report-only leak scan), or
-reports which container tools (docker/ddev) a config explicitly enables via
+permission.edit sections (used by status.sh's report-only leak scan; a
+whole-section "*" deny is deliberately excluded — it would match every
+command), or reports which container tools (docker/ddev) a config
+explicitly enables via
 permission.bash (used by the wrapper's container opt-in). Both modes accept
 "-" to read JSON from stdin instead of a file — the wrapper pipes
 `opencode debug config` output there (the session's final merged config,

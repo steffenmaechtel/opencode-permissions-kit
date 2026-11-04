@@ -9,7 +9,9 @@ the kit-mode-2x.tsx port is registered as a `plugins` entry instead.
 cli.json is user-owned state (the TUI persists preferences there), so this
 is strictly ADDITIVE: only entries whose package path points into the
 kit's LIBDIR/tui directory are ever added, rewritten, or removed — every
-other key and entry survives byte-order-preserving round-trips.
+other key and entry survives the round-trip (keys, values and key order
+are preserved; the document is re-serialized at indent 2, so byte-level
+formatting of untouched entries may change).
 
 Usage:
   tui-register.py <cli.json> register <plugin-path> [--drop <path>]...
