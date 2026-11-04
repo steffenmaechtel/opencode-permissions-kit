@@ -38,10 +38,12 @@ WORK="$(mktemp -d)"
 # receivers do not fit one line); unset-safe operands skip cleanly.
 # _lk_work (#379 a F3): trap-only by design — the leak-scan pin block
 # has no inline rm even on its normal path, so the trap is the cleanup.
+# _cfg_work (#382): same shape — the Config-row block has no rm either.
 # w2_run's _w2_dir is subshell-contained and cleaned inside w2_run.
 _trap_cleanup() {
     rm -rf "${WORK:-}" "${W3:-}" "${_gap_work:-}" "${_c1dir:-}" \
-        "${_d1dir:-}" "${F25P:-}" "${F25:-}" "${_f2bW:-}" "${_lk_work:-}"
+        "${_d1dir:-}" "${F25P:-}" "${F25:-}" "${_f2bW:-}" "${_lk_work:-}" \
+        "${_cfg_work:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -2987,6 +2989,86 @@ if [ -n "$_lk_block" ] && printf '%s' "$_lk_block" | grep -q 'agent config unsca
     fi
 else
     fail "leak-scan outer block extractable from status.sh (issue #217)"
+fi
+
+# --- Config row probe aligned to the leak scan (issue #382) ------------------------
+# The old ls-probe counted a non-regular form at the config path (dangling
+# symlink, dir, fifo) as PRESENT: a healthy plain row, host exited clean —
+# while plain absence counted as the "none" warn. Extract the REAL block
+# and drive every form. OPENCODE_USER carries a ../-prefixed scratch path
+# so the block's own /home/$OPENCODE_USER interpolation lands inside this
+# suite's mktemp scratch: the real code path runs unmodified and the
+# sandbox floor (no /home writes) holds.
+_cfg_block="$(sed -n '/^_occonf=""$/,/^fi$/p' "$STATUS")"
+if [ -n "$_cfg_block" ] && printf '%s' "$_cfg_block" | grep -q 'is not a regular file'; then
+    pass "Config row block extractable from status.sh (issue #382)"
+    _cfg_work=$(mktemp -d)
+    _cfg_case() {
+        # $1 = case name; creates the case's opencode home and sets _u to
+        # the OPENCODE_USER value routing /home/$OPENCODE_USER there (no
+        # command substitution: _cfg_dir must survive into the caller).
+        _cfg_dir="$_cfg_work/$1"
+        _u="../$_cfg_dir/oc"
+        mkdir -p "$_cfg_dir/oc/.config/opencode"
+    }
+    _cfg_run() {
+        (
+            OPENCODE_USER="$1"
+            ui_kv() { echo "kv: $*"; }
+            ui_kv_warn() { echo "kvwarn: $*"; }
+            ui_detail() { :; }
+            eval "$_cfg_block"
+        ) 2>&1
+    }
+    _cfg_case regular &&
+        printf '{}' >"$_cfg_dir/oc/.config/opencode/opencode.jsonc"
+    _out=$(_cfg_run "$_u")
+    if printf '%s' "$_out" | grep -q 'kv: Config ' &&
+        ! printf '%s' "$_out" | grep -q 'kvwarn:'; then
+        pass "regular config: plain row, no warn bump (issue #382)"
+    else
+        fail "regular config: plain row, no warn bump (out=$_out)"
+    fi
+    _cfg_case absent
+    _out=$(_cfg_run "$_u")
+    if printf '%s' "$_out" | grep -q 'kvwarn: Config none'; then
+        pass "plain absence: counted none warn stays (issue #382)"
+    else
+        fail "plain absence: counted none warn stays (out=$_out)"
+    fi
+    _cfg_case dangling &&
+        ln -s "$_cfg_work/nonexistent-target" \
+            "$_cfg_dir/oc/.config/opencode/opencode.jsonc"
+    _out=$(_cfg_run "$_u")
+    if printf '%s' "$_out" | grep -q 'kvwarn: Config unusable' &&
+        printf '%s' "$_out" | grep -q 'is not a regular file' &&
+        ! printf '%s' "$_out" | grep -q 'kv: Config'; then
+        pass "dangling symlink: counted unusable warn, not a healthy row (issue #382)"
+    else
+        fail "dangling symlink: counted unusable warn, not a healthy row (out=$_out)"
+    fi
+    _cfg_case dirform &&
+        mkdir "$_cfg_dir/oc/.config/opencode/opencode.jsonc"
+    _out=$(_cfg_run "$_u")
+    if printf '%s' "$_out" | grep -q 'kvwarn: Config unusable'; then
+        pass "dir at config path: counted unusable warn (issue #382)"
+    else
+        fail "dir at config path: counted unusable warn (out=$_out)"
+    fi
+    _cfg_case fallback &&
+        ln -s "$_cfg_work/nonexistent-target" \
+            "$_cfg_dir/oc/.config/opencode/opencode.jsonc" &&
+        printf '{}' >"$_cfg_dir/oc/.config/opencode/opencode.json"
+    _out=$(_cfg_run "$_u")
+    if printf '%s' "$_out" | grep -q 'kv: Config ' &&
+        printf '%s' "$_out" | grep -q 'opencode\.json$' &&
+        ! printf '%s' "$_out" | grep -q 'kvwarn:'; then
+        pass "dangling jsonc + regular json: fallback wins, plain row (issue #382)"
+    else
+        fail "dangling jsonc + regular json: fallback wins, plain row (out=$_out)"
+    fi
+else
+    fail "Config row block extractable from status.sh (issue #382)"
 fi
 
 echo ""

@@ -596,6 +596,13 @@ names the missing kit file and
 the repair hint `fix: sudo opk update`; the advisories row names the
 skipped security checks instead).
 
+The agent-config row in the Core section counts the same way (issue
+#382): only a regular file at the agent's config path (`opencode.jsonc`,
+fallback `opencode.json`) is a config — plain absence warns as `none`,
+and a non-regular form at that path (dangling symlink, directory, fifo)
+warns as `unusable`, so an effectively gone agent config never exits
+clean.
+
 On a terminal, the two project-root scans (the ddev-share group-write check
 and the Windows-hosts check) show a live progress line while they walk your
 project roots. The line is transient: it never appears in piped output, log

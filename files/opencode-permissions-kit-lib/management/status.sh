@@ -305,10 +305,29 @@ else
 fi
 ui_kv "Wrapper" "/usr/local/bin/opencode -> $(readlink /usr/local/bin/opencode 2>/dev/null || echo missing)"
 ui_kv "Library" "$LIBDIR"
-_occonf="$(ls /home/$OPENCODE_USER/.config/opencode/opencode.jsonc 2>/dev/null ||
-    ls /home/$OPENCODE_USER/.config/opencode/opencode.json 2>/dev/null || echo "")"
+# Config row aligned to the leak scan's -f semantics (issue #382): only a
+# REGULAR file at either path counts as a config. The old ls-probe treated
+# non-regular forms (dangling symlink, dir, fifo) as present — it printed
+# their path as a healthy plain row and such hosts exited clean. Both
+# unusable legs hold the exit code now: install writes opencode.jsonc by
+# default, so any unusable form is drift from the installed state.
+_occonf=""
+_ocform=""
+for _oc_c in "/home/$OPENCODE_USER/.config/opencode/opencode.jsonc" \
+    "/home/$OPENCODE_USER/.config/opencode/opencode.json"; do
+    if [ -f "$_oc_c" ]; then
+        _occonf="$_oc_c"
+        break
+    fi
+    if [ -e "$_oc_c" ] || [ -L "$_oc_c" ]; then
+        _ocform="$_oc_c"
+    fi
+done
 if [ -n "$_occonf" ]; then
     ui_kv "Config" "$_occonf"
+elif [ -n "$_ocform" ]; then
+    ui_kv_warn "Config" "unusable — $_ocform is not a regular file"
+    ui_detail "restore the config or remove the stale entry (dotfile links go stale when the target moves)"
 else
     ui_kv_warn "Config" "none"
 fi
@@ -1471,13 +1490,13 @@ elif [ ! -f "$SCAN_CFG" ]; then
     # Issue #217: no agent config at all is a cannot-judge state (no
     # deny patterns to derive) — an uncounted unknown per the W3 idiom,
     # like the offline rows. Scope (#379 a F1, narrowed by b R2): this
-    # removes the LEAK SCAN's warn contribution to the exit code. For
-    # plain absence the pre-existing counted "Config: none" row above
-    # still holds the host at "warnings present" (separate product
-    # decision, outside #217's scope); NON-REGULAR forms (dir, dangling
-    # symlink, fifo — anything where ls prints a path but -f fails)
-    # render plain in the Config row too, so such a host exits clean
-    # with this unknown row as its only trace.
+    # removes the LEAK SCAN's warn contribution to the exit code. The
+    # Config row above holds the host at "warnings present" for every
+    # unusable form: plain absence as the pre-existing counted "none"
+    # (separate product decision, outside #217's scope), non-regular
+    # forms (dir, dangling symlink, fifo) as its counted "unusable" warn
+    # since #382 — that row probes with the same -f semantics, so this
+    # unknown row is the leak scan's only contribution either way.
     ui_kv "result" "unknown — no agent config to scan (neither opencode.jsonc nor opencode.json is a regular file)"
     log "leak scan: unknown, no agent config ($SCAN_CFG)"
 else
