@@ -997,8 +997,11 @@ check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finis
     sh -c "test -n \"\$1\" && test -n \"\$2\" && printf '%s\n' \"\$1\" | grep -q e2e_dump_container && ! printf '%s\n' \"\$2\" | grep -q e2e_dump_container" _ "$_ecl_str" "$_efn_str"
 check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
     sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$_ecl_str"
+# _e2e_dump_strip body, comment-stripped (#387 c c1 / d d1 — the whole
+# block greps stripped streams; the raw shape stays in the deferred family)
+_eds_str="$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
 check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \
-    sh -c "awk '/^_e2e_dump_strip\(\)/,/^}/' \"\$1\" | grep -q -- '-type l -delete'" _ "$E2ELIB"
+    sh -c "printf '%s\n' \"\$1\" | grep -q -- '-type l -delete'" _ "$_eds_str"
 check "fix a Q3: install.sh probes the ddev version subcommand from /" \
     sh -c 'grep -q "env HOME=\"\$DEV_HOME\" sh -c .cd / && exec" "$1" && ! grep -q "\"\$DDEV_BIN_DEV\" version" "$1"' _ "$INSTALL"
 check "fix a M3: config.sh probes the ddev version from /" \
@@ -1035,8 +1038,6 @@ check "fix b M4: dump fires before the keep branches (red --debug runs get evide
     sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /E2E_KEEP.*keeping container/{if (k == 0) k = NR} END{exit !(d > 0 && k > 0 && d < k)}'" _ "$_ecl_str"
 check "fix b M4: E2E_KEEP stays dump-free by design" \
     sh -c "printf '%s\n' \"\$1\" | grep -qF '[ \"\${E2E_KEEP:-0}\" != \"1\" ]'" _ "$_ecl_str"
-# _e2e_dump_strip body, comment-stripped (#387 c c1 — same family, same block)
-_eds_str="$(awk '/^_e2e_dump_strip\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
 check "fix b S1: strip notice is conditional — success and failure arms both named" \
     sh -c "printf '%s\n' \"\$1\" | grep -q 'symlinks stripped' && printf '%s\n' \"\$1\" | grep -q 'strip failed'" _ "$_eds_str"
 # Functional L1 pin for the strip failure path (find untraversable subdir):
