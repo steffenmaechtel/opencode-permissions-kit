@@ -160,9 +160,11 @@ the gate (moved here from CONTRIBUTING, issue #236):
   blast-radius area changed (`sudoers.template`, the wrapper, backend
   provisioning, the security model, `set -e`/pipefail semantics,
   traps).
-- Findings from a review become issues labeled `review` (actionable
-  soon) or `tech-debt` (deliberately deferred, with a reason). A
-  review starts by working the backlog, not by re-inventing itself.
+- Findings from a review become NEW issues labeled `from-review` (their
+  origin — the label says where they came from, nothing else); urgency
+  travels in the existing `prio:*` labels, and a deliberately deferred
+  finding records its reason in the issue itself. A review starts by
+  working the backlog, not by re-inventing itself.
 
 After each review, try to shrink the next one: every finding that
 could be turned into a lint rule, unit test, or consistency guard
