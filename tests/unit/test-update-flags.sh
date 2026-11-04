@@ -272,8 +272,9 @@ check "fetch: current major 1 -> GitHub candidate" \
 rm -rf "$DL"
 
 # --- 3. TMP cleanup order: never before the install attempt ----------------------
-IB_LINE=$(grep -n 'install_binary "\$SRC"' "$UPDATE" | head -1 | cut -d: -f1)
-LAST_TMP_RM=$(grep -n 'rm -rf "\$TMP"' "$UPDATE" | tail -1 | cut -d: -f1)
+# (comment-stripped operands, #385)
+IB_LINE=$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -n 'install_binary "\$SRC"' | head -1 | cut -d: -f1)
+LAST_TMP_RM=$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -n 'rm -rf "\$TMP"' | tail -1 | cut -d: -f1)
 check "cleanup: candidate dir removed only AFTER the install attempt (issue #24)" \
     sh -c "[ -n \"\$1\" ] && [ -n \"\$2\" ] && [ \"\$2\" -gt \"\$1\" ]" _ "$IB_LINE" "$LAST_TMP_RM"
 
@@ -385,8 +386,8 @@ check "ddev stamp: summary line reports the refreshed value" \
     sh -c "grep -q 'DDEV_VERSION=\$NEW_DDEV_VERSION' \"\$1\"" _ "$UPDATE"
 
 # --- 7. --channel (switch the tracking ref without editing install.conf) --------
-_prescan_ln=$(grep -n '_prev_arg' "$UPDATE" | head -1 | cut -d: -f1)
-_resolv_ln=$(grep -n '_kit_stamped_channel=' "$UPDATE" | head -1 | cut -d: -f1)
+_prescan_ln=$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -n '_prev_arg' | head -1 | cut -d: -f1)
+_resolv_ln=$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -n '_kit_stamped_channel=' | head -1 | cut -d: -f1)
 if [ -n "$_prescan_ln" ] && [ -n "$_resolv_ln" ] && [ "$_prescan_ln" -lt "$_resolv_ln" ]; then
     pass "channel: pre-scan runs before the stamp resolution (fetch uses the new ref)"
 else

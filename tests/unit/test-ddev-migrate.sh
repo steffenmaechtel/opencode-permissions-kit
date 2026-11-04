@@ -542,9 +542,15 @@ if [ -s "$WORK/finblock" ]; then
     check "finalize: the manifest re-take rides the find gate (S2)" \
         sh -c "grep -qF -- '-exec chown \"root:\$dm_ocg\" {} +' \"\$1\"" _ "$WORK/finblock"
     check "finalize: dir lock (root takes the dir) precedes every operand op (S2/S5)" \
-        sh -c 'lock_ln=$(grep -n "^    chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR\" " "$1" | head -1 | cut -d: -f1); op_ln=$(grep -n "chmod 640" "$1" | head -1 | cut -d: -f1); [ -n "$lock_ln" ] && [ -n "$op_ln" ] && [ "$lock_ln" -lt "$op_ln" ]' _ "$WORK/finblock"
+        sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
+            lock_ln=$(printf "%s\n" "$s" | grep -n "^    chown \"root:\$dm_ocg\" \"\$DD_MIG_DUMP_DIR\" " | head -1 | cut -d: -f1);
+            op_ln=$(printf "%s\n" "$s" | grep -n "chmod 640" | head -1 | cut -d: -f1);
+            [ -n "$lock_ln" ] && [ -n "$op_ln" ] && [ "$lock_ln" -lt "$op_ln" ]' _ "$WORK/finblock"
     check "finalize: NO operand mutation after the first agent hand-over (S2/S5)" \
-        sh -c 'last_mut=$(grep -n "chmod" "$1" | tail -1 | cut -d: -f1); first_ho=$(grep -n "chown \"\$dm_oc:" "$1" | head -1 | cut -d: -f1); [ -n "$last_mut" ] && [ -n "$first_ho" ] && [ "$last_mut" -lt "$first_ho" ]' _ "$WORK/finblock"
+        sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
+            last_mut=$(printf "%s\n" "$s" | grep -n "chmod" | tail -1 | cut -d: -f1);
+            first_ho=$(printf "%s\n" "$s" | grep -n "chown \"\$dm_oc:" | head -1 | cut -d: -f1);
+            [ -n "$last_mut" ] && [ -n "$first_ho" ] && [ "$last_mut" -lt "$first_ho" ]' _ "$WORK/finblock"
     # behavioral end state: planted links survive untouched, dumps and
     # manifest end 640, the dir 750, the stage is gone (unprivileged:
     # chowns fail EPERM into || true — the end STATE is still exactly
@@ -596,7 +602,10 @@ check "install.sh sources ddev-migrate.sh" \
 check "install.sh fetch list includes ddev-migrate.sh" \
     sh -c "grep -q 'opencode-permissions-kit-lib/sh/ddev-migrate.sh' \"\$1\"" _ "$INSTALL"
 check "install.sh runs the export in Step 4b (before the Step 5 handover)" \
-    sh -c 'export_ln=$(grep -n "ddev_migrate_export \"" "$1" | head -1 | cut -d: -f1); hand_ln=$(grep -n "ddev_handover_root \"" "$1" | head -1 | cut -d: -f1); [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$INSTALL"
+    sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
+        export_ln=$(printf "%s\n" "$s" | grep -n "ddev_migrate_export \"" | head -1 | cut -d: -f1);
+        hand_ln=$(printf "%s\n" "$s" | grep -n "ddev_handover_root \"" | head -1 | cut -d: -f1);
+        [ -n "$export_ln" ] && [ -n "$hand_ln" ] && [ "$export_ln" -lt "$hand_ln" ]' _ "$INSTALL"
 check "install.sh stamps DDEV_EXPORTED=1 after a successful export" \
     sh -c "grep -q 'DDEV_EXPORTED=1' \"\$1\"" _ "$INSTALL"
 check "install.sh gates the DDEV_EXPORTED stamp on zero failures" \

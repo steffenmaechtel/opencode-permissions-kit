@@ -46,7 +46,9 @@ check() {
     fi
 }
 
-line_of() { grep -nF "$2" "$1" | head -1 | cut -d: -f1; }
+# line_of: first line (in the comment-stripped file, #385) containing $2.
+# The strip substitutes (never deletes), so the numbers stay real lines.
+line_of() { sed 's/^[[:space:]]*#.*$//' "$1" | grep -nF "$2" | head -1 | cut -d: -f1; }
 
 inst_win=$(line_of "$INSTALL" '/mnt/c/Users/*/AppData/Local/mkcert')
 inst_linux=$(line_of "$INSTALL" '$DEV_HOME/.local/share/mkcert/rootCA.pem')

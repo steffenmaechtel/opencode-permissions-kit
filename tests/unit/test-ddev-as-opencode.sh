@@ -1071,7 +1071,10 @@ check "fix c M1: no bare ddev-hosts invocation remains outside the helper (invoc
 check "fix c S1: ddev-migrate absolutizes a relative dump-dir" \
     sh -c "grep -qF 'dm_dir=\"\$PWD/\$dm_dir\"' \"\$1\" && grep -qF 'case \"\$dm_dir\" in' \"\$1\"" _ "$MIGRATESH"
 check "fix d M1: empty-dir refusal precedes the absolutization (guard hoisted)" \
-    sh -c 'g=$(grep -nF "[ -n \"\$dm_dir\" ] ||" "$1" | head -1 | cut -d: -f1); c=$(grep -nF "case \"\$dm_dir\" in" "$1" | head -1 | cut -d: -f1); test -n "$g" && test -n "$c" && test "$g" -lt "$c"' _ "$MIGRATESH"
+    sh -c 's=$(sed "s/^[[:space:]]*#.*\$//" "$1");
+        g=$(printf "%s\n" "$s" | grep -nF "[ -n \"\$dm_dir\" ] ||" | head -1 | cut -d: -f1);
+        c=$(printf "%s\n" "$s" | grep -nF "case \"\$dm_dir\" in" | head -1 | cut -d: -f1);
+        test -n "$g" && test -n "$c" && test "$g" -lt "$c"' _ "$MIGRATESH"
 check "fix c L1: container guard precedes the dumps mkdir" \
     sh -c "awk '/^e2e_dump_container\(\)/,/^}/' \"\$1\" | grep -vE '^[[:space:]]*#' | awk '/E2E_CONTAINER/{if (g == 0) g = NR} /mkdir -p/{if (m == 0) m = NR} END{exit !(g > 0 && m > 0 && g < m)}'" _ "$E2ELIB"
 check "fix c L2: the rc capture is the FIRST statement of the trap handler" \
