@@ -634,8 +634,8 @@ else
 fi
 # The trailing-slash spelling feeds the same gate through the #243
 # normalization: ops would receive the stripped form (measured: with
-# the slash, setfacl -R and chgrp -R recurse the WHOLE target tree) —
-# the skip echo names the normalized path.
+# the slash, the find-chown walk and setfacl -R recurse the WHOLE
+# target tree) — the skip echo names the normalized path.
 UN_SYMLINK_SLASH_OUT=$(_un_loop_out "" false 60000 60002 60001 "$WORK/fakelink/" || true)
 if printf '%s' "$UN_SYMLINK_SLASH_OUT" |
     grep -qF "Skipping symlinked project path (register the target directory instead): $WORK/fakelink" &&

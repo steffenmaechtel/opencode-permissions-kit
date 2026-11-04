@@ -201,6 +201,29 @@ else
     fail "real directory must not trip the symlink arm (rc=$_pp245_rc err=$_pp245_err) (#245)"
 fi
 
+# --- review a Q1: caller refusal messages must not misname the cause ------
+# project_path_sane returns 1 for system paths, symlinks, relative and
+# dot forms alike; each caller prints ONE message for every refusal —
+# the old "is a system path" wording was factually false for the new
+# symlink arm (learnings L2: a fix that adds a rejection cause sweeps
+# every message that enumerates causes). Presence counts carry the
+# comment-strip rider; the absence pin needs none (conventions
+# "Source-counting pins").
+_q1i=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -cF 'is not a valid project root (system path, symlink, or malformed form)')
+_q1c=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
+    grep -cF 'is not a valid project root (system path, symlink, or malformed form)')
+if [ "$_q1i" -eq 3 ] && [ "$_q1c" -eq 2 ]; then
+    pass "caller refusal messages enumerate the real causes at all five sites (a Q1)"
+else
+    fail "caller refusal messages must enumerate the real causes (install=$_q1i/3 config=$_q1c/2) (a Q1)"
+fi
+if grep -qF 'is a system path' "$INSTALL" "$CONFIG"; then
+    fail "no caller message may claim 'is a system path' for every refusal (a Q1)"
+else
+    pass "no caller message claims 'is a system path' anymore (a Q1)"
+fi
+
 # ~ expansion lands in _PP_NORM as an absolute path
 if project_path_sane "~/dev" && [ "${_PP_NORM#${HOME}/}" = "dev" ] && [ "${#_PP_NORM}" -gt "${#HOME}" ]; then
     pass "~ expands to \$HOME path (got $_PP_NORM)"

@@ -374,7 +374,7 @@ projects_add() {
     sudo mkdir -p "$(dirname "$PROJECTS_CONF")"
     for p in $TARGETS; do
         if ! project_path_sane "$p"; then
-            ui_error "'$p' is a system path — refusing to add it (chgrp -R/setfacl -R would run over it)."
+            ui_error "'$p' is not a valid project root (system path, symlink, or malformed form) — refusing to add it."
             continue
         fi
         p="${_PP_NORM:-$p}"
@@ -767,23 +767,32 @@ refresh() {
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r p; do
             [ -z "$p" ] && continue
-            # Writer parity (issue #245): project_path_sane strips one
-            # trailing slash before its checks — mirror it so the
-            # symlink gate below cannot be dodged by a `link/`
-            # spelling ([ -L "path/" ] is false, the kernel resolves
-            # through the slash — measured, issue #245).
+            # Form gate, writer parity (review a S1/S2, issue #245):
+            # raw-conf entries no writer gate ever saw — dot/empty-
+            # segment spellings (`link/.`) dodge the [ -L ] gate below
+            # ([ -L "path/." ] is false, measured) AND the helper
+            # belt's one-slash strip, putting the recursive baseline on
+            # the link's target; a double slash (`link//`) reaches the
+            # belt as `link/` and its rc-1 refusal aborts the whole
+            # run under set -e. Same arms as project_path_sane and the
+            # uninstall reader; skip loudly and keep processing the
+            # remaining roots. Blocklist parity rides #247.
+            case "$p" in
+                *..* | /./ | */./* | ./* | */. | *//*)
+                    ui_warn "skip $p (malformed project path — dot or empty segment)"
+                    continue
+                    ;;
+            esac
             p="${p%/}"
             [ -n "$p" ] || continue
-            [ -d "$p" ] || continue
-            # Symlinked root gate (issue #245): a raw-conf entry no
-            # writer gate ever saw — the baseline would silently no-op
-            # on a link (measured, issue #245) under this function's
-            # success lines. The form/blocklist parity for raw-conf
-            # reader loops rides #247.
+            # Symlinked root gate (issue #245), before [ -d ] (review
+            # a S3): a dangling link is a symlink first — [ -d ] would
+            # swallow it silently under the green summary below.
             if [ -L "$p" ]; then
                 ui_warn "skip $p (symlink — register the target directory instead)"
                 continue
             fi
+            [ -d "$p" ] || continue
             # Shared helper with live per-pass progress (issue #14).
             fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
@@ -834,7 +843,7 @@ handover() {
     [ -z "$TARGETS" ] && die "Usage: config.sh handover <path...>"
     for p in $TARGETS; do
         if ! project_path_sane "$p"; then
-            ui_error "'$p' is a system path — refusing to touch it (the handover chowns below it)."
+            ui_error "'$p' is not a valid project root (system path, symlink, or malformed form) — refusing to touch it."
             continue
         fi
         p="${_PP_NORM:-$p}"

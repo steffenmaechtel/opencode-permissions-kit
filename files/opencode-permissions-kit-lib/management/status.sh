@@ -713,6 +713,15 @@ ui_section "Projects ($_st_pc)"
 if [ -f "$PROJECTS_CONF" ] && [ -s "$PROJECTS_CONF" ]; then
     while IFS= read -r root; do
         [ -z "$root" ] && continue
+        # Symlinked root (review a X4, issue #245): a link's mode is
+        # always 777, so the setgid check below would fire for EVERY
+        # link entry and recommend a refresh that now skips links with
+        # a warning — an advice loop with no exit. Name the cause.
+        # Before [ -d ] so a dangling link reports as a symlink (S3).
+        if [ -L "$root" ]; then
+            ui_atten "$root" "symlinked root — register the target directory instead"
+            continue
+        fi
         [ -d "$root" ] || {
             ui_miss "$root" "directory missing"
             continue

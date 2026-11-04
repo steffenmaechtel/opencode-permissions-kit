@@ -360,14 +360,16 @@ fs_baseline_root() {
     # and every pass below would then be a silent no-op — the find
     # walks start at the link itself and visit nothing (measured,
     # issue #245) — while the callers print "baseline applied" over a
-    # tree that got NOTHING. Fail loud (the 0.0.43a F10 shape): the
-    # callers' success lines must not print over a baseline that did
-    # not run. The trailing-slash strip is dodge-proofing: [ -L
-    # "path/" ] is false (kernel resolution through the slash —
-    # measured), and a raw-conf caller may hand the stored spelling
-    # through. The loop-side gates in config.sh/update.sh keep this
-    # arm from firing in their flows (skip before the call); this is
-    # the belt for direct and future callers.
+    # tree that got NOTHING. Fail loud: rc 1 plus this reason line —
+    # under the shipped set -e callers (config.sh, update.sh,
+    # install.sh all run set -eu) the rc aborts before any success
+    # line; the loop-side gates keep those flows from reaching the
+    # belt at all. Not a guarantee for future NON-set-e callers: they
+    # receive the rc and the reason, a caller that ignores both can
+    # still print its own success line (review a Q2). The
+    # trailing-slash strip is dodge-proofing: [ -L "path/" ] is false
+    # (kernel resolution through the slash — measured), and a raw-conf
+    # caller may hand the stored spelling through.
     if [ -L "${fsb_root%/}" ]; then
         printf '  error: %s is a symlink — refusing the group baseline (register the target directory instead)\n' \
             "$fsb_root" >&2

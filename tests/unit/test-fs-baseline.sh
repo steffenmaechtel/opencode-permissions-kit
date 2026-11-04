@@ -837,7 +837,7 @@ rm -rf "$W23NZ"
 # config.sh add/handover) carry rider'd presence pins at the end of
 # this section.
 S245="$WORK/s245"
-mkdir -p "$S245/real"
+mkdir -p "$S245/real" "$S245/real2"
 ln -s "$S245/real" "$S245/link"
 
 # 12a. fs_baseline_root refuses a symlinked root LOUDLY and touches
@@ -866,10 +866,18 @@ fi
 
 # 12b. config.sh refresh(): the REAL extracted function over a fixture
 # conf — real root, plain link, trailing-slash link, and a bare "/"
-# (the strip degenerates it to the empty string: skipped, where the
-# old loop would have handed "/" to the recursive baseline). The
-# baseline/handover markers may fire for the real root ONLY; the skip
-# echo names the normalized link path twice.
+# (the strip degenerates it to the empty string: skipped silently —
+# the OLD loop refused "/" loudly at the pass guard (#211 b W7) and
+# set -e aborted the refresh; the strip turns loud-refuse-abort into
+# a safe silent skip, review a Q4). Plus the S1/S2 arms: `link/.`
+# (dot spelling that dodges [ -L ] and the belt strip — recursive
+# baseline on the target, review a S1) and `link//` (belt refusal
+# aborted the whole run under set -e, review a S2) — both are the
+# form gate's catch now: loud skip, remaining roots processed. The
+# dangling link (a S3) reports as a symlink before [ -d ] can swallow
+# it. The baseline/handover markers may fire for the REAL roots ONLY
+# (real and real2 — real2 after every malformed entry proves no
+# mid-loop abort).
 {
     printf '%s\n' \
         'ui_info() { :; }' \
@@ -882,19 +890,27 @@ fi
     sed -n '/^refresh() {/,/^}$/p' "$CONFIG"
     printf '%s\n' 'refresh'
 } >"$S245/run-refresh.sh"
-printf '%s\n/\n%s/\n%s\n' "$S245/real" "$S245/link" "$S245/link" >"$S245/conf"
+# conf order: real … malformed/link entries … real2 — real2 AFTER every
+# refused entry proves no mid-loop abort (the a S2 over-abort shape).
+ln -s "$S245/gone" "$S245/dangling"
+printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n' \
+    "$S245/real" "$S245/link" "$S245/link" "$S245/link" "$S245/link" \
+    "$S245/dangling" "$S245/real2" >"$S245/conf"
 S245R_OUT=$(PROJECTS_CONF="$S245/conf" OPENCODE_GROUP=tg OPENCODE_USER=toc DEFAULT_USER=tdv \
     sh "$S245/run-refresh.sh" 2>&1)
-if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^HO: ')" -eq 1 ] &&
+if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^HO: ')" -eq 2 ] &&
     printf '%s\n' "$S245R_OUT" | grep -qF "FSB: $S245/real" &&
-    printf '%s\n' "$S245R_OUT" | grep -qF "HO: $S245/real" &&
+    printf '%s\n' "$S245R_OUT" | grep -qF "FSB: $S245/real2" &&
     ! printf '%s\n' "$S245R_OUT" | grep -q '^FSB: .*/link' &&
     ! printf '%s\n' "$S245R_OUT" | grep -q '^HO: .*/link' &&
-    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 2 ]; then
-    pass "config.sh refresh: baseline/handover on the real root only, links skipped loudly (#245)"
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 2 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/dangling (symlink")" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link/. (malformed")" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ]; then
+    pass "config.sh refresh: real roots only, link/dangling/malformed skipped loudly, no abort (#245, a S1/S2/S3)"
 else
-    fail "config.sh refresh must skip symlinked roots (out=$(printf '%s\n' "$S245R_OUT" | head -6)) (#245)"
+    fail "config.sh refresh must skip link/dangling/malformed roots without abort (out=$(printf '%s\n' "$S245R_OUT" | head -8)) (#245)"
 fi
 
 # 12c. the update.sh root loop (refresh + handover, the #247 raw-conf
@@ -917,29 +933,36 @@ fi
         sed 's|done <"$PROJECTS_CONF"|done|'
 } >"$S245/run-update-loop.sh"
 S245U_OUT=$(sh "$S245/run-update-loop.sh" <"$S245/conf" 2>&1)
-if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^HO: ')" -eq 1 ] &&
+if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^HO: ')" -eq 2 ] &&
     printf '%s\n' "$S245U_OUT" | grep -qF "FSB: $S245/real" &&
-    printf '%s\n' "$S245U_OUT" | grep -qF "HO: $S245/real" &&
+    printf '%s\n' "$S245U_OUT" | grep -qF "FSB: $S245/real2" &&
     ! printf '%s\n' "$S245U_OUT" | grep -q '^FSB: .*/link' &&
     ! printf '%s\n' "$S245U_OUT" | grep -q '^HO: .*/link' &&
-    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 2 ]; then
-    pass "update.sh root loop: baseline/handover on the real root only, links skipped loudly (#245)"
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 2 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/dangling (symlink")" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link/. (malformed")" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ]; then
+    pass "update.sh root loop: real roots only, link/dangling/malformed skipped loudly, no abort (#245, a S1/S2/S3)"
 else
-    fail "update.sh root loop must skip symlinked roots (out=$(printf '%s\n' "$S245U_OUT" | head -6)) (#245)"
+    fail "update.sh root loop must skip link/dangling/malformed roots without abort (out=$(printf '%s\n' "$S245U_OUT" | head -8)) (#245)"
 fi
 
 # 12d. belt arms behind the writer gate (scan->act rechecks, L5):
 # install.sh's baseline loop and config.sh's add/handover rechecks are
 # driven by the writer pin (test-project-paths.sh) + the loop pins
 # above; these presence pins guard the wiring behind a comment-strip
-# rider (conventions "Source-counting pins"). config.sh counts THREE
-# sites: projects add, handover, refresh.
-if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
-    grep -qF 'ui_warn "skip $root (symlink — register the target directory instead)"'; then
-    pass "install.sh baseline loop carries the symlink skip arm (#245)"
+# rider (conventions "Source-counting pins"). install.sh counts TWO
+# sites (both $PROJECTS_ROOTS loops — the handover loop joined in
+# review a X1); config.sh counts THREE (projects add, handover,
+# refresh). The ddev_handover_root belt (a X2) and status.sh's
+# symlink report (a X4) ride the same rider'd shape.
+S245I=$(sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -cF 'ui_warn "skip $root (symlink — register the target directory instead)"')
+if [ "$S245I" -ge 2 ]; then
+    pass "install.sh: BOTH \$PROJECTS_ROOTS loops carry the symlink skip arm (#245, a X1)"
 else
-    fail "install.sh baseline loop must skip symlinked roots (#245)"
+    fail "install.sh must gate both \$PROJECTS_ROOTS loops (found $S245I of 2) (#245, a X1)"
 fi
 S245C=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
     grep -cF 'ui_warn "skip $p (symlink — register the target directory instead)"')
@@ -947,6 +970,56 @@ if [ "$S245C" -ge 3 ]; then
     pass "config.sh symlink skip arms wired at all three sites (add, handover, refresh) (#245)"
 else
     fail "config.sh must carry the symlink skip arm at add/handover/refresh (found $S245C of 3) (#245)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-handover.sh" |
+    grep -qF 'if [ -L "${dhr_root%/}" ]; then'; then
+    pass "ddev_handover_root carries the root-operand symlink belt (#245, a X2)"
+else
+    fail "ddev_handover_root must belt-gate symlinked roots (#245, a X2)"
+fi
+if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh" |
+    grep -qF 'ui_atten "$root" "symlinked root — register the target directory instead"'; then
+    pass "status.sh reports symlinked roots instead of the dead-end refresh advice (#245, a X4)"
+else
+    fail "status.sh must name symlinked roots, not advise a refresh that skips them (#245, a X4)"
+fi
+
+# 12e. install.sh's HANDOVER loop (review a X1), behavioral: the
+# second $PROJECTS_ROOTS loop is extracted by block identity (the one
+# whose body calls ddev_handover_root — a plain sed range cannot
+# separate the two loops) and driven with marker stubs. A symlinked
+# root (and a dangling one) must produce the skip warning and NO
+# handover/stamp op — the pre-fix loop wrote the stamp and the
+# "applied" audit line for the same root the baseline loop refused.
+{
+    printf '%s\n' \
+        'ui_warn() { echo "ui_warn: $1"; }' \
+        'ddev_handover_root() { echo "HO: $1"; }' \
+        'ddev_handover_stamp_write() { echo "STAMP: $1"; }' \
+        'log() { :; }' \
+        "PROJECTS_ROOTS=\"$S245/real $S245/link $S245/dangling\"" \
+        'OPENCODE_USER=toc' 'OPENCODE_GROUP=tg' 'DEFAULT_USER=tdv'
+    awk '
+        /for root in \$PROJECTS_ROOTS; do/ { buf = ""; inl = 1 }
+        inl { buf = buf $0 ORS }
+        inl && /^[[:space:]]*done$/ {
+            if (buf ~ /ddev_handover_root/) { printf "%s", buf; exit }
+            inl = 0
+        }
+    ' "$INSTALL"
+} >"$S245/run-install-handover.sh"
+S245H_OUT=$(sh "$S245/run-install-handover.sh" 2>&1)
+if [ "$(printf '%s\n' "$S245H_OUT" | grep -c '^HO: ')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245H_OUT" | grep -c '^STAMP: ')" -eq 1 ] &&
+    printf '%s\n' "$S245H_OUT" | grep -qF "HO: $S245/real" &&
+    printf '%s\n' "$S245H_OUT" | grep -qF "STAMP: $S245/real" &&
+    ! printf '%s\n' "$S245H_OUT" | grep -q '^HO: .*/link' &&
+    ! printf '%s\n' "$S245H_OUT" | grep -q '^HO: .*dangling' &&
+    [ "$(printf '%s\n' "$S245H_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245H_OUT" | grep -cF "ui_warn: skip $S245/dangling (symlink")" -eq 1 ]; then
+    pass "install.sh handover loop: no stamp/op for link or dangling root, loud skip (a X1/S3)"
+else
+    fail "install.sh handover loop must refuse symlinked roots (out=$(printf '%s\n' "$S245H_OUT" | head -6)) (a X1)"
 fi
 
 # --- Summary ---------------------------------------------------------------------------
