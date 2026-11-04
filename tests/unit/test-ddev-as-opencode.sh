@@ -1585,8 +1585,10 @@ check "update.sh: skip message names both force paths" \
 # single loop, each EXACTLY ONCE, in order arm < handover < stamp (the
 # stamp records a completed pass). The awk end pattern is deliberately
 # UNANCHORED (b1: an indent-anchored one silently captured the file
-# tail after a re-nest, all pins green) — a stray `done <"$PROJECTS_CONF"`
-# elsewhere reds the loops==1 pin instead of shortening this range.
+# tail after a re-nest, all pins green). A stray done-text occurrence
+# is loud in EVERY placement (c1): anywhere it reds the loops==1 pin,
+# and inside the range it additionally shortens this capture, which
+# reds the in-body counts.
 _upd_loop="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
 _upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
 _upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
