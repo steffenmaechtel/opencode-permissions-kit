@@ -160,7 +160,7 @@ the gate (moved here from CONTRIBUTING, issue #236):
   blast-radius area changed (`sudoers.template`, the wrapper, backend
   provisioning, the security model, `set -e`/pipefail semantics,
   traps).
-- Findings from a review become issues labeled `review` (actionable
+- Findings from a review become issues labeled `from-review` (actionable
   soon) or `tech-debt` (deliberately deferred, with a reason). A
   review starts by working the backlog, not by re-inventing itself.
 
