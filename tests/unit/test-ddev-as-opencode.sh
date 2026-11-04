@@ -1568,6 +1568,9 @@ unset OPK_HANDOVER_STAMP_DIR
 # Wiring: update.sh skips via the stamps (plain update only — --refresh
 # forces), re-stamps after every full pass, and says how to force;
 # install.sh + config.sh stamp their explicit passes too.
+# issue #219: --refresh rides the SAME loop (baseline arm loop-local) —
+# update.sh keeps exactly one project-root loop and one handover call
+# per root; comment-strip riders (#261) guard the counts.
 check "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid" \
     sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF 'ddev_handover_stamp_valid \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"; then' \"\$1\"" _ "$UPDATE"
 check "update.sh: stamps the root after the handover" \
@@ -1576,8 +1579,24 @@ check "update.sh: the scanning detail is printed only for roots actually scanned
     sh -c "grep -qF '_ho_announced=false' \"\$1\" && grep -qF 'if [ \"\$_ho_announced\" = false ]' \"\$1\"" _ "$UPDATE"
 check "update.sh: skip message names both force paths" \
     sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE"
-check "update.sh: --refresh pass re-stamps" \
-    sh -c "awk '/^    if \[ \"\\\$REFRESH\" = true \]/,/^    fi\$/' \"\$1\" | grep -q 'ddev_handover_stamp_write'" _ "$UPDATE"
+check "update.sh: --refresh baseline arm rides the loop (issue #219)" \
+    grep -qF 'fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"' "$UPDATE"
+_fs_arm_ln="$(grep -n 'fs_baseline_root "\$root"' "$UPDATE" | head -1 | cut -d: -f1)"
+_ho_call_ln="$(grep -n 'ddev_handover_root "\$root"' "$UPDATE" | head -1 | cut -d: -f1)"
+check "update.sh: baseline arm precedes the handover call (order ${_fs_arm_ln}<${_ho_call_ln} — issue #219)" \
+    sh -c '[ -n "$1" ] && [ -n "$2" ] && [ "$1" -lt "$2" ]' _ "$_fs_arm_ln" "$_ho_call_ln"
+_upd_loops_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -c 'done <"$PROJECTS_CONF"' || true)"
+check "update.sh: exactly one project-root loop (loops: $_upd_loops_n, need 1 — issue #219)" \
+    [ "$_upd_loops_n" -eq 1 ]
+_upd_ho_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -c 'ddev_handover_root "$root"' || true)"
+check "update.sh: handover call per root exactly once (sites: $_upd_ho_n, need 1 — issue #219)" \
+    [ "$_upd_ho_n" -eq 1 ]
+check "update.sh: refresh success line kept verbatim (issue #219 move)" \
+    grep -qF 'ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"' "$UPDATE"
+check "update.sh: refresh section header kept (issue #219 move)" \
+    grep -qF 'ui_section "Refreshing group baseline"' "$UPDATE"
+check "update.sh: routine skip hint kept verbatim (issue #219 move)" \
+    grep -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)' "$UPDATE"
 check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines

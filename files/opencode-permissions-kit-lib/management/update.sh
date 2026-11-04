@@ -1027,6 +1027,34 @@ if [ "$ONLY_BINARY" != true ]; then
         }
         command -v ddev_handover_stamp_valid >/dev/null 2>&1 || ddev_handover_stamp_valid() { return 1; }
         command -v ddev_handover_stamp_write >/dev/null 2>&1 || ddev_handover_stamp_write() { :; }
+        # Single project-root pass (issue #219): --refresh used to pay a
+        # second full scan — this loop (stamp-skip opened under REFRESH)
+        # already ran ddev_handover_root over every root, then a separate
+        # end-of-run block re-scanned the same roots for the group baseline
+        # AND the handover again. The baseline arm now rides this loop;
+        # per-root order matches the old refresh block (baseline first,
+        # handover second, so .ddev dirs end up owned by the opencode user).
+        if [ "$REFRESH" = true ]; then
+            ui_section "Refreshing group baseline"
+            # Shared helper with live per-pass progress (issue #14 — large trees
+            # used to run minutes in silence during --refresh).
+            _fsbl=""
+            for _fsbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
+                if [ -f "$_fsbl_cand" ]; then
+                    . "$_fsbl_cand"
+                    _fsbl="$_fsbl_cand"
+                    break
+                fi
+            done
+            # Loud like the config.sh twin and the ddev_handover_root stub above
+            # (#211 b W3 — the a F2 sweep stopped at this file's handover stub):
+            # a silent no-op let --refresh log "group baseline refreshed" over a
+            # pass that never ran. Fail loud, let set -e stop the update.
+            command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
+                echo "error: fs_baseline_root unavailable (fs-baseline.sh missing)" >&2
+                return 1
+            }
+        fi
         _ho_skip=0
         _ho_announced=false
         while IFS= read -r root; do
@@ -1041,6 +1069,9 @@ if [ "$ONLY_BINARY" != true ]; then
                 ui_detail "scanning project roots for ddev directories (large trees: this can take a while) ..."
                 _ho_announced=true
             fi
+            if [ "$REFRESH" = true ]; then
+                fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"
+            fi
             ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
             ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
             log "ddev handover pass completed under $root"
@@ -1049,6 +1080,12 @@ if [ "$ONLY_BINARY" != true ]; then
             ui_detail "skipped the ddev handover rescan for $_ho_skip root(s) — nothing changed since the last pass"
             ui_detail "force it with 'sudo opk update --refresh' or 'sudo opk config handover <path>'"
             log "ddev handover rescan skipped for $_ho_skip root(s) (issue #112 stamps)"
+        fi
+        if [ "$REFRESH" = true ]; then
+            ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"
+            log "group baseline refresh requested (--refresh)"
+        else
+            ui_detail "skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)"
         fi
     fi
 
@@ -1656,43 +1693,6 @@ if [ "$ONLY_BINARY" != true ]; then
     _oc_major=$(sed -n 's/^OPENCODE_MAJOR=//p' "$CONFDIR/install.conf" 2>/dev/null | tail -1 || true)
     [ -n "$_oc_major" ] || _oc_major=1
     sync_tui_registration "$_oc_major"
-
-    # --- optional group-baseline refresh ------------------------------------------
-
-    if [ "$REFRESH" = true ]; then
-        ui_section "Refreshing group baseline"
-        # Shared helper with live per-pass progress (issue #14 — large trees
-        # used to run minutes in silence during --refresh).
-        _fsbl=""
-        for _fsbl_cand in "$FILES_ROOT/opencode-permissions-kit-lib/sh/fs-baseline.sh" "$LIBDIR/sh/fs-baseline.sh"; do
-            if [ -f "$_fsbl_cand" ]; then
-                . "$_fsbl_cand"
-                _fsbl="$_fsbl_cand"
-                break
-            fi
-        done
-        # Loud like the config.sh twin and the ddev_handover_root stub above
-        # (#211 b W3 — the a F2 sweep stopped at this file's handover stub):
-        # a silent no-op let --refresh log "group baseline refreshed" over a
-        # pass that never ran. Fail loud, let set -e stop the update.
-        command -v fs_baseline_root >/dev/null 2>&1 || fs_baseline_root() {
-            echo "error: fs_baseline_root unavailable (fs-baseline.sh missing)" >&2
-            return 1
-        }
-        if [ -f "$PROJECTS_CONF" ]; then
-            while IFS= read -r root; do
-                [ -z "$root" ] && continue
-                [ -d "$root" ] || continue
-                fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"
-                ddev_handover_root "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-                ddev_handover_stamp_write "$root" "$OPENCODE_USER" "$NEW_OPENCODE_GROUP" "$DEFAULT_USER"
-            done <"$PROJECTS_CONF"
-        fi
-        ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"
-        log "group baseline refresh requested (--refresh)"
-    else
-        ui_detail "skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)"
-    fi
 
 fi # ONLY_BINARY skip: post-binary sections
 
