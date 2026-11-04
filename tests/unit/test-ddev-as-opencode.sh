@@ -628,8 +628,6 @@ check "handover helper skips unknown app types" \
     sh -c "grep -qF 'return 0' \"\$1\"" _ "$HANDOVER"
 check "config.sh projects add uses the handover helper" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$CONFIG"
-check "update.sh refresh uses the handover helper" \
-    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE"
 
 # --- 7b. project-root handover (TYPO3 bootstrap, EPERM on fresh clones) ---------
 # ddev's settings-path fallback targets the APP ROOT while TYPO3 is not
@@ -1568,6 +1566,9 @@ unset OPK_HANDOVER_STAMP_DIR
 # Wiring: update.sh skips via the stamps (plain update only — --refresh
 # forces), re-stamps after every full pass, and says how to force;
 # install.sh + config.sh stamp their explicit passes too.
+# issue #219: --refresh rides the SAME loop (baseline arm loop-local) —
+# update.sh keeps exactly one project-root loop and one handover call
+# per root; comment-strip riders (#261) guard the counts.
 check "update.sh: plain-update loop gates the skip on REFRESH + stamp_valid" \
     sh -c "grep -qF '[ \"\$REFRESH\" != true ]' \"\$1\" && grep -qF 'ddev_handover_stamp_valid \"\$root\" \"\$OPENCODE_USER\" \"\$NEW_OPENCODE_GROUP\" \"\$DEFAULT_USER\"; then' \"\$1\"" _ "$UPDATE"
 check "update.sh: stamps the root after the handover" \
@@ -1576,8 +1577,41 @@ check "update.sh: the scanning detail is printed only for roots actually scanned
     sh -c "grep -qF '_ho_announced=false' \"\$1\" && grep -qF 'if [ \"\$_ho_announced\" = false ]' \"\$1\"" _ "$UPDATE"
 check "update.sh: skip message names both force paths" \
     sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE"
-check "update.sh: --refresh pass re-stamps" \
-    sh -c "awk '/^    if \[ \"\\\$REFRESH\" = true \]/,/^    fi\$/' \"\$1\" | grep -q 'ddev_handover_stamp_write'" _ "$UPDATE"
+# pr-00381 a1/a2/a7 + b1/b2: the file-global presence/order pins were
+# comment-blind and position-free — hoisting the arm out of the loop,
+# dropping its REFRESH wrapper or commenting it out all stayed green.
+# The loop-body range pin below is comment-stripped (#261) and asserts
+# the arm's REFRESH gate, the arm itself and the stamp write INSIDE the
+# single loop, each EXACTLY ONCE, in order arm < handover < stamp (the
+# stamp records a completed pass). The awk end pattern is deliberately
+# UNANCHORED (b1: an indent-anchored one silently captured the file
+# tail after a re-nest, all pins green). A stray done-text occurrence
+# is loud in EVERY placement (c1): anywhere it reds the loops==1 pin,
+# and inside the range it additionally shortens this capture, which
+# reds the in-body counts.
+_upd_loop="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
+_upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
+_upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
+_upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write "\$root"' || true)"
+check "update.sh: loop body = 1× REFRESH gate + arm + stamp (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381 a1/a2/a7/b2)" \
+    sh -c '[ "$1" -eq 1 ] && [ "$2" -eq 1 ] && [ "$3" -eq 1 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
+_upd_arm_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'fs_baseline_root "\$root"' | head -1 | cut -d: -f1)"
+_upd_ho_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_root "\$root"' | head -1 | cut -d: -f1)"
+_upd_stamp_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_stamp_write "\$root"' | head -1 | cut -d: -f1)"
+check "update.sh: in-loop order arm < handover < stamp (${_upd_arm_ln}<${_upd_ho_ln}<${_upd_stamp_ln} — pr-00381 a7)" \
+    sh -c '[ -n "$1" ] && [ -n "$2" ] && [ -n "$3" ] && [ "$1" -lt "$2" ] && [ "$2" -lt "$3" ]' _ "$_upd_arm_ln" "$_upd_ho_ln" "$_upd_stamp_ln"
+_upd_loops_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -c 'done <"$PROJECTS_CONF"' || true)"
+check "update.sh: exactly one project-root loop (loops: $_upd_loops_n, need 1 — issue #219)" \
+    [ "$_upd_loops_n" -eq 1 ]
+_upd_ho_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -c 'ddev_handover_root "$root"' || true)"
+check "update.sh: handover call per root exactly once (sites: $_upd_ho_n, need 1 — issue #219)" \
+    [ "$_upd_ho_n" -eq 1 ]
+check "update.sh: refresh success line kept verbatim (issue #219 move)" \
+    grep -qF 'ui_success "group baseline refreshed (chgrp + setgid + g+rw + default ACLs)"' "$UPDATE"
+check "update.sh: refresh section header kept (issue #219 move)" \
+    grep -qF 'ui_section "Refreshing group baseline"' "$UPDATE"
+check "update.sh: routine skip hint kept verbatim (issue #219 move)" \
+    grep -qF 'skipped group-baseline refresh (use --refresh to re-apply chgrp/setgid/default ACLs)' "$UPDATE"
 check "install.sh: stamps after the install-time handover" \
     sh -c "grep -qF 'ddev_handover_stamp_write \"\$root\" \"\$OPENCODE_USER\" \"\$OPENCODE_GROUP\"' \"\$1\"" _ "$INSTALL"
 # Comment-strip riders (#261, the #244 g W1 class): commented-out lines
