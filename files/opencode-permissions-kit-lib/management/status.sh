@@ -310,7 +310,11 @@ ui_kv "Library" "$LIBDIR"
 # non-regular forms (dangling symlink, dir, fifo) as present — it printed
 # their path as a healthy plain row and such hosts exited clean. Both
 # unusable legs hold the exit code now: install writes opencode.jsonc by
-# default, so any unusable form is drift from the installed state.
+# default, so a config unusable at BOTH paths is drift from the
+# installed state. Carve-out (deliberate, pinned as "fallback wins"):
+# a regular opencode.json beats a non-regular jsonc — the plain row is
+# right there (same -f fallback as SCAN_CFG below), so an unusable form
+# only warns when no regular config exists at either path.
 _occonf=""
 _ocform=""
 for _oc_c in "/home/$OPENCODE_USER/.config/opencode/opencode.jsonc" \

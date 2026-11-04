@@ -600,8 +600,9 @@ The agent-config row in the Core section counts the same way (issue
 #382): only a regular file at the agent's config path (`opencode.jsonc`,
 fallback `opencode.json`) is a config — plain absence warns as `none`,
 and a non-regular form at that path (dangling symlink, directory, fifo)
-warns as `unusable`, so an effectively gone agent config never exits
-clean.
+warns as `unusable`. On an installed host an effectively gone agent
+config never exits clean; the pre-install exception above applies
+unchanged (full mode exits 0 before the Core section runs).
 
 On a terminal, the two project-root scans (the ddev-share group-write check
 and the Windows-hosts check) show a live progress line while they walk your
