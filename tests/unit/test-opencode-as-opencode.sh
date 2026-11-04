@@ -1045,8 +1045,8 @@ if [ -n "$_b220_block" ] && [ -f "$_b220_adv_src" ]; then
             printf '%s\n' "$_bridge_needed"
         )
     }
-    if [ "$(_b220_gate 1.19.0)" = 0 ] && [ "$(_b220_gate 2.0.19)" = 0 ] &&
-        [ "$(_b220_gate 2.0.18)" = 0 ] &&
+    if [ "$(_b220_gate 1.19.0)" = 0 ] && [ "$(_b220_gate 1.18.33)" = 0 ] &&
+        [ "$(_b220_gate 2.0.19)" = 0 ] && [ "$(_b220_gate 2.0.18)" = 0 ] &&
         [ "$(_b220_gate 1.18.32)" = 1 ] && [ "$(_b220_gate 2.0.17)" = 1 ] &&
         [ "$(_b220_gate '')" = 1 ]; then
         echo "  ${GREEN}PASS${NC}  bridge gate keys on ADV_VERSION (1.18.33+/2.0.18+ unneeded)"
@@ -1070,18 +1070,24 @@ fi
 
 # --- #220: the probe initializes its variables (no env inheritance) ----------
 # The init before the guarded block kills the collision vector at the
-# source: an exported ADV_VERSION/ADV_LINE can no longer impersonate a
-# probe result while advisories.sh is missing. Pin: the init literals
-# exist (comment-strip-ridden) and sit BEFORE the advisories.sh gate.
-_b220_init_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -nF 'ADV_VERSION=""' | head -1 | cut -d: -f1)"
+# source: an exported ADV_LINE/ADV_VERSION/ADV_HITS can no longer
+# impersonate a probe result while advisories.sh is missing (a1 swept
+# the whole ADV_* family, ADV_HITS included). Pin: every init literal
+# exists (comment-strip-ridden) and sits BEFORE the advisories.sh gate.
 _b220_gate_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" |
     grep -nF '[ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then' | head -1 | cut -d: -f1)"
-if [ -n "$_b220_init_ln" ] && [ -n "$_b220_gate_ln" ] &&
-    [ "$_b220_init_ln" -lt "$_b220_gate_ln" ]; then
-    echo "  ${GREEN}PASS${NC}  #220: ADV_VERSION init precedes the advisories gate (no env inheritance)"
+_b220_init_n=0
+for _v in ADV_LINE ADV_VERSION ADV_HITS; do
+    _ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -nF "${_v}=\"\"" | head -1 | cut -d: -f1)"
+    if [ -n "$_ln" ] && [ -n "$_b220_gate_ln" ] && [ "$_ln" -lt "$_b220_gate_ln" ]; then
+        _b220_init_n=$((_b220_init_n + 1))
+    fi
+done
+if [ "$_b220_init_n" -eq 3 ]; then
+    echo "  ${GREEN}PASS${NC}  #220: ADV_LINE/ADV_VERSION/ADV_HITS inits precede the advisories gate"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  #220: ADV_VERSION init missing or behind the gate (init:$_b220_init_ln gate:$_b220_gate_ln)"
+    echo "  ${RED}FAIL${NC}  #220: init(s) missing or behind the gate (got $_b220_init_n/3, gate:$_b220_gate_ln)"
     failures=$((failures + 1))
 fi
 

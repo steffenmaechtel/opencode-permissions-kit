@@ -392,10 +392,10 @@ if [ -d /mnt/c ]; then
     # need the carrier (2.0.10 verified live). ADV_VERSION comes from
     # the fail-open probe above: an unknown version keeps the warning.
     # The comparator-availability arm (issue #220): with an inherited
-    # env ADV_VERSION and a broken kit (advisories.sh missing, comparator
-    # undefined) the empty substitution satisfied != lt and suppressed
-    # this warning — the guard keeps the warning instead. Same shape as
-    # status.sh's bridge verdict gate.
+    # env ADV_VERSION and a kit whose comparator is undefined
+    # (advisories.sh missing or stripped) the empty substitution
+    # satisfied != lt and suppressed this warning — the guard keeps the
+    # warning instead. Same shape as status.sh's bridge verdict gate.
     _bridge_needed=1
     if [ -n "${ADV_VERSION:-}" ] && command -v advisories_version_cmp >/dev/null 2>&1; then
         case "$ADV_VERSION" in
