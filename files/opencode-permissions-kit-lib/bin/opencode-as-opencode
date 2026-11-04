@@ -223,11 +223,17 @@ fi
 # The kit installs the binary itself (never through a package manager),
 # so its install channel is always 'standalone' — advisories qualified
 # 'npm' (GHSA-632h-h47v-g4x4) do not match kit installs.
+# Initialize the probe's variables BEFORE the guarded block (issue #220):
+# an env-exported ADV_LINE/ADV_VERSION/ADV_HITS (name collision — the
+# wrapper does not sanitize inherited names) must never impersonate a
+# probe result while advisories.sh is missing. Same discipline as
+# status.sh's ADV_VER="" init.
+ADV_LINE=""
+ADV_VERSION=""
 ADV_HITS=""
 if [ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then
     # shellcheck disable=SC1091  # deployed lib, guarded above
     . /usr/local/lib/opencode-permissions-kit/sh/advisories.sh
-    ADV_LINE=""
     if command -v timeout >/dev/null 2>&1; then
         ADV_LINE=$(timeout 5 /usr/bin/sudo -n -u opencode \
             /usr/local/lib/opencode-permissions-kit/bin/opencode --version 2>/dev/null | head -1 || true)
@@ -385,8 +391,13 @@ if [ -d /mnt/c ]; then
     # versions bundle open@10.1.2 (1.x < 1.18.33, 2.0.2-2.0.17) and DO
     # need the carrier (2.0.10 verified live). ADV_VERSION comes from
     # the fail-open probe above: an unknown version keeps the warning.
+    # The comparator-availability arm (issue #220): with an inherited
+    # env ADV_VERSION and a kit whose comparator is undefined
+    # (advisories.sh missing or stripped) the empty substitution
+    # satisfied != lt and suppressed this warning — the guard keeps the
+    # warning instead. Same shape as status.sh's bridge verdict gate.
     _bridge_needed=1
-    if [ -n "${ADV_VERSION:-}" ]; then
+    if [ -n "${ADV_VERSION:-}" ] && command -v advisories_version_cmp >/dev/null 2>&1; then
         case "$ADV_VERSION" in
             1.*) if [ "$(advisories_version_cmp "$ADV_VERSION" 1.18.33)" != lt ]; then _bridge_needed=0; fi ;;
             2.*) if [ "$(advisories_version_cmp "$ADV_VERSION" 2.0.18)" != lt ]; then _bridge_needed=0; fi ;;
