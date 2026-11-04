@@ -1470,11 +1470,14 @@ EOF
 elif [ ! -f "$SCAN_CFG" ]; then
     # Issue #217: no agent config at all is a cannot-judge state (no
     # deny patterns to derive) — an uncounted unknown per the W3 idiom,
-    # like the offline rows. Scope (#379 a F1): this removes the LEAK
-    # SCAN's warn contribution to the exit code only — the pre-existing
-    # counted "Config: none" row above still holds an absent-config
-    # host at "warnings present"; that row is a separate product
-    # decision, outside #217's scope.
+    # like the offline rows. Scope (#379 a F1, narrowed by b R2): this
+    # removes the LEAK SCAN's warn contribution to the exit code. For
+    # plain absence the pre-existing counted "Config: none" row above
+    # still holds the host at "warnings present" (separate product
+    # decision, outside #217's scope); NON-REGULAR forms (dir, dangling
+    # symlink, fifo — anything where ls prints a path but -f fails)
+    # render plain in the Config row too, so such a host exits clean
+    # with this unknown row as its only trace.
     ui_kv "result" "unknown — no agent config to scan (neither opencode.jsonc nor opencode.json is a regular file)"
     log "leak scan: unknown, no agent config ($SCAN_CFG)"
 else
