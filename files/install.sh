@@ -781,10 +781,19 @@ do_plan_phase() {
         confirm "This does not appear to be WSL2. Continue anyway?" || exit 0
     fi
 
-    # Backup. mktemp (not a timestamped name): root copies sudoers, gitconfigs
-    # and the opencode binary into this directory inside world-writable /tmp —
-    # the path must not be predictable or pre-creatable by another user.
-    BACKUP_DIR="$(mktemp -d /tmp/opencode-install-backup.XXXXXX)" || exit 1
+    # Backup. Durable location (#370 a I1): these are the ONLY copies of the
+    # recovery material (sudoers, gitconfigs, prior binary/config) and must
+    # survive a reboot — the old mktemp dir under /tmp died with it (tmpfs
+    # wipe at boot, systemd-tmpfiles age-out). Root-owned /var/backups needs
+    # no unpredictable name (no other user can pre-create paths there), so a
+    # readable timestamp is safe and findable after a failed run; the base is
+    # shared with the ddev dumps and the uninstall agents-backup.
+    _bk_root=/var/backups/opencode-permissions-kit
+    mkdir -p "$_bk_root" || exit 1
+    BACKUP_DIR="$_bk_root/install-$(date +%Y%m%d-%H%M%S)"
+    # same-second rerun: PID suffix instead of clobbering existing material
+    [ -e "$BACKUP_DIR" ] && BACKUP_DIR="$BACKUP_DIR.$$"
+    mkdir -m 700 "$BACKUP_DIR" || exit 1
     echo "Backup directory: $BACKUP_DIR"
     log "backup dir created: $BACKUP_DIR"
     # pr-00263 a F6: the backup dir is announced as recovery material —
