@@ -165,7 +165,9 @@ nothing to review.
   BEFORE the closing summary, the loop owner duplicate-checks every
   collected work order against the tracker (open list + search),
   proposes the bundling (same-topic orders share one issue) with
-  title, the `prio:` label derived from the finding's severity
+  title, the `from-review` label (provenance: the issue came from a
+  review pass — urgency NEVER travels in it), the `prio:` label
+  derived from the finding's severity
   (LOW→prio:low, MED→prio:med, HIGH→prio:high; no label without a
   severity), and source pointers — and agrees EVERY work order with
   the maintainer in ONE ask placed at the very END of its report,

@@ -246,7 +246,7 @@ Before composing the closing summary, run the deferred-work-order
 issue gate (the rule: review-concept, "The loop and the stop rule"):
 duplicate-check every collected work order
 against the tracker (open list + search), propose the bundling with
-title + `prio:` label derived from severity + source pointers, and
+title + `from-review` + `prio:` label derived from severity + source pointers, and
 agree EVERY work order with the maintainer in ONE ask at the very END
 of the report — the answer is free-form, per work order or per
 proposed bundle ("A and B yes, C no"), never a single rigid yes/no
