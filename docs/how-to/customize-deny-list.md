@@ -69,6 +69,10 @@ visibility aid, `opk status` ends with a **leak scan**: a name-based,
 report-only sweep of the scratch directories (`/tmp`, `/var/tmp`,
 `/dev/shm`, overridable via `LEAK_SCAN_DIRS`) listing files matching the
 deny patterns. Renamed copies stay invisible; false positives are expected.
+When the scan cannot run, the verdict row distinguishes causes
+(issue #217): no agent config at all is an uncounted *unknown* (nothing
+to derive patterns from), while a missing parser/python3 or an
+unparseable config stays a counted warning.
 
 On the git side, prevent secrets from entering history in the first place
 (pre-commit secret scanning, e.g. gitleaks).

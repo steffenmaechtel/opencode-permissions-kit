@@ -2916,6 +2916,66 @@ else
     fail "advisory feed shape arms (pr-00263 a F11, rc1=$_adv_rc1 rc2=$_adv_rc2 err=$_adv_err out=$_adv_out)"
 fi
 
+# --- leak-scan skip arms split by cause (issue #217) -----------------------------
+# The old tail counted BOTH skip causes as warns: a host with no agent
+# config at all (cannot judge — the W3 unknown idiom, uncounted) and a
+# broken kit (parser/python3 gone — counted per #165). Extract the REAL
+# outer block and drive the three skip-side arms: absent config renders
+# a plain uncounted row (no kvwarn), broken kit and unscannable config
+# stay counted warns. Controlled PATH per the 0.0.46a F2 class: only the
+# block's few externals are visible.
+_lk_block="$(sed -n '/^if \[ -f "\$SCAN_CFG" \] && \[ -x "\$PARSER" \]/,/^fi$/p' "$STATUS")"
+if [ -n "$_lk_block" ] && printf '%s' "$_lk_block" | grep -q 'agent config unscannable'; then
+    pass "leak-scan outer block extractable from status.sh (issue #217)"
+    _lk_work=$(mktemp -d)
+    mkdir -p "$_lk_work/bin"
+    for _lk_t in python3 grep find; do
+        ln -s "$(command -v "$_lk_t")" "$_lk_work/bin/$_lk_t"
+    done
+    printf '{"top": 1}\n' >"$_lk_work/cfg.jsonc"
+    printf 'import sys\nsys.exit(1)\n' >"$_lk_work/parser-fails.py"
+    chmod +x "$_lk_work/parser-fails.py"
+    _lk_run() {
+        (
+            PATH="$_lk_work/bin"
+            export PATH
+            SCAN_CFG="$1"
+            PARSER="$2"
+            LEAK_DIRS="$_lk_work/scan-dir"
+            STATUS_SHORT=false
+            ui_kv() { echo "kv: $*"; }
+            ui_kv_ok() { echo "kvok: $*"; }
+            ui_kv_warn() { echo "kvwarn: $*"; }
+            ui_warn() { echo "warn: $*"; }
+            ui_detail() { :; }
+            log() { :; }
+            eval "$_lk_block"
+        ) 2>&1
+    }
+    _out=$(_lk_run "$_lk_work/absent.jsonc" "$_lk_work/parser-fails.py") || true
+    if printf '%s' "$_out" | grep -q 'kv: result unknown' &&
+        ! printf '%s' "$_out" | grep -q 'kvwarn:'; then
+        pass "absent-config arm: plain uncounted row, no warn bump (issue #217)"
+    else
+        fail "absent-config arm: plain uncounted row, no warn bump (out=$_out)"
+    fi
+    _out=$(_lk_run "$_lk_work/cfg.jsonc" "$_lk_work/no-parser.py") || true
+    if printf '%s' "$_out" | grep -q 'kvwarn: result skipped'; then
+        pass "broken-kit arm (parser gone): still a counted warn (issue #217)"
+    else
+        fail "broken-kit arm (parser gone): still a counted warn (out=$_out)"
+    fi
+    _out=$(_lk_run "$_lk_work/cfg.jsonc" "$_lk_work/parser-fails.py") || true
+    if printf '%s' "$_out" | grep -q 'kvwarn: result skipped' &&
+        printf '%s' "$_out" | grep -q 'agent config unscannable'; then
+        pass "unscannable-config arm: still a counted warn (issue #217)"
+    else
+        fail "unscannable-config arm: still a counted warn (out=$_out)"
+    fi
+else
+    fail "leak-scan outer block extractable from status.sh (issue #217)"
+fi
+
 echo ""
 if [ "$failures" -gt 0 ]; then
     echo "  ${RED}$failures test(s) failed.${NC}"

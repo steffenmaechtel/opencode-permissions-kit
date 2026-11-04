@@ -1467,8 +1467,21 @@ EOF
     else
         ui_kv_ok "result" "no matches in: $LEAK_DIRS"
     fi
+elif [ ! -f "$SCAN_CFG" ]; then
+    # Issue #217: no agent config at all is a cannot-judge state (no
+    # deny patterns to derive) — an uncounted unknown per the W3 idiom,
+    # like the offline rows; it must not hold the exit code at "warnings
+    # present" on hosts where nothing is broken.
+    ui_kv "result" "unknown — no agent config to scan (opencode.jsonc/.json absent)"
+    log "leak scan: unknown, no agent config ($SCAN_CFG)"
 else
-    ui_kv_warn "result" "skipped (global config or parser not available)"
+    # Issue #217, the other half of the split: a present config with the
+    # kit's parser or python3 gone is a broken kit — a counted warn per
+    # issue #165's "missing lib warns loudly" line, never an uncounted
+    # skip. (An unscannable config — the arm above — stays counted for
+    # the same reason: a real broken state, named.)
+    ui_kv_warn "result" "skipped — parser or python3 not available (fix: sudo opk update)"
+    log "leak scan: skipped, parser=$PARSER python3=$(command -v python3 2>/dev/null || echo missing)"
 fi
 
 # === Management ==================================================================
