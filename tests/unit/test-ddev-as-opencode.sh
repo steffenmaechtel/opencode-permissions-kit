@@ -985,13 +985,16 @@ rm -rf "$VN"
 E2ELIB="$SCRIPT_DIR/../e2e/lib.sh"
 check "fix a M1: status tier-1 probe runs ddev from / — no caller cwd" \
     sh -c 'grep -qF "(cd / && \"\$_st_bin\" --version)" "$1" && ! grep -qF "[ -n \"\$_st_bin\" ] && _st_ver=" "$1"' _ "$STATUS"
-check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finish" \
-    sh -c "awk '/^e2e_cleanup\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container && ! awk '/^e2e_finish\(\)/,/^}/' \"\$1\" | grep -q e2e_dump_container" _ "$E2ELIB"
-# e2e_cleanup body, comment-stripped once (#387 a a1): the NR anchors
-# below must not ride comment lines — the body carries a ~10-line
-# comment block around the dump gate, one comment naming
-# e2e_dump_container would anchor d and hide motion of the live call.
+# e2e_cleanup body, comment-stripped once (#387 a a1): the presence arm
+# and the NR anchors below must not ride comment lines — the body
+# carries a ~10-line comment block around the dump gate, one comment
+# naming e2e_dump_container would anchor the pin and hide motion of
+# the live call. e2e_finish likewise (#387 b b1): the negative arm
+# must not false-FAIL on a prose mention of the dump in its comments.
 _ecl_str="$(awk '/^e2e_cleanup\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
+_efn_str="$(awk '/^e2e_finish\(\)/,/^}/' "$E2ELIB" | sed 's/^[[:space:]]*#.*$//')"
+check "fix a M2: e2e dump hooked in e2e_cleanup (every exit path), not e2e_finish" \
+    sh -c "printf '%s\n' \"\$1\" | grep -q e2e_dump_container && ! printf '%s\n' \"\$2\" | grep -q e2e_dump_container" _ "$_ecl_str" "$_efn_str"
 check "fix a M2: the dump precedes the cleanup rm (evidence before destruction)" \
     sh -c "printf '%s\n' \"\$1\" | awk '/e2e_dump_container/{if (d == 0) d = NR} /^[[:space:]]*docker rm -f/{if (r == 0) r = NR} END{exit !(d > 0 && r > 0 && d < r)}'" _ "$_ecl_str"
 check "fix a S3: symlinks stripped from the dump (docker cp preserves them)" \

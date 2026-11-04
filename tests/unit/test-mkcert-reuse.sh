@@ -5,11 +5,11 @@
 # Background: the Windows user was detected via powershell.exe / cmd.exe,
 # which are frequently not on a WSL PATH — the probe failed silently, the
 # Windows CA (priority 1) was skipped, and an untrusted CA got reused
-# (browsers showed ddev sites as "not secure"). Both scripts now scan
-# /mnt/c/Users/*/AppData/Local/mkcert directly; update.sh also had the
-# search priorities inverted (Linux before Windows) — now matches install.
-# status.sh reports a fingerprint mismatch between the opencode CAROOT
-# and a found Windows CA.
+# (browsers showed ddev sites as "not secure"). install.sh now scans
+# /mnt/c/Users/*/AppData/Local/mkcert directly; update.sh carries no CA
+# provisioning at all anymore (legacy cleanup — pinned by the absence
+# check below). status.sh reports a fingerprint mismatch between the
+# opencode CAROOT and a found Windows CA.
 #
 # Static asserts on the repo files (no root, no WSL required).
 # Run: sh tests/unit/test-mkcert-reuse.sh
