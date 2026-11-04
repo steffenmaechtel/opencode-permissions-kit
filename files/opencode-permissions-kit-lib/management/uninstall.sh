@@ -765,6 +765,22 @@ if [ -f "$UNINSTALL_PROJECTS_CONF" ]; then
                 ;;
         esac
 
+        # Symlinked root gate (issue #245): [ ! -d ] above follows a
+        # link, so a conf entry that IS a symlink reaches the ops —
+        # which then dereference the operand: chmod g-s and setfacl
+        # -R -x land on the TARGET directory (one mode bit, one ACL
+        # entry per table, non-recursive — measured, issue #245) while
+        # the find-chown walk visits nothing. Skip loudly instead: no
+        # revert ops on an object that is not the configured root.
+        # Checked on the NORMALIZED root (the #243 c-wave strip above):
+        # a `link/` spelling would dodge a lexical [ -L ] — [ -L
+        # "path/" ] is false because the kernel resolves through the
+        # slash (measured, issue #245).
+        if [ -L "$root" ]; then
+            echo "  Skipping symlinked project path (register the target directory instead): $root"
+            continue
+        fi
+
         # Per-root partial causes (#218): failed ops (recorded by
         # un_rc_q) and unknown-id skips both land in this ONE
         # list — the closing log below reports them instead of

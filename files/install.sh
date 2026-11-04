@@ -1903,6 +1903,15 @@ do_deploy_phase() {
         if [ "$ans" != "n" ]; then
             for root in $PROJECTS_ROOTS; do
                 [ -d "$root" ] || continue
+                # Symlinked root gate (issue #245): the writer refuses
+                # links, this is the scan->act recheck (L5) — the
+                # baseline passes would silently no-op on a link
+                # (measured, issue #245) while this loop prints its
+                # success line right below.
+                if [ -L "$root" ]; then
+                    ui_warn "skip $root (symlink — register the target directory instead)"
+                    continue
+                fi
                 # Group baseline via the shared helper: chgrp + setgid +
                 # group rw + default ACLs, .git included (issue #17), with a
                 # live per-pass progress counter (issue #14 — large trees

@@ -383,6 +383,15 @@ projects_add() {
             ui_warn "skip $p (not a directory)"
             continue
         fi
+        # Symlinked root gate (issue #245): the writer check above
+        # refuses links; this is the immediately-before-acting recheck
+        # (L5 — the cd+pwd normalization keeps the logical spelling, it
+        # does not resolve the link). A link root would get a silent
+        # no-op baseline/handover under the success lines below.
+        if [ -L "$p" ]; then
+            ui_warn "skip $p (symlink — register the target directory instead)"
+            continue
+        fi
         if [ -f "$PROJECTS_CONF" ] && grep -qxF "$p" "$PROJECTS_CONF"; then
             ui_detail "exists: $p"
             continue
@@ -758,7 +767,23 @@ refresh() {
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r p; do
             [ -z "$p" ] && continue
+            # Writer parity (issue #245): project_path_sane strips one
+            # trailing slash before its checks — mirror it so the
+            # symlink gate below cannot be dodged by a `link/`
+            # spelling ([ -L "path/" ] is false, the kernel resolves
+            # through the slash — measured, issue #245).
+            p="${p%/}"
+            [ -n "$p" ] || continue
             [ -d "$p" ] || continue
+            # Symlinked root gate (issue #245): a raw-conf entry no
+            # writer gate ever saw — the baseline would silently no-op
+            # on a link (measured, issue #245) under this function's
+            # success lines. The form/blocklist parity for raw-conf
+            # reader loops rides #247.
+            if [ -L "$p" ]; then
+                ui_warn "skip $p (symlink — register the target directory instead)"
+                continue
+            fi
             # Shared helper with live per-pass progress (issue #14).
             fs_baseline_root "$p" "$OPENCODE_GROUP" "$OPENCODE_USER"
             ddev_handover_root "$p" "$OPENCODE_USER" "$OPENCODE_GROUP" "$DEFAULT_USER"
@@ -816,6 +841,15 @@ handover() {
         if _p_abs=$(cd "$p" 2>/dev/null && pwd); then p="$_p_abs"; fi
         if ! [ -d "$p" ]; then
             ui_warn "skip $p (not a directory)"
+            continue
+        fi
+        # Symlinked root gate (issue #245): the writer check above
+        # refuses links; this is the immediately-before-acting recheck
+        # (L5 — the cd+pwd normalization keeps the logical spelling, it
+        # does not resolve the link). A link root would get a silent
+        # no-op baseline/handover under the success lines below.
+        if [ -L "$p" ]; then
+            ui_warn "skip $p (symlink — register the target directory instead)"
             continue
         fi
         ui_info "ddev handover on $p (.ddev + settings dirs + typo3 bootstrap root) ..."

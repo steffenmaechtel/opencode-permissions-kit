@@ -49,8 +49,11 @@
 # A project root must never be (or live directly under) a system path:
 # the group baseline runs chgrp -R + setfacl -R over it. Allowed below
 # /home/ and /var/www...; everything else system-ish is rejected. Also
-# rejects relative paths and ../. traversal games. "~" is expanded to
-# $HOME; the normalized path is returned in _PP_NORM for the caller.
+# rejects relative paths, ../. traversal games, and roots that are
+# themselves symlinks (issue #245 — the baseline passes no-op on a
+# link while callers claim success; register the target instead).
+# "~" is expanded to $HOME; the normalized path is returned in
+# _PP_NORM for the caller.
 project_path_sane() {
     _pp="${1%/}"
     [ -n "$_pp" ] || return 1
@@ -79,6 +82,21 @@ project_path_sane() {
         *[[:space:]]*) return 1 ;;                         # storage format is line-based and
             # space-free (0.0.39b C3)
     esac
+    # A root ENTRY that is itself a symlink (issue #245): the form is
+    # clean and the blocklist below never fires, but every consumer of
+    # the conf would operate on the wrong object — chmod g-s and
+    # setfacl -R -x dereference the operand (measured, issue #245)
+    # while the find-based baseline passes visit nothing, so a link
+    # root silently gets NO group baseline under the callers' success
+    # lines. Refuse at the writer; the admin registers the target
+    # directory instead. Before the blocklist on purpose: a link to
+    # /etc is a symlink first, a system path second — and the refusal
+    # carries its own reason line. [ -L ] is false for a path that does
+    # not exist yet: plan-time validation of future directories passes.
+    if [ -L "$_pp" ]; then
+        echo "  refused: '$_pp' is a symlink — project roots must be real directories (register the target directory)" >&2
+        return 1
+    fi
     case "$_pp" in
         / | /bin | /bin/* | /boot | /boot/* | /dev | /dev/* | /etc | /etc/* | /home | /lib* | \
             /media | /media/* | /mnt | /mnt/* | /opt | /opt/* | /proc | /proc/* | /root | /root/* | \

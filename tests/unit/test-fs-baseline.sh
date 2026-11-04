@@ -824,6 +824,131 @@ else
 fi
 rm -rf "$W23NZ"
 
+# --- 12. symlinked project roots are refused everywhere (issue #245) -----------------
+# Measured (issue #245 comment, ext4 + overlayfs): on a root ENTRY that
+# is itself a symlink to a directory, every find-based baseline pass
+# visits NOTHING (silent no-op under the callers' success lines) while
+# chmod g-s / setfacl -R -x dereference onto the TARGET. Gates: writer
+# (project_path_sane — pinned in test-project-paths.sh), the shared
+# helper (behavioral, below), and the raw-conf reader loops (behavioral
+# drivers below — config.sh refresh and the update.sh root loop have NO
+# writer gate in front of them, the #247 gap is the blocklist, not the
+# symlink arm). Belt arms behind the writer (install.sh baseline loop,
+# config.sh add/handover) carry rider'd presence pins at the end of
+# this section.
+S245="$WORK/s245"
+mkdir -p "$S245/real"
+ln -s "$S245/real" "$S245/link"
+
+# 12a. fs_baseline_root refuses a symlinked root LOUDLY and touches
+# nothing: rc 1 (the 0.0.43a F10 shape — success lines must not print
+# over a baseline that did not run), the reason on stderr, and the
+# target tree keeps mode, group and default-ACL state. The slash
+# spelling hits the same refusal through the internal ${fsb_root%/}
+# strip ([ -L "path/" ] is false — measured; a raw-conf caller may
+# hand the stored spelling through).
+_s245_mode() { stat -c '%A %G' "$S245/real"; }
+_s245_before=$(_s245_mode)
+S245A_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S245/link" "$(id -gn)" 2>&1) &&
+    S245A_RC=0 || S245A_RC=$?
+S245B_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S245/link/" "$(id -gn)" 2>&1) &&
+    S245B_RC=0 || S245B_RC=$?
+if [ "$S245A_RC" -ne 0 ] &&
+    printf '%s' "$S245A_ERR" | grep -qF 'is a symlink — refusing the group baseline' &&
+    [ "$(_s245_mode)" = "$_s245_before" ] &&
+    [ "$(getfacl -cpd -- "$S245/real" 2>/dev/null | grep -c '^group:')" -eq 0 ] &&
+    [ "$S245B_RC" -ne 0 ] &&
+    printf '%s' "$S245B_ERR" | grep -qF 'is a symlink — refusing the group baseline'; then
+    pass "fs_baseline_root: symlinked root refused loudly, tree untouched, slash spelling too (#245)"
+else
+    fail "fs_baseline_root must refuse a symlinked root, both spellings (rcA=$S245A_RC rcB=$S245B_RC) (#245)"
+fi
+
+# 12b. config.sh refresh(): the REAL extracted function over a fixture
+# conf — real root, plain link, trailing-slash link, and a bare "/"
+# (the strip degenerates it to the empty string: skipped, where the
+# old loop would have handed "/" to the recursive baseline). The
+# baseline/handover markers may fire for the real root ONLY; the skip
+# echo names the normalized link path twice.
+{
+    printf '%s\n' \
+        'ui_info() { :; }' \
+        'ui_success() { :; }' \
+        'ui_warn() { echo "ui_warn: $1"; }' \
+        'log() { :; }' \
+        'fs_baseline_root() { echo "FSB: $1"; }' \
+        'ddev_handover_root() { echo "HO: $1"; }' \
+        'ddev_handover_stamp_write() { :; }'
+    sed -n '/^refresh() {/,/^}$/p' "$CONFIG"
+    printf '%s\n' 'refresh'
+} >"$S245/run-refresh.sh"
+printf '%s\n/\n%s/\n%s\n' "$S245/real" "$S245/link" "$S245/link" >"$S245/conf"
+S245R_OUT=$(PROJECTS_CONF="$S245/conf" OPENCODE_GROUP=tg OPENCODE_USER=toc DEFAULT_USER=tdv \
+    sh "$S245/run-refresh.sh" 2>&1)
+if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^HO: ')" -eq 1 ] &&
+    printf '%s\n' "$S245R_OUT" | grep -qF "FSB: $S245/real" &&
+    printf '%s\n' "$S245R_OUT" | grep -qF "HO: $S245/real" &&
+    ! printf '%s\n' "$S245R_OUT" | grep -q '^FSB: .*/link' &&
+    ! printf '%s\n' "$S245R_OUT" | grep -q '^HO: .*/link' &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 2 ]; then
+    pass "config.sh refresh: baseline/handover on the real root only, links skipped loudly (#245)"
+else
+    fail "config.sh refresh must skip symlinked roots (out=$(printf '%s\n' "$S245R_OUT" | head -6)) (#245)"
+fi
+
+# 12c. the update.sh root loop (refresh + handover, the #247 raw-conf
+# site): same fixture, same expectations — the loop is extracted
+# verbatim (conf path hardcoded, fed via stdin like the uninstall
+# driver), REFRESH=true so both consumers run, stamp check short-
+# circuited away.
+{
+    printf '%s\n' \
+        'ui_detail() { :; }' \
+        'ui_warn() { echo "ui_warn: $1"; }' \
+        'log() { :; }' \
+        'fs_baseline_root() { echo "FSB: $1"; }' \
+        'ddev_handover_root() { echo "HO: $1"; }' \
+        'ddev_handover_stamp_write() { :; }' \
+        'ddev_handover_stamp_valid() { return 1; }' \
+        'REFRESH=true' 'OPENCODE_USER=toc' 'NEW_OPENCODE_GROUP=tg' 'DEFAULT_USER=tdv' \
+        '_ho_skip=0' '_ho_announced=false'
+    sed -n '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/p' "$UPDATE" |
+        sed 's|done <"$PROJECTS_CONF"|done|'
+} >"$S245/run-update-loop.sh"
+S245U_OUT=$(sh "$S245/run-update-loop.sh" <"$S245/conf" 2>&1)
+if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^HO: ')" -eq 1 ] &&
+    printf '%s\n' "$S245U_OUT" | grep -qF "FSB: $S245/real" &&
+    printf '%s\n' "$S245U_OUT" | grep -qF "HO: $S245/real" &&
+    ! printf '%s\n' "$S245U_OUT" | grep -q '^FSB: .*/link' &&
+    ! printf '%s\n' "$S245U_OUT" | grep -q '^HO: .*/link' &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 2 ]; then
+    pass "update.sh root loop: baseline/handover on the real root only, links skipped loudly (#245)"
+else
+    fail "update.sh root loop must skip symlinked roots (out=$(printf '%s\n' "$S245U_OUT" | head -6)) (#245)"
+fi
+
+# 12d. belt arms behind the writer gate (scan->act rechecks, L5):
+# install.sh's baseline loop and config.sh's add/handover rechecks are
+# driven by the writer pin (test-project-paths.sh) + the loop pins
+# above; these presence pins guard the wiring behind a comment-strip
+# rider (conventions "Source-counting pins"). config.sh counts THREE
+# sites: projects add, handover, refresh.
+if sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -qF 'ui_warn "skip $root (symlink — register the target directory instead)"'; then
+    pass "install.sh baseline loop carries the symlink skip arm (#245)"
+else
+    fail "install.sh baseline loop must skip symlinked roots (#245)"
+fi
+S245C=$(sed 's/^[[:space:]]*#.*$//' "$CONFIG" |
+    grep -cF 'ui_warn "skip $p (symlink — register the target directory instead)"')
+if [ "$S245C" -ge 3 ]; then
+    pass "config.sh symlink skip arms wired at all three sites (add, handover, refresh) (#245)"
+else
+    fail "config.sh must carry the symlink skip arm at add/handover/refresh (found $S245C of 3) (#245)"
+fi
+
 # --- Summary ---------------------------------------------------------------------------
 echo ""
 echo "================================================="

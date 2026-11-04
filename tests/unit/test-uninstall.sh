@@ -611,6 +611,42 @@ else
     pass "ownership revert: system paths are never chowned (screened)"
 fi
 
+# --- issue #245: a symlinked conf root is skipped, never operated on ----
+# Measured (issue #245 comment, ext4 + overlayfs): a projects.conf entry
+# that IS a symlink to a directory passes [ ! -d ] (it follows), and the
+# loop-tail ops then dereference the operand — chmod g-s and setfacl
+# -R -x land on the TARGET directory while the find-chown walk visits
+# nothing. The gate (after the #243 normalization, so a `link/` spelling
+# is stripped first — [ -L "path/" ] is false, measured) must skip the
+# root loudly and issue NO op on the link OR its target; the primary
+# root keeps its full revert (isolation).
+mkdir -p "$WORK/faketarget"
+ln -s "$WORK/faketarget" "$WORK/fakelink"
+UN_SYMLINK_OUT=$(_un_loop_out "" false 60000 60002 60001 "$WORK/fakelink" || true)
+if printf '%s' "$UN_SYMLINK_OUT" |
+    grep -qF "Skipping symlinked project path (register the target directory instead): $WORK/fakelink" &&
+    ! printf '%s' "$UN_SYMLINK_OUT" | grep -q "sudo.*$WORK/fakelink" &&
+    ! printf '%s' "$UN_SYMLINK_OUT" | grep -q "sudo.*$WORK/faketarget" &&
+    printf '%s' "$UN_SYMLINK_OUT" | grep -qF "find $WORK/fakeproj"; then
+    pass "symlinked root: skip echo, no revert op on link or target, primary root intact (#245)"
+else
+    fail "symlinked root must be skipped without ops on link/target (#245; out=$(printf '%s' "$UN_SYMLINK_OUT" | head -8))"
+fi
+# The trailing-slash spelling feeds the same gate through the #243
+# normalization: ops would receive the stripped form (measured: with
+# the slash, setfacl -R and chgrp -R recurse the WHOLE target tree) —
+# the skip echo names the normalized path.
+UN_SYMLINK_SLASH_OUT=$(_un_loop_out "" false 60000 60002 60001 "$WORK/fakelink/" || true)
+if printf '%s' "$UN_SYMLINK_SLASH_OUT" |
+    grep -qF "Skipping symlinked project path (register the target directory instead): $WORK/fakelink" &&
+    ! printf '%s' "$UN_SYMLINK_SLASH_OUT" | grep -q "sudo.*$WORK/fakelink" &&
+    ! printf '%s' "$UN_SYMLINK_SLASH_OUT" | grep -q "sudo.*$WORK/faketarget" &&
+    printf '%s' "$UN_SYMLINK_SLASH_OUT" | grep -qF "find $WORK/fakeproj"; then
+    pass "symlinked root, trailing-slash spelling: normalized, skipped, no ops (#245)"
+else
+    fail "trailing-slash symlink root must be normalized and skipped (#245)"
+fi
+
 # The uid/gid capture must happen BEFORE the user removal: after userdel
 # the name no longer resolves and only the numeric ids can still match
 # the orphaned files.

@@ -356,6 +356,23 @@ fs_baseline_root() {
     fsb_root="$1"
     fsb_group="$2"
     [ -n "$fsb_root" ] && [ -d "$fsb_root" ] || return 0
+    # Symlinked root refusal (issue #245): [ -d ] above follows a link,
+    # and every pass below would then be a silent no-op — the find
+    # walks start at the link itself and visit nothing (measured,
+    # issue #245) — while the callers print "baseline applied" over a
+    # tree that got NOTHING. Fail loud (the 0.0.43a F10 shape): the
+    # callers' success lines must not print over a baseline that did
+    # not run. The trailing-slash strip is dodge-proofing: [ -L
+    # "path/" ] is false (kernel resolution through the slash —
+    # measured), and a raw-conf caller may hand the stored spelling
+    # through. The loop-side gates in config.sh/update.sh keep this
+    # arm from firing in their flows (skip before the call); this is
+    # the belt for direct and future callers.
+    if [ -L "${fsb_root%/}" ]; then
+        printf '  error: %s is a symlink — refusing the group baseline (register the target directory instead)\n' \
+            "$fsb_root" >&2
+        return 1
+    fi
     # Wholesale-failure detection part 1 (0.0.43a F10): a missing tool
     # used to die silently inside the pipeline (find's stderr is
     # redirected, xargs -r succeeds on empty input) and the passes
