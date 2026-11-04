@@ -32,14 +32,16 @@ fail() {
 WORK="$(mktemp -d)"
 # Widen the trap to every bare receiver of the suite (#283): W3,
 # _gap_work, _c1dir, _d1dir, F25P, F25 and _f2bW lived outside $WORK
-# with only inline rm on their normal paths — a set -e abort inside the
+# with only inline rm on their normal paths — a set-e abort inside the
 # window leaked them. The receivers anchored under $WORK (the *165
-# dirs) are covered by $WORK itself. The list is a function (eight
+# dirs) are covered by $WORK itself. The list is a function (nine
 # receivers do not fit one line); unset-safe operands skip cleanly.
+# _lk_work (#379 a F3): trap-only by design — the leak-scan pin block
+# has no inline rm even on its normal path, so the trap is the cleanup.
 # w2_run's _w2_dir is subshell-contained and cleaned inside w2_run.
 _trap_cleanup() {
     rm -rf "${WORK:-}" "${W3:-}" "${_gap_work:-}" "${_c1dir:-}" \
-        "${_d1dir:-}" "${F25P:-}" "${F25:-}" "${_f2bW:-}"
+        "${_d1dir:-}" "${F25P:-}" "${F25:-}" "${_f2bW:-}" "${_lk_work:-}"
 }
 trap _trap_cleanup EXIT INT TERM
 
@@ -2928,16 +2930,21 @@ _lk_block="$(sed -n '/^if \[ -f "\$SCAN_CFG" \] && \[ -x "\$PARSER" \]/,/^fi$/p'
 if [ -n "$_lk_block" ] && printf '%s' "$_lk_block" | grep -q 'agent config unscannable'; then
     pass "leak-scan outer block extractable from status.sh (issue #217)"
     _lk_work=$(mktemp -d)
-    mkdir -p "$_lk_work/bin"
-    for _lk_t in python3 grep find; do
+    mkdir -p "$_lk_work/bin" "$_lk_work/bin-nopy3"
+    for _lk_t in python3 grep find sort head sed; do
         ln -s "$(command -v "$_lk_t")" "$_lk_work/bin/$_lk_t"
+    done
+    # bin-nopy3: everything except python3 — drives the else arm's
+    # python3-gone leg (#379 a F5): the row must render its own cause.
+    for _lk_t in grep find sort head sed; do
+        ln -s "$(command -v "$_lk_t")" "$_lk_work/bin-nopy3/$_lk_t"
     done
     printf '{"top": 1}\n' >"$_lk_work/cfg.jsonc"
     printf 'import sys\nsys.exit(1)\n' >"$_lk_work/parser-fails.py"
     chmod +x "$_lk_work/parser-fails.py"
     _lk_run() {
         (
-            PATH="$_lk_work/bin"
+            PATH="${3:-$_lk_work/bin}"
             export PATH
             SCAN_CFG="$1"
             PARSER="$2"
@@ -2960,10 +2967,16 @@ if [ -n "$_lk_block" ] && printf '%s' "$_lk_block" | grep -q 'agent config unsca
         fail "absent-config arm: plain uncounted row, no warn bump (out=$_out)"
     fi
     _out=$(_lk_run "$_lk_work/cfg.jsonc" "$_lk_work/no-parser.py") || true
-    if printf '%s' "$_out" | grep -q 'kvwarn: result skipped'; then
-        pass "broken-kit arm (parser gone): still a counted warn (issue #217)"
+    if printf '%s' "$_out" | grep -q 'kvwarn: result skipped — config parser not available'; then
+        pass "broken-kit arm (parser gone): still a counted warn, cause named (#379 a F4)"
     else
-        fail "broken-kit arm (parser gone): still a counted warn (out=$_out)"
+        fail "broken-kit arm (parser gone): still a counted warn, cause named (out=$_out)"
+    fi
+    _out=$(_lk_run "$_lk_work/cfg.jsonc" "$_lk_work/parser-fails.py" "$_lk_work/bin-nopy3") || true
+    if printf '%s' "$_out" | grep -q 'kvwarn: result skipped — python3 not available'; then
+        pass "broken-host arm (python3 gone): counted warn, its own cause + remedy (#379 a F5)"
+    else
+        fail "broken-host arm (python3 gone): counted warn, its own cause + remedy (out=$_out)"
     fi
     _out=$(_lk_run "$_lk_work/cfg.jsonc" "$_lk_work/parser-fails.py") || true
     if printf '%s' "$_out" | grep -q 'kvwarn: result skipped' &&

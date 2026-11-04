@@ -1470,17 +1470,27 @@ EOF
 elif [ ! -f "$SCAN_CFG" ]; then
     # Issue #217: no agent config at all is a cannot-judge state (no
     # deny patterns to derive) — an uncounted unknown per the W3 idiom,
-    # like the offline rows; it must not hold the exit code at "warnings
-    # present" on hosts where nothing is broken.
-    ui_kv "result" "unknown — no agent config to scan (opencode.jsonc/.json absent)"
+    # like the offline rows. Scope (#379 a F1): this removes the LEAK
+    # SCAN's warn contribution to the exit code only — the pre-existing
+    # counted "Config: none" row above still holds an absent-config
+    # host at "warnings present"; that row is a separate product
+    # decision, outside #217's scope.
+    ui_kv "result" "unknown — no agent config to scan (neither opencode.jsonc nor opencode.json is a regular file)"
     log "leak scan: unknown, no agent config ($SCAN_CFG)"
 else
-    # Issue #217, the other half of the split: a present config with the
-    # kit's parser or python3 gone is a broken kit — a counted warn per
-    # issue #165's "missing lib warns loudly" line, never an uncounted
-    # skip. (An unscannable config — the arm above — stays counted for
-    # the same reason: a real broken state, named.)
-    ui_kv_warn "result" "skipped — parser or python3 not available (fix: sudo opk update)"
+    # Issue #217, the other half of the split: a present config with
+    # the kit's parser or the host's python3 gone is a broken state —
+    # a counted warn, never an uncounted skip (the #165/#199 "missing
+    # lib warns loudly" line for the kit's parser; a missing host
+    # interpreter is counted the same way — pre-existing seam noted at
+    # the upstream row: that one treats python3-missing as uncounted).
+    # Each leg names its actual cause and its real remedy (#379 a F2:
+    # opk update re-deploys the parser but installs no interpreter).
+    if [ ! -x "$PARSER" ]; then
+        ui_kv_warn "result" "skipped — config parser not available (fix: sudo opk update)"
+    else
+        ui_kv_warn "result" "skipped — python3 not available (fix: apt install python3)"
+    fi
     log "leak scan: skipped, parser=$PARSER python3=$(command -v python3 2>/dev/null || echo missing)"
 fi
 
