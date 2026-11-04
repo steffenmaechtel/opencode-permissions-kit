@@ -1577,19 +1577,22 @@ check "update.sh: the scanning detail is printed only for roots actually scanned
     sh -c "grep -qF '_ho_announced=false' \"\$1\" && grep -qF 'if [ \"\$_ho_announced\" = false ]' \"\$1\"" _ "$UPDATE"
 check "update.sh: skip message names both force paths" \
     sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE"
-# pr-00381 a1/a2/a7: the file-global presence/order pins were
+# pr-00381 a1/a2/a7 + b1/b2: the file-global presence/order pins were
 # comment-blind and position-free — hoisting the arm out of the loop,
 # dropping its REFRESH wrapper or commenting it out all stayed green.
 # The loop-body range pin below is comment-stripped (#261) and asserts
 # the arm's REFRESH gate, the arm itself and the stamp write INSIDE the
-# single loop, in order arm < handover < stamp (the stamp records a
-# completed pass).
-_upd_loop="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | awk '/while IFS= read -r root; do/,/^        done <"\$PROJECTS_CONF"/')"
+# single loop, each EXACTLY ONCE, in order arm < handover < stamp (the
+# stamp records a completed pass). The awk end pattern is deliberately
+# UNANCHORED (b1: an indent-anchored one silently captured the file
+# tail after a re-nest, all pins green) — a stray `done <"$PROJECTS_CONF"`
+# elsewhere reds the loops==1 pin instead of shortening this range.
+_upd_loop="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | awk '/while IFS= read -r root; do/,/done <"\$PROJECTS_CONF"/')"
 _upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
 _upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
 _upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write "\$root"' || true)"
-check "update.sh: loop body = REFRESH gate + arm + stamp (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381 a1/a2/a7)" \
-    sh -c '[ "$1" -ge 1 ] && [ "$2" -ge 1 ] && [ "$3" -ge 1 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
+check "update.sh: loop body = 1× REFRESH gate + arm + stamp (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381 a1/a2/a7/b2)" \
+    sh -c '[ "$1" -eq 1 ] && [ "$2" -eq 1 ] && [ "$3" -eq 1 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
 _upd_arm_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'fs_baseline_root "\$root"' | head -1 | cut -d: -f1)"
 _upd_ho_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_root "\$root"' | head -1 | cut -d: -f1)"
 _upd_stamp_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_stamp_write "\$root"' | head -1 | cut -d: -f1)"
