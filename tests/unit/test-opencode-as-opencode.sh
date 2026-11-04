@@ -258,12 +258,16 @@ else
 fi
 
 # The passthrough must precede the refusal (exec replaces the process, the
-# ERROR banner must stay unreachable for version/help args).
-if [ "$(grep -n -- '--version' "$WRAPPER_FILE" | head -1 | cut -d: -f1)" -lt "$(grep -n 'ERROR: opencode cannot be started here' "$WRAPPER_FILE" | head -1 | cut -d: -f1)" ]; then
+# ERROR banner must stay unreachable for version/help args). Comment-strip
+# ridden + guarded (#384 b b1): the raw grep anchored the full-line comment
+# above the case block, not the live label — case-block motion stayed green.
+_pass_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -n -- '--version' | head -1 | cut -d: -f1)"
+_refusal_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -n 'ERROR: opencode cannot be started here' | head -1 | cut -d: -f1)"
+if [ -n "$_pass_ln" ] && [ -n "$_refusal_ln" ] && [ "$_pass_ln" -lt "$_refusal_ln" ]; then
     echo "  ${GREEN}PASS${NC}  passthrough is checked before the refusal"
     passed=$((passed + 1))
 else
-    echo "  ${RED}FAIL${NC}  refusal runs before the version passthrough"
+    echo "  ${RED}FAIL${NC}  refusal runs before the version passthrough (pass:$_pass_ln refusal:$_refusal_ln)"
     failures=$((failures + 1))
 fi
 
