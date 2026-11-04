@@ -6,7 +6,9 @@
 # sudoers, the umask profile and the agent/binary state. Does NOT touch:
 #   - existing /etc/opencode-permissions-kit/projects.conf
 #   - existing /etc/opencode-permissions-kit/install.conf (except the
-#     VERSION stamp and the OPENCODE_GROUP re-base)
+#     keys this script writes: the VERSION stamp, KIT_CHANNEL,
+#     DDEV_VERSION and the OPENCODE_MAJOR stamp (own blocks), and the
+#     OPENCODE_GROUP re-base)
 #   - existing /home/opencode/.config/opencode/opencode.json[c]
 #   - the DEFAULT user's existing opencode config (a deny-all config is only
 #     deployed when that user has no opencode.jsonc yet)

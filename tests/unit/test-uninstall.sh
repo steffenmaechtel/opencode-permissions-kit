@@ -18,6 +18,7 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 UNINSTALL="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/uninstall.sh"
+INSTALL="$SCRIPT_DIR/../../files/install.sh"
 
 failures=0
 passed=0
@@ -1151,12 +1152,19 @@ if grep -qF '.config/opencode/opencode.jsonc' "$UNINSTALL"; then
 else
     fail "manual-cleanup section mentions the default-user config"
 fi
-# The backup path hint must match install.sh's mktemp shape
-if grep -qF '/tmp/opencode-install-backup' "$UNINSTALL" &&
-    ! grep -qF 'opencode-install-backup-<timestamp>' "$UNINSTALL"; then
-    pass "backup hint matches the mktemp path shape"
+# The backup path hint must match install.sh's durable backup root
+# (#370 a I1): both files name /var/backups/opencode-permissions-kit/
+# install-*, and neither carries the retired /tmp mktemp shape. The
+# positive legs strip comments first (the source-counting rider).
+if sed 's/^[[:space:]]*#.*$//' "$UNINSTALL" |
+    grep -qF '/var/backups/opencode-permissions-kit/install-' &&
+    sed 's/^[[:space:]]*#.*$//' "$INSTALL" |
+    grep -qF 'BACKUP_DIR="$_bk_root/install-' &&
+    ! grep -qF '/tmp/opencode-install-backup' "$UNINSTALL" &&
+    ! grep -qF '/tmp/opencode-install-backup' "$INSTALL"; then
+    pass "backup paths use the durable /var/backups root"
 else
-    fail "backup hint matches the mktemp path shape"
+    fail "backup paths use the durable /var/backups root"
 fi
 # Session hint (issue #73): the running shell keeps the ddev function
 # (helper deleted), PATH/umask and group membership — the uninstall must
