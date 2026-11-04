@@ -36,7 +36,6 @@ ui_warn "/mnt/c restriction configured but still pending 'wsl --shutdown'"
 ui_section "Update complete"
 
 ui_kv "Kit" "v$OLD -> $NEW"
-ui_kv "Backup" "/var/backups/opencode-permissions-kit/install-20261104-190102"
 ui_kv "Config" "unchanged"
 echo ""
 ui_kv_warn "WSL2" "run 'wsl --shutdown' from Windows to apply the /mnt/c fix"
