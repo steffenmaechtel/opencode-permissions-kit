@@ -86,7 +86,8 @@ opk update --refresh
 ```
 
 A pass that fails wholesale aborts with a per-pass warning instead of
-reporting success — a green "ACLs applied" always means the baseline actually
-landed. A missing or broken `python3` never blocks the baseline: the passes
+reporting success — the green "group baseline refreshed" line always means
+the baseline actually landed. A missing or broken `python3` never blocks the
+baseline: the passes
 run without the live entry counters, one warning says so. A broken `python3`
 names itself above that warning; a missing one stays silent.

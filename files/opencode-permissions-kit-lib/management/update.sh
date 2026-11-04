@@ -1033,7 +1033,10 @@ if [ "$ONLY_BINARY" != true ]; then
         # end-of-run block re-scanned the same roots for the group baseline
         # AND the handover again. The baseline arm now rides this loop;
         # per-root order matches the old refresh block (baseline first,
-        # handover second, so .ddev dirs end up owned by the opencode user).
+        # handover second, stamp last — the stamp records a completed
+        # pass). .ddev ownership comes from the handover's chown alone
+        # (ddev-handover.sh) — the baseline's chgrp never re-owns, so the
+        # per-root end state does not depend on this order.
         if [ "$REFRESH" = true ]; then
             ui_section "Refreshing group baseline"
             # Shared helper with live per-pass progress (issue #14 — large trees

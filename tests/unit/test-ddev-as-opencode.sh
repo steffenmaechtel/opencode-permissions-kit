@@ -628,8 +628,6 @@ check "handover helper skips unknown app types" \
     sh -c "grep -qF 'return 0' \"\$1\"" _ "$HANDOVER"
 check "config.sh projects add uses the handover helper" \
     sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$CONFIG"
-check "update.sh refresh uses the handover helper" \
-    sh -c "grep -q 'ddev_handover_root' \"\$1\"" _ "$UPDATE"
 
 # --- 7b. project-root handover (TYPO3 bootstrap, EPERM on fresh clones) ---------
 # ddev's settings-path fallback targets the APP ROOT while TYPO3 is not
@@ -1579,12 +1577,24 @@ check "update.sh: the scanning detail is printed only for roots actually scanned
     sh -c "grep -qF '_ho_announced=false' \"\$1\" && grep -qF 'if [ \"\$_ho_announced\" = false ]' \"\$1\"" _ "$UPDATE"
 check "update.sh: skip message names both force paths" \
     sh -c "grep -q 'opk update --refresh' \"\$1\" && grep -q 'config handover' \"\$1\"" _ "$UPDATE"
-check "update.sh: --refresh baseline arm rides the loop (issue #219)" \
-    grep -qF 'fs_baseline_root "$root" "$NEW_OPENCODE_GROUP" "$OPENCODE_USER"' "$UPDATE"
-_fs_arm_ln="$(grep -n 'fs_baseline_root "\$root"' "$UPDATE" | head -1 | cut -d: -f1)"
-_ho_call_ln="$(grep -n 'ddev_handover_root "\$root"' "$UPDATE" | head -1 | cut -d: -f1)"
-check "update.sh: baseline arm precedes the handover call (order ${_fs_arm_ln}<${_ho_call_ln} — issue #219)" \
-    sh -c '[ -n "$1" ] && [ -n "$2" ] && [ "$1" -lt "$2" ]' _ "$_fs_arm_ln" "$_ho_call_ln"
+# pr-00381 a1/a2/a7: the file-global presence/order pins were
+# comment-blind and position-free — hoisting the arm out of the loop,
+# dropping its REFRESH wrapper or commenting it out all stayed green.
+# The loop-body range pin below is comment-stripped (#261) and asserts
+# the arm's REFRESH gate, the arm itself and the stamp write INSIDE the
+# single loop, in order arm < handover < stamp (the stamp records a
+# completed pass).
+_upd_loop="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | awk '/while IFS= read -r root; do/,/^        done <"\$PROJECTS_CONF"/')"
+_upd_gate_n="$(printf '%s\n' "$_upd_loop" | grep -c 'if \[ "\$REFRESH" = true \]; then' || true)"
+_upd_arm_n="$(printf '%s\n' "$_upd_loop" | grep -c 'fs_baseline_root "\$root"' || true)"
+_upd_stmp_n="$(printf '%s\n' "$_upd_loop" | grep -c 'ddev_handover_stamp_write "\$root"' || true)"
+check "update.sh: loop body = REFRESH gate + arm + stamp (${_upd_gate_n}/${_upd_arm_n}/${_upd_stmp_n} — pr-00381 a1/a2/a7)" \
+    sh -c '[ "$1" -ge 1 ] && [ "$2" -ge 1 ] && [ "$3" -ge 1 ]' _ "$_upd_gate_n" "$_upd_arm_n" "$_upd_stmp_n"
+_upd_arm_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'fs_baseline_root "\$root"' | head -1 | cut -d: -f1)"
+_upd_ho_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_root "\$root"' | head -1 | cut -d: -f1)"
+_upd_stamp_ln="$(printf '%s\n' "$_upd_loop" | grep -n 'ddev_handover_stamp_write "\$root"' | head -1 | cut -d: -f1)"
+check "update.sh: in-loop order arm < handover < stamp (${_upd_arm_ln}<${_upd_ho_ln}<${_upd_stamp_ln} — pr-00381 a7)" \
+    sh -c '[ -n "$1" ] && [ -n "$2" ] && [ -n "$3" ] && [ "$1" -lt "$2" ] && [ "$2" -lt "$3" ]' _ "$_upd_arm_ln" "$_upd_ho_ln" "$_upd_stamp_ln"
 _upd_loops_n="$(sed 's/^[[:space:]]*#.*$//' "$UPDATE" | grep -c 'done <"$PROJECTS_CONF"' || true)"
 check "update.sh: exactly one project-root loop (loops: $_upd_loops_n, need 1 — issue #219)" \
     [ "$_upd_loops_n" -eq 1 ]
