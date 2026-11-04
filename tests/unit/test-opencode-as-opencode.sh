@@ -1010,6 +1010,81 @@ else
     failures=$((failures + 1))
 fi
 
+# --- #220: bridge gate fails safe without the comparator ---------------------
+# The bridge gate keys on ADV_VERSION — a variable owned by the advisories
+# probe block. An env-exported ADV_VERSION (name collision) plus a broken
+# kit (advisories.sh missing, comparator undefined) made the empty
+# substitution satisfy `!= lt` and suppressed the bridge warning (the
+# unsafe side, issue #220). Pin: the extracted gate block, eval'd with the
+# comparator unset and PATH emptied (a host binary of the same name must
+# not satisfy the guard either — 0.0.46a F2 class), keeps _bridge_needed=1
+# on both arms and unknown; with the REAL advisories.sh comparator the
+# version keying still holds (boundaries on their own arm each).
+_b220_block="$(sed -n '/^    _bridge_needed=1$/,/^    fi$/p' "$WRAPPER_FILE")"
+_b220_adv_src="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/advisories.sh"
+if [ -n "$_b220_block" ] && [ -f "$_b220_adv_src" ]; then
+    echo "  ${GREEN}PASS${NC}  bridge gate block extractable (#220)"
+    passed=$((passed + 1))
+    # with the real comparator: the gate keys on the version as documented
+    _b220_gate() {
+        (
+            # shellcheck disable=SC1090
+            . "$_b220_adv_src"
+            ADV_VERSION="$1"
+            eval "$_b220_block"
+            printf '%s\n' "$_bridge_needed"
+        )
+    }
+    # without any comparator: broken kit + inherited env value
+    _b220_gate_nocmp() {
+        (
+            unset -f advisories_version_cmp
+            PATH=
+            ADV_VERSION="$1"
+            eval "$_b220_block"
+            printf '%s\n' "$_bridge_needed"
+        )
+    }
+    if [ "$(_b220_gate 1.19.0)" = 0 ] && [ "$(_b220_gate 2.0.19)" = 0 ] &&
+        [ "$(_b220_gate 2.0.18)" = 0 ] &&
+        [ "$(_b220_gate 1.18.32)" = 1 ] && [ "$(_b220_gate 2.0.17)" = 1 ] &&
+        [ "$(_b220_gate '')" = 1 ]; then
+        echo "  ${GREEN}PASS${NC}  bridge gate keys on ADV_VERSION (1.18.33+/2.0.18+ unneeded)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  bridge gate version keying drifted (extract: $_b220_block)"
+        failures=$((failures + 1))
+    fi
+    if [ "$(_b220_gate_nocmp 1.19.0)" = 1 ] && [ "$(_b220_gate_nocmp 2.0.19)" = 1 ] &&
+        [ "$(_b220_gate_nocmp '')" = 1 ]; then
+        echo "  ${GREEN}PASS${NC}  #220: missing comparator keeps the bridge warning (fails safe)"
+        passed=$((passed + 1))
+    else
+        echo "  ${RED}FAIL${NC}  #220: bridge gate lost its fail-safe (extract: $_b220_block)"
+        failures=$((failures + 1))
+    fi
+else
+    echo "  ${RED}FAIL${NC}  bridge gate block not extractable (#220 anchor drift?)"
+    failures=$((failures + 1))
+fi
+
+# --- #220: the probe initializes its variables (no env inheritance) ----------
+# The init before the guarded block kills the collision vector at the
+# source: an exported ADV_VERSION/ADV_LINE can no longer impersonate a
+# probe result while advisories.sh is missing. Pin: the init literals
+# exist (comment-strip-ridden) and sit BEFORE the advisories.sh gate.
+_b220_init_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" | grep -nF 'ADV_VERSION=""' | head -1 | cut -d: -f1)"
+_b220_gate_ln="$(sed 's/^[[:space:]]*#.*$//' "$WRAPPER_FILE" |
+    grep -nF '[ -f /usr/local/lib/opencode-permissions-kit/sh/advisories.sh ]; then' | head -1 | cut -d: -f1)"
+if [ -n "$_b220_init_ln" ] && [ -n "$_b220_gate_ln" ] &&
+    [ "$_b220_init_ln" -lt "$_b220_gate_ln" ]; then
+    echo "  ${GREEN}PASS${NC}  #220: ADV_VERSION init precedes the advisories gate (no env inheritance)"
+    passed=$((passed + 1))
+else
+    echo "  ${RED}FAIL${NC}  #220: ADV_VERSION init missing or behind the gate (init:$_b220_init_ln gate:$_b220_gate_ln)"
+    failures=$((failures + 1))
+fi
+
 # --- Summary ---
 echo ""
 echo "===================================="
