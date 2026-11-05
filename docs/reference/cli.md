@@ -89,6 +89,15 @@ opk doctor                       # anywhere inside the project
 opk doctor /var/www/vhosts/<project>
 ```
 
+The division of labor with `opk status` (issue #368): **status is the
+install-wide green-board** — run from anywhere, always the same
+whole-install picture, read-only, no prompts, no repairs (registered
+projects appear there as summary rows, never as deep dives). **doctor
+is the per-project counterpart** — deep diagnosis of one project plus
+the guided remedy. Diagnosis may sweep — [`doctor all`](#doctor-all)
+scans every project at once — but repair never sweeps: `fix` and
+`detect` stay per-project, one consent prompt at a time.
+
 Without a path argument, doctor searches **upward** from the current
 directory for the project's `opk.json` — like git locates `.git`: the
 nearest one wins, a nested `opk.json` shadows any parent's, and the
@@ -574,6 +583,11 @@ browser-bridge state), the
 root-equivalent-access audit, and the leak scan — followed by management
 hints and the one-line verdict (the **Summary** row: *All green* or the
 alert/warning tally).
+
+`status` is the install-wide **green-board**: run it from anywhere —
+it reads state and reports, never prompts, never repairs. Per-project
+deep dives and guided fixes are [`opk doctor`](#doctor)'s job (the
+[division of labor](#doctor), issue #368).
 
 ```bash
 sudo bash /usr/local/lib/opencode-permissions-kit/management/status.sh

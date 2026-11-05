@@ -69,6 +69,21 @@ else
     fail "status.sh reports the host git via the shared git-check helper"
 fi
 
+# --- 0c. division of labor (issue #368): status is the install-wide
+# green-board — read-only by design. It never prompts (no ui_ask /
+# ui_menu / ui_confirm call anywhere in the source) and never repairs
+# (no active chown/chmod/mv line — full-line comment mentions do not
+# count, and the rm -f sites are status.sh's own mktemp cleanup). Deep
+# dives and guided fixes are opk doctor's job; this pin enforces the
+# boundary the cli.md division-of-labor passage states.
+if ! grep -qE 'ui_(ask|menu|confirm)[[:space:]]' "$STATUS" &&
+    ! grep -E '^[[:space:]]*[^#[:space:]]' "$STATUS" |
+    grep -qE '(^|[[:space:];&|(])(chown|chmod|mv)[[:space:]]'; then
+    pass "status.sh never prompts and never repairs (#368 boundary)"
+else
+    fail "status.sh never prompts and never repairs (#368 boundary)"
+fi
+
 # status.sh reads absolute paths (LIBDIR, /etc/...). The only seam we can
 # redirect without root is the opencode home it inspects — the interesting
 # branches here (backend case, install.conf sourcing) are exercised by
