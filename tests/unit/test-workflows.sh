@@ -12,6 +12,8 @@
 #   4. tsx syntax gate wiring (issue #114)
 #   5. opencode 2.x pin jobs (issue #80)
 #   6. YAML structure guards (one env block per step; run: block literals)
+#   7. e2e path-filter = e2e inputs
+#   8. pages re-run hygiene (issue #388)
 # Run: sh tests/unit/test-workflows.sh
 set -u
 
@@ -24,6 +26,7 @@ WF_TEST="$REPO/.github/workflows/test-unit.yml"
 WF_E2E="$REPO/.github/workflows/test-e2e.yml"
 WF_DDEV_E2E="$REPO/.github/workflows/test-e2e-ddev.yml"
 WF_ADVISORY="$REPO/.github/workflows/advisory-watch.yml"
+WF_PAGES="$REPO/.github/workflows/pages.yml"
 
 failures=0
 passed=0
@@ -422,6 +425,51 @@ for _wf in test-unit test-e2e test-e2e-ddev; do
         fail "$_wf.yml: dispatch gets its own concurrency group (V13)"
     fi
 done
+
+# --- 8. pages re-run hygiene (issue #388) ---------------------------------------
+#
+# deploy-pages@v5 fails a run that carries more than one artifact named
+# github-pages ("Artifact count is 2", run 41893900784): attempt 1
+# uploaded its artifact and died in the Pages deploy timeout, the re-run
+# uploaded a second one — artifacts survive a workflow re-run, and a
+# re-run reuses the run's original workflow file, so that run could
+# never heal. pages.yml must delete this run's stale github-pages
+# artifacts BEFORE upload-pages-artifact adds the fresh one, scoped to
+# the github-pages name, with actions: write for the delete and the
+# fail-loud set -euo pipefail in the cleanup step (the runner default
+# for a run: block is bash -e — pipefail must be re-established, or a
+# failed listing call left of the pipe exits 0 through the while loop).
+# Full-line comments never satisfy these checks (#261 rider).
+_pages_body() { sed 's/^[[:space:]]*#.*$//' "$WF_PAGES"; }
+
+_clean_ln="$(_pages_body | grep -nF 'actions/runs/${GITHUB_RUN_ID}/artifacts' | cut -d: -f1 | head -1)"
+_upload_ln="$(_pages_body | grep -nF 'upload-pages-artifact' | cut -d: -f1 | head -1)"
+_n_clean=$(_pages_body | grep -cF 'actions/runs/${GITHUB_RUN_ID}/artifacts' || true)
+_n_upload=$(_pages_body | grep -cF 'upload-pages-artifact' || true)
+_n_aw=$(_pages_body | grep -c '^  actions: write' || true)
+_pages_missing=""
+[ "$_n_clean" = 1 ] || _pages_missing="$_pages_missing cleanup-endpoint($_n_clean)"
+[ "$_n_upload" = 1 ] || _pages_missing="$_pages_missing upload-step($_n_upload)"
+if [ -n "$_clean_ln" ] && [ -n "$_upload_ln" ] &&
+    [ "$_clean_ln" -lt "$_upload_ln" ]; then
+    :
+else
+    _pages_missing="$_pages_missing cleanup-not-before-upload"
+fi
+_pages_body | grep -qF 'select(.name == "github-pages")' ||
+    _pages_missing="$_pages_missing not-scoped-to-github-pages"
+_pages_body | grep -qF -- '-X DELETE' ||
+    _pages_missing="$_pages_missing no-delete-verb"
+_pages_body | grep -qF 'GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}' ||
+    _pages_missing="$_pages_missing no-gh-token"
+_pages_body | grep -qF 'set -euo pipefail' ||
+    _pages_missing="$_pages_missing no-fail-loud-set"
+[ "$_n_aw" = 1 ] || _pages_missing="$_pages_missing actions-write($_n_aw)"
+if [ -z "$_pages_missing" ]; then
+    pass "pages.yml: re-run hygiene (cleanup before upload, scoped, token, actions: write, fail-loud set)"
+else
+    fail "pages.yml: re-run hygiene incomplete:$_pages_missing"
+fi
 
 # Summary gate LAST (fail-but-green defect fixed with the e2e path-filter
 # wave, the L4 class 0.0.44c C1): this block used to sit two sections
