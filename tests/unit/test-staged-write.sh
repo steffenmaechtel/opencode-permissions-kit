@@ -20,10 +20,6 @@
 # Run: sh tests/unit/test-staged-write.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 STAGEDWRITE="$REPO/files/opencode-permissions-kit-lib/sh/staged-write.sh"
@@ -34,8 +30,9 @@ INSTALL="$REPO/files/install.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 TUIPLUGIN="$REPO/files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 
-failures=0
-passed=0
+# Shared harness (issue #255 stage 2 spike): pass/fail, assert_eq,
+# check, colors and the summary gate live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 # Deterministic fixture modes (issue #112): the handover's top-inode fast
 # path skips chown -R/chmod -R on already-conforming trees — under a
@@ -44,26 +41,6 @@ passed=0
 # never match real stat output — 0.0.40a F7). The guard turns
 # load-bearing the moment a call does.
 umask 022
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-
-assert_eq() {
-    _d="$1" _e="$2" _a="$3"
-    if [ "$_e" = "$_a" ]; then pass "$_d"; else fail "$_d (expected [$_e] got [$_a])"; fi
-}
-
-check() {
-    _d="$1"
-    shift
-    if "$@"; then pass "$_d"; else fail "$_d"; fi
-}
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
@@ -594,12 +571,4 @@ check "0.0.39h F3: staged-write.sh refuses a directory destination" \
 
 # --- summary -----------------------------------------------------------------------
 
-echo ""
-echo "======================================="
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All staged-write / handover gate tests passed."
-echo ""
+suite_done "staged-write / handover gate tests"
