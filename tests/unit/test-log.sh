@@ -8,23 +8,12 @@
 # Run: sh tests/unit/test-log.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/log.sh"
 
-failures=0
-passed=0
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
+# Shared harness (issue #255 stage 2 spike): pass/fail + counters +
+# summary gate live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 WORK="$(mktemp -d)"
 # widen to the WORK2 receiver + signal arms (#283)
@@ -144,11 +133,4 @@ else
 fi
 
 # --- Summary ---------------------------------------------------------------------
-echo ""
-echo "===================================="
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All tests passed."
+suite_done "tests"
