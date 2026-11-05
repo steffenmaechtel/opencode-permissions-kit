@@ -435,8 +435,11 @@ done
 # re-run reuses the run's original workflow file, so that run could
 # never heal. pages.yml must delete this run's stale github-pages
 # artifacts BEFORE upload-pages-artifact adds the fresh one, scoped to
-# the github-pages name, with actions: write for the delete. Full-line
-# comments never satisfy these checks (#261 rider).
+# the github-pages name, with actions: write for the delete and the
+# fail-loud set -euo pipefail in the cleanup step (the runner default
+# for a run: block is bash -e — pipefail must be re-established, or a
+# failed listing call left of the pipe exits 0 through the while loop).
+# Full-line comments never satisfy these checks (#261 rider).
 _pages_body() { sed 's/^[[:space:]]*#.*$//' "$WF_PAGES"; }
 
 _clean_ln="$(_pages_body | grep -nF 'actions/runs/${GITHUB_RUN_ID}/artifacts' | cut -d: -f1 | head -1)"
@@ -459,9 +462,11 @@ _pages_body | grep -qF -- '-X DELETE' ||
     _pages_missing="$_pages_missing no-delete-verb"
 _pages_body | grep -qF 'GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}' ||
     _pages_missing="$_pages_missing no-gh-token"
+_pages_body | grep -qF 'set -euo pipefail' ||
+    _pages_missing="$_pages_missing no-fail-loud-set"
 [ "$_n_aw" = 1 ] || _pages_missing="$_pages_missing actions-write($_n_aw)"
 if [ -z "$_pages_missing" ]; then
-    pass "pages.yml: re-run hygiene (cleanup before upload, scoped, token, actions: write)"
+    pass "pages.yml: re-run hygiene (cleanup before upload, scoped, token, actions: write, fail-loud set)"
 else
     fail "pages.yml: re-run hygiene incomplete:$_pages_missing"
 fi
