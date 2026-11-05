@@ -767,19 +767,28 @@ refresh() {
     if [ -f "$PROJECTS_CONF" ]; then
         while IFS= read -r p; do
             [ -z "$p" ] && continue
-            # Form gate, writer parity (review a S1/S2, issue #245):
-            # raw-conf entries no writer gate ever saw — dot/empty-
-            # segment spellings (`link/.`) dodge the [ -L ] gate below
-            # ([ -L "path/." ] is false, measured) AND the helper
-            # belt's one-slash strip, putting the recursive baseline on
-            # the link's target; a double slash (`link//`) reaches the
-            # belt as `link/` and its rc-1 refusal aborts the whole
-            # run under set -e. Same arms as project_path_sane and the
-            # uninstall reader; skip loudly and keep processing the
-            # remaining roots. Blocklist parity rides #247.
+            # Form gate, writer parity (review a S1/S2, completed b X1,
+            # issue #245): raw-conf entries no writer gate ever saw —
+            # dot/empty-segment spellings (`link/.`) dodge the [ -L ]
+            # gate below ([ -L "path/." ] is false, measured) AND the
+            # helper belt's one-slash strip, putting the recursive
+            # baseline on the link's target; a double slash (`link//`)
+            # reaches the belt as `link/` and its rc-1 refusal aborts
+            # the whole run under set -e; a bare `.` or relative
+            # spelling would hand fs_baseline_root the invoking CWD
+            # (measured, b X1). Absolute first, then dots/empty
+            # segments, then whitespace — the writer's arm order
+            # (path-sane.sh); the system-path blocklist rides #247.
             case "$p" in
-                *..* | /./ | */./* | ./* | */. | *//*)
-                    ui_warn "skip $p (malformed project path — dot or empty segment)"
+                /*) ;;
+                *)
+                    ui_warn "skip $p (not an absolute project path)"
+                    continue
+                    ;;
+            esac
+            case "$p" in
+                *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+                    ui_warn "skip $p (malformed project path — dot, empty segment, or whitespace)"
                     continue
                     ;;
             esac

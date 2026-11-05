@@ -355,12 +355,16 @@ _fsb_pass() {
 fs_baseline_root() {
     fsb_root="$1"
     fsb_group="$2"
-    [ -n "$fsb_root" ] && [ -d "$fsb_root" ] || return 0
-    # Symlinked root refusal (issue #245): [ -d ] above follows a link,
-    # and every pass below would then be a silent no-op — the find
-    # walks start at the link itself and visit nothing (measured,
+    # Symlinked root refusal (issue #245), BEFORE the [ -n ] && [ -d ]
+    # arm (review b X4): that arm follows a link and returns 0 — a
+    # dangling link was a completely silent no-op for exactly the
+    # direct/future callers the belt exists for. [ -L ] is true for a
+    # dangling link too (lstat sees the link itself), so both live and
+    # dangling links refuse loudly here. Every pass below the old
+    # position would have been a silent no-op on a live link — the
+    # find walks start at the link itself and visit nothing (measured,
     # issue #245) — while the callers print "baseline applied" over a
-    # tree that got NOTHING. Fail loud: rc 1 plus this reason line —
+    # tree that got NOTHING. Fail loud: rc 1 plus the reason line —
     # under the shipped set -e callers (config.sh, update.sh,
     # install.sh all run set -eu) the rc aborts before any success
     # line; the loop-side gates keep those flows from reaching the
@@ -375,6 +379,7 @@ fs_baseline_root() {
             "$fsb_root" >&2
         return 1
     fi
+    [ -n "$fsb_root" ] && [ -d "$fsb_root" ] || return 0
     # Wholesale-failure detection part 1 (0.0.43a F10): a missing tool
     # used to die silently inside the pipeline (find's stderr is
     # redirected, xargs -r succeeds on empty input) and the passes

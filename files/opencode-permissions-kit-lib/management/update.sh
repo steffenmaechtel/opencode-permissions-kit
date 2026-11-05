@@ -1062,16 +1062,25 @@ if [ "$ONLY_BINARY" != true ]; then
         _ho_announced=false
         while IFS= read -r root; do
             [ -z "$root" ] && continue
-            # Form gate, writer parity (review a S1/S2, issue #245):
-            # `link/.` dodges the [ -L ] gate below and the helper
-            # belt's strip (recursive baseline on the link's target);
-            # `link//` reaches the belt as `link/` and its rc-1
-            # refusal aborts the whole update under set -e. Same arms
-            # as project_path_sane and the uninstall reader; skip
-            # loudly, keep processing. Blocklist parity rides #247.
+            # Form gate, writer parity (review a S1/S2, completed b X1,
+            # issue #245): `link/.` dodges the [ -L ] gate below and
+            # the helper belt's strip (recursive baseline on the link's
+            # target); `link//` reaches the belt as `link/` and its
+            # rc-1 refusal aborts the whole update under set -e; a bare
+            # `.` or relative spelling would hand fs_baseline_root the
+            # invoking CWD (measured, b X1). Absolute first, then
+            # dots/empty segments, then whitespace — the writer's arm
+            # order (path-sane.sh); the blocklist rides #247.
             case "$root" in
-                *..* | /./ | */./* | ./* | */. | *//*)
-                    ui_warn "skip $root (malformed project path — dot or empty segment)"
+                /*) ;;
+                *)
+                    ui_warn "skip $root (not an absolute project path)"
+                    continue
+                    ;;
+            esac
+            case "$root" in
+                *..* | /./ | */./* | ./* | */. | *//* | *[[:space:]]*)
+                    ui_warn "skip $root (malformed project path — dot, empty segment, or whitespace)"
                     continue
                     ;;
             esac

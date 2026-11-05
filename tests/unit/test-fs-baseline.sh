@@ -839,6 +839,7 @@ rm -rf "$W23NZ"
 S245="$WORK/s245"
 mkdir -p "$S245/real" "$S245/real2"
 ln -s "$S245/real" "$S245/link"
+ln -s "$S245/gone" "$S245/dangling"
 
 # 12a. fs_baseline_root refuses a symlinked root LOUDLY and touches
 # nothing: rc 1 (the 0.0.43a F10 shape — success lines must not print
@@ -853,15 +854,22 @@ S245A_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S
     S245A_RC=0 || S245A_RC=$?
 S245B_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S245/link/" "$(id -gn)" 2>&1) &&
     S245B_RC=0 || S245B_RC=$?
+# Dangling link (review b X4): the belt sits BEFORE the [ -n ] && [ -d ]
+# arm now — [ -L ] is true for a dangling link too, so it must refuse
+# loudly instead of the old silent rc-0 no-op.
+S245D_ERR=$(FS_SUDO="" sh -c '. "$1" && fs_baseline_root "$2" "$3"' _ "$LIB" "$S245/dangling" "$(id -gn)" 2>&1) &&
+    S245D_RC=0 || S245D_RC=$?
 if [ "$S245A_RC" -ne 0 ] &&
     printf '%s' "$S245A_ERR" | grep -qF 'is a symlink — refusing the group baseline' &&
     [ "$(_s245_mode)" = "$_s245_before" ] &&
     [ "$(getfacl -cpd -- "$S245/real" 2>/dev/null | grep -c '^group:')" -eq 0 ] &&
     [ "$S245B_RC" -ne 0 ] &&
-    printf '%s' "$S245B_ERR" | grep -qF 'is a symlink — refusing the group baseline'; then
-    pass "fs_baseline_root: symlinked root refused loudly, tree untouched, slash spelling too (#245)"
+    printf '%s' "$S245B_ERR" | grep -qF 'is a symlink — refusing the group baseline' &&
+    [ "$S245D_RC" -ne 0 ] &&
+    printf '%s' "$S245D_ERR" | grep -qF 'is a symlink — refusing the group baseline'; then
+    pass "fs_baseline_root: live/dangling/slash-spelling link roots all refused loudly, tree untouched (#245, b X4)"
 else
-    fail "fs_baseline_root must refuse a symlinked root, both spellings (rcA=$S245A_RC rcB=$S245B_RC) (#245)"
+    fail "fs_baseline_root must refuse live/dangling/slash link roots (rcA=$S245A_RC rcB=$S245B_RC rcD=$S245D_RC) (#245)"
 fi
 
 # 12b. config.sh refresh(): the REAL extracted function over a fixture
@@ -892,8 +900,9 @@ fi
 } >"$S245/run-refresh.sh"
 # conf order: real … malformed/link entries … real2 — real2 AFTER every
 # refused entry proves no mid-loop abort (the a S2 over-abort shape).
-ln -s "$S245/gone" "$S245/dangling"
-printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n' \
+# The b X1 arms ride along: `.` and `foo` (relative spellings the a-wave
+# form arms missed) and a spaced absolute path (writer whitespace arm).
+printf '%s\n/\n%s\n%s/\n%s/.\n%s//\n%s\n%s\n.\nfoo\n/var/www/foo bar\n%s\n' \
     "$S245/real" "$S245/link" "$S245/link" "$S245/link" "$S245/link" \
     "$S245/dangling" "$S245/real2" >"$S245/conf"
 S245R_OUT=$(PROJECTS_CONF="$S245/conf" OPENCODE_GROUP=tg OPENCODE_USER=toc DEFAULT_USER=tdv \
@@ -907,10 +916,13 @@ if [ "$(printf '%s\n' "$S245R_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/dangling (symlink")" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link/. (malformed")" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ]; then
-    pass "config.sh refresh: real roots only, link/dangling/malformed skipped loudly, no abort (#245, a S1/S2/S3)"
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip . (not an absolute project path)')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip foo (not an absolute project path)')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245R_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ]; then
+    pass "config.sh refresh: real roots only, link/dangling/malformed/relative/spaced skipped loudly, no abort (#245, a S1/S2/S3, b X1)"
 else
-    fail "config.sh refresh must skip link/dangling/malformed roots without abort (out=$(printf '%s\n' "$S245R_OUT" | head -8)) (#245)"
+    fail "config.sh refresh must skip link/dangling/malformed/relative roots without abort (out=$(printf '%s\n' "$S245R_OUT" | head -10)) (#245)"
 fi
 
 # 12c. the update.sh root loop (refresh + handover, the #247 raw-conf
@@ -942,10 +954,13 @@ if [ "$(printf '%s\n' "$S245U_OUT" | grep -c '^FSB: ')" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link (symlink")" -eq 2 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/dangling (symlink")" -eq 1 ] &&
     [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link/. (malformed")" -eq 1 ] &&
-    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ]; then
-    pass "update.sh root loop: real roots only, link/dangling/malformed skipped loudly, no abort (#245, a S1/S2/S3)"
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF "ui_warn: skip $S245/link// (malformed")" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip . (not an absolute project path)')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip foo (not an absolute project path)')" -eq 1 ] &&
+    [ "$(printf '%s\n' "$S245U_OUT" | grep -cF 'ui_warn: skip /var/www/foo bar (malformed')" -eq 1 ]; then
+    pass "update.sh root loop: real roots only, link/dangling/malformed/relative/spaced skipped loudly, no abort (#245, a S1/S2/S3, b X1)"
 else
-    fail "update.sh root loop must skip link/dangling/malformed roots without abort (out=$(printf '%s\n' "$S245U_OUT" | head -8)) (#245)"
+    fail "update.sh root loop must skip link/dangling/malformed/relative roots without abort (out=$(printf '%s\n' "$S245U_OUT" | head -10)) (#245)"
 fi
 
 # 12d. belt arms behind the writer gate (scan->act rechecks, L5):
@@ -976,6 +991,21 @@ if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit
     pass "ddev_handover_root carries the root-operand symlink belt (#245, a X2)"
 else
     fail "ddev_handover_root must belt-gate symlinked roots (#245, a X2)"
+fi
+# Executed belt arm (review b X2): the belt must REFUSE — rc 1, the
+# sibling fs_baseline_root shape. rc 0 let a caller stamp "applied"
+# over nothing (executed in the b review); the warn alone did not stop
+# the unconditional stamp writes. Function extracted, never sourced.
+S245X2_ERR=$(sh -c '
+    eval "$(sed -n "/^ddev_handover_root() {/,/^}$/p" "$1")"
+    ddev_handover_root "$2" u g d' _ \
+    "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ddev-handover.sh" \
+    "$S245/link" 2>&1) && S245X2_RC=0 || S245X2_RC=$?
+if [ "$S245X2_RC" -ne 0 ] &&
+    printf '%s' "$S245X2_ERR" | grep -qF 'is a symlink — refusing the ddev handover'; then
+    pass "ddev_handover_root belt refuses a link root with rc 1 (#245, b X2)"
+else
+    fail "ddev_handover_root belt must refuse link roots with rc 1 (rc=$S245X2_RC err=$S245X2_ERR) (#245, b X2)"
 fi
 if sed 's/^[[:space:]]*#.*$//' "$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/status.sh" |
     grep -qF 'ui_atten "$root" "symlinked root — register the target directory instead"'; then
