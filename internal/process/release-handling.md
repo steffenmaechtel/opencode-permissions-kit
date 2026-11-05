@@ -370,7 +370,11 @@ no-runtime philosophy regardless of scale.
    URL); master/branch/tag pins keep the ref-addressed raw URLs — a
    channel-fixed entry cannot self-pin. The workflow checks `stable`
    out explicitly for the served scripts, so the entry can never serve
-   dev state even when dispatched from another branch.
+   dev state even when dispatched from another branch. Re-runs are safe
+   since #388: the workflow deletes this run's stale `github-pages`
+   artifacts from earlier attempts before uploading — deploy-pages fails
+   a run that carries more than one. (Pre-#388 runs still need manual
+   artifact deletion before a re-run — see run 41893900784.)
 
 ## 8. Open questions
 
