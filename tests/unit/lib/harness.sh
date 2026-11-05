@@ -13,9 +13,13 @@
 #     . "$SCRIPT_DIR/lib/harness.sh"
 #
 # Provides:
-#   pass / fail          the counted PASS/FAIL rows (identical bytes to
-#                        the duplicated definitions: colors, two-space
-#                        indent, message last)
+#   pass / fail          the counted PASS/FAIL rows -- printf '%b' based,
+#                        byte-identical to the old echo definitions under
+#                        sh/dash (the suites' runtime) AND under bash
+#                        (the coverage shell: scripts/coverage.sh
+#                        resolves sh to bash for kcov, and bash echo
+#                        does not interpret \033 -- PR #397 CI caught
+#                        the echo form differing there)
 #   check <desc> cmd...  pass/fail around a command's rc
 #   assert_eq <desc> <expected> <actual>
 #                        string-equality assertion with expected/got
@@ -32,6 +36,18 @@
 # Counters (passed/failures) and colors stay globals so existing
 # suites read them unchanged.
 #
+# Standing rules (issue #394 -- the adoption wave's home):
+#   1. Rule of three -- a shape moves into the harness at the third
+#      real duplication, never speculatively.
+#   2. Pin-on-entry -- every function here is pinned by
+#      tests/unit/test-harness.sh the moment it lands (counting + rc
+#      contracts; the #393 spike's second sabotage arm showed an
+#      unpinned harness can print a FAIL row yet exit 0).
+#   3. Boundary -- harness = shell test mechanics; suites keep their
+#      subject knowledge (drivers, fixtures, seams like run_doctor or
+#      run_ui stay local; centralizing them is framework creep, the
+#      ShellSpec rejection reason in #255).
+#
 # Part of the shfmt + shellcheck gate scope (Makefile SHFMT_TEST_FILES
 # covers every tracked tests/*.sh).
 
@@ -43,11 +59,11 @@ passed=0
 failures=0
 
 pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
+    printf '  %bPASS%b  %s\n' "$GREEN" "$NC" "$1"
     passed=$((passed + 1))
 }
 fail() {
-    echo "  ${RED}FAIL${NC}  $1"
+    printf '  %bFAIL%b  %s\n' "$RED" "$NC" "$1"
     failures=$((failures + 1))
 }
 
@@ -70,9 +86,9 @@ suite_done() {
     _label="$1"
     echo ""
     echo "===================================="
-    echo "  ${GREEN}Passed: $passed${NC}"
+    printf '  %bPassed: %s%b\n' "$GREEN" "$passed" "$NC"
     if [ "$failures" -gt 0 ]; then
-        echo "  ${RED}Failed: $failures${NC}"
+        printf '  %bFailed: %s%b\n' "$RED" "$failures" "$NC"
         exit 1
     fi
     echo "  All $_label passed."

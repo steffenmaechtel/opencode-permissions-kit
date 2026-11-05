@@ -118,7 +118,7 @@ help:
 	@echo "  make check-version Validate VERSION + consistent KIT_BRANCH in install.sh/update.sh"
 	@echo "  make release VERSION=x.y.z  Cut a release: tag + fast-forward the stable mirror (maintainer)"
 
-test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-status test-doctor test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity test-update-check
+test: lint check-py test-opencode-as-opencode test-fs-baseline test-staged-write test-parser test-git-config test-container-backend test-bypass-guard test-ddev-as-opencode test-ddev-migrate test-ddev-hosts test-mkcert-reuse test-wsl-exposure test-ui test-kit-cli test-project-paths test-workflows test-check-host test-docs test-skills-lint test-reviews-meta-aggregate test-rules-meta test-rules-revisit test-line-length test-string-continuations test-format-gate test-coverage test-install-args test-kit-files test-tui-mode test-uninstall test-status test-doctor test-update-flags test-release test-e2e-sources test-browser-bridge test-security-advisories test-log test-deploy-lib test-secure-binary test-sudoers-deploy test-sandbox-policy test-pages test-rules-index-parity test-update-check test-harness
 	@echo ""
 	@echo "All shell tests passed."
 
@@ -441,6 +441,9 @@ test-deploy-lib:
 test-update-check:
 	@echo "=== Kit Update Check Tests (issue #358) ==="
 	@./tests/unit/test-update-check.sh
+test-harness:
+	@echo "=== Test Harness Meta Tests (issue #394) ==="
+	@./tests/unit/test-harness.sh
 
 test-secure-binary:
 	@echo "=== Binary Hardening Tests (0.0.41c) ==="
