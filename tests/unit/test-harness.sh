@@ -15,6 +15,10 @@
 #   - check pass arm + fail arm
 #   - the mixed-tally integration: 3 pass + 2 fail -> both counts in
 #     one output, rc 1
+#   - the work registry (#395): work_new / work_new_file create AND
+#     register receivers, work_register / work_register_var migrate
+#     pre-existing ones, the central trap collects on green, red, set -e
+#     abort and SIGTERM -- with a disarmed control arm that must leak
 #
 # Independent by design: this suite uses its OWN local ok/bad counters
 # and its own summary gate -- NOT the harness under test. A corrupted
@@ -43,6 +47,15 @@ bad() {
     echo "  BAD   $1"
     bad=$((bad + 1))
 }
+
+# The registry pin cells below create real receivers (_lc_iso, _sig_iso,
+# their cell scripts and _sig_out) -- this suite owns their cleanup with
+# its OWN trap, like it owns its own counters (independence, header
+# above: the main shell never sources the harness under test). The cell
+# child scripts are printf-written into scratch with literal "$" text --
+# embedded child scripts, the sandbox floor's documented invisible shape:
+# child scripts own their cleanup, the floor does not scan them.
+trap 'rm -rf "${_lc_iso:-}" "${_sig_iso:-}" "${_sig_scratch:-}"; rm -f "${_lc_cell:-}" "${_sig_out:-}"' EXIT INT TERM
 
 # arm <code>: source the harness in a child sh and eval the code;
 # captures the child's rc and combined output. Every pin below reads
@@ -78,6 +91,17 @@ lacks() {
 # [0;3Xm...[0m text pins color codes + spacing + message position.
 arm_plain() {
     printf '%s' "$_arm_out" | tr -d '\033'
+}
+# Registry pin helper: extracts the last "RECV=<path>" line the child
+# printed and asserts that path no longer exists -- the receiver must be
+# collected by the central trap, observed from OUTSIDE the child.
+recv_gone() {
+    _rp="$(printf '%s\n' "$_arm_out" | sed -n 's/^RECV=//p' | tail -n 1)"
+    if [ -n "$_rp" ] && [ ! -e "$_rp" ]; then
+        ok "$1"
+    else
+        bad "$1 (receiver [$_rp] still present)"
+    fi
 }
 
 echo ""
@@ -176,6 +200,110 @@ if arm_plain | grep -qF '[0;31mFAIL[0m  boom'; then
     ok "FAIL row bytes identical under $_arm_sh (coverage-shell fidelity)"
 else
     bad "FAIL row bytes identical under $_arm_sh (coverage-shell fidelity)"
+fi
+
+# --- 8. work registry (#395): the central trap ends the #283 leak class -------
+# Every pin runs the mechanism the way a real suite runs it: a child sh
+# sources the harness, registers receivers through the work_* API, exits
+# -- the parent then observes the receiver PATH is gone and the child's
+# rc. Sabotage discrimination (committed tree, then restore + re-run):
+#   - delete `trap _work_cleanup EXIT INT TERM` from the harness -> the
+#     recv_gone pins and the leak cell go red (receivers stay, control
+#     arm proves the cell was discriminating all along)
+#   - delete the `>>"$_WORK_REG"` append from _work_emit -> recv_gone
+#     pins go red while the ISDIR/ISFILE shape pins stay green
+arm 'W="$(work_new)"; echo "RECV=$W"; test -d "$W" && echo ISDIR; suite_done demo'
+rc_is 0 "work_new suite exits green"
+has ISDIR "work_new creates a directory receiver"
+recv_gone "green exit: the central trap collects the work_new receiver"
+arm 'W="$(work_new "${TMPDIR:-/tmp}/wntpl.XXXXXX")"; echo "RECV=$W"
+     case "$W" in *wntpl.??????*) echo TPLMATCH ;; *) echo TPLBAD ;; esac
+     suite_done demo'
+has TPLMATCH "work_new passes template args through to mktemp"
+recv_gone "template receiver collected too"
+arm 'F="$(work_new_file)"; echo "RECV=$F"; test -f "$F" && echo ISFILE; suite_done demo'
+has ISFILE "work_new_file creates a file receiver"
+recv_gone "file receiver collected by the same trap"
+arm 'P="$(mktemp -d)"; work_register "$P"; echo "RECV=$P"; suite_done demo'
+recv_gone "work_register collects a pre-existing receiver (migration shape)"
+arm 'work_register_var NEVERSET_YET; suite_done demo'
+rc_is 0 "work_register_var on a never-set name is unset-safe (skip, no crash)"
+arm 'LV=""; work_register_var LV; LV="$(mktemp -d)"; echo "RECV=$LV"; suite_done demo'
+recv_gone "work_register_var expands the name at EXIT time (late value collected)"
+arm 'OUT="$(work_new)"; echo "RECV=$OUT"; suite_done demo'
+recv_gone "registration from inside \$( ) reaches the trap (file registry)"
+arm 'set -e; work_register_var "bad name"; pass unreachable'
+rc_is 1 "work_register_var rejects a non-name loud under set -e"
+has "not a variable name" "the rejection names the bad operand"
+arm 'W="$(work_new)"; echo "RECV=$W"; fail boom; suite_done demo'
+rc_is 1 "red suite with a registered receiver still exits 1"
+recv_gone "red exit: cleanup ran AND the rc stayed 1 (rc preserved)"
+
+# Leak-shaped pin (acceptance of #395): the #283 form executing the
+# failure path -- isolated TMPDIR, receiver created, set -e abort inside
+# the window. Zero entries may remain (receiver AND registry file). The
+# control arm disarms the harness trap inline (the shape a deleted trap
+# line produces) and MUST leak -- the pair discriminates through the
+# trap, not through the abort.
+_leak_cell() {
+    # $1 = armed|gone -- sets _lc_left (leftover count) and _lc_rc. The
+    # cell script lives OUTSIDE the isolated TMPDIR (its file must not
+    # count as a leftover); printf-formatted with literal "$" text, the
+    # embedded-child-script shape.
+    _lc_iso="$(mktemp -d)"
+    _lc_cell="$(mktemp)"
+    printf '#!/bin/sh\nset -e\n. "$1"\nif [ "$2" = gone ]; then trap - EXIT INT TERM; fi\nW1="$(work_new)"\necho "RECV=$W1"\nfalse\necho unreachable\n' \
+        >"$_lc_cell"
+    _lc_rc=0
+    TMPDIR="$_lc_iso" sh "$_lc_cell" "$HARNESS" "$1" >/dev/null 2>&1 || _lc_rc=$?
+    _lc_left="$(find "$_lc_iso" -mindepth 1 | wc -l | tr -d ' ')"
+    rm -rf -- "$_lc_iso"
+    rm -f -- "$_lc_cell"
+}
+_leak_cell armed
+if [ "$_lc_left" = 0 ]; then
+    ok "#283 abort window: armed registry leaves zero leftovers"
+else
+    bad "#283 abort window: armed registry must leave zero leftovers (got $_lc_left)"
+fi
+if [ "$_lc_rc" = 1 ]; then
+    ok "abort rc preserved through the central trap (rc 1, not clobbered)"
+else
+    bad "abort rc must stay 1 through the trap (got $_lc_rc)"
+fi
+_leak_cell gone
+if [ "$_lc_left" -ge 1 ]; then
+    ok "abort control arm: disarmed registry leaks (pin discriminates)"
+else
+    bad "abort control arm must leak -- otherwise the armed cell is vacuous"
+fi
+
+# Signal arm (the #283 signal trigger): TERM into the receiver window
+# via a session-group kill (the house cell pattern, test-sandbox-policy
+# section 5) with a work_new receiver. The elapsed guard (<10 s) proves
+# the kill landed -- a missed kill would green through the EXIT arm
+# after the sleep (0.0.46a F2 vacuity class).
+_sig_iso="$(mktemp -d)"
+_sig_scratch="$(mktemp -d)"
+_sig_cell="$_sig_scratch/cell.sh"
+_sig_out="$(mktemp)"
+printf '#!/bin/sh\n. "$1"\nW1="$(work_new)"\necho "RECV=$W1"\nsleep 30\n' \
+    >"$_sig_cell"
+_sig_start=$(date +%s)
+TMPDIR="$_sig_iso" setsid sh "$_sig_cell" "$HARNESS" >"$_sig_out" 2>&1 &
+_sig_pid=$!
+sleep 1
+kill -TERM "-$_sig_pid" 2>/dev/null || :
+wait "$_sig_pid" 2>/dev/null || :
+_sig_left="$(find "$_sig_iso" -mindepth 1 | wc -l | tr -d ' ')"
+_sig_el=$(($(date +%s) - _sig_start))
+rm -rf -- "$_sig_iso"
+rm -rf -- "$_sig_scratch"
+rm -f -- "$_sig_out"
+if [ "$_sig_left" = 0 ] && [ "$_sig_el" -lt 10 ]; then
+    ok "signal window: TERM lands, registry collects (zero leftovers, ${_sig_el}s)"
+else
+    bad "signal window: TERM must collect within the window (left=$_sig_left elapsed=${_sig_el}s)"
 fi
 
 # --- summary gate (independent on purpose -- see header) ------------------------

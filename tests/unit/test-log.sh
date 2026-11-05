@@ -15,9 +15,7 @@ LOG_SH="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/log.sh"
 # summary gate live in lib/harness.sh now.
 . "$SCRIPT_DIR/lib/harness.sh"
 
-WORK="$(mktemp -d)"
-# widen to the WORK2 receiver + signal arms (#283)
-trap 'rm -rf "${WORK:-}" "${WORK2:-}"' EXIT INT TERM
+WORK="$(work_new)"
 
 # Source the lib once per scenario (log() re-inits every call, but a
 # fresh shell keeps the scenarios independent and the assertions local).
@@ -111,7 +109,7 @@ else
 fi
 
 # Below the threshold: no rotation artifacts at all.
-WORK2="$(mktemp -d)"
+WORK2="$(work_new)"
 run_lib "$WORK2" 1048576 'log "small"' >/dev/null 2>&1
 if [ -f "$WORK2/log/kit.log" ] && [ ! -f "$WORK2/log/kit.log.1" ]; then
     pass "no rotation below the size threshold"

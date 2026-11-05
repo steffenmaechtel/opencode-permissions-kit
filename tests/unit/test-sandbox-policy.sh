@@ -376,9 +376,45 @@ fi
 # shipping the guard, not by scanning itself).
 trap_scan() {
     find "$1" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
-        awk -v f="$f" -v dq='"' -v sq="'" '
+        awk -v f="$f" -v dq='"' -v sq="'" -v wnames='work_new|work_new_file|work_register|work_register_var' '
+            function workline(s,  _i, _ch, _ins, _ind, _out) {
+                # the own-call view for check 4b: single-quoted spans
+                # blanked (X placeholder), trailing comment cut, double
+                # quotes kept -- a real suite calls work_* bare or inside
+                # "$( )"; single quotes carry child-code strings
+                # (meta-suite arm() lines) that run in children, where a
+                # trap statement of the parent file is irrelevant
+                _ins = 0; _ind = 0; _out = ""
+                for (_i = 1; _i <= length(s); _i++) {
+                    _ch = substr(s, _i, 1)
+                    if (!_ins && !_ind && _ch == "\\") {
+                        _out = _out _ch
+                        _i++
+                        if (_i <= length(s)) _out = _out substr(s, _i, 1)
+                        continue
+                    }
+                    if (_ch == sq && !_ind) { _ins = !_ins; continue }
+                    if (_ins) continue
+                    if (_ch == dq) { _ind = !_ind; _out = _out _ch; continue }
+                    if (_ch == "#" && !_ind) break
+                    _out = _out _ch
+                }
+                return _out
+            }
             /^[[:space:]]*#/ { next }
             /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="?[$][(](command[[:space:]]+)?mktemp/ { recv++ }
+            # work_* CALL detection (#395 check 4b): a call shape, not
+            # bare word presence -- `\$(name`, command position at line
+            # start, or after ; && ||. Description strings of pin labels
+            # ("the work_new receiver collected") carry the word without
+            # a call shape and must not flag. A function definition
+            # (`work_new() {`) is followed by "(" and matches no branch;
+            # lib/harness.sh defines but never calls. Scanned on the
+            # sq-blanked, comment-cut line (workline).
+            {
+                _wl = workline($0)
+                if (_wl ~ "(\\$\\(|^[[:space:]]*|;[[:space:]]*|&&[[:space:]]*|\\|\\|[[:space:]]*)(" wnames ")([[:space:]]|\\))") workcall++
+            }
             /^[[:space:]]*trap[[:space:]].*/ {
                 traps++
                 _ln = NR
@@ -412,6 +448,7 @@ trap_scan() {
             END {
                 if (recv > 0 && traps == 0) print f "|notrap"
                 if (arms != "") print f "|arms" arms
+                if (workcall > 0 && traps > 0) print f "|mixtrap"
             }
         ' "$f"
     done
@@ -440,6 +477,7 @@ if [ -s "$VIOL" ]; then
         case "$tk" in
             notrap) fail "$tf has mktemp receiver(s) but no trap statement (#283: register one, arms EXIT INT TERM)" ;;
             arms*) fail "$tf trap statement missing arms:${tk#arms } (#283: every trap needs EXIT INT TERM)" ;;
+            mixtrap) fail "$tf mixes work_* calls with a local trap (#395: the local trap disarms the harness registry -- drop one)" ;;
         esac
     done <"$VIOL"
 else
@@ -527,6 +565,32 @@ if grep -q 'test-probe-trap-sqbs.sh|arms.*no-INT' "$VIOL" && grep -q 'test-probe
     pass "self-probe: sq-final-backslash action — trailing comment does not satisfy arms (#287 d D1)"
 else
     fail "self-probe: sq-final-backslash + arm-naming comment must be flagged (#287 d D1)"
+fi
+# work_* call + local trap must be caught (#395 check 4b): the local
+# trap statement replaces the harness registry's central trap -- every
+# registered receiver leaks (the #283 class re-entered from the other
+# side). The work-only probe passes clean: no literal mktemp receiver
+# (work_new lives in the harness), the registry owns the cleanup.
+printf '#!/bin/sh\n# probe: work_new call + local trap must be caught (check 4b)\nW="$(work_new)"\ntrap "rm -rf \\"$W\\"" EXIT INT TERM\n' \
+    >"$PROBE_DIR/unit/test-probe-trap-mix.sh"
+printf '#!/bin/sh\n# probe: work_new without a local trap passes (registry owns cleanup)\nW="$(work_new)"\n' \
+    >"$PROBE_DIR/unit/test-probe-work-only.sh"
+printf '#!/bin/sh\n# probe: a trailing comment naming work_new must not count as a call\nW=1 # migrated via work_new in #395\ntrap "rm -rf \\"$W\\"" EXIT INT TERM\n' \
+    >"$PROBE_DIR/unit/test-probe-work-cmt.sh"
+printf '#!/bin/sh\n# probe: the function definition form is not a call\nwork_new() { :; }\n' \
+    >"$PROBE_DIR/unit/test-probe-work-def.sh"
+: >"$VIOL"
+trap_scan "$PROBE_DIR/unit" >"$VIOL" || true
+if grep -q 'test-probe-trap-mix.sh|mixtrap' "$VIOL"; then
+    pass "self-probe: work_new + local trap mix is caught"
+else
+    fail "self-probe: work_new + local trap must be caught (check 4b)"
+fi
+if grep -qE 'test-probe-(work-only|work-cmt|work-def)\.sh\|' "$VIOL"; then
+    fail "self-probe: work-only, comment-only and definition forms must pass clean"
+    grep -E 'test-probe-(work-only|work-cmt|work-def)' "$VIOL" || true
+else
+    pass "self-probe: work-only, comment-only and definition forms pass clean"
 fi
 # scan-target assert must fail loudly on a vanished directory (#287 a S3)
 _ts_probe=0

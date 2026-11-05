@@ -33,8 +33,7 @@ mode_is() {
     [ "$(stat -c %a "$1")" = "$2" ]
 }
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT INT TERM
+WORK="$(work_new)"
 LIBD="$WORK/libdir"
 
 # --- 1. happy path ----------------------------------------------------------
