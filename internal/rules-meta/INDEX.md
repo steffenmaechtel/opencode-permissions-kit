@@ -6,11 +6,11 @@
 > compares. Grouped by source file + section, derived from
 > each meta's `rule:` back-reference.
 
-**137 metas · 134 active · 3 retired · 1 review-pending · next due 2026-11-14**
+**137 metas · 134 active · 3 retired · 0 review-pending · next due 2026-11-14**
 
 ## Actionable
 
-- **Review pending:** RM-0137
+- **Review pending:** none
 - **Amended — pending:** none
 - **Overdue:** none
 
@@ -76,7 +76,7 @@
 | [RM-0042](0/0/4/RM-0042.md) | Mutation check — a mutating verb | active | approved | 1m | 2026-11-17 |
 | [RM-0043](0/0/4/RM-0043.md) | Real-tree ratchet — any path-shaped | active | approved | 1m | 2026-11-17 |
 | [RM-0044](0/0/4/RM-0044.md) | rm suffix guard — any rm invocation | active | approved | 1m | 2026-11-17 |
-| [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | **pending** | 1m | 2026-12-06 |
+| [RM-0137](0/1/3/RM-0137.md) | Scratch receivers in harness-sourcing suites… | active | approved | 1m | 2026-12-06 |
 
 ### Referencing review findings
 
