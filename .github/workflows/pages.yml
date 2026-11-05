@@ -25,6 +25,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write # delete this run's stale artifacts (re-run hygiene, issue #388)
 
 # Deployments are sequential state machines — an in-flight deploy must
 # not be cancelled halfway (official actions/deploy-pages pattern).
@@ -56,6 +57,24 @@ jobs:
         with:
           source: site
           destination: ./_site
+      # Re-run hygiene (issue #388, run 41893900784): artifacts survive a
+      # workflow re-run, and deploy-pages fails a run that carries more
+      # than one artifact named github-pages ("Artifact count is 2") — so
+      # re-running a failed pages run can never heal it. Delete THIS
+      # run's stale github-pages artifacts from earlier attempts before
+      # the fresh upload below (no-op on the first attempt).
+      - name: Delete stale github-pages artifacts from earlier attempts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
+            --paginate \
+            --jq '.artifacts[] | select(.name == "github-pages") | .id' |
+            while IFS= read -r artifact_id; do
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+              echo "deleted stale github-pages artifact ${artifact_id}"
+            done
       - uses: actions/upload-pages-artifact@v5
         with:
           path: ./_site
