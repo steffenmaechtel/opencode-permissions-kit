@@ -33,15 +33,6 @@ check_fail() {
     fi
 }
 
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        pass "$desc"
-    else
-        fail "$desc (expected [$expected] got [$actual])"
-    fi
-}
-
 WORK=$(mktemp -d)
 # widen to the bare HOSTS_WORK receiver (#283; arms were already complete)
 trap 'rm -rf "${WORK:-}" "${HOSTS_WORK:-}"' EXIT INT TERM

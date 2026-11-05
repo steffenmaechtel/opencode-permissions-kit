@@ -242,7 +242,7 @@ else
     pass "dev-owned flag: linked config.yaml not written through"
 fi
 check "dev-owned flag: skip is announced" \
-    echo "$FLAGOUT" | grep -qF "is a symlink"
+    sh -c 'printf "%s\n" "$1" | grep -qF "is a symlink"' _ "$FLAGOUT"
 # ... and a REAL config.yaml gets the flag (the function keeps working).
 mkdir -p "$WORK/flagproj2/.ddev"
 printf 'type: typo3\n' >"$WORK/flagproj2/.ddev/config.yaml"
@@ -276,7 +276,8 @@ check "handover_root: .ddev reaches chmod -R" \
 check "handover_root: scan-loop settings handover runs (web/typo3conf)" \
     grep -qxF "chown -R ocuser:ocgroup $WORK/hr/proj/web/typo3conf" "$OPS_HR_LOG"
 check "handover_root: handover echoed" \
-    echo "$OUT_HR" | grep -qF ".ddev handover: $WORK/hr/proj/.ddev -> ocuser"
+    sh -c 'printf "%s\n" "$1" | grep -qF "$2"' _ "$OUT_HR" \
+    ".ddev handover: $WORK/hr/proj/.ddev -> ocuser"
 # 0.0.45e W1 behavioral order pin: chmod walk before the chown hand-over.
 _or_chmod=$(grep -n "^chmod -R g+w $WORK/hr/proj/.ddev$" "$OPS_HR_LOG" | cut -d: -f1)
 _or_chown=$(grep -n "^chown -R ocuser:ocgroup $WORK/hr/proj/.ddev$" "$OPS_HR_LOG" | cut -d: -f1)

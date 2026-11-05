@@ -94,9 +94,12 @@ trap 'rm -f "$TMP" "$VIOL"; [ -n "${PROBE_DIR:-}" ] && rm -rf "$PROBE_DIR"' EXIT
 PROBE_DIR=""
 
 # scan <dir> -- writes "file|line|kind|token" violation rows to $VIOL.
+# The sourced test lib (tests/unit/lib/*.sh) is scanned like a suite --
+# it is runtime part of every suite that sources it (review #398 a F9:
+# the name glob alone let the lib escape the policy scan).
 scan() {
     _scan_dir="$1"
-    find "$_scan_dir" -name 'test-*.sh' ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
+    find "$_scan_dir" \( -name 'test-*.sh' -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
         awk -v f="$f" -v allow="$ALLOW" -v trees="$RATCHET_TREES" -v dq='"' -v sq="'" '
             function isbad(t) {
                 if (substr(t, 1, 1) != "/") return 0
@@ -302,7 +305,7 @@ fi
 # unit-scoped: e2e scripts legitimately name container paths
 # (/var/www/vhosts fixtures) that the real-tree ratchet would flag.
 sfx_scan() {
-    find "$1" -name "${2:-test-*.sh}" ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
+    find "$1" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
         grep -HnE 'rm( -[A-Za-z]+| "[^"]*"| [^";&| ]+)*( "\$[A-Za-z_][A-Za-z0-9_]*/| "\$\{[A-Za-z_][A-Za-z0-9_]*\}/| "\$[A-Za-z_][A-Za-z0-9_]*"/| \$[A-Za-z_][A-Za-z0-9_]*/| "\$[A-Za-z_][A-Za-z0-9_]*\.| "\$\{[A-Za-z_][A-Za-z0-9_]*\}\.| \$[A-Za-z_][A-Za-z0-9_]*\.)' "$f" | grep -Ev ':[0-9]+:[[:space:]]*#' || true
     done
 }
@@ -372,7 +375,7 @@ fi
 # This suite excludes itself like checks 1-2 (its own trap is pinned by
 # shipping the guard, not by scanning itself).
 trap_scan() {
-    find "$1" -name "${2:-test-*.sh}" ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
+    find "$1" \( -name "${2:-test-*.sh}" -o -path '*/lib/*.sh' \) ! -name 'test-sandbox-policy.sh' | sort | while IFS= read -r f; do
         awk -v f="$f" -v dq='"' -v sq="'" '
             /^[[:space:]]*#/ { next }
             /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*="?[$][(](command[[:space:]]+)?mktemp/ { recv++ }

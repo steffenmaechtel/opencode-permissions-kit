@@ -136,6 +136,33 @@ else
     fail "test-unit.yml: unit suite(s) without a run step:$_orphans"
 fi
 
+# Makefile test: chain parity (review #398 a F8): the CI side is pinned
+# above; this is the LOCAL make-test side -- a suite wired into the
+# workflow but missing from the test: chain runs in CI yet never under a
+# developer's `make test`. Resolves through recipes, not names: the pin
+# maps each suite file to the Makefile target whose recipe executes it
+# (test-parser -> test-jsonc-parser.sh is the one alias) and checks that
+# target's chain membership.
+_chain="$(sed -n 's/^test: //p' "$REPO/Makefile" | tr -s ' ' '\n')"
+_orphans=""
+for _t in "$REPO"/tests/unit/test-*.sh; do
+    _base="$(basename "$_t")"
+    _tgts="$(awk -v f="./tests/unit/$_base" '
+        /^[A-Za-z0-9_.-]+:/ { _n = $1; sub(":", "", _n) }
+        index($0, f) { print _n }
+    ' "$REPO/Makefile" | sort -u)"
+    _hit=0
+    for _g in $_tgts; do
+        printf '%s\n' "$_chain" | grep -qxF "$_g" && _hit=1
+    done
+    [ "$_hit" -eq 1 ] || _orphans="$_orphans $_base"
+done
+if [ -z "$_orphans" ]; then
+    pass "make test chain: every unit suite runs under make test (recipes resolved)"
+else
+    fail "make test chain: suite(s) no chain target executes:$_orphans"
+fi
+
 # Behavioral pin of the command-position rule itself (0.0.42e C2): an
 # argument-position .sh on a run: line must NOT count as executed.
 _FAKEWF="$(mktemp)"

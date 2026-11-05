@@ -42,15 +42,6 @@ check_fail() {
     fi
 }
 
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        pass "$desc"
-    else
-        fail "$desc (expected [$expected] got [$actual])"
-    fi
-}
-
 WORK=$(mktemp -d)
 # widen to the bare _w5dir/F3ROOT receivers + signal arms (#283)
 trap 'rm -rf "${WORK:-}" "${_w5dir:-}" "${F3ROOT:-}"' EXIT INT TERM

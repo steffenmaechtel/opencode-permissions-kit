@@ -129,6 +129,25 @@ has "Passed: 1" "check pass arm counts as a pass"
 arm 'check "cmd bad" false; suite_done demo'
 rc_is 1 "check with failing command -> red"
 has "cmd bad" "check fail arm carries the description"
+arm 'check "desc only, no command"; suite_done demo'
+rc_is 1 "check without a command fails loud (F6)"
+has "no command given" "empty-command check names the contract (F6)"
+
+# --- 5b. quoting shapes (F5, review #398 a) ---------------------------------------
+# The forms every real consumer uses: multi-word args with internal
+# spaces through check, empty and multi-word strings through assert_eq.
+# The bare arms above pass even under an unquoted-$@ regression; these
+# must catch it (sabotage: harness check with `if $@` -> the quoted
+# multi-word arm goes red because test re-parses the split words).
+arm 'check "quoted args survive" test "a b" = "a b"; suite_done demo'
+rc_is 0 "check keeps quoted multi-word args intact (F5)"
+has "Passed: 1" "quoted check pass arm counts (F5)"
+arm 'check "quoted args mismatch" test "a b" = "a c"; suite_done demo'
+rc_is 1 "check multi-word mismatch -> red (F5)"
+arm 'assert_eq "empty strings" "" ""; suite_done demo'
+rc_is 0 "assert_eq empty equals empty (F5)"
+arm 'assert_eq "two words" "a b" "a b"; suite_done demo'
+rc_is 0 "assert_eq multi-word expected/actual (F5)"
 
 # --- 6. mixed tally (integration) -------------------------------------------------
 arm 'pass a; pass b; pass c; fail x; fail y; suite_done demo'

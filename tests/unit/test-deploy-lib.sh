@@ -16,8 +16,11 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
-# Shared harness (issue #394): pass/fail, colors, counters
-# (and check/assert_eq where present) live in lib/harness.sh now.
+# Shared harness (issue #394): pass/fail, colors, counters live in
+# lib/harness.sh now. The local check() below deliberately SHADOWS the
+# harness form -- it suppresses the checked command's output; keep it
+# (review #398 a F2: the shadow is intentional, the generic wording was
+# false here).
 . "$SCRIPT_DIR/lib/harness.sh"
 
 check() {

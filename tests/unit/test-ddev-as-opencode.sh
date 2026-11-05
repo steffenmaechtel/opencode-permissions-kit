@@ -54,15 +54,6 @@ check_fail() {
     fi
 }
 
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        pass "$desc"
-    else
-        fail "$desc (expected [$expected] got [$actual])"
-    fi
-}
-
 TMPDIR=$(mktemp -d)
 # widen to every bare receiver of the suite + signal arms (#283): the
 # WF/SH/DF/CONF/VCHAIN/HWORK/BH/DFH/RN/DWORK/RACE/_112_dir families

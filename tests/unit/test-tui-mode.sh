@@ -29,8 +29,11 @@ INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
-# Shared harness (issue #394): pass/fail, colors, counters
-# (and check/assert_eq where present) live in lib/harness.sh now.
+# Shared harness (issue #394): pass/fail, colors, counters live in
+# lib/harness.sh now. The local check() below deliberately SHADOWS the
+# harness form -- it suppresses the checked command's output; keep it
+# (review #398 a F2: the shadow is intentional, the generic wording was
+# false here).
 . "$REPO/tests/unit/lib/harness.sh"
 
 check() {
