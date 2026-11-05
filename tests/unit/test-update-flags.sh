@@ -11,31 +11,15 @@
 # Run: sh tests/unit/test-update-flags.sh
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 UPDATE="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/update.sh"
 KIT="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/bin/opk"
 TUIPLUGIN="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 CLI_MD="$SCRIPT_DIR/../../docs/reference/cli.md"
 
-failures=0
-passed=0
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-check() {
-    _d="$1"
-    shift
-    if "$@"; then pass "$_d"; else fail "$_d"; fi
-}
+# Shared harness (issue #394 adoption): pass/fail, colors, counters
+# and the summary gate live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 WORK="$(mktemp -d)"
 # Widen the trap to every bare receiver of the suite (#283): DL, F5,
@@ -1318,11 +1302,4 @@ grep -qF 'ui_detail "sudoers re-deploy skipped' "$UPDATE" &&
     }
 
 # --- Summary ----------------------------------------------------------------------
-echo ""
-echo "===================================="
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All tests passed."
+suite_done "tests"

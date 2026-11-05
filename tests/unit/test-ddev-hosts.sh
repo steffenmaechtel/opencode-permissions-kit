@@ -8,10 +8,6 @@
 # Run: sh tests/unit/test-ddev-hosts.sh
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILES="$SCRIPT_DIR/../../files"
 HOSTS="$FILES/opencode-permissions-kit-lib/sh/ddev-hosts.sh"
@@ -23,27 +19,9 @@ DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-
-check() {
-    local desc="$1"
-    shift
-    if "$@"; then
-        pass "$desc"
-    else
-        fail "$desc"
-    fi
-}
+# Shared harness (issue #394 adoption): pass/fail, colors, counters
+# and the summary gate live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 check_fail() {
     local desc="$1"
@@ -294,13 +272,4 @@ check "hostname mode: clean hostname reaches ddev hostname" \
 rm -rf "$HOSTS_WORK"
 
 # --- Summary -----------------------------------------------------------------------
-
-echo ""
-echo "======================================="
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All tests passed."
-echo ""
+suite_done "tests"

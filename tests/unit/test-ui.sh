@@ -5,34 +5,12 @@
 # No root required. Run: sh tests/unit/test-ui.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 UI="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/ui.sh"
 
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-
-check() {
-    local desc="$1"
-    shift
-    if "$@"; then
-        pass "$desc"
-    else
-        fail "$desc"
-    fi
-}
+# Shared harness (issue #394 adoption): pass/fail, colors, counters
+# and the summary gate live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 # ui_ask/ui_menu/ui_confirm read /dev/tty FIRST (design: prompts survive
 # `curl | bash` installs with redirected stdin). On an interactive terminal
@@ -254,12 +232,4 @@ check "NO_COLOR=1 keeps counting" \
     sh -c "printf %s \"\$1\" | grep -q 'WARN=1'" _ "$out"
 
 # --- Summary --------------------------------------------------------------------------------------------
-echo ""
-echo "===================================="
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All tests passed."
-echo ""
+suite_done "tests"
