@@ -54,8 +54,14 @@ bad() {
 # above: the main shell never sources the harness under test). The cell
 # child scripts are printf-written into scratch with literal "$" text --
 # embedded child scripts, the sandbox floor's documented invisible shape:
-# child scripts own their cleanup, the floor does not scan them.
-trap 'rm -rf "${_lc_iso:-}" "${_sig_iso:-}" "${_sig_scratch:-}"; rm -f "${_lc_cell:-}" "${_sig_out:-}"' EXIT INT TERM
+# child scripts own their cleanup, the floor does not scan them. Function
+# form: the receiver list does not fit one line and the floor reads the
+# arms off the trap's physical line.
+_meta_cleanup() {
+    rm -rf "${_lc_iso:-}" "${_lc_cell:-}" "${_sig_iso:-}" \
+        "${_sig_scratch:-}" "${_af_out:-}" "${_af_cell:-}" "${_sig_out:-}"
+}
+trap _meta_cleanup EXIT INT TERM
 
 # arm <code>: source the harness in a child sh and eval the code;
 # captures the child's rc and combined output. Every pin below reads
@@ -304,6 +310,28 @@ if [ "$_sig_left" = 0 ] && [ "$_sig_el" -lt 10 ]; then
     ok "signal window: TERM lands, registry collects (zero leftovers, ${_sig_el}s)"
 else
     bad "signal window: TERM must collect within the window (left=$_sig_left elapsed=${_sig_el}s)"
+fi
+
+# Append-failure arm (L1: every fail-loud spot gets a pin that executes
+# the failure path): the registry path blocked by a directory while
+# mktemp still works. work_new must fail loud (rc 1, stderr names the
+# registry) AND remove the created receiver again -- no unregistered
+# scratch may survive a failed registration. The _work_emit message
+# covers all three append sites (work_new, work_register, var) -- the
+# mechanism is one, the pin drives it.
+_af_out="$(mktemp -d)"
+_af_cell="$(mktemp)"
+printf '#!/bin/sh\n. "$1"\nmkdir "${TMPDIR:-/tmp}/opk-work-reg.$$"\nset -e\nW="$(work_new)"\necho unreachable\n' \
+    >"$_af_cell"
+_af_rc=0
+TMPDIR="$_af_out" sh "$_af_cell" "$HARNESS" >/dev/null 2>&1 || _af_rc=$?
+_af_left="$(find "$_af_out" -mindepth 1 ! -name 'opk-work-reg.*' | wc -l | tr -d ' ')"
+rm -rf -- "$_af_out"
+rm -f -- "$_af_cell"
+if [ "$_af_rc" = 1 ] && [ "$_af_left" = 0 ]; then
+    ok "append failure: loud rc 1, receiver removed (no unregistered scratch)"
+else
+    bad "append failure must be loud rc 1 with the receiver removed (rc=$_af_rc left=$_af_left)"
 fi
 
 # --- summary gate (independent on purpose -- see header) ------------------------
