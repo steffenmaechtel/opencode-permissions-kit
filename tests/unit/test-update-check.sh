@@ -13,10 +13,6 @@
 # Run: sh tests/unit/test-update-check.sh
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$SCRIPT_DIR/../.."
 LIB="$REPO/files/opencode-permissions-kit-lib/sh/update-check.sh"
@@ -25,17 +21,9 @@ STATUS="$REPO/files/opencode-permissions-kit-lib/management/status.sh"
 INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
-
-failures=0
-passed=0
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 if [ -f "$LIB" ]; then
     # shellcheck disable=SC1090  # the shipped lib under test

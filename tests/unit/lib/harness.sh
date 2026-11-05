@@ -48,8 +48,10 @@
 #      run_ui stay local; centralizing them is framework creep, the
 #      ShellSpec rejection reason in #255).
 #
-# Part of the shfmt + shellcheck gate scope (Makefile SHFMT_TEST_FILES
-# covers every tracked tests/*.sh).
+# Gate scope (review #398 a F4): part of the SHFMT gate -- Makefile
+# SHFMT_TEST_FILES covers every tracked tests/*.sh, this file included.
+# shellcheck covers files/ + scripts/ only (SHELLCHECK_FILES); this lib
+# is NOT in the shellcheck gate.
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -70,6 +72,13 @@ fail() {
 check() {
     local desc="$1"
     shift
+    # review #398 a F6: an empty command must fail loud, not silently
+    # pass (a conversion slip dropping the command word would otherwise
+    # record a vacuous PASS).
+    if [ "$#" -eq 0 ]; then
+        fail "$desc (check: no command given)"
+        return
+    fi
     if "$@"; then
         pass "$desc"
     else

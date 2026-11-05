@@ -17,28 +17,15 @@
 # Run: sh tests/unit/test-workflows.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 WF_TEST="$REPO/.github/workflows/test-unit.yml"
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$REPO/tests/unit/lib/harness.sh"
 WF_E2E="$REPO/.github/workflows/test-e2e.yml"
 WF_DDEV_E2E="$REPO/.github/workflows/test-e2e-ddev.yml"
 WF_ADVISORY="$REPO/.github/workflows/advisory-watch.yml"
 WF_PAGES="$REPO/.github/workflows/pages.yml"
-
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
 
 TMP_REQ="$(mktemp)"
 TMP_755="$(mktemp)"
@@ -147,6 +134,33 @@ if [ -z "$_orphans" ]; then
     pass "test-unit.yml: every unit suite on disk has a run step"
 else
     fail "test-unit.yml: unit suite(s) without a run step:$_orphans"
+fi
+
+# Makefile test: chain parity (review #398 a F8): the CI side is pinned
+# above; this is the LOCAL make-test side -- a suite wired into the
+# workflow but missing from the test: chain runs in CI yet never under a
+# developer's `make test`. Resolves through recipes, not names: the pin
+# maps each suite file to the Makefile target whose recipe executes it
+# (test-parser -> test-jsonc-parser.sh is the one alias) and checks that
+# target's chain membership.
+_chain="$(sed -n 's/^test: //p' "$REPO/Makefile" | tr -s ' ' '\n')"
+_orphans=""
+for _t in "$REPO"/tests/unit/test-*.sh; do
+    _base="$(basename "$_t")"
+    _tgts="$(awk -v f="./tests/unit/$_base" '
+        /^[A-Za-z0-9_.-]+:/ { _n = $1; sub(":", "", _n) }
+        index($0, f) { print _n }
+    ' "$REPO/Makefile" | sort -u)"
+    _hit=0
+    for _g in $_tgts; do
+        printf '%s\n' "$_chain" | grep -qxF "$_g" && _hit=1
+    done
+    [ "$_hit" -eq 1 ] || _orphans="$_orphans $_base"
+done
+if [ -z "$_orphans" ]; then
+    pass "make test chain: every unit suite runs under make test (recipes resolved)"
+else
+    fail "make test chain: suite(s) no chain target executes:$_orphans"
 fi
 
 # Behavioral pin of the command-position rule itself (0.0.42e C2): an

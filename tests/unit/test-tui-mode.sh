@@ -17,10 +17,6 @@
 # Run: sh tests/unit/test-tui-mode.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 TUIPLUGIN="$REPO/files/opencode-permissions-kit-lib/sh/tui-plugin.sh"
 STAGEDWRITE="$REPO/files/opencode-permissions-kit-lib/sh/staged-write.sh"
@@ -33,18 +29,12 @@ INSTALL="$REPO/files/install.sh"
 UPDATE="$REPO/files/opencode-permissions-kit-lib/management/update.sh"
 DEPLOYLIB="$REPO/files/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 UNINSTALL="$REPO/files/opencode-permissions-kit-lib/management/uninstall.sh"
-
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
+# Shared harness (issue #394): pass/fail, colors, counters live in
+# lib/harness.sh now. The local check() below deliberately SHADOWS the
+# harness form -- it suppresses the checked command's output; keep it
+# (review #398 a F2: the shadow is intentional, the generic wording was
+# false here).
+. "$REPO/tests/unit/lib/harness.sh"
 
 check() {
     desc="$1"

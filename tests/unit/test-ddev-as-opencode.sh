@@ -15,10 +15,6 @@
 # Run: sh tests/unit/test-ddev-as-opencode.sh
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILES="$SCRIPT_DIR/../../files"
 HELPER="$FILES/opencode-permissions-kit-lib/bin/ddev-as-opencode"
@@ -31,6 +27,9 @@ CONFIG="$FILES/opencode-permissions-kit-lib/management/config.sh"
 DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 KIT="$FILES/opencode-permissions-kit-lib/bin/opk"
 HANDOVER="$FILES/opencode-permissions-kit-lib/sh/ddev-handover.sh"
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 # Hermetic dev-owned checks: never read this machine's real install.conf
 # (ddev_devowned_enabled falls back to the stamp) — point it at nothing.
 OPK_INSTALL_CONF="/nonexistent-opk-test-install.conf"
@@ -39,33 +38,11 @@ STATUS="$FILES/opencode-permissions-kit-lib/management/status.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
 
-failures=0
-passed=0
-
 # Deterministic fixture modes (issue #112): the handover's top-inode fast
 # path skips chown -R/chmod -R (and its echo) on already-conforming
 # trees — under a developer's umask 002 freshly mkdir'ed dirs would
 # conform immediately and flip the first-run assertions below.
 umask 022
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-
-check() {
-    local desc="$1"
-    shift
-    if "$@"; then
-        pass "$desc"
-    else
-        fail "$desc"
-    fi
-}
 
 check_fail() {
     local desc="$1"
@@ -74,15 +51,6 @@ check_fail() {
         fail "$desc (expected absence, got a match)"
     else
         pass "$desc"
-    fi
-}
-
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        pass "$desc"
-    else
-        fail "$desc (expected [$expected] got [$actual])"
     fi
 }
 

@@ -9,35 +9,12 @@
 # edges must handle both eras. Run: sh tests/unit/test-reviews-meta-aggregate.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$REPO/scripts/reviews-meta-aggregate.py"
 OLD_DATA="$REPO/internal/reviews-meta/2026-10-10/data"
-
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-
-check() {
-    desc="$1"
-    shift
-    if "$@"; then
-        pass "$desc"
-    else
-        fail "$desc"
-    fi
-}
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$REPO/tests/unit/lib/harness.sh"
 
 WORK="$(mktemp -d /tmp/opencode-test-meta-aggregate.XXXXXX)"
 # Trap the receiver on exit and signals (#283): the suite had no trap

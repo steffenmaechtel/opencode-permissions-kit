@@ -17,10 +17,6 @@
 # Run: sh tests/unit/test-ddev-migrate.sh
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FILES="$SCRIPT_DIR/../../files"
 MIG="$FILES/opencode-permissions-kit-lib/sh/ddev-migrate.sh"
@@ -32,27 +28,9 @@ DEPLOYLIB="$FILES/opencode-permissions-kit-lib/sh/deploy-lib.sh"
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
 
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-
-check() {
-    local desc="$1"
-    shift
-    if "$@"; then
-        pass "$desc"
-    else
-        fail "$desc"
-    fi
-}
+# Shared harness (issue #394 adoption): pass/fail, colors, counters
+# and the summary gate live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 check_fail() {
     local desc="$1"
@@ -61,15 +39,6 @@ check_fail() {
         fail "$desc (expected absence, got a match)"
     else
         pass "$desc"
-    fi
-}
-
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        pass "$desc"
-    else
-        fail "$desc (expected [$expected] got [$actual])"
     fi
 }
 
@@ -1010,13 +979,4 @@ rm -rf "$F3ROOT"
 # Cleanup the fixture sandbox root. Unit-test policy (0.0.42e C1): suites
 # touch only their scratch and /tmp,/var/tmp -- never real project trees.
 rm -rf /var/tmp/opencode-ddev-mig-roots 2>/dev/null || true
-
-echo ""
-echo "========================================"
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All tests passed."
-echo ""
+suite_done "tests"

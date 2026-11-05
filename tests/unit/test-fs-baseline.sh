@@ -15,10 +15,6 @@
 # Run: sh tests/unit/test-fs-baseline.sh
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LIB="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/sh/fs-baseline.sh"
 INSTALL="$SCRIPT_DIR/../../files/install.sh"
@@ -27,22 +23,9 @@ CONFIG="$SCRIPT_DIR/../../files/opencode-permissions-kit-lib/management/config.s
 MAKEFILE="$SCRIPT_DIR/../../Makefile"
 TEST_CI="$SCRIPT_DIR/../../.github/workflows/test-unit.yml"
 
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-
-assert_eq() {
-    _d="$1" _e="$2" _a="$3"
-    if [ "$_e" = "$_a" ]; then pass "$_d"; else fail "$_d (expected [$_e] got [$_a])"; fi
-}
+# Shared harness (issue #394 adoption): pass/fail, colors, counters
+# and the summary gate live in lib/harness.sh now.
+. "$SCRIPT_DIR/lib/harness.sh"
 
 WORK=$(mktemp -d)
 # Widen the trap to every bare receiver of the suite (#283): TR, V9ROOT,
@@ -1082,12 +1065,4 @@ else
 fi
 
 # --- Summary ---------------------------------------------------------------------------
-echo ""
-echo "================================================="
-echo "  ${GREEN}Passed: $passed${NC}"
-if [ "$failures" -gt 0 ]; then
-    echo "  ${RED}Failed: $failures${NC}"
-    exit 1
-fi
-echo "  All tests passed."
-echo ""
+suite_done "tests"

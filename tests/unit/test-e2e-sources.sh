@@ -9,33 +9,11 @@
 # Run: sh tests/unit/test-e2e-sources.sh
 set -u
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
 LIB="$(cd "$(dirname "$0")/../e2e" && pwd)/lib.sh"
 
-failures=0
-passed=0
-
-pass() {
-    echo "  ${GREEN}PASS${NC}  $1"
-    passed=$((passed + 1))
-}
-fail() {
-    echo "  ${RED}FAIL${NC}  $1"
-    failures=$((failures + 1))
-}
-
-check() {
-    local desc="$1"
-    shift
-    if "$@"; then
-        pass "$desc"
-    else
-        fail "$desc"
-    fi
-}
+# Shared harness (issue #394): pass/fail, colors, counters
+# (and check/assert_eq where present) live in lib/harness.sh now.
+. "$(cd "$(dirname "$0")" && pwd)/lib/harness.sh"
 
 grep_q() { grep -q "$@" "$LIB"; }
 
